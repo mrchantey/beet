@@ -363,10 +363,10 @@ impl NodeRenderer for MarkdownRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError> {
+	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Markdown])?;
 		cx.walk(self);
-		RenderOutput::media_string(
+		MediaBytes::new_string(
 			MediaType::Markdown,
 			core::mem::take(&mut self.state.buffer),
 		)

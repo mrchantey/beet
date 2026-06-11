@@ -121,7 +121,7 @@ impl MediaRenderer {
 		&mut self,
 		cx: &mut RenderContext,
 		media_type: &MediaType,
-	) -> Result<Option<RenderOutput>, RenderError> {
+	) -> Result<Option<MediaBytes>, RenderError> {
 		// Build a context with empty accepts so sub-renderers don't
 		// reject based on the original accepts list.
 		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
@@ -164,7 +164,7 @@ impl NodeRenderer for MediaRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError> {
+	) -> Result<MediaBytes, RenderError> {
 		// a one-shot render (eg per-request SSR) happens between frames, so the
 		// `@` bindings built with the tree have not synced yet: settle the
 		// document sync chain so every binding renders its current value.

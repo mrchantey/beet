@@ -355,7 +355,7 @@ pub fn flex_layout_rects(
 	let flexbox = node.flexbox();
 
 	let box_model = BoxModel::from_node(node, viewport);
-	let content_rect = scrollport_of(node, box_model.content_rect(container_rect));
+	let content_rect = scrollport_of(node, query, box_model.content_rect(container_rect));
 	// flex math works in unsigned cell sizes; the signed content rect origin is
 	// re-added when each child rect is placed.
 	let available = UVec2::new(

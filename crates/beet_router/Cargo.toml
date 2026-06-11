@@ -42,6 +42,9 @@ postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_action/serde", "beet_net/serde"]
 markdown = ["std", "dep:pulldown-cmark"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
+# The live, interactive terminal target: the charcell TUI host + stdio terminal,
+# behind which the in-world `Navigator` browses the app's own routes (`TuiServer`).
+terminal = ["std", "beet_ui/terminal"]
 http = ["std", "beet_net/server"]
 # The server-to-client websocket channel (`ClientIo`) and the dev-mode
 # `LiveReload` watcher built on it. Native-only: no HTTP backend supports

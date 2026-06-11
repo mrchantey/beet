@@ -3,24 +3,23 @@ use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
 use thiserror::Error;
 
-/// Renders an entity tree into a [`RenderOutput`].
+/// Renders an entity tree into serialized [`MediaBytes`].
 ///
 /// Implementors walk the entity tree rooted at `cx.entity` using
-/// `cx.walk()` and produce either serialized [`MediaBytes`] or a
-/// [`RenderOutput::Stateful`] signal for persistent renderers.
+/// `cx.walk()` and produce the serialized bytes for their media type.
 pub trait NodeRenderer {
 	/// Render the entity tree described by `cx`.
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError>;
+	) -> Result<MediaBytes, RenderError>;
 
 
 	fn run(
 		&mut self,
 		entity: &mut EntityWorldMut,
 		accepts: Vec<MediaType>,
-	) -> Result<RenderOutput, RenderError> {
+	) -> Result<MediaBytes, RenderError> {
 		let id = entity.id();
 		entity.world_scope(|world| {
 			self.render(
@@ -123,90 +122,3 @@ impl From<BevyError> for RenderError {
 	fn from(err: BevyError) -> Self { RenderError::Other(err) }
 }
 
-/// The result of a [`NodeRenderer::render`] call.
-#[derive(Debug)]
-pub enum RenderOutput {
-	/// The render produced typed bytes, ie html, markdown, json.
-	Media(MediaBytes),
-	/// The renderer is stateful (ie a persistent UI) and completed
-	/// its render pass, which may or may not have changed the display.
-	Stateful,
-}
-
-impl RenderOutput {
-	/// Convenience constructor for a [`RenderOutput::Media`] with the given
-	/// media type and UTF-8 string content.
-	pub fn media_string(media_type: MediaType, content: String) -> Self {
-		Self::Media(MediaBytes::new_string(media_type, content))
-	}
-
-	/// Returns the inner [`MediaBytes`] if this is a [`RenderOutput::Media`].
-	pub fn media_bytes(&self) -> Option<&MediaBytes> {
-		match self {
-			Self::Media(mb) => Some(mb),
-			Self::Stateful => None,
-		}
-	}
-
-	/// Returns `true` if this is a [`RenderOutput::Media`] variant.
-	pub fn is_media(&self) -> bool { matches!(self, Self::Media(_)) }
-
-	/// Returns `true` if this is a [`RenderOutput::Stateful`] variant.
-	pub fn is_stateful(&self) -> bool { matches!(self, Self::Stateful) }
-}
-
-impl core::fmt::Display for RenderOutput {
-	fn fmt(
-		&self,
-		formatter: &mut core::fmt::Formatter<'_>,
-	) -> core::fmt::Result {
-		match self {
-			Self::Media(mb) => write!(formatter, "{mb}"),
-			Self::Stateful => write!(formatter, "Stateful"),
-		}
-	}
-}
-
-
-#[cfg(test)]
-mod test {
-	use super::*;
-
-	#[beet_core::test]
-	fn display_media_utf8() {
-		RenderOutput::media_string(MediaType::Html, "hello".into())
-			.to_string()
-			.xpect_eq("hello".to_string());
-	}
-
-	#[beet_core::test]
-	fn display_media_binary() {
-		RenderOutput::Media(MediaBytes::new(MediaType::Bytes, vec![
-			0xFF, 0xFE,
-		]))
-		.to_string()
-		.xpect_eq("<2 bytes of application/octet-stream>".to_string());
-	}
-
-	#[beet_core::test]
-	fn display_stateful() {
-		RenderOutput::Stateful
-			.to_string()
-			.xpect_eq("Stateful".to_string());
-	}
-
-	#[beet_core::test]
-	fn as_str_media() {
-		RenderOutput::media_string(MediaType::Text, "hello".into())
-			.to_string()
-			.xpect_eq("hello");
-	}
-
-	#[beet_core::test]
-	fn media_bytes_accessor() {
-		let output =
-			RenderOutput::media_string(MediaType::Json, r#"{"a":1}"#.into());
-		output.media_bytes().is_some().xpect_true();
-		RenderOutput::Stateful.media_bytes().is_none().xpect_true();
-	}
-}

@@ -64,7 +64,7 @@ impl NodeRenderer for PlainTextRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError> {
+	) -> Result<MediaBytes, RenderError> {
 		if self.plaintext_only {
 			cx.check_accepts(&[MediaType::Text])?;
 		} else if !cx.accepts.is_empty()
@@ -76,7 +76,7 @@ impl NodeRenderer for PlainTextRenderer {
 			});
 		}
 		cx.walk(self);
-		RenderOutput::media_string(
+		MediaBytes::new_string(
 			MediaType::Text,
 			core::mem::take(&mut self.buffer),
 		)

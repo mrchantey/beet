@@ -106,8 +106,11 @@ pub fn resolve_styles(
 				queue.extend(children_list.into_iter().cloned());
 			}
 			// follow a `RenderRef` holder into the content it renders in place, so
-			// transcluded content re-resolves under this (layout) cascade.
-			if let Ok(render_ref) = render_refs.get(entity) {
+			// transcluded content re-resolves under this (layout) cascade. An
+			// unresolved holder (placeholder, ie no page yet) has no content.
+			if let Ok(render_ref) = render_refs.get(entity)
+				&& render_ref.0 != Entity::PLACEHOLDER
+			{
 				queue.push(render_ref.0);
 			}
 		}

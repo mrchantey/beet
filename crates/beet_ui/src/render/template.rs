@@ -12,22 +12,22 @@ impl NodeRenderer for TemplateRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError> {
+	) -> Result<MediaBytes, RenderError> {
 		for accepts in &cx.accepts {
 			match accepts {
 				#[cfg(feature = "json")]
 				MediaType::Json => {
-					let media_bytes = TemplateSaver::new()
+					return TemplateSaver::new()
 						.with_entity_tree(cx.world, cx.entity)
-						.save(cx.world, MediaType::Json)?;
-					return RenderOutput::Media(media_bytes).xok();
+						.save(cx.world, MediaType::Json)?
+						.xok();
 				}
 				#[cfg(feature = "postcard")]
 				MediaType::Postcard => {
-					let media_bytes = TemplateSaver::new()
+					return TemplateSaver::new()
 						.with_entity_tree(cx.world, cx.entity)
-						.save(cx.world, MediaType::Postcard)?;
-					return RenderOutput::Media(media_bytes).xok();
+						.save(cx.world, MediaType::Postcard)?
+						.xok();
 				}
 				_ => {}
 			}

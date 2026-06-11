@@ -117,7 +117,7 @@ pub(super) fn resolve_contexts(
 		let child_clip = if node.is_scroll_container() {
 			// clip content to the scrollport so it never paints under the bar
 			let scrollport =
-				translate_rect(scrollport_rect(&node, viewport), cx.offset);
+				translate_rect(scrollport_rect(&node, query, viewport), cx.offset);
 			Clip(cx.clip.intersect(scrollport))
 		} else if node.layout_style().clips() {
 			let padding_box =
@@ -187,23 +187,10 @@ fn paint_node(
 	}
 
 	// 4. A scroll container paints its track/thumb in the reserved gutter, fixed
-	//    to the container (not scrolled with the content).
+	//    to the container (not scrolled with the content). The shared geometry
+	//    (read here and by the mouse hit-test) is derived from the screen offset.
 	if node.is_scroll_container() {
-		let scrollport = scrollport_of(node, box_model.content_rect(layout_rect));
-		let gutters = node_gutters(node, box_model.content_rect(layout_rect));
-		if gutters.any() {
-			let state = scroll_state(node, query, viewport);
-			paint_scrollbar(
-				&mut *buffer,
-				node.entity,
-				gutters,
-				scrollport,
-				state,
-				node.scroll_offset(),
-				node.scrollbar_style(),
-				cx.clip,
-			);
-		}
+		paint_scrollbar(&mut *buffer, node, query, viewport, cx.offset, cx.clip);
 	}
 
 	Ok(())

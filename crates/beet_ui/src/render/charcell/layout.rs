@@ -138,7 +138,7 @@ pub fn block_layout_rects(
 	let box_model = BoxModel::from_node(node, viewport);
 	// a scroll container reserves its scrollbar gutter, so children flow within
 	// the scrollport (content rect minus gutter), reflowing around the bar.
-	let content_rect = scrollport_of(node, box_model.content_rect(container_rect));
+	let content_rect = scrollport_of(node, query, box_model.content_rect(container_rect));
 	let containing = UVec2::new(
 		content_rect.width().max(0) as u32,
 		content_rect.height().max(0) as u32,
@@ -204,7 +204,7 @@ pub fn inline_layout_rects(
 	layout_rects: &mut HashMap<Entity, IRect>,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
-	let content_rect = scrollport_of(node, box_model.content_rect(container_rect));
+	let content_rect = scrollport_of(node, query, box_model.content_rect(container_rect));
 	let max_width = content_rect.width().max(0) as u32;
 
 	// Form rows: greedily pack children left-to-right, wrapping as needed
@@ -439,6 +439,7 @@ fn sticky_clamp(
 		.unwrap_or_else(|| scroller.layout_rect());
 	let scrollport = scrollport_of(
 		&scroller,
+		query,
 		BoxModel::from_node(&scroller, viewport).content_rect(scroller_rect),
 	);
 	let offset = scroller.scroll_offset();

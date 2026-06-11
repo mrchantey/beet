@@ -49,7 +49,11 @@ impl Plugin for CharcellTuiPlugin {
 			// SIGWINCH-equivalent: poll the real tty size and resize stdio buffers.
 			.add_systems(PreUpdate, resize_stdio_buffers)
 			// hit-test + scroll input ride the bridged bevy mouse/key messages.
-			.add_systems(Update, (pointer_input, scroll_input, exit_on_ctrl_c))
+			// scrollbar_mouse claims gutter presses; others fall through to pointer_input.
+			.add_systems(
+				Update,
+				(pointer_input, scroll_input, scrollbar_mouse, exit_on_ctrl_c),
+			)
 			// exactly one primary pointer for the hit-test (Task 09) to read.
 			.add_systems(Startup, spawn_primary_pointer);
 	}

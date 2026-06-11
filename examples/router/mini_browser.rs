@@ -1,10 +1,9 @@
 //! A tiny in-terminal web browser shell on the charcell renderer.
 //!
 //! Parses HTML and markdown only (no SPAs, no heavy css/js). It hosts a
-//! [`Navigator`] and a live-render host ([`LiveScenePlugin`]) that paints the
-//! active route
-//! ([`CurrentScene`]) into a persistent [`DoubleBuffer`], with an editable URL
-//! bar and back/forward keys.
+//! [`Navigator`] on the HTTP transport and a live-render host ([`LivePagePlugin`])
+//! that paints the active route ([`CurrentPage`]) into a persistent
+//! [`DoubleBuffer`], with an editable URL bar and back/forward keys.
 //!
 //! ```sh
 //! cargo run --example mini_browser --features _mini_browser -- https://wikipedia.org
@@ -25,10 +24,10 @@ fn main() {
 			MinimalPlugins,
 			// the live terminal host: charcell render + input bridge + repaint.
 			CharcellTuiPlugin,
-			// link-click navigation + the single-active-scene invariant.
+			// link-click navigation + the single-active-page invariant.
 			NavigatorPlugin,
-			// paint the active CurrentScene route into the host DoubleBuffer.
-			LiveScenePlugin,
+			// paint the active CurrentPage route into the host DoubleBuffer.
+			LivePagePlugin,
 			AsyncPlugin::default(),
 		))
 		.add_systems(PreUpdate, (url_bar_enter, history_keys))
@@ -44,8 +43,10 @@ fn setup(mut commands: Commands) {
 		.cloned()
 		.unwrap_or_else(|| "https://example.com".to_string());
 
-	// the live host paints the active route; the Navigator drives navigation.
-	commands.spawn(live_scene_host(terminal_ext::size()));
+	// the live host paints the active route; the Navigator drives navigation over
+	// the HTTP transport (remote URLs). The StdioTerminal shares the host entity so
+	// `render_terminal` paints its DoubleBuffer to the real terminal.
+	commands.spawn((StdioTerminal::default(), page_host(terminal_ext::size())));
 	commands.spawn(Navigator::new(Url::parse(&url)));
 	// an editable URL bar bound to the document field `url`.
 	commands.spawn((Document::new(val!({ "url": url })), children![

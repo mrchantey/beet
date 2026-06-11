@@ -9,7 +9,6 @@
 use super::*;
 use crate::prelude::*;
 use crate::style::Overflow;
-use crate::style::ScrollbarStyle;
 use crate::style::ScrollbarWidth;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
@@ -71,38 +70,56 @@ pub(super) fn scroll_state(
 	query: &CharcellQuery,
 	viewport: UVec2,
 ) -> ScrollState {
-	let scrollport = scrollport_rect(node, viewport);
+	let scrollport = scrollport_rect(node, query, viewport);
 	let scrollport_size = UVec2::new(
 		scrollport.width().max(0) as u32,
 		scrollport.height().max(0) as u32,
 	);
-	// union the children's extents in the scrollport's coordinate space. Each
-	// child's scrollable extent is its laid-out rect grown to its unconstrained
-	// intrinsic size: block layout clamps a child's width (and an explicit-height
-	// container clamps its own height), but the scroll overflow region is the
-	// content's natural size, so a non-wrapping `<pre>` overflows horizontally and
-	// a tall column overflows vertically.
-	let mut content = scrollport_size;
+	ScrollState::new(scroll_content_size(node, query, scrollport), scrollport_size)
+}
+
+/// The natural size of a scroll container's content, in cells: the union of its
+/// children's extents measured from `origin`'s top-left, each child's extent its
+/// laid-out rect grown to its unconstrained [`IntrinsicSize`].
+///
+/// This is the *content* a scrollbar measures against, not the container's own
+/// [`IntrinsicSize`], which an explicit `height` clamps to the box (defeating the
+/// `auto` overflow check). A non-wrapping `<pre>` overflows horizontally, a tall
+/// column vertically. A container with only inline/text content (no child boxes)
+/// falls back to the `origin` size.
+pub(super) fn scroll_content_size(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	origin: IRect,
+) -> UVec2 {
+	let mut content = UVec2::new(
+		origin.width().max(0) as u32,
+		origin.height().max(0) as u32,
+	);
 	for child in node.child_nodes(query) {
 		let rect = child.layout_rect();
-		let origin = rect.min - scrollport.min;
+		let offset = rect.min - origin.min;
 		let intrinsic = child.intrinsic_size();
 		let extent = IVec2::new(
-			origin.x + (rect.width().max(intrinsic.x as i32)),
-			origin.y + (rect.height().max(intrinsic.y as i32)),
+			offset.x + (rect.width().max(intrinsic.x as i32)),
+			offset.y + (rect.height().max(intrinsic.y as i32)),
 		);
 		content.x = content.x.max(extent.x.max(0) as u32);
 		content.y = content.y.max(extent.y.max(0) as u32);
 	}
-	ScrollState::new(content, scrollport_size)
+	content
 }
 
 /// The scrollport rect of a node from its laid-out [`LayoutRect`]: content rect
 /// (box model) minus the reserved gutter. The single source the clamp and paint
 /// both read, matching the layout pass (same `viewport`).
-pub(super) fn scrollport_rect(node: &CharcellNodeData, viewport: UVec2) -> IRect {
+pub(super) fn scrollport_rect(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	viewport: UVec2,
+) -> IRect {
 	let box_model = BoxModel::from_node(node, viewport);
-	scrollport_of(node, box_model.content_rect(node.layout_rect()))
+	scrollport_of(node, query, box_model.content_rect(node.layout_rect()))
 }
 
 /// Default vertical track/thumb glyphs (`scrollbar-width: auto`).
@@ -164,10 +181,12 @@ impl ScrollGutters {
 }
 
 /// The scrollbar gutters a node reserves, given its raw content rect (before the
-/// gutter). A non-scroll node reserves nothing. `Auto` consults the node's
-/// unconstrained [`IntrinsicSize`] to decide whether it overflows.
+/// gutter). A non-scroll node reserves nothing. `Auto` consults the actual
+/// [`scroll_content_size`] (the children's extent), not the node's own
+/// [`IntrinsicSize`], which an explicit `height` clamps to the box.
 pub(super) fn node_gutters(
 	node: &CharcellNodeData,
+	query: &CharcellQuery,
 	content_rect: IRect,
 ) -> ScrollGutters {
 	let layout = node.layout_style();
@@ -186,7 +205,7 @@ pub(super) fn node_gutters(
 	ScrollGutters::resolve(
 		layout.overflow_x,
 		layout.overflow_y,
-		node.intrinsic_size(),
+		scroll_content_size(node, query, content_rect),
 		port,
 	)
 }
@@ -196,57 +215,171 @@ pub(super) fn node_gutters(
 /// past it. For a non-scroll node this is the content rect unchanged.
 pub(super) fn scrollport_of(
 	node: &CharcellNodeData,
+	query: &CharcellQuery,
 	content_rect: IRect,
 ) -> IRect {
-	inset_rect(content_rect, node_gutters(node, content_rect).inset())
+	inset_rect(content_rect, node_gutters(node, query, content_rect).inset())
+}
+
+/// The on-screen geometry of one scrollbar axis, in buffer cells.
+///
+/// The single source the paint and the mouse hit-test both read, so a click
+/// lands exactly on the painted bar. `line` is the fixed cross-axis coordinate
+/// (the gutter column for the vertical bar, the gutter row for the horizontal);
+/// `track_start`/`track_len` span the track along the scroll axis, and
+/// `thumb_start`/`thumb_len` the thumb within it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct AxisBar {
+	/// Cross-axis screen coordinate: the gutter column (vertical) or row (horizontal).
+	pub line: i32,
+	/// Along-axis screen start of the track.
+	pub track_start: i32,
+	/// Track length in cells.
+	pub track_len: u32,
+	/// Along-axis screen start of the thumb.
+	pub thumb_start: i32,
+	/// Thumb length in cells.
+	pub thumb_len: u32,
+	/// Maximum scroll offset on this axis (content minus scrollport).
+	pub max_offset: i32,
+}
+
+impl AxisBar {
+	/// The leftover track the thumb travels across (track minus thumb length).
+	pub fn travel(&self) -> u32 { self.track_len.saturating_sub(self.thumb_len) }
+
+	/// Map an along-axis cursor coordinate (grabbed `grab` cells into the thumb)
+	/// to a clamped scroll offset: drag the thumb to the track end to reach
+	/// `max_offset`.
+	pub fn offset_at(&self, along: i32, grab: i32) -> i32 {
+		let travel = self.travel();
+		if travel == 0 {
+			return 0;
+		}
+		let thumb_pos =
+			(along - grab - self.track_start).clamp(0, travel as i32);
+		((thumb_pos as f32 / travel as f32) * self.max_offset as f32).round()
+			as i32
+	}
+}
+
+/// The screen-space scrollbar geometry of a scroll container: the active axes'
+/// track + thumb spans. The hit-test and the paint share this so they agree.
+#[derive(Debug, Default, Clone, Copy)]
+pub(super) struct ScrollbarGeometry {
+	/// The vertical bar (right gutter), present when that axis overflows + reserves.
+	pub vertical: Option<AxisBar>,
+	/// The horizontal bar (bottom gutter).
+	pub horizontal: Option<AxisBar>,
+}
+
+/// Compute a scroll container's on-screen scrollbar geometry, or `None` when it
+/// is not a scroll container or reserves no gutter.
+///
+/// `screen_offset` is the node's accumulated ancestor scroll translation (its
+/// [`PaintContext`](super::PaintContext) offset), so the geometry is in the same
+/// screen space the paint draws into and the hit-test reads.
+pub(super) fn scrollbar_geometry(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	viewport: UVec2,
+	screen_offset: IVec2,
+) -> Option<ScrollbarGeometry> {
+	if !node.is_scroll_container() {
+		return None;
+	}
+	let layout_rect = translate_rect(node.layout_rect(), screen_offset);
+	let content_rect = BoxModel::from_node(node, viewport).content_rect(layout_rect);
+	let gutters = node_gutters(node, query, content_rect);
+	if !gutters.any() {
+		return None;
+	}
+	let scrollport = scrollport_of(node, query, content_rect);
+	let state = scroll_state(node, query, viewport);
+	let offset = node.scroll_offset();
+	let max_offset = state.max_offset();
+
+	let vertical = gutters.vertical.then(|| {
+		let track_len = scrollport.height().max(0) as u32;
+		let (start, len) =
+			state.thumb_y(offset, track_len).unwrap_or((0, track_len));
+		AxisBar {
+			line: scrollport.max.x,
+			track_start: scrollport.min.y,
+			track_len,
+			thumb_start: scrollport.min.y + start as i32,
+			thumb_len: len,
+			max_offset: max_offset.y,
+		}
+	});
+	let horizontal = gutters.horizontal.then(|| {
+		let track_len = scrollport.width().max(0) as u32;
+		let (start, len) =
+			state.thumb_x(offset, track_len).unwrap_or((0, track_len));
+		AxisBar {
+			line: scrollport.max.y,
+			track_start: scrollport.min.x,
+			track_len,
+			thumb_start: scrollport.min.x + start as i32,
+			thumb_len: len,
+			max_offset: max_offset.x,
+		}
+	});
+	Some(ScrollbarGeometry {
+		vertical,
+		horizontal,
+	})
 }
 
 /// Paint the track and thumb for a scroll container into its reserved gutter,
 /// styled by the resolved [`ScrollbarStyle`].
 ///
-/// `scrollport` is the content rect after the gutter inset. The vertical bar
-/// fills the column at the scrollport's right edge, the horizontal bar the row at
-/// its bottom edge. Thumb/track colours come from `scrollbar-color`, the glyph
-/// weight from `scrollbar-width` (`thin` uses lighter glyphs).
+/// Reads the shared [`scrollbar_geometry`] so the painted bar matches exactly
+/// what the mouse hit-test acts on. Thumb/track colours come from
+/// `scrollbar-color`, the glyph weight from `scrollbar-width` (`thin` lighter).
 pub(super) fn paint_scrollbar(
 	buffer: &mut impl AsBuffer,
-	entity: Entity,
-	gutters: ScrollGutters,
-	scrollport: IRect,
-	state: ScrollState,
-	offset: IVec2,
-	style: ScrollbarStyle,
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	viewport: UVec2,
+	screen_offset: IVec2,
 	clip: Clip,
 ) {
+	let Some(geometry) = scrollbar_geometry(node, query, viewport, screen_offset)
+	else {
+		return;
+	};
+	let entity = node.entity;
+	let style = node.scrollbar_style();
 	let thin = matches!(style.width, ScrollbarWidth::Thin);
-	if gutters.vertical {
-		let col = scrollport.max.x; // the reserved column, just past the content
-		let track_len = scrollport.height().max(0) as u32;
+	if let Some(bar) = geometry.vertical {
 		let track_glyph = if thin { V_TRACK_THIN } else { V_TRACK };
 		let thumb_glyph = if thin { V_THUMB_THIN } else { V_THUMB };
-		paint_bar(buffer, entity, track_len, clip, |row| {
-			let glyph = match state.thumb_y(offset, track_len) {
-				Some((start, len)) if row >= start && row < start + len => {
-					(thumb_glyph, style.thumb)
-				}
-				_ => (track_glyph, style.track),
+		paint_bar(buffer, entity, bar.track_len, clip, |row| {
+			let along = bar.track_start + row as i32;
+			let glyph = if along >= bar.thumb_start
+				&& along < bar.thumb_start + bar.thumb_len as i32
+			{
+				(thumb_glyph, style.thumb)
+			} else {
+				(track_glyph, style.track)
 			};
-			(IVec2::new(col, scrollport.min.y + row as i32), glyph)
+			(IVec2::new(bar.line, along), glyph)
 		});
 	}
-	if gutters.horizontal {
-		let row = scrollport.max.y; // the reserved row, just past the content
-		let track_len = scrollport.width().max(0) as u32;
+	if let Some(bar) = geometry.horizontal {
 		let track_glyph = if thin { H_TRACK_THIN } else { H_TRACK };
 		let thumb_glyph = if thin { H_THUMB_THIN } else { H_THUMB };
-		paint_bar(buffer, entity, track_len, clip, |col| {
-			let glyph = match state.thumb_x(offset, track_len) {
-				Some((start, len)) if col >= start && col < start + len => {
-					(thumb_glyph, style.thumb)
-				}
-				_ => (track_glyph, style.track),
+		paint_bar(buffer, entity, bar.track_len, clip, |col| {
+			let along = bar.track_start + col as i32;
+			let glyph = if along >= bar.thumb_start
+				&& along < bar.thumb_start + bar.thumb_len as i32
+			{
+				(thumb_glyph, style.thumb)
+			} else {
+				(track_glyph, style.track)
 			};
-			(IVec2::new(scrollport.min.x + col as i32, row), glyph)
+			(IVec2::new(along, bar.line), glyph)
 		});
 	}
 	// the corner cell where both bars meet stays blank (the browser's empty

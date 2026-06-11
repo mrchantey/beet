@@ -14,20 +14,38 @@ fn main() {
 	use beet::prelude::*;
 	use beet_site::prelude::*;
 
-	App::new()
-		.add_plugins(server_plugin)
-		.insert_resource(PackageConfig {
-			title: "Beet".to_string(),
-			..pkg_config!()
-		})
-		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((site_server(), beet_site_router()));
-		})
-		.run();
+	let mut app = App::new();
+	app.add_plugins(server_plugin).insert_resource(PackageConfig {
+		title: "Beet".to_string(),
+		..pkg_config!()
+	});
+	// the live TUI layers the interactive plugins onto the shared substrate:
+	// the charcell host loop, link navigation, and the current-page painter.
+	#[cfg(feature = "tui")]
+	app.add_plugins((
+		CharcellTuiPlugin,
+		NavigatorPlugin,
+		LivePagePlugin,
+		FormRuntimePlugin,
+	));
+	app.add_systems(Startup, |mut commands: Commands| {
+		commands.spawn((site_server(), beet_site_router()));
+	});
+	app.run();
 }
 
+/// Boots the navigable live TUI, the interactive terminal target. Wins over the
+/// `web`/`cli` arms when enabled (it is layered onto the default features).
+#[cfg(all(not(feature = "codegen"), feature = "tui"))]
+fn site_server() -> impl beet::prelude::Bundle { beet::prelude::TuiServer }
+
 /// Boots an HTTP server, the default web target.
-#[cfg(all(not(feature = "codegen"), feature = "web", not(feature = "cli")))]
+#[cfg(all(
+	not(feature = "codegen"),
+	feature = "web",
+	not(feature = "cli"),
+	not(feature = "tui")
+))]
 fn site_server() -> impl beet::prelude::Bundle {
 	beet::prelude::HttpServer::default()
 }
@@ -37,7 +55,8 @@ fn site_server() -> impl beet::prelude::Bundle {
 /// terminal`).
 #[cfg(all(
 	not(feature = "codegen"),
-	any(feature = "cli", not(feature = "web"))
+	any(feature = "cli", not(feature = "web")),
+	not(feature = "tui")
 ))]
 fn site_server() -> impl beet::prelude::Bundle { beet::prelude::CliServer }
 

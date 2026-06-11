@@ -11,6 +11,6 @@ impl Plugin for NavigatorPlugin {
 		// link click handling (internal nav vs external open) lives in
 		// OpenLinkPlugin, which classifies a clicked `<a>` and routes it.
 		app.init_plugin::<OpenLinkPlugin>()
-			.add_observer(single_current_scene);
+			.add_observer(single_current_page);
 	}
 }

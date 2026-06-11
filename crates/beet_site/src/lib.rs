@@ -15,6 +15,8 @@ pub use launch::run_codegen;
 #[cfg(all(feature = "render", not(feature = "codegen")))]
 pub mod layouts;
 #[cfg(all(feature = "render", not(feature = "codegen")))]
+mod form_runtime;
+#[cfg(all(feature = "render", not(feature = "codegen")))]
 mod server;
 #[cfg(all(feature = "render", not(feature = "codegen")))]
 mod style;
@@ -44,6 +46,8 @@ pub mod prelude {
 	pub use crate::pages_codegen::*;
 	#[cfg(all(feature = "render", not(feature = "codegen")))]
 	pub use crate::route_tree::routes;
+	#[cfg(all(feature = "render", not(feature = "codegen")))]
+	pub use crate::form_runtime::*;
 	#[cfg(all(feature = "render", not(feature = "codegen")))]
 	pub use crate::server::*;
 	// the site-local `classes` module is intentionally *not* re-exported: a bare

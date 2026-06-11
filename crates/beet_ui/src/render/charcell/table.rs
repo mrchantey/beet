@@ -154,7 +154,7 @@ pub(super) fn table_layout_rects(
 	managed: &mut HashSet<Entity>,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
-	let content = scrollport_of(node, box_model.content_rect(container_rect));
+	let content = scrollport_of(node, query, box_model.content_rect(container_rect));
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, managed);
 	let widths = column_widths(&rows, query, content.width().max(0) as u32);

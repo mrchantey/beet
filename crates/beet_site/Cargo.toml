@@ -34,6 +34,10 @@ terminal = ["render", "beet/terminal"]
 # `--no-default-features`. Pulls in both render targets so either output works.
 cli = ["web", "terminal"]
 
+# Live interactive terminal target: boots the navigable site (scroll, links,
+# forms) via the in-world `Navigator` + `TuiServer`, sibling to the one-shot `cli`.
+tui = ["terminal", "beet/tui_server"]
+
 # Build-time route codegen. Compiles without the generated `src/codegen` modules
 # so it can bootstrap them: `cargo run -p beet_site --no-default-features
 # --features codegen`. Run this before a `web`/`terminal` build.
@@ -65,3 +69,9 @@ harness = false
 name = "sidebar_tree"
 path = "tests/sidebar_tree.rs"
 harness = false
+
+[[test]]
+name = "tui"
+path = "tests/tui.rs"
+harness = false
+required-features = ["tui"]

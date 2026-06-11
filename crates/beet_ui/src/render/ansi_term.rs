@@ -85,10 +85,10 @@ impl NodeRenderer for AnsiTermRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError> {
+	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::AnsiTerm, MediaType::Text])?;
 		let output = self.render_to_string(cx.entity, cx.world)?;
-		RenderOutput::media_string(MediaType::AnsiTerm, output).xok()
+		MediaBytes::new_string(MediaType::AnsiTerm, output).xok()
 	}
 }
 

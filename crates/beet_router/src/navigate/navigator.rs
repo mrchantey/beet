@@ -1,10 +1,8 @@
+use crate::prelude::*;
 use alloc::borrow::Cow;
 use alloc::collections::VecDeque;
-use beet_action::prelude::AsyncEntityActionExt;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-
-// RenderMedia, RenderTargets, RenderedBy are defined in beet_ui::input::render_media
 
 
 /// Maximum number of history entries to retain.
@@ -12,19 +10,40 @@ const HISTORY_LIMIT: usize = 100;
 
 const DEFAULT_HOME: &str = "about:blank";
 
-/// A browser-style navigation component that manages page history and
-/// dispatches [`RenderMedia`] events to its [`RenderTargets`].
+/// How a [`Navigator`] request travels to reach a page.
+///
+/// Two independent transports, chosen at construction: a real network fetch for
+/// remote URLs, or an in-world dispatch to a local router entity for browsing the
+/// app's own routes without a socket. The transport decides only *how the request
+/// travels*, not what becomes of the result (that fork lives in the render step).
+#[derive(Debug, Clone, Default)]
+pub enum NavigatorTransport {
+	/// Normal network fetch via [`Request::send`], for remote URLs.
+	#[default]
+	Http,
+	/// Dispatch the path straight to a local `router` entity in-world, no socket.
+	/// The live TUI browsing its own site uses this.
+	InWorld {
+		/// The router entity requests are dispatched to.
+		router: Entity,
+	},
+}
+
+/// A browser-style navigation component that manages page history and fetches
+/// pages through its [`NavigatorTransport`].
 ///
 /// History works like a browser: navigating to a new URL truncates any
 /// forward entries and appends the new URL.  [`Navigator::back`] and
 /// [`Navigator::forward`] move through that stack without making new
-/// network requests unless the cursor actually moves.
+/// requests unless the cursor actually moves.
 #[derive(Debug, Clone, Component)]
 #[component(on_add = on_add)]
 pub struct Navigator {
 	user_agent: Cow<'static, str>,
 	/// Media types accepted by this navigator, in preference order.
 	accepts: Vec<MediaType>,
+	/// How requests travel: a network fetch, or in-world router dispatch.
+	transport: NavigatorTransport,
 	/// `true` while a request is in-flight.
 	loading: bool,
 	home_url: Url,
@@ -62,6 +81,7 @@ impl Default for Navigator {
 				// MediaType::Markdown,
 				// MediaType::other("*/*"),
 			],
+			transport: NavigatorTransport::Http,
 			loading: false,
 			// home navigated to by on_add
 			history: default(),
@@ -77,6 +97,19 @@ impl Navigator {
 			..default()
 		}
 	}
+
+	/// An in-world navigator: requests dispatch to the local `router` entity
+	/// (no socket), for browsing the app's own routes. Starts at `home_url`.
+	pub fn in_world(router: Entity, home_url: impl Into<Url>) -> Self {
+		Self {
+			home_url: home_url.into(),
+			transport: NavigatorTransport::InWorld { router },
+			..default()
+		}
+	}
+
+	/// The transport this navigator uses to reach pages.
+	pub fn transport(&self) -> &NavigatorTransport { &self.transport }
 
 	/// The URL currently being displayed (or loading).
 	pub fn current_url(&self) -> &Url {
@@ -124,16 +157,22 @@ impl Navigator {
 	) -> Result {
 		let url = url.into();
 		// resolve relative url and push history
-		let (user_agent, resolved, accepts) = entity
+		let (transport, user_agent, resolved, accepts) = entity
 			.get_mut(move |mut nav: Mut<Navigator>| {
 				nav.loading = true;
 				let resolved = nav.resolve(url);
 				nav.push_history(resolved.clone());
-				(nav.user_agent.clone(), resolved, nav.accepts.clone())
+				(
+					nav.transport.clone(),
+					nav.user_agent.clone(),
+					resolved,
+					nav.accepts.clone(),
+				)
 			})
 			.await?;
 
-		Self::fetch_and_render(entity, user_agent, resolved, accepts).await
+		Self::fetch_and_render(entity, transport, user_agent, resolved, accepts)
+			.await
 	}
 
 	/// Navigate one step back in history, if possible.
@@ -146,6 +185,7 @@ impl Navigator {
 				nav.history_cursor -= 1;
 				nav.loading = true;
 				Some((
+					nav.transport.clone(),
 					nav.user_agent.clone(),
 					nav.current_url().clone(),
 					nav.accepts.clone(),
@@ -153,8 +193,9 @@ impl Navigator {
 			})
 			.await?;
 
-		if let Some((user_agent, url, accepts)) = nav_state {
-			Self::fetch_and_render(entity, user_agent, url, accepts).await?;
+		if let Some((transport, user_agent, url, accepts)) = nav_state {
+			Self::fetch_and_render(entity, transport, user_agent, url, accepts)
+				.await?;
 		}
 		Ok(())
 	}
@@ -169,6 +210,7 @@ impl Navigator {
 				nav.history_cursor += 1;
 				nav.loading = true;
 				Some((
+					nav.transport.clone(),
 					nav.user_agent.clone(),
 					nav.current_url().clone(),
 					nav.accepts.clone(),
@@ -176,23 +218,66 @@ impl Navigator {
 			})
 			.await?;
 
-		if let Some((user_agent, url, accepts)) = nav_state {
-			Self::fetch_and_render(entity, user_agent, url, accepts).await?;
+		if let Some((transport, user_agent, url, accepts)) = nav_state {
+			Self::fetch_and_render(entity, transport, user_agent, url, accepts)
+				.await?;
 		}
 		Ok(())
 	}
 
 	/// Shared fetch → render → clear-loading path used by all navigation
 	/// methods.
+	///
+	/// The transport decides how the request travels (network vs in-world
+	/// router dispatch); both end with a living [`CurrentPage`] tree that the
+	/// page host paints. The static serialize-and-despawn path is untouched.
 	async fn fetch_and_render(
 		entity: AsyncEntity,
+		transport: NavigatorTransport,
 		user_agent: Cow<'static, str>,
 		url: Url,
 		accepts: Vec<MediaType>,
 	) -> Result {
-		// get response without checking status,
-		// do not bail on 404, render anyway
-		let response = Request::get(&url)
+		let page = match transport {
+			NavigatorTransport::Http => {
+				// a real network fetch, then parse the bytes into a living tree
+				let bytes =
+					Self::http_fetch(user_agent, url, accepts).await?;
+				entity
+					.world()
+					.with(move |world| parse_page(world, bytes))
+					.await?
+			}
+			NavigatorTransport::InWorld { router } => {
+				// dispatch in-world to the local router, keeping the built tree
+				let request = Request::get(&url)
+					.with_header::<header::UserAgent>(user_agent)
+					.with_header::<header::Accept>(accepts);
+				build_live_page(&entity.world().entity(router), request).await?
+			}
+		};
+
+		// mark the new tree the current page (the host repaints) and clear loading
+		entity
+			.world()
+			.with(move |world| set_current_page(world, page))
+			.await;
+		entity
+			.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)
+			.await?;
+		Ok(())
+	}
+
+	/// Fetch the page at `url` over the network, returning its bytes.
+	///
+	/// A pure data fetch with no UI side effect; a 404 renders its error body
+	/// rather than bailing.
+	async fn http_fetch(
+		user_agent: Cow<'static, str>,
+		url: Url,
+		accepts: Vec<MediaType>,
+	) -> Result<MediaBytes> {
+		Request::get(&url)
 			.with_header::<header::UserAgent>(user_agent)
 			.with_header::<header::Accept>(accepts)
 			.send()
@@ -207,47 +292,21 @@ impl Navigator {
 					err,
 					MediaType::Text,
 				)
-			});
-
-		let redirect = if response.status().is_redirect_location() {
-			response
-				.headers
-				.get::<header::Location>()
-				.map(|loc| {
-					loc.ok().map(|loc|
-					// resolve relative redirect URLs against the original URL
-					url.join(Url::parse(loc)))
-				})
-				.flatten()
-		} else {
-			None
-		};
-
-		let media_bytes = response.into_media_bytes().await?;
-
-		// trigger a Request on this entity, expecting some
-		// renderer to handle it
-		let response = entity
-			.call::<Request, Response>(Request::with_media(
-				Url::default(),
-				media_bytes,
-			))
-			.await;
-
-		entity
-			.get_mut(|mut nav: Mut<Navigator>| {
-				nav.loading = false;
 			})
-			.await?;
+			.into_media_bytes()
+			.await
+	}
+}
 
-		// ensure the render request was succesful
-		let _response = response?.into_result().await?;
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
 
-		if let Some(_redirect_url) = redirect {
-			todo!("handle redirects");
-			// Self::navigate_to(entity, redirect_url).await?;
-		}
-
-		Ok(())
+	/// A default navigator uses the [`NavigatorTransport::Http`] transport.
+	#[beet_core::test]
+	fn defaults_to_http_transport() {
+		matches!(Navigator::default().transport(), NavigatorTransport::Http)
+			.xpect_true();
 	}
 }

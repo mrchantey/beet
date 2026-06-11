@@ -21,17 +21,8 @@ pub async fn default_renderer(
 			let world = entity.into_world_mut();
 
 			let mut cx = RenderContext::new(id, world).with_accepts(accepts);
-			let output = MediaRenderer::default().render(&mut cx)?;
-
-			match output {
-				RenderOutput::Media(bytes) => {
-					Response::ok_body(bytes.bytes(), bytes.media_type().clone())
-				}
-				RenderOutput::Stateful => {
-					Response::ok_body("state updated.", MediaType::Text)
-				}
-			}
-			.xok()
+			let bytes = MediaRenderer::default().render(&mut cx)?;
+			Response::ok().with_media(bytes).xok()
 		})
 		.await
 		.flatten()

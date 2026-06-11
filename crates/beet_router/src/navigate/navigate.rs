@@ -13,7 +13,7 @@ use beet_net::prelude::*;
 /// The direction to navigate relative to the current path.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum NavigateTo {
-	/// Move to the parent scene or root.
+	/// Move to the parent route or root.
 	#[default]
 	Parent,
 	/// Move to the first child route.

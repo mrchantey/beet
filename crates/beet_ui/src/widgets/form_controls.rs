@@ -194,6 +194,7 @@ mod test {
 					<TextField field={FieldRef::new("name")}/>
 				</div>
 			})
+			.unwrap()
 			.id();
 		app.world_mut()
 			.entity_mut(root)

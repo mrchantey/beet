@@ -289,10 +289,10 @@ impl NodeRenderer for HtmlRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError> {
+	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Html])?;
 		cx.walk(self);
-		RenderOutput::media_string(
+		MediaBytes::new_string(
 			MediaType::Html,
 			core::mem::take(&mut self.buffer),
 		)
