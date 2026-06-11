@@ -8,9 +8,6 @@
 //! came from source or from a macro expansion. That is what lets a nested `rsx!`
 //! expand safely inside `#[template]` output.
 //!
-//! Crib note: the recovery shape (scan-to-ending, then sub-parse) is borrowed
-//! from rstml's `parse_with_ending`, but none of its round-trip `ToTokens`, its
-//! `CustomNode` generics, or its `rawtext_stable_hack` are carried over.
 use super::ast::*;
 use alloc::string::String;
 use alloc::string::ToString;

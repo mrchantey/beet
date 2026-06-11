@@ -59,9 +59,7 @@ pub struct RsxKeyedAttr {
 
 impl RsxKeyedAttr {
 	/// The key rendered as a string.
-	pub fn key_str(&self) -> String {
-		self.key.value()
-	}
+	pub fn key_str(&self) -> String { self.key.value() }
 
 	/// The value expression, if the attribute has one.
 	pub fn value_expr(&self) -> Option<&syn::Expr> {
@@ -139,7 +137,7 @@ impl RsxName {
 }
 
 /// The displayable string of a literal expression (`"x"`, `'c'`, `1`, `0.5`,
-/// `true`), or `None` for any other expression. Adapted from rstml/leptos.
+/// `true`), or `None` for any other expression.
 fn expr_literal_string(expr: &syn::Expr) -> Option<String> {
 	let syn::Expr::Lit(lit) = expr else {
 		return None;
