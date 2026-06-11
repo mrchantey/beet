@@ -22,3 +22,7 @@ pub mod render_action;
 pub use default_renderer::*;
 mod route_query;
 pub use route_query::*;
+#[cfg(not(target_arch = "wasm32"))]
+mod routes_dir;
+#[cfg(not(target_arch = "wasm32"))]
+pub use routes_dir::*;

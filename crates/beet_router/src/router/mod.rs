@@ -54,6 +54,10 @@ mod base_layout;
 #[cfg(feature = "std")]
 pub use base_layout::*;
 #[cfg(feature = "std")]
+mod bsx_layout;
+#[cfg(feature = "std")]
+pub use bsx_layout::*;
+#[cfg(feature = "std")]
 mod sidebar;
 #[cfg(feature = "std")]
 pub use sidebar::*;

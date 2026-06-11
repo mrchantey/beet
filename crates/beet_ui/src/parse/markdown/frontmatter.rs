@@ -40,6 +40,31 @@ pub enum FrontmatterKind {
 }
 
 impl Frontmatter {
+	/// Extract and parse a leading frontmatter block from a raw source: a
+	/// `---` fence parses as YAML, a `+++` fence as TOML. Returns `None` when
+	/// the source has no leading fence.
+	///
+	/// The full markdown parser extracts frontmatter as part of its pass; this
+	/// standalone form serves scan-time metadata readers (eg route discovery)
+	/// that must not pay for a content parse.
+	pub fn extract(source: &str) -> Result<Option<Self>> {
+		let trimmed = source.trim_start();
+		let (fence, kind) = match trimmed {
+			s if s.starts_with("---") => ("---", FrontmatterKind::Yaml),
+			s if s.starts_with("+++") => ("+++", FrontmatterKind::Toml),
+			_ => return Ok(None),
+		};
+		// the fence must be a whole line, ie not a thematic break `--- foo`
+		let body = &trimmed[fence.len()..];
+		if !body.starts_with('\n') && !body.starts_with("\r\n") {
+			return Ok(None);
+		}
+		let Some(end) = body.find(&format!("\n{fence}")) else {
+			return Ok(None);
+		};
+		Self::parse(&body[..end], kind).map(Some)
+	}
+
 	/// Parse a raw frontmatter string into a [`Frontmatter`] component.
 	///
 	/// Dispatches to the appropriate parser based on `kind`.
@@ -388,6 +413,45 @@ mod test {
 		let content = "# comment\ntitle = \"Hello\"";
 		let pairs = parse_toml_kv(content).unwrap();
 		pairs.len().xpect_eq(1);
+	}
+
+	// -- extraction from raw source --
+
+	#[beet_core::test]
+	fn extract_toml_fence() {
+		let fm = Frontmatter::extract(
+			"+++\ntitle = \"Hello\"\norder = 2\n+++\n\n# Body",
+		)
+		.unwrap()
+		.unwrap();
+		fm.kind.xpect_eq(FrontmatterKind::Toml);
+		fm.get_str("title").unwrap().xpect_eq("Hello");
+		fm.get_uint("order").unwrap().xpect_eq(2);
+	}
+
+	#[beet_core::test]
+	fn extract_yaml_fence() {
+		let fm = Frontmatter::extract("---\ntitle: Hello\n---\n# Body")
+			.unwrap()
+			.unwrap();
+		fm.kind.xpect_eq(FrontmatterKind::Yaml);
+		fm.get_str("title").unwrap().xpect_eq("Hello");
+	}
+
+	#[beet_core::test]
+	fn extract_none() {
+		// no fence at all
+		Frontmatter::extract("# Body").unwrap().is_none().xpect_true();
+		// a thematic break is not a fence
+		Frontmatter::extract("--- not a fence")
+			.unwrap()
+			.is_none()
+			.xpect_true();
+		// an unclosed fence is not frontmatter
+		Frontmatter::extract("---\ntitle: Hello")
+			.unwrap()
+			.is_none()
+			.xpect_true();
 	}
 
 	// -- Frontmatter component --

@@ -72,6 +72,30 @@ fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 	parts: RequestParts,
 	content: Entity,
 ) -> Result<Entity> {
+	wrap_content_with(world, parts, content, |world, rendered| {
+		world
+			.spawn_template(Snippet::from_bundle((
+				C::default().into_snippet_bundle(),
+				children![(RenderRef::new(rendered), SlotChild::new())],
+			)))
+			.map(|entity| entity.id())
+	})
+}
+
+/// The shared wrap step of every layout middleware: read the inner render root,
+/// install the request-scoped [`RequestContext`] resource around `build_layout`
+/// (which spawns the layout with the content transcluded into its default slot,
+/// returning the layout entity), then mark the layout as the new render root.
+///
+/// The layout subtree is ephemeral and despawned after render (along with the
+/// content's own ephemerals), but the referenced content is never owned or
+/// despawned here, so a persistent fixed route survives request after request.
+pub(crate) fn wrap_content_with(
+	world: &mut World,
+	parts: RequestParts,
+	content: Entity,
+	build_layout: impl FnOnce(&mut World, Entity) -> Result<Entity>,
+) -> Result<Entity> {
 	// the inner render root names the entity to render and its ephemerals
 	let (rendered, content_despawn) = {
 		let entity = world.entity(content);
@@ -93,16 +117,9 @@ fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 	// any per-route components (eg `ArticleMeta` parsed from frontmatter).
 	// Installed as a resource for the synchronous layout build, then removed.
 	world.insert_resource(RequestContext::new(parts, rendered));
-
-	// the content is transcluded by reference: route it into the layout's default
-	// slot as a `SlotChild` carrying a `RenderRef` to the existing content.
-	let layout = world
-		.spawn_template(Snippet::from_bundle((
-			C::default().into_snippet_bundle(),
-			children![(RenderRef::new(rendered), SlotChild::new())],
-		)))?
-		.id();
+	let layout_result = build_layout(world, rendered);
 	world.remove_resource::<RequestContext>();
+	let layout = layout_result?;
 
 	// despawn the layout subtree plus the content's ephemerals after render
 	let mut to_despawn = vec![layout];

@@ -19,110 +19,236 @@ use bevy::reflect::tuple_struct::TupleStructInfo;
 
 /// Builds a [`ValueSchema`] from a bevy reflect [`TypeInfo`].
 pub fn build(type_info: &TypeInfo) -> ValueSchema {
-	match type_info {
-		TypeInfo::Struct(info) => ValueSchema::Struct(struct_schema(info)),
-		TypeInfo::TupleStruct(info) => tuple_struct_schema(info),
-		TypeInfo::Tuple(info) => {
-			if info.field_len() == 0 {
-				ValueSchema::Null
-			} else {
-				ValueSchema::Tuple(tuple_schema(info, None))
+	Builder::default().build(type_info)
+}
+
+/// The recursive walk, tracking named ancestor types so a self-referential
+/// type (eg `SidebarNode { children: Vec<SidebarNode> }`) lowers to a
+/// [`ValueSchema::Reference`] by short type path instead of recursing forever.
+#[derive(Default)]
+struct Builder {
+	visiting: Vec<SmolStr>,
+}
+
+impl Builder {
+	fn build(&mut self, type_info: &TypeInfo) -> ValueSchema {
+		// only named types (struct/tuple-struct/enum) can cycle
+		let named = matches!(
+			type_info,
+			TypeInfo::Struct(_) | TypeInfo::TupleStruct(_) | TypeInfo::Enum(_)
+		);
+		let path = SmolStr::from(type_info.type_path());
+		if named {
+			if self.visiting.contains(&path) {
+				return ValueSchema::Reference(SmolStr::from(
+					type_info.type_path_table().short_path(),
+				));
 			}
+			self.visiting.push(path);
 		}
-		TypeInfo::List(info) => ValueSchema::List(list_schema(info)),
-		TypeInfo::Array(info) => ValueSchema::List(array_schema(info)),
-		TypeInfo::Map(info) => ValueSchema::Map(map_schema(info)),
-		TypeInfo::Set(info) => ValueSchema::List(set_schema(info)),
-		TypeInfo::Enum(info) => enum_schema(info),
-		TypeInfo::Opaque(info) => primitive_schema(info.type_path()),
+		let schema = match type_info {
+			TypeInfo::Struct(info) => {
+				ValueSchema::Struct(self.struct_schema(info))
+			}
+			TypeInfo::TupleStruct(info) => self.tuple_struct_schema(info),
+			TypeInfo::Tuple(info) => {
+				if info.field_len() == 0 {
+					ValueSchema::Null
+				} else {
+					ValueSchema::Tuple(self.tuple_schema(info, None))
+				}
+			}
+			TypeInfo::List(info) => ValueSchema::List(self.list_schema(info)),
+			TypeInfo::Array(info) => ValueSchema::List(self.array_schema(info)),
+			TypeInfo::Map(info) => ValueSchema::Map(self.map_schema(info)),
+			TypeInfo::Set(info) => ValueSchema::List(set_schema(info)),
+			TypeInfo::Enum(info) => self.enum_schema(info),
+			TypeInfo::Opaque(info) => primitive_schema(info.type_path()),
+		};
+		if named {
+			self.visiting.pop();
+		}
+		schema
 	}
-}
 
-fn resolve_field(type_info: Option<&TypeInfo>, type_path: &str) -> ValueSchema {
-	match type_info {
-		Some(info) => build(info),
-		None => primitive_schema(type_path),
+	fn resolve_field(
+		&mut self,
+		type_info: Option<&TypeInfo>,
+		type_path: &str,
+	) -> ValueSchema {
+		match type_info {
+			Some(info) => self.build(info),
+			None => primitive_schema(type_path),
+		}
 	}
-}
 
-fn struct_schema(info: &StructInfo) -> StructSchema {
-	let fields = info.iter().map(named_field_schema).collect();
-	StructSchema {
-		name: Some(SmolStr::from(info.type_path_table().short_path())),
-		allow_additional: false,
-		fields,
+	fn struct_schema(&mut self, info: &StructInfo) -> StructSchema {
+		let fields = info
+			.iter()
+			.map(|field| self.named_field_schema(field))
+			.collect();
+		StructSchema {
+			name: Some(SmolStr::from(info.type_path_table().short_path())),
+			allow_additional: false,
+			fields,
+		}
 	}
-}
 
-fn named_field_schema(field: &NamedField) -> NamedFieldSchema {
-	let required = is_required_field(field.type_path());
-	let schema = resolve_field(field.type_info(), field.type_path());
+	fn named_field_schema(&mut self, field: &NamedField) -> NamedFieldSchema {
+		let required = is_required_field(field.type_path());
+		let schema = self.resolve_field(field.type_info(), field.type_path());
 
-	#[cfg(feature = "bevy_reflect_documentation")]
-	let description = field.docs().map(SmolStr::from);
-	#[cfg(not(feature = "bevy_reflect_documentation"))]
-	let description = None;
+		#[cfg(feature = "bevy_reflect_documentation")]
+		let description = field.docs().map(SmolStr::from);
+		#[cfg(not(feature = "bevy_reflect_documentation"))]
+		let description = None;
 
-	NamedFieldSchema {
-		key: SmolStr::from(field.name()),
-		required,
-		label: None,
-		description,
-		schema,
+		NamedFieldSchema {
+			key: SmolStr::from(field.name()),
+			required,
+			label: None,
+			description,
+			schema,
+		}
 	}
-}
 
-fn unnamed_field_schema(field: &UnnamedField) -> UnnamedFieldSchema {
-	let required = is_required_field(field.type_path());
-	let schema = resolve_field(field.type_info(), field.type_path());
+	fn unnamed_field_schema(
+		&mut self,
+		field: &UnnamedField,
+	) -> UnnamedFieldSchema {
+		let required = is_required_field(field.type_path());
+		let schema = self.resolve_field(field.type_info(), field.type_path());
 
-	#[cfg(feature = "bevy_reflect_documentation")]
-	let description = field.docs().map(SmolStr::from);
-	#[cfg(not(feature = "bevy_reflect_documentation"))]
-	let description = None;
+		#[cfg(feature = "bevy_reflect_documentation")]
+		let description = field.docs().map(SmolStr::from);
+		#[cfg(not(feature = "bevy_reflect_documentation"))]
+		let description = None;
 
-	UnnamedFieldSchema {
-		required,
-		description,
-		schema,
+		UnnamedFieldSchema {
+			required,
+			description,
+			schema,
+		}
 	}
-}
 
-fn tuple_struct_schema(info: &TupleStructInfo) -> ValueSchema {
-	// Newtypes unwrap to their inner type.
-	if info.field_len() == 1 {
-		let field = info.field_at(0).expect("tuple struct has 1 field");
-		return resolve_field(field.type_info(), field.type_path());
+	fn tuple_struct_schema(&mut self, info: &TupleStructInfo) -> ValueSchema {
+		// Newtypes unwrap to their inner type.
+		if info.field_len() == 1 {
+			let field = info.field_at(0).expect("tuple struct has 1 field");
+			return self.resolve_field(field.type_info(), field.type_path());
+		}
+		let fields = info
+			.iter()
+			.map(|field| self.unnamed_field_schema(field))
+			.collect();
+		ValueSchema::Tuple(TupleSchema {
+			name: Some(SmolStr::from(info.type_path_table().short_path())),
+			fields,
+		})
 	}
-	let fields = info.iter().map(unnamed_field_schema).collect();
-	ValueSchema::Tuple(TupleSchema {
-		name: Some(SmolStr::from(info.type_path_table().short_path())),
-		fields,
-	})
-}
 
-fn tuple_schema(info: &TupleInfo, name: Option<SmolStr>) -> TupleSchema {
-	let fields = info.iter().map(unnamed_field_schema).collect();
-	TupleSchema { name, fields }
-}
-
-fn list_schema(info: &ListInfo) -> ListSchema {
-	let item = resolve_field(info.item_info(), info.item_ty().path());
-	ListSchema {
-		item: Box::new(item),
-		min_items: None,
-		max_items: None,
-		unique: false,
+	fn tuple_schema(
+		&mut self,
+		info: &TupleInfo,
+		name: Option<SmolStr>,
+	) -> TupleSchema {
+		let fields = info
+			.iter()
+			.map(|field| self.unnamed_field_schema(field))
+			.collect();
+		TupleSchema { name, fields }
 	}
-}
 
-fn array_schema(info: &ArrayInfo) -> ListSchema {
-	let item = resolve_field(info.item_info(), info.item_ty().path());
-	ListSchema {
-		item: Box::new(item),
-		min_items: Some(info.capacity()),
-		max_items: Some(info.capacity()),
-		unique: false,
+	fn list_schema(&mut self, info: &ListInfo) -> ListSchema {
+		let item = self.resolve_field(info.item_info(), info.item_ty().path());
+		ListSchema {
+			item: Box::new(item),
+			min_items: None,
+			max_items: None,
+			unique: false,
+		}
+	}
+
+	fn array_schema(&mut self, info: &ArrayInfo) -> ListSchema {
+		let item = self.resolve_field(info.item_info(), info.item_ty().path());
+		ListSchema {
+			item: Box::new(item),
+			min_items: Some(info.capacity()),
+			max_items: Some(info.capacity()),
+			unique: false,
+		}
+	}
+
+	fn map_schema(&mut self, info: &MapInfo) -> MapSchema {
+		let value = self.resolve_field(info.value_info(), info.value_ty().path());
+		MapSchema {
+			value: Box::new(value),
+		}
+	}
+
+	fn enum_schema(&mut self, info: &EnumInfo) -> ValueSchema {
+		// Treat `Option<T>` specially: an optional wrapper over the inner schema, so a
+		// null or missing value validates while a present value is typed as `T`.
+		if is_option_type(info.type_path())
+			&& let Some(VariantInfo::Tuple(some_info)) = info.variant("Some")
+			&& let Some(field) = some_info.field_at(0)
+		{
+			return ValueSchema::Optional(Box::new(
+				self.resolve_field(field.type_info(), field.type_path()),
+			));
+		}
+
+		let variants = info
+			.iter()
+			.map(|variant| match variant {
+				VariantInfo::Unit(v) => VariantSchema {
+					name: SmolStr::from(v.name()),
+					payload: None,
+				},
+				VariantInfo::Tuple(v) => {
+					if v.field_len() == 1 {
+						let field = v.field_at(0).expect("len == 1");
+						VariantSchema {
+							name: SmolStr::from(v.name()),
+							payload: Some(self.resolve_field(
+								field.type_info(),
+								field.type_path(),
+							)),
+						}
+					} else {
+						let fields = v
+							.iter()
+							.map(|field| self.unnamed_field_schema(field))
+							.collect();
+						VariantSchema {
+							name: SmolStr::from(v.name()),
+							payload: Some(ValueSchema::Tuple(TupleSchema {
+								name: None,
+								fields,
+							})),
+						}
+					}
+				}
+				VariantInfo::Struct(v) => {
+					let fields = v
+						.iter()
+						.map(|field| self.named_field_schema(field))
+						.collect();
+					VariantSchema {
+						name: SmolStr::from(v.name()),
+						payload: Some(ValueSchema::Struct(StructSchema {
+							name: None,
+							allow_additional: false,
+							fields,
+						})),
+					}
+				}
+			})
+			.collect();
+		ValueSchema::Enum(EnumSchema {
+			name: Some(SmolStr::from(info.type_path_table().short_path())),
+			variants,
+		})
 	}
 }
 
@@ -134,73 +260,6 @@ fn set_schema(info: &SetInfo) -> ListSchema {
 		max_items: None,
 		unique: true,
 	}
-}
-
-fn map_schema(info: &MapInfo) -> MapSchema {
-	let value = resolve_field(info.value_info(), info.value_ty().path());
-	MapSchema {
-		value: Box::new(value),
-	}
-}
-
-fn enum_schema(info: &EnumInfo) -> ValueSchema {
-	// Treat `Option<T>` specially: an optional wrapper over the inner schema, so a
-	// null or missing value validates while a present value is typed as `T`.
-	if is_option_type(info.type_path())
-		&& let Some(VariantInfo::Tuple(some_info)) = info.variant("Some")
-		&& let Some(field) = some_info.field_at(0)
-	{
-		return ValueSchema::Optional(Box::new(resolve_field(
-			field.type_info(),
-			field.type_path(),
-		)));
-	}
-
-	let variants = info
-		.iter()
-		.map(|variant| match variant {
-			VariantInfo::Unit(v) => VariantSchema {
-				name: SmolStr::from(v.name()),
-				payload: None,
-			},
-			VariantInfo::Tuple(v) => {
-				if v.field_len() == 1 {
-					let field = v.field_at(0).expect("len == 1");
-					VariantSchema {
-						name: SmolStr::from(v.name()),
-						payload: Some(resolve_field(
-							field.type_info(),
-							field.type_path(),
-						)),
-					}
-				} else {
-					let fields = v.iter().map(unnamed_field_schema).collect();
-					VariantSchema {
-						name: SmolStr::from(v.name()),
-						payload: Some(ValueSchema::Tuple(TupleSchema {
-							name: None,
-							fields,
-						})),
-					}
-				}
-			}
-			VariantInfo::Struct(v) => {
-				let fields = v.iter().map(named_field_schema).collect();
-				VariantSchema {
-					name: SmolStr::from(v.name()),
-					payload: Some(ValueSchema::Struct(StructSchema {
-						name: None,
-						allow_additional: false,
-						fields,
-					})),
-				}
-			}
-		})
-		.collect();
-	ValueSchema::Enum(EnumSchema {
-		name: Some(SmolStr::from(info.type_path_table().short_path())),
-		variants,
-	})
 }
 
 fn primitive_schema(type_path: &str) -> ValueSchema {
@@ -247,4 +306,35 @@ fn extract_option_inner(type_path: &str) -> Option<&str> {
 		path.strip_prefix("Option<")
 	}?;
 	inner.strip_suffix('>')
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	/// A self-referential tree type, the schema cycle case.
+	#[derive(Default, Reflect)]
+	struct Node {
+		label: String,
+		children: Vec<Node>,
+	}
+
+	#[crate::test]
+	fn recursive_type_lowers_to_reference() {
+		let ValueSchema::Struct(schema) = ValueSchema::of::<Node>() else {
+			panic!("expected struct schema");
+		};
+		// the recursive `children` list item is a by-name reference, not a cycle
+		let children = schema
+			.fields
+			.iter()
+			.find(|field| field.key == "children")
+			.unwrap();
+		let ValueSchema::List(list) = &children.schema else {
+			panic!("expected list schema");
+		};
+		list.item
+			.as_ref()
+			.xpect_eq(ValueSchema::Reference("Node".into()));
+	}
 }

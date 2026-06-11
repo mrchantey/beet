@@ -147,9 +147,9 @@ impl NodeVisitor for HtmlRenderer {
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, doctype: &Doctype) {
 		self.write_indent();
-		// The stored value is the raw doctype text, ie `"DOCTYPE html"`.
-		// We wrap it in `<!` and `>`.
-		self.buffer.push_str("<!");
+		// the stored value is the doctype's value with the keyword stripped,
+		// ie `"html"` (see [`Doctype::new`])
+		self.buffer.push_str("<!DOCTYPE ");
 		self.buffer.push_str(doctype);
 		self.buffer.push('>');
 		self.write_newline();
@@ -386,6 +386,12 @@ mod test {
 	#[beet_core::test]
 	fn render_comment() {
 		roundtrip("<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
+	}
+
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn render_doctype() {
+		roundtrip("<!DOCTYPE html>").xpect_eq("<!DOCTYPE html>".to_string());
 	}
 
 	#[cfg(feature = "bsx")]

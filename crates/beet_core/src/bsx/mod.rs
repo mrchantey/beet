@@ -22,6 +22,8 @@
 
 mod ast;
 mod cursor;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+mod entry;
 mod events;
 mod parse;
 mod reflect;
@@ -33,6 +35,8 @@ mod schema;
 mod value;
 
 pub use ast::*;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+pub use entry::*;
 pub use events::*;
 pub use parse::*;
 pub use registry::*;

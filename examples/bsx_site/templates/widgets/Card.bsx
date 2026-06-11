@@ -1,0 +1,6 @@
+<!-- A site-local template: resolves as <widgets::Card> from any page.
+     Content routes into slots: a named `title` slot and the default body. -->
+<section class="card-filled">
+	<h2><Slot name="title">Card</Slot></h2>
+	<Slot/>
+</section>

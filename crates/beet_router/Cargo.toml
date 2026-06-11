@@ -106,5 +106,11 @@ beet_core = { workspace = true, features = ["testing"] }
 # path = "tests/interface.rs"
 # required-features = ["interface"]
 
+[[test]]
+name = "bsx_site"
+path = "tests/bsx_site.rs"
+harness = false
+required-features = ["markdown_parser"]
+
 [lib]
 harness = false

@@ -27,6 +27,80 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
+/// The document [`Head`] with per-route metadata: the route's [`ArticleMeta`]
+/// (frontmatter title/description) overrides the
+/// [`PackageConfig`](beet_core::prelude::PackageConfig) defaults. Extra tags
+/// (stylesheet, favicon, ...) flow through to the `<head>` via the default slot.
+///
+/// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
+/// a BSX layout declares `<RouteHead>...</RouteHead>`. Builds inside a layout
+/// render (it reads [`RequestContext`]).
+#[template(system)]
+pub fn RouteHead(
+	cx: Res<RequestContext>,
+	metas: Query<&ArticleMeta>,
+	pkg: Res<PackageConfig>,
+) -> impl Bundle {
+	let meta = metas.get(cx.route()).ok();
+	let title = meta
+		.and_then(|meta| meta.title.clone())
+		.unwrap_or_else(|| pkg.title.clone());
+	let description = meta
+		.and_then(|meta| meta.description.clone())
+		.unwrap_or_else(|| pkg.description.clone());
+	rsx! {
+		<Head title=title description=description>
+			<Slot/>
+		</Head>
+	}
+}
+
+/// The route-tree navigation rail as a widget: collects the world's
+/// [`RouteTree`] into [`Sidebar`] nodes against the current request, applying
+/// each route entity's [`ArticleMeta`] (scan-time or parsed frontmatter) as its
+/// [`SidebarInfo`] override.
+///
+/// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
+/// a BSX layout places it with `<RouteSidebar/>`. Builds inside a layout render
+/// (it reads [`RequestContext`]); the infra routes `app-info`/`analytics` are
+/// always excluded, `exclude` adds site-specific globs.
+#[template(system)]
+pub fn RouteSidebar(
+	/// Show the synthetic `Home` entry. Disable when the header links home.
+	#[prop(default = true)]
+	home: bool,
+	/// Glob patterns excluded from the nav, eg `["export"]`.
+	#[prop]
+	exclude: Vec<String>,
+	cx: Res<RequestContext>,
+	trees: Query<&RouteTree>,
+	metas: Query<&ArticleMeta>,
+) -> impl Bundle {
+	let nodes = trees
+		.iter()
+		.next()
+		.map(|tree| {
+			let mut state = SidebarState::new(cx.current_path())
+				.with_home(home)
+				.with_exclude("app-info")
+				.with_exclude("analytics");
+			for pattern in &exclude {
+				state = state.with_exclude(pattern);
+			}
+			// each route's metadata drives its label/order/expansion
+			for node in tree.flatten_nodes() {
+				if let Ok(meta) = metas.get(node.entity) {
+					let mut info = meta.sidebar.clone();
+					info.label = meta.sidebar_label().map(String::from);
+					state = state.with_info(node.path.annotated_path(), info);
+				}
+			}
+			state.collect(tree)
+		})
+		.unwrap_or_default();
+	rsx! { <Sidebar nodes=nodes/> }
+}
+
 /// Per-route override for a sidebar entry, sourced from markdown frontmatter
 /// (the `sidebar` field of [`ArticleMeta`](crate::prelude::ArticleMeta)).
 ///

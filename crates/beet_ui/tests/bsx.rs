@@ -266,6 +266,30 @@ fn spread_inserts_components() {
 	world.entity(root).get::<Sized>().unwrap().width.xpect_eq(2.0);
 }
 
+#[beet_core::test]
+fn spread_on_component_tag() {
+	// a spread stacks components onto an uppercase tag's entity, eg middleware
+	// on a router: `<Router {(RequestLogger, ..)}>`.
+	let mut world = world();
+	register::<Marker>(&mut world);
+	register::<Sized>(&mut world);
+	let root = spawn_bsx(&mut world, "<Sized width=1 height=1 {Marker}/>");
+	world.entity(root).contains::<Marker>().xpect_true();
+	world.entity(root).get::<Sized>().unwrap().width.xpect_eq(1.0);
+}
+
+#[beet_core::test]
+fn spread_on_bsx_template_tag() {
+	let mut world = world();
+	register::<Marker>(&mut world);
+	let mut registry = BsxTemplateRegistry::default();
+	registry.insert_source("Card", "<section><Slot/></section>").unwrap();
+	world.insert_resource(registry);
+	let root = spawn_bsx(&mut world, "<Card {Marker}>Body</Card>");
+	world.entity(root).contains::<Marker>().xpect_true();
+	render_html(&mut world, root).xpect_contains("Body");
+}
+
 // ---- bx:scope ---------------------------------------------------------------
 
 #[beet_core::test]

@@ -546,6 +546,11 @@ name = "file_based_routes"
 path = "examples/file_based_routes/main.rs"
 required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq", "rustls-tls"]
 
+[[example]]
+name = "bsx_site"
+path = "examples/bsx_site/main.rs"
+required-features = ["http_server", "markdown", "style", "template", "fs"]
+
 # 💡 Examples - Thread
 
 [[example]]

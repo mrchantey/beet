@@ -1,0 +1,9 @@
+<!--
+The whole site: a router serving the `routes/` directory, every page wrapped
+in the `templates/Layout.bsx` document. The router's middleware attaches as
+component spreads: request logging, `--help`, terminal link navigation, and
+the layout itself.
+-->
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+	<RoutesDir src="routes"/>
+</Router>

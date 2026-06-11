@@ -61,7 +61,16 @@ impl Plugin for RouterPlugin {
 				.init_plugin::<TemplatePlugin>()
 				.init_plugin::<DocumentPlugin>()
 				.register_type::<HelpHandler>()
-				.register_type::<NavigateHandler>();
+				.register_type::<NavigateHandler>()
+				// the no-code site surface: markup-resolved router components
+				// (`<RoutesDir/>`, a `BsxLayout` spread) and the by-name
+				// route-aware head/sidebar widgets.
+				.register_type::<BsxLayout>()
+				.register_template::<RouteHead>()
+				.register_template::<RouteSidebar>();
+			#[cfg(not(target_arch = "wasm32"))]
+			app.register_type::<RoutesDir>()
+				.add_observer(spawn_routes_dir);
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			#[cfg(feature = "scripting")]

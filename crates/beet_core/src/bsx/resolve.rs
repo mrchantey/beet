@@ -416,6 +416,8 @@ fn build_uppercase(
 		// build the template's subtree into this entity, carrying its slot targets.
 		cx.entity.build_template(&nested)?;
 		apply_common_directives(el, refs, cx)?;
+		let entity_refs = resolve_entity_refs(el, refs, cx);
+		apply_spreads(el, cx.entity, &entity_refs)?;
 		// caller content becomes slot children on this entity.
 		build_slot_children(el, registry, refs, cx)?;
 		return Ok(());
@@ -460,6 +462,7 @@ fn build_uppercase(
 		// build the registered template into this entity, then route caller content.
 		build_template_by_name(&app_registry, &el.tag, patch.as_ref(), cx)?;
 		apply_common_directives(el, refs, cx)?;
+		apply_spreads(el, cx.entity, &entity_refs)?;
 		build_slot_children(el, registry, refs, cx)?;
 	} else {
 		// a component: reflect-patch over default and insert.
@@ -468,6 +471,7 @@ fn build_uppercase(
 		// the component field, both ways, via a reflect-field binding.
 		apply_reflect_field_bindings(el, cx.entity)?;
 		apply_common_directives(el, refs, cx)?;
+		apply_spreads(el, cx.entity, &entity_refs)?;
 		build_children(el, registry, refs, cx)?;
 	}
 	Ok(())
@@ -684,23 +688,33 @@ fn apply_attributes(
 			Ok(())
 		})?;
 	}
-	// bare-position spreads insert components/templates onto the element itself.
-	// the registry is only needed when a spread is present, so a plain HTML/markdown
-	// parse (no `AppTypeRegistry`) never touches it.
+	apply_spreads(el, entity, entity_refs)
+}
+
+/// Insert every bare-position spread's components/templates onto `entity`,
+/// shared by every tag kind (an HTML element, a component, a template). The
+/// `AppTypeRegistry` is only touched when a spread is present, so a plain
+/// HTML/markdown parse (no registry) never needs it.
+fn apply_spreads(
+	el: &BsxElement,
+	entity: &mut EntityWorldMut,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> Result<()> {
 	let has_spread = el
 		.attributes
 		.iter()
 		.any(|attr| matches!(attr.value, AttrValue::Spread(_)));
-	if has_spread {
-		let app_registry = entity
-			.world_scope(|world| world.get_resource::<AppTypeRegistry>().cloned())
-			.ok_or_else(|| {
-				bevyhow!("a spread requires an `AppTypeRegistry` in the world")
-			})?;
-		for attr in &el.attributes {
-			if let AttrValue::Spread(spread) = &attr.value {
-				apply_spread(spread, entity, &app_registry, entity_refs)?;
-			}
+	if !has_spread {
+		return Ok(());
+	}
+	let app_registry = entity
+		.world_scope(|world| world.get_resource::<AppTypeRegistry>().cloned())
+		.ok_or_else(|| {
+			bevyhow!("a spread requires an `AppTypeRegistry` in the world")
+		})?;
+	for attr in &el.attributes {
+		if let AttrValue::Spread(spread) = &attr.value {
+			apply_spread(spread, entity, &app_registry, entity_refs)?;
 		}
 	}
 	Ok(())

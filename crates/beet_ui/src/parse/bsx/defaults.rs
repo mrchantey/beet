@@ -9,7 +9,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Registers the default BSX event/verb vocabulary into the core seam.
+/// Registers the default BSX event/verb vocabulary into the core seam, plus the
+/// widget set by name so a `<Head/>`/`<Sidebar/>` tag resolves.
 ///
 /// Builds on [`BsxPlugin`] (which seeds the empty registries): the `click`
 /// installer wires a [`PointerDown`] observer that runs the bound verb with
@@ -23,6 +24,7 @@ impl Plugin for BsxDefaultsPlugin {
 		app.add_plugins(BsxPlugin);
 		register_default_events(app.world_mut());
 		register_default_verbs(app.world_mut());
+		register_widget_templates(app.world_mut());
 	}
 }
 

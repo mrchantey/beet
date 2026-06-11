@@ -35,6 +35,20 @@ pub fn literal_to_reflect(
 	registry: &TypeRegistry,
 	resolver: EntityResolver,
 ) -> Result<Box<dyn PartialReflect>> {
+	// an `Option<T>` target wraps a plain value into `Some`: `title="x"` on an
+	// `Option<String>` field resolves to `Some("x")`. An explicit `Some`/`None`
+	// literal falls through to the ordinary enum path.
+	if let Some(some_info) = option_some_inner(field_info)
+		&& !is_option_literal(literal)
+	{
+		let inner =
+			literal_to_reflect(literal, Some(some_info), registry, resolver)?;
+		let mut tuple = DynamicTuple::default();
+		tuple.insert_boxed(inner);
+		let mut option = DynamicEnum::new("Some", DynamicVariant::Tuple(tuple));
+		option.set_represented_type(field_info);
+		return Ok(Box::new(option));
+	}
 	match literal {
 		DataLiteral::Scalar(value) => scalar_to_reflect(value, field_info),
 		DataLiteral::List(items) => {
@@ -48,6 +62,28 @@ pub fn literal_to_reflect(
 		}
 		DataLiteral::EntityRef(name) => Ok(Box::new(resolver(name))),
 	}
+}
+
+/// The `Some` variant's inner [`TypeInfo`] when `field_info` is an
+/// `Option<T>` enum, else `None`.
+fn option_some_inner(
+	field_info: Option<&'static TypeInfo>,
+) -> Option<&'static TypeInfo> {
+	let TypeInfo::Enum(info) = field_info? else {
+		return None;
+	};
+	if !info.type_path().starts_with("core::option::Option<") {
+		return None;
+	}
+	match info.variant("Some")? {
+		VariantInfo::Tuple(tuple) => tuple.field_at(0)?.type_info(),
+		_ => None,
+	}
+}
+
+/// Whether a literal already names an `Option` variant (`Some`/`None`).
+fn is_option_literal(literal: &DataLiteral) -> bool {
+	matches!(literal, DataLiteral::Enum(named) if named.name == "Some" || named.name == "None")
 }
 
 /// Look up a registered type's `'static` [`TypeInfo`] by short type path.
@@ -287,4 +323,41 @@ fn named_tuple_struct_to_reflect(
 	}
 	dynamic.set_represented_type(field_info);
 	Ok(Box::new(dynamic))
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use bevy::reflect::FromReflect;
+	use bevy::reflect::Typed;
+
+	fn resolve<T: FromReflect + Typed>(literal: DataLiteral) -> T {
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		let reflected = literal_to_reflect(
+			&literal,
+			Some(T::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.unwrap();
+		T::from_reflect(reflected.as_ref()).unwrap()
+	}
+
+	#[beet_core::test]
+	fn wraps_scalar_into_option() {
+		resolve::<Option<String>>(DataLiteral::Scalar(Value::str("beet")))
+			.xpect_eq(Some("beet".to_string()));
+		resolve::<Option<u32>>(DataLiteral::Scalar(Value::Uint(7)))
+			.xpect_eq(Some(7));
+	}
+
+	#[beet_core::test]
+	fn explicit_none_passes_through() {
+		resolve::<Option<String>>(DataLiteral::Enum(NamedLiteral {
+			name: "None".into(),
+			fields: NamedFields::Unit,
+		}))
+		.xpect_eq(None);
+	}
 }

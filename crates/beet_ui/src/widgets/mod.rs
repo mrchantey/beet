@@ -51,3 +51,38 @@ pub use sidebar::*;
 #[cfg(feature = "style")]
 pub use stylesheet::*;
 pub use table::*;
+
+use beet_core::prelude::*;
+
+/// Registers the widget set by short type path so a name-resolved tag (eg a
+/// BSX `<Head/>` or a serialized scene) builds the widget. Called by
+/// [`BsxDefaultsPlugin`](crate::prelude::BsxDefaultsPlugin).
+pub fn register_widget_templates(world: &mut World) {
+	world
+		.register_template::<Button>()
+		.register_template::<IconButton>()
+		.register_template::<Link>()
+		.register_template::<ColorSchemeScript>()
+		.register_template::<ErrorText>()
+		.register_template::<Footer>()
+		.register_template::<TextField>()
+		.register_template::<TextArea>()
+		.register_template::<Select>()
+		.register_template::<Form>()
+		.register_template::<Head>()
+		.register_template::<Header>()
+		.register_template::<HtmlDocument>()
+		.register_template::<PageLayout>()
+		.register_template::<PageBreak>()
+		.register_template::<ContentLayout>()
+		.register_template::<Preflight>()
+		.register_template::<Reset>()
+		.register_template::<Sidebar>()
+		.register_template::<SidebarScript>()
+		.register_template::<MenuButton>()
+		.register_template::<Table>();
+	#[cfg(feature = "net")]
+	world.register_template::<Analytics>();
+	#[cfg(feature = "style")]
+	world.register_template::<Stylesheet>();
+}

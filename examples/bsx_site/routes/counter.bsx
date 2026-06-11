@@ -1,0 +1,15 @@
+<!-- A BSX page: site templates by module path, document state, and event verbs. -->
+<article bx:scope="counter">
+	<h1>A page with state</h1>
+	<p>
+		Pages can be BSX too. This one composes the site's own
+		<code>widgets::Card</code> template and binds a document field to the
+		built-in verbs, no code required:
+	</p>
+	<widgets::Card>
+		<span bx:slot="title">Counter</span>
+		<p>You have clicked {#count=0} times.</p>
+		<button bx:click="increment#count">More</button>
+		<button bx:click="decrement#count">Less</button>
+	</widgets::Card>
+</article>
