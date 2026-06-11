@@ -14,7 +14,9 @@ pub struct FormRuntimePlugin;
 
 impl Plugin for FormRuntimePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(FormPlugin).add_observer(write_submit_json);
+		// init: the TUI target's `CharcellTuiPlugin` registers `FormPlugin` too
+		app.init_plugin::<FormPlugin>()
+			.add_observer(write_submit_json);
 	}
 }
 

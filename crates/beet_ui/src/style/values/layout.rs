@@ -18,6 +18,9 @@ pub enum Display {
 	Inline,
 	/// Flexbox layout.
 	Flex,
+	/// Grid layout: children flow row-major into equal-width column tracks
+	/// (see [`GridTracks`]).
+	Grid,
 	/// Table wrapper (`<table>`): lays its rows out as a column-aligned grid. The
 	/// charcell engine drives table layout off this and [`TableCell`](Self::TableCell)
 	/// alone — rows and row groups (`<tr>`/`<thead>`/…) are found structurally, so
@@ -36,6 +39,7 @@ impl AsCssValue for Display {
 			Self::ListItem => "list-item",
 			Self::Inline => "inline",
 			Self::Flex => "flex",
+			Self::Grid => "grid",
 			Self::Table => "table",
 			Self::TableCell => "table-cell",
 			Self::None => "none",
@@ -43,6 +47,82 @@ impl AsCssValue for Display {
 		.xmap(CssValue::expression)
 		.xok()
 	}
+}
+
+/// The column count of a grid container, mapping to CSS
+/// `grid-template-columns: repeat(n, minmax(0, 1fr))`. Defaults to the
+/// familiar 12-column grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct GridColumns(pub u32);
+
+impl Default for GridColumns {
+	fn default() -> Self { Self(12) }
+}
+
+impl AsCssValue for GridColumns {
+	fn as_css_value(&self) -> Result<CssValue> {
+		format!("repeat({}, minmax(0, 1fr))", self.0)
+			.xmap(CssValue::expression)
+			.xok()
+	}
+}
+
+/// Row track height of a grid container, mapping to CSS `grid-auto-rows`.
+///
+/// `Square` (default) sizes each track square: half its column width on the
+/// terminal, where a cell is about twice as tall as wide. The web has no
+/// square keyword, so it serializes to `auto` (pair with an `aspect-ratio`
+/// rule there if squareness matters).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum GridRows {
+	/// Square tracks: row height = column width / 2 in cells.
+	#[default]
+	Square,
+	/// An explicit track height.
+	Length(Length),
+}
+
+impl GridRows {
+	/// The track height in cells for a `column_width`-cell track.
+	pub fn cells(&self, column_width: u32, viewport: UVec2) -> u32 {
+		match self {
+			Self::Square => (column_width / 2).max(1),
+			Self::Length(length) => {
+				length.into_rem(viewport.as_vec2()).round().max(1.) as u32
+			}
+		}
+	}
+}
+
+impl AsCssValue for GridRows {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Square => CssValue::expression("auto").xok(),
+			Self::Length(length) => length.as_css_value(),
+		}
+	}
+}
+
+/// Grid track configuration for a `display: grid` container: the column count
+/// ("width", defaulting to 12) and row track height ("height", defaulting to
+/// square). Gaps come from the shared [`FlexBox`] gap values, like CSS `gap`.
+#[derive(Debug, Clone, Copy, PartialEq, Reflect)]
+pub struct GridTracks {
+	pub columns: GridColumns,
+	pub rows: GridRows,
+}
+
+impl Default for GridTracks {
+	fn default() -> Self { Self::DEFAULT }
+}
+
+impl GridTracks {
+	pub const DEFAULT: Self = Self {
+		columns: GridColumns(12),
+		rows: GridRows::Square,
+	};
 }
 
 /// How content overflowing a node's box is handled along one axis, mapping to
@@ -363,6 +443,8 @@ pub struct LayoutStyle {
 	pub display: Display,
 	pub white_space: WhiteSpace,
 	pub flex_box: FlexBox,
+	/// Grid tracks, read when `display: grid`.
+	pub grid: GridTracks,
 	pub flex_order: i32,
 	pub flex_grow: u32,
 	pub align_self: AlignSelf,
@@ -377,6 +459,7 @@ impl LayoutStyle {
 		display: Display::Block,
 		white_space: WhiteSpace::Normal,
 		flex_box: FlexBox::row(),
+		grid: GridTracks::DEFAULT,
 		flex_order: 0,
 		flex_grow: 0,
 		align_self: AlignSelf::Auto,
@@ -412,6 +495,24 @@ impl LayoutStyle {
 			flex_box: FlexBox::col(),
 			..default()
 		}
+	}
+
+	/// Create a grid layout style with the given column count (12 is the
+	/// conventional default) and square row tracks.
+	pub fn grid(columns: u32) -> Self {
+		Self {
+			display: Display::Grid,
+			grid: GridTracks {
+				columns: GridColumns(columns),
+				rows: GridRows::Square,
+			},
+			..default()
+		}
+	}
+
+	pub fn grid_rows(mut self, rows: GridRows) -> Self {
+		self.grid.rows = rows;
+		self
 	}
 
 	pub fn justify_content(mut self, justify: JustifyContent) -> Self {

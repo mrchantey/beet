@@ -61,7 +61,7 @@ template = ["std", "rsx", "style"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-tui = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
+tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -97,6 +97,7 @@ extend.workspace = true
 bytes.workspace = true
 libc = { workspace = true, optional = true }
 vte = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 serde_json = { workspace = true, optional = true }
@@ -121,7 +122,7 @@ streaming-iterator = { version = "0.1", optional = true }
 
 
 [dev-dependencies]
-beet_core = { workspace = true, features = ["testing"] }
+beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server"] }
 
 [lib]

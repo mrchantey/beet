@@ -50,6 +50,8 @@ pub fn token_map()->CssTokenMap{
 		.insert(ColumnGapProp)
 		.insert(RowGapProp)
 		.insert(DisplayProp)
+		.insert(GridTemplateColumnsProp)
+		.insert(GridAutoRowsProp)
 		.insert(ListStyleProp)
 		.insert(OverflowXProp)
 		.insert(OverflowYProp)
@@ -69,6 +71,7 @@ pub fn token_map()->CssTokenMap{
 		.insert(BreakAfterProp)
 		.insert(CursorProp)
 		.insert(TransitionDurationProp)
+		.insert(TransitionEaseProp)
 		.insert(AnimationDurationProp)
 		.insert(TransformProp)
 		.insert(OpacityProp)
@@ -119,8 +122,12 @@ canonical_property!(BreakAfterProp, BreakAfter, TokenInheritance::NotInherited, 
 canonical_property!(CursorProp, Cursor, TokenInheritance::NotInherited, "cursor");
 canonical_property!(TransformProp, Transform, TokenInheritance::NotInherited, "transform");
 css_property!(TransitionDurationProp, Duration, TokenInheritance::NotInherited, "transition-duration");
+// Easing for style transitions; pairs with `TransitionDurationProp` to drive
+// the charcell `VisualTransition` (see `style::animate`).
+css_property!(TransitionEaseProp, EaseFunction, TokenInheritance::NotInherited, "transition-timing-function");
 // Whole-element opacity, driving the interactive hover/active dim. A unitless
-// `f32` in `[0,1]`; the charcell target ignores it (no alpha compositing yet).
+// `f32` in `[0,1]`; the charcell target approximates it by blending colours
+// toward the element surface (see `VisualStyle::apply_opacity`).
 css_property!(OpacityProp, f32, TokenInheritance::NotInherited, "opacity");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
@@ -145,6 +152,8 @@ css_property!(BorderRightWidth, Length, TokenInheritance::NotInherited, "border-
 css_property!(BorderBottomWidth, Length, TokenInheritance::NotInherited, "border-bottom-width");
 css_property!(BorderLeftWidth, Length, TokenInheritance::NotInherited, "border-left-width");
 
+canonical_property!(GridTemplateColumnsProp, GridColumns, TokenInheritance::NotInherited, "grid-template-columns");
+canonical_property!(GridAutoRowsProp, GridRows, TokenInheritance::NotInherited, "grid-auto-rows");
 canonical_property!(JustifyContentProp, JustifyContent, TokenInheritance::NotInherited, "justify-content");
 canonical_property!(AlignItemsProp, AlignItems, TokenInheritance::NotInherited, "align-items");
 canonical_property!(AlignContentProp, AlignContent, TokenInheritance::NotInherited, "align-content");

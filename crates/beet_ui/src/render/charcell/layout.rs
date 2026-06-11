@@ -83,6 +83,13 @@ pub fn layout_nodes<B: Component + AsBuffer>(
 						viewport_size,
 						&mut layout_rects,
 					)?,
+					Display::Grid => grid_layout_rects(
+						&node,
+						&charcell,
+						node_rect,
+						viewport_size,
+						&mut layout_rects,
+					)?,
 					Display::Table => table_layout_rects(
 						&node,
 						&charcell,
@@ -164,9 +171,16 @@ pub fn block_layout_rects(
 		}
 		// an explicit (percent/absolute) width takes the child off full-bleed block
 		// flow, clamped to the available width; otherwise it fills the content box.
+		// A kitty raster is a replaced element: like CSS `width: auto` on an
+		// `<img>`, its box hugs the raster's cell width (aspect-derived from an
+		// explicit height when one is given).
 		let (explicit_w, explicit_h) =
 			explicit_box_size(child, viewport, containing);
-		let child_width = explicit_w.unwrap_or(full_width).min(full_width);
+		let raster_w = child.kitty_image().map(|image| {
+			image.cell_size_constrained(explicit_w, explicit_h, full_width).x
+		});
+		let child_width =
+			explicit_w.or(raster_w).unwrap_or(full_width).min(full_width);
 		// height resolved at the assigned width, not the wider measured width, so
 		// a narrowed column reserves every wrapped row instead of clipping the tail.
 		let child_height = explicit_h

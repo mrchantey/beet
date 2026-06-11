@@ -19,6 +19,19 @@ impl Plugin for StylePlugin {
 			sync_color_scheme.before(ResolveStylesSet),
 		);
 
+		// ease displayed styles toward the cascade's resolved targets. `Time`
+		// is initialized here so a host without `TimePlugin` (eg a one-shot
+		// render) still builds; its transitions simply never advance.
+		app.init_resource::<Time>()
+			.configure_sets(
+				PostParseTree,
+				AnimateStylesSet.after(ResolveStylesSet),
+			)
+			.add_systems(
+				PostParseTree,
+				animate_visual_transitions.in_set(AnimateStylesSet),
+			);
+
 		// terminal/char-cell defaults for prose elements (em → italic,
 		// h1 → bold colour, …), expressed as ordinary tag rules.
 		app.world_mut()

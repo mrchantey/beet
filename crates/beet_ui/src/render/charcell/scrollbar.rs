@@ -244,6 +244,8 @@ pub(super) struct AxisBar {
 	pub max_offset: i32,
 }
 
+// consumed by the tui-only scrollbar mouse hit-test
+#[cfg_attr(not(feature = "tui"), allow(dead_code))]
 impl AxisBar {
 	/// The leftover track the thumb travels across (track minus thumb length).
 	pub fn travel(&self) -> u32 { self.track_len.saturating_sub(self.thumb_len) }

@@ -12,6 +12,8 @@ mod decorate;
 mod double_buffer;
 mod flex;
 mod flex_buffer;
+mod grid;
+pub(self) use grid::*;
 mod inline;
 #[cfg(feature = "tui")]
 mod hit_test;
@@ -19,6 +21,10 @@ mod hit_test;
 mod input;
 #[cfg(feature = "tui")]
 mod input_bridge;
+// the `KittyImage` data is platform-neutral (measure/paint read it); the
+// attach/emission systems inside are `tui`-gated.
+mod kitty;
+pub use kitty::*;
 mod layout;
 mod measure;
 mod paint;
@@ -33,6 +39,10 @@ pub(self) use scrollbar::*;
 mod scrollbar_hit_test;
 #[cfg(feature = "tui")]
 pub use scrollbar_hit_test::*;
+#[cfg(feature = "tui")]
+mod select;
+#[cfg(feature = "tui")]
+pub use select::*;
 mod stacking;
 pub(self) use stacking::*;
 mod table;

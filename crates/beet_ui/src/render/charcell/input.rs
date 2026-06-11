@@ -29,8 +29,25 @@ impl InputParser {
 	pub fn new() -> Self { Self::default() }
 
 	/// Parse a byte slice and return all complete [`TerminalEvent`]s.
+	///
+	/// A chunk-final `ESC` (or one directly followed by another `ESC`) is the
+	/// Escape key: a real escape sequence's continuation bytes arrive in the
+	/// same read chunk, so feeding a dangling `ESC` to vte would park it in the
+	/// escape state and corrupt the next chunk (eg a following `a` would parse
+	/// as Alt+a). The same heuristic crossterm uses.
 	pub fn parse(&mut self, bytes: &[u8]) -> Result<Vec<TerminalEvent>> {
-		self.parser.advance(&mut self.performer, bytes);
+		let mut start = 0;
+		for i in 0..bytes.len() {
+			let lone_escape = bytes[i] == 0x1b
+				&& (i + 1 == bytes.len() || bytes.get(i + 1) == Some(&0x1b));
+			if lone_escape {
+				self.parser.advance(&mut self.performer, &bytes[start..i]);
+				self.performer
+					.push_key(KeyPress::unmodified(KeyCode::Escape));
+				start = i + 1;
+			}
+		}
+		self.parser.advance(&mut self.performer, &bytes[start..]);
 		Ok(core::mem::take(&mut self.performer.events))
 	}
 }

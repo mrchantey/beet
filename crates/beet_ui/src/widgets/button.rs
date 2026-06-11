@@ -105,7 +105,8 @@ mod test {
 	/// `PointerUp`, the same path `bx:click` rides.
 	fn spawn_button(app: &mut App) -> Entity {
 		app.world_mut()
-			.spawn_template(rsx! { <div><Button>"Save"</Button></div> });
+			.spawn_template(rsx! { <div><Button>"Save"</Button></div> })
+			.unwrap();
 		app.update();
 		let button = app
 			.world_mut()

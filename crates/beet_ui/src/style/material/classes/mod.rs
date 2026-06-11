@@ -91,6 +91,7 @@ pub fn all_rules() -> Vec<Rule> {
 		footer(),
 		footer_side(),
 		container(),
+		grid(),
 		// prose overrides — appended so they win the tag cascade over the
 		// user-agent element defaults (later rule wins ties)
 		link_prose(),
@@ -115,6 +116,11 @@ pub fn all_rules() -> Vec<Rule> {
 		select_outlined(),
 		select_filled(),
 		select_text(),
+		// the dropdown state rules trail their base so they win the cascade
+		select_dropdown(),
+		select_option(),
+		select_option_active(),
+		select_option_selected(),
 		error_text(),
 		// table (the `.table-vertical-borders` column dividers are drawn per target:
 		// an adjacent-sibling rule in `reset.css` on the web, the

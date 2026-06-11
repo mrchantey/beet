@@ -15,6 +15,8 @@ pub const CONTAINER: ClassName = ClassName::new_static("container");
 pub const PAGE: ClassName = ClassName::new_static("page");
 /// A footer side cell that grows to flank the centered copyright.
 pub const FOOTER_SIDE: ClassName = ClassName::new_static("footer-side");
+/// A 12-column grid container with square row tracks (see [`grid`]).
+pub const GRID: ClassName = ClassName::new_static("grid");
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
@@ -154,6 +156,17 @@ pub fn container() -> Rule {
 		// stretch the sidebar to the row height so its right divider runs the
 		// full height of the content, not just its own entries.
 		.with_value(common_props::AlignItemsProp, AlignItems::Stretch)
+}
+
+/// Grid container - the default 12 columns of square tracks with a one-cell
+/// gap. Adjust per usage with [`common_props::GridTemplateColumnsProp`] /
+/// [`common_props::GridAutoRowsProp`] rules.
+pub fn grid() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(GRID))
+		.with_value(common_props::DisplayProp, Display::Grid)
+		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))
+		.with_value(common_props::RowGapProp, Length::Rem(1.0))
 }
 
 /// Main content column - grows to fill the space beside the sidebar.

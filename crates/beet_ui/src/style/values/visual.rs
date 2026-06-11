@@ -103,6 +103,59 @@ impl VisualStyle {
 		}
 	}
 
+	/// Interpolate toward `to` at `t` in `[0, 1]`.
+	///
+	/// Colours mix continuously; an unset colour is the terminal default,
+	/// which has no value to mix through, so it snaps at the halfway point
+	/// like the discrete (weight/style/decoration/...) fields, mirroring how
+	/// CSS transitions non-interpolable properties.
+	pub fn mix(&self, to: &Self, t: f32) -> Self {
+		let mix_color = |from: &Option<Color>, to: &Option<Color>| {
+			match (from, to) {
+				(Some(from), Some(to)) => Some(from.mix(to, t)),
+				_ if t < 0.5 => *from,
+				_ => *to,
+			}
+		};
+		let discrete = if t < 0.5 { self } else { to };
+		Self {
+			foreground: mix_color(&self.foreground, &to.foreground),
+			background: mix_color(&self.background, &to.background),
+			decoration_color: mix_color(
+				&self.decoration_color,
+				&to.decoration_color,
+			),
+			decoration_line: discrete.decoration_line,
+			decoration_style: discrete.decoration_style,
+			font_weight: discrete.font_weight.clone(),
+			font_style: discrete.font_style,
+			blink: discrete.blink,
+			visibility: discrete.visibility,
+			text_align: discrete.text_align,
+		}
+	}
+
+	/// Approximate whole-element CSS `opacity` for a colour-only target: the
+	/// foreground (and decoration) blend toward the element's own background
+	/// when set — text fades into its surface — and every colour otherwise
+	/// scales toward black, the terminal's default backdrop. True per-cell
+	/// alpha compositing is out of scope for a char grid.
+	pub fn apply_opacity(&mut self, opacity: f32) {
+		let fade = 1. - opacity.clamp(0., 1.);
+		if fade == 0. {
+			return;
+		}
+		let backdrop = self.background.unwrap_or(Color::BLACK);
+		self.foreground =
+			self.foreground.map(|color| color.mix(&backdrop, fade));
+		self.decoration_color = self
+			.decoration_color
+			.map(|color| color.mix(&backdrop, fade));
+		self.background = self
+			.background
+			.map(|color| color.mix(&Color::BLACK, fade));
+	}
+
 	/// Whether this style would emit no escape codes.
 	pub fn is_plain(&self) -> bool {
 		self.foreground.is_none()

@@ -180,7 +180,16 @@ fn paint_node(
 	//    scrolls with it, so shift the content rect by its scroll offset (child
 	//    entities are already shifted via the descendant context).
 	let content_rect = translate_rect(content_rect, -node.scroll_offset());
-	if establishes_inline_flow(node, query) {
+	if node.kitty_image().is_some() {
+		// reserve the raster's box with entity-carrying spaces: the picture is
+		// drawn over them by `place_kitty_images`, and the cells keep the
+		// hit-test (eg the image hyperlink) working.
+		buffer.fill_rect(
+			content_rect,
+			Cell::new(" ", node.visual_style().clone(), node.entity),
+			clip,
+		);
+	} else if establishes_inline_flow(node, query) {
 		paint_inline_flow(node, query, content_rect, &mut *buffer, clip);
 	} else {
 		paint_text(node, content_rect, &mut *buffer, clip)?;

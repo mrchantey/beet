@@ -36,13 +36,15 @@ struct InlineSpan {
 	link: Option<SmolStr>,
 }
 
-/// Whether `node` establishes an inline formatting context: a non-flex
-/// container all of whose children are [inline-level](CharcellNodeData::is_inline_level).
+/// Whether `node` establishes an inline formatting context: a non-flex,
+/// non-grid container all of whose children are
+/// [inline-level](CharcellNodeData::is_inline_level) (flex/grid items are
+/// blockified, never flowed as text).
 pub(super) fn establishes_inline_flow(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 ) -> bool {
-	if node.layout_style().display == Display::Flex {
+	if matches!(node.layout_style().display, Display::Flex | Display::Grid) {
 		return false;
 	}
 	let mut any = false;

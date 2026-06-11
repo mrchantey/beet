@@ -34,6 +34,7 @@ pub fn resolve_styles(
 		Option<&mut PositionStyle>,
 		Option<&mut ScrollbarStyle>,
 	)>,
+	mut transitions: Query<Option<&mut TransitionStyle>>,
 ) -> Result {
 	// TODO fine-grained listeners
 	// reparenting etc. only update whats needed
@@ -108,6 +109,29 @@ pub fn resolve_styles(
 				commands.entity(entity).insert(scrollbar);
 			}
 
+			// resolve transition settings for every node, not just elements: a
+			// text leaf resolves through its nearest element's rules, so it
+			// carries the same transition and its inherited colours ease in
+			// step with the element (CSS gets this by re-deriving inherited
+			// used values; beet resolves each node's own). Attached only while
+			// the duration is nonzero, so the animation system iterates
+			// transitioned nodes alone.
+			let transition = resolve_transition(&ruleset_query, entity, &mut memo)?;
+			match transitions.get_mut(entity)? {
+				Some(mut style) if transition.duration > Duration::ZERO => {
+					style.set_if_neq(transition);
+				}
+				Some(_) => {
+					commands
+						.entity(entity)
+						.remove::<(TransitionStyle, VisualTransition)>();
+				}
+				None if transition.duration > Duration::ZERO => {
+					commands.entity(entity).insert(transition);
+				}
+				None => {}
+			}
+
 			if let Some(children_list) = children.get(entity).ok() {
 				queue.extend(children_list.into_iter().cloned());
 			}
@@ -147,8 +171,11 @@ fn resolve_visual(
 	let blink = query.resolve(entity, BlinkStyleProp, memo).unwrap_or_default();
 	let visibility =
 		query.resolve(entity, VisibilityProp, memo).unwrap_or_default();
+	// `opacity` bakes into the resolved colours (the charcell approximation,
+	// see [`VisualStyle::apply_opacity`]), so a transition eases the dim.
+	let opacity = query.resolve(entity, OpacityProp, memo).unwrap_or(1.);
 
-	VisualStyle {
+	let mut style = VisualStyle {
 		foreground,
 		background,
 		decoration_color,
@@ -159,8 +186,9 @@ fn resolve_visual(
 		blink,
 		visibility,
 		text_align,
-	}
-	.xok()
+	};
+	style.apply_opacity(opacity);
+	style.xok()
 }
 
 fn resolve_layout(
@@ -197,6 +225,14 @@ fn resolve_layout(
 		query.resolve(entity, OverflowXProp, memo).unwrap_or_default();
 	let overflow_y =
 		query.resolve(entity, OverflowYProp, memo).unwrap_or_default();
+	let grid = GridTracks {
+		columns: query
+			.resolve(entity, GridTemplateColumnsProp, memo)
+			.unwrap_or_default(),
+		rows: query
+			.resolve(entity, GridAutoRowsProp, memo)
+			.unwrap_or_default(),
+	};
 	LayoutStyle {
 		display,
 		white_space,
@@ -209,6 +245,7 @@ fn resolve_layout(
 			row_gap,
 			column_gap,
 		},
+		grid,
 		flex_grow,
 		flex_order,
 		align_self,
@@ -251,6 +288,23 @@ fn resolve_scrollbar(
 		thumb: color.map(|c| c.thumb),
 		track: color.map(|c| c.track),
 		width,
+	}
+	.xok()
+}
+
+fn resolve_transition(
+	query: &RuleSetQuery,
+	entity: Entity,
+	memo: &mut CascadeMemo,
+) -> Result<TransitionStyle> {
+	let default = TransitionStyle::default();
+	TransitionStyle {
+		duration: query
+			.resolve(entity, TransitionDurationProp, memo)
+			.unwrap_or(default.duration),
+		ease: query
+			.resolve(entity, TransitionEaseProp, memo)
+			.unwrap_or(default.ease),
 	}
 	.xok()
 }

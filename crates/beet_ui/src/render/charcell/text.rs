@@ -29,20 +29,20 @@ pub(super) fn measure_str(text: &str, max_width: u32) -> UVec2 {
 
 /// Paint text into the buffer from a [`CharcellNodeData`].
 ///
-/// Uses the node's [`Value`], falling back to its generated [`Marker`] (eg the
-/// `<hr>` rule); a no-op when it has neither.
+/// Uses the node's generated [`Marker`] (eg the `<hr>` rule or a `<select>`'s
+/// label — generated content replaces a raw [`Value`], which for a form
+/// control is submission state, not display text), else its [`Value`]; a
+/// no-op when it has neither.
 pub(super) fn paint_text(
 	node: &CharcellNodeData,
 	content_rect: IRect,
 	buffer: &mut impl AsBuffer,
 	clip: Clip,
 ) -> Result {
-	let text = match node.value() {
-		Some(value) => value.to_string(),
-		None => match node.marker() {
-			Some(marker) => marker.to_string(),
-			None => return Ok(()),
-		},
+	let text = match (node.marker(), node.value()) {
+		(Some(marker), _) => marker.to_string(),
+		(None, Some(value)) => value.to_string(),
+		(None, None) => return Ok(()),
 	};
 	let visual = node.visual_style();
 	let entity = node.entity;

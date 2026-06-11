@@ -13,6 +13,7 @@ use bevy::math::UVec2;
 
 use super::establishes_inline_flow;
 use super::explicit_box_size;
+use super::measure_grid;
 use super::marker_gutter;
 use super::measure_inline_flow;
 use super::measure_str;
@@ -184,8 +185,18 @@ pub(super) fn resolve_height(
 		Display::Flex => {
 			resolve_flex_height(node, query, content_width, viewport)
 		}
+		Display::Grid => {
+			measure_grid(node, query, UVec2::new(content_width, 0), viewport).y
+		}
 		Display::Table => {
 			resolve_table_height(node, query, content_width, viewport)
+		}
+		// a kitty raster's rows follow its aspect at the assigned width (an
+		// explicit `height` overrides below, like every other display)
+		_ if let Some(image) = node.kitty_image() => {
+			image
+				.cell_size_constrained(Some(content_width), None, content_width)
+				.y
 		}
 		// text leaf (eg a paragraph's text node)
 		_ if node.value().is_some() => measure_text(node, content_width).y,

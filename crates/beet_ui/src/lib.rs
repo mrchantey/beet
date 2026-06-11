@@ -74,6 +74,8 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::BlinkStyle;
 	#[cfg(feature = "style")]
+	pub use crate::style::AppColorScheme;
+	#[cfg(feature = "style")]
 	pub use crate::style::ColorScheme;
 	#[cfg(feature = "style")]
 	pub use crate::style::DecorationLine;

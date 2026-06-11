@@ -35,8 +35,9 @@ terminal = ["render", "beet/tui"]
 cli = ["web", "terminal"]
 
 # Live interactive terminal target: boots the navigable site (scroll, links,
-# forms) via the in-world `Navigator` + `TuiServer`, sibling to the one-shot `cli`.
-tui = ["terminal", "beet/tui_server"]
+# forms) via the in-world `Navigator` + `TuiServer`, sibling to the one-shot
+# `cli`. The HTTP transport lets remote `<img>` rasters fetch (kitty graphics).
+tui = ["terminal", "beet/tui_server", "beet/ureq", "beet/rustls-tls"]
 
 # Build-time route codegen. Compiles without the generated `src/codegen` modules
 # so it can bootstrap them: `cargo run -p beet_site --no-default-features

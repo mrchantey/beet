@@ -1,3 +1,4 @@
+mod animate;
 mod color_scheme;
 pub mod common_props;
 mod css;
@@ -9,6 +10,7 @@ mod style_query;
 #[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 pub mod syntax;
 mod values;
+pub use animate::*;
 pub use color_scheme::*;
 pub use css::*;
 pub use elements::*;

@@ -365,16 +365,21 @@ impl Terminal {
 		&mut self,
 		cells: impl IntoIterator<Item = (UVec2, &'a super::Cell)>,
 	) -> Result {
-		let mut last_pos: Option<UVec2> = None;
+		// where the terminal cursor lands after the previous write, accounting
+		// for wide glyphs advancing two columns.
+		let mut cursor: Option<UVec2> = None;
 		let mut last_style: Option<VisualStyle> = None;
 
 		for (pos, cell) in cells {
-			// Skip goto when directly following the previous written cell.
-			let skip_goto = matches!(last_pos, Some(lp) if lp.x.checked_add(1) == Some(pos.x) && lp.y == pos.y);
-			if !skip_goto {
+			// a wide glyph's trailing half is drawn by the glyph itself
+			if cell.is_wide_continuation() {
+				continue;
+			}
+			// Skip goto when the cursor already sits at the cell.
+			if cursor != Some(pos) {
 				escape::cursor_goto(&mut self.writer, pos)?;
 			}
-			last_pos = Some(pos);
+			cursor = Some(UVec2::new(pos.x + cell.cell_width() as u32, pos.y));
 
 			// Write only the SGR changes since the last written cell.
 			cell.style
@@ -441,6 +446,11 @@ pub fn render_terminal(
 	>,
 ) -> Result {
 	for (mut terminal, mut double_buffer) in query.iter_mut() {
+		// a resize invalidates the on-screen content (the emulator reflows or
+		// pads it), so erase it before redrawing the full frame.
+		if double_buffer.take_needs_clear() {
+			terminal.clear()?;
+		}
 		terminal.draw(double_buffer.diff())?;
 		double_buffer.swap_buffers();
 	}
@@ -462,6 +472,52 @@ pub fn restore_terminals(mut query: Query<&mut Terminal>) -> Result {
 		terminal.flush()?;
 	}
 	Ok(())
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::render::charcell::test_host::TestHost;
+	use bevy::math::UVec2;
+
+	/// After a resize the renderer erases the screen before redrawing, so stale
+	/// glyphs from the emulator-reflowed old frame can't survive wherever the
+	/// new frame is blank (the duplicated-letters bug).
+	#[beet_core::test]
+	fn resize_clears_screen_before_redraw() {
+		let mut host = TestHost::sized(UVec2::new(20, 6));
+		host.spawn_content(rsx! { <p>"hello"</p> });
+		host.step();
+		host.frame_ansi(); // drain the boot frame
+		// steady state never erases (it would flicker)
+		host.step();
+		String::from_utf8_lossy(&host.frame_ansi())
+			.into_owned()
+			.xnot()
+			.xpect_contains(escape::ERASE_ALL);
+		host.resize(UVec2::new(30, 8));
+		host.step();
+		let resized = String::from_utf8_lossy(&host.frame_ansi()).into_owned();
+		let erase = resized.find(escape::ERASE_ALL);
+		erase.is_some().xpect_true();
+		// the full frame is redrawn after the erase
+		resized[erase.unwrap()..].to_string().xpect_contains("hello");
+	}
+
+	/// Drawing a wide glyph advances the cursor two columns, so the cell after
+	/// it must not be written one column short (which shifted the rest of the
+	/// row right, duplicating letters).
+	#[beet_core::test]
+	fn wide_glyph_advances_cursor_two_columns() {
+		let mut host = TestHost::sized(UVec2::new(10, 2));
+		host.spawn_content(rsx! { <pre>"中x"</pre> });
+		host.step();
+		let out = String::from_utf8_lossy(&host.frame_ansi()).into_owned();
+		// the glyph after the wide char is written contiguously, with no goto
+		// re-targeting the column the wide char already covered.
+		out.as_str().xpect_contains("中x");
+		out.xnot().xpect_contains("\u{1b}[1;2H");
+	}
 }
 
 #[cfg(target_arch = "wasm32")]

@@ -223,7 +223,7 @@ fn fire_form_submit(
 }
 
 /// The current value of a form field: its edited [`Value`], or for an untouched
-/// `<select>` its first `<option>`'s `value` (the browser's default selection).
+/// `<select>` its first `<option>`'s value (the browser's default selection).
 fn field_value(
 	elements: &ElementQuery,
 	values: &Query<&Value>,
@@ -240,7 +240,7 @@ fn field_value(
 	elements
 		.iter_descendants_inclusive(view.entity)
 		.find(|child| child.tag() == "option")
-		.map(|option| option.attribute_string("value"))
+		.map(|option| option_value(&option))
 		.unwrap_or_default()
 		.xmap(Value::str)
 }

@@ -11,6 +11,8 @@ use beet_ui::prelude::*;
 /// Its `on_add` wires the live host: a [`StdioTerminal`] paired with a
 /// [`page_host`] buffer, plus an in-world [`Navigator`] pointed at this router,
 /// started at the CLI path argument (`-- docs/design/form`, default home `/`).
+/// A `--color-scheme=light|dark` argument seeds the app-wide [`ColorScheme`]
+/// resource, the session's scheme on every page (layouts consult it).
 /// The app then runs persistently, repainting reactively as navigation and input
 /// change the page; the `CharcellTuiPlugin` loop drives it and Ctrl+c exits.
 ///
@@ -31,12 +33,19 @@ async fn boot(entity: AsyncEntity) -> Result {
 		return Ok(());
 	}
 	let router = entity.id();
+	let request = Request::from_cli_args(CliArgs::parse_env());
+	// `--color-scheme=light|dark` pins the session's scheme app-wide
+	let scheme = request
+		.get_param("color-scheme")
+		.and_then(ColorScheme::parse);
 	// the initial route from the CLI path arg, else the site home `/`
-	let home =
-		Url::parse(Request::from_cli_args(CliArgs::parse_env()).path_string());
+	let home = Url::parse(request.path_string());
 	entity
 		.world()
 		.with(move |world: &mut World| {
+			if let Some(scheme) = scheme {
+				world.insert_resource(AppColorScheme(scheme));
+			}
 			// the live host: a stdio terminal paired with the page-host buffer,
 			// rendered together by `render_terminal` (one entity, both components).
 			world.spawn((

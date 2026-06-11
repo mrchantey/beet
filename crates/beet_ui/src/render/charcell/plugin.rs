@@ -35,10 +35,18 @@ impl Plugin for CharcellTuiPlugin {
 		// CursorMoved is a window message; with no WindowPlugin (no winit) the
 		// terminal host registers it itself so the bridge can emit it.
 		app.add_message::<bevy::window::CursorMoved>();
+		// browser-like form behavior: editable controls and submit, so a live
+		// TUI's `<form>`/`<select>` work out of the box.
+		#[cfg(feature = "template")]
+		app.init_plugin::<crate::prelude::FormPlugin>();
 		app.init_plugin::<CharcellPlugin>()
 			.init_plugin::<RealtimeParsePlugin>()
 			.init_plugin::<crate::prelude::DocumentUiPlugin>()
 			.init_plugin::<crate::prelude::FocusPlugin>()
+			// pointer-driven `:hover` element state for the style cascade
+			.init_plugin::<crate::prelude::PointerStatePlugin>()
+			// the native `<select>` dropdown interaction
+			.init_plugin::<SelectPlugin>()
 			// terminal bytes to bevy input, before InputPlugin consumes the messages
 			// this frame so `ButtonInput` reflects them immediately.
 			.add_systems(
@@ -90,12 +98,15 @@ impl Plugin for CharcellPlugin {
 				buffer_plugin::<DoubleBuffer>,
 				buffer_plugin::<FlexBuffer>,
 			))
-			// decorations run after styles resolve, the paint pipeline after them
+			// decorations run after styles resolve, the paint pipeline after both
+			// decorations and the style transitions it reads displayed values from
 			.configure_sets(
 				PostParseTree,
 				(
 					DecorateSet.after(ResolveStylesSet),
-					CharcellRenderSet.after(DecorateSet),
+					CharcellRenderSet
+						.after(DecorateSet)
+						.after(crate::style::AnimateStylesSet),
 				),
 			)
 			// post-resolve decorations consumed by the charcell paint pipeline
@@ -111,21 +122,32 @@ impl Plugin for CharcellPlugin {
 			);
 
 
-		// Terminal output: render the diffed buffer, flush, restore on exit. Input
-		// is bridged to bevy by `CharcellTuiPlugin` (the live app), not here.
+		// Terminal output: render the diffed buffer, overlay kitty rasters,
+		// flush, restore on exit. Input is bridged to bevy by
+		// `CharcellTuiPlugin` (the live app), not here.
 		#[cfg(feature = "tui")]
-		app.add_systems(
-			PostParseTree,
-			(
-				render_terminal,
-				flush_terminals,
-				restore_terminals
-					.run_if(common_conditions::on_message::<AppExit>),
+		app.init_resource::<KittyGraphicsSupport>()
+			.init_resource::<KittyPlacements>()
+			// before the cascade so the `graphics` state (and the block box it
+			// selects) resolves the same frame the raster attaches — no
+			// one-frame alt-text flash.
+			.add_systems(
+				PostParseTree,
+				attach_kitty_images.before(ResolveStylesSet),
 			)
-				.chain()
-				.after(paint_nodes::<DoubleBuffer>)
-				.in_set(CharcellRenderSet),
-		);
+			.add_systems(
+				PostParseTree,
+				(
+					render_terminal,
+					place_kitty_images,
+					flush_terminals,
+					restore_terminals
+						.run_if(common_conditions::on_message::<AppExit>),
+				)
+					.chain()
+					.after(paint_nodes::<DoubleBuffer>)
+					.in_set(CharcellRenderSet),
+			);
 	}
 }
 

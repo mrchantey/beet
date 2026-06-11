@@ -65,20 +65,35 @@ pub(super) fn measure_node(
 		Display::Flex => {
 			measure_flex(node, query, sizes, content_available, viewport)?
 		}
+		Display::Grid => {
+			measure_grid(node, query, content_available, viewport)
+		}
 		Display::Table => {
 			measure_table(node, query, content_available, viewport)
+		}
+		// a kitty-graphics raster occupies its scaled cell rect, an explicit
+		// `width`/`height` constraining it (a missing axis follows the
+		// aspect); the marker alt text presents only when no raster attached
+		_ if let Some(image) = node.kitty_image() => image
+			.cell_size_constrained(
+				box_model.width,
+				box_model.height,
+				content_available.x,
+			),
+		// leaf whose content is generated (the `<hr>` rule, `<img>` alt, a
+		// `<select>`'s label). Checked before the value branch: a `<select>`
+		// carries its submission state in [`Value`], and its marker — not that
+		// raw value — is what renders.
+		_ if let Some(marker) =
+			node.marker().filter(|_| !node.has_child_nodes(query)) =>
+		{
+			measure_str(marker, content_available.x)
 		}
 		// text leaf (eg a paragraph's text node)
 		_ if node.value().is_some() => measure_text(node, content_available.x),
 		// container of inline content: flow descendants as wrapped text
 		_ if establishes_inline_flow(node, query) => {
 			measure_inline_flow(node, query, content_available.x)
-		}
-		// block leaf whose content is generated (eg the `<hr>` rule, `<img>` alt)
-		_ if let Some(marker) =
-			node.marker().filter(|_| !node.has_child_nodes(query)) =>
-		{
-			measure_str(marker, content_available.x)
 		}
 		// block container: stack children vertically
 		_ => measure_block(node, query, content_available, viewport, sizes),

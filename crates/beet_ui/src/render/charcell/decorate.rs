@@ -58,9 +58,9 @@ pub fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
 }
 
 /// Attach a [`Marker`] to elements that carry generated content:
-/// `<li>` (bullet/number), `<hr>` (rule), and `<img>` (alt text). The
-/// `<blockquote>` callout draws its own thick left border via the box model, so
-/// no per-paragraph quote bar is added.
+/// `<li>` (bullet/number), `<hr>` (rule), `<img>` (alt text), and `<select>`
+/// (its selected option's label). The `<blockquote>` callout draws its own
+/// thick left border via the box model, so no per-paragraph quote bar is added.
 pub fn apply_markers(
 	mut commands: Commands,
 	ruleset: RuleSetQuery,
@@ -68,6 +68,9 @@ pub fn apply_markers(
 	parents: Query<&ChildOf>,
 	tags: Query<&Element>,
 	children: Query<&Children>,
+	// a `<select>`'s own Value (its edited selection); element-borne, so the
+	// ElementQuery's text-node value query cannot see it.
+	values: Query<&Value, With<Element>>,
 ) {
 	for view in elements.iter() {
 		let marker = match view.tag() {
@@ -77,6 +80,7 @@ pub fn apply_markers(
 			"hr" => Some(HR_RULE.into()),
 			"img" => Some(img_marker(&view)),
 			"iframe" => Some(iframe_marker(&view)),
+			"select" => Some(select_marker(&view, &elements, &values)),
 			_ => None,
 		};
 		if let Some(marker) = marker {
@@ -231,6 +235,52 @@ fn list_marker(
 		}
 		_ => None,
 	}
+}
+
+/// The closed `<select>` control's text: the selected option's label plus a
+/// dropdown caret. The selected option matches the select's edited [`Value`],
+/// falling back to the first option (the browser's default selection).
+fn select_marker(
+	view: &ElementView,
+	elements: &ElementQuery,
+	values: &Query<&Value, With<Element>>,
+) -> SmolStr {
+	let selected = values
+		.get(view.entity)
+		.ok()
+		.and_then(|value| value.as_str().ok())
+		.unwrap_or_default();
+	let options = elements
+		.iter_descendants_inclusive(view.entity)
+		.filter(|child| child.tag() == "option")
+		.collect::<Vec<_>>();
+	let label = options
+		.iter()
+		.find(|option| !selected.is_empty() && option_value(option) == selected)
+		.or_else(|| options.first())
+		.map(option_label)
+		.unwrap_or_default();
+	format!("{label} ▾").into()
+}
+
+/// An `<option>`'s submission value: its `value` attribute, falling back to its
+/// label text like a browser.
+pub fn option_value(view: &ElementView) -> String {
+	let value = view.attribute_string("value");
+	if value.is_empty() {
+		option_label(view)
+	} else {
+		value
+	}
+}
+
+/// An `<option>`'s visible label: its inner text, falling back to its `value`
+/// attribute.
+pub fn option_label(view: &ElementView) -> String {
+	view.inner_text
+		.and_then(|(_, value)| value.as_str().ok())
+		.map(|label| label.to_string())
+		.unwrap_or_else(|| view.attribute_string("value"))
 }
 
 /// The `[image]:`-prefixed placeholder text for an image, using the alt text and

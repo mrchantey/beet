@@ -13,6 +13,10 @@ use core::ops::DerefMut;
 pub struct DoubleBuffer {
 	buffers: [Buffer; 2],
 	current: usize,
+	/// Set by [`resize`](Self::resize), consumed by the terminal renderer via
+	/// [`take_needs_clear`](Self::take_needs_clear) to erase the screen before
+	/// the next draw.
+	needs_clear: bool,
 }
 
 impl Default for DoubleBuffer {
@@ -34,6 +38,7 @@ impl DoubleBuffer {
 		Self {
 			buffers: [Buffer::new(size), Buffer::new(size)],
 			current: 0,
+			needs_clear: false,
 		}
 	}
 
@@ -41,6 +46,7 @@ impl DoubleBuffer {
 		Self {
 			buffers: [buffer.clone(), buffer],
 			current: 0,
+			needs_clear: false,
 		}
 	}
 
@@ -52,11 +58,22 @@ impl DoubleBuffer {
 	/// Reallocate both inner buffers to `size`, clearing them. On a terminal
 	/// resize the old contents are invalid; both buffers start blank so the next
 	/// paint diffs the full new frame against a cleared previous buffer and
-	/// redraws everything.
+	/// redraws everything. The renderer is flagged to erase the screen first
+	/// (see [`take_needs_clear`](Self::take_needs_clear)).
 	pub fn resize(&mut self, size: UVec2) {
 		for buffer in &mut self.buffers {
 			buffer.resize(size);
 		}
+		self.needs_clear = true;
+	}
+
+	/// Consume the pending-clear flag set by [`resize`](Self::resize).
+	///
+	/// The emulator reflows or pads the old screen content on resize, and the
+	/// cell diff never touches cells that are blank in both buffers, so without a
+	/// full erase stale glyphs survive wherever the new frame is blank.
+	pub fn take_needs_clear(&mut self) -> bool {
+		core::mem::take(&mut self.needs_clear)
 	}
 
 	/// The buffer currently being drawn into.
@@ -84,6 +101,11 @@ impl DoubleBuffer {
 	///
 	/// Compares the current buffer (new frame) against the previous buffer
 	/// (on-screen state). Only yields cells that differ visually.
+	///
+	/// A changed wide-glyph trailing half is yielded as its owner glyph instead:
+	/// the terminal draws both columns from the owner, and a placeholder has no
+	/// glyph of its own to draw (a stale glyph there clobbered the owner's right
+	/// half, so the owner must repaint).
 	pub fn diff(&self) -> impl Iterator<Item = (UVec2, &Cell)> {
 		let prev = &self.buffers[1 - self.current];
 		let curr = &self.buffers[self.current];
@@ -94,11 +116,19 @@ impl DoubleBuffer {
 			.filter_map(move |(i, cell)| {
 				let changed =
 					prev.cells().get(i).map_or(true, |p| !cell.visual_eq(p));
-				if changed {
-					Some((UVec2::new(i as u32 % width, i as u32 / width), cell))
-				} else {
-					None
+				if !changed {
+					return None;
 				}
+				let pos = UVec2::new(i as u32 % width, i as u32 / width);
+				if cell.is_wide_continuation() {
+					// redraw the owner glyph one column left (same row only)
+					return (pos.x > 0)
+						.then(|| curr.cells().get(i - 1))
+						.flatten()
+						.filter(|owner| owner.cell_width() == 2)
+						.map(|owner| (UVec2::new(pos.x - 1, pos.y), owner));
+				}
+				Some((pos, cell))
 			})
 	}
 }
@@ -122,4 +152,50 @@ impl AsBuffer for DoubleBuffer {
 		self.current_buffer_mut().set(pos, cell);
 	}
 	fn clear(&mut self) { self.current_buffer_mut().clear(); }
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::style::VisualStyle;
+
+	fn glyph(symbol: &str) -> Cell {
+		Cell::new(symbol, VisualStyle::default(), Entity::PLACEHOLDER)
+	}
+
+	/// A changed wide-glyph trailing half is diffed as its owner glyph (one
+	/// column left), never a bare placeholder whose space would clobber the
+	/// glyph's right half on screen.
+	#[beet_core::test]
+	fn diff_redraws_wide_owner_for_changed_continuation() {
+		let mut buffer = DoubleBuffer::new(UVec2::new(4, 1));
+		// frame 1 on screen: "ab"
+		buffer.set(UVec2::new(0, 0), glyph("a"));
+		buffer.set(UVec2::new(1, 0), glyph("b"));
+		buffer.swap_buffers();
+		// frame 2: a wide glyph covering both columns
+		buffer.set(UVec2::new(0, 0), glyph("中"));
+		buffer.set(UVec2::new(1, 0), Cell {
+			symbol: None,
+			style: VisualStyle::default(),
+			entity: Some(Entity::PLACEHOLDER),
+		});
+		let diffed: Vec<_> = buffer.diff().collect();
+		// both changed cells resolve to the owner glyph at column 0
+		diffed.iter().all(|(pos, _)| *pos == UVec2::ZERO).xpect_true();
+		diffed
+			.iter()
+			.all(|(_, cell)| cell.symbol_str() == "中")
+			.xpect_true();
+	}
+
+	/// A resize flags the renderer for a full screen erase, consumed once.
+	#[beet_core::test]
+	fn resize_flags_needs_clear() {
+		let mut buffer = DoubleBuffer::new(UVec2::new(4, 1));
+		buffer.take_needs_clear().xpect_false();
+		buffer.resize(UVec2::new(8, 2));
+		buffer.take_needs_clear().xpect_true();
+		buffer.take_needs_clear().xpect_false();
+	}
 }

@@ -11,22 +11,31 @@ use beet::prelude::*;
 /// from the matched route's [`ArticleMeta`]. The `<head>` is non-visual, so the
 /// same layout renders in the terminal.
 #[template(system)]
-pub fn BeetLayout(cx: Res<RequestContext>) -> impl Bundle {
+pub fn BeetLayout(
+	cx: Res<RequestContext>,
+	// the app-wide scheme a TUI session seeds from `--color-scheme` (see
+	// `TuiServer`); absent on the web.
+	app_scheme: Option<Res<AppColorScheme>>,
+) -> impl Bundle {
 	// an explicit `?color-scheme=light|dark` pins the scheme on both targets via
 	// a body class. Absent it, the web follows the OS (`color_scheme.js`); a
-	// non-html target (the terminal) defaults to dark.
+	// non-html target (the terminal) uses the session's app-wide scheme,
+	// defaulting to dark.
 	let mut body_classes = Classes::new([classes::PAGE]);
-	match cx.parts().get_param("color-scheme") {
-		Some("light") => {
-			body_classes.insert_class(classes::LIGHT_SCHEME);
+	match cx
+		.parts()
+		.get_param("color-scheme")
+		.and_then(ColorScheme::parse)
+	{
+		Some(scheme) => {
+			body_classes.insert_class(scheme.class());
 		}
-		Some("dark") => {
-			body_classes.insert_class(classes::DARK_SCHEME);
+		None if !cx.parts().accepts(MediaType::Html) => {
+			let scheme =
+				app_scheme.map(|scheme| **scheme).unwrap_or(ColorScheme::Dark);
+			body_classes.insert_class(scheme.class());
 		}
-		_ if !cx.parts().accepts(MediaType::Html) => {
-			body_classes.insert_class(classes::DARK_SCHEME);
-		}
-		_ => {}
+		None => {}
 	}
 	// The web `<head>` chrome (the `<Stylesheet/>` CSS bake, preflight/reset,
 	// color-scheme script) is non-visual in the terminal, where `<head>` is

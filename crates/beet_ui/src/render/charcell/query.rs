@@ -29,6 +29,8 @@ pub(super) struct CharcellNodeData<'a> {
 	scroll: Option<&'a ScrollPosition>,
 	position: Option<&'a PositionStyle>,
 	scrollbar: Option<&'a ScrollbarStyle>,
+	transition: Option<&'a VisualTransition>,
+	kitty: Option<&'a KittyImage>,
 }
 
 impl CharcellNodeData<'_> {
@@ -71,9 +73,13 @@ impl CharcellNodeData<'_> {
 		self.layout.unwrap_or(&LAYOUT_STYLE_DEFAULT)
 	}
 
-	/// Resolved visual style, defaulting to [`VISUAL_STYLE_DEFAULT`].
+	/// The visual style to display: the in-flight [`VisualTransition`] value
+	/// when the element is transitioning, else the resolved target style,
+	/// defaulting to [`VISUAL_STYLE_DEFAULT`].
 	pub fn visual_style(&self) -> &VisualStyle {
-		self.visual.unwrap_or(&VISUAL_STYLE_DEFAULT)
+		self.transition
+			.map(|transition| &transition.current)
+			.unwrap_or_else(|| self.visual.unwrap_or(&VISUAL_STYLE_DEFAULT))
 	}
 
 	/// OSC-8 hyperlink target, if this element is an `<a>`/`<img>`.
@@ -85,6 +91,9 @@ impl CharcellNodeData<'_> {
 	pub fn marker(&self) -> Option<&str> {
 		self.marker.map(|marker| marker.0.as_str())
 	}
+
+	/// The kitty-graphics raster backing this `<img>`, if attached.
+	pub fn kitty_image(&self) -> Option<&KittyImage> { self.kitty }
 	/// Flexbox config from the layout style.
 	pub fn flexbox(&self) -> &FlexBox { &self.layout_style().flex_box }
 
@@ -240,6 +249,8 @@ pub struct CharcellQuery<'w, 's> {
 			Option<&'static ScrollPosition>,
 			Option<&'static PositionStyle>,
 			Option<&'static ScrollbarStyle>,
+			Option<&'static VisualTransition>,
+			Option<&'static KittyImage>,
 		),
 	>,
 	refs: Query<'w, 's, &'static RenderRef>,
@@ -278,6 +289,8 @@ impl CharcellQuery<'_, '_> {
 			scroll,
 			position,
 			scrollbar,
+			transition,
+			kitty,
 		) = self.nodes.get(entity)?;
 		Ok(CharcellNodeData {
 			intrinsic_size,
@@ -294,6 +307,8 @@ impl CharcellQuery<'_, '_> {
 			scroll,
 			position,
 			scrollbar,
+			transition,
+			kitty,
 		})
 	}
 }

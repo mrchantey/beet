@@ -12,9 +12,12 @@ impl Plugin for NavigatorPlugin {
 		// OpenLinkPlugin, which classifies a clicked `<a>` and routes it.
 		app.init_plugin::<OpenLinkPlugin>()
 			.add_observer(single_current_page);
-		// keyboard history shortcuts (alt+left/right) ride the terminal input layer.
+		// keyboard history shortcuts (alt+left/right) ride the terminal input
+		// layer. The message registration is idempotent and makes the shortcut
+		// system validate even when no input plugin is composed in.
 		#[cfg(feature = "tui")]
-		app.add_systems(Update, nav_shortcuts);
+		app.add_message::<bevy::input::keyboard::KeyboardInput>()
+			.add_systems(Update, nav_shortcuts);
 	}
 }
 

@@ -32,6 +32,17 @@ fn sgr(b: u32, col: u32, row: u32, pressed: bool) -> Vec<u8> {
 impl SiteHost {
 	/// Boot the site at `home` with a `size`-cell viewport.
 	fn new(size: UVec2, home: &str) -> Self {
+		Self::new_with(size, home, |_| {})
+	}
+
+	/// Boot the site at `home`, running `setup` before the first frame — for
+	/// app state that must exist when the initial page renders (eg the
+	/// session [`ColorScheme`], which the binary seeds before navigating).
+	fn new_with(
+		size: UVec2,
+		home: &str,
+		setup: impl FnOnce(&mut App),
+	) -> Self {
 		let mut app = App::new();
 		// the shared site substrate (router + style rules + package config) plus the
 		// live interactive plugins, exactly as `main.rs`'s `tui` arm composes them.
@@ -46,6 +57,10 @@ impl SiteHost {
 				LivePagePlugin,
 				FormRuntimePlugin,
 			));
+		// deterministic frames whatever terminal runs the tests: no kitty
+		// escapes unless a test opts back in via `setup`.
+		app.insert_resource(KittyGraphicsSupport { enabled: false });
+		setup(&mut app);
 		// intercept external-open intents instead of launching a browser.
 		app.init_resource::<ExternalOpens>();
 		app.add_systems(
@@ -324,6 +339,82 @@ async fn external_link_does_not_navigate() {
 	host.frame().xpect_contains("Malleable software");
 	// the page is unchanged by the external click.
 	(host.frame() == references).xpect_true();
+}
+
+/// The form page's `<select>` is a working dropdown: the closed control shows
+/// its default option's label, clicking it opens the option panel, choosing a
+/// row writes the value, closes the panel, and re-labels the control.
+#[beet::test]
+async fn form_select_opens_and_chooses() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/docs/design/form");
+	host.step_until("Submit");
+	// closed: the first option's label plus the dropdown caret
+	host.frame().xpect_contains("Engineer ▾");
+	host.frame().xnot().xpect_contains("Designer");
+
+	// click the select: the panel opens with every option row
+	let (col, row) = host.element_cell("role");
+	host.click(col, row);
+	let frame = host.step_until("Teacher");
+	frame.xpect_contains("Designer");
+
+	// click the Designer row: chosen, closed, the control re-labels
+	let (col, row) = host.cell_of("Designer");
+	host.click(col, row);
+	host.step_until("Designer ▾");
+	host.frame().xnot().xpect_contains("Teacher");
+
+	// the chosen value submits with the form
+	let (col, row) = host.cell_of("Submit");
+	host.click(col, row);
+	host.step_until("\"role\": \"designer\"");
+}
+
+/// The app-wide [`ColorScheme`] resource (seeded by `--color-scheme=light` in
+/// the binary) pins the scheme on every page, in place of the dark default.
+#[beet::test]
+async fn color_scheme_resource_pins_light() {
+	let mut host = SiteHost::new_with(UVec2::new(120, 96), "/", |app| {
+		app.insert_resource(AppColorScheme(ColorScheme::Light));
+	});
+	host.step_until("malleable application framework");
+	host.has_class("light-scheme").xpect_true();
+	host.has_class("dark-scheme").xpect_false();
+	// the scheme survives navigation (it is session state, not a URL param)
+	host.navigate("/docs/design/grid");
+	host.step_until("12 columns");
+	host.has_class("light-scheme").xpect_true();
+}
+
+/// The grid design page flows its numbered cells into column tracks: the
+/// first demo's cells sit side by side on one track row.
+#[beet::test]
+async fn grid_page_flows_tracks() {
+	let mut host = SiteHost::new(UVec2::new(120, 96), "/docs/design/grid");
+	let frame = host.step_until("4 columns");
+	// the 12-column demo's first cells share a row, advancing across tracks
+	let (col_1, row_1) = host.cell_of("1");
+	let (col_2, row_2) = host.cell_of("2");
+	(col_2 > col_1).xpect_true();
+	row_2.xpect_eq(row_1);
+	// every cell of the 12-column demo rendered
+	for index in 1..=12 {
+		frame.as_str().xpect_contains(&index.to_string());
+	}
+}
+
+/// The images page renders; without kitty graphics support (the host forces
+/// it off, so nothing fetches) every demo shows its alt-text fallback, the
+/// constrained boxes wrapping theirs.
+#[beet::test]
+async fn images_page_falls_back_to_alt_text() {
+	let mut host = SiteHost::new(UVec2::new(120, 96), "/docs/design/images");
+	let frame = host.step_until("[image]: teen titans, intrinsic size");
+	frame
+		.as_str()
+		// the 20-cell box wraps its alt text, proving the sizing applies
+		.xpect_contains("20rem wide")
+		.xpect_contains("[image]: teen titans, stretched");
 }
 
 /// Scenario 2, the final boss: the form page is interactive in the terminal.

@@ -556,6 +556,67 @@ mod test {
 		(max_offset(&mut host, |offset| offset.y) > after_arrow).xpect_true();
 	}
 
+	/// Hovering a link plays the hover tokens through the whole chain: the
+	/// hit-test fires `PointerOver`, the `:hover` state re-resolves the cascade
+	/// (the material `hover_dim` opacity), and a [`VisualTransition`] eases the
+	/// displayed style toward the dimmed target over the motion-token duration.
+	#[beet_core::test]
+	fn link_hover_dim_animates() {
+		let mut host = TestHost::new();
+		host.app.add_plugins(
+			crate::style::material::MaterialStylePlugin::default(),
+		);
+		// a long duration holds the transition mid-flight however slow the step
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![Rule::new()
+				.with_selector(Selector::tag("a"))
+				.with_value(
+					common_props::TransitionDurationProp,
+					Duration::from_secs(60),
+				)]);
+		host.spawn_content(rsx! { <div><a href="/x">"link"</a></div> });
+		host.step();
+		let link = host
+			.app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(host.app.world())
+			.find(|(_, element)| element.tag() == "a")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		let resting = host
+			.app
+			.world()
+			.get::<VisualStyle>(link)
+			.unwrap()
+			.foreground;
+
+		// hover the link's first glyph (any-motion event at cell 0,0)
+		host.send_input(&sgr(35, 0, 0, true));
+		host.step();
+		host.step();
+
+		// the hover state landed and re-resolved a dimmed target
+		host.app
+			.world()
+			.get::<ElementStateMap>(link)
+			.is_some_and(|map| map.contains(&ElementState::Hovered))
+			.xpect_true();
+		let target = host
+			.app
+			.world()
+			.get::<VisualStyle>(link)
+			.unwrap()
+			.foreground;
+		(target != resting).xpect_true();
+		// the displayed style is easing toward it, not snapped
+		let transition = host.app.world().get::<VisualTransition>(link).unwrap();
+		transition.is_animating().xpect_true();
+		(transition.current.foreground != target).xpect_true();
+	}
+
 	/// A horizontal wheel scrolls a wide container along its x axis (left then back
 	/// right), proving every wheel direction is routed.
 	#[beet_core::test]

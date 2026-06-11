@@ -101,6 +101,22 @@ pub fn default_element_rules() -> Vec<Rule> {
 		block_spaced(&["iframe"])
 			.with_canonical(DecorationLine::underline())
 			.with_value(ForegroundColor, faint()),
+		// a closed `<select>` shows only its value label (a charcell `Marker`);
+		// its options never lay out — the select dropdown spawns its own rows.
+		// Terminal-gated: the web's native select needs its options visible.
+		Rule::tags(&["option", "optgroup"])
+			.with_media(MediaQuery::Terminal)
+			.with_canonical(Display::None),
+		// an `<img>` backed by a kitty-graphics raster (the attach system sets
+		// the `graphics` state) gets its own block box sized by the raster;
+		// the inline alt-text presentation applies everywhere else.
+		Rule::new()
+			.with_selector(Selector::AllOf(vec![
+				Selector::tag("img"),
+				Selector::state(graphics_state()),
+			]))
+			.with_media(MediaQuery::Terminal)
+			.with_canonical(Display::Block),
 	]
 }
 
