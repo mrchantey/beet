@@ -27,7 +27,7 @@ render = ["beet/router", "beet/template", "beet/markdown", "beet/style", "beet/j
 web = ["render", "beet/http_server"]
 
 # Terminal render target: the charcell pipeline (`CharcellPlugin` + stdio host).
-terminal = ["render", "beet/terminal"]
+terminal = ["render", "beet/tui"]
 
 # CLI mode: render a single route to stdout and exit, picking HTML or ANSI via
 # `--accept`. Overrides the default HTTP server without needing

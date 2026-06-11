@@ -47,7 +47,7 @@ pub fn page_host(size: UVec2) -> impl Bundle {
 		children![(
 			Element::new("div"),
 			page_viewport_style(),
-			children![(PageSlot, RenderRef::new(Entity::PLACEHOLDER))],
+			children![(PageSlot, RenderRef::default())],
 		)],
 	)
 }
@@ -97,10 +97,10 @@ pub fn sync_current_page(
 /// scene route into a living entity tree, returning its root.
 ///
 /// The live parallel of the static [`RenderRoot::render`] path: it shares the
-/// route build (the route's own `Action<Request, RenderRequest>`, run through
-/// [`spawn_template`]) but forks at the output, handing back the built entity
-/// rather than serializing and despawning it. That entity is kept alive to
-/// become a [`CurrentPage`]. The static path is untouched.
+/// route build *and* the ancestor layout middleware (header/sidebar/footer, the
+/// document chrome) but forks at the output, handing back the built entity rather
+/// than serializing and despawning it. That entity is kept alive to become a
+/// [`CurrentPage`]. The static path is untouched.
 pub async fn build_live_page(
 	router: &AsyncEntity,
 	mut request: Request,
@@ -128,14 +128,25 @@ pub async fn build_live_page(
 	};
 	// surface matched dynamic segments (`:id`) to the handler
 	node.merge_path_params(&mut request);
-	// call the route's own scene-build action (output `RenderRequest`), skipping
-	// the `ExchangeAction` wrapper that would serialize then despawn the tree.
-	router
-		.world()
-		.entity(node.entity)
-		.call::<Request, RenderRequest>(request)
-		.await
-		.map(|render| render.0)
+	let parts = request.parts().clone();
+	let route = router.world().entity(node.entity);
+	// build the route's own content (output `RenderRequest`), skipping the
+	// `ExchangeAction` wrapper that would serialize then despawn the tree.
+	let t = Instant::now();
+	let content = route.call::<Request, RenderRequest>(request).await?.0;
+	beet_core::cross_log!("PERF route.call = {:?}", t.elapsed());
+	// wrap it in the ancestor layout middleware (the `BaseLayout` document chrome),
+	// transcluding the content by reference, exactly as `RenderRoot::render` does
+	// for the static path; here the wrapped tree is kept alive as the page.
+	let t = Instant::now();
+	let page = route
+		.call_with_middleware::<RequestParts, Entity>(
+			Action::new_fixed(content),
+			parts,
+		)
+		.await;
+	beet_core::cross_log!("PERF call_with_middleware = {:?}", t.elapsed());
+	page
 }
 
 /// Parse fetched [`MediaBytes`] (markdown/html) into a living entity tree on a

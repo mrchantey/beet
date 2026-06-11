@@ -59,14 +59,17 @@ impl NodeWalker<'_, '_> {
 
 		// A RenderRef holder is transparent: recurse directly into the
 		// referenced entity, rendering it in place without touching this
-		// entity's own components.
+		// entity's own components. An unresolved holder (no target) renders
+		// nothing.
 		if let Some(render_ref) = render_ref {
-			let child_cx = VisitContext {
-				start: cx.start,
-				entity: **render_ref,
-				depth: cx.depth,
-			};
-			self.walk_entity(visitor, child_cx);
+			if let Some(target) = render_ref.target() {
+				let child_cx = VisitContext {
+					start: cx.start,
+					entity: target,
+					depth: cx.depth,
+				};
+				self.walk_entity(visitor, child_cx);
+			}
 			return;
 		}
 

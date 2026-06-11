@@ -134,13 +134,12 @@ impl CharcellNodeData<'_> {
 /// referenced entity as if it sat at the holder's position (see [`RenderRef`]),
 /// so every traversal resolves through this before visiting a node.
 fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
-	while let Ok(render_ref) = refs.get(entity) {
-		// an unresolved holder (no page yet) renders empty in place: stop at the
-		// holder rather than following into the placeholder, which is not spawned.
-		if **render_ref == Entity::PLACEHOLDER {
-			break;
-		}
-		entity = **render_ref;
+	// follow holders to their target; an unresolved holder (no page yet) renders
+	// empty in place, so stop at the holder rather than chasing a missing target.
+	while let Ok(render_ref) = refs.get(entity)
+		&& let Some(target) = render_ref.target()
+	{
+		entity = target;
 	}
 	entity
 }

@@ -28,14 +28,23 @@ pub fn BeetLayout(cx: Res<RequestContext>) -> impl Bundle {
 		}
 		_ => {}
 	}
+	// The web `<head>` chrome (the `<Stylesheet/>` CSS bake, preflight/reset,
+	// color-scheme script) is non-visual in the terminal, where `<head>` is
+	// `display: none`. Baking the whole rule set to CSS on every navigation is
+	// pure cost there, so only emit it for the HTML target.
+	let html_head = cx.parts().accepts(MediaType::Html).then(|| {
+		rsx! {
+			<Preflight/>
+			<Reset/>
+			<Stylesheet/>
+			<ColorSchemeScript/>
+			<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
+		}
+	});
 	rsx! {
 		<html lang="en">
 			<RouteHead>
-				<Preflight/>
-				<Reset/>
-				<Stylesheet/>
-				<ColorSchemeScript/>
-				<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
+				{html_head}
 			</RouteHead>
 			<body {body_classes}>
 				<Header>

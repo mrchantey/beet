@@ -133,6 +133,17 @@ impl SiteHost {
 			.flatten()
 	}
 
+	/// Whether any rendered element carries the given class.
+	fn has_class(&mut self, class: &str) -> bool {
+		let class = class.to_string();
+		self.app
+			.world_mut()
+			.run_system_once(move |elements: ElementQuery| {
+				elements.iter().any(|view| view.contains_class(&class))
+			})
+			.unwrap_or(false)
+	}
+
 	/// A clickable center cell of the element whose `name` attribute is `name`.
 	fn element_cell(&mut self, name: &str) -> (u32, u32) {
 		let name = name.to_string();
@@ -217,9 +228,17 @@ impl SiteHost {
 
 /// The homepage boots and renders, and (being short) shows no scrollbar.
 #[beet::test]
-async fn homepage_boots_without_scrollbar() {
-	let mut host = SiteHost::new(UVec2::new(80, 40), "/");
+async fn homepage_boots_with_chrome_and_scheme() {
+	// a viewport tall enough for the full homepage + document chrome to fit.
+	let mut host = SiteHost::new(UVec2::new(120, 96), "/");
 	host.step_until("malleable application framework");
+	// the BaseLayout chrome renders: header nav, sidebar, footer.
+	let frame = host.frame();
+	frame.as_str().xpect_contains("Docs").xpect_contains("Blog");
+	frame.xpect_contains("© Beet");
+	// the terminal target seeds the dark scheme (no web color-scheme script).
+	host.has_class("dark-scheme").xpect_true();
+	// everything fits this viewport, so the `auto` scrollport shows no bar.
 	host.has_scrollbar().xpect_false();
 }
 
@@ -297,25 +316,25 @@ async fn external_link_does_not_navigate() {
 /// values as JSON below (the native counterpart of the web `<script>`).
 #[beet::test]
 async fn form_focus_type_and_submit() {
-	let mut host = SiteHost::new(UVec2::new(100, 60), "/docs/design/form");
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/docs/design/form");
 	host.step_until("Submit");
-
-	// Tab focusing moves through the fields in order.
-	host.send(b"\t");
-	host.app.update();
-	let first = host.focused_name();
-	host.send(b"\t");
-	host.app.update();
-	let second = host.focused_name();
-	first.xpect_eq(Some("name".to_string()));
-	second.xpect_eq(Some("email".to_string()));
 
 	// Click focusing: clicking the Name field focuses it.
 	let (col, row) = host.element_cell("name");
 	host.click(col, row);
 	host.focused_name().xpect_eq(Some("name".to_string()));
 
-	// Type a name into the focused field.
+	// Tab focusing moves through the form fields in order from there.
+	host.send(b"\t");
+	host.app.update();
+	host.focused_name().xpect_eq(Some("email".to_string()));
+	host.send(b"\t");
+	host.app.update();
+	host.focused_name().xpect_eq(Some("role".to_string()));
+
+	// Re-focus Name, type a value.
+	let (col, row) = host.element_cell("name");
+	host.click(col, row);
 	host.send(b"Ada Lovelace");
 	for _ in 0..3 {
 		host.app.update();

@@ -12,31 +12,32 @@ use beet_core::prelude::*;
 /// [`SceneProp`] props at macro time): the layout middleware needs to inject
 /// already-spawned route content into a freshly-spawned document layout without
 /// despawning it, by reference rather than by value.
+/// The target is `None` when the holder is unresolved (eg a page-host slot
+/// before any page is set), so a placeholder entity is never exposed; the
+/// derived [`Default`] is that unresolved state, satisfying the scene template
+/// machinery without a sentinel.
 #[derive(
 	Debug,
 	Clone,
 	Copy,
+	Default,
 	PartialEq,
 	Eq,
 	PartialOrd,
 	Ord,
 	Hash,
-	Deref,
 	Reflect,
 	Component,
 )]
 #[reflect(Component, Default)]
-pub struct RenderRef(pub Entity);
+pub struct RenderRef(pub Option<Entity>);
 
 impl RenderRef {
-	pub fn new(target: Entity) -> Self { Self(target) }
-}
+	/// Render `target` in place.
+	pub fn new(target: Entity) -> Self { Self(Some(target)) }
 
-/// A placeholder target, required so [`RenderRef`] satisfies the scene template
-/// machinery (`template_value`). The real target is cloned into the patch, so
-/// this default is never the value actually inserted.
-impl Default for RenderRef {
-	fn default() -> Self { Self(Entity::PLACEHOLDER) }
+	/// The referenced entity, or `None` when the holder is unresolved.
+	pub fn target(&self) -> Option<Entity> { self.0 }
 }
 
 #[cfg(test)]

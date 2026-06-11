@@ -199,24 +199,37 @@ pub fn pointer_input(
 	Ok(())
 }
 
-/// ECS system: scroll the hovered scroll container on wheel, the focused/active
-/// one on keyboard (arrows/PageUp/PageDown/Home/End).
+/// ECS system: scroll on wheel and on the keyboard
+/// (arrows/PageUp/PageDown/Home/End), like a browser.
 ///
-/// A wheel event scrolls the nearest scrollable ancestor of the hovered element
-/// (DOM behavior); keys scroll the container under the pointer's hover. A
-/// `ScrollPosition` change repaints via change detection.
-pub fn scroll_input(
+/// The target container is resolved in priority order, mirroring the DOM:
+/// 1. the nearest scrollable ancestor of the hovered element (a wheel sets its
+///    own hover the same frame, so a wheel always lands here),
+/// 2. else the nearest scrollable ancestor of the focused element (so the
+///    keyboard scrolls the focused scrollable with nothing under the pointer),
+/// 3. else the outermost scroll container of a buffer-root tree (the page
+///    scrollport), so arrow/page keys scroll the document by default.
+///
+/// A `ScrollPosition` change repaints via change detection.
+//
+// crate-visible (not `pub`): it reads the crate-internal `CharcellTree`, like the
+// `paint`/`prepare` systems. The plugin adds it via `super::*`.
+pub(crate) fn scroll_input(
 	mut wheel: MessageReader<MouseWheel>,
 	mut keys: MessageReader<KeyboardInput>,
 	pointers: Query<&Pointer, With<PrimaryPointer>>,
+	focused: Query<Entity, With<Focus>>,
 	parents: Query<&ChildOf>,
 	// transclusion: a `RenderRef` holder is the charcell parent of the entity it
 	// points at, so the ancestor walk can cross from transcluded content (eg a
 	// page) up into the holder's container (eg the page-host scrollport).
 	refs: Query<(Entity, &RenderRef)>,
+	tree: CharcellTree,
+	roots: Query<Entity, With<DoubleBuffer>>,
 	mut scrolls: Query<&mut ScrollPosition>,
 ) {
-	// accumulate this frame's scroll delta in cells.
+	// accumulate this frame's scroll delta in cells; track whether any of it came
+	// from the keyboard, which falls back to the focused/page scrollport.
 	let mut delta = IVec2::ZERO;
 	for ev in wheel.read() {
 		let lines = match ev.unit {
@@ -224,18 +237,32 @@ pub fn scroll_input(
 			// pixel deltas are coarse here; treat each as one notch
 			MouseScrollUnit::Pixel => MOUSE_SCROLL_LINES,
 		};
-		// wheel y is positive up (content moves down); scroll offset is opposite.
-		delta.x -= ev.x.signum() as i32 * lines * (ev.x != 0.) as i32;
+		// wheel y is positive up (content scrolls up), so the offset moves opposite;
+		// wheel x is positive right (content scrolls right), so the offset follows it.
+		delta.x += ev.x.signum() as i32 * lines * (ev.x != 0.) as i32;
 		delta.y -= ev.y.signum() as i32 * lines * (ev.y != 0.) as i32;
 	}
-	for key in keys.read().filter(|k| k.state == ButtonState::Pressed) {
-		match key.key_code {
+	let pressed = keys
+		.read()
+		.filter(|key| key.state == ButtonState::Pressed)
+		.map(|key| key.key_code)
+		.collect::<Vec<_>>();
+	// alt+arrows are reserved for history nav (back/forward), not scrolling.
+	let alt = pressed
+		.iter()
+		.any(|key| matches!(key, KeyCode::AltLeft | KeyCode::AltRight));
+	for key in &pressed {
+		match key {
+			KeyCode::ArrowLeft | KeyCode::ArrowRight if alt => {}
 			KeyCode::ArrowDown => delta.y += KEY_SCROLL_LINES,
 			KeyCode::ArrowUp => delta.y -= KEY_SCROLL_LINES,
 			KeyCode::ArrowRight => delta.x += KEY_SCROLL_LINES,
 			KeyCode::ArrowLeft => delta.x -= KEY_SCROLL_LINES,
 			KeyCode::PageDown => delta.y += PAGE_SCROLL_LINES,
 			KeyCode::PageUp => delta.y -= PAGE_SCROLL_LINES,
+			// Home/End jump to the top/bottom; the clamp settles the huge offset.
+			KeyCode::Home => delta.y = i32::MIN / 2,
+			KeyCode::End => delta.y = i32::MAX / 2,
 			_ => {}
 		}
 	}
@@ -243,313 +270,56 @@ pub fn scroll_input(
 		return;
 	}
 
-	// scroll the hovered element's nearest scrollable ancestor (inclusive). Walk
-	// up ChildOf, stopping at the first entity that carries a ScrollPosition.
-	let Some(hovered) = pointers.single().ok().and_then(|p| p.hover) else {
-		return;
+	// resolve the container to scroll, in DOM priority order.
+	let scrollable_ancestor = |start: Entity| {
+		let mut current = Some(start);
+		loop {
+			let entity = current?;
+			if scrolls.contains(entity) {
+				break Some(entity);
+			}
+			// transclusion wins for *visual* ancestry: if a RenderRef holder renders
+			// this entity in place, the holder (eg the page-host scrollport) is its
+			// visual parent, even though its structural ChildOf points elsewhere (eg a
+			// route entity under the router). Otherwise walk up ChildOf.
+			current = refs
+				.iter()
+				.find(|(_, render_ref)| render_ref.target() == Some(entity))
+				.map(|(holder, _)| holder)
+				.or_else(|| parents.get(entity).ok().map(|child_of| child_of.parent()));
+		}
 	};
-	let mut current = Some(hovered);
-	let container = loop {
-		let Some(entity) = current else { break None };
-		if scrolls.contains(entity) {
-			break Some(entity);
-		}
-		// transclusion wins for *visual* ancestry: if a RenderRef holder renders
-		// this entity in place, the holder (eg the page-host scrollport) is its
-		// visual parent, even though its structural ChildOf points elsewhere (eg a
-		// route entity under the router). Otherwise walk up ChildOf.
-		current = refs
-			.iter()
-			.find(|(_, render_ref)| render_ref.0 == entity)
-			.map(|(holder, _)| holder)
-			.or_else(|| parents.get(entity).ok().map(|child_of| child_of.parent()));
-	};
-	if let Some(container) = container {
-		if let Ok(mut scroll) = scrolls.get_mut(container) {
-			// the clamp_scroll_positions system settles this into range next frame.
-			let next = scroll.offset + delta;
-			if next != scroll.offset {
-				scroll.offset = next;
-			}
-		}
-	}
-}
-
-/// Convert a bevy cursor [`Vec2`] (cell-space, 1:1) to a signed cell.
-fn vec2_to_cell(position: Vec2) -> IVec2 {
-	IVec2::new(position.x.floor() as i32, position.y.floor() as i32)
-}
-
-// ── Scrollbar mouse interaction ─────────────────────────────────────────────────
-
-/// The two scroll axes a scrollbar drives.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ScrollAxis {
-	/// The horizontal bar (bottom gutter), scrolling `offset.x`.
-	X,
-	/// The vertical bar (right gutter), scrolling `offset.y`.
-	Y,
-}
-
-/// Which part of a scrollbar a press landed on.
-#[derive(Debug, Clone, Copy)]
-enum ScrollbarRegion {
-	/// On the thumb: begin a drag, grabbing `grab` cells into the thumb.
-	Thumb { grab: i32 },
-	/// On the track before the thumb: page toward the start.
-	PageBackward,
-	/// On the track after the thumb: page toward the end.
-	PageForward,
-}
-
-/// A scrollbar press: the container, the axis it scrolls, the region hit, and the
-/// live bar geometry (its `track_len` pages, its `offset_at` maps a drag).
-struct ScrollbarHit {
-	container: Entity,
-	axis: ScrollAxis,
-	region: ScrollbarRegion,
-	bar: AxisBar,
-}
-
-/// An in-progress thumb drag, persisted across frames (press → move → release)
-/// as the [`scrollbar_mouse`] system's `Local` state.
-pub struct ScrollbarDrag {
-	container: Entity,
-	axis: ScrollAxis,
-	/// Cells the cursor sat into the thumb when grabbed, kept under the cursor.
-	grab: i32,
-}
-
-/// Per-buffer scrollbar hit-test substrate: maps a cursor cell to the scrollbar
-/// region under it, reusing the shared [`scrollbar_geometry`] so a click lands
-/// exactly on the painted bar.
-#[derive(SystemParam)]
-pub struct ScrollbarHitTest<'w, 's> {
-	charcell: CharcellQuery<'w, 's>,
-	tree: CharcellTree<'w, 's>,
-	roots: Query<'w, 's, (Entity, &'static DoubleBuffer)>,
-}
-
-impl ScrollbarHitTest<'_, '_> {
-	/// The screen-space scrollbar geometry of every scroll container.
-	fn geometries(&self) -> HashMap<Entity, ScrollbarGeometry> {
-		let mut map = HashMap::<Entity, ScrollbarGeometry>::default();
-		for (root, buffer) in self.roots.iter() {
-			let viewport = buffer.current_buffer().size();
-			let ordered = self.tree.pre_order(root);
-			let contexts = resolve_contexts(
-				root,
-				&ordered,
-				&self.charcell,
-				&self.tree,
-				viewport,
-			);
-			for entity in ordered {
-				let Ok(node) = self.charcell.unresolved_node(entity) else {
-					continue;
-				};
-				let offset =
-					contexts.get(&entity).map(|cx| cx.offset).unwrap_or(IVec2::ZERO);
-				if let Some(geometry) =
-					scrollbar_geometry(&node, &self.charcell, viewport, offset)
-				{
-					map.insert(entity, geometry);
-				}
-			}
-		}
-		map
-	}
-
-	/// The bar geometry of `container` on `axis`, for live drag mapping.
-	fn bar(&self, container: Entity, axis: ScrollAxis) -> Option<AxisBar> {
-		self.geometries().get(&container).and_then(|geometry| match axis {
-			ScrollAxis::Y => geometry.vertical,
-			ScrollAxis::X => geometry.horizontal,
-		})
-	}
-
-	/// The scrollbar press at `cell`, if any.
-	fn hit(&self, cell: IVec2) -> Option<ScrollbarHit> {
-		for (container, geometry) in self.geometries() {
-			// vertical bar: cursor column on the gutter line, row along the track
-			if let Some(bar) = geometry.vertical {
-				if let Some(region) = bar_region(&bar, cell.x, cell.y) {
-					return Some(ScrollbarHit {
-						container,
-						axis: ScrollAxis::Y,
-						region,
-						bar,
-					});
-				}
-			}
-			// horizontal bar: cursor row on the gutter line, column along the track
-			if let Some(bar) = geometry.horizontal {
-				if let Some(region) = bar_region(&bar, cell.y, cell.x) {
-					return Some(ScrollbarHit {
-						container,
-						axis: ScrollAxis::X,
-						region,
-						bar,
-					});
-				}
-			}
-		}
-		None
-	}
-}
-
-/// Classify a press on `bar`: `cross` is the cursor's cross-axis coordinate
-/// (compared to the gutter line), `along` the along-axis coordinate (compared to
-/// the track and thumb spans). `None` when the cursor is off this bar.
-fn bar_region(bar: &AxisBar, cross: i32, along: i32) -> Option<ScrollbarRegion> {
-	if cross != bar.line {
-		return None;
-	}
-	if along < bar.track_start || along >= bar.track_start + bar.track_len as i32 {
-		return None;
-	}
-	if along < bar.thumb_start {
-		Some(ScrollbarRegion::PageBackward)
-	} else if along >= bar.thumb_start + bar.thumb_len as i32 {
-		Some(ScrollbarRegion::PageForward)
-	} else {
-		Some(ScrollbarRegion::Thumb {
-			grab: along - bar.thumb_start,
-		})
-	}
-}
-
-/// Read an axis from a scroll offset.
-fn axis_offset(offset: IVec2, axis: ScrollAxis) -> i32 {
-	match axis {
-		ScrollAxis::X => offset.x,
-		ScrollAxis::Y => offset.y,
-	}
-}
-
-/// Write an axis of a scroll offset.
-fn set_axis_offset(offset: &mut IVec2, axis: ScrollAxis, value: i32) {
-	match axis {
-		ScrollAxis::X => offset.x = value,
-		ScrollAxis::Y => offset.y = value,
-	}
-}
-
-/// ECS system: drive a container's scroll from mouse interaction with its
-/// scrollbar, like a browser: click the track to page toward the click, drag the
-/// thumb to scroll proportionally.
-///
-/// Sits alongside [`scroll_input`] (wheel/keys). A press in a gutter pages or
-/// begins a thumb drag; a `CursorMoved` while dragging maps the cursor to a
-/// clamped offset; a release ends the drag. A press outside every gutter is
-/// ignored here and falls through to the normal pointer hit-test.
-pub fn scrollbar_mouse(
-	mut buttons: MessageReader<MouseButtonInput>,
-	mut cursor: MessageReader<CursorMoved>,
-	// the hit-test reads ScrollPosition (via CharcellQuery), so it cannot coexist
-	// with the mutable write query; a ParamSet keeps the accesses disjoint.
-	mut params: ParamSet<(ScrollbarHitTest, Query<&'static mut ScrollPosition>)>,
-	mut drag: Local<Option<ScrollbarDrag>>,
-	mut last_cursor: Local<Option<IVec2>>,
-) {
-	// phase 1 (read-only hit-test): collect the offset writes this frame implies.
-	let mut writes = Vec::<ScrollWrite>::new();
-	{
-		let hit_test = params.p0();
-		// a move while dragging maps the cursor along the track to a scroll offset.
-		for moved in cursor.read() {
-			let cell = vec2_to_cell(moved.position);
-			*last_cursor = Some(cell);
-			let Some(state) = drag.as_ref() else { continue };
-			let Some(bar) = hit_test.bar(state.container, state.axis) else {
-				continue;
-			};
-			let along = axis_offset(cell, state.axis);
-			writes.push(ScrollWrite::Set {
-				container: state.container,
-				axis: state.axis,
-				offset: bar.offset_at(along, state.grab),
-			});
-		}
-		for button in buttons.read() {
-			match button.state {
-				ButtonState::Pressed => {
-					let Some(cell) = *last_cursor else { continue };
-					let Some(hit) = hit_test.hit(cell) else { continue };
-					match hit.region {
-						ScrollbarRegion::Thumb { grab } => {
-							*drag = Some(ScrollbarDrag {
-								container: hit.container,
-								axis: hit.axis,
-								grab,
-							});
-						}
-						// click the track to page one scrollport toward the click.
-						ScrollbarRegion::PageBackward => {
-							writes.push(ScrollWrite::page(&hit, -(hit.bar.track_len as i32)));
-						}
-						ScrollbarRegion::PageForward => {
-							writes.push(ScrollWrite::page(&hit, hit.bar.track_len as i32));
-						}
-					}
-				}
-				// any release ends a drag (clamp_scroll_positions settles it).
-				ButtonState::Released => *drag = None,
-			}
-		}
-	}
-
-	// phase 2 (mutable): apply the collected offset writes.
-	let mut scrolls = params.p1();
-	for write in writes {
-		let Ok(mut scroll) = scrolls.get_mut(write.container()) else {
-			continue;
-		};
-		let next = write.resolve(scroll.offset);
+	let container = pointers
+		.single()
+		.ok()
+		.and_then(|pointer| pointer.hover)
+		.and_then(scrollable_ancestor)
+		.or_else(|| focused.iter().next().and_then(scrollable_ancestor))
+		// the page scrollport: the outermost ScrollPosition container reachable from
+		// a buffer-root tree (the first one pre-order from a root). Generic over the
+		// router, so beet_ui needs no dependency on it.
+		.or_else(|| {
+			roots.iter().find_map(|root| {
+				tree.pre_order(root).into_iter().find(|entity| scrolls.contains(*entity))
+			})
+		});
+	let Some(container) = container else { return };
+	if let Ok(mut scroll) = scrolls.get_mut(container) {
+		// the clamp_scroll_positions system settles this into range next frame.
+		// saturating so the Home/End sentinel deltas can't overflow.
+		let next = IVec2::new(
+			scroll.offset.x.saturating_add(delta.x).max(0),
+			scroll.offset.y.saturating_add(delta.y).max(0),
+		);
 		if next != scroll.offset {
 			scroll.offset = next;
 		}
 	}
 }
 
-/// A pending scroll-offset mutation collected during the read-only hit-test, then
-/// applied against the mutable [`ScrollPosition`] query.
-enum ScrollWrite {
-	/// Set an axis to an absolute offset (a thumb drag).
-	Set { container: Entity, axis: ScrollAxis, offset: i32 },
-	/// Add `delta` to an axis, clamped to `[0, max]` (a track page).
-	Page { container: Entity, axis: ScrollAxis, delta: i32, max: i32 },
-}
-
-impl ScrollWrite {
-	/// A page write from a scrollbar hit and a signed cell delta.
-	fn page(hit: &ScrollbarHit, delta: i32) -> Self {
-		Self::Page {
-			container: hit.container,
-			axis: hit.axis,
-			delta,
-			max: hit.bar.max_offset,
-		}
-	}
-
-	fn container(&self) -> Entity {
-		match self {
-			Self::Set { container, .. } | Self::Page { container, .. } => *container,
-		}
-	}
-
-	/// The new offset this write produces from the `current` offset.
-	fn resolve(&self, current: IVec2) -> IVec2 {
-		let mut next = current;
-		match *self {
-			Self::Set { axis, offset, .. } => set_axis_offset(&mut next, axis, offset),
-			Self::Page { axis, delta, max, .. } => {
-				let value = (axis_offset(current, axis) + delta).clamp(0, max);
-				set_axis_offset(&mut next, axis, value);
-			}
-		}
-		next
-	}
+/// Convert a bevy cursor [`Vec2`] (cell-space, 1:1) to a signed cell.
+pub(super) fn vec2_to_cell(position: Vec2) -> IVec2 {
+	IVec2::new(position.x.floor() as i32, position.y.floor() as i32)
 }
 
 #[cfg(test)]
@@ -742,113 +512,54 @@ mod test {
 		(unscrolled_hit != scrolled_hit).xpect_true();
 	}
 
-	// ── Scrollbar mouse interaction (Task 06) ──
-
-	/// The vertical scrollbar's painted column and its track + thumb rows, scanned
-	/// from the rendered buffer so the test clicks exactly where paint drew.
-	fn vbar(host: &TestHost) -> (u32, Vec<u32>, Vec<u32>) {
-		let dbuf = host.app.world().get::<DoubleBuffer>(host.host).unwrap();
-		let bar: Vec<(u32, u32, String)> = dbuf
-			.front_buffer()
-			.iter_cells()
-			.filter(|(_, cell)| matches!(cell.symbol_str(), "│" | "█"))
-			.map(|(pos, cell)| (pos.x, pos.y, cell.symbol_str().to_string()))
-			.collect();
-		let col = bar.iter().map(|(x, _, _)| *x).max().expect("a vertical bar");
-		let mut track: Vec<u32> =
-			bar.iter().filter(|(x, _, _)| *x == col).map(|(_, y, _)| *y).collect();
-		let mut thumb: Vec<u32> = bar
-			.iter()
-			.filter(|(x, _, glyph)| *x == col && glyph == "█")
-			.map(|(_, y, _)| *y)
-			.collect();
-		track.sort();
-		thumb.sort();
-		(col, track, thumb)
-	}
-
-	/// The maximum scroll offset across every container (y).
-	fn offset_y(host: &mut TestHost) -> i32 {
+	/// The maximum scroll offset across every container, on the given axis.
+	fn max_offset(host: &mut TestHost, axis: impl Fn(IVec2) -> i32) -> i32 {
 		host.app
 			.world_mut()
 			.query::<&ScrollPosition>()
 			.iter(host.app.world())
-			.map(|scroll| scroll.offset.y)
+			.map(|scroll| axis(scroll.offset))
 			.max()
 			.unwrap_or(0)
 	}
 
-	/// The maximum scroll offset across every container (x).
-	fn offset_x(host: &mut TestHost) -> i32 {
-		host.app
-			.world_mut()
-			.query::<&ScrollPosition>()
-			.iter(host.app.world())
-			.map(|scroll| scroll.offset.x)
-			.max()
-			.unwrap_or(0)
-	}
-
-	/// A tall vertical scroll container (30 rows in a 6-row scrollport).
-	fn tall_scroller_host() -> TestHost {
+	/// A keyboard scroll (ArrowDown, then PageDown) scrolls the page scrollport with
+	/// nothing hovered: the fallback resolves the outermost buffer-root scroll
+	/// container, like a browser scrolling the document.
+	#[beet_core::test]
+	fn key_scrolls_page_without_hover() {
 		let mut host = TestHost::new();
+		// the host itself is the page scrollport: a viewport-height scroll container
+		// whose content overflows. No pointer ever moves, so nothing is hovered.
 		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
 			vec![
-				Rule::class("scroller")
-					.with_value(common_props::Height, Length::Rem(6.))
+				Rule::class("page")
+					.with_value(common_props::Height, Length::Rem(4.))
 					.with_value(common_props::OverflowYProp, Overflow::Scroll),
 			],
 		);
 		let body: String =
 			(0..30).map(|i| format!("r{i}")).collect::<Vec<_>>().join("\n");
-		host.spawn_content(rsx! { <div class="scroller"><pre>{body}</pre></div> });
+		host.spawn_content(rsx! { <div class="page"><pre>{body}</pre></div> });
 		host.step();
-		host
+		max_offset(&mut host, |offset| offset.y).xpect_eq(0);
+
+		// ArrowDown (CSI B) with no hover: the page scrolls via the fallback.
+		host.send_input(b"\x1b[B");
+		host.step();
+		let after_arrow = max_offset(&mut host, |offset| offset.y);
+		(after_arrow > 0).xpect_true();
+
+		// PageDown (CSI 6 ~) scrolls a whole page further.
+		host.send_input(b"\x1b[6~");
+		host.step();
+		(max_offset(&mut host, |offset| offset.y) > after_arrow).xpect_true();
 	}
 
-	/// Clicking the track below the thumb pages the content forward by ~one page.
+	/// A horizontal wheel scrolls a wide container along its x axis (left then back
+	/// right), proving every wheel direction is routed.
 	#[beet_core::test]
-	fn scrollbar_track_click_pages_forward() {
-		let mut host = tall_scroller_host();
-		offset_y(&mut host).xpect_eq(0);
-		// at offset 0 the thumb sits at the top; click the bottom of the track.
-		let (col, track, _thumb) = vbar(&host);
-		let bottom = *track.last().unwrap();
-		host.send_input(&sgr(0, col, bottom, true));
-		host.step();
-		// paged forward by ~one scrollport, revealing later content.
-		(offset_y(&mut host) > 0).xpect_true();
-		host.frame_plain().xnot().xpect_contains("r0");
-	}
-
-	/// Dragging the thumb to the bottom of the track scrolls to the maximum offset.
-	#[beet_core::test]
-	fn scrollbar_thumb_drag_scrolls_proportionally() {
-		let mut host = tall_scroller_host();
-		let (col, track, thumb) = vbar(&host);
-		let (top, bottom) = (*track.first().unwrap(), *track.last().unwrap());
-		// press the thumb (at the top), drag to the track bottom, release.
-		host.send_input(&sgr(0, col, *thumb.first().unwrap(), true));
-		host.step();
-		host.send_input(&sgr(35, col, bottom, true));
-		host.step();
-		host.send_input(&sgr(0, col, bottom, false));
-		host.step();
-		// a full drag to the track bottom reaches the maximum offset: the last
-		// content row is visible and the first is gone.
-		let at_max = offset_y(&mut host);
-		(at_max > 0).xpect_true();
-		host.frame_plain().xpect_contains("r29").xnot().xpect_contains("r0");
-		// the release ended the drag: a bare move no longer scrolls.
-		host.send_input(&sgr(35, col, top, true));
-		host.step();
-		offset_y(&mut host).xpect_eq(at_max);
-	}
-
-	/// The horizontal analog: clicking the bottom-gutter track right of the thumb
-	/// pages the wide content rightward.
-	#[beet_core::test]
-	fn scrollbar_horizontal_track_click_pages() {
+	fn horizontal_wheel_scrolls_wide_container() {
 		let mut host = TestHost::new();
 		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
 			vec![
@@ -857,30 +568,19 @@ mod test {
 					.with_value(common_props::OverflowXProp, Overflow::Scroll),
 			],
 		);
-		// content wider than the 40-cell buffer, so it overflows horizontally.
-		let wide: String = ('a'..='z').chain('A'..='Z').cycle().take(60).collect();
-		host.spawn_content(rsx! {
-			<div class="wide"><pre>{wide}</pre></div>
-		});
+		let wide: String = ('a'..='z').chain('A'..='Z').cycle().take(80).collect();
+		host.spawn_content(rsx! { <div class="wide"><pre>{wide}</pre></div> });
 		host.step();
-		// the horizontal bar is the bottom row of box-drawing glyphs.
-		let dbuf = host.app.world().get::<DoubleBuffer>(host.host).unwrap();
-		let bar: Vec<(u32, u32)> = dbuf
-			.front_buffer()
-			.iter_cells()
-			.filter(|(_, cell)| matches!(cell.symbol_str(), "─" | "█"))
-			.map(|(pos, _)| (pos.x, pos.y))
-			.collect();
-		let row = bar.iter().map(|(_, y)| *y).max().expect("a horizontal bar");
-		let right = bar
-			.iter()
-			.filter(|(_, y)| *y == row)
-			.map(|(x, _)| *x)
-			.max()
-			.unwrap();
-		// click the track right of the thumb -> page the content rightward.
-		host.send_input(&sgr(0, right, row, true));
+		// hover the wide container, then wheel right (SGR button 67) to scroll x.
+		host.send_input(&sgr(35, 1, 1, true));
 		host.step();
-		(offset_x(&mut host) > 0).xpect_true();
+		host.send_input(&sgr(67, 1, 1, true));
+		host.step();
+		let after_right = max_offset(&mut host, |offset| offset.x);
+		(after_right > 0).xpect_true();
+		// wheel left (SGR button 66) scrolls back toward the start.
+		host.send_input(&sgr(66, 1, 1, true));
+		host.step();
+		(max_offset(&mut host, |offset| offset.x) < after_right).xpect_true();
 	}
 }

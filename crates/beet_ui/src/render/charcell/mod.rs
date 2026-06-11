@@ -13,11 +13,11 @@ mod double_buffer;
 mod flex;
 mod flex_buffer;
 mod inline;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 mod hit_test;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 mod input;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 mod input_bridge;
 mod layout;
 mod measure;
@@ -29,14 +29,18 @@ pub(self) use query::*;
 mod renderer;
 mod scrollbar;
 pub(self) use scrollbar::*;
+#[cfg(feature = "tui")]
+mod scrollbar_hit_test;
+#[cfg(feature = "tui")]
+pub use scrollbar_hit_test::*;
 mod stacking;
 pub(self) use stacking::*;
 mod table;
 pub(self) use table::*;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 mod terminal;
 /// In-process test harness for the live TUI, reused by the interaction tasks.
-#[cfg(all(test, feature = "terminal"))]
+#[cfg(all(test, feature = "tui"))]
 pub(crate) mod test_host;
 mod text;
 
@@ -45,11 +49,11 @@ pub use buffer::*;
 pub use decorate::*;
 pub use double_buffer::*;
 pub use flex_buffer::*;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 pub use hit_test::*;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 pub use input::*;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 pub use input_bridge::*;
 pub use layout::LayoutRect;
 pub use measure::IntrinsicSize;
@@ -57,7 +61,7 @@ pub use measure::IntrinsicSize;
 pub(crate) use paint::*;
 pub use plugin::*;
 pub(crate) use prepare::*;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 pub use terminal::*;
 
 pub(self) use box_model::*;

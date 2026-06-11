@@ -73,7 +73,7 @@ pub fn Link(#[prop(into)] href: String, variant: ButtonVariant) -> impl Bundle {
 	}
 }
 
-#[cfg(all(test, feature = "terminal"))]
+#[cfg(all(test, feature = "tui"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

@@ -44,9 +44,12 @@ pub fn resolve_styles(
 
 	// inheritance cache friendly parallelism, top down queue,
 	// as described in stylo https://youtu.be/Y6SSTRr2mFU?t=310
+	let _perf = Instant::now();
+	let mut _perf_n = 0usize;
 	let mut queue = roots.into_iter().collect::<Vec<_>>();
 	while !queue.is_empty() {
 		for entity in queue.drain(..).collect::<Vec<_>>() {
+			_perf_n += 1;
 			// resolve visual style
 			let visual = resolve_visual(&ruleset_query, entity)?;
 			if let Some(mut style) = styles.get_mut(entity)?.0 {
@@ -107,13 +110,19 @@ pub fn resolve_styles(
 			}
 			// follow a `RenderRef` holder into the content it renders in place, so
 			// transcluded content re-resolves under this (layout) cascade. An
-			// unresolved holder (placeholder, ie no page yet) has no content.
+			// unresolved holder (no page yet) has no content to cascade into.
 			if let Ok(render_ref) = render_refs.get(entity)
-				&& render_ref.0 != Entity::PLACEHOLDER
+				&& let Some(target) = render_ref.target()
 			{
-				queue.push(render_ref.0);
+				queue.push(target);
 			}
 		}
+	}
+	if _perf_n > 0 {
+		beet_core::cross_log!(
+			"PERF resolve_styles: {_perf_n} entities in {:?}",
+			_perf.elapsed()
+		);
 	}
 	Ok(())
 }

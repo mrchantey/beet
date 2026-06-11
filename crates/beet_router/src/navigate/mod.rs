@@ -20,7 +20,7 @@ mod open_link;
 #[cfg(feature = "std")]
 pub use open_link::*;
 // terminal-only: the live-TUI server entry (needs beet_ui StdioTerminal).
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 mod tui_server;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 pub use tui_server::*;

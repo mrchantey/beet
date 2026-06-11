@@ -19,12 +19,12 @@ required-features = ["style"]
 [[example]]
 name = "tui"
 path = "examples/tui.rs"
-required-features = ["terminal", "style"]
+required-features = ["tui", "style"]
 
 [[example]]
 name = "term_input"
 path = "examples/term_input.rs"
-required-features = ["terminal"]
+required-features = ["tui"]
 
 [[example]]
 name = "build_css"
@@ -36,11 +36,11 @@ name = "showcase"
 path = "examples/showcase.rs"
 required-features = ["template", "style"]
 
-# measures the real terminal via crossterm, so requires the `terminal` feature
+# measures the real terminal via crossterm, so requires the `tui` feature
 [[example]]
 name = "layout"
 path = "examples/layout.rs"
-required-features = ["terminal"]
+required-features = ["tui"]
 
 
 [features]
@@ -61,7 +61,7 @@ template = ["std", "rsx", "style"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-terminal = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
+tui = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]

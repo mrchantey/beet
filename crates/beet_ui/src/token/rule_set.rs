@@ -243,7 +243,7 @@ impl RuleSetQuery<'_, '_> {
 	fn parent(&self, entity: Entity) -> Option<Entity> {
 		self.render_refs
 			.iter()
-			.find(|(_, render_ref)| render_ref.0 == entity)
+			.find(|(_, render_ref)| render_ref.target() == Some(entity))
 			.map(|(holder, _)| holder)
 			.or_else(|| self.ancestors.get(entity).map(|child_of| child_of.get()).ok())
 	}

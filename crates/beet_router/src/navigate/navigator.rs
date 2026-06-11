@@ -100,10 +100,19 @@ impl Navigator {
 
 	/// An in-world navigator: requests dispatch to the local `router` entity
 	/// (no socket), for browsing the app's own routes. Starts at `home_url`.
+	///
+	/// Accepts terminal media types (no HTML), so a layout's content negotiation
+	/// treats it as the non-web target: the document chrome seeds the dark scheme
+	/// itself rather than relying on the web `color-scheme` script.
 	pub fn in_world(router: Entity, home_url: impl Into<Url>) -> Self {
 		Self {
 			home_url: home_url.into(),
 			transport: NavigatorTransport::InWorld { router },
+			accepts: vec![
+				MediaType::AnsiTerm,
+				MediaType::Text,
+				MediaType::Markdown,
+			],
 			..default()
 		}
 	}

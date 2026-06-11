@@ -1,6 +1,6 @@
 use super::*;
 use crate::parse::PostParseTree;
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 use crate::parse::RealtimeParsePlugin;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
@@ -15,15 +15,15 @@ use bevy::ecs::schedule::common_conditions;
 /// repaint ([`RealtimeParsePlugin`]), the reactive document chain
 /// ([`DocumentUiPlugin`]), and spawns the one [`PrimaryPointer`]. The terminal
 /// lifecycle (input read, render, flush, restore) ships with [`CharcellPlugin`]
-/// under the `terminal` feature, so this is purely the live-app composition.
+/// under the `tui` feature, so this is purely the live-app composition.
 ///
 /// Later tasks layer the input bridge (terminal bytes to bevy input) and the
 /// hit-test (cursor to [`Pointer`] events) onto this plugin.
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 #[derive(Default)]
 pub struct CharcellTuiPlugin;
 
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 impl Plugin for CharcellTuiPlugin {
 	fn build(&self, app: &mut App) {
 		// InputPlugin maintains ButtonInput<KeyCode>/<MouseButton> and registers the
@@ -49,10 +49,16 @@ impl Plugin for CharcellTuiPlugin {
 			// SIGWINCH-equivalent: poll the real tty size and resize stdio buffers.
 			.add_systems(PreUpdate, resize_stdio_buffers)
 			// hit-test + scroll input ride the bridged bevy mouse/key messages.
-			// scrollbar_mouse claims gutter presses; others fall through to pointer_input.
+			// pointer_input runs first so a wheel's own hover is current when
+			// scroll_input reads it; scrollbar_mouse claims gutter presses, others
+			// fall through to pointer_input.
 			.add_systems(
 				Update,
-				(pointer_input, scroll_input, scrollbar_mouse, exit_on_ctrl_c),
+				(
+					(pointer_input, scroll_input).chain(),
+					scrollbar_mouse,
+					exit_on_ctrl_c,
+				),
 			)
 			// exactly one primary pointer for the hit-test (Task 09) to read.
 			.add_systems(Startup, spawn_primary_pointer);
@@ -60,7 +66,7 @@ impl Plugin for CharcellTuiPlugin {
 }
 
 /// Spawn the single [`PrimaryPointer`] the live TUI routes cursor events through.
-#[cfg(feature = "terminal")]
+#[cfg(feature = "tui")]
 fn spawn_primary_pointer(
 	mut commands: Commands,
 	existing: Query<(), With<crate::prelude::PrimaryPointer>>,
@@ -107,7 +113,7 @@ impl Plugin for CharcellPlugin {
 
 		// Terminal output: render the diffed buffer, flush, restore on exit. Input
 		// is bridged to bevy by `CharcellTuiPlugin` (the live app), not here.
-		#[cfg(feature = "terminal")]
+		#[cfg(feature = "tui")]
 		app.add_systems(
 			PostParseTree,
 			(
