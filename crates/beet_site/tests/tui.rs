@@ -398,6 +398,9 @@ async fn resize_on_crates_page_does_not_panic() {
 		host.app.update();
 	}
 	host.resize(UVec2::new(120, 40));
+	// the wheel above scrolled the page; jump back to the top so the heading is
+	// in view, confirming the app is alive and still scrollable after the churn.
+	host.send(b"\x1b[1~"); // Home
 	host.step_until("Crates");
 }
 

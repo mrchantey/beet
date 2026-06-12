@@ -62,6 +62,7 @@ pub fn token_map() -> CssTokenMap {
 
     .insert(Shadow)
     .insert(Scrim)
+    .insert(HoverSurface)
 
     .insert(OpacityHovered)
     .insert(OpacityFocused)
@@ -147,6 +148,12 @@ css_variable!(OnBackground, Color);
 
 css_variable!(Shadow, Color);
 css_variable!(Scrim, Color);
+// The hover state-layer fill for container-less interactives (text/outline
+// buttons, links, sidebar rows, disclosure summaries). Deliberately set only
+// under the light scheme: in dark mode it stays unset so it resolves to no
+// background and the hover reads as a subtle text dim instead, matching the
+// platform feel of each scheme.
+css_variable!(HoverSurface, Color);
 
 // ── Opacity scalars ───────────────────────────────────────────────────────────
 

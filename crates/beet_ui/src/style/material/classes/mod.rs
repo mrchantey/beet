@@ -166,6 +166,10 @@ pub fn all_rules() -> Vec<Rule> {
 		// interaction — shared hover affordance for buttons and links
 		interactive_transition(),
 		hover_dim(),
+		// container-less interactives get a light-scheme hover fill; dark keeps
+		// the dim alone (the token is unset there)
+		hover_state_layer(),
+		hover_surface_light(),
 		// accessibility — global state rules
 		disabled_state(),
 		// web-only overrides — gated behind `@media screen`, ignored by charcell

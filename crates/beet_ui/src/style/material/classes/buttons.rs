@@ -76,6 +76,8 @@ pub fn button_filled() -> Rule {
 }
 
 /// Outlined button - medium emphasis with a visible border, regular foreground.
+/// No container fill; its hover affordance comes from the shared
+/// [`interactive_hover`](super::interactive_hover) state layer.
 pub fn button_outlined() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(BTN_OUTLINED))

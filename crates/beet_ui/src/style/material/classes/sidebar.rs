@@ -182,6 +182,9 @@ pub fn sidebar_link() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
 		.with_canonical(DecorationLine::DEFAULT)
+		// full-width block so the whole row is the click/hover target (the
+		// hit-test resolves the row's rect, not just the painted text) and the
+		// hover state layer fills the rail.
 		.with_value(common_props::DisplayProp, Display::Block)
 		.with_value(common_props::Padding, Spacing {
 			top: Length::Rem(0.25),

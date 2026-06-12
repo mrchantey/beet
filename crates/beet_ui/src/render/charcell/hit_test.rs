@@ -225,11 +225,12 @@ pub(crate) fn scroll_input(
 	// page) up into the holder's container (eg the page-host scrollport).
 	refs: Query<(Entity, &RenderRef)>,
 	tree: CharcellTree,
-	roots: Query<Entity, With<DoubleBuffer>>,
-	mut scrolls: Query<&mut ScrollPosition>,
+	roots: Query<(Entity, &DoubleBuffer)>,
+	// `CharcellQuery` (p0) reads `ScrollPosition`, so it can't coexist with the
+	// `&mut ScrollPosition` writer (p1) outside a `ParamSet`.
+	mut params: ParamSet<(CharcellQuery, Query<&mut ScrollPosition>)>,
 ) {
-	// accumulate this frame's scroll delta in cells; track whether any of it came
-	// from the keyboard, which falls back to the focused/page scrollport.
+	// accumulate this frame's scroll delta in cells.
 	let mut delta = IVec2::ZERO;
 	for ev in wheel.read() {
 		let lines = match ev.unit {
@@ -270,41 +271,63 @@ pub(crate) fn scroll_input(
 		return;
 	}
 
-	// resolve the container to scroll, in DOM priority order.
-	let scrollable_ancestor = |start: Entity| {
-		let mut current = Some(start);
-		loop {
-			let entity = current?;
-			if scrolls.contains(entity) {
-				break Some(entity);
+	// the viewport (first buffer) for resolving the box model the same way layout
+	// did, so the scrollable-extent check matches the painted geometry.
+	let viewport = roots.iter().next().map(|(_, buffer)| buffer.size());
+	let Some(viewport) = viewport else { return };
+
+	// resolve the container to scroll, in DOM priority order, skipping any
+	// scroll container that can't actually scroll on the delta's axis — so the
+	// wheel falls through a pinned/zero-extent inner container to the real
+	// scrollport beneath it, like a browser.
+	let container = {
+		let charcell = params.p0();
+		// whether `entity` is a scroll container that can move on the delta axis.
+		let can_scroll = |entity: Entity| {
+			charcell
+				.unresolved_node(entity)
+				.ok()
+				.filter(|node| node.is_scroll_container())
+				.map(|node| scroll_state(&node, &charcell, viewport).max_offset())
+				.is_some_and(|max| {
+					(delta.y != 0 && max.y > 0) || (delta.x != 0 && max.x > 0)
+				})
+		};
+		// the nearest ancestor (self-inclusive) that can scroll the delta axis.
+		let scrollable_ancestor = |start: Entity| {
+			let mut current = Some(start);
+			loop {
+				let entity = current?;
+				if can_scroll(entity) {
+					break Some(entity);
+				}
+				// transclusion wins for *visual* ancestry: a RenderRef holder is the
+				// visual parent of the entity it renders in place; otherwise walk ChildOf.
+				current = refs
+					.iter()
+					.find(|(_, render_ref)| render_ref.target() == Some(entity))
+					.map(|(holder, _)| holder)
+					.or_else(|| {
+						parents.get(entity).ok().map(|child_of| child_of.parent())
+					});
 			}
-			// transclusion wins for *visual* ancestry: if a RenderRef holder renders
-			// this entity in place, the holder (eg the page-host scrollport) is its
-			// visual parent, even though its structural ChildOf points elsewhere (eg a
-			// route entity under the router). Otherwise walk up ChildOf.
-			current = refs
-				.iter()
-				.find(|(_, render_ref)| render_ref.target() == Some(entity))
-				.map(|(holder, _)| holder)
-				.or_else(|| parents.get(entity).ok().map(|child_of| child_of.parent()));
-		}
-	};
-	let container = pointers
-		.single()
-		.ok()
-		.and_then(|pointer| pointer.hover)
-		.and_then(scrollable_ancestor)
-		.or_else(|| focused.iter().next().and_then(scrollable_ancestor))
-		// the page scrollport: the outermost ScrollPosition container reachable from
-		// a buffer-root tree (the first one pre-order from a root). Generic over the
-		// router, so beet_ui needs no dependency on it.
-		.or_else(|| {
-			roots.iter().find_map(|root| {
-				tree.pre_order(root).into_iter().find(|entity| scrolls.contains(*entity))
+		};
+		pointers
+			.single()
+			.ok()
+			.and_then(|pointer| pointer.hover)
+			.and_then(scrollable_ancestor)
+			.or_else(|| focused.iter().next().and_then(scrollable_ancestor))
+			// the page scrollport: the outermost scrollable container reachable from
+			// a buffer-root tree (the first scrollable one pre-order from a root).
+			.or_else(|| {
+				roots.iter().find_map(|(root, _)| {
+					tree.pre_order(root).into_iter().find(|entity| can_scroll(*entity))
+				})
 			})
-		});
+	};
 	let Some(container) = container else { return };
-	if let Ok(mut scroll) = scrolls.get_mut(container) {
+	if let Ok(mut scroll) = params.p1().get_mut(container) {
 		// the clamp_scroll_positions system settles this into range next frame.
 		// saturating so the Home/End sentinel deltas can't overflow.
 		let next = IVec2::new(
@@ -386,21 +409,17 @@ mod test {
 		log.down.contains(&target).xpect_true();
 	}
 
-	/// A full-width `display: block` interactive with a background (the sidebar
-	/// row model) is hit across its whole width — clicking well past the end of
-	/// its text still resolves to it, because the background fills the row with
-	/// the element's painted cells.
+	/// A full-width `display: block` interactive *without* a background (the
+	/// sidebar row model) is hit across its whole width — clicking well past the
+	/// end of its text still resolves to it via the geometric rect fallback, so
+	/// the row needs no fill to be fully clickable.
 	#[beet_core::test]
 	fn full_width_block_is_hit_past_its_text() {
 		let mut host = logging_host();
 		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
 			vec![
 				Rule::class("row")
-					.with_value(common_props::DisplayProp, Display::Block)
-					.with_value(
-						common_props::BackgroundColor,
-						Color::srgb(0.2, 0.2, 0.2),
-					),
+					.with_value(common_props::DisplayProp, Display::Block),
 			],
 		);
 		let row = host
@@ -670,19 +689,18 @@ mod test {
 		(transition.current.foreground != target).xpect_true();
 	}
 
-	/// A backgroundless interactive (a text button) gains a visible hover: it
-	/// fills with its surface at rest so the hover dim has something to darken,
-	/// fixing the light-mode "no hover affordance" gap. The resolved hover
-	/// background differs from (and is darker than) the resting fill.
-	#[beet_core::test]
-	fn backgroundless_button_hover_darkens_background() {
+	/// The resolved background of the `.btn-text` button under `scheme` after the
+	/// pointer has hovered it (the cascade + transition settled).
+	fn hovered_button_background(scheme: ClassName) -> Option<Color> {
 		use crate::style::material::classes;
 		let mut host = TestHost::new();
 		host.app.add_plugins(
 			crate::style::material::MaterialStylePlugin::default(),
 		);
 		host.spawn_content(rsx! {
-			<div><button {Classes::new([classes::BTN_TEXT])}>"Go"</button></div>
+			<div {Classes::new([scheme])}>
+				<button {Classes::new([classes::BTN_TEXT])}>"Go"</button>
+			</div>
 		});
 		host.step();
 		host.step();
@@ -694,34 +712,74 @@ mod test {
 			.find(|(_, element)| element.tag() == "button")
 			.map(|(entity, _)| entity)
 			.unwrap();
-		let resting = host
-			.app
-			.world()
-			.get::<VisualStyle>(button)
-			.unwrap()
-			.background
-			.expect("text button fills with its surface at rest");
-
+		// no container at rest.
+		host.app.world().get::<VisualStyle>(button).unwrap().background.xpect_none();
 		// hover the button, settle the cascade + transition.
-		let (col, row) = (1u32, 0u32);
-		host.send_input(&sgr(35, col, row, true));
+		host.send_input(&sgr(35, 1, 0, true));
 		for _ in 0..4 {
 			host.step();
 		}
-		let hovered = host
+		host.app.world().get::<VisualStyle>(button).unwrap().background
+	}
+
+	/// A container-less interactive (text button) gains a *visible fill* on hover
+	/// in the light scheme — the fix for the light-mode "no hover affordance"
+	/// gap — but no fill in the dark scheme, where the hover reads as a text dim
+	/// instead. Neither carries a background at rest.
+	#[beet_core::test]
+	fn backgroundless_button_hover_is_scheme_aware() {
+		use crate::style::material::classes;
+		// light: a hover fill appears.
+		hovered_button_background(classes::LIGHT_SCHEME).xpect_some();
+		// dark: no hover fill (the HoverSurface token is unset there).
+		hovered_button_background(classes::DARK_SCHEME).xpect_none();
+	}
+
+	/// A wheel over content nested in a scroll container that *can't* scroll
+	/// (its content fits) falls through to the outer scrollport that can, like a
+	/// browser — so a pinned/zero-extent inner container never swallows the wheel.
+	#[beet_core::test]
+	fn wheel_falls_through_non_scrollable_inner_container() {
+		let mut host = TestHost::new();
+		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
+			vec![
+				// the outer page: short, scrollable, its content overflows.
+				Rule::class("outer")
+					.with_value(common_props::Height, Length::Rem(4.))
+					.with_value(common_props::OverflowYProp, Overflow::Scroll),
+				// the inner box: tall enough to hold its content, also a scroll
+				// container, but its own content fits so it can't scroll.
+				Rule::class("inner")
+					.with_value(common_props::Height, Length::Rem(20.))
+					.with_value(common_props::OverflowYProp, Overflow::Auto),
+			],
+		);
+		let content = host
 			.app
-			.world()
-			.get::<VisualStyle>(button)
-			.unwrap()
-			.background
-			.expect("hovered button keeps a background");
-		// the dim darkened the fill: a different, lower-luminance colour.
-		(hovered != resting).xpect_true();
-		let luma = |color: Color| {
-			let c = color.to_srgba();
-			c.red + c.green + c.blue
-		};
-		(luma(hovered) < luma(resting)).xpect_true();
+			.world_mut()
+			.spawn(rsx! {
+				<div class="outer">
+					<div class="inner"><pre>"a\nb\nc"</pre></div>
+					<pre>"d\ne\nf\ng\nh\ni\nj\nk"</pre>
+				</div>
+			})
+			.id();
+		host.app.world_mut().entity_mut(host.host).add_child(content);
+		host.step();
+		// hover the inner box (top-left), then wheel down.
+		host.send_input(&sgr(35, 1, 1, true));
+		host.step();
+		host.send_input(&sgr(65, 1, 1, true));
+		host.step();
+		// the OUTER scrolled (the inner can't), so some container has a non-zero
+		// offset that belongs to the outer page scrollport.
+		let scrolled = host
+			.app
+			.world_mut()
+			.query::<&ScrollPosition>()
+			.iter(host.app.world())
+			.any(|scroll| scroll.offset.y > 0);
+		scrolled.xpect_true();
 	}
 
 	/// A horizontal wheel scrolls a wide container along its x axis (left then back
