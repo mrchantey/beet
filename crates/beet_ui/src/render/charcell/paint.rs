@@ -48,6 +48,11 @@ pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 
 		// descendants of an IFC owner are painted by the owner, not themselves
 		let mut managed = HashSet::<Entity>::default();
+		// a `display: none` subtree is skipped entirely: layout doesn't re-place it
+		// (so its rect goes stale once it was visible), and without this skip paint
+		// would redraw it at that stale geometry — eg a `<details>` body that pops
+		// back after being collapsed.
+		let mut hidden = HashSet::<Entity>::default();
 		for &entity in &ordered {
 			if managed.contains(&entity) {
 				continue;
@@ -57,6 +62,10 @@ pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 			};
 			if establishes_inline_flow(&node, &charcell) {
 				managed.extend(tree.descendants(entity));
+			}
+			if node.layout_style().display == crate::style::Display::None {
+				hidden.insert(entity);
+				hidden.extend(tree.descendants(entity));
 			}
 		}
 
@@ -73,7 +82,7 @@ pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 		buffer.reset();
 
 		for &entity in &painted {
-			if managed.contains(&entity) {
+			if managed.contains(&entity) || hidden.contains(&entity) {
 				continue;
 			}
 			let Ok(node) = charcell.unresolved_node(entity) else {

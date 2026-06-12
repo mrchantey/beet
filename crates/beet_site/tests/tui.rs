@@ -121,6 +121,15 @@ impl SiteHost {
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
 	}
 
+	/// Resize the host buffer, as a terminal resize would.
+	fn resize(&mut self, size: UVec2) {
+		self.app
+			.world_mut()
+			.get_mut::<DoubleBuffer>(self.host)
+			.unwrap()
+			.resize(size);
+	}
+
 	/// Move the cursor over cell `(col, row)` (an SGR motion event) to set hover.
 	fn hover(&mut self, col: u32, row: u32) {
 		self.send(format!("\x1b[<35;{};{}M", col + 1, row + 1).as_bytes());
@@ -368,6 +377,28 @@ async fn form_select_opens_and_chooses() {
 	let (col, row) = host.cell_of("Submit");
 	host.click(col, row);
 	host.step_until("\"role\": \"designer\"");
+}
+
+/// Resizing while on the crates index (which has wide markdown tables) does not
+/// panic across extreme widths/heights and a non-zero scroll offset.
+#[beet::test]
+async fn resize_on_crates_page_does_not_panic() {
+	let mut host = SiteHost::new(UVec2::new(120, 40), "/docs/crates");
+	host.step_until("Crates");
+	// scroll into the body so resize happens with a non-zero scroll offset.
+	host.hover(60, 20);
+	for _ in 0..6 {
+		host.wheel_down(60, 20);
+	}
+	// shrink narrower than the table columns, grow, then extremes — each reflow
+	// must not panic.
+	for size in [(60, 20), (8, 6), (200, 60), (2, 2), (1, 1), (100, 30)] {
+		host.resize(UVec2::new(size.0, size.1));
+		host.app.update();
+		host.app.update();
+	}
+	host.resize(UVec2::new(120, 40));
+	host.step_until("Crates");
 }
 
 /// The app-wide [`ColorScheme`] resource (seeded by `--color-scheme=light` in

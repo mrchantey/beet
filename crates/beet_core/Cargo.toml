@@ -131,7 +131,7 @@ custom_test_frameworks = [
 	"nightly",
 ]
 http = ["dep:http"]
-crossterm = ["dep:crossterm"]
+crossterm = ["dep:crossterm", "dep:libc"]
 bevy_default = ["template_serde", "bevy_multithreaded"]
 # template serialization, see src/template_serde. needs reflect + Entity serde
 template_serde = ["serde", "bevy/serialize"]
@@ -270,6 +270,10 @@ futures = { workspace = true, optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ## async
 crossterm = { workspace = true, optional = true }
+# stdout/stderr fd redirection for `terminal_ext::redirect_std_to_file`, used by
+# the live TUI to keep logs off the alternate screen. Tied to `crossterm` since
+# both are terminal concerns enabled together by tui targets.
+libc = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-task = { workspace = true, optional = true }

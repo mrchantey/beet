@@ -386,6 +386,41 @@ mod test {
 		log.down.contains(&target).xpect_true();
 	}
 
+	/// A full-width `display: block` interactive with a background (the sidebar
+	/// row model) is hit across its whole width — clicking well past the end of
+	/// its text still resolves to it, because the background fills the row with
+	/// the element's painted cells.
+	#[beet_core::test]
+	fn full_width_block_is_hit_past_its_text() {
+		let mut host = logging_host();
+		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
+			vec![
+				Rule::class("row")
+					.with_value(common_props::DisplayProp, Display::Block)
+					.with_value(
+						common_props::BackgroundColor,
+						Color::srgb(0.2, 0.2, 0.2),
+					),
+			],
+		);
+		let row = host
+			.app
+			.world_mut()
+			.spawn(rsx! { <div class="row">"Hi"</div> })
+			.id();
+		host.app.world_mut().entity_mut(host.host).add_child(row);
+		host.step();
+		// click far to the right of the 2-char text, still on the row's first line.
+		host.send_input(&sgr(0, 30, 0, true));
+		host.step();
+		host.app
+			.world()
+			.resource::<PointerLog>()
+			.down
+			.contains(&row)
+			.xpect_true();
+	}
+
 	/// Moving the cursor across two stacked rows fires Over/Out with the right
 	/// targets and tracks `Pointer::hover`.
 	#[beet_core::test]
@@ -553,7 +588,25 @@ mod test {
 		// PageDown (CSI 6 ~) scrolls a whole page further.
 		host.send_input(b"\x1b[6~");
 		host.step();
-		(max_offset(&mut host, |offset| offset.y) > after_arrow).xpect_true();
+		let after_page = max_offset(&mut host, |offset| offset.y);
+		(after_page > after_arrow).xpect_true();
+
+		// End jumps to the bottom (the clamp settles the huge offset to the max),
+		// across every escape form a terminal may send it as.
+		for end in [&b"\x1b[F"[..], &b"\x1bOF"[..], &b"\x1b[4~"[..]] {
+			// reset to the top first so each form's jump is observable.
+			host.send_input(b"\x1b[1~"); // Home
+			host.step();
+			max_offset(&mut host, |offset| offset.y).xpect_eq(0);
+			host.send_input(end);
+			host.step();
+			let bottom = max_offset(&mut host, |offset| offset.y);
+			(bottom > after_page).xpect_true();
+			// Home returns to the top.
+			host.send_input(b"\x1b[H");
+			host.step();
+			max_offset(&mut host, |offset| offset.y).xpect_eq(0);
+		}
 	}
 
 	/// Hovering a link plays the hover tokens through the whole chain: the
@@ -615,6 +668,60 @@ mod test {
 		let transition = host.app.world().get::<VisualTransition>(link).unwrap();
 		transition.is_animating().xpect_true();
 		(transition.current.foreground != target).xpect_true();
+	}
+
+	/// A backgroundless interactive (a text button) gains a visible hover: it
+	/// fills with its surface at rest so the hover dim has something to darken,
+	/// fixing the light-mode "no hover affordance" gap. The resolved hover
+	/// background differs from (and is darker than) the resting fill.
+	#[beet_core::test]
+	fn backgroundless_button_hover_darkens_background() {
+		use crate::style::material::classes;
+		let mut host = TestHost::new();
+		host.app.add_plugins(
+			crate::style::material::MaterialStylePlugin::default(),
+		);
+		host.spawn_content(rsx! {
+			<div><button {Classes::new([classes::BTN_TEXT])}>"Go"</button></div>
+		});
+		host.step();
+		host.step();
+		let button = host
+			.app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(host.app.world())
+			.find(|(_, element)| element.tag() == "button")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		let resting = host
+			.app
+			.world()
+			.get::<VisualStyle>(button)
+			.unwrap()
+			.background
+			.expect("text button fills with its surface at rest");
+
+		// hover the button, settle the cascade + transition.
+		let (col, row) = (1u32, 0u32);
+		host.send_input(&sgr(35, col, row, true));
+		for _ in 0..4 {
+			host.step();
+		}
+		let hovered = host
+			.app
+			.world()
+			.get::<VisualStyle>(button)
+			.unwrap()
+			.background
+			.expect("hovered button keeps a background");
+		// the dim darkened the fill: a different, lower-luminance colour.
+		(hovered != resting).xpect_true();
+		let luma = |color: Color| {
+			let c = color.to_srgba();
+			c.red + c.green + c.blue
+		};
+		(luma(hovered) < luma(resting)).xpect_true();
 	}
 
 	/// A horizontal wheel scrolls a wide container along its x axis (left then back

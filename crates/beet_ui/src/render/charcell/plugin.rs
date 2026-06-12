@@ -69,7 +69,10 @@ impl Plugin for CharcellTuiPlugin {
 				),
 			)
 			// exactly one primary pointer for the hit-test (Task 09) to read.
-			.add_systems(Startup, spawn_primary_pointer);
+			.add_systems(Startup, spawn_primary_pointer)
+			// clicking a `<summary>` toggles its `<details>` (the terminal stand-in
+			// for the web's native disclosure).
+			.add_observer(toggle_details_on_click);
 	}
 }
 

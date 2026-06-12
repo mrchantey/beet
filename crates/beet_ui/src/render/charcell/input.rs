@@ -354,10 +354,13 @@ impl Perform for Performer {
 			(b"", 'D') if p.len() <= 1 => {
 				self.push_key(KeyPress::unmodified(KeyCode::ArrowLeft))
 			}
-			(b"", 'H') if p.is_empty() => {
+			// tolerate a default `[0]` param like the arrows above: vte can yield
+			// one for a bare `CSI H`/`CSI F`, so `is_empty()` would miss it and
+			// Home/End would never reach the scroll handler.
+			(b"", 'H') if p.len() <= 1 => {
 				self.push_key(KeyPress::unmodified(KeyCode::Home))
 			}
-			(b"", 'F') if p.is_empty() => {
+			(b"", 'F') if p.len() <= 1 => {
 				self.push_key(KeyPress::unmodified(KeyCode::End))
 			}
 

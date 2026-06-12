@@ -148,46 +148,214 @@ fn collect_cell_rows(
 
 /// Generic `<details>` disclosure on the terminal, mirroring the web's native
 /// collapse. A closed details (no `open` attribute) hides everything but its
-/// `<summary>` and prefixes the summary with a `▸` caret; an open one keeps its
-/// body and shows a `▾` caret. The sidebar's own disclosure (its right-aligned
-/// branch carets and always-expanded tree) carries `SIDEBAR_GROUP`, so it is
-/// left untouched.
+/// `<summary>` and marks the caret pointing right (`▸`); an open one keeps its
+/// body and points the caret down (`▾`).
+///
+/// A plain `<details>` gets a left caret [`Marker`] on its summary; a sidebar
+/// group (`SIDEBAR_GROUP`) instead has the markup `.sidebar-caret` glyph flipped
+/// in place (the web rotates it via CSS, which the terminal can't). Either way
+/// the body collapses when closed, so the disclosure is interactive on both —
+/// driven by [`toggle_details_on_click`].
+///
+/// Built from raw queries rather than [`ElementQuery`]/`AttributeQuery` so it can
+/// take `&mut Value` (to flip the sidebar caret) without a query conflict over
+/// the shared `Value` access those system params hold.
 pub fn apply_disclosure(
 	mut commands: Commands,
-	elements: ElementQuery,
+	elements: Query<(Entity, &Element)>,
+	class_q: Query<&Classes>,
+	attributes: Query<&Attributes>,
+	attr_keys: Query<&Attribute>,
 	children: Query<&Children>,
 	mut layouts: Query<&mut LayoutStyle>,
+	mut values: Query<&mut Value>,
 ) {
-	for view in elements.iter() {
-		if view.tag() != "details"
-			|| view.contains_class_name(&classes::SIDEBAR_GROUP)
-		{
+	for (details, element) in &elements {
+		if element.tag() != "details" {
 			continue;
 		}
-		let open = view.attribute("open").is_some();
-		let Ok(kids) = children.get(view.entity) else {
+		let is_sidebar = class_q
+			.get(details)
+			.is_ok_and(|class_set| class_set.contains_name(&classes::SIDEBAR_GROUP));
+		let open = has_open_attr(details, &attributes, &attr_keys);
+		let Ok(kids) = children.get(details) else {
 			continue;
 		};
 		for child in kids.iter() {
 			let is_summary = elements
 				.get(child)
-				.is_ok_and(|child| child.tag() == "summary");
-			match is_summary {
-				// the caret affordance, leading the summary like a tree disclosure
-				true => {
+				.is_ok_and(|(_, element)| element.tag() == "summary");
+			if is_summary {
+				if is_sidebar {
+					// flip the markup caret glyph (terminal can't rotate it)
+					flip_sidebar_caret(child, open, &class_q, &children, &mut values);
+				} else {
 					let caret = if open { "▾ " } else { "▸ " };
 					commands.entity(child).insert(Marker(caret.into()));
 				}
-				// a closed disclosure collapses its body out of layout
-				false if !open => {
-					if let Ok(mut layout) = layouts.get_mut(child) {
-						layout.display = Display::None;
-					}
+			} else if !open {
+				// collapse the body out of layout; the cascade restores its display
+				// on reopen (see `toggle_details_on_click`).
+				if let Ok(mut layout) = layouts.get_mut(child) {
+					layout.display = Display::None;
 				}
-				false => {}
 			}
 		}
 	}
+}
+
+/// Whether `entity` carries an `open` attribute (its presence, like HTML).
+fn has_open_attr(
+	entity: Entity,
+	attributes: &Query<&Attributes>,
+	attr_keys: &Query<&Attribute>,
+) -> bool {
+	attributes.get(entity).is_ok_and(|attrs| {
+		attrs
+			.iter()
+			.any(|attr| attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open"))
+	})
+}
+
+/// Point a sidebar group's `.sidebar-caret` glyph down (`▾`, open) or right
+/// (`▸`, closed) by rewriting its text node, the terminal stand-in for the web's
+/// CSS caret rotation.
+fn flip_sidebar_caret(
+	summary: Entity,
+	open: bool,
+	class_q: &Query<&Classes>,
+	children: &Query<&Children>,
+	values: &mut Query<&mut Value>,
+) {
+	let glyph = if open { " ▾" } else { " ▸" };
+	// the caret span sits directly under the summary; find it and rewrite its
+	// sole text child.
+	let Ok(kids) = children.get(summary) else {
+		return;
+	};
+	for child in kids.iter() {
+		if !class_q
+			.get(child)
+			.is_ok_and(|class_set| class_set.contains_name(&classes::SIDEBAR_CARET))
+		{
+			continue;
+		}
+		if let Ok(text_kids) = children.get(child) {
+			for text in text_kids.iter() {
+				if let Ok(mut value) = values.get_mut(text) {
+					value.set_if_neq(Value::str(glyph));
+				}
+			}
+		}
+	}
+}
+
+/// Observer: clicking a `<summary>` toggles its `<details>` open/closed, the
+/// terminal stand-in for the web's native disclosure (which the charcell target
+/// has no built-in toggle for).
+///
+/// A click that travelled through an `<a>` inside the summary is a link
+/// activation (a sidebar branch route) and navigates instead, so only the caret
+/// or a plain-summary click toggles. Toggling dirties the group's
+/// [`ElementStateMap`] so the cascade re-resolves the subtree, restoring the
+/// collapsed body's display when it reopens.
+#[cfg(feature = "tui")]
+pub fn toggle_details_on_click(
+	ev: On<crate::prelude::PointerUp>,
+	elements: Query<(Entity, &Element)>,
+	parents: Query<&ChildOf>,
+	attributes: Query<&Attributes>,
+	attr_keys: Query<&Attribute>,
+	mut states: Query<&mut ElementStateMap>,
+	mut commands: Commands,
+) {
+	let summary = ev.event_target();
+	if !elements
+		.get(summary)
+		.is_ok_and(|(_, element)| element.tag() == "summary")
+	{
+		return;
+	}
+	// a click through an inner `<a>` navigates; the caret/plain summary toggles.
+	if click_through_link(ev.original_event_target(), summary, &elements, &parents) {
+		return;
+	}
+	let Some(details) = nearest_details(summary, &elements, &parents) else {
+		return;
+	};
+	// toggle the `open` attribute (presence = open)
+	match open_attr(details, &attributes, &attr_keys) {
+		Some(attr) => commands.entity(attr).despawn(),
+		None => {
+			commands.spawn((
+				AttributeOf::new(details),
+				Attribute::new("open"),
+				Value::Bool(true),
+			));
+		}
+	}
+	// dirty the cascade so the collapsed body re-resolves its display on reopen.
+	if let Ok(mut map) = states.get_mut(details) {
+		map.set_changed();
+	} else {
+		commands.entity(details).insert(ElementStateMap::default());
+	}
+}
+
+/// Whether the path from `start` up to `summary` passes through an `<a>`, ie the
+/// click landed on a link nested in the summary.
+#[cfg(feature = "tui")]
+fn click_through_link(
+	start: Entity,
+	summary: Entity,
+	elements: &Query<(Entity, &Element)>,
+	parents: &Query<&ChildOf>,
+) -> bool {
+	let mut current = start;
+	loop {
+		if current == summary {
+			return false;
+		}
+		if elements.get(current).is_ok_and(|(_, el)| el.tag() == "a") {
+			return true;
+		}
+		match parents.get(current) {
+			Ok(parent) => current = parent.parent(),
+			Err(_) => return false,
+		}
+	}
+}
+
+/// The nearest `<details>` ancestor of `summary`.
+#[cfg(feature = "tui")]
+fn nearest_details(
+	summary: Entity,
+	elements: &Query<(Entity, &Element)>,
+	parents: &Query<&ChildOf>,
+) -> Option<Entity> {
+	let mut current = summary;
+	while let Ok(parent) = parents.get(current) {
+		let parent = parent.parent();
+		if elements.get(parent).is_ok_and(|(_, el)| el.tag() == "details") {
+			return Some(parent);
+		}
+		current = parent;
+	}
+	None
+}
+
+/// The `open` attribute entity on `entity`, if present.
+#[cfg(feature = "tui")]
+fn open_attr(
+	entity: Entity,
+	attributes: &Query<&Attributes>,
+	attr_keys: &Query<&Attribute>,
+) -> Option<Entity> {
+	attributes.get(entity).ok().and_then(|attrs| {
+		attrs
+			.iter()
+			.find(|&attr| attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open"))
+	})
 }
 
 /// The bullet (`• `) or number (`N. `) prefix for a list item, from its parent
@@ -478,5 +646,95 @@ mod tests {
 			.filter(|line| !line.is_empty())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["• top", "  • nested"]);
+	}
+}
+
+#[cfg(all(test, feature = "tui"))]
+mod disclosure_test {
+	use crate::prelude::*;
+	use crate::render::charcell::test_host::TestHost;
+	use crate::style::material::classes;
+	use beet_core::prelude::*;
+	use bevy::math::UVec2;
+
+	/// The first element with `tag` in the host tree.
+	fn element_by_tag(host: &mut TestHost, tag: &str) -> Entity {
+		let tag = tag.to_string();
+		host.app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(host.app.world())
+			.find(|(_, element)| element.tag() == tag)
+			.map(|(entity, _)| entity)
+			.unwrap()
+	}
+
+	/// Trigger a `PointerUp` on `entity`, as the hit-test would on a click.
+	fn click(host: &mut TestHost, entity: Entity) {
+		let pointer = host.app.world_mut().spawn_empty().id();
+		host.app
+			.world_mut()
+			.entity_mut(entity)
+			.trigger(PointerUp::new(pointer));
+		host.step();
+		host.step();
+	}
+
+	/// Clicking a plain `<details>` summary toggles it open and closed: the body
+	/// shows/hides and the caret flips, both reversibly.
+	#[beet_core::test]
+	fn click_summary_toggles_details() {
+		let mut host = TestHost::sized(UVec2::new(40, 12));
+		host.spawn_content(rsx! {
+			<details><summary>"More"</summary><p>"Body text"</p></details>
+		});
+		host.step();
+		// closed by default: caret points right, body hidden.
+		host.frame_plain().as_str().xpect_contains("▸ More");
+		host.frame_plain().xnot().xpect_contains("Body text");
+
+		// click the summary: opens — caret down, body shown.
+		let summary = element_by_tag(&mut host, "summary");
+		click(&mut host, summary);
+		host.frame_plain().as_str().xpect_contains("▾ More");
+		host.frame_plain().xpect_contains("Body text");
+
+		// click again: collapses back (the cascade restored the body, now hidden).
+		click(&mut host, summary);
+		host.frame_plain().as_str().xpect_contains("▸ More");
+		host.frame_plain().xnot().xpect_contains("Body text");
+	}
+
+	/// Clicking a sidebar group's caret collapses and expands it, flipping the
+	/// in-place caret glyph rather than adding a left marker.
+	#[beet_core::test]
+	fn click_caret_toggles_sidebar_group() {
+		let mut host = TestHost::sized(UVec2::new(40, 12));
+		host.spawn_content(rsx! {
+			<details {Classes::new([classes::SIDEBAR_GROUP])} open>
+				<summary {Classes::new([classes::SIDEBAR_SUMMARY])}>
+					<span {Classes::new([classes::SIDEBAR_LABEL])}>"Group"</span>
+					<span {Classes::new([classes::SIDEBAR_CARET])}>" ▾"</span>
+				</summary>
+				<ul {Classes::new([classes::SIDEBAR_LIST])}><li>"Child link"</li></ul>
+			</details>
+		});
+		host.step();
+		// open: caret down, child visible. No left marker (sidebar flips in place).
+		host.frame_plain().as_str().xpect_contains("▾").xpect_contains("Child link");
+		host.frame_plain().xnot().xpect_contains("▾ Group");
+
+		// click the caret span: collapses — caret right, child gone.
+		let caret = host
+			.app
+			.world_mut()
+			.query::<(Entity, &Classes)>()
+			.iter(host.app.world())
+			.find(|(_, class_set)| class_set.contains_name(&classes::SIDEBAR_CARET))
+			.map(|(entity, _)| entity)
+			.unwrap();
+		click(&mut host, caret);
+		host.frame_plain().as_str().xpect_contains("▸");
+		host.frame_plain().xnot().xpect_contains("Child link");
 	}
 }

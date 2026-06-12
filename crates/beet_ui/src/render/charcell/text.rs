@@ -99,12 +99,18 @@ pub(super) fn paint_text(
 // ── Word wrap ─────────────────────────────────────────────────────────────────
 
 /// Split `text` at the first column boundary that reaches `max_cols`.
+///
+/// Always consumes at least the first character, even when that glyph alone is
+/// wider than `max_cols` (a width-2 emoji in a 1-cell column). Without this the
+/// hard-break loop in [`word_wrap`] would split off an empty head and spin
+/// forever; here the wide glyph simply overflows its undersized column.
 fn split_at_display_width(text: &str, max_cols: usize) -> (&str, &str) {
 	let mut width = 0;
 	let mut byte_idx = text.len();
 	for (i, ch) in text.char_indices() {
 		let w = unicode_width(ch) as usize;
-		if width + w > max_cols {
+		// past the first char, stop once adding this glyph would overflow
+		if i > 0 && width + w > max_cols {
 			byte_idx = i;
 			break;
 		}
@@ -256,5 +262,22 @@ mod tests {
 		display_width("ＡＢＣ").xpect_eq(6);
 		// ASCII is 1 column each
 		display_width("abc").xpect_eq(3);
+	}
+
+	/// A wide glyph (width-2 emoji) in a 1-cell column hard-breaks without
+	/// hanging: each call consumes the glyph, overflowing the undersized
+	/// column rather than splitting off an empty head and spinning forever.
+	#[beet_core::test]
+	fn word_wrap_wide_glyph_in_narrow_column_terminates() {
+		// the crates-index status emoji are width-2; at a 1-cell column the old
+		// loop never made progress. Reaching here at all proves termination;
+		// each glyph lands on its own (overflowing) line, in order.
+		word_wrap("🦢🐣🐉", 1)
+			.into_iter()
+			.filter(|line| !line.is_empty())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["🦢", "🐣", "🐉"]);
+		// a mixed word also terminates and preserves every glyph
+		word_wrap("a🦢b", 1).join("").xpect_contains("🦢");
 	}
 }

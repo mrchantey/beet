@@ -9,6 +9,7 @@ use std::io::BufWriter;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
+use std::path::PathBuf;
 
 // ── StdioTerminal ─────────────────────────────────────────────────────────────
 
@@ -21,6 +22,11 @@ pub struct StdioTerminal {
 	ctrl_c_exit: bool,
 	/// When enabled, applies a ctrl+c and panic hook to restore terminal state.
 	restore_hook: bool,
+	/// When set, frames render to `/dev/tty` and the process `stdout`/`stderr`
+	/// (logs, panics, stray prints) redirect to this file, so diagnostics never
+	/// corrupt the alternate screen. `None` renders to `stdout` as-is (eg for
+	/// inline mode). Relative paths resolve against the working directory.
+	log_file: Option<PathBuf>,
 	config: TerminalConfig,
 }
 
@@ -29,6 +35,7 @@ impl Default for StdioTerminal {
 		Self {
 			restore_hook: true,
 			ctrl_c_exit: true,
+			log_file: Some(PathBuf::from("target/beet-log.txt")),
 			config: TerminalConfig::default().with_raw_mode(true),
 		}
 	}
@@ -38,6 +45,9 @@ impl StdioTerminal {
 	pub fn inline() -> Self {
 		Self {
 			config: TerminalConfig::inline(),
+			// inline mode shares the live screen, so it keeps writing to stdout
+			// rather than splitting frames onto /dev/tty.
+			log_file: None,
 			..default()
 		}
 	}
@@ -48,12 +58,22 @@ impl StdioTerminal {
 		/// Large write buffer prevents mid-frame flushes and terminal flicker.
 		const TERMINAL_BUFFER_CAPACITY: usize = 4 * 1024 * 1024;
 
+		// when a log file is configured, render frames to /dev/tty and redirect
+		// stdout/stderr to the file; if /dev/tty or the redirect is unavailable
+		// (eg a sandbox), fall back to stdout so the app still runs.
+		let writer: Box<dyn 'static + Send + Sync + Write> = stdio
+			.log_file
+			.clone()
+			.and_then(|path| {
+				let tty = terminal_ext::tty_writer().ok()?;
+				terminal_ext::redirect_std_to_file(&path).ok()?;
+				Some(Box::new(tty) as Box<dyn 'static + Send + Sync + Write>)
+			})
+			.unwrap_or_else(|| Box::new(std::io::stdout()));
+
 		let terminal = Terminal::new(
 			AsyncReader::stdin(),
-			BufWriter::with_capacity(
-				TERMINAL_BUFFER_CAPACITY,
-				std::io::stdout(),
-			),
+			BufWriter::with_capacity(TERMINAL_BUFFER_CAPACITY, writer),
 			stdio.config.clone(),
 		);
 		world.commands().entity(cx.entity).insert(terminal);
@@ -65,10 +85,18 @@ impl StdioTerminal {
 			return Ok(());
 		}
 		let config = self.config.clone();
+		// when std is redirected to a log file, the restore escapes must target
+		// /dev/tty rather than the (redirected) stdout.
+		let to_tty = self.log_file.is_some();
 		terminal_ext::on_force_exit(move || {
-			if let Err(err) =
+			let result = if to_tty {
+				terminal_ext::tty_writer().map_err(Into::into).and_then(
+					|mut tty| Terminal::restore_config_direct(&config, &mut tty),
+				)
+			} else {
 				Terminal::restore_config_direct(&config, &mut io::stdout())
-			{
+			};
+			if let Err(err) = result {
 				eprintln!("Error restoring terminal state: {err}");
 			}
 		})

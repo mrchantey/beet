@@ -61,6 +61,13 @@ impl Plugin for StylePlugin {
 				Rule::new().with_extend(syntax::default_scheme()),
 			);
 			rules.extend_rules(syntax::class_rules());
+			// scheme-aware overrides: the `.light-scheme`/`.dark-scheme` body class
+			// re-tints the highlight tokens (the root default is the dark palette,
+			// unreadable on a light background).
+			rules.extend_rules(vec![
+				syntax::light_scheme(),
+				syntax::dark_scheme(),
+			]);
 			// register the syntax tokens' CSS resolvers so the web `Stylesheet`
 			// can serialize the `.hl-<capture>` colour variables (otherwise it
 			// errors with "no CSS resolver registered" once a code block emits them).

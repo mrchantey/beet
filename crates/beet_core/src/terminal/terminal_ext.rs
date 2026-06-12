@@ -3,6 +3,49 @@
 use crate::prelude::*;
 use std::io::Write;
 use std::io::stdout;
+#[allow(unused)]
+use std::path::Path;
+
+/// Open the controlling terminal `/dev/tty` for writing.
+///
+/// The live TUI renders its frames here rather than to `stdout`, leaving
+/// `stdout`/`stderr` free for logging (see [`redirect_std_to_file`]). Input is
+/// already read from `/dev/tty` for the same separation.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn tty_writer() -> std::io::Result<std::fs::File> {
+	std::fs::OpenOptions::new().write(true).open("/dev/tty")
+}
+
+/// Redirect this process's `stdout` and `stderr` to `path`, creating any
+/// missing parent directories and appending to the file.
+///
+/// Done at the file-descriptor level (`dup2`), so it captures everything written
+/// to fd 1/2: tracing logs, stray `println!`/`eprintln!`, and panic messages
+/// (whose default hook writes to `stderr`). The live TUI uses this with a
+/// `/dev/tty` frame writer so diagnostics never corrupt the alternate screen.
+#[cfg(all(not(target_arch = "wasm32"), feature = "crossterm"))]
+pub fn redirect_std_to_file(path: impl AsRef<Path>) -> Result {
+	use std::os::unix::io::AsRawFd;
+	let path = path.as_ref();
+	if let Some(parent) = path.parent() {
+		fs_ext::create_dir_all(parent)?;
+	}
+	let file = std::fs::OpenOptions::new()
+		.create(true)
+		.append(true)
+		.open(path)?;
+	let fd = file.as_raw_fd();
+	// point fd 1 (stdout) and fd 2 (stderr) at the log file. The dup'd fds
+	// outlive `file`, so leak it to keep the underlying description open.
+	if unsafe { libc::dup2(fd, libc::STDOUT_FILENO) } < 0 {
+		bevybail!("dup2 stdout: {}", std::io::Error::last_os_error());
+	}
+	if unsafe { libc::dup2(fd, libc::STDERR_FILENO) } < 0 {
+		bevybail!("dup2 stderr: {}", std::io::Error::last_os_error());
+	}
+	core::mem::forget(file);
+	Ok(())
+}
 
 /// Adds this handler to both the panic and ctrl+c hooks
 pub fn on_force_exit(
