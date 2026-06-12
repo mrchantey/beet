@@ -21,10 +21,9 @@ pub struct BsxDefaultsPlugin;
 
 impl Plugin for BsxDefaultsPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(BsxPlugin);
+		app.add_plugins((BsxPlugin, widget_plugin));
 		register_default_events(app.world_mut());
 		register_default_verbs(app.world_mut());
-		register_widget_templates(app.world_mut());
 	}
 }
 

@@ -52,7 +52,10 @@ fn spawn_site(world: &mut World) -> Entity {
 	world.insert_resource(pkg_config!());
 	world.register_bsx_templates(site_dir.join("templates")).unwrap();
 	world.insert_resource(SiteRoot(site_dir.clone()));
-	world.spawn_bsx_entry(site_dir.join("main.bsx")).unwrap()
+	BsxTemplate::load_entry(world, site_dir.join("main.bsx"))
+		.unwrap()
+		.spawn(world)
+		.unwrap()
 }
 
 /// Request `path`, negotiating HTML, and return the rendered body.

@@ -5,24 +5,12 @@ use beet::prelude::*;
 ///
 /// Composes the library [`Header`]/[`Footer`] and the site [`BeetSidebar`]
 /// around the route content (the default `<Slot/>`, transcluded in place by the
-/// [`BaseLayout`] middleware). The library [`Head`] carries the web-only
-/// stylesheet/color-scheme/preflight/favicon, with its title/description sourced
-/// from the matched route's [`ArticleMeta`] (markdown frontmatter, queried off
-/// the [`RequestContext`] route entity, falling back to [`PackageConfig`]). The
-/// `<head>` is non-visual, so the same layout renders in the terminal.
+/// [`BaseLayout`] middleware). The shared [`RouteHead`] carries the web-only
+/// stylesheet/color-scheme/preflight/favicon, sourcing the title/description
+/// from the matched route's [`ArticleMeta`]. The `<head>` is non-visual, so the
+/// same layout renders in the terminal.
 #[template(system)]
-pub fn BeetLayout(
-	cx: Res<RequestContext>,
-	metas: Query<&ArticleMeta>,
-	pkg: Res<PackageConfig>,
-) -> impl Bundle {
-	let meta = metas.get(cx.route()).ok();
-	let title = meta
-		.and_then(|meta| meta.title.clone())
-		.unwrap_or_else(|| pkg.title.clone());
-	let description = meta
-		.and_then(|meta| meta.description.clone())
-		.unwrap_or_else(|| pkg.description.clone());
+pub fn BeetLayout(cx: Res<RequestContext>) -> impl Bundle {
 	// an explicit `?color-scheme=light|dark` pins the scheme on both targets via
 	// a body class. Absent it, the web follows the OS (`color_scheme.js`); a
 	// non-html target (the terminal) defaults to dark.
@@ -41,13 +29,13 @@ pub fn BeetLayout(
 	}
 	rsx! {
 		<html lang="en">
-			<Head title=title description=description>
+			<RouteHead>
 				<Preflight/>
 				<Reset/>
 				<Stylesheet/>
 				<ColorSchemeScript/>
 				<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
-			</Head>
+			</RouteHead>
 			<body {body_classes}>
 				<Header>
 					<MenuButton slot="leading"/>

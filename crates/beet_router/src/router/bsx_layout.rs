@@ -20,7 +20,7 @@ use beet_net::prelude::*;
 #[require(BsxLayoutAction)]
 pub struct BsxLayout {
 	/// The BSX-registry template name, eg `Layout` or `path::to::Layout`.
-	pub template: String,
+	pub template: SmolStr,
 }
 
 impl Default for BsxLayout {
@@ -33,7 +33,7 @@ impl Default for BsxLayout {
 
 impl BsxLayout {
 	/// Wrap descendant routes in the named BSX template.
-	pub fn new(template: impl Into<String>) -> Self {
+	pub fn new(template: impl Into<SmolStr>) -> Self {
 		Self {
 			template: template.into(),
 		}
@@ -56,7 +56,7 @@ async fn BsxLayoutAction(
 	// configuration sits on the ancestor that declared it (eg the router)
 	let template = cx
 		.caller
-		.with_state::<AncestorQuery<&BsxLayout>, Result<String>>(
+		.with_state::<AncestorQuery<&BsxLayout>, Result<SmolStr>>(
 			|entity, query| {
 				query
 					.get(entity)

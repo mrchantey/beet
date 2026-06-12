@@ -52,7 +52,8 @@ fn setup(world: &mut World) -> Result {
 	world.register_bsx_templates(site_dir.join("templates"))?;
 	// `<RoutesDir src=".."/>` resolves against the site root
 	world.insert_resource(SiteRoot(site_dir.clone()));
-	let root = world.spawn_bsx_entry(site_dir.join("main.bsx"))?;
+	let root = BsxTemplate::load_entry(world, site_dir.join("main.bsx"))?
+		.spawn(world)?;
 	world.entity_mut(root).insert(server_from_cli()?);
 	world.spawn((ChildOf(root), exchange_route("export", Export)));
 	Ok(())

@@ -1,29 +1,27 @@
-//! The `.bsx` entrypoint: boot an app's entity tree from a single markup file.
+//! Booting an app's entity tree from a single `.bsx` file.
 //!
-//! [`spawn_bsx_entry`](WorldBsxEntryExt::spawn_bsx_entry) parses a file like
-//! `main.bsx` and builds its single root element *into* a fresh entity, so
-//! root-level components (eg a `Router`) land on the returned entity exactly as
-//! `world.spawn((Router, ..))` would place them. This differs from the
-//! document-parse convention ([`BsxTemplate::container`]) where every root node
-//! spawns as a child of a container.
+//! [`BsxTemplate::load_entry`] parses a file like `main.bsx` as an entry
+//! document: exactly one root element, which [`BsxTemplate::spawn`] builds
+//! *into* a fresh entity, so root-level components (eg a `Router`) land on the
+//! returned entity exactly as `world.spawn((Router, ..))` would place them. This
+//! differs from the document-parse convention ([`BsxTemplate::container`]) where
+//! every root node spawns as a child of a container.
 
 use super::*;
 use crate::prelude::*;
 use std::path::Path;
 
-/// World extension spawning a `.bsx` file as an app entrypoint.
-#[extend::ext(name=WorldBsxEntryExt)]
-pub impl World {
-	/// Parse the file at `path` and build its single root element into a fresh
-	/// entity, returning it.
+impl BsxTemplate {
+	/// Parse `path` as an entry document and return the template for its single
+	/// root element, ready to [`spawn`](Self::spawn).
 	///
 	/// Like an XML document element, exactly one root element is required;
 	/// comments and whitespace at the root are ignored. `<path::to::X>` tags
-	/// resolve against the current [`BsxTemplateRegistry`], so register any
-	/// template directories (see
+	/// resolve against the world's current [`BsxTemplateRegistry`] (snapshotted
+	/// here), so register any template directories (see
 	/// [`register_bsx_templates`](WorldRegisterBsxExt::register_bsx_templates))
-	/// before spawning the entry.
-	fn spawn_bsx_entry(&mut self, path: impl AsRef<Path>) -> Result<Entity> {
+	/// before loading the entry.
+	pub fn load_entry(world: &World, path: impl AsRef<Path>) -> Result<Self> {
 		let path = path.as_ref();
 		let source = fs_ext::read_to_string(path)?;
 		let mut roots = parse_document(&source, &BsxParseConfig::bsx())?
@@ -34,26 +32,29 @@ pub impl World {
 				_ => true,
 			});
 		let root = match (roots.next(), roots.next()) {
-			(Some(BsxNode::Element(el)), None) => BsxNode::Element(el),
+			(Some(root @ BsxNode::Element(_)), None) => root,
 			(_, Some(_)) => bevybail!(
 				"`{}` must have a single root element, found multiple roots",
 				path.display()
 			),
-			_ => bevybail!(
-				"`{}` must have a single root element",
-				path.display()
-			),
+			_ => {
+				bevybail!("`{}` must have a single root element", path.display())
+			}
 		};
-		let registry = self
+		let registry = world
 			.get_resource::<BsxTemplateRegistry>()
 			.cloned()
 			.unwrap_or_default();
-		let entity = self
-			.spawn_template(BsxTemplate::new(vec![root], registry))?
-			.id();
-		// flush so observer-driven structure (eg routes spawned off a component
-		// insert) materializes before the caller inspects the tree.
-		self.flush();
+		Ok(Self::new(vec![root], registry))
+	}
+
+	/// Build this template into a fresh root entity and flush, returning the root.
+	///
+	/// The flush materializes observer-driven structure (eg routes spawned off a
+	/// component insert) before the caller inspects the tree.
+	pub fn spawn(self, world: &mut World) -> Result<Entity> {
+		let entity = world.spawn_template(self)?.id();
+		world.flush();
 		Ok(entity)
 	}
 }
@@ -78,23 +79,20 @@ mod test {
 			"<!-- entry -->\n<main class=\"app\"><span>hi</span></main>\n",
 		);
 		let mut world = TemplatePlugin::world();
-		let root = world.spawn_bsx_entry(&path).unwrap();
+		let root =
+			BsxTemplate::load_entry(&world, &path).unwrap().spawn(&mut world).unwrap();
 		// the root element's component lands on the returned entity itself
-		world
-			.entity(root)
-			.get::<Element>()
-			.unwrap()
-			.tag()
-			.xpect_eq("main");
+		world.entity(root).get::<Element>().unwrap().tag().xpect_eq("main");
 	}
 
 	#[crate::test]
 	fn rejects_multiple_roots() {
 		let path = entry_file("multi.bsx", "<a/><b/>");
-		let mut world = TemplatePlugin::world();
-		world
-			.spawn_bsx_entry(&path)
-			.unwrap_err()
+		let world = TemplatePlugin::world();
+		// `BsxTemplate` is not `Debug`, so take the error without `unwrap_err`
+		BsxTemplate::load_entry(&world, &path)
+			.err()
+			.unwrap()
 			.to_string()
 			.xpect_contains("single root element");
 	}

@@ -54,12 +54,11 @@ pub use table::*;
 
 use beet_core::prelude::*;
 
-/// Registers the widget set by short type path so a name-resolved tag (eg a
-/// BSX `<Head/>` or a serialized scene) builds the widget. Called by
+/// Registers the widget set by short type path, so a name-resolved tag (eg a
+/// BSX `<Head/>` or a serialized scene) builds the widget. Added by
 /// [`BsxDefaultsPlugin`](crate::prelude::BsxDefaultsPlugin).
-pub fn register_widget_templates(world: &mut World) {
-	world
-		.register_template::<Button>()
+pub fn widget_plugin(app: &mut App) {
+	app.register_template::<Button>()
 		.register_template::<IconButton>()
 		.register_template::<Link>()
 		.register_template::<ColorSchemeScript>()
@@ -82,7 +81,7 @@ pub fn register_widget_templates(world: &mut World) {
 		.register_template::<MenuButton>()
 		.register_template::<Table>();
 	#[cfg(feature = "net")]
-	world.register_template::<Analytics>();
+	app.register_template::<Analytics>();
 	#[cfg(feature = "style")]
-	world.register_template::<Stylesheet>();
+	app.register_template::<Stylesheet>();
 }
