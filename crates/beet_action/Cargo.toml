@@ -41,9 +41,9 @@ rhai_serde = ["rhai", "serde"]
 # Pair with `json` for the typed `Script::run` quickjs runtime.
 quickjs = ["scripting", "dep:rquickjs"]
 # Convenience alias: the QuickJS engine plus the typed `Script` runtime, which
-# marshals through `Value` then JSON across the engine boundary, so it pulls
-# `json` (serde_json, `no_std` with alloc). `rust-alloc` keeps the C engine
-# std/libc-light, so this no longer requires `std`.
+# marshals input/output as JSON (QuickJS's native currency, no `Value` hop), so
+# it pulls `json` (serde_json, `no_std` with alloc). `rust-alloc` keeps the C
+# engine std/libc-light, so this no longer requires `std`.
 quickjs_serde = ["quickjs", "json"]
 
 [dependencies]

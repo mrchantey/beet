@@ -1,20 +1,17 @@
 use beet_core::prelude::*;
 use rquickjs::Context;
 use rquickjs::Runtime;
-// beet's `Value` is the marshalling currency; rquickjs's is the live engine
-// value, aliased to keep the two apart.
-use rquickjs::Value as JsValue;
+use rquickjs::Value;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 /// Evaluate a QuickJS `script` as a pure `Input -> Output` function.
 ///
-/// `input` is marshalled to a [`Value`], JSON-encoded and bound to the `input`
-/// global; the value of the script's final expression is JSON-stringified, read
-/// back into a [`Value`] and deserialized as the output. Routing through
-/// [`Value`] (then JSON across the engine boundary) matches the rhai backend, so
-/// every engine shares one marshalling currency. QuickJS errors are flattened to
-/// a message.
+/// `input` is serialized to JSON and bound to the `input` global; the value of
+/// the script's final expression is JSON-stringified and deserialized as the
+/// output. JSON is QuickJS's native marshalling currency, so unlike the rhai
+/// backend this needs no intermediary `Value` hop — `serde_json` (alloc) is
+/// already `no_std`. QuickJS errors are flattened to a message.
 pub fn run_quickjs<Input, Output>(script: &str, input: Input) -> Result<Output>
 where
 	Input: Serialize,
@@ -34,7 +31,7 @@ where
 			.map_err(|err| bevyhow!("quickjs: failed to bind input: {err}"))?;
 
 		let output = ctx
-			.eval::<JsValue, _>(script)
+			.eval::<Value, _>(script)
 			.map_err(|err| bevyhow!("quickjs: {err}"))?;
 		let output = ctx
 			.json_stringify(output)

@@ -345,9 +345,8 @@ rhai_serde = ["rhai","serde","std","beet_action/rhai_serde","beet_router?/script
 # The QuickJS engine, re-exported via `beet::exports::rquickjs`. Bare engine for
 # consumers that marshal values by hand (no serde, no router registrations).
 quickjs = ["action","beet_action/quickjs"]
-# The typed-`Script` QuickJS backend: the `Value`/JSON-marshalled runtime plus
-# the std beet_router scripting registrations (the `std` is for those, not the
-# runtime).
+# The typed-`Script` QuickJS backend: the JSON-marshalled runtime plus the std
+# beet_router scripting registrations (the `std` is for those, not the runtime).
 quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/scripting"]
 ui = ["dep:beet_ui"]
 # The `beet_ui` function-component widget set (Header, Button, Sidebar, Table)
