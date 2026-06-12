@@ -1,8 +1,8 @@
-//! Proves the document-binding path: a `.bsx` file whose text holds `#field`
-//! references is loaded under a [`Document`], and each reference resolves to the
+//! Proves the document-binding path: a `.bsx` file whose text holds `@doc:field`
+//! bindings is loaded under a [`Document`], and each binding resolves to the
 //! document's live value. `bx:scope="user"` prefixes the descendant fields, so
-//! `#name` reads `user.name`; `#unread=0` seeds a default when the field is
-//! absent. This is the same reactive substrate the website uses.
+//! `@doc:name` reads `user.name`; `@doc:unread=0` seeds a default when the field
+//! is absent. This is the same reactive substrate the website uses.
 //!
 //! ```sh
 //! cargo run --example bsx_bindings --features template
@@ -16,13 +16,13 @@ fn main() {
 	let mut world = ui_world();
 
 	// 1. A document holds the state the markup binds to. `unread` is omitted so
-	// the `#unread=0` reference seeds its default.
+	// the `@doc:unread=0` binding seeds its default.
 	let doc = world
 		.spawn(Document::new(val!({ "user": { "name": "Ada" } })))
 		.id();
 
-	// 2. Load the `.bsx` under the document, so its `#field` references link to
-	// the document before the tree is built.
+	// 2. Load the `.bsx` under the document, so its `@doc:field` bindings link
+	// to the document before the tree is built.
 	let container = {
 		let bytes = MediaBytes::new_bsx(GREETING_BSX);
 		let mut entity = world.spawn(ChildOf(doc));

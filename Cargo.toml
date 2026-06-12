@@ -246,6 +246,8 @@ bevy_color = ["beet_core/bevy_color"]
 # 💡 Top Level
 
 http_server = ["net", "action","router", "beet_net/server", "beet_router?/http"]
+# The server-to-client websocket channel and the dev-mode live reload watcher.
+client_io = ["http_server", "tungstenite", "beet_router?/client_io"]
 tui_server = ["terminal","router", "markdown"]
 
 # 💡 Core
@@ -549,7 +551,7 @@ required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq",
 [[example]]
 name = "bsx_site"
 path = "examples/bsx_site/main.rs"
-required-features = ["http_server", "markdown", "style", "template", "fs"]
+required-features = ["http_server", "client_io", "json", "markdown", "style", "template", "fs"]
 
 # 💡 Examples - Thread
 

@@ -6,10 +6,9 @@
 		<code>widgets::Card</code> template and binds a document field to the
 		built-in verbs, no code required:
 	</p>
-	<widgets::Card>
-		<span bx:slot="title">Counter</span>
-		<p>You have clicked {#count=0} times.</p>
-		<button bx:click="increment#count">More</button>
-		<button bx:click="decrement#count">Less</button>
+	<widgets::Card title="Counter">
+		<p>You have clicked {@doc:count=0} times.</p>
+		<button bx:click="increment@doc:count">More</button>
+		<button bx:click="decrement@doc:count">Less</button>
 	</widgets::Card>
 </article>

@@ -43,6 +43,11 @@ serde = ["dep:serde", "beet_action/serde", "beet_net/serde"]
 markdown = ["std", "dep:pulldown-cmark"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
 http = ["std", "beet_net/server"]
+# The server-to-client websocket channel (`ClientIo`) and the dev-mode
+# `LiveReload` watcher built on it. Native-only: no HTTP backend supports
+# websocket upgrades, so the channel runs a tungstenite listener on its own
+# port beside the HTTP server.
+client_io = ["http", "beet_net/tungstenite"]
 # beet_router's only template_serde use is rebuilding route trees on a
 # `TemplateLoaded` event, which comes from `beet_core/template_serde` (beet's
 # own fork). It does NOT need bevy's `bevy_world_serialization` feature, which
@@ -54,9 +59,12 @@ scripting = ["std", "beet_action/scripting", "serde"]
 # rhai backend for the scripting registrations above.
 rhai = ["scripting", "beet_action/rhai"]
 # Build-time code generation: route tree, server/client actions, typed links.
+# `markdown_parser` lets the collection scan read content frontmatter so blob
+# routes are emitted with their scan-time `ArticleMeta`.
 codegen = [
 	"std",
 	"serde",
+	"markdown_parser",
 	"beet_core/tokens",
 	"beet_net/tokens",
 	"dep:syn",

@@ -87,8 +87,8 @@ pub(crate) fn emit_collection(
 					)?);
 				}
 			}
-			RouteFileKind::Blob { store_path } => {
-				children.push(emit_blob_route(file, store_path));
+			RouteFileKind::Blob { store_path, meta } => {
+				children.push(emit_blob_route(file, store_path, meta));
 			}
 		}
 	}
@@ -211,15 +211,25 @@ fn server_cfg(collection: &RouteCollection) -> Option<syn::Attribute> {
 	}
 }
 
-/// Emits the route bundle for a markdown/html content file.
-fn emit_blob_route(file: &RouteFile, store_path: &SmolPath) -> TokenStream {
+/// Emits the route bundle for a markdown/html content file, including its
+/// scan-time [`ArticleMeta`] when the frontmatter declared one.
+fn emit_blob_route(
+	file: &RouteFile,
+	store_path: &SmolPath,
+	meta: &Option<ArticleMeta>,
+) -> TokenStream {
 	let path = file.route_path.to_string();
 	let store_path = store_path.to_string();
+	let meta = meta.as_ref().map(|meta| {
+		let meta = meta.self_token_stream();
+		quote! { #meta, }
+	});
 	quote! {
 		(
 			route(#path, BlobScene::new(#store_path)),
 			HttpMethod::Get,
 			CacheStrategy::Static,
+			#meta
 		)
 	}
 }

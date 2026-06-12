@@ -30,7 +30,7 @@ impl Plugin for ParsePlugin {
 		// every tick).
 		app.init_schedule(PostParseTree);
 		// the default BSX event/verb vocabulary (`click` + the example verbs), so
-		// every existing `bx:click=verb#field` resolves through the core seam.
+		// every existing `bx:click="verb@doc:field"` resolves through the core seam.
 		#[cfg(feature = "bsx")]
 		app.init_plugin::<crate::prelude::BsxDefaultsPlugin>();
 	}

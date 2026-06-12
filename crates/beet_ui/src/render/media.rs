@@ -165,6 +165,11 @@ impl NodeRenderer for MediaRenderer {
 		&mut self,
 		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
+		// a one-shot render (eg per-request SSR) happens between frames, so the
+		// `@` bindings built with the tree have not synced yet: settle the
+		// document sync chain so every binding renders its current value.
+		DocumentSync::settle(cx.world);
+
 		// Resolve the list of types to try: accepts list, or fallback to default.
 		// Collect into an owned Vec to avoid holding a borrow on `self` during
 		// the mutable dispatch calls below.

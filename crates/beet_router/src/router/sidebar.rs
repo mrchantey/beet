@@ -90,9 +90,8 @@ pub fn RouteSidebar(
 			// each route's metadata drives its label/order/expansion
 			for node in tree.flatten_nodes() {
 				if let Ok(meta) = metas.get(node.entity) {
-					let mut info = meta.sidebar.clone();
-					info.label = meta.sidebar_label().map(String::from);
-					state = state.with_info(node.path.annotated_path(), info);
+					state = state
+						.with_info(node.path.annotated_path(), meta.sidebar_info());
 				}
 			}
 			state.collect(tree)
@@ -108,6 +107,7 @@ pub fn RouteSidebar(
 /// path segment, expansion to "open when the current path is a descendant".
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "codegen", derive(ToTokens))]
 pub struct SidebarInfo {
 	/// Display label override. Defaults to the last path segment.
 	pub label: Option<String>,

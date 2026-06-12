@@ -155,7 +155,7 @@ mod test {
 		// the href attribute LinkView reads.
 		let root = app
 			.world_mut()
-			.spawn_template(rsx! { <a href={href.to_string()}>"link"</a> })
+			.spawn_template(rsx! { <a href=href.to_string()>"link"</a> })
 			.unwrap()
 			.id();
 		app.update();

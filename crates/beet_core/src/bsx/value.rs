@@ -1,11 +1,11 @@
-//! The BSX value grammar: literals, `#`/`$` references, and spreads.
+//! The BSX value grammar: literals, `@` bindings, `$` references, and spreads.
 //!
 //! A hand-written cursor over the value surface, mirroring the `bsn!` surface:
 //! scalars, named-field structs, lists, and enums (unit/tuple/struct variants),
-//! plus `#field` document references and `$entity` references. Position decides
-//! which entry point is called: [`parse_value_expr`] for attribute-value and
-//! text position, [`parse_spread`] for bare-child position. Both share the
-//! literal grammar ([`parse_literal`]).
+//! plus `@source:path` reactive bindings ([`BindingExpr`]) and `$entity`
+//! references. Position decides which entry point is called:
+//! [`parse_value_expr`] for attribute-value and text position, [`parse_spread`]
+//! for bare-child position. Both share the literal grammar ([`parse_literal`]).
 
 use super::ast::*;
 use super::cursor::Cursor;
@@ -21,13 +21,17 @@ pub fn parse_value_expr_str(source: &str) -> Result<ValueExpr> {
 pub fn parse_value_expr(cursor: &mut Cursor) -> Result<ValueExpr> {
 	cursor.skip_ws();
 	match cursor.peek() {
-		Some('#') => parse_field_ref(cursor),
+		Some('#') => bevybail!(
+			"the `#field` syntax was removed, use `@doc:field` (init form `@doc:field=0`)"
+		),
 		Some('$') => parse_entity_ref(cursor),
+		Some('@') => parse_binding(cursor).map(ValueExpr::Binding),
 		_ => parse_literal(cursor).map(ValueExpr::Literal),
 	}
 }
 
-/// Parse a bare-position spread `{MyComponent{..}}` or `{(A, B)}`.
+/// Parse a bare-position spread `{MyComponent{..}}` or `{(A, B)}`. A tuple item
+/// may also be an `@` binding, eg `{(Bar{boo:"bazz"}, @comp:Bar.boo)}`.
 pub fn parse_spread(cursor: &mut Cursor) -> Result<SpreadExpr> {
 	cursor.skip_ws();
 	if cursor.peek() == Some('(') {
@@ -38,7 +42,10 @@ pub fn parse_spread(cursor: &mut Cursor) -> Result<SpreadExpr> {
 			if cursor.eat(")") {
 				break;
 			}
-			items.push(parse_named_literal(cursor)?);
+			items.push(match cursor.peek() {
+				Some('@') => parse_binding(cursor).map(SpreadItem::Binding)?,
+				_ => parse_named_literal(cursor).map(SpreadItem::Named)?,
+			});
 			cursor.skip_ws();
 			if !cursor.eat(",") && cursor.peek() != Some(')') {
 				bevybail!("expected `,` or `)` in spread tuple");
@@ -74,18 +81,78 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 	}
 }
 
-/// Parse a `#field.path` reference with an optional `=init` initializer.
-fn parse_field_ref(cursor: &mut Cursor) -> Result<ValueExpr> {
-	cursor.eat("#");
-	let path = parse_field_path(cursor)?;
-	// an optional `=literal` initializer.
+/// Parse an `@source selector? : path init?` binding, the module-level grammar.
+/// A `$ref` selector is a `bx:ref` name or one of the reserved well-known
+/// names (`BuildRoot`, `SnippetRoot`, `RenderRoot`, `Router`); reservation is
+/// the resolver's concern ([`ReservedRef`](super::resolve::ReservedRef)), the
+/// grammar does not distinguish them.
+pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
+	cursor.eat("@");
+	let source_name = cursor.take_while(|ch| ch.is_alphanumeric());
+	let source = match source_name {
+		"doc" => BindingSource::Doc,
+		"res" => BindingSource::Res,
+		"comp" => BindingSource::Comp,
+		"prop" => BindingSource::Prop,
+		other => bevybail!(
+			"unknown binding source `@{other}`, expected `doc`, `res`, `comp` or `prop`"
+		),
+	};
+	// an optional `$ref` selector, `@comp` only.
+	let selector = if cursor.peek() == Some('$') {
+		if source != BindingSource::Comp {
+			bevybail!(
+				"a `$ref` selector is only valid on `@comp`, found `@{source_name}$`"
+			);
+		}
+		cursor.bump();
+		let name = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
+		if name.is_empty() {
+			bevybail!("expected a ref name after `@comp$`");
+		}
+		Some(SmolStr::from(name))
+	} else {
+		None
+	};
+	if !cursor.eat(":") {
+		bevybail!("expected `:` after the `@{source_name}` binding source");
+	}
+	// `@res`/`@comp` lead with a `ShortTypePath.` segment.
+	let type_path = match source {
+		BindingSource::Res | BindingSource::Comp => {
+			let type_path = cursor
+				.take_while(|ch| ch.is_alphanumeric() || ch == '_' || ch == ':');
+			if type_path.is_empty() {
+				bevybail!("`@{source_name}:` expects a `Type.field` path");
+			}
+			if !cursor.eat(".") {
+				bevybail!(
+					"`@{source_name}:{type_path}` is missing its field path, expected `@{source_name}:{type_path}.field`"
+				);
+			}
+			Some(SmolStr::from(type_path))
+		}
+		BindingSource::Doc | BindingSource::Prop => None,
+	};
+	let field_path = parse_field_path(cursor)?;
+	// an optional `=literal` initializer, `@doc` only.
 	let init = if cursor.peek() == Some('=') {
+		if source != BindingSource::Doc {
+			bevybail!("an `=init` is only valid on `@doc` bindings");
+		}
 		cursor.bump();
 		Some(parse_literal(cursor)?)
 	} else {
 		None
 	};
-	Ok(ValueExpr::FieldRef { path, init })
+	BindingExpr {
+		source,
+		selector,
+		type_path,
+		field_path,
+		init,
+	}
+	.xok()
 }
 
 /// Parse a `$name` entity reference.
@@ -328,13 +395,9 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn field_ref_with_init() {
-		let ValueExpr::FieldRef { path, init } = value("#user.name=\"x\"")
-		else {
-			panic!("expected field ref");
-		};
-		path.to_string().xpect_eq("user.name".to_string());
-		init.xpect_eq(Some(DataLiteral::Scalar(Value::Str("x".into()))));
+	fn removed_field_ref_syntax_errors() {
+		parse_err("#count").xpect_contains("use `@doc:field`");
+		parse_err("#user.name=\"x\"").xpect_contains("removed");
 	}
 
 	#[beet_core::test]
@@ -358,5 +421,108 @@ mod test {
 			panic!("expected tuple spread");
 		};
 		items.len().xpect_eq(2);
+	}
+
+	/// Shorthand for the parsed [`BindingExpr`] of a binding source string.
+	fn binding(input: &str) -> BindingExpr {
+		let ValueExpr::Binding(binding) = value(input) else {
+			panic!("expected binding for `{input}`");
+		};
+		binding
+	}
+
+	#[beet_core::test]
+	fn doc_binding() {
+		let parsed = binding("@doc:count");
+		parsed.source.xpect_eq(BindingSource::Doc);
+		parsed.selector.xpect_eq(None);
+		parsed.type_path.xpect_eq(None);
+		parsed.field_path.to_string().xpect_eq("count".to_string());
+		parsed.init.xpect_eq(None);
+	}
+
+	#[beet_core::test]
+	fn doc_binding_with_init() {
+		let parsed = binding("@doc:user.name=\"x\"");
+		parsed.field_path.to_string().xpect_eq("user.name".to_string());
+		parsed
+			.init
+			.xpect_eq(Some(DataLiteral::Scalar(Value::Str("x".into()))));
+	}
+
+	#[beet_core::test]
+	fn res_binding() {
+		let parsed = binding("@res:PackageConfig.title");
+		parsed.source.xpect_eq(BindingSource::Res);
+		parsed.type_path.xpect_eq(Some("PackageConfig".into()));
+		parsed.field_path.to_string().xpect_eq("title".to_string());
+	}
+
+	#[beet_core::test]
+	fn comp_binding_with_selector() {
+		let parsed = binding("@comp$myref:Bar.boo");
+		parsed.source.xpect_eq(BindingSource::Comp);
+		parsed.selector.xpect_eq(Some("myref".into()));
+		parsed.type_path.xpect_eq(Some("Bar".into()));
+		parsed.field_path.to_string().xpect_eq("boo".to_string());
+	}
+
+	#[beet_core::test]
+	fn comp_binding_nested_field() {
+		let parsed = binding("@comp:Bar.style.width");
+		parsed.type_path.xpect_eq(Some("Bar".into()));
+		parsed
+			.field_path
+			.to_string()
+			.xpect_eq("style.width".to_string());
+	}
+
+	#[beet_core::test]
+	fn prop_binding() {
+		let parsed = binding("@prop:title");
+		parsed.source.xpect_eq(BindingSource::Prop);
+		parsed.type_path.xpect_eq(None);
+		parsed.field_path.to_string().xpect_eq("title".to_string());
+	}
+
+	/// Shorthand for the parse error of a value source string.
+	fn parse_err(input: &str) -> String {
+		parse_value_expr(&mut Cursor::new(input))
+			.unwrap_err()
+			.to_string()
+	}
+
+	#[beet_core::test]
+	fn binding_errors() {
+		parse_err("@bogus:x").xpect_contains("unknown binding source");
+		parse_err("@doc count").xpect_contains("expected `:`");
+		parse_err("@res:NoField").xpect_contains("missing its field path");
+		parse_err("@comp:").xpect_contains("expects a `Type.field` path");
+		parse_err("@prop$x:title")
+			.xpect_contains("only valid on `@comp`");
+		parse_err("@res:Type.field=1")
+			.xpect_contains("only valid on `@doc`");
+		parse_err("@comp$:Bar.boo")
+			.xpect_contains("expected a ref name");
+	}
+
+	#[beet_core::test]
+	fn spread_tuple_with_binding() {
+		let SpreadExpr::Tuple(items) =
+			parse_spread(&mut Cursor::new("(Bar{boo:\"bazz\"}, @comp:Bar.boo)"))
+				.unwrap()
+		else {
+			panic!("expected tuple spread");
+		};
+		items.len().xpect_eq(2);
+		let SpreadItem::Named(named) = &items[0] else {
+			panic!("expected named item");
+		};
+		named.name.as_str().xpect_eq("Bar");
+		let SpreadItem::Binding(parsed) = &items[1] else {
+			panic!("expected binding item");
+		};
+		parsed.source.xpect_eq(BindingSource::Comp);
+		parsed.type_path.clone().xpect_eq(Some("Bar".into()));
 	}
 }

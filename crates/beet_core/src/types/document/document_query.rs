@@ -1,13 +1,63 @@
 use crate::prelude::*;
 use bevy::reflect::Typed;
 
+/// Read-only resolver of a [`DocumentPath`] to the entity owning (or destined
+/// to own) the document.
+///
+/// Split from [`DocumentQuery`] so syncs holding their own `Document` access
+/// (eg [`sync_source_field_refs`](super::sync_source_field_refs)) can resolve
+/// paths without conflicting borrows.
+#[derive(SystemParam)]
+pub struct DocumentResolver<'w, 's> {
+	ancestors: Query<'w, 's, &'static ChildOf>,
+	docs: Query<'w, 's, (), With<Document>>,
+	props: Query<'w, 's, (), With<PropsDocument>>,
+}
+
+impl DocumentResolver<'_, '_> {
+	/// Resolve a [`DocumentPath`] to the actual entity that owns the document.
+	pub fn entity(&self, subject: Entity, path: &DocumentPath) -> Entity {
+		match path {
+			DocumentPath::Root => self.ancestors.root_ancestor(subject),
+			// nearest ancestor document, skipping props stores so user document
+			// scoping inside a template body is unaffected
+			DocumentPath::Ancestor => self
+				.ancestors
+				.iter_ancestors_inclusive(subject)
+				.find(|entity| {
+					self.docs.contains(*entity) && !self.props.contains(*entity)
+				})
+				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
+			// nearest ancestor props store, ie a template's materialized props
+			DocumentPath::Props => self
+				.ancestors
+				.iter_ancestors_inclusive(subject)
+				.find(|entity| self.props.contains(*entity))
+				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
+			DocumentPath::Entity(entity) => *entity,
+			DocumentPath::This => subject,
+		}
+	}
+
+	/// Resolve a [`DocumentPath`] starting *above* `subject` (its parent), for
+	/// tag-site bindings whose subject entity carries the template's own props
+	/// store. A parentless subject resolves from itself.
+	pub fn entity_above(&self, subject: Entity, path: &DocumentPath) -> Entity {
+		self.ancestors
+			.get(subject)
+			.map(|child_of| child_of.parent())
+			.unwrap_or(subject)
+			.xmap(|start| self.entity(start, path))
+	}
+}
+
 /// System parameter for working with documents.
 ///
 /// Provides convenient methods for accessing and modifying documents
 /// on entities, with automatic entity resolution based on [`DocumentPath`].
 #[derive(SystemParam)]
 pub struct DocumentQuery<'w, 's> {
-	ancestors: Query<'w, 's, &'static ChildOf>,
+	resolver: DocumentResolver<'w, 's>,
 	doc_query: Query<'w, 's, &'static mut Document>,
 	schemas: Query<'w, 's, &'static DocumentSchema>,
 	/// Shared upward resolver for the [`DocumentScope`] prefix, so reads and
@@ -18,17 +68,8 @@ pub struct DocumentQuery<'w, 's> {
 
 impl<'w, 's> DocumentQuery<'w, 's> {
 	/// Resolve a [`DocumentPath`] to the actual entity that owns the document.
-	pub fn entity(&mut self, subject: Entity, path: &DocumentPath) -> Entity {
-		match path {
-			DocumentPath::Root => self.ancestors.root_ancestor(subject),
-			DocumentPath::Ancestor => self
-				.ancestors
-				.iter_ancestors_inclusive(subject)
-				.find(|entity| self.doc_query.contains(*entity))
-				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
-			DocumentPath::Entity(entity) => *entity,
-			DocumentPath::This => subject,
-		}
+	pub fn entity(&self, subject: Entity, path: &DocumentPath) -> Entity {
+		self.resolver.entity(subject, path)
 	}
 
 	/// Returns the query item for the document.
@@ -64,7 +105,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result<Out> {
 		let doc_entity = self.entity(subject, &field.document);
 		// resolve the scope prefix fresh, so writes are reactive by construction
-		let field_path = self.scopes.resolved_path(subject, &field.field_path);
+		let field_path = self
+			.scopes
+			.resolved_path(subject, &field.field_path, Some(doc_entity));
 
 		if let Ok(mut doc) = self.doc_query.get_mut(doc_entity) {
 			let value = if let Ok(value) = doc.get_field_mut(&field_path) {
@@ -109,7 +152,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
 		// schema paths are authored against the resolved (absolute) path
-		let field_path = self.scopes.resolved_path(subject, &field.field_path);
+		let field_path = self
+			.scopes
+			.resolved_path(subject, &field.field_path, Some(doc_entity));
 		if let Ok(schema) = self.schemas.get(doc_entity) {
 			schema.assert_field_type::<T>(&field_path)?;
 		}
@@ -125,7 +170,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
 		// schema paths are authored against the resolved (absolute) path
-		let field_path = self.scopes.resolved_path(subject, &field.field_path);
+		let field_path = self
+			.scopes
+			.resolved_path(subject, &field.field_path, Some(doc_entity));
 		if let Ok(schema) = self.schemas.get(doc_entity) {
 			schema.assert_list_item_type::<T>(&field_path)?;
 		}

@@ -105,7 +105,7 @@ fn loader_missing_required_rides_template_error() {
 	registry
 		.insert_source(
 			"Card",
-			"<script type=\"json\" bx:schema>{ \"title\": { \"type\": \"string\", \"required\": true } }</script><section><h1>{#title}</h1></section>",
+			"<script type=\"json\" bx:schema>{ \"title\": { \"type\": \"string\", \"required\": true } }</script><section><h1>{@doc:title}</h1></section>",
 		)
 		.unwrap();
 	world.insert_resource(registry);
@@ -161,7 +161,7 @@ fn composable_schema_validates_recursively() {
 	registry
 		.insert_source(
 			"TodoItem",
-			"<script type=\"json\" bx:schema>{ \"label\": { \"type\": \"string\", \"required\": true } }</script><li>{#label}</li>",
+			"<script type=\"json\" bx:schema>{ \"label\": { \"type\": \"string\", \"required\": true } }</script><li>{@doc:label}</li>",
 		)
 		.unwrap();
 	registry
@@ -187,7 +187,7 @@ fn composable_schema_validates_recursively() {
 	has_template_error(&world, bad).xpect_true();
 }
 
-// ---- reflect-field binding: <MyComponent value=#path> ------------------------
+// ---- reflect-field binding: <MyComponent value=@doc:path> --------------------
 
 #[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
 #[reflect(Component, Default)]
@@ -203,8 +203,8 @@ fn component_field_binds_document() {
 		.write()
 		.register::<Slider>();
 	let doc = world.spawn(Document::new(val!({ "level": 9i64 }))).id();
-	// `<Slider value=#level>` binds document `level` to `Slider.value`, both ways.
-	let bytes = MediaBytes::new_bsx("<Slider value=#level/>");
+	// `<Slider value=@doc:level>` binds document `level` to `Slider.value`, both ways.
+	let bytes = MediaBytes::new_bsx("<Slider value=@doc:level/>");
 	let root = {
 		let mut entity = world.spawn(ChildOf(doc));
 		BsxParser::bsx()

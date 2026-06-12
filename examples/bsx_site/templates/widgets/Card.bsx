@@ -1,6 +1,7 @@
 <!-- A site-local template: resolves as <widgets::Card> from any page.
-     Content routes into slots: a named `title` slot and the default body. -->
+     The `title` prop binds into the heading via `@prop:`, caller content
+     routes into the default slot. -->
 <section class="card-filled">
-	<h2><Slot name="title">Card</Slot></h2>
+	<h2>{@prop:title}</h2>
 	<Slot/>
 </section>

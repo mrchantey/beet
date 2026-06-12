@@ -15,6 +15,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "codegen", derive(ToTokens))]
 pub struct ArticleMeta {
 	/// Page title; overrides the package title in the document `Head`.
 	pub title: Option<String>,
@@ -30,6 +31,27 @@ impl ArticleMeta {
 	/// The sidebar label: explicit `sidebar.label`, else the page `title`.
 	pub fn sidebar_label(&self) -> Option<&str> {
 		self.sidebar.label.as_deref().or(self.title.as_deref())
+	}
+
+	/// The route's [`SidebarInfo`]: its `sidebar` override with the label
+	/// resolved via [`sidebar_label`](Self::sidebar_label).
+	pub fn sidebar_info(&self) -> SidebarInfo {
+		let mut info = self.sidebar.clone();
+		info.label = self.sidebar_label().map(String::from);
+		info
+	}
+
+	/// Parse a markdown source's leading frontmatter, if any.
+	///
+	/// The scan-time entry point shared by [`RoutesDir`](crate::prelude::RoutesDir)
+	/// discovery and the codegen collection scan, so both route kinds carry
+	/// eager metadata.
+	#[cfg(feature = "markdown_parser")]
+	pub fn from_markdown(source: &str) -> Option<Self> {
+		beet_ui::prelude::Frontmatter::extract(source)
+			.ok()
+			.flatten()
+			.map(|frontmatter| Self::from_frontmatter(&frontmatter))
 	}
 
 	/// Build from parsed markdown [`Frontmatter`](beet_ui::prelude::Frontmatter).

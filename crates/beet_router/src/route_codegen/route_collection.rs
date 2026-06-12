@@ -139,10 +139,21 @@ impl RouteCollection {
 					});
 				}
 				"md" | "mdx" | "markdown" | "html" => {
+					// markdown frontmatter is read at scan time so the emitted
+					// route carries eager `ArticleMeta` (sidebar labels, drafts)
+					let meta = match ext {
+						"html" => None,
+						_ => {
+							let bytes = store.get(&store_path).await?;
+							let src = String::from_utf8(bytes.to_vec())?;
+							ArticleMeta::from_markdown(&src)
+						}
+					};
 					files.push(RouteFile {
 						route_path,
 						kind: RouteFileKind::Blob {
 							store_path: store_path.clone(),
+							meta,
 						},
 					});
 				}
@@ -188,6 +199,8 @@ pub enum RouteFileKind {
 	Blob {
 		/// Path of the content file relative to the store root.
 		store_path: SmolPath,
+		/// Scan-time frontmatter metadata, emitted alongside the route.
+		meta: Option<ArticleMeta>,
 	},
 }
 

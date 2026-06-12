@@ -37,10 +37,13 @@ impl Plugin for DocumentPlugin {
 		app
 			// Register document types
 			.register_type::<Document>()
+			.register_type::<PropsDocument>()
 			.register_type::<DocumentSchema>()
 			.register_type::<DocumentPath>()
 			.register_type::<OnMissingField>()
 			.register_type::<FieldRef>()
+			.register_type::<SourceFieldRef>()
+			.register_type::<BindingTarget>()
 			.register_type::<FieldSegment>()
 			.register_type::<DocumentScope>()
 			.register_type::<ResolvedFieldPath>()
@@ -53,40 +56,102 @@ impl Plugin for DocumentPlugin {
 			.add_observer(unlink_field_from_document)
 			.add_observer(resolve_field_path);
 
-		// the document sync chain. With `bevy_async` it runs after the async sync
-		// point so an async field write (eg refresh_blob_store_list) lands the
-		// same pass; without it (no_std core) there is no sync point to order on.
 		#[cfg(feature = "json")]
-		app.register_type::<ReflectFieldRef>();
+		app.register_type::<ReflectFieldRef>()
+			.register_type::<ResourceFieldRef>();
 
-		// the reflect-field-binding sync mirrors a `Value` to/from a reflected
-		// component field, the generalization of the `Value`-component bind. It
-		// runs after the document drives `Value` so the read direction lands first.
+		// the binding syncs mirror a `Value` to/from a reflected component or
+		// resource field, the generalization of the `Value`-component bind. They
+		// run after the document drives `Value` so the read direction lands first.
+		// Resources sync before components so a co-located pair (eg
+		// `<MyComponent value=@res:Type.field>`) seeds outside-in: the resource
+		// fills the `Value`, which the component sync then propagates.
 		#[cfg(feature = "json")]
-		let reflect_sync = sync_reflect_field_bindings;
+		let reflect_sync =
+			(sync_resource_field_bindings, sync_reflect_field_bindings).chain();
 		#[cfg(not(feature = "json"))]
 		let reflect_sync = || {};
 
-		let sync_chain = (
-			update_resolved_field_paths.run_if(resolved_paths_need_update),
-			sync_schema.run_if(schema_needs_sync),
-			sync_document_to_local,
-			sync_resolved_path_changes,
-			// reflect-field binding runs between the read path and the write-back,
-			// so a document change reaches the component and a component edit reaches
-			// the document, both within one pass.
-			reflect_sync,
-			sync_local_to_document,
-			update_reactive_children,
-		)
-			.chain();
+		// the chain lives in its own on-demand schedule so a one-shot render can
+		// run it to settlement ([`DocumentSync::settle`]) without driving the
+		// whole main loop; the realtime path drives it from `PreUpdate`.
+		app.init_schedule(DocumentSync);
+		app.add_systems(
+			DocumentSync,
+			(
+				update_resolved_field_paths.run_if(resolved_paths_need_update),
+				sync_schema.run_if(schema_needs_sync),
+				sync_document_to_local,
+				sync_resolved_path_changes,
+				// after the read path so a same-pass conflict resolves source-wins,
+				// before the write-back so the mirrored value lands the same pass.
+				sync_source_field_refs,
+				// field bindings run between the read path and the write-back, so a
+				// document change reaches the component/resource and an edit there
+				// reaches the document, both within one pass.
+				reflect_sync,
+				sync_local_to_document,
+				update_reactive_children,
+			)
+				.chain(),
+		);
+		// with `bevy_async` the per-frame run waits for the async sync point so an
+		// async field write (eg refresh_blob_store_list) lands the same pass.
 		#[cfg(feature = "bevy_async")]
 		app.add_systems(
 			PreUpdate,
-			sync_chain.after(async_world_sync_point::<BeetAsyncSyncPoint>),
+			run_document_sync.after(async_world_sync_point::<BeetAsyncSyncPoint>),
 		);
 		#[cfg(not(feature = "bevy_async"))]
-		app.add_systems(PreUpdate, sync_chain);
+		app.add_systems(PreUpdate, run_document_sync);
+	}
+}
+
+/// Per-frame driver: one [`DocumentSync`] pass.
+fn run_document_sync(world: &mut World) { world.run_schedule(DocumentSync); }
+
+/// The document sync chain's schedule: one read/write pass between every
+/// [`Document`], its bound [`Value`] entities, and the reflected
+/// component/resource bindings.
+///
+/// Driven from `PreUpdate` each frame, and on demand by render paths via
+/// [`DocumentSync::settle`].
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct DocumentSync;
+
+impl DocumentSync {
+	/// One sync pass may not settle a multi-hop binding chain (eg resource ->
+	/// `Value` <-> props field -> body binding): each hop lands one pass later.
+	/// A well-formed tree settles within a few passes; the cap only guards a
+	/// pathological cycle (the inequality guards make those converge too).
+	const MAX_SETTLE_PASSES: usize = 8;
+
+	/// Run the sync chain until a pass changes no [`Value`] or [`Document`],
+	/// so a one-shot render (eg HTML SSR) observes fully synced bindings.
+	///
+	/// A no-op when the schedule is not registered (no [`DocumentPlugin`]).
+	pub fn settle(world: &mut World) {
+		for _ in 0..Self::MAX_SETTLE_PASSES {
+			let before = world.change_tick();
+			if world.try_run_schedule(DocumentSync).is_err() {
+				return;
+			}
+			let this_run = world.change_tick();
+			let changed = world
+				.query::<Ref<Value>>()
+				.iter(world)
+				.any(|value| value.last_changed().is_newer_than(before, this_run))
+				|| world.query::<Ref<Document>>().iter(world).any(|document| {
+					document.last_changed().is_newer_than(before, this_run)
+				});
+			if !changed {
+				return;
+			}
+		}
+		warn!(
+			"document sync did not settle within {} passes",
+			Self::MAX_SETTLE_PASSES
+		);
 	}
 }
 

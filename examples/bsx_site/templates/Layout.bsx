@@ -2,14 +2,17 @@
 <!--
 The document layout wrapping every route: each page's body transcludes into
 the <Slot/> inside <main>. <RouteHead> fills the page title/description from
-frontmatter, <RouteSidebar/> collects the route tree into the nav rail.
+frontmatter, <RouteSidebar/> collects the route tree into the nav rail, and
+the @res bindings pull straight from the PackageConfig resource.
 -->
 <html lang="en">
 	<RouteHead>
+		<meta property="og:site_name" content=@res:PackageConfig.title/>
 		<Preflight/>
 		<Reset/>
 		<Stylesheet/>
 		<ColorSchemeScript/>
+		<LiveReloadScript/>
 	</RouteHead>
 	<body>
 		<Header>
@@ -21,6 +24,6 @@ frontmatter, <RouteSidebar/> collects the route tree into the nav rail.
 			<RouteSidebar home=false exclude={["export"]}/>
 			<main><Slot/></main>
 		</div>
-		<Footer/>
+		<Footer>{@res:PackageConfig.description}</Footer>
 	</body>
 </html>

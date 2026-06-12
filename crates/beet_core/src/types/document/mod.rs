@@ -9,6 +9,11 @@ mod field_ref;
 mod reactive_children;
 #[cfg(feature = "json")]
 mod reflect_binding;
+#[cfg(feature = "json")]
+pub mod reflect_value_ext;
+#[cfg(feature = "json")]
+mod resource_binding;
+mod source_binding;
 pub use document::*;
 pub use document_plugin::*;
 pub use document_query::*;
@@ -20,3 +25,6 @@ pub use field_ref::*;
 pub use reactive_children::*;
 #[cfg(feature = "json")]
 pub use reflect_binding::*;
+#[cfg(feature = "json")]
+pub use resource_binding::*;
+pub use source_binding::*;

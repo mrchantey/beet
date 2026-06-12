@@ -5,21 +5,23 @@
 //! and `templates/` holds the site's own BSX templates (the `Layout` document,
 //! widgets). See `README.md` for the architecture and feature-parity notes.
 //!
-//! This binary is the thin generic host a future `beet run main.bsx` command
-//! would replace: plugins + package config, then spawn the entry file and
-//! layer the host concerns (server backend, dev `export` route) onto it.
+//! This binary is the thin generic host the `beet run <site-dir>` command
+//! packages up (see beet-cli's `run_site.rs`): plugins + package config, then
+//! spawn the entry file and layer the host concerns (server backend, dev
+//! `export` route) onto it.
 //!
 //! ## Running
 //!
 //! ```sh
-//! alias site='cargo run --example bsx_site --features "http_server,markdown,style,template,fs" --'
+//! alias site='cargo run --example bsx_site --features "http_server,client_io,json,markdown,style,template,fs" --'
 //!
 //! # CLI mode: render the home route, or a named route
 //! site
 //! site docs/getting-started
 //!
-//! # HTTP mode
+//! # HTTP mode, optionally live-reloading on site edits
 //! site --server=http
+//! site --server=http --watch
 //!
 //! # static export to examples/bsx_site/dist
 //! site export
@@ -35,11 +37,9 @@ fn main() -> AppExit {
 			ServerPlugin,
 			material::MaterialStylePlugin::default(),
 		))
-		.insert_resource(PackageConfig {
-			title: "BSX Site".to_string(),
-			description: "A beet site with zero code".to_string(),
-			..pkg_config!()
-		})
+		// compile-time package metadata only: the site's title and description
+		// are declared in `main.bsx` via the `<PackageConfig/>` resource tag
+		.insert_resource(pkg_config!())
 		.add_systems(Startup, setup)
 		.run()
 }
@@ -56,6 +56,15 @@ fn setup(world: &mut World) -> Result {
 		.spawn(world)?;
 	world.entity_mut(root).insert(server_from_cli()?);
 	world.spawn((ChildOf(root), exchange_route("export", Export)));
+	// the default app routes `default_router` wires for codegen hosts; the
+	// `<PackageConfig/>` declared in `main.bsx` backs both
+	world.spawn((ChildOf(root), app_info()));
+	world.spawn((ChildOf(root), analytics_handler()));
+	// dev mode: watch the site dir, respawning routes and live-reloading
+	// browsers via the `<LiveReloadScript/>` in the layout head
+	if CliArgs::parse_env().params.contains_key("watch") {
+		world.spawn(LiveReload::new(site_dir));
+	}
 	Ok(())
 }
 

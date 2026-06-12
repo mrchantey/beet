@@ -62,6 +62,11 @@ impl Plugin for RouterPlugin {
 				.init_plugin::<DocumentPlugin>()
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>()
+				// per-route metadata, bindable via the reserved ref, eg
+				// `@comp$RenderRoot:ArticleMeta.title`
+				.register_type::<ArticleMeta>()
+				// the package resource, bindable as eg `@res:PackageConfig.title`
+				.register_type::<PackageConfig>()
 				// the no-code site surface: markup-resolved router components
 				// (`<RoutesDir/>`, a `BsxLayout` spread) and the by-name
 				// route-aware head/sidebar widgets.
@@ -71,6 +76,14 @@ impl Plugin for RouterPlugin {
 			#[cfg(not(target_arch = "wasm32"))]
 			app.register_type::<RoutesDir>()
 				.add_observer(spawn_routes_dir);
+			// the server-to-client websocket channel and the dev-mode live
+			// reload watcher, plus its by-name `<LiveReloadScript/>` widget
+			#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+			app.add_observer(start_client_io)
+				.add_observer(broadcast_to_clients)
+				.add_observer(start_live_reload)
+				.add_observer(reload_site_on_change)
+				.register_template::<LiveReloadScript>();
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			#[cfg(feature = "scripting")]

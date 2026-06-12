@@ -4,7 +4,7 @@
 //! event or verb, and bevy picking never enters it. This plugin supplies the
 //! concrete `click` event installer (a [`PointerDown`] observer) plus the
 //! example verb set (`increment`/`decrement`/`toggle`), so every existing
-//! `bx:click=verb#field` keeps working. An app that wants a different vocabulary
+//! `bx:click="verb@doc:field"` keeps working. An app that wants a different vocabulary
 //! registers its own instead of (or alongside) this default set.
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -84,12 +84,11 @@ mod test {
 		let binding = EventBinding {
 			event: "click".into(),
 			verb: "increment".into(),
-			field: FieldPath::new(["count"]),
-			init: None,
+			binding: BindingExpr::doc(["count"]),
 		};
 		let entity = {
 			let mut entity = world.spawn(Value::Int(0));
-			install_event(&mut entity, &binding);
+			install_event(&mut entity, &binding, BindingTarget::This).unwrap();
 			entity.id()
 		};
 		// fire the trigger; the queued command runs the verb on flush.

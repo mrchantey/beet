@@ -18,6 +18,7 @@ pub(super) struct CharcellNodeData<'a> {
 	pub entity: Entity,
 	intrinsic_size: &'a IntrinsicSize,
 	layout_rect: &'a LayoutRect,
+	element: Option<&'a Element>,
 	value: Option<&'a Value>,
 	visual: Option<&'a VisualStyle>,
 	layout: Option<&'a LayoutStyle>,
@@ -31,7 +32,15 @@ pub(super) struct CharcellNodeData<'a> {
 }
 
 impl CharcellNodeData<'_> {
-	pub fn value(&self) -> Option<&Value> { self.value }
+	/// The node's displayed [`Value`]: a text leaf's content, or a form
+	/// control's bound value. An element's own `Value` is otherwise binding
+	/// state (eg a `bx:click` field mirror), never painted as text.
+	pub fn value(&self) -> Option<&Value> {
+		self.element
+			.is_none_or(|element| is_value_element(element.tag()))
+			.then_some(self.value)
+			.flatten()
+	}
 
 	pub fn intrinsic_size(&self) -> UVec2 { self.intrinsic_size.0 }
 	pub fn layout_rect(&self) -> IRect { self.layout_rect.0 }
@@ -216,6 +225,7 @@ pub struct CharcellQuery<'w, 's> {
 		(
 			&'static IntrinsicSize,
 			&'static LayoutRect,
+			Option<&'static Element>,
 			Option<&'static Value>,
 			Option<&'static VisualStyle>,
 			Option<&'static LayoutStyle>,
@@ -253,6 +263,7 @@ impl CharcellQuery<'_, '_> {
 		let (
 			intrinsic_size,
 			layout_rect,
+			element,
 			value,
 			visual,
 			layout,
@@ -268,6 +279,7 @@ impl CharcellQuery<'_, '_> {
 			intrinsic_size,
 			layout_rect,
 			entity,
+			element,
 			value,
 			visual,
 			layout,

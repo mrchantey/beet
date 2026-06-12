@@ -29,11 +29,11 @@ default:
 
 #💡 Init
 
-# Install the cli and load its utility commands (s3-sync, run-wasm, ...).
+# Install the cli and load its default commands (run, s3-sync, run-wasm, ...).
 init-cli:
 	just install-cli
-	cargo run -p beet-cli --example export_scenes
-	beet load target/scenes/utils-cli.json
+	cargo run -p beet-cli --bin export_scenes
+	beet load target/scenes/default-cli.json
 
 # Set up a fresh checkout: cli, assets, and the ml default model.
 init-repo:

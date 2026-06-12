@@ -1,6 +1,7 @@
 //! Tests for the BSX parser and its resolution into the document-wired template
-//! tree (Task 4 gate): literals with type-inferred reflect, `#`/`$` references,
-//! spreads, `bx:` directives, slots, and events, asserted on the built tree.
+//! tree (Task 4 gate): literals with type-inferred reflect, `@` bindings,
+//! `#`/`$` references, spreads, `bx:` directives, slots, and events, asserted
+//! on the built tree.
 //! A `.bsx` snippet must resolve to the same tree the equivalent `rsx!` lowers.
 beet_core::test_main!();
 
@@ -175,13 +176,13 @@ fn enum_literal_infers_variant() {
 		.xpect_eq(Aligned { align: Align::Center });
 }
 
-// ---- #references ------------------------------------------------------------
+// ---- @doc bindings -----------------------------------------------------------
 
 #[beet_core::test]
 fn field_ref_binds_document() {
 	let mut world = world();
 	let doc = world.spawn(Document::new(val!({ "count": 7 }))).id();
-	let root = spawn_bsx_under(&mut world, Some(doc), "<span>{#count}</span>");
+	let root = spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count}</span>");
 	world.update_local();
 	// the text child holds a FieldRef bound to `count`, synced to 7.
 	let text = world.entity(root).get::<Children>().unwrap()[0];
@@ -199,7 +200,7 @@ fn field_ref_binds_document() {
 fn field_ref_init_seeds_when_missing() {
 	let mut world = world();
 	let doc = world.spawn(Document::new(val!({}))).id();
-	let _root = spawn_bsx_under(&mut world, Some(doc), "<span>{#count=5}</span>");
+	let _root = spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count=5}</span>");
 	world.update_local();
 	world.update_local();
 	world
@@ -301,7 +302,7 @@ fn scope_prefixes_descendant_fields() {
 	let root = spawn_bsx_under(
 		&mut world,
 		Some(doc),
-		"<div bx:scope=\"user\"><span>{#name}</span></div>",
+		"<div bx:scope=\"user\"><span>{@doc:name}</span></div>",
 	);
 	world.update_local();
 	world.entity(root).contains::<DocumentScope>().xpect_true();
@@ -338,6 +339,135 @@ fn reactive_children_per_item() {
 		.map(|children| children.len())
 		.unwrap()
 		.xpect_eq(3);
+}
+
+// ---- props store ------------------------------------------------------------
+
+/// Spawn a body-position props binding (what `@prop:<key>` will lower to once
+/// the syntax lands) under `parent`, returning the value-bearing entity.
+fn spawn_props_probe(world: &mut World, parent: Entity, key: &str) -> Entity {
+	world
+		.spawn((
+			ChildOf(parent),
+			Value::default(),
+			FieldRef::new(key).with_document(DocumentPath::Props),
+		))
+		.id()
+}
+
+/// Read the local [`Value`] of `entity`.
+fn read_value(world: &World, entity: Entity) -> Value {
+	world.entity(entity).get::<Value>().unwrap().clone()
+}
+
+#[beet_core::test]
+fn template_props_store_literal() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry.insert_source("Card", "<section><Slot/></section>").unwrap();
+	world.insert_resource(registry);
+
+	let card = spawn_bsx(&mut world, "<Card title=\"hi\"/>");
+	// the literal prop materialized into a props store on the template entity.
+	world.entity(card).contains::<PropsDocument>().xpect_true();
+	world
+		.entity(card)
+		.get::<Document>()
+		.unwrap()
+		.get_field_ref(&[FieldSegment::key("title")])
+		.unwrap()
+		.clone()
+		.xpect_eq(Value::Str("hi".into()));
+
+	// a body binding reads the prop through `DocumentPath::Props`.
+	let probe = spawn_props_probe(&mut world, card, "title");
+	world.update_local();
+	read_value(&world, probe).xpect_eq(Value::Str("hi".into()));
+}
+
+#[beet_core::test]
+fn template_props_bound_reactively() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry.insert_source("Card", "<section><Slot/></section>").unwrap();
+	world.insert_resource(registry);
+
+	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+	let card =
+		spawn_bsx_under(&mut world, Some(doc), "<Card title=@doc:name/>");
+	world.update_local();
+	world.update_local();
+
+	// the binding entity is related via `AttributeOf`, never rendered.
+	render_html(&mut world, card).xnot().xpect_contains("Alice");
+	// the bound value reached the props store.
+	world
+		.entity(card)
+		.get::<Document>()
+		.unwrap()
+		.get_field_ref(&[FieldSegment::key("title")])
+		.unwrap()
+		.clone()
+		.xpect_eq(Value::Str("Alice".into()));
+
+	// a body binding reads the caller-bound prop, reactively.
+	let probe = spawn_props_probe(&mut world, card, "title");
+	world.update_local();
+	read_value(&world, probe).xpect_eq(Value::Str("Alice".into()));
+
+	world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
+		val!({ "name": "Bob" });
+	world.update_local();
+	world.update_local();
+	read_value(&world, probe).xpect_eq(Value::Str("Bob".into()));
+}
+
+#[beet_core::test]
+fn nested_template_props_do_not_leak() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry.insert_source("Inner", "<span></span>").unwrap();
+	registry
+		.insert_source("Outer", "<div><Inner title=\"inner_val\"/></div>")
+		.unwrap();
+	world.insert_resource(registry);
+
+	let outer = spawn_bsx(&mut world, "<Outer title=\"outer_val\"/>");
+	// the inner template entity carries its own store.
+	let inner = world
+		.entity(outer)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.find(|child| world.entity(*child).contains::<PropsDocument>())
+		.unwrap();
+
+	// each body binding resolves its nearest store, no leakage either way.
+	let inner_probe = spawn_props_probe(&mut world, inner, "title");
+	let outer_probe = spawn_props_probe(&mut world, outer, "title");
+	world.update_local();
+	read_value(&world, inner_probe).xpect_eq(Value::Str("inner_val".into()));
+	read_value(&world, outer_probe).xpect_eq(Value::Str("outer_val".into()));
+}
+
+#[beet_core::test]
+fn ancestor_ref_in_template_body_skips_props_store() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Card", "<section>{@doc:name}</section>")
+		.unwrap();
+	world.insert_resource(registry);
+
+	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+	// the tag's own store also carries a `name` prop, which must not shadow
+	// the user document for the body's `@doc:name` ancestor binding.
+	let card =
+		spawn_bsx_under(&mut world, Some(doc), "<Card name=\"shadow\"/>");
+	world.update_local();
+
+	let text = world.entity(card).get::<Children>().unwrap()[0];
+	read_value(&world, text).xpect_eq(Value::Str("Alice".into()));
 }
 
 // ---- slots ------------------------------------------------------------------
@@ -387,7 +517,7 @@ fn click_increments_field() {
 	let button = spawn_bsx_under(
 		&mut world,
 		Some(doc),
-		"<button bx:click=\"increment#count\">+</button>",
+		"<button bx:click=\"increment@doc:count\">+</button>",
 	);
 	world.update_local();
 	// fire a pointer-down on the button: the verb runs against its bound Value.
@@ -403,6 +533,511 @@ fn click_increments_field() {
 		.as_i64()
 		.unwrap()
 		.xpect_eq(1);
+}
+
+/// The counter page shape: a `bx:scope`, an initializing text binding, and
+/// signal-less event bindings to the same field, with no pre-existing document.
+/// Regressions covered: the scoped init path corrupting the document
+/// (`{counter: 0}` instead of `{counter: {count: 0}}`), the event bindings'
+/// freshly added Null clobbering the init, and the element-hosted binding
+/// `Value` leaking into the button's rendered label.
+#[beet_core::test]
+fn scoped_counter_page() {
+	let mut world = world();
+	let root = spawn_bsx(
+		&mut world,
+		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click="increment@doc:count">More</button></article>"#,
+	);
+	// settle the init -> document -> event-binding chain
+	world.update_local();
+	world.update_local();
+
+	// the scoped init created the nested field, preserving the init value
+	let (_, doc) = world.query::<(Entity, &Document)>().single(&world).unwrap();
+	doc.get_field::<u64>(&[
+		FieldSegment::key("counter"),
+		FieldSegment::key("count"),
+	])
+	.unwrap()
+	.xpect_eq(0);
+
+	// the button's binding mirrors the field, but stays out of its label
+	render_html(&mut world, root)
+		.xpect_contains("clicked 0 times")
+		.xpect_contains("<button>More</button>");
+}
+
+// ---- @ bindings ---------------------------------------------------------------
+
+#[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
+#[reflect(Component, Default)]
+struct Slider {
+	value: i64,
+}
+
+#[derive(Resource, Reflect, Default, Clone, PartialEq, Debug)]
+#[reflect(Resource, Default)]
+struct Theme {
+	contrast: i64,
+}
+
+/// A world with a registered + inserted `Theme { contrast: 5 }`.
+fn theme_world() -> World {
+	let mut world = world();
+	register::<Theme>(&mut world);
+	world.insert_resource(Theme { contrast: 5 });
+	world
+}
+
+/// The local [`Value`] of `entity` as an i64.
+fn read_i64(world: &World, entity: Entity) -> i64 {
+	read_value(world, entity).as_i64().unwrap()
+}
+
+#[beet_core::test]
+fn binding_doc_text() {
+	let mut world = world();
+	let doc = world.spawn(Document::new(val!({ "count": 7 }))).id();
+	let root =
+		spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count}</span>");
+	world.update_local();
+	let text = world.entity(root).get::<Children>().unwrap()[0];
+	world.entity(text).contains::<FieldRef>().xpect_true();
+	read_i64(&world, text).xpect_eq(7);
+
+	// reactive: a document change reaches the text
+	world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
+		val!({ "count": 8 });
+	world.update_local();
+	read_i64(&world, text).xpect_eq(8);
+}
+
+#[beet_core::test]
+fn binding_doc_init_seeds_when_missing() {
+	let mut world = world();
+	let doc = world.spawn(Document::new(val!({}))).id();
+	spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count=5}</span>");
+	world.update_local();
+	world.update_local();
+	world
+		.entity(doc)
+		.get::<Document>()
+		.unwrap()
+		.get_field::<i64>(&[FieldSegment::key("count")])
+		.unwrap()
+		.xpect_eq(5);
+}
+
+#[beet_core::test]
+fn binding_doc_attribute_lowers_field_ref() {
+	let mut world = world();
+	let doc = world.spawn(Document::new(val!({ "name": "Ada" }))).id();
+	let root =
+		spawn_bsx_under(&mut world, Some(doc), "<input value=@doc:name/>");
+	// the attribute entity carries the FieldRef, exactly the `#` lowering
+	let attr = world
+		.entity(root)
+		.get::<Attributes>()
+		.unwrap()
+		.iter()
+		.next()
+		.unwrap();
+	world
+		.entity(attr)
+		.get::<FieldRef>()
+		.unwrap()
+		.field_path
+		.to_string()
+		.xpect_eq("name".to_string());
+}
+
+#[beet_core::test]
+fn binding_res_text() {
+	let mut world = theme_world();
+	let root = spawn_bsx(&mut world, "<span>{@res:Theme.contrast}</span>");
+	world.update_local();
+	let text = world.entity(root).get::<Children>().unwrap()[0];
+	read_i64(&world, text).xpect_eq(5);
+
+	// reactive: a resource change reaches the text
+	world.resource_mut::<Theme>().contrast = 9;
+	world.update_local();
+	read_i64(&world, text).xpect_eq(9);
+}
+
+#[beet_core::test]
+fn binding_res_attribute_renders() {
+	let mut world = theme_world();
+	let root = spawn_bsx(&mut world, "<input value=@res:Theme.contrast/>");
+	world.update_local();
+	render_html(&mut world, root).xpect_contains("value=\"5\"");
+
+	world.resource_mut::<Theme>().contrast = 9;
+	world.update_local();
+	render_html(&mut world, root).xpect_contains("value=\"9\"");
+}
+
+// ---- resource declaration tags ------------------------------------------------
+
+/// A two-field resource so a patch can prove the untouched field survives.
+#[derive(Resource, Reflect, Default, Clone, PartialEq, Debug)]
+#[reflect(Resource, Default)]
+struct SiteMeta {
+	title: String,
+	tagline: String,
+}
+
+#[beet_core::test]
+fn resource_tag_patches_existing_resource() {
+	let mut world = world();
+	register::<SiteMeta>(&mut world);
+	world.insert_resource(SiteMeta {
+		title: "old".into(),
+		tagline: "keep".into(),
+	});
+	let node = spawn_bsx(&mut world, "<SiteMeta title=\"new\"/>");
+	// the named field patched, the missing field kept
+	world.resource::<SiteMeta>().title.as_str().xpect_eq("new");
+	world.resource::<SiteMeta>().tagline.as_str().xpect_eq("keep");
+	// the tag produces no entity content
+	world.entity(node).contains::<Element>().xpect_false();
+	world.entity(node).contains::<Value>().xpect_false();
+}
+
+#[beet_core::test]
+fn resource_tag_inserts_when_absent() {
+	let mut world = world();
+	register::<SiteMeta>(&mut world);
+	spawn_bsx(&mut world, "<SiteMeta title=\"fresh\"/>");
+	// inserted over the type's default
+	world.resource::<SiteMeta>().title.as_str().xpect_eq("fresh");
+	world.resource::<SiteMeta>().tagline.as_str().xpect_eq("");
+}
+
+/// Build `source` and return the template error.
+fn build_error(world: &mut World, source: &str) -> String {
+	let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
+	world
+		.spawn_template(BsxTemplate::container(
+			nodes,
+			BsxTemplateRegistry::default(),
+		))
+		.map(|entity| entity.id())
+		.unwrap_err()
+		.to_string()
+}
+
+#[beet_core::test]
+fn resource_tag_children_error() {
+	let mut world = world();
+	register::<SiteMeta>(&mut world);
+	build_error(&mut world, "<SiteMeta title=\"x\"><span/></SiteMeta>")
+		.xpect_contains("cannot have children");
+}
+
+#[beet_core::test]
+fn resource_tag_binding_attr_error() {
+	let mut world = world();
+	register::<SiteMeta>(&mut world);
+	build_error(&mut world, "<SiteMeta title=@doc:name/>")
+		.xpect_contains("cannot declare a resource field");
+}
+
+#[beet_core::test]
+fn binding_comp_attribute_targets_element() {
+	let mut world = world();
+	register::<Slider>(&mut world);
+	let root = spawn_bsx(
+		&mut world,
+		"<input value=@comp:Slider.value {Slider{value:2}}/>",
+	);
+	world.update_local();
+	render_html(&mut world, root).xpect_contains("value=\"2\"");
+
+	// reactive: a component edit reaches the rendered attribute
+	world.entity_mut(root).get_mut::<Slider>().unwrap().value = 7;
+	world.update_local();
+	render_html(&mut world, root).xpect_contains("value=\"7\"");
+}
+
+#[beet_core::test]
+fn binding_comp_selector_text() {
+	let mut world = world();
+	register::<Slider>(&mut world);
+	// the text binds the `bx:ref`-named entity's component
+	let root = spawn_bsx(
+		&mut world,
+		"<div><input bx:ref=\"slider\" {Slider{value:4}}/><span>{@comp$slider:Slider.value}</span></div>",
+	);
+	world.update_local();
+	let children = world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.collect::<Vec<_>>();
+	let input = children[0];
+	let text = world.entity(children[1]).get::<Children>().unwrap()[0];
+	read_i64(&world, text).xpect_eq(4);
+
+	// reactive: the named component's edit reaches the text
+	world.entity_mut(input).get_mut::<Slider>().unwrap().value = 6;
+	world.update_local();
+	read_i64(&world, text).xpect_eq(6);
+}
+
+#[beet_core::test]
+fn binding_comp_spread_tuple() {
+	let mut world = world();
+	register::<Slider>(&mut world);
+	// the tuple pairs the component insert with its binding, same entity
+	let root = spawn_bsx(
+		&mut world,
+		"<entity {(Slider{value:3}, @comp:Slider.value)}/>",
+	);
+	world.update_local();
+	world.entity(root).get::<Slider>().unwrap().value.xpect_eq(3);
+	read_i64(&world, root).xpect_eq(3);
+
+	world.entity_mut(root).get_mut::<Slider>().unwrap().value = 8;
+	world.update_local();
+	read_i64(&world, root).xpect_eq(8);
+}
+
+// ---- reserved ref names -------------------------------------------------------
+
+#[beet_core::test]
+fn binding_comp_snippet_root() {
+	let mut world = world();
+	register::<Slider>(&mut world);
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source(
+			"Probe",
+			"<section><span>{@comp$SnippetRoot:Slider.value}</span></section>",
+		)
+		.unwrap();
+	world.insert_resource(registry);
+	// the tag-site spread lands on the template entity, the body's snippet root
+	let probe = spawn_bsx(&mut world, "<Probe {Slider{value:4}}/>");
+	world.update_local();
+	let span = world.entity(probe).get::<Children>().unwrap()[0];
+	let text = world.entity(span).get::<Children>().unwrap()[0];
+	read_i64(&world, text).xpect_eq(4);
+
+	// reactive: the snippet root's component edit reaches the text
+	world.entity_mut(probe).get_mut::<Slider>().unwrap().value = 6;
+	world.update_local();
+	read_i64(&world, text).xpect_eq(6);
+}
+
+#[beet_core::test]
+fn binding_comp_build_root() {
+	let mut world = world();
+	register::<Slider>(&mut world);
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Probe", "<span>{@comp$BuildRoot:Slider.value}</span>")
+		.unwrap();
+	world.insert_resource(registry);
+	// the build root is the parse container, above the template's snippet root
+	let container = parse_bsx(&mut world, None, "<div><Probe/></div>");
+	world.entity_mut(container).insert(Slider { value: 3 });
+	world.update_local();
+	let div = world.entity(container).get::<Children>().unwrap()[0];
+	let probe = world.entity(div).get::<Children>().unwrap()[0];
+	let text = world.entity(probe).get::<Children>().unwrap()[0];
+	read_i64(&world, text).xpect_eq(3);
+
+	// reactive: the build root's component edit reaches the text
+	world.entity_mut(container).get_mut::<Slider>().unwrap().value = 8;
+	world.update_local();
+	read_i64(&world, text).xpect_eq(8);
+}
+
+/// A stand-in carrying the reserved `Router` short name: lazy reserved
+/// resolution is name-based, so the mechanism tests without `beet_router`
+/// (whose real `Router`/`RenderRoot` markers get their own crate's tests).
+#[derive(Component, Default)]
+struct Router;
+
+#[beet_core::test]
+fn binding_comp_router_lazy() {
+	let mut world = world();
+	register::<Slider>(&mut world);
+	// build detached: no `Router` ancestor yet, the binding stays silent
+	let container =
+		parse_bsx(&mut world, None, "<input value=@comp$Router:Slider.value/>");
+	let input = world.entity(container).get::<Children>().unwrap()[0];
+	let router = world.spawn((Router, Slider { value: 5 })).id();
+	world.update_local();
+	world.with_state::<AttributeQuery, _>(|query| {
+		query.find(input, "value").unwrap().1.clone().xpect_eq(Value::Null);
+	});
+
+	// attaching beneath the router picks the binding up, even though the
+	// bound component last changed before the marker was reachable
+	world.entity_mut(container).insert(ChildOf(router));
+	world.update_local();
+	world.with_state::<AttributeQuery, _>(|query| {
+		query.find(input, "value").unwrap().1.clone().xpect_eq(Value::Int(5));
+	});
+
+	// reactive: a component edit on the router reaches the attribute
+	world.entity_mut(router).get_mut::<Slider>().unwrap().value = 7;
+	world.update_local();
+	world.with_state::<AttributeQuery, _>(|query| {
+		query.find(input, "value").unwrap().1.clone().xpect_eq(Value::Int(7));
+	});
+}
+
+#[beet_core::test]
+fn reserved_ref_shadow_errors() {
+	let mut world = world();
+	let nodes =
+		parse_document("<div bx:ref=\"Router\"/>", &BsxParseConfig::bsx())
+			.unwrap();
+	world
+		.spawn_template(BsxTemplate::container(
+			nodes,
+			BsxTemplateRegistry::default(),
+		))
+		.map(|entity| entity.id())
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("reserved");
+}
+
+#[beet_core::test]
+fn binding_prop_text() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Card", "<section>{@prop:title}</section>")
+		.unwrap();
+	world.insert_resource(registry);
+	let card = spawn_bsx(&mut world, "<Card title=\"hi\"/>");
+	world.update_local();
+	render_html(&mut world, card).xpect_contains("hi");
+}
+
+#[beet_core::test]
+fn binding_prop_doc_bound_reactively() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Card", "<section>{@prop:title}</section>")
+		.unwrap();
+	world.insert_resource(registry);
+	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+	let card = spawn_bsx_under(&mut world, Some(doc), "<Card title=@doc:name/>");
+	world.update_local();
+	world.update_local();
+	render_html(&mut world, card).xpect_contains("Alice");
+
+	world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
+		val!({ "name": "Bob" });
+	world.update_local();
+	world.update_local();
+	render_html(&mut world, card).xpect_contains("Bob");
+}
+
+#[beet_core::test]
+fn binding_prop_res_bound_reactively() {
+	let mut world = theme_world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Card", "<section>{@prop:level}</section>")
+		.unwrap();
+	world.insert_resource(registry);
+	let card = spawn_bsx(&mut world, "<Card level=@res:Theme.contrast/>");
+	world.update_local();
+	world.update_local();
+	render_html(&mut world, card).xpect_contains("5");
+
+	world.resource_mut::<Theme>().contrast = 9;
+	world.update_local();
+	world.update_local();
+	render_html(&mut world, card).xpect_contains("9");
+}
+
+/// A user `bx:scope` above the tag must not reach into the template's props
+/// store (regression: the scope walk prefixed `@prop:title` to `scope.title`,
+/// silently missing the store's root `title`).
+#[beet_core::test]
+fn binding_prop_unaffected_by_user_scope() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Card", "<section>{@prop:title}</section>")
+		.unwrap();
+	world.insert_resource(registry);
+	let card = spawn_bsx(
+		&mut world,
+		"<div bx:scope=\"user\"><Card title=\"hi\"/></div>",
+	);
+	world.update_local();
+	world.update_local();
+	render_html(&mut world, card).xpect_contains("hi");
+}
+
+#[beet_core::test]
+fn binding_prop_passes_through_nested_templates() {
+	let mut world = world();
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Inner", "<span>{@prop:title}</span>")
+		.unwrap();
+	registry
+		.insert_source("Outer", "<div><Inner title=@prop:title/></div>")
+		.unwrap();
+	world.insert_resource(registry);
+	let outer = spawn_bsx(&mut world, "<Outer title=\"hello\"/>");
+	world.update_local();
+	world.update_local();
+	world.update_local();
+	render_html(&mut world, outer).xpect_contains("hello");
+}
+
+#[beet_core::test]
+fn component_tag_binding_doc() {
+	let mut world = world();
+	register::<Slider>(&mut world);
+	let doc = world.spawn(Document::new(val!({ "level": 7i64 }))).id();
+	let slider =
+		spawn_bsx_under(&mut world, Some(doc), "<Slider value=@doc:level/>");
+	world.update_local();
+	world.update_local();
+	world.entity(slider).get::<Slider>().unwrap().value.xpect_eq(7);
+
+	// write-back: a component edit reaches the document
+	world.entity_mut(slider).get_mut::<Slider>().unwrap().value = 42;
+	world.update_local();
+	world.update_local();
+	world
+		.entity(doc)
+		.get::<Document>()
+		.unwrap()
+		.get_field::<i64>(&[FieldSegment::key("level")])
+		.unwrap()
+		.xpect_eq(42);
+}
+
+#[beet_core::test]
+fn component_tag_binding_res() {
+	let mut world = theme_world();
+	register::<Slider>(&mut world);
+	let slider = spawn_bsx(&mut world, "<Slider value=@res:Theme.contrast/>");
+	world.update_local();
+	world.update_local();
+	world.entity(slider).get::<Slider>().unwrap().value.xpect_eq(5);
+	// the resource seeds outside-in, never clobbered by the component default
+	world.resource::<Theme>().contrast.xpect_eq(5);
+
+	world.resource_mut::<Theme>().contrast = 9;
+	world.update_local();
+	world.update_local();
+	world.entity(slider).get::<Slider>().unwrap().value.xpect_eq(9);
 }
 
 // ---- mdx --------------------------------------------------------------------

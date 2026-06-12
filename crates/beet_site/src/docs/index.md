@@ -1,5 +1,7 @@
 +++
 title = "Docs"
+order = 0
+expanded = true
 +++
 
 # Beet

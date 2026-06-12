@@ -17,7 +17,8 @@ pub enum BsxNode {
 	Element(BsxElement),
 	/// Literal prose between tags.
 	Text(String),
-	/// A `{..}` block in text position: a literal or a `#`/`$` reference.
+	/// A `{..}` block in text position: a literal, an `@` binding, or a `$`
+	/// reference.
 	Expr(ValueExpr),
 	/// `<!-- .. -->`.
 	Comment(String),
@@ -56,7 +57,8 @@ pub enum AttrValue {
 	/// A quoted string literal, ie `class="card"`. Kept distinct from a braced
 	/// literal so HTML mode (no value grammar) still accepts string attributes.
 	Str(String),
-	/// A literal or `#`/`$` reference, from `key={..}` or unbraced `key=#foo=42`.
+	/// A literal, `@` binding, or `$` reference, from `key={..}` or unbraced
+	/// `key=@doc:foo=42`.
 	Expr(ValueExpr),
 	/// A bare-position spread `<el {..}>`: one or more components/templates.
 	Spread(SpreadExpr),
@@ -68,16 +70,67 @@ pub enum ValueExpr {
 	/// An inline literal (scalar, struct, list, enum), resolved against the
 	/// target's type.
 	Literal(DataLiteral),
-	/// `#field.path`, optionally `=init`, lowering to a
-	/// [`FieldRef`](beet_core::prelude::FieldRef).
-	FieldRef {
-		/// The dotted field path, eg `count`, `user.name`.
-		path: FieldPath,
-		/// The initializer literal from `=init`, if present.
-		init: Option<DataLiteral>,
-	},
 	/// `$name`, referencing a `bx:ref`-named entity.
 	EntityRef(SmolStr),
+	/// An `@source:path` reactive binding, eg `@doc:count` or
+	/// `@res:PackageConfig.title`.
+	Binding(BindingExpr),
+}
+
+/// An `@` reactive binding: `@source selector? : path init?`.
+///
+/// ```text
+/// binding   = "@" source selector? ":" path init?
+/// source    = "doc" | "res" | "comp" | "prop"
+/// selector  = "$" RefName             only for comp, eg @comp$myref:Bar.boo
+/// path      = doc/prop: a field path, eg count or user.name
+///             res/comp: ShortTypePath "." field path, eg PackageConfig.title
+/// init      = "=" literal             doc only, eg {@doc:count=0}
+/// ```
+///
+/// The selector names `BuildRoot`, `SnippetRoot`, `RenderRoot` and `Router`
+/// are reserved, targeting well-known entities instead of `bx:ref` names (see
+/// `ReservedRef` in the resolver), eg `@comp$RenderRoot:ArticleMeta.title`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BindingExpr {
+	/// What the binding reads from and writes to.
+	pub source: BindingSource,
+	/// The `$ref` selector retargeting an `@comp` binding to a `bx:ref`-named
+	/// entity, or a reserved well-known entity (`$BuildRoot`, `$SnippetRoot`,
+	/// `$RenderRoot`, `$Router`).
+	pub selector: Option<SmolStr>,
+	/// The short type path of the bound resource/component, eg `PackageConfig`.
+	pub type_path: Option<SmolStr>,
+	/// The field path within the source, eg `count`, `user.name`.
+	pub field_path: FieldPath,
+	/// The `=init` initializer literal, `@doc` only.
+	pub init: Option<DataLiteral>,
+}
+
+impl BindingExpr {
+	/// An `@doc:path` binding without an initializer.
+	pub fn doc<M>(field_path: impl IntoFieldPath<M>) -> Self {
+		Self {
+			source: BindingSource::Doc,
+			selector: None,
+			type_path: None,
+			field_path: field_path.into_field_path(),
+			init: None,
+		}
+	}
+}
+
+/// The source kinds of an `@` binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindingSource {
+	/// `@doc:` the nearest ancestor user [`Document`](crate::prelude::Document).
+	Doc,
+	/// `@res:` a reflected resource field.
+	Res,
+	/// `@comp:` a reflected component field.
+	Comp,
+	/// `@prop:` the nearest ancestor template props store.
+	Prop,
 }
 
 /// A bare-position spread: a typed struct/tuple naming components or templates.
@@ -86,8 +139,19 @@ pub enum SpreadExpr {
 	/// A single named component/template, eg `{MyComponent{foo:"bar"}}` or
 	/// `{MyComponent}`.
 	Named(NamedLiteral),
-	/// A tuple of named components/templates, eg `{(A, B)}`.
-	Tuple(Vec<NamedLiteral>),
+	/// A tuple of components/templates and bindings, eg
+	/// `{(Bar{boo:"bazz"}, @comp:Bar.boo)}`.
+	Tuple(Vec<SpreadItem>),
+}
+
+/// One item of a tuple spread: a named component/template or an `@` binding
+/// applied to the same entity.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SpreadItem {
+	/// A named component/template, eg `Bar{boo:"bazz"}`.
+	Named(NamedLiteral),
+	/// An `@` binding, eg `@comp:Bar.boo`.
+	Binding(BindingExpr),
 }
 
 /// A literal in the BSX value grammar, mirroring the `bsn!` value surface.

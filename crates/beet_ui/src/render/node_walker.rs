@@ -83,8 +83,12 @@ impl NodeWalker<'_, '_> {
 			visitor.visit_element(&cx, view);
 		}
 		// 4. Value
-		// note: elements can also have a value
-		if let Some(value) = value {
+		// an element's own Value is binding state (eg a `bx:click` field mirror),
+		// not markup content: text content lives on dedicated text-node children.
+		// Form controls are the exception, displaying their bound value.
+		if let Some(value) = value
+			&& element.is_none_or(|element| is_value_element(element.tag()))
+		{
 			visitor.visit_value(&cx, value);
 		}
 		// 5. Expression
@@ -134,6 +138,14 @@ pub const NON_VISUAL_TAGS: &[&str] = &[
 
 /// Whether a tag carries no visual content, ie [`NON_VISUAL_TAGS`].
 pub fn is_non_visual(tag: &str) -> bool { NON_VISUAL_TAGS.contains(&tag) }
+
+/// Form-control tags whose own [`Value`] is their displayed content (eg the
+/// charcell editable textbox). Every other element treats a co-located
+/// [`Value`] as binding state, never rendered as text.
+pub const VALUE_ELEMENT_TAGS: &[&str] = &["input", "textarea", "select"];
+
+/// Whether a tag displays its own [`Value`], ie [`VALUE_ELEMENT_TAGS`].
+pub fn is_value_element(tag: &str) -> bool { VALUE_ELEMENT_TAGS.contains(&tag) }
 
 pub trait NodeVisitor {
 	/// Return `true` to skip visiting this node and all its children.

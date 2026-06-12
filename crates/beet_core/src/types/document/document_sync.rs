@@ -85,7 +85,7 @@ pub(super) fn link_field_to_document(
 	mut commands: Commands,
 	fields: Query<&FieldRef>,
 	docs: Query<(), With<Document>>,
-	mut doc_query: DocumentQuery,
+	doc_query: DocumentQuery,
 ) -> Result {
 	let field = fields.get(ev.entity)?;
 	let document = doc_query.entity(ev.entity, &field.document);
@@ -235,17 +235,23 @@ pub(super) fn sync_schema(
 /// breaks the otherwise-infinite sync loop.
 pub(super) fn sync_local_to_document(
 	changed: Populated<
-		(Entity, &FieldRef, &ResolvedFieldPath, &Value),
+		(Entity, &FieldRef, &ResolvedFieldPath, Ref<Value>),
 		Changed<Value>,
 	>,
 	mut docs: DocumentQuery,
 ) -> Result {
 	for (entity, field, resolved, value) in changed.iter() {
+		// a freshly added Null carries no signal: it must neither clobber a
+		// field another binding wrote this pass, nor race a sibling's deferred
+		// document creation (the write-back is iteration-order independent).
+		if value.is_added() && value.is_null() {
+			continue;
+		}
 		// equality guard + policy, computed while the read borrow is live;
 		// the guard reads the scope-resolved path, the write scopes internally
 		let should_write = match docs.get(entity, &field.document) {
 			Ok(doc) => match doc.get_field_ref(&resolved.field_path) {
-				// field exists: write only when it differs
+				// field exists: write only when the value differs
 				Ok(field_val) => *field_val != *value,
 				// field missing: create it unless the ref opts out
 				Err(_) => {
@@ -256,7 +262,7 @@ pub(super) fn sync_local_to_document(
 			Err(_) => matches!(field.on_missing, OnMissingField::Init { .. }),
 		};
 		if should_write {
-			let new = value.clone();
+			let new = (*value).clone();
 			docs.with_field(entity, field, move |slot| *slot = new)?;
 		}
 	}
@@ -372,6 +378,113 @@ mod test {
 
 		let content = world.entity(text).get::<Value>().unwrap().clone();
 		content.xpect_eq(Value::Str("from_card".into()));
+	}
+
+	#[beet_core::test]
+	fn ancestor_skips_props_document() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(val!({ "name": "user_doc" })))
+			.id();
+		// a props store between the user doc and the field
+		let store = world
+			.spawn((
+				ChildOf(doc),
+				Document::new(val!({ "name": "props_doc" })),
+				PropsDocument,
+			))
+			.id();
+		let text = world
+			.spawn((ChildOf(store), Value::default(), FieldRef::new("name")))
+			.id();
+		world.update_local();
+
+		// Ancestor resolution skipped the props store
+		let field_of = world.entity(text).get::<FieldOf>().unwrap();
+		field_of.document.xpect_eq(doc);
+		world
+			.entity(text)
+			.get::<Value>()
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Str("user_doc".into()));
+	}
+
+	#[beet_core::test]
+	fn resolves_props_document_path() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(val!({ "name": "user_doc" })))
+			.id();
+		let store = world
+			.spawn((
+				ChildOf(doc),
+				Document::new(val!({ "name": "props_doc" })),
+				PropsDocument,
+			))
+			.id();
+		let text = world
+			.spawn((
+				ChildOf(store),
+				Value::default(),
+				FieldRef::new("name").with_document(DocumentPath::Props),
+			))
+			.id();
+		world.update_local();
+
+		// Props resolution targeted the store, not the user doc
+		let field_of = world.entity(text).get::<FieldOf>().unwrap();
+		field_of.document.xpect_eq(store);
+		world
+			.entity(text)
+			.get::<Value>()
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Str("props_doc".into()));
+	}
+
+	#[beet_core::test]
+	fn nested_props_documents_do_not_leak() {
+		let mut world = DocumentPlugin::world();
+		// outer store -> inner store: each Props ref resolves its nearest store
+		let outer = world
+			.spawn((Document::new(val!({ "name": "outer" })), PropsDocument))
+			.id();
+		let inner = world
+			.spawn((
+				ChildOf(outer),
+				Document::new(val!({ "name": "inner" })),
+				PropsDocument,
+			))
+			.id();
+		let inner_field = world
+			.spawn((
+				ChildOf(inner),
+				Value::default(),
+				FieldRef::new("name").with_document(DocumentPath::Props),
+			))
+			.id();
+		let outer_field = world
+			.spawn((
+				ChildOf(outer),
+				Value::default(),
+				FieldRef::new("name").with_document(DocumentPath::Props),
+			))
+			.id();
+		world.update_local();
+
+		world
+			.entity(inner_field)
+			.get::<Value>()
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Str("inner".into()));
+		world
+			.entity(outer_field)
+			.get::<Value>()
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Str("outer".into()));
 	}
 
 	#[beet_core::test]

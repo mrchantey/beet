@@ -127,7 +127,6 @@ fn store_path_of(rel: &Path) -> String { segments_of(rel).join("/") }
 /// Parse a markdown file's leading frontmatter into [`ArticleMeta`], if any.
 #[cfg(feature = "markdown_parser")]
 fn scan_meta(file: &Path) -> Option<ArticleMeta> {
-	use beet_ui::prelude::Frontmatter;
 	let is_markdown = file
 		.extension()
 		.and_then(|ext| ext.to_str())
@@ -136,9 +135,8 @@ fn scan_meta(file: &Path) -> Option<ArticleMeta> {
 		return None;
 	}
 	fs_ext::read_to_string(file)
-		.ok()?
-		.xmap(|source| Frontmatter::extract(&source).ok().flatten())
-		.map(|frontmatter| ArticleMeta::from_frontmatter(&frontmatter))
+		.ok()
+		.and_then(|source| ArticleMeta::from_markdown(&source))
 }
 
 #[cfg(test)]

@@ -13,7 +13,7 @@
 //! ```sh
 //! beet load scenes/led-script.json   # POST a scene file (remote) or set_scene (local)
 //! beet load scenes/led-script.json --watch  # local: reload on every save
-//! beet run led-script                # fire an action route the scene installed
+//! beet call led-script               # fire an action route the scene installed
 //! beet dump                          # print the loaded scene as JSON
 //! beet clear                         # despawn the scene + reset
 //! beet reset                         # stop the hardware
@@ -40,7 +40,7 @@ impl Plugin for SceneCommandsPlugin {
 			.register_type::<SceneClear>()
 			.register_type::<SceneReset>()
 			.register_type::<SceneDump>()
-			.register_type::<SceneRun>()
+			.register_type::<SceneCall>()
 			.register_type::<ExportScene>()
 			.register_type::<ExportPath>();
 	}
@@ -193,15 +193,15 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 	}
 }
 
-/// `run <route>` — fire an action route the loaded scene installed, eg
-/// `beet run led-script`. The original request (method, headers, query params
+/// `call <route>` — fire an action route the loaded scene installed, eg
+/// `beet call led-script`. The original request (method, headers, query params
 /// and body) is forwarded unchanged; only its destination URL is rewritten —
 /// to `<device>/<route>` for a remote, or the bare `<route>` against the host
 /// router for local.
-#[action(route = "run/:route", handler_only)]
+#[action(route = "call/:route", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
+pub async fn SceneCall(cx: ActionContext<Request>) -> Result<Response> {
 	let route = cx.input.get_param("route").unwrap_or("").to_string();
 	match device_url(cx.input.request_parts()) {
 		Some(url) => {

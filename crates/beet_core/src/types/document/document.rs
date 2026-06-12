@@ -48,6 +48,8 @@ impl Document {
 	) -> Result<&mut Value> {
 		let mut current = &mut self.0;
 
+		// missing segments are seeded Null so the next iteration coerces them
+		// into the container the path requires; only the leaf takes the init.
 		for segment in path {
 			match segment {
 				FieldSegment::ArrayIndex(idx) => {
@@ -79,11 +81,14 @@ impl Document {
 						}
 					})?;
 					if !map.contains_key(key) {
-						map.insert(key.clone(), init_value.clone());
+						map.insert(key.clone(), Value::Null);
 					}
 					current = map.get_mut(key).unwrap();
 				}
 			}
+		}
+		if current.is_null() {
+			*current = init_value.clone();
 		}
 		current.xok()
 	}
@@ -269,6 +274,20 @@ impl Default for OnMissingField {
 }
 
 
+/// Marker for a [`Document`] that stores a `.bsx` template's props.
+///
+/// Inserted alongside the [`Document`] on a template's entity when its tag is
+/// built (see `resolve.rs::build_uppercase`). [`DocumentPath::Props`] resolves
+/// to the nearest ancestor carrying this marker, while [`DocumentPath::Ancestor`]
+/// skips it, so user document scoping inside a template body is unaffected by
+/// the store.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
+)]
+#[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PropsDocument;
+
 /// Specifies which document to operate on.
 ///
 /// Documents can be attached to ancestors, the root entity, or any specific entity.
@@ -277,13 +296,17 @@ impl Default for OnMissingField {
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DocumentPath {
-	/// The nearest ancestor (inclusive) with a [`Document`] component.
+	/// The nearest ancestor (inclusive) with a [`Document`] component,
+	/// skipping props stores ([`PropsDocument`]).
 	#[default]
 	Ancestor,
 	/// This entity only, do not traverse.
 	This,
 	/// The root entity.
 	Root,
+	/// The nearest ancestor (inclusive) props store, ie a [`Document`] marked
+	/// with [`PropsDocument`], a template's materialized props.
+	Props,
 	/// A specific document by entity id.
 	Entity(Entity),
 	// TODO url, perhaps with some automerge style synchronous system
@@ -295,6 +318,7 @@ impl core::fmt::Display for DocumentPath {
 			DocumentPath::Ancestor => write!(f, "Ancestor"),
 			DocumentPath::This => write!(f, "This"),
 			DocumentPath::Root => write!(f, "Root"),
+			DocumentPath::Props => write!(f, "Props"),
 			DocumentPath::Entity(entity) => write!(f, "Entity({entity:?})"),
 		}
 	}
@@ -397,6 +421,26 @@ mod test {
 		])
 		.unwrap()
 		.xpect_eq("initialized");
+	}
+
+	/// A nested init must seed intermediate segments as containers, never with
+	/// the leaf init value (regression: `insert(["scope","count"], 0)` used to
+	/// write `{scope: 0}` and then fail navigating `scope.count`).
+	#[beet_core::test]
+	fn document_init_nested_leaf() {
+		let mut doc = Document::default();
+		doc.insert(
+			&[FieldSegment::key("scope"), FieldSegment::key("count")],
+			&Value::Uint(0),
+		)
+		.unwrap();
+
+		doc.get_field::<u64>(&[
+			FieldSegment::key("scope"),
+			FieldSegment::key("count"),
+		])
+		.unwrap()
+		.xpect_eq(0);
 	}
 
 	#[beet_core::test]

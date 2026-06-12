@@ -3,9 +3,10 @@ use beet::prelude::*;
 
 /// The global document layout wrapping every route's body.
 ///
-/// Composes the library [`Header`]/[`Footer`] and the site [`BeetSidebar`]
-/// around the route content (the default `<Slot/>`, transcluded in place by the
-/// [`BaseLayout`] middleware). The shared [`RouteHead`] carries the web-only
+/// Composes the library [`Header`]/[`Footer`] and the route-tree
+/// [`RouteSidebar`] (labels/order/expansion sourced from each route's
+/// scan-time [`ArticleMeta`]) around the route content (the default `<Slot/>`,
+/// transcluded in place by the [`BaseLayout`] middleware). The shared [`RouteHead`] carries the web-only
 /// stylesheet/color-scheme/preflight/favicon, sourcing the title/description
 /// from the matched route's [`ArticleMeta`]. The `<head>` is non-visual, so the
 /// same layout renders in the terminal.
@@ -44,7 +45,7 @@ pub fn BeetLayout(cx: Res<RequestContext>) -> impl Bundle {
 					<Link slot="nav" href="https://github.com/mrchantey/beet" variant=ButtonVariant::Text>"GitHub"</Link>
 				</Header>
 				<div {Classes::new([classes::CONTAINER])}>
-					<BeetSidebar/>
+					<RouteSidebar home=false/>
 					<main>
 						<Slot/>
 					</main>

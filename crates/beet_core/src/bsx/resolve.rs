@@ -5,11 +5,22 @@
 //! walks the syntax tree into `cx.entity`:
 //!
 //! - a lowercase tag becomes an [`Element`] with attribute child entities;
-//! - an uppercase tag resolves by name to a component (reflect-patched) or a
-//!   template (built with input props), incl `<path::to::X>` BSX templates;
+//! - an uppercase tag resolves by name to a component (reflect-patched), a
+//!   resource declaration (`<PackageConfig title=".."/>` patches the live
+//!   resource, no entity content), or a template (built with input props),
+//!   incl `<path::to::X>` BSX templates, whose props materialize as a reactive
+//!   `(Document, PropsDocument)` store;
 //! - a bare spread inserts its resolved components/templates onto the entity;
-//! - a `#`reference lowers to a [`FieldRef`] (with `=init`), a `$`reference to a
-//!   `bx:ref`-named entity through the one entity model;
+//! - an `@` binding lowers to its source's sync components: `@doc`/`@prop` to a
+//!   [`FieldRef`], `@res` to a `(Value, ResourceFieldRef)`, `@comp` to a
+//!   `(Value, ReflectFieldRef)` targeting the current entity, the element (in
+//!   attribute position), or a `@comp$ref:` named entity;
+//! - the reserved selector names ([`ReservedRef`]) target well-known entities
+//!   instead of `bx:ref` names (which may not shadow them): `$BuildRoot` and
+//!   `$SnippetRoot` resolve at build time, `$RenderRoot` and `$Router` lazily
+//!   in the sync pass via [`BindingTarget::Reserved`];
+//! - a `$`reference resolves to a `bx:ref`-named entity through the one entity
+//!   model;
 //! - `bx:scope`/`bx:for`+`bx:key`/`<Slot>`/`bx:slot`/`bx:click` lower to their
 //!   document-system and slot-marker components.
 //!
@@ -17,9 +28,12 @@
 //! (collect `bx:ref` names, then resolve `$name`), so `$name` may point forward.
 
 use super::ast::*;
+use super::cursor::Cursor;
 use super::events::*;
 use super::reflect::*;
 use super::registry::*;
+use super::schema::props_value;
+use super::value::parse_binding;
 use crate::prelude::*;
 use bevy::ecs::template::SceneEntityReference;
 use bevy::ecs::template::Template;
@@ -72,20 +86,40 @@ impl Template for BsxTemplate {
 		// pass 1: collect every `bx:ref` name -> a pinned reference id, so a `$name`
 		// forward reference resolves to the same placeholder entity.
 		let mut refs = RefBindings::default();
-		collect_refs(&self.nodes, &mut refs);
-		if self.as_container {
+		collect_refs(&self.nodes, &mut refs)?;
+		// expose this build's root for `$SnippetRoot`, restoring any outer
+		// snippet root so nested registry-template builds nest correctly.
+		let root = cx.entity.id();
+		// SAFETY: only used to swap the snippet-root resource, no flush.
+		let world = unsafe { cx.entity.world_mut() };
+		let previous = world.remove_resource::<SnippetBuildRoot>();
+		world.insert_resource(SnippetBuildRoot(root));
+		let result = if self.as_container {
 			// every root node spawns as a child of the container entity.
-			let root = cx.entity.id();
-			for node in &self.nodes {
-				spawn_child(node, root, &self.registry, &refs, cx)?;
-			}
-			Ok(())
+			self.nodes.iter().try_for_each(|node| {
+				spawn_child(node, root, &self.registry, &refs, cx).map(|_| ())
+			})
 		} else {
 			build_root_nodes(&self.nodes, &self.registry, &refs, cx)
+		};
+		// SAFETY: only used to swap the snippet-root resource, no flush.
+		let world = unsafe { cx.entity.world_mut() };
+		match previous {
+			Some(previous) => world.insert_resource(previous),
+			None => {
+				world.remove_resource::<SnippetBuildRoot>();
+			}
 		}
+		result
 	}
 	fn clone_template(&self) -> Self { self.clone() }
 }
+
+/// The root entity of the innermost [`BsxTemplate`] build (the parsed document
+/// container or a registry `<path::to::X>` body): the `$SnippetRoot` reserved
+/// target. Set for the duration of a build, mirroring [`TemplateBuildRoot`].
+#[derive(Debug, Clone, Copy, Resource)]
+struct SnippetBuildRoot(Entity);
 
 /// Names declared by a `bx:ref` anywhere in the tree, each pinned to a stable
 /// [`SceneEntityReference`] so a forward `$name` resolves identically.
@@ -110,19 +144,93 @@ impl RefBindings {
 	}
 }
 
-/// Walk the tree collecting every `bx:ref` name into stable references.
-fn collect_refs(nodes: &[BsxNode], refs: &mut RefBindings) {
+/// Walk the tree collecting every `bx:ref` name into stable references,
+/// erroring on a name that shadows a reserved selector ([`ReservedRef`]).
+fn collect_refs(nodes: &[BsxNode], refs: &mut RefBindings) -> Result<()> {
 	for node in nodes {
 		if let BsxNode::Element(el) = node {
 			for attr in &el.attributes {
 				if attr.key == "bx:ref" {
 					if let AttrValue::Str(name) = &attr.value {
+						if ReservedRef::parse(name).is_some() {
+							bevybail!(
+								"`bx:ref=\"{name}\"` shadows a reserved ref name, reserved: {:?}",
+								ReservedRef::NAMES
+							);
+						}
 						refs.reference(name);
 					}
 				}
 			}
-			collect_refs(&el.children, refs);
+			collect_refs(&el.children, refs)?;
 		}
+	}
+	Ok(())
+}
+
+/// The reserved `@comp$Name:` selector names, targeting well-known entities
+/// instead of user `bx:ref` names. Declaring one via `bx:ref` is a build error
+/// (see [`collect_refs`]), so a reserved selector is never ambiguous.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReservedRef {
+	/// The outermost root of the current `spawn_template` build, resolved at
+	/// build time from [`TemplateBuildRoot`].
+	BuildRoot,
+	/// The root of the innermost BSX template build (the parsed document or a
+	/// registry template body), resolved at build time from [`SnippetBuildRoot`].
+	SnippetRoot,
+	/// The nearest self-or-ancestor entity carrying a `RenderRoot` component,
+	/// resolved lazily each sync pass: the render tree may not exist or be
+	/// attached at build time (layouts build detached, per request).
+	RenderRoot,
+	/// The nearest self-or-ancestor entity carrying a `Router` component,
+	/// resolved lazily each sync pass.
+	Router,
+}
+
+impl ReservedRef {
+	/// Every reserved selector name.
+	pub const NAMES: &[&str] =
+		&["BuildRoot", "SnippetRoot", "RenderRoot", "Router"];
+
+	/// Classify a selector name, `None` for a user `bx:ref` name.
+	pub fn parse(name: &str) -> Option<Self> {
+		match name {
+			"BuildRoot" => Some(Self::BuildRoot),
+			"SnippetRoot" => Some(Self::SnippetRoot),
+			"RenderRoot" => Some(Self::RenderRoot),
+			"Router" => Some(Self::Router),
+			_ => None,
+		}
+	}
+
+	/// Resolve a build-time reserved name, `None` for the lazy names
+	/// ([`Self::RenderRoot`]/[`Self::Router`]), which resolve in the binding
+	/// sync instead ([`BindingTarget::Reserved`]).
+	fn build_time_entity(
+		self,
+		world: &World,
+		fallback: Entity,
+	) -> Option<Entity> {
+		match self {
+			Self::BuildRoot => Some(TemplateBuildRoot::resolve(world, fallback)),
+			Self::SnippetRoot => world
+				.get_resource::<SnippetBuildRoot>()
+				.map(|root| root.0)
+				.unwrap_or(fallback)
+				.xmap(Some),
+			Self::RenderRoot | Self::Router => None,
+		}
+	}
+
+	/// The selector's [`BindingTarget`]: a build-time entity, or the lazy
+	/// reserved `name` deferred to the sync pass.
+	fn target(self, name: &SmolStr, cx: &mut TemplateContext) -> BindingTarget {
+		let fallback = cx.entity.id();
+		cx.entity
+			.world_scope(|world| self.build_time_entity(world, fallback))
+			.map(BindingTarget::Entity)
+			.unwrap_or_else(|| BindingTarget::Reserved(name.clone()))
 	}
 }
 
@@ -157,10 +265,7 @@ fn build_node_into(
 ) -> Result<()> {
 	match node {
 		BsxNode::Element(el) => build_element(el, registry, refs, cx),
-		_ => {
-			apply_leaf(node, cx.entity)?;
-			Ok(())
-		}
+		_ => apply_leaf(node, refs, cx),
 	}
 }
 
@@ -223,44 +328,182 @@ fn build_node_at(
 	let mut scoped = TemplateContext::new(&mut entity_mut, cx.entity_references);
 	match node {
 		BsxNode::Element(el) => build_element(el, registry, refs, &mut scoped),
-		_ => apply_leaf(node, scoped.entity),
+		_ => apply_leaf(node, refs, &mut scoped),
 	}
 }
 
-/// Apply a text/expr/comment/doctype leaf onto `entity`.
-fn apply_leaf(node: &BsxNode, entity: &mut EntityWorldMut) -> Result<()> {
+/// Apply a text/expr/comment/doctype leaf onto `cx.entity`.
+fn apply_leaf(
+	node: &BsxNode,
+	refs: &RefBindings,
+	cx: &mut TemplateContext,
+) -> Result<()> {
 	match node {
 		BsxNode::Text(text) => {
-			entity.insert(Value::Str(text.into()));
+			cx.entity.insert(Value::Str(text.into()));
 		}
-		BsxNode::Expr(expr) => apply_value_expr(expr, entity)?,
+		BsxNode::Expr(expr) => {
+			// text position: an `@comp` binds this entity unless `$ref` retargets.
+			let comp_target = match expr {
+				ValueExpr::Binding(binding) => match &binding.selector {
+					Some(name) => selector_target(name, refs, cx),
+					None => BindingTarget::This,
+				},
+				_ => BindingTarget::This,
+			};
+			apply_value_expr(expr, cx.entity, comp_target)?;
+		}
 		BsxNode::Comment(content) => {
-			entity.insert(Comment::new(content.clone()));
+			cx.entity.insert(Comment::new(content.clone()));
 		}
 		BsxNode::Doctype(value) => {
-			entity.insert(Doctype::new(value.clone()));
+			cx.entity.insert(Doctype::new(value.clone()));
 		}
 		BsxNode::Element(_) => unreachable!("handled before apply_leaf"),
 	}
 	Ok(())
 }
 
-/// Lower a text-position value expression onto `entity`: a literal becomes a
-/// [`Value`], a `#`reference a [`FieldRef`], a `$`reference is rejected (an
-/// entity reference is not a text value).
-fn apply_value_expr(expr: &ValueExpr, entity: &mut EntityWorldMut) -> Result<()> {
+/// Resolve a `$name` to its real, forward-mapped entity through the one entity
+/// model, spawning the pinned placeholder on first use.
+fn resolve_ref(
+	name: &str,
+	refs: &RefBindings,
+	cx: &mut TemplateContext,
+) -> Entity {
+	let reference = refs.get(name).unwrap_or_else(|| stable_reference(name));
+	// SAFETY: only used to spawn-or-fetch the mapped placeholder entity.
+	let world = unsafe { cx.entity.world_mut() };
+	cx.entity_references.get(reference, world)
+}
+
+/// Lower a text/attribute-position value expression onto `entity`: a literal
+/// becomes a [`Value`], an `@` binding its binding components
+/// ([`apply_binding`], with `comp_target` naming the entity an `@comp` binds),
+/// a `$`reference is rejected (an entity reference is not a text value).
+fn apply_value_expr(
+	expr: &ValueExpr,
+	entity: &mut EntityWorldMut,
+	comp_target: BindingTarget,
+) -> Result<()> {
 	match expr {
 		ValueExpr::Literal(literal) => {
 			entity.insert(literal_to_value(literal)?);
 		}
-		ValueExpr::FieldRef { path, init } => {
-			entity.insert(field_ref(path, init.as_ref())?);
+		ValueExpr::Binding(binding) => {
+			apply_binding(binding, entity, comp_target)?;
 		}
 		ValueExpr::EntityRef(_) => {
 			bevybail!("`$name` entity references are not valid in text position")
 		}
 	}
 	Ok(())
+}
+
+/// Lower an `@` binding's components onto the value-bearing `entity`.
+///
+/// `comp_target` is the entity an `@comp` binding's component lives on: the
+/// element in attribute position, the binding entity itself in text and spread
+/// position, the `$ref` entity when a selector is present.
+pub(super) fn apply_binding(
+	binding: &BindingExpr,
+	entity: &mut EntityWorldMut,
+	comp_target: BindingTarget,
+) -> Result<()> {
+	match binding.source {
+		BindingSource::Doc => {
+			entity
+				.insert(field_ref(&binding.field_path, binding.init.as_ref())?);
+		}
+		BindingSource::Prop => {
+			entity.insert(
+				FieldRef::new(binding.field_path.clone())
+					.with_document(DocumentPath::Props),
+			);
+		}
+		// the `Value`<->reflect bridge needs `serde_json` (the `json` feature);
+		// an embedded build without it keeps the `Value` but loses the
+		// resource/component sync (Risk: documented, acceptable).
+		BindingSource::Res => {
+			insert_value_if_missing(entity);
+			#[cfg(feature = "json")]
+			entity.insert(ResourceFieldRef::new(
+				binding.type_path.clone().unwrap_or_default(),
+				binding.field_path.to_string(),
+			));
+		}
+		BindingSource::Comp => {
+			insert_value_if_missing(entity);
+			#[cfg(feature = "json")]
+			{
+				let mut reflect_ref = ReflectFieldRef::new(
+					binding.type_path.clone().unwrap_or_default(),
+					binding.field_path.to_string(),
+				);
+				reflect_ref.target = comp_target;
+				entity.insert(reflect_ref);
+			}
+			#[cfg(not(feature = "json"))]
+			let _ = comp_target;
+		}
+	}
+	Ok(())
+}
+
+/// Seed a default [`Value`] for a binding's sync to fill, preserving any value
+/// already present (eg a `FieldRef`-seeded one).
+fn insert_value_if_missing(entity: &mut EntityWorldMut) {
+	if !entity.contains::<Value>() {
+		entity.insert(Value::default());
+	}
+}
+
+/// The target of an `@comp$name` selector in a cx-bearing position (text,
+/// event): a reserved name resolves to its well-known entity (or defers to the
+/// sync pass), else through the `bx:ref` machinery.
+fn selector_target(
+	name: &SmolStr,
+	refs: &RefBindings,
+	cx: &mut TemplateContext,
+) -> BindingTarget {
+	match ReservedRef::parse(name) {
+		Some(reserved) => reserved.target(name, cx),
+		None => BindingTarget::Entity(resolve_ref(name, refs, cx)),
+	}
+}
+
+/// The target of an `@comp$name` selector resolved against a pre-built
+/// name->entity map ([`resolve_entity_refs`], which also resolves the
+/// build-time reserved names): a lazy reserved name defers to the sync pass,
+/// anything else looks up the map.
+fn map_selector_target(
+	name: &SmolStr,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> BindingTarget {
+	match ReservedRef::parse(name) {
+		Some(ReservedRef::RenderRoot | ReservedRef::Router) => {
+			BindingTarget::Reserved(name.clone())
+		}
+		_ => BindingTarget::Entity(
+			entity_refs.get(name).copied().unwrap_or(Entity::PLACEHOLDER),
+		),
+	}
+}
+
+/// The `@comp` target of an attribute-position expression: the `$ref` entity
+/// when selected, else the `element` carrying the attribute.
+fn attr_comp_target(
+	expr: &ValueExpr,
+	element: Entity,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> BindingTarget {
+	match expr {
+		ValueExpr::Binding(BindingExpr {
+			selector: Some(name),
+			..
+		}) => map_selector_target(name, entity_refs),
+		_ => BindingTarget::Entity(element),
+	}
 }
 
 /// Build an element: dispatch on its tag kind, then directives, attributes, and
@@ -323,10 +566,26 @@ fn resolve_entity_refs(
 				collect_literal_entity_ref_names(literal, &mut names)
 			}
 			AttrValue::Expr(ValueExpr::EntityRef(name)) => names.push(name.clone()),
+			// an `@comp$ref:` selector resolves through the same machinery.
+			AttrValue::Expr(ValueExpr::Binding(binding)) => {
+				names.extend(binding.selector.clone());
+			}
 			_ => {}
 		}
 	}
 	for name in names {
+		// a reserved name never resolves through the `bx:ref` machinery: the
+		// build-time ones resolve from the build resources here, the lazy ones
+		// (`RenderRoot`/`Router`) defer to the sync pass instead.
+		if let Some(reserved) = ReservedRef::parse(&name) {
+			let fallback = cx.entity.id();
+			if let Some(entity) = cx.entity.world_scope(|world| {
+				reserved.build_time_entity(world, fallback)
+			}) {
+				out.insert(name, entity);
+			}
+			continue;
+		}
 		let reference = refs
 			.get(&name)
 			.unwrap_or_else(|| stable_reference(&name));
@@ -338,14 +597,26 @@ fn resolve_entity_refs(
 	out
 }
 
-/// Collect every `$name` in a spread's literals.
+/// Collect every `$name` in a spread's literals and binding selectors.
 fn collect_entity_ref_names(spread: &SpreadExpr, out: &mut Vec<SmolStr>) {
-	let items = match spread {
-		SpreadExpr::Named(named) => core::slice::from_ref(named),
-		SpreadExpr::Tuple(items) => items.as_slice(),
-	};
-	for named in items {
-		collect_literal_entity_ref_names(&DataLiteral::Enum(named.clone()), out);
+	match spread {
+		SpreadExpr::Named(named) => collect_literal_entity_ref_names(
+			&DataLiteral::Enum(named.clone()),
+			out,
+		),
+		SpreadExpr::Tuple(items) => {
+			for item in items {
+				match item {
+					SpreadItem::Named(named) => collect_literal_entity_ref_names(
+						&DataLiteral::Enum(named.clone()),
+						out,
+					),
+					SpreadItem::Binding(binding) => {
+						out.extend(binding.selector.clone())
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -412,11 +683,16 @@ fn build_uppercase(
 		if let Some(schema) = def.schema.clone() {
 			verify_props_against(el, &el.tag, &schema, cx)?;
 		}
+		// pre-resolve `$name` refs (incl `@comp$ref:` selectors) for the props
+		// store and spreads.
+		let entity_refs = resolve_entity_refs(el, refs, cx);
+		// materialize the props store before the body builds, so the body's
+		// `DocumentPath::Props` bindings link against it on insert.
+		apply_props_store(el, cx.entity, &entity_refs)?;
 		let nested = BsxTemplate::new(def.nodes.clone(), registry.clone());
 		// build the template's subtree into this entity, carrying its slot targets.
 		cx.entity.build_template(&nested)?;
 		apply_common_directives(el, refs, cx)?;
-		let entity_refs = resolve_entity_refs(el, refs, cx);
 		apply_spreads(el, cx.entity, &entity_refs)?;
 		// caller content becomes slot children on this entity.
 		build_slot_children(el, registry, refs, cx)?;
@@ -440,50 +716,80 @@ fn build_uppercase(
 		registry
 			.get_with_short_type_path(&el.tag)
 			.map(|registration| {
-				(
-					registration.data::<ReflectTemplate>().is_some(),
-					registration.type_info(),
-				)
+				let kind = if registration.data::<ReflectTemplate>().is_some() {
+					UppercaseKind::Template
+				} else if registration
+					.data::<bevy::ecs::reflect::ReflectResource>()
+					.is_some()
+				{
+					UppercaseKind::Resource
+				} else {
+					UppercaseKind::Component
+				};
+				(kind, registration.type_info())
 			})
-			.map(|(is_template, info)| {
-				(is_template, build_patch(el, info, &registry, &entity_refs))
+			.map(|(kind, info)| {
+				(kind, build_patch(el, info, &registry, &entity_refs))
 			})
 	};
 
-	let Some((is_template, patch)) = registration_kind else {
-		bevybail!("no component or template registered for tag `{}`", el.tag);
+	let Some((kind, patch)) = registration_kind else {
+		bevybail!(
+			"no component, resource or template registered for tag `{}`",
+			el.tag
+		);
 	};
 	let patch = patch?;
 
-	if is_template {
-		// verify the props against the template's schema before building, so a
-		// missing required field or a type mismatch is a graceful error.
-		verify_props(el, &el.tag, &app_registry, cx)?;
-		// build the registered template into this entity, then route caller content.
-		build_template_by_name(&app_registry, &el.tag, patch.as_ref(), cx)?;
-		apply_common_directives(el, refs, cx)?;
-		apply_spreads(el, cx.entity, &entity_refs)?;
-		build_slot_children(el, registry, refs, cx)?;
-	} else {
-		// a component: reflect-patch over default and insert.
-		insert_component(cx.entity, patch.as_ref(), &app_registry)?;
-		// a `<MyComponent value=#path>` field reference binds the document field to
-		// the component field, both ways, via a reflect-field binding.
-		apply_reflect_field_bindings(el, cx.entity)?;
-		apply_common_directives(el, refs, cx)?;
-		apply_spreads(el, cx.entity, &entity_refs)?;
-		build_children(el, registry, refs, cx)?;
+	match kind {
+		UppercaseKind::Template => {
+			// verify the props against the template's schema before building, so a
+			// missing required field or a type mismatch is a graceful error.
+			verify_props(el, &el.tag, &app_registry, cx)?;
+			// build the registered template into this entity, then route caller content.
+			build_template_by_name(&app_registry, &el.tag, patch.as_ref(), cx)?;
+			apply_common_directives(el, refs, cx)?;
+			apply_spreads(el, cx.entity, &entity_refs)?;
+			build_slot_children(el, registry, refs, cx)?;
+		}
+		UppercaseKind::Resource => {
+			// a resource declaration: patch the live resource, no entity content.
+			apply_resource_tag(el, patch.as_ref(), &app_registry, cx)?;
+		}
+		UppercaseKind::Component => {
+			// a component: reflect-patch over default and insert.
+			insert_component(cx.entity, patch.as_ref(), &app_registry)?;
+			// a `<MyComponent value=@doc:path>` binding syncs the source field with
+			// the component field, both ways, via a reflect-field binding.
+			apply_component_field_bindings(el, cx.entity)?;
+			apply_common_directives(el, refs, cx)?;
+			apply_spreads(el, cx.entity, &entity_refs)?;
+			build_children(el, registry, refs, cx)?;
+		}
 	}
 	Ok(())
 }
 
-/// Insert a reflect-field binding for every `field=#path` attribute on a
-/// component tag, so the document field syncs with the component field both ways.
+/// How an uppercase tag's type registration resolves.
+enum UppercaseKind {
+	/// A `#[template]` type ([`ReflectTemplate`]).
+	Template,
+	/// A `#[reflect(Resource)]` type: a resource declaration.
+	Resource,
+	/// A plain reflected component.
+	Component,
+}
+
+/// Insert a reflect-field binding for every binding-valued attribute on a
+/// component tag (`<MyComponent value=@doc:path>`), so the source field syncs
+/// with the component field both ways:
+/// `source <-> Value <-> MyComponent.field`.
 ///
-/// The first such attribute owns the entity's [`FieldRef`] (one per entity) plus
-/// a [`ReflectFieldRef`] naming the component and field, and a default [`Value`]
-/// the bidirectional sync fills.
-fn apply_reflect_field_bindings(
+/// The first such attribute owns the entity's binding: the source components
+/// via [`apply_binding`] plus a [`ReflectFieldRef`] sink naming the tag's
+/// component and field. An `@comp` source is rejected, an entity carries at
+/// most one [`ReflectFieldRef`].
+fn apply_component_field_bindings(
 	el: &BsxElement,
 	entity: &mut EntityWorldMut,
 ) -> Result<()> {
@@ -491,22 +797,158 @@ fn apply_reflect_field_bindings(
 		if is_directive(&attr.key) || attr.key.is_empty() {
 			continue;
 		}
-		let AttrValue::Expr(ValueExpr::FieldRef { path, init }) = &attr.value else {
-			continue;
-		};
-		entity.insert(field_ref(path, init.as_ref())?);
+		match &attr.value {
+			AttrValue::Expr(ValueExpr::Binding(binding)) => {
+				if binding.source == BindingSource::Comp {
+					bevybail!(
+						"`{}={}` cannot bind a component field to another component field",
+						attr.key,
+						"@comp:.."
+					);
+				}
+				apply_binding(binding, entity, BindingTarget::This)?;
+			}
+			_ => continue,
+		}
 		// the `Value`<->reflect bridge needs `serde_json` (the `json` feature); an
-		// embedded build without it keeps the `FieldRef` binding but loses the
+		// embedded build without it keeps the source binding but loses the
 		// bidirectional reflect-field write (Risk: documented, acceptable).
 		#[cfg(feature = "json")]
 		{
 			let component = el.tag.rsplit("::").next().unwrap_or(&el.tag);
 			entity.insert(ReflectFieldRef::new(component, attr.key.as_str()));
 		}
-		// one FieldRef per entity: the first field reference owns the binding.
+		// one binding per entity: the first binding-valued attribute owns it.
 		break;
 	}
 	Ok(())
+}
+
+/// Materialize a `.bsx` registry tag's prop attributes as a reactive props
+/// store on the template's entity, so the body binds to them via
+/// [`DocumentPath::Props`] (while [`DocumentPath::Ancestor`] skips the store).
+///
+/// Literal props seed the store's [`Document`]. Each binding-valued prop
+/// (`title=@doc:field`, `@res`, `@comp`, `@prop`)
+/// additionally spawns a binding entity chaining
+/// `source -> Value <-> props.title`, which the document sync fans out to the
+/// body. The binding entity relates via [`AttributeOf`] rather than as a
+/// child, so it never renders and despawns with the template entity.
+fn apply_props_store(
+	el: &BsxElement,
+	entity: &mut EntityWorldMut,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> Result<()> {
+	let store = entity.id();
+	let mut props = props_value(el);
+	let mut bindings = Vec::new();
+	for attr in &el.attributes {
+		if is_directive(&attr.key) || attr.key.is_empty() {
+			continue;
+		}
+		let binding = match &attr.value {
+			AttrValue::Expr(ValueExpr::Binding(binding)) => binding.clone(),
+			_ => continue,
+		};
+		// pre-seed the bound key (`=init` or null) so a freshly added body
+		// Value never racily seeds it via write-back before the source lands.
+		let seed = binding
+			.init
+			.as_ref()
+			.map(literal_to_value)
+			.transpose()?
+			.unwrap_or_default();
+		props
+			.as_map_mut()?
+			.insert(SmolStr::from(attr.key.as_str()), seed);
+		bindings.push((
+			prop_binding_source(&binding, store, entity_refs),
+			FieldRef::new(attr.key.as_str())
+				.with_document(DocumentPath::Entity(store)),
+		));
+	}
+	entity.insert((Document::new(props), PropsDocument));
+	entity.world_scope(|world| {
+		for (source, sink) in bindings {
+			let mut binding_entity =
+				world.spawn((AttributeOf::new(store), Value::default(), sink));
+			match source {
+				PropBindingSource::Field(source) => {
+					binding_entity.insert(source);
+				}
+				#[cfg(feature = "json")]
+				PropBindingSource::Resource(source) => {
+					binding_entity.insert(source);
+				}
+				#[cfg(feature = "json")]
+				PropBindingSource::Component(source) => {
+					binding_entity.insert(source);
+				}
+				#[cfg(not(feature = "json"))]
+				PropBindingSource::Seed => {}
+			}
+		}
+	});
+	Ok(())
+}
+
+/// The source component of a props binding entity, mirroring the tag-site
+/// binding source into the entity's [`Value`].
+enum PropBindingSource {
+	/// `@doc`/`@prop`: a one-way document mirror.
+	Field(SourceFieldRef),
+	/// `@res`: a bidirectional resource field sync.
+	#[cfg(feature = "json")]
+	Resource(ResourceFieldRef),
+	/// `@comp`: a bidirectional component field sync.
+	#[cfg(feature = "json")]
+	Component(ReflectFieldRef),
+	/// `@res`/`@comp` without the `json` reflect bridge: the seed only.
+	#[cfg(not(feature = "json"))]
+	Seed,
+}
+
+/// Build the source component for a binding-valued prop. The document-sourced
+/// kinds resolve from the `store` (the tag site), since the binding entity
+/// itself is outside the `ChildOf` hierarchy; a selector-less `@comp` also
+/// targets the store, ie a component co-located on the template's entity.
+fn prop_binding_source(
+	binding: &BindingExpr,
+	store: Entity,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> PropBindingSource {
+	#[cfg(not(feature = "json"))]
+	let _ = entity_refs;
+	match binding.source {
+		BindingSource::Doc => SourceFieldRef::new(binding.field_path.clone())
+			.with_subject(store)
+			.xmap(PropBindingSource::Field),
+		BindingSource::Prop => SourceFieldRef::new(binding.field_path.clone())
+			.with_document(DocumentPath::Props)
+			.with_subject(store)
+			.xmap(PropBindingSource::Field),
+		#[cfg(feature = "json")]
+		BindingSource::Res => ResourceFieldRef::new(
+			binding.type_path.clone().unwrap_or_default(),
+			binding.field_path.to_string(),
+		)
+		.xmap(PropBindingSource::Resource),
+		#[cfg(feature = "json")]
+		BindingSource::Comp => {
+			let target = match &binding.selector {
+				Some(name) => map_selector_target(name, entity_refs),
+				None => BindingTarget::Entity(store),
+			};
+			ReflectFieldRef::new(
+				binding.type_path.clone().unwrap_or_default(),
+				binding.field_path.to_string(),
+			)
+			.with_target(target)
+			.xmap(PropBindingSource::Component)
+		}
+		#[cfg(not(feature = "json"))]
+		BindingSource::Res | BindingSource::Comp => PropBindingSource::Seed,
+	}
 }
 
 /// Build a `<Slot>` placeholder into `entity` as a [`SlotTarget`] marker, with
@@ -565,14 +1007,19 @@ fn apply_common_directives(
 	if let Some(slot) = slot_routing(el) {
 		cx.entity.insert(slot);
 	}
-	// `bx:<event>=verb#field` events. The event name is the directive suffix
-	// after `bx:`; the verb + field resolve through the core registries.
+	// `bx:<event>="verb@source:path"` events. The event name is the directive
+	// suffix after `bx:`; the verb + binding resolve through the core registries.
 	for attr in &el.attributes {
 		if let Some(event) = attr.key.strip_prefix("bx:")
 			&& BSX_EVENTS.contains(&event)
 		{
 			let binding = parse_event_binding(event, &attr.value)?;
-			install_event(cx.entity, &binding);
+			// an `@comp$ref:` binding retargets, else the component is on this entity.
+			let comp_target = match &binding.binding.selector {
+				Some(name) => selector_target(name, refs, cx),
+				None => BindingTarget::This,
+			};
+			install_event(cx.entity, &binding, comp_target)?;
 		}
 	}
 	Ok(())
@@ -681,7 +1128,11 @@ fn apply_attributes(
 					attr_entity.insert(Value::Str(string.into()));
 				}
 				AttrValue::Expr(expr) => {
-					apply_value_expr(expr, &mut attr_entity)?;
+					// attribute position: an `@comp` binds the element unless
+					// `$ref` retargets.
+					let comp_target =
+						attr_comp_target(expr, parent, entity_refs);
+					apply_value_expr(expr, &mut attr_entity, comp_target)?;
 				}
 				AttrValue::Spread(_) => {}
 			}
@@ -720,50 +1171,83 @@ fn apply_spreads(
 	Ok(())
 }
 
-/// Insert or build a spread's components/templates onto `entity`.
+/// Insert or build a spread's components/templates onto `entity`. A tuple's
+/// `@` binding items apply to the same entity, pairing a component insert with
+/// its binding, eg `{(Bar{boo:"bazz"}, @comp:Bar.boo)}`.
 fn apply_spread(
 	spread: &SpreadExpr,
 	entity: &mut EntityWorldMut,
 	app_registry: &AppTypeRegistry,
 	entity_refs: &HashMap<SmolStr, Entity>,
 ) -> Result<()> {
-	let items = match spread {
-		SpreadExpr::Named(named) => core::slice::from_ref(named),
-		SpreadExpr::Tuple(items) => items.as_slice(),
-	};
-	for named in items {
-		let literal = DataLiteral::Enum(named.clone());
-		let (is_template, patch) = {
-			let registry = app_registry.read();
-			let info = type_info_by_name(&registry, &named.name);
-			let is_template = registry
-				.get_with_short_type_path(&named.name)
-				.map(|registration| registration.data::<ReflectTemplate>().is_some())
-				.unwrap_or(false);
-			let mut resolver = entity_ref_resolver(entity_refs);
-			(
-				is_template,
-				literal_to_reflect(&literal, info, &registry, &mut resolver)?,
-			)
-		};
-		if is_template {
-			let id = entity.id();
-			entity.world_scope(|world| -> Result<()> {
-				let mut references =
-					bevy::ecs::template::SceneEntityReferences::default();
-				let mut entity_mut = world.entity_mut(id);
-				let mut cx =
-					TemplateContext::new(&mut entity_mut, &mut references);
-				build_template_by_name(
-					app_registry,
-					&named.name,
-					patch.as_ref(),
-					&mut cx,
-				)
-			})?;
-		} else {
-			insert_component(entity, patch.as_ref(), app_registry)?;
+	match spread {
+		SpreadExpr::Named(named) => {
+			apply_spread_named(named, entity, app_registry, entity_refs)
 		}
+		SpreadExpr::Tuple(items) => {
+			for item in items {
+				match item {
+					SpreadItem::Named(named) => apply_spread_named(
+						named,
+						entity,
+						app_registry,
+						entity_refs,
+					)?,
+					// spread position: an `@comp` binds this entity unless
+					// `$ref` retargets.
+					SpreadItem::Binding(binding) => {
+						let comp_target = match &binding.selector {
+							Some(name) => {
+								map_selector_target(name, entity_refs)
+							}
+							None => BindingTarget::This,
+						};
+						apply_binding(binding, entity, comp_target)?;
+					}
+				}
+			}
+			Ok(())
+		}
+	}
+}
+
+/// Insert or build one named spread component/template onto `entity`.
+fn apply_spread_named(
+	named: &NamedLiteral,
+	entity: &mut EntityWorldMut,
+	app_registry: &AppTypeRegistry,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> Result<()> {
+	let literal = DataLiteral::Enum(named.clone());
+	let (is_template, patch) = {
+		let registry = app_registry.read();
+		let info = type_info_by_name(&registry, &named.name);
+		let is_template = registry
+			.get_with_short_type_path(&named.name)
+			.map(|registration| registration.data::<ReflectTemplate>().is_some())
+			.unwrap_or(false);
+		let mut resolver = entity_ref_resolver(entity_refs);
+		(
+			is_template,
+			literal_to_reflect(&literal, info, &registry, &mut resolver)?,
+		)
+	};
+	if is_template {
+		let id = entity.id();
+		entity.world_scope(|world| -> Result<()> {
+			let mut references =
+				bevy::ecs::template::SceneEntityReferences::default();
+			let mut entity_mut = world.entity_mut(id);
+			let mut cx = TemplateContext::new(&mut entity_mut, &mut references);
+			build_template_by_name(
+				app_registry,
+				&named.name,
+				patch.as_ref(),
+				&mut cx,
+			)
+		})?;
+	} else {
+		insert_component(entity, patch.as_ref(), app_registry)?;
 	}
 	Ok(())
 }
@@ -786,11 +1270,8 @@ fn build_patch(
 		if is_directive(&attr.key) || attr.key.is_empty() {
 			continue;
 		}
-		// a `#field` reference becomes a reflect-field binding, not a patch field.
-		if matches!(
-			&attr.value,
-			AttrValue::Expr(ValueExpr::FieldRef { .. })
-		) {
+		// an `@` binding becomes a field binding, not a patch field.
+		if matches!(&attr.value, AttrValue::Expr(ValueExpr::Binding(_))) {
 			continue;
 		}
 		let field_info = struct_info
@@ -879,6 +1360,84 @@ fn entity_ref_resolver(
 	move |name| entity_refs.get(name).copied().unwrap_or(Entity::PLACEHOLDER)
 }
 
+/// Lower a resource declaration tag (`<PackageConfig title=".."/>`): the
+/// literal attrs patch the named fields of the live resource, the rest keep
+/// their current values. An absent resource inserts over the type's default
+/// (which needs `#[reflect(Default)]` or a complete patch). The element
+/// produces no entity content, like a directive-only node.
+fn apply_resource_tag(
+	el: &BsxElement,
+	patch: &dyn bevy::reflect::PartialReflect,
+	app_registry: &AppTypeRegistry,
+	cx: &mut TemplateContext,
+) -> Result<()> {
+	use bevy::ecs::reflect::ReflectComponent;
+	if !el.children.is_empty() {
+		bevybail!(
+			"`<{}>` declares a resource and cannot have children",
+			el.tag
+		);
+	}
+	// a resource declaration is a one-shot patch, not a sync target.
+	if let Some(attr) = el.attributes.iter().find(|attr| {
+		matches!(&attr.value, AttrValue::Expr(ValueExpr::Binding(_)))
+	}) {
+		bevybail!(
+			"`<{} {}=@..>`: an `@` binding cannot declare a resource field, use a literal",
+			el.tag,
+			attr.key
+		);
+	}
+	cx.entity.world_scope(|world| -> Result<()> {
+		let registry = app_registry.read();
+		let type_info = patch
+			.get_represented_type_info()
+			.ok_or_else(|| bevyhow!("resource patch has no represented type"))?;
+		let registration = registry.get(type_info.type_id()).ok_or_else(|| {
+			bevyhow!("type `{}` is not registered", type_info.type_path())
+		})?;
+		// resources are entity-backed: write through the implied ReflectComponent.
+		let reflect_component = registration
+			.data::<ReflectComponent>()
+			.expect("ReflectComponent is depended on by ReflectResource");
+		let component_id = reflect_component.register_component(world);
+		match world.resource_entities().get(component_id) {
+			// patch the live resource: missing fields keep their values.
+			Some(resource_entity) => reflect_component
+				.apply(&mut world.entity_mut(resource_entity), patch),
+			// absent: insert the patch over the type's default.
+			None => {
+				use bevy::ecs::reflect::ReflectFromWorld;
+				use bevy::reflect::ReflectFromReflect;
+				use bevy::reflect::std_traits::ReflectDefault;
+				// ReflectComponent::insert panics on unconstructible types,
+				// so check before reaching it
+				let constructible = registration.data::<ReflectDefault>().is_some()
+					|| registration.data::<ReflectFromWorld>().is_some()
+					|| registration
+						.data::<ReflectFromReflect>()
+						.is_some_and(|from_reflect| {
+							from_reflect.from_reflect(patch).is_some()
+						});
+				if !constructible {
+					bevybail!(
+						"`<{}>`: the resource is not in the world and `{}` cannot be constructed from the patch, add `#[reflect(Default)]` or insert the resource first",
+						el.tag,
+						type_info.type_path()
+					);
+				}
+				let resource_entity = world.spawn_empty().id();
+				reflect_component.insert(
+					&mut world.entity_mut(resource_entity),
+					patch,
+					&registry,
+				);
+			}
+		}
+		Ok(())
+	})
+}
+
 /// Insert a reflect-patched component over its default onto `entity`.
 fn insert_component(
 	entity: &mut EntityWorldMut,
@@ -936,7 +1495,7 @@ fn literal_to_value(literal: &DataLiteral) -> Result<Value> {
 	}
 }
 
-/// Build a [`FieldRef`] from a `#field=init` reference.
+/// Build a [`FieldRef`] from a `@doc:field=init` binding.
 fn field_ref(path: &FieldPath, init: Option<&DataLiteral>) -> Result<FieldRef> {
 	let mut field = FieldRef::new(path.clone());
 	if let Some(init) = init {
@@ -957,8 +1516,8 @@ fn attr_to_literal(value: &AttrValue) -> Result<DataLiteral> {
 		AttrValue::Expr(ValueExpr::EntityRef(name)) => {
 			Ok(DataLiteral::EntityRef(name.clone()))
 		}
-		AttrValue::Expr(ValueExpr::FieldRef { .. }) => {
-			bevybail!("a `#field` reference is not a component patch value")
+		AttrValue::Expr(ValueExpr::Binding(_)) => {
+			bevybail!("an `@` binding is not a component patch value")
 		}
 		AttrValue::Spread(_) => bevybail!("a spread is not an attribute value"),
 	}
@@ -966,46 +1525,34 @@ fn attr_to_literal(value: &AttrValue) -> Result<DataLiteral> {
 
 /// The `bx:<event>` directive names treated as event bindings (as opposed to the
 /// structural directives `scope`/`for`/`key`/`slot`/`ref`/`schema`). Core stays
-/// event-agnostic; this list only names which directives carry a `verb#field`,
-/// not what the events mean (that lives in the [`EventRegistry`] installers).
+/// event-agnostic; this list only names which directives carry a
+/// `verb@source:path`, not what the events mean (that lives in the
+/// [`EventRegistry`] installers).
 const BSX_EVENTS: &[&str] = &["click"];
 
-/// Parse a `bx:<event>=verb#field` event binding from its attribute value.
+/// Parse a `bx:<event>="verb@source:path"` event binding from its attribute
+/// value, eg `bx:click="increment@doc:count"`. The binding part shares the
+/// `@` grammar ([`parse_binding`]).
 fn parse_event_binding(event: &str, value: &AttrValue) -> Result<EventBinding> {
 	let raw = match value {
 		AttrValue::Str(string) => string.clone(),
-		// an unbraced `bx:click=increment#count` parses as a value expr fallback.
-		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Enum(named)))
-			if matches!(named.fields, NamedFields::Unit) =>
-		{
-			named.name.to_string()
-		}
-		_ => bevybail!("`bx:{event}` expects a `verb#field` binding"),
+		_ => bevybail!(
+			"`bx:{event}` expects a quoted `verb@source:path` binding, ie `bx:{event}=\"increment@doc:count\"`"
+		),
 	};
-	let (verb, rest) = raw.split_once('#').ok_or_else(|| {
-		bevyhow!("`bx:{event}` must name a field, ie `verb#field`")
-	})?;
-	let (field_str, init) = match rest.split_once('=') {
-		Some((field, init)) => (field, Some(parse_init(init)?)),
-		None => (rest, None),
+	let Some(at) = raw.find('@') else {
+		bevybail!("`bx:{event}` must name a binding, ie `verb@doc:field`")
 	};
+	if at == 0 {
+		bevybail!("`bx:{event}` must name a verb, ie `verb@doc:field`");
+	}
+	let mut cursor = Cursor::new(&raw[at..]);
+	let binding = parse_binding(&mut cursor)?;
 	Ok(EventBinding {
 		event: event.into(),
-		verb: verb.into(),
-		field: FieldPath::new(field_str.split('.').collect::<Vec<_>>()),
-		init,
+		verb: raw[..at].into(),
+		binding,
 	})
-}
-
-/// Parse an event field initializer literal `=init`.
-fn parse_init(init: &str) -> Result<Value> {
-	if let Ok(int) = init.parse::<i64>() {
-		Ok(Value::Int(int))
-	} else if let Ok(b) = init.parse::<bool>() {
-		Ok(Value::Bool(b))
-	} else {
-		Ok(Value::Str(init.into()))
-	}
 }
 
 // --- attribute lookup helpers ------------------------------------------------

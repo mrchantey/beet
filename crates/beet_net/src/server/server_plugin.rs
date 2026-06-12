@@ -13,7 +13,8 @@ pub struct ServerPlugin;
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
-			.register_type::<CliServer>();
+			.register_type::<CliServer>()
+			.register_type::<HttpServer>();
 
 		// per-request logging: log each exchange's method/path/status/duration on
 		// completion. std-only, since [`ExchangeStats`] (the request counter the

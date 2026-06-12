@@ -4,6 +4,10 @@ extern crate alloc;
 
 beet_core::test_main!();
 
+// the server-to-client websocket channel and dev-mode live reload, native-only
+// (a tungstenite listener and an fs watcher).
+#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+mod client_io;
 mod extra;
 #[cfg(all(feature = "codegen", feature = "std"))]
 mod route_codegen;
@@ -22,6 +26,8 @@ mod static_export;
 
 /// Exports the most commonly used items.
 pub mod prelude {
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+	pub use crate::client_io::*;
 	pub use crate::extra::*;
 	#[cfg(feature = "std")]
 	pub use crate::media::*;

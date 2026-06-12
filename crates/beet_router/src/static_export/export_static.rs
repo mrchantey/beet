@@ -13,7 +13,8 @@ use beet_net::prelude::*;
 /// Renders every static route in the router to HTML.
 ///
 /// A route is exported when its path is fully static, its method is `GET`, and
-/// it is either a scene route or marked [`CacheStrategy::Static`].
+/// it is either a scene route or marked [`CacheStrategy::Static`]. Routes whose
+/// [`ArticleMeta`] marks them a draft are skipped.
 pub async fn collect_static_html(
 	world: &AsyncWorld,
 	router: Entity,
@@ -38,6 +39,14 @@ pub async fn collect_static_html(
 					.map(|method| method != HttpMethod::Get)
 					.unwrap_or(false)
 				{
+					continue;
+				}
+				// drafts stay out of production builds
+				let is_draft = world
+					.entity(node.entity)
+					.get::<ArticleMeta>()
+					.is_some_and(|meta| meta.draft);
+				if is_draft {
 					continue;
 				}
 				let cache = world
@@ -150,5 +159,89 @@ mod test {
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("App Info");
+	}
+
+	/// Exports `router` to a temp store, returning the written paths.
+	async fn export(world: &mut World, router: Entity) -> Vec<SmolPath> {
+		let out = BlobStore::temp();
+		world
+			.run_async_then(async move |world| {
+				export_static(&world, router, &out).await
+			})
+			.await
+			.unwrap()
+	}
+
+	/// The codegen route shape: a `BlobScene` route emitted with eager
+	/// `ArticleMeta { draft: true }` stays out of the export.
+	#[beet_core::test]
+	async fn skips_draft_routes() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.insert_resource(pkg_config!());
+		let router = world
+			.spawn((default_router(), children![
+				(
+					render_action::fixed_route(
+						"published",
+						rsx! { <p>"Published"</p> }
+					),
+					HttpMethod::Get,
+				),
+				(
+					render_action::fixed_route(
+						"secret",
+						rsx! { <p>"Secret"</p> }
+					),
+					HttpMethod::Get,
+					ArticleMeta {
+						draft: true,
+						..default()
+					},
+				),
+			]))
+			.flush();
+
+		let written = export(&mut world, router).await;
+		written
+			.iter()
+			.any(|path| path.starts_with("published"))
+			.xpect_true();
+		written
+			.iter()
+			.any(|path| path.starts_with("secret"))
+			.xpect_false();
+	}
+
+	/// The `RoutesDir` shape: scan-time frontmatter `draft = true` excludes the
+	/// discovered route from the export.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	async fn skips_draft_routes_dir() {
+		let root = fs_ext::workspace_root()
+			.join("target/tests/export_static/drafts");
+		fs_ext::remove(&root).ok();
+		fs_ext::write(root.join("published.md"), "# Published").unwrap();
+		fs_ext::write(
+			root.join("secret.md"),
+			"+++\ndraft = true\n+++\n\n# Secret",
+		)
+		.unwrap();
+
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.insert_resource(pkg_config!());
+		world.insert_resource(SiteRoot(AbsPathBuf::new(root).unwrap()));
+		let router = world
+			.spawn((default_router(), children![RoutesDir::new("")]))
+			.flush();
+
+		let written = export(&mut world, router).await;
+		written
+			.iter()
+			.any(|path| path.starts_with("published"))
+			.xpect_true();
+		written
+			.iter()
+			.any(|path| path.starts_with("secret"))
+			.xpect_false();
 	}
 }

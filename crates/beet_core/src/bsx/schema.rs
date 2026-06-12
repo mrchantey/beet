@@ -83,9 +83,10 @@ pub fn verify_props_against(
 }
 
 /// Build a [`Value::Map`] of a tag's literal prop attributes, for schema
-/// validation. Directives, spreads, references and entity refs are skipped, as
-/// they are not plain prop values.
-fn props_value(el: &BsxElement) -> Value {
+/// validation and as a props store's initial document (see
+/// `resolve.rs::apply_props_store`). Directives, spreads, references and entity
+/// refs are skipped, as they are not plain prop values.
+pub(super) fn props_value(el: &BsxElement) -> Value {
 	let mut map = Map::default();
 	for attr in &el.attributes {
 		if is_directive(&attr.key) || attr.key.is_empty() {

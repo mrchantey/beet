@@ -60,7 +60,17 @@ impl ScopeQuery<'_, '_> {
 	/// Accumulate the [`DocumentScope`] prefix for `subject`, walking ancestors
 	/// inclusive. Outermost scope leads; a `terminate` scope is collected, then
 	/// the walk stops.
-	pub fn scope_prefix(&self, subject: Entity) -> FieldPath {
+	///
+	/// `document` bounds the walk at the bound document's entity (its own scope
+	/// is still collected): a scope above the document belongs to an *outer*
+	/// document's namespace and must not prefix this one. The canonical case is
+	/// a `@prop` binding inside a `bx:scope`d subtree: the user scope must not
+	/// reach into the template's props store.
+	pub fn scope_prefix(
+		&self,
+		subject: Entity,
+		document: Option<Entity>,
+	) -> FieldPath {
 		// innermost -> outermost as we walk up
 		let mut collected: Vec<FieldPath> = Vec::new();
 		for ancestor in self.ancestors.iter_ancestors_inclusive(subject) {
@@ -71,6 +81,10 @@ impl ScopeQuery<'_, '_> {
 					break;
 				}
 			}
+			// scopes above the bound document are out of its namespace
+			if document == Some(ancestor) {
+				break;
+			}
 		}
 		collected
 			.into_iter()
@@ -80,13 +94,14 @@ impl ScopeQuery<'_, '_> {
 			.into()
 	}
 
-	/// `scope_prefix(subject)` ++ `authored`.
+	/// `scope_prefix(subject, document)` ++ `authored`.
 	pub fn resolved_path(
 		&self,
 		subject: Entity,
 		authored: &FieldPath,
+		document: Option<Entity>,
 	) -> FieldPath {
-		let mut path = self.scope_prefix(subject);
+		let mut path = self.scope_prefix(subject, document);
 		path.extend(authored.iter().cloned());
 		path
 	}
@@ -103,10 +118,13 @@ pub(super) fn resolve_field_path(
 	ev: On<Insert, FieldRef>,
 	mut commands: Commands,
 	fields: Query<&FieldRef>,
+	docs: DocumentResolver,
 	resolver: ScopeQuery,
 ) -> Result {
 	let field = fields.get(ev.entity)?;
-	let field_path = resolver.resolved_path(ev.entity, &field.field_path);
+	let document = docs.entity(ev.entity, &field.document);
+	let field_path =
+		resolver.resolved_path(ev.entity, &field.field_path, Some(document));
 	commands
 		.entity(ev.entity)
 		.insert(ResolvedFieldPath { field_path });
@@ -141,6 +159,7 @@ pub(super) fn update_resolved_field_paths(
 	mut removed_scopes: RemovedComponents<DocumentScope>,
 	children: Query<&Children>,
 	scopes: Query<&DocumentScope>,
+	docs: DocumentResolver,
 	resolver: ScopeQuery,
 	has_ref: Query<&FieldRef>,
 	mut resolved: Query<&mut ResolvedFieldPath>,
@@ -155,7 +174,12 @@ pub(super) fn update_resolved_field_paths(
 			if let (Ok(field), Ok(mut slot)) =
 				(has_ref.get(node), resolved.get_mut(node))
 			{
-				let next = resolver.resolved_path(node, &field.field_path);
+				let document = docs.entity(node, &field.document);
+				let next = resolver.resolved_path(
+					node,
+					&field.field_path,
+					Some(document),
+				);
 				// equality guard: only dirty when the path actually changed
 				if slot.field_path != next {
 					slot.field_path = next;

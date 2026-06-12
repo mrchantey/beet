@@ -9,5 +9,3 @@
 //! in the terminal, so the one layout serves both targets.
 mod layout;
 pub use layout::*;
-mod sidebar;
-pub use sidebar::*;

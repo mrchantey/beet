@@ -627,7 +627,7 @@ fn parse_attributes(
 	Ok(attributes)
 }
 
-/// Parse a single `key`, `key="value"`, or (BSX) `key={..}` / `key=#foo`.
+/// Parse a single `key`, `key="value"`, or (BSX) `key={..}` / `key=@doc:foo`.
 fn parse_attribute(
 	cursor: &mut Cursor,
 	config: &BsxParseConfig,
@@ -654,7 +654,7 @@ fn parse_attribute(
 			let inner = take_braced(cursor)?;
 			AttrValue::Expr(parse_value_expr(&mut Cursor::new(&inner))?)
 		}
-		// unbraced value grammar, BSX only: `value=#foo=42`, `align=Center`.
+		// unbraced value grammar, BSX only: `value=@doc:foo=42`, `align=Center`.
 		_ if config.bsx => {
 			let raw = cursor.take_while(is_unbraced_value_char);
 			AttrValue::Expr(parse_value_expr(&mut Cursor::new(raw))?)
@@ -787,7 +787,7 @@ mod test {
 	#[beet_core::test]
 	fn text_block_expr() {
 		let nodes =
-			parse_document("<p>{#count}</p>", &BsxParseConfig::bsx()).unwrap();
+			parse_document("<p>{@doc:count}</p>", &BsxParseConfig::bsx()).unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected p");
 		};

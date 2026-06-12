@@ -2,8 +2,10 @@
 The whole site: a router serving the `routes/` directory, every page wrapped
 in the `templates/Layout.bsx` document. The router's middleware attaches as
 component spreads: request logging, `--help`, terminal link navigation, and
-the layout itself.
+the layout itself. The `<PackageConfig/>` declaration patches the resource of
+the same name, the rest of its fields keep the host's compile-time values.
 -->
 <Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<RoutesDir src="routes"/>
 </Router>

@@ -1,6 +1,8 @@
 +++
 title = "The Full Moon Harvest"
-
+sidebar_label = "Blog"
+order = 1
+expanded = true
 +++
 
 # The Full Moon Harvest

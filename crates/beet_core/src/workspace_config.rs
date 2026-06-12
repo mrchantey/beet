@@ -4,7 +4,6 @@
 //! including compile-time package metadata via [`pkg_config!`] and runtime
 //! workspace settings via [`WorkspaceConfig`].
 
-// use crate::prelude::*;
 use crate::prelude::*;
 use heck::ToKebabCase;
 use std::path::Path;
@@ -15,7 +14,7 @@ use std::str::FromStr;
 /// This resource is required for all beet applications and should be consistent
 /// across launch, server and client binaries.
 #[derive(Debug, Clone, Resource, Reflect)]
-#[reflect(Resource)]
+#[reflect(Resource, Default)]
 pub struct PackageConfig {
 	/// The pretty name of the package.
 	pub title: String,
@@ -35,6 +34,23 @@ pub struct PackageConfig {
 	pub stage: String,
 	/// How services should be accessed.
 	pub service_access: ServiceAccess,
+}
+
+/// The empty-package defaults, used when a markup-declared
+/// `<PackageConfig/>` is built without a host-inserted [`pkg_config!`].
+impl Default for PackageConfig {
+	fn default() -> Self {
+		Self {
+			title: default(),
+			binary_name: default(),
+			version: default(),
+			description: default(),
+			homepage: default(),
+			repository: None,
+			stage: "dev".to_string(),
+			service_access: ServiceAccess::Local,
+		}
+	}
 }
 
 /// Options for how services should be accessed.

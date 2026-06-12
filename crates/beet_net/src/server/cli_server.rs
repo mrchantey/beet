@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 /// Supports `--accept=<media types>` to override the default content negotiation,
 /// for example `--accept=text/html,text/plain`.
 #[derive(Default, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 #[component(on_add=on_add)]
 pub struct CliServer;
 

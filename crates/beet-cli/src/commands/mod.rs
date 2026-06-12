@@ -3,12 +3,14 @@
 mod export_pdf;
 #[cfg(feature = "qrcode")]
 mod qrcode;
+mod run_site;
 mod run_wasm;
 mod s3_sync;
 
 pub use export_pdf::*;
 #[cfg(feature = "qrcode")]
 pub use qrcode::*;
+pub use run_site::*;
 pub use run_wasm::*;
 pub use s3_sync::*;
 
@@ -21,7 +23,8 @@ pub struct CliCommandsPlugin;
 
 impl Plugin for CliCommandsPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<RunWasm>()
+		app.register_type::<Run>()
+			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()
 			.register_type::<ExportPdf>()
 			.register_type::<SyncS3>();

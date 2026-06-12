@@ -51,7 +51,8 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 ///     exchange_handler(|req| req.mirror()),
 /// ));
 /// ```
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Reflect)]
+#[reflect(Component, Default)]
 #[component(on_add=on_add)]
 #[cfg_attr(feature = "std", require(ExchangeStats))]
 pub struct HttpServer {
@@ -126,12 +127,19 @@ impl HttpServer {
 	}
 }
 
+/// Marker the `on_add` hook inserts in test builds instead of starting a
+/// backend, proving the hook fired (including through reflect inserts).
+#[cfg(test)]
+#[derive(Component)]
+pub(crate) struct ServerHookFired;
+
 // Using queue_async allows a ServerHandler to be inserted, instead of running
 // immediately and using the one inserted via Required.
 #[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	cfg_if! {
 		if #[cfg(test)] {
+			world.commands().entity(cx.entity).insert(ServerHookFired);
 			return;
 		} else if #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))] {
 			world
@@ -217,6 +225,42 @@ mod std_impl {
 	}
 }
 
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use bevy::ecs::reflect::ReflectComponent;
+
+	/// Component hooks fire through reflect inserts, so a BSX spread like
+	/// `{(HttpServer{port:8080})}` starts the server exactly like a regular
+	/// spawn. Test builds insert [`ServerHookFired`] instead of a backend.
+	#[beet_core::test]
+	fn hook_fires_on_reflect_insert() {
+		let mut world = World::new();
+		let app_registry = AppTypeRegistry::default();
+		app_registry.write().register::<HttpServer>();
+		let entity = world.spawn_empty().id();
+		let registry = app_registry.read();
+		registry
+			.get(core::any::TypeId::of::<HttpServer>())
+			.unwrap()
+			.data::<ReflectComponent>()
+			.unwrap()
+			.insert(
+				&mut world.entity_mut(entity),
+				&HttpServer::new(8080),
+				&registry,
+			);
+		world.flush();
+		world.entity(entity).contains::<ServerHookFired>().xpect_true();
+		world
+			.entity(entity)
+			.get::<HttpServer>()
+			.unwrap()
+			.port
+			.xpect_eq(Some(8080));
+	}
+}
 
 // needs `new_test` + `async_io` (server, native) and the ureq client.
 #[cfg(test)]
