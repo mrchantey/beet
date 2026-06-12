@@ -4,18 +4,20 @@ use core::marker::PhantomData;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-/// A scripted, pure `Input -> Output` action.
+/// A scripted, pure `Input -> Output` transformation, carried as data.
 ///
-/// The [`Script::content`] is evaluated with the action input bound to a
-/// variable named `input`; the value of the script's final expression
-/// becomes the action output. Scripts have no access to the [`World`],
-/// so they are deterministic transformations of their input.
+/// The [`Script::content`] is evaluated with the input bound to a variable
+/// named `input`; the value of the script's final expression becomes the
+/// output. Scripts have no access to the [`World`], so they are deterministic
+/// transformations of their input.
 ///
-/// Spawning a `Script` inserts [`ScriptAction`] (and therefore an
-/// [`Action`]) via `#[require]`, mirroring how [`Sequence`] requires
-/// [`SequenceAction`](crate::prelude::SequenceAction).
+/// `Script` is pure data: it holds the program but installs no [`Action`]. To
+/// run it as a behaviour-tree leaf add [`ScriptAction`] (which requires a
+/// `Script`); to dispatch it from a route add `ExchangeScript`. Keeping the
+/// data and the action separate lets a domain action gather its own input and
+/// apply its own output around the shared [`Script::run`] backend without a
+/// second, dormant action fighting over the entity's [`ActionMeta`].
 #[derive(Component, Reflect)]
-#[require(ScriptAction<Input, Output>)]
 #[reflect(Component)]
 // `Input` and `Output` only appear in the ignored phantom marker, so an
 // empty `#[reflect(where)]` drops the default `Reflect`/`TypePath` bound
@@ -138,30 +140,28 @@ where
 	/// Propagates parse, evaluation, or (de)serialization errors.
 	pub fn run(&self, input: Input) -> Result<Output> {
 		match self.language {
-			#[cfg(feature = "rhai_serde")]
+			// this module is gated on `serde`, so `rhai` here implies the
+			// `all(rhai, serde)` runtime is compiled in.
+			#[cfg(feature = "rhai")]
 			ScriptLanguage::Rhai => crate::scripting::run_rhai(&self.content, input),
-			// the rhai engine is present but its serde runtime is gated on `rhai_serde`.
-			#[cfg(all(feature = "rhai", not(feature = "rhai_serde")))]
-			ScriptLanguage::Rhai => {
-				let _ = input;
-				bevybail!(
-					"the rhai `Script` backend requires the `rhai_serde` feature"
-				)
-			}
-			#[cfg(all(feature = "quickjs_serde", not(target_arch = "wasm32")))]
+			#[cfg(all(
+				feature = "quickjs",
+				feature = "json",
+				not(target_arch = "wasm32")
+			))]
 			ScriptLanguage::QuickJs => {
 				crate::scripting::run_quickjs(&self.content, input)
 			}
-			// the quickjs engine is present but its serde runtime is gated on `quickjs_serde`.
+			// the quickjs engine is present but its JSON marshalling needs `json`.
 			#[cfg(all(
 				feature = "quickjs",
-				not(feature = "quickjs_serde"),
+				not(feature = "json"),
 				not(target_arch = "wasm32")
 			))]
 			ScriptLanguage::QuickJs => {
 				let _ = input;
 				bevybail!(
-					"the quickjs `Script` backend requires the `quickjs_serde` feature"
+					"the quickjs `Script` backend requires the `json` feature"
 				)
 			}
 		}

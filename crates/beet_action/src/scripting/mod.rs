@@ -1,20 +1,34 @@
-// the serde-marshalled `Script`/`ScriptAction` need serde; the rhai/quickjs
-// serde runtimes additionally need std. Without serde the agnostic layer is just
-// `ScriptLanguage`; without a `*_serde` backend `Script::run` has no runtime for
-// that language.
-#[cfg(all(feature = "quickjs_serde", not(target_arch = "wasm32")))]
+// The `Script`/`ScriptAction` types marshal their `Input`/`Output` through
+// `Value`, so they need `serde`; running one needs a backend, so they are gated
+// on `serde` + at least one usable backend (a build with neither has no
+// `ScriptLanguage` variant, so the typed `Script` could not pick a default).
+// `run_rhai` needs `rhai` + `serde`; `run_quickjs` additionally JSON-marshals
+// across the engine boundary, so it needs `json` and is native-only.
+#[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
 mod quickjs_runtime;
-#[cfg(feature = "rhai_serde")]
+#[cfg(all(feature = "rhai", feature = "serde"))]
 mod rhai_runtime;
-#[cfg(feature = "serde")]
+#[cfg(all(
+	feature = "serde",
+	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+))]
 mod script;
-#[cfg(feature = "serde")]
+#[cfg(all(
+	feature = "serde",
+	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+))]
 mod script_action;
-#[cfg(all(feature = "quickjs_serde", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
 pub(crate) use quickjs_runtime::run_quickjs;
-#[cfg(feature = "rhai_serde")]
+#[cfg(all(feature = "rhai", feature = "serde"))]
 pub(crate) use rhai_runtime::run_rhai;
-#[cfg(feature = "serde")]
+#[cfg(all(
+	feature = "serde",
+	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+))]
 pub use script::*;
-#[cfg(feature = "serde")]
+#[cfg(all(
+	feature = "serde",
+	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+))]
 pub use script_action::*;

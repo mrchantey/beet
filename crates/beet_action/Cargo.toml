@@ -16,7 +16,8 @@ default = ["std", "reflect"]
 # a std build links rhai's std *mode*; no_std consumers (eg `beet_esp`) leave
 # `std` off and select rhai's `no_std` mode on their own dependency edge, keeping
 # the `rhai` feature mode-agnostic so it never collides under `--all-features`.
-# rhai's *serde* is a separate concern, owned by `rhai_serde`, not `std`/`serde`.
+# The typed `Script` marshals through `Value` (not rhai's serde), so its runtimes
+# build `no_std`; `std` is no longer part of the scripting story.
 std = ["beet_core/std", "rhai?/std", "rquickjs?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
@@ -28,23 +29,22 @@ reflect = ["beet_core/bevy_reflect_documentation"]
 scripting = []
 # The rhai engine + `ScriptLanguage::Rhai` + `exports::rhai`. Builds on the
 # agnostic `scripting` layer (no point pulling the engine without it in a beet
-# app); the raw engine carries no serde, so this stays serde-free for embedded
-# consumers that marshal by hand.
+# app). Pair with `serde` for the typed `Script::run` rhai runtime, which
+# marshals through `Value` by hand and so needs neither std nor rhai's serde.
 rhai = ["scripting", "dep:rhai"]
-# rhai's serde marshalling runtime (`run_rhai`, the typed `Script::run`). rhai's
-# serde layer needs std, so this pulls `rhai` + `serde` + `std` together.
-rhai_serde = ["rhai", "serde", "std", "rhai/serde"]
-# The QuickJS engine + `ScriptLanguage::QuickJs` + `exports::quickjs`. Like
-# `rhai`, this stays serde-free: the raw engine builds on the agnostic
-# `scripting` layer so embedded consumers can marshal values by hand. QuickJS is
-# a C engine, so it is native-only — `rquickjs` is a `not(wasm32)` dependency and
-# the engine code is cfg'd off wasm even when this feature is on.
+# Convenience alias: the rhai engine plus the typed `Script` runtime. `no_std`,
+# so embedded consumers (eg `beet_esp`) get a working `Script` without `std`.
+rhai_serde = ["rhai", "serde"]
+# The QuickJS engine + `ScriptLanguage::QuickJs` + `exports::quickjs`. Builds on
+# the agnostic `scripting` layer. QuickJS is a C engine, so it is native-only —
+# `rquickjs` is a `not(wasm32)` dependency and the engine code is cfg'd off wasm.
+# Pair with `json` for the typed `Script::run` quickjs runtime.
 quickjs = ["scripting", "dep:rquickjs"]
-# The QuickJS typed-`Script` backend (`run_quickjs`, `Script::run`). Marshals
-# input/output as JSON across the engine boundary, so it pulls `json`
-# (serde_json) alongside the engine; `rust-alloc` keeps it std/libc-light but
-# the C engine still needs a C toolchain, so this is a std-target backend.
-quickjs_serde = ["quickjs", "json", "std"]
+# Convenience alias: the QuickJS engine plus the typed `Script` runtime, which
+# marshals through `Value` then JSON across the engine boundary, so it pulls
+# `json` (serde_json, `no_std` with alloc). `rust-alloc` keeps the C engine
+# std/libc-light, so this no longer requires `std`.
+quickjs_serde = ["quickjs", "json"]
 
 [dependencies]
 beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }

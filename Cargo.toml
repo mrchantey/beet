@@ -254,7 +254,7 @@ tui_server = ["tui","router", "markdown", "beet_router?/tui", "beet_ui?/net"]
 
 # 💡 Core
 
-serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
+serde = ["beet_core/serde", "beet_action?/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
@@ -337,14 +337,17 @@ scripting = ["action","beet_action/scripting"]
 # The rhai engine, re-exported via `beet::exports::rhai`. Bare engine for
 # embedded consumers (no_std, no serde, no router registrations).
 rhai = ["action","beet_action/rhai"]
-# The std typed-`Script` rhai backend: the serde marshalling runtime plus the
-# beet_router scripting registrations. Pulls `rhai` + `serde` + `std`.
+# The typed-`Script` rhai backend: the `Value`-marshalled runtime (itself
+# `no_std`) plus the std beet_router scripting registrations. The `std` here is
+# for those registrations, not the runtime — embedded consumers take
+# `beet_action/rhai_serde` directly without it.
 rhai_serde = ["rhai","serde","std","beet_action/rhai_serde","beet_router?/scripting"]
 # The QuickJS engine, re-exported via `beet::exports::rquickjs`. Bare engine for
 # consumers that marshal values by hand (no serde, no router registrations).
 quickjs = ["action","beet_action/quickjs"]
-# The std typed-`Script` QuickJS backend: the JSON marshalling runtime plus the
-# beet_router scripting registrations. Pulls `quickjs` + `serde` + `std`.
+# The typed-`Script` QuickJS backend: the `Value`/JSON-marshalled runtime plus
+# the std beet_router scripting registrations (the `std` is for those, not the
+# runtime).
 quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/scripting"]
 ui = ["dep:beet_ui"]
 # The `beet_ui` function-component widget set (Header, Button, Sidebar, Table)
