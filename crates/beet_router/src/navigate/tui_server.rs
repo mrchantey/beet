@@ -5,26 +5,34 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// A live-TUI server: spawned alongside a router, it boots the navigable
-/// terminal app. The interactive sibling of the one-shot [`CliServer`].
+/// A live-TUI [`ServerBackend`]: spawned alongside a router, it boots the
+/// navigable terminal app. The interactive sibling of the one-shot
+/// [`CliServer`].
 ///
-/// Its `on_add` wires the live host: a [`StdioTerminal`] paired with a
-/// [`page_host`] buffer, plus an in-world [`Navigator`] pointed at this router,
-/// started at the CLI path argument (`-- docs/design/form`, default home `/`).
-/// A `--color-scheme=light|dark` argument seeds the app-wide [`ColorScheme`]
-/// resource, the session's scheme on every page (layouts consult it).
-/// The app then runs persistently, repainting reactively as navigation and input
-/// change the page; the `CharcellTuiPlugin` loop drives it and Ctrl+c exits.
+/// A long-running backend: spawning it pulls in the [`Server`] orchestrator (via
+/// `#[require(Server)]`), which starts it through [`TuiServer::start`] and keeps
+/// the process alive. [`start`](ServerBackend::start) wires the live host: a
+/// [`StdioTerminal`] paired with a [`page_host`] buffer, plus an in-world
+/// [`Navigator`] pointed at this router, started at the CLI path argument
+/// (`-- docs/design/form`, default home `/`). A `--color-scheme=light|dark`
+/// argument seeds the app-wide [`ColorScheme`] resource, the session's scheme on
+/// every page (layouts consult it). The app then runs persistently, repainting
+/// reactively as navigation and input change the page; the `CharcellTuiPlugin`
+/// loop drives it and Ctrl+c exits.
 ///
 /// Reusable: any app gets a live TUI by adding the live plugins
 /// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]) and spawning
 /// this on its router entity.
 #[derive(Default, Component)]
-#[component(on_add = on_add)]
+#[require(Server)]
 pub struct TuiServer;
 
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).queue_async(boot);
+impl ServerBackend for TuiServer {
+	/// Boot the live terminal app on the router entity. A long-running backend;
+	/// it keeps the default no-op [`stop`](ServerBackend::stop).
+	fn start(entity: AsyncEntity) -> MaybeSendBoxedFuture<'static, Result> {
+		Box::pin(boot(entity))
+	}
 }
 
 async fn boot(entity: AsyncEntity) -> Result {

@@ -167,6 +167,44 @@ mod test {
 		rect(&world, spans[12]).xpect_eq(IRect::new(0, 1, 2, 2));
 	}
 
+	/// Cells authored as a collected `Vec` (eg `{(0..4).map(cell).collect()}`) sit
+	/// under a transparent [`FragmentNode`] wrapper. The wrapper must be spliced
+	/// out so the cells flow as direct grid tracks; otherwise the grid lays out the
+	/// single wrapper as one cell and the cells collapse into a zero-width nested
+	/// grid (the `bsx_site`/`beet_site` grid demo regression).
+	#[beet_core::test]
+	fn fragment_wrapped_cells_flow_as_tracks() {
+		let mut world = CharcellPlugin::world();
+		world.get_resource_or_init::<RuleSet>().extend_rules(vec![grid_rule()]);
+		// a `.grid` whose four cells are nested under one `FragmentNode`, exactly
+		// the shape `Vec::into_snippet` lowers a collected child position to.
+		let grid = world
+			.spawn((
+				Buffer::new(UVec2::new(24, 6)).into_double_buffer(),
+				Element::new("div"),
+				Classes::new([ClassName::string("grid")]),
+			))
+			.id();
+		let fragment = world.spawn((FragmentNode, ChildOf(grid))).id();
+		let spans = (0..4)
+			.map(|i| {
+				world
+					.spawn((
+						Element::new("span").with_inner_text(&i.to_string()),
+						ChildOf(fragment),
+					))
+					.id()
+			})
+			.collect::<Vec<_>>();
+		world.run_schedule(PostParseTree);
+
+		// the cells lay out into the default 12 tracks (24 / 12 = 2-cell tracks),
+		// side by side on the first row, not collapsed under the wrapper.
+		rect(&world, spans[0]).xpect_eq(IRect::new(0, 0, 2, 1));
+		rect(&world, spans[1]).xpect_eq(IRect::new(2, 0, 4, 1));
+		rect(&world, spans[3]).xpect_eq(IRect::new(6, 0, 8, 1));
+	}
+
 	/// An adjustable column count: 4 tracks split a 20-wide grid into 5-cell
 	/// columns, and square rows stand half the track width tall.
 	#[beet_core::test]

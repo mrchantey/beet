@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "tui")]
+use beet_net::prelude::*;
 
 
 #[derive(Default)]
@@ -18,6 +20,18 @@ impl Plugin for NavigatorPlugin {
 		#[cfg(feature = "tui")]
 		app.add_message::<bevy::input::keyboard::KeyboardInput>()
 			.add_systems(Update, nav_shortcuts);
+		// register the TUI backend with the `Server` orchestrator's registry, so a
+		// spawned `TuiServer` (or `--server=tui`) is selected and started. The
+		// registry is shared across crates, keeping `beet_net` ignorant of the TUI.
+		#[cfg(feature = "tui")]
+		{
+			let mut backends =
+				app.world_mut().get_resource_or_init::<ServerBackends>();
+			backends.register(ServerKind::Tui, ServerBackendEntry {
+				is_present: |entity| entity.contains::<TuiServer>(),
+				start: TuiServer::start,
+			});
+		}
 	}
 }
 

@@ -223,7 +223,7 @@ pub(crate) fn scroll_input(
 	// transclusion: a `RenderRef` holder is the charcell parent of the entity it
 	// points at, so the ancestor walk can cross from transcluded content (eg a
 	// page) up into the holder's container (eg the page-host scrollport).
-	refs: Query<(Entity, &RenderRef)>,
+	refs: Query<&RenderRefOf>,
 	tree: CharcellTree,
 	roots: Query<(Entity, &DoubleBuffer)>,
 	// `CharcellQuery` (p0) reads `ScrollPosition`, so it can't coexist with the
@@ -304,9 +304,9 @@ pub(crate) fn scroll_input(
 				// transclusion wins for *visual* ancestry: a RenderRef holder is the
 				// visual parent of the entity it renders in place; otherwise walk ChildOf.
 				current = refs
-					.iter()
-					.find(|(_, render_ref)| render_ref.target() == Some(entity))
-					.map(|(holder, _)| holder)
+					.get(entity)
+					.ok()
+					.and_then(|render_ref_of| render_ref_of.holders().first().copied())
 					.or_else(|| {
 						parents.get(entity).ok().map(|child_of| child_of.parent())
 					});

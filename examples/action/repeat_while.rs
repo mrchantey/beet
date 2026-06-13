@@ -35,6 +35,6 @@ async fn main() -> Result {
 		)]))
 		.call::<(), Outcome>(())
 		.await?;
-	cross_log!("loop exited with {outcome:?}");
+	info!("loop exited with {outcome:?}");
 	Ok(())
 }

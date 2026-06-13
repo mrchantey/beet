@@ -20,9 +20,7 @@ use std::net::SocketAddr;
 /// backends via feature flags.
 pub async fn start_mini_http_server(entity: AsyncEntity) -> Result {
 	let addr: SocketAddr = entity
-		.get::<HttpServer, SocketAddr>(|server| {
-			(server.host, server.port.unwrap_or(0)).into()
-		})
+		.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
 		.await?;
 
 	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
@@ -46,14 +44,14 @@ pub async fn start_mini_http_server_with_tcp(
 		.get_ref()
 		.local_addr()
 		.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
-	cross_log!("Mini HTTP server listening on http://{addr}");
+	info!("Mini HTTP server listening on http://{addr}");
 
 	loop {
 		let accept_result = listener.accept().await;
 		let (stream, peer_addr) = match accept_result {
 			Ok(pair) => pair,
 			Err(err) => {
-				cross_log_error!("Failed to accept connection: {err}");
+				error!("Failed to accept connection: {err}");
 				continue;
 			}
 		};
@@ -63,7 +61,7 @@ pub async fn start_mini_http_server_with_tcp(
 				if let Err(err) =
 					handle_connection(entity, stream, peer_addr).await
 				{
-					cross_log_error!(
+					error!(
 						"Error handling connection from {peer_addr}: {err}"
 					);
 				}
@@ -123,6 +121,15 @@ async fn handle_connection(
 
 	// Dispatch through the entity's exchange
 	let response: Response = entity.exchange(request).await;
+
+	// A `101 Switching Protocols` (a route returning `WebSocketUpgrade`) means we
+	// write the handshake then keep the raw stream as a `Socket`, instead of
+	// closing after the body.
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+	if http_ext::is_websocket_response(&response) {
+		return upgrade_connection(entity, stream, response).await;
+	}
+
 	let (parts, body) = response.into_parts();
 
 	match body {
@@ -176,6 +183,60 @@ async fn handle_connection(
 }
 
 
+/// Complete a WebSocket upgrade on a raw connection: write the `101` handshake
+/// bytes, wrap the stream as a [`Socket`] (`Role::Server`, no re-handshake), and
+/// trigger [`OnWebSocketUpgrade`] so the socket layer (eg `client_io`) can adopt
+/// it. The `client_io` broadcast/registry layer is unchanged: it sees a normal
+/// `Socket` entity.
+///
+/// The whole hand-off runs `_local` on the world-owning thread, where the
+/// `Socket`'s thread-bound `SendWrapper` reader is created and polled, mirroring
+/// the side-port [`start_tungstenite_server`](crate::sockets) accept loop.
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+async fn upgrade_connection(
+	entity: AsyncEntity,
+	stream: async_io::Async<std::net::TcpStream>,
+	response: Response,
+) -> Result {
+	// write the handshake by hand: a `101` keeps the connection open, so it must
+	// not get the `content-length`/`connection: close` `serialize_http_response`
+	// appends for a normal body.
+	let parts = response.into_parts().0;
+	let mut handshake = Vec::new();
+	write!(
+		handshake,
+		"HTTP/1.1 {} {}\r\n",
+		parts.status().as_u16(),
+		parts.status().message()
+	)?;
+	for (key, values) in parts.headers().iter_all() {
+		for value in values {
+			write!(handshake, "{key}: {value}\r\n")?;
+		}
+	}
+	write!(handshake, "\r\n")?;
+	entity
+		.run_async_local(async move |entity| -> Result {
+			use futures_lite::AsyncWriteExt;
+			let mut stream = stream;
+			stream.write_all(&handshake).await?;
+			stream.flush().await?;
+			// wrap the now-upgraded stream, spawn it as a `Socket`, and announce it
+			let socket = crate::sockets::socket_from_upgraded(stream).await;
+			entity
+				.world()
+				.with(move |world: &mut World| {
+					let socket = world.spawn(socket).id();
+					world.trigger(crate::sockets::OnWebSocketUpgrade { socket });
+				})
+				.await;
+			Ok(())
+		})
+		.await?;
+	Ok(())
+}
+
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -191,5 +252,68 @@ mod test {
 			start_mini_http_server_with_tcp,
 		)
 		.await;
+	}
+
+	/// The same-port upgrade: a route returning [`WebSocketUpgrade`] hands the
+	/// raw stream to the socket layer as a [`Socket`] entity, and the channel
+	/// echoes over it. This is the seam `client_io` rides off the side port.
+	#[cfg(feature = "tungstenite")]
+	#[beet_core::test]
+	async fn upgrades_to_socket() {
+		use crate::sockets::*;
+
+		let server = HttpServer::new_test(start_mini_http_server_with_tcp);
+		let port = server.0.port.unwrap();
+		// records each landed socket entity so the test can assert the upgrade
+		let landed = Store::<Vec<Entity>>::default();
+		let captor = landed.clone();
+
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, ServerPlugin));
+			// a route that upgrades any request to a websocket
+			app.world_mut().spawn((
+				server,
+				exchange_handler(|cx| WebSocketUpgrade::from_request(&cx).into()),
+			));
+			// record landed sockets
+			app.world_mut().add_observer(
+				move |ev: On<OnWebSocketUpgrade>| {
+					captor.push(ev.event().socket);
+				},
+			);
+			// a global recv observer echoes text back; global (not per-socket)
+			// so it is always installed before the socket reader fires, avoiding
+			// a deferred-registration race
+			app.world_mut().add_observer(
+				|ev: On<MessageRecv>, mut commands: Commands| {
+					if let Message::Text(text) = ev.event().inner() {
+						commands.entity(ev.original_target()).trigger_target(
+							MessageSend(Message::text(text.clone())),
+						);
+					}
+				},
+			);
+			app.run();
+		});
+		time_ext::sleep_millis(200).await;
+
+		// a real client connects over the main HTTP port and upgrades
+		let mut client =
+			Socket::connect(format!("ws://127.0.0.1:{port}")).await.unwrap();
+		client.send(Message::text("over-the-upgrade")).await.unwrap();
+
+		// the server echoes the message back over the upgraded channel
+		let mut echoed = None;
+		for _ in 0..40 {
+			if let Some(Ok(Message::Text(text))) = client.next().await {
+				echoed = Some(text);
+				break;
+			}
+		}
+		echoed.xpect_eq(Some("over-the-upgrade".to_string()));
+		// exactly one socket entity landed for the one connection
+		landed.get().len().xpect_eq(1usize);
+		client.close(None).await.ok();
 	}
 }

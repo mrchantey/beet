@@ -37,9 +37,9 @@ beet = { workspace = true, features = [
 	"json",
 	"webdriver",
 	"template_serde",
-	# the `run` command spawns and serves a no-code BSX site
+	# the `serve` command spawns and serves a no-code BSX site
 	"http_server",
-	# `beet run --watch`: dev-mode live reload over the client_io channel
+	# `beet serve --watch`: dev-mode live reload over the client_io channel
 	"client_io",
 	"markdown",
 	"style",

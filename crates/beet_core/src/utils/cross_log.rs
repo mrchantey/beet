@@ -34,7 +34,12 @@ pub fn _cross_log_error_native(msg: &str) {
 	eprintln!("{}", msg);
 }
 
-/// Cross-platform logging without a trailing newline.
+/// Cross-platform raw output without a trailing newline.
+///
+/// Only for output that must not carry a log prefix, ie streaming a response
+/// body to stdout or rendering the program's actual result. Never for
+/// informational logging, which uses the `log` crate (`error!`/`warn!`/`info!`/
+/// `debug!`), already cross-platform via the `log` facade + the app's `LogPlugin`.
 ///
 /// - **wasm32**: writes to `console.log`
 /// - **native + std**: prints to stdout and flushes
@@ -51,7 +56,12 @@ macro_rules! cross_log_noline {
     })
 }
 
-/// Cross-platform logging with a trailing newline.
+/// Cross-platform raw output with a trailing newline.
+///
+/// Only for output that must not carry a log prefix, ie streaming a response
+/// body to stdout or rendering the program's actual result. Never for
+/// informational logging, which uses the `log` crate (`error!`/`warn!`/`info!`/
+/// `debug!`), already cross-platform via the `log` facade + the app's `LogPlugin`.
 ///
 /// - **wasm32**: writes to `console.log`
 /// - **native + std**: prints to stdout

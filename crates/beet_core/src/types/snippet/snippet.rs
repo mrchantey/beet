@@ -228,14 +228,21 @@ impl IntoSnippet<(NotSnippetBundleMarker, SnippetEntityMarker)> for Entity {
 /// `Vec<T>` — each item becomes its own child entity. Spawning each item as a
 /// distinct child is required: tupling several single-component effects onto one
 /// entity is last-write-wins and would silently drop all but the last.
+///
+/// In a child position this lowers onto a [`FragmentNode`] wrapper holding the
+/// items as its children, so the renderers treat the group as transparent (its
+/// items lay out as direct siblings of the parent) rather than as a nested box.
 impl<T, M> IntoSnippet<(NotSnippetBundleMarker, (Vec<T>, M))> for Vec<T>
 where
 	T: 'static + Send + Sync + IntoSnippet<M>,
 {
 	fn into_snippet(self) -> impl Bundle {
-		Children::spawn(SpawnIter(
-			self.into_iter().map(|item| item.into_snippet()),
-		))
+		(
+			FragmentNode,
+			Children::spawn(SpawnIter(
+				self.into_iter().map(|item| item.into_snippet()),
+			)),
+		)
 	}
 }
 

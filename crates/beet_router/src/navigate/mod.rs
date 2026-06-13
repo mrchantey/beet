@@ -6,6 +6,11 @@ mod navigator;
 pub use navigator::*;
 mod current_page;
 pub use current_page::*;
+// std-only: the navigation-failure error page (a beet_ui `#[template]`).
+#[cfg(feature = "std")]
+mod error_page;
+#[cfg(feature = "std")]
+pub use error_page::*;
 mod navigate;
 pub use navigate::*;
 // std-only: drives navigation into the beet_ui render-media pipeline.

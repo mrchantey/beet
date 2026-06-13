@@ -193,6 +193,9 @@ serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 sha2 = "0.10"
+# SHA-1 for the websocket `Sec-WebSocket-Accept` handshake (RFC 6455). no_std by
+# default; the digest API works on alloc, so consumers need not re-enable `std`.
+sha1 = { version = "0.10", default-features = false }
 ron = "0.8"
 toml = "0.8"
 
@@ -551,11 +554,6 @@ required-features = ["router", "rhai_serde", "template_serde"]
 name = "file_based_routes"
 path = "examples/file_based_routes/main.rs"
 required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq", "rustls-tls"]
-
-[[example]]
-name = "bsx_site"
-path = "examples/bsx_site/main.rs"
-required-features = ["http_server", "client_io", "json", "markdown", "style", "template", "fs"]
 
 # 💡 Examples - Thread
 

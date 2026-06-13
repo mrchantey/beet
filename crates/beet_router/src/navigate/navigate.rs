@@ -110,9 +110,9 @@ pub async fn NavigateHandler(
 /// given current path, returning the target path segments.
 fn resolve_navigation(
 	tree: &RouteTree,
-	current_path: &[String],
+	current_path: &[SmolStr],
 	direction: NavigateTo,
-) -> Result<Vec<String>> {
+) -> Result<Vec<SmolStr>> {
 	match direction {
 		NavigateTo::Parent => resolve_parent(current_path),
 		NavigateTo::FirstChild => resolve_first_child(tree, current_path),
@@ -127,7 +127,7 @@ fn resolve_navigation(
 
 /// Navigate to the parent by dropping the last path segment.
 /// An empty path stays at root.
-fn resolve_parent(current_path: &[String]) -> Result<Vec<String>> {
+fn resolve_parent(current_path: &[SmolStr]) -> Result<Vec<SmolStr>> {
 	if current_path.is_empty() {
 		vec![].xok()
 	} else {
@@ -138,8 +138,8 @@ fn resolve_parent(current_path: &[String]) -> Result<Vec<String>> {
 /// Navigate to the first child of the current path's subtree.
 fn resolve_first_child(
 	tree: &RouteTree,
-	current_path: &[String],
-) -> Result<Vec<String>> {
+	current_path: &[SmolStr],
+) -> Result<Vec<SmolStr>> {
 	let subtree = if current_path.is_empty() {
 		tree
 	} else {
@@ -176,9 +176,9 @@ enum SiblingDirection {
 /// Navigate to the next or previous sibling at the same tree level.
 fn resolve_sibling(
 	tree: &RouteTree,
-	current_path: &[String],
+	current_path: &[SmolStr],
 	direction: SiblingDirection,
-) -> Result<Vec<String>> {
+) -> Result<Vec<SmolStr>> {
 	if current_path.is_empty() {
 		bevybail!("Cannot navigate to a sibling of the root");
 	}
@@ -234,11 +234,11 @@ fn resolve_sibling(
 	path_segments(&siblings[target_idx].path)
 }
 
-/// Extract the segment names from a [`PathPattern`] as a `Vec<String>`.
-fn path_segments(pattern: &PathPattern) -> Result<Vec<String>> {
+/// Extract the segment names from a [`PathPattern`] as a `Vec<SmolStr>`.
+fn path_segments(pattern: &PathPattern) -> Result<Vec<SmolStr>> {
 	pattern
 		.iter()
-		.map(|seg| seg.name().to_string())
+		.map(|seg| seg.name().into())
 		.collect::<Vec<_>>()
 		.xok()
 }

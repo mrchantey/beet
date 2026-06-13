@@ -155,6 +155,62 @@ pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 	.xok()
 }
 
+/// Parse a `verb{ arg: value, .. }` event-verb call, the value of a `bx:<event>`
+/// directive. The verb is a bare identifier; the brace map is optional (a verb
+/// may take no arguments, eg `submit`). Each argument value shares the
+/// attribute-value grammar ([`parse_value_expr`]), so a literal and an `@`
+/// binding both parse, the latter kept as a [`VerbArg::Binding`].
+pub fn parse_verb_call(cursor: &mut Cursor) -> Result<VerbCall> {
+	cursor.skip_ws();
+	let verb = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
+	if verb.is_empty() {
+		bevybail!("expected a verb name, ie `increment{{ field: @doc:count }}`");
+	}
+	cursor.skip_ws();
+	let args = match cursor.peek() {
+		Some('{') => parse_verb_args(cursor)?,
+		_ => Vec::new(),
+	};
+	Ok(VerbCall {
+		verb: verb.into(),
+		args,
+	})
+}
+
+/// Parse the `{ key: value, .. }` argument map of a verb call (braces inclusive),
+/// each value a literal or an `@` binding.
+fn parse_verb_args(cursor: &mut Cursor) -> Result<Vec<(SmolStr, VerbArg)>> {
+	cursor.eat("{");
+	let mut args = Vec::new();
+	loop {
+		cursor.skip_ws();
+		if cursor.eat("}") {
+			break;
+		}
+		let key = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
+		if key.is_empty() {
+			bevybail!("expected a verb argument name");
+		}
+		cursor.skip_ws();
+		if !cursor.eat(":") {
+			bevybail!("expected `:` after verb argument `{key}`");
+		}
+		let arg = match parse_value_expr(cursor)? {
+			ValueExpr::Binding(binding) => VerbArg::Binding(binding),
+			ValueExpr::Literal(literal) => VerbArg::Literal(literal),
+			ValueExpr::EntityRef(_) => bevybail!(
+				"a `$name` entity reference is not a verb argument value"
+			),
+		};
+		args.push((key.into(), arg));
+		cursor.skip_ws();
+		if !cursor.eat(",") && cursor.peek() != Some('}') {
+			bevybail!("expected `,` or `}}` in verb arguments");
+		}
+	}
+	Ok(args)
+}
+
 /// Parse a `$name` entity reference.
 fn parse_entity_ref(cursor: &mut Cursor) -> Result<ValueExpr> {
 	cursor.eat("$");
@@ -524,5 +580,69 @@ mod test {
 		};
 		parsed.source.xpect_eq(BindingSource::Comp);
 		parsed.type_path.clone().xpect_eq(Some("Bar".into()));
+	}
+
+	/// Shorthand for a parsed verb call.
+	fn verb(input: &str) -> VerbCall {
+		parse_verb_call(&mut Cursor::new(input)).unwrap()
+	}
+
+	#[beet_core::test]
+	fn verb_call_literal_and_binding_args() {
+		let call = verb("increment{ field: @doc:count, amount: 3 }");
+		call.verb.as_str().xpect_eq("increment");
+		call.args.len().xpect_eq(2);
+		// `field` is a binding, `amount` a literal.
+		let (field_name, field_arg) = &call.args[0];
+		field_name.as_str().xpect_eq("field");
+		let VerbArg::Binding(binding) = field_arg else {
+			panic!("expected a binding arg");
+		};
+		binding.source.xpect_eq(BindingSource::Doc);
+		binding.field_path.to_string().xpect_eq("count".to_string());
+		let (amount_name, amount_arg) = &call.args[1];
+		amount_name.as_str().xpect_eq("amount");
+		amount_arg
+			.clone()
+			.xpect_eq(VerbArg::Literal(DataLiteral::Scalar(Value::Uint(3))));
+	}
+
+	#[beet_core::test]
+	fn verb_call_no_args() {
+		// a bare verb name with no brace map is a zero-argument verb.
+		let call = verb("submit");
+		call.verb.as_str().xpect_eq("submit");
+		call.args.is_empty().xpect_true();
+	}
+
+	#[beet_core::test]
+	fn verb_call_doc_init_arg() {
+		// a binding arg keeps its `=init`, eg `@doc:count=0`.
+		let call = verb("increment{ field: @doc:count=0 }");
+		let VerbArg::Binding(binding) = &call.args[0].1 else {
+			panic!("expected a binding arg");
+		};
+		binding
+			.init
+			.clone()
+			.xpect_eq(Some(DataLiteral::Scalar(Value::Uint(0))));
+	}
+
+	/// Shorthand for the parse error of a verb-call source string.
+	fn verb_err(input: &str) -> String {
+		parse_verb_call(&mut Cursor::new(input))
+			.unwrap_err()
+			.to_string()
+	}
+
+	#[beet_core::test]
+	fn verb_call_errors() {
+		verb_err("{ field: @doc:count }").xpect_contains("expected a verb name");
+		verb_err("increment{ : @doc:count }")
+			.xpect_contains("expected a verb argument name");
+		verb_err("increment{ field @doc:count }")
+			.xpect_contains("expected `:` after verb argument");
+		verb_err("increment{ field: @doc:count amount: 3 }")
+			.xpect_contains("expected `,` or `}`");
 	}
 }

@@ -233,6 +233,12 @@ impl From<&Vec<String>> for SmolPath {
 	}
 }
 
+impl From<&Vec<SmolStr>> for SmolPath {
+	fn from(parts: &Vec<SmolStr>) -> Self {
+		Self::from_segments(parts.as_slice())
+	}
+}
+
 impl Deref for SmolPath {
 	type Target = str;
 	fn deref(&self) -> &str { self.0.as_str() }

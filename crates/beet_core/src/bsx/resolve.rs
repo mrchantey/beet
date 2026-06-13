@@ -28,12 +28,10 @@
 //! (collect `bx:ref` names, then resolve `$name`), so `$name` may point forward.
 
 use super::ast::*;
-use super::cursor::Cursor;
 use super::events::*;
 use super::reflect::*;
 use super::registry::*;
 use super::schema::props_value;
-use super::value::parse_binding;
 use crate::prelude::*;
 use bevy::ecs::template::SceneEntityReference;
 use bevy::ecs::template::Template;
@@ -1007,20 +1005,40 @@ fn apply_common_directives(
 	if let Some(slot) = slot_routing(el) {
 		cx.entity.insert(slot);
 	}
-	// `bx:<event>="verb@source:path"` events. The event name is the directive
-	// suffix after `bx:`; the verb + binding resolve through the core registries.
+	// `bx:<event>=verb{ arg: value, .. }` events. The event name is the directive
+	// suffix after `bx:`; the verb + args resolve through the core registries.
 	for attr in &el.attributes {
-		if let Some(event) = attr.key.strip_prefix("bx:")
-			&& BSX_EVENTS.contains(&event)
-		{
-			let binding = parse_event_binding(event, &attr.value)?;
-			// an `@comp$ref:` binding retargets, else the component is on this entity.
-			let comp_target = match &binding.binding.selector {
-				Some(name) => selector_target(name, refs, cx),
-				None => BindingTarget::This,
-			};
-			install_event(cx.entity, &binding, comp_target)?;
+		if !is_event_directive(&attr.key) {
+			continue;
 		}
+		let AttrValue::Verb(call) = &attr.value else {
+			bevybail!(
+				"`{}` expects a verb call, ie `{}=increment{{ field: @doc:count }}`",
+				attr.key,
+				attr.key
+			);
+		};
+		let event = attr.key.strip_prefix("bx:").unwrap_or(&attr.key);
+		let binding = EventBinding::new(event, call.clone());
+		// pre-resolve each binding argument's `@comp$ref:` selector to its target
+		// (needs `cx`), so the install closure is a plain lookup with no `cx`
+		// borrow conflicting with `cx.entity`.
+		let targets = binding
+			.args
+			.iter()
+			.filter_map(|(_, arg)| match arg {
+				VerbArg::Binding(BindingExpr {
+					selector: Some(name),
+					..
+				}) => Some((name.clone(), selector_target(name, refs, cx))),
+				_ => None,
+			})
+			.collect::<HashMap<SmolStr, BindingTarget>>();
+		install_event(cx.entity, &binding, |selector| {
+			selector
+				.and_then(|name| targets.get(name).cloned())
+				.unwrap_or(BindingTarget::This)
+		})?;
 	}
 	Ok(())
 }
@@ -1134,7 +1152,8 @@ fn apply_attributes(
 						attr_comp_target(expr, parent, entity_refs);
 					apply_value_expr(expr, &mut attr_entity, comp_target)?;
 				}
-				AttrValue::Spread(_) => {}
+				// spreads and `bx:<event>` verb calls are handled elsewhere.
+				AttrValue::Spread(_) | AttrValue::Verb(_) => {}
 			}
 			Ok(())
 		})?;
@@ -1520,39 +1539,10 @@ fn attr_to_literal(value: &AttrValue) -> Result<DataLiteral> {
 			bevybail!("an `@` binding is not a component patch value")
 		}
 		AttrValue::Spread(_) => bevybail!("a spread is not an attribute value"),
+		AttrValue::Verb(_) => {
+			bevybail!("a `bx:<event>` verb call is not a component patch value")
+		}
 	}
-}
-
-/// The `bx:<event>` directive names treated as event bindings (as opposed to the
-/// structural directives `scope`/`for`/`key`/`slot`/`ref`/`schema`). Core stays
-/// event-agnostic; this list only names which directives carry a
-/// `verb@source:path`, not what the events mean (that lives in the
-/// [`EventRegistry`] installers).
-const BSX_EVENTS: &[&str] = &["click"];
-
-/// Parse a `bx:<event>="verb@source:path"` event binding from its attribute
-/// value, eg `bx:click="increment@doc:count"`. The binding part shares the
-/// `@` grammar ([`parse_binding`]).
-fn parse_event_binding(event: &str, value: &AttrValue) -> Result<EventBinding> {
-	let raw = match value {
-		AttrValue::Str(string) => string.clone(),
-		_ => bevybail!(
-			"`bx:{event}` expects a quoted `verb@source:path` binding, ie `bx:{event}=\"increment@doc:count\"`"
-		),
-	};
-	let Some(at) = raw.find('@') else {
-		bevybail!("`bx:{event}` must name a binding, ie `verb@doc:field`")
-	};
-	if at == 0 {
-		bevybail!("`bx:{event}` must name a verb, ie `verb@doc:field`");
-	}
-	let mut cursor = Cursor::new(&raw[at..]);
-	let binding = parse_binding(&mut cursor)?;
-	Ok(EventBinding {
-		event: event.into(),
-		verb: raw[..at].into(),
-		binding,
-	})
 }
 
 // --- attribute lookup helpers ------------------------------------------------
@@ -1587,4 +1577,16 @@ fn slot_routing(el: &BsxElement) -> Option<SlotChild> {
 /// Whether a key is a `bx:`/slot directive rather than an HTML attribute.
 pub(super) fn is_directive(key: &str) -> bool {
 	key.starts_with("bx:") || key == "slot"
+}
+
+/// The `bx:` directives with dedicated structural meaning, as opposed to a
+/// `bx:<event>` verb trigger. Anything else under `bx:` is treated as an event
+/// (resolved through the [`EventRegistry`], a graceful no-op when unregistered).
+const STRUCTURAL_DIRECTIVES: &[&str] =
+	&["bx:scope", "bx:for", "bx:key", "bx:slot", "bx:ref", "bx:schema"];
+
+/// Whether a key is a `bx:<event>` verb-trigger directive (eg `bx:click`), ie a
+/// `bx:` key that is not one of the [`STRUCTURAL_DIRECTIVES`].
+pub(super) fn is_event_directive(key: &str) -> bool {
+	key.starts_with("bx:") && !STRUCTURAL_DIRECTIVES.contains(&key)
 }

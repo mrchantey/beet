@@ -17,6 +17,6 @@ fn main() -> Result {
 	world.update_local();
 	count.get(&mut world.entity_mut(entity))?.xpect_eq(8);
 
-	cross_log!("success");
+	info!("success");
 	Ok(())
 }

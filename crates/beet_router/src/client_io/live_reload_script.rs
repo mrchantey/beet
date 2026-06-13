@@ -2,10 +2,10 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 
 /// Injects the live-reload client as an inline `<script>`: it connects to the
-/// world's [`ClientIo`] channel, calls `location.reload()` on a
+/// world's [`ClientIo`] channel (a same-port websocket upgrade at
+/// [`CLIENT_IO_PATH`]), calls `location.reload()` on a
 /// [`RELOAD_MESSAGE`](super::RELOAD_MESSAGE), and reconnects with exponential
 /// backoff, reloading after the server restarts.
 ///
@@ -15,15 +15,11 @@ use beet_net::prelude::*;
 /// always safe to include.
 #[template(system)]
 pub fn LiveReloadScript(channels: Query<&ClientIo>) -> Snippet {
-	let Some(port) = channels
-		.iter()
-		.next()
-		.map(|channel| channel.port.unwrap_or(DEFAULT_SOCKET_PORT))
-	else {
+	if channels.iter().next().is_none() {
 		return Snippet::from_bundle(());
-	};
+	}
 	let body = format!(
-		"const CLIENT_IO_PORT={port};\n{}",
+		"const CLIENT_IO_PATH={CLIENT_IO_PATH:?};\n{}",
 		include_str!("./live_reload.js")
 	);
 	rsx! { <script>{body}</script> }.any_snippet()
@@ -50,10 +46,10 @@ mod test {
 	#[beet_core::test]
 	fn renders_the_script_against_the_channel() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		world.spawn(ClientIo { port: Some(7777) });
+		world.spawn(ClientIo);
 		render_html(&mut world)
 			.xpect_contains("<script>")
-			.xpect_contains("const CLIENT_IO_PORT=7777;")
+			.xpect_contains("const CLIENT_IO_PATH=\"__client_io\";")
 			.xpect_contains("location.reload()");
 	}
 

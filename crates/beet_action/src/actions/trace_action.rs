@@ -38,9 +38,9 @@ impl OnLogMessage {
 		}
 	}
 
-	/// Immediately logs to stdout (cross-platform) and returns self for chaining.
+	/// Immediately logs the message at debug level and returns self for chaining.
 	pub fn and_log(self) -> Self {
-		cross_log!("{}", self.msg);
+		debug!("{}", self.msg);
 		self
 	}
 }
@@ -88,9 +88,9 @@ where
 	result
 }
 
-/// Log to stdout (cross-platform) and emit an [`OnLogMessage`].
+/// Log at debug level and emit an [`OnLogMessage`].
 async fn emit(world: &AsyncWorld, msg: String) {
-	cross_log!("{msg}");
+	debug!("{msg}");
 	world
 		.with(move |world| {
 			world.write_message(OnLogMessage::new(msg));
@@ -122,7 +122,7 @@ pub struct DebugRunning;
 
 fn log_user_message(ev: On<UserMessage>, mut out: MessageWriter<OnLogMessage>) {
 	let msg = format!("User: {}", ev.event().0);
-	cross_log!("{msg}");
+	debug!("{msg}");
 	out.write(OnLogMessage::new(msg));
 }
 
@@ -137,7 +137,7 @@ fn log_running(
 			.map(|name| name.to_string())
 			.unwrap_or_else(|| entity.to_string());
 		let msg = format!("Running: {name}");
-		cross_log!("{msg}");
+		debug!("{msg}");
 		out.write(OnLogMessage::new(msg));
 	}
 }

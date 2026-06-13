@@ -115,6 +115,15 @@ fn scalar_to_reflect(
 		}
 	}
 
+	// a string targeting a `SmolStr` field coerces to `SmolStr`, mirroring the
+	// numeric cast above (the natural reflect type of a string is `String`).
+	if let (Value::Str(string), Some(TypeInfo::Opaque(opaque))) =
+		(value, field_info)
+		&& opaque.type_id() == TypeId::of::<SmolStr>()
+	{
+		return Ok(Box::new(SmolStr::new(string)));
+	}
+
 	// otherwise the value's natural reflect type.
 	let reflected: Box<dyn PartialReflect> = match value {
 		Value::Bool(b) => Box::new(*b),

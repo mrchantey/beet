@@ -27,6 +27,18 @@ impl std::fmt::Debug for Socket {
 /// and hooked up.
 #[derive(EntityTargetEvent)]
 pub struct SocketReady;
+
+/// Global event: an HTTP backend upgraded a connection to a WebSocket and
+/// spawned [`Self::socket`] as an orphan [`Socket`] entity.
+///
+/// The same-port upgrade seam (`mini_http_server`/`hyper_server`) fires this so
+/// the socket layer (eg `client_io`) can adopt the connection, eg re-parent it
+/// onto a channel, without the backend knowing about that layer.
+#[derive(Debug, Clone, Event)]
+pub struct OnWebSocketUpgrade {
+	/// The freshly-spawned, fully-wired [`Socket`] entity.
+	pub socket: Entity,
+}
 impl Socket {
 	fn effect(self, entity: &mut EntityWorldMut) {
 		let (send, mut recv) = self.split();

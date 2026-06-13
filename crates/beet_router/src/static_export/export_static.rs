@@ -14,7 +14,9 @@ use beet_net::prelude::*;
 ///
 /// A route is exported when its path is fully static, its method is `GET`, and
 /// it is either a scene route or marked [`CacheStrategy::Static`]. Routes whose
-/// [`ArticleMeta`] marks them a draft are skipped.
+/// [`ArticleMeta`] marks them a draft are skipped only on a `prod`
+/// [`PackageConfig::stage`]; dev/staging builds export drafts so they can be
+/// previewed.
 pub async fn collect_static_html(
 	world: &AsyncWorld,
 	router: Entity,
@@ -28,6 +30,11 @@ pub async fn collect_static_html(
 					bevyhow!("router entity {router} has no RouteTree")
 				})?
 				.clone();
+			// drafts are excluded only in production; the resource is present at
+			// export, defaulting to dev (keep drafts) when unset.
+			let is_prod = world
+				.get_resource::<PackageConfig>()
+				.is_some_and(|config| config.stage() == "prod");
 
 			let mut paths = Vec::new();
 			for node in tree.flatten_nodes() {
@@ -41,12 +48,12 @@ pub async fn collect_static_html(
 				{
 					continue;
 				}
-				// drafts stay out of production builds
+				// a draft route is dropped only on a prod stage
 				let is_draft = world
 					.entity(node.entity)
 					.get::<ArticleMeta>()
 					.is_some_and(|meta| meta.draft);
-				if is_draft {
+				if is_prod && is_draft {
 					continue;
 				}
 				let cache = world
@@ -172,13 +179,26 @@ mod test {
 			.unwrap()
 	}
 
-	/// The codegen route shape: a `BlobScene` route emitted with eager
-	/// `ArticleMeta { draft: true }` stays out of the export.
-	#[beet_core::test]
-	async fn skips_draft_routes() {
+	/// A router world with the package `stage` set, so the draft gate keys off
+	/// it deterministically rather than the build profile.
+	fn world_with_stage(stage: &str) -> World {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		world.insert_resource(pkg_config!());
-		let router = world
+		world.insert_resource(PackageConfig {
+			stage: stage.into(),
+			..pkg_config!()
+		});
+		world
+	}
+
+	/// Whether the export wrote a route under `prefix`.
+	fn exported(written: &[SmolPath], prefix: &str) -> bool {
+		written.iter().any(|path| path.starts_with(prefix))
+	}
+
+	/// A `published` route plus a `secret` route eagerly marked
+	/// `ArticleMeta { draft: true }` (the codegen `BlobScene` shape).
+	fn spawn_draft_router(world: &mut World) -> Entity {
+		world
 			.spawn((default_router(), children![
 				(
 					render_action::fixed_route(
@@ -199,27 +219,38 @@ mod test {
 					},
 				),
 			]))
-			.flush();
-
-		let written = export(&mut world, router).await;
-		written
-			.iter()
-			.any(|path| path.starts_with("published"))
-			.xpect_true();
-		written
-			.iter()
-			.any(|path| path.starts_with("secret"))
-			.xpect_false();
+			.flush()
 	}
 
-	/// The `RoutesDir` shape: scan-time frontmatter `draft = true` excludes the
-	/// discovered route from the export.
+	/// Non-prod builds export drafts so they can be previewed.
+	#[beet_core::test]
+	async fn dev_keeps_draft_routes() {
+		let mut world = world_with_stage("dev");
+		let router = spawn_draft_router(&mut world);
+		let written = export(&mut world, router).await;
+		exported(&written, "published").xpect_true();
+		exported(&written, "secret").xpect_true();
+	}
+
+	/// A `prod` stage drops the draft route from the export.
+	#[beet_core::test]
+	async fn prod_drops_draft_routes() {
+		let mut world = world_with_stage("prod");
+		let router = spawn_draft_router(&mut world);
+		let written = export(&mut world, router).await;
+		exported(&written, "published").xpect_true();
+		exported(&written, "secret").xpect_false();
+	}
+
+	/// Write a `published`/`secret` (frontmatter `draft = true`) content dir under
+	/// a per-test `name` (so parallel cases never share a directory) and return
+	/// its root.
 	// `RoutesDir`/`SiteRoot` scan the filesystem, so this is native-only.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
-	#[beet_core::test]
-	async fn skips_draft_routes_dir() {
+	fn draft_content_dir(name: &str) -> AbsPathBuf {
 		let root = fs_ext::workspace_root()
-			.join("target/tests/export_static/drafts");
+			.join("target/tests/export_static/drafts")
+			.join(name);
 		fs_ext::remove(&root).ok();
 		fs_ext::write(root.join("published.md"), "# Published").unwrap();
 		fs_ext::write(
@@ -227,22 +258,39 @@ mod test {
 			"+++\ndraft = true\n+++\n\n# Secret",
 		)
 		.unwrap();
+		AbsPathBuf::new(root).unwrap()
+	}
 
-		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		world.insert_resource(pkg_config!());
-		world.insert_resource(SiteRoot(AbsPathBuf::new(root).unwrap()));
-		let router = world
+	/// Spawn a `RoutesDir` router over `root`.
+	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
+	fn spawn_routes_dir(world: &mut World, root: AbsPathBuf) -> Entity {
+		world.insert_resource(SiteRoot(root));
+		world
 			.spawn((default_router(), children![RoutesDir::new("")]))
-			.flush();
+			.flush()
+	}
 
+	/// The `RoutesDir` shape in dev: a scan-time `draft = true` route is still
+	/// exported for preview.
+	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	async fn dev_keeps_draft_routes_dir() {
+		let mut world = world_with_stage("dev");
+		let router = spawn_routes_dir(&mut world, draft_content_dir("dev"));
 		let written = export(&mut world, router).await;
-		written
-			.iter()
-			.any(|path| path.starts_with("published"))
-			.xpect_true();
-		written
-			.iter()
-			.any(|path| path.starts_with("secret"))
-			.xpect_false();
+		exported(&written, "published").xpect_true();
+		exported(&written, "secret").xpect_true();
+	}
+
+	/// The `RoutesDir` shape in prod: scan-time frontmatter `draft = true`
+	/// excludes the discovered route from the export.
+	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	async fn prod_drops_draft_routes_dir() {
+		let mut world = world_with_stage("prod");
+		let router = spawn_routes_dir(&mut world, draft_content_dir("prod"));
+		let written = export(&mut world, router).await;
+		exported(&written, "published").xpect_true();
+		exported(&written, "secret").xpect_false();
 	}
 }

@@ -1542,6 +1542,7 @@ dependencies = [
  "serde_dynamo",
  "serde_json",
  "serde_urlencoded",
+ "sha1 0.10.6",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

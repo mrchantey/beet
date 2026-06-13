@@ -8,6 +8,7 @@
 
 use super::ast::*;
 use super::cursor::Cursor;
+use super::resolve::is_event_directive;
 use super::value::*;
 use crate::prelude::*;
 
@@ -647,6 +648,15 @@ fn parse_attribute(
 		});
 	}
 	cursor.skip_ws();
+	// a `bx:<event>` directive is a verb call `increment{ field: @doc:count }`,
+	// parsed straight off the cursor so its internal whitespace survives.
+	if config.bsx && is_event_directive(&key) {
+		let verb = parse_verb_call(cursor)?;
+		return Ok(BsxAttribute {
+			key,
+			value: AttrValue::Verb(verb),
+		});
+	}
 	let value = match cursor.peek() {
 		Some('"') => AttrValue::Str(parse_attr_string(cursor)?),
 		Some('\'') => AttrValue::Str(parse_attr_string(cursor)?),

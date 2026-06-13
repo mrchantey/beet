@@ -14,7 +14,7 @@ use beet_infra::prelude::*;
 #[beet_core::main]
 async fn main() -> Result {
 	// Use the existing schema.json instead of running the full tofu init cycle.
-	beet_core::cross_log!("Generating provider bindings from schema.json ...");
+	info!("Generating provider bindings from schema.json ...");
 
 	SchemaBindingGenerator::default()
 		.with_file(
@@ -86,6 +86,6 @@ async fn main() -> Result {
 		)
 		.generate()
 		.await?;
-	beet_core::cross_log!("Done!");
+	info!("Done!");
 	Ok(())
 }

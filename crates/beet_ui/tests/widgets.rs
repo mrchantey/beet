@@ -19,10 +19,10 @@ fn layout_world() -> World {
 	let mut world = ui_world();
 	world.insert_resource(PackageConfig {
 		title: "Beet UI".into(),
-		binary_name: "beet_ui".into(),
-		version: "0.0.0".into(),
 		description: "test".into(),
-		homepage: "https://example.test".into(),
+		binary_name: Some("beet_ui".into()),
+		version: Some("0.0.0".into()),
+		homepage: Some("https://example.test".into()),
 		repository: None,
 		stage: "dev".into(),
 		service_access: ServiceAccess::Local,
@@ -80,6 +80,19 @@ fn head_includes_pwa_meta_beyond_twelve_children() {
 			.xpect_true();
 		names.iter().any(|n| n == "twitter:card").xpect_true();
 	});
+}
+
+#[beet_core::test]
+fn head_emits_single_og_site_name_from_package_config() {
+	// the default head owns og:site_name, bound to `PackageConfig.title`; the
+	// seeded value renders the title even before any document sync.
+	let mut world = layout_world();
+	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
+	let html = render_html(&mut world, root);
+	// exactly one tag, carrying the resource title
+	html.matches("og:site_name").count().xpect_eq(1);
+	html.as_str()
+		.xpect_contains("property=\"og:site_name\" content=\"Beet UI\"");
 }
 
 #[beet_core::test]

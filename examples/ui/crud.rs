@@ -55,7 +55,7 @@ async fn main() -> Result {
 		.entity_mut(actor)
 		.call::<usize, Option<Value>>(0)
 		.await?;
-	cross_log!("removed: {removed:?}");
+	info!("removed: {removed:?}");
 	log_state("after remove at 0", &world, host)?;
 
 	// Replace: overwrite the entire list
@@ -73,6 +73,6 @@ fn log_state(label: &str, world: &World, host: Entity) -> Result {
 		.get::<Document>()
 		.ok_or_else(|| bevyhow!("missing Document on host"))?
 		.get_field_ref(&[FieldSegment::key("todos")])?;
-	cross_log!("{label}: {value}");
+	info!("{label}: {value}");
 	Ok(())
 }

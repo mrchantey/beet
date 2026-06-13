@@ -19,12 +19,14 @@ fn AppInfoContent(config: Res<PackageConfig>) -> impl Bundle {
 		stage,
 		..
 	} = config.clone();
+	// the version line is omitted when no version is set.
+	let version = version.map(|version| rsx! { <p>"Version: "{version}</p> });
 	rsx! {
 		<article>
 			<h1>"App Info"</h1>
 			<p>"Title: "{title}</p>
 			<p>"Description: "{description}</p>
-			<p>"Version: "{version}</p>
+			{version}
 			<p>"Stage: "{stage}</p>
 		</article>
 	}

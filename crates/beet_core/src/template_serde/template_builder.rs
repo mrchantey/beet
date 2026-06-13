@@ -12,6 +12,7 @@ use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity_disabling::DefaultQueryFilters;
 use bevy::ecs::reflect::ReflectComponent;
 use bevy::ecs::reflect::ReflectResource;
+use bevy::ecs::relationship::RelationshipAccessor;
 use bevy::ecs::resource::IS_RESOURCE;
 use bevy_reflect::PartialReflect;
 use bevy_reflect::TypeRegistry;
@@ -236,20 +237,23 @@ impl<'w> TemplateBuilder<'w> {
 			// for each component on the entity, extract it through the filter.
 			for &component_id in original_entity.archetype().components().iter() {
 				let mut extract_and_push = || {
-					let type_id = self
+					let info = self
 						.original_world
 						.components()
-						.get_info(component_id)?
-						.type_id()?;
+						.get_info(component_id)?;
 
-					// never extract `Children`: it is the mirror of the `ChildOf`
-					// relationship and is rebuilt in order by the relationship hook
-					// on the build path. Serializing it would double-apply the
-					// hierarchy (both the direct write and the hook), corrupting
-					// `Children` order and producing duplicate entries.
-					if type_id == TypeId::of::<Children>() {
+					// never extract a `RelationshipTarget` collection (eg `Children`,
+					// `RenderRefOf`): it mirrors its `Relationship` source and is
+					// rebuilt by the relationship hook on the build path. Serializing
+					// it would double-apply the relation (the direct write plus the
+					// hook), corrupting order and producing duplicate entries.
+					if let Some(RelationshipAccessor::RelationshipTarget { .. }) =
+						info.relationship_accessor()
+					{
 						return None;
 					}
+
+					let type_id = info.type_id()?;
 
 					if self.component_filter.is_denied_by_id(type_id) {
 						return None;

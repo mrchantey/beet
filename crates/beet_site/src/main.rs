@@ -1,10 +1,12 @@
 //! The beet website binary.
 //!
 //! With the `codegen` feature it runs the route codegen pass and exits.
-//! Otherwise it boots the site router behind a server: an [`HttpServer`] by
-//! default, or a [`CliServer`] (with the `cli` feature, or when no `web` target
-//! is enabled) that renders a single route to stdout (HTML or ANSI per
-//! `--accept`) and exits.
+//! Otherwise it spawns the site router with a [`ServerBackend`] selected by build
+//! features; spawning the backend pulls in the [`Server`] orchestrator (via
+//! `#[require(Server)]`), which starts it. The backend is an [`HttpServer`] by
+//! default, the live `TuiServer` under `tui`, or a [`CliServer`] (with the `cli`
+//! feature, or when no `web` target is enabled) that renders a single route to
+//! stdout (HTML or ANSI per `--accept`) and exits.
 
 #[cfg(feature = "codegen")]
 fn main() -> beet::prelude::Result { beet_site::run_codegen() }
@@ -16,7 +18,7 @@ fn main() {
 
 	let mut app = App::new();
 	app.add_plugins(server_plugin).insert_resource(PackageConfig {
-		title: "Beet".to_string(),
+		title: "Beet".into(),
 		..pkg_config!()
 	});
 	// the live TUI layers the interactive plugins onto the shared substrate:

@@ -15,24 +15,29 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A server that accepts CLI arguments and environment variables as a request,
-/// logging the response body to stdout.
+/// The entrypoint [`ServerBackend`]: accepts CLI arguments and environment
+/// variables as a request, runs one exchange, streams the response body to
+/// stdout, then exits (unless [`KeepAlive`] is set).
+///
+/// This is how every beet binary boots: spawning it pulls in the [`Server`]
+/// orchestrator (via `#[require(Server)]`), which starts it through
+/// [`CliServer::start`]. Being a one-shot, it cannot [`stop`](ServerBackend::stop)
+/// (the default no-op).
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
 /// for example `--accept=text/html,text/plain`.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add=on_add)]
+#[require(Server)]
 pub struct CliServer;
 
-/// When inserted, a [`CliServer`] streams its response but does not emit
-/// [`AppExit`], keeping the process alive after the command completes (eg so a
-/// `--watch` file watcher keeps firing).
-#[derive(Default, Resource)]
-pub struct KeepAlive;
-
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).queue_async(run_and_exit);
+impl ServerBackend for CliServer {
+	/// Parse argv into a request, run one exchange, stream the body to stdout,
+	/// and exit unless [`KeepAlive`] is set. The entrypoint backend; it has no
+	/// listener to stop, so it keeps the default no-op [`stop`](ServerBackend::stop).
+	fn start(entity: AsyncEntity) -> MaybeSendBoxedFuture<'static, Result> {
+		Box::pin(run_and_exit(entity))
+	}
 }
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {

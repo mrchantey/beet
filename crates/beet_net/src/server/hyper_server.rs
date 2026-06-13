@@ -26,9 +26,7 @@ use std::task::Poll;
 /// See [`HttpServer`] for customizing handlers.
 pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
 	let addr = entity
-		.get::<HttpServer, SocketAddr>(|server| {
-			(server.host, server.port.unwrap_or(0)).into()
-		})
+		.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
 		.await?;
 
 	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
@@ -61,22 +59,33 @@ pub async fn start_hyper_server_with_tcp(
 		entity
 			.run_async_local(async move |entity| {
 				// pass an AsyncEntity to the service_fn
-				let service = service_fn(move |req| {
+				let service = service_fn(move |mut req| {
 					let entity = entity.clone();
 
 					async move {
+						// grab the upgrade future before consuming the request; if
+						// the route answers with a `101` we drive it to a `Socket`
+						#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+						let on_upgrade = hyper::upgrade::on(&mut req);
 						let req = hyper_to_request(req).await;
 						let res = entity.exchange(req).await;
+						#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+						if http_ext::is_websocket_response(&res) {
+							spawn_hyper_upgrade(entity, on_upgrade).await;
+						}
 						let res = response_to_hyper(res).await;
 						res.xok::<Infallible>()
 					}
 				});
 
+				// `.with_upgrades()`: keep the connection alive past the `101` so
+				// hyper can yield the upgraded IO to `hyper::upgrade::on`.
 				if let Err(err) = http1::Builder::new()
 					.timer(BevyTimer)
 					.header_read_timeout(Duration::from_secs(2))
 					// .keep_alive(false)
 					.serve_connection(io, service)
+					.with_upgrades()
 					.await
 				{
 					if err.is_timeout()
@@ -93,6 +102,38 @@ pub async fn start_hyper_server_with_tcp(
 			.await
 			.ok();
 	}
+}
+
+/// Drive a hyper connection upgrade to a [`Socket`]: await the upgraded IO,
+/// adapt it to futures IO ([`HyperIo`]), wrap it (`Role::Server`, no
+/// re-handshake), spawn it as a [`Socket`] entity, and fire
+/// [`OnWebSocketUpgrade`] for the socket layer to adopt, mirroring the
+/// `mini_http_server` hand-off. Runs `_local` for the thread-bound reader.
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+async fn spawn_hyper_upgrade(
+	entity: AsyncEntity,
+	on_upgrade: hyper::upgrade::OnUpgrade,
+) {
+	// awaiting only spawns the detached task (which then awaits `on_upgrade` in
+	// the background); it does not block the `101` response.
+	entity
+		.world()
+		.clone()
+		.run_async_local(async move |world| -> Result {
+			let upgraded = on_upgrade
+				.await
+				.map_err(|err| bevyhow!("hyper upgrade failed: {err}"))?;
+			let socket =
+				crate::sockets::socket_from_upgraded(HyperIo::new(upgraded)).await;
+			world
+				.with(move |world: &mut World| {
+					let socket = world.spawn(socket).id();
+					world.trigger(crate::sockets::OnWebSocketUpgrade { socket });
+				})
+				.await;
+			Ok(())
+		})
+		.await;
 }
 
 
@@ -214,6 +255,66 @@ where
 		cx: &mut Context<'_>,
 	) -> Poll<Result<(), io::Error>> {
 		Pin::new(&mut self.inner).poll_close(cx)
+	}
+}
+
+/// The inverse of [`BevyIo`]: adapts a `hyper::rt::Read + hyper::rt::Write` (eg
+/// the [`hyper::upgrade::Upgraded`] IO) to the futures IO traits
+/// `async-tungstenite` needs, so an upgraded hyper connection becomes a
+/// [`Socket`](crate::sockets::Socket).
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+struct HyperIo<S> {
+	inner: S,
+}
+
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+impl<S> HyperIo<S> {
+	fn new(stream: S) -> Self { Self { inner: stream } }
+}
+
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+impl<S> futures::AsyncRead for HyperIo<S>
+where
+	S: hyper::rt::Read + Unpin,
+{
+	fn poll_read(
+		mut self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+		buf: &mut [u8],
+	) -> Poll<io::Result<usize>> {
+		let mut read_buf = hyper::rt::ReadBuf::new(buf);
+		ready!(
+			Pin::new(&mut self.inner).poll_read(cx, read_buf.unfilled())
+		)?;
+		Poll::Ready(Ok(read_buf.filled().len()))
+	}
+}
+
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+impl<S> futures::AsyncWrite for HyperIo<S>
+where
+	S: hyper::rt::Write + Unpin,
+{
+	fn poll_write(
+		mut self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+		buf: &[u8],
+	) -> Poll<io::Result<usize>> {
+		Pin::new(&mut self.inner).poll_write(cx, buf)
+	}
+
+	fn poll_flush(
+		mut self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+	) -> Poll<io::Result<()>> {
+		Pin::new(&mut self.inner).poll_flush(cx)
+	}
+
+	fn poll_close(
+		mut self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+	) -> Poll<io::Result<()>> {
+		Pin::new(&mut self.inner).poll_shutdown(cx)
 	}
 }
 
@@ -427,5 +528,68 @@ mod test {
 		// Use generous upper bound to account for system load variance
 		final_elapsed.xpect_greater_or_equal_to(300);
 		final_elapsed.xpect_less_or_equal_to(2000);
+	}
+}
+
+#[cfg(test)]
+#[cfg(feature = "tungstenite")]
+mod upgrade_test {
+	use crate::prelude::*;
+	use crate::sockets::*;
+	// explicit: `sockets::Message` (the enum) must win over bevy's `Message`
+	// trait, both pulled in by the globs above
+	use crate::sockets::Message;
+	use beet_core::prelude::*;
+
+	/// The hyper backend's same-port upgrade: a route returning
+	/// [`WebSocketUpgrade`] drives `hyper::upgrade::on` to a [`Socket`] entity
+	/// (via [`HyperIo`]), and the channel echoes over it. Mirrors the
+	/// `mini_http_server` upgrade test.
+	#[beet_core::test]
+	async fn upgrades_to_socket() {
+		let server = HttpServer::new_test(super::start_hyper_server_with_tcp);
+		let port = server.0.port.unwrap();
+		let landed = Store::<Vec<Entity>>::default();
+		let captor = landed.clone();
+
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, ServerPlugin));
+			app.world_mut().spawn((
+				server,
+				exchange_handler(|cx| WebSocketUpgrade::from_request(&cx).into()),
+			));
+			app.world_mut()
+				.add_observer(move |ev: On<OnWebSocketUpgrade>| {
+					captor.push(ev.event().socket);
+				});
+			// global recv observer echoes text, installed before any reader fires
+			app.world_mut().add_observer(
+				|ev: On<MessageRecv>, mut commands: Commands| {
+					if let Message::Text(text) = ev.event().inner() {
+						commands.entity(ev.original_target()).trigger_target(
+							MessageSend(Message::text(text.clone())),
+						);
+					}
+				},
+			);
+			app.run();
+		});
+		time_ext::sleep_millis(200).await;
+
+		let mut client =
+			Socket::connect(format!("ws://127.0.0.1:{port}")).await.unwrap();
+		client.send(Message::text("over-hyper")).await.unwrap();
+
+		let mut echoed = None;
+		for _ in 0..40 {
+			if let Some(Ok(Message::Text(text))) = client.next().await {
+				echoed = Some(text);
+				break;
+			}
+		}
+		echoed.xpect_eq(Some("over-hyper".to_string()));
+		landed.get().len().xpect_eq(1usize);
+		client.close(None).await.ok();
 	}
 }

@@ -23,7 +23,7 @@ pub struct CliCommandsPlugin;
 
 impl Plugin for CliCommandsPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<Run>()
+		app.register_type::<Serve>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()
 			.register_type::<ExportPdf>()

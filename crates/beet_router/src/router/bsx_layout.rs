@@ -186,4 +186,108 @@ mod test {
 		let second = get(&mut world, root, "").await;
 		first.xpect_eq(second);
 	}
+
+	/// A world whose `Layout` binds its `<title>` from the transcluded route's
+	/// `ArticleMeta` via the reserved `@comp$RenderRoot:` selector. This is the
+	/// in-markup replacement for the Rust `RouteHead` title lookup: the layout
+	/// builds detached and the binding follows the `RenderRootRef` link
+	/// (installed by `wrap_content_with`) across the transclusion boundary.
+	fn meta_layout_world() -> World {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let mut registry = BsxTemplateRegistry::default();
+		registry
+			.insert_source(
+				"Layout",
+				"<html><head><title>{@comp$RenderRoot:ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
+			)
+			.unwrap();
+		world.insert_resource(registry);
+		world
+	}
+
+	/// A route whose rendered content carries the given frontmatter title.
+	fn meta_route(path: &str, title: &str) -> impl Bundle {
+		render_action::fixed_route(path, (
+			ArticleMeta {
+				title: Some(title.into()),
+				..default()
+			},
+			rsx! { <p>"body"</p> },
+		))
+	}
+
+	/// A layout-head `@comp$RenderRoot:ArticleMeta.title` binding resolves to the
+	/// transcluded route's meta, and differs per route (the gap this stream
+	/// closes: the layout root's self-referential render root is not the content,
+	/// so the walk must follow the distinct content link).
+	#[beet_core::test]
+	async fn layout_title_binds_transcluded_route_meta() {
+		let mut world = meta_layout_world();
+		let root = world
+			.spawn((Router, BsxLayout::default(), children![
+				meta_route("alpha", "Alpha"),
+				meta_route("beta", "Beta"),
+			]))
+			.flush();
+
+		// each route's meta surfaces in the layout head, transcluded by reference.
+		get(&mut world, root, "alpha")
+			.await
+			.xpect_contains("<title>Alpha</title>");
+		// a different route renders a different title through the same layout.
+		get(&mut world, root, "beta")
+			.await
+			.xpect_contains("<title>Beta</title>");
+	}
+
+	/// The layout link [`RenderRootRef`] (and its reverse [`RenderRootRefOf`])
+	/// survives a scene serialization round-trip: a reflect-registered
+	/// relationship whose `#[entities]` source remaps onto the freshly spawned
+	/// content, and whose collection target the relationship hook rebuilds on
+	/// load. This is the link a reloaded layout tree's reserved bindings follow.
+	#[cfg(all(feature = "template_serde", feature = "json"))]
+	#[beet_core::test]
+	fn render_root_ref_round_trips_through_scene() {
+		// a tree the saver collects by `Children`: a content sibling and a layout
+		// root linked to it via `RenderRootRef`, so the edge and its reverse
+		// collection both serialize and rebuild on load with remapped ids.
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let root = world.spawn_empty().id();
+		let content = world.spawn(ChildOf(root)).id();
+		let layout = world
+			.spawn((ChildOf(root), RenderRootRef::new(content)))
+			.id();
+		world.flush();
+		// the relationship hook mirrors the edge onto the content's reverse side.
+		world
+			.entity(content)
+			.get::<RenderRootRefOf>()
+			.unwrap()
+			.holders()
+			.xpect_eq(&[layout]);
+
+		let bytes = TemplateSaver::new()
+			.with_entity_tree(&world, root)
+			.save(&world, MediaType::Json)
+			.unwrap();
+
+		// load into a fresh world: the saved entity ids are remapped to new ones.
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		TemplateLoader::new(&mut world).load(&bytes).unwrap();
+		// the reloaded layout link points at the reloaded content, and the content
+		// carries the rebuilt reverse edge back to the layout.
+		let (layout, render_root_ref) = world
+			.query_once::<(Entity, &RenderRootRef)>()
+			.into_iter()
+			.next()
+			.unwrap();
+		let content = render_root_ref.0;
+		layout.xpect_not_eq(content);
+		world
+			.entity(content)
+			.get::<RenderRootRefOf>()
+			.unwrap()
+			.holders()
+			.xpect_eq(&[layout]);
+	}
 }

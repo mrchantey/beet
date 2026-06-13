@@ -33,6 +33,18 @@ use beet_core_macros::ToTokens;
 // scene template via `template_value`. The default is always overwritten.
 pub struct Element(SmolStr);
 
+/// Marks a node that groups children without introducing a box of its own: the
+/// transparent wrapper a `Vec`/iterator of children lowers to (eg the
+/// `{items.map(..).collect()}` child position). The renderers treat it as
+/// transparent, hoisting its children into the parent's flow, the same way an
+/// HTML walk emits no tag for a child-only node. Without the marker, a fragment
+/// of grid/flex items would lay out (in charcell) as a single nested box.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[reflect(Default, Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct FragmentNode;
+
 impl Element {
 	/// Construct an element with the given tag name.
 	pub fn new(name: impl Into<SmolStr>) -> Self { Self(name.into()) }

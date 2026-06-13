@@ -106,8 +106,8 @@ fn attr_prop_value(value: &AttrValue) -> Option<Value> {
 		AttrValue::Flag => Some(Value::Bool(true)),
 		AttrValue::Str(string) => Some(Value::Str(string.into())),
 		AttrValue::Expr(ValueExpr::Literal(literal)) => literal_prop_value(literal),
-		// a binding or entity ref is not a plain prop value
-		AttrValue::Expr(_) | AttrValue::Spread(_) => None,
+		// a binding, entity ref, spread or verb call is not a plain prop value
+		AttrValue::Expr(_) | AttrValue::Spread(_) | AttrValue::Verb(_) => None,
 	}
 }
 

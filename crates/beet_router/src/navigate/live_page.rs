@@ -47,7 +47,9 @@ pub fn page_host(size: UVec2) -> impl Bundle {
 		children![(
 			Element::new("div"),
 			page_viewport_style(),
-			children![(PageSlot, RenderRef::default())],
+			// the slot carries no `RenderRef` until a page is current: absence is the
+			// unresolved state, so `sync_current_page` installs the reference.
+			children![PageSlot],
 		)],
 	)
 }
@@ -82,14 +84,17 @@ impl Plugin for LivePagePlugin {
 /// the next [`RealtimeParsePlugin`] repaint walks the new page through the
 /// reference. A no-op when nothing changed.
 pub fn sync_current_page(
+	mut commands: Commands,
 	pages: Populated<Entity, Added<CurrentPage>>,
-	mut slots: Query<&mut RenderRef, With<PageSlot>>,
+	slots: Query<Entity, With<PageSlot>>,
 ) {
 	let Some(page) = pages.iter().next() else {
 		return;
 	};
-	for mut slot in slots.iter_mut() {
-		slot.set_if_neq(RenderRef::new(page));
+	// (re)point each slot at the new page; inserting the relationship replaces any
+	// previous target and rebuilds the reverse edge.
+	for slot in slots.iter() {
+		commands.entity(slot).insert(RenderRef::new(page));
 	}
 }
 
@@ -184,10 +189,14 @@ pub fn set_current_page(world: &mut World, page: Entity) {
 
 	world.entity_mut(page).insert(CurrentPage);
 
-	// re-point host slots now so nothing references the outgoing tree on despawn.
-	let mut slots = world.query_filtered::<&mut RenderRef, With<PageSlot>>();
-	for mut slot in slots.iter_mut(world) {
-		slot.set_if_neq(RenderRef::new(page));
+	// re-point host slots now so nothing references the outgoing tree on despawn;
+	// inserting the relationship replaces any previous target.
+	let slots = world
+		.query_filtered::<Entity, With<PageSlot>>()
+		.iter(world)
+		.collect::<Vec<_>>();
+	for slot in slots {
+		world.entity_mut(slot).insert(RenderRef::new(page));
 	}
 
 	for entity in stale {

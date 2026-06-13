@@ -27,6 +27,6 @@ async fn main() -> Result {
 		]))
 		.call::<(), Outcome>(())
 		.await?;
-	cross_log!("sequence finished: {outcome:?}");
+	info!("sequence finished: {outcome:?}");
 	Ok(())
 }

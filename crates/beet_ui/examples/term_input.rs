@@ -30,6 +30,6 @@ fn update(nodes: Query<&mut Value>) {
 /// Terminal input now flows through bevy's unified `KeyboardInput` messages.
 fn log_input(mut keys: MessageReader<KeyboardInput>) {
 	for key in keys.read() {
-		cross_log!("Key: {key:?}");
+		info!("Key: {key:?}");
 	}
 }

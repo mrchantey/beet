@@ -51,7 +51,7 @@ async fn TryHealSelf(cx: ActionContext) -> Result<Outcome> {
 			}
 			let remaining =
 				agent.get::<Health>().map(|h| h.0).unwrap_or_default();
-			cross_log!("Malenia heals herself, health now {remaining}");
+			info!("Malenia heals herself, health now {remaining}");
 			Outcome::PASS
 		})
 		.await?
@@ -89,7 +89,7 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 				.resource_mut::<RandomSource>()
 				.random_range(0.0..attack.max_recoil)
 				.round();
-			cross_log!("Malenia attacks with {name}");
+			info!("Malenia attacks with {name}");
 
 			let player_hp = {
 				let mut player_health = world
@@ -98,7 +98,7 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 				player_health.0 -= damage;
 				player_health.0
 			};
-			cross_log!("Player takes {damage} damage, health now {player_hp}");
+			info!("Player takes {damage} damage, health now {player_hp}");
 
 			let malenia_hp = {
 				let mut malenia_health = world
@@ -107,16 +107,16 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 				malenia_health.0 -= recoil;
 				malenia_health.0
 			};
-			cross_log!(
+			info!(
 				"Malenia takes {recoil} recoil, health now {malenia_hp}"
 			);
 
 			if player_hp <= 0.0 {
-				cross_log!("You lose - Malenia, Blade of Miquella, stands");
+				info!("You lose - Malenia, Blade of Miquella, stands");
 				return Outcome::FAIL.xok();
 			}
 			if malenia_hp <= 0.0 {
-				cross_log!("You win - 'Your strength, extraordinary...'");
+				info!("You win - 'Your strength, extraordinary...'");
 				return Outcome::FAIL.xok();
 			}
 			Outcome::PASS.xok()
@@ -172,6 +172,6 @@ async fn main() -> Result {
 		))
 		.call::<(), Outcome>(())
 		.await?;
-	cross_log!("battle over: {outcome:?}");
+	info!("battle over: {outcome:?}");
 	Ok(())
 }

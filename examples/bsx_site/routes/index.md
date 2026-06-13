@@ -14,5 +14,5 @@ This whole site is markup: a `main.bsx` entrypoint, a `routes/` directory of pag
 Head over to the [docs](/docs) to see how it fits together, or run this site in your terminal:
 
 ```sh
-cargo run --example bsx_site
+beet serve examples/bsx_site
 ```

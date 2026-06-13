@@ -232,27 +232,61 @@ async fn handle_connection(
 	let ws_stream = accept_async(stream)
 		.await
 		.map_err(|e| bevyhow!("WebSocket handshake failed: {}", e))?;
-	let (sink, stream) = ws_stream.split();
+	server.spawn_child(socket_from_ws_stream(ws_stream)).await;
+	Ok(())
+}
 
+/// Build a cross-platform [`Socket`] from an already-handshaked tungstenite
+/// stream by splitting it, mapping inbound `tungstenite::Message` to our
+/// [`Message`], and wrapping the sink in a [`SocketWriter`].
+///
+/// Generic over the transport `S` so the side-port accept loop
+/// ([`handle_connection`], an `Async<TcpStream>`) and the same-port upgrade
+/// seams ([`socket_from_upgraded`] for the mini server, the hyper backend's
+/// `HyperIo`) all land an identical `Socket`.
+pub(crate) fn socket_from_ws_stream<S>(
+	ws_stream: async_tungstenite::WebSocketStream<S>,
+) -> Socket
+where
+	S: 'static
+		+ Send
+		+ Unpin
+		+ futures::AsyncRead
+		+ futures::AsyncWrite,
+{
+	let (sink, stream) = ws_stream.split();
 	let (sink_boxed, stream_boxed): (
 		Pin<Box<DynTungSink>>,
 		Pin<Box<DynTungStream>>,
 	) = (Box::pin(sink), Box::pin(stream));
 
-	// Map incoming tungstenite messages to our cross-platform Message
 	let reader = stream_boxed.map(|res| match res {
 		Ok(msg) => Ok(from_tung_msg(msg)),
 		Err(err) => Err(bevyhow!("WebSocket receive error: {}", err)),
 	});
-
 	let writer = TungWriter {
 		sink: Arc::new(Mutex::new(sink_boxed)),
 	};
+	Socket::new(reader, writer)
+}
 
-	server
-		.spawn_child(Socket::new(reader, writer.clone()))
-		.await;
-	Ok(())
+/// Build a [`Socket`] from a raw stream whose `101 Switching Protocols`
+/// handshake the HTTP backend already wrote (see `mini_http_server`/the hyper
+/// backend). Wraps the stream with [`Role::Server`] without re-running the
+/// handshake, the same-port counterpart to the side-port [`accept_async`].
+pub(crate) async fn socket_from_upgraded<S>(stream: S) -> Socket
+where
+	S: 'static
+		+ Send
+		+ Unpin
+		+ futures::AsyncRead
+		+ futures::AsyncWrite,
+{
+	use async_tungstenite::WebSocketStream;
+	use async_tungstenite::tungstenite::protocol::Role;
+	let ws_stream =
+		WebSocketStream::from_raw_socket(stream, Role::Server, None).await;
+	socket_from_ws_stream(ws_stream)
 }
 
 #[derive(Clone)]

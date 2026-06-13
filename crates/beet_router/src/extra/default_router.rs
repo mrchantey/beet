@@ -34,6 +34,10 @@ pub fn default_router() -> impl Bundle {
 		OnSpawn::insert_child(app_info()),
 		#[cfg(all(feature = "json", feature = "std"))]
 		OnSpawn::insert_child(analytics_handler()),
+		// the same-port `/__client_io` websocket-upgrade endpoint, so every HTTP
+		// router exposes the live-reload/socket channel on its own port.
+		#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+		OnSpawn::insert_child(client_io_route()),
 	)
 }
 

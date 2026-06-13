@@ -114,11 +114,13 @@ impl CharcellNodeData<'_> {
 		// `display: none` children are removed from layout: skipping them here
 		// means they reserve no space (measure) and are never assigned a rect
 		// (layout), so the subtree is neither sized nor painted. A child that is a
-		// [`RenderRef`] holder is resolved to the entity it renders in place.
-		self.children
-			.iter()
-			.flat_map(|children| children.iter())
-			.filter_map(move |child| query.resolved_node(child).ok())
+		// [`RenderRef`] holder is resolved to the entity it renders in place; a
+		// [`FragmentNode`] grouping wrapper is spliced out, its children hoisted
+		// into this flow so they lay out as direct siblings.
+		query
+			.flow_child_entities(self.children)
+			.into_iter()
+			.filter_map(move |child| query.unresolved_node(child).ok())
 			.filter(|node| node.layout_style().display != Display::None)
 	}
 
@@ -146,12 +148,10 @@ impl CharcellNodeData<'_> {
 /// referenced entity as if it sat at the holder's position (see [`RenderRef`]),
 /// so every traversal resolves through this before visiting a node.
 fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
-	// follow holders to their target; an unresolved holder (no page yet) renders
-	// empty in place, so stop at the holder rather than chasing a missing target.
-	while let Ok(render_ref) = refs.get(entity)
-		&& let Some(target) = render_ref.target()
-	{
-		entity = target;
+	// follow holders to their target; the relationship always names one, so an
+	// unresolved slot points at a placeholder that renders empty in place.
+	while let Ok(render_ref) = refs.get(entity) {
+		entity = render_ref.target();
 	}
 	entity
 }
@@ -167,6 +167,10 @@ fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
 pub(crate) struct CharcellTree<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
 	refs: Query<'w, 's, &'static RenderRef>,
+	// transparent grouping wrappers (a `Vec`/iterator child position lowers to a
+	// `FragmentNode`), spliced out so every traversal agrees with
+	// [`CharcellNodeData::child_nodes`].
+	fragments: Query<'w, 's, (), With<FragmentNode>>,
 }
 
 impl CharcellTree<'_, '_> {
@@ -175,13 +179,37 @@ impl CharcellTree<'_, '_> {
 		resolve_render_ref(&self.refs, entity)
 	}
 
-	/// Resolved children of `entity`, holders replaced by their referents.
+	/// Resolved children of `entity`: holders replaced by their referents and
+	/// [`FragmentNode`] grouping wrappers spliced out so their children are hoisted.
 	fn children(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
-		self.children
+		let mut out = Vec::new();
+		for child in self
+			.children
 			.get(entity)
 			.into_iter()
 			.flat_map(|children| children.iter())
-			.map(|child| self.resolve(child))
+		{
+			self.push_flow_entity(child, &mut out);
+		}
+		out.into_iter()
+	}
+
+	/// Resolve `child` into the flow, recursing through [`FragmentNode`] wrappers
+	/// so their children take their place.
+	fn push_flow_entity(&self, child: Entity, out: &mut Vec<Entity>) {
+		let child = self.resolve(child);
+		if self.fragments.contains(child) {
+			for grandchild in self
+				.children
+				.get(child)
+				.into_iter()
+				.flat_map(|children| children.iter())
+			{
+				self.push_flow_entity(grandchild, out);
+			}
+		} else {
+			out.push(child);
+		}
 	}
 
 	/// Resolved direct children of `entity`, holders replaced by their referents.
@@ -257,19 +285,43 @@ pub struct CharcellQuery<'w, 's> {
 		),
 	>,
 	refs: Query<'w, 's, &'static RenderRef>,
+	// transparent grouping wrappers (a `Vec`/iterator child position lowers to a
+	// `FragmentNode`); their children are hoisted into the parent's flow. A
+	// fragment carries no box, so the render systems never assign it an
+	// `IntrinsicSize`/`LayoutRect` and it is absent from `nodes`: this query reads
+	// its [`Children`] directly so the hoist still finds them.
+	fragments: Query<'w, 's, Option<&'static Children>, With<FragmentNode>>,
 }
 
 impl CharcellQuery<'_, '_> {
-	/// Build a node, resolving [`RenderRef`] holders to the entity they render.
-	///
-	/// Use this when starting from a raw [`Children`] entity. Once an entity has
-	/// already been resolved (eg by [`CharcellTree`] traversal), call
-	/// [`Self::unresolved_node`] to avoid a redundant resolution.
-	pub(super) fn resolved_node(
-		&self,
-		entity: Entity,
-	) -> Result<CharcellNodeData<'_>> {
-		self.unresolved_node(resolve_render_ref(&self.refs, entity))
+	/// The flow child entities behind a [`Children`]: each resolved through
+	/// [`RenderRef`] holders, with [`FragmentNode`] grouping wrappers spliced out
+	/// so their own children take their place (depth-first, order preserved).
+	/// Keeps [`CharcellNodeData::child_nodes`] aligned with the [`CharcellTree`]
+	/// traversal that paint reads.
+	fn flow_child_entities(&self, children: Option<&Children>) -> Vec<Entity> {
+		let mut out = Vec::new();
+		for child in children.iter().flat_map(|children| children.iter()) {
+			self.push_flow_entity(child, &mut out);
+		}
+		out
+	}
+
+	/// Resolve a child into the flow: push its [`RenderRef`]-resolved id, or, when
+	/// it is a [`FragmentNode`] wrapper, recurse so its children take its place.
+	fn push_flow_entity(&self, entity: Entity, out: &mut Vec<Entity>) {
+		let entity = resolve_render_ref(&self.refs, entity);
+		// the fragment marker is checked independently of `nodes`: a fragment has
+		// no box, so it is never prepared into `nodes`, but its children must still
+		// be hoisted.
+		match self.fragments.get(entity) {
+			Ok(children) => {
+				for child in children.iter().flat_map(|children| children.iter()) {
+					self.push_flow_entity(child, out);
+				}
+			}
+			Err(_) => out.push(entity),
+		}
 	}
 
 	/// Build a node for an entity that is already [`RenderRef`]-resolved,

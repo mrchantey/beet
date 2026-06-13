@@ -6,9 +6,9 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub struct CliArgs {
 	/// Positional arguments forming the path.
-	pub path: Vec<String>,
+	pub path: Vec<SmolStr>,
 	/// Named arguments as key-value pairs, supporting multiple values per key.
-	pub params: MultiMap<String, String>,
+	pub params: MultiMap<SmolStr, SmolStr>,
 }
 
 
@@ -18,6 +18,7 @@ impl CliArgs {
 	/// The arguments arrive already tokenized by the shell, so they are fed
 	/// straight to [`parse_tokens`](Self::parse_tokens) without re-grouping.
 	/// This preserves quotes within a value, eg a JSON `--body`.
+	#[cfg(feature = "std")]
 	pub fn parse_env() -> Self { Self::parse_tokens(env_ext::args()) }
 
 	/// Parses CLI arguments from a string, grouping quoted sections into
@@ -33,13 +34,13 @@ impl CliArgs {
 		let mut path = Vec::new();
 		let mut params = MultiMap::new();
 		let mut collecting_nested = false;
-		let mut pending_key: Option<String> = None;
+		let mut pending_key: Option<SmolStr> = None;
 
 		let mut args_iter = tokens.into_iter();
 		while let Some(arg) = args_iter.next() {
 			if collecting_nested {
 				// After seeing `--`, everything goes into 'nested-args'
-				params.insert("nested-args".to_string(), arg);
+				params.insert("nested-args".into(), arg.into());
 			} else if arg == "--" {
 				// Start collecting nested args.
 				// If there's a pending key, it's a flag.
@@ -58,16 +59,16 @@ impl CliArgs {
 
 				if let Some((key, value)) = stripped.split_once('=') {
 					// Key=value format
-					params.insert(key.to_string(), value.to_string());
+					params.insert(key.into(), value.into());
 				} else {
 					// No equals sign - might be followed by a value
-					pending_key = Some(stripped.to_string());
+					pending_key = Some(stripped.into());
 				}
 			} else {
 				// Non-dash argument
 				if let Some(key) = pending_key.take() {
 					// This is the value for the pending key
-					params.insert(key, arg);
+					params.insert(key, arg.into());
 				} else {
 					// Path param: split slash-delimited segments so a single
 					// `blog/post-1` arg becomes `["blog", "post-1"]`, matching
@@ -75,7 +76,7 @@ impl CliArgs {
 					path.extend(
 						arg.split('/')
 							.filter(|seg| !seg.is_empty())
-							.map(String::from),
+							.map(SmolStr::from),
 					);
 				}
 			}
@@ -160,7 +161,8 @@ impl CliArgs {
 	/// Ordering between positionals and flags is not preserved. The inverse of
 	/// [`parse_tokens`](Self::parse_tokens), useful for forwarding to a subprocess.
 	pub fn into_args(self) -> Vec<String> {
-		let mut args = self.path;
+		let mut args: Vec<String> =
+			self.path.into_iter().map(Into::into).collect();
 		for (key, values) in self.params.iter_all() {
 			if values.is_empty() {
 				args.push(format!("--{key}"));

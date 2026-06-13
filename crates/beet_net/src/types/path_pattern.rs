@@ -192,9 +192,9 @@ impl PathPattern {
 	/// to reconstruct paths with double slashes like `foo//bar/baz.rs`.
 	pub fn parse_path(
 		&self,
-		path: &Vec<String>,
+		path: &[SmolStr],
 	) -> Result<PathMatch, RouteMatchError> {
-		let mut remaining_path = VecDeque::from(path.clone());
+		let mut remaining_path = VecDeque::from(path.to_vec());
 
 		let mut dyn_map = default();
 		// check each segment against the path
@@ -246,10 +246,10 @@ pub struct PathPatternSegment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathMatch {
 	/// Path segments that were not consumed by the pattern.
-	pub remaining_path: VecDeque<String>,
+	pub remaining_path: VecDeque<SmolStr>,
 	/// Dynamic segment values. For duplicate and greedy segments, each matched path segment
 	/// is stored as a separate value.
-	pub dyn_map: MultiMap<String, String>,
+	pub dyn_map: MultiMap<SmolStr, SmolStr>,
 }
 impl PathMatch {
 	/// Returns true if there is no remaining path to match
@@ -424,8 +424,8 @@ impl PathPatternSegment {
 	/// and stored as separate values in the multimap.
 	pub fn parse_parts(
 		&self,
-		dyn_map: &mut MultiMap<String, String>,
-		path: &mut VecDeque<String>,
+		dyn_map: &mut MultiMap<SmolStr, SmolStr>,
+		path: &mut VecDeque<SmolStr>,
 	) -> Result<(), RouteMatchError> {
 		match (&self.modifier, path.pop_front()) {
 			// Static match - must match exactly
@@ -437,7 +437,7 @@ impl PathPatternSegment {
 			(PathPatternModifier::Static, Some(other)) => {
 				Err(RouteMatchError::InvalidStatic {
 					segment: self.name.clone(),
-					path: other,
+					path: other.to_string(),
 				})
 			}
 			(PathPatternModifier::Static, None) => {
@@ -451,10 +451,10 @@ impl PathPatternSegment {
 				if value.is_empty() {
 					Err(RouteMatchError::InvalidStatic {
 						segment: "dynamic segment".to_string(),
-						path: value,
+						path: value.to_string(),
 					})
 				} else {
-					dyn_map.insert(self.name.clone(), value);
+					dyn_map.insert(self.name.clone().into(), value);
 					Ok(())
 				}
 			}
@@ -469,24 +469,24 @@ impl PathPatternSegment {
 				if value.is_empty() {
 					// Empty string from adjacent slash - treat as no match, put it back
 					path.push_front(value);
-					dyn_map.insert_key(self.name.clone());
+					dyn_map.insert_key(self.name.clone().into());
 				} else {
-					dyn_map.insert(self.name.clone(), value);
+					dyn_map.insert(self.name.clone().into(), value);
 				}
 				Ok(())
 			}
 			(PathPatternModifier::Optional, None) => {
-				dyn_map.insert_key(self.name.clone());
+				dyn_map.insert_key(self.name.clone().into());
 				Ok(())
 			}
 
 			// Dynamic OneOrMore - greedy, must have at least one segment
 			(PathPatternModifier::OneOrMore, Some(value)) => {
 				// Insert first segment
-				dyn_map.insert(self.name.clone(), value);
+				dyn_map.insert(self.name.clone().into(), value);
 				// Insert remaining segments separately
 				while let Some(next) = path.pop_front() {
-					dyn_map.insert(self.name.clone(), next);
+					dyn_map.insert(self.name.clone().into(), next);
 				}
 				Ok(())
 			}
@@ -499,16 +499,16 @@ impl PathPatternSegment {
 			// Dynamic ZeroOrMore - greedy, can match empty
 			(PathPatternModifier::ZeroOrMore, Some(value)) => {
 				// Insert first segment
-				dyn_map.insert(self.name.clone(), value);
+				dyn_map.insert(self.name.clone().into(), value);
 				// Insert remaining segments separately
 				while let Some(next) = path.pop_front() {
-					dyn_map.insert(self.name.clone(), next);
+					dyn_map.insert(self.name.clone().into(), next);
 				}
 				Ok(())
 			}
 			(PathPatternModifier::ZeroOrMore, None) => {
 				// Zero matches is valid for ZeroOrMore - create empty entry
-				dyn_map.insert_key(self.name.clone());
+				dyn_map.insert_key(self.name.clone().into());
 				Ok(())
 			}
 		}
@@ -560,7 +560,7 @@ mod test {
 		let parts = RequestParts::get(route_path);
 		PathPattern::new(segments)
 			.unwrap()
-			.parse_path(&parts.path())
+			.parse_path(parts.path())
 	}
 
 	#[beet_core::test]
@@ -620,25 +620,25 @@ mod test {
 		parse("/:foo", "").xpect_err();
 
 		let map = parse("/:foo", "bar").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.get("foo").unwrap().xpect_eq("bar");
 		map.len().xpect_eq(1);
 
 		let map = parse("/:foo", "/bar").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.get("foo").unwrap().xpect_eq("bar");
 		map.len().xpect_eq(1);
 
 		let map = parse("/:foo/:baz", "bar/baz").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
-		map.get("baz").cloned().xpect_eq(Some("baz".to_string()));
+		map.get("foo").unwrap().xpect_eq("bar");
+		map.get("baz").unwrap().xpect_eq("baz");
 		map.len().xpect_eq(2);
 
 		let map = parse("/:foo/:baz", "/bar/baz").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
-		map.get("baz").cloned().xpect_eq(Some("baz".to_string()));
+		map.get("foo").unwrap().xpect_eq("bar");
+		map.get("baz").unwrap().xpect_eq("baz");
 		map.len().xpect_eq(2);
 
 		let map = parse("/:foo", "bar/baz").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.get("foo").unwrap().xpect_eq("bar");
 		map.len().xpect_eq(1);
 	}
 
@@ -658,22 +658,25 @@ mod test {
 		parse("/*foo", "").xpect_err();
 
 		let map = parse("/*foo", "bar").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.get("foo").unwrap().xpect_eq("bar");
 		map.len().xpect_eq(1);
 
 		let map = parse("/*foo", "bar/baz").unwrap().dyn_map;
 		map.get_vec("foo")
-			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
+			.unwrap()
+			.xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 
 		let map = parse("/*foo", "/bar/baz").unwrap().dyn_map;
 		map.get_vec("foo")
-			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
+			.unwrap()
+			.xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 
 		let map = parse("foo/*bar", "foo/bar/baz").unwrap().dyn_map;
 		map.get_vec("bar")
-			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
+			.unwrap()
+			.xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 	}
 
@@ -690,18 +693,19 @@ mod test {
 		// Empty match creates key with no values
 		let map = parse("/*foo?", "").unwrap().dyn_map;
 		map.contains_key("foo").xpect_true();
-		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
+		map.get_vec("foo").unwrap().xpect_empty();
 		map.len().xpect_eq(1);
 
 		let map = parse("foo/*bar?", "foo").unwrap().dyn_map;
 		map.contains_key("bar").xpect_true();
-		map.get_vec("bar").xpect_eq(Some(&Vec::<String>::new()));
+		map.get_vec("bar").unwrap().xpect_empty();
 		map.len().xpect_eq(1);
 
 		// Non-empty match stores each segment separately
 		let map = parse("/*foo?", "bar/baz").unwrap().dyn_map;
 		map.get_vec("foo")
-			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
+			.unwrap()
+			.xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 	}
 
@@ -716,18 +720,18 @@ mod test {
 		// Empty match creates key with no values
 		let map = parse("/:foo?", "").unwrap().dyn_map;
 		map.contains_key("foo").xpect_true();
-		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
+		map.get_vec("foo").unwrap().xpect_empty();
 		map.len().xpect_eq(1);
 
 		// With prefix
 		let map = parse("/prefix/:foo?", "prefix").unwrap().dyn_map;
 		map.contains_key("foo").xpect_true();
-		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
+		map.get_vec("foo").unwrap().xpect_empty();
 		map.len().xpect_eq(1);
 
 		// Non-empty match
 		let map = parse("/:foo?", "bar").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.get("foo").unwrap().xpect_eq("bar");
 		map.len().xpect_eq(1);
 	}
 
@@ -740,7 +744,8 @@ mod test {
 
 		let map = parse("/:foo+", "bar/baz").unwrap().dyn_map;
 		map.get_vec("foo")
-			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
+			.unwrap()
+			.xpect_eq(vec!["bar", "baz"]);
 
 		// Test :foo* syntax (explicit ZeroOrMore)
 		parse("/:foo*", "bar").xpect_ok();
@@ -749,36 +754,23 @@ mod test {
 
 		let map = parse("/:foo*", "").unwrap().dyn_map;
 		map.contains_key("foo").xpect_true();
-		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
+		map.get_vec("foo").unwrap().xpect_empty();
 	}
 
 	#[beet_core::test]
 	fn adjacent_slashes() {
 		// greedy segments store each part separately
 		let map = parse("foo/*bar", "foo//bar/baz.rs").unwrap().dyn_map;
-		map.get_vec("bar").xpect_eq(Some(&vec![
-			// "".to_string(),
-			"bar".to_string(),
-			"baz.rs".to_string(),
-		]));
+		map.get_vec("bar").unwrap().xpect_eq(vec!["bar", "baz.rs"]);
 		map.len().xpect_eq(1);
 
 		let map = parse("/*file", "/bar//baz.rs").unwrap().dyn_map;
-		map.get_vec("file").xpect_eq(Some(&vec![
-			"bar".to_string(),
-			// "".to_string(),
-			"baz.rs".to_string(),
-		]));
+		map.get_vec("file").unwrap().xpect_eq(vec!["bar", "baz.rs"]);
 		map.len().xpect_eq(1);
 
 		// multiple adjacent slashes stored as empty strings
 		let map = parse("/*path", "foo///bar").unwrap().dyn_map;
-		map.get_vec("path").xpect_eq(Some(&vec![
-			"foo".to_string(),
-			// "".to_string(),
-			// "".to_string(),
-			"bar".to_string(),
-		]));
+		map.get_vec("path").unwrap().xpect_eq(vec!["foo", "bar"]);
 		map.len().xpect_eq(1);
 	}
 

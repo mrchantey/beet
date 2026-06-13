@@ -20,9 +20,7 @@ the package resource patched from markup -->
 
 const LAYOUT_BSX: &str = r#"
 <html lang="en">
-	<RouteHead>
-		<meta property="og:site_name" content=@res:PackageConfig.title/>
-	</RouteHead>
+	<RouteHead/>
 	<body>
 		<RouteSidebar/>
 		<main><Slot/></main>
@@ -41,7 +39,7 @@ const COUNTER_BSX: &str = r#"
 <article bx:scope="counter">
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click="increment@doc:count">More</button>
+		<button bx:click=increment{ field: @doc:count }>More</button>
 	</widgets::Card>
 </article>
 "#;
@@ -119,23 +117,27 @@ async fn entry_components_land_on_root() {
 	world
 		.resource::<PackageConfig>()
 		.version
-		.as_str()
+		.as_deref()
+		.unwrap()
 		.xpect_eq(env!("CARGO_PKG_VERSION"));
 	// discovered routes assembled into the root's route tree
 	let tree = world.entity(root).get::<RouteTree>().unwrap();
 	tree.find(&["docs", "intro"]).is_some().xpect_true();
 }
 
-/// `<Router {(HttpServer{..}, ..)}>`: the http server is declarable from
-/// markup, landing on the router entity via the reflect spread path (port 0
-/// keeps any started backend on an OS-assigned port). The `on_add` hook fires
-/// through the reflect insert, dispatching the installed no-op backend.
+/// `<Router {(HttpServer{port:0})}>`: the http server is declarable from markup,
+/// landing on the router via the reflect spread path (port 0 keeps any started
+/// backend on an OS-assigned port). The reflect insert pulls in the `Server`
+/// orchestrator (`#[require(Server)]`), which dispatches the no-backend
+/// fall-through to the installed runtime hook.
 #[beet_core::test]
 fn http_server_declarable_in_markup() {
-	// no `server` backend feature here, so install the runtime hook the
-	// `on_add` dispatch falls through to
-	set_http_server(|_| Box::pin(async { Ok(()) })).unwrap();
-	let mut world = (AsyncPlugin, RouterPlugin, ServerPlugin).into_world();
+	// no `server` backend feature here, so install the runtime hook the backend
+	// dispatch falls through to (idempotent: a prior test may have set it).
+	set_http_server(|_| Box::pin(async { Ok(()) })).ok();
+	// `RouterPlugin` now brings in `ServerPlugin` (the `ServerBackends` registry),
+	// so it must not be added again.
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let holder = world.spawn_empty().id();
 	let root = spawn_bsx_under(
 		&mut world,
@@ -144,6 +146,8 @@ fn http_server_declarable_in_markup() {
 	);
 	world.entity(root).contains::<Router>().xpect_true();
 	world.entity(root).contains::<RequestLogger>().xpect_true();
+	// the orchestrator landed via the require
+	world.entity(root).contains::<Server>().xpect_true();
 	world
 		.entity(root)
 		.get::<HttpServer>()
@@ -171,17 +175,17 @@ async fn page_renders_in_layout() {
 		.xpect_contains("aria-current=\"page\"");
 }
 
-/// The `@` bindings against the real route pipeline: a layout `@res` attribute,
-/// a `.bsx` template `@prop`, and the counter page's `@doc` text/event bindings,
-/// all settled before the SSR render.
+/// The `@` bindings against the real route pipeline: the default head's
+/// `og:site_name` resource bind, a `.bsx` template `@prop`, and the counter
+/// page's `@doc` text/event bindings, all settled before the SSR render.
 #[beet_core::test]
 async fn bindings_render_in_route_pipeline() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let root = spawn_site(&mut world);
-	get(&mut world, root, "counter")
-		.await
-		.as_str()
-		// the layout head pulls the resource title via `@res:PackageConfig.title`
+	let html = get(&mut world, root, "counter").await;
+	html.as_str()
+		// the default head binds og:site_name to `PackageConfig.title` (no
+		// hand-written tag in the layout), so the markup-declared title surfaces
 		.xpect_contains("property=\"og:site_name\" content=\"Beet Test Site\"")
 		// the Card's `@prop:title` binds the caller's prop into the heading
 		.xpect_contains("<h2>Counter</h2>")
@@ -189,6 +193,8 @@ async fn bindings_render_in_route_pipeline() {
 		.xpect_contains("You have clicked 0 times.")
 		// the event binding's field mirror stays out of the button label
 		.xpect_contains("<button>More</button>");
+	// exactly one og:site_name: the default head owns it, no duplicate.
+	html.matches("og:site_name").count().xpect_eq(1);
 }
 
 #[beet_core::test]

@@ -60,10 +60,16 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.queue_async(async |entity| {
 			let home_url =
 				entity.get(|nav: &Navigator| nav.home_url.clone()).await?;
-			// a failed home load (eg network down) shows nothing rather than
-			// crashing the host; the error page lives in the render step.
+			// world handle kept before `navigate_to` consumes `entity`, for the
+			// error-page render below.
+			let world = entity.world().clone();
+			// a failed home load (eg network down) renders a user-facing error
+			// page in place of the missing page rather than crashing the host or
+			// leaving it blank, while still logging the cause.
 			if let Err(err) = Navigator::navigate_to(entity, home_url).await {
-				cross_log!("Navigator failed to load home page: {err}");
+				error!("Navigator failed to load home page: {err}");
+				let message = err.to_string();
+				world.with(move |world| set_error_page(world, message)).await;
 			}
 			Ok(())
 		});

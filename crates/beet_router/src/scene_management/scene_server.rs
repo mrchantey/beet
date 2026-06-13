@@ -86,7 +86,7 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 					Response::ok_text(format!("loaded scene: {} root(s)\n", roots.len()))
 				}
 				Err(err) => {
-					cross_log_error!("scene: failed to load: {err}");
+					error!("scene: failed to load: {err}");
 					Response::status_text(
 						StatusCode::BAD_REQUEST,
 						format!("invalid scene: {err}\n"),
@@ -96,7 +96,7 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 		})
 		.await
 		.unwrap_or_else(|err| {
-			cross_log_error!("scene: load failed: {err}");
+			error!("scene: load failed: {err}");
 			Response::status_text(
 				StatusCode::INTERNAL_SERVER_ERROR,
 				"scene load failed\n",
@@ -146,7 +146,7 @@ pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 			{
 				Ok(json) => Response::ok_body(json, MediaType::Json),
 				Err(err) => {
-					cross_log_error!("scene: dump failed: {err}");
+					error!("scene: dump failed: {err}");
 					Response::status_text(
 						StatusCode::INTERNAL_SERVER_ERROR,
 						format!("dump failed: {err}\n"),
@@ -156,7 +156,7 @@ pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 		})
 		.await
 		.unwrap_or_else(|err| {
-			cross_log_error!("scene: dump failed: {err}");
+			error!("scene: dump failed: {err}");
 			Response::status_text(
 				StatusCode::INTERNAL_SERVER_ERROR,
 				"dump failed\n",

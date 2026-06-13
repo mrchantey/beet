@@ -173,7 +173,7 @@ impl SchemaBindingGenerator {
 				.unwrap_or(false);
 
 		if can_reuse {
-			cross_log!(
+			info!(
 				"[schema_binding_generator] providers unchanged, reusing existing schema"
 			);
 		} else {
@@ -255,24 +255,24 @@ impl SchemaBindingGenerator {
 	fn write_providers_tf_bytes(&self, content: &[u8]) -> Result {
 		let path = self.work_dir.join("providers.tf.json");
 		fs_ext::write(&path, content)?;
-		cross_log!("[schema_binding_generator] wrote {}", path.display());
+		info!("[schema_binding_generator] wrote {}", path.display());
 		Ok(())
 	}
 
 	async fn run_tofu_init(&self) -> Result {
-		cross_log!(
+		info!(
 			"[schema_binding_generator] running tofu init in {}",
 			self.work_dir.display()
 		);
 		tofu::init(&self.work_dir, false).await?;
 
-		cross_log!("[schema_binding_generator] tofu init: OK");
+		info!("[schema_binding_generator] tofu init: OK");
 		Ok(())
 	}
 
 	async fn run_tofu_schema(&self) -> Result<AbsPathBuf> {
 		let schema_path = self.work_dir.join("schema.json");
-		cross_log!(
+		info!(
 			"[schema_binding_generator] running tofu providers schema → {}",
 			schema_path
 		);
@@ -280,7 +280,7 @@ impl SchemaBindingGenerator {
 
 		fs_ext::write_async(&schema_path, &schema).await?;
 
-		cross_log!(
+		info!(
 			"[schema_binding_generator] schema exported ({:.1} MB)",
 			schema.len() as f64 / 1_048_576.0
 		);
@@ -309,7 +309,7 @@ impl SchemaBindingGenerator {
 			}
 
 			binding_gen.generate_to_file(&schema, &file.path)?;
-			cross_log!(
+			info!(
 				"[schema_binding_generator] wrote {}",
 				file.path.display()
 			);

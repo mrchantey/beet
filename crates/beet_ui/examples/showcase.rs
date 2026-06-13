@@ -37,10 +37,10 @@ fn main() {
 		))
 		.insert_resource(PackageConfig {
 			title: "Beet UI Showcase".into(),
-			binary_name: "showcase".into(),
-			version: "0.0.0".into(),
 			description: "A gallery of beet_ui rules and widgets".into(),
-			homepage: "https://beetstack.dev".into(),
+			binary_name: Some("showcase".into()),
+			version: Some("0.0.0".into()),
+			homepage: Some("https://beetstack.dev".into()),
 			repository: None,
 			stage: "dev".into(),
 			service_access: ServiceAccess::Local,
@@ -71,7 +71,7 @@ fn serve_showcase(world: &mut World) -> Result {
 		}),
 	));
 
-	cross_log!(
+	info!(
 		"Showcase served at http://localhost:{port} (also written to {})",
 		path.display()
 	);

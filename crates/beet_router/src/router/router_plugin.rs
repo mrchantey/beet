@@ -52,6 +52,10 @@ impl Plugin for RouterPlugin {
 		#[cfg(feature = "std")]
 		{
 			app
+				// the server model: routers and servers go together, so spawning a
+				// backend on a router boots through the `Server` orchestrator, which
+				// reads the `ServerBackends` registry `ServerPlugin` populates.
+				.init_plugin::<ServerPlugin>()
 				// template routes render through the charcell layout/paint
 				// pipeline; without it the `PostParseTree` schedule has no systems
 				// and ANSI output is blank.
@@ -62,6 +66,10 @@ impl Plugin for RouterPlugin {
 				.init_plugin::<DocumentPlugin>()
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>()
+				// the diagnostic pages: the help/not-found route list and the
+				// navigation-failure error page, both rendered through the layout.
+				.register_template::<RouteList>()
+				.register_template::<ErrorPage>()
 				// per-route metadata, bindable via the reserved ref, eg
 				// `@comp$RenderRoot:ArticleMeta.title`
 				.register_type::<ArticleMeta>()
@@ -77,9 +85,12 @@ impl Plugin for RouterPlugin {
 			app.register_type::<RoutesDir>()
 				.add_observer(spawn_routes_dir);
 			// the server-to-client websocket channel and the dev-mode live
-			// reload watcher, plus its by-name `<LiveReloadScript/>` widget
+			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
+			// channel rides the main HTTP port: `default_router` wires the
+			// `/__client_io` upgrade route and `adopt_client_io_socket` adopts the
+			// landed `Socket`.
 			#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
-			app.add_observer(start_client_io)
+			app.add_observer(adopt_client_io_socket)
 				.add_observer(broadcast_to_clients)
 				.add_observer(start_live_reload)
 				.add_observer(reload_site_on_change)

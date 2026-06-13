@@ -74,7 +74,7 @@ fn echo_request(req: ActionContext<Request>) -> Response {
 /// Builds a JSON response echoing the request's method, path, headers, body, and query params.
 fn standard_echo_response(req: Request) -> Response {
 	let method = *req.method();
-	let path = req.path().to_vec();
+	let path = req.path().iter().map(|seg| seg.to_string()).collect();
 
 	let mut headers = MultiMap::new();
 	for (key, values) in req.headers.iter_all() {
@@ -86,7 +86,7 @@ fn standard_echo_response(req: Request) -> Response {
 	let mut query = MultiMap::new();
 	for (key, values) in req.params().iter_all() {
 		for value in values {
-			query.insert(key.clone(), value.clone());
+			query.insert(key.to_string(), value.to_string());
 		}
 	}
 

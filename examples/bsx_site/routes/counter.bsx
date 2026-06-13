@@ -8,7 +8,7 @@
 	</p>
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click="increment@doc:count">More</button>
-		<button bx:click="decrement@doc:count">Less</button>
+		<button bx:click=increment{ field: @doc:count, amount: 1 }>More</button>
+		<button bx:click=decrement{ field: @doc:count }>Less</button>
 	</widgets::Card>
 </article>

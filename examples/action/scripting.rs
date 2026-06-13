@@ -33,7 +33,7 @@ async fn main() -> Result {
 		))
 		.call::<i64, i64>(41)
 		.await?;
-	cross_log!("count is now {count}");
+	info!("count is now {count}");
 
 	// string transform: greet the input
 	let greeting = world
@@ -43,7 +43,7 @@ async fn main() -> Result {
 		))
 		.call::<String, String>("world".to_string())
 		.await?;
-	cross_log!("{greeting}");
+	info!("{greeting}");
 
 	// struct transform: mutate a single field, return the struct
 	let player = world
@@ -56,7 +56,7 @@ async fn main() -> Result {
 			score: 1,
 		})
 		.await?;
-	cross_log!("{} now has score {}", player.name, player.score);
+	info!("{} now has score {}", player.name, player.score);
 
 	Ok(())
 }

@@ -45,7 +45,7 @@ pub(crate) fn start_live_reload(
 		),
 	);
 	if channels.is_empty() {
-		commands.spawn((ChildOf(ev.entity), ClientIo::default()));
+		commands.spawn((ChildOf(ev.entity), ClientIo));
 	}
 	Ok(())
 }
@@ -103,7 +103,6 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_net::prelude::*;
 
 	/// Write a watched site fixture (`templates/` + `routes/`) under
 	/// `target/tests` and return its root.
@@ -127,8 +126,8 @@ mod test {
 	}
 
 	/// Spawn the watched site: a router serving `routes/`, the registered
-	/// templates, and a [`LiveReload`] with a pre-set OS-assigned-port
-	/// [`ClientIo`] so parallel tests never race on the default port.
+	/// templates, and a [`LiveReload`] with its [`ClientIo`] channel (which now
+	/// rides the main HTTP port, so no per-channel port to set).
 	fn spawn_site(world: &mut World, site_dir: &AbsPathBuf) -> (Entity, Entity) {
 		world.register_bsx_templates(site_dir.join("templates")).unwrap();
 		world.insert_resource(SiteRoot(site_dir.clone()));
@@ -136,9 +135,7 @@ mod test {
 			.spawn((default_router(), children![RoutesDir::new("routes")]))
 			.flush();
 		let watcher = world
-			.spawn((LiveReload::new(site_dir.clone()), ClientIo {
-				port: None,
-			}))
+			.spawn((LiveReload::new(site_dir.clone()), ClientIo))
 			.flush();
 		(root, watcher)
 	}
@@ -225,17 +222,16 @@ mod test {
 	fn spawns_a_channel_when_none_exists() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = site_fixture("spawns_channel");
-		// no pre-set ClientIo: the watcher spawns a default one as its child
+		// no pre-set ClientIo: the watcher spawns one as its child
 		world.register_bsx_templates(site_dir.join("templates")).unwrap();
 		let watcher = world.spawn(LiveReload::new(site_dir.clone())).flush();
 		let channel = world
-			.with_state::<Query<(Entity, &ClientIo)>, _>(|query| {
-				query.single().map(|(entity, channel)| (entity, channel.port))
+			.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
+				query.single()
 			})
 			.unwrap();
-		channel.1.xpect_eq(Some(DEFAULT_SOCKET_PORT));
 		world
-			.entity(channel.0)
+			.entity(channel)
 			.get::<ChildOf>()
 			.unwrap()
 			.parent()

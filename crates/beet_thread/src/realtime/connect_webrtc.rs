@@ -1,4 +1,4 @@
-use beet_core::cross_log;
+use beet_core::prelude::debug;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -78,12 +78,12 @@ pub(super) async fn connect_webrtc(
 	// }
 
 	// Create offer and set local description
-	cross_log!("creating offer");
+	debug!("creating offer");
 	let offer: RtcSessionDescriptionInit =
 		JsFuture::from(pc.create_offer()).await?.into();
-	cross_log!("setting local description");
+	debug!("setting local description");
 	JsFuture::from(pc.set_local_description(&offer)).await?;
-	cross_log!("local description set");
+	debug!("local description set");
 
 	// Fetch SDP answer
 	let base_url = "https://api.openai.com/v1/realtime";
@@ -103,7 +103,7 @@ pub(super) async fn connect_webrtc(
 		window.fetch_with_request(&request),
 	)
 	.await?;
-	cross_log!("request made");
+	debug!("request made");
 	let resp: web_sys::Response = resp_value.dyn_into()?;
 	let sdp_text = wasm_bindgen_futures::JsFuture::from(resp.text()?).await?;
 	let sdp_str = sdp_text.as_string().unwrap_or_default();
@@ -114,13 +114,13 @@ pub(super) async fn connect_webrtc(
 	answer.set_sdp(&sdp_str);
 	wasm_bindgen_futures::JsFuture::from(pc.set_remote_description(&answer))
 		.await?;
-	cross_log!("answer is set");
+	debug!("answer is set");
 
 	// Data channel open event
 	{
 		let dc = dc.clone();
 		let onopen = Closure::<dyn FnMut()>::new(move || {
-			cross_log!("Data channel is open");
+			debug!("Data channel is open");
 			// web_sys::console::log_1(&"Data channel is open".into());
 			// let event = serde_json::json!({
 			// 	"type": "session.update",

@@ -11,14 +11,13 @@
 //! - [`GlobFilter`] - Glob pattern matching utilities (requires `std`)
 //! # Macros
 //!
-//! - [`cross_log!`](crate::cross_log) - Cross-platform logging (works in wasm)
+//! - [`cross_log!`](crate::cross_log) - Cross-platform raw output (not for logging, see the macro docs)
 
 mod as_any;
 /// Async utilities and future helpers.
 pub mod async_ext;
 mod backoff;
 mod cfg_if;
-#[cfg(feature = "std")]
 mod cli_args;
 /// Coalescing trigger for async write deduplication.
 mod coalescing_trigger;
@@ -68,7 +67,6 @@ pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
-#[cfg(feature = "std")]
 pub use cli_args::*;
 pub use coalescing_trigger::*;
 #[cfg(feature = "std")]

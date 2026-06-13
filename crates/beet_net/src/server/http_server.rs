@@ -3,13 +3,14 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::OnceLock;
 
-/// Boxed server-start function: installs a backend for [`HttpServer`].
+/// Boxed server-start function: the [`ServerBackend::start`] shape, also used by
+/// the [`ServerBackends`] registry and the runtime [`set_http_server`] seam.
 ///
 /// This is the no_std-friendly server hook, mirroring [`HttpSendFn`] on the
 /// client side. When no server backend feature (`server`/`hyper`/`lambda`) is
-/// compiled in, [`HttpServer`]'s `on_add` hook falls through to a function
-/// installed via [`set_http_server`] — letting a downstream adapter (an embassy
-/// / esp WiFi crate, …) plug in its own listener without living in `beet_net`.
+/// compiled in, [`HttpServer::start`] falls through to a function installed via
+/// [`set_http_server`] — letting a downstream adapter (an embassy / esp WiFi
+/// crate, …) plug in its own listener without living in `beet_net`.
 ///
 /// It is handed an [`AsyncEntity`] for the spawned server (run on the async
 /// layer, exactly like the built-in [`start_hyper_server`] /
@@ -32,8 +33,10 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 
 /// HTTP server that listens for incoming requests, triggering an [`Action::<Request,Response>`] call.
 ///
-/// When spawned, this component automatically starts a server on the specified port.
-/// The underlying implementation depends on compile-time feature flags:
+/// A long-running [`ServerBackend`]: spawning it pulls in the [`Server`]
+/// orchestrator (via `#[require(Server)]`), which starts it through
+/// [`HttpServer::start`]. The concrete listener depends on compile-time feature
+/// flags:
 /// - Default (`server`): Lightweight mini HTTP server using `async-io` TCP
 /// - `hyper`: Full-featured Hyper HTTP server
 /// - `lambda`: AWS Lambda runtime
@@ -53,7 +56,7 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add=on_add)]
+#[require(Server)]
 #[cfg_attr(feature = "std", require(ExchangeStats))]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
@@ -125,57 +128,71 @@ impl HttpServer {
 		let port = self.port.unwrap_or(0);
 		format!("http://127.0.0.1:{}", port)
 	}
+
+	/// The socket address to bind, resolving port and host by precedence
+	/// `--port` / `--host` argv param > component field > default (`0` =
+	/// OS-assigned, localhost). Backends call this so a `--port=8080` overrides
+	/// a declared `HttpServer { port }`.
+	#[cfg(feature = "std")]
+	pub fn socket_addr(&self) -> core::net::SocketAddr {
+		let params = CliArgs::parse_env().params;
+		let port = resolve_config(
+			params.get("port").and_then(|val| val.parse().ok()),
+			self.port,
+			0,
+		);
+		let host = resolve_config(
+			params.get("host").map(|val| {
+				if val == "0.0.0.0" { [0, 0, 0, 0] } else { [127, 0, 0, 1] }
+			}),
+			Some(self.host),
+			[127, 0, 0, 1],
+		);
+		(host, port).into()
+	}
 }
 
-/// Marker the `on_add` hook inserts in test builds instead of starting a
-/// backend, proving the hook fired (including through reflect inserts).
+/// Marker [`HttpServer::start`] inserts in test builds instead of starting a
+/// backend, proving the orchestrator reached it (including through reflect
+/// inserts and the `#[require(Server)]` boot).
 #[cfg(test)]
 #[derive(Component)]
 pub(crate) struct ServerHookFired;
 
-// Using queue_async allows a ServerHandler to be inserted, instead of running
-// immediately and using the one inserted via Required.
-#[allow(unused)]
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	cfg_if! {
-		if #[cfg(test)] {
-			world.commands().entity(cx.entity).insert(ServerHookFired);
-			return;
-		} else if #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))] {
-			world
-				.commands()
-				.entity(cx.entity)
-				.queue_async_local(super::start_lambda_server);
-		} else if #[cfg(all(feature = "hyper", not(target_arch = "wasm32")))] {
-			world
-				.commands()
-				.entity(cx.entity)
-				.queue_async_local(super::start_hyper_server);
-		} else if #[cfg(all(feature = "server", not(target_arch = "wasm32")))] {
-			world
-				.commands()
-				.entity(cx.entity)
-				.queue_async_local(super::start_mini_http_server);
-		} else {
-			// No backend compiled in (eg a no_std embedded target): defer to a
-			// backend installed at runtime via `set_http_server`. Dispatch it on
-			// the async layer with an `AsyncEntity`, exactly like the hyper/mini
-			// arms above, so the adapter can read the `HttpServer` config off the
-			// entity and route requests back through `entity.exchange(req)`.
-			match HTTP_SERVER.get() {
-				Some(start) => {
-					let start = *start;
-					world
-						.commands()
-						.entity(cx.entity)
-						.queue_async_local(move |entity: AsyncEntity| {
-							start(entity)
-						});
+impl ServerBackend for HttpServer {
+	/// Start the compile-time-selected HTTP backend. In test builds this inserts
+	/// [`ServerHookFired`] instead, proving the [`Server`] orchestrator reached
+	/// the backend. With no backend feature compiled in (eg a no_std embedded
+	/// target) it defers to a listener installed via [`set_http_server`].
+	#[allow(unused_variables)]
+	fn start(entity: AsyncEntity) -> MaybeSendBoxedFuture<'static, Result> {
+		cfg_if! {
+			if #[cfg(test)] {
+				Box::pin(async move {
+					entity
+						.with(|mut entity| { entity.insert(ServerHookFired); })
+						.await
+				})
+			} else if #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))] {
+				Box::pin(super::start_lambda_server(entity))
+			} else if #[cfg(all(feature = "hyper", not(target_arch = "wasm32")))] {
+				Box::pin(super::start_hyper_server(entity))
+			} else if #[cfg(all(feature = "server", not(target_arch = "wasm32")))] {
+				Box::pin(super::start_mini_http_server(entity))
+			} else {
+				// No backend compiled in: defer to a listener installed at runtime
+				// via `set_http_server`, reading the `HttpServer` config off the
+				// entity and routing requests back through `entity.exchange(req)`.
+				match HTTP_SERVER.get() {
+					Some(start) => start(entity),
+					None => Box::pin(async {
+						bevybail!(
+							"No HTTP server backend configured. Enable a server \
+							 feature (server/hyper/lambda) or install one via \
+							 set_http_server(...)."
+						)
+					}),
 				}
-				None => cross_log_error!(
-					"No HTTP server backend configured. Enable a server feature \
-					 (server/hyper/lambda) or install one via set_http_server(...)."
-				),
 			}
 		}
 	}
@@ -195,9 +212,10 @@ mod std_impl {
 		/// collisions in parallel tests. The listener is kept alive and
 		/// passed directly to the server function, eliminating port race conditions.
 		///
-		/// The `on_add` hook is disabled in tests, so the returned
-		/// [`OnSpawn`] must be included in the spawn bundle to start
-		/// the listener.
+		/// The returned [`OnSpawn`] runs the real listener; include it in the
+		/// spawn bundle. In `beet_net`'s own unit tests the [`ServerBackend`]
+		/// start stub only inserts [`ServerHookFired`], so the listener comes
+		/// from this `OnSpawn`.
 		pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
 		where
 			Func: 'static
@@ -231,34 +249,52 @@ mod tests {
 	use super::*;
 	use bevy::ecs::reflect::ReflectComponent;
 
-	/// Component hooks fire through reflect inserts, so a BSX spread like
-	/// `{(HttpServer{port:8080})}` starts the server exactly like a regular
-	/// spawn. Test builds insert [`ServerHookFired`] instead of a backend.
+	/// A reflect insert (the BSX spread path, eg `{(HttpServer{port:8080})}`)
+	/// brings the [`Server`] orchestrator in via `#[require(Server)]` and boots
+	/// the backend exactly like a regular spawn. `beet_net`'s own unit-test
+	/// backend stub inserts [`ServerHookFired`] instead of binding a port.
 	#[beet_core::test]
-	fn hook_fires_on_reflect_insert() {
-		let mut world = World::new();
-		let app_registry = AppTypeRegistry::default();
-		app_registry.write().register::<HttpServer>();
-		let entity = world.spawn_empty().id();
-		let registry = app_registry.read();
-		registry
-			.get(core::any::TypeId::of::<HttpServer>())
-			.unwrap()
-			.data::<ReflectComponent>()
-			.unwrap()
-			.insert(
-				&mut world.entity_mut(entity),
-				&HttpServer::new(8080),
-				&registry,
-			);
-		world.flush();
-		world.entity(entity).contains::<ServerHookFired>().xpect_true();
-		world
+	async fn boots_on_reflect_insert() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app.world_mut().spawn_empty().id();
+		let registry = app.world().resource::<AppTypeRegistry>().clone();
+		// reflect-insert `HttpServer`, the same path a BSX `{(HttpServer{..})}`
+		// spread takes; the `#[require(Server)]` fires through it.
+		{
+			let registry = registry.read();
+			registry
+				.get(core::any::TypeId::of::<HttpServer>())
+				.unwrap()
+				.data::<ReflectComponent>()
+				.unwrap()
+				.insert(
+					&mut app.world_mut().entity_mut(entity),
+					&HttpServer::new(8080),
+					&registry,
+				);
+		}
+		// the require brings `Server` in synchronously
+		app.world().entity(entity).contains::<Server>().xpect_true();
+		app.world()
 			.entity(entity)
 			.get::<HttpServer>()
 			.unwrap()
 			.port
 			.xpect_eq(Some(8080));
+		// settle the orchestrator's queued boot, which reaches the backend stub
+		app.update_async().await;
+		app.world()
+			.entity(entity)
+			.contains::<ServerHookFired>()
+			.xpect_true();
+	}
+
+	/// With no `--port` argv param the component field drives the bind address
+	/// (the middle tier of the `param > field > default` precedence).
+	#[beet_core::test]
+	fn socket_addr_uses_component_port() {
+		HttpServer::new(8080).socket_addr().port().xpect_eq(8080);
 	}
 }
 

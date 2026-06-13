@@ -67,6 +67,11 @@ async_ext::do_async_thing().await;
 - git: Whether on a branch, worktree or detacthed head, do not create branches or make commits unless explicitly told to. By default just keep things as unstaged changes.
 - when the world has to do something like a one-off traversal, just use with_state, ie world.with_state::<(Resource<Foo>,Query<&Children..>)>(||{resource.bar});.
 - never pass through bundles unnessecarily: fn default_router(bundle: impl Bundle)->impl Bundle ((bundle,Router)). it is pointless and obscures the function signature
+- `.agents`: directory for files authored by users and agents, for agents
+	- `.agents/plans`
+	- `.agents/reports`
+	- `.agents/skills`
+	- `.agents/tmp`: scratchpads, output logs and dumps, wip scripts, etc
 
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.
@@ -109,7 +114,7 @@ async_ext::do_async_thing().await;
 ## Debugging
 - The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.
 - The `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.
-- Beet is a cross-platform framework, never use println! as it is silent in wasm, all temp logging should be done either via `foo.xprint()` or `beet_core::cross_log!()` to ensure we get logs across platforms
+- Beet is a cross-platform framework, never use println! as it is silent in wasm. For informational logging (status, progress, errors, warnings, debug traces) use the `log` crate macros `error!`/`warn!`/`info!`/`debug!`, which are cross-platform via the `log` facade and the app's `LogPlugin`. `cross_log!`/`cross_log_noline!` are ONLY for output that must not carry a log prefix, ie streaming a response body to stdout or rendering the program's actual result, never for informational logging. For temp/debug dumps use `foo.xprint()`.
 - In wasm environments, app.run() will immediately return AppExit::Success. To run the app to completion use `app.run_async()`
 - In bevy the two main causes of bugs are:
 	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to
@@ -133,3 +138,9 @@ async_ext::do_async_thing().await;
 - Styling: `<Stylesheet/>` bakes the active rule set into a `<style>`, `<Preflight/>` is the base reset, `<ColorSchemeScript/>` seeds `.light-scheme`/`.dark-scheme`. Drop these in `<head>`; never hand-assemble a `<style>{css}</style>` string.
 - Optional attributes: for `Option` props use `{optional_attr("name", name)}` so the attribute is omitted when `None` (an empty `name=""` is wrong). Use `{attr(key, value)}` for a dynamically-built always-present attribute. Both accumulate alongside literal attributes.
 - Interpolation: share one value across many tags by reference, `<title>{&title}</title>` — this lowers to `Value::new(&title)` (a cheap clone at build) without moving the local or peppering `.clone()`.
+
+## Server Cheatsheet (`beet_net`)
+
+- Every binary is a CLI server: the entrypoint is a `CliServer` that parses argv and runs one exchange. Long-running backends (`HttpServer`, `TuiServer`) never self-boot; they `#[require(Server)]`, and the `Server` orchestrator (`server/server_backend.rs`) starts the selected backends and inserts `KeepAlive` when one is long-running.
+- Spawn a backend, never a bespoke boot hook. Selection precedence is `--server=` param > present backend components > feature default (`cli`). Pin a controller binary to its entrypoint with `Server::cli()` so the global `--server` param cannot hijack it (eg the `beet` CLI host).
+- A backend implements the `ServerBackend` trait (`start`, and `stop` defaulting to a no-op `Ok`) and registers a `ServerBackendEntry` in the `ServerBackends` resource, keeping `beet_net` ignorant of downstream backends like the `beet_router` TUI. Resolve config knobs with `resolve_config(param, field, default)`.

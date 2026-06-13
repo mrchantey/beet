@@ -43,6 +43,8 @@ impl Plugin for DocumentPlugin {
 			.register_type::<OnMissingField>()
 			.register_type::<FieldRef>()
 			.register_type::<SourceFieldRef>()
+			.register_type::<RenderRootRef>()
+			.register_type::<RenderRootRefOf>()
 			.register_type::<BindingTarget>()
 			.register_type::<FieldSegment>()
 			.register_type::<DocumentScope>()

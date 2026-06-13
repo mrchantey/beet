@@ -125,16 +125,16 @@ impl RequestParts {
 	pub fn authority(&self) -> &str { self.url.authority().unwrap_or_default() }
 
 	/// Returns the path segments.
-	pub fn path(&self) -> &Vec<String> { self.url.path() }
+	pub fn path(&self) -> &Vec<SmolStr> { self.url.path() }
 
 	/// Returns the version string.
 	pub fn version(&self) -> &str { &self.version }
 
 	/// Returns all parameters.
-	pub fn params(&self) -> &MultiMap<String, String> { self.url.params() }
+	pub fn params(&self) -> &MultiMap<SmolStr, SmolStr> { self.url.params() }
 
 	/// Returns a mutable reference to the parameters.
-	pub fn params_mut(&mut self) -> &mut MultiMap<String, String> {
+	pub fn params_mut(&mut self) -> &mut MultiMap<SmolStr, SmolStr> {
 		self.url.params_mut()
 	}
 
@@ -142,7 +142,7 @@ impl RequestParts {
 	pub fn headers_mut(&mut self) -> &mut HeaderMap { &mut self.headers }
 
 	/// Adds a parameter and returns self for chaining.
-	pub fn with_flag(mut self, key: impl Into<String>) -> Self {
+	pub fn with_flag(mut self, key: impl Into<SmolStr>) -> Self {
 		self.url.params_mut().insert_key(key.into());
 		self
 	}
@@ -150,23 +150,23 @@ impl RequestParts {
 	/// Adds a parameter and returns self for chaining.
 	pub fn with_param(
 		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
+		key: impl Into<SmolStr>,
+		value: impl Into<SmolStr>,
 	) -> Self {
 		self.url.params_mut().insert(key.into(), value.into());
 		self
 	}
 
 	/// Adds a flag parameter.
-	pub fn insert_flag(&mut self, key: impl Into<String>) {
+	pub fn insert_flag(&mut self, key: impl Into<SmolStr>) {
 		self.url.params_mut().insert_key(key.into());
 	}
 
 	/// Adds a parameter.
 	pub fn insert_param(
 		&mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
+		key: impl Into<SmolStr>,
+		value: impl Into<SmolStr>,
 	) {
 		self.url.params_mut().insert(key.into(), value.into());
 	}
@@ -180,7 +180,7 @@ impl RequestParts {
 	}
 
 	/// Gets all values for a parameter.
-	pub fn get_params(&self, key: &str) -> Option<&Vec<String>> {
+	pub fn get_params(&self, key: &str) -> Option<&Vec<SmolStr>> {
 		self.url.params().get_vec(key)
 	}
 
@@ -231,7 +231,7 @@ impl RequestParts {
 	pub fn last_segment(&self) -> Option<&str> { self.url.last_segment() }
 
 	/// Returns path segments starting from the given index.
-	pub fn path_from(&self, index: usize) -> &[String] {
+	pub fn path_from(&self, index: usize) -> &[SmolStr] {
 		self.url.path_from(index)
 	}
 
@@ -336,7 +336,7 @@ impl From<http::request::Parts> for RequestParts {
 		let uri = &http_parts.uri;
 
 		let scheme = Scheme::from(uri.scheme());
-		let authority = uri.authority().map(|auth| auth.to_string());
+		let authority = uri.authority().map(|auth| SmolStr::from(auth.as_str()));
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
@@ -360,7 +360,7 @@ impl From<&http::request::Parts> for RequestParts {
 		let uri = &http_parts.uri;
 
 		let scheme = Scheme::from(uri.scheme());
-		let authority = uri.authority().map(|auth| auth.to_string());
+		let authority = uri.authority().map(|auth| SmolStr::from(auth.as_str()));
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);

@@ -13,7 +13,7 @@
 //! ```sh
 //! beet load scenes/led-script.json   # POST a scene file (remote) or set_scene (local)
 //! beet load scenes/led-script.json --watch  # local: reload on every save
-//! beet call led-script               # fire an action route the scene installed
+//! beet run led-script                # fire an action route the scene installed
 //! beet dump                          # print the loaded scene as JSON
 //! beet clear                         # despawn the scene + reset
 //! beet reset                         # stop the hardware
@@ -40,7 +40,7 @@ impl Plugin for SceneCommandsPlugin {
 			.register_type::<SceneClear>()
 			.register_type::<SceneReset>()
 			.register_type::<SceneDump>()
-			.register_type::<SceneCall>()
+			.register_type::<SceneRun>()
 			.register_type::<ExportScenes>()
 			.register_type::<ExportPath>();
 	}
@@ -193,16 +193,16 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 	}
 }
 
-/// `call <route>` — fire an action route the loaded scene installed, eg
-/// `beet call led-script`. The original request (method, headers, query params
+/// `run <route>` — fire an action route the loaded scene installed, eg
+/// `beet run led-script`. The original request (method, headers, query params
 /// and body) is forwarded unchanged; only its destination URL is rewritten —
 /// to `<device>/<route>` for a remote, or the bare `<route>` against the host
 /// router for local.
-#[action(route = "call/:route", handler_only)]
+#[action(route = "run/:route", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub async fn SceneCall(cx: ActionContext<Request>) -> Result<Response> {
-	let route = cx.input.get_param("route").unwrap_or("").to_string();
+pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
+	let route = SmolStr::from(cx.input.get_param("route").unwrap_or(""));
 	match device_url(cx.input.request_parts()) {
 		Some(url) => {
 			let target = Url::parse(format!("{url}/{route}"));
@@ -284,4 +284,37 @@ fn export_entity(world: &mut World, entity: Entity) -> Result<String> {
 		.to_string();
 	fs_ext::write(&output, &json)?;
 	Ok(format!("wrote scene to {output}\n"))
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	#[action(handler_only)]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	async fn Ping(_cx: ActionContext<RequestParts>) -> MediaBytes {
+		MediaBytes::new_text("pong")
+	}
+
+	/// The renamed `run/:route` forwarder dispatches against the host router: a
+	/// `beet run ping` fires the route the scene installed under the host.
+	#[beet_core::test(timeout_ms = 10000)]
+	async fn scene_run_resolves_local_route() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.insert_resource(pkg_config!());
+		let host = world
+			.spawn((default_router(), children![
+				SceneRun,
+				exchange_route("ping", Ping),
+			]))
+			.flush();
+		world
+			.entity_mut(host)
+			.exchange_str(Request::get("run/ping"))
+			.await
+			.xpect_eq("pong");
+	}
 }

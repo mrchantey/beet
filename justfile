@@ -29,7 +29,7 @@ default:
 
 #💡 Init
 
-# Install the cli and load its default commands (run, s3-sync, run-wasm, ...).
+# Install the cli and load its default commands (serve, s3-sync, run-wasm, ...).
 init-cli:
 	just install-cli
 	cargo run -p beet-cli --bin export_scenes

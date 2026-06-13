@@ -244,12 +244,12 @@ impl RouteTree {
 	/// the provided path. There should never be more than one match
 	/// as [`RouteTree::from_nodes`] rejects conflicts.
 	pub fn find(&self, path: &[impl AsRef<str>]) -> Option<&ActionNode> {
-		let path_vec: Vec<String> =
-			path.iter().map(|s| s.as_ref().to_string()).collect();
+		let path_vec: Vec<SmolStr> =
+			path.iter().map(|s| s.as_ref().into()).collect();
 
 		fn inner<'a>(
 			node: &'a RouteTree,
-			path: &Vec<String>,
+			path: &[SmolStr],
 		) -> Option<&'a ActionNode> {
 			if let Some(route) = &node.node {
 				if route

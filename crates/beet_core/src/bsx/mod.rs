@@ -56,16 +56,19 @@
 //! Bindings work in attribute position (`value=@res:Theme.contrast`), text
 //! position (`{@doc:name}`), and as spread-tuple items
 //! (`{(Slider{value:3}, @comp:Slider.value)}`), pairing a component insert with
-//! a binding on the same entity. Event directives ride the same grammar:
-//! `bx:click="increment@doc:count"` runs the registered `increment` verb
-//! against the entity's bound [`Value`], which the sync mirrors back ([`events`]).
+//! a binding on the same entity. Event directives are a verb call:
+//! `bx:click=increment{ field: @doc:count, amount: 3 }` runs the registered
+//! `increment` verb with its named arguments against the host entity, the verb
+//! writing the bound source directly ([`events`]). No mirror is lowered onto the
+//! host: the verb mutates the real document/resource and document-sync fans the
+//! change out to display bindings.
 //!
 //! ```
 //! use beet_core::prelude::*;
 //!
 //! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
 //! let nodes = parse_document(
-//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click="increment@doc:clicks">+</button></section>"#,
+//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click=increment{ field: @doc:clicks }>+</button></section>"#,
 //!     &BsxParseConfig::bsx(),
 //! )
 //! .unwrap();
@@ -83,9 +86,9 @@
 //! let text = world.entity(paragraph).get::<Children>().unwrap()[0];
 //! assert!(world.entity(text).contains::<FieldRef>());
 //! assert_eq!(world.entity(text).get::<Value>().unwrap(), &Value::Str("Ada".into()));
-//! // the event binding mirrors its field on the button entity
+//! // the event host carries no mirror: the verb writes the document directly
 //! let button = world.entity(section).get::<Children>().unwrap()[1];
-//! assert!(world.entity(button).contains::<FieldRef>());
+//! assert!(!world.entity(button).contains::<FieldRef>());
 //! ```
 //!
 //! ## Templates
@@ -155,19 +158,17 @@ pub use schema::*;
 use crate::prelude::*;
 
 /// Registers the BSX event/verb seam resources so
-/// `bx:<event>="<verb>@source:path"` resolves at build time.
+/// `bx:<event>=verb{ arg: value, .. }` resolves at build time.
 ///
 /// Both registries are **empty by default**: core knows no concrete event or
 /// verb. An app (or `beet_ui`'s default registration) installs the concrete
-/// `click` event installer and the example verb set. This plugin only seeds the
-/// empty registries plus the named-handler escape hatch.
+/// `click` event installer and the example verb set.
 pub struct BsxPlugin;
 
 impl Plugin for BsxPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<EventRegistry>()
 			.init_resource::<VerbRegistry>()
-			.init_resource::<BsxHandlerRegistry>()
 			.init_resource::<BsxTemplateRegistry>();
 	}
 }

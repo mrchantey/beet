@@ -56,6 +56,10 @@ mod status_code;
 pub use http_method::*;
 pub use status_code::*;
 pub mod http_ext;
+// the upgrade response type is part of the public route API, so it rides the
+// prelude; the pure detection/accept helpers stay namespaced under `http_ext`.
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+pub use http_ext::WebSocketUpgrade;
 
 // higher-level exchange patterns built on the action system. `exchange` only
 // needs `beet_action`, so it rides the no_std-capable `action` feature;

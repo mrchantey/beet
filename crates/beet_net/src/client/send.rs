@@ -143,7 +143,7 @@ impl Request {
 				}
 			}
 			Scheme::About
-				if self.path().first() == Some(&String::from("blank")) =>
+				if self.path().first().map(SmolStr::as_str) == Some("blank") =>
 			{
 				Ok(Response::ok())
 			}

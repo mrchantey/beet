@@ -22,7 +22,7 @@ async fn Patrol(cx: ActionContext) -> Result<Outcome> {
 	let _ = cx;
 	for step in 1..=5 {
 		time_ext::sleep(Duration::from_millis(200)).await;
-		cross_log!("patrolling, step {step}");
+		info!("patrolling, step {step}");
 	}
 	Outcome::PASS.xok()
 }

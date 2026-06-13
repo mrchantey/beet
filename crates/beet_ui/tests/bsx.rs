@@ -517,38 +517,65 @@ fn click_increments_field() {
 	let button = spawn_bsx_under(
 		&mut world,
 		Some(doc),
-		"<button bx:click=\"increment@doc:count\">+</button>",
+		"<button bx:click=increment{ field: @doc:count }>+</button>",
 	);
 	world.update_local();
-	// fire a pointer-down on the button: the verb runs against its bound Value.
+	// the host carries no mirror: the verb writes the document, not a local Value.
+	world.entity(button).contains::<FieldRef>().xpect_false();
+	world.entity(button).contains::<Value>().xpect_false();
+	// fire a pointer-down on the button: the verb writes the ancestor document.
 	let pointer = world.spawn_empty().id();
 	world
 		.entity_mut(button)
 		.trigger(move |target| PointerDown { target, pointer });
 	world.flush();
 	world
-		.entity(button)
-		.get::<Value>()
+		.entity(doc)
+		.get::<Document>()
 		.unwrap()
-		.as_i64()
+		.get_field::<i64>(&[FieldSegment::key("count")])
 		.unwrap()
 		.xpect_eq(1);
 }
 
-/// The counter page shape: a `bx:scope`, an initializing text binding, and
-/// signal-less event bindings to the same field, with no pre-existing document.
+#[beet_core::test]
+fn click_increments_by_amount() {
+	let mut world = world();
+	let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
+	let button = spawn_bsx_under(
+		&mut world,
+		Some(doc),
+		"<button bx:click=increment{ field: @doc:count, amount: 5 }>+</button>",
+	);
+	world.update_local();
+	let pointer = world.spawn_empty().id();
+	world
+		.entity_mut(button)
+		.trigger(move |target| PointerDown { target, pointer });
+	world.flush();
+	world
+		.entity(doc)
+		.get::<Document>()
+		.unwrap()
+		.get_field::<i64>(&[FieldSegment::key("count")])
+		.unwrap()
+		.xpect_eq(5);
+}
+
+/// The counter page shape: a `bx:scope`, an initializing text binding, and an
+/// event verb mutating the same scoped field, with no pre-existing document.
 /// Regressions covered: the scoped init path corrupting the document
-/// (`{counter: 0}` instead of `{counter: {count: 0}}`), the event bindings'
-/// freshly added Null clobbering the init, and the element-hosted binding
-/// `Value` leaking into the button's rendered label.
+/// (`{counter: 0}` instead of `{counter: {count: 0}}`), and the event host
+/// carrying no mirror that could leak into the button's rendered label. The
+/// click drives the end-to-end verb -> scoped-document -> display-binding path.
 #[beet_core::test]
 fn scoped_counter_page() {
 	let mut world = world();
 	let root = spawn_bsx(
 		&mut world,
-		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click="increment@doc:count">More</button></article>"#,
+		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click=increment{ field: @doc:count }>More</button></article>"#,
 	);
-	// settle the init -> document -> event-binding chain
+	// settle the init -> document chain
 	world.update_local();
 	world.update_local();
 
@@ -561,10 +588,157 @@ fn scoped_counter_page() {
 	.unwrap()
 	.xpect_eq(0);
 
-	// the button's binding mirrors the field, but stays out of its label
+	// the button carries no mirror, so nothing leaks into its label
 	render_html(&mut world, root)
 		.xpect_contains("clicked 0 times")
 		.xpect_contains("<button>More</button>");
+
+	// click the button: the verb resolves the scoped field and writes the document
+	let button = world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.find(|child| world.entity(*child).get::<Element>().is_some_and(|el| el.tag() == "button"))
+		.unwrap();
+	let pointer = world.spawn_empty().id();
+	world
+		.entity_mut(button)
+		.trigger(move |target| PointerDown { target, pointer });
+	world.flush();
+	world.update_local();
+
+	// the scoped field incremented, and the display binding refreshes to match
+	let doc = world.query::<(Entity, &Document)>().single(&world).unwrap().0;
+	world
+		.entity(doc)
+		.get::<Document>()
+		.unwrap()
+		.get_field::<i64>(&[
+			FieldSegment::key("counter"),
+			FieldSegment::key("count"),
+		])
+		.unwrap()
+		.xpect_eq(1);
+	render_html(&mut world, root).xpect_contains("clicked 1 times");
+}
+
+// ---- live TUI counter (the `bsx_site` reactivity example) ---------------------
+
+/// The `examples/bsx_site/routes/counter.bsx` markup, the no-code reactivity
+/// example: a scoped document, a display binding, and the `increment`/`decrement`
+/// verbs (one with an explicit `amount` arg) mutating it.
+#[cfg(feature = "tui")]
+const COUNTER_BSX: &str = r#"<article bx:scope="counter">
+	<widgets::Card title="Counter">
+		<p>You have clicked {@doc:count=0} times.</p>
+		<button bx:click=increment{ field: @doc:count, amount: 1 }>More</button>
+		<button bx:click=decrement{ field: @doc:count }>Less</button>
+	</widgets::Card>
+</article>"#;
+
+/// Drive `counter.bsx` through the real live-charcell stack (the terminal target):
+/// a click runs the verb, document-sync fans the change to the display binding,
+/// and the charcell renderer repaints. Asserts the *rendered frame text* changes,
+/// not just the document, exercising the click -> repaint path end to end.
+#[cfg(feature = "tui")]
+#[beet_core::test]
+fn counter_bsx_repaints_in_live_tui() {
+	use bevy::math::UVec2;
+
+	let mut app = App::new();
+	app.add_plugins((MinimalPlugins, CharcellTuiPlugin));
+	// the site-local `<widgets::Card>` template the counter composes
+	app.world_mut()
+		.resource_mut::<BsxTemplateRegistry>()
+		.insert_source(
+			"widgets::Card",
+			"<section><h2>{@prop:title}</h2><Slot/></section>",
+		)
+		.unwrap();
+	// the host buffer the charcell pipeline paints into, plus a channel terminal
+	// so the run is headless and deterministic.
+	let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
+	let host = app
+		.world_mut()
+		.spawn((channel, terminal, DoubleBuffer::new(UVec2::new(48, 12))))
+		.id();
+	app.update();
+	// parse the counter markup as the host's content tree.
+	let bytes = MediaBytes::new_bsx(COUNTER_BSX);
+	BsxParser::bsx()
+		.parse(ParseContext::new(&mut app.world_mut().entity_mut(host), &bytes))
+		.unwrap();
+
+	// step until the scoped `@doc:count=0` init reaches the rendered frame.
+	let frame = step_until(&mut app, host, "clicked 0 times");
+	frame.xpect_contains("Counter");
+
+	// click "More": fire a `PointerDown` on the increment button, like the hit-test
+	// does for a real cursor press.
+	let more = find_button(&mut app, host, "More");
+	click(&mut app, more);
+	// the verb wrote the document; the next frames sync the binding and repaint.
+	step_until(&mut app, host, "clicked 1 times");
+
+	// click "Less": the decrement verb walks back to the same scoped field.
+	let less = find_button(&mut app, host, "Less");
+	click(&mut app, less);
+	step_until(&mut app, host, "clicked 0 times");
+}
+
+/// Trigger a `PointerDown` on `entity`, then flush so the queued verb command runs.
+#[cfg(feature = "tui")]
+fn click(app: &mut App, entity: Entity) {
+	let pointer = app.world_mut().spawn_empty().id();
+	app.world_mut()
+		.entity_mut(entity)
+		.trigger(move |target| PointerDown { target, pointer });
+	app.world_mut().flush();
+}
+
+/// The `<button>` entity beneath `host` whose rendered text is `label`.
+#[cfg(feature = "tui")]
+fn find_button(app: &mut App, host: Entity, label: &str) -> Entity {
+	let label = label.to_string();
+	app.world_mut()
+		.run_system_once(move |elements: ElementQuery| {
+			elements
+				.iter_descendants_inclusive(host)
+				.find(|view| {
+					view.tag() == "button"
+						&& view.inner_text.is_some_and(|(_, text)| {
+							text.as_str().is_ok_and(|text| text == label)
+						})
+				})
+				.map(|view| view.entity)
+		})
+		.unwrap()
+		.expect("a button with that label")
+}
+
+/// Advance frames until the host's painted frame contains `needle`, returning it.
+#[cfg(feature = "tui")]
+fn step_until(app: &mut App, host: Entity, needle: &str) -> String {
+	for _ in 0..50 {
+		app.update();
+		let frame = app
+			.world()
+			.get::<DoubleBuffer>(host)
+			.unwrap()
+			.front_buffer()
+			.render_plain();
+		if frame.contains(needle) {
+			return frame;
+		}
+	}
+	let frame = app
+		.world()
+		.get::<DoubleBuffer>(host)
+		.unwrap()
+		.front_buffer()
+		.render_plain();
+	panic!("frame never contained {needle:?}:\n{frame}");
 }
 
 // ---- @ bindings ---------------------------------------------------------------

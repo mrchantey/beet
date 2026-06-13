@@ -31,6 +31,6 @@ async fn main() -> Result {
 		]))
 		.call::<(), Outcome>(())
 		.await?;
-	cross_log!("selector finished: {outcome:?}");
+	info!("selector finished: {outcome:?}");
 	Ok(())
 }

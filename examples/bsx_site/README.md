@@ -1,41 +1,38 @@
 # BSX Site
 
-A site declared entirely in markup. `main.bsx` is the entrypoint, `routes/` is the content, `templates/` holds the site's own BSX templates. No Rust authoring and no codegen.
+A site declared entirely in markup. `main.bsx` is the entrypoint, `routes/` is the content, `templates/` holds the site's own BSX templates. No Rust authoring, no codegen, and no `main.rs`: there is no host binary, the `beet serve` command is the host.
 
 ```sh
-alias site='cargo run --example bsx_site --features "http_server,client_io,json,markdown,style,template,fs" --'
-
 # CLI mode: render the home route, or a named route
-site
-site docs/getting-started
+beet serve examples/bsx_site
+beet serve examples/bsx_site --route=docs/getting-started
 
 # HTTP mode, optionally watching the site dir for live reload
-site --server=http
-site --server=http --watch
+beet serve examples/bsx_site --server=http
+beet serve examples/bsx_site --server=http --watch
 
 # static export to examples/bsx_site/dist
-site export
+beet serve examples/bsx_site --server=export
 ```
 
-Because the site is runtime files, edits to `main.bsx`, the templates, and the routes need no rebuild, just rerun (or re-request, in HTTP mode).
+Because the site is runtime files, edits to `main.bsx`, the templates, and the routes need no rebuild, just rerun (or re-request, in HTTP mode). Install the CLI with `cargo install --path crates/beet-cli`, or run it from the workspace with `cargo run -p beet-cli -- serve examples/bsx_site`.
 
 ## Live reload
 
 `--watch` spawns a `LiveReload` watcher on the site dir: on any change it re-registers the `templates/` directory, re-scans every `RoutesDir` (despawning and respawning its route children, rebuilding the route tree), and broadcasts `reload` over the `ClientIo` websocket channel. The channel runs beside the HTTP server on its own port since none of the HTTP backends support websocket upgrades.
 
-The browser side is the `<LiveReloadScript/>` widget in the layout head: it connects to the channel, reloads the page on a `reload` message, and reconnects with exponential backoff, reloading after the server itself restarts. The widget renders nothing when no channel is active, so it is safe to leave in the layout for production and static export. The same applies to `beet run <site-dir> --server=http --watch`.
+The browser side is the `<LiveReloadScript/>` widget in the layout head: it connects to the channel, reloads the page on a `reload` message, and reconnects with exponential backoff, reloading after the server itself restarts. The widget renders nothing when no channel is active, so it is safe to leave in the layout for production and static export.
 
 ## Layout
 
 ```
 bsx_site/
-  main.rs        a thin host: plugins + package config, then spawn main.bsx
   main.bsx       the entrypoint: the router and its middleware
   templates/     the site's BSX templates, eg Layout.bsx and widgets/Card.bsx
   routes/        the content: every file is a page
 ```
 
-`main.rs` is a generic host (the documented reference for what `beet run <site-dir>` does): it adds the server plugins, registers the template directory, then spawns the entry file and layers the host concerns (server backend, dev `export` route) onto it.
+There is no `main.rs`. `beet serve <site-dir>` is the host: it registers the `templates/` directory, sets the `SiteRoot`, spawns `main.bsx` as the app root, and layers the default app routes (`/app-info`, `POST /analytics`) onto it. The selected backend (`cli`/`http`/`export`) drives one rendered exchange, the HTTP listener, or a static export. The `<PackageConfig/>` declared in `main.bsx` supplies the site title and description those routes read.
 
 ## How it works
 
@@ -60,8 +57,8 @@ bsx_site/
 
 All interpolation is reactive and source-prefixed with `@` (the canonical grammar reference is the `beet_core::bsx` module doc). The site uses each source:
 
-- `@doc:` document state: the counter page binds `{@doc:count=0}` and the buttons mutate it via the event verbs, `bx:click="increment@doc:count"`.
-- `@res:` resource fields: the layout pulls `@res:PackageConfig.title` into the head's `og:site_name` meta and `@res:PackageConfig.description` into the footer.
+- `@doc:` document state: the counter page binds `{@doc:count=0}` and the buttons mutate it via the event verbs, `bx:click=increment{ field: @doc:count }`.
+- `@res:` resource fields: the footer pulls `@res:PackageConfig.description` straight from the resource (the default document head emits `og:site_name` from `PackageConfig.title` automatically, so the layout no longer hand-writes it).
 - `@prop:` template props: `widgets::Card` binds its heading to `{@prop:title}`, filled by the caller's `title="Counter"` attribute.
 
 HTML responses render with the bindings settled, while live targets (the terminal today) keep syncing them continuously.

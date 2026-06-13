@@ -22,7 +22,7 @@ pub fn Stylesheet(#[prop] minify: bool, style: StyleQuery) -> impl Bundle {
 				.with_format_variables(FormatVariables::short()),
 		)
 		.unwrap_or_else(|err| {
-			cross_log!("Stylesheet: failed to build css: {err}");
+			error!("Stylesheet: failed to build css: {err}");
 			String::new()
 		});
 	rsx! {

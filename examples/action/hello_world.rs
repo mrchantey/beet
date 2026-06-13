@@ -29,6 +29,6 @@ async fn main() -> Result {
 		.spawn(Greet)
 		.call::<String, String>("world".to_string())
 		.await?;
-	cross_log!("{message}");
+	info!("{message}");
 	Ok(())
 }

@@ -48,7 +48,7 @@ impl SiteHost {
 		// live interactive plugins, exactly as `main.rs`'s `tui` arm composes them.
 		app.add_plugins(server_plugin)
 			.insert_resource(PackageConfig {
-				title: "Beet".to_string(),
+				title: "Beet".into(),
 				..pkg_config!()
 			})
 			.add_plugins((
@@ -485,4 +485,27 @@ async fn form_focus_type_and_submit() {
 	let (col, row) = host.cell_of("Submit");
 	host.click(col, row);
 	host.step_until("\"name\": \"Ada Lovelace\"");
+}
+
+/// The Rust reactive counter is interactive in the terminal: clicking a button
+/// mutates the document field, which document-sync fans to the display binding,
+/// repainting the count. The Rust mirror of the no-code `counter.bsx` page.
+#[beet::test]
+async fn counter_clicks_update_count() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/docs/design/counter");
+	host.step_until("You have clicked 0 times.");
+
+	// click "More": the increment observer writes the field, the count repaints.
+	let (col, row) = host.cell_of("More");
+	host.click(col, row);
+	host.step_until("You have clicked 1 times.");
+
+	// click again: the same field accumulates.
+	host.click(col, row);
+	host.step_until("You have clicked 2 times.");
+
+	// click "Less": the decrement observer walks the count back down.
+	let (col, row) = host.cell_of("Less");
+	host.click(col, row);
+	host.step_until("You have clicked 1 times.");
 }

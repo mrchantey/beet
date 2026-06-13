@@ -99,7 +99,7 @@ fn watch_scene_file(mut world: DeferredWorld, cx: HookContext) {
 			}
 			commands.queue_async(move |world: AsyncWorld| async move {
 				if let Err(err) = reload_watched(world, entity).await {
-					cross_log_error!("scene reload failed: {err}");
+					error!("scene reload failed: {err}");
 				}
 			});
 		});
@@ -167,7 +167,7 @@ pub fn rehydrate_scene_cache(world: &mut World) -> Result {
 	// a stale or version-skewed cache (eg a type removed since it was written)
 	// must not crash startup: warn and carry on with an empty scene.
 	if let Err(err) = result {
-		cross_log_error!("ignoring unloadable scene cache {path:?}: {err}");
+		warn!("ignoring unloadable scene cache {path:?}: {err}");
 	}
 	Ok(())
 }
@@ -200,7 +200,7 @@ fn persist_on_root_added(
 	}
 	commands.queue(|world: &mut World| {
 		if let Err(err) = persist_scene_cache(world) {
-			cross_log_error!("scene persist failed: {err}");
+			error!("scene persist failed: {err}");
 		}
 	});
 }
@@ -218,7 +218,7 @@ fn persist_on_root_removed(
 	}
 	commands.queue(|world: &mut World| {
 		if let Err(err) = persist_scene_cache(world) {
-			cross_log_error!("scene persist failed: {err}");
+			error!("scene persist failed: {err}");
 		}
 	});
 }

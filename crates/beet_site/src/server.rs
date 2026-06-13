@@ -15,9 +15,9 @@ const THEME_COLOR: Color = Color::srgb(0., 1., 0.75);
 pub fn server_plugin(app: &mut App) {
 	app.add_plugins((
 		MinimalPlugins,
+		// `RouterPlugin` brings in `ServerPlugin` (the `ServerBackends` registry).
 		RouterPlugin,
 		LogPlugin::new(Level::INFO),
-		ServerPlugin,
 		material::MaterialStylePlugin::new(THEME_COLOR),
 	));
 	// site-local layout rules, see `design_row_rule` (in `style`). The landing-page

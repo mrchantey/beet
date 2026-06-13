@@ -121,6 +121,13 @@ pub(crate) fn wrap_content_with(
 	world.remove_resource::<RequestContext>();
 	let layout = layout_result?;
 
+	// link the layout root to the transcluded content, distinct from the
+	// self-referential render root: a layout-head `@comp$RenderRoot:` binding
+	// follows this to read the route's `ArticleMeta` across the transclusion.
+	world
+		.entity_mut(layout)
+		.insert(RenderRootRef::new(rendered));
+
 	// despawn the layout subtree plus the content's ephemerals after render
 	let mut to_despawn = vec![layout];
 	to_despawn.extend(content_despawn);

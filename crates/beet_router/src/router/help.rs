@@ -1,9 +1,12 @@
-//! Help middleware that renders route documentation using beet_ui.
+//! Help middleware that renders route documentation as a material widget.
 //!
-//! When the `--help` param is present, renders a scene entity tree
-//! describing available routes, then converts it to a response
-//! via the scene rendering pipeline. If the param is absent,
-//! calls the inner handler via [`Next`].
+//! When the `--help` (or `?help`) param is present, [`HelpHandler`] collects the
+//! scoped [`RouteTree`] into [`RouteEntry`] rows and renders the [`RouteList`]
+//! template. [`ContextualNotFound`] renders the same template for an unmatched
+//! path, prefixed with a not-found notice. Both go through
+//! [`RenderRoot::render`], so an ancestor layout (the document chrome) wraps the
+//! list exactly like any other route, and the one template serves both the CLI
+//! `--help` and the web `?help` view.
 
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -11,8 +14,8 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// Middleware that intercepts `--help` and renders scoped help
-/// as a beet_ui scene entity tree.
+/// Middleware that intercepts `--help`/`?help` and renders the scoped
+/// [`RouteList`] through the layout.
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -30,253 +33,197 @@ pub async fn HelpHandler(
 	let path = request.path().clone();
 	let parts = request.parts().clone();
 
-	let nodes = caller
+	// the scoped route entries: the subtree under the requested path, else the
+	// whole tree, with the `help` route itself filtered out.
+	let entries = caller
 		.clone()
-		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
+		.with_state::<AncestorQuery<&RouteTree>, Result<Vec<RouteEntry>>>(
 			move |entity, query| {
 				let tree = query.get(entity)?;
-				let nodes = if let Some(subtree) = tree.find_subtree(&path) {
-					subtree.flatten_nodes()
-				} else {
-					tree.flatten_nodes()
-				};
-				let filtered: Vec<&ActionNode> = nodes
-					.into_iter()
-					.filter(|node| {
-						node.path.annotated_path().last_segment()
-							!= Some("help")
-					})
-					.collect();
-				filtered
-					.into_iter()
-					.cloned()
-					.collect::<Vec<ActionNode>>()
-					.xok()
+				let subtree = tree.find_subtree(&path).unwrap_or(tree);
+				route_entries(subtree).xok()
 			},
 		)
 		.await??;
 
-	let root = spawn_help_scene(&caller, &nodes).await;
+	let root = spawn_route_list(&caller, None, entries).await?;
 	RenderRoot::render(root, &caller, parts).await
 }
 
-/// Fallback handler that shows help scoped to the nearest ancestor scene route
-/// of an unmatched path. Returns a NOT_FOUND status with the help scene.
+/// Fallback handler that renders the [`RouteList`] scoped to the nearest ancestor
+/// scene route of an unmatched path, prefixed with a not-found notice. Returns a
+/// `NOT_FOUND` status.
 #[action]
 pub(crate) async fn ContextualNotFound(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let path = cx.input.path().clone();
 
-	let (info, nodes) = cx
+	let (notice, entries) = cx
 		.caller
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
 			move |entity, query| {
 				let tree = query.get(entity)?;
-				let (info, help_nodes) =
-					nearest_ancestor_help_nodes(tree, &path);
-				(info, help_nodes).xok()
+				nearest_ancestor_help(tree, &path).xok()
 			},
 		)
 		.await??;
 
-	let root = spawn_not_found_scene(&cx.caller, info, &nodes).await;
+	let root = spawn_route_list(&cx.caller, Some(notice), entries).await?;
 	let mut response =
 		RenderRoot::render(root, &cx.caller, cx.input.parts().clone()).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }
 
-/// Data describing a not-found route for rendering the preamble.
-struct NotFoundInfo {
+/// A not-found notice rendered above the [`RouteList`]: the path that missed and
+/// the nearest ancestor scene route whose help is shown, if any.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+pub struct NotFoundNotice {
 	/// The path that was not found.
-	not_found_path: String,
-	/// The nearest ancestor scene-route path, if any.
-	ancestor_path: Option<String>,
+	pub not_found_path: String,
+	/// The nearest ancestor scene-route path whose help is shown, if any.
+	pub ancestor_path: Option<String>,
 }
 
-/// Walks path segments from longest to shortest prefix, returning
-/// help nodes for the first ancestor that matches a scene route.
-fn nearest_ancestor_help_nodes(
-	tree: &RouteTree,
-	segments: &[String],
-) -> (NotFoundInfo, Vec<ActionNode>) {
-	let not_found_path = segments.join("/");
+/// A single route row in the [`RouteList`], flattened from an [`ActionNode`] into
+/// the render-friendly shape the template consumes.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+pub struct RouteEntry {
+	/// The route path with a leading slash, eg `/counter/increment`.
+	pub href: String,
+	/// A kind tag rendered beside the path, eg `scene` or an HTTP method.
+	pub tag: Option<String>,
+	/// Detail rows (`label`, `value`): description, input/output types, params.
+	pub details: Vec<(String, String)>,
+}
 
-	for length in (1..segments.len()).rev() {
-		let prefix = &segments[..length];
-		if let Some(node) = tree.find(prefix) {
-			if node.is_scene() {
-				let prefix_str = prefix.join("/");
-				let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
-				let nodes = filtered_nodes(help_tree);
-				return (
-					NotFoundInfo {
-						not_found_path,
-						ancestor_path: Some(prefix_str),
-					},
-					nodes,
-				);
-			}
-		}
+/// The help view: a material list of [`RouteEntry`] rows under an "Available
+/// routes" heading, optionally prefixed with a [`NotFoundNotice`].
+///
+/// One template for both the CLI `--help` and the web `?help`: the document
+/// chrome (head/sidebar/footer) is the ancestor layout's job, applied by
+/// [`RenderRoot::render`], so this widget only owns the route listing.
+#[template]
+pub fn RouteList(
+	notice: Option<NotFoundNotice>,
+	entries: Vec<RouteEntry>,
+) -> impl Bundle {
+	let items: Vec<_> = entries.into_iter().map(route_entry_item).collect();
+	rsx! {
+		<div {Classes::new([classes::CARD_FILLED])}>
+			{notice.map(not_found_notice)}
+			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Available routes"</h2>
+			<ul>{items}</ul>
+		</div>
 	}
-	let nodes = filtered_nodes(tree);
-	(
-		NotFoundInfo {
-			not_found_path,
-			ancestor_path: None,
-		},
-		nodes,
-	)
 }
 
-fn filtered_nodes(tree: &RouteTree) -> Vec<ActionNode> {
+/// The not-found preamble: the missing path linked, and the ancestor route whose
+/// help follows, if any.
+fn not_found_notice(notice: NotFoundNotice) -> impl Bundle {
+	let not_found_href = format!("/{}", notice.not_found_path);
+	// when help is scoped to an ancestor scene route, name it; otherwise the
+	// notice ends at the plain "not found." after the missing-path link.
+	let scoped = notice.ancestor_path.map(|ancestor| {
+		let ancestor_href = format!("/{ancestor}");
+		rsx! {
+			" Showing help for "
+			<a href=ancestor_href.clone()>{ancestor_href}</a>
+			":"
+		}
+	});
+	rsx! {
+		<p {Classes::new([classes::ERROR_TEXT])}>
+			"Route "
+			<a href=not_found_href.clone()>{not_found_href}</a>
+			" not found."
+			{scoped}
+		</p>
+	}
+}
+
+/// One route row: the path heading with its kind tag, and a nested detail list.
+fn route_entry_item(entry: RouteEntry) -> impl Bundle {
+	let RouteEntry {
+		href,
+		tag,
+		details,
+	} = entry;
+	// the kind tag (eg `[scene]`/`[GET]`) folds into the heading text so the row
+	// stays a single link plus a flat detail list.
+	let tag = tag.map(|tag| format!(" [{tag}]")).unwrap_or_default();
+	let details: Vec<_> = details
+		.into_iter()
+		.map(|(label, value)| {
+			rsx! { <li><strong>{format!("{label}:")}</strong>{format!(" {value}")}</li> }
+		})
+		.collect();
+	rsx! {
+		<li>
+			<a href=href.clone()>{href}</a>
+			{tag}
+			{(!details.is_empty()).then(|| rsx! { <ul>{details}</ul> })}
+		</li>
+	}
+}
+
+/// Spawn the [`RouteList`] template as an ephemeral render root, returning its id.
+///
+/// Built through `spawn_template` so the widget's slots and lifecycle resolve,
+/// then marked a self-referential [`RenderRoot`] so [`RenderRoot::render`] walks
+/// it (wrapping it in the ancestor layout) and despawns it after rendering.
+async fn spawn_route_list(
+	caller: &AsyncEntity,
+	notice: Option<NotFoundNotice>,
+	entries: Vec<RouteEntry>,
+) -> Result<Entity> {
+	caller
+		.world()
+		.with(move |world: &mut World| -> Result<Entity> {
+			// an `Option` prop takes the inner value at the call site (auto-`Some`)
+			// or is omitted (defaults to `None`); branch on the notice rather than
+			// passing the `Option` through.
+			let snippet = match notice {
+				Some(notice) => {
+					rsx! { <RouteList notice=notice entries=entries/> }
+				}
+				None => rsx! { <RouteList entries=entries/> },
+			};
+			let mut entity = world.spawn_template(snippet)?;
+			let id = entity.id();
+			RenderRoot::insert(&mut entity, vec![id]);
+			id.xok()
+		})
+		.await
+}
+
+/// Collect a [`RouteTree`] into [`RouteEntry`] rows, excluding the `help` route.
+fn route_entries(tree: &RouteTree) -> Vec<RouteEntry> {
 	tree.flatten_nodes()
 		.into_iter()
 		.filter(|node| {
 			node.path.annotated_path().last_segment() != Some("help")
 		})
-		.cloned()
+		.map(route_entry)
 		.collect()
 }
-/// Spawns a help scene entity tree with route documentation, returning the
-/// render-root entity.
-async fn spawn_help_scene(
-	caller: &AsyncEntity,
-	nodes: &[ActionNode],
-) -> Entity {
-	let children: Vec<OnSpawn> = nodes
-		.iter()
-		.map(|node| format_action_node_bundle(node).any_bundle())
-		.collect();
 
-	let world = caller.world();
-	// spawn children first
-	let mut child_ids = Vec::new();
-	for child in children {
-		let child_entity = world.spawn(child).await;
-		child_ids.push(child_entity.id());
-	}
-	// build parent with heading
-	let entity = world
-		.spawn(rsx! {
-			<div>
-				<h2>"Available routes"</h2>
-			</div>
-		})
-		.await;
-	// add pre-spawned children to parent, then mark it an ephemeral render root
-	let parent_id = entity.id();
-	entity
-		.with(move |mut entity| {
-			entity.world_scope(move |world| {
-				for child_id in child_ids {
-					world.entity_mut(parent_id).add_child(child_id);
-				}
-			});
-			RenderRoot::insert(&mut entity, vec![parent_id]);
-		})
-		.await
-		.ok();
-	parent_id
-}
-
-/// Builds the not-found preamble with anchor tags for the missing route
-/// and optional ancestor route.
-fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
-	let not_found_path = info.not_found_path;
-	let not_found_href = format!("/{not_found_path}");
-
-	if let Some(ancestor) = info.ancestor_path {
-		let ancestor_href = format!("/{ancestor}");
-		rsx! {
-			<div>
-				<p>
-					"Route "
-					<a href=not_found_href.clone()>{not_found_href}</a>
-					" not found. Showing help for "
-					<a href=ancestor_href.clone()>{ancestor_href}</a>
-					":"
-				</p>
-				<h2>"Available routes"</h2>
-			</div>
-		}
-		.any_bundle()
-	} else {
-		rsx! {
-			<div>
-				<p>
-					"Route "
-					<a href=not_found_href.clone()>{not_found_href}</a>
-					" not found."
-				</p>
-				<h2>"Available routes"</h2>
-			</div>
-		}
-		.any_bundle()
-	}
-}
-
-/// Spawns a not-found scene entity tree with anchor-tagged preamble and help,
-/// returning the render-root entity.
-async fn spawn_not_found_scene(
-	caller: &AsyncEntity,
-	info: NotFoundInfo,
-	nodes: &[ActionNode],
-) -> Entity {
-	let children: Vec<OnSpawn> = nodes
-		.iter()
-		.map(|node| format_action_node_bundle(node).any_bundle())
-		.collect();
-
-	let world = caller.world();
-	// spawn children first
-	let mut child_ids = Vec::new();
-	for child in children {
-		let child_entity = world.spawn(child).await;
-		child_ids.push(child_entity.id());
-	}
-	// build parent from preamble
-	let entity = world.spawn(not_found_preamble(info)).await;
-	// add pre-spawned children to parent, then mark it an ephemeral render root
-	let parent_id = entity.id();
-	entity
-		.with(move |mut entity| {
-			entity.world_scope(move |world| {
-				for child_id in child_ids {
-					world.entity_mut(parent_id).add_child(child_id);
-				}
-			});
-			RenderRoot::insert(&mut entity, vec![parent_id]);
-		})
-		.await
-		.ok();
-	parent_id
-}
-
-/// Creates an element bundle describing a single route node.
-///
-/// Each route renders as a `<li>` containing the path heading
-/// and a nested `<ul>` with description, type info, and parameters.
-fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
+/// Flatten one [`ActionNode`] into a [`RouteEntry`]: path + kind tag, then the
+/// detail rows (description, non-trivial input/output types, params).
+fn route_entry(node: &ActionNode) -> RouteEntry {
 	let path = node.path.annotated_path().to_string();
-
-	// path with leading slash and kind tag
-	let heading = if node.is_scene() {
-		format!("/{path} [scene]")
-	} else if let Some(method) = &node.method {
-		format!("/{path} [{method}]")
+	let tag = if node.is_scene() {
+		Some("scene".to_string())
 	} else {
-		format!("/{path}")
+		node.method.as_ref().map(|method| method.to_string())
 	};
 
-	// collect detail items as (label, value) pairs
 	let mut details: Vec<(String, String)> = Vec::new();
-
 	if let Some(description) = node.description() {
 		details.push(("description".into(), description.to_string()));
 	}
-
+	// only show input/output for non-trivial, non-exchange, non-scene routes
 	let input_type = node.meta.input().type_name();
 	let output_type = node.meta.output().type_name();
 	let is_trivial = input_type == "()" && output_type == "()";
@@ -286,51 +233,56 @@ fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
 		details.push(("input".into(), input_type.to_string()));
 		details.push(("output".into(), output_type.to_string()));
 	}
-
 	for param in node.params.iter() {
 		details.push(("param".into(), param.to_string()));
 	}
 
+	RouteEntry {
+		href: format!("/{path}"),
+		tag,
+		details,
+	}
+}
+
+/// Walk path segments from longest to shortest prefix, returning the not-found
+/// notice and the route entries for the first ancestor that matches a scene
+/// route (else the whole tree).
+fn nearest_ancestor_help(
+	tree: &RouteTree,
+	segments: &[SmolStr],
+) -> (NotFoundNotice, Vec<RouteEntry>) {
+	let not_found_path = segments.join("/");
+
+	for length in (1..segments.len()).rev() {
+		let prefix = &segments[..length];
+		if let Some(node) = tree.find(prefix)
+			&& node.is_scene()
+		{
+			let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
+			return (
+				NotFoundNotice {
+					not_found_path,
+					ancestor_path: Some(prefix.join("/")),
+				},
+				route_entries(help_tree),
+			);
+		}
+	}
 	(
-		Element::new("li"),
-		OnSpawn::new(move |entity| {
-			let li_id = entity.id();
-			entity.world_scope(move |world| {
-				// spawn heading text first
-				let heading_entity =
-					world.spawn(Value::Str(heading.into())).flush();
-				// spawn nested detail list if needed
-				if !details.is_empty() {
-					let lis: Vec<Entity> = details
-						.into_iter()
-						.map(|(label, value)| {
-							world
-								.spawn(rsx! {
-									<li>
-										<strong>{format!("{label}:")}</strong>
-										{format!(" {value}")}
-									</li>
-								})
-								.flush()
-						})
-						.collect();
-					let ul =
-						world.spawn(rsx! { <ul>{lis}</ul> }).flush();
-					// add heading and ul as children of li
-					world.entity_mut(li_id).add_children(&[heading_entity, ul]);
-				} else {
-					world.entity_mut(li_id).add_child(heading_entity);
-				}
-			});
-		}),
+		NotFoundNotice {
+			not_found_path,
+			ancestor_path: None,
+		},
+		route_entries(tree),
 	)
 }
 
 /// Format a [`RouteTree`] as a help string, listing both scene routes and
 /// actions.
 ///
-/// The help action itself is excluded from the listing.
-/// Retained for backward compatibility with tests and plaintext rendering.
+/// The help route itself is excluded from the listing. The interactive help
+/// surfaces render the material [`RouteList`]; this is the plaintext counterpart
+/// for non-rendered CLI output.
 pub fn format_route_help(tree: &RouteTree) -> String {
 	let mut output = String::new();
 	output.push_str("Available routes:\n\n");
@@ -399,170 +351,214 @@ fn format_action_node_text(output: &mut String, node: &ActionNode) {
 #[cfg(test)]
 mod test {
 	use super::*;
-
-	/// Adds help as an action located at `/help`.
-	fn help() -> impl Bundle {
-		(
-			PathPartial::new("help"),
-			Action::<(), String>::new_system(help_system),
-			ActionMeta::of::<(), (), String>(),
-		)
-	}
-	fn help_system(
-		In(cx): In<ActionContext>,
-		ancestors: Query<&ChildOf>,
-		trees: Query<&RouteTree>,
-	) -> Result<String> {
-		let root = ancestors.root_ancestor(cx.id());
-		let tree = trees.get(root).map_err(|_| {
-			bevyhow!("No RouteTree found on root ancestor, cannot render help")
-		})?;
-		format_route_help(tree).xok()
-	}
+	#[allow(unused)]
+	use beet_net::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	#[beet_core::test]
-	async fn help_lists_actions() {
-		let mut world = router_world();
-		let root = world
-			.spawn(children![
-				help(),
-				increment(FieldRef::new("count")),
-				decrement(FieldRef::new("count")),
-			])
-			.flush();
-
-		let help_entity = world
-			.entity(root)
-			.get::<RouteTree>()
-			.unwrap()
-			.find(&["help"])
-			.unwrap()
-			.entity;
-
-		let output = world
-			.entity_mut(help_entity)
-			.call::<(), String>(())
+	/// Request `path` (CLI form), negotiating HTML, returning the rendered body.
+	async fn help_body(world: &mut World, root: Entity, path: &str) -> String {
+		world
+			.entity_mut(root)
+			.call::<Request, Response>(
+				Request::from_cli_str(path)
+					.with_header::<header::Accept>(vec![MediaType::Html]),
+			)
 			.await
-			.unwrap();
-
-		output.contains("Available routes").xpect_true();
-		output.contains("increment").xpect_true();
-		output.contains("decrement").xpect_true();
-		// help itself should be excluded from the listing
-		output.contains("help").xpect_false();
+			.unwrap()
+			.unwrap_str()
+			.await
 	}
 
 	#[beet_core::test]
-	async fn help_shows_nested_actions() {
+	async fn help_lists_routes() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![
-				help(),
-				(PathPartial::new("counter"), children![increment(
-					FieldRef::new("count")
-				),]),
-			])
+			.spawn((default_router(), children![
+				increment(FieldRef::new("count")),
+				decrement(FieldRef::new("count")),
+			]))
 			.flush();
 
-		let help_entity = world
-			.entity(root)
-			.get::<RouteTree>()
-			.unwrap()
-			.find(&["help"])
-			.unwrap()
-			.entity;
-
-		let output = world
-			.entity_mut(help_entity)
-			.call::<(), String>(())
+		help_body(&mut world, root, "--help")
 			.await
-			.unwrap();
+			.xpect_contains("Available routes")
+			.xpect_contains("/increment")
+			.xpect_contains("/decrement")
+			// the help route itself is excluded
+			.xnot()
+			.xpect_contains("/help");
+	}
 
-		output.contains("counter/increment").xpect_true();
+	/// The web `?help` query form routes through the same template as the CLI
+	/// `--help`: one [`RouteList`] serves both surfaces.
+	#[beet_core::test]
+	async fn web_help_query_renders_same_route_list() {
+		let mut world = router_world();
+		let root = world
+			.spawn((default_router(), children![increment(FieldRef::new(
+				"count"
+			))]))
+			.flush();
+
+		world
+			.entity_mut(root)
+			.call::<Request, Response>(
+				Request::get("?help")
+					.with_header::<header::Accept>(vec![MediaType::Html]),
+			)
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("Available routes")
+			.xpect_contains("/increment");
+	}
+
+	#[beet_core::test]
+	async fn help_shows_nested_routes() {
+		let mut world = router_world();
+		let root = world
+			.spawn((default_router(), children![(
+				render_action::fixed_route(
+					"counter",
+					Element::new("p").with_inner_text("counter")
+				),
+				children![increment(FieldRef::new("count"))],
+			)]))
+			.flush();
+
+		help_body(&mut world, root, "--help")
+			.await
+			.xpect_contains("/counter/increment");
+	}
+
+	#[beet_core::test]
+	async fn help_scopes_to_subcommand() {
+		let mut world = router_world();
+		let root = world
+			.spawn((default_router(), children![
+				(
+					render_action::fixed_route(
+						"counter",
+						Element::new("p").with_inner_text("counter")
+					),
+					children![increment(FieldRef::new("count"))],
+				),
+				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
+			]))
+			.flush();
+
+		// `counter --help` lists only the counter subtree, not sibling routes
+		help_body(&mut world, root, "counter --help")
+			.await
+			.xpect_contains("increment")
+			.xnot()
+			.xpect_contains("about");
 	}
 
 	#[beet_core::test]
 	async fn help_shows_input_output_types() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![help(), add(FieldRef::new("value")),])
+			.spawn((default_router(), children![add(FieldRef::new("value"))]))
 			.flush();
 
-		let help_entity = world
-			.entity(root)
-			.get::<RouteTree>()
-			.unwrap()
-			.find(&["help"])
-			.unwrap()
-			.entity;
-
-		let output = world
-			.entity_mut(help_entity)
-			.call::<(), String>(())
-			.await
-			.unwrap();
-
 		// add takes i64 input and returns i64
-		output.contains("i64").xpect_true();
-	}
-
-	#[beet_core::test]
-	async fn help_with_no_other_actions() {
-		let mut world = router_world();
-		let root = world.spawn(children![help()]).flush();
-
-		let help_entity = world
-			.entity(root)
-			.get::<RouteTree>()
-			.unwrap()
-			.find(&["help"])
-			.unwrap()
-			.entity;
-
-		let output = world
-			.entity_mut(help_entity)
-			.call::<(), String>(())
-			.await
-			.unwrap();
-
-		output.contains("(none)").xpect_true();
-		output.contains("Available routes").xpect_true();
+		help_body(&mut world, root, "--help").await.xpect_contains("i64");
 	}
 
 	#[beet_core::test]
 	async fn help_includes_scenes() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![
-				help(),
-				render_action::fixed_route(
-					"about",
-					rsx! { <p>"about"</p> }
-				),
+			.spawn((default_router(), children![
+				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
 				increment(FieldRef::new("count")),
-			])
+			]))
 			.flush();
 
-		let help_entity = world
-			.entity(root)
-			.get::<RouteTree>()
-			.unwrap()
-			.find(&["help"])
-			.unwrap()
-			.entity;
-
-		let output = world
-			.entity_mut(help_entity)
-			.call::<(), String>(())
+		help_body(&mut world, root, "--help")
 			.await
-			.unwrap();
+			// scene routes carry a [scene] tag, actions still appear
+			.xpect_contains("about")
+			.xpect_contains("[scene]")
+			.xpect_contains("increment");
+	}
 
-		// scene routes should appear with a [scene] marker
-		output.contains("about").xpect_true();
-		output.contains("[scene]").xpect_true();
-		// actions should still appear
-		output.contains("increment").xpect_true();
+	/// The help view renders through the ancestor layout: the document chrome
+	/// (here a `<main>` from the layout) wraps the route list.
+	#[beet_core::test]
+	async fn help_renders_through_layout() {
+		#[template]
+		fn PageLayout() -> impl Bundle {
+			rsx! {
+				<html>
+					<head><meta charset="utf-8"/></head>
+					<body><main><Slot/></main></body>
+				</html>
+			}
+		}
+
+		let mut world = router_world();
+		let root = world
+			.spawn((
+				default_router(),
+				BaseLayout::<PageLayout>::default(),
+				children![increment(FieldRef::new("count"))],
+			))
+			.flush();
+
+		help_body(&mut world, root, "--help")
+			.await
+			// the layout chrome wraps the route list content
+			.xpect_contains("<meta charset=\"utf-8\"")
+			.xpect_contains("<main>")
+			.xpect_contains("Available routes")
+			.xpect_contains("/increment");
+	}
+
+	#[beet_core::test]
+	async fn not_found_shows_route_list() {
+		let mut world = router_world();
+		let root = world
+			.spawn((default_router(), children![increment(FieldRef::new(
+				"count"
+			))]))
+			.flush();
+
+		// not-found responds 404, so take the body directly rather than via the
+		// ok-only `unwrap_str`.
+		world
+			.entity_mut(root)
+			.call::<Request, Response>(
+				Request::from_cli_str("nonexistent")
+					.with_header::<header::Accept>(vec![MediaType::Html]),
+			)
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("not found")
+			.xpect_contains("Available routes")
+			.xpect_contains("/increment");
+	}
+
+	#[beet_core::test]
+	async fn format_route_help_excludes_help_and_lists_routes() {
+		let mut world = router_world();
+		let root = world
+			.spawn((default_router(), children![
+				increment(FieldRef::new("count")),
+				decrement(FieldRef::new("count")),
+			]))
+			.flush();
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+
+		format_route_help(&tree)
+			.xpect_contains("Available routes")
+			.xpect_contains("increment")
+			.xpect_contains("decrement");
 	}
 }

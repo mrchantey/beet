@@ -123,7 +123,6 @@ pub fn catch_no_abort(
 	match outcome {
 		Ok(()) => Ok(Ok(())),
 		Err(err) if err.is_string() => {
-			crate::cross_log!("twas error!");
 			Ok(Err(err.as_string().expect("checked")))
 		}
 		Err(_) => Err(()),

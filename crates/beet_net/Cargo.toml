@@ -102,7 +102,10 @@ http = [
 ]
 reqwest = ["std", "http", "dep:reqwest", "beet_core/tokio"]
 ureq = ["std", "http", "dep:ureq", "dep:blocking"]
-tungstenite = ["std", "dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
+# the same-port upgrade seam (`WebSocketUpgrade`, the `mini_http_server` hand-off)
+# is a server concern, so `tungstenite` pulls `server`; the side-port `SocketServer`
+# and the `Socket` client ride the same feature.
+tungstenite = ["std", "server", "dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url", "dep:sha1", "dep:base64"]
 webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
 native-tls = [
 	"reqwest?/default",
@@ -165,6 +168,8 @@ futures = { workspace = true, optional = true }
 
 # serde
 base64 = { workspace = true, optional = true }
+# the websocket `Sec-WebSocket-Accept` digest, see `http_ext::sec_websocket_accept`
+sha1 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }

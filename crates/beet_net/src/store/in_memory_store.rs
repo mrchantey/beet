@@ -195,6 +195,7 @@ impl BlobStoreProvider for InMemoryStore {
 	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
+		#[cfg(feature = "std")]
 		let path = path.clone();
 		Box::pin(async move {
 			let existed = {

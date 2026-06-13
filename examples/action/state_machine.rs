@@ -49,6 +49,6 @@ async fn main() -> Result {
 		))
 		.call::<Outcome, Outcome>(Outcome::PASS)
 		.await?;
-	cross_log!("machine finished: {outcome:?}");
+	info!("machine finished: {outcome:?}");
 	Ok(())
 }

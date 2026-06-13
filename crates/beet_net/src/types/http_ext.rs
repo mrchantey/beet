@@ -1,6 +1,6 @@
 //! HTTP parsing and wire utilities.
 //!
-//! This module is split into two halves:
+//! This module is split into three groups:
 //!
 //! - **`no_std` wire helpers** ([`find_header_end`], [`parse_content_length`],
 //!   [`parse_http_request`], [`serialize_http_response`]): operate only on byte
@@ -10,6 +10,12 @@
 //!   [`set_http_server`]. Only the *pure* parse/serialise half is shareable; the
 //!   connection + streaming half differs per transport (std `async-io` vs an
 //!   embassy `TcpSocket`) and stays in each backend.
+//! - **websocket upgrade helpers**: the transport-agnostic, mostly-pure
+//!   handshake seam. [`is_websocket_upgrade`]/[`is_websocket_response`] are
+//!   `no_std`; the accept-key digest (`sec_websocket_accept`) and the
+//!   `WebSocketUpgrade` response type a route returns are gated behind
+//!   `tungstenite` (they pull `sha1`/`base64`). A backend lands the upgraded
+//!   stream as a `Socket` (see `mini_http_server`/`hyper_server`).
 //! - **`http`-crate helpers** ([`has_body`], [`version_to_string`],
 //!   [`parse_version`]): convert to/from the `http` crate types and are gated
 //!   per-function behind the `http` feature, so the module itself still compiles
@@ -267,6 +273,119 @@ pub async fn serialize_http_response(response: Response) -> Result<Vec<u8>> {
 	Ok(output)
 }
 
+/// Whether request headers ask to upgrade the connection to a WebSocket.
+///
+/// Pure and transport-agnostic: `Connection` must list `upgrade` (it may carry
+/// other tokens, eg `keep-alive, Upgrade`) and `Upgrade` must name `websocket`,
+/// both matched case-insensitively per [RFC 6455 §4.2.1].
+pub fn is_websocket_upgrade(headers: &HeaderMap) -> bool {
+	let connection_upgrades = headers
+		.first_raw("connection")
+		.map(|val| {
+			val.split(',')
+				.any(|token| token.trim().eq_ignore_ascii_case("upgrade"))
+		})
+		.unwrap_or(false);
+	let upgrade_websocket = headers
+		.first_raw("upgrade")
+		.map(|val| {
+			val.split(',')
+				.any(|token| token.trim().eq_ignore_ascii_case("websocket"))
+		})
+		.unwrap_or(false);
+	connection_upgrades && upgrade_websocket
+}
+
+/// The client's `Sec-WebSocket-Key` header value, required to compute the
+/// handshake response (see [`sec_websocket_accept`]).
+pub fn sec_websocket_key(headers: &HeaderMap) -> Option<&str> {
+	headers.first_raw("sec-websocket-key")
+}
+
+/// Compute the `Sec-WebSocket-Accept` value for a client's `Sec-WebSocket-Key`,
+/// `base64(SHA1(key + GUID))` per [RFC 6455 §4.2.2].
+///
+/// Reuses the workspace `sha1` (the RustCrypto sibling of `sha2`, used for the
+/// `aws_sdk` signing) and `base64` crates, so no new crypto dependency is added.
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+pub fn sec_websocket_accept(key: &str) -> String {
+	/// The GUID concatenated with `Sec-WebSocket-Key` before hashing, per
+	/// [RFC 6455 §1.3](https://datatracker.ietf.org/doc/html/rfc6455#section-1.3).
+	const WEBSOCKET_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+	use base64::Engine as _;
+	use sha1::Digest;
+	let mut hasher = sha1::Sha1::new();
+	hasher.update(key.as_bytes());
+	hasher.update(WEBSOCKET_GUID.as_bytes());
+	base64::engine::general_purpose::STANDARD.encode(hasher.finalize())
+}
+
+/// A response that signals the backend to upgrade the connection to a WebSocket
+/// rather than write a normal body.
+///
+/// A route returns `WebSocketUpgrade::new(request)` (or `from_request`); it
+/// lowers to a `101 Switching Protocols` [`Response`] carrying the computed
+/// `Sec-WebSocket-Accept` and the required `Upgrade`/`Connection` headers. The
+/// `101` status is the backend's signal to keep the raw stream and hand it to
+/// the socket layer (see `mini_http_server`/`hyper_server`), instead of closing
+/// the connection after the body.
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+#[derive(Debug, Clone)]
+pub struct WebSocketUpgrade {
+	/// The computed `Sec-WebSocket-Accept` value, or `None` when the request was
+	/// not a valid upgrade (a missing/invalid `Sec-WebSocket-Key`).
+	accept: Option<String>,
+}
+
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+impl WebSocketUpgrade {
+	/// Build the upgrade from request headers, computing the accept key.
+	pub fn from_request(request: &Request) -> Self { Self::new(request.headers()) }
+
+	/// Build the upgrade from request headers, computing the accept key.
+	pub fn new(headers: &HeaderMap) -> Self {
+		let accept = is_websocket_upgrade(headers)
+			.then(|| sec_websocket_key(headers))
+			.flatten()
+			.map(sec_websocket_accept);
+		Self { accept }
+	}
+
+	/// Whether the request was a valid upgrade (had the headers and a key).
+	pub fn is_valid(&self) -> bool { self.accept.is_some() }
+
+	/// Lower into the `101 Switching Protocols` handshake [`Response`], or a
+	/// `400 Bad Request` if the request was not a valid upgrade.
+	pub fn into_response(self) -> Response {
+		let Some(accept) = self.accept else {
+			return Response::from_status(StatusCode::BAD_REQUEST);
+		};
+		let mut parts = ResponseParts::new(StatusCode::SWITCHING_PROTOCOLS);
+		parts.headers.set_raw("upgrade", "websocket");
+		parts.headers.set_raw("connection", "Upgrade");
+		parts.headers.set_raw("sec-websocket-accept", accept);
+		Response::new(parts, Body::default())
+	}
+}
+
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+impl From<WebSocketUpgrade> for Response {
+	fn from(upgrade: WebSocketUpgrade) -> Self { upgrade.into_response() }
+}
+
+/// Whether a [`Response`] is a WebSocket upgrade handshake (a `101` with the
+/// `upgrade: websocket` header), ie a backend should keep the raw stream and
+/// hand it to the socket layer instead of closing after the body.
+pub fn is_websocket_response(response: &Response) -> bool {
+	response.status() == StatusCode::SWITCHING_PROTOCOLS
+		&& response
+			.headers()
+			.first_raw("upgrade")
+			.map(|val| val.eq_ignore_ascii_case("websocket"))
+			.unwrap_or(false)
+}
+
 /// Check if HTTP request parts indicate a body is present based on headers.
 #[cfg(feature = "http")]
 pub fn has_body(parts: &http::request::Parts) -> bool {
@@ -449,6 +568,75 @@ mod test {
 		let raw_str = String::from_utf8(raw).unwrap();
 		raw_str.as_str().xpect_contains("HTTP/1.1 200 OK");
 		raw_str.as_str().xpect_contains("content-length: 0");
+	}
+
+	// -- websocket upgrade --
+
+	/// Headers carrying a valid upgrade request, with the RFC 6455 example key.
+	fn upgrade_headers() -> HeaderMap {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("upgrade", "websocket");
+		headers.set_raw("connection", "Upgrade");
+		headers.set_raw("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==");
+		headers
+	}
+
+	#[beet_core::test]
+	fn detects_upgrade_headers() {
+		is_websocket_upgrade(&upgrade_headers()).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn detects_upgrade_case_insensitively_with_extra_tokens() {
+		let mut headers = HeaderMap::new();
+		// real browsers send a multi-token Connection and mixed casing
+		headers.set_raw("upgrade", "WebSocket");
+		headers.set_raw("connection", "keep-alive, Upgrade");
+		is_websocket_upgrade(&headers).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn rejects_non_upgrade_headers() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("connection", "keep-alive");
+		is_websocket_upgrade(&headers).xpect_false();
+		is_websocket_upgrade(&HeaderMap::new()).xpect_false();
+	}
+
+	// RFC 6455 §1.3 worked example: key `dGhlIHNhbXBsZSBub25jZQ==` hashes to the
+	// accept value `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=`.
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn computes_rfc_accept_key() {
+		sec_websocket_accept("dGhlIHNhbXBsZSBub25jZQ==")
+			.xpect_eq("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+	}
+
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn upgrade_lowers_to_101_handshake() {
+		let upgrade = WebSocketUpgrade::new(&upgrade_headers());
+		upgrade.is_valid().xpect_true();
+		let response = upgrade.into_response();
+		response.status().xpect_eq(StatusCode::SWITCHING_PROTOCOLS);
+		response
+			.headers()
+			.first_raw("sec-websocket-accept")
+			.unwrap()
+			.xpect_eq("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+		is_websocket_response(&response).xpect_true();
+	}
+
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn invalid_upgrade_lowers_to_400() {
+		// no `Sec-WebSocket-Key`: not a valid handshake
+		let mut headers = HeaderMap::new();
+		headers.set_raw("upgrade", "websocket");
+		headers.set_raw("connection", "Upgrade");
+		let upgrade = WebSocketUpgrade::new(&headers);
+		upgrade.is_valid().xpect_false();
+		upgrade.into_response().status().xpect_eq(StatusCode::BAD_REQUEST);
 	}
 
 	// -- http-crate helpers --

@@ -16,38 +16,38 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource, Default)]
 pub struct PackageConfig {
-	/// The pretty name of the package.
-	pub title: String,
-	/// The name of the package set via `CARGO_PKG_NAME`.
-	pub binary_name: String,
-	/// The version of the package set via `CARGO_PKG_VERSION`.
-	pub version: String,
-	/// The description of the package set via `CARGO_PKG_DESCRIPTION`.
-	pub description: String,
-	/// The homepage URL of the package, set via `CARGO_PKG_HOMEPAGE`.
-	pub homepage: String,
-	/// The repository URL of the package, set via `CARGO_PKG_REPOSITORY` if available.
-	pub repository: Option<String>,
+	/// The pretty name of the package, shown in titles and headers.
+	pub title: SmolStr,
+	/// A short description of the package, used for meta tags.
+	pub description: SmolStr,
+	/// The binary name, usually set via `CARGO_PKG_NAME` in [`pkg_config!`].
+	pub binary_name: Option<SmolStr>,
+	/// The package version, usually set via `CARGO_PKG_VERSION` in [`pkg_config!`].
+	pub version: Option<SmolStr>,
+	/// The homepage URL, usually set via `CARGO_PKG_HOMEPAGE` in [`pkg_config!`].
+	pub homepage: Option<SmolStr>,
+	/// The repository URL, usually set via `CARGO_PKG_REPOSITORY` in [`pkg_config!`].
+	pub repository: Option<SmolStr>,
 	/// The infrastructure stage for this build.
 	///
 	/// Defaults to `dev` in debug builds and `prod` in release builds.
-	pub stage: String,
+	pub stage: SmolStr,
 	/// How services should be accessed.
 	pub service_access: ServiceAccess,
 }
 
-/// The empty-package defaults, used when a markup-declared
-/// `<PackageConfig/>` is built without a host-inserted [`pkg_config!`].
+/// The defaults govern unset fields for markup-only sites: a markup-declared
+/// `<PackageConfig/>` is built over these when no host inserted a [`pkg_config!`].
 impl Default for PackageConfig {
 	fn default() -> Self {
 		Self {
-			title: default(),
-			binary_name: default(),
-			version: default(),
-			description: default(),
-			homepage: default(),
+			title: "My Beet App".into(),
+			description: "An app built with beet".into(),
+			binary_name: None,
+			version: None,
+			homepage: None,
 			repository: None,
-			stage: "dev".to_string(),
+			stage: "dev".into(),
 			service_access: ServiceAccess::Local,
 		}
 	}
@@ -87,16 +87,21 @@ impl std::fmt::Display for ServiceAccess {
 }
 
 impl PackageConfig {
-	/// Returns the binary name.
-	pub fn binary_name(&self) -> &str { &self.binary_name }
+	/// Returns the binary name if set.
+	pub fn binary_name(&self) -> Option<&str> {
+		self.binary_name.as_deref()
+	}
 
-	/// Returns the version string.
-	pub fn version(&self) -> &str { &self.version }
+	/// Returns the version string if set.
+	pub fn version(&self) -> Option<&str> { self.version.as_deref() }
 
 	/// Returns the description.
 	pub fn description(&self) -> &str { &self.description }
 
-	/// Returns the repository URL if available.
+	/// Returns the homepage URL if set.
+	pub fn homepage(&self) -> Option<&str> { self.homepage.as_deref() }
+
+	/// Returns the repository URL if set.
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
 
 	/// Returns the infrastructure stage.
@@ -137,26 +142,34 @@ impl PackageConfig {
 	/// This binary-resource-stage convention must match sst config:
 	/// `sst.config.ts -> new sst.aws.Function(.., {name: THIS_FIELD })`.
 	pub fn resource_name(&self, descriptor: &str) -> String {
-		let binary_name = self.binary_name.to_kebab_case();
+		// the cloud naming convention needs a stable prefix; fall back to the
+		// title when no binary name was set.
+		let binary_name = self
+			.binary_name
+			.as_deref()
+			.unwrap_or(&self.title)
+			.to_kebab_case();
 		let stage = self.stage.as_str();
 		format! {"{binary_name}--{stage}--{descriptor}"}
 	}
 }
 
 impl std::fmt::Display for PackageConfig {
+	/// Writes each set field as a `key: value` line, omitting unset optionals.
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		writeln!(f, "title: {}", self.title)?;
-		writeln!(f, "binary_name: {}", self.binary_name)?;
-		writeln!(f, "version: {}", self.version)?;
 		writeln!(f, "description: {}", self.description)?;
-		writeln!(f, "homepage: {}", self.homepage)?;
-		if let Some(repo) = &self.repository {
-			writeln!(f, "repository: {}", repo)?;
-		} else {
-			writeln!(f, "repository: None")?;
+		for (key, value) in [
+			("binary_name", &self.binary_name),
+			("version", &self.version),
+			("homepage", &self.homepage),
+			("repository", &self.repository),
+		] {
+			if let Some(value) = value {
+				writeln!(f, "{key}: {value}")?;
+			}
 		}
-		writeln!(f, "stage: {}", self.stage)?;
-		Ok(())
+		writeln!(f, "stage: {}", self.stage)
 	}
 }
 
@@ -170,7 +183,7 @@ impl std::fmt::Display for PackageConfig {
 /// # use beet_core::prelude::*;
 /// let mut world = World::new();
 /// world.insert_resource(PackageConfig {
-/// 	title: "My Site".to_string(),
+/// 	title: "My Site".into(),
 /// 	..pkg_config!()
 /// });
 /// ```
@@ -178,14 +191,13 @@ impl std::fmt::Display for PackageConfig {
 macro_rules! pkg_config {
 	() => {
 		$crate::prelude::PackageConfig {
-			title: env!("CARGO_PKG_NAME").to_string(),
-			binary_name: env!("CARGO_PKG_NAME").to_string(),
-			version: env!("CARGO_PKG_VERSION").to_string(),
-			description: env!("CARGO_PKG_DESCRIPTION").to_string(),
-			homepage: env!("CARGO_PKG_HOMEPAGE").to_string(),
-			repository: option_env!("CARGO_PKG_REPOSITORY")
-				.map(|s| s.to_string()),
-			stage: option_env!("BEET_STAGE").unwrap_or("dev").to_string(),
+			title: env!("CARGO_PKG_NAME").into(),
+			description: env!("CARGO_PKG_DESCRIPTION").into(),
+			binary_name: Some(env!("CARGO_PKG_NAME").into()),
+			version: Some(env!("CARGO_PKG_VERSION").into()),
+			homepage: Some(env!("CARGO_PKG_HOMEPAGE").into()),
+			repository: option_env!("CARGO_PKG_REPOSITORY").map(|s| s.into()),
+			stage: option_env!("BEET_STAGE").unwrap_or("dev").into(),
 			service_access: option_env!("BEET_SERVICE_ACCESS")
 				.map(|s| s.parse().unwrap_or(ServiceAccess::Local))
 				.unwrap_or(ServiceAccess::Local),
@@ -320,5 +332,50 @@ mod test {
 		pkg_config!()
 			.resource_name("lambda")
 			.xpect_eq("beet-core--dev--lambda");
+	}
+
+	#[crate::test]
+	fn default_shape() {
+		let config = PackageConfig::default();
+		config.title.as_str().xpect_eq("My Beet App");
+		config.description.as_str().xpect_eq("An app built with beet");
+		config.binary_name.xpect_none();
+		config.version.xpect_none();
+		config.homepage.xpect_none();
+		config.repository.xpect_none();
+		config.stage.as_str().xpect_eq("dev");
+		config.service_access.xpect_eq(ServiceAccess::Local);
+	}
+
+	/// A markup-declared `<PackageConfig/>` patches only its named fields over
+	/// [`PackageConfig::default`]: set fields override, unset fields keep the
+	/// defaults (and the optionals stay `None`).
+	#[crate::test]
+	fn markup_patches_over_defaults() {
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		world
+			.resource_mut::<AppTypeRegistry>()
+			.write()
+			.register::<PackageConfig>();
+		let nodes = parse_document(
+			r#"<PackageConfig title="Patched"/>"#,
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
+		world
+			.spawn_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap();
+
+		let config = world.resource::<PackageConfig>();
+		// the set field overrides the default
+		config.title.as_str().xpect_eq("Patched");
+		// unset fields keep their defaults
+		config.description.as_str().xpect_eq("An app built with beet");
+		config.stage.as_str().xpect_eq("dev");
+		config.binary_name.xpect_none();
+		config.version.xpect_none();
 	}
 }

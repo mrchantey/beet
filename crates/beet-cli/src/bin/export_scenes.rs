@@ -1,5 +1,5 @@
 //! Generates the `default-cli` scene: the `beet` CLI's default commands
-//! (run, run-wasm, build-wasm, export-pdf, s3-sync, and under `qrcode` qrcode)
+//! (serve, run-wasm, build-wasm, export-pdf, s3-sync, and under `qrcode` qrcode)
 //! bundled as a loadable scene.
 //!
 //! The `beet` binary itself only carries scene management; running this bin
@@ -11,7 +11,7 @@
 //! ```sh
 //! cargo run -p beet-cli --bin export_scenes   # writes target/scenes/default-cli.json
 //! beet load target/scenes/default-cli.json
-//! beet run examples/bsx_site
+//! beet serve examples/bsx_site
 //! ```
 use beet::prelude::*;
 use beet_cli::prelude::*;
@@ -36,20 +36,25 @@ fn main() -> AppExit {
 /// [`Router`] (not [`default_router`]), avoiding the host's app routes, which
 /// would clash when the scene loads under another router.
 fn spawn_host(mut commands: Commands) {
-	commands.spawn((CliServer, default_router(), children![(
-		ExportScenes,
+	commands.spawn((
+		CliServer,
+		Server::cli(),
+		default_router(),
 		children![(
-			ExportPath("target/scenes/default-cli.json".into()),
-			Router,
-			children![
-				Run,
-				RunWasm,
-				BuildWasm,
-				ExportPdf,
-				SyncS3,
-				#[cfg(feature = "qrcode")]
-				QrCode,
-			],
+			ExportScenes,
+			children![(
+				ExportPath("target/scenes/default-cli.json".into()),
+				Router,
+				children![
+					Serve,
+					RunWasm,
+					BuildWasm,
+					ExportPdf,
+					SyncS3,
+					#[cfg(feature = "qrcode")]
+					QrCode,
+				],
+			)],
 		)],
-	)]));
+	));
 }

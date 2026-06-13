@@ -474,7 +474,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	#[cfg(feature = "template_serde")]
+	#[cfg(all(feature = "template_serde", feature = "json"))]
 	fn roundtrip_increment_template() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
@@ -487,7 +487,7 @@ mod test {
 		// Serialize
 		let template_bytes = TemplateSaver::new()
 			.with_entity_tree(app.world(), entity)
-			.save(app.world(), MediaType::Ron)
+			.save(app.world(), MediaType::Json)
 			.unwrap();
 		template_bytes
 			.as_utf8()

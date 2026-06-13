@@ -308,9 +308,12 @@ where
 	pub fn clear(&mut self) { self.inner.clear(); }
 }
 
-/// Trait for parsing a `MultiMap<String, String>` into a concrete reflected type.
+/// Trait for parsing a string-keyed [`MultiMap`] into a concrete reflected type.
+///
+/// Implemented for any key/value that borrows as `str`, ie both
+/// `MultiMap<String, String>` and `MultiMap<SmolStr, SmolStr>`.
 #[extend::ext(name=MultiMapReflectExt)]
-pub impl MultiMap<String, String> {
+pub impl<K: AsRef<str> + Eq + Hash, V: AsRef<str>> MultiMap<K, V> {
 	/// Parse the multimap into a concrete type `T`.
 	///
 	/// The type `T` must implement `Reflect`, `FromReflect`, `Default`, and `Typed`,
@@ -364,15 +367,15 @@ pub impl MultiMap<String, String> {
 		T: 'static + Send + Sync + FromReflect + Typed,
 	{
 		// normalize kebab-case keys to snake_case for reflection
-		let mut normalized = MultiMap::new();
+		let mut normalized = MultiMap::<String, String>::new();
 		for (key, values) in self.iter_all() {
-			let snake_key = key.to_snake_case();
+			let snake_key = key.as_ref().to_snake_case();
 			if values.is_empty() {
 				// preserve empty value lists (flags with no value)
 				normalized.insert_key(snake_key);
 			} else {
 				for value in values {
-					normalized.insert(snake_key.clone(), value.clone());
+					normalized.insert(snake_key.clone(), value.as_ref().to_string());
 				}
 			}
 		}

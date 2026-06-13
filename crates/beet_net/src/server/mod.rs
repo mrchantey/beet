@@ -3,6 +3,14 @@
 //! This module provides server infrastructure that listens for HTTP requests
 //! and routes them to Bevy entities for processing via `Action<Request, Response>`.
 //!
+//! ## Every binary is a CLI server
+//!
+//! A formal beet binary boots as a CLI server at the top level: its entrypoint
+//! is a [`CliServer`] that parses argv into a [`Request`] and runs one exchange.
+//! Long-running backends ([`HttpServer`], the `beet_router` `TuiServer`) are
+//! never self-booting; the [`Server`] orchestrator starts them, pulled in by each
+//! backend's `#[require(Server)]`. See [`server_backend`] for the model.
+//!
 //! ## Implementations
 //!
 //! - **Mini HTTP**: Lightweight async-io TCP server (default for `server` feature)
@@ -15,9 +23,12 @@
 //! All implementations route requests through the action-based exchange
 //! pattern, allowing the same handler code to work in every environment.
 
-// The `HttpServer` component and its `set_http_server` install hook are
-// no_std-capable and compile unconditionally; the concrete backends below stay
-// std/feature-gated.
+// The unified server model (the `Server` orchestrator, `ServerBackend` trait,
+// `ServerBackends` registry), the `HttpServer` component and its
+// `set_http_server` install hook are all no_std-capable and compile
+// unconditionally; the concrete backends below stay std/feature-gated.
+mod server_backend;
+pub use server_backend::*;
 mod http_server;
 pub use http_server::*;
 

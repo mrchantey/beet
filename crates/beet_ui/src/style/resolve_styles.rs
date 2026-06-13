@@ -137,11 +137,9 @@ pub fn resolve_styles(
 			}
 			// follow a `RenderRef` holder into the content it renders in place, so
 			// transcluded content re-resolves under this (layout) cascade. An
-			// unresolved holder (no page yet) has no content to cascade into.
-			if let Ok(render_ref) = render_refs.get(entity)
-				&& let Some(target) = render_ref.target()
-			{
-				queue.push(target);
+			// unresolved holder (no `RenderRef` yet) has no content to cascade into.
+			if let Ok(render_ref) = render_refs.get(entity) {
+				queue.push(render_ref.target());
 			}
 		}
 	}

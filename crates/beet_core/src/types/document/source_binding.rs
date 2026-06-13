@@ -59,6 +59,13 @@ impl BindingTarget {
 	/// [`ChildOf`], hopping an [`AttributeOf`] relation when no parent exists,
 	/// so an attribute or props binding entity (outside the `ChildOf` tree)
 	/// resolves through its owning element/store.
+	///
+	/// A matched marker carrying a [`RenderRootRef`] (a layout root linked to its
+	/// transcluded route content, installed by the router's layout wrap) resolves
+	/// to that content instead, so a layout-head `@comp$RenderRoot:` binding reads
+	/// the route's `ArticleMeta` across the transclusion boundary. A
+	/// self-referential render root has no such link and resolves to itself, as
+	/// before.
 	pub fn resolve(
 		&self,
 		world: &World,
@@ -72,7 +79,12 @@ impl BindingTarget {
 				while let Some(entity) = current {
 					let entity_ref = world.get_entity(entity).ok()?;
 					if entity_ref.contains_id(component_id) {
-						return Some(entity);
+						// a render root linked to detached content (the layout case)
+						// resolves into the content; a self-referential one stays put.
+						return entity_ref
+							.get::<RenderRootRef>()
+							.map(|content| content.get())
+							.or(Some(entity));
 					}
 					current = entity_ref
 						.get::<ChildOf>()
@@ -88,6 +100,43 @@ impl BindingTarget {
 			_ => self.fixed(binding_entity),
 		}
 	}
+}
+
+/// On a render-root entity: a one-directional link to the per-request route
+/// content it transcludes, the seam a layout-head `@comp$RenderRoot:` binding
+/// follows to reach the route's metadata.
+///
+/// A layout builds detached and transcludes the route content by reference (a
+/// `RenderRef` slot child), so the content carries no [`ChildOf`] edge to the
+/// layout. The layout root's own render-root handle is self-referential (it
+/// drives serialization of the layout tree) and cannot double as the content
+/// pointer, so this is a distinct edge installed alongside it (in the router's
+/// layout wrap). The reverse [`RenderRootRefOf`] gives content -> render-root
+/// traversal.
+///
+/// A self-referential render root (a fixed or per-request route that is its own
+/// content) carries no [`RenderRootRef`]: the reserved walk resolves to the
+/// marker entity itself, the pre-transclusion behavior.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
+#[reflect(Component)]
+#[relationship(relationship_target = RenderRootRefOf)]
+pub struct RenderRootRef(#[entities] pub Entity);
+
+impl RenderRootRef {
+	/// Link a render root to the `content` entity its reserved bindings read.
+	pub fn new(content: Entity) -> Self { Self(content) }
+}
+
+/// On route content: the render roots transcluding it, the reverse edge of
+/// [`RenderRootRef`]. Gives content -> render-root traversal for free.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
+#[reflect(Component)]
+#[relationship_target(relationship = RenderRootRef)]
+pub struct RenderRootRefOf(Vec<Entity>);
+
+impl RenderRootRefOf {
+	/// The render roots transcluding this content.
+	pub fn holders(&self) -> &[Entity] { &self.0 }
 }
 
 /// The [`ComponentId`] of the component with this short type path: the type

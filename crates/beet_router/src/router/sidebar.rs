@@ -44,10 +44,10 @@ pub fn RouteHead(
 	let meta = metas.get(cx.route()).ok();
 	let title = meta
 		.and_then(|meta| meta.title.clone())
-		.unwrap_or_else(|| pkg.title.clone());
+		.unwrap_or_else(|| pkg.title.to_string());
 	let description = meta
 		.and_then(|meta| meta.description.clone())
-		.unwrap_or_else(|| pkg.description.clone());
+		.unwrap_or_else(|| pkg.description.to_string());
 	rsx! {
 		<Head title=title description=description>
 			<Slot/>

@@ -23,7 +23,7 @@ async fn Greet(cx: ActionContext) -> Result<Outcome> {
 		.get(|name: &Name| name.to_string())
 		.await
 		.unwrap_or_else(|_| "anonymous".to_string());
-	cross_log!("hello from {name}");
+	info!("hello from {name}");
 	Outcome::PASS.xok()
 }
 
@@ -34,6 +34,6 @@ async fn main() -> Result {
 		.spawn((Name::new("greeter"), trace_action.wrap(Greet)))
 		.call::<(), Outcome>(())
 		.await?;
-	cross_log!("done: {outcome:?}");
+	info!("done: {outcome:?}");
 	Ok(())
 }

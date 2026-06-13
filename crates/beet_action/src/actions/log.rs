@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 ///
 /// Folds the old `LogOnRun` and `LogNameOnRun` into a single action:
 /// [`Log::Message`] logs a fixed string, [`Log::Name`] logs the caller's
-/// [`Name`]. Uses [`cross_log!`] so output is visible on wasm.
+/// [`Name`]. Logs at info level via the `log` crate, visible on every platform.
 ///
 /// # Example
 /// ```
@@ -45,14 +45,14 @@ impl Log {
 #[derive(Component)]
 pub async fn LogAction(cx: ActionContext) -> Result<Outcome> {
 	match cx.caller.get_cloned::<Log>().await? {
-		Log::Message(message) => cross_log!("{message}"),
+		Log::Message(message) => info!("{message}"),
 		Log::Name => {
 			let name = cx
 				.caller
 				.get(|name: &Name| name.to_string())
 				.await
 				.unwrap_or_else(|_| "<unnamed>".to_string());
-			cross_log!("Running: {name}");
+			info!("Running: {name}");
 		}
 	}
 	Outcome::PASS.xok()

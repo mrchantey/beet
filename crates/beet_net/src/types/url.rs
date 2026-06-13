@@ -35,10 +35,10 @@ use beet_core::prelude::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Url {
 	scheme: Scheme,
-	authority: Option<String>,
-	path: Vec<String>,
-	params: MultiMap<String, String>,
-	fragment: Option<String>,
+	authority: Option<SmolStr>,
+	path: Vec<SmolStr>,
+	params: MultiMap<SmolStr, SmolStr>,
+	fragment: Option<SmolStr>,
 }
 
 impl Url {
@@ -70,7 +70,7 @@ impl Url {
 				path: if payload.is_empty() {
 					vec![]
 				} else {
-					vec![payload.to_string()]
+					vec![payload.into()]
 				},
 				authority: None,
 				params: default(),
@@ -81,7 +81,7 @@ impl Url {
 		// Split off fragment first
 		let (before_fragment, fragment) = match input.split_once('#') {
 			Some((before, frag)) if !frag.is_empty() => {
-				(before, Some(frag.to_string()))
+				(before, Some(frag.into()))
 			}
 			Some((before, _)) => (before, None),
 			None => (input, None),
@@ -121,11 +121,11 @@ impl Url {
 				// Authority ends at the first `/` (or end of string)
 				match rest.split_once('/') {
 					Some((auth, path)) if !auth.is_empty() => {
-						(Some(auth.to_string()), format!("/{path}"))
+						(Some(SmolStr::from(auth)), format!("/{path}"))
 					}
 					_ if !rest.is_empty() && !rest.starts_with('/') => {
 						// Entire rest is the authority with no path
-						(Some(rest.to_string()), String::new())
+						(Some(SmolStr::from(rest)), String::new())
 					}
 					_ => (None, rest.to_string()),
 				}
@@ -145,7 +145,7 @@ impl Url {
 			if path_str.is_empty() {
 				vec![]
 			} else {
-				vec![path_str]
+				vec![path_str.into()]
 			}
 		} else {
 			split_path(&path_str)
@@ -163,10 +163,10 @@ impl Url {
 	/// Create a URL from individual components.
 	pub fn new(
 		scheme: Scheme,
-		authority: Option<String>,
-		path: Vec<String>,
-		params: MultiMap<String, String>,
-		fragment: Option<String>,
+		authority: Option<SmolStr>,
+		path: Vec<SmolStr>,
+		params: MultiMap<SmolStr, SmolStr>,
+		fragment: Option<SmolStr>,
 	) -> Self {
 		Self {
 			scheme,
@@ -199,34 +199,34 @@ impl Url {
 	pub fn is_external(&self) -> bool { self.authority.is_some() }
 
 	/// Set the authority.
-	pub fn with_authority(mut self, authority: impl Into<String>) -> Self {
+	pub fn with_authority(mut self, authority: impl Into<SmolStr>) -> Self {
 		self.authority = Some(authority.into());
 		self
 	}
 
 	/// The path segments.
-	pub fn path(&self) -> &Vec<String> { &self.path }
+	pub fn path(&self) -> &Vec<SmolStr> { &self.path }
 
 	/// A mutable reference to the path segments.
-	pub fn path_mut(&mut self) -> &mut Vec<String> { &mut self.path }
+	pub fn path_mut(&mut self) -> &mut Vec<SmolStr> { &mut self.path }
 
 	/// Set the path segments.
-	pub fn with_path(mut self, path: Vec<String>) -> Self {
+	pub fn with_path(mut self, path: Vec<SmolStr>) -> Self {
 		self.path = path;
 		self
 	}
 
 	/// Set the path segments.
-	pub fn set_path(&mut self, path: Vec<String>) -> &mut Self {
+	pub fn set_path(&mut self, path: Vec<SmolStr>) -> &mut Self {
 		self.path = path;
 		self
 	}
 
 	/// All query parameters.
-	pub fn params(&self) -> &MultiMap<String, String> { &self.params }
+	pub fn params(&self) -> &MultiMap<SmolStr, SmolStr> { &self.params }
 
 	/// A mutable reference to the query parameters.
-	pub fn params_mut(&mut self) -> &mut MultiMap<String, String> {
+	pub fn params_mut(&mut self) -> &mut MultiMap<SmolStr, SmolStr> {
 		&mut self.params
 	}
 
@@ -243,15 +243,15 @@ impl Url {
 	/// Add a query parameter, returning self for chaining.
 	pub fn with_param(
 		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
+		key: impl Into<SmolStr>,
+		value: impl Into<SmolStr>,
 	) -> Self {
 		self.params.insert(key.into(), value.into());
 		self
 	}
 
 	/// Add a flag parameter (key with no value).
-	pub fn with_flag(mut self, key: impl Into<String>) -> Self {
+	pub fn with_flag(mut self, key: impl Into<SmolStr>) -> Self {
 		self.params.insert_key(key.into());
 		self
 	}
@@ -260,7 +260,7 @@ impl Url {
 	pub fn fragment(&self) -> Option<&str> { self.fragment.as_deref() }
 
 	/// Set the fragment identifier.
-	pub fn with_fragment(mut self, fragment: impl Into<String>) -> Self {
+	pub fn with_fragment(mut self, fragment: impl Into<SmolStr>) -> Self {
 		self.fragment = Some(fragment.into());
 		self
 	}
@@ -288,7 +288,7 @@ impl Url {
 	}
 
 	/// Path segments starting from the given index.
-	pub fn path_from(&self, index: usize) -> &[String] {
+	pub fn path_from(&self, index: usize) -> &[SmolStr] {
 		if index >= self.path.len() {
 			&[]
 		} else {
@@ -313,7 +313,7 @@ impl Url {
 	}
 
 	/// Push a path segment to the end of the path.
-	pub fn push(mut self, segment: impl Into<String>) -> Self {
+	pub fn push(mut self, segment: impl Into<SmolStr>) -> Self {
 		self.path.push(segment.into());
 		self
 	}
@@ -527,15 +527,15 @@ impl From<Option<&http::uri::Scheme>> for Scheme {
 // ============================================================================
 
 /// Parse a query string into a [`MultiMap`].
-pub(crate) fn parse_query_string(query: &str) -> MultiMap<String, String> {
+pub(crate) fn parse_query_string(query: &str) -> MultiMap<SmolStr, SmolStr> {
 	let mut params = MultiMap::default();
 	for pair in query.split('&') {
 		if pair.is_empty() {
 			continue;
 		}
 		let (key, value) = match pair.split_once('=') {
-			Some((key, value)) => (key.to_string(), value.to_string()),
-			None => (pair.to_string(), String::new()),
+			Some((key, value)) => (key.into(), value.into()),
+			None => (pair.into(), SmolStr::default()),
 		};
 		params.insert(key, value);
 	}
@@ -543,20 +543,20 @@ pub(crate) fn parse_query_string(query: &str) -> MultiMap<String, String> {
 }
 
 /// Split a path string into segments, filtering empty segments.
-pub(crate) fn split_path(path: &str) -> Vec<String> {
+pub(crate) fn split_path(path: &str) -> Vec<SmolStr> {
 	path.split('/')
 		.filter(|segment| !segment.is_empty())
-		.map(|segment| segment.to_string())
+		.map(SmolStr::from)
 		.collect()
 }
 
 /// Build a query string from a [`MultiMap`].
-pub(crate) fn build_query_string(params: &MultiMap<String, String>) -> String {
-	let mut parts = Vec::new();
+pub(crate) fn build_query_string(params: &MultiMap<SmolStr, SmolStr>) -> String {
+	let mut parts: Vec<String> = Vec::new();
 	for (key, values) in params.iter_all() {
 		for value in values {
 			if value.is_empty() {
-				parts.push(key.clone());
+				parts.push(key.to_string());
 			} else {
 				parts.push(format!("{}={}", key, value));
 			}
@@ -892,7 +892,7 @@ mod test {
 		let url = Url::default()
 			.with_scheme(Scheme::Https)
 			.with_authority("example.com")
-			.with_path(vec!["api".to_string()])
+			.with_path(vec!["api".into()])
 			.with_param("key", "val")
 			.with_fragment("top");
 		url.to_string()

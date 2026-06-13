@@ -297,7 +297,7 @@ where
 			Err(panic) => {
 				let msg = display_ext::try_downcast_str(&panic)
 					.unwrap_or_else(|| "unknown panic".to_string());
-				cross_log!("Async task panicked: {}", msg);
+				error!("Async task panicked: {}", msg);
 			}
 		}
 	}

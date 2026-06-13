@@ -49,7 +49,7 @@ pub struct BsxAttribute {
 	pub value: AttrValue,
 }
 
-/// The three things an attribute can hold, position-disambiguated by the parser.
+/// What an attribute can hold, position-disambiguated by the parser.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttrValue {
 	/// A bare flag with no value, ie `disabled`.
@@ -62,6 +62,8 @@ pub enum AttrValue {
 	Expr(ValueExpr),
 	/// A bare-position spread `<el {..}>`: one or more components/templates.
 	Spread(SpreadExpr),
+	/// A `bx:<event>` directive's verb call, eg `bx:click=increment{ field: @doc:count }`.
+	Verb(VerbCall),
 }
 
 /// A value in attribute-value or text position: a literal or a reference.
@@ -118,6 +120,30 @@ impl BindingExpr {
 			init: None,
 		}
 	}
+}
+
+/// A parsed `verb{ arg: value, .. }` event-verb call, the value of a
+/// `bx:<event>` directive (eg `bx:click=increment{ field: @doc:count, amount: 3 }`).
+///
+/// The verb name resolves against the [`VerbRegistry`](crate::prelude::VerbRegistry)
+/// at build time; each named argument is a literal value or an `@` binding,
+/// kept distinct so a binding argument resolves to a live source rather than a
+/// frozen [`Value`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerbCall {
+	/// The verb name, eg `increment`.
+	pub verb: SmolStr,
+	/// The named arguments in author order.
+	pub args: Vec<(SmolStr, VerbArg)>,
+}
+
+/// A single argument of a [`VerbCall`]: a literal value or an `@` binding.
+#[derive(Debug, Clone, PartialEq)]
+pub enum VerbArg {
+	/// A literal value, eg `amount: 3`.
+	Literal(DataLiteral),
+	/// An `@` binding to a live source, eg `field: @doc:count`.
+	Binding(BindingExpr),
 }
 
 /// The source kinds of an `@` binding.
