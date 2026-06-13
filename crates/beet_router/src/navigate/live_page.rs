@@ -332,6 +332,34 @@ mod test {
 			.xpect_contains("Alpha page");
 	}
 
+	/// The default navigator's `about:blank` home renders an empty page in-place
+	/// without a network fetch (regression: it used to HTTP-fetch `about:blank`,
+	/// fail to parse, and panic the async task).
+	#[beet_core::test]
+	async fn default_home_renders_blank() {
+		let mut app = nav_app();
+		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
+		app.world_mut().spawn(Navigator::default());
+		// drive the async on_add navigation until the blank page is current
+		for _ in 0..200 {
+			frame(&mut app, host);
+			if app
+				.world_mut()
+				.query_filtered::<Entity, With<CurrentPage>>()
+				.iter(app.world())
+				.next()
+				.is_some()
+			{
+				break;
+			}
+		}
+		app.world_mut()
+			.query_filtered::<Entity, With<CurrentPage>>()
+			.iter(app.world())
+			.count()
+			.xpect_eq(1);
+	}
+
 	/// The `MediaBytes` → living tree primitive: parsed markdown becomes a page
 	/// that the host paints.
 	#[cfg(feature = "markdown_parser")]

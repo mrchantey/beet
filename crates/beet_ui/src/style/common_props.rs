@@ -11,6 +11,7 @@ use crate::style::Direction;
 use crate::style::AlignContent;
 use crate::style::FlexWrap;
 use crate::style::Visibility;
+use crate::style::Overflow;
 use crate::style::*;
 use beet_core::prelude::*;
 

@@ -60,7 +60,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.queue_async(async |entity| {
 			let home_url =
 				entity.get(|nav: &Navigator| nav.home_url.clone()).await?;
-			Navigator::navigate_to(entity, home_url).await
+			// a failed home load (eg network down) shows nothing rather than
+			// crashing the host; the error page lives in the render step.
+			if let Err(err) = Navigator::navigate_to(entity, home_url).await {
+				cross_log!("Navigator failed to load home page: {err}");
+			}
+			Ok(())
 		});
 }
 
@@ -247,6 +252,24 @@ impl Navigator {
 		url: Url,
 		accepts: Vec<MediaType>,
 	) -> Result {
+		// `about:` urls (eg the default `about:blank` home) are empty documents:
+		// render nothing without touching the network or router.
+		if url.scheme() == &Scheme::About {
+			let page = entity
+				.world()
+				.with(|world| {
+					parse_page(world, MediaBytes::new(MediaType::Text, Vec::new()))
+				})
+				.await?;
+			entity
+				.world()
+				.with(move |world| set_current_page(world, page))
+				.await;
+			return entity
+				.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)
+				.await;
+		}
+
 		let page = match transport {
 			NavigatorTransport::Http => {
 				// a real network fetch, then parse the bytes into a living tree

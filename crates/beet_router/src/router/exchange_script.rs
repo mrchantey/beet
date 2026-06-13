@@ -1,12 +1,12 @@
 //! Scene-friendly [`Script`] route marker.
 //!
-//! [`ExchangeScript`] is a unit marker. When spawned alongside a
-//! [`Script<Input, Output>`] it requires the runtime [`ExchangeAction`]
-//! used by the router, so the entity becomes a dispatchable route
-//! without any post-load hooks.
+//! [`ExchangeScript`] is a unit marker. It requires a [`ScriptAction`] (which
+//! installs the typed `Action<Input, Output>` + `ActionMeta` that runs the
+//! sibling [`Script`]) plus the runtime [`ExchangeAction`] used by the router,
+//! so the entity becomes a dispatchable route without any post-load hooks.
 
 use crate::prelude::*;
-use beet_action::prelude::Script;
+use beet_action::prelude::ScriptAction;
 use beet_core::prelude::*;
 use beet_net::prelude::FromRequest;
 use beet_net::prelude::SerdeFromRequestMarker;
@@ -14,8 +14,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
-/// Reflect-able marker that installs the [`ExchangeAction`] for a
-/// [`Script<Input, Output>`] sibling component.
+/// Reflect-able marker that installs the typed [`ScriptAction`] and the
+/// type-erased [`ExchangeAction`] for a [`Script<Input, Output>`] route.
 ///
 /// `M1`/`M2` are [`FromRequest`]/[`ExchangeRouteOut`] markers. The
 /// defaults handle the serde blanket case; for custom extractors
@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 #[reflect(Component)]
 #[reflect(where)]
 #[require(
-	Script<Input, Output>,
+	ScriptAction<Input, Output>,
 	ExchangeAction = ExchangeAction::new::<Input, Output, M1, M2>(),
 )]
 pub struct ExchangeScript<
@@ -77,5 +77,35 @@ where
 {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("ExchangeScript").finish()
+	}
+}
+
+#[cfg(test)]
+#[cfg(feature = "rhai")]
+mod test {
+	use crate::prelude::*;
+	use beet_action::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	/// An `ExchangeScript` route installs the typed `ScriptAction` (hence an
+	/// `ActionMeta`) and the `ExchangeAction`, so the script's output is served
+	/// as the route response. Regression: requiring only `Script` left the route
+	/// without an `ActionMeta`, so it never joined the `RouteTree`.
+	#[beet_core::test]
+	async fn exchange_script_route_dispatches() {
+		(AsyncPlugin, RouterPlugin)
+			.into_world()
+			.spawn((default_router(), children![(
+				Script::<(), String>::rhai(r#""hello world""#),
+				ExchangeScript::<(), String>::default(),
+				PathPartial::new("greet"),
+			)]))
+			.call::<Request, Response>(Request::get("greet"))
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("hello world");
 	}
 }

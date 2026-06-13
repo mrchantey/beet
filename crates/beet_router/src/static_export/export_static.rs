@@ -214,7 +214,8 @@ mod test {
 
 	/// The `RoutesDir` shape: scan-time frontmatter `draft = true` excludes the
 	/// discovered route from the export.
-	#[cfg(feature = "markdown_parser")]
+	// `RoutesDir`/`SiteRoot` scan the filesystem, so this is native-only.
+	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn skips_draft_routes_dir() {
 		let root = fs_ext::workspace_root()

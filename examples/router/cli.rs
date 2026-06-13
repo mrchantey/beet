@@ -49,19 +49,23 @@ fn setup(mut commands: Commands) {
 				"foo",
 				Action::<(), &str>::new_pure(|_| { "hello foo" })
 			),
-			exchange_route(
-				"greet",
+			// a `Script` is pure data, so pair it with an `ExchangeScript` to
+			// make the entity a dispatchable route.
+			(
 				Script::<QueryParams<GreetRequest>, String>::rhai(
 					r#""hello " + input.name"#,
 				),
+				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(),
+				PathPartial::new("greet"),
 			),
 			// same idea, but the script receives the full [`RequestParts`]
 			// and digs out the `name` query parameter itself.
-			exchange_route(
-				"greet-request",
+			(
 				Script::<RequestParts, String>::rhai(
 					r#""hello " + input.url.params.name[0]"#,
 				),
+				ExchangeScript::<RequestParts, String, _, _>::default(),
+				PathPartial::new("greet-request"),
 			),
 		]),
 	));

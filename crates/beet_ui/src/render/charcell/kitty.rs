@@ -522,6 +522,8 @@ mod test {
 
 	/// A host with graphics forced on and an `<img>` whose `src` is a real
 	/// PNG file in a temp dir.
+	// the temp file + `fs_ext` load is native-only (no filesystem on wasm).
+	#[cfg(not(target_arch = "wasm32"))]
 	fn image_host(width: u32, height: u32) -> (TestHost, TempDir) {
 		let mut host = TestHost::sized(UVec2::new(40, 14));
 		host.app
@@ -539,6 +541,7 @@ mod test {
 
 	/// A supported terminal transmits the PNG once and places it at its
 	/// laid-out cell rect; the alt-text fallback is not painted.
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn transmits_and_places_image() {
 		let (mut host, _dir) = image_host(100, 40);
@@ -559,6 +562,7 @@ mod test {
 
 	/// Removing the image deletes its placement; a resize deletes all visible
 	/// placements and re-places from scratch.
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn removal_and_resize_replace_placements() {
 		let (mut host, _dir) = image_host(100, 40);

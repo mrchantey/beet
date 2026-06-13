@@ -157,7 +157,15 @@ mod tests {
 		});
 		app.update();
 		drop(app);
-		other_app.update();
+		// the detached task only observes the drop once the task pool polls it
+		// again; a single tick races its scheduling, so pump until it resolves.
+		for _ in 0..1000 {
+			other_app.update();
+			if WORLD_WAS_DROPPED.load(Ordering::Relaxed) {
+				break;
+			}
+			std::thread::yield_now();
+		}
 		assert!(WORLD_WAS_DROPPED.load(Ordering::Relaxed));
 	}
 

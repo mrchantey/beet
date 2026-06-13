@@ -16,6 +16,15 @@ pub fn tty_writer() -> std::io::Result<std::fs::File> {
 	std::fs::OpenOptions::new().write(true).open("/dev/tty")
 }
 
+/// wasm has no controlling terminal; callers fall back to `stdout`.
+#[cfg(target_arch = "wasm32")]
+pub fn tty_writer() -> std::io::Result<std::fs::File> {
+	Err(std::io::Error::new(
+		std::io::ErrorKind::Unsupported,
+		"no /dev/tty on wasm",
+	))
+}
+
 /// Redirect this process's `stdout` and `stderr` to `path`, creating any
 /// missing parent directories and appending to the file.
 ///
@@ -45,6 +54,12 @@ pub fn redirect_std_to_file(path: impl AsRef<Path>) -> Result {
 	}
 	core::mem::forget(file);
 	Ok(())
+}
+
+/// wasm cannot redirect file descriptors; callers fall back to `stdout`.
+#[cfg(target_arch = "wasm32")]
+pub fn redirect_std_to_file(_path: impl AsRef<Path>) -> Result {
+	bevybail!("redirecting std is not supported on wasm")
 }
 
 /// Adds this handler to both the panic and ctrl+c hooks

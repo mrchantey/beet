@@ -4,6 +4,9 @@
 //! and [`CharcellQuery`] (the shared system parameter).
 
 use crate::prelude::*;
+// explicit imports shadow the bevy_ui types of the same name that leak through
+// `beet_core::prelude` when `bevy_default` is co-enabled.
+use crate::input::ScrollPosition;
 use crate::style::Display;
 use crate::style::*;
 use beet_core::prelude::*;

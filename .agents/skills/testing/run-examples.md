@@ -45,8 +45,8 @@ CLI router server, persisted router, and the codegen pipeline.
 cargo run --example router           --features=router,markdown
 cargo run --example router           --features=router,markdown -- about
 cargo run --example cli              --features=router,rhai_serde -- greet --name=world
-cargo run --example router_serde     --features=router,rhai_serde,world_serde
-cargo run --example router_serde     --features=router,rhai_serde,world_serde -- greet --name=world
+cargo run --example router_serde     --features=router,rhai_serde,template_serde
+cargo run --example router_serde     --features=router,rhai_serde,template_serde -- greet --name=world
 cargo run --example file_based_routes -- codegen            --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls
 cargo run --example file_based_routes -- about              --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls
 cargo run --example file_based_routes -- call-add --a=10 --b=20  --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls

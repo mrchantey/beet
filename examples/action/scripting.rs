@@ -7,7 +7,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example scripting --features scripting
+//! cargo run --example scripting --features rhai_serde
 //! ```
 use beet::prelude::*;
 use serde::Deserialize;
@@ -24,23 +24,33 @@ struct Player {
 async fn main() -> Result {
 	let mut world = AsyncPlugin::world();
 
-	// numeric transform: increment the input
+	// numeric transform: increment the input. `Script` is pure data, so pair it
+	// with a `ScriptAction` to make the entity a callable action.
 	let count = world
-		.spawn(Script::<i64, i64>::rhai("input + 1"))
+		.spawn((
+			Script::<i64, i64>::rhai("input + 1"),
+			ScriptAction::<i64, i64>::default(),
+		))
 		.call::<i64, i64>(41)
 		.await?;
 	cross_log!("count is now {count}");
 
 	// string transform: greet the input
 	let greeting = world
-		.spawn(Script::<String, String>::rhai(r#""hello " + input"#))
+		.spawn((
+			Script::<String, String>::rhai(r#""hello " + input"#),
+			ScriptAction::<String, String>::default(),
+		))
 		.call::<String, String>("world".to_string())
 		.await?;
 	cross_log!("{greeting}");
 
 	// struct transform: mutate a single field, return the struct
 	let player = world
-		.spawn(Script::<Player, Player>::rhai("input.score += 100; input"))
+		.spawn((
+			Script::<Player, Player>::rhai("input.score += 100; input"),
+			ScriptAction::<Player, Player>::default(),
+		))
 		.call::<Player, Player>(Player {
 			name: "ada".to_string(),
 			score: 1,

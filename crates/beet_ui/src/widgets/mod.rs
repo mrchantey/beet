@@ -58,7 +58,10 @@ use beet_core::prelude::*;
 /// BSX `<Head/>` or a serialized scene) builds the widget. Added by
 /// [`BsxDefaultsPlugin`](crate::prelude::BsxDefaultsPlugin).
 pub fn widget_plugin(app: &mut App) {
-	app.register_template::<Button>()
+	// `button::Button` is qualified so it resolves to this crate's widget rather
+	// than the bevy_ui `Button` that leaks through `beet_core::prelude` when
+	// `bevy_default` is co-enabled.
+	app.register_template::<button::Button>()
 		.register_template::<IconButton>()
 		.register_template::<Link>()
 		.register_template::<ColorSchemeScript>()

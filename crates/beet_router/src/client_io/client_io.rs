@@ -69,7 +69,6 @@ pub(crate) fn broadcast_to_clients(
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	/// A child entity recording every [`MessageSend`] it receives.
 	fn client_captor(world: &mut World, channel: Entity) -> Store<Vec<Message>> {

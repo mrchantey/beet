@@ -164,7 +164,11 @@ pub fn rehydrate_scene_cache(world: &mut World) -> Result {
 	world.insert_resource(Rehydrating);
 	let result = set_scene(world, &fs_ext::read_media(&path)?, Some(host));
 	world.remove_resource::<Rehydrating>();
-	result?;
+	// a stale or version-skewed cache (eg a type removed since it was written)
+	// must not crash startup: warn and carry on with an empty scene.
+	if let Err(err) = result {
+		cross_log_error!("ignoring unloadable scene cache {path:?}: {err}");
+	}
 	Ok(())
 }
 

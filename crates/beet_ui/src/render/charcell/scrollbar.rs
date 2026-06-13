@@ -8,6 +8,8 @@
 
 use super::*;
 use crate::prelude::*;
+// shadow the leaked bevy_ui `ScrollPosition` (see query.rs).
+use crate::input::ScrollPosition;
 use crate::style::Overflow;
 use crate::style::ScrollbarWidth;
 use crate::style::VisualStyle;

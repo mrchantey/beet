@@ -1,7 +1,9 @@
 //! Prepare phase: ensure all nodes in a buffer tree have the required layout
 //! components before measure and layout systems run.
 use super::*;
-use crate::prelude::*;
+// explicit import shadows the bevy_ui `ScrollPosition` that leaks through
+// `beet_core::prelude` when `bevy_default` is co-enabled.
+use crate::input::ScrollPosition;
 use crate::style::LayoutStyle;
 use beet_core::prelude::*;
 
