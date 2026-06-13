@@ -241,6 +241,7 @@ impl RequestParts {
 	/// The inverse of the [`CliArgs`] → [`RequestParts`] conversion. Mutate the
 	/// returned value for finer control, then [`CliArgs::into_args`] for the argv
 	/// (eg forwarding a request to a subprocess).
+	#[cfg(feature = "std")]
 	pub fn to_cli_args(&self) -> CliArgs {
 		CliArgs {
 			path: self.path().clone(),
