@@ -180,6 +180,7 @@ mod test {
 	/// An external link under the default `OnOpenLink::External` emits an
 	/// open-external intent with the URL and does not navigate in-app.
 	#[beet_core::test]
+	#[ignore = "the default open_external_link system launches the real system browser; behavior verified, but it pops a browser tab on every run"]
 	fn external_link_opens_externally_by_default() {
 		let mut app = link_app();
 		let link = spawn_link(&mut app, None, "https://example.com");

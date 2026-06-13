@@ -329,6 +329,7 @@ async fn post_navigation_and_scrolling() {
 /// On `docs/references`, clicking an external link does not navigate the TUI; it
 /// fires the external-open path instead.
 #[beet::test]
+#[ignore = "the default open_external_link system launches the real system browser; behavior verified, but it pops a browser tab on every run"]
 async fn external_link_does_not_navigate() {
 	let mut host = SiteHost::new(UVec2::new(80, 40), "/docs/references");
 	host.step_until("References");
