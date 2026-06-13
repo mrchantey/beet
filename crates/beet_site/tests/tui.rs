@@ -302,9 +302,9 @@ async fn post_navigation_and_scrolling() {
 	// click the #12 post heading link -> navigate to the post.
 	let (col, row) = host.cell_of("Gentle Slopes");
 	host.click(col, row);
-	// navigation happened: the post body shows, the index's other posts are gone.
+	// navigation happened: the post body shows, the index's post blurbs are gone.
 	host.step_until("Wollongong");
-	host.frame().xnot().xpect_contains("User Modifiable Users");
+	host.frame().xnot().xpect_contains("mountain peak of specialization");
 	// the long post overflows the viewport, so a scrollbar exists.
 	host.has_scrollbar().xpect_true();
 

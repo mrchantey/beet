@@ -1,5 +1,5 @@
 +++
-title="The Full Moon Harvest #6"
+title="Folk Technology"
 created="2025-12-04"
 +++
 

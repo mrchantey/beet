@@ -66,7 +66,7 @@ async fn blog_post_title_from_frontmatter() {
 		.spawn(beet_site_router())
 		.exchange_str(html_get("blog/post-1"))
 		.await
-		.xpect_contains("<title>The Full Moon Harvest #1</title>");
+		.xpect_contains("<title>Full Stack Bevy</title>");
 }
 
 #[beet::test]

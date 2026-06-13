@@ -1,5 +1,5 @@
 +++
-title="The Full Moon Harvest #5"
+title="Declarative State"
 created="2025-11-05"
 +++
 

@@ -1,5 +1,5 @@
 +++
-title = "The Full Moon Harvest #1"
+title = "Full Stack Bevy"
 created= "2025-07-11"
 +++
 

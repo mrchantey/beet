@@ -1,5 +1,5 @@
 +++
-title="The Harvest #7"
+title="Malleable Application Framework"
 created="2026-01-04"
 +++
 

@@ -1,5 +1,5 @@
 +++
-title="The Full Moon Harvest #3"
+title="Bevy's Five and Beet's Alive!"
 created="2025-09-06"
 +++
 

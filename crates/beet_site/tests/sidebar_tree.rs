@@ -50,6 +50,6 @@ fn groups_docs_and_blog() {
 	nodes[1]
 		.children
 		.iter()
-		.any(|node| node.display_name == "The Full Moon Harvest #1")
+		.any(|node| node.display_name == "Full Stack Bevy")
 		.xpect_true();
 }

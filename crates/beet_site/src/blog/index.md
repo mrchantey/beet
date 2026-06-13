@@ -84,7 +84,7 @@ An ECS-native HTTP router unifies server actions, client island scenes, and stat
 
 <br/>
 
-#### [1 — Full Stack Bevy](/blog/post-1)
+#### [#1 — Full Stack Bevy](/blog/post-1)
 *Pete Hayman — 11th July, 2025*
 
 Bevy ECS as the foundation for a full-stack application framework, achieving SSR, CSR, SSG, client islands, and server actions.

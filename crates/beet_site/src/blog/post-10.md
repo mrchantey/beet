@@ -1,5 +1,5 @@
 +++
-title="The Harvest #10"
+title="Application Level Homoiconicity"
 created="2026-04-06"
 +++
 

@@ -1,5 +1,5 @@
 +++
-title="The Harvest #9"
+title="Multi-Interface Applications"
 created="2026-03-06"
 +++
 
