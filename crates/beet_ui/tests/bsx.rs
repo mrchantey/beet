@@ -935,13 +935,13 @@ fn binding_comp_attribute_targets_element() {
 }
 
 #[beet_core::test]
-fn binding_comp_selector_text() {
+fn binding_entity_selector_text() {
 	let mut world = world();
 	register::<Slider>(&mut world);
-	// the text binds the `bx:ref`-named entity's component
+	// the text binds the `bx:ref`-named entity's component via `@entity:name::`
 	let root = spawn_bsx(
 		&mut world,
-		"<div><input bx:ref=\"slider\" {Slider{value:4}}/><span>{@comp$slider:Slider.value}</span></div>",
+		"<div><input bx:ref=\"slider\" {Slider{value:4}}/><span>{@entity:slider::Slider.value}</span></div>",
 	);
 	world.update_local();
 	let children = world
@@ -988,7 +988,7 @@ fn binding_comp_snippet_root() {
 	registry
 		.insert_source(
 			"Probe",
-			"<section><span>{@comp$SnippetRoot:Slider.value}</span></section>",
+			"<section><span>{@entity:SnippetRoot::Slider.value}</span></section>",
 		)
 		.unwrap();
 	world.insert_resource(registry);
@@ -1011,7 +1011,7 @@ fn binding_comp_build_root() {
 	register::<Slider>(&mut world);
 	let mut registry = BsxTemplateRegistry::default();
 	registry
-		.insert_source("Probe", "<span>{@comp$BuildRoot:Slider.value}</span>")
+		.insert_source("Probe", "<span>{@entity:BuildRoot::Slider.value}</span>")
 		.unwrap();
 	world.insert_resource(registry);
 	// the build root is the parse container, above the template's snippet root
@@ -1041,7 +1041,7 @@ fn binding_comp_router_lazy() {
 	register::<Slider>(&mut world);
 	// build detached: no `Router` ancestor yet, the binding stays silent
 	let container =
-		parse_bsx(&mut world, None, "<input value=@comp$Router:Slider.value/>");
+		parse_bsx(&mut world, None, "<input value=@entity:Router::Slider.value/>");
 	let input = world.entity(container).get::<Children>().unwrap()[0];
 	let router = world.spawn((Router, Slider { value: 5 })).id();
 	world.update_local();

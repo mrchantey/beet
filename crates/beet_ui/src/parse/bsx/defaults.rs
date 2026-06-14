@@ -65,7 +65,10 @@ fn register_default_verbs(world: &mut World) {
 			.binding("field")
 			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
-			let amount = args.value_i64("amount", 1);
+			let amount = args
+				.value("amount")
+				.and_then(|value| value.as_i64().ok())
+				.unwrap_or(1);
 			update_field(entity, args, |value| {
 				*value = Value::Int(value.as_i64().unwrap_or(0) + amount)
 			});
@@ -78,7 +81,10 @@ fn register_default_verbs(world: &mut World) {
 			.binding("field")
 			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
-			let amount = args.value_i64("amount", 1);
+			let amount = args
+				.value("amount")
+				.and_then(|value| value.as_i64().ok())
+				.unwrap_or(1);
 			update_field(entity, args, |value| {
 				*value = Value::Int(value.as_i64().unwrap_or(0) - amount)
 			});

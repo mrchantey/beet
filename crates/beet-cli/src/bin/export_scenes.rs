@@ -1,12 +1,12 @@
 //! Generates the `default-cli` scene: the `beet` CLI's default commands
-//! (serve, run-wasm, build-wasm, export-pdf, s3-sync, and under `qrcode` qrcode)
-//! bundled as a loadable scene.
+//! (serve, export-static, run-wasm, build-wasm, export-pdf, s3-sync, and under
+//! `qrcode` qrcode) bundled as a loadable scene.
 //!
 //! The `beet` binary itself only carries scene management; running this bin
 //! writes `target/scenes/default-cli.json`, which `beet load`s to add the
-//! command routes. It is a regular [`CliServer`]: an [`ExportScenes`] root route
-//! whose children are the scenes to write, so running it with no args writes
-//! them all.
+//! command routes. It is a regular [`CliServer`] host (booted by
+//! [`bootstrap_cli`]): an [`ExportScenes`] root route whose children are the
+//! scenes to write, so running it with no args writes them all.
 //!
 //! ```sh
 //! cargo run -p beet-cli --bin export_scenes   # writes target/scenes/default-cli.json
@@ -38,7 +38,7 @@ fn main() -> AppExit {
 fn spawn_host(mut commands: Commands) {
 	commands.spawn((
 		CliServer,
-		Server::cli(),
+		bootstrap_cli(),
 		default_router(),
 		children![(
 			ExportScenes,
@@ -47,6 +47,7 @@ fn spawn_host(mut commands: Commands) {
 				Router,
 				children![
 					Serve,
+					ExportStatic,
 					RunWasm,
 					BuildWasm,
 					ExportPdf,

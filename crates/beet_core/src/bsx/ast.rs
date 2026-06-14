@@ -79,27 +79,33 @@ pub enum ValueExpr {
 	Binding(BindingExpr),
 }
 
-/// An `@` reactive binding: `@source selector? : path init?`.
+/// An `@` reactive binding: `@source ":" path init?`.
 ///
 /// ```text
-/// binding   = "@" source selector? ":" path init?
-/// source    = "doc" | "res" | "comp" | "prop"
-/// selector  = "$" RefName             only for comp, eg @comp$myref:Bar.boo
-/// path      = doc/prop: a field path, eg count or user.name
-///             res/comp: ShortTypePath "." field path, eg PackageConfig.title
-/// init      = "=" literal             doc only, eg {@doc:count=0}
+/// binding   = "@doc"  ":" fieldpath init?     eg @doc:count, @doc:count=0
+///           | "@prop" ":" fieldpath           eg @prop:title
+///           | "@res"  ":" ShortTypePath "." fieldpath   eg @res:PackageConfig.title
+///           | "@comp" ":" ShortTypePath "." fieldpath   eg @comp:Bar.boo (this entity)
+///           | "@entity" ":" RefName "::" ShortTypePath "." fieldpath
+///                                              eg @entity:slider::Slider.value
+/// fieldpath = a dotted field path, eg count or user.name
+/// init      = "=" literal             @doc only, eg {@doc:count=0}
 /// ```
 ///
-/// The selector names `BuildRoot`, `SnippetRoot`, `RenderRoot` and `Router`
-/// are reserved, targeting well-known entities instead of `bx:ref` names (see
-/// `ReservedRef` in the resolver), eg `@comp$RenderRoot:ArticleMeta.title`.
+/// `@entity:` is `@comp` retargeted to a named entity: the [`selector`] names a
+/// `bx:ref` entity, or one of the reserved well-known entities `BuildRoot`,
+/// `SnippetRoot`, `RenderRoot`, `Router` (see `ReservedRef` in the resolver), eg
+/// `@entity:RenderRoot::ArticleMeta.title`. `@comp:` (no `@entity:`) binds the
+/// current entity.
+///
+/// [`selector`]: Self::selector
 #[derive(Debug, Clone, PartialEq)]
 pub struct BindingExpr {
 	/// What the binding reads from and writes to.
 	pub source: BindingSource,
-	/// The `$ref` selector retargeting an `@comp` binding to a `bx:ref`-named
-	/// entity, or a reserved well-known entity (`$BuildRoot`, `$SnippetRoot`,
-	/// `$RenderRoot`, `$Router`).
+	/// The `@entity:` selector retargeting a component binding to a `bx:ref`-named
+	/// entity, or a reserved well-known entity (`BuildRoot`, `SnippetRoot`,
+	/// `RenderRoot`, `Router`). Only [`BindingSource::Comp`] carries one.
 	pub selector: Option<SmolStr>,
 	/// The short type path of the bound resource/component, eg `PackageConfig`.
 	pub type_path: Option<SmolStr>,

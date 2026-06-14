@@ -15,29 +15,33 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint [`ServerBackend`]: accepts CLI arguments and environment
-/// variables as a request, runs one exchange, streams the response body to
-/// stdout, then exits (unless [`KeepAlive`] is set).
+/// The entrypoint server: on a [`StartServer`] whose filter passes `"cli"`, it
+/// parses argv and environment into a request, runs one exchange, streams the
+/// response body to stdout, then exits (unless [`KeepAlive`] is set).
 ///
-/// This is how every beet binary boots: spawning it pulls in the [`Server`]
-/// orchestrator (via `#[require(Server)]`), which starts it through
-/// [`CliServer::start`]. Being a one-shot, it cannot [`stop`](ServerBackend::stop)
-/// (the default no-op).
+/// This is how every beet binary boots: spawn it on the host alongside
+/// [`bootstrap_cli`], which fires the `cli`-filtered [`StartServer`]. Being a
+/// one-shot, [`StopServer`] is a no-op for it.
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
 /// for example `--accept=text/html,text/plain`.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Server)]
+#[component(on_add = on_add)]
 pub struct CliServer;
 
-impl ServerBackend for CliServer {
-	/// Parse argv into a request, run one exchange, stream the body to stdout,
-	/// and exit unless [`KeepAlive`] is set. The entrypoint backend; it has no
-	/// listener to stop, so it keeps the default no-op [`stop`](ServerBackend::stop).
-	fn start(entity: AsyncEntity) -> MaybeSendBoxedFuture<'static, Result> {
-		Box::pin(run_and_exit(entity))
+/// Registers the [`StartServer`] observer on the host, so the one-shot exchange
+/// runs when a start event whose filter passes `"cli"` lands on it.
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world.commands().entity(cx.entity).observe_any(on_start_server);
+}
+
+/// Runs the one argv exchange when a [`StartServer`] passing `"cli"` lands.
+fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
+	if !ev.passes("cli") {
+		return;
 	}
+	commands.entity(ev.event_target()).queue_async_local(run_and_exit);
 }
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {
@@ -78,8 +82,8 @@ async fn run_and_exit(entity: AsyncEntity) -> Result {
 
 	stream_body_to_stdout(body).await?;
 
-	// a `--watch` command inserts `KeepAlive` so the schedule keeps running and
-	// the file watcher can fire; otherwise the process exits after one command.
+	// a long-running server (or a `--watch` command) inserts `KeepAlive` so the
+	// schedule keeps running; otherwise the process exits after one command.
 	let keep_alive = entity
 		.world()
 		.with(|world| world.contains_resource::<KeepAlive>())
@@ -108,13 +112,14 @@ mod tests {
 	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn cli_server_works() {
-		App::new()
-			.add_plugins((MinimalPlugins, ServerPlugin))
-			.spawn((
-				CliServer,
-				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
-			))
-			.run_async()
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		app.world_mut().spawn((
+			CliServer,
+			bootstrap_cli(),
+			exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
+		));
+		app.run_async()
 			.await
 			.xpect_eq(AppExit::Error(1.try_into().unwrap()));
 	}

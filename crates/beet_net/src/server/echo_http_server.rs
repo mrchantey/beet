@@ -13,13 +13,13 @@ pub struct EchoResponse {
 	/// The HTTP method used, ie `GET`, `POST`.
 	pub method: HttpMethod,
 	/// Path segments from the request URL.
-	pub path: Vec<String>,
+	pub path: Vec<SmolStr>,
 	/// Request headers as a multimap.
-	pub headers: MultiMap<String, String>,
+	pub headers: MultiMap<SmolStr, SmolStr>,
 	/// Query parameters as a multimap.
-	pub query: MultiMap<String, String>,
+	pub query: MultiMap<SmolStr, SmolStr>,
 	/// The request body as text.
-	pub body: String,
+	pub body: SmolStr,
 }
 
 /// Test event payload for SSE endpoint.
@@ -74,19 +74,19 @@ fn echo_request(req: ActionContext<Request>) -> Response {
 /// Builds a JSON response echoing the request's method, path, headers, body, and query params.
 fn standard_echo_response(req: Request) -> Response {
 	let method = *req.method();
-	let path = req.path().iter().map(|seg| seg.to_string()).collect();
+	let path = req.path().clone();
 
 	let mut headers = MultiMap::new();
 	for (key, values) in req.headers.iter_all() {
 		for value in values {
-			headers.insert(key.clone(), value.clone());
+			headers.insert(SmolStr::from(key.as_str()), SmolStr::from(value.as_str()));
 		}
 	}
 
 	let mut query = MultiMap::new();
 	for (key, values) in req.params().iter_all() {
 		for value in values {
-			query.insert(key.to_string(), value.to_string());
+			query.insert(key.clone(), value.clone());
 		}
 	}
 
@@ -94,7 +94,7 @@ fn standard_echo_response(req: Request) -> Response {
 	let body = req
 		.body
 		.try_into_bytes()
-		.map(|bytes| String::from_utf8_lossy(bytes.as_ref()).into_owned())
+		.map(|bytes| SmolStr::from(String::from_utf8_lossy(bytes.as_ref())))
 		.unwrap_or_default();
 
 	let echo = EchoResponse {
@@ -183,7 +183,7 @@ mod test {
 		let server = EchoHttpServer::new().await;
 		let resp = echo(Request::get(server.url().clone().push("get"))).await;
 		resp.method.xpect_eq(HttpMethod::Get);
-		resp.path.xpect_eq(vec!["get".to_string()]);
+		resp.path.xpect_eq(vec![SmolStr::new("get")]);
 	}
 
 	#[beet_core::test]

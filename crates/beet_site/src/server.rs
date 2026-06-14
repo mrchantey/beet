@@ -15,7 +15,8 @@ const THEME_COLOR: Color = Color::srgb(0., 1., 0.75);
 pub fn server_plugin(app: &mut App) {
 	app.add_plugins((
 		MinimalPlugins,
-		// `RouterPlugin` brings in `ServerPlugin` (the `ServerBackends` registry).
+		// `RouterPlugin` brings in `ServerPlugin`, which installs the `HttpServer`
+		// backend and registers the server types.
 		RouterPlugin,
 		LogPlugin::new(Level::INFO),
 		material::MaterialStylePlugin::new(THEME_COLOR),

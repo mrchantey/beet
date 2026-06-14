@@ -30,6 +30,7 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				HttpServer::default(),
+				bootstrap_server(),
 				Count::default(),
 				Action::<Request, Response>::new_system(router),
 			));

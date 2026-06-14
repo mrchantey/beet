@@ -229,20 +229,19 @@ impl IntoSnippet<(NotSnippetBundleMarker, SnippetEntityMarker)> for Entity {
 /// distinct child is required: tupling several single-component effects onto one
 /// entity is last-write-wins and would silently drop all but the last.
 ///
-/// In a child position this lowers onto a [`FragmentNode`] wrapper holding the
-/// items as its children, so the renderers treat the group as transparent (its
-/// items lay out as direct siblings of the parent) rather than as a nested box.
+/// In a child position this lowers onto a tag-less wrapper (an entity with
+/// [`Children`] but no [`Element`]) holding the items. Both renderers treat such
+/// a node as transparent: the HTML walk emits no tag and recurses, and charcell
+/// hoists the items into the parent's flow (so a collected `{items.map(..)}` grid
+/// or list lays out as direct siblings rather than a nested box).
 impl<T, M> IntoSnippet<(NotSnippetBundleMarker, (Vec<T>, M))> for Vec<T>
 where
 	T: 'static + Send + Sync + IntoSnippet<M>,
 {
 	fn into_snippet(self) -> impl Bundle {
-		(
-			FragmentNode,
-			Children::spawn(SpawnIter(
-				self.into_iter().map(|item| item.into_snippet()),
-			)),
-		)
+		Children::spawn(SpawnIter(
+			self.into_iter().map(|item| item.into_snippet()),
+		))
 	}
 }
 

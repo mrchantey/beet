@@ -34,6 +34,7 @@ fn main() {
 			commands.spawn((
 				// CliServer::default(),
 				HttpServer::default(),
+				bootstrap_server(),
 				Count::default(),
 				Handler,
 			));

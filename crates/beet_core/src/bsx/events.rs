@@ -78,14 +78,6 @@ impl VerbArgs {
 	/// The literal value of argument `name`, if supplied (or defaulted).
 	pub fn value(&self, name: &str) -> Option<&Value> { self.values.0.get(name) }
 
-	/// The literal value of `name` coerced to `i64`, or `fallback` when absent or
-	/// non-numeric, the common shape for an optional numeric argument.
-	pub fn value_i64(&self, name: &str, fallback: i64) -> i64 {
-		self.value(name)
-			.and_then(|value| value.as_i64().ok())
-			.unwrap_or(fallback)
-	}
-
 	/// The resolved binding handle of argument `name`, if supplied.
 	pub fn field(&self, name: &str) -> Option<&BindingArg> {
 		self.bindings.get(name)
@@ -97,7 +89,7 @@ impl VerbArgs {
 ///
 /// A `@doc`/`@prop` argument resolves the document by walking the host's
 /// ancestry ([`DocumentQuery`]); a `@res`/`@comp` argument reflect-reads/writes
-/// the resource or a component (resolving a `@comp$ref:` target via
+/// the resource or a component (resolving an `@entity:ref::` target via
 /// [`BindingTarget::resolve`]). The verb never sees a mirror [`Value`]: it reads
 /// the live source, mutates, and writes back, which document-sync fans out to
 /// the display bindings.
@@ -119,7 +111,7 @@ impl BindingArg {
 	/// The whole point of the uniform model: the verb mutates the real source
 	/// (no per-host mirror), so document-sync fans the change out to display
 	/// bindings. A missing document/field is initialized per the binding's
-	/// [`FieldRef::on_missing`]; a missing component/resource is a silent no-op.
+	/// [`FieldRef::on_missing`]; a missing component/resource is an `error!`.
 	pub fn update(
 		&self,
 		host: &mut EntityWorldMut,
@@ -134,7 +126,9 @@ impl BindingArg {
 			#[cfg(feature = "json")]
 			Self::Reflect(reflect) => {
 				let host_id = host.id();
-				host.world_scope(|world| reflect_update(world, host_id, reflect, func));
+				host.world_scope(|world| {
+					component_update(world, host_id, reflect, func)
+				});
 				Ok(())
 			}
 			#[cfg(feature = "json")]
@@ -148,10 +142,11 @@ impl BindingArg {
 
 /// Read-modify-write a reflected component field through a throwaway [`Value`]
 /// entity, resolving the target via [`BindingTarget::resolve`] against the host
-/// (the same walk the display sync uses). A missing component/target is a silent
-/// no-op.
+/// (the same walk the display sync uses). A missing/unregistered component or an
+/// unresolved target is an `error!`, naming the component and the `component`
+/// verb path.
 #[cfg(feature = "json")]
-fn reflect_update(
+fn component_update(
 	world: &mut World,
 	host: Entity,
 	reflect: &ReflectFieldRef,
@@ -161,37 +156,47 @@ fn reflect_update(
 	let scratch = world.spawn(Value::default()).id();
 	let access = reflect_value_ext::field_access(&reflect.field);
 	let registry = world.resource::<AppTypeRegistry>().clone();
-	(|| {
+	let component = &reflect.component;
+	let resolved = (|| {
 		let reflect_component = registry
 			.read()
-			.get_with_short_type_path(&reflect.component)?
+			.get_with_short_type_path(component)?
 			.data::<ReflectComponent>()?
 			.clone();
 		// `@comp:` (no `$ref`) targets the host; a `$ref`/reserved target resolves
 		// from the host's ancestry.
 		let target = reflect.target.resolve(world, host)?;
-		reflect_value_ext::read_field_into_value(
-			world,
-			scratch,
-			target,
-			&access,
-			&reflect_component,
-		);
-		modify_scratch(world, scratch, func);
-		reflect_value_ext::write_field_from_value(
-			world,
-			scratch,
-			target,
-			&access,
-			&reflect_component,
-		);
-		Some(())
+		Some((reflect_component, target))
 	})();
+	match resolved {
+		Some((reflect_component, target)) => {
+			reflect_value_ext::read_field_into_value(
+				world,
+				scratch,
+				target,
+				&access,
+				&reflect_component,
+			);
+			modify_scratch(world, scratch, func);
+			reflect_value_ext::write_field_from_value(
+				world,
+				scratch,
+				target,
+				&access,
+				&reflect_component,
+			);
+		}
+		None => error!(
+			"`component` verb: component `{component}` is not registered, \
+			 lacks `#[reflect(Component)]`, or its target could not be resolved"
+		),
+	}
 	world.entity_mut(scratch).despawn();
 }
 
 /// Read-modify-write a reflected resource field through a throwaway [`Value`]
-/// entity. A missing resource is a silent no-op.
+/// entity. A missing/unregistered resource is an `error!`, naming the resource
+/// and the `resource` verb path.
 #[cfg(feature = "json")]
 fn resource_update(
 	world: &mut World,
@@ -203,30 +208,39 @@ fn resource_update(
 	let scratch = world.spawn(Value::default()).id();
 	let access = reflect_value_ext::field_access(&resource.field);
 	let registry = world.resource::<AppTypeRegistry>().clone();
-	(|| {
+	let resource_name = &resource.resource;
+	let resolved = (|| {
 		let read = registry.read();
-		let registration = read.get_with_short_type_path(&resource.resource)?;
+		let registration = read.get_with_short_type_path(resource_name)?;
 		registration.data::<ReflectResource>()?;
 		let reflect_component = registration.data::<ReflectComponent>()?.clone();
 		let component_id = world.components().get_id(registration.type_id())?;
 		let resource_entity = world.resource_entities().get(component_id)?;
-		reflect_value_ext::read_field_into_value(
-			world,
-			scratch,
-			resource_entity,
-			&access,
-			&reflect_component,
-		);
-		modify_scratch(world, scratch, func);
-		reflect_value_ext::write_field_from_value(
-			world,
-			scratch,
-			resource_entity,
-			&access,
-			&reflect_component,
-		);
-		Some(())
+		Some((reflect_component, resource_entity))
 	})();
+	match resolved {
+		Some((reflect_component, resource_entity)) => {
+			reflect_value_ext::read_field_into_value(
+				world,
+				scratch,
+				resource_entity,
+				&access,
+				&reflect_component,
+			);
+			modify_scratch(world, scratch, func);
+			reflect_value_ext::write_field_from_value(
+				world,
+				scratch,
+				resource_entity,
+				&access,
+				&reflect_component,
+			);
+		}
+		None => error!(
+			"`resource` verb: resource `{resource_name}` is not registered, \
+			 lacks `#[reflect(Resource)]`, or is not present in the world"
+		),
+	}
 	world.entity_mut(scratch).despawn();
 }
 
@@ -529,7 +543,7 @@ fn resolve_binding_arg(
 /// Resolve an [`EventBinding`]'s args against the verb's [`VerbSchema`], building
 /// the [`VerbArgs`] (literal values, defaults applied; resolved binding handles).
 ///
-/// `selector_target` resolves a binding argument's `@comp$ref:` selector to its
+/// `selector_target` resolves a binding argument's `@entity:ref::` selector to its
 /// target entity, the element/host by default. Errors if the verb is unknown or
 /// an argument fails [`VerbSchema::verify_against`].
 fn resolve_args(
@@ -578,7 +592,7 @@ fn resolve_args(
 /// Install an [`EventBinding`] onto `entity`: verify and resolve its arguments,
 /// then wire the event's registered trigger to run the verb.
 ///
-/// `selector_target` resolves a binding argument's `@comp$ref:` selector. The
+/// `selector_target` resolves a binding argument's `@entity:ref::` selector. The
 /// trigger is resolved through the [`EventRegistry`]: a registered installer
 /// wires it (typically an observer running the named verb from the
 /// [`VerbRegistry`] with the resolved [`VerbArgs`]); an unregistered event is a
@@ -698,7 +712,10 @@ mod test {
 		let mut entity = world.spawn_empty();
 		let args =
 			resolve_args(&mut entity, &omitted, |_| BindingTarget::This).unwrap();
-		args.value_i64("amount", 0).xpect_eq(1);
+		args.value("amount")
+			.and_then(|value| value.as_i64().ok())
+			.unwrap_or(0)
+			.xpect_eq(1);
 	}
 
 	#[beet_core::test]

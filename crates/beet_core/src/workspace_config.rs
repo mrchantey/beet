@@ -22,8 +22,9 @@ pub struct PackageConfig {
 	pub description: SmolStr,
 	/// The binary name, usually set via `CARGO_PKG_NAME` in [`pkg_config!`].
 	pub binary_name: Option<SmolStr>,
-	/// The package version, usually set via `CARGO_PKG_VERSION` in [`pkg_config!`].
-	pub version: Option<SmolStr>,
+	/// The package version, defaulting to `0.0.1` and usually overridden via
+	/// `CARGO_PKG_VERSION` in [`pkg_config!`].
+	pub version: SmolStr,
 	/// The homepage URL, usually set via `CARGO_PKG_HOMEPAGE` in [`pkg_config!`].
 	pub homepage: Option<SmolStr>,
 	/// The repository URL, usually set via `CARGO_PKG_REPOSITORY` in [`pkg_config!`].
@@ -44,7 +45,7 @@ impl Default for PackageConfig {
 			title: "My Beet App".into(),
 			description: "An app built with beet".into(),
 			binary_name: None,
-			version: None,
+			version: "0.0.1".into(),
 			homepage: None,
 			repository: None,
 			stage: "dev".into(),
@@ -92,8 +93,8 @@ impl PackageConfig {
 		self.binary_name.as_deref()
 	}
 
-	/// Returns the version string if set.
-	pub fn version(&self) -> Option<&str> { self.version.as_deref() }
+	/// Returns the version string.
+	pub fn version(&self) -> &str { &self.version }
 
 	/// Returns the description.
 	pub fn description(&self) -> &str { &self.description }
@@ -106,6 +107,9 @@ impl PackageConfig {
 
 	/// Returns the infrastructure stage.
 	pub fn stage(&self) -> &str { &self.stage }
+
+	/// Whether this is a production build, ie [`Self::stage`] is `prod`.
+	pub fn is_prod(&self) -> bool { self.stage == "prod" }
 
 	/// The cloud resource name for the server lambda function.
 	pub fn router_lambda_name(&self) -> String { self.resource_name("router") }
@@ -159,9 +163,9 @@ impl std::fmt::Display for PackageConfig {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		writeln!(f, "title: {}", self.title)?;
 		writeln!(f, "description: {}", self.description)?;
+		writeln!(f, "version: {}", self.version)?;
 		for (key, value) in [
 			("binary_name", &self.binary_name),
-			("version", &self.version),
 			("homepage", &self.homepage),
 			("repository", &self.repository),
 		] {
@@ -194,7 +198,7 @@ macro_rules! pkg_config {
 			title: env!("CARGO_PKG_NAME").into(),
 			description: env!("CARGO_PKG_DESCRIPTION").into(),
 			binary_name: Some(env!("CARGO_PKG_NAME").into()),
-			version: Some(env!("CARGO_PKG_VERSION").into()),
+			version: env!("CARGO_PKG_VERSION").into(),
 			homepage: Some(env!("CARGO_PKG_HOMEPAGE").into()),
 			repository: option_env!("CARGO_PKG_REPOSITORY").map(|s| s.into()),
 			stage: option_env!("BEET_STAGE").unwrap_or("dev").into(),
@@ -340,7 +344,7 @@ mod test {
 		config.title.as_str().xpect_eq("My Beet App");
 		config.description.as_str().xpect_eq("An app built with beet");
 		config.binary_name.xpect_none();
-		config.version.xpect_none();
+		config.version.as_str().xpect_eq("0.0.1");
 		config.homepage.xpect_none();
 		config.repository.xpect_none();
 		config.stage.as_str().xpect_eq("dev");
@@ -376,6 +380,7 @@ mod test {
 		config.description.as_str().xpect_eq("An app built with beet");
 		config.stage.as_str().xpect_eq("dev");
 		config.binary_name.xpect_none();
-		config.version.xpect_none();
+		// version keeps the default since the markup did not set it
+		config.version.as_str().xpect_eq("0.0.1");
 	}
 }

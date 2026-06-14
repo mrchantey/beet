@@ -21,7 +21,7 @@ fn layout_world() -> World {
 		title: "Beet UI".into(),
 		description: "test".into(),
 		binary_name: Some("beet_ui".into()),
-		version: Some("0.0.0".into()),
+		version: "0.0.0".into(),
 		homepage: Some("https://example.test".into()),
 		repository: None,
 		stage: "dev".into(),
@@ -47,20 +47,22 @@ fn head_emits_charset_meta() {
 }
 
 #[beet_core::test]
-fn head_title_override_beats_package_config() {
-	// per-page `ArticleMeta` title/description override the `PackageConfig`
-	// defaults; here the title prop wins over the resource's "Beet UI".
+fn head_title_defaults_to_package_config() {
+	// the standalone head renders its own `<title>` seeded from the package title.
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <Head title="Override Title"/> })
-		.unwrap().id();
-	world.with_state::<ElementQuery, _>(|query| {
-		let values: Vec<String> = query
-			.iter_descendant_values(root)
-			.filter_map(|v| v.as_str().ok().map(String::from))
-			.collect();
-		values.iter().any(|v| v == "Override Title").xpect_true();
-		values.iter().any(|v| v == "Beet UI").xpect_false();
-	});
+	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
+	let html = render_html(&mut world, root);
+	html.as_str().xpect_contains("<title>Beet UI</title>");
+}
+
+#[beet_core::test]
+fn head_omit_title_drops_own_title() {
+	// `omit_title` lets a layout own the single `<title>`: the head renders none.
+	let mut world = layout_world();
+	let root =
+		world.spawn_template(rsx! { <Head omit_title=true/> }).unwrap().id();
+	let html = render_html(&mut world, root);
+	html.matches("<title>").count().xpect_eq(0);
 }
 
 #[beet_core::test]

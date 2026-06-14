@@ -59,14 +59,53 @@ async fn blog_post_in_layout() {
 
 #[beet::test]
 async fn blog_post_title_from_frontmatter() {
-	// the per-page `<title>` comes from the post's frontmatter via `ArticleMeta`
-	// (queried off the `RequestContext` route entity) -> the layout's `Head`, not
-	// the package default.
+	// the per-page `<title>` comes from the post's frontmatter via `ArticleMeta`,
+	// bound through the layout's `RouteHead` (`@entity:RenderRoot::ArticleMeta.title`),
+	// not the package default.
 	site_world()
 		.spawn(beet_site_router())
 		.exchange_str(html_get("blog/post-1"))
 		.await
 		.xpect_contains("<title>Full Stack Bevy</title>");
+}
+
+/// The sticky-title regression against the real site router: two sequential
+/// requests on one router must each render their *own* `<title>` (the bug
+/// leaked the previous request's title), the header link must always be the
+/// package title, and the shared `PackageConfig.title` must never be polluted by
+/// a per-route write-back.
+#[beet::test]
+async fn title_is_not_sticky_across_requests() {
+	let mut world = site_world();
+	let site_title = world.resource::<PackageConfig>().title.clone();
+	let root = world.spawn(beet_site_router()).id();
+
+	// a frontmatter route then a different one: each title is its own, not stale.
+	let first = world.entity_mut(root).exchange_str(html_get("blog/post-1")).await;
+	first.as_str().xpect_contains("<title>Full Stack Bevy</title>");
+	let second = world.entity_mut(root).exchange_str(html_get("blog/post-2")).await;
+	second
+		.as_str()
+		.xpect_contains("<title>ECS Router</title>")
+		.xnot()
+		.xpect_contains("<title>Full Stack Bevy</title>");
+
+	// the header link stays the package title across both requests (never a route
+	// title), and exactly one `<title>` renders.
+	second.matches("<title>").count().xpect_eq(1);
+	// the `<a class="app-bar-title">{title}</a>` element text is the site title.
+	second
+		.as_str()
+		.xpect_contains(&format!(
+			"class=\"app-bar-title\">{site_title}</a>"
+		));
+
+	// the shared resource was never overwritten by a per-route title write-back.
+	world
+		.resource::<PackageConfig>()
+		.title
+		.clone()
+		.xpect_eq(site_title);
 }
 
 #[beet::test]

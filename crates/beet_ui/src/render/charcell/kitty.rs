@@ -484,7 +484,6 @@ fn write_delete_all(w: &mut (impl Write + ?Sized)) -> Result {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::render::charcell::test_host::TestHost;
 
 	/// Minimal PNG header bytes for a `width`x`height` image: enough for the
 	/// loader (magic + IHDR dimensions); the terminal never sees it in tests.
@@ -520,10 +519,15 @@ mod test {
 		image.cell_size(10).xpect_eq(UVec2::new(10, 3));
 	}
 
+	// the live-terminal cases drive the `TestHost`/`KittyGraphicsSupport`
+	// machinery, both `tui`-gated; default-feature builds skip them.
+	#[cfg(feature = "tui")]
+	use crate::render::charcell::test_host::TestHost;
+
 	/// A host with graphics forced on and an `<img>` whose `src` is a real
 	/// PNG file in a temp dir.
 	// the temp file + `fs_ext` load is native-only (no filesystem on wasm).
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	fn image_host(width: u32, height: u32) -> (TestHost, TempDir) {
 		let mut host = TestHost::sized(UVec2::new(40, 14));
 		host.app
@@ -541,7 +545,7 @@ mod test {
 
 	/// A supported terminal transmits the PNG once and places it at its
 	/// laid-out cell rect; the alt-text fallback is not painted.
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	fn transmits_and_places_image() {
 		let (mut host, _dir) = image_host(100, 40);
@@ -562,7 +566,7 @@ mod test {
 
 	/// Removing the image deletes its placement; a resize deletes all visible
 	/// placements and re-places from scratch.
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	fn removal_and_resize_replace_placements() {
 		let (mut host, _dir) = image_host(100, 40);
@@ -592,6 +596,7 @@ mod test {
 	}
 
 	/// An unsupported terminal keeps the `[image]: alt` marker fallback.
+	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn unsupported_terminal_keeps_marker() {
 		let mut host = TestHost::sized(UVec2::new(40, 8));

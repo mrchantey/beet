@@ -188,7 +188,7 @@ mod test {
 	}
 
 	/// A world whose `Layout` binds its `<title>` from the transcluded route's
-	/// `ArticleMeta` via the reserved `@comp$RenderRoot:` selector. This is the
+	/// `ArticleMeta` via the reserved `@entity:RenderRoot::` selector. This is the
 	/// in-markup replacement for the Rust `RouteHead` title lookup: the layout
 	/// builds detached and the binding follows the `RenderRootRef` link
 	/// (installed by `wrap_content_with`) across the transclusion boundary.
@@ -198,7 +198,7 @@ mod test {
 		registry
 			.insert_source(
 				"Layout",
-				"<html><head><title>{@comp$RenderRoot:ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
+				"<html><head><title>{@entity:RenderRoot::ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
 			)
 			.unwrap();
 		world.insert_resource(registry);
@@ -216,7 +216,7 @@ mod test {
 		))
 	}
 
-	/// A layout-head `@comp$RenderRoot:ArticleMeta.title` binding resolves to the
+	/// A layout-head `@entity:RenderRoot::ArticleMeta.title` binding resolves to the
 	/// transcluded route's meta, and differs per route (the gap this stream
 	/// closes: the layout root's self-referential render root is not the content,
 	/// so the walk must follow the distinct content link).

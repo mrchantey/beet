@@ -33,11 +33,11 @@
 //! All interpolation is reactive and explicitly source-prefixed:
 //!
 //! ```text
-//! binding   = "@" source selector? ":" path init?
-//! source    = "doc" | "res" | "comp" | "prop"
-//! selector  = "$" RefName             comp only, eg @comp$myref:Bar.boo
-//! path      = doc/prop: a field path, eg count or user.name
-//!             res/comp: ShortTypePath "." field path, eg PackageConfig.title
+//! binding = "@doc"    ":" fieldpath init?   | "@prop" ":" fieldpath
+//!         | "@res"    ":" ShortTypePath "." fieldpath
+//!         | "@comp"   ":" ShortTypePath "." fieldpath
+//!         | "@entity" ":" RefName "::" ShortTypePath "." fieldpath
+//! fieldpath = a field path, eg count or user.name
 //! init      = "=" literal             doc only, eg {@doc:count=0}
 //! ```
 //!
@@ -46,8 +46,9 @@
 //! - `@res:` a reflected resource field, a [`ResourceFieldRef`]
 //! - `@comp:` a reflected component field, a [`ReflectFieldRef`] targeting the
 //!   current entity: the element in attribute position, the text node in text
-//!   position. `@comp$ref:` retargets to a `bx:ref` named entity; the names
-//!   `BuildRoot`, `SnippetRoot`, `RenderRoot` and `Router` are reserved
+//!   position
+//! - `@entity:Name::` retargets a component binding to a `bx:ref` named entity;
+//!   the names `BuildRoot`, `SnippetRoot`, `RenderRoot` and `Router` are reserved
 //!   ([`ReservedRef`]) for well-known entities (the latter two resolved lazily
 //!   each sync pass) and may not be shadowed
 //! - `@prop:` the enclosing `.bsx` template's props store, materialized from

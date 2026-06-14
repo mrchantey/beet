@@ -39,16 +39,17 @@ fn main() -> AppExit {
 /// built-in scene commands. Scenes load *under* it as route children, mirroring
 /// the device's `HttpServer` host.
 ///
-/// The `Server` is pinned to the CLI entrypoint ([`Server::cli`]) so a
-/// `beet serve <site> --server=http` invocation's global `--server` param starts
-/// the [`HttpServer`] the `serve` command spawns on the site root, never
-/// hijacking this controller host.
+/// [`bootstrap_cli`] fires a `cli`-filtered [`StartServer`] on the host, so it
+/// runs one argv exchange and exits. The filter is fixed to `cli`, so a
+/// `beet serve <site> --server=http` invocation's `--server` param (carried in
+/// the request to the `serve` route) starts the [`HttpServer`] on the site root,
+/// never hijacking this controller host.
 ///
 /// The host claims no bespoke `/` route: an empty `beet` answers through the
 /// router's not-found middleware (a route listing), and a loaded scene is free to
 /// supply its own `/` root without colliding with a host-owned home route.
 fn spawn_host(world: &mut World) {
-	world.spawn((CliServer, Server::cli(), default_router(), children![
+	world.spawn((CliServer, bootstrap_cli(), default_router(), children![
 		SceneLoad, SceneClear, SceneReset, SceneDump, SceneRun,
 	]));
 }

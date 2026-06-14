@@ -1,12 +1,12 @@
 //! The beet website binary.
 //!
 //! With the `codegen` feature it runs the route codegen pass and exits.
-//! Otherwise it spawns the site router with a [`ServerBackend`] selected by build
-//! features; spawning the backend pulls in the [`Server`] orchestrator (via
-//! `#[require(Server)]`), which starts it. The backend is an [`HttpServer`] by
-//! default, the live `TuiServer` under `tui`, or a [`CliServer`] (with the `cli`
-//! feature, or when no `web` target is enabled) that renders a single route to
-//! stdout (HTML or ANSI per `--accept`) and exits.
+//! Otherwise it spawns the site router with a server selected by build features,
+//! then triggers a [`StartServer`] on it (empty filter, so whichever server is
+//! present boots). The server is an [`HttpServer`] by default, the live
+//! `TuiServer` under `tui`, or a [`CliServer`] (with the `cli` feature, or when
+//! no `web` target is enabled) that renders a single route to stdout (HTML or
+//! ANSI per `--accept`) and exits.
 
 #[cfg(feature = "codegen")]
 fn main() -> beet::prelude::Result { beet_site::run_codegen() }
@@ -31,7 +31,9 @@ fn main() {
 		FormRuntimePlugin,
 	));
 	app.add_systems(Startup, |mut commands: Commands| {
-		commands.spawn((site_server(), beet_site_router()));
+		// spawn the site host and start whichever server build feature selected
+		// (`bootstrap_server`'s empty filter matches the present server).
+		commands.spawn((site_server(), beet_site_router(), bootstrap_server()));
 	});
 	app.run();
 }

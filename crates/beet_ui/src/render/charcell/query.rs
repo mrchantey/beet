@@ -115,8 +115,8 @@ impl CharcellNodeData<'_> {
 		// means they reserve no space (measure) and are never assigned a rect
 		// (layout), so the subtree is neither sized nor painted. A child that is a
 		// [`RenderRef`] holder is resolved to the entity it renders in place; a
-		// [`FragmentNode`] grouping wrapper is spliced out, its children hoisted
-		// into this flow so they lay out as direct siblings.
+		// tag-less grouping wrapper (children, no [`Element`]) is spliced out, its
+		// children hoisted into this flow so they lay out as direct siblings.
 		query
 			.flow_child_entities(self.children)
 			.into_iter()
@@ -156,6 +156,54 @@ fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
 	entity
 }
 
+/// Detects a *transparent grouping wrapper*: a node that groups children without
+/// introducing a box of its own, so every traversal hoists its children into the
+/// parent's flow rather than treating it as a nested box. This is the shape a
+/// collected `Vec`/iterator child position lowers to (eg `{cells.collect()}`); a
+/// `<div>`, an anonymous block, or a hand-styled box is *not* one.
+///
+/// Mirrors the HTML walker's tag-less transparency (it emits a tag only for an
+/// [`Element`] yet recurses into children regardless): the primary signal is "no
+/// [`Element`]". Charcell adds one box-establishing carve-out, since a tag-less
+/// node *can* carry a hand-attached load-bearing style in tests and ad-hoc trees:
+/// a non-default [`BoxStyle`] (border/padding/size) or a [`VisualStyle`]
+/// background needs the node's own rect to paint, so such a node stays a box.
+///
+/// These two are the reliable signals after `resolve_styles`, which gives every
+/// node a resolved style: it leaves a non-element's [`BoxStyle`] at the default
+/// (the box model is element-only) and never inherits a `background` (it is a
+/// non-inherited property), so a hoisted wrapper has neither while an authored box
+/// has one. The resolved [`LayoutStyle`] is *not* a usable signal — a tag-less
+/// node resolves its `display` from its nearest ancestor element, so a fragment
+/// under a `display: grid` parent picks up `Grid`; its display is simply never
+/// read, as it is spliced before layout.
+#[derive(SystemParam)]
+pub(crate) struct WrapperQuery<'w, 's> {
+	wrappers: Query<
+		'w,
+		's,
+		(
+			&'static Children,
+			Option<&'static BoxStyle>,
+			Option<&'static VisualStyle>,
+		),
+		Without<Element>,
+	>,
+}
+
+impl WrapperQuery<'_, '_> {
+	/// The children to hoist when `entity` is a transparent grouping wrapper, else
+	/// `None` (it is a real node and lays out as itself).
+	fn splice_children(&self, entity: Entity) -> Option<&Children> {
+		let (children, box_style, visual) = self.wrappers.get(entity).ok()?;
+		// transparent unless the node authored a box of its own: a non-default box
+		// model or a background fill both need the node's own painted rect.
+		(box_style.is_none_or(|style| *style == BoxStyle::default())
+			&& visual.is_none_or(|style| style.background.is_none()))
+		.then_some(children)
+	}
+}
+
 /// [`RenderRef`]-aware traversal of a charcell buffer tree.
 ///
 /// Every phase (prepare, measure, layout, paint) walks the tree through this, so
@@ -167,10 +215,9 @@ fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
 pub(crate) struct CharcellTree<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
 	refs: Query<'w, 's, &'static RenderRef>,
-	// transparent grouping wrappers (a `Vec`/iterator child position lowers to a
-	// `FragmentNode`), spliced out so every traversal agrees with
-	// [`CharcellNodeData::child_nodes`].
-	fragments: Query<'w, 's, (), With<FragmentNode>>,
+	// transparent grouping wrappers spliced out so every traversal agrees with
+	// [`CharcellNodeData::child_nodes`] (see [`WrapperQuery`]).
+	wrappers: WrapperQuery<'w, 's>,
 }
 
 impl CharcellTree<'_, '_> {
@@ -180,7 +227,7 @@ impl CharcellTree<'_, '_> {
 	}
 
 	/// Resolved children of `entity`: holders replaced by their referents and
-	/// [`FragmentNode`] grouping wrappers spliced out so their children are hoisted.
+	/// tag-less grouping wrappers spliced out so their children are hoisted.
 	fn children(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
 		let mut out = Vec::new();
 		for child in self
@@ -194,21 +241,17 @@ impl CharcellTree<'_, '_> {
 		out.into_iter()
 	}
 
-	/// Resolve `child` into the flow, recursing through [`FragmentNode`] wrappers
-	/// so their children take their place.
+	/// Resolve `child` into the flow, recursing through transparent wrappers so
+	/// their children take their place.
 	fn push_flow_entity(&self, child: Entity, out: &mut Vec<Entity>) {
 		let child = self.resolve(child);
-		if self.fragments.contains(child) {
-			for grandchild in self
-				.children
-				.get(child)
-				.into_iter()
-				.flat_map(|children| children.iter())
-			{
-				self.push_flow_entity(grandchild, out);
+		match self.wrappers.splice_children(child) {
+			Some(grandchildren) => {
+				for grandchild in grandchildren.iter() {
+					self.push_flow_entity(grandchild, out);
+				}
 			}
-		} else {
-			out.push(child);
+			None => out.push(child),
 		}
 	}
 
@@ -285,19 +328,19 @@ pub struct CharcellQuery<'w, 's> {
 		),
 	>,
 	refs: Query<'w, 's, &'static RenderRef>,
-	// transparent grouping wrappers (a `Vec`/iterator child position lowers to a
-	// `FragmentNode`); their children are hoisted into the parent's flow. A
-	// fragment carries no box, so the render systems never assign it an
-	// `IntrinsicSize`/`LayoutRect` and it is absent from `nodes`: this query reads
-	// its [`Children`] directly so the hoist still finds them.
-	fragments: Query<'w, 's, Option<&'static Children>, With<FragmentNode>>,
+	// transparent grouping wrappers (see [`WrapperQuery`]); their children are
+	// hoisted into the parent's flow. Such a wrapper carries no box, so the render
+	// systems never assign it an `IntrinsicSize`/`LayoutRect` and it is absent from
+	// `nodes`: `WrapperQuery` reads its [`Children`] directly so the hoist still
+	// finds them.
+	wrappers: WrapperQuery<'w, 's>,
 }
 
 impl CharcellQuery<'_, '_> {
 	/// The flow child entities behind a [`Children`]: each resolved through
-	/// [`RenderRef`] holders, with [`FragmentNode`] grouping wrappers spliced out
-	/// so their own children take their place (depth-first, order preserved).
-	/// Keeps [`CharcellNodeData::child_nodes`] aligned with the [`CharcellTree`]
+	/// [`RenderRef`] holders, with transparent grouping wrappers spliced out so
+	/// their own children take their place (depth-first, order preserved). Keeps
+	/// [`CharcellNodeData::child_nodes`] aligned with the [`CharcellTree`]
 	/// traversal that paint reads.
 	fn flow_child_entities(&self, children: Option<&Children>) -> Vec<Entity> {
 		let mut out = Vec::new();
@@ -308,19 +351,18 @@ impl CharcellQuery<'_, '_> {
 	}
 
 	/// Resolve a child into the flow: push its [`RenderRef`]-resolved id, or, when
-	/// it is a [`FragmentNode`] wrapper, recurse so its children take its place.
+	/// it is a transparent wrapper, recurse so its children take its place.
 	fn push_flow_entity(&self, entity: Entity, out: &mut Vec<Entity>) {
 		let entity = resolve_render_ref(&self.refs, entity);
-		// the fragment marker is checked independently of `nodes`: a fragment has
-		// no box, so it is never prepared into `nodes`, but its children must still
-		// be hoisted.
-		match self.fragments.get(entity) {
-			Ok(children) => {
-				for child in children.iter().flat_map(|children| children.iter()) {
+		// the wrapper is checked independently of `nodes`: it has no box, so it is
+		// never prepared into `nodes`, but its children must still be hoisted.
+		match self.wrappers.splice_children(entity) {
+			Some(children) => {
+				for child in children.iter() {
 					self.push_flow_entity(child, out);
 				}
 			}
-			Err(_) => out.push(entity),
+			None => out.push(entity),
 		}
 	}
 

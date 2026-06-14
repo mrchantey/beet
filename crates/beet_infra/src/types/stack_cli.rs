@@ -4,7 +4,9 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 pub fn stack_cli() -> impl Bundle {
-	(CliServer::default(), default_router(), children![
+	// the infra CLI host: a `CliServer` entrypoint booted by `bootstrap_cli`
+	// (fires a `cli`-filtered `StartServer`, runs one argv exchange, exits).
+	(CliServer::default(), bootstrap_cli(), default_router(), children![
 		Validate,
 		Plan,
 		Apply,

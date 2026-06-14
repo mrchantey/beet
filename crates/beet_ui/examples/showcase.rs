@@ -39,7 +39,7 @@ fn main() {
 			title: "Beet UI Showcase".into(),
 			description: "A gallery of beet_ui rules and widgets".into(),
 			binary_name: Some("showcase".into()),
-			version: Some("0.0.0".into()),
+			version: "0.0.0".into(),
 			homepage: Some("https://beetstack.dev".into()),
 			repository: None,
 			stage: "dev".into(),

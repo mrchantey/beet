@@ -12,7 +12,7 @@ beet serve examples/bsx_site --server=http
 beet serve examples/bsx_site --server=http --watch
 
 # static export to examples/bsx_site/dist
-beet serve examples/bsx_site --server=export
+beet export-static examples/bsx_site
 ```
 
 Because the site is runtime files, edits to `main.bsx`, the templates, and the routes need no rebuild, just rerun (or re-request, in HTTP mode). Install the CLI with `cargo install --path crates/beet-cli`, or run it from the workspace with `cargo run -p beet-cli -- serve examples/bsx_site`.
@@ -32,7 +32,7 @@ bsx_site/
   routes/        the content: every file is a page
 ```
 
-There is no `main.rs`. `beet serve <site-dir>` is the host: it registers the `templates/` directory, sets the `SiteRoot`, spawns `main.bsx` as the app root, and layers the default app routes (`/app-info`, `POST /analytics`) onto it. The selected backend (`cli`/`http`/`export`) drives one rendered exchange, the HTTP listener, or a static export. The `<PackageConfig/>` declared in `main.bsx` supplies the site title and description those routes read.
+There is no `main.rs`. `beet serve <site-dir>` is the host: it registers the `templates/` directory, sets the `SiteRoot`, spawns `main.bsx` as the app root, and layers the default app routes (`/app-info`, `POST /analytics`) onto it. With no `--server` it renders the requested route once; `--server=http` triggers a `StartServer` on the site root, booting the HTTP listener. Static export is its own command, `beet export-static <site-dir>`. The `<PackageConfig/>` declared in `main.bsx` supplies the site title and description those routes read.
 
 ## How it works
 

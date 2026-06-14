@@ -117,8 +117,7 @@ async fn entry_components_land_on_root() {
 	world
 		.resource::<PackageConfig>()
 		.version
-		.as_deref()
-		.unwrap()
+		.as_str()
 		.xpect_eq(env!("CARGO_PKG_VERSION"));
 	// discovered routes assembled into the root's route tree
 	let tree = world.entity(root).get::<RouteTree>().unwrap();
@@ -127,16 +126,24 @@ async fn entry_components_land_on_root() {
 
 /// `<Router {(HttpServer{port:0})}>`: the http server is declarable from markup,
 /// landing on the router via the reflect spread path (port 0 keeps any started
-/// backend on an OS-assigned port). The reflect insert pulls in the `Server`
-/// orchestrator (`#[require(Server)]`), which dispatches the no-backend
-/// fall-through to the installed runtime hook.
+/// backend on an OS-assigned port). The reflect insert registers the server's
+/// `StartServer` observer through its `on_add`, so a triggered start boots it via
+/// the installed runtime hook.
 #[beet_core::test]
-fn http_server_declarable_in_markup() {
-	// no `server` backend feature here, so install the runtime hook the backend
-	// dispatch falls through to (idempotent: a prior test may have set it).
-	set_http_server(|_| Box::pin(async { Ok(()) })).ok();
-	// `RouterPlugin` now brings in `ServerPlugin` (the `ServerBackends` registry),
-	// so it must not be added again.
+async fn http_server_declarable_in_markup() {
+	// no `server` backend feature here, so install the runtime hook the start
+	// observer invokes (idempotent: a prior test may have set it).
+	set_http_server(|entity| {
+		Box::pin(async move {
+			entity
+				.with(|mut entity| {
+					entity.insert(ServerBooted);
+				})
+				.await
+		})
+	})
+	.ok();
+	// `RouterPlugin` brings in `ServerPlugin`, so it must not be added again.
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let holder = world.spawn_empty().id();
 	let root = spawn_bsx_under(
@@ -146,15 +153,22 @@ fn http_server_declarable_in_markup() {
 	);
 	world.entity(root).contains::<Router>().xpect_true();
 	world.entity(root).contains::<RequestLogger>().xpect_true();
-	// the orchestrator landed via the require
-	world.entity(root).contains::<Server>().xpect_true();
 	world
 		.entity(root)
 		.get::<HttpServer>()
 		.unwrap()
 		.port
 		.xpect_eq(Some(0));
+	// a triggered `StartServer` boots the declared server via the runtime hook.
+	world.entity_mut(root).trigger(StartServer::all);
+	AsyncRunner::flush_async_tasks(&mut world).await;
+	world.entity(root).contains::<ServerBooted>().xpect_true();
 }
+
+/// Flag the test runtime hook inserts, proving a triggered `StartServer` reached
+/// the declared `HttpServer`'s backend.
+#[derive(Component)]
+struct ServerBooted;
 
 #[beet_core::test]
 async fn page_renders_in_layout() {
@@ -229,7 +243,7 @@ fn text_value(world: &World, entity: Entity) -> Value {
 	world.entity(text).get::<Value>().unwrap().clone()
 }
 
-/// `@comp$RenderRoot:` resolves to the nearest render-root ancestor, the
+/// `@entity:RenderRoot::` resolves to the nearest render-root ancestor, the
 /// in-content replacement for the Rust `RouteHead` meta lookup.
 #[beet_core::test]
 fn render_root_binding_reads_article_meta() {
@@ -245,7 +259,7 @@ fn render_root_binding_reads_article_meta() {
 	let span = spawn_bsx_under(
 		&mut world,
 		route,
-		"<span>{@comp$RenderRoot:ArticleMeta.title}</span>",
+		"<span>{@entity:RenderRoot::ArticleMeta.title}</span>",
 	);
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Str("The Title".into()));
@@ -264,7 +278,7 @@ struct SiteBrand {
 	name: String,
 }
 
-/// `@comp$Router:` resolves to the nearest router ancestor, lazily: content
+/// `@entity:Router::` resolves to the nearest router ancestor, lazily: content
 /// built detached stays silent until it attaches beneath the router.
 #[beet_core::test]
 fn router_binding_resolves_lazily() {
@@ -283,7 +297,7 @@ fn router_binding_resolves_lazily() {
 	let span = spawn_bsx_under(
 		&mut world,
 		holder,
-		"<span>{@comp$Router:SiteBrand.name}</span>",
+		"<span>{@entity:Router::SiteBrand.name}</span>",
 	);
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Null);

@@ -14,10 +14,10 @@
 //! - an `@` binding lowers to its source's sync components: `@doc`/`@prop` to a
 //!   [`FieldRef`], `@res` to a `(Value, ResourceFieldRef)`, `@comp` to a
 //!   `(Value, ReflectFieldRef)` targeting the current entity, the element (in
-//!   attribute position), or a `@comp$ref:` named entity;
+//!   attribute position), or an `@entity:Name::` named entity;
 //! - the reserved selector names ([`ReservedRef`]) target well-known entities
-//!   instead of `bx:ref` names (which may not shadow them): `$BuildRoot` and
-//!   `$SnippetRoot` resolve at build time, `$RenderRoot` and `$Router` lazily
+//!   instead of `bx:ref` names (which may not shadow them): `BuildRoot` and
+//!   `SnippetRoot` resolve at build time, `RenderRoot` and `Router` lazily
 //!   in the sync pass via [`BindingTarget::Reserved`];
 //! - a `$`reference resolves to a `bx:ref`-named entity through the one entity
 //!   model;
@@ -85,7 +85,7 @@ impl Template for BsxTemplate {
 		// forward reference resolves to the same placeholder entity.
 		let mut refs = RefBindings::default();
 		collect_refs(&self.nodes, &mut refs)?;
-		// expose this build's root for `$SnippetRoot`, restoring any outer
+		// expose this build's root for `@entity:SnippetRoot::`, restoring any outer
 		// snippet root so nested registry-template builds nest correctly.
 		let root = cx.entity.id();
 		// SAFETY: only used to swap the snippet-root resource, no flush.
@@ -114,7 +114,7 @@ impl Template for BsxTemplate {
 }
 
 /// The root entity of the innermost [`BsxTemplate`] build (the parsed document
-/// container or a registry `<path::to::X>` body): the `$SnippetRoot` reserved
+/// container or a registry `<path::to::X>` body): the `SnippetRoot` reserved
 /// target. Set for the duration of a build, mirroring [`TemplateBuildRoot`].
 #[derive(Debug, Clone, Copy, Resource)]
 struct SnippetBuildRoot(Entity);
@@ -166,7 +166,7 @@ fn collect_refs(nodes: &[BsxNode], refs: &mut RefBindings) -> Result<()> {
 	Ok(())
 }
 
-/// The reserved `@comp$Name:` selector names, targeting well-known entities
+/// The reserved `@entity:Name::` selector names, targeting well-known entities
 /// instead of user `bx:ref` names. Declaring one via `bx:ref` is a build error
 /// (see [`collect_refs`]), so a reserved selector is never ambiguous.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -456,7 +456,7 @@ fn insert_value_if_missing(entity: &mut EntityWorldMut) {
 	}
 }
 
-/// The target of an `@comp$name` selector in a cx-bearing position (text,
+/// The target of an `@entity:name::` selector in a cx-bearing position (text,
 /// event): a reserved name resolves to its well-known entity (or defers to the
 /// sync pass), else through the `bx:ref` machinery.
 fn selector_target(
@@ -470,7 +470,7 @@ fn selector_target(
 	}
 }
 
-/// The target of an `@comp$name` selector resolved against a pre-built
+/// The target of an `@entity:name::` selector resolved against a pre-built
 /// name->entity map ([`resolve_entity_refs`], which also resolves the
 /// build-time reserved names): a lazy reserved name defers to the sync pass,
 /// anything else looks up the map.
@@ -564,7 +564,7 @@ fn resolve_entity_refs(
 				collect_literal_entity_ref_names(literal, &mut names)
 			}
 			AttrValue::Expr(ValueExpr::EntityRef(name)) => names.push(name.clone()),
-			// an `@comp$ref:` selector resolves through the same machinery.
+			// an `@entity:ref::` selector resolves through the same machinery.
 			AttrValue::Expr(ValueExpr::Binding(binding)) => {
 				names.extend(binding.selector.clone());
 			}
@@ -681,7 +681,7 @@ fn build_uppercase(
 		if let Some(schema) = def.schema.clone() {
 			verify_props_against(el, &el.tag, &schema, cx)?;
 		}
-		// pre-resolve `$name` refs (incl `@comp$ref:` selectors) for the props
+		// pre-resolve `$name` refs (incl `@entity:ref::` selectors) for the props
 		// store and spreads.
 		let entity_refs = resolve_entity_refs(el, refs, cx);
 		// materialize the props store before the body builds, so the body's
@@ -1020,7 +1020,7 @@ fn apply_common_directives(
 		};
 		let event = attr.key.strip_prefix("bx:").unwrap_or(&attr.key);
 		let binding = EventBinding::new(event, call.clone());
-		// pre-resolve each binding argument's `@comp$ref:` selector to its target
+		// pre-resolve each binding argument's `@entity:ref::` selector to its target
 		// (needs `cx`), so the install closure is a plain lookup with no `cx`
 		// borrow conflicting with `cx.entity`.
 		let targets = binding

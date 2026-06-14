@@ -61,6 +61,9 @@ pub fn router_scene() -> Result<impl Bundle> {
 		// the server is the IO layer, handling incoming requests
 		// from http, stdin etc
 		server_from_cli()?,
+		// boot whichever server `server_from_cli` selected (empty filter matches
+		// it). `ReplServer` self-boots its own loop, so it ignores this.
+		bootstrap_server(),
 		// the batteries-included router: route lookup + the default app routes,
 		// wrapping the user routes (children with a PathPartial and action)
 		(default_router(), children![routes()]),
@@ -83,7 +86,7 @@ fn server_from_cli() -> Result<OnSpawn> {
 	match CliArgs::parse_env()
 		.params
 		.get("server")
-		.map(|val: &String| val.to_lowercase())
+		.map(|val: &SmolStr| val.to_lowercase())
 		.unwrap_or_else(|| default_server.into())
 		.as_str()
 	{

@@ -27,10 +27,12 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
-/// The document [`Head`] with per-route metadata: the route's [`ArticleMeta`]
-/// (frontmatter title/description) overrides the
-/// [`PackageConfig`](beet_core::prelude::PackageConfig) defaults. Extra tags
-/// (stylesheet, favicon, ...) flow through to the `<head>` via the default slot.
+/// The document [`Head`] with a per-route `<title>`: the base [`Head`] omits its
+/// own `<title>` and this widget owns the single one, bound to the route's
+/// [`ArticleMeta`] title (`@entity:RenderRoot::ArticleMeta.title`) so it differs
+/// per route and stays live. The base head's social/PWA meta names the site from
+/// [`PackageConfig`](beet_core::prelude::PackageConfig). Extra tags (stylesheet,
+/// favicon, ...) flow through to the `<head>` via the default slot.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout declares `<RouteHead>...</RouteHead>`. Builds inside a layout
@@ -41,18 +43,37 @@ pub fn RouteHead(
 	metas: Query<&ArticleMeta>,
 	pkg: Res<PackageConfig>,
 ) -> impl Bundle {
-	let meta = metas.get(cx.route()).ok();
-	let title = meta
+	// the SSR seed: the resolved title rendered before any document sync. The
+	// binding then keeps it live and per-route, so the title is never sticky.
+	let seed = metas
+		.get(cx.route())
+		.ok()
 		.and_then(|meta| meta.title.clone())
 		.unwrap_or_else(|| pkg.title.to_string());
-	let description = meta
-		.and_then(|meta| meta.description.clone())
-		.unwrap_or_else(|| pkg.description.to_string());
 	rsx! {
-		<Head title=title description=description>
+		<Head omit_title=true>
+			<title>{route_title(&seed)}</title>
 			<Slot/>
 		</Head>
 	}
+}
+
+/// The bound text child of the route `<title>`: a [`Value`] seeded with the
+/// resolved title (so SSR renders it before any sync) plus, under `json`, a
+/// [`ReflectFieldRef`] resolving `@entity:RenderRoot::ArticleMeta.title` — the
+/// nearest render-root ancestor, hopping the layout's [`RenderRootRef`] into the
+/// transcluded route content. Re-resolved each sync pass and each request, so the
+/// title tracks the current route. Without `json` it stays the static seed.
+fn route_title(seed: &str) -> impl Bundle {
+	let value = Value::new(seed);
+	#[cfg(feature = "json")]
+	return (
+		value,
+		ReflectFieldRef::new("ArticleMeta", "title")
+			.with_target(BindingTarget::Reserved("RenderRoot".into())),
+	);
+	#[cfg(not(feature = "json"))]
+	return value;
 }
 
 /// The route-tree navigation rail as a widget: collects the world's

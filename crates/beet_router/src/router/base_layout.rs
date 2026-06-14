@@ -122,7 +122,7 @@ pub(crate) fn wrap_content_with(
 	let layout = layout_result?;
 
 	// link the layout root to the transcluded content, distinct from the
-	// self-referential render root: a layout-head `@comp$RenderRoot:` binding
+	// self-referential render root: a layout-head `@entity:RenderRoot::` binding
 	// follows this to read the route's `ArticleMeta` across the transclusion.
 	world
 		.entity_mut(layout)
@@ -141,6 +141,10 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_ui::prelude::*;
+	// disambiguate the `Header` widget from `beet_net`'s `Header` trait, both
+	// pulled in via the prelude globs above.
+	use beet_ui::prelude::Header;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -315,5 +319,121 @@ mod test {
 		let link = html.find("<a>home</a>").unwrap();
 		link.xpect_greater_than(nav_open);
 		link.xpect_less_than(nav_close);
+	}
+
+	/// The real site head/header layout: `RouteHead` owns the single `<title>`
+	/// bound to the route, `Header` owns the site-title link.
+	#[cfg(feature = "json")]
+	#[template]
+	fn MetaLayout() -> impl Bundle {
+		rsx! {
+			<html>
+				<RouteHead/>
+				<body><Header/><main><Slot/></main></body>
+			</html>
+		}
+	}
+
+	/// A route whose rendered content carries the given frontmatter title.
+	#[cfg(feature = "json")]
+	fn meta_route(path: &str, title: &str) -> impl Bundle {
+		render_action::fixed_route(path, (
+			ArticleMeta {
+				title: Some(title.into()),
+				..default()
+			},
+			rsx! { <p>"body"</p> },
+		))
+	}
+
+	/// The sticky-title regression: through the real `wrap_content_with` pipeline
+	/// (per-request layout + transcluded content + fresh `RenderRootRef`), each
+	/// route renders its *own* `<title>` (not the previous request's), the visible
+	/// header stays the site title, and the shared `PackageConfig.title` is never
+	/// polluted by a per-route title write-back.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn route_title_differs_per_request_and_header_stays_site_title() {
+		let mut world = router_world();
+		world.insert_resource(PackageConfig {
+			title: "SiteName".into(),
+			..default()
+		});
+		let root = world
+			.spawn((Router, BaseLayout::<MetaLayout>::default(), children![
+				meta_route("alpha", "Alpha"),
+				meta_route("beta", "Beta"),
+			]))
+			.flush();
+
+		// each route renders exactly one `<title>`, carrying its own route title.
+		let alpha = get(&mut world, root, "alpha").await;
+		alpha.matches("<title>").count().xpect_eq(1);
+		alpha.as_str().xpect_contains("<title>Alpha</title>");
+		// the header link is always the site title, never the route title.
+		alpha.as_str().xpect_contains("app-bar-title");
+		alpha
+			.split("app-bar-title")
+			.nth(1)
+			.unwrap()
+			.xpect_contains("SiteName");
+
+		// a different route renders a different title (not sticky on "Alpha").
+		let beta = get(&mut world, root, "beta").await;
+		beta.as_str().xpect_contains("<title>Beta</title>");
+		beta.as_str().xnot().xpect_contains("<title>Alpha</title>");
+
+		// re-requesting alpha is fresh again, not stuck on the last request.
+		get(&mut world, root, "alpha")
+			.await
+			.as_str()
+			.xpect_contains("<title>Alpha</title>");
+
+		// the shared resource was never overwritten by a per-route title.
+		world.resource::<PackageConfig>().title.as_str().xpect_eq("SiteName");
+	}
+
+	/// The per-request link is fresh: `wrap_content_with` installs a
+	/// [`RenderRootRef`] from the layout root to *this request's* content, the
+	/// seam the layout-head title binding follows. Two requests yield two distinct
+	/// content entities, each pointed at by its own layout.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn wrap_content_links_each_request_to_fresh_content() {
+		let mut world = router_world();
+		let content_a = world.spawn(ArticleMeta::default()).flush();
+		RenderRoot::insert(&mut world.entity_mut(content_a), default());
+		let content_b = world.spawn(ArticleMeta::default()).flush();
+		RenderRoot::insert(&mut world.entity_mut(content_b), default());
+
+		let layout_a = wrap_content_with(
+			&mut world,
+			RequestParts::get("alpha"),
+			content_a,
+			|world, _| Ok(world.spawn(Element::new("html")).id()),
+		)
+		.unwrap();
+		let layout_b = wrap_content_with(
+			&mut world,
+			RequestParts::get("beta"),
+			content_b,
+			|world, _| Ok(world.spawn(Element::new("html")).id()),
+		)
+		.unwrap();
+
+		// each layout points at its own request's content, not a shared/stale one.
+		world
+			.entity(layout_a)
+			.get::<RenderRootRef>()
+			.unwrap()
+			.0
+			.xpect_eq(content_a);
+		world
+			.entity(layout_b)
+			.get::<RenderRootRef>()
+			.unwrap()
+			.0
+			.xpect_eq(content_b);
+		layout_a.xpect_not_eq(layout_b);
 	}
 }

@@ -34,7 +34,7 @@ pub async fn collect_static_html(
 			// export, defaulting to dev (keep drafts) when unset.
 			let is_prod = world
 				.get_resource::<PackageConfig>()
-				.is_some_and(|config| config.stage() == "prod");
+				.is_some_and(|config| config.is_prod());
 
 			let mut paths = Vec::new();
 			for node in tree.flatten_nodes() {

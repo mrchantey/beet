@@ -3,18 +3,17 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::OnceLock;
 
-/// Boxed server-start function: the [`ServerBackend::start`] shape, also used by
-/// the [`ServerBackends`] registry and the runtime [`set_http_server`] seam.
+/// Boxed server-start function: the no_std-friendly server hook, mirroring
+/// [`HttpSendFn`] on the client side.
 ///
-/// This is the no_std-friendly server hook, mirroring [`HttpSendFn`] on the
-/// client side. When no server backend feature (`server`/`hyper`/`lambda`) is
-/// compiled in, [`HttpServer::start`] falls through to a function installed via
-/// [`set_http_server`] — letting a downstream adapter (an embassy / esp WiFi
-/// crate, …) plug in its own listener without living in `beet_net`.
+/// [`ServerPlugin`] installs one of the built-in backends (mini / hyper / lambda)
+/// via [`set_http_server`] based on compile-time features; a downstream adapter
+/// (an embassy / esp WiFi crate, …) installs its own without living in
+/// [`beet_net`]. [`HttpServer`]'s start observer invokes the installed function.
 ///
 /// It is handed an [`AsyncEntity`] for the spawned server (run on the async
 /// layer, exactly like the built-in [`start_hyper_server`] /
-/// `start_mini_http_server` backends) and returns a boxed future. The adapter
+/// `start_mini_http_server` backends) and returns a boxed future. The backend
 /// reads the [`HttpServer`] config off the entity, opens its own listener, and
 /// dispatches each request back through `entity.exchange(req)`.
 pub type HttpServerFn =
@@ -22,26 +21,34 @@ pub type HttpServerFn =
 
 static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 
-/// Install the server backend used by [`HttpServer`] when no server feature is
-/// compiled in. Call once at startup from the adapter crate; returns an error
-/// if a backend has already been installed.
+/// Install the backend [`HttpServer`] invokes on start. [`ServerPlugin`] calls
+/// this for the compile-time-selected feature backend; a no_std adapter with no
+/// compiled-in backend installs its own. Returns an error if one is already set.
 pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 	HTTP_SERVER
 		.set(server)
 		.map_err(|_| bevyhow!("HTTP server already installed"))
 }
 
-/// HTTP server that listens for incoming requests, triggering an [`Action::<Request,Response>`] call.
+/// The installed backend, if any.
+pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
+
+/// HTTP server that listens for incoming requests, triggering an
+/// [`Action::<Request,Response>`] call.
 ///
-/// A long-running [`ServerBackend`]: spawning it pulls in the [`Server`]
-/// orchestrator (via `#[require(Server)]`), which starts it through
-/// [`HttpServer::start`]. The concrete listener depends on compile-time feature
-/// flags:
-/// - Default (`server`): Lightweight mini HTTP server using `async-io` TCP
-/// - `hyper`: Full-featured Hyper HTTP server
+/// A long-running server: a [`StartServer`] event whose filter passes `"http"`
+/// boots it through the backend [`ServerPlugin`] installed via
+/// [`set_http_server`], reading `--port` / `--host` from the event's `params`.
+/// Booting inserts [`KeepAlive`] so the process persists. A [`StopServer`] event
+/// (`"http"`) tears it down. A markup-spawned `<Router {(HttpServer{port:0})}>`
+/// boots exactly the same way.
+///
+/// The concrete backend depends on compile-time features:
+/// - Default (`server`): lightweight mini HTTP server using `async-io` TCP
+/// - `hyper`: full-featured Hyper HTTP server
 /// - `lambda`: AWS Lambda runtime
-/// - none of the above (eg `no_std` embedded): a backend installed at runtime
-///   via [`set_http_server`]
+/// - none of the above (eg no_std embedded): a backend installed at runtime via
+///   [`set_http_server`]
 ///
 /// # Example
 ///
@@ -49,14 +56,15 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// world.spawn((
+/// let host = world.spawn((
 ///     HttpServer::default(),
 ///     exchange_handler(|req| req.mirror()),
-/// ));
+/// )).id();
+/// world.entity_mut(host).trigger(StartServer::all);
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Server)]
+#[cfg_attr(feature = "std", component(on_add = on_add))]
 #[cfg_attr(feature = "std", require(ExchangeStats))]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
@@ -129,74 +137,97 @@ impl HttpServer {
 		format!("http://127.0.0.1:{}", port)
 	}
 
-	/// The socket address to bind, resolving port and host by precedence
-	/// `--port` / `--host` argv param > component field > default (`0` =
-	/// OS-assigned, localhost). Backends call this so a `--port=8080` overrides
-	/// a declared `HttpServer { port }`.
+	/// The socket address to bind, from the component fields (`0` = OS-assigned,
+	/// localhost the default host). The start observer applies any `--port` /
+	/// `--host` from the [`StartServer`] event onto these fields before the
+	/// backend reads them, so a `--port=8080` overrides a declared `port`.
 	#[cfg(feature = "std")]
 	pub fn socket_addr(&self) -> core::net::SocketAddr {
-		let params = CliArgs::parse_env().params;
-		let port = resolve_config(
-			params.get("port").and_then(|val| val.parse().ok()),
-			self.port,
-			0,
-		);
-		let host = resolve_config(
-			params.get("host").map(|val| {
-				if val == "0.0.0.0" { [0, 0, 0, 0] } else { [127, 0, 0, 1] }
-			}),
-			Some(self.host),
-			[127, 0, 0, 1],
-		);
-		(host, port).into()
+		(self.host, self.port.unwrap_or(0)).into()
 	}
-}
 
-/// Marker [`HttpServer::start`] inserts in test builds instead of starting a
-/// backend, proving the orchestrator reached it (including through reflect
-/// inserts and the `#[require(Server)]` boot).
-#[cfg(test)]
-#[derive(Component)]
-pub(crate) struct ServerHookFired;
-
-impl ServerBackend for HttpServer {
-	/// Start the compile-time-selected HTTP backend. In test builds this inserts
-	/// [`ServerHookFired`] instead, proving the [`Server`] orchestrator reached
-	/// the backend. With no backend feature compiled in (eg a no_std embedded
-	/// target) it defers to a listener installed via [`set_http_server`].
-	#[allow(unused_variables)]
-	fn start(entity: AsyncEntity) -> MaybeSendBoxedFuture<'static, Result> {
-		cfg_if! {
-			if #[cfg(test)] {
-				Box::pin(async move {
-					entity
-						.with(|mut entity| { entity.insert(ServerHookFired); })
-						.await
-				})
-			} else if #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))] {
-				Box::pin(super::start_lambda_server(entity))
-			} else if #[cfg(all(feature = "hyper", not(target_arch = "wasm32")))] {
-				Box::pin(super::start_hyper_server(entity))
-			} else if #[cfg(all(feature = "server", not(target_arch = "wasm32")))] {
-				Box::pin(super::start_mini_http_server(entity))
-			} else {
-				// No backend compiled in: defer to a listener installed at runtime
-				// via `set_http_server`, reading the `HttpServer` config off the
-				// entity and routing requests back through `entity.exchange(req)`.
-				match HTTP_SERVER.get() {
-					Some(start) => start(entity),
-					None => Box::pin(async {
-						bevybail!(
-							"No HTTP server backend configured. Enable a server \
-							 feature (server/hyper/lambda) or install one via \
-							 set_http_server(...)."
-						)
-					}),
-				}
-			}
+	/// Overlays `--port` / `--host` from a [`StartServer`]'s params onto a copy of
+	/// these fields, the resolved bind config the backend then reads.
+	#[cfg(feature = "std")]
+	fn with_params(mut self, params: &MultiMap<SmolStr, SmolStr>) -> Self {
+		if let Some(port) = params.get("port").and_then(|val| val.parse().ok()) {
+			self.port = Some(port);
 		}
+		if let Some(host) = params.get("host") {
+			self.host = if host == "0.0.0.0" {
+				[0, 0, 0, 0]
+			} else {
+				[127, 0, 0, 1]
+			};
+		}
+		self
 	}
 }
+
+/// Registers the [`StartServer`] / [`StopServer`] observers on the host, so the
+/// server boots when a start event whose filter passes `"http"` lands on it.
+#[cfg(feature = "std")]
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_start_server)
+		.observe_any(on_stop_server);
+}
+
+/// Boots the HTTP backend when a [`StartServer`] event passing `"http"` lands.
+/// Applies the event's `--port` / `--host` onto the component, inserts
+/// [`KeepAlive`] (a long-running server keeps the process up), then queues the
+/// installed [`HttpServerFn`].
+#[cfg(feature = "std")]
+fn on_start_server(
+	ev: On<StartServer>,
+	mut servers: Query<&mut HttpServer>,
+	mut commands: Commands,
+) {
+	if !ev.passes("http") {
+		return;
+	}
+	let entity = ev.event_target();
+	// resolve the bind config from the event params, the only source of truth.
+	if let Ok(mut server) = servers.get_mut(entity) {
+		*server = server.clone().with_params(&ev.params);
+	}
+	commands.insert_resource(KeepAlive);
+	commands.entity(entity).queue_async_local(start_http_server);
+}
+
+/// Tears down the HTTP backend when a [`StopServer`] passing `"http"` lands.
+#[cfg(feature = "std")]
+fn on_stop_server(ev: On<StopServer>, mut commands: Commands) {
+	if !ev.passes("http") {
+		return;
+	}
+	commands.entity(ev.event_target()).queue_async_local(stop_http_server);
+}
+
+/// Invoke the installed backend on a started host, after confirming the entity
+/// still exists (a briefly-spawned server, eg during serialization, is gone by
+/// the time this runs).
+#[cfg(feature = "std")]
+async fn start_http_server(entity: AsyncEntity) -> Result {
+	if !entity.is_alive().await {
+		return Ok(());
+	}
+	match http_server() {
+		Some(start) => start(entity).await,
+		None => bevybail!(
+			"No HTTP server backend installed. Enable a server feature \
+			 (server/hyper/lambda) or install one via set_http_server(...)."
+		),
+	}
+}
+
+/// Stop hook seam: the built-in listeners run an accept loop with no cancel
+/// handle, so this is a no-op today; a backend owning a cancellable listener
+/// keys off its own component here.
+#[cfg(feature = "std")]
+async fn stop_http_server(_entity: AsyncEntity) -> Result { Ok(()) }
 
 
 /// std-only constructors and the on-hardware integration test suite.
@@ -213,9 +244,8 @@ mod std_impl {
 		/// passed directly to the server function, eliminating port race conditions.
 		///
 		/// The returned [`OnSpawn`] runs the real listener; include it in the
-		/// spawn bundle. In `beet_net`'s own unit tests the [`ServerBackend`]
-		/// start stub only inserts [`ServerHookFired`], so the listener comes
-		/// from this `OnSpawn`.
+		/// spawn bundle. The `HttpServer` unit tests do not trigger a
+		/// [`StartServer`], so the listener comes from this `OnSpawn`.
 		pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
 		where
 			Func: 'static
@@ -250,17 +280,28 @@ mod tests {
 	use bevy::ecs::reflect::ReflectComponent;
 
 	/// A reflect insert (the BSX spread path, eg `{(HttpServer{port:8080})}`)
-	/// brings the [`Server`] orchestrator in via `#[require(Server)]` and boots
-	/// the backend exactly like a regular spawn. `beet_net`'s own unit-test
-	/// backend stub inserts [`ServerHookFired`] instead of binding a port.
+	/// registers the start observer through `on_add`, so a [`StartServer`]
+	/// triggered on the host boots it exactly like a regular spawn. With no
+	/// server feature here, the installed runtime hook stands in for the backend.
 	#[beet_core::test]
-	async fn boots_on_reflect_insert() {
+	async fn boots_on_triggered_start() {
+		// install a hook that flags the entity, standing in for a real backend.
+		set_http_server(|entity| {
+			Box::pin(async move {
+				entity
+					.with(|mut entity| {
+						entity.insert(ServerStartFlag);
+					})
+					.await
+			})
+		})
+		.ok();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app.world_mut().spawn_empty().id();
 		let registry = app.world().resource::<AppTypeRegistry>().clone();
 		// reflect-insert `HttpServer`, the same path a BSX `{(HttpServer{..})}`
-		// spread takes; the `#[require(Server)]` fires through it.
+		// spread takes; the `on_add` registers the start observer through it.
 		{
 			let registry = registry.read();
 			registry
@@ -274,29 +315,73 @@ mod tests {
 					&registry,
 				);
 		}
-		// the require brings `Server` in synchronously
-		app.world().entity(entity).contains::<Server>().xpect_true();
 		app.world()
 			.entity(entity)
 			.get::<HttpServer>()
 			.unwrap()
 			.port
 			.xpect_eq(Some(8080));
-		// settle the orchestrator's queued boot, which reaches the backend stub
+		// trigger the start: the http observer queues the backend hook.
+		app.world_mut().entity_mut(entity).trigger(StartServer::all);
+		app.update_async().await;
+		app.world().entity(entity).contains::<ServerStartFlag>().xpect_true();
+		// a long-running server keeps the process alive.
+		app.world().contains_resource::<KeepAlive>().xpect_true();
+	}
+
+	/// `--port` in the [`StartServer`] params overrides the declared component
+	/// port before the backend reads the bind address.
+	#[beet_core::test]
+	async fn resolves_port_from_params() {
+		set_http_server(|_| Box::pin(async { Ok(()) })).ok();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app.world_mut().spawn(HttpServer::new(8080)).id();
+		let mut params = MultiMap::default();
+		params.insert("port".into(), "9090".into());
+		app.world_mut()
+			.entity_mut(entity)
+			.trigger(move |entity| StartServer {
+				entity,
+				filter: default(),
+				params,
+			});
 		app.update_async().await;
 		app.world()
 			.entity(entity)
-			.contains::<ServerHookFired>()
-			.xpect_true();
+			.get::<HttpServer>()
+			.unwrap()
+			.port
+			.xpect_eq(Some(9090));
 	}
 
-	/// With no `--port` argv param the component field drives the bind address
-	/// (the middle tier of the `param > field > default` precedence).
+	/// A start whose filter does not pass `"http"` leaves the server untouched.
 	#[beet_core::test]
-	fn socket_addr_uses_component_port() {
-		HttpServer::new(8080).socket_addr().port().xpect_eq(8080);
+	async fn skips_on_filter_miss() {
+		set_http_server(|entity| {
+			Box::pin(async move {
+				entity
+					.with(|mut entity| {
+						entity.insert(ServerStartFlag);
+					})
+					.await
+			})
+		})
+		.ok();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
+		app.world_mut().entity_mut(entity).trigger(StartServer::cli);
+		app.update_async().await;
+		app.world().entity(entity).contains::<ServerStartFlag>().xpect_false();
 	}
 }
+
+/// Marker the test backend hook inserts in place of binding a port, proving a
+/// [`StartServer`] reached the installed backend.
+#[cfg(test)]
+#[derive(Component)]
+struct ServerStartFlag;
 
 // needs `new_test` + `async_io` (server, native) and the ureq client.
 #[cfg(test)]

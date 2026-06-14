@@ -81,11 +81,14 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 	}
 }
 
-/// Parse an `@source selector? : path init?` binding, the module-level grammar.
-/// A `$ref` selector is a `bx:ref` name or one of the reserved well-known
-/// names (`BuildRoot`, `SnippetRoot`, `RenderRoot`, `Router`); reservation is
-/// the resolver's concern ([`ReservedRef`](super::resolve::ReservedRef)), the
-/// grammar does not distinguish them.
+/// Parse an `@source : path init?` binding, the module-level grammar.
+///
+/// `@entity:` is `@comp` retargeted to a named entity: its first segment is the
+/// entity name, `::` separates it from the `Type.field` path
+/// (`@entity:slider::Slider.value`). The name is a `bx:ref` name or a reserved
+/// well-known name (`BuildRoot`, `SnippetRoot`, `RenderRoot`, `Router`);
+/// reservation is the resolver's concern ([`ReservedRef`](super::resolve::ReservedRef)),
+/// the grammar does not distinguish them.
 pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 	cursor.eat("@");
 	let source_name = cursor.take_while(|ch| ch.is_alphanumeric());
@@ -94,30 +97,31 @@ pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 		"res" => BindingSource::Res,
 		"comp" => BindingSource::Comp,
 		"prop" => BindingSource::Prop,
+		// `@entity` lowers to a `@comp` retargeted by a leading entity selector.
+		"entity" => BindingSource::Comp,
 		other => bevybail!(
-			"unknown binding source `@{other}`, expected `doc`, `res`, `comp` or `prop`"
+			"unknown binding source `@{other}`, expected `doc`, `res`, `comp`, `prop` or `entity`"
 		),
 	};
-	// an optional `$ref` selector, `@comp` only.
-	let selector = if cursor.peek() == Some('$') {
-		if source != BindingSource::Comp {
-			bevybail!(
-				"a `$ref` selector is only valid on `@comp`, found `@{source_name}$`"
-			);
-		}
-		cursor.bump();
+	if !cursor.eat(":") {
+		bevybail!("expected `:` after the `@{source_name}` binding source");
+	}
+	// `@entity:` leads with an `EntityName::` selector segment.
+	let selector = if source_name == "entity" {
 		let name = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
 		if name.is_empty() {
-			bevybail!("expected a ref name after `@comp$`");
+			bevybail!("`@entity:` expects an entity name, ie `@entity:Name::Type.field`");
+		}
+		if !cursor.eat("::") {
+			bevybail!(
+				"`@entity:{name}` is missing its `::Type.field` path, expected `@entity:{name}::Type.field`"
+			);
 		}
 		Some(SmolStr::from(name))
 	} else {
 		None
 	};
-	if !cursor.eat(":") {
-		bevybail!("expected `:` after the `@{source_name}` binding source");
-	}
-	// `@res`/`@comp` lead with a `ShortTypePath.` segment.
+	// `@res`/`@comp`/`@entity` lead with a `ShortTypePath.` segment.
 	let type_path = match source {
 		BindingSource::Res | BindingSource::Comp => {
 			let type_path = cursor
@@ -127,7 +131,7 @@ pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 			}
 			if !cursor.eat(".") {
 				bevybail!(
-					"`@{source_name}:{type_path}` is missing its field path, expected `@{source_name}:{type_path}.field`"
+					"`@{source_name}:` is missing its field path, expected a `Type.field` path"
 				);
 			}
 			Some(SmolStr::from(type_path))
@@ -515,12 +519,21 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn comp_binding_with_selector() {
-		let parsed = binding("@comp$myref:Bar.boo");
+	fn entity_binding_with_selector() {
+		let parsed = binding("@entity:myref::Bar.boo");
 		parsed.source.xpect_eq(BindingSource::Comp);
 		parsed.selector.xpect_eq(Some("myref".into()));
 		parsed.type_path.xpect_eq(Some("Bar".into()));
 		parsed.field_path.to_string().xpect_eq("boo".to_string());
+	}
+
+	#[beet_core::test]
+	fn entity_binding_reserved_name() {
+		let parsed = binding("@entity:RenderRoot::ArticleMeta.title");
+		parsed.source.xpect_eq(BindingSource::Comp);
+		parsed.selector.xpect_eq(Some("RenderRoot".into()));
+		parsed.type_path.xpect_eq(Some("ArticleMeta".into()));
+		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
 	#[beet_core::test]
@@ -554,12 +567,12 @@ mod test {
 		parse_err("@doc count").xpect_contains("expected `:`");
 		parse_err("@res:NoField").xpect_contains("missing its field path");
 		parse_err("@comp:").xpect_contains("expects a `Type.field` path");
-		parse_err("@prop$x:title")
-			.xpect_contains("only valid on `@comp`");
 		parse_err("@res:Type.field=1")
 			.xpect_contains("only valid on `@doc`");
-		parse_err("@comp$:Bar.boo")
-			.xpect_contains("expected a ref name");
+		parse_err("@entity:::Bar.boo")
+			.xpect_contains("expects an entity name");
+		parse_err("@entity:Name.Bar.boo")
+			.xpect_contains("missing its `::Type.field` path");
 	}
 
 	#[beet_core::test]

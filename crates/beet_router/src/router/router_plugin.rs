@@ -52,9 +52,10 @@ impl Plugin for RouterPlugin {
 		#[cfg(feature = "std")]
 		{
 			app
-				// the server model: routers and servers go together, so spawning a
-				// backend on a router boots through the `Server` orchestrator, which
-				// reads the `ServerBackends` registry `ServerPlugin` populates.
+				// the server model: routers and servers go together, so a server
+				// spawned on a router boots when a `StartServer` event lands on it.
+				// `ServerPlugin` installs the `HttpServer` backend and registers the
+				// server types.
 				.init_plugin::<ServerPlugin>()
 				// template routes render through the charcell layout/paint
 				// pipeline; without it the `PostParseTree` schedule has no systems
@@ -71,7 +72,7 @@ impl Plugin for RouterPlugin {
 				.register_template::<RouteList>()
 				.register_template::<ErrorPage>()
 				// per-route metadata, bindable via the reserved ref, eg
-				// `@comp$RenderRoot:ArticleMeta.title`
+				// `@entity:RenderRoot::ArticleMeta.title`
 				.register_type::<ArticleMeta>()
 				// the package resource, bindable as eg `@res:PackageConfig.title`
 				.register_type::<PackageConfig>()

@@ -168,16 +168,19 @@ mod test {
 	}
 
 	/// Cells authored as a collected `Vec` (eg `{(0..4).map(cell).collect()}`) sit
-	/// under a transparent [`FragmentNode`] wrapper. The wrapper must be spliced
-	/// out so the cells flow as direct grid tracks; otherwise the grid lays out the
-	/// single wrapper as one cell and the cells collapse into a zero-width nested
-	/// grid (the `bsx_site`/`beet_site` grid demo regression).
+	/// under a tag-less grouping wrapper: an entity with [`Children`] but no
+	/// [`Element`], the shape `Vec::into_snippet` lowers a collected child position
+	/// to. The wrapper must be spliced out so the cells flow as direct grid tracks;
+	/// otherwise the grid lays out the single wrapper as one cell and the cells
+	/// collapse into a zero-width nested grid (the `bsx_site`/`beet_site` grid demo
+	/// regression). This mirrors the HTML walker, which emits no tag for such a
+	/// node yet still renders its children.
 	#[beet_core::test]
 	fn fragment_wrapped_cells_flow_as_tracks() {
 		let mut world = CharcellPlugin::world();
 		world.get_resource_or_init::<RuleSet>().extend_rules(vec![grid_rule()]);
-		// a `.grid` whose four cells are nested under one `FragmentNode`, exactly
-		// the shape `Vec::into_snippet` lowers a collected child position to.
+		// a `.grid` whose four cells are nested under one tag-less wrapper (children,
+		// no `Element`), exactly the shape `Vec::into_snippet` lowers to.
 		let grid = world
 			.spawn((
 				Buffer::new(UVec2::new(24, 6)).into_double_buffer(),
@@ -185,7 +188,7 @@ mod test {
 				Classes::new([ClassName::string("grid")]),
 			))
 			.id();
-		let fragment = world.spawn((FragmentNode, ChildOf(grid))).id();
+		let fragment = world.spawn(ChildOf(grid)).id();
 		let spans = (0..4)
 			.map(|i| {
 				world
@@ -203,6 +206,43 @@ mod test {
 		rect(&world, spans[0]).xpect_eq(IRect::new(0, 0, 2, 1));
 		rect(&world, spans[1]).xpect_eq(IRect::new(2, 0, 4, 1));
 		rect(&world, spans[3]).xpect_eq(IRect::new(6, 0, 8, 1));
+	}
+
+	/// The same regression end to end through the real `rsx!` lowering: a collected
+	/// `Vec` child position (`{(..).map(..).collect()}`) is what the `beet_site`
+	/// grid demo authors, and `Vec::into_snippet` lowers it to the tag-less wrapper.
+	/// Each cell must paint at its own track, not collapse into one wrapper cell.
+	#[beet_core::test]
+	fn collected_vec_grid_cells_paint_as_tracks() {
+		let mut world = CharcellPlugin::world();
+		world.get_resource_or_init::<RuleSet>().extend_rules(vec![grid_rule()]);
+		// 12 cols over 12 cells = 1-cell tracks, so each digit lands on its own column
+		world.spawn((
+			Buffer::new(UVec2::new(12, 4)).into_double_buffer(),
+			rsx! {
+				<div class="grid">
+					{(0..12).map(|i| rsx! { <span>{i % 10}</span> }).collect::<Vec<_>>()}
+				</div>
+			},
+		));
+		world.run_schedule(PostParseTree);
+		let buffer = world
+			.query::<&DoubleBuffer>()
+			.iter(&world)
+			.next()
+			.unwrap()
+			.current_buffer();
+		let glyph_at = |x: u32| {
+			buffer
+				.get(UVec2::new(x, 0))
+				.map(|cell| cell.symbol_str().to_string())
+				.unwrap_or_default()
+		};
+		// each cell occupies one track, so columns 0..10 read the cell digits in
+		// order (collapsed-into-one-wrapper would paint only the first at column 0)
+		glyph_at(0).xpect_eq("0");
+		glyph_at(1).xpect_eq("1");
+		glyph_at(9).xpect_eq("9");
 	}
 
 	/// An adjustable column count: 4 tracks split a 20-wide grid into 5-cell
