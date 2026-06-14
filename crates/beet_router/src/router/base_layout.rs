@@ -52,9 +52,14 @@ where
 	let content = next.call(parts.clone()).await?;
 	// the request parts feed the render context (active nav, per-route meta, etc.)
 	let parts = parts.clone();
+	// the middleware runs with the matched route as caller, the reliable in-tree
+	// anchor for tree-scoped widgets (the rendered content may be detached)
+	let route = cx.id();
 	next.world()
 		.clone()
-		.with(move |world: &mut World| wrap_content::<C>(world, parts, content))
+		.with(move |world: &mut World| {
+			wrap_content::<C>(world, parts, route, content)
+		})
 		.await
 }
 
@@ -70,9 +75,10 @@ where
 fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 	world: &mut World,
 	parts: RequestParts,
+	route: Entity,
 	content: Entity,
 ) -> Result<Entity> {
-	wrap_content_with(world, parts, content, |world, rendered| {
+	wrap_content_with(world, parts, route, content, |world, rendered| {
 		world
 			.spawn_template(Snippet::from_bundle((
 				C::default().into_snippet_bundle(),
@@ -93,6 +99,7 @@ fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 pub(crate) fn wrap_content_with(
 	world: &mut World,
 	parts: RequestParts,
+	route: Entity,
 	content: Entity,
 	build_layout: impl FnOnce(&mut World, Entity) -> Result<Entity>,
 ) -> Result<Entity> {
@@ -113,10 +120,12 @@ pub(crate) fn wrap_content_with(
 	};
 
 	// the request-scoped render context, read by the layout's scene systems: the
-	// request parts plus the rendered content entity, off which widgets query
-	// any per-route components (eg `ArticleMeta` parsed from frontmatter).
-	// Installed as a resource for the synchronous layout build, then removed.
-	world.insert_resource(RequestContext::new(parts, rendered));
+	// request parts, the rendered content entity (off which widgets query
+	// per-route components, eg `ArticleMeta` parsed from frontmatter), and the
+	// matched route entity (the in-tree anchor for tree-scoped widgets, since the
+	// content may be a detached per-request root). Installed as a resource for the
+	// synchronous layout build, then removed.
+	world.insert_resource(RequestContext::new(parts, rendered, route));
 	let layout_result = build_layout(world, rendered);
 	world.remove_resource::<RequestContext>();
 	let layout = layout_result?;
@@ -406,9 +415,12 @@ mod test {
 		let content_b = world.spawn(ArticleMeta::default()).flush();
 		RenderRoot::insert(&mut world.entity_mut(content_b), default());
 
+		// these test contents are self-referential roots, so the route anchor and
+		// content coincide.
 		let layout_a = wrap_content_with(
 			&mut world,
 			RequestParts::get("alpha"),
+			content_a,
 			content_a,
 			|world, _| Ok(world.spawn(Element::new("html")).id()),
 		)
@@ -416,6 +428,7 @@ mod test {
 		let layout_b = wrap_content_with(
 			&mut world,
 			RequestParts::get("beta"),
+			content_b,
 			content_b,
 			|world, _| Ok(world.spawn(Element::new("html")).id()),
 		)

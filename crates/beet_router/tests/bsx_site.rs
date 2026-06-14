@@ -211,6 +211,54 @@ async fn bindings_render_in_route_pipeline() {
 	html.matches("og:site_name").count().xpect_eq(1);
 }
 
+/// Regression: when a host root carries its own command [`RouteTree`] (eg the
+/// `beet` CLI's `run-wasm`/`serve` commands from a loaded scene) in the *same*
+/// world as a served site, the site's `RouteSidebar` must render only the
+/// served site's routes, never leaking the host commands. The sidebar resolves
+/// its own tree by an ancestor walk from the matched route entity (the in-tree
+/// anchor in [`RequestContext`]), not by grabbing an arbitrary `RouteTree`.
+///
+/// Both route content shapes are covered: a `BlobScene` page (`docs/intro`,
+/// whose rendered content is the in-tree route entity) and a per-request page
+/// whose rendered content is *detached* from the tree (`page`, the
+/// `fixed_func_route` shape the home page uses). The detached case is why the
+/// anchor must be the matched route entity, not the rendered content.
+#[beet_core::test]
+async fn sidebar_excludes_foreign_host_command_tree() {
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
+	// a separate host root with its own command route tree, mirroring the CLI
+	// host that has `beet load`ed the default-cli scene (run-wasm, serve, ...).
+	world.spawn(children![
+		render_action::fixed_route("run-wasm", rsx! { <p>"run-wasm"</p> }),
+		render_action::fixed_route("export-static", rsx! { <p>"export"</p> }),
+	]);
+	// the served site, a distinct root in the same world, plus a per-request page
+	// whose content is built detached (the `fixed_func_route` shape).
+	let root = spawn_site(&mut world);
+	world.spawn((
+		ChildOf(root),
+		render_action::fixed_func_route("page", || rsx! { <p>"detached"</p> }),
+	));
+	world.flush();
+
+	// the in-tree `BlobScene` page: its content is the route entity itself.
+	let docs = get(&mut world, root, "docs/intro").await;
+	docs.as_str().xpect_contains(">The Intro<");
+	// the detached per-request page: its content is spawned outside the tree, so
+	// only the matched-route anchor resolves the served tree.
+	let page = get(&mut world, root, "page").await;
+	page.as_str().xpect_contains("detached").xpect_contains(">The Intro<");
+
+	// the host's command routes never leak into either served sidebar.
+	for html in [&docs, &page] {
+		html.as_str()
+			.xnot()
+			.xpect_contains("run-wasm")
+			.xnot()
+			.xpect_contains("export-static");
+	}
+}
+
 #[beet_core::test]
 async fn home_route_serves_index() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();

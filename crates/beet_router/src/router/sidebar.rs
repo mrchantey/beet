@@ -43,10 +43,11 @@ pub fn RouteHead(
 	metas: Query<&ArticleMeta>,
 	pkg: Res<PackageConfig>,
 ) -> impl Bundle {
-	// the SSR seed: the resolved title rendered before any document sync. The
-	// binding then keeps it live and per-route, so the title is never sticky.
+	// the SSR seed: the resolved title rendered before any document sync, read
+	// off the rendered content. The binding then keeps it live and per-route, so
+	// the title is never sticky.
 	let seed = metas
-		.get(cx.route())
+		.get(cx.content())
 		.ok()
 		.and_then(|meta| meta.title.clone())
 		.unwrap_or_else(|| pkg.title.to_string());
@@ -76,10 +77,19 @@ fn route_title(seed: &str) -> impl Bundle {
 	return value;
 }
 
-/// The route-tree navigation rail as a widget: collects the world's
-/// [`RouteTree`] into [`Sidebar`] nodes against the current request, applying
+/// The route-tree navigation rail as a widget: collects the route tree this
+/// page belongs to into [`Sidebar`] nodes against the current request, applying
 /// each route entity's [`ArticleMeta`] (scan-time or parsed frontmatter) as its
 /// [`SidebarInfo`] override.
+///
+/// The tree is resolved by an ancestor walk from the matched route entity
+/// ([`RequestContext::route`]) rather than picking an arbitrary world
+/// [`RouteTree`]: the widget is built in the detached layout subtree (the
+/// content is transcluded by [`RenderRef`]), so its own entity has no route-tree
+/// ancestor, and the rendered content may itself be a detached per-request root,
+/// but the matched route entity always lives in the served tree. This scopes
+/// the nav to the served site even when other [`RouteTree`]s share the world (eg
+/// the `beet` CLI host's loaded command routes alongside a `beet serve` site).
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout places it with `<RouteSidebar/>`. Builds inside a layout render
@@ -94,12 +104,11 @@ pub fn RouteSidebar(
 	#[prop]
 	exclude: Vec<String>,
 	cx: Res<RequestContext>,
-	trees: Query<&RouteTree>,
+	trees: AncestorQuery<&RouteTree>,
 	metas: Query<&ArticleMeta>,
 ) -> impl Bundle {
 	let nodes = trees
-		.iter()
-		.next()
+		.get(cx.route())
 		.map(|tree| {
 			let mut state = SidebarState::new(cx.current_path())
 				.with_home(home)

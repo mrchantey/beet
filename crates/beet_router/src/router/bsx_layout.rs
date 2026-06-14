@@ -53,7 +53,9 @@ async fn BsxLayoutAction(
 	let content = next.call(parts.clone()).await?;
 	let parts = parts.clone();
 	// the middleware runs with the matched route as caller; the `BsxLayout`
-	// configuration sits on the ancestor that declared it (eg the router)
+	// configuration sits on the ancestor that declared it (eg the router). The
+	// caller is also the in-tree anchor threaded into the render context.
+	let route = cx.id();
 	let template = cx
 		.caller
 		.with_state::<AncestorQuery<&BsxLayout>, Result<SmolStr>>(
@@ -68,7 +70,7 @@ async fn BsxLayoutAction(
 	next.world()
 		.clone()
 		.with(move |world: &mut World| {
-			wrap_content_with(world, parts, content, |world, rendered| {
+			wrap_content_with(world, parts, route, content, |world, rendered| {
 				build_bsx_layout(world, &template, rendered)
 			})
 		})
