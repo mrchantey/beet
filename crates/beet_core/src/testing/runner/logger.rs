@@ -285,7 +285,7 @@ fn failed_file_context(
 	const LINE_CONTEXT_SIZE: usize = 2;
 	const TAB_SPACES: usize = 2;
 
-	let path = outcome.path(test).into_abs();
+	let path = WsPathBuf::new(outcome.path(test)).into_abs();
 	let file = fs_ext::read_to_string(path)?;
 	let lines = file.split('\n').collect::<Vec<_>>();
 	let max_digits = lines.len().to_string().len();
@@ -378,21 +378,10 @@ fn fail_reason(outcome: &TestFail, color: bool) -> String {
 	}
 }
 
-/// The failure's file path: the filesystem-backed `WsPathBuf` on std (which
-/// resolves a panic location's own file), or the test's raw `source_file` on the
-/// device (where a panic location is never captured).
-#[cfg(feature = "std")]
-fn fail_path(test: &Test, outcome: &TestFail) -> String {
-	outcome.path(test).to_string()
-}
-#[cfg(not(feature = "std"))]
-fn fail_path(test: &Test, _outcome: &TestFail) -> String {
-	test.source_file.to_string()
-}
-
 fn failed_stacktrace(test: &Test, outcome: &TestFail, color: bool) -> String {
 	let prefix = TermStyle::new().dimmed().or_plain(color).paint("at");
-	let path = TermStyle::cyan().or_plain(color).paint(fail_path(test, outcome));
+	let path =
+		TermStyle::cyan().or_plain(color).paint(outcome.path(test).to_string());
 	let start = outcome.start(test);
 	let line_loc = TermStyle::new().dimmed().or_plain(color).paint(format!(
 		":{}:{}",

@@ -312,14 +312,16 @@ impl WorkspaceConfig {
 
 	/// Returns `true` if the path passes the snippet filter.
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
-		self.snippet_filter.passes(path)
+		self.snippet_filter.passes(path.as_ref().to_string_lossy())
 	}
 
 	/// Returns all files in the root directory that pass the snippet filter.
 	pub fn get_files(&self) -> Result<Vec<AbsPathBuf>, FsError> {
 		ReadDir::files_recursive(&self.root_dir.into_abs())?
 			.into_iter()
-			.filter(|path| self.snippet_filter.passes(path))
+			.filter(|path| {
+				self.snippet_filter.passes(path.to_string_lossy())
+			})
 			.map(|path| AbsPathBuf::new(path))
 			.collect()
 	}

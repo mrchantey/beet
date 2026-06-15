@@ -330,7 +330,7 @@ mod test {
 			.cloned()
 			.unwrap()
 			.path()
-			.xpect_eq(WsPathBuf::new("test.md"));
+			.xpect_eq(SmolPath::new("test.md"));
 	}
 
 	#[beet_core::test]
@@ -584,7 +584,7 @@ mod test {
 			.unwrap();
 		// root span should cover entire input
 		span.start().xpect_eq(LineCol::new(1, 0));
-		span.path().xpect_eq(WsPathBuf::new("test.md"));
+		span.path().xpect_eq(SmolPath::new("test.md"));
 	}
 
 	/// Root entity must not receive any content components — only metadata

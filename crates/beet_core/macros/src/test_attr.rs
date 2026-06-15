@@ -154,13 +154,16 @@ pub fn impl_test_attr(
 		}
 	};
 
+	// `alloc`'s `String`, named through the `_alloc` re-export under `testing`.
+	// The macro reaches everything else through `..testing::*`, and that is the
+	// only path that resolves the same across crate/beet_core/beet, in
+	// integration tests, and on the no_std device (where `std::string::String`
+	// is absent and downstream crates have no bare `alloc` in scope).
+	let string_ty = quote! { #beet_core::testing::_alloc::string::String };
+
 	let run_fn = quote! {
 		#[allow(dead_code)]
-		// The return type is named through the `testing` re-export (not `_alloc`
-		// or `std`) so the macro resolves the same way `BeetTestCase` does:
-		// integration tests / downstream crates import `beet_core::testing` but
-		// not `_alloc`, and `std::string::String` is absent on the no_std device.
-		fn #run_ident() -> ::core::result::Result<(), #beet_core::testing::TestError> {
+		fn #run_ident() -> ::core::result::Result<(), #string_ty> {
 			#run_body
 		}
 	};
@@ -204,7 +207,7 @@ pub fn impl_test_attr(
 			#[test]
 			#[allow(dead_code)]
 			#(#func_attrs)*
-			#vis fn #ident() -> ::core::result::Result<(), ::std::string::String> {
+			#vis fn #ident() -> ::core::result::Result<(), #string_ty> {
 				#run_ident()
 			}
 		}

@@ -137,7 +137,7 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 				}
 			};
 			let Some(ev) = DirEvent::new(ev)?
-				.apply_filter(|ev| watcher.filter.passes(&ev.path))
+				.apply_filter(|ev| watcher.filter.passes(ev.path.to_string()))
 			else {
 				// empty after filter
 				continue;

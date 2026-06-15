@@ -115,17 +115,6 @@ pub struct TestDescAndFn {
 	pub testfn: TestFn,
 }
 
-/// The error string a `#[beet_core::test]` run yields on failure: an `alloc`
-/// [`String`].
-///
-/// The `#[beet_core::test]` macro names the generated runner fn's return type
-/// through this `beet_core::testing` re-export rather than `alloc`/`std`
-/// directly: integration tests and downstream crates already `use
-/// beet_core::testing;` (so `crate::testing::*` / `beet::testing::*` resolves),
-/// but do not import `beet_core::_alloc`, and `std::string::String` does not
-/// exist on the no_std device.
-pub type TestError = String;
-
 /// Converts a test's return value into the runner's `Result<(), String>`.
 ///
 /// Mirrors libtest's use of `std::process::Termination` for

@@ -27,11 +27,9 @@ pub struct TestRunnerConfig {
 	pub no_color: bool,
 	/// Suppress all logger output.
 	pub quiet: bool,
-	/// Glob pattern filter for test selection. std-only: glob matching pulls the
-	/// `glob` crate (filesystem-oriented), and the device runs every test, so the
-	/// embedded build omits the field and [`passes_filter`](Self::passes_filter)
-	/// always passes.
-	#[cfg(feature = "std")]
+	/// Glob pattern filter for test selection. Empty by default (every test
+	/// passes); the embedded build can populate it directly since
+	/// [`GlobFilter`] is no_std.
 	pub filter: GlobFilter,
 	/// By default the glob filter wraps all patterns in wildcards,
 	/// so `*foo*` will match `/foo.rs`. Specify `--exact` to disable this.
@@ -55,7 +53,6 @@ impl Default for TestRunnerConfig {
 			log_skipped: false,
 			no_color: false,
 			quiet: false,
-			#[cfg(feature = "std")]
 			filter: GlobFilter::default(),
 			exact: false,
 			ignored: false,
@@ -147,14 +144,8 @@ impl TestRunnerConfig {
 	pub fn timeout(&self) -> Duration { Duration::from_millis(self.timeout_ms) }
 
 	/// Returns true if the given test passes the filter.
-	#[cfg(feature = "std")]
 	pub fn passes_filter(&self, test: &super::Test) -> bool {
 		self.filter.passes(test.name.to_string())
 			|| self.filter.passes(test.source_file)
 	}
-
-	/// The embedded build has no glob filter (it runs every test), so every
-	/// test passes. See the [`filter`](Self::filter) field.
-	#[cfg(not(feature = "std"))]
-	pub fn passes_filter(&self, _test: &super::Test) -> bool { true }
 }

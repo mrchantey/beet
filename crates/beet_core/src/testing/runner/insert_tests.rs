@@ -66,16 +66,11 @@ fn test_fn_bundle(func: TestFn) -> impl Bundle {
 	}
 }
 fn test_desc_bundle(desc: TestDesc) -> impl Bundle {
-	// `FileSpan` is a Component only on std (the no_std span is a plain field in
-	// the outcome types); the device has no consumer for it, so it is omitted.
-	#[cfg(feature = "std")]
 	let span = FileSpan::new(
 		desc.source_file,
 		LineCol::new(desc.start_line as u32, desc.start_col as u32),
 		LineCol::new(desc.end_line as u32, desc.end_col as u32),
 	);
-	#[cfg(not(feature = "std"))]
-	let span = ();
 	(
 		Name::new(desc.name.to_string()),
 		span,

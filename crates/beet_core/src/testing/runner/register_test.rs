@@ -11,7 +11,7 @@
 //! ### Beet tests (`#[beet::test]`)
 //! - Unified registration via `register_test()`
 //! - Registers both `TestCaseParams` AND test future in a single call
-//! - Thread-local storage allows opaque `fn()` from libtest to provide async tests
+//! - Single-cell storage lets an opaque `fn()` from the runner provide async tests
 //! - Params are available before awaiting the future, enabling:
 //!   - Per-test timeout configuration
 //!   - Future extensibility (retries, resource limits, etc.)
@@ -27,7 +27,7 @@
 //! ## How it works
 //!
 //! 1. `#[beet_core::test]` macro generates code calling `register_test(params, async_body)`
-//! 2. Both params and test are stored together in thread-local `REGISTERED_TEST`
+//! 2. Both params and test are stored together in the pending-registration cell
 //! 3. Test runner calls `try_run_async()` which:
 //!    - Invokes the test function (triggering registration)
 //!    - Extracts both params and async test from thread-local
@@ -38,64 +38,88 @@
 use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
-use core::cell::RefCell;
 use core::pin::Pin;
+use registration::has_registration;
+use registration::store_registration;
+use registration::take_registration;
 
-// Registration storage. A test fn invoked synchronously by the runner may call
-// `register_test`, stashing the async body + params for the runner to pick up
-// immediately after. std uses a `thread_local!`; the single-threaded esp-rtos
-// executor uses a `critical_section::Mutex` static instead, which is sound
-// because only the executor ever touches it (no other thread or interrupt does).
+/// Native/wasm pending-registration storage: a `thread_local!` cell. A test fn
+/// invoked synchronously by the runner may call [`register_test`], stashing the
+/// async body + params here for the runner to pick up immediately after.
+///
+/// Discriminated on `std` rather than `testing_embedded`: `thread_local!` is the
+/// std mechanism and `critical_section` is its no_std fallback, so std-gating
+/// stays correct even when both `testing` and `testing_embedded` are enabled
+/// (eg `--all-features`), where the host has no `critical-section` impl to link.
 #[cfg(feature = "std")]
-thread_local! {
-	static REGISTERED_TEST: RefCell<Option<TestRegistration>> = RefCell::new(None);
+mod registration {
+	use super::TestRegistration;
+	use core::cell::RefCell;
+
+	thread_local! {
+		static REGISTERED_TEST: RefCell<Option<TestRegistration>> =
+			RefCell::new(None);
+	}
+
+	/// Stores a pending registration, clobbering any prior one.
+	pub(super) fn store_registration(reg: TestRegistration) {
+		REGISTERED_TEST.with(|cell| *cell.borrow_mut() = Some(reg));
+	}
+
+	/// Takes the pending registration, if any.
+	pub(super) fn take_registration() -> Option<TestRegistration> {
+		REGISTERED_TEST.with(|cell| cell.borrow_mut().take())
+	}
+
+	/// Whether a registration is currently pending.
+	pub(super) fn has_registration() -> bool {
+		REGISTERED_TEST.with(|cell| cell.borrow().is_some())
+	}
 }
 
-// The registration holds a `Pin<Box<dyn AsyncTest>>`, which is neither `Send`
-// nor `Sync`, but a `static` must be `Sync`. The single-threaded esp-rtos
-// executor is the only accessor and every access is inside a critical section,
-// so asserting `Sync` on the wrapper is sound.
+/// Bare-metal pending-registration storage: a `critical_section::Mutex` static.
+/// There is no `thread_local!` in no_std, but the single-threaded esp-rtos
+/// executor is the only accessor and every access is inside a critical section,
+/// so asserting `Sync` on the non-`Sync` `Pin<Box<dyn AsyncTest>>` it holds is
+/// sound (no other thread or interrupt ever touches it).
+///
+/// Only ever compiled under `testing_embedded` (the sole no_std test build), so
+/// the `critical-section` dependency it uses is always present here.
 #[cfg(not(feature = "std"))]
-struct SyncRegistration(
-	critical_section::Mutex<RefCell<Option<TestRegistration>>>,
-);
-#[cfg(not(feature = "std"))]
-unsafe impl Sync for SyncRegistration {}
+mod registration {
+	use super::TestRegistration;
+	use core::cell::RefCell;
 
-#[cfg(not(feature = "std"))]
-static REGISTERED_TEST: SyncRegistration =
-	SyncRegistration(critical_section::Mutex::new(RefCell::new(None)));
+	struct SyncRegistration(
+		critical_section::Mutex<RefCell<Option<TestRegistration>>>,
+	);
+	// SAFETY: only the single-threaded executor accesses the cell, always within
+	// a critical section, so no concurrent access can occur.
+	unsafe impl Sync for SyncRegistration {}
 
-/// Stores a pending registration, clobbering any prior one.
-#[cfg(feature = "std")]
-fn store_registration(reg: TestRegistration) {
-	REGISTERED_TEST.with(|cell| *cell.borrow_mut() = Some(reg));
-}
-#[cfg(not(feature = "std"))]
-fn store_registration(reg: TestRegistration) {
-	critical_section::with(|cs| {
-		*REGISTERED_TEST.0.borrow(cs).borrow_mut() = Some(reg)
-	});
-}
+	static REGISTERED_TEST: SyncRegistration =
+		SyncRegistration(critical_section::Mutex::new(RefCell::new(None)));
 
-/// Takes the pending registration, if any.
-#[cfg(feature = "std")]
-fn take_registration() -> Option<TestRegistration> {
-	REGISTERED_TEST.with(|cell| cell.borrow_mut().take())
-}
-#[cfg(not(feature = "std"))]
-fn take_registration() -> Option<TestRegistration> {
-	critical_section::with(|cs| REGISTERED_TEST.0.borrow(cs).borrow_mut().take())
-}
+	/// Stores a pending registration, clobbering any prior one.
+	pub(super) fn store_registration(reg: TestRegistration) {
+		critical_section::with(|cs| {
+			*REGISTERED_TEST.0.borrow(cs).borrow_mut() = Some(reg)
+		});
+	}
 
-/// Whether a registration is currently pending.
-#[cfg(feature = "std")]
-fn has_registration() -> bool {
-	REGISTERED_TEST.with(|cell| cell.borrow().is_some())
-}
-#[cfg(not(feature = "std"))]
-fn has_registration() -> bool {
-	critical_section::with(|cs| REGISTERED_TEST.0.borrow(cs).borrow().is_some())
+	/// Takes the pending registration, if any.
+	pub(super) fn take_registration() -> Option<TestRegistration> {
+		critical_section::with(|cs| {
+			REGISTERED_TEST.0.borrow(cs).borrow_mut().take()
+		})
+	}
+
+	/// Whether a registration is currently pending.
+	pub(super) fn has_registration() -> bool {
+		critical_section::with(|cs| {
+			REGISTERED_TEST.0.borrow(cs).borrow().is_some()
+		})
+	}
 }
 
 /// Registration data for a test, containing both the test future and params

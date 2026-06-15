@@ -113,7 +113,6 @@ bevy_reflect = { version = "0.19.0-rc.2", default-features = false, features = [
 bitflags = "2"
 thiserror = { version = "2", default-features = false }
 heck = "0.5"
-glob = "0.3"
 dotenv = "0.15"
 send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"

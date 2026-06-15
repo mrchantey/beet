@@ -220,7 +220,7 @@ mod test {
 		let span = lookup.span_of(slice);
 		span.start().xpect_eq(LineCol::new(2, 0));
 		span.end().xpect_eq(LineCol::new(2, 5));
-		span.path().xpect_eq(WsPathBuf::new("test.txt"));
+		span.path().xpect_eq(SmolPath::new("test.txt"));
 	}
 
 	#[beet_core::test]

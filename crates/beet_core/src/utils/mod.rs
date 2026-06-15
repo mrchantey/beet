@@ -8,7 +8,7 @@
 //!
 //! - [`Xtend`] - Method chaining utilities for any type
 //! - [`Tree`] - Simple tree data structure
-//! - [`GlobFilter`] - Glob pattern matching utilities (requires `std`)
+//! - [`GlobFilter`] - Glob pattern matching utilities
 //! # Macros
 //!
 //! - [`cross_log!`](crate::cross_log) - Cross-platform raw output (not for logging, see the macro docs)
@@ -25,7 +25,6 @@ pub mod cross_log;
 /// Display formatting utilities.
 pub mod display_ext;
 mod file_span;
-#[cfg(feature = "std")]
 mod glob_filter;
 mod into_option;
 // LazyPool is built on async_lock (std-only).
@@ -69,7 +68,6 @@ pub use bevy::tasks::BoxedFuture;
 pub use cli_args::*;
 pub use coalescing_trigger::*;
 pub use file_span::*;
-#[cfg(feature = "std")]
 pub use glob_filter::*;
 pub use line_col::*;
 pub use once_value::*;

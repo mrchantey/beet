@@ -140,6 +140,6 @@ mod test {
 			.cloned()
 			.unwrap()
 			.path()
-			.xpect_eq(WsPathBuf::new("foo.txt"));
+			.xpect_eq(SmolPath::new("foo.txt"));
 	}
 }

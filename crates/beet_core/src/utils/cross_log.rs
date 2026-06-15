@@ -1,43 +1,53 @@
-//! Cross-platform logging macros and their native backend helpers.
+//! Cross-platform logging macros and their per-platform backends.
+//!
+//! Each backend routes by platform via [`cfg_if!`](crate::cfg_if): the browser
+//! console on wasm, stdout/stderr on native std, and `tracing` on a bare no_std
+//! target (no stdout, so the message still reaches the platform logger, eg RTT
+//! on the esp32). The `cfg` checks live here in `beet_core`, where `std` is a
+//! declared feature, so they are never evaluated in downstream crates.
 
-/// Internal helper: log a line to native stdout.
-///
-/// The `cfg(feature = "std")` check lives here in `beet_core`, where `std`
-/// is a declared feature, so it is never evaluated in downstream crates. On a
-/// bare no_std target (no stdout) it routes through `tracing` instead, so the
-/// message still reaches the platform's logger (eg RTT on the esp32).
-#[cfg(not(target_arch = "wasm32"))]
+/// Internal helper: log a line.
 #[doc(hidden)]
-pub fn _cross_log_native(msg: &str) {
-	#[cfg(feature = "std")]
-	println!("{}", msg);
-	#[cfg(not(feature = "std"))]
-	tracing::info!("{}", msg);
-}
-
-/// Internal helper: log without a newline to native stdout, flushing after.
-/// no_std has no stdout, so it routes through `tracing` (a record per call).
-#[cfg(not(target_arch = "wasm32"))]
-#[doc(hidden)]
-pub fn _cross_log_native_noline(msg: &str) {
-	#[cfg(feature = "std")]
-	{
-		print!("{}", msg);
-		use std::io::Write;
-		std::io::stdout().flush().unwrap();
+pub fn _cross_log(msg: &str) {
+	crate::cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			crate::exports::web_sys::console::log_1(&msg.into());
+		} else if #[cfg(feature = "std")] {
+			println!("{msg}");
+		} else {
+			tracing::info!("{msg}");
+		}
 	}
-	#[cfg(not(feature = "std"))]
-	tracing::info!("{}", msg);
 }
 
-/// Internal helper: log a line to native stderr.
-#[cfg(not(target_arch = "wasm32"))]
+/// Internal helper: log without a trailing newline, flushing after.
 #[doc(hidden)]
-pub fn _cross_log_error_native(msg: &str) {
-	#[cfg(feature = "std")]
-	eprintln!("{}", msg);
-	#[cfg(not(feature = "std"))]
-	tracing::error!("{}", msg);
+pub fn _cross_log_noline(msg: &str) {
+	crate::cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			crate::exports::web_sys::console::log_1(&msg.into());
+		} else if #[cfg(feature = "std")] {
+			use std::io::Write;
+			print!("{msg}");
+			std::io::stdout().flush().unwrap();
+		} else {
+			tracing::info!("{msg}");
+		}
+	}
+}
+
+/// Internal helper: log a line to the error stream.
+#[doc(hidden)]
+pub fn _cross_log_error(msg: &str) {
+	crate::cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			crate::exports::web_sys::console::error_1(&msg.into());
+		} else if #[cfg(feature = "std")] {
+			eprintln!("{msg}");
+		} else {
+			tracing::error!("{msg}");
+		}
+	}
 }
 
 /// Cross-platform raw output without a trailing newline.
@@ -49,17 +59,12 @@ pub fn _cross_log_error_native(msg: &str) {
 ///
 /// - **wasm32**: writes to `console.log`
 /// - **native + std**: prints to stdout and flushes
-/// - **native + no_std**: no-op
+/// - **native + no_std**: records via `tracing`
 #[macro_export]
 macro_rules! cross_log_noline {
-    ($($t:tt)*) => ({
-      #[cfg(target_arch = "wasm32")]
-      $crate::exports::web_sys::console::log_1(
-          &($crate::_alloc::format!($($t)*).into())
-      );
-      #[cfg(not(target_arch = "wasm32"))]
-      $crate::_cross_log_native_noline(&$crate::_alloc::format!($($t)*));
-    })
+	($($t:tt)*) => {
+		$crate::_cross_log_noline(&$crate::_alloc::format!($($t)*))
+	};
 }
 
 /// Cross-platform raw output with a trailing newline.
@@ -71,34 +76,24 @@ macro_rules! cross_log_noline {
 ///
 /// - **wasm32**: writes to `console.log`
 /// - **native + std**: prints to stdout
-/// - **native + no_std**: no-op
+/// - **native + no_std**: records via `tracing`
 #[macro_export]
 macro_rules! cross_log {
-    ($($t:tt)*) => ({
-      #[cfg(target_arch = "wasm32")]
-      $crate::exports::web_sys::console::log_1(
-          &($crate::_alloc::format!($($t)*).into())
-      );
-      #[cfg(not(target_arch = "wasm32"))]
-      $crate::_cross_log_native(&$crate::_alloc::format!($($t)*));
-    })
+	($($t:tt)*) => {
+		$crate::_cross_log(&$crate::_alloc::format!($($t)*))
+	};
 }
 
 /// Cross-platform error logging with a trailing newline.
 ///
 /// - **wasm32**: writes to `console.error`
 /// - **native + std**: prints to stderr
-/// - **native + no_std**: no-op
+/// - **native + no_std**: records via `tracing`
 #[macro_export]
 macro_rules! cross_log_error {
-    ($($t:tt)*) => ({
-      #[cfg(target_arch = "wasm32")]
-      $crate::exports::web_sys::console::error_1(
-          &($crate::_alloc::format!($($t)*).into())
-      );
-      #[cfg(not(target_arch = "wasm32"))]
-      $crate::_cross_log_error_native(&$crate::_alloc::format!($($t)*));
-    })
+	($($t:tt)*) => {
+		$crate::_cross_log_error(&$crate::_alloc::format!($($t)*))
+	};
 }
 
 /// Logs the current source location, ie `file!():line!():column!()`.

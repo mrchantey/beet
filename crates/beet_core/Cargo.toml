@@ -100,7 +100,6 @@ std = [
 	"dep:dotenv",
 	"dep:async-lock",
 	"dep:pathdiff",
-	"dep:glob",
 	"dep:futures",
 	"dep:async-channel",
 	"dep:async-executor",
@@ -278,7 +277,6 @@ uuid = { workspace = true, optional = true, features = ["v4", "v7", "js"] }
 ## utils
 thiserror.workspace = true
 extend.workspace = true
-glob = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
 
 

@@ -1,8 +1,14 @@
-//! Glob-based path filtering.
+//! Glob-based string filtering.
 //!
-//! This module provides [`GlobFilter`], a type for filtering paths using
-//! include and exclude glob patterns. It's commonly used for file watching
-//! and path matching operations.
+//! This module provides [`GlobFilter`], a type for filtering strings (paths,
+//! test names, ..) using include and exclude glob patterns. It is commonly used
+//! for file watching and path matching.
+//!
+//! Matching is backed by a small vendored glob engine ([`glob_match`]) rather
+//! than the `glob` crate, so it needs no filesystem and compiles on no_std.
+//! Patterns are matched against the whole string, so `*` and `?` cross `/`
+//! (the `glob` crate's `require_literal_separator = false`); `\` in the input is
+//! normalized to `/` first so a `/`-pattern matches a `\`-path.
 //!
 //! # Example
 //!
@@ -16,36 +22,35 @@
 //! assert!(!filter.passes("target/debug/lib.rs"));
 //! ```
 
-use bevy::prelude::*;
-use std::path::Path;
+use crate::prelude::*;
 
-/// A glob-based path filter with include and exclude patterns.
+/// A glob-based string filter with include and exclude patterns.
 ///
-/// To pass a path must:
+/// To pass a string must:
 /// 1. Not match any exclude patterns
 /// 2. Match at least one include pattern (or include patterns are empty)
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobFilter {
-	/// Glob patterns for paths to include. Leave empty to include all.
+	/// Glob patterns to include. Leave empty to include all.
 	include: Vec<GlobPattern>,
-	/// Glob patterns for paths to exclude.
+	/// Glob patterns to exclude.
 	exclude: Vec<GlobPattern>,
 }
 
-impl std::fmt::Display for GlobFilter {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for GlobFilter {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		let include = self
 			.include
 			.iter()
-			.map(|p| p.as_str())
+			.map(|pattern| pattern.as_str())
 			.collect::<Vec<_>>()
 			.join(", ");
 		let exclude = self
 			.exclude
 			.iter()
-			.map(|p| p.as_str())
+			.map(|pattern| pattern.as_str())
 			.collect::<Vec<_>>()
 			.join(", ");
 		write!(f, "include: {}\nexclude: {}", include, exclude)
@@ -56,26 +61,24 @@ impl GlobFilter {
 	/// Parses and validates a glob pattern string.
 	///
 	/// For use by clap parsers to verify a pattern before inserting.
-	pub fn parse_glob_pattern(s: &str) -> Result<String, String> {
-		// Validate it's a valid pattern
-		glob::Pattern::new(s)
-			.map_err(|e| format!("Invalid glob pattern: {}", e))?;
-		Ok(s.to_string())
+	pub fn parse_glob_pattern(pattern: &str) -> Result<String, String> {
+		validate_glob(pattern)?;
+		Ok(pattern.to_string())
 	}
 
 	/// Wraps each pattern with wildcards if they don't already have them.
 	///
-	/// Turns `foo/bar` into `*foo/bar*` which matches any path that contains `foo/bar`.
+	/// Turns `foo/bar` into `*foo/bar*` which matches any string that contains `foo/bar`.
 	pub fn wrap_all_with_wildcard(&mut self) -> &mut Self {
 		self.include = self
 			.include
 			.iter()
-			.map(|p| Self::wrap_pattern_with_wildcard(p.as_str()))
+			.map(|pattern| Self::wrap_pattern_with_wildcard(pattern.as_str()))
 			.collect();
 		self.exclude = self
 			.exclude
 			.iter()
-			.map(|p| Self::wrap_pattern_with_wildcard(p.as_str()))
+			.map(|pattern| Self::wrap_pattern_with_wildcard(pattern.as_str()))
 			.collect();
 		self
 	}
@@ -84,23 +87,24 @@ impl GlobFilter {
 		let starts = pattern.starts_with('*');
 		let ends = pattern.ends_with('*');
 		let wrapped = match (starts, ends) {
-			(true, true) => pattern.to_string(),
+			(true, true) => pattern.into(),
 			(true, false) => format!("{pattern}*"),
 			(false, true) => format!("*{pattern}"),
 			(false, false) => format!("*{pattern}*"),
 		};
-		GlobPattern(wrapped)
+		// Wrapping an already-valid pattern in `*` keeps it valid.
+		GlobPattern(wrapped.into())
 	}
 
 	/// Sets the include patterns, replacing any existing ones.
 	pub fn set_include(mut self, items: Vec<&str>) -> Self {
-		self.include = items.iter().map(|w| GlobPattern::new(w)).collect();
+		self.include = items.iter().map(|item| GlobPattern::new(item)).collect();
 		self
 	}
 
 	/// Sets the exclude patterns, replacing any existing ones.
 	pub fn set_exclude(mut self, items: Vec<&str>) -> Self {
-		self.exclude = items.iter().map(|i| GlobPattern::new(i)).collect();
+		self.exclude = items.iter().map(|item| GlobPattern::new(item)).collect();
 		self
 	}
 
@@ -109,8 +113,9 @@ impl GlobFilter {
 		mut self,
 		items: impl IntoIterator<Item = T>,
 	) -> Self {
-		self.include
-			.extend(items.into_iter().map(|w| GlobPattern::new(w.as_ref())));
+		self.include.extend(
+			items.into_iter().map(|item| GlobPattern::new(item.as_ref())),
+		);
 		self
 	}
 
@@ -119,8 +124,9 @@ impl GlobFilter {
 		mut self,
 		items: impl IntoIterator<Item = T>,
 	) -> Self {
-		self.exclude
-			.extend(items.into_iter().map(|w| GlobPattern::new(w.as_ref())));
+		self.exclude.extend(
+			items.into_iter().map(|item| GlobPattern::new(item.as_ref())),
+		);
 		self
 	}
 
@@ -153,108 +159,227 @@ impl GlobFilter {
 		self.include.is_empty() && self.exclude.is_empty()
 	}
 
-	/// Checks if a path passes the filter.
+	/// Checks if a string passes the filter.
 	///
-	/// To pass a path must:
-	/// 1. Not be present in the exclude patterns
-	/// 2. Be present in the include patterns or the include patterns are empty
-	///
-	/// Currently converts paths to strings with forward slashes.
-	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
-		self.passes_include(&path) && self.passes_exclude(&path)
+	/// To pass a string must:
+	/// 1. Not match any exclude pattern
+	/// 2. Match an include pattern, or the include patterns are empty
+	pub fn passes(&self, text: impl AsRef<str>) -> bool {
+		let text = text.as_ref();
+		self.passes_include(text) && self.passes_exclude(text)
 	}
 
-	/// Checks if a path passes the include filter.
-	pub fn passes_include(&self, path: impl AsRef<Path>) -> bool {
+	/// Checks if a string passes the include filter.
+	pub fn passes_include(&self, text: impl AsRef<str>) -> bool {
+		let text = text.as_ref();
 		self.include.is_empty()
-			|| self
-				.include
-				.iter()
-				.any(|watch| watch.matches_path(path.as_ref()))
+			|| self.include.iter().any(|pattern| pattern.matches(text))
 	}
 
-	/// Checks if a path passes the exclude filter.
-	pub fn passes_exclude(&self, path: impl AsRef<Path>) -> bool {
-		!self
-			.exclude
-			.iter()
-			.any(|watch| watch.matches_path(path.as_ref()))
+	/// Checks if a string passes the exclude filter.
+	pub fn passes_exclude(&self, text: impl AsRef<str>) -> bool {
+		let text = text.as_ref();
+		!self.exclude.iter().any(|pattern| pattern.matches(text))
 	}
 }
 
 
-/// A validated glob pattern that stores the pattern as a String.
+/// A validated glob pattern, stored as a [`SmolStr`] for cheap clones.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GlobPattern(String);
+pub struct GlobPattern(SmolStr);
 
 impl GlobPattern {
-	/// Creates a new [`GlobPattern`], validating it's a valid glob pattern.
+	/// Creates a new [`GlobPattern`], validating it is a valid glob pattern.
 	///
 	/// # Panics
 	///
 	/// Panics if the pattern is invalid.
 	pub fn new(pattern: &str) -> Self {
-		// Validate it's a valid pattern
-		glob::Pattern::new(pattern).expect("Invalid glob pattern");
-		Self(pattern.to_string())
+		validate_glob(pattern).expect("Invalid glob pattern");
+		Self(pattern.into())
 	}
 
 	/// Returns the pattern as a string slice.
 	pub fn as_str(&self) -> &str { &self.0 }
 
-	/// Converts to a [`glob::Pattern`].
-	///
-	/// # Panics
-	///
-	/// Panics if the stored pattern is invalid (should never happen).
-	pub fn to_pattern(&self) -> glob::Pattern {
-		glob::Pattern::new(&self.0)
-			.expect("Invalid glob pattern stored in GlobPattern")
-	}
-
-	/// Creates a [`GlobPattern`] from a [`glob::Pattern`].
-	pub fn from_pattern(pattern: &glob::Pattern) -> Self {
-		Self(pattern.as_str().to_string())
-	}
-
 	/// Checks if the pattern matches the given text.
+	///
+	/// `\` in `text` is normalized to `/` first, so a `/`-pattern matches a
+	/// `\`-path (mirroring the `glob` crate's `matches_path`).
 	pub fn matches(&self, text: &str) -> bool {
-		self.to_pattern().matches(text)
-	}
-
-	/// Checks if the pattern matches the given path.
-	pub fn matches_path(&self, path: impl AsRef<Path>) -> bool {
-		self.to_pattern().matches_path(path.as_ref())
+		if text.contains('\\') {
+			glob_match(&self.0, &text.replace('\\', "/"))
+		} else {
+			glob_match(&self.0, text)
+		}
 	}
 }
 
-impl std::fmt::Display for GlobPattern {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for GlobPattern {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}", self.0)
 	}
 }
 
 impl From<String> for GlobPattern {
-	fn from(s: String) -> Self {
-		glob::Pattern::new(&s).expect("Invalid glob pattern");
-		Self(s)
-	}
+	fn from(pattern: String) -> Self { Self::new(&pattern) }
 }
 
 impl From<&str> for GlobPattern {
-	fn from(s: &str) -> Self { Self::new(s) }
+	fn from(pattern: &str) -> Self { Self::new(pattern) }
+}
+
+/// Matches `text` against a glob `pattern`.
+///
+/// Supports `*` (any run, including `/`), `?` (any single char) and `[..]`
+/// character classes (with `!` negation and `a-z` ranges). `**` is accepted and
+/// behaves as `*` (patterns match the whole string, so `*` already crosses path
+/// separators). Brace alternation `{a,b}` is *not* expanded, `{` matches
+/// literally, mirroring `glob::Pattern`.
+fn glob_match(pattern: &str, text: &str) -> bool {
+	let pat: Vec<char> = pattern.chars().collect();
+	let txt: Vec<char> = text.chars().collect();
+	let mut pi = 0;
+	let mut ti = 0;
+	// the last `*` seen: (pattern index after the star, text index it absorbs from)
+	let mut star: Option<(usize, usize)> = None;
+	while ti < txt.len() {
+		let advanced = match pat.get(pi) {
+			Some('*') => {
+				// collapse a run of stars (handles `**`)
+				while pat.get(pi) == Some(&'*') {
+					pi += 1;
+				}
+				star = Some((pi, ti));
+				true
+			}
+			Some('?') => {
+				pi += 1;
+				ti += 1;
+				true
+			}
+			Some('[') => match class_matches(&pat, pi, txt[ti]) {
+				Some((true, next)) => {
+					pi = next;
+					ti += 1;
+					true
+				}
+				// class parsed but the char is not in it
+				Some((false, _)) => false,
+				// unterminated `[`, treat it as a literal
+				None if txt[ti] == '[' => {
+					pi += 1;
+					ti += 1;
+					true
+				}
+				None => false,
+			},
+			Some(&pat_char) if pat_char == txt[ti] => {
+				pi += 1;
+				ti += 1;
+				true
+			}
+			_ => false,
+		};
+		if advanced {
+			continue;
+		}
+		// mismatch: backtrack to the last `*`, letting it absorb one more char
+		match star {
+			Some((star_pi, star_ti)) => {
+				pi = star_pi;
+				ti = star_ti + 1;
+				star = Some((star_pi, star_ti + 1));
+			}
+			None => return false,
+		}
+	}
+	// any remaining pattern must be only stars
+	while pat.get(pi) == Some(&'*') {
+		pi += 1;
+	}
+	pi == pat.len()
+}
+
+/// Tests `ch` against a `[..]` class starting at `pat[start] == '['`.
+///
+/// Returns `(matched, index_just_after_the_closing_bracket)`, or [`None`] if the
+/// class is unterminated (the caller then treats `[` as a literal).
+fn class_matches(pat: &[char], start: usize, ch: char) -> Option<(bool, usize)> {
+	let mut idx = start + 1;
+	let negated = pat.get(idx) == Some(&'!');
+	if negated {
+		idx += 1;
+	}
+	let mut matched = false;
+	// a `]` is a literal when it is the very first class member
+	let mut first = true;
+	while idx < pat.len() {
+		if pat[idx] == ']' && !first {
+			return Some((matched ^ negated, idx + 1));
+		}
+		first = false;
+		// range `a-z`: a `-` flanked by two chars, the `-` not being the closer
+		if idx + 2 < pat.len() && pat[idx + 1] == '-' && pat[idx + 2] != ']' {
+			if ch >= pat[idx] && ch <= pat[idx + 2] {
+				matched = true;
+			}
+			idx += 3;
+		} else {
+			if pat[idx] == ch {
+				matched = true;
+			}
+			idx += 1;
+		}
+	}
+	None
+}
+
+/// Validates a glob pattern, the only structural requirement being that every
+/// `[` character class is terminated by a `]`.
+fn validate_glob(pattern: &str) -> Result<(), String> {
+	let chars: Vec<char> = pattern.chars().collect();
+	let mut idx = 0;
+	while idx < chars.len() {
+		if chars[idx] != '[' {
+			idx += 1;
+			continue;
+		}
+		// scan for the terminator, allowing a leading `!` and a literal first `]`
+		let mut end = idx + 1;
+		if chars.get(end) == Some(&'!') {
+			end += 1;
+		}
+		let mut first = true;
+		let closed = loop {
+			match chars.get(end) {
+				Some(']') if !first => break true,
+				Some(_) => {
+					first = false;
+					end += 1;
+				}
+				None => break false,
+			}
+		};
+		if !closed {
+			return Err(format!(
+				"unterminated character class in glob pattern: {pattern}"
+			));
+		}
+		idx = end + 1;
+	}
+	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use glob::Pattern;
 
 	#[crate::test]
 	fn pattern() {
-		let pat = Pattern::new("*target*").unwrap();
+		let pat = GlobPattern::new("*target*");
 		pat.matches("foo").xpect_false();
 		pat.matches("target").xpect_true();
 		pat.matches("foo/target/foo").xpect_true();
@@ -264,9 +389,30 @@ mod test {
 	fn glob_pattern_new() {
 		let gp = GlobPattern::new("*foo*");
 		gp.as_str().xpect_eq("*foo*");
-		gp.to_pattern().matches("foo").xpect_true();
-		gp.to_pattern().matches("bar/foo/baz").xpect_true();
+		gp.matches("foo").xpect_true();
+		gp.matches("bar/foo/baz").xpect_true();
 	}
+
+	#[crate::test]
+	fn wildcards_and_classes() {
+		// `?` matches a single char
+		GlobPattern::new("f?o").matches("foo").xpect_true();
+		GlobPattern::new("f?o").matches("fooo").xpect_false();
+		// character classes, ranges and negation
+		GlobPattern::new("[abc]").matches("b").xpect_true();
+		GlobPattern::new("[a-c]*").matches("cat").xpect_true();
+		GlobPattern::new("[!a-c]*").matches("cat").xpect_false();
+		GlobPattern::new("file.[ch]").matches("file.c").xpect_true();
+		// `**` behaves as `*`
+		GlobPattern::new("**/*.rs").matches("a/b/c.rs").xpect_true();
+		// `{}` is literal, not expanded
+		GlobPattern::new("{a,b}/*").matches("a/x").xpect_false();
+		GlobPattern::new("{a,b}/*").matches("{a,b}/x").xpect_true();
+	}
+
+	#[crate::test]
+	#[should_panic]
+	fn rejects_unterminated_class() { GlobPattern::new("[abc"); }
 
 	#[crate::test]
 	fn passes() {

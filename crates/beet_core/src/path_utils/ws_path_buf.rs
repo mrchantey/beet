@@ -131,6 +131,12 @@ impl Into<WsPathBuf> for PathBuf {
 impl Into<AbsPathBuf> for WsPathBuf {
 	fn into(self) -> AbsPathBuf { self.into_abs() }
 }
+impl From<WsPathBuf> for SmolPath {
+	fn from(value: WsPathBuf) -> Self { Self::from(value.take()) }
+}
+impl From<&WsPathBuf> for SmolPath {
+	fn from(value: &WsPathBuf) -> Self { Self::from(value.as_path()) }
+}
 
 
 #[cfg(test)]
