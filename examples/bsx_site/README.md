@@ -64,3 +64,13 @@ All interpolation is reactive and source-prefixed with `@` (the canonical gramma
 HTML responses render with the bindings settled, while live targets (the terminal today) keep syncing them continuously.
 
 The same site renders on the web (a full HTML document), in the terminal (charcell with the same style rules), and exports statically, all through the standard router pipeline.
+
+## One counter, three targets
+
+`routes/counter.bsx` is a single no-code page that runs on every target, unchanged:
+
+- **Terminal (in-process):** `beet serve examples/bsx_site --server=tui` drives the same `@doc:count` and verbs natively through the document sync, the count repainting in charcell on each click.
+- **Web (the JS runtime):** `beet serve examples/bsx_site --server=http` renders the page in the reactive wire format and ships `<ReactivityScript/>`, a small dependency-free JavaScript signal runtime (no WASM). It hydrates from a serialized document blob and runs the same verbs in the browser, mutating the client document and patching the bound text with no network round-trip and no re-render flash.
+- **Static export:** `beet export-static examples/bsx_site` writes the page with its bindings settled to the initial state. Static export is non-reactive: it emits no blob and no runtime, just the correct first paint.
+
+The web runtime is pure enhancement layered on correct SSR: the `@doc:`/`@prop:` document is a clean subset of the Rust document-sync semantics, never a parallel reimplementation. `@res`/`@comp` (resources, components, reflect) stay server-rendered, the down-the-track WASM concern.

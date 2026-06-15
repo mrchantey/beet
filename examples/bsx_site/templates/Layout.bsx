@@ -13,6 +13,7 @@ binding pulls straight from the PackageConfig resource.
 		<Stylesheet/>
 		<ColorSchemeScript/>
 		<LiveReloadScript/>
+		<ReactivityScript/>
 	</RouteHead>
 	<body>
 		<Header>

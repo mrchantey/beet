@@ -256,6 +256,15 @@ fn modify_scratch(
 	}
 }
 
+/// Records the [`EventBinding`]s installed on an entity so a reactive renderer
+/// can re-emit them as `bx:<event>` attributes for the thin client.
+///
+/// Pure server-side render state: it drives no behavior itself (the installed
+/// observers do). The thin client reads the emitted `bx:<event>` attributes and
+/// runs the matching JS verb, the browser twin of the native trigger.
+#[derive(Debug, Default, Clone, Component)]
+pub struct EventBindings(pub Vec<EventBinding>);
+
 /// An event installer: wires the trigger (typically an observer) onto `entity`,
 /// running the named verb with its arguments when the trigger fires.
 ///
@@ -289,11 +298,20 @@ impl EventRegistry {
 	}
 }
 
-/// A registered verb: its argument [`VerbSchema`] paired with the [`VerbFn`].
+/// A registered verb: its argument [`VerbSchema`] paired with the [`VerbFn`] and,
+/// optionally, the source of its JavaScript twin for the thin client.
+///
+/// The `js_verb` is the body of a `(entity, args) => { .. }` handler (referencing
+/// `entity` and `args`), co-located with the Rust verb so registering one without
+/// the other is a deliberate choice, not an oversight. The default verb set keeps
+/// it `None` (the JS runtime hand-writes those four); an app verb supplies its JS
+/// twin here and the reactive renderer emits it into the page. See the
+/// `web-reactivity` plan's "hand-written JS twins, no codegen" decision.
 #[derive(Clone)]
 struct RegisteredVerb {
 	schema: VerbSchema,
 	verb: VerbFn,
+	js_verb: Option<String>,
 }
 
 /// The verb seam: verb name -> a [`VerbSchema`] + [`VerbFn`]. Empty by default;
@@ -304,11 +322,18 @@ pub struct VerbRegistry {
 }
 
 impl VerbRegistry {
-	/// Register a verb by name with its argument schema and handler.
+	/// Register a verb by name with its argument schema, JavaScript twin, and
+	/// handler.
+	///
+	/// `js_verb` is the body of the matching `(entity, args) => { .. }` thin-client
+	/// handler, or `None` for a server-only verb (and for the default set, whose
+	/// twins the JS runtime hand-writes). It rides alongside the Rust verb so the
+	/// two are registered together.
 	pub fn insert(
 		&mut self,
 		name: impl Into<SmolStr>,
 		schema: VerbSchema,
+		js_verb: Option<&str>,
 		verb: impl Fn(&mut EntityWorldMut, &VerbArgs) + Send + Sync + 'static,
 	) {
 		self.verbs.insert(
@@ -316,6 +341,7 @@ impl VerbRegistry {
 			RegisteredVerb {
 				schema,
 				verb: Arc::new(verb),
+				js_verb: js_verb.map(Into::into),
 			},
 		);
 	}
@@ -328,6 +354,21 @@ impl VerbRegistry {
 	/// The handler of a registered verb.
 	pub fn get(&self, name: &str) -> Option<VerbFn> {
 		self.verbs.get(name).map(|registered| registered.verb.clone())
+	}
+
+	/// Every registered verb that ships a JavaScript twin, as `(name, js source)`
+	/// pairs, for the reactive renderer to emit into the page. Verbs with no
+	/// `js_verb` (the default set, server-only verbs) are omitted.
+	pub fn js_verbs(&self) -> Vec<(SmolStr, String)> {
+		self.verbs
+			.iter()
+			.filter_map(|(name, registered)| {
+				registered
+					.js_verb
+					.clone()
+					.map(|source| (name.clone(), source))
+			})
+			.collect()
 	}
 }
 
@@ -471,9 +512,12 @@ fn type_check_literal(schema: &ValueSchema, literal: &DataLiteral) -> Option<Str
 		.map(|error| error.message.to_string())
 }
 
-/// The plain [`Value`] of a literal for verification, or `None` for a non-literal
-/// (an entity ref carries no inline value).
-fn literal_value(literal: &DataLiteral) -> Option<Value> {
+/// The plain [`Value`] of a literal, or `None` for a non-literal (an entity ref
+/// carries no inline value).
+///
+/// Used both for build-time verification and by the reactive renderer to
+/// serialize a literal verb argument into the emitted `bx:<event>` attribute.
+pub fn literal_value(literal: &DataLiteral) -> Option<Value> {
 	match literal {
 		DataLiteral::Scalar(value) => Some(value.clone()),
 		DataLiteral::List(items) => items
@@ -605,6 +649,12 @@ pub fn install_event(
 ) -> Result<()> {
 	let args = resolve_args(entity, binding, selector_target)?;
 
+	// record the binding so a reactive renderer can re-emit it verbatim as a
+	// `bx:<event>` attribute, the thin client's trigger.
+	let mut bindings = entity.get::<EventBindings>().cloned().unwrap_or_default();
+	bindings.0.push(binding.clone());
+	entity.insert(bindings);
+
 	let installer = entity.world_scope(|world| {
 		world
 			.get_resource::<EventRegistry>()
@@ -642,6 +692,7 @@ mod test {
 		world.resource_mut::<VerbRegistry>().insert(
 			"increment",
 			VerbSchema::new().binding("field"),
+			None,
 			|entity: &mut EntityWorldMut, args: &VerbArgs| {
 				if let Some(field) = args.field("field") {
 					field
@@ -707,6 +758,7 @@ mod test {
 		world.resource_mut::<VerbRegistry>().insert(
 			"increment",
 			schema,
+			None,
 			|_, _| {},
 		);
 		let mut entity = world.spawn_empty();
@@ -726,6 +778,7 @@ mod test {
 		world.resource_mut::<VerbRegistry>().insert(
 			"mark",
 			VerbSchema::new(),
+			None,
 			|entity: &mut EntityWorldMut, _: &VerbArgs| {
 				entity.insert(DocumentScope {
 					path: FieldPath::new(["marked"]),

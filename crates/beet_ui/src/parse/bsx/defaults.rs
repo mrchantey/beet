@@ -59,11 +59,14 @@ fn register_default_events(world: &mut World) {
 fn register_default_verbs(world: &mut World) {
 	let mut verbs = world.resource_mut::<VerbRegistry>();
 	// `increment{ field, amount: i64 = 1 }`: add `amount` to the bound field.
+	// `js_verb` is `None`: the thin-client runtime hand-writes the four default
+	// twins (see the `web-reactivity` plan), so they need no per-page emission.
 	verbs.insert(
 		"increment",
 		VerbSchema::new()
 			.binding("field")
 			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
+		None,
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let amount = args
 				.value("amount")
@@ -80,6 +83,7 @@ fn register_default_verbs(world: &mut World) {
 		VerbSchema::new()
 			.binding("field")
 			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
+		None,
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let amount = args
 				.value("amount")
@@ -94,6 +98,7 @@ fn register_default_verbs(world: &mut World) {
 	verbs.insert(
 		"toggle",
 		VerbSchema::new().binding("field"),
+		None,
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			update_field(entity, args, |value| {
 				*value = Value::Bool(!matches!(value, Value::Bool(true)))
@@ -104,6 +109,7 @@ fn register_default_verbs(world: &mut World) {
 	verbs.insert(
 		"set",
 		VerbSchema::new().binding("field").value("value", ValueSchema::Any),
+		None,
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let Some(new_value) = args.value("value").cloned() else {
 				return;

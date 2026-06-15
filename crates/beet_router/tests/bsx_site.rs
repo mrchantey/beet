@@ -20,7 +20,9 @@ the package resource patched from markup -->
 
 const LAYOUT_BSX: &str = r#"
 <html lang="en">
-	<RouteHead/>
+	<RouteHead>
+		<ReactivityScript/>
+	</RouteHead>
 	<body>
 		<RouteSidebar/>
 		<main><Slot/></main>
@@ -209,6 +211,35 @@ async fn bindings_render_in_route_pipeline() {
 		.xpect_contains("<button>More</button>");
 	// exactly one og:site_name: the default head owns it, no duplicate.
 	html.matches("og:site_name").count().xpect_eq(1);
+}
+
+/// While serving (a live server inserts [`KeepAlive`]), the counter page is
+/// emitted in the reactive wire format: the SSR value is correct (no flash), the
+/// bound run is wrapped in anchors, the document blob and event verbs are
+/// emitted, and the `<ReactivityScript/>` runtime ships. This is the Stream 3
+/// gate; the in-browser proof is the Playwright check (Stream 4).
+#[beet_core::test]
+async fn served_counter_is_reactive() {
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
+	// stand in for a running HTTP server, the signal `default_renderer` gates on.
+	world.insert_resource(KeepAlive);
+	let root = spawn_site(&mut world);
+	let html = get(&mut world, root, "counter").await;
+	html.as_str()
+		// the document subtree is marked, and the bound run wrapped in anchors with
+		// the SSR value between them (correct first paint, no client overwrite).
+		.xpect_contains("data-bx-doc=")
+		.xpect_contains(
+			"You have clicked <!--bx-ref=\"counter.count\"-->0<!--bx-end--> times.",
+		)
+		// the event verb is re-emitted with its `@doc` arg resolved to an absolute
+		// path, so the client needs no scope walk.
+		.xpect_contains("bx:click=\"increment{ field: @doc:counter.count }\"")
+		// the hydration blob carries the initial state, keyed by document id.
+		.xpect_contains("data-bx-blob")
+		.xpect_contains("\"count\":0")
+		// the runtime ships (the `<ReactivityScript/>` widget, active while serving).
+		.xpect_contains("EntityMut");
 }
 
 /// Regression: when a host root carries its own command [`RouteTree`] (eg the

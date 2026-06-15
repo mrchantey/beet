@@ -15,6 +15,9 @@ mod route_codegen;
 #[cfg(feature = "std")]
 mod media;
 mod navigate;
+// the thin-client reactivity runtime widget; needs the `#[template]` machinery.
+#[cfg(feature = "std")]
+mod reactivity;
 mod router;
 // every scene-management module needs `template_serde` (load/save a scene through it).
 #[cfg(feature = "template_serde")]
@@ -32,6 +35,8 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::media::*;
 	pub use crate::navigate::*;
+	#[cfg(feature = "std")]
+	pub use crate::reactivity::*;
 	#[cfg(all(feature = "codegen", feature = "std"))]
 	pub use crate::route_codegen::*;
 	pub use crate::router::*;

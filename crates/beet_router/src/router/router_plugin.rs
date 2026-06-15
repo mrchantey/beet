@@ -81,7 +81,10 @@ impl Plugin for RouterPlugin {
 				// route-aware head/sidebar widgets.
 				.register_type::<BsxLayout>()
 				.register_template::<RouteHead>()
-				.register_template::<RouteSidebar>();
+				.register_template::<RouteSidebar>()
+				// the thin-client reactivity runtime widget, used in a layout head
+				// beside `<LiveReloadScript/>`; renders only while serving.
+				.register_template::<ReactivityScript>();
 			#[cfg(not(target_arch = "wasm32"))]
 			app.register_type::<RoutesDir>()
 				.add_observer(spawn_routes_dir);

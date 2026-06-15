@@ -20,8 +20,18 @@ pub async fn default_renderer(
 			let id = entity.id();
 			let world = entity.into_world_mut();
 
+			// a long-running server (HTTP serve) renders HTML reactively, emitting
+			// the thin-client wire format; a one-shot render or static export
+			// (no `KeepAlive`) stays clean, so the static output is unchanged.
+			let mut renderer = if world.contains_resource::<KeepAlive>() {
+				MediaRenderer::default()
+					.with_html_renderer(HtmlRenderer::new().reactive())
+			} else {
+				MediaRenderer::default()
+			};
+
 			let mut cx = RenderContext::new(id, world).with_accepts(accepts);
-			let bytes = MediaRenderer::default().render(&mut cx)?;
+			let bytes = renderer.render(&mut cx)?;
 			Response::ok().with_media(bytes).xok()
 		})
 		.await

@@ -28,6 +28,11 @@ pub struct HtmlRenderer {
 	raw_text_elements: Vec<Cow<'static, str>>,
 	/// Tracks whether we are currently inside a raw text element.
 	in_raw_text_element: bool,
+	/// When set, the renderer also emits the thin-client reactivity wire format
+	/// (see [`reactive`](super::reactive)); the resolved text is unchanged, so a
+	/// non-reactive page is byte-identical.
+	#[cfg(all(feature = "bsx", feature = "json"))]
+	reactive: Option<super::reactive::Reactive>,
 }
 
 /// Indentation style for pretty-printing.
@@ -66,12 +71,24 @@ impl HtmlRenderer {
 			escape_html: true,
 			raw_text_elements: default_raw_text_elements(),
 			in_raw_text_element: false,
+			#[cfg(all(feature = "bsx", feature = "json"))]
+			reactive: None,
 		}
 	}
 
 	/// Enable pretty-printing with the default indentation (one tab).
 	pub fn pretty(mut self) -> Self {
 		self.indent = Some(Indent::default());
+		self
+	}
+
+	/// Emit the thin-client reactivity wire format alongside the resolved HTML:
+	/// `data-bx-doc`/`data-bx-attr`/`bx:<event>` annotations, `<!--bx-ref-->` text
+	/// anchors, and the document/verb blobs. The resolved text is unchanged, so a
+	/// page with no bindings renders identically to the static output.
+	#[cfg(all(feature = "bsx", feature = "json"))]
+	pub fn reactive(mut self) -> Self {
+		self.reactive = Some(super::reactive::Reactive::default());
 		self
 	}
 
@@ -168,6 +185,43 @@ impl NodeVisitor for HtmlRenderer {
 		self.buffer.push('<');
 		self.buffer.push_str(view.tag());
 
+		// reactive mode: emit `data-bx-doc`, `bx:<event>`, and `data-bx-attr-*`
+		// for this element (computed first so the `reactive` borrow ends before
+		// the buffer writes).
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		{
+			let fragments = self
+				.reactive
+				.as_mut()
+				.map(|reactive| {
+					let mut fragments = Vec::new();
+					if let Some(id) = reactive.enter_element(_cx.entity) {
+						fragments.push(format!("data-bx-doc=\"d{id}\""));
+					}
+					for (event, call) in reactive.events(_cx.entity) {
+						fragments.push(format!(
+							"bx:{event}=\"{}\"",
+							escape_html_attribute(call)
+						));
+					}
+					for attr in &view.attributes {
+						if let Some(path) = reactive.attr_path(attr.entity) {
+							fragments.push(format!(
+								"data-bx-attr-{}=\"{}\"",
+								attr.attribute.as_str(),
+								escape_html_attribute(path)
+							));
+						}
+					}
+					fragments
+				})
+				.unwrap_or_default();
+			for fragment in fragments {
+				self.buffer.push(' ');
+				self.buffer.push_str(&fragment);
+			}
+		}
+
 		for attr in &view.attributes {
 			// the `class` attribute is merged with the `Classes` component and
 			// emitted once below, so skip the raw attribute here
@@ -230,6 +284,12 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
+		// reactive mode: pop this element's document scope (before the void
+		// early-return, so the stack balances with `visit_element`).
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		if let Some(reactive) = self.reactive.as_mut() {
+			reactive.leave_element();
+		}
 		let is_void = self.is_void_element(element.tag());
 		if is_void {
 			return;
@@ -251,14 +311,32 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
+		// reactive mode: a bound text node is wrapped in `<!--bx-ref-->` anchors so
+		// the runtime can patch just this run (computed first to end the borrow).
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		let bx_ref = self
+			.reactive
+			.as_ref()
+			.and_then(|reactive| reactive.text_path(_cx.entity))
+			.map(|path| escape_html_attribute(path));
 		if self.is_pretty() {
 			self.write_indent();
+		}
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		if let Some(path) = &bx_ref {
+			self.buffer.push_str("<!--bx-ref=\"");
+			self.buffer.push_str(path);
+			self.buffer.push_str("\"-->");
 		}
 		let raw = value.to_string();
 		if self.escape_html && !self.in_raw_text_element {
 			self.buffer.push_str(&escape_html_text(&raw));
 		} else {
 			self.buffer.push_str(&raw);
+		}
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		if bx_ref.is_some() {
+			self.buffer.push_str("<!--bx-end-->");
 		}
 		if self.is_pretty() {
 			self.buffer.push('\n');
@@ -291,7 +369,25 @@ impl NodeRenderer for HtmlRenderer {
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Html])?;
+		// collect the reactivity annotations once (the only world-reading pass)
+		// before the walk, holding the blob/verb scripts to append after it.
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		let scripts = match self.reactive.as_mut() {
+			Some(reactive) => {
+				reactive.collect(cx.world, cx.entity);
+				reactive
+					.blob_script()
+					.into_iter()
+					.chain(reactive.verbs_script())
+					.collect::<Vec<_>>()
+			}
+			None => Vec::new(),
+		};
 		cx.walk(self);
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		for script in scripts {
+			self.buffer.push_str(&script);
+		}
 		MediaBytes::new_string(
 			MediaType::Html,
 			core::mem::take(&mut self.buffer),

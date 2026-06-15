@@ -8,6 +8,8 @@ mod template;
 pub use template::*;
 mod html;
 pub use html::*;
+#[cfg(all(feature = "bsx", feature = "json"))]
+mod reactive;
 mod html_utils;
 pub use html_utils::*;
 mod style_map;
