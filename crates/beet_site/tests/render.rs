@@ -69,19 +69,15 @@ async fn blog_post_title_from_frontmatter() {
 		.xpect_contains("<title>Full Stack Bevy</title>");
 }
 
-/// The Rust-authored counter renders reactively on the web: while serving (a
-/// live server inserts [`KeepAlive`]), its `{count}` display is wrapped in
-/// `<!--bx-ref-->` anchors with the SSR value, the document state ships as a
-/// blob, and the `<ReactivityScript/>` runtime is included, so the count
-/// hydrates with no flash. Its buttons drive the count through native
-/// `PointerUp` observers (the native-target path); the fully web-interactive
-/// `bx:click` verb counter is the no-code `bsx_site` page.
+/// The Rust-authored counter renders reactively on the web: its `{count}`
+/// display is wrapped in `<!--bx-ref-->` anchors with the SSR value, the document
+/// state ships as a blob, and the runtime loads from the shared
+/// `/js/reactivity.js`, so the count hydrates with no flash. Its buttons drive
+/// the count through native `PointerUp` observers (the native-target path); the
+/// fully web-interactive `bx:click` verb counter is the no-code `bsx_site` page.
 #[beet::test]
 async fn counter_renders_reactively() {
-	let mut world = site_world();
-	// stand in for a running server, the signal the reactive renderer gates on.
-	world.insert_resource(KeepAlive);
-	world
+	site_world()
 		.spawn(beet_site_router())
 		.exchange_str(html_get("docs/design/counter"))
 		.await
@@ -91,8 +87,8 @@ async fn counter_renders_reactively() {
 		// the hydration blob carries the initial document state
 		.xpect_contains("data-bx-blob")
 		.xpect_contains("\"count\":0")
-		// the runtime ships (the `<ReactivityScript/>` widget, active while serving)
-		.xpect_contains("EntityMut");
+		// the runtime ships, loaded from the shared cached asset
+		.xpect_contains("<script defer src=\"/js/reactivity.js\">");
 }
 
 /// The sticky-title regression against the real site router: two sequential

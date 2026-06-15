@@ -514,11 +514,6 @@ path = "examples/ui/bsx_bindings.rs"
 required-features = ["template"]
 
 [[example]]
-name = "custom_events"
-path = "examples/ui/custom_events.rs"
-required-features = ["template"]
-
-[[example]]
 name = "crud"
 path = "examples/ui/crud.rs"
 required-features = ["ui", "action"]

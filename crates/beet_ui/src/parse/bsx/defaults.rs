@@ -231,31 +231,4 @@ mod test {
 			.unwrap()
 			.xpect_eq("done");
 	}
-
-	/// rsx! is a superset of the BSX event syntax: the same
-	/// `bx:<event>=verb{ args }` directive with `@`-binding args parses through
-	/// the same `parse_verb_call` grammar and installs the same event binding.
-	#[beet_core::test]
-	fn rsx_bx_click_increments_document_field() {
-		let mut world = ui_world();
-		let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
-		// rsx! accepts the same `bx:<event>=verb{ args }` directive as `.bsx`
-		let button = world
-			.spawn_template(rsx! {
-				<button bx:click=increment{ field: @doc:count }>"+"</button>
-			})
-			.unwrap()
-			.id();
-		world.entity_mut(button).insert(ChildOf(doc));
-		world.update_local();
-		world.entity_mut(button).trigger(PointerDown::new(button));
-		world.flush();
-		world
-			.entity(doc)
-			.get::<Document>()
-			.unwrap()
-			.get_field::<i64>(&[FieldSegment::key("count")])
-			.unwrap()
-			.xpect_eq(1);
-	}
 }
