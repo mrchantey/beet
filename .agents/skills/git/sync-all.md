@@ -6,6 +6,8 @@ Apply the worktree sync skill to the following worktrees.
 .agents/skills/git/worktree-sync.md
 
 - Main Branch `~/me/beet`
-- Worktrees
+- Merge: changes in these worktrees are intended to be merged
 	- rendering `~/me/worktrees/beet/rendering/beet`
 	- apps `~/me/worktrees/beet/apps/beet`
+- Ignore: experimental and not to be merged
+	- coding `~/me/worktrees/beet/coding/beet`
