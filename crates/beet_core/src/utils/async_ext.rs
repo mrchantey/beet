@@ -56,6 +56,9 @@ pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
 /// A 'static + Send, making it suitable for spawning on async runtimes
 pub type LifetimeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
+/// A boxed [`Future`] that is never `Send`, for hooks always polled on the
+/// thread they were created on (eg the thread-local server/runtime layer).
+pub type LocalBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
 
 cfg_if! {
 	// `Send` only in multi-threaded native builds, matching [`MaybeSend`].

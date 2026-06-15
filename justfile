@@ -172,19 +172,20 @@ _extra-pkgs-wasm := "beet_spatial"
 # - `ndarray` / `cuda`: burn backends mutually exclusive with `wgpu` (the
 #   default). Co-enabling them links conflicting backend runtimes and corrupts
 #   the heap at process teardown, so `--all-features` is never safe here.
-# - `testing_embedded`: the bare-metal runner backend, collecting cases through a
-#   `linkme` distributed slice that is unsupported off bare metal (notably wasm).
-#   Validated on its own target, never in these native/wasm sweeps.
 # On stable additionally excludes `nightly` / `custom_test_frameworks`, the
 # nightly-only test-runner features that stable cannot compile.
-_core-features pkgs:
+# `extra` is a `|`-joined list of additional feature names to exclude; the wasm
+# runner passes `testing_embedded`, whose `linkme` distributed slice does not
+# compile off bare metal (native keeps it, exercising the linkme declaration).
+_core-features pkgs extra="":
 	#!/usr/bin/env bash
 	set -euo pipefail
-	if rustc --version | grep -q nightly; then
-		exclude='/(default|ndarray|cuda|testing_embedded)$'
-	else
-		exclude='/(nightly|custom_test_frameworks|default|ndarray|cuda|testing_embedded)$'
+	base='default|ndarray|cuda'
+	if ! rustc --version | grep -q nightly; then
+		base="nightly|custom_test_frameworks|$base"
 	fi
+	[ -n "{{ extra }}" ] && base="$base|{{ extra }}"
+	exclude="/($base)\$"
 	feats=$(for c in {{ pkgs }}; do
 		# Crates may be nested (e.g. crates/beet_core/macros) — resolve by package name.
 		toml=$(grep -lE "^name *= *\"$c\"$" crates/$c/Cargo.toml crates/*/*/Cargo.toml 2>/dev/null | head -1)
@@ -203,10 +204,12 @@ _test-pkgs pkgs *args:
 	cargo test $crates $feats {{ args }} -- {{ test-threads }}
 
 # Shared wasm cargo test runner over a space-separated list of crates.
+# Excludes `testing_embedded`: its `linkme` distributed slice is unsupported on
+# wasm32 (the embedded runner is bare-metal only).
 _test-pkgs-wasm pkgs *args:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	feats=$(just _core-features "{{ pkgs }}")
+	feats=$(just _core-features "{{ pkgs }}" "testing_embedded")
 	crates=$(printf -- "-p %s " {{ pkgs }})
 	cargo test $crates --lib --target wasm32-unknown-unknown $feats {{ args }} -- {{ test-threads }}
 

@@ -19,27 +19,22 @@ pub async fn start_lambda_server(entity: AsyncEntity) -> Result {
 
 	info!("🌱 listening for lambda requests");
 
-	// lambda_http::run owns its own tokio runtime loop and its service future is
-	// `!Send` (higher-ranked lifetimes in `lambda_http::Response`), so it can't
-	// be spawned. Drive it with `block_on` (no `Send` bound) on a dedicated
-	// thread that owns the shared tokio runtime, and await the result over a
-	// channel so `start_lambda_server` itself stays `Send` for `HttpServerFn`.
-	let (send, recv) = async_channel::bounded(1);
-	std::thread::spawn(move || {
-		let result = async_ext::tokio().block_on(async move {
-			lambda_http::run(service_fn(move |lambda_req| {
-				let entity = entity.clone();
-				handle_request(entity, lambda_req)
-			}))
-			.await
-			.map_err(|err| {
-				error!("Error running lambda: {:?}", err);
-				bevyhow!("{}", err)
-			})
-		});
-		send.send_blocking(result).ok();
-	});
-	recv.recv().await?
+	// lambda_http uses Tokio internally, so we need a Tokio runtime context.
+	// The enter guard sets the Tokio reactor for I/O operations while
+	// beet's async-executor drives the future. The guard is `!Send` and held
+	// across the await, which is fine: `HttpServerFn` runs on the local thread
+	// (its future is a `LocalBoxedFuture`), never moved between threads.
+	let _guard = async_ext::tokio().enter();
+
+	lambda_http::run(service_fn(move |lambda_req| {
+		let entity = entity.clone();
+		handle_request(entity, lambda_req)
+	}))
+	.await
+	.map_err(|err| {
+		error!("Error running lambda: {:?}", err);
+		bevyhow!("{}", err)
+	})
 }
 
 

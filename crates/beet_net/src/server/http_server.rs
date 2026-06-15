@@ -11,13 +11,15 @@ use bevy::platform::sync::OnceLock;
 /// (an embassy / esp WiFi crate, …) installs its own without living in
 /// [`beet_net`]. [`HttpServer`]'s start observer invokes the installed function.
 ///
-/// It is handed an [`AsyncEntity`] for the spawned server (run on the async
-/// layer, exactly like the built-in [`start_hyper_server`] /
-/// `start_mini_http_server` backends) and returns a boxed future. The backend
-/// reads the [`HttpServer`] config off the entity, opens its own listener, and
-/// dispatches each request back through `entity.exchange(req)`.
-pub type HttpServerFn =
-	fn(AsyncEntity) -> MaybeSendBoxedFuture<'static, Result>;
+/// It is handed an [`AsyncEntity`] for the spawned server and returns a boxed
+/// future. The backend reads the [`HttpServer`] config off the entity, opens its
+/// own listener, and dispatches each request back through `entity.exchange(req)`.
+///
+/// The future is a [`LocalBoxedFuture`] (never `Send`): the start observer always
+/// drives it with `queue_async_local`, so it stays on the thread it was created
+/// on. This lets a backend hold a thread-bound resource across an await — eg the
+/// lambda backend's tokio runtime [`EnterGuard`](tokio::runtime::EnterGuard).
+pub type HttpServerFn = fn(AsyncEntity) -> LocalBoxedFuture<'static, Result>;
 
 static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 
@@ -279,13 +281,14 @@ mod tests {
 	use super::*;
 	use bevy::ecs::reflect::ReflectComponent;
 
-	/// A reflect insert (the BSX spread path, eg `{(HttpServer{port:8080})}`)
-	/// registers the start observer through `on_add`, so a [`StartServer`]
-	/// triggered on the host boots it exactly like a regular spawn. With no
-	/// server feature here, the installed runtime hook stands in for the backend.
-	#[beet_core::test]
-	async fn boots_on_triggered_start() {
-		// install a hook that flags the entity, standing in for a real backend.
+	/// Install the stub backend: flag the entity, standing in for a real server.
+	///
+	/// [`set_http_server`] is a process-global [`OnceLock`], so the first install
+	/// wins for the whole test binary (notably the single wasm module that runs
+	/// every case in series). Every test therefore installs this same idempotent
+	/// hook: flagging is observable where a start is expected and harmless where
+	/// it is not (a filter miss never invokes the hook).
+	fn stub_backend() {
 		set_http_server(|entity| {
 			Box::pin(async move {
 				entity
@@ -296,6 +299,15 @@ mod tests {
 			})
 		})
 		.ok();
+	}
+
+	/// A reflect insert (the BSX spread path, eg `{(HttpServer{port:8080})}`)
+	/// registers the start observer through `on_add`, so a [`StartServer`]
+	/// triggered on the host boots it exactly like a regular spawn. With no
+	/// server feature here, the installed runtime hook stands in for the backend.
+	#[beet_core::test]
+	async fn boots_on_triggered_start() {
+		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app.world_mut().spawn_empty().id();
@@ -333,7 +345,7 @@ mod tests {
 	/// port before the backend reads the bind address.
 	#[beet_core::test]
 	async fn resolves_port_from_params() {
-		set_http_server(|_| Box::pin(async { Ok(()) })).ok();
+		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app.world_mut().spawn(HttpServer::new(8080)).id();
@@ -358,16 +370,7 @@ mod tests {
 	/// A start whose filter does not pass `"http"` leaves the server untouched.
 	#[beet_core::test]
 	async fn skips_on_filter_miss() {
-		set_http_server(|entity| {
-			Box::pin(async move {
-				entity
-					.with(|mut entity| {
-						entity.insert(ServerStartFlag);
-					})
-					.await
-			})
-		})
-		.ok();
+		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app.world_mut().spawn(HttpServer::new(0)).id();

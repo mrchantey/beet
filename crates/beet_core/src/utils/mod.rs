@@ -61,6 +61,7 @@ mod xtend;
 pub use as_any::*;
 
 pub use async_ext::LifetimeSendBoxedFuture;
+pub use async_ext::LocalBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;
