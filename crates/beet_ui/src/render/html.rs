@@ -29,10 +29,10 @@ pub struct HtmlRenderer {
 	/// Tracks whether we are currently inside a raw text element.
 	in_raw_text_element: bool,
 	/// When set, the renderer also emits the thin-client reactivity wire format
-	/// (see [`reactive`](super::reactive)); the resolved text is unchanged, so a
-	/// non-reactive page is byte-identical.
+	/// (see [`reactive_html_render`](super::reactive_html_render)); the resolved
+	/// text is unchanged, so a non-reactive page is byte-identical.
 	#[cfg(all(feature = "bsx", feature = "json"))]
-	reactive: Option<super::reactive::Reactive>,
+	reactive: Option<super::reactive_html_render::ReactiveHtmlRender>,
 }
 
 /// Indentation style for pretty-printing.
@@ -84,11 +84,27 @@ impl HtmlRenderer {
 
 	/// Emit the thin-client reactivity wire format alongside the resolved HTML:
 	/// `data-bx-doc`/`data-bx-attr`/`bx:<event>` annotations, `<!--bx-ref-->` text
-	/// anchors, and the document/verb blobs. The resolved text is unchanged, so a
-	/// page with no bindings renders identically to the static output.
+	/// anchors, the document/verb blobs, and the runtime script (in `<head>`). In
+	/// the default [`InsertReactive::Auto`] mode the resolved text is unchanged and
+	/// a page with no bindings renders identically to the static output.
 	#[cfg(all(feature = "bsx", feature = "json"))]
-	pub fn reactive(mut self) -> Self {
-		self.reactive = Some(super::reactive::Reactive::default());
+	pub fn reactive(self) -> Self {
+		self.reactive_with(InsertReactive::default(), false)
+	}
+
+	/// [`reactive`](Self::reactive) with explicit config: when to inject the
+	/// runtime ([`InsertReactive`]) and whether to inline [`REACTIVITY_JS`] rather
+	/// than reference it by URL.
+	#[cfg(all(feature = "bsx", feature = "json"))]
+	pub fn reactive_with(
+		mut self,
+		insert_reactive: InsertReactive,
+		inline_js_runtime: bool,
+	) -> Self {
+		self.reactive = Some(super::reactive_html_render::ReactiveHtmlRender::new(
+			insert_reactive,
+			inline_js_runtime,
+		));
 		self
 	}
 
@@ -299,6 +315,22 @@ impl NodeVisitor for HtmlRenderer {
 			self.in_raw_text_element = false;
 		}
 
+		// reactive mode: inject the blob + runtime script inside `<head>`, before
+		// its close tag. `<head>` is the single injection point; a fragment with no
+		// head falls back to a post-walk append in `render`.
+		#[cfg(all(feature = "bsx", feature = "json"))]
+		if element.tag().eq_ignore_ascii_case("head") {
+			if let Some(injection) = self
+				.reactive
+				.as_mut()
+				.and_then(|reactive| reactive.take_head_injection())
+			{
+				self.write_indent();
+				self.buffer.push_str(&injection);
+				self.write_newline();
+			}
+		}
+
 		if self.is_pretty() {
 			self.current_depth = self.current_depth.saturating_sub(1);
 			self.write_indent();
@@ -370,23 +402,21 @@ impl NodeRenderer for HtmlRenderer {
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Html])?;
 		// collect the reactivity annotations once (the only world-reading pass)
-		// before the walk, holding the blob/verb scripts to append after it.
+		// before the walk, so the head injection is known when `<head>` closes.
 		#[cfg(all(feature = "bsx", feature = "json"))]
-		let scripts = match self.reactive.as_mut() {
-			Some(reactive) => {
-				reactive.collect(cx.world, cx.entity);
-				reactive
-					.blob_script()
-					.into_iter()
-					.chain(reactive.verbs_script())
-					.collect::<Vec<_>>()
-			}
-			None => Vec::new(),
-		};
+		if let Some(reactive) = self.reactive.as_mut() {
+			reactive.collect(cx.world, cx.entity);
+		}
 		cx.walk(self);
+		// fallback: a fragment with no `<head>` never triggered the in-walk
+		// injection, so emit it now (a no-op when the walk already did).
 		#[cfg(all(feature = "bsx", feature = "json"))]
-		for script in scripts {
-			self.buffer.push_str(&script);
+		if let Some(injection) = self
+			.reactive
+			.as_mut()
+			.and_then(|reactive| reactive.take_head_injection())
+		{
+			self.buffer.push_str(&injection);
 		}
 		MediaBytes::new_string(
 			MediaType::Html,

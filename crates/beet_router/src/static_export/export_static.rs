@@ -86,8 +86,11 @@ pub async fn collect_static_html(
 	Ok(pages)
 }
 
-/// Renders every static route and writes it to the output store as
-/// `<path>/index.html`, returning the written paths.
+/// Renders every static route and writes it to the output store, returning the
+/// written paths. A page writes to `<path>/index.html` (clean URLs); an asset
+/// route with a file extension (eg `js/reactivity.js`) writes its raw file, so
+/// the `<script src="/js/reactivity.js">` a reactive page references resolves and
+/// the export is self-contained.
 pub async fn export_static(
 	world: &AsyncWorld,
 	router: Entity,
@@ -98,6 +101,8 @@ pub async fn export_static(
 	for (path, html) in pages {
 		let out_path = if path.segments().is_empty() {
 			SmolPath::new("index.html")
+		} else if path.extension().is_some() {
+			path
 		} else {
 			path.join("index.html")
 		};
@@ -148,9 +153,9 @@ mod test {
 			.await
 			.unwrap();
 
-		// the two user scene routes plus the `app-info` route wired by
-		// `default_router`.
-		written.len().xpect_eq(3);
+		// the two user scene routes plus the `app-info` scene and the
+		// `js/reactivity.js` runtime asset, both wired by `default_router`.
+		written.len().xpect_eq(4);
 		out.get(&SmolPath::new("index.html"))
 			.await
 			.unwrap()
@@ -161,6 +166,13 @@ mod test {
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("About");
+		// the runtime asset is a raw file (not `<path>/index.html`), so a reactive
+		// page's `<script src="/js/reactivity.js">` resolves: a self-contained export.
+		out.get(&SmolPath::new("js/reactivity.js"))
+			.await
+			.unwrap()
+			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+			.xpect_contains("class EntityMut");
 		out.get(&SmolPath::new("app-info/index.html"))
 			.await
 			.unwrap()

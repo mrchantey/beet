@@ -11,6 +11,8 @@ use beet_core::prelude::*;
 ///   support (std-only: they render through the scene pipeline).
 /// - an `/app-info` scene route (std-only) and a `POST /analytics` route
 ///   (`json` + std), both of which require a [`PackageConfig`] resource.
+/// - a cached `GET /js/reactivity.js` route (std-only) serving the thin-client
+///   reactivity runtime, the asset the reactive renderer's injected script loads.
 ///
 /// On no_std the std-only children/middleware are omitted and the not-found
 /// fallback is a plain-text route listing; add any extra `Request`/`Response`
@@ -32,6 +34,10 @@ pub fn default_router() -> impl Bundle {
 		// no_std. `app_info`/`analytics` both need a `PackageConfig` resource.
 		#[cfg(feature = "std")]
 		OnSpawn::insert_child(app_info()),
+		// the cached `/js/reactivity.js` runtime route, so a served or statically
+		// exported reactive page's auto-injected runtime script resolves.
+		#[cfg(feature = "std")]
+		OnSpawn::insert_child(reactivity_js_route()),
 		#[cfg(all(feature = "json", feature = "std"))]
 		OnSpawn::insert_child(analytics_handler()),
 		// the same-port `/__client_io` websocket-upgrade endpoint, so every HTTP

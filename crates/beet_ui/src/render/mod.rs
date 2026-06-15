@@ -9,7 +9,9 @@ pub use template::*;
 mod html;
 pub use html::*;
 #[cfg(all(feature = "bsx", feature = "json"))]
-mod reactive;
+mod reactive_html_render;
+#[cfg(all(feature = "bsx", feature = "json"))]
+pub use reactive_html_render::{InsertReactive, REACTIVITY_JS, REACTIVITY_SRC};
 mod html_utils;
 pub use html_utils::*;
 mod style_map;

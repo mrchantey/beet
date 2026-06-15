@@ -86,14 +86,11 @@ impl BindingTarget {
 							.map(|content| content.get())
 							.or(Some(entity));
 					}
-					current = entity_ref
-						.get::<ChildOf>()
-						.map(|child_of| child_of.parent())
-						.or_else(|| {
-							entity_ref
-								.get::<AttributeOf>()
-								.map(|attribute_of| attribute_of.get())
-						});
+					// the shared ancestry step: ChildOf parent, else AttributeOf owner
+					current = element_parent(
+						entity_ref.get::<ChildOf>(),
+						entity_ref.get::<AttributeOf>(),
+					);
 				}
 				None
 			}

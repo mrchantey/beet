@@ -125,6 +125,11 @@ streaming-iterator = { version = "0.1", optional = true }
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server"] }
 
+# the wasm/deno reactivity-runtime test evaluates `REACTIVITY_JS` and drives it
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+js-sys = { workspace = true }
+wasm-bindgen = { workspace = true }
+
 [lib]
 harness = false
 

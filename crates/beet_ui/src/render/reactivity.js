@@ -1,11 +1,13 @@
 // The beet thin-client reactivity runtime: a tiny, dependency-free signal engine
 // that hydrates a page from the wire format the reactive HTML renderer emits
-// (see `render/reactive.rs` for the contract) and drives it with no WASM.
+// (see `render/reactive_html_render.rs` for the contract) and drives it with no
+// WASM.
 //
 // It reads the annotations already in the HTML:
 //   - `<script data-bx-blob>`  : the document state, keyed by `dN`.
-//   - `<script data-bx-verbs>` : app-supplied JS verbs, installed beside the four
-//                                built-in defaults below.
+//   - `<script data-bx-verbs>` : the JS verbs to install (every verb, including
+//                                the defaults). The runtime ships zero built-in
+//                                verbs; it is pure mechanism.
 //   - `data-bx-doc="dN"`       : the element topping document N's subtree.
 //   - `<!--bx-ref="path"-->..<!--bx-end-->` : a bound text run.
 //   - `data-bx-attr-name="path"`            : a bound attribute.
@@ -15,8 +17,11 @@
 // `verb(EntityWorldMut, VerbArgs)`. `entity` is an `EntityMut` over the
 // event-target node; it touches the document and the node, never `document`/
 // `window` (only the DOM binding layer does). The same `EntityMut`, minus its DOM
-// binding, runs under Node.js / a worker / the unit tests against an in-memory
+// binding, runs under deno / a worker / the unit tests against an in-memory
 // store, so the tests cover real verb behavior, not a stand-in.
+//
+// The runtime api and the live store are exposed on `globalThis.beet` so a test
+// (deno/wasm) or the browser can read them after evaluating this file.
 (function () {
 	"use strict";
 
@@ -85,91 +90,71 @@
 		};
 	}
 
-	function EntityMut(store, docId, repr, binding) {
-		this.store = store;
-		this.docId = docId;
-		this.repr = repr || emptyRepr(undefined);
-		this.binding = binding || null;
-	}
-	EntityMut.prototype = {
+	class EntityMut {
+		constructor(store, docId, repr, binding) {
+			this.store = store;
+			this.docId = docId;
+			this.repr = repr || emptyRepr(undefined);
+			this.binding = binding || null;
+		}
 		// document-scope-aware field access (the document is resolved once, at
 		// construction, by walking up to `data-bx-doc`).
 		get_field(path) {
 			return this.store.get(this.docId, path);
-		},
+		}
 		set_field(path, value) {
 			this.store.set(this.docId, path, value);
-		},
+		}
 		// element access, mirroring the Bevy components.
 		get_tag() {
 			return this.repr.tag;
-		},
+		}
 		get_attribute(key) {
 			return this.repr.attributes[key];
-		},
+		}
 		set_attribute(key, value) {
 			this.repr.attributes[key] = value;
 			if (this.binding) this.binding.setAttribute(key, value);
-		},
+		}
 		get_value() {
 			return this.repr.value;
-		},
+		}
 		set_value(value) {
 			this.repr.value = value;
 			if (this.binding) this.binding.setValue(value);
-		},
+		}
 		contains_class_name(name) {
 			return this.repr.classes.has(name);
-		},
+		}
 		set_class(name, on) {
 			if (on) this.repr.classes.add(name);
 			else this.repr.classes.delete(name);
 			if (this.binding) this.binding.setClass(name, on);
-		},
-	};
+		}
+	}
 
 	// ---- verb table --------------------------------------------------------
 	//
-	// The JS twins of the registered verbs, keyed by name. A `field` arg is a
-	// path the verb mutates via `entity.set_field`; the rest are values. The four
-	// defaults match the Rust `defaults.rs` set exactly (incl their defaults); app
-	// verbs from `data-bx-verbs` are installed alongside.
+	// The runtime ships zero built-in verbs: it is pure mechanism. Every verb,
+	// including the defaults (`increment`/`decrement`/`toggle`/`set`), arrives in
+	// the `data-bx-verbs` blob and is installed below. A `field` arg is a path the
+	// verb mutates via `entity.set_field`; the rest are values.
 
-	function asNumber(value) {
-		return typeof value === "number" ? value : 0;
-	}
-
-	const verbs = {
-		// `increment{ field, amount = 1 }`
-		increment(entity, args) {
-			const amount = args.amount == null ? 1 : args.amount;
-			entity.set_field(args.field, asNumber(entity.get_field(args.field)) + amount);
-		},
-		// `decrement{ field, amount = 1 }`
-		decrement(entity, args) {
-			const amount = args.amount == null ? 1 : args.amount;
-			entity.set_field(args.field, asNumber(entity.get_field(args.field)) - amount);
-		},
-		// `toggle{ field }`: flip the boolean (true only when currently true).
-		toggle(entity, args) {
-			entity.set_field(args.field, entity.get_field(args.field) !== true);
-		},
-		// `set{ field, value }`
-		set(entity, args) {
-			entity.set_field(args.field, args.value);
-		},
-	};
+	const verbs = {};
 
 	/** Register (or override) a verb at runtime, the JS twin of `VerbRegistry`. */
 	function installVerb(name, fn) {
 		verbs[name] = fn;
 	}
 
-	/** Install every app verb from a `name -> js-source` map (`data-bx-verbs`). */
+	/** Install every verb from a `name -> js-source` map (`data-bx-verbs`),
+	 *  including the defaults the renderer emits. */
 	function installVerbs(map) {
 		for (const name of Object.keys(map || {})) {
-			// the source is a `(entity, args) => { .. }` body; the renderer
-			// co-located it with the Rust verb (no codegen, a hand-written twin).
+			// the source is a `(entity, args) => { .. }` body, the JS twin the
+			// renderer co-located with the Rust verb (no codegen, a hand-written
+			// twin). `new Function` sees only `entity`/`args` + globals, so the
+			// body must be self-contained.
 			verbs[name] = new Function("entity", "args", map[name]);
 		}
 	}
@@ -384,7 +369,8 @@
 		}
 	}
 
-	/** Hydrate and activate the page: the whole browser entry point. */
+	/** Hydrate and activate the page, returning the live store (the browser
+	 *  entry point). */
 	function bootstrap() {
 		const store = createStore(readJsonScript("script[data-bx-blob]"));
 		installVerbs(readJsonScript("script[data-bx-verbs]"));
@@ -394,12 +380,14 @@
 		patchAll(bindings, store);
 		store.subscribe(() => patchAll(bindings, store));
 		wireEvents(store);
-		// expose the live store and verb table for introspection (eg the Playwright
-		// check reads the client document back); this is the page's only global.
-		window.beet = { store, verbs };
+		return store;
 	}
 
 	// ---- exports / bootstrap ----------------------------------------------
+	//
+	// Expose the runtime api on `globalThis.beet` unconditionally, so deno/wasm
+	// (no DOM) can read `createStore`/`EntityMut`/`installVerbs`/`verbs` after
+	// evaluating this file, and the browser can introspect the live store/verbs.
 
 	const api = {
 		createStore,
@@ -411,18 +399,20 @@
 		installVerb,
 		installVerbs,
 		parseVerbCall,
-		asNumber,
+		// the live store, filled in by `bootstrap` in the browser.
+		store: null,
 	};
-	// Node.js / worker / tests: export the runtime, no DOM.
-	if (typeof module !== "undefined" && module.exports) {
-		module.exports = api;
-	}
-	// Browser: boot once the DOM is ready.
+	globalThis.beet = api;
+
+	// Browser: boot once the DOM is ready, then publish the live store.
 	if (typeof document !== "undefined") {
+		const boot = () => {
+			api.store = bootstrap();
+		};
 		if (document.readyState === "loading") {
-			document.addEventListener("DOMContentLoaded", bootstrap);
+			document.addEventListener("DOMContentLoaded", boot);
 		} else {
-			bootstrap();
+			boot();
 		}
 	}
 })();

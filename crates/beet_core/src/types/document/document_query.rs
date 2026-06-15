@@ -9,7 +9,7 @@ use bevy::reflect::Typed;
 /// paths without conflicting borrows.
 #[derive(SystemParam)]
 pub struct DocumentResolver<'w, 's> {
-	ancestors: Query<'w, 's, &'static ChildOf>,
+	traverse: ElementTraverseQuery<'w, 's>,
 	docs: Query<'w, 's, (), With<Document>>,
 	props: Query<'w, 's, (), With<PropsDocument>>,
 }
@@ -18,22 +18,22 @@ impl DocumentResolver<'_, '_> {
 	/// Resolve a [`DocumentPath`] to the actual entity that owns the document.
 	pub fn entity(&self, subject: Entity, path: &DocumentPath) -> Entity {
 		match path {
-			DocumentPath::Root => self.ancestors.root_ancestor(subject),
+			DocumentPath::Root => self.traverse.root(subject),
 			// nearest ancestor document, skipping props stores so user document
 			// scoping inside a template body is unaffected
 			DocumentPath::Ancestor => self
-				.ancestors
-				.iter_ancestors_inclusive(subject)
+				.traverse
+				.ancestors_inclusive(subject)
 				.find(|entity| {
 					self.docs.contains(*entity) && !self.props.contains(*entity)
 				})
-				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
+				.unwrap_or_else(|| self.traverse.root(subject)),
 			// nearest ancestor props store, ie a template's materialized props
 			DocumentPath::Props => self
-				.ancestors
-				.iter_ancestors_inclusive(subject)
+				.traverse
+				.ancestors_inclusive(subject)
 				.find(|entity| self.props.contains(*entity))
-				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
+				.unwrap_or_else(|| self.traverse.root(subject)),
 			DocumentPath::Entity(entity) => *entity,
 			DocumentPath::This => subject,
 		}
@@ -43,9 +43,8 @@ impl DocumentResolver<'_, '_> {
 	/// tag-site bindings whose subject entity carries the template's own props
 	/// store. A parentless subject resolves from itself.
 	pub fn entity_above(&self, subject: Entity, path: &DocumentPath) -> Entity {
-		self.ancestors
-			.get(subject)
-			.map(|child_of| child_of.parent())
+		self.traverse
+			.parent(subject)
 			.unwrap_or(subject)
 			.xmap(|start| self.entity(start, path))
 	}

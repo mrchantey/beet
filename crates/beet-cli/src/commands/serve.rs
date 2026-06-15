@@ -101,8 +101,11 @@ pub(crate) async fn build_site(
 			// `<RoutesDir src=".."/>` resolves against the site root
 			world.insert_resource(SiteRoot(site_dir));
 			let root = BsxTemplate::load_entry(world, &entry)?.spawn(world)?;
-			// the default app routes `default_router` wires for codegen hosts
+			// the default app routes `default_router` wires for codegen hosts,
+			// including the cached `/js/reactivity.js` runtime the reactive
+			// renderer's auto-injected script loads
 			world.spawn((ChildOf(root), app_info()));
+			world.spawn((ChildOf(root), reactivity_js_route()));
 			world.spawn((ChildOf(root), analytics_handler()));
 			root.xok()
 		})

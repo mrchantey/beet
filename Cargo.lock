@@ -1643,6 +1643,7 @@ dependencies = [
  "bytes",
  "extend",
  "heck",
+ "js-sys",
  "libc",
  "material-colors",
  "postcard",
@@ -1658,6 +1659,7 @@ dependencies = [
  "tree-sitter-rust",
  "variadics_please",
  "vte",
+ "wasm-bindgen",
  "webbrowser",
 ]
 

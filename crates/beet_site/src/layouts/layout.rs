@@ -47,7 +47,6 @@ pub fn BeetLayout(
 			<Reset/>
 			<Stylesheet/>
 			<ColorSchemeScript/>
-			<ReactivityScript/>
 			<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
 		}
 	});

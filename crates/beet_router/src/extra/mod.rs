@@ -24,6 +24,13 @@ pub use analytics::*;
 mod app_info;
 #[cfg(feature = "std")]
 pub use app_info::*;
+
+// std-only: the reactivity runtime route serves beet_ui's `REACTIVITY_JS`, the
+// shared asset the renderer's auto-injected `<script defer>` loads.
+#[cfg(feature = "std")]
+mod reactivity_js;
+#[cfg(feature = "std")]
+pub use reactivity_js::*;
 // The single router builder, available on std and no_std. The feature-specific
 // app routes (`app-info`, `analytics`) are gated inside the module.
 mod default_router;

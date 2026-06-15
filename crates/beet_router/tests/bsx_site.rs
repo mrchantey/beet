@@ -20,9 +20,7 @@ the package resource patched from markup -->
 
 const LAYOUT_BSX: &str = r#"
 <html lang="en">
-	<RouteHead>
-		<ReactivityScript/>
-	</RouteHead>
+	<RouteHead/>
 	<body>
 		<RouteSidebar/>
 		<main><Slot/></main>
@@ -131,6 +129,12 @@ async fn entry_components_land_on_root() {
 /// backend on an OS-assigned port). The reflect insert registers the server's
 /// `StartServer` observer through its `on_add`, so a triggered start boots it via
 /// the installed runtime hook.
+// Only without a real HTTP backend: the test installs a stand-in runtime hook to
+// prove the wiring without a live server, but with the `http`/`client_io` backend
+// present, `StartServer::all` boots a real listener (and, under `client_io`, its
+// tungstenite channel on a fixed port) that this test cannot cleanly stop, so it
+// would leak a spinning task into the rest of the single-process suite.
+#[cfg(not(feature = "http"))]
 #[beet_core::test]
 async fn http_server_declarable_in_markup() {
 	// no `server` backend feature here, so install the runtime hook the start
@@ -169,6 +173,7 @@ async fn http_server_declarable_in_markup() {
 
 /// Flag the test runtime hook inserts, proving a triggered `StartServer` reached
 /// the declared `HttpServer`'s backend.
+#[cfg(not(feature = "http"))]
 #[derive(Component)]
 struct ServerBooted;
 
@@ -191,55 +196,61 @@ async fn page_renders_in_layout() {
 		.xpect_contains("aria-current=\"page\"");
 }
 
-/// The `@` bindings against the real route pipeline: the default head's
-/// `og:site_name` resource bind, a `.bsx` template `@prop`, and the counter
-/// page's `@doc` text/event bindings, all settled before the SSR render.
+/// The counter page through the full route pipeline. The `@` binding values are
+/// correct first paint (the default head's `og:site_name` resource bind, the
+/// Card's `@prop:title`, the scoped `@doc:count` init); and because the router
+/// always renders through the reactive renderer, the same page carries the
+/// thin-client wire format: the bound run wrapped in anchors (no flash), the
+/// document blob, the event verb with its `@doc` arg resolved absolute, the
+/// default verb twins, and the runtime `<script defer>` loaded from the shared
+/// `/js/reactivity.js`. The in-browser proof is the Playwright check (Stream 4).
 #[beet_core::test]
-async fn bindings_render_in_route_pipeline() {
+async fn counter_page_renders_reactively() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let root = spawn_site(&mut world);
 	let html = get(&mut world, root, "counter").await;
 	html.as_str()
+		// --- binding values, correct first paint ---
 		// the default head binds og:site_name to `PackageConfig.title` (no
 		// hand-written tag in the layout), so the markup-declared title surfaces
 		.xpect_contains("property=\"og:site_name\" content=\"Beet Test Site\"")
 		// the Card's `@prop:title` binds the caller's prop into the heading
 		.xpect_contains("<h2>Counter</h2>")
-		// the scoped `@doc:count=0` init reaches the text binding
-		.xpect_contains("You have clicked 0 times.")
-		// the event binding's field mirror stays out of the button label
-		.xpect_contains("<button>More</button>");
-	// exactly one og:site_name: the default head owns it, no duplicate.
-	html.matches("og:site_name").count().xpect_eq(1);
-}
-
-/// While serving (a live server inserts [`KeepAlive`]), the counter page is
-/// emitted in the reactive wire format: the SSR value is correct (no flash), the
-/// bound run is wrapped in anchors, the document blob and event verbs are
-/// emitted, and the `<ReactivityScript/>` runtime ships. This is the Stream 3
-/// gate; the in-browser proof is the Playwright check (Stream 4).
-#[beet_core::test]
-async fn served_counter_is_reactive() {
-	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	// stand in for a running HTTP server, the signal `default_renderer` gates on.
-	world.insert_resource(KeepAlive);
-	let root = spawn_site(&mut world);
-	let html = get(&mut world, root, "counter").await;
-	html.as_str()
+		// --- reactive wire format ---
 		// the document subtree is marked, and the bound run wrapped in anchors with
-		// the SSR value between them (correct first paint, no client overwrite).
+		// the scoped `@doc:count=0` init between them (correct paint, no overwrite)
 		.xpect_contains("data-bx-doc=")
 		.xpect_contains(
 			"You have clicked <!--bx-ref=\"counter.count\"-->0<!--bx-end--> times.",
 		)
-		// the event verb is re-emitted with its `@doc` arg resolved to an absolute
-		// path, so the client needs no scope walk.
+		// the event verb re-emitted with its `@doc` arg resolved to an absolute
+		// path, so the client needs no scope walk
 		.xpect_contains("bx:click=\"increment{ field: @doc:counter.count }\"")
-		// the hydration blob carries the initial state, keyed by document id.
+		// the hydration blob, keyed by document id
 		.xpect_contains("data-bx-blob")
 		.xpect_contains("\"count\":0")
-		// the runtime ships (the `<ReactivityScript/>` widget, active while serving).
-		.xpect_contains("EntityMut");
+		// the default verb twins ship (the runtime has zero built in)
+		.xpect_contains("data-bx-verbs")
+		// the runtime loads from the shared cached asset, not an inline script
+		.xpect_contains("<script defer src=\"/js/reactivity.js\"></script>");
+	// exactly one og:site_name: the default head owns it, no duplicate.
+	html.matches("og:site_name").count().xpect_eq(1);
+}
+
+/// A page with no `@doc`/`@prop` bindings (the markdown home page) stays
+/// byte-clean: the `Auto` reactive renderer emits no blob and no runtime script,
+/// so the static output is unchanged.
+#[beet_core::test]
+async fn plain_page_stays_clean() {
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
+	let root = spawn_site(&mut world);
+	get(&mut world, root, "docs/intro")
+		.await
+		.as_str()
+		.xnot()
+		.xpect_contains("data-bx")
+		.xnot()
+		.xpect_contains("/js/reactivity.js");
 }
 
 /// Regression: when a host root carries its own command [`RouteTree`] (eg the

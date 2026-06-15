@@ -52,7 +52,7 @@ pub struct ResolvedFieldPath {
 /// (with its [`Commands`]) in the resolve system.
 #[derive(SystemParam)]
 pub struct ScopeQuery<'w, 's> {
-	ancestors: Query<'w, 's, &'static ChildOf>,
+	traverse: ElementTraverseQuery<'w, 's>,
 	scopes: Query<'w, 's, &'static DocumentScope>,
 }
 
@@ -73,7 +73,7 @@ impl ScopeQuery<'_, '_> {
 	) -> FieldPath {
 		// innermost -> outermost as we walk up
 		let mut collected: Vec<FieldPath> = Vec::new();
-		for ancestor in self.ancestors.iter_ancestors_inclusive(subject) {
+		for ancestor in self.traverse.ancestors_inclusive(subject) {
 			if let Ok(scope) = self.scopes.get(ancestor) {
 				collected.push(scope.path.clone());
 				// a terminate scope is collected, then seals off outer scopes
@@ -362,6 +362,46 @@ mod test {
 
 		resolved_path(&mut world, field).xpect_eq(FieldPath::new(["name"]));
 		read_value(&mut world, field).xpect_eq(Value::Str("root_name".into()));
+	}
+
+	/// An attribute entity lives outside the `ChildOf` tree (related to its
+	/// element via [`AttributeOf`]). Its scope prefix and document must still
+	/// resolve through the owning element, agreeing with a text binding to the
+	/// same field under the same scope.
+	#[beet_core::test]
+	fn attribute_binding_scopes_through_its_element() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(val!({ "counter": { "count": 5i64 } })))
+			.id();
+		let scope = world
+			.spawn((ChildOf(doc), DocumentScope {
+				path: FieldPath::new(["counter"]),
+				terminate: false,
+			}))
+			.id();
+		let element = world.spawn((ChildOf(scope), Element::new("div"))).id();
+		// a text binding under the element (in the ChildOf tree)
+		let text = world
+			.spawn((ChildOf(element), Value::default(), FieldRef::new("count")))
+			.id();
+		// an attribute binding on the element (outside the ChildOf tree)
+		let attribute = world
+			.spawn((
+				AttributeOf::new(element),
+				Value::default(),
+				FieldRef::new("count"),
+			))
+			.id();
+		world.update_local();
+
+		// the attribute resolves to the same scoped absolute path as the text
+		let scoped = FieldPath::new(["counter", "count"]);
+		resolved_path(&mut world, text).xpect_eq(scoped.clone());
+		resolved_path(&mut world, attribute).xpect_eq(scoped);
+		// and reads the surrounding document, not an isolated empty one
+		read_value(&mut world, text).xpect_eq(Value::Int(5));
+		read_value(&mut world, attribute).xpect_eq(Value::Int(5));
 	}
 
 	#[beet_core::test]

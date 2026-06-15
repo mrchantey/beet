@@ -247,6 +247,23 @@ pub fn unescape_html_attribute(input: &str) -> String {
 	unescape_html_text(input)
 }
 
+/// Escape JSON for embedding inside a `<script>` element.
+///
+/// Replaces every `<` with its JSON unicode escape, so an embedded value (a
+/// `</script>` substring, an HTML comment opener) can never close or break out
+/// of the host `<script>`. The result is still valid JSON.
+///
+/// ```rust
+/// # use beet_ui::prelude::*;
+/// # use beet_core::prelude::*;
+/// // no `<` survives, so the value cannot close the host <script>
+/// escape_script_json(r#"{"html":"</script>"}"#)
+///     .xnot()
+///     .xpect_contains("<")
+///     .xpect_contains("/script>");
+/// ```
+pub fn escape_script_json(json: &str) -> String { json.replace('<', "\\u003c") }
+
 
 #[cfg(test)]
 mod test {

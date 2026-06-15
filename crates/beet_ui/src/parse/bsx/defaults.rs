@@ -56,17 +56,22 @@ fn register_default_events(world: &mut World) {
 
 /// Register the example verb set: each mutates a document field through its
 /// `field` binding argument's read-modify-write helper.
+///
+/// Each verb passes its `js_verb`, the self-contained JS twin the renderer emits
+/// into `data-bx-verbs` and the thin-client runtime installs (the runtime ships
+/// zero built-in verbs). Every twin matches the Rust semantics exactly.
 fn register_default_verbs(world: &mut World) {
+	// computed before borrowing the registry; `+`/`-` are the only difference.
+	let increment_js = counter_js('+');
+	let decrement_js = counter_js('-');
 	let mut verbs = world.resource_mut::<VerbRegistry>();
 	// `increment{ field, amount: i64 = 1 }`: add `amount` to the bound field.
-	// `js_verb` is `None`: the thin-client runtime hand-writes the four default
-	// twins (see the `web-reactivity` plan), so they need no per-page emission.
 	verbs.insert(
 		"increment",
 		VerbSchema::new()
 			.binding("field")
 			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
-		None,
+		Some(increment_js.as_str()),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let amount = args
 				.value("amount")
@@ -83,7 +88,7 @@ fn register_default_verbs(world: &mut World) {
 		VerbSchema::new()
 			.binding("field")
 			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
-		None,
+		Some(decrement_js.as_str()),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let amount = args
 				.value("amount")
@@ -94,11 +99,11 @@ fn register_default_verbs(world: &mut World) {
 			});
 		},
 	);
-	// `toggle{ field }`: flip the bound boolean field.
+	// `toggle{ field }`: flip the bound boolean field (true only when not true).
 	verbs.insert(
 		"toggle",
 		VerbSchema::new().binding("field"),
-		None,
+		Some("entity.set_field(args.field, entity.get_field(args.field) !== true);"),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			update_field(entity, args, |value| {
 				*value = Value::Bool(!matches!(value, Value::Bool(true)))
@@ -109,7 +114,7 @@ fn register_default_verbs(world: &mut World) {
 	verbs.insert(
 		"set",
 		VerbSchema::new().binding("field").value("value", ValueSchema::Any),
-		None,
+		Some("entity.set_field(args.field, args.value);"),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let Some(new_value) = args.value("value").cloned() else {
 				return;
@@ -117,6 +122,19 @@ fn register_default_verbs(world: &mut World) {
 			update_field(entity, args, move |value| *value = new_value);
 		},
 	);
+}
+
+/// The JS twin body of `increment`/`decrement`: coerce the bound field to a
+/// number (non-number reads as 0, matching `as_i64().unwrap_or(0)`), then apply
+/// `op` with `amount` (default 1). Self-contained: it touches only
+/// `entity`/`args`, as `new Function("entity", "args", body)` requires.
+fn counter_js(op: char) -> String {
+	format!(
+		"const value = entity.get_field(args.field);\n\
+		 const current = typeof value === \"number\" ? value : 0;\n\
+		 const amount = args.amount == null ? 1 : args.amount;\n\
+		 entity.set_field(args.field, current {op} amount);"
+	)
 }
 
 /// Read-modify-write the `field` binding argument against the host, the shared
@@ -212,5 +230,32 @@ mod test {
 			.get_field::<String>(&[FieldSegment::key("status")])
 			.unwrap()
 			.xpect_eq("done");
+	}
+
+	/// rsx! is a superset of the BSX event syntax: the same
+	/// `bx:<event>=verb{ args }` directive with `@`-binding args parses through
+	/// the same `parse_verb_call` grammar and installs the same event binding.
+	#[beet_core::test]
+	fn rsx_bx_click_increments_document_field() {
+		let mut world = ui_world();
+		let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
+		// rsx! accepts the same `bx:<event>=verb{ args }` directive as `.bsx`
+		let button = world
+			.spawn_template(rsx! {
+				<button bx:click=increment{ field: @doc:count }>"+"</button>
+			})
+			.unwrap()
+			.id();
+		world.entity_mut(button).insert(ChildOf(doc));
+		world.update_local();
+		world.entity_mut(button).trigger(PointerDown::new(button));
+		world.flush();
+		world
+			.entity(doc)
+			.get::<Document>()
+			.unwrap()
+			.get_field::<i64>(&[FieldSegment::key("count")])
+			.unwrap()
+			.xpect_eq(1);
 	}
 }
