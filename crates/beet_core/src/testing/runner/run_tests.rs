@@ -42,7 +42,7 @@ pub(super) fn run_non_send_tests_series(
 ) -> Result {
 	for (entity, test, mut func) in query.iter_mut() {
 		commands.entity(entity).remove::<NonSendTestFunc>();
-		let func = std::mem::replace(
+		let func = core::mem::replace(
 			func.as_mut(),
 			// unreachable because we remove the component immediately
 			NonSendTestFunc::new(|| unreachable!("test func already taken")),

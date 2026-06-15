@@ -4,9 +4,16 @@
 //! plus [`foreground_term`]/[`background_term`], which write the 16-colour,
 //! 256-colour and 24-bit sequences for a [`TermColor`](super::term_style::TermColor)
 //! used by [`TermStyle`](super::term_style::TermStyle).
+// The raw sequence constants below are no_std; the `Write`-based emitters are
+// std-only (they target stdout via `std::io::Write`). no_std colour output goes
+// through `TermColor::foreground_sgr`/`background_sgr` instead.
+#[cfg(feature = "std")]
 use crate::prelude::*;
+#[cfg(feature = "std")]
 use crate::terminal::term_style::TermColor;
+#[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "std")]
 use std::io::Write;
 
 /// The ESC control character (`0x1b`) that introduces every escape sequence.
@@ -123,27 +130,32 @@ pub const OVERLINE_OFF: &str = "\x1b[55m";
 // ── Positioning ───────────────────────────────────────────────────────────────
 
 /// Write a cursor-goto sequence for a 0-indexed [`UVec2`] position.
+#[cfg(feature = "std")]
 pub fn cursor_goto(w: &mut impl Write, pos: UVec2) -> io::Result<()> {
 	// ANSI format: row ; col (1-indexed)
 	write!(w, "\x1b[{};{}H", pos.y + 1, pos.x + 1)
 }
 
 /// Write cursor up by `n` rows.
+#[cfg(feature = "std")]
 pub fn cursor_up(w: &mut impl Write, n: u32) -> io::Result<()> {
 	write!(w, "\x1b[{n}A")
 }
 
 /// Write cursor down by `n` rows.
+#[cfg(feature = "std")]
 pub fn cursor_down(w: &mut impl Write, n: u32) -> io::Result<()> {
 	write!(w, "\x1b[{n}B")
 }
 
 /// Write cursor right by `n` columns.
+#[cfg(feature = "std")]
 pub fn cursor_right(w: &mut impl Write, n: u32) -> io::Result<()> {
 	write!(w, "\x1b[{n}C")
 }
 
 /// Write cursor left by `n` columns.
+#[cfg(feature = "std")]
 pub fn cursor_left(w: &mut impl Write, n: u32) -> io::Result<()> {
 	write!(w, "\x1b[{n}D")
 }
@@ -151,12 +163,14 @@ pub fn cursor_left(w: &mut impl Write, n: u32) -> io::Result<()> {
 // ── 24-bit colour ─────────────────────────────────────────────────────────────
 
 /// Write a 24-bit foreground colour from a bevy [`Color`].
+#[cfg(feature = "std")]
 pub fn foreground(w: &mut impl Write, color: Color) -> io::Result<()> {
 	let c = color.to_srgba().to_u8_array();
 	write!(w, "\x1b[38;2;{};{};{}m", c[0], c[1], c[2])
 }
 
 /// Write a 24-bit background colour from a bevy [`Color`].
+#[cfg(feature = "std")]
 pub fn background(w: &mut impl Write, color: Color) -> io::Result<()> {
 	let c = color.to_srgba().to_u8_array();
 	write!(w, "\x1b[48;2;{};{};{}m", c[0], c[1], c[2])
@@ -166,28 +180,14 @@ pub fn background(w: &mut impl Write, color: Color) -> io::Result<()> {
 
 /// Write a foreground [`TermColor`] using the 16-colour, 256-colour or 24-bit
 /// sequence as appropriate.
+#[cfg(feature = "std")]
 pub fn foreground_term(w: &mut impl Write, color: TermColor) -> io::Result<()> {
-	match color.palette_index() {
-		Some(index) if index < 8 => write!(w, "\x1b[{}m", 30 + index),
-		Some(index) => write!(w, "\x1b[{}m", 90 + index - 8),
-		None => match color {
-			TermColor::Fixed(n) => write!(w, "\x1b[38;5;{n}m"),
-			TermColor::Rgb(r, g, b) => write!(w, "\x1b[38;2;{r};{g};{b}m"),
-			_ => unreachable!("named colours return a palette index"),
-		},
-	}
+	write!(w, "{}", color.foreground_sgr())
 }
 
 /// Write a background [`TermColor`] using the 16-colour, 256-colour or 24-bit
 /// sequence as appropriate.
+#[cfg(feature = "std")]
 pub fn background_term(w: &mut impl Write, color: TermColor) -> io::Result<()> {
-	match color.palette_index() {
-		Some(index) if index < 8 => write!(w, "\x1b[{}m", 40 + index),
-		Some(index) => write!(w, "\x1b[{}m", 100 + index - 8),
-		None => match color {
-			TermColor::Fixed(n) => write!(w, "\x1b[48;5;{n}m"),
-			TermColor::Rgb(r, g, b) => write!(w, "\x1b[48;2;{r};{g};{b}m"),
-			_ => unreachable!("named colours return a palette index"),
-		},
-	}
+	write!(w, "{}", color.background_sgr())
 }

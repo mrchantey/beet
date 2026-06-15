@@ -11,6 +11,8 @@ pub(super) fn log_suite_running(
 	requests: Populated<(Entity, &TestRunnerConfig), Added<TestRunnerConfig>>,
 ) -> Result {
 	for (_entity, config) in requests {
+		// watch mode (terminal clear) is std/TUI only; the device never sets it.
+		#[cfg(feature = "std")]
 		if config.watch {
 			terminal_ext::clear().ok();
 		}
@@ -208,8 +210,13 @@ pub(super) fn log_suite_outcome(
 					out.push(String::new());
 					out.push(failed_heading(test, fail, color));
 					out.push(String::new());
-					out.push(failed_file_context(test, fail, color)?);
-					out.push(String::new());
+					// Source-line context reads the file from disk, so it is
+					// std-only; the device has no filesystem.
+					#[cfg(feature = "std")]
+					{
+						out.push(failed_file_context(test, fail, color)?);
+						out.push(String::new());
+					}
 					out.push(failed_stacktrace(test, fail, color));
 					out.push(String::new());
 				}
@@ -269,6 +276,7 @@ fn run_stats(outcome: &SuiteOutcome, config: &TestRunnerConfig) -> String {
 	format!("{} in {}", test_stats, time)
 }
 
+#[cfg(feature = "std")]
 fn failed_file_context(
 	test: &Test,
 	outcome: &TestFail,
@@ -370,11 +378,21 @@ fn fail_reason(outcome: &TestFail, color: bool) -> String {
 	}
 }
 
+/// The failure's file path: the filesystem-backed `WsPathBuf` on std (which
+/// resolves a panic location's own file), or the test's raw `source_file` on the
+/// device (where a panic location is never captured).
+#[cfg(feature = "std")]
+fn fail_path(test: &Test, outcome: &TestFail) -> String {
+	outcome.path(test).to_string()
+}
+#[cfg(not(feature = "std"))]
+fn fail_path(test: &Test, _outcome: &TestFail) -> String {
+	test.source_file.to_string()
+}
+
 fn failed_stacktrace(test: &Test, outcome: &TestFail, color: bool) -> String {
 	let prefix = TermStyle::new().dimmed().or_plain(color).paint("at");
-	let path = TermStyle::cyan()
-		.or_plain(color)
-		.paint(outcome.path(test).to_string());
+	let path = TermStyle::cyan().or_plain(color).paint(fail_path(test, outcome));
 	let start = outcome.start(test);
 	let line_loc = TermStyle::new().dimmed().or_plain(color).paint(format!(
 		":{}:{}",

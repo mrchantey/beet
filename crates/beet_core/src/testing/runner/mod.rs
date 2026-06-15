@@ -26,5 +26,7 @@ mod filter_tests;
 pub use filter_tests::*;
 mod logger;
 pub(self) use logger::*;
-/// Extensions for the test runner configuration.
+/// Extensions for the test runner configuration. std-only test scaffolding
+/// (single-app `run`/`run_async`, CLI-string config) used by beet's own tests.
+#[cfg(feature = "std")]
 pub mod test_runner_ext;

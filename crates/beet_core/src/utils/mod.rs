@@ -24,7 +24,6 @@ mod coalescing_trigger;
 pub mod cross_log;
 /// Display formatting utilities.
 pub mod display_ext;
-#[cfg(feature = "std")]
 mod file_span;
 #[cfg(feature = "std")]
 mod glob_filter;
@@ -35,7 +34,7 @@ mod lazy_pool;
 mod line_col;
 /// A no_std one-shot value channel.
 mod once_value;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "testing_embedded"))]
 mod panic_context;
 /// Process and command execution utilities.
 #[cfg(feature = "std")]
@@ -69,13 +68,12 @@ pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
 pub use cli_args::*;
 pub use coalescing_trigger::*;
-#[cfg(feature = "std")]
 pub use file_span::*;
 #[cfg(feature = "std")]
 pub use glob_filter::*;
 pub use line_col::*;
 pub use once_value::*;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "testing_embedded"))]
 pub use panic_context::*;
 #[cfg(feature = "rand")]
 pub use random_source::*;

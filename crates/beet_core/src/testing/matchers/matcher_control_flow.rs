@@ -3,8 +3,8 @@
 //! This module provides assertion methods for [`ControlFlow`] values.
 
 use crate::prelude::*;
-use std::fmt::Debug;
-use std::ops::ControlFlow;
+use core::fmt::Debug;
+use core::ops::ControlFlow;
 
 /// Extension trait adding assertion methods to [`ControlFlow<B, C>`].
 #[extend::ext(name=MatcherControlFlow)]
@@ -15,7 +15,7 @@ pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
-	/// # use std::ops::ControlFlow;
+	/// # use core::ops::ControlFlow;
 	/// ControlFlow::<(),()>::Continue(()).xpect_continue();
 	/// ```
 	///
@@ -40,7 +40,7 @@ pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
-	/// # use std::ops::ControlFlow;
+	/// # use core::ops::ControlFlow;
 	/// ControlFlow::<(),()>::Break(()).xpect_break();
 	/// ```
 	///
@@ -60,7 +60,7 @@ pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 
 #[cfg(test)]
 mod test {
-	use std::ops::ControlFlow;
+	use core::ops::ControlFlow;
 
 	use crate::prelude::*;
 

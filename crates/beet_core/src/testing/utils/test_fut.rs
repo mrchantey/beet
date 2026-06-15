@@ -1,4 +1,6 @@
-use std::future::Future;
+use alloc::string::String;
+use alloc::string::ToString;
+use core::future::Future;
 
 /// A trait representing an async test future that returns a Result<(), String>
 pub trait AsyncTest: 'static + Future<Output = Result<(), String>> {}
@@ -61,6 +63,10 @@ where
 
 /// Just block on async tests, useful as fallback
 /// for when runner feature is disabled.
+///
+/// std-only: `futures_lite`'s `block_on` needs its std feature. The embedded
+/// runner always drives async tests through the bevy_async executor instead.
+#[cfg(feature = "std")]
 #[track_caller]
 pub fn block_on_async_test<M>(fut: impl IntoFut<M>) {
 	futures_lite::future::block_on(fut.into_fut()).unwrap();

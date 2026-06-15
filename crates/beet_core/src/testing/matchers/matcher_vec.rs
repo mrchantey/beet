@@ -4,7 +4,7 @@
 //! predicate matching and emptiness checks.
 
 use crate::prelude::*;
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 /// Extension trait adding assertion methods to [`Vec<T>`].
 #[extend::ext(name=MatcherVec)]

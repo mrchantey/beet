@@ -1,10 +1,15 @@
 use crate::prelude::*;
+use core::future::Future;
+#[cfg(feature = "std")]
 use std::cell::Cell;
-use std::future::Future;
+#[cfg(feature = "std")]
 use std::pin::Pin;
+#[cfg(feature = "std")]
 use std::task;
+#[cfg(feature = "std")]
 use std::task::Poll;
 
+#[cfg(feature = "std")]
 thread_local! {
 	/// Whether [`PanicContext::init`] has been called yet.
 	/// Whether we are currently in a panic catch scope
@@ -13,10 +18,12 @@ thread_local! {
 	static CONTEXT: Cell<Option<PanicContext>> = Cell::new(None);
 }
 
+#[cfg(feature = "std")]
 static INITIALIZED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 /// Cross-platform method for capturing panic info, including in
 /// non-unwind contexts like wasm. See [`Self::catch`]
+#[cfg(feature = "std")]
 pub struct PanicContext {
 	/// The payload downcast to a string if possible
 	payload: Option<String>,
@@ -24,6 +31,40 @@ pub struct PanicContext {
 	location: Option<FileSpan>,
 }
 
+/// no_std (bare-metal) [`PanicContext`]: there is no unwinding under
+/// `panic = abort`, so it cannot catch. [`Self::catch`] runs the test directly;
+/// a failing assertion panics and the device panic handler logs it then
+/// semihosting-exits (the abort-on-first-failure model).
+#[cfg(not(feature = "std"))]
+pub struct PanicContext;
+
+#[cfg(not(feature = "std"))]
+impl PanicContext {
+	/// Runs `func`, mapping its result into a [`PanicResult`]. A panic is not
+	/// caught here; it aborts via the panic handler.
+	pub fn catch(func: impl FnOnce() -> Result<(), String>) -> PanicResult {
+		match func() {
+			Ok(()) => PanicResult::Ok,
+			Err(err) => PanicResult::Err(err),
+		}
+	}
+
+	/// Awaits `fut`, mapping its result into a [`PanicResult`]. As with
+	/// [`Self::catch`], a panic aborts rather than being caught.
+	pub fn catch_async<Fut>(fut: Fut) -> impl Future<Output = PanicResult>
+	where
+		Fut: Future<Output = Result<(), String>>,
+	{
+		async move {
+			match fut.await {
+				Ok(()) => PanicResult::Ok,
+				Err(err) => PanicResult::Err(err),
+			}
+		}
+	}
+}
+
+#[cfg(feature = "std")]
 impl PanicContext {
 	/// Cross-platform method for capturing panic info, including in
 	/// non-unwind contexts like wasm.
@@ -156,14 +197,17 @@ impl PanicResult {
 
 /// A future that wraps each poll in [`PanicContext::catch_poll`], to ensure
 /// panics are properly handled in a cross-plaform way.
+#[cfg(feature = "std")]
 struct PanicContextFuture<F> {
 	inner: F,
 }
 
+#[cfg(feature = "std")]
 impl<F> PanicContextFuture<F> {
 	pub fn new(inner: F) -> Self { Self { inner } }
 }
 
+#[cfg(feature = "std")]
 impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 	type Output = PanicResult;
 	fn poll(

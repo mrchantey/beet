@@ -82,8 +82,47 @@ mod utils;
 pub use runner::*;
 pub use utils::*;
 
-/// Re-export of [`inventory::submit`] so the `#[beet_core::test]` macro can
-/// register tests via the same `beet_core::testing` path it uses for
-/// everything else (works in integration tests via `use beet_core::testing;`).
+// Test registration is per-platform: native/wasm collect via `inventory`'s
+// life-before-main constructors, but those never run on bare metal, so the
+// embedded build registers into a `linkme` distributed slice instead. Both are
+// driven by the same `submit!` the `#[beet_core::test]` macro emits; the macro
+// is selected here by feature so the test author's usage is identical.
+#[cfg(feature = "testing")]
 #[doc(hidden)]
-pub use inventory::submit;
+pub use inventory::submit as _inventory_submit;
+
+/// linkme's distributed-slice attribute, re-exported so the `submit!` macro can
+/// reference it by `$crate` path without the test author depending on linkme.
+#[cfg(feature = "testing_embedded")]
+#[doc(hidden)]
+pub use linkme::distributed_slice;
+
+/// Registers a [`BeetTestCase`] via `inventory` (native/wasm).
+///
+/// The leading ident (the unique static name linkme needs) is unused here.
+#[cfg(feature = "testing")]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __beet_testing_submit {
+	($name:ident, $case:expr $(,)?) => {
+		$crate::testing::_inventory_submit! { $case }
+	};
+}
+
+/// Registers a [`BeetTestCase`] into the [`BEET_TESTS`] `linkme` slice (embedded).
+#[cfg(all(feature = "testing_embedded", not(feature = "testing")))]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __beet_testing_submit {
+	($name:ident, $case:expr $(,)?) => {
+		// The static name is derived from the (snake_case) test fn ident, so it
+		// trips `non_upper_case_globals`; the name is an internal linkme handle.
+		#[allow(non_upper_case_globals)]
+		#[$crate::testing::distributed_slice($crate::testing::BEET_TESTS)]
+		static $name: $crate::testing::BeetTestCase = $case;
+	};
+}
+
+/// The `#[beet_core::test]` registration entry, switched per-platform above.
+#[doc(hidden)]
+pub use crate::__beet_testing_submit as submit;

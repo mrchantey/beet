@@ -117,6 +117,14 @@ glob = "0.3"
 dotenv = "0.15"
 send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
+# Link-section test registration for bare-metal targets, where `inventory`'s
+# life-before-main ctors never run (xtensa-lx-rt does not walk `.init_array`).
+# Used by `beet_core/testing_embedded`; kept off the wasm build (unsupported).
+linkme = "0.3"
+# no_std interrupt-free critical sections; backs the embedded test runner's
+# single-cell async-test registration. The impl is supplied by the target
+# (eg esp-hal), beet_core only takes the `Mutex`/`with` API.
+critical-section = "1"
 itertools = { version = "0.14", default-features = false }
 # default-features off (drops `std`) so dependents can compile on no_std;
 # std consumers re-add `uuid/std`. `js`/`rng-getrandom` backends are opt-in per crate.
@@ -267,6 +275,9 @@ ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
 testing = ["beet_core/testing"]
+# no_std test runner for bare-metal consumers (eg the esp32 firmware): the beet
+# harness registering via `linkme` instead of `inventory`. See `beet_core`.
+testing_embedded = ["beet_core/testing_embedded"]
 # The nightly `custom_test_frameworks` test-runner path (libtest harness). Stable
 # builds use the default `inventory` runner.
 custom_test_frameworks = ["beet_core/custom_test_frameworks"]

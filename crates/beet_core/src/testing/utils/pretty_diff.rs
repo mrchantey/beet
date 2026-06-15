@@ -128,6 +128,8 @@ fn write_inline_diff<TWrite: fmt::Write>(
 /// Copied from https://crates.io/crates/diff on 2026/01/06
 mod diff {
 	#![forbid(unsafe_code)]
+	use alloc::vec;
+	use alloc::vec::Vec;
 
 	/// A fragment of a computed diff.
 	#[derive(Clone, Debug, PartialEq, Eq)]

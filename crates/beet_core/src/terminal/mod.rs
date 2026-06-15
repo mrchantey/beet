@@ -6,6 +6,9 @@
 
 pub mod escape;
 pub mod term_style;
+// Cursor/screen/size control writes to stdout via crossterm/libc, so it is
+// std-only; `escape` (raw sequences) and `term_style` (colour) stay no_std.
+#[cfg(feature = "std")]
 pub mod terminal_ext;
 
 pub use term_style::*;

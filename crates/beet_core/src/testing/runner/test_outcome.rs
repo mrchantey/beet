@@ -86,6 +86,9 @@ impl TestFail {
 	/// Gets the file path of the failure location.
 	///
 	/// Returns the panic location if available, otherwise the test file path.
+	/// std-only: the path type is the filesystem-backed [`WsPathBuf`]. The
+	/// embedded logger uses `test.source_file` directly instead.
+	#[cfg(feature = "std")]
 	pub fn path(&self, test: &Test) -> WsPathBuf {
 		match self {
 			TestFail::Panic {

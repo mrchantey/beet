@@ -5,7 +5,7 @@
 
 use crate::prelude::*;
 use bevy::prelude::*;
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 /// Extension trait adding assertion methods to [`Result<T, E>`].
 #[extend::ext(name=MatcherResult)]

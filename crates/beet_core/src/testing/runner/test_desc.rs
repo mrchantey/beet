@@ -4,7 +4,12 @@
 //! `custom_test_frameworks` path converts `test::*` into these via the
 //! `#[cfg(feature = "custom_test_frameworks")]` shims at the bottom.
 
-use std::string::String;
+// `alloc` (not `std`) so the descriptor types are no_std-ready (eg the esp32
+// firmware test build); these are identical to the `std` types on std.
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 /// Mirror of `test::TestName`.
 #[derive(Debug, Clone)]
@@ -110,6 +115,17 @@ pub struct TestDescAndFn {
 	pub testfn: TestFn,
 }
 
+/// The error string a `#[beet_core::test]` run yields on failure: an `alloc`
+/// [`String`].
+///
+/// The `#[beet_core::test]` macro names the generated runner fn's return type
+/// through this `beet_core::testing` re-export rather than `alloc`/`std`
+/// directly: integration tests and downstream crates already `use
+/// beet_core::testing;` (so `crate::testing::*` / `beet::testing::*` resolves),
+/// but do not import `beet_core::_alloc`, and `std::string::String` does not
+/// exist on the no_std device.
+pub type TestError = String;
+
 /// Converts a test's return value into the runner's `Result<(), String>`.
 ///
 /// Mirrors libtest's use of `std::process::Termination` for
@@ -200,14 +216,32 @@ impl BeetTestCase {
 	}
 }
 
+#[cfg(feature = "testing")]
 inventory::collect!(BeetTestCase);
 
 /// Collects all [`BeetTestCase`]s registered via [`inventory`].
+#[cfg(feature = "testing")]
 pub fn inventory_tests() -> Vec<TestDescAndFn> {
 	inventory::iter::<BeetTestCase>
 		.into_iter()
 		.map(BeetTestCase::to_desc_and_fn)
 		.collect()
+}
+
+/// The `linkme` distributed slice every embedded `#[beet_core::test]` registers
+/// into. `inventory`'s life-before-main constructors never run on bare metal
+/// (xtensa-lx-rt does not walk `.init_array`), so the embedded build collects
+/// cases from a dedicated linker section instead. Declared here, populated by
+/// the `submit!` the `#[beet_core::test]` macro emits under `testing_embedded`.
+#[cfg(feature = "testing_embedded")]
+#[linkme::distributed_slice]
+pub static BEET_TESTS: [BeetTestCase];
+
+/// Collects all [`BeetTestCase`]s registered via the [`BEET_TESTS`] `linkme`
+/// slice. The embedded mirror of [`inventory_tests`].
+#[cfg(feature = "testing_embedded")]
+pub fn embedded_tests() -> Vec<TestDescAndFn> {
+	BEET_TESTS.iter().map(BeetTestCase::to_desc_and_fn).collect()
 }
 
 #[cfg(feature = "custom_test_frameworks")]

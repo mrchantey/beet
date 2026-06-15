@@ -123,6 +123,18 @@ ctrlc = ["dep:ctrlc"]
 tokio = ["dep:tokio"]
 nightly = []
 testing = ["std", "dep:inventory"]
+# no_std test runner for bare-metal targets (eg the esp32 firmware). Same
+# `#[beet_core::test]` + matchers + `TestPlugin` as `testing`, but registers
+# cases through a `linkme` distributed slice (inventory's ctors are dead on
+# bare metal) and skips the std-only seams (snapshot fs, terminal control,
+# env/argv parsing, `process::exit`). The host supplies the `critical-section`
+# impl + an `AppExit` consumer. NOT `std`; kept off wasm (linkme is unsupported).
+testing_embedded = [
+	"dep:linkme",
+	"dep:critical-section",
+	"embedded",
+	"bevy_async",
+]
 # Opt-in nightly path: the macro emits libtest `#[test]`s collected via
 # `custom_test_frameworks`. Default builds use `inventory` on stable.
 custom_test_frameworks = [
@@ -203,6 +215,9 @@ beet_core_macros.workspace = true
 beet_core_shared = { workspace = true, optional = true }
 beet_async = { workspace = true, optional = true, default-features = false }
 inventory = { workspace = true, optional = true }
+# Bare-metal test registration (the `testing_embedded` feature); see its docs.
+linkme = { workspace = true, optional = true }
+critical-section = { workspace = true, optional = true }
 bytes.workspace = true
 bevy.workspace = true
 bevy_reflect.workspace = true

@@ -3,7 +3,7 @@
 //! This module provides assertion methods for comparing values for equality.
 
 use crate::prelude::*;
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 /// Extension trait adding equality assertion methods to all [`Debug`] types.
 #[extend::ext(name=MatcherEq)]

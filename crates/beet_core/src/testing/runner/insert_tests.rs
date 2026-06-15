@@ -6,7 +6,25 @@
 use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
+#[cfg(feature = "std")]
 use send_wrapper::SendWrapper;
+
+// no_std single-threaded stand-in for `send_wrapper::SendWrapper` (which uses
+// `std::thread`). The esp-rtos executor never moves a `NonSendTestFunc` across
+// threads, so asserting `Send + Sync` is sound, the same basis as the
+// critical-section test registration. Only static-fn tests run on device, so in
+// practice this is unused there, but it keeps `NonSendTestFunc` compiling.
+#[cfg(not(feature = "std"))]
+struct SendWrapper<T>(T);
+#[cfg(not(feature = "std"))]
+unsafe impl<T> Send for SendWrapper<T> {}
+#[cfg(not(feature = "std"))]
+unsafe impl<T> Sync for SendWrapper<T> {}
+#[cfg(not(feature = "std"))]
+impl<T> SendWrapper<T> {
+	fn new(value: T) -> Self { Self(value) }
+	fn take(self) -> T { self.0 }
+}
 
 
 /// Inserts a borrowed libtest slice into the [`World`] by converting each
@@ -48,13 +66,19 @@ fn test_fn_bundle(func: TestFn) -> impl Bundle {
 	}
 }
 fn test_desc_bundle(desc: TestDesc) -> impl Bundle {
+	// `FileSpan` is a Component only on std (the no_std span is a plain field in
+	// the outcome types); the device has no consumer for it, so it is omitted.
+	#[cfg(feature = "std")]
+	let span = FileSpan::new(
+		desc.source_file,
+		LineCol::new(desc.start_line as u32, desc.start_col as u32),
+		LineCol::new(desc.end_line as u32, desc.end_col as u32),
+	);
+	#[cfg(not(feature = "std"))]
+	let span = ();
 	(
 		Name::new(desc.name.to_string()),
-		FileSpan::new(
-			desc.source_file,
-			LineCol::new(desc.start_line as u32, desc.start_col as u32),
-			LineCol::new(desc.end_line as u32, desc.end_col as u32),
-		),
+		span,
 		Test::new(desc.clone()),
 		OnSpawn::new(move |entity| try_skip(entity, &desc)),
 	)
@@ -104,7 +128,7 @@ pub struct Test {
 	timer: Stopwatch,
 }
 
-impl std::ops::Deref for Test {
+impl core::ops::Deref for Test {
 	type Target = TestDesc;
 	fn deref(&self) -> &Self::Target { &self.desc }
 }

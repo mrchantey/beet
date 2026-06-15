@@ -6,6 +6,12 @@ use bevy::ecs::schedule::SingleThreadedExecutor;
 use bevy::time::TimePlugin;
 
 /// Builds and runs the test app for the given owned tests.
+///
+/// std-shaped: `MinimalPlugins`' run-once-and-exit plus [`AppExitPlugin`]'s
+/// `process::exit`. The bare-metal build assembles its own app + runner +
+/// `AppExit`-to-semihosting consumer instead, reusing [`TestPlugin`] and
+/// [`tests_bundle`].
+#[cfg(feature = "testing")]
 fn run_tests_app(tests: Vec<TestDescAndFn>) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
@@ -24,6 +30,7 @@ unsafe extern "C" {
 
 /// Stable-Rust entry point: runs every [`BeetTestCase`] registered via
 /// [`inventory`]. Invoked by the `beet_core::test_main!()` macro.
+#[cfg(feature = "testing")]
 pub fn test_main() {
 	#[cfg(target_family = "wasm")]
 	unsafe {
@@ -36,6 +43,7 @@ pub fn test_main() {
 ///
 /// Used by the `examples/runner.rs` demo. The nightly
 /// `custom_test_frameworks` harness uses [`libtest_runner`] instead.
+#[cfg(feature = "testing")]
 pub fn test_runner(tests: &[&TestDescAndFn]) {
 	run_tests_app(tests.iter().map(|t| test_ext::clone_static(t)).collect());
 }

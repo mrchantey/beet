@@ -3,7 +3,7 @@
 //! This module provides assertion methods for string types, including
 //! equality checks, substring containment, and prefix/suffix matching.
 
-use std::fmt::Display;
+use core::fmt::Display;
 
 use crate::prelude::*;
 

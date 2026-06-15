@@ -54,7 +54,7 @@ pub fn is_close_f64(a: f64, b: f64, delta: f64) -> bool {
 /// Returns the absolute difference between two values.
 pub fn abs_diff<T>(a: T, b: T) -> T
 where
-	T: PartialOrd + std::ops::Sub<Output = T>,
+	T: PartialOrd + core::ops::Sub<Output = T>,
 {
 	if a > b { a - b } else { b - a }
 }

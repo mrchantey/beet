@@ -1371,6 +1371,7 @@ dependencies = [
  "bitflags 2.11.1",
  "bytes",
  "console_error_panic_hook",
+ "critical-section",
  "crossterm",
  "ctrlc",
  "dotenv",
@@ -1386,6 +1387,7 @@ dependencies = [
  "itertools 0.14.0",
  "js-sys",
  "libc",
+ "linkme",
  "notify",
  "notify-debouncer-full",
  "pathdiff",
@@ -7922,6 +7924,26 @@ name = "linebender_resource_handle"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4a5ff6bcca6c4867b1c4fd4ef63e4db7436ef363e0ad7531d1558856bae64f4"
+
+[[package]]
+name = "linkme"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e83272d46373fb8decca684579ac3e7c8f3d71d4cc3aa693df8759e260ae41cf"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32d59e20403c7d08fe62b4376edfe5c7fb2ef1e6b1465379686d0f21c8df444b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "linux-raw-sys"

@@ -13,7 +13,8 @@
 //! value.passes(&10).xpect_true(); // passes because 5 != 10
 //! value.passes(&5).xpect_false(); // fails because negated
 //! ```
-use std::fmt::Display;
+use crate::prelude::*;
+use core::fmt::Display;
 
 /// Extension trait adding the `xnot()` method to all types.
 #[extend::ext(name=MatcherNot)]
@@ -67,7 +68,7 @@ impl<T> MaybeNot<T> {
 	pub fn passes_display(
 		&self,
 		result: bool,
-		expected: impl std::fmt::Display,
+		expected: impl core::fmt::Display,
 	) -> Result<(), String> {
 		match (result, self.is_negated()) {
 			(true, false) => Ok(()),
@@ -80,7 +81,7 @@ impl<T> MaybeNot<T> {
 	pub fn passes_debug(
 		&self,
 		result: bool,
-		expected: impl std::fmt::Debug,
+		expected: impl core::fmt::Debug,
 	) -> Result<(), String> {
 		match (result, self.is_negated()) {
 			(true, false) => Ok(()),
@@ -106,7 +107,7 @@ impl<T> MaybeNot<T> {
 		expected: &Expected,
 	) -> Result<(), String>
 	where
-		Expected: std::fmt::Display,
+		Expected: core::fmt::Display,
 		T: PartialEq<Expected>,
 	{
 		if self.passes(expected) {
@@ -122,7 +123,7 @@ impl<T> MaybeNot<T> {
 		expected: &Expected,
 	) -> Result<(), String>
 	where
-		Expected: std::fmt::Debug,
+		Expected: core::fmt::Debug,
 		T: PartialEq<Expected>,
 	{
 		if self.passes(expected) {
@@ -168,7 +169,7 @@ mod test {
 	impl<T, U> T
 	where
 		Self: IntoMaybeNotDisplay<U>,
-		U: PartialEq + std::fmt::Debug,
+		U: PartialEq + core::fmt::Debug,
 	{
 		fn check(self, expected: U) -> Result<(), String> {
 			self.into_maybe_not().compare_debug(&expected)
@@ -177,7 +178,7 @@ mod test {
 		// otherwise multiple impls
 		fn check_untyped<V>(self, expected: V) -> Result<(), String>
 		where
-			V: std::fmt::Debug,
+			V: core::fmt::Debug,
 			U: PartialEq<V>,
 		{
 			self.into_maybe_not().compare_debug(&expected)

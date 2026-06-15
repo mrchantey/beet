@@ -41,6 +41,7 @@ pub trait TestDescExt {
 	}
 
 	/// Returns the source file path as a workspace-relative path.
+	#[cfg(feature = "std")]
 	fn path(&self) -> WsPathBuf { WsPathBuf::new(self.desc().source_file) }
 
 	/// Returns the start location (line and column) of the test.

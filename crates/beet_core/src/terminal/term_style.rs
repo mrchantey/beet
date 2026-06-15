@@ -13,7 +13,10 @@
 //! ```
 use crate::prelude::escape;
 use crate::prelude::escape::RESET;
-use std::fmt::Display;
+use alloc::format;
+use alloc::string::String;
+use alloc::string::ToString;
+use core::fmt::Display;
 
 /// A terminal colour, resolved against the terminal's own palette.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -81,6 +84,36 @@ impl TermColor {
 			Fixed(_) | Rgb(..) => return None,
 		};
 		Some(index)
+	}
+
+	/// The SGR sequence that sets this colour as the foreground, using the
+	/// 16-colour, 256-colour or 24-bit form as appropriate. The no_std core
+	/// shared by [`escape::foreground_term`](crate::terminal::escape) and
+	/// [`TermStyle::prefix`].
+	pub fn foreground_sgr(&self) -> String {
+		match self.palette_index() {
+			Some(index) if index < 8 => format!("\x1b[{}m", 30 + index),
+			Some(index) => format!("\x1b[{}m", 90 + index - 8),
+			None => match self {
+				TermColor::Fixed(n) => format!("\x1b[38;5;{n}m"),
+				TermColor::Rgb(r, g, b) => format!("\x1b[38;2;{r};{g};{b}m"),
+				_ => unreachable!("named colours return a palette index"),
+			},
+		}
+	}
+
+	/// The SGR sequence that sets this colour as the background.
+	/// See [`foreground_sgr`](TermColor::foreground_sgr).
+	pub fn background_sgr(&self) -> String {
+		match self.palette_index() {
+			Some(index) if index < 8 => format!("\x1b[{}m", 40 + index),
+			Some(index) => format!("\x1b[{}m", 100 + index - 8),
+			None => match self {
+				TermColor::Fixed(n) => format!("\x1b[48;5;{n}m"),
+				TermColor::Rgb(r, g, b) => format!("\x1b[48;2;{r};{g};{b}m"),
+				_ => unreachable!("named colours return a palette index"),
+			},
+		}
 	}
 }
 
@@ -180,27 +213,26 @@ impl TermStyle {
 		if self.is_plain() {
 			return String::new();
 		}
-		let mut buf: Vec<u8> = Vec::new();
-		// writing to a Vec cannot fail
+		let mut buf = String::new();
 		if let Some(color) = self.foreground {
-			escape::foreground_term(&mut buf, color).ok();
+			buf.push_str(&color.foreground_sgr());
 		}
 		if let Some(color) = self.background {
-			escape::background_term(&mut buf, color).ok();
+			buf.push_str(&color.background_sgr());
 		}
 		if self.bold {
-			buf.extend_from_slice(escape::BOLD.as_bytes());
+			buf.push_str(escape::BOLD);
 		}
 		if self.dimmed {
-			buf.extend_from_slice(escape::FAINT.as_bytes());
+			buf.push_str(escape::FAINT);
 		}
 		if self.italic {
-			buf.extend_from_slice(escape::ITALIC.as_bytes());
+			buf.push_str(escape::ITALIC);
 		}
 		if self.underline {
-			buf.extend_from_slice(escape::UNDERLINE.as_bytes());
+			buf.push_str(escape::UNDERLINE);
 		}
-		String::from_utf8_lossy(&buf).into_owned()
+		buf
 	}
 
 	/// Wrap `val` in this style's prefix and a trailing [`RESET`].

@@ -1,8 +1,8 @@
 //! Panic and assertion helpers for matchers.
 //! All functions use `#[track_caller]` to capture the correct source location.
 use crate::prelude::*;
-use std::fmt::Debug;
-use std::fmt::Display;
+use core::fmt::Debug;
+use core::fmt::Display;
 
 
 
@@ -10,10 +10,27 @@ use std::fmt::Display;
 // Panic functions - always panic with formatted messages
 // ============================================================================
 
+/// Panics with the given message.
+///
+/// On std the payload is the `String` itself (so `PanicContext`'s
+/// `catch_unwind` can downcast it); on no_std there is no unwinding, so the
+/// abort-model panic handler logs the formatted message instead.
+#[track_caller]
+fn do_panic(msg: String) -> ! {
+	#[cfg(feature = "std")]
+	{
+		std::panic::panic_any(msg);
+	}
+	#[cfg(not(feature = "std"))]
+	{
+		panic!("{msg}");
+	}
+}
+
 /// Panics with a string message.
 #[track_caller]
 pub fn panic_str(msg: impl AsRef<str>) -> ! {
-	std::panic::panic_any(msg.as_ref().to_string());
+	do_panic(msg.as_ref().to_string());
 }
 
 /// Panics with formatted expected/received using Display for both.
@@ -24,7 +41,7 @@ pub fn panic_expected_received_display<T1: Display, T2: Display>(
 ) -> ! {
 	let expected = TermStyle::green().paint(expected);
 	let received = TermStyle::red().paint(received);
-	std::panic::panic_any(format!(
+	do_panic(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));
 }
@@ -37,7 +54,7 @@ pub fn panic_expected_received_debug<T1: Debug, T2: Debug>(
 ) -> ! {
 	let expected = TermStyle::green().paint(format!("{:?}", expected));
 	let received = TermStyle::red().paint(format!("{:?}", received));
-	std::panic::panic_any(format!(
+	do_panic(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));
 }
@@ -50,7 +67,7 @@ pub fn panic_expected_received_debug_display<T1: Debug, T2: Display>(
 ) -> ! {
 	let expected = TermStyle::green().paint(format!("{:?}", expected));
 	let received = TermStyle::red().paint(received);
-	std::panic::panic_any(format!(
+	do_panic(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));
 }
@@ -63,7 +80,7 @@ pub fn panic_expected_received_display_debug<T1: Display, T2: Debug>(
 ) -> ! {
 	let expected = TermStyle::green().paint(expected);
 	let received = TermStyle::red().paint(format!("{:?}", received));
-	std::panic::panic_any(format!(
+	do_panic(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));
 }

@@ -59,9 +59,12 @@ mod path;
 #[cfg(feature = "std")]
 mod path_utils;
 pub mod template;
-#[cfg(feature = "std")]
+// `term_style` (colours) is no_std and feeds the test logger, so the embedded
+// test runner needs `terminal` too; the io/tty control parts stay std-gated
+// inside the module.
+#[cfg(any(feature = "std", feature = "testing_embedded"))]
 pub mod terminal;
-#[cfg(feature = "testing")]
+#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 pub mod testing;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
@@ -150,7 +153,7 @@ pub mod prelude {
 	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
-	#[cfg(feature = "testing")]
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 	pub use crate::testing::*;
 	pub use crate::subtree_template;
 	pub use crate::template::*;
@@ -160,7 +163,7 @@ pub mod prelude {
 	pub use crate::utils::*;
 	#[cfg(feature = "template_serde")]
 	pub use crate::template_serde::*;
-	#[cfg(feature = "std")]
+	#[cfg(any(feature = "std", feature = "testing_embedded"))]
 	pub use crate::terminal::*;
 	pub use either::Either;
 	#[cfg(feature = "serde")]

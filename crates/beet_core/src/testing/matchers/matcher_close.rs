@@ -4,7 +4,7 @@
 //! values within a tolerance using the [`CloseTo`] trait.
 
 use crate::prelude::*;
-use std::fmt::Display;
+use core::fmt::Display;
 
 
 /// Extension trait adding approximate equality assertion methods.

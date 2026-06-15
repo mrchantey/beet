@@ -3,19 +3,22 @@
 /// Internal helper: log a line to native stdout.
 ///
 /// The `cfg(feature = "std")` check lives here in `beet_core`, where `std`
-/// is a declared feature, so it is never evaluated in downstream crates.
+/// is a declared feature, so it is never evaluated in downstream crates. On a
+/// bare no_std target (no stdout) it routes through `tracing` instead, so the
+/// message still reaches the platform's logger (eg RTT on the esp32).
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]
-#[cfg_attr(not(feature = "std"), allow(unused_variables))]
 pub fn _cross_log_native(msg: &str) {
 	#[cfg(feature = "std")]
 	println!("{}", msg);
+	#[cfg(not(feature = "std"))]
+	tracing::info!("{}", msg);
 }
 
 /// Internal helper: log without a newline to native stdout, flushing after.
+/// no_std has no stdout, so it routes through `tracing` (a record per call).
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]
-#[cfg_attr(not(feature = "std"), allow(unused_variables))]
 pub fn _cross_log_native_noline(msg: &str) {
 	#[cfg(feature = "std")]
 	{
@@ -23,15 +26,18 @@ pub fn _cross_log_native_noline(msg: &str) {
 		use std::io::Write;
 		std::io::stdout().flush().unwrap();
 	}
+	#[cfg(not(feature = "std"))]
+	tracing::info!("{}", msg);
 }
 
 /// Internal helper: log a line to native stderr.
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]
-#[cfg_attr(not(feature = "std"), allow(unused_variables))]
 pub fn _cross_log_error_native(msg: &str) {
 	#[cfg(feature = "std")]
 	eprintln!("{}", msg);
+	#[cfg(not(feature = "std"))]
+	tracing::error!("{}", msg);
 }
 
 /// Cross-platform raw output without a trailing newline.

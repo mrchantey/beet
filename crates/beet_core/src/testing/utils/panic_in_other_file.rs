@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 /// A helper function that panics, used to test that panic locations
 /// are correctly reported when they occur in a different file than the test.
 pub fn panic_in_this_file() {

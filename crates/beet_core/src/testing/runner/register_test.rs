@@ -38,14 +38,64 @@
 use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
-use std::cell::RefCell;
-use std::pin::Pin;
+use core::cell::RefCell;
+use core::pin::Pin;
 
+// Registration storage. A test fn invoked synchronously by the runner may call
+// `register_test`, stashing the async body + params for the runner to pick up
+// immediately after. std uses a `thread_local!`; the single-threaded esp-rtos
+// executor uses a `critical_section::Mutex` static instead, which is sound
+// because only the executor ever touches it (no other thread or interrupt does).
+#[cfg(feature = "std")]
 thread_local! {
-	/// Thread-local storage for test registration.
-	/// When a test function is invoked by libtest, it calls `register_test`
-	/// which populates this cell with both the async test future and params.
 	static REGISTERED_TEST: RefCell<Option<TestRegistration>> = RefCell::new(None);
+}
+
+// The registration holds a `Pin<Box<dyn AsyncTest>>`, which is neither `Send`
+// nor `Sync`, but a `static` must be `Sync`. The single-threaded esp-rtos
+// executor is the only accessor and every access is inside a critical section,
+// so asserting `Sync` on the wrapper is sound.
+#[cfg(not(feature = "std"))]
+struct SyncRegistration(
+	critical_section::Mutex<RefCell<Option<TestRegistration>>>,
+);
+#[cfg(not(feature = "std"))]
+unsafe impl Sync for SyncRegistration {}
+
+#[cfg(not(feature = "std"))]
+static REGISTERED_TEST: SyncRegistration =
+	SyncRegistration(critical_section::Mutex::new(RefCell::new(None)));
+
+/// Stores a pending registration, clobbering any prior one.
+#[cfg(feature = "std")]
+fn store_registration(reg: TestRegistration) {
+	REGISTERED_TEST.with(|cell| *cell.borrow_mut() = Some(reg));
+}
+#[cfg(not(feature = "std"))]
+fn store_registration(reg: TestRegistration) {
+	critical_section::with(|cs| {
+		*REGISTERED_TEST.0.borrow(cs).borrow_mut() = Some(reg)
+	});
+}
+
+/// Takes the pending registration, if any.
+#[cfg(feature = "std")]
+fn take_registration() -> Option<TestRegistration> {
+	REGISTERED_TEST.with(|cell| cell.borrow_mut().take())
+}
+#[cfg(not(feature = "std"))]
+fn take_registration() -> Option<TestRegistration> {
+	critical_section::with(|cs| REGISTERED_TEST.0.borrow(cs).borrow_mut().take())
+}
+
+/// Whether a registration is currently pending.
+#[cfg(feature = "std")]
+fn has_registration() -> bool {
+	REGISTERED_TEST.with(|cell| cell.borrow().is_some())
+}
+#[cfg(not(feature = "std"))]
+fn has_registration() -> bool {
+	critical_section::with(|cs| REGISTERED_TEST.0.borrow(cs).borrow().is_some())
 }
 
 /// Registration data for a test, containing both the test future and params
@@ -88,11 +138,9 @@ struct TestRegistration {
 /// 3. Insert params as ECS components for system access
 #[track_caller]
 pub fn register_test<M>(params: TestCaseParams, fut: impl IntoFut<M>) {
-	REGISTERED_TEST.with(|cell| {
-		*cell.borrow_mut() = Some(TestRegistration {
-			async_test: Box::pin(fut.into_fut()),
-			params,
-		});
+	store_registration(TestRegistration {
+		async_test: Box::pin(fut.into_fut()),
+		params,
 	});
 }
 
@@ -120,17 +168,15 @@ pub(super) struct TestRunResult {
 pub(super) fn try_run_async(
 	func: impl FnOnce() -> Result<(), String>,
 ) -> TestRunResult {
-	REGISTERED_TEST.with(|cell| {
-		if cell.borrow().is_some() {
-			panic!(
-				"test was registered outside of a test run. This is not supported"
-			);
-		}
-	});
+	if has_registration() {
+		panic!(
+			"test was registered outside of a test run. This is not supported"
+		);
+	}
 
 	let panic_outcome = PanicContext::catch(func);
 
-	let registration = REGISTERED_TEST.with(|cell| cell.borrow_mut().take());
+	let registration = take_registration();
 
 	match registration {
 		Some(reg) => {

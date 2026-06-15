@@ -20,5 +20,9 @@ pub use matcher_ord::*;
 pub use matcher_result::*;
 pub use matcher_str::*;
 pub use matcher_vec::*;
+// Snapshot matchers read/write `.snap` files and use `LazyLock`/`Mutex`, so the
+// no_std (embedded) test build drops them; on-device tests use the inline matchers.
+#[cfg(feature = "std")]
 mod snapshot;
+#[cfg(feature = "std")]
 pub use snapshot::*;

@@ -18,13 +18,13 @@ pub use beet_core::cross_log_error;
 #[cfg(feature = "custom_test_frameworks")]
 pub use beet_core::libtest_runner;
 pub use beet_core::main;
-#[cfg(feature = "testing")]
+#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 pub use beet_core::test;
 #[cfg(feature = "testing")]
 pub use beet_core::test_main;
 #[cfg(feature = "testing")]
 pub use beet_core::test_runner;
-#[cfg(feature = "testing")]
+#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 pub use beet_core::testing;
 #[cfg(feature = "examples")]
 pub use beet_examples as examples;

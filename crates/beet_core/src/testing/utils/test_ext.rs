@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::testing::utils::*;
-use std::panic::Location;
+use core::panic::Location;
 
 /// Uses [`Location::caller`] to propagate test location and name
 #[track_caller]

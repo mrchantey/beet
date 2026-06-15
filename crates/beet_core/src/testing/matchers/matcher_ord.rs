@@ -4,7 +4,7 @@
 //! ordering relations (less than, greater than, etc.).
 
 use crate::prelude::*;
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 /// Extension trait adding ordering assertion methods to [`PartialOrd`] types.
 #[extend::ext(name=MatcherOrd)]

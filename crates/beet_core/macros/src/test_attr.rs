@@ -156,13 +156,21 @@ pub fn impl_test_attr(
 
 	let run_fn = quote! {
 		#[allow(dead_code)]
-		fn #run_ident() -> ::core::result::Result<(), ::std::string::String> {
+		// The return type is named through the `testing` re-export (not `_alloc`
+		// or `std`) so the macro resolves the same way `BeetTestCase` does:
+		// integration tests / downstream crates import `beet_core::testing` but
+		// not `_alloc`, and `std::string::String` is absent on the no_std device.
+		fn #run_ident() -> ::core::result::Result<(), #beet_core::testing::TestError> {
 			#run_body
 		}
 	};
 
-	let inventory = quote! {
+	// The unique static name linkme needs for the embedded registration; the
+	// inventory path ignores it. Derived from the fn ident like `__beet_run_*`.
+	let case_ident = format_ident!("__beet_test_case_{}", ident);
+	let registration = quote! {
 		#beet_core::testing::submit! {
+			#case_ident,
 			#beet_core::testing::BeetTestCase::new(
 				concat!(module_path!(), "::", stringify!(#ident)),
 				file!(),
@@ -206,7 +214,7 @@ pub fn impl_test_attr(
 
 	Ok(quote! {
 		#run_fn
-		#inventory
+		#registration
 		#libtest_fn
 	})
 }

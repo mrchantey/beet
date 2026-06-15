@@ -27,7 +27,11 @@ pub struct TestRunnerConfig {
 	pub no_color: bool,
 	/// Suppress all logger output.
 	pub quiet: bool,
-	/// Glob pattern filter for test selection.
+	/// Glob pattern filter for test selection. std-only: glob matching pulls the
+	/// `glob` crate (filesystem-oriented), and the device runs every test, so the
+	/// embedded build omits the field and [`passes_filter`](Self::passes_filter)
+	/// always passes.
+	#[cfg(feature = "std")]
 	pub filter: GlobFilter,
 	/// By default the glob filter wraps all patterns in wildcards,
 	/// so `*foo*` will match `/foo.rs`. Specify `--exact` to disable this.
@@ -40,11 +44,33 @@ pub struct TestRunnerConfig {
 	pub timeout_ms: u64,
 }
 
+impl Default for TestRunnerConfig {
+	fn default() -> Self {
+		Self {
+			started: Instant::now(),
+			watch: false,
+			no_incremental: false,
+			log_cases: false,
+			log_runs: false,
+			log_skipped: false,
+			no_color: false,
+			quiet: false,
+			#[cfg(feature = "std")]
+			filter: GlobFilter::default(),
+			exact: false,
+			ignored: false,
+			include_ignored: false,
+			timeout_ms: Self::DEFAULT_TIMEOUT_MS,
+		}
+	}
+}
+
 impl TestRunnerConfig {
 	/// Default per-test timeout in milliseconds.
 	const DEFAULT_TIMEOUT_MS: u64 = 5_000;
 
 	/// Creates a config from a [`CliArgs`] instance.
+	#[cfg(feature = "std")]
 	pub fn from_cli_args(args: CliArgs) -> Self {
 		let params = args.params;
 
@@ -105,11 +131,13 @@ impl TestRunnerConfig {
 	}
 
 	/// Creates a config by parsing a CLI-style string.
+	#[cfg(feature = "std")]
 	pub fn from_cli_str(args: &str) -> Self {
 		Self::from_cli_args(CliArgs::parse(args))
 	}
 
 	/// Creates a config from environment CLI arguments.
+	#[cfg(feature = "std")]
 	pub fn from_env() -> Self { Self::from_cli_args(CliArgs::parse_env()) }
 
 	/// Returns the instant this was created.
@@ -119,8 +147,14 @@ impl TestRunnerConfig {
 	pub fn timeout(&self) -> Duration { Duration::from_millis(self.timeout_ms) }
 
 	/// Returns true if the given test passes the filter.
+	#[cfg(feature = "std")]
 	pub fn passes_filter(&self, test: &super::Test) -> bool {
 		self.filter.passes(test.name.to_string())
 			|| self.filter.passes(test.source_file)
 	}
+
+	/// The embedded build has no glob filter (it runs every test), so every
+	/// test passes. See the [`filter`](Self::filter) field.
+	#[cfg(not(feature = "std"))]
+	pub fn passes_filter(&self, _test: &super::Test) -> bool { true }
 }
