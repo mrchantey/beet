@@ -172,15 +172,18 @@ _extra-pkgs-wasm := "beet_spatial"
 # - `ndarray` / `cuda`: burn backends mutually exclusive with `wgpu` (the
 #   default). Co-enabling them links conflicting backend runtimes and corrupts
 #   the heap at process teardown, so `--all-features` is never safe here.
+# - `testing_embedded`: the bare-metal runner backend, collecting cases through a
+#   `linkme` distributed slice that is unsupported off bare metal (notably wasm).
+#   Validated on its own target, never in these native/wasm sweeps.
 # On stable additionally excludes `nightly` / `custom_test_frameworks`, the
 # nightly-only test-runner features that stable cannot compile.
 _core-features pkgs:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	if rustc --version | grep -q nightly; then
-		exclude='/(default|ndarray|cuda)$'
+		exclude='/(default|ndarray|cuda|testing_embedded)$'
 	else
-		exclude='/(nightly|custom_test_frameworks|default|ndarray|cuda)$'
+		exclude='/(nightly|custom_test_frameworks|default|ndarray|cuda|testing_embedded)$'
 	fi
 	feats=$(for c in {{ pkgs }}; do
 		# Crates may be nested (e.g. crates/beet_core/macros) — resolve by package name.

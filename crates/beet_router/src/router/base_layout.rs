@@ -150,9 +150,6 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use beet_ui::prelude::*;
-	// disambiguate the `Header` widget from `beet_net`'s `Header` trait, both
-	// pulled in via the prelude globs above.
 	use beet_ui::prelude::Header;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }

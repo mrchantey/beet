@@ -41,21 +41,27 @@ pub struct OnWebSocketUpgrade {
 }
 impl Socket {
 	fn effect(self, entity: &mut EntityWorldMut) {
-		let (send, mut recv) = self.split();
+		let (mut send, mut recv) = self.split();
+		// Feed the writer task over a channel. Both halves are `SendWrapper`s
+		// (under `bevy_multithreaded`) bound to the thread they were created on,
+		// so they must only be touched from a `_local` task. The observer runs on
+		// an arbitrary pool thread, so it only pushes `Send` messages into the
+		// channel rather than touching the writer directly.
+		let (message_send, message_recv) = async_channel::unbounded::<Message>();
 		entity
-			.observe_any(
-				move |ev: On<MessageSend>, commands: AsyncCommands| -> Result {
-					let mut send = send.clone();
-					let message = ev.event().clone();
-					commands.run_local(async move |_| {
-						// socket send errors are non-fatal
-						send.send(message.take()).await.unwrap_or_else(|err| {
-							error!("{:?}", err);
-						})
-					});
-					Ok(())
-				},
-			)
+			.observe_any(move |ev: On<MessageSend>| -> Result {
+				message_send.try_send(ev.event().clone().take()).ok();
+				Ok(())
+			})
+			// writer task: owns `send` and drains the channel on its creation thread.
+			.run_async_local(async move |_| {
+				while let Ok(message) = message_recv.recv().await {
+					// socket send errors are non-fatal
+					send.send(message).await.unwrap_or_else(|err| {
+						error!("{:?}", err);
+					})
+				}
+			})
 			// `_local`: the reader is a `SendWrapper` (under `bevy_multithreaded`)
 			// bound to the thread it was created on, so it must be polled there.
 			.run_async_local(async move |entity| {
@@ -187,9 +193,6 @@ impl Stream for SocketRead {
 /// Platform-specific implementations live in their respective modules and are
 /// boxed into `Socket`.
 pub trait SocketWriter: 'static + MaybeSend {
-	/// Returns a boxed clone of this writer for sharing across tasks.
-	fn clone_boxed(&self) -> Box<dyn SocketWriter>;
-
 	/// Send a message to the socket peer.
 	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
 	/// Close the socket with an optional close frame.
@@ -216,14 +219,6 @@ impl SocketWrite {
 		self.writer.close_boxed(close).await
 	}
 }
-impl Clone for SocketWrite {
-	fn clone(&self) -> Self {
-		Self {
-			writer: SendWrapper::new(self.writer.clone_boxed()),
-		}
-	}
-}
-
 /// A WebSocket message.
 ///
 /// Mirrors common WS message types across platforms (e.g. web-sys and tungstenite)
@@ -326,9 +321,6 @@ mod tests {
 	}
 
 	impl SocketWriter for DummyWriter {
-		fn clone_boxed(&self) -> Box<dyn SocketWriter> {
-			Box::new(self.clone())
-		}
 		fn send_boxed(
 			&mut self,
 			msg: Message,

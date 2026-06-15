@@ -146,8 +146,6 @@ impl Drop for WasmSocketWriter {
 }
 
 impl SocketWriter for WasmSocketWriter {
-	fn clone_boxed(&self) -> Box<dyn SocketWriter> { Box::new(self.clone()) }
-
 	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>> {
 		let res = match msg {
 			Message::Text(s) => self.ws.send_with_str(&s).map_jserr(),

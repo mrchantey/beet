@@ -87,7 +87,10 @@ fn main() -> AppExit {
 /// routes layered on the same router.
 fn setup(mut commands: Commands) -> Result {
 	commands
-		.spawn((server_from_cli()?, site()))
+		// `bootstrap_server` fires the `StartServer` that boots whichever server
+		// `server_from_cli` selected (an empty filter matches it); without it the
+		// server never runs its exchange and the app loops forever.
+		.spawn((server_from_cli()?, bootstrap_server(), site()))
 		.with_children(|parent| {
 			#[cfg(feature = "codegen")]
 			parent.spawn(exchange_route("codegen", Codegen));

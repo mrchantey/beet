@@ -295,8 +295,6 @@ struct TungWriter {
 }
 
 impl SocketWriter for TungWriter {
-	fn clone_boxed(&self) -> Box<dyn SocketWriter> { Box::new(self.clone()) }
-
 	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>> {
 		let tmsg = to_tung_msg(msg);
 		let sink = self.sink.clone();
