@@ -30,14 +30,17 @@ pub fn server_plugin(app: &mut App) {
 	rules.extend_rules(color_scheme_rules());
 }
 
-/// Every site route: the page collection plus the docs and blog collections,
-/// each grouped under a [`BlobStore`] rooted at its markdown source directory so
-/// their [`BlobScene`] routes can read their content.
+/// Every site route: the page collection plus the docs and blog collections
+/// (each grouped under a [`BlobStore`] rooted at its markdown source directory so
+/// their [`BlobScene`] routes can read their content), plus the `/assets` route
+/// serving the workspace `assets/` directory (eg `/assets/branding/favicon-32x32.png`
+/// and the images referenced by blog posts).
 pub fn beet_site_endpoints() -> impl Bundle {
 	children![
 		pages_routes(),
 		(content_store("docs"), docs_routes()),
 		(content_store("blog"), blog_routes()),
+		serve_store("assets", asset_store()),
 	]
 }
 
@@ -48,6 +51,20 @@ fn content_store(dir: &str) -> BlobStore {
 		AbsPathBuf::new_workspace_rel(format!("crates/beet_site/src/{dir}"))
 			.unwrap();
 	BlobStore::new(FsStore::new(root))
+}
+
+/// The static asset store backing the `/assets` route, rooted at the workspace
+/// `assets/` directory.
+///
+/// A [`BlobStore`] so serving is filesystem/S3 agnostic: [`serve_blob`] streams
+/// the bytes from this local [`FsStore`], and swapping in an S3-backed store at
+/// deploy time redirects to its public URL instead, with no route change. The
+/// directory is git-ignored, holding the branding and blog images the site and
+/// markdown reference (eg `/assets/branding/favicon-32x32.png`).
+fn asset_store() -> BlobStore {
+	BlobStore::new(FsStore::new(
+		AbsPathBuf::new_workspace_rel("assets").unwrap(),
+	))
 }
 
 /// The site router.

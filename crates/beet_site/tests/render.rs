@@ -130,6 +130,19 @@ async fn title_is_not_sticky_across_requests() {
 		.xpect_eq(site_title);
 }
 
+/// The `/assets` route streams files from the workspace `assets/` directory, so
+/// the branding and blog images the site and markdown reference resolve rather
+/// than 404 (the favicon `<link>` and eg post-6's sea-shanty photo).
+#[beet::test]
+async fn assets_route_serves_files() {
+	let response = site_world()
+		.spawn(beet_site_router())
+		.exchange(Request::get("assets/branding/favicon-32x32.png"))
+		.await;
+	response.status().xpect_eq(StatusCode::OK);
+	response.bytes().await.unwrap().is_empty().xpect_false();
+}
+
 #[beet::test]
 async fn sidebar_marks_active_route() {
 	// the sidebar reads the current path from `RequestContext`, marking the active

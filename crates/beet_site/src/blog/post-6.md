@@ -16,7 +16,7 @@ Last week I was lucky enough to attend the first DevOps Days in my hometown of W
 I spent much of my twenties traveling the festival circuit in Serenity, my beloved Mitsubishi Express. I started working at the commercial festivals I'd attended as a teenager, but quickly discovered what I love about festivals is better represented in folk culture. Before long I was exclusively seeking folk festivals and alternative gatherings where the lines between organizer, performer, and attendee are blurred, and in some cases disappear completely. In this culture, the experience is crafted by each participant and the result is radical individuality. For me, this meant dressing up like a pirate and performing to an audience not much bigger than our own motley crew.
 
 
-<img alt="hope you can read this sam and danny, it's a picture of us all the first time we performed at folk by the sea in the little room downstairs :)" src="/assets/blog/kiama-sea-shanty-club.jpg" style="width:941px;"/>
+<img alt="Kiama Sea Shanty Club at Folk by the Sea 2023" src="/assets/blog/kiama-sea-shanty-club.jpg" style="width:941px;"/>
 
 <p style="align-self:center;"><em>Kiama Sea Shanty Club - Folk By The Sea 2023</em></p>
 
@@ -39,4 +39,3 @@ Folk technology is alive and well—we can see it in game jams, makerspaces, and
 At DevOps Days Wollongong, I gave a talk describing the problems these silos create for developers, and the principles that make ECS architecture different. I believe it is our best shot at fulfilling Kay's vision for the Computer Revolution—technology as beautiful and free as music.
 
 <iframe src="https://www.youtube.com/embed/oK1o0AX-FRU" alt-src="https://youtu.be/oK1o0AX-FRU" title="Unifying the Fuller Stack with ECS" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
