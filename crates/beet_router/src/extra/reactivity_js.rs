@@ -7,7 +7,7 @@ use beet_net::prelude::*;
 use beet_ui::prelude::REACTIVITY_JS;
 use beet_ui::prelude::REACTIVITY_SRC;
 
-/// A [`CacheStrategy::Static`] route serving the thin-client reactivity runtime
+/// A [`ExportStrategy::Static`] route serving the thin-client reactivity runtime
 /// ([`REACTIVITY_JS`]) as `application/javascript` at [`REACTIVITY_SRC`].
 ///
 /// `default_router` wires it in, so a served page's auto-injected
@@ -23,7 +23,7 @@ pub fn reactivity_js_route() -> impl Bundle {
 			}),
 		),
 		HttpMethod::Get,
-		CacheStrategy::Static,
+		ExportStrategy::Static,
 	)
 }
 

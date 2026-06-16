@@ -1,13 +1,16 @@
 <!--
 The whole site: a router serving the `routes/` directory, every page wrapped
-in the `templates/Layout.bsx` document. The router's middleware attaches as
-component spreads: request logging, `--help`, terminal link navigation, and
-the layout itself. There is no `main.rs`: `beet serve` is the host. The
-`<PackageConfig/>` declaration patches the named fields of the resource,
-creating it from defaults if absent, so the title and description are set in
-markup with no compile-time host config.
+in the `templates/Layout.bsx` document. The router's middleware, server, and
+default app routes all attach as component spreads: request logging, `--help`,
+terminal link navigation, the layout, the default app routes
+(`DefaultAppRoutes`, eg the `/js/reactivity.js` runtime a reactive page loads),
+and an `HttpServer`. There is no `main.rs`: `beet serve` spawns this host and
+triggers its server, which the site owns here in markup. The `<PackageConfig/>`
+declaration patches the named fields of the resource, creating it from defaults
+if absent, so the title and description are set in markup with no compile-time
+host config.
 -->
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, DefaultAppRoutes, HttpServer{port:8337})}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<RoutesDir src="routes"/>
 </Router>

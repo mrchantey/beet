@@ -44,8 +44,8 @@ use beet_core::prelude::*;
 ///     app.world_mut().spawn((
 ///         default_router(),
 ///         children![
-///             render_action::fixed_route("", Name::new("welcome!")),
-///             render_action::fixed_route("about", Name::new("about")),
+///             render_action::fixed_func_route("", || Name::new("welcome!")),
+///             render_action::fixed_func_route("about", || Name::new("about")),
 ///         ],
 ///         ReplServer,
 ///     ));

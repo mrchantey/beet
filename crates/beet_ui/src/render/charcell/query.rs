@@ -114,7 +114,7 @@ impl CharcellNodeData<'_> {
 		// `display: none` children are removed from layout: skipping them here
 		// means they reserve no space (measure) and are never assigned a rect
 		// (layout), so the subtree is neither sized nor painted. A child that is a
-		// [`RenderRef`] holder is resolved to the entity it renders in place; a
+		// [`Portal`] holder is resolved to the entity it renders in place; a
 		// tag-less grouping wrapper (children, no [`Element`]) is spliced out, its
 		// children hoisted into this flow so they lay out as direct siblings.
 		query
@@ -142,12 +142,12 @@ impl CharcellNodeData<'_> {
 	}
 }
 
-/// Follow a chain of [`RenderRef`] holders to the entity that renders in place.
+/// Follow a chain of [`Portal`] holders to the entity that renders in place.
 ///
-/// A [`RenderRef`] holder is transparent: the charcell pipeline treats the
-/// referenced entity as if it sat at the holder's position (see [`RenderRef`]),
+/// A [`Portal`] holder is transparent: the charcell pipeline treats the
+/// referenced entity as if it sat at the holder's position (see [`Portal`]),
 /// so every traversal resolves through this before visiting a node.
-fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
+fn resolve_render_ref(refs: &Query<&Portal>, mut entity: Entity) -> Entity {
 	// follow holders to their target; the relationship always names one, so an
 	// unresolved slot points at a placeholder that renders empty in place.
 	while let Ok(render_ref) = refs.get(entity) {
@@ -204,24 +204,24 @@ impl WrapperQuery<'_, '_> {
 	}
 }
 
-/// [`RenderRef`]-aware traversal of a charcell buffer tree.
+/// [`Portal`]-aware traversal of a charcell buffer tree.
 ///
 /// Every phase (prepare, measure, layout, paint) walks the tree through this, so
-/// a [`RenderRef`] holder is transparently replaced by the entity it renders in
-/// a single place rather than each system threading [`Children`] + [`RenderRef`]
+/// a [`Portal`] holder is transparently replaced by the entity it renders in
+/// a single place rather than each system threading [`Children`] + [`Portal`]
 /// queries and re-deriving the resolution. Its orderings match
 /// [`CharcellNodeData::child_nodes`], so the per-entity rect map keys line up.
 #[derive(SystemParam)]
 pub(crate) struct CharcellTree<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
-	refs: Query<'w, 's, &'static RenderRef>,
+	refs: Query<'w, 's, &'static Portal>,
 	// transparent grouping wrappers spliced out so every traversal agrees with
 	// [`CharcellNodeData::child_nodes`] (see [`WrapperQuery`]).
 	wrappers: WrapperQuery<'w, 's>,
 }
 
 impl CharcellTree<'_, '_> {
-	/// Follow [`RenderRef`] holders to the entity that renders in place.
+	/// Follow [`Portal`] holders to the entity that renders in place.
 	pub fn resolve(&self, entity: Entity) -> Entity {
 		resolve_render_ref(&self.refs, entity)
 	}
@@ -327,7 +327,7 @@ pub struct CharcellQuery<'w, 's> {
 			Option<&'static KittyImage>,
 		),
 	>,
-	refs: Query<'w, 's, &'static RenderRef>,
+	refs: Query<'w, 's, &'static Portal>,
 	// transparent grouping wrappers (see [`WrapperQuery`]); their children are
 	// hoisted into the parent's flow. Such a wrapper carries no box, so the render
 	// systems never assign it an `IntrinsicSize`/`LayoutRect` and it is absent from
@@ -338,7 +338,7 @@ pub struct CharcellQuery<'w, 's> {
 
 impl CharcellQuery<'_, '_> {
 	/// The flow child entities behind a [`Children`]: each resolved through
-	/// [`RenderRef`] holders, with transparent grouping wrappers spliced out so
+	/// [`Portal`] holders, with transparent grouping wrappers spliced out so
 	/// their own children take their place (depth-first, order preserved). Keeps
 	/// [`CharcellNodeData::child_nodes`] aligned with the [`CharcellTree`]
 	/// traversal that paint reads.
@@ -350,7 +350,7 @@ impl CharcellQuery<'_, '_> {
 		out
 	}
 
-	/// Resolve a child into the flow: push its [`RenderRef`]-resolved id, or, when
+	/// Resolve a child into the flow: push its [`Portal`]-resolved id, or, when
 	/// it is a transparent wrapper, recurse so its children take its place.
 	fn push_flow_entity(&self, entity: Entity, out: &mut Vec<Entity>) {
 		let entity = resolve_render_ref(&self.refs, entity);
@@ -366,7 +366,7 @@ impl CharcellQuery<'_, '_> {
 		}
 	}
 
-	/// Build a node for an entity that is already [`RenderRef`]-resolved,
+	/// Build a node for an entity that is already [`Portal`]-resolved,
 	/// without following holders again.
 	pub(super) fn unresolved_node(
 		&self,

@@ -92,7 +92,7 @@ pub fn spawn_routes_dir(
 			ChildOf(ev.entity),
 			route(&route_path_of(rel), BlobScene::new(store_path_of(rel))),
 			HttpMethod::Get,
-			CacheStrategy::Static,
+			ExportStrategy::Static,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
 		#[cfg(feature = "markdown_parser")]

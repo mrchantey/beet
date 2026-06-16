@@ -6,7 +6,7 @@
 //! root.
 //!
 //! The boundary is the *rendered content* entity — the one tagged
-//! [`RenderRootOf`] and walked by the `NodeRenderer` — not the [`RenderRoot`]
+//! [`PageOf`] and walked by the `NodeRenderer` — not the [`Page`]
 //! handle that names it. The two coincide for self-referential roots, but an
 //! ephemeral coordinator route points its handle at separate content, and only
 //! the content lives in the traversed tree.
@@ -14,9 +14,9 @@
 //! # Traversal Rules
 //!
 //! Given an entity, RouteQuery:
-//! 1. Traverses up to find the containing [`RenderRootOf`], or root if none exists
+//! 1. Traverses up to find the containing [`PageOf`], or root if none exists
 //! 2. Iterates descendants within that render root, stopping at and excluding
-//!    nested [`RenderRootOf`] boundaries (unless it's the render root itself)
+//!    nested [`PageOf`] boundaries (unless it's the render root itself)
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -31,7 +31,7 @@ pub struct RouteQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
-	render_roots: Query<'w, 's, (), With<RenderRootOf>>,
+	render_roots: Query<'w, 's, (), With<PageOf>>,
 }
 
 impl<'w, 's> RouteQuery<'w, 's> {
@@ -46,8 +46,8 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// Finds the render root for the given entity.
 	///
 	/// Traverses [`ChildOf`] ancestors to find the nearest rendered-content root
-	/// ([`RenderRootOf`]), or returns the root ancestor if none is found. The
-	/// `ChildOf` walk is acyclic — descendants are not tagged with `RenderRootOf`
+	/// ([`PageOf`]), or returns the root ancestor if none is found. The
+	/// `ChildOf` walk is acyclic — descendants are not tagged with `PageOf`
 	/// — so this is loop-safe.
 	pub fn render_root(&self, entity: Entity) -> Entity {
 		self.ancestors
@@ -56,7 +56,7 @@ impl<'w, 's> RouteQuery<'w, 's> {
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity is a rendered-content root ([`RenderRootOf`]),
+	/// Returns true if the entity is a rendered-content root ([`PageOf`]),
 	/// ie a boundary the traversal stops at.
 	pub fn is_render_root(&self, entity: Entity) -> bool {
 		self.render_roots.contains(entity)
@@ -65,7 +65,7 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// Creates a depth-first iterator over entities within the render.
 	///
 	/// Starts from the given entity's render root and traverses descendants,
-	/// stopping at [`RenderRoot`] boundaries.
+	/// stopping at [`Page`] boundaries.
 	pub fn iter_dfs(&self, entity: Entity) -> RenderDfsIter<'_, 'w, 's> {
 		let root = self.render_root(entity);
 		RenderDfsIter {
@@ -93,7 +93,7 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// Creates a breadth-first iterator over entities within the render.
 	///
 	/// Starts from the given entity's render root and traverses descendants,
-	/// stopping at [`RenderRoot`] boundaries.
+	/// stopping at [`Page`] boundaries.
 	pub fn iter_bfs(&self, entity: Entity) -> RenderBfsIter<'_, 'w, 's> {
 		let root = self.render_root(entity);
 		RenderBfsIter {
@@ -189,17 +189,17 @@ impl Iterator for RenderBfsIter<'_, '_, '_> {
 mod test {
 	use super::*;
 
-	/// Spawns a self-referential [`RenderRoot`] boundary entity.
+	/// Spawns a self-referential [`Page`] boundary entity.
 	fn render_root(world: &mut World) -> Entity {
 		let entity = world.spawn_empty().id();
-		world.entity_mut(entity).insert(RenderRootOf(entity));
+		world.entity_mut(entity).insert(PageOf(entity));
 		entity
 	}
 
-	/// Spawns a self-referential [`RenderRoot`] boundary entity as a child.
+	/// Spawns a self-referential [`Page`] boundary entity as a child.
 	fn render_root_child(world: &mut World, parent: Entity) -> Entity {
 		let entity = world.spawn(ChildOf(parent)).id();
-		world.entity_mut(entity).insert(RenderRootOf(entity));
+		world.entity_mut(entity).insert(PageOf(entity));
 		entity
 	}
 

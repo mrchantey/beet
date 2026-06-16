@@ -12,10 +12,9 @@ fn sidebar_nodes() -> Vec<SidebarNode> {
 	let id = world.spawn(beet_site_router()).id();
 	world.flush();
 	let tree = world.entity(id).get::<RouteTree>().unwrap().clone();
-	let mut state = SidebarState::new("")
-		.with_home(false)
-		.with_exclude("app-info")
-		.with_exclude("analytics");
+	// no explicit excludes: only `PageRoute`-marked routes reach the nav, so the
+	// infra routes (`app-info`/`analytics`/`js/reactivity.js`) drop out on their own.
+	let mut state = SidebarState::new("").with_home(false);
 	for node in tree.flatten_nodes() {
 		if let Some(meta) = world.entity(node.entity).get::<ArticleMeta>() {
 			state = state.with_info(node.path.annotated_path(), meta.sidebar_info());
@@ -31,9 +30,11 @@ fn excludes_infra_routes() {
 		.iter()
 		.map(|node| node.display_name.as_str())
 		.collect();
-	// the batteries-included infra routes never appear in the nav
+	// the batteries-included infra routes never appear in the nav (no PageRoute)
 	names.iter().any(|name| *name == "app-info").xpect_false();
 	names.iter().any(|name| *name == "analytics").xpect_false();
+	// the `/js/reactivity.js` asset route is infra too, so its `js` branch is gone
+	names.iter().any(|name| *name == "js").xpect_false();
 }
 
 #[beet::test]

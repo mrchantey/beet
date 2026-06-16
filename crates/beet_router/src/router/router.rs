@@ -201,9 +201,9 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((default_router(), children![render_action::fixed_route(
+			.spawn((default_router(), children![render_action::fixed_func_route(
 				"about",
-				rsx! { <p>"About page"</p> }
+				|| rsx! { <p>"About page"</p> }
 			),]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
@@ -217,9 +217,9 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((default_router(), children![render_action::fixed_route(
+			.spawn((default_router(), children![render_action::fixed_func_route(
 				"",
-				rsx! { <p>"Root content"</p> }
+				|| rsx! { <p>"Root content"</p> }
 			),]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -233,13 +233,13 @@ mod test {
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
 			.spawn((default_router(), children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"",
-					rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
+					|| rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"about"</p> }
+					|| rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::get(""))
@@ -256,9 +256,9 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"about"</p> }
+					|| rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help"))
@@ -274,9 +274,9 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"about"</p> }
+					|| rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help"))
@@ -303,13 +303,13 @@ mod test {
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
 			.spawn((default_router(), children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"",
-					rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
+					|| rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"about"</p> }
+					|| rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str(""))
@@ -328,15 +328,15 @@ mod test {
 		let root = world
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_route(
+					render_action::fixed_func_route(
 						"counter",
-						Element::new("p").with_inner_text("counter")
+						|| Element::new("p").with_inner_text("counter")
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"about"</p> }
+					|| rsx! { <p>"about"</p> }
 				),
 			]))
 			.flush();
@@ -373,15 +373,15 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_route(
+					render_action::fixed_func_route(
 						"counter",
-						Element::new("p").with_inner_text("counter")
+						|| Element::new("p").with_inner_text("counter")
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"about"</p> }
+					|| rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str(

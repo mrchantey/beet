@@ -19,8 +19,8 @@ use beet_core::prelude::*;
 /// parses argv and environment into a request, runs one exchange, streams the
 /// response body to stdout, then exits (unless [`KeepAlive`] is set).
 ///
-/// This is how every beet binary boots: spawn it on the host alongside
-/// [`bootstrap_cli`], which fires the `cli`-filtered [`StartServer`]. Being a
+/// This is how every beet binary boots: spawn it on the host, then trigger
+/// [`StartServer::all`] (the empty filter matches the lone server). Being a
 /// one-shot, [`StopServer`] is a no-op for it.
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
@@ -114,11 +114,12 @@ mod tests {
 	async fn cli_server_works() {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		app.world_mut().spawn((
-			CliServer,
-			bootstrap_cli(),
-			exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
-		));
+		app.world_mut()
+			.spawn((
+				CliServer,
+				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
+			))
+			.trigger(StartServer::all);
 		app.run_async()
 			.await
 			.xpect_eq(AppExit::Error(1.try_into().unwrap()));

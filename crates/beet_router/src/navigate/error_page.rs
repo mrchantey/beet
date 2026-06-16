@@ -5,7 +5,7 @@
 //! down on the initial home fetch) the failure is both logged (`error!`) and
 //! surfaced to the user as a rendered page rather than left blank. [`error_page`]
 //! builds the template into a [`CurrentPage`], so the live page host paints it
-//! through the same layout/`RenderRef` path as any other page.
+//! through the same layout/`Portal` path as any other page.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;

@@ -38,6 +38,9 @@ impl Element {
 	pub fn new(name: impl Into<SmolStr>) -> Self { Self(name.into()) }
 	/// The tag name of this element, ie `div`, `span`, `p`.
 	pub fn tag(&self) -> &str { &self.0 }
+	/// Whether the tag equals `tag`, case-insensitively: HTML tag names are
+	/// case-insensitive, so `<DIV>` and `<div>` are the same element.
+	pub fn tag_eq(&self, tag: &str) -> bool { self.0.eq_ignore_ascii_case(tag) }
 	/// Bundle this element with inner text, using [`OnSpawn`] to avoid
 	/// clobbering other children.
 	pub fn with_inner_text(self, text: &str) -> impl Bundle {

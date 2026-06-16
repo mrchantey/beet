@@ -5,11 +5,12 @@
 //! # Every binary is a CLI server
 //!
 //! A formal beet binary boots as a CLI server at the top level: its entrypoint
-//! triggers a [`StartServer`] with the `cli` filter on its host (see
-//! [`bootstrap_cli`]), parsing argv into a [`Request`] and running one exchange
-//! against the router. Long-running servers ([`HttpServer`], the `beet_router`
-//! `TuiServer`) are started the same way, by a [`StartServer`] event whose
-//! filter selects them.
+//! spawns the host (a [`CliServer`] + router) and then triggers
+//! [`StartServer::all`] on it, so the server's `on_add` observers are registered
+//! before the start lands. The `CliServer` parses argv into a [`Request`], runs
+//! one exchange against the router, and exits. Long-running servers
+//! ([`HttpServer`], the `beet_router` `TuiServer`) are started the same way, by a
+//! [`StartServer`] event whose filter selects them.
 //!
 //! # Server owns its boot
 //!
@@ -61,7 +62,8 @@ impl StartServer {
 	}
 
 	/// The CLI entrypoint start: targets `entity`, filtered to the `cli` server.
-	/// The "every binary is a CLI server" boot, fired by [`bootstrap_cli`].
+	/// Most hosts carry a single server and trigger [`StartServer::all`]; this
+	/// names `cli` explicitly when several servers share a host.
 	pub fn cli(entity: Entity) -> Self { Self::named(entity, "cli") }
 
 	/// A start built agnostically from a request: the `--server=` value selects
@@ -133,31 +135,6 @@ impl StopServer {
 /// inserts it so a file watcher keeps firing.
 #[derive(Default, Resource)]
 pub struct KeepAlive;
-
-/// The CLI entrypoint: a spawn effect that fires [`StartServer::cli`] on its host
-/// once the bundle's components (and their `on_add` observers) have landed.
-///
-/// This is the "every binary is a CLI server" boot. Spawn it alongside a
-/// [`CliServer`] on the host so the host runs one argv exchange and exits:
-///
-/// ```ignore
-/// world.spawn((CliServer, bootstrap_cli(), default_router()));
-/// ```
-pub fn bootstrap_cli() -> impl Bundle {
-	OnSpawn::new(|entity: &mut EntityWorldMut| {
-		entity.trigger(StartServer::cli);
-	})
-}
-
-/// A general entrypoint: a spawn effect that fires [`StartServer::all`] on its
-/// host, booting whichever server component the host carries (empty filter
-/// matches all). Use it when the server is selected by build features or argv
-/// rather than fixed to the CLI, eg a site host that may be HTTP or a live TUI.
-pub fn bootstrap_server() -> impl Bundle {
-	OnSpawn::new(|entity: &mut EntityWorldMut| {
-		entity.trigger(StartServer::all);
-	})
-}
 
 #[cfg(test)]
 mod test {

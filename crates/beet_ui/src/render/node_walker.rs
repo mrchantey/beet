@@ -8,7 +8,7 @@ pub type NodeView<'a> = (
 	Option<&'a Children>,
 	Option<&'a Value>,
 	Option<&'a Expression>,
-	Option<&'a RenderRef>,
+	Option<&'a Portal>,
 );
 
 
@@ -57,7 +57,7 @@ impl NodeWalker<'_, '_> {
 			render_ref,
 		) = node;
 
-		// A RenderRef holder is transparent: recurse directly into the
+		// A Portal holder is transparent: recurse directly into the
 		// referenced entity, rendering it in place without touching this
 		// entity's own components. Absence of the holder is the unresolved
 		// state (no page yet), which renders nothing.

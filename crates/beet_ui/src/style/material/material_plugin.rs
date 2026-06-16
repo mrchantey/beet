@@ -144,7 +144,7 @@ mod tests {
 		});
 	}
 
-	/// Content transcluded into a `.dark-scheme` layout by [`RenderRef`] (no
+	/// Content transcluded into a `.dark-scheme` layout by [`Portal`] (no
 	/// `ChildOf` edge) still inherits the layout's scheme through the holder, so a
 	/// card in referenced content is dark, not the light `:root` fallback. This is
 	/// the document-layout transclusion path that produced the "white card".
@@ -165,7 +165,7 @@ mod tests {
 		let body = world
 			.spawn((rsx! { <div/> }, Classes::new([classes::DARK_SCHEME])))
 			.id();
-		world.spawn((RenderRef::new(content), ChildOf(body)));
+		world.spawn((Portal::new(content), ChildOf(body)));
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let memo = &mut default();
 			let card_bg = query.resolve(card, BackgroundColor, memo).unwrap();

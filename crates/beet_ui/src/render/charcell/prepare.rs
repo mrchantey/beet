@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 /// [`ScrollPosition`] on every node in a buffer tree (rooted at a `B` component)
 /// that is missing them.
 ///
-/// Walks the tree via [`CharcellTree`], resolving [`RenderRef`] holders so
+/// Walks the tree via [`CharcellTree`], resolving [`Portal`] holders so
 /// transcluded content is prepared too. Structural mutations are isolated to
 /// this step so the measure, layout, and paint phases can run pure query access
 /// without command buffering.

@@ -12,18 +12,22 @@
 use beet_core::prelude::*;
 use core::fmt;
 
-/// Caching strategy for route responses.
+/// Whether a route is pre-rendered to disk during static export (SSG).
+///
+/// Read only by static export (`export_static`) to pick which routes to write
+/// out. It is not a live response cache: at serve time every route renders
+/// fresh per request regardless of this value.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum CacheStrategy {
-	/// An endpoint that may produce different responses for the same path and method,
-	/// and should not be cached.
+pub enum ExportStrategy {
+	/// An endpoint that may produce different responses for the same path and
+	/// method, so it is skipped by static export.
 	#[default]
 	Dynamic,
-	/// An endpoint that always returns the same response for a given
-	/// path and method, making it suitable for SSG and caching.
+	/// An endpoint that always returns the same response for a given path and
+	/// method, so static export pre-renders it to a file.
 	Static,
 }
 

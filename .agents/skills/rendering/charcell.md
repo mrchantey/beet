@@ -24,7 +24,7 @@ The terminal layout + paint engine, `crates/beet_ui/src/render/charcell`. Read t
 - **Adding `padding`/`display:block` to an inline element** changes its charcell box and can shift a whole subtree. Re-render the terminal after any such change, not just the web.
 - **A flex column clamps each item's cross size (width) to the container** (`resolve_line_sizes` in `flex.rs`). Items are measured at the unconstrained viewport, so without the clamp a column with `align-items: center` centres against a width wider than it has and overflows (the homepage-hero-past-the-sidebar bug). The main axis stays unclamped (height scrolls).
 - **The ratatui/ANSI paint drops colour alpha** (`color_to_ratatui` uses RGB only), so a *transparent* colour renders as **black**, not invisible. To reserve a border that should not show (eg equalising a filled button with an outlined one), colour it the same as the fill, not transparent.
-- **Default scheme is dark**, set by the layout (`beet_site/src/layouts/layout.rs`), not the renderer: a non-html request gets `.dark-scheme` on `<body>` so a light `OnSurface` isn't invisible on a dark terminal. Transcluded `.md`/`RenderRef` content inherits this because `RuleSetQuery::parent` + `resolve_styles` follow `RenderRef` across the transclusion boundary.
+- **Default scheme is dark**, set by the layout (`beet_site/src/layouts/layout.rs`), not the renderer: a non-html request gets `.dark-scheme` on `<body>` so a light `OnSurface` isn't invisible on a dark terminal. Transcluded `.md`/`Portal` content inherits this because `RuleSetQuery::parent` + `resolve_styles` follow `Portal` across the transclusion boundary.
 
 ## Measure against a real terminal width
 

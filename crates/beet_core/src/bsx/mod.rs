@@ -48,7 +48,7 @@
 //!   current entity: the element in attribute position, the text node in text
 //!   position
 //! - `@entity:Name::` retargets a component binding to a `bx:ref` named entity;
-//!   the names `BuildRoot`, `SnippetRoot`, `RenderRoot` and `Router` are reserved
+//!   the names `BuildRoot`, `SnippetRoot`, `Page` and `Router` are reserved
 //!   ([`ReservedRef`]) for well-known entities (the latter two resolved lazily
 //!   each sync pass) and may not be shadowed
 //! - `@prop:` the enclosing `.bsx` template's props store, materialized from

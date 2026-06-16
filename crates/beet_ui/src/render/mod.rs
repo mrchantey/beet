@@ -2,18 +2,11 @@
 mod charcell;
 #[cfg(feature = "style")]
 pub use charcell::*;
-#[cfg(feature = "template_serde")]
-mod template;
-#[cfg(feature = "template_serde")]
-pub use template::*;
+// the html-rendering target, its utilities, reactive-render injection and the
+// `reactivity.js` runtime; the shared `node_walker`/`node_renderer` substrate
+// (also used by markdown/ansi/charcell) stays here in `render/`.
 mod html;
 pub use html::*;
-#[cfg(all(feature = "bsx", feature = "json"))]
-mod reactive_html_render;
-#[cfg(all(feature = "bsx", feature = "json"))]
-pub use reactive_html_render::{InsertReactive, REACTIVITY_JS, REACTIVITY_SRC};
-mod html_utils;
-pub use html_utils::*;
 mod style_map;
 pub use style_map::*;
 mod media;

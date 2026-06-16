@@ -26,11 +26,12 @@ fn main() {
 			material::MaterialStylePlugin::new(palettes::basic::YELLOW),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((
-				HttpServer::default(),
-				bootstrap_server(),
-				Handler.into_action(),
-			));
+			commands
+				.spawn((
+					HttpServer::default(),
+					Handler.into_action(),
+				))
+				.trigger(StartServer::all);
 		})
 		.run();
 }

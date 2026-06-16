@@ -45,10 +45,12 @@ fn main() -> AppExit {
 }
 
 fn setup(mut commands: Commands) -> Result {
-	commands.spawn((
-		FsStore::new(WsPathBuf::new("examples/assets")),
-		router_scene()?,
-	));
+	commands
+		.spawn((
+			FsStore::new(WsPathBuf::new("examples/assets")),
+			router_scene()?,
+		))
+		.trigger(StartServer::all);
 	Ok(())
 }
 
@@ -60,10 +62,9 @@ pub fn router_scene() -> Result<impl Bundle> {
 		// declare the store used by the blob scenes
 		// the server is the IO layer, handling incoming requests
 		// from http, stdin etc
+		// the spawn site triggers `StartServer::all` (empty filter matches it).
+		// `ReplServer` self-boots its own loop, so it ignores the start.
 		server_from_cli()?,
-		// boot whichever server `server_from_cli` selected (empty filter matches
-		// it). `ReplServer` self-boots its own loop, so it ignores this.
-		bootstrap_server(),
 		// the batteries-included router: route lookup + the default app routes,
 		// wrapping the user routes (children with a PathPartial and action)
 		(default_router(), children![routes()]),
@@ -130,15 +131,17 @@ struct CounterParams {
 
 
 fn counter() -> impl Bundle {
-	let field_ref = FieldRef::new("count").with_init(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		render_action::fixed_route("counter", rsx! {
-			<div>
-				<h1>"Cookie Counter"</h1>
-				<p>"Value: "{field_ref.clone()}</p>
-				{increment(field_ref)}
-			</div>
+		render_action::fixed_func_route("counter", || {
+			let field_ref = FieldRef::new("count").with_init(0);
+			rsx! {
+				<div>
+					<h1>"Cookie Counter"</h1>
+					<p>"Value: "{field_ref.clone()}</p>
+					{increment(field_ref)}
+				</div>
+			}
 		}),
 	)
 }

@@ -4,30 +4,30 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// On the rendered content entity: its [`RenderRoot`] handle (often itself).
+/// On the rendered content entity: its [`Page`] handle (often itself).
 ///
-/// The source side of the one-to-one [`RenderRoot`] relationship, the entity
+/// The source side of the one-to-one [`Page`] relationship, the entity
 /// whose tree the [`NodeRenderer`] walks, and the boundary at which in-tree
 /// traversal stops (see [`RouteQuery`]). A fixed or per-request route is
 /// self-referential — the content is its own handle — hence
 /// `allow_self_referential`. An ephemeral coordinator route instead points a
 /// persistent handle at a separately spawned content entity (see
-/// [`RenderRoot::insert_rendered`]).
+/// [`Page::insert_rendered`]).
 #[derive(Component)]
-#[relationship(relationship_target = RenderRoot, allow_self_referential)]
-pub struct RenderRootOf(pub Entity);
+#[relationship(relationship_target = Page, allow_self_referential)]
+pub struct PageOf(pub Entity);
 
 /// The handle of a render tree: names the content entity to walk and serialize.
 ///
-/// The target side of the one-to-one relationship. [`RenderRoot::rendered`] is
-/// the content entity (the [`RenderRootOf`] holder) the [`NodeRenderer`] walks;
+/// The target side of the one-to-one relationship. [`Page::rendered`] is
+/// the content entity (the [`PageOf`] holder) the [`NodeRenderer`] walks;
 /// it equals the handle itself for self-referential roots. The ephemeral
 /// entities to clean up after render live separately on [`DespawnAfterRender`],
-/// since cleanup is *not* derived from tree membership: a shared/cached fragment
+/// since cleanup is *not* derived from tree membership: a shared fragment
 /// can be slotted into a render without being owned by it.
 #[derive(Component)]
-#[relationship_target(relationship = RenderRootOf)]
-pub struct RenderRoot {
+#[relationship_target(relationship = PageOf)]
+pub struct Page {
 	/// The content entity whose tree the [`NodeRenderer`] walks (the one-to-one
 	/// source), equal to the handle for self-referential roots.
 	#[relationship]
@@ -39,7 +39,7 @@ pub struct RenderRoot {
 #[derive(Default, Component)]
 pub struct DespawnAfterRender(pub Vec<Entity>);
 
-impl RenderRoot {
+impl Page {
 	/// The entity whose tree the [`NodeRenderer`] walks.
 	pub fn rendered(&self) -> Entity { self.rendered }
 
@@ -48,10 +48,10 @@ impl RenderRoot {
 	///
 	/// The common case: the entity is both handle and content. For an ephemeral
 	/// coordinator that outlives the content it renders, see
-	/// [`RenderRoot::insert_rendered`].
+	/// [`Page::insert_rendered`].
 	pub fn insert(entity: &mut EntityWorldMut, to_despawn: Vec<Entity>) {
 		let id = entity.id();
-		entity.insert((RenderRootOf(id), DespawnAfterRender(to_despawn)));
+		entity.insert((PageOf(id), DespawnAfterRender(to_despawn)));
 	}
 
 	/// Points render root `handle` at a separately spawned `rendered` content
@@ -61,14 +61,14 @@ impl RenderRoot {
 	/// The path for ephemeral coordinator routes, where a persistent handle (in
 	/// the route tree) renders per-request content spawned elsewhere. The
 	/// [`NodeRenderer`] walks `rendered`, not `handle`. For the common
-	/// self-referential case see [`RenderRoot::insert`].
+	/// self-referential case see [`Page::insert`].
 	pub fn insert_rendered(
 		world: &mut World,
 		handle: Entity,
 		rendered: Entity,
 		to_despawn: Vec<Entity>,
 	) {
-		world.entity_mut(rendered).insert(RenderRootOf(handle));
+		world.entity_mut(rendered).insert(PageOf(handle));
 		world
 			.entity_mut(handle)
 			.insert(DespawnAfterRender(to_despawn));
@@ -78,7 +78,7 @@ impl RenderRoot {
 	/// 1. ancestor render middleware (layout wrapping, etc.) — `Entity` → `Entity`
 	/// 2. the [`RequestParts`]/[`Response`] renderer middleware
 	///
-	/// Reads [`RenderRoot::rendered`] off the (post-middleware) root to find
+	/// Reads [`Page::rendered`] off the (post-middleware) root to find
 	/// what to serialize, then despawns the [`DespawnAfterRender`] entities.
 	pub async fn render(
 		root: Entity,
@@ -107,7 +107,7 @@ impl RenderRoot {
 			.entity(root)
 			.with(|entity| -> Result<(Entity, Vec<Entity>)> {
 				let rendered = entity
-					.get::<RenderRoot>()
+					.get::<Page>()
 					.ok_or_else(|| {
 						bevyhow!("entity {} is not a render root", entity.id())
 					})?
@@ -142,33 +142,17 @@ impl RenderRoot {
 	}
 }
 
-impl ExchangeRouteOut<Self> for RenderRequest {
+impl ExchangeRouteOut<Self> for PageRequest {
 	fn into_route_response(
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(
-			async move { RenderRoot::render(self.0, &caller, parts).await },
+			async move { Page::render(self.0, &caller, parts).await },
 		)
 	}
 }
-
-/// Returns the caller as a self-referential render root.
-#[action(route)]
-#[derive(Default, Component)]
-pub(crate) async fn CallerScene(
-	cx: ActionContext<Request>,
-) -> Result<RenderRequest> {
-	let id = cx.id();
-	cx.caller
-		.with(move |mut entity| {
-			RenderRoot::insert(&mut entity, default());
-		})
-		.await?;
-	RenderRequest(id).xok()
-}
-
 
 /// Serves bytes from the ancestor [`BlobStore`] parsed into a render tree.
 #[derive(Component, Reflect)]
@@ -183,7 +167,7 @@ impl BlobScene {
 
 #[action(route)]
 #[derive(Default, Component)]
-async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<RenderRequest> {
+async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 	let store = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, BlobStore>(|entity, query| {
@@ -217,9 +201,9 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<RenderRequest> {
 				.get::<Children>()
 				.map(|children| children.iter().collect())
 				.unwrap_or_default();
-			RenderRoot::insert(&mut entity, to_despawn);
+			Page::insert(&mut entity, to_despawn);
 			Ok(())
 		})
 		.await??;
-	RenderRequest(cx.id()).xok()
+	PageRequest(cx.id()).xok()
 }

@@ -1,7 +1,7 @@
 //! Static-site export driven by the runtime [`RouteTree`].
 //!
 //! Walks the router's route tree for every static-path scene route or route
-//! marked [`CacheStrategy::Static`], renders each through the same dispatch path
+//! marked [`ExportStrategy::Static`], renders each through the same dispatch path
 //! a live request would take, and writes the resulting HTML to an output
 //! [`BlobStore`] as `<path>/index.html`.
 
@@ -13,7 +13,7 @@ use beet_net::prelude::*;
 /// Renders every static route in the router to HTML.
 ///
 /// A route is exported when its path is fully static, its method is `GET`, and
-/// it is either a scene route or marked [`CacheStrategy::Static`]. Routes whose
+/// it is either a scene route or marked [`ExportStrategy::Static`]. Routes whose
 /// [`ArticleMeta`] marks them a draft are skipped only on a `prod`
 /// [`PackageConfig::stage`]; dev/staging builds export drafts so they can be
 /// previewed.
@@ -58,10 +58,10 @@ pub async fn collect_static_html(
 				}
 				let cache = world
 					.entity(node.entity)
-					.get::<CacheStrategy>()
+					.get::<ExportStrategy>()
 					.copied()
 					.unwrap_or_default();
-				if node.is_scene() || cache == CacheStrategy::Static {
+				if node.is_scene() || cache == ExportStrategy::Static {
 					paths.push(node.path.annotated_path());
 				}
 			}
@@ -128,16 +128,16 @@ mod test {
 		let router = world
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_route(
+					render_action::fixed_func_route(
 						"about",
-						rsx! { <p>"About"</p> }
+						|| rsx! { <p>"About"</p> }
 					),
 					HttpMethod::Get
 				),
 				(
-					render_action::fixed_route(
+					render_action::fixed_func_route(
 						"",
-						rsx! { <h1>"Home"</h1> }
+						|| rsx! { <h1>"Home"</h1> }
 					),
 					HttpMethod::Get
 				),
@@ -213,16 +213,16 @@ mod test {
 		world
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_route(
+					render_action::fixed_func_route(
 						"published",
-						rsx! { <p>"Published"</p> }
+						|| rsx! { <p>"Published"</p> }
 					),
 					HttpMethod::Get,
 				),
 				(
-					render_action::fixed_route(
+					render_action::fixed_func_route(
 						"secret",
-						rsx! { <p>"Secret"</p> }
+						|| rsx! { <p>"Secret"</p> }
 					),
 					HttpMethod::Get,
 					ArticleMeta {

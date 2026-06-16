@@ -8,7 +8,7 @@
 //! difference is exactly the buffer target plus the persistent lifecycle, not a
 //! forked render path: the page tree is still built through the template
 //! substrate, and the charcell pipeline still walks it (here by reference, via a
-//! [`RenderRef`] slot under the buffer host).
+//! [`Portal`] slot under the buffer host).
 
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -17,7 +17,7 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 use bevy::math::UVec2;
 
-/// A live-render host: a [`DoubleBuffer`] plus the [`RenderRef`] slot that
+/// A live-render host: a [`DoubleBuffer`] plus the [`Portal`] slot that
 /// transcludes the active [`CurrentPage`] into it.
 ///
 /// Spawn one with [`page_host`]. Mark a built route tree [`CurrentPage`]
@@ -27,14 +27,14 @@ use bevy::math::UVec2;
 #[derive(Component)]
 pub struct PageHost;
 
-/// The slot entity (a child of the host) whose [`RenderRef`] transcludes the
+/// The slot entity (a child of the host) whose [`Portal`] transcludes the
 /// current page. Kept distinct from the host so the host's buffer renders the
 /// slot, and the slot's reference can be retargeted without touching the buffer.
 #[derive(Component)]
 pub struct PageSlot;
 
 /// Spawn a live-render host: a `size`-cell [`DoubleBuffer`] whose content is a
-/// viewport-filling `auto` scroll container holding the [`RenderRef`] slot that
+/// viewport-filling `auto` scroll container holding the [`Portal`] slot that
 /// transcludes the active [`CurrentPage`].
 ///
 /// The scroll container is the page's scrollport (like the browser's scrollable
@@ -47,7 +47,7 @@ pub fn page_host(size: UVec2) -> impl Bundle {
 		children![(
 			Element::new("div"),
 			page_viewport_style(),
-			// the slot carries no `RenderRef` until a page is current: absence is the
+			// the slot carries no `Portal` until a page is current: absence is the
 			// unresolved state, so `sync_current_page` installs the reference.
 			children![PageSlot],
 		)],
@@ -77,7 +77,7 @@ impl Plugin for LivePagePlugin {
 	}
 }
 
-/// ECS system: point each host's [`RenderRef`] slot at the active
+/// ECS system: point each host's [`Portal`] slot at the active
 /// [`CurrentPage`], so the buffer paints the current route.
 ///
 /// Runs when a new `CurrentPage` is added (navigation) and retargets the slot;
@@ -94,14 +94,14 @@ pub fn sync_current_page(
 	// (re)point each slot at the new page; inserting the relationship replaces any
 	// previous target and rebuilds the reverse edge.
 	for slot in slots.iter() {
-		commands.entity(slot).insert(RenderRef::new(page));
+		commands.entity(slot).insert(Portal::new(page));
 	}
 }
 
 /// Resolve `request` against the router's [`RouteTree`] and build the matched
 /// scene route into a living entity tree, returning its root.
 ///
-/// The live parallel of the static [`RenderRoot::render`] path: it shares the
+/// The live parallel of the static [`Page::render`] path: it shares the
 /// route build *and* the ancestor layout middleware (header/sidebar/footer, the
 /// document chrome) but forks at the output, handing back the built entity rather
 /// than serializing and despawning it. That entity is kept alive to become a
@@ -135,11 +135,11 @@ pub async fn build_live_page(
 	node.merge_path_params(&mut request);
 	let parts = request.parts().clone();
 	let route = router.world().entity(node.entity);
-	// build the route's own content (output `RenderRequest`), skipping the
+	// build the route's own content (output `PageRequest`), skipping the
 	// `ExchangeAction` wrapper that would serialize then despawn the tree.
-	let content = route.call::<Request, RenderRequest>(request).await?.0;
+	let content = route.call::<Request, PageRequest>(request).await?.0;
 	// wrap it in the ancestor layout middleware (the `BaseLayout` document chrome),
-	// transcluding the content by reference, exactly as `RenderRoot::render` does
+	// transcluding the content by reference, exactly as `Page::render` does
 	// for the static path; here the wrapped tree is kept alive as the page.
 	route
 		.call_with_middleware::<RequestParts, Entity>(
@@ -173,7 +173,7 @@ pub fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
 /// self-referential fixed route carries an empty set, so its entity survives.
 ///
 /// The host slots are re-pointed at the new page *before* the despawn, so no
-/// [`RenderRef`] references the outgoing tree when it is removed.
+/// [`Portal`] references the outgoing tree when it is removed.
 pub fn set_current_page(world: &mut World, page: Entity) {
 	// snapshot the outgoing pages' cleanup sets before the marker moves.
 	let mut pages = world
@@ -196,7 +196,7 @@ pub fn set_current_page(world: &mut World, page: Entity) {
 		.iter(world)
 		.collect::<Vec<_>>();
 	for slot in slots {
-		world.entity_mut(slot).insert(RenderRef::new(page));
+		world.entity_mut(slot).insert(Portal::new(page));
 	}
 
 	for entity in stale {
@@ -244,7 +244,7 @@ mod test {
 	/// The host buffer's painted frame as plain text after one frame.
 	fn frame(app: &mut App, host: Entity) -> String {
 		// one frame: PreUpdate points the slot at CurrentPage, then the post-parse
-		// pipeline paints the host buffer through the RenderRef slot.
+		// pipeline paints the host buffer through the Portal slot.
 		app.update();
 		app.world()
 			.get::<DoubleBuffer>(host)
@@ -318,13 +318,13 @@ mod test {
 		let router = app
 			.world_mut()
 			.spawn((Router, children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"alpha",
-					rsx! { <p>"Alpha page"</p> }
+					|| rsx! { <p>"Alpha page"</p> }
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"beta",
-					rsx! { <p>"Beta page"</p> }
+					|| rsx! { <p>"Beta page"</p> }
 				),
 			]))
 			.flush();

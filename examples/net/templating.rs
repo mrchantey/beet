@@ -28,12 +28,13 @@ fn main() {
 			ServerPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((
-				HttpServer::default(),
-				bootstrap_server(),
-				Count::default(),
-				Action::<Request, Response>::new_system(router),
-			));
+			commands
+				.spawn((
+					HttpServer::default(),
+					Count::default(),
+					Action::<Request, Response>::new_system(router),
+				))
+				.trigger(StartServer::all);
 		})
 		.run();
 }

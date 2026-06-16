@@ -19,7 +19,7 @@ proc-macro = true
 [features]
 default = ["slot"]
 rsx = []
-# Hoist `<slot>` markup into scene props: the `#[scene]` macro injects a
+# Hoist `<slot>` markup into scene props: the `#[template]` macro injects a
 # `SceneProp` field per slot and `rsx!` lowers `<slot name="x"/>` to that prop.
 slot = []
 # When enabled the `#[beet::test]` macro additionally emits a libtest

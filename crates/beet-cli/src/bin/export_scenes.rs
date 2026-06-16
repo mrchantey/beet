@@ -4,9 +4,9 @@
 //!
 //! The `beet` binary itself only carries scene management; running this bin
 //! writes `target/scenes/default-cli.json`, which `beet load`s to add the
-//! command routes. It is a regular [`CliServer`] host (booted by
-//! [`bootstrap_cli`]): an [`ExportScenes`] root route whose children are the
-//! scenes to write, so running it with no args writes them all.
+//! command routes. It is a regular [`CliServer`] host (spawned, then triggered
+//! with [`StartServer::all`]): an [`ExportScenes`] root route whose children are
+//! the scenes to write, so running it with no args writes them all.
 //!
 //! ```sh
 //! cargo run -p beet-cli --bin export_scenes   # writes target/scenes/default-cli.json
@@ -36,26 +36,28 @@ fn main() -> AppExit {
 /// [`Router`] (not [`default_router`]), avoiding the host's app routes, which
 /// would clash when the scene loads under another router.
 fn spawn_host(mut commands: Commands) {
-	commands.spawn((
-		CliServer,
-		bootstrap_cli(),
-		default_router(),
-		children![(
-			ExportScenes,
+	// spawn first so the `CliServer` `on_add` observers register, then trigger.
+	commands
+		.spawn((
+			CliServer,
+			default_router(),
 			children![(
-				ExportPath("target/scenes/default-cli.json".into()),
-				Router,
-				children![
-					Serve,
-					ExportStatic,
-					RunWasm,
-					BuildWasm,
-					ExportPdf,
-					SyncS3,
-					#[cfg(feature = "qrcode")]
-					QrCode,
-				],
+				ExportScenes,
+				children![(
+					ExportPath("target/scenes/default-cli.json".into()),
+					Router,
+					children![
+						Serve,
+						ExportStatic,
+						RunWasm,
+						BuildWasm,
+						ExportPdf,
+						SyncS3,
+						#[cfg(feature = "qrcode")]
+						QrCode,
+					],
+				)],
 			)],
-		)],
-	));
+		))
+		.trigger(StartServer::all);
 }

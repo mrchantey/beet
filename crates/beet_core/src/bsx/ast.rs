@@ -94,8 +94,8 @@ pub enum ValueExpr {
 ///
 /// `@entity:` is `@comp` retargeted to a named entity: the [`selector`] names a
 /// `bx:ref` entity, or one of the reserved well-known entities `BuildRoot`,
-/// `SnippetRoot`, `RenderRoot`, `Router` (see `ReservedRef` in the resolver), eg
-/// `@entity:RenderRoot::ArticleMeta.title`. `@comp:` (no `@entity:`) binds the
+/// `SnippetRoot`, `Page`, `Router` (see `ReservedRef` in the resolver), eg
+/// `@entity:Page::ArticleMeta.title`. `@comp:` (no `@entity:`) binds the
 /// current entity.
 ///
 /// [`selector`]: Self::selector
@@ -105,7 +105,7 @@ pub struct BindingExpr {
 	pub source: BindingSource,
 	/// The `@entity:` selector retargeting a component binding to a `bx:ref`-named
 	/// entity, or a reserved well-known entity (`BuildRoot`, `SnippetRoot`,
-	/// `RenderRoot`, `Router`). Only [`BindingSource::Comp`] carries one.
+	/// `Page`, `Router`). Only [`BindingSource::Comp`] carries one.
 	pub selector: Option<SmolStr>,
 	/// The short type path of the bound resource/component, eg `PackageConfig`.
 	pub type_path: Option<SmolStr>,

@@ -319,7 +319,7 @@ impl NodeVisitor for HtmlRenderer {
 		// its close tag. `<head>` is the single injection point; a fragment with no
 		// head falls back to a post-walk append in `render`.
 		#[cfg(all(feature = "bsx", feature = "json"))]
-		if element.tag().eq_ignore_ascii_case("head") {
+		if element.tag_eq("head") {
 			if let Some(injection) = self
 				.reactive
 				.as_mut()

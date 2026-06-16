@@ -243,7 +243,7 @@ impl<'w> TemplateBuilder<'w> {
 						.get_info(component_id)?;
 
 					// never extract a `RelationshipTarget` collection (eg `Children`,
-					// `RenderRefOf`): it mirrors its `Relationship` source and is
+					// `PortalOf`): it mirrors its `Relationship` source and is
 					// rebuilt by the relationship hook on the build path. Serializing
 					// it would double-apply the relation (the direct write plus the
 					// hook), corrupting order and producing duplicate entries.

@@ -220,10 +220,10 @@ pub(crate) fn scroll_input(
 	pointers: Query<&Pointer, With<PrimaryPointer>>,
 	focused: Query<Entity, With<Focus>>,
 	parents: Query<&ChildOf>,
-	// transclusion: a `RenderRef` holder is the charcell parent of the entity it
+	// transclusion: a `Portal` holder is the charcell parent of the entity it
 	// points at, so the ancestor walk can cross from transcluded content (eg a
 	// page) up into the holder's container (eg the page-host scrollport).
-	refs: Query<&RenderRefOf>,
+	refs: Query<&PortalOf>,
 	tree: CharcellTree,
 	roots: Query<(Entity, &DoubleBuffer)>,
 	// `CharcellQuery` (p0) reads `ScrollPosition`, so it can't coexist with the
@@ -301,7 +301,7 @@ pub(crate) fn scroll_input(
 				if can_scroll(entity) {
 					break Some(entity);
 				}
-				// transclusion wins for *visual* ancestry: a RenderRef holder is the
+				// transclusion wins for *visual* ancestry: a Portal holder is the
 				// visual parent of the entity it renders in place; otherwise walk ChildOf.
 				current = refs
 					.get(entity)
@@ -655,7 +655,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(host.app.world())
-			.find(|(_, element)| element.tag() == "a")
+			.find(|(_, element)| element.tag_eq("a"))
 			.map(|(entity, _)| entity)
 			.unwrap();
 		let resting = host
@@ -709,7 +709,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(host.app.world())
-			.find(|(_, element)| element.tag() == "button")
+			.find(|(_, element)| element.tag_eq("button"))
 			.map(|(entity, _)| entity)
 			.unwrap();
 		// no container at rest.

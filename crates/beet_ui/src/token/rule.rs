@@ -403,7 +403,7 @@ impl Selector {
 			Selector::Entity(entity) => el.entity == *entity,
 			Selector::AnyOf(rules) => rules.iter().any(|rule| rule.matches(el)),
 			Selector::AllOf(rules) => rules.iter().all(|rule| rule.matches(el)),
-			Selector::Tag(tag) => el.element.tag() == tag,
+			Selector::Tag(tag) => el.element.tag_eq(tag.as_str()),
 			Selector::Attribute { key, value } => match value {
 				Some(expected) => el
 					.attribute(key)

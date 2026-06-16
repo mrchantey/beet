@@ -289,10 +289,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route("", rsx! { <h1>"Root"</h1> }),
-				render_action::fixed_route(
+				render_action::fixed_func_route("", || rsx! { <h1>"Root"</h1> }),
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"About page"</p> }
+					|| rsx! { <p>"About page"</p> }
 				),
 			]))
 			.flush();
@@ -314,13 +314,13 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"alpha",
-					rsx! { <p>"Alpha page"</p> }
+					|| rsx! { <p>"Alpha page"</p> }
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"beta",
-					rsx! { <p>"Beta page"</p> }
+					|| rsx! { <p>"Beta page"</p> }
 				),
 			]))
 			.flush();
@@ -342,13 +342,13 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"alpha",
-					rsx! { <p>"Alpha page"</p> }
+					|| rsx! { <p>"Alpha page"</p> }
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"beta",
-					rsx! { <p>"Beta page"</p> }
+					|| rsx! { <p>"Beta page"</p> }
 				),
 			]))
 			.flush();
@@ -383,13 +383,13 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"alpha",
-					rsx! { <p>"Alpha page"</p> }
+					|| rsx! { <p>"Alpha page"</p> }
 				),
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"beta",
-					rsx! { <p>"Beta page"</p> }
+					|| rsx! { <p>"Beta page"</p> }
 				),
 			]))
 			.flush();
@@ -411,9 +411,9 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = router_world();
 		let root = world
-			.spawn((nav_router(), children![render_action::fixed_route(
+			.spawn((nav_router(), children![render_action::fixed_func_route(
 				"about",
-				rsx! { <p>"About page"</p> }
+				|| rsx! { <p>"About page"</p> }
 			),]))
 			.flush();
 

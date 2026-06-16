@@ -23,7 +23,7 @@ pub fn resolve_styles(
 	// content transcluded by reference has no `ChildOf` edge to the layout, so the
 	// traversal follows holders to re-resolve referenced content under the layout's
 	// cascade (eg the color scheme), even when the content itself is unchanged.
-	render_refs: Query<&RenderRef>,
+	render_refs: Query<&Portal>,
 	// the box model (margin/border/padding/background) is element-level; text and
 	// fragment nodes must not resolve their nearest ancestor's box and re-paint it.
 	elements: Query<(), With<Element>>,
@@ -135,9 +135,9 @@ pub fn resolve_styles(
 			if let Some(children_list) = children.get(entity).ok() {
 				queue.extend(children_list.into_iter().cloned());
 			}
-			// follow a `RenderRef` holder into the content it renders in place, so
+			// follow a `Portal` holder into the content it renders in place, so
 			// transcluded content re-resolves under this (layout) cascade. An
-			// unresolved holder (no `RenderRef` yet) has no content to cascade into.
+			// unresolved holder (no `Portal` yet) has no content to cascade into.
 			if let Ok(render_ref) = render_refs.get(entity) {
 				queue.push(render_ref.target());
 			}

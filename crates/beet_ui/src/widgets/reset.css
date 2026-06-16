@@ -83,6 +83,20 @@ iframe {
 	border: 0;
 }
 
+/* Images never overflow their column: cap at the content width and keep aspect
+   ratio. A safety net for prose/markdown images carrying an intrinsic or inline
+   width wider than a small screen (eg a blog photo). */
+img {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Code blocks scroll horizontally instead of forcing the page wider than the
+   viewport when a line is long. */
+pre {
+	overflow-x: auto;
+}
+
 /* A blockquote pads its own box, so the bottom margin of its last child would
    stack on top of that padding into an oversized gutter. Drop the trailing
    margin while keeping the inter-paragraph margins of a multi-line quote. */

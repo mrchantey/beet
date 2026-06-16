@@ -229,11 +229,11 @@ pub struct RuleSetQuery<'w, 's> {
 	rule_set: ResMut<'w, RuleSet>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	_children: Query<'w, 's, &'static Children>,
-	// the [`RenderRef`] reverse edge, so the inherited cascade crosses transclusion
+	// the [`Portal`] reverse edge, so the inherited cascade crosses transclusion
 	// boundaries: content transcluded into a layout by reference has no `ChildOf`
 	// edge to the layout, so inheritance (eg the color scheme) continues from the
 	// holder that renders it in place.
-	render_refs: Query<'w, 's, &'static RenderRefOf>,
+	render_refs: Query<'w, 's, &'static PortalOf>,
 	element_query: ElementQuery<'w, 's>,
 }
 
@@ -305,7 +305,7 @@ impl RuleSetQuery<'_, '_> {
 	}
 
 	/// The cascade parent of `entity`. A transcluded entity (the target of a
-	/// [`RenderRef`]) inherits from the holder that renders it in place, not from
+	/// [`Portal`]) inherits from the holder that renders it in place, not from
 	/// its original [`ChildOf`] spawn location — so the cascade (eg the color
 	/// scheme) crosses the transclusion boundary. Otherwise the `ChildOf` parent.
 	fn parent(&self, entity: Entity) -> Option<Entity> {

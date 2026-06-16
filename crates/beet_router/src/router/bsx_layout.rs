@@ -78,7 +78,7 @@ async fn BsxLayoutAction(
 }
 
 /// Spawn the named BSX template as the layout around `rendered`: the slot child
-/// carrying the content [`RenderRef`](beet_ui::prelude::RenderRef) spawns
+/// carrying the content [`Portal`](beet_ui::prelude::Portal) spawns
 /// first, then the template builds into the same entity, whose slot-resolution
 /// pass routes the content into the template's default `<Slot/>`.
 fn build_bsx_layout(
@@ -99,7 +99,7 @@ fn build_bsx_layout(
 		.nodes
 		.clone();
 	let layout = world
-		.spawn(children![(RenderRef::new(rendered), SlotChild::new())])
+		.spawn(children![(Portal::new(rendered), SlotChild::new())])
 		.id();
 	world
 		.entity_mut(layout)
@@ -146,7 +146,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BsxLayout::default(), children![
-				render_action::fixed_route("", rsx! { <p>"page body"</p> })
+				render_action::fixed_func_route("", || rsx! { <p>"page body"</p> })
 			]))
 			.flush();
 
@@ -162,7 +162,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BsxLayout::new("Nope"), children![
-				render_action::fixed_route("", rsx! { <p>"body"</p> })
+				render_action::fixed_func_route("", || rsx! { <p>"body"</p> })
 			]))
 			.flush();
 
@@ -180,7 +180,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BsxLayout::default(), children![
-				render_action::fixed_route("", rsx! { <p>"page body"</p> })
+				render_action::fixed_func_route("", || rsx! { <p>"page body"</p> })
 			]))
 			.flush();
 
@@ -190,9 +190,9 @@ mod test {
 	}
 
 	/// A world whose `Layout` binds its `<title>` from the transcluded route's
-	/// `ArticleMeta` via the reserved `@entity:RenderRoot::` selector. This is the
+	/// `ArticleMeta` via the reserved `@entity:Page::` selector. This is the
 	/// in-markup replacement for the Rust `RouteHead` title lookup: the layout
-	/// builds detached and the binding follows the `RenderRootRef` link
+	/// builds detached and the binding follows the `LayoutContent` link
 	/// (installed by `wrap_content_with`) across the transclusion boundary.
 	fn meta_layout_world() -> World {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -200,7 +200,7 @@ mod test {
 		registry
 			.insert_source(
 				"Layout",
-				"<html><head><title>{@entity:RenderRoot::ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
+				"<html><head><title>{@entity:Page::ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
 			)
 			.unwrap();
 		world.insert_resource(registry);
@@ -209,16 +209,16 @@ mod test {
 
 	/// A route whose rendered content carries the given frontmatter title.
 	fn meta_route(path: &str, title: &str) -> impl Bundle {
-		render_action::fixed_route(path, (
-			ArticleMeta {
-				title: Some(title.into()),
-				..default()
-			},
-			rsx! { <p>"body"</p> },
-		))
+		let meta = ArticleMeta {
+			title: Some(title.into()),
+			..default()
+		};
+		render_action::fixed_func_route(path, move || {
+			(meta.clone(), rsx! { <p>"body"</p> })
+		})
 	}
 
-	/// A layout-head `@entity:RenderRoot::ArticleMeta.title` binding resolves to the
+	/// A layout-head `@entity:Page::ArticleMeta.title` binding resolves to the
 	/// transcluded route's meta, and differs per route (the gap this stream
 	/// closes: the layout root's self-referential render root is not the content,
 	/// so the walk must follow the distinct content link).
@@ -242,7 +242,7 @@ mod test {
 			.xpect_contains("<title>Beta</title>");
 	}
 
-	/// The layout link [`RenderRootRef`] (and its reverse [`RenderRootRefOf`])
+	/// The layout link [`LayoutContent`] (and its reverse [`LayoutContentOf`])
 	/// survives a scene serialization round-trip: a reflect-registered
 	/// relationship whose `#[entities]` source remaps onto the freshly spawned
 	/// content, and whose collection target the relationship hook rebuilds on
@@ -251,19 +251,19 @@ mod test {
 	#[beet_core::test]
 	fn render_root_ref_round_trips_through_scene() {
 		// a tree the saver collects by `Children`: a content sibling and a layout
-		// root linked to it via `RenderRootRef`, so the edge and its reverse
+		// root linked to it via `LayoutContent`, so the edge and its reverse
 		// collection both serialize and rebuild on load with remapped ids.
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world.spawn_empty().id();
 		let content = world.spawn(ChildOf(root)).id();
 		let layout = world
-			.spawn((ChildOf(root), RenderRootRef::new(content)))
+			.spawn((ChildOf(root), LayoutContent::new(content)))
 			.id();
 		world.flush();
 		// the relationship hook mirrors the edge onto the content's reverse side.
 		world
 			.entity(content)
-			.get::<RenderRootRefOf>()
+			.get::<LayoutContentOf>()
 			.unwrap()
 			.holders()
 			.xpect_eq(&[layout]);
@@ -279,7 +279,7 @@ mod test {
 		// the reloaded layout link points at the reloaded content, and the content
 		// carries the rebuilt reverse edge back to the layout.
 		let (layout, render_root_ref) = world
-			.query_once::<(Entity, &RenderRootRef)>()
+			.query_once::<(Entity, &LayoutContent)>()
 			.into_iter()
 			.next()
 			.unwrap();
@@ -287,7 +287,7 @@ mod test {
 		layout.xpect_not_eq(content);
 		world
 			.entity(content)
-			.get::<RenderRootRefOf>()
+			.get::<LayoutContentOf>()
 			.unwrap()
 			.holders()
 			.xpect_eq(&[layout]);

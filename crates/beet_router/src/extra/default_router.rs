@@ -26,25 +26,49 @@ pub fn default_router() -> impl Bundle {
 		HelpHandler::default(),
 		#[cfg(feature = "std")]
 		NavigateHandler::default(),
-		// The default app routes, attached directly to this (path-less) router
-		// entity via `OnSpawn::insert_child` so each route keeps its own path.
-		// `insert_child` (unlike a shared `children!`) composes without bevy's
-		// duplicate-`Children` error, so the std-only `app-info` and `json` + std
-		// `analytics` routes can be cfg-gated tuple elements, simply absent on
-		// no_std. `app_info`/`analytics` both need a `PackageConfig` resource.
+		// the default app routes (reactivity-runtime asset, app-info, analytics,
+		// client-io), inserted as children by `DefaultAppRoutes`'s observer so a
+		// no-code BSX site can request them from markup too.
 		#[cfg(feature = "std")]
-		OnSpawn::insert_child(app_info()),
-		// the cached `/js/reactivity.js` runtime route, so a served or statically
-		// exported reactive page's auto-injected runtime script resolves.
-		#[cfg(feature = "std")]
-		OnSpawn::insert_child(reactivity_js_route()),
-		#[cfg(all(feature = "json", feature = "std"))]
-		OnSpawn::insert_child(analytics_handler()),
-		// the same-port `/__client_io` websocket-upgrade endpoint, so every HTTP
-		// router exposes the live-reload/socket channel on its own port.
-		#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
-		OnSpawn::insert_child(client_io_route()),
+		DefaultAppRoutes,
 	)
+}
+
+/// Marks an entity to receive the default app routes as children: the
+/// reactivity-runtime asset (`/js/reactivity.js`), `/app-info`,
+/// `POST /analytics`, and the `/__client_io` websocket channel, exactly what
+/// [`default_router`] wires. [`spawn_default_app_routes`] inserts them on insert.
+///
+/// Being a reflect component, a no-code BSX site declares the same app routes
+/// from markup (`<Router {(.., DefaultAppRoutes)}>`) without a Rust
+/// `default_router`. `app_info`/`analytics` need a [`PackageConfig`] resource.
+///
+/// A one-shot: the observer removes the marker once it has expanded, so only the
+/// spawned routes (not the marker) persist into a saved scene, and reloading that
+/// scene never double-spawns them.
+#[cfg(feature = "std")]
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct DefaultAppRoutes;
+
+/// Observer that inserts the [`DefaultAppRoutes`] children (see its docs), then
+/// removes the marker. Each route is attached directly to the marked router
+/// entity, keeping its own path.
+#[cfg(feature = "std")]
+pub fn spawn_default_app_routes(
+	ev: On<Insert, DefaultAppRoutes>,
+	mut commands: Commands,
+) {
+	let parent = ev.entity;
+	commands.spawn((ChildOf(parent), app_info()));
+	commands.spawn((ChildOf(parent), reactivity_js_route()));
+	#[cfg(feature = "json")]
+	commands.spawn((ChildOf(parent), analytics_handler()));
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+	commands.spawn((ChildOf(parent), client_io_route()));
+	// expand once, then drop the marker so it neither persists into a saved scene
+	// nor re-spawns the routes when that scene reloads.
+	commands.entity(parent).remove::<DefaultAppRoutes>();
 }
 
 

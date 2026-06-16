@@ -6,10 +6,10 @@ Style is expressed as **semantic classes + design tokens**, never raw CSS, becau
 
 ## Authoring
 
-A page module exposes `pub fn get() -> impl Scene` and builds its body with `rsx!`. Markdown files are routes directly, with `+++ ... +++` TOML frontmatter (`title`, `description`, `created`).
+A page module exposes `pub fn get() -> impl Bundle` and builds its body with `rsx!`. Markdown files are routes directly, with `+++ ... +++` TOML frontmatter (`title`, `description`, `created`).
 
 ```rust
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
     rsx! { <article><h1>"Title"</h1><p>"Body"</p></article> }
 }
 ```
@@ -26,7 +26,7 @@ Families: `BTN*`, `CARD_*`, the type scale (`TEXT_DISPLAY/HEADLINE/TITLE/BODY/LA
 
 ## Widgets
 
-`#[scene]` function components used as capitalized tags, imported via `crate::prelude::*` / `beet::prelude::*`. Source: `crates/beet_ui/src/widgets/`.
+`#[template]` function components used as capitalized tags, imported via `crate::prelude::*` / `beet::prelude::*`. Source: `crates/beet_ui/src/widgets/`.
 
 - `Button`/`IconButton`/`Link` take their content as the **default slot** (`<Button>"Save"</Button>`), plus `variant: ButtonVariant` (`Filled` default, `Outlined`, `Text`, `Tonal`, `Elevated`, `Secondary`, `Tertiary`, `Error`); `Link` also `href`. `ErrorText` takes `message`.
 - `TextField`/`TextArea`/`Select`/`Form` take `name`/`field`/`placeholder` options and a `variant`; `Select`/`Form` take slot children.
@@ -49,11 +49,11 @@ A raw `<style>` string is the last resort, web-only. Standing web-only overrides
 - **Adjacent same-selector rules merge only when their media also matches** (`RuleSet::insert_rule`). A `Screen`-gated `.x` rule right after an ungated `.x` rule stays separate, so its declarations don't leak to every target. Overrides between a base and a target-gated rule work through the cascade's later-wins, not through merging.
 - **Inheritance mirrors CSS** (`common_props.rs`): text props inherit (color, font-*, line-height, letter-spacing, text-align, white-space, list-style, visibility); box/layout props do **not** (padding, margin, width/height, border-*, border-radius, box-shadow, gap, outline, display, flex-*, transform). Inheriting a box prop silently compounds down a subtree, that bug is why a nested tree over-indents. The one deliberate exception is the text-decoration trio, modelled as inherited so an underline reaches nested spans.
 - **Selectors** model tag/class/attribute/state/`AnyOf`/`AllOf`/`Not` and one **descendant combinator** (`Selector::descendant(ancestor, descendant)`, css `a b`). The combinator is **web-only**: it serializes to CSS but the charcell cascade has no ancestor context, so it never matches there (gate it `Screen`). Use it for `[open]`-reactive child styling, eg the sidebar caret rotates via `details:not([open]) .sidebar-caret { transform: rotate(-90deg) }`. For `+`/`>` combinators, use `reset.css`.
-- **Transcluded content inherits the shell cascade.** Route content is rendered then transcluded into the document layout by reference (`RenderRef`, no `ChildOf` edge). `RuleSetQuery::parent` treats a `RenderRef` target as a child of its holder and `resolve_styles` follows holders, so inheritance (eg the dark scheme) crosses the boundary. Regression tests in `material_plugin.rs`.
+- **Transcluded content inherits the shell cascade.** Route content is rendered then transcluded into the document layout by reference (`Portal`, no `ChildOf` edge). `RuleSetQuery::parent` treats a `Portal` target as a child of its holder and `resolve_styles` follows holders, so inheritance (eg the dark scheme) crosses the boundary. Regression tests in `material_plugin.rs`.
 
 ## Routing and codegen
 
-File-based (`beet_site/src/launch.rs`): `src/pages/*.rs` → `/*`, `src/docs/**` → `/docs/**` (nested dirs allowed), `src/blog/**` → `/blog/**`. Each `.rs` route needs `pub fn get() -> impl Scene`; `.md` files are routes directly. **After any route add/remove/move, regenerate codegen** or the build fails on a missing module:
+File-based (`beet_site/src/launch.rs`): `src/pages/*.rs` → `/*`, `src/docs/**` → `/docs/**` (nested dirs allowed), `src/blog/**` → `/blog/**`. Each `.rs` route needs `pub fn get() -> impl Bundle`; `.md` files are routes directly. **After any route add/remove/move, regenerate codegen** or the build fails on a missing module:
 
 ```bash
 cargo run -p beet_site --no-default-features --features codegen
@@ -65,7 +65,7 @@ This rewrites `src/codegen/{pages.rs,docs/mod.rs,blog/mod.rs,route_tree.rs}` (gi
 
 | Legacy | Current |
 |---|---|
-| `-> impl IntoHtml` | `-> impl Scene` |
+| `-> impl IntoHtml` | `-> impl Bundle` |
 | `#[template]` + `signal` | plain scene; reactivity via the `document` module |
 | `class="card-filled"` | `{Classes::new([classes::CARD_FILLED])}` |
 | `<Button label="Save"/>` | `<Button>"Save"</Button>` (default slot) |

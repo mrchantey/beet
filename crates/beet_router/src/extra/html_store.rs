@@ -93,9 +93,9 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![render_action::fixed_route(
+				(default_router(), children![render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"live about"</p> }
+					|| rsx! { <p>"live about"</p> }
 				)]),
 				HtmlStore::ssg(html_store().await),
 			))
@@ -114,9 +114,9 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![render_action::fixed_route(
+				(default_router(), children![render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"live about"</p> }
+					|| rsx! { <p>"live about"</p> }
 				)]),
 				HtmlStore::ssr(html_store().await),
 			))
@@ -133,9 +133,9 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![render_action::fixed_route(
+				(default_router(), children![render_action::fixed_func_route(
 					"contact",
-					rsx! { <p>"live contact"</p> }
+					|| rsx! { <p>"live contact"</p> }
 				)]),
 				HtmlStore::ssg(html_store().await),
 			))

@@ -13,9 +13,12 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
-	commands.spawn(
-		StdioTerminal::inline(), // .with_raw_mode(true)
-	);
+	// keyboard-only demo: disable mouse reporting so the terminal is never put
+	// into mouse-tracking mode and the example emits only key events, not a
+	// stream of mouse escape sequences.
+	commands.spawn(StdioTerminal::inline().with_config(
+		TerminalConfig::inline().with_enable_mouse(false),
+	));
 }
 
 

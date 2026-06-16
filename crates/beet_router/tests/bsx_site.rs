@@ -271,8 +271,8 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	// a separate host root with its own command route tree, mirroring the CLI
 	// host that has `beet load`ed the default-cli scene (run-wasm, serve, ...).
 	world.spawn(children![
-		render_action::fixed_route("run-wasm", rsx! { <p>"run-wasm"</p> }),
-		render_action::fixed_route("export-static", rsx! { <p>"export"</p> }),
+		render_action::fixed_func_route("run-wasm", || rsx! { <p>"run-wasm"</p> }),
+		render_action::fixed_func_route("export-static", || rsx! { <p>"export"</p> }),
 	]);
 	// the served site, a distinct root in the same world, plus a per-request page
 	// whose content is built detached (the `fixed_func_route` shape).
@@ -333,7 +333,7 @@ fn text_value(world: &World, entity: Entity) -> Value {
 	world.entity(text).get::<Value>().unwrap().clone()
 }
 
-/// `@entity:RenderRoot::` resolves to the nearest render-root ancestor, the
+/// `@entity:Page::` resolves to the nearest render-root ancestor, the
 /// in-content replacement for the Rust `RouteHead` meta lookup.
 #[beet_core::test]
 fn render_root_binding_reads_article_meta() {
@@ -345,11 +345,11 @@ fn render_root_binding_reads_article_meta() {
 			..default()
 		})
 		.id();
-	RenderRoot::insert(&mut world.entity_mut(route), default());
+	Page::insert(&mut world.entity_mut(route), default());
 	let span = spawn_bsx_under(
 		&mut world,
 		route,
-		"<span>{@entity:RenderRoot::ArticleMeta.title}</span>",
+		"<span>{@entity:Page::ArticleMeta.title}</span>",
 	);
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Str("The Title".into()));

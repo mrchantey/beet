@@ -29,7 +29,7 @@ use beet_ui::prelude::*;
 
 /// The document [`Head`] with a per-route `<title>`: the base [`Head`] omits its
 /// own `<title>` and this widget owns the single one, bound to the route's
-/// [`ArticleMeta`] title (`@entity:RenderRoot::ArticleMeta.title`) so it differs
+/// [`ArticleMeta`] title (`@entity:Page::ArticleMeta.title`) so it differs
 /// per route and stays live. The base head's social/PWA meta names the site from
 /// [`PackageConfig`](beet_core::prelude::PackageConfig). Extra tags (stylesheet,
 /// favicon, ...) flow through to the `<head>` via the default slot.
@@ -61,8 +61,8 @@ pub fn RouteHead(
 
 /// The bound text child of the route `<title>`: a [`Value`] seeded with the
 /// resolved title (so SSR renders it before any sync) plus, under `json`, a
-/// [`ReflectFieldRef`] resolving `@entity:RenderRoot::ArticleMeta.title` — the
-/// nearest render-root ancestor, hopping the layout's [`RenderRootRef`] into the
+/// [`ReflectFieldRef`] resolving `@entity:Page::ArticleMeta.title` — the
+/// nearest render-root ancestor, hopping the layout's [`LayoutContent`] into the
 /// transcluded route content. Re-resolved each sync pass and each request, so the
 /// title tracks the current route. Without `json` it stays the static seed.
 fn route_title(seed: &str) -> impl Bundle {
@@ -71,7 +71,7 @@ fn route_title(seed: &str) -> impl Bundle {
 	return (
 		value,
 		ReflectFieldRef::new("ArticleMeta", "title")
-			.with_target(BindingTarget::Reserved("RenderRoot".into())),
+			.with_target(BindingTarget::Reserved("Page".into())),
 	);
 	#[cfg(not(feature = "json"))]
 	return value;
@@ -85,7 +85,7 @@ fn route_title(seed: &str) -> impl Bundle {
 /// The tree is resolved by an ancestor walk from the matched route entity
 /// ([`RequestContext::route`]) rather than picking an arbitrary world
 /// [`RouteTree`]: the widget is built in the detached layout subtree (the
-/// content is transcluded by [`RenderRef`]), so its own entity has no route-tree
+/// content is transcluded by [`Portal`]), so its own entity has no route-tree
 /// ancestor, and the rendered content may itself be a detached per-request root,
 /// but the matched route entity always lives in the served tree. This scopes
 /// the nav to the served site even when other [`RouteTree`]s share the world (eg
@@ -93,8 +93,9 @@ fn route_title(seed: &str) -> impl Bundle {
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout places it with `<RouteSidebar/>`. Builds inside a layout render
-/// (it reads [`RequestContext`]); the infra routes `app-info`/`analytics` are
-/// always excluded, `exclude` adds site-specific globs.
+/// (it reads [`RequestContext`]); only [`PageRoute`] routes appear (so infra
+/// routes like the `js/reactivity.js` asset are absent), and `exclude` adds
+/// site-specific globs.
 #[template(system)]
 pub fn RouteSidebar(
 	/// Show the synthetic `Home` entry. Disable when the header links home.
@@ -110,10 +111,8 @@ pub fn RouteSidebar(
 	let nodes = trees
 		.get(cx.route())
 		.map(|tree| {
-			let mut state = SidebarState::new(cx.current_path())
-				.with_home(home)
-				.with_exclude("app-info")
-				.with_exclude("analytics");
+			let mut state =
+				SidebarState::new(cx.current_path()).with_home(home);
 			for pattern in &exclude {
 				state = state.with_exclude(pattern);
 			}
@@ -244,11 +243,14 @@ impl SidebarState {
 			.iter()
 			.filter_map(|child| self.collect_node(child))
 			.collect();
-		let has_route = tree.node().is_some();
+		// only page routes belong in the nav; infra/data routes (eg the
+		// `js/reactivity.js` asset, `app-info`) carry no [`PageRoute`] marker.
+		let has_page_route =
+			tree.node().is_some_and(|node| node.is_page_route);
 
 		if children.is_empty() {
-			// leaf: only render if it actually routes somewhere
-			if !has_route {
+			// leaf: only render if it is a page route
+			if !has_page_route {
 				return None;
 			}
 			Some(SidebarNode {
@@ -259,17 +261,17 @@ impl SidebarState {
 				active: path == self.current_path,
 			})
 		} else {
-			// branch: collapsible, optionally also a link if it carries a route
+			// branch: collapsible, optionally also a link if it is a page route
 			let expanded = match info.and_then(|info| info.expanded) {
 				Some(value) => value,
 				None => self.is_ancestor_of_current(&path),
 			};
 			Some(SidebarNode {
 				display_name: self.label(&path, info),
-				path: has_route.then(|| path.clone()),
+				path: has_page_route.then(|| path.clone()),
 				children,
 				expanded,
-				active: has_route && path == self.current_path,
+				active: has_page_route && path == self.current_path,
 			})
 		}
 	}
@@ -397,6 +399,16 @@ mod test {
 		world.entity(root).get::<RouteTree>().unwrap().clone()
 	}
 
+	/// A page route at `path` carrying the [`PageRoute`] marker the nav filters
+	/// on. The rendered content is irrelevant to collection, which keys off the
+	/// route path plus the marker, so every test route shares one body.
+	fn page_route(path: &str) -> impl Bundle {
+		(
+			render_action::fixed_func_route(path, || rsx! { <p>"page"</p> }),
+			PageRoute,
+		)
+	}
+
 	#[beet_core::test]
 	fn natural_compare() {
 		let mut v = vec!["page10", "page1", "page2"];
@@ -409,14 +421,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route(
-					"about",
-					rsx! { <p>"about"</p> }
-				),
-				render_action::fixed_route(
-					"docs",
-					rsx! { <p>"docs"</p> }
-				),
+				page_route("about"),
+				page_route("docs"),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -434,14 +440,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route(
-					"about",
-					rsx! { <p>"about"</p> }
-				),
-				render_action::fixed_route(
-					"docs",
-					rsx! { <p>"docs"</p> }
-				),
+				page_route("about"),
+				page_route("docs"),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -457,10 +457,7 @@ mod test {
 	fn marks_active_home() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![render_action::fixed_route(
-				"about",
-				rsx! { <p>"about"</p> }
-			)])
+			.spawn(children![page_route("about")])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
@@ -473,19 +470,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route(
-					"about",
-					rsx! { <p>"about"</p> }
-				),
+				page_route("about"),
 				(PathPartial::new("docs"), children![
-					render_action::fixed_route(
-						"intro",
-						rsx! { <p>"intro"</p> }
-					),
-					render_action::fixed_route(
-						"api",
-						rsx! { <p>"api"</p> }
-					),
+					page_route("intro"),
+					page_route("api"),
 				]),
 			])
 			.flush();
@@ -511,16 +499,10 @@ mod test {
 		let root = world
 			.spawn(children![
 				(PathPartial::new("docs"), children![
-					render_action::fixed_route(
-						"intro",
-						rsx! { <p>"intro"</p> }
-					),
+					page_route("intro"),
 				]),
 				(PathPartial::new("blog"), children![
-					render_action::fixed_route(
-						"post1",
-						rsx! { <p>"post1"</p> }
-					),
+					page_route("post1"),
 				]),
 			])
 			.flush();
@@ -545,10 +527,7 @@ mod test {
 	fn custom_label_override() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![render_action::fixed_route(
-				"about",
-				rsx! { <p>"about"</p> }
-			)])
+			.spawn(children![page_route("about")])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
@@ -573,14 +552,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route(
-					"zulu",
-					rsx! { <p>"zulu"</p> }
-				),
-				render_action::fixed_route(
-					"alpha",
-					rsx! { <p>"alpha"</p> }
-				),
+				page_route("zulu"),
+				page_route("alpha"),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -620,10 +593,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(PathPartial::new("docs"), children![
-				render_action::fixed_route(
-					"intro",
-					rsx! { <p>"intro"</p> }
-				),
+				page_route("intro"),
 			])])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -648,14 +618,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(
-				render_action::fixed_route(
-					"docs",
-					Element::new("p").with_inner_text("docs index")
-				),
-				children![render_action::fixed_route(
-					"intro",
-					rsx! { <p>"intro"</p> }
-				)],
+				page_route("docs"),
+				children![page_route("intro")],
 			)])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -674,15 +638,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route(
-					"about",
-					rsx! { <p>"about"</p> }
-				),
+				page_route("about"),
 				(PathPartial::new("docs"), children![
-					render_action::fixed_route(
-						"intro",
-						rsx! { <p>"intro"</p> }
-					),
+					page_route("intro"),
 				]),
 			])
 			.flush();

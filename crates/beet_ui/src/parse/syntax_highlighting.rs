@@ -261,7 +261,7 @@ pub fn apply_syntax_highlighting(
 	elements: ElementQuery,
 ) {
 	for view in elements.iter() {
-		if view.tag() != "code" {
+		if !view.tag_eq("code") {
 			continue;
 		}
 		let Some((text_entity, value)) = view.inner_text else {

@@ -31,9 +31,12 @@ fn main() {
 		FormRuntimePlugin,
 	));
 	app.add_systems(Startup, |mut commands: Commands| {
-		// spawn the site host and start whichever server build feature selected
-		// (`bootstrap_server`'s empty filter matches the present server).
-		commands.spawn((site_server(), beet_site_router(), bootstrap_server()));
+		// spawn the site host first (registering its server's `on_add` observers),
+		// then trigger the start: the empty filter matches whichever server the
+		// build feature selected.
+		commands
+			.spawn((site_server(), beet_site_router()))
+			.trigger(StartServer::all);
 	});
 	app.run();
 }

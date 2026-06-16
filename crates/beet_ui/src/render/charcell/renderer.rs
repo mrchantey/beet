@@ -133,13 +133,13 @@ mod tests {
 
 	#[beet_core::test]
 	fn paints_render_ref_content() {
-		// a RenderRef holder is transparent: the charcell pipeline measures,
+		// a Portal holder is transparent: the charcell pipeline measures,
 		// lays out, and paints the referenced entity in the holder's place,
 		// without it being parented under the buffer tree.
 		let mut world = CharcellPlugin::world();
 		let content = world.spawn(rsx! { <p>"transcluded"</p> }).id();
 		let root = world
-			.spawn((FlexBuffer::new(40), children![(RenderRef::new(content),)]))
+			.spawn((FlexBuffer::new(40), children![(Portal::new(content),)]))
 			.id();
 		world.run_schedule(PostParseTree);
 		world

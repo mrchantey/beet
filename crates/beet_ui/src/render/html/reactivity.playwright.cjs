@@ -10,7 +10,7 @@
 //
 //   cargo test -p beet_ui --lib writes_playwright_fixture   # render the fixture
 //   npx playwright install chromium                         # once
-//   node crates/beet_ui/src/render/reactivity.playwright.cjs
+//   node crates/beet_ui/src/render/html/reactivity.playwright.cjs
 
 const fs = require("node:fs");
 const path = require("node:path");

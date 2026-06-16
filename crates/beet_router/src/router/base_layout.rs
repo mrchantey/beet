@@ -6,7 +6,7 @@
 //! middleware, eg [`RequestLogger`]). For every descendant render route it runs
 //! the inner handler to obtain the content render root, then builds the layout,
 //! an ordinary `#[template]` widget, with the content routed into its default
-//! `<Slot>` as a [`RenderRef`] transclusion. The content is rendered *in place,
+//! `<Slot>` as a [`Portal`] transclusion. The content is rendered *in place,
 //! by reference*: it is never reparented under the layout nor re-resolved, so a
 //! persistent fixed route survives request after request.
 //!
@@ -37,7 +37,7 @@ use beet_ui::prelude::*;
 ///
 /// For each request it runs the inner route to obtain the content render root,
 /// then builds `C` with that content routed into its default `<Slot>` (a
-/// [`RenderRef`] transclusion).
+/// [`Portal`] transclusion).
 #[action]
 #[derive(Component)]
 #[component(on_add = on_add_middleware::<Self, RequestParts, Entity>)]
@@ -67,7 +67,7 @@ where
 /// layout as the new render root.
 ///
 /// The content is routed into the layout's default `<Slot>` as a [`SlotChild`]
-/// carrying a [`RenderRef`]: the walker splices it at the layout's slot,
+/// carrying a [`Portal`]: the walker splices it at the layout's slot,
 /// transcluding the existing content entity **by reference**. The layout subtree
 /// is ephemeral and despawned after render (along with the content's own
 /// ephemerals), but the referenced content is never owned or despawned here, so
@@ -82,7 +82,7 @@ fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 		world
 			.spawn_template(Snippet::from_bundle((
 				C::default().into_snippet_bundle(),
-				children![(RenderRef::new(rendered), SlotChild::new())],
+				children![(Portal::new(rendered), SlotChild::new())],
 			)))
 			.map(|entity| entity.id())
 	})
@@ -107,7 +107,7 @@ pub(crate) fn wrap_content_with(
 	let (rendered, content_despawn) = {
 		let entity = world.entity(content);
 		let rendered = entity
-			.get::<RenderRoot>()
+			.get::<Page>()
 			.ok_or_else(|| {
 				bevyhow!("layout inner handler did not yield a render root")
 			})?
@@ -131,16 +131,16 @@ pub(crate) fn wrap_content_with(
 	let layout = layout_result?;
 
 	// link the layout root to the transcluded content, distinct from the
-	// self-referential render root: a layout-head `@entity:RenderRoot::` binding
+	// self-referential render root: a layout-head `@entity:Page::` binding
 	// follows this to read the route's `ArticleMeta` across the transclusion.
 	world
 		.entity_mut(layout)
-		.insert(RenderRootRef::new(rendered));
+		.insert(LayoutContent::new(rendered));
 
 	// despawn the layout subtree plus the content's ephemerals after render
 	let mut to_despawn = vec![layout];
 	to_despawn.extend(content_despawn);
-	RenderRoot::insert(&mut world.entity_mut(layout), to_despawn);
+	Page::insert(&mut world.entity_mut(layout), to_despawn);
 	layout.xok()
 }
 
@@ -190,9 +190,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BaseLayout::<PageLayout>::default(), children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"",
-					rsx! { <p>"page body"</p> }
+					|| rsx! { <p>"page body"</p> }
 				)
 			]))
 			.flush();
@@ -211,9 +211,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BaseLayout::<PageLayout>::default(), children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"",
-					rsx! { <p>"page body"</p> }
+					|| rsx! { <p>"page body"</p> }
 				)
 			]))
 			.flush();
@@ -315,7 +315,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BaseLayout::<NavLayout>::default(), children![
-				render_action::fixed_route("", rsx! { <a>"home"</a> })
+				render_action::fixed_func_route("", || rsx! { <a>"home"</a> })
 			]))
 			.flush();
 
@@ -343,17 +343,17 @@ mod test {
 	/// A route whose rendered content carries the given frontmatter title.
 	#[cfg(feature = "json")]
 	fn meta_route(path: &str, title: &str) -> impl Bundle {
-		render_action::fixed_route(path, (
-			ArticleMeta {
-				title: Some(title.into()),
-				..default()
-			},
-			rsx! { <p>"body"</p> },
-		))
+		let meta = ArticleMeta {
+			title: Some(title.into()),
+			..default()
+		};
+		render_action::fixed_func_route(path, move || {
+			(meta.clone(), rsx! { <p>"body"</p> })
+		})
 	}
 
 	/// The sticky-title regression: through the real `wrap_content_with` pipeline
-	/// (per-request layout + transcluded content + fresh `RenderRootRef`), each
+	/// (per-request layout + transcluded content + fresh `LayoutContent`), each
 	/// route renders its *own* `<title>` (not the previous request's), the visible
 	/// header stays the site title, and the shared `PackageConfig.title` is never
 	/// polluted by a per-route title write-back.
@@ -400,7 +400,7 @@ mod test {
 	}
 
 	/// The per-request link is fresh: `wrap_content_with` installs a
-	/// [`RenderRootRef`] from the layout root to *this request's* content, the
+	/// [`LayoutContent`] from the layout root to *this request's* content, the
 	/// seam the layout-head title binding follows. Two requests yield two distinct
 	/// content entities, each pointed at by its own layout.
 	#[cfg(feature = "json")]
@@ -408,9 +408,9 @@ mod test {
 	async fn wrap_content_links_each_request_to_fresh_content() {
 		let mut world = router_world();
 		let content_a = world.spawn(ArticleMeta::default()).flush();
-		RenderRoot::insert(&mut world.entity_mut(content_a), default());
+		Page::insert(&mut world.entity_mut(content_a), default());
 		let content_b = world.spawn(ArticleMeta::default()).flush();
-		RenderRoot::insert(&mut world.entity_mut(content_b), default());
+		Page::insert(&mut world.entity_mut(content_b), default());
 
 		// these test contents are self-referential roots, so the route anchor and
 		// content coincide.
@@ -434,13 +434,13 @@ mod test {
 		// each layout points at its own request's content, not a shared/stale one.
 		world
 			.entity(layout_a)
-			.get::<RenderRootRef>()
+			.get::<LayoutContent>()
 			.unwrap()
 			.0
 			.xpect_eq(content_a);
 		world
 			.entity(layout_b)
-			.get::<RenderRootRef>()
+			.get::<LayoutContent>()
 			.unwrap()
 			.0
 			.xpect_eq(content_b);

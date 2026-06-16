@@ -117,7 +117,7 @@ impl ReactiveHtmlRender {
 			.unwrap_or_default();
 	}
 
-	/// Walk the render tree (transparent through [`RenderRef`]), assigning each
+	/// Walk the render tree (transparent through [`Portal`]), assigning each
 	/// non-props [`Document`] a tree-order id and recording each entity's
 	/// governing document.
 	fn walk_docs(
@@ -128,12 +128,12 @@ impl ReactiveHtmlRender {
 		doc_ids: &mut HashMap<Entity, usize>,
 		blob: &mut Vec<Value>,
 	) {
-		// a RenderRef holder is transparent: descend into the referenced entity,
+		// a Portal holder is transparent: descend into the referenced entity,
 		// mirroring the node walker. Transcluded content carries its own document
 		// context (the document may live on the content tree's root, *above* this
 		// transclusion entry), so resolve it from the target's own ancestors rather
 		// than inheriting the holder's; the entry element then tops the document.
-		if let Some(target) = world.get::<RenderRef>(entity).map(RenderRef::target) {
+		if let Some(target) = world.get::<Portal>(entity).map(Portal::target) {
 			let doc = self
 				.governing_doc_id(world, target, doc_ids, blob)
 				.or(current);
@@ -661,7 +661,7 @@ mod test {
 		world.spawn((ChildOf(inner), Value::default(), FieldRef::new("count")));
 		world.update_local();
 		// a holder transcludes `inner` (below the document) by reference
-		let holder = world.spawn(RenderRef::new(inner)).id();
+		let holder = world.spawn(Portal::new(inner)).id();
 
 		reactive_html(&mut world, holder)
 			// the entry element tops the document region
@@ -725,7 +725,7 @@ mod test {
 	/// `target/playwright/counter.html`, the input the Playwright check drives.
 	///
 	/// Run: `cargo test -p beet_ui --lib writes_playwright_fixture`, then
-	/// `node crates/beet_ui/src/render/reactivity.playwright.cjs`.
+	/// `node crates/beet_ui/src/render/html/reactivity.playwright.cjs`.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn writes_playwright_fixture() {

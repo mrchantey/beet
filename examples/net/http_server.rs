@@ -31,13 +31,14 @@ fn main() {
 			ServerPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((
-				// CliServer::default(),
-				HttpServer::default(),
-				bootstrap_server(),
-				Count::default(),
-				Handler,
-			));
+			commands
+				.spawn((
+					// CliServer::default(),
+					HttpServer::default(),
+					Count::default(),
+					Handler,
+				))
+				.trigger(StartServer::all);
 		})
 		.run();
 }

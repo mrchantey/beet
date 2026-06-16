@@ -16,7 +16,7 @@ Last week I was lucky enough to attend the first DevOps Days in my hometown of W
 I spent much of my twenties traveling the festival circuit in Serenity, my beloved Mitsubishi Express. I started working at the commercial festivals I'd attended as a teenager, but quickly discovered what I love about festivals is better represented in folk culture. Before long I was exclusively seeking folk festivals and alternative gatherings where the lines between organizer, performer, and attendee are blurred, and in some cases disappear completely. In this culture, the experience is crafted by each participant and the result is radical individuality. For me, this meant dressing up like a pirate and performing to an audience not much bigger than our own motley crew.
 
 
-<img alt="Kiama Sea Shanty Club at Folk by the Sea 2023" src="/assets/blog/kiama-sea-shanty-club.jpg" style="width:941px;"/>
+<img alt="Kiama Sea Shanty Club at Folk by the Sea 2023" src="/assets/blog/kiama-sea-shanty-club.jpg"/>
 
 <p style="align-self:center;"><em>Kiama Sea Shanty Club - Folk By The Sea 2023</em></p>
 

@@ -3,16 +3,17 @@
 //! **Page handlers return `impl Bundle`** (the authoring default; an `rsx!`
 //! tree is one), served by the route family the codegen emits:
 //!
-//! - [`fixed_route`] — a static page from a [`Bundle`].
+//! - [`fixed_func_route`] — a static page from `fn() -> impl Bundle`.
+//! - [`func_route`] — a content fn `fn(Props) -> impl Bundle` built via `Default`.
 //! - [`pure_route`] — `fn(cx: ActionContext<In>) -> impl Bundle`.
 //! - [`async_route`] — `async fn(cx: ActionContext<In>) -> impl Bundle`.
 //! - [`system_route`] — `fn(cx: In<ActionContext<In>>, ..) -> impl Bundle`.
 //!
 //! The router dispatches actions whose output must be [`ExchangeRouteOut`]. The
 //! per-request constructors bridge this: a handler becomes an
-//! `Action<In, RenderRequest>` called on every request that runs the handler,
+//! `Action<In, PageRequest>` called on every request that runs the handler,
 //! builds the result through the template substrate (`spawn_template`) as an
-//! ephemeral render root, and hands back its [`RenderRequest`]. The renderer
+//! ephemeral render root, and hands back its [`PageRequest`]. The renderer
 //! serializes it and despawns it via [`DespawnAfterRender`].
 //!
 //! Building through `spawn_template` (not a bare `world.spawn`) is what resolves
@@ -20,9 +21,8 @@
 //! lifecycle, so a page composed of `#[template]` widgets renders correctly.
 //!
 //! For pages whose content depends on the request, `In` is typically [`Request`]
-//! (the full request, the same shape route actions like `CallerScene` use).
+//! (the full request, the same shape the per-request scene-route actions use).
 
-use super::render_root::CallerScene;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -31,24 +31,6 @@ use beet_ui::prelude::Snippet;
 use bevy::ecs::system::In;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
-
-/// A static page spawned once: the entity becomes both the route and the
-/// rendered content, marked a render root by [`CallerScene`].
-///
-/// # Example
-///
-/// ```no_run
-/// use beet_router::prelude::*;
-/// use beet_core::prelude::*;
-/// use beet_ui::prelude::*;
-///
-/// let bundle = render_action::fixed_route("about",
-///     Element::new("p").with_inner_text("About page")
-/// );
-/// ```
-pub fn fixed_route<B: Bundle>(path: &str, bundle: B) -> impl Bundle {
-	route(path, (CallerScene, bundle))
-}
 
 /// A per-request scene route from a sync handler
 /// `fn(cx: ActionContext<In>) -> impl Bundle`.
@@ -104,23 +86,23 @@ where
 
 /// The shared second half of every per-request route constructor: takes the
 /// bundle produced by a handler, builds it through the template substrate as an
-/// ephemeral render root, and returns its [`RenderRequest`]. The entity is
+/// ephemeral render root, and returns its [`PageRequest`]. The entity is
 /// despawned after render.
 ///
 /// Building via `spawn_template` (rather than a bare `world.spawn`) runs the
 /// slot resolution and lifecycle for content composed of `#[template]` widgets.
 fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
--> Action<B, RenderRequest> {
+-> Action<B, PageRequest> {
 	Action::new_async(|cx: ActionContext<B>| async move {
 		let (caller, bundle) = (cx.caller, cx.input);
 		caller
 			.world()
-			.with(move |world: &mut World| -> Result<RenderRequest> {
+			.with(move |world: &mut World| -> Result<PageRequest> {
 				let mut entity =
 					world.spawn_template(Snippet::from_bundle(bundle))?;
 				let id = entity.id();
-				RenderRoot::insert(&mut entity, vec![id]);
-				Ok(RenderRequest(id))
+				Page::insert(&mut entity, vec![id]);
+				Ok(PageRequest(id))
 			})
 			.await
 	})
@@ -150,9 +132,10 @@ where
 	})
 }
 
-/// A static page from a no-argument handler `fn() -> impl Bundle`. The handler
-/// is called per request (the route is typically `CacheStrategy::Static`, so the
-/// result is cached). This is the page-codegen default for a static page.
+/// A static page from a no-argument handler `fn() -> impl Bundle`, the
+/// page-codegen default for a `.rs` page. The handler runs fresh each request
+/// (nothing is cached at serve time); static export is governed separately by
+/// [`ExportStrategy`].
 pub fn fixed_func_route<Func, B>(path: &str, handler: Func) -> impl Bundle
 where
 	Func: 'static + Send + Sync + Clone + Fn() -> B,

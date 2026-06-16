@@ -13,7 +13,7 @@ use beet_ui::prelude::*;
 /// shared across std and no_std; the std build additionally wires the scene /
 /// asset / charcell rendering pipeline and the reflect registrations the
 /// help/scene routes and `template_serde`/scripting need (all std-only). Scene
-/// routes register as actions (via [`RenderRoot`] + [`ActionMeta`]), so there is
+/// routes register as actions (via [`Page`] + [`ActionMeta`]), so there is
 /// no separate scene observer.
 #[derive(Default)]
 pub struct RouterPlugin;
@@ -72,7 +72,7 @@ impl Plugin for RouterPlugin {
 				.register_template::<RouteList>()
 				.register_template::<ErrorPage>()
 				// per-route metadata, bindable via the reserved ref, eg
-				// `@entity:RenderRoot::ArticleMeta.title`
+				// `@entity:Page::ArticleMeta.title`
 				.register_type::<ArticleMeta>()
 				// the package resource, bindable as eg `@res:PackageConfig.title`
 				.register_type::<PackageConfig>()
@@ -82,6 +82,10 @@ impl Plugin for RouterPlugin {
 				.register_type::<BsxLayout>()
 				.register_template::<RouteHead>()
 				.register_template::<RouteSidebar>();
+			// the default app routes as a markup-spawnable marker, so a no-code
+			// BSX site requests them with `<Router {(.., DefaultAppRoutes)}>`.
+			app.register_type::<DefaultAppRoutes>()
+				.add_observer(spawn_default_app_routes);
 			#[cfg(not(target_arch = "wasm32"))]
 			app.register_type::<RoutesDir>()
 				.add_observer(spawn_routes_dir);
@@ -164,7 +168,7 @@ pub fn insert_path_pattern_for_late_path_partial(
 /// Collects all entities with action components ([`ActionMeta`], [`PathPattern`],
 /// [`ParamsPattern`]) from the root's descendants and constructs a validated
 /// tree. Scene routes are distinguished from regular actions by their output
-/// type being [`RenderRequest`], detected via [`ActionMeta::output_is`].
+/// type being [`PageRequest`], detected via [`ActionMeta::output_is`].
 // TODO this is a bit wasteful, if we used change detection could deduplicate added,
 // and only generate once, but we'd still want a guanratee the system runs immediately
 pub fn insert_route_tree(

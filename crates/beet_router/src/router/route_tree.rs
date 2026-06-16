@@ -11,6 +11,21 @@ use beet_net::prelude::*;
 #[reflect(Component)]
 pub struct RouteHidden;
 
+/// Marks a route that renders a user-facing page, the routes that populate the
+/// navigation [`RouteSidebar`](crate::prelude::RouteSidebar).
+///
+/// Auto-attached by codegen route emission (`emit_routes`) to `.rs` page routes
+/// and markdown/blob content routes. Infrastructure routes injected by
+/// [`default_router`](crate::prelude::default_router) (`app_info`, `analytics`,
+/// the `js/reactivity.js` asset, `client_io`) are not codegen-emitted, so they
+/// never carry it and stay out of the nav.
+///
+/// Distinct from [`PageRequest`]: a `PageRoute` marks a route entity, while a
+/// [`PageRequest`] is the render handle such a route produces per request.
+#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
+#[reflect(Component)]
+pub struct PageRoute;
+
 /// Collects all routes (actions and scene routes) in an entity hierarchy and
 /// arranges them into a validated tree.
 ///
@@ -360,10 +375,10 @@ impl core::fmt::Display for RouteTree {
 /// despawn list) lives in `scene_routes`; the type itself is here in the
 /// no_std core so [`ActionNode::is_scene`] can detect scene routes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RenderRequest(pub Entity);
+pub struct PageRequest(pub Entity);
 
 /// An action route node, representing a callable action at a specific path.
-/// Scene routes are identified by their output type being [`RenderRequest`].
+/// Scene routes are identified by their output type being [`PageRequest`].
 #[derive(Debug, Clone)]
 pub struct ActionNode {
 	/// The entity containing this action.
@@ -376,11 +391,15 @@ pub struct ActionNode {
 	pub path: PathPattern,
 	/// Optional HTTP method restriction.
 	pub method: Option<HttpMethod>,
+	/// Whether the route carries the [`PageRoute`] marker, ie a user-facing page
+	/// route rather than an infrastructure or data route. Drives inclusion in the
+	/// navigation [`RouteSidebar`](crate::prelude::RouteSidebar).
+	pub is_page_route: bool,
 }
 
 impl ActionNode {
-	/// Whether this action is a scene route (output type is [`RenderRequest`]).
-	pub fn is_scene(&self) -> bool { self.meta.output_is::<RenderRequest>() }
+	/// Whether this action is a scene route (output type is [`PageRequest`]).
+	pub fn is_scene(&self) -> bool { self.meta.output_is::<PageRequest>() }
 
 	/// The action's description from doc comments, if available.
 	pub fn description(&self) -> Option<&str> { self.meta.description() }
@@ -415,12 +434,22 @@ pub type ActionQueryItem<'a> = (
 	&'a PathPattern,
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
+	Has<PageRoute>,
 );
 
 impl ActionNode {
-	/// Create an [`ActionNode`] from the full query result tuple.
+	/// Create an [`ActionNode`] from a fetched [`ActionQueryItem`]. Takes the
+	/// query item shape (`Has<PageRoute>` resolves to a `bool`), not the
+	/// query-data alias itself.
 	pub fn from_query(
-		(entity, meta, path, params, method): ActionQueryItem,
+		(entity, meta, path, params, method, is_page_route): (
+			Entity,
+			&ActionMeta,
+			&PathPattern,
+			&ParamsPattern,
+			Option<&HttpMethod>,
+			bool,
+		),
 	) -> Self {
 		Self {
 			entity,
@@ -428,6 +457,7 @@ impl ActionNode {
 			params: params.clone(),
 			path: path.clone(),
 			method: method.cloned(),
+			is_page_route,
 		}
 	}
 }
@@ -512,9 +542,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route(
+				render_action::fixed_func_route(
 					"about",
-					rsx! { <p>"about"</p> }
+					|| rsx! { <p>"about"</p> }
 				),
 				action_at("action"),
 			])
@@ -533,6 +563,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -540,6 +571,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -558,6 +590,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":foo").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -565,6 +598,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -583,6 +617,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -590,6 +625,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -608,6 +644,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -615,6 +652,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("bar").unwrap(),
 				method: None,
+				is_page_route: false,
 			},
 		];
 		let tree = RouteTree::from_nodes(nodes).unwrap();
@@ -669,9 +707,9 @@ mod test {
 		let root = world
 			.spawn(children![
 				(
-					render_action::fixed_route(
+					render_action::fixed_func_route(
 						"counter",
-						Element::new("p").with_inner_text("counter")
+						|| Element::new("p").with_inner_text("counter")
 					),
 					children![action_at("increment"), action_at("decrement"),],
 				),

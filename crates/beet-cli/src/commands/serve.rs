@@ -4,34 +4,30 @@ use beet::prelude::*;
 #[derive(Reflect, Default)]
 #[reflect(Default)]
 struct ServeParams {
-	/// Server to start: absent renders the route once, `http` serves the site
-	/// over HTTP. Comma-separate to start several.
+	/// Servers to start, selected from those the site declares (eg `http`).
+	/// Comma-separate to start several; absent starts every declared server.
 	server: Option<String>,
-	/// The route to render when no long-running server is started, defaults to
-	/// the home route.
-	route: Option<String>,
-	/// When serving over HTTP, watch the site dir: respawn its routes on change
-	/// and live-reload connected browsers.
+	/// Watch the site dir: respawn its routes on change and live-reload browsers.
 	watch: bool,
 }
 
-/// Serves a no-code BSX site: registers the site's `templates/` directory,
-/// spawns its `main.bsx` entry as the app root, then either renders one route or
-/// starts a long-running server selected by `--server`. The site path is a
+/// Serves a no-code BSX site: registers the site's `templates/` directory and
+/// spawns its `main.bsx` entry as the app root, then triggers the server the
+/// site declared and hands it the process, never returning. The site path is a
 /// directory containing `main.bsx`, or the file itself:
 ///
 /// ```sh
-/// beet serve examples/bsx_site                        # render the home route
-/// beet serve examples/bsx_site --route=docs/routing   # render a named route
-/// beet serve examples/bsx_site --server=http          # serve the site over http
+/// beet serve examples/bsx_site                 # start every server main.bsx declares
+/// beet serve examples/bsx_site --server=http   # start only its http server
 /// beet serve examples/bsx_site --server=http --watch  # serve with live reload
 /// ```
 ///
-/// A long-running `--server` (eg `http`) is started by triggering a
-/// [`StartServer`] built agnostically from the request on the site root, the way
-/// any host boots its servers. With no long-running server selected, `Serve`
-/// renders the requested route once and returns it, the way `beet`'s own
-/// entrypoint serves a single request.
+/// `Serve` knows nothing about specific servers: it triggers a [`StartServer`]
+/// built from the request (`--server=` selects which declared servers boot, the
+/// rest of the params flow as boot config) on the site root, then yields forever.
+/// Whatever the site declared owns the process from there: a [`CliServer`] runs
+/// one exchange and exits, an [`HttpServer`] (which self-inserts [`KeepAlive`])
+/// keeps it alive, and if the site declares no server, nothing runs.
 #[action(route = "serve/*site", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
@@ -43,97 +39,52 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
 	let root = build_site(&cx.caller, site_dir.clone(), entry).await?;
 
-	// a long-running server (`http`) is started on the site root and keeps the
-	// process alive; absent one, render the requested route once and return it.
-	if params.server.as_deref().is_some_and(is_long_running) {
-		// the start built straight from the request: the `--server=` value selects
-		// the servers, the rest of the params flow through as boot config.
-		let start = StartServer::from_request(
-			root,
-			params.server.as_deref(),
-			request_params,
-		);
-		let watch = params.watch;
-		let serving =
-			format!("serving {site_dir} with {}\n", params.server.unwrap());
-		cx.caller
-			.with_world(move |world, _caller| {
-				// spawn the long-running server, then trigger its start.
-				world.entity_mut(root).insert(HttpServer::default());
-				world.entity_mut(root).trigger(move |_| start);
-				// dev mode: watch the site dir, respawning routes and live-reloading
-				// browsers via `<LiveReloadScript/>`.
-				if watch {
-					world.spawn(LiveReload::new(site_dir));
-				}
-			})
-			.await?;
-		Response::ok_text(serving).xok()
-	} else {
-		render_route(cx, root, params.route).await
-	}
+	// the start built straight from the request: `--server=` selects which of the
+	// site's declared servers boot, the rest of the params flow as boot config.
+	let start =
+		StartServer::from_request(root, params.server.as_deref(), request_params);
+	let watch = params.watch;
+	cx.caller
+		.with_world(move |world, _caller| {
+			world.entity_mut(root).trigger(move |_| start);
+			// dev mode: watch the site dir, respawning routes and live-reloading
+			// browsers via `<LiveReloadScript/>`.
+			if watch {
+				world.spawn(LiveReload::new(site_dir));
+			}
+		})
+		.await?;
+	// never return: the spawned server owns when the process exits.
+	async_ext::yield_forever().await
 }
 
-/// Whether a `--server` value names a long-running server (one that keeps the
-/// process alive), eg `http`. A bare/absent value renders one route and returns.
-fn is_long_running(server: &str) -> bool {
-	server
-		.split(',')
-		.map(str::trim)
-		.any(|name| matches!(name, "http" | "tui"))
-}
-
-/// Build the site world on the caller: register the site templates, spawn the
-/// `main.bsx` entry as the root, and layer the default app routes onto it.
-/// Returns the spawned site root entity. Shared by [`Serve`] and the
-/// `export-static` command.
+/// Load the site to serve onto the caller's world, returning its root entity.
+/// Shared by [`Serve`] and the `export-static` command; the site declares its
+/// own server and app routes in `main.bsx`, so this only loads it.
 pub(crate) async fn build_site(
 	caller: &AsyncEntity,
 	site_dir: AbsPathBuf,
 	entry: AbsPathBuf,
 ) -> Result<Entity> {
 	caller
-		.with_world(move |world, _caller| -> Result<Entity> {
-			let templates = site_dir.join("templates");
-			if fs_ext::exists(&templates)? {
-				world.register_bsx_templates(templates)?;
-			}
-			// `<RoutesDir src=".."/>` resolves against the site root
-			world.insert_resource(SiteRoot(site_dir));
-			let root = BsxTemplate::load_entry(world, &entry)?.spawn(world)?;
-			// the default app routes `default_router` wires for codegen hosts,
-			// including the cached `/js/reactivity.js` runtime the reactive
-			// renderer's auto-injected script loads
-			world.spawn((ChildOf(root), app_info()));
-			world.spawn((ChildOf(root), reactivity_js_route()));
-			world.spawn((ChildOf(root), analytics_handler()));
-			root.xok()
-		})
+		.with_world(move |world, _caller| load_site(world, site_dir, entry))
 		.await?
 }
 
-/// Render the requested route through the site router, forwarding the original
-/// request so eg `--accept` content negotiation holds. The same one-exchange
-/// shape as `beet`'s own CLI entrypoint.
-async fn render_route(
-	cx: ActionContext<Request>,
-	root: Entity,
-	route: Option<String>,
-) -> Result<Response> {
-	let route = route
-		.unwrap_or_default()
-		.split('/')
-		.filter(|segment| !segment.is_empty())
-		.map(SmolStr::from)
-		.collect();
-	let (mut parts, body) = cx.input.into_parts();
-	*parts.url_mut() = parts.url().clone().with_path(route);
-	cx.caller
-		.world()
-		.entity(root)
-		.exchange(Request::from_parts(parts, body))
-		.await
-		.xok()
+/// The synchronous site load: register the site's `templates/`, set the
+/// [`SiteRoot`] (which `<RoutesDir/>` resolves against), and spawn the
+/// `main.bsx` entry as the app root.
+pub(crate) fn load_site(
+	world: &mut World,
+	site_dir: AbsPathBuf,
+	entry: AbsPathBuf,
+) -> Result<Entity> {
+	let templates = site_dir.join("templates");
+	if fs_ext::exists(&templates)? {
+		world.register_bsx_templates(templates)?;
+	}
+	world.insert_resource(SiteRoot(site_dir));
+	BsxTemplate::load_entry(world, &entry)?.spawn(world)
 }
 
 /// The `*site` path argument, joined back into a path. Errors with usage if empty.
@@ -196,28 +147,6 @@ mod test {
 		AbsPathBuf::new_workspace_rel("examples/bsx_site").unwrap()
 	}
 
-	/// Render `req` through a host carrying only the [`Serve`] route. The style
-	/// plugin mirrors `beet`'s own entrypoint, so the site's `<Stylesheet/>`
-	/// resolves its rules as it does in production.
-	async fn run(req: Request) -> String {
-		let mut world = (
-			AsyncPlugin,
-			RouterPlugin,
-			material::MaterialStylePlugin::default(),
-		)
-			.into_world();
-		let host = world.spawn((Router, children![Serve])).id();
-		world
-			.entity_mut(host)
-			.call::<Request, Response>(
-				req.with_header::<header::Accept>(vec![MediaType::Html]),
-			)
-			.await
-			.unwrap()
-			.unwrap_str()
-			.await
-	}
-
 	#[beet::test]
 	fn resolves_dir_and_entry_file() {
 		let dir = resolve_site(site_path().to_string_lossy().as_ref()).unwrap();
@@ -234,60 +163,30 @@ mod test {
 			.xpect_contains("site not found");
 	}
 
+	/// The site declares its own server and app routes: loading `main.bsx` yields
+	/// a root carrying the markup-declared `HttpServer` plus the default app
+	/// routes it requested with `DefaultAppRoutes` (eg `/js/reactivity.js`), so
+	/// `Serve` only has to trigger the start.
 	#[beet::test]
-	fn long_running_classifies_servers() {
-		is_long_running("http").xpect_true();
-		is_long_running("tui").xpect_true();
-		is_long_running("http, tui").xpect_true();
-		is_long_running("cli").xpect_false();
-		is_long_running("").xpect_false();
-	}
-
-	#[beet::test]
-	async fn renders_home_route_in_cli_mode() {
-		run(Request::get(format!("serve/{}", site_path())))
-			.await
-			.as_str()
-			// the entry's layout document wraps the rendered route
-			.xpect_contains("<html lang=\"en\">")
-			// the markup `<PackageConfig/>` reached the layout's `@res` binding
-			.xpect_contains("BSX Site");
-	}
-
-	/// The host layers the default app routes onto the markup-declared router,
-	/// backed by the `<PackageConfig/>` declared in `main.bsx`.
-	#[beet::test]
-	async fn wires_default_app_routes() {
-		run(Request::get(format!("serve/{}?route=app-info", site_path())))
-			.await
-			.as_str()
-			.xpect_contains("App Info")
-			.xpect_contains("BSX Site");
-	}
-
-	#[beet::test]
-	async fn renders_named_route() {
-		run(Request::get(format!(
-			"serve/{}?route=docs/routing",
-			site_path()
-		)))
-		.await
-		.as_str()
-		.xpect_contains("<html lang=\"en\">")
-		.xpect_contains("Routing");
-	}
-
-	/// `--server=http` starts the long-running HTTP server on the site root
-	/// (returning a serving message) rather than rendering a single route.
-	#[beet::test]
-	async fn starts_http_server() {
-		// no `server` backend feature in this build, so install the runtime hook
-		// the HTTP start observer invokes (idempotent across cases).
-		set_http_server(|_| Box::pin(async { Ok(()) })).ok();
-		run(Request::get(format!("serve/{}?server=http", site_path())))
-			.await
-			.as_str()
-			.xpect_contains("serving")
-			.xpect_contains("http");
+	fn site_declares_server_and_app_routes() {
+		let mut world = (
+			AsyncPlugin,
+			RouterPlugin,
+			material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let SiteEntry { site_dir, entry } =
+			resolve_site(site_path().to_string_lossy().as_ref()).unwrap();
+		let root = load_site(&mut world, site_dir, entry).unwrap();
+		world.flush();
+		// the markup `<Router {(.., HttpServer{..})}>` declared a server
+		world.entity(root).contains::<HttpServer>().xpect_true();
+		// and `DefaultAppRoutes` wired the reactivity-runtime route
+		world
+			.entity(root)
+			.get::<RouteTree>()
+			.unwrap()
+			.find(&["js", "reactivity.js"])
+			.xpect_some();
 	}
 }

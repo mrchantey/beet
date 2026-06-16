@@ -148,10 +148,11 @@ fn emit_rust_route(
 				}
 			};
 			let cache = match kind {
-				HandlerKind::Static => quote! { CacheStrategy::Static },
-				_ => quote! { CacheStrategy::Dynamic },
+				HandlerKind::Static => quote! { ExportStrategy::Static },
+				_ => quote! { ExportStrategy::Dynamic },
 			};
-			Ok(quote! { (#route, #http, #cache) })
+			// `PageRoute` marks this a user-facing page so it appears in the nav.
+			Ok(quote! { (#route, #http, #cache, PageRoute) })
 		}
 		RouteCollectionCategory::Actions => {
 			// Pin In/Out so `Result<T>` unwraps to `T` (otherwise `IntoResult`
@@ -179,7 +180,7 @@ fn emit_rust_route(
 			} else {
 				quote! { exchange_route(#path, #ctor) }
 			};
-			Ok(quote! { (#exchange, #http, CacheStrategy::Dynamic) })
+			Ok(quote! { (#exchange, #http, ExportStrategy::Dynamic) })
 		}
 	}
 }
@@ -228,7 +229,8 @@ fn emit_blob_route(
 		(
 			route(#path, BlobScene::new(#store_path)),
 			HttpMethod::Get,
-			CacheStrategy::Static,
+			ExportStrategy::Static,
+			PageRoute,
 			#meta
 		)
 	}

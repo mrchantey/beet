@@ -66,8 +66,8 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[cfg_attr(feature = "std", component(on_add = on_add))]
-#[cfg_attr(feature = "std", require(ExchangeStats))]
+#[component(on_add = on_add)]
+#[require(ExchangeStats)]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
 	/// an available port (equivalent to binding to port `0`).
@@ -143,14 +143,12 @@ impl HttpServer {
 	/// localhost the default host). The start observer applies any `--port` /
 	/// `--host` from the [`StartServer`] event onto these fields before the
 	/// backend reads them, so a `--port=8080` overrides a declared `port`.
-	#[cfg(feature = "std")]
 	pub fn socket_addr(&self) -> core::net::SocketAddr {
 		(self.host, self.port.unwrap_or(0)).into()
 	}
 
 	/// Overlays `--port` / `--host` from a [`StartServer`]'s params onto a copy of
 	/// these fields, the resolved bind config the backend then reads.
-	#[cfg(feature = "std")]
 	fn with_params(mut self, params: &MultiMap<SmolStr, SmolStr>) -> Self {
 		if let Some(port) = params.get("port").and_then(|val| val.parse().ok()) {
 			self.port = Some(port);
@@ -168,20 +166,23 @@ impl HttpServer {
 
 /// Registers the [`StartServer`] / [`StopServer`] observers on the host, so the
 /// server boots when a start event whose filter passes `"http"` lands on it.
-#[cfg(feature = "std")]
+///
+/// No-std targets register only the start observer (which resolves bind config
+/// and inserts [`KeepAlive`]); the stop observer is pure async-runtime teardown
+/// and stays std.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_start_server)
-		.observe_any(on_stop_server);
+	let mut commands = world.commands();
+	let mut entity = commands.entity(cx.entity);
+	entity.observe_any(on_start_server);
+	#[cfg(feature = "std")]
+	entity.observe_any(on_stop_server);
 }
 
 /// Boots the HTTP backend when a [`StartServer`] event passing `"http"` lands.
 /// Applies the event's `--port` / `--host` onto the component, inserts
 /// [`KeepAlive`] (a long-running server keeps the process up), then queues the
-/// installed [`HttpServerFn`].
-#[cfg(feature = "std")]
+/// installed [`HttpServerFn`]. The queue step is the only std-only part (the
+/// async runtime); the config resolution is no_std.
 fn on_start_server(
 	ev: On<StartServer>,
 	mut servers: Query<&mut HttpServer>,
@@ -196,6 +197,9 @@ fn on_start_server(
 		*server = server.clone().with_params(&ev.params);
 	}
 	commands.insert_resource(KeepAlive);
+	// dispatch the installed backend on the async runtime (std only); a no_std
+	// adapter drives its own backend off the resolved config above.
+	#[cfg(feature = "std")]
 	commands.entity(entity).queue_async_local(start_http_server);
 }
 

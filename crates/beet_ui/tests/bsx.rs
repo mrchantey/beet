@@ -1031,7 +1031,7 @@ fn binding_comp_build_root() {
 
 /// A stand-in carrying the reserved `Router` short name: lazy reserved
 /// resolution is name-based, so the mechanism tests without `beet_router`
-/// (whose real `Router`/`RenderRoot` markers get their own crate's tests).
+/// (whose real `Router`/`Page` markers get their own crate's tests).
 #[derive(Component, Default)]
 struct Router;
 

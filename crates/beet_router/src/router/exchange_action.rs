@@ -88,7 +88,7 @@ impl IntoAction<Self> for ExchangeAction {
 /// Blanket impls cover the main cases:
 /// - Types implementing [`Serialize`] (serde content negotiation)
 ///
-/// Concrete impls exist for [`MediaBytes`] and [`RenderRequest`] (a render root).
+/// Concrete impls exist for [`MediaBytes`] and [`PageRequest`] (a render root).
 pub trait ExchangeRouteOut<M>
 where
 	Self: Sized,

@@ -1,5 +1,8 @@
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
+// disambiguate `Page`: the render-root `Page` (router prelude) and the webdriver
+// browser `Page` are both glob-imported; this command drives the browser one.
+use beet::prelude::webdriver::Page;
 use std::path::PathBuf;
 
 /// Request params for the [`ExportPdf`] command, surfaced in `--help`.

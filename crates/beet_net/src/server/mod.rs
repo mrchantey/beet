@@ -6,8 +6,8 @@
 //! ## Every binary is a CLI server
 //!
 //! A formal beet binary boots as a CLI server at the top level: its entrypoint
-//! triggers a [`StartServer`] with the `cli` filter (see [`bootstrap_cli`]) on a
-//! [`CliServer`] host, parsing argv into a [`Request`] and running one exchange.
+//! spawns a [`CliServer`] host and triggers [`StartServer::all`] on it, parsing
+//! argv into a [`Request`] and running one exchange.
 //! Long-running servers ([`HttpServer`], the `beet_router` `TuiServer`) are
 //! started the same way, by a [`StartServer`] event whose filter selects them.
 //! See [`server_events`] for the model.
@@ -30,12 +30,11 @@
 mod http_server;
 pub use http_server::*;
 // The server model events (`StartServer` / `StopServer`) and the `KeepAlive`
-// resource depend on the std-only `GlobFilter` / `MultiMap`, so the model is
-// std-gated; a no_std target drives `HttpServer` through `set_http_server`
-// directly.
-#[cfg(feature = "std")]
+// resource are no_std (`GlobFilter` and `MultiMap` both build no_std), so a
+// no_std target boots `HttpServer` through the very same `StartServer` observers,
+// supplying its backend via `set_http_server`. Only the async-runtime dispatch
+// (`queue_async_local`) inside the observers stays std-gated.
 mod server_events;
-#[cfg(feature = "std")]
 pub use server_events::*;
 
 #[cfg(feature = "std")]

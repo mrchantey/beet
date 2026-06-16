@@ -1,6 +1,6 @@
 // The beet thin-client reactivity runtime: a tiny, dependency-free signal engine
 // that hydrates a page from the wire format the reactive HTML renderer emits
-// (see `render/reactive_html_render.rs` for the contract) and drives it with no
+// (see `render/html/reactive_html_render.rs` for the contract) and drives it with no
 // WASM.
 //
 // It reads the annotations already in the HTML:
