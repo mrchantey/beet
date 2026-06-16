@@ -162,9 +162,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route("alpha", rsx! { <p>"a"</p> }),
-				render_action::fixed_route("beta", rsx! { <p>"b"</p> }),
-				render_action::fixed_route("gamma", rsx! { <p>"c"</p> }),
+				render_action::fixed_func_route("alpha", || rsx! { <p>"a"</p> }),
+				render_action::fixed_func_route("beta", || rsx! { <p>"b"</p> }),
+				render_action::fixed_func_route("gamma", || rsx! { <p>"c"</p> }),
 			]))
 			.flush();
 		world.entity(root).get::<RouteTree>().unwrap().clone()
