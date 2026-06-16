@@ -190,7 +190,7 @@ mod test {
 	}
 
 	/// A world whose `Layout` binds its `<title>` from the transcluded route's
-	/// `ArticleMeta` via the reserved `@entity:Page::` selector. This is the
+	/// `ArticleMeta` via the reserved `@entity:PageRoot::` selector. This is the
 	/// in-markup replacement for the Rust `RouteHead` title lookup: the layout
 	/// builds detached and the binding follows the `LayoutContent` link
 	/// (installed by `wrap_content_with`) across the transclusion boundary.
@@ -200,7 +200,7 @@ mod test {
 		registry
 			.insert_source(
 				"Layout",
-				"<html><head><title>{@entity:Page::ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
+				"<html><head><title>{@entity:PageRoot::ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
 			)
 			.unwrap();
 		world.insert_resource(registry);
@@ -218,7 +218,7 @@ mod test {
 		})
 	}
 
-	/// A layout-head `@entity:Page::ArticleMeta.title` binding resolves to the
+	/// A layout-head `@entity:PageRoot::ArticleMeta.title` binding resolves to the
 	/// transcluded route's meta, and differs per route (the gap this stream
 	/// closes: the layout root's self-referential render root is not the content,
 	/// so the walk must follow the distinct content link).
@@ -249,7 +249,7 @@ mod test {
 	/// load. This is the link a reloaded layout tree's reserved bindings follow.
 	#[cfg(all(feature = "template_serde", feature = "json"))]
 	#[beet_core::test]
-	fn render_root_ref_round_trips_through_scene() {
+	fn layout_content_round_trips_through_scene() {
 		// a tree the saver collects by `Children`: a content sibling and a layout
 		// root linked to it via `LayoutContent`, so the edge and its reverse
 		// collection both serialize and rebuild on load with remapped ids.
@@ -278,12 +278,12 @@ mod test {
 		TemplateLoader::new(&mut world).load(&bytes).unwrap();
 		// the reloaded layout link points at the reloaded content, and the content
 		// carries the rebuilt reverse edge back to the layout.
-		let (layout, render_root_ref) = world
+		let (layout, layout_content) = world
 			.query_once::<(Entity, &LayoutContent)>()
 			.into_iter()
 			.next()
 			.unwrap();
-		let content = render_root_ref.0;
+		let content = layout_content.0;
 		layout.xpect_not_eq(content);
 		world
 			.entity(content)

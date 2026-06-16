@@ -24,6 +24,9 @@ mod coalescing_trigger;
 pub mod cross_log;
 /// Display formatting utilities.
 pub mod display_ext;
+// Cross-platform env access; no_std reads return "not found" so callers fall
+// back to defaults (it does not need std like the rest of `path_utils`).
+pub mod env_ext;
 mod file_span;
 mod glob_filter;
 mod into_option;

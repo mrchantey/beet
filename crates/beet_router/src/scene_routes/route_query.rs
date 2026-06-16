@@ -6,7 +6,7 @@
 //! root.
 //!
 //! The boundary is the *rendered content* entity — the one tagged
-//! [`PageOf`] and walked by the `NodeRenderer` — not the [`Page`]
+//! [`PageRootOf`] and walked by the `NodeRenderer` — not the [`PageRoot`]
 //! handle that names it. The two coincide for self-referential roots, but an
 //! ephemeral coordinator route points its handle at separate content, and only
 //! the content lives in the traversed tree.
@@ -14,9 +14,9 @@
 //! # Traversal Rules
 //!
 //! Given an entity, RouteQuery:
-//! 1. Traverses up to find the containing [`PageOf`], or root if none exists
+//! 1. Traverses up to find the containing [`PageRootOf`], or root if none exists
 //! 2. Iterates descendants within that render root, stopping at and excluding
-//!    nested [`PageOf`] boundaries (unless it's the render root itself)
+//!    nested [`PageRootOf`] boundaries (unless it's the render root itself)
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -31,7 +31,7 @@ pub struct RouteQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
-	render_roots: Query<'w, 's, (), With<PageOf>>,
+	page_roots: Query<'w, 's, (), With<PageRootOf>>,
 }
 
 impl<'w, 's> RouteQuery<'w, 's> {
@@ -46,28 +46,28 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// Finds the render root for the given entity.
 	///
 	/// Traverses [`ChildOf`] ancestors to find the nearest rendered-content root
-	/// ([`PageOf`]), or returns the root ancestor if none is found. The
-	/// `ChildOf` walk is acyclic — descendants are not tagged with `PageOf`
+	/// ([`PageRootOf`]), or returns the root ancestor if none is found. The
+	/// `ChildOf` walk is acyclic — descendants are not tagged with `PageRootOf`
 	/// — so this is loop-safe.
-	pub fn render_root(&self, entity: Entity) -> Entity {
+	pub fn page_root(&self, entity: Entity) -> Entity {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
-			.find(|&entity| self.render_roots.contains(entity))
+			.find(|&entity| self.page_roots.contains(entity))
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity is a rendered-content root ([`PageOf`]),
+	/// Returns true if the entity is a rendered-content root ([`PageRootOf`]),
 	/// ie a boundary the traversal stops at.
-	pub fn is_render_root(&self, entity: Entity) -> bool {
-		self.render_roots.contains(entity)
+	pub fn is_page_root(&self, entity: Entity) -> bool {
+		self.page_roots.contains(entity)
 	}
 
 	/// Creates a depth-first iterator over entities within the render.
 	///
 	/// Starts from the given entity's render root and traverses descendants,
-	/// stopping at [`Page`] boundaries.
+	/// stopping at [`PageRoot`] boundaries.
 	pub fn iter_dfs(&self, entity: Entity) -> RenderDfsIter<'_, 'w, 's> {
-		let root = self.render_root(entity);
+		let root = self.page_root(entity);
 		RenderDfsIter {
 			query: self,
 			stack: vec![root],
@@ -93,9 +93,9 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// Creates a breadth-first iterator over entities within the render.
 	///
 	/// Starts from the given entity's render root and traverses descendants,
-	/// stopping at [`Page`] boundaries.
+	/// stopping at [`PageRoot`] boundaries.
 	pub fn iter_bfs(&self, entity: Entity) -> RenderBfsIter<'_, 'w, 's> {
-		let root = self.render_root(entity);
+		let root = self.page_root(entity);
 		RenderBfsIter {
 			query: self,
 			queue: VecDeque::from([root]),
@@ -145,7 +145,7 @@ impl Iterator for RenderDfsIter<'_, '_, '_> {
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter().rev() {
 				// Stop at render-root boundaries, unless the child is the root
-				if child != self.root && self.query.is_render_root(child) {
+				if child != self.root && self.query.is_page_root(child) {
 					continue;
 				}
 				self.stack.push(child);
@@ -173,7 +173,7 @@ impl Iterator for RenderBfsIter<'_, '_, '_> {
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter() {
 				// Stop at render-root boundaries, unless the child is the root
-				if child != self.root && self.query.is_render_root(child) {
+				if child != self.root && self.query.is_page_root(child) {
 					continue;
 				}
 				self.queue.push_back(child);
@@ -189,32 +189,32 @@ impl Iterator for RenderBfsIter<'_, '_, '_> {
 mod test {
 	use super::*;
 
-	/// Spawns a self-referential [`Page`] boundary entity.
-	fn render_root(world: &mut World) -> Entity {
+	/// Spawns a self-referential [`PageRoot`] boundary entity.
+	fn page_root(world: &mut World) -> Entity {
 		let entity = world.spawn_empty().id();
-		world.entity_mut(entity).insert(PageOf(entity));
+		world.entity_mut(entity).insert(PageRootOf(entity));
 		entity
 	}
 
-	/// Spawns a self-referential [`Page`] boundary entity as a child.
-	fn render_root_child(world: &mut World, parent: Entity) -> Entity {
+	/// Spawns a self-referential [`PageRoot`] boundary entity as a child.
+	fn page_root_child(world: &mut World, parent: Entity) -> Entity {
 		let entity = world.spawn(ChildOf(parent)).id();
-		world.entity_mut(entity).insert(PageOf(entity));
+		world.entity_mut(entity).insert(PageRootOf(entity));
 		entity
 	}
 
 	#[beet_core::test]
-	fn render_root_finds_render() {
+	fn page_root_finds_render() {
 		let mut world = World::new();
 
-		let render = render_root(&mut world);
+		let render = page_root(&mut world);
 		let child = world.spawn(ChildOf(render)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
 		world
 			.run_system_cached_with(
 				|In(entity): In<Entity>, query: RouteQuery| {
-					query.render_root(entity).xpect_eq(entity);
+					query.page_root(entity).xpect_eq(entity);
 				},
 				render,
 			)
@@ -224,7 +224,7 @@ mod test {
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
 				 query: RouteQuery| {
-					query.render_root(entity).xpect_eq(expected);
+					query.page_root(entity).xpect_eq(expected);
 				},
 				(child, render),
 			)
@@ -234,7 +234,7 @@ mod test {
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
 				 query: RouteQuery| {
-					query.render_root(entity).xpect_eq(expected);
+					query.page_root(entity).xpect_eq(expected);
 				},
 				(grandchild, render),
 			)
@@ -242,7 +242,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn render_root_falls_back_to_root() {
+	fn page_root_falls_back_to_root() {
 		let mut world = World::new();
 
 		let root = world.spawn_empty().id();
@@ -252,7 +252,7 @@ mod test {
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
 				 query: RouteQuery| {
-					query.render_root(entity).xpect_eq(expected);
+					query.page_root(entity).xpect_eq(expected);
 				},
 				(child, root),
 			)
@@ -264,7 +264,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = render_root(&mut world);
+		let root = page_root(&mut world);
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -290,7 +290,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = render_root(&mut world);
+		let root = page_root(&mut world);
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -315,9 +315,9 @@ mod test {
 	fn stops_at_nested_render() {
 		let mut world = World::new();
 
-		let render = render_root(&mut world);
+		let render = page_root(&mut world);
 		let child = world.spawn(ChildOf(render)).id();
-		let nested_render = render_root_child(&mut world, child);
+		let nested_render = page_root_child(&mut world, child);
 		let _nested_child = world.spawn(ChildOf(nested_render)).id();
 
 		let expected = vec![render, child];
@@ -339,9 +339,9 @@ mod test {
 	fn stops_at_render_boundary() {
 		let mut world = World::new();
 
-		let render = render_root(&mut world);
+		let render = page_root(&mut world);
 		let child = world.spawn(ChildOf(render)).id();
-		let boundary = render_root_child(&mut world, child);
+		let boundary = page_root_child(&mut world, child);
 		let _boundary_child = world.spawn(ChildOf(boundary)).id();
 
 		let expected = vec![render, child];
@@ -360,10 +360,10 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn iter_from_child_finds_render_root() {
+	fn iter_from_child_finds_page_root() {
 		let mut world = World::new();
 
-		let render = render_root(&mut world);
+		let render = page_root(&mut world);
 		let child = world.spawn(ChildOf(render)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
@@ -386,7 +386,7 @@ mod test {
 	fn iter_dfs_from_starts_at_given_entity() {
 		let mut world = World::new();
 
-		let render = render_root(&mut world);
+		let render = page_root(&mut world);
 		let child = world.spawn(ChildOf(render)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 

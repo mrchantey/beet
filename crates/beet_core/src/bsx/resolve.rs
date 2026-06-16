@@ -17,7 +17,7 @@
 //!   attribute position), or an `@entity:Name::` named entity;
 //! - the reserved selector names ([`ReservedRef`]) target well-known entities
 //!   instead of `bx:ref` names (which may not shadow them): `BuildRoot` and
-//!   `SnippetRoot` resolve at build time, `Page` and `Router` lazily
+//!   `SnippetRoot` resolve at build time, `PageRoot` and `Router` lazily
 //!   in the sync pass via [`BindingTarget::Reserved`];
 //! - a `$`reference resolves to a `bx:ref`-named entity through the one entity
 //!   model;
@@ -177,10 +177,10 @@ pub enum ReservedRef {
 	/// The root of the innermost BSX template build (the parsed document or a
 	/// registry template body), resolved at build time from [`SnippetBuildRoot`].
 	SnippetRoot,
-	/// The nearest self-or-ancestor entity carrying a `Page` component,
+	/// The nearest self-or-ancestor entity carrying a `PageRoot` component,
 	/// resolved lazily each sync pass: the render tree may not exist or be
 	/// attached at build time (layouts build detached, per request).
-	Page,
+	PageRoot,
 	/// The nearest self-or-ancestor entity carrying a `Router` component,
 	/// resolved lazily each sync pass.
 	Router,
@@ -189,21 +189,21 @@ pub enum ReservedRef {
 impl ReservedRef {
 	/// Every reserved selector name.
 	pub const NAMES: &[&str] =
-		&["BuildRoot", "SnippetRoot", "Page", "Router"];
+		&["BuildRoot", "SnippetRoot", "PageRoot", "Router"];
 
 	/// Classify a selector name, `None` for a user `bx:ref` name.
 	pub fn parse(name: &str) -> Option<Self> {
 		match name {
 			"BuildRoot" => Some(Self::BuildRoot),
 			"SnippetRoot" => Some(Self::SnippetRoot),
-			"Page" => Some(Self::Page),
+			"PageRoot" => Some(Self::PageRoot),
 			"Router" => Some(Self::Router),
 			_ => None,
 		}
 	}
 
 	/// Resolve a build-time reserved name, `None` for the lazy names
-	/// ([`Self::Page`]/[`Self::Router`]), which resolve in the binding
+	/// ([`Self::PageRoot`]/[`Self::Router`]), which resolve in the binding
 	/// sync instead ([`BindingTarget::Reserved`]).
 	fn build_time_entity(
 		self,
@@ -217,7 +217,7 @@ impl ReservedRef {
 				.map(|root| root.0)
 				.unwrap_or(fallback)
 				.xmap(Some),
-			Self::Page | Self::Router => None,
+			Self::PageRoot | Self::Router => None,
 		}
 	}
 
@@ -479,7 +479,7 @@ fn map_selector_target(
 	entity_refs: &HashMap<SmolStr, Entity>,
 ) -> BindingTarget {
 	match ReservedRef::parse(name) {
-		Some(ReservedRef::Page | ReservedRef::Router) => {
+		Some(ReservedRef::PageRoot | ReservedRef::Router) => {
 			BindingTarget::Reserved(name.clone())
 		}
 		_ => BindingTarget::Entity(
@@ -574,7 +574,7 @@ fn resolve_entity_refs(
 	for name in names {
 		// a reserved name never resolves through the `bx:ref` machinery: the
 		// build-time ones resolve from the build resources here, the lazy ones
-		// (`Page`/`Router`) defer to the sync pass instead.
+		// (`PageRoot`/`Router`) defer to the sync pass instead.
 		if let Some(reserved) = ReservedRef::parse(&name) {
 			let fallback = cx.entity.id();
 			if let Some(entity) = cx.entity.world_scope(|world| {

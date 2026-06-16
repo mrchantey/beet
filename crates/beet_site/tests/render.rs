@@ -60,7 +60,7 @@ async fn blog_post_in_layout() {
 #[beet::test]
 async fn blog_post_title_from_frontmatter() {
 	// the per-page `<title>` comes from the post's frontmatter via `ArticleMeta`,
-	// bound through the layout's `RouteHead` (`@entity:Page::ArticleMeta.title`),
+	// bound through the layout's `RouteHead` (`@entity:PageRoot::ArticleMeta.title`),
 	// not the package default.
 	site_world()
 		.spawn(beet_site_router())

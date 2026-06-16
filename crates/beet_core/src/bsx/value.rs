@@ -86,7 +86,7 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 /// `@entity:` is `@comp` retargeted to a named entity: its first segment is the
 /// entity name, `::` separates it from the `Type.field` path
 /// (`@entity:slider::Slider.value`). The name is a `bx:ref` name or a reserved
-/// well-known name (`BuildRoot`, `SnippetRoot`, `Page`, `Router`);
+/// well-known name (`BuildRoot`, `SnippetRoot`, `PageRoot`, `Router`);
 /// reservation is the resolver's concern ([`ReservedRef`](super::resolve::ReservedRef)),
 /// the grammar does not distinguish them.
 pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
@@ -529,9 +529,9 @@ mod test {
 
 	#[beet_core::test]
 	fn entity_binding_reserved_name() {
-		let parsed = binding("@entity:Page::ArticleMeta.title");
+		let parsed = binding("@entity:PageRoot::ArticleMeta.title");
 		parsed.source.xpect_eq(BindingSource::Comp);
-		parsed.selector.xpect_eq(Some("Page".into()));
+		parsed.selector.xpect_eq(Some("PageRoot".into()));
 		parsed.type_path.xpect_eq(Some("ArticleMeta".into()));
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}

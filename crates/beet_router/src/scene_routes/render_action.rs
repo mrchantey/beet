@@ -101,7 +101,7 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 				let mut entity =
 					world.spawn_template(Snippet::from_bundle(bundle))?;
 				let id = entity.id();
-				Page::insert(&mut entity, vec![id]);
+				PageRoot::insert(&mut entity, vec![id]);
 				Ok(PageRequest(id))
 			})
 			.await

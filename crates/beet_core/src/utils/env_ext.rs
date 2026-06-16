@@ -16,8 +16,10 @@ pub fn load_dotenv() {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
 			todo!("probs load from query params or something?")
-		} else {
+		} else if #[cfg(feature = "std")] {
 			dotenv::dotenv().ok();
+		} else {
+			// no_std: no `.env` file to load.
 		}
 	}
 }
@@ -28,8 +30,10 @@ pub fn args() -> Vec<String> {
 		if #[cfg(target_arch = "wasm32")] {
 			// Deno.args already excludes program name
 			return array_ext::into_vec_str(js_runtime::env_args());
-		} else {
+		} else if #[cfg(feature = "std")] {
 			return std::env::args().skip(1).collect();
+		} else {
+			return Vec::new();
 		}
 	}
 }
@@ -41,13 +45,14 @@ pub fn args() -> Vec<String> {
 /// threads or while other threads read environment variables is undefined behavior.
 #[allow(unused)]
 pub unsafe fn set_var(key: &str, value: &str) {
-	unsafe {
-		cfg_if! {
-		if #[cfg(not(target_arch = "wasm32"))] {
-			std::env::set_var(key, value);
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			unsafe { js_runtime::set_env(key, value); }
+		} else if #[cfg(feature = "std")] {
+			unsafe { std::env::set_var(key, value); }
 		} else {
-			js_runtime::set_env(key, value);
-		}
+			// no_std: no process environment to mutate.
+			let _ = (key, value);
 		}
 	}
 }
@@ -59,9 +64,13 @@ pub fn var(key: &str) -> Result<String, EnvError> {
 		if #[cfg(target_arch = "wasm32")] {
 			return js_runtime::env_var(key)
 				.ok_or_else(|| EnvError::NotFound(key.to_string()));
-		} else {
+		} else if #[cfg(feature = "std")] {
 			return std::env::var(key)
 				.map_err(|_| EnvError::NotFound(key.to_string()));
+		} else {
+			// no_std: no process environment, so always "not found" and callers
+			// fall back to their defaults.
+			return Err(EnvError::NotFound(key.to_string()));
 		}
 	}
 }
@@ -85,8 +94,10 @@ pub fn vars() -> Vec<(String, String)> {
 				out.push((key, value));
 			}
 			return out;
-		} else {
+		} else if #[cfg(feature = "std")] {
 			return std::env::vars().collect();
+		} else {
+			return Vec::new();
 		}
 	}
 }

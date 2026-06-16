@@ -12,9 +12,6 @@
 
 use beet::net::prelude::webdriver::*;
 use beet::prelude::*;
-// disambiguate `Page`: the webdriver browser `Page` (this example) vs the
-// render-root `Page` both glob-imported above.
-use beet::net::prelude::webdriver::Page;
 
 fn main() {
 	App::new()

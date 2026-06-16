@@ -2,8 +2,9 @@
 //!
 //! This module provides [`ExchangeStats`] for tracking request counts
 //! and the [`exchange_stats`] observer for logging exchange completion.
-// the wire-event imports (`ExchangeEnd` etc.) are only used by the std observer.
-#[cfg(feature = "std")]
+// the wire-event imports (`ExchangeEnd` etc.) are only used by the observer,
+// which needs the `action` feature.
+#[cfg(feature = "action")]
 use super::*;
 use beet_core::prelude::*;
 
@@ -17,10 +18,10 @@ use beet_core::prelude::*;
 /// [`ExchangeEnd`] event, so this works for the live-server `call` path as well
 /// as spawn-type exchanges.
 ///
-/// Std-only: it reads the `action`-feature [`ExchangeEnd`] event. The
-/// [`ExchangeStats`] counter it bumps is itself no_std (it backs the no_std
+/// `action`-gated (its only non-no_std dep): it reads the [`ExchangeEnd`] event.
+/// The [`ExchangeStats`] counter it bumps is itself no_std (it backs the no_std
 /// [`HttpServer`] requirement).
-#[cfg(feature = "std")]
+#[cfg(feature = "action")]
 pub fn exchange_stats(
 	ev: On<ExchangeEnd>,
 	mut servers: AncestorQuery<&mut ExchangeStats>,
@@ -60,8 +61,8 @@ impl ExchangeStats {
 	pub fn request_count(&self) -> u128 { self.request_count }
 
 	/// Increments the request counter.
-	// only the std logging observer bumps it today; a no_std backend may too.
-	#[cfg_attr(not(feature = "std"), allow(dead_code))]
+	// only the `action`-gated logging observer bumps it today; a backend may too.
+	#[cfg_attr(not(feature = "action"), allow(dead_code))]
 	pub(super) fn increment_requests(&mut self) -> &mut Self {
 		self.request_count += 1;
 		self

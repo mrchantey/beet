@@ -11,7 +11,7 @@
 //! by default, or another entity (eg an attribute `Value` binding to its
 //! element). A [`BindingTarget::Reserved`] target re-resolves each pass to the
 //! nearest self-or-ancestor carrying the named marker component (the lazy
-//! reserved refs `@entity:Page::`/`@entity:Router::`), staying silent until
+//! reserved refs `@entity:PageRoot::`/`@entity:Router::`), staying silent until
 //! the marker is reachable and forcing a read-back when it first resolves. The
 //! `Value` always stays on the binding entity.
 //!

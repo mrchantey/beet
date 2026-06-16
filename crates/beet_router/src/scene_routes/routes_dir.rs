@@ -93,6 +93,9 @@ pub fn spawn_routes_dir(
 			route(&route_path_of(rel), BlobScene::new(store_path_of(rel))),
 			HttpMethod::Get,
 			ExportStrategy::Static,
+			// a discovered content file is a user-facing page, so it carries
+			// `PageRoute` and appears in the nav, like its codegen blob equivalent.
+			PageRoute,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
 		#[cfg(feature = "markdown_parser")]

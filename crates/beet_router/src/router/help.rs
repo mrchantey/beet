@@ -4,7 +4,7 @@
 //! scoped [`RouteTree`] into [`RouteEntry`] rows and renders the [`RouteList`]
 //! template. [`ContextualNotFound`] renders the same template for an unmatched
 //! path, prefixed with a not-found notice. Both go through
-//! [`Page::render`], so an ancestor layout (the document chrome) wraps the
+//! [`PageRoot::render`], so an ancestor layout (the document chrome) wraps the
 //! list exactly like any other route, and the one template serves both the CLI
 //! `--help` and the web `?help` view.
 
@@ -47,7 +47,7 @@ pub async fn HelpHandler(
 		.await??;
 
 	let root = spawn_route_list(&caller, None, entries).await?;
-	Page::render(root, &caller, parts).await
+	PageRoot::render(root, &caller, parts).await
 }
 
 /// Fallback handler that renders the [`RouteList`] scoped to the nearest ancestor
@@ -71,7 +71,7 @@ pub(crate) async fn ContextualNotFound(
 
 	let root = spawn_route_list(&cx.caller, Some(notice), entries).await?;
 	let mut response =
-		Page::render(root, &cx.caller, cx.input.parts().clone()).await?;
+		PageRoot::render(root, &cx.caller, cx.input.parts().clone()).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }
@@ -103,7 +103,7 @@ pub struct RouteEntry {
 ///
 /// One template for both the CLI `--help` and the web `?help`: the document
 /// chrome (head/sidebar/footer) is the ancestor layout's job, applied by
-/// [`Page::render`], so this widget only owns the route listing.
+/// [`PageRoot::render`], so this widget only owns the route listing.
 #[template]
 pub fn RouteList(
 	notice: Option<NotFoundNotice>,
@@ -171,7 +171,7 @@ fn route_entry_item(entry: RouteEntry) -> impl Bundle {
 /// Spawn the [`RouteList`] template as an ephemeral render root, returning its id.
 ///
 /// Built through `spawn_template` so the widget's slots and lifecycle resolve,
-/// then marked a self-referential [`Page`] so [`Page::render`] walks
+/// then marked a self-referential [`PageRoot`] so [`PageRoot::render`] walks
 /// it (wrapping it in the ancestor layout) and despawns it after rendering.
 async fn spawn_route_list(
 	caller: &AsyncEntity,
@@ -192,7 +192,7 @@ async fn spawn_route_list(
 			};
 			let mut entity = world.spawn_template(snippet)?;
 			let id = entity.id();
-			Page::insert(&mut entity, vec![id]);
+			PageRoot::insert(&mut entity, vec![id]);
 			id.xok()
 		})
 		.await

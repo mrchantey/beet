@@ -31,7 +31,7 @@ pub enum BindingTarget {
 	/// A lazily resolved target: the nearest self-or-ancestor entity carrying
 	/// the component named by this short type path, re-resolved each sync pass.
 	///
-	/// Produced by the lazy reserved BSX selectors (`@entity:Page::`,
+	/// Produced by the lazy reserved BSX selectors (`@entity:PageRoot::`,
 	/// `@entity:Router::`), whose marker entities may not exist or be attached at
 	/// build time. Unresolvable targets are silently skipped until the marker
 	/// appears in the ancestry.
@@ -62,7 +62,7 @@ impl BindingTarget {
 	///
 	/// A matched marker carrying a [`LayoutContent`] (a layout root linked to its
 	/// transcluded route content, installed by the router's layout wrap) resolves
-	/// to that content instead, so a layout-head `@entity:Page::` binding reads
+	/// to that content instead, so a layout-head `@entity:PageRoot::` binding reads
 	/// the route's `ArticleMeta` across the transclusion boundary. A
 	/// self-referential render root has no such link and resolves to itself, as
 	/// before.
@@ -100,7 +100,7 @@ impl BindingTarget {
 }
 
 /// On a render-root entity: a one-directional link to the per-request route
-/// content it transcludes, the seam a layout-head `@entity:Page::` binding
+/// content it transcludes, the seam a layout-head `@entity:PageRoot::` binding
 /// follows to reach the route's metadata.
 ///
 /// A layout builds detached and transcludes the route content by reference (a

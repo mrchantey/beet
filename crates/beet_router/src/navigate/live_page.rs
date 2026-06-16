@@ -101,7 +101,7 @@ pub fn sync_current_page(
 /// Resolve `request` against the router's [`RouteTree`] and build the matched
 /// scene route into a living entity tree, returning its root.
 ///
-/// The live parallel of the static [`Page::render`] path: it shares the
+/// The live parallel of the static [`PageRoot::render`] path: it shares the
 /// route build *and* the ancestor layout middleware (header/sidebar/footer, the
 /// document chrome) but forks at the output, handing back the built entity rather
 /// than serializing and despawning it. That entity is kept alive to become a
@@ -139,7 +139,7 @@ pub async fn build_live_page(
 	// `ExchangeAction` wrapper that would serialize then despawn the tree.
 	let content = route.call::<Request, PageRequest>(request).await?.0;
 	// wrap it in the ancestor layout middleware (the `BaseLayout` document chrome),
-	// transcluding the content by reference, exactly as `Page::render` does
+	// transcluding the content by reference, exactly as `PageRoot::render` does
 	// for the static path; here the wrapped tree is kept alive as the page.
 	route
 		.call_with_middleware::<RequestParts, Entity>(

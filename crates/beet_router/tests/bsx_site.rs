@@ -333,7 +333,7 @@ fn text_value(world: &World, entity: Entity) -> Value {
 	world.entity(text).get::<Value>().unwrap().clone()
 }
 
-/// `@entity:Page::` resolves to the nearest render-root ancestor, the
+/// `@entity:PageRoot::` resolves to the nearest render-root ancestor, the
 /// in-content replacement for the Rust `RouteHead` meta lookup.
 #[beet_core::test]
 fn render_root_binding_reads_article_meta() {
@@ -345,11 +345,11 @@ fn render_root_binding_reads_article_meta() {
 			..default()
 		})
 		.id();
-	Page::insert(&mut world.entity_mut(route), default());
+	PageRoot::insert(&mut world.entity_mut(route), default());
 	let span = spawn_bsx_under(
 		&mut world,
 		route,
-		"<span>{@entity:Page::ArticleMeta.title}</span>",
+		"<span>{@entity:PageRoot::ArticleMeta.title}</span>",
 	);
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Str("The Title".into()));

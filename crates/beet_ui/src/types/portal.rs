@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 /// points at one content entity, and the content tracks every holder that
 /// transcludes it (eg a layout root and a live page-host slot rendering the same
 /// content). The reverse edge is what lets a binding cross the transclusion
-/// boundary (the layout-head `@entity:Page::` walk into the route content)
+/// boundary (the layout-head `@entity:PageRoot::` walk into the route content)
 /// and the cascade inherit through it (the holder is the visual parent of the
 /// content). Absence is the unresolved state, eg a page-host slot before any
 /// page is set, so a placeholder entity is never exposed.
@@ -40,7 +40,7 @@ impl Portal {
 /// The reverse edge of a transclusion: content transcluded into a layout (or a
 /// live page host) has no [`ChildOf`] link to its holder, so this is how a walk
 /// crosses from content up into the holder. A binding in a layout head resolving
-/// `@entity:Page::` follows it from the layout root to the route content,
+/// `@entity:PageRoot::` follows it from the layout root to the route content,
 /// and the style cascade inherits from the holder through it.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
 #[reflect(Component)]

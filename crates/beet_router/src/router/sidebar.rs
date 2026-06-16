@@ -29,7 +29,7 @@ use beet_ui::prelude::*;
 
 /// The document [`Head`] with a per-route `<title>`: the base [`Head`] omits its
 /// own `<title>` and this widget owns the single one, bound to the route's
-/// [`ArticleMeta`] title (`@entity:Page::ArticleMeta.title`) so it differs
+/// [`ArticleMeta`] title (`@entity:PageRoot::ArticleMeta.title`) so it differs
 /// per route and stays live. The base head's social/PWA meta names the site from
 /// [`PackageConfig`](beet_core::prelude::PackageConfig). Extra tags (stylesheet,
 /// favicon, ...) flow through to the `<head>` via the default slot.
@@ -61,7 +61,7 @@ pub fn RouteHead(
 
 /// The bound text child of the route `<title>`: a [`Value`] seeded with the
 /// resolved title (so SSR renders it before any sync) plus, under `json`, a
-/// [`ReflectFieldRef`] resolving `@entity:Page::ArticleMeta.title` — the
+/// [`ReflectFieldRef`] resolving `@entity:PageRoot::ArticleMeta.title` — the
 /// nearest render-root ancestor, hopping the layout's [`LayoutContent`] into the
 /// transcluded route content. Re-resolved each sync pass and each request, so the
 /// title tracks the current route. Without `json` it stays the static seed.
@@ -71,7 +71,7 @@ fn route_title(seed: &str) -> impl Bundle {
 	return (
 		value,
 		ReflectFieldRef::new("ArticleMeta", "title")
-			.with_target(BindingTarget::Reserved("Page".into())),
+			.with_target(BindingTarget::Reserved("PageRoot".into())),
 	);
 	#[cfg(not(feature = "json"))]
 	return value;

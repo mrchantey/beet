@@ -107,7 +107,7 @@ pub(crate) fn wrap_content_with(
 	let (rendered, content_despawn) = {
 		let entity = world.entity(content);
 		let rendered = entity
-			.get::<Page>()
+			.get::<PageRoot>()
 			.ok_or_else(|| {
 				bevyhow!("layout inner handler did not yield a render root")
 			})?
@@ -131,7 +131,7 @@ pub(crate) fn wrap_content_with(
 	let layout = layout_result?;
 
 	// link the layout root to the transcluded content, distinct from the
-	// self-referential render root: a layout-head `@entity:Page::` binding
+	// self-referential render root: a layout-head `@entity:PageRoot::` binding
 	// follows this to read the route's `ArticleMeta` across the transclusion.
 	world
 		.entity_mut(layout)
@@ -140,7 +140,7 @@ pub(crate) fn wrap_content_with(
 	// despawn the layout subtree plus the content's ephemerals after render
 	let mut to_despawn = vec![layout];
 	to_despawn.extend(content_despawn);
-	Page::insert(&mut world.entity_mut(layout), to_despawn);
+	PageRoot::insert(&mut world.entity_mut(layout), to_despawn);
 	layout.xok()
 }
 
@@ -408,9 +408,9 @@ mod test {
 	async fn wrap_content_links_each_request_to_fresh_content() {
 		let mut world = router_world();
 		let content_a = world.spawn(ArticleMeta::default()).flush();
-		Page::insert(&mut world.entity_mut(content_a), default());
+		PageRoot::insert(&mut world.entity_mut(content_a), default());
 		let content_b = world.spawn(ArticleMeta::default()).flush();
-		Page::insert(&mut world.entity_mut(content_b), default());
+		PageRoot::insert(&mut world.entity_mut(content_b), default());
 
 		// these test contents are self-referential roots, so the route anchor and
 		// content coincide.

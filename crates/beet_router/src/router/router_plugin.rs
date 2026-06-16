@@ -13,7 +13,7 @@ use beet_ui::prelude::*;
 /// shared across std and no_std; the std build additionally wires the scene /
 /// asset / charcell rendering pipeline and the reflect registrations the
 /// help/scene routes and `template_serde`/scripting need (all std-only). Scene
-/// routes register as actions (via [`Page`] + [`ActionMeta`]), so there is
+/// routes register as actions (via [`PageRoot`] + [`ActionMeta`]), so there is
 /// no separate scene observer.
 #[derive(Default)]
 pub struct RouterPlugin;
@@ -72,7 +72,7 @@ impl Plugin for RouterPlugin {
 				.register_template::<RouteList>()
 				.register_template::<ErrorPage>()
 				// per-route metadata, bindable via the reserved ref, eg
-				// `@entity:Page::ArticleMeta.title`
+				// `@entity:PageRoot::ArticleMeta.title`
 				.register_type::<ArticleMeta>()
 				// the package resource, bindable as eg `@res:PackageConfig.title`
 				.register_type::<PackageConfig>()

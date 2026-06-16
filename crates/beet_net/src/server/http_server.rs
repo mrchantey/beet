@@ -80,33 +80,20 @@ pub struct HttpServer {
 
 impl Default for HttpServer {
 	fn default() -> Self {
-		cfg_if! {
-			if #[cfg(feature = "std")] {
-				let port = env_ext::var("BEET_PORT")
-					.ok()
-					.and_then(|val| val.parse().ok())
-					.unwrap_or(DEFAULT_SERVER_PORT);
-				let host = env_ext::var("BEET_HOST")
-					.ok()
-					.map(|val| {
-						if val == "0.0.0.0" {
-							[0, 0, 0, 0]
-						} else {
-							[127, 0, 0, 1]
-						}
-					})
-					.unwrap_or([127, 0, 0, 1]);
-				Self {
-					port: Some(port),
-					host,
-				}
-			} else {
-				// no_std: no environment to read, use the static defaults.
-				Self {
-					port: Some(DEFAULT_SERVER_PORT),
-					host: [127, 0, 0, 1],
-				}
-			}
+		// `env_ext::var` returns "not found" on no_std, so this reads `BEET_PORT`
+		// / `BEET_HOST` where there is an environment and falls back to the static
+		// defaults everywhere else, no feature gate needed.
+		let port = env_ext::var("BEET_PORT")
+			.ok()
+			.and_then(|val| val.parse().ok())
+			.unwrap_or(DEFAULT_SERVER_PORT);
+		let host = env_ext::var("BEET_HOST")
+			.ok()
+			.map(|val| if val == "0.0.0.0" { [0, 0, 0, 0] } else { [127, 0, 0, 1] })
+			.unwrap_or([127, 0, 0, 1]);
+		Self {
+			port: Some(port),
+			host,
 		}
 	}
 }
@@ -166,23 +153,20 @@ impl HttpServer {
 
 /// Registers the [`StartServer`] / [`StopServer`] observers on the host, so the
 /// server boots when a start event whose filter passes `"http"` lands on it.
-///
-/// No-std targets register only the start observer (which resolves bind config
-/// and inserts [`KeepAlive`]); the stop observer is pure async-runtime teardown
-/// and stays std.
+/// no_std, like the start/stop dispatch it registers: the async runtime
+/// (`queue_async_local`) and the installed backend hook both build without std.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	let mut commands = world.commands();
-	let mut entity = commands.entity(cx.entity);
-	entity.observe_any(on_start_server);
-	#[cfg(feature = "std")]
-	entity.observe_any(on_stop_server);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_start_server)
+		.observe_any(on_stop_server);
 }
 
 /// Boots the HTTP backend when a [`StartServer`] event passing `"http"` lands.
 /// Applies the event's `--port` / `--host` onto the component, inserts
 /// [`KeepAlive`] (a long-running server keeps the process up), then queues the
-/// installed [`HttpServerFn`]. The queue step is the only std-only part (the
-/// async runtime); the config resolution is no_std.
+/// installed [`HttpServerFn`] on the async runtime.
 fn on_start_server(
 	ev: On<StartServer>,
 	mut servers: Query<&mut HttpServer>,
@@ -197,14 +181,10 @@ fn on_start_server(
 		*server = server.clone().with_params(&ev.params);
 	}
 	commands.insert_resource(KeepAlive);
-	// dispatch the installed backend on the async runtime (std only); a no_std
-	// adapter drives its own backend off the resolved config above.
-	#[cfg(feature = "std")]
 	commands.entity(entity).queue_async_local(start_http_server);
 }
 
 /// Tears down the HTTP backend when a [`StopServer`] passing `"http"` lands.
-#[cfg(feature = "std")]
 fn on_stop_server(ev: On<StopServer>, mut commands: Commands) {
 	if !ev.passes("http") {
 		return;
@@ -215,7 +195,6 @@ fn on_stop_server(ev: On<StopServer>, mut commands: Commands) {
 /// Invoke the installed backend on a started host, after confirming the entity
 /// still exists (a briefly-spawned server, eg during serialization, is gone by
 /// the time this runs).
-#[cfg(feature = "std")]
 async fn start_http_server(entity: AsyncEntity) -> Result {
 	if !entity.is_alive().await {
 		return Ok(());
@@ -232,7 +211,6 @@ async fn start_http_server(entity: AsyncEntity) -> Result {
 /// Stop hook seam: the built-in listeners run an accept loop with no cancel
 /// handle, so this is a no-op today; a backend owning a cancellable listener
 /// keys off its own component here.
-#[cfg(feature = "std")]
 async fn stop_http_server(_entity: AsyncEntity) -> Result { Ok(()) }
 
 
