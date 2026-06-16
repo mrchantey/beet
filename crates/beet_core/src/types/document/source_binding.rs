@@ -103,6 +103,15 @@ impl BindingTarget {
 /// content it transcludes, the seam a layout-head `@entity:PageRoot::` binding
 /// follows to reach the route's metadata.
 ///
+/// This is the **beet_core-side** transclusion edge, and the only one the
+/// binding resolver here can follow: the structural `Portal` is a beet_ui type
+/// sitting on a descendant slot child (the wrong direction), and the router's
+/// `RequestContext` is a beet_router type invisible to this crate, so neither can
+/// serve the head binding's content hop. The edge stays because the binding
+/// re-resolves each sync pass to keep the `<title>` live and per-route across
+/// client-side navigation; it would only be removable if the title never needed
+/// to update live, which contradicts the live-page feature.
+///
 /// A layout builds detached and transcludes the route content by reference (a
 /// `Portal` slot child), so the content carries no [`ChildOf`] edge to the
 /// layout. The layout root's own render-root handle is self-referential (it

@@ -89,9 +89,10 @@ fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 }
 
 /// The shared wrap step of every layout middleware: read the inner render root,
-/// install the request-scoped [`RequestContext`] resource around `build_layout`
-/// (which spawns the layout with the content transcluded into its default slot,
-/// returning the layout entity), then mark the layout as the new render root.
+/// push the request-scoped [`RequestContext`] onto the [`RequestContextStack`]
+/// around `build_layout` (which spawns the layout with the content transcluded
+/// into its default slot, returning the layout entity), then mark the layout as
+/// the new render root.
 ///
 /// The layout subtree is ephemeral and despawned after render (along with the
 /// content's own ephemerals), but the referenced content is never owned or
@@ -119,15 +120,29 @@ pub(crate) fn wrap_content_with(
 		(rendered, despawn)
 	};
 
+	// resolve the entity owning this request's route tree once, as the nearest
+	// tree-bearing ancestor of the in-tree route anchor (`route` is always in the
+	// served tree, where `rendered` content may be detached). Threading this
+	// handle lets tree-scoped widgets read the tree with an O(1) get instead of
+	// re-walking each render; falling back to `route` when no tree ancestor exists
+	// (eg a synthetic test root) leaves such a widget's lookup empty, not wrong.
+	let router = world
+		.with_state::<AncestorQuery<&RouteTree>, _>(|trees| {
+			trees.get_entity(route)
+		})
+		.unwrap_or(route);
+
 	// the request-scoped render context, read by the layout's scene systems: the
 	// request parts, the rendered content entity (off which widgets query
-	// per-route components, eg `ArticleMeta` parsed from frontmatter), and the
-	// matched route entity (the in-tree anchor for tree-scoped widgets, since the
-	// content may be a detached per-request root). Installed as a resource for the
-	// synchronous layout build, then removed.
-	world.insert_resource(RequestContext::new(parts, rendered, route));
+	// per-route components, eg `ArticleMeta` parsed from frontmatter), the matched
+	// route entity, and its tree-owning `router`. Pushed onto the stack for the
+	// synchronous layout build, then popped — a stack so a nested render restores
+	// this context on completion.
+	world
+		.resource_mut::<RequestContextStack>()
+		.push(RequestContext::new(parts, rendered, route, router));
 	let layout_result = build_layout(world, rendered);
-	world.remove_resource::<RequestContext>();
+	world.resource_mut::<RequestContextStack>().pop();
 	let layout = layout_result?;
 
 	// link the layout root to the transcluded content, distinct from the

@@ -65,6 +65,9 @@ impl Plugin for RouterPlugin {
 				// substrate (`spawn_template`), which needs the template plugins.
 				.init_plugin::<TemplatePlugin>()
 				.init_plugin::<DocumentPlugin>()
+				// the re-entrant stack of request-scoped render contexts the
+				// layout middleware pushes onto and layout widgets read the top of.
+				.init_resource::<RequestContextStack>()
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>()
 				// the diagnostic pages: the help/not-found route list and the

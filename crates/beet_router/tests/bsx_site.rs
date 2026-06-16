@@ -256,15 +256,18 @@ async fn plain_page_stays_clean() {
 /// Regression: when a host root carries its own command [`RouteTree`] (eg the
 /// `beet` CLI's `run-wasm`/`serve` commands from a loaded scene) in the *same*
 /// world as a served site, the site's `RouteSidebar` must render only the
-/// served site's routes, never leaking the host commands. The sidebar resolves
-/// its own tree by an ancestor walk from the matched route entity (the in-tree
-/// anchor in [`RequestContext`]), not by grabbing an arbitrary `RouteTree`.
+/// served site's routes, never leaking the host commands. The sidebar reads its
+/// tree off the threaded [`RequestContext::router`] handle — the tree owner
+/// resolved once at context build as the nearest tree-bearing ancestor of the
+/// matched route — so it renders the served tree, never an arbitrary world
+/// `RouteTree`.
 ///
 /// Both route content shapes are covered: a `BlobScene` page (`docs/intro`,
 /// whose rendered content is the in-tree route entity) and a per-request page
 /// whose rendered content is *detached* from the tree (`page`, the
 /// `fixed_func_route` shape the home page uses). The detached case is why the
-/// anchor must be the matched route entity, not the rendered content.
+/// `router` handle is resolved from the matched route entity, not the rendered
+/// content (which may sit outside the tree).
 #[beet_core::test]
 async fn sidebar_excludes_foreign_host_command_tree() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();

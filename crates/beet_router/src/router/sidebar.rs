@@ -39,10 +39,11 @@ use beet_ui::prelude::*;
 /// render (it reads [`RequestContext`]).
 #[template(system)]
 pub fn RouteHead(
-	cx: Res<RequestContext>,
+	stack: Res<RequestContextStack>,
 	metas: Query<&ArticleMeta>,
 	pkg: Res<PackageConfig>,
 ) -> impl Bundle {
+	let cx = stack.current();
 	// the SSR seed: the resolved title rendered before any document sync, read
 	// off the rendered content. The binding then keeps it live and per-route, so
 	// the title is never sticky.
@@ -82,14 +83,16 @@ fn route_title(seed: &str) -> impl Bundle {
 /// each route entity's [`ArticleMeta`] (scan-time or parsed frontmatter) as its
 /// [`SidebarInfo`] override.
 ///
-/// The tree is resolved by an ancestor walk from the matched route entity
-/// ([`RequestContext::route`]) rather than picking an arbitrary world
-/// [`RouteTree`]: the widget is built in the detached layout subtree (the
-/// content is transcluded by [`Portal`]), so its own entity has no route-tree
-/// ancestor, and the rendered content may itself be a detached per-request root,
-/// but the matched route entity always lives in the served tree. This scopes
-/// the nav to the served site even when other [`RouteTree`]s share the world (eg
-/// the `beet` CLI host's loaded command routes alongside a `beet serve` site).
+/// The tree is read directly off the [`RequestContext::router`] handle — the
+/// entity owning this request's [`RouteTree`] — rather than picking an arbitrary
+/// world [`RouteTree`] or re-walking the hierarchy. That handle is resolved once
+/// when the context is built (the nearest tree-bearing ancestor of the matched
+/// route), so the widget does an O(1) component get with no ancestor walk of its
+/// own — it could not walk to the tree anyway, being built in the detached layout
+/// subtree (the content is transcluded by [`Portal`]). Reading the threaded
+/// handle scopes the nav to *this request's* served tree even when other
+/// [`RouteTree`]s share the world (eg the `beet` CLI host's loaded command routes
+/// alongside a `beet serve` site).
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout places it with `<RouteSidebar/>`. Builds inside a layout render
@@ -104,12 +107,13 @@ pub fn RouteSidebar(
 	/// Glob patterns excluded from the nav, eg `["export"]`.
 	#[prop]
 	exclude: Vec<String>,
-	cx: Res<RequestContext>,
-	trees: AncestorQuery<&RouteTree>,
+	stack: Res<RequestContextStack>,
+	trees: Query<&RouteTree>,
 	metas: Query<&ArticleMeta>,
 ) -> impl Bundle {
+	let cx = stack.current();
 	let nodes = trees
-		.get(cx.route())
+		.get(cx.router())
 		.map(|tree| {
 			let mut state =
 				SidebarState::new(cx.current_path()).with_home(home);

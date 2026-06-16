@@ -12,11 +12,12 @@ use beet::prelude::*;
 /// same layout renders in the terminal.
 #[template(system)]
 pub fn BeetLayout(
-	cx: Res<RequestContext>,
+	stack: Res<RequestContextStack>,
 	// the app-wide scheme a TUI session seeds from `--color-scheme` (see
 	// `TuiServer`); absent on the web.
 	app_scheme: Option<Res<AppColorScheme>>,
 ) -> impl Bundle {
+	let cx = stack.current();
 	// an explicit `?color-scheme=light|dark` pins the scheme on both targets via
 	// a body class. Absent it, the web follows the OS (`color_scheme.js`); a
 	// non-html target (the terminal) uses the session's app-wide scheme,

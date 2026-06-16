@@ -66,6 +66,19 @@ impl<'w, 's, D: 'static + QueryData, F: 'static + QueryFilter>
 		}
 		bevybail!("No ancestor found matching query for entity {:?}", entity);
 	}
+
+	/// Get the [`Entity`] of the first ancestor (inclusive) matching the query,
+	/// the entity counterpart of [`get`](Self::get) for when the matched entity
+	/// itself is wanted rather than its query data (eg threading the matched
+	/// entity into a later read).
+	pub fn get_entity(&self, entity: Entity) -> Result<Entity> {
+		self.ancestors
+			.iter_ancestors_inclusive(entity)
+			.find(|ancestor| self.query.get(*ancestor).is_ok())
+			.ok_or_else(|| {
+				bevyhow!("No ancestor found matching query for entity {entity}")
+			})
+	}
 	/// Get the first ancestor of the given entity that matches the query,
 	/// inclusive of the given entity.
 	pub fn get_mut<'a>(
