@@ -69,6 +69,12 @@ impl CliArgs {
 				if let Some(key) = pending_key.take() {
 					// This is the value for the pending key
 					params.insert(key, arg.into());
+				} else if arg.starts_with('/') {
+					// An absolute path the user typed (eg `beet load /abs/x.json`)
+					// is a single value, not a route: keep it intact so its leading
+					// `/` survives and consumers (`*scene`/`*site` joined by `/`)
+					// see it as absolute rather than relative-to-cwd.
+					path.push(arg.into());
 				} else {
 					// Path param: split slash-delimited segments so a single
 					// `blog/post-1` arg becomes `["blog", "post-1"]`, matching
@@ -233,14 +239,24 @@ mod tests {
 
 	#[crate::test]
 	fn parse_slash_delimited_path() {
-		// a single positional with slashes splits into route segments
+		// a relative positional with slashes splits into route segments
 		CliArgs::parse("blog/post-1")
 			.path
 			.xpect_eq(vec!["blog".to_string(), "post-1".to_string()]);
-		// leading/trailing slashes produce no empty segments
-		CliArgs::parse("/docs/web/")
+		// trailing slashes produce no empty segments
+		CliArgs::parse("docs/web/")
 			.path
 			.xpect_eq(vec!["docs".to_string(), "web".to_string()]);
+	}
+
+	#[crate::test]
+	fn parse_absolute_positional_kept_whole() {
+		// an absolute path is a single value, not a route: it stays intact so its
+		// leading `/` survives (eg `beet load /abs/scene.json` round-trips as an
+		// absolute path rather than resolving relative to the cwd).
+		CliArgs::parse("load /abs/scene.json")
+			.path
+			.xpect_eq(vec!["load".to_string(), "/abs/scene.json".to_string()]);
 	}
 
 	#[crate::test]

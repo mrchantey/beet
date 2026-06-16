@@ -165,6 +165,8 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	// the `MetaLayout` test template's site-title link, gated like its only user.
+	#[cfg(feature = "json")]
 	use beet_ui::prelude::Header;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }

@@ -4,6 +4,10 @@ extern crate alloc;
 
 beet_core::test_main!();
 
+// the reusable stack-of-cards machinery (the HyperCard model): a `CardDeck`
+// router plus its `CardStackPlugin`. Self-contained; the navigate/router core
+// stays card-agnostic.
+mod card_stack;
 // the server-to-client websocket channel and dev-mode live reload, native-only
 // (a tungstenite listener and an fs watcher).
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
@@ -26,6 +30,7 @@ mod static_export;
 
 /// Exports the most commonly used items.
 pub mod prelude {
+	pub use crate::card_stack::*;
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	pub use crate::client_io::*;
 	pub use crate::extra::*;

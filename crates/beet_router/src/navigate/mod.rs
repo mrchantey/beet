@@ -13,11 +13,6 @@ mod error_page;
 pub use error_page::*;
 mod navigate;
 pub use navigate::*;
-// std-only: the deck speaker-notes pre-render hook (needs beet_ui ElementQuery).
-#[cfg(feature = "std")]
-mod slide_notes;
-#[cfg(feature = "std")]
-pub use slide_notes::*;
 // std-only: drives navigation into the beet_ui render-media pipeline.
 #[cfg(feature = "std")]
 mod navigator_plugin;

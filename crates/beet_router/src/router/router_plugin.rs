@@ -104,6 +104,11 @@ impl Plugin for RouterPlugin {
 				.register_template::<LiveReloadScript>();
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
+			// the live-TUI server, declarable in a router markup spread
+			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
+			// terminal app when a `tui`-filtered `StartServer` lands.
+			#[cfg(feature = "tui")]
+			app.register_type::<TuiServer>();
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
 				.register_type::<ExchangeScript<(), String>>()

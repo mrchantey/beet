@@ -21,7 +21,8 @@ use beet_ui::prelude::*;
 /// Reusable: any app gets a live TUI by adding the live plugins
 /// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]) and spawning
 /// this on its router entity, then triggering a [`StartServer`].
-#[derive(Default, Component)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
 #[component(on_add = on_add)]
 pub struct TuiServer;
 
@@ -52,7 +53,9 @@ async fn boot(entity: AsyncEntity) -> Result {
 	let scheme = request
 		.get_param("color-scheme")
 		.and_then(ColorScheme::parse);
-	// the initial route from the CLI path arg, else the site home `/`
+	// the initial route: the CLI path arg, else the site home `/`. The server is
+	// route-agnostic; a downstream plugin (eg `CardStackPlugin`) patches up a more
+	// specific opening route after boot if the router calls for one.
 	let home = Url::parse(request.path_string());
 	entity
 		.world()

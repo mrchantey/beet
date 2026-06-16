@@ -29,6 +29,11 @@ fn main() -> AppExit {
 		SceneManagementPlugin,
 		// the style rule set `beet serve` / `beet present` sites render with
 		material::MaterialStylePlugin::default(),
+		// the stack-of-cards machinery (`CardDeck` routers): keyboard card nav, the
+		// back-of-card notes hook, and the card layout rules. Added after
+		// `MaterialStylePlugin` so its card rules win cascade ties; it only activates
+		// when a `CardDeck` is present, so a plain site is untouched.
+		CardStackPlugin,
 	));
 	// the live terminal target `beet present` boots: the charcell host loop and
 	// the current-page painter, the same stack `beet_site` layers under its `tui`

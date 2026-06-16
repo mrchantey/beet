@@ -15,19 +15,18 @@ const DENO_TS: &str = include_str!("deno.ts");
 /// runner = "beet run-wasm"
 /// ```
 ///
-/// As a route it is served greedily (`run-wasm/*args`): the path segments after
-/// `run-wasm` rejoin into the (absolute) binary path, and any query params are
-/// forwarded to the running module as flags — the beet wasm test runner reads
-/// them back via `Deno.args`. Rejoining is necessary because cargo passes an
-/// absolute path whose `/` separators split into several route segments.
+/// As a route it is served greedily (`run-wasm/*args`): the segments after
+/// `run-wasm` rejoin into the binary path, and any query params are forwarded to
+/// the running module as flags — the beet wasm test runner reads them back via
+/// `Deno.args`. cargo passes an absolute binary path, which `CliArgs` keeps as
+/// one intact segment, so the rejoin reproduces it leading-`/` and all.
 #[action(route = "run-wasm/*args", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn RunWasm(parts: RequestParts) -> Result<String> {
 	let mut cli = parts.to_cli_args();
 	// route `run-wasm/*args`: the first segment is the command, the rest rejoin
-	// into the (absolute) binary path. cargo passes an absolute path whose `/`
-	// separators split into several segments, hence the rejoin.
+	// into the binary path (absolute, as cargo passes it).
 	let mut segments = core::mem::take(&mut cli.path);
 	if segments.is_empty() {
 		bevybail!("usage: beet run-wasm <binary-path> [args..]");
@@ -36,7 +35,7 @@ pub async fn RunWasm(parts: RequestParts) -> Result<String> {
 	if segments.is_empty() {
 		bevybail!("usage: beet run-wasm <binary-path> [args..]");
 	}
-	let exe_path = format!("/{}", segments.join("/"));
+	let exe_path = segments.join("/");
 	// `cli` now holds only the forwarded params; flatten them to `--key[=value]`
 	// flags the running module reads back via `Deno.args`.
 	let forwarded = cli.into_args();

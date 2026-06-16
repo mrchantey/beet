@@ -418,6 +418,10 @@ impl From<&http::response::Parts> for ResponseParts {
 #[cfg(feature = "std")]
 impl From<CliArgs> for RequestParts {
 	fn from(cli: CliArgs) -> Self {
+		// `cli.path` segments are carried verbatim, so an absolute-path positional
+		// (kept whole with its leading `/` by `CliArgs::parse_tokens`) round-trips
+		// as absolute: a `*scene`/`*site` wildcard rejoins it to `/abs/...` rather
+		// than a cwd-relative path. See `parts.rs`'s `absolute_positional_round_trips`.
 		let url = Url::new(Scheme::None, None, cli.path, cli.params, None);
 		RequestParts {
 			method: HttpMethod::Get,
@@ -650,6 +654,31 @@ mod test {
 		parts.path().xpect_empty();
 		parts.has_param("verbose").xpect_true();
 		parts.has_param("debug").xpect_true();
+	}
+
+	/// An absolute-path positional (eg `beet load /abs/scene.json`) keeps its
+	/// leading `/` through the conversion, so a greedy `*scene`/`*site` wildcard
+	/// rejoins it to the original absolute path rather than a cwd-relative one.
+	/// This is the round-trip that the `beet load <abs>` / `beet serve <abs>`
+	/// path resolution depends on.
+	#[beet_core::test]
+	fn absolute_positional_round_trips() {
+		let parts = RequestParts::from(CliArgs::parse("load /abs/scene.json"));
+		// the absolute path stays a single intact segment, not split on `/`
+		parts.path().xpect_eq(vec![
+			"load".to_string(),
+			"/abs/scene.json".to_string(),
+		]);
+		// the way a `load/*scene` handler reconstructs its captured value
+		parts.path_from(1).join("/").xpect_eq("/abs/scene.json");
+		// a relative positional still splits into route segments
+		RequestParts::from(CliArgs::parse("serve examples/bsx_site"))
+			.path()
+			.xpect_eq(vec![
+				"serve".to_string(),
+				"examples".to_string(),
+				"bsx_site".to_string(),
+			]);
 	}
 
 	#[beet_core::test]

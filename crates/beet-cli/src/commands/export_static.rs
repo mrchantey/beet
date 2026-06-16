@@ -53,9 +53,14 @@ mod test {
 
 	/// `export-static` statically exports the markup site to `<site>/dist`, the
 	/// no-main.rs replacement for the example's old `export` route.
+	///
+	/// Built through [`Request::from_cli_args`], the way the CLI invokes it, so the
+	/// absolute `<site>` positional round-trips as absolute (`*site` keeps its
+	/// leading `/`); a stringified `format!("export-static/{abs}")` URL would drop it.
 	#[beet::test]
 	async fn exports_static_site() {
-		run(Request::get(format!("export-static/{}", site_path())))
+		let args = CliArgs::parse(&format!("export-static {}", site_path()));
+		run(Request::from_cli_args(args))
 			.await
 			.as_str()
 			.xpect_contains("exported")

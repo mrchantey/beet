@@ -106,14 +106,10 @@ pub(crate) struct SiteEntry {
 }
 
 /// Resolve a site path: a directory containing `main.bsx`, or the file itself.
-/// Relative paths resolve against the cwd; route segments lose a leading `/`,
-/// so the absolute form is retried before erroring.
+/// Relative paths resolve against the cwd; an absolute positional round-trips as
+/// absolute (the `*site` capture keeps its leading `/`), so any cwd resolves it.
 pub(crate) fn resolve_site(site: &str) -> Result<SiteEntry> {
 	let path = AbsPathBuf::new(site)?;
-	let path = match fs_ext::exists(&path)? {
-		true => path,
-		false => AbsPathBuf::new(format!("/{site}"))?,
-	};
 	if !fs_ext::exists(&path)? {
 		bevybail!("site not found: {site}");
 	}
@@ -165,7 +161,7 @@ mod test {
 
 	/// The site declares its own server and app routes: loading `main.bsx` yields
 	/// a root carrying the markup-declared `HttpServer` plus the default app
-	/// routes it requested with `DefaultAppRoutes` (eg `/js/reactivity.js`), so
+	/// routes it requested with `<DefaultAppRoutes/>` (eg `/js/reactivity.js`), so
 	/// `Serve` only has to trigger the start.
 	#[beet::test]
 	fn site_declares_server_and_app_routes() {
@@ -181,7 +177,7 @@ mod test {
 		world.flush();
 		// the markup `<Router {(.., HttpServer{..})}>` declared a server
 		world.entity(root).contains::<HttpServer>().xpect_true();
-		// and `DefaultAppRoutes` wired the reactivity-runtime route
+		// and `<DefaultAppRoutes/>` wired the reactivity-runtime route
 		world
 			.entity(root)
 			.get::<RouteTree>()
