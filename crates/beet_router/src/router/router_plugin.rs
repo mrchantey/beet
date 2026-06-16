@@ -81,11 +81,10 @@ impl Plugin for RouterPlugin {
 				// route-aware head/sidebar widgets.
 				.register_type::<BsxLayout>()
 				.register_template::<RouteHead>()
-				.register_template::<RouteSidebar>();
-			// the default app routes as a markup-spawnable marker, so a no-code
-			// BSX site requests them with `<Router {(.., DefaultAppRoutes)}>`.
-			app.register_type::<DefaultAppRoutes>()
-				.add_observer(spawn_default_app_routes);
+				.register_template::<RouteSidebar>()
+				// the default app routes as a markup template, so a no-code BSX
+				// site requests them with `<DefaultAppRoutes/>`.
+				.register_template::<DefaultAppRoutes>();
 			#[cfg(not(target_arch = "wasm32"))]
 			app.register_type::<RoutesDir>()
 				.add_observer(spawn_routes_dir);

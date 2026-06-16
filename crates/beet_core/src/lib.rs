@@ -144,7 +144,6 @@ pub mod prelude {
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
 	pub use crate::cfg_if;
-	pub use crate::env_ext;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;

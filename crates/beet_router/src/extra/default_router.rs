@@ -26,51 +26,38 @@ pub fn default_router() -> impl Bundle {
 		HelpHandler::default(),
 		#[cfg(feature = "std")]
 		NavigateHandler::default(),
-		// The default app routes, attached directly to this (path-less) router
-		// entity via `OnSpawn::insert_child` so each route keeps its own path. A
-		// no-code BSX site requests the same set with `<.. DefaultAppRoutes>`.
-		// `app_info`/`analytics` both need a `PackageConfig` resource.
+		// the default app routes, as children of this router entity (a no-code BSX
+		// site gets the same set from the `<DefaultAppRoutes/>` template).
 		#[cfg(feature = "std")]
+		default_app_routes(),
+	)
+}
+
+/// The default app routes as a bundle of [`OnSpawn::insert_child`] effects: the
+/// reactivity-runtime asset (`/js/reactivity.js`), `/app-info`, `POST /analytics`,
+/// and the `/__client_io` websocket channel, each attached as its own child so it
+/// keeps its own path. Shared by [`default_router`] and the [`DefaultAppRoutes`]
+/// template. `app_info`/`analytics` need a [`PackageConfig`] resource.
+#[cfg(feature = "std")]
+pub fn default_app_routes() -> impl Bundle {
+	(
 		OnSpawn::insert_child(app_info()),
-		#[cfg(feature = "std")]
 		OnSpawn::insert_child(reactivity_js_route()),
-		#[cfg(all(feature = "json", feature = "std"))]
+		#[cfg(feature = "json")]
 		OnSpawn::insert_child(analytics_handler()),
 		#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 		OnSpawn::insert_child(client_io_route()),
 	)
 }
 
-/// Markup-spawnable counterpart of the app routes [`default_router`] wires: an
-/// entity carrying this receives the reactivity-runtime asset
-/// (`/js/reactivity.js`), `/app-info`, `POST /analytics`, and the `/__client_io`
-/// websocket channel as children, via [`spawn_default_app_routes`].
-///
-/// It exists so a no-code BSX site declares those routes from markup
-/// (`<Router {(.., DefaultAppRoutes)}>`) without a Rust `default_router`. This is
-/// the same reflect-component-plus-`On<Insert>`-observer shape as
-/// [`RoutesDir`](crate::prelude::RoutesDir), the established way markup injects
-/// routes. `app_info`/`analytics` need a [`PackageConfig`] resource.
+/// Markup-spawnable [`default_app_routes`]: a template so a no-code BSX site
+/// requests the default app routes with `<DefaultAppRoutes/>`, the same way it
+/// places `<RouteSidebar/>` or `<RoutesDir/>`, without a Rust `default_router`.
+/// Expanding at build leaves no marker behind, so a saved scene round-trips
+/// cleanly.
 #[cfg(feature = "std")]
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct DefaultAppRoutes;
-
-/// Observer that inserts the [`DefaultAppRoutes`] children (see its docs). Each
-/// route is attached directly to the marked entity, keeping its own path.
-#[cfg(feature = "std")]
-pub fn spawn_default_app_routes(
-	ev: On<Insert, DefaultAppRoutes>,
-	mut commands: Commands,
-) {
-	let parent = ev.entity;
-	commands.spawn((ChildOf(parent), app_info()));
-	commands.spawn((ChildOf(parent), reactivity_js_route()));
-	#[cfg(feature = "json")]
-	commands.spawn((ChildOf(parent), analytics_handler()));
-	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
-	commands.spawn((ChildOf(parent), client_io_route()));
-}
+#[template]
+pub fn DefaultAppRoutes() -> impl Bundle { default_app_routes() }
 
 
 #[cfg(all(feature = "json", feature = "std"))]
