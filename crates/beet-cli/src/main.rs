@@ -17,21 +17,29 @@ fn main() -> AppExit {
 	// load any local `.env` so eg `BEET_REMOTE_URL` is picked up by the scene
 	// commands before the app starts.
 	env_ext::load_dotenv();
-	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			LogPlugin::new(Level::DEBUG),
-			ClientAppPlugin,
-			// register the loadable command types so a scene's markers can
-			// reconstruct their behaviour: the `default-cli` commands and the
-			// built-in scene commands.
-			CliCommandsPlugin,
-			SceneManagementPlugin,
-			// the style rule set `beet serve` sites render with
-			material::MaterialStylePlugin::default(),
-		))
-		// spawn the host before the plugin rehydrates the retained scene under it.
-		.add_systems(Startup, spawn_host.before(rehydrate_scene_cache))
+	let mut app = App::new();
+	app.add_plugins((
+		MinimalPlugins,
+		LogPlugin::new(Level::DEBUG),
+		ClientAppPlugin,
+		// register the loadable command types so a scene's markers can
+		// reconstruct their behaviour: the `default-cli` commands and the
+		// built-in scene commands.
+		CliCommandsPlugin,
+		SceneManagementPlugin,
+		// the style rule set `beet serve` / `beet present` sites render with
+		material::MaterialStylePlugin::default(),
+	));
+	// the live terminal target `beet present` boots: the charcell host loop and
+	// the current-page painter, the same stack `beet_site` layers under its `tui`
+	// feature. `init_plugin` is idempotent, so `NavigatorPlugin` (already added by
+	// `ClientAppPlugin`) is not added twice. The one-shot render path ignores these.
+	#[cfg(feature = "tui")]
+	app.init_plugin::<CharcellTuiPlugin>()
+		.init_plugin::<NavigatorPlugin>()
+		.init_plugin::<LivePagePlugin>();
+	// spawn the host before the plugin rehydrates the retained scene under it.
+	app.add_systems(Startup, spawn_host.before(rehydrate_scene_cache))
 		.run()
 }
 

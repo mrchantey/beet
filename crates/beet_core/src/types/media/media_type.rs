@@ -304,7 +304,9 @@ impl MediaType {
 		match ext.to_ascii_lowercase().as_str() {
 			// text
 			"txt" | "text" | "log" => MediaType::Text,
-			"md" | "markdown" => MediaType::Markdown,
+			// `mdx` is markdown with embedded components, which the markdown
+			// parser already lowers (it parses embedded markup fragments).
+			"md" | "markdown" | "mdx" => MediaType::Markdown,
 			"bsx" => MediaType::Bsx,
 			"html" | "htm" => MediaType::Html,
 			"css" => MediaType::Css,

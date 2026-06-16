@@ -88,6 +88,17 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 			.insert(dir);
 	}
 	world.flush();
+	// the respawn replaced the RoutesDir's route children, never the router, so the
+	// router's `SlideDeck` marker (and any other router component) survives; the
+	// `insert_route_tree` observer rebuilt the tree on the router from the sorted,
+	// respawned routes, so navigation resolves the fresh slides in order.
+
+	// the in-world TUI navigator has no `ClientIo` client, so repaint it directly:
+	// re-fetch its current page through the rebuilt route tree and the page host
+	// repaints. The web client has no in-world navigator and reloads via the
+	// broadcast below instead.
+	reload_in_world_navigators(world);
+
 	// tell connected clients to reload
 	let channels = world.with_state::<Query<Entity, With<ClientIo>>, _>(
 		|query| query.iter().collect::<Vec<_>>(),
@@ -100,9 +111,31 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 	Ok(())
 }
 
+/// Re-fetch and repaint every in-world [`Navigator`]'s current page, the TUI
+/// counterpart of the [`ClientIo`] reload broadcast (an in-world navigator
+/// browses the app's own routes with no socket client to notify).
+///
+/// A no-op for an HTTP navigator or when none is present, so this is inert
+/// outside the live TUI.
+fn reload_in_world_navigators(world: &mut World) {
+	let navigators = world.with_state::<Query<(Entity, &Navigator)>, _>(|query| {
+		query
+			.iter()
+			.filter(|(_, nav)| {
+				matches!(nav.transport(), NavigatorTransport::InWorld { .. })
+			})
+			.map(|(entity, _)| entity)
+			.collect::<Vec<_>>()
+	});
+	for navigator in navigators {
+		world.entity_mut(navigator).run_async_local(Navigator::reload);
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_ui::prelude::*;
 
 	/// Write a watched site fixture (`templates/` + `routes/`) under
 	/// `target/tests` and return its root.
@@ -236,5 +269,134 @@ mod test {
 			.unwrap()
 			.parent()
 			.xpect_eq(watcher);
+	}
+
+	/// A deck fixture: zero-padded slide files under `slides/` (deliberately
+	/// out-of-order on disk) backing a [`SlideDeck`] router. Returns the site dir.
+	fn deck_fixture(name: &str) -> AbsPathBuf {
+		let root = AbsPathBuf::new(
+			fs_ext::workspace_root()
+				.join("target/tests/live_reload")
+				.join(name),
+		)
+		.unwrap();
+		fs_ext::remove(&root).ok();
+		fs_ext::write(root.join("slides/02-beta.md"), "# Beta").unwrap();
+		fs_ext::write(root.join("slides/01-alpha.md"), "# Alpha first").unwrap();
+		root
+	}
+
+	/// The slide path segments of a router's [`RouteTree`], in child order.
+	fn slide_order(world: &mut World, router: Entity) -> Vec<String> {
+		world
+			.entity(router)
+			.get::<RouteTree>()
+			.unwrap()
+			.children
+			.iter()
+			.filter(|child| child.node().is_some())
+			.filter_map(|child| child.path.iter().last())
+			.map(|seg| seg.name().to_string())
+			.collect()
+	}
+
+	/// A live reload of a deck router preserves its [`SlideDeck`] marker and keeps
+	/// the slides in sorted order: the respawn replaces the route children, not the
+	/// router, so the marker survives and the rebuilt tree is still ordered.
+	#[beet_core::test]
+	fn reload_preserves_slide_deck_marker_and_order() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let site_dir = deck_fixture("deck_marker");
+		world.insert_resource(SiteRoot(site_dir.clone()));
+		// a deck router: the SlideDeck marker (as `beet present` inserts it).
+		let router = world
+			.spawn((Router, SlideDeck, children![RoutesDir::new("slides")]))
+			.flush();
+		slide_order(&mut world, router)
+			.xpect_eq(vec!["01-alpha".to_string(), "02-beta".to_string()]);
+
+		// a new slide, then a live reload (the watcher's change path).
+		fs_ext::write(site_dir.join("slides/03-gamma.md"), "# Gamma").unwrap();
+		reload_site(&mut world, &LiveReload::new(site_dir.clone())).unwrap();
+
+		// the marker survived the route respawn ...
+		world.entity(router).contains::<SlideDeck>().xpect_true();
+		// ... and the rebuilt tree still lists the slides in sorted order.
+		slide_order(&mut world, router).xpect_eq(vec![
+			"01-alpha".to_string(),
+			"02-beta".to_string(),
+			"03-gamma".to_string(),
+		]);
+	}
+
+	/// The live TUI stack: charcell pipeline + per-frame repaint + in-world nav.
+	/// `RouterPlugin` brings the charcell/template/async plugins and the live
+	/// reload observers; the page host + navigator need the realtime/nav plugins.
+	fn tui_app() -> App {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			RouterPlugin,
+			RealtimeParsePlugin,
+			LivePagePlugin,
+			NavigatorPlugin,
+		));
+		app
+	}
+
+	/// The page host buffer's painted frame as plain text after one frame.
+	fn frame(app: &mut App, host: Entity) -> String {
+		app.update();
+		app.world()
+			.get::<DoubleBuffer>(host)
+			.unwrap()
+			.current_buffer()
+			.render_plain()
+	}
+
+	/// Drive the app until the host frame contains `needle`, returning the frame.
+	fn drive_until(app: &mut App, host: Entity, needle: &str) -> String {
+		for _ in 0..400 {
+			let frame = frame(app, host);
+			if frame.contains(needle) {
+				return frame;
+			}
+		}
+		panic!("host frame never contained '{needle}'");
+	}
+
+	/// Editing a slide repaints the live terminal: after the watched change
+	/// respawns the routes, the in-world navigator re-fetches its current slide and
+	/// the page host paints the edited content, with the `SlideDeck` marker intact.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	async fn tui_reload_repaints_current_slide() {
+		use bevy::math::UVec2;
+
+		let mut app = tui_app();
+		let site_dir = deck_fixture("tui_repaint");
+		app.world_mut().insert_resource(SiteRoot(site_dir.clone()));
+		let router = app
+			.world_mut()
+			.spawn((Router, SlideDeck, children![RoutesDir::new("slides")]))
+			.flush();
+		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
+		// an in-world navigator opened on the first slide, as the TUI boot does.
+		app.world_mut().spawn(Navigator::in_world(router, "/01-alpha"));
+		drive_until(&mut app, host, "Alpha first");
+
+		// edit the current slide on disk, then drive the watched-change reload.
+		fs_ext::write(site_dir.join("slides/01-alpha.md"), "# Alpha edited")
+			.unwrap();
+		let site = LiveReload::new(site_dir.clone());
+		app.world_mut()
+			.commands()
+			.queue(move |world: &mut World| reload_site(world, &site).unwrap());
+		// the navigator re-fetches the current slide and the host repaints it.
+		drive_until(&mut app, host, "Alpha edited")
+			.xnot()
+			.xpect_contains("Alpha first");
+		// the marker survived the respawn, so slide nav still works.
+		app.world().entity(router).contains::<SlideDeck>().xpect_true();
 	}
 }

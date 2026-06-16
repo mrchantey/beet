@@ -48,6 +48,7 @@ fn spawn_host(mut commands: Commands) {
 					Router,
 					children![
 						Serve,
+						Present,
 						ExportStatic,
 						RunWasm,
 						BuildWasm,

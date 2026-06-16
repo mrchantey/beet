@@ -39,7 +39,7 @@ interface = ["serde"]
 bsx = ["std", "beet_ui/bsx"]
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
-serde = ["dep:serde", "beet_action/serde", "beet_net/serde"]
+serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde"]
 markdown = ["std", "dep:pulldown-cmark"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
 # The live, interactive terminal target: the charcell TUI host + stdio terminal,

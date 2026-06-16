@@ -173,12 +173,35 @@ enum SiblingDirection {
 	Prev,
 }
 
-/// Navigate to the next or previous sibling at the same tree level.
+/// Navigate to the next or previous sibling at the same tree level, wrapping at
+/// the ends (the history-style shortcut behavior). For non-wrapping slide
+/// navigation see [`resolve_slide`].
 fn resolve_sibling(
 	tree: &RouteTree,
 	current_path: &[SmolStr],
 	direction: SiblingDirection,
 ) -> Result<Vec<SmolStr>> {
+	let (siblings, current_idx) = siblings_and_index(tree, current_path)?;
+	let target_idx = match direction {
+		SiblingDirection::Next => (current_idx + 1) % siblings.len(),
+		SiblingDirection::Prev => {
+			if current_idx == 0 {
+				siblings.len() - 1
+			} else {
+				current_idx - 1
+			}
+		}
+	};
+	path_segments(&siblings[target_idx].path)
+}
+
+/// The routable siblings at the current path's tree level, paired with the
+/// current path's index among them. Shared by [`resolve_sibling`] (wrapping
+/// history shortcuts) and [`resolve_slide`] (clamped slide navigation).
+fn siblings_and_index<'a>(
+	tree: &'a RouteTree,
+	current_path: &[SmolStr],
+) -> Result<(Vec<&'a RouteTree>, usize)> {
 	if current_path.is_empty() {
 		bevybail!("Cannot navigate to a sibling of the root");
 	}
@@ -220,17 +243,63 @@ fn resolve_sibling(
 			)
 		})?;
 
-	let target_idx = match direction {
-		SiblingDirection::Next => (current_idx + 1) % siblings.len(),
-		SiblingDirection::Prev => {
-			if current_idx == 0 {
-				siblings.len() - 1
-			} else {
-				current_idx - 1
-			}
-		}
-	};
+	(siblings, current_idx).xok()
+}
 
+/// Marker opting a router into keyboard slide navigation (the arrow/space/page
+/// keys step between sibling routes). `beet present` inserts it on the deck
+/// router; ordinary `serve`/docs-TUI routers omit it, so their plain arrows keep
+/// scrolling the page. Read by the `slide_nav` system in [`NavigatorPlugin`].
+#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct SlideDeck;
+
+/// A slide-deck navigation step, resolved against the flat list of sibling
+/// routes at the current path's level. Unlike [`NavigateTo`]'s sibling moves
+/// these clamp at the ends rather than wrapping: a deck does not loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+pub enum SlideNav {
+	/// The previous sibling, clamped at the first.
+	Prev,
+	/// The next sibling, clamped at the last.
+	Next,
+	/// The first sibling.
+	First,
+	/// The last sibling.
+	Last,
+}
+
+/// The path of the `n`th (1-based) top-level slide, clamped to the deck range
+/// (`n < 1` lands on the first, `n > len` on the last). A deck is a flat list,
+/// so its slides are the routable children at the tree root, in sorted order.
+/// Backs `beet present --slide=N`.
+pub fn resolve_nth_slide(tree: &RouteTree, n: usize) -> Result<Vec<SmolStr>> {
+	let slides: Vec<&RouteTree> = tree
+		.children
+		.iter()
+		.filter(|child| child.node().is_some())
+		.collect();
+	if slides.is_empty() {
+		bevybail!("deck has no slides");
+	}
+	let idx = n.saturating_sub(1).min(slides.len() - 1);
+	path_segments(&slides[idx].path)
+}
+
+/// Resolve a [`SlideNav`] step against a [`RouteTree`] from the current path,
+/// returning the target path segments. Clamps at the ends (no wrap).
+pub fn resolve_slide(
+	tree: &RouteTree,
+	current_path: &[SmolStr],
+	nav: SlideNav,
+) -> Result<Vec<SmolStr>> {
+	let (siblings, current_idx) = siblings_and_index(tree, current_path)?;
+	let target_idx = match nav {
+		SlideNav::Prev => current_idx.saturating_sub(1),
+		SlideNav::Next => (current_idx + 1).min(siblings.len() - 1),
+		SlideNav::First => 0,
+		SlideNav::Last => siblings.len() - 1,
+	};
 	path_segments(&siblings[target_idx].path)
 }
 
@@ -405,6 +474,62 @@ mod test {
 			.unwrap_str()
 			.await;
 		body.contains("Beta page").xpect_true();
+	}
+
+	/// A flat three-route deck, the [`RouteTree`] slide-nav resolves against.
+	fn slide_deck() -> RouteTree {
+		let mut world = router_world();
+		let root = world
+			.spawn((nav_router(), children![
+				render_action::fixed_route("alpha", rsx! { <p>"a"</p> }),
+				render_action::fixed_route("beta", rsx! { <p>"b"</p> }),
+				render_action::fixed_route("gamma", rsx! { <p>"c"</p> }),
+			]))
+			.flush();
+		world.entity(root).get::<RouteTree>().unwrap().clone()
+	}
+
+	/// The single path segment a [`SlideNav`] step lands on from `current`.
+	fn slide_to(tree: &RouteTree, current: &str, nav: SlideNav) -> String {
+		resolve_slide(tree, &[current.into()], nav).unwrap().join("/")
+	}
+
+	/// Next/prev clamp at the ends rather than wrapping (a deck does not loop).
+	#[beet_core::test]
+	fn slide_next_prev_clamp_at_ends() {
+		let tree = slide_deck();
+		// interior moves
+		slide_to(&tree, "alpha", SlideNav::Next).xpect_eq("beta");
+		slide_to(&tree, "beta", SlideNav::Next).xpect_eq("gamma");
+		slide_to(&tree, "gamma", SlideNav::Prev).xpect_eq("beta");
+		// next on the last slide stays put; prev on the first stays put
+		slide_to(&tree, "gamma", SlideNav::Next).xpect_eq("gamma");
+		slide_to(&tree, "alpha", SlideNav::Prev).xpect_eq("alpha");
+	}
+
+	/// First/last jump to the ends regardless of the current slide.
+	#[beet_core::test]
+	fn slide_first_and_last() {
+		let tree = slide_deck();
+		slide_to(&tree, "beta", SlideNav::First).xpect_eq("alpha");
+		slide_to(&tree, "beta", SlideNav::Last).xpect_eq("gamma");
+		slide_to(&tree, "alpha", SlideNav::First).xpect_eq("alpha");
+		slide_to(&tree, "gamma", SlideNav::Last).xpect_eq("gamma");
+	}
+
+	/// `--slide=N` maps a 1-based index to the Nth ordered slide, clamping an
+	/// out-of-range N to the first/last rather than erroring.
+	#[beet_core::test]
+	fn nth_slide_maps_and_clamps() {
+		let tree = slide_deck();
+		let nth = |n| resolve_nth_slide(&tree, n).unwrap().join("/");
+		// 1-based: slide 1 is the first, 3 the last
+		nth(1).xpect_eq("alpha");
+		nth(2).xpect_eq("beta");
+		nth(3).xpect_eq("gamma");
+		// out of range clamps to the ends
+		nth(0).xpect_eq("alpha");
+		nth(99).xpect_eq("gamma");
 	}
 
 	#[beet_core::test]

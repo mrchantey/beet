@@ -11,6 +11,8 @@ homepage.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
+# two bins (`beet` + `export_scenes`); pick `beet` for a bare `cargo run`/`just beet`
+default-run = "beet"
 
 [[bin]]
 name = "beet"
@@ -22,12 +24,16 @@ name = "export_scenes"
 path = "src/bin/export_scenes.rs"
 
 [features]
-default = ["qrcode", "net"]
+default = ["qrcode", "net", "tui"]
 qrcode = ["dep:qrcode", "dep:image"]
 # HTTP transport for the remote scene-control commands. Native-only: the
 # ureq/rustls stack does not build on wasm, so it is enabled via the non-wasm
 # target table below rather than wired into this feature directly.
 net = ["beet/ureq","beet/rustls-tls"]
+# The live terminal target for `beet present`: the navigable charcell host and
+# the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
+# which registers it). On by default so a bare `beet present` boots the deck.
+tui = ["beet/tui_server"]
 
 [dependencies]
 beet = { workspace = true, features = [
@@ -42,6 +48,8 @@ beet = { workspace = true, features = [
 	# `beet serve --watch`: dev-mode live reload over the client_io channel
 	"client_io",
 	"markdown",
+	# fenced code blocks in served/presented decks render highlighted
+	"syntax_highlighting",
 	"style",
 	"template",
 ] }

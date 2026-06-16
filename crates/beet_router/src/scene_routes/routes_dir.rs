@@ -3,7 +3,7 @@
 //!
 //! Inserting a [`RoutesDir`] (eg from a `main.bsx` entry via
 //! `<RoutesDir src="routes"/>`) triggers [`spawn_routes_dir`]: the directory is
-//! scanned recursively and each content file (`.md`/`.bsx`/`.html`) spawns a
+//! scanned recursively and each content file (`.md`/`.mdx`/`.bsx`/`.html`) spawns a
 //! [`BlobScene`] route child, served through the shared media-parse pipeline.
 //! A [`BlobStore`] rooted at the directory backs the routes, and markdown
 //! frontmatter is read at scan time into [`ArticleMeta`] so navigation (eg
@@ -72,7 +72,12 @@ pub fn spawn_routes_dir(
 		.entity(ev.entity)
 		.insert(BlobStore::new(FsStore::new(dir.clone())));
 
-	for file in ReadDir::files_recursive(&dir)? {
+	// `files_recursive` yields filesystem order (unspecified); sort lexically by
+	// relative path so zero-padded routes (eg slides `01..20`) spawn in sequence,
+	// giving a deterministic `RouteTree` child order for sibling navigation.
+	let mut files = ReadDir::files_recursive(&dir)?;
+	files.sort();
+	for file in files {
 		let is_content = file
 			.extension()
 			.and_then(|ext| ext.to_str())
@@ -202,6 +207,33 @@ mod test {
 				.await
 				.xpect_contains(expected);
 		}
+	}
+
+	/// Discovered files are sorted lexically before spawning, so the [`RouteTree`]
+	/// children come out in filename order regardless of filesystem read order.
+	#[beet_core::test]
+	fn routes_spawn_in_sorted_order() {
+		let mut world = router_world();
+		// deliberately out-of-order, zero-padded like the slide deck
+		world.insert_resource(fixture("sorted", &[
+			("03-gamma.md", "# Gamma"),
+			("01-alpha.md", "# Alpha"),
+			("02-beta.md", "# Beta"),
+		]));
+		// a bare `Router` (not `default_router`) so the opinionated app routes do
+		// not appear as extra top-level children alongside the discovered slides.
+		let root = world
+			.spawn((Router, children![RoutesDir::new("")]))
+			.flush();
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		// the discovered slide routes, in tree-child order
+		tree.children
+			.iter()
+			.filter_map(|child| child.path.iter().last())
+			.map(|seg| seg.name().to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["01-alpha", "02-beta", "03-gamma"]);
 	}
 
 	#[cfg(feature = "markdown_parser")]

@@ -245,6 +245,29 @@ impl Navigator {
 		Ok(())
 	}
 
+	/// Re-fetch and re-render the current page without touching history, ie the
+	/// browser's refresh.
+	///
+	/// Dev-mode live reload drives this on the in-world TUI navigator after a
+	/// watched edit respawns the routes: re-running the current URL through
+	/// [`build_live_page`] rebuilds the page from the fresh route tree and the
+	/// page host repaints, so the terminal updates live (the web client reloads via
+	/// its own [`ClientIo`](crate::prelude::ClientIo) broadcast instead).
+	pub async fn reload(entity: AsyncEntity) -> Result {
+		let (transport, user_agent, url, accepts) = entity
+			.get_mut(|mut nav: Mut<Navigator>| {
+				nav.loading = true;
+				(
+					nav.transport.clone(),
+					nav.user_agent.clone(),
+					nav.current_url().clone(),
+					nav.accepts.clone(),
+				)
+			})
+			.await?;
+		Self::fetch_and_render(entity, transport, user_agent, url, accepts).await
+	}
+
 	/// Shared fetch → render → clear-loading path used by all navigation
 	/// methods.
 	///
