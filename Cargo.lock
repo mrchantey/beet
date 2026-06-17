@@ -1581,17 +1581,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_site"
-version = "0.0.9-dev.16"
-dependencies = [
- "beet",
- "futures",
- "getrandom 0.3.4",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "beet_spatial"
 version = "0.0.9-dev.16"
 dependencies = [
@@ -10482,6 +10471,13 @@ dependencies = [
  "signature 3.0.0",
  "spki 0.8.0-rc.4",
  "zeroize",
+]
+
+[[package]]
+name = "rsx_site"
+version = "0.0.9-dev.16"
+dependencies = [
+ "beet",
 ]
 
 [[package]]

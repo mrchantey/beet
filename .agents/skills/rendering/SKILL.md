@@ -16,10 +16,10 @@ The live reference is the bar. "Not broken" is not the bar. Find the gap between
 The CLI binary renders one route to stdout and exits; the default binary serves the web on :8337. They are different feature sets, so each switch recompiles, batch all terminal checks, then all web checks.
 
 1. Change the page, widget, or rule.
-2. Routes changed? `cargo run -p beet_site --no-default-features --features codegen`.
-3. **Terminal:** `cargo run -p beet_site --features=cli -- <path> --accept=text/ansi-term` (strip escapes to read; true width via the PTY harness in `charcell.md`).
-4. **Web:** `cargo run -p beet_site` serves :8337, screenshot with playwright (`playwright.md`).
-5. **Tests:** `cargo test -p beet_ui --lib`, `cargo test -p beet_site` (`--snap` to update snapshots).
+2. Routes changed? `cargo run -p rsx_site --no-default-features --features codegen`.
+3. **Terminal:** `cargo run -p rsx_site --features=cli -- <path> --accept=text/ansi-term` (strip escapes to read; true width via the PTY harness in `charcell.md`).
+4. **Web:** `cargo run -p rsx_site` serves :8337, screenshot with playwright (`playwright.md`).
+5. **Tests:** `cargo test -p beet_ui --lib`, `cargo test -p rsx_site` (`--snap` to update snapshots).
 
 ## Instrument to root cause
 

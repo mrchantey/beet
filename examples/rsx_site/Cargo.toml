@@ -1,0 +1,59 @@
+[package]
+name = "rsx_site"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description = "A minimal typed (rsx!) beet site, demonstrating the Rust authoring path"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[features]
+default = ["web", "terminal"]
+
+# Shared render substrate: the router, template system and style rule set, used by
+# both render targets. Page bodies and the layout live here.
+render = ["beet/router", "beet/style"]
+
+# Web render target: the document shell + HTTP server + `HtmlRenderer`.
+web = ["render", "beet/http_server"]
+
+# Terminal render target: the charcell pipeline (`CharcellPlugin` + stdio host).
+terminal = ["render", "beet/tui"]
+
+# CLI mode: render a single route to stdout and exit, picking HTML or ANSI via
+# `--accept`. Overrides the default HTTP server without `--no-default-features`.
+cli = ["web", "terminal"]
+
+# Live interactive terminal target: boots the navigable site via the in-world
+# `Navigator` + `TuiServer`, sibling to the one-shot `cli`.
+tui = ["terminal", "beet/tui_server"]
+
+# Build-time route codegen. Compiles without the generated `src/codegen` modules
+# so it can bootstrap them: `cargo run -p rsx_site --no-default-features
+# --features codegen`. Run this before a `web`/`terminal` build.
+codegen = ["beet/codegen"]
+
+[dependencies]
+beet.workspace = true
+
+[dev-dependencies]
+beet = { workspace = true, features = ["testing"] }
+
+# the `beet` test runner replaces libtest's harness
+[[test]]
+name = "render"
+path = "tests/render.rs"
+harness = false
+
+[[test]]
+name = "tui"
+path = "tests/tui.rs"
+harness = false
+required-features = ["tui"]

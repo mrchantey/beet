@@ -1,6 +1,6 @@
 # Verifying the web target
 
-Two ways to a styled page: run the server (`cargo run -p beet_site`, :8337) and hit the live URL, or render `--accept=text/html` to a file (the stylesheet inlines, so `file://` needs no server). The live server is best for interactive checks; a file is best for a frozen snapshot. `npx playwright install chromium` once.
+Two ways to a styled page: run the server (`cargo run -p rsx_site`, :8337) and hit the live URL, or render `--accept=text/html` to a file (the stylesheet inlines, so `file://` needs no server). The live server is best for interactive checks; a file is best for a frozen snapshot. `npx playwright install chromium` once.
 
 ## Content first (cheap)
 

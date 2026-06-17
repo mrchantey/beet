@@ -115,7 +115,7 @@ mod tests {
 
 	#[beet_core::test]
 	fn non_visual_tags_skipped_with_material() {
-		// beet_site composes CharcellPlugin (which brings StylePlugin) plus
+		// rsx_site composes CharcellPlugin (which brings StylePlugin) plus
 		// MaterialStylePlugin, whose rule set replaces the one StylePlugin seeds.
 		// The user-agent `non_visual_rule` must survive that replace so
 		// <head>/<style> resolve to display:none and never paint into the terminal.

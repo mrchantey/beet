@@ -72,7 +72,6 @@ let outcome = AsyncPlugin::world()
 | Crate                                            | Status | Description                                          |
 | ------------------------------------------------ | ------ | ---------------------------------------------------- |
 | [`beet-cli`](crates/beet-cli)                    | 🐉      | Build, serve and run-wasm helpers for beet apps      |
-| [`beet_site`](crates/beet_site)                  | 🐉      | The beet website, built with beet                    |
 | [`beet_examples`](crates/beet_examples)          | 🐉      | Shared scaffolding for the larger examples           |
 
 ## Bevy Versions

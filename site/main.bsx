@@ -1,7 +1,7 @@
 <!--
 The beet website, authored entirely in markup: a router serving the `routes/`
-directory, every page wrapped in `templates/Layout.bsx`. This is the no-code twin
-of the compiled `crates/beet_site`, which stays as the parity reference.
+directory, every page wrapped in `templates/Layout.bsx`. This is the canonical
+website; the typed (rsx!) authoring path is demonstrated by `examples/rsx_site`.
 
 The router's middleware and servers attach as component spreads (request logging,
 `--help`, terminal link navigation, the layout). It declares three servers, so

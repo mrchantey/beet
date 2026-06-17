@@ -7,7 +7,6 @@
 # just test-all
 # ```
 #
-
 set dotenv-load := true
 
 # fresh compile of beet is so big it keeps asking for bigger stacks.. this is 1GB 😭
@@ -61,42 +60,10 @@ cli *args:
 install-cli *args:
   cargo install --locked --path crates/beet-cli {{ args }}
 
-# Run and watch a workspace example
-run example *args:
-	just watch just run-ci {{ example }} {{ args }}
-
-run-feat example *args:
-	just run {{ example }} --all-features {{ args }}
-
-# Run an example without watching
-run-ci example *args:
-	cargo run --example {{ example }} {{ args }}
-
-# Run and watch a crate example
-run-p crate example *args:
-	just watch cargo run -p {{ crate }} --example {{ example }} {{ args }}
-
-# Run and watch a crate build step
-run-b crate *args:
-	just watch cargo run -p {{ crate }} --bin run-build --features=build {{ args }}
-
 #💡 Aliases
-
-doc crate *args:
-	just watch cargo doc -p {{ crate }} --open {{ args }}
 
 fmt *args:
 	cargo fmt {{ args }}
-
-# just cli watch -p beet_site {{args}}
-build-site *args:
-	just cli build -p beet_site {{ args }}
-
-run-site *args:
-	just cli run -p beet_site {{ args }}
-
-deploy-site *args:
-	just cli deploy -p beet_site --release
 
 #💡 Test
 
@@ -218,13 +185,6 @@ test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 
 
-# The rsx crates (beet_build, beet_site) are
-# currently commented out of the workspace, and beet_router's old
-# `tokens`/`server` features no longer exist. beet_router is already
-# exercised by `test-core`. Re-add lines here as the rsx crates come back.
-test-rsx *args:
-	@echo "test-rsx is a no-op while rsx crates are out of the workspace"
-
 test crate *args:
 	just watch cargo test -p {{ crate }} --lib -- --watch=true {{ args }}
 
@@ -263,7 +223,7 @@ clear-ice:
 
 clear-artifacts:
 	just clear-ice
-	rm -rf crates/beet_site/src/codegen
+	rm -rf examples/rsx_site/src/codegen
 	rm -rf launch.ron
 	rm -rf target
 
@@ -279,24 +239,12 @@ tree:
 
 #💡 Misc
 
-expand crate test *args:
-	just watch 'cargo expand -p {{ crate }} --test {{ test }} {{ args }}'
-
 patch:
 	cargo set-version --bump patch
 
 publish *args:
 	cargo publish --workspace --allow-dirty --no-verify {{ args }}
 
-watch *command:
-	just cli watch "{{ command }}"
-
-#💡 Misc
-
 # Cargo search but returns one line
 search *args:
 	cargo search {{ args }} | head -n 1
-
-
-nightly date:
-	rustup default nightly-{{ date }}

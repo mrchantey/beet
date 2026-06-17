@@ -42,7 +42,7 @@ Behaviors built on `beet_action`: behavior trees, utility AI and agentic systems
 |---|---|---|
 | [beet-cli](/docs/crates/beet-cli) | 🐉 | Build, serve and run-wasm helpers for beet apps |
 
-`beet_site` (this website) and `beet_examples` (shared scaffolding for the larger examples) round out the workspace. Both are built with beet but are not meant to be depended on directly.
+`beet_examples` (shared scaffolding for the larger examples) rounds out the workspace. It is built with beet but is not meant to be depended on directly.
 
 ## How they stack up
 

@@ -1,6 +1,6 @@
 # Site docs
 
-How to write and edit the public website docs in `crates/beet_site/src/docs`.
+How to write and edit the public website docs in `site/routes/docs`.
 These are the high-level docs at [beetstack.dev](https://beetstack.dev/docs), distinct from the crate READMEs and the rustdoc API docs.
 
 ## Audience
@@ -23,7 +23,7 @@ Load the `diataxis` skill and pick one mode per page before writing. Mixing mode
 ## Conventions
 
 - TOML frontmatter for the title: `+++\ntitle = "Foo"\n+++`.
-- Routes mirror the file tree under `src/docs`. A new `foo.md` becomes `/docs/foo`; nested dirs need an `index.md`. The sidebar is auto-collected, no manual wiring.
+- Routes mirror the file tree under `site/routes/docs`. A new `foo.md` becomes `/docs/foo`; nested dirs need an `index.md`. The sidebar is auto-collected, no manual wiring.
 - Link internally with absolute paths, eg `/docs/crates/beet_router`.
 - Use language fences (` ```rust `, ` ```sh `) so syntax highlighting works.
 - LLMs love writing text, humans hate reading it. Include exactly what must be there and nothing more. Short code snippets over prose where a snippet says it better.

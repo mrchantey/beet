@@ -62,7 +62,7 @@ A `.bsx`/`.mdx`/`.md` edit needs a server RESTART (RoutesDir scans at startup).
 `beet check <site>` validates without serving (exit 70 on an error-level diagnostic).
 
 ## Parity verification (matching a compiled reference)
-When a no-code site must match a compiled one (`crates/beet_site`):
+When a no-code site must match a compiled one (eg `examples/rsx_site`):
 - **Web (pixel gate):** screenshot both, `compare -metric AE golden.png new.png null:`
   (0 = identical). Drive each diff to AE=0; reduce a diff to its ONE upstream cause
   (often a cascade across many routes — eg an incomplete sidebar subtree, a missing

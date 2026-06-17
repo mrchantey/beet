@@ -176,7 +176,7 @@ mod tests {
 	}
 
 	/// The [`Theme`] default is the historical brand green the plugin baked, so a
-	/// host that never touches the theme (and beet_site, which sets it to its own
+	/// host that never touches the theme (and rsx_site, which sets it to its own
 	/// green) renders byte-identically across this refactor.
 	#[beet_core::test]
 	fn theme_default_is_brand_green() {

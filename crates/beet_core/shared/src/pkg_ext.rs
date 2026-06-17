@@ -13,7 +13,7 @@
 /// then the example should `use beet_core::prelude;`
 /// which allows `crate::prelude` to resolve to `beet_core`.
 ///
-/// Crates upstream of beet, like `beet_site` will not use the internal name
+/// Crates upstream of beet, like `rsx_site` will not use the internal name
 pub fn internal_or_beet(pkg_name: &str) -> syn::Path {
 	if !is_internal() {
 		syn::parse_str("beet").unwrap()

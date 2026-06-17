@@ -36,7 +36,7 @@ fn main() -> AppExit {
 		CardStackPlugin,
 	));
 	// the live terminal target `beet present` boots: the charcell host loop and
-	// the current-page painter, the same stack `beet_site` layers under its `tui`
+	// the current-page painter, the same stack `rsx_site` layers under its `tui`
 	// feature. `init_plugin` is idempotent, so `NavigatorPlugin` (already added by
 	// `ClientAppPlugin`) is not added twice. The one-shot render path ignores these.
 	#[cfg(feature = "tui")]

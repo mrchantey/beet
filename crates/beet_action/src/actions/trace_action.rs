@@ -1,8 +1,7 @@
 //! Debug tracing for the action call model.
 //!
 //! A [`TraceAction`] wraps an inner action and logs on call entry and exit.
-//! [`OnLogMessage`]/[`UserMessage`] are kept for log-UI consumers such as
-//! `beet_site`.
+//! [`OnLogMessage`]/[`UserMessage`] are kept for log-UI consumers.
 use crate::prelude::*;
 use alloc::borrow::Cow;
 use beet_core::prelude::*;

@@ -24,8 +24,8 @@ The terminal layout + paint engine, `crates/beet_ui/src/render/charcell`. Read t
 - **Adding `padding`/`display:block` to an inline element** changes its charcell box and can shift a whole subtree. Re-render the terminal after any such change, not just the web.
 - **A flex column clamps each item's cross size (width) to the container** (`resolve_line_sizes` in `flex.rs`). Items are measured at the unconstrained viewport, so without the clamp a column with `align-items: center` centres against a width wider than it has and overflows (the homepage-hero-past-the-sidebar bug). The main axis stays unclamped (height scrolls).
 - **The ratatui/ANSI paint drops colour alpha** (`color_to_ratatui` uses RGB only), so a *transparent* colour renders as **black**, not invisible. To reserve a border that should not show (eg equalising a filled button with an outlined one), colour it the same as the fill, not transparent.
-- **Default scheme is dark**, set by the layout (`beet_site/src/layouts/layout.rs`), not the renderer: a non-html request gets `.dark-scheme` on `<body>` so a light `OnSurface` isn't invisible on a dark terminal. Transcluded `.md`/`Portal` content inherits this because `RuleSetQuery::parent` + `resolve_styles` follow `Portal` across the transclusion boundary.
-- **An empty `Value` reserves no row** (`text.rs` `measure_text`): a blank `<input>`/`<textarea>` hugs its padding/border, matching a control with no value. This matters because the live/interactive path (`CharcellTuiPlugin`/serve) installs `FormPlugin`, which seeds every form control an empty `Value::str("")` for editability, while the static one-shot render path (`CharcellPlugin`, eg `beet_site --features cli`, `AnsiTermRenderer`) does **not** — so a form-control box can measure a row taller on the serve than in a CLI render. The exception is anything carrying a [`Marker`] (a `<select>`'s label): its empty value is submission state but the marker paints, so it keeps its row.
+- **Default scheme is dark**, set by the layout (`rsx_site/src/layout.rs`), not the renderer: a non-html request gets `.dark-scheme` on `<body>` so a light `OnSurface` isn't invisible on a dark terminal. Transcluded `.md`/`Portal` content inherits this because `RuleSetQuery::parent` + `resolve_styles` follow `Portal` across the transclusion boundary.
+- **An empty `Value` reserves no row** (`text.rs` `measure_text`): a blank `<input>`/`<textarea>` hugs its padding/border, matching a control with no value. This matters because the live/interactive path (`CharcellTuiPlugin`/serve) installs `FormPlugin`, which seeds every form control an empty `Value::str("")` for editability, while the static one-shot render path (`CharcellPlugin`, eg `rsx_site --features cli`, `AnsiTermRenderer`) does **not** — so a form-control box can measure a row taller on the serve than in a CLI render. The exception is anything carrying a [`Marker`] (a `<select>`'s label): its empty value is submission state but the marker paints, so it keeps its row.
 
 ## Measure against a real terminal width
 
@@ -57,10 +57,10 @@ else:
     sys.stdout.buffer.write(out)
 ```
 
-`cargo build -p beet_site --features cli` then `COLS=50 python3 /tmp/charcell.py ~/.cargo_target/debug/beet_site blog post-1`. Run the binary directly (not `cargo run`). Stripped mode prints `width repr(line)` per row, so overflow is `awk '$1>50'`. Pass `--raw` to keep escapes, then grep SGR codes (`38;2;r;g;b` fg, `48;2;r;g;b` bg). Never eyeball widths from a truncated `repr(line[:N])`, strip escapes and print the full line.
+`cargo build -p rsx_site --features cli` then `COLS=50 python3 /tmp/charcell.py ~/.cargo_target/debug/rsx_site counter`. Run the binary directly (not `cargo run`). Stripped mode prints `width repr(line)` per row, so overflow is `awk '$1>50'`. Pass `--raw` to keep escapes, then grep SGR codes (`38;2;r;g;b` fg, `48;2;r;g;b` bg). Never eyeball widths from a truncated `repr(line[:N])`, strip escapes and print the full line.
 
 ## Tests
 
 - `cargo test -p beet_ui --lib render::charcell` (snapshots; `--snap` to regenerate, then eyeball `.beet/snapshots/...`).
-- `cargo test -p beet_site` for end-to-end prose.
+- `cargo test -p rsx_site` for end-to-end prose.
 - Match a fix with a regression test asserting on cell state (`buffer.iter_cells()`, `cell.style.background`) or stripped output, not exact bytes.

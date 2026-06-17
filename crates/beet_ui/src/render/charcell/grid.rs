@@ -172,7 +172,7 @@ mod test {
 	/// [`Element`], the shape `Vec::into_snippet` lowers a collected child position
 	/// to. The wrapper must be spliced out so the cells flow as direct grid tracks;
 	/// otherwise the grid lays out the single wrapper as one cell and the cells
-	/// collapse into a zero-width nested grid (the `bsx_site`/`beet_site` grid demo
+	/// collapse into a zero-width nested grid (the `bsx_site` grid demo
 	/// regression). This mirrors the HTML walker, which emits no tag for such a
 	/// node yet still renders its children.
 	#[beet_core::test]
@@ -209,7 +209,7 @@ mod test {
 	}
 
 	/// The same regression end to end through the real `rsx!` lowering: a collected
-	/// `Vec` child position (`{(..).map(..).collect()}`) is what the `beet_site`
+	/// `Vec` child position (`{(..).map(..).collect()}`) is what the `bsx_site`
 	/// grid demo authors, and `Vec::into_snippet` lowers it to the tag-less wrapper.
 	/// Each cell must paint at its own track, not collapse into one wrapper cell.
 	#[beet_core::test]

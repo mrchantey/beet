@@ -64,7 +64,7 @@ members = [
 	"crates/beet_spatial",
 
 	## 💡 Beet
-	"crates/beet_site",
+	"examples/rsx_site",
 	"crates/beet-cli",
 ]
 

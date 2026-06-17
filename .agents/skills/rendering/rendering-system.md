@@ -37,7 +37,7 @@ Slotted children use `slot="name"`.
 
 ## Rules, inline classes, escape hatches
 
-The target-agnostic way to add a reusable style is a `Rule` in the rule set (sets tokens, resolves on both targets). See `beet_site/src/server.rs` `design_row_rule` and `style/material/classes/*.rs`. For a **one-off per-element** style use `inline_class!` (`token/class.rs`): it returns the `InlineClass` component, so it works as a block attribute in both `rsx_direct!` and scene `rsx!`. Scene-rsx gotchas: only the **first** `{..}` after a tag is an attribute (a second is a child), so combine a semantic class and an inline class in one tuple `{(Classes::new([..]), inline_class![..])}`; and the class name is sanitized to `inline-<file>-<line>-<col>` (raw `file:line:col` fails on the web).
+The target-agnostic way to add a reusable style is a `Rule` in the rule set (sets tokens, resolves on both targets). See `rsx_site/src/style.rs` `design_row_rule` and `style/material/classes/*.rs`. For a **one-off per-element** style use `inline_class!` (`token/class.rs`): it returns the `InlineClass` component, so it works as a block attribute in both `rsx_direct!` and scene `rsx!`. Scene-rsx gotchas: only the **first** `{..}` after a tag is an attribute (a second is a child), so combine a semantic class and an inline class in one tuple `{(Classes::new([..]), inline_class![..])}`; and the class name is sanitized to `inline-<file>-<line>-<col>` (raw `file:line:col` fails on the web).
 
 Common prop tokens (`common_props`): `BackgroundColor`/`ForegroundColor`, `DisplayProp`, `GapProp`/`ColumnGapProp`/`RowGapProp` (`Length`), `Padding`/`MarginProp` (`Spacing`), `Width`/`Height`/`Min*`/`Max*`, `FlexDirectionProp`, `AlignItemsProp`, `JustifyContentProp`, `ShapeProp`, `ElevationProp`, `CursorProp`, `TransformProp`. Values: `Length::{Px,Rem,Percent,Viewport*}`, `Display`, `Direction`, `Cursor`, `Transform::{None,Rotate(deg)}`, `ListStyle::{Auto,None}`.
 
@@ -53,10 +53,10 @@ A raw `<style>` string is the last resort, web-only. Standing web-only overrides
 
 ## Routing and codegen
 
-File-based (`beet_site/src/launch.rs`): `src/pages/*.rs` → `/*`, `src/docs/**` → `/docs/**` (nested dirs allowed), `src/blog/**` → `/blog/**`. Each `.rs` route needs `pub fn get() -> impl Bundle`; `.md` files are routes directly. **After any route add/remove/move, regenerate codegen** or the build fails on a missing module:
+File-based (`rsx_site/src/launch.rs`): `src/pages/*.rs` → `/*`. A collection can set a base route and allow nested dirs (eg a `src/docs/**` collection → `/docs/**`). Each `.rs` route needs `pub fn get() -> impl Bundle`; `.md` files are routes directly. **After any route add/remove/move, regenerate codegen** or the build fails on a missing module:
 
 ```bash
-cargo run -p beet_site --no-default-features --features codegen
+cargo run -p rsx_site --no-default-features --features codegen
 ```
 
 This rewrites `src/codegen/{pages.rs,docs/mod.rs,blog/mod.rs,route_tree.rs}` (gitignored). Typed paths (`routes::docs::index()`) come from there, and the sidebar nav is auto-collected from the route tree.
@@ -78,7 +78,7 @@ Live-interactivity demos (counters, live binding) rely on the old signal system;
 
 - `<li>` is `Display::ListItem`, not `Block`: the web needs `list-item` to keep its bullet/number (Preflight strips markers, `reset.css` restores `list-style` on `ul`/`ol`), while charcell lays it out as a block and draws the marker via `decorate.rs`. A plain `display: block` on a `<li>` silently drops web markers.
 - A border changes an element's footprint on both targets (a terminal border eats a whole cell). To keep variants the same size, *reserve* the border on every variant and only recolour it — eg contained buttons (`button_contained`) carry a fill-matched border so they match the outlined variant.
-- Color scheme is decided by the layout (`beet_site/src/layouts/layout.rs`), not the renderer: `?color-scheme=light|dark` (CLI `--color-scheme=`) pins a body class; else the web follows the OS via `color_scheme.js` and a non-html target defaults to `.dark-scheme` (dark prose on a dark terminal would be invisible).
-- Syntax highlighting needs `beet/syntax_highlighting` (in `beet_site`'s `render` feature); verify with `docs/design/code`.
+- Color scheme is decided by the layout (`rsx_site/src/layout.rs`), not the renderer: `?color-scheme=light|dark` (CLI `--color-scheme=`) pins a body class; else the web follows the OS via `color_scheme.js` and a non-html target defaults to `.dark-scheme` (dark prose on a dark terminal would be invisible).
+- Syntax highlighting needs `beet/syntax_highlighting`; verify with the no-code `site/`'s `/docs/design/code` page.
 - `children!`/`related!` are set operations, clobbering existing relations.
 - Use `cross_log!()` / `.xprint()`, never `println!` (silent in wasm).
