@@ -39,6 +39,12 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
 	let root = build_site(&cx.caller, site_dir.clone(), entry).await?;
 
+	// run the render-diagnostics pass over the freshly built site and surface every
+	// problem loudly in the console before serving (dev mode does not abort on an
+	// error; the console output and the live-reload re-scan are the signal). A
+	// `--watch` reload re-runs the pass via `reload_site`.
+	check_routes(&cx.world(), root).await?.log();
+
 	// the start built straight from the request: `--server=` selects which of the
 	// site's declared servers boot, the rest of the params flow as boot config.
 	let start =

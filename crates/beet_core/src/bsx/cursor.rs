@@ -24,6 +24,15 @@ impl<'a> Cursor<'a> {
 	/// The current byte offset into the source.
 	pub fn offset(&self) -> usize { self.offset }
 
+	/// The [`LineCol`] of a byte `offset` into the source: 1-indexed line,
+	/// 0-indexed column, matching [`SpanLookup`](crate::prelude::SpanLookup).
+	pub fn line_col(&self, offset: usize) -> crate::prelude::LineCol {
+		let prefix = &self.source[..offset];
+		let line = prefix.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
+		let col = prefix.len() - prefix.rfind('\n').map(|nl| nl + 1).unwrap_or(0);
+		crate::prelude::LineCol::new(line, col as u32)
+	}
+
 	/// Slice the source between two byte offsets recorded from [`Self::offset`].
 	pub fn slice(&self, start: usize, end: usize) -> &'a str {
 		&self.source[start..end]

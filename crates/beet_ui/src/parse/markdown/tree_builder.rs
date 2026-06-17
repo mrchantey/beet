@@ -74,6 +74,48 @@ pub(crate) fn build_markdown_tree<'a>(
 	builder.finish()
 }
 
+/// `<pre>`-family tags whose whitespace is significant, so their children are
+/// left verbatim (mirrors the core BSX `normalize_whitespace`).
+const PRE_ELEMENTS: &[&str] = &["pre", "textarea", "script", "style"];
+
+/// Drop insignificant inter-element whitespace from an embedded-markup element's
+/// children, the markdown-path twin of the core BSX `normalize_whitespace` (and
+/// of the `rsx!` macro's compile-time trim). Embedded markup like
+/// `<div class="design-row">\n\t<Button/>\n\t<Button/>\n</div>` carries the
+/// formatting indentation as whitespace-only text nodes; the browser collapses
+/// them but the charcell layout would render each as a blank row / extra gap, so
+/// they must be dropped before the tree is built (markdown-native content has no
+/// such nodes, so this is a no-op there).
+///
+/// A whitespace-only [`HtmlNode::Text`] is insignificant when neither neighbour
+/// (nor a list edge) is inline content (non-blank text or an `{expr}`): an
+/// *element* neighbour, even an inline one like `<button>`, does not make it
+/// significant, matching how `rsx!` trims between tags. Whitespace touching real
+/// text/`{expr}` stays (collapsing to one space at render).
+fn drop_insignificant_whitespace<'a>(
+	children: &mut Vec<HtmlNode<'a>>,
+) {
+	let is_inline = |node: &HtmlNode<'a>| {
+		matches!(node, HtmlNode::Text(text) if !text.trim().is_empty())
+			|| matches!(node, HtmlNode::Expression(_))
+	};
+	let keep: Vec<bool> = children
+		.iter()
+		.enumerate()
+		.map(|(index, node)| {
+			let insignificant = node.is_blank_text()
+				&& index
+					.checked_sub(1)
+					.and_then(|prev| children.get(prev))
+					.is_none_or(|prev| !is_inline(prev))
+				&& children.get(index + 1).is_none_or(|next| !is_inline(next));
+			!insignificant
+		})
+		.collect();
+	let mut keep = keep.into_iter();
+	children.retain(|_| keep.next().unwrap_or(true));
+}
+
 /// Wrap maximal runs of inline children in anonymous `<div>` blocks whenever the
 /// children mix inline and block content, mirroring how a browser generates
 /// anonymous block boxes. Without this a list item like `` - a: `b` `` followed
@@ -202,6 +244,13 @@ impl<'a> MdTreeBuilder<'a> {
 			return;
 		}
 		if let Some(mut frame) = self.stack.pop() {
+			// drop the formatting indentation an embedded-markup element carries
+			// between its child tags, the markdown twin of the core BSX
+			// `normalize_whitespace`; skip `<pre>`-family frames whose whitespace is
+			// significant.
+			if !PRE_ELEMENTS.contains(&frame.name) {
+				drop_insignificant_whitespace(&mut frame.children);
+			}
 			// a tight list item mixing leading inline content with a nested list (or
 			// other block) is the one prose case of a block box with mixed children;
 			// wrap its inline runs in anonymous blocks so they flow on one line
@@ -724,11 +773,15 @@ impl<'a> MdTreeBuilder<'a> {
 			self.pop();
 		}
 
-		let nodes = self
+		let mut nodes = self
 			.stack
 			.pop()
 			.map(|frame| frame.children)
 			.unwrap_or_default();
+		// the synthetic root collects top-level nodes; drop the whitespace between
+		// top-level embedded-markup blocks too (eg a leading newline before
+		// `<article>` that would otherwise paint as a blank first row).
+		drop_insignificant_whitespace(&mut nodes);
 
 		let frontmatter =
 			self.frontmatter_content.and_then(|(content, kind)| {
@@ -951,6 +1004,40 @@ mod test {
 			.filter(|node| node_name(node) == "br")
 			.count()
 			.xpect_eq(2);
+	}
+
+	#[beet_core::test]
+	fn embedded_markup_drops_inter_tag_whitespace() {
+		// the formatting indentation between embedded-markup child tags is dropped
+		// (the markdown twin of the core BSX `normalize_whitespace`), so a design
+		// row renders its items with no blank rows / extra gap on the charcell
+		// target — the parity bug the `.mdx` design showcases surfaced.
+		let nodes = build(
+			"<div class=\"row\">\n\t<span>a</span>\n\t<span>b</span>\n</div>",
+		);
+		let div = nodes.iter().find(|node| node_name(node) == "div").unwrap();
+		// only the two spans survive; the `\n\t` text runs between/around them drop.
+		let names: Vec<&str> =
+			node_children(div).iter().map(node_name).collect();
+		names.xpect_eq(vec!["span", "span"]);
+	}
+
+	#[beet_core::test]
+	fn embedded_markup_keeps_inline_whitespace() {
+		// whitespace between an inline element and real text is significant (a word
+		// gap), so it must survive even as the inter-tag indentation drops.
+		let nodes = build("<p>see <a href=\"#\">here</a> now</p>");
+		let para = nodes.iter().find(|node| node_name(node) == "p").unwrap();
+		let texts: Vec<&str> = node_children(para)
+			.iter()
+			.filter_map(|node| match node {
+				HtmlNode::Text(text) => Some(*text),
+				_ => None,
+			})
+			.collect();
+		// the leading "see " and trailing " now" keep their boundary spaces.
+		texts.iter().any(|text| text.ends_with(' ')).xpect_true();
+		texts.iter().any(|text| text.starts_with(' ')).xpect_true();
 	}
 
 	#[beet_core::test]

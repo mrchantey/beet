@@ -106,8 +106,12 @@ fn attr_prop_value(value: &AttrValue) -> Option<Value> {
 		AttrValue::Flag => Some(Value::Bool(true)),
 		AttrValue::Str(string) => Some(Value::Str(string.into())),
 		AttrValue::Expr(ValueExpr::Literal(literal)) => literal_prop_value(literal),
-		// a binding, entity ref, spread or verb call is not a plain prop value
-		AttrValue::Expr(_) | AttrValue::Spread(_) | AttrValue::Verb(_) => None,
+		// a binding, entity ref, spread, verb call or style directive is not a
+		// plain prop value
+		AttrValue::Expr(_)
+		| AttrValue::Spread(_)
+		| AttrValue::Verb(_)
+		| AttrValue::Style { .. } => None,
 	}
 }
 
@@ -136,9 +140,13 @@ fn literal_prop_value(literal: &DataLiteral) -> Option<Value> {
 
 /// Convert a named literal (enum variant or struct) to its serde-tagged [`Value`].
 fn named_prop_value(named: &NamedLiteral) -> Option<Value> {
+	// reflection keys on the bare variant/type name, so a qualified path
+	// (`ButtonVariant::Outlined`) reduces to its last segment (`Outlined`), the
+	// markup twin of Rust accepting either form.
+	let name = variant_name(&named.name);
 	match &named.fields {
 		// a unit variant is its bare name
-		NamedFields::Unit => Some(Value::Str(named.name.as_str().into())),
+		NamedFields::Unit => Some(Value::Str(name.into())),
 		// a tuple/struct variant is `{ "Variant": payload }`
 		NamedFields::Tuple(items) => {
 			let payload = items
@@ -147,7 +155,7 @@ fn named_prop_value(named: &NamedLiteral) -> Option<Value> {
 				.collect::<Option<Vec<_>>>()
 				.map(Value::List)?;
 			let mut map = Map::default();
-			map.insert(SmolStr::from(named.name.as_str()), payload);
+			map.insert(SmolStr::from(name), payload);
 			Some(Value::Map(map))
 		}
 		NamedFields::Struct(fields) => {
@@ -157,10 +165,16 @@ fn named_prop_value(named: &NamedLiteral) -> Option<Value> {
 					.insert(SmolStr::from(key.as_str()), literal_prop_value(item)?);
 			}
 			let mut map = Map::default();
-			map.insert(SmolStr::from(named.name.as_str()), Value::Map(payload));
+			map.insert(SmolStr::from(name), Value::Map(payload));
 			Some(Value::Map(map))
 		}
 	}
+}
+
+/// The bare variant/type name of a (possibly qualified) path: the segment after
+/// the last `::`, eg `ButtonVariant::Outlined` -> `Outlined`.
+fn variant_name(name: &str) -> &str {
+	name.rsplit("::").next().unwrap_or(name)
 }
 
 /// A template's `bx:schema` declaration: an inline JSON schema, a remote schema
@@ -281,5 +295,26 @@ mod test {
 		map.0.len().xpect_eq(2);
 		map.0.get("label").unwrap().clone().xpect_eq(Value::Str("hi".into()));
 		map.0.get("count").unwrap().clone().xpect_eq(Value::Int(3));
+	}
+
+	#[beet_core::test]
+	fn qualified_unit_enum_prop_reduces_to_variant() {
+		// `variant=ButtonVariant::Outlined` reflects by the bare variant name, so the
+		// qualifying path is dropped (else the enum silently falls back to default).
+		let el = element(&[(
+			"variant",
+			AttrValue::Expr(ValueExpr::Literal(DataLiteral::Enum(NamedLiteral {
+				name: "ButtonVariant::Outlined".into(),
+				fields: NamedFields::Unit,
+			}))),
+		)]);
+		let Value::Map(map) = props_value(&el) else {
+			panic!("expected map");
+		};
+		map.0
+			.get("variant")
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Str("Outlined".into()));
 	}
 }

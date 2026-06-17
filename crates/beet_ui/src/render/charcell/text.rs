@@ -11,11 +11,18 @@ use super::truncate_to_width;
 /// Compute the intrinsic size of a text node.
 ///
 /// Wraps the text to `max_width` columns and returns `(max_line_width, line_count)`.
+/// An empty value with no generated [`Marker`] reserves no row, so a form control
+/// with an empty bound value (eg a blank `<input>` after `FormPlugin` seeds
+/// `Value::str("")`) hugs its padding/border rather than gaining a phantom content
+/// line — matching a control with no value at all. A `<select>` keeps its row: the
+/// empty value is submission state, but the marker label is what paints, so the box
+/// must still reserve a line for it.
 pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
-	let Some(value) = node.value() else {
+	let value = node.value().map(|value| value.to_string()).unwrap_or_default();
+	if value.is_empty() && node.marker().is_none() {
 		return UVec2::ZERO;
-	};
-	measure_str(&value.to_string(), max_width)
+	}
+	measure_str(&value, max_width)
 }
 
 /// Wrap `text` to `max_width` columns and return `(max_line_width, line_count)`.
@@ -262,6 +269,40 @@ mod tests {
 		display_width("ＡＢＣ").xpect_eq(6);
 		// ASCII is 1 column each
 		display_width("abc").xpect_eq(3);
+	}
+
+	/// An empty bound value reserves no content row, so a value-leaf with an empty
+	/// [`Value`] (eg a blank `<input>` after `FormPlugin` seeds `Value::str("")`)
+	/// measures the same height as one with no value at all. A non-empty value adds
+	/// its wrapped line count back. This was the parity gap where the editable serve
+	/// path drew form-control boxes one row taller than the static render, which
+	/// never seeds the empty value.
+	#[beet_core::test]
+	fn empty_value_reserves_no_content_row() {
+		// the input's intrinsic height with the given value, or `None` for no value.
+		let height = |value: Option<&'static str>| {
+			let mut world = CharcellPlugin::world();
+			world.spawn((
+				FlexBuffer::new(20),
+				rsx! { <input type="text"/> },
+			));
+			world.run_schedule(crate::parse::PostParseTree);
+			let input = world
+				.query::<(Entity, &Element)>()
+				.iter(&world)
+				.find(|(_, element)| element.tag_eq("input"))
+				.map(|(entity, _)| entity)
+				.unwrap();
+			if let Some(value) = value {
+				world.entity_mut(input).insert(Value::str(value));
+			}
+			world.run_schedule(crate::parse::PostParseTree);
+			world.entity(input).get::<IntrinsicSize>().unwrap().0.y
+		};
+		// an empty value measures exactly like no value (no phantom content row).
+		height(Some("")).xpect_eq(height(None));
+		// a one-line value adds exactly one content row over the empty case.
+		height(Some("hi")).xpect_eq(height(Some("")) + 1);
 	}
 
 	/// A wide glyph (width-2 emoji) in a 1-cell column hard-breaks without

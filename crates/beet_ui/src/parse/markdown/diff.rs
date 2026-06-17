@@ -91,7 +91,15 @@ impl Default for HtmlDiffConfig {
 
 impl HtmlDiffConfig {
 	/// Returns whether the given element name is a void element.
+	///
+	/// HTML tag names are case-insensitive (`<BR>` is `<br>`), but BSX uses case to
+	/// distinguish a component/template from an element. A PascalCase tag (eg the
+	/// `<Link>` widget) is therefore never the HTML void element it lowercases to
+	/// (`link`): it resolves through the BSX path and keeps its slot children.
 	pub fn is_void_element(&self, name: &str) -> bool {
+		if is_component_tag(name) {
+			return false;
+		}
 		let lower = name.to_ascii_lowercase();
 		self.void_elements.iter().any(|el| el.as_ref() == lower)
 	}
@@ -197,6 +205,19 @@ fn is_bsx_tag(tag: &str) -> bool {
 		.next()
 		.unwrap_or(tag)
 		.starts_with(|ch: char| ch.is_uppercase())
+}
+
+/// Whether a tag is unambiguously a BSX component/template rather than an HTML
+/// element written in uppercase. A component is PascalCase (an uppercase first
+/// char *and* a lowercase letter, eg `Link`) or carries a `::` path; an all-caps
+/// tag (`BR`, `LINK`) stays an HTML element, since HTML tag names are
+/// case-insensitive. Used to keep an uppercase component tag from colliding with
+/// a void HTML element it lowercases to.
+fn is_component_tag(tag: &str) -> bool {
+	let last = tag.rsplit("::").next().unwrap_or(tag);
+	tag.contains("::")
+		|| (last.starts_with(|ch: char| ch.is_uppercase())
+			&& last.chars().any(|ch| ch.is_lowercase()))
 }
 
 /// Build an [`HtmlNode::Element`] subtree through [`BsxTemplate`], so an embedded
@@ -655,5 +676,47 @@ mod test {
 		config_no_parse
 			.attribute_value("true")
 			.xpect_eq(Value::Str("true".into()));
+	}
+
+	/// A capitalized BSX component tag (eg the `<Link>` widget) is never the HTML
+	/// void element it lowercases to (`<link>`), so its slot children survive.
+	/// Regression for the landing-page CTA rendering as an empty `<a></a>` with its
+	/// label leaking out as a sibling, because `<Link>` matched the void `link`.
+	#[beet_core::test]
+	fn bsx_component_tag_is_not_void() {
+		let config = HtmlDiffConfig::default();
+		// the HTML void element stays void, in any case (HTML is case-insensitive).
+		config.is_void_element("link").xpect_true();
+		config.is_void_element("LINK").xpect_true();
+		// the PascalCase component tag is not — it keeps its slot children.
+		config.is_void_element("Link").xpect_false();
+	}
+
+	/// The component's children are nested, not flattened into siblings: a
+	/// `<Link>text</Link>` parses to a `Link` element holding the text, ready for
+	/// the BSX build path to route into its default slot.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn markdown_component_keeps_children() {
+		use crate::parse::markdown::tree_builder::build_markdown_tree;
+		let tree = build_markdown_tree(
+			"<Link href=\"/x\">hello</Link>",
+			crate::prelude::MarkdownParseConfig::default_cmark_options(),
+			&crate::prelude::HtmlParseConfig::default(),
+			&HtmlDiffConfig::default(),
+			None,
+		)
+		.unwrap();
+		let describe = |node: &HtmlNode| match node {
+			HtmlNode::Element { name, children, .. } => {
+				format!("{name}/{}", children.len())
+			}
+			_ => "?".to_string(),
+		};
+		// one node: the Link element holding its single text child (not Link/0
+		// beside a stray text sibling).
+		tree.nodes.iter().map(describe).collect::<Vec<_>>().xpect_eq(vec![
+			"Link/1".to_string(),
+		]);
 	}
 }

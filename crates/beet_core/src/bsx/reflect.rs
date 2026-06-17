@@ -235,7 +235,12 @@ fn enum_to_reflect(
 		Some(TypeInfo::Enum(info)) => Some(info),
 		_ => None,
 	};
-	let variant = enum_info.and_then(|info| info.variant(&named.name));
+	// reflection keys on the bare variant name, so a qualified path
+	// (`ButtonVariant::Outlined`) reduces to its last segment (`Outlined`), the
+	// markup twin of Rust accepting either form. Without this the variant lookup
+	// misses and the value silently falls back to the enum's default.
+	let variant_name = named.name.rsplit("::").next().unwrap_or(&named.name);
+	let variant = enum_info.and_then(|info| info.variant(variant_name));
 
 	let dynamic_variant = match (&named.fields, variant) {
 		(NamedFields::Unit, _) => DynamicVariant::Unit,
@@ -273,7 +278,7 @@ fn enum_to_reflect(
 	};
 
 	let mut dynamic_enum =
-		DynamicEnum::new(named.name.to_string(), dynamic_variant);
+		DynamicEnum::new(variant_name.to_string(), dynamic_variant);
 	dynamic_enum.set_represented_type(field_info);
 	Ok(Box::new(dynamic_enum))
 }
@@ -368,5 +373,24 @@ mod test {
 			fields: NamedFields::Unit,
 		}))
 		.xpect_eq(None);
+	}
+
+	#[derive(Debug, Default, PartialEq, Reflect)]
+	enum Emphasis {
+		#[default]
+		Low,
+		High,
+	}
+
+	/// A qualified unit-variant path (`Emphasis::High`) resolves to its variant,
+	/// not the enum default, the bug that left a `<Link variant=ButtonVariant::Outlined>`
+	/// rendering filled.
+	#[beet_core::test]
+	fn qualified_unit_variant_resolves() {
+		resolve::<Emphasis>(DataLiteral::Enum(NamedLiteral {
+			name: "Emphasis::High".into(),
+			fields: NamedFields::Unit,
+		}))
+		.xpect_eq(Emphasis::High);
 	}
 }

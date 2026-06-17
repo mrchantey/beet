@@ -151,10 +151,20 @@ fn build_root(
 	let previous_root = world.remove_resource::<TemplateBuildRoot>();
 	world.insert_resource(TemplateBuildRoot(root));
 
+	// caller content routed to the root before the build (eg the layout
+	// middleware's transcluded body, a `SlotChild` portal), to anchor onto the
+	// built layout once it exists.
+	let pre_slot_children = root_slot_children(world, root);
+
 	// step 1: build into the root, recording a failure rather than escaping it.
 	let build_result = world
 		.entity_mut(root)
 		.build_template(&template)
+		// step 1b: anchor the pre-build slot children onto the built layout's content
+		// root, so the layout's `<Slot>`s receive them regardless of how the root
+		// template built (clobbering the root's `Children`, or nesting the content
+		// under a tag-less wrapper when the document is multi-root).
+		.map(|()| anchor_pre_slot_children(world, root, &pre_slot_children))
 		// step 2: slots, only when the build itself succeeded.
 		.and_then(|()| resolve_slots(world, root));
 	// a failure rides `TemplateError` + `LoadTemplate` *and* is returned, all
@@ -182,6 +192,72 @@ fn build_root(
 	drain_pending_dependencies(&mut entity);
 
 	outcome
+}
+
+/// The root's direct [`SlotChild`] children present before the build, ie caller
+/// content routed to the root by the spawner (the layout middleware's portal).
+fn root_slot_children(world: &World, root: Entity) -> Vec<Entity> {
+	world
+		.entity(root)
+		.get::<Children>()
+		.into_iter()
+		.flat_map(Children::iter)
+		.filter(|child| world.entity(*child).contains::<SlotChild>())
+		.collect()
+}
+
+/// Anchor the layout's pre-build [`SlotChild`] content (the transcluded portal)
+/// onto the built layout's *content root*, so the layout's `<Slot>`s receive it.
+///
+/// The root template may build in two ways that strand pre-added slot children:
+/// - a template-invocation root (`<SiteLayout/>`) whose body lowers to
+///   `children!`/`Children::spawn` *sets* the root's [`Children`], detaching them
+///   (Bevy drops the [`ChildOf`] rather than despawning);
+/// - a multi-root document (eg a leading `<!-- comment -->` before `<SiteLayout>`)
+///   builds the content under a tag-less wrapper one level below the root, so a
+///   child of the root sits in a *different composition scope* than the content's
+///   `<Slot>`s and never matches.
+///
+/// Both are fixed by re-homing each pre-added slot child onto the content root:
+/// the root itself if it built an [`Element`], else its sole element child (the
+/// wrapper's content). This keeps the portal in the same scope as the layout's
+/// slot targets, matching the additive single-root element-root case.
+fn anchor_pre_slot_children(
+	world: &mut World,
+	root: Entity,
+	pre_slot_children: &[Entity],
+) {
+	let content_root = content_root(world, root);
+	for &child in pre_slot_children {
+		// skip a child the build consumed (despawned) or already re-homed under the
+		// content root; otherwise (detached, or stranded above the content) re-home it.
+		let needs_anchor = world.get_entity(child).is_ok()
+			&& world
+				.entity(child)
+				.get::<ChildOf>()
+				.map(ChildOf::parent)
+				!= Some(content_root);
+		if needs_anchor {
+			world.entity_mut(child).insert(ChildOf(content_root));
+		}
+	}
+}
+
+/// The entity a layout's `<Slot>`s live under: the root if it built an
+/// [`Element`], else its sole [`Element`] child (a multi-root document nests the
+/// real content under a tag-less wrapper, eg a leading comment before the layout
+/// element), else the root unchanged.
+fn content_root(world: &World, root: Entity) -> Entity {
+	if world.entity(root).contains::<Element>() {
+		return root;
+	}
+	world
+		.entity(root)
+		.get::<Children>()
+		.into_iter()
+		.flat_map(Children::iter)
+		.find(|child| world.entity(*child).contains::<Element>())
+		.unwrap_or(root)
 }
 
 #[cfg(test)]

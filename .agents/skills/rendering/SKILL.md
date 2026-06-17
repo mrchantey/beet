@@ -1,6 +1,6 @@
 # Iterating on Beet Rendering
 
-Pages are authored once as target-agnostic scenes and rendered to two targets: the web (HTML + CSS) and the terminal (charcell ANSI). This skill is how to change them and get it right. System reference: `rendering-system.md`. Charcell internals + true terminal width: `charcell.md`. Screenshots: `playwright.md`. Live reference (previous, web-only site): `.agents/reference/beet_old`.
+Pages are authored once as target-agnostic scenes and rendered to two targets: the web (HTML + CSS) and the terminal (charcell ANSI). This skill is how to change them and get it right. System reference: `rendering-system.md`. Charcell internals + true terminal width: `charcell.md`. Screenshots: `playwright.md`. No-code (markup) sites + matching a compiled reference for parity: `no-code-sites.md`. Live reference (previous, web-only site): `.agents/reference/beet_old`.
 
 ## Attitude
 

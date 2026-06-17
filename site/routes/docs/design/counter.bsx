@@ -1,0 +1,13 @@
+<article>
+	<h1>Counter</h1>
+	<p>
+		A reactive counter with no custom client code: each button mutates a document field, and the count reads it back. The Rust counterpart of the no-code <code>counter.bsx</code> page.
+	</p>
+	<div bx:scope="counter" bx:style="max-width=Rem(20.0)">
+		<p>You have clicked {@doc:count=0} times.</p>
+		<div class="design-row">
+			<button class="btn btn-filled" bx:click=increment{ field: @doc:count, amount: 1 }>More</button>
+			<button class="btn btn-tonal" bx:click=decrement{ field: @doc:count }>Less</button>
+		</div>
+	</div>
+</article>

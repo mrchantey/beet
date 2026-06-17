@@ -64,6 +64,17 @@ pub enum AttrValue {
 	Spread(SpreadExpr),
 	/// A `bx:<event>` directive's verb call, eg `bx:click=increment{ field: @doc:count }`.
 	Verb(VerbCall),
+	/// A `bx:style` directive's one-off rule declarations, eg
+	/// `bx:style="display=Flex max-width=Rem(40.0)"`. The raw declaration text is
+	/// kept verbatim (parsed downstream where the style types live), paired with
+	/// the source [`FileSpan`] so the minted inline class is stable across spawns
+	/// of the same callsite, the markup twin of `inline_class!`'s `panic::Location`.
+	Style {
+		/// The raw `prop=value ..` declaration text, parsed downstream.
+		source: SmolStr,
+		/// The directive's source span, mapped onto the minted inline class.
+		span: FileSpan,
+	},
 }
 
 /// A value in attribute-value or text position: a literal or a reference.

@@ -86,6 +86,34 @@ mod tests {
 	}
 
 	#[beet_core::test]
+	fn comment_node_reserves_no_row() {
+		// an authoring comment between two blocks is non-visual on the terminal too
+		// (the twin of the HTML renderer skipping it), so it adds no blank row.
+		let mut world = CharcellPlugin::world();
+		let root = world
+			.spawn((
+				Buffer::new(UVec2::new(20, 5)).into_double_buffer(),
+				children![
+					rsx! { <p>"Top"</p> },
+					(Comment::new(" an authoring note "),),
+					rsx! { <p>"Bottom"</p> },
+				],
+			))
+			.id();
+		world.run_schedule(PostParseTree);
+		world
+			.get::<DoubleBuffer>(root)
+			.unwrap()
+			.current_buffer()
+			.render_plain()
+			.lines()
+			.map(|line| line.trim_end())
+			.filter(|line| !line.is_empty())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["Top", "Bottom"]);
+	}
+
+	#[beet_core::test]
 	fn non_visual_tags_skipped_with_material() {
 		// beet_site composes CharcellPlugin (which brings StylePlugin) plus
 		// MaterialStylePlugin, whose rule set replaces the one StylePlugin seeds.

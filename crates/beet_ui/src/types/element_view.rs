@@ -85,16 +85,14 @@ impl<'a> ElementView<'a> {
 		self.iter_classes().any(|c| c == selector)
 	}
 
-	/// Iterate every class name visible to selector matching, combining
-	/// whitespace-separated values from the `class` attribute with names
-	/// stored in the [`Classes`] component.
+	/// Iterate every class name visible to selector matching, combining the
+	/// `class` attribute (a space-separated string *or* a list of strings, eg
+	/// `class={["color-box", "primary"]}`) with names stored in the [`Classes`]
+	/// component.
 	pub fn iter_classes(&self) -> impl Iterator<Item = SmolStr> + '_ {
 		let attr_classes = self
 			.attribute("class")
-			.and_then(|attr| attr.value.as_str().ok())
-			.map(|s| {
-				s.split_whitespace().map(SmolStr::from).collect::<Vec<_>>()
-			})
+			.map(|attr| class_attr_names(&attr.value))
 			.unwrap_or_default();
 		let entity_classes = self
 			.classes
@@ -206,4 +204,23 @@ pub struct AttributeView<'a> {
 
 impl<'a> AttributeView<'a> {
 	pub fn key(&self) -> &str { &self.attribute }
+}
+
+/// The class names a `class` attribute carries: a space-separated string
+/// (`class="a b"`) splits on whitespace, while a list value
+/// (`class={["color-box", "primary"]}`, eg from embedded markup) yields each
+/// string item. Any other value kind contributes nothing.
+fn class_attr_names(value: &Value) -> Vec<SmolStr> {
+	match value {
+		Value::List(items) => items
+			.iter()
+			.filter_map(|item| item.as_str().ok())
+			.map(SmolStr::from)
+			.collect(),
+		_ => value
+			.as_str()
+			.ok()
+			.map(|text| text.split_whitespace().map(SmolStr::from).collect())
+			.unwrap_or_default(),
+	}
 }

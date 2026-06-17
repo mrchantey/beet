@@ -9,7 +9,7 @@ impl Plugin for StylePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<TokenPlugin>()
 			.init_plugin::<ParsePlugin>()
-			.init_resource::<CssTokenMap>()
+			.init_plugin::<CssPlugin>()
 			.register_type::<ColorScheme>();
 
 		// mirror the typed scheme handle onto classes before the cascade runs,

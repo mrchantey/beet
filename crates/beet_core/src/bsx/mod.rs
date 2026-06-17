@@ -144,12 +144,17 @@ mod registry;
 mod remote;
 mod resolve;
 mod schema;
+mod style_resolver;
+mod tag_resolver;
 mod value;
 
 pub use ast::*;
 pub use events::*;
 pub use parse::*;
+pub use reflect::*;
 pub use registry::*;
+pub use style_resolver::*;
+pub use tag_resolver::*;
 pub use value::parse_value_expr_str;
 #[cfg(feature = "bevy_async")]
 pub use remote::*;
@@ -170,6 +175,8 @@ impl Plugin for BsxPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<EventRegistry>()
 			.init_resource::<VerbRegistry>()
+			.init_resource::<BsxTagResolvers>()
+			.init_resource::<StyleResolver>()
 			.init_resource::<BsxTemplateRegistry>();
 	}
 }

@@ -1,0 +1,79 @@
+<!--
+The site's named style rules, declared in markup with no Rust. Included once from
+`main.bsx` so they land in the `RuleSet` before any page renders. These are the
+no-code port of the compiled site's `design_row_rule` + `color_scheme_rules`: each
+`<Rule>` selector comes from `class`/`tag`/`state`, every other attribute is a
+declaration in BSX enum form (`Flex`, `Rem(1.0)`), and a `@token:Role` value binds
+to a Material colour token, resolving on both the web and terminal targets.
+-->
+
+<!-- design_row_rule: the design-showcase rows that lay widget variants out side
+     by side, wrapping and spaced on both targets. -->
+<Rule class="design-row"
+      display=Flex
+      flex-wrap=Wrap
+      align-items=Center
+      column-gap=Rem(1.0)
+      row-gap=Rem(1.0) />
+
+<!-- color_scheme_rules: the colour-schemes showcase. A wrapping row of swatches,
+     each a fixed-width block binding its fill/text to a colour-role token so the
+     cascade resolves it per scheme on both targets. -->
+<Rule class="color-group"
+      display=Flex
+      flex-direction=Horizontal
+      flex-wrap=Wrap
+      column-gap=Px(2.0)
+      row-gap=Px(2.0)
+      margin={Spacing{top:Px(0.0), right:Px(0.0), bottom:Px(2.0), left:Px(0.0)}} />
+
+<Rule class="color-box"
+      width=Rem(10.0)
+      height=Rem(3.0)
+      padding={Spacing{top:Rem(0.3), right:Rem(0.3), bottom:Rem(0.3), left:Rem(0.3)}} />
+
+<!-- Primary -->
+<Rule class={["color-box", "primary"]} background-color="@token:Primary" color="@token:OnPrimary" />
+<Rule class={["color-box", "on-primary"]} background-color="@token:OnPrimary" color="@token:Primary" />
+<Rule class={["color-box", "primary-container"]} background-color="@token:PrimaryContainer" color="@token:OnPrimaryContainer" />
+<Rule class={["color-box", "on-primary-container"]} background-color="@token:OnPrimaryContainer" color="@token:PrimaryContainer" />
+<Rule class={["color-box", "inverse-primary"]} background-color="@token:InversePrimary" color="@token:InverseSurface" />
+
+<!-- Secondary -->
+<Rule class={["color-box", "secondary"]} background-color="@token:Secondary" color="@token:OnSecondary" />
+<Rule class={["color-box", "on-secondary"]} background-color="@token:OnSecondary" color="@token:Secondary" />
+<Rule class={["color-box", "secondary-container"]} background-color="@token:SecondaryContainer" color="@token:OnSecondaryContainer" />
+<Rule class={["color-box", "on-secondary-container"]} background-color="@token:OnSecondaryContainer" color="@token:SecondaryContainer" />
+
+<!-- Tertiary -->
+<Rule class={["color-box", "tertiary"]} background-color="@token:Tertiary" color="@token:OnTertiary" />
+<Rule class={["color-box", "on-tertiary"]} background-color="@token:OnTertiary" color="@token:Tertiary" />
+<Rule class={["color-box", "tertiary-container"]} background-color="@token:TertiaryContainer" color="@token:OnTertiaryContainer" />
+<Rule class={["color-box", "on-tertiary-container"]} background-color="@token:OnTertiaryContainer" color="@token:TertiaryContainer" />
+
+<!-- Error -->
+<Rule class={["color-box", "error"]} background-color="@token:Error" color="@token:OnError" />
+<Rule class={["color-box", "on-error"]} background-color="@token:OnError" color="@token:Error" />
+<Rule class={["color-box", "error-container"]} background-color="@token:ErrorContainer" color="@token:OnErrorContainer" />
+<Rule class={["color-box", "on-error-container"]} background-color="@token:OnErrorContainer" color="@token:ErrorContainer" />
+
+<!-- Surface -->
+<Rule class={["color-box", "surface-dim"]} background-color="@token:SurfaceDim" color="@token:OnSurface" />
+<Rule class={["color-box", "surface"]} background-color="@token:Surface" color="@token:OnSurface" />
+<Rule class={["color-box", "surface-bright"]} background-color="@token:SurfaceBright" color="@token:OnSurface" />
+<Rule class={["color-box", "on-surface"]} background-color="@token:OnSurface" color="@token:Surface" />
+<Rule class={["color-box", "surface-variant"]} background-color="@token:SurfaceVariant" color="@token:OnSurfaceVariant" />
+<Rule class={["color-box", "on-surface-variant"]} background-color="@token:OnSurfaceVariant" color="@token:SurfaceVariant" />
+<Rule class={["color-box", "inverse-surface"]} background-color="@token:InverseSurface" color="@token:InverseOnSurface" />
+<Rule class={["color-box", "inverse-on-surface"]} background-color="@token:InverseOnSurface" color="@token:InverseSurface" />
+<Rule class={["color-box", "surface-container-lowest"]} background-color="@token:SurfaceContainerLowest" color="@token:OnSurface" />
+<Rule class={["color-box", "surface-container-low"]} background-color="@token:SurfaceContainerLow" color="@token:OnSurface" />
+<Rule class={["color-box", "surface-container"]} background-color="@token:SurfaceContainer" color="@token:OnSurface" />
+<Rule class={["color-box", "surface-container-high"]} background-color="@token:SurfaceContainerHigh" color="@token:OnSurface" />
+<Rule class={["color-box", "surface-container-highest"]} background-color="@token:SurfaceContainerHighest" color="@token:OnSurface" />
+
+<!-- Misc -->
+<Rule class={["color-box", "outline"]} background-color="@token:Outline" color="@token:Surface" />
+<Rule class={["color-box", "outline-variant"]} background-color="@token:OutlineVariant" color="@token:OnSurface" />
+<Rule class={["color-box", "scrim"]} background-color="@token:Scrim" color="@token:Surface" />
+<Rule class={["color-box", "shadow"]} background-color="@token:Shadow" color="@token:Surface" />

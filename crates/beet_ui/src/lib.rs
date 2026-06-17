@@ -88,6 +88,8 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::StylePlugin;
 	#[cfg(feature = "style")]
+	pub use crate::style::material::Theme;
+	#[cfg(feature = "style")]
 	pub use crate::style::TextAlign;
 	#[cfg(feature = "style")]
 	pub use crate::style::VISUAL_STYLE_DEFAULT;

@@ -47,8 +47,54 @@ pub fn parse_document(
 	config: &BsxParseConfig,
 ) -> Result<Vec<BsxNode>> {
 	let mut cursor = Cursor::new(source);
-	let nodes = parse_nodes(&mut cursor, config, None)?;
+	let mut nodes = parse_nodes(&mut cursor, config, None)?;
+	normalize_whitespace(&mut nodes);
 	Ok(nodes)
+}
+
+/// Tags whose text content is whitespace-significant, so their children are left
+/// verbatim (the cascade reads `white-space: pre` on these).
+const PRE_ELEMENTS: &[&str] = &["pre", "textarea", "script", "style"];
+
+/// Drop insignificant inter-element whitespace from a node tree, the runtime BSX
+/// twin of the `rsx!` macro's compile-time trim and the browser's collapsing.
+///
+/// A whitespace-only [`BsxNode::Text`] is insignificant when both its neighbours
+/// (or a list edge) are non-inline (an element, comment, or doctype): formatting
+/// indentation between block tags. Whitespace touching inline content (text or an
+/// `{expr}`) stays, collapsing to a single space at render. Recurses, but skips
+/// `<pre>`-family elements whose whitespace is meaningful.
+fn normalize_whitespace(nodes: &mut Vec<BsxNode>) {
+	// a text/`{expr}` neighbour makes adjacent whitespace inline-significant.
+	let is_inline = |node: &BsxNode| {
+		matches!(node, BsxNode::Text(text) if !text.trim().is_empty())
+			|| matches!(node, BsxNode::Expr(_))
+	};
+	// an insignificant node is a whitespace-only text run with no inline neighbour
+	// (between block tags or comments), so it drops like the browser collapses it.
+	let keep: Vec<bool> = nodes
+		.iter()
+		.enumerate()
+		.map(|(index, node)| {
+			let insignificant = matches!(node, BsxNode::Text(text) if text.trim().is_empty())
+				&& index
+					.checked_sub(1)
+					.and_then(|prev| nodes.get(prev))
+					.map_or(true, |prev| !is_inline(prev))
+				&& nodes.get(index + 1).map_or(true, |next| !is_inline(next));
+			!insignificant
+		})
+		.collect();
+	let mut keep = keep.into_iter();
+	nodes.retain(|_| keep.next().unwrap_or(true));
+	// recurse into element children, leaving `<pre>`-family content verbatim.
+	for node in nodes.iter_mut() {
+		if let BsxNode::Element(element) = node {
+			if !PRE_ELEMENTS.contains(&element.tag.as_str()) {
+				normalize_whitespace(&mut element.children);
+			}
+		}
+	}
 }
 
 /// One lenient, fragment-safe markup token produced by [`parse_fragment`].
@@ -285,7 +331,15 @@ fn parse_fragment_attributes(
 }
 
 /// Parse one fragment attribute: `key`, `key="v"`, `key=unquoted`, `key={..}`.
+///
+/// A fragment is always BSX (it already parses `{..}` spreads and expressions),
+/// so the `bx:` directives are resolved here too, identically to the document
+/// parser ([`parse_attribute`]): a `bx:style` keeps its raw text plus span for a
+/// stable inline class, and a `bx:<event>` parses its verb call. Without this,
+/// embedded markdown markup silently drops these directives (the `.md`/`.bsx`
+/// parity gap surfaced by the no-code site rehearsal).
 fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
+	let key_offset = cursor.offset();
 	let key = cursor.take_while(is_attr_key_char).to_string();
 	if key.is_empty() {
 		bevybail!("expected an attribute name");
@@ -298,6 +352,32 @@ fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
 		});
 	}
 	cursor.skip_ws();
+	// `bx:style="prop=value .."` declares a one-off rule; its value is parsed
+	// downstream where the style types live, so keep the raw text plus a source
+	// span (for a stable inline class), mirroring the document parser.
+	if key == "bx:style" {
+		let source = parse_fragment_string(cursor);
+		return Ok(BsxAttribute {
+			key,
+			value: AttrValue::Style {
+				source: source.into(),
+				span: FileSpan::new(
+					SmolPath::new("bsx"),
+					cursor.line_col(key_offset),
+					cursor.line_col(cursor.offset()),
+				),
+			},
+		});
+	}
+	// a `bx:<event>=verb{ .. }` directive is a verb call, parsed off the cursor so
+	// its internal whitespace survives. The braced form `bx:<event>={expr}` is a
+	// plain expression, so it falls through to the `{` arm below.
+	if is_event_directive(&key) && cursor.peek() != Some('{') {
+		return Ok(BsxAttribute {
+			key,
+			value: AttrValue::Verb(parse_verb_call(cursor)?),
+		});
+	}
 	let value = match cursor.peek() {
 		Some('"') | Some('\'') => AttrValue::Str(parse_fragment_string(cursor)),
 		Some('{') => {
@@ -306,7 +386,7 @@ fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
 		}
 		// unquoted HTML value: a plain string up to whitespace, `>` or `/>`. Per
 		// the HTML spec `/` does not terminate it, so URLs survive.
-		_ => AttrValue::Str(parse_unquoted_value(cursor)),
+		_ => fragment_unquoted_value(parse_unquoted_value(cursor)),
 	};
 	Ok(BsxAttribute { key, value })
 }
@@ -335,6 +415,29 @@ fn parse_unquoted_value(cursor: &mut Cursor) -> String {
 				&& ch != '`'
 		})
 		.to_string()
+}
+
+/// Classify an unquoted fragment attribute value, resolving the forms that a
+/// component prop needs through the value grammar while keeping bare HTML values
+/// as plain strings:
+///
+/// - a Rust **qualified path** (`::`, eg `variant=ButtonVariant::Filled`) reaches
+///   a typed enum-variant prop;
+/// - a **boolean** (`true`/`false`, eg `vertical_lines=true`) reaches a typed
+///   `bool` prop, instead of the string `"true"` failing prop validation and
+///   dropping the whole template.
+///
+/// Both mirror what the document parser and `rsx!` accept. Every other unquoted
+/// value stays a plain string so HTML URLs survive verbatim (`src=https://x//`,
+/// whose `://` is never a path separator). A value that fails to parse falls back
+/// to a string, never an error.
+fn fragment_unquoted_value(raw: String) -> AttrValue {
+	if raw.contains("::") || raw == "true" || raw == "false" {
+		if let Ok(expr) = parse_value_expr(&mut Cursor::new(&raw)) {
+			return AttrValue::Expr(expr);
+		}
+	}
+	AttrValue::Str(raw)
 }
 
 /// Take raw text up to the matching `</tag>`, splitting `{{expr}}` blocks when
@@ -633,6 +736,9 @@ fn parse_attribute(
 	cursor: &mut Cursor,
 	config: &BsxParseConfig,
 ) -> Result<BsxAttribute> {
+	// the source position of the key, mapped onto the minted inline class for a
+	// `bx:style` directive (the markup twin of `inline_class!`'s callsite).
+	let key_offset = cursor.offset();
 	let key = cursor.take_while(is_attr_key_char).to_string();
 	if key.is_empty() {
 		bevybail!("expected an attribute name");
@@ -648,6 +754,23 @@ fn parse_attribute(
 		});
 	}
 	cursor.skip_ws();
+	// `bx:style="prop=value .."` declares a one-off rule; its value is parsed
+	// downstream where the style types live, so keep the raw text plus the source
+	// span (for a stable inline class).
+	if config.bsx && key == "bx:style" {
+		let source = parse_attr_string(cursor)?;
+		return Ok(BsxAttribute {
+			key,
+			value: AttrValue::Style {
+				source: source.into(),
+				span: FileSpan::new(
+					SmolPath::new("bsx"),
+					cursor.line_col(key_offset),
+					cursor.line_col(cursor.offset()),
+				),
+			},
+		});
+	}
 	// a `bx:<event>` directive is a verb call `increment{ field: @doc:count }`,
 	// parsed straight off the cursor so its internal whitespace survives.
 	if config.bsx && is_event_directive(&key) {
@@ -922,6 +1045,51 @@ mod test {
 	}
 
 	#[beet_core::test]
+	fn fragment_unquoted_qualified_path_is_value_expr() {
+		// an unquoted Rust qualified path (`::`) resolves through the value grammar
+		// so an embedded-markup component prop like `variant=ButtonVariant::Filled`
+		// reaches the typed enum, instead of staying the literal string (which
+		// silently fell back to the enum default). A URL's `://` is untouched.
+		let BsxFragmentToken::Open { attributes, .. } =
+			&fragment("<Button variant=ButtonVariant::Outlined>")[0]
+		else {
+			panic!("expected open");
+		};
+		let AttrValue::Expr(ValueExpr::Literal(DataLiteral::Enum(named))) =
+			&attributes[0].value
+		else {
+			panic!("expected an enum value expression, got {:?}", attributes[0].value);
+		};
+		named.name.as_str().xpect_eq("ButtonVariant::Outlined");
+	}
+
+	#[beet_core::test]
+	fn fragment_unquoted_bool_is_value_expr() {
+		// an unquoted `true`/`false` resolves through the value grammar so an
+		// embedded-markup component prop like `vertical_lines=true` reaches the
+		// typed `bool` prop, instead of the string `"true"` failing prop validation
+		// and dropping the whole template.
+		let BsxFragmentToken::Open { attributes, .. } =
+			&fragment("<Table vertical_lines=true>")[0]
+		else {
+			panic!("expected open");
+		};
+		attributes[0].value.clone().xpect_eq(AttrValue::Expr(
+			ValueExpr::Literal(DataLiteral::Scalar(Value::Bool(true))),
+		));
+		// a bare word that is not a bool stays a plain string (an HTML URL/value).
+		let BsxFragmentToken::Open { attributes, .. } =
+			&fragment("<img loading=lazy>")[0]
+		else {
+			panic!("expected open");
+		};
+		attributes[0]
+			.value
+			.clone()
+			.xpect_eq(AttrValue::Str("lazy".to_string()));
+	}
+
+	#[beet_core::test]
 	fn fragment_braced_attr_uses_value_grammar() {
 		let BsxFragmentToken::Open { attributes, .. } =
 			&fragment("<button bx:click={count.increment}>")[0]
@@ -1007,5 +1175,48 @@ mod test {
 				BsxFragmentToken::Text(" b"),
 				BsxFragmentToken::Close { tag: "style" },
 			]);
+	}
+
+	/// The child nodes of a single root element parsed from `source`.
+	fn children_of(source: &str) -> Vec<BsxNode> {
+		let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
+		let BsxNode::Element(element) = nodes.into_iter().next().unwrap() else {
+			panic!("expected a root element");
+		};
+		element.children
+	}
+
+	#[beet_core::test]
+	fn drops_formatting_whitespace_between_blocks() {
+		// the indentation between block children is insignificant, like `rsx!` trims
+		// and the browser collapses, so only the two elements survive.
+		let children = children_of("<div>\n\t<h1>A</h1>\n\t<p>B</p>\n</div>");
+		children.len().xpect_eq(2);
+		matches!(children[0], BsxNode::Element(_)).xpect_true();
+		matches!(children[1], BsxNode::Element(_)).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn keeps_significant_inline_whitespace() {
+		// the whitespace separating prose from an inline link is significant, so it
+		// stays (collapsing to a single space at render).
+		let children =
+			children_of("<p>say hi in the\n\t<a href=\"x\">Discord</a>.</p>");
+		// "say hi in the…", <a>, "."
+		children.len().xpect_eq(3);
+		let BsxNode::Text(lead) = &children[0] else {
+			panic!("expected leading text");
+		};
+		lead.ends_with(char::is_whitespace).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn preserves_pre_whitespace() {
+		// `<pre>` content is whitespace-significant, so its newlines/indent survive.
+		let children = children_of("<pre>\n  line one\n  line two\n</pre>");
+		let BsxNode::Text(text) = &children[0] else {
+			panic!("expected verbatim text");
+		};
+		text.clone().xpect_eq("\n  line one\n  line two\n".to_string());
 	}
 }

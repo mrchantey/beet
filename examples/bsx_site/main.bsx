@@ -12,6 +12,8 @@ host config.
 -->
 <Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337})}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
+	<Theme color={Srgba(Srgba{red:0.5, green:0.2, blue:0.9, alpha:1.0})}/>
+	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
 </Router>

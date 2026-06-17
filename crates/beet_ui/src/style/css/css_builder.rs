@@ -10,6 +10,12 @@ impl Plugin for CssPlugin {
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(common_props::token_map());
+		// the `<Rule>` markup tag declares a named rule into the `RuleSet` at
+		// build time, the no-code analogue of a typed `Rule` in Rust.
+		register_rule_tag(app.world_mut());
+		// `bx:style` declares a one-off rule + span-derived inline class, the
+		// no-code analogue of the `inline_class!` macro.
+		register_inline_style(app.world_mut());
 	}
 }
 

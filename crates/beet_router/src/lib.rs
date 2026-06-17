@@ -12,6 +12,10 @@ mod card_stack;
 // (a tungstenite listener and an fs watcher).
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 mod client_io;
+// the no-code "type-checker": a post-build validation pass over the render tree.
+// std-only, it needs the `beet_ui` `RuleSet`/`ElementQuery`.
+#[cfg(feature = "std")]
+mod diagnostics;
 mod extra;
 #[cfg(all(feature = "codegen", feature = "std"))]
 mod route_codegen;
@@ -33,6 +37,8 @@ pub mod prelude {
 	pub use crate::card_stack::*;
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	pub use crate::client_io::*;
+	#[cfg(feature = "std")]
+	pub use crate::diagnostics::*;
 	pub use crate::extra::*;
 	#[cfg(feature = "std")]
 	pub use crate::media::*;

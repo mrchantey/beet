@@ -19,6 +19,9 @@ pub fn server_plugin(app: &mut App) {
 		// backend and registers the server types.
 		RouterPlugin,
 		LogPlugin::new(Level::INFO),
+		// seeds the `Theme` resource with the brand colour; `rebuild_theme_tones`
+		// derives every palette tone from it, the Rust analogue of a markup
+		// `<Theme color=.../>` declaration.
 		material::MaterialStylePlugin::new(THEME_COLOR),
 	));
 	// site-local layout rules, see `design_row_rule` (in `style`). The landing-page

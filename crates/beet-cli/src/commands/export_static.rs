@@ -17,6 +17,23 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	let site = site_arg(cx.input.request_parts())?;
 	let SiteEntry { site_dir, entry } = resolve_site(&site)?;
 	let root = build_site(&cx.caller, site_dir.clone(), entry).await?;
+
+	// validate before writing: the render-diagnostics pass gates CI, so a broken
+	// no-code site (unknown tag, dead link) fails the export with a non-zero exit
+	// rather than shipping a broken `dist`.
+	let report = check_routes(&cx.world(), root).await?;
+	report.log();
+	if report.has_errors() {
+		return Response::status_text(
+			StatusCode::INTERNAL_SERVER_ERROR,
+			format!(
+				"export aborted: {} render error(s), see log\n",
+				report.error_count()
+			),
+		)
+		.xok();
+	}
+
 	let out = BlobStore::new(FsStore::new(site_dir.join("dist")));
 	let written = export_static(&cx.world(), root, &out).await?;
 	Response::ok_text(format!("exported {} routes to dist\n", written.len()))

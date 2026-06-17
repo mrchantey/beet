@@ -1,5 +1,6 @@
 //! The individual `beet` CLI commands, each implemented as an action.
 
+mod check;
 mod export_pdf;
 mod export_static;
 #[cfg(feature = "qrcode")]
@@ -8,6 +9,7 @@ mod run_wasm;
 mod s3_sync;
 mod serve;
 
+pub use check::*;
 pub use export_pdf::*;
 pub use export_static::*;
 #[cfg(feature = "qrcode")]
@@ -26,6 +28,7 @@ pub struct CliCommandsPlugin;
 impl Plugin for CliCommandsPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<Serve>()
+			.register_type::<Check>()
 			.register_type::<ExportStatic>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()

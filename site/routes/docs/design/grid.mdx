@@ -1,0 +1,38 @@
+<article>
+	<h1>Grid</h1>
+	<h2>Default: 12 columns, square tracks</h2>
+	<div class="grid">
+		<div class="card-filled">1</div>
+		<div class="card-filled">2</div>
+		<div class="card-filled">3</div>
+		<div class="card-filled">4</div>
+		<div class="card-filled">5</div>
+		<div class="card-filled">6</div>
+		<div class="card-filled">7</div>
+		<div class="card-filled">8</div>
+		<div class="card-filled">9</div>
+		<div class="card-filled">10</div>
+		<div class="card-filled">11</div>
+		<div class="card-filled">12</div>
+	</div>
+	<h2>4 columns</h2>
+	<div class="grid" bx:style="grid-template-columns=GridColumns(4)">
+		<div class="card-filled">1</div>
+		<div class="card-filled">2</div>
+		<div class="card-filled">3</div>
+		<div class="card-filled">4</div>
+		<div class="card-filled">5</div>
+		<div class="card-filled">6</div>
+		<div class="card-filled">7</div>
+		<div class="card-filled">8</div>
+	</div>
+	<h2>3 columns, 2-row tracks</h2>
+	<div class="grid" bx:style="grid-template-columns=GridColumns(3) grid-auto-rows=Length(Rem(2.0))">
+		<div class="card-filled">1</div>
+		<div class="card-filled">2</div>
+		<div class="card-filled">3</div>
+		<div class="card-filled">4</div>
+		<div class="card-filled">5</div>
+		<div class="card-filled">6</div>
+	</div>
+</article>

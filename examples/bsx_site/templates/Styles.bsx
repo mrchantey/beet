@@ -1,0 +1,31 @@
+<!--
+Site-local named style rules, declared at runtime with no Rust. Included once
+from `main.bsx` so they land in the `RuleSet` before any page renders; rule
+insertion is keyed by selector, so a rebuild just overwrites. Each `<Rule>` is
+the no-code analogue of a typed `Rule`: the selector comes from `class`/`tag`/
+`state`, every other attribute is a `display`/`column-gap`/... declaration in
+BSX enum form (`Flex`, `Rem(1.0)`), and a `@token:Role` value binds to a Material
+colour token.
+-->
+<!-- design_row_rule: lay cards/widget variants out side by side, wrapping and
+     spaced on both targets. -->
+<Rule class="design-row"
+      display=Flex
+      flex-wrap=Wrap
+      align-items=Stretch
+      column-gap=Rem(1.0)
+      row-gap=Rem(1.0) />
+
+<!-- feature-card: one cell of the landing-page feature grid. Sits in a
+     `design-row` and combines with the shipped `card-filled` class; the fixed
+     measure makes the cards wrap into an even grid on both targets. -->
+<Rule class="feature-card"
+      width=Rem(16.0) />
+
+<!-- a color_scheme_rules role: a .swatch.primary box binds its fill/text to the
+     Primary role tokens, so the cascade resolves it per scheme on both targets. -->
+<Rule class={["swatch", "primary"]}
+      width=Rem(8.0)
+      height=Rem(3.0)
+      background-color="@token:Primary"
+      color="@token:OnPrimary" />

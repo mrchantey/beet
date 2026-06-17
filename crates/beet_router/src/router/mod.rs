@@ -61,3 +61,7 @@ pub use bsx_layout::*;
 mod sidebar;
 #[cfg(feature = "std")]
 pub use sidebar::*;
+#[cfg(feature = "std")]
+mod site_layout;
+#[cfg(feature = "std")]
+pub use site_layout::*;

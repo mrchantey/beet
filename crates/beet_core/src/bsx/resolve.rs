@@ -658,6 +658,16 @@ fn build_uppercase(
 	refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
+	// a custom-tag handler (eg `<Rule>`) resolves the whole tag before the type
+	// registry: it reads the raw attributes and mutates the world, producing no
+	// entity content. Core registers none; a higher layer installs them.
+	if let Some(handler) = cx
+		.entity
+		.world_scope(|world| world.get_resource::<BsxTagResolvers>()?.get(&el.tag))
+	{
+		return handler(el, cx.entity);
+	}
+
 	// `<Template src="..">` is the remote-template front-end: register a pending
 	// fetch into the root's pending set, awaited by `LoadTemplate`. Remote
 	// resolution needs the async runtime, so it is `bevy_async`-gated.
@@ -1005,6 +1015,18 @@ fn apply_common_directives(
 	if let Some(slot) = slot_routing(el) {
 		cx.entity.insert(slot);
 	}
+	// `bx:style="prop=value .."` declares a one-off rule and attaches a unique,
+	// span-derived class, the markup twin of `inline_class!`. The declaration
+	// grammar lives in a higher crate, so it resolves through the `StyleResolver`
+	// seam (a graceful no-op when no handler is registered).
+	if let Some((source, span)) = bsx_style_attr(el) {
+		let handler = cx
+			.entity
+			.world_scope(|world| world.get_resource::<StyleResolver>()?.get());
+		if let Some(handler) = handler {
+			handler(cx.entity, source, span)?;
+		}
+	}
 	// `bx:<event>=verb{ arg: value, .. }` events. The event name is the directive
 	// suffix after `bx:`; the verb + args resolve through the core registries.
 	for attr in &el.attributes {
@@ -1152,8 +1174,11 @@ fn apply_attributes(
 						attr_comp_target(expr, parent, entity_refs);
 					apply_value_expr(expr, &mut attr_entity, comp_target)?;
 				}
-				// spreads and `bx:<event>` verb calls are handled elsewhere.
-				AttrValue::Spread(_) | AttrValue::Verb(_) => {}
+				// spreads, `bx:<event>` verb calls and `bx:style` are handled
+				// elsewhere (the directives pass / spread pass).
+				AttrValue::Spread(_)
+				| AttrValue::Verb(_)
+				| AttrValue::Style { .. } => {}
 			}
 			Ok(())
 		})?;
@@ -1542,6 +1567,9 @@ fn attr_to_literal(value: &AttrValue) -> Result<DataLiteral> {
 		AttrValue::Verb(_) => {
 			bevybail!("a `bx:<event>` verb call is not a component patch value")
 		}
+		AttrValue::Style { .. } => {
+			bevybail!("a `bx:style` directive is not a component patch value")
+		}
 	}
 }
 
@@ -1582,8 +1610,9 @@ pub(super) fn is_directive(key: &str) -> bool {
 /// The `bx:` directives with dedicated structural meaning, as opposed to a
 /// `bx:<event>` verb trigger. Anything else under `bx:` is treated as an event
 /// (resolved through the [`EventRegistry`], a graceful no-op when unregistered).
-const STRUCTURAL_DIRECTIVES: &[&str] =
-	&["bx:scope", "bx:for", "bx:key", "bx:slot", "bx:ref", "bx:schema"];
+const STRUCTURAL_DIRECTIVES: &[&str] = &[
+	"bx:scope", "bx:for", "bx:key", "bx:slot", "bx:ref", "bx:schema", "bx:style",
+];
 
 /// Whether a key is a `bx:<event>` verb-trigger directive (eg `bx:click`), ie a
 /// `bx:` key that is not one of the [`STRUCTURAL_DIRECTIVES`].

@@ -1,0 +1,9 @@
+<!--
+The document layout wrapping every route: the shipped <SiteLayout> shell, whose
+defaults reproduce the reference `BeetLayout` exactly, the head/header/sidebar/
+footer chrome plus the body `page` + color-scheme class. The layout middleware
+transcludes each route's body in as SiteLayout's default-slot child, so it lands
+in <main> with no relay here. No overrides: the no-code site is the full beet
+chrome with nothing excluded.
+-->
+<SiteLayout/>

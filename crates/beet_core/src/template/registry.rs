@@ -60,9 +60,15 @@ impl ReflectTemplate {
 /// schema. The `#[template]` macro overrides it with a precise schema that marks
 /// `#[prop(required)]` props as required (which the type alone cannot express).
 #[derive(Clone)]
-pub(crate) struct ReflectTemplateSchema {
+pub struct ReflectTemplateSchema {
 	/// The template's prop schema.
 	pub schema: ValueSchema,
+}
+
+impl ReflectTemplateSchema {
+	/// The template's prop [`ValueSchema`], the props it accepts and their types.
+	/// Read by tooling (eg the diagnostics manifest) to enumerate a tag's props.
+	pub fn schema(&self) -> &ValueSchema { &self.schema }
 }
 
 impl<T> FromType<T> for ReflectTemplateSchema

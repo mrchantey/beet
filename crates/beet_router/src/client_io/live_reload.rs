@@ -99,6 +99,14 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 	// broadcast below instead.
 	reload_in_world_navigators(world);
 
+	// re-run the render-diagnostics pass over the rebuilt routes and log every
+	// problem loudly, the dev-loop "type-check": an edit that introduces an unknown
+	// tag, a dead link or an unknown class surfaces in the console on save. A
+	// fire-and-forget task (route rendering is async), so the reload never blocks.
+	world.run_async(|world| async move {
+		log_all_render_diagnostics(&world).await;
+	});
+
 	// tell connected clients to reload
 	let channels = world.with_state::<Query<Entity, With<ClientIo>>, _>(
 		|query| query.iter().collect::<Vec<_>>(),

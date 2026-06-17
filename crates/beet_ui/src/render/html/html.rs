@@ -189,6 +189,13 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
+		// Strip authoring comments so they never leak into rendered output; keep
+		// only functional `bx`-prefixed anchors (eg `<!--bx-ref-->`,
+		// `<!--bx-end-->`). The framework emits those without a leading space, so a
+		// space-led authoring comment (`<!-- note -->`) is always stripped.
+		if !comment.starts_with("bx") {
+			return;
+		}
 		self.write_indent();
 		self.buffer.push_str("<!--");
 		self.buffer.push_str(comment);
@@ -510,8 +517,16 @@ mod test {
 
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
-	fn render_comment() {
-		roundtrip("<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
+	fn strips_plain_comment() {
+		// authoring comments are stripped so they never leak into rendered HTML
+		roundtrip("<!-- hello -->").xpect_eq(String::new());
+	}
+
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn keeps_bx_comment() {
+		// functional `bx`-prefixed anchors survive (eg the reactive ref/end markers)
+		roundtrip("<!--bx-ref-->").xpect_eq("<!--bx-ref-->".to_string());
 	}
 
 	#[cfg(feature = "bsx")]

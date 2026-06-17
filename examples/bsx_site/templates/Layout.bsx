@@ -1,29 +1,12 @@
-<!DOCTYPE html>
 <!--
-The document layout wrapping every route: each page's body transcludes into
-the <Slot/> inside <main>. <RouteHead> fills the page title/description from
-frontmatter (and the default head emits og:site_name from PackageConfig.title),
-<RouteSidebar/> collects the route tree into the nav rail, and the footer's @res
-binding pulls straight from the PackageConfig resource.
+The document layout wrapping every route: a thin use of the shipped <SiteLayout>
+shell, which carries the full beet chrome (head/header/sidebar/footer + the body
+`page` + color-scheme class). The layout middleware transcludes each route's body
+in as SiteLayout's default-slot child, so it lands in <main> with no relay here;
+<LiveReloadScript/> appends to the head chrome, and the sidebar override excludes
+the `export` route.
 -->
-<html lang="en">
-	<RouteHead>
-		<Preflight/>
-		<Reset/>
-		<Stylesheet/>
-		<ColorSchemeScript/>
-		<LiveReloadScript/>
-	</RouteHead>
-	<body>
-		<Header>
-			<MenuButton slot="leading"/>
-			<a slot="nav" href="/docs">Docs</a>
-			<a slot="nav" href="https://github.com/mrchantey/beet">GitHub</a>
-		</Header>
-		<div class="container">
-			<RouteSidebar home=false exclude={["export"]}/>
-			<main><Slot/></main>
-		</div>
-		<Footer>{@res:PackageConfig.description}</Footer>
-	</body>
-</html>
+<SiteLayout>
+	<LiveReloadScript slot="head"/>
+	<RouteSidebar home=false exclude={["export"]} slot="sidebar"/>
+</SiteLayout>

@@ -157,6 +157,79 @@ mod test {
 			.xpect_contains("<p>page body</p>");
 	}
 
+	/// The shipped `<SiteLayout>` shell, used as a no-code site's layout template,
+	/// lands the transcluded route body inside its `<main>` (below the header
+	/// chrome) with no relay `<Slot/>`: the middleware routes the body as
+	/// SiteLayout's default-slot child, which forwards into its own default slot.
+	/// Regression for a bare-`<Slot/>` relay that leaked the body above the header.
+	#[beet_core::test]
+	async fn site_layout_routes_body_into_main() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		// SiteLayout's Header/RouteHead read the site name off PackageConfig.
+		world.init_resource::<PackageConfig>();
+		let mut registry = BsxTemplateRegistry::default();
+		registry.insert_source("Layout", "<SiteLayout/>").unwrap();
+		world.insert_resource(registry);
+		let root = world
+			.spawn((Router, BsxLayout::default(), children![
+				render_action::fixed_func_route("", || rsx! { <p>"page body"</p> })
+			]))
+			.flush();
+
+		let html = get(&mut world, root, "").await;
+		// the body sits inside <main>, not leaked above the header.
+		let main_open = html.find("<main").unwrap();
+		let main_close = html.find("</main>").unwrap();
+		let body_at = html.find("page body").unwrap();
+		(body_at > main_open && body_at < main_close).xpect_true();
+	}
+
+	/// The shipped `Layout.bsx` idiom verbatim: a leading comment then
+	/// `<SiteLayout>` carrying slotted children that override named slots. The
+	/// leading comment makes the layout document *multi-root*, so `<SiteLayout>`
+	/// builds one level below the layout root (a tag-less wrapper). The transcluded
+	/// body must still reach SiteLayout's default `<main>` slot (the wrapper
+	/// forwards its default content into its lone template-invocation child) *and*
+	/// the slotted children fill their named slots, all in one resolution pass.
+	/// Regression for the body leaking into the head widget's default `<Slot/>` (or
+	/// going unconsumed) when a nested widget exposed a competing default slot.
+	#[beet_core::test]
+	async fn site_layout_slotted_idiom_routes_body_and_slots() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.init_resource::<PackageConfig>();
+		let mut registry = BsxTemplateRegistry::default();
+		registry
+			.insert_source(
+				"Layout",
+				"<!-- layout -->\n<SiteLayout>\n\t<meta slot=\"head\" name=\"x-custom\"/>\n\t<div slot=\"sidebar\">\"custom rail\"</div>\n</SiteLayout>",
+			)
+			.unwrap();
+		world.insert_resource(registry);
+		let root = world
+			.spawn((Router, BsxLayout::default(), children![
+				render_action::fixed_func_route("", || {
+					let meta = ArticleMeta {
+						title: Some("Welcome".into()),
+						..default()
+					};
+					(meta, rsx! { <p>"page body"</p> })
+				})
+			]))
+			.flush();
+
+		let html = get(&mut world, root, "").await;
+		// the named-slot overrides filled their slots.
+		html.as_str()
+			.xpect_contains("custom rail")
+			.xpect_contains("x-custom");
+		// the body still routes into <main> alongside the overrides, not leaked into
+		// the head slot beside the `x-custom` override.
+		let main_open = html.find("<main").unwrap();
+		let main_close = html.find("</main>").unwrap();
+		let body_at = html.find("page body").unwrap();
+		(body_at > main_open && body_at < main_close).xpect_true();
+	}
+
 	#[beet_core::test]
 	async fn missing_template_errors() {
 		let mut world = router_world();

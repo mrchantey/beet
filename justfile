@@ -61,9 +61,6 @@ cli *args:
 install-cli *args:
   cargo install --locked --path crates/beet-cli {{ args }}
 
-lambda-build:
-	cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
-
 # Run and watch a workspace example
 run example *args:
 	just watch just run-ci {{ example }} {{ args }}

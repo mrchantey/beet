@@ -15,6 +15,10 @@ use beet_core::prelude::*;
 /// transcluded content is prepared too. Structural mutations are isolated to
 /// this step so the measure, layout, and paint phases can run pure query access
 /// without command buffering.
+///
+/// A [`Comment`]/[`Doctype`] node is non-visual (the terminal twin of the HTML
+/// renderer skipping comments): it gets no layout box, so it reserves no row and
+/// `CharcellQuery` drops it for lacking an [`IntrinsicSize`].
 pub fn prepare_charcell_tree<B: Component>(
 	mut commands: Commands,
 	roots: Populated<Entity, With<B>>,
@@ -25,9 +29,14 @@ pub fn prepare_charcell_tree<B: Component>(
 	// axis; it then carries a persistent ScrollPosition.
 	layout: Query<&LayoutStyle>,
 	has_scroll: Query<(), With<ScrollPosition>>,
+	non_visual: Query<(), Or<(With<Comment>, With<Doctype>)>>,
 ) {
 	for root in roots.iter() {
 		for entity in tree.pre_order(root) {
+			// a comment/doctype is non-visual: leave it without a layout box.
+			if non_visual.contains(entity) {
+				continue;
+			}
 			if !has_intrinsic.contains(entity) {
 				commands.entity(entity).insert(IntrinsicSize::default());
 			}

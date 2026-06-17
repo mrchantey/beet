@@ -478,13 +478,20 @@ async fn validate_enum(
 	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
-	// Unit variant as bare string.
+	// Unit variant as bare string. A qualified `EnumName::Variant` (the Rust
+	// path form authors reach for) is accepted by its trailing segment and
+	// normalized to the bare variant name, so reflect deserialization downstream
+	// (which expects the bare name) succeeds.
 	if let Value::Str(name) = value {
+		let variant = name.rsplit("::").next().unwrap_or(name.as_str());
 		if schema
 			.variants
 			.iter()
-			.any(|v| v.payload.is_none() && v.name.as_str() == name.as_str())
+			.any(|v| v.payload.is_none() && v.name.as_str() == variant)
 		{
+			if variant != name.as_str() {
+				*value = Value::Str(variant.into());
+			}
 			return Vec::new();
 		}
 		return vec![ValidationError::new(
@@ -688,6 +695,17 @@ mod test {
 		let mut value = val!("Nope");
 		let errors = schema.validate(&mut value).await;
 		errors.len().xpect_eq(1);
+	}
+
+	/// A unit variant given as the qualified `EnumName::Variant` form (the Rust
+	/// path an author reaches for in markup) validates and is normalized to the
+	/// bare variant name so reflect deserialization downstream succeeds.
+	#[crate::test]
+	async fn validate_enum_qualified_unit() {
+		let schema = ValueSchema::of::<Status>();
+		let mut value = val!("Status::Active");
+		schema.validate(&mut value).await.is_empty().xpect_true();
+		value.xpect_eq(val!("Active"));
 	}
 
 	#[crate::test]

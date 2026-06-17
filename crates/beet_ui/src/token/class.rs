@@ -39,6 +39,37 @@ impl ClassName {
 		}
 	}
 
+	/// Create an inline class from a BSX source [`FileSpan`], the markup twin of
+	/// [`Self::new_inline`]: the `bx:style` directive's span maps one-to-one onto
+	/// the `panic::Location` a Rust `inline_class!` derives from.
+	pub fn from_span(span: &FileSpan) -> Self {
+		Self::Inline {
+			file: span.path().to_string().into(),
+			line: span.start_line(),
+			col: span.start_col(),
+		}
+	}
+
+	/// Create an inline class keyed on a `bx:style` directive's declaration
+	/// `source`, the content-addressed twin of [`Self::from_span`].
+	///
+	/// A BSX source span is fragment-relative (markdown feeds each HTML block to
+	/// the parser as its own string starting at offset 0), so two `bx:style`
+	/// directives on different file lines can share a span and collide into one
+	/// class, clobbering each other's rule. Keying on the declaration content
+	/// instead is collision-free and correctly dedups identical declarations: a
+	/// one-off rule is a pure function of its `prop=value` pairs.
+	pub fn from_inline_source(source: &str) -> Self {
+		let hash = source.bytes().fold(0u64, |acc, byte| {
+			acc.wrapping_mul(31).wrapping_add(byte as u64)
+		});
+		Self::Inline {
+			file: SmolStr::new_static("style"),
+			line: (hash >> 32) as u32,
+			col: hash as u32,
+		}
+	}
+
 	/// The string used when matching against [`Selector::Class`],
 	/// the class name does not have a `.` prefix.
 	pub fn as_selector(&self) -> SmolStr {
@@ -143,25 +174,33 @@ pub fn inline_class(
 	declarations: impl IntoIterator<Item = (TokenKey, TokenValue)>,
 ) -> OnSpawn {
 	let class = ClassName::new_inline();
-	let selector = Selector::Class(class.as_selector());
-	let declarations: Vec<(TokenKey, TokenValue)> =
-		declarations.into_iter().collect();
-	OnSpawn::new(move |entity| -> Result {
-		let rule = Rule::new()
-			.with_selector(selector)
-			.with_extend(declarations);
-		entity.world_scope(move |world| {
-			world
-				.get_resource_or_init::<RuleSet>()
-				.try_insert_inline(rule);
-		});
-		if let Some(mut classes) = entity.get_mut::<Classes>() {
-			classes.insert_class(class);
-		} else {
-			entity.insert(Classes::from_iter([class]));
-		}
-		Ok(())
-	})
+	let rule = Rule::new()
+		.with_selector(Selector::Class(class.as_selector()))
+		.with_extend(declarations);
+	OnSpawn::new(move |entity| register_inline_rule(entity, class, rule.clone()))
+}
+
+/// Register a one-off `rule` keyed on `class` into the global [`RuleSet`] (only
+/// once) and add `class` to the element's [`Classes`].
+///
+/// The shared runtime of the `inline_class!` macro and the `bx:style` markup
+/// directive: the macro mints `class` from `panic::Location`, `bx:style` mints it
+/// from the BSX source span, but both register the rule and attach the class
+/// identically. The caller seeds `rule` with `Selector::Class(class.as_selector())`.
+pub fn register_inline_rule(
+	entity: &mut EntityWorldMut,
+	class: ClassName,
+	rule: Rule,
+) -> Result {
+	entity.world_scope(move |world| {
+		world.get_resource_or_init::<RuleSet>().try_insert_inline(rule);
+	});
+	if let Some(mut classes) = entity.get_mut::<Classes>() {
+		classes.insert_class(class);
+	} else {
+		entity.insert(Classes::from_iter([class]));
+	}
+	Ok(())
 }
 
 /// Declare a [`RuleSet`] rule inline on an element.

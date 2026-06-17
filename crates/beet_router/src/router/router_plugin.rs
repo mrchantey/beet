@@ -79,18 +79,28 @@ impl Plugin for RouterPlugin {
 				.register_type::<ArticleMeta>()
 				// the package resource, bindable as eg `@res:PackageConfig.title`
 				.register_type::<PackageConfig>()
+				// the no-code render-diagnostics config, patchable from markup
+				// like `PackageConfig`, eg `<RenderDiagnostics unknown_class="Off"/>`
+				.register_type::<RenderDiagnostics>()
 				// the no-code site surface: markup-resolved router components
 				// (`<RoutesDir/>`, a `BsxLayout` spread) and the by-name
 				// route-aware head/sidebar widgets.
 				.register_type::<BsxLayout>()
 				.register_template::<RouteHead>()
 				.register_template::<RouteSidebar>()
+				// the shipped document shell a no-code site wraps its pages in,
+				// requested with `<SiteLayout>`.
+				.register_template::<SiteLayout>()
 				// the default app routes as a markup template, so a no-code BSX
 				// site requests them with `<DefaultAppRoutes/>`.
 				.register_template::<DefaultAppRoutes>();
 			#[cfg(not(target_arch = "wasm32"))]
 			app.register_type::<RoutesDir>()
-				.add_observer(spawn_routes_dir);
+				.add_observer(spawn_routes_dir)
+				// the no-code static-asset mount, eg `<AssetsDir src="assets"/>`,
+				// the markup analogue of `serve_store`.
+				.register_type::<AssetsDir>()
+				.add_observer(spawn_assets_dir);
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `default_router` wires the
