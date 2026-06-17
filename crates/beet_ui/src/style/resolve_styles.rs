@@ -336,6 +336,7 @@ fn resolve_box(
 		padding,
 		width: query.resolve(entity, Width, memo).ok(),
 		height: query.resolve(entity, Height, memo).ok(),
+		min_height: query.resolve(entity, MinHeight, memo).ok(),
 	}
 	.xok()
 }

@@ -100,7 +100,7 @@ pub fn apply_table_vertical_borders(
 	mut box_styles: Query<&mut BoxStyle>,
 ) {
 	for view in elements.iter() {
-		if !view.tag_eq("table")
+		if view.tag() != "table"
 			|| !view.contains_class_name(&classes::TABLE_VERTICAL_BORDERS)
 		{
 			continue;
@@ -171,7 +171,7 @@ pub fn apply_disclosure(
 	mut values: Query<&mut Value>,
 ) {
 	for (details, element) in &elements {
-		if !element.tag_eq("details") {
+		if element.tag() != "details" {
 			continue;
 		}
 		let is_sidebar = class_q
@@ -184,7 +184,7 @@ pub fn apply_disclosure(
 		for child in kids.iter() {
 			let is_summary = elements
 				.get(child)
-				.is_ok_and(|(_, element)| element.tag_eq("summary"));
+				.is_ok_and(|(_, element)| element.tag() == "summary");
 			if is_summary {
 				if is_sidebar {
 					// flip the markup caret glyph (terminal can't rotate it)
@@ -272,7 +272,7 @@ pub fn toggle_details_on_click(
 	let summary = ev.event_target();
 	if !elements
 		.get(summary)
-		.is_ok_and(|(_, element)| element.tag_eq("summary"))
+		.is_ok_and(|(_, element)| element.tag() == "summary")
 	{
 		return;
 	}
@@ -316,7 +316,7 @@ fn click_through_link(
 		if current == summary {
 			return false;
 		}
-		if elements.get(current).is_ok_and(|(_, el)| el.tag_eq("a")) {
+		if elements.get(current).is_ok_and(|(_, el)| el.tag() == "a") {
 			return true;
 		}
 		match parents.get(current) {
@@ -336,7 +336,7 @@ fn nearest_details(
 	let mut current = summary;
 	while let Ok(parent) = parents.get(current) {
 		let parent = parent.parent();
-		if elements.get(parent).is_ok_and(|(_, el)| el.tag_eq("details")) {
+		if elements.get(parent).is_ok_and(|(_, el)| el.tag() == "details") {
 			return Some(parent);
 		}
 		current = parent;
@@ -393,7 +393,7 @@ fn list_marker(
 						.iter()
 						.filter(|&entity| {
 							tags.get(entity)
-								.map(|el| el.tag_eq("li"))
+								.map(|el| el.tag() == "li")
 								.unwrap_or(false)
 						})
 						.position(|entity| entity == li)
@@ -420,7 +420,7 @@ fn select_marker(
 		.unwrap_or_default();
 	let options = elements
 		.iter_descendants_inclusive(view.entity)
-		.filter(|child| child.tag_eq("option"))
+		.filter(|child| child.tag() == "option")
 		.collect::<Vec<_>>();
 	let label = options
 		.iter()
@@ -659,12 +659,11 @@ mod disclosure_test {
 
 	/// The first element with `tag` in the host tree.
 	fn element_by_tag(host: &mut TestHost, tag: &str) -> Entity {
-		let tag = tag.to_string();
 		host.app
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(host.app.world())
-			.find(|(_, element)| element.tag_eq(&tag))
+			.find(|(_, element)| element.tag() == tag)
 			.map(|(entity, _)| entity)
 			.unwrap()
 	}

@@ -1,26 +1,22 @@
 mod animate;
+mod bsx_style;
 mod color_scheme;
 pub mod common_props;
 mod css;
 mod elements;
-mod inline_style;
 pub mod material;
-mod prop_name;
 mod resolve_styles;
-mod rule_markup;
 mod style_plugin;
 mod style_query;
 #[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 pub mod syntax;
 mod values;
 pub use animate::*;
+pub use bsx_style::*;
 pub use color_scheme::*;
 pub use css::*;
 pub use elements::*;
-pub use inline_style::*;
-pub use prop_name::*;
 pub use resolve_styles::*;
-pub use rule_markup::*;
 pub use style_plugin::*;
 pub use style_query::*;
 pub use values::*;

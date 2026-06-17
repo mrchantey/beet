@@ -655,7 +655,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(host.app.world())
-			.find(|(_, element)| element.tag_eq("a"))
+			.find(|(_, element)| element.tag() == "a")
 			.map(|(entity, _)| entity)
 			.unwrap();
 		let resting = host
@@ -709,7 +709,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(host.app.world())
-			.find(|(_, element)| element.tag_eq("button"))
+			.find(|(_, element)| element.tag() == "button")
 			.map(|(entity, _)| entity)
 			.unwrap();
 		// no container at rest.

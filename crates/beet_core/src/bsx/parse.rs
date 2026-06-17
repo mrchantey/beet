@@ -52,10 +52,6 @@ pub fn parse_document(
 	Ok(nodes)
 }
 
-/// Tags whose text content is whitespace-significant, so their children are left
-/// verbatim (the cascade reads `white-space: pre` on these).
-const PRE_ELEMENTS: &[&str] = &["pre", "textarea", "script", "style"];
-
 /// Drop insignificant inter-element whitespace from a node tree, the runtime BSX
 /// twin of the `rsx!` macro's compile-time trim and the browser's collapsing.
 ///

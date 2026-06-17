@@ -143,6 +143,23 @@ async fn homepage_boots_with_chrome_and_scheme() {
 	host.has_class("dark-scheme").xpect_true();
 }
 
+/// The terminal app fills at least the full viewport height, like the web, so a
+/// short page pins its footer to the bottom rows rather than sitting
+/// content-height with the footer floating just below the content.
+#[beet::test]
+async fn app_fills_terminal_height() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/counter");
+	host.step_until("You have clicked 0 times.");
+	let frame = host.frame();
+	let footer_row = frame
+		.lines()
+		.position(|line| line.contains("© Beet"))
+		.expect("footer present");
+	// the short counter content is ~15 rows; the footer is pushed to the bottom of
+	// the 64-row viewport by the viewport-fill page column, not floating near it.
+	(footer_row >= 60).xpect_true();
+}
+
 /// Clicking the header `Counter` nav link navigates the TUI to the counter page,
 /// the navigate-by-click path the harness exists to cover.
 #[beet::test]
@@ -179,13 +196,14 @@ async fn counter_clicks_update_count() {
 	host.step_until("You have clicked 1 times.");
 }
 
-/// The app-wide [`ColorScheme`] resource (seeded by `--color-scheme=light` in the
+/// The app-wide [`Theme::scheme`] (seeded by `--color-scheme=light` in the
 /// binary) pins the scheme on every page, in place of the dark default, and
 /// survives navigation (it is session state, not a URL param).
 #[beet::test]
 async fn color_scheme_resource_pins_light() {
 	let mut host = SiteHost::new_with(UVec2::new(120, 64), "/", |app| {
-		app.insert_resource(AppColorScheme(ColorScheme::Light));
+		app.world_mut().get_resource_or_init::<Theme>().scheme =
+			ColorScheme::Light;
 	});
 	host.step_until("malleable application framework");
 	host.has_class("light-scheme").xpect_true();

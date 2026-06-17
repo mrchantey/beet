@@ -8,7 +8,7 @@ The router's middleware and servers attach as component spreads (request logging
 `beet serve site/` runs the default `HttpServer`, `--server=tui` the live
 `TuiServer`, and `--server=cli` a one-shot render. `<DefaultAppRoutes/>` adds the
 default app routes (`/app-info`, the reactivity runtime, …), `<RoutesDir/>`
-discovers the `routes/` pages, and `<AssetsDir/>` mounts the workspace assets the
+discovers the `routes/` pages, and `<BlobStoreRoute/>` mounts the workspace assets the
 site and blog reference (the favicon, images). `<Theme color=.../>` seeds the
 brand colour the whole Material palette derives from, and `<Styles/>` registers
 the named style rules in `templates/Styles.bsx`.
@@ -19,5 +19,5 @@ the named style rules in `templates/Styles.bsx`.
 	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
-	<AssetsDir src="assets"/>
+	<BlobStoreRoute src="assets"/>
 </Router>

@@ -192,22 +192,27 @@ pub fn page() -> Rule {
 // these refine the web look without touching the terminal, which keeps its
 // colored headings and grows to fit its content.
 
-/// On the web, the `.page` body fills at least the viewport height as a flex
-/// column, so a short page still pins its footer to the bottom of the screen.
+/// The `.page` body fills at least the viewport height as a flex column, so a
+/// short page still pins its footer to the bottom — of the screen on the web, and
+/// of the terminal window in charcell (the cell viewport resolves `100vh`).
+/// Ungated so both targets fill the window; the terminal no longer shrinks to its
+/// content.
 pub fn page_fill_viewport() -> Rule {
 	Rule::new()
-		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::class(PAGE))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
+		// stretch the header/content/footer to the full width (the web's flex
+		// default; charcell's flex defaults to `start`, so a column would otherwise
+		// shrink each row to its content and the app-bar divider wouldn't span).
+		.with_value(common_props::AlignItemsProp, AlignItems::Stretch)
 		.with_value(common_props::MinHeight, Length::ViewportHeight(100.))
 }
 
-/// On the web, the sidebar + main row grows to fill the space above the footer
-/// inside the [`page_fill_viewport`] column.
-pub fn container_grow_web() -> Rule {
+/// The sidebar + main row grows to fill the space above the footer inside the
+/// [`page_fill_viewport`] column, on both targets.
+pub fn container_grow() -> Rule {
 	Rule::new()
-		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::class(CONTAINER))
 		.with_value(common_props::FlexGrowProp, 1u32)
 }

@@ -74,10 +74,6 @@ pub(crate) fn build_markdown_tree<'a>(
 	builder.finish()
 }
 
-/// `<pre>`-family tags whose whitespace is significant, so their children are
-/// left verbatim (mirrors the core BSX `normalize_whitespace`).
-const PRE_ELEMENTS: &[&str] = &["pre", "textarea", "script", "style"];
-
 /// Drop insignificant inter-element whitespace from an embedded-markup element's
 /// children, the markdown-path twin of the core BSX `normalize_whitespace` (and
 /// of the `rsx!` macro's compile-time trim). Embedded markup like

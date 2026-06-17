@@ -17,7 +17,7 @@ The CLI binary renders one route to stdout and exits; the default binary serves 
 
 1. Change the page, widget, or rule.
 2. Routes changed? `cargo run -p rsx_site --no-default-features --features codegen`.
-3. **Terminal:** `cargo run -p rsx_site --features=cli -- <path> --accept=text/ansi-term` (strip escapes to read; true width via the PTY harness in `charcell.md`).
+3. **Terminal:** `cargo run -p rsx_site --features=cli -- <path> --accept=text/ansi-term` (strip escapes to read; true width via the PTY harness in `charcell.md`). This is the **unbounded stdout** render (auto-grows to content height), so anything keyed on the terminal *height* — viewport-fill (`min-height: 100vh`), footer-at-bottom — does **not** show here. Verify those in the **live TUI** (fixed-size `Buffer`): the `SiteHost` harness in `examples/rsx_site/tests/tui.rs` renders at a set viewport and exposes `frame()`. The sidebar is a no-code-only widget (`site/` via `SiteLayout`/`RouteSidebar`), absent from `rsx_site`.
 4. **Web:** `cargo run -p rsx_site` serves :8337, screenshot with playwright (`playwright.md`).
 5. **Tests:** `cargo test -p beet_ui --lib`, `cargo test -p rsx_site` (`--snap` to update snapshots).
 

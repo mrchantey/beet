@@ -28,11 +28,15 @@ use bevy::app::App;
 
 fn main() {
 	App::new()
+		.insert_resource(material::Theme {
+			color: palettes::basic::BLUE.into(),
+			..default()
+		})
 		.add_plugins((
 			MinimalPlugins,
 			TemplatePlugin,
 			DocumentPlugin,
-			material::MaterialStylePlugin::new(palettes::basic::BLUE),
+			material::MaterialStylePlugin,
 			ServerPlugin,
 		))
 		.insert_resource(PackageConfig {

@@ -272,9 +272,8 @@ fn primitive_schema(type_path: &str) -> ValueSchema {
 	}
 	let short = type_path.rsplit("::").next().unwrap_or(type_path);
 	match short {
-		"String" | "str" | "char" | "PathBuf" | "OsString" => {
-			ValueSchema::String(StringSchema::default())
-		}
+		"String" | "str" | "char" | "PathBuf" | "OsString" | "SmolStr"
+		| "SmolPath" => ValueSchema::String(StringSchema::default()),
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
 			ValueSchema::U64(U64Schema::default())
 		}

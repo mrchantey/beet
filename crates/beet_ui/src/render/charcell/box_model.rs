@@ -59,6 +59,9 @@ pub(super) struct BoxModel {
 	/// size to content.
 	pub width: Option<u32>,
 	pub height: Option<u32>,
+	/// Minimum content height in cells (CSS `min-height`), a floor the measure and
+	/// layout passes grow the node up to. `None` for no floor.
+	pub min_height: Option<u32>,
 }
 
 impl BoxModel {
@@ -104,6 +107,7 @@ impl BoxModel {
 				padding: URect::default(),
 				width: None,
 				height: None,
+				min_height: None,
 			};
 		};
 
@@ -129,6 +133,9 @@ impl BoxModel {
 			height: box_style
 				.height
 				.and_then(|length| explicit_cells(length, vp, containing.map(|c| c.y))),
+			min_height: box_style
+				.min_height
+				.and_then(|length| min_height_cells(length, viewport, containing.map(|c| c.y))),
 		}
 	}
 
@@ -305,6 +312,33 @@ pub(super) fn draw_border(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Resolve a `min-height` [`Length`] to whole cells, against the cell `viewport`
+/// and an optional `containing` block height (in cells).
+///
+/// A viewport-relative minimum (`100vh`) is meaningless in an unbounded-height
+/// buffer (the stdout [`FlexBuffer`](super::FlexBuffer), whose cell viewport
+/// height is the [auto-grow sentinel](super::AUTO_GROW_VIEWPORT_HEIGHT)): it
+/// would force a 65535-row fill. Such a floor resolves to `None` there, so the
+/// node stays content-sized; absolute floors (eg `min-height: 10rem`) still
+/// apply.
+fn min_height_cells(
+	length: Length,
+	viewport: UVec2,
+	containing: Option<u32>,
+) -> Option<u32> {
+	let viewport_relative = matches!(
+		length,
+		Length::ViewportHeight(_)
+			| Length::ViewportMin(_)
+			| Length::ViewportMax(_)
+	);
+	if viewport_relative && viewport.y >= super::AUTO_GROW_VIEWPORT_HEIGHT {
+		return None;
+	}
+	let vp = Vec2::new(viewport.x as f32, viewport.y as f32);
+	explicit_cells(length, vp, containing)
+}
 
 /// Resolve an explicit `width`/`height` [`Length`] to whole cells.
 ///

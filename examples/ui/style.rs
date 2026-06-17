@@ -19,11 +19,15 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
+		.insert_resource(material::Theme {
+			color: palettes::basic::YELLOW.into(),
+			..default()
+		})
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
 			ServerPlugin::default(),
-			material::MaterialStylePlugin::new(palettes::basic::YELLOW),
+			material::MaterialStylePlugin,
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands

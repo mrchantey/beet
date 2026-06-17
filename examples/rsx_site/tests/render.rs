@@ -6,10 +6,8 @@ use rsx_site::prelude::*;
 /// A world with the site's render substrate: the router observers and the
 /// Material style rule set, plus the package config the `Header`/`Footer` read.
 fn site_world() -> World {
-	(
-		RouterPlugin,
-		material::MaterialStylePlugin::new(palettes::basic::GREEN),
-	)
+	// `Theme` defaults to the brand green, so the plugin needs no seed colour.
+	(RouterPlugin, material::MaterialStylePlugin)
 		.into_world()
 		.xtap(|world| world.insert_resource(pkg_config!()))
 }

@@ -12,16 +12,20 @@ const THEME_COLOR: Color = Color::srgb(0., 1., 0.75);
 /// the Material style rule set that both the web [`Stylesheet`] and the charcell
 /// renderer read, then registers the site-local [`design_row_rule`].
 pub fn server_plugin(app: &mut App) {
-	app.add_plugins((
+	// seed the `Theme` resource with the brand colour before the plugin reads it;
+	// `rebuild_theme_tones` derives every palette tone from it, the Rust analogue
+	// of a markup `<Theme color=.../>` declaration.
+	app.insert_resource(material::Theme {
+		color: THEME_COLOR,
+		..default()
+	})
+	.add_plugins((
 		MinimalPlugins,
 		// `RouterPlugin` brings in `ServerPlugin`, which installs the `HttpServer`
 		// backend and registers the server types.
 		RouterPlugin,
 		LogPlugin::new(Level::INFO),
-		// seeds the `Theme` resource with the brand colour; `rebuild_theme_tones`
-		// derives every palette tone from it, the Rust analogue of a markup
-		// `<Theme color=.../>` declaration.
-		material::MaterialStylePlugin::new(THEME_COLOR),
+		material::MaterialStylePlugin,
 	));
 	// the site-local typed `Rule` (see `design_row_rule`), used by the buttons
 	// showcase. The hero uses `inline_class!` instead, since its layout is a

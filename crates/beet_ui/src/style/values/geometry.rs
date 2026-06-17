@@ -24,6 +24,10 @@ pub struct BoxStyle {
 	pub width: Option<Length>,
 	/// Explicit content height (CSS `height`); `None` sizes to content.
 	pub height: Option<Length>,
+	/// Minimum content height (CSS `min-height`); `None` for no floor. The
+	/// charcell engine grows a node up to it (eg `min-height: 100vh` fills the
+	/// terminal window), the terminal twin of the web's viewport-fill.
+	pub min_height: Option<Length>,
 }
 
 pub static BOX_STYLE_DEFAULT: BoxStyle = BoxStyle::DEFAULT;
@@ -39,6 +43,7 @@ impl BoxStyle {
 		padding: Spacing::DEFAULT,
 		width: None,
 		height: None,
+		min_height: None,
 	};
 	/// Set all four border colors at once.
 	pub fn with_border_color(mut self, color: impl Into<Color>) -> Self {

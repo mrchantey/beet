@@ -22,7 +22,7 @@ use beet_ui::prelude::Reset;
 ///
 /// Color scheme resolution mirrors the reference: an explicit
 /// `?color-scheme=light|dark` pins the scheme on both targets; absent it, a
-/// non-html target (the terminal) uses the session [`AppColorScheme`] defaulting
+/// non-html target (the terminal) uses the session [`Theme::scheme`] defaulting
 /// to [`ColorScheme::Dark`], and the web adds no class (the browser's
 /// `color_scheme.js` follows the OS).
 ///
@@ -43,9 +43,9 @@ use beet_ui::prelude::Reset;
 #[template(system)]
 pub fn SiteLayout(
 	stack: Res<RequestContextStack>,
-	// the app-wide scheme a TUI session seeds from `--color-scheme` (see
-	// `TuiServer`); absent on the web.
-	app_scheme: Option<Res<AppColorScheme>>,
+	// the app-wide scheme default a TUI session seeds from `--color-scheme` (see
+	// `TuiServer`); the web ignores it and follows the OS.
+	theme: Res<Theme>,
 ) -> impl Bundle {
 	let cx = stack.current();
 	// an explicit `?color-scheme=light|dark` pins the scheme on both targets via
@@ -62,9 +62,7 @@ pub fn SiteLayout(
 			body_classes.insert_class(scheme.class());
 		}
 		None if !cx.parts().accepts(MediaType::Html) => {
-			let scheme =
-				app_scheme.map(|scheme| **scheme).unwrap_or(ColorScheme::Dark);
-			body_classes.insert_class(scheme.class());
+			body_classes.insert_class(theme.scheme.class());
 		}
 		None => {}
 	}
@@ -128,6 +126,9 @@ mod test {
 		// the `Header`/`RouteHead` chrome reads the site name off `PackageConfig`;
 		// the live middleware seeds it, so a bare render world must too.
 		world.init_resource::<PackageConfig>();
+		// the layout reads the app-wide scheme default off `Theme`, seeded here as a
+		// bare render world omits `MaterialStylePlugin`.
+		world.init_resource::<Theme>();
 		let route = world
 			.spawn((
 				render_action::fixed_func_route("", || rsx! { <p>"body"</p> }),

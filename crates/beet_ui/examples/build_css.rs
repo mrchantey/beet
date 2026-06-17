@@ -4,9 +4,11 @@ use beet_ui::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((material::MaterialStylePlugin::new(
-			palettes::basic::YELLOW,
-		),))
+		.insert_resource(material::Theme {
+			color: palettes::basic::YELLOW.into(),
+			..default()
+		})
+		.add_plugins((material::MaterialStylePlugin,))
 		.add_systems(Startup, setup)
 		.run();
 }

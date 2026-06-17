@@ -64,7 +64,7 @@ fn toggle_select_on_click(
 ) {
 	// the event bubbles; act only at the `<select>` step of the propagation.
 	let select = ev.event_target();
-	if !elements.get(select).is_ok_and(|view| view.tag_eq("select")) {
+	if !elements.get(select).is_ok_and(|view| view.tag() == "select") {
 		return;
 	}
 	// a click originating inside the panel (a row) bubbles through the select;
@@ -221,7 +221,7 @@ fn select_options<'a>(
 ) -> impl Iterator<Item = ElementView<'a>> {
 	elements
 		.iter_descendants_inclusive(select)
-		.filter(|view| view.tag_eq("option"))
+		.filter(|view| view.tag() == "option")
 }
 
 /// Whether `entity` sits inside a spawned dropdown panel (inclusive).
@@ -274,7 +274,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(host.app.world())
-			.find(|(_, element)| element.tag_eq("select"))
+			.find(|(_, element)| element.tag() == "select")
 			.map(|(entity, _)| entity)
 			.unwrap()
 	}

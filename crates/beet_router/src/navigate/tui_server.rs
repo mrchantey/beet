@@ -13,8 +13,8 @@ use beet_ui::prelude::*;
 /// persists. The start wires the live host: a [`StdioTerminal`] paired with a
 /// [`page_host`] buffer, plus an in-world [`Navigator`] pointed at this router,
 /// started at the CLI path argument (`-- docs/design/form`, default home `/`). A
-/// `--color-scheme=light|dark` argument seeds the app-wide [`ColorScheme`]
-/// resource, the session's scheme on every page (layouts consult it). The app
+/// `--color-scheme=light|dark` argument seeds the app-wide [`Theme::scheme`],
+/// the session's scheme on every page (layouts consult it). The app
 /// then runs persistently, repainting reactively as navigation and input change
 /// the page; the `CharcellTuiPlugin` loop drives it and Ctrl+c exits.
 ///
@@ -79,7 +79,7 @@ async fn boot(
 		.world()
 		.with(move |world: &mut World| {
 			if let Some(scheme) = scheme {
-				world.insert_resource(AppColorScheme(scheme));
+				world.get_resource_or_init::<Theme>().scheme = scheme;
 			}
 			// the live host: a stdio terminal paired with the page-host buffer,
 			// rendered together by `render_terminal` (one entity, both components).

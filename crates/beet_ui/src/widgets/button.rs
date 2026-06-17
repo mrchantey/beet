@@ -112,7 +112,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(app.world())
-			.find(|(_, element)| element.tag_eq("button"))
+			.find(|(_, element)| element.tag() == "button")
 			.map(|(entity, _)| entity)
 			.unwrap();
 		app.world_mut().entity_mut(button).observe(

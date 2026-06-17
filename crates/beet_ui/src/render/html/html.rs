@@ -23,6 +23,10 @@ pub struct HtmlRenderer {
 	/// attribute values using [`escape_html_text`] and
 	/// [`escape_html_attribute`] respectively.
 	escape_html: bool,
+	/// When `true` (the default), authoring comments (`<!-- note -->`) are
+	/// stripped so they never leak into rendered output. Functional `bx`-prefixed
+	/// anchors (`<!--bx-ref-->`) are always kept regardless.
+	strip_comments: bool,
 	/// Raw text elements whose children should not be HTML-escaped,
 	/// per the HTML spec, ie `<script>`, `<style>`.
 	raw_text_elements: Vec<Cow<'static, str>>,
@@ -69,6 +73,7 @@ impl HtmlRenderer {
 			void_elements: default_void_elements(),
 			current_depth: 0,
 			escape_html: true,
+			strip_comments: true,
 			raw_text_elements: default_raw_text_elements(),
 			in_raw_text_element: false,
 			#[cfg(all(feature = "bsx", feature = "json"))]
@@ -117,6 +122,14 @@ impl HtmlRenderer {
 	/// Enable rendering of [`Expression`] nodes as `{expr}`.
 	pub fn with_expressions(mut self) -> Self {
 		self.render_expressions = true;
+		self
+	}
+
+	/// Keep authoring comments (`<!-- note -->`) in the output rather than
+	/// stripping them (the default). Functional `bx`-prefixed anchors are emitted
+	/// either way.
+	pub fn with_comments(mut self) -> Self {
+		self.strip_comments = false;
 		self
 	}
 
@@ -189,11 +202,11 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
-		// Strip authoring comments so they never leak into rendered output; keep
-		// only functional `bx`-prefixed anchors (eg `<!--bx-ref-->`,
-		// `<!--bx-end-->`). The framework emits those without a leading space, so a
-		// space-led authoring comment (`<!-- note -->`) is always stripped.
-		if !comment.starts_with("bx") {
+		// Functional `bx`-prefixed anchors (eg `<!--bx-ref-->`, `<!--bx-end-->`)
+		// always render. Authoring comments are stripped by default (the framework
+		// emits anchors without a leading space, so a space-led `<!-- note -->` is
+		// authoring), unless `with_comments` opted to keep them.
+		if self.strip_comments && !comment.starts_with("bx") {
 			return;
 		}
 		self.write_indent();
@@ -326,7 +339,7 @@ impl NodeVisitor for HtmlRenderer {
 		// its close tag. `<head>` is the single injection point; a fragment with no
 		// head falls back to a post-walk append in `render`.
 		#[cfg(all(feature = "bsx", feature = "json"))]
-		if element.tag_eq("head") {
+		if element.tag() == "head" {
 			if let Some(injection) = self
 				.reactive
 				.as_mut()

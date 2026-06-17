@@ -166,7 +166,7 @@ pub fn attach_kitty_images(
 		return;
 	}
 	for view in elements.iter() {
-		if !view.tag_eq("img") || !unvisited.contains(view.entity) {
+		if view.tag() != "img" || !unvisited.contains(view.entity) {
 			continue;
 		}
 		let src = view.attribute_string("src");

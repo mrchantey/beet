@@ -49,7 +49,7 @@ impl<'a> ElementView<'a> {
 	pub fn try_as<T: TypedElementView<'a>>(
 		self,
 	) -> Result<T, FromElementError> {
-		if self.element.tag_eq(T::TAG) {
+		if self.element.tag() == T::TAG {
 			T::from_element_view_unchecked(self)
 		} else {
 			Err(FromElementError::tag_mismatch(T::TAG, self.element.tag()))
@@ -58,9 +58,6 @@ impl<'a> ElementView<'a> {
 
 	/// The tag name of this element, ie `div`, `span`, `p`.
 	pub fn tag(&self) -> &str { self.element.tag() }
-
-	/// Whether the tag equals `tag`, case-insensitively. See [`Element::tag_eq`].
-	pub fn tag_eq(&self, tag: &str) -> bool { self.element.tag_eq(tag) }
 
 	/// Look up the first attribute matching `key` and return its value.
 	pub fn attribute<'b>(&'b self, key: &str) -> Option<&'b AttributeView<'a>> {

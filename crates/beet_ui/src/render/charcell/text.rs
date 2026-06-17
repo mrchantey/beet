@@ -290,7 +290,7 @@ mod tests {
 			let input = world
 				.query::<(Entity, &Element)>()
 				.iter(&world)
-				.find(|(_, element)| element.tag_eq("input"))
+				.find(|(_, element)| element.tag() == "input")
 				.map(|(entity, _)| entity)
 				.unwrap();
 			if let Some(value) = value {

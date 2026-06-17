@@ -199,7 +199,7 @@ fn fire_form_submit(
 	let target = ev.event_target();
 	let is_button = elements
 		.get(target)
-		.map(|view| view.tag_eq("button"))
+		.map(|view| view.tag() == "button")
 		.unwrap_or(false);
 	if !is_button {
 		return;
@@ -234,12 +234,12 @@ fn field_value(
 		.ok()
 		.and_then(|value| value.as_str().ok())
 		.unwrap_or_default();
-	if !edited.is_empty() || !view.tag_eq("select") {
+	if !edited.is_empty() || view.tag() != "select" {
 		return Value::str(edited);
 	}
 	elements
 		.iter_descendants_inclusive(view.entity)
-		.find(|child| child.tag_eq("option"))
+		.find(|child| child.tag() == "option")
 		.map(|option| option_value(&option))
 		.unwrap_or_default()
 		.xmap(Value::str)
@@ -255,7 +255,7 @@ fn ancestor_form(
 	while let Some(entity) = current {
 		if elements
 			.get(entity)
-			.map(|view| view.tag_eq("form"))
+			.map(|view| view.tag() == "form")
 			.unwrap_or(false)
 		{
 			return Some(entity);
@@ -342,7 +342,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(app.world())
-			.find(|(_, element)| element.tag_eq("input"))
+			.find(|(_, element)| element.tag() == "input")
 			.map(|(entity, _)| entity)
 			.unwrap();
 		app.world_mut().entity_mut(input).insert(Focus);
@@ -411,7 +411,7 @@ mod test {
 			app.world_mut()
 				.query::<(Entity, &Element)>()
 				.iter(app.world())
-				.find(|(_, el)| el.tag_eq(tag))
+				.find(|(_, el)| el.tag() == tag)
 				.map(|(entity, _)| entity)
 				.unwrap()
 		};

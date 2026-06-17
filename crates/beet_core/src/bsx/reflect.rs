@@ -124,6 +124,15 @@ fn scalar_to_reflect(
 		return Ok(Box::new(SmolStr::new(string)));
 	}
 
+	// a string targeting a `SmolPath` field coerces to a logical path, so a markup
+	// `src="assets"` resolves to a `SmolPath` (a tuple struct, hence checked by
+	// `type_id` rather than the opaque branch above).
+	if let (Value::Str(string), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<SmolPath>()
+	{
+		return Ok(Box::new(SmolPath::new(string.as_str())));
+	}
+
 	// otherwise the value's natural reflect type.
 	let reflected: Box<dyn PartialReflect> = match value {
 		Value::Bool(b) => Box::new(*b),

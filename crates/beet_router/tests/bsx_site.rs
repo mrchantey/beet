@@ -15,6 +15,7 @@ the package resource patched from markup -->
 <Router {(RequestLogger, BsxLayout{template:"Layout"})}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
 	<RoutesDir src="routes"/>
+	<BlobStoreRoute src="assets"/>
 </Router>
 "#;
 
@@ -57,6 +58,9 @@ fn site_fixture() -> AbsPathBuf {
 	fs_ext::write(root.join("templates/widgets/Card.bsx"), CARD_BSX).unwrap();
 	fs_ext::write(root.join("routes/index.md"), "# Home\n\nwelcome").unwrap();
 	fs_ext::write(root.join("routes/counter.bsx"), COUNTER_BSX).unwrap();
+	// a static asset the `<BlobStoreRoute src="assets"/>` mount streams
+	fs_ext::write(root.join("assets/style.css"), "body { color: red; }")
+		.unwrap();
 	fs_ext::write(
 		root.join("routes/docs/intro.md"),
 		"+++\ntitle = \"The Intro\"\norder = 1\n+++\n\n# Intro\n\nintro body",
@@ -122,6 +126,22 @@ async fn entry_components_land_on_root() {
 	// discovered routes assembled into the root's route tree
 	let tree = world.entity(root).get::<RouteTree>().unwrap();
 	tree.find(&["docs", "intro"]).is_some().xpect_true();
+}
+
+/// The markup `<BlobStoreRoute src="assets"/>` resolves its `SmolPath` prop and
+/// mounts the on-disk `assets/` directory, streaming files beneath it.
+#[beet_core::test]
+async fn blob_store_route_serves_assets() {
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
+	let root = spawn_site(&mut world);
+	world
+		.entity_mut(root)
+		.call::<Request, Response>(Request::get("assets/style.css"))
+		.await
+		.unwrap()
+		.unwrap_str()
+		.await
+		.xpect_contains("color: red");
 }
 
 /// `<Router {(HttpServer{port:0})}>`: the http server is declarable from markup,

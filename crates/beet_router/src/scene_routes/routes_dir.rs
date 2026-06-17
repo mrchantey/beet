@@ -111,57 +111,6 @@ pub fn spawn_routes_dir(
 	Ok(())
 }
 
-/// A static asset directory mounted as routes, the no-code analogue of
-/// [`serve_store`].
-///
-/// Inserting an [`AssetsDir`] (eg from `main.bsx` via `<AssetsDir src="assets"/>`)
-/// triggers [`spawn_assets_dir`]: a [`BlobStore`] rooted at `src` (relative to
-/// [`SiteRoot`]) is mounted under [`Self::mount`], so `<AssetsDir src="assets"/>`
-/// serves `assets/branding/favicon-32x32.png` from `branding/favicon-32x32.png`
-/// in the directory. Unlike [`RoutesDir`] (which discovers content pages) this
-/// streams any file, the binary images and favicon a site references.
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct AssetsDir {
-	/// The asset directory, relative to [`SiteRoot`].
-	pub src: String,
-	/// The url path the directory mounts at, defaulting to [`Self::src`].
-	pub mount: Option<String>,
-}
-
-impl Default for AssetsDir {
-	fn default() -> Self { Self { src: "assets".into(), mount: None } }
-}
-
-impl AssetsDir {
-	/// Mount the directory `src` (relative to [`SiteRoot`]) at the matching url path.
-	pub fn new(src: impl Into<String>) -> Self {
-		Self { src: src.into(), mount: None }
-	}
-}
-
-/// Observer: mount the [`AssetsDir`] as a static-file route (see its docs).
-pub fn spawn_assets_dir(
-	ev: On<Insert, AssetsDir>,
-	dirs: Query<&AssetsDir>,
-	site_root: Option<Res<SiteRoot>>,
-	mut commands: Commands,
-) -> Result {
-	let assets = dirs.get(ev.entity)?;
-	let dir = site_root
-		.map(|root| root.0.clone())
-		.unwrap_or_else(|| SiteRoot::default().0)
-		.join(&assets.src);
-	let mount = assets.mount.clone().unwrap_or_else(|| assets.src.clone());
-	// `serve_store` mounts the store and captures the trailing path greedily, so
-	// the asset routes resolve files beneath `mount` from the on-disk directory.
-	commands.entity(ev.entity).insert(serve_store(
-		mount,
-		BlobStore::new(FsStore::new(dir)),
-	));
-	Ok(())
-}
-
 /// A relative path's `/`-joined utf8 segments, cross-platform.
 fn segments_of(rel: &Path) -> Vec<&str> {
 	rel.components()

@@ -26,3 +26,7 @@ pub use route_query::*;
 mod routes_dir;
 #[cfg(not(target_arch = "wasm32"))]
 pub use routes_dir::*;
+#[cfg(not(target_arch = "wasm32"))]
+mod blob_store_route;
+#[cfg(not(target_arch = "wasm32"))]
+pub use blob_store_route::*;

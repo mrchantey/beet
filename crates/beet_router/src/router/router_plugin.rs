@@ -97,10 +97,9 @@ impl Plugin for RouterPlugin {
 			#[cfg(not(target_arch = "wasm32"))]
 			app.register_type::<RoutesDir>()
 				.add_observer(spawn_routes_dir)
-				// the no-code static-asset mount, eg `<AssetsDir src="assets"/>`,
-				// the markup analogue of `serve_store`.
-				.register_type::<AssetsDir>()
-				.add_observer(spawn_assets_dir);
+				// the no-code static-asset mount, eg `<BlobStoreRoute src="assets"/>`:
+				// a template that expands to a blob-store-backed serve route.
+				.register_template::<BlobStoreRoute>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `default_router` wires the

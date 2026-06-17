@@ -213,8 +213,12 @@ pub(super) fn resolve_height(
 		// block container: stack children, each flowed at the constrained width
 		_ => resolve_block_height(node, query, content_width, viewport),
 	};
-	// an explicit `height` overrides the resolved content height.
-	let content_height = box_model.height.unwrap_or(content_height);
+	// an explicit `height` overrides the resolved content height; a `min-height`
+	// floors it (eg `100vh` to fill the terminal window).
+	let content_height = box_model
+		.height
+		.unwrap_or(content_height)
+		.max(box_model.min_height.unwrap_or(0));
 	content_height + overhead.y
 }
 
@@ -333,10 +337,20 @@ fn resolve_line_sizes(
 			// height at that assigned width so wrapped rows are fully reserved.
 			let width =
 				if vertical { size.x.min(container_cross) } else { size.x };
-			let height = query
+			let content_height = query
 				.unresolved_node(*entity)
 				.map(|child| resolve_height(&child, query, width, viewport))
 				.unwrap_or(size.y);
+			// a row's height is the cross axis: take it from the content at the
+			// assigned width. A column's height is the *main* axis, so keep the
+			// flex-grown size (a `flex-grow` item filling the surplus, eg the page's
+			// sidebar+main row pushing the footer to the bottom), never clipping
+			// wrapped content below it.
+			let height = if vertical {
+				size.y.max(content_height)
+			} else {
+				content_height
+			};
 			UVec2::new(width, height)
 		})
 		.collect()

@@ -129,6 +129,17 @@ pub fn sidebar_web() -> Rule {
 		})
 }
 
+/// Terminal sidebar - a fixed rail width matching the web's, so the nav is a
+/// stable column rather than sizing to its widest label. Long anchors wrap within
+/// it (the links are full-width blocks). Terminal-gated; the web uses
+/// [`sidebar_web`].
+pub fn sidebar_terminal() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Terminal)
+		.with_selector(Selector::class(SIDEBAR))
+		.with_value(common_props::Width, Length::Rem(16.))
+}
+
 /// Web sidebar collapse - on screens at or below [`SIDEBAR_BREAKPOINT_PX`] the
 /// rail is taken out of flow when `sidebar.js` marks it `aria-hidden="true"`
 /// (its default on load below the breakpoint, toggled by the [`MENU_BUTTON`]).
@@ -180,6 +191,10 @@ pub fn sidebar_link() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_LINK))
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		// a base background matching the rail (invisible at rest), so the hover
+		// highlight eases opaque->opaque like the active row, rather than snapping
+		// in from an unset colour the transition can't interpolate through.
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerLow).unwrap()
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
 		.with_canonical(DecorationLine::DEFAULT)
 		// full-width block so the whole row is the click/hover target (the

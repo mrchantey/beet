@@ -286,6 +286,25 @@ mod test {
 		render_plain(rsx! { <Sidebar nodes=nodes/> })
 	}
 
+	/// Render the sidebar into a styled [`FlexBuffer`] of fixed `width`, for cell
+	/// inspection (entity ownership, background).
+	fn render_sidebar_cells(width: u32, nodes: Vec<SidebarNode>) -> FlexBuffer {
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root = world
+			.spawn_template(rsx! { <Sidebar nodes=nodes/> })
+			.unwrap()
+			.id();
+		world.entity_mut(root).insert(FlexBuffer::new(width));
+		world.run_schedule(crate::parse::PostParseTree);
+		world.entity_mut(root).take::<FlexBuffer>().unwrap()
+	}
+
 	/// The menu button is `display: none` on the styled (charcell) target - it is
 	/// a web-only affordance for the narrow-screen sidebar - so its glyph never
 	/// paints. Rendered beside a sibling so the test distinguishes "hidden" from
@@ -353,5 +372,37 @@ mod test {
 		content.xpect_ends_with("▾");
 		// the caret is pushed right, not sitting immediately beside the label
 		(content.len() - "docs".len() > 4).xpect_true();
+	}
+
+	/// A leaf link paints its full row width as one filled box (not just its
+	/// label), so the whole row is the click/hover target rather than only the
+	/// text. The cells past the label form one contiguous painted box carrying a
+	/// background, distinct from the bare rail behind it; the label glyph sits
+	/// inside that box. Guards the sidebar-anchor bug where the row beyond the text
+	/// belonged to the rail, so only the text was interactive.
+	#[beet_core::test]
+	fn leaf_link_fills_row_width() {
+		let width = 20u32;
+		let buffer = render_sidebar_cells(width, nodes());
+		let cells = buffer.cells();
+		let row_of = |y: u32| &cells[(y * width) as usize..((y + 1) * width) as usize];
+		// the row whose first glyph is the `home` leaf
+		let row = (0u32..(cells.len() as u32 / width))
+			.map(row_of)
+			.find(|row| {
+				row.iter().find_map(|cell| cell.symbol.as_ref()).map(SmolStr::as_str)
+					== Some("h")
+			})
+			.expect("a `home` row");
+		// the link box fills the row past the label as one contiguous entity,
+		// each cell carrying its surface background (the hover/active target).
+		let link = row[10].entity.expect("mid-row cell painted by the link box");
+		row[8].entity.xpect_eq(Some(link));
+		row[14].entity.xpect_eq(Some(link));
+		row[10].style.background.is_some().xpect_true();
+		// the label text sits inside that box (a distinct child glyph entity)
+		(row[0].entity.expect("label glyph") != link).xpect_true();
+		// and the box is the link, not the bare rail divider trailing the row
+		(row[(width - 1) as usize].entity != Some(link)).xpect_true();
 	}
 }

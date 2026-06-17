@@ -92,16 +92,12 @@ impl Default for HtmlDiffConfig {
 impl HtmlDiffConfig {
 	/// Returns whether the given element name is a void element.
 	///
-	/// HTML tag names are case-insensitive (`<BR>` is `<br>`), but BSX uses case to
-	/// distinguish a component/template from an element. A PascalCase tag (eg the
-	/// `<Link>` widget) is therefore never the HTML void element it lowercases to
-	/// (`link`): it resolves through the BSX path and keeps its slot children.
+	/// HTML tags are lowercase by convention (BSX is HTML-like, not HTML, so the
+	/// uppercase-tag case is disregarded), so this is a plain membership check: a
+	/// capitalized component tag (eg the `<Link>` widget) never matches the
+	/// lowercase void list and resolves through the BSX path keeping its children.
 	pub fn is_void_element(&self, name: &str) -> bool {
-		if is_component_tag(name) {
-			return false;
-		}
-		let lower = name.to_ascii_lowercase();
-		self.void_elements.iter().any(|el| el.as_ref() == lower)
+		self.void_elements.iter().any(|el| el.as_ref() == name)
 	}
 
 	/// Convert an attribute token value to a [`Value`] based on config.
@@ -205,19 +201,6 @@ fn is_bsx_tag(tag: &str) -> bool {
 		.next()
 		.unwrap_or(tag)
 		.starts_with(|ch: char| ch.is_uppercase())
-}
-
-/// Whether a tag is unambiguously a BSX component/template rather than an HTML
-/// element written in uppercase. A component is PascalCase (an uppercase first
-/// char *and* a lowercase letter, eg `Link`) or carries a `::` path; an all-caps
-/// tag (`BR`, `LINK`) stays an HTML element, since HTML tag names are
-/// case-insensitive. Used to keep an uppercase component tag from colliding with
-/// a void HTML element it lowercases to.
-fn is_component_tag(tag: &str) -> bool {
-	let last = tag.rsplit("::").next().unwrap_or(tag);
-	tag.contains("::")
-		|| (last.starts_with(|ch: char| ch.is_uppercase())
-			&& last.chars().any(|ch| ch.is_lowercase()))
 }
 
 /// Build an [`HtmlNode::Element`] subtree through [`BsxTemplate`], so an embedded
@@ -639,7 +622,6 @@ mod test {
 	fn diff_config_is_void() {
 		let config = HtmlDiffConfig::default();
 		config.is_void_element("br").xpect_true();
-		config.is_void_element("BR").xpect_true();
 		config.is_void_element("div").xpect_false();
 		config.is_void_element("img").xpect_true();
 	}
@@ -679,16 +661,15 @@ mod test {
 	}
 
 	/// A capitalized BSX component tag (eg the `<Link>` widget) is never the HTML
-	/// void element it lowercases to (`<link>`), so its slot children survive.
-	/// Regression for the landing-page CTA rendering as an empty `<a></a>` with its
-	/// label leaking out as a sibling, because `<Link>` matched the void `link`.
+	/// void element it shares a lowercased name with (`<link>`), so its slot
+	/// children survive. Regression for the landing-page CTA rendering as an empty
+	/// `<a></a>` with its label leaking out as a sibling, because `<Link>` matched
+	/// the void `link`.
 	#[beet_core::test]
 	fn bsx_component_tag_is_not_void() {
 		let config = HtmlDiffConfig::default();
-		// the HTML void element stays void, in any case (HTML is case-insensitive).
+		// the lowercase HTML void element is void; the PascalCase component is not.
 		config.is_void_element("link").xpect_true();
-		config.is_void_element("LINK").xpect_true();
-		// the PascalCase component tag is not — it keeps its slot children.
 		config.is_void_element("Link").xpect_false();
 	}
 

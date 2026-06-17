@@ -136,6 +136,7 @@ pub fn all_rules() -> Vec<Rule> {
 		sidebar_list(),
 		sidebar(),
 		sidebar_web(),
+		sidebar_terminal(),
 		// responsive: narrow-screen collapse + the header toggle that drives it
 		sidebar_hidden(),
 		menu_button(),
@@ -172,10 +173,12 @@ pub fn all_rules() -> Vec<Rule> {
 		hover_surface_light(),
 		// accessibility — global state rules
 		disabled_state(),
-		// web-only overrides — gated behind `@media screen`, ignored by charcell
+		// the `@media screen` app-bar override, ignored by charcell
 		app_bar_nav_web(),
+		// viewport-fill: both targets fill the window so the footer pins to the
+		// bottom (charcell resolves `100vh` against the cell viewport)
 		page_fill_viewport(),
-		container_grow_web(),
+		container_grow(),
 	];
 	// prose heading sizes (the MD3 type scale per `<h1>`..`<h6>`); appended so
 	// these tag rules win the cascade over the user-agent heading defaults.

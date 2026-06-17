@@ -3,53 +3,50 @@ use crate::style::material::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-/// The brand colour seeding the Material palette, the single source of every
-/// accent (every tone derives from it through [`themes::from_color`]).
+/// The active theme: the brand colour seeding the Material palette plus the
+/// app-wide [`ColorScheme`] default for non-web targets.
+///
+/// The colour is the single source of every accent (every tone derives from it
+/// through [`themes::from_color`]). The scheme is the session default a non-html
+/// target (the terminal) falls back to when a request pins none, eg seeded from a
+/// `--color-scheme` CLI argument by the live TUI.
 ///
 /// Declared in markup as `<Theme color=Srgba{..}/>` — the resolver patches the
 /// live resource exactly like `<PackageConfig/>` — or inserted in Rust. A change
 /// re-runs [`rebuild_theme_tones`], rewriting the `:root` tone declarations so
 /// both the web CSS bake and the charcell cascade recolour from the same seed.
+///
+/// Always present once [`MaterialStylePlugin`] is added (it `init_resource`s the
+/// default), so consumers read `Res<Theme>` directly.
 #[derive(Debug, Clone, PartialEq, Resource, Reflect)]
 #[reflect(Resource, Default)]
 pub struct Theme {
 	/// The seed colour the palette tones derive from.
 	pub color: Color,
+	/// The app-wide default colour scheme for non-web targets.
+	pub scheme: ColorScheme,
 }
 
 impl Default for Theme {
 	fn default() -> Self {
 		Self {
 			color: palettes::basic::GREEN.into(),
+			scheme: ColorScheme::Dark,
 		}
 	}
 }
 
-pub struct MaterialStylePlugin {
-	color: Color,
-}
-
-impl MaterialStylePlugin {
-	pub fn new(color: impl Into<Color>) -> Self {
-		Self {
-			color: color.into(),
-		}
-	}
-}
-
-impl Default for MaterialStylePlugin {
-	fn default() -> Self {
-		Self {
-			color: Theme::default().color,
-		}
-	}
-}
+/// Installs the Material rule set. The seed colour and scheme are owned by the
+/// [`Theme`] resource (insert it before adding this plugin to override the
+/// default), the only way to configure them.
+#[derive(Default)]
+pub struct MaterialStylePlugin;
 
 impl Plugin for MaterialStylePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<CssPlugin>()
 			.register_type::<Theme>()
-			.insert_resource(Theme { color: self.color });
+			.init_resource::<Theme>();
 		// Extend the existing rule set rather than replacing it, so the prose
 		// `default_element_rules` seeded by `StylePlugin` (em → italic, h1 →
 		// bold, code/a → inline, …) survive alongside the Material rules. The
@@ -190,7 +187,7 @@ mod tests {
 	fn theme_recolors_root_tones() {
 		let violet = Color::srgb(0.5, 0.0, 1.0);
 		let mut world = MaterialStylePlugin::world();
-		world.insert_resource(Theme { color: violet });
+		world.insert_resource(Theme { color: violet, ..default() });
 		world.run_system_cached(rebuild_theme_tones).unwrap();
 
 		world.with_state::<Res<RuleSet>, _>(|rules| {

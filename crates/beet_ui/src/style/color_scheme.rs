@@ -12,22 +12,16 @@ use beet_core::prelude::*;
 /// `.light-scheme`/`.dark-scheme` classes.
 ///
 /// Query it to read the current scheme; mutate it to switch themes at runtime.
-/// For the app-wide session default see [`AppColorScheme`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Component, Reflect)]
+/// For the app-wide session default see [`Theme::scheme`](crate::style::material::Theme).
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect,
+)]
 #[reflect(Component)]
 pub enum ColorScheme {
 	Light,
+	#[default]
 	Dark,
 }
-
-/// The app-wide default [`ColorScheme`] for non-web targets, eg seeded from a
-/// `--color-scheme` CLI argument by the live TUI. Layouts consult it when a
-/// request pins no scheme of its own.
-///
-/// A distinct resource type: `ColorScheme` itself is an entity [`Component`],
-/// and a type cannot be both in bevy's resources-as-entities model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deref, Resource)]
-pub struct AppColorScheme(pub ColorScheme);
 
 impl ColorScheme {
 	/// Parse a scheme keyword (`light`/`dark`), eg a `color-scheme` URL or CLI

@@ -99,10 +99,14 @@ pub(super) fn measure_node(
 		_ => measure_block(node, query, content_available, viewport, sizes),
 	};
 	// an explicit `width`/`height` overrides the measured content size, so a
-	// fixed-size control keeps its footprint instead of hugging its content.
+	// fixed-size control keeps its footprint instead of hugging its content; a
+	// `min-height` floors it (eg `100vh` to fill the terminal window).
 	let content_size = UVec2::new(
 		box_model.width.unwrap_or(content_size.x),
-		box_model.height.unwrap_or(content_size.y),
+		box_model
+			.height
+			.unwrap_or(content_size.y)
+			.max(box_model.min_height.unwrap_or(0)),
 	);
 	(content_size + overhead).xok()
 }
