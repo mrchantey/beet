@@ -3,15 +3,17 @@ The beet website, authored entirely in markup: a router serving the `routes/`
 directory, every page wrapped in `templates/Layout.bsx`. This is the no-code twin
 of the compiled `crates/beet_site`, which stays as the parity reference.
 
-The router's middleware and server attach as component spreads (request logging,
-`--help`, terminal link navigation, the layout, and an `HttpServer`).
-`<DefaultAppRoutes/>` adds the default app routes (`/app-info`, the reactivity
-runtime, …), `<RoutesDir/>` discovers the `routes/` pages, and `<AssetsDir/>`
-mounts the workspace assets the site and blog reference (the favicon, images).
-`<Theme color=.../>` seeds the brand colour the whole Material palette derives
-from, and `<Styles/>` registers the named style rules in `templates/Styles.bsx`.
+The router's middleware and servers attach as component spreads (request logging,
+`--help`, terminal link navigation, the layout). It declares three servers, so
+`beet serve site/` runs the default `HttpServer`, `--server=tui` the live
+`TuiServer`, and `--server=cli` a one-shot render. `<DefaultAppRoutes/>` adds the
+default app routes (`/app-info`, the reactivity runtime, …), `<RoutesDir/>`
+discovers the `routes/` pages, and `<AssetsDir/>` mounts the workspace assets the
+site and blog reference (the favicon, images). `<Theme color=.../>` seeds the
+brand colour the whole Material palette derives from, and `<Styles/>` registers
+the named style rules in `templates/Styles.bsx`.
 -->
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8339})}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8339}, TuiServer, CliServer)}>
 	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 	<Styles/>

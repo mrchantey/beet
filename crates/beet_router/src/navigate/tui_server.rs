@@ -39,24 +39,42 @@ fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 		return;
 	}
 	commands.insert_resource(KeepAlive);
-	commands.entity(ev.event_target()).queue_async_local(boot);
+	// the trigger's params (eg the `beet serve` command's) carry the opening route
+	// and scheme, so a served site opens at the right page rather than the serve
+	// command's own argv.
+	let params = ev.params.clone();
+	commands
+		.entity(ev.event_target())
+		.queue_async_local(move |entity| boot(entity, params));
 }
 
-async fn boot(entity: AsyncEntity) -> Result {
+async fn boot(
+	entity: AsyncEntity,
+	params: MultiMap<SmolStr, SmolStr>,
+) -> Result {
 	// a briefly-spawned server (eg during serialization) has no business booting
 	if !entity.is_alive().await {
 		return Ok(());
 	}
 	let router = entity.id();
-	let request = Request::from_cli_args(CliArgs::parse_env());
-	// `--color-scheme=light|dark` pins the session's scheme app-wide
-	let scheme = request
-		.get_param("color-scheme")
-		.and_then(ColorScheme::parse);
-	// the initial route: the CLI path arg, else the site home `/`. The server is
-	// route-agnostic; a downstream plugin (eg `CardStackPlugin`) patches up a more
-	// specific opening route after boot if the router calls for one.
-	let home = Url::parse(request.path_string());
+	// A `path` param from the trigger (eg `beet serve <dir> --server=tui
+	// --path=docs/design/form`) opens that route; absent it, the process argv (a
+	// compiled binary's own args). `--color-scheme=light|dark` pins the session
+	// scheme app-wide either way. The server is route-agnostic; a downstream plugin
+	// (eg `CardStackPlugin`) may patch a more specific opening route after boot.
+	let (home, scheme) = match params.get("path") {
+		Some(path) => (
+			Url::parse(path.as_str()),
+			params.get("color-scheme").and_then(|s| ColorScheme::parse(s)),
+		),
+		None => {
+			let request = Request::from_cli_args(CliArgs::parse_env());
+			let scheme = request
+				.get_param("color-scheme")
+				.and_then(ColorScheme::parse);
+			(Url::parse(request.path_string()), scheme)
+		}
+	};
 	entity
 		.world()
 		.with(move |world: &mut World| {

@@ -5,8 +5,11 @@ use beet::prelude::*;
 #[reflect(Default)]
 struct ServeParams {
 	/// Servers to start, selected from those the site declares (eg `http`).
-	/// Comma-separate to start several; absent starts every declared server.
+	/// Comma-separate to start several; absent starts the `http` server.
 	server: Option<String>,
+	/// The route the `tui`/`cli` servers open at (eg `--path=docs/design/form`),
+	/// defaulting to the site home.
+	path: Option<String>,
 	/// Watch the site dir: respawn its routes on change and live-reload browsers.
 	watch: bool,
 }
@@ -35,20 +38,36 @@ struct ServeParams {
 pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ServeParams>()?;
-	let request_params = parts.params().clone();
+	let mut request_params = parts.params().clone();
+	// the tui/cli servers open at this route (default home), flowing through the
+	// start params so a served site does not parse the serve command's own argv as
+	// its route.
+	if request_params.get("path").is_none() {
+		request_params.insert(
+			"path".into(),
+			params.path.clone().unwrap_or_else(|| "/".into()).into(),
+		);
+	}
 	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
 	let root = build_site(&cx.caller, site_dir.clone(), entry).await?;
 
-	// run the render-diagnostics pass over the freshly built site and surface every
-	// problem loudly in the console before serving (dev mode does not abort on an
-	// error; the console output and the live-reload re-scan are the signal). A
-	// `--watch` reload re-runs the pass via `reload_site`.
-	check_routes(&cx.world(), root).await?.log();
-
 	// the start built straight from the request: `--server=` selects which of the
 	// site's declared servers boot, the rest of the params flow as boot config.
-	let start =
-		StartServer::from_request(root, params.server.as_deref(), request_params);
+	// Default to the `http` server when none is named, so `beet serve <dir>` boots
+	// a single server rather than every one a multi-server site declares (eg an
+	// http + tui + cli site). Pick another with `--server=tui` etc.
+	let server = params.server.as_deref().or(Some("http"));
+	let start = StartServer::from_request(root, server, request_params);
+
+	// run the render-diagnostics pass and surface every problem loudly in the
+	// console before serving (dev mode does not abort on an error; the console
+	// output and the live-reload re-scan are the signal; a `--watch` reload re-runs
+	// it via `reload_site`). ONLY when an http server is the target: the tui owns the
+	// terminal and the cli streams its render to stdout, so dumping route
+	// diagnostics there would corrupt the output (use `beet check <site>` to lint).
+	if start.passes("http") {
+		check_routes(&cx.world(), root).await?.log();
+	}
 	let watch = params.watch;
 	cx.caller
 		.with_world(move |world, _caller| {

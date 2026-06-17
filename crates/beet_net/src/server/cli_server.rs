@@ -41,33 +41,57 @@ fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 	if !ev.passes("cli") {
 		return;
 	}
-	commands.entity(ev.event_target()).queue_async_local(run_and_exit);
+	// the trigger's params (eg the `beet serve` command's) reach the exchange so a
+	// served site renders the requested route, not the serve command's own argv.
+	let params = ev.params.clone();
+	commands
+		.entity(ev.event_target())
+		.queue_async_local(move |entity| run_and_exit(entity, params));
 }
 
-async fn run_and_exit(entity: AsyncEntity) -> Result {
+/// The default content negotiation when `--accept` is unset.
+fn default_accept() -> Vec<MediaType> {
+	vec![
+		MediaType::AnsiTerm,
+		MediaType::Text,
+		MediaType::Markdown,
+		MediaType::Json,
+	]
+}
+
+async fn run_and_exit(
+	entity: AsyncEntity,
+	params: MultiMap<SmolStr, SmolStr>,
+) -> Result {
 	// short-circuit when the entity has already been despawned, ie
 	// [`TemplateStore::save_bundle`] briefly spawns a [`CliServer`]
 	// just to serialize it.
 	if !entity.is_alive().await {
 		return Ok(());
 	}
-	let args = CliArgs::parse_env();
 
-	let accept = args
-		.params
-		.get("accept")
-		.map(|item| MediaType::from_accepts(item))
-		.unwrap_or_else(|| {
-			vec![
-				MediaType::AnsiTerm,
-				MediaType::Text,
-				MediaType::Markdown,
-				MediaType::Json,
-			]
-		});
-
-	let req =
-		Request::from_cli_args(args).with_header::<header::Accept>(accept);
+	// A `path` param from the trigger (eg `beet serve <dir> --server=cli
+	// --path=blog/post-1`) renders that site route; absent it, parse the process
+	// argv (a compiled binary's own one-shot entrypoint).
+	let req = match params.get("path") {
+		Some(path) => {
+			let accept = params
+				.get("accept")
+				.map(|item| MediaType::from_accepts(item))
+				.unwrap_or_else(default_accept);
+			Request::get(Url::parse(path.as_str()))
+				.with_header::<header::Accept>(accept)
+		}
+		None => {
+			let args = CliArgs::parse_env();
+			let accept = args
+				.params
+				.get("accept")
+				.map(|item| MediaType::from_accepts(item))
+				.unwrap_or_else(default_accept);
+			Request::from_cli_args(args).with_header::<header::Accept>(accept)
+		}
+	};
 
 	let res = entity.exchange(req).await;
 	let (parts, body) = res.into_parts();

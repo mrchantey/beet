@@ -259,10 +259,19 @@ impl DiagnosticsQuery<'_, '_> {
 			));
 		}
 
-		// each class token must match a selector in the live rule set.
+		// each class token must match a selector in the live rule set, except the
+		// framework-emitted syntax-highlight classes: the `hl-<capture>` token spans
+		// and the code-fence language hint on a `<code>` element (eg `rust`, `sh`).
+		// The highlighter emits them; they may legitimately have no style rule
+		// (a token falls back to the default text colour), and would otherwise warn
+		// on every code block of every page.
 		let class_severity = config.severity(DiagnosticKind::UnknownClass);
 		if class_severity != DiagnosticSeverity::Off {
+			let in_code = el.tag() == "code";
 			for class in el.iter_classes() {
+				if in_code || class.starts_with("hl-") {
+					continue;
+				}
 				if !rule_set_has_class(rule_set, &class) {
 					out.push(Diagnostic::new(
 						DiagnosticKind::UnknownClass,
@@ -488,6 +497,25 @@ mod test {
 		)
 		.xmap(|d| of_kind(&d, DiagnosticKind::UnknownClass).len())
 		.xpect_eq(0);
+	}
+
+	#[beet_core::test]
+	fn syntax_highlight_classes_skipped() {
+		// the code-fence language hint (`<code class="rust">`) and the `hl-<capture>`
+		// token spans are framework-emitted by the syntax highlighter and may have no
+		// style rule; they must NOT warn, else every code-heavy page floods the
+		// console (and the tui).
+		let diagnostics = run(
+			rsx! {
+				<pre><code class="rust">
+					<span class="hl-function.macro">"vec!"</span>
+				</code></pre>
+			},
+			&RenderDiagnostics::default(),
+		);
+		of_kind(&diagnostics, DiagnosticKind::UnknownClass)
+			.len()
+			.xpect_eq(0);
 	}
 
 	#[beet_core::test]

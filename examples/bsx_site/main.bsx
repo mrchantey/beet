@@ -1,16 +1,18 @@
 <!--
 The whole site: a router serving the `routes/` directory, every page wrapped
-in the `templates/Layout.bsx` document. The router's middleware and server
+in the `templates/Layout.bsx` document. The router's middleware and servers
 attach as component spreads (request logging, `--help`, terminal link
-navigation, the layout, and an `HttpServer`), while `<DefaultAppRoutes/>` adds
+navigation, the layout). It declares three servers, so `beet serve
+examples/bsx_site` runs the default `HttpServer`, `--server=tui` the live
+`TuiServer`, and `--server=cli` a one-shot render. `<DefaultAppRoutes/>` adds
 the default app routes (eg the `/js/reactivity.js` runtime a reactive page
 loads) as child routes. There is no `main.rs`: `beet serve` spawns this host and
-triggers its server, which the site owns here in markup. The `<PackageConfig/>`
+triggers its servers, which the site owns here in markup. The `<PackageConfig/>`
 declaration patches the named fields of the resource, creating it from defaults
 if absent, so the title and description are set in markup with no compile-time
 host config.
 -->
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337})}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337}, TuiServer, CliServer)}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<Theme color={Srgba(Srgba{red:0.5, green:0.2, blue:0.9, alpha:1.0})}/>
 	<Styles/>
