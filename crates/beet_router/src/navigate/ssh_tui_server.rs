@@ -38,12 +38,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 /// Boots the SSH listener when a [`StartServer`] passing `"ssh"` lands: builds an
 /// [`SshServer`] from the params and inserts it on the router (its `on_add` starts
-/// the listener), records the opening route, and inserts [`KeepAlive`].
+/// the listener), records the opening route, and holds the process up with a
+/// [`KeepAliveGuard`].
 fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 	if !ev.passes("ssh") {
 		return;
 	}
-	commands.insert_resource(KeepAlive);
 	// the bind config from the start params, defaulting from env.
 	let mut server = SshServer::default();
 	if let Some(port) = ev.params.get("port").and_then(|port| port.parse().ok()) {
@@ -57,10 +57,11 @@ fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 		};
 	}
 	// the opening route each session navigates to, recorded on the router (the
-	// shared mechanism the local TUI server also reads).
+	// shared mechanism the local TUI server also reads). The `KeepAliveGuard` holds
+	// the process up for the server's lifetime, released when the router despawns.
 	commands
 		.entity(ev.event_target())
-		.insert((server, OpeningRoute::from_params(&ev.params)));
+		.insert((server, OpeningRoute::from_params(&ev.params), KeepAliveGuard));
 }
 
 /// Per-connection behavior for the [`SshTuiServer`], added once by the app: spins

@@ -44,6 +44,61 @@ fn replace_url(url: &Url) {
 		.unwrap();
 }
 
+/// The browser equivalent of process argv: the current location's path and query as
+/// CLI-style arguments, so [`CliArgs::parse_env`](crate::prelude::CliArgs::parse_env)
+/// works in a browser the same way it does over `Deno.args`. Path segments become
+/// positionals and query params become `--key=value` flags, ie
+/// `example.com/foo/bar.png?bazz=boo&boom=boo` yields
+/// `["foo", "bar.png", "--bazz=boo", "--boom=boo"]`.
+pub fn location_args() -> Vec<String> {
+	let location = current_window().location();
+	args_from_location(
+		&location.pathname().unwrap_or_default(),
+		&location.search().unwrap_or_default(),
+	)
+}
+
+/// The pure core of [`location_args`]: convert a URL `pathname` and `search` into
+/// CLI-style args, so the conversion is testable off a browser. Path segments become
+/// positionals and query params become `--key=value` flags.
+fn args_from_location(pathname: &str, search: &str) -> Vec<String> {
+	let mut args = Vec::new();
+	args.extend(
+		pathname.split('/').filter(|seg| !seg.is_empty()).map(String::from),
+	);
+	for pair in search
+		.trim_start_matches('?')
+		.split('&')
+		.filter(|pair| !pair.is_empty())
+	{
+		args.push(format!("--{pair}"));
+	}
+	args
+}
+
+#[cfg(test)]
+mod test {
+	use super::args_from_location;
+	use crate::prelude::*;
+
+	/// A location's path becomes positionals and its query becomes `--key=value`
+	/// flags, the browser equivalent of process argv.
+	#[beet_core::test]
+	fn converts_location_to_args() {
+		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(vec![
+			"foo".to_string(),
+			"bar.png".to_string(),
+			"--bazz=boo".to_string(),
+			"--boom=boo".to_string(),
+		]);
+		// a bare flag and an empty path/query degrade cleanly.
+		args_from_location("/", "?verbose").xpect_eq(vec![
+			"--verbose".to_string(),
+		]);
+		args_from_location("", "").xpect_eq(Vec::<String>::new());
+	}
+}
+
 /// Whether the query string contains `key`.
 ///
 /// Examples

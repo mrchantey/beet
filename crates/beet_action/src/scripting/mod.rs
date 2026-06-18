@@ -10,7 +10,7 @@ mod quickjs_runtime;
 // compiles for a native-quickjs build or any wasm build.
 #[cfg(any(
 	all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")),
-	target_arch = "wasm32"
+	all(feature = "json", target_arch = "wasm32")
 ))]
 mod eval_on_load;
 #[cfg(all(feature = "rhai", feature = "serde"))]
@@ -33,7 +33,7 @@ pub use quickjs_runtime::ConsoleStream;
 pub use quickjs_runtime::run_quickjs_console;
 #[cfg(any(
 	all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")),
-	target_arch = "wasm32"
+	all(feature = "json", target_arch = "wasm32")
 ))]
 pub use eval_on_load::EvalOnLoad;
 #[cfg(all(feature = "rhai", feature = "serde"))]

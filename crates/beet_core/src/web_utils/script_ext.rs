@@ -26,20 +26,25 @@ pub enum ConsoleStream {
 	Stderr,
 }
 
-/// The keys the eval binds on `globalThis` for the console bridge and the script
-/// source, removed again after the eval so the host realm is left clean.
+/// The keys the eval binds on `globalThis` for the console bridge, the script
+/// source, and the input JSON, removed again after the eval so the host realm is
+/// left clean.
 const BRIDGE_KEY: &str = "__beet_console_write";
 const SCRIPT_KEY: &str = "__beet_script";
+const INPUT_KEY: &str = "__beet_input";
 
 /// Evaluate `script` in the wasm host, streaming each `console` call to `sink` the
 /// moment it runs.
 ///
 /// `console` `log`/`info`/`debug` forward to [`ConsoleStream::Stdout`] and
-/// `warn`/`error` to [`ConsoleStream::Stderr`]. `console` is overridden for the
-/// duration of the eval and restored after. `sink` is captured into a `'static`
-/// JS closure, so a capturing test sink shares its buffer through an `Rc`.
+/// `warn`/`error` to [`ConsoleStream::Stderr`]. `input_json` (a JSON string) is
+/// parsed and bound as the global `input`, the wasm analogue of the native runtime's
+/// `input`. `console` and `input` are overridden for the eval and restored after.
+/// `sink` is captured into a `'static` JS closure, so a capturing test sink shares
+/// its buffer through an `Rc`.
 pub fn eval_console(
 	script: &str,
+	input_json: &str,
 	mut sink: impl 'static + FnMut(ConsoleStream, &str),
 ) -> Result<()> {
 	let global = js_sys::global();
@@ -55,13 +60,16 @@ pub fn eval_console(
 	);
 	set_global(&global, BRIDGE_KEY, bridge.as_ref())?;
 	set_global(&global, SCRIPT_KEY, &JsValue::from_str(script))?;
+	set_global(&global, INPUT_KEY, &JsValue::from_str(input_json))?;
 
-	// run the script with a forwarding `console`, restoring the host's on the way
-	// out. The script source is read from `globalThis` rather than interpolated, so
-	// no escaping is needed; indirect `eval` runs it in the surrounding realm.
+	// run the script with a forwarding `console` and the parsed `input`, restoring
+	// both on the way out. The script and input are read from `globalThis` rather
+	// than interpolated, so no escaping is needed; indirect `eval` runs it in the
+	// surrounding realm.
 	let runner = format!(
 		r#"(function() {{
-	const saved = globalThis.console;
+	const savedConsole = globalThis.console;
+	const savedInput = globalThis.input;
 	const fmt = (args) => args
 		.map((arg) => typeof arg === 'string' ? arg : JSON.stringify(arg))
 		.join(' ');
@@ -71,8 +79,12 @@ pub fn eval_console(
 		log: write(0), info: write(0), debug: write(0),
 		warn: write(1), error: write(1),
 	}};
+	globalThis.input = JSON.parse(globalThis.{INPUT_KEY});
 	try {{ (0, eval)(globalThis.{SCRIPT_KEY}); }}
-	finally {{ globalThis.console = saved; }}
+	finally {{
+		globalThis.console = savedConsole;
+		globalThis.input = savedInput;
+	}}
 }})()"#
 	);
 
@@ -80,6 +92,7 @@ pub fn eval_console(
 	// drop the bridge and clear the temporary globals before surfacing any error.
 	delete_global(&global, BRIDGE_KEY);
 	delete_global(&global, SCRIPT_KEY);
+	delete_global(&global, INPUT_KEY);
 	drop(bridge);
 	result.map_err(|err| bevyhow!("script_ext: eval failed: {err:?}"))?;
 	Ok(())
@@ -117,6 +130,7 @@ mod test {
 		let sink = out.clone();
 		eval_console(
 			r#"console.log("hello"); console.error("oops")"#,
+			"null",
 			move |stream, msg| sink.borrow_mut().push((stream, msg.to_string())),
 		)
 		.unwrap();
@@ -126,5 +140,20 @@ mod test {
 		out[0].1.xpect_eq("hello".to_string());
 		out[1].0.xpect_eq(ConsoleStream::Stderr);
 		out[1].1.xpect_eq("oops".to_string());
+	}
+
+	/// The `input_json` is parsed and bound as the global `input`, so a script reads
+	/// it the same way the native runtime exposes `input`.
+	#[beet_core::test]
+	fn binds_input() {
+		let out = Rc::new(RefCell::new(Vec::<String>::new()));
+		let sink = out.clone();
+		eval_console(
+			r#"console.log(input.name)"#,
+			r#"{"name":"ada"}"#,
+			move |_, msg| sink.borrow_mut().push(msg.to_string()),
+		)
+		.unwrap();
+		out.borrow().clone().xpect_eq(vec!["ada".to_string()]);
 	}
 }

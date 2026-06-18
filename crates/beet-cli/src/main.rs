@@ -66,16 +66,19 @@ fn main() -> AppExit {
 /// than panicking. Run here (not before the app) so the message goes through the
 /// initialized logger.
 fn load_entry(world: &mut World) {
-	// hold the load-scope ref, then build. The verbs' boots cascade through deferred
-	// commands, so flush before dropping the ref to ensure any lasting claim is held.
-	world.resource_mut::<KeepAlive>().acquire();
+	// hold a load-scope `KeepAliveGuard` across the build so the process cannot exit
+	// mid-load; a verb that boots a long-running server (or queues the cli exchange)
+	// inserts its own guard before this one drops. The boots cascade through deferred
+	// commands, so flush before despawning the guard to ensure any lasting claim is
+	// held.
+	let guard = world.spawn(KeepAliveGuard).id();
 	match try_load_entry(world) {
 		Ok(()) => {
 			world.flush();
-			world.resource_mut::<KeepAlive>().release();
+			world.despawn(guard);
 		}
 		Err(err) => {
-			// a failed build keeps its ref (the exit system emits no success) and
+			// a failed build keeps its guard (the exit system emits no success) and
 			// exits with an error code instead.
 			error!("{err}");
 			world.write_message(AppExit::error());

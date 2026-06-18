@@ -11,15 +11,20 @@ use bevy::platform::sync::OnceLock;
 /// (an embassy / esp WiFi crate, …) installs its own without living in
 /// [`beet_net`]. [`HttpServer`]'s start observer invokes the installed function.
 ///
-/// It is handed an [`AsyncEntity`] for the spawned server and returns a boxed
+/// It is handed an [`AsyncEntity`] for the spawned server and a shutdown
+/// [`OnceValueRx`] that resolves when a [`StopServer`] lands, and returns a boxed
 /// future. The backend reads the [`HttpServer`] config off the entity, opens its
-/// own listener, and dispatches each request back through `entity.exchange(req)`.
+/// own listener, and dispatches each request through `entity.exchange(req)`. It owns
+/// its teardown: on the shutdown signal it stops accepting and drops its listener
+/// (and may abort tasks it spawned), since only the backend knows how it spawned its
+/// own work.
 ///
 /// The future is a [`LocalBoxedFuture`] (never `Send`): the start observer always
 /// drives it with `queue_async_local`, so it stays on the thread it was created
-/// on. This lets a backend hold a thread-bound resource across an await — eg the
+/// on. This lets a backend hold a thread-bound resource across an await, eg the
 /// lambda backend's tokio runtime [`EnterGuard`](tokio::runtime::EnterGuard).
-pub type HttpServerFn = fn(AsyncEntity) -> LocalBoxedFuture<'static, Result>;
+pub type HttpServerFn =
+	fn(AsyncEntity, OnceValueRx<()>) -> LocalBoxedFuture<'static, Result>;
 
 static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 
@@ -164,21 +169,20 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 /// Shutdown signal for a running [`HttpServer`]: [`on_start_server`] stores the
-/// sender on the host, [`start_http_server`] awaits the receiver alongside the
-/// backend, and [`on_stop_server`] signals it to end the accept loop and drop the
-/// listener (closing the port). A no_std one-shot channel, so an embedded backend
-/// tears down the same way. Removed on stop, so a reboot installs a fresh one.
+/// sender on the host and hands the receiver to the backend, and [`on_stop_server`]
+/// signals it so the backend stops accepting and drops its listener. A no_std
+/// one-shot channel, so an embedded backend tears down the same way. Removed on
+/// stop, so a reboot installs a fresh one.
 #[derive(Component)]
 struct HttpServerShutdown(Option<OnceValue<()>>);
 
 /// Boots the HTTP backend when a [`StartServer`] event passing `"http"` lands.
-/// Applies the event's `--port` / `--host` onto the component, takes a [`KeepAlive`]
-/// ref (a long-running server keeps the process up), then queues the installed
-/// [`HttpServerFn`] on the async runtime, racing it against a stored shutdown.
+/// Applies the event's `--port` / `--host` onto the component, holds the process up
+/// with a [`KeepAliveGuard`], then queues the installed [`HttpServerFn`], handing it
+/// the shutdown receiver so it owns its own teardown.
 fn on_start_server(
 	ev: On<StartServer>,
 	mut servers: Query<&mut HttpServer>,
-	mut keep_alive: ResMut<KeepAlive>,
 	mut commands: Commands,
 ) {
 	if !ev.passes("http") {
@@ -189,22 +193,22 @@ fn on_start_server(
 	if let Ok(mut server) = servers.get_mut(entity) {
 		*server = server.clone().with_params(&ev.params);
 	}
-	keep_alive.acquire();
-	// store the shutdown sender on the host; move the receiver into the accept loop.
+	// store the shutdown sender on the host; hand the receiver to the backend.
 	let (signal, shutdown) = oneshot::<()>();
 	commands
 		.entity(entity)
-		.insert(HttpServerShutdown(Some(signal)))
+		.insert((KeepAliveGuard, HttpServerShutdown(Some(signal))))
 		.queue_async_local(move |entity| start_http_server(entity, shutdown));
 }
 
 /// Tears down the HTTP backend when a [`StopServer`] passing `"http"` lands: signals
-/// the shutdown channel (ending the accept loop and dropping the listener, which
-/// closes the port) and releases the server's [`KeepAlive`] ref.
+/// the shutdown channel (so the backend stops accepting and drops its listener) and
+/// drops the [`KeepAliveGuard`], releasing the server's hold on the process. Both
+/// removals are idempotent, so a stop on an unstarted or already-stopped server is a
+/// no-op.
 fn on_stop_server(
 	ev: On<StopServer>,
 	mut shutdowns: Query<&mut HttpServerShutdown>,
-	mut keep_alive: ResMut<KeepAlive>,
 	mut commands: Commands,
 ) {
 	if !ev.passes("http") {
@@ -212,19 +216,18 @@ fn on_stop_server(
 	}
 	let entity = ev.event_target();
 	if let Ok(mut shutdown) = shutdowns.get_mut(entity) {
-		// signalling wakes the receiver in `start_http_server`, dropping the backend.
 		if let Some(signal) = shutdown.0.take() {
 			signal.signal(());
 		}
-		keep_alive.release();
-		commands.entity(entity).remove::<HttpServerShutdown>();
 	}
+	commands
+		.entity(entity)
+		.remove::<(KeepAliveGuard, HttpServerShutdown)>();
 }
 
-/// Invoke the installed backend on a started host, racing its accept loop against
-/// the `shutdown` signal. The backend owns its listener, so when a [`StopServer`]
-/// signals the channel the race drops the backend future, dropping the listener and
-/// closing the port. Skips a host already despawned (eg a serialization spawn).
+/// Invoke the installed backend on a started host, handing it the `shutdown`
+/// receiver so it stops accepting and releases its listener when a [`StopServer`]
+/// signals. Skips a host already despawned (eg a serialization spawn).
 async fn start_http_server(
 	entity: AsyncEntity,
 	shutdown: OnceValueRx<()>,
@@ -238,13 +241,7 @@ async fn start_http_server(
 			 (server/hyper/lambda) or install one via set_http_server(...)."
 		)
 	};
-	// the shutdown branch resolves when signalled; `or` then drops the backend
-	// future, dropping its listener and closing the port.
-	beet_core::exports::futures_lite::future::or(backend(entity), async move {
-		shutdown.wait().await;
-		Result::Ok(())
-	})
-	.await
+	backend(entity, shutdown).await
 }
 
 
@@ -272,6 +269,7 @@ mod std_impl {
 				+ FnOnce(
 					AsyncEntity,
 					async_io::Async<std::net::TcpListener>,
+					OnceValueRx<()>,
 				) -> Fut,
 			Fut: 'static + Send + Sync + Future<Output = Result>,
 		{
@@ -280,12 +278,17 @@ mod std_impl {
 			let port = listener.local_addr().unwrap().port();
 			let listener = async_io::Async::new(listener)
 				.expect("failed to create async listener");
+			// these tests never stop the server, so the shutdown sender is dropped:
+			// the receiver never resolves and the server runs for the test's duration.
+			let (_signal, shutdown) = oneshot::<()>();
 			(
 				Self {
 					port: Some(port),
 					..default()
 				},
-				OnSpawn::new_async(move |entity| run_server(entity, listener)),
+				OnSpawn::new_async(move |entity| {
+					run_server(entity, listener, shutdown)
+				}),
 			)
 		}
 	}
@@ -305,7 +308,7 @@ mod tests {
 	/// hook: flagging is observable where a start is expected and harmless where
 	/// it is not (a filter miss never invokes the hook).
 	fn stub_backend() {
-		set_http_server(|entity| {
+		set_http_server(|entity, _shutdown| {
 			Box::pin(async move {
 				entity
 					.with(|mut entity| {
@@ -478,7 +481,11 @@ pub(crate) mod test {
 		Func: 'static
 			+ Send
 			+ Sync
-			+ FnOnce(AsyncEntity, async_io::Async<std::net::TcpListener>) -> Fut,
+			+ FnOnce(
+				AsyncEntity,
+				async_io::Async<std::net::TcpListener>,
+				OnceValueRx<()>,
+			) -> Fut,
 		Fut: 'static + Send + Sync + Future<Output = Result>,
 	{
 		let server = HttpServer::new_test(run_server);
@@ -518,5 +525,42 @@ pub(crate) mod test {
 			.unwrap();
 		let body_text = response.text().await.unwrap();
 		body_text.xpect_eq("hello");
+	}
+
+	/// A real running mini server stops when its shutdown signal fires: it serves
+	/// before, and after the signal the port is closed (a connect is refused). The
+	/// end-to-end proof that the shutdown a `StopServer` sends tears down a live
+	/// listener, joining the mechanism (`shutdown_ends_accept_loop`) and the wiring
+	/// (`stop_releases_keepalive`).
+	#[beet_core::test]
+	async fn stops_real_server() {
+		let listener = async_io::Async::<std::net::TcpListener>::bind(
+			core::net::SocketAddr::from(([127, 0, 0, 1], 0)),
+		)
+		.unwrap();
+		let port = listener.get_ref().local_addr().unwrap().port();
+		let url = format!("http://127.0.0.1:{port}");
+		// keep the sender in the test so we can stop the server ourselves.
+		let (signal, shutdown) = oneshot::<()>();
+		let _handle = std::thread::spawn(move || {
+			App::new()
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn((
+					HttpServer { port: Some(port), ..default() },
+					exchange_handler(|_| Response::ok().with_body("up")),
+					OnSpawn::new_async(move |entity| {
+						start_mini_http_server_with_tcp(entity, listener, shutdown)
+					}),
+				))
+				.run();
+		});
+		time_ext::sleep_millis(150).await;
+		// serving before the stop
+		Request::get(&url).send().await.unwrap().into_result().await.xpect_ok();
+		// fire the shutdown: the mini server's race resolves and drops its listener.
+		signal.signal(());
+		time_ext::sleep_millis(150).await;
+		// the port is closed, so a fresh connect is refused.
+		Request::get(&url).send().await.xpect_err();
 	}
 }

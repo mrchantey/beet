@@ -26,11 +26,6 @@ use beet_ui::prelude::*;
 #[component(on_add = on_add)]
 pub struct TuiServer;
 
-/// Marks a [`TuiServer`] whose live app is running, so a [`StopServer`] releases
-/// the `KeepAlive` ref exactly once (and never another claimant's).
-#[derive(Component)]
-struct TuiServerRunning;
-
 /// Registers the [`StartServer`] / [`StopServer`] observers on the router, so the
 /// live terminal app boots and tears down when a matching event lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -42,16 +37,11 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 /// Boots the live terminal app when a [`StartServer`] passing `"tui"` lands.
-/// A long-running server, so it takes a [`KeepAlive`] ref.
-fn on_start_server(
-	ev: On<StartServer>,
-	mut keep_alive: ResMut<KeepAlive>,
-	mut commands: Commands,
-) {
+/// A long-running server, so it holds the process up with a [`KeepAliveGuard`].
+fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 	if !ev.passes("tui") {
 		return;
 	}
-	keep_alive.acquire();
 	// the start event's params (the `ServeOnLoad` verb's entry request, or a `beet
 	// serve` command's argv) carry the opening route and scheme, so a served site
 	// opens at the right page. Record the opening route on the router (the shared
@@ -60,25 +50,20 @@ fn on_start_server(
 	commands
 		.entity(ev.event_target())
 		.insert(OpeningRoute::from_params(&params))
-		.insert(TuiServerRunning)
+		.insert(KeepAliveGuard)
 		.queue_async_local(move |entity| boot(entity, params));
 }
 
 /// Tears down the live terminal app when a [`StopServer`] passing `"tui"` lands by
-/// releasing its [`KeepAlive`] ref. When that drops the count to zero the binary's
-/// exit system emits `AppExit`, ending the `CharcellTuiPlugin` loop (which restores
-/// the terminal on exit), the same path Ctrl+c takes.
-fn on_stop_server(
-	ev: On<StopServer>,
-	running: Query<(), With<TuiServerRunning>>,
-	mut keep_alive: ResMut<KeepAlive>,
-	mut commands: Commands,
-) {
-	if !ev.passes("tui") || !running.contains(ev.event_target()) {
+/// dropping its [`KeepAliveGuard`] (a no-op if it never started). When that drops
+/// the last ref the binary's exit system emits `AppExit`, ending the
+/// `CharcellTuiPlugin` loop (which restores the terminal on exit), the same path
+/// Ctrl+c takes.
+fn on_stop_server(ev: On<StopServer>, mut commands: Commands) {
+	if !ev.passes("tui") {
 		return;
 	}
-	keep_alive.release();
-	commands.entity(ev.event_target()).remove::<TuiServerRunning>();
+	commands.entity(ev.event_target()).remove::<KeepAliveGuard>();
 }
 
 async fn boot(

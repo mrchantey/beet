@@ -48,36 +48,35 @@ fn on_load_template(
 	if script.trim().is_empty() {
 		return Ok(());
 	}
-	eval_script(&script)
+	// the process argv as `input`: native argv, or the browser URL / `Deno.args` in
+	// wasm (see `CliArgs::parse_env`). The binary's own `--main` rides along as an
+	// extra param the script ignores, as the one-shot `CliServer` re-parses argv.
+	let input = request_input(&CliArgs::parse_env());
+	eval_script(&script, &input)
 }
 
-/// Evaluate the script, streaming `console.log`/`error` to the host streams. Native
-/// runs it through the quickjs runtime with the process argv bound as `input`; wasm
-/// runs it isolated in the host (browser/Deno) via [`script_ext`], with no argv.
+/// Evaluate the script with `input` bound, streaming `console.log`/`error` to the
+/// host streams. Native runs it through the quickjs runtime; wasm runs it isolated
+/// in the host (browser/Deno) via [`script_ext`].
 #[cfg(not(target_arch = "wasm32"))]
-fn eval_script(script: &str) -> Result {
-	// the process argv as `input`. The binary's own `--main` rides along as an extra
-	// param the script ignores, exactly as the one-shot `CliServer` re-parses argv.
-	let input = request_input(&CliArgs::parse_env());
+fn eval_script(script: &str, input: &serde_json::Value) -> Result {
 	run_quickjs_console(script, input, |stream, line| match stream {
 		ConsoleStream::Stdout => cross_log!("{line}"),
 		ConsoleStream::Stderr => cross_log_error!("{line}"),
 	})
 }
 
-/// Evaluate the script in the wasm host, streaming its console output. wasm has no
-/// process argv, so the script runs with no `input` binding.
 #[cfg(target_arch = "wasm32")]
-fn eval_script(script: &str) -> Result {
+fn eval_script(script: &str, input: &serde_json::Value) -> Result {
 	use beet_core::web_utils::script_ext;
-	script_ext::eval_console(script, |stream, line| match stream {
+	let input = serde_json::to_string(input)?;
+	script_ext::eval_console(script, &input, |stream, line| match stream {
 		script_ext::ConsoleStream::Stdout => cross_log!("{line}"),
 		script_ext::ConsoleStream::Stderr => cross_log_error!("{line}"),
 	})
 }
 
 /// The process argv as the script's `input`: a `{ path, params }` object.
-#[cfg(not(target_arch = "wasm32"))]
 fn request_input(args: &CliArgs) -> serde_json::Value {
 	let path: Vec<String> =
 		args.path.iter().map(|segment| segment.to_string()).collect();

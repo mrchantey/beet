@@ -33,11 +33,11 @@ impl Plugin for ServerPlugin {
 		{
 			cfg_if! {
 				if #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))] {
-					set_http_server(|entity| Box::pin(super::start_lambda_server(entity))).ok();
+					set_http_server(|entity, shutdown| Box::pin(super::start_lambda_server(entity, shutdown))).ok();
 				} else if #[cfg(all(feature = "hyper", not(target_arch = "wasm32")))] {
-					set_http_server(|entity| Box::pin(super::start_hyper_server(entity))).ok();
+					set_http_server(|entity, shutdown| Box::pin(super::start_hyper_server(entity, shutdown))).ok();
 				} else if #[cfg(all(feature = "server", not(target_arch = "wasm32")))] {
-					set_http_server(|entity| Box::pin(super::start_mini_http_server(entity))).ok();
+					set_http_server(|entity, shutdown| Box::pin(super::start_mini_http_server(entity, shutdown))).ok();
 				} else {
 					// no feature backend: a downstream `set_http_server` supplies one.
 				}

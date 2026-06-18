@@ -28,7 +28,12 @@ pub fn load_dotenv() {
 pub fn args() -> Vec<String> {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
-			// Deno.args already excludes program name
+			// a browser has no process argv, so derive args from the location (path
+			// segments -> positionals, query -> `--key=value`). deno/node use
+			// `Deno.args`, which already excludes the program name.
+			if web_sys::window().is_some() {
+				return search_params_ext::location_args();
+			}
 			return array_ext::into_vec_str(js_runtime::env_args());
 		} else if #[cfg(feature = "std")] {
 			return std::env::args().skip(1).collect();

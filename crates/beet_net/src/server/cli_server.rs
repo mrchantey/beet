@@ -37,22 +37,19 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 /// Runs the one argv exchange when a [`StartServer`] passing `"cli"` lands.
-fn on_start_server(
-	ev: On<StartServer>,
-	mut keep_alive: ResMut<KeepAlive>,
-	mut commands: Commands,
-) {
+fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 	if !ev.passes("cli") {
 		return;
 	}
-	// hold a ref for the duration of the async exchange so the process cannot exit
-	// before it completes; `run_and_exit` releases it when the exchange finishes.
-	keep_alive.acquire();
+	// hold the process up for the duration of the async exchange with a
+	// `KeepAliveGuard`; `run_and_exit` drops it when the exchange finishes, and a
+	// despawn drops it automatically, so it cannot leak.
 	// the boot params (from the `ServeOnLoad` verb, parsed from argv) reach the
 	// exchange so a served site renders the requested route.
 	let params = ev.params.clone();
 	commands
 		.entity(ev.event_target())
+		.insert(KeepAliveGuard)
 		.queue_async_local(move |entity| run_and_exit(entity, params));
 }
 
@@ -71,10 +68,9 @@ async fn run_and_exit(
 	params: MultiMap<SmolStr, SmolStr>,
 ) -> Result {
 	// short-circuit when the entity has already been despawned, ie
-	// [`TemplateStore::save_bundle`] briefly spawns a [`CliServer`]
-	// just to serialize it. Drop the ref taken on start so it cannot leak.
+	// [`TemplateStore::save_bundle`] briefly spawns a [`CliServer`] just to serialize
+	// it. The despawn already dropped the `KeepAliveGuard`, so nothing leaks.
 	if !entity.is_alive().await {
-		release_keep_alive(&entity).await;
 		return Ok(());
 	}
 
@@ -107,11 +103,11 @@ async fn run_and_exit(
 	stream_body_to_stdout(body).await?;
 
 	match exit_code {
-		// success: drop our ref. If nothing else holds the process up the exit
+		// success: drop our guard. If nothing else holds the process up the exit
 		// system emits `AppExit::Success`; a sibling long-running server keeps it.
-		Ok(()) => release_keep_alive(&entity).await,
+		Ok(()) => remove_keep_alive_guard(&entity).await,
 		// failure: report the non-zero exit code directly so it reaches the process
-		// exit, leaving our ref since the message ends the run anyway.
+		// exit, leaving our guard since the message ends the run anyway.
 		Err(code) => {
 			error!("Command failed\nStatus code: {code}");
 			entity.world().write_message(AppExit::Error(code)).await;
@@ -120,13 +116,15 @@ async fn run_and_exit(
 	Ok(())
 }
 
-/// Drop the [`KeepAlive`] ref a `cli` start took, so a finished exchange lets the
-/// process exit unless another claim still holds it.
-async fn release_keep_alive(entity: &AsyncEntity) {
+/// Drop the [`KeepAliveGuard`] a `cli` start inserted, so a finished exchange lets
+/// the process exit unless another claim still holds it.
+async fn remove_keep_alive_guard(entity: &AsyncEntity) {
 	entity
-		.world()
-		.with(|world: &mut World| world.resource_mut::<KeepAlive>().release())
-		.await;
+		.with(|mut entity| {
+			entity.remove::<KeepAliveGuard>();
+		})
+		.await
+		.ok();
 }
 
 /// Streams a [`Response`] body to stdout chunk-by-chunk, returning

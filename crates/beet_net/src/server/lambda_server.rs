@@ -5,7 +5,13 @@ use lambda_http::tower::service_fn;
 
 
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
-pub async fn start_lambda_server(entity: AsyncEntity) -> Result {
+///
+/// The lambda runtime owns the lifecycle (it stops invoking when the function is
+/// torn down) and there is no listener to close, so the shutdown signal is unused.
+pub async fn start_lambda_server(
+	entity: AsyncEntity,
+	_shutdown: OnceValueRx<()>,
+) -> Result {
 	// This variable only applies to API Gateway stages,
 	// you can remove it if you don't use them.
 	// i.e

@@ -18,7 +18,10 @@ use std::net::SocketAddr;
 /// This async function mirrors the signature of `start_hyper_server` and
 /// `start_lambda_server` so the `HttpServer` component can swap
 /// backends via feature flags.
-pub async fn start_mini_http_server(entity: AsyncEntity) -> Result {
+pub async fn start_mini_http_server(
+	entity: AsyncEntity,
+	shutdown: OnceValueRx<()>,
+) -> Result {
 	let addr: SocketAddr = entity
 		.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
 		.await?;
@@ -28,7 +31,7 @@ pub async fn start_mini_http_server(entity: AsyncEntity) -> Result {
 			bevyhow!("Failed to bind mini HTTP server to {addr}: {err}")
 		})?;
 
-	start_mini_http_server_with_tcp(entity, listener).await
+	start_mini_http_server_with_tcp(entity, listener, shutdown).await
 }
 
 /// Start a mini HTTP server using a pre-bound TCP listener.
@@ -39,6 +42,7 @@ pub async fn start_mini_http_server(entity: AsyncEntity) -> Result {
 pub async fn start_mini_http_server_with_tcp(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
+	shutdown: OnceValueRx<()>,
 ) -> Result {
 	let addr = listener
 		.get_ref()
@@ -46,6 +50,24 @@ pub async fn start_mini_http_server_with_tcp(
 		.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
 	info!("Mini HTTP server listening on http://{addr}");
 
+	// race the accept loop against the shutdown signal: when `StopServer` signals,
+	// the loop future is dropped, releasing the listener so the port closes. The
+	// per-connection tasks are spawned, so this is a minimal drain — in-flight
+	// requests finish on their own (or are cut by process exit when nothing else
+	// holds the process up).
+	beet_core::exports::futures_lite::future::or(accept_loop(entity, listener), async move {
+		shutdown.wait().await;
+		Result::Ok(())
+	})
+	.await
+}
+
+/// The accept loop: dispatch each connection on its own spawned task. Diverges
+/// (only [`start_mini_http_server_with_tcp`]'s shutdown race ends it).
+async fn accept_loop(
+	entity: AsyncEntity,
+	listener: async_io::Async<std::net::TcpListener>,
+) -> Result {
 	loop {
 		let accept_result = listener.accept().await;
 		let (stream, peer_addr) = match accept_result {

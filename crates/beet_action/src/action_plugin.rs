@@ -48,7 +48,7 @@ impl Plugin for ActionPlugin {
 		// `scripting` module, so the wasm arm needs that feature too.
 		#[cfg(any(
 			all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")),
-			all(feature = "scripting", target_arch = "wasm32")
+			all(feature = "scripting", feature = "json", target_arch = "wasm32")
 		))]
 		app.register_type::<EvalOnLoad>();
 	}

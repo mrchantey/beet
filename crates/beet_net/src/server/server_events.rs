@@ -134,24 +134,47 @@ impl StopServer {
 /// zero the binary does not exit; when the last claim drops and it reaches zero the
 /// exit system emits [`AppExit::Success`].
 ///
-/// Each claimant takes a ref for its lifetime and drops it when done: a long-running
-/// [`HttpServer`] / `TuiServer` ([`acquire`](Self::acquire) on start,
-/// [`release`](Self::release) on [`StopServer`]), a running [`CliServer`] exchange
-/// (acquire on start, release when the exchange finishes), and the binary itself
-/// (a load-scope ref held across the build). A refcount, not a unit flag, so sibling
-/// servers on one host (the multi-server site) each hold their own ref: a one-shot
-/// `CliServer` releasing its ref never tears down a live `HttpServer`.
+/// Claims are taken as [`KeepAliveGuard`] components, not by hand: a long-running
+/// [`HttpServer`] / `TuiServer` holds one on its host, a running [`CliServer`]
+/// exchange holds one for its duration, and the binary holds one across the build.
+/// A refcount, not a unit flag, so sibling servers on one host (the multi-server
+/// site) each hold their own: a one-shot `CliServer` dropping its guard never tears
+/// down a live `HttpServer`.
 #[derive(Debug, Default, Resource)]
 pub struct KeepAlive(usize);
 
 impl KeepAlive {
-	/// Takes a ref: the process stays alive until it is released.
+	/// Takes a ref: the process stays alive until it is released. Prefer a
+	/// [`KeepAliveGuard`] component, which calls this on insert.
 	pub fn acquire(&mut self) { self.0 += 1; }
 	/// Drops a ref previously taken with [`acquire`](Self::acquire), saturating at
 	/// zero so an extra release can never underflow.
 	pub fn release(&mut self) { self.0 = self.0.saturating_sub(1); }
 	/// The number of outstanding refs; zero means nothing is keeping the process up.
 	pub fn count(&self) -> usize { self.0 }
+}
+
+/// A process-lifetime claim held as a component: inserting it acquires a [`KeepAlive`]
+/// ref, removing it (or despawning its entity) releases that ref. Every long-running
+/// claimant holds one (a booted server on its host, the binary's load scope on a
+/// scratch entity), so the accounting is uniform and a despawn can never leak a ref.
+/// Removing an absent guard is a no-op, so stop paths are idempotent.
+#[derive(Default, Component)]
+#[component(on_add = on_guard_add, on_remove = on_guard_remove)]
+pub struct KeepAliveGuard;
+
+/// Acquire a [`KeepAlive`] ref when a guard is inserted.
+fn on_guard_add(mut world: DeferredWorld, _cx: HookContext) {
+	if let Some(mut keep_alive) = world.get_resource_mut::<KeepAlive>() {
+		keep_alive.acquire();
+	}
+}
+
+/// Release the [`KeepAlive`] ref when a guard is removed or its entity despawned.
+fn on_guard_remove(mut world: DeferredWorld, _cx: HookContext) {
+	if let Some(mut keep_alive) = world.get_resource_mut::<KeepAlive>() {
+		keep_alive.release();
+	}
 }
 
 #[cfg(test)]

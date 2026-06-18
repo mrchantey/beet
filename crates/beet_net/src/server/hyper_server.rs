@@ -24,7 +24,10 @@ use std::task::Poll;
 /// This async function contains unopinionated machinery for handling
 /// hyper requests.
 /// See [`HttpServer`] for customizing handlers.
-pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
+pub async fn start_hyper_server(
+	entity: AsyncEntity,
+	shutdown: OnceValueRx<()>,
+) -> Result {
 	let addr = entity
 		.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
 		.await?;
@@ -32,7 +35,7 @@ pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
 	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
 		.map_err(|err| bevyhow!("Failed to bind to {}: {}", addr, err))?;
 
-	start_hyper_server_with_tcp(entity, listener).await
+	start_hyper_server_with_tcp(entity, listener, shutdown).await
 }
 
 /// Like [`start_hyper_server`] but accepts a pre-bound TCP listener,
@@ -40,6 +43,7 @@ pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
 pub async fn start_hyper_server_with_tcp(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
+	shutdown: OnceValueRx<()>,
 ) -> Result {
 	let addr = listener
 		.get_ref()
@@ -47,6 +51,24 @@ pub async fn start_hyper_server_with_tcp(
 		.map_err(|err| bevyhow!("Failed to get local address: {}", err))?;
 	info!("Server listening on http://{}", addr);
 
+	// race the accept loop against the shutdown signal: signalling drops the loop
+	// future, releasing the listener so the port closes (the mini server pattern).
+	beet_core::exports::futures_lite::future::or(
+		hyper_accept_loop(entity, listener),
+		async move {
+			shutdown.wait().await;
+			Result::Ok(())
+		},
+	)
+	.await
+}
+
+/// The hyper accept loop: serve each connection on its own spawned task. Diverges
+/// (only the shutdown race in [`start_hyper_server_with_tcp`] ends it).
+async fn hyper_accept_loop(
+	entity: AsyncEntity,
+	listener: async_io::Async<std::net::TcpListener>,
+) -> Result {
 	loop {
 		let (tcp, addr) = listener
 			.accept()
