@@ -61,7 +61,7 @@ template = ["std", "rsx", "style"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
+tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "dep:image", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -98,6 +98,9 @@ bytes.workspace = true
 libc = { workspace = true, optional = true }
 vte = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
+# terminal raster decoding: a non-PNG `<img>` (eg a `.jpg`) is decoded and
+# re-encoded to PNG for the kitty `f=100` transmit. PNG + common web formats only.
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 serde = { workspace = true, optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 serde_json = { workspace = true, optional = true }

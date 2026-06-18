@@ -120,7 +120,11 @@ impl Plugin for RouterPlugin {
 			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
 			// terminal app when a `tui`-filtered `StartServer` lands.
 			#[cfg(feature = "tui")]
-			app.register_type::<TuiServer>();
+			app.register_type::<TuiServer>()
+				// point the terminal image renderer at our own HTTP server, so a
+				// site-rooted `<img src="/assets/…">` is fetched over HTTP (the
+				// server maps it to its blob store) like the browser does.
+				.add_observer(set_render_server_origin);
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
 				.register_type::<ExchangeScript<(), String>>()
@@ -131,6 +135,25 @@ impl Plugin for RouterPlugin {
 					SerdeIntoResponseMarker,
 				>>();
 		}
+	}
+}
+
+/// Observer: point the terminal image renderer's [`RenderServerOrigin`] at our
+/// own [`HttpServer`]'s loopback address, so a site-rooted image `src`
+/// (`/assets/…`) is fetched over HTTP and mapped to the blob store, no filesystem
+/// on the render host. Fires when an `HttpServer` lands on the router.
+#[cfg(all(feature = "std", feature = "tui"))]
+fn set_render_server_origin(
+	ev: On<Insert, HttpServer>,
+	servers: Query<&HttpServer>,
+	mut commands: Commands,
+) {
+	if let Ok(port) =
+		servers.get(ev.entity).map(|server| server.socket_addr().port())
+		&& port != 0
+	{
+		commands
+			.insert_resource(RenderServerOrigin(format!("http://127.0.0.1:{port}")));
 	}
 }
 

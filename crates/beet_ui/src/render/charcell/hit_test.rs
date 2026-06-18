@@ -50,7 +50,11 @@ impl HitTest<'_, '_> {
 	/// `<a>` text lands on the link), stacking, clipping, and the scroll transform.
 	/// Falls back to a geometric rect walk for cells no glyph painted (eg a
 	/// transparent container's padding).
-	fn entity_at_surface(&self, surface: Entity, cell: IVec2) -> Option<Entity> {
+	pub(crate) fn entity_at_surface(
+		&self,
+		surface: Entity,
+		cell: IVec2,
+	) -> Option<Entity> {
 		let Ok((root, buffer)) = self.roots.get(surface) else {
 			return None;
 		};
@@ -370,6 +374,70 @@ mod test {
 	fn sgr(b: u32, col: u32, row: u32, pressed: bool) -> Vec<u8> {
 		let m = if pressed { 'M' } else { 'm' };
 		format!("\x1b[<{b};{};{}{m}", col + 1, row + 1).into_bytes()
+	}
+
+	/// A sidebar link is one uniform hit target across its full row, and stays one
+	/// while hovered in the **dark** scheme — the case that regressed. The hover
+	/// must keep the link's background *defined* (a scheme tone, not an unset token
+	/// that resolves to `None`); otherwise the row's fill drops on hover, its cells
+	/// leak back to the rail, and the hover flickers (clicking still worked because
+	/// the click is one discrete resolve). Character cells were immune since the
+	/// glyph keeps painting; the empty row cells are the tell.
+	#[beet_core::test]
+	fn sidebar_link_row_is_one_hit_target() {
+		use crate::style::material::classes;
+		let mut host = TestHost::sized(UVec2::new(30, 8));
+		host.app.add_plugins(
+			crate::style::material::MaterialStylePlugin::default(),
+		);
+		host.spawn_content(rsx! {
+			<div {Classes::new([classes::DARK_SCHEME])}>
+				<nav {Classes::new([classes::SIDEBAR])}>
+					<ul {Classes::new([classes::SIDEBAR_LIST])}>
+						<li {Classes::new([classes::SIDEBAR_ITEM_ROOT])}>
+							<a {Classes::new([classes::SIDEBAR_LINK])} href="/x">"home"</a>
+						</li>
+					</ul>
+				</nav>
+			</div>
+		});
+		host.step();
+		host.step();
+		let surface = host.host;
+		let link = host
+			.app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(host.app.world())
+			.find(|(_, el)| el.tag() == "a")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		// at rest every cell past the 4-char label resolves to the link — one
+		// contiguous hit target, not the bare rail.
+		let cols: Vec<i32> = (5..16).collect();
+		let resolved = cols.clone();
+		host.app
+			.world_mut()
+			.run_system_once(move |hit: HitTest| {
+				resolved
+					.iter()
+					.all(|&x| hit.entity_at_surface(surface, IVec2::new(x, 0))
+						== Some(link))
+			})
+			.unwrap()
+			.xpect_true();
+		// hovering resolves a *defined* background (the dark hover surface tone),
+		// not `None`, so the row keeps painting its fill and never leaks to the rail.
+		host.send_input(&sgr(35, 8, 0, true));
+		host.step();
+		host.step();
+		host.app
+			.world()
+			.get::<VisualStyle>(link)
+			.unwrap()
+			.background
+			.is_some()
+			.xpect_true();
 	}
 
 	/// Boot a host with the pointer-logging observers attached.
@@ -768,17 +836,21 @@ mod test {
 		host.app.world().get::<VisualStyle>(button).unwrap().background
 	}
 
-	/// A container-less interactive (text button) gains a *visible fill* on hover
-	/// in the light scheme — the fix for the light-mode "no hover affordance"
-	/// gap — but no fill in the dark scheme, where the hover reads as a text dim
-	/// instead. Neither carries a background at rest.
+	/// A container-less interactive (text button) gains a visible hover fill in
+	/// *both* schemes — a raised surface tone resolved per scheme — so the hover
+	/// affordance reads on light and dark alike, and a full-width row never loses
+	/// its background mid-hover (the dark-scheme flicker fix; `HoverSurface` is now
+	/// defined in every scheme, not just light). Neither carries one at rest.
 	#[beet_core::test]
-	fn backgroundless_button_hover_is_scheme_aware() {
+	fn button_hover_fill_is_scheme_aware() {
 		use crate::style::material::classes;
-		// light: a hover fill appears.
-		hovered_button_background(classes::LIGHT_SCHEME).xpect_some();
-		// dark: no hover fill (the HoverSurface token is unset there).
-		hovered_button_background(classes::DARK_SCHEME).xpect_none();
+		let light = hovered_button_background(classes::LIGHT_SCHEME);
+		let dark = hovered_button_background(classes::DARK_SCHEME);
+		// both schemes resolve a defined fill ...
+		light.xpect_some();
+		dark.xpect_some();
+		// ... in scheme-appropriate tones (the light raised tone differs from dark).
+		(light != dark).xpect_true();
 	}
 
 	/// A wheel over content nested in a scroll container that *can't* scroll
