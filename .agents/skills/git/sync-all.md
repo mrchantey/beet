@@ -12,5 +12,6 @@ Apply the worktree sync skill to the following worktrees.
 - Ignore: experimental and not to be merged
 	- coding `~/me/worktrees/beet/coding/beet`
 
+Do Not run cargo fmt.
 
 Naturally, if you need to make changes to resolve conflicts, then after those conflicts are resolved, you'll need to re-sync with those child work trees so that everything is in lockstep finally.

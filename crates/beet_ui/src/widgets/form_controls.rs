@@ -345,7 +345,12 @@ mod test {
 			.find(|(_, element)| element.tag() == "input")
 			.map(|(entity, _)| entity)
 			.unwrap();
-		app.world_mut().entity_mut(input).insert(Focus);
+		// scope the input to a window surface so the per-surface focus path delivers
+		// the typed text (the real app binds the page to a RenderSurface).
+		let window = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.entity_mut(input)
+			.insert((Focus, RenderSurface(window)));
 		for ch in ["h", "i"] {
 			app.world_mut().write_message(KeyboardInput {
 				key_code: KeyCode::KeyH,
@@ -353,7 +358,7 @@ mod test {
 				state: ButtonState::Pressed,
 				text: Some(ch.into()),
 				repeat: false,
-				window: Entity::PLACEHOLDER,
+				window,
 			});
 		}
 		// a few frames for the edit to flow through the document sync chain.
@@ -417,7 +422,12 @@ mod test {
 		};
 		// focus the input and type a name.
 		let input = element(&mut app, "input");
-		app.world_mut().entity_mut(input).insert(Focus);
+		// scope the input to a window surface so the per-surface focus path delivers
+		// the typed text (the real app binds the page to a RenderSurface).
+		let window = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.entity_mut(input)
+			.insert((Focus, RenderSurface(window)));
 		for ch in ["A", "d", "a"] {
 			app.world_mut().write_message(KeyboardInput {
 				key_code: KeyCode::KeyA,
@@ -425,7 +435,7 @@ mod test {
 				state: ButtonState::Pressed,
 				text: Some(ch.into()),
 				repeat: false,
-				window: Entity::PLACEHOLDER,
+				window,
 			});
 		}
 		app.update();

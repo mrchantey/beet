@@ -50,12 +50,10 @@ fn main() -> AppExit {
 	#[cfg(feature = "ssh")]
 	app.init_plugin::<SshTuiPlugin>();
 
-	app.add_systems(Startup, load_entry)
-		.add_systems(
-			Last,
-			exit_when_unclaimed.run_if(resource_exists_and_changed::<KeepAlive>),
-		)
-		.run()
+	// the process exits when the `KeepAlive` refcount hits zero (every server
+	// stopped, the load scope released); `ServerPlugin` registers that exit system,
+	// so a long-running server persists while a one-shot cli exchange exits.
+	app.add_systems(Startup, load_entry).run()
 }
 
 /// `Startup`: resolve the entry and build it through the unified [`TemplateLoader`].
@@ -137,18 +135,4 @@ fn discover_entry() -> Result<AbsPathBuf> {
 		"no entry document found: looked for {ENTRY_NAMES:?} in `{start}` and its \
 		ancestors. Create a `main.bsx` or pass `--main=<path>`."
 	)
-}
-
-/// `Last`: exit once nothing is keeping the process alive. [`KeepAlive`] refcounts
-/// the live claims (the load scope, each running server or cli exchange); when the
-/// last ref drops the count reaches zero and the process exits cleanly. A failed
-/// command writes its own `AppExit::Error` first to carry its exit code. Gated on a
-/// `KeepAlive` change, so there is no per-frame polling.
-fn exit_when_unclaimed(
-	keep_alive: Res<KeepAlive>,
-	mut exit: MessageWriter<AppExit>,
-) {
-	if keep_alive.count() == 0 {
-		exit.write(AppExit::Success);
-	}
 }

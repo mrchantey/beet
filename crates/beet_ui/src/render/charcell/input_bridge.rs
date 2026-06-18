@@ -399,10 +399,13 @@ mod test {
 	#[beet_core::test]
 	fn focus_plugin_receives_typed_text() {
 		let mut host = TestHost::new();
+		// bind the field to the host surface (input_bridge tags events with the host
+		// entity as their window), so the per-surface focus path delivers the text.
+		let surface = host.host;
 		let field = host
 			.app
 			.world_mut()
-			.spawn((Focus, Value::str("")))
+			.spawn((Focus, Value::str(""), RenderSurface(surface)))
 			.id();
 		host.send_input(b"hi");
 		host.step();

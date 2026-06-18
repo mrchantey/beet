@@ -23,6 +23,16 @@ impl Plugin for ServerPlugin {
 			// resolves it.
 			.register_type::<ServeOnLoad>();
 
+		// exit once nothing keeps the process alive: a finished `CliServer`
+		// exchange or a stopped server drops its `KeepAliveGuard`, and when the last
+		// claim goes the refcount reaches zero. Gated on a `KeepAlive` change so
+		// there is no per-frame polling. Lives here (not in a binary's main) so every
+		// server app — the cli and the examples alike — exits cleanly.
+		app.add_systems(
+			Last,
+			exit_when_unclaimed.run_if(resource_exists_and_changed::<KeepAlive>),
+		);
+
 		// install the HTTP backend `HttpServer` invokes on start. The cascade
 		// mirrors the old per-component dispatch, now in one place: a downstream
 		// `set_http_server` (an embassy / esp adapter) replaces it on no_std,
@@ -49,6 +59,18 @@ impl Plugin for ServerPlugin {
 		// observer increments) backs the std [`HttpServer`] requirement.
 		#[cfg(feature = "std")]
 		app.add_observer(exchange_stats);
+	}
+}
+
+/// `Last`: emit [`AppExit::Success`] once the [`KeepAlive`] refcount reaches zero,
+/// so a process with no remaining claim (every server stopped, the cli exchange
+/// finished) exits cleanly. A long-running server holds a guard, so it persists.
+fn exit_when_unclaimed(
+	keep_alive: Res<KeepAlive>,
+	mut exit: MessageWriter<AppExit>,
+) {
+	if keep_alive.count() == 0 {
+		exit.write(AppExit::Success);
 	}
 }
 

@@ -365,8 +365,14 @@ mod test {
 	#[beet_core::test]
 	fn keyboard_opens_tabs_and_chooses() {
 		let mut host = select_host();
+		let surface = host.host;
 		let select = select_entity(&mut host);
-		host.app.world_mut().entity_mut(select).insert(Focus);
+		// scope the select (and its `ChildOf`-nested dropdown rows) to the host
+		// surface so the per-surface keyboard path delivers Enter/Tab to it.
+		host.app
+			.world_mut()
+			.entity_mut(select)
+			.insert((Focus, RenderSurface(surface)));
 		host.step();
 		// Enter activates the focused select, opening the panel
 		host.send_input(b"\r");

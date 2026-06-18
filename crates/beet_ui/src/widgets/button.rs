@@ -146,14 +146,19 @@ mod test {
 	fn button_fires_on_enter() {
 		let mut app = button_app();
 		let button = spawn_button(&mut app);
-		app.world_mut().entity_mut(button).insert(Focus);
+		// scope the button to a window surface so the per-surface keyboard-activation
+		// path delivers Enter to it.
+		let window = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.entity_mut(button)
+			.insert((Focus, RenderSurface(window)));
 		app.world_mut().write_message(KeyboardInput {
 			key_code: bevy::input::keyboard::KeyCode::Enter,
 			logical_key: Key::Enter,
 			state: ButtonState::Pressed,
 			text: None,
 			repeat: false,
-			window: Entity::PLACEHOLDER,
+			window,
 		});
 		app.update();
 		// the activate-on-enter system fired PointerUp on the focused button

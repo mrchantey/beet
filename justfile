@@ -96,6 +96,14 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
+# rsx_site (the typed-authoring example) is excluded from the `test-core` /
+# `test-all` package lists (its `src/codegen` route modules are generated, not
+# committed). Regenerate them, then run its render + tui tests (`--features tui`
+# enables the tui-gated `tui.rs` while keeping the default `web` target).
+test-rsx *args:
+	cargo run -p rsx_site --no-default-features --features codegen
+	cargo test -p rsx_site --features tui {{ args }}
+
 # client for the ssh_server example
 # the constant debug host key means fingerprints are stable between restarts
 ssh-client:
