@@ -133,15 +133,37 @@ impl Default for KittyGraphicsSupport {
 
 // ── Attach ────────────────────────────────────────────────────────────────────
 
-/// The base URL a site-rooted image `src` (`/assets/…`) is fetched from, so the
-/// terminal renderer requests the image over HTTP from our own server exactly
+/// The base [`Url`] a site-rooted image `src` (`/assets/…`) is fetched from, so
+/// the terminal renderer requests the image over HTTP from our own server exactly
 /// like the browser does — the server maps the path to its blob store (fs, S3,
-/// …), with no filesystem dependency on the render host (Lambda/Fargate). Set
-/// from the running `HttpServer`'s loopback address; absent, a `/`-rooted `src`
-/// is not resolvable and the `[image]: alt` marker presents.
-#[cfg(feature = "tui")]
+/// …), with no filesystem dependency on the render host (Lambda/Fargate). Set by
+/// [`set_render_server_origin`] from the running `HttpServer`'s loopback address;
+/// absent (no HTTP server listening), a `/`-rooted `src` is unresolvable and the
+/// `[image]: alt` marker presents.
+#[cfg(all(feature = "tui", feature = "net"))]
 #[derive(Debug, Clone, Resource)]
-pub struct RenderServerOrigin(pub String);
+pub struct RenderServerOrigin(pub beet_net::prelude::Url);
+
+/// Observer: point [`RenderServerOrigin`] at our own `HttpServer`'s loopback
+/// address when one lands, so a site-rooted image `src` is fetched over HTTP and
+/// mapped to the blob store (no filesystem on the render host). A `port: 0`
+/// (OS-assigned, pre-bind) is skipped; the fixed port is used as-is.
+#[cfg(all(feature = "tui", feature = "net"))]
+pub fn set_render_server_origin(
+	ev: On<Insert, beet_net::prelude::HttpServer>,
+	servers: Query<&beet_net::prelude::HttpServer>,
+	mut commands: Commands,
+) {
+	use beet_net::prelude::Url;
+	if let Ok(port) =
+		servers.get(ev.entity).map(|server| server.socket_addr().port())
+		&& port != 0
+	{
+		commands.insert_resource(RenderServerOrigin(Url::parse(format!(
+			"http://127.0.0.1:{port}"
+		))));
+	}
+}
 
 /// Marks an `<img>` whose `src` could not back a raster (missing file, not a
 /// PNG, a failed or unsupported fetch), so the attach system tries it exactly
@@ -163,7 +185,7 @@ pub struct KittyImageLoading;
 pub fn attach_kitty_images(
 	support: Res<KittyGraphicsSupport>,
 	mut placements: ResMut<KittyPlacements>,
-	origin: Option<Res<RenderServerOrigin>>,
+	#[cfg(feature = "net")] origin: Option<Res<RenderServerOrigin>>,
 	elements: ElementQuery,
 	unvisited: Query<
 		(),
@@ -176,6 +198,9 @@ pub fn attach_kitty_images(
 	>,
 	mut commands: Commands,
 ) {
+	// `placements` allocates raster ids only on the `net` fetch path.
+	#[cfg(not(feature = "net"))]
+	let _ = &mut placements;
 	if !support.enabled {
 		return;
 	}
@@ -184,22 +209,17 @@ pub fn attach_kitty_images(
 			continue;
 		}
 		let src = view.attribute_string("src");
-		let url =
-			image_request_url(&src, origin.as_ref().map(|origin| origin.0.as_str()));
-		if let Some(url) = url {
-			#[cfg(feature = "net")]
-			{
-				let id = placements.alloc_id();
-				commands.entity(view.entity).insert(KittyImageLoading);
-				commands
-					.entity(view.entity)
-					.queue_async(move |entity| fetch_remote(entity, url, id));
-			}
-			#[cfg(not(feature = "net"))]
-			{
-				let _ = url;
-				commands.entity(view.entity).insert(KittyImageUnavailable);
-			}
+		// an absolute or site-rooted URL is fetched over HTTP from our own server
+		// (which maps it to the blob store, no filesystem); needs the `net` client.
+		#[cfg(feature = "net")]
+		if let Some(url) =
+			image_request_url(&src, origin.as_ref().map(|origin| &origin.0))
+		{
+			let id = placements.alloc_id();
+			commands.entity(view.entity).insert(KittyImageLoading);
+			commands
+				.entity(view.entity)
+				.queue_async(move |entity| fetch_remote(entity, url, id));
 			continue;
 		}
 		// a bare/relative path is read from the local filesystem (test fixtures,
@@ -239,17 +259,21 @@ fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 	}
 }
 
-/// The URL an image `src` is fetched from over HTTP, or `None` for a local-file
-/// path read directly. An absolute `http(s)://` URL is used as-is; a site-rooted
-/// `/assets/…` is resolved against the server `origin` (our own server, which
-/// maps it to the blob store) like the browser does; a bare/relative path is a
-/// local file (`None`).
-#[cfg(feature = "tui")]
-fn image_request_url(src: &str, origin: Option<&str>) -> Option<String> {
+/// The [`Url`](beet_net::prelude::Url) an image `src` is fetched from over HTTP,
+/// or `None` for a local-file path read directly. An absolute `http(s)://` URL is
+/// used as-is; a site-rooted `/assets/…` is resolved against the server `origin`
+/// (our own server, which maps it to the blob store) like the browser does; a
+/// bare/relative path is a local file (`None`).
+#[cfg(all(feature = "tui", feature = "net"))]
+fn image_request_url(
+	src: &str,
+	origin: Option<&beet_net::prelude::Url>,
+) -> Option<beet_net::prelude::Url> {
+	use beet_net::prelude::Url;
 	if src.starts_with("http://") || src.starts_with("https://") {
-		Some(src.to_string())
+		Some(Url::parse(src))
 	} else if src.starts_with('/') {
-		origin.map(|origin| format!("{origin}{src}"))
+		origin.map(|origin| Url::parse(format!("{origin}{src}")))
 	} else {
 		None
 	}
@@ -285,12 +309,16 @@ fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
 /// Background fetch for a remote `src`: attach the raster on arrival, or mark
 /// the element unavailable so the alt marker stays.
 #[cfg(all(feature = "tui", feature = "net"))]
-async fn fetch_remote(entity: AsyncEntity, src: String, id: u32) -> Result {
+async fn fetch_remote(
+	entity: AsyncEntity,
+	url: beet_net::prelude::Url,
+	id: u32,
+) -> Result {
 	use beet_net::prelude::*;
 	// no `Accept` constraint: the server returns the stored file (jpg/png/…) and
 	// `to_png_bytes` decodes it; pinning `Accept: png` would reject a jpg asset.
 	let loaded = async {
-		Request::get(&src)
+		Request::get(url)
 			.send()
 			.await
 			.ok()?
@@ -620,20 +648,24 @@ mod test {
 
 	/// An image `src` resolves to an HTTP request for a URL or a site-rooted path
 	/// (against the server origin), and a bare path stays a local-file read.
-	#[cfg(feature = "tui")]
+	#[cfg(all(feature = "tui", feature = "net"))]
 	#[beet_core::test]
 	fn image_url_resolution() {
-		let origin = Some("http://127.0.0.1:8339");
+		use beet_net::prelude::Url;
+		let origin = Url::parse("http://127.0.0.1:8339");
+		let url = |src| {
+			image_request_url(src, Some(&origin)).map(|url| url.to_string())
+		};
 		// a site-rooted path fetches from our own server (mapped to the blob store)
-		image_request_url("/assets/x.jpg", origin)
+		url("/assets/x.jpg")
 			.xpect_eq(Some("http://127.0.0.1:8339/assets/x.jpg".to_string()));
 		// an absolute URL is used as-is
-		image_request_url("https://cdn/x.png", origin)
+		url("https://cdn/x.png")
 			.xpect_eq(Some("https://cdn/x.png".to_string()));
 		// no origin: a site-rooted path is unresolvable (no HTTP, no local read)
-		image_request_url("/assets/x.jpg", None).xpect_eq(None);
+		image_request_url("/assets/x.jpg", None).is_none().xpect_true();
 		// a bare path is a local file, not an HTTP request
-		image_request_url("logo.png", origin).xpect_eq(None);
+		image_request_url("logo.png", Some(&origin)).is_none().xpect_true();
 	}
 
 	/// A non-PNG image (a JPEG) is decoded and re-encoded to PNG so the kitty

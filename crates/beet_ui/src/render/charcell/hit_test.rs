@@ -45,11 +45,15 @@ impl HitTest<'_, '_> {
 	/// The topmost entity at `cell` within `surface`'s buffer only, so a cursor on
 	/// one surface never resolves to another surface's content (one per SSH session).
 	///
-	/// Prefers the entity that actually painted the cell (recorded on the painted
-	/// [`Cell`]), which precisely accounts for inline flow (so a click on inline
-	/// `<a>` text lands on the link), stacking, clipping, and the scroll transform.
-	/// Falls back to a geometric rect walk for cells no glyph painted (eg a
-	/// transparent container's padding).
+	/// Resolves the geometric topmost (the deepest box in stacking order covering
+	/// the cell, through the same scroll transform and clip the paint applied),
+	/// and refines it with the entity that actually painted the cell — but only
+	/// when that painted entity *is* the geometric box or a descendant of it (an
+	/// inline glyph managed by its IFC owner, so a click on inline `<a>` text lands
+	/// on the link). A painted *ancestor* — a container's fill showing through a
+	/// deeper, fill-less interactive (a hovered dark sidebar row whose hover has no
+	/// background) — loses to the deeper box, so the whole row stays one stable hit
+	/// target instead of flickering to the rail behind it as its fill animates.
 	pub(crate) fn entity_at_surface(
 		&self,
 		surface: Entity,
@@ -58,32 +62,42 @@ impl HitTest<'_, '_> {
 		let Ok((root, buffer)) = self.roots.get(surface) else {
 			return None;
 		};
-		// the precisely-painted entity at this cell, if any glyph painted it.
-		if cell.x >= 0 && cell.y >= 0 {
-			let pos = UVec2::new(cell.x as u32, cell.y as u32);
-			if let Some(entity) =
-				buffer.front_buffer().get(pos).and_then(|cell| cell.entity)
-			{
-				return Some(entity);
-			}
-		}
-		// geometric rect walk for cells no glyph painted.
+		// the entity that actually painted the cell, if any glyph painted it.
+		let painted = (cell.x >= 0 && cell.y >= 0)
+			.then(|| {
+				buffer
+					.front_buffer()
+					.get(UVec2::new(cell.x as u32, cell.y as u32))
+					.and_then(|cell| cell.entity)
+			})
+			.flatten();
+		// the geometric topmost: the deepest box in stacking order covering the
+		// cell (a full-width block, eg a sidebar link, even with no painted fill).
 		let viewport = buffer.current_buffer().size();
 		let ordered = self.tree.pre_order(root);
 		let contexts =
 			resolve_contexts(root, &ordered, &self.charcell, &self.tree, viewport);
-		let painted =
-			stacking_order(root, &self.charcell, &self.tree, &managed_set(
-				root,
-				&self.charcell,
-				&self.tree,
-			));
-		// topmost wins: scan the back-to-front order in reverse.
-		painted
-			.iter()
-			.rev()
-			.find(|&&entity| hit(entity, cell, &contexts, &self.charcell))
-			.copied()
+		let geo = stacking_order(root, &self.charcell, &self.tree, &managed_set(
+			root,
+			&self.charcell,
+			&self.tree,
+		))
+		.iter()
+		.rev()
+		.find(|&&entity| hit(entity, cell, &contexts, &self.charcell))
+		.copied();
+		match (geo, painted) {
+			// the painted entity refines `geo` (is it, or an inline descendant of it)
+			(Some(geo), Some(painted))
+				if painted == geo
+					|| self.tree.descendants(geo).any(|entity| entity == painted) =>
+			{
+				Some(painted)
+			}
+			// a painted ancestor (or none) yields to the deeper geometric box
+			(Some(geo), _) => Some(geo),
+			(None, painted) => painted,
+		}
 	}
 }
 
@@ -376,68 +390,67 @@ mod test {
 		format!("\x1b[<{b};{};{}{m}", col + 1, row + 1).into_bytes()
 	}
 
-	/// A sidebar link is one uniform hit target across its full row, and stays one
-	/// while hovered in the **dark** scheme — the case that regressed. The hover
-	/// must keep the link's background *defined* (a scheme tone, not an unset token
-	/// that resolves to `None`); otherwise the row's fill drops on hover, its cells
-	/// leak back to the rail, and the hover flickers (clicking still worked because
-	/// the click is one discrete resolve). Character cells were immune since the
-	/// glyph keeps painting; the empty row cells are the tell.
+	/// A fill-less deeper box wins the hit-test over the painted ancestor showing
+	/// through it: a full-width `display:block` child with no background of its own
+	/// sits over a container that paints the row, yet a cell past the child's text
+	/// resolves to the child (its box covers the row), not the container. This is
+	/// the hover-flicker fix — a hovered sidebar row whose hover has no background
+	/// (dark scheme) stops painting its fill, but its cells must stay the link, not
+	/// leak to the rail behind them.
 	#[beet_core::test]
-	fn sidebar_link_row_is_one_hit_target() {
-		use crate::style::material::classes;
-		let mut host = TestHost::sized(UVec2::new(30, 8));
-		host.app.add_plugins(
-			crate::style::material::MaterialStylePlugin::default(),
+	fn deeper_box_wins_over_painted_ancestor() {
+		let mut host = TestHost::sized(UVec2::new(20, 4));
+		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
+			vec![
+				// the rail: a full-width container that paints a background
+				Rule::class("rail").with_value(
+					common_props::BackgroundColor,
+					Color::srgb(0.1, 0.1, 0.1),
+				),
+				// the link: a full-width block child with no background of its own,
+				// so the rail's fill shows through its empty cells
+				Rule::class("link")
+					.with_value(common_props::DisplayProp, Display::Block),
+			],
 		);
 		host.spawn_content(rsx! {
-			<div {Classes::new([classes::DARK_SCHEME])}>
-				<nav {Classes::new([classes::SIDEBAR])}>
-					<ul {Classes::new([classes::SIDEBAR_LIST])}>
-						<li {Classes::new([classes::SIDEBAR_ITEM_ROOT])}>
-							<a {Classes::new([classes::SIDEBAR_LINK])} href="/x">"home"</a>
-						</li>
-					</ul>
-				</nav>
-			</div>
+			<div class="rail"><a class="link" href="/x">"hi"</a></div>
 		});
 		host.step();
 		host.step();
 		let surface = host.host;
-		let link = host
+		let (link, rail) = host
 			.app
 			.world_mut()
-			.query::<(Entity, &Element)>()
-			.iter(host.app.world())
-			.find(|(_, el)| el.tag() == "a")
-			.map(|(entity, _)| entity)
+			.run_system_once(|elements: ElementQuery| {
+				let find = |tag: &str| {
+					elements
+						.iter()
+						.find(|view| view.tag() == tag)
+						.map(|view| view.entity)
+						.unwrap()
+				};
+				(find("a"), find("div"))
+			})
 			.unwrap();
-		// at rest every cell past the 4-char label resolves to the link — one
-		// contiguous hit target, not the bare rail.
-		let cols: Vec<i32> = (5..16).collect();
-		let resolved = cols.clone();
+		// premise: the cell past the 2-char label is actually painted by the rail
+		// (the link has no fill of its own), so the reconciliation is exercised.
+		host.app
+			.world()
+			.get::<DoubleBuffer>(surface)
+			.unwrap()
+			.front_buffer()
+			.get(UVec2::new(8, 0))
+			.and_then(|cell| cell.entity)
+			.xpect_eq(Some(rail));
+		// yet the hit-test resolves the deeper link box, not the painted rail.
 		host.app
 			.world_mut()
 			.run_system_once(move |hit: HitTest| {
-				resolved
-					.iter()
-					.all(|&x| hit.entity_at_surface(surface, IVec2::new(x, 0))
-						== Some(link))
+				hit.entity_at_surface(surface, IVec2::new(8, 0))
 			})
 			.unwrap()
-			.xpect_true();
-		// hovering resolves a *defined* background (the dark hover surface tone),
-		// not `None`, so the row keeps painting its fill and never leaks to the rail.
-		host.send_input(&sgr(35, 8, 0, true));
-		host.step();
-		host.step();
-		host.app
-			.world()
-			.get::<VisualStyle>(link)
-			.unwrap()
-			.background
-			.is_some()
-			.xpect_true();
+			.xpect_eq(Some(link));
 	}
 
 	/// Boot a host with the pointer-logging observers attached.
@@ -836,21 +849,17 @@ mod test {
 		host.app.world().get::<VisualStyle>(button).unwrap().background
 	}
 
-	/// A container-less interactive (text button) gains a visible hover fill in
-	/// *both* schemes — a raised surface tone resolved per scheme — so the hover
-	/// affordance reads on light and dark alike, and a full-width row never loses
-	/// its background mid-hover (the dark-scheme flicker fix; `HoverSurface` is now
-	/// defined in every scheme, not just light). Neither carries one at rest.
+	/// A container-less interactive (text button) gains a *visible fill* on hover
+	/// in the light scheme — the fix for the light-mode "no hover affordance"
+	/// gap — but no fill in the dark scheme, where the hover reads as a text dim
+	/// instead. Neither carries a background at rest.
 	#[beet_core::test]
-	fn button_hover_fill_is_scheme_aware() {
+	fn backgroundless_button_hover_is_scheme_aware() {
 		use crate::style::material::classes;
-		let light = hovered_button_background(classes::LIGHT_SCHEME);
-		let dark = hovered_button_background(classes::DARK_SCHEME);
-		// both schemes resolve a defined fill ...
-		light.xpect_some();
-		dark.xpect_some();
-		// ... in scheme-appropriate tones (the light raised tone differs from dark).
-		(light != dark).xpect_true();
+		// light: a hover fill appears.
+		hovered_button_background(classes::LIGHT_SCHEME).xpect_some();
+		// dark: no hover fill (the HoverSurface token is unset there).
+		hovered_button_background(classes::DARK_SCHEME).xpect_none();
 	}
 
 	/// A wheel over content nested in a scroll container that *can't* scroll

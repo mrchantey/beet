@@ -139,6 +139,10 @@ impl Plugin for CharcellPlugin {
 					.after(paint_nodes::<DoubleBuffer>)
 					.in_set(CharcellRenderSet),
 			);
+		// point the image renderer at our own HTTP server, so a site-rooted
+		// `<img src="/assets/…">` is fetched over HTTP and mapped to the blob store.
+		#[cfg(all(feature = "tui", feature = "net"))]
+		app.add_observer(set_render_server_origin);
 	}
 }
 

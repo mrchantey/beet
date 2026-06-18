@@ -120,7 +120,8 @@ fn container_less_hover() -> Selector {
 /// That token is set only under `.light-scheme` (see [`hover_surface_light`]),
 /// so in a dark scheme it fails to resolve and the background stays unset — the
 /// hover there is the [`hover_dim`] text darkening alone, matching how the dark
-/// theme is meant to read.
+/// theme is meant to read. (A backgroundless hovered row stays its own hit target
+/// regardless: the hit-test resolves the row's box, not its fill.)
 pub fn hover_state_layer() -> Rule {
 	Rule::new()
 		.with_selector(container_less_hover())
