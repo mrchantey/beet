@@ -200,7 +200,6 @@ impl NodeRenderer for MediaRenderer {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	#[allow(unused)]

@@ -46,8 +46,6 @@ impl Default for ForceScalar {
 	fn default() -> Self { Self(1.) }
 }
 
-
-
 /// The components required for steering behaviors.
 /// This should be used in conjunction with the [`ForceBundle`] and [`TransformBundle`]
 #[derive(Default, Bundle)]

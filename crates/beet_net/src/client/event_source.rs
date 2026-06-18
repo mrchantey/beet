@@ -212,7 +212,6 @@ pub impl Response {
 	}
 }
 
-
 #[cfg(test)]
 #[cfg(feature = "json")]
 mod sse_builder_test {

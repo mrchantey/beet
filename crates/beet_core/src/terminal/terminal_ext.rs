@@ -83,7 +83,6 @@ pub fn on_force_exit(
 	Ok(())
 }
 
-
 /// Shows the terminal cursor.
 ///
 /// ```
@@ -136,7 +135,6 @@ pub fn clear() -> std::io::Result<()> {
 	Ok(())
 }
 
-
 /// Moves the cursor to the specified position (x, y).
 ///
 /// # Arguments
@@ -160,9 +158,6 @@ pub fn move_to(x: u16, y: u16) -> std::io::Result<()> {
 	stdout.flush()?;
 	Ok(())
 }
-
-
-
 
 /// Returns the terminal size, defaulting to 80,24 if it could not be determined.
 pub fn size() -> UVec2 {

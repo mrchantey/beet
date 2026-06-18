@@ -15,7 +15,6 @@ pub mod prelude {
 	pub use crate::plugins::*;
 }
 
-
 // because of cyclic deps we cant use beet directly
 // so instead we make a pretend beet module
 #[cfg(feature = "bevy_default")]

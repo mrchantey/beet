@@ -157,7 +157,6 @@ where
 	}
 }
 
-
 /// Prevents [`InterruptRun`] from interrupting this action.
 ///
 /// Interruption only ever descends from an ancestor, so a direct
@@ -243,7 +242,6 @@ where
 		.add_observer(reset_run_time_started::<Out>)
 		.add_observer(reset_run_timer_stopped::<Out>);
 }
-
 
 /// Tracks elapsed time since an action last started and last ended.
 ///

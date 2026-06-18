@@ -142,7 +142,6 @@ impl<S> StyleMap<S> {
 	}
 }
 
-
 fn default_associations() -> HashMap<Cow<'static, str>, Cow<'static, str>> {
 	vec![
 		("b", "strong"),

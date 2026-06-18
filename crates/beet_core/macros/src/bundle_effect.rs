@@ -4,8 +4,6 @@ use syn;
 use syn::DeriveInput;
 use syn::parse_macro_input;
 
-
-
 pub fn impl_bundle_effect(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
@@ -27,7 +25,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			}
 		})
 		.unwrap_or_else(|| quote! {Self::effect});
-
 
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();

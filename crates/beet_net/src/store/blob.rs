@@ -150,7 +150,6 @@ impl Blob {
 	}
 }
 
-
 /// Serializable blob handle that inserts an erased [`Blob`] on add.
 ///
 /// Unlike [`Blob`], this type is fully reflectable and can be used in
@@ -337,7 +336,6 @@ where
 			.finish()
 	}
 }
-
 
 #[cfg(test)]
 mod test {

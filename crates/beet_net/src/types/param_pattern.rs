@@ -3,9 +3,6 @@ use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use heck::ToKebabCase;
 
-
-
-
 /// The param equivelent of a [`PathPartial`], denoting
 /// all params used at this point in the graph. For the full
 /// list see [`Endpoint::params`]
@@ -180,7 +177,6 @@ impl core::fmt::Display for ParamMeta {
 	}
 }
 
-
 impl ParamMeta {
 	/// Creates a new `ParamMeta` with the given name and value type.
 	pub fn new(name: impl Into<String>, value: ParamValue) -> Self {
@@ -320,7 +316,6 @@ impl ParamOptions {
 			short: Some(short),
 		}
 	}
-
 
 	fn from_reflect(field: &bevy::reflect::NamedField) -> Self {
 		#[allow(unused_mut)]

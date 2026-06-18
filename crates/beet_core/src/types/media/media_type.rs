@@ -7,8 +7,6 @@
 
 use crate::prelude::*;
 
-
-
 /// Common media types used in HTTP exchange.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,

@@ -25,7 +25,6 @@ pub async fn NoCacheHeaders(
 	Ok(response)
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -68,7 +68,6 @@ impl From<CssVariable> for CssValue {
 	fn from(var: CssVariable) -> Self { Self::Variable(var) }
 }
 
-
 /// Converts a value to its CSS string representation.
 pub trait AsCssValues {
 	fn suffixes() -> Vec<CssKey>;

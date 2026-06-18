@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::testing::runner::*;
 
-
 /// Added to the [`TestRunnerConfig`] entity once all tests have completed
 #[derive(Component)]
 pub struct SuiteOutcome {
@@ -121,11 +120,9 @@ pub(crate) fn trigger_timeouts(
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;
-
 
 	async fn did_timeout(test: TestDescAndFn) -> bool {
 		test_runner_ext::run(Some("--timeout-ms=10"), test)

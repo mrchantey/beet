@@ -69,7 +69,10 @@ impl BsxTemplate {
 	}
 
 	/// A parsed document: the calling entity is a container, roots become children.
-	pub fn container(nodes: Vec<BsxNode>, registry: BsxTemplateRegistry) -> Self {
+	pub fn container(
+		nodes: Vec<BsxNode>,
+		registry: BsxTemplateRegistry,
+	) -> Self {
 		Self {
 			nodes,
 			registry,
@@ -130,10 +133,9 @@ impl RefBindings {
 	/// The pinned reference for `name`, allocating a stable one on first use.
 	fn reference(&mut self, name: &str) -> SceneEntityReference {
 		let next = self.names.len();
-		*self
-			.names
-			.entry(name.into())
-			.or_insert_with(|| SceneEntityReference::new(("bsx_ref", 0, 0), next))
+		*self.names.entry(name.into()).or_insert_with(|| {
+			SceneEntityReference::new(("bsx_ref", 0, 0), next)
+		})
 	}
 
 	/// The pinned reference for `name`, if declared by a `bx:ref`.
@@ -211,7 +213,9 @@ impl ReservedRef {
 		fallback: Entity,
 	) -> Option<Entity> {
 		match self {
-			Self::BuildRoot => Some(TemplateBuildRoot::resolve(world, fallback)),
+			Self::BuildRoot => {
+				Some(TemplateBuildRoot::resolve(world, fallback))
+			}
 			Self::SnippetRoot => world
 				.get_resource::<SnippetBuildRoot>()
 				.map(|root| root.0)
@@ -323,7 +327,8 @@ fn build_node_at(
 	// SAFETY: scope a build into the target entity, sharing the reference map.
 	let world = unsafe { cx.entity.world_mut() };
 	let mut entity_mut = world.entity_mut(entity);
-	let mut scoped = TemplateContext::new(&mut entity_mut, cx.entity_references);
+	let mut scoped =
+		TemplateContext::new(&mut entity_mut, cx.entity_references);
 	match node {
 		BsxNode::Element(el) => build_element(el, registry, refs, &mut scoped),
 		_ => apply_leaf(node, refs, &mut scoped),
@@ -392,7 +397,9 @@ fn apply_value_expr(
 			apply_binding(binding, entity, comp_target)?;
 		}
 		ValueExpr::EntityRef(_) => {
-			bevybail!("`$name` entity references are not valid in text position")
+			bevybail!(
+				"`$name` entity references are not valid in text position"
+			)
 		}
 	}
 	Ok(())
@@ -483,7 +490,10 @@ fn map_selector_target(
 			BindingTarget::Reserved(name.clone())
 		}
 		_ => BindingTarget::Entity(
-			entity_refs.get(name).copied().unwrap_or(Entity::PLACEHOLDER),
+			entity_refs
+				.get(name)
+				.copied()
+				.unwrap_or(Entity::PLACEHOLDER),
 		),
 	}
 }
@@ -559,11 +569,15 @@ fn resolve_entity_refs(
 	let mut names = Vec::new();
 	for attr in &el.attributes {
 		match &attr.value {
-			AttrValue::Spread(spread) => collect_entity_ref_names(spread, &mut names),
+			AttrValue::Spread(spread) => {
+				collect_entity_ref_names(spread, &mut names)
+			}
 			AttrValue::Expr(ValueExpr::Literal(literal)) => {
 				collect_literal_entity_ref_names(literal, &mut names)
 			}
-			AttrValue::Expr(ValueExpr::EntityRef(name)) => names.push(name.clone()),
+			AttrValue::Expr(ValueExpr::EntityRef(name)) => {
+				names.push(name.clone())
+			}
 			// an `@entity:ref::` selector resolves through the same machinery.
 			AttrValue::Expr(ValueExpr::Binding(binding)) => {
 				names.extend(binding.selector.clone());
@@ -584,9 +598,8 @@ fn resolve_entity_refs(
 			}
 			continue;
 		}
-		let reference = refs
-			.get(&name)
-			.unwrap_or_else(|| stable_reference(&name));
+		let reference =
+			refs.get(&name).unwrap_or_else(|| stable_reference(&name));
 		// SAFETY: only used to spawn-or-fetch the mapped placeholder entity.
 		let world = unsafe { cx.entity.world_mut() };
 		let entity = cx.entity_references.get(reference, world);
@@ -605,10 +618,12 @@ fn collect_entity_ref_names(spread: &SpreadExpr, out: &mut Vec<SmolStr>) {
 		SpreadExpr::Tuple(items) => {
 			for item in items {
 				match item {
-					SpreadItem::Named(named) => collect_literal_entity_ref_names(
-						&DataLiteral::Enum(named.clone()),
-						out,
-					),
+					SpreadItem::Named(named) => {
+						collect_literal_entity_ref_names(
+							&DataLiteral::Enum(named.clone()),
+							out,
+						)
+					}
 					SpreadItem::Binding(binding) => {
 						out.extend(binding.selector.clone())
 					}
@@ -619,7 +634,10 @@ fn collect_entity_ref_names(spread: &SpreadExpr, out: &mut Vec<SmolStr>) {
 }
 
 /// Collect every `$name` referenced anywhere inside a literal.
-fn collect_literal_entity_ref_names(literal: &DataLiteral, out: &mut Vec<SmolStr>) {
+fn collect_literal_entity_ref_names(
+	literal: &DataLiteral,
+	out: &mut Vec<SmolStr>,
+) {
 	match literal {
 		DataLiteral::EntityRef(name) => out.push(name.clone()),
 		DataLiteral::List(items) => items
@@ -632,9 +650,11 @@ fn collect_literal_entity_ref_names(literal: &DataLiteral, out: &mut Vec<SmolStr
 			NamedFields::Tuple(items) => items
 				.iter()
 				.for_each(|item| collect_literal_entity_ref_names(item, out)),
-			NamedFields::Struct(fields) => fields
-				.iter()
-				.for_each(|(_, item)| collect_literal_entity_ref_names(item, out)),
+			NamedFields::Struct(fields) => {
+				fields.iter().for_each(|(_, item)| {
+					collect_literal_entity_ref_names(item, out)
+				})
+			}
 			NamedFields::Unit => {}
 		},
 		DataLiteral::Scalar(_) => {}
@@ -661,10 +681,9 @@ fn build_uppercase(
 	// a custom-tag handler (eg `<Rule>`) resolves the whole tag before the type
 	// registry: it reads the raw attributes and mutates the world, producing no
 	// entity content. Core registers none; a higher layer installs them.
-	if let Some(handler) = cx
-		.entity
-		.world_scope(|world| world.get_resource::<BsxTagResolvers>()?.get(&el.tag))
-	{
+	if let Some(handler) = cx.entity.world_scope(|world| {
+		world.get_resource::<BsxTagResolvers>()?.get(&el.tag)
+	}) {
 		return handler(el, cx.entity);
 	}
 
@@ -976,7 +995,8 @@ fn build_slot(el: &BsxElement, entity: &mut EntityWorldMut) -> Result<()> {
 	let id = entity.id();
 	if !el.children.is_empty() {
 		entity.world_scope(|world| -> Result<()> {
-			let mut references = bevy::ecs::template::SceneEntityReferences::default();
+			let mut references =
+				bevy::ecs::template::SceneEntityReferences::default();
 			let mut entity_mut = world.entity_mut(id);
 			let mut cx = TemplateContext::new(&mut entity_mut, &mut references);
 			let refs = RefBindings::default();
@@ -1097,18 +1117,20 @@ fn build_reactive_children(
 	let registry = registry.clone();
 	// the field backing the list: its synced `Value` drives the rebuild.
 	cx.entity.insert(FieldRef::new(field));
-	cx.entity.insert(ReactiveChildren::new(move |_index, _item| {
-		let template = template.clone();
-		let registry = registry.clone();
-		OnSpawn::new(move |entity| {
-			// each item child builds the element's body as its own template; the
-			// terminating index scope `ReactiveChildren` adds resolves its fields.
-			let nested = BsxTemplate::container(template.clone(), registry.clone());
-			if let Err(error) = entity.build_template(&nested) {
-				entity.insert(TemplateError::new(error));
-			}
-		})
-	}));
+	cx.entity
+		.insert(ReactiveChildren::new(move |_index, _item| {
+			let template = template.clone();
+			let registry = registry.clone();
+			OnSpawn::new(move |entity| {
+				// each item child builds the element's body as its own template; the
+				// terminating index scope `ReactiveChildren` adds resolves its fields.
+				let nested =
+					BsxTemplate::container(template.clone(), registry.clone());
+				if let Err(error) = entity.build_template(&nested) {
+					entity.insert(TemplateError::new(error));
+				}
+			})
+		}));
 	Ok(())
 }
 
@@ -1268,7 +1290,9 @@ fn apply_spread_named(
 		let info = type_info_by_name(&registry, &named.name);
 		let is_template = registry
 			.get_with_short_type_path(&named.name)
-			.map(|registration| registration.data::<ReflectTemplate>().is_some())
+			.map(|registration| {
+				registration.data::<ReflectTemplate>().is_some()
+			})
 			.unwrap_or(false);
 		let mut resolver = entity_ref_resolver(entity_refs);
 		(
@@ -1333,9 +1357,12 @@ fn build_patch(
 				registry,
 				&mut resolver,
 			)?,
-			None => {
-				literal_to_reflect(&literal, field_info, registry, &mut resolver)?
-			}
+			None => literal_to_reflect(
+				&literal,
+				field_info,
+				registry,
+				&mut resolver,
+			)?,
 		};
 		patch.insert_boxed(&attr.key, reflected);
 	}
@@ -1401,7 +1428,12 @@ fn prop_opt_value(
 fn entity_ref_resolver(
 	entity_refs: &HashMap<SmolStr, Entity>,
 ) -> impl FnMut(&str) -> Entity + '_ {
-	move |name| entity_refs.get(name).copied().unwrap_or(Entity::PLACEHOLDER)
+	move |name| {
+		entity_refs
+			.get(name)
+			.copied()
+			.unwrap_or(Entity::PLACEHOLDER)
+	}
 }
 
 /// Lower a resource declaration tag (`<PackageConfig title=".."/>`): the
@@ -1490,9 +1522,9 @@ fn insert_component(
 ) -> Result<()> {
 	use bevy::ecs::reflect::ReflectComponent;
 	let registry = app_registry.read();
-	let type_info = patch
-		.get_represented_type_info()
-		.ok_or_else(|| bevyhow!("spread/component patch has no represented type"))?;
+	let type_info = patch.get_represented_type_info().ok_or_else(|| {
+		bevyhow!("spread/component patch has no represented type")
+	})?;
 	let registration = registry.get(type_info.type_id()).ok_or_else(|| {
 		bevyhow!("type `{}` is not registered", type_info.type_path())
 	})?;
@@ -1527,7 +1559,9 @@ fn literal_to_value(literal: &DataLiteral) -> Result<Value> {
 			}
 			Ok(Value::Map(map))
 		}
-		DataLiteral::Enum(named) if matches!(named.fields, NamedFields::Unit) => {
+		DataLiteral::Enum(named)
+			if matches!(named.fields, NamedFields::Unit) =>
+		{
 			Ok(Value::Str(named.name.clone().into()))
 		}
 		DataLiteral::Enum(_) => {
@@ -1611,7 +1645,13 @@ pub(super) fn is_directive(key: &str) -> bool {
 /// `bx:<event>` verb trigger. Anything else under `bx:` is treated as an event
 /// (resolved through the [`EventRegistry`], a graceful no-op when unregistered).
 const STRUCTURAL_DIRECTIVES: &[&str] = &[
-	"bx:scope", "bx:for", "bx:key", "bx:slot", "bx:ref", "bx:schema", "bx:style",
+	"bx:scope",
+	"bx:for",
+	"bx:key",
+	"bx:slot",
+	"bx:ref",
+	"bx:schema",
+	"bx:style",
 ];
 
 /// Whether a key is a `bx:<event>` verb-trigger directive (eg `bx:click`), ie a

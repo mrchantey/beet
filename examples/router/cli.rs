@@ -38,9 +38,10 @@ struct GreetRequest {
 }
 
 fn setup(mut commands: Commands) {
-	commands.spawn((
-		CliServer::default(),
-		(default_router(), children![
+	commands
+		.spawn((
+			CliServer::default(),
+			(default_router(), children![
 			exchange_route(
 				"",
 				Action::<(), &str>::new_pure(|_| { "hello world" })
@@ -68,6 +69,6 @@ fn setup(mut commands: Commands) {
 				PathPartial::new("greet-request"),
 			),
 		]),
-	))
-	.trigger(StartServer::all);
+		))
+		.trigger(StartServer::all);
 }

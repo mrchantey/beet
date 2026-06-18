@@ -38,7 +38,6 @@ where
 	}
 }
 
-
 macro_rules! impl_tokenize_components_tuple {
 	($(($T:ident, $t:ident)),*) => {
 		impl<$($T),*> TokenizeComponents for ($($T,)*)
@@ -68,7 +67,6 @@ pub struct SpanOf<C> {
 	_phantom: std::marker::PhantomData<C>,
 }
 
-
 impl<C> std::ops::Deref for SpanOf<C> {
 	type Target = proc_macro2::Span;
 	fn deref(&self) -> &Self::Target { &self.value }
@@ -85,7 +83,6 @@ impl<C> SpanOf<C> {
 	/// Consumes the wrapper and returns the inner span.
 	pub fn take(self) -> proc_macro2::Span { self.value.take() }
 }
-
 
 #[cfg(test)]
 mod test {

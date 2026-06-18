@@ -81,7 +81,6 @@ pub struct OutputTokensDetails {
 	pub reasoning_tokens: u32,
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

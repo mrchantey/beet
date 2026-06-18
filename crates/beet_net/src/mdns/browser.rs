@@ -328,8 +328,8 @@ pub async fn run_mdns_browser_on<E: crate::udp::UdpEndpoint>(
 	multicast_group: Option<core::net::Ipv4Addr>,
 ) -> Result {
 	use crate::udp::UdpSocket;
-	use core::net::SocketAddr;
 	use bevy::tasks::futures_lite::FutureExt;
+	use core::net::SocketAddr;
 
 	let socket = endpoint.bind(bind).await?;
 	if let Some(group) = multicast_group {

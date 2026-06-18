@@ -17,10 +17,11 @@ fn main() {
 	use rsx_site::prelude::*;
 
 	let mut app = App::new();
-	app.add_plugins(server_plugin).insert_resource(PackageConfig {
-		title: "Beet".into(),
-		..pkg_config!()
-	});
+	app.add_plugins(server_plugin)
+		.insert_resource(PackageConfig {
+			title: "Beet".into(),
+			..pkg_config!()
+		});
 	// the live TUI layers the interactive plugins onto the shared substrate:
 	// the charcell host loop, link navigation, and the current-page painter.
 	#[cfg(feature = "tui")]

@@ -28,7 +28,6 @@ impl Plugin for UiTerminalPlugin {
 	}
 }
 
-
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct InputContainer;

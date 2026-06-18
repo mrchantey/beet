@@ -1,11 +1,9 @@
 use beet_core::prelude::*;
 
-
 /// The default maximum depth for ultrasound sensors,
 /// this effect the time of flight cutoff, ie how long
 /// to wait for a bounce before giving up.
 pub const DEFAULT_ULTRASOUND_MAX_DEPTH: f32 = 2.0;
-
 
 /// Represents the current reading of a depth sensor,
 /// if this is none the last reading was invalid, usually

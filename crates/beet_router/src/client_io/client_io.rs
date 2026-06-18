@@ -83,14 +83,17 @@ mod test {
 	use super::*;
 
 	/// A child entity recording every [`MessageSend`] it receives.
-	fn client_captor(world: &mut World, channel: Entity) -> Store<Vec<Message>> {
+	fn client_captor(
+		world: &mut World,
+		channel: Entity,
+	) -> Store<Vec<Message>> {
 		let received = Store::<Vec<Message>>::default();
 		let captor = received.clone();
-		world
-			.spawn(ChildOf(channel))
-			.observe_any(move |ev: On<MessageSend>| {
+		world.spawn(ChildOf(channel)).observe_any(
+			move |ev: On<MessageSend>| {
 				captor.push(ev.event().inner().clone());
-			});
+			},
+		);
 		received
 	}
 
@@ -160,7 +163,8 @@ mod test {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin, RouterPlugin));
 			// the router (wires `/__client_io`), the channel, and the listener
-			app.world_mut().spawn((default_router(), ClientIo, on_spawn));
+			app.world_mut()
+				.spawn((default_router(), ClientIo, on_spawn));
 			// once a client is adopted, broadcast `reload` to the channel each
 			// frame (the client breaks after the first message)
 			app.add_systems(
@@ -170,9 +174,9 @@ mod test {
 					for (channel, _children) in
 						channels.iter().filter(|(_, kids)| !kids.is_empty())
 					{
-						commands.entity(channel).trigger_target(ClientIoBroadcast(
-							Message::text(RELOAD_MESSAGE),
-						));
+						commands.entity(channel).trigger_target(
+							ClientIoBroadcast(Message::text(RELOAD_MESSAGE)),
+						);
 					}
 				},
 			);

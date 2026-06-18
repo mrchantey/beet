@@ -216,7 +216,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			predicate
 		}));
 
-
 	Ok(quote! {
 		impl #impl_generics #beet_core::prelude::TokenizeSelf for #ident #type_generics #where_clause {
 			fn self_tokens(&self, tokens: &mut #beet_core::exports::proc_macro2::TokenStream) {
@@ -228,7 +227,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		}
 	})
 }
-
 
 #[cfg(test)]
 mod test {

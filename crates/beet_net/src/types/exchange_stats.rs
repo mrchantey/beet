@@ -8,8 +8,6 @@
 use super::*;
 use beet_core::prelude::*;
 
-
-
 /// Observer that logs each completed exchange and bumps the server's request
 /// counter, registered by [`ServerPlugin`](crate::prelude::ServerPlugin).
 ///
@@ -44,8 +42,6 @@ pub fn exchange_stats(
 	Ok(())
 }
 
-
-
 /// Component for tracking exchange statistics on a server entity.
 ///
 /// Add this to server entities to track the number of requests processed.
@@ -68,7 +64,6 @@ impl ExchangeStats {
 		self
 	}
 }
-
 
 #[cfg(all(test, feature = "std"))]
 mod test {

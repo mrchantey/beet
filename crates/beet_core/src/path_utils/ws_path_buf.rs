@@ -5,9 +5,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-
-
-
 /// ## Workspace PathBuf
 ///
 /// Represents a [`PathBuf`] relative to the root of the workspace, usually
@@ -137,7 +134,6 @@ impl From<WsPathBuf> for SmolPath {
 impl From<&WsPathBuf> for SmolPath {
 	fn from(value: &WsPathBuf) -> Self { Self::from(value.as_path()) }
 }
-
 
 #[cfg(test)]
 mod test {

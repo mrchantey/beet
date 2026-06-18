@@ -127,8 +127,6 @@ impl std::fmt::Debug for Post {
 	}
 }
 
-
-
 impl PartialOrd for Post {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
@@ -176,7 +174,6 @@ impl Post {
 	/// Returns a mutable reference to the raw body bytes.
 	pub fn body_bytes_mut(&mut self) -> &mut Vec<u8> { &mut self.body }
 
-
 	/// Returns the `file_stem` from metadata, if present.
 	pub fn file_stem(&self) -> Option<&str> {
 		self.metadata
@@ -205,7 +202,6 @@ impl Post {
 		self.body = text.into_bytes();
 	}
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // Display
@@ -348,7 +344,6 @@ impl From<String> for IntoPost {
 impl From<&str> for IntoPost {
 	fn from(text: &str) -> Self { IntoPost::Text(text.to_string()) }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // Timestamp

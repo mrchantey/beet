@@ -79,7 +79,10 @@ fn standard_echo_response(req: Request) -> Response {
 	let mut headers = MultiMap::new();
 	for (key, values) in req.headers.iter_all() {
 		for value in values {
-			headers.insert(SmolStr::from(key.as_str()), SmolStr::from(value.as_str()));
+			headers.insert(
+				SmolStr::from(key.as_str()),
+				SmolStr::from(value.as_str()),
+			);
 		}
 	}
 
@@ -151,7 +154,6 @@ fn stream_response(req: &Request) -> Response {
 		.with_content_type(MediaType::Json)
 		.with_body(Body::stream(stream))
 }
-
 
 #[cfg(test)]
 #[cfg(all(

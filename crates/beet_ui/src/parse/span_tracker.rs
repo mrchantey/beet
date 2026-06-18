@@ -176,7 +176,6 @@ impl SpanTracker {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

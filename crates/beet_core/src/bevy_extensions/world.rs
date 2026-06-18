@@ -1,6 +1,5 @@
 //! Extension methods for Bevy's [`World`].
 
-
 use crate::prelude::*;
 use bevy::ecs::change_detection::MaybeLocation;
 use bevy::ecs::component::ComponentInfo;
@@ -164,7 +163,6 @@ pub impl World {
 		None
 	}
 }
-
 
 /// A collected query result that owns its data.
 ///
@@ -383,8 +381,6 @@ pub impl World {
 		}
 	}
 }
-
-
 
 /// Extension trait adding observer and trigger helpers to [`World`].
 #[ext(name=CoreWorldExt)]

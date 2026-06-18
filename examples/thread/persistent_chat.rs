@@ -24,7 +24,6 @@ fn main() {
 		.run();
 }
 
-
 fn setup(async_commands: AsyncCommands) {
 	cfg_if! {
 		if #[cfg(feature="aws_sdk")]{
@@ -35,7 +34,6 @@ fn setup(async_commands: AsyncCommands) {
 			let store = FsStore::new(WsPathBuf::default());
 		}
 	}
-
 
 	let blob = store.blob(SmolPath::new(WORLD_SERDE_FILE));
 	let new_thread = CliArgs::parse_env().params.contains_key("new");

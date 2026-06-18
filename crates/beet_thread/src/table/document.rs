@@ -10,7 +10,6 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use uuid::Uuid;
 
-
 pub trait Table: 'static + Send + Sync + Sized {
 	type Id: TableId;
 	fn id(&self) -> Self::Id;
@@ -77,7 +76,6 @@ impl<M> TableId for Uuid7<M> {
 unsafe impl<M> Send for Uuid7<M> {}
 unsafe impl<M> Sync for Uuid7<M> {}
 
-
 impl<M> Uuid7<M> {
 	pub fn new_now() -> Self {
 		Self {
@@ -91,7 +89,6 @@ impl<M> Uuid7<M> {
 impl<M> Default for Uuid7<M> {
 	fn default() -> Self { Self::new_now() }
 }
-
 
 impl<M> Copy for Uuid7<M> {}
 impl<M> Clone for Uuid7<M> {
@@ -121,13 +118,10 @@ impl<M> std::hash::Hash for Uuid7<M> {
 	}
 }
 
-
-
 impl<M> std::ops::Deref for Uuid7<M> {
 	type Target = Uuid;
 	fn deref(&self) -> &Self::Target { &self.uuid_v7 }
 }
-
 
 impl<M> std::fmt::Display for Uuid7<M> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -168,7 +162,6 @@ where
 		Box::pin(async move { self.0.read().await.get(id).cloned() })
 	}
 }
-
 
 /// In-memory collection of tables, mapped by their id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

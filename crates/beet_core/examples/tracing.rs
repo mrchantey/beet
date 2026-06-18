@@ -1,7 +1,5 @@
 use beet_core::prelude::*;
 
-
-
 fn main() {
 	PrettyTracing::default().init();
 	trace!("This is Trace");

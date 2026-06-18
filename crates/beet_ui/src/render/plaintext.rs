@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
 /// Renders an entity tree as plain text, stripping all markup.
 ///
 /// When `plaintext_only` is `true`, only [`MediaType::Text`] is accepted

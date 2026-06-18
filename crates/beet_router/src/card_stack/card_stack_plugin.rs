@@ -111,7 +111,7 @@ fn open_initial_card(
 		return;
 	};
 	let url = Url::parse(format!("/{}", segments.join("/")));
-	commands
-		.entity(ev.entity)
-		.queue_async(async move |entity| Navigator::navigate_to(entity, url).await);
+	commands.entity(ev.entity).queue_async(async move |entity| {
+		Navigator::navigate_to(entity, url).await
+	});
 }

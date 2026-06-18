@@ -156,12 +156,11 @@ pub fn component_id_by_short_path(
 	world
 		.get_resource::<AppTypeRegistry>()
 		.and_then(|registry| {
-			registry
-				.read()
-				.get_with_short_type_path(name)
-				.and_then(|registration| {
+			registry.read().get_with_short_type_path(name).and_then(
+				|registration| {
 					world.components().get_id(registration.type_id())
-				})
+				},
+			)
 		})
 		.or_else(|| {
 			world
@@ -278,7 +277,11 @@ mod test {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
 		let binding = world
-			.spawn((ChildOf(doc), Value::default(), SourceFieldRef::new("name")))
+			.spawn((
+				ChildOf(doc),
+				Value::default(),
+				SourceFieldRef::new("name"),
+			))
 			.id();
 		world.update_local();
 
@@ -306,7 +309,11 @@ mod test {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
 		let binding = world
-			.spawn((ChildOf(doc), Value::default(), SourceFieldRef::new("name")))
+			.spawn((
+				ChildOf(doc),
+				Value::default(),
+				SourceFieldRef::new("name"),
+			))
 			.id();
 		world.update_local();
 

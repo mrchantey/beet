@@ -81,9 +81,7 @@ struct Prop {
 impl Prop {
 	/// Whether the prop is stored as a `PropOpt<_>` (a required prop, or a
 	/// declared `Option<T>` prop).
-	fn is_opt(&self) -> bool {
-		self.required || self.option_inner.is_some()
-	}
+	fn is_opt(&self) -> bool { self.required || self.option_inner.is_some() }
 
 	/// The field's stored type. A required prop or a declared `Option<T>` prop
 	/// stores `PropOpt<inner>` (so the call-site conversion stays unambiguous);
@@ -155,7 +153,10 @@ fn parse_prop(pt: &syn::PatType) -> syn::Result<Prop> {
 			syn::Meta::List(list) => list.tokens.clone(),
 			syn::Meta::Path(_) => TokenStream::new(), // bare `#[prop]`
 			syn::Meta::NameValue(_) => {
-				synbail!(attr, "`#[prop = ..]` form is not supported, use #[prop(..)]")
+				synbail!(
+					attr,
+					"`#[prop = ..]` form is not supported, use #[prop(..)]"
+				)
 			}
 		};
 		let map = AttributeMap::parse(tokens)?;
@@ -169,10 +170,7 @@ fn parse_prop(pt: &syn::PatType) -> syn::Result<Prop> {
 					attr,
 					"`#[prop(all)]` has been removed; declare each prop"
 				),
-				other => synbail!(
-					attr,
-					"unknown `#[prop({other})]` argument"
-				),
+				other => synbail!(attr, "unknown `#[prop({other})]` argument"),
 			}
 		}
 	}
@@ -218,7 +216,10 @@ fn param_ident(pt: &syn::PatType) -> syn::Result<syn::Ident> {
 	match pt.pat.as_ref() {
 		syn::Pat::Ident(pi) => Ok(pi.ident.clone()),
 		other => {
-			synbail!(other, "`#[template]` parameters must be plain identifiers")
+			synbail!(
+				other,
+				"`#[template]` parameters must be plain identifiers"
+			)
 		}
 	}
 }
@@ -260,7 +261,14 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 			sys_pats.push(param_ident(pt)?);
 		}
 	}
-	emit(&item, &props, Some(System { sys_types, sys_pats }))
+	emit(
+		&item,
+		&props,
+		Some(System {
+			sys_types,
+			sys_pats,
+		}),
+	)
 }
 
 /// The system-template data for a `#[template(system)]`.
@@ -290,37 +298,28 @@ fn emit(
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 	// `Self`-deferred bounds the generated impls require, no-ops when non-generic.
-	let unpin_where = merge_where(
-		generics,
-		quote! {
-			for<'a> [()]:
-				#beet_core::exports::bevy::ecs::template::SpecializeFromTemplate
-		},
-	);
+	let unpin_where = merge_where(generics, quote! {
+		for<'a> [()]:
+			#beet_core::exports::bevy::ecs::template::SpecializeFromTemplate
+	});
 	let template_where =
 		merge_where(generics, quote! { Self: ::core::clone::Clone });
-	let build_template_where = merge_where(
-		generics,
-		quote! {
-			Self: 'static
-				+ ::core::marker::Send
-				+ ::core::marker::Sync
-				+ ::core::clone::Clone
-				+ #bevy::ecs::template::Template<Output = ()>
-		},
-	);
+	let build_template_where = merge_where(generics, quote! {
+		Self: 'static
+			+ ::core::marker::Send
+			+ ::core::marker::Sync
+			+ ::core::clone::Clone
+			+ #bevy::ecs::template::Template<Output = ()>
+	});
 	let schema_where =
 		merge_where(generics, quote! { Self: #bevy::reflect::Typed });
-	let register_where = merge_where(
-		generics,
-		quote! {
-			Self: #bevy::reflect::FromReflect
-				+ #bevy::reflect::Typed
-				+ #bevy::reflect::GetTypeRegistration
-				+ #beet_core::prelude::GetTemplateSchema
-				+ #bevy::ecs::template::Template<Output = ()>
-		},
-	);
+	let register_where = merge_where(generics, quote! {
+		Self: #bevy::reflect::FromReflect
+			+ #bevy::reflect::Typed
+			+ #bevy::reflect::GetTypeRegistration
+			+ #beet_core::prelude::GetTemplateSchema
+			+ #bevy::ecs::template::Template<Output = ()>
+	});
 
 	let field_idents: Vec<&syn::Ident> =
 		props.iter().map(|prop| &prop.ident).collect();
@@ -345,7 +344,10 @@ fn emit(
 	// `impl Bundle`, commonly an `rsx!` that expands through the normal macro
 	// path), insert the resulting bundle into the build target.
 	let build_body = match system {
-		Some(System { sys_types, sys_pats }) => quote! {
+		Some(System {
+			sys_types,
+			sys_pats,
+		}) => quote! {
 			let inner = #beet_core::prelude::system_template::<
 				(#(#sys_types,)*), _, _
 			>(move |_entity, (#(#sys_pats,)*)| {
@@ -368,8 +370,7 @@ fn emit(
 	};
 
 	// system templates move `self` into a `FnOnce`, so bind a clone first.
-	let props_binding =
-		is_system.then(|| quote! { let props = self.clone(); });
+	let props_binding = is_system.then(|| quote! { let props = self.clone(); });
 
 	let register_fn = format_ident!("register_{}", name);
 
@@ -510,10 +511,7 @@ fn data_struct(
 }
 
 /// `if <field>.is_none() { missing.push("<field>"); }` for each required prop.
-fn required_checks(
-	props: &[Prop],
-	beet_core: &syn::Path,
-) -> Vec<TokenStream> {
+fn required_checks(props: &[Prop], beet_core: &syn::Path) -> Vec<TokenStream> {
 	props
 		.iter()
 		.filter(|prop| prop.required)
@@ -577,7 +575,9 @@ mod test {
 		// the subtree-template opt-out (inlined `Unpin`) + Template impl
 		assert!(result.contains("Unpin for Button"));
 		assert!(result.contains("Template for Button"));
-		assert!(result.contains("let Self { label , variant } = self . clone ()"));
+		assert!(
+			result.contains("let Self { label , variant } = self . clone ()")
+		);
 		// registration fn
 		assert!(result.contains("fn register_Button"));
 		// the prop schema, authored by the typed signature
@@ -598,7 +598,10 @@ mod test {
 		assert!(result.contains("PropOpt < Variant >"));
 		assert!(result.contains("if self . variant . is_none ()"));
 		assert!(result.contains("MissingProps"));
-		assert!(result.contains("let variant = variant . into_inner () . unwrap ()"));
+		assert!(
+			result
+				.contains("let variant = variant . into_inner () . unwrap ()")
+		);
 	}
 
 	#[test]
@@ -608,7 +611,9 @@ mod test {
 				rsx! { <span/> }
 			}
 		});
-		assert!(result.contains("impl :: core :: default :: Default for Field"));
+		assert!(
+			result.contains("impl :: core :: default :: Default for Field")
+		);
 		assert!(result.contains("\"hi\""));
 	}
 

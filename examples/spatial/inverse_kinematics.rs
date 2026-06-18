@@ -17,9 +17,6 @@ fn main() {
 		.run();
 }
 
-
-
-
 fn spawn_ik_camera(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Camera"),
@@ -159,7 +156,6 @@ fn spawn_test_arm(
 		),
 	));
 }
-
 
 fn ik_segment(
 	commands: &mut EntityCommands,

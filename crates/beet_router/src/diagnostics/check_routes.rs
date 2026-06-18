@@ -102,7 +102,9 @@ pub async fn check_routes(
 			let route_tree = world
 				.entity(router)
 				.get::<RouteTree>()
-				.ok_or_else(|| bevyhow!("router entity {router} has no RouteTree"))?
+				.ok_or_else(|| {
+					bevyhow!("router entity {router} has no RouteTree")
+				})?
 				.clone();
 			let config = world
 				.get_resource::<RenderDiagnostics>()
@@ -132,7 +134,10 @@ pub async fn check_routes(
 /// route). Mirrors `export-static`'s selection.
 fn checkable(node: &ActionNode) -> bool {
 	node.path.is_static()
-		&& node.method.map(|method| method == HttpMethod::Get).unwrap_or(true)
+		&& node
+			.method
+			.map(|method| method == HttpMethod::Get)
+			.unwrap_or(true)
 		&& node.is_scene()
 }
 
@@ -171,7 +176,11 @@ async fn check_route(
 						.cloned()
 						.unwrap_or_default();
 					let out = render_diagnostics(
-						world, content, &route_tree, &rule_set, &config,
+						world,
+						content,
+						&route_tree,
+						&rule_set,
+						&config,
 					)
 					.into_iter()
 					.map(|diagnostic| diagnostic.with_route(route.clone()))
@@ -220,7 +229,6 @@ async fn check_route(
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -245,7 +253,9 @@ mod test {
 	/// Run [`check_routes`] over `router` and return the report.
 	async fn check(world: &mut World, router: Entity) -> CheckReport {
 		world
-			.run_async_then(async move |world| check_routes(&world, router).await)
+			.run_async_then(async move |world| {
+				check_routes(&world, router).await
+			})
 			.await
 			.unwrap()
 	}

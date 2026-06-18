@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
 /// Used for training a QTable to completion with a provided [`Environment`].
 pub struct QTableTrainer<S: RlSessionTypes> {
 	pub table: S::QLearnPolicy,
@@ -25,7 +24,6 @@ impl<S: RlSessionTypes> QTableTrainer<S> {
 		}
 	}
 }
-
 
 impl<S: RlSessionTypes> QPolicy for QTableTrainer<S> {
 	type Action = S::Action;
@@ -54,7 +52,6 @@ impl<S: RlSessionTypes> QPolicy for QTableTrainer<S> {
 		self.table.set_q(state, action, value)
 	}
 }
-
 
 impl<S: RlSessionTypes> QTrainer for QTableTrainer<S>
 where
@@ -116,10 +113,6 @@ where
 		Evaluation::new(rewards, total_steps)
 	}
 }
-
-
-
-
 
 #[cfg(test)]
 mod test {

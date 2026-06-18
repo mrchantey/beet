@@ -19,9 +19,6 @@ pub use sequence::*;
 
 use beet_core::prelude::*;
 
-
-
-
 /// A control flow return type that can be used to implement
 /// fallback/sequence, if/else,
 /// switch, and other control flow structures.

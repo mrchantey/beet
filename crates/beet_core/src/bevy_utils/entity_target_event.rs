@@ -208,7 +208,6 @@ where
 /// Marker type for [`TriggerFromTarget`] implementations of [`IntoEntityTargetEvent`].
 pub struct TriggerFromTargetIntoEntityTargetMarker;
 
-
 impl<E, T> IntoEntityTargetEvent<(T, TriggerFromTargetIntoEntityTargetMarker)>
 	for E
 where
@@ -225,8 +224,6 @@ where
 		(self, T::trigger_from_target(entity))
 	}
 }
-
-
 
 /// A trait for creating triggers from a target entity.
 pub trait TriggerFromTarget {
@@ -286,9 +283,6 @@ pub impl EntityWorldMut<'_> {
 		self
 	}
 }
-
-
-
 
 /// Extension trait for triggering entity target events on [`EntityCommands`].
 #[extend::ext(name=EntityCommandsActionEventExt)]
@@ -350,7 +344,6 @@ mod test {
 
 	#[derive(EntityTargetEvent)]
 	struct MyEvent;
-
 
 	#[crate::test]
 	fn works() {

@@ -3,7 +3,6 @@ use beet_core::prelude::When;
 use beet_core::prelude::*;
 use core::f32::consts::TAU;
 
-
 /// Translates the agent up and down in a sine wave.
 ///
 /// A long-running action: stays [`Running`] while active, hovering
@@ -56,13 +55,11 @@ pub(crate) fn hover(
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-
 
 	#[beet_core::test]
 	fn works() {

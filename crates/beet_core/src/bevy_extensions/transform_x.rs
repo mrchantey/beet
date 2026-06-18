@@ -143,8 +143,6 @@ pub impl Transform {
 		self.translation += translation;
 	}
 
-
-
 	/// Rotates to look away from the target (opposite of `look_at`).
 	fn look_away(&mut self, target: Vec3, up: Vec3) {
 		let forward = Vec3::normalize(target - self.translation);

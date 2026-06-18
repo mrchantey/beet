@@ -9,7 +9,6 @@ use beet_core::prelude::*;
 /// This is the only component alongside [`Transform`] required for force integration.
 pub struct Velocity(pub Vec3);
 
-
 impl Velocity {
 	/// Create a new velocity from the given x, y, and z values.
 	pub fn from_xyz(x: f32, y: f32, z: f32) -> Self { Self(Vec3::new(x, y, z)) }

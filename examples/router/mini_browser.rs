@@ -102,7 +102,6 @@ fn history_keys(
 	}
 }
 
-
 //*
 //
 // # 🌐 Classic Web-1.0 Sites That Work Great in TUI Browsers

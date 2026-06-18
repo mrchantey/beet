@@ -5,7 +5,6 @@ pub trait QPolicy: 'static + Send + Sync {
 	type State: StateSpace;
 	type Action: ActionSpace;
 
-
 	fn step(
 		&mut self,
 		params: &QLearnParams,

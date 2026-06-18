@@ -112,7 +112,6 @@ pub async fn export_static(
 	Ok(written)
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -14,9 +14,9 @@ use beet_core::prelude::*;
 /// seam: a local `src` (resolved against the [`SiteRoot`], the entry's project
 /// root) is read and its parsed entry built at the include site.
 pub fn register_template_include(world: &mut World) {
-	world
-		.get_resource_or_init::<BsxTagResolvers>()
-		.insert("Template", |el, entity| {
+	world.get_resource_or_init::<BsxTagResolvers>().insert(
+		"Template",
+		|el, entity| {
 			let Some(src) = template_src(el) else {
 				// `<Template>` with no `src` is a directives-only no-op.
 				return Ok(());
@@ -40,11 +40,13 @@ pub fn register_template_include(world: &mut World) {
 				.map(Ok)
 				.unwrap_or_else(|| AbsPathBuf::new(src.as_str()))?;
 			let media = fs_ext::read_media(&path)?;
-			let entry =
-				entity.world_scope(|world| EntryTemplate::from_bytes(world, &media))?;
+			let entry = entity.world_scope(|world| {
+				EntryTemplate::from_bytes(world, &media)
+			})?;
 			entity.build_template(&entry)?;
 			Ok(())
-		});
+		},
+	);
 }
 
 /// Whether `src` names a remote endpoint rather than a local path.
@@ -86,7 +88,10 @@ mod test {
 	fn includes_local_bsx_and_json() {
 		let mut world = TemplatePlugin::world();
 		register_template_include(&mut world);
-		world.resource::<AppTypeRegistry>().write().register::<Name>();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Name>();
 
 		// a bsx fragment and a json scene (a single `Name` node), included by path.
 		let bsx = temp_entry("included.bsx", "<section class=\"card\"/>");
@@ -112,8 +117,12 @@ mod test {
 		.unwrap();
 
 		// the two includes built at their sites: a `section` element and a `Name`.
-		let children: Vec<Entity> =
-			world.entity(root).get::<Children>().unwrap().iter().collect();
+		let children: Vec<Entity> = world
+			.entity(root)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.collect();
 		world
 			.entity(children[0])
 			.get::<Element>()

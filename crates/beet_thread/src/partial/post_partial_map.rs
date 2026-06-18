@@ -22,7 +22,6 @@ impl PostPartialMap {
 		self
 	}
 
-
 	/// Apply a stream of partial items against the post map, producing
 	/// [`PostChanges`] describing what was created or modified.
 	/// Also registers call_id and response_item mappings for new posts.
@@ -66,7 +65,6 @@ impl PostPartialMap {
 		}
 		changes.xok()
 	}
-
 
 	// ═══════════════════════════════════════════════════════════════════════
 	// Response item key mapping

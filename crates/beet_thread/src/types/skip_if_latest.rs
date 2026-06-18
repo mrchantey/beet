@@ -42,7 +42,6 @@ where
 	}
 }
 
-
 impl<T, M> DefaultAction<(), Outcome> for SkipIfLatest<T, M>
 where
 	T: 'static + Send + Sync + Clone + IntoAction<M, In = (), Out = Outcome>,

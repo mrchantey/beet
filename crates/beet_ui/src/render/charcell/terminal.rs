@@ -91,7 +91,9 @@ impl StdioTerminal {
 		terminal_ext::on_force_exit(move || {
 			let result = if to_tty {
 				terminal_ext::tty_writer().map_err(Into::into).and_then(
-					|mut tty| Terminal::restore_config_direct(&config, &mut tty),
+					|mut tty| {
+						Terminal::restore_config_direct(&config, &mut tty)
+					},
 				)
 			} else {
 				Terminal::restore_config_direct(&config, &mut io::stdout())
@@ -181,7 +183,6 @@ impl ChannelTerminal {
 	}
 }
 
-
 // ── AsyncReader ───────────────────────────────────────────────────────────────
 
 /// Non-blocking reader that drains a background thread reading from `/dev/tty`.
@@ -194,7 +195,6 @@ impl AsyncReader {
 		let (send, recv) = async_channel::unbounded();
 		(send, Self { recv })
 	}
-
 
 	pub fn stdin() -> Self {
 		let (send, recv) = async_channel::unbounded();
@@ -234,9 +234,6 @@ impl Read for AsyncReader {
 		Ok(total)
 	}
 }
-
-
-
 
 pub struct AsyncWriter {
 	send: Sender<Result<Vec<u8>>>,
@@ -534,7 +531,9 @@ mod test {
 		let erase = resized.find(escape::ERASE_ALL);
 		erase.is_some().xpect_true();
 		// the full frame is redrawn after the erase
-		resized[erase.unwrap()..].to_string().xpect_contains("hello");
+		resized[erase.unwrap()..]
+			.to_string()
+			.xpect_contains("hello");
 	}
 
 	/// Drawing a wide glyph advances the cursor two columns, so the cell after

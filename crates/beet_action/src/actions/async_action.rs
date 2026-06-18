@@ -75,7 +75,6 @@ where
 	}
 }
 
-
 /// Marker for the async action [`IntoAction`] impl accepting
 /// `Fn(ActionContext<I>) -> Future<Output = Result<O>>`.
 pub struct AsyncActionMarker;
@@ -117,7 +116,6 @@ where
 		})
 	}
 }
-
 
 #[cfg(test)]
 mod test {

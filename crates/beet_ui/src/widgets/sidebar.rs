@@ -385,18 +385,23 @@ mod test {
 		let width = 20u32;
 		let buffer = render_sidebar_cells(width, nodes());
 		let cells = buffer.cells();
-		let row_of = |y: u32| &cells[(y * width) as usize..((y + 1) * width) as usize];
+		let row_of =
+			|y: u32| &cells[(y * width) as usize..((y + 1) * width) as usize];
 		// the row whose first glyph is the `home` leaf
 		let row = (0u32..(cells.len() as u32 / width))
 			.map(row_of)
 			.find(|row| {
-				row.iter().find_map(|cell| cell.symbol.as_ref()).map(SmolStr::as_str)
+				row.iter()
+					.find_map(|cell| cell.symbol.as_ref())
+					.map(SmolStr::as_str)
 					== Some("h")
 			})
 			.expect("a `home` row");
 		// the link box fills the row past the label as one contiguous entity,
 		// each cell carrying its surface background (the hover/active target).
-		let link = row[10].entity.expect("mid-row cell painted by the link box");
+		let link = row[10]
+			.entity
+			.expect("mid-row cell painted by the link box");
 		row[8].entity.xpect_eq(Some(link));
 		row[14].entity.xpect_eq(Some(link));
 		row[10].style.background.is_some().xpect_true();

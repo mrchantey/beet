@@ -11,13 +11,11 @@ pub type NodeView<'a> = (
 	Option<&'a Portal>,
 );
 
-
 #[derive(SystemParam)]
 pub struct NodeWalker<'w, 's> {
 	elements: ElementQuery<'w, 's>,
 	nodes: Query<'w, 's, NodeView<'static>>,
 }
-
 
 pub struct VisitContext {
 	/// The entity from which the walker began.

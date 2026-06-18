@@ -556,7 +556,6 @@ pub struct ReasoningParam {
 	pub summary: Option<ReasoningSummary>,
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

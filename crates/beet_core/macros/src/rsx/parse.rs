@@ -530,9 +530,7 @@ mod test {
 	}
 
 	#[test]
-	fn recovers_from_missing_close() {
-		recover(quote! { <div> });
-	}
+	fn recovers_from_missing_close() { recover(quote! { <div> }); }
 
 	#[test]
 	fn recovers_from_unquoted_text() {

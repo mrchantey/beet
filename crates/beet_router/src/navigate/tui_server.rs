@@ -63,7 +63,9 @@ fn on_stop_server(ev: On<StopServer>, mut commands: Commands) {
 	if !ev.passes("tui") {
 		return;
 	}
-	commands.entity(ev.event_target()).remove::<KeepAliveGuard>();
+	commands
+		.entity(ev.event_target())
+		.remove::<KeepAliveGuard>();
 }
 
 async fn boot(

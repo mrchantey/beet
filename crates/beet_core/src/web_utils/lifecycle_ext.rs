@@ -35,8 +35,6 @@ where
 	closure.forget();
 }
 
-
-
 /// Runs a future with a timeout, returning an error if the timeout expires.
 ///
 /// # Errors
@@ -75,7 +73,6 @@ where
 	}
 }
 
-
 fn timeout_reject(duration: Duration) -> Promise {
 	Promise::new(&mut |_resolve, reject| {
 		web_sys::window()
@@ -88,8 +85,6 @@ fn timeout_reject(duration: Duration) -> Promise {
 			.unwrap();
 	})
 }
-
-
 
 #[cfg(test)]
 #[cfg(target_arch = "wasm32")]

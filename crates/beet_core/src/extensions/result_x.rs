@@ -34,8 +34,6 @@ pub impl<T, E> Result<T, E> {
 	}
 }
 
-
-
 /// Extension trait for [`Result`] with displayable errors.
 #[cfg(feature = "std")]
 #[ext(name=ResultExtDisplay)]

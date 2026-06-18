@@ -253,7 +253,6 @@ impl Element {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::webdriver::*;

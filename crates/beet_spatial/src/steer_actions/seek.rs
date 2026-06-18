@@ -37,7 +37,6 @@ pub enum OnTargetNotFound {
 	Succeed,
 }
 
-
 // TODO if target has Velocity, pursue
 pub(crate) fn seek(
 	mut commands: Commands,
@@ -90,7 +89,6 @@ pub(crate) fn seek(
 	}
 	Ok(())
 }
-
 
 #[cfg(test)]
 mod test {

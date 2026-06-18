@@ -80,7 +80,6 @@ where
 	}
 }
 
-
 #[cfg(test)]
 #[cfg(feature = "json")]
 mod test {

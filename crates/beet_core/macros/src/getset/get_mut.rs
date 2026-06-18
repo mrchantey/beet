@@ -42,7 +42,6 @@ fn generate_field(field: &syn::Field, config: &FieldConfig) -> TokenStream {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

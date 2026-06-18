@@ -184,7 +184,6 @@ pub struct AllowedToolsChoice {
 	pub mode: super::ToolChoiceValue,
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

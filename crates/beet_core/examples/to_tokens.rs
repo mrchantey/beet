@@ -2,7 +2,6 @@ use beet_core::exports;
 use beet_core::prelude;
 use beet_core::prelude::*;
 
-
 fn main() {}
 #[derive(ToTokens)]
 #[to_tokens(Self::new)]

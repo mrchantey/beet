@@ -137,13 +137,11 @@ impl<T: 'static + Send> Store<T> {
 	pub fn remove(&self) { self.0.remove(); }
 }
 
-
 impl<T: 'static + Debug> Debug for Store<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.0.with(|val| write!(f, "Store({:?})", val))
 	}
 }
-
 
 impl<T: 'static + Send> Store<Vec<T>> {
 	/// helper
@@ -230,9 +228,6 @@ impl<T: 'static + Send> Store<Vec<T>> {
 		self.0.with(|vec| vec.get(index).cloned())
 	}
 }
-
-
-
 
 #[cfg(test)]
 mod test {

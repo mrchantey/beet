@@ -24,7 +24,6 @@ pub fn new_auto_static(func: fn() -> Result<(), String>) -> TestDescAndFn {
 	}
 }
 
-
 /// Creates a test descriptor using the caller's location for metadata.
 #[track_caller]
 pub fn new_auto_desc() -> TestDesc {
@@ -65,7 +64,6 @@ pub fn new(
 	}
 }
 
-
 /// Clones a static test for handing out ownership of tests to parallel
 /// test runners.
 ///
@@ -80,7 +78,6 @@ pub fn clone_static(test: &TestDescAndFn) -> TestDescAndFn {
 		_ => panic!("non-static tests cannot be cloned"),
 	}
 }
-
 
 /// Runs a test function and returns its result.
 pub fn run(test: TestFn) -> Result<(), String> {

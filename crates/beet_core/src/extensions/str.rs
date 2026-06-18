@@ -8,7 +8,6 @@ pub impl<T: AsRef<str>> T {
 	/// whitespace in the first and last non-empty lines.
 	fn trim_lines(&self) -> String { self.trim_start_lines().trim_end_lines() }
 
-
 	/// Skip empty lines, while preserving
 	/// whitespace in the first non-empty line.
 	fn trim_start_lines(&self) -> String {
@@ -36,7 +35,6 @@ pub impl<T: AsRef<str>> T {
 			.into()
 	}
 }
-
 
 // pub impl SmolStr {
 // 	/// Appends a string slice to the end of this `SmolStr`, returning a new `SmolStr`.

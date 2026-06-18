@@ -66,7 +66,9 @@ fn object_to_schema(map: &Map<String, Json>) -> Result<ValueSchema> {
 				struct_schema(map)?
 			} else if map.contains_key("items") {
 				list_schema(map)?
-			} else if let Some(reference) = map.get("$ref").and_then(Json::as_str) {
+			} else if let Some(reference) =
+				map.get("$ref").and_then(Json::as_str)
+			{
 				ValueSchema::Reference(SmolStr::from(strip_ref(reference)))
 			} else {
 				// the compact shorthand: this object is a map of prop -> descriptor.
@@ -161,7 +163,9 @@ fn shorthand_schema(map: &Map<String, Json>) -> Result<ValueSchema> {
 fn primitive_or_reference(name: &str) -> ValueSchema {
 	match name {
 		"string" | "str" => ValueSchema::String(StringSchema::default()),
-		"integer" | "int" | "i64" | "i32" => ValueSchema::I64(I64Schema::default()),
+		"integer" | "int" | "i64" | "i32" => {
+			ValueSchema::I64(I64Schema::default())
+		}
 		"u64" | "uint" | "u32" => ValueSchema::U64(U64Schema::default()),
 		"number" | "float" | "f64" | "f32" => {
 			ValueSchema::F64(F64Schema::default())

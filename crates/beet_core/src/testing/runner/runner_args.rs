@@ -101,8 +101,6 @@ impl TestRunnerConfig {
 			filter = filter.extend_exclude(excludes);
 		}
 
-
-
 		// Extend include by positional args
 		filter = filter.extend_include(&args.path);
 		// Wrap patterns in wildcards unless exact mode

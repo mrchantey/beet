@@ -4,8 +4,6 @@ use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
 
-
-
 #[allow(unused)]
 pub(super) fn log_suite_running(
 	requests: Populated<(Entity, &TestRunnerConfig), Added<TestRunnerConfig>>,
@@ -24,7 +22,6 @@ pub(super) fn log_suite_running(
 		let mut out = Vec::new();
 
 		out.push("🌱 beet test 🌱".to_string());
-
 
 		crate::cross_log!("\n{}\n", out.join("\n"));
 	}
@@ -79,8 +76,6 @@ pub(super) fn log_case_outcomes(
 	}
 	Ok(())
 }
-
-
 
 fn log_case_runs(test: &Test, color: bool) -> String {
 	let prefix = TermStyle::new()
@@ -186,7 +181,6 @@ pub(super) fn log_file_outcomes(
 fn test_heading_log(prefix: &str, test: &Test) -> String {
 	format!("{} {}", prefix, test.short_file_and_name())
 }
-
 
 pub(super) fn log_suite_outcome(
 	requests: Populated<
@@ -385,8 +379,9 @@ fn fail_reason(outcome: &TestFail, color: bool) -> String {
 
 fn failed_stacktrace(test: &Test, outcome: &TestFail, color: bool) -> String {
 	let prefix = TermStyle::new().dimmed().or_plain(color).paint("at");
-	let path =
-		TermStyle::cyan().or_plain(color).paint(outcome.path(test).to_string());
+	let path = TermStyle::cyan()
+		.or_plain(color)
+		.paint(outcome.path(test).to_string());
 	let start = outcome.start(test);
 	let line_loc = TermStyle::new().dimmed().or_plain(color).paint(format!(
 		":{}:{}",

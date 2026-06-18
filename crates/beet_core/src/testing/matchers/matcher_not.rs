@@ -160,7 +160,6 @@ where
 	fn into_maybe_not(self) -> MaybeNot<T> { self }
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

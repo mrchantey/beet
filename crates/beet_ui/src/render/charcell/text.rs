@@ -18,7 +18,10 @@ use super::truncate_to_width;
 /// empty value is submission state, but the marker label is what paints, so the box
 /// must still reserve a line for it.
 pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
-	let value = node.value().map(|value| value.to_string()).unwrap_or_default();
+	let value = node
+		.value()
+		.map(|value| value.to_string())
+		.unwrap_or_default();
 	if value.is_empty() && node.marker().is_none() {
 		return UVec2::ZERO;
 	}
@@ -79,7 +82,13 @@ pub(super) fn paint_text(
 		let glyph_width = display_width(glyphs) as u32;
 		let offset = align_offset(glyph_width, width, visual.text_align);
 		if decorated {
-			buffer.write_text(origin, &aligned, undecorated.clone(), entity, clip);
+			buffer.write_text(
+				origin,
+				&aligned,
+				undecorated.clone(),
+				entity,
+				clip,
+			);
 			buffer.write_text(
 				IVec2::new(content_rect.min.x + offset as i32, y),
 				glyphs,
@@ -101,7 +110,6 @@ pub(super) fn paint_text(
 	}
 	Ok(())
 }
-
 
 // ── Word wrap ─────────────────────────────────────────────────────────────────
 
@@ -197,7 +205,6 @@ pub(super) fn align_line(line: &str, width: u32, align: TextAlign) -> String {
 	}
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -282,10 +289,7 @@ mod tests {
 		// the input's intrinsic height with the given value, or `None` for no value.
 		let height = |value: Option<&'static str>| {
 			let mut world = CharcellPlugin::world();
-			world.spawn((
-				FlexBuffer::new(20),
-				rsx! { <input type="text"/> },
-			));
+			world.spawn((FlexBuffer::new(20), rsx! { <input type="text"/> }));
 			world.run_schedule(crate::parse::PostParseTree);
 			let input = world
 				.query::<(Entity, &Element)>()

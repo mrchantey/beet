@@ -30,7 +30,6 @@ pub fn wander_impulse(
 	impulse
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

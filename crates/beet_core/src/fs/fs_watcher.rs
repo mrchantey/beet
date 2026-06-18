@@ -58,7 +58,6 @@ impl Default for FsWatcher {
 	}
 }
 
-
 /// Parses a duration from a string of milliseconds.
 pub fn parse_duration(s: &str) -> Result<Duration, ParseIntError> {
 	s.parse().map(Duration::from_millis)
@@ -160,7 +159,6 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 	})
 }
 
-
 /// An file system event that occurred for a given file or directory.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct PathEvent {
@@ -233,7 +231,6 @@ impl DirEvent {
 
 	/// Consumes self and returns the inner events.
 	pub fn take(self) -> Vec<PathEvent> { self.events }
-
 
 	/// Returns None if no events match the filter.
 	fn apply_filter(
@@ -351,7 +348,6 @@ impl DirEvent {
 		self.events.iter().any(|e| e.kind.is_other())
 	}
 }
-
 
 #[cfg(test)]
 #[cfg(feature = "rand")]

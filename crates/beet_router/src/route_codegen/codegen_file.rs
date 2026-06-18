@@ -224,8 +224,6 @@ impl CodegenFile {
 	}
 }
 
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

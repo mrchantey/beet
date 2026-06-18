@@ -120,12 +120,16 @@ mod test {
 		rule.get_typed::<style::Display>(&common_props::DisplayProp.into())
 			.unwrap()
 			.xpect_eq(style::Display::Flex);
-		rule.get_typed::<style::Direction>(&common_props::FlexDirectionProp.into())
-			.unwrap()
-			.xpect_eq(style::Direction::Vertical);
-		rule.get_typed::<style::AlignItems>(&common_props::AlignItemsProp.into())
-			.unwrap()
-			.xpect_eq(style::AlignItems::Center);
+		rule.get_typed::<style::Direction>(
+			&common_props::FlexDirectionProp.into(),
+		)
+		.unwrap()
+		.xpect_eq(style::Direction::Vertical);
+		rule.get_typed::<style::AlignItems>(
+			&common_props::AlignItemsProp.into(),
+		)
+		.unwrap()
+		.xpect_eq(style::AlignItems::Center);
 		rule.get_typed::<style::Length>(&common_props::MaxWidth.into())
 			.unwrap()
 			.xpect_eq(style::Length::Rem(40.0));
@@ -205,7 +209,9 @@ mod test {
 		let width_of = |class: ClassName| {
 			rule_set
 				.rules()
-				.find(|rule| rule.selector() == &Selector::Class(class.as_selector()))
+				.find(|rule| {
+					rule.selector() == &Selector::Class(class.as_selector())
+				})
 				.unwrap()
 				.get_typed::<style::Length>(&common_props::MaxWidth.into())
 				.unwrap()

@@ -88,9 +88,7 @@ pub(crate) fn build_markdown_tree<'a>(
 /// *element* neighbour, even an inline one like `<button>`, does not make it
 /// significant, matching how `rsx!` trims between tags. Whitespace touching real
 /// text/`{expr}` stays (collapsing to one space at render).
-fn drop_insignificant_whitespace<'a>(
-	children: &mut Vec<HtmlNode<'a>>,
-) {
+fn drop_insignificant_whitespace<'a>(children: &mut Vec<HtmlNode<'a>>) {
 	let is_inline = |node: &HtmlNode<'a>| {
 		matches!(node, HtmlNode::Text(text) if !text.trim().is_empty())
 			|| matches!(node, HtmlNode::Expression(_))
@@ -151,7 +149,6 @@ fn wrap_inline_runs<'a>(
 	flush(&mut run, &mut out);
 	out
 }
-
 
 /// Internal stack-based builder that converts pulldown events into a
 /// `TreeNode` tree. Each open tag pushes a frame; each close tag pops
@@ -252,8 +249,7 @@ impl<'a> MdTreeBuilder<'a> {
 			// wrap its inline runs in anonymous blocks so they flow on one line
 			// rather than each breaking to its own (browsers do this implicitly).
 			if frame.name == "li" {
-				frame.children =
-					wrap_inline_runs(frame.children, frame.source);
+				frame.children = wrap_inline_runs(frame.children, frame.source);
 			}
 			let node = HtmlNode::Element {
 				name: frame.name,
@@ -361,10 +357,8 @@ impl<'a> MdTreeBuilder<'a> {
 				});
 			}
 			Event::TaskListMarker(checked) => {
-				let mut attrs = vec![
-					flag_attr("disabled"),
-					str_attr("type", "checkbox"),
-				];
+				let mut attrs =
+					vec![flag_attr("disabled"), str_attr("type", "checkbox")];
 				if checked {
 					attrs.push(flag_attr("checked"));
 				}
@@ -374,10 +368,7 @@ impl<'a> MdTreeBuilder<'a> {
 				let text_slice = self.slice(&range);
 				self.push_leaf(HtmlNode::Element {
 					name: "span",
-					attributes: vec![str_attr(
-						"class",
-						"math-inline",
-					)],
+					attributes: vec![str_attr("class", "math-inline")],
 					children: vec![HtmlNode::Text(text_slice)],
 					source: text_slice,
 				});
@@ -386,10 +377,7 @@ impl<'a> MdTreeBuilder<'a> {
 				let text_slice = self.slice(&range);
 				self.push_leaf(HtmlNode::Element {
 					name: "div",
-					attributes: vec![str_attr(
-						"class",
-						"math-display",
-					)],
+					attributes: vec![str_attr("class", "math-display")],
 					children: vec![HtmlNode::Text(text_slice)],
 					source: text_slice,
 				});
@@ -787,7 +775,6 @@ impl<'a> MdTreeBuilder<'a> {
 		Ok(MarkdownTree { nodes, frontmatter })
 	}
 }
-
 
 #[cfg(test)]
 mod test {

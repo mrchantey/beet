@@ -5,7 +5,6 @@ use syn;
 use syn::DeriveInput;
 use syn::parse_macro_input;
 
-
 /// ActionEvent is now just an alias for EntityTargetEvent
 pub fn impl_action_event(
 	input: proc_macro::TokenStream,
@@ -43,8 +42,6 @@ fn parse_entity_target_event(input: DeriveInput) -> syn::Result<TokenStream> {
 		}
 	})
 }
-
-
 
 #[cfg(test)]
 mod test {

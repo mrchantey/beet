@@ -9,7 +9,6 @@ impl<T> Readonly<T> {
 	pub fn new(value: T) -> Self { Self(value) }
 }
 
-
 pub trait Environment: 'static + Send + Sync + Clone {
 	type State: StateSpace;
 	type Action: ActionSpace;
@@ -62,7 +61,6 @@ impl<
 > DiscreteSpace for T
 {
 }
-
 
 // #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 // pub enum SpaceShape {

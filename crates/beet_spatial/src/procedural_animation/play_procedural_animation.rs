@@ -80,7 +80,6 @@ pub(crate) fn play_procedural_animation(
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

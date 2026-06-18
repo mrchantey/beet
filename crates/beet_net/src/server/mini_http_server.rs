@@ -55,10 +55,13 @@ pub async fn start_mini_http_server_with_tcp(
 	// per-connection tasks are spawned, so this is a minimal drain — in-flight
 	// requests finish on their own (or are cut by process exit when nothing else
 	// holds the process up).
-	beet_core::exports::futures_lite::future::or(accept_loop(entity, listener), async move {
-		shutdown.wait().await;
-		Result::Ok(())
-	})
+	beet_core::exports::futures_lite::future::or(
+		accept_loop(entity, listener),
+		async move {
+			shutdown.wait().await;
+			Result::Ok(())
+		},
+	)
 	.await
 }
 
@@ -83,16 +86,13 @@ async fn accept_loop(
 				if let Err(err) =
 					handle_connection(entity, stream, peer_addr).await
 				{
-					error!(
-						"Error handling connection from {peer_addr}: {err}"
-					);
+					error!("Error handling connection from {peer_addr}: {err}");
 				}
 			})
 			.await
 			.ok();
 	}
 }
-
 
 /// Handle a single HTTP connection: read the request, dispatch it,
 /// and write the response.
@@ -204,7 +204,6 @@ async fn handle_connection(
 	Ok(())
 }
 
-
 /// Complete a WebSocket upgrade on a raw connection: write the `101` handshake
 /// bytes, wrap the stream as a [`Socket`] (`Role::Server`, no re-handshake), and
 /// trigger [`OnWebSocketUpgrade`] so the socket layer (eg `client_io`) can adopt
@@ -249,7 +248,8 @@ async fn upgrade_connection(
 				.world()
 				.with(move |world: &mut World| {
 					let socket = world.spawn(socket).id();
-					world.trigger(crate::sockets::OnWebSocketUpgrade { socket });
+					world
+						.trigger(crate::sockets::OnWebSocketUpgrade { socket });
 				})
 				.await;
 			Ok(())
@@ -257,7 +257,6 @@ async fn upgrade_connection(
 		.await?;
 	Ok(())
 }
-
 
 #[cfg(test)]
 mod test {
@@ -296,14 +295,15 @@ mod test {
 			// a route that upgrades any request to a websocket
 			app.world_mut().spawn((
 				server,
-				exchange_handler(|cx| WebSocketUpgrade::from_request(&cx).into()),
+				exchange_handler(|cx| {
+					WebSocketUpgrade::from_request(&cx).into()
+				}),
 			));
 			// record landed sockets
-			app.world_mut().add_observer(
-				move |ev: On<OnWebSocketUpgrade>| {
+			app.world_mut()
+				.add_observer(move |ev: On<OnWebSocketUpgrade>| {
 					captor.push(ev.event().socket);
-				},
-			);
+				});
 			// a global recv observer echoes text back; global (not per-socket)
 			// so it is always installed before the socket reader fires, avoiding
 			// a deferred-registration race
@@ -321,9 +321,13 @@ mod test {
 		time_ext::sleep_millis(200).await;
 
 		// a real client connects over the main HTTP port and upgrades
-		let mut client =
-			Socket::connect(format!("ws://127.0.0.1:{port}")).await.unwrap();
-		client.send(Message::text("over-the-upgrade")).await.unwrap();
+		let mut client = Socket::connect(format!("ws://127.0.0.1:{port}"))
+			.await
+			.unwrap();
+		client
+			.send(Message::text("over-the-upgrade"))
+			.await
+			.unwrap();
 
 		// the server echoes the message back over the upgraded channel
 		let mut echoed = None;

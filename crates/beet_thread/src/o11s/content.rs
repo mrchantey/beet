@@ -292,7 +292,6 @@ impl ContentPart {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

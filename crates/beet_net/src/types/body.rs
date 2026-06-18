@@ -119,7 +119,6 @@ impl Stream for Body {
 	}
 }
 
-
 impl Into<Body> for &[u8] {
 	fn into(self) -> Body { Body::Bytes(Bytes::from(self.to_vec())) }
 }
@@ -135,8 +134,6 @@ impl Into<Body> for Bytes {
 impl Into<Body> for Vec<u8> {
 	fn into(self) -> Body { Body::Bytes(Bytes::from(self)) }
 }
-
-
 
 impl Body {
 	/// Maximum buffer size for parsing streaming bodies.

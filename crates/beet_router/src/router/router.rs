@@ -124,7 +124,6 @@ fn format_route_help(tree: &RouteTree) -> String {
 	output
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -201,10 +200,12 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((default_router(), children![render_action::fixed_func_route(
-				"about",
-				|| rsx! { <p>"About page"</p> }
-			),]))
+			.spawn((default_router(), children![
+				render_action::fixed_func_route(
+					"about",
+					|| rsx! { <p>"About page"</p> }
+				),
+			]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
 			.unwrap()
@@ -217,10 +218,12 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((default_router(), children![render_action::fixed_func_route(
-				"",
-				|| rsx! { <p>"Root content"</p> }
-			),]))
+			.spawn((default_router(), children![
+				render_action::fixed_func_route(
+					"",
+					|| rsx! { <p>"Root content"</p> }
+				),
+			]))
 			.call::<Request, Response>(Request::get(""))
 			.await
 			.unwrap()
@@ -328,10 +331,9 @@ mod test {
 		let root = world
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_func_route(
-						"counter",
-						|| Element::new("p").with_inner_text("counter")
-					),
+					render_action::fixed_func_route("counter", || {
+						Element::new("p").with_inner_text("counter")
+					}),
 					children![increment(FieldRef::new("count")),],
 				),
 				render_action::fixed_func_route(
@@ -373,10 +375,9 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_func_route(
-						"counter",
-						|| Element::new("p").with_inner_text("counter")
-					),
+					render_action::fixed_func_route("counter", || {
+						Element::new("p").with_inner_text("counter")
+					}),
 					children![increment(FieldRef::new("count")),],
 				),
 				render_action::fixed_func_route(

@@ -139,7 +139,9 @@ mod test {
 		eval_console(
 			r#"console.log("hello"); console.error("oops")"#,
 			"null",
-			move |stream, msg| sink.borrow_mut().push((stream, msg.to_string())),
+			move |stream, msg| {
+				sink.borrow_mut().push((stream, msg.to_string()))
+			},
 		)
 		.unwrap();
 		let out = out.borrow();

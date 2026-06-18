@@ -53,7 +53,8 @@ impl Focus {
 					.iter()
 					.filter(|entity| *entity != added)
 					.filter(|entity| {
-						surface_of(*entity, &parents, &surfaces) == added_surface
+						surface_of(*entity, &parents, &surfaces)
+							== added_surface
 					})
 					.collect::<Vec<_>>()
 			});
@@ -128,7 +129,10 @@ fn activate_focused_on_enter(
 	// activate the focused element of each surface Enter landed on.
 	for target in focused.iter() {
 		let surface = surface_of(target, &parents, &surfaces);
-		if enter_windows.iter().any(|window| surface_matches(surface, *window)) {
+		if enter_windows
+			.iter()
+			.any(|window| surface_matches(surface, *window))
+		{
 			// the activation reuses the click path; consumers read the target, not
 			// the pointer, so the target itself stands in as the pointer entity.
 			commands.entity(target).trigger(PointerDown::new(target));
@@ -204,7 +208,10 @@ fn tab_focus(
 			.iter()
 			.copied()
 			.filter(|entity| {
-				surface_matches(surface_of(*entity, &parents, &surfaces), window)
+				surface_matches(
+					surface_of(*entity, &parents, &surfaces),
+					window,
+				)
 			})
 			.collect::<Vec<_>>();
 		if order.is_empty() {
@@ -214,14 +221,16 @@ fn tab_focus(
 		let current = focused.iter().find(|entity| {
 			surface_matches(surface_of(*entity, &parents, &surfaces), window)
 		});
-		let next = match current.and_then(|c| order.iter().position(|&e| e == c)) {
-			// wrap forward/back around the focusable ring
-			Some(idx) => {
-				((idx as i32 + direction).rem_euclid(order.len() as i32)) as usize
-			}
-			// nothing focused yet: start at the first
-			None => 0,
-		};
+		let next =
+			match current.and_then(|c| order.iter().position(|&e| e == c)) {
+				// wrap forward/back around the focusable ring
+				Some(idx) => {
+					((idx as i32 + direction).rem_euclid(order.len() as i32))
+						as usize
+				}
+				// nothing focused yet: start at the first
+				None => 0,
+			};
 		commands.entity(order[next]).insert(Focus);
 	}
 }
@@ -424,7 +433,8 @@ mod test {
 	/// that window's scoped input.
 	fn on_surface(app: &mut App, bundle: impl Bundle) -> (Entity, Entity) {
 		let window = app.world_mut().spawn_empty().id();
-		let entity = app.world_mut().spawn((bundle, RenderSurface(window))).id();
+		let entity =
+			app.world_mut().spawn((bundle, RenderSurface(window))).id();
 		(window, entity)
 	}
 
@@ -462,8 +472,12 @@ mod test {
 		let window_b = app.world_mut().spawn_empty().id();
 		let field_a = app.world_mut().spawn((Focusable, Value::str(""))).id();
 		let field_b = app.world_mut().spawn((Focusable, Value::str(""))).id();
-		app.world_mut().spawn(RenderSurface(window_a)).add_child(field_a);
-		app.world_mut().spawn(RenderSurface(window_b)).add_child(field_b);
+		app.world_mut()
+			.spawn(RenderSurface(window_a))
+			.add_child(field_a);
+		app.world_mut()
+			.spawn(RenderSurface(window_b))
+			.add_child(field_b);
 		// focus both: on different surfaces, so both keep Focus.
 		app.world_mut().entity_mut(field_a).insert(Focus);
 		app.world_mut().entity_mut(field_b).insert(Focus);
@@ -585,8 +599,14 @@ mod test {
 		let input = app.world_mut().spawn(Element::new("input")).id();
 		let span = app.world_mut().spawn(Element::new("span")).id();
 		app.update();
-		app.world().entity(input).contains::<Focusable>().xpect_true();
-		app.world().entity(span).contains::<Focusable>().xpect_false();
+		app.world()
+			.entity(input)
+			.contains::<Focusable>()
+			.xpect_true();
+		app.world()
+			.entity(span)
+			.contains::<Focusable>()
+			.xpect_false();
 	}
 
 	/// Clicking a focusable focuses it.
@@ -649,15 +669,17 @@ mod test {
 			FocusPlugin,
 		));
 		let ring = Color::srgb(0.1, 0.4, 0.9);
-		app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(vec![
-			// `input:focus { border-color: <ring> }`, the focus-visible ring.
-			Rule::new()
-				.with_selector(Selector::AllOf(vec![
-					Selector::tag("input"),
-					Selector::state(ElementState::Focused),
-				]))
-				.with_value(common_props::BorderColorProp, ring),
-		]);
+		app.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
+				// `input:focus { border-color: <ring> }`, the focus-visible ring.
+				Rule::new()
+					.with_selector(Selector::AllOf(vec![
+						Selector::tag("input"),
+						Selector::state(ElementState::Focused),
+					]))
+					.with_value(common_props::BorderColorProp, ring),
+			]);
 		let input = app.world_mut().spawn(Element::new("input")).id();
 		// settle: resolve the unfocused style (the focus ring rule does not apply)
 		app.update();
@@ -706,4 +728,3 @@ mod test {
 			.xpect_true();
 	}
 }
-

@@ -341,7 +341,9 @@ pub struct WebSocketUpgrade {
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 impl WebSocketUpgrade {
 	/// Build the upgrade from request headers, computing the accept key.
-	pub fn from_request(request: &Request) -> Self { Self::new(request.headers()) }
+	pub fn from_request(request: &Request) -> Self {
+		Self::new(request.headers())
+	}
 
 	/// Build the upgrade from request headers, computing the accept key.
 	pub fn new(headers: &HeaderMap) -> Self {
@@ -636,7 +638,10 @@ mod test {
 		headers.set_raw("connection", "Upgrade");
 		let upgrade = WebSocketUpgrade::new(&headers);
 		upgrade.is_valid().xpect_false();
-		upgrade.into_response().status().xpect_eq(StatusCode::BAD_REQUEST);
+		upgrade
+			.into_response()
+			.status()
+			.xpect_eq(StatusCode::BAD_REQUEST);
 	}
 
 	// -- http-crate helpers --

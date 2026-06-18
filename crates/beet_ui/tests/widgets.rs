@@ -59,8 +59,10 @@ fn head_title_defaults_to_package_config() {
 fn head_omit_title_drops_own_title() {
 	// `omit_title` lets a layout own the single `<title>`: the head renders none.
 	let mut world = layout_world();
-	let root =
-		world.spawn_template(rsx! { <Head omit_title=true/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Head omit_title=true/> })
+		.unwrap()
+		.id();
 	let html = render_html(&mut world, root);
 	html.matches("<title>").count().xpect_eq(0);
 }
@@ -140,13 +142,15 @@ fn header_places_children_and_nav() {
 	// the title, `slot="nav"` content fills the <nav>. Proves the cloned-props
 	// path carries slot children through a system template.
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! {
+	let root = world
+		.spawn_template(rsx! {
 			<Header>
 				<span slot="nav">"NavLink"</span>
 				"HeaderExtra"
 			</Header>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("HeaderExtra")
@@ -161,14 +165,16 @@ fn page_layout_forwards_through_nested_composition() {
 	// HtmlDocument into Head/Header — multi-level forwarding the old `<slot>`
 	// system could not do.
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! {
+	let root = world
+		.spawn_template(rsx! {
 			<PageLayout>
 				<meta slot="head" name="custom" content="x"/>
 				<a slot="header-nav" href="/docs">"Docs"</a>
 				"PageBody"
 			</PageLayout>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	render_html(&mut world, root)
 		.as_str()
 		// the custom meta forwarded into <head> (Head's children), the nav link
@@ -206,7 +212,10 @@ fn page_layout_root_is_html() {
 #[beet_core::test]
 fn content_layout_root_is_html() {
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <ContentLayout/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <ContentLayout/> })
+		.unwrap()
+		.id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -218,8 +227,10 @@ fn content_layout_root_is_html() {
 #[beet_core::test]
 fn text_field_uses_input_classes() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! { <TextField name="username"/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <TextField name="username"/> })
+		.unwrap()
+		.id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
@@ -233,10 +244,12 @@ fn text_field_uses_input_classes() {
 #[beet_core::test]
 fn text_field_variant_changes_class() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! {
+	let root = world
+		.spawn_template(rsx! {
 			<TextField name="x" variant=TextFieldVariant::Filled/>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.contains_class_name(&classes::INPUT_FILLED)
@@ -250,15 +263,19 @@ fn text_field_variant_changes_class() {
 fn text_field_field_attaches_field_ref() {
 	let mut world = ui_world();
 	// supplied: the FieldRef component attaches to the input entity
-	let root = world.spawn_template(rsx! {
+	let root = world
+		.spawn_template(rsx! {
 			<TextField name="email" field=FieldRef::new("email")/>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	world.entity(root).get::<FieldRef>().unwrap();
 
 	// omitted: no FieldRef
-	let bare = world.spawn_template(rsx! { <TextField name="email"/> })
-		.unwrap().id();
+	let bare = world
+		.spawn_template(rsx! { <TextField name="email"/> })
+		.unwrap()
+		.id();
 	world.entity(bare).get::<FieldRef>().is_none().xpect_true();
 }
 
@@ -268,8 +285,10 @@ fn text_field_omits_unset_optional_attrs() {
 	// omitted: no `name`/`placeholder` attributes (not an empty `name=""`)
 	let bare = world.spawn_template(rsx! { <TextField/> }).unwrap().id();
 	// supplied: the attribute is present with its value
-	let named = world.spawn_template(rsx! { <TextField name="email"/> })
-		.unwrap().id();
+	let named = world
+		.spawn_template(rsx! { <TextField name="email"/> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let bare = query.get(bare).unwrap();
 		bare.attribute("name").is_none().xpect_true();
@@ -285,8 +304,10 @@ fn text_field_omits_unset_optional_attrs() {
 #[beet_core::test]
 fn text_area_root_is_textarea() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! { <TextArea name="bio"/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <TextArea name="bio"/> })
+		.unwrap()
+		.id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -298,8 +319,10 @@ fn text_area_root_is_textarea() {
 #[beet_core::test]
 fn select_root_is_select() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! { <Select name="country"/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Select name="country"/> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("select");
@@ -312,8 +335,10 @@ fn select_root_is_select() {
 #[beet_core::test]
 fn form_root_is_form() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! { <Form name="signup"/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Form name="signup"/> })
+		.unwrap()
+		.id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -325,8 +350,10 @@ fn form_root_is_form() {
 #[beet_core::test]
 fn error_text_carries_class() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! { <ErrorText message="oops"/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <ErrorText message="oops"/> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("span");
@@ -363,8 +390,10 @@ fn sidebar_renders_nav() {
 		path: Some(SmolPath::new("/")),
 		..default()
 	}];
-	let root = world.spawn_template(rsx! { <Sidebar nodes=nodes/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Sidebar nodes=nodes/> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("nav");
@@ -386,8 +415,10 @@ fn sidebar_branch_renders_details() {
 		expanded: true,
 		..default()
 	}];
-	let root = world.spawn_template(rsx! { <Sidebar nodes=nodes/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Sidebar nodes=nodes/> })
+		.unwrap()
+		.id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		let tags: Vec<_> = query
@@ -408,8 +439,10 @@ fn sidebar_active_leaf_marks_aria_current() {
 		active: true,
 		..default()
 	}];
-	let root = world.spawn_template(rsx! { <Sidebar nodes=nodes/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Sidebar nodes=nodes/> })
+		.unwrap()
+		.id();
 	// the active leaf carries an `aria-current` attribute
 	world.with_state::<ElementQuery, _>(|query| {
 		query
@@ -444,8 +477,10 @@ fn preflight_emits_style() {
 #[beet_core::test]
 fn color_scheme_script_emits_scheme_classes() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! { <ColorSchemeScript/> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <ColorSchemeScript/> })
+		.unwrap()
+		.id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -495,10 +530,12 @@ fn page_break_emits_page_break_class() {
 #[beet_core::test]
 fn button_emits_base_and_variant_class() {
 	let mut world = ui_world();
-	let root = world.spawn_template(
+	let root = world
+		.spawn_template(
 			rsx! { <Button variant=ButtonVariant::Error>"Save"</Button> },
 		)
-		.unwrap().id();
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("button");
@@ -515,8 +552,10 @@ fn button_emits_base_and_variant_class() {
 #[beet_core::test]
 fn icon_button_adds_icon_class() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! { <IconButton>"+"</IconButton> })
-		.unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <IconButton>"+"</IconButton> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("button");
@@ -527,10 +566,12 @@ fn icon_button_adds_icon_class() {
 #[beet_core::test]
 fn link_is_anchor_styled_as_button() {
 	let mut world = ui_world();
-	let root = world.spawn_template(rsx! {
+	let root = world
+		.spawn_template(rsx! {
 			<Link href="/" variant=ButtonVariant::Outlined>"Home"</Link>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("a");

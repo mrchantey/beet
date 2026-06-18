@@ -50,7 +50,6 @@ impl DoubleBuffer {
 		}
 	}
 
-
 	pub fn into_buffer(self) -> Buffer {
 		self.buffers.into_iter().nth(self.current).unwrap()
 	}
@@ -133,7 +132,6 @@ impl DoubleBuffer {
 	}
 }
 
-
 impl From<Buffer> for DoubleBuffer {
 	fn from(buffer: Buffer) -> Self { Self::from_buffer(buffer) }
 }
@@ -182,7 +180,10 @@ mod test {
 		});
 		let diffed: Vec<_> = buffer.diff().collect();
 		// both changed cells resolve to the owner glyph at column 0
-		diffed.iter().all(|(pos, _)| *pos == UVec2::ZERO).xpect_true();
+		diffed
+			.iter()
+			.all(|(pos, _)| *pos == UVec2::ZERO)
+			.xpect_true();
 		diffed
 			.iter()
 			.all(|(_, cell)| cell.symbol_str() == "中")

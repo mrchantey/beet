@@ -143,7 +143,8 @@ impl Request {
 				}
 			}
 			Scheme::About
-				if self.path().first().map(SmolStr::as_str) == Some("blank") =>
+				if self.path().first().map(SmolStr::as_str)
+					== Some("blank") =>
 			{
 				Ok(Response::ok())
 			}
@@ -197,7 +198,6 @@ async fn send_data(request: Request) -> Result<Response> {
 		.with_body(mb.bytes().to_vec())
 		.xok()
 }
-
 
 #[cfg(test)]
 mod test_data_scheme {
@@ -426,7 +426,6 @@ mod test_request {
 	}
 }
 
-
 #[cfg(test)]
 #[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
 #[cfg(feature = "json")]
@@ -471,7 +470,6 @@ mod test_response {
 		res.text().await.unwrap().len().xpect_greater_than(10);
 	}
 }
-
 
 #[cfg(feature = "fs")]
 #[cfg(test)]

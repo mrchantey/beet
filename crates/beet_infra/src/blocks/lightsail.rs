@@ -475,7 +475,6 @@ impl Block for LightsailBlock {
 	}
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;

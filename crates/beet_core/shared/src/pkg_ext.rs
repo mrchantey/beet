@@ -45,7 +45,6 @@ fn crate_name() -> alloc::string::String {
 	std::env::var("CARGO_PKG_NAME").unwrap()
 }
 
-
 /// checks the CARGO_PKG_NAME against a list of internal packages
 pub fn is_internal() -> bool {
 	const INTERNAL_PKGS: &[&str] = &[

@@ -14,7 +14,10 @@ fn world() -> World { ui_world() }
 
 /// Register a reflect type into the world's [`AppTypeRegistry`].
 fn register<T: GetTypeRegistration>(world: &mut World) {
-	world.resource_mut::<AppTypeRegistry>().write().register::<T>();
+	world
+		.resource_mut::<AppTypeRegistry>()
+		.write()
+		.register::<T>();
 }
 
 /// Parse a `.bsx` source into a container and return its first content child
@@ -37,7 +40,11 @@ fn spawn_bsx_under(
 
 /// Parse a `.bsx` source into a freshly spawned container entity, returning the
 /// container (whose children are the parsed roots).
-fn parse_bsx(world: &mut World, parent: Option<Entity>, source: &str) -> Entity {
+fn parse_bsx(
+	world: &mut World,
+	parent: Option<Entity>,
+	source: &str,
+) -> Entity {
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = match parent {
 		Some(parent) => world.spawn(ChildOf(parent)),
@@ -80,7 +87,12 @@ fn descendant_values(world: &World, root: Entity) -> Vec<String> {
 fn element_and_text() {
 	let mut world = world();
 	let root = spawn_bsx(&mut world, "<div>hello</div>");
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 	descendant_values(&world, root).xpect_eq(vec!["hello".to_string()]);
 }
 
@@ -89,7 +101,12 @@ fn nested_elements() {
 	let mut world = world();
 	let root = spawn_bsx(&mut world, "<div><span>inner</span></div>");
 	let span = world.entity(root).get::<Children>().unwrap()[0];
-	world.entity(span).get::<Element>().unwrap().tag().xpect_eq("span");
+	world
+		.entity(span)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("span");
 }
 
 #[beet_core::test]
@@ -104,7 +121,13 @@ fn attributes_become_attribute_entities() {
 			.as_str()
 			.unwrap()
 			.xpect_eq("card");
-		query.find(root, "id").unwrap().1.as_str().unwrap().xpect_eq("main");
+		query
+			.find(root, "id")
+			.unwrap()
+			.1
+			.as_str()
+			.unwrap()
+			.xpect_eq("main");
 	});
 }
 
@@ -160,7 +183,10 @@ fn struct_literal_infers_field_types() {
 		.get::<Sized>()
 		.cloned()
 		.unwrap()
-		.xpect_eq(Sized { width: 8.0, height: 4.0 });
+		.xpect_eq(Sized {
+			width: 8.0,
+			height: 4.0,
+		});
 }
 
 #[beet_core::test]
@@ -173,7 +199,9 @@ fn enum_literal_infers_variant() {
 		.get::<Aligned>()
 		.cloned()
 		.unwrap()
-		.xpect_eq(Aligned { align: Align::Center });
+		.xpect_eq(Aligned {
+			align: Align::Center,
+		});
 }
 
 // ---- @doc bindings -----------------------------------------------------------
@@ -182,7 +210,8 @@ fn enum_literal_infers_variant() {
 fn field_ref_binds_document() {
 	let mut world = world();
 	let doc = world.spawn(Document::new(val!({ "count": 7 }))).id();
-	let root = spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count}</span>");
+	let root =
+		spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count}</span>");
 	world.update_local();
 	// the text child holds a FieldRef bound to `count`, synced to 7.
 	let text = world.entity(root).get::<Children>().unwrap()[0];
@@ -200,7 +229,8 @@ fn field_ref_binds_document() {
 fn field_ref_init_seeds_when_missing() {
 	let mut world = world();
 	let doc = world.spawn(Document::new(val!({}))).id();
-	let _root = spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count=5}</span>");
+	let _root =
+		spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count=5}</span>");
 	world.update_local();
 	world.update_local();
 	world
@@ -247,7 +277,11 @@ struct Linked {
 }
 
 impl Default for Linked {
-	fn default() -> Self { Self { to: Entity::PLACEHOLDER } }
+	fn default() -> Self {
+		Self {
+			to: Entity::PLACEHOLDER,
+		}
+	}
 }
 
 // ---- spreads ----------------------------------------------------------------
@@ -264,7 +298,12 @@ fn spread_inserts_components() {
 	let root =
 		spawn_bsx(&mut world, "<entity {(Marker, Sized{width:2,height:2})}/>");
 	world.entity(root).contains::<Marker>().xpect_true();
-	world.entity(root).get::<Sized>().unwrap().width.xpect_eq(2.0);
+	world
+		.entity(root)
+		.get::<Sized>()
+		.unwrap()
+		.width
+		.xpect_eq(2.0);
 }
 
 #[beet_core::test]
@@ -276,7 +315,12 @@ fn spread_on_component_tag() {
 	register::<Sized>(&mut world);
 	let root = spawn_bsx(&mut world, "<Sized width=1 height=1 {Marker}/>");
 	world.entity(root).contains::<Marker>().xpect_true();
-	world.entity(root).get::<Sized>().unwrap().width.xpect_eq(1.0);
+	world
+		.entity(root)
+		.get::<Sized>()
+		.unwrap()
+		.width
+		.xpect_eq(1.0);
 }
 
 #[beet_core::test]
@@ -284,7 +328,9 @@ fn spread_on_bsx_template_tag() {
 	let mut world = world();
 	register::<Marker>(&mut world);
 	let mut registry = BsxTemplateRegistry::default();
-	registry.insert_source("Card", "<section><Slot/></section>").unwrap();
+	registry
+		.insert_source("Card", "<section><Slot/></section>")
+		.unwrap();
 	world.insert_resource(registry);
 	let root = spawn_bsx(&mut world, "<Card {Marker}>Body</Card>");
 	world.entity(root).contains::<Marker>().xpect_true();
@@ -364,7 +410,9 @@ fn read_value(world: &World, entity: Entity) -> Value {
 fn template_props_store_literal() {
 	let mut world = world();
 	let mut registry = BsxTemplateRegistry::default();
-	registry.insert_source("Card", "<section><Slot/></section>").unwrap();
+	registry
+		.insert_source("Card", "<section><Slot/></section>")
+		.unwrap();
 	world.insert_resource(registry);
 
 	let card = spawn_bsx(&mut world, "<Card title=\"hi\"/>");
@@ -389,7 +437,9 @@ fn template_props_store_literal() {
 fn template_props_bound_reactively() {
 	let mut world = world();
 	let mut registry = BsxTemplateRegistry::default();
-	registry.insert_source("Card", "<section><Slot/></section>").unwrap();
+	registry
+		.insert_source("Card", "<section><Slot/></section>")
+		.unwrap();
 	world.insert_resource(registry);
 
 	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
@@ -501,7 +551,10 @@ fn slot_fallback_when_no_content() {
 	let mut world = world();
 	let mut registry = BsxTemplateRegistry::default();
 	registry
-		.insert_source("Card", "<section><Slot name=\"header\">Fallback</Slot></section>")
+		.insert_source(
+			"Card",
+			"<section><Slot name=\"header\">Fallback</Slot></section>",
+		)
 		.unwrap();
 	world.insert_resource(registry);
 	let root = spawn_bsx(&mut world, "<Card/>");
@@ -599,7 +652,12 @@ fn scoped_counter_page() {
 		.get::<Children>()
 		.unwrap()
 		.iter()
-		.find(|child| world.entity(*child).get::<Element>().is_some_and(|el| el.tag() == "button"))
+		.find(|child| {
+			world
+				.entity(*child)
+				.get::<Element>()
+				.is_some_and(|el| el.tag() == "button")
+		})
 		.unwrap();
 	let pointer = world.spawn_empty().id();
 	world
@@ -609,7 +667,11 @@ fn scoped_counter_page() {
 	world.update_local();
 
 	// the scoped field incremented, and the display binding refreshes to match
-	let doc = world.query::<(Entity, &Document)>().single(&world).unwrap().0;
+	let doc = world
+		.query::<(Entity, &Document)>()
+		.single(&world)
+		.unwrap()
+		.0;
 	world
 		.entity(doc)
 		.get::<Document>()
@@ -667,7 +729,10 @@ fn counter_bsx_repaints_in_live_tui() {
 	// parse the counter markup as the host's content tree.
 	let bytes = MediaBytes::new_bsx(COUNTER_BSX);
 	BsxParser::bsx()
-		.parse(ParseContext::new(&mut app.world_mut().entity_mut(host), &bytes))
+		.parse(ParseContext::new(
+			&mut app.world_mut().entity_mut(host),
+			&bytes,
+		))
 		.unwrap();
 
 	// step until the scoped `@doc:count=0` init reaches the rendered frame.
@@ -872,7 +937,11 @@ fn resource_tag_patches_existing_resource() {
 	let node = spawn_bsx(&mut world, "<SiteMeta title=\"new\"/>");
 	// the named field patched, the missing field kept
 	world.resource::<SiteMeta>().title.as_str().xpect_eq("new");
-	world.resource::<SiteMeta>().tagline.as_str().xpect_eq("keep");
+	world
+		.resource::<SiteMeta>()
+		.tagline
+		.as_str()
+		.xpect_eq("keep");
 	// the tag produces no entity content
 	world.entity(node).contains::<Element>().xpect_false();
 	world.entity(node).contains::<Value>().xpect_false();
@@ -884,7 +953,11 @@ fn resource_tag_inserts_when_absent() {
 	register::<SiteMeta>(&mut world);
 	spawn_bsx(&mut world, "<SiteMeta title=\"fresh\"/>");
 	// inserted over the type's default
-	world.resource::<SiteMeta>().title.as_str().xpect_eq("fresh");
+	world
+		.resource::<SiteMeta>()
+		.title
+		.as_str()
+		.xpect_eq("fresh");
 	world.resource::<SiteMeta>().tagline.as_str().xpect_eq("");
 }
 
@@ -970,7 +1043,12 @@ fn binding_comp_spread_tuple() {
 		"<entity {(Slider{value:3}, @comp:Slider.value)}/>",
 	);
 	world.update_local();
-	world.entity(root).get::<Slider>().unwrap().value.xpect_eq(3);
+	world
+		.entity(root)
+		.get::<Slider>()
+		.unwrap()
+		.value
+		.xpect_eq(3);
 	read_i64(&world, root).xpect_eq(3);
 
 	world.entity_mut(root).get_mut::<Slider>().unwrap().value = 8;
@@ -1011,7 +1089,10 @@ fn binding_comp_build_root() {
 	register::<Slider>(&mut world);
 	let mut registry = BsxTemplateRegistry::default();
 	registry
-		.insert_source("Probe", "<span>{@entity:BuildRoot::Slider.value}</span>")
+		.insert_source(
+			"Probe",
+			"<span>{@entity:BuildRoot::Slider.value}</span>",
+		)
 		.unwrap();
 	world.insert_resource(registry);
 	// the build root is the parse container, above the template's snippet root
@@ -1024,7 +1105,11 @@ fn binding_comp_build_root() {
 	read_i64(&world, text).xpect_eq(3);
 
 	// reactive: the build root's component edit reaches the text
-	world.entity_mut(container).get_mut::<Slider>().unwrap().value = 8;
+	world
+		.entity_mut(container)
+		.get_mut::<Slider>()
+		.unwrap()
+		.value = 8;
 	world.update_local();
 	read_i64(&world, text).xpect_eq(8);
 }
@@ -1040,13 +1125,21 @@ fn binding_comp_router_lazy() {
 	let mut world = world();
 	register::<Slider>(&mut world);
 	// build detached: no `Router` ancestor yet, the binding stays silent
-	let container =
-		parse_bsx(&mut world, None, "<input value=@entity:Router::Slider.value/>");
+	let container = parse_bsx(
+		&mut world,
+		None,
+		"<input value=@entity:Router::Slider.value/>",
+	);
 	let input = world.entity(container).get::<Children>().unwrap()[0];
 	let router = world.spawn((Router, Slider { value: 5 })).id();
 	world.update_local();
 	world.with_state::<AttributeQuery, _>(|query| {
-		query.find(input, "value").unwrap().1.clone().xpect_eq(Value::Null);
+		query
+			.find(input, "value")
+			.unwrap()
+			.1
+			.clone()
+			.xpect_eq(Value::Null);
 	});
 
 	// attaching beneath the router picks the binding up, even though the
@@ -1054,14 +1147,24 @@ fn binding_comp_router_lazy() {
 	world.entity_mut(container).insert(ChildOf(router));
 	world.update_local();
 	world.with_state::<AttributeQuery, _>(|query| {
-		query.find(input, "value").unwrap().1.clone().xpect_eq(Value::Int(5));
+		query
+			.find(input, "value")
+			.unwrap()
+			.1
+			.clone()
+			.xpect_eq(Value::Int(5));
 	});
 
 	// reactive: a component edit on the router reaches the attribute
 	world.entity_mut(router).get_mut::<Slider>().unwrap().value = 7;
 	world.update_local();
 	world.with_state::<AttributeQuery, _>(|query| {
-		query.find(input, "value").unwrap().1.clone().xpect_eq(Value::Int(7));
+		query
+			.find(input, "value")
+			.unwrap()
+			.1
+			.clone()
+			.xpect_eq(Value::Int(7));
 	});
 }
 
@@ -1104,7 +1207,8 @@ fn binding_prop_doc_bound_reactively() {
 		.unwrap();
 	world.insert_resource(registry);
 	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
-	let card = spawn_bsx_under(&mut world, Some(doc), "<Card title=@doc:name/>");
+	let card =
+		spawn_bsx_under(&mut world, Some(doc), "<Card title=@doc:name/>");
 	world.update_local();
 	world.update_local();
 	render_html(&mut world, card).xpect_contains("Alice");
@@ -1182,7 +1286,12 @@ fn component_tag_binding_doc() {
 		spawn_bsx_under(&mut world, Some(doc), "<Slider value=@doc:level/>");
 	world.update_local();
 	world.update_local();
-	world.entity(slider).get::<Slider>().unwrap().value.xpect_eq(7);
+	world
+		.entity(slider)
+		.get::<Slider>()
+		.unwrap()
+		.value
+		.xpect_eq(7);
 
 	// write-back: a component edit reaches the document
 	world.entity_mut(slider).get_mut::<Slider>().unwrap().value = 42;
@@ -1204,14 +1313,24 @@ fn component_tag_binding_res() {
 	let slider = spawn_bsx(&mut world, "<Slider value=@res:Theme.contrast/>");
 	world.update_local();
 	world.update_local();
-	world.entity(slider).get::<Slider>().unwrap().value.xpect_eq(5);
+	world
+		.entity(slider)
+		.get::<Slider>()
+		.unwrap()
+		.value
+		.xpect_eq(5);
 	// the resource seeds outside-in, never clobbered by the component default
 	world.resource::<Theme>().contrast.xpect_eq(5);
 
 	world.resource_mut::<Theme>().contrast = 9;
 	world.update_local();
 	world.update_local();
-	world.entity(slider).get::<Slider>().unwrap().value.xpect_eq(9);
+	world
+		.entity(slider)
+		.get::<Slider>()
+		.unwrap()
+		.value
+		.xpect_eq(9);
 }
 
 // ---- mdx --------------------------------------------------------------------
@@ -1288,7 +1407,12 @@ fn html_mode_is_plain_html() {
 	let container = parse_bsx_html(&mut world, &bytes);
 	// the parsed content is a child of the container parse target.
 	let div = world.entity(container).get::<Children>().unwrap()[0];
-	world.entity(div).get::<Element>().unwrap().tag().xpect_eq("div");
+	world
+		.entity(div)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 }
 
 /// Parse HTML-mode bytes into a container, returning the container entity.

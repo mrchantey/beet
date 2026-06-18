@@ -5,7 +5,6 @@ use beet_net::prelude::*;
 #[cfg(feature = "std")]
 use beet_ui::prelude::*;
 
-
 /// Plugin that registers route-building observers for actions.
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor whenever

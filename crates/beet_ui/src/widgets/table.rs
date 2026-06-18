@@ -2,8 +2,8 @@
 //!
 //! Slot content is supplied as `<tr>` rows; the head/foot slots wrap their
 //! content in `<thead>`/`<tfoot>` automatically.
-use crate::token::Classes;
 use crate::style::material::classes;
+use crate::token::Classes;
 use beet_core::prelude::*;
 
 /// A styled `<table>` with semantic head/body/foot sections.
@@ -34,14 +34,15 @@ pub fn Table(#[prop] vertical_lines: bool) -> impl Bundle {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
 	/// Render a template to plain charcell with the Material rule set.
-	fn render_charcell(template: impl bevy::ecs::template::Template<Output = ()>) -> String {
+	fn render_charcell(
+		template: impl bevy::ecs::template::Template<Output = ()>,
+	) -> String {
 		let mut world = (
 			TemplatePlugin,
 			DocumentPlugin,
@@ -52,7 +53,11 @@ mod test {
 		let root = world.spawn_template(template).unwrap().id();
 		world.entity_mut(root).insert(FlexBuffer::new(40));
 		world.run_schedule(crate::parse::PostParseTree);
-		world.entity_mut(root).take::<FlexBuffer>().unwrap().render_plain()
+		world
+			.entity_mut(root)
+			.take::<FlexBuffer>()
+			.unwrap()
+			.render_plain()
 	}
 
 	fn demo(vertical_lines: bool) -> Snippet {

@@ -298,7 +298,6 @@ fn stem_length(filename: &str) -> usize {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

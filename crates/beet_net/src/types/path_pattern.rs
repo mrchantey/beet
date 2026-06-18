@@ -161,7 +161,6 @@ impl PathPattern {
 			.xmap(Self::from_segments)
 	}
 
-
 	/// Called by to_tokens, this should never be used directly
 	pub fn _from_raw(
 		segments: Vec<PathPatternSegment>,
@@ -544,9 +543,6 @@ impl core::fmt::Display for PathPatternSegment {
 	}
 }
 
-
-
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -558,9 +554,7 @@ mod test {
 		route_path: &str,
 	) -> Result<PathMatch, RouteMatchError> {
 		let parts = RequestParts::get(route_path);
-		PathPattern::new(segments)
-			.unwrap()
-			.parse_path(parts.path())
+		PathPattern::new(segments).unwrap().parse_path(parts.path())
 	}
 
 	#[beet_core::test]
@@ -662,21 +656,15 @@ mod test {
 		map.len().xpect_eq(1);
 
 		let map = parse("/*foo", "bar/baz").unwrap().dyn_map;
-		map.get_vec("foo")
-			.unwrap()
-			.xpect_eq(vec!["bar", "baz"]);
+		map.get_vec("foo").unwrap().xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 
 		let map = parse("/*foo", "/bar/baz").unwrap().dyn_map;
-		map.get_vec("foo")
-			.unwrap()
-			.xpect_eq(vec!["bar", "baz"]);
+		map.get_vec("foo").unwrap().xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 
 		let map = parse("foo/*bar", "foo/bar/baz").unwrap().dyn_map;
-		map.get_vec("bar")
-			.unwrap()
-			.xpect_eq(vec!["bar", "baz"]);
+		map.get_vec("bar").unwrap().xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 	}
 
@@ -703,9 +691,7 @@ mod test {
 
 		// Non-empty match stores each segment separately
 		let map = parse("/*foo?", "bar/baz").unwrap().dyn_map;
-		map.get_vec("foo")
-			.unwrap()
-			.xpect_eq(vec!["bar", "baz"]);
+		map.get_vec("foo").unwrap().xpect_eq(vec!["bar", "baz"]);
 		map.len().xpect_eq(1);
 	}
 
@@ -743,9 +729,7 @@ mod test {
 		parse("/:foo+", "").xpect_err();
 
 		let map = parse("/:foo+", "bar/baz").unwrap().dyn_map;
-		map.get_vec("foo")
-			.unwrap()
-			.xpect_eq(vec!["bar", "baz"]);
+		map.get_vec("foo").unwrap().xpect_eq(vec!["bar", "baz"]);
 
 		// Test :foo* syntax (explicit ZeroOrMore)
 		parse("/:foo*", "bar").xpect_ok();

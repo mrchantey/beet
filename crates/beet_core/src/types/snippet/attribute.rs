@@ -58,7 +58,11 @@ impl Attribute {
 		OnSpawn::new(move |entity| {
 			let element = entity.id();
 			entity.world_scope(move |world| {
-				world.spawn((AttributeOf::new(element), Attribute::new(key), value));
+				world.spawn((
+					AttributeOf::new(element),
+					Attribute::new(key),
+					value,
+				));
 			});
 		})
 	}

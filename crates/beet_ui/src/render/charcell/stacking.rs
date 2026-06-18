@@ -184,7 +184,11 @@ mod test {
 			},
 		);
 		// at the shared top-left cell, the higher z-index glyph (H) is on top
-		buffer.get(UVec2::new(0, 0)).unwrap().symbol_str().xpect_eq("H");
+		buffer
+			.get(UVec2::new(0, 0))
+			.unwrap()
+			.symbol_str()
+			.xpect_eq("H");
 
 		// reversing z-index reverses the winner, proving it is z not tree order
 		let buffer = stacked_buffer(
@@ -197,7 +201,11 @@ mod test {
 				</div>
 			},
 		);
-		buffer.get(UVec2::new(0, 0)).unwrap().symbol_str().xpect_eq("L");
+		buffer
+			.get(UVec2::new(0, 0))
+			.unwrap()
+			.symbol_str()
+			.xpect_eq("L");
 	}
 
 	/// A negative `z-index` child paints behind its parent's background.
@@ -252,6 +260,10 @@ mod test {
 		);
 		// "O" is relatively shifted up onto "I"'s row and, being positioned, paints
 		// above it
-		buffer.get(UVec2::new(0, 0)).unwrap().symbol_str().xpect_eq("O");
+		buffer
+			.get(UVec2::new(0, 0))
+			.unwrap()
+			.symbol_str()
+			.xpect_eq("O");
 	}
 }

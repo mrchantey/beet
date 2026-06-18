@@ -69,7 +69,6 @@ fn AgentChoiceAction(cx: ActionContext<ChoiceInput>) -> String {
 	.to_string()
 }
 
-
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
 struct ChoiceInput {
 	/// The choice you can make, follow the schema and pick one.

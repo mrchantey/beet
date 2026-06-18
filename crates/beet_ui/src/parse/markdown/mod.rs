@@ -97,7 +97,6 @@ impl MarkdownParseConfig {
 	}
 }
 
-
 impl MarkdownParser {
 	/// Create a new parser with default settings and maximal extensions.
 	pub fn new() -> Self { Self::default() }
@@ -110,7 +109,6 @@ impl MarkdownParser {
 			..Default::default()
 		}
 	}
-
 
 	/// Shared parsing logic: tokenize markdown, build tree, diff against entity.
 	fn parse_text(
@@ -183,8 +181,6 @@ impl NodeParser for MarkdownParser {
 			.xok()
 	}
 }
-
-
 
 #[cfg(test)]
 mod test {

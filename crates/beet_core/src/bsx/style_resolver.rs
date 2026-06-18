@@ -18,8 +18,9 @@ use alloc::sync::Arc;
 /// The `bx:style` handler: parses the raw declaration `source` against the
 /// element's [`FileSpan`] and mutates the build entity (register a one-off rule,
 /// attach the minted inline class).
-pub type StyleResolverFn =
-	Arc<dyn Fn(&mut EntityWorldMut, &str, &FileSpan) -> Result<()> + Send + Sync>;
+pub type StyleResolverFn = Arc<
+	dyn Fn(&mut EntityWorldMut, &str, &FileSpan) -> Result<()> + Send + Sync,
+>;
 
 /// The `bx:style` seam: the single handler that lowers a `bx:style` directive's
 /// declarations into a one-off [`Rule`] plus a span-derived class.

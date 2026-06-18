@@ -202,7 +202,6 @@ impl ReadDir {
 		}
 	}
 
-
 	/// Read dir with the provided options. if the root is a file, the
 	/// file will be returned.
 	pub fn read(&self, root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {

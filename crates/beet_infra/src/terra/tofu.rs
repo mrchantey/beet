@@ -43,7 +43,6 @@ fn tofu_process() -> ChildProcess {
 	ChildProcess::new("tofu").with_not_found(NOT_FOUND)
 }
 
-
 /// Export the provider schema based on `./providers.tf.json`
 pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
@@ -122,7 +121,6 @@ pub async fn show(dir: &AbsPathBuf) -> Result<String> {
 		.run_async_stdout()
 		.await
 }
-
 
 /// Read a specific output value from the tofu state.
 pub async fn output(dir: &AbsPathBuf, name: &str) -> Result<String> {

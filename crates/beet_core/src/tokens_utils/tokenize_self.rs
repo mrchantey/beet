@@ -22,8 +22,6 @@ pub trait TokenizeSelf<M = Self> {
 	}
 }
 
-
-
 /// Returns the past part of an [`std::any::type_name`] as a [`syn::Path`],
 /// the user is expected to bring the type into scope.
 /// Where the typename is `"std::option::Option<std::vec::Vec<usize>>"`,
@@ -172,7 +170,6 @@ impl_self_tokens!(
 	char,
 	&'static str
 );
-
 
 #[cfg(test)]
 mod test {

@@ -30,7 +30,6 @@ fn AppInfoContent(config: Res<PackageConfig>) -> impl Bundle {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

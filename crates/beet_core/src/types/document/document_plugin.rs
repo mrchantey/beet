@@ -1,7 +1,6 @@
 use super::*;
 use crate::prelude::*;
 
-
 /// Plugin that enables document synchronization for field values.
 ///
 /// This plugin:
@@ -102,7 +101,8 @@ impl Plugin for DocumentPlugin {
 		#[cfg(feature = "bevy_async")]
 		app.add_systems(
 			PreUpdate,
-			run_document_sync.after(async_world_sync_point::<BeetAsyncSyncPoint>),
+			run_document_sync
+				.after(async_world_sync_point::<BeetAsyncSyncPoint>),
 		);
 		#[cfg(not(feature = "bevy_async"))]
 		app.add_systems(PreUpdate, run_document_sync);
@@ -139,13 +139,14 @@ impl DocumentSync {
 				return;
 			}
 			let this_run = world.change_tick();
-			let changed = world
-				.query::<Ref<Value>>()
-				.iter(world)
-				.any(|value| value.last_changed().is_newer_than(before, this_run))
-				|| world.query::<Ref<Document>>().iter(world).any(|document| {
-					document.last_changed().is_newer_than(before, this_run)
-				});
+			let changed =
+				world.query::<Ref<Value>>().iter(world).any(|value| {
+					value.last_changed().is_newer_than(before, this_run)
+				}) || world.query::<Ref<Document>>().iter(world).any(
+					|document| {
+						document.last_changed().is_newer_than(before, this_run)
+					},
+				);
 			if !changed {
 				return;
 			}
@@ -156,7 +157,6 @@ impl DocumentSync {
 		);
 	}
 }
-
 
 #[cfg(test)]
 mod test {

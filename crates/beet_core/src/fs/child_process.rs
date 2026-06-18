@@ -32,7 +32,6 @@ impl std::fmt::Display for ChildProcess {
 	}
 }
 
-
 /// Handle for a long-running child process.
 /// Kills the process on drop, and also supports explicit [`kill`](ChildHandle::kill).
 pub struct ChildHandle {

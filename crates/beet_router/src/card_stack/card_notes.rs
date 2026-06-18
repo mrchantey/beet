@@ -82,7 +82,6 @@ pub fn card_notes(
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::HTML_BLOCK;
@@ -94,8 +93,7 @@ mod test {
 	/// registers, so the tests exercise the gated behaviour.
 	fn strip(world: &mut World) {
 		let mut schedule = Schedule::default();
-		schedule
-			.add_systems(card_notes.run_if(any_with_component::<CardDeck>));
+		schedule.add_systems(card_notes.run_if(any_with_component::<CardDeck>));
 		schedule.run(world);
 		world.flush();
 	}
@@ -179,10 +177,9 @@ mod test {
 		// content root → <div> → <hr>: the rule's parent is an Element, so it is
 		// nested, not a top-level node.
 		let root = world
-			.spawn(children![(
-				Element::new("div"),
-				children![Element::new("hr")]
-			)])
+			.spawn(children![(Element::new("div"), children![Element::new(
+				"hr"
+			)])])
 			.id();
 
 		strip(&mut world);
@@ -209,17 +206,14 @@ mod test {
 		// content root → __html_block → [div, hr, notes], the structure an mdx card
 		// (markdown body around a `<TitleLayout>`) renders into.
 		let root = world
-			.spawn(children![(
-				Element::new(HTML_BLOCK),
-				children![
-					(Element::new("div"), children![(
-						Element::new("p"),
-						children![Value::str("content")]
-					)]),
-					Element::new("hr"),
-					(Element::new("p"), children![Value::str("speaker notes")]),
-				]
-			)])
+			.spawn(children![(Element::new(HTML_BLOCK), children![
+				(Element::new("div"), children![(
+					Element::new("p"),
+					children![Value::str("content")]
+				)]),
+				Element::new("hr"),
+				(Element::new("p"), children![Value::str("speaker notes")]),
+			])])
 			.id();
 
 		strip(&mut world);

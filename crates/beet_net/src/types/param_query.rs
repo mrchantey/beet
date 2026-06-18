@@ -7,7 +7,6 @@ use super::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
-
 /// A system parameter for extracting types from request params,
 /// and caching them by inserting as components alongside the request.
 ///

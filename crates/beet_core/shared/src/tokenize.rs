@@ -5,7 +5,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 
-
 /// Bevy's bounded `related!` / tuple `Bundle` arity limit.
 const BOUNDED_MAX: usize = 12;
 
@@ -88,7 +87,6 @@ fn is_reserved_keyword(key: &str) -> bool {
 			| "'static" | "macro_rules" | "raw" | "safe" | "union"
 	)
 }
-
 
 #[cfg(test)]
 mod test {

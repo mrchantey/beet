@@ -15,7 +15,6 @@ impl Default for RandomizePosition {
 	}
 }
 
-
 pub fn randomize_position(
 	mut commands: Commands,
 	mut rand: ResMut<RandomSource>,

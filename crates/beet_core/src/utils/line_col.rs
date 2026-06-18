@@ -75,7 +75,6 @@ impl core::fmt::Display for LineCol {
 	}
 }
 
-
 #[cfg(feature = "tokens")]
 impl From<proc_macro2::LineColumn> for LineCol {
 	fn from(line_col: proc_macro2::LineColumn) -> Self {

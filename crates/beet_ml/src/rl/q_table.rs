@@ -71,9 +71,6 @@ impl<State: StateSpace, Action: ActionSpace> QPolicy for QTable<State, Action> {
 	}
 }
 
-
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

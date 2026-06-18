@@ -101,7 +101,6 @@
 
 use beet_core::prelude::*;
 
-
 #[derive(Component)]
 struct Counter {
 	value: usize,
@@ -432,7 +431,6 @@ fn main() {
 		"  Max:     {:?}",
 		app_default_plugins_times.iter().max().unwrap()
 	);
-
 
 	// Performance comparisons
 	println!("\n⚡ Performance Comparison (relative to simple loop):");

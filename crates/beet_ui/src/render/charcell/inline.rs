@@ -135,7 +135,10 @@ pub(super) fn paint_inline_flow(
 			// wrap the painted columns in this run's OSC-8 link (stdout only)
 			if let Some(link) = &span.link {
 				for col in x.max(0)..(x + span_width).max(0) {
-					buffer.set_link(UVec2::new(col as u32, y.max(0) as u32), link);
+					buffer.set_link(
+						UVec2::new(col as u32, y.max(0) as u32),
+						link,
+					);
 				}
 			}
 			x += span_width;
@@ -519,11 +522,8 @@ mod pipeline_tests {
 
 	#[beet_core::test]
 	fn paragraph_wraps_at_content_width() {
-		render(
-			UVec2::new(9, 5),
-			rsx! { <p>"one two three four"</p> },
-		)
-		.xpect_eq("one two\nthree\nfour");
+		render(UVec2::new(9, 5), rsx! { <p>"one two three four"</p> })
+			.xpect_eq("one two\nthree\nfour");
 	}
 
 	#[beet_core::test]

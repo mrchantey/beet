@@ -6,7 +6,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 
-
 /// Represents a section of a text file.
 ///
 /// When used as a component, this entity represents this section.
@@ -98,14 +97,12 @@ impl FileSpan {
 		Self::new(file, span.start().into(), span.end().into())
 	}
 
-
 	/// Creates a new [`FileSpan`] representing an entire file.
 	///
 	/// The line and column are set to 1 and 0 respectively.
 	pub fn new_for_file(file: impl Into<SmolPath>) -> Self {
 		Self::new(file, LineCol::default(), LineCol::default())
 	}
-
 
 	/// Creates a new [`FileSpan`] from a file path, line, and column.
 	///
@@ -184,7 +181,6 @@ pub struct FileSpanOf<C> {
 	#[reflect(ignore)]
 	pub phantom: core::marker::PhantomData<C>,
 }
-
 
 impl<C> core::ops::Deref for FileSpanOf<C> {
 	type Target = FileSpan;

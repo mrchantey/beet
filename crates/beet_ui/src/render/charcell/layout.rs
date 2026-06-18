@@ -145,7 +145,8 @@ pub fn block_layout_rects(
 	let box_model = BoxModel::from_node(node, viewport);
 	// a scroll container reserves its scrollbar gutter, so children flow within
 	// the scrollport (content rect minus gutter), reflowing around the bar.
-	let content_rect = scrollport_of(node, query, box_model.content_rect(container_rect));
+	let content_rect =
+		scrollport_of(node, query, box_model.content_rect(container_rect));
 	let containing = UVec2::new(
 		content_rect.width().max(0) as u32,
 		content_rect.height().max(0) as u32,
@@ -177,14 +178,19 @@ pub fn block_layout_rects(
 		let (explicit_w, explicit_h) =
 			explicit_box_size(child, viewport, containing);
 		let raster_w = child.kitty_image().map(|image| {
-			image.cell_size_constrained(explicit_w, explicit_h, full_width).x
+			image
+				.cell_size_constrained(explicit_w, explicit_h, full_width)
+				.x
 		});
-		let child_width =
-			explicit_w.or(raster_w).unwrap_or(full_width).min(full_width);
+		let child_width = explicit_w
+			.or(raster_w)
+			.unwrap_or(full_width)
+			.min(full_width);
 		// height resolved at the assigned width, not the wider measured width, so
 		// a narrowed column reserves every wrapped row instead of clipping the tail.
-		let child_height = explicit_h
-			.unwrap_or_else(|| resolve_height(child, query, child_width, viewport));
+		let child_height = explicit_h.unwrap_or_else(|| {
+			resolve_height(child, query, child_width, viewport)
+		});
 		// the last child keeps its full box so its own bottom-margin inset never
 		// clips content; the container was already measured one margin shorter
 		// (see `node_bottom_margin`), so that empty trailing-margin row simply
@@ -218,7 +224,8 @@ pub fn inline_layout_rects(
 	layout_rects: &mut HashMap<Entity, IRect>,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
-	let content_rect = scrollport_of(node, query, box_model.content_rect(container_rect));
+	let content_rect =
+		scrollport_of(node, query, box_model.content_rect(container_rect));
 	let max_width = content_rect.width().max(0) as u32;
 
 	// Form rows: greedily pack children left-to-right, wrapping as needed
@@ -305,15 +312,36 @@ fn position_node(
 				return;
 			};
 			let containing = containing_size(rect);
-			let dx = inset_axis(style.left(), style.right(), viewport, containing.x, true);
-			let dy = inset_axis(style.top(), style.bottom(), viewport, containing.y, false);
-			layout_rects.insert(entity, translate_rect(rect, IVec2::new(dx, dy)));
+			let dx = inset_axis(
+				style.left(),
+				style.right(),
+				viewport,
+				containing.x,
+				true,
+			);
+			let dy = inset_axis(
+				style.top(),
+				style.bottom(),
+				viewport,
+				containing.y,
+				false,
+			);
+			layout_rects
+				.insert(entity, translate_rect(rect, IVec2::new(dx, dy)));
 		}
 		Position::Absolute | Position::Fixed => {
 			let block = match style.position {
-				Position::Fixed => IRect::new(0, 0, viewport.x as i32, viewport.y as i32),
+				Position::Fixed => {
+					IRect::new(0, 0, viewport.x as i32, viewport.y as i32)
+				}
 				// absolute: nearest positioned ancestor's padding box, else viewport
-				_ => containing_block(entity, query, parents, layout_rects, viewport),
+				_ => containing_block(
+					entity,
+					query,
+					parents,
+					layout_rects,
+					viewport,
+				),
 			};
 			layout_rects
 				.insert(entity, absolute_rect(node, &style, block, viewport));
@@ -344,7 +372,8 @@ fn containing_block(
 					.get(&parent)
 					.copied()
 					.unwrap_or_else(|| parent_node.layout_rect());
-				return BoxModel::from_node(&parent_node, viewport).inner_rect(rect);
+				return BoxModel::from_node(&parent_node, viewport)
+					.inner_rect(rect);
 			}
 		}
 		current = parent;
@@ -369,20 +398,40 @@ fn absolute_rect(
 	let block_h = (block.height().max(0)) as u32;
 
 	let (left, right) = (
-		style.left().map(|l| inset_cells(l, viewport, block_w, true)),
-		style.right().map(|l| inset_cells(l, viewport, block_w, true)),
+		style
+			.left()
+			.map(|l| inset_cells(l, viewport, block_w, true)),
+		style
+			.right()
+			.map(|l| inset_cells(l, viewport, block_w, true)),
 	);
 	let (top, bottom) = (
-		style.top().map(|l| inset_cells(l, viewport, block_h, false)),
-		style.bottom().map(|l| inset_cells(l, viewport, block_h, false)),
+		style
+			.top()
+			.map(|l| inset_cells(l, viewport, block_h, false)),
+		style
+			.bottom()
+			.map(|l| inset_cells(l, viewport, block_h, false)),
 	);
 	let explicit_w = box_model.width.map(|w| w + box_model.overhead().x);
 	let explicit_h = box_model.height.map(|h| h + box_model.overhead().y);
 
-	let (x0, x1) =
-		axis_extent(block.min.x, block.max.x, left, right, explicit_w, intrinsic.x);
-	let (y0, y1) =
-		axis_extent(block.min.y, block.max.y, top, bottom, explicit_h, intrinsic.y);
+	let (x0, x1) = axis_extent(
+		block.min.x,
+		block.max.x,
+		left,
+		right,
+		explicit_w,
+		intrinsic.x,
+	);
+	let (y0, y1) = axis_extent(
+		block.min.y,
+		block.max.y,
+		top,
+		bottom,
+		explicit_h,
+		intrinsic.y,
+	);
 	IRect::new(x0, y0, x1, y1)
 }
 
@@ -491,8 +540,12 @@ fn inset_axis(
 	containing: u32,
 	x_axis: bool,
 ) -> i32 {
-	let lead = lead.map(|l| inset_cells(l, viewport, containing, x_axis)).unwrap_or(0);
-	let trail = trail.map(|l| inset_cells(l, viewport, containing, x_axis)).unwrap_or(0);
+	let lead = lead
+		.map(|l| inset_cells(l, viewport, containing, x_axis))
+		.unwrap_or(0);
+	let trail = trail
+		.map(|l| inset_cells(l, viewport, containing, x_axis))
+		.unwrap_or(0);
 	lead - trail
 }
 
@@ -525,7 +578,9 @@ mod tests {
 		// the paint boundary drops any cell with a negative component
 		Clip::NONE.cell(IVec2::new(-1, 0)).xpect_eq(None);
 		Clip::NONE.cell(IVec2::new(0, -1)).xpect_eq(None);
-		Clip::NONE.cell(IVec2::new(1, 2)).xpect_eq(Some(UVec2::new(1, 2)));
+		Clip::NONE
+			.cell(IVec2::new(1, 2))
+			.xpect_eq(Some(UVec2::new(1, 2)));
 
 		// filling that rect into a small buffer paints only the on-screen
 		// quadrant (x in 0..3, y in 0..2), leaving the off-screen rows/cols blank
@@ -535,8 +590,12 @@ mod tests {
 			Cell::new("x", VisualStyle::default(), Entity::PLACEHOLDER),
 			Clip::NONE,
 		);
-		let painted: Vec<UVec2> = buffer.iter_cells().map(|(pos, _)| pos).collect();
-		painted.iter().all(|pos| pos.x < 3 && pos.y < 2).xpect_true();
+		let painted: Vec<UVec2> =
+			buffer.iter_cells().map(|(pos, _)| pos).collect();
+		painted
+			.iter()
+			.all(|pos| pos.x < 3 && pos.y < 2)
+			.xpect_true();
 		painted.contains(&UVec2::new(0, 0)).xpect_true();
 		painted.contains(&UVec2::new(2, 1)).xpect_true();
 	}
@@ -622,11 +681,7 @@ mod tests {
 					display: Display::Inline,
 					..default()
 				},
-				children![
-					rsx! {"Hello"},
-					rsx! {"World"},
-					rsx! {"Foo"},
-				],
+				children![rsx! {"Hello"}, rsx! {"World"}, rsx! {"Foo"},],
 			),
 		)
 		.trim_lines();
@@ -639,7 +694,9 @@ mod tests {
 	fn fill_width(buffer: &Buffer, bg: Color, y: u32) -> usize {
 		buffer
 			.iter_cells()
-			.filter(|(pos, cell)| pos.y == y && cell.style.background == Some(bg))
+			.filter(|(pos, cell)| {
+				pos.y == y && cell.style.background == Some(bg)
+			})
 			.count()
 	}
 
@@ -696,14 +753,17 @@ mod tests {
 		let width = 12;
 		// a grow box filling the line, an unbreakable run, and wide chars that
 		// would straddle the right edge all stay within the buffer width.
-		let bundle = (LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-			(rsx! { "中文日本語ＡＢＣ" }, bordered.clone()),
-			(
-				rsx! { "Supercalifragilistic" },
-				bordered.clone(),
-				LayoutStyle::default().with_flex_grow(1)
-			),
-		]);
+		let bundle = (
+			LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+			children![
+				(rsx! { "中文日本語ＡＢＣ" }, bordered.clone()),
+				(
+					rsx! { "Supercalifragilistic" },
+					bordered.clone(),
+					LayoutStyle::default().with_flex_grow(1)
+				),
+			],
+		);
 		Buffer::render_oneshot_sized(UVec2::new(width, 6), bundle)
 			.lines()
 			.map(display_width)

@@ -55,22 +55,10 @@ pub mod prelude {
 	pub use crate::ui_world;
 	// the `rsx!` / `#[template]` snippet runtime moved to `beet_core`; re-export it
 	// so the macro output and `use beet_ui::prelude::*` call sites resolve.
-	#[cfg(feature = "template")]
-	pub use beet_core::types::snippet::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;
 	#[cfg(feature = "style")]
 	pub use crate::style;
-	/// The shared class-name vocabulary, reached through the `classes::` prefix.
-	#[cfg(feature = "style")]
-	pub use crate::style::material::classes;
-	/// The Material styling system. Its design-token roles are deliberately
-	/// reached through the `material::` prefix (eg `material::colors::Primary`),
-	/// since Material is one of potentially many styling systems. (Internally
-	/// beet_ui's own rule definitions reach the bare `colors::` prefix via
-	/// `use crate::style::material::*`.)
-	#[cfg(feature = "style")]
-	pub use crate::style::material;
 	#[cfg(feature = "style")]
 	pub use crate::style::BlinkStyle;
 	#[cfg(feature = "style")]
@@ -86,15 +74,27 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::StylePlugin;
 	#[cfg(feature = "style")]
-	pub use crate::style::material::Theme;
-	#[cfg(feature = "style")]
 	pub use crate::style::TextAlign;
 	#[cfg(feature = "style")]
 	pub use crate::style::VISUAL_STYLE_DEFAULT;
 	#[cfg(feature = "style")]
 	pub use crate::style::VisualStyle;
+	/// The Material styling system. Its design-token roles are deliberately
+	/// reached through the `material::` prefix (eg `material::colors::Primary`),
+	/// since Material is one of potentially many styling systems. (Internally
+	/// beet_ui's own rule definitions reach the bare `colors::` prefix via
+	/// `use crate::style::material::*`.)
+	#[cfg(feature = "style")]
+	pub use crate::style::material;
+	#[cfg(feature = "style")]
+	pub use crate::style::material::Theme;
+	/// The shared class-name vocabulary, reached through the `classes::` prefix.
+	#[cfg(feature = "style")]
+	pub use crate::style::material::classes;
 	pub use crate::token;
 	pub use crate::token::*;
+	#[cfg(feature = "template")]
+	pub use beet_core::types::snippet::*;
 
 	pub use crate::types::*;
 	#[cfg(feature = "template")]
@@ -103,7 +103,6 @@ pub mod prelude {
 	// re-exported so the `token!` macro can resolve `$crate::prelude::FieldSchema`
 	pub use beet_core::prelude::FieldSchema;
 }
-
 
 pub mod exports {
 	// used by the val! macro

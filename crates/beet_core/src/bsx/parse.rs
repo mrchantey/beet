@@ -253,9 +253,8 @@ fn parse_fragment_token<'a>(
 	}
 	// verbatim text up to the next `<` (and `{` when expressions are enabled).
 	let start = cursor.offset();
-	let text = cursor.take_while(|ch| {
-		ch != '<' && !(config.expressions && ch == '{')
-	});
+	let text =
+		cursor.take_while(|ch| ch != '<' && !(config.expressions && ch == '{'));
 	if text.is_empty() {
 		// a stray char (eg a `<` not starting a valid tag): consume it as text so
 		// the loop advances, matching lenient HTML.
@@ -263,8 +262,9 @@ fn parse_fragment_token<'a>(
 			cursor.bump();
 		}
 		let consumed = cursor.slice(start, cursor.offset());
-		return Ok((!consumed.is_empty())
-			.then_some(BsxFragmentToken::Text(consumed)));
+		return Ok(
+			(!consumed.is_empty()).then_some(BsxFragmentToken::Text(consumed))
+		);
 	}
 	Ok(Some(BsxFragmentToken::Text(text)))
 }
@@ -302,9 +302,7 @@ fn parse_fragment_open<'a>(
 /// plain string (HTML), so a URL like `src=https://x//` is not run through the
 /// value grammar; only braced `key={..}` / bare `{..}` use the value grammar so
 /// `bx:` directives, spreads, and references still resolve.
-fn parse_fragment_attributes(
-	cursor: &mut Cursor,
-) -> Result<Vec<BsxAttribute>> {
+fn parse_fragment_attributes(cursor: &mut Cursor) -> Result<Vec<BsxAttribute>> {
 	let mut attributes = Vec::new();
 	loop {
 		cursor.skip_ws();
@@ -562,9 +560,7 @@ fn parse_text(
 	cursor: &mut Cursor,
 	config: &BsxParseConfig,
 ) -> Result<Option<BsxNode>> {
-	let text = cursor.take_while(|ch| {
-		ch != '<' && !(config.bsx && ch == '{')
-	});
+	let text = cursor.take_while(|ch| ch != '<' && !(config.bsx && ch == '{'));
 	if text.is_empty() {
 		// avoid an infinite loop on a stray char we did not consume.
 		if !cursor.is_eof() {
@@ -720,7 +716,9 @@ fn parse_attributes(
 					value: AttrValue::Spread(spread),
 				});
 			}
-			Some('{') => bevybail!("`{{..}}` spreads require bsx to be enabled"),
+			Some('{') => {
+				bevybail!("`{{..}}` spreads require bsx to be enabled")
+			}
 			_ => attributes.push(parse_attribute(cursor, config)?),
 		}
 	}
@@ -788,7 +786,9 @@ fn parse_attribute(
 			let raw = cursor.take_while(is_unbraced_value_char);
 			AttrValue::Expr(parse_value_expr(&mut Cursor::new(raw))?)
 		}
-		_ => bevybail!("attribute `{key}` requires a quoted value in html mode"),
+		_ => {
+			bevybail!("attribute `{key}` requires a quoted value in html mode")
+		}
 	};
 	Ok(BsxAttribute { key, value })
 }
@@ -861,8 +861,8 @@ mod test {
 
 	#[beet_core::test]
 	fn simple_element() {
-		let nodes = parse_document("<div>hi</div>", &BsxParseConfig::bsx())
-			.unwrap();
+		let nodes =
+			parse_document("<div>hi</div>", &BsxParseConfig::bsx()).unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected element");
 		};
@@ -888,9 +888,11 @@ mod test {
 
 	#[beet_core::test]
 	fn attributes() {
-		let nodes =
-			parse_document("<div class=\"card\" disabled/>", &BsxParseConfig::bsx())
-				.unwrap();
+		let nodes = parse_document(
+			"<div class=\"card\" disabled/>",
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected element");
 		};
@@ -916,7 +918,8 @@ mod test {
 	#[beet_core::test]
 	fn text_block_expr() {
 		let nodes =
-			parse_document("<p>{@doc:count}</p>", &BsxParseConfig::bsx()).unwrap();
+			parse_document("<p>{@doc:count}</p>", &BsxParseConfig::bsx())
+				.unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected p");
 		};
@@ -930,8 +933,12 @@ mod test {
 			&BsxParseConfig::bsx(),
 		)
 		.unwrap();
-		nodes[0].clone().xpect_eq(BsxNode::Doctype("html".to_string()));
-		nodes[1].clone().xpect_eq(BsxNode::Comment(" hi ".to_string()));
+		nodes[0]
+			.clone()
+			.xpect_eq(BsxNode::Doctype("html".to_string()));
+		nodes[1]
+			.clone()
+			.xpect_eq(BsxNode::Comment(" hi ".to_string()));
 	}
 
 	#[beet_core::test]
@@ -947,9 +954,11 @@ mod test {
 
 	#[beet_core::test]
 	fn html_mode_plain_html() {
-		let nodes =
-			parse_document("<div class=\"a\">hi</div>", &BsxParseConfig::html())
-				.unwrap();
+		let nodes = parse_document(
+			"<div class=\"a\">hi</div>",
+			&BsxParseConfig::html(),
+		)
+		.unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected div");
 		};
@@ -993,21 +1002,15 @@ mod test {
 
 	#[beet_core::test]
 	fn fragment_void_and_self_closing() {
-		matches!(
-			fragment("<br>")[0],
-			BsxFragmentToken::Open {
-				self_closing: true,
-				..
-			}
-		)
+		matches!(fragment("<br>")[0], BsxFragmentToken::Open {
+			self_closing: true,
+			..
+		})
 		.xpect_true();
-		matches!(
-			fragment("<br/>")[0],
-			BsxFragmentToken::Open {
-				self_closing: true,
-				..
-			}
-		)
+		matches!(fragment("<br/>")[0], BsxFragmentToken::Open {
+			self_closing: true,
+			..
+		})
 		.xpect_true();
 	}
 
@@ -1054,7 +1057,10 @@ mod test {
 		let AttrValue::Expr(ValueExpr::Literal(DataLiteral::Enum(named))) =
 			&attributes[0].value
 		else {
-			panic!("expected an enum value expression, got {:?}", attributes[0].value);
+			panic!(
+				"expected an enum value expression, got {:?}",
+				attributes[0].value
+			);
 		};
 		named.name.as_str().xpect_eq("ButtonVariant::Outlined");
 	}
@@ -1138,8 +1144,9 @@ mod test {
 			expressions: true,
 			..Default::default()
 		};
-		parse_fragment("<p>hi {name}</p>", &config).unwrap().xpect_eq(
-			vec![
+		parse_fragment("<p>hi {name}</p>", &config)
+			.unwrap()
+			.xpect_eq(vec![
 				BsxFragmentToken::Open {
 					tag: "p",
 					attributes: vec![],
@@ -1148,8 +1155,7 @@ mod test {
 				BsxFragmentToken::Text("hi "),
 				BsxFragmentToken::Expr("name"),
 				BsxFragmentToken::Close { tag: "p" },
-			],
-		);
+			]);
 	}
 
 	#[beet_core::test]
@@ -1176,7 +1182,8 @@ mod test {
 	/// The child nodes of a single root element parsed from `source`.
 	fn children_of(source: &str) -> Vec<BsxNode> {
 		let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
-		let BsxNode::Element(element) = nodes.into_iter().next().unwrap() else {
+		let BsxNode::Element(element) = nodes.into_iter().next().unwrap()
+		else {
 			panic!("expected a root element");
 		};
 		element.children
@@ -1213,6 +1220,7 @@ mod test {
 		let BsxNode::Text(text) = &children[0] else {
 			panic!("expected verbatim text");
 		};
-		text.clone().xpect_eq("\n  line one\n  line two\n".to_string());
+		text.clone()
+			.xpect_eq("\n  line one\n  line two\n".to_string());
 	}
 }

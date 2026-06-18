@@ -81,7 +81,6 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		self.doc_query.get(doc_entity)?.xok()
 	}
 
-
 	/// Returns the mutable query item for the document.
 	pub fn get_mut(
 		&mut self,
@@ -104,9 +103,11 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result<Out> {
 		let doc_entity = self.entity(subject, &field.document);
 		// resolve the scope prefix fresh, so writes are reactive by construction
-		let field_path = self
-			.scopes
-			.resolved_path(subject, &field.field_path, Some(doc_entity));
+		let field_path = self.scopes.resolved_path(
+			subject,
+			&field.field_path,
+			Some(doc_entity),
+		);
 
 		if let Ok(mut doc) = self.doc_query.get_mut(doc_entity) {
 			let value = if let Ok(value) = doc.get_field_mut(&field_path) {
@@ -151,9 +152,11 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
 		// schema paths are authored against the resolved (absolute) path
-		let field_path = self
-			.scopes
-			.resolved_path(subject, &field.field_path, Some(doc_entity));
+		let field_path = self.scopes.resolved_path(
+			subject,
+			&field.field_path,
+			Some(doc_entity),
+		);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
 			schema.assert_field_type::<T>(&field_path)?;
 		}
@@ -169,9 +172,11 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
 		// schema paths are authored against the resolved (absolute) path
-		let field_path = self
-			.scopes
-			.resolved_path(subject, &field.field_path, Some(doc_entity));
+		let field_path = self.scopes.resolved_path(
+			subject,
+			&field.field_path,
+			Some(doc_entity),
+		);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
 			schema.assert_list_item_type::<T>(&field_path)?;
 		}
@@ -246,8 +251,6 @@ fn as_list_mut(value: &mut Value) -> Result<&mut Vec<Value>> {
 		other => bevybail!("expected list, received {}", other.kind()),
 	}
 }
-
-
 
 #[cfg(all(test, feature = "json"))]
 mod test {

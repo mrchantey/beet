@@ -55,8 +55,9 @@ impl BsxTemplate {
 	pub fn load_entry(world: &World, path: impl AsRef<Path>) -> Result<Self> {
 		let path = path.as_ref();
 		let source = fs_ext::read_to_string(path)?;
-		Self::parse_entry(world, &source)
-			.map_err(|err| bevyhow!("failed to load entry `{}`: {err}", path.display()))
+		Self::parse_entry(world, &source).map_err(|err| {
+			bevyhow!("failed to load entry `{}`: {err}", path.display())
+		})
 	}
 
 	/// Build this template into a fresh root entity and flush, returning the root.
@@ -90,10 +91,17 @@ mod test {
 			"<!-- entry -->\n<main class=\"app\"><span>hi</span></main>\n",
 		);
 		let mut world = TemplatePlugin::world();
-		let root =
-			BsxTemplate::load_entry(&world, &path).unwrap().spawn(&mut world).unwrap();
+		let root = BsxTemplate::load_entry(&world, &path)
+			.unwrap()
+			.spawn(&mut world)
+			.unwrap();
 		// the root element's component lands on the returned entity itself
-		world.entity(root).get::<Element>().unwrap().tag().xpect_eq("main");
+		world
+			.entity(root)
+			.get::<Element>()
+			.unwrap()
+			.tag()
+			.xpect_eq("main");
 	}
 
 	#[crate::test]

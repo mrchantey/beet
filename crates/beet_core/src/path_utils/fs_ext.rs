@@ -26,7 +26,6 @@ macro_rules! dir {
 	};
 }
 
-
 /// Get the current working directory
 pub fn current_dir() -> FsResult<PathBuf> {
 	cfg_if! {
@@ -61,7 +60,6 @@ pub fn copy_recursive(
 	Ok(())
 }
 
-
 /// Checks if a path exists on the filesystem.
 pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	let path = path.as_ref();
@@ -93,7 +91,6 @@ pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
 		}
 	}
 }
-
 
 /// Creates a directory and all parent directories if they don't exist.
 pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
@@ -311,7 +308,6 @@ pub fn read_stream_string(
 	let byte_stream = fs_ext::read_stream(path)?;
 	crate::utils::stream_ext::bytes_to_text(byte_stream).xok()
 }
-
 
 /// Computes a hash of a file's contents.
 pub fn hash_file(path: impl AsRef<Path>) -> FsResult<u64> {

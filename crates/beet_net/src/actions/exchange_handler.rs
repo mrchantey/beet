@@ -6,7 +6,6 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 
-
 /// Creates a synchronous [`Action<Request, Response>`] from a closure.
 ///
 /// ## Example

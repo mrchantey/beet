@@ -12,11 +12,9 @@ pub enum ProceduralAnimationSpeed {
 	MetersPerSecond(f32),
 }
 
-
 impl Default for ProceduralAnimationSpeed {
 	fn default() -> Self { Self::Duration(Duration::from_secs(1)) }
 }
-
 
 impl ProceduralAnimationSpeed {
 	/// Calculate the current `t` value for the procedural animation.

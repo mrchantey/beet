@@ -8,7 +8,6 @@ use base64::prelude::*;
 use beet_core::prelude::*;
 use serde_json::json;
 
-
 /// Configuration options for PDF export.
 #[derive(Debug, Clone)]
 pub struct PdfOptions {
@@ -28,7 +27,6 @@ pub struct PdfOptions {
 	pub page_ranges: Vec<String>,
 }
 
-
 impl Default for PdfOptions {
 	fn default() -> Self {
 		Self {
@@ -42,7 +40,6 @@ impl Default for PdfOptions {
 		}
 	}
 }
-
 
 /// Page margins for PDF export (in cm).
 #[derive(Debug, Clone)]
@@ -68,7 +65,6 @@ impl Default for PdfMargin {
 	}
 }
 
-
 impl PdfMargin {
 	/// No margins (0 cm).
 	pub fn none() -> Self {
@@ -80,7 +76,6 @@ impl PdfMargin {
 		}
 	}
 }
-
 
 /// Page orientation for PDF export.
 #[derive(Debug, Clone)]
@@ -128,7 +123,6 @@ impl PdfPageSize {
 	/// Custom page size.
 	pub fn custom(width: f64, height: f64) -> Self { Self { width, height } }
 }
-
 
 impl Page {
 	/// Export the current page as a PDF using default settings.
@@ -181,7 +175,6 @@ impl Page {
 			.map_err(|e| bevyhow!("failed to decode base64 PDF data: {}", e))
 	}
 }
-
 
 #[cfg(test)]
 mod test {

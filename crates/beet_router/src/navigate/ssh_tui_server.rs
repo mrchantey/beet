@@ -33,7 +33,10 @@ pub struct SshTuiServer;
 /// Registers the [`StartServer`] observer on the router, so the SSH listener boots
 /// when a start event whose filter passes `"ssh"` lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_start_server);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_start_server);
 }
 
 /// Boots the SSH listener when a [`StartServer`] passing `"ssh"` lands: builds an
@@ -46,7 +49,8 @@ fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 	}
 	// the bind config from the start params, defaulting from env.
 	let mut server = SshServer::default();
-	if let Some(port) = ev.params.get("port").and_then(|port| port.parse().ok()) {
+	if let Some(port) = ev.params.get("port").and_then(|port| port.parse().ok())
+	{
 		server.port = Some(port);
 	}
 	if let Some(host) = ev.params.get("host") {
@@ -59,9 +63,11 @@ fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 	// the opening route each session navigates to, recorded on the router (the
 	// shared mechanism the local TUI server also reads). The `KeepAliveGuard` holds
 	// the process up for the server's lifetime, released when the router despawns.
-	commands
-		.entity(ev.event_target())
-		.insert((server, OpeningRoute::from_params(&ev.params), KeepAliveGuard));
+	commands.entity(ev.event_target()).insert((
+		server,
+		OpeningRoute::from_params(&ev.params),
+		KeepAliveGuard,
+	));
 }
 
 /// Per-connection behavior for the [`SshTuiServer`], added once by the app: spins
@@ -99,7 +105,8 @@ fn on_ssh_recv(
 ) -> Result {
 	let connection = ev.target();
 	// only handle connections (carry SshPeerInfo) whose router is an SshTuiServer.
-	let Ok(router) = peers.get(connection).map(|child_of| child_of.parent()) else {
+	let Ok(router) = peers.get(connection).map(|child_of| child_of.parent())
+	else {
 		return Ok(());
 	};
 	let Ok(opening) = tui_servers.get(router) else {
@@ -242,16 +249,16 @@ mod test {
 			.world_mut()
 			.spawn((SshPeerInfo { username: None }, ChildOf(router)))
 			.id();
-		app.world_mut().entity_mut(connection).trigger_target(SshRecv(
-			SshEvent::RequestPty(RequestPty {
+		app.world_mut()
+			.entity_mut(connection)
+			.trigger_target(SshRecv(SshEvent::RequestPty(RequestPty {
 				terminal: "xterm".into(),
 				window: SshWindowSize {
 					cells: size,
 					pixels: UVec2::ZERO,
 				},
 				terminal_modes: Vec::new(),
-			}),
-		));
+			})));
 		app.update();
 		connection
 	}
@@ -287,8 +294,14 @@ mod test {
 		let router = spawn_router(&mut app);
 		let connection = open_connection(&mut app, router, UVec2::new(40, 8));
 		// the surface components landed on the connection entity
-		app.world().entity(connection).contains::<ChannelTerminal>().xpect_true();
-		app.world().entity(connection).contains::<DoubleBuffer>().xpect_true();
+		app.world()
+			.entity(connection)
+			.contains::<ChannelTerminal>()
+			.xpect_true();
+		app.world()
+			.entity(connection)
+			.contains::<DoubleBuffer>()
+			.xpect_true();
 		// and the home route paints into its buffer
 		drive_until(&mut app, connection, "Alpha page");
 	}

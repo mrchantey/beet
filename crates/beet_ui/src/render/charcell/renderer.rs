@@ -154,8 +154,7 @@ mod tests {
 			.map(|i| i.to_string())
 			.collect::<Vec<_>>()
 			.join("\n");
-		let out =
-			FlexBuffer::render_oneshot(20, rsx! { <pre>{text}</pre> });
+		let out = FlexBuffer::render_oneshot(20, rsx! { <pre>{text}</pre> });
 		out.lines().count().xpect_eq(30);
 	}
 

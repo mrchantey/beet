@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 
-
 /// Description of a target used by steering behaviors.
 /// This can either be a fixed position or an entity with a [`Transform`] component.
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
@@ -36,7 +35,6 @@ impl SteerTarget {
 	}
 }
 
-
 impl MapEntities for SteerTarget {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
 		match self {
@@ -45,7 +43,6 @@ impl MapEntities for SteerTarget {
 		}
 	}
 }
-
 
 impl Into<SteerTarget> for Vec3 {
 	fn into(self) -> SteerTarget { SteerTarget::Position(self) }

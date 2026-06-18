@@ -40,7 +40,6 @@ pub async fn InterruptOnEnd(
 	response
 }
 
-
 #[cfg(test)]
 mod test {
 	use beet_action::prelude::*;

@@ -75,7 +75,12 @@ pub fn apply_markers(
 	for view in elements.iter() {
 		let marker = match view.tag() {
 			"li" => list_marker(
-				view.entity, &ruleset, &parents, &tags, &children, &elements,
+				view.entity,
+				&ruleset,
+				&parents,
+				&tags,
+				&children,
+				&elements,
 			),
 			"hr" => Some(HR_RULE.into()),
 			"img" => Some(img_marker(&view)),
@@ -135,8 +140,7 @@ fn collect_cell_rows(
 			.get(entity)
 			.is_ok_and(|view| matches!(view.tag(), "td" | "th"))
 	};
-	let cells: Vec<Entity> =
-		kids.iter().filter(|&kid| is_cell(kid)).collect();
+	let cells: Vec<Entity> = kids.iter().filter(|&kid| is_cell(kid)).collect();
 	if cells.is_empty() {
 		for kid in kids.iter() {
 			collect_cell_rows(kid, elements, children, rows);
@@ -174,9 +178,9 @@ pub fn apply_disclosure(
 		if element.tag() != "details" {
 			continue;
 		}
-		let is_sidebar = class_q
-			.get(details)
-			.is_ok_and(|class_set| class_set.contains_name(&classes::SIDEBAR_GROUP));
+		let is_sidebar = class_q.get(details).is_ok_and(|class_set| {
+			class_set.contains_name(&classes::SIDEBAR_GROUP)
+		});
 		let open = has_open_attr(details, &attributes, &attr_keys);
 		let Ok(kids) = children.get(details) else {
 			continue;
@@ -188,7 +192,13 @@ pub fn apply_disclosure(
 			if is_summary {
 				if is_sidebar {
 					// flip the markup caret glyph (terminal can't rotate it)
-					flip_sidebar_caret(child, open, &class_q, &children, &mut values);
+					flip_sidebar_caret(
+						child,
+						open,
+						&class_q,
+						&children,
+						&mut values,
+					);
 				} else {
 					let caret = if open { "▾ " } else { "▸ " };
 					commands.entity(child).insert(Marker(caret.into()));
@@ -211,9 +221,9 @@ fn has_open_attr(
 	attr_keys: &Query<&Attribute>,
 ) -> bool {
 	attributes.get(entity).is_ok_and(|attrs| {
-		attrs
-			.iter()
-			.any(|attr| attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open"))
+		attrs.iter().any(|attr| {
+			attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open")
+		})
 	})
 }
 
@@ -234,10 +244,9 @@ fn flip_sidebar_caret(
 		return;
 	};
 	for child in kids.iter() {
-		if !class_q
-			.get(child)
-			.is_ok_and(|class_set| class_set.contains_name(&classes::SIDEBAR_CARET))
-		{
+		if !class_q.get(child).is_ok_and(|class_set| {
+			class_set.contains_name(&classes::SIDEBAR_CARET)
+		}) {
 			continue;
 		}
 		if let Ok(text_kids) = children.get(child) {
@@ -277,7 +286,12 @@ pub fn toggle_details_on_click(
 		return;
 	}
 	// a click through an inner `<a>` navigates; the caret/plain summary toggles.
-	if click_through_link(ev.original_event_target(), summary, &elements, &parents) {
+	if click_through_link(
+		ev.original_event_target(),
+		summary,
+		&elements,
+		&parents,
+	) {
 		return;
 	}
 	let Some(details) = nearest_details(summary, &elements, &parents) else {
@@ -336,7 +350,10 @@ fn nearest_details(
 	let mut current = summary;
 	while let Ok(parent) = parents.get(current) {
 		let parent = parent.parent();
-		if elements.get(parent).is_ok_and(|(_, el)| el.tag() == "details") {
+		if elements
+			.get(parent)
+			.is_ok_and(|(_, el)| el.tag() == "details")
+		{
 			return Some(parent);
 		}
 		current = parent;
@@ -352,9 +369,9 @@ fn open_attr(
 	attr_keys: &Query<&Attribute>,
 ) -> Option<Entity> {
 	attributes.get(entity).ok().and_then(|attrs| {
-		attrs
-			.iter()
-			.find(|&attr| attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open"))
+		attrs.iter().find(|&attr| {
+			attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open")
+		})
 	})
 }
 
@@ -720,7 +737,10 @@ mod disclosure_test {
 		});
 		host.step();
 		// open: caret down, child visible. No left marker (sidebar flips in place).
-		host.frame_plain().as_str().xpect_contains("▾").xpect_contains("Child link");
+		host.frame_plain()
+			.as_str()
+			.xpect_contains("▾")
+			.xpect_contains("Child link");
 		host.frame_plain().xnot().xpect_contains("▾ Group");
 
 		// click the caret span: collapses — caret right, child gone.
@@ -729,7 +749,9 @@ mod disclosure_test {
 			.world_mut()
 			.query::<(Entity, &Classes)>()
 			.iter(host.app.world())
-			.find(|(_, class_set)| class_set.contains_name(&classes::SIDEBAR_CARET))
+			.find(|(_, class_set)| {
+				class_set.contains_name(&classes::SIDEBAR_CARET)
+			})
 			.map(|(entity, _)| entity)
 			.unwrap();
 		click(&mut host, caret);

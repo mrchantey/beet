@@ -94,7 +94,13 @@ impl Default for HttpServer {
 			.unwrap_or(DEFAULT_SERVER_PORT);
 		let host = env_ext::var("BEET_HOST")
 			.ok()
-			.map(|val| if val == "0.0.0.0" { [0, 0, 0, 0] } else { [127, 0, 0, 1] })
+			.map(|val| {
+				if val == "0.0.0.0" {
+					[0, 0, 0, 0]
+				} else {
+					[127, 0, 0, 1]
+				}
+			})
 			.unwrap_or([127, 0, 0, 1]);
 		Self {
 			port: Some(port),
@@ -142,7 +148,8 @@ impl HttpServer {
 	/// Overlays `--port` / `--host` from a [`StartServer`]'s params onto a copy of
 	/// these fields, the resolved bind config the backend then reads.
 	fn with_params(mut self, params: &MultiMap<SmolStr, SmolStr>) -> Self {
-		if let Some(port) = params.get("port").and_then(|val| val.parse().ok()) {
+		if let Some(port) = params.get("port").and_then(|val| val.parse().ok())
+		{
 			self.port = Some(port);
 		}
 		if let Some(host) = params.get("host") {
@@ -244,7 +251,6 @@ async fn start_http_server(
 	backend(entity, shutdown).await
 }
 
-
 /// std-only constructors and the on-hardware integration test suite.
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod std_impl {
@@ -293,7 +299,6 @@ mod std_impl {
 		}
 	}
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -355,7 +360,10 @@ mod tests {
 		// trigger the start: the http observer queues the backend hook.
 		app.world_mut().entity_mut(entity).trigger(StartServer::all);
 		app.update_async().await;
-		app.world().entity(entity).contains::<ServerStartFlag>().xpect_true();
+		app.world()
+			.entity(entity)
+			.contains::<ServerStartFlag>()
+			.xpect_true();
 		// a long-running server holds a `KeepAlive` ref.
 		app.world().resource::<KeepAlive>().count().xpect_eq(1);
 	}
@@ -376,7 +384,10 @@ mod tests {
 		app.world_mut().entity_mut(entity).trigger(StopServer::all);
 		app.update_async().await;
 		app.world().resource::<KeepAlive>().count().xpect_eq(0);
-		app.world().entity(entity).contains::<HttpServerShutdown>().xpect_false();
+		app.world()
+			.entity(entity)
+			.contains::<HttpServerShutdown>()
+			.xpect_false();
 	}
 
 	/// Closing the shutdown channel ends the accept loop and drops the listener,
@@ -396,19 +407,20 @@ mod tests {
 		let (signal, shutdown) = oneshot::<()>();
 		// mirror `start_http_server`: the accept loop owns the listener, raced
 		// against the shutdown receiver.
-		let served = beet_core::exports::futures_lite::future::or::<Result<()>, _, _>(
-			async move {
-				loop {
-					listener.accept().await.ok();
-				}
-				#[allow(unreachable_code)]
-				Result::Ok(())
-			},
-			async move {
-				shutdown.wait().await;
-				Result::Ok(())
-			},
-		);
+		let served =
+			beet_core::exports::futures_lite::future::or::<Result<()>, _, _>(
+				async move {
+					loop {
+						listener.accept().await.ok();
+					}
+					#[allow(unreachable_code)]
+					Result::Ok(())
+				},
+				async move {
+					shutdown.wait().await;
+					Result::Ok(())
+				},
+			);
 		// open while listening
 		std::net::TcpStream::connect(("127.0.0.1", port)).xpect_ok();
 		// signal the shutdown: the race resolves, dropping the loser (the loop) and
@@ -454,7 +466,10 @@ mod tests {
 		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
 		app.world_mut().entity_mut(entity).trigger(StartServer::cli);
 		app.update_async().await;
-		app.world().entity(entity).contains::<ServerStartFlag>().xpect_false();
+		app.world()
+			.entity(entity)
+			.contains::<ServerStartFlag>()
+			.xpect_false();
 	}
 }
 
@@ -546,17 +561,28 @@ pub(crate) mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
-					HttpServer { port: Some(port), ..default() },
+					HttpServer {
+						port: Some(port),
+						..default()
+					},
 					exchange_handler(|_| Response::ok().with_body("up")),
 					OnSpawn::new_async(move |entity| {
-						start_mini_http_server_with_tcp(entity, listener, shutdown)
+						start_mini_http_server_with_tcp(
+							entity, listener, shutdown,
+						)
 					}),
 				))
 				.run();
 		});
 		time_ext::sleep_millis(150).await;
 		// serving before the stop
-		Request::get(&url).send().await.unwrap().into_result().await.xpect_ok();
+		Request::get(&url)
+			.send()
+			.await
+			.unwrap()
+			.into_result()
+			.await
+			.xpect_ok();
 		// fire the shutdown: the mini server's race resolves and drops its listener.
 		signal.signal(());
 		time_ext::sleep_millis(150).await;

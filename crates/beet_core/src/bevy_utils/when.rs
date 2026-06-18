@@ -7,7 +7,6 @@ use bevy::ecs::system::SystemParamValidationError;
 use bevy::ecs::world::DeferredWorld;
 use bevy::ecs::world::unsafe_world_cell::UnsafeWorldCell;
 
-
 /// A [`SystemParam`] that wraps another parameter and causes its system to skip instead of failing when the parameter is invalid.
 ///
 /// # Example

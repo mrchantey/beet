@@ -5,7 +5,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::json;
 
-
 #[derive(
 	Debug,
 	Clone,
@@ -30,7 +29,6 @@ pub struct S3BucketBlock {
 	/// ensuring unique files per deploy
 	deploy_versioned: bool,
 }
-
 
 impl S3BucketBlock {
 	pub fn new(label: impl Into<SmolStr>) -> Self {

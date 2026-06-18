@@ -33,7 +33,10 @@ pub struct CliServer;
 /// Registers the [`StartServer`] observer on the host, so the one-shot exchange
 /// runs when a start event whose filter passes `"cli"` lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_start_server);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_start_server);
 }
 
 /// Runs the one argv exchange when a [`StartServer`] passing `"cli"` lands.
@@ -136,7 +139,6 @@ pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 	}
 	Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

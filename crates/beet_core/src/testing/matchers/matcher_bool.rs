@@ -43,7 +43,6 @@ pub impl bool {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

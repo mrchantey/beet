@@ -183,9 +183,10 @@ pub fn build_template_by_name(
 	cx: &mut TemplateContext,
 ) -> Result {
 	let registry = registry.read();
-	let registration = registry
-		.get_with_short_type_path(tag)
-		.ok_or_else(|| bevyhow!("no type registered for template tag `{tag}`"))?;
+	let registration =
+		registry.get_with_short_type_path(tag).ok_or_else(|| {
+			bevyhow!("no type registered for template tag `{tag}`")
+		})?;
 	let reflect_template =
 		registration.data::<ReflectTemplate>().ok_or_else(|| {
 			bevyhow!("type `{tag}` is registered but is not a template")
@@ -243,7 +244,12 @@ mod test {
 			.unwrap();
 
 		let kid = world.entity(root).get::<Children>().unwrap()[0];
-		world.entity(kid).get::<Name>().unwrap().as_str().xpect_eq("hello");
+		world
+			.entity(kid)
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("hello");
 	}
 
 	#[beet_core::test]

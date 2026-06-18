@@ -50,13 +50,10 @@ mod test {
 	fn concatenates_descendant_text() {
 		let mut world = World::new();
 		let root = world
-			.spawn((
-				Element::new("script"),
-				children![
-					Value::Str("console.log(".into()),
-					Value::Str("\"hi\")".into()),
-				],
-			))
+			.spawn((Element::new("script"), children![
+				Value::Str("console.log(".into()),
+				Value::Str("\"hi\")".into()),
+			]))
 			.id();
 		world
 			.run_system_cached_with(

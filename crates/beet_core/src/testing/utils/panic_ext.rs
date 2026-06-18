@@ -4,8 +4,6 @@ use crate::prelude::*;
 use core::fmt::Debug;
 use core::fmt::Display;
 
-
-
 // ============================================================================
 // Panic functions - always panic with formatted messages
 // ============================================================================
@@ -41,9 +39,7 @@ pub fn panic_expected_received_display<T1: Display, T2: Display>(
 ) -> ! {
 	let expected = TermStyle::green().paint(expected);
 	let received = TermStyle::red().paint(received);
-	do_panic(format!(
-		"Expected: {expected}\nReceived: {received}"
-	));
+	do_panic(format!("Expected: {expected}\nReceived: {received}"));
 }
 
 /// Panics with formatted expected/received using Debug for both.
@@ -54,9 +50,7 @@ pub fn panic_expected_received_debug<T1: Debug, T2: Debug>(
 ) -> ! {
 	let expected = TermStyle::green().paint(format!("{:?}", expected));
 	let received = TermStyle::red().paint(format!("{:?}", received));
-	do_panic(format!(
-		"Expected: {expected}\nReceived: {received}"
-	));
+	do_panic(format!("Expected: {expected}\nReceived: {received}"));
 }
 
 /// Panics with formatted expected/received using Debug for expected, Display for received.
@@ -67,9 +61,7 @@ pub fn panic_expected_received_debug_display<T1: Debug, T2: Display>(
 ) -> ! {
 	let expected = TermStyle::green().paint(format!("{:?}", expected));
 	let received = TermStyle::red().paint(received);
-	do_panic(format!(
-		"Expected: {expected}\nReceived: {received}"
-	));
+	do_panic(format!("Expected: {expected}\nReceived: {received}"));
 }
 
 /// Panics with formatted expected/received using Display for expected, Debug for received.
@@ -80,9 +72,7 @@ pub fn panic_expected_received_display_debug<T1: Display, T2: Debug>(
 ) -> ! {
 	let expected = TermStyle::green().paint(expected);
 	let received = TermStyle::red().paint(format!("{:?}", received));
-	do_panic(format!(
-		"Expected: {expected}\nReceived: {received}"
-	));
+	do_panic(format!("Expected: {expected}\nReceived: {received}"));
 }
 
 // ============================================================================

@@ -67,10 +67,11 @@ fn setup(async_commands: AsyncCommands) {
 		// the bundle stays serializable (`CliServer` + router, both reflect
 		// components); the boot is a triggered `StartServer`, not a spawn hook, so
 		// fire it on the loaded root once the scene lands.
-		let roots = TemplateStore::load_or_create(world.clone(), blob, async |_| {
-			route_bundle().xok()
-		})
-		.await?;
+		let roots =
+			TemplateStore::load_or_create(world.clone(), blob, async |_| {
+				route_bundle().xok()
+			})
+			.await?;
 		for root in roots {
 			world.entity(root).trigger(StartServer::cli).await?;
 		}

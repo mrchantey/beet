@@ -87,11 +87,17 @@ async fn hyper_accept_loop(
 					async move {
 						// grab the upgrade future before consuming the request; if
 						// the route answers with a `101` we drive it to a `Socket`
-						#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+						#[cfg(all(
+							feature = "tungstenite",
+							not(target_arch = "wasm32")
+						))]
 						let on_upgrade = hyper::upgrade::on(&mut req);
 						let req = hyper_to_request(req).await;
 						let res = entity.exchange(req).await;
-						#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+						#[cfg(all(
+							feature = "tungstenite",
+							not(target_arch = "wasm32")
+						))]
 						if http_ext::is_websocket_response(&res) {
 							spawn_hyper_upgrade(entity, on_upgrade).await;
 						}
@@ -146,18 +152,19 @@ async fn spawn_hyper_upgrade(
 				.await
 				.map_err(|err| bevyhow!("hyper upgrade failed: {err}"))?;
 			let socket =
-				crate::sockets::socket_from_upgraded(HyperIo::new(upgraded)).await;
+				crate::sockets::socket_from_upgraded(HyperIo::new(upgraded))
+					.await;
 			world
 				.with(move |world: &mut World| {
 					let socket = world.spawn(socket).id();
-					world.trigger(crate::sockets::OnWebSocketUpgrade { socket });
+					world
+						.trigger(crate::sockets::OnWebSocketUpgrade { socket });
 				})
 				.await;
 			Ok(())
 		})
 		.await;
 }
-
 
 async fn hyper_to_request(
 	req: hyper::Request<hyper::body::Incoming>,
@@ -219,8 +226,6 @@ async fn response_to_hyper(
 		}
 	}
 }
-
-
 
 // Wrapper to make async-io's TcpStream work with hyper's IO traits
 struct BevyIo<S> {
@@ -305,9 +310,7 @@ where
 		buf: &mut [u8],
 	) -> Poll<io::Result<usize>> {
 		let mut read_buf = hyper::rt::ReadBuf::new(buf);
-		ready!(
-			Pin::new(&mut self.inner).poll_read(cx, read_buf.unfilled())
-		)?;
+		ready!(Pin::new(&mut self.inner).poll_read(cx, read_buf.unfilled()))?;
 		Poll::Ready(Ok(read_buf.filled().len()))
 	}
 }
@@ -387,9 +390,6 @@ impl BevySleep {
 		self.project().inner.as_mut().set_at(deadline);
 	}
 }
-
-
-
 
 #[cfg(test)]
 #[cfg(feature = "ureq")]
@@ -579,7 +579,9 @@ mod upgrade_test {
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			app.world_mut().spawn((
 				server,
-				exchange_handler(|cx| WebSocketUpgrade::from_request(&cx).into()),
+				exchange_handler(|cx| {
+					WebSocketUpgrade::from_request(&cx).into()
+				}),
 			));
 			app.world_mut()
 				.add_observer(move |ev: On<OnWebSocketUpgrade>| {
@@ -599,8 +601,9 @@ mod upgrade_test {
 		});
 		time_ext::sleep_millis(200).await;
 
-		let mut client =
-			Socket::connect(format!("ws://127.0.0.1:{port}")).await.unwrap();
+		let mut client = Socket::connect(format!("ws://127.0.0.1:{port}"))
+			.await
+			.unwrap();
 		client.send(Message::text("over-hyper")).await.unwrap();
 
 		let mut echoed = None;

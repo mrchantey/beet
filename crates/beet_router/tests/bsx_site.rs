@@ -75,7 +75,9 @@ fn site_fixture() -> AbsPathBuf {
 fn spawn_site(world: &mut World) -> Entity {
 	let site_dir = site_fixture();
 	world.insert_resource(pkg_config!());
-	world.register_bsx_templates(site_dir.join("templates")).unwrap();
+	world
+		.register_bsx_templates(site_dir.join("templates"))
+		.unwrap();
 	world.insert_resource(SiteRoot(site_dir.clone()));
 	BsxTemplate::load_entry(world, site_dir.join("main.bsx"))
 		.unwrap()
@@ -294,8 +296,14 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	// a separate host root with its own command route tree, mirroring the dev
 	// commands the repo's `main.bsx` wires (run-wasm, export-static, ...).
 	world.spawn(children![
-		render_action::fixed_func_route("run-wasm", || rsx! { <p>"run-wasm"</p> }),
-		render_action::fixed_func_route("export-static", || rsx! { <p>"export"</p> }),
+		render_action::fixed_func_route(
+			"run-wasm",
+			|| rsx! { <p>"run-wasm"</p> }
+		),
+		render_action::fixed_func_route(
+			"export-static",
+			|| rsx! { <p>"export"</p> }
+		),
 	]);
 	// the served site, a distinct root in the same world, plus a per-request page
 	// whose content is built detached (the `fixed_func_route` shape).
@@ -312,7 +320,9 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	// the detached per-request page: its content is spawned outside the tree, so
 	// only the matched-route anchor resolves the served tree.
 	let page = get(&mut world, root, "page").await;
-	page.as_str().xpect_contains("detached").xpect_contains(">The Intro<");
+	page.as_str()
+		.xpect_contains("detached")
+		.xpect_contains(">The Intro<");
 
 	// the host's command routes never leak into either served sidebar.
 	for html in [&docs, &page] {
@@ -378,8 +388,11 @@ fn render_root_binding_reads_article_meta() {
 	text_value(&world, span).xpect_eq(Value::Str("The Title".into()));
 
 	// reactive: a meta edit reaches the bound text
-	world.entity_mut(route).get_mut::<ArticleMeta>().unwrap().title =
-		Some("Renamed".into());
+	world
+		.entity_mut(route)
+		.get_mut::<ArticleMeta>()
+		.unwrap()
+		.title = Some("Renamed".into());
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Str("Renamed".into()));
 }
@@ -420,4 +433,3 @@ fn router_binding_resolves_lazily() {
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Str("Beet".into()));
 }
-

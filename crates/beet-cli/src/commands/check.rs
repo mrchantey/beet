@@ -64,11 +64,7 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 /// Build the site's [`DiagnosticsManifest`] and write it as pretty JSON to `out`
 /// (a file path, or `-` for stdout). Runs in the loaded world so the registries,
 /// `RuleSet` and `RouteTree` are all live.
-async fn write_manifest(
-	world: &AsyncWorld,
-	root: Entity,
-	out: &str,
-) -> Result {
+async fn write_manifest(world: &AsyncWorld, root: Entity, out: &str) -> Result {
 	let manifest = world
 		.with(move |world: &mut World| build_diagnostics_manifest(world, root))
 		.await?;

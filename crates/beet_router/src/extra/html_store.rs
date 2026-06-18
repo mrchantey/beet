@@ -71,7 +71,6 @@ pub async fn HtmlStoreAction(
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -93,10 +92,12 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![render_action::fixed_func_route(
-					"about",
-					|| rsx! { <p>"live about"</p> }
-				)]),
+				(default_router(), children![
+					render_action::fixed_func_route(
+						"about",
+						|| rsx! { <p>"live about"</p> }
+					)
+				]),
 				HtmlStore::ssg(html_store().await),
 			))
 			.call::<Request, Response>(Request::get("about"))
@@ -114,10 +115,12 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![render_action::fixed_func_route(
-					"about",
-					|| rsx! { <p>"live about"</p> }
-				)]),
+				(default_router(), children![
+					render_action::fixed_func_route(
+						"about",
+						|| rsx! { <p>"live about"</p> }
+					)
+				]),
 				HtmlStore::ssr(html_store().await),
 			))
 			.call::<Request, Response>(Request::get("about"))
@@ -133,10 +136,12 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![render_action::fixed_func_route(
-					"contact",
-					|| rsx! { <p>"live contact"</p> }
-				)]),
+				(default_router(), children![
+					render_action::fixed_func_route(
+						"contact",
+						|| rsx! { <p>"live contact"</p> }
+					)
+				]),
 				HtmlStore::ssg(html_store().await),
 			))
 			.call::<Request, Response>(Request::get("contact"))

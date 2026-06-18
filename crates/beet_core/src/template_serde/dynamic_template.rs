@@ -233,10 +233,7 @@ fn build_node(
 /// The deterministic [`SceneEntityReference`] for an in-template entity, keyed on
 /// its index at this source location, so a reference is traceable when debugging.
 fn scene_reference(in_template: Entity) -> SceneEntityReference {
-	SceneEntityReference::new(
-		(file!(), 0, 0),
-		in_template.index_u32() as usize,
-	)
+	SceneEntityReference::new((file!(), 0, 0), in_template.index_u32() as usize)
 }
 
 /// An [`EntityMapper`] backed by the build's [`SceneEntityReferences`], so an

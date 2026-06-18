@@ -21,7 +21,6 @@ use beet::prelude::*;
 #[derive(Component)]
 fn Greet(name: String) -> String { format!("Hello, {name}!") }
 
-
 #[beet::main]
 async fn main() -> Result {
 	let mut world = AsyncPlugin::world();

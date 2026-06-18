@@ -76,7 +76,6 @@ impl ArticleMeta {
 	}
 }
 
-
 #[cfg(all(test, feature = "markdown_parser"))]
 mod test {
 	use super::*;

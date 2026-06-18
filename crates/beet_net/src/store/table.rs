@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-
 /// Type-safe storage table for serializable objects.
 ///
 /// # Example
@@ -263,7 +262,6 @@ impl<T: TableStoreRow> TableStore<T> {
 	}
 }
 
-
 /// Types that can be stored in a [`TableStore`].
 ///
 /// This trait is automatically implemented for any type that implements the required bounds:
@@ -293,7 +291,6 @@ impl<T> TableContent for T where
 {
 }
 
-
 /// Helper type implementing [`TableStoreRow`]. Note some services
 /// like DynamoDB do not allow indexing nested values, so if thats required
 /// a standalone [`TableStoreRow`] implementation should be used.
@@ -320,7 +317,6 @@ impl<T> TableItem<T> {
 impl<T: TableContent> TableStoreRow for TableItem<T> {
 	fn id(&self) -> Uuid { self.id }
 }
-
 
 /// Storage provider for typed table operations.
 ///

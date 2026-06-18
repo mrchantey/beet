@@ -70,9 +70,13 @@ async fn BsxLayoutAction(
 	next.world()
 		.clone()
 		.with(move |world: &mut World| {
-			wrap_content_with(world, parts, route, content, |world, rendered| {
-				build_bsx_layout(world, &template, rendered)
-			})
+			wrap_content_with(
+				world,
+				parts,
+				route,
+				content,
+				|world, rendered| build_bsx_layout(world, &template, rendered),
+			)
 		})
 		.await
 }
@@ -146,7 +150,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BsxLayout::default(), children![
-				render_action::fixed_func_route("", || rsx! { <p>"page body"</p> })
+				render_action::fixed_func_route(
+					"",
+					|| rsx! { <p>"page body"</p> }
+				)
 			]))
 			.flush();
 
@@ -172,7 +179,10 @@ mod test {
 		world.insert_resource(registry);
 		let root = world
 			.spawn((Router, BsxLayout::default(), children![
-				render_action::fixed_func_route("", || rsx! { <p>"page body"</p> })
+				render_action::fixed_func_route(
+					"",
+					|| rsx! { <p>"page body"</p> }
+				)
 			]))
 			.flush();
 
@@ -253,7 +263,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BsxLayout::default(), children![
-				render_action::fixed_func_route("", || rsx! { <p>"page body"</p> })
+				render_action::fixed_func_route(
+					"",
+					|| rsx! { <p>"page body"</p> }
+				)
 			]))
 			.flush();
 

@@ -37,7 +37,6 @@ pub async fn WriteBlob(cx: ActionContext<WriteBlobParams>) -> Result<()> {
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

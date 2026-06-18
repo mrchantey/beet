@@ -7,7 +7,6 @@ use crate::style::common_props::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-
 pub fn resolve_styles(
 	mut commands: Commands,
 	ruleset_query: RuleSetQuery,
@@ -116,7 +115,8 @@ pub fn resolve_styles(
 			// used values; beet resolves each node's own). Attached only while
 			// the duration is nonzero, so the animation system iterates
 			// transitioned nodes alone.
-			let transition = resolve_transition(&ruleset_query, entity, &mut memo)?;
+			let transition =
+				resolve_transition(&ruleset_query, entity, &mut memo)?;
 			match transitions.get_mut(entity)? {
 				Some(mut style) if transition.duration > Duration::ZERO => {
 					style.set_if_neq(transition);
@@ -160,15 +160,21 @@ fn resolve_visual(
 	let decoration_style = query
 		.resolve(entity, DecorationStyleProp, memo)
 		.unwrap_or_default();
-	let text_align =
-		query.resolve(entity, TextAlignProp, memo).unwrap_or_default();
-	let font_weight =
-		query.resolve(entity, FontWeightProp, memo).unwrap_or_default();
-	let font_style =
-		query.resolve(entity, FontStyleProp, memo).unwrap_or_default();
-	let blink = query.resolve(entity, BlinkStyleProp, memo).unwrap_or_default();
-	let visibility =
-		query.resolve(entity, VisibilityProp, memo).unwrap_or_default();
+	let text_align = query
+		.resolve(entity, TextAlignProp, memo)
+		.unwrap_or_default();
+	let font_weight = query
+		.resolve(entity, FontWeightProp, memo)
+		.unwrap_or_default();
+	let font_style = query
+		.resolve(entity, FontStyleProp, memo)
+		.unwrap_or_default();
+	let blink = query
+		.resolve(entity, BlinkStyleProp, memo)
+		.unwrap_or_default();
+	let visibility = query
+		.resolve(entity, VisibilityProp, memo)
+		.unwrap_or_default();
 	// `opacity` bakes into the resolved colours (the charcell approximation,
 	// see [`VisualStyle::apply_opacity`]), so a transition eases the dim.
 	let opacity = query.resolve(entity, OpacityProp, memo).unwrap_or(1.);
@@ -194,35 +200,47 @@ fn resolve_layout(
 	entity: Entity,
 	memo: &mut CascadeMemo,
 ) -> Result<LayoutStyle> {
-	let flex_grow =
-		query.resolve(entity, FlexGrowProp, memo).unwrap_or_default();
-	let flex_order =
-		query.resolve(entity, FlexOrderProp, memo).unwrap_or_default();
-	let align_self =
-		query.resolve(entity, AlignSelfProp, memo).unwrap_or_default();
+	let flex_grow = query
+		.resolve(entity, FlexGrowProp, memo)
+		.unwrap_or_default();
+	let flex_order = query
+		.resolve(entity, FlexOrderProp, memo)
+		.unwrap_or_default();
+	let align_self = query
+		.resolve(entity, AlignSelfProp, memo)
+		.unwrap_or_default();
 	let display = query.resolve(entity, DisplayProp, memo).unwrap_or_default();
-	let white_space =
-		query.resolve(entity, WhiteSpaceProp, memo).unwrap_or_default();
-	let direction =
-		query.resolve(entity, FlexDirectionProp, memo).unwrap_or_default();
-	let wrap = query.resolve(entity, FlexWrapProp, memo).unwrap_or_default();
+	let white_space = query
+		.resolve(entity, WhiteSpaceProp, memo)
+		.unwrap_or_default();
+	let direction = query
+		.resolve(entity, FlexDirectionProp, memo)
+		.unwrap_or_default();
+	let wrap = query
+		.resolve(entity, FlexWrapProp, memo)
+		.unwrap_or_default();
 	let justify_content = query
 		.resolve(entity, JustifyContentProp, memo)
 		.unwrap_or_default();
-	let align_items =
-		query.resolve(entity, AlignItemsProp, memo).unwrap_or_default();
-	let align_content =
-		query.resolve(entity, AlignContentProp, memo).unwrap_or_default();
+	let align_items = query
+		.resolve(entity, AlignItemsProp, memo)
+		.unwrap_or_default();
+	let align_content = query
+		.resolve(entity, AlignContentProp, memo)
+		.unwrap_or_default();
 	// gaps stay as `Length` here (the resolution-independent value): each renderer
 	// converts at layout time, where the real viewport is known. The charcell
 	// engine rounds to whole cells via `FlexBox::{row,column}_gap_cells`.
 	let row_gap = query.resolve(entity, RowGapProp, memo).unwrap_or_default();
-	let column_gap =
-		query.resolve(entity, ColumnGapProp, memo).unwrap_or_default();
-	let overflow_x =
-		query.resolve(entity, OverflowXProp, memo).unwrap_or_default();
-	let overflow_y =
-		query.resolve(entity, OverflowYProp, memo).unwrap_or_default();
+	let column_gap = query
+		.resolve(entity, ColumnGapProp, memo)
+		.unwrap_or_default();
+	let overflow_x = query
+		.resolve(entity, OverflowXProp, memo)
+		.unwrap_or_default();
+	let overflow_y = query
+		.resolve(entity, OverflowYProp, memo)
+		.unwrap_or_default();
 	let grid = GridTracks {
 		columns: query
 			.resolve(entity, GridTemplateColumnsProp, memo)
@@ -258,7 +276,9 @@ fn resolve_position(
 	entity: Entity,
 	memo: &mut CascadeMemo,
 ) -> Result<PositionStyle> {
-	let position = query.resolve(entity, PositionProp, memo).unwrap_or_default();
+	let position = query
+		.resolve(entity, PositionProp, memo)
+		.unwrap_or_default();
 	// each inset is `auto` (None) unless a rule sets it.
 	PositionStyle {
 		position,
@@ -278,8 +298,9 @@ fn resolve_scrollbar(
 	entity: Entity,
 	memo: &mut CascadeMemo,
 ) -> Result<ScrollbarStyle> {
-	let width =
-		query.resolve(entity, ScrollbarWidthProp, memo).unwrap_or_default();
+	let width = query
+		.resolve(entity, ScrollbarWidthProp, memo)
+		.unwrap_or_default();
 	// scrollbar-color sets both thumb and track; absent leaves renderer defaults.
 	let color = query.resolve(entity, ScrollbarColorProp, memo).ok();
 	ScrollbarStyle {
@@ -329,7 +350,11 @@ fn resolve_box(
 		border: Spacing {
 			top: resolve_side(query.resolve(entity, BorderTopWidth, memo)),
 			right: resolve_side(query.resolve(entity, BorderRightWidth, memo)),
-			bottom: resolve_side(query.resolve(entity, BorderBottomWidth, memo)),
+			bottom: resolve_side(query.resolve(
+				entity,
+				BorderBottomWidth,
+				memo,
+			)),
 			left: resolve_side(query.resolve(entity, BorderLeftWidth, memo)),
 		},
 		margin,

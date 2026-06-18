@@ -16,8 +16,6 @@ pub struct Socket {
 	pub(crate) writer: SendWrapper<Box<dyn SocketWriter>>,
 }
 
-
-
 impl std::fmt::Debug for Socket {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Socket").finish_non_exhaustive()
@@ -47,7 +45,8 @@ impl Socket {
 		// so they must only be touched from a `_local` task. The observer runs on
 		// an arbitrary pool thread, so it only pushes `Send` messages into the
 		// channel rather than touching the writer directly.
-		let (message_send, message_recv) = async_channel::unbounded::<Message>();
+		let (message_send, message_recv) =
+			async_channel::unbounded::<Message>();
 		entity
 			.observe_any(move |ev: On<MessageSend>| -> Result {
 				message_send.try_send(ev.event().clone().take()).ok();
@@ -170,7 +169,6 @@ impl<T> SocketReader for T where
 	T: 'static + MaybeSend + Stream<Item = Result<Message>>
 {
 }
-
 
 /// Read half returned by `Socket::split()`.
 pub struct SocketRead {
@@ -304,7 +302,6 @@ pub struct CloseFrame {
 	/// Human-readable reason.
 	pub reason: String,
 }
-
 
 #[cfg(test)]
 #[cfg(any(feature = "tungstenite", target_arch = "wasm32"))]

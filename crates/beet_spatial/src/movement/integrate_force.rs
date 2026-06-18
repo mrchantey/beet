@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::When;
 use beet_core::prelude::*;
 
-
 /// Implementation of position, velocity, force integration
 /// as described by Daniel Shiffman
 /// https://natureofcode.com/vectors/#acceleration
@@ -58,7 +57,6 @@ pub fn integrate_force(
 		}
 	}
 }
-
 
 #[cfg(test)]
 mod test {

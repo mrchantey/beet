@@ -25,7 +25,6 @@ fn mean(data: &[f32]) -> Option<f32> {
 	Some(data.iter().sum::<f32>() / len as f32)
 }
 
-
 fn variance(data: &[f32]) -> Option<f32> {
 	let len = data.len();
 	if len < 2 {

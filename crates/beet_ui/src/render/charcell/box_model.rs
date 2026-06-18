@@ -127,15 +127,15 @@ impl BoxModel {
 			margin,
 			border,
 			padding,
-			width: box_style
-				.width
-				.and_then(|length| explicit_cells(length, vp, containing.map(|c| c.x))),
-			height: box_style
-				.height
-				.and_then(|length| explicit_cells(length, vp, containing.map(|c| c.y))),
-			min_height: box_style
-				.min_height
-				.and_then(|length| min_height_cells(length, viewport, containing.map(|c| c.y))),
+			width: box_style.width.and_then(|length| {
+				explicit_cells(length, vp, containing.map(|c| c.x))
+			}),
+			height: box_style.height.and_then(|length| {
+				explicit_cells(length, vp, containing.map(|c| c.y))
+			}),
+			min_height: box_style.min_height.and_then(|length| {
+				min_height_cells(length, viewport, containing.map(|c| c.y))
+			}),
 		}
 	}
 
@@ -269,45 +269,125 @@ pub(super) fn draw_border(
 
 	if sides.all() {
 		// full box: corners join the sides
-		buffer.set_composite_clipped(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity), clip);
-		buffer.set_composite_clipped(IVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style.clone(), entity), clip);
-		buffer.set_composite_clipped(IVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity), clip);
-		buffer.set_composite_clipped(IVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style.clone(), entity), clip);
+		buffer.set_composite_clipped(
+			rect.min,
+			Cell::new(
+				corner(heavy_top, heavy_left, "┏", "┌"),
+				top_style.clone(),
+				entity,
+			),
+			clip,
+		);
+		buffer.set_composite_clipped(
+			IVec2::new(right, top),
+			Cell::new(
+				corner(heavy_top, heavy_right, "┓", "┐"),
+				top_style.clone(),
+				entity,
+			),
+			clip,
+		);
+		buffer.set_composite_clipped(
+			IVec2::new(left, bottom),
+			Cell::new(
+				corner(heavy_bottom, heavy_left, "┗", "└"),
+				bottom_style.clone(),
+				entity,
+			),
+			clip,
+		);
+		buffer.set_composite_clipped(
+			IVec2::new(right, bottom),
+			Cell::new(
+				corner(heavy_bottom, heavy_right, "┛", "┘"),
+				bottom_style.clone(),
+				entity,
+			),
+			clip,
+		);
 	}
 
 	// horizontal edges span the full width (corners overwrite the ends above)
 	if sides.top {
 		let glyph = if heavy_top { "━" } else { "─" };
 		for x in left..=right {
-			buffer.set_composite_clipped(IVec2::new(x, top), Cell::new(glyph, top_style.clone(), entity), clip);
+			buffer.set_composite_clipped(
+				IVec2::new(x, top),
+				Cell::new(glyph, top_style.clone(), entity),
+				clip,
+			);
 		}
 	}
 	if sides.bottom {
 		let glyph = if heavy_bottom { "━" } else { "─" };
 		for x in left..=right {
-			buffer.set_composite_clipped(IVec2::new(x, bottom), Cell::new(glyph, bottom_style.clone(), entity), clip);
+			buffer.set_composite_clipped(
+				IVec2::new(x, bottom),
+				Cell::new(glyph, bottom_style.clone(), entity),
+				clip,
+			);
 		}
 	}
 	// vertical edges span the full height
 	if sides.left {
 		let glyph = if heavy_left { "┃" } else { "│" };
 		for y in top..=bottom {
-			buffer.set_composite_clipped(IVec2::new(left, y), Cell::new(glyph, left_style.clone(), entity), clip);
+			buffer.set_composite_clipped(
+				IVec2::new(left, y),
+				Cell::new(glyph, left_style.clone(), entity),
+				clip,
+			);
 		}
 	}
 	if sides.right {
 		let glyph = if heavy_right { "┃" } else { "│" };
 		for y in top..=bottom {
-			buffer.set_composite_clipped(IVec2::new(right, y), Cell::new(glyph, right_style.clone(), entity), clip);
+			buffer.set_composite_clipped(
+				IVec2::new(right, y),
+				Cell::new(glyph, right_style.clone(), entity),
+				clip,
+			);
 		}
 	}
 
 	if sides.all() {
 		// re-draw corners so they sit on top of the straight edges
-		buffer.set_composite_clipped(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity), clip);
-		buffer.set_composite_clipped(IVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style, entity), clip);
-		buffer.set_composite_clipped(IVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity), clip);
-		buffer.set_composite_clipped(IVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style, entity), clip);
+		buffer.set_composite_clipped(
+			rect.min,
+			Cell::new(
+				corner(heavy_top, heavy_left, "┏", "┌"),
+				top_style.clone(),
+				entity,
+			),
+			clip,
+		);
+		buffer.set_composite_clipped(
+			IVec2::new(right, top),
+			Cell::new(
+				corner(heavy_top, heavy_right, "┓", "┐"),
+				top_style,
+				entity,
+			),
+			clip,
+		);
+		buffer.set_composite_clipped(
+			IVec2::new(left, bottom),
+			Cell::new(
+				corner(heavy_bottom, heavy_left, "┗", "└"),
+				bottom_style.clone(),
+				entity,
+			),
+			clip,
+		);
+		buffer.set_composite_clipped(
+			IVec2::new(right, bottom),
+			Cell::new(
+				corner(heavy_bottom, heavy_right, "┛", "┘"),
+				bottom_style,
+				entity,
+			),
+			clip,
+		);
 	}
 }
 
@@ -354,14 +434,16 @@ fn explicit_cells(
 	viewport: Vec2,
 	containing: Option<u32>,
 ) -> Option<u32> {
-	let cells = |fraction: f32, extent: f32| (fraction * extent).round().max(0.);
+	let cells =
+		|fraction: f32, extent: f32| (fraction * extent).round().max(0.);
 	match length {
 		Length::Px(_) | Length::Rem(_) => {
 			Some(length.into_rem(viewport).round().max(0.) as u32)
 		}
 		// percent is relative to the containing block, resolved in the layout pass
-		Length::Percent(percent) => containing
-			.map(|axis| cells(percent / 100., axis as f32) as u32),
+		Length::Percent(percent) => {
+			containing.map(|axis| cells(percent / 100., axis as f32) as u32)
+		}
 		// viewport units resolve against the cell viewport, one cell per percent of
 		// the relevant viewport extent
 		Length::ViewportWidth(percent) => {

@@ -169,7 +169,6 @@ impl PanicContext {
 	}
 }
 
-
 /// Result of running code that may panic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PanicResult {
@@ -193,7 +192,6 @@ impl PanicResult {
 	/// Returns `true` if the result is [`PanicResult::Panic`].
 	pub fn is_panic(&self) -> bool { matches!(self, PanicResult::Panic { .. }) }
 }
-
 
 /// A future that wraps each poll in [`PanicContext::catch_poll`], to ensure
 /// panics are properly handled in a cross-plaform way.
@@ -221,7 +219,6 @@ impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 	}
 }
 
-
 #[cfg(test)]
 // wasm test runner uses PanicContext so cant test properly
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -238,7 +235,6 @@ mod tests {
 			location: Some(FileSpan::new_with_start(file!(), line!() - 2, 31)),
 		});
 	}
-
 
 	#[crate::test]
 	async fn works_async() {

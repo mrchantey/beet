@@ -116,9 +116,10 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 	});
 
 	// tell connected clients to reload
-	let channels = world.with_state::<Query<Entity, With<ClientIo>>, _>(
-		|query| query.iter().collect::<Vec<_>>(),
-	);
+	let channels =
+		world.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
+			query.iter().collect::<Vec<_>>()
+		});
 	for channel in channels {
 		world
 			.entity_mut(channel)
@@ -173,8 +174,13 @@ mod test {
 	/// Spawn the watched site: a router serving `routes/`, the registered
 	/// templates, and a [`LiveReload`] with its [`ClientIo`] channel (which now
 	/// rides the main HTTP port, so no per-channel port to set).
-	fn spawn_site(world: &mut World, site_dir: &AbsPathBuf) -> (Entity, Entity) {
-		world.register_bsx_templates(site_dir.join("templates")).unwrap();
+	fn spawn_site(
+		world: &mut World,
+		site_dir: &AbsPathBuf,
+	) -> (Entity, Entity) {
+		world
+			.register_bsx_templates(site_dir.join("templates"))
+			.unwrap();
 		world.insert_resource(SiteRoot(site_dir.clone()));
 		let root = world
 			.spawn((default_router(), children![RoutesDir::new("routes")]))
@@ -190,8 +196,8 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = site_fixture("respawns");
 		let (root, watcher) = spawn_site(&mut world, &site_dir);
-		let routes_dir = world
-			.with_state::<Query<Entity, With<RoutesDir>>, _>(|query| {
+		let routes_dir =
+			world.with_state::<Query<Entity, With<RoutesDir>>, _>(|query| {
 				query.single().unwrap()
 			});
 		world
@@ -202,7 +208,8 @@ mod test {
 			.xpect_none();
 
 		// mutate the site: a new route, an edited template, a new template
-		fs_ext::write(site_dir.join("routes/docs/intro.md"), "# Intro").unwrap();
+		fs_ext::write(site_dir.join("routes/docs/intro.md"), "# Intro")
+			.unwrap();
 		fs_ext::write(
 			site_dir.join("templates/Card.bsx"),
 			"<section>second card</section>",
@@ -211,7 +218,9 @@ mod test {
 		fs_ext::write(site_dir.join("templates/Hero.bsx"), "<h1>hero</h1>")
 			.unwrap();
 		// drive the change directly instead of awaiting the debounced watcher
-		world.entity_mut(watcher).trigger_target(DirEvent::default());
+		world
+			.entity_mut(watcher)
+			.trigger_target(DirEvent::default());
 		world.flush();
 
 		// the new route landed in the rebuilt tree
@@ -245,19 +254,21 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = site_fixture("broadcasts");
 		let (_root, watcher) = spawn_site(&mut world, &site_dir);
-		let channel = world
-			.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
+		let channel =
+			world.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
 				query.single().unwrap()
 			});
 		let received = Store::<Vec<Message>>::default();
 		let captor = received.clone();
-		world
-			.spawn(ChildOf(channel))
-			.observe_any(move |ev: On<MessageSend>| {
+		world.spawn(ChildOf(channel)).observe_any(
+			move |ev: On<MessageSend>| {
 				captor.push(ev.event().inner().clone());
-			});
+			},
+		);
 
-		world.entity_mut(watcher).trigger_target(DirEvent::default());
+		world
+			.entity_mut(watcher)
+			.trigger_target(DirEvent::default());
 		world.flush();
 
 		received.get().xpect_eq(vec![Message::text(RELOAD_MESSAGE)]);
@@ -268,7 +279,9 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = site_fixture("spawns_channel");
 		// no pre-set ClientIo: the watcher spawns one as its child
-		world.register_bsx_templates(site_dir.join("templates")).unwrap();
+		world
+			.register_bsx_templates(site_dir.join("templates"))
+			.unwrap();
 		let watcher = world.spawn(LiveReload::new(site_dir.clone())).flush();
 		let channel = world
 			.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
@@ -294,7 +307,8 @@ mod test {
 		.unwrap();
 		fs_ext::remove(&root).ok();
 		fs_ext::write(root.join("slides/02-beta.md"), "# Beta").unwrap();
-		fs_ext::write(root.join("slides/01-alpha.md"), "# Alpha first").unwrap();
+		fs_ext::write(root.join("slides/01-alpha.md"), "# Alpha first")
+			.unwrap();
 		root
 	}
 
@@ -415,6 +429,9 @@ mod test {
 			.xnot()
 			.xpect_contains("Alpha first");
 		// the marker survived the respawn, so card nav still works.
-		app.world().entity(router).contains::<CardDeck>().xpect_true();
+		app.world()
+			.entity(router)
+			.contains::<CardDeck>()
+			.xpect_true();
 	}
 }

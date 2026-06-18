@@ -203,7 +203,8 @@ fn plan_scope(
 
 	// targets: this scope's structural slots, descending its subtree but never
 	// crossing into routed content or a nested scope.
-	let mut targets = collect_targets(scope, scopes, children, slot_children, slot_targets);
+	let mut targets =
+		collect_targets(scope, scopes, children, slot_children, slot_targets);
 
 	// fixpoint: a filled transfer target re-opens, so deeper content flows.
 	let mut next = 0;
@@ -265,7 +266,9 @@ fn collect_targets(
 	let mut targets = Vec::new();
 	let mut stack = vec![scope];
 	while let Some(entity) = stack.pop() {
-		if entity != scope && let Ok(target) = slot_targets.get(entity) {
+		if entity != scope
+			&& let Ok(target) = slot_targets.get(entity)
+		{
 			// a target (including a forwarding relay that is also a `SlotChild`) is
 			// visible to this scope so the parent can fill it; its children are
 			// fallback or deeper content, not further targets for this scope.
@@ -285,7 +288,6 @@ fn collect_targets(
 	targets
 }
 
-
 /// Replaces a [`SlotTarget`]'s children with `content`, in order.
 ///
 /// The target keeps its identity (a transparent fragment) but loses its
@@ -304,7 +306,10 @@ fn splice_into_target(world: &mut World, target: Entity, content: Vec<Entity>) {
 	}
 	// route each content entity in as a child, stripping its routing marker.
 	for child in content.iter().copied() {
-		world.entity_mut(child).remove::<SlotChild>().insert(ChildOf(target));
+		world
+			.entity_mut(child)
+			.remove::<SlotChild>()
+			.insert(ChildOf(target));
 	}
 	// the target is now a transparent fragment: drop its placeholder marker.
 	world.entity_mut(target).remove::<SlotTarget>();
@@ -337,16 +342,22 @@ mod test {
 		let mut world = World::new();
 		// scope with a default target and a named "header" target.
 		let scope = node(&mut world, "scope");
-		let default_target = world
-			.spawn((SlotTarget::new(), ChildOf(scope)))
-			.id();
+		let default_target =
+			world.spawn((SlotTarget::new(), ChildOf(scope))).id();
 		let header_target = world
 			.spawn((SlotTarget::named("header"), ChildOf(scope)))
 			.id();
 		// caller content: default body + named header.
-		let body = world.spawn((Name::new("body"), SlotChild::new(), ChildOf(scope))).id();
-		let title =
-			world.spawn((Name::new("title"), SlotChild::named("header"), ChildOf(scope))).id();
+		let body = world
+			.spawn((Name::new("body"), SlotChild::new(), ChildOf(scope)))
+			.id();
+		let title = world
+			.spawn((
+				Name::new("title"),
+				SlotChild::named("header"),
+				ChildOf(scope),
+			))
+			.id();
 
 		resolve_slots(&mut world, scope).unwrap();
 
@@ -355,17 +366,23 @@ mod test {
 		// markers stripped.
 		world.entity(body).contains::<SlotChild>().xpect_false();
 		world.entity(title).contains::<SlotChild>().xpect_false();
-		world.entity(default_target).contains::<SlotTarget>().xpect_false();
+		world
+			.entity(default_target)
+			.contains::<SlotTarget>()
+			.xpect_false();
 	}
 
 	#[beet_core::test]
 	fn fallback_when_unfilled() {
 		let mut world = World::new();
 		let scope = node(&mut world, "scope");
-		let target = world.spawn((SlotTarget::named("header"), ChildOf(scope))).id();
+		let target = world
+			.spawn((SlotTarget::named("header"), ChildOf(scope)))
+			.id();
 		world.spawn((Name::new("fallback"), ChildOf(target)));
 		// a different slot is filled so the scope is a valid composition scope.
-		let default_target = world.spawn((SlotTarget::new(), ChildOf(scope))).id();
+		let default_target =
+			world.spawn((SlotTarget::new(), ChildOf(scope))).id();
 		world.spawn((Name::new("body"), SlotChild::new(), ChildOf(scope)));
 
 		resolve_slots(&mut world, scope).unwrap();
@@ -399,7 +416,11 @@ mod test {
 		let scope = node(&mut world, "scope");
 		// only a default target, but content targets "header".
 		world.spawn((SlotTarget::new(), ChildOf(scope)));
-		world.spawn((Name::new("title"), SlotChild::named("header"), ChildOf(scope)));
+		world.spawn((
+			Name::new("title"),
+			SlotChild::named("header"),
+			ChildOf(scope),
+		));
 
 		let err = resolve_slots(&mut world, scope).unwrap_err();
 		err.to_string().xpect_contains("header");
@@ -413,10 +434,18 @@ mod test {
 		// two sibling scopes, each a default target with its own content.
 		let scope_a = world.spawn((Name::new("a"), ChildOf(root))).id();
 		let target_a = world.spawn((SlotTarget::new(), ChildOf(scope_a))).id();
-		world.spawn((Name::new("contentA"), SlotChild::new(), ChildOf(scope_a)));
+		world.spawn((
+			Name::new("contentA"),
+			SlotChild::new(),
+			ChildOf(scope_a),
+		));
 		let scope_b = world.spawn((Name::new("b"), ChildOf(root))).id();
 		let target_b = world.spawn((SlotTarget::new(), ChildOf(scope_b))).id();
-		world.spawn((Name::new("contentB"), SlotChild::new(), ChildOf(scope_b)));
+		world.spawn((
+			Name::new("contentB"),
+			SlotChild::new(),
+			ChildOf(scope_b),
+		));
 
 		resolve_slots(&mut world, root).unwrap();
 
@@ -462,13 +491,11 @@ mod test {
 			.flat_map(|children| children.iter())
 			.flat_map(|child| {
 				core::iter::once(child).chain(
-					world
-						.entity(child)
-						.get::<Children>()
-						.into_iter()
-						.flat_map(|grandchildren| {
+					world.entity(child).get::<Children>().into_iter().flat_map(
+						|grandchildren| {
 							grandchildren.iter().collect::<Vec<_>>()
-						}),
+						},
+					),
 				)
 			})
 			.any(|entity| {
@@ -488,7 +515,9 @@ mod test {
 		let mut world = World::new();
 		let scope = node(&mut world, "scope");
 		// the deeper structural target the relay forwards into.
-		let inner = world.spawn((SlotTarget::named("head"), ChildOf(scope))).id();
+		let inner = world
+			.spawn((SlotTarget::named("head"), ChildOf(scope)))
+			.id();
 		// the relay: routed as "head" content, and itself a re-opening "head" target.
 		world.spawn((
 			SlotChild::named("head"),
@@ -497,7 +526,11 @@ mod test {
 		));
 		// caller content for "head", which must flow through the relay, not be
 		// eaten by the relay matching its own name.
-		world.spawn((Name::new("meta"), SlotChild::named("head"), ChildOf(scope)));
+		world.spawn((
+			Name::new("meta"),
+			SlotChild::named("head"),
+			ChildOf(scope),
+		));
 
 		resolve_slots(&mut world, scope).unwrap();
 
@@ -509,13 +542,11 @@ mod test {
 			.flat_map(|children| children.iter())
 			.flat_map(|child| {
 				core::iter::once(child).chain(
-					world
-						.entity(child)
-						.get::<Children>()
-						.into_iter()
-						.flat_map(|grandchildren| {
+					world.entity(child).get::<Children>().into_iter().flat_map(
+						|grandchildren| {
 							grandchildren.iter().collect::<Vec<_>>()
-						}),
+						},
+					),
 				)
 			})
 			.any(|entity| {

@@ -2,7 +2,6 @@ use beet_core::prelude::*;
 
 pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
 
-
 #[derive(Debug, Clone, Resource, PartialEq, Reflect)]
 #[reflect(Resource)]
 pub struct WrapAround {
@@ -53,12 +52,10 @@ pub fn wrap_around(
 	}
 }
 
-
 // fn setup_wrap(mut commands: Commands, windows: Query<&Window>) {
 // 	let size = windows.single().size();
 // 	commands.insert_resource(WrapAround::from_window_size(size));
 // }
-
 
 pub fn update_wrap_around(
 	mut wrap_around: When<ResMut<WrapAround>>,

@@ -145,11 +145,7 @@ fn not_found_notice(notice: NotFoundNotice) -> impl Bundle {
 
 /// One route row: the path heading with its kind tag, and a nested detail list.
 fn route_entry_item(entry: RouteEntry) -> impl Bundle {
-	let RouteEntry {
-		href,
-		tag,
-		details,
-	} = entry;
+	let RouteEntry { href, tag, details } = entry;
 	// the kind tag (eg `[scene]`/`[GET]`) folds into the heading text so the row
 	// stays a single link plus a flat detail list.
 	let tag = tag.map(|tag| format!(" [{tag}]")).unwrap_or_default();
@@ -347,7 +343,6 @@ fn format_action_node_text(output: &mut String, node: &ActionNode) {
 	output.push('\n');
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -420,10 +415,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((default_router(), children![(
-				render_action::fixed_func_route(
-					"counter",
-					|| Element::new("p").with_inner_text("counter")
-				),
+				render_action::fixed_func_route("counter", || {
+					Element::new("p").with_inner_text("counter")
+				}),
 				children![increment(FieldRef::new("count"))],
 			)]))
 			.flush();
@@ -439,13 +433,15 @@ mod test {
 		let root = world
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_func_route(
-						"counter",
-						|| Element::new("p").with_inner_text("counter")
-					),
+					render_action::fixed_func_route("counter", || {
+						Element::new("p").with_inner_text("counter")
+					}),
 					children![increment(FieldRef::new("count"))],
 				),
-				render_action::fixed_func_route("about", || rsx! { <p>"about"</p> }),
+				render_action::fixed_func_route(
+					"about",
+					|| rsx! { <p>"about"</p> }
+				),
 			]))
 			.flush();
 
@@ -465,7 +461,9 @@ mod test {
 			.flush();
 
 		// add takes i64 input and returns i64
-		help_body(&mut world, root, "--help").await.xpect_contains("i64");
+		help_body(&mut world, root, "--help")
+			.await
+			.xpect_contains("i64");
 	}
 
 	#[beet_core::test]
@@ -473,7 +471,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((default_router(), children![
-				render_action::fixed_func_route("about", || rsx! { <p>"about"</p> }),
+				render_action::fixed_func_route(
+					"about",
+					|| rsx! { <p>"about"</p> }
+				),
 				increment(FieldRef::new("count")),
 			]))
 			.flush();

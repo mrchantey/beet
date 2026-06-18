@@ -349,7 +349,6 @@ impl BlobStoreProvider for DynamoStore {
 	}
 }
 
-
 #[cfg(feature = "json")]
 impl<T: TableStoreRow> TableProvider<T> for DynamoStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {

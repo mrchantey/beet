@@ -8,7 +8,6 @@ use bytes::Bytes;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
-
 impl BlobStore {
 	/// Create a pre-created [`InMemoryStore`] store for testing.
 	pub fn new_test() -> Self { Self::new(InMemoryStore::new()) }

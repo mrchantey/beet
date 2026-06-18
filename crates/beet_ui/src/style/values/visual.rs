@@ -110,13 +110,12 @@ impl VisualStyle {
 	/// like the discrete (weight/style/decoration/...) fields, mirroring how
 	/// CSS transitions non-interpolable properties.
 	pub fn mix(&self, to: &Self, t: f32) -> Self {
-		let mix_color = |from: &Option<Color>, to: &Option<Color>| {
-			match (from, to) {
+		let mix_color =
+			|from: &Option<Color>, to: &Option<Color>| match (from, to) {
 				(Some(from), Some(to)) => Some(from.mix(to, t)),
 				_ if t < 0.5 => *from,
 				_ => *to,
-			}
-		};
+			};
 		let discrete = if t < 0.5 { self } else { to };
 		Self {
 			foreground: mix_color(&self.foreground, &to.foreground),
@@ -151,9 +150,8 @@ impl VisualStyle {
 		self.decoration_color = self
 			.decoration_color
 			.map(|color| color.mix(&backdrop, fade));
-		self.background = self
-			.background
-			.map(|color| color.mix(&Color::BLACK, fade));
+		self.background =
+			self.background.map(|color| color.mix(&Color::BLACK, fade));
 	}
 
 	/// Whether this style would emit no escape codes.

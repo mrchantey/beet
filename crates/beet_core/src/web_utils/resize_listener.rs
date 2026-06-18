@@ -12,7 +12,6 @@ use web_sys::ResizeObserver;
 use web_sys::ResizeObserverEntry;
 use web_sys::ResizeObserverSize;
 
-
 /// Wrapper around [`ResizeObserver`] that monitors element size changes,
 /// removed on drop.
 pub struct ResizeListener {

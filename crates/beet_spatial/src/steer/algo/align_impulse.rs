@@ -28,13 +28,10 @@ pub fn align_impulse<'a, T>(
 	Impulse(average * align.scalar)
 }
 
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-
 
 	fn spawn(world: &mut World, pos: Vec3, vel: Vec3) -> Entity {
 		world

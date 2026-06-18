@@ -1,12 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
 /// A [`NodeRenderer`] that serializes the entity subtree via [`TemplateSaver`].
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TemplateRenderer {}
-
 
 impl NodeRenderer for TemplateRenderer {
 	fn render(

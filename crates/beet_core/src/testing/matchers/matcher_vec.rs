@@ -56,7 +56,6 @@ pub impl<T: Debug> Vec<T> {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

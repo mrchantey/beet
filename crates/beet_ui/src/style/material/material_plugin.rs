@@ -95,9 +95,9 @@ impl Plugin for MaterialStylePlugin {
 /// by token so it overwrites in place (idempotent — the scheme/opacity/
 /// typography keys are untouched). Runs whenever [`Theme`] changes.
 pub fn rebuild_theme_tones(theme: Res<Theme>, mut rules: ResMut<RuleSet>) {
-	rules
-		.default_rule_mut()
-		.push_declarations(Rule::new().with_extend(themes::from_color(theme.color)));
+	rules.default_rule_mut().push_declarations(
+		Rule::new().with_extend(themes::from_color(theme.color)),
+	);
 }
 
 pub fn default_token_map() -> CssTokenMap {
@@ -154,7 +154,6 @@ pub fn scheme_independent_declarations() -> Rule {
 		.with_extend(motion::default_motions())
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -177,7 +176,9 @@ mod tests {
 	/// green) renders byte-identically across this refactor.
 	#[beet_core::test]
 	fn theme_default_is_brand_green() {
-		Theme::default().color.xpect_eq(palettes::basic::GREEN.into());
+		Theme::default()
+			.color
+			.xpect_eq(palettes::basic::GREEN.into());
 	}
 
 	/// Setting [`Theme::color`] and running [`rebuild_theme_tones`] rewrites the
@@ -187,7 +188,10 @@ mod tests {
 	fn theme_recolors_root_tones() {
 		let violet = Color::srgb(0.5, 0.0, 1.0);
 		let mut world = MaterialStylePlugin::world();
-		world.insert_resource(Theme { color: violet, ..default() });
+		world.insert_resource(Theme {
+			color: violet,
+			..default()
+		});
 		world.run_system_cached(rebuild_theme_tones).unwrap();
 
 		world.with_state::<Res<RuleSet>, _>(|rules| {
@@ -292,13 +296,9 @@ mod tests {
 	fn descendant_inherits_scheme_class() {
 		let mut world = MaterialStylePlugin::world();
 		let parent = world
-			.spawn((
-				rsx! { <div/> },
-				Classes::new([classes::DARK_SCHEME]),
-			))
+			.spawn((rsx! { <div/> }, Classes::new([classes::DARK_SCHEME])))
 			.id();
-		let child =
-			world.spawn((rsx! { <span/> }, ChildOf(parent))).id();
+		let child = world.spawn((rsx! { <span/> }, ChildOf(parent))).id();
 		// a sibling with no scheme falls back to the light `:root` default
 		let bare = world.spawn(rsx! { <span/> }).id();
 
@@ -307,8 +307,9 @@ mod tests {
 			let child_surface =
 				query.resolve(child, colors::Surface, memo).unwrap();
 			// inherits the parent's dark scheme ...
-			child_surface
-				.xpect_eq(query.resolve(parent, colors::Surface, memo).unwrap());
+			child_surface.xpect_eq(
+				query.resolve(parent, colors::Surface, memo).unwrap(),
+			);
 			// ... which differs from the do-nothing light fallback
 			(child_surface
 				!= query.resolve(bare, colors::Surface, memo).unwrap())
@@ -322,9 +323,12 @@ mod tests {
 	fn scheme_class_themes_page() {
 		// `RealtimeParsePlugin` wires `PostParseTree` into the main loop so
 		// `update_local` resolves styles (the on-demand render paths run it directly)
-		let mut world =
-			(MaterialStylePlugin::default(), StylePlugin, RealtimeParsePlugin)
-				.into_world();
+		let mut world = (
+			MaterialStylePlugin::default(),
+			StylePlugin,
+			RealtimeParsePlugin,
+		)
+			.into_world();
 		let light = world
 			.spawn((
 				rsx! { <div/> },

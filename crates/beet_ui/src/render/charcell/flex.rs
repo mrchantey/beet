@@ -13,8 +13,8 @@ use bevy::math::UVec2;
 
 use super::establishes_inline_flow;
 use super::explicit_box_size;
-use super::measure_grid;
 use super::marker_gutter;
+use super::measure_grid;
 use super::measure_inline_flow;
 use super::measure_str;
 use super::measure_text;
@@ -242,7 +242,9 @@ fn resolve_block_height(
 			// the last child's trailing margin doesn't reserve a row (matches
 			// `measure_block` and `block_layout_rects`).
 			match i == last {
-				true => height.saturating_sub(node_bottom_margin(child, viewport)),
+				true => {
+					height.saturating_sub(node_bottom_margin(child, viewport))
+				}
 				false => height,
 			}
 		})
@@ -272,7 +274,11 @@ fn resolve_flex_height(
 			.iter()
 			.enumerate()
 			.map(|(idx, line)| {
-				let gap = if idx > 0 { flexbox.row_gap_cells(viewport) } else { 0 };
+				let gap = if idx > 0 {
+					flexbox.row_gap_cells(viewport)
+				} else {
+					0
+				};
 				let sizes = resolve_line_sizes(
 					flexbox,
 					line,
@@ -289,8 +295,8 @@ fn resolve_flex_height(
 		Direction::Vertical => lines
 			.iter()
 			.map(|line| {
-				let gaps =
-					flexbox.row_gap_cells(viewport) * (line.len().saturating_sub(1) as u32);
+				let gaps = flexbox.row_gap_cells(viewport)
+					* (line.len().saturating_sub(1) as u32);
 				let items: u32 = line
 					.iter()
 					.filter_map(|(entity, size)| {
@@ -335,8 +341,11 @@ fn resolve_line_sizes(
 		.map(|(size, (entity, _))| {
 			// clamp the column cross size (width) to the container, then resolve
 			// height at that assigned width so wrapped rows are fully reserved.
-			let width =
-				if vertical { size.x.min(container_cross) } else { size.x };
+			let width = if vertical {
+				size.x.min(container_cross)
+			} else {
+				size.x
+			};
 			let content_height = query
 				.unresolved_node(*entity)
 				.map(|child| resolve_height(&child, query, width, viewport))
@@ -380,7 +389,8 @@ pub fn flex_layout_rects(
 	let flexbox = node.flexbox();
 
 	let box_model = BoxModel::from_node(node, viewport);
-	let content_rect = scrollport_of(node, query, box_model.content_rect(container_rect));
+	let content_rect =
+		scrollport_of(node, query, box_model.content_rect(container_rect));
 	// flex math works in unsigned cell sizes; the signed content rect origin is
 	// re-added when each child rect is placed.
 	let available = UVec2::new(
@@ -938,7 +948,6 @@ fn apply_align_content(
 	positions
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -1021,17 +1030,18 @@ mod tests {
 
 	#[beet_core::test]
 	fn column_gap() {
-		render((LayoutStyle::flex_row().column_gap(Length::Rem(3.)), children![
-			(rsx! {"A"}, bordered()),
-			(rsx! {"B"}, bordered()),
-		]))
+		render((
+			LayoutStyle::flex_row().column_gap(Length::Rem(3.)),
+			children![(rsx! {"A"}, bordered()), (rsx! {"B"}, bordered()),],
+		))
 		.xpect_snapshot();
 	}
 
 	#[beet_core::test]
 	fn flex_grow_distributes_space() {
-		let output =
-			render((LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
+		let output = render((
+			LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+			children![
 				(rsx! {"A"}, bordered()),
 				(
 					rsx! {"B"},
@@ -1039,7 +1049,8 @@ mod tests {
 					LayoutStyle::default().with_flex_grow(1)
 				),
 				(rsx! {"C"}, bordered()),
-			]));
+			],
+		));
 		output.xpect_snapshot();
 		// B should be wider than A and C
 		let lines: Vec<&str> = output.lines().collect();
@@ -1117,24 +1128,26 @@ mod tests {
 
 	#[beet_core::test]
 	fn nested_flex() {
-		render((LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
-			(
-				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
-				children![
-					(rsx! {"A"}, bordered()),
-					(rsx! {"B"}, bordered()),
-				],
-				bordered()
-			),
-			(
-				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
-				children![
-					(rsx! {"C"}, bordered()),
-					(rsx! {"D"}, bordered()),
-				],
-				bordered()
-			),
-		]))
+		render(
+			(LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
+				(
+					LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+					children![
+						(rsx! {"A"}, bordered()),
+						(rsx! {"B"}, bordered()),
+					],
+					bordered()
+				),
+				(
+					LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+					children![
+						(rsx! {"C"}, bordered()),
+						(rsx! {"D"}, bordered()),
+					],
+					bordered()
+				),
+			]),
+		)
 		.xpect_snapshot();
 	}
 
@@ -1151,11 +1164,13 @@ mod tests {
 
 	#[beet_core::test]
 	fn column_with_multiple_items() {
-		render((LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
-			(rsx! {"First"}, bordered()),
-			(rsx! {"Second"}, bordered()),
-			(rsx! {"Third"}, bordered()),
-		]))
+		render(
+			(LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
+				(rsx! {"First"}, bordered()),
+				(rsx! {"Second"}, bordered()),
+				(rsx! {"Third"}, bordered()),
+			]),
+		)
 		.xpect_snapshot();
 	}
 
@@ -1186,30 +1201,33 @@ mod tests {
 	/// Verifies background ordering and multi-level flex layout.
 	#[beet_core::test]
 	fn nested_with_backgrounds() {
-		let out = render((LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
-			(
-				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
-				children![
-					(rsx! { "Left" }, bordered(), VisualStyle {
-						background: Some(Color::srgb(0.2, 0.2, 0.5)),
+		let out = render((
+			LayoutStyle::flex_col().row_gap(Length::Rem(1.)),
+			children![
+				(
+					LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+					children![
+						(rsx! { "Left" }, bordered(), VisualStyle {
+							background: Some(Color::srgb(0.2, 0.2, 0.5)),
+							..default()
+						},),
+						(rsx! { "Right" }, bordered(), VisualStyle {
+							background: Some(Color::srgb(0.5, 0.2, 0.2)),
+							..default()
+						},),
+					],
+					bordered()
+				),
+				(
+					LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+					children![(rsx! { "Below" }, bordered(), VisualStyle {
+						background: Some(Color::srgb(0.2, 0.5, 0.2)),
 						..default()
-					},),
-					(rsx! { "Right" }, bordered(), VisualStyle {
-						background: Some(Color::srgb(0.5, 0.2, 0.2)),
-						..default()
-					},),
-				],
-				bordered()
-			),
-			(
-				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
-				children![(rsx! { "Below" }, bordered(), VisualStyle {
-					background: Some(Color::srgb(0.2, 0.5, 0.2)),
-					..default()
-				},),],
-				bordered()
-			),
-		]));
+					},),],
+					bordered()
+				),
+			],
+		));
 		// both rows should appear - header row and second row
 		out.as_str().xpect_contains("┌"); // at least one top-left corner
 		// ensure trim_lines worked (output should not include excess blank rows)
@@ -1223,10 +1241,13 @@ mod tests {
 	/// The border width must account for the display width, not the char count.
 	#[beet_core::test]
 	fn wide_chars_layout() {
-		let out = render((LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-			(rsx! { "中文" }, bordered()),
-			(rsx! { "ＡＢＣ" }, bordered()),
-		]));
+		let out = render((
+			LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+			children![
+				(rsx! { "中文" }, bordered()),
+				(rsx! { "ＡＢＣ" }, bordered()),
+			],
+		));
 		// "中文": 2 wide chars = 4 cols content → border top = ┌────┐
 		out.as_str().xpect_contains("┌────┐");
 		// "ＡＢＣ": 3 wide chars = 6 cols content → border top = ┌──────┐

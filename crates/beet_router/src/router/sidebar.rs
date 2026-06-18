@@ -123,8 +123,10 @@ pub fn RouteSidebar(
 			// each route's metadata drives its label/order/expansion
 			for node in tree.flatten_nodes() {
 				if let Ok(meta) = metas.get(node.entity) {
-					state = state
-						.with_info(node.path.annotated_path(), meta.sidebar_info());
+					state = state.with_info(
+						node.path.annotated_path(),
+						meta.sidebar_info(),
+					);
 				}
 			}
 			state.collect(tree)
@@ -216,8 +218,11 @@ impl SidebarState {
 	/// Emits a synthetic "Home" entry followed by a recursively collected,
 	/// order-sorted node for each routable child of the tree.
 	pub fn collect(&self, tree: &RouteTree) -> Vec<SidebarNode> {
-		let mut nodes =
-			if self.show_home { vec![self.home_node()] } else { Vec::new() };
+		let mut nodes = if self.show_home {
+			vec![self.home_node()]
+		} else {
+			Vec::new()
+		};
 		for child in self.sort_children(tree) {
 			if let Some(node) = self.collect_node(&child) {
 				nodes.push(node);
@@ -249,8 +254,7 @@ impl SidebarState {
 			.collect();
 		// only page routes belong in the nav; infra/data routes (eg the
 		// `js/reactivity.js` asset, `app-info`) carry no [`PageRoute`] marker.
-		let has_page_route =
-			tree.node().is_some_and(|node| node.is_page_route);
+		let has_page_route = tree.node().is_some_and(|node| node.is_page_route);
 
 		if children.is_empty() {
 			// leaf: only render if it is a page route
@@ -424,10 +428,7 @@ mod test {
 	fn collects_home_and_leaves() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![
-				page_route("about"),
-				page_route("docs"),
-			])
+			.spawn(children![page_route("about"), page_route("docs"),])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
@@ -443,10 +444,7 @@ mod test {
 	fn marks_active_leaf() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![
-				page_route("about"),
-				page_route("docs"),
-			])
+			.spawn(children![page_route("about"), page_route("docs"),])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
@@ -460,9 +458,7 @@ mod test {
 	#[beet_core::test]
 	fn marks_active_home() {
 		let mut world = router_world();
-		let root = world
-			.spawn(children![page_route("about")])
-			.flush();
+		let root = world.spawn(children![page_route("about")]).flush();
 		let tree = tree_of(&mut world, root);
 
 		let nodes = SidebarState::new("").collect(&tree);
@@ -502,12 +498,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				(PathPartial::new("docs"), children![
-					page_route("intro"),
-				]),
-				(PathPartial::new("blog"), children![
-					page_route("post1"),
-				]),
+				(PathPartial::new("docs"), children![page_route("intro"),]),
+				(PathPartial::new("blog"), children![page_route("post1"),]),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -530,9 +522,7 @@ mod test {
 	#[beet_core::test]
 	fn custom_label_override() {
 		let mut world = router_world();
-		let root = world
-			.spawn(children![page_route("about")])
-			.flush();
+		let root = world.spawn(children![page_route("about")]).flush();
 		let tree = tree_of(&mut world, root);
 
 		let nodes = SidebarState::new("")
@@ -555,10 +545,7 @@ mod test {
 	fn sort_by_order() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![
-				page_route("zulu"),
-				page_route("alpha"),
-			])
+			.spawn(children![page_route("zulu"), page_route("alpha"),])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
@@ -621,10 +608,9 @@ mod test {
 	fn branch_with_route_carries_path() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![(
-				page_route("docs"),
-				children![page_route("intro")],
-			)])
+			.spawn(children![(page_route("docs"), children![page_route(
+				"intro"
+			)],)])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
@@ -643,9 +629,7 @@ mod test {
 		let root = world
 			.spawn(children![
 				page_route("about"),
-				(PathPartial::new("docs"), children![
-					page_route("intro"),
-				]),
+				(PathPartial::new("docs"), children![page_route("intro"),]),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);

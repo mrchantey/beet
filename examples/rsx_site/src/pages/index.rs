@@ -54,7 +54,10 @@ fn block_measure() -> OnSpawn {
 fn button_row() -> OnSpawn {
 	inline_class![
 		(common_props::DisplayProp, style::Display::Flex),
-		(common_props::JustifyContentProp, style::JustifyContent::Center),
+		(
+			common_props::JustifyContentProp,
+			style::JustifyContent::Center
+		),
 		(common_props::AlignItemsProp, style::AlignItems::Center),
 		(common_props::ColumnGapProp, Length::Rem(1.)),
 	]

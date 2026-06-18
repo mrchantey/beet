@@ -52,7 +52,6 @@ pub impl<T> Option<T> {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

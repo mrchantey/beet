@@ -163,7 +163,6 @@ pub async fn await_interaction() {
 	let _ = race(click, race(scroll, key)).await;
 }
 
-
 /// Create a typed paragraph element.
 pub fn create_paragraph() -> HtmlParagraphElement {
 	document().create_element("p").unwrap().dyn_into().unwrap()

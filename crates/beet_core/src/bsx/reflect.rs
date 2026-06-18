@@ -109,7 +109,8 @@ fn scalar_to_reflect(
 		Value::Float(float) => Some(*float),
 		_ => None,
 	};
-	if let (Some(number), Some(TypeInfo::Opaque(opaque))) = (as_f64, field_info) {
+	if let (Some(number), Some(TypeInfo::Opaque(opaque))) = (as_f64, field_info)
+	{
 		if let Some(reflected) = cast_number(number, opaque.type_id()) {
 			return Ok(reflected);
 		}
@@ -146,7 +147,10 @@ fn scalar_to_reflect(
 }
 
 /// Cast a number to a registered scalar type by its [`TypeId`].
-fn cast_number(number: f64, type_id: TypeId) -> Option<Box<dyn PartialReflect>> {
+fn cast_number(
+	number: f64,
+	type_id: TypeId,
+) -> Option<Box<dyn PartialReflect>> {
 	if type_id == TypeId::of::<f32>() {
 		Some(Box::new(number as f32))
 	} else if type_id == TypeId::of::<f64>() {
@@ -231,7 +235,9 @@ fn enum_to_reflect(
 ) -> Result<Box<dyn PartialReflect>> {
 	match field_info {
 		Some(TypeInfo::Struct(_)) => {
-			return named_struct_to_reflect(named, field_info, registry, resolver);
+			return named_struct_to_reflect(
+				named, field_info, registry, resolver,
+			);
 		}
 		Some(TypeInfo::TupleStruct(_)) => {
 			return named_tuple_struct_to_reflect(

@@ -497,7 +497,6 @@ impl FromRequest<Self> for RequestParts {
 	}
 }
 
-
 /// Marker type for [`FromRequest`] implementations via [`TryFrom`].
 pub struct TryFromRequestMarker;
 
@@ -545,7 +544,6 @@ where
 impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 	fn from(request: http::Request<T>) -> Self { Self::from_http(request) }
 }
-
 
 #[cfg(test)]
 mod test {

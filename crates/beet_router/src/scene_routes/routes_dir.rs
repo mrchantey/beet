@@ -173,9 +173,11 @@ mod test {
 			.spawn((default_router(), children![RoutesDir::new("")]))
 			.flush();
 
-		for (path, expected) in
-			[("", "welcome"), ("docs/intro", "the intro"), ("about", "About")]
-		{
+		for (path, expected) in [
+			("", "welcome"),
+			("docs/intro", "the intro"),
+			("about", "About"),
+		] {
 			world
 				.entity_mut(root)
 				.call::<Request, Response>(
@@ -203,9 +205,7 @@ mod test {
 		]));
 		// a bare `Router` (not `default_router`) so the opinionated app routes do
 		// not appear as extra top-level children alongside the discovered slides.
-		let root = world
-			.spawn((Router, children![RoutesDir::new("")]))
-			.flush();
+		let root = world.spawn((Router, children![RoutesDir::new("")])).flush();
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 		// the discovered slide routes, in tree-child order

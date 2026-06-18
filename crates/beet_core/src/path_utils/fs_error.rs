@@ -11,7 +11,6 @@ use thiserror::Error;
 /// Result type alias using [`FsError`].
 pub type FsResult<T = ()> = Result<T, FsError>;
 
-
 /// An file system error that includes the path that caused the error.
 ///
 /// Unlike [`std::io::Error`], this error type always includes the path,
@@ -90,7 +89,6 @@ impl FsError {
 			Ok(())
 		}
 	}
-
 
 	/// Creates an [`FsError`] from an [`io::Error`], inferring the error type from the path.
 	pub fn io(path: impl AsRef<Path>, e: io::Error) -> Self {

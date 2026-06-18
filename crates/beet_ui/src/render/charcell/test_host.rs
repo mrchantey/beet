@@ -46,14 +46,11 @@ impl TestHost {
 
 		// the host entity stands in for a window surface: it carries the channel
 		// terminal, its paired Terminal, and the DoubleBuffer the pipeline paints.
-		let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
+		let (channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
 		let host = app
 			.world_mut()
-			.spawn((
-				channel,
-				terminal,
-				DoubleBuffer::new(size),
-			))
+			.spawn((channel, terminal, DoubleBuffer::new(size)))
 			.id();
 		// the host carries its own Pointer (required by Terminal); run one update
 		// to settle Startup before any stepping.

@@ -125,12 +125,14 @@ pub(super) fn resolve_contexts(
 		let translated_rect = translate_rect(node.layout_rect(), cx.offset);
 		let child_clip = if node.is_scroll_container() {
 			// clip content to the scrollport so it never paints under the bar
-			let scrollport =
-				translate_rect(scrollport_rect(&node, query, viewport), cx.offset);
+			let scrollport = translate_rect(
+				scrollport_rect(&node, query, viewport),
+				cx.offset,
+			);
 			Clip(cx.clip.intersect(scrollport))
 		} else if node.layout_style().clips() {
-			let padding_box =
-				BoxModel::from_node(&node, viewport).inner_rect(translated_rect);
+			let padding_box = BoxModel::from_node(&node, viewport)
+				.inner_rect(translated_rect);
 			Clip(cx.clip.intersect(padding_box))
 		} else {
 			cx.clip
@@ -208,7 +210,14 @@ fn paint_node(
 	//    to the container (not scrolled with the content). The shared geometry
 	//    (read here and by the mouse hit-test) is derived from the screen offset.
 	if node.is_scroll_container() {
-		paint_scrollbar(&mut *buffer, node, query, viewport, cx.offset, cx.clip);
+		paint_scrollbar(
+			&mut *buffer,
+			node,
+			query,
+			viewport,
+			cx.offset,
+			cx.clip,
+		);
 	}
 
 	Ok(())
@@ -287,13 +296,10 @@ mod tests {
 	/// itself (outside the clip) stays visible while inner content is cut.
 	#[beet_core::test]
 	fn overflow_hidden_keeps_border() {
-		let out = overflow_frame(
-			Overflow::Hidden,
-			vec![
-				Rule::class("container")
-					.with_value(common_props::OutlineWidth, Length::Px(1.)),
-			],
-		);
+		let out = overflow_frame(Overflow::Hidden, vec![
+			Rule::class("container")
+				.with_value(common_props::OutlineWidth, Length::Px(1.)),
+		]);
 		// the top border (and its corners) survive the clip at the padding box
 		out.as_str().xpect_contains("┌").xpect_contains("┐");
 		// content past the clipped 2-row box is gone

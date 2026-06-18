@@ -5,7 +5,6 @@ beet_core::test_main!();
 
 use beet_core::prelude::*;
 
-
 #[derive(Component)]
 #[component(on_add=on_add1)]
 #[component(on_remove=on_remove1)]
@@ -29,7 +28,6 @@ fn removed1(ev: On<Remove, Comp1>, query: Query<&Comp1>) {
 	query.get(ev.entity).unwrap();
 }
 
-
 #[derive(Component)]
 #[component(on_add=on_add2)]
 #[component(on_remove=on_remove2)]
@@ -49,7 +47,6 @@ fn added2(ev: On<Add, Comp2>) {
 fn removed2(ev: On<Remove, Comp2>) {
 	println!("{:?}: Comp2 Event - Remove", ev.entity);
 }
-
 
 use beet_core::testing;
 

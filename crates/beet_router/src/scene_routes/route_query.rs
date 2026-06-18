@@ -184,7 +184,6 @@ impl Iterator for RenderBfsIter<'_, '_, '_> {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

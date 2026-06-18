@@ -8,7 +8,6 @@
 //! ```
 use beet::prelude::*;
 
-
 fn main() { async_ext::block_on(main_async()); }
 async fn main_async() {
 	let _handle = std::thread::spawn(|| {
@@ -29,7 +28,6 @@ async fn main_async() {
 	// let num_requests = 10; //    850 us
 	// let num_requests = 100; //   5 ms
 	let num_requests = 1000; //     65 ms
-
 
 	let futures = (0..num_requests).map(|_| async {
 		let start = Instant::now();

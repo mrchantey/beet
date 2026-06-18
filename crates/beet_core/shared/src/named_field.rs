@@ -253,7 +253,6 @@ impl<'a> NamedField<'a> {
 	}
 }
 
-
 // cant use beet_core as shared with beet_core_macros
 #[cfg(test)]
 mod test {

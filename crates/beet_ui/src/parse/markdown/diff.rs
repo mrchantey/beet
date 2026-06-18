@@ -244,9 +244,7 @@ fn html_node_to_bsx(node: &HtmlNode<'_>) -> Option<BsxNode> {
 			children: children.iter().filter_map(html_node_to_bsx).collect(),
 			self_closing: children.is_empty(),
 		})),
-		HtmlNode::Text(text) => {
-			Some(BsxNode::Text(unescape_html_text(text)))
-		}
+		HtmlNode::Text(text) => Some(BsxNode::Text(unescape_html_text(text))),
 		HtmlNode::Comment(text) => Some(BsxNode::Comment(text.to_string())),
 		HtmlNode::Doctype(text) => Some(BsxNode::Doctype(text.to_string())),
 		// a markdown `{expr}` inside a BSX subtree: parse it as a value expression.
@@ -573,7 +571,13 @@ pub(crate) fn spawn_node(
 				world.entity_mut(child_id).insert(Element::new(*name));
 				diff_attributes(world, child_id, attributes, config)?;
 				for child_node in children {
-					spawn_node(world, child_id, child_node, config, span_lookup)?;
+					spawn_node(
+						world,
+						child_id,
+						child_node,
+						config,
+						span_lookup,
+					)?;
 				}
 			}
 		}
@@ -696,8 +700,10 @@ mod test {
 		};
 		// one node: the Link element holding its single text child (not Link/0
 		// beside a stray text sibling).
-		tree.nodes.iter().map(describe).collect::<Vec<_>>().xpect_eq(vec![
-			"Link/1".to_string(),
-		]);
+		tree.nodes
+			.iter()
+			.map(describe)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["Link/1".to_string()]);
 	}
 }

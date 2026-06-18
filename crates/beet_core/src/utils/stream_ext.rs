@@ -150,7 +150,6 @@ pub fn bytes_to_text(
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

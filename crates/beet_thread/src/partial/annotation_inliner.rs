@@ -210,7 +210,6 @@ impl AnnotationInliner {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

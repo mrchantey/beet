@@ -3,14 +3,10 @@ use quote::ToTokens;
 use std::fmt::Display;
 use syn::parse::Parse;
 
-
-
-
 /// Wrapper for [`ToTokens`] types that parses the stream, removing span
 /// information and allowing the value to be sent across threads.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref)]
 pub struct Unspan<T>(T);
-
 
 impl<T: ToTokens + Parse> Unspan<T> {
 	/// Creates a new [`Unspan`] by parsing the token stream representation.
@@ -36,7 +32,6 @@ impl<T: ToTokens> ToTokens for Unspan<T> {
 		self.0.to_tokens(tokens);
 	}
 }
-
 
 impl<T: Display> Display for Unspan<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

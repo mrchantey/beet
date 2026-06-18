@@ -6,9 +6,6 @@ use core::future::Future;
 pub trait AsyncTest: 'static + Future<Output = Result<(), String>> {}
 impl<F> AsyncTest for F where F: 'static + Future<Output = Result<(), String>> {}
 
-
-
-
 /// Converts a type into an async test future.
 pub trait IntoFut<M> {
 	/// Converts this type into an async test future.

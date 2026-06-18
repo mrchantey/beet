@@ -152,13 +152,13 @@ pub use events::*;
 pub use parse::*;
 pub use reflect::*;
 pub use registry::*;
-pub use style_resolver::*;
-pub use tag_resolver::*;
-pub use value::parse_value_expr_str;
 #[cfg(feature = "bevy_async")]
 pub use remote::*;
 pub use resolve::*;
 pub use schema::*;
+pub use style_resolver::*;
+pub use tag_resolver::*;
+pub use value::parse_value_expr_str;
 
 use crate::prelude::*;
 

@@ -39,7 +39,6 @@ pub struct ActionOf(pub Entity);
 #[relationship_target(relationship = ActionOf, linked_spawn)]
 pub struct Actions(Vec<Entity>);
 
-
 /// System parameter for resolving the agent entity of an action.
 ///
 /// This type optionally accepts `QueryData` and `QueryFilter` generics for
@@ -83,7 +82,6 @@ where
 	pub query: Query<'w, 's, D, F>,
 }
 
-
 impl AgentQuery<'_, '_, (), ()> {
 	/// Resolves the agent entity asynchronously.
 	pub async fn entity_async(world: &AsyncWorld, action: Entity) -> Entity {
@@ -98,7 +96,6 @@ impl AgentQuery<'_, '_, (), ()> {
 			.unwrap()
 	}
 }
-
 
 impl<'w, 's, D, F> AgentQuery<'w, 's, D, F>
 where
@@ -140,7 +137,6 @@ where
 		self.query.get(agent)
 	}
 
-
 	/// Returns the mutable query item for the agent of the given action.
 	pub fn get_mut(
 		&mut self,
@@ -181,7 +177,6 @@ where
 			.xok()
 	}
 }
-
 
 #[cfg(test)]
 mod test {

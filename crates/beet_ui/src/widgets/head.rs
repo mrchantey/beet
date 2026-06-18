@@ -106,11 +106,13 @@ fn site_name_attr(title: &SmolStr) -> impl Bundle {
 	OnSpawn::new(move |entity| {
 		let element = entity.id();
 		entity.world_scope(move |world| {
-			let attr = (AttributeOf::new(element), Attribute::new("content"), value);
+			let attr =
+				(AttributeOf::new(element), Attribute::new("content"), value);
 			// under `json` the resource bind tracks the live title; otherwise the
 			// seeded value renders as a static snapshot.
 			#[cfg(feature = "json")]
-			world.spawn((attr, ResourceFieldRef::new("PackageConfig", "title")));
+			world
+				.spawn((attr, ResourceFieldRef::new("PackageConfig", "title")));
 			#[cfg(not(feature = "json"))]
 			world.spawn(attr);
 		});

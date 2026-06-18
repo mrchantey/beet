@@ -352,7 +352,6 @@ impl<'u, 't, 'w> PostViewMut<'u, 't, 'w> {
 	}
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;

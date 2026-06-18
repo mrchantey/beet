@@ -43,7 +43,10 @@ pub struct ResourceFieldRef {
 
 impl ResourceFieldRef {
 	/// Bind to `resource`'s `field`.
-	pub fn new(resource: impl Into<SmolStr>, field: impl Into<SmolStr>) -> Self {
+	pub fn new(
+		resource: impl Into<SmolStr>,
+		field: impl Into<SmolStr>,
+	) -> Self {
 		Self {
 			resource: resource.into(),
 			field: field.into(),
@@ -173,7 +176,10 @@ mod test {
 		let mut world = world();
 		world.insert_resource(Theme { contrast: 5 });
 		let entity = world
-			.spawn((Value::default(), ResourceFieldRef::new("Theme", "contrast")))
+			.spawn((
+				Value::default(),
+				ResourceFieldRef::new("Theme", "contrast"),
+			))
 			.id();
 		world.update_local();
 
@@ -236,7 +242,10 @@ mod test {
 		let mut world = world();
 		world.insert_resource(Theme { contrast: 5 });
 		let entity = world
-			.spawn((Value::default(), ResourceFieldRef::new("Theme", "contrast")))
+			.spawn((
+				Value::default(),
+				ResourceFieldRef::new("Theme", "contrast"),
+			))
 			.id();
 		// settle the initial resource -> Value sync.
 		world.update_local();
@@ -275,7 +284,10 @@ mod test {
 		let mut world = world();
 		// `Theme` registered but never inserted, plus an entirely unknown type.
 		let entity = world
-			.spawn((Value::default(), ResourceFieldRef::new("Theme", "contrast")))
+			.spawn((
+				Value::default(),
+				ResourceFieldRef::new("Theme", "contrast"),
+			))
 			.id();
 		world.spawn((Value::default(), ResourceFieldRef::new("Nope", "field")));
 		world.update_local();

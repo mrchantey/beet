@@ -49,7 +49,9 @@ impl BsxTemplateRegistry {
 				super::schema::SchemaDirective::Inline(schema) => {
 					(Some(schema), None)
 				}
-				super::schema::SchemaDirective::Remote(src) => (None, Some(src)),
+				super::schema::SchemaDirective::Remote(src) => {
+					(None, Some(src))
+				}
 				super::schema::SchemaDirective::None => (None, None),
 			};
 		let nodes = super::schema::strip_schema_blocks(nodes);
@@ -112,7 +114,9 @@ impl BsxTemplateRegistry {
 	/// The registered template names paired with their schemas, the manifest the
 	/// reactive client layer reads and the source for [`SchemaRegistry`]
 	/// population.
-	pub fn manifest(&self) -> impl Iterator<Item = (&SmolStr, Option<&ValueSchema>)> {
+	pub fn manifest(
+		&self,
+	) -> impl Iterator<Item = (&SmolStr, Option<&ValueSchema>)> {
 		self.templates
 			.iter()
 			.map(|(name, def)| (name, def.schema.as_ref()))
@@ -131,8 +135,9 @@ pub impl World {
 	/// are loaded, so a tag resolves to a known template and its schema and a
 	/// missing required field is a real error.
 	fn register_bsx_templates(&mut self, dir: impl AsRef<Path>) -> Result {
-		let mut registry =
-			self.remove_resource::<BsxTemplateRegistry>().unwrap_or_default();
+		let mut registry = self
+			.remove_resource::<BsxTemplateRegistry>()
+			.unwrap_or_default();
 		registry.register_dir(dir)?;
 		// collect each template's schema, then mirror them into the schema registry.
 		let schemas = registry
@@ -176,7 +181,11 @@ pub impl World {
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 fn module_path_of(dir: &Path, path: &Path) -> Result<String> {
 	let relative = path.strip_prefix(dir).map_err(|_| {
-		bevyhow!("template file `{}` is not under `{}`", path.display(), dir.display())
+		bevyhow!(
+			"template file `{}` is not under `{}`",
+			path.display(),
+			dir.display()
+		)
 	})?;
 	let without_ext = relative.with_extension("");
 	let module = without_ext
@@ -198,13 +207,17 @@ mod test {
 	fn module_path_from_file() {
 		let dir = Path::new("/templates");
 		let path = Path::new("/templates/path/to/X.bsx");
-		module_path_of(dir, path).unwrap().xpect_eq("path::to::X".to_string());
+		module_path_of(dir, path)
+			.unwrap()
+			.xpect_eq("path::to::X".to_string());
 	}
 
 	#[beet_core::test]
 	fn module_path_top_level() {
 		let dir = Path::new("/templates");
 		let path = Path::new("/templates/Todo.bsx");
-		module_path_of(dir, path).unwrap().xpect_eq("Todo".to_string());
+		module_path_of(dir, path)
+			.unwrap()
+			.xpect_eq("Todo".to_string());
 	}
 }

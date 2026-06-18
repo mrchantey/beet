@@ -64,7 +64,10 @@ fn toggle_select_on_click(
 ) {
 	// the event bubbles; act only at the `<select>` step of the propagation.
 	let select = ev.event_target();
-	if !elements.get(select).is_ok_and(|view| view.tag() == "select") {
+	if !elements
+		.get(select)
+		.is_ok_and(|view| view.tag() == "select")
+	{
 		return;
 	}
 	// a click originating inside the panel (a row) bubbles through the select;
@@ -176,7 +179,9 @@ fn open_select(
 			row.insert(ElementStateMap::with(ElementState::Selected));
 		}
 	}
-	commands.entity(select).insert(SelectOpen { dropdown: panel });
+	commands
+		.entity(select)
+		.insert(SelectOpen { dropdown: panel });
 }
 
 /// Despawn the panel; `refocus` returns keyboard focus to the select (chosen
@@ -230,7 +235,8 @@ fn inside_dropdown(
 	dropdowns: &Query<(), With<SelectDropdown>>,
 	parents: &Query<&ChildOf>,
 ) -> bool {
-	ancestors_inclusive(entity, parents).any(|entity| dropdowns.contains(entity))
+	ancestors_inclusive(entity, parents)
+		.any(|entity| dropdowns.contains(entity))
 }
 
 /// `entity` then its ancestors, root-ward.
@@ -356,7 +362,11 @@ mod test {
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::str("designer"));
-		host.app.world().entity(select).contains::<Focus>().xpect_true();
+		host.app
+			.world()
+			.entity(select)
+			.contains::<Focus>()
+			.xpect_true();
 		host.step();
 		host.frame_plain().xpect_contains("Designer ▾");
 	}

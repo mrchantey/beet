@@ -12,7 +12,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-
 /// A plugin containing systems required for animation actions:
 /// - [`PlayAnimation`]
 /// - [`TriggerOnAnimationEnd`]

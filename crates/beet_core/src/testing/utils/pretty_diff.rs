@@ -69,7 +69,6 @@ pub fn inline_diff(expected: &str, received: &str) -> String {
 	output
 }
 
-
 /// Format a single line to show an inline diff of the two strings given.
 ///
 /// The given strings should not have a trailing newline.
@@ -123,7 +122,6 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	}
 	writer.finish()
 }
-
 
 /// Copied from https://crates.io/crates/diff on 2026/01/06
 mod diff {

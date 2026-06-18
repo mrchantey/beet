@@ -11,7 +11,6 @@ use russh::server::Session;
 use std::sync::Arc;
 use std::time::Duration;
 
-
 /// Info passed from the russh tokio task to the beet accept loop per connection.
 pub(crate) struct NewConnectionInfo {
 	pub to_client: async_channel::Sender<SshEvent>,

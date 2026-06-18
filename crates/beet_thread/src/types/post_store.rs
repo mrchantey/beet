@@ -13,7 +13,6 @@ impl PostStore {
 	pub fn inner(&self) -> Arc<dyn PostStoreProvider> { self.0.clone() }
 }
 
-
 impl Default for PostStore {
 	fn default() -> Self { Self::new(MemoryPostStore::default()) }
 }
@@ -114,7 +113,6 @@ pub struct MemoryPostStore {
 	map: Arc<RwLock<ContextMap>>,
 }
 
-
 /// An in-memory unindexed table store for short-lived queries.
 /// Correctness is prioritized over efficiency, ie no indexes are
 /// maintained, and posts are sorted per each 'get'.
@@ -125,7 +123,6 @@ struct ContextMap {
 	threads: TableMap<Thread>,
 	response_metas: TableMap<ResponseMeta>,
 }
-
 
 impl ContextMap {
 	pub fn actors(&self) -> &TableMap<Actor> { &self.actors }
@@ -166,7 +163,6 @@ impl ContextMap {
 		}
 	}
 }
-
 
 impl PostStoreProvider for MemoryPostStore {
 	fn stored_response_meta<'a>(

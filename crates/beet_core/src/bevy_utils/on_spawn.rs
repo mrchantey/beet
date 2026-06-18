@@ -31,7 +31,6 @@ where
 	T::spawn(SpawnWith(func))
 }
 
-
 /// A type-erased [`BundleEffect`] that runs a function when the entity is spawned.
 ///
 /// This is the most flexible spawn effect, accepting any boxed closure.
@@ -171,7 +170,6 @@ impl OnSpawn {
 		})
 	}
 
-
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function.
@@ -211,7 +209,6 @@ impl OnSpawn {
 		}))
 	}
 }
-
 
 /// A [`BundleEffect`] that runs a typed function when the entity is spawned.
 ///
@@ -310,7 +307,6 @@ impl OnSpawnDeferred {
 		}
 	}
 
-
 	/// Calls the deferred function.
 	pub fn call(self, entity: &mut EntityWorldMut) -> Result {
 		(self.0)(entity)
@@ -362,7 +358,6 @@ impl OnSpawnClone {
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }
 
-
 impl Clone for OnSpawnClone {
 	fn clone(&self) -> Self { Self(self.0.box_clone()) }
 }
@@ -382,7 +377,6 @@ where
 {
 	fn box_clone(&self) -> Box<dyn CloneEntityFunc> { Box::new(self.clone()) }
 }
-
 
 #[cfg(test)]
 #[cfg(feature = "std")]

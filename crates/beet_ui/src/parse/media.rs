@@ -27,12 +27,9 @@ pub struct MediaParser {
 	markdown_parser: MarkdownParser,
 }
 
-
 impl Default for MediaParser {
 	fn default() -> Self { Self::new() }
 }
-
-
 
 impl MediaParser {
 	/// Create a parser with the plain-text fallback enabled.
@@ -66,7 +63,6 @@ impl MediaParser {
 		self
 	}
 }
-
 
 impl NodeParser for MediaParser {
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
@@ -104,7 +100,6 @@ impl NodeParser for MediaParser {
 		}
 	}
 }
-
 
 #[cfg(test)]
 mod test {

@@ -207,7 +207,6 @@ pub(crate) fn now_timestamp() -> String {
 	format!("{}s", time_ext::now().as_secs())
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;

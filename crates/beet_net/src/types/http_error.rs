@@ -16,7 +16,6 @@ use bevy::ecs::system::RunSystemError;
 /// Result type alias using [`HttpError`].
 pub type HttpResult<T> = Result<T, HttpError>;
 
-
 /// A non-200 response from an HTTP request.
 ///
 /// The message *will be* returned to the client, so ensure that no sensitive
@@ -30,7 +29,6 @@ pub struct HttpError {
 	/// The error message.
 	pub message: String,
 }
-
 
 impl HttpError {
 	/// Creates an [`HttpError`] with the given status code and an empty message.

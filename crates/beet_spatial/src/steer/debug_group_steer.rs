@@ -5,7 +5,6 @@ use bevy::color::palettes::tailwind;
 use bevy::input::common_conditions::input_toggle_active;
 use core::marker::PhantomData;
 
-
 /// Provides debug visualization for the `Separate`, `Align`, and `Cohere` actions.
 pub struct DebugGroupSteerPlugin<M> {
 	toggle_key: KeyCode,

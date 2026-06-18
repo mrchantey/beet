@@ -15,7 +15,6 @@ pub struct IkSegment {
 	pub max_angle: f32,
 }
 
-
 impl Default for IkSegment {
 	fn default() -> Self {
 		Self {

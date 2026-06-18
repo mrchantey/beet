@@ -2,7 +2,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
 /// Store and load serialized world data as needed
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -47,7 +46,6 @@ impl TemplateStore {
 		}
 		Self::load(entity).await
 	}
-
 
 	/// Loads the associated [`Blob`], adding to this entities [`TemplateNodes`].
 	/// ## Errors
@@ -131,7 +129,6 @@ impl TemplateStore {
 		Ok(())
 	}
 }
-
 
 pub fn load_template_on_insert(
 	async_commands: AsyncCommands,

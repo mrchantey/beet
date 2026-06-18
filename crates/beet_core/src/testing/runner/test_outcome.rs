@@ -38,7 +38,6 @@ impl TestOutcome {
 	}
 }
 
-
 /// Reasons why a test was skipped.
 ///
 /// Applied to test entities either upon spawn or after applying a filter.
@@ -138,7 +137,6 @@ impl TestFail {
 		matches!(self, TestFail::ExpectedPanic { .. })
 	}
 }
-
 
 impl Into<TestOutcome> for TestFail {
 	fn into(self) -> TestOutcome { TestOutcome::Fail(self) }

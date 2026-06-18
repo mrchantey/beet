@@ -42,17 +42,13 @@ pub struct PageSlot;
 /// `<main>`): a page taller or wider than the viewport gets a scrollbar, a short
 /// one does not. [`bind_surface_page`] points the inner slot at the bound page.
 pub fn page_host(size: UVec2) -> impl Bundle {
-	(
-		PageHost,
-		DoubleBuffer::new(size),
-		children![(
-			Element::new("div"),
-			page_viewport_style(),
-			// the slot carries no `Portal` until a page is bound: absence is the
-			// unresolved state, so `bind_surface_page` installs the reference.
-			children![PageSlot],
-		)],
-	)
+	(PageHost, DoubleBuffer::new(size), children![(
+		Element::new("div"),
+		page_viewport_style(),
+		// the slot carries no `Portal` until a page is bound: absence is the
+		// unresolved state, so `bind_surface_page` installs the reference.
+		children![PageSlot],
+	)])
 }
 
 /// The viewport-filling `overflow: auto` scroll container style for the page slot.
@@ -60,8 +56,14 @@ fn page_viewport_style() -> impl Bundle {
 	inline_class![
 		(style::common_props::OverflowXProp, style::Overflow::Auto),
 		(style::common_props::OverflowYProp, style::Overflow::Auto),
-		(style::common_props::Width, style::Length::ViewportWidth(100.)),
-		(style::common_props::Height, style::Length::ViewportHeight(100.)),
+		(
+			style::common_props::Width,
+			style::Length::ViewportWidth(100.)
+		),
+		(
+			style::common_props::Height,
+			style::Length::ViewportHeight(100.)
+		),
 	]
 }
 
@@ -142,7 +144,9 @@ pub fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
 	MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
 	let page = entity.id();
 	// the parsed tree is this page's own; clean it up when the page is replaced.
-	world.entity_mut(page).insert(DespawnAfterRender(vec![page]));
+	world
+		.entity_mut(page)
+		.insert(DespawnAfterRender(vec![page]));
 	Ok(page)
 }
 
@@ -309,9 +313,7 @@ mod test {
 		let url = Url::parse(path);
 		app.world_mut()
 			.entity_mut(nav)
-			.run_async_local(move |entity| {
-				Navigator::navigate_to(entity, url)
-			});
+			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
 	}
 
 	/// Drive the app until the host frame contains `needle`, returning the frame.
@@ -413,18 +415,26 @@ mod test {
 		let router = linked_router(&mut app);
 		let first = app
 			.world_mut()
-			.spawn((page_host(UVec2::new(40, 8)), Navigator::in_world(router, "alpha")))
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "alpha"),
+			))
 			.id();
 		let second = app
 			.world_mut()
-			.spawn((page_host(UVec2::new(40, 8)), Navigator::in_world(router, "alpha")))
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "alpha"),
+			))
 			.id();
 		drive_until(&mut app, first, "to beta");
 		drive_until(&mut app, second, "to beta");
 
 		// click the first host's link (as the hit-test would on a real click).
 		let link = link_in(&mut app, first);
-		app.world_mut().entity_mut(link).trigger(PointerUp::new(link));
+		app.world_mut()
+			.entity_mut(link)
+			.trigger(PointerUp::new(link));
 		drive_until(&mut app, first, "Beta page");
 
 		// the second host never navigated: still on alpha, never beta.

@@ -219,7 +219,8 @@ impl Buffer {
 	/// the previous contents are invalidated and a full repaint follows.
 	pub fn resize(&mut self, size: UVec2) {
 		self.size = size;
-		self.cells = alloc::vec::from_elem(Cell::BLANK, (size.x * size.y) as usize);
+		self.cells =
+			alloc::vec::from_elem(Cell::BLANK, (size.x * size.y) as usize);
 	}
 
 	pub fn into_double_buffer(self) -> DoubleBuffer {
@@ -484,7 +485,6 @@ impl Cell {
 		}
 	}
 }
-
 
 #[cfg(test)]
 mod tests {

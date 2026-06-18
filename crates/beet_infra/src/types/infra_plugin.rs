@@ -1,9 +1,5 @@
 use beet_core::prelude::*;
 
-
-
-
-
 #[derive(Default)]
 pub struct InfraPlugin;
 

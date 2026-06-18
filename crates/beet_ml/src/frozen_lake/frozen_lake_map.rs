@@ -41,7 +41,6 @@ impl FrozenLakeCell {
 	}
 }
 
-
 /// Define an intial state for a [`FrozenLakeEnv`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 pub struct FrozenLakeMap {
@@ -186,7 +185,6 @@ impl FrozenLakeMap {
 		}
 	}
 }
-
 
 impl FrozenLakeMap {
 	#[rustfmt::skip]

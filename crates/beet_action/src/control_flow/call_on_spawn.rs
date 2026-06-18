@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
 /// Call the entity on spawn with the provided input,
 /// discarding the outcome.
 /// This component causes a tool call on the entity every

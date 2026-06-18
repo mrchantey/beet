@@ -180,7 +180,8 @@ impl Builder {
 	}
 
 	fn map_schema(&mut self, info: &MapInfo) -> MapSchema {
-		let value = self.resolve_field(info.value_info(), info.value_ty().path());
+		let value =
+			self.resolve_field(info.value_info(), info.value_ty().path());
 		MapSchema {
 			value: Box::new(value),
 		}
@@ -198,53 +199,52 @@ impl Builder {
 			));
 		}
 
-		let variants = info
-			.iter()
-			.map(|variant| match variant {
-				VariantInfo::Unit(v) => VariantSchema {
-					name: SmolStr::from(v.name()),
-					payload: None,
-				},
-				VariantInfo::Tuple(v) => {
-					if v.field_len() == 1 {
-						let field = v.field_at(0).expect("len == 1");
-						VariantSchema {
-							name: SmolStr::from(v.name()),
-							payload: Some(self.resolve_field(
-								field.type_info(),
-								field.type_path(),
-							)),
+		let variants =
+			info.iter()
+				.map(|variant| match variant {
+					VariantInfo::Unit(v) => VariantSchema {
+						name: SmolStr::from(v.name()),
+						payload: None,
+					},
+					VariantInfo::Tuple(v) => {
+						if v.field_len() == 1 {
+							let field = v.field_at(0).expect("len == 1");
+							VariantSchema {
+								name: SmolStr::from(v.name()),
+								payload: Some(self.resolve_field(
+									field.type_info(),
+									field.type_path(),
+								)),
+							}
+						} else {
+							let fields = v
+								.iter()
+								.map(|field| self.unnamed_field_schema(field))
+								.collect();
+							VariantSchema {
+								name: SmolStr::from(v.name()),
+								payload: Some(ValueSchema::Tuple(
+									TupleSchema { name: None, fields },
+								)),
+							}
 						}
-					} else {
+					}
+					VariantInfo::Struct(v) => {
 						let fields = v
 							.iter()
-							.map(|field| self.unnamed_field_schema(field))
+							.map(|field| self.named_field_schema(field))
 							.collect();
 						VariantSchema {
 							name: SmolStr::from(v.name()),
-							payload: Some(ValueSchema::Tuple(TupleSchema {
+							payload: Some(ValueSchema::Struct(StructSchema {
 								name: None,
+								allow_additional: false,
 								fields,
 							})),
 						}
 					}
-				}
-				VariantInfo::Struct(v) => {
-					let fields = v
-						.iter()
-						.map(|field| self.named_field_schema(field))
-						.collect();
-					VariantSchema {
-						name: SmolStr::from(v.name()),
-						payload: Some(ValueSchema::Struct(StructSchema {
-							name: None,
-							allow_additional: false,
-							fields,
-						})),
-					}
-				}
-			})
-			.collect();
+				})
+				.collect();
 		ValueSchema::Enum(EnumSchema {
 			name: Some(SmolStr::from(info.type_path_table().short_path())),
 			variants,

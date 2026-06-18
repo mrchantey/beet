@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 
 css_property!(ColorRoleProps, ColorRole, "background-color", "color");
 
-
 #[derive(Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ColorRole {

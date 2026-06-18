@@ -144,7 +144,6 @@ where
 	pure_route(path, move |_cx: ActionContext<Request>| handler())
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::asset::AssetMetaCheck;
 
-
 /// A minimal app with flow and spatial
 pub fn minimal_beet_example_plugin(app: &mut App) {
 	app.add_plugins((

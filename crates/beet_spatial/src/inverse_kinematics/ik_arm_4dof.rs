@@ -70,7 +70,6 @@ impl IkArm4Dof {
 		(angles.0, angles.1, angles.2, theta4)
 	}
 
-
 	/// Solve the inverse kinematics problem for a 3DOF arm with a base and two segments.
 	/// Returns angles for the base, segment1 and segment2 in radians
 	pub fn solve3d(&self, delta_pos: Vec3) -> (f32, f32, f32) {
@@ -104,7 +103,6 @@ impl IkArm4Dof {
 			target.y = -target.y;
 		};
 
-
 		// Calculate angle for segment 2 using the Law of Cosines
 		let cos_angle2 = (target.x.squared() + target.y.squared()
 			- l1.squared()
@@ -129,9 +127,6 @@ impl IkArm4Dof {
 		}
 	}
 }
-
-
-
 
 #[cfg(test)]
 mod test {

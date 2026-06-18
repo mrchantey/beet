@@ -97,7 +97,6 @@ fn validate_edits(text: &str, edits: &[TextEdit]) -> Result<()> {
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

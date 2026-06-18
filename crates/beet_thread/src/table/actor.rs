@@ -49,7 +49,6 @@ impl Actor {
 	pub fn metadata_mut(&mut self) -> &mut Map { &mut self.metadata }
 }
 
-
 /// The kind of actor this entity is.
 /// Distinct from [`OpenResponses::MessageRole`] in that
 /// [`ActorKind`] is absolute, whereas the difference between
@@ -92,7 +91,6 @@ impl std::fmt::Display for ActorKind {
 		}
 	}
 }
-
 
 impl ActorKind {
 	pub fn input_str(&self) -> &'static str {

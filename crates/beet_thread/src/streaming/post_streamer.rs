@@ -6,7 +6,6 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize)]
 pub struct ModelDef {
@@ -15,7 +14,6 @@ pub struct ModelDef {
 	pub url: SmolStr,
 	pub auth: Option<EnvVar>,
 }
-
 
 pub trait PostStreamer {
 	fn provider_slug(&self) -> &str;
@@ -27,10 +25,8 @@ pub trait PostStreamer {
 	) -> BoxedFuture<'_, Result<PostStream>>;
 }
 
-
 pub type ResPartialStream =
 	Pin<Box<dyn Stream<Item = Result<ResponsePartial>> + Send + Sync>>;
-
 
 /// Processes typed streaming events into [`PostChanges`] values.
 pub struct PostStream {
@@ -124,7 +120,6 @@ impl PostChanges {
 		self.created.iter().chain(self.modified.iter())
 	}
 }
-
 
 impl Stream for PostStream {
 	type Item = Result<PostChanges>;

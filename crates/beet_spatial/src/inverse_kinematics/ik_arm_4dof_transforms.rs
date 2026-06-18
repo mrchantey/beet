@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::reflect::ReflectMapEntities;
 
-
 /// A wrapper around the [`IkArm4Dof`] that will use the [`GlobalTransform`] pose of
 /// the entities to solve the IK.
 #[derive(Debug, Clone, Component, Reflect)]
@@ -71,7 +70,6 @@ impl IkArm4DofTransforms {
 		let delta_pos =
 			delta_pos_including_segment3 - target_pos_with_segment_3;
 
-
 		// TODO delta pos without segment3
 		let angles = self.ik.solve4d(delta_pos);
 
@@ -86,7 +84,6 @@ impl IkArm4DofTransforms {
 		}
 	}
 }
-
 
 impl MapEntities for IkArm4DofTransforms {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {

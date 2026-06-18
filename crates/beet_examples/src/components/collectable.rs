@@ -5,7 +5,6 @@ use std::f32::consts::TAU;
 #[reflect(Default, Component)]
 pub struct Collectable;
 
-
 const TURNS_PER_SECOND: f32 = 0.5;
 
 pub fn rotate_collectables(

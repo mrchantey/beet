@@ -37,7 +37,6 @@ pub enum TokenInheritance {
 	NotInherited,
 }
 
-
 impl Token {
 	pub fn new(key: TokenKey, schema: FieldSchema) -> Self {
 		Self {
@@ -55,7 +54,6 @@ impl Token {
 		Self::new(TokenKey::new_inline(), schema)
 	}
 }
-
 
 impl core::fmt::Display for Token {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -79,7 +77,6 @@ pub trait CanonicalToken: Sized {
 	/// The property token this value canonically sets.
 	type Token: Default + TypedToken<Value = Self> + Into<Token>;
 }
-
 
 #[macro_export]
 macro_rules! token {
@@ -117,8 +114,6 @@ macro_rules! token {
 		}
 	};
 }
-
-
 
 #[cfg(test)]
 mod tests {

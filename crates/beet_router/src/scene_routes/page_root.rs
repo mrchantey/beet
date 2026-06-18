@@ -148,9 +148,7 @@ impl ExchangeRouteOut<Self> for PageRequest {
 		caller: AsyncEntity,
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
-		Box::pin(
-			async move { PageRoot::render(self.0, &caller, parts).await },
-		)
+		Box::pin(async move { PageRoot::render(self.0, &caller, parts).await })
 	}
 }
 
@@ -163,7 +161,6 @@ pub struct BlobScene {
 impl BlobScene {
 	pub fn new(path: impl Into<SmolPath>) -> Self { Self { path: path.into() } }
 }
-
 
 #[action(route)]
 #[derive(Default, Component)]

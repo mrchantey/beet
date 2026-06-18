@@ -107,9 +107,7 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 				malenia_health.0 -= recoil;
 				malenia_health.0
 			};
-			info!(
-				"Malenia takes {recoil} recoil, health now {malenia_hp}"
-			);
+			info!("Malenia takes {recoil} recoil, health now {malenia_hp}");
 
 			if player_hp <= 0.0 {
 				info!("You lose - Malenia, Blade of Miquella, stands");

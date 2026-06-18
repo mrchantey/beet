@@ -34,7 +34,10 @@ pub struct EvalOnLoad;
 /// Registers the `LoadTemplate` observer on the marked entity, mirroring
 /// `CliServer::on_add`.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_load_template);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_load_template);
 }
 
 /// On `LoadTemplate`, collect the marked element's script text and run it,
@@ -81,8 +84,11 @@ fn eval_script(script: &str, input: &serde_json::Value) -> Result {
 
 /// The process argv as the script's `input`: a `{ path, params }` object.
 fn request_input(args: &CliArgs) -> serde_json::Value {
-	let path: Vec<String> =
-		args.path.iter().map(|segment| segment.to_string()).collect();
+	let path: Vec<String> = args
+		.path
+		.iter()
+		.map(|segment| segment.to_string())
+		.collect();
 	let params: serde_json::Map<String, serde_json::Value> = args
 		.params
 		.iter_all()
@@ -113,9 +119,10 @@ mod test {
 		let root = world.spawn(EvalOnLoad).id();
 		world.spawn((Value::Str("console.log(\"hi\")".into()), ChildOf(root)));
 		world.flush();
-		world
-			.entity_mut(root)
-			.trigger(|entity| LoadTemplate { entity, is_error: false });
+		world.entity_mut(root).trigger(|entity| LoadTemplate {
+			entity,
+			is_error: false,
+		});
 		world.flush();
 		world.entity(root).contains::<EvalOnLoad>().xpect_true();
 	}

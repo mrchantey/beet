@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
 /// A handy abstraction over two motor values,
 /// one for the left motor and one for the right motor.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Component, Reflect)]

@@ -136,7 +136,8 @@ impl SyntaxHighlighting {
 		let query_source = query.into();
 		// compile up-front so a bad grammar fails registration, not highlight, and
 		// the cached query is reused by every `highlight` call.
-		let query = TsQuery::new(&language, &query_source).expect("query compiles");
+		let query =
+			TsQuery::new(&language, &query_source).expect("query compiles");
 		let aliases = aliases.iter().map(|s| SmolStr::from(*s)).collect();
 		self.languages.insert(name, LanguageEntry {
 			language,
@@ -305,7 +306,6 @@ fn spawn_highlight_span(
 	}
 	commands.spawn((Value::Str(span.text), ChildOf(element)));
 }
-
 
 #[cfg(test)]
 mod test {

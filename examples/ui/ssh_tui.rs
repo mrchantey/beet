@@ -42,7 +42,6 @@ fn main() -> Result {
 #[derive(Component, Default)]
 struct Counter(i32);
 
-
 /// Renders a colour-cycling counter panel.
 fn render_frame(mut query: Populated<(&mut Terminal, &Counter)>) -> Result {
 	for (mut terminal, counter) in query.iter_mut() {
@@ -77,7 +76,6 @@ fn render(count: i32, mut writer: impl std::io::Write) -> Result {
 	writer.write_all(escape::RESET_FG.as_bytes())?;
 	Ok(())
 }
-
 
 fn on_input(
 	ev: On<TerminalEvent>,

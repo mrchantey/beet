@@ -172,7 +172,11 @@ impl Default for SshServer {
 		let host = env_ext::var("BEET_HOST")
 			.ok()
 			.map(|val| {
-				if val == "0.0.0.0" { [0, 0, 0, 0] } else { [127, 0, 0, 1] }
+				if val == "0.0.0.0" {
+					[0, 0, 0, 0]
+				} else {
+					[127, 0, 0, 1]
+				}
 			})
 			.unwrap_or([127, 0, 0, 1]);
 		Self {

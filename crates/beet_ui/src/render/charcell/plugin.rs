@@ -53,8 +53,7 @@ impl Plugin for CharcellTuiPlugin {
 			// this frame so `ButtonInput` reflects them immediately.
 			.add_systems(
 				PreUpdate,
-				terminal_input_bridge
-					.before(bevy::input::InputSystems),
+				terminal_input_bridge.before(bevy::input::InputSystems),
 			)
 			// SIGWINCH-equivalent: poll the real tty size and resize stdio buffers.
 			.add_systems(PreUpdate, resize_stdio_buffers)
@@ -111,7 +110,6 @@ impl Plugin for CharcellPlugin {
 				)
 					.in_set(DecorateSet),
 			);
-
 
 		// Terminal output: render the diffed buffer, overlay kitty rasters,
 		// flush, restore on exit. Input is bridged to bevy by

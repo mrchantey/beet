@@ -89,9 +89,7 @@ impl std::fmt::Display for ServiceAccess {
 
 impl PackageConfig {
 	/// Returns the binary name if set.
-	pub fn binary_name(&self) -> Option<&str> {
-		self.binary_name.as_deref()
-	}
+	pub fn binary_name(&self) -> Option<&str> { self.binary_name.as_deref() }
 
 	/// Returns the version string.
 	pub fn version(&self) -> &str { &self.version }
@@ -125,7 +123,6 @@ impl PackageConfig {
 		self.resource_name("analytics")
 	}
 
-
 	/// Returns a vec of environment variables to be propagated
 	/// from the parent process in compilation commands.
 	#[rustfmt::skip]
@@ -138,7 +135,6 @@ impl PackageConfig {
 			("BEET_SERVICE_ACCESS".to_string(),self.service_access.to_string()),
 		]
 	}
-
 
 	/// Prefixes the binary name and suffixes the stage to the provided name.
 	///
@@ -208,8 +204,6 @@ macro_rules! pkg_config {
 		}
 	};
 }
-
-
 
 /// Config for the scene containing all information that can be statically extracted
 /// from files, including html, parsed styles etc.
@@ -319,15 +313,11 @@ impl WorkspaceConfig {
 	pub fn get_files(&self) -> Result<Vec<AbsPathBuf>, FsError> {
 		ReadDir::files_recursive(&self.root_dir.into_abs())?
 			.into_iter()
-			.filter(|path| {
-				self.snippet_filter.passes(path.to_string_lossy())
-			})
+			.filter(|path| self.snippet_filter.passes(path.to_string_lossy()))
 			.map(|path| AbsPathBuf::new(path))
 			.collect()
 	}
 }
-
-
 
 #[cfg(test)]
 mod test {
@@ -344,7 +334,10 @@ mod test {
 	fn default_shape() {
 		let config = PackageConfig::default();
 		config.title.as_str().xpect_eq("My Beet App");
-		config.description.as_str().xpect_eq("An app built with beet");
+		config
+			.description
+			.as_str()
+			.xpect_eq("An app built with beet");
 		config.binary_name.xpect_none();
 		config.version.as_str().xpect_eq("0.0.1");
 		config.homepage.xpect_none();
@@ -379,7 +372,10 @@ mod test {
 		// the set field overrides the default
 		config.title.as_str().xpect_eq("Patched");
 		// unset fields keep their defaults
-		config.description.as_str().xpect_eq("An app built with beet");
+		config
+			.description
+			.as_str()
+			.xpect_eq("An app built with beet");
 		config.stage.as_str().xpect_eq("dev");
 		config.binary_name.xpect_none();
 		// version keeps the default since the markup did not set it

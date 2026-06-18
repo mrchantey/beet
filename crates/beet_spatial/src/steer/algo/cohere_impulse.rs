@@ -42,7 +42,6 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 
-
 		let entity = world.spawn(Transform::from_translation(Vec3::ZERO)).id();
 		world.spawn(Transform::from_translation(Vec3::new(0.1, 0., 0.)));
 		world.spawn(Transform::from_translation(Vec3::new(0., 0.1, 0.)));

@@ -70,7 +70,6 @@ pub enum GridDirection {
 	Left,
 }
 
-
 impl Into<IVec2> for GridDirection {
 	fn into(self) -> IVec2 {
 		match self {
@@ -116,7 +115,6 @@ impl GridDirection {
 	}
 }
 
-
 impl ActionSpace for GridDirection {
 	fn sample(rng: &mut impl Rng) -> Self {
 		match rng.random_range(0..4) {
@@ -128,7 +126,6 @@ impl ActionSpace for GridDirection {
 		}
 	}
 }
-
 
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -151,7 +148,6 @@ impl GridToWorld {
 			0.,
 			-h_map_width + h_cell_width,
 		);
-
 
 		// let mut offset = Vec3::new(
 		// 	grid.num_cols() as f32,

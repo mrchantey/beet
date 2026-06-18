@@ -36,7 +36,6 @@ pub struct LambdaBlock {
 	region: Option<SmolStr>,
 }
 
-
 impl Default for LambdaBlock {
 	fn default() -> Self {
 		Self {

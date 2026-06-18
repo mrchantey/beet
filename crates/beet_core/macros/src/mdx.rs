@@ -28,7 +28,6 @@ use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
 
-
 /// Entry point for the `mdx` proc macro.
 ///
 /// Content tokens are parsed directly — no crate path prefix needed.
@@ -46,7 +45,6 @@ pub fn impl_mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let output = generate_output(segments);
 	output.into()
 }
-
 
 /// A segment of parsed MDX content.
 enum Segment {

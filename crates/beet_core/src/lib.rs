@@ -46,9 +46,9 @@ pub use utils::cross_log::_cross_log_noline;
 #[cfg(feature = "std")]
 pub mod arena;
 mod bevy_extensions;
+pub mod bevy_utils;
 #[cfg(feature = "bsx")]
 pub mod bsx;
-pub mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
@@ -59,6 +59,8 @@ pub mod template;
 // `term_style` (colours) is no_std and feeds the test logger, so the embedded
 // test runner needs `terminal` too; the io/tty control parts stay std-gated
 // inside the module.
+#[cfg(feature = "template_serde")]
+pub mod template_serde;
 #[cfg(any(feature = "std", feature = "testing_embedded"))]
 pub mod terminal;
 #[cfg(any(feature = "testing", feature = "testing_embedded"))]
@@ -67,8 +69,6 @@ pub mod testing;
 pub mod tokens_utils;
 pub mod types;
 pub mod utils;
-#[cfg(feature = "template_serde")]
-pub mod template_serde;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
@@ -139,10 +139,10 @@ pub mod prelude {
 	pub use crate::arena::*;
 	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
-	#[cfg(feature = "bsx")]
-	pub use crate::bsx::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
+	#[cfg(feature = "bsx")]
+	pub use crate::bsx::*;
 	pub use crate::cfg_if;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -150,18 +150,18 @@ pub mod prelude {
 	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
-	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
-	pub use crate::testing::*;
 	pub use crate::subtree_template;
 	pub use crate::template::*;
-	#[cfg(feature = "tokens")]
-	pub use crate::tokens_utils::*;
-	pub use crate::types::*;
-	pub use crate::utils::*;
 	#[cfg(feature = "template_serde")]
 	pub use crate::template_serde::*;
 	#[cfg(any(feature = "std", feature = "testing_embedded"))]
 	pub use crate::terminal::*;
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
+	pub use crate::testing::*;
+	#[cfg(feature = "tokens")]
+	pub use crate::tokens_utils::*;
+	pub use crate::types::*;
+	pub use crate::utils::*;
 	pub use either::Either;
 	#[cfg(feature = "serde")]
 	pub use serde::Deserialize;

@@ -16,7 +16,6 @@ use web_sys::File;
 use web_sys::HtmlInputElement;
 use web_sys::Url;
 
-
 /// Downloads binary data as a file with the given filename.
 ///
 /// Creates a Blob with MIME type `application/octet-stream` and triggers

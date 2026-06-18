@@ -53,7 +53,10 @@ fn collect_rows(
 		// a row: its cells are laid out by the grid; the row node is managed so the
 		// main loop doesn't re-flow it.
 		managed.insert(entity);
-		rows.push(TableRow { node: entity, cells });
+		rows.push(TableRow {
+			node: entity,
+			cells,
+		});
 	}
 }
 
@@ -83,8 +86,8 @@ fn column_widths(
 	let total: u32 = widths.iter().sum();
 	if total > available && available > 0 {
 		for width in &mut widths {
-			*width =
-				((*width as u64 * available as u64) / total as u64).max(1) as u32;
+			*width = ((*width as u64 * available as u64) / total as u64).max(1)
+				as u32;
 		}
 	}
 	widths
@@ -103,7 +106,9 @@ fn row_height(
 		.map(|(col, &cell)| {
 			let width = widths.get(col).copied().unwrap_or(0);
 			match query.unresolved_node(cell) {
-				Ok(node) => resolve_height(&node, query, width, viewport).max(1),
+				Ok(node) => {
+					resolve_height(&node, query, width, viewport).max(1)
+				}
 				Err(_) => 1,
 			}
 		})
@@ -139,7 +144,9 @@ pub(super) fn resolve_table_height(
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, &mut HashSet::default());
 	let widths = column_widths(&rows, query, content_width);
-	rows.iter().map(|row| row_height(row, query, &widths, viewport)).sum()
+	rows.iter()
+		.map(|row| row_height(row, query, &widths, viewport))
+		.sum()
 }
 
 /// Assign rects across a table's grid: stack rows top-to-bottom and place each
@@ -154,7 +161,8 @@ pub(super) fn table_layout_rects(
 	managed: &mut HashSet<Entity>,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
-	let content = scrollport_of(node, query, box_model.content_rect(container_rect));
+	let content =
+		scrollport_of(node, query, box_model.content_rect(container_rect));
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, managed);
 	let widths = column_widths(&rows, query, content.width().max(0) as u32);
@@ -219,14 +227,8 @@ mod test {
 			},
 			children![
 				// a `<tr>` is a plain block whose cells mark it as a row
-				(LayoutStyle::default(), children![
-					cell("Name"),
-					cell("Age")
-				]),
-				(LayoutStyle::default(), children![
-					cell("Alice"),
-					cell("30")
-				]),
+				(LayoutStyle::default(), children![cell("Name"), cell("Age")]),
+				(LayoutStyle::default(), children![cell("Alice"), cell("30")]),
 			],
 		);
 		let out = Buffer::render_oneshot_plain_sized(UVec2::new(20, 6), table)
@@ -248,29 +250,26 @@ mod test {
 	#[beet_core::test]
 	fn full_width_table_fills_container() {
 		let bg = Color::srgb(0.2, 0.4, 0.8);
-		let table = (
-			LayoutStyle::default(),
+		let table = (LayoutStyle::default(), children![(
+			LayoutStyle {
+				display: Display::Table,
+				..default()
+			},
+			BoxStyle {
+				width: Some(Length::Percent(100.)),
+				..default()
+			},
+			// a row carries the background so its rect (spanning the table's
+			// content width) is what we measure
 			children![(
-				LayoutStyle {
-					display: Display::Table,
+				LayoutStyle::default(),
+				VisualStyle {
+					background: Some(bg),
 					..default()
 				},
-				BoxStyle {
-					width: Some(Length::Percent(100.)),
-					..default()
-				},
-				// a row carries the background so its rect (spanning the table's
-				// content width) is what we measure
-				children![(
-					LayoutStyle::default(),
-					VisualStyle {
-						background: Some(bg),
-						..default()
-					},
-					children![cell("A"), cell("B")],
-				)],
+				children![cell("A"), cell("B")],
 			)],
-		);
+		)]);
 		let buffer = Buffer::new(UVec2::new(20, 4)).populate(table);
 		// the row background spans all 20 columns of the container's content width
 		buffer

@@ -291,7 +291,6 @@ fn strip_quotes(val: &str) -> &str {
 	val
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -441,7 +440,10 @@ mod test {
 	#[beet_core::test]
 	fn extract_none() {
 		// no fence at all
-		Frontmatter::extract("# Body").unwrap().is_none().xpect_true();
+		Frontmatter::extract("# Body")
+			.unwrap()
+			.is_none()
+			.xpect_true();
 		// a thematic break is not a fence
 		Frontmatter::extract("--- not a fence")
 			.unwrap()

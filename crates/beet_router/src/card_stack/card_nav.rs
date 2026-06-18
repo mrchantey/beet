@@ -138,11 +138,10 @@ pub(crate) fn card_nav(
 
 	// navigate to the resolved card's absolute path (clamped at the stack's ends).
 	let url = Url::parse(format!("/{}", target.join("/")));
-	commands
-		.entity(entity)
-		.queue_async(async move |entity| Navigator::navigate_to(entity, url).await);
+	commands.entity(entity).queue_async(async move |entity| {
+		Navigator::navigate_to(entity, url).await
+	});
 }
-
 
 #[cfg(test)]
 mod test {
@@ -162,9 +161,15 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_func_route("alpha", || rsx! { <p>"a"</p> }),
+				render_action::fixed_func_route(
+					"alpha",
+					|| rsx! { <p>"a"</p> }
+				),
 				render_action::fixed_func_route("beta", || rsx! { <p>"b"</p> }),
-				render_action::fixed_func_route("gamma", || rsx! { <p>"c"</p> }),
+				render_action::fixed_func_route(
+					"gamma",
+					|| rsx! { <p>"c"</p> }
+				),
 			]))
 			.flush();
 		world.entity(root).get::<RouteTree>().unwrap().clone()
@@ -172,7 +177,9 @@ mod test {
 
 	/// The single path segment a [`CardNav`] step lands on from `current`.
 	fn card_to(tree: &RouteTree, current: &str, nav: CardNav) -> String {
-		resolve_card(tree, &[current.into()], nav).unwrap().join("/")
+		resolve_card(tree, &[current.into()], nav)
+			.unwrap()
+			.join("/")
 	}
 
 	/// Next/prev clamp at the ends rather than wrapping (a stack does not loop).

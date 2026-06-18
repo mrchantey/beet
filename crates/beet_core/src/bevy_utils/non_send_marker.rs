@@ -1,10 +1,8 @@
 use crate::prelude::*;
 
-
 /// A dummy type that is [`!Send`](Send), to force systems to run on the main thread.
 // TODO use bevy's marker in 0.16.2
 pub type TempNonSendMarker<'w> = Option<NonSend<'w, ()>>;
-
 
 // /// A component with the inner wrapped in a [`SendWrapper`].
 // /// ## Panics

@@ -60,7 +60,6 @@ impl Plugin for RealtimeParsePlugin {
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct PostParseTree;
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

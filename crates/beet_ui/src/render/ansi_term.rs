@@ -92,7 +92,6 @@ impl NodeRenderer for AnsiTermRenderer {
 	}
 }
 
-
 #[cfg(test)]
 #[cfg(feature = "markdown_parser")]
 mod test {

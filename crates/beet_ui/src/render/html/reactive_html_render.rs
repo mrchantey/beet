@@ -194,8 +194,9 @@ impl ReactiveHtmlRender {
 			if let Some(id) = self.assign_doc_id(world, entity, doc_ids, blob) {
 				return Some(id);
 			}
-			current =
-				world.get::<ChildOf>(entity).map(|child_of| child_of.parent());
+			current = world
+				.get::<ChildOf>(entity)
+				.map(|child_of| child_of.parent());
 		}
 		None
 	}
@@ -213,12 +214,16 @@ impl ReactiveHtmlRender {
 			)>,
 			Query<(), With<PropsDocument>>,
 		)>::new(world);
-		let (query, props) = state.get(world).expect("infallible binding query");
-		for (entity, resolved, element, attribute_of, field_of) in query.iter() {
+		let (query, props) =
+			state.get(world).expect("infallible binding query");
+		for (entity, resolved, element, attribute_of, field_of) in query.iter()
+		{
 			// a binding into a props store is server-only: a props store holds a
 			// template's materialized props and is never shipped, so the client
 			// cannot read it (the SSR value is final). Skip it, like `@res`/`@comp`.
-			if field_of.is_some_and(|field_of| props.contains(field_of.document)) {
+			if field_of
+				.is_some_and(|field_of| props.contains(field_of.document))
+			{
 				continue;
 			}
 			let dotted = dotted_path(&resolved.field_path);
@@ -248,7 +253,8 @@ impl ReactiveHtmlRender {
 			state.get(world).expect("infallible event query");
 		for (entity, bindings) in query.iter() {
 			for binding in &bindings.0 {
-				let call = render_verb_call(binding, entity, &resolver, &scopes);
+				let call =
+					render_verb_call(binding, entity, &resolver, &scopes);
 				self.events
 					.entry(entity)
 					.or_default()
@@ -277,8 +283,9 @@ impl ReactiveHtmlRender {
 	pub(crate) fn enter_element(&mut self, entity: Entity) -> Option<usize> {
 		let governing = self.governing.get(&entity).copied();
 		let enclosing = self.element_doc_stack.last().copied().flatten();
-		let emit = governing
-			.filter(|id| self.referenced.contains(id) && Some(*id) != enclosing);
+		let emit = governing.filter(|id| {
+			self.referenced.contains(id) && Some(*id) != enclosing
+		});
 		self.element_doc_stack.push(governing);
 		emit
 	}
@@ -409,7 +416,10 @@ fn render_verb_call(
 		.args
 		.iter()
 		.map(|(name, arg)| {
-			format!("{name}: {}", render_verb_arg(arg, entity, resolver, scopes))
+			format!(
+				"{name}: {}",
+				render_verb_arg(arg, entity, resolver, scopes)
+			)
 		})
 		.collect::<Vec<_>>()
 		.join(", ");
@@ -431,12 +441,19 @@ fn render_verb_arg(
 				BindingSource::Prop => ("@prop:", DocumentPath::Props),
 				// reflect sources are server-only; emit best-effort so the markup
 				// stays readable, the client ignores them.
-				BindingSource::Res => return format!("@res:{}", expr.field_path),
-				BindingSource::Comp => return format!("@comp:{}", expr.field_path),
+				BindingSource::Res => {
+					return format!("@res:{}", expr.field_path);
+				}
+				BindingSource::Comp => {
+					return format!("@comp:{}", expr.field_path);
+				}
 			};
 			let doc_entity = resolver.entity(entity, &document);
-			let resolved =
-				scopes.resolved_path(entity, &expr.field_path, Some(doc_entity));
+			let resolved = scopes.resolved_path(
+				entity,
+				&expr.field_path,
+				Some(doc_entity),
+			);
 			format!("{prefix}{}", dotted_path(&resolved))
 		}
 		VerbArg::Literal(literal) => literal_value(literal)
@@ -477,8 +494,7 @@ mod test {
 	const COUNTER_PAGE: &str = r#"<html><head><title>t</title></head><body><article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p></article></body></html>"#;
 
 	/// A document with no bindings, ie nothing reactive to ship.
-	const PLAIN_PAGE: &str =
-		r#"<html><head><title>t</title></head><body><p>hello</p></body></html>"#;
+	const PLAIN_PAGE: &str = r#"<html><head><title>t</title></head><body><p>hello</p></body></html>"#;
 
 	/// Build `markup` as a document and settle the sync so its documents exist.
 	fn build(world: &mut World, markup: &str) -> Entity {
@@ -554,7 +570,9 @@ mod test {
 			.xpect_contains(
 				"bx:click=\"increment{ field: @doc:counter.count, amount: 1 }\"",
 			)
-			.xpect_contains("bx:click=\"decrement{ field: @doc:counter.count }\"");
+			.xpect_contains(
+				"bx:click=\"decrement{ field: @doc:counter.count }\"",
+			);
 	}
 
 	#[beet_core::test]
@@ -612,9 +630,7 @@ mod test {
 		head.xpect_contains(
 			"<script defer src=\"/js/reactivity.js\"></script>",
 		);
-		html.xpect_contains(
-			"<!--bx-ref=\"counter.count\"-->0<!--bx-end-->",
-		);
+		html.xpect_contains("<!--bx-ref=\"counter.count\"-->0<!--bx-end-->");
 	}
 
 	#[beet_core::test]
@@ -655,9 +671,13 @@ mod test {
 		let mut world = ui_world();
 		// content tree: the document on the root, a bound run two levels below
 		let content_root = world
-			.spawn((Element::new("article"), Document::new(val!({ "count": 0 }))))
+			.spawn((
+				Element::new("article"),
+				Document::new(val!({ "count": 0 })),
+			))
 			.id();
-		let inner = world.spawn((ChildOf(content_root), Element::new("p"))).id();
+		let inner =
+			world.spawn((ChildOf(content_root), Element::new("p"))).id();
 		world.spawn((ChildOf(inner), Value::default(), FieldRef::new("count")));
 		world.update_local();
 		// a holder transcludes `inner` (below the document) by reference
@@ -747,13 +767,13 @@ mod test {
 			.run_system_once(
 				|mut docs: Query<&mut Document, Without<PropsDocument>>| {
 					for mut doc in docs.iter_mut() {
-						doc.0 =
-							val!({ "count": 0, "flag": false, "status": "pending" });
+						doc.0 = val!({ "count": 0, "flag": false, "status": "pending" });
 					}
 				},
 			)
 			.unwrap();
-		let html = reactive_html_with(&mut world, root, InsertReactive::Auto, true);
+		let html =
+			reactive_html_with(&mut world, root, InsertReactive::Auto, true);
 		// the fixture carries the wire format, the custom verb twin, and the runtime
 		html.clone()
 			.xpect_contains("data-bx-doc=")

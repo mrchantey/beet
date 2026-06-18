@@ -68,7 +68,10 @@ pub struct ScrollState {
 impl ScrollState {
 	/// Build from a content size and a scrollport size.
 	pub fn new(content: UVec2, scrollport: UVec2) -> Self {
-		Self { content, scrollport }
+		Self {
+			content,
+			scrollport,
+		}
 	}
 
 	/// The maximum scroll offset per axis: how far the content can move before

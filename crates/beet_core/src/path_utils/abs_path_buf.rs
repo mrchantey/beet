@@ -45,7 +45,6 @@ impl std::fmt::Display for AbsPathBuf {
 	}
 }
 
-
 impl AbsPathBuf {
 	/// Create a new [`AbsPathBuf`] from a `PathBuf`, calling [`std::path::absolute`]
 	/// which prepends the `env::current_dir` to relative paths.
@@ -217,14 +216,10 @@ impl<'de> serde::Deserialize<'de> for AbsPathBuf {
 	}
 }
 
-
-
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-
-
 
 	#[crate::test]
 	fn canonicalizes() { let _buf = AbsPathBuf::new("Cargo.toml").unwrap(); }

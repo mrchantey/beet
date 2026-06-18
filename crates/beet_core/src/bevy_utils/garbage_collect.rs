@@ -8,7 +8,6 @@ use crate::prelude::*;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 
-
 /// A reference to a garbage-collected entity.
 ///
 /// When this component is added to an entity, it registers as a reference to

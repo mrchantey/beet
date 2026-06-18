@@ -30,7 +30,6 @@ pub async fn serve_blob(
 	}
 }
 
-
 // the tests serve from a temp fs-backed store (std-only).
 #[cfg(all(test, feature = "std"))]
 mod test {

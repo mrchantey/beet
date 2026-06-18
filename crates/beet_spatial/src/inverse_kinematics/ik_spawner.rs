@@ -120,7 +120,6 @@ fn map_names_to_query_entries<'a>(
 		.collect()
 }
 
-
 fn find_by_name<'a>(
 	query: &'a Query<(Entity, &Name, &Transform, &Children)>,
 	entity: Entity,

@@ -36,7 +36,6 @@ const DEFAULT_HTTP_VERSION: &str = "1.1";
 #[cfg(feature = "std")]
 const DEFAULT_CLI_VERSION: &str = "0.1.0";
 
-
 /// Request-specific parts including HTTP method, URL, headers, and version.
 ///
 /// # Example
@@ -256,7 +255,6 @@ impl RequestParts {
 	pub fn url_mut(&mut self) -> &mut Url { &mut self.url }
 }
 
-
 /// Response-specific parts including HTTP status code, headers, and version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResponseParts {
@@ -336,7 +334,8 @@ impl From<http::request::Parts> for RequestParts {
 		let uri = &http_parts.uri;
 
 		let scheme = Scheme::from(uri.scheme());
-		let authority = uri.authority().map(|auth| SmolStr::from(auth.as_str()));
+		let authority =
+			uri.authority().map(|auth| SmolStr::from(auth.as_str()));
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
@@ -360,7 +359,8 @@ impl From<&http::request::Parts> for RequestParts {
 		let uri = &http_parts.uri;
 
 		let scheme = Scheme::from(uri.scheme());
-		let authority = uri.authority().map(|auth| SmolStr::from(auth.as_str()));
+		let authority =
+			uri.authority().map(|auth| SmolStr::from(auth.as_str()));
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
@@ -395,7 +395,6 @@ impl From<http::response::Parts> for ResponseParts {
 		}
 	}
 }
-
 
 #[cfg(feature = "http")]
 impl From<&http::response::Parts> for ResponseParts {
@@ -664,10 +663,9 @@ mod test {
 	fn absolute_positional_round_trips() {
 		let parts = RequestParts::from(CliArgs::parse("load /abs/scene.json"));
 		// the absolute path stays a single intact segment, not split on `/`
-		parts.path().xpect_eq(vec![
-			"load".to_string(),
-			"/abs/scene.json".to_string(),
-		]);
+		parts
+			.path()
+			.xpect_eq(vec!["load".to_string(), "/abs/scene.json".to_string()]);
 		// the way a `load/*scene` handler reconstructs its captured value
 		parts.path_from(1).join("/").xpect_eq("/abs/scene.json");
 		// a relative positional still splits into route segments

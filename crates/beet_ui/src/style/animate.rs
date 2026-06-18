@@ -142,12 +142,22 @@ mod test {
 		world.init_resource::<Time>();
 		world.get_resource_or_init::<RuleSet>().extend_rules(vec![
 			Rule::class("box")
-				.with_value(common_props::TransitionDurationProp, Duration::from_secs(1))
-				.with_value(common_props::TransitionEaseProp, EaseFunction::Linear),
-			Rule::class("a")
-				.with_value(common_props::ForegroundColor, Color::srgb(0., 0., 0.)),
-			Rule::class("b")
-				.with_value(common_props::ForegroundColor, Color::srgb(1., 1., 1.)),
+				.with_value(
+					common_props::TransitionDurationProp,
+					Duration::from_secs(1),
+				)
+				.with_value(
+					common_props::TransitionEaseProp,
+					EaseFunction::Linear,
+				),
+			Rule::class("a").with_value(
+				common_props::ForegroundColor,
+				Color::srgb(0., 0., 0.),
+			),
+			Rule::class("b").with_value(
+				common_props::ForegroundColor,
+				Color::srgb(1., 1., 1.),
+			),
 		]);
 		world.spawn((
 			Buffer::new(UVec2::new(8, 2)).into_double_buffer(),
@@ -183,8 +193,7 @@ mod test {
 	fn class_change_eases_foreground() {
 		let (mut world, element) = transition_world();
 		// first resolve snapped straight to black, no animate-in
-		displayed_fg(&mut world, element)
-			.xpect_eq(Color::srgb(0., 0., 0.));
+		displayed_fg(&mut world, element).xpect_eq(Color::srgb(0., 0., 0.));
 
 		// retarget to white via a class swap
 		world.entity_mut(element).insert(Classes::new([
@@ -240,11 +249,8 @@ mod test {
 		]));
 		advance(&mut world, Duration::ZERO);
 		advance(&mut world, Duration::from_millis(500));
-		let buffer = world
-			.query::<&DoubleBuffer>()
-			.iter(&world)
-			.next()
-			.unwrap();
+		let buffer =
+			world.query::<&DoubleBuffer>().iter(&world).next().unwrap();
 		let cell_fg = buffer
 			.current_buffer()
 			.iter_cells()

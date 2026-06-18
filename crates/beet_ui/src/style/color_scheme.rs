@@ -13,9 +13,7 @@ use beet_core::prelude::*;
 ///
 /// Query it to read the current scheme; mutate it to switch themes at runtime.
 /// For the app-wide session default see [`Theme::scheme`](crate::style::material::Theme).
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect,
-)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
 pub enum ColorScheme {
 	Light,
@@ -83,7 +81,6 @@ pub fn sync_color_scheme(
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -96,9 +93,12 @@ mod test {
 	fn scheme_toggle_reresolves() {
 		// `RealtimeParsePlugin` wires `PostParseTree` into the main loop so
 		// `update_local` re-resolves styles, matching a realtime app's repaint
-		let mut world =
-			(MaterialStylePlugin::default(), StylePlugin, RealtimeParsePlugin)
-				.into_world();
+		let mut world = (
+			MaterialStylePlugin::default(),
+			StylePlugin,
+			RealtimeParsePlugin,
+		)
+			.into_world();
 		let entity = world
 			.spawn((
 				rsx! { <div/> },

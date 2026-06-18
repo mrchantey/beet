@@ -56,7 +56,6 @@ fn main() -> Result<()> {
 	.run()
 }
 
-
 impl BenchAssert {
 	fn run(self) -> Result<()> {
 		fs::create_dir_all(BENCH_DIR)?;
@@ -64,7 +63,6 @@ impl BenchAssert {
 		self.run_assert()?;
 		Ok(())
 	}
-
 
 	fn run_assert(&self) -> Result<()> {
 		self.create_iter_file(ASSERT_FILE_PATH, ASSERT_TEMPLATE, |i| {
@@ -104,7 +102,6 @@ impl BenchAssert {
 		fs::write(file_path, output)?;
 		Ok(())
 	}
-
 
 	fn bench_compile(&self, test_name: &str) -> Result<()> {
 		// let path = path::Path::new(BENCH_DIR).join(test_name);

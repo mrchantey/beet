@@ -27,7 +27,6 @@ pub struct O11sStreamer {
 	reasoning: Option<ReasoningParam>,
 }
 
-
 impl DefaultAction<(), Outcome> for O11sStreamer {
 	fn default_action() -> Action<(), Outcome> {
 		Action::new_async(post_streamer_action::<O11sStreamer>)
@@ -166,7 +165,6 @@ impl O11sStreamer {
 impl PostStreamer for O11sStreamer {
 	fn provider_slug(&self) -> &str { &self.model.provider_slug }
 	fn model_slug(&self) -> &str { &self.model.model_slug }
-
 
 	fn stream_posts(
 		&self,

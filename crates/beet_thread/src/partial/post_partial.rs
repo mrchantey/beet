@@ -10,7 +10,6 @@ use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-
 /// Items come from model providers in all sorts of weird and wonderful ways.
 /// The first step is to translate these forms into a unified type,
 /// for integrating into our own stateful representations.
@@ -164,7 +163,6 @@ impl PostPartial {
 		}
 	}
 }
-
 
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,

@@ -116,7 +116,8 @@ pub fn drain_loaded_assets(world: &mut World) {
 		let mut settled = Vec::new();
 		let mut still_pending = Vec::new();
 		for (handle, pending_id) in pending {
-			match asset_server.get_recursive_dependency_load_state(handle.id()) {
+			match asset_server.get_recursive_dependency_load_state(handle.id())
+			{
 				Some(RecursiveDependencyLoadState::Loaded)
 				| Some(RecursiveDependencyLoadState::Failed(_)) => {
 					settled.push(pending_id);
@@ -202,7 +203,9 @@ mod test {
 
 		let load_state = Store::new(None);
 		let ls = load_state.clone();
-		world.add_observer(move |ev: On<LoadTemplate>| ls.set(Some(ev.is_error)));
+		world.add_observer(move |ev: On<LoadTemplate>| {
+			ls.set(Some(ev.is_error))
+		});
 
 		// a template that loads the asset, deferring LoadTemplate.
 		let root = world
@@ -218,7 +221,10 @@ mod test {
 
 		// LoadTemplate has not fired: the asset is still pending.
 		load_state.get().xpect_none();
-		app.world().entity(root).contains::<PendingAssets>().xpect_true();
+		app.world()
+			.entity(root)
+			.contains::<PendingAssets>()
+			.xpect_true();
 
 		// pump frames until the asset loads and the pending set drains, yielding
 		// to the async runtime so the in-memory IO task can make progress.

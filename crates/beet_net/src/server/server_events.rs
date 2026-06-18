@@ -207,11 +207,8 @@ mod test {
 	#[beet_core::test]
 	fn from_request_builds_filter() {
 		// no `--server`: matches all present servers.
-		let start = StartServer::from_request(
-			Entity::PLACEHOLDER,
-			None,
-			default(),
-		);
+		let start =
+			StartServer::from_request(Entity::PLACEHOLDER, None, default());
 		start.passes("cli").xpect_true();
 		start.passes("http").xpect_true();
 		// `--server=http`: only http.
@@ -235,7 +232,9 @@ mod test {
 
 	#[beet_core::test]
 	fn stop_filter_matches() {
-		StopServer::all(Entity::PLACEHOLDER).passes("http").xpect_true();
+		StopServer::all(Entity::PLACEHOLDER)
+			.passes("http")
+			.xpect_true();
 		let stop = StopServer {
 			entity: Entity::PLACEHOLDER,
 			filter: GlobFilter::default().with_include("tui"),

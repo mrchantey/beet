@@ -42,10 +42,7 @@ fn has_template_error(world: &World, root: Entity) -> bool {
 /// A template with an optional and a required prop, authoring its schema via its
 /// typed signature.
 #[template]
-fn Badge(
-	#[prop(required)] label: String,
-	count: u32,
-) -> impl Bundle {
+fn Badge(#[prop(required)] label: String, count: u32) -> impl Bundle {
 	let _ = (label, count);
 	rsx! { <span/> }
 }
@@ -126,10 +123,8 @@ fn module_path_resolution_from_directory() {
 	let mut world = world();
 	// lay out a template directory: <dir>/path/to/X.bsx (a process-unique dir so
 	// parallel runs do not collide).
-	let dir = std::env::temp_dir().join(format!(
-		"beet_bsx_templates_{}",
-		std::process::id()
-	));
+	let dir = std::env::temp_dir()
+		.join(format!("beet_bsx_templates_{}", std::process::id()));
 	let _ = fs_ext::remove(&dir);
 	let file = dir.join("path/to/X.bsx");
 	fs_ext::write(&file, "<strong>indexed</strong>").unwrap();
@@ -176,10 +171,8 @@ fn composable_schema_validates_recursively() {
 	world.register_bsx_schemas();
 
 	// a valid list of todo items passes recursive validation.
-	let ok = parse_bsx(
-		&mut world,
-		"<TodoList items={[{label:\"buy milk\"}]}/>",
-	);
+	let ok =
+		parse_bsx(&mut world, "<TodoList items={[{label:\"buy milk\"}]}/>");
 	has_template_error(&world, ok).xpect_false();
 
 	// a todo item missing its required `label` fails recursively.
@@ -217,10 +210,18 @@ fn component_field_binds_document() {
 
 	// the document value reached the component field.
 	let slider = world.entity(root).get::<Children>().unwrap()[0];
-	world.entity(slider).get::<Slider>().unwrap().value.xpect_eq(9);
+	world
+		.entity(slider)
+		.get::<Slider>()
+		.unwrap()
+		.value
+		.xpect_eq(9);
 	// the binding components are present on the component entity.
 	world.entity(slider).contains::<FieldRef>().xpect_true();
-	world.entity(slider).contains::<ReflectFieldRef>().xpect_true();
+	world
+		.entity(slider)
+		.contains::<ReflectFieldRef>()
+		.xpect_true();
 }
 
 // ---- async schema resolution drains LoadTemplate -----------------------------
@@ -262,7 +263,9 @@ async fn async_remote_schema_defers_load() {
 	// LoadTemplate has not fired: the remote schema is still pending.
 	load_state.get().xpect_none();
 	let pending = app.world().entity(root).get::<TemplatePending>();
-	pending.map(|pending| pending.is_empty()).xpect_eq(Some(false));
+	pending
+		.map(|pending| pending.is_empty())
+		.xpect_eq(Some(false));
 
 	// pump frames until the async fetch resolves and the pending set drains.
 	for _ in 0..200 {
@@ -292,7 +295,8 @@ async fn remote_template_stub_defers_load() {
 		.add_observer(move |ev: On<LoadTemplate>| ls.set(Some(ev.is_error)));
 
 	// `<Template src="..">` registers a pending fetch into the root's pending set.
-	let bytes = MediaBytes::new_bsx("<Template src=\"https://example.com/Todo.bsx\"/>");
+	let bytes =
+		MediaBytes::new_bsx("<Template src=\"https://example.com/Todo.bsx\"/>");
 	let root = {
 		let world = app.world_mut();
 		let mut entity = world.spawn_empty();

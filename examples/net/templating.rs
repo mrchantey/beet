@@ -63,8 +63,6 @@ fn router(
 	.xok()
 }
 
-
-
 /// Home page.
 fn home(visitor_number: u32) -> Response {
 	Response::ok_body(

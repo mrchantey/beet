@@ -22,7 +22,11 @@ struct GridGeometry {
 }
 
 impl GridGeometry {
-	fn new(node: &CharcellNodeData, content_width: u32, viewport: UVec2) -> Self {
+	fn new(
+		node: &CharcellNodeData,
+		content_width: u32,
+		viewport: UVec2,
+	) -> Self {
 		let grid = &node.layout_style().grid;
 		let columns = grid.columns.0.max(1);
 		let column_gap = node.flexbox().column_gap_cells(viewport);
@@ -178,7 +182,9 @@ mod test {
 	#[beet_core::test]
 	fn fragment_wrapped_cells_flow_as_tracks() {
 		let mut world = CharcellPlugin::world();
-		world.get_resource_or_init::<RuleSet>().extend_rules(vec![grid_rule()]);
+		world
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![grid_rule()]);
 		// a `.grid` whose four cells are nested under one tag-less wrapper (children,
 		// no `Element`), exactly the shape `Vec::into_snippet` lowers to.
 		let grid = world
@@ -215,7 +221,9 @@ mod test {
 	#[beet_core::test]
 	fn collected_vec_grid_cells_paint_as_tracks() {
 		let mut world = CharcellPlugin::world();
-		world.get_resource_or_init::<RuleSet>().extend_rules(vec![grid_rule()]);
+		world
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![grid_rule()]);
 		// 12 cols over 12 cells = 1-cell tracks, so each digit lands on its own column
 		world.spawn((
 			Buffer::new(UVec2::new(12, 4)).into_double_buffer(),
@@ -314,11 +322,14 @@ mod test {
 	/// list must not collapse the container into an inline formatting context).
 	#[beet_core::test]
 	fn paints_children_in_track_cells() {
-		let (mut world, _) =
-			grid_world(UVec2::new(12, 4), vec![grid_rule().with_value(
+		let (mut world, _) = grid_world(
+			UVec2::new(12, 4),
+			vec![grid_rule().with_value(
 				common_props::GridTemplateColumnsProp,
 				GridColumns(3),
-			)], 3);
+			)],
+			3,
+		);
 		let buffer = world
 			.query::<&DoubleBuffer>()
 			.iter(&world)

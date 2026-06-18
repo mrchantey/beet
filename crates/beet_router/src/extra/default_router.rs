@@ -63,7 +63,6 @@ pub fn default_app_routes() -> impl Bundle {
 #[template]
 pub fn DefaultAppRoutes() -> impl Bundle { default_app_routes() }
 
-
 #[cfg(all(feature = "json", feature = "std"))]
 #[cfg(test)]
 mod test {

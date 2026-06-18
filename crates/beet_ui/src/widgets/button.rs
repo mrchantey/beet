@@ -130,7 +130,10 @@ mod test {
 		let mut app = button_app();
 		let button = spawn_button(&mut app);
 		// the button is focusable (inferred from the tag)
-		app.world().entity(button).contains::<Focusable>().xpect_true();
+		app.world()
+			.entity(button)
+			.contains::<Focusable>()
+			.xpect_true();
 		// click: PointerUp fires the action
 		let pointer = app.world_mut().spawn_empty().id();
 		app.world_mut()

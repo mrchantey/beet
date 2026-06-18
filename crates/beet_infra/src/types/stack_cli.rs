@@ -173,7 +173,6 @@ async fn Rollforward(cx: ActionContext) -> Result<String> {
 	format!("Rolled forward to version {version} and re-applied").xok()
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;

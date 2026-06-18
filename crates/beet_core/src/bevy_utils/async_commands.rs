@@ -42,10 +42,10 @@ use bevy::ecs::component::Mutable;
 use bevy::ecs::system::Command;
 use bevy::ecs::system::EntityCommand;
 use bevy::ecs::system::IntoObserverSystem;
-use bevy::ecs::template::Template;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::SystemParam;
+use bevy::ecs::template::Template;
 use bevy::platform::sync::Arc;
 use bevy::platform::sync::Mutex;
 use core::future::Future;
@@ -596,12 +596,15 @@ pub impl AsyncWorld {
 			// capture the piped observer system's output, signal it once, then
 			// despawn the temporary observer.
 			let capture =
-				move |bevy::ecs::system::In(value): bevy::ecs::system::In<O>,
+				move |bevy::ecs::system::In(value): bevy::ecs::system::In<
+					O,
+				>,
 				      mut commands: Commands| {
 					if let Some(send) = sender.lock().unwrap().take() {
 						send.signal(value);
 					}
-					if let Some(observer) = capture_slot.lock().unwrap().take() {
+					if let Some(observer) = capture_slot.lock().unwrap().take()
+					{
 						commands.entity(observer).despawn();
 					}
 				};
@@ -657,8 +660,7 @@ fn build_template_async(
 		let sender = Arc::new(Mutex::new(Some(send)));
 		let root = world
 			.with(move |world: &mut World| {
-				let root =
-					entity.unwrap_or_else(|| world.spawn_empty().id());
+				let root = entity.unwrap_or_else(|| world.spawn_empty().id());
 				// observe LoadTemplate on the root, signalling its error flag, then
 				// build (which fires it), so a synchronous load is caught.
 				world.entity_mut(root).observe(
@@ -987,12 +989,15 @@ impl AsyncEntity {
 			// capture the piped observer system's output, signal it once, then
 			// despawn the temporary observer.
 			let capture =
-				move |bevy::ecs::system::In(value): bevy::ecs::system::In<O>,
+				move |bevy::ecs::system::In(value): bevy::ecs::system::In<
+					O,
+				>,
 				      mut commands: Commands| {
 					if let Some(send) = sender.lock().unwrap().take() {
 						send.signal(value);
 					}
-					if let Some(observer) = capture_slot.lock().unwrap().take() {
+					if let Some(observer) = capture_slot.lock().unwrap().take()
+					{
 						commands.entity(observer).despawn();
 					}
 				};

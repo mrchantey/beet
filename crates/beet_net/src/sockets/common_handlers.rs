@@ -39,8 +39,6 @@ pub fn echo_close(ev: On<MessageRecv>, mut commands: Commands) {
 	}
 }
 
-
-
 /// A timestamp payload for WebSocket ping/pong round-trip time measurement.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PingTime {
@@ -63,7 +61,6 @@ impl PingTime {
 		Message::Ping(ping_time.into())
 	}
 }
-
 
 /// On receiving a [`Pong`] message which contains a serialized [`PingTime`],
 /// calculate and log the round trip time.

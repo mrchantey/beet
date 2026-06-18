@@ -203,7 +203,6 @@ impl From<u16> for StatusCode {
 	fn from(code: u16) -> Self { Self(code) }
 }
 
-
 // 1xx Informational
 impl StatusCode {
 	/// # 100 Continue
@@ -474,7 +473,6 @@ impl StatusCode {
 	/// The client needs to authenticate to gain network access.
 	pub const NETWORK_AUTHENTICATION_REQUIRED: StatusCode = StatusCode(511);
 }
-
 
 #[cfg(test)]
 mod test {

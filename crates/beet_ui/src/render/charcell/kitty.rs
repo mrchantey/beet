@@ -46,11 +46,7 @@ impl KittyImage {
 	/// scales the image to exactly this rect (`c=`/`r=`).
 	pub fn cell_size(&self, max_cols: u32) -> UVec2 {
 		const CELL_PX_WIDTH: u32 = 10;
-		let cols = self
-			.px
-			.x
-			.div_ceil(CELL_PX_WIDTH)
-			.clamp(1, max_cols.max(1));
+		let cols = self.px.x.div_ceil(CELL_PX_WIDTH).clamp(1, max_cols.max(1));
 		UVec2::new(cols, self.rows_for(cols))
 	}
 
@@ -64,9 +60,7 @@ impl KittyImage {
 		max_cols: u32,
 	) -> UVec2 {
 		match (width, height) {
-			(Some(cols), Some(rows)) => {
-				UVec2::new(cols.max(1), rows.max(1))
-			}
+			(Some(cols), Some(rows)) => UVec2::new(cols.max(1), rows.max(1)),
 			(Some(cols), None) => {
 				let cols = cols.max(1);
 				UVec2::new(cols, self.rows_for(cols))
@@ -155,8 +149,9 @@ pub fn set_render_server_origin(
 	mut commands: Commands,
 ) {
 	use beet_net::prelude::Url;
-	if let Ok(port) =
-		servers.get(ev.entity).map(|server| server.socket_addr().port())
+	if let Ok(port) = servers
+		.get(ev.entity)
+		.map(|server| server.socket_addr().port())
 		&& port != 0
 	{
 		commands.insert_resource(RenderServerOrigin(Url::parse(format!(
@@ -231,11 +226,9 @@ pub fn attach_kitty_images(
 					data,
 					px,
 				};
-				commands
-					.entity(view.entity)
-					.queue(move |entity: EntityWorldMut| {
-						attach_image(entity, image)
-					});
+				commands.entity(view.entity).queue(
+					move |entity: EntityWorldMut| attach_image(entity, image),
+				);
 			}
 			None => {
 				commands.entity(view.entity).insert(KittyImageUnavailable);
@@ -427,9 +420,8 @@ pub(crate) fn place_kitty_images(
 			state.viewport = viewport;
 		}
 
-		let desired = desired_placements(
-			root, viewport, &charcell, &tree, &images,
-		);
+		let desired =
+			desired_placements(root, viewport, &charcell, &tree, &images);
 
 		// remove placements for images gone from the frame
 		let stale = state
@@ -455,7 +447,9 @@ pub(crate) fn place_kitty_images(
 				let image = images
 					.iter()
 					.find(|image| image.id == placed.id)
-					.ok_or_else(|| bevyhow!("missing image {}", placed.id))?;
+					.ok_or_else(|| {
+					bevyhow!("missing image {}", placed.id)
+				})?;
 				write_transmit(writer, placed.id, &image.data)?;
 			}
 			write_place(writer, &placed)?;
@@ -495,8 +489,8 @@ fn desired_placements(
 			continue;
 		}
 		// fully visible only: inside both the overflow clip and the screen
-		let visible = cx.clip.intersect(rect) == rect
-			&& screen.intersect(rect) == rect;
+		let visible =
+			cx.clip.intersect(rect) == rect && screen.intersect(rect) == rect;
 		if !visible {
 			continue;
 		}
@@ -517,7 +511,11 @@ const CHUNK: usize = 4096;
 
 /// Transmit a base64 PNG payload (`a=t`), chunked at [`CHUNK`] bytes.
 #[cfg(feature = "tui")]
-fn write_transmit(w: &mut (impl Write + ?Sized), id: u32, data: &str) -> Result {
+fn write_transmit(
+	w: &mut (impl Write + ?Sized),
+	id: u32,
+	data: &str,
+) -> Result {
 	let mut chunks = data.as_bytes().chunks(CHUNK).peekable();
 	let mut first = true;
 	while let Some(chunk) = chunks.next() {
@@ -663,9 +661,13 @@ mod test {
 		url("https://cdn/x.png")
 			.xpect_eq(Some("https://cdn/x.png".to_string()));
 		// no origin: a site-rooted path is unresolvable (no HTTP, no local read)
-		image_request_url("/assets/x.jpg", None).is_none().xpect_true();
+		image_request_url("/assets/x.jpg", None)
+			.is_none()
+			.xpect_true();
 		// a bare path is a local file, not an HTTP request
-		image_request_url("logo.png", Some(&origin)).is_none().xpect_true();
+		image_request_url("logo.png", Some(&origin))
+			.is_none()
+			.xpect_true();
 	}
 
 	/// A non-PNG image (a JPEG) is decoded and re-encoded to PNG so the kitty

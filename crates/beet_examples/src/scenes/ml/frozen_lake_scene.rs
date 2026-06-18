@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 
 pub const FROZEN_LAKE_SCENE_SCALE: f32 = 1.;
 
-
 pub fn frozen_lake_scene(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,

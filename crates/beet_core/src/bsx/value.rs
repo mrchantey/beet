@@ -67,7 +67,8 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 		Some('$') => {
 			// a `$name` entity reference nested in a literal (eg a spread field).
 			cursor.eat("$");
-			let name = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
+			let name =
+				cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
 			if name.is_empty() {
 				bevybail!("expected an entity name after `$`");
 			}
@@ -76,7 +77,9 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 		Some(ch) if ch.is_ascii_digit() || ch == '-' || ch == '+' => {
 			parse_number(cursor)
 		}
-		Some(ch) if ch.is_alphabetic() || ch == '_' => parse_ident_value(cursor),
+		Some(ch) if ch.is_alphabetic() || ch == '_' => {
+			parse_ident_value(cursor)
+		}
 		other => bevybail!("unexpected character in value: {other:?}"),
 	}
 }
@@ -110,7 +113,9 @@ pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 	let selector = if source_name == "entity" {
 		let name = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
 		if name.is_empty() {
-			bevybail!("`@entity:` expects an entity name, ie `@entity:Name::Type.field`");
+			bevybail!(
+				"`@entity:` expects an entity name, ie `@entity:Name::Type.field`"
+			);
 		}
 		if !cursor.eat("::") {
 			bevybail!(
@@ -124,8 +129,9 @@ pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 	// `@res`/`@comp`/`@entity` lead with a `ShortTypePath.` segment.
 	let type_path = match source {
 		BindingSource::Res | BindingSource::Comp => {
-			let type_path = cursor
-				.take_while(|ch| ch.is_alphanumeric() || ch == '_' || ch == ':');
+			let type_path = cursor.take_while(|ch| {
+				ch.is_alphanumeric() || ch == '_' || ch == ':'
+			});
 			if type_path.is_empty() {
 				bevybail!("`@{source_name}:` expects a `Type.field` path");
 			}
@@ -168,7 +174,9 @@ pub fn parse_verb_call(cursor: &mut Cursor) -> Result<VerbCall> {
 	cursor.skip_ws();
 	let verb = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
 	if verb.is_empty() {
-		bevybail!("expected a verb name, ie `increment{{ field: @doc:count }}`");
+		bevybail!(
+			"expected a verb name, ie `increment{{ field: @doc:count }}`"
+		);
 	}
 	cursor.skip_ws();
 	let args = match cursor.peek() {
@@ -275,21 +283,21 @@ fn parse_string(cursor: &mut Cursor) -> Result<SmolStr> {
 
 /// Parse a number literal as the natural [`Value`] kind by its text.
 fn parse_number(cursor: &mut Cursor) -> Result<DataLiteral> {
-	let text = cursor.take_while(|ch| {
-		ch.is_ascii_digit()
-			|| ch == '-'
-			|| ch == '+'
-			|| ch == '.'
-			|| ch == 'e'
-			|| ch == 'E'
-	});
-	let value = if text.contains('.') || text.contains('e') || text.contains('E') {
-		Value::Float(text.parse()?)
-	} else if let Ok(uint) = text.parse::<u64>() {
-		Value::Uint(uint)
-	} else {
-		Value::Int(text.parse()?)
-	};
+	let text =
+		cursor.take_while(|ch| {
+			ch.is_ascii_digit()
+				|| ch == '-' || ch == '+'
+				|| ch == '.' || ch == 'e'
+				|| ch == 'E'
+		});
+	let value =
+		if text.contains('.') || text.contains('e') || text.contains('E') {
+			Value::Float(text.parse()?)
+		} else if let Ok(uint) = text.parse::<u64>() {
+			Value::Uint(uint)
+		} else {
+			Value::Int(text.parse()?)
+		};
 	Ok(DataLiteral::Scalar(value))
 }
 
@@ -341,9 +349,8 @@ fn parse_struct(cursor: &mut Cursor) -> Result<Vec<(SmolStr, DataLiteral)>> {
 /// Parse an identifier-led value: `true`/`false`, or an enum/typed name with
 /// optional unit/tuple/struct fields.
 fn parse_ident_value(cursor: &mut Cursor) -> Result<DataLiteral> {
-	let ident = cursor.take_while(|ch| {
-		ch.is_alphanumeric() || ch == '_' || ch == ':'
-	});
+	let ident =
+		cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_' || ch == ':');
 	match ident {
 		"true" => return Ok(DataLiteral::Scalar(Value::Bool(true))),
 		"false" => return Ok(DataLiteral::Scalar(Value::Bool(false))),
@@ -360,8 +367,8 @@ fn parse_ident_value(cursor: &mut Cursor) -> Result<DataLiteral> {
 /// by enum variants and spread components/templates.
 fn parse_named_literal(cursor: &mut Cursor) -> Result<NamedLiteral> {
 	cursor.skip_ws();
-	let name = cursor
-		.take_while(|ch| ch.is_alphanumeric() || ch == '_' || ch == ':');
+	let name =
+		cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_' || ch == ':');
 	if name.is_empty() {
 		bevybail!("expected a name in spread or enum value");
 	}
@@ -407,12 +414,10 @@ mod test {
 
 	#[beet_core::test]
 	fn scalars() {
-		value("42").xpect_eq(ValueExpr::Literal(DataLiteral::Scalar(
-			Value::Uint(42),
-		)));
-		value("-3").xpect_eq(ValueExpr::Literal(DataLiteral::Scalar(
-			Value::Int(-3),
-		)));
+		value("42")
+			.xpect_eq(ValueExpr::Literal(DataLiteral::Scalar(Value::Uint(42))));
+		value("-3")
+			.xpect_eq(ValueExpr::Literal(DataLiteral::Scalar(Value::Int(-3))));
 		value("2.5").xpect_eq(ValueExpr::Literal(DataLiteral::Scalar(
 			Value::Float(2.5),
 		)));
@@ -462,8 +467,7 @@ mod test {
 
 	#[beet_core::test]
 	fn entity_ref() {
-		value("$header")
-			.xpect_eq(ValueExpr::EntityRef("header".into()));
+		value("$header").xpect_eq(ValueExpr::EntityRef("header".into()));
 	}
 
 	#[beet_core::test]
@@ -504,7 +508,10 @@ mod test {
 	#[beet_core::test]
 	fn doc_binding_with_init() {
 		let parsed = binding("@doc:user.name=\"x\"");
-		parsed.field_path.to_string().xpect_eq("user.name".to_string());
+		parsed
+			.field_path
+			.to_string()
+			.xpect_eq("user.name".to_string());
 		parsed
 			.init
 			.xpect_eq(Some(DataLiteral::Scalar(Value::Str("x".into()))));
@@ -567,20 +574,18 @@ mod test {
 		parse_err("@doc count").xpect_contains("expected `:`");
 		parse_err("@res:NoField").xpect_contains("missing its field path");
 		parse_err("@comp:").xpect_contains("expects a `Type.field` path");
-		parse_err("@res:Type.field=1")
-			.xpect_contains("only valid on `@doc`");
-		parse_err("@entity:::Bar.boo")
-			.xpect_contains("expects an entity name");
+		parse_err("@res:Type.field=1").xpect_contains("only valid on `@doc`");
+		parse_err("@entity:::Bar.boo").xpect_contains("expects an entity name");
 		parse_err("@entity:Name.Bar.boo")
 			.xpect_contains("missing its `::Type.field` path");
 	}
 
 	#[beet_core::test]
 	fn spread_tuple_with_binding() {
-		let SpreadExpr::Tuple(items) =
-			parse_spread(&mut Cursor::new("(Bar{boo:\"bazz\"}, @comp:Bar.boo)"))
-				.unwrap()
-		else {
+		let SpreadExpr::Tuple(items) = parse_spread(&mut Cursor::new(
+			"(Bar{boo:\"bazz\"}, @comp:Bar.boo)",
+		))
+		.unwrap() else {
 			panic!("expected tuple spread");
 		};
 		items.len().xpect_eq(2);
@@ -650,7 +655,8 @@ mod test {
 
 	#[beet_core::test]
 	fn verb_call_errors() {
-		verb_err("{ field: @doc:count }").xpect_contains("expected a verb name");
+		verb_err("{ field: @doc:count }")
+			.xpect_contains("expected a verb name");
 		verb_err("increment{ : @doc:count }")
 			.xpect_contains("expected a verb argument name");
 		verb_err("increment{ field @doc:count }")

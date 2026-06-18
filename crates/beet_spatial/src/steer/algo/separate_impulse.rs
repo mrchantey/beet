@@ -32,8 +32,6 @@ pub fn separate_impulse<'a, T>(
 	Impulse(average * separate.scalar)
 }
 
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -42,7 +40,6 @@ mod test {
 	#[beet_core::test]
 	fn works() {
 		let mut world = World::new();
-
 
 		let entity = world.spawn(Transform::from_translation(Vec3::ZERO)).id();
 		world.spawn(Transform::from_translation(Vec3::new(0.05, 0., 0.)));

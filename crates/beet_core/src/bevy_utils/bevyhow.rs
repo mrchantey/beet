@@ -57,7 +57,6 @@ impl<T, E> IntoResult<T, E> for Result<T, E> {
 	fn into_result(self) -> Result<T, E> { self }
 }
 
-
 /// Intermediary type for converting formatted strings to [`BevyError`].
 ///
 /// This type implements [`core::error::Error`] and can be converted into a
@@ -142,12 +141,10 @@ macro_rules! bevybail {
 	};
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use bevy::ecs::error::BevyError;
-
 
 	#[crate::test]
 	fn works() {

@@ -131,7 +131,6 @@ mod tests {
 	use super::*;
 	use bevy::ecs::system::RunSystemOnce;
 
-
 	#[derive(Component)]
 	struct A;
 

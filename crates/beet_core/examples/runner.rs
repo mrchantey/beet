@@ -1,8 +1,6 @@
 //! Example usage of the test runner
 use beet_core::prelude::*;
 
-
-
 fn main() {
 	test_runner(&[
 		&test_ext::new_auto_static(returns_ok),
@@ -14,13 +12,11 @@ fn main() {
 	]);
 }
 
-
 fn returns_ok() -> Result<(), String> { Ok(()) }
 fn returns_err() -> Result<(), String> { Err("foo".to_string()) }
 fn panics() -> Result<(), String> {
 	panic!("whoops");
 }
-
 
 fn returns_ok_async() -> Result<(), String> {
 	register_test(TestCaseParams::new(), async { Ok::<(), String>(()) });

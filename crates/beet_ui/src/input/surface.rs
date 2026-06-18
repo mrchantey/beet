@@ -67,6 +67,9 @@ pub fn surface_of(
 /// Whether an element on `element_surface` should receive input from `window`: the
 /// element's surface must resolve and match. An element with no surface receives no
 /// scoped input (fail-closed, so an unscoped element never leaks into a session).
-pub fn surface_matches(element_surface: Option<Entity>, window: Entity) -> bool {
+pub fn surface_matches(
+	element_surface: Option<Entity>,
+	window: Entity,
+) -> bool {
 	element_surface == Some(window)
 }

@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
-
 /// A class name assigned to an element entity.
 ///
 /// In addition to the `class` attribute, classes may be stored directly on an
@@ -102,7 +101,6 @@ impl<S: Into<SmolStr>> From<S> for ClassName {
 	fn from(value: S) -> Self { Self::String(value.into()) }
 }
 
-
 /// Classes assigned to an element entity, checked alongside the `class`
 /// attribute by [`ElementView::contains_class`].
 #[derive(Default, Clone, Component, Deref, DerefMut)]
@@ -137,7 +135,6 @@ impl FromIterator<ClassName> for Classes {
 	}
 }
 
-
 /// Converts a `(Token, Value)` pair into a declaration for use with
 /// [`inline_class`].
 pub trait IntoDeclaration {
@@ -160,7 +157,6 @@ where
 	}
 }
 
-
 /// Register a rule inline at the callsite, returning an [`OnSpawn`] effect that
 /// adds a unique inline class to the entity and registers the rule (only once)
 /// in the global [`RuleSet`].
@@ -177,7 +173,9 @@ pub fn inline_class(
 	let rule = Rule::new()
 		.with_selector(Selector::Class(class.as_selector()))
 		.with_extend(declarations);
-	OnSpawn::new(move |entity| register_inline_rule(entity, class, rule.clone()))
+	OnSpawn::new(move |entity| {
+		register_inline_rule(entity, class, rule.clone())
+	})
 }
 
 /// Register a one-off `rule` keyed on `class` into the global [`RuleSet`] (only
@@ -193,7 +191,9 @@ pub fn register_inline_rule(
 	rule: Rule,
 ) -> Result {
 	entity.world_scope(move |world| {
-		world.get_resource_or_init::<RuleSet>().try_insert_inline(rule);
+		world
+			.get_resource_or_init::<RuleSet>()
+			.try_insert_inline(rule);
 	});
 	if let Some(mut classes) = entity.get_mut::<Classes>() {
 		classes.insert_class(class);

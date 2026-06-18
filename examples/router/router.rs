@@ -54,8 +54,6 @@ fn setup(mut commands: Commands) -> Result {
 	Ok(())
 }
 
-
-
 #[allow(unused, reason = "module not used when deploying infra")]
 pub fn router_scene() -> Result<impl Bundle> {
 	(
@@ -72,7 +70,6 @@ pub fn router_scene() -> Result<impl Bundle> {
 		.xok()
 }
 
-
 // OnSpawn serves as a type erased bundle
 fn server_from_cli() -> Result<OnSpawn> {
 	cfg_if! {
@@ -82,7 +79,6 @@ fn server_from_cli() -> Result<OnSpawn> {
 			let default_server = "cli";
 		}
 	};
-
 
 	match CliArgs::parse_env()
 		.params
@@ -107,7 +103,6 @@ fn server_from_cli() -> Result<OnSpawn> {
 	.xok()
 }
 
-
 fn routes() -> impl Bundle {
 	(
 		// render middleware wrapping every descendant route's content in the
@@ -122,13 +117,11 @@ fn routes() -> impl Bundle {
 	)
 }
 
-
 #[derive(Reflect)]
 struct CounterParams {
 	/// the number to start with
 	starting_value: u32,
 }
-
 
 fn counter() -> impl Bundle {
 	(
@@ -145,8 +138,6 @@ fn counter() -> impl Bundle {
 		}),
 	)
 }
-
-
 
 fn sequence() -> impl Bundle {
 	route(

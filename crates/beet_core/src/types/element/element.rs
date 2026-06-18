@@ -45,7 +45,6 @@ impl Element {
 	}
 }
 
-
 /// Tags whose text content is whitespace-significant, so their children are left
 /// verbatim (the cascade reads `white-space: pre` on these). The single shared
 /// list for every whitespace-normalisation pass (the BSX parser, the markdown

@@ -3,7 +3,6 @@ use quote::quote;
 use syn::DeriveInput;
 use syn::parse_macro_input;
 
-
 pub fn impl_as_any(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let item = parse_macro_input!(item as DeriveInput);
 	let result = parse_as_any(item);

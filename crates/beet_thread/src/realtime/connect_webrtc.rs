@@ -10,7 +10,6 @@ use web_sys::RtcPeerConnection;
 use web_sys::RtcSessionDescriptionInit;
 use web_sys::window;
 
-
 // TODO integrate with bevy app using async tasks
 pub(super) async fn connect_webrtc(
 	ephemeral_key: String,

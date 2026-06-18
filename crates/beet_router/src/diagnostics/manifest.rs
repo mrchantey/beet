@@ -275,10 +275,7 @@ mod test {
 		let manifest = build_diagnostics_manifest(&mut world, router).unwrap();
 
 		// routes: both static scene routes, rooted.
-		manifest
-			.routes
-			.contains(&SmolStr::from("/"))
-			.xpect_true();
+		manifest.routes.contains(&SmolStr::from("/")).xpect_true();
 		manifest
 			.routes
 			.contains(&SmolStr::from("/about"))
@@ -291,9 +288,8 @@ mod test {
 			.xpect_true();
 
 		// tags: a known widget (`Header`) and the `<Rule>` handler.
-		let tag = |name: &str| {
-			manifest.tags.iter().find(|tag| tag.name == name)
-		};
+		let tag =
+			|name: &str| manifest.tags.iter().find(|tag| tag.name == name);
 		tag("Header").xpect_some();
 		(tag("Rule").unwrap().kind == TagKind::Handler).xpect_true();
 

@@ -58,7 +58,6 @@ pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 		.run();
 }
 
-
 /// Bevy plugin that sets up the test runner infrastructure.
 #[derive(Default)]
 pub struct TestPlugin;
@@ -109,7 +108,6 @@ impl Plugin for TestPlugin {
 			);
 	}
 }
-
 
 /// Schedule that runs test execution systems.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]

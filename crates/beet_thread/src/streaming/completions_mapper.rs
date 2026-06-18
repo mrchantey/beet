@@ -31,7 +31,6 @@ use async_openai::types::chat::ImageUrl;
 use async_openai::types::chat::ToolChoiceOptions;
 use beet_core::prelude::*;
 
-
 // ═══════════════════════════════════════════════════════════════════════
 // Request Mapping: PostView -> ChatCompletionRequestMessage
 // ═══════════════════════════════════════════════════════════════════════
@@ -298,7 +297,6 @@ pub fn response_to_partial(
 	.xok()
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════
 // Streaming: StreamAccumulator + chunk mapping
 // ═══════════════════════════════════════════════════════════════════════
@@ -425,7 +423,6 @@ pub fn stream_chunk_to_partial(
 	.xok()
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════
 // Tool Mapping
 // ═══════════════════════════════════════════════════════════════════════
@@ -507,7 +504,6 @@ pub fn tool_choice_to_completions(
 		}
 	}
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // Helpers

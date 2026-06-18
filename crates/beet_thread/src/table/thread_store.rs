@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-
 pub fn store_thread_on_post(
 	async_commands: AsyncCommands,
 	changed: Query<(Entity, &Post), Changed<Post>>,

@@ -42,7 +42,10 @@ pub struct SuppressServerBoot;
 /// Registers the `LoadTemplate` observer on the marked entity, mirroring
 /// `CliServer::on_add`.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_load_template);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_load_template);
 }
 
 /// On `LoadTemplate`, boot the host's declared servers from the process argv,
@@ -84,9 +87,10 @@ mod test {
 	struct ServerEvents(Vec<&'static str>);
 
 	fn fire_load(world: &mut World, root: Entity) {
-		world
-			.entity_mut(root)
-			.trigger(|entity| LoadTemplate { entity, is_error: false });
+		world.entity_mut(root).trigger(|entity| LoadTemplate {
+			entity,
+			is_error: false,
+		});
 		world.flush();
 	}
 
@@ -99,9 +103,11 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.init_resource::<ServerEvents>()
-			.add_observer(|_: On<StartServer>, mut log: ResMut<ServerEvents>| {
-				log.0.push("boot");
-			});
+			.add_observer(
+				|_: On<StartServer>, mut log: ResMut<ServerEvents>| {
+					log.0.push("boot");
+				},
+			);
 		let world = app.world_mut();
 		let root = world.spawn(ServeOnLoad).id();
 		world.flush();
@@ -116,12 +122,16 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.init_resource::<ServerEvents>()
-			.add_observer(|_: On<StartServer>, mut log: ResMut<ServerEvents>| {
-				log.0.push("boot")
-			})
-			.add_observer(|_: On<StopServer>, mut log: ResMut<ServerEvents>| {
-				log.0.push("stop")
-			});
+			.add_observer(
+				|_: On<StartServer>, mut log: ResMut<ServerEvents>| {
+					log.0.push("boot")
+				},
+			)
+			.add_observer(
+				|_: On<StopServer>, mut log: ResMut<ServerEvents>| {
+					log.0.push("stop")
+				},
+			);
 		let world = app.world_mut();
 		let root = world.spawn(ServeOnLoad).id();
 		world.flush();

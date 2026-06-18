@@ -30,7 +30,6 @@ pub async fn ListBlobs(
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

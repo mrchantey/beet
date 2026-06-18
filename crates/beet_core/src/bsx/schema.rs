@@ -105,7 +105,9 @@ fn attr_prop_value(value: &AttrValue) -> Option<Value> {
 	match value {
 		AttrValue::Flag => Some(Value::Bool(true)),
 		AttrValue::Str(string) => Some(Value::Str(string.into())),
-		AttrValue::Expr(ValueExpr::Literal(literal)) => literal_prop_value(literal),
+		AttrValue::Expr(ValueExpr::Literal(literal)) => {
+			literal_prop_value(literal)
+		}
 		// a binding, entity ref, spread, verb call or style directive is not a
 		// plain prop value
 		AttrValue::Expr(_)
@@ -128,7 +130,10 @@ fn literal_prop_value(literal: &DataLiteral) -> Option<Value> {
 		DataLiteral::Struct(fields) => {
 			let mut map = Map::default();
 			for (key, item) in fields {
-				map.insert(SmolStr::from(key.as_str()), literal_prop_value(item)?);
+				map.insert(
+					SmolStr::from(key.as_str()),
+					literal_prop_value(item)?,
+				);
 			}
 			Some(Value::Map(map))
 		}
@@ -161,8 +166,10 @@ fn named_prop_value(named: &NamedLiteral) -> Option<Value> {
 		NamedFields::Struct(fields) => {
 			let mut payload = Map::default();
 			for (key, item) in fields {
-				payload
-					.insert(SmolStr::from(key.as_str()), literal_prop_value(item)?);
+				payload.insert(
+					SmolStr::from(key.as_str()),
+					literal_prop_value(item)?,
+				);
 			}
 			let mut map = Map::default();
 			map.insert(SmolStr::from(name), Value::Map(payload));
@@ -173,9 +180,7 @@ fn named_prop_value(named: &NamedLiteral) -> Option<Value> {
 
 /// The bare variant/type name of a (possibly qualified) path: the segment after
 /// the last `::`, eg `ButtonVariant::Outlined` -> `Outlined`.
-fn variant_name(name: &str) -> &str {
-	name.rsplit("::").next().unwrap_or(name)
-}
+fn variant_name(name: &str) -> &str { name.rsplit("::").next().unwrap_or(name) }
 
 /// A template's `bx:schema` declaration: an inline JSON schema, a remote schema
 /// referenced by `src` (resolved asynchronously), or none.
@@ -204,7 +209,9 @@ pub fn extract_schema_directive(nodes: &[BsxNode]) -> SchemaDirective {
 			}
 			// a `src` makes it remote; otherwise the raw-text body is inline JSON.
 			if let Some(src) = string_attr(el, "src") {
-				return Some(SchemaDirective::Remote(SmolStr::from(src.as_str())));
+				return Some(SchemaDirective::Remote(SmolStr::from(
+					src.as_str(),
+				)));
 			}
 			let json = schema_block_body(el)?;
 			ValueSchema::from_json_schema(&json)
@@ -241,9 +248,9 @@ fn string_attr(el: &BsxElement, key: &str) -> Option<String> {
 pub fn strip_schema_blocks(nodes: Vec<BsxNode>) -> Vec<BsxNode> {
 	nodes
 		.into_iter()
-		.filter(|node| {
-			!matches!(node, BsxNode::Element(el) if is_schema_block(el))
-		})
+		.filter(
+			|node| !matches!(node, BsxNode::Element(el) if is_schema_block(el)),
+		)
 		.collect()
 }
 
@@ -260,7 +267,6 @@ fn schema_block_body(el: &BsxElement) -> Option<String> {
 		_ => None,
 	})
 }
-
 
 #[cfg(all(test, feature = "json"))]
 mod test {
@@ -285,7 +291,12 @@ mod test {
 	fn props_value_collects_literals() {
 		let el = element(&[
 			("label", AttrValue::Str("hi".into())),
-			("count", AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(Value::Int(3))))),
+			(
+				"count",
+				AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(
+					Value::Int(3),
+				))),
+			),
 			("bx:scope", AttrValue::Str("x".into())),
 		]);
 		let Value::Map(map) = props_value(&el) else {
@@ -293,7 +304,11 @@ mod test {
 		};
 		// the two literal props are collected, the directive is skipped
 		map.0.len().xpect_eq(2);
-		map.0.get("label").unwrap().clone().xpect_eq(Value::Str("hi".into()));
+		map.0
+			.get("label")
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Str("hi".into()));
 		map.0.get("count").unwrap().clone().xpect_eq(Value::Int(3));
 	}
 
@@ -303,10 +318,12 @@ mod test {
 		// qualifying path is dropped (else the enum silently falls back to default).
 		let el = element(&[(
 			"variant",
-			AttrValue::Expr(ValueExpr::Literal(DataLiteral::Enum(NamedLiteral {
-				name: "ButtonVariant::Outlined".into(),
-				fields: NamedFields::Unit,
-			}))),
+			AttrValue::Expr(ValueExpr::Literal(DataLiteral::Enum(
+				NamedLiteral {
+					name: "ButtonVariant::Outlined".into(),
+					fields: NamedFields::Unit,
+				},
+			))),
 		)]);
 		let Value::Map(map) = props_value(&el) else {
 			panic!("expected map");

@@ -95,7 +95,6 @@ where
 	AsyncRunner::poll_and_update(|| world.update_local(), recv.wait()).await
 }
 
-
 /// Extension trait for calling [`Action`] components on
 /// [`EntityWorldMut`].
 #[extend::ext(name=EntityWorldMutActionExt)]

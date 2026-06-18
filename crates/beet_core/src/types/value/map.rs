@@ -85,7 +85,6 @@ impl Map {
 	}
 }
 
-
 impl core::fmt::Display for Map {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		let mut entries: Vec<_> = self.0.iter().collect();

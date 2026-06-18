@@ -41,7 +41,6 @@
 //! assert_eq!(ev.type_(), "click");
 //! ```
 
-
 use async_channel::Receiver;
 use async_channel::Sender;
 use async_channel::TryRecvError;
@@ -166,7 +165,6 @@ impl<T> Stream for HtmlEventListener<T> {
 		}
 	}
 }
-
 
 #[cfg(test)]
 #[cfg(target_arch = "wasm32")]

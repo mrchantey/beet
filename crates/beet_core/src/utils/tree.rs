@@ -131,8 +131,6 @@ impl<T> Tree<T> {
 		self.children.last_mut().unwrap()
 	}
 
-
-
 	/// Recursively sorts all children by their values.
 	pub fn sort_recursive(&mut self)
 	where
@@ -170,7 +168,6 @@ impl<T> Tree<T> {
 impl<T> From<T> for Tree<T> {
 	fn from(value: T) -> Self { Self::new(value) }
 }
-
 
 impl<T: fmt::Display> fmt::Display for Tree<T> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

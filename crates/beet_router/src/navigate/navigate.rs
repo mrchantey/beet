@@ -55,7 +55,6 @@ impl core::fmt::Display for NavigateTo {
 	}
 }
 
-
 /// Middleware that intercepts `--navigate` and resolves the target
 /// route from the [`RouteTree`]. If the param is absent, calls the
 /// inner handler via [`Next`].
@@ -255,7 +254,6 @@ pub(crate) fn path_segments(pattern: &PathPattern) -> Result<Vec<SmolStr>> {
 		.xok()
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -301,7 +299,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_func_route("", || rsx! { <h1>"Root"</h1> }),
+				render_action::fixed_func_route(
+					"",
+					|| rsx! { <h1>"Root"</h1> }
+				),
 				render_action::fixed_func_route(
 					"about",
 					|| rsx! { <p>"About page"</p> }

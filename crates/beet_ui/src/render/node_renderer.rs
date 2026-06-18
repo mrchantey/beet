@@ -14,7 +14,6 @@ pub trait NodeRenderer {
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError>;
 
-
 	fn run(
 		&mut self,
 		entity: &mut EntityWorldMut,
@@ -28,8 +27,6 @@ pub trait NodeRenderer {
 		})
 	}
 }
-
-
 
 /// Context passed to [`NodeRenderer::render`].
 pub struct RenderContext<'a> {
@@ -121,4 +118,3 @@ pub enum RenderError {
 impl From<BevyError> for RenderError {
 	fn from(err: BevyError) -> Self { RenderError::Other(err) }
 }
-

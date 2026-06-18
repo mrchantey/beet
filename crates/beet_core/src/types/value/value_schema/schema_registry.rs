@@ -72,10 +72,12 @@ impl SchemaRegistry {
 			return ValueSchema::Any;
 		}
 		match schema {
-			ValueSchema::Reference(name) => match self.schemas.get(name.as_str()) {
-				Some(target) => self.resolve_inner(target, depth - 1),
-				None => ValueSchema::Any,
-			},
+			ValueSchema::Reference(name) => {
+				match self.schemas.get(name.as_str()) {
+					Some(target) => self.resolve_inner(target, depth - 1),
+					None => ValueSchema::Any,
+				}
+			}
 			ValueSchema::Optional(inner) => ValueSchema::Optional(Box::new(
 				self.resolve_inner(inner, depth - 1),
 			)),
@@ -100,7 +102,8 @@ impl SchemaRegistry {
 							required: field.required,
 							label: field.label.clone(),
 							description: field.description.clone(),
-							schema: self.resolve_inner(&field.schema, depth - 1),
+							schema: self
+								.resolve_inner(&field.schema, depth - 1),
 						})
 						.collect(),
 				})
@@ -124,10 +127,9 @@ impl SchemaRegistry {
 					.iter()
 					.map(|variant| VariantSchema {
 						name: variant.name.clone(),
-						payload: variant
-							.payload
-							.as_ref()
-							.map(|payload| self.resolve_inner(payload, depth - 1)),
+						payload: variant.payload.as_ref().map(|payload| {
+							self.resolve_inner(payload, depth - 1)
+						}),
 					})
 					.collect(),
 			}),

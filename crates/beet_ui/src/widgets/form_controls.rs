@@ -265,14 +265,15 @@ fn ancestor_form(
 	None
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
 	/// Render a template to an HTML string through the substrate.
-	fn render_html(template: impl bevy::ecs::template::Template<Output = ()>) -> String {
+	fn render_html(
+		template: impl bevy::ecs::template::Template<Output = ()>,
+	) -> String {
 		let mut world = ui_world();
 		let root = world.spawn_template(template).unwrap().id();
 		HtmlRenderer::new()
@@ -443,12 +444,24 @@ mod test {
 		// click Submit, firing Submit on the form.
 		let button = element(&mut app, "button");
 		let pointer = app.world_mut().spawn_empty().id();
-		app.world_mut().entity_mut(button).trigger(PointerUp::new(pointer));
+		app.world_mut()
+			.entity_mut(button)
+			.trigger(PointerUp::new(pointer));
 		app.update();
 
 		let values = captured.get().unwrap();
-		values.get("name").unwrap().as_str().unwrap().xpect_eq("Ada");
+		values
+			.get("name")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("Ada");
 		// the untouched select defaults to its first option's value.
-		values.get("role").unwrap().as_str().unwrap().xpect_eq("engineer");
+		values
+			.get("role")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("engineer");
 	}
 }

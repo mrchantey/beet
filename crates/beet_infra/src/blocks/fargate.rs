@@ -752,15 +752,18 @@ impl Block for FargateBlock {
 			self.desired_count.clamp(self.min_count, self.max_count);
 		// the http target group is always registered; the ssh target group only
 		// when `allow_ssh` provisioned the NLB.
-		let mut load_balancer = vec![AwsEcsServiceResourceBlockTypeLoadBalancer {
-			target_group_arn: Some(target_group.field_ref("arn").into()),
-			container_name: self.label.clone(),
-			container_port: self.container_port.into(),
-			..default()
-		}];
+		let mut load_balancer =
+			vec![AwsEcsServiceResourceBlockTypeLoadBalancer {
+				target_group_arn: Some(target_group.field_ref("arn").into()),
+				container_name: self.label.clone(),
+				container_port: self.container_port.into(),
+				..default()
+			}];
 		if let Some((_, ssh_target_group, _)) = &ssh_infra {
 			load_balancer.push(AwsEcsServiceResourceBlockTypeLoadBalancer {
-				target_group_arn: Some(ssh_target_group.field_ref("arn").into()),
+				target_group_arn: Some(
+					ssh_target_group.field_ref("arn").into(),
+				),
 				container_name: self.label.clone(),
 				container_port: self.ssh_container_port.into(),
 				..default()
@@ -922,7 +925,6 @@ impl Block for FargateBlock {
 		Ok(())
 	}
 }
-
 
 #[cfg(test)]
 mod tests {

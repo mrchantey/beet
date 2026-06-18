@@ -3,8 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::BlobStoreProvider;
 
-
-
 #[derive(Debug, Clone, Deref, Get)]
 pub struct Project {
 	config: Config,

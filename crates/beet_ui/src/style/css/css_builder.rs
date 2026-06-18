@@ -188,12 +188,10 @@ impl CssBuilder {
 	}
 }
 
-
 struct CollisionFound {
 	original: CssVariable,
 	formatted: CssVariable,
 }
-
 
 #[derive(Debug, Default, Copy, Clone)]
 pub enum FormatVariables {
@@ -211,7 +209,6 @@ pub enum FormatVariables {
 		min_len: usize,
 	},
 }
-
 
 impl FormatVariables {
 	/// Formats variables shortening the full name by five parts:
@@ -259,7 +256,6 @@ impl FormatVariables {
 		}
 	}
 }
-
 
 /// The right hand side of a css declaration
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

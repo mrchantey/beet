@@ -40,7 +40,9 @@ fn value_to_dynamic(value: &Value) -> Dynamic {
 		Value::Float(val) => (*val).into(),
 		Value::Str(val) => val.as_str().into(),
 		Value::Bytes(val) => Dynamic::from_array(
-			val.iter().map(|byte| (*byte as i64).into()).collect::<rhai::Array>(),
+			val.iter()
+				.map(|byte| (*byte as i64).into())
+				.collect::<rhai::Array>(),
 		),
 		Value::Map(map) => Dynamic::from_map(
 			map.iter()

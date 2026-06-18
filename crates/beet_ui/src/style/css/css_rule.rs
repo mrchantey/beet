@@ -172,7 +172,6 @@ impl CssRule {
 	}
 }
 
-
 /// Converts a token value to a [`CssRule`].
 pub trait AsCssRule {
 	fn as_css_rule(&self, value: &TokenValue) -> Result<CssRule>;
@@ -213,7 +212,6 @@ impl CssTokenMap {
 		self
 	}
 }
-
 
 /// Generates a token type that resolves to named CSS properties.
 ///
@@ -265,7 +263,6 @@ macro_rules! css_property {
  };
 }
 
-
 /// Like [`css_property!`] but also implements [`CanonicalToken`] for the value
 /// type, so a [`Rule`] can set it via [`Rule::with_canonical`] without naming
 /// the property token, eg `Rule::new().with_canonical(Display::None)`.
@@ -295,7 +292,6 @@ macro_rules! canonical_property {
   }
  };
 }
-
 
 /// Generates a token type that resolves to a CSS variable declaration.
 ///

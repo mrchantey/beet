@@ -267,8 +267,10 @@ mod test {
 	/// buffer-after-eval shim missed it.
 	#[beet_core::test]
 	fn drains_async_microtasks() {
-		let output =
-			capture(r#"Promise.resolve().then(() => console.log("later"))"#, ());
+		let output = capture(
+			r#"Promise.resolve().then(() => console.log("later"))"#,
+			(),
+		);
 		output.stdout.xpect_eq(vec!["later".to_string()]);
 	}
 }

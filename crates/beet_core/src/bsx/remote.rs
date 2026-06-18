@@ -35,8 +35,13 @@ pub fn register_remote_schema(
 	let world = unsafe { cx.entity.world_mut() };
 	let (async_world, spawner, root, pending_id) =
 		register_pending_fetch(world, entity_id)?;
-	spawner
-		.spawn(resolve_remote_schema(async_world, name, url, root, pending_id));
+	spawner.spawn(resolve_remote_schema(
+		async_world,
+		name,
+		url,
+		root,
+		pending_id,
+	));
 	Ok(())
 }
 
@@ -83,7 +88,8 @@ async fn resolve_remote_schema(
 				.get_resource_or_init::<SchemaRegistry>()
 				.insert(name, schema);
 			let mut root_entity = world.entity_mut(root);
-			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>() {
+			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>()
+			{
 				pending.resolve(pending_id);
 			}
 			drain_pending_dependencies(&mut root_entity);
@@ -140,11 +146,11 @@ async fn resolve_remote_template(
 	async_world
 		.with(move |world: &mut World| {
 			let mut root_entity = world.entity_mut(root);
-			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>() {
+			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>()
+			{
 				pending.resolve(pending_id);
 			}
 			drain_pending_dependencies(&mut root_entity);
 		})
 		.await;
 }
-

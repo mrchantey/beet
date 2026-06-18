@@ -230,7 +230,10 @@ pub static BEET_TESTS: [BeetTestCase];
 /// slice. The embedded mirror of [`inventory_tests`].
 #[cfg(feature = "testing_embedded")]
 pub fn embedded_tests() -> Vec<TestDescAndFn> {
-	BEET_TESTS.iter().map(BeetTestCase::to_desc_and_fn).collect()
+	BEET_TESTS
+		.iter()
+		.map(BeetTestCase::to_desc_and_fn)
+		.collect()
 }
 
 #[cfg(feature = "custom_test_frameworks")]

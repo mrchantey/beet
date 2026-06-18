@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use bevy::animation::RepeatAnimation;
 use core::time::Duration;
 
-
 pub(super) const DEFAULT_ANIMATION_TRANSITION: Duration =
 	Duration::from_millis(250);
 
@@ -142,8 +141,6 @@ pub fn clip_to_player(
 		.id();
 	(player_entity, animation_index)
 }
-
-
 
 #[cfg(test)]
 mod test {

@@ -119,7 +119,6 @@ impl PrettyTracing {
 		// // remove timestamps from the output in debug mode
 		// let sub = sub.without_time();
 
-
 		// if self.aws_lambda && std::env::var("AWS_LAMBDA_LOG_FORMAT")
 		// 	.unwrap_or_default()
 		// 	.eq_ignore_ascii_case("json") {

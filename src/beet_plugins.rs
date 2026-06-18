@@ -28,7 +28,6 @@ impl Plugin for BeetPlugins {
 	}
 }
 
-
 /// Will set the [`App::runner`] based on the features enabled.
 #[derive(Default)]
 pub struct BeetRunner;
@@ -60,7 +59,6 @@ impl Plugin for BeetRunner {
 	}
 }
 
-
 #[allow(unused)]
 fn print_config(pkg_config: Res<PackageConfig>) {
 	// Order matches runner priority (last wins, so check in reverse)
@@ -82,7 +80,6 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 	// 	},
 	// );
 }
-
 
 /// Master plugin for `beet_router`, combining all sub-plugins.
 ///

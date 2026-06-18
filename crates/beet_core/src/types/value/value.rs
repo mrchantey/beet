@@ -31,8 +31,6 @@ pub enum Value {
 	List(Vec<Value>),
 }
 
-
-
 impl Eq for Value {}
 
 /// The kind/type of a [`Value`], used in error reporting.
@@ -486,7 +484,6 @@ impl Ord for Value {
 	}
 }
 
-
 impl From<bool> for Value {
 	fn from(value: bool) -> Self { Value::Bool(value) }
 }
@@ -646,7 +643,6 @@ macro_rules! val {
 		$crate::prelude::Value::from($other)
 	};
 }
-
 
 #[cfg(test)]
 mod test {
@@ -942,7 +938,6 @@ mod test {
 			((result.float_32 - original.float_32).abs() < 0.001).xpect_true();
 			((result.float_64 - original.float_64).abs() < 0.001).xpect_true();
 		}
-
 
 		#[crate::test]
 		fn roundtrip_string() { roundtrip_for("hello world".to_string()); }

@@ -3,7 +3,6 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use core::marker::PhantomData;
 
-
 /// Sets the [`Text`] of all entities with the filter component `F`
 /// when this action runs, then passes.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]

@@ -41,7 +41,11 @@ pub fn clamp_scroll_positions<B: Component + AsBuffer>(
 				.filter_map(|entity| {
 					let node = charcell.unresolved_node(entity).ok()?;
 					node.is_scroll_container().then(|| {
-						(entity, scroll_state(&node, &charcell, viewport).max_offset())
+						(
+							entity,
+							scroll_state(&node, &charcell, viewport)
+								.max_offset(),
+						)
 					})
 				})
 				.collect()
@@ -77,7 +81,10 @@ pub(super) fn scroll_state(
 		scrollport.width().max(0) as u32,
 		scrollport.height().max(0) as u32,
 	);
-	ScrollState::new(scroll_content_size(node, query, scrollport), scrollport_size)
+	ScrollState::new(
+		scroll_content_size(node, query, scrollport),
+		scrollport_size,
+	)
 }
 
 /// The natural size of a scroll container's content, in cells: the union of its
@@ -94,10 +101,8 @@ pub(super) fn scroll_content_size(
 	query: &CharcellQuery,
 	origin: IRect,
 ) -> UVec2 {
-	let mut content = UVec2::new(
-		origin.width().max(0) as u32,
-		origin.height().max(0) as u32,
-	);
+	let mut content =
+		UVec2::new(origin.width().max(0) as u32, origin.height().max(0) as u32);
 	for child in node.child_nodes(query) {
 		let rect = child.layout_rect();
 		let offset = rect.min - origin.min;
@@ -156,12 +161,12 @@ impl ScrollGutters {
 		content: UVec2,
 		content_rect: UVec2,
 	) -> Self {
-		let reserve = |overflow: Overflow, content: u32, port: u32| match overflow
-		{
-			Overflow::Scroll => true,
-			Overflow::Auto => content > port,
-			Overflow::Visible | Overflow::Hidden => false,
-		};
+		let reserve =
+			|overflow: Overflow, content: u32, port: u32| match overflow {
+				Overflow::Scroll => true,
+				Overflow::Auto => content > port,
+				Overflow::Visible | Overflow::Hidden => false,
+			};
 		Self {
 			vertical: reserve(overflow_y, content.y, content_rect.y),
 			horizontal: reserve(overflow_x, content.x, content_rect.x),
@@ -220,7 +225,10 @@ pub(super) fn scrollport_of(
 	query: &CharcellQuery,
 	content_rect: IRect,
 ) -> IRect {
-	inset_rect(content_rect, node_gutters(node, query, content_rect).inset())
+	inset_rect(
+		content_rect,
+		node_gutters(node, query, content_rect).inset(),
+	)
 }
 
 /// The on-screen geometry of one scrollbar axis, in buffer cells.
@@ -250,7 +258,9 @@ pub(super) struct AxisBar {
 #[cfg_attr(not(feature = "tui"), allow(dead_code))]
 impl AxisBar {
 	/// The leftover track the thumb travels across (track minus thumb length).
-	pub fn travel(&self) -> u32 { self.track_len.saturating_sub(self.thumb_len) }
+	pub fn travel(&self) -> u32 {
+		self.track_len.saturating_sub(self.thumb_len)
+	}
 
 	/// Map an along-axis cursor coordinate (grabbed `grab` cells into the thumb)
 	/// to a clamped scroll offset: drag the thumb to the track end to reach
@@ -293,7 +303,8 @@ pub(super) fn scrollbar_geometry(
 		return None;
 	}
 	let layout_rect = translate_rect(node.layout_rect(), screen_offset);
-	let content_rect = BoxModel::from_node(node, viewport).content_rect(layout_rect);
+	let content_rect =
+		BoxModel::from_node(node, viewport).content_rect(layout_rect);
 	let gutters = node_gutters(node, query, content_rect);
 	if !gutters.any() {
 		return None;
@@ -349,7 +360,8 @@ pub(super) fn paint_scrollbar(
 	screen_offset: IVec2,
 	clip: Clip,
 ) {
-	let Some(geometry) = scrollbar_geometry(node, query, viewport, screen_offset)
+	let Some(geometry) =
+		scrollbar_geometry(node, query, viewport, screen_offset)
 	else {
 		return;
 	};
@@ -405,7 +417,11 @@ fn paint_bar(
 			foreground: color,
 			..default()
 		};
-		buffer.set_composite_clipped(pos, Cell::new(glyph, style, entity), clip);
+		buffer.set_composite_clipped(
+			pos,
+			Cell::new(glyph, style, entity),
+			clip,
+		);
 	}
 }
 
@@ -430,17 +446,16 @@ mod test {
 	) -> Buffer {
 		let mut world = CharcellPlugin::world();
 		world.get_resource_or_init::<RuleSet>().extend_rules(rules);
-		let body: String =
-			(0..lines).map(|i| format!("r{i}")).collect::<Vec<_>>().join("\n");
+		let body: String = (0..lines)
+			.map(|i| format!("r{i}"))
+			.collect::<Vec<_>>()
+			.join("\n");
 		let root = world
-			.spawn((
-				Buffer::new(size).into_double_buffer(),
-				rsx! {
-					<div>
-						<div class="scroller"><pre>{body}</pre></div>
-					</div>
-				},
-			))
+			.spawn((Buffer::new(size).into_double_buffer(), rsx! {
+				<div>
+					<div class="scroller"><pre>{body}</pre></div>
+				</div>
+			}))
 			.id();
 		// first pass inserts ScrollPosition + lays out
 		world.run_schedule(PostParseTree);
@@ -450,7 +465,9 @@ mod test {
 			.iter(&world)
 			.next()
 			.expect("a scroll container with a ScrollPosition");
-		world.entity_mut(scroller).insert(ScrollPosition::new(offset));
+		world
+			.entity_mut(scroller)
+			.insert(ScrollPosition::new(offset));
 		world.run_schedule(PostParseTree);
 		world
 			.entity_mut(root)
@@ -485,9 +502,9 @@ mod test {
 		frame.as_str().xnot().xpect_contains("r0");
 		frame.as_str().xnot().xpect_contains("r9");
 		// a vertical bar glyph (track or thumb) is painted somewhere
-		let has_bar = buffer.iter_cells().any(|(_, cell)| {
-			matches!(cell.symbol_str(), "│" | "█")
-		});
+		let has_bar = buffer
+			.iter_cells()
+			.any(|(_, cell)| matches!(cell.symbol_str(), "│" | "█"));
 		has_bar.xpect_true();
 	}
 
@@ -564,14 +581,11 @@ mod test {
 	fn scrollbar_color_styles_the_thumb() {
 		let thumb = Color::srgb(0.9, 0.2, 0.3);
 		let track = Color::srgb(0.1, 0.1, 0.1);
-		let mut rules =
-			scroller_rules(Overflow::Visible, Overflow::Scroll);
-		rules.push(
-			Rule::class("scroller").with_value(
-				common_props::ScrollbarColorProp,
-				ScrollbarColor { thumb, track },
-			),
-		);
+		let mut rules = scroller_rules(Overflow::Visible, Overflow::Scroll);
+		rules.push(Rule::class("scroller").with_value(
+			common_props::ScrollbarColorProp,
+			ScrollbarColor { thumb, track },
+		));
 		let buffer = scroll_buffer(UVec2::new(12, 8), rules, 10, IVec2::ZERO);
 		// the thumb cell (the solid block) carries the resolved thumb colour
 		let thumb_fg = buffer

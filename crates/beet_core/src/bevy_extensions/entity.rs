@@ -6,7 +6,6 @@ use bevy::ecs::system::SystemParamValidationError;
 
 use crate::prelude::*;
 
-
 /// Extension trait adding utility methods to [`EntityRef`].
 #[extend::ext(name=EntityRefExt)]
 pub impl<'a> EntityRef<'a> {

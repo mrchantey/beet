@@ -53,9 +53,7 @@ fn setup(mut commands: Commands) -> Result {
 
 /// The stack namespaces every aws resource; pick your region.
 #[cfg(feature = "deploy")]
-fn stack() -> Stack {
-	Stack::new("beet-ssh-site").with_aws_region("us-west-2")
-}
+fn stack() -> Stack { Stack::new("beet-ssh-site").with_aws_region("us-west-2") }
 
 /// The infra scene: the standard IaC commands plus a `deploy` route that builds
 /// the container binary, applies the terraform, pushes the image and watches it.
@@ -89,7 +87,7 @@ fn infra_scene() -> Result<impl Bundle> {
 			])
 		),
 	])
-	.xok()
+		.xok()
 }
 
 /// Build the `ssh_tui_site` example as a release binary for the container, with

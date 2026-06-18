@@ -375,7 +375,8 @@ pub impl<K: AsRef<str> + Eq + Hash, V: AsRef<str>> MultiMap<K, V> {
 				normalized.insert_key(snake_key);
 			} else {
 				for value in values {
-					normalized.insert(snake_key.clone(), value.as_ref().to_string());
+					normalized
+						.insert(snake_key.clone(), value.as_ref().to_string());
 				}
 			}
 		}

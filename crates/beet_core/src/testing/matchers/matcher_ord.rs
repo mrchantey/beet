@@ -107,7 +107,6 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 mod test {
 	use crate::prelude::*;
 
-
 	#[crate::test]
 	fn order() {
 		0.xpect_greater_or_equal_to(0);

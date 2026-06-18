@@ -65,7 +65,6 @@ pub impl Commands<'_, '_> {
 	}
 }
 
-
 /// Extension trait adding utility methods to [`EntityCommands`].
 #[extend::ext(name=EntityCommandsExt)]
 pub impl EntityCommands<'_> {

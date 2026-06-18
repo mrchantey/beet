@@ -46,8 +46,16 @@ fn Card(#[prop(into)] title: String) -> impl Bundle {
 #[beet_core::test]
 fn into_prop_flows_to_body() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <Card title="Hi"/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	let root = world
+		.spawn_template(rsx! { <Card title="Hi"/> })
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 	descendant_values(&world, root).xpect_eq(vec!["Hi".to_string()]);
 }
 
@@ -76,11 +84,22 @@ fn default_and_option_props() {
 	});
 
 	// supplied props flow through.
-	let root = world.spawn_template(rsx! { <Tag kind="x" label="hi"/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Tag kind="x" label="hi"/> })
+		.unwrap()
+		.id();
 	world.with_state::<AttributeQuery, _>(|query| {
-		query.find(root, "class").unwrap().1.as_str().unwrap().xpect_eq("x");
+		query
+			.find(root, "class")
+			.unwrap()
+			.1
+			.as_str()
+			.unwrap()
+			.xpect_eq("x");
 	});
-	descendant_values(&world, root).contains(&"hi".to_string()).xpect_true();
+	descendant_values(&world, root)
+		.contains(&"hi".to_string())
+		.xpect_true();
 }
 
 #[derive(Default, Clone, PartialEq, Reflect)]
@@ -102,10 +121,24 @@ fn Badge(#[prop(required)] variant: Variant) -> impl Bundle {
 #[beet_core::test]
 fn required_prop_supplied_resolves() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <Badge variant=Variant::Error/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("span");
+	let root = world
+		.spawn_template(rsx! { <Badge variant=Variant::Error/> })
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("span");
 	world.with_state::<AttributeQuery, _>(|query| {
-		query.find(root, "class").unwrap().1.as_str().unwrap().xpect_eq("error");
+		query
+			.find(root, "class")
+			.unwrap()
+			.1
+			.as_str()
+			.unwrap()
+			.xpect_eq("error");
 	});
 }
 
@@ -143,7 +176,12 @@ fn system_template_reads_resource() {
 	let mut world = world();
 	world.insert_resource(AppTitle("beet".into()));
 	let root = world.spawn_template(rsx! { <AppInfo/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("article");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("article");
 	descendant_values(&world, root).xpect_eq(vec!["beet".to_string()]);
 }
 
@@ -157,9 +195,18 @@ fn Panel(#[prop] role: String, config: Res<AppTitle>) -> impl Bundle {
 fn system_template_mixes_props_and_params() {
 	let mut world = world();
 	world.insert_resource(AppTitle("beet".into()));
-	let root = world.spawn_template(rsx! { <Panel role="main"/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Panel role="main"/> })
+		.unwrap()
+		.id();
 	world.with_state::<AttributeQuery, _>(|query| {
-		query.find(root, "class").unwrap().1.as_str().unwrap().xpect_eq("main");
+		query
+			.find(root, "class")
+			.unwrap()
+			.1
+			.as_str()
+			.unwrap()
+			.xpect_eq("main");
 	});
 	descendant_values(&world, root).xpect_eq(vec!["beet".to_string()]);
 }
@@ -187,14 +234,22 @@ fn Counter(#[prop(into)] label: String) -> impl Bundle {
 fn template_event_attaches_observer() {
 	let mut world = world();
 	world.init_resource::<Count>();
-	let root = world.spawn_template(rsx! { <Counter label="Bump"/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <Counter label="Bump"/> })
+		.unwrap()
+		.id();
 
 	world.resource::<Count>().0.xpect_eq(0);
 	world.trigger(Bump(root));
 	world.trigger(Bump(root));
 	world.resource::<Count>().0.xpect_eq(2);
 	// the semantic classes attached, not a `class=` string.
-	world.entity(root).get::<Classes>().unwrap().contains_selector("btn").xpect_true();
+	world
+		.entity(root)
+		.get::<Classes>()
+		.unwrap()
+		.contains_selector("btn")
+		.xpect_true();
 }
 
 // ---- slots ------------------------------------------------------------------
@@ -219,7 +274,8 @@ fn named_and_default_slots() {
 				<p>"Body"</p>
 			</LayoutPanel>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("<header><h1>Title</h1></header>")
@@ -241,7 +297,10 @@ fn FallbackPanel() -> impl Bundle {
 #[beet_core::test]
 fn slot_fallback_renders_when_unset() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <FallbackPanel/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <FallbackPanel/> })
+		.unwrap()
+		.id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("Default Title")
@@ -258,7 +317,8 @@ fn slot_fallback_overridden_by_caller() {
 				<p>"Real Body"</p>
 			</FallbackPanel>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("<header><h1>Real Title</h1></header>")
@@ -274,10 +334,15 @@ fn slot_children_preserve_order() {
 		.spawn_template(rsx! {
 			<LayoutPanel><p>"one"</p><p>"two"</p><p>"three"</p></LayoutPanel>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	let html = render_html(&mut world, root);
-	html.find("one").unwrap().xpect_less_than(html.find("two").unwrap());
-	html.find("two").unwrap().xpect_less_than(html.find("three").unwrap());
+	html.find("one")
+		.unwrap()
+		.xpect_less_than(html.find("two").unwrap());
+	html.find("two")
+		.unwrap()
+		.xpect_less_than(html.find("three").unwrap());
 }
 
 // nested templates: a widget that exposes a default slot, used as content of
@@ -297,7 +362,8 @@ fn nested_template_in_named_slot() {
 				<p>"Body"</p>
 			</LayoutPanel>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("<header><span>Title</span></header>")
@@ -306,6 +372,4 @@ fn nested_template_in_named_slot() {
 
 // reference the imported `classes` so the import is exercised.
 #[beet_core::test]
-fn classes_constant_is_a_class_name() {
-	let _ = classes::BTN;
-}
+fn classes_constant_is_a_class_name() { let _ = classes::BTN; }

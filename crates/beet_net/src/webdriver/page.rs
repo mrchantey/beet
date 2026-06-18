@@ -10,7 +10,6 @@ use bevy::prelude::Result;
 use serde_json::Value;
 use serde_json::json;
 
-
 /// High level ergonomic wrapper over a BiDi `Session` bound to a single
 /// top-level browsing context (page / tab).
 ///
@@ -118,7 +117,6 @@ impl Page {
 			.to_string()
 			.xok()
 	}
-
 
 	/// Query a single element. Returns `Ok(None)` if no match.
 	/// When an element is found we extract its BiDi remote handle

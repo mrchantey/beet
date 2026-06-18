@@ -13,7 +13,6 @@
 use super::*;
 use beet_core::prelude::*;
 
-
 // ============================================================================
 // ContentType
 // ============================================================================
@@ -618,7 +617,6 @@ impl Header for UserAgent {
 
 	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
-
 
 #[cfg(test)]
 mod test {

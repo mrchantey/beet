@@ -47,8 +47,16 @@ impl Plugin for ActionPlugin {
 		// Runs on native (quickjs) and wasm (`script_ext`); the verb lives in the
 		// `scripting` module, so the wasm arm needs that feature too.
 		#[cfg(any(
-			all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")),
-			all(feature = "scripting", feature = "json", target_arch = "wasm32")
+			all(
+				feature = "quickjs",
+				feature = "json",
+				not(target_arch = "wasm32")
+			),
+			all(
+				feature = "scripting",
+				feature = "json",
+				target_arch = "wasm32"
+			)
 		))]
 		app.register_type::<EvalOnLoad>();
 	}

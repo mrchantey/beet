@@ -10,7 +10,7 @@ use std::path::Path;
 /// The directory site-relative paths resolve against: a `<RoutesDir src>` scan
 /// root and a `<Template src>` include base. A host sets this to the directory of
 /// its entry file; defaults to the workspace root, matching the [`WsPathBuf`]
-/// convention. 
+/// convention.
 #[derive(Debug, Clone, Resource)]
 pub struct SiteRoot(pub AbsPathBuf);
 

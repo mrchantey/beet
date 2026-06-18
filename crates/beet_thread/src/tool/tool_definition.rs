@@ -112,9 +112,6 @@ impl FunctionToolDefinition {
 	}
 }
 
-
-
-
 #[derive(Debug, Default, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize, Component, Default)]
 pub enum ToolChoice {

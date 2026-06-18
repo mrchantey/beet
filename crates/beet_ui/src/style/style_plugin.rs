@@ -83,7 +83,6 @@ impl Plugin for StylePlugin {
 	}
 }
 
-
 /// The [`PostParseTree`] set that resolves [`VisualStyle`](crate::style::VisualStyle),
 /// [`LayoutStyle`](crate::style::LayoutStyle), and [`BoxStyle`](crate::style::BoxStyle)
 /// from the [`RuleSet`] cascade. Charcell decorations and the paint pipeline

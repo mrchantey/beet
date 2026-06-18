@@ -2,9 +2,6 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-
-
-
 /// Border and spacing styles for a node's box model.
 ///
 /// Holds per-side border colors and margin/border/padding dimensions.
@@ -56,7 +53,6 @@ impl BoxStyle {
 	}
 }
 
-
 impl AsCssValue for f32 {
 	fn as_css_value(&self) -> Result<CssValue> {
 		CssValue::expression(self.to_string()).xok()
@@ -77,7 +73,6 @@ impl AsCssValue for i32 {
 		CssValue::expression(self.to_string()).xok()
 	}
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -145,7 +140,6 @@ impl AsCssValue for Length {
 	}
 }
 
-
 #[derive(Debug, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Elevation {
@@ -186,7 +180,6 @@ impl AsCssValue for Elevation {
 		.xok()
 	}
 }
-
 
 css_property!(
 	ShapeProps,

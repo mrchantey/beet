@@ -73,12 +73,17 @@ fn main() -> Result {
 		.map(|addr| addr.to_string())
 		.unwrap_or_else(|| format!("127.0.0.1:{}", DEFAULT_SSH_PORT));
 	let hold = args.params.contains_key("hold");
-	let hold_for =
-		Duration::from_secs_f32(parse_param(&args, "hold-secs").unwrap_or(20.0));
+	let hold_for = Duration::from_secs_f32(
+		parse_param(&args, "hold-secs").unwrap_or(20.0),
+	);
 	let input_hz = parse_param(&args, "input-hz").unwrap_or(2.0);
 
 	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin::default()))
+		.add_plugins((
+			MinimalPlugins,
+			LogPlugin::default(),
+			AsyncPlugin::default(),
+		))
 		.insert_resource(StressConfig {
 			count,
 			addr,
@@ -105,7 +110,11 @@ fn spawn_sessions(mut commands: Commands, config: Res<StressConfig>) {
 		"opening {} ssh sessions to {} ({})",
 		config.count,
 		config.addr,
-		if config.hold { "steady-state" } else { "connect-storm" }
+		if config.hold {
+			"steady-state"
+		} else {
+			"connect-storm"
+		}
 	);
 	for _ in 0..config.count {
 		commands.spawn(SshSession::insert_anon(&config.addr));
@@ -155,7 +164,9 @@ fn on_recv(
 			// a frame arriving after a driving input closes the latency sample.
 			if let Ok(mut driver) = drivers.get_mut(session) {
 				if let Some(sent) = driver.pending_since.take() {
-					stats.latencies_ms.push(sent.elapsed().as_secs_f32() * 1000.0);
+					stats
+						.latencies_ms
+						.push(sent.elapsed().as_secs_f32() * 1000.0);
 				}
 			}
 		}
@@ -217,10 +228,22 @@ struct DriveInput {
 /// streamed frame diff (the dominant per-interaction cost). Only the navigating
 /// Enter is flagged `repaints`, so the latency samples reflect real frames.
 const DRIVE_INPUTS: &[DriveInput] = &[
-	DriveInput { bytes: b"\x1b[<65;10;5M", repaints: false }, // wheel down
-	DriveInput { bytes: b"\x1b[<35;20;3M", repaints: false }, // hover move
-	DriveInput { bytes: b"\t", repaints: false },             // focus the link
-	DriveInput { bytes: b"\r", repaints: true },              // Enter: navigate
+	DriveInput {
+		bytes: b"\x1b[<65;10;5M",
+		repaints: false,
+	}, // wheel down
+	DriveInput {
+		bytes: b"\x1b[<35;20;3M",
+		repaints: false,
+	}, // hover move
+	DriveInput {
+		bytes: b"\t",
+		repaints: false,
+	}, // focus the link
+	DriveInput {
+		bytes: b"\r",
+		repaints: true,
+	}, // Enter: navigate
 ];
 
 /// Report progress each second. In connect-storm mode, exit once every session
@@ -276,7 +299,11 @@ fn report_and_exit(
 
 /// The final result line(s): always the connect/paint tally; in hold mode also
 /// the input count and input-to-frame latency percentiles.
-fn report_summary(config: &StressConfig, stats: &StressStats, elapsed: Duration) {
+fn report_summary(
+	config: &StressConfig,
+	stats: &StressStats,
+	elapsed: Duration,
+) {
 	cross_log!(
 		"stress done: {}/{} connected, {}/{} painted, {} bytes in {:.1}s",
 		stats.connected,

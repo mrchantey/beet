@@ -6,7 +6,6 @@
 use crate::prelude::*;
 use core::fmt::Display;
 
-
 /// Extension trait adding approximate equality assertion methods.
 #[extend::ext(name=MatcherClose)]
 pub impl<T, U> T
@@ -64,7 +63,6 @@ fn assert<T: CloseTo + Display>(expected: T, received: MaybeNot<T>, delta: T) {
 		);
 	}
 }
-
 
 #[cfg(test)]
 mod test {

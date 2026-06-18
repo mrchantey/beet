@@ -54,7 +54,8 @@ impl ElementTraverseQuery<'_, '_> {
 		// `successors` yields `entity`, then each `parent`, stopping the first
 		// time a parent has already been visited.
 		core::iter::successors(Some(entity), move |&current| {
-			self.parent(current).filter(|parent| visited.insert(*parent))
+			self.parent(current)
+				.filter(|parent| visited.insert(*parent))
 		})
 	}
 }

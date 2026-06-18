@@ -285,7 +285,6 @@ impl<'a> AgentPost<'a> {
 	}
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════
 // Post constructors
 // ═══════════════════════════════════════════════════════════════════════
@@ -488,7 +487,6 @@ impl AgentPost<'static> {
 	}
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════
 // View types
 // ═══════════════════════════════════════════════════════════════════════
@@ -573,7 +571,6 @@ impl<'a> UrlView<'a> {
 pub struct BytesView<'a> {
 	post: &'a Post,
 }
-
 
 impl<'a> BytesView<'a> {
 	pub fn try_new(post: &'a Post) -> Option<Self> {
@@ -687,7 +684,6 @@ impl OwnedFunctionCall {
 	pub fn arguments(&self) -> &str { &self.arguments }
 }
 
-
 /// A function call output post. Validated by `post_kind: "function_call_output"` metadata.
 #[derive(Deref)]
 pub struct FunctionCallOutputView<'a> {
@@ -767,7 +763,6 @@ impl<'a> ReasoningSummaryView<'a> {
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // Post convenience methods

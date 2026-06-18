@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-
 /// Parses CLI args into request-style path and query parameters.
 // TODO deprecate, just use Parts directly
 #[derive(Debug, Clone)]
@@ -202,7 +201,6 @@ impl CliArgs {
 		path_str
 	}
 }
-
 
 #[cfg(test)]
 mod tests {

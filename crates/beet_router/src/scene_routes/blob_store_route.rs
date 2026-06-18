@@ -110,7 +110,10 @@ mod test {
 	/// self-or-ancestor [`BlobStore`] (the [`BlobStoreRoute`] expansion, minus the
 	/// build-time `src` FsStore seed which the `bsx_site` test covers end to end).
 	fn serve_route(mount: &str) -> impl Bundle {
-		(PathPartial::new(format!("{mount}/*{STORE_PATH_PARAM}?")), ServeStoreAction)
+		(
+			PathPartial::new(format!("{mount}/*{STORE_PATH_PARAM}?")),
+			ServeStoreAction,
+		)
 	}
 
 	/// A store on an ancestor (the router) backs a child serve route: the
@@ -118,11 +121,9 @@ mod test {
 	#[beet_core::test]
 	async fn serves_from_ancestor_store() {
 		router_world()
-			.spawn((
-				default_router(),
-				css_store().await,
-				children![serve_route("assets")],
-			))
+			.spawn((default_router(), css_store().await, children![
+				serve_route("assets")
+			]))
 			.call::<Request, Response>(Request::get("assets/style.css"))
 			.await
 			.unwrap()
@@ -136,10 +137,10 @@ mod test {
 	#[beet_core::test]
 	async fn serves_from_colocated_store() {
 		router_world()
-			.spawn((
-				default_router(),
-				children![(serve_route("assets"), css_store().await)],
-			))
+			.spawn((default_router(), children![(
+				serve_route("assets"),
+				css_store().await
+			)]))
 			.call::<Request, Response>(Request::get("assets/style.css"))
 			.await
 			.unwrap()

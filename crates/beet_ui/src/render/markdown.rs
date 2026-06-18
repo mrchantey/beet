@@ -2,7 +2,6 @@ use crate::prelude::*;
 use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
-
 /// Renders an entity tree back to a markdown string via [`NodeVisitor`].
 ///
 /// Converts HTML-like element trees (as produced by [`MarkdownParser`])
@@ -71,7 +70,6 @@ impl MarkdownRenderer {
 
 	fn push_char(&mut self, ch: char) { self.state.push_raw_char(ch); }
 }
-
 
 impl NodeVisitor for MarkdownRenderer {
 	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
@@ -358,7 +356,6 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 }
 
-
 impl NodeRenderer for MarkdownRenderer {
 	fn render(
 		&mut self,
@@ -373,7 +370,6 @@ impl NodeRenderer for MarkdownRenderer {
 		.xok()
 	}
 }
-
 
 #[cfg(test)]
 #[cfg(feature = "markdown_parser")]

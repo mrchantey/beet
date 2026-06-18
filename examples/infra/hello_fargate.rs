@@ -19,7 +19,6 @@
 mod router;
 use beet::prelude::*;
 
-
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((

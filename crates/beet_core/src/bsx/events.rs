@@ -76,7 +76,9 @@ pub struct VerbArgs {
 
 impl VerbArgs {
 	/// The literal value of argument `name`, if supplied (or defaulted).
-	pub fn value(&self, name: &str) -> Option<&Value> { self.values.0.get(name) }
+	pub fn value(&self, name: &str) -> Option<&Value> {
+		self.values.0.get(name)
+	}
 
 	/// The resolved binding handle of argument `name`, if supplied.
 	pub fn field(&self, name: &str) -> Option<&BindingArg> {
@@ -133,7 +135,9 @@ impl BindingArg {
 			}
 			#[cfg(feature = "json")]
 			Self::Resource(resource) => {
-				host.world_scope(|world| resource_update(world, resource, func));
+				host.world_scope(|world| {
+					resource_update(world, resource, func)
+				});
 				Ok(())
 			}
 		}
@@ -213,7 +217,8 @@ fn resource_update(
 		let read = registry.read();
 		let registration = read.get_with_short_type_path(resource_name)?;
 		registration.data::<ReflectResource>()?;
-		let reflect_component = registration.data::<ReflectComponent>()?.clone();
+		let reflect_component =
+			registration.data::<ReflectComponent>()?.clone();
 		let component_id = world.components().get_id(registration.type_id())?;
 		let resource_entity = world.resource_entities().get(component_id)?;
 		Some((reflect_component, resource_entity))
@@ -287,7 +292,10 @@ impl EventRegistry {
 	pub fn insert(
 		&mut self,
 		name: impl Into<SmolStr>,
-		installer: impl Fn(&mut EntityWorldMut, SmolStr, VerbArgs) + Send + Sync + 'static,
+		installer: impl Fn(&mut EntityWorldMut, SmolStr, VerbArgs)
+		+ Send
+		+ Sync
+		+ 'static,
 	) {
 		self.installers.insert(name.into(), Arc::new(installer));
 	}
@@ -336,14 +344,11 @@ impl VerbRegistry {
 		js_verb: Option<&str>,
 		verb: impl Fn(&mut EntityWorldMut, &VerbArgs) + Send + Sync + 'static,
 	) {
-		self.verbs.insert(
-			name.into(),
-			RegisteredVerb {
-				schema,
-				verb: Arc::new(verb),
-				js_verb: js_verb.map(Into::into),
-			},
-		);
+		self.verbs.insert(name.into(), RegisteredVerb {
+			schema,
+			verb: Arc::new(verb),
+			js_verb: js_verb.map(Into::into),
+		});
 	}
 
 	/// The argument schema of a registered verb.
@@ -353,7 +358,9 @@ impl VerbRegistry {
 
 	/// The handler of a registered verb.
 	pub fn get(&self, name: &str) -> Option<VerbFn> {
-		self.verbs.get(name).map(|registered| registered.verb.clone())
+		self.verbs
+			.get(name)
+			.map(|registered| registered.verb.clone())
 	}
 
 	/// Every registered verb that ships a JavaScript twin, as `(name, js source)`
@@ -472,9 +479,8 @@ impl VerbSchema {
 				continue;
 			};
 			match (schema.binding, arg) {
-				(true, VerbArg::Literal(_)) => {
-					errors.push(format!("argument `{name}` expects an `@` binding"))
-				}
+				(true, VerbArg::Literal(_)) => errors
+					.push(format!("argument `{name}` expects an `@` binding")),
 				(false, VerbArg::Binding(_)) => errors
 					.push(format!("argument `{name}` expects a literal value")),
 				(false, VerbArg::Literal(literal)) => {
@@ -490,26 +496,31 @@ impl VerbSchema {
 		// every required argument must be supplied.
 		for arg in self.args.iter().filter(|arg| arg.required) {
 			if !args.iter().any(|(name, _)| name == &arg.name) {
-				errors.push(format!("missing required argument `{}`", arg.name));
+				errors
+					.push(format!("missing required argument `{}`", arg.name));
 			}
 		}
 		if errors.is_empty() {
 			Ok(())
 		} else {
-			bevybail!("verb `{verb}` argument verification failed: {}", errors.join(", "))
+			bevybail!(
+				"verb `{verb}` argument verification failed: {}",
+				errors.join(", ")
+			)
 		}
 	}
 }
 
 /// Type-check a literal against a field schema, returning a message on mismatch.
-fn type_check_literal(schema: &ValueSchema, literal: &DataLiteral) -> Option<String> {
+fn type_check_literal(
+	schema: &ValueSchema,
+	literal: &DataLiteral,
+) -> Option<String> {
 	let Some(mut value) = literal_value(literal) else {
 		return None;
 	};
 	let errors = async_ext::try_block_on(schema.validate(&mut value)).ok()?;
-	errors
-		.first()
-		.map(|error| error.message.to_string())
+	errors.first().map(|error| error.message.to_string())
 }
 
 /// The plain [`Value`] of a literal, or `None` for a non-literal (an entity ref
@@ -532,7 +543,9 @@ pub fn literal_value(literal: &DataLiteral) -> Option<Value> {
 			}
 			Some(Value::Map(map))
 		}
-		DataLiteral::Enum(named) if matches!(named.fields, NamedFields::Unit) => {
+		DataLiteral::Enum(named)
+			if matches!(named.fields, NamedFields::Unit) =>
+		{
 			Some(Value::Str(named.name.clone()))
 		}
 		DataLiteral::Enum(_) | DataLiteral::EntityRef(_) => None,
@@ -579,7 +592,9 @@ fn resolve_binding_arg(
 		#[cfg(not(feature = "json"))]
 		BindingSource::Comp | BindingSource::Res => {
 			let _ = comp_target;
-			bevybail!("`@res`/`@comp` verb arguments require the `json` feature")
+			bevybail!(
+				"`@res`/`@comp` verb arguments require the `json` feature"
+			)
 		}
 	}
 }
@@ -651,7 +666,8 @@ pub fn install_event(
 
 	// record the binding so a reactive renderer can re-emit it verbatim as a
 	// `bx:<event>` attribute, the thin client's trigger.
-	let mut bindings = entity.get::<EventBindings>().cloned().unwrap_or_default();
+	let mut bindings =
+		entity.get::<EventBindings>().cloned().unwrap_or_default();
 	bindings.0.push(binding.clone());
 	entity.insert(bindings);
 
@@ -675,8 +691,9 @@ mod test {
 		world.resource_mut::<EventRegistry>().insert(
 			"click",
 			|entity: &mut EntityWorldMut, verb: SmolStr, args: VerbArgs| {
-				let verb_fn = entity
-					.world_scope(|world| world.resource::<VerbRegistry>().get(&verb));
+				let verb_fn = entity.world_scope(|world| {
+					world.resource::<VerbRegistry>().get(&verb)
+				});
 				if let Some(verb_fn) = verb_fn {
 					verb_fn(entity, &args);
 				}
@@ -704,20 +721,18 @@ mod test {
 			},
 		);
 		let doc = world.spawn(Document::new(val!({ "count": 4 }))).id();
-		let binding = EventBinding::new(
-			"click",
-			VerbCall {
-				verb: "increment".into(),
-				args: vec![(
-					"field".into(),
-					VerbArg::Binding(BindingExpr::doc(["count"])),
-				)],
-			},
-		);
+		let binding = EventBinding::new("click", VerbCall {
+			verb: "increment".into(),
+			args: vec![(
+				"field".into(),
+				VerbArg::Binding(BindingExpr::doc(["count"])),
+			)],
+		});
 		// the inline installer runs the verb during install, against the host.
 		let button = {
 			let mut entity = world.spawn(ChildOf(doc));
-			install_event(&mut entity, &binding, |_| BindingTarget::This).unwrap();
+			install_event(&mut entity, &binding, |_| BindingTarget::This)
+				.unwrap();
 			entity.id()
 		};
 		world.flush();
@@ -738,23 +753,19 @@ mod test {
 	fn literal_arg_with_default() {
 		let mut world = (BsxPlugin, DocumentPlugin).into_world();
 		// `amount` is an optional i64 defaulting to 1.
-		let schema =
-			VerbSchema::new().binding("field").optional_value(
-				"amount",
-				ValueSchema::of::<i64>(),
-				Value::Int(1),
-			);
-		// omitted -> default 1
-		let omitted = EventBinding::new(
-			"click",
-			VerbCall {
-				verb: "increment".into(),
-				args: vec![(
-					"field".into(),
-					VerbArg::Binding(BindingExpr::doc(["count"])),
-				)],
-			},
+		let schema = VerbSchema::new().binding("field").optional_value(
+			"amount",
+			ValueSchema::of::<i64>(),
+			Value::Int(1),
 		);
+		// omitted -> default 1
+		let omitted = EventBinding::new("click", VerbCall {
+			verb: "increment".into(),
+			args: vec![(
+				"field".into(),
+				VerbArg::Binding(BindingExpr::doc(["count"])),
+			)],
+		});
 		world.resource_mut::<VerbRegistry>().insert(
 			"increment",
 			schema,
@@ -762,8 +773,8 @@ mod test {
 			|_, _| {},
 		);
 		let mut entity = world.spawn_empty();
-		let args =
-			resolve_args(&mut entity, &omitted, |_| BindingTarget::This).unwrap();
+		let args = resolve_args(&mut entity, &omitted, |_| BindingTarget::This)
+			.unwrap();
 		args.value("amount")
 			.and_then(|value| value.as_i64().ok())
 			.unwrap_or(0)
@@ -786,42 +797,42 @@ mod test {
 				});
 			},
 		);
-		let binding = EventBinding::new(
-			"click",
-			VerbCall {
-				verb: "mark".into(),
-				args: Vec::new(),
-			},
-		);
+		let binding = EventBinding::new("click", VerbCall {
+			verb: "mark".into(),
+			args: Vec::new(),
+		});
 		// the inline installer runs the side-effect verb during install.
 		let button = {
 			let mut entity = world.spawn_empty();
-			install_event(&mut entity, &binding, |_| BindingTarget::This).unwrap();
+			install_event(&mut entity, &binding, |_| BindingTarget::This)
+				.unwrap();
 			entity.id()
 		};
 		world.flush();
-		world.entity(button).contains::<DocumentScope>().xpect_true();
+		world
+			.entity(button)
+			.contains::<DocumentScope>()
+			.xpect_true();
 	}
 
 	#[beet_core::test]
 	fn verify_rejects_unknown_missing_and_mistyped() {
 		// verification is pure: no world needed.
-		let schema = VerbSchema::new()
-			.binding("field")
-			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1));
+		let schema = VerbSchema::new().binding("field").optional_value(
+			"amount",
+			ValueSchema::of::<i64>(),
+			Value::Int(1),
+		);
 
 		// unknown argument
 		schema
-			.verify_against(
-				"increment",
-				&[
-					("field".into(), VerbArg::Binding(BindingExpr::doc(["c"]))),
-					(
-						"bogus".into(),
-						VerbArg::Literal(DataLiteral::Scalar(Value::Int(1))),
-					),
-				],
-			)
+			.verify_against("increment", &[
+				("field".into(), VerbArg::Binding(BindingExpr::doc(["c"]))),
+				(
+					"bogus".into(),
+					VerbArg::Literal(DataLiteral::Scalar(Value::Int(1))),
+				),
+			])
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("unknown argument `bogus`");
@@ -835,29 +846,25 @@ mod test {
 
 		// type mismatch on a literal
 		schema
-			.verify_against(
-				"increment",
-				&[
-					("field".into(), VerbArg::Binding(BindingExpr::doc(["c"]))),
-					(
-						"amount".into(),
-						VerbArg::Literal(DataLiteral::Scalar(Value::Str("x".into()))),
-					),
-				],
-			)
+			.verify_against("increment", &[
+				("field".into(), VerbArg::Binding(BindingExpr::doc(["c"]))),
+				(
+					"amount".into(),
+					VerbArg::Literal(DataLiteral::Scalar(Value::Str(
+						"x".into(),
+					))),
+				),
+			])
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("amount");
 
 		// a literal where a binding is expected
 		schema
-			.verify_against(
-				"increment",
-				&[(
-					"field".into(),
-					VerbArg::Literal(DataLiteral::Scalar(Value::Int(1))),
-				)],
-			)
+			.verify_against("increment", &[(
+				"field".into(),
+				VerbArg::Literal(DataLiteral::Scalar(Value::Int(1))),
+			)])
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("expects an `@` binding");
@@ -897,7 +904,12 @@ mod test {
 				*value = Value::Int(value.as_i64().unwrap_or(0) + 1)
 			})
 			.unwrap();
-		world.entity(host).get::<Counter>().unwrap().value.xpect_eq(4);
+		world
+			.entity(host)
+			.get::<Counter>()
+			.unwrap()
+			.value
+			.xpect_eq(4);
 
 		// `@res:Score.points`: bump the resource field, no mirror entity.
 		BindingArg::Resource(ResourceFieldRef::new("Score", "points"))

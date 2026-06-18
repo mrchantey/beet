@@ -7,7 +7,6 @@ use core::f32::consts::PI;
 #[reflect(Default, Component)]
 pub struct RotateToVelocity2d;
 
-
 pub(crate) fn rotate_to_velocity_2d(
 	mut query: Query<(&mut Transform, &Velocity), With<RotateToVelocity2d>>,
 ) {
@@ -19,7 +18,6 @@ pub(crate) fn rotate_to_velocity_2d(
 			Quat::from_rotation_z(ops::atan2(dir.y, dir.x) - PI * 0.5);
 	}
 }
-
 
 /// Rotate an entity to face its [`Velocity`] in 3D space, orienting the
 /// entity's local `+Z` (the conventional GLTF visual forward) toward the

@@ -109,7 +109,6 @@ mod tests {
 
 		// Make it visible to avoid some headless environment quirks
 
-
 		doc::append_child(&iframe);
 
 		let data_url = "data:text/html,<html><body>ok</body></html>";

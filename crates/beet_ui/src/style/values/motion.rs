@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 
 css_property!(MotionProps, Motion, "duration", "timing-function");
 
-
 /// A motion token combining an easing function with a duration token.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -318,9 +318,10 @@ impl<'de> Visitor<'de> for TemplateVisitor<'_> {
 					if resources.is_some() {
 						return Err(Error::duplicate_field(TEMPLATE_RESOURCES));
 					}
-					resources = Some(map.next_value_seed(ValueMapDeserializer {
-						registry: self.type_registry,
-					})?);
+					resources =
+						Some(map.next_value_seed(ValueMapDeserializer {
+							registry: self.type_registry,
+						})?);
 				}
 				TemplateField::Nodes => {
 					if nodes.is_some() {
@@ -333,9 +334,10 @@ impl<'de> Visitor<'de> for TemplateVisitor<'_> {
 			}
 		}
 
-		let resources =
-			resources.ok_or_else(|| Error::missing_field(TEMPLATE_RESOURCES))?;
-		let nodes = nodes.ok_or_else(|| Error::missing_field(TEMPLATE_NODES))?;
+		let resources = resources
+			.ok_or_else(|| Error::missing_field(TEMPLATE_RESOURCES))?;
+		let nodes =
+			nodes.ok_or_else(|| Error::missing_field(TEMPLATE_NODES))?;
 
 		Ok(DynamicTemplate { resources, nodes })
 	}
@@ -461,11 +463,14 @@ impl<'de> Visitor<'de> for NodeVisitor<'_> {
 			match key {
 				NodeField::Components => {
 					if components.is_some() {
-						return Err(Error::duplicate_field(NODE_FIELD_COMPONENTS));
+						return Err(Error::duplicate_field(
+							NODE_FIELD_COMPONENTS,
+						));
 					}
-					components = Some(map.next_value_seed(SlotMapDeserializer {
-						registry: self.registry,
-					})?);
+					components =
+						Some(map.next_value_seed(SlotMapDeserializer {
+							registry: self.registry,
+						})?);
 				}
 			}
 		}
@@ -580,7 +585,9 @@ impl<'de> Visitor<'de> for ValueMapVisitor<'_> {
 			let value = self
 				.registry
 				.get(registration.type_id())
-				.and_then(|registration| registration.data::<ReflectFromReflect>())
+				.and_then(|registration| {
+					registration.data::<ReflectFromReflect>()
+				})
 				.and_then(|from_reflect| {
 					from_reflect.from_reflect(value.as_partial_reflect())
 				})
@@ -610,7 +617,10 @@ mod test {
 		use serde::Serializer;
 		use serde::de::Error;
 
-		pub fn serialize<S>(value: &u32, serializer: S) -> Result<S::Ok, S::Error>
+		pub fn serialize<S>(
+			value: &u32,
+			serializer: S,
+		) -> Result<S::Ok, S::Error>
 		where
 			S: Serializer,
 		{
@@ -630,7 +640,14 @@ mod test {
 	}
 
 	#[derive(
-		Component, Copy, Clone, Reflect, Debug, PartialEq, Serialize, Deserialize,
+		Component,
+		Copy,
+		Clone,
+		Reflect,
+		Debug,
+		PartialEq,
+		Serialize,
+		Deserialize,
 	)]
 	#[reflect(Component, Serialize, Deserialize)]
 	struct Qux(#[serde(with = "qux")] u32);
@@ -662,7 +679,8 @@ mod test {
 			registry.register::<MyComponent>();
 			registry.register::<MyEnum>();
 			registry.register::<String>();
-			registry.register_type_data::<String, bevy_reflect::ReflectSerialize>();
+			registry
+				.register_type_data::<String, bevy_reflect::ReflectSerialize>();
 			registry.register::<[usize; 3]>();
 			registry.register::<(f32, f32)>();
 		}
@@ -676,7 +694,9 @@ mod test {
 		let template = {
 			let registry = world.resource::<AppTypeRegistry>().read();
 			TemplateBuilder::from_world(world, &registry)
-				.extract_entities(world.iter_entities().map(|entity| entity.id()))
+				.extract_entities(
+					world.iter_entities().map(|entity| entity.id()),
+				)
 				.build()
 		};
 		let registry = world.resource::<AppTypeRegistry>().read();
@@ -723,9 +743,9 @@ mod test {
 		let template = TemplateBuilder::from_world(&world, &registry)
 			.extract_entities(world.iter_entities().map(|entity| entity.id()))
 			.build();
-		let serialized = postcard::to_allocvec(&DynamicTemplateSerializer::new(
-			&template, &registry,
-		))
+		let serialized = postcard::to_allocvec(
+			&DynamicTemplateSerializer::new(&template, &registry),
+		)
 		.unwrap();
 
 		let deserialized = DynamicTemplateDeserializer {

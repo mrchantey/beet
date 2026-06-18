@@ -75,13 +75,19 @@ impl HitTest<'_, '_> {
 		// cell (a full-width block, eg a sidebar link, even with no painted fill).
 		let viewport = buffer.current_buffer().size();
 		let ordered = self.tree.pre_order(root);
-		let contexts =
-			resolve_contexts(root, &ordered, &self.charcell, &self.tree, viewport);
-		let geo = stacking_order(root, &self.charcell, &self.tree, &managed_set(
+		let contexts = resolve_contexts(
+			root,
+			&ordered,
+			&self.charcell,
+			&self.tree,
+			viewport,
+		);
+		let geo = stacking_order(
 			root,
 			&self.charcell,
 			&self.tree,
-		))
+			&managed_set(root, &self.charcell, &self.tree),
+		)
 		.iter()
 		.rev()
 		.find(|&&entity| hit(entity, cell, &contexts, &self.charcell))
@@ -90,7 +96,10 @@ impl HitTest<'_, '_> {
 			// the painted entity refines `geo` (is it, or an inline descendant of it)
 			(Some(geo), Some(painted))
 				if painted == geo
-					|| self.tree.descendants(geo).any(|entity| entity == painted) =>
+					|| self
+						.tree
+						.descendants(geo)
+						.any(|entity| entity == painted) =>
 			{
 				Some(painted)
 			}
@@ -263,7 +272,10 @@ pub(crate) fn scroll_input(
 	// group this frame's pressed keys by their source surface.
 	let mut keys_by_surface = HashMap::<Entity, Vec<KeyCode>>::default();
 	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
-		keys_by_surface.entry(key.window).or_default().push(key.key_code);
+		keys_by_surface
+			.entry(key.window)
+			.or_default()
+			.push(key.key_code);
 	}
 	for (surface, pressed) in &keys_by_surface {
 		// alt+arrows are reserved for history nav (back/forward), not scrolling.
@@ -312,9 +324,12 @@ pub(crate) fn scroll_input(
 					.unresolved_node(entity)
 					.ok()
 					.filter(|node| node.is_scroll_container())
-					.map(|node| scroll_state(&node, &charcell, viewport).max_offset())
+					.map(|node| {
+						scroll_state(&node, &charcell, viewport).max_offset()
+					})
 					.is_some_and(|max| {
-						(delta.y != 0 && max.y > 0) || (delta.x != 0 && max.x > 0)
+						(delta.y != 0 && max.y > 0)
+							|| (delta.x != 0 && max.x > 0)
 					})
 			};
 			// the nearest ancestor (self-inclusive) that can scroll the delta axis.
@@ -330,9 +345,14 @@ pub(crate) fn scroll_input(
 					current = refs
 						.get(entity)
 						.ok()
-						.and_then(|render_ref_of| render_ref_of.holders().first().copied())
+						.and_then(|render_ref_of| {
+							render_ref_of.holders().first().copied()
+						})
 						.or_else(|| {
-							parents.get(entity).ok().map(|child_of| child_of.parent())
+							parents
+								.get(entity)
+								.ok()
+								.map(|child_of| child_of.parent())
 						});
 				}
 			};
@@ -345,7 +365,9 @@ pub(crate) fn scroll_input(
 				// the page scrollport: the outermost scrollable container reachable
 				// from this surface's buffer-root tree (first scrollable pre-order).
 				.or_else(|| {
-					tree.pre_order(root).into_iter().find(|entity| can_scroll(*entity))
+					tree.pre_order(root)
+						.into_iter()
+						.find(|entity| can_scroll(*entity))
 				})
 		};
 		let Some(container) = container else { continue };
@@ -400,8 +422,10 @@ mod test {
 	#[beet_core::test]
 	fn deeper_box_wins_over_painted_ancestor() {
 		let mut host = TestHost::sized(UVec2::new(20, 4));
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				// the rail: a full-width container that paints a background
 				Rule::class("rail").with_value(
 					common_props::BackgroundColor,
@@ -411,8 +435,7 @@ mod test {
 				// so the rail's fill shows through its empty cells
 				Rule::class("link")
 					.with_value(common_props::DisplayProp, Display::Block),
-			],
-		);
+			]);
 		host.spawn_content(rsx! {
 			<div class="rail"><a class="link" href="/x">"hi"</a></div>
 		});
@@ -480,11 +503,8 @@ mod test {
 	fn click_fires_pointer_down_on_target() {
 		let mut host = logging_host();
 		// a labelled box; observe PointerDown on the box entity
-		let target = host
-			.app
-			.world_mut()
-			.spawn(rsx! { <div>"hello"</div> })
-			.id();
+		let target =
+			host.app.world_mut().spawn(rsx! { <div>"hello"</div> }).id();
 		host.app.world_mut().entity_mut(host.host).add_child(target);
 		host.step();
 		// click the first cell, where "hello" begins
@@ -502,12 +522,13 @@ mod test {
 	#[beet_core::test]
 	fn full_width_block_is_hit_past_its_text() {
 		let mut host = logging_host();
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				Rule::class("row")
 					.with_value(common_props::DisplayProp, Display::Block),
-			],
-		);
+			]);
 		let row = host
 			.app
 			.world_mut()
@@ -532,7 +553,8 @@ mod test {
 	fn hover_tracks_over_and_out() {
 		let mut host = logging_host();
 		let first = host.app.world_mut().spawn(rsx! { <div>"AAAA"</div> }).id();
-		let second = host.app.world_mut().spawn(rsx! { <div>"BBBB"</div> }).id();
+		let second =
+			host.app.world_mut().spawn(rsx! { <div>"BBBB"</div> }).id();
 		host.app.world_mut().entity_mut(host.host).add_child(first);
 		host.app.world_mut().entity_mut(host.host).add_child(second);
 		host.step();
@@ -572,10 +594,15 @@ mod test {
 		let spawn_surface = |app: &mut App, label: &str| -> (Entity, Entity) {
 			let (channel, terminal) =
 				ChannelTerminal::new(TerminalConfig::default());
-			let content = app.world_mut().spawn(rsx! { <div>{label}</div> }).id();
+			let content =
+				app.world_mut().spawn(rsx! { <div>{label}</div> }).id();
 			let host = app
 				.world_mut()
-				.spawn((channel, terminal, DoubleBuffer::new(UVec2::new(20, 4))))
+				.spawn((
+					channel,
+					terminal,
+					DoubleBuffer::new(UVec2::new(20, 4)),
+				))
 				.id();
 			app.world_mut().entity_mut(host).add_child(content);
 			(host, content)
@@ -601,13 +628,14 @@ mod test {
 	#[beet_core::test]
 	fn wheel_scrolls_hovered_container() {
 		let mut host = logging_host();
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				Rule::class("scroller")
 					.with_value(common_props::Height, Length::Rem(3.))
 					.with_value(common_props::OverflowYProp, Overflow::Scroll),
-			],
-		);
+			]);
 		let content = host
 			.app
 			.world_mut()
@@ -615,7 +643,10 @@ mod test {
 				<div class="scroller"><pre>"a\nb\nc\nd\ne\nf\ng\nh"</pre></div>
 			})
 			.id();
-		host.app.world_mut().entity_mut(host.host).add_child(content);
+		host.app
+			.world_mut()
+			.entity_mut(host.host)
+			.add_child(content);
 		host.step();
 		// hover over the scroller, then wheel down
 		host.send_input(&sgr(35, 1, 1, true));
@@ -639,13 +670,14 @@ mod test {
 	#[beet_core::test]
 	fn click_in_scrolled_container_uses_transform() {
 		let mut host = logging_host();
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				Rule::class("scroller")
 					.with_value(common_props::Height, Length::Rem(3.))
 					.with_value(common_props::OverflowYProp, Overflow::Scroll),
-			],
-		);
+			]);
 		let scroller = host
 			.app
 			.world_mut()
@@ -659,14 +691,26 @@ mod test {
 				</div>
 			})
 			.id();
-		host.app.world_mut().entity_mut(host.host).add_child(scroller);
+		host.app
+			.world_mut()
+			.entity_mut(host.host)
+			.add_child(scroller);
 		host.step();
 		// click the top-left cell unscrolled, recording the deepest hit row.
 		host.send_input(&sgr(0, 0, 0, true));
 		host.step();
-		let unscrolled_hit =
-			host.app.world().resource::<PointerLog>().down.first().copied();
-		host.app.world_mut().resource_mut::<PointerLog>().down.clear();
+		let unscrolled_hit = host
+			.app
+			.world()
+			.resource::<PointerLog>()
+			.down
+			.first()
+			.copied();
+		host.app
+			.world_mut()
+			.resource_mut::<PointerLog>()
+			.down
+			.clear();
 
 		// scroll down by 2 so a different row sits at the top, then click the same
 		// cell again.
@@ -683,8 +727,13 @@ mod test {
 		host.step();
 		host.send_input(&sgr(0, 0, 0, true));
 		host.step();
-		let scrolled_hit =
-			host.app.world().resource::<PointerLog>().down.first().copied();
+		let scrolled_hit = host
+			.app
+			.world()
+			.resource::<PointerLog>()
+			.down
+			.first()
+			.copied();
 
 		// the same cell resolved to a different entity after scrolling: the hit-test
 		// applied the scroll transform, not the unscrolled rect.
@@ -712,15 +761,18 @@ mod test {
 		let mut host = TestHost::new();
 		// the host itself is the page scrollport: a viewport-height scroll container
 		// whose content overflows. No pointer ever moves, so nothing is hovered.
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				Rule::class("page")
 					.with_value(common_props::Height, Length::Rem(4.))
 					.with_value(common_props::OverflowYProp, Overflow::Scroll),
-			],
-		);
-		let body: String =
-			(0..30).map(|i| format!("r{i}")).collect::<Vec<_>>().join("\n");
+			]);
+		let body: String = (0..30)
+			.map(|i| format!("r{i}"))
+			.collect::<Vec<_>>()
+			.join("\n");
 		host.spawn_content(rsx! { <div class="page"><pre>{body}</pre></div> });
 		host.step();
 		max_offset(&mut host, |offset| offset.y).xpect_eq(0);
@@ -762,19 +814,18 @@ mod test {
 	#[beet_core::test]
 	fn link_hover_dim_animates() {
 		let mut host = TestHost::new();
-		host.app.add_plugins(
-			crate::style::material::MaterialStylePlugin::default(),
-		);
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
 		// a long duration holds the transition mid-flight however slow the step
 		host.app
 			.world_mut()
 			.get_resource_or_init::<RuleSet>()
-			.extend_rules(vec![Rule::new()
-				.with_selector(Selector::tag("a"))
-				.with_value(
+			.extend_rules(vec![
+				Rule::new().with_selector(Selector::tag("a")).with_value(
 					common_props::TransitionDurationProp,
 					Duration::from_secs(60),
-				)]);
+				),
+			]);
 		host.spawn_content(rsx! { <div><a href="/x">"link"</a></div> });
 		host.step();
 		let link = host
@@ -811,7 +862,8 @@ mod test {
 			.foreground;
 		(target != resting).xpect_true();
 		// the displayed style is easing toward it, not snapped
-		let transition = host.app.world().get::<VisualTransition>(link).unwrap();
+		let transition =
+			host.app.world().get::<VisualTransition>(link).unwrap();
 		transition.is_animating().xpect_true();
 		(transition.current.foreground != target).xpect_true();
 	}
@@ -821,9 +873,8 @@ mod test {
 	fn hovered_button_background(scheme: ClassName) -> Option<Color> {
 		use crate::style::material::classes;
 		let mut host = TestHost::new();
-		host.app.add_plugins(
-			crate::style::material::MaterialStylePlugin::default(),
-		);
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
 		host.spawn_content(rsx! {
 			<div {Classes::new([scheme])}>
 				<button {Classes::new([classes::BTN_TEXT])}>"Go"</button>
@@ -840,13 +891,22 @@ mod test {
 			.map(|(entity, _)| entity)
 			.unwrap();
 		// no container at rest.
-		host.app.world().get::<VisualStyle>(button).unwrap().background.xpect_none();
+		host.app
+			.world()
+			.get::<VisualStyle>(button)
+			.unwrap()
+			.background
+			.xpect_none();
 		// hover the button, settle the cascade + transition.
 		host.send_input(&sgr(35, 1, 0, true));
 		for _ in 0..4 {
 			host.step();
 		}
-		host.app.world().get::<VisualStyle>(button).unwrap().background
+		host.app
+			.world()
+			.get::<VisualStyle>(button)
+			.unwrap()
+			.background
 	}
 
 	/// A container-less interactive (text button) gains a *visible fill* on hover
@@ -868,8 +928,10 @@ mod test {
 	#[beet_core::test]
 	fn wheel_falls_through_non_scrollable_inner_container() {
 		let mut host = TestHost::new();
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				// the outer page: short, scrollable, its content overflows.
 				Rule::class("outer")
 					.with_value(common_props::Height, Length::Rem(4.))
@@ -879,8 +941,7 @@ mod test {
 				Rule::class("inner")
 					.with_value(common_props::Height, Length::Rem(20.))
 					.with_value(common_props::OverflowYProp, Overflow::Auto),
-			],
-		);
+			]);
 		let content = host
 			.app
 			.world_mut()
@@ -891,7 +952,10 @@ mod test {
 				</div>
 			})
 			.id();
-		host.app.world_mut().entity_mut(host.host).add_child(content);
+		host.app
+			.world_mut()
+			.entity_mut(host.host)
+			.add_child(content);
 		host.step();
 		// hover the inner box (top-left), then wheel down.
 		host.send_input(&sgr(35, 1, 1, true));
@@ -914,14 +978,16 @@ mod test {
 	#[beet_core::test]
 	fn horizontal_wheel_scrolls_wide_container() {
 		let mut host = TestHost::new();
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				Rule::class("wide")
 					.with_value(common_props::Width, Length::Rem(8.))
 					.with_value(common_props::OverflowXProp, Overflow::Scroll),
-			],
-		);
-		let wide: String = ('a'..='z').chain('A'..='Z').cycle().take(80).collect();
+			]);
+		let wide: String =
+			('a'..='z').chain('A'..='Z').cycle().take(80).collect();
 		host.spawn_content(rsx! { <div class="wide"><pre>{wide}</pre></div> });
 		host.step();
 		// hover the wide container, then wheel right (SGR button 67) to scroll x.

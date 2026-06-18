@@ -42,7 +42,6 @@ fn spawn_analytics_event_store(
 	});
 }
 
-
 /// A listener for [`AnalyticsEvent`] triggers, pushing them to the [`AnalyticsEventStore`] resource
 fn handle_analytics_events(
 	trigger: On<AnalyticsEvent>,
@@ -73,7 +72,6 @@ pub struct AnalyticsEvent {
 	#[serde(flatten)]
 	pub session_data: Value,
 }
-
 
 impl AnalyticsEvent {
 	/// Parses an analytics event from a JSON payload.
@@ -142,7 +140,6 @@ mod test {
 			}
 		})
 	}
-
 
 	#[beet_core::test]
 	fn not_allowed() {

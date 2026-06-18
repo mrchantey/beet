@@ -215,7 +215,6 @@ mod std_ext {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

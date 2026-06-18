@@ -89,7 +89,6 @@ fn margin() -> BoxStyle {
 	BoxStyle::default().with_margin(Spacing::all(Length::Rem(1.)))
 }
 
-
 // ── JustifyContent ────────────────────────────────────────────────────────────
 
 fn setup_justify_start() -> impl Bundle {
@@ -278,32 +277,38 @@ fn setup_gaps() -> impl Bundle {
 // ── Flex Grow ─────────────────────────────────────────────────────────────────
 
 fn setup_flex_grow() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! {"Fixed"}, bordered()),
-		(
-			rsx! {"Grow 1"},
-			bordered(),
-			LayoutStyle::default().with_flex_grow(1)
-		),
-		(
-			rsx! {"Grow 2"},
-			bordered(),
-			LayoutStyle::default().with_flex_grow(2)
-		),
-		(rsx! {"Fixed"}, bordered()),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! {"Fixed"}, bordered()),
+			(
+				rsx! {"Grow 1"},
+				bordered(),
+				LayoutStyle::default().with_flex_grow(1)
+			),
+			(
+				rsx! {"Grow 2"},
+				bordered(),
+				LayoutStyle::default().with_flex_grow(2)
+			),
+			(rsx! {"Fixed"}, bordered()),
+		],
+	)
 }
 
 // ── Wrapping ──────────────────────────────────────────────────────────────────
 
 fn setup_no_wrap() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! {"Item 1"}, bordered()),
-		(rsx! {"Item 2"}, bordered()),
-		(rsx! {"Item 3"}, bordered()),
-		(rsx! {"Item 4"}, bordered()),
-		(rsx! {"Item 5"}, bordered()),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! {"Item 1"}, bordered()),
+			(rsx! {"Item 2"}, bordered()),
+			(rsx! {"Item 3"}, bordered()),
+			(rsx! {"Item 4"}, bordered()),
+			(rsx! {"Item 5"}, bordered()),
+		],
+	)
 }
 
 fn setup_wrap() -> impl Bundle {
@@ -378,28 +383,37 @@ fn setup_nested() -> impl Bundle {
 // ── Margins, Borders, Padding ─────────────────────────────────────────────────
 
 fn setup_margin_only() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx! {"A"}, margin()),
-		(rsx! {"B"}, margin()),
-		(rsx! {"C"}, margin()),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(0.)),
+		children![
+			(rsx! {"A"}, margin()),
+			(rsx! {"B"}, margin()),
+			(rsx! {"C"}, margin()),
+		],
+	)
 }
 
 fn setup_border_only() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx! {"A"}, bordered()),
-		(rsx! {"B"}, bordered()),
-		(rsx! {"C"}, bordered()),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(0.)),
+		children![
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+			(rsx! {"C"}, bordered()),
+		],
+	)
 }
 
 fn setup_padding_only() -> impl Bundle {
 	let style = bordered().with_padding(Spacing::all(Length::Rem(1.)));
-	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx! {"A"}, style.clone()),
-		(rsx! {"B"}, style.clone()),
-		(rsx! {"C"}, style.clone()),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(0.)),
+		children![
+			(rsx! {"A"}, style.clone()),
+			(rsx! {"B"}, style.clone()),
+			(rsx! {"C"}, style.clone()),
+		],
+	)
 }
 
 fn setup_all_spacing() -> impl Bundle {
@@ -408,125 +422,146 @@ fn setup_all_spacing() -> impl Bundle {
 		.with_border(Spacing::all(Length::Rem(1.)))
 		.with_padding(Spacing::all(Length::Rem(1.)));
 
-	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx! {"A"}, style.clone()),
-		(rsx! {"B"}, style.clone()),
-		(rsx! {"C"}, style.clone()),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(0.)),
+		children![
+			(rsx! {"A"}, style.clone()),
+			(rsx! {"B"}, style.clone()),
+			(rsx! {"C"}, style.clone()),
+		],
+	)
 }
 
 // ── Style / Color ─────────────────────────────────────────────────────────────
 
 fn setup_foreground_color() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! { "Red" }, bordered(), VisualStyle {
-			foreground: Some(Color::srgb(1., 0., 0.)),
-			..default()
-		},),
-		(rsx! { "Green" }, bordered(), VisualStyle {
-			foreground: Some(Color::srgb(0., 0.8, 0.)),
-			..default()
-		},),
-		(rsx! { "Blue" }, bordered(), VisualStyle {
-			foreground: Some(Color::srgb(0.2, 0.4, 1.)),
-			..default()
-		},),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! { "Red" }, bordered(), VisualStyle {
+				foreground: Some(Color::srgb(1., 0., 0.)),
+				..default()
+			},),
+			(rsx! { "Green" }, bordered(), VisualStyle {
+				foreground: Some(Color::srgb(0., 0.8, 0.)),
+				..default()
+			},),
+			(rsx! { "Blue" }, bordered(), VisualStyle {
+				foreground: Some(Color::srgb(0.2, 0.4, 1.)),
+				..default()
+			},),
+		],
+	)
 }
 
 fn setup_background_color() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(
-			rsx! { "A" },
-			bordered().with_padding(Spacing::all(Length::Rem(0.5))),
-			VisualStyle {
-				background: Some(Color::srgb(0.5, 0., 0.5)),
-				foreground: Some(Color::WHITE),
-				..default()
-			},
-		),
-		(
-			rsx! { "B" },
-			bordered().with_padding(Spacing::all(Length::Rem(0.5))),
-			VisualStyle {
-				background: Some(Color::srgb(0., 0.4, 0.6)),
-				foreground: Some(Color::WHITE),
-				..default()
-			},
-		),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(
+				rsx! { "A" },
+				bordered().with_padding(Spacing::all(Length::Rem(0.5))),
+				VisualStyle {
+					background: Some(Color::srgb(0.5, 0., 0.5)),
+					foreground: Some(Color::WHITE),
+					..default()
+				},
+			),
+			(
+				rsx! { "B" },
+				bordered().with_padding(Spacing::all(Length::Rem(0.5))),
+				VisualStyle {
+					background: Some(Color::srgb(0., 0.4, 0.6)),
+					foreground: Some(Color::WHITE),
+					..default()
+				},
+			),
+		],
+	)
 }
 
 fn setup_border_color() -> impl Bundle {
 	// Each node gets per-side border colors: top=red, bottom=blue, left=green, right=yellow
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![(
-		rsx! { "Box" },
-		BoxStyle {
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![(rsx! { "Box" }, BoxStyle {
 			border: Spacing::all(Length::Rem(1.)),
 			border_top: Some(Color::srgb(1., 0., 0.)),
 			border_bottom: Some(Color::srgb(0., 0.4, 1.)),
 			border_left: Some(Color::srgb(0., 0.8, 0.)),
 			border_right: Some(Color::srgb(1., 0.8, 0.)),
 			..default()
-		},
-	),])
+		},),],
+	)
 }
 
 fn setup_text_formatting() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! { "Underline" }, bordered(), VisualStyle {
-			decoration_line: DecorationLine::underline(),
-			..default()
-		},),
-		(rsx! { "Strike" }, bordered(), VisualStyle {
-			decoration_line: DecorationLine::line_through(),
-			..default()
-		},),
-		(rsx! { "Bold" }, bordered(), VisualStyle {
-			font_weight: FontWeight::Bold,
-			..default()
-		},),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! { "Underline" }, bordered(), VisualStyle {
+				decoration_line: DecorationLine::underline(),
+				..default()
+			},),
+			(rsx! { "Strike" }, bordered(), VisualStyle {
+				decoration_line: DecorationLine::line_through(),
+				..default()
+			},),
+			(rsx! { "Bold" }, bordered(), VisualStyle {
+				font_weight: FontWeight::Bold,
+				..default()
+			},),
+		],
+	)
 }
 
 fn setup_text_italic() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! { "Italic" }, bordered(), VisualStyle {
-			font_style: FontStyle::Italic,
-			..default()
-		}),
-		(rsx! { "Bold+Italic" }, bordered(), VisualStyle {
-			font_weight: FontWeight::Bold,
-			font_style: FontStyle::Italic,
-			..default()
-		}),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! { "Italic" }, bordered(), VisualStyle {
+				font_style: FontStyle::Italic,
+				..default()
+			}),
+			(rsx! { "Bold+Italic" }, bordered(), VisualStyle {
+				font_weight: FontWeight::Bold,
+				font_style: FontStyle::Italic,
+				..default()
+			}),
+		],
+	)
 }
 
 fn setup_text_blink() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! { "Blink" }, bordered(), VisualStyle {
-			blink: BlinkStyle::Blink,
-			..default()
-		}),
-		(rsx! { "RapidBlink" }, bordered(), VisualStyle {
-			blink: BlinkStyle::RapidBlink,
-			..default()
-		}),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! { "Blink" }, bordered(), VisualStyle {
+				blink: BlinkStyle::Blink,
+				..default()
+			}),
+			(rsx! { "RapidBlink" }, bordered(), VisualStyle {
+				blink: BlinkStyle::RapidBlink,
+				..default()
+			}),
+		],
+	)
 }
 
 fn setup_text_hidden() -> impl Bundle {
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! { "Visible" }, bordered(), VisualStyle {
-			visibility: Visibility::Visible,
-			..default()
-		}),
-		(rsx! { "Hidden" }, bordered(), VisualStyle {
-			visibility: Visibility::Hidden,
-			..default()
-		}),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! { "Visible" }, bordered(), VisualStyle {
+				visibility: Visibility::Visible,
+				..default()
+			}),
+			(rsx! { "Hidden" }, bordered(), VisualStyle {
+				visibility: Visibility::Hidden,
+				..default()
+			}),
+		],
+	)
 }
 
 fn setup_inline_basic() -> impl Bundle {
@@ -565,20 +600,23 @@ fn setup_inline_wrap() -> impl Bundle {
 
 fn setup_wide_chars() -> impl Bundle {
 	// CJK and fullwidth characters occupy 2 terminal columns each
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! { "中文" }, bordered(), VisualStyle {
-			foreground: Some(Color::srgb(0.9, 0.5, 0.1)),
-			..default()
-		}),
-		(rsx! { "日本語" }, bordered(), VisualStyle {
-			foreground: Some(Color::srgb(0.1, 0.7, 0.9)),
-			..default()
-		}),
-		(rsx! { "ＡＢＣ" }, bordered(), VisualStyle {
-			foreground: Some(Color::srgb(0.5, 0.9, 0.4)),
-			..default()
-		}),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! { "中文" }, bordered(), VisualStyle {
+				foreground: Some(Color::srgb(0.9, 0.5, 0.1)),
+				..default()
+			}),
+			(rsx! { "日本語" }, bordered(), VisualStyle {
+				foreground: Some(Color::srgb(0.1, 0.7, 0.9)),
+				..default()
+			}),
+			(rsx! { "ＡＢＣ" }, bordered(), VisualStyle {
+				foreground: Some(Color::srgb(0.5, 0.9, 0.4)),
+				..default()
+			}),
+		],
+	)
 }
 
 fn setup_text_align() -> impl Bundle {
@@ -589,18 +627,21 @@ fn setup_text_align() -> impl Bundle {
 		LayoutStyle::default().with_flex_grow(1),
 	);
 
-	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx! { "Left" }, item_styles.clone(), VisualStyle {
-			text_align: TextAlign::Left,
-			..default()
-		},),
-		(rsx! { "Center" }, item_styles.clone(), VisualStyle {
-			text_align: TextAlign::Center,
-			..default()
-		},),
-		(rsx! { "Right" }, item_styles, VisualStyle {
-			text_align: TextAlign::Right,
-			..default()
-		},),
-	])
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
+		children![
+			(rsx! { "Left" }, item_styles.clone(), VisualStyle {
+				text_align: TextAlign::Left,
+				..default()
+			},),
+			(rsx! { "Center" }, item_styles.clone(), VisualStyle {
+				text_align: TextAlign::Center,
+				..default()
+			},),
+			(rsx! { "Right" }, item_styles, VisualStyle {
+				text_align: TextAlign::Right,
+				..default()
+			},),
+		],
+	)
 }

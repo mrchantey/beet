@@ -41,13 +41,11 @@ pub(crate) fn translate(
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-
 
 	#[beet_core::test]
 	fn works() {

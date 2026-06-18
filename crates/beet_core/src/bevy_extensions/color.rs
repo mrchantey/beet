@@ -2,7 +2,6 @@ use bevy::color::Color;
 // `f32::round` is std-only; `bevy::math::ops::round` uses libm under no_std.
 use bevy::math::ops;
 
-
 /// A simple struct representing an sRGBA color with 8 bits per channel.
 pub struct SrgbaU8 {
 	/// The red component

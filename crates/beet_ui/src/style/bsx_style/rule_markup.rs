@@ -29,15 +29,16 @@ use beet_core::prelude::*;
 /// Register the `<Rule>` custom-tag handler into the [`BsxTagResolvers`] seam, so
 /// a `<Rule>` element declares a named rule into the [`RuleSet`] at build time.
 pub fn register_rule_tag(world: &mut World) {
-	world
-		.get_resource_or_init::<BsxTagResolvers>()
-		.insert("Rule", |el, entity| {
+	world.get_resource_or_init::<BsxTagResolvers>().insert(
+		"Rule",
+		|el, entity| {
 			let rule = parse_rule(el)?;
 			entity.world_scope(|world| {
 				world.get_resource_or_init::<RuleSet>().insert_rule(rule);
 			});
 			Ok(())
-		});
+		},
+	);
 }
 
 /// Build a [`Rule`] from a `<Rule>` element's attributes: the selector from
@@ -81,13 +82,16 @@ pub fn apply_declarations<'a>(
 			// `"@token:Role"`: a token-to-token binding, not a literal value.
 			Some(role) => {
 				let token = role_names.get(role).cloned().ok_or_else(|| {
-					bevyhow!("`{context}`: `@token:{role}` is not a known colour role")
+					bevyhow!(
+						"`{context}`: `@token:{role}` is not a known colour role"
+					)
 				})?;
 				rule.with_token(resolver.token.clone(), token)?
 			}
 			// otherwise a literal value parsed against the property's value type.
 			None => {
-				let value = resolver.parse(&attr_literal(context, key, value)?)?;
+				let value =
+					resolver.parse(&attr_literal(context, key, value)?)?;
 				rule.insert(resolver.token.clone(), value)?;
 				rule
 			}
@@ -114,7 +118,9 @@ fn parse_selector(el: &BsxElement) -> Result<Selector> {
 		parts.push(Selector::tag(string_value(value, "tag")?));
 	}
 	if let Some(value) = attr(el, "state") {
-		parts.push(Selector::state(parse_state(&string_value(value, "state")?)?));
+		parts.push(Selector::state(parse_state(&string_value(
+			value, "state",
+		)?)?));
 	}
 	match parts.len() {
 		0 => bevybail!(
@@ -129,10 +135,12 @@ fn parse_selector(el: &BsxElement) -> Result<Selector> {
 /// class of a `["a", "b"]` list.
 fn class_selectors(value: &AttrValue) -> Result<Vec<Selector>> {
 	match value {
-		AttrValue::Str(class) => Ok(vec![Selector::class(ClassName::string(class.as_str()))]),
-		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(Value::Str(class)))) => {
+		AttrValue::Str(class) => {
 			Ok(vec![Selector::class(ClassName::string(class.as_str()))])
 		}
+		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(
+			Value::Str(class),
+		))) => Ok(vec![Selector::class(ClassName::string(class.as_str()))]),
 		AttrValue::Expr(ValueExpr::Literal(DataLiteral::List(items))) => items
 			.iter()
 			.map(|item| match item {
@@ -142,7 +150,9 @@ fn class_selectors(value: &AttrValue) -> Result<Vec<Selector>> {
 				_ => bevybail!("`<Rule>` `class` list items must be strings"),
 			})
 			.collect(),
-		_ => bevybail!("`<Rule>` `class` must be a string or a list of strings"),
+		_ => {
+			bevybail!("`<Rule>` `class` must be a string or a list of strings")
+		}
 	}
 }
 
@@ -182,9 +192,9 @@ fn parse_media(el: &BsxElement) -> Result<Option<MediaQuery>> {
 fn token_binding(value: &AttrValue) -> Option<&str> {
 	let text = match value {
 		AttrValue::Str(text) => text.as_str(),
-		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(Value::Str(text)))) => {
-			text.as_str()
-		}
+		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(
+			Value::Str(text),
+		))) => text.as_str(),
 		_ => return None,
 	};
 	text.strip_prefix("@token:")
@@ -192,9 +202,15 @@ fn token_binding(value: &AttrValue) -> Option<&str> {
 
 /// The literal of a declaration attribute, for parsing against the property's
 /// value type. A bare flag, spread, or `@`/`$` binding is not a style value.
-fn attr_literal(context: &str, key: &str, value: &AttrValue) -> Result<DataLiteral> {
+fn attr_literal(
+	context: &str,
+	key: &str,
+	value: &AttrValue,
+) -> Result<DataLiteral> {
 	match value {
-		AttrValue::Str(string) => Ok(DataLiteral::Scalar(Value::Str(string.into()))),
+		AttrValue::Str(string) => {
+			Ok(DataLiteral::Scalar(Value::Str(string.into())))
+		}
 		AttrValue::Expr(ValueExpr::Literal(literal)) => Ok(literal.clone()),
 		_ => bevybail!(
 			"`{context}`: `{key}` must be a literal style value, ie `Flex` or `Rem(1.0)`"
@@ -214,9 +230,9 @@ fn attr<'a>(el: &'a BsxElement, key: &str) -> Option<&'a AttrValue> {
 fn string_value(value: &AttrValue, key: &str) -> Result<SmolStr> {
 	match value {
 		AttrValue::Str(string) => Ok(string.into()),
-		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(Value::Str(string)))) => {
-			Ok(string.clone())
-		}
+		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Scalar(
+			Value::Str(string),
+		))) => Ok(string.clone()),
 		_ => bevybail!("`<Rule>` `{key}` must be a string"),
 	}
 }
@@ -240,7 +256,12 @@ mod test {
 				BsxTemplateRegistry::default(),
 			))
 			.unwrap();
-		world.resource::<RuleSet>().rules().nth(before).cloned().unwrap()
+		world
+			.resource::<RuleSet>()
+			.rules()
+			.nth(before)
+			.cloned()
+			.unwrap()
 	}
 
 	#[beet_core::test]

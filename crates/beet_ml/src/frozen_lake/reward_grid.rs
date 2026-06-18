@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
 pub fn reward_grid(
 	mut query: Query<(&FrozenLakeMap, &GridPos, &mut Reward), Changed<GridPos>>,
 ) {

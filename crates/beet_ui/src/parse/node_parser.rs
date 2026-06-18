@@ -47,7 +47,6 @@ impl<'a, 'w> ParseContext<'a, 'w> {
 	}
 }
 
-
 /// Error returned when a parser does not support the given media type.
 #[derive(Debug, Error)]
 pub enum ParseError {

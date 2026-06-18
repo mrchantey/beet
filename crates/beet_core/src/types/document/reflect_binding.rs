@@ -55,7 +55,10 @@ pub struct ReflectFieldRef {
 
 impl ReflectFieldRef {
 	/// Bind to `component`'s `field` on this entity.
-	pub fn new(component: impl Into<SmolStr>, field: impl Into<SmolStr>) -> Self {
+	pub fn new(
+		component: impl Into<SmolStr>,
+		field: impl Into<SmolStr>,
+	) -> Self {
 		Self {
 			component: component.into(),
 			field: field.into(),
@@ -123,11 +126,10 @@ pub fn sync_reflect_field_bindings(world: &mut World) {
 			// a reserved target resolving for the first time (or to a new
 			// entity, eg a reparent) forces a read-back: the component's change
 			// tick may have fired long before the marker became reachable.
-			let target_resolved = matches!(
-				binding.target,
-				BindingTarget::Reserved(_)
-			) && cache.reserved_targets.insert(entity, target)
-				!= Some(target);
+			let target_resolved =
+				matches!(binding.target, BindingTarget::Reserved(_))
+					&& cache.reserved_targets.insert(entity, target)
+						!= Some(target);
 			let access = binding.access();
 			if value_changed {
 				// read direction: the Value (document-driven or edited) writes the field.
@@ -196,7 +198,10 @@ mod test {
 	/// A world with the document plugin plus a registered `Slider`.
 	fn world() -> World {
 		let mut world = DocumentPlugin::world();
-		world.resource_mut::<AppTypeRegistry>().write().register::<Slider>();
+		world
+			.resource_mut::<AppTypeRegistry>()
+			.write()
+			.register::<Slider>();
 		world
 	}
 
@@ -262,7 +267,12 @@ mod test {
 			.id();
 		world.update_local();
 
-		world.entity(target).get::<Slider>().unwrap().value.xpect_eq(7);
+		world
+			.entity(target)
+			.get::<Slider>()
+			.unwrap()
+			.value
+			.xpect_eq(7);
 
 		// edit the target's component; the write-back reaches the binding Value.
 		world.entity_mut(target).get_mut::<Slider>().unwrap().value = 42;
@@ -387,10 +397,14 @@ mod test {
 			.xpect_eq(Value::Int(6));
 
 		// ...and a Value edit reaches the marker's component.
-		*world.entity_mut(entity).get_mut::<Value>().unwrap() =
-			Value::Int(11);
+		*world.entity_mut(entity).get_mut::<Value>().unwrap() = Value::Int(11);
 		world.update_local();
-		world.entity(marked).get::<Slider>().unwrap().value.xpect_eq(11);
+		world
+			.entity(marked)
+			.get::<Slider>()
+			.unwrap()
+			.value
+			.xpect_eq(11);
 	}
 
 	#[beet_core::test]
@@ -447,8 +461,7 @@ mod test {
 		let new_target = world.spawn_empty().id();
 		let mut binding =
 			ReflectFieldRef::new("Slider", "value").with_target(old_target);
-		let mut mapping =
-			<bevy::ecs::entity::EntityHashMap<Entity>>::default();
+		let mut mapping = <bevy::ecs::entity::EntityHashMap<Entity>>::default();
 		mapping.insert(old_target, new_target);
 		binding.map_entities(&mut mapping);
 		binding.target.xpect_eq(BindingTarget::Entity(new_target));

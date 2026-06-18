@@ -7,7 +7,6 @@ use beet_ui::style::common_props::FontWeightProp;
 use beet_ui::style::common_props::ForegroundColor;
 use beet_ui::style::common_props::TextAlignProp;
 
-
 fn main() {
 	App::new()
 		.add_plugins((CharcellPlugin, RealtimeParsePlugin))
@@ -27,8 +26,6 @@ fn main() {
 		.add_systems(PostParseTree, render.after(CharcellRenderSet))
 		.run();
 }
-
-
 
 fn setup(mut commands: Commands) {
 	commands.spawn((

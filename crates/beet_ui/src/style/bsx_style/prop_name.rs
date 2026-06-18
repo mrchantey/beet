@@ -74,10 +74,7 @@ where
 		&mut |_| Entity::PLACEHOLDER,
 	)?;
 	let value = V::from_reflect(reflected.as_ref()).ok_or_else(|| {
-		bevyhow!(
-			"value `{literal:?}` is not a valid `{}`",
-			V::type_path()
-		)
+		bevyhow!("value `{literal:?}` is not a valid `{}`", V::type_path())
 	})?;
 	TokenValue::value(value)
 }

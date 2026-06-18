@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 
-
 /// Creates a tool name by combining the entity bits with the path.
 /// Format: `tool_{entity_bits}_{path_with_underscores}`
 pub fn tool_name(entity: Entity, path: &str) -> String {

@@ -208,8 +208,6 @@ pub async fn verify_dead(
 	bevybail!("endpoint still reachable after destroy")
 }
 
-
-
 /// Clean up any prior state before test starts.
 /// Terraform should handle all infrastructure cleanup, we only need to clean
 /// the artifacts store which is not managed by terraform.

@@ -163,7 +163,6 @@ impl Config {
 		self.add_labeled_resource(resource.ident().label(), resource.resource())
 	}
 
-
 	/// Add a typed resource (chaining). The required provider is registered
 	/// automatically from the resource's [`Resource`] implementation.
 	pub fn with_labeled_resource(
@@ -203,7 +202,6 @@ impl Config {
 		}
 		Ok(self)
 	}
-
 
 	/// Add a typed data source (chaining). The required provider is registered
 	/// automatically from the data source's [`DataSource`] implementation.

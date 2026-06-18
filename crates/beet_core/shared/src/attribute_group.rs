@@ -11,7 +11,6 @@ use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 
-
 /// [`AttributeItem`] collection parsed from Syn attributes.
 /// These cannot be ref types because they are parsed.
 #[derive(Debug)]
@@ -19,8 +18,6 @@ pub struct AttributeGroup {
 	/// The parsed attribute items.
 	pub attributes: Vec<AttributeItem>,
 }
-
-
 
 impl AttributeGroup {
 	/// Parses attributes with the given name from a list of syn attributes.
@@ -112,7 +109,6 @@ impl quote::ToTokens for AttributeItem {
 	}
 }
 
-
 impl AttributeItem {
 	/// Parses an attribute item from the input stream.
 	pub fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -133,7 +129,6 @@ impl AttributeItem {
 			_ => None,
 		}
 	}
-
 
 	/// Handle `#[foo(bar="baz")]` and `#[foo(bar=bazz)]`, useful
 	/// for when generics are required that arent valid tokens

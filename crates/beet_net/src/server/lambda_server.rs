@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use lambda_http::tower::service_fn;
 
-
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
 ///
 /// The lambda runtime owns the lifecycle (it stops invoking when the function is
@@ -42,7 +41,6 @@ pub async fn start_lambda_server(
 		bevyhow!("{}", err)
 	})
 }
-
 
 /// Handler function that processes each lambda request
 async fn handle_request(

@@ -181,7 +181,6 @@ where
 	}
 }
 
-
 /// When the `nightly` feature is enabled, `FuncStore` can be called like a
 /// regular function/closure. Each invocation records the output just like
 /// [`FuncStore::call`].

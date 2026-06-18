@@ -68,7 +68,6 @@ fn truncate_text(
 	MediaBytes::new(media.media_type().clone(), result.into_bytes()).xok()
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

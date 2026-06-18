@@ -653,7 +653,6 @@ fn gap_cells(gap: Length, viewport: UVec2) -> u32 {
 	gap.into_rem(viewport.as_vec2()).round().max(0.) as u32
 }
 
-
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum JustifyContent {
@@ -779,7 +778,6 @@ impl AsCssValue for Direction {
 	}
 }
 
-
 /// How to distribute lines along the cross axis when wrapping.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -824,7 +822,6 @@ impl AsCssValue for FlexWrap {
 		.xok()
 	}
 }
-
 
 /// Spacing around an element.
 #[derive(Debug, Default, Clone, Copy, PartialEq, SetWith, Reflect)]

@@ -51,7 +51,6 @@ impl Url {
 		fragment: None,
 	};
 
-
 	/// Parse a URL string.
 	///
 	/// Accepts full URLs (`https://example.com/path`), scheme-relative
@@ -519,9 +518,6 @@ impl From<Option<&http::uri::Scheme>> for Scheme {
 	}
 }
 
-
-
-
 // ============================================================================
 // Shared parsing helpers (also used by parts.rs)
 // ============================================================================
@@ -551,7 +547,9 @@ pub(crate) fn split_path(path: &str) -> Vec<SmolStr> {
 }
 
 /// Build a query string from a [`MultiMap`].
-pub(crate) fn build_query_string(params: &MultiMap<SmolStr, SmolStr>) -> String {
+pub(crate) fn build_query_string(
+	params: &MultiMap<SmolStr, SmolStr>,
+) -> String {
 	let mut parts: Vec<String> = Vec::new();
 	for (key, values) in params.iter_all() {
 		for value in values {
@@ -600,7 +598,6 @@ pub(crate) fn header_map_to_http(
 	}
 	Ok(http_headers)
 }
-
 
 #[cfg(test)]
 mod test {
@@ -804,8 +801,6 @@ mod test {
 		url.path().first().unwrap().xpect_contains("text/html,");
 		url.to_string().xpect_eq(raw);
 	}
-
-
 
 	#[beet_core::test]
 	fn parse_blob() {

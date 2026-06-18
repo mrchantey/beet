@@ -161,7 +161,11 @@ mod test {
 	/// plus an `<a href>` page tree bound to that surface via [`RenderSurface`],
 	/// returning the `<a>` element entity. Mirrors the real app: the click handler
 	/// resolves the navigator from the link's surface.
-	fn spawn_link(app: &mut App, on_open: Option<OnOpenLink>, href: &str) -> Entity {
+	fn spawn_link(
+		app: &mut App,
+		on_open: Option<OnOpenLink>,
+		href: &str,
+	) -> Entity {
 		let mut nav = app.world_mut().spawn(Navigator::default());
 		if let Some(on_open) = on_open {
 			nav.insert(on_open);
@@ -174,7 +178,9 @@ mod test {
 			.spawn_template(rsx! { <a href=href.to_string()>"link"</a> })
 			.unwrap()
 			.id();
-		app.world_mut().entity_mut(root).insert(RenderSurface(navigator));
+		app.world_mut()
+			.entity_mut(root)
+			.insert(RenderSurface(navigator));
 		app.update();
 		// the <a> is the descendant Element whose tag is "a".
 		app.world_mut()
@@ -220,7 +226,11 @@ mod test {
 		);
 		click(&mut app, link);
 		// no external open: the Internal mode navigated the Navigator instead.
-		app.world().resource::<ExternalOpens>().0.is_empty().xpect_true();
+		app.world()
+			.resource::<ExternalOpens>()
+			.0
+			.is_empty()
+			.xpect_true();
 	}
 
 	/// An internal (relative) link never opens externally regardless of
@@ -230,15 +240,20 @@ mod test {
 		let mut app = link_app();
 		let link = spawn_link(&mut app, None, "/beta");
 		click(&mut app, link);
-		app.world().resource::<ExternalOpens>().0.is_empty().xpect_true();
+		app.world()
+			.resource::<ExternalOpens>()
+			.0
+			.is_empty()
+			.xpect_true();
 	}
 
 	/// `Url::is_external` classifies absolute (has authority) vs relative URLs.
 	#[beet_core::test]
 	fn url_external_classification() {
-		Url::parse("https://example.com/x").is_external().xpect_true();
+		Url::parse("https://example.com/x")
+			.is_external()
+			.xpect_true();
 		Url::parse("/about").is_external().xpect_false();
 		Url::parse("./next").is_external().xpect_false();
 	}
 }
-

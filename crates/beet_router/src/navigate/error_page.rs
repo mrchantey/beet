@@ -45,7 +45,9 @@ pub fn set_error_page(
 		.map(|entity| entity.id());
 	match page {
 		Ok(page) => {
-			world.entity_mut(page).insert(DespawnAfterRender(vec![page]));
+			world
+				.entity_mut(page)
+				.insert(DespawnAfterRender(vec![page]));
 			bind_surface_page(world, host, page);
 		}
 		// a failure building the error page itself is logged; there is no further

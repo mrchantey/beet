@@ -232,7 +232,6 @@ impl PostStreamer for CompletionsStreamer {
 	}
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════
 // SSE -> ResponsePartial stream adapter
 // ═══════════════════════════════════════════════════════════════════════
@@ -320,8 +319,6 @@ where
 		}
 	}
 }
-
-
 
 /// Tracks accumulated tool call state across streaming chunks.
 /// Each tool call arrives incrementally: the first chunk carries `id`

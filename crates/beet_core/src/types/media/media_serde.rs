@@ -72,7 +72,6 @@ impl MediaType {
 		}
 	}
 
-
 	/// Serialize `value` into bytes using this media type's format.
 	///
 	/// ## Errors
@@ -283,7 +282,6 @@ mod test {
 		a: i32,
 		b: i32,
 	}
-
 
 	#[cfg(feature = "serde_plain")]
 	#[crate::test]

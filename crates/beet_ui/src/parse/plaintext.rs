@@ -53,7 +53,6 @@ impl NodeParser for PlainTextParser {
 			tracker.into_full_span()
 		});
 
-
 		let parent = cx.entity.id();
 		// we diff against the first child,
 		// differs should not render to the root

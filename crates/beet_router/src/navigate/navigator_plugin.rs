@@ -1,10 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
 #[derive(Default)]
 pub struct NavigatorPlugin;
-
 
 impl Plugin for NavigatorPlugin {
 	fn build(&self, app: &mut App) {

@@ -173,7 +173,9 @@ fn build_root(
 		Ok(()) => Ok(()),
 		Err(error) => {
 			let error = CloneError::new(error);
-			world.entity_mut(root).insert(TemplateError::new(error.clone()));
+			world
+				.entity_mut(root)
+				.insert(TemplateError::new(error.clone()));
 			Err(error)
 		}
 	};
@@ -232,10 +234,7 @@ fn anchor_pre_slot_children(
 		// skip a child the build consumed (despawned) or already re-homed under the
 		// content root; otherwise (detached, or stranded above the content) re-home it.
 		let needs_anchor = world.get_entity(child).is_ok()
-			&& world
-				.entity(child)
-				.get::<ChildOf>()
-				.map(ChildOf::parent)
+			&& world.entity(child).get::<ChildOf>().map(ChildOf::parent)
 				!= Some(content_root);
 		if needs_anchor {
 			world.entity_mut(child).insert(ChildOf(content_root));
@@ -288,7 +287,12 @@ mod test {
 		let mut world = TemplatePlugin::world();
 		let root = world.spawn_template(Child("kid")).unwrap().id();
 		let kid = world.entity(root).get::<Children>().unwrap()[0];
-		world.entity(kid).get::<Name>().unwrap().as_str().xpect_eq("kid");
+		world
+			.entity(kid)
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("kid");
 	}
 
 	/// A nested, slotted template: builds a `<header>`/`<body>` subtree carrying
@@ -313,7 +317,11 @@ mod test {
 			let body = world.spawn((Name::new("body"), ChildOf(root))).id();
 			world.spawn((SlotTarget::new(), ChildOf(body)));
 			// caller content routed as direct slot children of the root.
-			world.spawn((Name::new("the-body"), SlotChild::new(), ChildOf(root)));
+			world.spawn((
+				Name::new("the-body"),
+				SlotChild::new(),
+				ChildOf(root),
+			));
 			world.spawn((
 				Name::new("the-title"),
 				SlotChild::named("title"),
@@ -332,8 +340,9 @@ mod test {
 		let sc = spawn_count;
 		world.add_observer(move |_: On<SpawnTemplate>| sc.set(sc.get() + 1));
 		let ls = load_state;
-		world
-			.add_observer(move |ev: On<LoadTemplate>| ls.set(Some(ev.is_error)));
+		world.add_observer(move |ev: On<LoadTemplate>| {
+			ls.set(Some(ev.is_error))
+		});
 
 		let root = world.spawn_template(Card).unwrap().id();
 
@@ -364,7 +373,10 @@ mod test {
 		let body_target = world.entity(body).get::<Children>().unwrap()[0];
 		child_names(&world, body_target).xpect_eq(vec!["the-body".to_string()]);
 		// slot markers are stripped after resolution.
-		world.entity(title_target).contains::<SlotTarget>().xpect_false();
+		world
+			.entity(title_target)
+			.contains::<SlotTarget>()
+			.xpect_false();
 
 		// lifecycle: SpawnTemplate once, LoadTemplate immediately with no error.
 		spawn_count.get().xpect_eq(1);
@@ -421,7 +433,11 @@ mod test {
 		// (`EntityWorldMut` is not `Debug`, so take the error without `unwrap_err`)
 		result.err().unwrap().to_string().xpect_contains("boom");
 		// the root carries the same error via `TemplateError`.
-		world.query::<&TemplateError>().iter(&world).count().xpect_eq(1);
+		world
+			.query::<&TemplateError>()
+			.iter(&world)
+			.count()
+			.xpect_eq(1);
 	}
 
 	#[beet_core::test]

@@ -413,7 +413,11 @@ mod test {
 			.xpect_contains("<title>Alpha</title>");
 
 		// the shared resource was never overwritten by a per-route title.
-		world.resource::<PackageConfig>().title.as_str().xpect_eq("SiteName");
+		world
+			.resource::<PackageConfig>()
+			.title
+			.as_str()
+			.xpect_eq("SiteName");
 	}
 
 	/// The per-request link is fresh: `wrap_content_with` installs a

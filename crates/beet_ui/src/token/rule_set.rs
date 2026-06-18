@@ -29,7 +29,6 @@ impl Default for RuleSet {
 	fn default() -> Self { Self::new(default()) }
 }
 
-
 impl RuleSet {
 	pub fn new(default_rule: Rule) -> Self {
 		Self {
@@ -203,7 +202,6 @@ impl RuleSet {
 	}
 }
 
-
 /// Within-pass cascade memo, owned by [`resolve_styles`] and fresh each pass so
 /// no stale value leaks across frames. Two caches collapse the cost:
 ///
@@ -264,9 +262,9 @@ impl RuleSetQuery<'_, '_> {
 		// so a cache hit here is what turns the cascade from O(n²) back to O(n).
 		let key = (entity, token.clone());
 		if let Some(cached) = memo.values.get(&key) {
-			return cached
-				.clone()
-				.ok_or_else(|| bevyhow!("no matching rule for token `{token}`"));
+			return cached.clone().ok_or_else(|| {
+				bevyhow!("no matching rule for token `{token}`")
+			});
 		}
 		let resolved = self.resolve_untyped_uncached(entity, token, memo);
 		memo.values.insert(key, resolved.as_ref().ok().cloned());
@@ -313,7 +311,12 @@ impl RuleSetQuery<'_, '_> {
 			.get(entity)
 			.ok()
 			.and_then(|render_ref_of| render_ref_of.holders().first().copied())
-			.or_else(|| self.ancestors.get(entity).map(|child_of| child_of.get()).ok())
+			.or_else(|| {
+				self.ancestors
+					.get(entity)
+					.map(|child_of| child_of.get())
+					.ok()
+			})
 	}
 
 	/// Resolves `token` against the `:root` default rule — the lowest-priority
@@ -357,10 +360,6 @@ impl RuleSetQuery<'_, '_> {
 		self.rule_set.cascade_in(matched, token)
 	}
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests {

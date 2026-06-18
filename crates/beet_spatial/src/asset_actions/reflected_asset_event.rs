@@ -1,7 +1,5 @@
 use beet_core::prelude::*;
 
-
-
 /// The vanilla asset event doesnt implement reflect so..
 #[derive(Debug, Reflect, PartialEq, Event)]
 pub enum ReflectedAssetEvent<A: Asset> {
@@ -32,7 +30,6 @@ pub enum ReflectedAssetEvent<A: Asset> {
 	},
 }
 
-
 impl<A: Asset> Into<AssetEvent<A>> for ReflectedAssetEvent<A> {
 	fn into(self) -> AssetEvent<A> {
 		match self {
@@ -60,7 +57,6 @@ impl<A: Asset> From<AssetEvent<A>> for ReflectedAssetEvent<A> {
 		}
 	}
 }
-
 
 impl<A: Asset> Clone for ReflectedAssetEvent<A> {
 	fn clone(&self) -> Self { *self }

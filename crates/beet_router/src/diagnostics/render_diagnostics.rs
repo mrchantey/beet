@@ -107,7 +107,11 @@ pub struct Diagnostic {
 impl Diagnostic {
 	/// A diagnostic with no route context (the drivers attach it via
 	/// [`Self::with_route`]).
-	pub fn new(kind: DiagnosticKind, severity: DiagnosticSeverity, message: String) -> Self {
+	pub fn new(
+		kind: DiagnosticKind,
+		severity: DiagnosticSeverity,
+		message: String,
+	) -> Self {
 		Self {
 			kind,
 			severity,
@@ -124,7 +128,9 @@ impl Diagnostic {
 
 	/// Whether this is an [`Error`](DiagnosticSeverity::Error)-level diagnostic, ie one that
 	/// gates `export-static`/`beet check`.
-	pub fn is_error(&self) -> bool { self.severity == DiagnosticSeverity::Error }
+	pub fn is_error(&self) -> bool {
+		self.severity == DiagnosticSeverity::Error
+	}
 
 	/// Log this diagnostic through the cross-platform `log` facade at the level
 	/// matching its [`DiagnosticSeverity`].
@@ -135,8 +141,12 @@ impl Diagnostic {
 			.map(|path| format!(" [{}]", path.with_leading_slash()))
 			.unwrap_or_default();
 		match self.severity {
-			DiagnosticSeverity::Error => error!("render-diagnostic{route}: {}", self.message),
-			DiagnosticSeverity::Warn => warn!("render-diagnostic{route}: {}", self.message),
+			DiagnosticSeverity::Error => {
+				error!("render-diagnostic{route}: {}", self.message)
+			}
+			DiagnosticSeverity::Warn => {
+				warn!("render-diagnostic{route}: {}", self.message)
+			}
 			DiagnosticSeverity::Off => {}
 		}
 	}
@@ -233,7 +243,8 @@ impl DiagnosticsQuery<'_, '_> {
 	) {
 		// an uppercase tag that survived as a literal element resolved to nothing.
 		let tag_severity = config.severity(DiagnosticKind::UnknownTag);
-		if tag_severity != DiagnosticSeverity::Off && is_uppercase_tag(el.tag()) {
+		if tag_severity != DiagnosticSeverity::Off && is_uppercase_tag(el.tag())
+		{
 			out.push(Diagnostic::new(
 				DiagnosticKind::UnknownTag,
 				tag_severity,
@@ -248,14 +259,18 @@ impl DiagnosticsQuery<'_, '_> {
 		// are skipped.
 		let href_severity = config.severity(DiagnosticKind::BrokenHref);
 		if href_severity != DiagnosticSeverity::Off
-			&& let Some(href) = el.attribute("href").and_then(|attr| attr.value.as_str().ok())
+			&& let Some(href) = el
+				.attribute("href")
+				.and_then(|attr| attr.value.as_str().ok())
 			&& let Some(segments) = internal_href_segments(href)
 			&& route_tree.find(&segments).is_none()
 		{
 			out.push(Diagnostic::new(
 				DiagnosticKind::BrokenHref,
 				href_severity,
-				format!("broken internal link `href=\"{href}\"`: no matching route"),
+				format!(
+					"broken internal link `href=\"{href}\"`: no matching route"
+				),
 			));
 		}
 
@@ -276,7 +291,9 @@ impl DiagnosticsQuery<'_, '_> {
 					out.push(Diagnostic::new(
 						DiagnosticKind::UnknownClass,
 						class_severity,
-						format!("unknown class `{class}`: no matching style rule"),
+						format!(
+							"unknown class `{class}`: no matching style rule"
+						),
 					));
 				}
 			}
@@ -314,7 +331,10 @@ fn internal_href_segments(href: &str) -> Option<Vec<SmolStr>> {
 	if path.is_empty() {
 		return Some(Vec::new());
 	}
-	path.split('/').map(SmolStr::from).collect::<Vec<_>>().xmap(Some)
+	path.split('/')
+		.map(SmolStr::from)
+		.collect::<Vec<_>>()
+		.xmap(Some)
 }
 
 /// Whether the [`RuleSet`] carries any selector matching the class `name`,
@@ -343,9 +363,10 @@ pub fn rule_set_classes(rule_set: &RuleSet) -> impl Iterator<Item = &str> {
 fn selector_classes(selector: &Selector) -> Vec<&str> {
 	match selector {
 		Selector::Class(class) => vec![class.as_str()],
-		Selector::AnyOf(parts) | Selector::AllOf(parts) => {
-			parts.iter().flat_map(|part| selector_classes(part)).collect()
-		}
+		Selector::AnyOf(parts) | Selector::AllOf(parts) => parts
+			.iter()
+			.flat_map(|part| selector_classes(part))
+			.collect(),
 		Selector::Not(inner) => selector_classes(inner),
 		Selector::Descendant {
 			ancestor,
@@ -357,7 +378,6 @@ fn selector_classes(selector: &Selector) -> Vec<&str> {
 		_ => Vec::new(),
 	}
 }
-
 
 #[cfg(test)]
 mod test {
@@ -380,7 +400,10 @@ mod test {
 		let root = world
 			.spawn((Router, children![
 				render_action::fixed_func_route("", || rsx! { <p>"home"</p> }),
-				render_action::fixed_func_route("about", || rsx! { <p>"about"</p> }),
+				render_action::fixed_func_route(
+					"about",
+					|| rsx! { <p>"about"</p> }
+				),
 			]))
 			.flush();
 		world.entity(root).get::<RouteTree>().unwrap().clone()
@@ -388,10 +411,7 @@ mod test {
 
 	/// Build `bundle` into a fresh render root and run the pass with the given
 	/// `config`, returning the diagnostics.
-	fn run(
-		bundle: impl Bundle,
-		config: &RenderDiagnostics,
-	) -> Vec<Diagnostic> {
+	fn run(bundle: impl Bundle, config: &RenderDiagnostics) -> Vec<Diagnostic> {
 		let mut world = diagnostics_world();
 		let tree = route_tree();
 		let rules = rule_set();
@@ -459,21 +479,21 @@ mod test {
 		.xmap(|d| of_kind(&d, DiagnosticKind::BrokenHref).len())
 		.xpect_eq(0);
 		// the root `/` resolves too.
-		run(rsx! { <a href="/">"home"</a> }, &RenderDiagnostics::default())
-			.xmap(|d| of_kind(&d, DiagnosticKind::BrokenHref).len())
-			.xpect_eq(0);
+		run(
+			rsx! { <a href="/">"home"</a> },
+			&RenderDiagnostics::default(),
+		)
+		.xmap(|d| of_kind(&d, DiagnosticKind::BrokenHref).len())
+		.xpect_eq(0);
 	}
 
 	#[beet_core::test]
 	fn external_href_skipped() {
 		// an external scheme, a fragment and a mailto are never route-checked.
 		for href in ["https://example.com/nope", "#anchor", "mailto:a@b.c"] {
-			run(
-				rsx! { <a href=href>"x"</a> },
-				&RenderDiagnostics::default(),
-			)
-			.xmap(|d| of_kind(&d, DiagnosticKind::BrokenHref).len())
-			.xpect_eq(0);
+			run(rsx! { <a href=href>"x"</a> }, &RenderDiagnostics::default())
+				.xmap(|d| of_kind(&d, DiagnosticKind::BrokenHref).len())
+				.xpect_eq(0);
 		}
 	}
 
@@ -491,12 +511,9 @@ mod test {
 
 	#[beet_core::test]
 	fn known_class_passes() {
-		run(
-			rsx! { <div class="page"/> },
-			&RenderDiagnostics::default(),
-		)
-		.xmap(|d| of_kind(&d, DiagnosticKind::UnknownClass).len())
-		.xpect_eq(0);
+		run(rsx! { <div class="page"/> }, &RenderDiagnostics::default())
+			.xmap(|d| of_kind(&d, DiagnosticKind::UnknownClass).len())
+			.xpect_eq(0);
 	}
 
 	#[beet_core::test]
@@ -533,11 +550,12 @@ mod test {
 			unknown_class: DiagnosticSeverity::Error,
 			..default()
 		};
-		let class = run(rsx! { <div class="zzz"/> }, &config)
-			.xmap(|d| of_kind(&d, DiagnosticKind::UnknownClass)
+		let class = run(rsx! { <div class="zzz"/> }, &config).xmap(|d| {
+			of_kind(&d, DiagnosticKind::UnknownClass)
 				.into_iter()
 				.cloned()
-				.collect::<Vec<_>>());
+				.collect::<Vec<_>>()
+		});
 		class.len().xpect_eq(1);
 		class[0].is_error().xpect_true();
 	}
@@ -560,10 +578,7 @@ mod test {
 		let tree = route_tree();
 		let rules = rule_set();
 		let root = world
-			.spawn((
-				Element::new("div"),
-				TemplateError::new(bevyhow!("boom")),
-			))
+			.spawn((Element::new("div"), TemplateError::new(bevyhow!("boom"))))
 			.flush();
 		let diagnostics = render_diagnostics(
 			&mut world,

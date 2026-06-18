@@ -77,14 +77,21 @@ impl ScrollbarHitTest<'_, '_> {
 		};
 		let viewport = buffer.current_buffer().size();
 		let ordered = self.tree.pre_order(root);
-		let contexts =
-			resolve_contexts(root, &ordered, &self.charcell, &self.tree, viewport);
+		let contexts = resolve_contexts(
+			root,
+			&ordered,
+			&self.charcell,
+			&self.tree,
+			viewport,
+		);
 		for entity in ordered {
 			let Ok(node) = self.charcell.unresolved_node(entity) else {
 				continue;
 			};
-			let offset =
-				contexts.get(&entity).map(|cx| cx.offset).unwrap_or(IVec2::ZERO);
+			let offset = contexts
+				.get(&entity)
+				.map(|cx| cx.offset)
+				.unwrap_or(IVec2::ZERO);
 			if let Some(geometry) =
 				scrollbar_geometry(&node, &self.charcell, viewport, offset)
 			{
@@ -102,12 +109,12 @@ impl ScrollbarHitTest<'_, '_> {
 		container: Entity,
 		axis: ScrollAxis,
 	) -> Option<AxisBar> {
-		self.geometries_for(surface).get(&container).and_then(|geometry| {
-			match axis {
+		self.geometries_for(surface)
+			.get(&container)
+			.and_then(|geometry| match axis {
 				ScrollAxis::Y => geometry.vertical,
 				ScrollAxis::X => geometry.horizontal,
-			}
-		})
+			})
 	}
 
 	/// The scrollbar press at `cell` within `surface`, if any.
@@ -147,11 +154,17 @@ impl ScrollbarHitTest<'_, '_> {
 /// Classify a press on `bar`: `cross` is the cursor's cross-axis coordinate
 /// (compared to the gutter line), `along` the along-axis coordinate (compared to
 /// the track and thumb spans). `None` when the cursor is off this bar.
-fn bar_region(bar: &AxisBar, cross: i32, along: i32) -> Option<ScrollbarRegion> {
+fn bar_region(
+	bar: &AxisBar,
+	cross: i32,
+	along: i32,
+) -> Option<ScrollbarRegion> {
 	if cross != bar.line {
 		return None;
 	}
-	if along < bar.track_start || along >= bar.track_start + bar.track_len as i32 {
+	if along < bar.track_start
+		|| along >= bar.track_start + bar.track_len as i32
+	{
 		return None;
 	}
 	if along < bar.thumb_start {
@@ -194,7 +207,10 @@ pub fn scrollbar_mouse(
 	mut cursor: MessageReader<CursorMoved>,
 	// the hit-test reads ScrollPosition (via CharcellQuery), so it cannot coexist
 	// with the mutable write query; a ParamSet keeps the accesses disjoint.
-	mut params: ParamSet<(ScrollbarHitTest, Query<&'static mut ScrollPosition>)>,
+	mut params: ParamSet<(
+		ScrollbarHitTest,
+		Query<&'static mut ScrollPosition>,
+	)>,
 	// drag + last cursor are kept per surface (window), so a drag on one SSH
 	// session never moves another's scrollbar.
 	mut drag: Local<HashMap<Entity, ScrollbarDrag>>,
@@ -209,7 +225,9 @@ pub fn scrollbar_mouse(
 			let surface = moved.window;
 			let cell = vec2_to_cell(moved.position);
 			last_cursor.insert(surface, cell);
-			let Some(state) = drag.get(&surface) else { continue };
+			let Some(state) = drag.get(&surface) else {
+				continue;
+			};
 			let Some(bar) = hit_test.bar(surface, state.container, state.axis)
 			else {
 				continue;
@@ -225,7 +243,9 @@ pub fn scrollbar_mouse(
 			let surface = button.window;
 			match button.state {
 				ButtonState::Pressed => {
-					let Some(&cell) = last_cursor.get(&surface) else { continue };
+					let Some(&cell) = last_cursor.get(&surface) else {
+						continue;
+					};
 					let Some(hit) = hit_test.hit_surface(surface, cell) else {
 						continue;
 					};
@@ -239,10 +259,16 @@ pub fn scrollbar_mouse(
 						}
 						// click the track to page one scrollport toward the click.
 						ScrollbarRegion::PageBackward => {
-							writes.push(ScrollWrite::page(&hit, -(hit.bar.track_len as i32)));
+							writes.push(ScrollWrite::page(
+								&hit,
+								-(hit.bar.track_len as i32),
+							));
 						}
 						ScrollbarRegion::PageForward => {
-							writes.push(ScrollWrite::page(&hit, hit.bar.track_len as i32));
+							writes.push(ScrollWrite::page(
+								&hit,
+								hit.bar.track_len as i32,
+							));
 						}
 					}
 				}
@@ -271,9 +297,18 @@ pub fn scrollbar_mouse(
 /// applied against the mutable [`ScrollPosition`] query.
 enum ScrollWrite {
 	/// Set an axis to an absolute offset (a thumb drag).
-	Set { container: Entity, axis: ScrollAxis, offset: i32 },
+	Set {
+		container: Entity,
+		axis: ScrollAxis,
+		offset: i32,
+	},
 	/// Add `delta` to an axis, clamped to `[0, max]` (a track page).
-	Page { container: Entity, axis: ScrollAxis, delta: i32, max: i32 },
+	Page {
+		container: Entity,
+		axis: ScrollAxis,
+		delta: i32,
+		max: i32,
+	},
 }
 
 impl ScrollWrite {
@@ -289,7 +324,9 @@ impl ScrollWrite {
 
 	fn container(&self) -> Entity {
 		match self {
-			Self::Set { container, .. } | Self::Page { container, .. } => *container,
+			Self::Set { container, .. } | Self::Page { container, .. } => {
+				*container
+			}
 		}
 	}
 
@@ -297,8 +334,12 @@ impl ScrollWrite {
 	fn resolve(&self, current: IVec2) -> IVec2 {
 		let mut next = current;
 		match *self {
-			Self::Set { axis, offset, .. } => set_axis_offset(&mut next, axis, offset),
-			Self::Page { axis, delta, max, .. } => {
+			Self::Set { axis, offset, .. } => {
+				set_axis_offset(&mut next, axis, offset)
+			}
+			Self::Page {
+				axis, delta, max, ..
+			} => {
 				let value = (axis_offset(current, axis) + delta).clamp(0, max);
 				set_axis_offset(&mut next, axis, value);
 			}
@@ -330,9 +371,16 @@ mod test {
 			.filter(|(_, cell)| matches!(cell.symbol_str(), "│" | "█"))
 			.map(|(pos, cell)| (pos.x, pos.y, cell.symbol_str().to_string()))
 			.collect();
-		let col = bar.iter().map(|(x, _, _)| *x).max().expect("a vertical bar");
-		let mut track: Vec<u32> =
-			bar.iter().filter(|(x, _, _)| *x == col).map(|(_, y, _)| *y).collect();
+		let col = bar
+			.iter()
+			.map(|(x, _, _)| *x)
+			.max()
+			.expect("a vertical bar");
+		let mut track: Vec<u32> = bar
+			.iter()
+			.filter(|(x, _, _)| *x == col)
+			.map(|(_, y, _)| *y)
+			.collect();
 		let mut thumb: Vec<u32> = bar
 			.iter()
 			.filter(|(x, _, glyph)| *x == col && glyph == "█")
@@ -368,16 +416,21 @@ mod test {
 	/// A tall vertical scroll container (30 rows in a 6-row scrollport).
 	fn tall_scroller_host() -> TestHost {
 		let mut host = TestHost::new();
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				Rule::class("scroller")
 					.with_value(common_props::Height, Length::Rem(6.))
 					.with_value(common_props::OverflowYProp, Overflow::Scroll),
-			],
+			]);
+		let body: String = (0..30)
+			.map(|i| format!("r{i}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+		host.spawn_content(
+			rsx! { <div class="scroller"><pre>{body}</pre></div> },
 		);
-		let body: String =
-			(0..30).map(|i| format!("r{i}")).collect::<Vec<_>>().join("\n");
-		host.spawn_content(rsx! { <div class="scroller"><pre>{body}</pre></div> });
 		host.step();
 		host
 	}
@@ -414,7 +467,10 @@ mod test {
 		// content row is visible and the first is gone.
 		let at_max = offset_y(&mut host);
 		(at_max > 0).xpect_true();
-		host.frame_plain().xpect_contains("r29").xnot().xpect_contains("r0");
+		host.frame_plain()
+			.xpect_contains("r29")
+			.xnot()
+			.xpect_contains("r0");
 		// the release ended the drag: a bare move no longer scrolls.
 		host.send_input(&sgr(35, col, top, true));
 		host.step();
@@ -426,15 +482,17 @@ mod test {
 	#[beet_core::test]
 	fn scrollbar_horizontal_track_click_pages() {
 		let mut host = TestHost::new();
-		host.app.world_mut().get_resource_or_init::<RuleSet>().extend_rules(
-			vec![
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
 				Rule::class("wide")
 					.with_value(common_props::Width, Length::Rem(8.))
 					.with_value(common_props::OverflowXProp, Overflow::Scroll),
-			],
-		);
+			]);
 		// content wider than the 40-cell buffer, so it overflows horizontally.
-		let wide: String = ('a'..='z').chain('A'..='Z').cycle().take(60).collect();
+		let wide: String =
+			('a'..='z').chain('A'..='Z').cycle().take(60).collect();
 		host.spawn_content(rsx! {
 			<div class="wide"><pre>{wide}</pre></div>
 		});

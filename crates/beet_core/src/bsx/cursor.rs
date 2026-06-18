@@ -28,8 +28,10 @@ impl<'a> Cursor<'a> {
 	/// 0-indexed column, matching [`SpanLookup`](crate::prelude::SpanLookup).
 	pub fn line_col(&self, offset: usize) -> crate::prelude::LineCol {
 		let prefix = &self.source[..offset];
-		let line = prefix.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
-		let col = prefix.len() - prefix.rfind('\n').map(|nl| nl + 1).unwrap_or(0);
+		let line =
+			prefix.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
+		let col =
+			prefix.len() - prefix.rfind('\n').map(|nl| nl + 1).unwrap_or(0);
 		crate::prelude::LineCol::new(line, col as u32)
 	}
 
@@ -78,7 +80,10 @@ impl<'a> Cursor<'a> {
 	}
 
 	/// Consume characters while `predicate` holds, returning the consumed slice.
-	pub fn take_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> &'a str {
+	pub fn take_while(
+		&mut self,
+		mut predicate: impl FnMut(char) -> bool,
+	) -> &'a str {
 		let start = self.offset;
 		while let Some(ch) = self.peek() {
 			if predicate(ch) {
@@ -119,9 +124,7 @@ mod test {
 	fn eat_and_take() {
 		let mut cursor = Cursor::new("<div>hi</div>");
 		cursor.eat("<").xpect_true();
-		cursor
-			.take_while(|ch| ch.is_alphanumeric())
-			.xpect_eq("div");
+		cursor.take_while(|ch| ch.is_alphanumeric()).xpect_eq("div");
 		cursor.eat(">").xpect_true();
 		cursor.take_until("</").xpect_eq("hi");
 	}

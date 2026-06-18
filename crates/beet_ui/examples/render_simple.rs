@@ -9,8 +9,6 @@ fn main() {
 		.xprint();
 }
 
-
-
 fn setup() -> impl Bundle {
 	(
 		rsx! {<div>"hello world!"</div>},

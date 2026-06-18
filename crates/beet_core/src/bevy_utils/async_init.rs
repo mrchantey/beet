@@ -15,7 +15,6 @@ pub struct AsyncInit {
 	>,
 }
 
-
 impl AsyncInit {
 	/// Register an async init function when the entity is initialized.
 	pub fn register_on_add<Func, Fut>(
@@ -71,7 +70,6 @@ impl AsyncInit {
 			inits.into_iter().map(|init| init.run(entity.clone())),
 		)
 		.await?;
-
 
 		Ok(())
 	}

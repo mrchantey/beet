@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-
-
 /// A simple counter to generate unique ids.
 ///
 /// ## Example

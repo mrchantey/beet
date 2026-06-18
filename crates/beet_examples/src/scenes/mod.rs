@@ -6,12 +6,10 @@ use beet_core::prelude::*;
 use bevy::light::CascadeShadowConfigBuilder;
 use std::f32::consts::PI;
 
-
 pub fn ui_terminal_input(commands: Commands) {
 	spawn_ui_terminal(commands, true);
 }
 pub fn ui_terminal(commands: Commands) { spawn_ui_terminal(commands, false); }
-
 
 pub fn hello_world(mut commands: Commands) {
 	commands.spawn((
@@ -24,7 +22,6 @@ pub fn hello_world(mut commands: Commands) {
 		],
 	));
 }
-
 
 pub fn camera_2d(mut commands: Commands) { commands.spawn(Camera2d); }
 
@@ -42,7 +39,6 @@ pub fn ground_3d(
 		MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
 	));
 }
-
 
 pub fn lighting_3d(mut commands: Commands) {
 	// Light
@@ -65,7 +61,6 @@ pub fn lighting_3d(mut commands: Commands) {
 		.build(),
 	));
 }
-
 
 pub fn space_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 	commands.spawn((

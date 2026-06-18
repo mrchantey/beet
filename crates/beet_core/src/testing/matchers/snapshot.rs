@@ -294,7 +294,6 @@ fn parse_snapshot(
 	// Location::caller() returns 1-indexed line and column, but LineCol stores 0-indexed column
 	let loc = LineCol::from_location(&caller_loc);
 
-
 	match SnapMode::parse() {
 		SnapMode::Save => {
 			SnapMap::set(&file_path, loc, received.to_string())?;

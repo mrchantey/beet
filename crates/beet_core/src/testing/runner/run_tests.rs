@@ -4,8 +4,6 @@ use crate::testing::runner::TestRunResult;
 use crate::testing::runner::*;
 use bevy::ecs::system::NonSendMarker;
 
-
-
 #[track_caller]
 pub(super) fn run_tests_series(
 	mut commands: Commands,
@@ -26,9 +24,6 @@ pub(super) fn run_tests_series(
 	}
 	Ok(())
 }
-
-
-
 
 #[track_caller]
 pub(super) fn run_non_send_tests_series(
@@ -57,7 +52,6 @@ pub(super) fn run_non_send_tests_series(
 	}
 	Ok(())
 }
-
 
 #[track_caller]
 fn run_test(
@@ -104,8 +98,6 @@ fn run_test(
 
 	Ok(())
 }
-
-
 
 #[cfg(test)]
 mod tests {

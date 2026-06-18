@@ -79,7 +79,6 @@ pub struct FieldConfig {
 	pub not_into: bool,
 }
 
-
 /// Defaults parsed from struct-level attributes.
 pub struct StructConfig {
 	/// Default visibility for generated methods.
@@ -456,7 +455,6 @@ pub fn produce(
 		}
 	})
 }
-
 
 #[cfg(test)]
 mod test {

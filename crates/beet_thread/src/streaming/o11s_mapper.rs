@@ -18,7 +18,6 @@ use crate::o11s::streaming::ResponseQueuedEvent;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
 /// Maps a [`PostView`] into an OpenResponses [`InputItem`] for request building.
 /// Classification is performed via [`AgentPost`] for clean dispatch.
 pub fn post_to_o11s_input(
@@ -154,8 +153,6 @@ pub fn post_to_o11s_input(
 	input_item.xok()
 }
 
-
-
 pub fn ev_to_response_partial(
 	prev: Option<ResponsePartial>,
 	ev: StreamingEvent,
@@ -228,7 +225,6 @@ pub fn response_to_partial(response: ResponseBody) -> Result<ResponsePartial> {
 	}
 	.xok()
 }
-
 
 /// ## Errors
 /// Errors if a [`StreamingEvent::Error`] is received
@@ -461,8 +457,6 @@ fn stream_to_partial_posts(event: StreamingEvent) -> Result<Vec<PostPartial>> {
 	.xok()
 }
 
-
-
 pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 	match tool {
 		ToolDefinition::Function(func) => {
@@ -489,7 +483,6 @@ pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 		},
 	}
 }
-
 
 pub fn tool_choice(tool: &ToolChoice) -> o11s::ToolChoice {
 	use crate::o11s::AllowedToolsChoice;

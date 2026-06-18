@@ -230,7 +230,6 @@ where
 	doc.get_field::<T>(&field.field_path)?.xok()
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

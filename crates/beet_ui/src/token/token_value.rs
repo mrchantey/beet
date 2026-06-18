@@ -34,7 +34,6 @@ where
 	fn from(token: T) -> Self { Self::Token(token.into()) }
 }
 
-
 #[derive(
 	Debug,
 	Clone,
@@ -80,7 +79,6 @@ impl TypedValue {
 	pub fn take(self) -> Value { self.value }
 }
 
-
 impl From<TypedValue> for TokenValue {
 	fn from(value: TypedValue) -> Self { Self::Value(value) }
 }
@@ -92,7 +90,6 @@ impl From<TypedValue> for TokenValue {
 // 		Self::new(value).expect("failed to serialize value")
 // 	}
 // }
-
 
 pub trait IntoTokenValue<M> {
 	fn into_token_value(self) -> TokenValue;

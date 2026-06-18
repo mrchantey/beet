@@ -17,34 +17,58 @@ mod eval_on_load;
 mod rhai_runtime;
 #[cfg(all(
 	feature = "serde",
-	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+	any(
+		feature = "rhai",
+		all(feature = "quickjs", not(target_arch = "wasm32"))
+	)
 ))]
 mod script;
 #[cfg(all(
 	feature = "serde",
-	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+	any(
+		feature = "rhai",
+		all(feature = "quickjs", not(target_arch = "wasm32"))
+	)
 ))]
 mod script_action;
-#[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
-pub(crate) use quickjs_runtime::run_quickjs;
-#[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
-pub use quickjs_runtime::ConsoleStream;
-#[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
-pub use quickjs_runtime::run_quickjs_console;
 #[cfg(any(
 	all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")),
 	all(feature = "json", target_arch = "wasm32")
 ))]
 pub use eval_on_load::EvalOnLoad;
+#[cfg(all(
+	feature = "quickjs",
+	feature = "json",
+	not(target_arch = "wasm32")
+))]
+pub use quickjs_runtime::ConsoleStream;
+#[cfg(all(
+	feature = "quickjs",
+	feature = "json",
+	not(target_arch = "wasm32")
+))]
+pub(crate) use quickjs_runtime::run_quickjs;
+#[cfg(all(
+	feature = "quickjs",
+	feature = "json",
+	not(target_arch = "wasm32")
+))]
+pub use quickjs_runtime::run_quickjs_console;
 #[cfg(all(feature = "rhai", feature = "serde"))]
 pub(crate) use rhai_runtime::run_rhai;
 #[cfg(all(
 	feature = "serde",
-	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+	any(
+		feature = "rhai",
+		all(feature = "quickjs", not(target_arch = "wasm32"))
+	)
 ))]
 pub use script::*;
 #[cfg(all(
 	feature = "serde",
-	any(feature = "rhai", all(feature = "quickjs", not(target_arch = "wasm32")))
+	any(
+		feature = "rhai",
+		all(feature = "quickjs", not(target_arch = "wasm32"))
+	)
 ))]
 pub use script_action::*;

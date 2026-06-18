@@ -10,12 +10,11 @@ mod main_attr;
 mod mdx;
 #[cfg(feature = "rsx")]
 mod rsx;
+mod sendit;
 #[cfg(feature = "rsx")]
 mod template;
-mod sendit;
 mod test_attr;
 mod to_tokens;
-
 
 /// Implements `TokenizeSelf` for a struct or enum.
 /// All fields must also implement `TokenizeSelf`.
@@ -98,7 +97,6 @@ pub fn bundle_effect(
 pub fn as_any(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	as_any::impl_as_any(input).into()
 }
-
 
 /// Macro for [`ActionEvent`]
 ///
@@ -246,7 +244,6 @@ pub fn template(
 ) -> proc_macro::TokenStream {
 	template::impl_template(attr, item)
 }
-
 
 /// Entry point macro for async `main` functions, using [`async_executor::LocalExecutor`].
 ///

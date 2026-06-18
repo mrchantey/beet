@@ -229,7 +229,6 @@ impl S3Sync {
 		}
 	}
 
-
 	/// Sync an S3 URI down to a local directory: `aws s3 sync s3://bucket/prefix <local_dir>`.
 	///
 	/// ## Example

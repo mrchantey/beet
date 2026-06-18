@@ -7,7 +7,6 @@
 use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
-
 /// The HTML block-level element names, the single list shared by everything that
 /// distinguishes block from inline elements for whitespace and layout decisions
 /// (renderers, the markdown tree builder, …).
@@ -51,7 +50,9 @@ pub const BLOCK_ELEMENTS: &[&str] = &[
 /// Whether `name` is an HTML block-level element (case-insensitive), per
 /// [`BLOCK_ELEMENTS`].
 pub fn is_block_element(name: &str) -> bool {
-	BLOCK_ELEMENTS.iter().any(|el| el.eq_ignore_ascii_case(name))
+	BLOCK_ELEMENTS
+		.iter()
+		.any(|el| el.eq_ignore_ascii_case(name))
 }
 
 /// The default set of block-level element names as owned `Cow`s, for renderers
@@ -59,7 +60,6 @@ pub fn is_block_element(name: &str) -> bool {
 pub fn default_block_elements() -> Vec<Cow<'static, str>> {
 	BLOCK_ELEMENTS.iter().map(|el| Cow::Borrowed(*el)).collect()
 }
-
 
 /// Entity pairs as `(html_entity, character)`.
 const HTML_ENTITY_PAIRS: &[(&str, &str)] = &[
@@ -263,7 +263,6 @@ pub fn unescape_html_attribute(input: &str) -> String {
 ///     .xpect_contains("/script>");
 /// ```
 pub fn escape_script_json(json: &str) -> String { json.replace('<', "\\u003c") }
-
 
 #[cfg(test)]
 mod test {

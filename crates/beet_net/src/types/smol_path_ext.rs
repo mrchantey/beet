@@ -45,7 +45,6 @@ pub fn url_path_from_file_path(file_path: impl Into<SmolPath>) -> SmolPath {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;

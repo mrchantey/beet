@@ -7,9 +7,9 @@
 //! target entity is given, the spawned roots are tracked as [`TemplateNodeOf`] of it
 //! rather than reparented, so its existing children survive.
 
-use crate::prelude::*;
 #[cfg(feature = "bsx")]
 use crate::prelude::BsxTemplate;
+use crate::prelude::*;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
 
@@ -300,7 +300,8 @@ mod entry_test {
 	fn loads_bsx_and_json_through_one_loader() {
 		// markup: the single root element's component lands on the spawned root.
 		let mut world = TemplatePlugin::world();
-		let bsx = MediaBytes::new_bsx("<main class=\"app\"><span>hi</span></main>");
+		let bsx =
+			MediaBytes::new_bsx("<main class=\"app\"><span>hi</span></main>");
 		let roots = TemplateLoader::new(&mut world).load(&bsx).unwrap();
 		world
 			.entity(roots[0])
@@ -321,7 +322,10 @@ mod entry_test {
 				.unwrap()
 		};
 		let mut world = TemplatePlugin::world();
-		world.resource::<AppTypeRegistry>().write().register::<Name>();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Name>();
 		let roots = TemplateLoader::new(&mut world).load(&json).unwrap();
 		world
 			.entity(roots[0])
@@ -466,14 +470,11 @@ mod test {
 		let mut app = serde_world();
 		let root = app
 			.world_mut()
-			.spawn((
-				Name::new("parent"),
-				children![
-					Name::new("a"),
-					Name::new("b"),
-					Name::new("c"),
-				],
-			))
+			.spawn((Name::new("parent"), children![
+				Name::new("a"),
+				Name::new("b"),
+				Name::new("c"),
+			]))
 			.id();
 		let bytes = TemplateSaver::new()
 			.with_entity_tree(app.world(), root)
@@ -505,10 +506,6 @@ mod test {
 				app.world().entity(child).get::<Name>().unwrap().to_string()
 			})
 			.collect();
-		order.xpect_eq(vec![
-			"a".to_string(),
-			"b".to_string(),
-			"c".to_string(),
-		]);
+		order.xpect_eq(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 	}
 }

@@ -186,7 +186,6 @@ impl Client {
 	}
 }
 
-
 /// A WebDriver client with an owned driver process.
 ///
 /// This struct manages the lifecycle of the WebDriver process,
@@ -320,7 +319,6 @@ impl ClientProcess {
 		Ok(())
 	}
 }
-
 
 #[cfg(test)]
 mod test {

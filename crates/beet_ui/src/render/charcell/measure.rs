@@ -65,9 +65,7 @@ pub(super) fn measure_node(
 		Display::Flex => {
 			measure_flex(node, query, sizes, content_available, viewport)?
 		}
-		Display::Grid => {
-			measure_grid(node, query, content_available, viewport)
-		}
+		Display::Grid => measure_grid(node, query, content_available, viewport),
 		Display::Table => {
 			measure_table(node, query, content_available, viewport)
 		}

@@ -97,7 +97,6 @@ pub fn despawn_scene(world: &mut World) {
 	});
 }
 
-
 #[cfg(all(test, feature = "template_serde", feature = "json"))]
 mod test {
 	use crate::prelude::*;
@@ -114,7 +113,10 @@ mod test {
 	fn test_world() -> World {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
-		world.resource::<AppTypeRegistry>().write().register::<Ping>();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Ping>();
 		world
 	}
 
@@ -177,7 +179,10 @@ mod test {
 				.find(&["ping"])
 				.xpect_some();
 			bytes = TemplateSaver::new()
-				.save_roots_filtered::<With<BeetSceneRoot>>(&mut world, MediaType::Json)
+				.save_roots_filtered::<With<BeetSceneRoot>>(
+					&mut world,
+					MediaType::Json,
+				)
 				.unwrap();
 		}
 	}

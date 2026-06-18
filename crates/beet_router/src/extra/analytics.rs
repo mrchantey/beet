@@ -24,7 +24,6 @@ fn AnalyticsHandler(
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -121,7 +121,11 @@ impl TemplateSaver {
 	}
 
 	/// Serializes to [`MediaBytes`] using the given format with default options.
-	pub fn save(self, world: &World, media_type: MediaType) -> Result<MediaBytes> {
+	pub fn save(
+		self,
+		world: &World,
+		media_type: MediaType,
+	) -> Result<MediaBytes> {
 		self.save_with_options(world, media_type, default())
 	}
 

@@ -4,10 +4,6 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::process::ExitStatus;
 
-
-
-
-
 /// Extension trait for [`ExitStatus`].
 #[extend::ext]
 pub impl ExitStatus {

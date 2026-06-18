@@ -56,7 +56,6 @@ impl Default for RandomSource {
 	}
 }
 
-
 /// save the `use rand::Rng` shenannigans
 impl RandomSource {
 	/// see [Rng::random]

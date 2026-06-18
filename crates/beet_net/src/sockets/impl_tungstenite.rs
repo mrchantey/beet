@@ -248,11 +248,7 @@ pub(crate) fn socket_from_ws_stream<S>(
 	ws_stream: async_tungstenite::WebSocketStream<S>,
 ) -> Socket
 where
-	S: 'static
-		+ Send
-		+ Unpin
-		+ futures::AsyncRead
-		+ futures::AsyncWrite,
+	S: 'static + Send + Unpin + futures::AsyncRead + futures::AsyncWrite,
 {
 	let (sink, stream) = ws_stream.split();
 	let (sink_boxed, stream_boxed): (
@@ -276,11 +272,7 @@ where
 /// handshake, the same-port counterpart to the side-port [`accept_async`].
 pub(crate) async fn socket_from_upgraded<S>(stream: S) -> Socket
 where
-	S: 'static
-		+ Send
-		+ Unpin
-		+ futures::AsyncRead
-		+ futures::AsyncWrite,
+	S: 'static + Send + Unpin + futures::AsyncRead + futures::AsyncWrite,
 {
 	use async_tungstenite::WebSocketStream;
 	use async_tungstenite::tungstenite::protocol::Role;
@@ -407,7 +399,6 @@ fn close_code_to_u16(code: TungCloseCode) -> u16 {
 }
 
 fn close_code_from_u16(code: u16) -> TungCloseCode { TungCloseCode::from(code) }
-
 
 #[cfg(test)]
 mod tests {

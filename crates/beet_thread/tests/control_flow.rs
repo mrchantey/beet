@@ -38,7 +38,6 @@ fn setup(mut commands: Commands) {
 		.call::<(), Outcome>((), default());
 }
 
-
 fn assert_and_exit(
 	input: In<ActionContext>,
 	mut commands: Commands,

@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-
 /// Filesystem-backed store for local storage.
 ///
 /// Stores objects as files on the local filesystem, with the configured
@@ -65,7 +64,6 @@ impl<T: TableStoreRow> TableProvider<T> for FsStore {
 		Box::new(self.clone())
 	}
 }
-
 
 impl BlobStoreProvider for FsStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
@@ -162,7 +160,6 @@ impl BlobStoreProvider for FsStore {
 		Box::pin(async move { Ok(None) })
 	}
 }
-
 
 #[cfg(test)]
 // TODO js_runtime fs support

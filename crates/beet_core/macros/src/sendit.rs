@@ -71,8 +71,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	})
 }
 
-
-
 #[cfg(test)]
 mod test {
 	use super::*;

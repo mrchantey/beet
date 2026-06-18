@@ -73,7 +73,6 @@ fn into_request(request: Request) -> Result<reqwest::Request> {
 	}
 }
 
-
 async fn into_response(res: reqwest::Response) -> Result<Response> {
 	let status = res.status();
 

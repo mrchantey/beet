@@ -46,7 +46,6 @@ pub struct Response {
 	pub body: Body,
 }
 
-
 /// Marker component to indicate that a response has been inserted.
 /// Even if the response gets taken this struct should remain.
 #[derive(Debug, Component)]
@@ -436,7 +435,6 @@ impl IntoResponse<Self> for StatusCode {
 	fn into_response(self) -> Response { Response::from_status(self) }
 }
 
-
 /// Converts a type into a [`Response`].
 ///
 /// This trait enables blanket implementations for common types:
@@ -489,7 +487,6 @@ impl IntoResponse<Self> for () {
 // 	fn into_response(self) -> Response { self.into() }
 // }
 
-
 impl<T: TryInto<Response>, M1> IntoResponse<(Self, M1)> for T
 where
 	T::Error: IntoResponse<M1>,
@@ -502,12 +499,10 @@ where
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	#[allow(unused_imports)]
 	use super::*;
-
 
 	#[beet_core::test]
 	fn response_ok() { Response::ok().status().xpect_eq(StatusCode::OK); }
@@ -554,7 +549,6 @@ mod test {
 		let response = Response::ok();
 		response.status().xpect_eq(StatusCode::OK);
 	}
-
 
 	#[beet_core::test]
 	fn response_temporary_redirect() {

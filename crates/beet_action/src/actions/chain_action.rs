@@ -53,16 +53,12 @@ where
 	}
 }
 
-
 impl<In, Out, M, T> IntoChainAction<In, Out, M> for T
 where
 	T: 'static + IntoAction<M, In = In, Out = Out>,
 	Out: 'static,
 {
 }
-
-
-
 
 #[cfg(test)]
 mod test {

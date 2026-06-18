@@ -119,7 +119,6 @@ impl TempDir {
 	}
 }
 
-
 impl Drop for TempDir {
 	/// Automatically removes the temporary directory when the `TempDir` goes out of scope.
 	///

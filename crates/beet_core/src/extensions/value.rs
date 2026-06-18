@@ -217,7 +217,6 @@ mod tests {
 	use crate::prelude::*;
 	use serde_json::json;
 
-
 	#[crate::test]
 	fn test_field_str_success() {
 		json!({"name": "Alice"})

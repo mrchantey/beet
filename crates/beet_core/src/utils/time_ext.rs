@@ -76,7 +76,6 @@ pub fn current_year() -> i32 {
 	1970 + (secs as f64 / (365.2425 * 86400.0)) as i32
 }
 
-
 /// Formats a duration as a human-readable string with appropriate units.
 ///
 /// Automatically selects the most appropriate unit (minutes, seconds,
@@ -149,8 +148,6 @@ pub async fn sleep(duration: Duration) {
 	}
 }
 
-
-
 /// Runs a Send+Sync function with a timeout on native platforms.
 /// Returns `Ok(PanicResult)` if completed, `Err(elapsed)` if timed out.
 ///
@@ -178,7 +175,6 @@ pub fn timeout_sync(
 		}
 	}
 }
-
 
 // every test here exercises std-only sleep/timeout helpers
 #[cfg(all(test, feature = "std"))]

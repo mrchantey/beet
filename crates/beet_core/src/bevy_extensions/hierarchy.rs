@@ -10,8 +10,6 @@ use bevy::ecs::relationship::Relationship;
 use bevy::ecs::relationship::SourceIter;
 use core::iter::Chain;
 
-
-
 /// Extension trait adding hierarchy traversal methods to [`Query`].
 #[extend::ext(name=HierarchyQueryExtExt)]
 pub impl<
@@ -148,9 +146,6 @@ pub impl<
 	}
 }
 
-
-
-
 /// An [`Iterator`] over the direct descendants of an [`Entity`].
 ///
 /// Unlike [`DescendantIter`], this only yields immediate children,
@@ -183,9 +178,6 @@ impl Iterator for DirectDescendantIter {
 	type Item = Entity;
 	fn next(&mut self) -> Option<Self::Item> { self.vec.pop() }
 }
-
-
-
 
 /// A loop-safe [`Iterator`] over the ancestors of an [`Entity`].
 ///
@@ -222,7 +214,6 @@ where
 		Some(current)
 	}
 }
-
 
 #[cfg(test)]
 mod test {

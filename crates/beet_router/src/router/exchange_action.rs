@@ -101,7 +101,6 @@ where
 	) -> MaybeSendBoxedFuture<'static, Result<Response>>;
 }
 
-
 /// Concrete impl for [`Response`] — an action that already produced a
 /// fully-formed response (eg a redirect) passes it through unchanged.
 impl ExchangeRouteOut<Self> for Response {
@@ -158,7 +157,6 @@ where
 		})
 	}
 }
-
 
 /// Creates a route from a path and bundle, the simplest route constructor.
 pub fn route<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {

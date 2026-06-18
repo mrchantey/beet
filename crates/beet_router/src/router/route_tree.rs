@@ -462,7 +462,6 @@ impl ActionNode {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -707,10 +706,9 @@ mod test {
 		let root = world
 			.spawn(children![
 				(
-					render_action::fixed_func_route(
-						"counter",
-						|| Element::new("p").with_inner_text("counter")
-					),
+					render_action::fixed_func_route("counter", || {
+						Element::new("p").with_inner_text("counter")
+					}),
 					children![action_at("increment"), action_at("decrement"),],
 				),
 				action_at("other"),

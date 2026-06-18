@@ -63,7 +63,6 @@ where
 
 	pub fn handler_meta(&self) -> TypeMeta { self.handler_meta }
 
-
 	/// Invoke this action handler with the given [`ActionCall`].
 	///
 	/// # Errors
@@ -187,7 +186,6 @@ impl<Out> OutHandler<Out> {
 		}
 	}
 }
-
 
 impl<Out> OutHandler<Out> {
 	/// Create an [`OutHandler`] from any compatible closure.

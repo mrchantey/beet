@@ -25,7 +25,6 @@ fn clear_on_run() -> Result {
 #[derive(Deref, Resource)]
 pub struct StdoutActorFilter(Vec<ActorKind>);
 
-
 impl Default for StdoutActorFilter {
 	fn default() -> Self {
 		Self(vec![
@@ -69,7 +68,6 @@ fn post_added(
 		if !post.intent().is_display() {
 			continue;
 		}
-
 
 		let text = TermStyle::new();
 		let primary = TermStyle::new().fg(TermColor::Cyan);

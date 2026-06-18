@@ -38,7 +38,6 @@ fn main() {
 	info!("Done");
 }
 
-
 fn on_ready(ev: On<SocketReady>, mut commands: Commands) {
 	commands
 		.entity(ev.target())

@@ -1,7 +1,6 @@
 //! Serde utilities for [`Value`]
 use crate::prelude::*;
 
-
 impl serde::Serialize for Value {
 	fn serialize<S: serde::Serializer>(
 		&self,
@@ -156,10 +155,6 @@ impl<'de> serde::Deserialize<'de> for Value {
 		deserializer.deserialize_any(ValueVisitor)
 	}
 }
-
-
-
-
 
 /// A [`serde::Serializer`] that builds a [`Value`] directly.
 ///

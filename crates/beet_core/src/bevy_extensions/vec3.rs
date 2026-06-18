@@ -127,7 +127,6 @@ pub impl Vec3 {
 	}
 }
 
-
 #[cfg(feature = "rand")]
 #[cfg(test)]
 mod test {

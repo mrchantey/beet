@@ -39,7 +39,6 @@ where
 	pub fn new(inner: T) -> Self { Self(inner) }
 }
 
-
 fn on_add<T, In, Out>(mut world: DeferredWorld, cx: HookContext)
 where
 	In: 'static,
@@ -90,7 +89,6 @@ where
 		},
 	);
 }
-
 
 /// Type-erased collection of middleware actions declared on an ancestor.
 ///
@@ -184,8 +182,6 @@ where
 		false
 	}
 }
-
-
 
 #[extend::ext(name=AsyncEntityMiddleware)]
 pub impl AsyncEntity {

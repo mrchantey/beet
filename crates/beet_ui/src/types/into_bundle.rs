@@ -95,7 +95,6 @@ impl<T: Into<Value>> IntoBundle<(NotBundleMarker, IntoValueMarker)> for T {
 	fn into_bundle(self) -> impl Bundle { self.into() }
 }
 
-
 use variadics_please::all_tuples;
 
 /// Marker that distinguishes variadic tuple [`IntoBundle`] impls

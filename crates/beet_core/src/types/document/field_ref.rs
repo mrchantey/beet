@@ -4,8 +4,6 @@ use core::marker::PhantomData;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
-
-
 /// A reference to a specific field in a document.
 ///
 /// Used by content and actions to interact with document fields. By default,
@@ -53,7 +51,6 @@ impl core::fmt::Display for FieldRef {
 		write!(f, "{}#{}", self.document, self.field_path)
 	}
 }
-
 
 impl FieldRef {
 	/// Create a new field reference with the given field path.

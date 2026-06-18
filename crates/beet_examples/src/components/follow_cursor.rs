@@ -26,7 +26,6 @@ pub fn follow_cursor_2d(
 	}
 }
 
-
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct FollowCursor3d {
@@ -46,7 +45,6 @@ impl FollowCursor3d {
 		intersect_point: Vec3::ZERO,
 		intersect_plane: InfinitePlane3d { normal: Dir3::Z },
 	};
-
 
 	pub fn new(intersect_point: Vec3, intersect_plane: Vec3) -> Self {
 		Self {

@@ -14,9 +14,9 @@ mod flex;
 mod flex_buffer;
 mod grid;
 pub(self) use grid::*;
-mod inline;
 #[cfg(feature = "tui")]
 mod hit_test;
+mod inline;
 #[cfg(feature = "tui")]
 mod input;
 #[cfg(feature = "tui")]

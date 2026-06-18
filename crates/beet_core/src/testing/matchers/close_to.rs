@@ -68,8 +68,6 @@ impl CloseTo for Vec2 {
 	}
 }
 
-
-
 impl CloseTo for Vec3 {
 	fn default_delta() -> Self {
 		Vec3::new(DEFAULT_DELTA_F32, DEFAULT_DELTA_F32, DEFAULT_DELTA_F32)
@@ -80,7 +78,6 @@ impl CloseTo for Vec3 {
 			&& is_close_f32(self.z, b.z, delta.z)
 	}
 }
-
 
 #[cfg(test)]
 mod test {

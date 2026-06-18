@@ -4,9 +4,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-
-
-
 /// Calls functions and inserts the output as posts
 pub async fn call_functions(
 	agent: AsyncEntity,

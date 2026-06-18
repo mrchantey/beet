@@ -29,7 +29,6 @@ use wasm_bindgen::JsValue;
 use web_sys::Url;
 use web_sys::UrlSearchParams;
 
-
 fn current_window() -> web_sys::Window { web_sys::window().unwrap() }
 
 fn current_url() -> Url {
@@ -64,7 +63,10 @@ pub fn location_args() -> Vec<String> {
 fn args_from_location(pathname: &str, search: &str) -> Vec<String> {
 	let mut args = Vec::new();
 	args.extend(
-		pathname.split('/').filter(|seg| !seg.is_empty()).map(String::from),
+		pathname
+			.split('/')
+			.filter(|seg| !seg.is_empty())
+			.map(String::from),
 	);
 	for pair in search
 		.trim_start_matches('?')
@@ -85,16 +87,17 @@ mod test {
 	/// flags, the browser equivalent of process argv.
 	#[beet_core::test]
 	fn converts_location_to_args() {
-		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(vec![
-			"foo".to_string(),
-			"bar.png".to_string(),
-			"--bazz=boo".to_string(),
-			"--boom=boo".to_string(),
-		]);
+		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(
+			vec![
+				"foo".to_string(),
+				"bar.png".to_string(),
+				"--bazz=boo".to_string(),
+				"--boom=boo".to_string(),
+			],
+		);
 		// a bare flag and an empty path/query degrade cleanly.
-		args_from_location("/", "?verbose").xpect_eq(vec![
-			"--verbose".to_string(),
-		]);
+		args_from_location("/", "?verbose")
+			.xpect_eq(vec!["--verbose".to_string()]);
 		args_from_location("", "").xpect_eq(Vec::<String>::new());
 	}
 }

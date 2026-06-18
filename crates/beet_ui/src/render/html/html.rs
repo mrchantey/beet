@@ -106,10 +106,11 @@ impl HtmlRenderer {
 		insert_reactive: InsertReactive,
 		inline_js_runtime: bool,
 	) -> Self {
-		self.reactive = Some(super::reactive_html_render::ReactiveHtmlRender::new(
-			insert_reactive,
-			inline_js_runtime,
-		));
+		self.reactive =
+			Some(super::reactive_html_render::ReactiveHtmlRender::new(
+				insert_reactive,
+				inline_js_runtime,
+			));
 		self
 	}
 
@@ -185,7 +186,6 @@ impl HtmlRenderer {
 		}
 	}
 }
-
 
 impl NodeVisitor for HtmlRenderer {
 	// html renderer visits every node
@@ -414,7 +414,6 @@ impl NodeVisitor for HtmlRenderer {
 	}
 }
 
-
 impl NodeRenderer for HtmlRenderer {
 	fn render(
 		&mut self,
@@ -446,7 +445,6 @@ impl NodeRenderer for HtmlRenderer {
 	}
 }
 
-
 fn default_void_elements() -> Vec<Cow<'static, str>> {
 	vec![
 		"area".into(),
@@ -471,7 +469,6 @@ fn default_void_elements() -> Vec<Cow<'static, str>> {
 fn default_raw_text_elements() -> Vec<Cow<'static, str>> {
 	vec!["script".into(), "style".into()]
 }
-
 
 #[cfg(test)]
 mod test {

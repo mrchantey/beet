@@ -178,10 +178,16 @@ mod test {
 
 	#[crate::test]
 	fn sets_list_type_if_none() {
-		matches!(TemplateFilter::Unset.allow::<i32>(), TemplateFilter::Allowlist(_))
-			.xpect_true();
-		matches!(TemplateFilter::Unset.deny::<i32>(), TemplateFilter::Denylist(_))
-			.xpect_true();
+		matches!(
+			TemplateFilter::Unset.allow::<i32>(),
+			TemplateFilter::Allowlist(_)
+		)
+		.xpect_true();
+		matches!(
+			TemplateFilter::Unset.deny::<i32>(),
+			TemplateFilter::Denylist(_)
+		)
+		.xpect_true();
 	}
 
 	#[crate::test]

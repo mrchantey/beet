@@ -29,7 +29,6 @@ pub async fn RemoveBlob(cx: ActionContext<RemoveBlobParams>) -> Result<()> {
 	Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

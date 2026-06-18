@@ -118,7 +118,6 @@ pub async fn CorsHandler(
 /// Bundle combining the [`CorsHandler`] middleware with its [`CorsConfig`].
 pub fn cors(config: CorsConfig) -> impl Bundle { (CorsHandler, config) }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

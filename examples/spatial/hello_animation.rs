@@ -38,7 +38,6 @@ fn setup(
 		walk_clip,
 	} = Foxie::new(&asset_server, &mut anim_graphs);
 
-
 	let transition_duration = Duration::from_secs_f32(0.5);
 
 	commands.spawn((

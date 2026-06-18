@@ -98,13 +98,15 @@ impl GlobFilter {
 
 	/// Sets the include patterns, replacing any existing ones.
 	pub fn set_include(mut self, items: Vec<&str>) -> Self {
-		self.include = items.iter().map(|item| GlobPattern::new(item)).collect();
+		self.include =
+			items.iter().map(|item| GlobPattern::new(item)).collect();
 		self
 	}
 
 	/// Sets the exclude patterns, replacing any existing ones.
 	pub fn set_exclude(mut self, items: Vec<&str>) -> Self {
-		self.exclude = items.iter().map(|item| GlobPattern::new(item)).collect();
+		self.exclude =
+			items.iter().map(|item| GlobPattern::new(item)).collect();
 		self
 	}
 
@@ -114,7 +116,9 @@ impl GlobFilter {
 		items: impl IntoIterator<Item = T>,
 	) -> Self {
 		self.include.extend(
-			items.into_iter().map(|item| GlobPattern::new(item.as_ref())),
+			items
+				.into_iter()
+				.map(|item| GlobPattern::new(item.as_ref())),
 		);
 		self
 	}
@@ -125,7 +129,9 @@ impl GlobFilter {
 		items: impl IntoIterator<Item = T>,
 	) -> Self {
 		self.exclude.extend(
-			items.into_iter().map(|item| GlobPattern::new(item.as_ref())),
+			items
+				.into_iter()
+				.map(|item| GlobPattern::new(item.as_ref())),
 		);
 		self
 	}
@@ -182,7 +188,6 @@ impl GlobFilter {
 		!self.exclude.iter().any(|pattern| pattern.matches(text))
 	}
 }
-
 
 /// A validated glob pattern, stored as a [`SmolStr`] for cheap clones.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
@@ -306,7 +311,11 @@ fn glob_match(pattern: &str, text: &str) -> bool {
 ///
 /// Returns `(matched, index_just_after_the_closing_bracket)`, or [`None`] if the
 /// class is unterminated (the caller then treats `[` as a literal).
-fn class_matches(pat: &[char], start: usize, ch: char) -> Option<(bool, usize)> {
+fn class_matches(
+	pat: &[char],
+	start: usize,
+	ch: char,
+) -> Option<(bool, usize)> {
 	let mut idx = start + 1;
 	let negated = pat.get(idx) == Some(&'!');
 	if negated {
@@ -371,7 +380,6 @@ fn validate_glob(pattern: &str) -> Result<(), String> {
 	}
 	Ok(())
 }
-
 
 #[cfg(test)]
 mod test {
@@ -441,8 +449,6 @@ mod test {
 
 		filter.passes_include("foo/bar").xpect_true();
 		filter.passes_exclude("foo/bar").xpect_true();
-
-
 
 		let filter =
 			GlobFilter::default().with_exclude("*apply_style_id_attributes*");

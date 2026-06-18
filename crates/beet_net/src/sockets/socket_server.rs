@@ -17,7 +17,6 @@ impl Plugin for SocketServerPlugin {
 	}
 }
 
-
 /// A WebSocket server that can accept incoming connections.
 ///
 /// Platform-specific implementations provide the actual binding and accept logic.
@@ -91,8 +90,6 @@ impl SocketServer {
 		format!("ws://{}", self.local_address())
 	}
 }
-
-
 
 impl Default for SocketServer {
 	fn default() -> Self { Self::new(DEFAULT_SOCKET_PORT) }

@@ -309,10 +309,7 @@ impl SchemaBindingGenerator {
 			}
 
 			binding_gen.generate_to_file(&schema, &file.path)?;
-			info!(
-				"[schema_binding_generator] wrote {}",
-				file.path.display()
-			);
+			info!("[schema_binding_generator] wrote {}", file.path.display());
 		}
 
 		Ok(())

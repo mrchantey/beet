@@ -30,13 +30,21 @@ fn child_values(world: &World, entity: Entity) -> Vec<Value> {
 fn single_element() {
 	let mut world = world();
 	let root = world.spawn_template(rsx! { <div/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 }
 
 #[beet_core::test]
 fn element_with_string_attribute() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <div class="card"/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <div class="card"/> })
+		.unwrap()
+		.id();
 	world.with_state::<AttributeQuery, _>(|query| {
 		let (_, value) = query.find(root, "class").unwrap();
 		value.clone().xpect_eq(Value::new("card"));
@@ -47,16 +55,28 @@ fn element_with_string_attribute() {
 fn element_with_expr_attribute() {
 	let mut world = world();
 	let bang = 3;
-	let root = world.spawn_template(rsx! { <div bang=bang/> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <div bang=bang/> })
+		.unwrap()
+		.id();
 	world.with_state::<AttributeQuery, _>(|query| {
-		query.find(root, "bang").unwrap().1.as_i64().unwrap().xpect_eq(3);
+		query
+			.find(root, "bang")
+			.unwrap()
+			.1
+			.as_i64()
+			.unwrap()
+			.xpect_eq(3);
 	});
 }
 
 #[beet_core::test]
 fn element_with_text_child() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <div>"hello"</div> }).unwrap().id();
+	let root = world
+		.spawn_template(rsx! { <div>"hello"</div> })
+		.unwrap()
+		.id();
 	child_values(&world, root).xpect_eq(vec![Value::new("hello")]);
 }
 
@@ -73,8 +93,14 @@ fn element_with_block_spread() {
 	let mut world = world();
 	let root = world
 		.spawn_template(rsx! { <div {Name::new("spread")}/> })
-		.unwrap().id();
-	world.entity(root).get::<Name>().unwrap().as_str().xpect_eq("spread");
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Name>()
+		.unwrap()
+		.as_str()
+		.xpect_eq("spread");
 }
 
 #[beet_core::test]
@@ -82,9 +108,15 @@ fn nested_elements() {
 	let mut world = world();
 	let root = world
 		.spawn_template(rsx! { <div><span>"inner"</span></div> })
-		.unwrap().id();
+		.unwrap()
+		.id();
 	let span = world.entity(root).get::<Children>().unwrap()[0];
-	world.entity(span).get::<Element>().unwrap().tag().xpect_eq("span");
+	world
+		.entity(span)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("span");
 	child_values(&world, span).xpect_eq(vec![Value::new("inner")]);
 }
 
@@ -93,7 +125,12 @@ fn multiple_root_elements() {
 	let mut world = world();
 	// multiple roots become a fragment spawning each as a child.
 	let root = world.spawn_template(rsx! { <br/> <hr/> }).unwrap().id();
-	world.entity(root).get::<Children>().unwrap().len().xpect_eq(2);
+	world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.len()
+		.xpect_eq(2);
 }
 
 #[beet_core::test]
@@ -111,7 +148,8 @@ fn event_attribute_attaches_observer() {
 				|_: On<Ping>, mut pinged: ResMut<Pinged>| pinged.0 = true
 			}/>
 		})
-		.unwrap().id();
+		.unwrap()
+		.id();
 
 	world.resource::<Pinged>().0.xpect_false();
 	world.trigger(Ping(root));
@@ -133,7 +171,8 @@ fn component_tag_patches_over_default() {
 	let mut world = world();
 	let root = world
 		.spawn_template(rsx! { <MyComponent foo bar="hello"/> })
-		.unwrap().id();
+		.unwrap()
+		.id();
 	let comp = world.entity(root).get::<MyComponent>().unwrap();
 	comp.foo.xpect_true();
 	comp.bar.as_str().xpect_eq("hello");
@@ -144,8 +183,14 @@ fn component_spread_inserts_additional() {
 	let mut world = world();
 	let root = world
 		.spawn_template(rsx! { <MyComponent foo {Name::new("extra")}/> })
-		.unwrap().id();
-	world.entity(root).get::<Name>().unwrap().as_str().xpect_eq("extra");
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Name>()
+		.unwrap()
+		.as_str()
+		.xpect_eq("extra");
 }
 
 // a `#[template]` tag builds its subtree with input props.
@@ -157,8 +202,16 @@ fn Card(#[prop(into)] title: String) -> impl Bundle {
 #[beet_core::test]
 fn template_tag_builds_with_props() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <Card title="Hi"/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("article");
+	let root = world
+		.spawn_template(rsx! { <Card title="Hi"/> })
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("article");
 	child_values(&world, root).xpect_eq(vec![Value::new("Hi")]);
 }
 
@@ -184,10 +237,28 @@ fn Branch(#[prop(into)] heading: bool) -> impl Bundle {
 #[beet_core::test]
 fn rsx_in_non_final_position() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <Branch heading=true/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	let root = world
+		.spawn_template(rsx! { <Branch heading=true/> })
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 	let children = world.entity(root).get::<Children>().unwrap();
 	children.len().xpect_eq(2);
-	world.entity(children[0]).get::<Element>().unwrap().tag().xpect_eq("h1");
-	world.entity(children[1]).get::<Element>().unwrap().tag().xpect_eq("section");
+	world
+		.entity(children[0])
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("h1");
+	world
+		.entity(children[1])
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("section");
 }

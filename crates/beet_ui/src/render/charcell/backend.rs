@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 mod test_backend;
 pub use test_backend::*;
 
-
 /// The window size in characters (columns / rows) as well as pixels.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct WindowSize {

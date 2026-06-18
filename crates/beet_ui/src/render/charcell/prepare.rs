@@ -43,9 +43,9 @@ pub fn prepare_charcell_tree<B: Component>(
 			if !has_layout.contains(entity) {
 				commands.entity(entity).insert(LayoutRect::default());
 			}
-			let scrolls = layout
-				.get(entity)
-				.is_ok_and(|style| style.overflow_x.is_scroll() || style.overflow_y.is_scroll());
+			let scrolls = layout.get(entity).is_ok_and(|style| {
+				style.overflow_x.is_scroll() || style.overflow_y.is_scroll()
+			});
 			if scrolls && !has_scroll.contains(entity) {
 				commands.entity(entity).insert(ScrollPosition::default());
 			}

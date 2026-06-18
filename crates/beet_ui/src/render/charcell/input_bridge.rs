@@ -92,7 +92,12 @@ fn keyboard_inputs(key: KeyPress, window: Entity) -> Vec<KeyboardInput> {
 	let mut inputs = Vec::new();
 	let modifiers = modifier_keycodes(*key.modifier());
 	for &code in &modifiers {
-		inputs.push(named_input(code, modifier_key(code), ButtonState::Pressed, window));
+		inputs.push(named_input(
+			code,
+			modifier_key(code),
+			ButtonState::Pressed,
+			window,
+		));
 	}
 	let logical = logical_key(&key);
 	let text = key.char.map(|c| c.to_string().into());
@@ -113,7 +118,12 @@ fn keyboard_inputs(key: KeyPress, window: Entity) -> Vec<KeyboardInput> {
 		window,
 	});
 	for &code in modifiers.iter().rev() {
-		inputs.push(named_input(code, modifier_key(code), ButtonState::Released, window));
+		inputs.push(named_input(
+			code,
+			modifier_key(code),
+			ButtonState::Released,
+			window,
+		));
 	}
 	inputs
 }
@@ -148,7 +158,10 @@ fn logical_key(key: &KeyPress) -> Key {
 	if let Some(c) = key.char {
 		// a control combo (eg ctrl+c) carries a char but should not type it; only
 		// plain/shifted printable chars become text.
-		if !key.modifier().intersects(KeyModifier::CTRL | KeyModifier::ALT) {
+		if !key
+			.modifier()
+			.intersects(KeyModifier::CTRL | KeyModifier::ALT)
+		{
 			return Key::Character(c.to_string().into());
 		}
 	}

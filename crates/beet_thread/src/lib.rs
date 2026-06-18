@@ -12,7 +12,6 @@ pub mod table;
 mod tool;
 mod types;
 
-
 pub mod prelude {
 	pub use crate::o11s;
 	pub use crate::partial::*;

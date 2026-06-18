@@ -39,7 +39,10 @@ fn main() {
 	let html = render_html(&mut world, root);
 
 	// 4. The bound values reached the rendered output.
-	assert!(html.contains("Hello, Ada!"), "name binding missing:\n{html}");
+	assert!(
+		html.contains("Hello, Ada!"),
+		"name binding missing:\n{html}"
+	);
 	assert!(
 		html.contains("You have 0 unread messages."),
 		"seeded `unread` binding missing:\n{html}"
@@ -50,9 +53,15 @@ fn main() {
 		.entity(doc)
 		.get::<Document>()
 		.unwrap()
-		.get_field::<i64>(&[FieldSegment::key("user"), FieldSegment::key("unread")])
+		.get_field::<i64>(&[
+			FieldSegment::key("user"),
+			FieldSegment::key("unread"),
+		])
 		.unwrap();
-	assert_eq!(seeded, 0, "expected `user.unread` seeded to 0, got {seeded}");
+	assert_eq!(
+		seeded, 0,
+		"expected `user.unread` seeded to 0, got {seeded}"
+	);
 
 	println!("rendered `.bsx` with document bindings:\n{html}");
 }

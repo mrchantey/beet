@@ -43,8 +43,6 @@ where
 	}
 }
 
-
-
 pub struct FuncActionMarker;
 
 impl<F, I, O> IntoAction<(FuncActionMarker, I, O)> for F
@@ -75,8 +73,6 @@ where
 		})
 	}
 }
-
-
 
 #[cfg(test)]
 mod test {

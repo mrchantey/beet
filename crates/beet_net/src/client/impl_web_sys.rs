@@ -22,7 +22,6 @@ pub(super) async fn send_wasm(request: Request) -> Result<Response> {
 	into_response(res).await
 }
 
-
 fn into_request(req: Request) -> Result<web_sys::Request> {
 	let init = web_sys::RequestInit::new();
 	let method_str = req.method().to_string().to_uppercase();
@@ -54,7 +53,6 @@ fn into_request(req: Request) -> Result<web_sys::Request> {
 	}
 	Ok(request)
 }
-
 
 fn create_readable_stream_from_body(
 	body: Body,
@@ -104,7 +102,6 @@ fn create_readable_stream_from_body(
 
 	Ok(stream)
 }
-
 
 async fn into_response(res: web_sys::Response) -> Result<Response> {
 	let status = StatusCode::new(res.status() as u16);

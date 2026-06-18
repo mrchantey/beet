@@ -152,7 +152,6 @@ impl ActionMeta {
 	}
 }
 
-
 /// Reflection metadata for an action. Always includes the handler
 /// [`TypeInfo`]; input and output [`TypeInfo`] are optional and
 /// present only when created vian [`ActionTypeInfo::of_full`].
@@ -210,7 +209,6 @@ impl ActionTypeInfo {
 		}
 	}
 }
-
 
 /// Lightweight type metadata using [`TypeId`](core::any::TypeId) for
 /// comparison and [`type_name`](core::any::type_name) for display.

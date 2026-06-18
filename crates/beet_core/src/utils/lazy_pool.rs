@@ -21,7 +21,6 @@ impl<K, V, O> LazyPool<K, V, O> {
 	}
 }
 
-
 impl<K, V> LazyPool<K, V, V>
 where
 	K: std::hash::Hash + Eq + Clone,

@@ -68,9 +68,11 @@ fn register_default_verbs(world: &mut World) {
 	// `increment{ field, amount: i64 = 1 }`: add `amount` to the bound field.
 	verbs.insert(
 		"increment",
-		VerbSchema::new()
-			.binding("field")
-			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
+		VerbSchema::new().binding("field").optional_value(
+			"amount",
+			ValueSchema::of::<i64>(),
+			Value::Int(1),
+		),
 		Some(increment_js.as_str()),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let amount = args
@@ -85,9 +87,11 @@ fn register_default_verbs(world: &mut World) {
 	// `decrement{ field, amount: i64 = 1 }`: subtract `amount` from the field.
 	verbs.insert(
 		"decrement",
-		VerbSchema::new()
-			.binding("field")
-			.optional_value("amount", ValueSchema::of::<i64>(), Value::Int(1)),
+		VerbSchema::new().binding("field").optional_value(
+			"amount",
+			ValueSchema::of::<i64>(),
+			Value::Int(1),
+		),
 		Some(decrement_js.as_str()),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let amount = args
@@ -103,7 +107,9 @@ fn register_default_verbs(world: &mut World) {
 	verbs.insert(
 		"toggle",
 		VerbSchema::new().binding("field"),
-		Some("entity.set_field(args.field, entity.get_field(args.field) !== true);"),
+		Some(
+			"entity.set_field(args.field, entity.get_field(args.field) !== true);",
+		),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			update_field(entity, args, |value| {
 				*value = Value::Bool(!matches!(value, Value::Bool(true)))
@@ -113,7 +119,9 @@ fn register_default_verbs(world: &mut World) {
 	// `set{ field, value }`: write `value` to the bound field.
 	verbs.insert(
 		"set",
-		VerbSchema::new().binding("field").value("value", ValueSchema::Any),
+		VerbSchema::new()
+			.binding("field")
+			.value("value", ValueSchema::Any),
 		Some("entity.set_field(args.field, args.value);"),
 		|entity: &mut EntityWorldMut, args: &VerbArgs| {
 			let Some(new_value) = args.value("value").cloned() else {
@@ -215,7 +223,9 @@ mod test {
 	#[beet_core::test]
 	fn set_writes_document_field() {
 		let mut world = ui_world();
-		let doc = world.spawn(Document::new(val!({ "status": "pending" }))).id();
+		let doc = world
+			.spawn(Document::new(val!({ "status": "pending" })))
+			.id();
 		let button = click_button(
 			&mut world,
 			doc,

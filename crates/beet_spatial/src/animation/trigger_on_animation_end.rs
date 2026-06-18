@@ -31,7 +31,6 @@ where
 	pub transition_duration: Duration,
 }
 
-
 impl<P> TriggerOnAnimationEnd<P>
 where
 	P: 'static + Send + Sync + Clone,

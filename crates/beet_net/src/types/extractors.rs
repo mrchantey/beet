@@ -26,7 +26,6 @@ pub struct Javascript(pub String);
 /// Wrapper for PNG image responses.
 pub struct Png(pub String);
 
-
 impl Into<Html<Self>> for String {
 	fn into(self) -> Html<Self> { Html(self) }
 }
@@ -52,7 +51,6 @@ pub struct JsonResult<T, E> {
 	/// Defaults to 418 (I'm a teapot).
 	pub err_status: StatusCode,
 }
-
 
 impl JsonResult<(), ()> {
 	/// Default error status code for failed server action responses.
@@ -125,7 +123,6 @@ impl<T> Json<T> {
 	pub fn pipe(val: In<T>) -> Json<T> { Json(val.0) }
 }
 
-
 #[cfg(feature = "json")]
 impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
 	fn from_request(
@@ -152,7 +149,6 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 		Ok(Response::ok_body(json_str, MediaType::Json))
 	}
 }
-
 
 /// Query params wrapper that supports complex types via JSON encoding.
 ///
@@ -257,8 +253,6 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
 		Ok(Self(params))
 	}
 }
-
-
 
 impl<T> Into<Response> for Html<T>
 where

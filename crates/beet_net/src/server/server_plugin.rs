@@ -10,7 +10,6 @@ use beet_core::prelude::*;
 #[derive(Default)]
 pub struct ServerPlugin;
 
-
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
@@ -30,7 +29,8 @@ impl Plugin for ServerPlugin {
 		// server app — the cli and the examples alike — exits cleanly.
 		app.add_systems(
 			Last,
-			exit_when_unclaimed.run_if(resource_exists_and_changed::<KeepAlive>),
+			exit_when_unclaimed
+				.run_if(resource_exists_and_changed::<KeepAlive>),
 		);
 
 		// install the HTTP backend `HttpServer` invokes on start. The cascade

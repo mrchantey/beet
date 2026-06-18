@@ -46,8 +46,6 @@
 
 use crate::prelude::*;
 
-
-
 /// Tracks every [`FieldRef`] associated with this [`Document`] entity.
 ///
 /// This component is automatically managed through Bevy's relationship system.
@@ -111,7 +109,6 @@ pub(super) fn unlink_field_from_document(
 		.try_remove::<(FieldOf, ResolvedFieldPath)>();
 	Ok(())
 }
-
 
 /// Read path: when a [`Document`] changes, update the [`Value`] of every
 /// [`FieldRef`] bound to it, reading the scope-resolved [`ResolvedFieldPath`].
@@ -268,7 +265,6 @@ pub(super) fn sync_local_to_document(
 	}
 	Ok(())
 }
-
 
 #[cfg(test)]
 mod test {

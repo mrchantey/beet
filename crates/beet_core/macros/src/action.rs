@@ -151,7 +151,6 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	})
 }
 
-
 // ---------------------------------------------------------------------------
 // Parameter analysis for async/func actions
 // ---------------------------------------------------------------------------
@@ -219,7 +218,6 @@ fn make_simple_fn_parts(
 		}
 	}
 }
-
 
 // ---------------------------------------------------------------------------
 // Parameter analysis for system actions
@@ -316,7 +314,6 @@ fn make_system_fn_parts(
 
 	Ok((in_type, fn_params, preamble))
 }
-
 
 // ---------------------------------------------------------------------------
 // Type extraction helpers
@@ -419,7 +416,6 @@ fn extract_result_inner(ty: &Type) -> Option<&Type> {
 	extract_wrapper_type(ty, "Result")
 }
 
-
 // ---------------------------------------------------------------------------
 // Output type and body helpers
 // ---------------------------------------------------------------------------
@@ -449,7 +445,6 @@ fn compute_out_type(item: &ItemFn, result_out: bool) -> TokenStream {
 		quote! { () }
 	}
 }
-
 
 // ---------------------------------------------------------------------------
 // Struct definition and require helpers
@@ -613,7 +608,6 @@ fn make_default(fn_name: &syn::Ident, generics: &syn::Generics) -> TokenStream {
 	}
 }
 
-
 // ---------------------------------------------------------------------------
 // Action-specific helpers
 // ---------------------------------------------------------------------------
@@ -652,7 +646,6 @@ fn make_turbofish(generics: &syn::Generics) -> TokenStream {
 		quote! { ::<#(#type_params),*> }
 	}
 }
-
 
 // ===========================================================================
 // Tests

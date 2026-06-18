@@ -26,7 +26,6 @@ impl<T> SendWrapper<T> {
 	fn take(self) -> T { self.0 }
 }
 
-
 /// Inserts a borrowed libtest slice into the [`World`] by converting each
 /// descriptor into a beet [`TestDescAndFn`].
 ///
@@ -90,7 +89,6 @@ fn try_skip(entity: &mut EntityWorldMut, desc: &TestDesc) {
 		entity.insert(TestOutcome::Skip(TestSkip::Ignore(desc.ignore_message)));
 	}
 }
-
 
 /// Per-test parameters that can be configured via attributes.
 #[derive(Debug, Clone, Component)]
@@ -158,7 +156,6 @@ impl TestDescExt for Test {
 	fn desc_mut(&mut self) -> &mut TestDesc { &mut self.desc }
 }
 
-
 /// Component wrapping a static test function.
 #[derive(Debug, Copy, Clone, Component)]
 pub struct TestFunc(fn() -> Result<(), String>);
@@ -189,9 +186,6 @@ impl NonSendTestFunc {
 	/// Runs the test function and returns the result.
 	pub fn run(self) -> Result<(), String> { self.0.take()() }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {

@@ -1,7 +1,6 @@
 use beet_core::prelude::*;
 use core::f32::consts::TAU;
 
-
 /// Enum of common curves that can be serialized.
 /// This will likely be deprecated when bevy_curve gets better support for serde.
 #[derive(Debug, Default, Clone, Component, Reflect)]
@@ -20,7 +19,6 @@ pub enum SerdeCurve {
 	Samples(SampleAutoCurve<Vec3>),
 }
 
-
 const DEFAULT_TOTAL_LEN_SAMPLES: usize = 32;
 
 impl SerdeCurve {
@@ -30,7 +28,6 @@ impl SerdeCurve {
 	pub fn total_len(&self) -> f32 {
 		self.total_len_with_samples(DEFAULT_TOTAL_LEN_SAMPLES)
 	}
-
 
 	/// Calculate the total length of the curve by sampling it at
 	/// regular intervals. The number of samples determines the accuracy
@@ -74,7 +71,6 @@ impl Into<SerdeCurve> for SampleAutoCurve<Vec3> {
 	fn into(self) -> SerdeCurve { SerdeCurve::Samples(self) }
 }
 
-
 fn circle_curve(t: f32) -> Vec3 {
 	let angle = t * TAU;
 	Vec3::new(ops::cos(angle), ops::sin(angle), 0.)
@@ -105,7 +101,6 @@ mod test {
 		SerdeCurve::Circle.total_len().xpect_greater_than(6.);
 		SerdeCurve::Square.total_len().xpect_less_than(4.);
 		SerdeCurve::Square.total_len().xpect_greater_than(3.8);
-
 
 		let ease = SerdeCurve::EaseDir2(EasingCurve::new(
 			Dir2::X,

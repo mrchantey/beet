@@ -99,9 +99,10 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 		.with_world(move |world, caller| -> Response {
 			let server = world.root_ancestor(caller);
 			match set_scene(world, &media, Some(server)) {
-				Ok(roots) => {
-					Response::ok_text(format!("loaded scene: {} root(s)\n", roots.len()))
-				}
+				Ok(roots) => Response::ok_text(format!(
+					"loaded scene: {} root(s)\n",
+					roots.len()
+				)),
 				Err(err) => {
 					error!("scene: failed to load: {err}");
 					Response::status_text(

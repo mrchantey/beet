@@ -76,7 +76,6 @@ impl Stack {
 		self.deploy_timestamp = ledger.timestamp.clone();
 	}
 
-
 	/// Create a stack with a local backend and a temporary directory for testing.
 	/// The directory will be removed on drop.
 	#[cfg(test)]
@@ -157,7 +156,6 @@ impl Stack {
 		self.backend.provider().erased_blob(self.backend_path())
 	}
 }
-
 
 #[derive(SystemParam)]
 pub struct StackQuery<'w, 's> {

@@ -4,15 +4,11 @@ use crate::bindings::*;
 #[allow(unused)]
 use crate::prelude::*;
 
-
-
-
 pub mod region {
 	pub const DEFAULT: &str = US_EAST_1;
 	pub const US_EAST_1: &str = "us-east-1";
 	pub const US_WEST_2: &str = "us-west-2";
 }
-
 
 #[cfg(feature = "bindings_aws_common")]
 impl terra::PrimaryResource for AwsS3BucketDetails {

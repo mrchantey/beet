@@ -50,7 +50,8 @@ impl SiteHost {
 		let router = app.world_mut().spawn(rsx_site_router()).id();
 		// the host pairs a channel terminal with the page-host buffer, the in-world
 		// navigator co-located on it (one surface), as the TUI boot composes them.
-		let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
+		let (channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
 		let host = app
 			.world_mut()
 			.spawn((
@@ -143,7 +144,10 @@ async fn homepage_boots_with_chrome_and_scheme() {
 	host.step_until("malleable application framework");
 	// the BaseLayout chrome renders: header nav and footer.
 	let frame = host.frame();
-	frame.as_str().xpect_contains("Counter").xpect_contains("Buttons");
+	frame
+		.as_str()
+		.xpect_contains("Counter")
+		.xpect_contains("Buttons");
 	frame.xpect_contains("© Beet");
 	// the terminal target seeds the dark scheme (no web color-scheme script).
 	host.has_class("dark-scheme").xpect_true();
@@ -176,7 +180,9 @@ async fn nav_link_click_navigates() {
 	let (col, row) = host.cell_of("Counter");
 	host.click(col, row);
 	host.step_until("You have clicked 0 times.");
-	host.frame().xnot().xpect_contains("malleable application framework");
+	host.frame()
+		.xnot()
+		.xpect_contains("malleable application framework");
 }
 
 /// The Rust reactive counter is interactive in the terminal: clicking a button

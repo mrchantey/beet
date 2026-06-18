@@ -4,7 +4,6 @@ use bevy::ecs::query::QueryFilter;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-
 /// Utilities for working with ancestors
 #[derive(SystemParam)]
 pub struct AncestorQuery<

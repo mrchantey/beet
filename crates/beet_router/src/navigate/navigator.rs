@@ -4,7 +4,6 @@ use alloc::collections::VecDeque;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-
 /// Maximum number of history entries to retain.
 const HISTORY_LIMIT: usize = 100;
 
@@ -273,7 +272,8 @@ impl Navigator {
 				)
 			})
 			.await?;
-		Self::fetch_and_render(entity, transport, user_agent, url, accepts).await
+		Self::fetch_and_render(entity, transport, user_agent, url, accepts)
+			.await
 	}
 
 	/// Shared fetch → render → clear-loading path used by all navigation
@@ -296,7 +296,10 @@ impl Navigator {
 			let page = entity
 				.world()
 				.with(|world| {
-					parse_page(world, MediaBytes::new(MediaType::Text, Vec::new()))
+					parse_page(
+						world,
+						MediaBytes::new(MediaType::Text, Vec::new()),
+					)
 				})
 				.await?;
 			Self::bind_page(&entity, page).await;
@@ -308,8 +311,7 @@ impl Navigator {
 		let page = match transport {
 			NavigatorTransport::Http => {
 				// a real network fetch, then parse the bytes into a living tree
-				let bytes =
-					Self::http_fetch(user_agent, url, accepts).await?;
+				let bytes = Self::http_fetch(user_agent, url, accepts).await?;
 				entity
 					.world()
 					.with(move |world| parse_page(world, bytes))
@@ -342,7 +344,9 @@ impl Navigator {
 			.with(move |world| match host_of(world, navigator) {
 				Some(host) => bind_surface_page(world, host, page),
 				None => {
-					error!("navigator {navigator} has no page host to render into")
+					error!(
+						"navigator {navigator} has no page host to render into"
+					)
 				}
 			})
 			.await;

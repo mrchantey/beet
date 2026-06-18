@@ -22,7 +22,6 @@ impl Default for Pose {
 	}
 }
 
-
 impl Pose {
 	/// Creates a 2D [`Pose`] from a planar position and a yaw about the Z axis,
 	/// the natural form for a ground robot's `(x, y, theta)` pose.

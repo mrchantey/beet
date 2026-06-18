@@ -16,7 +16,6 @@ impl std::ops::Deref for ThreadRef<'_> {
 	fn deref(&self) -> &Self::Target { self.thread }
 }
 
-
 impl<'a> ThreadRef<'a> {
 	pub fn id(&self) -> ThreadId { self.thread.id() }
 
@@ -105,7 +104,6 @@ pub struct PostView<'a> {
 	pub actor: &'a Actor,
 	pub response_meta: Option<&'a ResponseMeta>,
 }
-
 
 impl std::ops::Deref for PostView<'_> {
 	type Target = Post;

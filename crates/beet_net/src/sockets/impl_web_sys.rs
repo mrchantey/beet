@@ -130,7 +130,6 @@ struct WasmSocketWriter {
 	_on_close: Arc<Closure<dyn FnMut(CloseEvent)>>,
 }
 
-
 impl WasmSocketWriter {
 	/// Clear all event handlers to prevent callbacks after drop
 	fn remove_listeners(&self) {

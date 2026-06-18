@@ -14,8 +14,8 @@
 //! [`scene`]: https://docs.rs/beet_ui
 //! [`style`]: https://docs.rs/beet_ui
 use crate::prelude::*;
-use crate::style::*;
 use crate::style::material::typography as type_tokens;
+use crate::style::*;
 
 pub mod buttons;
 pub mod color_scheme;
@@ -186,7 +186,6 @@ pub fn all_rules() -> Vec<Rule> {
 	rules
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -223,7 +222,10 @@ mod tests {
 	fn all_rules_emit_selectors() {
 		let css = CssBuilder::default()
 			.with_format_variables(FormatVariables::short())
-			.build(&css_map(), &RuleSet::new(Rule::new()).with_rules(all_rules()))
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(all_rules()),
+			)
 			.unwrap();
 		// compound `.input:focus` exercises Selector::AllOf serialization
 		css.as_str()
@@ -262,8 +264,9 @@ mod tests {
 			.xpect_contains(".print-hidden")
 			.xpect_contains("display: none;");
 		// the at-rule wraps the selector (appears before it in the output)
-		(css.find("@media print").unwrap() < css.find(".print-hidden").unwrap())
-			.xpect_true();
+		(css.find("@media print").unwrap()
+			< css.find(".print-hidden").unwrap())
+		.xpect_true();
 	}
 
 	/// The reduced-motion rule serializes wrapped in its `@media` at-rule and
@@ -289,14 +292,16 @@ mod tests {
 	/// overriding the plain-bold user-agent heading default.
 	#[beet_core::test]
 	fn terminal_headings_resolve_to_primary() {
-		let mut world = (MaterialStylePlugin::default(), StylePlugin).into_world();
+		let mut world =
+			(MaterialStylePlugin::default(), StylePlugin).into_world();
 		let heading = world.spawn(rsx! { <h1/> }).id();
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let foreground = query
 				.resolve(heading, common_props::ForegroundColor, &mut default())
 				.unwrap();
-			let primary =
-				query.resolve(heading, colors::Primary, &mut default()).unwrap();
+			let primary = query
+				.resolve(heading, colors::Primary, &mut default())
+				.unwrap();
 			foreground.xpect_eq(primary);
 		});
 	}
@@ -313,8 +318,9 @@ mod tests {
 			let foreground = query
 				.resolve(entity, common_props::ForegroundColor, &mut default())
 				.unwrap();
-			let error =
-				query.resolve(entity, colors::Error, &mut default()).unwrap();
+			let error = query
+				.resolve(entity, colors::Error, &mut default())
+				.unwrap();
 			foreground.xpect_eq(error);
 		});
 	}

@@ -17,9 +17,9 @@ mod client_io;
 #[cfg(feature = "std")]
 mod diagnostics;
 mod extra;
+mod navigate;
 #[cfg(all(feature = "codegen", feature = "std"))]
 mod route_codegen;
-mod navigate;
 mod router;
 // every scene-management module needs `template_serde` (load/save a scene through it).
 #[cfg(feature = "template_serde")]

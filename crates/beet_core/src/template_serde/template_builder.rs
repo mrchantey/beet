@@ -235,7 +235,8 @@ impl<'w> TemplateBuilder<'w> {
 			}
 
 			// for each component on the entity, extract it through the filter.
-			for &component_id in original_entity.archetype().components().iter() {
+			for &component_id in original_entity.archetype().components().iter()
+			{
 				let mut extract_and_push = || {
 					let info = self
 						.original_world
@@ -247,8 +248,9 @@ impl<'w> TemplateBuilder<'w> {
 					// rebuilt by the relationship hook on the build path. Serializing
 					// it would double-apply the relation (the direct write plus the
 					// hook), corrupting order and producing duplicate entries.
-					if let Some(RelationshipAccessor::RelationshipTarget { .. }) =
-						info.relationship_accessor()
+					if let Some(RelationshipAccessor::RelationshipTarget {
+						..
+					}) = info.relationship_accessor()
 					{
 						return None;
 					}
@@ -570,7 +572,11 @@ mod test {
 
 		match &template.nodes[0].components[0] {
 			ComponentSlot::Value(value) => {
-				value.try_as_reflect().unwrap().is::<SomeType>().xpect_true();
+				value
+					.try_as_reflect()
+					.unwrap()
+					.is::<SomeType>()
+					.xpect_true();
 			}
 			ComponentSlot::Template(_) => panic!("expected a value slot"),
 		}
