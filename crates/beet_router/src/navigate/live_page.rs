@@ -4,7 +4,7 @@
 //! The one-shot CLI path serializes a route's template tree to a string and
 //! despawns it. The live TUI instead keeps the rendered tree alive and paints it
 //! into a persistent [`DoubleBuffer`] each frame (via [`RealtimeParsePlugin`]),
-//! re-rendering when the active [`CurrentPage`] changes. The injected
+//! re-rendering when the surface's bound page changes. The injected
 //! difference is exactly the buffer target plus the persistent lifecycle, not a
 //! forked render path: the page tree is still built through the template
 //! substrate, and the charcell pipeline still walks it (here by reference, via a
@@ -17,29 +17,30 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 use bevy::math::UVec2;
 
-/// A live-render host: a [`DoubleBuffer`] plus the [`Portal`] slot that
-/// transcludes the active [`CurrentPage`] into it.
+/// A live-render host (a "surface"): a [`DoubleBuffer`] plus the [`Portal`] slot
+/// that transcludes the page currently bound to this surface.
 ///
-/// Spawn one with [`page_host`]. Mark a built route tree [`CurrentPage`]
-/// and [`sync_current_page`] points the slot at it, so the charcell pipeline
-/// paints it into the buffer. Navigating swaps `CurrentPage`, which re-points
-/// the slot and repaints.
+/// Spawn one with [`page_host`]. A [`Navigator`] whose `render_target` is this
+/// host calls [`bind_surface_page`] to point the slot at a built page, so the
+/// charcell pipeline paints it into the buffer. Navigating rebinds the slot and
+/// repaints. Each surface is independent, so many can coexist (one per SSH
+/// session) and show different pages at once.
 #[derive(Component)]
 pub struct PageHost;
 
 /// The slot entity (a child of the host) whose [`Portal`] transcludes the
-/// current page. Kept distinct from the host so the host's buffer renders the
-/// slot, and the slot's reference can be retargeted without touching the buffer.
+/// surface's bound page. Kept distinct from the host so the host's buffer renders
+/// the slot, and the slot's reference can be retargeted without touching the buffer.
 #[derive(Component)]
 pub struct PageSlot;
 
 /// Spawn a live-render host: a `size`-cell [`DoubleBuffer`] whose content is a
 /// viewport-filling `auto` scroll container holding the [`Portal`] slot that
-/// transcludes the active [`CurrentPage`].
+/// transcludes the surface's bound page.
 ///
 /// The scroll container is the page's scrollport (like the browser's scrollable
 /// `<main>`): a page taller or wider than the viewport gets a scrollbar, a short
-/// one does not. [`sync_current_page`] points the inner slot at the current page.
+/// one does not. [`bind_surface_page`] points the inner slot at the bound page.
 pub fn page_host(size: UVec2) -> impl Bundle {
 	(
 		PageHost,
@@ -47,8 +48,8 @@ pub fn page_host(size: UVec2) -> impl Bundle {
 		children![(
 			Element::new("div"),
 			page_viewport_style(),
-			// the slot carries no `Portal` until a page is current: absence is the
-			// unresolved state, so `sync_current_page` installs the reference.
+			// the slot carries no `Portal` until a page is bound: absence is the
+			// unresolved state, so `bind_surface_page` installs the reference.
 			children![PageSlot],
 		)],
 	)
@@ -64,38 +65,18 @@ fn page_viewport_style() -> impl Bundle {
 	]
 }
 
-/// Registers the live-render sync system.
+/// Marks an app that paints live navigator pages into [`page_host`] surfaces.
 ///
 /// Pairs with [`CharcellPlugin`] + [`RealtimeParsePlugin`] (the repaint loop) and
-/// [`NavigatorPlugin`] (which marks the navigated page [`CurrentPage`]).
+/// [`NavigatorPlugin`] (which navigates). The page-to-surface binding is now
+/// direct (a [`Navigator`] calls [`bind_surface_page`] on its `render_target`),
+/// so there is no per-frame sync system; this plugin remains the documented home
+/// for the live-render composition.
 #[derive(Default)]
 pub struct LivePagePlugin;
 
 impl Plugin for LivePagePlugin {
-	fn build(&self, app: &mut App) {
-		app.add_systems(PreUpdate, sync_current_page);
-	}
-}
-
-/// ECS system: point each host's [`Portal`] slot at the active
-/// [`CurrentPage`], so the buffer paints the current route.
-///
-/// Runs when a new `CurrentPage` is added (navigation) and retargets the slot;
-/// the next [`RealtimeParsePlugin`] repaint walks the new page through the
-/// reference. A no-op when nothing changed.
-pub fn sync_current_page(
-	mut commands: Commands,
-	pages: Populated<Entity, Added<CurrentPage>>,
-	slots: Query<Entity, With<PageSlot>>,
-) {
-	let Some(page) = pages.iter().next() else {
-		return;
-	};
-	// (re)point each slot at the new page; inserting the relationship replaces any
-	// previous target and rebuilds the reverse edge.
-	for slot in slots.iter() {
-		commands.entity(slot).insert(Portal::new(page));
-	}
+	fn build(&self, _app: &mut App) {}
 }
 
 /// Resolve `request` against the router's [`RouteTree`] and build the matched
@@ -104,8 +85,8 @@ pub fn sync_current_page(
 /// The live parallel of the static [`PageRoot::render`] path: it shares the
 /// route build *and* the ancestor layout middleware (header/sidebar/footer, the
 /// document chrome) but forks at the output, handing back the built entity rather
-/// than serializing and despawning it. That entity is kept alive to become a
-/// [`CurrentPage`]. The static path is untouched.
+/// than serializing and despawning it. That entity is kept alive to be bound to a
+/// surface via [`bind_surface_page`]. The static path is untouched.
 pub async fn build_live_page(
 	router: &AsyncEntity,
 	mut request: Request,
@@ -165,45 +146,81 @@ pub fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
 	Ok(page)
 }
 
-/// Make `page` the [`CurrentPage`], cleaning up the page it replaces.
+/// Bind `page` to the surface a navigator renders into, cleaning up the page it
+/// replaces.
 ///
-/// Inserting [`CurrentPage`] fires [`single_current_page`], clearing the marker
-/// from the outgoing page; that page's [`DespawnAfterRender`] ephemerals (a
-/// per-request or parsed tree) are then despawned so pages do not accumulate. A
+/// `render_target` is the navigator's [`PageHost`]; absent it (a single-surface
+/// app), the lone host is used. The host's [`PageSlot`] [`Portal`] is re-pointed
+/// at `page` *before* the despawn, so nothing references the outgoing tree when
+/// it is removed. The outgoing page's [`DespawnAfterRender`] ephemerals (a
+/// per-request or parsed tree) are then despawned so pages do not accumulate; a
 /// self-referential fixed route carries an empty set, so its entity survives.
 ///
-/// The host slots are re-pointed at the new page *before* the despawn, so no
-/// [`Portal`] references the outgoing tree when it is removed.
-pub fn set_current_page(world: &mut World, page: Entity) {
-	// snapshot the outgoing pages' cleanup sets before the marker moves.
-	let mut pages = world
-		.query_filtered::<(Entity, Option<&DespawnAfterRender>), With<CurrentPage>>();
-	let stale: Vec<Entity> = pages
-		.iter(world)
-		.filter(|(entity, _)| *entity != page)
-		.flat_map(|(_, despawn)| {
-			despawn.map(|despawn| despawn.0.clone()).unwrap_or_default()
-		})
-		.filter(|entity| *entity != page)
-		.collect();
+/// Scoped to one surface, so binding a page on one SSH session never disturbs
+/// another session's page.
+pub fn bind_surface_page(
+	world: &mut World,
+	render_target: Option<Entity>,
+	page: Entity,
+) {
+	let Some(host) = resolve_surface(world, render_target) else {
+		error!("no page host found to bind the rendered page into");
+		return;
+	};
+	let Some(slot) = page_slot_of(world, host) else {
+		error!("page host {host} has no PageSlot child");
+		return;
+	};
+	// the page the slot points at now, to clean up after the swap.
+	let outgoing = world.entity(slot).get::<Portal>().map(|portal| portal.target());
 
-	world.entity_mut(page).insert(CurrentPage);
+	// back-link the page to its surface, then re-point the slot at it.
+	world.entity_mut(page).insert(RenderSurface(host));
+	world.entity_mut(slot).insert(Portal::new(page));
 
-	// re-point host slots now so nothing references the outgoing tree on despawn;
-	// inserting the relationship replaces any previous target.
-	let slots = world
-		.query_filtered::<Entity, With<PageSlot>>()
-		.iter(world)
-		.collect::<Vec<_>>();
-	for slot in slots {
-		world.entity_mut(slot).insert(Portal::new(page));
-	}
-
-	for entity in stale {
-		if let Ok(entity) = world.get_entity_mut(entity) {
-			entity.despawn();
+	// despawn the outgoing page's ephemerals now that nothing references them.
+	if let Some(outgoing) = outgoing.filter(|outgoing| *outgoing != page) {
+		let stale = world
+			.entity(outgoing)
+			.get::<DespawnAfterRender>()
+			.map(|despawn| despawn.0.clone())
+			.unwrap_or_default();
+		for entity in stale.into_iter().filter(|entity| *entity != page) {
+			if let Ok(entity) = world.get_entity_mut(entity) {
+				entity.despawn();
+			}
 		}
 	}
+}
+
+/// Resolve the surface a page binds into: the navigator's explicit `render_target`
+/// when alive, else the single [`PageHost`] of a single-surface app.
+fn resolve_surface(
+	world: &mut World,
+	render_target: Option<Entity>,
+) -> Option<Entity> {
+	render_target
+		.filter(|host| world.get_entity(*host).is_ok())
+		.or_else(|| {
+			world
+				.query_filtered::<Entity, With<PageHost>>()
+				.iter(world)
+				.next()
+		})
+}
+
+/// The [`PageSlot`] descendant of `host` (a grandchild as [`page_host`] spawns it).
+fn page_slot_of(world: &World, host: Entity) -> Option<Entity> {
+	let mut stack = vec![host];
+	while let Some(entity) = stack.pop() {
+		if world.entity(entity).contains::<PageSlot>() {
+			return Some(entity);
+		}
+		if let Some(children) = world.entity(entity).get::<Children>() {
+			stack.extend(children.iter());
+		}
+	}
+	None
 }
 
 #[cfg(test)]
@@ -212,7 +229,7 @@ mod test {
 	use bevy::math::UVec2;
 
 	/// The live-TUI render stack minus the terminal host: charcell pipeline,
-	/// per-frame repaint, the document chain, and the current-page sync.
+	/// per-frame repaint, and the document chain.
 	fn live_app() -> App {
 		let mut app = App::new();
 		app.add_plugins((
@@ -226,25 +243,25 @@ mod test {
 		app
 	}
 
-	/// Build a page tree marked as the active page, returning its root entity.
+	/// Build a page tree bound to `host`'s surface, returning its root entity.
 	///
 	/// Built through the template substrate (`spawn_template` + `Snippet`) so a
 	/// page of `#[template]` widgets resolves its slots/lifecycle, exactly as the
 	/// route constructors build per-request content.
-	fn spawn_page(app: &mut App, bundle: impl Bundle) -> Entity {
+	fn spawn_page(app: &mut App, host: Entity, bundle: impl Bundle) -> Entity {
 		let page = app
 			.world_mut()
 			.spawn_template(Snippet::from_bundle(bundle))
 			.unwrap()
 			.id();
-		app.world_mut().entity_mut(page).insert(CurrentPage);
+		bind_surface_page(app.world_mut(), Some(host), page);
 		page
 	}
 
 	/// The host buffer's painted frame as plain text after one frame.
 	fn frame(app: &mut App, host: Entity) -> String {
-		// one frame: PreUpdate points the slot at CurrentPage, then the post-parse
-		// pipeline paints the host buffer through the Portal slot.
+		// one frame: the post-parse pipeline paints the host buffer through the
+		// Portal slot bound by `bind_surface_page`.
 		app.update();
 		app.world()
 			.get::<DoubleBuffer>(host)
@@ -253,30 +270,28 @@ mod test {
 			.render_plain()
 	}
 
-	/// The active route renders into the persistent buffer, and navigating to a
-	/// second route re-renders it (the previous page is dropped).
+	/// The bound page renders into the persistent buffer, and binding a second page
+	/// re-renders it (the previous page is dropped).
 	#[beet_core::test]
 	fn renders_and_re_renders_active_page() {
 		let mut app = live_app();
 		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
 
-		// initial route: Alpha
-		let alpha = spawn_page(&mut app, rsx! { <p>"Alpha page"</p> });
+		// initial page: Alpha
+		spawn_page(&mut app, host, rsx! { <p>"Alpha page"</p> });
 		frame(&mut app, host).xpect_contains("Alpha page");
 
-		// navigate: a new page becomes current; the slot re-points and repaints.
-		// the previous page leaves the active set (the single-page observer would
-		// despawn it in the full app; here we drop it explicitly).
-		app.world_mut().entity_mut(alpha).remove::<CurrentPage>();
-		let _beta = spawn_page(&mut app, rsx! { <p>"Beta page"</p> });
+		// rebind: a new page takes the surface; the slot re-points and repaints,
+		// the previous page is unbound (and despawned if ephemeral).
+		spawn_page(&mut app, host, rsx! { <p>"Beta page"</p> });
 		let out = frame(&mut app, host);
 		out.as_str().xpect_contains("Beta page");
 		out.xnot().xpect_contains("Alpha page");
 	}
 
 	/// The full live-navigation stack: a router + an in-world navigator + a page
-	/// host. [`RouterPlugin`] brings the charcell/template/async plugins; the
-	/// single-active-page invariant needs [`NavigatorPlugin`].
+	/// host. [`RouterPlugin`] brings the charcell/template/async plugins;
+	/// [`NavigatorPlugin`] brings link handling and history shortcuts.
 	fn nav_app() -> App {
 		let mut app = App::new();
 		app.add_plugins((
@@ -341,6 +356,13 @@ mod test {
 			.xpect_contains("Alpha page");
 	}
 
+	/// Whether `host`'s page slot has been bound to a page.
+	fn slot_bound(app: &App, host: Entity) -> bool {
+		page_slot_of(app.world(), host)
+			.and_then(|slot| app.world().entity(slot).get::<Portal>())
+			.is_some()
+	}
+
 	/// The default navigator's `about:blank` home renders an empty page in-place
 	/// without a network fetch (regression: it used to HTTP-fetch `about:blank`,
 	/// fail to parse, and panic the async task).
@@ -349,24 +371,56 @@ mod test {
 		let mut app = nav_app();
 		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
 		app.world_mut().spawn(Navigator::default());
-		// drive the async on_add navigation until the blank page is current
+		// drive the async on_add navigation until the surface slot is bound
 		for _ in 0..200 {
 			frame(&mut app, host);
-			if app
-				.world_mut()
-				.query_filtered::<Entity, With<CurrentPage>>()
-				.iter(app.world())
-				.next()
-				.is_some()
-			{
+			if slot_bound(&app, host) {
 				break;
 			}
 		}
+		slot_bound(&app, host).xpect_true();
+	}
+
+	/// Two surfaces render independently: each navigator binds only its own host's
+	/// slot, so two sessions show different pages at once (the multi-tenant
+	/// invariant the SSH TUI server relies on).
+	#[beet_core::test]
+	async fn two_surfaces_render_independently() {
+		let mut app = nav_app();
+		let router = app
+			.world_mut()
+			.spawn((Router, children![
+				render_action::fixed_func_route("alpha", || {
+					rsx! { <p>"Alpha page"</p> }
+				}),
+				render_action::fixed_func_route("beta", || {
+					rsx! { <p>"Beta page"</p> }
+				}),
+			]))
+			.flush();
+		let host_a = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
+		let host_b = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
 		app.world_mut()
-			.query_filtered::<Entity, With<CurrentPage>>()
-			.iter(app.world())
-			.count()
-			.xpect_eq(1);
+			.spawn(Navigator::in_world(router, "alpha").with_render_target(host_a));
+		app.world_mut()
+			.spawn(Navigator::in_world(router, "beta").with_render_target(host_b));
+
+		// drive until both surfaces have painted their own route
+		for _ in 0..400 {
+			let frame_a = frame(&mut app, host_a);
+			let frame_b = frame(&mut app, host_b);
+			if frame_a.contains("Alpha page") && frame_b.contains("Beta page") {
+				break;
+			}
+		}
+		frame(&mut app, host_a)
+			.xpect_contains("Alpha page")
+			.xnot()
+			.xpect_contains("Beta page");
+		frame(&mut app, host_b)
+			.xpect_contains("Beta page")
+			.xnot()
+			.xpect_contains("Alpha page");
 	}
 
 	/// The `MediaBytes` → living tree primitive: parsed markdown becomes a page
@@ -378,7 +432,7 @@ mod test {
 		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
 		let bytes = MediaBytes::new_markdown("# Hello");
 		let page = parse_page(app.world_mut(), bytes).unwrap();
-		set_current_page(app.world_mut(), page);
+		bind_surface_page(app.world_mut(), Some(host), page);
 		frame(&mut app, host).xpect_contains("Hello");
 	}
 }

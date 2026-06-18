@@ -43,6 +43,10 @@ fn main() -> AppExit {
 	app.init_plugin::<CharcellTuiPlugin>()
 		.init_plugin::<NavigatorPlugin>()
 		.init_plugin::<LivePagePlugin>();
+	// the multi-tenant SSH-TUI server's per-connection behavior, so a served site
+	// declaring `<.. SshTuiServer>` serves each ssh session its own terminal.
+	#[cfg(feature = "ssh")]
+	app.init_plugin::<SshTuiPlugin>();
 	// spawn the host before the plugin rehydrates the retained scene under it.
 	app.add_systems(Startup, spawn_host.before(rehydrate_scene_cache))
 		.run()

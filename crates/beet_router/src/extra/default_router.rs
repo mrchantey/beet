@@ -11,6 +11,8 @@ use beet_core::prelude::*;
 ///   support (std-only: they render through the scene pipeline).
 /// - an `/app-info` scene route (std-only) and a `POST /analytics` route
 ///   (`json` + std), both of which require a [`PackageConfig`] resource.
+/// - a `GET /health` route (std-only) returning 200 + json metrics, the
+///   load-balancer health check and autoscaling signal.
 /// - a cached `GET /js/reactivity.js` route (std-only) serving the thin-client
 ///   reactivity runtime, the asset the reactive renderer's injected script loads.
 ///
@@ -43,6 +45,8 @@ pub fn default_app_routes() -> impl Bundle {
 	(
 		OnSpawn::insert_child(app_info()),
 		OnSpawn::insert_child(reactivity_js_route()),
+		// the load-balancer health check + autoscaling signal.
+		OnSpawn::insert_child(health_route()),
 		#[cfg(feature = "json")]
 		OnSpawn::insert_child(analytics_handler()),
 		#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]

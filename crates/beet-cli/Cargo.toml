@@ -24,7 +24,7 @@ name = "export_scenes"
 path = "src/bin/export_scenes.rs"
 
 [features]
-default = ["qrcode", "net", "tui"]
+default = ["qrcode", "net", "tui", "ssh"]
 qrcode = ["dep:qrcode", "dep:image"]
 # HTTP transport for the remote scene-control commands. Native-only: the
 # ureq/rustls stack does not build on wasm, so it is enabled via the non-wasm
@@ -34,6 +34,10 @@ net = ["beet/ureq","beet/rustls-tls"]
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.
 tui = ["beet/tui_server"]
+# The multi-tenant SSH-TUI server (`SshTuiServer`), so `beet serve <site>
+# --server=http,ssh` serves http and an ssh terminal from one process. Registers
+# the markup-declarable `SshTuiServer` via `SshTuiPlugin`.
+ssh = ["tui", "beet/ssh_tui"]
 
 [dependencies]
 beet = { workspace = true, features = [

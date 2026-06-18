@@ -10,8 +10,7 @@ impl Plugin for NavigatorPlugin {
 	fn build(&self, app: &mut App) {
 		// link click handling (internal nav vs external open) lives in
 		// OpenLinkPlugin, which classifies a clicked `<a>` and routes it.
-		app.init_plugin::<OpenLinkPlugin>()
-			.add_observer(single_current_page);
+		app.init_plugin::<OpenLinkPlugin>();
 		// keyboard history shortcuts (alt+left/right) ride the terminal input
 		// layer. The message registration is idempotent and makes the shortcut
 		// system validate even when no input plugin is composed in. Stepping
@@ -27,38 +26,47 @@ impl Plugin for NavigatorPlugin {
 }
 
 /// System: alt+left / alt+right drive the navigator back / forward, the browser's
-/// history shortcuts.
+/// history shortcuts, scoped per surface so each session navigates its own history.
 ///
 /// The terminal bridge emits the Alt modifier as a bracketing `AltLeft` press
 /// (mirroring how Shift+Tab arrives), so the modifier and the arrow land in the
-/// same frame's key stream. The scroll input ignores alt+arrows, so plain arrows
-/// still scroll.
+/// same frame's key stream, tagged with that surface's `window`. The scroll input
+/// ignores alt+arrows, so plain arrows still scroll.
 #[cfg(feature = "tui")]
 fn nav_shortcuts(
 	mut keys: MessageReader<bevy::input::keyboard::KeyboardInput>,
-	navigators: Query<Entity, With<Navigator>>,
+	navigators: Query<(Entity, &Navigator)>,
 	mut commands: Commands,
 ) {
 	use bevy::input::ButtonState;
 	use bevy::input::keyboard::KeyCode;
-	let (mut alt, mut back, mut forward) = (false, false, false);
+	// per surface (window): (alt held, back arrow, forward arrow) this frame.
+	let mut per_window = HashMap::<Entity, (bool, bool, bool)>::default();
 	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		let entry = per_window.entry(key.window).or_default();
 		match key.key_code {
-			KeyCode::AltLeft | KeyCode::AltRight => alt = true,
-			KeyCode::ArrowLeft => back = true,
-			KeyCode::ArrowRight => forward = true,
+			KeyCode::AltLeft | KeyCode::AltRight => entry.0 = true,
+			KeyCode::ArrowLeft => entry.1 = true,
+			KeyCode::ArrowRight => entry.2 = true,
 			_ => {}
 		}
 	}
-	if !alt {
-		return;
-	}
-	let Ok(navigator) = navigators.single() else {
-		return;
-	};
-	if back {
-		commands.entity(navigator).queue_async(Navigator::back);
-	} else if forward {
-		commands.entity(navigator).queue_async(Navigator::forward);
+	for (window, (alt, back, forward)) in per_window {
+		if !alt {
+			continue;
+		}
+		// the navigator painting into this surface: an explicit render_target match,
+		// else the lone navigator of a single-surface app.
+		let navigator = navigators
+			.iter()
+			.find(|(_, nav)| nav.render_target() == Some(window))
+			.or_else(|| navigators.single().ok())
+			.map(|(entity, _)| entity);
+		let Some(navigator) = navigator else { continue };
+		if back {
+			commands.entity(navigator).queue_async(Navigator::back);
+		} else if forward {
+			commands.entity(navigator).queue_async(Navigator::forward);
+		}
 	}
 }

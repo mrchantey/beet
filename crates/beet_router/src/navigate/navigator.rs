@@ -44,6 +44,10 @@ pub struct Navigator {
 	accepts: Vec<MediaType>,
 	/// How requests travel: a network fetch, or in-world router dispatch.
 	transport: NavigatorTransport,
+	/// The [`PageHost`] surface this navigator paints into. `None` resolves to the
+	/// single host of a single-surface app; multi-surface apps (one per SSH
+	/// session) set it so each navigator binds only its own surface.
+	render_target: Option<Entity>,
 	/// `true` while a request is in-flight.
 	loading: bool,
 	home_url: Url,
@@ -58,8 +62,9 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.commands()
 		.entity(cx.entity)
 		.queue_async(async |entity| {
-			let home_url =
-				entity.get(|nav: &Navigator| nav.home_url.clone()).await?;
+			let (home_url, render_target) = entity
+				.get(|nav: &Navigator| (nav.home_url.clone(), nav.render_target))
+				.await?;
 			// world handle kept before `navigate_to` consumes `entity`, for the
 			// error-page render below.
 			let world = entity.world().clone();
@@ -69,7 +74,11 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 			if let Err(err) = Navigator::navigate_to(entity, home_url).await {
 				error!("Navigator failed to load home page: {err}");
 				let message = err.to_string();
-				world.with(move |world| set_error_page(world, message)).await;
+				world
+					.with(move |world| {
+						set_error_page(world, render_target, message)
+					})
+					.await;
 			}
 			Ok(())
 		});
@@ -93,6 +102,7 @@ impl Default for Navigator {
 				// MediaType::other("*/*"),
 			],
 			transport: NavigatorTransport::Http,
+			render_target: None,
 			loading: false,
 			// home navigated to by on_add
 			history: default(),
@@ -108,6 +118,17 @@ impl Navigator {
 			..default()
 		}
 	}
+
+	/// Sets the [`PageHost`] surface this navigator paints into, pairing the two
+	/// so a multi-surface app (one per SSH session) binds each navigator's pages
+	/// to its own surface.
+	pub fn with_render_target(mut self, host: Entity) -> Self {
+		self.render_target = Some(host);
+		self
+	}
+
+	/// The surface this navigator paints into, if explicitly paired.
+	pub fn render_target(&self) -> Option<Entity> { self.render_target }
 
 	/// An in-world navigator: requests dispatch to the local `router` entity
 	/// (no socket), for browsing the app's own routes. Starts at `home_url`.
@@ -177,7 +198,7 @@ impl Navigator {
 	) -> Result {
 		let url = url.into();
 		// resolve relative url and push history
-		let (transport, user_agent, resolved, accepts) = entity
+		let (transport, user_agent, resolved, accepts, render_target) = entity
 			.get_mut(move |mut nav: Mut<Navigator>| {
 				nav.loading = true;
 				let resolved = nav.resolve(url);
@@ -187,12 +208,20 @@ impl Navigator {
 					nav.user_agent.clone(),
 					resolved,
 					nav.accepts.clone(),
+					nav.render_target,
 				)
 			})
 			.await?;
 
-		Self::fetch_and_render(entity, transport, user_agent, resolved, accepts)
-			.await
+		Self::fetch_and_render(
+			entity,
+			transport,
+			user_agent,
+			resolved,
+			accepts,
+			render_target,
+		)
+		.await
 	}
 
 	/// Navigate one step back in history, if possible.
@@ -209,13 +238,23 @@ impl Navigator {
 					nav.user_agent.clone(),
 					nav.current_url().clone(),
 					nav.accepts.clone(),
+					nav.render_target,
 				))
 			})
 			.await?;
 
-		if let Some((transport, user_agent, url, accepts)) = nav_state {
-			Self::fetch_and_render(entity, transport, user_agent, url, accepts)
-				.await?;
+		if let Some((transport, user_agent, url, accepts, render_target)) =
+			nav_state
+		{
+			Self::fetch_and_render(
+				entity,
+				transport,
+				user_agent,
+				url,
+				accepts,
+				render_target,
+			)
+			.await?;
 		}
 		Ok(())
 	}
@@ -234,13 +273,23 @@ impl Navigator {
 					nav.user_agent.clone(),
 					nav.current_url().clone(),
 					nav.accepts.clone(),
+					nav.render_target,
 				))
 			})
 			.await?;
 
-		if let Some((transport, user_agent, url, accepts)) = nav_state {
-			Self::fetch_and_render(entity, transport, user_agent, url, accepts)
-				.await?;
+		if let Some((transport, user_agent, url, accepts, render_target)) =
+			nav_state
+		{
+			Self::fetch_and_render(
+				entity,
+				transport,
+				user_agent,
+				url,
+				accepts,
+				render_target,
+			)
+			.await?;
 		}
 		Ok(())
 	}
@@ -254,7 +303,7 @@ impl Navigator {
 	/// page host repaints, so the terminal updates live (the web client reloads via
 	/// its own [`ClientIo`](crate::prelude::ClientIo) broadcast instead).
 	pub async fn reload(entity: AsyncEntity) -> Result {
-		let (transport, user_agent, url, accepts) = entity
+		let (transport, user_agent, url, accepts, render_target) = entity
 			.get_mut(|mut nav: Mut<Navigator>| {
 				nav.loading = true;
 				(
@@ -262,24 +311,35 @@ impl Navigator {
 					nav.user_agent.clone(),
 					nav.current_url().clone(),
 					nav.accepts.clone(),
+					nav.render_target,
 				)
 			})
 			.await?;
-		Self::fetch_and_render(entity, transport, user_agent, url, accepts).await
+		Self::fetch_and_render(
+			entity,
+			transport,
+			user_agent,
+			url,
+			accepts,
+			render_target,
+		)
+		.await
 	}
 
 	/// Shared fetch → render → clear-loading path used by all navigation
 	/// methods.
 	///
 	/// The transport decides how the request travels (network vs in-world
-	/// router dispatch); both end with a living [`CurrentPage`] tree that the
-	/// page host paints. The static serialize-and-despawn path is untouched.
+	/// router dispatch); both end by binding a living page tree to the navigator's
+	/// surface, which the page host paints. The static serialize-and-despawn path
+	/// is untouched.
 	async fn fetch_and_render(
 		entity: AsyncEntity,
 		transport: NavigatorTransport,
 		user_agent: Cow<'static, str>,
 		url: Url,
 		accepts: Vec<MediaType>,
+		render_target: Option<Entity>,
 	) -> Result {
 		// `about:` urls (eg the default `about:blank` home) are empty documents:
 		// render nothing without touching the network or router.
@@ -292,7 +352,9 @@ impl Navigator {
 				.await?;
 			entity
 				.world()
-				.with(move |world| set_current_page(world, page))
+				.with(move |world| {
+					bind_surface_page(world, render_target, page)
+				})
 				.await;
 			return entity
 				.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)
@@ -318,10 +380,11 @@ impl Navigator {
 			}
 		};
 
-		// mark the new tree the current page (the host repaints) and clear loading
+		// bind the new tree to this navigator's surface (the host repaints) and
+		// clear loading
 		entity
 			.world()
-			.with(move |world| set_current_page(world, page))
+			.with(move |world| bind_surface_page(world, render_target, page))
 			.await;
 		entity
 			.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)

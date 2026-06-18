@@ -65,46 +65,58 @@ pub struct ScrollbarHitTest<'w, 's> {
 }
 
 impl ScrollbarHitTest<'_, '_> {
-	/// The screen-space scrollbar geometry of every scroll container.
-	fn geometries(&self) -> HashMap<Entity, ScrollbarGeometry> {
+	/// The screen-space scrollbar geometry of every scroll container within
+	/// `surface`'s buffer, so a press on one surface never drives another's bar.
+	fn geometries_for(
+		&self,
+		surface: Entity,
+	) -> HashMap<Entity, ScrollbarGeometry> {
 		let mut map = HashMap::<Entity, ScrollbarGeometry>::default();
-		for (root, buffer) in self.roots.iter() {
-			let viewport = buffer.current_buffer().size();
-			let ordered = self.tree.pre_order(root);
-			let contexts = resolve_contexts(
-				root,
-				&ordered,
-				&self.charcell,
-				&self.tree,
-				viewport,
-			);
-			for entity in ordered {
-				let Ok(node) = self.charcell.unresolved_node(entity) else {
-					continue;
-				};
-				let offset =
-					contexts.get(&entity).map(|cx| cx.offset).unwrap_or(IVec2::ZERO);
-				if let Some(geometry) =
-					scrollbar_geometry(&node, &self.charcell, viewport, offset)
-				{
-					map.insert(entity, geometry);
-				}
+		let Ok((root, buffer)) = self.roots.get(surface) else {
+			return map;
+		};
+		let viewport = buffer.current_buffer().size();
+		let ordered = self.tree.pre_order(root);
+		let contexts =
+			resolve_contexts(root, &ordered, &self.charcell, &self.tree, viewport);
+		for entity in ordered {
+			let Ok(node) = self.charcell.unresolved_node(entity) else {
+				continue;
+			};
+			let offset =
+				contexts.get(&entity).map(|cx| cx.offset).unwrap_or(IVec2::ZERO);
+			if let Some(geometry) =
+				scrollbar_geometry(&node, &self.charcell, viewport, offset)
+			{
+				map.insert(entity, geometry);
 			}
 		}
 		map
 	}
 
-	/// The bar geometry of `container` on `axis`, for live drag mapping.
-	fn bar(&self, container: Entity, axis: ScrollAxis) -> Option<AxisBar> {
-		self.geometries().get(&container).and_then(|geometry| match axis {
-			ScrollAxis::Y => geometry.vertical,
-			ScrollAxis::X => geometry.horizontal,
+	/// The bar geometry of `container` on `axis` within `surface`, for live drag
+	/// mapping.
+	fn bar(
+		&self,
+		surface: Entity,
+		container: Entity,
+		axis: ScrollAxis,
+	) -> Option<AxisBar> {
+		self.geometries_for(surface).get(&container).and_then(|geometry| {
+			match axis {
+				ScrollAxis::Y => geometry.vertical,
+				ScrollAxis::X => geometry.horizontal,
+			}
 		})
 	}
 
-	/// The scrollbar press at `cell`, if any.
-	fn hit(&self, cell: IVec2) -> Option<ScrollbarHit> {
-		for (container, geometry) in self.geometries() {
+	/// The scrollbar press at `cell` within `surface`, if any.
+	fn hit_surface(
+		&self,
+		surface: Entity,
+		cell: IVec2,
+	) -> Option<ScrollbarHit> {
+		for (container, geometry) in self.geometries_for(surface) {
 			// vertical bar: cursor column on the gutter line, row along the track
 			if let Some(bar) = geometry.vertical {
 				if let Some(region) = bar_region(&bar, cell.x, cell.y) {
@@ -183,8 +195,10 @@ pub fn scrollbar_mouse(
 	// the hit-test reads ScrollPosition (via CharcellQuery), so it cannot coexist
 	// with the mutable write query; a ParamSet keeps the accesses disjoint.
 	mut params: ParamSet<(ScrollbarHitTest, Query<&'static mut ScrollPosition>)>,
-	mut drag: Local<Option<ScrollbarDrag>>,
-	mut last_cursor: Local<Option<IVec2>>,
+	// drag + last cursor are kept per surface (window), so a drag on one SSH
+	// session never moves another's scrollbar.
+	mut drag: Local<HashMap<Entity, ScrollbarDrag>>,
+	mut last_cursor: Local<HashMap<Entity, IVec2>>,
 ) {
 	// phase 1 (read-only hit-test): collect the offset writes this frame implies.
 	let mut writes = Vec::<ScrollWrite>::new();
@@ -192,10 +206,12 @@ pub fn scrollbar_mouse(
 		let hit_test = params.p0();
 		// a move while dragging maps the cursor along the track to a scroll offset.
 		for moved in cursor.read() {
+			let surface = moved.window;
 			let cell = vec2_to_cell(moved.position);
-			*last_cursor = Some(cell);
-			let Some(state) = drag.as_ref() else { continue };
-			let Some(bar) = hit_test.bar(state.container, state.axis) else {
+			last_cursor.insert(surface, cell);
+			let Some(state) = drag.get(&surface) else { continue };
+			let Some(bar) = hit_test.bar(surface, state.container, state.axis)
+			else {
 				continue;
 			};
 			let along = axis_offset(cell, state.axis);
@@ -206,13 +222,16 @@ pub fn scrollbar_mouse(
 			});
 		}
 		for button in buttons.read() {
+			let surface = button.window;
 			match button.state {
 				ButtonState::Pressed => {
-					let Some(cell) = *last_cursor else { continue };
-					let Some(hit) = hit_test.hit(cell) else { continue };
+					let Some(&cell) = last_cursor.get(&surface) else { continue };
+					let Some(hit) = hit_test.hit_surface(surface, cell) else {
+						continue;
+					};
 					match hit.region {
 						ScrollbarRegion::Thumb { grab } => {
-							*drag = Some(ScrollbarDrag {
+							drag.insert(surface, ScrollbarDrag {
 								container: hit.container,
 								axis: hit.axis,
 								grab,
@@ -227,8 +246,10 @@ pub fn scrollbar_mouse(
 						}
 					}
 				}
-				// any release ends a drag (clamp_scroll_positions settles it).
-				ButtonState::Released => *drag = None,
+				// any release ends this surface's drag (clamp settles it).
+				ButtonState::Released => {
+					drag.remove(&surface);
+				}
 			}
 		}
 	}

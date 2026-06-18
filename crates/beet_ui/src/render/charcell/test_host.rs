@@ -55,7 +55,8 @@ impl TestHost {
 				DoubleBuffer::new(size),
 			))
 			.id();
-		// run Startup (spawns the PrimaryPointer) before any stepping.
+		// the host carries its own Pointer (required by Terminal); run one update
+		// to settle Startup before any stepping.
 		app.update();
 		Self { app, host }
 	}

@@ -3,9 +3,10 @@
 //!
 //! When a [`Navigator`](crate::prelude::Navigator) load fails (eg the network is
 //! down on the initial home fetch) the failure is both logged (`error!`) and
-//! surfaced to the user as a rendered page rather than left blank. [`error_page`]
-//! builds the template into a [`CurrentPage`], so the live page host paints it
-//! through the same layout/`Portal` path as any other page.
+//! surfaced to the user as a rendered page rather than left blank.
+//! [`set_error_page`] builds the template and binds it to the failing navigator's
+//! surface, so the live page host paints it through the same layout/`Portal` path
+//! as any other page.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
@@ -26,13 +27,18 @@ pub fn ErrorPage(#[prop(into)] message: String) -> impl Bundle {
 	}
 }
 
-/// Build the [`ErrorPage`] for `message` as the current page, so the live host
-/// paints it in place of the page that failed to load.
+/// Build the [`ErrorPage`] for `message` and bind it to the failing navigator's
+/// surface, so the live host paints it in place of the page that failed to load.
 ///
-/// Built through `spawn_template` (so its slots/lifecycle resolve) and marked
+/// `render_target` is the navigator's surface (absent it, the lone host). Built
+/// through `spawn_template` (so its slots/lifecycle resolve) and marked
 /// [`DespawnAfterRender`] so it is cleaned up when the next navigation replaces
 /// it, exactly like a parsed or per-request page.
-pub fn set_error_page(world: &mut World, message: impl Into<String>) {
+pub fn set_error_page(
+	world: &mut World,
+	render_target: Option<Entity>,
+	message: impl Into<String>,
+) {
 	let message = message.into();
 	let page = world
 		.spawn_template(rsx! { <ErrorPage message=message/> })
@@ -40,7 +46,7 @@ pub fn set_error_page(world: &mut World, message: impl Into<String>) {
 	match page {
 		Ok(page) => {
 			world.entity_mut(page).insert(DespawnAfterRender(vec![page]));
-			set_current_page(world, page);
+			bind_surface_page(world, render_target, page);
 		}
 		// a failure building the error page itself is logged; there is no further
 		// fallback to render.
@@ -84,7 +90,7 @@ mod test {
 	fn error_page_paints_message() {
 		let mut app = live_app();
 		let host = app.world_mut().spawn(page_host(UVec2::new(60, 8))).id();
-		set_error_page(app.world_mut(), "network down");
+		set_error_page(app.world_mut(), Some(host), "network down");
 		frame(&mut app, host)
 			.xpect_contains("Page failed to load")
 			.xpect_contains("network down");

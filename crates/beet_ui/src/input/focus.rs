@@ -15,17 +15,20 @@ use crate::prelude::ElementState;
 use crate::prelude::ElementStateMap;
 use crate::prelude::PointerDown;
 use crate::prelude::PointerUp;
-use crate::prelude::PrimaryPointer;
+use crate::prelude::RenderSurface;
+use crate::prelude::surface_matches;
+use crate::prelude::surface_of;
 use beet_core::prelude::*;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 
-/// Marker for the single focused entity that receives keyboard input.
+/// Marker for the focused entity that receives keyboard input on a surface.
 ///
-/// At most one entity carries `Focus` at a time. The `on_add` hook
-/// enforces this by clearing `Focus` from every other entity, so the
-/// invariant holds regardless of who sets focus. Having no focused
+/// At most one entity carries `Focus` *per surface* (per [`RenderSurface`]): the
+/// `on_add` hook clears `Focus` from every other entity on the same surface, so
+/// each session (one per SSH connection) keeps its own focused element. A
+/// single-surface app behaves as before (one focus world-wide). Having no focused
 /// entity is a valid steady state.
 #[derive(Debug, Default, Clone, Copy, Reflect, Component)]
 #[reflect(Component)]
@@ -33,18 +36,28 @@ use bevy::input::keyboard::KeyboardInput;
 pub struct Focus;
 
 impl Focus {
-	/// Clears `Focus` from every other entity so only the newest one keeps it.
+	/// Clears `Focus` from other entities on the same surface so only the newest
+	/// one keeps it, leaving other surfaces' focus untouched.
 	///
 	/// A [`DeferredWorld`] cannot run an arbitrary query inline, so the
 	/// full-world work is queued as a command closure.
 	fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		let added = cx.entity;
 		world.commands().queue(move |world: &mut World| {
-			let stale = world
-				.query_filtered::<Entity, With<Focus>>()
-				.iter(world)
-				.filter(|entity| *entity != added)
-				.collect::<Vec<_>>();
+			let stale = world.with_state::<(
+				Query<Entity, With<Focus>>,
+				Query<&ChildOf>,
+				Query<&RenderSurface>,
+			), _>(|(focused, parents, surfaces)| {
+				let added_surface = surface_of(added, &parents, &surfaces);
+				focused
+					.iter()
+					.filter(|entity| *entity != added)
+					.filter(|entity| {
+						surface_of(*entity, &parents, &surfaces) == added_surface
+					})
+					.collect::<Vec<_>>()
+			});
 			for entity in stale {
 				world.entity_mut(entity).remove::<Focus>();
 			}
@@ -98,21 +111,31 @@ impl Plugin for FocusPlugin {
 fn activate_focused_on_enter(
 	mut keys: MessageReader<KeyboardInput>,
 	focused: Query<Entity, With<Focus>>,
-	pointers: Query<Entity, With<PrimaryPointer>>,
+	parents: Query<&ChildOf>,
+	surfaces: Query<&RenderSurface>,
 	mut commands: Commands,
 ) {
-	let entered = keys
+	// the surfaces (windows) Enter was pressed on this frame.
+	let enter_windows = keys
 		.read()
-		.any(|key| key.state == ButtonState::Pressed && key.logical_key == Key::Enter);
-	if !entered {
+		.filter(|key| {
+			key.state == ButtonState::Pressed && key.logical_key == Key::Enter
+		})
+		.map(|key| key.window)
+		.collect::<HashSet<_>>();
+	if enter_windows.is_empty() {
 		return;
 	}
-	let Ok(target) = focused.single() else { return };
-	// the primary pointer carries the event; a placeholder is fine when none is
-	// spawned (the consumers read the target, not the pointer).
-	let pointer = pointers.iter().next().unwrap_or(Entity::PLACEHOLDER);
-	commands.entity(target).trigger(PointerDown::new(pointer));
-	commands.entity(target).trigger(PointerUp::new(pointer));
+	// activate the focused element of each surface Enter landed on.
+	for target in focused.iter() {
+		let surface = surface_of(target, &parents, &surfaces);
+		if enter_windows.iter().any(|window| surface_matches(surface, *window)) {
+			// the activation reuses the click path; consumers read the target, not
+			// the pointer, so the target itself stands in as the pointer entity.
+			commands.entity(target).trigger(PointerDown::new(target));
+			commands.entity(target).trigger(PointerUp::new(target));
+		}
+	}
 }
 
 /// Observer: infer [`Focusable`] from a newly-added element's tag.
@@ -154,42 +177,54 @@ fn tab_focus(
 	focusables: Query<Entity, With<Focusable>>,
 	children: Query<&Children>,
 	parents: Query<&ChildOf>,
+	surfaces: Query<&RenderSurface>,
 	focused: Query<Entity, With<Focus>>,
 	mut commands: Commands,
 ) {
-	// scan this frame's keys for Tab and whether Shift is held. The terminal
-	// bridge emits Shift+Tab as a ShiftLeft press bracketing the Tab press, so
-	// both land in the same frame's stream.
-	let mut tabs = 0i32;
-	let mut shift = false;
+	// per surface (window): the net tab count and whether Shift was held. The
+	// terminal bridge emits Shift+Tab as a ShiftLeft press bracketing the Tab
+	// press, so both land in the same frame's stream for that window.
+	let mut per_window = HashMap::<Entity, (i32, bool)>::default();
 	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		let entry = per_window.entry(key.window).or_default();
 		match &key.logical_key {
-			Key::Tab => tabs += 1,
-			Key::Shift => shift = true,
+			Key::Tab => entry.0 += 1,
+			Key::Shift => entry.1 = true,
 			_ => {}
 		}
 	}
-	if tabs == 0 {
-		return;
-	}
-	let direction = if shift { -tabs } else { tabs };
 
-	let order = focusables_in_order(&focusables, &children, &parents);
-	if order.is_empty() {
-		return;
-	}
-
-	let current = focused.iter().next();
-	let next = match current.and_then(|c| order.iter().position(|&e| e == c)) {
-		// wrap forward/back around the focusable ring
-		Some(idx) => {
-			let len = order.len() as i32;
-			((idx as i32 + direction).rem_euclid(len)) as usize
+	let full_order = focusables_in_order(&focusables, &children, &parents);
+	for (window, (tabs, shift)) in per_window {
+		if tabs == 0 {
+			continue;
 		}
-		// nothing focused yet: start at the first
-		None => 0,
-	};
-	commands.entity(order[next]).insert(Focus);
+		let direction = if shift { -tabs } else { tabs };
+		// the focusables on this surface, in document order.
+		let order = full_order
+			.iter()
+			.copied()
+			.filter(|entity| {
+				surface_matches(surface_of(*entity, &parents, &surfaces), window)
+			})
+			.collect::<Vec<_>>();
+		if order.is_empty() {
+			continue;
+		}
+		// the element currently focused on this surface, if any.
+		let current = focused.iter().find(|entity| {
+			surface_matches(surface_of(*entity, &parents, &surfaces), window)
+		});
+		let next = match current.and_then(|c| order.iter().position(|&e| e == c)) {
+			// wrap forward/back around the focusable ring
+			Some(idx) => {
+				((idx as i32 + direction).rem_euclid(order.len() as i32)) as usize
+			}
+			// nothing focused yet: start at the first
+			None => 0,
+		};
+		commands.entity(order[next]).insert(Focus);
+	}
 }
 
 /// The focusables in document (tree pre-order) order, roots sorted by entity for
@@ -243,9 +278,10 @@ fn sync_focus_state(
 	without_map: Query<Entity, (With<Focus>, Without<ElementStateMap>)>,
 	mut commands: Commands,
 ) {
-	let focus = focused.iter().next();
+	// every focused element (one per surface) carries the `Focused` state.
+	let focus = focused.iter().collect::<HashSet<_>>();
 	for (entity, mut map) in states.iter_mut() {
-		let should = Some(entity) == focus;
+		let should = focus.contains(&entity);
 		if should && !map.contains(&ElementState::Focused) {
 			map.insert(ElementState::Focused);
 		} else if !should && map.contains(&ElementState::Focused) {
@@ -260,20 +296,23 @@ fn sync_focus_state(
 	}
 }
 
-/// Turns buffered key presses into text edits on the focused entity's [`Value`].
+/// Turns buffered key presses into text edits on the focused entity's [`Value`],
+/// scoped per surface so each session types into its own focused field.
 ///
 /// Only acts on `ButtonState::Pressed` (repeats flow through so held keys
 /// repeat). With no focused entity, no `Value`, or no editing keys this turn,
-/// it is a no-op and never marks `Changed`.
+/// it is a no-op and never marks `Changed`. A key's edits reach the focused
+/// element whose surface matches the key's `window`.
 fn write_focus_input(
 	mut keys: MessageReader<KeyboardInput>,
-	mut focused: Query<&mut Value, With<Focus>>,
+	mut focused: Query<(Entity, &mut Value), With<Focus>>,
+	parents: Query<&ChildOf>,
+	surfaces: Query<&RenderSurface>,
 ) {
-	// collect editing keys first so a non-editing turn never touches the query
-	let edits = keys
-		.read()
-		.filter(|key| key.state == ButtonState::Pressed)
-		.filter_map(|key| match &key.logical_key {
+	// collect editing keys grouped by their source surface (window).
+	let mut edits_by_window = HashMap::<Entity, Vec<KeyEdit>>::default();
+	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		let edit = match &key.logical_key {
 			// normal typing, terminals also map space to a ' ' character
 			Key::Character(chars) => Some(KeyEdit::Insert(chars.to_string())),
 			// some backends send space distinctly
@@ -283,19 +322,33 @@ fn write_focus_input(
 			Key::Delete => Some(KeyEdit::Delete),
 			// Enter, arrows, Tab, Escape, etc belong to navigation/shortcuts
 			_ => None,
-		})
-		.collect::<Vec<_>>();
-	if edits.is_empty() {
+		};
+		if let Some(edit) = edit {
+			edits_by_window.entry(key.window).or_default().push(edit);
+		}
+	}
+	if edits_by_window.is_empty() {
 		return;
 	}
 
-	// no focused entity, or it has no Value, means no write
-	let Ok(mut value) = focused.single_mut() else {
-		return;
-	};
+	// apply each surface's edits to its own focused element.
+	for (entity, value) in focused.iter_mut() {
+		let surface = surface_of(entity, &parents, &surfaces);
+		let edits = edits_by_window
+			.iter()
+			.filter(|(window, _)| surface_matches(surface, **window))
+			.flat_map(|(_, edits)| edits.iter().cloned())
+			.collect::<Vec<_>>();
+		if !edits.is_empty() {
+			apply_text_edits(value, edits);
+		}
+	}
+}
 
-	// edit through bypass so a non-text sink or no-op never dirties Changed,
-	// then flag Changed once if an edit actually landed
+/// Apply text `edits` to a focused [`Value`] through change-detection bypass, so a
+/// non-text sink or no-op never dirties `Changed`; flags `Changed` once if an edit
+/// actually landed.
+fn apply_text_edits(mut value: Mut<Value>, edits: Vec<KeyEdit>) {
 	let bypass = value.bypass_change_detection();
 	let changed = edits.into_iter().fold(false, |changed, edit| {
 		let did_edit = bypass
@@ -320,6 +373,7 @@ fn write_focus_input(
 }
 
 /// A single resolved keyboard edit applied to the focused text.
+#[derive(Clone)]
 enum KeyEdit {
 	/// Append the given characters at the end.
 	Insert(String),
@@ -382,6 +436,40 @@ mod test {
 		let entity = app.world_mut().spawn((Focus, Value::str(""))).id();
 		type_keys(&mut app, [char_key("h"), char_key("i")]);
 		value_of(&app, entity).xpect_eq(Value::str("hi"));
+	}
+
+	/// Two surfaces focus and type independently: both keep their own focused field
+	/// (the per-surface single-focus invariant), and a key from surface A's window
+	/// edits only A's field, never B's (the multi-tenant typing invariant).
+	#[beet_core::test]
+	fn typing_routes_to_its_own_surface() {
+		let mut app = app();
+		// two surfaces (windows), each a RenderSurface page root with a field.
+		let window_a = app.world_mut().spawn_empty().id();
+		let window_b = app.world_mut().spawn_empty().id();
+		let field_a = app.world_mut().spawn((Focusable, Value::str(""))).id();
+		let field_b = app.world_mut().spawn((Focusable, Value::str(""))).id();
+		app.world_mut().spawn(RenderSurface(window_a)).add_child(field_a);
+		app.world_mut().spawn(RenderSurface(window_b)).add_child(field_b);
+		// focus both: on different surfaces, so both keep Focus.
+		app.world_mut().entity_mut(field_a).insert(Focus);
+		app.world_mut().entity_mut(field_b).insert(Focus);
+		app.update();
+		is_focused(&app, field_a).xpect_true();
+		is_focused(&app, field_b).xpect_true();
+
+		// type into surface A only
+		app.world_mut().write_message(KeyboardInput {
+			key_code: bevy::input::keyboard::KeyCode::KeyX,
+			logical_key: char_key("x"),
+			state: ButtonState::Pressed,
+			text: None,
+			repeat: false,
+			window: window_a,
+		});
+		app.update();
+		value_of(&app, field_a).xpect_eq(Value::str("x"));
+		value_of(&app, field_b).xpect_eq(Value::str(""));
 	}
 
 	#[beet_core::test]

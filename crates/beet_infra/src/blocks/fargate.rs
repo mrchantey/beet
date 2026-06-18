@@ -62,12 +62,21 @@ pub struct FargateBlock {
 	domain: Option<SmolStr>,
 	/// Port the application listens on inside the container.
 	container_port: u16,
+	/// Port the SSH server listens on inside the container, exposed via a
+	/// dedicated TCP Network Load Balancer.
+	ssh_container_port: u16,
 	/// Task CPU units (256, 512, 1024, 2048, 4096).
 	cpu: u16,
 	/// Task memory in MB (512, 1024, 2048, 4096, 8192, etc).
 	memory: u16,
-	/// Number of tasks to run.
+	/// Desired number of tasks to run, kept within `[min_count, max_count]`.
 	desired_count: u32,
+	/// Minimum number of tasks the autoscaling target may scale down to.
+	min_count: u32,
+	/// Maximum number of tasks the autoscaling target may scale up to.
+	max_count: u32,
+	/// Target average CPU utilization (percent) for target tracking autoscaling.
+	cpu_target_percent: f64,
 	/// Health check path for the load balancer.
 	health_check_path: SmolStr,
 	/// Load balancer type (ALB or NLB).
@@ -82,10 +91,14 @@ impl Default for FargateBlock {
 			label: "main-fargate".into(),
 			domain: None,
 			container_port: beet_net::prelude::DEFAULT_SERVER_PORT,
+			ssh_container_port: beet_net::prelude::DEFAULT_SSH_PORT,
 			cpu: 256,
 			memory: 512,
 			desired_count: 1,
-			health_check_path: "/".into(),
+			min_count: 1,
+			max_count: 4,
+			cpu_target_percent: 50.0,
+			health_check_path: "/health".into(),
 			load_balancer_type: LoadBalancerType::default(),
 			container_image: ContainerImage::default(),
 			env_vars: Vec::new(),
@@ -410,6 +423,22 @@ impl Block for FargateBlock {
 			},
 		);
 
+		// Task security group rules - ingress for SSH from anywhere.
+		// The NLB preserves client IPs and has no security group, so the task
+		// must accept SSH traffic directly from 0.0.0.0/0.
+		let task_sg_ssh_ingress = terra::ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("task-sg-ssh-in")),
+			AwsSecurityGroupRuleDetails {
+				security_group_id: task_sg.field_ref("id").into(),
+				r#type: "ingress".into(),
+				from_port: self.ssh_container_port.into(),
+				to_port: self.ssh_container_port.into(),
+				protocol: "tcp".into(),
+				cidr_blocks: Some(vec!["0.0.0.0/0".into()]),
+				..default()
+			},
+		);
+
 		// Task security group rules - egress all
 		let task_sg_egress = terra::ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("task-sg-out")),
@@ -485,6 +514,73 @@ impl Block for FargateBlock {
 						r#type: "forward".into(),
 						target_group_arn: Some(
 							target_group.field_ref("arn").into(),
+						),
+						..default()
+					},
+				]),
+				..default()
+			},
+		);
+
+		// Network Load Balancer for raw TCP SSH traffic, across the same subnets.
+		// NLBs operate at layer 4 and do not use security groups.
+		let ssh_lb_ident = stack.resource_ident(self.build_label("ssh-lb"));
+		let ssh_lb =
+			terra::ResourceDef::new_secondary(ssh_lb_ident, AwsLbDetails {
+				name: Some(self.short_name(stack, "ssh-lb")),
+				load_balancer_type: Some("network".into()),
+				subnets: Some(vec![
+					subnet_a.field_ref("id").into(),
+					subnet_b.field_ref("id").into(),
+				]),
+				tags: Some(
+					[(
+						SmolStr::from("Name"),
+						self.build_label("ssh-lb").into(),
+					)]
+					.into_iter()
+					.collect(),
+				),
+				..default()
+			});
+
+		// TCP target group for the SSH port.
+		let ssh_tg_ident = stack.resource_ident(self.build_label("ssh-tg"));
+		let ssh_target_group = terra::ResourceDef::new_secondary(
+			ssh_tg_ident,
+			AwsLbTargetGroupDetails {
+				name: Some(self.build_label("ssh-tg").into()),
+				port: Some(self.ssh_container_port.into()),
+				protocol: Some("TCP".into()),
+				target_type: Some("ip".into()),
+				vpc_id: Some(vpc.field_ref("id").into()),
+				health_check: Some(vec![
+					AwsLbTargetGroupResourceBlockTypeHealthCheck {
+						enabled: Some(true),
+						healthy_threshold: Some(2),
+						interval: Some(30),
+						protocol: Some("TCP".into()),
+						timeout: Some(10),
+						unhealthy_threshold: Some(2),
+						..default()
+					},
+				]),
+				..default()
+			},
+		);
+
+		// TCP listener forwarding the SSH port to the SSH target group.
+		let ssh_listener = terra::ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("listener-ssh")),
+			AwsLbListenerDetails {
+				load_balancer_arn: ssh_lb.field_ref("arn").into(),
+				port: Some(self.ssh_container_port.into()),
+				protocol: Some("TCP".into()),
+				default_action: Some(vec![
+					AwsLbListenerResourceBlockTypeDefaultAction {
+						r#type: "forward".into(),
+						target_group_arn: Some(
+							ssh_target_group.field_ref("arn").into(),
 						),
 						..default()
 					},
@@ -574,6 +670,10 @@ impl Block for FargateBlock {
 		env_vars.insert("BEET_HOST".into(), "0.0.0.0".into());
 		env_vars
 			.insert("BEET_PORT".into(), self.container_port.to_string().into());
+		env_vars.insert(
+			"BEET_SSH_PORT".into(),
+			self.ssh_container_port.to_string().into(),
+		);
 		env_vars.insert("RUST_LOG".into(), "info".into());
 		env_vars.insert("AWS_REGION".into(), region.to_string());
 
@@ -591,6 +691,9 @@ impl Block for FargateBlock {
 			"essential": true,
 			"portMappings": [{
 				"containerPort": self.container_port,
+				"protocol": "tcp"
+			}, {
+				"containerPort": self.ssh_container_port,
 				"protocol": "tcp"
 			}],
 			"environment": env_vars.iter().map(|(k, v)| {
@@ -624,13 +727,16 @@ impl Block for FargateBlock {
 
 		// ECS Service
 		let service_ident = stack.resource_ident(self.build_label("service"));
+		// keep the desired count within the autoscaling bounds
+		let desired_count =
+			self.desired_count.clamp(self.min_count, self.max_count);
 		let service = terra::ResourceDef::new_secondary(
 			service_ident,
 			AwsEcsServiceDetails {
 				name: self.build_label("service").into(),
 				cluster: Some(cluster.field_ref("id").into()),
 				task_definition: Some(task_def.field_ref("arn").into()),
-				desired_count: Some(self.desired_count.into()),
+				desired_count: Some(desired_count.into()),
 				launch_type: Some("FARGATE".into()),
 				network_configuration: Some(vec![
 					AwsEcsServiceResourceBlockTypeNetworkConfiguration {
@@ -652,6 +758,64 @@ impl Block for FargateBlock {
 						),
 						container_name: self.label.clone(),
 						container_port: self.container_port.into(),
+						..default()
+					},
+					AwsEcsServiceResourceBlockTypeLoadBalancer {
+						target_group_arn: Some(
+							ssh_target_group.field_ref("arn").into(),
+						),
+						container_name: self.label.clone(),
+						container_port: self.ssh_container_port.into(),
+						..default()
+					},
+				]),
+				..default()
+			},
+		);
+
+		// Application Auto Scaling target for the ECS service desired count.
+		let scaling_resource_id = format!(
+			"service/{}/{}",
+			cluster.field_ref("name"),
+			service.field_ref("name")
+		);
+		let scaling_target_ident =
+			stack.resource_ident(self.build_label("scaling-target"));
+		let scaling_target = terra::ResourceDef::new_secondary(
+			scaling_target_ident,
+			AwsAppautoscalingTargetDetails {
+				service_namespace: "ecs".into(),
+				scalable_dimension: "ecs:service:DesiredCount".into(),
+				resource_id: scaling_resource_id.into(),
+				min_capacity: self.min_count.into(),
+				max_capacity: self.max_count.into(),
+				..default()
+			},
+		);
+
+		// Target tracking policy keeping average CPU at `cpu_target_percent`.
+		let scaling_policy_ident =
+			stack.resource_ident(self.build_label("scaling-policy"));
+		let scaling_policy = terra::ResourceDef::new_secondary(
+			scaling_policy_ident,
+			AwsAppautoscalingPolicyDetails {
+				name: self.build_label("cpu-scaling").into(),
+				policy_type: Some("TargetTrackingScaling".into()),
+				service_namespace: scaling_target.field_ref("service_namespace").into(),
+				scalable_dimension: scaling_target
+					.field_ref("scalable_dimension")
+					.into(),
+				resource_id: scaling_target.field_ref("resource_id").into(),
+				target_tracking_scaling_policy_configuration: Some(vec![
+					AwsAppautoscalingPolicyResourceBlockTypeTargetTrackingScalingPolicyConfiguration {
+						target_value: self.cpu_target_percent as i64,
+						predefined_metric_specification: Some(vec![
+							TargetTrackingScalingPolicyConfigurationResourceBlockTypePredefinedMetricSpecification {
+								predefined_metric_type:
+									"ECSServiceAverageCPUUtilization".into(),
+								..default()
+							},
+						]),
 						..default()
 					},
 				]),
@@ -676,17 +840,23 @@ impl Block for FargateBlock {
 			.add_resource(&alb_sg_egress)?
 			.add_resource(&task_sg)?
 			.add_resource(&task_sg_ingress)?
+			.add_resource(&task_sg_ssh_ingress)?
 			.add_resource(&task_sg_egress)?
 			.add_resource(&lb)?
 			.add_resource(&target_group)?
 			.add_resource(&http_listener)?
+			.add_resource(&ssh_lb)?
+			.add_resource(&ssh_target_group)?
+			.add_resource(&ssh_listener)?
 			.add_resource(&exec_role)?
 			.add_resource(&exec_policy)?
 			.add_resource(&task_role)?
 			.add_resource(&task_s3_policy)?
 			.add_resource(&cluster)?
 			.add_resource(&task_def)?
-			.add_resource(&service)?;
+			.add_resource(&service)?
+			.add_resource(&scaling_target)?
+			.add_resource(&scaling_policy)?;
 
 		if let Some(https_sg) = alb_sg_https_ingress {
 			config.add_resource(&https_sg)?;
@@ -697,6 +867,13 @@ impl Block for FargateBlock {
 			.add_output("load_balancer_dns", terra::Output {
 				value: json!(lb.field_ref("dns_name")),
 				description: Some("The DNS name of the load balancer".into()),
+				sensitive: None,
+			})?
+			.add_output("ssh_load_balancer_dns", terra::Output {
+				value: json!(ssh_lb.field_ref("dns_name")),
+				description: Some(
+					"The DNS name of the SSH network load balancer".into(),
+				),
 				sensitive: None,
 			})?
 			.add_output("cluster_name", terra::Output {
@@ -724,11 +901,10 @@ impl Block for FargateBlock {
 mod tests {
 	use super::*;
 
-	#[beet_core::test(timeout_ms = 120000)]
-	#[ignore = "very slow"]
-	async fn validate() {
-		let (stack, _dir) = Stack::default_local();
-		let block = FargateBlock::default();
+	/// Build a config from the given block, returning the config, stack, and the
+	/// temp directory guard that keeps the local stack alive.
+	fn build_config(block: &FargateBlock) -> (terra::Config, Stack, TempDir) {
+		let (stack, dir) = Stack::default_local();
 		let mut config = stack.create_config();
 		let mut world = World::new();
 		block
@@ -738,7 +914,46 @@ mod tests {
 				&mut config,
 			)
 			.unwrap();
+		(config, stack, dir)
+	}
+
+	#[beet_core::test(timeout_ms = 120000)]
+	#[ignore = "very slow"]
+	async fn validate() {
+		let (config, stack, _dir) = build_config(&FargateBlock::default());
 		let project = terra::Project::new(&stack, config);
 		project.validate().await.unwrap();
+	}
+
+	#[beet_core::test]
+	fn emits_autoscaling_and_ssh() {
+		let block = FargateBlock::default()
+			.with_min_count(2)
+			.with_max_count(7)
+			.with_cpu_target_percent(65.0);
+		let (config, _stack, _dir) = build_config(&block);
+		let json = config.to_json().to_string();
+		let ssh_port = beet_net::prelude::DEFAULT_SSH_PORT.to_string();
+
+		// a TCP target group and TCP listener are both present for SSH
+		json.matches("\"protocol\":\"TCP\"")
+			.count()
+			.xpect_greater_or_equal_to(2);
+
+		json
+			// autoscaling target + policy with target tracking on CPU
+			.xpect_contains("aws_appautoscaling_target")
+			.xpect_contains("aws_appautoscaling_policy")
+			.xpect_contains("ecs:service:DesiredCount")
+			.xpect_contains("TargetTrackingScaling")
+			.xpect_contains("ECSServiceAverageCPUUtilization")
+			.xpect_contains("\"max_capacity\":7")
+			.xpect_contains("\"min_capacity\":2")
+			.xpect_contains("\"target_value\":65")
+			// SSH network load balancer + exposed ssh port
+			.xpect_contains("\"load_balancer_type\":\"network\"")
+			.xpect_contains("ssh_load_balancer_dns")
+			.xpect_contains("BEET_SSH_PORT")
+			.xpect_contains(&ssh_port);
 	}
 }

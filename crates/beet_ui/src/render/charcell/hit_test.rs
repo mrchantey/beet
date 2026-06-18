@@ -42,49 +42,44 @@ pub struct HitTest<'w, 's> {
 }
 
 impl HitTest<'_, '_> {
-	/// The topmost entity at `cell`, resolved through every buffer root.
+	/// The topmost entity at `cell` within `surface`'s buffer only, so a cursor on
+	/// one surface never resolves to another surface's content (one per SSH session).
 	///
 	/// Prefers the entity that actually painted the cell (recorded on the painted
 	/// [`Cell`]), which precisely accounts for inline flow (so a click on inline
 	/// `<a>` text lands on the link), stacking, clipping, and the scroll transform.
 	/// Falls back to a geometric rect walk for cells no glyph painted (eg a
 	/// transparent container's padding).
-	fn entity_at(&self, cell: IVec2) -> Option<Entity> {
+	fn entity_at_surface(&self, surface: Entity, cell: IVec2) -> Option<Entity> {
+		let Ok((root, buffer)) = self.roots.get(surface) else {
+			return None;
+		};
 		// the precisely-painted entity at this cell, if any glyph painted it.
 		if cell.x >= 0 && cell.y >= 0 {
 			let pos = UVec2::new(cell.x as u32, cell.y as u32);
-			for (_, buffer) in self.roots.iter() {
-				if let Some(entity) =
-					buffer.front_buffer().get(pos).and_then(|cell| cell.entity)
-				{
-					return Some(entity);
-				}
+			if let Some(entity) =
+				buffer.front_buffer().get(pos).and_then(|cell| cell.entity)
+			{
+				return Some(entity);
 			}
 		}
-		for (root, buffer) in self.roots.iter() {
-			let viewport = buffer.current_buffer().size();
-			let ordered = self.tree.pre_order(root);
-			let contexts = resolve_contexts(
+		// geometric rect walk for cells no glyph painted.
+		let viewport = buffer.current_buffer().size();
+		let ordered = self.tree.pre_order(root);
+		let contexts =
+			resolve_contexts(root, &ordered, &self.charcell, &self.tree, viewport);
+		let painted =
+			stacking_order(root, &self.charcell, &self.tree, &managed_set(
 				root,
-				&ordered,
 				&self.charcell,
 				&self.tree,
-				viewport,
-			);
-			let painted =
-				stacking_order(root, &self.charcell, &self.tree, &managed_set(
-					root,
-					&self.charcell,
-					&self.tree,
-				));
-			// topmost wins: scan the back-to-front order in reverse.
-			if let Some(entity) = painted.iter().rev().find(|&&entity| {
-				hit(entity, cell, &contexts, &self.charcell)
-			}) {
-				return Some(*entity);
-			}
-		}
-		None
+			));
+		// topmost wins: scan the back-to-front order in reverse.
+		painted
+			.iter()
+			.rev()
+			.find(|&&entity| hit(entity, cell, &contexts, &self.charcell))
+			.copied()
 	}
 }
 
@@ -149,50 +144,52 @@ pub fn pointer_input(
 	mut buttons: MessageReader<MouseButtonInput>,
 	hit_test: HitTest,
 	mut commands: Commands,
-	mut pointers: Query<(Entity, &mut Pointer), With<PrimaryPointer>>,
-	mut last_cursor: Local<Option<IVec2>>,
+	mut pointers: Query<&mut Pointer>,
+	mut last_cursor: Local<HashMap<Entity, IVec2>>,
 ) -> Result {
-	let Ok((pointer, mut hover)) = pointers.single_mut() else {
-		cursor.clear();
-		buttons.clear();
-		return Ok(());
-	};
-
-	// hover follows the latest cursor position this frame.
+	// the pointer lives on the surface (window) entity, so cursor/button events
+	// route to their own surface's pointer and hit-test only that surface's buffer.
 	for moved in cursor.read() {
+		let surface = moved.window;
 		let cell = vec2_to_cell(moved.position);
-		*last_cursor = Some(cell);
-		let target = hit_test.entity_at(cell);
+		last_cursor.insert(surface, cell);
+		let Ok(mut hover) = pointers.get_mut(surface) else {
+			continue;
+		};
+		let target = hit_test.entity_at_surface(surface, cell);
 		match (hover.hover, target) {
 			(Some(old), Some(new)) if old != new => {
-				commands.entity(old).trigger(PointerOut::new(pointer));
-				commands.entity(new).trigger(PointerOver::new(pointer));
+				commands.entity(old).trigger(PointerOut::new(surface));
+				commands.entity(new).trigger(PointerOver::new(surface));
 				hover.hover = Some(new);
 			}
 			(None, Some(new)) => {
-				commands.entity(new).trigger(PointerOver::new(pointer));
+				commands.entity(new).trigger(PointerOver::new(surface));
 				hover.hover = Some(new);
 			}
 			(Some(old), None) => {
-				commands.entity(old).trigger(PointerOut::new(pointer));
+				commands.entity(old).trigger(PointerOut::new(surface));
 				hover.hover = None;
 			}
 			_ => {}
 		}
 	}
 
-	// button presses target the entity under the most recent cursor cell.
+	// button presses target the entity under that surface's most recent cursor cell.
 	for button in buttons.read() {
-		let Some(cell) = *last_cursor else { continue };
-		let Some(target) = hit_test.entity_at(cell) else {
+		let surface = button.window;
+		let Some(&cell) = last_cursor.get(&surface) else {
+			continue;
+		};
+		let Some(target) = hit_test.entity_at_surface(surface, cell) else {
 			continue;
 		};
 		match button.state {
 			ButtonState::Pressed => {
-				commands.entity(target).trigger(PointerDown::new(pointer));
+				commands.entity(target).trigger(PointerDown::new(surface));
 			}
 			ButtonState::Released => {
-				commands.entity(target).trigger(PointerUp::new(pointer));
+				commands.entity(target).trigger(PointerUp::new(surface));
 			}
 		}
 	}
@@ -217,7 +214,7 @@ pub fn pointer_input(
 pub(crate) fn scroll_input(
 	mut wheel: MessageReader<MouseWheel>,
 	mut keys: MessageReader<KeyboardInput>,
-	pointers: Query<&Pointer, With<PrimaryPointer>>,
+	pointers: Query<&Pointer>,
 	focused: Query<Entity, With<Focus>>,
 	parents: Query<&ChildOf>,
 	// transclusion: a `Portal` holder is the charcell parent of the entity it
@@ -230,112 +227,120 @@ pub(crate) fn scroll_input(
 	// `&mut ScrollPosition` writer (p1) outside a `ParamSet`.
 	mut params: ParamSet<(CharcellQuery, Query<&mut ScrollPosition>)>,
 ) {
-	// accumulate this frame's scroll delta in cells.
-	let mut delta = IVec2::ZERO;
+	// accumulate this frame's scroll delta per surface (window), in cells, so each
+	// session scrolls only its own page.
+	let mut deltas = HashMap::<Entity, IVec2>::default();
 	for ev in wheel.read() {
 		let lines = match ev.unit {
 			MouseScrollUnit::Line => MOUSE_SCROLL_LINES,
 			// pixel deltas are coarse here; treat each as one notch
 			MouseScrollUnit::Pixel => MOUSE_SCROLL_LINES,
 		};
+		let delta = deltas.entry(ev.window).or_default();
 		// wheel y is positive up (content scrolls up), so the offset moves opposite;
 		// wheel x is positive right (content scrolls right), so the offset follows it.
 		delta.x += ev.x.signum() as i32 * lines * (ev.x != 0.) as i32;
 		delta.y -= ev.y.signum() as i32 * lines * (ev.y != 0.) as i32;
 	}
-	let pressed = keys
-		.read()
-		.filter(|key| key.state == ButtonState::Pressed)
-		.map(|key| key.key_code)
-		.collect::<Vec<_>>();
-	// alt+arrows are reserved for history nav (back/forward), not scrolling.
-	let alt = pressed
-		.iter()
-		.any(|key| matches!(key, KeyCode::AltLeft | KeyCode::AltRight));
-	for key in &pressed {
-		match key {
-			KeyCode::ArrowLeft | KeyCode::ArrowRight if alt => {}
-			KeyCode::ArrowDown => delta.y += KEY_SCROLL_LINES,
-			KeyCode::ArrowUp => delta.y -= KEY_SCROLL_LINES,
-			KeyCode::ArrowRight => delta.x += KEY_SCROLL_LINES,
-			KeyCode::ArrowLeft => delta.x -= KEY_SCROLL_LINES,
-			KeyCode::PageDown => delta.y += PAGE_SCROLL_LINES,
-			KeyCode::PageUp => delta.y -= PAGE_SCROLL_LINES,
-			// Home/End jump to the top/bottom; the clamp settles the huge offset.
-			KeyCode::Home => delta.y = i32::MIN / 2,
-			KeyCode::End => delta.y = i32::MAX / 2,
-			_ => {}
+	// group this frame's pressed keys by their source surface.
+	let mut keys_by_surface = HashMap::<Entity, Vec<KeyCode>>::default();
+	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		keys_by_surface.entry(key.window).or_default().push(key.key_code);
+	}
+	for (surface, pressed) in &keys_by_surface {
+		// alt+arrows are reserved for history nav (back/forward), not scrolling.
+		let alt = pressed
+			.iter()
+			.any(|key| matches!(key, KeyCode::AltLeft | KeyCode::AltRight));
+		let delta = deltas.entry(*surface).or_default();
+		for key in pressed {
+			match key {
+				KeyCode::ArrowLeft | KeyCode::ArrowRight if alt => {}
+				KeyCode::ArrowDown => delta.y += KEY_SCROLL_LINES,
+				KeyCode::ArrowUp => delta.y -= KEY_SCROLL_LINES,
+				KeyCode::ArrowRight => delta.x += KEY_SCROLL_LINES,
+				KeyCode::ArrowLeft => delta.x -= KEY_SCROLL_LINES,
+				KeyCode::PageDown => delta.y += PAGE_SCROLL_LINES,
+				KeyCode::PageUp => delta.y -= PAGE_SCROLL_LINES,
+				// Home/End jump to the top/bottom; the clamp settles the huge offset.
+				KeyCode::Home => delta.y = i32::MIN / 2,
+				KeyCode::End => delta.y = i32::MAX / 2,
+				_ => {}
+			}
 		}
 	}
-	if delta == IVec2::ZERO {
-		return;
-	}
 
-	// the viewport (first buffer) for resolving the box model the same way layout
-	// did, so the scrollable-extent check matches the painted geometry.
-	let viewport = roots.iter().next().map(|(_, buffer)| buffer.size());
-	let Some(viewport) = viewport else { return };
-
-	// resolve the container to scroll, in DOM priority order, skipping any
-	// scroll container that can't actually scroll on the delta's axis — so the
-	// wheel falls through a pinned/zero-extent inner container to the real
-	// scrollport beneath it, like a browser.
-	let container = {
-		let charcell = params.p0();
-		// whether `entity` is a scroll container that can move on the delta axis.
-		let can_scroll = |entity: Entity| {
-			charcell
-				.unresolved_node(entity)
-				.ok()
-				.filter(|node| node.is_scroll_container())
-				.map(|node| scroll_state(&node, &charcell, viewport).max_offset())
-				.is_some_and(|max| {
-					(delta.y != 0 && max.y > 0) || (delta.x != 0 && max.x > 0)
-				})
+	// resolve and apply the scroll for each surface independently.
+	for (surface, delta) in deltas {
+		if delta == IVec2::ZERO {
+			continue;
+		}
+		// the surface's own buffer root and viewport, so the box model resolves the
+		// same way layout did and the scrollable-extent check matches the geometry.
+		let Ok((root, buffer)) = roots.get(surface) else {
+			continue;
 		};
-		// the nearest ancestor (self-inclusive) that can scroll the delta axis.
-		let scrollable_ancestor = |start: Entity| {
-			let mut current = Some(start);
-			loop {
-				let entity = current?;
-				if can_scroll(entity) {
-					break Some(entity);
-				}
-				// transclusion wins for *visual* ancestry: a Portal holder is the
-				// visual parent of the entity it renders in place; otherwise walk ChildOf.
-				current = refs
-					.get(entity)
+		let viewport = buffer.size();
+
+		// resolve the container to scroll, in DOM priority order, scoped to this
+		// surface, skipping any container that can't scroll on the delta's axis — so
+		// the wheel falls through a pinned/zero-extent inner container to the real
+		// scrollport beneath it, like a browser.
+		let container = {
+			let charcell = params.p0();
+			// whether `entity` is a scroll container that can move on the delta axis.
+			let can_scroll = |entity: Entity| {
+				charcell
+					.unresolved_node(entity)
 					.ok()
-					.and_then(|render_ref_of| render_ref_of.holders().first().copied())
-					.or_else(|| {
-						parents.get(entity).ok().map(|child_of| child_of.parent())
-					});
-			}
-		};
-		pointers
-			.single()
-			.ok()
-			.and_then(|pointer| pointer.hover)
-			.and_then(scrollable_ancestor)
-			.or_else(|| focused.iter().next().and_then(scrollable_ancestor))
-			// the page scrollport: the outermost scrollable container reachable from
-			// a buffer-root tree (the first scrollable one pre-order from a root).
-			.or_else(|| {
-				roots.iter().find_map(|(root, _)| {
+					.filter(|node| node.is_scroll_container())
+					.map(|node| scroll_state(&node, &charcell, viewport).max_offset())
+					.is_some_and(|max| {
+						(delta.y != 0 && max.y > 0) || (delta.x != 0 && max.x > 0)
+					})
+			};
+			// the nearest ancestor (self-inclusive) that can scroll the delta axis.
+			let scrollable_ancestor = |start: Entity| {
+				let mut current = Some(start);
+				loop {
+					let entity = current?;
+					if can_scroll(entity) {
+						break Some(entity);
+					}
+					// transclusion wins for *visual* ancestry: a Portal holder is the
+					// visual parent of the entity it renders in place; else walk ChildOf.
+					current = refs
+						.get(entity)
+						.ok()
+						.and_then(|render_ref_of| render_ref_of.holders().first().copied())
+						.or_else(|| {
+							parents.get(entity).ok().map(|child_of| child_of.parent())
+						});
+				}
+			};
+			pointers
+				.get(surface)
+				.ok()
+				.and_then(|pointer| pointer.hover)
+				.and_then(scrollable_ancestor)
+				.or_else(|| focused.iter().next().and_then(scrollable_ancestor))
+				// the page scrollport: the outermost scrollable container reachable
+				// from this surface's buffer-root tree (first scrollable pre-order).
+				.or_else(|| {
 					tree.pre_order(root).into_iter().find(|entity| can_scroll(*entity))
 				})
-			})
-	};
-	let Some(container) = container else { return };
-	if let Ok(mut scroll) = params.p1().get_mut(container) {
-		// the clamp_scroll_positions system settles this into range next frame.
-		// saturating so the Home/End sentinel deltas can't overflow.
-		let next = IVec2::new(
-			scroll.offset.x.saturating_add(delta.x).max(0),
-			scroll.offset.y.saturating_add(delta.y).max(0),
-		);
-		if next != scroll.offset {
-			scroll.offset = next;
+		};
+		let Some(container) = container else { continue };
+		if let Ok(mut scroll) = params.p1().get_mut(container) {
+			// the clamp_scroll_positions system settles this into range next frame.
+			// saturating so the Home/End sentinel deltas can't overflow.
+			let next = IVec2::new(
+				scroll.offset.x.saturating_add(delta.x).max(0),
+				scroll.offset.y.saturating_add(delta.y).max(0),
+			);
+			if next != scroll.offset {
+				scroll.offset = next;
+			}
 		}
 	}
 }
@@ -459,15 +464,56 @@ mod test {
 		log.over.contains(&first).xpect_true();
 		log.over.contains(&second).xpect_true();
 		log.out.contains(&first).xpect_true();
-		// hover now tracks the second row's entity (or its text child)
+		// hover now tracks the second row's entity (or its text child); the pointer
+		// lives on the host surface (window) entity itself.
 		let hover = host
 			.app
-			.world_mut()
-			.query_filtered::<&Pointer, With<PrimaryPointer>>()
-			.single(host.app.world())
+			.world()
+			.entity(host.host)
+			.get::<Pointer>()
 			.unwrap()
 			.hover;
 		hover.xpect_some();
+	}
+
+	/// Two surfaces hit-test independently: a click routed to surface A resolves to
+	/// A's content and never B's (the multi-tenant pointer invariant the SSH TUI
+	/// server relies on, since both surfaces share the 0-indexed cell grid).
+	#[beet_core::test]
+	fn click_routes_to_its_own_surface() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, CharcellTuiPlugin));
+		app.init_resource::<PointerLog>();
+		app.add_observer(|ev: On<PointerDown>, mut log: ResMut<PointerLog>| {
+			log.down.push(ev.event_target());
+		});
+		// spawn an independent surface (channel terminal + buffer) holding `label`.
+		let spawn_surface = |app: &mut App, label: &str| -> (Entity, Entity) {
+			let (channel, terminal) =
+				ChannelTerminal::new(TerminalConfig::default());
+			let content = app.world_mut().spawn(rsx! { <div>{label}</div> }).id();
+			let host = app
+				.world_mut()
+				.spawn((channel, terminal, DoubleBuffer::new(UVec2::new(20, 4))))
+				.id();
+			app.world_mut().entity_mut(host).add_child(content);
+			(host, content)
+		};
+		let (host_a, content_a) = spawn_surface(&mut app, "AAAA");
+		let (_host_b, content_b) = spawn_surface(&mut app, "BBBB");
+		app.update();
+
+		// click cell (0,0) on surface A's channel only
+		app.world_mut()
+			.get_mut::<ChannelTerminal>(host_a)
+			.unwrap()
+			.send_input(&sgr(0, 0, 0, true))
+			.unwrap();
+		app.update();
+
+		let log = app.world().resource::<PointerLog>();
+		log.down.contains(&content_a).xpect_true();
+		log.down.contains(&content_b).xpect_false();
 	}
 
 	/// A wheel-down while hovering a scroll container increases its scroll offset.

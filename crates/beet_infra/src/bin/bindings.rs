@@ -57,6 +57,15 @@ async fn main() -> Result {
 				]),
 		)
 		.with_file(
+			BindingFile::new(
+				"crates/beet_infra/src/bindings/aws_autoscaling.rs",
+			)
+			.with_resources(terra::Provider::AWS, [
+				"aws_appautoscaling_policy",
+				"aws_appautoscaling_target",
+			]),
+		)
+		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_fargate.rs")
 				.with_resources(terra::Provider::AWS, [
 					"aws_ecr_repository",

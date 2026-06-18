@@ -83,12 +83,17 @@ async fn boot(
 			}
 			// the live host: a stdio terminal paired with the page-host buffer,
 			// rendered together by `render_terminal` (one entity, both components).
-			world.spawn((
-				StdioTerminal::default(),
-				page_host(terminal_ext::size()),
-			));
-			// an in-world navigator browsing this router, starting at `home`
-			world.spawn(Navigator::in_world(router, home));
+			let host = world
+				.spawn((
+					StdioTerminal::default(),
+					page_host(terminal_ext::size()),
+				))
+				.id();
+			// an in-world navigator browsing this router, starting at `home`,
+			// painting into the host surface it is paired with
+			world.spawn(
+				Navigator::in_world(router, home).with_render_target(host),
+			);
 		})
 		.await;
 	Ok(())

@@ -12,10 +12,12 @@ use bevy::ecs::schedule::common_conditions;
 /// The single plugin a live, interactive terminal app adds.
 ///
 /// Composes the charcell render pipeline ([`CharcellPlugin`]) with per-frame
-/// repaint ([`RealtimeParsePlugin`]), the reactive document chain
-/// ([`DocumentUiPlugin`]), and spawns the one [`PrimaryPointer`]. The terminal
-/// lifecycle (input read, render, flush, restore) ships with [`CharcellPlugin`]
-/// under the `tui` feature, so this is purely the live-app composition.
+/// repaint ([`RealtimeParsePlugin`]) and the reactive document chain
+/// ([`DocumentUiPlugin`]). Each surface owns its own [`Pointer`] (required by
+/// [`Terminal`]), so input routes per surface and many can coexist (one per SSH
+/// session). The terminal lifecycle (input read, render, flush, restore) ships
+/// with [`CharcellPlugin`] under the `tui` feature, so this is purely the
+/// live-app composition.
 ///
 /// Later tasks layer the input bridge (terminal bytes to bevy input) and the
 /// hit-test (cursor to [`Pointer`] events) onto this plugin.
@@ -68,23 +70,9 @@ impl Plugin for CharcellTuiPlugin {
 					exit_on_ctrl_c,
 				),
 			)
-			// exactly one primary pointer for the hit-test (Task 09) to read.
-			.add_systems(Startup, spawn_primary_pointer)
 			// clicking a `<summary>` toggles its `<details>` (the terminal stand-in
 			// for the web's native disclosure).
 			.add_observer(toggle_details_on_click);
-	}
-}
-
-/// Spawn the single [`PrimaryPointer`] the live TUI routes cursor events through.
-#[cfg(feature = "tui")]
-fn spawn_primary_pointer(
-	mut commands: Commands,
-	existing: Query<(), With<crate::prelude::PrimaryPointer>>,
-) {
-	// idempotent: a host may have spawned one already
-	if existing.is_empty() {
-		commands.spawn(crate::prelude::PrimaryPointer);
 	}
 }
 

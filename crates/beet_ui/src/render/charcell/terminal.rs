@@ -266,7 +266,12 @@ impl Write for AsyncWriter {
 ///
 /// Writes ANSI escape sequences via [`InputParser`] and reads input events.
 /// Use [`StdioTerminal`] for local stdio and [`ChannelTerminal`] for SSH/headless.
+///
+/// Each terminal is one interactive surface (one window), so it owns its own
+/// [`Pointer`]: input events carry their source `window`, routing pointer/scroll
+/// input to the right surface when many coexist (one per SSH session).
 #[derive(Component)]
+#[require(crate::prelude::Pointer)]
 pub struct Terminal {
 	/// Input reader.
 	pub reader: Box<dyn 'static + Send + Sync + Read>,

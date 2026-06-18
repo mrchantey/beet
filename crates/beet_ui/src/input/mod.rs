@@ -6,3 +6,5 @@ mod pointer;
 pub use pointer::*;
 mod scroll;
 pub use scroll::*;
+mod surface;
+pub use surface::*;

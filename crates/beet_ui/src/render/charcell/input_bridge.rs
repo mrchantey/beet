@@ -273,18 +273,33 @@ pub fn resize_stdio_buffers(
 	}
 }
 
-/// ECS observer: exit on ctrl+c, read from the unified bevy keyboard input.
+/// ECS system: exit the process on ctrl+c from the local stdio surface only.
 ///
-/// Driven by `ButtonInput<KeyCode>` (maintained by `InputPlugin` from the bridge
-/// messages): ctrl held (or just pressed this frame) plus C just pressed.
+/// Reads the per-surface [`KeyboardInput`] stream (each event carries its source
+/// `window`): a terminal ctrl+c arrives as a Control press bracketing a `C` press
+/// on the same window. Only a non-[`ChannelTerminal`] surface (the local stdio
+/// terminal) exits the process; an SSH session is a [`ChannelTerminal`], whose
+/// ctrl+c the SSH server handles as a per-session close, never a global
+/// [`AppExit`] that would tear down every other session.
 pub fn exit_on_ctrl_c(
-	keys: Res<ButtonInput<KeyCode>>,
+	mut keys: MessageReader<KeyboardInput>,
+	channels: Query<(), With<ChannelTerminal>>,
 	mut exit: MessageWriter<AppExit>,
 ) {
-	let ctrl = keys.pressed(KeyCode::ControlLeft)
-		|| keys.just_pressed(KeyCode::ControlLeft);
-	if ctrl && keys.just_pressed(KeyCode::KeyC) {
-		exit.write(AppExit::Success);
+	// group this frame's pressed keys by window: (ctrl seen, c seen).
+	let mut per_window = HashMap::<Entity, (bool, bool)>::default();
+	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		let entry = per_window.entry(key.window).or_default();
+		match key.key_code {
+			KeyCode::ControlLeft | KeyCode::ControlRight => entry.0 = true,
+			KeyCode::KeyC => entry.1 = true,
+			_ => {}
+		}
+	}
+	for (window, (ctrl, c)) in per_window {
+		if ctrl && c && !channels.contains(window) {
+			exit.write(AppExit::Success);
+		}
 	}
 }
 
@@ -399,13 +414,43 @@ mod test {
 			.xpect_eq(Value::str("hi"));
 	}
 
-	/// ctrl+c writes `AppExit`, driven from the unified `ButtonInput<KeyCode>`.
+	/// ctrl+c on a remote (channel) surface does NOT exit the process: an SSH
+	/// session's ctrl+c is a per-session close, never a global `AppExit` that would
+	/// tear down every other session.
 	#[beet_core::test]
-	fn ctrl_c_exits() {
-		let mut host = TestHost::new();
+	fn ctrl_c_does_not_exit_remote_surface() {
+		let mut host = TestHost::new(); // a ChannelTerminal surface
 		host.send_input(&[0x03]); // ctrl+c
 		host.step();
-		let exits = host.messages::<AppExit>();
-		(!exits.is_empty()).xpect_true();
+		host.messages::<AppExit>().is_empty().xpect_true();
+	}
+
+	/// ctrl+c on the local stdio surface (no [`ChannelTerminal`]) exits the process.
+	#[beet_core::test]
+	fn ctrl_c_exits_local_surface() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins)
+			.add_message::<KeyboardInput>()
+			.add_systems(Update, exit_on_ctrl_c);
+		// a local surface: a Terminal-bearing entity with no ChannelTerminal.
+		let local = app.world_mut().spawn(Terminal::new_buffered()).id();
+		// ctrl+c arrives as a ControlLeft press bracketing a KeyC press.
+		for code in [KeyCode::ControlLeft, KeyCode::KeyC] {
+			app.world_mut().write_message(KeyboardInput {
+				key_code: code,
+				logical_key: Key::Character("c".into()),
+				state: ButtonState::Pressed,
+				text: None,
+				repeat: false,
+				window: local,
+			});
+		}
+		app.update();
+		let exited = app
+			.world()
+			.resource::<Messages<AppExit>>()
+			.iter_current_update_messages()
+			.count() > 0;
+		exited.xpect_true();
 	}
 }

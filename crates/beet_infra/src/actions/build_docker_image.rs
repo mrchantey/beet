@@ -161,13 +161,16 @@ pub async fn BuildDockerImageAction(
 		""
 	};
 
+	// expose both the http and ssh container ports (EXPOSE is documentation; the
+	// load balancers + security group make them reachable, see `FargateBlock`).
 	let dockerfile_content = format!(
-		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\nEXPOSE {}\nCMD \
+		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\nEXPOSE {}\nEXPOSE {}\nCMD \
 			[\"/app\"]\n",
 		base_image,
 		setup_commands,
 		binary_filename.to_string_lossy(),
-		block.container_port()
+		block.container_port(),
+		block.ssh_container_port(),
 	);
 	std::fs::write(dockerfile_dir.join("Dockerfile"), dockerfile_content)?;
 

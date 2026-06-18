@@ -67,26 +67,16 @@ fn hover_state_on_out(
 
 /// Tracks which entity a pointer is currently hovering over.
 ///
-/// Each pointer entity carries its own hover state so that
-/// multiple pointers (eg two XR hands) can independently track
-/// hover targets.
+/// One pointer lives on each interactive surface (the terminal/window entity),
+/// so many surfaces (one per SSH session, or two XR hands) independently track
+/// their own hover target. Input events carry their source `window`, so each is
+/// routed to that surface's pointer.
 #[derive(Debug, Default, Clone, Reflect, Component)]
 #[reflect(Component)]
 pub struct Pointer {
 	/// The entity the pointer was over last frame, if any.
 	pub hover: Option<Entity>,
 }
-
-/// Marker for the primary pointer.
-///
-/// There should only ever be one entity with this component.
-/// Global mouse/cursor events are routed through the primary
-/// pointer, for example the TUI input system reads the hover
-/// state from this entity.
-#[derive(Debug, Default, Clone, Copy, Reflect, Component)]
-#[reflect(Component)]
-#[require(Pointer)]
-pub struct PrimaryPointer;
 
 /// Triggered when a pointer button is pressed over an entity.
 ///

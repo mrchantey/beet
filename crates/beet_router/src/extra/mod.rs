@@ -31,6 +31,13 @@ pub use app_info::*;
 mod reactivity_js;
 #[cfg(feature = "std")]
 pub use reactivity_js::*;
+
+// std-only: the `/health` route + live `ServerMetrics`, the load-balancer health
+// check and autoscaling signal.
+#[cfg(feature = "std")]
+mod health;
+#[cfg(feature = "std")]
+pub use health::*;
 // The single router builder, available on std and no_std. The feature-specific
 // app routes (`app-info`, `analytics`) are gated inside the module.
 mod default_router;

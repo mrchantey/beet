@@ -68,6 +68,9 @@ impl Plugin for RouterPlugin {
 				// the re-entrant stack of request-scoped render contexts the
 				// layout middleware pushes onto and layout widgets read the top of.
 				.init_resource::<RequestContextStack>()
+				// live metrics surfaced at `/health` (active sessions, uptime), the
+				// load-balancer health check and autoscaling signal.
+				.init_resource::<ServerMetrics>()
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>()
 				// the diagnostic pages: the help/not-found route list and the

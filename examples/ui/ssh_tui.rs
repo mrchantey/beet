@@ -10,11 +10,11 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example ssh_tui --features ssh_server,terminal
+//! cargo run --example ssh_tui --features ssh_server,tui
 //! ```
-//! Connect:
+//! Connect (the default port is [`DEFAULT_SSH_PORT`]):
 //! ```sh
-//! ssh -p 2222 guest@127.0.0.1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+//! ssh -p 8322 guest@127.0.0.1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
 //! ```
 
 use beet::net::prelude::*;

@@ -1,11 +1,9 @@
 // std-only: the browser-style Navigator drives the live-render pipeline
-// (`parse_page`/`build_live_page`/`set_current_page`), which needs beet_ui.
+// (`parse_page`/`build_live_page`/`bind_surface_page`), which needs beet_ui.
 #[cfg(feature = "std")]
 mod navigator;
 #[cfg(feature = "std")]
 pub use navigator::*;
-mod current_page;
-pub use current_page::*;
 // std-only: the navigation-failure error page (a beet_ui `#[template]`).
 #[cfg(feature = "std")]
 mod error_page;
@@ -33,3 +31,8 @@ pub use open_link::*;
 mod tui_server;
 #[cfg(feature = "tui")]
 pub use tui_server::*;
+// the multi-tenant SSH-TUI server (needs the russh server transport).
+#[cfg(feature = "ssh")]
+mod ssh_tui_server;
+#[cfg(feature = "ssh")]
+pub use ssh_tui_server::*;

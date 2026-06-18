@@ -52,6 +52,9 @@ impl SshCredentials {
 pub struct SshServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
+	/// The host address to bind to. Defaults to `[127, 0, 0, 1]` (localhost); use
+	/// `[0, 0, 0, 0]` to listen on all interfaces (required for deployed servers).
+	pub host: [u8; 4],
 	/// Optional credentials. If `None`, all connections are accepted.
 	pub credentials: Option<SshCredentials>,
 }
@@ -60,6 +63,7 @@ impl std::fmt::Debug for SshServer {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("SshServer")
 			.field("port", &self.port)
+			.field("host", &self.host)
 			.field(
 				"credentials",
 				if self.credentials.is_some() {
@@ -90,12 +94,19 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 impl SshServer {
-	/// Creates a new SSH server bound to the specified port.
+	/// Creates a new SSH server bound to the specified port on localhost.
 	pub fn new(port: u16) -> Self {
 		Self {
 			port: Some(port),
+			host: [127, 0, 0, 1],
 			credentials: None,
 		}
+	}
+
+	/// Sets the host address to bind to (eg `[0, 0, 0, 0]` for all interfaces).
+	pub fn with_host(mut self, host: [u8; 4]) -> Self {
+		self.host = host;
+		self
 	}
 
 	/// Sets the required credentials for this server.
@@ -124,6 +135,7 @@ impl SshServer {
 		(
 			Self {
 				port: Some(port),
+				host: [127, 0, 0, 1],
 				credentials: None,
 			},
 			OnSpawn::new_async(move |entity| {
@@ -134,15 +146,41 @@ impl SshServer {
 		)
 	}
 
-	/// The host and port without the protocol, ie `127.0.0.1:2222`.
+	/// The client-facing host and port without the protocol, ie `127.0.0.1:2222`.
 	pub fn local_address(&self) -> String {
 		let port = self.port.unwrap_or(0);
 		format!("127.0.0.1:{}", port)
 	}
+
+	/// The address the listener binds to, from [`host`](Self::host) and
+	/// [`port`](Self::port), eg `0.0.0.0:2222` for a deployed server.
+	pub fn bind_address(&self) -> String {
+		let [a, b, c, d] = self.host;
+		format!("{a}.{b}.{c}.{d}:{}", self.port.unwrap_or(0))
+	}
 }
 
 impl Default for SshServer {
-	fn default() -> Self { Self::new(DEFAULT_SSH_PORT) }
+	/// Reads `BEET_SSH_PORT` / `BEET_HOST` where there is an environment (a deployed
+	/// server sets `BEET_HOST=0.0.0.0`), falling back to localhost on
+	/// [`DEFAULT_SSH_PORT`] otherwise.
+	fn default() -> Self {
+		let port = env_ext::var("BEET_SSH_PORT")
+			.ok()
+			.and_then(|val| val.parse().ok())
+			.unwrap_or(DEFAULT_SSH_PORT);
+		let host = env_ext::var("BEET_HOST")
+			.ok()
+			.map(|val| {
+				if val == "0.0.0.0" { [0, 0, 0, 0] } else { [127, 0, 0, 1] }
+			})
+			.unwrap_or([127, 0, 0, 1]);
+		Self {
+			port: Some(port),
+			host,
+			credentials: None,
+		}
+	}
 }
 
 #[cfg(test)]

@@ -333,6 +333,10 @@ _pretty_curl = ["net", "ui", "ureq", "rustls-tls"]
 _mini_browser = ["_pretty_curl", "tui", "router", "beet_router?/tui"]
 ssh_server = ["net", "beet_net?/russh_server", "native-tls"]
 ssh_client = ["net", "beet_net?/russh_client", "native-tls"]
+# The multi-tenant SSH-TUI server: serves each SSH connection its own navigable
+# terminal, all browsing one router, alongside the http server (`SshTuiServer` +
+# `SshTuiPlugin`). Combines the ssh transport with the live TUI render stack.
+ssh_tui = ["ssh_server", "tui_server", "beet_router?/ssh"]
 
 
 thread = ["dep:beet_thread","net","action"]
@@ -492,6 +496,16 @@ name = "ssh_tui"
 path = "examples/ui/ssh_tui.rs"
 required-features = ["ssh_server", "tui"]
 
+[[example]]
+name = "ssh_tui_site"
+path = "examples/ui/ssh_tui_site.rs"
+required-features = ["ssh_tui", "http_server", "markdown"]
+
+[[example]]
+name = "ssh_stress"
+path = "examples/ui/ssh_stress.rs"
+required-features = ["ssh_client"]
+
 # 💡 Examples - Node
 
 [[example]]
@@ -624,6 +638,11 @@ required-features = ["router", "lightsail_block", "markdown"]
 [[example]]
 name = "hello_fargate"
 path = "examples/infra/hello_fargate.rs"
+required-features = ["router", "fargate_block", "markdown"]
+
+[[example]]
+name = "deploy_ssh_site"
+path = "examples/infra/deploy_ssh_site.rs"
 required-features = ["router", "fargate_block", "markdown"]
 
 # 💡 Examples - action
