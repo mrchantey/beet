@@ -68,6 +68,10 @@ impl Plugin for RouterPlugin {
 				// the re-entrant stack of request-scoped render contexts the
 				// layout middleware pushes onto and layout widgets read the top of.
 				.init_resource::<RequestContextStack>()
+				// the app-wide color scheme `SiteLayout` reads: init here so a router
+				// app renders the shipped layout without `MaterialStylePlugin` (which
+				// also inits it; `init_resource` is idempotent).
+				.init_resource::<Theme>()
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>()
 				// the diagnostic pages: the help/not-found route list and the
@@ -113,7 +117,8 @@ impl Plugin for RouterPlugin {
 				.register_template::<LiveReloadScript>();
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
-			// the `<Template src>` include handler, into the BSX tag seam.
+			// the `<Template src>` include handler (local-file includes resolved
+			// against the `SiteRoot`), into the BSX tag seam.
 			#[cfg(all(feature = "bsx", feature = "template_serde"))]
 			register_template_include(app.world_mut());
 			// the live-TUI server, declarable in a router markup spread

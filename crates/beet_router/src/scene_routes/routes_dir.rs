@@ -15,25 +15,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use std::path::Path;
 
-/// The directory site-relative paths (eg [`RoutesDir::src`]) resolve against.
-/// A host sets this to the directory of its entry file; defaults to the
-/// workspace root, matching the [`WsPathBuf`] convention.
-#[derive(Debug, Clone, Resource)]
-pub struct SiteRoot(pub AbsPathBuf);
-
-impl SiteRoot {
-	/// A site root at `path`, workspace-relative.
-	pub fn new_workspace_rel(path: impl AsRef<Path>) -> FsResult<Self> {
-		AbsPathBuf::new_workspace_rel(path).map(Self)
-	}
-}
-
-impl Default for SiteRoot {
-	fn default() -> Self {
-		Self(AbsPathBuf::new_workspace_rel("").expect("workspace root exists"))
-	}
-}
-
 /// Spawns one [`BlobScene`] route child per content file under `src`,
 /// discovered at spawn time (see the module docs).
 ///

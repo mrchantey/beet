@@ -1,6 +1,9 @@
 //! The [`EvalOnLoad`] load-lifecycle verb: "`node main.js`" ergonomics for an
 //! entry. A bare `<script {EvalOnLoad}>console.log("hi")</script>` runs and prints.
 
+// the quickjs runtime backing the native `eval_script` lives in this crate's
+// prelude; the wasm path runs in the host realm and uses none of it.
+#[cfg(not(target_arch = "wasm32"))]
 use crate::prelude::*;
 use beet_core::prelude::*;
 

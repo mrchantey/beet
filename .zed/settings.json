@@ -88,6 +88,7 @@
 		},
 	},
 	"file_scan_inclusions": [
+		// "target",
 		".agents/plan*",
 		".agents/report*",
 		".agents/feedback*",

@@ -29,6 +29,20 @@ Never use `.claude/projects/../memory`, all content related to this project must
 ## Conventions
 
 - A rust module should read like a good book: public high level structs at the top and implementation details below
+- When breaking down tasks and providing responses to the user, always use a single sequence, ie 
+```md
+## Blockers
+
+1. foo
+2. bar
+	2.1. bing
+
+## Design decisions
+
+3. bazz
+4. boo
+	4.1 boom
+```
 - Its perfectly acceptable for functions longer than ~20 lines to have brief comments describing each step
 - Never consider backward-compatibility. when asked to change something, remove the old implementation
 - all shared dependencies should be declared in the workspace Cargo.toml. if one needs no-default-features, disable that at the workspace level, and reenable as required

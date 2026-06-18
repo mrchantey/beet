@@ -44,7 +44,8 @@ use beet_ui::prelude::Reset;
 pub fn SiteLayout(
 	stack: Res<RequestContextStack>,
 	// the app-wide scheme default a TUI session seeds from `--color-scheme` (see
-	// `TuiServer`); the web ignores it and follows the OS.
+	// `TuiServer`); the web ignores it and follows the OS. `RouterPlugin` inits
+	// `Theme`, so this resolves even without `MaterialStylePlugin`.
 	theme: Res<Theme>,
 ) -> impl Bundle {
 	let cx = stack.current();
@@ -126,9 +127,6 @@ mod test {
 		// the `Header`/`RouteHead` chrome reads the site name off `PackageConfig`;
 		// the live middleware seeds it, so a bare render world must too.
 		world.init_resource::<PackageConfig>();
-		// the layout reads the app-wide scheme default off `Theme`, seeded here as a
-		// bare render world omits `MaterialStylePlugin`.
-		world.init_resource::<Theme>();
 		let route = world
 			.spawn((
 				render_action::fixed_func_route("", || rsx! { <p>"body"</p> }),

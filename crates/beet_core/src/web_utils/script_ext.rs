@@ -73,12 +73,20 @@ pub fn eval_console(
 	const fmt = (args) => args
 		.map((arg) => typeof arg === 'string' ? arg : JSON.stringify(arg))
 		.join(' ');
-	const write = (stream) => (...args) =>
-		globalThis.{BRIDGE_KEY}(stream, fmt(args));
-	globalThis.console = {{
+	// forward each console call to the bridge with the real console restored for the
+	// duration, so a sink that itself logs (eg streaming to the host console) does
+	// not re-enter this override and recurse into the bridge closure.
+	const write = (stream) => (...args) => {{
+		const line = fmt(args);
+		globalThis.console = savedConsole;
+		try {{ globalThis.{BRIDGE_KEY}(stream, line); }}
+		finally {{ globalThis.console = overridden; }}
+	}};
+	const overridden = {{
 		log: write(0), info: write(0), debug: write(0),
 		warn: write(1), error: write(1),
 	}};
+	globalThis.console = overridden;
 	globalThis.input = JSON.parse(globalThis.{INPUT_KEY});
 	try {{ (0, eval)(globalThis.{SCRIPT_KEY}); }}
 	finally {{

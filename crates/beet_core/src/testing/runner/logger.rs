@@ -285,8 +285,13 @@ fn failed_file_context(
 	const LINE_CONTEXT_SIZE: usize = 2;
 	const TAB_SPACES: usize = 2;
 
+	// the panic location may sit in a dependency (an absolute path) or be
+	// unreadable on wasm; fall back to no source context rather than failing the
+	// whole suite log (which would mask the actual test error).
 	let path = WsPathBuf::new(outcome.path(test)).into_abs();
-	let file = fs_ext::read_to_string(path)?;
+	let Ok(file) = fs_ext::read_to_string(path) else {
+		return Ok(String::new());
+	};
 	let lines = file.split('\n').collect::<Vec<_>>();
 	let max_digits = lines.len().to_string().len();
 

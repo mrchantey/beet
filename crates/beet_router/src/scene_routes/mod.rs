@@ -22,6 +22,10 @@ pub mod render_action;
 pub use default_renderer::*;
 mod route_query;
 pub use route_query::*;
+// the site root (a path) backs both `RoutesDir` and `<Template src>` includes, so
+// it is always compiled, unlike the native-only directory-scan modules below.
+mod site_root;
+pub use site_root::*;
 #[cfg(not(target_arch = "wasm32"))]
 mod routes_dir;
 #[cfg(not(target_arch = "wasm32"))]

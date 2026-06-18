@@ -62,14 +62,19 @@ impl Plugin for ServerPlugin {
 	}
 }
 
-/// `Last`: emit [`AppExit::Success`] once the [`KeepAlive`] refcount reaches zero,
-/// so a process with no remaining claim (every server stopped, the cli exchange
-/// finished) exits cleanly. A long-running server holds a guard, so it persists.
+/// `Last`: emit [`AppExit::Success`] once the [`KeepAlive`] refcount has been
+/// claimed and then fully released (every server stopped, the cli exchange
+/// finished). The `claimed` latch keeps a freshly-initialised refcount (zero, never
+/// claimed) from exiting an app before its first server inserts its guard, eg a
+/// server booted off a later frame rather than during `Startup`.
 fn exit_when_unclaimed(
 	keep_alive: Res<KeepAlive>,
+	mut claimed: Local<bool>,
 	mut exit: MessageWriter<AppExit>,
 ) {
-	if keep_alive.count() == 0 {
+	if keep_alive.count() > 0 {
+		*claimed = true;
+	} else if *claimed {
 		exit.write(AppExit::Success);
 	}
 }
