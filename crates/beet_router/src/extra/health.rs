@@ -1,40 +1,16 @@
-//! The `/health` endpoint and the live [`ServerMetrics`] it reports.
+//! The `/health` endpoint, derived from live server state.
 //!
 //! A load balancer probes `/health` to know a task is live (the Fargate health
 //! check path), and the same metrics (active sessions, uptime) drive autoscaling
-//! decisions and human debugging.
+//! decisions and human debugging. Both are read from the world directly (the app
+//! clock and a query) rather than a hand-maintained resource.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+#[cfg(feature = "tui")]
+use beet_ui::prelude::*;
 use bevy::ecs::system::In;
-
-/// Live server metrics, surfaced at `/health` and usable as an autoscaling signal.
-///
-/// `active_sessions` is maintained by the SSH-TUI server (incremented on connect,
-/// decremented on disconnect); `uptime` is measured from when the resource was
-/// created (server start).
-#[derive(Debug, Resource)]
-pub struct ServerMetrics {
-	/// Currently connected interactive sessions (eg SSH TUIs).
-	pub active_sessions: u32,
-	/// When the server started, for uptime reporting.
-	started: Instant,
-}
-
-impl Default for ServerMetrics {
-	fn default() -> Self {
-		Self {
-			active_sessions: 0,
-			started: Instant::now(),
-		}
-	}
-}
-
-impl ServerMetrics {
-	/// Seconds since the server started.
-	pub fn uptime_secs(&self) -> u64 { self.started.elapsed().as_secs() }
-}
 
 /// A `GET /health` route returning 200 with a small json body (`status`,
 /// `uptime_secs`, `active_sessions`), for load-balancer health checks and humans.
@@ -46,16 +22,25 @@ pub fn health_route() -> impl Bundle {
 	(exchange_route("health", HealthHandler), HttpMethod::Get)
 }
 
+/// Derives the health metrics from live world state: `uptime_secs` from the app
+/// clock ([`Time`]), `active_sessions` from the live remote terminal surfaces
+/// ([`ChannelTerminal`](beet_ui::prelude::ChannelTerminal), one per SSH session,
+/// which excludes the local stdio terminal). No bookkeeping resource to keep in
+/// sync; without the `tui` feature no remote sessions exist, so the count is 0.
 #[action(handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 fn HealthHandler(
 	_cx: In<ActionContext<RequestParts>>,
-	metrics: Option<Res<ServerMetrics>>,
+	time: Option<Res<Time>>,
+	#[cfg(feature = "tui")] sessions: Query<(), With<ChannelTerminal>>,
 ) -> MediaBytes {
-	let (uptime, sessions) = metrics
-		.map(|metrics| (metrics.uptime_secs(), metrics.active_sessions))
-		.unwrap_or((0, 0));
+	// `Time` is absent without a `TimePlugin` (eg a bare test world); report 0.
+	let uptime = time.map(|time| time.elapsed().as_secs()).unwrap_or(0);
+	#[cfg(feature = "tui")]
+	let sessions = sessions.iter().count();
+	#[cfg(not(feature = "tui"))]
+	let sessions = 0usize;
 	let body = format!(
 		"{{\"status\":\"ok\",\"uptime_secs\":{uptime},\"active_sessions\":{sessions}}}"
 	);
@@ -84,14 +69,18 @@ mod test {
 			.xpect_contains("active_sessions");
 	}
 
+	/// Active sessions count the live remote terminal surfaces; three
+	/// [`ChannelTerminal`](beet_ui::prelude::ChannelTerminal)s stand in for three
+	/// SSH sessions. Needs the `tui` feature (the charcell terminal lives there).
+	#[cfg(feature = "tui")]
 	#[beet_core::test]
-	async fn health_reports_active_sessions() {
+	async fn health_counts_active_sessions() {
+		use beet_ui::prelude::*;
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
-		world.insert_resource(ServerMetrics {
-			active_sessions: 3,
-			..default()
-		});
+		for _ in 0..3 {
+			world.spawn(ChannelTerminal::new(TerminalConfig::default()).0);
+		}
 		world
 			.spawn(default_router())
 			.call::<Request, Response>(Request::get("health"))

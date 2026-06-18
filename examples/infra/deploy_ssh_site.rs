@@ -61,9 +61,10 @@ fn stack() -> Stack {
 /// the container binary, applies the terraform, pushes the image and watches it.
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
-	// the defaults already expose ssh (an NLB on the ssh port) and autoscale on
-	// cpu between min_count and max_count; the http health check is `/health`.
-	let block = FargateBlock::default();
+	// the default is http-only, so opt into ssh (an NLB on the ssh port). the
+	// block also autoscales on cpu between min_count and max_count; the http
+	// health check is `/health`.
+	let block = FargateBlock::default().with_allow_ssh(true);
 	(stack(), stack_cli(), children![
 		route(
 			"watch",

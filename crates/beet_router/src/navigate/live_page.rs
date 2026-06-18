@@ -20,9 +20,9 @@ use bevy::math::UVec2;
 /// A live-render host (a "surface"): a [`DoubleBuffer`] plus the [`Portal`] slot
 /// that transcludes the page currently bound to this surface.
 ///
-/// Spawn one with [`page_host`]. A [`Navigator`] whose `render_target` is this
-/// host calls [`bind_surface_page`] to point the slot at a built page, so the
-/// charcell pipeline paints it into the buffer. Navigating rebinds the slot and
+/// Spawn one with [`page_host`]. A [`Navigator`] co-located on this host calls
+/// [`bind_surface_page`] to point the slot at a built page, so the charcell
+/// pipeline paints it into the buffer. Navigating rebinds the slot and
 /// repaints. Each surface is independent, so many can coexist (one per SSH
 /// session) and show different pages at once.
 #[derive(Component)]
@@ -69,7 +69,7 @@ fn page_viewport_style() -> impl Bundle {
 ///
 /// Pairs with [`CharcellPlugin`] + [`RealtimeParsePlugin`] (the repaint loop) and
 /// [`NavigatorPlugin`] (which navigates). The page-to-surface binding is now
-/// direct (a [`Navigator`] calls [`bind_surface_page`] on its `render_target`),
+/// direct (a [`Navigator`] calls [`bind_surface_page`] on its co-located host),
 /// so there is no per-frame sync system; this plugin remains the documented home
 /// for the live-render composition.
 #[derive(Default)]
@@ -146,35 +146,31 @@ pub fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
 	Ok(page)
 }
 
-/// Bind `page` to the surface a navigator renders into, cleaning up the page it
+/// Bind `page` to `host` (a [`PageHost`] surface), cleaning up the page it
 /// replaces.
 ///
-/// `render_target` is the navigator's [`PageHost`]; absent it (a single-surface
-/// app), the lone host is used. The host's [`PageSlot`] [`Portal`] is re-pointed
-/// at `page` *before* the despawn, so nothing references the outgoing tree when
-/// it is removed. The outgoing page's [`DespawnAfterRender`] ephemerals (a
-/// per-request or parsed tree) are then despawned so pages do not accumulate; a
-/// self-referential fixed route carries an empty set, so its entity survives.
+/// The host's [`PageSlot`] [`Portal`] is re-pointed at `page` *before* the
+/// despawn, so nothing references the outgoing tree when it is removed. The
+/// outgoing page is the host's current [`RenderSurfaceOf`] (the one-to-one
+/// back-link `RenderSurface(host)` maintains); its [`DespawnAfterRender`]
+/// ephemerals (a per-request or parsed tree) are then despawned so pages do not
+/// accumulate, while a self-referential fixed route (empty set) survives.
 ///
 /// Scoped to one surface, so binding a page on one SSH session never disturbs
 /// another session's page.
-pub fn bind_surface_page(
-	world: &mut World,
-	render_target: Option<Entity>,
-	page: Entity,
-) {
-	let Some(host) = resolve_surface(world, render_target) else {
-		error!("no page host found to bind the rendered page into");
-		return;
-	};
+pub fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
 	let Some(slot) = page_slot_of(world, host) else {
 		error!("page host {host} has no PageSlot child");
 		return;
 	};
-	// the page the slot points at now, to clean up after the swap.
-	let outgoing = world.entity(slot).get::<Portal>().map(|portal| portal.target());
+	// the page currently bound to this surface, to clean up after the swap.
+	let outgoing = world
+		.entity(host)
+		.get::<RenderSurfaceOf>()
+		.map(|surface| surface.page());
 
-	// back-link the page to its surface, then re-point the slot at it.
+	// back-link the page to its surface (one-to-one, so the outgoing page's link is
+	// dropped), then re-point the slot at it.
 	world.entity_mut(page).insert(RenderSurface(host));
 	world.entity_mut(slot).insert(Portal::new(page));
 
@@ -193,20 +189,24 @@ pub fn bind_surface_page(
 	}
 }
 
-/// Resolve the surface a page binds into: the navigator's explicit `render_target`
-/// when alive, else the single [`PageHost`] of a single-surface app.
-fn resolve_surface(
-	world: &mut World,
-	render_target: Option<Entity>,
-) -> Option<Entity> {
-	render_target
-		.filter(|host| world.get_entity(*host).is_ok())
-		.or_else(|| {
-			world
-				.query_filtered::<Entity, With<PageHost>>()
-				.iter(world)
-				.next()
-		})
+/// The [`PageHost`] surface a navigator drives: the nearest self-or-ancestor host,
+/// walking `ChildOf`.
+///
+/// A navigator is co-located on (or nested under) its host, so which surface it
+/// drives is structural rather than a nullable field. `None` only for a navigator
+/// with no host (a misconfiguration the caller logs).
+pub fn host_of(world: &World, entity: Entity) -> Option<Entity> {
+	let mut current = entity;
+	loop {
+		let entity_ref = world.get_entity(current).ok()?;
+		if entity_ref.contains::<PageHost>() {
+			return Some(current);
+		}
+		match entity_ref.get::<ChildOf>() {
+			Some(child_of) => current = child_of.parent(),
+			None => return None,
+		}
+	}
 }
 
 /// The [`PageSlot`] descendant of `host` (a grandchild as [`page_host`] spawns it).
@@ -254,7 +254,7 @@ mod test {
 			.spawn_template(Snippet::from_bundle(bundle))
 			.unwrap()
 			.id();
-		bind_surface_page(app.world_mut(), Some(host), page);
+		bind_surface_page(app.world_mut(), host, page);
 		page
 	}
 
@@ -343,17 +343,95 @@ mod test {
 				),
 			]))
 			.flush();
-		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
+		// the navigator is co-located on its page host (one surface)
+		let host = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "alpha"),
+			))
+			.id();
 		// home is `alpha`, so the on_add navigation paints the alpha route
-		let nav =
-			app.world_mut().spawn(Navigator::in_world(router, "alpha")).id();
 		drive_until(&mut app, host, "Alpha page");
 
 		// navigate to beta: the page swaps and repaints, alpha is gone
-		navigate(&mut app, nav, "beta");
+		navigate(&mut app, host, "beta");
 		drive_until(&mut app, host, "Beta page")
 			.xnot()
 			.xpect_contains("Alpha page");
+	}
+
+	/// A router whose pages cross-link, for the link-click navigation tests.
+	fn linked_router(app: &mut App) -> Entity {
+		app.world_mut()
+			.spawn((Router, children![
+				render_action::fixed_func_route("alpha", || {
+					rsx! { <a href="/beta">"to beta"</a> }
+				}),
+				render_action::fixed_func_route("beta", || {
+					rsx! { <p>"Beta page"</p> }
+				}),
+			]))
+			.flush()
+	}
+
+	/// The `<a>` element entity within `host`'s currently bound page.
+	fn link_in(app: &mut App, host: Entity) -> Entity {
+		let page = app
+			.world()
+			.get::<RenderSurfaceOf>(host)
+			.expect("host has a bound page")
+			.page();
+		// the <a> is the page's descendant Element tagged "a".
+		let descendants = std::iter::successors(Some(vec![page]), |level| {
+			let next = level
+				.iter()
+				.filter_map(|entity| app.world().get::<Children>(*entity))
+				.flat_map(|children| children.iter())
+				.collect::<Vec<_>>();
+			(!next.is_empty()).then_some(next)
+		})
+		.flatten();
+		descendants
+			.filter(|entity| {
+				app.world()
+					.get::<Element>(*entity)
+					.is_some_and(|element| element.tag() == "a")
+			})
+			.next()
+			.expect("page has an <a> element")
+	}
+
+	/// Clicking an internal link navigates the clicked link's own surface, even when
+	/// many surfaces coexist: the regression for `on_link_click` resolving the
+	/// navigator from the link's surface rather than assuming a single global one
+	/// (the prior `navigators.single()` returned `Err` with 2+ sessions, so no
+	/// session navigated). One host clicks through to beta; the other stays on alpha.
+	#[beet_core::test]
+	async fn link_click_navigates_only_its_surface() {
+		let mut app = nav_app();
+		let router = linked_router(&mut app);
+		let first = app
+			.world_mut()
+			.spawn((page_host(UVec2::new(40, 8)), Navigator::in_world(router, "alpha")))
+			.id();
+		let second = app
+			.world_mut()
+			.spawn((page_host(UVec2::new(40, 8)), Navigator::in_world(router, "alpha")))
+			.id();
+		drive_until(&mut app, first, "to beta");
+		drive_until(&mut app, second, "to beta");
+
+		// click the first host's link (as the hit-test would on a real click).
+		let link = link_in(&mut app, first);
+		app.world_mut().entity_mut(link).trigger(PointerUp::new(link));
+		drive_until(&mut app, first, "Beta page");
+
+		// the second host never navigated: still on alpha, never beta.
+		frame(&mut app, second)
+			.xpect_contains("to beta")
+			.xnot()
+			.xpect_contains("Beta page");
 	}
 
 	/// Whether `host`'s page slot has been bound to a page.
@@ -369,8 +447,11 @@ mod test {
 	#[beet_core::test]
 	async fn default_home_renders_blank() {
 		let mut app = nav_app();
-		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
-		app.world_mut().spawn(Navigator::default());
+		// the navigator is co-located on its page host
+		let host = app
+			.world_mut()
+			.spawn((page_host(UVec2::new(40, 8)), Navigator::default()))
+			.id();
 		// drive the async on_add navigation until the surface slot is bound
 		for _ in 0..200 {
 			frame(&mut app, host);
@@ -398,12 +479,21 @@ mod test {
 				}),
 			]))
 			.flush();
-		let host_a = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
-		let host_b = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
-		app.world_mut()
-			.spawn(Navigator::in_world(router, "alpha").with_render_target(host_a));
-		app.world_mut()
-			.spawn(Navigator::in_world(router, "beta").with_render_target(host_b));
+		// each surface's navigator is co-located on its own host
+		let host_a = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "alpha"),
+			))
+			.id();
+		let host_b = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "beta"),
+			))
+			.id();
 
 		// drive until both surfaces have painted their own route
 		for _ in 0..400 {
@@ -432,7 +522,7 @@ mod test {
 		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
 		let bytes = MediaBytes::new_markdown("# Hello");
 		let page = parse_page(app.world_mut(), bytes).unwrap();
-		bind_surface_page(app.world_mut(), Some(host), page);
+		bind_surface_page(app.world_mut(), host, page);
 		frame(&mut app, host).xpect_contains("Hello");
 	}
 }

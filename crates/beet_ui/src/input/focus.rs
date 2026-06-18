@@ -27,9 +27,8 @@ use bevy::input::keyboard::KeyboardInput;
 ///
 /// At most one entity carries `Focus` *per surface* (per [`RenderSurface`]): the
 /// `on_add` hook clears `Focus` from every other entity on the same surface, so
-/// each session (one per SSH connection) keeps its own focused element. A
-/// single-surface app behaves as before (one focus world-wide). Having no focused
-/// entity is a valid steady state.
+/// each session (one per SSH connection) keeps its own focused element. Having no
+/// focused entity is a valid steady state.
 #[derive(Debug, Default, Clone, Copy, Reflect, Component)]
 #[reflect(Component)]
 #[component(on_add = Self::on_add)]
@@ -395,24 +394,38 @@ mod test {
 		app
 	}
 
-	/// A pressed [`KeyboardInput`] for the given logical `key`.
-	fn press(key: Key) -> KeyboardInput {
+	/// A pressed [`KeyboardInput`] for `key`, tagged with its source `window`.
+	fn press(window: Entity, key: Key) -> KeyboardInput {
 		KeyboardInput {
 			key_code: bevy::input::keyboard::KeyCode::KeyA,
 			logical_key: key,
 			state: ButtonState::Pressed,
 			text: None,
 			repeat: false,
-			window: Entity::PLACEHOLDER,
+			window,
 		}
 	}
 
-	/// Sends each `key` as a press and runs one frame.
-	fn type_keys(app: &mut App, keys: impl IntoIterator<Item = Key>) {
+	/// Sends each `key` as a press from `window` and runs one frame.
+	fn type_keys(
+		app: &mut App,
+		window: Entity,
+		keys: impl IntoIterator<Item = Key>,
+	) {
 		for key in keys {
-			app.world_mut().write_message(press(key));
+			app.world_mut().write_message(press(window, key));
 		}
 		app.update();
+	}
+
+	/// Spawn `bundle` as a focusable scoped to a fresh one-surface window,
+	/// returning `(window, entity)`. The pure-mechanism focus tests have no page
+	/// tree, so they tag the focusable with its own [`RenderSurface`] to receive
+	/// that window's scoped input.
+	fn on_surface(app: &mut App, bundle: impl Bundle) -> (Entity, Entity) {
+		let window = app.world_mut().spawn_empty().id();
+		let entity = app.world_mut().spawn((bundle, RenderSurface(window))).id();
+		(window, entity)
 	}
 
 	fn char_key(text: &str) -> Key { Key::Character(text.into()) }
@@ -433,8 +446,8 @@ mod test {
 	#[beet_core::test]
 	fn typing_appends() {
 		let mut app = app();
-		let entity = app.world_mut().spawn((Focus, Value::str(""))).id();
-		type_keys(&mut app, [char_key("h"), char_key("i")]);
+		let (window, entity) = on_surface(&mut app, (Focus, Value::str("")));
+		type_keys(&mut app, window, [char_key("h"), char_key("i")]);
 		value_of(&app, entity).xpect_eq(Value::str("hi"));
 	}
 
@@ -475,38 +488,38 @@ mod test {
 	#[beet_core::test]
 	fn backspace_pops() {
 		let mut app = app();
-		let entity = app.world_mut().spawn((Focus, Value::str("hi"))).id();
-		type_keys(&mut app, [Key::Backspace]);
+		let (window, entity) = on_surface(&mut app, (Focus, Value::str("hi")));
+		type_keys(&mut app, window, [Key::Backspace]);
 		value_of(&app, entity).xpect_eq(Value::str("h"));
 		// backspace on empty stays Str(""), does not revert to Null
-		type_keys(&mut app, [Key::Backspace, Key::Backspace]);
+		type_keys(&mut app, window, [Key::Backspace, Key::Backspace]);
 		value_of(&app, entity).xpect_eq(Value::str(""));
 	}
 
 	#[beet_core::test]
 	fn null_coercion() {
 		let mut app = app();
-		let entity = app.world_mut().spawn((Focus, Value::Null)).id();
-		type_keys(&mut app, [char_key("x")]);
+		let (window, entity) = on_surface(&mut app, (Focus, Value::Null));
+		type_keys(&mut app, window, [char_key("x")]);
 		value_of(&app, entity).xpect_eq(Value::str("x"));
 	}
 
 	#[beet_core::test]
 	fn typing_digit_into_number() {
 		let mut app = app();
-		let entity = app.world_mut().spawn((Focus, Value::Int(5))).id();
+		let (window, entity) = on_surface(&mut app, (Focus, Value::Int(5)));
 		// number fields stringify, edit, and parse back, preserving the variant
-		type_keys(&mut app, [char_key("3")]);
+		type_keys(&mut app, window, [char_key("3")]);
 		value_of(&app, entity).xpect_eq(Value::Int(53));
 	}
 
 	#[beet_core::test]
 	fn invalid_number_edit_rejected() {
 		let mut app = app();
-		let entity = app.world_mut().spawn((Focus, Value::Int(5))).id();
+		let (window, entity) = on_surface(&mut app, (Focus, Value::Int(5)));
 		app.update(); // clear the spawn-time Changed tick
 		// a non-numeric key leaves the number untouched and unmarked
-		type_keys(&mut app, [char_key("x")]);
+		type_keys(&mut app, window, [char_key("x")]);
 		value_of(&app, entity).xpect_eq(Value::Int(5));
 		changed_count(&mut app).xpect_eq(0);
 	}
@@ -514,11 +527,11 @@ mod test {
 	#[beet_core::test]
 	fn delete_drops_first() {
 		let mut app = app();
-		let entity = app.world_mut().spawn((Focus, Value::str("hi"))).id();
-		type_keys(&mut app, [Key::Delete]);
+		let (window, entity) = on_surface(&mut app, (Focus, Value::str("hi")));
+		type_keys(&mut app, window, [Key::Delete]);
 		value_of(&app, entity).xpect_eq(Value::str("i"));
 		// delete on empty stays Str(""), does not panic
-		type_keys(&mut app, [Key::Delete, Key::Delete]);
+		type_keys(&mut app, window, [Key::Delete, Key::Delete]);
 		value_of(&app, entity).xpect_eq(Value::str(""));
 	}
 
@@ -537,7 +550,7 @@ mod test {
 		let mut app = app();
 		app.world_mut().spawn(Focus);
 		// typing without a Value on the focused entity must not panic
-		type_keys(&mut app, [char_key("x")]);
+		type_keys(&mut app, Entity::PLACEHOLDER, [char_key("x")]);
 	}
 
 	#[beet_core::test]
@@ -545,15 +558,15 @@ mod test {
 		let mut app = app();
 		app.world_mut().spawn(Value::str(""));
 		// typing with nothing focused must not panic
-		type_keys(&mut app, [char_key("x")]);
+		type_keys(&mut app, Entity::PLACEHOLDER, [char_key("x")]);
 	}
 
 	#[beet_core::test]
 	fn ignored_keys_dont_dirty() {
 		let mut app = app();
-		let entity = app.world_mut().spawn((Focus, Value::str("hi"))).id();
+		let (window, entity) = on_surface(&mut app, (Focus, Value::str("hi")));
 		app.update(); // clear the spawn-time Changed tick
-		type_keys(&mut app, [Key::ArrowLeft]);
+		type_keys(&mut app, window, [Key::ArrowLeft]);
 		value_of(&app, entity).xpect_eq(Value::str("hi"));
 		changed_count(&mut app).xpect_eq(0);
 	}
@@ -596,23 +609,27 @@ mod test {
 	fn tab_cycles_focus() {
 		let mut app = app();
 		// focusables in a tree so document order is the children order (not entity
-		// id order), matching a real page.
+		// id order), matching a real page. The tree root carries the surface, so tab
+		// traversal scopes to this window.
 		let first = app.world_mut().spawn(Focusable).id();
 		let second = app.world_mut().spawn(Focusable).id();
-		app.world_mut().spawn_empty().add_children(&[first, second]);
+		let window = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.spawn(RenderSurface(window))
+			.add_children(&[first, second]);
 		app.update();
 
 		// no focus yet: Tab focuses the first
-		type_keys(&mut app, [Key::Tab]);
+		type_keys(&mut app, window, [Key::Tab]);
 		is_focused(&app, first).xpect_true();
 		// Tab again: second
-		type_keys(&mut app, [Key::Tab]);
+		type_keys(&mut app, window, [Key::Tab]);
 		is_focused(&app, second).xpect_true();
 		// Tab wraps back to first
-		type_keys(&mut app, [Key::Tab]);
+		type_keys(&mut app, window, [Key::Tab]);
 		is_focused(&app, first).xpect_true();
 		// Shift+Tab goes back, wrapping to the last
-		type_keys(&mut app, [Key::Shift, Key::Tab]);
+		type_keys(&mut app, window, [Key::Shift, Key::Tab]);
 		is_focused(&app, second).xpect_true();
 	}
 

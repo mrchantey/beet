@@ -97,14 +97,22 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 	// re-fetch its current page through the rebuilt route tree and the page host
 	// repaints. The web client has no in-world navigator and reloads via the
 	// broadcast below instead.
-	reload_in_world_navigators(world);
-
-	// re-run the render-diagnostics pass over the rebuilt routes and log every
-	// problem loudly, the dev-loop "type-check": an edit that introduces an unknown
-	// tag, a dead link or an unknown class surfaces in the console on save. A
-	// fire-and-forget task (route rendering is async), so the reload never blocks.
-	world.run_async(|world| async move {
+	// dev-loop "type-check" then repaint, sequenced in one task: first re-render
+	// every route to surface problems (an unknown tag, dead link or unknown class an
+	// edit introduced logs loudly), then repaint each in-world navigator. The repaint
+	// runs *after* the diagnostics so a navigator's freshly-built page is the last
+	// render of each shared route node; otherwise the diagnostics' ephemeral cleanup
+	// races the repaint and blanks the live TUI. The web client has no in-world
+	// navigator and repaints via the broadcast below. Fire-and-forget (route
+	// rendering is async), so the reload never blocks.
+	let navigators = in_world_navigators(world);
+	world.run_async(move |world| async move {
 		log_all_render_diagnostics(&world).await;
+		for navigator in navigators {
+			if let Err(err) = Navigator::reload(world.entity(navigator)).await {
+				error!("live reload repaint failed: {err}");
+			}
+		}
 	});
 
 	// tell connected clients to reload
@@ -119,25 +127,21 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 	Ok(())
 }
 
-/// Re-fetch and repaint every in-world [`Navigator`]'s current page, the TUI
-/// counterpart of the [`ClientIo`] reload broadcast (an in-world navigator
-/// browses the app's own routes with no socket client to notify).
+/// The in-world [`Navigator`] entities (the live-TUI navigators that browse the
+/// app's own routes with no socket client), to repaint on reload as the TUI
+/// counterpart of the [`ClientIo`] reload broadcast.
 ///
-/// A no-op for an HTTP navigator or when none is present, so this is inert
-/// outside the live TUI.
-fn reload_in_world_navigators(world: &mut World) {
-	let navigators = world.with_state::<Query<(Entity, &Navigator)>, _>(|query| {
+/// Empty for an HTTP-only app, so the reload repaint is inert outside the live TUI.
+fn in_world_navigators(world: &mut World) -> Vec<Entity> {
+	world.with_state::<Query<(Entity, &Navigator)>, _>(|query| {
 		query
 			.iter()
 			.filter(|(_, nav)| {
 				matches!(nav.transport(), NavigatorTransport::InWorld { .. })
 			})
 			.map(|(entity, _)| entity)
-			.collect::<Vec<_>>()
-	});
-	for navigator in navigators {
-		world.entity_mut(navigator).run_async_local(Navigator::reload);
-	}
+			.collect()
+	})
 }
 
 #[cfg(test)]
@@ -388,9 +392,15 @@ mod test {
 			.world_mut()
 			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
 			.flush();
-		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
-		// an in-world navigator opened on the first card, as the TUI boot does.
-		app.world_mut().spawn(Navigator::in_world(router, "/01-alpha"));
+		// the host with its in-world navigator co-located, opened on the first card,
+		// as the TUI boot composes them.
+		let host = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "/01-alpha"),
+			))
+			.id();
 		drive_until(&mut app, host, "Alpha first");
 
 		// edit the current card on disk, then drive the watched-change reload.

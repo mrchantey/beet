@@ -30,11 +30,6 @@ use bevy::math::UVec2;
 #[component(on_add = on_add)]
 pub struct SshTuiServer;
 
-/// The route each new SSH session opens at, stored on the router so the
-/// per-connection setup reads it without re-parsing argv.
-#[derive(Debug, Clone, Component)]
-struct SshTuiHome(SmolStr);
-
 /// Registers the [`StartServer`] observer on the router, so the SSH listener boots
 /// when a start event whose filter passes `"ssh"` lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -61,15 +56,11 @@ fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 			[127, 0, 0, 1]
 		};
 	}
-	// the opening route each session navigates to (default home).
-	let home = ev
-		.params
-		.get("path")
-		.cloned()
-		.unwrap_or_else(|| "/".into());
+	// the opening route each session navigates to, recorded on the router (the
+	// shared mechanism the local TUI server also reads).
 	commands
 		.entity(ev.event_target())
-		.insert((server, SshTuiHome(home)));
+		.insert((server, OpeningRoute::from_params(&ev.params)));
 }
 
 /// Per-connection behavior for the [`SshTuiServer`], added once by the app: spins
@@ -100,11 +91,9 @@ impl Plugin for SshTuiPlugin {
 fn on_ssh_recv(
 	ev: On<SshRecv>,
 	peers: Query<&ChildOf, With<SshPeerInfo>>,
-	tui_servers: Query<&SshTuiHome, With<SshTuiServer>>,
-	navigators: Query<(Entity, &Navigator)>,
+	tui_servers: Query<&OpeningRoute, With<SshTuiServer>>,
 	mut terminals: Query<&mut ChannelTerminal>,
 	mut buffers: Query<&mut DoubleBuffer>,
-	mut metrics: ResMut<ServerMetrics>,
 	mut commands: Commands,
 ) -> Result {
 	let connection = ev.target();
@@ -112,7 +101,7 @@ fn on_ssh_recv(
 	let Ok(router) = peers.get(connection).map(|child_of| child_of.parent()) else {
 		return Ok(());
 	};
-	let Ok(home) = tui_servers.get(router) else {
+	let Ok(opening) = tui_servers.get(router) else {
 		return Ok(());
 	};
 	match ev.event().inner() {
@@ -127,18 +116,17 @@ fn on_ssh_recv(
 			} else {
 				pty.window.cells
 			};
-			// the surface: a channel terminal + the page-host buffer on the
-			// connection entity, plus an in-world navigator painting into it.
+			// the surface: a channel terminal + the page-host buffer + the
+			// in-world navigator, all co-located on the connection entity,
+			// browsing this router from the recorded opening route.
 			let (channel, terminal) =
 				ChannelTerminal::new(TerminalConfig::default());
-			commands
-				.entity(connection)
-				.insert((channel, terminal, page_host(size)));
-			commands.spawn(
-				Navigator::in_world(router, Url::parse(home.0.as_str()))
-					.with_render_target(connection),
-			);
-			metrics.active_sessions += 1;
+			commands.entity(connection).insert((
+				channel,
+				terminal,
+				page_host(size),
+				Navigator::in_world(router, opening.0.clone()),
+			));
 		}
 		SshEvent::Data(bytes) => {
 			if let Ok(mut terminal) = terminals.get_mut(connection) {
@@ -155,14 +143,9 @@ fn on_ssh_recv(
 			}
 		}
 		SshEvent::Close(_) => {
-			// despawn this session's navigator, then the connection surface.
-			for (entity, navigator) in navigators.iter() {
-				if navigator.render_target() == Some(connection) {
-					commands.entity(entity).despawn();
-				}
-			}
+			// the navigator is co-located on the connection surface, so despawning
+			// the connection tears down the whole session.
 			commands.entity(connection).despawn();
-			metrics.active_sessions = metrics.active_sessions.saturating_sub(1);
 		}
 		_ => {}
 	}
@@ -238,7 +221,7 @@ mod test {
 			.spawn((
 				Router,
 				SshTuiServer,
-				SshTuiHome("alpha".into()),
+				OpeningRoute(Url::parse("alpha")),
 				children![
 					render_action::fixed_func_route("alpha", || {
 						rsx! { <p>"Alpha page"</p> }
@@ -320,17 +303,11 @@ mod test {
 		drive_until(&mut app, first, "Alpha page");
 		drive_until(&mut app, second, "Alpha page");
 
-		// navigate only the second session to beta
-		let navigator = app
-			.world_mut()
-			.query::<(Entity, &Navigator)>()
-			.iter(app.world())
-			.find(|(_, nav)| nav.render_target() == Some(second))
-			.map(|(entity, _)| entity)
-			.unwrap();
+		// navigate only the second session to beta (its navigator is co-located on
+		// the connection surface)
 		let url = Url::parse("beta");
 		app.world_mut()
-			.entity_mut(navigator)
+			.entity_mut(second)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
 		drive_until(&mut app, second, "Beta page");
 

@@ -64,19 +64,32 @@ impl Plugin for OpenLinkPlugin {
 /// Internal links navigate the [`Navigator`]; external links follow the host's
 /// [`OnOpenLink`] (default: emit [`OpenExternalLink`] for the system browser;
 /// `Internal`: navigate the `Navigator` at the external URL).
+///
+/// The navigator is resolved from the clicked link's own surface (the
+/// [`RenderSurface`] ancestor, on which the [`Navigator`] is co-located), so a
+/// click navigates only that session when many surfaces coexist.
 fn on_link_click(
 	ev: On<PointerUp>,
 	mut commands: Commands,
 	elements: ElementQuery,
-	navigators: Query<(Entity, Option<&OnOpenLink>), With<Navigator>>,
+	parents: Query<&ChildOf>,
+	surfaces: Query<&RenderSurface>,
+	navigators: Query<Option<&OnOpenLink>, With<Navigator>>,
 	mut open: MessageWriter<OpenExternalLink>,
 ) -> Result {
 	// only `<a>` elements carry a LinkView; other targets are ignored.
-	let Ok(link) = elements.get_as::<LinkView>(ev.event().target) else {
+	let link_entity = ev.event().target;
+	let Ok(link) = elements.get_as::<LinkView>(link_entity) else {
 		return Ok(());
 	};
 	let url = Url::parse(link.href);
-	let Ok((navigator, on_open)) = navigators.single() else {
+	// the navigator is co-located on the link's surface; resolve it from the link
+	// rather than assuming a single global navigator, so each session navigates
+	// independently.
+	let Some(navigator) = surface_of(link_entity, &parents, &surfaces) else {
+		return Ok(());
+	};
+	let Ok(on_open) = navigators.get(navigator) else {
 		return Ok(());
 	};
 	let on_open = on_open.copied().unwrap_or_default();
@@ -144,20 +157,24 @@ mod test {
 		app
 	}
 
-	/// Spawn a Navigator (with an optional [`OnOpenLink`]) and an `<a href>` tree,
-	/// returning the `<a>` element entity.
+	/// Spawn a Navigator (with an optional [`OnOpenLink`]) co-located on a surface,
+	/// plus an `<a href>` page tree bound to that surface via [`RenderSurface`],
+	/// returning the `<a>` element entity. Mirrors the real app: the click handler
+	/// resolves the navigator from the link's surface.
 	fn spawn_link(app: &mut App, on_open: Option<OnOpenLink>, href: &str) -> Entity {
 		let mut nav = app.world_mut().spawn(Navigator::default());
 		if let Some(on_open) = on_open {
 			nav.insert(on_open);
 		}
+		let navigator = nav.id();
 		// build the <a> through the template substrate so it is a real Element with
-		// the href attribute LinkView reads.
+		// the href attribute LinkView reads; bind its tree to the navigator's surface.
 		let root = app
 			.world_mut()
 			.spawn_template(rsx! { <a href=href.to_string()>"link"</a> })
 			.unwrap()
 			.id();
+		app.world_mut().entity_mut(root).insert(RenderSurface(navigator));
 		app.update();
 		// the <a> is the descendant Element whose tag is "a".
 		app.world_mut()

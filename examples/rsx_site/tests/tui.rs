@@ -14,7 +14,6 @@ use rsx_site::prelude::*;
 struct SiteHost {
 	app: App,
 	host: Entity,
-	nav: Entity,
 }
 
 /// An SGR mouse sequence: button `b` at 0-indexed cell `(col, row)`, pressed
@@ -49,13 +48,20 @@ impl SiteHost {
 
 		// the router on its own entity; the in-world navigator dispatches to it.
 		let router = app.world_mut().spawn(rsx_site_router()).id();
-		// the host pairs a channel terminal with the page-host buffer.
+		// the host pairs a channel terminal with the page-host buffer, the in-world
+		// navigator co-located on it (one surface), as the TUI boot composes them.
 		let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
-		let host =
-			app.world_mut().spawn((channel, terminal, page_host(size))).id();
-		let nav = app.world_mut().spawn(Navigator::in_world(router, home)).id();
+		let host = app
+			.world_mut()
+			.spawn((
+				channel,
+				terminal,
+				page_host(size),
+				Navigator::in_world(router, home),
+			))
+			.id();
 		app.update();
-		Self { app, host, nav }
+		Self { app, host }
 	}
 
 	/// Push raw input bytes (keys, SGR mouse) into the channel terminal.
@@ -91,7 +97,7 @@ impl SiteHost {
 		let url = Url::parse(path);
 		self.app
 			.world_mut()
-			.entity_mut(self.nav)
+			.entity_mut(self.host)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
 	}
 

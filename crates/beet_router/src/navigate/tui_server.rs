@@ -41,10 +41,12 @@ fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
 	commands.insert_resource(KeepAlive);
 	// the trigger's params (eg the `beet serve` command's) carry the opening route
 	// and scheme, so a served site opens at the right page rather than the serve
-	// command's own argv.
+	// command's own argv. Record the opening route on the router (the shared
+	// mechanism the SSH server also reads); the scheme is applied at boot.
 	let params = ev.params.clone();
 	commands
 		.entity(ev.event_target())
+		.insert(OpeningRoute::from_params(&params))
 		.queue_async_local(move |entity| boot(entity, params));
 }
 
@@ -57,23 +59,17 @@ async fn boot(
 		return Ok(());
 	}
 	let router = entity.id();
-	// A `path` param from the trigger (eg `beet serve <dir> --server=tui
-	// --path=docs/design/form`) opens that route; absent it, the process argv (a
-	// compiled binary's own args). `--color-scheme=light|dark` pins the session
-	// scheme app-wide either way. The server is route-agnostic; a downstream plugin
-	// (eg `CardStackPlugin`) may patch a more specific opening route after boot.
-	let (home, scheme) = match params.get("path") {
-		Some(path) => (
-			Url::parse(path.as_str()),
-			params.get("color-scheme").and_then(|s| ColorScheme::parse(s)),
-		),
-		None => {
-			let request = Request::from_cli_args(CliArgs::parse_env());
-			let scheme = request
-				.get_param("color-scheme")
-				.and_then(ColorScheme::parse);
-			(Url::parse(request.path_string()), scheme)
-		}
+	// the opening route is recorded on the router (the shared mechanism); read it
+	// back here. The server is route-agnostic; a downstream plugin (eg
+	// `CardStackPlugin`) may patch a more specific opening route after boot.
+	let home = entity.get(|route: &OpeningRoute| route.0.clone()).await?;
+	// `--color-scheme=light|dark` pins the session scheme app-wide (the single
+	// local surface): from the trigger params, else the process argv.
+	let scheme = match params.get("color-scheme") {
+		Some(scheme) => ColorScheme::parse(scheme),
+		None => Request::from_cli_args(CliArgs::parse_env())
+			.get_param("color-scheme")
+			.and_then(ColorScheme::parse),
 	};
 	entity
 		.world()
@@ -81,19 +77,14 @@ async fn boot(
 			if let Some(scheme) = scheme {
 				world.get_resource_or_init::<Theme>().scheme = scheme;
 			}
-			// the live host: a stdio terminal paired with the page-host buffer,
-			// rendered together by `render_terminal` (one entity, both components).
-			let host = world
-				.spawn((
-					StdioTerminal::default(),
-					page_host(terminal_ext::size()),
-				))
-				.id();
-			// an in-world navigator browsing this router, starting at `home`,
-			// painting into the host surface it is paired with
-			world.spawn(
-				Navigator::in_world(router, home).with_render_target(host),
-			);
+			// the live host: a stdio terminal paired with the page-host buffer
+			// (rendered together by `render_terminal`) plus the in-world navigator
+			// co-located on it, browsing this router from `home`.
+			world.spawn((
+				StdioTerminal::default(),
+				page_host(terminal_ext::size()),
+				Navigator::in_world(router, home),
+			));
 		})
 		.await;
 	Ok(())

@@ -1,33 +1,9 @@
-//! Serving static files from a [`BlobStore`] as routes.
+//! Serving a path from a [`BlobStore`] with static-host conventions, the shared
+//! primitive behind [`BlobStoreRoute`](crate::prelude::BlobStoreRoute) and the
+//! [`HtmlStore`](crate::prelude::HtmlStore) gate.
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-
-/// The greedy segment name used by [`BlobStoreRoute`] to capture the file path.
-pub(crate) const STORE_PATH_PARAM: &str = "store_path";
-
-/// Serves the captured path from the ancestor [`BlobStore`].
-#[action(route, handler_only)]
-#[derive(Default, Component)]
-pub(crate) async fn ServeStoreAction(
-	cx: ActionContext<RequestParts>,
-) -> Result<Response> {
-	let store = cx
-		.caller
-		.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-			|entity, query| query.get(entity).cloned(),
-		)
-		.await??;
-
-	// the greedy capture is the file path relative to the mount point
-	let path = cx
-		.input
-		.get_params(STORE_PATH_PARAM)
-		.map(|segments| SmolPath::from_segments(segments))
-		.unwrap_or_else(|| SmolPath::from(cx.input.path()));
-
-	serve_blob(&store, &path).await
-}
 
 /// Serves a single path from a [`BlobStore`] using static-host conventions:
 /// - extensioned path + a store public URL → permanent redirect

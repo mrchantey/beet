@@ -35,7 +35,7 @@ impl Plugin for NavigatorPlugin {
 #[cfg(feature = "tui")]
 fn nav_shortcuts(
 	mut keys: MessageReader<bevy::input::keyboard::KeyboardInput>,
-	navigators: Query<(Entity, &Navigator)>,
+	navigators: Query<(), With<Navigator>>,
 	mut commands: Commands,
 ) {
 	use bevy::input::ButtonState;
@@ -52,21 +52,15 @@ fn nav_shortcuts(
 		}
 	}
 	for (window, (alt, back, forward)) in per_window {
-		if !alt {
+		// the navigator is co-located on its surface, so the key's `window` (the
+		// surface entity) is the navigator; ignore a window with no navigator.
+		if !alt || !navigators.contains(window) {
 			continue;
 		}
-		// the navigator painting into this surface: an explicit render_target match,
-		// else the lone navigator of a single-surface app.
-		let navigator = navigators
-			.iter()
-			.find(|(_, nav)| nav.render_target() == Some(window))
-			.or_else(|| navigators.single().ok())
-			.map(|(entity, _)| entity);
-		let Some(navigator) = navigator else { continue };
 		if back {
-			commands.entity(navigator).queue_async(Navigator::back);
+			commands.entity(window).queue_async(Navigator::back);
 		} else if forward {
-			commands.entity(navigator).queue_async(Navigator::forward);
+			commands.entity(window).queue_async(Navigator::forward);
 		}
 	}
 }

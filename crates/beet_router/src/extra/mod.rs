@@ -7,7 +7,8 @@
 
 mod html_store;
 pub use html_store::*;
-// serving static files from a [`BlobStore`] as routes (no_std core).
+// the shared static-host serve rules (`serve_blob`) for a [`BlobStore`], used by
+// `BlobStoreRoute` and the HTML-store gate (no_std core).
 mod blob_store;
 pub use blob_store::*;
 
@@ -32,8 +33,8 @@ mod reactivity_js;
 #[cfg(feature = "std")]
 pub use reactivity_js::*;
 
-// std-only: the `/health` route + live `ServerMetrics`, the load-balancer health
-// check and autoscaling signal.
+// std-only: the `/health` route (uptime + active sessions derived from world
+// state), the load-balancer health check and autoscaling signal.
 #[cfg(feature = "std")]
 mod health;
 #[cfg(feature = "std")]

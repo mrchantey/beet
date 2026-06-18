@@ -161,16 +161,19 @@ pub async fn BuildDockerImageAction(
 		""
 	};
 
-	// expose both the http and ssh container ports (EXPOSE is documentation; the
-	// load balancers + security group make them reachable, see `FargateBlock`).
+	// expose the http port, and the ssh port only when `allow_ssh`. EXPOSE is
+	// documentation; the load balancers + security group make ports reachable
+	// (see `FargateBlock`), so this mirrors the terraform ssh gating.
+	let mut expose = format!("EXPOSE {}\n", block.container_port());
+	if block.allow_ssh() {
+		expose.push_str(&format!("EXPOSE {}\n", block.ssh_container_port()));
+	}
 	let dockerfile_content = format!(
-		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\nEXPOSE {}\nEXPOSE {}\nCMD \
-			[\"/app\"]\n",
+		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\n{}CMD [\"/app\"]\n",
 		base_image,
 		setup_commands,
 		binary_filename.to_string_lossy(),
-		block.container_port(),
-		block.ssh_container_port(),
+		expose,
 	);
 	std::fs::write(dockerfile_dir.join("Dockerfile"), dockerfile_content)?;
 

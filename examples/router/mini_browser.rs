@@ -40,16 +40,18 @@ fn setup(mut commands: Commands) {
 	let url = args
 		.path
 		.first()
-		.cloned()
+		.map(|path| path.to_string())
 		.unwrap_or_else(|| "https://example.com".to_string());
 
-	// the live host paints the bound page; the Navigator drives navigation over
-	// the HTTP transport (remote URLs). The StdioTerminal shares the host entity so
-	// `render_terminal` paints its DoubleBuffer to the real terminal.
-	let host = commands
-		.spawn((StdioTerminal::default(), page_host(terminal_ext::size())))
-		.id();
-	commands.spawn(Navigator::new(Url::parse(&url)).with_render_target(host));
+	// the live host paints the bound page; the co-located Navigator drives
+	// navigation over the HTTP transport (remote URLs). The StdioTerminal shares
+	// the host entity so `render_terminal` paints its DoubleBuffer to the real
+	// terminal.
+	commands.spawn((
+		StdioTerminal::default(),
+		page_host(terminal_ext::size()),
+		Navigator::new(Url::parse(&url)),
+	));
 	// an editable URL bar bound to the document field `url`.
 	commands.spawn((Document::new(val!({ "url": url })), children![
 		rsx! { <TextField field={FieldRef::new("url")}/> }
