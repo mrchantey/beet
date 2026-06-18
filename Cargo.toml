@@ -250,6 +250,12 @@ std = ["beet_core/std", "beet_action?/std", "beet_net?/std", "beet_spatial?/std"
 # Minimal no_std build for bare-metal targets (e.g. esp32 firmware): the libm /
 # critical-section shims, no ui/net/action/etc. Capabilities are opt-in.
 embedded = ["beet_core/embedded"]
+# The no_std BSX parser/build runtime (eg parsing a `.bsx` scene pushed to esp
+# firmware). Forwards `beet_core`'s parser only, not `beet_router/bsx` (the std +
+# `beet_ui` rendering path).
+bsx = ["beet_core/bsx"]
+# The `#[template]`/`rsx!` proc-macros (compile-time only, no_std-safe).
+rsx = ["beet_core/rsx"]
 # Bevy colour types (`Color`, `Srgba`, …) plus beet's `ColorExt`.
 bevy_color = ["beet_core/bevy_color"]
 

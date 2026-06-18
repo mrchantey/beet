@@ -58,7 +58,9 @@ client_io = ["http", "beet_net/tungstenite"]
 # `TemplateLoaded` event, which comes from `beet_core/template_serde` (beet's
 # own fork). It does NOT need bevy's `bevy_world_serialization` feature, which
 # drags in `bevy_asset` (std) and so breaks no_std consumers.
-template_serde = ["beet_core/template_serde", "serde"]
+# `beet_core/rsx`: the `SceneServer` meta-route bundle is a `#[template]`, whose
+# attribute macro is rsx-gated; scene_server compiles wherever template_serde is on.
+template_serde = ["beet_core/template_serde", "beet_core/rsx", "serde"]
 # Generic scripting registration (the `Script`/`ExchangeScript` reflect types).
 # Backend-agnostic; pair with a backend (eg `rhai`) for a working runtime.
 scripting = ["std", "beet_action/scripting", "serde"]

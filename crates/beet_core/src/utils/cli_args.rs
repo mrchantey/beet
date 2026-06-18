@@ -16,8 +16,9 @@ impl CliArgs {
 	///
 	/// The arguments arrive already tokenized by the shell, so they are fed
 	/// straight to [`parse_tokens`](Self::parse_tokens) without re-grouping.
-	/// This preserves quotes within a value, eg a JSON `--body`.
-	#[cfg(feature = "std")]
+	/// This preserves quotes within a value, eg a JSON `--body`. On a bare-metal
+	/// no_std target [`env_ext::args`] has no process argv to read, so this yields
+	/// empty args (the load-lifecycle verbs that call it then get an empty input).
 	pub fn parse_env() -> Self { Self::parse_tokens(env_ext::args()) }
 
 	/// Parses CLI arguments from a string, grouping quoted sections into
