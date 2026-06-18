@@ -11,18 +11,6 @@ pub struct CliArgs {
 	pub params: MultiMap<SmolStr, SmolStr>,
 }
 
-/// The process request supplied to a loaded entry tree, carried as a resource the
-/// load-lifecycle verbs read: a `StartScript` binds it as script input, a
-/// `StartServer` reads its `params` for boot config (`--server`, `--port`).
-///
-/// The `beet` binary parses argv once into this (minus its own `--main` flag) and
-/// inserts it before loading the entry, so the loaded tree never re-parses argv.
-/// It lives in `beet_core` because both verb crates (`beet_action`, `beet_net`)
-/// can see it, where neither can see the other's request type.
-#[derive(Debug, Clone, Resource)]
-pub struct EntryRequest(pub CliArgs);
-
-
 impl CliArgs {
 	/// Parses the CLI args from the environment, excluding program name.
 	///

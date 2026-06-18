@@ -14,11 +14,14 @@ pub struct ServerPlugin;
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
+			// the process-lifetime refcount the servers and the binary's load scope
+			// claim, driving exit when it returns to zero.
+			.init_resource::<KeepAlive>()
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
-			// the markup boot verb, so a `<Router {(.., StartServer)}>` entry
+			// the markup boot verb, so a `<Router {(.., ServeOnLoad)}>` entry
 			// resolves it.
-			.register_type::<StartServer>();
+			.register_type::<ServeOnLoad>();
 
 		// install the HTTP backend `HttpServer` invokes on start. The cascade
 		// mirrors the old per-component dispatch, now in one place: a downstream

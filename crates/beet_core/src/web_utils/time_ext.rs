@@ -1,11 +1,21 @@
-//! Timer utilities for WebAssembly environments.
-//!
-//! Provides wrappers around JavaScript's `setTimeout` for scheduling
-//! delayed callbacks in wasm.
+//! Timing utilities for WebAssembly environments: high-resolution timestamps via
+//! `Performance.now()` and scheduled (cancelable) timeouts via `setTimeout`.
 
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::window;
+
+/// Returns the current high-resolution timestamp in milliseconds.
+///
+/// This wraps the browser's [`Performance.now()`](https://developer.mozilla.org/en-US/docs/Web/API/Performance/now)
+/// API, providing sub-millisecond precision for timing measurements.
+///
+/// # Panics
+///
+/// Panics if called outside a browser environment (no `window` object).
+pub fn performance_now() -> f64 {
+	window().unwrap().performance().unwrap().now()
+}
 
 /// Handle to a scheduled timeout that cancels on drop.
 ///

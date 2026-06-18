@@ -1,13 +1,13 @@
-//! The server model: the [`BootServer`] / [`StopServer`] entity events that drive
-//! a server's lifecycle, the `StartServer` markup verb that fires `BootServer` on
+//! The server model: the [`StartServer`] / [`StopServer`] entity events that drive
+//! a server's lifecycle, the `ServeOnLoad` markup verb that fires `StartServer` on
 //! load, and the [`KeepAlive`] resource that keeps a long-running server's process
 //! up.
 //!
 //! # Boot is a load-lifecycle verb
 //!
 //! The binary forces no server. An entry declares its transports and a
-//! `StartServer` in a router spread (`<Router {(HttpServer, StartServer)}>`); on
-//! `LoadTemplate`, `StartServer` triggers a [`BootServer`] built from the entry
+//! `ServeOnLoad` in a router spread (`<Router {(HttpServer, ServeOnLoad)}>`); on
+//! `LoadTemplate`, `ServeOnLoad` triggers a [`StartServer`] built from the entry
 //! request, whose filter (`--server`) selects which declared servers boot. A
 //! one-shot [`CliServer`] parses argv into a [`Request`], runs one exchange
 //! against the router, and exits; a long-running [`HttpServer`] / `TuiServer`
@@ -16,11 +16,11 @@
 //! # Server owns its boot
 //!
 //! Each server component ([`CliServer`], [`HttpServer`], `TuiServer`) registers
-//! entity-scoped observers in its `on_add` hook: a [`BootServer`] observer that
+//! entity-scoped observers in its `on_add` hook: a [`StartServer`] observer that
 //! boots the server when the event's filter matches its name, and a
 //! [`StopServer`] observer that tears it down. There is no central orchestrator:
 //! a markup-spawned `<Router {(HttpServer{port:0})}>` boots exactly like an
-//! explicit trigger, the moment a [`BootServer`] lands on it.
+//! explicit trigger, the moment a [`StartServer`] lands on it.
 use beet_core::prelude::*;
 
 /// Start the servers on an entity whose name passes the [`filter`](Self::filter).
@@ -34,7 +34,7 @@ use beet_core::prelude::*;
 /// `--port`, `--host` for [`HttpServer`]); they flow from whoever triggered the
 /// start, never from `CliArgs::parse_env` inside the server.
 #[derive(Debug, Clone, EntityEvent, Get)]
-pub struct BootServer {
+pub struct StartServer {
 	/// The host entity to start servers on.
 	pub entity: Entity,
 	/// Selects which servers boot by name; empty matches all present.
@@ -43,7 +43,7 @@ pub struct BootServer {
 	pub params: MultiMap<SmolStr, SmolStr>,
 }
 
-impl BootServer {
+impl StartServer {
 	/// A start targeting `entity` whose filter matches every present server.
 	pub fn all(entity: Entity) -> Self {
 		Self {
@@ -63,7 +63,7 @@ impl BootServer {
 	}
 
 	/// The CLI entrypoint start: targets `entity`, filtered to the `cli` server.
-	/// Most hosts carry a single server and trigger [`BootServer::all`]; this
+	/// Most hosts carry a single server and trigger [`StartServer::all`]; this
 	/// names `cli` explicitly when several servers share a host.
 	pub fn cli(entity: Entity) -> Self { Self::named(entity, "cli") }
 
@@ -71,7 +71,7 @@ impl BootServer {
 	/// the servers (comma-separated, empty/absent = all), the rest of the request
 	/// `params` flow through as boot config.
 	///
-	/// This is how the `StartServer` verb boots an entry's declared servers from
+	/// This is how the `ServeOnLoad` verb boots an entry's declared servers from
 	/// the entry request, without naming any backend itself.
 	pub fn from_request(
 		entity: Entity,
@@ -130,12 +130,29 @@ impl StopServer {
 	pub fn passes(&self, name: &str) -> bool { self.filter.passes(name) }
 }
 
-/// When inserted, the process does not emit [`AppExit`] after the entrypoint's
-/// one exchange completes, keeping it alive: a long-running server ([`HttpServer`],
-/// the `beet_router` `TuiServer`) inserts it on start, and a `--watch` command
-/// inserts it so a file watcher keeps firing.
-#[derive(Default, Resource)]
-pub struct KeepAlive;
+/// Refcounts the live claims keeping the process alive. While the count is above
+/// zero the binary does not exit; when the last claim drops and it reaches zero the
+/// exit system emits [`AppExit::Success`].
+///
+/// Each claimant takes a ref for its lifetime and drops it when done: a long-running
+/// [`HttpServer`] / `TuiServer` ([`acquire`](Self::acquire) on start,
+/// [`release`](Self::release) on [`StopServer`]), a running [`CliServer`] exchange
+/// (acquire on start, release when the exchange finishes), and the binary itself
+/// (a load-scope ref held across the build). A refcount, not a unit flag, so sibling
+/// servers on one host (the multi-server site) each hold their own ref: a one-shot
+/// `CliServer` releasing its ref never tears down a live `HttpServer`.
+#[derive(Debug, Default, Resource)]
+pub struct KeepAlive(usize);
+
+impl KeepAlive {
+	/// Takes a ref: the process stays alive until it is released.
+	pub fn acquire(&mut self) { self.0 += 1; }
+	/// Drops a ref previously taken with [`acquire`](Self::acquire), saturating at
+	/// zero so an extra release can never underflow.
+	pub fn release(&mut self) { self.0 = self.0.saturating_sub(1); }
+	/// The number of outstanding refs; zero means nothing is keeping the process up.
+	pub fn count(&self) -> usize { self.0 }
+}
 
 #[cfg(test)]
 mod test {
@@ -143,7 +160,7 @@ mod test {
 
 	#[beet_core::test]
 	fn empty_filter_matches_all() {
-		let start = BootServer::all(Entity::PLACEHOLDER);
+		let start = StartServer::all(Entity::PLACEHOLDER);
 		start.passes("cli").xpect_true();
 		start.passes("http").xpect_true();
 		start.passes("tui").xpect_true();
@@ -151,7 +168,7 @@ mod test {
 
 	#[beet_core::test]
 	fn named_filter_matches_one() {
-		let start = BootServer::named(Entity::PLACEHOLDER, "http");
+		let start = StartServer::named(Entity::PLACEHOLDER, "http");
 		start.passes("http").xpect_true();
 		start.passes("cli").xpect_false();
 		start.passes("tui").xpect_false();
@@ -159,7 +176,7 @@ mod test {
 
 	#[beet_core::test]
 	fn cli_filter_selects_cli() {
-		let start = BootServer::cli(Entity::PLACEHOLDER);
+		let start = StartServer::cli(Entity::PLACEHOLDER);
 		start.passes("cli").xpect_true();
 		start.passes("http").xpect_false();
 	}
@@ -167,7 +184,7 @@ mod test {
 	#[beet_core::test]
 	fn from_request_builds_filter() {
 		// no `--server`: matches all present servers.
-		let start = BootServer::from_request(
+		let start = StartServer::from_request(
 			Entity::PLACEHOLDER,
 			None,
 			default(),
@@ -175,7 +192,7 @@ mod test {
 		start.passes("cli").xpect_true();
 		start.passes("http").xpect_true();
 		// `--server=http`: only http.
-		let start = BootServer::from_request(
+		let start = StartServer::from_request(
 			Entity::PLACEHOLDER,
 			Some("http"),
 			default(),
@@ -183,7 +200,7 @@ mod test {
 		start.passes("http").xpect_true();
 		start.passes("cli").xpect_false();
 		// `--server=http,tui`: either.
-		let start = BootServer::from_request(
+		let start = StartServer::from_request(
 			Entity::PLACEHOLDER,
 			Some("http, tui"),
 			default(),

@@ -147,11 +147,11 @@ async fn blob_store_route_serves_assets() {
 /// `<Router {(HttpServer{port:0})}>`: the http server is declarable from markup,
 /// landing on the router via the reflect spread path (port 0 keeps any started
 /// backend on an OS-assigned port). The reflect insert registers the server's
-/// `BootServer` observer through its `on_add`, so a triggered start boots it via
+/// `StartServer` observer through its `on_add`, so a triggered start boots it via
 /// the installed runtime hook.
 // Only without a real HTTP backend: the test installs a stand-in runtime hook to
 // prove the wiring without a live server, but with the `http`/`client_io` backend
-// present, `BootServer::all` boots a real listener (and, under `client_io`, its
+// present, `StartServer::all` boots a real listener (and, under `client_io`, its
 // tungstenite channel on a fixed port) that this test cannot cleanly stop, so it
 // would leak a spinning task into the rest of the single-process suite.
 #[cfg(not(feature = "http"))]
@@ -185,13 +185,13 @@ async fn http_server_declarable_in_markup() {
 		.unwrap()
 		.port
 		.xpect_eq(Some(0));
-	// a triggered `BootServer` boots the declared server via the runtime hook.
-	world.entity_mut(root).trigger(BootServer::all);
+	// a triggered `StartServer` boots the declared server via the runtime hook.
+	world.entity_mut(root).trigger(StartServer::all);
 	AsyncRunner::flush_async_tasks(&mut world).await;
 	world.entity(root).contains::<ServerBooted>().xpect_true();
 }
 
-/// Flag the test runtime hook inserts, proving a triggered `BootServer` reached
+/// Flag the test runtime hook inserts, proving a triggered `StartServer` reached
 /// the declared `HttpServer`'s backend.
 #[cfg(not(feature = "http"))]
 #[derive(Component)]

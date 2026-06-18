@@ -38,14 +38,14 @@ fn main() -> AppExit {
 fn setup(mut commands: Commands) -> Result {
 	cfg_if! {
 		if #[cfg(feature="deploy")]{
-			commands.spawn(infra_scene()?).trigger(BootServer::all);
+			commands.spawn(infra_scene()?).trigger(StartServer::all);
 		}else{
 			commands
 				.spawn((
 					BlobStore::new(assets_store()),
 					router::router_scene()?,
 				))
-				.trigger(BootServer::all);
+				.trigger(StartServer::all);
 		}
 	}
 	Ok(())

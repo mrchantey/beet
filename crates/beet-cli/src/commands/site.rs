@@ -32,7 +32,7 @@ pub(crate) fn load_site(
 	}
 	world.insert_resource(SiteRoot(site_dir));
 	// `check`/`export-static` render the site, never serve it: keep the servers
-	// the site's `<StartServer/>` would boot dormant.
+	// the site's `<ServeOnLoad/>` would boot dormant.
 	world.insert_resource(SuppressServerBoot);
 	BsxTemplate::load_entry(world, &entry)?.spawn(world)
 }

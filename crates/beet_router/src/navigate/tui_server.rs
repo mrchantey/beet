@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// A live-TUI server: spawned alongside a router, a [`BootServer`] event whose
+/// A live-TUI server: spawned alongside a router, a [`StartServer`] event whose
 /// filter passes `"tui"` boots the navigable terminal app. The interactive
 /// sibling of the one-shot [`CliServer`].
 ///
@@ -20,26 +20,39 @@ use beet_ui::prelude::*;
 ///
 /// Reusable: any app gets a live TUI by adding the live plugins
 /// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]) and spawning
-/// this on its router entity, then triggering a [`BootServer`].
+/// this on its router entity, then triggering a [`StartServer`].
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(on_add = on_add)]
 pub struct TuiServer;
 
-/// Registers the [`BootServer`] observer on the router, so the live terminal
-/// app boots when a start event whose filter passes `"tui"` lands on it.
+/// Marks a [`TuiServer`] whose live app is running, so a [`StopServer`] releases
+/// the `KeepAlive` ref exactly once (and never another claimant's).
+#[derive(Component)]
+struct TuiServerRunning;
+
+/// Registers the [`StartServer`] / [`StopServer`] observers on the router, so the
+/// live terminal app boots and tears down when a matching event lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_start_server);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_start_server)
+		.observe_any(on_stop_server);
 }
 
-/// Boots the live terminal app when a [`BootServer`] passing `"tui"` lands.
-/// A long-running server, so it inserts [`KeepAlive`].
-fn on_start_server(ev: On<BootServer>, mut commands: Commands) {
+/// Boots the live terminal app when a [`StartServer`] passing `"tui"` lands.
+/// A long-running server, so it takes a [`KeepAlive`] ref.
+fn on_start_server(
+	ev: On<StartServer>,
+	mut keep_alive: ResMut<KeepAlive>,
+	mut commands: Commands,
+) {
 	if !ev.passes("tui") {
 		return;
 	}
-	commands.insert_resource(KeepAlive);
-	// the boot event's params (the `StartServer` verb's entry request, or a `beet
+	keep_alive.acquire();
+	// the start event's params (the `ServeOnLoad` verb's entry request, or a `beet
 	// serve` command's argv) carry the opening route and scheme, so a served site
 	// opens at the right page. Record the opening route on the router (the shared
 	// mechanism the SSH server also reads); the scheme is applied at boot.
@@ -47,7 +60,25 @@ fn on_start_server(ev: On<BootServer>, mut commands: Commands) {
 	commands
 		.entity(ev.event_target())
 		.insert(OpeningRoute::from_params(&params))
+		.insert(TuiServerRunning)
 		.queue_async_local(move |entity| boot(entity, params));
+}
+
+/// Tears down the live terminal app when a [`StopServer`] passing `"tui"` lands by
+/// releasing its [`KeepAlive`] ref. When that drops the count to zero the binary's
+/// exit system emits `AppExit`, ending the `CharcellTuiPlugin` loop (which restores
+/// the terminal on exit), the same path Ctrl+c takes.
+fn on_stop_server(
+	ev: On<StopServer>,
+	running: Query<(), With<TuiServerRunning>>,
+	mut keep_alive: ResMut<KeepAlive>,
+	mut commands: Commands,
+) {
+	if !ev.passes("tui") || !running.contains(ev.event_target()) {
+		return;
+	}
+	keep_alive.release();
+	commands.entity(ev.event_target()).remove::<TuiServerRunning>();
 }
 
 async fn boot(

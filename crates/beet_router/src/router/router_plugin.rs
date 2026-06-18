@@ -53,7 +53,7 @@ impl Plugin for RouterPlugin {
 		{
 			app
 				// the server model: routers and servers go together, so a server
-				// spawned on a router boots when a `BootServer` event lands on it.
+				// spawned on a router boots when a `StartServer` event lands on it.
 				// `ServerPlugin` installs the `HttpServer` backend and registers the
 				// server types.
 				.init_plugin::<ServerPlugin>()
@@ -118,7 +118,7 @@ impl Plugin for RouterPlugin {
 			register_template_include(app.world_mut());
 			// the live-TUI server, declarable in a router markup spread
 			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
-			// terminal app when a `tui`-filtered `BootServer` lands.
+			// terminal app when a `tui`-filtered `StartServer` lands.
 			#[cfg(feature = "tui")]
 			app.register_type::<TuiServer>();
 			#[cfg(feature = "scripting")]

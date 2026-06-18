@@ -57,9 +57,6 @@ pub mod time_ext;
 #[cfg(feature = "std")]
 pub use lazy_pool::*;
 mod tree;
-/// Timer utilities for WebAssembly environments.
-#[cfg(target_arch = "wasm32")]
-pub mod wasm;
 mod xtend;
 pub use as_any::*;
 

@@ -55,7 +55,9 @@ cli *args:
   # cargo run -p beet-cli -- {{ args }}
 
 install-cli *args:
-  cargo install --path crates/beet-cli {{ args }}
+  # --locked pins the workspace bevy rc; a bare install re-resolves the
+  # pre-release deps to a newer, incompatible candidate.
+  cargo install --locked --path crates/beet-cli {{ args }}
 
 #💡 Aliases
 

@@ -30,6 +30,9 @@ mod interval;
 pub use self::interval::*;
 /// Runtime bindings for Deno/browser environments.
 pub mod js_runtime;
+/// Isolated JavaScript evaluation with streamed console output (the `EvalOnLoad`
+/// wasm backend).
+pub mod script_ext;
 /// Async timeout and lifecycle utilities.
 pub mod lifecycle_ext;
 mod poll;
@@ -38,8 +41,8 @@ mod resize_listener;
 pub use self::resize_listener::*;
 /// URL query string reading and writing utilities.
 pub mod search_params_ext;
-mod time_utils;
-pub use self::time_utils::*;
+mod time_ext;
+pub use self::time_ext::*;
 mod result;
 pub use result::*;
 mod closure;

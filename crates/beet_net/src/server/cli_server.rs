@@ -15,12 +15,12 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint server: on a [`BootServer`] whose filter passes `"cli"`, it
+/// The entrypoint server: on a [`StartServer`] whose filter passes `"cli"`, it
 /// parses argv and environment into a request, runs one exchange, streams the
 /// response body to stdout, then exits (unless [`KeepAlive`] is set).
 ///
 /// This is how every beet binary boots: spawn it on the host, then trigger
-/// [`BootServer::all`] (the empty filter matches the lone server). Being a
+/// [`StartServer::all`] (the empty filter matches the lone server). Being a
 /// one-shot, [`StopServer`] is a no-op for it.
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
@@ -30,18 +30,25 @@ use beet_core::prelude::*;
 #[component(on_add = on_add)]
 pub struct CliServer;
 
-/// Registers the [`BootServer`] observer on the host, so the one-shot exchange
+/// Registers the [`StartServer`] observer on the host, so the one-shot exchange
 /// runs when a start event whose filter passes `"cli"` lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(on_start_server);
 }
 
-/// Runs the one argv exchange when a [`BootServer`] passing `"cli"` lands.
-fn on_start_server(ev: On<BootServer>, mut commands: Commands) {
+/// Runs the one argv exchange when a [`StartServer`] passing `"cli"` lands.
+fn on_start_server(
+	ev: On<StartServer>,
+	mut keep_alive: ResMut<KeepAlive>,
+	mut commands: Commands,
+) {
 	if !ev.passes("cli") {
 		return;
 	}
-	// the boot params (from the `StartServer` verb's entry request) reach the
+	// hold a ref for the duration of the async exchange so the process cannot exit
+	// before it completes; `run_and_exit` releases it when the exchange finishes.
+	keep_alive.acquire();
+	// the boot params (from the `ServeOnLoad` verb, parsed from argv) reach the
 	// exchange so a served site renders the requested route.
 	let params = ev.params.clone();
 	commands
@@ -65,8 +72,9 @@ async fn run_and_exit(
 ) -> Result {
 	// short-circuit when the entity has already been despawned, ie
 	// [`TemplateStore::save_bundle`] briefly spawns a [`CliServer`]
-	// just to serialize it.
+	// just to serialize it. Drop the ref taken on start so it cannot leak.
 	if !entity.is_alive().await {
+		release_keep_alive(&entity).await;
 		return Ok(());
 	}
 
@@ -94,27 +102,31 @@ async fn run_and_exit(
 
 	let res = entity.exchange(req).await;
 	let (parts, body) = res.into_parts();
-
-	let exit = match parts.status_to_exit_code() {
-		Ok(()) => AppExit::Success,
-		Err(code) => {
-			error!("Command failed\nStatus code: {code}");
-			AppExit::Error(code)
-		}
-	};
+	let exit_code = parts.status_to_exit_code();
 
 	stream_body_to_stdout(body).await?;
 
-	// a long-running server (or a `--watch` command) inserts `KeepAlive` so the
-	// schedule keeps running; otherwise the process exits after one command.
-	let keep_alive = entity
-		.world()
-		.with(|world| world.contains_resource::<KeepAlive>())
-		.await;
-	if !keep_alive {
-		entity.world().write_message(exit).await;
+	match exit_code {
+		// success: drop our ref. If nothing else holds the process up the exit
+		// system emits `AppExit::Success`; a sibling long-running server keeps it.
+		Ok(()) => release_keep_alive(&entity).await,
+		// failure: report the non-zero exit code directly so it reaches the process
+		// exit, leaving our ref since the message ends the run anyway.
+		Err(code) => {
+			error!("Command failed\nStatus code: {code}");
+			entity.world().write_message(AppExit::Error(code)).await;
+		}
 	}
 	Ok(())
+}
+
+/// Drop the [`KeepAlive`] ref a `cli` start took, so a finished exchange lets the
+/// process exit unless another claim still holds it.
+async fn release_keep_alive(entity: &AsyncEntity) {
+	entity
+		.world()
+		.with(|world: &mut World| world.resource_mut::<KeepAlive>().release())
+		.await;
 }
 
 /// Streams a [`Response`] body to stdout chunk-by-chunk, returning
@@ -142,7 +154,7 @@ mod tests {
 				CliServer,
 				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
 			))
-			.trigger(BootServer::all);
+			.trigger(StartServer::all);
 		app.run_async()
 			.await
 			.xpect_eq(AppExit::Error(1.try_into().unwrap()));

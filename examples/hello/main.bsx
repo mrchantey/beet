@@ -1,7 +1,7 @@
 <!--
 The smallest beet entry: a script that runs on load and prints, the
 `node main.js` shape. `<script>` is a raw-text element so the JavaScript body is
-verbatim; the `{StartScript}` verb spread runs it once the entry is built,
+verbatim; the `{EvalOnLoad}` verb spread runs it once the entry is built,
 binding the process request as `input` and streaming `console.log` to stdout.
 -->
-<script {StartScript}>console.log("hello world")</script>
+<script {EvalOnLoad}>console.log("hello world")</script>

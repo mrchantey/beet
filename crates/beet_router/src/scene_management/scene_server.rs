@@ -34,7 +34,7 @@ impl Plugin for SceneServerPlugin {
 }
 
 /// The scene-server meta-routes as a markup-spawnable bundle: place
-/// `<SceneServer/>` under a `<Router {(HttpServer, StartServer)}>` to expose
+/// `<SceneServer/>` under a `<Router {(HttpServer, ServeOnLoad)}>` to expose
 /// `POST /load`, `GET /clear`, `GET /reset` and `GET /dump` — the device side of
 /// a scene push, receiving a scene over the wire and swapping it via
 /// [`set_scene`]. The host side is the `SceneLoad`/`SceneClear`/... push commands.

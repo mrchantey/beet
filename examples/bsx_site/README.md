@@ -1,6 +1,6 @@
 # BSX Site
 
-A site declared entirely in markup. `main.bsx` is the entrypoint, `routes/` is the content, `templates/` holds the site's own BSX templates. No Rust authoring, no codegen, and no `main.rs`: the `beet` binary discovers `main.bsx`, and the `StartServer` verb it declares boots the servers the moment the entry loads.
+A site declared entirely in markup. `main.bsx` is the entrypoint, `routes/` is the content, `templates/` holds the site's own BSX templates. No Rust authoring, no codegen, and no `main.rs`: the `beet` binary discovers `main.bsx`, and the `ServeOnLoad` verb it declares boots the servers the moment the entry loads.
 
 ```sh
 # run from the site dir so the binary discovers its main.bsx (or pass --main=<path>)
@@ -31,21 +31,21 @@ bsx_site/
   routes/        the content: every file is a page
 ```
 
-There is no `main.rs`. The `beet` binary discovers `main.bsx`, registers the sibling `templates/` directory, sets the `SiteRoot` (which `<RoutesDir/>` resolves against), and loads `main.bsx` as the app root. The `<StartServer/>` verb declared on the router then boots the servers once the entry has loaded: `--server=http` starts the HTTP listener, `--server=cli` runs one render, `--server=tui` opens the live terminal. `<DefaultAppRoutes/>` layers the default app routes (`/app-info`, `POST /analytics`) on. Static export is a separate dev command, `beet export-static <site-dir>`. The `<PackageConfig/>` declared in `main.bsx` supplies the site title and description those routes read.
+There is no `main.rs`. The `beet` binary discovers `main.bsx`, registers the sibling `templates/` directory, sets the `SiteRoot` (which `<RoutesDir/>` resolves against), and loads `main.bsx` as the app root. The `<ServeOnLoad/>` verb declared on the router then boots the servers once the entry has loaded: `--server=http` starts the HTTP listener, `--server=cli` runs one render, `--server=tui` opens the live terminal. `<DefaultAppRoutes/>` layers the default app routes (`/app-info`, `POST /analytics`) on. Static export is a separate dev command, `beet export-static <site-dir>`. The `<PackageConfig/>` declared in `main.bsx` supplies the site title and description those routes read.
 
 ## How it works
 
 `main.bsx` declares the whole app as a single root element:
 
 ```html
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337}, TuiServer, CliServer, StartServer)}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337}, TuiServer, CliServer, ServeOnLoad)}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<RoutesDir src="routes"/>
 </Router>
 ```
 
 - `<Router>` is the `beet_router` dispatch component. The entry's single root element is built *into* the spawned root entity, so the route tree, servers, and middleware all live where they expect to.
-- The three servers (`HttpServer`, `TuiServer`, `CliServer`) are transport components, and `StartServer` is the boot verb: on load it triggers the servers `--server` selects, so the same markup serves every target with no host binary.
+- The three servers (`HttpServer`, `TuiServer`, `CliServer`) are transport components, and `ServeOnLoad` is the boot verb: on load it triggers the servers `--server` selects, so the same markup serves every target with no host binary.
 - `<PackageConfig/>` is a resource declaration: a capitalized tag naming a `#[reflect(Resource)]` type patches the live resource's named fields (here the site title and description), leaving the rest, eg the compile-time version, untouched. It produces no markup.
 - The `{(..)}` spread stacks middleware components onto the router entity, exactly as a Rust `world.spawn((Router, RequestLogger, ..))` would: request logging, `--help`, terminal link navigation, and the layout.
 - `BsxLayout{template:"Layout"}` is render middleware: every page's body transcludes into the default `<Slot/>` of the `templates/Layout.bsx` template, resolved from the registry by name.

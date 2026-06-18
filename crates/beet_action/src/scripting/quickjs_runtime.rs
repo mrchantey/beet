@@ -1,8 +1,9 @@
 use beet_core::prelude::*;
-use rquickjs::Array;
 use rquickjs::Context;
+use rquickjs::Function;
 use rquickjs::Runtime;
 use rquickjs::Value;
+use rquickjs::function::MutFn;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -46,49 +47,57 @@ where
 	})
 }
 
-/// Console output captured from a side-effecting [`run_quickjs_console`] eval.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct ConsoleOutput {
-	/// Lines from `console.log`/`info`/`debug`, in call order.
-	pub stdout: Vec<String>,
-	/// Lines from `console.warn`/`error`, in call order.
-	pub stderr: Vec<String>,
+/// Which host stream a [`run_quickjs_console`] call targets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsoleStream {
+	/// `console.log`/`info`/`debug`.
+	Stdout,
+	/// `console.warn`/`error`.
+	Stderr,
 }
 
-/// The `console` shim installed before a [`run_quickjs_console`] script: each
-/// call buffers a formatted line into a global array the host reads back, so
-/// output reaches the host streams with no Rust callback binding. The IIFE
-/// returns `undefined`, leaving no stray value.
+/// The `console` shim installed before a [`run_quickjs_console`] script: each call
+/// formats its args and forwards them straight to the `__console_write` FFI sink, so
+/// output reaches the host the moment the call runs (not buffered until `eval`
+/// returns). The IIFE returns `undefined`, leaving no stray value.
 const CONSOLE_PRELUDE: &str = r#"
-globalThis.__stdout = [];
-globalThis.__stderr = [];
 (() => {
 	const fmt = (args) => args
 		.map((arg) => typeof arg === 'string' ? arg : JSON.stringify(arg))
 		.join(' ');
+	const write = (stream) => (...args) =>
+		globalThis.__console_write(stream, fmt(args));
 	globalThis.console = {
-		log:   (...args) => globalThis.__stdout.push(fmt(args)),
-		info:  (...args) => globalThis.__stdout.push(fmt(args)),
-		debug: (...args) => globalThis.__stdout.push(fmt(args)),
-		warn:  (...args) => globalThis.__stderr.push(fmt(args)),
-		error: (...args) => globalThis.__stderr.push(fmt(args)),
+		log: write(0), info: write(0), debug: write(0),
+		warn: write(1), error: write(1),
 	};
 })();
 "#;
 
-/// Evaluate `script` for its side effects, returning its captured console output.
+/// Evaluate `script` for its side effects, streaming each `console` call to `sink`
+/// the moment it runs.
 ///
-/// Unlike [`run_quickjs`] (a pure `Input -> Output` transform), this binds a
-/// `console` whose `log`/`info`/`debug` buffer to stdout and `warn`/`error` to
-/// stderr, and tolerates a script that returns no value (a statement like
-/// `console.log("hi")`, which [`run_quickjs`] rejects). The `input` global is the
-/// serialized `input`, as in [`run_quickjs`]. This is the `StartScript` eval path.
-pub fn run_quickjs_console<Input>(
+/// Unlike [`run_quickjs`] (a pure `Input -> Output` transform), `console`
+/// `log`/`info`/`debug` forward to [`ConsoleStream::Stdout`] and `warn`/`error` to
+/// [`ConsoleStream::Stderr`] through a direct FFI binding, not a buffer read back
+/// after `eval` runs. So a long-running or async script's output is not held back
+/// until `eval` returns (it may never). After the top-level eval the QuickJS job
+/// queue is drained, so a script that schedules a microtask (a resolved promise,
+/// `queueMicrotask`) runs to completion, its output streaming as each job runs.
+/// Tolerates a script that returns no value (a bare `console.log("hi")`, which
+/// [`run_quickjs`] rejects). The `input` global is the serialized `input`, as in
+/// [`run_quickjs`]. This is the `EvalOnLoad` eval path.
+///
+/// `sink` is `FnMut` and runs on the single-threaded [`Context::full`], so it needs
+/// no `Send`.
+pub fn run_quickjs_console<Input, Sink>(
 	script: &str,
 	input: Input,
-) -> Result<ConsoleOutput>
+	sink: Sink,
+) -> Result<()>
 where
 	Input: Serialize,
+	Sink: 'static + FnMut(ConsoleStream, &str),
 {
 	let input = serde_json::to_string(&input)
 		.map_err(|err| bevyhow!("quickjs: failed to encode input: {err}"))?;
@@ -97,37 +106,47 @@ where
 	let context =
 		Context::full(&runtime).map_err(|err| bevyhow!("quickjs: {err}"))?;
 
-	context.with(|ctx| {
+	context.with(|ctx| -> Result<()> {
 		let globals = ctx.globals();
 		globals
 			.set("input", ctx.json_parse(input)?)
 			.map_err(|err| bevyhow!("quickjs: failed to bind input: {err}"))?;
 
-		// install the buffering `console`, then run the script. Both eval to a
+		// the single FFI sink the `console` prelude forwards every call to. `MutFn`
+		// wraps the `FnMut` for QuickJS's reentrant calls; the closure writes through
+		// immediately, so output streams as the script runs.
+		let mut sink = sink;
+		let write = Function::new(
+			ctx.clone(),
+			MutFn::new(move |stream: i32, msg: String| {
+				let stream = match stream {
+					1 => ConsoleStream::Stderr,
+					_ => ConsoleStream::Stdout,
+				};
+				sink(stream, &msg);
+			}),
+		)
+		.map_err(|err| bevyhow!("quickjs: bind console sink: {err}"))?;
+		globals
+			.set("__console_write", write)
+			.map_err(|err| bevyhow!("quickjs: bind console: {err}"))?;
+
+		// install the streaming `console`, then run the script. Both eval to a
 		// discarded `Value`, so a no-value statement never errors.
 		ctx.eval::<Value, _>(CONSOLE_PRELUDE)
 			.map_err(|err| bevyhow!("quickjs: console prelude: {err}"))?;
 		ctx.eval::<Value, _>(script)
 			.map_err(|err| bevyhow!("quickjs: {err}"))?;
+		Ok(())
+	})?;
 
-		// drain each buffer array back into the host strings, in call order.
-		let drain = |key: &str| -> Result<Vec<String>> {
-			let array: Array = globals
-				.get(key)
-				.map_err(|err| bevyhow!("quickjs: read `{key}`: {err}"))?;
-			(0..array.len())
-				.map(|index| {
-					array.get::<String>(index).map_err(|err| {
-						bevyhow!("quickjs: decode `{key}`: {err}")
-					})
-				})
-				.collect()
-		};
-		Ok(ConsoleOutput {
-			stdout: drain("__stdout")?,
-			stderr: drain("__stderr")?,
-		})
-	})
+	// drain scheduled jobs (microtasks) so a promise-based script completes, its
+	// console output streaming as each job runs.
+	while runtime
+		.execute_pending_job()
+		.map_err(|err| bevyhow!("quickjs: job: {err:?}"))?
+	{}
+	Ok(())
 }
 
 #[cfg(test)]
@@ -198,22 +217,58 @@ mod test {
 			.unwrap_err();
 	}
 
+	/// Collects the streamed console output into buffers for assertions.
+	#[derive(Debug, Default)]
+	struct ConsoleOutput {
+		stdout: Vec<String>,
+		stderr: Vec<String>,
+	}
+
+	/// Run a script with a capturing sink, collecting its streamed output. The sink
+	/// must be `'static`, so it shares the buffer through an `Rc` rather than
+	/// borrowing the local.
+	fn capture(script: &str, input: impl serde::Serialize) -> ConsoleOutput {
+		use std::cell::RefCell;
+		use std::rc::Rc;
+		let output = Rc::new(RefCell::new(ConsoleOutput::default()));
+		let sink = output.clone();
+		run_quickjs_console(script, input, move |stream, msg| {
+			let mut out = sink.borrow_mut();
+			match stream {
+				ConsoleStream::Stdout => out.stdout.push(msg.to_string()),
+				ConsoleStream::Stderr => out.stderr.push(msg.to_string()),
+			}
+		})
+		.unwrap();
+		// the sink (and its `Rc` clone) is dropped with the context inside
+		// `run_quickjs_console`, leaving `output` the sole owner.
+		Rc::try_unwrap(output).unwrap().into_inner()
+	}
+
 	#[beet_core::test]
-	fn console_log_captures_stdout() {
-		let output =
-			run_quickjs_console(r#"console.log("hello world")"#, ()).unwrap();
+	fn console_log_streams_stdout() {
+		let output = capture(r#"console.log("hello world")"#, ());
 		output.stdout.xpect_eq(vec!["hello world".to_string()]);
 		output.stderr.xpect_empty();
 	}
 
 	#[beet_core::test]
 	fn console_reads_input_and_splits_streams() {
-		let output = run_quickjs_console(
+		let output = capture(
 			r#"console.log(input.name); console.error("oops")"#,
 			serde_json::json!({ "name": "ada" }),
-		)
-		.unwrap();
+		);
 		output.stdout.xpect_eq(vec!["ada".to_string()]);
 		output.stderr.xpect_eq(vec!["oops".to_string()]);
+	}
+
+	/// The job queue drains after the top-level eval, so a microtask scheduled by a
+	/// resolved promise still runs and its output streams. The old
+	/// buffer-after-eval shim missed it.
+	#[beet_core::test]
+	fn drains_async_microtasks() {
+		let output =
+			capture(r#"Promise.resolve().then(() => console.log("later"))"#, ());
+		output.stdout.xpect_eq(vec!["later".to_string()]);
 	}
 }

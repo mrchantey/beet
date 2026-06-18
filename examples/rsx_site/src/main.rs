@@ -2,7 +2,7 @@
 //!
 //! With the `codegen` feature it runs the route codegen pass and exits.
 //! Otherwise it spawns the site router with a server selected by build features,
-//! then triggers a [`BootServer`] on it (empty filter, so whichever server is
+//! then triggers a [`StartServer`] on it (empty filter, so whichever server is
 //! present boots). The server is an [`HttpServer`] by default, the live
 //! `TuiServer` under `tui`, or a [`CliServer`] (with the `cli` feature, or when
 //! no `web` target is enabled) that renders a single route to stdout (HTML or
@@ -31,7 +31,7 @@ fn main() {
 		// build feature selected.
 		commands
 			.spawn((site_server(), rsx_site_router()))
-			.trigger(BootServer::all);
+			.trigger(StartServer::all);
 	});
 	app.run();
 }

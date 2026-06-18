@@ -8,7 +8,7 @@ does nothing until you supply an entry. On startup it discovers `main.bsx` (or
 `main.json` / `main.ron`) by walking the cwd's ancestors, with `--main=<path>` as
 an override. It parses argv once into a request the loaded tree consumes, builds
 the entry through the unified loader, and lets the load-lifecycle verbs
-(`StartScript`, `StartServer`) run. With no `KeepAlive` it exits once the
+(`EvalOnLoad`, `ServeOnLoad`) run. With no `KeepAlive` it exits once the
 lifecycle settles; a long-running server keeps it alive.
 
 There is no built-in command, route, host, or retained state. The dev commands

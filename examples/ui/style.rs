@@ -35,7 +35,7 @@ fn main() {
 					HttpServer::default(),
 					Handler.into_action(),
 				))
-				.trigger(BootServer::all);
+				.trigger(StartServer::all);
 		})
 		.run();
 }
