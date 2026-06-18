@@ -1633,6 +1633,7 @@ dependencies = [
  "bytes",
  "extend",
  "heck",
+ "image",
  "js-sys",
  "libc",
  "material-colors",

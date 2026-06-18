@@ -442,10 +442,18 @@ pub fn flex_layout_rects(
 			)
 		})
 		.collect();
-	let line_cross_sizes: Vec<u32> = final_per_line
+	let mut line_cross_sizes: Vec<u32> = final_per_line
 		.iter()
 		.map(|sizes| line_cross_size_for(sizes, flexbox.direction, viewport))
 		.collect();
+	// a single flex line fills the container's cross size (CSS: a single-line
+	// container's line cross size is the container's inner cross size), so
+	// `align-items: stretch` fills the container — the full-width header/footer and
+	// the full-height sidebar rail — not just the content. Wrapped (multi-line)
+	// flows keep their per-line content cross size, distributed by `align-content`.
+	if let [only] = line_cross_sizes.as_mut_slice() {
+		*only = (*only).max(container_cross);
+	}
 
 	let line_positions = apply_align_content(
 		flexbox,

@@ -541,6 +541,62 @@ mod tests {
 		painted.contains(&UVec2::new(2, 1)).xpect_true();
 	}
 
+	/// The page chrome fills the fixed terminal viewport like the web: the body's
+	/// flex column stretches the header/footer to full width (`align-items:
+	/// stretch` filling the container, not just the content), `min-height: 100vh`
+	/// plus the container's `flex-grow` pins the footer to the bottom row, and the
+	/// container's row stretches the sidebar to full height so its right divider
+	/// runs the whole rail. Regression for the terminal app rendering
+	/// content-sized: a short header, a content-height sidebar border.
+	#[beet_core::test]
+	fn page_chrome_fills_viewport() {
+		use crate::prelude::*;
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<html lang="en">
+					<body {Classes::new([classes::PAGE])}>
+						<header {Classes::new([classes::APP_BAR])}>"Header"</header>
+						<div {Classes::new([classes::CONTAINER])}>
+							<nav {Classes::new([classes::SIDEBAR])}>"Nav"</nav>
+							<main>"Content"</main>
+						</div>
+						<footer>"Footer"</footer>
+					</body>
+				</html>
+			})
+			.unwrap()
+			.id();
+		let size = UVec2::new(60, 24);
+		world
+			.entity_mut(root)
+			.insert(Buffer::new(size).into_double_buffer());
+		world.run_schedule(crate::parse::PostParseTree);
+		let rects = world
+			.run_system_once(|q: Query<(&Element, &LayoutRect)>| {
+				q.iter()
+					.map(|(el, r)| (el.tag().to_string(), r.0))
+					.collect::<HashMap<_, _>>()
+			})
+			.unwrap();
+		let rect = |tag: &str| rects[tag];
+		// header and footer span the full viewport width
+		rect("header").width().xpect_eq(60);
+		rect("footer").width().xpect_eq(60);
+		// the footer pins to the bottom row of the 24-row viewport
+		rect("footer").max.y.xpect_eq(24);
+		// the sidebar rail runs the full height of the content row (its divider too)
+		let container = rect("div");
+		rect("nav").height().xpect_eq(container.height());
+		(container.height() > 10).xpect_true();
+	}
+
 	#[beet_core::test]
 	fn inline_places_children_side_by_side() {
 		let out = render((

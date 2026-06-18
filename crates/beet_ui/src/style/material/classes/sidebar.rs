@@ -111,16 +111,17 @@ pub fn sidebar() -> Rule {
 		})
 }
 
-/// Web sidebar - a comfortable fixed rail width so the nav tree isn't cramped.
-/// `min-width` pins the width: the rail is a flex item beside the main column,
-/// so without a floor the main content's preferred width shrinks it (a varying
-/// amount per page). Screen-gated: the terminal sizes the rail to its content.
+/// Web sidebar - a responsive rail that prefers a comfortable 22rem but shrinks
+/// to a 16rem floor when a wide main column needs the room (the rail is a flex
+/// item beside it, so `min-width` is the floor and `max-width` the ceiling).
+/// Screen-gated; the terminal uses the fixed [`sidebar_terminal`].
 pub fn sidebar_web() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::class(SIDEBAR))
-		.with_value(common_props::Width, Length::Rem(16.))
+		.with_value(common_props::Width, Length::Rem(22.))
 		.with_value(common_props::MinWidth, Length::Rem(16.))
+		.with_value(common_props::MaxWidth, Length::Rem(22.))
 		.with_value(common_props::Padding, Spacing {
 			left: Length::Rem(0.5),
 			right: Length::Rem(1.),
@@ -129,15 +130,15 @@ pub fn sidebar_web() -> Rule {
 		})
 }
 
-/// Terminal sidebar - a fixed rail width matching the web's, so the nav is a
-/// stable column rather than sizing to its widest label. Long anchors wrap within
-/// it (the links are full-width blocks). Terminal-gated; the web uses
-/// [`sidebar_web`].
+/// Terminal sidebar - a fixed 20rem rail, so the nav is a stable column rather
+/// than sizing to its widest label. Long anchors wrap within it (the links are
+/// full-width blocks). Fixed rather than the web's responsive range since the
+/// charcell engine sizes from explicit `width` alone (no min/max-width).
 pub fn sidebar_terminal() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Terminal)
 		.with_selector(Selector::class(SIDEBAR))
-		.with_value(common_props::Width, Length::Rem(16.))
+		.with_value(common_props::Width, Length::Rem(20.))
 }
 
 /// Web sidebar collapse - on screens at or below [`SIDEBAR_BREAKPOINT_PX`] the
