@@ -15,7 +15,10 @@ impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
 			.register_type::<CliServer>()
-			.register_type::<HttpServer>();
+			.register_type::<HttpServer>()
+			// the markup boot verb, so a `<Router {(.., StartServer)}>` entry
+			// resolves it.
+			.register_type::<StartServer>();
 
 		// install the HTTP backend `HttpServer` invokes on start. The cascade
 		// mirrors the old per-component dispatch, now in one place: a downstream

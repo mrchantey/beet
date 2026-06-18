@@ -15,12 +15,12 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint server: on a [`StartServer`] whose filter passes `"cli"`, it
+/// The entrypoint server: on a [`BootServer`] whose filter passes `"cli"`, it
 /// parses argv and environment into a request, runs one exchange, streams the
 /// response body to stdout, then exits (unless [`KeepAlive`] is set).
 ///
 /// This is how every beet binary boots: spawn it on the host, then trigger
-/// [`StartServer::all`] (the empty filter matches the lone server). Being a
+/// [`BootServer::all`] (the empty filter matches the lone server). Being a
 /// one-shot, [`StopServer`] is a no-op for it.
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
@@ -30,19 +30,19 @@ use beet_core::prelude::*;
 #[component(on_add = on_add)]
 pub struct CliServer;
 
-/// Registers the [`StartServer`] observer on the host, so the one-shot exchange
+/// Registers the [`BootServer`] observer on the host, so the one-shot exchange
 /// runs when a start event whose filter passes `"cli"` lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(on_start_server);
 }
 
-/// Runs the one argv exchange when a [`StartServer`] passing `"cli"` lands.
-fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
+/// Runs the one argv exchange when a [`BootServer`] passing `"cli"` lands.
+fn on_start_server(ev: On<BootServer>, mut commands: Commands) {
 	if !ev.passes("cli") {
 		return;
 	}
-	// the trigger's params (eg the `beet serve` command's) reach the exchange so a
-	// served site renders the requested route, not the serve command's own argv.
+	// the boot params (from the `StartServer` verb's entry request) reach the
+	// exchange so a served site renders the requested route.
 	let params = ev.params.clone();
 	commands
 		.entity(ev.event_target())
@@ -70,9 +70,8 @@ async fn run_and_exit(
 		return Ok(());
 	}
 
-	// A `path` param from the trigger (eg `beet serve <dir> --server=cli
-	// --path=blog/post-1`) renders that site route; absent it, parse the process
-	// argv (a compiled binary's own one-shot entrypoint).
+	// A `path` boot param (eg `--server=cli --path=blog/post-1`) renders that site
+	// route; absent it, parse the process argv (the binary's one-shot entrypoint).
 	let req = match params.get("path") {
 		Some(path) => {
 			let accept = params
@@ -143,7 +142,7 @@ mod tests {
 				CliServer,
 				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
 			))
-			.trigger(StartServer::all);
+			.trigger(BootServer::all);
 		app.run_async()
 			.await
 			.xpect_eq(AppExit::Error(1.try_into().unwrap()));

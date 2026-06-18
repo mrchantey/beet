@@ -2,7 +2,7 @@
 
 A deliberately small **typed** beet site, demonstrating the Rust authoring path
 that the no-code `examples/bsx_site` (and the canonical top-level `site/`) does
-not exercise. It is the compiled counterpart to `beet serve site/`.
+not exercise. It is the compiled counterpart to the no-code `site/`.
 
 Three routes, exercising the interesting typed mechanisms:
 - **`/`** — an `rsx!` hero page using `inline_class!` for one-off layout.

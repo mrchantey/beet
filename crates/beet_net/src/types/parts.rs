@@ -656,11 +656,10 @@ mod test {
 		parts.has_param("debug").xpect_true();
 	}
 
-	/// An absolute-path positional (eg `beet load /abs/scene.json`) keeps its
-	/// leading `/` through the conversion, so a greedy `*scene`/`*site` wildcard
-	/// rejoins it to the original absolute path rather than a cwd-relative one.
-	/// This is the round-trip that the `beet load <abs>` / `beet serve <abs>`
-	/// path resolution depends on.
+	/// An absolute-path positional (eg `load /abs/scene.json`) keeps its leading
+	/// `/` through the conversion, so a greedy `*scene` wildcard rejoins it to the
+	/// original absolute path rather than a cwd-relative one. This is the
+	/// round-trip an absolute-path command argument depends on.
 	#[beet_core::test]
 	fn absolute_positional_round_trips() {
 		let parts = RequestParts::from(CliArgs::parse("load /abs/scene.json"));

@@ -40,8 +40,16 @@ use bevy_reflect::PartialReflect;
 use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
 
-/// The intermediate representation produced by every front-end (serde format or
-/// markup parser): ordered resources plus an ordered list of nodes.
+/// The serde intermediate representation: ordered resources plus an ordered list
+/// of nodes, each slot a reflectable value or a named deferred template.
+///
+/// This is the IR for the serde formats (RON/JSON/postcard), not for markup: BSX
+/// is its own syntax-tree IR ([`BsxTemplate`](crate::prelude::BsxTemplate))
+/// resolved against live registries, with no serializable value form. Both
+/// implement [`Template`] and the unified
+/// [`TemplateLoader`](crate::prelude::TemplateLoader) dispatches between them by
+/// [`MediaType`](crate::prelude::MediaType) (see
+/// [`EntryTemplate`](crate::prelude::EntryTemplate)); they are not merged.
 ///
 /// It builds a subtree into the world, so it is a [`Template`]. The first node
 /// builds into the context entity (the root); the rest spawn. See the module

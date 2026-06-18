@@ -7,7 +7,7 @@ mod export_static;
 mod qrcode;
 mod run_wasm;
 mod s3_sync;
-mod serve;
+mod site;
 
 pub use check::*;
 pub use export_pdf::*;
@@ -16,19 +16,18 @@ pub use export_static::*;
 pub use qrcode::*;
 pub use run_wasm::*;
 pub use s3_sync::*;
-pub use serve::*;
+pub(crate) use site::*;
 
 use beet::prelude::*;
 
-/// Registers reflection for every built-in `beet` command, so the default CLI
-/// scene round-trips through `beet.json`: the exporter serializes the command
-/// markers and the runner reconstructs their behaviour from the require hooks.
+/// Registers reflection for every `beet` dev command, so a `main.bsx` can name
+/// them as route actions. The binary spawns no host; these are inert capabilities
+/// until an entry wires them.
 pub struct CliCommandsPlugin;
 
 impl Plugin for CliCommandsPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<Serve>()
-			.register_type::<Check>()
+		app.register_type::<Check>()
 			.register_type::<ExportStatic>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()

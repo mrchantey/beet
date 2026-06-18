@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// A live-TUI server: spawned alongside a router, a [`StartServer`] event whose
+/// A live-TUI server: spawned alongside a router, a [`BootServer`] event whose
 /// filter passes `"tui"` boots the navigable terminal app. The interactive
 /// sibling of the one-shot [`CliServer`].
 ///
@@ -20,28 +20,28 @@ use beet_ui::prelude::*;
 ///
 /// Reusable: any app gets a live TUI by adding the live plugins
 /// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]) and spawning
-/// this on its router entity, then triggering a [`StartServer`].
+/// this on its router entity, then triggering a [`BootServer`].
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(on_add = on_add)]
 pub struct TuiServer;
 
-/// Registers the [`StartServer`] observer on the router, so the live terminal
+/// Registers the [`BootServer`] observer on the router, so the live terminal
 /// app boots when a start event whose filter passes `"tui"` lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(on_start_server);
 }
 
-/// Boots the live terminal app when a [`StartServer`] passing `"tui"` lands.
+/// Boots the live terminal app when a [`BootServer`] passing `"tui"` lands.
 /// A long-running server, so it inserts [`KeepAlive`].
-fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
+fn on_start_server(ev: On<BootServer>, mut commands: Commands) {
 	if !ev.passes("tui") {
 		return;
 	}
 	commands.insert_resource(KeepAlive);
-	// the trigger's params (eg the `beet serve` command's) carry the opening route
-	// and scheme, so a served site opens at the right page rather than the serve
-	// command's own argv. Record the opening route on the router (the shared
+	// the boot event's params (the `StartServer` verb's entry request, or a `beet
+	// serve` command's argv) carry the opening route and scheme, so a served site
+	// opens at the right page. Record the opening route on the router (the shared
 	// mechanism the SSH server also reads); the scheme is applied at boot.
 	let params = ev.params.clone();
 	commands

@@ -6,10 +6,10 @@
 //! ## Every binary is a CLI server
 //!
 //! A formal beet binary boots as a CLI server at the top level: its entrypoint
-//! spawns a [`CliServer`] host and triggers [`StartServer::all`] on it, parsing
+//! spawns a [`CliServer`] host and triggers [`BootServer::all`] on it, parsing
 //! argv into a [`Request`] and running one exchange.
 //! Long-running servers ([`HttpServer`], the `beet_router` `TuiServer`) are
-//! started the same way, by a [`StartServer`] event whose filter selects them.
+//! started the same way, by a [`BootServer`] event whose filter selects them.
 //! See [`server_events`] for the model.
 //!
 //! ## Implementations
@@ -29,9 +29,9 @@
 // std/feature-gated.
 mod http_server;
 pub use http_server::*;
-// The server model events (`StartServer` / `StopServer`) and the `KeepAlive`
+// The server model events (`BootServer` / `StopServer`) and the `KeepAlive`
 // resource are no_std (`GlobFilter` and `MultiMap` both build no_std), so a
-// no_std target boots `HttpServer` through the very same `StartServer` observers,
+// no_std target boots `HttpServer` through the very same `BootServer` observers,
 // supplying its backend via `set_http_server`. Only the async-runtime dispatch
 // (`queue_async_local`) inside the observers stays std-gated.
 mod server_events;
@@ -41,6 +41,12 @@ pub use server_events::*;
 mod cli_server;
 #[cfg(feature = "std")]
 pub use cli_server::*;
+// The `StartServer` markup verb that boots a host's declared servers on
+// `LoadTemplate`, by triggering a `BootServer` built from the entry request.
+#[cfg(feature = "std")]
+mod start_server;
+#[cfg(feature = "std")]
+pub use start_server::*;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod repl_server;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]

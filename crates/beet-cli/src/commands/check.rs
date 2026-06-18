@@ -11,7 +11,7 @@ struct CheckParams {
 }
 
 /// Validates a no-code BSX site without rendering it to disk: builds the site
-/// world like [`Serve`]/[`ExportStatic`], then runs the render-diagnostics pass
+/// world like [`ExportStatic`], then runs the render-diagnostics pass
 /// over every static route, printing a summary and exiting NON-ZERO if any
 /// error-level diagnostic fired.
 ///

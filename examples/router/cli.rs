@@ -69,5 +69,5 @@ fn setup(mut commands: Commands) {
 			),
 		]),
 	))
-	.trigger(StartServer::all);
+	.trigger(BootServer::all);
 }

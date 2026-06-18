@@ -10,9 +10,9 @@ use core::task::Poll;
 
 /// A future that never completes, parking the task forever.
 ///
-/// Used by a long-running action (eg `beet serve`) that hands the process
-/// lifetime to a spawned server: it triggers the start, then yields here so the
-/// action future never resolves and the server decides when to exit. no_std.
+/// Used by a long-running action that hands the process lifetime to a spawned
+/// server: it triggers the start, then yields here so the action future never
+/// resolves and the server decides when to exit. no_std.
 pub async fn yield_forever<T>() -> T { core::future::pending().await }
 
 /// Polls a collection of fallible futures concurrently, resolving to their

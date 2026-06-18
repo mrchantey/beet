@@ -1,18 +1,22 @@
 <!--
 The whole site: a router serving the `routes/` directory, every page wrapped
-in the `templates/Layout.bsx` document. The router's middleware and servers
-attach as component spreads (request logging, `--help`, terminal link
-navigation, the layout). It declares three servers, so `beet serve
-examples/bsx_site` runs the default `HttpServer`, `--server=tui` the live
-`TuiServer`, and `--server=cli` a one-shot render. `<DefaultAppRoutes/>` adds
-the default app routes (eg the `/js/reactivity.js` runtime a reactive page
-loads) as child routes. There is no `main.rs`: `beet serve` spawns this host and
-triggers its servers, which the site owns here in markup. The `<PackageConfig/>`
-declaration patches the named fields of the resource, creating it from defaults
-if absent, so the title and description are set in markup with no compile-time
-host config.
+in the `templates/Layout.bsx` document. The router's middleware, servers, and the
+`StartServer` boot verb attach as component spreads (request logging, `--help`,
+terminal link navigation, the layout). It declares three servers, so `--server`
+picks one on load: the default `HttpServer`, `--server=tui` the live `TuiServer`,
+or `--server=cli` a one-shot render:
+
+    beet --main=examples/bsx_site/main.bsx --server=http
+    cd examples/bsx_site && beet --server=tui   # or rely on discovery
+
+There is no `main.rs`: the binary discovers this entry, and `StartServer` boots
+the servers the site declares the moment the entry loads. `<DefaultAppRoutes/>`
+adds the default app routes (eg the `/js/reactivity.js` runtime a reactive page
+loads) as child routes. The `<PackageConfig/>` declaration patches the named
+fields of the resource, creating it from defaults if absent, so the title and
+description are set in markup with no compile-time host config.
 -->
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337}, TuiServer, SshTuiServer, CliServer)}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337}, TuiServer, SshTuiServer, CliServer, StartServer)}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<Theme color={Srgba(Srgba{red:0.5, green:0.2, blue:0.9, alpha:1.0})}/>
 	<Styles/>

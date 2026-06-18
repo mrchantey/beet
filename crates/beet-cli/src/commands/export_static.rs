@@ -1,8 +1,9 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// Statically exports a no-code BSX site: builds the site world like [`Serve`],
-/// then renders every static route once and writes it under `<site>/dist`.
+/// Statically exports a no-code BSX site: builds the site world (loads its
+/// `main.bsx`), then renders every static route once and writes it under
+/// `<site>/dist`.
 ///
 /// A one-shot generation, not a serve mode: the site root is the router (the
 /// entry's root element is built into it), so it exports directly.

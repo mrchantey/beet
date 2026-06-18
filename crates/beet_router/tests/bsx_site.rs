@@ -147,11 +147,11 @@ async fn blob_store_route_serves_assets() {
 /// `<Router {(HttpServer{port:0})}>`: the http server is declarable from markup,
 /// landing on the router via the reflect spread path (port 0 keeps any started
 /// backend on an OS-assigned port). The reflect insert registers the server's
-/// `StartServer` observer through its `on_add`, so a triggered start boots it via
+/// `BootServer` observer through its `on_add`, so a triggered start boots it via
 /// the installed runtime hook.
 // Only without a real HTTP backend: the test installs a stand-in runtime hook to
 // prove the wiring without a live server, but with the `http`/`client_io` backend
-// present, `StartServer::all` boots a real listener (and, under `client_io`, its
+// present, `BootServer::all` boots a real listener (and, under `client_io`, its
 // tungstenite channel on a fixed port) that this test cannot cleanly stop, so it
 // would leak a spinning task into the rest of the single-process suite.
 #[cfg(not(feature = "http"))]
@@ -185,13 +185,13 @@ async fn http_server_declarable_in_markup() {
 		.unwrap()
 		.port
 		.xpect_eq(Some(0));
-	// a triggered `StartServer` boots the declared server via the runtime hook.
-	world.entity_mut(root).trigger(StartServer::all);
+	// a triggered `BootServer` boots the declared server via the runtime hook.
+	world.entity_mut(root).trigger(BootServer::all);
 	AsyncRunner::flush_async_tasks(&mut world).await;
 	world.entity(root).contains::<ServerBooted>().xpect_true();
 }
 
-/// Flag the test runtime hook inserts, proving a triggered `StartServer` reached
+/// Flag the test runtime hook inserts, proving a triggered `BootServer` reached
 /// the declared `HttpServer`'s backend.
 #[cfg(not(feature = "http"))]
 #[derive(Component)]
@@ -291,8 +291,8 @@ async fn plain_page_stays_clean() {
 #[beet_core::test]
 async fn sidebar_excludes_foreign_host_command_tree() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	// a separate host root with its own command route tree, mirroring the CLI
-	// host that has `beet load`ed the default-cli scene (run-wasm, serve, ...).
+	// a separate host root with its own command route tree, mirroring the dev
+	// commands the repo's `main.bsx` wires (run-wasm, export-static, ...).
 	world.spawn(children![
 		render_action::fixed_func_route("run-wasm", || rsx! { <p>"run-wasm"</p> }),
 		render_action::fixed_func_route("export-static", || rsx! { <p>"export"</p> }),

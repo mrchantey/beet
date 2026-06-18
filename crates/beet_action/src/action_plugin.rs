@@ -43,5 +43,9 @@ impl Plugin for ActionPlugin {
 		#[cfg(feature = "scripting")]
 		app.register_type::<ScriptLanguage>()
 			.register_type::<Script<(), String>>();
+		// the `StartScript` load verb, so a `<script {StartScript}>` entry resolves
+		// it. Native-only, like its quickjs console runtime.
+		#[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
+		app.register_type::<StartScript>();
 	}
 }

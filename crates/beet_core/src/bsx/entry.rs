@@ -1,30 +1,34 @@
-//! Booting an app's entity tree from a single `.bsx` file.
+//! Booting an app's entity tree from a single `.bsx` entry document.
 //!
-//! [`BsxTemplate::load_entry`] parses a file like `main.bsx` as an entry
+//! [`BsxTemplate::parse_entry`] parses `main.bsx`-style source as an entry
 //! document: exactly one root element, which [`BsxTemplate::spawn`] builds
 //! *into* a fresh entity, so root-level components (eg a `Router`) land on the
 //! returned entity exactly as `world.spawn((Router, ..))` would place them. This
 //! differs from the document-parse convention ([`BsxTemplate::container`]) where
-//! every root node spawns as a child of a container.
+//! every root node spawns as a child of a container. [`BsxTemplate::load_entry`]
+//! is the file convenience over it.
 
 use super::*;
 use crate::prelude::*;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 use std::path::Path;
 
 impl BsxTemplate {
-	/// Parse `path` as an entry document and return the template for its single
-	/// root element, ready to [`spawn`](Self::spawn).
+	/// Parse `source` as an entry document and return the template for its single
+	/// root element, ready to build into a root entity.
 	///
 	/// Like an XML document element, exactly one root element is required;
 	/// comments and whitespace at the root are ignored. `<path::to::X>` tags
 	/// resolve against the world's current [`BsxTemplateRegistry`] (snapshotted
 	/// here), so register any template directories (see
 	/// [`register_bsx_templates`](WorldRegisterBsxExt::register_bsx_templates))
-	/// before loading the entry.
-	pub fn load_entry(world: &World, path: impl AsRef<Path>) -> Result<Self> {
-		let path = path.as_ref();
-		let source = fs_ext::read_to_string(path)?;
-		let mut roots = parse_document(&source, &BsxParseConfig::bsx())?
+	/// before parsing the entry.
+	///
+	/// This is the single BSX entry-parse path: the unified
+	/// [`TemplateLoader`](crate::prelude::TemplateLoader) dispatches `.bsx`/`.html`
+	/// bytes here, and [`load_entry`](Self::load_entry) is a file convenience over it.
+	pub fn parse_entry(world: &World, source: &str) -> Result<Self> {
+		let mut roots = parse_document(source, &BsxParseConfig::bsx())?
 			.into_iter()
 			.filter(|node| match node {
 				BsxNode::Comment(_) => false,
@@ -34,18 +38,25 @@ impl BsxTemplate {
 		let root = match (roots.next(), roots.next()) {
 			(Some(root @ BsxNode::Element(_)), None) => root,
 			(_, Some(_)) => bevybail!(
-				"`{}` must have a single root element, found multiple roots",
-				path.display()
+				"an entry document must have a single root element, found multiple roots"
 			),
-			_ => {
-				bevybail!("`{}` must have a single root element", path.display())
-			}
+			_ => bevybail!("an entry document must have a single root element"),
 		};
 		let registry = world
 			.get_resource::<BsxTemplateRegistry>()
 			.cloned()
 			.unwrap_or_default();
 		Ok(Self::new(vec![root], registry))
+	}
+
+	/// Read and [`parse_entry`](Self::parse_entry) the entry document at `path`, a
+	/// file convenience over the byte-oriented loader path.
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub fn load_entry(world: &World, path: impl AsRef<Path>) -> Result<Self> {
+		let path = path.as_ref();
+		let source = fs_ext::read_to_string(path)?;
+		Self::parse_entry(world, &source)
+			.map_err(|err| bevyhow!("failed to load entry `{}`: {err}", path.display()))
 	}
 
 	/// Build this template into a fresh root entity and flush, returning the root.
@@ -59,7 +70,7 @@ impl BsxTemplate {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 

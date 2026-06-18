@@ -87,7 +87,7 @@ fn main() -> AppExit {
 /// routes layered on the same router.
 fn setup(mut commands: Commands) -> Result {
 	commands
-		// `bootstrap_server` fires the `StartServer` that boots whichever server
+		// `bootstrap_server` fires the `BootServer` that boots whichever server
 		// `server_from_cli` selected (an empty filter matches it); without it the
 		// server never runs its exchange and the app loops forever.
 		.spawn((server_from_cli()?, bootstrap_server(), site()))

@@ -38,7 +38,7 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// HTTP server that listens for incoming requests, triggering an
 /// [`Action::<Request,Response>`] call.
 ///
-/// A long-running server: a [`StartServer`] event whose filter passes `"http"`
+/// A long-running server: a [`BootServer`] event whose filter passes `"http"`
 /// boots it through the backend [`ServerPlugin`] installed via
 /// [`set_http_server`], reading `--port` / `--host` from the event's `params`.
 /// Booting inserts [`KeepAlive`] so the process persists. A [`StopServer`] event
@@ -62,7 +62,7 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 ///     HttpServer::default(),
 ///     exchange_handler(|req| req.mirror()),
 /// )).id();
-/// world.entity_mut(host).trigger(StartServer::all);
+/// world.entity_mut(host).trigger(BootServer::all);
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -128,13 +128,13 @@ impl HttpServer {
 
 	/// The socket address to bind, from the component fields (`0` = OS-assigned,
 	/// localhost the default host). The start observer applies any `--port` /
-	/// `--host` from the [`StartServer`] event onto these fields before the
+	/// `--host` from the [`BootServer`] event onto these fields before the
 	/// backend reads them, so a `--port=8080` overrides a declared `port`.
 	pub fn socket_addr(&self) -> core::net::SocketAddr {
 		(self.host, self.port.unwrap_or(0)).into()
 	}
 
-	/// Overlays `--port` / `--host` from a [`StartServer`]'s params onto a copy of
+	/// Overlays `--port` / `--host` from a [`BootServer`]'s params onto a copy of
 	/// these fields, the resolved bind config the backend then reads.
 	fn with_params(mut self, params: &MultiMap<SmolStr, SmolStr>) -> Self {
 		if let Some(port) = params.get("port").and_then(|val| val.parse().ok()) {
@@ -151,7 +151,7 @@ impl HttpServer {
 	}
 }
 
-/// Registers the [`StartServer`] / [`StopServer`] observers on the host, so the
+/// Registers the [`BootServer`] / [`StopServer`] observers on the host, so the
 /// server boots when a start event whose filter passes `"http"` lands on it.
 /// no_std, like the start/stop dispatch it registers: the async runtime
 /// (`queue_async_local`) and the installed backend hook both build without std.
@@ -163,12 +163,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.observe_any(on_stop_server);
 }
 
-/// Boots the HTTP backend when a [`StartServer`] event passing `"http"` lands.
+/// Boots the HTTP backend when a [`BootServer`] event passing `"http"` lands.
 /// Applies the event's `--port` / `--host` onto the component, inserts
 /// [`KeepAlive`] (a long-running server keeps the process up), then queues the
 /// installed [`HttpServerFn`] on the async runtime.
 fn on_start_server(
-	ev: On<StartServer>,
+	ev: On<BootServer>,
 	mut servers: Query<&mut HttpServer>,
 	mut commands: Commands,
 ) {
@@ -229,7 +229,7 @@ mod std_impl {
 		///
 		/// The returned [`OnSpawn`] runs the real listener; include it in the
 		/// spawn bundle. The `HttpServer` unit tests do not trigger a
-		/// [`StartServer`], so the listener comes from this `OnSpawn`.
+		/// [`BootServer`], so the listener comes from this `OnSpawn`.
 		pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
 		where
 			Func: 'static
@@ -284,7 +284,7 @@ mod tests {
 	}
 
 	/// A reflect insert (the BSX spread path, eg `{(HttpServer{port:8080})}`)
-	/// registers the start observer through `on_add`, so a [`StartServer`]
+	/// registers the start observer through `on_add`, so a [`BootServer`]
 	/// triggered on the host boots it exactly like a regular spawn. With no
 	/// server feature here, the installed runtime hook stands in for the backend.
 	#[beet_core::test]
@@ -316,14 +316,14 @@ mod tests {
 			.port
 			.xpect_eq(Some(8080));
 		// trigger the start: the http observer queues the backend hook.
-		app.world_mut().entity_mut(entity).trigger(StartServer::all);
+		app.world_mut().entity_mut(entity).trigger(BootServer::all);
 		app.update_async().await;
 		app.world().entity(entity).contains::<ServerStartFlag>().xpect_true();
 		// a long-running server keeps the process alive.
 		app.world().contains_resource::<KeepAlive>().xpect_true();
 	}
 
-	/// `--port` in the [`StartServer`] params overrides the declared component
+	/// `--port` in the [`BootServer`] params overrides the declared component
 	/// port before the backend reads the bind address.
 	#[beet_core::test]
 	async fn resolves_port_from_params() {
@@ -335,7 +335,7 @@ mod tests {
 		params.insert("port".into(), "9090".into());
 		app.world_mut()
 			.entity_mut(entity)
-			.trigger(move |entity| StartServer {
+			.trigger(move |entity| BootServer {
 				entity,
 				filter: default(),
 				params,
@@ -356,14 +356,14 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
-		app.world_mut().entity_mut(entity).trigger(StartServer::cli);
+		app.world_mut().entity_mut(entity).trigger(BootServer::cli);
 		app.update_async().await;
 		app.world().entity(entity).contains::<ServerStartFlag>().xpect_false();
 	}
 }
 
 /// Marker the test backend hook inserts in place of binding a port, proving a
-/// [`StartServer`] reached the installed backend.
+/// [`BootServer`] reached the installed backend.
 #[cfg(test)]
 #[derive(Component)]
 struct ServerStartFlag;

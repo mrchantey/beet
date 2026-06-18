@@ -1,4 +1,4 @@
-//! Loading, swapping, watching and remotely controlling beet scenes.
+//! Loading, swapping and remotely pushing beet scenes.
 //!
 //! A *scene* is a reflection-serialized slice of an ECS world; scene management
 //! is the machinery to make it the live behaviour of a process:
@@ -6,18 +6,15 @@
 //!   [`ResetScene`] event and [`set_scene`], which swaps the active scene.
 //! - [`scene_server`]: an HTTP API (no_std-friendly) whose real routes arrive as
 //!   a POSTed scene; runs equally on a host or on bare-metal firmware.
-//! - [`scene_watcher`]: the host CLI side, wired through ECS — the
-//!   [`SceneManagementPlugin`] reactively persists the `.beet` retained scene
-//!   cache (observers on [`BeetSceneRoot`]) and a [`SceneWatch`] `on_add` hook
-//!   installs the `--watch` file watcher.
-//! - [`scene_commands`]: the host load/clear/reset/dump/run commands, each
-//!   targeting either a remote device or the local world, plus [`ExportScenes`].
+//! - [`scene_commands`]: the host push commands (load/clear/reset/dump/run), each
+//!   driving a remote scene-server device over HTTP.
 //!
-//! The core and server need `template_serde`; the watcher, welcome page and host
-//! commands are std-only.
+//! The core and server need `template_serde`; the host push commands are std-only
+//! (an http client). The binary forces none of this on; a device or push host
+//! opts in by adding [`SceneManagementPlugin`] and/or spawning a scene server.
 
-// Shared core + HTTP scene server: no_std-friendly, gated on `template_serde` since
-// both load/save scenes through world serde.
+// Shared core + HTTP scene server: no_std-friendly, gated on `template_serde`
+// since both load/save scenes through world serde.
 #[cfg(feature = "template_serde")]
 mod scene_root;
 #[cfg(feature = "template_serde")]
@@ -27,17 +24,48 @@ mod scene_server;
 #[cfg(feature = "template_serde")]
 pub use scene_server::*;
 
-// Host CLI side: the file watcher needs native fs (`FsWatcher`/`DirEvent`, absent
-// on wasm), so it and the scene commands that spawn it are gated off wasm.
-#[cfg(all(feature = "std", feature = "template_serde", not(target_arch = "wasm32")))]
-mod scene_watcher;
-#[cfg(all(feature = "std", feature = "template_serde", not(target_arch = "wasm32")))]
-pub use scene_watcher::*;
-
-// Host scene commands: load/clear/reset/dump/run + export, each local or remote
-// (std http client + world serde for the local path). Spawns the file watcher,
-// so they share its native-only gate.
-#[cfg(all(feature = "std", feature = "template_serde", not(target_arch = "wasm32")))]
+// Host push commands: drive a remote device (std http client). Native-only.
+#[cfg(all(
+	feature = "std",
+	feature = "template_serde",
+	not(target_arch = "wasm32")
+))]
 mod scene_commands;
-#[cfg(all(feature = "std", feature = "template_serde", not(target_arch = "wasm32")))]
+#[cfg(all(
+	feature = "std",
+	feature = "template_serde",
+	not(target_arch = "wasm32")
+))]
 pub use scene_commands::*;
+
+#[cfg(all(
+	feature = "std",
+	feature = "template_serde",
+	not(target_arch = "wasm32")
+))]
+use beet_core::prelude::*;
+
+/// Registers the scene-management capabilities as reflect types so a scene (or a
+/// `main.bsx`) can name them: the [`BeetSceneRoot`] marker and the host push
+/// commands ([`SceneCommandsPlugin`]). The receiving counterpart, the
+/// [`scene_server`] HTTP API, is wired by whoever spawns the server.
+///
+/// Inert by default — the binary forces nothing; a device or push host adds this.
+#[cfg(all(
+	feature = "std",
+	feature = "template_serde",
+	not(target_arch = "wasm32")
+))]
+pub struct SceneManagementPlugin;
+
+#[cfg(all(
+	feature = "std",
+	feature = "template_serde",
+	not(target_arch = "wasm32")
+))]
+impl Plugin for SceneManagementPlugin {
+	fn build(&self, app: &mut App) {
+		app.register_type::<BeetSceneRoot>()
+			.add_plugins(SceneCommandsPlugin);
+	}
+}

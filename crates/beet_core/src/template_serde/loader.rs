@@ -8,6 +8,10 @@
 //! rather than reparented, so its existing children survive.
 
 use crate::prelude::*;
+#[cfg(feature = "bsx")]
+use crate::prelude::BsxTemplate;
+use bevy::ecs::template::Template;
+use bevy::ecs::template::TemplateContext;
 
 /// Deserializes template bytes into the world and builds the result.
 ///
@@ -45,91 +49,43 @@ impl<'a> TemplateLoader<'a> {
 		self
 	}
 
-	/// Deserializes from [`MediaBytes`] into the world, dispatching by media type.
+	/// Loads an entry from [`MediaBytes`] into the world, dispatching by media
+	/// type: `.bsx`/`.html` parse to the BSX IR, every serde format
+	/// (RON/JSON/postcard) to the [`DynamicTemplate`] IR. Both build through the
+	/// one [`spawn_template`](WorldTemplateExt::spawn_template) path.
 	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
-		let template = self.deserialize(bytes)?;
-		self.build(template)
+		let entry = EntryTemplate::from_bytes(self.world, bytes)?;
+		let is_serde = entry.is_serde();
+		self.build(entry, is_serde)
 	}
 
-	#[cfg(any(feature = "ron", feature = "json", feature = "postcard"))]
-	fn deserialize(&self, bytes: &MediaBytes) -> Result<super::DynamicTemplate> {
-		use super::serde::DynamicTemplateDeserializer;
-		use serde::de::DeserializeSeed;
-		let type_registry = self.world.resource::<AppTypeRegistry>().clone();
-		let registry = type_registry.read();
-		match bytes.media_type() {
-			MediaType::Ron => {
-				cfg_if! {
-					if #[cfg(feature = "ron")] {
-						let text = bytes.as_utf8()?;
-						let mut de = ron::de::Deserializer::from_str(text)?;
-						DynamicTemplateDeserializer { type_registry: &registry }
-							.deserialize(&mut de)?
-							.xok()
-					} else {
-						bevybail!("The `ron` feature is required for RON loading")
-					}
-				}
-			}
-			MediaType::Json => {
-				cfg_if! {
-					if #[cfg(feature = "json")] {
-						let mut de =
-							serde_json::Deserializer::from_slice(bytes.bytes());
-						DynamicTemplateDeserializer { type_registry: &registry }
-							.deserialize(&mut de)?
-							.xok()
-					} else {
-						bevybail!("The `json` feature is required for JSON loading")
-					}
-				}
-			}
-			MediaType::Postcard | MediaType::Bytes => {
-				cfg_if! {
-					if #[cfg(feature = "postcard")] {
-						let mut de =
-							postcard::Deserializer::from_bytes(bytes.bytes());
-						DynamicTemplateDeserializer { type_registry: &registry }
-							.deserialize(&mut de)?
-							.xok()
-					} else {
-						bevybail!("The `postcard` feature is required for postcard loading")
-					}
-				}
-			}
-			other => {
-				bevybail!("Unsupported media type for template loading: {other}")
-			}
-		}
-	}
-
-	#[cfg(not(any(feature = "ron", feature = "json", feature = "postcard")))]
-	fn deserialize(
-		&self,
-		_bytes: &MediaBytes,
-	) -> Result<super::DynamicTemplate> {
-		bevybail!(
-			"No serde format feature enabled; enable `ron`, `json`, or `postcard`"
-		)
-	}
-
-	/// Builds the template through [`spawn_template`](WorldTemplateExt::spawn_template),
-	/// collecting every spawned entity via the build sink.
-	fn build(self, template: super::DynamicTemplate) -> Result<Vec<Entity>> {
-		let entity = self.entity;
-		// install the sink so the build records every real entity it maps to.
+	/// Builds an [`EntryTemplate`] through
+	/// [`spawn_template`](WorldTemplateExt::spawn_template), returning every
+	/// spawned entity. `is_serde` gates the [`LoadTemplateSerde`] batch signal.
+	fn build(
+		self,
+		entry: EntryTemplate,
+		is_serde: bool,
+	) -> Result<Vec<Entity>> {
+		let target = self.entity;
+		// install the sink so a serde build records every real entity it maps to.
 		self.world.insert_resource(TemplateBuildSink::default());
-		self.world.spawn_template(template)?;
-		let spawned = self
+		let root = self.world.spawn_template(entry)?.id();
+		let mut spawned = self
 			.world
 			.remove_resource::<TemplateBuildSink>()
 			.map(|sink| sink.0)
 			.unwrap_or_default();
+		// a markup build does not feed the serde sink, so its single spawned root
+		// is the whole result.
+		if spawned.is_empty() {
+			spawned.push(root);
+		}
 
 		// in entity mode the spawned roots (no `ChildOf`) are tracked as
 		// `TemplateNodeOf` of the target rather than reparented, preserving its
 		// existing children.
-		if let Some(parent) = entity {
+		if let Some(parent) = target {
 			for spawned_entity in spawned.iter() {
 				if !self.world.entity(*spawned_entity).contains::<ChildOf>() {
 					self.world
@@ -139,15 +95,148 @@ impl<'a> TemplateLoader<'a> {
 			}
 		}
 
-		// reflect inserts settle per-entity during the build, so per-insert
-		// observers run before relationships like `ChildOf` are whole. Signal
-		// completion now the hierarchy is settled, so listeners can react (eg
-		// rebuilding a `RouteTree`) before any async work runs.
-		self.world.trigger(LoadTemplateSerde {
-			entities: spawned.clone(),
-		});
+		// the serde batch-completion signal: reflect inserts settle per-entity, so
+		// per-insert observers run before relationships like `ChildOf` are whole.
+		// Listeners (eg `RouteTree` rebuild) react once the hierarchy is settled. A
+		// markup build inserts in tree order and rebuilds incrementally, so it needs
+		// no batch signal.
+		if is_serde {
+			self.world.trigger(LoadTemplateSerde {
+				entities: spawned.clone(),
+			});
+		}
 
 		Ok(spawned)
+	}
+}
+
+/// The closed set of entry-document IRs the unified [`TemplateLoader`] builds: the
+/// serde [`DynamicTemplate`] or the BSX [`BsxTemplate`].
+///
+/// Both are [`Template`]s that tail through the one
+/// [`spawn_template`](WorldTemplateExt::spawn_template) build path. This enum lets
+/// the loader dispatch by [`MediaType`] without a `dyn Template`, which is not
+/// object-safe (`Template::clone_template` returns `Self`). They stay distinct
+/// IRs: `DynamicTemplate` is the serde round-trip form, `BsxTemplate` a syntax
+/// tree resolved against live registries, with no serializable value form.
+pub enum EntryTemplate {
+	/// The serde IR, from RON/JSON/postcard bytes.
+	Serde(super::DynamicTemplate),
+	/// The BSX markup IR, from `.bsx`/`.html` source.
+	#[cfg(feature = "bsx")]
+	Bsx(BsxTemplate),
+}
+
+impl EntryTemplate {
+	/// Parse entry bytes into the matching IR, dispatching by [`MediaType`]: the
+	/// parse half of [`TemplateLoader::load`]. For a caller that builds the result
+	/// into an existing entity rather than spawning a root — an include
+	/// (`<Template src>`) builds the parsed entry at its own site.
+	pub fn from_bytes(world: &World, bytes: &MediaBytes) -> Result<Self> {
+		match bytes.media_type() {
+			// markup entries parse through the core BSX engine; HTML is the
+			// features-off subset of the same grammar.
+			#[cfg(feature = "bsx")]
+			MediaType::Bsx | MediaType::Html => {
+				BsxTemplate::parse_entry(world, bytes.as_utf8()?).map(Self::Bsx)
+			}
+			// every other type is a serde scene format.
+			_ => deserialize_dynamic_template(world, bytes).map(Self::Serde),
+		}
+	}
+
+	/// Whether this is the serde IR, gating the [`LoadTemplateSerde`] batch signal.
+	pub fn is_serde(&self) -> bool {
+		match self {
+			Self::Serde(_) => true,
+			#[cfg(feature = "bsx")]
+			Self::Bsx(_) => false,
+		}
+	}
+}
+
+/// Deserialize entry bytes into a [`DynamicTemplate`], dispatching by serde
+/// format. The serde half of [`EntryTemplate::from_bytes`].
+#[cfg(any(feature = "ron", feature = "json", feature = "postcard"))]
+fn deserialize_dynamic_template(
+	world: &World,
+	bytes: &MediaBytes,
+) -> Result<super::DynamicTemplate> {
+	use super::serde::DynamicTemplateDeserializer;
+	use serde::de::DeserializeSeed;
+	let type_registry = world.resource::<AppTypeRegistry>().clone();
+	let registry = type_registry.read();
+	match bytes.media_type() {
+		MediaType::Ron => {
+			cfg_if! {
+				if #[cfg(feature = "ron")] {
+					let text = bytes.as_utf8()?;
+					let mut de = ron::de::Deserializer::from_str(text)?;
+					DynamicTemplateDeserializer { type_registry: &registry }
+						.deserialize(&mut de)?
+						.xok()
+				} else {
+					bevybail!("The `ron` feature is required for RON loading")
+				}
+			}
+		}
+		MediaType::Json => {
+			cfg_if! {
+				if #[cfg(feature = "json")] {
+					let mut de = serde_json::Deserializer::from_slice(bytes.bytes());
+					DynamicTemplateDeserializer { type_registry: &registry }
+						.deserialize(&mut de)?
+						.xok()
+				} else {
+					bevybail!("The `json` feature is required for JSON loading")
+				}
+			}
+		}
+		MediaType::Postcard | MediaType::Bytes => {
+			cfg_if! {
+				if #[cfg(feature = "postcard")] {
+					let mut de = postcard::Deserializer::from_bytes(bytes.bytes());
+					DynamicTemplateDeserializer { type_registry: &registry }
+						.deserialize(&mut de)?
+						.xok()
+				} else {
+					bevybail!("The `postcard` feature is required for postcard loading")
+				}
+			}
+		}
+		other => {
+			bevybail!("Unsupported media type for template loading: {other}")
+		}
+	}
+}
+
+#[cfg(not(any(feature = "ron", feature = "json", feature = "postcard")))]
+fn deserialize_dynamic_template(
+	_world: &World,
+	_bytes: &MediaBytes,
+) -> Result<super::DynamicTemplate> {
+	bevybail!(
+		"No serde format feature enabled; enable `ron`, `json`, or `postcard`"
+	)
+}
+
+impl Template for EntryTemplate {
+	type Output = ();
+
+	fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
+		match self {
+			Self::Serde(template) => template.build_template(cx),
+			#[cfg(feature = "bsx")]
+			Self::Bsx(template) => template.build_template(cx),
+		}
+	}
+
+	fn clone_template(&self) -> Self {
+		match self {
+			Self::Serde(template) => Self::Serde(template.clone_template()),
+			#[cfg(feature = "bsx")]
+			Self::Bsx(template) => Self::Bsx(template.clone_template()),
+		}
 	}
 }
 
@@ -199,6 +288,49 @@ pub struct TemplateNodeOf(pub Entity);
 #[reflect(Component)]
 #[relationship_target(relationship = TemplateNodeOf, linked_spawn)]
 pub struct TemplateNodes(Vec<Entity>);
+
+#[cfg(all(test, feature = "bsx", feature = "json"))]
+mod entry_test {
+	use crate::prelude::*;
+
+	/// A `.bsx` entry and a `.json` entry both load through the one
+	/// [`TemplateLoader`] entry point, each landing the expected component on the
+	/// spawned root: markup dispatches to the BSX IR, json to the serde IR.
+	#[crate::test]
+	fn loads_bsx_and_json_through_one_loader() {
+		// markup: the single root element's component lands on the spawned root.
+		let mut world = TemplatePlugin::world();
+		let bsx = MediaBytes::new_bsx("<main class=\"app\"><span>hi</span></main>");
+		let roots = TemplateLoader::new(&mut world).load(&bsx).unwrap();
+		world
+			.entity(roots[0])
+			.get::<Element>()
+			.unwrap()
+			.tag()
+			.xpect_eq("main");
+
+		// serde: a json scene authored by saving a `Name` root, loaded through the
+		// same entry point.
+		let json = {
+			let mut src = TemplatePlugin::world();
+			src.resource::<AppTypeRegistry>().write().register::<Name>();
+			let root = src.spawn(Name::new("root")).id();
+			TemplateSaver::new()
+				.with_entity_tree(&src, root)
+				.save(&src, MediaType::Json)
+				.unwrap()
+		};
+		let mut world = TemplatePlugin::world();
+		world.resource::<AppTypeRegistry>().write().register::<Name>();
+		let roots = TemplateLoader::new(&mut world).load(&json).unwrap();
+		world
+			.entity(roots[0])
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("root");
+	}
+}
 
 #[cfg(all(test, feature = "ron"))]
 mod test {

@@ -19,7 +19,7 @@ impl Plugin for NavigatorPlugin {
 		#[cfg(feature = "tui")]
 		app.add_message::<bevy::input::keyboard::KeyboardInput>()
 			.add_systems(Update, nav_shortcuts);
-		// the `TuiServer` registers its own `StartServer` / `StopServer`
+		// the `TuiServer` registers its own `BootServer` / `StopServer`
 		// observers in its `on_add` hook, so there is no central registry to
 		// populate here; `beet_net` stays ignorant of the TUI.
 	}

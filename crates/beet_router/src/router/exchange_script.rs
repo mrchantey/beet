@@ -6,9 +6,13 @@
 //! so the entity becomes a dispatchable route without any post-load hooks.
 
 use crate::prelude::*;
+use beet_action::prelude::Script;
 use beet_action::prelude::ScriptAction;
+use beet_action::prelude::ScriptLanguage;
 use beet_core::prelude::*;
 use beet_net::prelude::FromRequest;
+use beet_net::prelude::PathPartial;
+use beet_net::prelude::RequestParts;
 use beet_net::prelude::SerdeFromRequestMarker;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -78,6 +82,32 @@ where
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("ExchangeScript").finish()
 	}
+}
+
+/// A markup-friendly scripted route: a `path` plus a `script` over the request
+/// parts, serving the script's string output as the response.
+///
+/// The non-generic front-end for a `(PathPartial, Script, ExchangeScript)` route,
+/// so a no-code entry declares one without spelling the generic types:
+///
+/// ```bsx
+/// <ScriptRoute path="add"
+///   script='"result: " + (Number(input.url.params.a[0]) + Number(input.url.params.b[0]))'/>
+/// ```
+///
+/// The script runs in the build's default backend ([`ScriptLanguage::default`]),
+/// so a quickjs binary runs JavaScript with the request as its `input` (a quickjs
+/// `RequestParts` exposes the query params at `input.url.params`).
+#[template]
+pub fn ScriptRoute(
+	#[prop(into)] path: String,
+	#[prop(into)] script: String,
+) -> impl Bundle {
+	(
+		PathPartial::new(path),
+		Script::<RequestParts, String>::new(ScriptLanguage::default(), script),
+		ExchangeScript::<RequestParts, String, _, _>::default(),
+	)
 }
 
 #[cfg(test)]

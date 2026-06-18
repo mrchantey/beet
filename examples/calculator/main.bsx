@@ -1,0 +1,21 @@
+<!--
+A no-code routed app: a router with two scripted routes, served over either a
+one-shot CLI exchange or a long-running HTTP server. The transports and the
+`StartServer` boot verb attach as a component spread; `StartServer` boots the
+servers on load, reading `--server` to pick one:
+
+    beet --main=examples/calculator/main.bsx --server=cli add --a=3 --b=4
+    # result: 7  (one-shot, then exits)
+
+    beet --main=examples/calculator/main.bsx --server=http
+    # serves /add?a=3&b=4 on :8080 and stays alive
+
+Each `<ScriptRoute>` is a path plus a JavaScript script over the request, whose
+string output is the response. The query params arrive at `input.url.params`.
+-->
+<Router {(CliServer, HttpServer{port:8080}, StartServer)}>
+	<ScriptRoute path="add"
+		script='"result: " + (Number(input.url.params.a[0]) + Number(input.url.params.b[0]))'/>
+	<ScriptRoute path="subtract"
+		script='"result: " + (Number(input.url.params.a[0]) - Number(input.url.params.b[0]))'/>
+</Router>

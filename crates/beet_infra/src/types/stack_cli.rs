@@ -5,7 +5,7 @@ use beet_router::prelude::*;
 
 pub fn stack_cli() -> impl Bundle {
 	// the infra CLI host bundle: a `CliServer` entrypoint + the IaC routes. The
-	// caller triggers `StartServer::all` after spawning, so the `on_add`
+	// caller triggers `BootServer::all` after spawning, so the `on_add`
 	// observers are registered before the `cli` boot lands.
 	(CliServer::default(), default_router(), children![
 		Validate,

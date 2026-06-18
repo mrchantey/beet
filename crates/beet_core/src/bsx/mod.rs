@@ -134,7 +134,6 @@
 
 mod ast;
 mod cursor;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod entry;
 mod events;
 mod parse;

@@ -11,17 +11,9 @@ homepage.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
-# two bins (`beet` + `export_scenes`); pick `beet` for a bare `cargo run`/`just beet`
-default-run = "beet"
-
 [[bin]]
 name = "beet"
 path = "src/main.rs"
-
-# Generates the loadable `default-cli` scene (`target/scenes/default-cli.json`).
-[[bin]]
-name = "export_scenes"
-path = "src/bin/export_scenes.rs"
 
 [features]
 default = ["qrcode", "net", "tui", "ssh"]
@@ -56,6 +48,12 @@ beet = { workspace = true, features = [
 	"syntax_highlighting",
 	"style",
 	"template",
+	# the QuickJS scripting runtime: the `StartScript` load verb's `console.log`
+	# path and the `ExchangeScript` route backend a `main.bsx` wires.
+	"quickjs_serde",
+	# plaintext `MediaType::Text` serialization, so a scripted route's `String`
+	# output streams raw (`result: 7`) instead of JSON-quoted under the cli accept.
+	"serde_plain",
 ] }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }

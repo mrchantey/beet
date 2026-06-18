@@ -19,9 +19,6 @@ mod diagnostics;
 mod extra;
 #[cfg(all(feature = "codegen", feature = "std"))]
 mod route_codegen;
-// The media exchange parses responses into beet_ui scene trees (std-only).
-#[cfg(feature = "std")]
-mod media;
 mod navigate;
 mod router;
 // every scene-management module needs `template_serde` (load/save a scene through it).
@@ -40,8 +37,6 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::diagnostics::*;
 	pub use crate::extra::*;
-	#[cfg(feature = "std")]
-	pub use crate::media::*;
 	pub use crate::navigate::*;
 	#[cfg(all(feature = "codegen", feature = "std"))]
 	pub use crate::route_codegen::*;

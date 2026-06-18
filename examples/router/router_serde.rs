@@ -9,7 +9,7 @@
 //! Every runtime component — [`CliServer`], the [`router`] bundle, the
 //! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the
 //! components round-trip with no post-load patching; the loaded `CliServer` is
-//! then booted by triggering a `StartServer` on its root.
+//! then booted by triggering a `BootServer` on its root.
 //!
 //! ## Running the Example
 //!
@@ -65,14 +65,14 @@ fn setup(async_commands: AsyncCommands) {
 			blob.remove().await.ok();
 		}
 		// the bundle stays serializable (`CliServer` + router, both reflect
-		// components); the boot is a triggered `StartServer`, not a spawn hook, so
+		// components); the boot is a triggered `BootServer`, not a spawn hook, so
 		// fire it on the loaded root once the scene lands.
 		let roots = TemplateStore::load_or_create(world.clone(), blob, async |_| {
 			route_bundle().xok()
 		})
 		.await?;
 		for root in roots {
-			world.entity(root).trigger(StartServer::cli).await?;
+			world.entity(root).trigger(BootServer::cli).await?;
 		}
 		Ok(())
 	});

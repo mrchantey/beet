@@ -91,8 +91,8 @@ fn route_title(seed: &str) -> impl Bundle {
 /// own — it could not walk to the tree anyway, being built in the detached layout
 /// subtree (the content is transcluded by [`Portal`]). Reading the threaded
 /// handle scopes the nav to *this request's* served tree even when other
-/// [`RouteTree`]s share the world (eg the `beet` CLI host's loaded command routes
-/// alongside a `beet serve` site).
+/// [`RouteTree`]s share the world (eg a dev-command router alongside a served
+/// site).
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout places it with `<RouteSidebar/>`. Builds inside a layout render

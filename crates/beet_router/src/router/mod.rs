@@ -14,6 +14,11 @@ pub use exchange_sequence::*;
 mod exchange_script;
 #[cfg(feature = "scripting")]
 pub use exchange_script::*;
+// the `<Template src>` include: needs the BSX tag seam + the unified loader.
+#[cfg(all(feature = "bsx", feature = "template_serde"))]
+mod template_include;
+#[cfg(all(feature = "bsx", feature = "template_serde"))]
+pub use template_include::*;
 mod request_logger;
 pub use request_logger::*;
 mod interrupt;

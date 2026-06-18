@@ -1,0 +1,25 @@
+<!--
+beet's own entry: the dev commands, wired as routes over the capabilities linked
+into the `beet` binary. This replaces the old `default-cli.json` scene and the
+`just init-cli` load dance — there is no retained state, the binary discovers this
+file by walking up from the cwd and runs one command per invocation.
+
+The wasm test runner depends on it: `.cargo/config.toml` sets
+`runner = 'beet run-wasm'`, so `cargo test --target wasm32-...` invokes
+`beet run-wasm <module>`, which discovers this entry and dispatches the
+`<RunWasm/>` route. The rest are convenience: build, check, static export, pdf,
+s3 sync.
+
+    cargo install --path crates/beet-cli   # then, from anywhere in the repo:
+    beet run-wasm <module.wasm>            # run a wasm test module
+    beet check examples/bsx_site           # lint a no-code site
+    beet export-static examples/bsx_site   # write its dist/
+-->
+<Router {(CliServer, StartServer)}>
+	<RunWasm/>
+	<BuildWasm/>
+	<Check/>
+	<ExportStatic/>
+	<ExportPdf/>
+	<SyncS3/>
+</Router>

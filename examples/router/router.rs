@@ -50,7 +50,7 @@ fn setup(mut commands: Commands) -> Result {
 			FsStore::new(WsPathBuf::new("examples/assets")),
 			router_scene()?,
 		))
-		.trigger(StartServer::all);
+		.trigger(BootServer::all);
 	Ok(())
 }
 
@@ -62,7 +62,7 @@ pub fn router_scene() -> Result<impl Bundle> {
 		// declare the store used by the blob scenes
 		// the server is the IO layer, handling incoming requests
 		// from http, stdin etc
-		// the spawn site triggers `StartServer::all` (empty filter matches it).
+		// the spawn site triggers `BootServer::all` (empty filter matches it).
 		// `ReplServer` self-boots its own loop, so it ignores the start.
 		server_from_cli()?,
 		// the batteries-included router: route lookup + the default app routes,

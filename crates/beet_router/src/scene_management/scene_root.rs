@@ -144,12 +144,12 @@ mod test {
 		tree.find(&["ping"]).xpect_some();
 	}
 
-	/// The retained-cache persist path: load a scene under a host, mark it
-	/// [`BeetSceneRoot`], then re-serialize via `save_roots_filtered` (what the
-	/// CLI writes to `.beet/scene.json`) and rehydrate it. The child routes must
-	/// survive the round-trip, not just the bare root.
+	/// A pushed scene round-trips: load a scene under a host, mark it
+	/// [`BeetSceneRoot`], then re-serialize via `save_roots_filtered` (what `dump`
+	/// reads off a device) and reload it. The child routes must survive the
+	/// round-trip, not just the bare root.
 	#[beet_core::test(timeout_ms = 10000)]
-	async fn persist_round_trip_keeps_children() {
+	async fn scene_round_trip_keeps_children() {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
@@ -160,10 +160,10 @@ mod test {
 			.save(&world, MediaType::Json)
 			.unwrap();
 
-		// the CLI re-persists on every startup (rehydrate marks `BeetSceneRoot`,
-		// the observer re-saves), so the cache survives repeated load→save cycles,
-		// not just one. Each iteration loads the prior bytes under a fresh host and
-		// re-saves via the persist path; the child route must never be dropped.
+		// a device receives and re-dumps a scene repeatedly (push, dump, re-push),
+		// so the cycle must survive more than once. Each iteration loads the prior
+		// bytes under a fresh host and re-saves the `BeetSceneRoot` trees; the child
+		// route must never be dropped.
 		let mut bytes = json;
 		for _ in 0..3 {
 			let mut world = test_world();

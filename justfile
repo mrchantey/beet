@@ -28,11 +28,10 @@ default:
 
 #💡 Init
 
-# Install the cli and load its default commands (serve, export-static, s3-sync, run-wasm, ...).
+# Install the cli. The dev commands (run-wasm, check, export-static, s3-sync, ...)
+# are wired in the repo's `main.bsx`, discovered at runtime — no scene to load.
 init-cli:
 	just install-cli
-	cargo run -p beet-cli --bin export_scenes
-	beet load target/scenes/default-cli.json
 
 # Set up a fresh checkout: cli, assets, and the ml default model.
 init-repo:
@@ -55,10 +54,8 @@ cli *args:
   beet {{ args }}
   # cargo run -p beet-cli -- {{ args }}
 
-# `--locked` pins the workspace bevy rc, since a bare install re-resolves
-# pre-release deps to a newer, incompatible candidate.
 install-cli *args:
-  cargo install --locked --path crates/beet-cli {{ args }}
+  cargo install --path crates/beet-cli {{ args }}
 
 #💡 Aliases
 

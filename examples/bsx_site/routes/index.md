@@ -43,5 +43,5 @@ description = "A beet site with zero code"
 The same files render as a full HTML document on the web and as charcell in the terminal. Head over to the [docs](/docs) to see how it fits together, or run this site yourself:
 
 ```sh
-beet serve examples/bsx_site
+cd examples/bsx_site && beet --server=http
 ```

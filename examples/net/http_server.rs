@@ -38,7 +38,7 @@ fn main() {
 					Count::default(),
 					Handler,
 				))
-				.trigger(StartServer::all);
+				.trigger(BootServer::all);
 		})
 		.run();
 }
