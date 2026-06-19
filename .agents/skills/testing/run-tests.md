@@ -3,7 +3,7 @@
 ## Context
 
 Always use `tail` when running tests to preserve context.
-Run all tests piping the entire output to `.agents/scratch.txt`, use this for all commands, so that multiple greps can be applied without rerunning the tetsts.
+Run all tests piping the entire output to `.agents/tmp/scratch.txt`, use this for all commands, so that multiple greps can be applied without rerunning the tetsts.
 
 ## Hanging Tests
 

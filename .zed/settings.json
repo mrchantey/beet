@@ -1,5 +1,10 @@
 // https://zed.dev/docs/configuring-zed#settings-files
 {
+	"languages": {
+		"Rust": {
+			"enable_language_server": false,
+		},
+	},
 	// "show_completions_on_input": false,
 	// "completions": {
 	// 	"words": "disabled"
@@ -89,11 +94,11 @@
 	},
 	"file_scan_inclusions": [
 		// "target",
-		".agents/plan*",
-		".agents/report*",
-		".agents/feedback*",
+		".agents*",
 	],
 	"file_scan_exclusions": [
+		".agents/tmp*",
+		".agents/reference*",
 		".cargo",
 		".beet",
 		".claude",
