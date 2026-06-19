@@ -46,8 +46,10 @@ impl S3BucketBlock {
 
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
+	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket, resolved
+	/// against `stack` (bucket name, region, and deploy-versioned subdir).
 	#[cfg(feature = "aws_sdk")]
-	pub fn provider(&self, stack: &Stack) -> beet_net::prelude::S3Store {
+	pub fn store(&self, stack: &Stack) -> beet_net::prelude::S3Store {
 		let region = self.region.as_ref().unwrap_or(stack.aws_region());
 		let bucket_name = stack.resource_ident(self.label.clone());
 		let mut store = beet_net::prelude::S3Store::new(
@@ -78,7 +80,7 @@ fn on_add_s3_bucket_block(mut world: DeferredWorld, cx: HookContext) {
 						query.get(entity).cloned()
 					}) {
 					let block = entity.get_or_else::<S3BucketBlock>()?;
-					let s3_store = block.provider(&stack);
+					let s3_store = block.store(&stack);
 					entity.insert(s3_store);
 				}
 				Ok(())

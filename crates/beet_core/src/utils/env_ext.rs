@@ -62,6 +62,26 @@ pub unsafe fn set_var(key: &str, value: &str) {
 	}
 }
 
+/// Remove an environment variable.
+///
+/// # Safety
+/// Modifies global process state. Calling concurrently from multiple
+/// threads or while other threads read environment variables is undefined behavior.
+#[allow(unused)]
+pub unsafe fn remove_var(key: &str) {
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			// no process environment to mutate from wasm.
+			let _ = key;
+		} else if #[cfg(feature = "std")] {
+			unsafe { std::env::remove_var(key); }
+		} else {
+			// no_std: no process environment to mutate.
+			let _ = key;
+		}
+	}
+}
+
 /// Try get the environment variable with the given key, returning
 /// an error containing the key name if not found.
 pub fn var(key: &str) -> Result<String, EnvError> {

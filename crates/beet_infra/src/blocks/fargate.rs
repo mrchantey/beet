@@ -56,6 +56,14 @@ pub struct FargateBlock {
 	/// in the Fargate task.
 	#[serde(default)]
 	env_vars: Vec<Variable>,
+	/// Plain static environment variables injected directly into the task, eg
+	/// `BEET_SERVICE_ACCESS=remote`, the S3 bucket names the container reads its
+	/// site and assets from, and `BEET_SSH_HOST_KEY` (so every task shares one
+	/// stable ssh fingerprint). Unlike [`env_vars`](Self::env_vars) these are
+	/// literal values, not terraform variable references.
+	#[serde(default)]
+	#[set_with(skip)]
+	static_env: Vec<(SmolStr, SmolStr)>,
 	/// Optional domain for HTTPS. When provided, an HTTPS listener
 	/// is added to the load balancer. DNS must be configured separately.
 	#[set_with(unwrap_option, into)]
@@ -107,6 +115,7 @@ impl Default for FargateBlock {
 			load_balancer_type: LoadBalancerType::default(),
 			container_image: ContainerImage::default(),
 			env_vars: Vec::new(),
+			static_env: Vec::new(),
 		}
 	}
 }
@@ -115,6 +124,17 @@ impl FargateBlock {
 	/// Build a prefixed label for terraform resources.
 	pub fn build_label(&self, suffix: &str) -> String {
 		format!("{}--{}", self.label, suffix)
+	}
+
+	/// Add a plain static environment variable to the task (see
+	/// [`static_env`](Self::static_env)).
+	pub fn with_static_env(
+		mut self,
+		key: impl Into<SmolStr>,
+		value: impl Into<SmolStr>,
+	) -> Self {
+		self.static_env.push((key.into(), value.into()));
+		self
 	}
 
 	/// Generate a shortened name for AWS resources with length limits (e.g. ALB names).
@@ -696,6 +716,12 @@ impl Block for FargateBlock {
 		for variable in &self.env_vars {
 			env_vars
 				.insert(variable.key().clone(), variable.tf_var_ref().into());
+		}
+
+		// add plain static env vars (bucket names, service access, ssh host key),
+		// last so the deploy can override the defaults above if needed.
+		for (key, value) in &self.static_env {
+			env_vars.insert(key.clone(), value.to_string().into());
 		}
 
 		// Task definition. The http port is always mapped; the ssh port only

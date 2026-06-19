@@ -93,12 +93,7 @@ mod test {
 	/// Render `req` through a host carrying only the [`Check`] route, returning the
 	/// response (so a test can assert the status that drives the exit code).
 	async fn run(req: Request) -> Response {
-		let mut world = (
-			AsyncPlugin,
-			RouterPlugin,
-			material::MaterialStylePlugin::default(),
-		)
-			.into_world();
+		let mut world = crate::commands::render_world();
 		let host = world.spawn((Router, children![Check])).id();
 		world
 			.entity_mut(host)

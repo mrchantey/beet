@@ -30,16 +30,18 @@ pub fn register_template_include(world: &mut World) {
 					supported; use a local path"
 				);
 			}
-			// resolve a local path against the SiteRoot (the including entry's dir),
-			// else the cwd, then build the parsed entry into this site.
-			let path = entity
-				.world_scope(|world| {
-					world.get_resource::<SiteRoot>().map(|root| root.0.clone())
-				})
-				.map(|dir| dir.join(src.as_str()))
-				.map(Ok)
-				.unwrap_or_else(|| AbsPathBuf::new(src.as_str()))?;
-			let media = fs_ext::read_media(&path)?;
+			// resolve `src` against the SiteRoot store (the including entry's dir),
+			// reading it through the store so an S3-backed site composes the same
+			// way; fall back to the cwd for a SiteRoot-less include.
+			let store = entity.world_scope(|world| {
+				world.get_resource::<SiteRoot>().map(|root| root.0.clone())
+			});
+			let media = match store {
+				Some(store) => async_ext::block_on(
+					store.get_media(&SmolPath::from(src.as_str())),
+				)?,
+				None => fs_ext::read_media(AbsPathBuf::new(src.as_str())?)?,
+			};
 			let entry = entity.world_scope(|world| {
 				EntryTemplate::from_bytes(world, &media)
 			})?;

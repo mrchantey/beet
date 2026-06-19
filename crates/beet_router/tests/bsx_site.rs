@@ -78,7 +78,7 @@ fn spawn_site(world: &mut World) -> Entity {
 	world
 		.register_bsx_templates(site_dir.join("templates"))
 		.unwrap();
-	world.insert_resource(SiteRoot(site_dir.clone()));
+	world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
 	BsxTemplate::load_entry(world, site_dir.join("main.bsx"))
 		.unwrap()
 		.spawn(world)
@@ -161,7 +161,7 @@ async fn blob_store_route_serves_assets() {
 async fn http_server_declarable_in_markup() {
 	// no `server` backend feature here, so install the runtime hook the start
 	// observer invokes (idempotent: a prior test may have set it).
-	set_http_server(|entity| {
+	set_http_server(|entity, _shutdown| {
 		Box::pin(async move {
 			entity
 				.with(|mut entity| {

@@ -275,7 +275,7 @@ mod test {
 	/// Spawn a `RoutesDir` router over `root`.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	fn spawn_routes_dir(world: &mut World, root: AbsPathBuf) -> Entity {
-		world.insert_resource(SiteRoot(root));
+		world.insert_resource(SiteRoot::new_fs(root));
 		world
 			.spawn((default_router(), children![RoutesDir::new("")]))
 			.flush()

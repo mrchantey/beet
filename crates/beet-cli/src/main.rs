@@ -22,7 +22,14 @@ fn main() -> AppExit {
 
 	let mut app = App::new();
 	app.add_plugins((
-		MinimalPlugins,
+		// pace the schedule loop instead of busy-spinning (the default
+		// `ScheduleRunnerPlugin` runs with no wait, pinning a core even when a
+		// served site is idle). 30Hz matches the TUI's 30fps render cap and halves
+		// the per-tick schedule cost vs 60Hz, so an idle task on a fractional-vCPU
+		// Fargate slice stays well under the CPU autoscaling target and can scale in.
+		MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(
+			Duration::from_secs_f64(1.0 / 30.0),
+		)),
 		LogPlugin::new(Level::DEBUG),
 		ClientAppPlugin,
 		// dev-command capabilities stay linked as registered types, inert until a
@@ -85,9 +92,36 @@ fn load_entry(world: &mut World) {
 }
 
 fn try_load_entry(world: &mut World) -> Result {
-	// the binary's own `--main` overrides discovery; the loaded tree re-parses argv
-	// itself (the load verbs call `CliArgs::parse_env`), so the binary consumes only
-	// its own `--main` here.
+	// resolve the site store + the entry document name within it: the filesystem
+	// locally, an S3 bucket in a deployed task. The store roots the whole site, so
+	// the entry document, `templates/`, `<RoutesDir/>` and `<Template src>` includes
+	// all load through the one [`BlobStore`].
+	let (site_root, entry_name) = resolve_site_root()?;
+	site_root.register_templates(world)?;
+	let media = async_ext::block_on(
+		site_root.0.get_media(&SmolPath::from(entry_name.as_str())),
+	)?;
+	world.insert_resource(site_root);
+
+	TemplateLoader::new(world)
+		.load(&media)
+		.map_err(|err| bevyhow!("failed to load entry `{entry_name}`: {err}"))?;
+	Ok(())
+}
+
+/// Resolve the [`SiteRoot`] store and the entry document name within it.
+///
+/// A deployed task (`BEET_SERVICE_ACCESS=remote`) loads the site from its S3
+/// bucket; otherwise discovery walks the filesystem for a local `main.bsx`.
+fn resolve_site_root() -> Result<(SiteRoot, String)> {
+	// remote: pull the whole site from the S3 bucket the deploy injected.
+	#[cfg(feature = "aws_sdk")]
+	if remote_access() {
+		return remote_site_root();
+	}
+
+	// local: the binary's own `--main` overrides discovery; the loaded tree
+	// re-parses argv itself, so the binary consumes only its own `--main` here.
 	let mut args = CliArgs::parse_env();
 	let entry = match args
 		.params
@@ -97,24 +131,38 @@ fn try_load_entry(world: &mut World) -> Result {
 		Some(path) => AbsPathBuf::new(path.as_str())?,
 		None => discover_entry()?,
 	};
+	let dir = entry
+		.parent()
+		.ok_or_else(|| bevyhow!("entry `{entry}` has no parent directory"))?;
+	let entry_name = entry
+		.file_name()
+		.and_then(|name| name.to_str())
+		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
+		.to_string();
+	Ok((SiteRoot::new_fs(dir), entry_name))
+}
 
-	// the entry's directory is its project root: register a sibling `templates/`
-	// (so `<path::to::X>` / `<Styles/>` templates resolve) and set the `SiteRoot`
-	// (which `<RoutesDir/>` resolves against), so a no-code site entry's templates
-	// and routes load. Both are no-ops for a single-file entry that uses neither.
-	if let Some(dir) = entry.parent() {
-		let templates = dir.join("templates");
-		if fs_ext::exists(&templates)? {
-			world.register_bsx_templates(templates)?;
-		}
-		world.insert_resource(SiteRoot(dir));
-	}
+/// Whether the runtime should access services remotely (the deployed task), read
+/// from `BEET_SERVICE_ACCESS`.
+#[cfg(feature = "aws_sdk")]
+fn remote_access() -> bool {
+	env_ext::var("BEET_SERVICE_ACCESS")
+		.map(|value| value.eq_ignore_ascii_case("remote"))
+		.unwrap_or(false)
+}
 
-	let media = fs_ext::read_media(&entry)?;
-	TemplateLoader::new(world)
-		.load(&media)
-		.map_err(|err| bevyhow!("failed to load entry `{entry}`: {err}"))?;
-	Ok(())
+/// A [`SiteRoot`] backed by the deploy's S3 site bucket (`BEET_SITE_BUCKET` /
+/// `AWS_REGION`); the entry document is `main.bsx` at the bucket root.
+#[cfg(feature = "aws_sdk")]
+fn remote_site_root() -> Result<(SiteRoot, String)> {
+	let bucket = env_ext::var("BEET_SITE_BUCKET").map_err(|_| {
+		bevyhow!("BEET_SERVICE_ACCESS=remote but BEET_SITE_BUCKET is unset")
+	})?;
+	let region =
+		env_ext::var("AWS_REGION").unwrap_or_else(|_| "us-west-2".to_string());
+	info!("loading site from s3 bucket `{bucket}` ({region})");
+	let store = BlobStore::new(S3Store::new(bucket, region));
+	Ok((SiteRoot(store), "main.bsx".to_string()))
 }
 
 /// Walk the cwd and its ancestors for the first [`ENTRY_NAMES`] match, erroring

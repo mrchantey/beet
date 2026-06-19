@@ -31,12 +31,17 @@ impl ContainerEngine {
 pub struct BuildDockerImage {
 	/// Container engine to use (Docker or Podman).
 	pub engine: ContainerEngine,
+	/// Arguments appended to the binary in the image `CMD`, eg
+	/// `["serve", "--server=http,ssh"]` so the container runs
+	/// `beet serve --server=http,ssh`. Empty runs the bare binary.
+	pub cmd_args: Vec<SmolStr>,
 }
 
 impl Default for BuildDockerImage {
 	fn default() -> Self {
 		Self {
 			engine: ContainerEngine::default(),
+			cmd_args: Vec::new(),
 		}
 	}
 }
@@ -46,6 +51,7 @@ impl BuildDockerImage {
 	pub fn with_docker() -> Self {
 		Self {
 			engine: ContainerEngine::Docker,
+			..default()
 		}
 	}
 
@@ -53,7 +59,17 @@ impl BuildDockerImage {
 	pub fn with_podman() -> Self {
 		Self {
 			engine: ContainerEngine::Podman,
+			..default()
 		}
+	}
+
+	/// Set the arguments appended to the binary in the image `CMD`.
+	pub fn with_cmd_args(
+		mut self,
+		args: impl IntoIterator<Item = impl Into<SmolStr>>,
+	) -> Self {
+		self.cmd_args = args.into_iter().map(Into::into).collect();
+		self
 	}
 }
 
@@ -68,8 +84,9 @@ impl BuildDockerImage {
 pub async fn BuildDockerImageAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	// get the container engine configuration
-	let engine = cx.caller.get_cloned::<BuildDockerImage>().await?.engine;
+	// get the container engine + run configuration
+	let docker_config = cx.caller.get_cloned::<BuildDockerImage>().await?;
+	let engine = docker_config.engine;
 
 	// get the stack for region and deploy_id
 	let stack = cx
@@ -168,12 +185,21 @@ pub async fn BuildDockerImageAction(
 	if block.allow_ssh() {
 		expose.push_str(&format!("EXPOSE {}\n", block.ssh_container_port()));
 	}
+	// the `CMD` runs the copied binary at `/app` with any configured args, eg
+	// `["/app", "serve", "--server=http,ssh"]` so the beet container serves the
+	// site over http + ssh (the site itself is pulled from S3 at boot, not baked in).
+	let cmd_json = core::iter::once("/app")
+		.chain(docker_config.cmd_args.iter().map(SmolStr::as_str))
+		.map(|arg| format!("\"{arg}\""))
+		.collect::<Vec<_>>()
+		.join(", ");
 	let dockerfile_content = format!(
-		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\n{}CMD [\"/app\"]\n",
+		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\n{}CMD [{}]\n",
 		base_image,
 		setup_commands,
 		binary_filename.to_string_lossy(),
 		expose,
+		cmd_json,
 	);
 	std::fs::write(dockerfile_dir.join("Dockerfile"), dockerfile_content)?;
 

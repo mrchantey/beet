@@ -1,4 +1,5 @@
 use crate::ssh::*;
+use base64::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use russh::Channel;
@@ -132,21 +133,11 @@ async fn run_russh_server_inner(
 	new_conn_tx: async_channel::Sender<NewConnectionInfo>,
 	credentials: Option<SshCredentials>,
 ) {
-	// In debug builds use a constant key so the fingerprint stays stable
-	// between restarts. In release builds generate a fresh random key.
-	#[cfg(debug_assertions)]
-	let host_key = PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES)
-		.expect("failed to load debug SSH host key");
-	#[cfg(not(debug_assertions))]
-	let host_key =
-		PrivateKey::random(&mut rand::rng(), russh::keys::Algorithm::Ed25519)
-			.expect("failed to generate SSH host key");
-
 	let config = Arc::new(russh::server::Config {
 		inactivity_timeout: Some(Duration::from_secs(3600)),
 		auth_rejection_time: Duration::from_secs(3),
 		auth_rejection_time_initial: Some(Duration::from_secs(0)),
-		keys: vec![host_key],
+		keys: vec![host_key()],
 		..Default::default()
 	});
 
@@ -164,6 +155,35 @@ async fn run_russh_server_inner(
 	if let Err(err) = app.run_on_socket(config, &tokio_listener).await {
 		error!("SSH server error: {:?}", err);
 	}
+}
+
+/// Selects the Ed25519 host key, in precedence order:
+/// 1. `BEET_SSH_HOST_KEY`: base64-encoded OpenSSH private key bytes, letting
+///    multiple processes present the same fingerprint. A malformed value warns
+///    and falls through rather than panicking.
+/// 2. debug builds: the stable [`DEBUG_HOST_KEY_BYTES`] const.
+/// 3. release builds: a fresh random key.
+fn host_key() -> PrivateKey {
+	if let Ok(encoded) = env_ext::var("BEET_SSH_HOST_KEY") {
+		// base64's no_std DecodeError lacks a std::error::Error impl, so render it
+		// into a message rather than relying on the `?`/`From<Error>` path.
+		match BASE64_STANDARD
+			.decode(&encoded)
+			.map_err(|err| bevyhow!("{err}"))
+			.and_then(|bytes| PrivateKey::from_bytes(&bytes).map_err(Into::into))
+		{
+			Ok(key) => return key,
+			Err(err) => {
+				warn!("ignoring malformed BEET_SSH_HOST_KEY: {err}")
+			}
+		}
+	}
+	#[cfg(debug_assertions)]
+	return PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES)
+		.expect("failed to load debug SSH host key");
+	#[cfg(not(debug_assertions))]
+	return PrivateKey::random(&mut rand::rng(), russh::keys::Algorithm::Ed25519)
+		.expect("failed to generate SSH host key");
 }
 
 /// Per-app state shared across connection handlers.
@@ -451,3 +471,29 @@ const DEBUG_HOST_KEY_BYTES: &[u8] = &[
 	184, 249, 15, 71, 215, 245, 215, 225, 75, 130, 173, 187, 182, 181, 10, 210,
 	100, 0, 0, 0, 0, 1, 2, 3, 4, 5,
 ];
+
+#[cfg(test)]
+#[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
+mod tests {
+	use super::*;
+
+	/// `BEET_SSH_HOST_KEY` yields a deterministic key across calls, equal to the
+	/// baked-in debug key it was generated from.
+	#[beet_core::test]
+	fn stable_host_key_from_env() {
+		let encoded = BASE64_STANDARD.encode(DEBUG_HOST_KEY_BYTES);
+		// safety: single-threaded test, restored before returning.
+		unsafe { env_ext::set_var("BEET_SSH_HOST_KEY", &encoded) };
+
+		let fingerprint =
+			|key: PrivateKey| key.public_key().fingerprint(Default::default());
+		let expected =
+			fingerprint(PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES).unwrap());
+
+		fingerprint(host_key()).xpect_eq(expected);
+		fingerprint(host_key()).xpect_eq(expected);
+
+		// safety: see above.
+		unsafe { std::env::remove_var("BEET_SSH_HOST_KEY") };
+	}
+}

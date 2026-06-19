@@ -44,14 +44,14 @@ pub fn BlobStoreRoute(
 	} else {
 		format!("{mount}/*{STORE_PATH_PARAM}?")
 	};
-	// `src` seeds a local FsStore on the route; otherwise the serve action resolves
-	// the nearest ancestor store (composed by the caller).
+	// `src` scopes the site store to that subdirectory and seeds it on the route;
+	// otherwise the serve action resolves the nearest ancestor store (composed by
+	// the caller).
 	let store = src.map(|src| {
-		let dir = site_root
+		site_root
 			.map(|root| root.0.clone())
 			.unwrap_or_else(|| SiteRoot::default().0)
-			.join(&src);
-		BlobStore::new(FsStore::new(dir))
+			.with_subdir(src)
 	});
 	(
 		PathPartial::new(path),

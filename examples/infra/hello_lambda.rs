@@ -97,7 +97,7 @@ fn assets_s3_fs_store() -> S3FsStore {
 	let stk = stack();
 	S3FsStore::new(
 		FsStore::new(WsPathBuf::new("examples/assets")),
-		assets_bucket_block().provider(&stk),
+		assets_bucket_block().store(&stk),
 	)
 }
 
@@ -106,7 +106,7 @@ fn assets_store() -> impl BlobStoreProvider {
 	cfg_if! {
 		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
 			let stk = stack();
-			assets_bucket_block().provider(&stk)
+			assets_bucket_block().store(&stk)
 		}else{
 			FsStore::new(WsPathBuf::new("examples/assets"))
 		}

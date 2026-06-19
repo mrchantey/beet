@@ -337,8 +337,11 @@ reqwest = ["net", "beet_net?/reqwest"]
 hyper = ["net", "beet_net?/hyper"]
 _pretty_curl = ["net", "ui", "ureq", "rustls-tls"]
 _mini_browser = ["_pretty_curl", "tui", "router", "beet_router?/tui"]
-ssh_server = ["net", "beet_net?/russh_server", "native-tls"]
-ssh_client = ["net", "beet_net?/russh_client", "native-tls"]
+# russh brings its own crypto (ring / aws-lc-rs), so the ssh transport only needs
+# a TLS backend for the colocated http client; use rustls so the server binary
+# cross-compiles with zigbuild (OpenSSL/native-tls has no cross system library).
+ssh_server = ["net", "beet_net?/russh_server", "rustls-tls"]
+ssh_client = ["net", "beet_net?/russh_client", "rustls-tls"]
 # The multi-tenant SSH-TUI server: serves each SSH connection its own navigable
 # terminal, all browsing one router, alongside the http server (`SshTuiServer` +
 # `SshTuiPlugin`). Combines the ssh transport with the live TUI render stack.
@@ -649,6 +652,11 @@ required-features = ["router", "fargate_block", "markdown"]
 [[example]]
 name = "deploy_ssh_site"
 path = "examples/infra/deploy_ssh_site.rs"
+required-features = ["router", "fargate_block", "markdown"]
+
+[[example]]
+name = "deploy_beet_site"
+path = "examples/infra/deploy_beet_site.rs"
 required-features = ["router", "fargate_block", "markdown"]
 
 # 💡 Examples - action

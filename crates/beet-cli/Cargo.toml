@@ -30,6 +30,11 @@ tui = ["beet/tui_server"]
 # --server=http,ssh` serves http and an ssh terminal from one process. Registers
 # the markup-declarable `SshTuiServer` via `SshTuiPlugin`.
 ssh = ["tui", "beet/ssh_tui"]
+# S3-backed stores, so a deployed `beet serve` task loads its site (`main.bsx`,
+# `routes/`, `templates/`) from an S3 bucket instead of the local filesystem,
+# selected at runtime by `BEET_SERVICE_ACCESS=remote`. Adds no deploy/terraform
+# machinery, keeping the container binary lean.
+aws_sdk = ["beet/aws_sdk"]
 
 [dependencies]
 beet = { workspace = true, features = [

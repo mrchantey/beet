@@ -181,7 +181,7 @@ mod test {
 		world
 			.register_bsx_templates(site_dir.join("templates"))
 			.unwrap();
-		world.insert_resource(SiteRoot(site_dir.clone()));
+		world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
 		let root = world
 			.spawn((default_router(), children![RoutesDir::new("routes")]))
 			.flush();
@@ -333,7 +333,7 @@ mod test {
 	fn reload_preserves_card_deck_marker_and_order() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = deck_fixture("deck_marker");
-		world.insert_resource(SiteRoot(site_dir.clone()));
+		world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
 		// a deck router: the CardDeck marker (declared in the deck's markup spread).
 		let router = world
 			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
@@ -401,7 +401,7 @@ mod test {
 
 		let mut app = tui_app();
 		let site_dir = deck_fixture("tui_repaint");
-		app.world_mut().insert_resource(SiteRoot(site_dir.clone()));
+		app.world_mut().insert_resource(SiteRoot::new_fs(site_dir.clone()));
 		let router = app
 			.world_mut()
 			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))

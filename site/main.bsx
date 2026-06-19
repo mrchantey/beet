@@ -16,7 +16,7 @@ site and blog reference (the favicon, images). `<Theme color=.../>` seeds the
 brand colour the whole Material palette derives from, and `<Styles/>` registers
 the named style rules in `templates/Styles.bsx`.
 -->
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8339}, TuiServer, SshTuiServer, CliServer, ServeOnLoad)}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, CliServer, ServeOnLoad)}>
 	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 	<Styles/>

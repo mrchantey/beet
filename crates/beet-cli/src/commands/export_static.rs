@@ -51,12 +51,7 @@ mod test {
 
 	/// Render `req` through a host carrying only the [`ExportStatic`] route.
 	async fn run(req: Request) -> String {
-		let mut world = (
-			AsyncPlugin,
-			RouterPlugin,
-			material::MaterialStylePlugin::default(),
-		)
-			.into_world();
+		let mut world = crate::commands::render_world();
 		let host = world.spawn((Router, children![ExportStatic])).id();
 		world
 			.entity_mut(host)

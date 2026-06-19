@@ -26,15 +26,24 @@ pub(crate) fn load_site(
 	site_dir: AbsPathBuf,
 	entry: AbsPathBuf,
 ) -> Result<Entity> {
-	let templates = site_dir.join("templates");
-	if fs_ext::exists(&templates)? {
-		world.register_bsx_templates(templates)?;
-	}
-	world.insert_resource(SiteRoot(site_dir));
+	let entry_name = entry
+		.file_name()
+		.and_then(|name| name.to_str())
+		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?;
+	let site_root = SiteRoot::new_fs(site_dir);
+	// register `templates/` and read the entry document through the site store
+	// (the same path a deployed task takes against S3).
+	site_root.register_templates(world)?;
 	// `check`/`export-static` render the site, never serve it: keep the servers
 	// the site's `<ServeOnLoad/>` would boot dormant.
 	world.insert_resource(SuppressServerBoot);
-	BsxTemplate::load_entry(world, &entry)?.spawn(world)
+	let bytes =
+		async_ext::block_on(site_root.0.get(&SmolPath::from(entry_name)))?;
+	let source = core::str::from_utf8(&bytes)?;
+	// insert the `SiteRoot` resource before spawning so the route-discovery
+	// observer and `<Template src>` includes resolve against it.
+	world.insert_resource(site_root);
+	BsxTemplate::parse_entry(world, source)?.spawn(world)
 }
 
 /// The `*site` path argument, joined back into a path. Errors with usage if empty.
@@ -85,6 +94,28 @@ pub(crate) fn resolve_site(site: &str) -> Result<SiteEntry> {
 	}
 }
 
+/// A world able to load and render a no-code site for the `check` /
+/// `export-static` / site-load tests. Beyond the render plugins it registers the
+/// markup-declarable `SshTuiServer` *type* so a site's server spread resolves;
+/// the binary registers it through `SshTuiPlugin`, but the type alone suffices
+/// here without pulling the ssh runtime systems (which need an input backend),
+/// and `SuppressServerBoot` keeps the declared server dormant anyway.
+#[cfg(test)]
+pub(crate) fn render_world() -> World {
+	let mut world = (
+		AsyncPlugin,
+		RouterPlugin,
+		material::MaterialStylePlugin::default(),
+	)
+		.into_world();
+	#[cfg(feature = "ssh")]
+	world
+		.resource_mut::<AppTypeRegistry>()
+		.write()
+		.register::<SshTuiServer>();
+	world
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -114,12 +145,7 @@ mod test {
 	/// routes it requested with `<DefaultAppRoutes/>` (eg `/js/reactivity.js`).
 	#[beet::test]
 	fn site_declares_server_and_app_routes() {
-		let mut world = (
-			AsyncPlugin,
-			RouterPlugin,
-			material::MaterialStylePlugin::default(),
-		)
-			.into_world();
+		let mut world = render_world();
 		let SiteEntry { site_dir, entry } =
 			resolve_site(site_path().to_string_lossy().as_ref()).unwrap();
 		let root = load_site(&mut world, site_dir, entry).unwrap();

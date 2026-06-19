@@ -185,6 +185,10 @@ pub mod prelude {
 	pub use bevy::ecs::system::SystemParam;
 	pub use bevy::ecs::traversal::Traversal;
 	pub use bevy::ecs::world::DeferredWorld;
+	// the schedule-loop runner, so a long-running server can pace its loop
+	// (`ScheduleRunnerPlugin::run_loop`) instead of busy-spinning; not in
+	// `bevy::prelude`.
+	pub use bevy::app::ScheduleRunnerPlugin;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;

@@ -134,6 +134,8 @@ russh_server = [
 	"beet_core/tokio",
 	"dep:tokio",
 	"dep:rand",
+	# base64-decode the optional `BEET_SSH_HOST_KEY` env var into a stable host key
+	"dep:base64",
 	"server",
 ]
 russh_client = [
