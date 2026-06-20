@@ -43,7 +43,7 @@ mod test {
 		// `default_router` already wires `app_info()` as a child under std.
 		world
 			.spawn(default_router())
-			.route(Request::get("app-info"))
+			.exchange(Request::get("app-info"))
 			.await
 			.unwrap_str()
 			.await

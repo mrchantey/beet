@@ -89,7 +89,7 @@ fn spawn_site(world: &mut World) -> Entity {
 async fn get(world: &mut World, root: Entity, path: &str) -> String {
 	world
 		.entity_mut(root)
-		.route(
+		.exchange(
 			Request::get(path)
 				.with_header::<header::Accept>(vec![MediaType::Html]),
 		)
@@ -137,7 +137,7 @@ async fn blob_store_route_serves_assets() {
 	let root = spawn_site(&mut world);
 	world
 		.entity_mut(root)
-		.route(Request::get("assets/style.css"))
+		.exchange(Request::get("assets/style.css"))
 		.await
 		.unwrap_str()
 		.await

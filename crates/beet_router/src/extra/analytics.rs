@@ -49,10 +49,7 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.route(Request::with_json_str(
-				"analytics",
-				payload,
-			))
+			.exchange(Request::with_json_str("analytics", payload))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);

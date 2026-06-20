@@ -183,12 +183,14 @@ mod test {
 	/// Assert the three fixture routes render their content, shared by the
 	/// filesystem- and memory-backed cases so both providers prove the same scan.
 	async fn assert_serves(world: &mut World, root: Entity) {
-		for (path, expected) in
-			[("", "welcome"), ("docs/intro", "the intro"), ("about", "About")]
-		{
+		for (path, expected) in [
+			("", "welcome"),
+			("docs/intro", "the intro"),
+			("about", "About"),
+		] {
 			world
 				.entity_mut(root)
-				.route(
+				.exchange(
 					Request::get(path)
 						.with_header::<header::Accept>(vec![MediaType::Html]),
 				)

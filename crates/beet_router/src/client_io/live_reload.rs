@@ -401,7 +401,8 @@ mod test {
 
 		let mut app = tui_app();
 		let site_dir = deck_fixture("tui_repaint");
-		app.world_mut().insert_resource(SiteRoot::new_fs(site_dir.clone()));
+		app.world_mut()
+			.insert_resource(SiteRoot::new_fs(site_dir.clone()));
 		let router = app
 			.world_mut()
 			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))

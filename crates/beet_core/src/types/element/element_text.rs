@@ -12,7 +12,7 @@ use crate::prelude::*;
 ///
 /// [`text_content`](Self::text_content) concatenates the [`Value::Str`] text of an
 /// entity and its descendants in pre-order: the verbatim body of a raw-text
-/// element, shared by the `RunScript` script verb and any render path that needs
+/// element, shared by the `ScriptEntry` script verb and any render path that needs
 /// an element's text content.
 #[derive(SystemParam)]
 pub struct ElementTextQuery<'w, 's> {

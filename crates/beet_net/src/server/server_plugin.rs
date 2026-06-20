@@ -16,9 +16,9 @@ impl Plugin for ServerPlugin {
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
 			// the markup load verb (and its opt-out), so a
-			// `<Router {(.., RunOnLoad)}>` entry resolves them.
-			.register_type::<RunOnLoad>()
-			.register_type::<DisableRunOnLoad>();
+			// `<Router {(.., BootOnLoad)}>` entry resolves them.
+			.register_type::<BootOnLoad>()
+			.register_type::<DisableBootOnLoad>();
 
 		// the process exits when `bootstrap` writes `AppExit` for the one-shot it
 		// resolves; a long-running server never resolves its boot call, so its
@@ -74,7 +74,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					RouteAction(exchange_handler(|_| {
+					ExchangeAction(exchange_handler(|_| {
 						Response::ok().with_body("hello")
 					})),
 				))

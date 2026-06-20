@@ -1,10 +1,10 @@
 //! Isolated JavaScript evaluation in a wasm host (browser or Deno), streaming the
 //! script's console output.
 //!
-//! `RunScript`'s wasm counterpart to the native quickjs runtime: it runs a
-//! `<script {RunScript}>` body in the wasm host, capturing `console` output and
-//! streaming it through a sink the same shape as the native side
-//! ([`ConsoleStream`] + `FnMut(stream, &str)`).
+//! The wasm counterpart to the native quickjs/rhai runtimes, backing
+//! `Script::run_console` (in `beet_action`) on wasm: it runs a `<script>` body in
+//! the wasm host, capturing `console` output and streaming it through a sink the
+//! same shape as the native side ([`ConsoleStream`] + `FnMut(stream, &str)`).
 //!
 //! The script runs with `console` overridden for the eval and restored after, so
 //! its output is captured wherever it runs (Deno, the wasm test runner, or a
@@ -16,7 +16,7 @@ use crate::prelude::*;
 use wasm_bindgen::prelude::*;
 
 /// Which host stream a console call targets, mirroring the native runtime's
-/// `ConsoleStream` so `RunScript` dispatches to the same sink shape on both
+/// `ConsoleStream` so the console path dispatches to the same sink shape on both
 /// targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsoleStream {

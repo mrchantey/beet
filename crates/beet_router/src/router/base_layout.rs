@@ -192,7 +192,7 @@ mod test {
 	async fn get(world: &mut World, root: Entity, path: &str) -> String {
 		world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::get(path)
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)

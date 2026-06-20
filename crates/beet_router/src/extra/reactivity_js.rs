@@ -38,7 +38,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world
 			.spawn(default_router())
-			.route(Request::get("js/reactivity.js"))
+			.exchange(Request::get("js/reactivity.js"))
 			.await
 			.unwrap_str()
 			.await

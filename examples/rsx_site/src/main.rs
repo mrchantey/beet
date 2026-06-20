@@ -2,7 +2,7 @@
 //!
 //! With the `codegen` feature it runs the route codegen pass and exits.
 //! Otherwise it spawns the site router with a server selected by build features,
-//! then triggers a [`StartServer`] on it (empty filter, so whichever server is
+//! then boots it (empty filter, so whichever server is
 //! present boots). The server is an [`HttpServer`] by default, the live
 //! `TuiServer` under `tui`, or a [`CliServer`] (with the `cli` feature, or when
 //! no `web` target is enabled) that renders a single route to stdout (HTML or
@@ -28,11 +28,11 @@ fn main() {
 	app.add_plugins((CharcellTuiPlugin, NavigatorPlugin, LivePagePlugin));
 	app.add_systems(Startup, |mut commands: Commands| {
 		// spawn the site host first (registering its server's `on_add` observers),
-		// then trigger the start: the empty filter matches whichever server the
+		// then boot it: the empty filter matches whichever server the
 		// build feature selected.
 		commands
 			.spawn((site_server(), rsx_site_router()))
-			.trigger(StartServer::all);
+			.trigger(ActionIn::boot);
 	});
 	app.run();
 }

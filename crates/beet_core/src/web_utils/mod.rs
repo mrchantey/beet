@@ -33,8 +33,8 @@ pub mod js_runtime;
 /// Async timeout and lifecycle utilities.
 pub mod lifecycle_ext;
 mod poll;
-/// Isolated JavaScript evaluation with streamed console output (the `RunScript`
-/// wasm backend).
+/// Isolated JavaScript evaluation with streamed console output (the wasm console
+/// backend behind `Script::run_console`).
 pub mod script_ext;
 pub use self::poll::*;
 mod resize_listener;

@@ -59,7 +59,7 @@ mod test {
 		world.insert_resource(pkg_config!());
 		world
 			.spawn(default_router())
-			.route(Request::get("health"))
+			.exchange(Request::get("health"))
 			.await
 			.unwrap_str()
 			.await
@@ -81,7 +81,7 @@ mod test {
 		}
 		world
 			.spawn(default_router())
-			.route(Request::get("health"))
+			.exchange(Request::get("health"))
 			.await
 			.unwrap_str()
 			.await

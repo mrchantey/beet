@@ -8,19 +8,20 @@
 use super::*;
 use beet_core::prelude::*;
 
-/// Observer that logs each routed request and bumps the server's request counter,
-/// registered by [`ServerPlugin`](crate::prelude::ServerPlugin).
+/// Observer that logs each exchanged request and bumps the server's request
+/// counter, registered by [`ServerPlugin`](crate::prelude::ServerPlugin).
 ///
 /// Logs a single concise line per request — method, path, status, duration, and
 /// running request index — at `info`. The method/path/status/timing ride on the
-/// [`RouteEnd`] event fired by [`route`](crate::prelude::AsyncRouteExt::route).
+/// [`ExchangeEnd`] event fired by
+/// [`exchange`](crate::prelude::AsyncExchangeExt::exchange).
 ///
-/// `action`-gated (its only non-no_std dep): it reads the [`RouteEnd`] event. The
-/// [`ExchangeStats`] counter it bumps is itself no_std (it backs the no_std
+/// `action`-gated (its only non-no_std dep): it reads the [`ExchangeEnd`] event.
+/// The [`ExchangeStats`] counter it bumps is itself no_std (it backs the no_std
 /// [`HttpServer`] requirement).
 #[cfg(feature = "action")]
 pub fn exchange_stats(
-	ev: On<RouteEnd>,
+	ev: On<ExchangeEnd>,
 	mut servers: AncestorQuery<&mut ExchangeStats>,
 ) -> Result {
 	let entity = ev.event_target();
@@ -77,13 +78,13 @@ mod test {
 		let entity = world
 			.spawn((
 				ExchangeStats::default(),
-				RouteAction(exchange_handler(|req| req.mirror_parts())),
+				ExchangeAction(exchange_handler(|req| req.mirror_parts())),
 			))
 			.id();
 
 		world
 			.entity_mut(entity)
-			.route(Request::get("/mirror"))
+			.exchange(Request::get("/mirror"))
 			.await
 			.into_result()
 			.await

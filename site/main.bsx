@@ -3,7 +3,7 @@ The beet website, authored entirely in markup: a router serving the `routes/`
 directory, every page wrapped in `templates/Layout.bsx`. This is the canonical
 website; the typed (rsx!) authoring path is demonstrated by `examples/rsx_site`.
 
-The router's middleware, servers, and the `RunOnLoad` boot verb attach as
+The router's middleware, servers, and the `BootOnLoad` boot verb attach as
 component spreads (request logging, `--help`, terminal link navigation, the
 layout). It declares four servers, so `--server` picks them on load: the default
 `HttpServer`, `--server=tui` the local live `TuiServer`, `--server=cli` a one-shot
@@ -16,7 +16,7 @@ site and blog reference (the favicon, images). `<Theme color=.../>` seeds the
 brand colour the whole Material palette derives from, and `<Styles/>` registers
 the named style rules in `templates/Styles.bsx`.
 -->
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, CliServer, RunOnLoad)}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, CliServer, BootOnLoad)}>
 	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 	<Styles/>

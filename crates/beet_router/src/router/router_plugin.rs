@@ -137,17 +137,15 @@ impl Plugin for RouterPlugin {
 				// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
 				.register_template::<ScriptRoute>();
 
-			// the `RunScript` entry action, so a `<script {RunScript}>` entry resolves
-			// it. Native runs through quickjs; wasm runs in the host realm.
-			#[cfg(any(
-				all(feature = "quickjs", not(target_arch = "wasm32")),
-				all(
-					feature = "scripting",
-					feature = "json",
-					target_arch = "wasm32"
-				)
+			// the `ScriptEntry` console-capturing entry action, so a
+			// `<script {ScriptEntry}>` entry resolves it. Native runs through the
+			// default backend (quickjs/rhai); wasm runs in the host realm. Gated on
+			// `json` like the action (it marshals the request as a JSON `input`).
+			#[cfg(all(
+				feature = "json",
+				any(not(target_arch = "wasm32"), feature = "scripting")
 			))]
-			app.register_type::<RunScript>();
+			app.register_type::<ScriptEntry>();
 		}
 	}
 }

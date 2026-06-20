@@ -5,30 +5,24 @@ use beet_net::prelude::*;
 
 /// Markup component for an entry that routes: it occupies the entity's action
 /// slot with an [`ActionTrigger`] (so the boot exchange fans out to any servers
-/// present) and installs a [`RouteAction`] (the route-tree dispatch, reached via
-/// [`route`](beet_net::prelude::AsyncRouteExt::route)).
+/// present) and installs an [`ExchangeAction`] (the route-tree dispatch, reached
+/// via [`exchange`](beet_net::prelude::AsyncExchangeExt::exchange)).
 ///
-/// Splitting the two lets one host both fan a boot out (its slot) and route
-/// per-request (its [`RouteAction`]): a [`CliServer`] resolves the boot by
+/// Splitting the two lets one host both fan a boot out (its slot) and dispatch
+/// per-request (its [`ExchangeAction`]): a [`CliServer`] resolves the boot by
 /// routing, an [`HttpServer`] parks and routes each socket request.
 ///
 /// `Reflect` is derived unconditionally: reflection works on no_std and is wanted
 /// there for scene loading.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ActionTrigger<Request, Response>)]
-#[component(on_add = on_add)]
+#[require(
+	ActionTrigger<Request, Response>,
+	ExchangeAction = ExchangeAction(route_action()),
+)]
 pub struct Router;
 
-/// Installs the [`RouteAction`] (the route-tree dispatch) on the router entity.
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.insert(RouteAction(route_action()));
-}
-
-/// The route-tree dispatch behind a router's [`RouteAction`]: matches the request
+/// The route-tree dispatch behind a router's [`ExchangeAction`]: matches the request
 /// against the ancestor [`RouteTree`] and applies ancestor [`MiddlewareList`]
 /// around the matched action.
 ///
@@ -37,14 +31,15 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 /// listing the available routes. Middleware such as [`HelpHandler`] and
 /// [`NavigateHandler`] wrap the inner action so they can intercept before dispatch.
 pub fn route_action() -> Action<Request, Response> {
-	Action::new_async(async move |cx: ActionContext<Request>| -> Result<Response> {
-		let caller = cx.caller.clone();
-		let world = cx.world();
-		let mut request = cx.input;
-		let path = request.path().clone();
+	Action::new_async(
+		async move |cx: ActionContext<Request>| -> Result<Response> {
+			let caller = cx.caller.clone();
+			let world = cx.world();
+			let mut request = cx.input;
+			let path = request.path().clone();
 
-		// find the matching route in the tree
-		let node = world
+			// find the matching route in the tree
+			let node = world
 			.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
 				query.get(caller.id()).map(|tree| tree.find(&path).cloned()).map_err(|_|{
 					bevyhow!("Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?")
@@ -52,36 +47,37 @@ pub fn route_action() -> Action<Request, Response> {
 			})
 			.await;
 
-		// resolve the inner action and dispatch entity from the matched route
-		let (inner_action, dispatch_entity) = match &node {
-			Ok(Some(node)) => {
-				// surface matched dynamic segments (`:id`) to the handler
-				node.merge_path_params(&mut request);
-				let entity = world.entity(node.entity);
-				match entity.clone().get_cloned::<ExchangeAction>().await {
-					Ok(action) => (action.into_action(), entity),
-					Err(err) => return Ok(err.into_response()),
+			// resolve the inner action and dispatch entity from the matched route
+			let (inner_action, dispatch_entity) = match &node {
+				Ok(Some(node)) => {
+					// surface matched dynamic segments (`:id`) to the handler
+					node.merge_path_params(&mut request);
+					let entity = world.entity(node.entity);
+					match entity.clone().get_cloned::<ExchangeAction>().await {
+						Ok(action) => (action.into_action(), entity),
+						Err(err) => return Ok(err.into_response()),
+					}
 				}
-			}
-			Ok(None) => {
-				// no matching route — std builds a not-found response through the
-				// contextual help system so middleware still applies; no_std falls
-				// back to a plain-text route listing (no scene pipeline).
-				#[cfg(feature = "std")]
-				let action = ContextualNotFound.into_action();
-				#[cfg(not(feature = "std"))]
-				let action = not_found_action();
-				(action, cx.caller.clone())
-			}
-			Err(err) => return Ok(bevyhow!("{err}").into_response()),
-		};
+				Ok(None) => {
+					// no matching route — std builds a not-found response through the
+					// contextual help system so middleware still applies; no_std falls
+					// back to a plain-text route listing (no scene pipeline).
+					#[cfg(feature = "std")]
+					let action = ContextualNotFound.into_action();
+					#[cfg(not(feature = "std"))]
+					let action = not_found_action();
+					(action, cx.caller.clone())
+				}
+				Err(err) => return Ok(bevyhow!("{err}").into_response()),
+			};
 
-		dispatch_entity
-			.call_with_middleware(inner_action, request)
-			.await
-			.unwrap_or_else(|err| err.into_response())
-			.xok()
-	})
+			dispatch_entity
+				.call_with_middleware(inner_action, request)
+				.await
+				.unwrap_or_else(|err| err.into_response())
+				.xok()
+		},
+	)
 }
 
 /// Builds the no_std not-found fallback: a plain-text `404` listing the
@@ -178,7 +174,7 @@ mod test {
 				"users/:id",
 				EchoParams
 			)]))
-			.route(Request::get("users/42"))
+			.exchange(Request::get("users/42"))
 			.await
 			.unwrap_str()
 			.await
@@ -192,7 +188,7 @@ mod test {
 				"files/*path",
 				EchoParams
 			)]))
-			.route(Request::get("files/a/b/c.txt"))
+			.exchange(Request::get("files/a/b/c.txt"))
 			.await
 			.unwrap_str()
 			.await
@@ -206,7 +202,7 @@ mod test {
 				"users/:id",
 				EchoParams
 			)]))
-			.route(Request::get("users/42?id=99"))
+			.exchange(Request::get("users/42?id=99"))
 			.await
 			.unwrap_str()
 			.await
@@ -224,7 +220,7 @@ mod test {
 					|| rsx! { <p>"About page"</p> }
 				),
 			]))
-			.route(Request::get("about"))
+			.exchange(Request::get("about"))
 			.await
 			.unwrap_str()
 			.await
@@ -241,7 +237,7 @@ mod test {
 					|| rsx! { <p>"Root content"</p> }
 				),
 			]))
-			.route(Request::get(""))
+			.exchange(Request::get(""))
 			.await
 			.unwrap_str()
 			.await
@@ -261,7 +257,7 @@ mod test {
 					|| rsx! { <p>"about"</p> }
 				),
 			]))
-			.route(Request::get(""))
+			.exchange(Request::get(""))
 			.await
 			.unwrap_str()
 			.await;
@@ -279,7 +275,7 @@ mod test {
 					|| rsx! { <p>"about"</p> }
 				),
 			]))
-			.route(Request::from_cli_str("--help"))
+			.exchange(Request::from_cli_str("--help"))
 			.await
 			.unwrap_str()
 			.await
@@ -296,7 +292,7 @@ mod test {
 					|| rsx! { <p>"about"</p> }
 				),
 			]))
-			.route(Request::from_cli_str("--help"))
+			.exchange(Request::from_cli_str("--help"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
@@ -308,7 +304,7 @@ mod test {
 			.spawn((default_router(), children![increment(FieldRef::new(
 				"count"
 			)),]))
-			.route(Request::from_cli_str("nonexistent"))
+			.exchange(Request::from_cli_str("nonexistent"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
@@ -327,7 +323,7 @@ mod test {
 					|| rsx! { <p>"about"</p> }
 				),
 			]))
-			.route(Request::from_cli_str(""))
+			.exchange(Request::from_cli_str(""))
 			.await
 			.unwrap_str()
 			.await
@@ -356,7 +352,7 @@ mod test {
 
 		let res = world
 			.entity_mut(root)
-			.route(Request::from_cli_str("counter --help"))
+			.exchange(Request::from_cli_str("counter --help"))
 			.await;
 
 		let body = res.unwrap_str().await;
@@ -370,7 +366,7 @@ mod test {
 			.spawn((default_router(), children![increment(FieldRef::new(
 				"count"
 			)),]))
-			.route(Request::from_cli_str("nonexistent"))
+			.exchange(Request::from_cli_str("nonexistent"))
 			.await
 			.text()
 			.await
@@ -394,9 +390,7 @@ mod test {
 					|| rsx! { <p>"about"</p> }
 				),
 			]))
-			.route(Request::from_cli_str(
-				"counter nonsense",
-			))
+			.exchange(Request::from_cli_str("counter nonsense"))
 			.await
 			.text()
 			.await
@@ -430,7 +424,7 @@ mod test {
 			.spawn((default_router(), children![exchange_route(
 				"ticks", Ticks
 			)]))
-			.route(Request::get("ticks"))
+			.exchange(Request::get("ticks"))
 			.await
 			.text()
 			.await

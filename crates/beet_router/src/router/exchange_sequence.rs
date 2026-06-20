@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -83,7 +82,7 @@ mod test {
 					|cx: ActionContext<Request>| Pass(cx.input),
 				),]),
 			)]))
-			.route(Request::get("seq"))
+			.exchange(Request::get("seq"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);

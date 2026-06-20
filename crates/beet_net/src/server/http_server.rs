@@ -15,7 +15,7 @@ use bevy::platform::sync::OnceLock;
 /// It is handed an [`AsyncEntity`] for the spawned server and a shutdown
 /// [`OnceValueRx`] that resolves when the host's [`Running<Response>`] is removed,
 /// and returns a boxed future. The backend reads the [`HttpServer`] config off the entity, opens its
-/// own listener, and dispatches each request through `entity.route(req)`. It owns
+/// own listener, and dispatches each request through `entity.exchange(req)`. It owns
 /// its teardown: on the shutdown signal it stops accepting and drops its listener
 /// (and may abort tasks it spawned), since only the backend knows how it spawned its
 /// own work.
@@ -42,7 +42,7 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 
 /// HTTP server that listens for incoming requests, dispatching each through the
-/// host's [`RouteAction`] via `entity.route`.
+/// host's [`ExchangeAction`] via `entity.exchange`.
 ///
 /// A long-running server: the boot fan-out ([`ActionIn<Request>`]) whose
 /// `--server` selects `"http"` boots it through the backend [`ServerPlugin`]
@@ -386,7 +386,9 @@ mod tests {
 			.is_some()
 			.xpect_true();
 		// remove the boot's Running: the teardown observer signals shutdown.
-		app.world_mut().entity_mut(entity).remove::<Running<Response>>();
+		app.world_mut()
+			.entity_mut(entity)
+			.remove::<Running<Response>>();
 		app.update_async().await;
 		app.world()
 			.entity(entity)
@@ -506,7 +508,7 @@ pub(crate) mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					RouteAction(exchange_handler(move |req| {
+					ExchangeAction(exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
 					})),
 				))
@@ -561,7 +563,7 @@ pub(crate) mod test {
 						port: Some(port),
 						..default()
 					},
-					RouteAction(exchange_handler(|_| {
+					ExchangeAction(exchange_handler(|_| {
 						Response::ok().with_body("up")
 					})),
 					OnSpawn::new_async(move |entity| {

@@ -13,8 +13,13 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// The entrypoint server: observes the boot [`ActionIn<Request>`], routes the
-/// request through the host's [`RouteAction`], and resolves the boot call with an
-/// [`EndRun`] so [`bootstrap`] streams the response and exits.
+/// request through the host's [`ExchangeAction`], then either resolves the boot
+/// call or streams the response and exits itself, whichever the boot path needs.
+///
+/// Two boot paths land here. The full [`bootstrap`] fires `ActionIn` behind a
+/// `Running<Response>` keep-alive, so `CliServer` resolves it with an [`EndRun`]
+/// and `bootstrap` streams the response. A direct `trigger(ActionIn::boot)` has no
+/// `Running`, so `CliServer` streams the response and writes the [`AppExit`] itself.
 ///
 /// This is how every beet binary boots by default: spread it on the entry root,
 /// and the boot fan-out (no `--server`, or `--server=cli`) reaches it. Being a
@@ -56,17 +61,31 @@ fn default_accept() -> Vec<MediaType> {
 	]
 }
 
-/// Route the request through the host and resolve the boot call with the response,
-/// which [`bootstrap`] then streams to stdout.
-async fn route_and_end(host: AsyncEntity, action_in: ActionIn<Request>) -> Result {
+/// Route the request through the host, then hand the response to whichever boot
+/// path called us: resolve the `Running` keep-alive if [`bootstrap`] set one (it
+/// streams and exits), otherwise stream and exit here ourselves.
+async fn route_and_end(
+	host: AsyncEntity,
+	action_in: ActionIn<Request>,
+) -> Result {
 	let request = action_in.take()?;
 	let accept = request
 		.get_param("accept")
 		.map(MediaType::from_accepts)
 		.unwrap_or_else(default_accept);
-	let response =
-		host.route(request.with_header::<header::Accept>(accept)).await;
-	host.queue(EndRun(response)).await??;
+	let response = host
+		.exchange(request.with_header::<header::Accept>(accept))
+		.await;
+	// the full bootstrap path parks on a Running; resolve it so bootstrap streams.
+	// a direct `trigger(ActionIn::boot)` has none, so stream and exit ourselves.
+	if host
+		.with(|entity| entity.contains::<Running<Response>>())
+		.await?
+	{
+		host.queue(EndRun(response)).await??;
+	} else {
+		stream_and_exit(&host, response).await?;
+	}
 	Ok(())
 }
 

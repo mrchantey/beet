@@ -61,13 +61,14 @@ client_io = ["http", "beet_net/tungstenite"]
 # `beet_core/rsx`: the `SceneServer` meta-route bundle is a `#[template]`, whose
 # attribute macro is rsx-gated; scene_server compiles wherever template_serde is on.
 template_serde = ["beet_core/template_serde", "beet_core/rsx", "serde"]
-# Generic scripting registration (the `Script`/`ExchangeScript` reflect types).
-# Backend-agnostic; pair with a backend (eg `rhai`) for a working runtime.
+# Generic scripting registration (the `Script`/`ExchangeScript`/`ScriptEntry`
+# reflect types). Backend-agnostic; pair with a backend (eg `rhai`) for a working
+# runtime, and `json` for the `ScriptEntry` console entry action.
 scripting = ["std", "beet_action/scripting", "serde"]
 # rhai backend for the scripting registrations above.
 rhai = ["scripting", "beet_action/rhai"]
-# quickjs backend, plus the `RunScript` console-capturing entry action (native;
-# wasm runs in the host realm).
+# quickjs backend. `json` also enables the `ScriptEntry` console-capturing entry
+# action (the `<script>` flavor; native runs the default backend, wasm the host realm).
 quickjs = ["scripting", "json", "beet_action/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.
 # `markdown_parser` lets the collection scan read content frontmatter so blob

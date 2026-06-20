@@ -50,7 +50,9 @@ impl SiteRoot {
 				.await?
 				.into_iter()
 				.filter(|path| path.extension() == Some("bsx"))
-				.map(async |path| store.get(&path).await.map(|bytes| (path, bytes)))
+				.map(async |path| {
+					store.get(&path).await.map(|bytes| (path, bytes))
+				})
 				.xmap(async_ext::try_join_all)
 				.await
 		})?;

@@ -36,9 +36,9 @@ fn main() {
 					// CliServer::default(),
 					HttpServer::default(),
 					Count::default(),
-					Handler,
+					ExchangeAction(Handler.into_action()),
 				))
-				.trigger(StartServer::all);
+				.trigger(ActionIn::boot);
 		})
 		.run();
 }
@@ -48,7 +48,6 @@ struct Count(u32);
 
 /// Handler function that processes all incoming requests.
 #[action]
-#[derive(Component)]
 fn Handler(
 	cx: In<ActionContext<Request>>,
 	mut query: Query<&mut Count>,

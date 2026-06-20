@@ -123,7 +123,7 @@ mod test {
 			.spawn((default_router(), css_store().await, children![
 				serve_route("assets")
 			]))
-			.route(Request::get("assets/style.css"))
+			.exchange(Request::get("assets/style.css"))
 			.await
 			.unwrap_str()
 			.await
@@ -139,7 +139,7 @@ mod test {
 				serve_route("assets"),
 				css_store().await
 			)]))
-			.route(Request::get("assets/style.css"))
+			.exchange(Request::get("assets/style.css"))
 			.await
 			.unwrap_str()
 			.await
@@ -156,7 +156,7 @@ mod test {
 			.unwrap();
 		router_world()
 			.spawn((default_router(), store, children![serve_route("foo")]))
-			.route(Request::get("foo/bar"))
+			.exchange(Request::get("foo/bar"))
 			.await
 			.unwrap_str()
 			.await

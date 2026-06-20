@@ -8,7 +8,7 @@ does nothing until you supply an entry. On startup it discovers `main.bsx` (or
 `main.json` / `main.ron`) by walking the cwd's ancestors, with `--main=<path>` as
 an override. It parses argv once into a request the loaded tree consumes, builds
 the entry through the unified loader, and lets its load-lifecycle verb run: a
-`RunScript` script runs and exits, or a `BootOnLoad` server entry fans the
+`ScriptEntry` script runs and exits, or a `BootOnLoad` server entry fans the
 request out to its servers. A one-shot streams its response and exits; a
 long-running server parks its boot call to keep the process alive.
 

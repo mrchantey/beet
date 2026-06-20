@@ -346,9 +346,7 @@ mod test {
 		// and it still renders, the symptom a real serve/export would hit.
 		world
 			.entity_mut(router)
-			.route(
-				Request::get("post").with_accept(MediaType::Html),
-			)
+			.exchange(Request::get("post").with_accept(MediaType::Html))
 			.await
 			.unwrap_str()
 			.await

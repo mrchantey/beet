@@ -10,21 +10,12 @@ mod exchange_fallback;
 pub use exchange_fallback::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
+// the typed `ExchangeScript` route marker, the `ScriptRoute` front-end, and the
+// `ScriptEntry` console-capturing `<script>` entry action (json-gated within).
 #[cfg(feature = "scripting")]
 mod exchange_script;
 #[cfg(feature = "scripting")]
 pub use exchange_script::*;
-// the `RunScript` entry action runs on native (quickjs) and wasm (`script_ext`).
-#[cfg(any(
-	all(feature = "quickjs", not(target_arch = "wasm32")),
-	all(feature = "scripting", feature = "json", target_arch = "wasm32")
-))]
-mod run_script;
-#[cfg(any(
-	all(feature = "quickjs", not(target_arch = "wasm32")),
-	all(feature = "scripting", feature = "json", target_arch = "wasm32")
-))]
-pub use run_script::*;
 // the `<Template src>` include: needs the BSX tag seam + the unified loader.
 #[cfg(all(feature = "bsx", feature = "template_serde"))]
 mod template_include;

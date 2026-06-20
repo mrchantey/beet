@@ -53,7 +53,7 @@ beet = { workspace = true, features = [
 	"syntax_highlighting",
 	"style",
 	"template",
-	# the QuickJS scripting runtime: the `RunScript` load verb's `console.log`
+	# the QuickJS scripting runtime: the `ScriptEntry` load verb's `console.log`
 	# path and the `ExchangeScript` route backend a `main.bsx` wires.
 	"quickjs_serde",
 	# plaintext `MediaType::Text` serialization, so a scripted route's `String`

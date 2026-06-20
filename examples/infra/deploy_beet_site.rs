@@ -48,7 +48,9 @@ fn main() -> AppExit {
 fn setup(mut commands: Commands) -> Result {
 	cfg_if! {
 		if #[cfg(feature = "deploy")] {
-			commands.spawn(infra_scene()?).trigger(StartServer::all);
+			commands
+				.spawn(infra_scene()?)
+				.trigger(ActionIn::boot);
 		} else {
 			let _ = &mut commands;
 			bevybail!("the deploy_beet_site example requires the `fargate_block` feature");
@@ -165,7 +167,10 @@ fn build_beet_binary() -> impl Bundle {
 #[cfg(feature = "deploy")]
 fn sync_site(stack: &Stack) -> impl Bundle + use<> {
 	(
-		S3FsStore::new(FsStore::new(WsPathBuf::new("site")), site_bucket().store(stack)),
+		S3FsStore::new(
+			FsStore::new(WsPathBuf::new("site")),
+			site_bucket().store(stack),
+		),
 		SyncS3BucketAction,
 	)
 }
@@ -176,7 +181,9 @@ fn sync_assets(stack: &Stack) -> impl Bundle + use<> {
 	(
 		S3FsStore::new(
 			FsStore::new(WsPathBuf::new("assets")),
-			site_bucket().store(stack).with_subdir(SmolPath::new("assets")),
+			site_bucket()
+				.store(stack)
+				.with_subdir(SmolPath::new("assets")),
 		),
 		SyncS3BucketAction,
 	)

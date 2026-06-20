@@ -93,7 +93,7 @@ async fn hyper_accept_loop(
 						))]
 						let on_upgrade = hyper::upgrade::on(&mut req);
 						let req = hyper_to_request(req).await;
-						let res = entity.route(req).await;
+						let res = entity.exchange(req).await;
 						#[cfg(all(
 							feature = "tungstenite",
 							not(target_arch = "wasm32")
@@ -417,7 +417,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					RouteAction(exchange_handler(move |req| {
+					ExchangeAction(exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
 					})),
 				))
@@ -441,7 +441,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, RouteAction(mirror_exchange())))
+				.spawn((server, ExchangeAction(mirror_exchange())))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -472,7 +472,7 @@ mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
-					RouteAction(exchange_handler(move |req| {
+					ExchangeAction(exchange_handler(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
 							req.take().body,
@@ -579,7 +579,7 @@ mod upgrade_test {
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			app.world_mut().spawn((
 				server,
-				RouteAction(exchange_handler(|cx| {
+				ExchangeAction(exchange_handler(|cx| {
 					WebSocketUpgrade::from_request(&cx).into()
 				})),
 			));

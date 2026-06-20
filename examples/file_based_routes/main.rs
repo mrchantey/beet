@@ -87,7 +87,7 @@ fn main() -> AppExit {
 /// routes layered on the same router.
 fn setup(mut commands: Commands) -> Result {
 	commands
-		.spawn((server_from_cli()?, site(), RunOnLoad))
+		.spawn((server_from_cli()?, site()))
 		.with_children(|parent| {
 			#[cfg(feature = "codegen")]
 			parent.spawn(exchange_route("codegen", Codegen));
@@ -96,10 +96,7 @@ fn setup(mut commands: Commands) -> Result {
 		})
 		// boot whichever server `server_from_cli` selected (an empty filter matches
 		// it); without it the server never runs its exchange and the app loops forever.
-		.trigger(|entity| LoadTemplate {
-			entity,
-			is_error: false,
-		});
+		.trigger(ActionIn::boot);
 	Ok(())
 }
 

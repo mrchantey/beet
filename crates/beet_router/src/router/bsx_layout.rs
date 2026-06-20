@@ -134,7 +134,7 @@ mod test {
 	async fn get(world: &mut World, root: Entity, path: &str) -> String {
 		world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::get(path)
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
@@ -249,7 +249,7 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.route(Request::get(""))
+			.exchange(Request::get(""))
 			.await
 			.status()
 			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);

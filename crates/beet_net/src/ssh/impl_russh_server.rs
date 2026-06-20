@@ -170,8 +170,9 @@ fn host_key() -> PrivateKey {
 		match BASE64_STANDARD
 			.decode(&encoded)
 			.map_err(|err| bevyhow!("{err}"))
-			.and_then(|bytes| PrivateKey::from_bytes(&bytes).map_err(Into::into))
-		{
+			.and_then(|bytes| {
+				PrivateKey::from_bytes(&bytes).map_err(Into::into)
+			}) {
 			Ok(key) => return key,
 			Err(err) => {
 				warn!("ignoring malformed BEET_SSH_HOST_KEY: {err}")
@@ -182,8 +183,11 @@ fn host_key() -> PrivateKey {
 	return PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES)
 		.expect("failed to load debug SSH host key");
 	#[cfg(not(debug_assertions))]
-	return PrivateKey::random(&mut rand::rng(), russh::keys::Algorithm::Ed25519)
-		.expect("failed to generate SSH host key");
+	return PrivateKey::random(
+		&mut rand::rng(),
+		russh::keys::Algorithm::Ed25519,
+	)
+	.expect("failed to generate SSH host key");
 }
 
 /// Per-app state shared across connection handlers.

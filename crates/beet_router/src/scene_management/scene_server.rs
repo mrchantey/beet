@@ -229,7 +229,7 @@ mod test {
 			.flush();
 		world
 			.entity_mut(server)
-			.route(
+			.exchange(
 				Request::post("load")
 					.with_content_type(MediaType::Json)
 					.with_body(scene.bytes()),
@@ -249,7 +249,7 @@ mod test {
 		// and dispatches it: the pushed route answers on the device.
 		world
 			.entity_mut(server)
-			.route(Request::get("ping"))
+			.exchange(Request::get("ping"))
 			.await
 			.unwrap_str()
 			.await

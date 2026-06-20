@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -104,7 +103,7 @@ mod test {
 					},
 				),]),
 			)]))
-			.route(Request::get("fb"))
+			.exchange(Request::get("fb"))
 			.await
 			.unwrap_str()
 			.await

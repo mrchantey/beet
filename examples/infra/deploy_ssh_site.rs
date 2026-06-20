@@ -42,7 +42,9 @@ fn main() -> AppExit {
 fn setup(mut commands: Commands) -> Result {
 	cfg_if! {
 		if #[cfg(feature = "deploy")] {
-			commands.spawn(infra_scene()?).trigger(StartServer::all);
+			commands
+				.spawn(infra_scene()?)
+				.trigger(ActionIn::boot);
 		} else {
 			let _ = &mut commands;
 			bevybail!("the deploy_ssh_site example requires the `fargate_block` feature");

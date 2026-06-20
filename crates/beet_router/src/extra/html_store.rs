@@ -99,7 +99,7 @@ mod test {
 				]),
 				HtmlStore::ssg(html_store().await),
 			))
-			.route(Request::get("about"))
+			.exchange(Request::get("about"))
 			.await
 			.unwrap_str()
 			.await
@@ -121,7 +121,7 @@ mod test {
 				]),
 				HtmlStore::ssr(html_store().await),
 			))
-			.route(Request::get("about"))
+			.exchange(Request::get("about"))
 			.await
 			.unwrap_str()
 			.await
@@ -141,7 +141,7 @@ mod test {
 				]),
 				HtmlStore::ssg(html_store().await),
 			))
-			.route(Request::get("contact"))
+			.exchange(Request::get("contact"))
 			.await
 			.unwrap_str()
 			.await

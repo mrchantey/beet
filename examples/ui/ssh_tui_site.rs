@@ -43,7 +43,7 @@ fn main() -> Result {
 	))
 	.insert_resource(pkg_config!());
 
-	// one router carrying both servers + the demo routes; `StartServer::all` boots
+	// one router carrying both servers + the demo routes; the boot fan-out boots
 	// every server present (http + ssh), each on its own async accept loop, while
 	// the bevy loop repaints every ssh surface each frame.
 	app.world_mut()
@@ -59,7 +59,7 @@ fn main() -> Result {
 				render_action::func_route("about", |_: ()| about()),
 			],
 		))
-		.trigger(StartServer::all);
+		.trigger(ActionIn::boot);
 
 	app.run();
 	Ok(())

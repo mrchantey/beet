@@ -372,7 +372,7 @@ rhai_serde = ["rhai","serde","std","beet_action/rhai_serde","beet_router?/script
 # consumers that marshal values by hand (no serde, no router registrations).
 quickjs = ["action","beet_action/quickjs"]
 # The typed-`Script` QuickJS backend: the JSON-marshalled runtime plus the std
-# beet_router scripting registrations and the `RunScript` entry action (the `std`
+# beet_router scripting registrations and the `ScriptEntry` entry action (the `std`
 # is for those, not the runtime).
 quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/quickjs"]
 ui = ["dep:beet_ui"]

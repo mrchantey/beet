@@ -152,7 +152,7 @@ mod test {
 		);
 		let response = world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::get("")
 					.with_header_raw("origin", "https://allowed.com"),
 			)
@@ -174,7 +174,7 @@ mod test {
 			spawn_cors(&mut world, CorsConfig::allow_origins([] as [&str; 0]));
 		world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::get("")
 					.with_header_raw("origin", "https://blocked.com"),
 			)
@@ -189,7 +189,7 @@ mod test {
 		let root = spawn_cors(&mut world, CorsConfig::allow_any());
 		let response = world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::get("")
 					.with_header_raw("origin", "https://anything.com"),
 			)
@@ -210,7 +210,7 @@ mod test {
 		let root = spawn_cors(&mut world, CorsConfig::allow_any());
 		world
 			.entity_mut(root)
-			.route(Request::get(""))
+			.exchange(Request::get(""))
 			.await
 			.headers
 			.get::<header::AccessControlAllowOrigin>()
@@ -228,7 +228,7 @@ mod test {
 		);
 		let response = world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::options("")
 					.with_header_raw("origin", "https://allowed.com"),
 			)

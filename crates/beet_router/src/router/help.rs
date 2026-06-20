@@ -355,7 +355,7 @@ mod test {
 	async fn help_body(world: &mut World, root: Entity, path: &str) -> String {
 		world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::from_cli_str(path)
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
@@ -397,7 +397,7 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::get("?help")
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
@@ -530,7 +530,7 @@ mod test {
 		// ok-only `unwrap_str`.
 		world
 			.entity_mut(root)
-			.route(
+			.exchange(
 				Request::from_cli_str("nonexistent")
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)

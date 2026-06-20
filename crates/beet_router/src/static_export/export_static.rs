@@ -73,7 +73,7 @@ pub async fn collect_static_html(
 	for path in paths {
 		let request = Request::get(path.with_leading_slash())
 			.with_accept(MediaType::Html);
-		let response = entity.route(request).await;
+		let response = entity.exchange(request).await;
 		let html = response
 			.into_result()
 			.await

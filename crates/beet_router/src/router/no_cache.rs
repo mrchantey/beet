@@ -47,7 +47,7 @@ mod test {
 				(default_router(), children![exchange_route("", Hello)]),
 				NoCacheHeaders,
 			))
-			.route(Request::get(""))
+			.exchange(Request::get(""))
 			.await;
 
 		response

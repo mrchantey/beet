@@ -50,7 +50,7 @@ async fn handle_request(
 {
 	let result: Result<lambda_http::Response<lambda_http::Body>> = async {
 		let req = lambda_to_request(lambda_req)?;
-		let res = entity.route(req).await;
+		let res = entity.exchange(req).await;
 		response_to_lambda(res).await
 	}
 	.await;

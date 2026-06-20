@@ -311,9 +311,7 @@ mod test {
 
 		let body = world
 			.entity_mut(root)
-			.route(Request::from_cli_str(
-				"about --navigate=parent",
-			))
+			.exchange(Request::from_cli_str("about --navigate=parent"))
 			.await
 			.unwrap_str()
 			.await;
@@ -338,9 +336,7 @@ mod test {
 
 		let body = world
 			.entity_mut(root)
-			.route(Request::from_cli_str(
-				"--navigate=first-child",
-			))
+			.exchange(Request::from_cli_str("--navigate=first-child"))
 			.await
 			.unwrap_str()
 			.await;
@@ -366,9 +362,7 @@ mod test {
 		// alpha -> next -> beta
 		let body = world
 			.entity_mut(root)
-			.route(Request::from_cli_str(
-				"alpha --navigate=next-sibling",
-			))
+			.exchange(Request::from_cli_str("alpha --navigate=next-sibling"))
 			.await
 			.unwrap_str()
 			.await;
@@ -377,9 +371,7 @@ mod test {
 		// beta -> next -> wraps to alpha
 		let body = world
 			.entity_mut(root)
-			.route(Request::from_cli_str(
-				"beta --navigate=next-sibling",
-			))
+			.exchange(Request::from_cli_str("beta --navigate=next-sibling"))
 			.await
 			.unwrap_str()
 			.await;
@@ -405,9 +397,7 @@ mod test {
 		// alpha -> prev -> wraps to beta
 		let body = world
 			.entity_mut(root)
-			.route(Request::from_cli_str(
-				"alpha --navigate=prev-sibling",
-			))
+			.exchange(Request::from_cli_str("alpha --navigate=prev-sibling"))
 			.await
 			.unwrap_str()
 			.await;
@@ -427,7 +417,7 @@ mod test {
 		// No --navigate param, should route normally
 		let body = world
 			.entity_mut(root)
-			.route(Request::get("about"))
+			.exchange(Request::get("about"))
 			.await
 			.unwrap_str()
 			.await;

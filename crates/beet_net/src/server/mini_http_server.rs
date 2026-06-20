@@ -142,7 +142,7 @@ async fn handle_connection(
 	let request = http_ext::parse_http_request(&buf)?;
 
 	// Dispatch through the host's routing
-	let response: Response = entity.route(request).await;
+	let response: Response = entity.exchange(request).await;
 
 	// A `101 Switching Protocols` (a route returning `WebSocketUpgrade`) means we
 	// write the handshake then keep the raw stream as a `Socket`, instead of
@@ -295,7 +295,7 @@ mod test {
 			// a route that upgrades any request to a websocket
 			app.world_mut().spawn((
 				server,
-				RouteAction(exchange_handler(|cx| {
+				ExchangeAction(exchange_handler(|cx| {
 					WebSocketUpgrade::from_request(&cx).into()
 				})),
 			));

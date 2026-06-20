@@ -42,8 +42,8 @@ pub(crate) fn load_site(
 	world.insert_resource(site_root);
 	let template = BsxTemplate::parse_entry(world, source)?;
 	// `check`/`export-static` render the site, never serve it: build into a root
-	// carrying `DisableRunOnLoad` so the entry's `RunOnLoad` verb stays dormant.
-	let root = world.spawn(DisableRunOnLoad).id();
+	// carrying `DisableBootOnLoad` so the entry's `BootOnLoad` verb stays dormant.
+	let root = world.spawn(DisableBootOnLoad).id();
 	world.entity_mut(root).insert_template(template)?;
 	Ok(root)
 }
@@ -101,7 +101,7 @@ pub(crate) fn resolve_site(site: &str) -> Result<SiteEntry> {
 /// markup-declarable `SshTuiServer` *type* so a site's server spread resolves;
 /// the binary registers it through `SshTuiPlugin`, but the type alone suffices
 /// here without pulling the ssh runtime systems (which need an input backend),
-/// and `SuppressServerBoot` keeps the declared server dormant anyway.
+/// and `DisableBootOnLoad` keeps the declared server dormant anyway.
 #[cfg(test)]
 pub(crate) fn render_world() -> World {
 	let mut world = (

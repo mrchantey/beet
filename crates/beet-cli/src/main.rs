@@ -5,7 +5,7 @@
 //! (registered reflect types) but ships zero behaviour. It discovers `main.bsx`
 //! (or `main.json`/`main.ron`) by walking the cwd and its ancestors, consumes
 //! only its own `--main` flag, and builds the entry through the unified
-//! [`TemplateLoader`], then lets the `RunOnLoad` verb fan the process request out
+//! [`TemplateLoader`], then lets the `BootOnLoad` verb fan the process request out
 //! on the build's `LoadTemplate`. A one-shot streams its response and exits; a
 //! long-running server parks its boot call to persist the process.
 use beet::prelude::*;
@@ -87,9 +87,9 @@ fn try_load_entry(world: &mut World) -> Result {
 	)?;
 	world.insert_resource(site_root);
 
-	TemplateLoader::new(world)
-		.load(&media)
-		.map_err(|err| bevyhow!("failed to load entry `{entry_name}`: {err}"))?;
+	TemplateLoader::new(world).load(&media).map_err(|err| {
+		bevyhow!("failed to load entry `{entry_name}`: {err}")
+	})?;
 	Ok(())
 }
 

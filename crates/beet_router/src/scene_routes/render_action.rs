@@ -163,7 +163,7 @@ mod test {
 			.spawn((default_router(), children![render_action::async_route(
 				"home", home
 			)]))
-			.route(Request::get("home"))
+			.exchange(Request::get("home"))
 			.await
 			.unwrap_str()
 			.await
@@ -179,7 +179,7 @@ mod test {
 			.spawn((default_router(), children![render_action::system_route(
 				"home", home
 			)]))
-			.route(Request::get("home"))
+			.exchange(Request::get("home"))
 			.await
 			.unwrap_str()
 			.await
@@ -201,7 +201,7 @@ mod test {
 		for _ in 0..2 {
 			world
 				.entity_mut(root)
-				.route(Request::get("home"))
+				.exchange(Request::get("home"))
 				.await
 				.unwrap_str()
 				.await
