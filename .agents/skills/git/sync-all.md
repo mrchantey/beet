@@ -10,7 +10,7 @@ Apply the worktree sync skill to the following worktrees.
 	- rendering `~/me/worktrees/beet/rendering/beet`
 	- apps `~/me/worktrees/beet/apps/beet`
 - Ignore: experimental and not to be merged
-	- coding `~/me/worktrees/beet/coding/beet`
+	- any other not explicitly listed above, ie coding, web
 
 Do Not run cargo fmt.
 
