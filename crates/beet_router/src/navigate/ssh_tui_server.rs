@@ -8,6 +8,7 @@
 //! independently in one process, alongside the [`HttpServer`].
 
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
@@ -16,12 +17,13 @@ use bevy::input::keyboard::KeyCode;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::math::UVec2;
 
-/// A multi-tenant SSH-TUI server, spawned on a router: a [`StartServer`] whose
-/// filter passes `"ssh"` boots an [`SshServer`] on the router and serves every
+/// A multi-tenant SSH-TUI server, spread on a router: the boot fan-out whose
+/// `--server` selects `"ssh"` boots an [`SshServer`] on the router and serves every
 /// connection its own navigable terminal browsing this router.
 ///
-/// A long-running server: starting it inserts [`KeepAlive`] so the process
-/// persists. Reads `--port` / `--host` from the start params (defaulting from
+/// A long-running server: it never resolves the boot call, so the host's
+/// [`Running<Response>`](beet_action::prelude::Running) parks the process up.
+/// Reads `--port` / `--host` from the boot request (defaulting from
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
 /// Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
 /// [`HttpServer`] on the same router, so one process answers http and ssh at once.
@@ -30,44 +32,46 @@ use bevy::math::UVec2;
 #[component(on_add = on_add)]
 pub struct SshTuiServer;
 
-/// Registers the [`StartServer`] observer on the router, so the SSH listener boots
-/// when a start event whose filter passes `"ssh"` lands on it.
+/// Registers the boot ([`ActionIn<Request>`]) observer on the router, so the SSH
+/// listener boots when the boot fan-out selects `"ssh"`.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_start_server);
+	world.commands().entity(cx.entity).observe_any(on_action_in);
 }
 
-/// Boots the SSH listener when a [`StartServer`] passing `"ssh"` lands: builds an
-/// [`SshServer`] from the params and inserts it on the router (its `on_add` starts
-/// the listener), records the opening route, and holds the process up with a
-/// [`KeepAliveGuard`].
-fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
-	if !ev.passes("ssh") {
-		return;
+/// Boots the SSH listener on the boot fan-out, if `--server` selects `"ssh"`:
+/// builds an [`SshServer`] from the request and inserts it on the router (its
+/// `on_add` starts the listener), and records the opening route. Never resolves
+/// the boot call, so its `Running` parks the process up.
+fn on_action_in(ev: On<ActionIn<Request>>, mut commands: Commands) -> Result {
+	let (selected, port, host, opening) = ev.with(|req| {
+		(
+			request_selects_server(req, "ssh"),
+			req.get_param("port").and_then(|port| port.parse().ok()),
+			req.get_param("host").map(|host| {
+				if host == "0.0.0.0" {
+					[0, 0, 0, 0]
+				} else {
+					[127, 0, 0, 1]
+				}
+			}),
+			OpeningRoute::from_request(req),
+		)
+	})?;
+	if !selected {
+		return Ok(());
 	}
-	// the bind config from the start params, defaulting from env.
+	// the bind config from the request, defaulting from env.
 	let mut server = SshServer::default();
-	if let Some(port) = ev.params.get("port").and_then(|port| port.parse().ok())
-	{
+	if let Some(port) = port {
 		server.port = Some(port);
 	}
-	if let Some(host) = ev.params.get("host") {
-		server.host = if host.as_str() == "0.0.0.0" {
-			[0, 0, 0, 0]
-		} else {
-			[127, 0, 0, 1]
-		};
+	if let Some(host) = host {
+		server.host = host;
 	}
 	// the opening route each session navigates to, recorded on the router (the
-	// shared mechanism the local TUI server also reads). The `KeepAliveGuard` holds
-	// the process up for the server's lifetime, released when the router despawns.
-	commands.entity(ev.event_target()).insert((
-		server,
-		OpeningRoute::from_params(&ev.params),
-		KeepAliveGuard,
-	));
+	// shared mechanism the local TUI server also reads).
+	commands.entity(ev.entity).insert((server, opening));
+	Ok(())
 }
 
 /// Per-connection behavior for the [`SshTuiServer`], added once by the app: spins

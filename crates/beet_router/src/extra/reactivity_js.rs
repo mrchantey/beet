@@ -30,7 +30,6 @@ pub fn reactivity_js_route() -> impl Bundle {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -39,9 +38,8 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world
 			.spawn(default_router())
-			.call::<Request, Response>(Request::get("js/reactivity.js"))
+			.route(Request::get("js/reactivity.js"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			// the real runtime, not a stub

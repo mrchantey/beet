@@ -52,7 +52,7 @@ impl Plugin for RouterPlugin {
 		{
 			app
 				// the server model: routers and servers go together, so a server
-				// spawned on a router boots when a `StartServer` event lands on it.
+				// spread on a router boots when the boot fan-out reaches it.
 				// `ServerPlugin` installs the `HttpServer` backend and registers the
 				// server types.
 				.init_plugin::<ServerPlugin>()
@@ -122,7 +122,7 @@ impl Plugin for RouterPlugin {
 			register_template_include(app.world_mut());
 			// the live-TUI server, declarable in a router markup spread
 			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
-			// terminal app when a `tui`-filtered `StartServer` lands.
+			// terminal app when the boot fan-out selects `tui`.
 			#[cfg(feature = "tui")]
 			app.register_type::<TuiServer>();
 			#[cfg(feature = "scripting")]
@@ -136,6 +136,18 @@ impl Plugin for RouterPlugin {
 				>>()
 				// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
 				.register_template::<ScriptRoute>();
+
+			// the `RunScript` entry action, so a `<script {RunScript}>` entry resolves
+			// it. Native runs through quickjs; wasm runs in the host realm.
+			#[cfg(any(
+				all(feature = "quickjs", not(target_arch = "wasm32")),
+				all(
+					feature = "scripting",
+					feature = "json",
+					target_arch = "wasm32"
+				)
+			))]
+			app.register_type::<RunScript>();
 		}
 	}
 }

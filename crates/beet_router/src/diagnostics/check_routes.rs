@@ -346,11 +346,10 @@ mod test {
 		// and it still renders, the symptom a real serve/export would hit.
 		world
 			.entity_mut(router)
-			.call::<Request, Response>(
+			.route(
 				Request::get("post").with_accept(MediaType::Html),
 			)
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("body");

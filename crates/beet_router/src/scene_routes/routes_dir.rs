@@ -139,7 +139,6 @@ async fn scan_meta(store: &BlobStore, path: &SmolPath) -> Option<ArticleMeta> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -189,12 +188,11 @@ mod test {
 		{
 			world
 				.entity_mut(root)
-				.call::<Request, Response>(
+				.route(
 					Request::get(path)
 						.with_header::<header::Accept>(vec![MediaType::Html]),
 				)
 				.await
-				.unwrap()
 				.unwrap_str()
 				.await
 				.xpect_contains(expected);

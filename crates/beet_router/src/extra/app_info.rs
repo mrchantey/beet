@@ -33,7 +33,6 @@ fn AppInfoContent(config: Res<PackageConfig>) -> impl Bundle {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -44,9 +43,8 @@ mod test {
 		// `default_router` already wires `app_info()` as a child under std.
 		world
 			.spawn(default_router())
-			.call::<Request, Response>(Request::get("app-info"))
+			.route(Request::get("app-info"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("App Info")

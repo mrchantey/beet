@@ -3,14 +3,16 @@
 //! This module provides server infrastructure that listens for HTTP requests
 //! and routes them to Bevy entities for processing via `Action<Request, Response>`.
 //!
-//! ## Every binary is a CLI server
+//! ## One boot path, servers are observers
 //!
-//! A formal beet binary boots as a CLI server at the top level: its entrypoint
-//! spawns a [`CliServer`] host and triggers [`StartServer::all`] on it, parsing
-//! argv into a [`Request`] and running one exchange.
-//! Long-running servers ([`HttpServer`], the `beet_router` `TuiServer`) are
-//! started the same way, by a [`StartServer`] event whose filter selects them.
-//! See [`server_events`] for the model.
+//! [`bootstrap`] fans the process request out to a host's servers via a detached
+//! [`action_trigger`](beet_action::prelude::action_trigger): it inserts a
+//! `Running<Response>` keep-alive claim and fires an `ActionIn<Request>` the
+//! servers observe. A one-shot [`CliServer`] resolves the call (its response
+//! streams to stdout and the process exits); a long-running [`HttpServer`] /
+//! `TuiServer` parks the call, persisting the process until its `Running` is
+//! removed, which fires its teardown observer. `--server` selects which servers
+//! act. See [`bootstrap_app`] for the model.
 //!
 //! ## Implementations
 //!
@@ -26,27 +28,23 @@
 
 // The `HttpServer` component and its `set_http_server` install hook are
 // no_std-capable and compile unconditionally; the concrete backends below stay
-// std/feature-gated.
+// std/feature-gated. A server is an `ActionIn<Request>` observer torn down by
+// observing the removal of the boot exchange's `Running<Response>`.
 mod http_server;
 pub use http_server::*;
-// The server model events (`StartServer` / `StopServer`) and the `KeepAlive`
-// resource are no_std (`GlobFilter` and `MultiMap` both build no_std), so a
-// no_std target boots `HttpServer` through the very same `StartServer` observers,
-// supplying its backend via `set_http_server`. Only the async-runtime dispatch
-// (`queue_async_local`) inside the observers stays std-gated.
-mod server_events;
-pub use server_events::*;
+
+// The single bootstrap path: the `BootOnLoad` verb fans the process request out
+// to a host's servers and writes `AppExit`. std-only (it reads CLI args, streams
+// to stdout, and writes the exit).
+#[cfg(feature = "std")]
+mod bootstrap_app;
+#[cfg(feature = "std")]
+pub use bootstrap_app::*;
 
 #[cfg(feature = "std")]
 mod cli_server;
 #[cfg(feature = "std")]
 pub use cli_server::*;
-// The `ServeOnLoad` markup verb that boots a host's declared servers on
-// `LoadTemplate`, by triggering a `StartServer` built from the entry request.
-#[cfg(feature = "std")]
-mod serve_on_load;
-#[cfg(feature = "std")]
-pub use serve_on_load::*;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod repl_server;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]

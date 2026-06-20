@@ -74,7 +74,6 @@ pub async fn HtmlStoreAction(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -100,9 +99,8 @@ mod test {
 				]),
 				HtmlStore::ssg(html_store().await),
 			))
-			.call::<Request, Response>(Request::get("about"))
+			.route(Request::get("about"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("prebuilt")
@@ -123,9 +121,8 @@ mod test {
 				]),
 				HtmlStore::ssr(html_store().await),
 			))
-			.call::<Request, Response>(Request::get("about"))
+			.route(Request::get("about"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("live about");
@@ -144,9 +141,8 @@ mod test {
 				]),
 				HtmlStore::ssg(html_store().await),
 			))
-			.call::<Request, Response>(Request::get("contact"))
+			.route(Request::get("contact"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("live contact");

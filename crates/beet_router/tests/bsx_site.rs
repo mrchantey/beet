@@ -89,12 +89,11 @@ fn spawn_site(world: &mut World) -> Entity {
 async fn get(world: &mut World, root: Entity, path: &str) -> String {
 	world
 		.entity_mut(root)
-		.call::<Request, Response>(
+		.route(
 			Request::get(path)
 				.with_header::<header::Accept>(vec![MediaType::Html]),
 		)
 		.await
-		.unwrap()
 		.unwrap_str()
 		.await
 }
@@ -138,9 +137,8 @@ async fn blob_store_route_serves_assets() {
 	let root = spawn_site(&mut world);
 	world
 		.entity_mut(root)
-		.call::<Request, Response>(Request::get("assets/style.css"))
+		.route(Request::get("assets/style.css"))
 		.await
-		.unwrap()
 		.unwrap_str()
 		.await
 		.xpect_contains("color: red");
@@ -149,11 +147,11 @@ async fn blob_store_route_serves_assets() {
 /// `<Router {(HttpServer{port:0})}>`: the http server is declarable from markup,
 /// landing on the router via the reflect spread path (port 0 keeps any started
 /// backend on an OS-assigned port). The reflect insert registers the server's
-/// `StartServer` observer through its `on_add`, so a triggered start boots it via
-/// the installed runtime hook.
+/// boot (`ActionIn<Request>`) observer through its `on_add`, so the boot fan-out
+/// boots it via the installed runtime hook.
 // Only without a real HTTP backend: the test installs a stand-in runtime hook to
 // prove the wiring without a live server, but with the `http`/`client_io` backend
-// present, `StartServer::all` boots a real listener (and, under `client_io`, its
+// present, the boot fan-out boots a real listener (and, under `client_io`, its
 // tungstenite channel on a fixed port) that this test cannot cleanly stop, so it
 // would leak a spinning task into the rest of the single-process suite.
 #[cfg(not(feature = "http"))]
@@ -187,14 +185,26 @@ async fn http_server_declarable_in_markup() {
 		.unwrap()
 		.port
 		.xpect_eq(Some(0));
-	// a triggered `StartServer` boots the declared server via the runtime hook.
-	world.entity_mut(root).trigger(StartServer::all);
-	AsyncRunner::flush_async_tasks(&mut world).await;
+	// the boot fan-out boots the declared server via the runtime hook: firing
+	// the host's `ActionTrigger` slot reaches the http observer. The call is
+	// fire-and-forget: the http boot never resolves (the host parks on its
+	// `Running<Response>`), so the stub backend flags the entity then parks.
+	world.run_async_local(move |async_world| async move {
+		async_world
+			.entity(root)
+			.call::<Request, Response>(Request::get("/"))
+			.await?;
+		Ok(())
+	});
+	// drive the world so the boot task reaches the stub backend; the boot call
+	// itself never resolves (the host parks on `Running<Response>`), so settle to
+	// its safety cap rather than `flush_async_tasks`, which would wait forever.
+	AsyncRunner::settle_async_tasks(&mut world).await;
 	world.entity(root).contains::<ServerBooted>().xpect_true();
 }
 
-/// Flag the test runtime hook inserts, proving a triggered `StartServer` reached
-/// the declared `HttpServer`'s backend.
+/// Flag the test runtime hook inserts, proving the boot fan-out reached the
+/// declared `HttpServer`'s backend.
 #[cfg(not(feature = "http"))]
 #[derive(Component)]
 struct ServerBooted;

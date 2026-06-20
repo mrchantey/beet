@@ -14,6 +14,17 @@ pub use exchange_sequence::*;
 mod exchange_script;
 #[cfg(feature = "scripting")]
 pub use exchange_script::*;
+// the `RunScript` entry action runs on native (quickjs) and wasm (`script_ext`).
+#[cfg(any(
+	all(feature = "quickjs", not(target_arch = "wasm32")),
+	all(feature = "scripting", feature = "json", target_arch = "wasm32")
+))]
+mod run_script;
+#[cfg(any(
+	all(feature = "quickjs", not(target_arch = "wasm32")),
+	all(feature = "scripting", feature = "json", target_arch = "wasm32")
+))]
+pub use run_script::*;
 // the `<Template src>` include: needs the BSX tag seam + the unified loader.
 #[cfg(all(feature = "bsx", feature = "template_serde"))]
 mod template_include;

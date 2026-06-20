@@ -90,38 +90,34 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get("app-info"))
+			.route(Request::get("app-info"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("App Info");
 
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get("foobar"))
+			.route(Request::get("foobar"))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::OK);
 
 		let payload = r#"{"event_type":"x","client_timestamp":0,"event_data":{},"session_data":{}}"#;
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::with_json_str(
+			.route(Request::with_json_str(
 				"analytics",
 				payload,
 			))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::OK);
 
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get("bingbong"))
+			.route(Request::get("bingbong"))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
 	}
@@ -141,17 +137,15 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get("foo"))
+			.route(Request::get("foo"))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::OK);
 
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get("bar"))
+			.route(Request::get("bar"))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::OK);
 	}

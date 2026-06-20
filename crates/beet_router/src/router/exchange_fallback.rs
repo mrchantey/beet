@@ -65,8 +65,9 @@ mod test {
 					},
 				),
 			]))
-			.exchange(Request::get("test"))
+			.call::<Request, Response>(Request::get("test"))
 			.await
+			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_eq("first".to_string());
@@ -81,8 +82,9 @@ mod test {
 			>::new_pure(
 				|cx: ActionContext<Request>| Fail(cx.input),
 			),]))
-			.exchange(Request::get("test"))
+			.call::<Request, Response>(Request::get("test"))
 			.await
+			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
 	}
@@ -102,7 +104,7 @@ mod test {
 					},
 				),]),
 			)]))
-			.exchange(Request::get("fb"))
+			.route(Request::get("fb"))
 			.await
 			.unwrap_str()
 			.await

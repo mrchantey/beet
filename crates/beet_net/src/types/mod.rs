@@ -61,16 +61,15 @@ pub mod http_ext;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 pub use http_ext::WebSocketUpgrade;
 
-// higher-level exchange patterns built on the action system. `exchange` only
-// needs `beet_action`, so it rides the no_std-capable `action` feature;
-// `exchange_stats` is no_std: the `ExchangeStats` counter backs the (now no_std)
-// `HttpServer` requirement; its logging observer is std and registered by
-// `ServerPlugin`.
+// higher-level routing built on the action system. `route` only needs
+// `beet_action`, so it rides the no_std-capable `action` feature; `exchange_stats`
+// is no_std: the `ExchangeStats` counter backs the (now no_std) `HttpServer`
+// requirement; its logging observer is std and registered by `ServerPlugin`.
 #[cfg(feature = "action")]
-mod exchange;
+mod route;
 mod exchange_stats;
 mod extractors;
 #[cfg(feature = "action")]
-pub use exchange::*;
+pub use route::*;
 pub use exchange_stats::*;
 pub use extractors::*;

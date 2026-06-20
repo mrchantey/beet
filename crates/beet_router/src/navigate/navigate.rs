@@ -257,7 +257,6 @@ pub(crate) fn path_segments(pattern: &PathPattern) -> Result<Vec<SmolStr>> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -312,11 +311,10 @@ mod test {
 
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::from_cli_str(
+			.route(Request::from_cli_str(
 				"about --navigate=parent",
 			))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await;
 		body.contains("Root").xpect_true();
@@ -340,11 +338,10 @@ mod test {
 
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::from_cli_str(
+			.route(Request::from_cli_str(
 				"--navigate=first-child",
 			))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await;
 		body.contains("Alpha page").xpect_true();
@@ -369,11 +366,10 @@ mod test {
 		// alpha -> next -> beta
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::from_cli_str(
+			.route(Request::from_cli_str(
 				"alpha --navigate=next-sibling",
 			))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await;
 		body.contains("Beta page").xpect_true();
@@ -381,11 +377,10 @@ mod test {
 		// beta -> next -> wraps to alpha
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::from_cli_str(
+			.route(Request::from_cli_str(
 				"beta --navigate=next-sibling",
 			))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await;
 		body.contains("Alpha page").xpect_true();
@@ -410,11 +405,10 @@ mod test {
 		// alpha -> prev -> wraps to beta
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::from_cli_str(
+			.route(Request::from_cli_str(
 				"alpha --navigate=prev-sibling",
 			))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await;
 		body.contains("Beta page").xpect_true();
@@ -433,9 +427,8 @@ mod test {
 		// No --navigate param, should route normally
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get("about"))
+			.route(Request::get("about"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await;
 		body.contains("About page").xpect_true();

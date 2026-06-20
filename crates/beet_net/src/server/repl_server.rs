@@ -4,7 +4,7 @@
 //!
 //! Uses a background thread for stdin reading so the async executor
 //! is never blocked.
-use super::cli_server::stream_body_to_stdout;
+use super::bootstrap_app::stream_body_to_stdout;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::exports::async_channel;

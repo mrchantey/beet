@@ -43,8 +43,9 @@ mod test {
 					|cx: ActionContext<Request>| Pass(cx.input),
 				),
 			]))
-			.exchange(Request::get("test"))
+			.call::<Request, Response>(Request::get("test"))
 			.await
+			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::OK);
 	}
@@ -62,8 +63,9 @@ mod test {
 					|cx: ActionContext<Request>| Pass(cx.input),
 				),
 			]))
-			.exchange(Request::get("test"))
+			.call::<Request, Response>(Request::get("test"))
 			.await
+			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
@@ -81,7 +83,7 @@ mod test {
 					|cx: ActionContext<Request>| Pass(cx.input),
 				),]),
 			)]))
-			.exchange(Request::get("seq"))
+			.route(Request::get("seq"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);

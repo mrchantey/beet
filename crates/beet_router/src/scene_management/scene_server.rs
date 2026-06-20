@@ -34,7 +34,7 @@ impl Plugin for SceneServerPlugin {
 }
 
 /// The scene-server meta-routes as a markup-spawnable bundle: place
-/// `<SceneServer/>` under a `<Router {(HttpServer, ServeOnLoad)}>` to expose
+/// `<SceneServer/>` under a `<Router {(HttpServer, BootOnLoad)}>` to expose
 /// `POST /load`, `GET /clear`, `GET /reset` and `GET /dump` — the device side of
 /// a scene push, receiving a scene over the wire and swapping it via
 /// [`set_scene`]. The host side is the `SceneLoad`/`SceneClear`/... push commands.
@@ -229,7 +229,7 @@ mod test {
 			.flush();
 		world
 			.entity_mut(server)
-			.exchange(
+			.route(
 				Request::post("load")
 					.with_content_type(MediaType::Json)
 					.with_body(scene.bytes()),
@@ -249,9 +249,8 @@ mod test {
 		// and dispatches it: the pushed route answers on the device.
 		world
 			.entity_mut(server)
-			.call::<Request, Response>(Request::get("ping"))
+			.route(Request::get("ping"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("pong");

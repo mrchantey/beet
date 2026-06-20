@@ -13,25 +13,16 @@ pub struct ServerPlugin;
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
-			// the process-lifetime refcount the servers and the binary's load scope
-			// claim, driving exit when it returns to zero.
-			.init_resource::<KeepAlive>()
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
-			// the markup boot verb, so a `<Router {(.., ServeOnLoad)}>` entry
-			// resolves it.
-			.register_type::<ServeOnLoad>();
+			// the markup load verb (and its opt-out), so a
+			// `<Router {(.., RunOnLoad)}>` entry resolves them.
+			.register_type::<RunOnLoad>()
+			.register_type::<DisableRunOnLoad>();
 
-		// exit once nothing keeps the process alive: a finished `CliServer`
-		// exchange or a stopped server drops its `KeepAliveGuard`, and when the last
-		// claim goes the refcount reaches zero. Gated on a `KeepAlive` change so
-		// there is no per-frame polling. Lives here (not in a binary's main) so every
-		// server app — the cli and the examples alike — exits cleanly.
-		app.add_systems(
-			Last,
-			exit_when_unclaimed
-				.run_if(resource_exists_and_changed::<KeepAlive>),
-		);
+		// the process exits when `bootstrap` writes `AppExit` for the one-shot it
+		// resolves; a long-running server never resolves its boot call, so its
+		// parked `Running<Response>` holds the run open with no refcount.
 
 		// install the HTTP backend `HttpServer` invokes on start. The cascade
 		// mirrors the old per-component dispatch, now in one place: a downstream
@@ -62,23 +53,6 @@ impl Plugin for ServerPlugin {
 	}
 }
 
-/// `Last`: emit [`AppExit::Success`] once the [`KeepAlive`] refcount has been
-/// claimed and then fully released (every server stopped, the cli exchange
-/// finished). The `claimed` latch keeps a freshly-initialised refcount (zero, never
-/// claimed) from exiting an app before its first server inserts its guard, eg a
-/// server booted off a later frame rather than during `Startup`.
-fn exit_when_unclaimed(
-	keep_alive: Res<KeepAlive>,
-	mut claimed: Local<bool>,
-	mut exit: MessageWriter<AppExit>,
-) {
-	if keep_alive.count() > 0 {
-		*claimed = true;
-	} else if *claimed {
-		exit.write(AppExit::Success);
-	}
-}
-
 #[cfg(test)]
 #[cfg(all(
 	feature = "server",
@@ -100,7 +74,9 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					exchange_handler(|_| Response::ok().with_body("hello")),
+					RouteAction(exchange_handler(|_| {
+						Response::ok().with_body("hello")
+					})),
 				))
 				.run();
 		});

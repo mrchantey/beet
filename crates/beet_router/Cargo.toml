@@ -66,6 +66,9 @@ template_serde = ["beet_core/template_serde", "beet_core/rsx", "serde"]
 scripting = ["std", "beet_action/scripting", "serde"]
 # rhai backend for the scripting registrations above.
 rhai = ["scripting", "beet_action/rhai"]
+# quickjs backend, plus the `RunScript` console-capturing entry action (native;
+# wasm runs in the host realm).
+quickjs = ["scripting", "json", "beet_action/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.
 # `markdown_parser` lets the collection scan read content frontmatter so blob
 # routes are emitted with their scan-time `ArticleMeta`.

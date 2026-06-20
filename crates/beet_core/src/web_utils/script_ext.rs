@@ -1,8 +1,8 @@
 //! Isolated JavaScript evaluation in a wasm host (browser or Deno), streaming the
 //! script's console output.
 //!
-//! `EvalOnLoad`'s wasm counterpart to the native quickjs runtime: it runs a
-//! `<script {EvalOnLoad}>` body in the wasm host, capturing `console` output and
+//! `RunScript`'s wasm counterpart to the native quickjs runtime: it runs a
+//! `<script {RunScript}>` body in the wasm host, capturing `console` output and
 //! streaming it through a sink the same shape as the native side
 //! ([`ConsoleStream`] + `FnMut(stream, &str)`).
 //!
@@ -16,7 +16,7 @@ use crate::prelude::*;
 use wasm_bindgen::prelude::*;
 
 /// Which host stream a console call targets, mirroring the native runtime's
-/// `ConsoleStream` so [`EvalOnLoad`] dispatches to the same sink shape on both
+/// `ConsoleStream` so `RunScript` dispatches to the same sink shape on both
 /// targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsoleStream {

@@ -43,21 +43,5 @@ impl Plugin for ActionPlugin {
 		#[cfg(feature = "scripting")]
 		app.register_type::<ScriptLanguage>()
 			.register_type::<Script<(), String>>();
-		// the `EvalOnLoad` load verb, so a `<script {EvalOnLoad}>` entry resolves it.
-		// Runs on native (quickjs) and wasm (`script_ext`); the verb lives in the
-		// `scripting` module, so the wasm arm needs that feature too.
-		#[cfg(any(
-			all(
-				feature = "quickjs",
-				feature = "json",
-				not(target_arch = "wasm32")
-			),
-			all(
-				feature = "scripting",
-				feature = "json",
-				target_arch = "wasm32"
-			)
-		))]
-		app.register_type::<EvalOnLoad>();
 	}
 }

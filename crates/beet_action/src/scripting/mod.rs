@@ -6,13 +6,6 @@
 // across the engine boundary, so it needs `json` and is native-only.
 #[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
 mod quickjs_runtime;
-// the `EvalOnLoad` verb runs on native (quickjs) and wasm (`script_ext`), so it
-// compiles for a native-quickjs build or any wasm build.
-#[cfg(any(
-	all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")),
-	all(feature = "json", target_arch = "wasm32")
-))]
-mod eval_on_load;
 #[cfg(all(feature = "rhai", feature = "serde"))]
 mod rhai_runtime;
 #[cfg(all(
@@ -31,11 +24,6 @@ mod script;
 	)
 ))]
 mod script_action;
-#[cfg(any(
-	all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")),
-	all(feature = "json", target_arch = "wasm32")
-))]
-pub use eval_on_load::EvalOnLoad;
 #[cfg(all(
 	feature = "quickjs",
 	feature = "json",

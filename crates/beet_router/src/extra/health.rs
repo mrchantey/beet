@@ -50,7 +50,6 @@ fn HealthHandler(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -60,9 +59,8 @@ mod test {
 		world.insert_resource(pkg_config!());
 		world
 			.spawn(default_router())
-			.call::<Request, Response>(Request::get("health"))
+			.route(Request::get("health"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("\"status\":\"ok\"")
@@ -83,9 +81,8 @@ mod test {
 		}
 		world
 			.spawn(default_router())
-			.call::<Request, Response>(Request::get("health"))
+			.route(Request::get("health"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("\"active_sessions\":3");

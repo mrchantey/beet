@@ -5,10 +5,9 @@
 //! (registered reflect types) but ships zero behaviour. It discovers `main.bsx`
 //! (or `main.json`/`main.ron`) by walking the cwd and its ancestors, consumes
 //! only its own `--main` flag, and builds the entry through the unified
-//! [`TemplateLoader`], then lets the load-lifecycle verbs (`EvalOnLoad`,
-//! `ServeOnLoad`) fire on the build's `LoadTemplate`, each re-parsing argv for its
-//! own input. It exits once the [`KeepAlive`] refcount falls to zero; a long-running
-//! server holds a ref to persist the process.
+//! [`TemplateLoader`], then lets the `RunOnLoad` verb fan the process request out
+//! on the build's `LoadTemplate`. A one-shot streams its response and exits; a
+//! long-running server parks its boot call to persist the process.
 use beet::prelude::*;
 use beet_cli::prelude::*;
 
@@ -57,37 +56,22 @@ fn main() -> AppExit {
 	#[cfg(feature = "ssh")]
 	app.init_plugin::<SshTuiPlugin>();
 
-	// the process exits when the `KeepAlive` refcount hits zero (every server
-	// stopped, the load scope released); `ServerPlugin` registers that exit system,
-	// so a long-running server persists while a one-shot cli exchange exits.
+	// the process exits when `bootstrap` writes `AppExit` for the one-shot it
+	// resolves; a long-running server parks its boot call, so its unresolved
+	// `Running<Response>` persists the process with no refcount.
 	app.add_systems(Startup, load_entry).run()
 }
 
 /// `Startup`: resolve the entry and build it through the unified [`TemplateLoader`].
-/// The build fires `LoadTemplate` on the root, running the tree's verbs. A load-scope
-/// [`KeepAlive`] ref is held across the build so the process cannot exit mid-load;
-/// any verb that boots a long-running server (or queues the cli exchange) takes its
-/// own ref before this one drops. Any failure logs and exits with an error rather
-/// than panicking. Run here (not before the app) so the message goes through the
-/// initialized logger.
+/// The build fires `LoadTemplate` on the root, where the `BootOnLoad` verb fans the
+/// process request out to the entry's servers. The app loop then drives that boot
+/// and stays alive until it writes `AppExit`, so nothing is held by hand here. A
+/// failed build logs and exits with an error rather than panicking. Run here (not
+/// before the app) so the message goes through the initialized logger.
 fn load_entry(world: &mut World) {
-	// hold a load-scope `KeepAliveGuard` across the build so the process cannot exit
-	// mid-load; a verb that boots a long-running server (or queues the cli exchange)
-	// inserts its own guard before this one drops. The boots cascade through deferred
-	// commands, so flush before despawning the guard to ensure any lasting claim is
-	// held.
-	let guard = world.spawn(KeepAliveGuard).id();
-	match try_load_entry(world) {
-		Ok(()) => {
-			world.flush();
-			world.despawn(guard);
-		}
-		Err(err) => {
-			// a failed build keeps its guard (the exit system emits no success) and
-			// exits with an error code instead.
-			error!("{err}");
-			world.write_message(AppExit::error());
-		}
+	if let Err(err) = try_load_entry(world) {
+		error!("{err}");
+		world.write_message(AppExit::error());
 	}
 }
 

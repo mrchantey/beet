@@ -163,9 +163,8 @@ mod test {
 			.spawn((default_router(), children![render_action::async_route(
 				"home", home
 			)]))
-			.call::<Request, Response>(Request::get("home"))
+			.route(Request::get("home"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("async home");
@@ -180,9 +179,8 @@ mod test {
 			.spawn((default_router(), children![render_action::system_route(
 				"home", home
 			)]))
-			.call::<Request, Response>(Request::get("home"))
+			.route(Request::get("home"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("system home");
@@ -203,9 +201,8 @@ mod test {
 		for _ in 0..2 {
 			world
 				.entity_mut(root)
-				.call::<Request, Response>(Request::get("home"))
+				.route(Request::get("home"))
 				.await
-				.unwrap()
 				.unwrap_str()
 				.await
 				.xpect_contains("home");

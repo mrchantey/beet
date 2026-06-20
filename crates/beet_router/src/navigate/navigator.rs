@@ -387,24 +387,22 @@ impl Navigator {
 ///
 /// The one opening-route mechanism both TUI servers read: the local [`TuiServer`]
 /// (one stdio surface) and the multi-tenant SSH server (one surface per
-/// connection) each store this on their router from the [`StartServer`] params,
-/// then read it back when they spawn a surface's navigator. The SSH boot is
-/// two-phase (the start event lands once, but connections are set up later by an
-/// observer that cannot see it), so the route must live on the router rather than
-/// be re-parsed from argv per connection.
+/// connection) each store this on their router from the boot request, then read
+/// it back when they spawn a surface's navigator. The SSH boot is two-phase (the
+/// boot fans out once, but connections are set up later by an observer that cannot
+/// see it), so the route must live on the router rather than be re-derived per
+/// connection.
 #[derive(Debug, Clone, Component)]
 pub struct OpeningRoute(pub Url);
 
 impl OpeningRoute {
-	/// The opening route from a server's start params: an explicit `path` param (eg
-	/// `beet serve <dir> --server=tui --path=docs/form`), else the process argv (a
+	/// The opening route from the boot request: an explicit `--path` param (eg
+	/// `beet serve <dir> --server=tui --path=docs/form`), else the request path (a
 	/// compiled binary's own args, eg a deployed site opening at its home route).
-	pub fn from_params(params: &MultiMap<SmolStr, SmolStr>) -> Self {
-		let url = match params.get("path") {
-			Some(path) => Url::parse(path.as_str()),
-			None => Url::parse(
-				Request::from_cli_args(CliArgs::parse_env()).path_string(),
-			),
+	pub fn from_request(request: &Request) -> Self {
+		let url = match request.get_param("path") {
+			Some(path) => Url::parse(path),
+			None => Url::parse(request.path_string()),
 		};
 		Self(url)
 	}

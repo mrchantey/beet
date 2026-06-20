@@ -86,7 +86,7 @@ const CONSOLE_PRELUDE: &str = r#"
 /// `queueMicrotask`) runs to completion, its output streaming as each job runs.
 /// Tolerates a script that returns no value (a bare `console.log("hi")`, which
 /// [`run_quickjs`] rejects). The `input` global is the serialized `input`, as in
-/// [`run_quickjs`]. This is the `EvalOnLoad` eval path.
+/// [`run_quickjs`]. This is the `RunScript` eval path.
 ///
 /// `sink` is `FnMut` and runs on the single-threaded [`Context::full`], so it needs
 /// no `Send`.

@@ -355,12 +355,11 @@ mod test {
 	async fn help_body(world: &mut World, root: Entity, path: &str) -> String {
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::from_cli_str(path)
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 	}
@@ -398,12 +397,11 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::get("?help")
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("Available routes")
@@ -532,12 +530,11 @@ mod test {
 		// ok-only `unwrap_str`.
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::from_cli_str("nonexistent")
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
 			.await
-			.unwrap()
 			.text()
 			.await
 			.unwrap()

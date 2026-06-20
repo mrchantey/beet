@@ -6,7 +6,6 @@
 //! [`BlobStore`] as `<path>/index.html`.
 
 use crate::prelude::*;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -74,7 +73,7 @@ pub async fn collect_static_html(
 	for path in paths {
 		let request = Request::get(path.with_leading_slash())
 			.with_accept(MediaType::Html);
-		let response = entity.call::<Request, Response>(request).await?;
+		let response = entity.route(request).await;
 		let html = response
 			.into_result()
 			.await

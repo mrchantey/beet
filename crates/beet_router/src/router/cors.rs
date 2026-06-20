@@ -121,7 +121,6 @@ pub fn cors(config: CorsConfig) -> impl Bundle { (CorsHandler, config) }
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -153,12 +152,11 @@ mod test {
 		);
 		let response = world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::get("")
 					.with_header_raw("origin", "https://allowed.com"),
 			)
-			.await
-			.unwrap();
+			.await;
 
 		response.status().xpect_eq(StatusCode::OK);
 		response
@@ -176,12 +174,11 @@ mod test {
 			spawn_cors(&mut world, CorsConfig::allow_origins([] as [&str; 0]));
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::get("")
 					.with_header_raw("origin", "https://blocked.com"),
 			)
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::FORBIDDEN);
 	}
@@ -192,12 +189,11 @@ mod test {
 		let root = spawn_cors(&mut world, CorsConfig::allow_any());
 		let response = world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::get("")
 					.with_header_raw("origin", "https://anything.com"),
 			)
-			.await
-			.unwrap();
+			.await;
 
 		response.status().xpect_eq(StatusCode::OK);
 		response
@@ -214,9 +210,8 @@ mod test {
 		let root = spawn_cors(&mut world, CorsConfig::allow_any());
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get(""))
+			.route(Request::get(""))
 			.await
-			.unwrap()
 			.headers
 			.get::<header::AccessControlAllowOrigin>()
 			.unwrap()
@@ -233,12 +228,11 @@ mod test {
 		);
 		let response = world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::options("")
 					.with_header_raw("origin", "https://allowed.com"),
 			)
-			.await
-			.unwrap();
+			.await;
 
 		response.status().xpect_eq(StatusCode::OK);
 		response

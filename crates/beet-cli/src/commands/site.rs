@@ -34,16 +34,18 @@ pub(crate) fn load_site(
 	// register `templates/` and read the entry document through the site store
 	// (the same path a deployed task takes against S3).
 	site_root.register_templates(world)?;
-	// `check`/`export-static` render the site, never serve it: keep the servers
-	// the site's `<ServeOnLoad/>` would boot dormant.
-	world.insert_resource(SuppressServerBoot);
 	let bytes =
 		async_ext::block_on(site_root.0.get(&SmolPath::from(entry_name)))?;
 	let source = core::str::from_utf8(&bytes)?;
 	// insert the `SiteRoot` resource before spawning so the route-discovery
 	// observer and `<Template src>` includes resolve against it.
 	world.insert_resource(site_root);
-	BsxTemplate::parse_entry(world, source)?.spawn(world)
+	let template = BsxTemplate::parse_entry(world, source)?;
+	// `check`/`export-static` render the site, never serve it: build into a root
+	// carrying `DisableRunOnLoad` so the entry's `RunOnLoad` verb stays dormant.
+	let root = world.spawn(DisableRunOnLoad).id();
+	world.entity_mut(root).insert_template(template)?;
+	Ok(root)
 }
 
 /// The `*site` path argument, joined back into a path. Errors with usage if empty.

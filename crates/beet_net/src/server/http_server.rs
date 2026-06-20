@@ -1,5 +1,6 @@
 //! HTTP server component for handling incoming requests.
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::OnceLock;
 
@@ -12,9 +13,9 @@ use bevy::platform::sync::OnceLock;
 /// [`beet_net`]. [`HttpServer`]'s start observer invokes the installed function.
 ///
 /// It is handed an [`AsyncEntity`] for the spawned server and a shutdown
-/// [`OnceValueRx`] that resolves when a [`StopServer`] lands, and returns a boxed
-/// future. The backend reads the [`HttpServer`] config off the entity, opens its
-/// own listener, and dispatches each request through `entity.exchange(req)`. It owns
+/// [`OnceValueRx`] that resolves when the host's [`Running<Response>`] is removed,
+/// and returns a boxed future. The backend reads the [`HttpServer`] config off the entity, opens its
+/// own listener, and dispatches each request through `entity.route(req)`. It owns
 /// its teardown: on the shutdown signal it stops accepting and drops its listener
 /// (and may abort tasks it spawned), since only the backend knows how it spawned its
 /// own work.
@@ -40,15 +41,16 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 /// The installed backend, if any.
 pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 
-/// HTTP server that listens for incoming requests, triggering an
-/// [`Action::<Request,Response>`] call.
+/// HTTP server that listens for incoming requests, dispatching each through the
+/// host's [`RouteAction`] via `entity.route`.
 ///
-/// A long-running server: a [`StartServer`] event whose filter passes `"http"`
-/// boots it through the backend [`ServerPlugin`] installed via
-/// [`set_http_server`], reading `--port` / `--host` from the event's `params`.
-/// Booting inserts [`KeepAlive`] so the process persists. A [`StopServer`] event
-/// (`"http"`) tears it down. A markup-spawned `<Router {(HttpServer{port:0})}>`
-/// boots exactly the same way.
+/// A long-running server: the boot fan-out ([`ActionIn<Request>`]) whose
+/// `--server` selects `"http"` boots it through the backend [`ServerPlugin`]
+/// installed via [`set_http_server`], reading `--port` / `--host` from the boot
+/// request. It never resolves the boot call, so the host's [`Running<Response>`]
+/// keep-alive claim persists the process; when that `Running` is removed (a
+/// reload or shutdown) its teardown observer stops the listener. A markup-spawned
+/// `<Router {(HttpServer{port:0})}>` boots exactly the same way.
 ///
 /// The concrete backend depends on compile-time features:
 /// - Default (`server`): lightweight mini HTTP server using `async-io` TCP
@@ -63,11 +65,10 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// let host = world.spawn((
+/// world.spawn((
 ///     HttpServer::default(),
 ///     exchange_handler(|req| req.mirror()),
-/// )).id();
-/// world.entity_mut(host).trigger(StartServer::all);
+/// )).boot(Request::get("/"));
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -138,103 +139,106 @@ impl HttpServer {
 	}
 
 	/// The socket address to bind, from the component fields (`0` = OS-assigned,
-	/// localhost the default host). The start observer applies any `--port` /
-	/// `--host` from the [`StartServer`] event onto these fields before the
-	/// backend reads them, so a `--port=8080` overrides a declared `port`.
+	/// localhost the default host). The boot observer applies any `--port` /
+	/// `--host` from the boot request onto these fields before the backend reads
+	/// them, so a `--port=8080` overrides a declared `port`.
 	pub fn socket_addr(&self) -> core::net::SocketAddr {
 		(self.host, self.port.unwrap_or(0)).into()
 	}
 
-	/// Overlays `--port` / `--host` from a [`StartServer`]'s params onto a copy of
-	/// these fields, the resolved bind config the backend then reads.
-	fn with_params(mut self, params: &MultiMap<SmolStr, SmolStr>) -> Self {
-		if let Some(port) = params.get("port").and_then(|val| val.parse().ok())
+	/// Overlays `--port` / `--host` from the boot request onto these fields, the
+	/// resolved bind config the backend then reads.
+	fn apply_request(&mut self, request: &Request) {
+		if let Some(port) =
+			request.get_param("port").and_then(|val| val.parse().ok())
 		{
 			self.port = Some(port);
 		}
-		if let Some(host) = params.get("host") {
+		if let Some(host) = request.get_param("host") {
 			self.host = if host == "0.0.0.0" {
 				[0, 0, 0, 0]
 			} else {
 				[127, 0, 0, 1]
 			};
 		}
-		self
 	}
 }
 
-/// Registers the [`StartServer`] / [`StopServer`] observers on the host, so the
-/// server boots when a start event whose filter passes `"http"` lands on it.
-/// no_std, like the start/stop dispatch it registers: the async runtime
-/// (`queue_async_local`) and the installed backend hook both build without std.
+/// Registers the boot ([`ActionIn<Request>`]) and teardown
+/// (`On<Remove, Running<Response>>`) observers on the host. no_std-clean: the
+/// async runtime (`queue_async_local`) and the installed backend hook both build
+/// without std.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.observe_any(on_start_server)
-		.observe_any(on_stop_server);
+		.observe_any(on_action_in)
+		.observe_any(on_running_removed);
 }
 
-/// Shutdown signal for a running [`HttpServer`]: [`on_start_server`] stores the
-/// sender on the host and hands the receiver to the backend, and [`on_stop_server`]
-/// signals it so the backend stops accepting and drops its listener. A no_std
-/// one-shot channel, so an embedded backend tears down the same way. Removed on
-/// stop, so a reboot installs a fresh one.
+/// Shutdown signal for a running [`HttpServer`]: [`on_action_in`] stores the
+/// sender on the host and hands the receiver to the backend, and
+/// [`on_running_removed`] signals it so the backend stops accepting and drops its
+/// listener. A no_std one-shot channel, so an embedded backend tears down the same
+/// way. Replaced on each boot, so a reboot installs a fresh one.
 #[derive(Component)]
 struct HttpServerShutdown(Option<OnceValue<()>>);
 
-/// Boots the HTTP backend when a [`StartServer`] event passing `"http"` lands.
-/// Applies the event's `--port` / `--host` onto the component, holds the process up
-/// with a [`KeepAliveGuard`], then queues the installed [`HttpServerFn`], handing it
-/// the shutdown receiver so it owns its own teardown.
-fn on_start_server(
-	ev: On<StartServer>,
+/// Boots the HTTP backend on the boot fan-out, if `--server` selects `"http"`.
+/// Applies the boot request's `--port` / `--host` onto the component, then queues
+/// the installed [`HttpServerFn`], handing it the shutdown receiver so it owns its
+/// own teardown. Reads the request without consuming it (never the taker), and
+/// never resolves the boot call, so the host's [`Running<Response>`] parks the
+/// process up.
+fn on_action_in(
+	ev: On<ActionIn<Request>>,
 	mut servers: Query<&mut HttpServer>,
 	mut commands: Commands,
-) {
-	if !ev.passes("http") {
-		return;
-	}
-	let entity = ev.event_target();
-	// resolve the bind config from the event params, the only source of truth.
-	if let Ok(mut server) = servers.get_mut(entity) {
-		*server = server.clone().with_params(&ev.params);
+) -> Result {
+	let entity = ev.entity;
+	// read the request (without consuming it: the http server is a reader, never
+	// the taker) for the `--server` selection and the `--port` / `--host` config.
+	let selected = ev.with(|req| {
+		let selected = request_selects_server(req, "http");
+		if selected {
+			if let Ok(mut server) = servers.get_mut(entity) {
+				server.apply_request(req);
+			}
+		}
+		selected
+	})?;
+	if !selected {
+		return Ok(());
 	}
 	// store the shutdown sender on the host; hand the receiver to the backend.
 	let (signal, shutdown) = oneshot::<()>();
 	commands
 		.entity(entity)
-		.insert((KeepAliveGuard, HttpServerShutdown(Some(signal))))
+		.insert(HttpServerShutdown(Some(signal)))
 		.queue_async_local(move |entity| start_http_server(entity, shutdown));
+	Ok(())
 }
 
-/// Tears down the HTTP backend when a [`StopServer`] passing `"http"` lands: signals
-/// the shutdown channel (so the backend stops accepting and drops its listener) and
-/// drops the [`KeepAliveGuard`], releasing the server's hold on the process. Both
-/// removals are idempotent, so a stop on an unstarted or already-stopped server is a
-/// no-op.
-fn on_stop_server(
-	ev: On<StopServer>,
+/// Tears down the HTTP backend when the host's [`Running<Response>`] is removed (a
+/// reload, an interrupt, or a despawn, since Bevy runs remove hooks on despawn):
+/// signals the shutdown channel so the backend stops accepting and drops its
+/// listener. Cause-agnostic, so any teardown closes the socket. Idempotent: a
+/// missing shutdown handle is a no-op.
+fn on_running_removed(
+	ev: On<Remove, Running<Response>>,
 	mut shutdowns: Query<&mut HttpServerShutdown>,
-	mut commands: Commands,
 ) {
-	if !ev.passes("http") {
-		return;
+	if let Ok(mut shutdown) = shutdowns.get_mut(ev.event().event_target())
+		&& let Some(signal) = shutdown.0.take()
+	{
+		signal.signal(());
 	}
-	let entity = ev.event_target();
-	if let Ok(mut shutdown) = shutdowns.get_mut(entity) {
-		if let Some(signal) = shutdown.0.take() {
-			signal.signal(());
-		}
-	}
-	commands
-		.entity(entity)
-		.remove::<(KeepAliveGuard, HttpServerShutdown)>();
 }
 
 /// Invoke the installed backend on a started host, handing it the `shutdown`
-/// receiver so it stops accepting and releases its listener when a [`StopServer`]
-/// signals. Skips a host already despawned (eg a serialization spawn).
+/// receiver so it stops accepting and releases its listener when the host's
+/// [`Running<Response>`] is removed. Skips a host already despawned (eg a
+/// serialization spawn).
 async fn start_http_server(
 	entity: AsyncEntity,
 	shutdown: OnceValueRx<()>,
@@ -265,8 +269,8 @@ mod std_impl {
 		/// passed directly to the server function, eliminating port race conditions.
 		///
 		/// The returned [`OnSpawn`] runs the real listener; include it in the
-		/// spawn bundle. The `HttpServer` unit tests do not trigger a
-		/// [`StartServer`], so the listener comes from this `OnSpawn`.
+		/// spawn bundle. The `HttpServer` unit tests do not boot through the
+		/// fan-out, so the listener comes from this `OnSpawn`.
 		pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
 		where
 			Func: 'static
@@ -303,7 +307,6 @@ mod std_impl {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use bevy::ecs::reflect::ReflectComponent;
 
 	/// Install the stub backend: flag the entity, standing in for a real server.
 	///
@@ -325,75 +328,78 @@ mod tests {
 		.ok();
 	}
 
-	/// A reflect insert (the BSX spread path, eg `{(HttpServer{port:8080})}`)
-	/// registers the start observer through `on_add`, so a [`StartServer`]
-	/// triggered on the host boots it exactly like a regular spawn. With no
-	/// server feature here, the installed runtime hook stands in for the backend.
+	/// Fire the boot exchange on the host's `ActionTrigger` slot (fire-and-forget:
+	/// the call fans out and parks). The host carries an `ActionTrigger` so the
+	/// call reaches the http observer, exactly as a real `Router` host does.
+	fn boot(app: &mut App, port: u16, request: Request) -> Entity {
+		let entity = app
+			.world_mut()
+			.spawn((
+				HttpServer::new(port),
+				ActionTrigger::<Request, Response>::default(),
+			))
+			.id();
+		app.world_mut().entity_mut(entity).run_async_local(
+			move |host| async move {
+				host.call::<Request, Response>(request).await?;
+				Ok(())
+			},
+		);
+		entity
+	}
+
+	/// The boot fan-out (no `--server`) reaches the http server: the installed
+	/// backend runs and the host parks on its unresolved `Running<Response>`.
 	#[beet_core::test]
-	async fn boots_on_triggered_start() {
+	async fn boots_on_boot() {
 		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = app.world_mut().spawn_empty().id();
-		let registry = app.world().resource::<AppTypeRegistry>().clone();
-		// reflect-insert `HttpServer`, the same path a BSX `{(HttpServer{..})}`
-		// spread takes; the `on_add` registers the start observer through it.
-		{
-			let registry = registry.read();
-			registry
-				.get(core::any::TypeId::of::<HttpServer>())
-				.unwrap()
-				.data::<ReflectComponent>()
-				.unwrap()
-				.insert(
-					&mut app.world_mut().entity_mut(entity),
-					&HttpServer::new(8080),
-					&registry,
-				);
-		}
-		app.world()
-			.entity(entity)
-			.get::<HttpServer>()
-			.unwrap()
-			.port
-			.xpect_eq(Some(8080));
-		// trigger the start: the http observer queues the backend hook.
-		app.world_mut().entity_mut(entity).trigger(StartServer::all);
+		let entity = boot(&mut app, 8080, Request::get("/"));
 		app.update_async().await;
 		app.world()
 			.entity(entity)
 			.contains::<ServerStartFlag>()
 			.xpect_true();
-		// a long-running server holds a `KeepAlive` ref.
-		app.world().resource::<KeepAlive>().count().xpect_eq(1);
+		// a long-running server parks: the boot call's Running is unresolved.
+		app.world()
+			.entity(entity)
+			.contains::<Running<Response>>()
+			.xpect_true();
 	}
 
-	/// A [`StopServer`] passing `"http"` releases the server's `KeepAlive` ref and
-	/// removes its shutdown handle, so a stopped server no longer holds the process
-	/// up (no leaked ref).
+	/// Removing the host's `Running<Response>` (a reload, interrupt, or despawn)
+	/// fires the teardown observer, which signals the backend's shutdown channel.
 	#[beet_core::test]
-	async fn stop_releases_keepalive() {
+	async fn teardown_on_running_removed() {
 		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
-		app.world_mut().entity_mut(entity).trigger(StartServer::all);
+		let entity = boot(&mut app, 0, Request::get("/"));
 		app.update_async().await;
-		app.world().resource::<KeepAlive>().count().xpect_eq(1);
-		// stop it: the ref drops back to zero and the shutdown handle is gone.
-		app.world_mut().entity_mut(entity).trigger(StopServer::all);
-		app.update_async().await;
-		app.world().resource::<KeepAlive>().count().xpect_eq(0);
+		// booted: the shutdown handle holds a live signal.
 		app.world()
 			.entity(entity)
-			.contains::<HttpServerShutdown>()
-			.xpect_false();
+			.get::<HttpServerShutdown>()
+			.unwrap()
+			.0
+			.is_some()
+			.xpect_true();
+		// remove the boot's Running: the teardown observer signals shutdown.
+		app.world_mut().entity_mut(entity).remove::<Running<Response>>();
+		app.update_async().await;
+		app.world()
+			.entity(entity)
+			.get::<HttpServerShutdown>()
+			.unwrap()
+			.0
+			.is_none()
+			.xpect_true();
 	}
 
 	/// Closing the shutdown channel ends the accept loop and drops the listener,
 	/// freeing the port: the same race `start_http_server` runs around the backend.
-	/// Proves the `StopServer` teardown closes a real listener (it was a no-op
-	/// before), so the port reopens.
+	/// Proves the teardown closes a real listener, so the port reopens.
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn shutdown_ends_accept_loop() {
@@ -431,23 +437,14 @@ mod tests {
 		std::net::TcpListener::bind(("127.0.0.1", port)).xpect_ok();
 	}
 
-	/// `--port` in the [`StartServer`] params overrides the declared component
-	/// port before the backend reads the bind address.
+	/// `--port` in the boot request overrides the declared component port before
+	/// the backend reads the bind address.
 	#[beet_core::test]
 	async fn resolves_port_from_params() {
 		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = app.world_mut().spawn(HttpServer::new(8080)).id();
-		let mut params = MultiMap::default();
-		params.insert("port".into(), "9090".into());
-		app.world_mut()
-			.entity_mut(entity)
-			.trigger(move |entity| StartServer {
-				entity,
-				filter: default(),
-				params,
-			});
+		let entity = boot(&mut app, 8080, Request::from_cli_str("--port=9090"));
 		app.update_async().await;
 		app.world()
 			.entity(entity)
@@ -457,14 +454,13 @@ mod tests {
 			.xpect_eq(Some(9090));
 	}
 
-	/// A start whose filter does not pass `"http"` leaves the server untouched.
+	/// A boot whose `--server` does not select `"http"` leaves the server untouched.
 	#[beet_core::test]
 	async fn skips_on_filter_miss() {
 		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
-		app.world_mut().entity_mut(entity).trigger(StartServer::cli);
+		let entity = boot(&mut app, 0, Request::from_cli_str("--server=cli"));
 		app.update_async().await;
 		app.world()
 			.entity(entity)
@@ -473,8 +469,8 @@ mod tests {
 	}
 }
 
-/// Marker the test backend hook inserts in place of binding a port, proving a
-/// [`StartServer`] reached the installed backend.
+/// Marker the test backend hook inserts in place of binding a port, proving the
+/// boot fan-out reached the installed backend.
 #[cfg(test)]
 #[derive(Component)]
 struct ServerStartFlag;
@@ -510,9 +506,9 @@ pub(crate) mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					exchange_handler(move |req| {
+					RouteAction(exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
-					}),
+					})),
 				))
 				.run();
 		});
@@ -544,9 +540,9 @@ pub(crate) mod test {
 
 	/// A real running mini server stops when its shutdown signal fires: it serves
 	/// before, and after the signal the port is closed (a connect is refused). The
-	/// end-to-end proof that the shutdown a `StopServer` sends tears down a live
-	/// listener, joining the mechanism (`shutdown_ends_accept_loop`) and the wiring
-	/// (`stop_releases_keepalive`).
+	/// end-to-end proof that the teardown shutdown tears down a live listener,
+	/// joining the mechanism (`shutdown_ends_accept_loop`) and the wiring
+	/// (`teardown_on_running_removed`).
 	#[beet_core::test]
 	async fn stops_real_server() {
 		let listener = async_io::Async::<std::net::TcpListener>::bind(
@@ -565,7 +561,9 @@ pub(crate) mod test {
 						port: Some(port),
 						..default()
 					},
-					exchange_handler(|_| Response::ok().with_body("up")),
+					RouteAction(exchange_handler(|_| {
+						Response::ok().with_body("up")
+					})),
 					OnSpawn::new_async(move |entity| {
 						start_mini_http_server_with_tcp(
 							entity, listener, shutdown,

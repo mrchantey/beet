@@ -28,7 +28,6 @@ pub async fn NoCacheHeaders(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -48,9 +47,8 @@ mod test {
 				(default_router(), children![exchange_route("", Hello)]),
 				NoCacheHeaders,
 			))
-			.call::<Request, Response>(Request::get(""))
-			.await
-			.unwrap();
+			.route(Request::get(""))
+			.await;
 
 		response
 			.headers

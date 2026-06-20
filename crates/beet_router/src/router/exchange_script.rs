@@ -131,9 +131,8 @@ mod test {
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("greet"),
 			)]))
-			.call::<Request, Response>(Request::get("greet"))
+			.route(Request::get("greet"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("hello world");

@@ -1,8 +1,4 @@
-//! CLI-based server for running beet applications from the command line.
-//!
-//! This module provides [`CliServer`], which accepts command-line arguments
-//! as a request and logs the response to stdout. Useful for CLI actions and
-//! scripting.
+//! The one-shot CLI server: routes the boot request and resolves the boot call.
 //!
 //! ## Accept Header
 //!
@@ -13,15 +9,17 @@
 //! ```
 //! When omitted the default preference is `ansi-term, text, markdown, json`.
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint server: on a [`StartServer`] whose filter passes `"cli"`, it
-/// parses argv and environment into a request, runs one exchange, streams the
-/// response body to stdout, then exits (unless [`KeepAlive`] is set).
+/// The entrypoint server: observes the boot [`ActionIn<Request>`], routes the
+/// request through the host's [`RouteAction`], and resolves the boot call with an
+/// [`EndRun`] so [`bootstrap`] streams the response and exits.
 ///
-/// This is how every beet binary boots: spawn it on the host, then trigger
-/// [`StartServer::all`] (the empty filter matches the lone server). Being a
-/// one-shot, [`StopServer`] is a no-op for it.
+/// This is how every beet binary boots by default: spread it on the entry root,
+/// and the boot fan-out (no `--server`, or `--server=cli`) reaches it. Being a
+/// one-shot, it resolves the call rather than parking, so the process exits once
+/// its response is streamed.
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
 /// for example `--accept=text/html,text/plain`.
@@ -30,30 +28,22 @@ use beet_core::prelude::*;
 #[component(on_add = on_add)]
 pub struct CliServer;
 
-/// Registers the [`StartServer`] observer on the host, so the one-shot exchange
-/// runs when a start event whose filter passes `"cli"` lands on it.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_start_server);
+	world.commands().entity(cx.entity).observe_any(on_action_in);
 }
 
-/// Runs the one argv exchange when a [`StartServer`] passing `"cli"` lands.
-fn on_start_server(ev: On<StartServer>, mut commands: Commands) {
-	if !ev.passes("cli") {
-		return;
+/// On the boot fan-out, if `--server` selects `cli`, route the request and resolve
+/// the boot call. The selection check reads the request (without consuming it);
+/// the take is deferred into the task, so a co-observer's read never races it.
+fn on_action_in(ev: On<ActionIn<Request>>, mut commands: Commands) -> Result {
+	if !ev.with(|req| request_selects_server(req, "cli"))? {
+		return Ok(());
 	}
-	// hold the process up for the duration of the async exchange with a
-	// `KeepAliveGuard`; `run_and_exit` drops it when the exchange finishes, and a
-	// despawn drops it automatically, so it cannot leak.
-	// the boot params (from the `ServeOnLoad` verb, parsed from argv) reach the
-	// exchange so a served site renders the requested route.
-	let params = ev.params.clone();
+	let action_in = ev.clone();
 	commands
-		.entity(ev.event_target())
-		.insert(KeepAliveGuard)
-		.queue_async_local(move |entity| run_and_exit(entity, params));
+		.entity(ev.entity)
+		.queue_async_local(move |host| route_and_end(host, action_in));
+	Ok(())
 }
 
 /// The default content negotiation when `--accept` is unset.
@@ -66,99 +56,23 @@ fn default_accept() -> Vec<MediaType> {
 	]
 }
 
-async fn run_and_exit(
-	entity: AsyncEntity,
-	params: MultiMap<SmolStr, SmolStr>,
-) -> Result {
-	// short-circuit when the entity has already been despawned, ie
-	// [`TemplateStore::save_bundle`] briefly spawns a [`CliServer`] just to serialize
-	// it. The despawn already dropped the `KeepAliveGuard`, so nothing leaks.
-	if !entity.is_alive().await {
-		return Ok(());
-	}
-
-	// A `path` boot param (eg `--server=cli --path=blog/post-1`) renders that site
-	// route; absent it, parse the process argv (the binary's one-shot entrypoint).
-	let req = match params.get("path") {
-		Some(path) => {
-			let accept = params
-				.get("accept")
-				.map(|item| MediaType::from_accepts(item))
-				.unwrap_or_else(default_accept);
-			Request::get(Url::parse(path.as_str()))
-				.with_header::<header::Accept>(accept)
-		}
-		None => {
-			let args = CliArgs::parse_env();
-			let accept = args
-				.params
-				.get("accept")
-				.map(|item| MediaType::from_accepts(item))
-				.unwrap_or_else(default_accept);
-			Request::from_cli_args(args).with_header::<header::Accept>(accept)
-		}
-	};
-
-	let res = entity.exchange(req).await;
-	let (parts, body) = res.into_parts();
-	let exit_code = parts.status_to_exit_code();
-
-	stream_body_to_stdout(body).await?;
-
-	match exit_code {
-		// success: drop our guard. If nothing else holds the process up the exit
-		// system emits `AppExit::Success`; a sibling long-running server keeps it.
-		Ok(()) => remove_keep_alive_guard(&entity).await,
-		// failure: report the non-zero exit code directly so it reaches the process
-		// exit, leaving our guard since the message ends the run anyway.
-		Err(code) => {
-			error!("Command failed\nStatus code: {code}");
-			entity.world().write_message(AppExit::Error(code)).await;
-		}
-	}
-	Ok(())
-}
-
-/// Drop the [`KeepAliveGuard`] a `cli` start inserted, so a finished exchange lets
-/// the process exit unless another claim still holds it.
-async fn remove_keep_alive_guard(entity: &AsyncEntity) {
-	entity
-		.with(|mut entity| {
-			entity.remove::<KeepAliveGuard>();
-		})
-		.await
-		.ok();
-}
-
-/// Streams a [`Response`] body to stdout chunk-by-chunk, returning
-/// the response parts for exit-code inspection.
-pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
-	while let Some(chunk) = body.next().await? {
-		let chunk_str = String::from_utf8_lossy(&chunk);
-		cross_log_noline!("{}", chunk_str);
-	}
+/// Route the request through the host and resolve the boot call with the response,
+/// which [`bootstrap`] then streams to stdout.
+async fn route_and_end(host: AsyncEntity, action_in: ActionIn<Request>) -> Result {
+	let request = action_in.take()?;
+	let accept = request
+		.get_param("accept")
+		.map(MediaType::from_accepts)
+		.unwrap_or_else(default_accept);
+	let response =
+		host.route(request.with_header::<header::Accept>(accept)).await;
+	host.queue(EndRun(response)).await??;
 	Ok(())
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-
-	#[beet_core::test]
-	#[cfg(feature = "http")]
-	async fn cli_server_works() {
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
-		app.world_mut()
-			.spawn((
-				CliServer,
-				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
-			))
-			.trigger(StartServer::all);
-		app.run_async()
-			.await
-			.xpect_eq(AppExit::Error(1.try_into().unwrap()));
-	}
 
 	#[beet_core::test]
 	fn into_request_simple_path() {

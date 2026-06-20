@@ -90,7 +90,6 @@ pub(crate) async fn ServeStoreAction(
 #[cfg(all(test, feature = "std"))]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -124,9 +123,8 @@ mod test {
 			.spawn((default_router(), css_store().await, children![
 				serve_route("assets")
 			]))
-			.call::<Request, Response>(Request::get("assets/style.css"))
+			.route(Request::get("assets/style.css"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("color: red");
@@ -141,9 +139,8 @@ mod test {
 				serve_route("assets"),
 				css_store().await
 			)]))
-			.call::<Request, Response>(Request::get("assets/style.css"))
+			.route(Request::get("assets/style.css"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("color: red");
@@ -159,9 +156,8 @@ mod test {
 			.unwrap();
 		router_world()
 			.spawn((default_router(), store, children![serve_route("foo")]))
-			.call::<Request, Response>(Request::get("foo/bar"))
+			.route(Request::get("foo/bar"))
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.xpect_contains("<div>fallback</div>");

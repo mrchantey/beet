@@ -50,7 +50,7 @@ pub async fn start_mini_http_server_with_tcp(
 		.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
 	info!("Mini HTTP server listening on http://{addr}");
 
-	// race the accept loop against the shutdown signal: when `StopServer` signals,
+	// race the accept loop against the shutdown signal: when teardown signals,
 	// the loop future is dropped, releasing the listener so the port closes. The
 	// per-connection tasks are spawned, so this is a minimal drain — in-flight
 	// requests finish on their own (or are cut by process exit when nothing else
@@ -141,8 +141,8 @@ async fn handle_connection(
 	// Parse the raw HTTP request into our Request type
 	let request = http_ext::parse_http_request(&buf)?;
 
-	// Dispatch through the entity's exchange
-	let response: Response = entity.exchange(request).await;
+	// Dispatch through the host's routing
+	let response: Response = entity.route(request).await;
 
 	// A `101 Switching Protocols` (a route returning `WebSocketUpgrade`) means we
 	// write the handshake then keep the raw stream as a `Socket`, instead of
@@ -295,9 +295,9 @@ mod test {
 			// a route that upgrades any request to a websocket
 			app.world_mut().spawn((
 				server,
-				exchange_handler(|cx| {
+				RouteAction(exchange_handler(|cx| {
 					WebSocketUpgrade::from_request(&cx).into()
-				}),
+				})),
 			));
 			// record landed sockets
 			app.world_mut()

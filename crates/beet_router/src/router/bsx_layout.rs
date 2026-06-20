@@ -114,7 +114,6 @@ fn build_bsx_layout(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -135,12 +134,11 @@ mod test {
 	async fn get(world: &mut World, root: Entity, path: &str) -> String {
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::get(path)
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 	}
@@ -251,9 +249,8 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(Request::get(""))
+			.route(Request::get(""))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}

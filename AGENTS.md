@@ -86,7 +86,7 @@ async_ext::do_async_thing().await;
 	- `.agents/reports`
 	- `.agents/skills`
 	- `.agents/tmp`: scratchpads, output logs and dumps, wip scripts, etc
-
+- Unless explcitly told to, never create extension methods on World, EntityRef, Commands or any of their async/mut counterparts. 
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.
 - comments must be concise

@@ -192,12 +192,11 @@ mod test {
 	async fn get(world: &mut World, root: Entity, path: &str) -> String {
 		world
 			.entity_mut(root)
-			.call::<Request, Response>(
+			.route(
 				Request::get(path)
 					.with_header::<header::Accept>(vec![MediaType::Html]),
 			)
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 	}
