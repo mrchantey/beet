@@ -17,3 +17,13 @@ pub use block::*;
 mod s3_bucket_block;
 #[cfg(feature = "bindings_aws_common")]
 pub use s3_bucket_block::*;
+// Cloudflare blocks are plain config components (wrangler-provisioned, not
+// terraform), so they need no bindings feature.
+#[cfg(feature = "cloudflare_block")]
+mod cloudflare_container;
+#[cfg(feature = "cloudflare_block")]
+pub use cloudflare_container::*;
+#[cfg(feature = "cloudflare_block")]
+mod cloudflare_worker;
+#[cfg(feature = "cloudflare_block")]
+pub use cloudflare_worker::*;

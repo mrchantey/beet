@@ -10,7 +10,13 @@ runner = 'beet run-wasm'
 # Bump the wasm stack from LLD's 1MB default. A feature-heavy bevy `App` future
 # built at `opt-level=0` (the test profile) overflows 1MB and traps with a
 # "memory access out of bounds" on the first poll.
-rustflags = ['-C', 'link-arg=-zstack-size=16777216']
+# `getrandom_backend="wasm_js"`: getrandom 0.3 (pulled via fastrand/ahash) has no
+# wasm32 backend by default; select its WebCrypto backend so the browser / worker
+# build links (the workspace enables its `wasm_js` feature alongside this cfg).
+rustflags = [
+	'-C', 'link-arg=-zstack-size=16777216',
+	'--cfg', 'getrandom_backend="wasm_js"',
+]
 
 # Bare no_std target (esp32 etc). getrandom 0.3 has no built-in backend here, so
 # select its `custom` backend — the downstream embedded adapter provides the

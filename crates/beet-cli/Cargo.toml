@@ -35,37 +35,71 @@ ssh = ["tui", "beet/ssh_tui"]
 # selected at runtime by `BEET_SERVICE_ACCESS=remote`. Adds no deploy/terraform
 # machinery, keeping the container binary lean.
 aws_sdk = ["beet/aws_sdk"]
+# The AWS Lambda backend: builds the generic `beet` binary as a `provided.al2023`
+# function (the lambda http backend wins server selection over the mini server).
+# Pulls `aws_sdk` so the deployed function loads its site from S3 at request time.
+lambda = ["beet/lambda", "beet/aws_sdk"]
+# The Cloudflare Worker target (wasm32-only): builds the `beet-cli` lib as a
+# `cdylib` Worker that loads its site from an R2 bucket and serves it through the
+# render router. Pulls `beet/cloudflare` (the portable render router + the R2
+# store backend) plus the wasm Worker SDK; see `lib.rs`'s `#[event(fetch)]` entry.
+# Build with: `cargo build --target wasm32-unknown-unknown -p beet-cli --lib \
+# --no-default-features --features cloudflare`.
+cloudflare = ["beet/cloudflare", "dep:worker", "dep:console_error_panic_hook"]
 
+# the portable cross-platform base: the render router stack, media negotiation and
+# the runtime BSX parser the no-code site needs, on both native and wasm. beet's
+# default features (`std`, `ui`) are cross-platform, so they ride along.
 [dependencies]
 beet = { workspace = true, features = [
-	"router",
-	"fs",
-	"infra",
 	"json",
-	"webdriver",
 	"template_serde",
-	# the `serve` command spawns and serves a no-code BSX site
-	"http_server",
-	# `beet serve --watch`: dev-mode live reload over the client_io channel
-	"client_io",
 	"markdown",
-	# fenced code blocks in served/presented decks render highlighted
-	"syntax_highlighting",
 	"style",
 	"template",
-	# the QuickJS scripting runtime: the `ScriptEntry` load verb's `console.log`
-	# path and the `ExchangeScript` route backend a `main.bsx` wires.
-	"quickjs_serde",
 	# plaintext `MediaType::Text` serialization, so a scripted route's `String`
 	# output streams raw (`result: 7`) instead of JSON-quoted under the cli accept.
 	"serde_plain",
 ] }
+
+# the native binary's full surface: the std router + server, the dev-command
+# infra, webdriver, the live-reload client channel, and the QuickJS runtime.
+# These do not build on wasm, so they ride the non-wasm target table; cargo merges
+# features per active target, so the native bin gets them while the wasm lib does not.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet = { workspace = true, features = [
+	"router",
+	"fs",
+	"infra",
+	"webdriver",
+	# the `serve` command spawns and serves a no-code BSX site
+	"http_server",
+	# `beet serve --watch`: dev-mode live reload over the client_io channel
+	"client_io",
+	# fenced code blocks in served/presented decks render highlighted
+	"syntax_highlighting",
+	# the QuickJS scripting runtime: the `StartScript` load verb's `console.log`
+	# path and the `ExchangeScript` route backend a `main.bsx` wires.
+	"quickjs_serde",
+] }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }
+
+# the wasm Worker target's extra deps: the Workers SDK (the `#[event(fetch)]`
+# entry + request/response conversion) and a panic hook for readable errors.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+worker = { workspace = true, optional = true }
+console_error_panic_hook = { workspace = true, optional = true }
+# force getrandom's `wasm_js` (WebCrypto) backend into the graph: fastrand/ahash
+# pull getrandom 0.3, which has no default wasm backend (see the `getrandom_backend`
+# cfg in `.cargo/config.toml`).
+getrandom = { workspace = true }
 
 [dev-dependencies]
 beet = { workspace = true, features = ["testing"] }
 
-# the `beet` test runner replaces libtest's harness
+# the `beet` test runner replaces libtest's harness. `cdylib` builds the wasm
+# Worker (the Cloudflare target), `rlib` keeps the native `beet` bin linking the lib.
 [lib]
 harness = false
+crate-type = ["cdylib", "rlib"]

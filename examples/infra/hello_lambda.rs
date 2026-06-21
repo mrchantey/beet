@@ -1,116 +1,51 @@
 //! # Hello Lambda
 //!
-//! Deploys the router example as a Lambda function.
+//! Deploys `examples/bsx_site` as an http-only Lambda function (behind an API
+//! Gateway URL, no custom domain). The generic `beet` binary is packaged as a
+//! `provided.al2023` function and reads the site from an S3 bucket at request
+//! time (`BEET_SERVICE_ACCESS=remote` + `BEET_SITE_BUCKET`), so a site change
+//! re-publishes by re-running `sync` with no redeploy.
+//!
+//! Lambda is invocation-scoped: each request runs in a (possibly reused)
+//! execution environment, sharing the warm-world-reuse concern with Cloudflare
+//! Workers (see `hello_cloudflare_workers`). The shared shape lives in
+//! `utils.rs`; this one differs only in its block (`LambdaBlock`), its build
+//! (the lambda bootstrap zip), and its watch (`AwsWatch::for_lambda`).
 //!
 //! ## Usage
 //!
 //! ```sh
-//! cargo run --example hello_lambda --features=deploy,lambda_block -- validate
-//! cargo run --example hello_lambda --features=deploy,lambda_block -- plan
-//! cargo run --example hello_lambda --features=deploy,lambda_block -- deploy
-//! cargo run --example hello_lambda --features=deploy,lambda_block -- watch
-//! cargo run --example hello_lambda --features=deploy,lambda_block -- show
-//! cargo run --example hello_lambda --features=deploy,lambda_block -- destroy --force
+//! cargo run --example hello_lambda --features=router,lambda_block,markdown -- validate
+//! cargo run --example hello_lambda --features=router,lambda_block,markdown -- deploy
+//! cargo run --example hello_lambda --features=router,lambda_block,markdown -- sync
+//! cargo run --example hello_lambda --features=router,lambda_block,markdown -- watch
+//! cargo run --example hello_lambda --features=router,lambda_block,markdown -- destroy --force
 //! ```
 
-#[path = "../router/router.rs"]
-mod router;
+#[path = "utils.rs"]
+mod utils;
 use beet::prelude::*;
+use utils::*;
 
-fn main() -> AppExit {
-	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			LogPlugin {
-				level: Level::TRACE,
-				..default()
-			},
-			RouterPlugin,
-			InfraPlugin,
-		))
-		.add_systems(Startup, setup)
-		.run()
-}
+fn main() -> AppExit { deploy_main(infra_scene) }
 
-fn setup(mut commands: Commands) -> Result {
-	cfg_if! {
-		if #[cfg(feature="deploy")]{
-			commands
-				.spawn(infra_scene()?)
-				.trigger(StartRunning::boot);
-		}else{
-			commands
-				.spawn((
-					BlobStore::new(assets_store()),
-					router::router_scene()?,
-					))
-				.trigger(StartRunning::boot);
-		}
-	}
-	Ok(())
-}
-
-#[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
-	let block = LambdaBlock::default();
-	(stack(), stack_cli(), assets_s3_fs_store(), children![
-		route(
-			"watch",
-			(exchange_sequence(), children![AwsWatch::for_lambda(
-				&stack(),
-				&block
-			),])
+	let stk = stack("hello_lambda");
+	let block =
+		LambdaBlock::default().with_env_vars(remote_env(site_bucket_name(&stk)));
+
+	(
+		stack("hello_lambda"),
+		stack_cli(),
+		deploy_route(
+			block.clone(),
+			build_beet_lambda_binary("lambda,aws_sdk"),
+			&stk,
+			AwsWatch::for_lambda(&stk, &block)
+				.with_timeout(Duration::from_secs(30)),
 		),
-		route(
-			"deploy",
-			(exchange_sequence(), children![
-				(
-					block.clone(),
-					CargoBuild::default()
-						.with_target(BuildTarget::Zigbuild)
-						.with_example("hello_lambda")
-						.with_additional_args(vec![
-							"--features".into(),
-							"http_server,lambda,router,infra,aws_sdk,bindings_aws_common".into(),
-						])
-						.into_lambda_build_artifact()
-				),
-				TofuApplyAction,
-				SyncS3BucketAction,
-				AwsWatch::for_lambda(&stack(), &block)
-					.with_timeout(Duration::from_secs(30)),
-			]),
-		),
-	])
-		.xok()
-}
-
-/// The stack is used by both infra and router for resolving bucket names.
-#[allow(unused)]
-fn stack() -> Stack { Stack::new("hello_lambda").with_aws_region("us-west-2") }
-
-#[cfg(feature = "bindings_aws_common")]
-fn assets_bucket_block() -> S3BucketBlock {
-	S3BucketBlock::new("assets").with_deploy_versioned(true)
-}
-
-#[cfg(feature = "deploy")]
-fn assets_s3_fs_store() -> S3FsStore {
-	let stk = stack();
-	S3FsStore::new(
-		FsStore::new(WsPathBuf::new("examples/assets")),
-		assets_bucket_block().store(&stk),
+		sync_route(&stk),
+		watch_route(AwsWatch::for_lambda(&stk, &block)),
 	)
-}
-
-#[allow(unused)]
-fn assets_store() -> impl BlobStoreProvider {
-	cfg_if! {
-		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
-			let stk = stack();
-			assets_bucket_block().store(&stk)
-		}else{
-			FsStore::new(WsPathBuf::new("examples/assets"))
-		}
-	}
+		.xok()
 }

@@ -97,9 +97,13 @@ impl Plugin for RouterPlugin {
 				// the default app routes as a markup template, so a no-code BSX
 				// site requests them with `<DefaultAppRoutes/>`.
 				.register_template::<DefaultAppRoutes>();
+			// the markup-resolved `<RoutesDir src=".."/>` is registered on every std
+			// target so a no-code site loads. Native scans the store at spawn time
+			// via the blocking `spawn_routes_dir` observer; wasm (which cannot block)
+			// registers only the type and awaits `spawn_routes_dir_async` post-build.
+			app.register_type::<RoutesDir>();
 			#[cfg(not(target_arch = "wasm32"))]
-			app.register_type::<RoutesDir>()
-				.add_observer(spawn_routes_dir)
+			app.add_observer(spawn_routes_dir)
 				// the no-code static-asset mount, eg `<BlobStoreRoute src="assets"/>`:
 				// a template that expands to a blob-store-backed serve route.
 				.register_template::<BlobStoreRoute>();

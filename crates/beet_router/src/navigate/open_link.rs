@@ -116,7 +116,12 @@ fn on_link_click(
 fn open_external_link(mut events: MessageReader<OpenExternalLink>) {
 	for ev in events.read() {
 		// a failed launch (eg headless CI) is non-fatal; the intent was recorded.
+		// `webbrowser` is native-only (the `native` feature); the wasm render
+		// target records the intent via the event but has no system browser to open.
+		#[cfg(not(target_arch = "wasm32"))]
 		let _ = webbrowser::open(&ev.url.to_string());
+		#[cfg(target_arch = "wasm32")]
+		let _ = ev;
 	}
 }
 

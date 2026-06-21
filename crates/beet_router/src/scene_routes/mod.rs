@@ -26,10 +26,11 @@ pub use route_query::*;
 // it is always compiled, unlike the native-only directory-scan modules below.
 mod site_root;
 pub use site_root::*;
-#[cfg(not(target_arch = "wasm32"))]
+// `RoutesDir` + its discovery is compiled on every std target: native scans at
+// spawn via the blocking observer, wasm awaits `spawn_routes_dir_async`.
 mod routes_dir;
-#[cfg(not(target_arch = "wasm32"))]
 pub use routes_dir::*;
+// the static-asset mount is native-only (no wasm consumer needs it yet).
 #[cfg(not(target_arch = "wasm32"))]
 mod blob_store_route;
 #[cfg(not(target_arch = "wasm32"))]

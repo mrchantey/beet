@@ -22,6 +22,10 @@ beet_router = ["dep:beet_router"]
 lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail"]
 fargate_block = ["bindings_aws_common","bindings_aws_fargate"]
+# The Cloudflare Containers + Workers blocks/actions. Wrangler-provisioned, so no
+# terraform bindings; needs `deploy` (the actions) and `aws_sdk` (the container's
+# `S3Store::r2` path) at the consumer.
+cloudflare_block = []
 bindings_aws_common = []
 bindings_aws_dns = []
 bindings_aws_lightsail = []

@@ -32,7 +32,11 @@ pub use beet_examples as examples;
 pub use beet_infra as infra;
 #[cfg(feature = "net")]
 pub use beet_net as net;
-#[cfg(any(feature = "router", feature = "router_embedded"))]
+#[cfg(any(
+	feature = "router",
+	feature = "router_render",
+	feature = "router_embedded"
+))]
 pub use beet_router as router;
 #[cfg(feature = "thread")]
 pub use beet_thread as thread;
@@ -65,7 +69,11 @@ pub mod prelude {
 	pub use crate::net::prelude::*;
 	#[cfg(feature = "ui")]
 	pub use crate::ui::prelude::*;
-	#[cfg(any(feature = "router", feature = "router_embedded"))]
+	#[cfg(any(
+		feature = "router",
+		feature = "router_render",
+		feature = "router_embedded"
+	))]
 	pub use crate::router::prelude::*;
 	pub use beet_core::val;
 	// #[cfg(feature = "build")]

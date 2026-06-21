@@ -13,6 +13,19 @@ split-debuginfo = "unpacked"
 [profile.dev.package."*"]
 opt-level = 3
 
+# Size-minimal profile for the wasm Cloudflare Worker build: optimize for size
+# (`z`), fat LTO and a single codegen unit to let the linker drop dead code, abort
+# on panic (no unwinding tables), and strip symbols. Used as:
+#   cargo build --target wasm32-unknown-unknown -p beet-cli --lib \
+#     --no-default-features --features cloudflare --profile wasm-release
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
 [workspace.package]
 version = "0.0.9-dev.16"
 authors = ["Pete Hayman"]
@@ -55,7 +68,6 @@ members = [
 	"crates/beet_router",
 	"crates/beet_thread",
 	"crates/beet_action",
-	"examples/infra/extra-types",
 
 	## 💡 Flow
 	"crates/beet_examples",
@@ -224,6 +236,10 @@ wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 # https://github.com/wasm-bindgen/wasm-bindgen/blob/215b914c739c598e5c076f8ed22df20d2c77a3dd/crates/web-sys/Cargo.toml#L45
 web-sys = "0.3"
+# Cloudflare Workers SDK (workers-rs): the `R2WorkersStore` backend and the
+# `#[event(fetch)]` Worker entry. wasm32-only, referenced under each crate's
+# wasm target table behind the `cloudflare` feature.
+worker = "0.8"
 
 [package]
 name = "beet"
@@ -319,11 +335,22 @@ native-tls = [
 # beet_net is a hard dependency of beet_router. The facade pins beet_router to
 # `default-features = false`, so the std router must re-enable the std + markdown
 # + http surface it relied on (previously supplied by default features + net).
-router = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http", "beet_infra?/beet_router"]
+# `beet_router/native` adds the filesystem store + http transport + browser opener.
+router = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/native", "beet_router/markdown", "beet_router/http", "beet_infra?/beet_router"]
+# The portable render router: the route tree, scene rendering, media negotiation
+# and the runtime BSX parser (`beet_router/std`, which is now wasm-safe), without
+# the native-only `beet_router/native` surface (filesystem store, http transport,
+# server). Builds on wasm — the basis of the Cloudflare Worker target. Native
+# consumers use the full `router` instead.
+router_render = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown"]
 # no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
 # dispatch and middleware core from beet_router, without the std scene/help
 # rendering pipeline. See `beet_router`'s `embedded` module.
 router_embedded = ["action", "net", "dep:beet_router"]
+# The Cloudflare Worker target: the portable render router plus the R2 store
+# backend, so a wasm `beet-cli` lib loads its site from an R2 bucket and serves
+# it through the router. wasm32-only (the `worker` crate is wasm-gated in beet_net).
+cloudflare = ["router_render", "json", "markdown", "serde_plain", "beet_net/cloudflare"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -392,6 +419,10 @@ infra = ["dep:beet_infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
 lightsail_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
 fargate_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/fargate_block", "fs", "rand"]
+# The Cloudflare Containers + Workers deploy blocks/actions (wrangler-provisioned,
+# so no terraform bindings). The deployed container binary is built as a separate
+# `cargo` invocation, so the orchestrator needs no `aws_sdk` itself.
+cloudflare_block = ["deploy", "beet_infra?/cloudflare_block", "fs", "rand"]
 bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
 bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
@@ -659,6 +690,16 @@ required-features = ["router", "fargate_block", "markdown"]
 name = "deploy_beet_site"
 path = "examples/infra/deploy_beet_site.rs"
 required-features = ["router", "fargate_block", "markdown"]
+
+[[example]]
+name = "hello_cloudflare_containers"
+path = "examples/infra/hello_cloudflare_containers.rs"
+required-features = ["router", "cloudflare_block", "markdown"]
+
+[[example]]
+name = "hello_cloudflare_workers"
+path = "examples/infra/hello_cloudflare_workers.rs"
+required-features = ["router", "cloudflare_block", "markdown"]
 
 # 💡 Examples - action
 

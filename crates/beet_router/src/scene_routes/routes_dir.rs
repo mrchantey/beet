@@ -38,6 +38,11 @@ impl RoutesDir {
 const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 
 /// Observer: scan the [`RoutesDir`] store and spawn its routes (see the module docs).
+///
+/// Native-only: it blocks on the store scan at spawn time. The wasm site-load
+/// path (the Cloudflare Worker) cannot block, so it awaits
+/// [`spawn_routes_dir_async`] after the entry build instead.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn spawn_routes_dir(
 	ev: On<Insert, RoutesDir>,
 	dirs: Query<&RoutesDir>,
@@ -53,7 +58,8 @@ pub fn spawn_routes_dir(
 
 	// discover routes + read frontmatter through the store, a one-time blocking
 	// scan at spawn (boot): fs-backed in dev, S3-backed in a deployed task.
-	for spec in async_ext::block_on(discover_routes(&store))? {
+	let specs = async_ext::block_on(discover_routes(&store))?;
+	for spec in specs {
 		#[allow(unused_mut, unused_variables)]
 		let mut route_entity = commands.spawn((
 			ChildOf(ev.entity),
@@ -71,6 +77,63 @@ pub fn spawn_routes_dir(
 		}
 	}
 	Ok(())
+}
+
+/// Async counterpart to [`spawn_routes_dir`] for wasm, where a blocking scan
+/// would hang the single-threaded runtime.
+///
+/// Resolves the [`SiteRoot`]-scoped store for every [`RoutesDir`] in the world,
+/// awaits its content scan, then spawns each route child and flushes so the
+/// route-tree observers settle. Run once after the entry build, since the
+/// build's `Insert, RoutesDir` observer is native-only.
+#[cfg(target_arch = "wasm32")]
+pub async fn spawn_routes_dir_async(world: &mut World) -> Result {
+	// snapshot the (entity, scoped store) pairs, the SiteRoot scoped to each `src`.
+	let site_store = world
+		.get_resource::<SiteRoot>()
+		.map(|root| root.0.clone())
+		.unwrap_or_else(|| SiteRoot::default().0);
+	let dirs = world
+		.query::<(Entity, &RoutesDir)>()
+		.iter(world)
+		.map(|(entity, dir)| {
+			(entity, site_store.with_subdir(SmolPath::from(dir.src.as_str())))
+		})
+		.collect::<Vec<_>>();
+
+	for (entity, store) in dirs {
+		// compose the scoped store onto the entity so its routes read from it.
+		world.entity_mut(entity).insert(store.clone());
+		// await the content scan (the wasm-safe replacement for the native
+		// observer's `block_on`), then spawn the route children directly.
+		for spec in discover_routes(&store).await? {
+			spawn_route_spec(world, entity, spec);
+		}
+		// flush so the `Insert, PathPattern` route-tree observers run against the
+		// settled hierarchy before the next exchange.
+		world.flush();
+	}
+	Ok(())
+}
+
+/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
+#[cfg(target_arch = "wasm32")]
+fn spawn_route_spec(world: &mut World, parent: Entity, spec: RouteSpec) {
+	#[allow(unused_mut, unused_variables)]
+	let mut route_entity = world.spawn((
+		ChildOf(parent),
+		route(&spec.route_path, BlobScene::new(spec.store_path)),
+		HttpMethod::Get,
+		ExportStrategy::Static,
+		// a discovered content file is a user-facing page, so it carries
+		// `PageRoute` and appears in the nav, like its codegen blob equivalent.
+		PageRoute,
+	));
+	// scan-time page metadata, so navigation knows titles/order up front
+	#[cfg(feature = "markdown_parser")]
+	if let Some(meta) = spec.meta {
+		route_entity.insert(meta);
+	}
 }
 
 /// A discovered content file: its route path, the store path its bytes load from,

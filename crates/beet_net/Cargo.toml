@@ -88,6 +88,11 @@ aws_sdk = [
 	"dep:aws-config",
 	"beet_core/tokio",
 ]
+# The Cloudflare R2 store backend (`R2WorkersStore`), reading the site through the
+# Worker's R2 binding instead of the S3 API. wasm32-only: the `worker` crate is
+# referenced under the wasm target table, so `dep:worker` activates only there.
+# Mirrors `aws_sdk`'s shape (a store backend behind `std`), but target-gated.
+cloudflare = ["std", "dep:worker"]
 serde = [
 	"dep:serde",
 	"dep:base64",
@@ -244,6 +249,12 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
+# the workspace sets `default-features = false` so uuid compiles no_std; on wasm
+# the std `uuid/v7` needs a randomness backend, so re-add the `js` (WebCrypto) one.
+uuid = { workspace = true, optional = true, features = ["js"] }
+# the Cloudflare Workers SDK, behind the `cloudflare` feature (the `R2WorkersStore`
+# backend + the `worker::Env`/`worker::Bucket` bindings it resolves).
+worker = { workspace = true, optional = true }
 web-sys = { workspace = true, features = [
 	# Fetch
 	'Headers',

@@ -64,6 +64,10 @@ pub use fs_blob_watchers::*;
 mod indexed_db_store;
 #[cfg(target_arch = "wasm32")]
 mod local_storage_store;
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+mod r2_workers_store;
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+pub use r2_workers_store::*;
 #[cfg(feature = "std")]
 pub use fs_store::*;
 #[cfg(target_arch = "wasm32")]
@@ -126,6 +130,12 @@ impl Plugin for StorePlugin {
 			.init_non_send::<LocalStorageBlobWatcher>()
 			.add_observer(add_local_storage_store_watcher)
 			.add_observer(remove_local_storage_store_watcher);
+
+		// the Cloudflare R2 binding store, registered so a deployed Worker can
+		// resolve `<.. R2WorkersStore>` from markup and serialize it.
+		#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+		app.register_type::<R2WorkersStore>()
+			.register_type::<TypedBlob<R2WorkersStore>>();
 
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		app.register_type::<S3Store>()

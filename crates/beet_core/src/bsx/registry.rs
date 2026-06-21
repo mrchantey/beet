@@ -123,7 +123,9 @@ impl BsxTemplateRegistry {
 	}
 }
 
-/// World/App registration of a BSX template directory.
+/// Filesystem registration of a BSX template directory. Native-only: it scans a
+/// `dir` off disk. The in-memory schema mirror lives on [`WorldRegisterBsxSchemasExt`]
+/// so it stays available on wasm.
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 #[extend::ext(name=WorldRegisterBsxExt)]
 pub impl World {
@@ -139,25 +141,21 @@ pub impl World {
 			.remove_resource::<BsxTemplateRegistry>()
 			.unwrap_or_default();
 		registry.register_dir(dir)?;
-		// collect each template's schema, then mirror them into the schema registry.
-		let schemas = registry
-			.manifest()
-			.filter_map(|(name, schema)| {
-				schema.map(|schema| (name.clone(), schema.clone()))
-			})
-			.collect::<Vec<_>>();
 		self.insert_resource(registry);
-		let mut schema_registry = self.get_resource_or_init::<SchemaRegistry>();
-		for (name, schema) in schemas {
-			schema_registry.insert(name, schema);
-		}
+		self.register_bsx_schemas();
 		Ok(())
 	}
+}
 
+/// The in-memory schema mirror, split out so it builds on wasm (it touches no
+/// filesystem). The store-backed registration paths (eg a Cloudflare Worker
+/// reading `templates/` from R2) call this after `insert_source`.
+#[extend::ext(name=WorldRegisterBsxSchemasExt)]
+pub impl World {
 	/// Mirror the schemas of the already-populated [`BsxTemplateRegistry`] into the
 	/// [`SchemaRegistry`], so a composable [`ValueSchema::Reference`] between BSX
 	/// templates resolves. Used when templates were registered via
-	/// [`BsxTemplateRegistry::insert_source`] rather than [`register_bsx_templates`].
+	/// [`BsxTemplateRegistry::insert_source`] rather than `register_bsx_templates`.
 	fn register_bsx_schemas(&mut self) -> &mut Self {
 		let Some(registry) = self.get_resource::<BsxTemplateRegistry>() else {
 			return self;

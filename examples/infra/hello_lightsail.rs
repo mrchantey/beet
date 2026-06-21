@@ -1,125 +1,48 @@
 //! # Hello Lightsail
 //!
-//! Deploys the router example as a Lightsail instance.
-//! Assets are uploaded to S3 during deploy and accessed at runtime
-//! via aws_sdk, identical to the Lambda pattern.
+//! Deploys `examples/bsx_site` as an http-only Lightsail instance. The generic
+//! `beet` binary runs under systemd and reads the site from an S3 bucket at
+//! request time (`BEET_SERVICE_ACCESS=remote` + `BEET_SITE_BUCKET`), so a site
+//! change re-publishes by re-running `sync` with no redeploy. Served on the
+//! instance's public address (no custom domain).
+//!
+//! The shared shape of every infra example lives in `utils.rs`; this one differs
+//! only in its block (`LightsailBlock`) and watch (`AwsWatch::for_lightsail`).
 //!
 //! ## Usage
 //!
 //! ```sh
-//! cargo run --example hello_lightsail --features=deploy,lightsail_block -- validate
-//! cargo run --example hello_lightsail --features=deploy,lightsail_block -- plan
-//! cargo run --example hello_lightsail --features=deploy,lightsail_block -- deploy
-//! cargo run --example hello_lightsail --features=deploy,lightsail_block -- watch
-//! cargo run --example hello_lightsail --features=deploy,lightsail_block -- show
-//! cargo run --example hello_lightsail --features=deploy,lightsail_block -- destroy --force
+//! cargo run --example hello_lightsail --features=router,lightsail_block,markdown -- validate
+//! cargo run --example hello_lightsail --features=router,lightsail_block,markdown -- deploy
+//! cargo run --example hello_lightsail --features=router,lightsail_block,markdown -- sync
+//! cargo run --example hello_lightsail --features=router,lightsail_block,markdown -- watch
+//! cargo run --example hello_lightsail --features=router,lightsail_block,markdown -- destroy --force
 //! ```
 
-#[path = "../router/router.rs"]
-mod router;
+#[path = "utils.rs"]
+mod utils;
 use beet::prelude::*;
+use utils::*;
 
-fn main() -> AppExit {
-	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			LogPlugin {
-				level: Level::TRACE,
-				..default()
-			},
-			RouterPlugin,
-			InfraPlugin,
-		))
-		.add_systems(Startup, setup)
-		.run()
-}
+fn main() -> AppExit { deploy_main(infra_scene) }
 
-fn setup(mut commands: Commands) -> Result {
-	cfg_if! {
-		if #[cfg(feature="deploy")]{
-			commands
-				.spawn(infra_scene()?)
-				.trigger(StartRunning::boot);
-		}else{
-			commands
-				.spawn((
-					BlobStore::new(assets_store()),
-					router::router_scene()?,
-					))
-				.trigger(StartRunning::boot);
-		}
-	}
-	Ok(())
-}
-
-#[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
-	let block = LightsailBlock::default();
-	(stack(), stack_cli(), assets_s3_fs_store(), children![
-		route(
-			"watch",
-			(exchange_sequence(), children![AwsWatch::for_lightsail(
-				&stack(),
-				&block
-			),])
+	let stk = stack("hello_lightsail");
+	let block = LightsailBlock::default()
+		.with_env_vars(remote_env(site_bucket_name(&stk)));
+
+	(
+		stack("hello_lightsail"),
+		stack_cli(),
+		deploy_route(
+			block.clone(),
+			build_beet_binary("aws_sdk"),
+			&stk,
+			AwsWatch::for_lightsail(&stk, &block)
+				.with_timeout(Duration::from_secs(30)),
 		),
-		route(
-			"deploy",
-			(exchange_sequence(), children![
-				(
-					block.clone(),
-					CargoBuild::default()
-						.with_release(true)
-						.with_target(BuildTarget::Zigbuild)
-						.with_example("hello_lightsail")
-						.with_additional_args(vec![
-							"--features".into(),
-							"http_server,router,aws_sdk,bindings_aws_common"
-								.into(),
-						])
-						.into_build_artifact()
-				),
-				TofuApplyAction,
-				SyncS3BucketAction,
-				AwsWatch::for_lightsail(&stack(), &block)
-					.with_timeout(Duration::from_secs(30)),
-			]),
-		),
-	])
-		.xok()
-}
-
-/// The stack is used by both infra and router for resolving bucket names.
-#[allow(unused)]
-fn stack() -> Stack {
-	Stack::new("hello_lightsail").with_aws_region("us-west-2")
-}
-
-#[cfg(feature = "bindings_aws_common")]
-fn assets_bucket_block() -> S3BucketBlock {
-	S3BucketBlock::new("assets").with_deploy_versioned(true)
-}
-
-#[cfg(feature = "deploy")]
-fn assets_s3_fs_store() -> S3FsStore {
-	let stk = stack();
-	S3FsStore::new(
-		FsStore::new(WsPathBuf::new("examples/assets")),
-		assets_bucket_block().store(&stk),
+		sync_route(&stk),
+		watch_route(AwsWatch::for_lightsail(&stk, &block)),
 	)
-}
-
-/// Resolve the assets bucket. Identical to the Lambda pattern:
-/// on deployed instances, assets are accessed via S3 at runtime.
-/// During local development, assets are read from the workspace.
-#[allow(unused)]
-fn assets_store() -> impl BlobStoreProvider {
-	cfg_if! {
-		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
-			let stk = stack();
-			assets_bucket_block().store(&stk)
-		}else{
-			FsStore::new(WsPathBuf::new("examples/assets"))
-		}
-	}
+		.xok()
 }

@@ -1,131 +1,69 @@
 //! # Hello Fargate
 //!
-//! Deploys the router example as a Fargate service.
-//! Assets are uploaded to S3 during deploy and accessed at runtime
-//! via aws_sdk, identical to the Lambda pattern.
+//! Deploys `examples/bsx_site` as an http-only Fargate service. The generic
+//! `beet` binary runs in the container (`beet serve --server=http`) and reads the
+//! site from an S3 bucket at request time (`BEET_SERVICE_ACCESS=remote` +
+//! `BEET_SITE_BUCKET`), so a site change re-publishes by re-running `sync` with
+//! no image rebuild. The ALB serves http on its own DNS name (no custom domain).
+//!
+//! This is `deploy_beet_site` minus the ssh / domain / autoscaling showcase, and
+//! the shared shape of every infra example (see `utils.rs`). Switching to
+//! Cloudflare Containers is a block + deploy-route swap (see
+//! `hello_cloudflare_containers`).
 //!
 //! ## Usage
 //!
 //! ```sh
-//! cargo run --example hello_fargate --features=router,fargate_block -- validate
-//! cargo run --example hello_fargate --features=router,fargate_block -- plan
-//! cargo run --example hello_fargate --features=router,fargate_block -- deploy
-//! cargo run --example hello_fargate --features=router,fargate_block -- watch
-//! cargo run --example hello_fargate --features=router,fargate_block -- show
-//! cargo run --example hello_fargate --features=router,fargate_block -- destroy --force
+//! cargo run --example hello_fargate --features=router,fargate_block,markdown -- validate
+//! cargo run --example hello_fargate --features=router,fargate_block,markdown -- deploy
+//! cargo run --example hello_fargate --features=router,fargate_block,markdown -- sync
+//! cargo run --example hello_fargate --features=router,fargate_block,markdown -- watch
+//! cargo run --example hello_fargate --features=router,fargate_block,markdown -- destroy --force
 //! ```
 
-#[path = "../router/router.rs"]
-mod router;
+#[path = "utils.rs"]
+mod utils;
 use beet::prelude::*;
+use utils::*;
 
-fn main() -> AppExit {
-	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			LogPlugin {
-				level: Level::TRACE,
-				..default()
-			},
-			RouterPlugin,
-			InfraPlugin,
-		))
-		.add_systems(Startup, setup)
-		.run()
-}
+fn main() -> AppExit { deploy_main(infra_scene) }
 
-fn setup(mut commands: Commands) -> Result {
-	cfg_if! {
-		if #[cfg(feature="deploy")]{
-			commands
-				.spawn(infra_scene()?)
-				.trigger(StartRunning::boot);
-		}else{
-			commands
-				.spawn((
-					BlobStore::new(assets_store()),
-					router::router_scene()?,
-					))
-				.trigger(StartRunning::boot);
-		}
-	}
-	Ok(())
-}
-
-#[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
-	let block = FargateBlock::default();
-	(stack(), stack_cli(), assets_s3_fs_store(), children![
-		route(
-			"watch",
-			(exchange_sequence(), children![AwsWatch::for_fargate(
-				&stack(),
-				&block
-			),])
-		),
-		route(
+	let stk = stack("hello_fargate");
+	// the container reconstructs the site store from these.
+	let block =
+		FargateBlock::default().with_env_vars(remote_env(site_bucket_name(&stk)));
+
+	// `stack_cli()` carries the IaC verbs; the custom routes append via
+	// `OnSpawn::insert_child` (a second `children!` would clobber them).
+	(
+		stack("hello_fargate"),
+		stack_cli(),
+		// containerized deploy: build the binary, apply the infra (creates the ECR
+		// repo + bucket), build + push the image, then publish the site and watch.
+		// block + build stay separate children so `BuildDockerImageAction` finds both.
+		OnSpawn::insert_child(route(
 			"deploy",
 			(exchange_sequence(), children![
 				block.clone(),
-				// build binary for containerization
-				build_fargate_binary(),
-				// deploy infrastructure first (creates ECR repo)
+				site_bucket(),
+				build_beet_binary("aws_sdk"),
 				TofuApplyAction,
-				// build and push Docker image (ECR repo now exists)
-				BuildDockerImageAction,
-				// sync assets to S3
-				SyncS3BucketAction,
-				AwsWatch::for_fargate(&stack(), &block)
-					.with_timeout(Duration::from_secs(30)),
+				(
+					BuildDockerImage::default().with_cmd_args([
+						"serve",
+						"--server=http",
+						"--path=/",
+					]),
+					BuildDockerImageAction,
+				),
+				sync_site(&stk),
+				AwsWatch::for_fargate(&stk, &block)
+					.with_timeout(Duration::from_secs(300)),
 			]),
-		),
-	])
-		.xok()
-}
-
-/// Build configuration for the Fargate binary.
-#[cfg(feature = "deploy")]
-fn build_fargate_binary() -> impl Bundle {
-	CargoBuild::default()
-		.with_release(true)
-		.with_target(BuildTarget::Zigbuild)
-		.with_example("hello_fargate")
-		.with_additional_args(vec![
-			"--features".into(),
-			"http_server,router,aws_sdk,bindings_aws_common".into(),
-		])
-		.into_build_artifact()
-}
-
-/// The stack is used by both infra and router for resolving bucket names.
-#[allow(unused)]
-fn stack() -> Stack { Stack::new("hello_fargate").with_aws_region("us-west-2") }
-
-#[cfg(feature = "bindings_aws_common")]
-fn assets_bucket_block() -> S3BucketBlock {
-	S3BucketBlock::new("assets").with_deploy_versioned(true)
-}
-
-#[cfg(feature = "deploy")]
-fn assets_s3_fs_store() -> S3FsStore {
-	let stk = stack();
-	S3FsStore::new(
-		FsStore::new(WsPathBuf::new("examples/assets")),
-		assets_bucket_block().store(&stk),
+		)),
+		sync_route(&stk),
+		watch_route(AwsWatch::for_fargate(&stk, &block)),
 	)
-}
-
-/// Resolve the assets bucket. Identical to the Lambda pattern:
-/// on deployed instances, assets are accessed via S3 at runtime.
-/// During local development, assets are read from the workspace.
-#[allow(unused)]
-fn assets_store() -> impl BlobStoreProvider {
-	cfg_if! {
-		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
-			let stk = stack();
-			assets_bucket_block().store(&stk)
-		}else{
-			FsStore::new(WsPathBuf::new("examples/assets"))
-		}
-	}
+		.xok()
 }

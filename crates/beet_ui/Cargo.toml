@@ -51,7 +51,11 @@ std = []
 # `beet_ui` build does not pull `bevy/keyboard`. Terminal renderers enable it.
 keyboard = ["std", "beet_core/bevy_keyboard"]
 action = ["dep:beet_action", "net"]
-net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde", "beet_net/fs", "beet_net/http"]
+# The `beet_net` integration beet_ui needs: the std `BlobStore` + serde. wasm-safe
+# — it deliberately omits the native-only `fs`/`http` (a render/document consumer
+# does not touch the filesystem store or the http transport directly; native
+# consumers pull those through `beet_router/std`).
+net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 # The function-component widget layer: `#[template]` widgets and the `rsx!`

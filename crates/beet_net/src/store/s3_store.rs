@@ -19,6 +19,10 @@ pub struct S3Store {
 	region: SmolStr,
 	/// Optional subdirectory prefix for all keys.
 	subdir: Option<SmolPath>,
+	/// Optional S3 endpoint override. Unset uses the default AWS endpoint;
+	/// set (with path-style addressing) targets an S3-compatible service such as
+	/// Cloudflare R2. See [`S3Store::r2`].
+	endpoint: Option<SmolStr>,
 }
 
 #[cfg(feature = "json")]
@@ -38,12 +42,34 @@ impl S3Store {
 			bucket_name: bucket_name.into(),
 			region: region.into(),
 			subdir: None,
+			endpoint: None,
 		}
+	}
+
+	/// Create a store backed by Cloudflare R2 through its S3-compatible API. The
+	/// endpoint is derived from the account id and the region is always `auto`;
+	/// the client uses path-style addressing, as R2 requires. The deployed
+	/// container reads the site through this exactly as it would from S3.
+	pub fn r2(
+		account_id: impl AsRef<str>,
+		bucket_name: impl Into<SmolStr>,
+	) -> Self {
+		Self::new(bucket_name, "auto").with_endpoint(format!(
+			"https://{}.r2.cloudflarestorage.com",
+			account_id.as_ref()
+		))
 	}
 
 	/// Set the subdirectory prefix for all keys.
 	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
 		self.subdir = Some(subdir.into());
+		self
+	}
+
+	/// Override the S3 endpoint, switching the client to path-style addressing for
+	/// an S3-compatible service (eg Cloudflare R2, MinIO).
+	pub fn with_endpoint(mut self, endpoint: impl Into<SmolStr>) -> Self {
+		self.endpoint = Some(endpoint.into());
 		self
 	}
 
@@ -55,18 +81,32 @@ impl S3Store {
 		}
 	}
 
-	/// Get or create an S3 client for this store's region.
+	/// Get or create an S3 client for this store's region (and endpoint, if set).
+	/// Cached by `(region, endpoint)` so an R2 store and an AWS store in the same
+	/// region get distinct clients.
 	async fn client(&self) -> Client {
-		static POOL: LazyPool<SmolStr, Client, Client> =
-			LazyPool::new(|region| {
+		static POOL: LazyPool<(SmolStr, Option<SmolStr>), Client, Client> =
+			LazyPool::new(|key| {
+				let (region, endpoint) = (key.0.clone(), key.1.clone());
 				Box::pin(async move {
 					let region_obj = Region::new(region.to_string());
 					let config =
 						aws_config::from_env().region(region_obj).load().await;
-					Client::new(&config)
+					match endpoint {
+						// R2 / S3-compatible: override the endpoint and use
+						// path-style addressing, which those services require.
+						Some(endpoint) => Client::from_conf(
+							aws_sdk_s3::config::Builder::from(&config)
+								.endpoint_url(endpoint.to_string())
+								.force_path_style(true)
+								.build(),
+						),
+						// the unchanged default AWS path.
+						None => Client::new(&config),
+					}
 				})
 			});
-		POOL.get(&self.region).await
+		POOL.get(&(self.region.clone(), self.endpoint.clone())).await
 	}
 
 	/// Resolve the S3 object key from a [`SmolPath`].
@@ -94,6 +134,7 @@ impl BlobStoreProvider for S3Store {
 				Some(existing) => existing.join(&path),
 				None => path,
 			}),
+			endpoint: self.endpoint.clone(),
 		})
 	}
 
@@ -325,11 +366,21 @@ impl BlobStoreProvider for S3Store {
 		&self,
 		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
-		let region = &self.region;
-		let bucket_name = &self.bucket_name;
 		let key = self.resolve_key(path);
-		let public_url =
-			format!("https://{bucket_name}.s3.{region}.amazonaws.com/{key}");
+		let public_url = match &self.endpoint {
+			// path-style URL against the override endpoint (eg the R2 S3 API). A
+			// truly public URL needs a custom domain or r2.dev binding.
+			Some(endpoint) => format!(
+				"{}/{}/{key}",
+				endpoint.trim_end_matches('/'),
+				self.bucket_name
+			),
+			// virtual-hosted AWS S3 URL (unchanged).
+			None => format!(
+				"https://{}.s3.{}.amazonaws.com/{key}",
+				self.bucket_name, self.region
+			),
+		};
 		Box::pin(async move { Some(public_url).xok() })
 	}
 }
@@ -359,6 +410,27 @@ mod test {
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_starts_with("<!DOCTYPE html>");
+	}
+
+	#[beet_core::test]
+	async fn r2_store_config() {
+		// no network: verifies the R2 constructor wiring + path-style public url.
+		let store = S3Store::r2("abc123", "my-bucket");
+		store.region().as_str().xpect_eq("auto");
+		store
+			.endpoint()
+			.as_ref()
+			.unwrap()
+			.as_str()
+			.xpect_eq("https://abc123.r2.cloudflarestorage.com");
+		BlobStore::new(store)
+			.public_url(&SmolPath::from("index.html"))
+			.await
+			.unwrap()
+			.unwrap()
+			.xpect_eq(
+				"https://abc123.r2.cloudflarestorage.com/my-bucket/index.html",
+			);
 	}
 
 	#[beet_core::test]

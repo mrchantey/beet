@@ -29,7 +29,6 @@
 //! ```
 use beet::prelude::*;
 
-#[allow(unused, reason = "module used by hello_lambda etc")]
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((
@@ -54,7 +53,6 @@ fn setup(mut commands: Commands) -> Result {
 	Ok(())
 }
 
-#[allow(unused, reason = "module not used when deploying infra")]
 pub fn router_scene() -> Result<impl Bundle> {
 	(
 		// declare the store used by the blob scenes

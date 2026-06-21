@@ -89,11 +89,11 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 /// - [`RouterPlugin`] — route tree building observers
 /// - [`InterfacePlugin`] — single-active-scene enforcement
 /// - [`InputPlugin`] — link click navigation wiring
-#[cfg(feature = "router")]
+#[cfg(any(feature = "router", feature = "router_render"))]
 #[derive(Default)]
 pub struct ClientAppPlugin;
 
-#[cfg(feature = "router")]
+#[cfg(any(feature = "router", feature = "router_render"))]
 impl Plugin for ClientAppPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<DocumentPlugin>()
