@@ -1,7 +1,7 @@
 //! Scene routes — routes that return a renderable entity tree (a scene) rather
 //! than serialized data.
 //!
-//! A regular `exchange_route` returns an `ExchangeRouteOut` (JSON, a redirect,
+//! A regular `exchange_route` returns an `IntoResponseAsync` (JSON, a redirect,
 //! bytes) already in final form. A *scene route* instead yields the [`Entity`]
 //! root of a tree (an rsx/markdown/parsed document, a behavior tree, …)
 //! carrying a [`PageRoot`]; a `NodeRenderer` walks [`PageRoot::rendered`]

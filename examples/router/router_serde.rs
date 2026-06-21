@@ -7,7 +7,7 @@
 //! fresh copy.
 //!
 //! Every runtime component — [`CliServer`], the [`router`] bundle, the
-//! middleware and the [`TransformExchangeScript`] markers — is `Reflect`, so the
+//! middleware and the [`ExchangeOverloadScript`] markers — is `Reflect`, so the
 //! components round-trip with no post-load patching; `BootOnLoad` is then added to
 //! the loaded root and a `LoadTemplate` fired to boot it.
 //!
@@ -42,7 +42,7 @@ fn main() -> AppExit {
 		// registering — ClientAppPlugin's RouterPlugin / ActionPlugin
 		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<TransformExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
+		.register_type::<ExchangeOverloadScript<QueryParams<GreetRequest>, String, _, _>>(
 		)
 		.add_systems(Startup, setup)
 		.run()
@@ -66,14 +66,14 @@ fn setup(async_commands: AsyncCommands) {
 		}
 		// the bundle stays serializable (`CliServer` + router, both reflect
 		// components); the boot runs on the loaded root, not via a spawn hook, so
-		// fire `ActionIn::<Boot>::boot` on each root once the scene lands.
+		// fire `StartRunning::boot` on each root once the scene lands.
 		let roots =
 			TemplateStore::load_or_create(world.clone(), blob, async |_| {
 				route_bundle().xok()
 			})
 			.await?;
 		for root in roots {
-			world.entity(root).trigger(ActionIn::<Boot>::boot).await?;
+			world.entity(root).trigger(StartRunning::boot).await?;
 		}
 		Ok(())
 	});
@@ -85,19 +85,19 @@ fn route_bundle() -> impl Bundle {
 		(default_router(), children![
 			(
 				Script::<(), String>::rhai(r#""hello world""#),
-				TransformExchangeScript::<(), String>::default(),
+				ExchangeOverloadScript::<(), String>::default(),
 				PathPartial::new(""),
 			),
 			(
 				Script::<(), String>::rhai(r#""hello foo""#),
-				TransformExchangeScript::<(), String>::default(),
+				ExchangeOverloadScript::<(), String>::default(),
 				PathPartial::new("foo"),
 			),
 			(
 				Script::<QueryParams<GreetRequest>, String>::rhai(
 					r#""hello " + input.name"#,
 				),
-				TransformExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(),
+				ExchangeOverloadScript::<QueryParams<GreetRequest>, String, _, _>::default(),
 				PathPartial::new("greet"),
 			),
 			// same idea, but the script receives the full [`RequestParts`]
@@ -106,7 +106,7 @@ fn route_bundle() -> impl Bundle {
 				Script::<RequestParts, String>::rhai(
 					r#""hello " + input.url.params.name[0]"#,
 				),
-				TransformExchangeScript::<RequestParts, String, _, _>::default(),
+				ExchangeOverloadScript::<RequestParts, String, _, _>::default(),
 				PathPartial::new("greet-request"),
 			),
 		]),

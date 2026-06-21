@@ -7,7 +7,7 @@
 //!
 //! [`boot`] calls a host's `Action<Boot, Response>` slot with `Boot(request)`:
 //! the server-provided `ContinueRun<Boot, Response>` inserts a `Running<Response>`
-//! keep-alive claim and fires an `ActionIn<Boot>` the servers observe. A one-shot
+//! keep-alive claim and fires an `StartRunning<Boot>` the servers observe. A one-shot
 //! [`CliServer`] resolves the call (its response streams to stdout and the process
 //! exits); a long-running [`HttpServer`] / `TuiServer` parks the call, persisting
 //! the process until its `Running` is removed, which fires its teardown observer.
@@ -27,7 +27,7 @@
 
 // The `HttpServer` component and its `set_http_server` install hook are
 // no_std-capable and compile unconditionally; the concrete backends below stay
-// std/feature-gated. A server is an `ActionIn<Boot>` observer torn down by
+// std/feature-gated. A server is an `StartRunning<Boot>` observer torn down by
 // observing the removal of the boot exchange's `Running<Response>`.
 mod http_server;
 pub use http_server::*;

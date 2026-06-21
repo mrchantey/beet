@@ -44,7 +44,7 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// HTTP server that listens for incoming requests, dispatching each through the
 /// host's `Action<Request, Response>` dispatch slot via `entity.exchange`.
 ///
-/// A long-running server: the boot fan-out ([`ActionIn<Boot>`]) whose
+/// A long-running server: the boot fan-out ([`StartRunning<Boot>`]) whose
 /// `--server` selects `"http"` boots it through the backend [`ServerPlugin`]
 /// installed via [`set_http_server`], reading `--port` / `--host` from the boot
 /// request. It never resolves the boot call, so the host's [`Running<Response>`]
@@ -68,7 +68,7 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// world.spawn((
 ///     HttpServer::default(),
 ///     exchange_handler(|req| req.mirror()),
-/// )).trigger(ActionIn::boot);
+/// )).trigger(StartRunning::boot);
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -164,7 +164,7 @@ impl HttpServer {
 	}
 }
 
-/// Registers the boot ([`ActionIn<Boot>`]) and teardown
+/// Registers the boot ([`StartRunning<Boot>`]) and teardown
 /// (`On<Remove, Running<Response>>`) observers on the host. no_std-clean: the
 /// async runtime (`queue_async_local`) and the installed backend hook both build
 /// without std.
@@ -191,7 +191,7 @@ struct HttpServerShutdown(Option<OnceValue<()>>);
 /// never resolves the boot call, so the host's [`Running<Response>`] parks the
 /// process up.
 fn on_action_in(
-	ev: On<ActionIn<Boot>>,
+	ev: On<StartRunning<Boot>>,
 	mut servers: Query<&mut HttpServer>,
 	mut commands: Commands,
 ) -> Result {

@@ -2,7 +2,7 @@
 //!
 //! This module provides [`ExchangeStats`] for tracking request counts
 //! and the [`exchange_stats`] observer for logging exchange completion.
-// the wire-event imports (`ExchangeEnd` etc.) are only used by the observer,
+// the wire-event imports (`EndExchange` etc.) are only used by the observer,
 // which needs the `action` feature.
 #[cfg(feature = "action")]
 use super::*;
@@ -13,15 +13,15 @@ use beet_core::prelude::*;
 ///
 /// Logs a single concise line per request — method, path, status, duration, and
 /// running request index — at `info`. The method/path/status/timing ride on the
-/// [`ExchangeEnd`] event fired by
+/// [`EndExchange`] event fired by
 /// [`exchange`](crate::prelude::AsyncExchangeExt::exchange).
 ///
-/// `action`-gated (its only non-no_std dep): it reads the [`ExchangeEnd`] event.
+/// `action`-gated (its only non-no_std dep): it reads the [`EndExchange`] event.
 /// The [`ExchangeStats`] counter it bumps is itself no_std (it backs the no_std
 /// [`HttpServer`] requirement).
 #[cfg(feature = "action")]
 pub fn exchange_stats(
-	ev: On<ExchangeEnd>,
+	ev: On<EndExchange>,
 	mut servers: AncestorQuery<&mut ExchangeStats>,
 ) -> Result {
 	let entity = ev.event_target();
@@ -46,7 +46,7 @@ pub fn exchange_stats(
 ///
 /// Add this to server entities to track the number of requests processed.
 /// The [`exchange_stats`] observer will automatically update these stats
-/// when [`ExchangeEnd`] events are triggered.
+/// when [`EndExchange`] events are triggered.
 #[derive(Default, Component)]
 pub struct ExchangeStats {
 	request_count: u128,

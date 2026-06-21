@@ -13,7 +13,7 @@ use serde::de::DeserializeOwned;
 ///
 /// `Script` is pure data: it holds the program but installs no [`Action`]. To
 /// run it as a behaviour-tree leaf add [`ScriptAction`] (which requires a
-/// `Script`); to dispatch it from a route add `TransformExchangeScript`. Keeping the
+/// `Script`); to dispatch it from a route add `ExchangeOverloadScript`. Keeping the
 /// data and the action separate lets a domain action gather its own input and
 /// apply its own output around the shared [`Script::run`] backend without a
 /// second, dormant action fighting over the entity's [`ActionMeta`].

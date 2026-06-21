@@ -1,8 +1,8 @@
 //! Request dispatch through an entity's `Action<Request, Response>` slot, plus
-//! [`ExchangeEnd`] for observability.
+//! [`EndExchange`] for observability.
 //!
 //! [`exchange`](ExchangeExt::exchange) is the dispatch verb: it calls the entity's
-//! own `Action<Request, Response>` slot with the request, fires an [`ExchangeEnd`]
+//! own `Action<Request, Response>` slot with the request, fires an [`EndExchange`]
 //! for the stats observer, and maps a missing slot or handler error to a `500`.
 //! The slot's handler is whatever the higher layer installed: `beet_router`'s
 //! `Router` fills it with the route-tree dispatch, a test fills it with a bare
@@ -69,7 +69,7 @@ pub impl AsyncEntity {
 }
 
 /// Dispatch `request` through `entity`'s `Action<Request, Response>` slot, then
-/// fire [`ExchangeEnd`] so [`exchange_stats`] can log the request. The shared body
+/// fire [`EndExchange`] so [`exchange_stats`] can log the request. The shared body
 /// of both `exchange` extension traits. A missing slot or a handler error maps to
 /// [`Response::internal_error`].
 async fn exchange(entity: AsyncEntity, request: Request) -> Response {
@@ -94,7 +94,7 @@ async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 	};
 	let status = res.status();
 	entity
-		.trigger(move |entity| ExchangeEnd {
+		.trigger(move |entity| EndExchange {
 			entity,
 			method,
 			path,
@@ -112,7 +112,7 @@ async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 /// and start time, so observers (eg [`exchange_stats`]) can log per-request info
 /// without a [`RequestMeta`] component on the handler entity.
 #[derive(Clone, EntityEvent)]
-pub struct ExchangeEnd {
+pub struct EndExchange {
 	/// The entity that dispatched this request.
 	pub entity: Entity,
 	/// The request method, captured at dispatch.

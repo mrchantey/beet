@@ -37,14 +37,14 @@ fn setup(mut commands: Commands) -> Result {
 		if #[cfg(feature="deploy")]{
 			commands
 				.spawn(infra_scene()?)
-				.trigger(ActionIn::<Boot>::boot);
+				.trigger(StartRunning::boot);
 		}else{
 			commands
 				.spawn((
 					BlobStore::new(assets_store()),
 					router::router_scene()?,
 					))
-				.trigger(ActionIn::<Boot>::boot);
+				.trigger(StartRunning::boot);
 		}
 	}
 	Ok(())

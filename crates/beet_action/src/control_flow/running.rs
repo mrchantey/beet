@@ -7,11 +7,11 @@
 //! by queuing an [`EndRun`] command, which removes [`Running`] and resolves
 //! the stored handler with a value.
 //!
-//! Calling a [`ContinueRun`] also fires an [`ActionIn`] event carrying the
+//! Calling a [`ContinueRun`] also fires an [`StartRunning`] event carrying the
 //! input, so any number of observers can react to the parked call. One of them
 //! resolves it by queuing an [`EndRun`]; with no observer the call simply parks
 //! on its [`Running`]. This is how a server host fans a boot exchange out to
-//! every server that observes [`ActionIn<Request>`].
+//! every server that observes [`StartRunning<Request>`].
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
@@ -79,13 +79,13 @@ pub enum ControlFlowError {
 /// Cheaply cloned via the inner [`Arc`] (no `In: Clone` bound); all clones share
 /// one slot, so a [`take`](Self::take) by any is seen by all.
 #[derive(EntityEvent)]
-pub struct ActionIn<In: 'static + Send + Sync> {
+pub struct StartRunning<In: 'static + Send + Sync> {
 	/// The entity the action was called on.
 	pub entity: Entity,
 	value: Arc<Mutex<Option<In>>>,
 }
 
-impl<In: 'static + Send + Sync> Clone for ActionIn<In> {
+impl<In: 'static + Send + Sync> Clone for StartRunning<In> {
 	fn clone(&self) -> Self {
 		Self {
 			entity: self.entity,
@@ -94,7 +94,7 @@ impl<In: 'static + Send + Sync> Clone for ActionIn<In> {
 	}
 }
 
-impl<In: 'static + Send + Sync> ActionIn<In> {
+impl<In: 'static + Send + Sync> StartRunning<In> {
 	/// Wrap `input` in a shared slot targeting `entity`.
 	pub fn new(entity: Entity, input: In) -> Self {
 		Self {
@@ -114,7 +114,7 @@ impl<In: 'static + Send + Sync> ActionIn<In> {
 			.unwrap()
 			.as_ref()
 			.map(func)
-			.ok_or_else(|| bevyhow!("ActionIn input already taken"))
+			.ok_or_else(|| bevyhow!("StartRunning input already taken"))
 	}
 
 	/// Take ownership of the input.
@@ -126,7 +126,7 @@ impl<In: 'static + Send + Sync> ActionIn<In> {
 			.lock()
 			.unwrap()
 			.take()
-			.ok_or_else(|| bevyhow!("ActionIn input already taken"))
+			.ok_or_else(|| bevyhow!("StartRunning input already taken"))
 	}
 }
 
@@ -135,10 +135,10 @@ impl<In: 'static + Send + Sync> ActionIn<In> {
 ///
 /// When called, the [`start_running`] handler stores the [`OutHandler`] on a
 /// [`Running`] component (so the call stays pending until an [`EndRun`] is
-/// queued) and fires an [`ActionIn`] carrying the input to any observers. A
+/// queued) and fires an [`StartRunning`] carrying the input to any observers. A
 /// behaviour-tree action parks with no observer; a server host carries
 /// `ContinueRun<Request, Response>` so a boot exchange reaches every server that
-/// observes [`ActionIn<Request>`].
+/// observes [`StartRunning<Request>`].
 #[derive(Component)]
 #[require(RunTimer)]
 #[require(Action<In, Out> = start_running::<In, Out>())]
@@ -180,7 +180,7 @@ impl ContinueRun {
 }
 
 /// The [`Action`] backing [`ContinueRun`]: stores the [`OutHandler`] in a
-/// [`Running`] component (leaving the call pending) and fires an [`ActionIn`]
+/// [`Running`] component (leaving the call pending) and fires an [`StartRunning`]
 /// with the input for any observers.
 pub fn start_running<In, Out>() -> Action<In, Out>
 where
@@ -196,13 +196,13 @@ where
 		     out_handler,
 		 }| {
 			// park the call on a `Running<Out>`, then fan the input out to any
-			// `ActionIn<In>` observers; `Running` is inserted first so a
+			// `StartRunning<In>` observers; `Running` is inserted first so a
 			// synchronous `EndRun` from an observer always lands on it.
 			commands
 				.commands
 				.entity(caller)
 				.insert(Running::new(out_handler))
-				.trigger(move |entity| ActionIn::new(entity, input));
+				.trigger(move |entity| StartRunning::new(entity, input));
 			Ok(())
 		},
 	)
@@ -374,7 +374,7 @@ mod test {
 
 	#[beet_core::test]
 	fn take_and_with_share_one_slot() {
-		let ev = ActionIn::new(Entity::PLACEHOLDER, 42u32);
+		let ev = StartRunning::new(Entity::PLACEHOLDER, 42u32);
 		let clone = ev.clone();
 		ev.with(|value| *value).unwrap().xpect_eq(42);
 		ev.take().unwrap().xpect_eq(42);
@@ -389,7 +389,7 @@ mod test {
 		let entity = world.spawn(ContinueRun::<(), Outcome>::default()).id();
 		// an observer resolves the pending call when the input fans out to it
 		world.entity_mut(entity).observe_any(
-			|ev: On<ActionIn<()>>, mut commands: Commands| {
+			|ev: On<StartRunning<()>>, mut commands: Commands| {
 				commands.entity(ev.entity).queue(EndRun(Outcome::PASS));
 			},
 		);

@@ -9,7 +9,7 @@
 //! - [`async_route`] — `async fn(cx: ActionContext<In>) -> impl Bundle`.
 //! - [`system_route`] — `fn(cx: In<ActionContext<In>>, ..) -> impl Bundle`.
 //!
-//! The router dispatches actions whose output must be [`ExchangeRouteOut`]. The
+//! The router dispatches actions whose output must be [`IntoResponseAsync`]. The
 //! per-request constructors bridge this: a handler becomes an
 //! `Action<In, PageRequest>` called on every request that runs the handler,
 //! builds the result through the template substrate (`spawn_template`) as an

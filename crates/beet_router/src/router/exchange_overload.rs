@@ -2,15 +2,15 @@
 //! bridges a typed handler into the router's request/response dispatch.
 //!
 //! A route handler is a typed `Action<In, Out>` where `In: FromRequest` and
-//! `Out: ExchangeRouteOut`. The router dispatches through an entity's
+//! `Out: IntoResponseAsync`. The router dispatches through an entity's
 //! `Action<Request, Response>` slot, which only speaks `Request -> Response`.
-//! [`RouteExchange`] bridges the two: its on-add installs an
+//! [`ExchangeOverload`] bridges the two: its on-add installs an
 //! `Action<Request, Response>` that extracts the input from the request, self-calls
 //! the entity's typed `Action<In, Out>`, and converts the output into a response.
 //! A handler that is already `Request -> Response` is its own route action, so no
-//! adapter is installed (it would collide on the slot). [`ExchangeRouteOut`] is the
+//! adapter is installed (it would collide on the slot). [`IntoResponseAsync`] is the
 //! output half of the conversion. The macro, [`exchange_route`], and
-//! `TransformExchangeScript` all install the adapter through this one layer.
+//! `ExchangeOverloadScript` all install the adapter through this one layer.
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -22,7 +22,7 @@ use serde::Serialize;
 /// handler `Action<In, Out>` on the same entity.
 ///
 /// Built (via [`new`](Self::new)) at the route's require site, where the typed
-/// `In`/`Out` and their [`FromRequest`] / [`ExchangeRouteOut`] markers are known,
+/// `In`/`Out` and their [`FromRequest`] / [`IntoResponseAsync`] markers are known,
 /// then its on-add moves the prebuilt adapter into the entity's
 /// `Action<Request, Response>` slot. A `Request -> Response` handler IS the route
 /// action, so [`new`](Self::new) stores [`None`] and no adapter is installed
@@ -30,18 +30,18 @@ use serde::Serialize;
 /// the route component's `#[require]` on scene load, like the action it wraps.
 #[derive(Clone, Component)]
 #[component(on_add = on_add)]
-pub struct RouteExchange(Option<Action<Request, Response>>);
+pub struct ExchangeOverload(Option<Action<Request, Response>>);
 
-impl RouteExchange {
+impl ExchangeOverload {
 	/// Builds the adapter for a typed handler `Action<In, Out>`, or [`None`] when
 	/// the handler is already `Request -> Response` (it is its own route action).
 	///
-	/// `M1`/`M2` are the [`FromRequest`] / [`ExchangeRouteOut`] markers, inferred at
+	/// `M1`/`M2` are the [`FromRequest`] / [`IntoResponseAsync`] markers, inferred at
 	/// the call site from `In`/`Out`.
 	pub fn new<In, Out, M1, M2>() -> Self
 	where
 		In: 'static + Send + Sync + FromRequest<M1>,
-		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
+		Out: 'static + Send + Sync + IntoResponseAsync<M2>,
 	{
 		// a `Request -> Response` handler is the route action itself; installing an
 		// adapter would clobber its `Action<Request, Response>` slot.
@@ -55,7 +55,7 @@ impl RouteExchange {
 				let parts = cx.input.parts().clone();
 				let input = In::from_request(cx.input).await?;
 				let output: Out = cx.caller.call(input).await?;
-				output.into_route_response(cx.caller, parts).await
+				output.into_response_async(cx.caller, parts).await
 			},
 		)))
 	}
@@ -64,10 +64,10 @@ impl RouteExchange {
 /// Moves the prebuilt adapter into the entity's `Action<Request, Response>` slot.
 /// A passthrough route ([`None`]) is its own route action, so nothing is installed.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	if let Some(adapter) = world
+	let Some(adapter) = world
 		.entity(cx.entity)
-		.get::<RouteExchange>()
-		.and_then(|route| route.0.clone())
+		.get::<ExchangeOverload>()
+		.and_then(|exchange| exchange.0.clone())
 	else {
 		return;
 	};
@@ -75,18 +75,18 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 /// Trait for converting a typed handler's output into a [`Response`], the output
-/// half of the [`RouteExchange`] conversion.
+/// half of the [`ExchangeOverload`] conversion.
 ///
 /// Blanket impls cover the main cases:
 /// - Types implementing [`Serialize`] (serde content negotiation)
 ///
 /// Concrete impls exist for [`MediaBytes`] and [`PageRequest`] (a render root).
-pub trait ExchangeRouteOut<M>
+pub trait IntoResponseAsync<M>
 where
 	Self: Sized,
 {
 	/// Converts this output value into a response.
-	fn into_route_response(
+	fn into_response_async(
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,
@@ -95,8 +95,8 @@ where
 
 /// Concrete impl for [`Response`] — an action that already produced a
 /// fully-formed response (eg a redirect) passes it through unchanged.
-impl ExchangeRouteOut<Self> for Response {
-	fn into_route_response(
+impl IntoResponseAsync<Self> for Response {
+	fn into_response_async(
 		self,
 		_caller: AsyncEntity,
 		_parts: RequestParts,
@@ -107,8 +107,8 @@ impl ExchangeRouteOut<Self> for Response {
 
 /// Concrete impl for [`MediaBytes`] — wraps the bytes directly
 /// into a response without content negotiation.
-impl ExchangeRouteOut<Self> for MediaBytes {
-	fn into_route_response(
+impl IntoResponseAsync<Self> for MediaBytes {
+	fn into_response_async(
 		self,
 		_caller: AsyncEntity,
 		_parts: RequestParts,
@@ -117,16 +117,16 @@ impl ExchangeRouteOut<Self> for MediaBytes {
 	}
 }
 
-/// Marker type for the [`Serialize`] blanket impl of [`ExchangeRouteOut`].
+/// Marker type for the [`Serialize`] blanket impl of [`IntoResponseAsync`].
 #[cfg(feature = "serde")]
 #[derive(TypePath)]
 pub struct SerdeIntoResponseMarker;
 #[cfg(feature = "serde")]
-impl<T> ExchangeRouteOut<SerdeIntoResponseMarker> for T
+impl<T> IntoResponseAsync<SerdeIntoResponseMarker> for T
 where
 	T: 'static + Send + Sync + Serialize,
 {
-	fn into_route_response(
+	fn into_response_async(
 		self,
 		_caller: AsyncEntity,
 		parts: RequestParts,
@@ -156,20 +156,20 @@ pub fn route<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {
 }
 
 /// Creates a route bundle from a path and a typed action, including the
-/// [`RouteExchange`] adapter that bridges the action to request/response dispatch.
+/// [`ExchangeOverload`] adapter that bridges the action to request/response dispatch.
 pub fn exchange_route<In, Out, M, M1, M2, B>(
 	path: &str,
 	action: B,
-) -> (PathPartial, B, RouteExchange)
+) -> (PathPartial, B, ExchangeOverload)
 where
 	In: 'static + Send + Sync + FromRequest<M1>,
-	Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
+	Out: 'static + Send + Sync + IntoResponseAsync<M2>,
 	B: Bundle + IntoAction<M, In = In, Out = Out>,
 {
 	(
 		PathPartial::new(path),
 		action,
-		RouteExchange::new::<In, Out, M1, M2>(),
+		ExchangeOverload::new::<In, Out, M1, M2>(),
 	)
 }
 
@@ -179,7 +179,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
-	/// An `In = Request` route handler is its own route action: [`RouteExchange`]
+	/// An `In = Request` route handler is its own route action: [`ExchangeOverload`]
 	/// installs no adapter (the signature-check passthrough), so the route dispatches
 	/// directly through the handler's own `Action<Request, Response>` slot with no
 	/// same-type collision.

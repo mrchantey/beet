@@ -57,7 +57,9 @@ impl CliArgs {
 				}
 
 				if let Some((key, value)) = stripped.split_once('=') {
-					// Key=value format
+					// Key=value format. The value is kept whole (commas are not a
+					// list separator here, so a JSON body survives verbatim); a
+					// consumer that wants a list splits it itself.
 					params.insert(key.into(), value.into());
 				} else {
 					// No equals sign - might be followed by a value

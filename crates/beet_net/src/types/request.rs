@@ -73,24 +73,6 @@ impl core::ops::DerefMut for Request {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.parts }
 }
 
-/// A [`Request`] wrapped as a *boot* exchange, kept distinct from a dispatch
-/// exchange so the two action slots on a host never collide.
-///
-/// A server host holds an `Action<Boot, Response>` (the boot slot, a
-/// `ContinueRun`) alongside an `Action<Request, Response>` (dispatch). Booting
-/// calls the former with `Boot(request)`; dispatching calls the latter with the
-/// [`Request`]. Because `Boot` and [`Request`] are different types the two slots
-/// coexist with no holder newtype.
-///
-/// Needs no `Clone`: `ActionIn` clones via an `Arc` with no `In: Clone` bound,
-/// and [`Request`] is itself not `Clone`.
-#[derive(Debug, Deref, DerefMut)]
-pub struct Boot(pub Request);
-
-impl From<Request> for Boot {
-	fn from(request: Request) -> Self { Self(request) }
-}
-
 /// Cloned from the [`Request`] when its added, allowing the [`Request`]
 /// to be consumed and for these parts to still be accessible.
 /// This component should not be removed.
@@ -589,16 +571,6 @@ mod test {
 		request
 			.path()
 			.xpect_eq(vec!["api".to_string(), "users".to_string()]);
-	}
-
-	#[beet_core::test]
-	fn boot_derefs_to_request() {
-		let boot = Boot::from(Request::get("api/users"));
-		// Deref reaches the inner Request (and its RequestParts methods)
-		(*boot.method()).xpect_eq(HttpMethod::Get);
-		boot.path_string().xpect_eq("/api/users");
-		// and the inner Request is recoverable by value
-		boot.0.path_string().xpect_eq("/api/users");
 	}
 
 	#[beet_core::test]

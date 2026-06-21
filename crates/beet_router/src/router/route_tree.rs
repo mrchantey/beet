@@ -370,7 +370,7 @@ impl core::fmt::Display for RouteTree {
 /// [`Entity`].
 ///
 /// A dedicated type (rather than a bare `Entity`) is required so the
-/// `ExchangeRouteOut` impl does not collide with the blanket `Serialize`
+/// `IntoResponseAsync` impl does not collide with the blanket `Serialize`
 /// impl — `Entity` is itself `Serialize`. The render side (the impl, the
 /// despawn list) lives in `scene_routes`; the type itself is here in the
 /// no_std core so [`ActionNode::is_scene`] can detect scene routes.

@@ -4,13 +4,13 @@ mod cors;
 pub use cors::*;
 mod no_cache;
 pub use no_cache::*;
-mod route_exchange;
-pub use route_exchange::*;
+mod exchange_overload;
+pub use exchange_overload::*;
 mod exchange_fallback;
 pub use exchange_fallback::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
-// the typed `TransformExchangeScript` route marker, the `ScriptRoute` front-end,
+// the typed `ExchangeOverloadScript` route marker, the `ScriptRoute` front-end,
 // and the `ExchangeScriptElement` console-capturing `<script>` entry action.
 #[cfg(feature = "scripting")]
 mod exchange_script;

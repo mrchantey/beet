@@ -142,8 +142,8 @@ impl PageRoot {
 	}
 }
 
-impl ExchangeRouteOut<Self> for PageRequest {
-	fn into_route_response(
+impl IntoResponseAsync<Self> for PageRequest {
+	fn into_response_async(
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,

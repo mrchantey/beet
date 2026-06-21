@@ -12,13 +12,13 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint server: observes the boot [`ActionIn<Boot>`], routes the inner
+/// The entrypoint server: observes the boot [`StartRunning<Boot>`], routes the inner
 /// request through the host's dispatch slot, then either resolves the boot call or
 /// streams the response and exits itself, whichever the boot path needs.
 ///
-/// Two boot paths land here. The full [`boot`] fires `ActionIn<Boot>` behind a
+/// Two boot paths land here. The full [`boot`] fires `StartRunning<Boot>` behind a
 /// `Running<Response>` keep-alive, so `CliServer` resolves it with an [`EndRun`]
-/// and `boot` streams the response. A direct `trigger(ActionIn::boot)` has no
+/// and `boot` streams the response. A direct `trigger(StartRunning::boot)` has no
 /// `Running`, so `CliServer` streams the response and writes the [`AppExit`] itself.
 ///
 /// This is how every beet binary boots by default: spread it on the entry root,
@@ -41,7 +41,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 /// On the boot fan-out, if `--server` selects `cli`, route the request and resolve
 /// the boot call. The selection check reads the boot (without consuming it); the
 /// take is deferred into the task, so a co-observer's read never races it.
-fn on_action_in(ev: On<ActionIn<Boot>>, mut commands: Commands) -> Result {
+fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 	if !ev.with(|boot| request_selects_server(boot, "cli"))? {
 		return Ok(());
 	}
@@ -67,18 +67,25 @@ fn default_accept() -> Vec<MediaType> {
 /// streams and exits), otherwise stream and exit here ourselves.
 async fn route_and_end(
 	host: AsyncEntity,
-	action_in: ActionIn<Boot>,
+	action_in: StartRunning<Boot>,
 ) -> Result {
 	let request = action_in.take()?.0;
+	// `--accept` may arrive as several params (CliArgs splits comma lists), so
+	// gather every value's media types.
 	let accept = request
-		.get_param("accept")
-		.map(MediaType::from_accepts)
+		.get_params("accept")
+		.map(|values| {
+			values
+				.iter()
+				.flat_map(|value| MediaType::from_accepts(value))
+				.collect::<Vec<_>>()
+		})
 		.unwrap_or_else(default_accept);
 	let response = host
 		.exchange(request.with_header::<header::Accept>(accept))
 		.await;
 	// the full boot path parks on a Running; resolve it so `boot` streams.
-	// a direct `trigger(ActionIn::boot)` has none, so stream and exit ourselves.
+	// a direct `trigger(StartRunning::boot)` has none, so stream and exit ourselves.
 	if host
 		.with(|entity| entity.contains::<Running<Response>>())
 		.await?

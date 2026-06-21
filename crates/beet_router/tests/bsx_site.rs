@@ -147,7 +147,7 @@ async fn blob_store_route_serves_assets() {
 /// `<Router {(HttpServer{port:0})}>`: the http server is declarable from markup,
 /// landing on the router via the reflect spread path (port 0 keeps any started
 /// backend on an OS-assigned port). The reflect insert registers the server's
-/// boot (`ActionIn<Request>`) observer through its `on_add`, so the boot fan-out
+/// boot (`StartRunning<Request>`) observer through its `on_add`, so the boot fan-out
 /// boots it via the installed runtime hook.
 // Only without a real HTTP backend: the test installs a stand-in runtime hook to
 // prove the wiring without a live server, but with the `http`/`client_io` backend

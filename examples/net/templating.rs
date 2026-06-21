@@ -34,7 +34,7 @@ fn main() {
 					Count::default(),
 					Action::<Request, Response>::new_system(router),
 				))
-				.trigger(ActionIn::<Boot>::boot);
+				.trigger(StartRunning::boot);
 		})
 		.run();
 }

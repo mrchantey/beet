@@ -38,7 +38,7 @@ fn main() {
 					Count::default(),
 					Handler.into_action(),
 				))
-				.trigger(ActionIn::<Boot>::boot);
+				.trigger(StartRunning::boot);
 		})
 		.run();
 }

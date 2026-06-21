@@ -18,7 +18,7 @@
 //!
 //! - [`ExchangeExt`] / [`AsyncExchangeExt`]: Convenience traits for calling
 //!   `Action<Request, Response>` on entities
-//! - [`ExchangeEnd`]: Event triggered when an exchange completes
+//! - [`EndExchange`]: Event triggered when an exchange completes
 //! - [`exchange_handler`]: Creates a sync `Action<Request, Response>` from a closure
 //! - [`exchange_handler_async`]: Creates an async `Action<Request, Response>` from a closure
 //! - [`mirror_exchange`]: Echoes requests back as responses

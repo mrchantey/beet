@@ -34,7 +34,7 @@ pub struct TuiServer;
 #[derive(Component)]
 struct TuiHost(Entity);
 
-/// Registers the boot ([`ActionIn<Boot>`]) and teardown
+/// Registers the boot ([`StartRunning<Boot>`]) and teardown
 /// (`On<Remove, Running<Response>>`) observers on the router.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
@@ -48,7 +48,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 /// Records the opening route on the router (the shared mechanism the SSH server
 /// also reads) and never resolves the boot call, so its `Running` parks the
 /// process up.
-fn on_action_in(ev: On<ActionIn<Boot>>, mut commands: Commands) -> Result {
+fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 	let (selected, opening, scheme) = ev.with(|boot| {
 		(
 			request_selects_server(boot, "tui"),

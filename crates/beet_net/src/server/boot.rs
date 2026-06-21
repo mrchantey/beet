@@ -1,17 +1,17 @@
-//! Turning the process request into a run: the load verbs that call an entry's
-//! action and write the [`AppExit`].
+//! Turning the process request into a run: the [`Boot`] newtype, the load verbs
+//! that call an entry's action, and the [`AppExit`] writers.
 //!
 //! [`BootOnLoad`], spread on a server entry root, observes its `LoadTemplate`
-//! and calls the entry's `Action<Boot, Response>` boot slot with `Boot(request)`.
-//! That slot (a server-provided `ContinueRun<Boot, Response>`) parks on a
-//! [`Running<Response>`] keep-alive and fires an `ActionIn<Boot>` the servers
-//! observe. A one-shot [`CliServer`] resolves the call (its response streams to
-//! stdout and the process exits); a long-running [`HttpServer`] parks the call,
+//! and calls the entry's `Action<Boot, Response>` boot slot with `Boot(request)`
+//! (via [`Boot::boot`]). That slot (a server-provided `ContinueRun<Boot, Response>`)
+//! parks on a [`Running<Response>`] keep-alive and fires a `StartRunning<Boot>` the
+//! servers observe. A one-shot [`CliServer`] resolves the call (its response streams
+//! to stdout and the process exits); a long-running [`HttpServer`] parks the call,
 //! holding the process up until its `Running` is removed.
 //!
 //! [`ExchangeOnLoad`] is the plain counterpart for entries with no boot
-//! machinery (eg an `ExchangeScriptElement`): it calls the entry's
-//! `Action<Request, Response>` slot directly and streams the one-shot response.
+//! machinery (eg an `ExchangeScriptElement`): via [`Boot::exchange_boot`] it calls
+//! the entry's `Action<Request, Response>` slot directly and streams the response.
 //!
 //! This is the one path that reads `CliArgs::parse_env()` and writes `AppExit`;
 //! the servers are handed the request, never re-parse argv.
@@ -19,8 +19,50 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
+/// A [`Request`] wrapped as a *boot* exchange, kept distinct from a dispatch
+/// exchange so the two action slots on a host never collide.
+///
+/// A server host holds an `Action<Boot, Response>` (the boot slot, a
+/// `ContinueRun`) alongside an `Action<Request, Response>` (dispatch). Booting
+/// calls the former with `Boot(request)`; dispatching calls the latter with the
+/// [`Request`]. Because `Boot` and [`Request`] are different types the two slots
+/// coexist with no holder newtype.
+///
+/// Needs no `Clone`: `StartRunning` clones via an `Arc` with no `In: Clone` bound,
+/// and [`Request`] is itself not `Clone`.
+#[derive(Debug, Deref, DerefMut)]
+pub struct Boot(pub Request);
+
+impl From<Request> for Boot {
+	fn from(request: Request) -> Self { Self(request) }
+}
+
+impl Boot {
+	/// Call the host's boot slot (`Action<Boot, Response>`) with `Boot(request)`
+	/// and, for the one-shot it resolves, stream the response and write the
+	/// [`AppExit`].
+	///
+	/// A long-running server's boot slot never resolves the call, so the await
+	/// parks here and the process stays up; a one-shot [`CliServer`] resolves it,
+	/// streams, and exits. Used by [`BootOnLoad`].
+	pub async fn boot(host: AsyncEntity, request: Request) -> Result {
+		let response = host.call::<Boot, Response>(Boot(request)).await?;
+		// reached only for the one-shot; a long-running server parks the await.
+		stream_and_exit(&host, response).await
+	}
+
+	/// Call the host's `Action<Request, Response>` slot directly and stream the
+	/// one-shot response. The plain counterpart to [`Boot::boot`] for entries with
+	/// no server/boot machinery, eg an `ExchangeScriptElement`. Used by
+	/// [`ExchangeOnLoad`].
+	pub async fn exchange_boot(host: AsyncEntity, request: Request) -> Result {
+		let response = host.call::<Request, Response>(request).await?;
+		stream_and_exit(&host, response).await
+	}
+}
+
 /// Load verb for a server entry: on its `LoadTemplate`, calls the entity's
-/// `Action<Boot, Response>` boot slot with the process request.
+/// `Action<Boot, Response>` boot slot with the process request (via [`Boot::boot`]).
 ///
 /// Spread on the entry root alongside the servers that fill the boot slot:
 ///
@@ -39,7 +81,8 @@ pub struct BootOnLoad;
 
 /// Load verb for a plain `Request -> Response` entry with no boot machinery (eg
 /// an `ExchangeScriptElement`): on its `LoadTemplate`, calls the entity's own
-/// `Action<Request, Response>` slot directly and streams the one-shot response.
+/// `Action<Request, Response>` slot directly (via [`Boot::exchange_boot`]) and
+/// streams the one-shot response.
 ///
 /// Identical to [`BootOnLoad`] except for the slot it calls; kept as a separate
 /// type so the two load verbs read side by side.
@@ -64,7 +107,7 @@ fn on_add_exchange(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(on_load_exchange);
 }
 
-/// On the entry root's `LoadTemplate`, queue [`boot`] with the process request.
+/// On the entry root's `LoadTemplate`, queue [`Boot::boot`] with the process request.
 fn on_load_boot(
 	ev: On<LoadTemplate>,
 	ancestors: Query<&ChildOf>,
@@ -77,12 +120,12 @@ fn on_load_boot(
 		return;
 	}
 	commands.entity(target).queue_async_local(|host| {
-		boot(host, Request::from_cli_args(CliArgs::parse_env()))
+		Boot::boot(host, Request::from_cli_args(CliArgs::parse_env()))
 	});
 }
 
-/// On the entry root's `LoadTemplate`, queue [`exchange_load`] with the process
-/// request.
+/// On the entry root's `LoadTemplate`, queue [`Boot::exchange_boot`] with the
+/// process request.
 fn on_load_exchange(
 	ev: On<LoadTemplate>,
 	ancestors: Query<&ChildOf>,
@@ -95,7 +138,7 @@ fn on_load_exchange(
 		return;
 	}
 	commands.entity(target).queue_async_local(|host| {
-		exchange_load(host, Request::from_cli_args(CliArgs::parse_env()))
+		Boot::exchange_boot(host, Request::from_cli_args(CliArgs::parse_env()))
 	});
 }
 
@@ -123,49 +166,28 @@ fn should_load(
 
 /// The process request as an exchange event: fire it on an entity to dispatch
 /// its `Action<Request, Response>` slot.
-#[extend::ext(name = ActionInRequestExt)]
-pub impl ActionIn<Request> {
+#[extend::ext(name = StartRunningRequestExt)]
+pub impl StartRunning<Request> {
 	/// The process request as an exchange event.
-	fn exchange(entity: Entity) -> Self {
+	fn exchange_boot(entity: Entity) -> Self {
 		Self::new(entity, Request::from_cli_args(CliArgs::parse_env()))
 	}
 }
 
 /// The process request as a boot event: fire it on a host to boot its servers.
-#[extend::ext(name = ActionInBootExt)]
-pub impl ActionIn<Boot> {
+#[extend::ext(name = StartRunningBootExt)]
+pub impl StartRunning<Boot> {
 	/// The process request as a boot event.
 	fn boot(entity: Entity) -> Self {
 		Self::new(entity, Request::from_cli_args(CliArgs::parse_env()).into())
 	}
 }
 
-/// Call the host's boot slot (`Action<Boot, Response>`) with `Boot(request)`
-/// and, for the one-shot it resolves, stream the response and write the
-/// [`AppExit`].
-///
-/// A long-running server's boot slot never resolves the call, so the await parks
-/// here and the process stays up; a one-shot [`CliServer`] resolves it, streams,
-/// and exits.
-pub async fn boot(host: AsyncEntity, request: Request) -> Result {
-	let response = host.call::<Boot, Response>(Boot(request)).await?;
-	// reached only for the one-shot; a long-running server parks the await above.
-	stream_and_exit(&host, response).await
-}
-
-/// Call the host's `Action<Request, Response>` slot directly and stream the
-/// one-shot response. The plain counterpart to [`boot`] for entries with no
-/// server/boot machinery, eg an `ExchangeScriptElement`.
-pub async fn exchange_load(host: AsyncEntity, request: Request) -> Result {
-	let response = host.call::<Request, Response>(request).await?;
-	stream_and_exit(&host, response).await
-}
-
 /// Stream a one-shot's [`Response`] to stdout and write the matching [`AppExit`].
 ///
-/// The shared tail of both boot paths: [`boot`] after its awaited call resolves,
-/// and [`CliServer`] when it boots via a direct `ActionIn` with no `Running` to
-/// resolve.
+/// The shared tail of both boot paths: [`Boot::boot`] after its awaited call
+/// resolves, and [`CliServer`] when it boots via a direct `StartRunning` with no
+/// `Running` to resolve.
 pub(crate) async fn stream_and_exit(
 	host: &AsyncEntity,
 	response: Response,
@@ -183,12 +205,14 @@ pub(crate) async fn stream_and_exit(
 }
 
 /// Whether a server named `name` should boot for `request`, read from its
-/// `--server` param (comma-separated globs). An absent/empty value matches every
-/// present server; otherwise the name must pass the [`GlobFilter`].
+/// `--server` params. Reads every `server` value (repeated flags) and splits each
+/// on commas (a glob list, eg `--server=cli,http`). An absent/empty value matches
+/// every present server; otherwise the name must pass the [`GlobFilter`].
 pub fn request_selects_server(request: &Request, name: &str) -> bool {
 	request
-		.get_param("server")
+		.get_params("server")
 		.into_iter()
+		.flatten()
 		.flat_map(|value| value.split(','))
 		.map(str::trim)
 		.filter(|name| !name.is_empty())
@@ -210,10 +234,21 @@ pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 mod test {
 	use super::*;
 
+	#[beet_core::test]
+	fn boot_derefs_to_request() {
+		let boot = Boot::from(Request::get("api/users"));
+		// Deref reaches the inner Request (and its RequestParts methods)
+		(*boot.method()).xpect_eq(HttpMethod::Get);
+		boot.path_string().xpect_eq("/api/users");
+		// and the inner Request is recoverable by value
+		boot.0.path_string().xpect_eq("/api/users");
+	}
+
 	/// End to end through the boot slot: `BootOnLoad` calls the host's
-	/// `Action<Boot, Response>` slot (provided by `CliServer`), which fans out an
-	/// `ActionIn<Boot>`; `CliServer` routes it through the host's dispatch slot and
-	/// resolves the parked boot call, and `boot` exits with the status's code.
+	/// `Action<Boot, Response>` slot (provided by `CliServer`), which fans out a
+	/// `StartRunning<Boot>`; `CliServer` routes it through the host's dispatch slot
+	/// and resolves the parked boot call, and `Boot::boot` exits with the status's
+	/// code.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn one_shot_resolves_and_exits() {
@@ -236,9 +271,9 @@ mod test {
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
 
-	/// The lightweight boot: `trigger(ActionIn::boot)` fires an `ActionIn<Boot>`
-	/// straight at `CliServer` with no `Running` keep-alive, so the server streams
-	/// the response and writes the `AppExit` itself.
+	/// The lightweight boot: `trigger(StartRunning::boot)` fires a
+	/// `StartRunning<Boot>` straight at `CliServer` with no `Running` keep-alive, so
+	/// the server streams the response and writes the `AppExit` itself.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn boot_event_resolves_and_exits() {
@@ -251,7 +286,7 @@ mod test {
 						exchange_handler(|_| Response::ok().with_body("hi")),
 						CliServer,
 					))
-					.trigger(ActionIn::<Boot>::boot);
+					.trigger(StartRunning::boot);
 			},
 		);
 		app.run_async().await.xpect_eq(AppExit::Success);

@@ -33,7 +33,7 @@ use bevy::math::UVec2;
 #[component(on_add = on_add)]
 pub struct SshTuiServer;
 
-/// Registers the boot ([`ActionIn<Boot>`]) observer on the router, so the SSH
+/// Registers the boot ([`StartRunning<Boot>`]) observer on the router, so the SSH
 /// listener boots when the boot fan-out selects `"ssh"`.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(on_action_in);
@@ -43,7 +43,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 /// builds an [`SshServer`] from the request and inserts it on the router (its
 /// `on_add` starts the listener), and records the opening route. Never resolves
 /// the boot call, so its `Running` parks the process up.
-fn on_action_in(ev: On<ActionIn<Boot>>, mut commands: Commands) -> Result {
+fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 	let (selected, port, host, opening) = ev.with(|boot| {
 		(
 			request_selects_server(boot, "ssh"),
