@@ -21,6 +21,19 @@ use beet_net::prelude::*;
 /// Default Workers compatibility date stamped into generated `wrangler.jsonc`.
 const COMPATIBILITY_DATE: &str = "2025-06-01";
 
+/// The container Durable Object class name. Cloudflare derives the deployed
+/// container application name as `<worker-name>-<lowercased class name>`
+/// (eg `beet-hello-container-beetcontainer`) and names the managed-registry image
+/// repository the same, which the teardown matches on to delete both.
+const CONTAINER_CLASS: &str = "BeetContainer";
+
+/// The container application + image repository name Cloudflare derives for a
+/// given worker name (`<worker>-<lowercased class>`). Both the container app and
+/// its registry image use this, so teardown lists by name and deletes both.
+fn container_app_name(worker_name: &str) -> String {
+	format!("{worker_name}-{}", CONTAINER_CLASS.to_lowercase())
+}
+
 // ───────────────────────────── shared wrangler helpers ─────────────────────
 
 /// Create an R2 bucket, treating an "already exists" failure as success so
@@ -210,7 +223,7 @@ fn write_container_worker_js(
 	let js = format!(
 		"import {{ Container, getContainer }} from \"@cloudflare/containers\";\n\
 		 \n\
-		 export class BeetContainer extends Container {{\n\
+		 export class {CONTAINER_CLASS} extends Container {{\n\
 		 \x20 defaultPort = {port};\n\
 		 \x20 sleepAfter = \"{sleep_after}\";\n\
 		 \x20 envVars = {{\n{env_lines}  }};\n\
@@ -265,16 +278,16 @@ fn write_container_wrangler(
 		"main": "worker.js",
 		"compatibility_date": COMPATIBILITY_DATE,
 		"containers": [{
-			"class_name": "BeetContainer",
+			"class_name": CONTAINER_CLASS,
 			"image": "./Dockerfile",
 			"max_instances": block.max_instances(),
 			// the smallest instance; wrangler 4.103 renamed the former "dev" to "lite".
 			"instance_type": "lite",
 		}],
 		"durable_objects": {
-			"bindings": [{ "name": "BEET_CONTAINER", "class_name": "BeetContainer" }],
+			"bindings": [{ "name": "BEET_CONTAINER", "class_name": CONTAINER_CLASS }],
 		},
-		"migrations": [{ "tag": "v1", "new_sqlite_classes": ["BeetContainer"] }],
+		"migrations": [{ "tag": "v1", "new_sqlite_classes": [CONTAINER_CLASS] }],
 	}))?;
 	fs_ext::write(dir.join("wrangler.jsonc"), json)?;
 	Ok(())
@@ -526,6 +539,11 @@ pub async fn CloudflareDestroyAction(
 		.run_async()
 		.await
 		.ok();
+	// deleting the worker leaves the container application and its pushed
+	// managed-registry image behind (they are not cascade-deleted), so remove both
+	// explicitly or they keep billing.
+	delete_container_app(destroy.name()).await;
+	delete_container_images(destroy.name()).await;
 	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty
 	// bucket, so delete the objects that were synced from `local_dir` (the same
 	// keys `CloudflareR2Sync` uploaded). Missing objects are ignored.
@@ -539,6 +557,72 @@ pub async fn CloudflareDestroyAction(
 		.await
 		.ok();
 	Pass(cx.input).xok()
+}
+
+/// Delete the container application Cloudflare created for `worker_name`. Lists
+/// the apps as json, finds the one named `<worker>-<class>` (the only stable
+/// handle, since `wrangler containers delete` takes the generated id, not the
+/// name), and deletes it by id. A worker with no container is a no-op.
+async fn delete_container_app(worker_name: &str) {
+	let app_name = container_app_name(worker_name);
+	let Ok(json) = ChildProcess::new("wrangler")
+		.with_args(["containers", "list", "--json"])
+		.run_async_stdout()
+		.await
+	else {
+		return;
+	};
+	// `[{ id, name, ... }]`; match our app by name and delete by id.
+	let id = serde_json::from_str::<serde_json::Value>(&json)
+		.ok()
+		.as_ref()
+		.and_then(|apps| apps.as_array())
+		.and_then(|apps| {
+			apps.iter().find(|app| app["name"] == app_name.as_str())
+		})
+		.and_then(|app| app["id"].as_str().map(str::to_string));
+	if let Some(id) = id {
+		info!("deleting container app `{app_name}` ({id})");
+		ChildProcess::new("wrangler")
+			.with_args(["containers", "delete", &id])
+			.run_async()
+			.await
+			.ok();
+	}
+}
+
+/// Delete every managed-registry image pushed for `worker_name`. Lists the repos
+/// as json (`[{ name, tags }]`), then deletes each `<repo>:<tag>` whose repo is
+/// the container app's. An empty registry is a no-op.
+async fn delete_container_images(worker_name: &str) {
+	let repo = container_app_name(worker_name);
+	let Ok(json) = ChildProcess::new("wrangler")
+		.with_args(["containers", "images", "list", "--json"])
+		.run_async_stdout()
+		.await
+	else {
+		return;
+	};
+	let Ok(repos) = serde_json::from_str::<serde_json::Value>(&json) else {
+		return;
+	};
+	let tags = repos
+		.as_array()
+		.into_iter()
+		.flatten()
+		.filter(|entry| entry["name"] == repo.as_str())
+		.filter_map(|entry| entry["tags"].as_array())
+		.flatten()
+		.filter_map(|tag| tag.as_str());
+	for tag in tags {
+		let image = format!("{repo}:{tag}");
+		info!("deleting container image `{image}`");
+		ChildProcess::new("wrangler")
+			.with_args(["containers", "images", "delete", &image])
+			.run_async()
+			.await
+			.ok();
+	}
 }
 
 /// Delete every object in `bucket` whose key matches a file under `local_dir`,
