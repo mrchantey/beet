@@ -36,12 +36,14 @@ fn reduce(source: &str) -> App {
 	let mut app = App::new();
 	app.add_plugins(MinimalPlugins)
 		.init_plugin::<ThreadPlugin>()
+		// registers `{UserInput}` so the interactive chat scenes resolve
+		.init_plugin::<ThreadUiPlugin>()
 		.register_type::<AgentChoiceAction>();
 	BsxTemplate::parse_entry(app.world(), source)
 		.unwrap()
 		.spawn(app.world_mut())
 		.unwrap();
-	reduce_threads_now(app.world_mut());
+	ThreadWindow::reduce_now(app.world_mut());
 	app.world_mut().flush();
 	app
 }
@@ -52,6 +54,15 @@ fn window_counts(app: &mut App) -> (usize, usize) {
 	let thread = threads.iter(app.world()).next().unwrap();
 	let window = app.world().get::<ThreadWindow>(thread).unwrap();
 	(window.actors().len(), window.posts().len())
+}
+
+/// The kinds of every actor in the reduced window, so a scene's `kind="..."`
+/// attributes are verified to resolve (not silently default to `Agent`).
+fn actor_kinds(app: &mut App) -> Vec<ActorKind> {
+	let mut threads = app.world_mut().query_filtered::<Entity, With<Thread>>();
+	let thread = threads.iter(app.world()).next().unwrap();
+	let window = app.world().get::<ThreadWindow>(thread).unwrap();
+	window.actors().values().map(|actor| actor.kind()).collect()
 }
 
 /// Count of reduced agents: an `ActorRef` carrying a model streamer.
@@ -73,6 +84,11 @@ fn chat_scene_reduces() {
 	let mut app = reduce(include_str!("../examples/thread/chat.bsx"));
 	window_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
+	// the `kind="System"` / `kind="User"` attributes resolve, rather than
+	// silently defaulting to `Agent`
+	let kinds = actor_kinds(&mut app);
+	kinds.contains(&ActorKind::User).xpect_true();
+	kinds.contains(&ActorKind::System).xpect_true();
 }
 
 #[beet::test]
@@ -115,4 +131,7 @@ fn persistent_chat_scene_reduces() {
 		reduce(include_str!("../examples/thread/persistent_chat.bsx"));
 	window_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
+	let kinds = actor_kinds(&mut app);
+	kinds.contains(&ActorKind::User).xpect_true();
+	kinds.contains(&ActorKind::System).xpect_true();
 }

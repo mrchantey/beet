@@ -1,7 +1,9 @@
-<div {Thread}>
-	<ActorDef name="System" kind="System">
-		<CreatePost text="you are robot, make beep boop noises"/>
-	</ActorDef>
-	<ActorDef name="BeepBot" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
-	<ActorDef name="Billy" kind="User"/>
+<div {Repeat} {RunThread}>
+	<div {Thread} {Sequence}>
+		<CreateActor name="System" kind="System">
+			<CreatePost text="you are robot, make beep boop noises"/>
+		</CreateActor>
+		<CreateActor name="BeepBot" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
+		<CreateActor name="Billy" kind="User" {UserInput}/>
+	</div>
 </div>

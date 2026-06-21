@@ -33,17 +33,88 @@ impl Plugin for ThreadUiPlugin {
 		app.register_type::<ThreadView>()
 			.register_type::<ThreadScroll>()
 			.register_type::<ThreadComposer>()
-			// project first, then follow the resulting document change to the bottom
+			.register_type::<UserInput>()
+			// project each window into its views' documents, then pin to the bottom
 			.add_systems(
 				Update,
-				(
-					reply_to_user_posts,
-					(project_window_to_document, follow_thread_scroll).chain(),
-				),
+				(project_window_to_document, follow_thread_scroll).chain(),
 			)
-			// a composer submit appends a user post to its thread's window
-			.add_observer(submit_composer);
+			// scope + focus a charcell chat composer (the router's page-host does
+			// this for web; a directly-spawned terminal host needs it here)
+			.add_observer(focus_chat_composer)
+			// empty the composer's field once its message is submitted
+			.add_observer(clear_composer_on_submit);
 	}
+}
+
+/// Clear a [`ThreadComposer`]'s text field after it submits, so the next turn
+/// starts from an empty input (the submitted value is already gathered into the
+/// [`Submit`], so clearing here never drops it).
+fn clear_composer_on_submit(
+	ev: On<Submit>,
+	parents: Query<&ChildOf>,
+	composers: Query<(), With<ThreadComposer>>,
+	children: Query<&Children>,
+	elements: Query<&Element>,
+	mut values: Query<&mut Value>,
+) {
+	// only forms belonging to a ThreadComposer
+	if !parents
+		.iter_ancestors_inclusive(ev.form)
+		.any(|ancestor| composers.contains(ancestor))
+	{
+		return;
+	}
+	std::iter::once(ev.form)
+		.chain(children.iter_descendants(ev.form))
+		.filter(|entity| {
+			elements
+				.get(*entity)
+				.map(|element| matches!(element.tag(), "input" | "textarea"))
+				.unwrap_or(false)
+		})
+		.for_each(|input| {
+			if let Ok(mut value) = values.get_mut(input) {
+				*value = Value::str("");
+			}
+		});
+}
+
+/// When a [`ThreadComposer`]'s text input is added under a charcell host, scope
+/// the composer to that host surface and focus the input, so typing and Enter
+/// reach it. `thread_chat_tui` spawns the host directly, skipping the router's
+/// page-host wiring (`RenderSurface` + focus) that would otherwise do this; the
+/// web path keeps its own wiring (no [`DoubleBuffer`] host, so this is a no-op).
+fn focus_chat_composer(
+	ev: On<Add, Element>,
+	elements: Query<&Element>,
+	parents: Query<&ChildOf>,
+	composers: Query<(), With<ThreadComposer>>,
+	hosts: Query<(), With<DoubleBuffer>>,
+	mut commands: Commands,
+) {
+	// only the composer's text input
+	let Ok(element) = elements.get(ev.entity) else {
+		return;
+	};
+	if !matches!(element.tag(), "input" | "textarea") {
+		return;
+	}
+	let Some(composer) = parents
+		.iter_ancestors_inclusive(ev.entity)
+		.find(|ancestor| composers.contains(*ancestor))
+	else {
+		return;
+	};
+	// charcell only: the terminal host (the window keyboard events carry)
+	let Some(host) = parents
+		.iter_ancestors_inclusive(composer)
+		.find(|ancestor| hosts.contains(*ancestor))
+	else {
+		return;
+	};
+	commands.entity(composer).insert(RenderSurface(host));
+	commands.entity(ev.entity).insert(Focus);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -66,8 +137,9 @@ pub fn thread_tui(thread: Entity) -> impl Bundle {
 }
 
 /// A full-screen charcell chat around `thread`: the scrolling transcript above a
-/// [`ThreadComposer`] input. Submitting the composer appends a user post, which
-/// [`reply_to_user_posts`] answers, so the loop needs no blocking stdin.
+/// [`ThreadComposer`] input. Submitting the composer ends the user's turn (the
+/// [`UserInput`] action consumes the [`Submit`]), so the thread's `Sequence`
+/// advances and the agent answers, no blocking stdin.
 pub fn thread_chat_tui(thread: Entity) -> impl Bundle {
 	(
 		StdioTerminal::default(),
@@ -78,48 +150,173 @@ pub fn thread_chat_tui(thread: Entity) -> impl Bundle {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Event-driven turns: an agent answers a user post
+// ThreadScenePlugin: load a `.bsx` author scene and mount its UI
 // ═══════════════════════════════════════════════════════════════════════
 
-/// When a thread's window gains a user-authored latest post, run each of its
-/// agents' turns once. This drives interactive chat without a blocking input
-/// action: the [`ThreadComposer`] (or a loaded history) appends the user post,
-/// and the agent answers reactively.
+/// Load a `.bsx` author scene on startup and auto-mount a charcell host over each
+/// thread it reduces, so an example `main` is just plugins plus this.
 ///
-/// It is self-gating against re-entry: once an agent starts replying the latest
-/// post is the agent's, so a streaming turn never re-triggers itself; auto and
-/// finite threads (no `User` actor) never fire it.
-pub fn reply_to_user_posts(
-	async_commands: AsyncCommands,
-	windows: Query<(Entity, &ThreadWindow), Changed<ThreadWindow>>,
-	children: Query<&Children>,
-	agents: Query<(Entity, &ActorRef), With<Action<(), Outcome>>>,
+/// The scene declares its own kick (`{RunThread}`) and store, so no setup-system
+/// glue remains: a thread with a `User` actor gets the interactive
+/// [`thread_chat_tui`], the rest get the inline [`thread_tui`] transcript.
+pub struct ThreadScenePlugin {
+	scene: &'static str,
+}
+
+impl ThreadScenePlugin {
+	/// Run `scene`, the contents of a `.bsx` file (eg `include_str!`).
+	pub fn new(scene: &'static str) -> Self { Self { scene } }
+}
+
+impl Plugin for ThreadScenePlugin {
+	fn build(&self, app: &mut App) {
+		app.insert_resource(ThreadScene(self.scene))
+			.add_systems(Startup, spawn_thread_scene)
+			.add_systems(Update, mount_thread_ui);
+	}
+}
+
+#[derive(Resource)]
+struct ThreadScene(&'static str);
+
+/// Spawn the author scene; reduction (`First`) turns it into a window + behavior.
+fn spawn_thread_scene(world: &mut World) -> Result {
+	let scene = world.resource::<ThreadScene>().0;
+	BsxTemplate::parse_entry(world, scene)?.spawn(world)?;
+	Ok(())
+}
+
+/// Mount a charcell host over each freshly-reduced thread: a chat (with composer)
+/// when it has a `User` actor, an inline transcript otherwise.
+fn mount_thread_ui(
+	mut commands: Commands,
+	threads: Query<(Entity, &ThreadWindow), Added<ThreadWindow>>,
 ) {
-	for (thread, window) in windows.iter() {
-		// only answer when the user just spoke
-		let user_spoke = window
-			.last_post()
-			.and_then(|post| window.actor(post.author()).ok())
-			.map(|actor| actor.kind() == ActorKind::User)
-			.unwrap_or(false);
-		if !user_spoke {
-			continue;
+	for (thread, window) in threads.iter() {
+		let has_user = window
+			.actors()
+			.values()
+			.any(|actor| actor.kind() == ActorKind::User);
+		match has_user {
+			true => commands.spawn(thread_chat_tui(thread)),
+			false => commands.spawn(thread_tui(thread)),
+		};
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// UserInput: the user's turn is a Sequence action
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Marks a `User` actor whose turn is to take input from a [`ThreadComposer`].
+///
+/// Spread it onto a user actor (`<CreateActor name=".." kind="User" {UserInput}/>`);
+/// its `on_add` installs the [`user_input_action`]. When the thread's `Sequence`
+/// reaches this actor, the action waits for the composer's [`Submit`] (the user
+/// pressing Enter ends their turn), appends the typed post, and passes, so the
+/// Sequence moves on like any other. A submit outside a user turn installs no
+/// observer and is ignored.
+#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
+#[reflect(Component, Default)]
+#[component(on_add = user_input_on_add)]
+pub struct UserInput;
+
+fn user_input_on_add(mut world: DeferredWorld, cx: HookContext) {
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(Action::<(), Outcome>::new_async(user_input_action));
+}
+
+/// The user's turn: await the thread's composer [`Submit`], append the typed post
+/// authored by this actor, and [`Pass`] so the `Sequence` advances.
+pub async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
+	// resolve which thread + actor this user turn belongs to
+	let (thread_entity, actor_id, thread_id) = cx
+		.caller
+		.with_state::<ThreadWindowQuery, _>(
+			|entity, window_mut| -> Result<(Entity, ActorId, ThreadId)> {
+				Ok((
+					window_mut.thread_entity(entity)?,
+					window_mut.actor_id(entity)?,
+					window_mut.thread_id(entity)?,
+				))
+			},
+		)
+		.await??;
+
+	// the composer bound to this thread is the input surface; await its <form>.
+	// It may not be mounted yet, so yield a tick and retry until it is.
+	let form = loop {
+		if let Some(form) = cx
+			.caller
+			.with_state::<ComposerForms, _>(move |_entity, forms| {
+				forms.form_for_thread(thread_entity)
+			})
+			.await?
+		{
+			break form;
 		}
-		// run every agent actor under this thread, in document order
-		for (agent, _) in children
-			.iter_descendants(thread)
-			.filter_map(|entity| agents.get(entity).ok())
-			.filter(|(_, actor_ref)| {
-				window
-					.actor(actor_ref.0)
-					.map(|actor| actor.kind() == ActorKind::Agent)
-					.unwrap_or(false)
-			}) {
-			async_commands.run(async move |world: AsyncWorld| -> Result {
-				world.entity(agent).call::<(), Outcome>(()).await?;
-				Ok(())
-			});
+		cx.caller.with(|_| ()).await?;
+	};
+
+	// wait for the user to end their turn: a non-empty composer Submit
+	let text = loop {
+		let text = cx
+			.world()
+			.entity(form)
+			.await_event::<Submit, _, _, String>(|ev: On<Submit>| {
+				ev.values
+					.get("message")
+					.and_then(|message| message.as_str().ok())
+					.unwrap_or_default()
+					.to_string()
+			})
+			.await?;
+		if !text.trim().is_empty() {
+			break text;
 		}
+	};
+
+	// append the typed post and advance the Sequence
+	cx.caller
+		.with_state::<ThreadWindowQuery, _>(
+			move |entity, mut window_mut| -> Result {
+				window_mut.push_post(
+					entity,
+					AgentPost::new_text(
+						actor_id,
+						thread_id,
+						text,
+						PostStatus::Completed,
+					),
+				)
+			},
+		)
+		.await??;
+	Ok(Pass(()))
+}
+
+/// Resolves the `<form>` entity of the [`ThreadComposer`] bound to a thread, so
+/// [`user_input_action`] can await its [`Submit`].
+#[derive(SystemParam)]
+pub struct ComposerForms<'w, 's> {
+	composers: Query<'w, 's, (Entity, &'static ThreadComposer)>,
+	elements: ElementQuery<'w, 's>,
+}
+
+impl ComposerForms<'_, '_> {
+	/// The `<form>` entity of the composer bound to `thread`, if one is mounted.
+	fn form_for_thread(&self, thread: Entity) -> Option<Entity> {
+		let composer = self
+			.composers
+			.iter()
+			.find(|(_, composer)| composer.thread == thread)
+			.map(|(entity, _)| entity)?;
+		self.elements
+			.iter_descendants_inclusive(composer)
+			.find(|view| view.tag() == "form")
+			.map(|view| view.entity)
 	}
 }
 
@@ -224,7 +421,7 @@ impl ThreadComposer {
 	}
 
 	/// A `<form>` whose `message` field + submit button fire `beet_ui`'s
-	/// [`Submit`], handled by [`submit_composer`].
+	/// [`Submit`], consumed by the active [`UserInput`] turn.
 	fn content() -> impl Bundle {
 		rsx! {
 			<form>
@@ -233,51 +430,6 @@ impl ThreadComposer {
 			</form>
 		}
 	}
-}
-
-/// On a composer's [`Submit`], append the typed `message` as a user post in the
-/// thread's window, authored by the thread's first `User`-kind actor.
-fn submit_composer(
-	ev: On<Submit>,
-	parents: Query<&ChildOf>,
-	composers: Query<&ThreadComposer>,
-	threads: Query<&Thread>,
-	mut windows: Query<&mut ThreadWindow>,
-) -> Result {
-	// the submitted form belongs to the composer it descends from
-	let Some(composer) = parents
-		.iter_ancestors_inclusive(ev.form)
-		.find_map(|ancestor| composers.get(ancestor).ok())
-	else {
-		return Ok(());
-	};
-	let text = ev
-		.values
-		.get("message")
-		.and_then(|message| message.as_str().ok())
-		.unwrap_or_default()
-		.to_string();
-	if text.is_empty() {
-		return Ok(());
-	}
-
-	let thread_id = threads.get(composer.thread)?.id();
-	let mut window = windows.get_mut(composer.thread)?;
-	let Some(user) = window
-		.actors()
-		.values()
-		.find(|actor| actor.kind() == ActorKind::User)
-		.map(|actor| actor.id())
-	else {
-		return Ok(());
-	};
-	window.upsert_post(AgentPost::new_text(
-		user,
-		thread_id,
-		text,
-		PostStatus::Completed,
-	));
-	Ok(())
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -378,6 +530,7 @@ fn set_document(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_ui::prelude::style::LayoutStyle;
 	use beet_ui::prelude::*;
@@ -412,28 +565,31 @@ mod test {
 			.render_plain()
 	}
 
-	/// End to end: a user post drives the agent's reply through
-	/// [`reply_to_user_posts`], and both project into the view's document and
-	/// render as charcell text, streamed body included.
+	/// End to end: calling the thread runs the agent's turn (its `Sequence`
+	/// child), which projects into the view's document and renders as charcell
+	/// text, the agent's streamed echo included.
 	#[beet_core::test]
 	async fn renders_window_posts() {
 		let (mut app, host) = charcell_app();
 
-		// author an ephemeral thread; the user seed makes the agent next to speak
+		// author an ephemeral thread; the user seed gives the agent something to
+		// echo, the Sequence makes calling the thread run the agent's turn
 		let thread = app
 			.world_mut()
-			.spawn((Thread::default(), children![
+			.spawn((Thread::default(), Sequence::new(), children![
 				(Actor::user(), children![Post::spawn("hello")]),
 				(Actor::agent(), MockPostStreamer::default()),
 			]))
 			.id();
-		// reduce (First) then let the driver (Update) queue the agent turn
 		app.update();
 
-		// attach the reactive view of that thread under the charcell host
+		// attach the reactive view under the charcell host, then kick the thread
 		app.world_mut()
 			.entity_mut(host)
 			.insert(ThreadView::new(thread));
+		app.world_mut()
+			.entity_mut(thread)
+			.insert(CallOnSpawn::<(), Outcome>::new(()));
 
 		// pump: agent turn -> projection -> document sync -> rows -> charcell paint
 		for _ in 0..40 {
@@ -455,7 +611,7 @@ mod test {
 		let (mut app, host) = charcell_app();
 		let thread = app
 			.world_mut()
-			.spawn((Thread::default(), children![
+			.spawn((Thread::default(), Sequence::new(), children![
 				(Actor::user(), children![Post::spawn("hello")]),
 				(Actor::agent(), MockPostStreamer::default()),
 			]))
@@ -465,6 +621,9 @@ mod test {
 			LayoutStyle::flex_col(),
 			children![ThreadView::new(thread), ThreadComposer::new(thread)],
 		));
+		app.world_mut()
+			.entity_mut(thread)
+			.insert(CallOnSpawn::<(), Outcome>::new(()));
 		for _ in 0..40 {
 			app.update();
 		}
@@ -473,45 +632,110 @@ mod test {
 		frame.xpect_contains("Agent: you said: hello");
 	}
 
-	/// A composer submit appends a user post to the thread window, authored by
-	/// the thread's user actor: the agnostic replacement for blocking stdin. The
-	/// focus/typing/button path is `beet_ui`'s (tested there); here the `Submit`
-	/// is fired directly to verify the thread-side handler.
+	/// The user's turn is a Sequence action: calling the thread reaches the
+	/// `User` actor's [`UserInput`], which waits for the composer's [`Submit`],
+	/// appends the typed post, then passes so the agent replies to it. The
+	/// `Submit` is fired directly here (the focus/typing path is `beet_ui`'s); a
+	/// full keystroke run is the example's deterministic interaction test.
 	#[beet_core::test]
-	fn composer_submits_user_post() {
-		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.init_plugin::<ThreadPlugin>()
-			.init_plugin::<ThreadUiPlugin>();
+	async fn user_input_advances_on_submit() {
+		let (mut app, host) = charcell_app();
 
-		// a thread whose roster includes a user actor (reduced into the window)
+		// user turn first, then the agent: one Sequence call exercises both
 		let thread = app
 			.world_mut()
-			.spawn((Thread::default(), children![
-				(Actor::user(), children![Post::spawn("seed")]),
+			.spawn((Thread::default(), Sequence::new(), children![
+				(Actor::user(), UserInput),
 				(Actor::agent(), MockPostStreamer::default()),
 			]))
 			.id();
 		app.update();
 
-		// a composer for the thread, plus a stand-in form descendant to submit
-		let composer = app.world_mut().spawn(ThreadComposer { thread }).id();
-		let form = app.world_mut().spawn(ChildOf(composer)).id();
+		// mount the chat UI so the composer's <form> exists for the turn to await
+		app.world_mut().entity_mut(host).insert((
+			LayoutStyle::flex_col(),
+			children![ThreadView::new(thread), ThreadComposer::new(thread)],
+		));
+		app.world_mut()
+			.entity_mut(thread)
+			.insert(CallOnSpawn::<(), Outcome>::new(()));
+
+		// pump until the user turn has installed its Submit observer
+		for _ in 0..20 {
+			app.update();
+		}
+
+		// the user ends their turn by submitting "hello" on the composer's <form>
+		let form = app
+			.world_mut()
+			.with_state::<ElementQuery, _>(|elements| {
+				elements
+					.iter()
+					.find(|view| view.tag() == "form")
+					.map(|view| view.entity)
+			})
+			.unwrap();
 		let values = Value::Map(
-			[("message".into(), Value::new("hi there"))]
+			[("message".into(), Value::new("hello"))]
 				.into_iter()
 				.collect(),
 		);
 		app.world_mut().trigger(Submit { form, values });
-		app.world_mut().flush();
 
-		// the window gained a user-authored post with the typed text
-		app.world()
-			.get::<ThreadWindow>(thread)
+		// pump: user post appended -> Sequence advances -> agent replies -> paint
+		for _ in 0..40 {
+			app.update();
+		}
+
+		let frame = frame_plain(&app, host);
+		frame.as_str().xpect_contains("User: hello");
+		frame.xpect_contains("Agent: you said: hello");
+	}
+
+	/// The full deterministic interaction: real keystrokes through the input
+	/// bridge type into the focused composer and Enter submits, advancing the
+	/// user turn so the mock agent replies. The charcell host is wired by
+	/// [`focus_chat_composer`] exactly as `thread_chat_tui` wires the real one.
+	#[beet_core::test]
+	async fn keyboard_submit_drives_reply() {
+		let (mut app, host) = charcell_app();
+
+		// user turn first, then the agent, so one exchange yields a reply
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), Sequence::new(), children![
+				(Actor::user(), UserInput),
+				(Actor::agent(), MockPostStreamer::default()),
+			]))
+			.id();
+		app.update();
+
+		// mount the chat UI on the host (as `thread_chat_tui` does), then kick
+		app.world_mut().entity_mut(host).insert((
+			LayoutStyle::flex_col(),
+			children![ThreadView::new(thread), ThreadComposer::new(thread)],
+		));
+		app.world_mut()
+			.entity_mut(thread)
+			.insert(CallOnSpawn::<(), Outcome>::new(()));
+
+		// pump: composer builds + focuses, the user turn installs its observer
+		for _ in 0..25 {
+			app.update();
+		}
+
+		// type "hello" + Enter through the real terminal input bridge
+		app.world_mut()
+			.get_mut::<ChannelTerminal>(host)
 			.unwrap()
-			.post_views()
-			.filter(|view| view.actor.kind() == ActorKind::User)
-			.any(|view| view.post.to_string() == "hi there")
-			.xpect_true();
+			.send_input(b"hello\r")
+			.unwrap();
+		for _ in 0..40 {
+			app.update();
+		}
+
+		let frame = frame_plain(&app, host);
+		frame.as_str().xpect_contains("User: hello");
+		frame.xpect_contains("Agent: you said: hello");
 	}
 }

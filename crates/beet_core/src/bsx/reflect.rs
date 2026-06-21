@@ -147,6 +147,21 @@ fn scalar_to_reflect(
 		return Ok(Box::new(SmolPath::new(string.as_str())));
 	}
 
+	// a string targeting an enum field coerces to that unit variant by name, so a
+	// markup attribute `kind="User"` resolves to `ActorKind::User` (the quoted
+	// twin of the `{Foo{kind:User}}` spread's bare-variant form).
+	if let (Value::Str(string), Some(TypeInfo::Enum(enum_info))) =
+		(value, field_info)
+		&& matches!(
+			enum_info.variant(string.as_str()),
+			Some(VariantInfo::Unit(_))
+		) {
+		return Ok(Box::new(DynamicEnum::new(
+			string.as_str(),
+			DynamicVariant::Unit,
+		)));
+	}
+
 	// otherwise the value's natural reflect type.
 	let reflected: Box<dyn PartialReflect> = match value {
 		Value::Bool(b) => Box::new(*b),

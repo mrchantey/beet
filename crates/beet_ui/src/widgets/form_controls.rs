@@ -162,8 +162,15 @@ impl Plugin for FormPlugin {
 		app.add_observer(ensure_form_field_value)
 			.add_observer(fire_form_submit);
 		// Enter-to-submit needs the keyboard/focus stack, gated with the renderer.
+		// Order after `write_focus_input` so a batch of input delivered in one
+		// frame (a paste, fast typing, or a cooked-mode terminal sending the whole
+		// line at once) has its typed chars committed to the field `Value` before
+		// the Enter in that same batch gathers and submits them.
 		#[cfg(feature = "tui")]
-		app.add_systems(Update, submit_form_on_enter);
+		app.add_systems(
+			Update,
+			submit_form_on_enter.after(crate::prelude::write_focus_input),
+		);
 	}
 }
 

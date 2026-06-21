@@ -249,7 +249,7 @@ impl Post {
 		}
 	}
 
-	/// Author a seed post in markup as a child of its `<Actor>`, ie
+	/// Author a seed post in markup as a child of its `<CreateActor>`, ie
 	/// `children![Post::spawn("hello")]`. The author-to-behavior reduction
 	/// resolves its author (the actor parent) and thread, hoists it into the
 	/// [`ThreadWindow`], and despawns the entity, leaving only the record.

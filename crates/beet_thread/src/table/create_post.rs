@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Author a seed [`Post`] in markup as a child of an `<Actor>`.
+/// Author a seed [`Post`] in markup as a child of a `<CreateActor>`.
 ///
 /// Expands to a [`SeedPost`]; the author-to-behavior reduction resolves its
 /// author (the actor parent) and thread, hoists it into the [`ThreadWindow`],

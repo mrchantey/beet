@@ -186,7 +186,7 @@ mod test {
 			.init_plugin::<ThreadPlugin>();
 		let source = r#"
 <div {Thread}>
-	<ActorDef name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, instructions:"be terse"}}/>
+	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, instructions:"be terse"}}/>
 </div>
 "#;
 		BsxTemplate::parse_entry(app.world(), source)

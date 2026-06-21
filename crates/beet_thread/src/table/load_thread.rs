@@ -15,35 +15,6 @@ pub enum ThreadConfig {
 	Remove,
 }
 
-/// Compute the seed hash of a freshly-reduced [`ThreadWindow`]: the authored
-/// actor definitions and seed-post content/author, excluding volatile post ids
-/// and timestamps. Editing the seed changes the hash (forks a thread); editing
-/// only behavior does not.
-#[cfg(feature = "action")]
-pub fn thread_seed_hash(window: &ThreadWindow) -> u64 {
-	use std::hash::Hash;
-	use std::hash::Hasher;
-	let mut hasher = std::collections::hash_map::DefaultHasher::new();
-
-	let mut actors = window.actors().values().collect::<Vec<_>>();
-	actors.sort_by_key(|actor| actor.id());
-	for actor in actors {
-		actor.id().hash(&mut hasher);
-		actor.name().hash(&mut hasher);
-		actor.kind().hash(&mut hasher);
-	}
-
-	let mut posts = window.posts().iter().collect::<Vec<_>>();
-	posts.sort_by_key(|post| post.id());
-	for post in posts {
-		post.author().hash(&mut hasher);
-		post.intent().hash(&mut hasher);
-		post.body_bytes().hash(&mut hasher);
-	}
-
-	hasher.finish()
-}
-
 /// Adopt or bootstrap an already-spawned thread `entity` against `store`, keyed
 /// by its seed hash, without attaching any turn trigger.
 ///
@@ -66,7 +37,7 @@ pub async fn adopt_thread(
 	// reduce the authored scene and read its seed hash
 	let (seed_hash, config) = world
 		.with(move |world: &mut World| -> Result<(u64, ThreadConfig)> {
-			reduce_threads_now(world);
+			ThreadWindow::reduce_now(world);
 			let config = world
 				.get::<ThreadConfig>(entity)
 				.copied()
@@ -75,7 +46,7 @@ pub async fn adopt_thread(
 				world.get::<ThreadWindow>(entity).ok_or_else(|| {
 					bevyhow!("spawned scene has no Thread to reduce")
 				})?;
-			Ok((thread_seed_hash(window), config))
+			Ok((window.seed_hash(), config))
 		})
 		.await?;
 
@@ -130,6 +101,11 @@ pub async fn adopt_thread(
 /// then attach the behavior trigger ([`CallOnSpawn`]) so the turn runs once the
 /// window is correct. The trigger never fires against an empty or stale window
 /// because it lands only after adoption, no `Hydrating` marker required.
+///
+/// Topology-agnostic: the `Thread` may be the spawned root or nested under a loop
+/// (eg `Repeat[Thread+Sequence]` for an interactive chat). The store mounts on
+/// the `Thread` entity, where the persistence sync reads it; the kick lands on
+/// the root (the loop, or the `Thread` itself when flat). Returns the `Thread`.
 #[cfg(feature = "action")]
 pub async fn load_thread(
 	world: AsyncWorld,
@@ -137,20 +113,41 @@ pub async fn load_thread(
 	scene: impl Bundle,
 ) -> Result<Entity> {
 	let store_component = store.clone();
-	let entity = world
-		.with(move |world: &mut World| {
-			world.spawn((scene, store_component)).id()
+	// spawn + reduce, then mount the store on the Thread entity (root or nested)
+	let (root, thread) = world
+		.with(move |world: &mut World| -> Result<(Entity, Entity)> {
+			let root = world.spawn(scene).id();
+			ThreadWindow::reduce_now(world);
+			let thread = thread_entity_under(world, root)?;
+			world.entity_mut(thread).insert(store_component);
+			Ok((root, thread))
 		})
-		.await;
-	adopt_thread(world.clone(), store, entity).await?;
+		.await?;
+	adopt_thread(world.clone(), store, thread).await?;
+	// kick the root (the loop, or the Thread itself) now the window is correct
 	world
 		.with(move |world: &mut World| {
 			world
-				.entity_mut(entity)
+				.entity_mut(root)
 				.insert(CallOnSpawn::<(), Outcome>::new(()));
 		})
 		.await;
-	Ok(entity)
+	Ok(thread)
+}
+
+/// The [`Thread`] entity at or under `root`: the root itself, or nested beneath a
+/// loop wrapper (eg `Repeat`).
+#[cfg(feature = "action")]
+fn thread_entity_under(world: &mut World, root: Entity) -> Result<Entity> {
+	world
+		.with_state::<(Query<(), With<Thread>>, Query<&Children>), _>(
+			|(threads, children)| {
+				std::iter::once(root)
+					.chain(children.iter_descendants(root))
+					.find(|entity| threads.contains(*entity))
+			},
+		)
+		.ok_or_else(|| bevyhow!("spawned scene has no Thread"))
 }
 
 #[cfg(all(test, feature = "action"))]
@@ -180,8 +177,8 @@ mod test {
 			let mut world = World::new();
 			let thread = world.spawn(scene(user, agent, prompt)).id();
 			world.flush();
-			reduce_threads_now(&mut world);
-			thread_seed_hash(world.get::<ThreadWindow>(thread).unwrap())
+			ThreadWindow::reduce_now(&mut world);
+			world.get::<ThreadWindow>(thread).unwrap().seed_hash()
 		};
 		// same seed -> same hash, behavior aside
 		hash("hi").xpect_eq(hash("hi"));

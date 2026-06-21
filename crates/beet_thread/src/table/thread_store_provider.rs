@@ -39,7 +39,7 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 	/// All stored threads. Used on load to discover whether a store already
 	/// holds a conversation (and which thread to hydrate).
 	fn threads(&self) -> BoxedFuture<'_, Result<Vec<Thread>>>;
-	/// All stored actors. Used on load to bind the authored roster to stored
+	/// All stored actors. Used on load to bind the authored actor scene to stored
 	/// actor identities by name.
 	fn actors(&self) -> BoxedFuture<'_, Result<Vec<Actor>>>;
 
@@ -90,8 +90,10 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 	}
 
 	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>>;
-	fn insert_thread(&self, thread: Thread)
-	-> BoxedFuture<'_, Result<ThreadId>>;
+	fn insert_thread(
+		&self,
+		thread: Thread,
+	) -> BoxedFuture<'_, Result<ThreadId>>;
 	fn insert_posts(&self, posts: Vec<Post>) -> BoxedFuture<'_, Result<()>>;
 	fn insert_response_metas(
 		&self,
@@ -207,7 +209,9 @@ impl BlobThreadStore {
 	/// types into `threads/`, `actors/`, `posts/` and `metas/` subdirs.
 	pub fn new(blob: BlobStore) -> Self {
 		Self {
-			threads: TableStore::new(blob.with_subdir(SmolPath::new("threads"))),
+			threads: TableStore::new(
+				blob.with_subdir(SmolPath::new("threads")),
+			),
 			actors: TableStore::new(blob.with_subdir(SmolPath::new("actors"))),
 			posts: TableStore::new(blob.with_subdir(SmolPath::new("posts"))),
 			metas: TableStore::new(blob.with_subdir(SmolPath::new("metas"))),
@@ -427,7 +431,9 @@ pub mod thread_store_test {
 			.iter()
 			.map(|post| post.id())
 			.collect::<Vec<_>>()
-			.xpect_eq(expected.iter().map(|post| post.id()).collect::<Vec<_>>());
+			.xpect_eq(
+				expected.iter().map(|post| post.id()).collect::<Vec<_>>(),
+			);
 
 		// posts from another thread are excluded
 		provider
@@ -446,7 +452,12 @@ pub mod thread_store_test {
 			.iter()
 			.map(|post| post.id())
 			.collect::<Vec<_>>()
-			.xpect_eq(expected[1..].iter().map(|post| post.id()).collect::<Vec<_>>());
+			.xpect_eq(
+				expected[1..]
+					.iter()
+					.map(|post| post.id())
+					.collect::<Vec<_>>(),
+			);
 
 		// the actor join resolves each post's author
 		let full = provider.full_thread_posts(thread_id, None).await.unwrap();
@@ -489,8 +500,10 @@ pub mod thread_store_test {
 	async fn fs() {
 		use beet_net::prelude::*;
 		let blob = BlobStore::new(FsStore::new(
-			AbsPathBuf::new_workspace_rel("target/tests/beet_thread/thread-store-fs")
-				.unwrap(),
+			AbsPathBuf::new_workspace_rel(
+				"target/tests/beet_thread/thread-store-fs",
+			)
+			.unwrap(),
 		));
 		run(BlobThreadStore::new(blob)).await;
 	}

@@ -86,18 +86,15 @@ mod test {
 		let store = ThreadStore::new(backing.clone());
 
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.init_plugin::<ThreadPlugin>();
 
 		let thread = app
 			.world_mut()
-			.spawn((
-				Thread::default(),
-				store.clone(),
-				children![
-					(Actor::user(), children![Post::spawn("hi")]),
-					(Actor::agent(), MockPostStreamer::default()),
-				],
-			))
+			.spawn((Thread::default(), store.clone(), children![
+				(Actor::user(), children![Post::spawn("hi")]),
+				(Actor::agent(), MockPostStreamer::default()),
+			]))
 			.id();
 		app.update();
 
@@ -108,7 +105,11 @@ mod test {
 				|query| query.iter().next(),
 			)
 			.unwrap();
-		app.world_mut().entity_mut(agent).call::<(), Outcome>(()).await.unwrap();
+		app.world_mut()
+			.entity_mut(agent)
+			.call::<(), Outcome>(())
+			.await
+			.unwrap();
 
 		// pump so the sync system runs and its task flushes
 		for _ in 0..20 {

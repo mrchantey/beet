@@ -1,12 +1,15 @@
 //! Tool calling: an inline `#[action]` referenced by tag in a `.bsx` scene, run
 //! to completion and rendered through the agnostic charcell UI.
+//!
+//! The scene is the whole program: a dungeon turn whose agent is equipped with
+//! `<AgentChoiceAction/>`, looped twice by `RepeatTimes` and kicked by
+//! `{RunThread}`. `main` just loads it and registers the inline tool type so the
+//! `<AgentChoiceAction/>` tag resolves from markup.
 use beet::prelude::*;
 
-/// The author scene: a dungeon turn whose agent is equipped with `<AgentChoiceAction/>`.
 const SCENE: &str = include_str!("tool_call.bsx");
 
-#[beet::main]
-async fn main() {
+fn main() {
 	env_ext::load_dotenv();
 	App::new()
 		.add_plugins((
@@ -14,34 +17,11 @@ async fn main() {
 			ThreadPlugin::default(),
 			ThreadUiPlugin,
 			CharcellTuiPlugin,
+			ThreadScenePlugin::new(SCENE),
 		))
 		// register the inline tool so `<AgentChoiceAction/>` resolves from markup
 		.register_type::<AgentChoiceAction>()
-		.add_systems(Startup, setup)
 		.run();
-}
-
-fn setup(async_commands: AsyncCommands) {
-	async_commands.run(async move |world: AsyncWorld| -> Result {
-		// reduce the scene and mount the transcript, all before the turn runs
-		let root = world
-			.with(|world: &mut World| -> Result<Entity> {
-				let root =
-					BsxTemplate::parse_entry(world, SCENE)?.spawn(world)?;
-				reduce_threads_now(world);
-				let thread = world
-					.query_filtered::<Entity, With<Thread>>()
-					.iter(world)
-					.next()
-					.ok_or_else(|| bevyhow!("no Thread in scene"))?;
-				world.spawn(thread_tui(thread));
-				Ok(root)
-			})
-			.await?;
-		world.entity(root).call::<(), Outcome>(()).await?;
-		world.write_message(AppExit::Success).await;
-		Ok(())
-	});
 }
 
 /// Make a choice for what to do, following the schema

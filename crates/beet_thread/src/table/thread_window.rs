@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 #[cfg(feature = "action")]
 use beet_action::prelude::*;
+use beet_core::prelude::*;
 
 /// A materialized view of a [`Thread`], the runtime truth-for-the-scene.
 ///
@@ -37,7 +37,7 @@ impl ThreadWindow {
 			.ok_or_else(|| bevyhow!("No actor {id} in window"))
 	}
 
-	/// Insert (or replace) an actor in the roster.
+	/// Insert (or replace) an actor in the window.
 	pub fn insert_actor(&mut self, actor: Actor) -> ActorId {
 		let id = actor.id();
 		self.actors.insert(id, actor);
@@ -53,20 +53,22 @@ impl ThreadWindow {
 	/// Append a post, or replace the existing post with the same id. New posts
 	/// keep insertion (ie [`PostId`]) order; modified posts update in place.
 	pub fn upsert_post(&mut self, post: Post) {
-		match self.posts.iter_mut().find(|existing| existing.id() == post.id())
+		match self
+			.posts
+			.iter_mut()
+			.find(|existing| existing.id() == post.id())
 		{
 			Some(existing) => *existing = post,
 			None => self.posts.push(post),
 		}
 	}
 
-	/// Join each post with its authoring [`Actor`] from the roster.
+	/// Join each post with its authoring [`Actor`] from the window.
 	pub fn post_views(&self) -> impl Iterator<Item = PostView<'_>> {
 		self.posts.iter().filter_map(|post| {
-			self.actors.get(&post.author()).map(|actor| PostView {
-				post,
-				actor,
-			})
+			self.actors
+				.get(&post.author())
+				.map(|actor| PostView { post, actor })
 		})
 	}
 
@@ -174,11 +176,22 @@ pub struct ActorRef(pub ActorId);
 // SeedPost
 // ═══════════════════════════════════════════════════════════════════════
 
-/// An author-time seed post, spawned as a child of its `<Actor>`.
+/// An author-time seed post: an unresolved [`IntoPost`] payload spawned as a
+/// child of its `<CreateActor>`, awaiting reduction.
 ///
-/// Carries unresolved [`IntoPost`] content; the reduction resolves its author
-/// (the actor parent) and thread, hoists it into the [`ThreadWindow`], and
-/// despawns the entity. Authored via [`Post::spawn`] / `<CreatePost>`.
+/// This is the runtime component the author-to-behavior reduction queries
+/// ([`ThreadWindow::reduce`]): it resolves the seed's author (its actor parent)
+/// and thread, hoists the materialized [`Post`] into the [`ThreadWindow`], and
+/// despawns the entity.
+///
+/// It is the payload, not the tag. `<CreatePost>` is the `#[template]` that
+/// produces a `SeedPost` from markup; the two cannot be merged: a `#[template]`
+/// expands away at build and leaves no component for the runtime `Query<&SeedPost>`
+/// to read, and `content: IntoPost` is not attribute-coercible so `SeedPost`
+/// itself cannot be a tag. The template adapts a coercible `text` into `IntoPost`;
+/// this component is what the world stores and reduces. (Mirrors the
+/// `<CreateActor>`/[`Actor`] tag/payload pair.) Authored via [`Post::spawn`] /
+/// `<CreatePost>`.
 #[derive(Clone, Component)]
 pub struct SeedPost {
 	pub content: IntoPost,
@@ -200,130 +213,160 @@ impl SeedPost {
 // The reduction: author scene -> ThreadWindow + behavior scene
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Reduce every freshly-spawned authored [`Thread`] into a [`ThreadWindow`] plus
-/// a lean behavior scene.
-///
-/// For each thread lacking a window, walk its descendant actors in author order
-/// and: hoist each [`Actor`] into `window.actors`, hoist each [`SeedPost`] into
-/// `window.posts`, then rewrite the actor entity. An actor that carries behavior
-/// (an [`Action`]) becomes an [`ActorRef`] keeping its behavior and tools; a
-/// seed-only actor (eg the system prompt) is despawned, leaving no turn behind.
-///
-/// Idempotent: gated on `Without<ThreadWindow>`, so it runs once per thread.
-pub fn reduce_threads(
-	mut commands: Commands,
-	threads: Query<(Entity, &Thread), Without<ThreadWindow>>,
-	children: Query<&Children>,
-	actors: Query<&Actor>,
-	seeds: Query<&SeedPost>,
-	#[cfg(feature = "action")] behaviors: Query<(), With<ActionMeta>>,
-) -> Result {
-	for (thread_entity, thread) in threads.iter() {
-		let thread_id = thread.id();
-		let mut window = ThreadWindow::new();
+impl ThreadWindow {
+	/// Reduce every freshly-spawned authored [`Thread`] into a [`ThreadWindow`] plus
+	/// a lean behavior scene.
+	///
+	/// For each thread lacking a window, walk its descendant actors in author order
+	/// and: hoist each [`Actor`] into `window.actors`, hoist each [`SeedPost`] into
+	/// `window.posts`, then rewrite the actor entity. An actor that carries behavior
+	/// (an [`Action`]) becomes an [`ActorRef`] keeping its behavior and tools; a
+	/// seed-only actor (eg the system prompt) is despawned, leaving no turn behind.
+	///
+	/// Idempotent: gated on `Without<ThreadWindow>`, so it runs once per thread.
+	pub fn reduce(
+		mut commands: Commands,
+		threads: Query<(Entity, &Thread), Without<ThreadWindow>>,
+		children: Query<&Children>,
+		actors: Query<&Actor>,
+		seeds: Query<&SeedPost>,
+		#[cfg(feature = "action")] behaviors: Query<(), With<ActionMeta>>,
+	) -> Result {
+		for (thread_entity, thread) in threads.iter() {
+			let thread_id = thread.id();
+			let mut window = ThreadWindow::new();
 
-		// descendant actor entities, in author (DFS) order
-		let actor_entities = children
-			.iter_descendants(thread_entity)
-			.filter(|entity| actors.contains(*entity))
-			.collect::<Vec<_>>();
+			// descendant actor entities, in author (DFS) order
+			let actor_entities = children
+				.iter_descendants(thread_entity)
+				.filter(|entity| actors.contains(*entity))
+				.collect::<Vec<_>>();
 
-		for actor_entity in actor_entities {
-			let actor = actors.get(actor_entity)?.clone();
-			let actor_id = window.insert_actor(actor);
+			for actor_entity in actor_entities {
+				let actor = actors.get(actor_entity)?.clone();
+				let actor_id = window.insert_actor(actor);
 
-			// hoist this actor's seed posts, despawning their entities. Scan all
-			// descendants (not just direct children) so seeds authored through a
-			// markup `<Slot/>` are still found; actors never nest, so every
-			// `SeedPost` under an actor entity is unambiguously its own.
-			children
-				.iter_descendants(actor_entity)
-				.filter_map(|child| {
-					seeds.get(child).ok().map(|seed| (child, seed))
-				})
-				.for_each(|(child, seed)| {
-					window.upsert_post(
-						seed.clone().into_post(actor_id, thread_id),
-					);
-					commands.entity(child).despawn();
-				});
+				// hoist this actor's seed posts, despawning their entities. Scan all
+				// descendants (not just direct children) so seeds authored through a
+				// markup `<Slot/>` are still found; actors never nest, so every
+				// `SeedPost` under an actor entity is unambiguously its own.
+				children
+					.iter_descendants(actor_entity)
+					.filter_map(|child| {
+						seeds.get(child).ok().map(|seed| (child, seed))
+					})
+					.for_each(|(child, seed)| {
+						window.upsert_post(
+							seed.clone().into_post(actor_id, thread_id),
+						);
+						commands.entity(child).despawn();
+					});
 
-			// rewrite the actor: behavior -> ActorRef, seed-only -> despawn
-			#[cfg(feature = "action")]
-			let has_behavior = behaviors.contains(actor_entity);
-			#[cfg(not(feature = "action"))]
-			let has_behavior = true;
-			if has_behavior {
-				commands
-					.entity(actor_entity)
-					.remove::<Actor>()
-					.insert(ActorRef(actor_id));
-			} else {
-				commands.entity(actor_entity).despawn();
+				// rewrite the actor: behavior -> ActorRef, seed-only -> despawn
+				#[cfg(feature = "action")]
+				let has_behavior = behaviors.contains(actor_entity);
+				#[cfg(not(feature = "action"))]
+				let has_behavior = true;
+				if has_behavior {
+					commands
+						.entity(actor_entity)
+						.remove::<Actor>()
+						.insert(ActorRef(actor_id));
+				} else {
+					commands.entity(actor_entity).despawn();
+				}
 			}
+
+			window.posts.sort_by_key(|post| post.id());
+			commands.entity(thread_entity).insert(window);
+		}
+		Ok(())
+	}
+
+	/// Run [`ThreadWindow::reduce`] immediately and flush, for manual consumers that
+	/// pump the world directly (eg `run_oneshot`, tests) rather than the schedule.
+	pub fn reduce_now(world: &mut World) {
+		let _ = world.run_system_cached::<Result, _, _>(Self::reduce);
+		world.flush();
+	}
+
+	/// Spawn an authored thread `scene` and reduce it into a [`ThreadWindow`] plus
+	/// behavior scene in one step, returning the root entity. The behavior is *not*
+	/// triggered; the caller drives it (eg `entity.call(())`), so the window is
+	/// always populated before any turn runs.
+	pub async fn spawn_reduced(
+		world: AsyncWorld,
+		scene: impl Bundle,
+	) -> Result<Entity> {
+		world
+			.with(move |world: &mut World| {
+				let root = world.spawn(scene).id();
+				Self::reduce_now(world);
+				root
+			})
+			.await
+			.xok()
+	}
+
+	/// Compute the seed hash of a freshly-reduced [`ThreadWindow`]: the authored
+	/// actor definitions and seed-post content/author, excluding volatile post ids
+	/// and timestamps. Editing the seed changes the hash (forks a thread); editing
+	/// only behavior does not.
+	#[cfg(feature = "action")]
+	pub fn seed_hash(&self) -> u64 {
+		use std::hash::Hash;
+		use std::hash::Hasher;
+		let mut hasher = std::collections::hash_map::DefaultHasher::new();
+
+		let mut actors = self.actors().values().collect::<Vec<_>>();
+		actors.sort_by_key(|actor| actor.id());
+		for actor in actors {
+			actor.id().hash(&mut hasher);
+			actor.name().hash(&mut hasher);
+			actor.kind().hash(&mut hasher);
 		}
 
-		window.posts.sort_by_key(|post| post.id());
-		commands.entity(thread_entity).insert(window);
+		let mut posts = self.posts().iter().collect::<Vec<_>>();
+		posts.sort_by_key(|post| post.id());
+		for post in posts {
+			post.author().hash(&mut hasher);
+			post.intent().hash(&mut hasher);
+			post.body_bytes().hash(&mut hasher);
+		}
+
+		hasher.finish()
 	}
-	Ok(())
-}
-
-/// Run [`reduce_threads`] immediately and flush, for manual consumers that pump
-/// the world directly (eg `run_oneshot`, tests) rather than the schedule.
-pub fn reduce_threads_now(world: &mut World) {
-	let _ = world.run_system_cached::<Result, _, _>(reduce_threads);
-	world.flush();
-}
-
-/// Spawn an authored thread `scene` and reduce it into a [`ThreadWindow`] plus
-/// behavior scene in one step, returning the root entity. The behavior is *not*
-/// triggered; the caller drives it (eg `entity.call(())`), so the window is
-/// always populated before any turn runs.
-pub async fn spawn_reduced(
-	world: AsyncWorld,
-	scene: impl Bundle,
-) -> Result<Entity> {
-	world
-		.with(move |world: &mut World| {
-			let root = world.spawn(scene).id();
-			reduce_threads_now(world);
-			root
-		})
-		.await
-		.xok()
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// WindowMut: mutate the thread window from a behavior entity
+// ThreadWindowQuery: mutate the thread window from a behavior entity
 // ═══════════════════════════════════════════════════════════════════════
 
 /// Locate and mutate the [`ThreadWindow`] of the thread a behavior entity
 /// belongs to. Behavior entities ([`ActorRef`]) are descendants of their
 /// thread; the window lives on the thread.
 #[derive(SystemParam)]
-pub struct WindowMut<'w, 's> {
+pub struct ThreadWindowQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	actor_refs: Query<'w, 's, &'static ActorRef>,
 	windows: Query<'w, 's, (&'static Thread, &'static mut ThreadWindow)>,
 }
 
-impl WindowMut<'_, '_> {
+impl ThreadWindowQuery<'_, '_> {
 	/// Walk ancestors to the thread entity carrying the [`ThreadWindow`].
 	pub fn thread_entity(&self, entity: Entity) -> Result<Entity> {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
 			.find(|ancestor| self.windows.contains(*ancestor))
-			.ok_or_else(|| {
-				bevyhow!("No ThreadWindow in ancestors of {entity}")
-			})
+			.ok_or_else(|| bevyhow!("No ThreadWindow in ancestors of {entity}"))
 	}
 
 	/// The [`ActorId`] a behavior entity acts as.
 	pub fn actor_id(&self, entity: Entity) -> Result<ActorId> {
-		self.actor_refs.get(entity).map(|actor_ref| **actor_ref).map_err(
-			|_| bevyhow!("entity {entity} has no ActorRef"),
-		)
+		self.actor_refs
+			.get(entity)
+			.map(|actor_ref| **actor_ref)
+			.map_err(|_| bevyhow!("entity {entity} has no ActorRef"))
 	}
 
 	/// The [`ThreadId`] of the thread a behavior entity belongs to.
@@ -333,7 +376,10 @@ impl WindowMut<'_, '_> {
 	}
 
 	/// Mutable access to the thread's window.
-	pub fn window_mut(&mut self, entity: Entity) -> Result<Mut<'_, ThreadWindow>> {
+	pub fn window_mut(
+		&mut self,
+		entity: Entity,
+	) -> Result<Mut<'_, ThreadWindow>> {
 		let thread_entity = self.thread_entity(entity)?;
 		Ok(self.windows.get_mut(thread_entity)?.1)
 	}
@@ -356,26 +402,29 @@ mod test {
 	fn reduction_hoists_and_rewrites() {
 		let mut world = World::new();
 		let thread = world
-			.spawn((
-				Thread::default(),
-				children![
-					// seed-only actor: hoisted then despawned
-					(Actor::system(), children![Post::spawn("sys prompt")]),
-					// behavior actor: kept as an ActorRef
-					(Actor::agent(), MockPostStreamer::default()),
-				],
-			))
+			.spawn((Thread::default(), children![
+				// seed-only actor: hoisted then despawned
+				(Actor::system(), children![Post::spawn("sys prompt")]),
+				// behavior actor: kept as an ActorRef
+				(Actor::agent(), MockPostStreamer::default()),
+			]))
 			.id();
 		world.flush();
-		reduce_threads_now(&mut world);
+		ThreadWindow::reduce_now(&mut world);
 
 		// window holds both actors and the one seed post, author resolvable
 		let window = world.get::<ThreadWindow>(thread).unwrap();
 		window.actors().len().xpect_eq(2);
 		window.posts().len().xpect_eq(1);
-		window.posts()[0].to_string().xpect_eq("sys prompt".to_string());
+		window.posts()[0]
+			.to_string()
+			.xpect_eq("sys prompt".to_string());
 		let author = window.posts()[0].author();
-		window.actor(author).unwrap().kind().xpect_eq(ActorKind::System);
+		window
+			.actor(author)
+			.unwrap()
+			.kind()
+			.xpect_eq(ActorKind::System);
 
 		// behavior scene: exactly one ActorRef (the agent), no Actor or SeedPost
 		// entities survive, and the survivor keeps its streamer behavior
@@ -383,7 +432,8 @@ mod test {
 		world.query::<&Actor>().iter(&world).count().xpect_eq(0);
 		world.query::<&SeedPost>().iter(&world).count().xpect_eq(0);
 		world
-			.query_filtered::<Entity, (With<ActorRef>, With<MockPostStreamer>)>()
+			.query_filtered::<Entity, (With<ActorRef>, With<MockPostStreamer>)>(
+			)
 			.iter(&world)
 			.count()
 			.xpect_eq(1);
@@ -408,7 +458,11 @@ mod test {
 		post.set_status(PostStatus::Completed);
 		window.upsert_post(post);
 		window.posts().len().xpect_eq(1);
-		window.last_post().unwrap().to_string().xpect_eq("hello".to_string());
+		window
+			.last_post()
+			.unwrap()
+			.to_string()
+			.xpect_eq("hello".to_string());
 		window.last_post().unwrap().in_progress().xpect_false();
 	}
 }

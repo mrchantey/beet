@@ -1,6 +1,6 @@
-<div {RepeatTimes{total_times:2}}>
+<div {RepeatTimes{total_times:2}} {RunThread}>
 	<div {Thread} {Sequence}>
-		<ActorDef name="System" kind="System">
+		<CreateActor name="System" kind="System">
 			<CreatePost text='
 This is a tool call test. You will get two responses.
 
@@ -17,9 +17,9 @@ This will be your final response so do not attempt to continue the conversation.
 
 You enter the cave, and from the ceiling drops a glowing red beet..
 '/>
-		</ActorDef>
-		<ActorDef name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+		</CreateActor>
+		<CreateActor name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 			<AgentChoiceAction/>
-		</ActorDef>
+		</CreateActor>
 	</div>
 </div>

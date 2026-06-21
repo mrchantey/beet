@@ -38,6 +38,9 @@ pub fn add_fs_store_watcher(
 		entry.count += 1;
 		return;
 	}
+	// a fresh store has no directory yet, but an `FsWatcher` cannot watch a path
+	// that does not exist, so ensure the base exists before watching it.
+	fs_ext::create_dir_all(&path).ok();
 	// spawn an internal FsWatcher on the base path, forwarding DirEvents to the
 	// bus relative to that base.
 	let base = path.clone();

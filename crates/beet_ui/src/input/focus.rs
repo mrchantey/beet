@@ -310,8 +310,10 @@ fn sync_focus_state(
 /// Only acts on `ButtonState::Pressed` (repeats flow through so held keys
 /// repeat). With no focused entity, no `Value`, or no editing keys this turn,
 /// it is a no-op and never marks `Changed`. A key's edits reach the focused
-/// element whose surface matches the key's `window`.
-fn write_focus_input(
+/// element whose surface matches the key's `window`. `pub` so consumers can
+/// order against it (eg form submit runs after, so a one-frame input batch's
+/// chars land before its Enter gathers them).
+pub fn write_focus_input(
 	mut keys: MessageReader<KeyboardInput>,
 	mut focused: Query<(Entity, &mut Value), With<Focus>>,
 	parents: Query<&ChildOf>,

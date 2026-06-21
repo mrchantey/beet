@@ -1,6 +1,6 @@
-<div {RepeatWhileFunctionCallOutput}>
-	<div {Thread} {Sequence}>
-		<ActorDef name="System" kind="System">
+<div {RepeatWhileFunctionCallOutput} {RunThread}>
+	<div {Thread} {Sequence} {MountFsStore{path:".beet/coding_agent"}}>
+		<CreateActor name="System" kind="System">
 			<CreatePost text='
 You are a coding agent with access to a file store.
 Your available tools are: list-blobs, read-blob, write-blob, edit-text, remove-blob.
@@ -18,9 +18,9 @@ Please perform the following steps in order:
 7. Use list-blobs to confirm it was deleted
 8. Finally, write a brief summary of what happened and whether all tools worked correctly
 '/>
-		</ActorDef>
-		<ActorDef name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+		</CreateActor>
+		<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 			<StoreToolset/>
-		</ActorDef>
+		</CreateActor>
 	</div>
 </div>

@@ -22,7 +22,11 @@ impl Plugin for ThreadPlugin {
 		app.init_plugin::<ActionPlugin>()
 			// agent-loop control flow + the standard store toolset, as markup
 			.register_type::<RepeatWhileFunctionCallOutput>()
-			.register_template::<StoreToolset>();
+			.register_type::<RunThread>()
+			.register_template::<StoreToolset>()
+			.register_template::<MountFsStore>()
+			// markup kick: call the thread on load, exit when it completes
+			.add_systems(Update, run_thread_on_load);
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────
@@ -59,12 +63,12 @@ impl Plugin for ThreadPlugin {
 			// ── Markup templates ──────────────────────────────────────────
 			.register_template::<CreatePost>()
 			.register_template::<ModelStreamer>()
-			.register_template::<ActorDef>()
+			.register_template::<CreateActor>()
 			.add_observer(insert_tool_definition)
 			// _
 			;
 
-		app.add_systems(First, reduce_threads)
+		app.add_systems(First, ThreadWindow::reduce)
 			.add_systems(PostUpdate, thread_store::sync_window_to_store);
 	}
 }

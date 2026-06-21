@@ -232,11 +232,7 @@ mod test {
 
 		let (name, args) = run_oneshot(children![
 			(Actor::user(), children![Post::spawn("Greet someone")]),
-			(
-				Actor::agent(),
-				MockPostStreamer::default(),
-				children![tool]
-			),
+			(Actor::agent(), MockPostStreamer::default(), children![tool]),
 		])
 		.await
 		.unwrap()

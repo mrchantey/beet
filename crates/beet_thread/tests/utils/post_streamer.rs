@@ -1,6 +1,6 @@
 // Test cases for validating PostStreamer implementations via the declarative
-// `run_oneshot` helper: a thread is authored as a roster of actors with seed
-// posts, the agent runs, and its reply is collected.
+// `run_oneshot` helper: a thread is authored as an author scene of actors with
+// seed posts, the agent runs, and its reply is collected.
 use beet_core::prelude::*;
 use beet_thread::prelude::*;
 
@@ -9,12 +9,9 @@ pub async fn basic_text_response(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
 	run_oneshot(children![
-		(
-			Actor::user(),
-			children![Post::spawn(
-				"complete the sequence: one, two, three, ____"
-			)]
-		),
+		(Actor::user(), children![Post::spawn(
+			"complete the sequence: one, two, three, ____"
+		)]),
 		(Actor::agent(), streamer),
 	])
 	.await
@@ -47,16 +44,12 @@ pub async fn streaming_response(
 /// Use a system prompt and verify the response follows it.
 pub async fn system_prompt(streamer: impl Component + PostStreamer + Clone) {
 	run_oneshot(children![
-		(
-			Actor::system(),
-			children![Post::spawn(
-				"You are a pirate. Always respond in pirate speak, beginning with 'ahoy'."
-			)]
-		),
-		(
-			Actor::user(),
-			children![Post::spawn("Say hello in exactly 5 words.")]
-		),
+		(Actor::system(), children![Post::spawn(
+			"You are a pirate. Always respond in pirate speak, beginning with 'ahoy'."
+		)]),
+		(Actor::user(), children![Post::spawn(
+			"Say hello in exactly 5 words."
+		)]),
 		(Actor::agent(), streamer),
 	])
 	.await
@@ -88,10 +81,9 @@ pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
 	.into();
 
 	let (name, args) = run_oneshot(children![
-		(
-			Actor::user(),
-			children![Post::spawn("What's the weather like in San Francisco?")]
-		),
+		(Actor::user(), children![Post::spawn(
+			"What's the weather like in San Francisco?"
+		)]),
 		(Actor::agent(), streamer, children![tool]),
 	])
 	.await
@@ -155,12 +147,9 @@ pub async fn multi_turn_conversation(
 ) {
 	run_oneshot(children![
 		(Actor::user(), children![Post::spawn("My name is Alice.")]),
-		(
-			Actor::agent(),
-			children![Post::spawn(
-				"Hello Alice! Nice to meet you. How can I help you today?"
-			)]
-		),
+		(Actor::agent(), children![Post::spawn(
+			"Hello Alice! Nice to meet you. How can I help you today?"
+		)]),
 		(Actor::user(), children![Post::spawn("What is my name?")]),
 		(Actor::agent(), streamer),
 	])
@@ -184,12 +173,9 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 
 	// Step 1: ask the agent to generate a blue image
 	let posts = run_oneshot(children![
-		(
-			Actor::user(),
-			children![Post::spawn(
-				"Create a solid blue 1x1 pixel image. Return only the image."
-			)]
-		),
+		(Actor::user(), children![Post::spawn(
+			"Create a solid blue 1x1 pixel image. Return only the image."
+		)]),
 		(Actor::agent(), streamer.clone()),
 	])
 	.await

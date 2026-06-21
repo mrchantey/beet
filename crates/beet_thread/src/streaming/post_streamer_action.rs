@@ -58,15 +58,19 @@ where
 
 		// apply the changes to the thread window
 		cx.caller
-			.with_state::<WindowMut, _>(move |entity, mut window_mut| -> Result {
-				let mut window = window_mut.window_mut(entity)?;
-				modified.into_iter().for_each(|post| window.upsert_post(post));
-				created.into_iter().zip(metas).for_each(|(post, meta)| {
-					window.set_meta(meta);
-					window.upsert_post(post);
-				});
-				Ok(())
-			})
+			.with_state::<ThreadWindowQuery, _>(
+				move |entity, mut window_mut| -> Result {
+					let mut window = window_mut.window_mut(entity)?;
+					modified
+						.into_iter()
+						.for_each(|post| window.upsert_post(post));
+					created.into_iter().zip(metas).for_each(|(post, meta)| {
+						window.set_meta(meta);
+						window.upsert_post(post);
+					});
+					Ok(())
+				},
+			)
 			.await??;
 	}
 

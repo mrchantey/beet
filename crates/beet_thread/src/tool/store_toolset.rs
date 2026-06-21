@@ -8,7 +8,7 @@ use beet_router::prelude::*;
 /// dispatch the call.
 ///
 /// A `#[template]`, so it nests under an agent in markup, ie
-/// `<ActorDef name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}><StoreToolset/></ActorDef>`,
+/// `<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}><StoreToolset/></CreateActor>`,
 /// with a [`BlobStore`] mounted on an ancestor (eg the thread's behavior root).
 #[template]
 pub fn StoreToolset() -> impl Bundle {
@@ -19,6 +19,17 @@ pub fn StoreToolset() -> impl Bundle {
 		exchange_route("edit-text", EditText),
 		exchange_route("remove-blob", RemoveBlob),
 	]
+}
+
+/// Mount a filesystem-backed [`BlobStore`] from markup, so a [`StoreToolset`]
+/// nested under the same root resolves it without Rust glue:
+/// `<div {Thread} {Sequence} {MountFsStore{path:"target/examples/agent"}}>`.
+///
+/// The `path` is workspace-relative; [`FsStore`]'s own `path` is an `AbsPathBuf`
+/// (not attribute-coercible), so this thin template adapts a coercible string.
+#[template]
+pub fn MountFsStore(#[prop(into)] path: String) -> impl Bundle {
+	FsStore::new(WsPathBuf::new(path))
 }
 
 #[cfg(test)]
@@ -35,16 +46,16 @@ mod test {
 			.init_plugin::<ThreadPlugin>();
 		let source = r#"
 <div {Thread}>
-	<ActorDef name="Coder" kind="Agent" {ModelStreamer{provider:Ollama}}>
+	<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:Ollama}}>
 		<StoreToolset/>
-	</ActorDef>
+	</CreateActor>
 </div>
 "#;
 		BsxTemplate::parse_entry(app.world(), source)
 			.unwrap()
 			.spawn(app.world_mut())
 			.unwrap();
-		reduce_threads_now(app.world_mut());
+		ThreadWindow::reduce_now(app.world_mut());
 		app.world_mut().flush();
 
 		app.world_mut()

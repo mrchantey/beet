@@ -1,6 +1,6 @@
 mod actor;
-mod actor_def;
-pub use actor_def::*;
+mod create_actor;
+pub use create_actor::*;
 mod create_post;
 mod document;
 mod load_thread;
@@ -8,8 +8,8 @@ pub use create_post::*;
 pub use load_thread::*;
 mod thread;
 mod thread_query;
-mod thread_window;
 pub mod thread_store;
+mod thread_window;
 pub use thread_store::SyncedPosts;
 mod thread_store_provider;
 pub use document::*;

@@ -9,6 +9,12 @@ examples/file_based_routes/generated
 examples/file_based_routes/dist
 examples/bsx_site/dist
 examples/thread/persistent_chat.json
+# these should be temporary, its terrible split up like this
+# we need a unified representation
+examples/thread/persistent_chat/metas*
+examples/thread/persistent_chat/actors*
+examples/thread/persistent_chat/posts*
+examples/thread/persistent_chat/threads*
 examples/router/router_serde.json
 examples/todo/todos.json
 

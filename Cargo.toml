@@ -376,9 +376,6 @@ ssh_tui = ["ssh_server", "tui_server", "beet_router?/ssh"]
 
 
 thread = ["dep:beet_thread","net","action"]
-# the agnostic charcell/web chat UI for threads (`ThreadView`/`ThreadComposer`),
-# pulling beet_thread's `ui` feature plus the beet_ui tui render stack.
-thread_ui = ["thread","tui","beet_thread?/ui"]
 
 
 # 💡 Stack
@@ -405,7 +402,9 @@ quickjs = ["action","beet_action/quickjs"]
 # beet_router scripting registrations and the `ScriptEntry` entry action (the `std`
 # is for those, not the runtime).
 quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/quickjs"]
-ui = ["dep:beet_ui"]
+# turning on `ui` also lights up beet_thread's chat UI (`ThreadView`,
+# `ThreadComposer`, `ThreadScenePlugin`) when `thread` is present.
+ui = ["dep:beet_ui", "beet_thread?/ui"]
 # The `beet_ui` function-component widget set (Header, Button, Sidebar, Table)
 # and the `rsx!`/`#[template]` lowering runtime. std-only, so it stays opt-in.
 template = ["ui", "beet_ui?/template"]
@@ -628,37 +627,37 @@ required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq",
 [[example]]
 name = "chat"
 path = "examples/thread/chat.rs"
-required-features = ["thread_ui"]
+required-features = ["thread", "tui", "rustls-tls"]
 
 [[example]]
 name = "multi_agent"
 path = "examples/thread/multi_agent.rs"
-required-features = ["thread_ui"]
+required-features = ["thread", "tui", "rustls-tls"]
 
 [[example]]
 name = "oneshot"
 path = "examples/thread/oneshot.rs"
-required-features = ["thread"]
+required-features = ["thread", "rustls-tls"]
 
 [[example]]
 name = "tool_call"
 path = "examples/thread/tool_call.rs"
-required-features = ["thread_ui", "router"]
+required-features = ["thread", "tui", "router", "rustls-tls"]
 
 [[example]]
 name = "self_evolving"
 path = "examples/thread/self_evolving.rs"
-required-features = ["thread_ui", "fs", "router"]
+required-features = ["thread", "tui", "fs", "router", "rustls-tls"]
 
 [[example]]
 name = "coding_agent"
 path = "examples/thread/coding_agent.rs"
-required-features = ["thread_ui", "fs", "router"]
+required-features = ["thread", "tui", "fs", "router", "rustls-tls"]
 
 [[example]]
 name = "persistent_chat"
 path = "examples/thread/persistent_chat.rs"
-required-features = ["thread_ui","template_serde"]
+required-features = ["thread", "tui", "template_serde", "rustls-tls"]
 
 
 

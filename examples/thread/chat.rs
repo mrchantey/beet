@@ -1,8 +1,11 @@
-//! Interactive terminal chat: a `.bsx` roster reduced into a thread, rendered
-//! and driven through the agnostic charcell UI.
+//! Interactive terminal chat: a `.bsx` author scene reduced into a thread,
+//! rendered and driven through the agnostic charcell UI.
+//!
+//! The scene is the whole program: a `Repeat[Sequence[agent, user]]` whose user
+//! turn (`{UserInput}`) waits for the composer, kicked by `{RunThread}`. `main`
+//! just loads it, so there is no setup-system glue.
 use beet::prelude::*;
 
-/// The author scene: roster + system seed, reduced at runtime.
 const SCENE: &str = include_str!("chat.bsx");
 
 fn main() {
@@ -13,16 +16,7 @@ fn main() {
 			ThreadPlugin::default(),
 			ThreadUiPlugin,
 			CharcellTuiPlugin,
+			ThreadScenePlugin::new(SCENE),
 		))
-		.add_systems(Startup, setup)
 		.run();
-}
-
-/// Reduce the `.bsx` scene into a window + behavior, then mount an interactive
-/// charcell chat over it; the composer drives the agent's replies, no stdin.
-fn setup(world: &mut World) -> Result {
-	let thread = BsxTemplate::parse_entry(world, SCENE)?.spawn(world)?;
-	reduce_threads_now(world);
-	world.spawn(thread_chat_tui(thread));
-	Ok(())
 }

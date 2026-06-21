@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Author an [`Actor`] in markup, ie `<ActorDef name="Agent" kind="Agent"/>`.
+/// Author an [`Actor`] in markup, ie `<CreateActor name="Agent" kind="Agent"/>`.
 ///
 /// A plain [`Actor`] cannot be a BSX tag because its [`ActorId`] (a [`Uuid7`])
 /// is not attribute-coercible; this template wraps it. Set `id` to pin a stable
@@ -9,11 +9,11 @@ use beet_core::prelude::*;
 /// bindings depend on it); omit it for an ephemeral, freshly-minted id.
 ///
 /// Spread behavior and nest seeds/tools as children, ie
-/// `<ActorDef name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+/// `<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 ///   <CreatePost text="hello"/>
-/// </ActorDef>`.
+/// </CreateActor>`.
 #[template]
-pub fn ActorDef(
+pub fn CreateActor(
 	#[prop(into)] name: String,
 	kind: ActorKind,
 	id: Option<u64>,
@@ -48,6 +48,45 @@ mod test {
 	#[reflect(Component)]
 	fn ProbeTool(cx: ActionContext<ProbeInput>) -> String { cx.value.clone() }
 
+	/// A `kind="..."` attribute resolves to the named [`ActorKind`] variant rather
+	/// than silently defaulting to `Agent`: a string attribute coercing to a unit
+	/// enum variant by name (`kind="User"` -> `ActorKind::User`).
+	#[beet_core::test]
+	fn kind_attribute_resolves_to_variant() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins).init_plugin::<ThreadPlugin>();
+		let source = r#"
+<div {Thread}>
+	<CreateActor name="Sys" kind="System"/>
+	<CreateActor name="Bot" kind="Agent"/>
+	<CreateActor name="Person" kind="User"/>
+</div>
+"#;
+		BsxTemplate::parse_entry(app.world(), source)
+			.unwrap()
+			.spawn(app.world_mut())
+			.unwrap();
+		ThreadWindow::reduce_now(app.world_mut());
+
+		let thread = app
+			.world_mut()
+			.query_filtered::<Entity, With<Thread>>()
+			.iter(app.world())
+			.next()
+			.unwrap();
+		let kinds = app
+			.world()
+			.get::<ThreadWindow>(thread)
+			.unwrap()
+			.actors()
+			.values()
+			.map(|actor| actor.kind())
+			.collect::<Vec<_>>();
+		kinds.contains(&ActorKind::System).xpect_true();
+		kinds.contains(&ActorKind::User).xpect_true();
+		kinds.contains(&ActorKind::Agent).xpect_true();
+	}
+
 	/// A routed `#[action]` referenced by tag in a runtime `.bsx` equips the same
 	/// tool an `rsx!` `children![Tool]` would: reflect-inserting the component
 	/// fires its `#[require]` chain (`Action`/`ExchangeAction`/`PathPartial`) and
@@ -62,9 +101,9 @@ mod test {
 
 		let source = r#"
 <div {Thread}>
-	<ActorDef name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}>
+	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}>
 		<ProbeTool/>
-	</ActorDef>
+	</CreateActor>
 </div>
 "#;
 		let template = BsxTemplate::parse_entry(app.world(), source).unwrap();
@@ -92,18 +131,18 @@ mod test {
 			.init_plugin::<ThreadPlugin>();
 		let source = "
 <div {Thread}>
-	<ActorDef name=\"System\" kind=\"System\">
+	<CreateActor name=\"System\" kind=\"System\">
 		<CreatePost text='line one
 respond: \"I open the door..\"
 line three'/>
-	</ActorDef>
+	</CreateActor>
 </div>
 ";
 		let thread = BsxTemplate::parse_entry(app.world(), source)
 			.unwrap()
 			.spawn(app.world_mut())
 			.unwrap();
-		reduce_threads_now(app.world_mut());
+		ThreadWindow::reduce_now(app.world_mut());
 
 		let window = app.world().get::<ThreadWindow>(thread).unwrap();
 		window.posts()[0].to_string().xpect_eq(
@@ -112,7 +151,7 @@ line three'/>
 	}
 
 	/// A `.bsx` author scene reduces into a `ThreadWindow` + behavior scene just
-	/// like a Rust one: `<ActorDef>` roster, `<CreatePost>` seeds, a spread
+	/// like a Rust one: `<CreateActor>` actors, `<CreatePost>` seeds, a spread
 	/// `{ModelStreamer}` behavior.
 	#[beet_core::test]
 	fn bsx_author_scene_reduces() {
@@ -121,19 +160,19 @@ line three'/>
 			.init_plugin::<ThreadPlugin>();
 
 		// the root carries `Thread` via a spread on a lowercase element (which
-		// nests children natively); actors are `<ActorDef>` tags that forward
+		// nests children natively); actors are `<CreateActor>` tags that forward
 		// their seed/tool children through a `<Slot/>`.
 		let source = r#"
 <div {Thread}>
-	<ActorDef name="System" kind="System">
+	<CreateActor name="System" kind="System">
 		<CreatePost text="be helpful"/>
-	</ActorDef>
-	<ActorDef name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}/>
+	</CreateActor>
+	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}/>
 </div>
 "#;
 		let template = BsxTemplate::parse_entry(app.world(), source).unwrap();
 		let thread = template.spawn(app.world_mut()).unwrap();
-		reduce_threads_now(app.world_mut());
+		ThreadWindow::reduce_now(app.world_mut());
 
 		// the window holds both actors and the seed post
 		let window = app.world().get::<ThreadWindow>(thread).unwrap();

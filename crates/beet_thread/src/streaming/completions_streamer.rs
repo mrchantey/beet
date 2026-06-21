@@ -129,7 +129,9 @@ impl CompletionsStreamer {
 
 					let tool_choice =
 						query.tool_choice(actor_entity).map(|choice| {
-							completions_mapper::tool_choice_to_completions(choice)
+							completions_mapper::tool_choice_to_completions(
+								choice,
+							)
 						});
 
 					#[allow(deprecated)]

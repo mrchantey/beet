@@ -1,7 +1,9 @@
-<div {Thread}>
-	<ActorDef id=1 name="System" kind="System">
-		<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>
-	</ActorDef>
-	<ActorDef id=2 name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
-	<ActorDef id=3 name="User" kind="User"/>
+<div {Repeat}>
+	<div {Thread} {Sequence}>
+		<CreateActor id=1 name="System" kind="System">
+			<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>
+		</CreateActor>
+		<CreateActor id=2 name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
+		<CreateActor id=3 name="User" kind="User" {UserInput}/>
+	</div>
 </div>

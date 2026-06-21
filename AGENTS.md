@@ -49,6 +49,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
 - We prefer `use crate::prelude::*` and `use other_crate::prelude::*;`, instead of individual imports.
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
+- Generally in beet mod files are just reexports, aside from the occasional high level plugin, prefer to split up into more specific sub files.
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - we never mark #[deprecated] because we have no users, instead replace existing machinery
 - prefer method chaining over if statements, but dont use `for_each`. ie  this is correct`for child in children.iter().filter(query.contains}`
