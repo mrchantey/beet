@@ -18,7 +18,7 @@ use beet_net::prelude::*;
 #[reflect(Component, Default)]
 #[require(
 	ActionTrigger<Request, Response>,
-	ExchangeAction = ExchangeAction(route_action()),
+	ExchangeAction = ExchangeAction::new(route_action()),
 )]
 pub struct Router;
 

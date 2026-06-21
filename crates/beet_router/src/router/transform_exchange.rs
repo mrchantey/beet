@@ -1,89 +1,69 @@
-//! Type-erased action and response-conversion traits for route dispatch.
+//! The typed-route transform: build an [`ExchangeAction`] from a typed handler.
 //!
-//! [`ExchangeAction`] wraps a typed action into a uniform
-//! `Action<Request, Response>` so the router can dispatch without
-//! knowing concrete input/output types. [`ExchangeRouteOut`] converts
-//! an action's output into a [`Response`].
+//! A route handler is a typed `Action<In, Out>` where `In: FromRequest` and
+//! `Out: ExchangeRouteOut`. The router dispatches through the type-erased
+//! [`ExchangeAction`] (defined in `beet_net`), which only speaks
+//! `Request -> Response`. [`TransformExchange`] bridges the two: it wraps a typed
+//! handler in an [`ExchangeAction`] that extracts the input from the request and
+//! converts the output into a response. [`ExchangeRouteOut`] is the output half of
+//! that conversion.
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-/// Type-erased `Action<Request, Response>` stored on each route entity.
-/// Handles request extraction and response conversion so the router
-/// can dispatch uniformly.
-#[derive(Clone, Component)]
-pub struct ExchangeAction {
-	inner: Action<Request, Response>,
-}
+/// Builds the type-erased [`ExchangeAction`] for a typed route handler.
+///
+/// A purely namespacing type: its [`new`](Self::new) /
+/// [`new_detached`](Self::new_detached) constructors wrap a typed
+/// `Action<In, Out>` (with `In: FromRequest`, `Out: ExchangeRouteOut`) in an
+/// [`ExchangeAction`] that extracts the request input and converts the output to a
+/// [`Response`].
+pub enum TransformExchange {}
 
-impl ExchangeAction {
-	/// Creates an exchange action that calls the entity's own typed action,
+impl TransformExchange {
+	/// Builds an [`ExchangeAction`] that calls the entity's own typed action,
 	/// extracting input from the request and converting output to a response.
-	pub fn new<In, Out, M1, M2>() -> Self
+	pub fn new<In, Out, M1, M2>() -> ExchangeAction
 	where
 		In: 'static + Send + Sync + FromRequest<M1>,
 		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
 	{
-		Self {
-			inner: Action::new_async(
-				async |cx: ActionContext<Request>| -> Result<Response> {
-					let parts = cx.input.parts().clone();
-					let input = In::from_request(cx.input).await?;
-					let output: Out = cx.caller.call(input).await?;
-					output.into_route_response(cx.caller, parts).await
-				},
-			),
-		}
+		ExchangeAction::new(Action::new_async(
+			async |cx: ActionContext<Request>| -> Result<Response> {
+				let parts = cx.input.parts().clone();
+				let input = In::from_request(cx.input).await?;
+				let output: Out = cx.caller.call(input).await?;
+				output.into_route_response(cx.caller, parts).await
+			},
+		))
 	}
 
-	/// Wraps an existing `Action<Request, Response>` directly.
-	/// Use this when you already have a fully constructed action
-	/// that handles its own request/response lifecycle.
-	pub fn from_action(action: Action<Request, Response>) -> Self {
-		Self { inner: action }
-	}
-
-	/// Creates an exchange action that calls a detached inner action
+	/// Builds an [`ExchangeAction`] that calls a detached inner action
 	/// instead of the entity's own action.
-	pub fn new_detached<In, Out, Inner, M1, M2, M3>(inner: Inner) -> Self
+	pub fn new_detached<In, Out, Inner, M1, M2, M3>(
+		inner: Inner,
+	) -> ExchangeAction
 	where
 		In: 'static + Send + Sync + FromRequest<M1>,
 		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
 		Inner: 'static + Send + Sync + IntoAction<M3, In = In, Out = Out>,
 	{
 		let inner = inner.into_action();
-		Self {
-			inner: Action::new_async(
-				async move |cx: ActionContext<Request>| -> Result<Response> {
-					let parts = cx.input.parts().clone();
-					let input = In::from_request(cx.input).await?;
-					let output: Out =
-						cx.caller.call_detached(inner, input).await?;
-					output.into_route_response(cx.caller, parts).await
-				},
-			),
-		}
-	}
-
-	/// Dispatches a request through this exchange action on the given entity.
-	pub async fn call(
-		&self,
-		entity: AsyncEntity,
-		request: Request,
-	) -> Result<Response> {
-		entity.call_detached(self.inner.clone(), request).await
+		ExchangeAction::new(Action::new_async(
+			async move |cx: ActionContext<Request>| -> Result<Response> {
+				let parts = cx.input.parts().clone();
+				let input = In::from_request(cx.input).await?;
+				let output: Out = cx.caller.call_detached(inner, input).await?;
+				output.into_route_response(cx.caller, parts).await
+			},
+		))
 	}
 }
 
-impl IntoAction<Self> for ExchangeAction {
-	type In = Request;
-	type Out = Response;
-	fn into_action(self) -> Action<Request, Response> { self.inner }
-}
-
-/// Trait for converting an action's output into a [`Response`].
+/// Trait for converting a typed handler's output into a [`Response`], the output
+/// half of the [`TransformExchange`] conversion.
 ///
 /// Blanket impls cover the main cases:
 /// - Types implementing [`Serialize`] (serde content negotiation)
@@ -163,8 +143,8 @@ pub fn route<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {
 	(PathPartial::new(path), bundle)
 }
 
-/// Creates a route bundle from a path and action, including the
-/// [`ExchangeAction`] for type-erased dispatch.
+/// Creates a route bundle from a path and action, including the type-erased
+/// [`ExchangeAction`] (built by [`TransformExchange::new_detached`]) for dispatch.
 pub fn exchange_route<In, Out, M, M1, M2, B>(
 	path: &str,
 	action: B,
@@ -177,6 +157,6 @@ where
 	(
 		PathPartial::new(path),
 		action.clone(),
-		ExchangeAction::new_detached(action),
+		TransformExchange::new_detached(action),
 	)
 }

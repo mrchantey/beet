@@ -1,72 +1,72 @@
-//! Core exchange types for request/response handling via the action pattern.
+//! Request dispatch through an entity's [`ExchangeAction`], plus [`ExchangeEnd`]
+//! for observability.
 //!
-//! This module provides [`ExchangeExt`] for ergonomic request/response
-//! exchanges on entities that have an [`Action<Request, Response>`] component,
-//! and [`ExchangeEnd`] for observability.
+//! The entity's own [`Action<Request, Response>`] slot is the *exchangeable*
+//! action a caller invokes with [`call`](beet_action::prelude::AsyncEntityActionExt::call)
+//! (a server host fills it with an `ActionTrigger`). Dispatch is separate: an
+//! [`ExchangeAction`] holds the request handler the higher layer (`beet_router`)
+//! installs, and [`exchange`](ExchangeExt::exchange) dispatches it. This lets
+//! `beet_net` dispatch a request without naming the router, and lets one host both
+//! fan a boot out (its slot) and dispatch per-request (its [`ExchangeAction`]).
 use super::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Extension trait for performing request/response exchanges on entities
-/// with an [`Action<Request, Response>`] component.
+/// An arbitrary `Request -> Response` handler that an
+/// [`exchange`](ExchangeExt::exchange) call dispatches.
 ///
-/// This is a thin convenience wrapper around the action call pattern,
-/// converting the `Result<Response>` into a `Response` by logging
-/// errors and returning an internal error response on failure.
+/// The raw dispatch hook: it holds a fully constructed `Action<Request, Response>`
+/// and nothing more. `beet_router`'s `Router` installs one wrapping the route-tree
+/// dispatch; a test installs one wrapping a bare handler. Held off the entity's
+/// [`Action`] slot (which a server fills with an `ActionTrigger`), so a host can
+/// both fan a boot out and dispatch per-request.
+#[derive(Clone, Component)]
+pub struct ExchangeAction(pub Action<Request, Response>);
+
+impl ExchangeAction {
+	/// Wraps an existing `Action<Request, Response>` as the dispatch hook.
+	pub fn new(action: Action<Request, Response>) -> Self { Self(action) }
+
+	/// Dispatches a request through this exchange action on the given entity.
+	pub async fn call(
+		&self,
+		entity: AsyncEntity,
+		request: Request,
+	) -> Result<Response> {
+		entity.call_detached(self.0.clone(), request).await
+	}
+}
+
+impl IntoAction<Self> for ExchangeAction {
+	type In = Request;
+	type Out = Response;
+	fn into_action(self) -> Action<Request, Response> { self.0 }
+}
+
+/// Extension trait for dispatching a request through an entity's
+/// [`ExchangeAction`] from an owned [`EntityWorldMut`].
 ///
-/// std-only: it drives the app to completion via `run_async_then`, which needs
-/// the std [`AsyncRunner`]. no_std consumers use [`AsyncExchangeExt`] on an
+/// std-only: it drives the app to completion via `run_async_then`, which needs the
+/// std [`AsyncRunner`]. no_std consumers use [`AsyncExchangeExt`] on an
 /// [`AsyncEntity`] instead.
 #[cfg(feature = "std")]
-#[extend::ext(name=ExchangeExt)]
+#[extend::ext(name = ExchangeExt)]
 pub impl EntityWorldMut<'_> {
-	/// Send a request and await the response.
+	/// Dispatch a request and await the response.
 	///
-	/// If the action call fails, logs the error and returns
-	/// [`Response::internal_error`].
+	/// If dispatch fails, logs the error and returns [`Response::internal_error`].
 	fn exchange(
 		mut self,
 		request: impl Into<Request>,
 	) -> impl Future<Output = Response> {
-		let start_time = Instant::now();
 		let request = request.into();
-		let method = *request.method();
-		let path = request.path_string();
 		async move {
-			self.run_async_then(async move |entity| {
-				let res = entity.call(request).await.unwrap_or_else(|err| {
-					error!(
-						"Exchange failed on entity {:?}: {}",
-						entity.id(),
-						err
-					);
-					Response::internal_error()
-				});
-				trace!(
-					"Exchange on {:?} completed in {:?}",
-					entity.id(),
-					start_time.elapsed()
-				);
-				let status = res.status();
-				entity
-					.trigger(move |entity| ExchangeEnd {
-						entity,
-						method,
-						path,
-						start_time,
-						status,
-					})
-					.await
-					.ok();
-				res
-			})
-			.await
+			self.run_async_then(move |entity| exchange(entity, request))
+				.await
 		}
 	}
 
-	/// Exchange a request and return the response body as a string.
-	///
-	/// Convenience method for testing and debugging.
+	/// Dispatch a request and return the response body as a string. For tests.
 	fn exchange_str(
 		self,
 		request: impl Into<Request>,
@@ -76,53 +76,21 @@ pub impl EntityWorldMut<'_> {
 	}
 }
 
-/// Extension trait for performing request/response exchanges on
-/// [`AsyncEntity`] handles.
-#[extend::ext(name=AsyncExchangeExt)]
+/// Extension trait for dispatching a request through an entity's
+/// [`ExchangeAction`] from an [`AsyncEntity`] handle.
+#[extend::ext(name = AsyncExchangeExt)]
 pub impl AsyncEntity {
-	/// Send a request and await the response.
+	/// Dispatch a request and await the response.
 	///
-	/// If the action call fails, logs the error and returns
-	/// [`Response::internal_error`].
+	/// If dispatch fails, logs the error and returns [`Response::internal_error`].
 	fn exchange(
 		&self,
 		request: impl Into<Request>,
 	) -> impl MaybeSend + Future<Output = Response> {
-		let start_time = Instant::now();
-		let request = request.into();
-		let method = *request.method();
-		let path = request.path_string();
-		let entity = self.clone();
-		let fut = self.call::<Request, Response>(request);
-		async move {
-			let res = match fut.await {
-				Ok(res) => res,
-				Err(err) => {
-					error!("Exchange failed: {}", err);
-					Response::internal_error()
-				}
-			};
-			// fire `ExchangeEnd` so `exchange_stats` can log method/path/status/
-			// duration. This is the live-server path (mini/hyper backends call
-			// through here), mirroring the std `ExchangeExt::exchange` variant.
-			let status = res.status();
-			entity
-				.trigger(move |entity| ExchangeEnd {
-					entity,
-					method,
-					path,
-					start_time,
-					status,
-				})
-				.await
-				.ok();
-			res
-		}
+		exchange(self.clone(), request.into())
 	}
 
-	/// Exchange a request and return the response body as a string.
-	///
-	/// Convenience method for testing and debugging.
+	/// Dispatch a request and return the response body as a string. For tests.
 	fn exchange_str(
 		&self,
 		request: impl Into<Request>,
@@ -132,16 +100,48 @@ pub impl AsyncEntity {
 	}
 }
 
+/// Dispatch `request` through `entity`'s [`ExchangeAction`], then fire
+/// [`ExchangeEnd`] so [`exchange_stats`] can log the request. The shared body of
+/// both `exchange` extension traits.
+async fn exchange(entity: AsyncEntity, request: Request) -> Response {
+	let start_time = Instant::now();
+	let method = *request.method();
+	let path = request.path_string();
+	let res = match entity.get_cloned::<ExchangeAction>().await {
+		Ok(action) => entity
+			.call_detached(action.0, request)
+			.await
+			.unwrap_or_else(|err| {
+				error!("Exchange failed on {:?}: {}", entity.id(), err);
+				Response::internal_error()
+			}),
+		Err(_) => {
+			error!("No ExchangeAction on entity {:?}", entity.id());
+			Response::internal_error()
+		}
+	};
+	let status = res.status();
+	entity
+		.trigger(move |entity| ExchangeEnd {
+			entity,
+			method,
+			path,
+			start_time,
+			status,
+		})
+		.await
+		.ok();
+	res
+}
+
 /// Event triggered when an exchange completes.
 ///
-/// Carries the request method/path captured at dispatch plus the response
-/// status and start time, so observers (eg [`exchange_stats`]) can log
-/// per-request info without a [`RequestMeta`] component on the handler entity
-/// (the live-server path dispatches the request through `call`, not as a
-/// spawned component).
+/// Carries the request method/path captured at dispatch plus the response status
+/// and start time, so observers (eg [`exchange_stats`]) can log per-request info
+/// without a [`RequestMeta`] component on the handler entity.
 #[derive(Clone, EntityEvent)]
 pub struct ExchangeEnd {
-	/// The entity that handled this exchange.
+	/// The entity that dispatched this request.
 	pub entity: Entity,
 	/// The request method, captured at dispatch.
 	pub method: HttpMethod,
@@ -159,7 +159,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
-	async fn missing_action_returns_error() {
+	async fn missing_exchange_action_returns_error() {
 		AsyncPlugin::world()
 			.spawn_empty()
 			.exchange(Request::get("foo"))
@@ -171,7 +171,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(exchange_handler(|req| req.take().mirror()))
+			.spawn(ExchangeAction(exchange_handler(|req| req.take().mirror())))
 			.exchange(Request::get("foo"))
 			.await
 			.status()
@@ -182,7 +182,9 @@ mod test {
 	#[beet_core::test]
 	async fn exchange_str_works() {
 		AsyncPlugin::world()
-			.spawn(exchange_handler(|_| Response::ok().with_body("hello")))
+			.spawn(ExchangeAction(exchange_handler(|_| {
+				Response::ok().with_body("hello")
+			})))
 			.exchange_str(Request::get("foo"))
 			.await
 			.xpect_eq("hello".to_string());

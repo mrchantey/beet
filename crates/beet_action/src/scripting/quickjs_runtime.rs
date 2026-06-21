@@ -1,3 +1,4 @@
+use crate::prelude::ConsoleStream;
 use beet_core::prelude::*;
 use rquickjs::Context;
 use rquickjs::Function;
@@ -47,15 +48,6 @@ where
 	})
 }
 
-/// Which host stream a [`run_quickjs_console`] call targets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConsoleStream {
-	/// `console.log`/`info`/`debug`.
-	Stdout,
-	/// `console.warn`/`error`.
-	Stderr,
-}
-
 /// The `console` shim installed before a [`run_quickjs_console`] script: each call
 /// formats its args and forwards them straight to the `__console_write` FFI sink, so
 /// output reaches the host the moment the call runs (not buffered until `eval`
@@ -86,7 +78,7 @@ const CONSOLE_PRELUDE: &str = r#"
 /// `queueMicrotask`) runs to completion, its output streaming as each job runs.
 /// Tolerates a script that returns no value (a bare `console.log("hi")`, which
 /// [`run_quickjs`] rejects). The `input` global is the serialized `input`, as in
-/// [`run_quickjs`]. This is the `RunScript` eval path.
+/// [`run_quickjs`]. The quickjs backend of [`Script::run_console`].
 ///
 /// `sink` is `FnMut` and runs on the single-threaded [`Context::full`], so it needs
 /// no `Send`.
@@ -232,7 +224,7 @@ mod test {
 		use std::rc::Rc;
 		let output = Rc::new(RefCell::new(ConsoleOutput::default()));
 		let sink = output.clone();
-		run_quickjs_console(script, input, move |stream, msg| {
+		super::run_quickjs_console(script, input, move |stream, msg| {
 			let mut out = sink.borrow_mut();
 			match stream {
 				ConsoleStream::Stdout => out.stdout.push(msg.to_string()),
@@ -256,7 +248,7 @@ mod test {
 	fn console_reads_input_and_splits_streams() {
 		let output = capture(
 			r#"console.log(input.name); console.error("oops")"#,
-			serde_json::json!({ "name": "ada" }),
+			val!({ "name": "ada" }),
 		);
 		output.stdout.xpect_eq(vec!["ada".to_string()]);
 		output.stderr.xpect_eq(vec!["oops".to_string()]);

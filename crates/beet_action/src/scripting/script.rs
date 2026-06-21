@@ -108,6 +108,36 @@ pub enum ScriptLanguage {
 	QuickJs,
 }
 
+/// Parse a language name (eg the `language` attribute of a `<script>`) into a
+/// [`ScriptLanguage`], case-insensitively. Only variants compiled in are
+/// recognized; an unknown or unavailable name is an error so the caller can fall
+/// back to the [`default`](ScriptLanguage::default).
+impl core::str::FromStr for ScriptLanguage {
+	type Err = BevyError;
+	fn from_str(name: &str) -> Result<Self> {
+		match name.to_ascii_lowercase().as_str() {
+			#[cfg(feature = "rhai")]
+			"rhai" => Ok(Self::Rhai),
+			#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
+			"quickjs" | "js" | "javascript" => Ok(Self::QuickJs),
+			other => bevybail!("unknown or unavailable script language: {other:?}"),
+		}
+	}
+}
+
+/// Which host stream a [`Script::run_console`] line targets.
+///
+/// The backend-agnostic console channel: a JS `console.log`/`info`/`debug` (or a
+/// rhai `print`) is [`Stdout`](Self::Stdout); a JS `console.warn`/`error` (or a
+/// rhai `debug`) is [`Stderr`](Self::Stderr).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsoleStream {
+	/// JS `console.log`/`info`/`debug`, or rhai `print`.
+	Stdout,
+	/// JS `console.warn`/`error`, or rhai `debug`.
+	Stderr,
+}
+
 impl<Input, Output> Script<Input, Output>
 where
 	Input: 'static + Send + Sync + Serialize,
@@ -165,6 +195,113 @@ where
 				)
 			}
 		}
+	}
+
+	/// Evaluate the script for its side effects, streaming each console line to
+	/// `sink` the moment it runs.
+	///
+	/// Unlike [`run`](Self::run) (a pure `Input -> Output` transform), this is the
+	/// console-capturing path: a JS `console.log`/`info`/`debug` (or a rhai `print`)
+	/// streams as [`ConsoleStream::Stdout`], a JS `console.warn`/`error` (or a rhai
+	/// `debug`) as [`ConsoleStream::Stderr`]. `input` is bound the same way as
+	/// [`run`](Self::run) (the `input` global). A script that returns no value (a
+	/// bare `console.log("hi")`) is tolerated, where [`run`](Self::run) would reject
+	/// it.
+	///
+	/// `sink` runs on the single-threaded engine, so it needs no `Send`.
+	///
+	/// # Errors
+	/// Propagates parse, evaluation, or input-serialization errors.
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn run_console<Sink>(&self, input: Input, sink: Sink) -> Result<()>
+	where
+		Sink: 'static + FnMut(ConsoleStream, &str),
+	{
+		match self.language {
+			#[cfg(feature = "rhai")]
+			ScriptLanguage::Rhai => {
+				crate::scripting::run_rhai_console(&self.content, input, sink)
+			}
+			#[cfg(all(
+				feature = "quickjs",
+				feature = "json",
+				not(target_arch = "wasm32")
+			))]
+			ScriptLanguage::QuickJs => {
+				crate::scripting::run_quickjs_console(&self.content, input, sink)
+			}
+			#[cfg(all(
+				feature = "quickjs",
+				not(feature = "json"),
+				not(target_arch = "wasm32")
+			))]
+			ScriptLanguage::QuickJs => {
+				let _ = (input, sink);
+				bevybail!(
+					"the quickjs `Script` backend requires the `json` feature"
+				)
+			}
+		}
+	}
+
+	/// Evaluate the script for its side effects in the wasm host, streaming each
+	/// console line to `sink`. The wasm counterpart to the native [`run_console`],
+	/// running in the surrounding realm (browser/Deno) with the same stream mapping.
+	///
+	/// The language is always JavaScript in the host realm, so [`Self::language`]
+	/// is not consulted; `input` is JSON-encoded and bound as the `input` global.
+	#[cfg(all(target_arch = "wasm32", feature = "json"))]
+	pub fn run_console<Sink>(&self, input: Input, mut sink: Sink) -> Result<()>
+	where
+		Sink: 'static + FnMut(ConsoleStream, &str),
+	{
+		use beet_core::web_utils::script_ext;
+		let input = serde_json::to_string(&input)?;
+		script_ext::eval_console(&self.content, &input, move |stream, line| {
+			// the host bridge has its own `ConsoleStream`; map it onto ours.
+			let stream = match stream {
+				script_ext::ConsoleStream::Stderr => ConsoleStream::Stderr,
+				script_ext::ConsoleStream::Stdout => ConsoleStream::Stdout,
+			};
+			sink(stream, line);
+		})
+	}
+
+	/// The wasm host console path JSON-encodes its `input`, so without `json` there
+	/// is no usable console backend on wasm. Kept so [`run_captured`](Self::run_captured)
+	/// resolves; it bails at runtime.
+	#[cfg(all(target_arch = "wasm32", not(feature = "json")))]
+	pub fn run_console<Sink>(&self, input: Input, sink: Sink) -> Result<()>
+	where
+		Sink: 'static + FnMut(ConsoleStream, &str),
+	{
+		let _ = (input, sink);
+		bevybail!("the wasm `Script` console backend requires the `json` feature")
+	}
+
+	/// Run the script for its console output, collecting each [`Stdout`] line into
+	/// the returned newline-terminated string and forwarding each [`Stderr`] line
+	/// to the host error log.
+	///
+	/// The "`node main.js`" shape: a `<script>` body run for its `console.log`,
+	/// returned as a body to stream. Built on [`run_console`](Self::run_console), so
+	/// it serves every backend (native rhai/quickjs, the wasm host realm).
+	///
+	/// [`Stdout`]: ConsoleStream::Stdout
+	/// [`Stderr`]: ConsoleStream::Stderr
+	pub fn run_captured(&self, input: Input) -> Result<String> {
+		let lines = Store::<Vec<String>>::default();
+		let captured = lines.clone();
+		self.run_console(input, move |stream, line| match stream {
+			ConsoleStream::Stdout => captured.push(line.to_string()),
+			ConsoleStream::Stderr => cross_log_error!("{line}"),
+		})?;
+		lines
+			.get()
+			.into_iter()
+			.map(|line| line + "\n")
+			.collect::<String>()
+			.xok()
 	}
 }
 

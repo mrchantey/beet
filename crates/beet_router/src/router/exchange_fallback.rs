@@ -37,7 +37,7 @@ pub fn exchange_fallback() -> impl Bundle {
 	);
 	(
 		ExcludeErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
-		ExchangeAction::from_action(action.clone()),
+		ExchangeAction::new(action.clone()),
 		action,
 	)
 }
