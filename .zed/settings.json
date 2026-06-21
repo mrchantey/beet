@@ -103,7 +103,7 @@
 		".beet",
 		".claude",
 		// ".gitignore",
-		".env.example",
+		// ".env.example",
 		".github",
 		".playwright-cli",
 		".vscode",

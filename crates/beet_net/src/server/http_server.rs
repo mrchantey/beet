@@ -42,9 +42,9 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 
 /// HTTP server that listens for incoming requests, dispatching each through the
-/// host's [`DispatchExchange`] via `entity.exchange`.
+/// host's `Action<Request, Response>` dispatch slot via `entity.exchange`.
 ///
-/// A long-running server: the boot fan-out ([`ActionIn<Request>`]) whose
+/// A long-running server: the boot fan-out ([`ActionIn<Boot>`]) whose
 /// `--server` selects `"http"` boots it through the backend [`ServerPlugin`]
 /// installed via [`set_http_server`], reading `--port` / `--host` from the boot
 /// request. It never resolves the boot call, so the host's [`Running<Response>`]
@@ -68,12 +68,12 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// world.spawn((
 ///     HttpServer::default(),
 ///     exchange_handler(|req| req.mirror()),
-/// )).boot(Request::get("/"));
+/// )).trigger(ActionIn::boot);
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = on_add)]
-#[require(ExchangeStats)]
+#[require(ExchangeStats, ContinueRun<Boot, Response>)]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
 	/// an available port (equivalent to binding to port `0`).
@@ -164,7 +164,7 @@ impl HttpServer {
 	}
 }
 
-/// Registers the boot ([`ActionIn<Request>`]) and teardown
+/// Registers the boot ([`ActionIn<Boot>`]) and teardown
 /// (`On<Remove, Running<Response>>`) observers on the host. no_std-clean: the
 /// async runtime (`queue_async_local`) and the installed backend hook both build
 /// without std.
@@ -191,18 +191,18 @@ struct HttpServerShutdown(Option<OnceValue<()>>);
 /// never resolves the boot call, so the host's [`Running<Response>`] parks the
 /// process up.
 fn on_action_in(
-	ev: On<ActionIn<Request>>,
+	ev: On<ActionIn<Boot>>,
 	mut servers: Query<&mut HttpServer>,
 	mut commands: Commands,
 ) -> Result {
 	let entity = ev.entity;
-	// read the request (without consuming it: the http server is a reader, never
-	// the taker) for the `--server` selection and the `--port` / `--host` config.
-	let selected = ev.with(|req| {
-		let selected = request_selects_server(req, "http");
+	// read the boot (without consuming it: the http server is a reader, never the
+	// taker) for the `--server` selection and the `--port` / `--host` config.
+	let selected = ev.with(|boot| {
+		let selected = request_selects_server(boot, "http");
 		if selected {
 			if let Ok(mut server) = servers.get_mut(entity) {
-				server.apply_request(req);
+				server.apply_request(boot);
 			}
 		}
 		selected
@@ -328,20 +328,14 @@ mod tests {
 		.ok();
 	}
 
-	/// Fire the boot exchange on the host's `ActionTrigger` slot (fire-and-forget:
-	/// the call fans out and parks). The host carries an `ActionTrigger` so the
-	/// call reaches the http observer, exactly as a real `Router` host does.
+	/// Fire the boot exchange on the host's `ContinueRun<Boot, Response>` slot
+	/// (fire-and-forget: the call fans out and parks). `HttpServer` provides that
+	/// slot, so the call reaches the http observer exactly as a real boot does.
 	fn boot(app: &mut App, port: u16, request: Request) -> Entity {
-		let entity = app
-			.world_mut()
-			.spawn((
-				HttpServer::new(port),
-				ActionTrigger::<Request, Response>::default(),
-			))
-			.id();
+		let entity = app.world_mut().spawn(HttpServer::new(port)).id();
 		app.world_mut().entity_mut(entity).run_async_local(
 			move |host| async move {
-				host.call::<Request, Response>(request).await?;
+				host.call::<Boot, Response>(Boot::from(request)).await?;
 				Ok(())
 			},
 		);
@@ -508,9 +502,9 @@ pub(crate) mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					DispatchExchange(exchange_handler(move |req| {
+					exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
-					})),
+					}),
 				))
 				.run();
 		});
@@ -563,9 +557,9 @@ pub(crate) mod test {
 						port: Some(port),
 						..default()
 					},
-					DispatchExchange(exchange_handler(|_| {
+					exchange_handler(|_| {
 						Response::ok().with_body("up")
-					})),
+					}),
 					OnSpawn::new_async(move |entity| {
 						start_mini_http_server_with_tcp(
 							entity, listener, shutdown,

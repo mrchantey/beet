@@ -50,7 +50,7 @@ fn setup(mut commands: Commands) -> Result {
 			FsStore::new(WsPathBuf::new("examples/assets")),
 			router_scene()?,
 		))
-		.trigger(ActionIn::boot);
+		.trigger(ActionIn::<Boot>::boot);
 	Ok(())
 }
 

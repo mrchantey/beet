@@ -32,7 +32,7 @@ fn main() {
 		// build feature selected.
 		commands
 			.spawn((site_server(), rsx_site_router()))
-			.trigger(ActionIn::boot);
+			.trigger(ActionIn::<Boot>::boot);
 	});
 	app.run();
 }

@@ -59,7 +59,7 @@ fn main() -> Result {
 				render_action::func_route("about", |_: ()| about()),
 			],
 		))
-		.trigger(ActionIn::boot);
+		.trigger(ActionIn::<Boot>::boot);
 
 	app.run();
 	Ok(())

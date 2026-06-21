@@ -56,7 +56,7 @@ fn main() -> AppExit {
 	#[cfg(feature = "ssh")]
 	app.init_plugin::<SshTuiPlugin>();
 
-	// the process exits when `bootstrap` writes `AppExit` for the one-shot it
+	// the process exits when `boot` writes `AppExit` for the one-shot it
 	// resolves; a long-running server parks its boot call, so its unresolved
 	// `Running<Response>` persists the process with no refcount.
 	app.add_systems(Startup, load_entry).run()

@@ -18,9 +18,10 @@ impl Plugin for ServerPlugin {
 			// the markup load verb (and its opt-out), so a
 			// `<Router {(.., BootOnLoad)}>` entry resolves them.
 			.register_type::<BootOnLoad>()
+			.register_type::<ExchangeOnLoad>()
 			.register_type::<DisableBootOnLoad>();
 
-		// the process exits when `bootstrap` writes `AppExit` for the one-shot it
+		// the process exits when `boot` writes `AppExit` for the one-shot it
 		// resolves; a long-running server never resolves its boot call, so its
 		// parked `Running<Response>` holds the run open with no refcount.
 
@@ -74,9 +75,9 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					DispatchExchange(exchange_handler(|_| {
+					exchange_handler(|_| {
 						Response::ok().with_body("hello")
-					})),
+					}),
 				))
 				.run();
 		});

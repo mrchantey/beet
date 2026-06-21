@@ -32,11 +32,9 @@ fn main() {
 				.spawn((
 					HttpServer::default(),
 					Count::default(),
-					DispatchExchange(Action::<Request, Response>::new_system(
-						router,
-					)),
+					Action::<Request, Response>::new_system(router),
 				))
-				.trigger(ActionIn::boot);
+				.trigger(ActionIn::<Boot>::boot);
 		})
 		.run();
 }

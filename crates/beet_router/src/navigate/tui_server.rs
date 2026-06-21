@@ -25,6 +25,7 @@ use beet_ui::prelude::*;
 /// this on its router entity, then booting it.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
+#[require(ContinueRun<Boot, Response>)]
 #[component(on_add = on_add)]
 pub struct TuiServer;
 
@@ -33,7 +34,7 @@ pub struct TuiServer;
 #[derive(Component)]
 struct TuiHost(Entity);
 
-/// Registers the boot ([`ActionIn<Request>`]) and teardown
+/// Registers the boot ([`ActionIn<Boot>`]) and teardown
 /// (`On<Remove, Running<Response>>`) observers on the router.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
@@ -47,12 +48,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 /// Records the opening route on the router (the shared mechanism the SSH server
 /// also reads) and never resolves the boot call, so its `Running` parks the
 /// process up.
-fn on_action_in(ev: On<ActionIn<Request>>, mut commands: Commands) -> Result {
-	let (selected, opening, scheme) = ev.with(|req| {
+fn on_action_in(ev: On<ActionIn<Boot>>, mut commands: Commands) -> Result {
+	let (selected, opening, scheme) = ev.with(|boot| {
 		(
-			request_selects_server(req, "tui"),
-			OpeningRoute::from_request(req),
-			req.get_param("color-scheme").and_then(ColorScheme::parse),
+			request_selects_server(boot, "tui"),
+			OpeningRoute::from_request(boot),
+			boot.get_param("color-scheme").and_then(ColorScheme::parse),
 		)
 	})?;
 	if !selected {
@@ -61,7 +62,7 @@ fn on_action_in(ev: On<ActionIn<Request>>, mut commands: Commands) -> Result {
 	commands
 		.entity(ev.entity)
 		.insert(opening)
-		.queue_async_local(move |entity| boot(entity, scheme));
+		.queue_async_local(move |entity| start_tui(entity, scheme));
 	Ok(())
 }
 
@@ -78,7 +79,7 @@ fn on_running_removed(
 	}
 }
 
-async fn boot(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
+async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 	// a briefly-spawned server (eg during serialization) has no business booting
 	if !entity.is_alive().await {
 		return Ok(());

@@ -12,13 +12,13 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint server: observes the boot [`ActionIn<Request>`], routes the
-/// request through the host's [`DispatchExchange`], then either resolves the boot
-/// call or streams the response and exits itself, whichever the boot path needs.
+/// The entrypoint server: observes the boot [`ActionIn<Boot>`], routes the inner
+/// request through the host's dispatch slot, then either resolves the boot call or
+/// streams the response and exits itself, whichever the boot path needs.
 ///
-/// Two boot paths land here. The full [`bootstrap`] fires `ActionIn` behind a
+/// Two boot paths land here. The full [`boot`] fires `ActionIn<Boot>` behind a
 /// `Running<Response>` keep-alive, so `CliServer` resolves it with an [`EndRun`]
-/// and `bootstrap` streams the response. A direct `trigger(ActionIn::boot)` has no
+/// and `boot` streams the response. A direct `trigger(ActionIn::boot)` has no
 /// `Running`, so `CliServer` streams the response and writes the [`AppExit`] itself.
 ///
 /// This is how every beet binary boots by default: spread it on the entry root,
@@ -30,6 +30,7 @@ use beet_core::prelude::*;
 /// for example `--accept=text/html,text/plain`.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
+#[require(ContinueRun<Boot, Response>)]
 #[component(on_add = on_add)]
 pub struct CliServer;
 
@@ -38,10 +39,10 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 /// On the boot fan-out, if `--server` selects `cli`, route the request and resolve
-/// the boot call. The selection check reads the request (without consuming it);
-/// the take is deferred into the task, so a co-observer's read never races it.
-fn on_action_in(ev: On<ActionIn<Request>>, mut commands: Commands) -> Result {
-	if !ev.with(|req| request_selects_server(req, "cli"))? {
+/// the boot call. The selection check reads the boot (without consuming it); the
+/// take is deferred into the task, so a co-observer's read never races it.
+fn on_action_in(ev: On<ActionIn<Boot>>, mut commands: Commands) -> Result {
+	if !ev.with(|boot| request_selects_server(boot, "cli"))? {
 		return Ok(());
 	}
 	let action_in = ev.clone();
@@ -62,13 +63,13 @@ fn default_accept() -> Vec<MediaType> {
 }
 
 /// Route the request through the host, then hand the response to whichever boot
-/// path called us: resolve the `Running` keep-alive if [`bootstrap`] set one (it
+/// path called us: resolve the `Running` keep-alive if [`boot`] set one (it
 /// streams and exits), otherwise stream and exit here ourselves.
 async fn route_and_end(
 	host: AsyncEntity,
-	action_in: ActionIn<Request>,
+	action_in: ActionIn<Boot>,
 ) -> Result {
-	let request = action_in.take()?;
+	let request = action_in.take()?.0;
 	let accept = request
 		.get_param("accept")
 		.map(MediaType::from_accepts)
@@ -76,7 +77,7 @@ async fn route_and_end(
 	let response = host
 		.exchange(request.with_header::<header::Accept>(accept))
 		.await;
-	// the full bootstrap path parks on a Running; resolve it so bootstrap streams.
+	// the full boot path parks on a Running; resolve it so `boot` streams.
 	// a direct `trigger(ActionIn::boot)` has none, so stream and exit ourselves.
 	if host
 		.with(|entity| entity.contains::<Running<Response>>())

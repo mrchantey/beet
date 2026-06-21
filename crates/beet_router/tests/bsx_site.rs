@@ -185,14 +185,14 @@ async fn http_server_declarable_in_markup() {
 		.unwrap()
 		.port
 		.xpect_eq(Some(0));
-	// the boot fan-out boots the declared server via the runtime hook: firing
-	// the host's `ActionTrigger` slot reaches the http observer. The call is
-	// fire-and-forget: the http boot never resolves (the host parks on its
+	// the boot fan-out boots the declared server via the runtime hook: calling
+	// the host's `ContinueRun<Boot, Response>` slot reaches the http observer. The
+	// call is fire-and-forget: the http boot never resolves (the host parks on its
 	// `Running<Response>`), so the stub backend flags the entity then parks.
 	world.run_async_local(move |async_world| async move {
 		async_world
 			.entity(root)
-			.call::<Request, Response>(Request::get("/"))
+			.call::<Boot, Response>(Boot::from(Request::get("/")))
 			.await?;
 		Ok(())
 	});

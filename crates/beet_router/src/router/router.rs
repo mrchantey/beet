@@ -3,28 +3,25 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Markup component for an entry that routes: it occupies the entity's action
-/// slot with an [`ActionTrigger`] (so the boot exchange fans out to any servers
-/// present) and installs an [`DispatchExchange`] (the route-tree dispatch, reached
-/// via [`exchange`](beet_net::prelude::AsyncExchangeExt::exchange)).
+/// Markup component for an entry that routes: it fills the entity's
+/// `Action<Request, Response>` slot with [`route_action`], the route-tree dispatch
+/// reached via [`exchange`](beet_net::prelude::AsyncExchangeExt::exchange).
 ///
-/// Splitting the two lets one host both fan a boot out (its slot) and dispatch
-/// per-request (its [`DispatchExchange`]): a [`CliServer`] resolves the boot by
-/// routing, an [`HttpServer`] parks and routes each socket request.
+/// `Router` is pure dispatch and observes nothing; the boot slot
+/// (`Action<Boot, Response>`) is provided by whatever server is spread alongside it
+/// (a [`CliServer`] resolves the boot by routing, an [`HttpServer`] parks and routes
+/// each socket request).
 ///
 /// `Reflect` is derived unconditionally: reflection works on no_std and is wanted
 /// there for scene loading.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(
-	ActionTrigger<Request, Response>,
-	DispatchExchange = DispatchExchange::new(route_action()),
-)]
+#[require(Action<Request, Response> = route_action())]
 pub struct Router;
 
-/// The route-tree dispatch behind a router's [`DispatchExchange`]: matches the request
-/// against the ancestor [`RouteTree`] and applies ancestor [`MiddlewareList`]
-/// around the matched action.
+/// The route-tree dispatch behind a router's `Action<Request, Response>` slot:
+/// matches the request against the ancestor [`RouteTree`] and applies ancestor
+/// [`MiddlewareList`] around the matched action.
 ///
 /// When no route matches, the std build renders contextual not-found help through
 /// the beet_ui scene pipeline; the no_std build falls back to a plain-text `404`
@@ -53,8 +50,12 @@ pub fn route_action() -> Action<Request, Response> {
 					// surface matched dynamic segments (`:id`) to the handler
 					node.merge_path_params(&mut request);
 					let entity = world.entity(node.entity);
-					match entity.clone().get_cloned::<DispatchExchange>().await {
-						Ok(action) => (action.into_action(), entity),
+					match entity
+						.clone()
+						.get_cloned::<Action<Request, Response>>()
+						.await
+					{
+						Ok(action) => (action, entity),
 						Err(err) => return Ok(err.into_response()),
 					}
 				}

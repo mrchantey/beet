@@ -50,7 +50,7 @@ fn setup(mut commands: Commands) -> Result {
 		if #[cfg(feature = "deploy")] {
 			commands
 				.spawn(infra_scene()?)
-				.trigger(ActionIn::boot);
+				.trigger(ActionIn::<Boot>::boot);
 		} else {
 			let _ = &mut commands;
 			bevybail!("the deploy_beet_site example requires the `fargate_block` feature");

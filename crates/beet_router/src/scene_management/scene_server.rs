@@ -200,9 +200,9 @@ mod test {
 	/// live — the server received the bytes, swapped them in via `set_scene`, and
 	/// now dispatches the pushed route.
 	///
-	/// The route is an `TransformExchangeScript`: its reflectable component re-derives its
-	/// runtime dispatch (`DispatchExchange`) from its `#[require]` hook on load, so it
-	/// survives the round-trip (a bare `exchange_route`'s `DispatchExchange` does not,
+	/// The route is a `TransformExchangeScript`: its reflectable component re-derives
+	/// its runtime dispatch (the `RouteExchange` adapter) from its `#[require]` hook on
+	/// load, so it survives the round-trip (a bare `exchange_route`'s adapter does not,
 	/// the scene-routing constraint a device scene authors around).
 	#[beet_core::test(timeout_ms = 10000)]
 	async fn load_route_installs_pushed_scene() {

@@ -38,7 +38,7 @@ const INPUT_KEY: &str = "__beet_input";
 ///
 /// `console` `log`/`info`/`debug` forward to [`ConsoleStream::Stdout`] and
 /// `warn`/`error` to [`ConsoleStream::Stderr`]. `input` is converted to a live JS
-/// value ([`value_to_js`]) and bound as the global `input`, the wasm analogue of the
+/// value ([`Value::to_js_value`]) and bound as the global `input`, the wasm analogue of the
 /// native runtime's `input` — beet's own [`Value`], so no JSON round-trip. `console`
 /// and `input` are overridden for the eval and restored after. `sink` is captured
 /// into a `'static` JS closure, so a capturing test sink shares its buffer through an
@@ -61,7 +61,7 @@ pub fn eval_console(
 	);
 	set_global(&global, BRIDGE_KEY, bridge.as_ref())?;
 	set_global(&global, SCRIPT_KEY, &JsValue::from_str(script))?;
-	set_global(&global, INPUT_KEY, &value_to_js(input))?;
+	set_global(&global, INPUT_KEY, &input.to_js_value())?;
 
 	// run the script with a forwarding `console` and the parsed `input`, restoring
 	// both on the way out. The script and input are read from `globalThis` rather
@@ -105,45 +105,6 @@ pub fn eval_console(
 	drop(bridge);
 	result.map_err(|err| bevyhow!("script_ext: eval failed: {err:?}"))?;
 	Ok(())
-}
-
-/// Convert a beet [`Value`] into a live [`JsValue`] for binding as the script
-/// `input`, the wasm analogue of the native runtimes' input marshalling.
-///
-/// Mirrors the shape `JSON.parse` of the native JSON encoding would yield: numbers
-/// (incl. bytes) become JS numbers, a [`Value::Bytes`] an array of byte numbers, a
-/// [`Value::List`] an array, and a [`Value::Map`] an object with string keys.
-fn value_to_js(value: &Value) -> JsValue {
-	match value {
-		Value::Null => JsValue::NULL,
-		Value::Bool(bool) => JsValue::from_bool(*bool),
-		Value::Int(int) => JsValue::from_f64(*int as f64),
-		Value::Uint(uint) => JsValue::from_f64(*uint as f64),
-		Value::Float(float) => JsValue::from_f64(*float),
-		Value::Str(str) => JsValue::from_str(str),
-		Value::Bytes(bytes) => bytes
-			.iter()
-			.map(|byte| JsValue::from_f64(*byte as f64))
-			.collect::<js_sys::Array>()
-			.into(),
-		Value::List(list) => list
-			.iter()
-			.map(value_to_js)
-			.collect::<js_sys::Array>()
-			.into(),
-		Value::Map(map) => {
-			let obj = js_sys::Object::new();
-			map.iter().for_each(|(key, value)| {
-				js_sys::Reflect::set(
-					&obj,
-					&JsValue::from_str(key.as_str()),
-					&value_to_js(value),
-				)
-				.ok();
-			});
-			obj.into()
-		}
-	}
 }
 
 /// Set `key` on `target`, mapping a JS error to a [`Result`].

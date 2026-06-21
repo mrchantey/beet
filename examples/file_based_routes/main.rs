@@ -96,7 +96,7 @@ fn setup(mut commands: Commands) -> Result {
 		})
 		// boot whichever server `server_from_cli` selected (an empty filter matches
 		// it); without it the server never runs its exchange and the app loops forever.
-		.trigger(ActionIn::boot);
+		.trigger(ActionIn::<Boot>::boot);
 	Ok(())
 }
 

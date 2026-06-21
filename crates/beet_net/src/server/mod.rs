@@ -5,14 +5,13 @@
 //!
 //! ## One boot path, servers are observers
 //!
-//! [`bootstrap`] fans the process request out to a host's servers via a detached
-//! [`action_trigger`](beet_action::prelude::action_trigger): it inserts a
-//! `Running<Response>` keep-alive claim and fires an `ActionIn<Request>` the
-//! servers observe. A one-shot [`CliServer`] resolves the call (its response
-//! streams to stdout and the process exits); a long-running [`HttpServer`] /
-//! `TuiServer` parks the call, persisting the process until its `Running` is
-//! removed, which fires its teardown observer. `--server` selects which servers
-//! act. See [`bootstrap_app`] for the model.
+//! [`boot`] calls a host's `Action<Boot, Response>` slot with `Boot(request)`:
+//! the server-provided `ContinueRun<Boot, Response>` inserts a `Running<Response>`
+//! keep-alive claim and fires an `ActionIn<Boot>` the servers observe. A one-shot
+//! [`CliServer`] resolves the call (its response streams to stdout and the process
+//! exits); a long-running [`HttpServer`] / `TuiServer` parks the call, persisting
+//! the process until its `Running` is removed, which fires its teardown observer.
+//! `--server` selects which servers act. See [`boot`] for the model.
 //!
 //! ## Implementations
 //!
@@ -28,18 +27,18 @@
 
 // The `HttpServer` component and its `set_http_server` install hook are
 // no_std-capable and compile unconditionally; the concrete backends below stay
-// std/feature-gated. A server is an `ActionIn<Request>` observer torn down by
+// std/feature-gated. A server is an `ActionIn<Boot>` observer torn down by
 // observing the removal of the boot exchange's `Running<Response>`.
 mod http_server;
 pub use http_server::*;
 
-// The single bootstrap path: the `BootOnLoad` verb fans the process request out
-// to a host's servers and writes `AppExit`. std-only (it reads CLI args, streams
-// to stdout, and writes the exit).
+// The boot path: the `BootOnLoad` / `ExchangeOnLoad` verbs call a host's action
+// slot with the process request and write `AppExit`. std-only (it reads CLI args,
+// streams to stdout, and writes the exit).
 #[cfg(feature = "std")]
-mod bootstrap_app;
+mod boot;
 #[cfg(feature = "std")]
-pub use bootstrap_app::*;
+pub use boot::*;
 
 #[cfg(feature = "std")]
 mod cli_server;

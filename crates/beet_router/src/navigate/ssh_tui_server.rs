@@ -29,10 +29,11 @@ use bevy::math::UVec2;
 /// [`HttpServer`] on the same router, so one process answers http and ssh at once.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
+#[require(ContinueRun<Boot, Response>)]
 #[component(on_add = on_add)]
 pub struct SshTuiServer;
 
-/// Registers the boot ([`ActionIn<Request>`]) observer on the router, so the SSH
+/// Registers the boot ([`ActionIn<Boot>`]) observer on the router, so the SSH
 /// listener boots when the boot fan-out selects `"ssh"`.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(on_action_in);
@@ -42,19 +43,19 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 /// builds an [`SshServer`] from the request and inserts it on the router (its
 /// `on_add` starts the listener), and records the opening route. Never resolves
 /// the boot call, so its `Running` parks the process up.
-fn on_action_in(ev: On<ActionIn<Request>>, mut commands: Commands) -> Result {
-	let (selected, port, host, opening) = ev.with(|req| {
+fn on_action_in(ev: On<ActionIn<Boot>>, mut commands: Commands) -> Result {
+	let (selected, port, host, opening) = ev.with(|boot| {
 		(
-			request_selects_server(req, "ssh"),
-			req.get_param("port").and_then(|port| port.parse().ok()),
-			req.get_param("host").map(|host| {
+			request_selects_server(boot, "ssh"),
+			boot.get_param("port").and_then(|port| port.parse().ok()),
+			boot.get_param("host").map(|host| {
 				if host == "0.0.0.0" {
 					[0, 0, 0, 0]
 				} else {
 					[127, 0, 0, 1]
 				}
 			}),
-			OpeningRoute::from_request(req),
+			OpeningRoute::from_request(boot),
 		)
 	})?;
 	if !selected {

@@ -14,7 +14,6 @@ use beet_action::prelude::Script;
 use beet_action::prelude::ScriptAction;
 use beet_action::prelude::ScriptLanguage;
 use beet_core::prelude::*;
-use beet_net::prelude::DispatchExchange;
 use beet_net::prelude::FromRequest;
 use beet_net::prelude::PathPartial;
 use beet_net::prelude::Request;
@@ -116,7 +115,7 @@ async fn request_input(request: Request) -> Result<Value> {
 }
 
 /// Reflect-able marker that installs the typed [`ScriptAction`] and the
-/// type-erased [`DispatchExchange`] for a [`Script<Input, Output>`] route.
+/// [`RouteExchange`] adapter for a [`Script<Input, Output>`] route.
 ///
 /// Serves the script's typed [`Output`](Script) (eg a `String` the script
 /// returns), not its console output (that is [`ExchangeScriptElement`]). `M1`/`M2`
@@ -129,7 +128,7 @@ async fn request_input(request: Request) -> Result<Value> {
 #[reflect(where)]
 #[require(
 	ScriptAction<Input, Output>,
-	DispatchExchange = TransformExchange::new::<Input, Output, M1, M2>(),
+	RouteExchange = RouteExchange::new::<Input, Output, M1, M2>(),
 )]
 pub struct TransformExchangeScript<
 	Input = (),
@@ -218,9 +217,9 @@ pub fn ScriptRoute(
 }
 
 /// A `TransformExchangeScript` route installs the typed `ScriptAction` (hence an
-/// `ActionMeta`) and the `DispatchExchange`, so the script's output is served as the
-/// route response. Regression: requiring only `Script` left the route without an
-/// `ActionMeta`, so it never joined the `RouteTree`.
+/// `ActionMeta`) and the `RouteExchange` adapter, so the script's output is served
+/// as the route response. Regression: requiring only `Script` left the route without
+/// an `ActionMeta`, so it never joined the `RouteTree`.
 #[cfg(test)]
 #[cfg(feature = "rhai")]
 mod route_test {
@@ -281,10 +280,13 @@ mod entry_test {
 	async fn script_entry_captures_console() {
 		AsyncPlugin::world()
 			.spawn((
-				DispatchExchange(ExchangeScriptElement.into_action()),
+				ExchangeScriptElement,
 				children![Value::Str(r#"console.log("hi")"#.into())]
 			))
-			.exchange_str(Request::get("/"))
+			.call::<Request, Response>(Request::get("/"))
+			.await
+			.unwrap()
+			.unwrap_str()
 			.await
 			.xpect_eq("hi\n".to_string());
 	}
@@ -295,10 +297,13 @@ mod entry_test {
 	async fn script_entry_reads_body() {
 		AsyncPlugin::world()
 			.spawn((
-				DispatchExchange(ExchangeScriptElement.into_action()),
+				ExchangeScriptElement,
 				children![Value::Str(r#"console.log(input.body)"#.into())]
 			))
-			.exchange_str(Request::post("/").with_body("hello body"))
+			.call::<Request, Response>(Request::post("/").with_body("hello body"))
+			.await
+			.unwrap()
+			.unwrap_str()
 			.await
 			.xpect_eq("hello body\n".to_string());
 	}
@@ -313,7 +318,7 @@ mod entry_test {
 		let mut world = AsyncPlugin::world();
 		let element = world
 			.spawn((
-				DispatchExchange(ExchangeScriptElement.into_action()),
+				ExchangeScriptElement,
 				children![Value::Str(r#"print("from rhai")"#.into())]
 			))
 			.id();
@@ -324,7 +329,10 @@ mod entry_test {
 		));
 		world
 			.entity_mut(element)
-			.exchange_str(Request::get("/"))
+			.call::<Request, Response>(Request::get("/"))
+			.await
+			.unwrap()
+			.unwrap_str()
 			.await
 			.xpect_eq("from rhai\n".to_string());
 	}

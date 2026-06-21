@@ -70,5 +70,5 @@ fn setup(mut commands: Commands) {
 			),
 		]),
 		))
-		.trigger(ActionIn::boot);
+		.trigger(ActionIn::<Boot>::boot);
 }

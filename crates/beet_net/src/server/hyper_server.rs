@@ -417,9 +417,9 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					DispatchExchange(exchange_handler(move |req| {
+					exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
-					})),
+					}),
 				))
 				.run();
 		});
@@ -441,7 +441,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, DispatchExchange(mirror_exchange())))
+				.spawn((server, mirror_exchange()))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -472,7 +472,7 @@ mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
-					DispatchExchange(exchange_handler(move |req| {
+					exchange_handler(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
 							req.take().body,
@@ -491,7 +491,7 @@ mod test {
 							},
 						);
 						Response::ok().with_body(Body::stream(delayed_stream))
-					})),
+					}),
 					server,
 				))
 				.run();
@@ -579,9 +579,9 @@ mod upgrade_test {
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			app.world_mut().spawn((
 				server,
-				DispatchExchange(exchange_handler(|cx| {
+				exchange_handler(|cx| {
 					WebSocketUpgrade::from_request(&cx).into()
-				})),
+				}),
 			));
 			app.world_mut()
 				.add_observer(move |ev: On<OnWebSocketUpgrade>| {

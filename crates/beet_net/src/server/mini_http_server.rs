@@ -295,9 +295,9 @@ mod test {
 			// a route that upgrades any request to a websocket
 			app.world_mut().spawn((
 				server,
-				DispatchExchange(exchange_handler(|cx| {
+				exchange_handler(|cx| {
 					WebSocketUpgrade::from_request(&cx).into()
-				})),
+				}),
 			));
 			// record landed sockets
 			app.world_mut()

@@ -33,9 +33,9 @@ fn main() {
 			commands
 				.spawn((
 					HttpServer::default(),
-					DispatchExchange(Handler.into_action()),
+					Handler.into_action(),
 				))
-				.trigger(ActionIn::boot);
+				.trigger(ActionIn::<Boot>::boot);
 		})
 		.run();
 }

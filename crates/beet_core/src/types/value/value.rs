@@ -398,6 +398,51 @@ impl Value {
 	}
 }
 
+/// wasm-only: marshal a [`Value`] into a live JS value for a wasm script host.
+#[cfg(target_arch = "wasm32")]
+impl Value {
+	/// Convert into a live [`wasm_bindgen::JsValue`] for binding into a wasm script
+	/// host, the wasm analogue of the native runtimes' input marshalling.
+	///
+	/// Mirrors the shape `JSON.parse` of the native JSON encoding would yield:
+	/// numbers (incl. bytes) become JS numbers, [`Value::Bytes`] an array of byte
+	/// numbers, a [`Value::List`] an array, and a [`Value::Map`] an object with
+	/// string keys.
+	pub fn to_js_value(&self) -> wasm_bindgen::JsValue {
+		use wasm_bindgen::JsValue;
+		match self {
+			Value::Null => JsValue::NULL,
+			Value::Bool(bool) => JsValue::from_bool(*bool),
+			Value::Int(int) => JsValue::from_f64(*int as f64),
+			Value::Uint(uint) => JsValue::from_f64(*uint as f64),
+			Value::Float(float) => JsValue::from_f64(*float),
+			Value::Str(str) => JsValue::from_str(str),
+			Value::Bytes(bytes) => bytes
+				.iter()
+				.map(|byte| JsValue::from_f64(*byte as f64))
+				.collect::<js_sys::Array>()
+				.into(),
+			Value::List(list) => list
+				.iter()
+				.map(Value::to_js_value)
+				.collect::<js_sys::Array>()
+				.into(),
+			Value::Map(map) => {
+				let obj = js_sys::Object::new();
+				map.iter().for_each(|(key, value)| {
+					js_sys::Reflect::set(
+						&obj,
+						&JsValue::from_str(key.as_str()),
+						&value.to_js_value(),
+					)
+					.ok();
+				});
+				obj.into()
+			}
+		}
+	}
+}
+
 /// Parse the trimmed text into a number `T`, erroring with the original text.
 fn parse_number<T: core::str::FromStr>(text: &str) -> Result<T> {
 	text.trim()

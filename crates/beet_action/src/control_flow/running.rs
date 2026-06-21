@@ -1,4 +1,4 @@
-//! Long-running action support.
+//! Long-running action support and action-to-observer fan-out.
 //!
 //! In the async action model a handler resolves its [`OutHandler`] to
 //! complete a call. A *long-running* action instead defers completion: the
@@ -6,8 +6,16 @@
 //! and returns without resolving it. Some later system or event ends the run
 //! by queuing an [`EndRun`] command, which removes [`Running`] and resolves
 //! the stored handler with a value.
+//!
+//! Calling a [`ContinueRun`] also fires an [`ActionIn`] event carrying the
+//! input, so any number of observers can react to the parked call. One of them
+//! resolves it by queuing an [`EndRun`]; with no observer the call simply parks
+//! on its [`Running`]. This is how a server host fans a boot exchange out to
+//! every server that observes [`ActionIn<Request>`].
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::platform::sync::Arc;
+use bevy::platform::sync::Mutex;
 use bevy::reflect::GetTypeRegistration;
 use bevy::reflect::Typed;
 use core::marker::PhantomData;
@@ -62,11 +70,75 @@ pub enum ControlFlowError {
 	Interrupted,
 }
 
-/// Turns an action into a long-running one.
+/// Entity event carrying an action's input to its observers behind a shared
+/// handle, so many observers can read it and one can take it.
+///
+/// Fired by [`start_running`] on the caller once a [`Running<Out>`] is in place.
+/// The response returns through that [`Running`] plus an [`EndRun`], not through
+/// this event, so the non-[`Clone`] `Request`/`Response` bodies are a non-issue.
+/// Cheaply cloned via the inner [`Arc`] (no `In: Clone` bound); all clones share
+/// one slot, so a [`take`](Self::take) by any is seen by all.
+#[derive(EntityEvent)]
+pub struct ActionIn<In: 'static + Send + Sync> {
+	/// The entity the action was called on.
+	pub entity: Entity,
+	value: Arc<Mutex<Option<In>>>,
+}
+
+impl<In: 'static + Send + Sync> Clone for ActionIn<In> {
+	fn clone(&self) -> Self {
+		Self {
+			entity: self.entity,
+			value: self.value.clone(),
+		}
+	}
+}
+
+impl<In: 'static + Send + Sync> ActionIn<In> {
+	/// Wrap `input` in a shared slot targeting `entity`.
+	pub fn new(entity: Entity, input: In) -> Self {
+		Self {
+			entity,
+			value: Arc::new(Mutex::new(Some(input))),
+		}
+	}
+
+	/// Read the input without consuming it.
+	///
+	/// # Errors
+	/// Errors if the input has already been [`take`](Self::take)n. A [`Mutex`]
+	/// guard cannot lend `&In` past its own lifetime, hence the closure form.
+	pub fn with<O>(&self, func: impl FnOnce(&In) -> O) -> Result<O> {
+		self.value
+			.lock()
+			.unwrap()
+			.as_ref()
+			.map(func)
+			.ok_or_else(|| bevyhow!("ActionIn input already taken"))
+	}
+
+	/// Take ownership of the input.
+	///
+	/// # Errors
+	/// Errors if the input has already been taken.
+	pub fn take(&self) -> Result<In> {
+		self.value
+			.lock()
+			.unwrap()
+			.take()
+			.ok_or_else(|| bevyhow!("ActionIn input already taken"))
+	}
+}
+
+/// Turns an action into a long-running, fan-out one: the single "park and emit"
+/// primitive.
 ///
 /// When called, the [`start_running`] handler stores the [`OutHandler`] on a
-/// [`Running`] component and returns without resolving it, so the call stays
-/// pending until an [`EndRun`] is queued.
+/// [`Running`] component (so the call stays pending until an [`EndRun`] is
+/// queued) and fires an [`ActionIn`] carrying the input to any observers. A
+/// behaviour-tree action parks with no observer; a server host carries
+/// `ContinueRun<Request, Response>` so a boot exchange reaches every server that
+/// observes [`ActionIn<Request>`].
 #[derive(Component)]
 #[require(RunTimer)]
 #[require(Action<In, Out> = start_running::<In, Out>())]
@@ -108,7 +180,8 @@ impl ContinueRun {
 }
 
 /// The [`Action`] backing [`ContinueRun`]: stores the [`OutHandler`] in a
-/// [`Running`] component and returns, leaving the call pending.
+/// [`Running`] component (leaving the call pending) and fires an [`ActionIn`]
+/// with the input for any observers.
 pub fn start_running<In, Out>() -> Action<In, Out>
 where
 	In: 'static + Send + Sync,
@@ -122,11 +195,14 @@ where
 		     input,
 		     out_handler,
 		 }| {
-			let _ = input;
+			// park the call on a `Running<Out>`, then fan the input out to any
+			// `ActionIn<In>` observers; `Running` is inserted first so a
+			// synchronous `EndRun` from an observer always lands on it.
 			commands
 				.commands
 				.entity(caller)
-				.insert(Running::new(out_handler));
+				.insert(Running::new(out_handler))
+				.trigger(move |entity| ActionIn::new(entity, input));
 			Ok(())
 		},
 	)
@@ -295,6 +371,46 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+
+	#[beet_core::test]
+	fn take_and_with_share_one_slot() {
+		let ev = ActionIn::new(Entity::PLACEHOLDER, 42u32);
+		let clone = ev.clone();
+		ev.with(|value| *value).unwrap().xpect_eq(42);
+		ev.take().unwrap().xpect_eq(42);
+		// the clone shares the slot, so it sees the value already taken
+		clone.take().xpect_err();
+		clone.with(|value| *value).xpect_err();
+	}
+
+	#[beet_core::test]
+	async fn fans_out_and_resolves() {
+		let mut world = AsyncPlugin::world();
+		let entity = world.spawn(ContinueRun::<(), Outcome>::default()).id();
+		// an observer resolves the pending call when the input fans out to it
+		world.entity_mut(entity).observe_any(
+			|ev: On<ActionIn<()>>, mut commands: Commands| {
+				commands.entity(ev.entity).queue(EndRun(Outcome::PASS));
+			},
+		);
+
+		let store = Store::<Option<Outcome>>::default();
+		let captured = store.clone();
+		world
+			.entity_mut(entity)
+			.call_with(
+				(),
+				OutHandler::<Outcome>::new(move |_, result| {
+					captured.set(Some(result?));
+					Ok(())
+				}),
+			)
+			.unwrap();
+		world.flush();
+
+		world.get::<Running<Outcome>>(entity).xpect_none();
+		store.get().xpect_eq(Some(Outcome::PASS));
+	}
 
 	#[beet_core::test]
 	async fn defers_until_end_run() {
