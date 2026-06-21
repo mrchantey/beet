@@ -66,10 +66,10 @@ pub use http_ext::WebSocketUpgrade;
 // is no_std: the `ExchangeStats` counter backs the (now no_std) `HttpServer`
 // requirement; its logging observer is std and registered by `ServerPlugin`.
 #[cfg(feature = "action")]
-mod exchange;
+mod dispatch_exchange;
 mod exchange_stats;
 mod extractors;
 #[cfg(feature = "action")]
-pub use exchange::*;
+pub use dispatch_exchange::*;
 pub use exchange_stats::*;
 pub use extractors::*;

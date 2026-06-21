@@ -119,7 +119,7 @@ pub async fn build_live_page(
 	let parts = request.parts().clone();
 	let route = router.world().entity(node.entity);
 	// build the route's own content (output `PageRequest`), skipping the
-	// `ExchangeAction` wrapper that would serialize then despawn the tree.
+	// `DispatchExchange` wrapper that would serialize then despawn the tree.
 	let content = route.call::<Request, PageRequest>(request).await?.0;
 	// wrap it in the ancestor layout middleware (the `BaseLayout` document chrome),
 	// transcluding the content by reference, exactly as `PageRoot::render` does

@@ -7,7 +7,7 @@
 //! fresh copy.
 //!
 //! Every runtime component — [`CliServer`], the [`router`] bundle, the
-//! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the
+//! middleware and the [`TransformExchangeScript`] markers — is `Reflect`, so the
 //! components round-trip with no post-load patching; `BootOnLoad` is then added to
 //! the loaded root and a `LoadTemplate` fired to boot it.
 //!
@@ -42,7 +42,7 @@ fn main() -> AppExit {
 		// registering — ClientAppPlugin's RouterPlugin / ActionPlugin
 		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
+		.register_type::<TransformExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
 		)
 		.add_systems(Startup, setup)
 		.run()
@@ -85,19 +85,19 @@ fn route_bundle() -> impl Bundle {
 		(default_router(), children![
 			(
 				Script::<(), String>::rhai(r#""hello world""#),
-				ExchangeScript::<(), String>::default(),
+				TransformExchangeScript::<(), String>::default(),
 				PathPartial::new(""),
 			),
 			(
 				Script::<(), String>::rhai(r#""hello foo""#),
-				ExchangeScript::<(), String>::default(),
+				TransformExchangeScript::<(), String>::default(),
 				PathPartial::new("foo"),
 			),
 			(
 				Script::<QueryParams<GreetRequest>, String>::rhai(
 					r#""hello " + input.name"#,
 				),
-				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(),
+				TransformExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(),
 				PathPartial::new("greet"),
 			),
 			// same idea, but the script receives the full [`RequestParts`]
@@ -106,7 +106,7 @@ fn route_bundle() -> impl Bundle {
 				Script::<RequestParts, String>::rhai(
 					r#""hello " + input.url.params.name[0]"#,
 				),
-				ExchangeScript::<RequestParts, String, _, _>::default(),
+				TransformExchangeScript::<RequestParts, String, _, _>::default(),
 				PathPartial::new("greet-request"),
 			),
 		]),

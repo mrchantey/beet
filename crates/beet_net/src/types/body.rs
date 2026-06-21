@@ -194,6 +194,50 @@ impl Body {
 		media_type.deserialize(&bytes)
 	}
 
+	/// Consumes the body and returns it as [`MediaBytes`], tagging the bytes with
+	/// `content_type` (defaulting to [`MediaType::Bytes`] when `None`).
+	///
+	/// The shared body of [`Request::into_media_bytes`](crate::prelude::Request::into_media_bytes)
+	/// and [`Response::into_media_bytes`](crate::prelude::Response::into_media_bytes),
+	/// which each read their own `content-type` header and delegate here.
+	pub async fn into_media_bytes(
+		self,
+		content_type: Option<MediaType>,
+	) -> Result<MediaBytes> {
+		let media_type = content_type.unwrap_or(MediaType::Bytes);
+		let bytes = self.into_bytes().await?;
+		Ok(MediaBytes::new(media_type, bytes.to_vec()))
+	}
+
+	/// Consumes the body and decodes it into a [`Value`], a string or bytes per
+	/// `content_type` (or UTF-8 validity when `None`).
+	///
+	/// A declared text media type decodes (lossily) as a [`Value::Str`]; a declared
+	/// non-text type stays [`Value::Bytes`]; with no type the bytes are a string if
+	/// valid UTF-8, else bytes. Uses beet's own [`Value`], so it is not json-gated.
+	/// The shared body of [`Request::into_value`](crate::prelude::Request::into_value)
+	/// and [`Response::into_value`](crate::prelude::Response::into_value).
+	pub async fn into_value(
+		self,
+		content_type: Option<MediaType>,
+	) -> Result<Value> {
+		let bytes = self.into_bytes().await?;
+		match content_type {
+			// a declared text type is decoded as UTF-8 (lossily, never failing).
+			Some(media_type) if media_type.is_text() => {
+				Value::str(String::from_utf8_lossy(&bytes).into_owned())
+			}
+			// a declared non-text type stays bytes.
+			Some(_) => Value::Bytes(bytes.to_vec()),
+			// no type: a string if valid UTF-8, else bytes.
+			None => match String::from_utf8(bytes.to_vec()) {
+				Ok(text) => Value::str(text),
+				Err(err) => Value::Bytes(err.into_bytes()),
+			},
+		}
+		.xok()
+	}
+
 	/// Attempts to extract bytes without consuming a stream.
 	///
 	/// Returns `None` if this is a streaming body.

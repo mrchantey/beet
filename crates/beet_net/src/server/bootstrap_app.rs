@@ -3,7 +3,7 @@
 //!
 //! [`BootOnLoad`], spread on the entry root, observes its `LoadTemplate` and drives
 //! [`bootstrap`]: it calls the entity's own [`Action<Request, Response>`] slot with
-//! the process request. That slot is a `ScriptEntry` (runs a script, returns its
+//! the process request. That slot is a `ExchangeScriptElement` (runs a script, returns its
 //! console output), an `ActionTrigger` (fans out to server observers), or a `Router`
 //! (routes directly) — whatever the entry installed. A one-shot resolves and its
 //! response streams to stdout before exit; a long-running server parks the call,
@@ -22,7 +22,7 @@ use beet_core::prelude::*;
 ///
 /// ```bsx
 /// <Router {(HttpServer, CliServer, BootOnLoad)}>
-/// <script {ScriptEntry}{BootOnLoad}>console.log("hi")</script>
+/// <script {ExchangeScriptElement}{BootOnLoad}>console.log("hi")</script>
 /// ```
 ///
 /// `on_add` registers the `LoadTemplate` observer on the marked entity, so it must
@@ -153,7 +153,7 @@ mod test {
 	use super::*;
 
 	/// End to end through the slot: `BootOnLoad` calls the entity's exchangeable
-	/// action (an `ExchangeAction` fronted by an `ActionTrigger` slot) which resolves
+	/// action (an `DispatchExchange` fronted by an `ActionTrigger` slot) which resolves
 	/// via `CliServer`, and `bootstrap` exits with the status's exit code.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
@@ -165,7 +165,7 @@ mod test {
 				commands
 					.spawn((
 						ActionTrigger::<Request, Response>::default(),
-						ExchangeAction(exchange_handler(|_| {
+						DispatchExchange(exchange_handler(|_| {
 							Response::ok().with_body("hi")
 						})),
 						CliServer,
@@ -192,7 +192,7 @@ mod test {
 			|mut commands: Commands| {
 				commands
 					.spawn((
-						ExchangeAction(exchange_handler(|_| {
+						DispatchExchange(exchange_handler(|_| {
 							Response::ok().with_body("hi")
 						})),
 						CliServer,

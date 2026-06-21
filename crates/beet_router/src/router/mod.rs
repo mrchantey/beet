@@ -10,8 +10,8 @@ mod exchange_fallback;
 pub use exchange_fallback::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
-// the typed `ExchangeScript` route marker, the `ScriptRoute` front-end, and the
-// `ScriptEntry` console-capturing `<script>` entry action (json-gated within).
+// the typed `TransformExchangeScript` route marker, the `ScriptRoute` front-end,
+// and the `ExchangeScriptElement` console-capturing `<script>` entry action.
 #[cfg(feature = "scripting")]
 mod exchange_script;
 #[cfg(feature = "scripting")]

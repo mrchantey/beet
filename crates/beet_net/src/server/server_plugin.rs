@@ -74,7 +74,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					ExchangeAction(exchange_handler(|_| {
+					DispatchExchange(exchange_handler(|_| {
 						Response::ok().with_body("hello")
 					})),
 				))

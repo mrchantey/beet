@@ -13,7 +13,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// The entrypoint server: observes the boot [`ActionIn<Request>`], routes the
-/// request through the host's [`ExchangeAction`], then either resolves the boot
+/// request through the host's [`DispatchExchange`], then either resolves the boot
 /// call or streams the response and exits itself, whichever the boot path needs.
 ///
 /// Two boot paths land here. The full [`bootstrap`] fires `ActionIn` behind a

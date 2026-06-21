@@ -36,7 +36,7 @@ fn main() {
 					// CliServer::default(),
 					HttpServer::default(),
 					Count::default(),
-					ExchangeAction(Handler.into_action()),
+					DispatchExchange(Handler.into_action()),
 				))
 				.trigger(ActionIn::boot);
 		})

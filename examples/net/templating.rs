@@ -32,7 +32,7 @@ fn main() {
 				.spawn((
 					HttpServer::default(),
 					Count::default(),
-					ExchangeAction(Action::<Request, Response>::new_system(
+					DispatchExchange(Action::<Request, Response>::new_system(
 						router,
 					)),
 				))

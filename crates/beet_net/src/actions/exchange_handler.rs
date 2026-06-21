@@ -67,7 +67,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_sync_works() {
 		AsyncPlugin::world()
-			.spawn(ExchangeAction(exchange_handler(|req| req.mirror_parts())))
+			.spawn(DispatchExchange(exchange_handler(|req| req.mirror_parts())))
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
@@ -77,7 +77,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_sync_custom_response() {
 		AsyncPlugin::world()
-			.spawn(ExchangeAction(exchange_handler(|_| {
+			.spawn(DispatchExchange(exchange_handler(|_| {
 				Response::from_status(StatusCode::IM_A_TEAPOT)
 			})))
 			.exchange(Request::get("/foo"))
@@ -89,7 +89,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_async_works() {
 		AsyncPlugin::world()
-			.spawn(ExchangeAction(exchange_handler_async(|req| async move {
+			.spawn(DispatchExchange(exchange_handler_async(|req| async move {
 				req.mirror_parts()
 			})))
 			.exchange(Request::get("/bar"))
@@ -101,7 +101,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_async_custom_response() {
 		AsyncPlugin::world()
-			.spawn(ExchangeAction(exchange_handler_async(|_| async move {
+			.spawn(DispatchExchange(exchange_handler_async(|_| async move {
 				Response::from_status(StatusCode::IM_A_TEAPOT)
 			})))
 			.exchange(Request::get("/bar"))
@@ -113,7 +113,7 @@ mod test {
 	#[beet_core::test]
 	async fn mirror_works() {
 		AsyncPlugin::world()
-			.spawn(ExchangeAction(mirror_exchange()))
+			.spawn(DispatchExchange(mirror_exchange()))
 			.exchange(Request::get("/mirror"))
 			.await
 			.status()

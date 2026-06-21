@@ -1,36 +1,41 @@
-//! The typed-route transform: build an [`ExchangeAction`] from a typed handler.
+//! The typed-route transform: wrap a typed handler into the route's
+//! [`DispatchExchange`].
 //!
 //! A route handler is a typed `Action<In, Out>` where `In: FromRequest` and
 //! `Out: ExchangeRouteOut`. The router dispatches through the type-erased
-//! [`ExchangeAction`] (defined in `beet_net`), which only speaks
+//! [`DispatchExchange`] (defined in `beet_net`), which only speaks
 //! `Request -> Response`. [`TransformExchange`] bridges the two: it wraps a typed
-//! handler in an [`ExchangeAction`] that extracts the input from the request and
-//! converts the output into a response. [`ExchangeRouteOut`] is the output half of
-//! that conversion.
+//! handler into the `Request -> Response` action a [`DispatchExchange`] holds,
+//! extracting the input from the request and converting the output into a response.
+//! [`ExchangeRouteOut`] is the output half of that conversion.
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-/// Builds the type-erased [`ExchangeAction`] for a typed route handler.
+/// A typed route handler wrapped into the `Request -> Response` action a
+/// [`DispatchExchange`] dispatches.
 ///
-/// A purely namespacing type: its [`new`](Self::new) /
-/// [`new_detached`](Self::new_detached) constructors wrap a typed
-/// `Action<In, Out>` (with `In: FromRequest`, `Out: ExchangeRouteOut`) in an
-/// [`ExchangeAction`] that extracts the request input and converts the output to a
-/// [`Response`].
-pub enum TransformExchange {}
+/// Its own type, distinct from [`DispatchExchange`] (the already-erased dispatch
+/// hook with its own purpose): a `TransformExchange` is the *bridge* a typed
+/// handler produces, erasing into a [`DispatchExchange`] via [`From`]. Its
+/// [`new`](Self::new) / [`new_detached`](Self::new_detached) constructors wrap a
+/// typed `Action<In, Out>` (with `In: FromRequest`, `Out: ExchangeRouteOut`),
+/// extracting the request input and converting the output to a [`Response`]. A
+/// `#[require(DispatchExchange = TransformExchange::new::<..>())]` converts it for
+/// free, since bevy's `require` applies `.into()`.
+pub struct TransformExchange(Action<Request, Response>);
 
 impl TransformExchange {
-	/// Builds an [`ExchangeAction`] that calls the entity's own typed action,
-	/// extracting input from the request and converting output to a response.
-	pub fn new<In, Out, M1, M2>() -> ExchangeAction
+	/// Wraps the entity's own typed action, extracting input from the request and
+	/// converting output to a response.
+	pub fn new<In, Out, M1, M2>() -> Self
 	where
 		In: 'static + Send + Sync + FromRequest<M1>,
 		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
 	{
-		ExchangeAction::new(Action::new_async(
+		Self(Action::new_async(
 			async |cx: ActionContext<Request>| -> Result<Response> {
 				let parts = cx.input.parts().clone();
 				let input = In::from_request(cx.input).await?;
@@ -40,18 +45,15 @@ impl TransformExchange {
 		))
 	}
 
-	/// Builds an [`ExchangeAction`] that calls a detached inner action
-	/// instead of the entity's own action.
-	pub fn new_detached<In, Out, Inner, M1, M2, M3>(
-		inner: Inner,
-	) -> ExchangeAction
+	/// Wraps a detached inner action instead of the entity's own action.
+	pub fn new_detached<In, Out, Inner, M1, M2, M3>(inner: Inner) -> Self
 	where
 		In: 'static + Send + Sync + FromRequest<M1>,
 		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
 		Inner: 'static + Send + Sync + IntoAction<M3, In = In, Out = Out>,
 	{
 		let inner = inner.into_action();
-		ExchangeAction::new(Action::new_async(
+		Self(Action::new_async(
 			async move |cx: ActionContext<Request>| -> Result<Response> {
 				let parts = cx.input.parts().clone();
 				let input = In::from_request(cx.input).await?;
@@ -59,6 +61,14 @@ impl TransformExchange {
 				output.into_route_response(cx.caller, parts).await
 			},
 		))
+	}
+}
+
+/// A [`TransformExchange`] erases into the [`DispatchExchange`] the router stores
+/// on the route entity and dispatches.
+impl From<TransformExchange> for DispatchExchange {
+	fn from(transform: TransformExchange) -> Self {
+		DispatchExchange::new(transform.0)
 	}
 }
 
@@ -144,11 +154,11 @@ pub fn route<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {
 }
 
 /// Creates a route bundle from a path and action, including the type-erased
-/// [`ExchangeAction`] (built by [`TransformExchange::new_detached`]) for dispatch.
+/// [`DispatchExchange`] (built by [`TransformExchange::new_detached`]) for dispatch.
 pub fn exchange_route<In, Out, M, M1, M2, B>(
 	path: &str,
 	action: B,
-) -> (PathPartial, B, ExchangeAction)
+) -> (PathPartial, B, DispatchExchange)
 where
 	In: 'static + Send + Sync + FromRequest<M1>,
 	Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
@@ -157,6 +167,6 @@ where
 	(
 		PathPartial::new(path),
 		action.clone(),
-		TransformExchange::new_detached(action),
+		TransformExchange::new_detached(action).into(),
 	)
 }

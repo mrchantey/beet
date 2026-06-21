@@ -1,13 +1,13 @@
-//! Request dispatch through an entity's [`ExchangeAction`], plus [`ExchangeEnd`]
+//! Request dispatch through an entity's [`DispatchExchange`], plus [`ExchangeEnd`]
 //! for observability.
 //!
 //! The entity's own [`Action<Request, Response>`] slot is the *exchangeable*
 //! action a caller invokes with [`call`](beet_action::prelude::AsyncEntityActionExt::call)
-//! (a server host fills it with an `ActionTrigger`). Dispatch is separate: an
-//! [`ExchangeAction`] holds the request handler the higher layer (`beet_router`)
+//! (a server host fills it with an `ActionTrigger`). Dispatch is separate: a
+//! [`DispatchExchange`] holds the request handler the higher layer (`beet_router`)
 //! installs, and [`exchange`](ExchangeExt::exchange) dispatches it. This lets
 //! `beet_net` dispatch a request without naming the router, and lets one host both
-//! fan a boot out (its slot) and dispatch per-request (its [`ExchangeAction`]).
+//! fan a boot out (its slot) and dispatch per-request (its [`DispatchExchange`]).
 use super::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -20,10 +20,13 @@ use beet_core::prelude::*;
 /// dispatch; a test installs one wrapping a bare handler. Held off the entity's
 /// [`Action`] slot (which a server fills with an `ActionTrigger`), so a host can
 /// both fan a boot out and dispatch per-request.
+///
+/// Distinct from `beet_router`'s `TransformExchange`, which *builds* one of these
+/// from a typed `Action<In, Out>`; this type is only the erased dispatch hook.
 #[derive(Clone, Component)]
-pub struct ExchangeAction(pub Action<Request, Response>);
+pub struct DispatchExchange(pub Action<Request, Response>);
 
-impl ExchangeAction {
+impl DispatchExchange {
 	/// Wraps an existing `Action<Request, Response>` as the dispatch hook.
 	pub fn new(action: Action<Request, Response>) -> Self { Self(action) }
 
@@ -37,14 +40,14 @@ impl ExchangeAction {
 	}
 }
 
-impl IntoAction<Self> for ExchangeAction {
+impl IntoAction<Self> for DispatchExchange {
 	type In = Request;
 	type Out = Response;
 	fn into_action(self) -> Action<Request, Response> { self.0 }
 }
 
 /// Extension trait for dispatching a request through an entity's
-/// [`ExchangeAction`] from an owned [`EntityWorldMut`].
+/// [`DispatchExchange`] from an owned [`EntityWorldMut`].
 ///
 /// std-only: it drives the app to completion via `run_async_then`, which needs the
 /// std [`AsyncRunner`]. no_std consumers use [`AsyncExchangeExt`] on an
@@ -77,7 +80,7 @@ pub impl EntityWorldMut<'_> {
 }
 
 /// Extension trait for dispatching a request through an entity's
-/// [`ExchangeAction`] from an [`AsyncEntity`] handle.
+/// [`DispatchExchange`] from an [`AsyncEntity`] handle.
 #[extend::ext(name = AsyncExchangeExt)]
 pub impl AsyncEntity {
 	/// Dispatch a request and await the response.
@@ -100,14 +103,14 @@ pub impl AsyncEntity {
 	}
 }
 
-/// Dispatch `request` through `entity`'s [`ExchangeAction`], then fire
+/// Dispatch `request` through `entity`'s [`DispatchExchange`], then fire
 /// [`ExchangeEnd`] so [`exchange_stats`] can log the request. The shared body of
 /// both `exchange` extension traits.
 async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 	let start_time = Instant::now();
 	let method = *request.method();
 	let path = request.path_string();
-	let res = match entity.get_cloned::<ExchangeAction>().await {
+	let res = match entity.get_cloned::<DispatchExchange>().await {
 		Ok(action) => entity
 			.call_detached(action.0, request)
 			.await
@@ -116,7 +119,7 @@ async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 				Response::internal_error()
 			}),
 		Err(_) => {
-			error!("No ExchangeAction on entity {:?}", entity.id());
+			error!("No DispatchExchange on entity {:?}", entity.id());
 			Response::internal_error()
 		}
 	};
@@ -159,7 +162,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
-	async fn missing_exchange_action_returns_error() {
+	async fn missing_dispatch_exchange_returns_error() {
 		AsyncPlugin::world()
 			.spawn_empty()
 			.exchange(Request::get("foo"))
@@ -171,7 +174,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(ExchangeAction(exchange_handler(|req| req.take().mirror())))
+			.spawn(DispatchExchange(exchange_handler(|req| req.take().mirror())))
 			.exchange(Request::get("foo"))
 			.await
 			.status()
@@ -182,7 +185,7 @@ mod test {
 	#[beet_core::test]
 	async fn exchange_str_works() {
 		AsyncPlugin::world()
-			.spawn(ExchangeAction(exchange_handler(|_| {
+			.spawn(DispatchExchange(exchange_handler(|_| {
 				Response::ok().with_body("hello")
 			})))
 			.exchange_str(Request::get("foo"))

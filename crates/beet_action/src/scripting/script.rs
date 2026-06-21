@@ -13,7 +13,7 @@ use serde::de::DeserializeOwned;
 ///
 /// `Script` is pure data: it holds the program but installs no [`Action`]. To
 /// run it as a behaviour-tree leaf add [`ScriptAction`] (which requires a
-/// `Script`); to dispatch it from a route add `ExchangeScript`. Keeping the
+/// `Script`); to dispatch it from a route add `TransformExchangeScript`. Keeping the
 /// data and the action separate lets a domain action gather its own input and
 /// apply its own output around the shared [`Script::run`] backend without a
 /// second, dormant action fighting over the entity's [`ActionMeta`].
@@ -248,15 +248,16 @@ where
 	/// console line to `sink`. The wasm counterpart to the native [`run_console`],
 	/// running in the surrounding realm (browser/Deno) with the same stream mapping.
 	///
-	/// The language is always JavaScript in the host realm, so [`Self::language`]
-	/// is not consulted; `input` is JSON-encoded and bound as the `input` global.
-	#[cfg(all(target_arch = "wasm32", feature = "json"))]
+	/// The language is always JavaScript in the host realm, so [`Self::language`] is
+	/// not consulted; `input` is marshalled through beet's [`Value`] and bound as the
+	/// `input` global, so this path needs no `json` feature.
+	#[cfg(target_arch = "wasm32")]
 	pub fn run_console<Sink>(&self, input: Input, mut sink: Sink) -> Result<()>
 	where
 		Sink: 'static + FnMut(ConsoleStream, &str),
 	{
 		use beet_core::web_utils::script_ext;
-		let input = serde_json::to_string(&input)?;
+		let input = Value::from_serde(input)?;
 		script_ext::eval_console(&self.content, &input, move |stream, line| {
 			// the host bridge has its own `ConsoleStream`; map it onto ours.
 			let stream = match stream {
@@ -265,18 +266,6 @@ where
 			};
 			sink(stream, line);
 		})
-	}
-
-	/// The wasm host console path JSON-encodes its `input`, so without `json` there
-	/// is no usable console backend on wasm. Kept so [`run_captured`](Self::run_captured)
-	/// resolves; it bails at runtime.
-	#[cfg(all(target_arch = "wasm32", not(feature = "json")))]
-	pub fn run_console<Sink>(&self, input: Input, sink: Sink) -> Result<()>
-	where
-		Sink: 'static + FnMut(ConsoleStream, &str),
-	{
-		let _ = (input, sink);
-		bevybail!("the wasm `Script` console backend requires the `json` feature")
 	}
 
 	/// Run the script for its console output, collecting each [`Stdout`] line into

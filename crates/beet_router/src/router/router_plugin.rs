@@ -127,8 +127,8 @@ impl Plugin for RouterPlugin {
 			app.register_type::<TuiServer>();
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
-				.register_type::<ExchangeScript<(), String>>()
-				.register_type::<ExchangeScript<
+				.register_type::<TransformExchangeScript<(), String>>()
+				.register_type::<TransformExchangeScript<
 					RequestParts,
 					String,
 					RequestParts,
@@ -137,15 +137,13 @@ impl Plugin for RouterPlugin {
 				// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
 				.register_template::<ScriptRoute>();
 
-			// the `ScriptEntry` console-capturing entry action, so a
-			// `<script {ScriptEntry}>` entry resolves it. Native runs through the
-			// default backend (quickjs/rhai); wasm runs in the host realm. Gated on
-			// `json` like the action (it marshals the request as a JSON `input`).
-			#[cfg(all(
-				feature = "json",
-				any(not(target_arch = "wasm32"), feature = "scripting")
-			))]
-			app.register_type::<ScriptEntry>();
+			// the `ExchangeScriptElement` console-capturing entry action, so a
+			// `<script {ExchangeScriptElement}>` entry resolves it. Native runs through
+			// the default backend (quickjs/rhai); wasm runs in the host realm. The
+			// request `input` marshals through beet's [`Value`], so it rides the
+			// backend-agnostic `scripting` feature, not `json`.
+			#[cfg(feature = "scripting")]
+			app.register_type::<ExchangeScriptElement>();
 		}
 	}
 }

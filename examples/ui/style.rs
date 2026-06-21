@@ -33,7 +33,7 @@ fn main() {
 			commands
 				.spawn((
 					HttpServer::default(),
-					ExchangeAction(Handler.into_action()),
+					DispatchExchange(Handler.into_action()),
 				))
 				.trigger(ActionIn::boot);
 		})

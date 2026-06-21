@@ -306,14 +306,24 @@ impl Response {
 	/// using the [`header::ContentType`], or defaulting to [`MediaType::Bytes`].
 	/// Note, the bytes may be empty.
 	pub async fn into_media_bytes(self) -> Result<MediaBytes> {
-		let media_type = self
+		let content_type = self
 			.parts
 			.headers
 			.get::<header::ContentType>()
-			.and_then(|res| res.ok())
-			.unwrap_or(MediaType::Bytes);
-		let bytes = self.bytes_vec().await?;
-		Ok(MediaBytes::new(media_type, bytes))
+			.and_then(|res| res.ok());
+		self.body.into_media_bytes(content_type).await
+	}
+
+	/// Consumes the response body and returns it as a [`Value`], a string or bytes
+	/// per the [`header::ContentType`] (or UTF-8 validity when none); see
+	/// [`Body::into_value`].
+	pub async fn into_value(self) -> Result<Value> {
+		let content_type = self
+			.parts
+			.headers
+			.get::<header::ContentType>()
+			.and_then(|res| res.ok());
+		self.body.into_value(content_type).await
 	}
 
 	/// Consumes the response body and returns it as a string

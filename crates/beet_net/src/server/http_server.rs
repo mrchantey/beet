@@ -42,7 +42,7 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 
 /// HTTP server that listens for incoming requests, dispatching each through the
-/// host's [`ExchangeAction`] via `entity.exchange`.
+/// host's [`DispatchExchange`] via `entity.exchange`.
 ///
 /// A long-running server: the boot fan-out ([`ActionIn<Request>`]) whose
 /// `--server` selects `"http"` boots it through the backend [`ServerPlugin`]
@@ -508,7 +508,7 @@ pub(crate) mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					ExchangeAction(exchange_handler(move |req| {
+					DispatchExchange(exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
 					})),
 				))
@@ -563,7 +563,7 @@ pub(crate) mod test {
 						port: Some(port),
 						..default()
 					},
-					ExchangeAction(exchange_handler(|_| {
+					DispatchExchange(exchange_handler(|_| {
 						Response::ok().with_body("up")
 					})),
 					OnSpawn::new_async(move |entity| {

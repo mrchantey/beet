@@ -432,15 +432,29 @@ impl Request {
 		Response::new(res_parts, default())
 	}
 
-	/// Converts the request body into bytes, consuming the request.
+	/// Converts the request body into [`MediaBytes`], consuming the request.
+	///
+	/// Uses the request's `content-type` header, defaulting to [`MediaType::Json`]
+	/// when absent (so a typed route with no declared type deserializes as JSON).
 	pub async fn into_media_bytes(self) -> Result<MediaBytes> {
 		let content_type = self
 			.headers
 			.get::<header::ContentType>()
 			.and_then(|res| res.ok())
-			.unwrap_or(MediaType::Json);
-		let bytes = self.body.into_bytes().await?;
-		Ok(MediaBytes::new(content_type, bytes.to_vec()))
+			.or(Some(MediaType::Json));
+		self.body.into_media_bytes(content_type).await
+	}
+
+	/// Converts the request body into a [`Value`], consuming the request.
+	///
+	/// A string or bytes per the `content-type` (or UTF-8 validity when none); see
+	/// [`Body::into_value`].
+	pub async fn into_value(self) -> Result<Value> {
+		let content_type = self
+			.headers
+			.get::<header::ContentType>()
+			.and_then(|res| res.ok());
+		self.body.into_value(content_type).await
 	}
 }
 

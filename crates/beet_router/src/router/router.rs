@@ -5,11 +5,11 @@ use beet_net::prelude::*;
 
 /// Markup component for an entry that routes: it occupies the entity's action
 /// slot with an [`ActionTrigger`] (so the boot exchange fans out to any servers
-/// present) and installs an [`ExchangeAction`] (the route-tree dispatch, reached
+/// present) and installs an [`DispatchExchange`] (the route-tree dispatch, reached
 /// via [`exchange`](beet_net::prelude::AsyncExchangeExt::exchange)).
 ///
 /// Splitting the two lets one host both fan a boot out (its slot) and dispatch
-/// per-request (its [`ExchangeAction`]): a [`CliServer`] resolves the boot by
+/// per-request (its [`DispatchExchange`]): a [`CliServer`] resolves the boot by
 /// routing, an [`HttpServer`] parks and routes each socket request.
 ///
 /// `Reflect` is derived unconditionally: reflection works on no_std and is wanted
@@ -18,11 +18,11 @@ use beet_net::prelude::*;
 #[reflect(Component, Default)]
 #[require(
 	ActionTrigger<Request, Response>,
-	ExchangeAction = ExchangeAction::new(route_action()),
+	DispatchExchange = DispatchExchange::new(route_action()),
 )]
 pub struct Router;
 
-/// The route-tree dispatch behind a router's [`ExchangeAction`]: matches the request
+/// The route-tree dispatch behind a router's [`DispatchExchange`]: matches the request
 /// against the ancestor [`RouteTree`] and applies ancestor [`MiddlewareList`]
 /// around the matched action.
 ///
@@ -53,7 +53,7 @@ pub fn route_action() -> Action<Request, Response> {
 					// surface matched dynamic segments (`:id`) to the handler
 					node.merge_path_params(&mut request);
 					let entity = world.entity(node.entity);
-					match entity.clone().get_cloned::<ExchangeAction>().await {
+					match entity.clone().get_cloned::<DispatchExchange>().await {
 						Ok(action) => (action.into_action(), entity),
 						Err(err) => return Ok(err.into_response()),
 					}

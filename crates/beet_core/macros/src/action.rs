@@ -453,7 +453,7 @@ fn compute_out_type(item: &ItemFn, result_out: bool) -> TokenStream {
 /// Build the `#[require(...)]` expression for the `Action` component.
 ///
 /// When `has_route` is true, requires both `Action<In, Out>` (which inserts
-/// [`ActionMeta`] via its own on-add hook) and the [`ExchangeAction`] for
+/// [`ActionMeta`] via its own on-add hook) and the [`DispatchExchange`] for
 /// type-erased request/response dispatch, built from the typed action by
 /// `TransformExchange::new_detached`.
 fn make_require_action(
@@ -468,7 +468,7 @@ fn make_require_action(
 		let beet_router = pkg_ext::internal_or_beet("beet_router");
 		quote! {
 			#beet_action::prelude::Action<#in_type, #out_type> = #action_expr,
-			#beet_net::prelude::ExchangeAction = #beet_router::prelude::TransformExchange::new_detached::<#in_type, #out_type, _, _, _, _>(#action_expr)
+			#beet_net::prelude::DispatchExchange = #beet_router::prelude::TransformExchange::new_detached::<#in_type, #out_type, _, _, _, _>(#action_expr)
 		}
 	} else {
 		quote! {
@@ -1246,7 +1246,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn MyAction(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("ExchangeAction"));
+		assert!(result.contains("DispatchExchange"));
 		assert!(result.contains("TransformExchange :: new_detached"));
 		assert!(result.contains("Action <"));
 		assert!(!result.contains("PathPartial"));
@@ -1258,7 +1258,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn MyAction(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("ExchangeAction"));
+		assert!(result.contains("DispatchExchange"));
 		assert!(result.contains("Action <"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (\"home\")"));
@@ -1271,7 +1271,7 @@ mod test {
 				#[derive(Component, Reflect)]
 				async fn MyAction(val: i32) -> String { val.to_string() }
 			});
-		assert!(result.contains("ExchangeAction"));
+		assert!(result.contains("DispatchExchange"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (get_route_path ())"));
 	}
@@ -1291,7 +1291,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn Validate(input: String) -> String { input }
 		});
-		assert!(result.contains("ExchangeAction"));
+		assert!(result.contains("DispatchExchange"));
 		assert!(result.contains("PathPartial :: new (\"validate\")"));
 		assert!(result.contains("of_reflect :: < Self , _ > ()"));
 	}

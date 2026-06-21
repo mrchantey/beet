@@ -96,10 +96,10 @@ pub async fn NavigateHandler(
 		.xok();
 	};
 
-	// Dispatch through the route's ExchangeAction
+	// Dispatch through the route's DispatchExchange
 	node.merge_path_params(&mut request);
 	let entity = world.entity(node.entity);
-	let exchange = entity.clone().get_cloned::<ExchangeAction>().await?;
+	let exchange = entity.clone().get_cloned::<DispatchExchange>().await?;
 	let response = exchange.call(entity, request).await?;
 
 	response.xok()
