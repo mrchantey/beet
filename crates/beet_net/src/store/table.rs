@@ -351,6 +351,16 @@ pub trait TableProvider<T: TableStoreRow>:
 	}
 }
 
+/// The [`BlobStore`] wrapper is a [`TableProvider`] for free, serializing rows
+/// as JSON via the default trait methods. This is what lets a single
+/// [`BlobStore`] back many typed [`TableStore`]s, one per record-type subdir.
+#[cfg(all(feature = "json", feature = "std"))]
+impl<T: TableStoreRow> TableProvider<T> for BlobStore {
+	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+		Box::new(self.clone())
+	}
+}
+
 /// Create temporary in-memory table for testing.
 /// The returned table is pre-created and ready for immediate use.
 pub fn temp_table<T: TableStoreRow>() -> TableStore<T> {

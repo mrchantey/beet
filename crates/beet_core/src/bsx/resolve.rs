@@ -1108,9 +1108,10 @@ fn build_children(
 	Ok(())
 }
 
-/// `bx:for="items"` + `bx:key`: a [`ReactiveChildren`] over the `items` array,
-/// spawning the element's child template per item, each in a terminating index
-/// scope.
+/// `bx:for="items"` + optional `bx:key`: a [`ReactiveChildren`] over the `items`
+/// array, spawning the element's child template per item, each in a terminating
+/// index scope. With `bx:key="field"` it reconciles by that per-item key so an
+/// append reuses existing rows instead of rebuilding them.
 fn build_reactive_children(
 	el: &BsxElement,
 	field: &str,
@@ -1120,23 +1121,51 @@ fn build_reactive_children(
 ) -> Result<()> {
 	let template = el.children.clone();
 	let registry = registry.clone();
+	// each item child builds the element's body as its own template; the
+	// terminating index scope `ReactiveChildren` adds resolves its fields.
+	let build = move |_index: usize, _item: &Value| {
+		let template = template.clone();
+		let registry = registry.clone();
+		OnSpawn::new(move |entity| {
+			let nested =
+				BsxTemplate::container(template.clone(), registry.clone());
+			if let Err(error) = entity.build_template(&nested) {
+				entity.insert(TemplateError::new(error));
+			}
+		})
+	};
 	// the field backing the list: its synced `Value` drives the rebuild.
 	cx.entity.insert(FieldRef::new(field));
-	cx.entity
-		.insert(ReactiveChildren::new(move |_index, _item| {
-			let template = template.clone();
-			let registry = registry.clone();
-			OnSpawn::new(move |entity| {
-				// each item child builds the element's body as its own template; the
-				// terminating index scope `ReactiveChildren` adds resolves its fields.
-				let nested =
-					BsxTemplate::container(template.clone(), registry.clone());
-				if let Err(error) = entity.build_template(&nested) {
-					entity.insert(TemplateError::new(error));
-				}
-			})
-		}));
+	match string_attr(el, "bx:key") {
+		Some(key_path) => {
+			let key_path = key_path.to_string();
+			cx.entity.insert(ReactiveChildren::keyed(
+				move |item| reactive_item_key(item, &key_path),
+				build,
+			));
+		}
+		None => {
+			cx.entity.insert(ReactiveChildren::new(build));
+		}
+	}
 	Ok(())
+}
+
+/// Extract a reconciliation key from a `bx:for` item by a dotted `bx:key` path,
+/// eg `bx:key="id"` or `bx:key="user.id"`. Falls back to a debug repr for
+/// non-string keys (eg numeric ids), which is stable within a session.
+fn reactive_item_key(item: &Value, key_path: &str) -> String {
+	let mut current = item;
+	for segment in key_path.split('.') {
+		match current.get(segment) {
+			Some(next) => current = next,
+			None => return String::new(),
+		}
+	}
+	current
+		.as_str()
+		.map(str::to_string)
+		.unwrap_or_else(|_| format!("{current:?}"))
 }
 
 /// Build the caller content of an uppercase tag as slot children: each child its

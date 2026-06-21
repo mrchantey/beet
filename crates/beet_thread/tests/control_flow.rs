@@ -43,11 +43,11 @@ fn assert_and_exit(
 	mut commands: Commands,
 	query: ThreadQuery,
 ) -> Result<Outcome> {
-	let view = query.thread(input.id())?;
-	view.posts
-		.iter()
-		.find(|post| {
-			post.intent().is_display() && post.actor.kind() == ActorKind::Agent
+	query
+		.window(input.id())?
+		.post_views()
+		.find(|view| {
+			view.intent().is_display() && view.actor.kind() == ActorKind::Agent
 		})
 		.unwrap()
 		.to_string()

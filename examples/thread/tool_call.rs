@@ -1,5 +1,9 @@
-//! Demonstrates tool calling
+//! Tool calling: an inline `#[action]` referenced by tag in a `.bsx` scene, run
+//! to completion and rendered through the agnostic charcell UI.
 use beet::prelude::*;
+
+/// The author scene: a dungeon turn whose agent is equipped with `<AgentChoiceAction/>`.
+const SCENE: &str = include_str!("tool_call.bsx");
 
 #[beet::main]
 async fn main() {
@@ -8,54 +12,42 @@ async fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			ThreadPlugin::default(),
-			ThreadStdoutPlugin::default(),
+			ThreadUiPlugin,
+			CharcellTuiPlugin,
 		))
+		// register the inline tool so `<AgentChoiceAction/>` resolves from markup
+		.register_type::<AgentChoiceAction>()
 		.add_systems(Startup, setup)
 		.run();
 }
 
-fn setup(mut commands: Commands) {
-	let schema = Schema::new::<ChoiceInput>();
-	println!("Tool Call Schema:\n{:#?}", schema);
-
-	commands
-		.spawn((RepeatTimes::new(2), children![(
-			Thread::default(),
-			Sequence::new(),
-			ExcludeErrors(ChildError::NO_ACTION),
-			children![
-				(Actor::system(), children![Post::spawn(
-					r#"
-This is a tool call test. You will get two responses.
-
-For the first, respond in the first person:
-> "I open the door.." - good, you are rolepaying
-> "The door opens, what do you want to do next" - bad, remember you are a participant, not dungeon master
-
-For the second, if you receive a tool output, produce a final text response.
-If you instead receive an error break character,
-describe the error to the user, and offer a suggestion to fix it.
-This will be your final response so do not attempt to continue the conversation.
-
-## Scenario
-
-You enter the cave, and from the ceiling drops a glowing red beet..
-"#
-				)]),
-				(
-					Actor::new("Fearless Warrior", ActorKind::Agent),
-					// OllamaProvider::default_12gb(),
-					OpenAiProvider::gpt_5_mini().unwrap(),
-					children![AgentChoiceAction]
-				),
-			]
-		),]))
-		.call::<(), Outcome>((), OutHandler::exit());
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async move |world: AsyncWorld| -> Result {
+		// reduce the scene and mount the transcript, all before the turn runs
+		let root = world
+			.with(|world: &mut World| -> Result<Entity> {
+				let root =
+					BsxTemplate::parse_entry(world, SCENE)?.spawn(world)?;
+				reduce_threads_now(world);
+				let thread = world
+					.query_filtered::<Entity, With<Thread>>()
+					.iter(world)
+					.next()
+					.ok_or_else(|| bevyhow!("no Thread in scene"))?;
+				world.spawn(thread_tui(thread));
+				Ok(root)
+			})
+			.await?;
+		world.entity(root).call::<(), Outcome>(()).await?;
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }
 
 /// Make a choice for what to do, following the schema
 #[action(pure, route = "make-choice")]
 #[derive(Component, Reflect)]
+#[reflect(Component)]
 fn AgentChoiceAction(cx: ActionContext<ChoiceInput>) -> String {
 	match cx.choice {
 		Choice::Attack => {

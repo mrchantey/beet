@@ -87,13 +87,26 @@ fn is_option_literal(literal: &DataLiteral) -> bool {
 }
 
 /// Look up a registered type's `'static` [`TypeInfo`] by short type path.
+///
+/// A generic type's short path keeps its arguments (eg `Repeat<()>`), so a bare
+/// `{Repeat}` spread or `<Repeat>` tag misses the exact lookup; it then falls
+/// back to the unique generic instantiation whose base name matches (the `<`
+/// boundary guards against prefix collisions like `Repeat` vs `RepeatTimes`).
 pub fn type_info_by_name(
 	registry: &TypeRegistry,
 	name: &str,
 ) -> Option<&'static TypeInfo> {
-	registry
-		.get_with_short_type_path(name)
-		.map(|registration| registration.type_info())
+	if let Some(registration) = registry.get_with_short_type_path(name) {
+		return Some(registration.type_info());
+	}
+	let mut matches = registry.iter().filter(|registration| {
+		let short = registration.type_info().type_path_table().short_path();
+		short.len() > name.len()
+			&& short.starts_with(name)
+			&& short.as_bytes()[name.len()] == b'<'
+	});
+	let first = matches.next()?;
+	matches.next().is_none().then(|| first.type_info())
 }
 
 /// Coerce a scalar [`Value`] to the field's concrete type, falling through to
@@ -371,6 +384,33 @@ mod test {
 		)
 		.unwrap();
 		T::from_reflect(reflected.as_ref()).unwrap()
+	}
+
+	/// A generic marker whose registered short path keeps its argument
+	/// (`GenericMarker<u32>`), to exercise base-name resolution.
+	#[derive(Reflect)]
+	struct GenericMarker<T: Reflect>(
+		#[reflect(ignore)] core::marker::PhantomData<T>,
+	);
+
+	/// A bare base name resolves to the sole generic instantiation, so a
+	/// `{Repeat}` spread / `<Repeat>` tag finds `Repeat<()>` despite the argument
+	/// kept in its short path. Ambiguity (more than one) resolves to nothing
+	/// rather than guessing.
+	#[beet_core::test]
+	fn generic_resolves_by_base_name() {
+		let mut registry = TypeRegistry::default();
+		registry.register::<GenericMarker<u32>>();
+		type_info_by_name(&registry, "GenericMarker")
+			.unwrap()
+			.type_path()
+			.xpect_eq(GenericMarker::<u32>::type_info().type_path());
+		// the exact short path still resolves; an unknown name does not
+		type_info_by_name(&registry, "GenericMarker<u32>").xpect_some();
+		type_info_by_name(&registry, "Nope").xpect_none();
+		// a second instantiation makes the bare name ambiguous
+		registry.register::<GenericMarker<bool>>();
+		type_info_by_name(&registry, "GenericMarker").xpect_none();
 	}
 
 	#[beet_core::test]

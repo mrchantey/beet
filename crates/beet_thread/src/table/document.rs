@@ -1,4 +1,3 @@
-use async_lock::RwLock;
 // use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
@@ -7,7 +6,6 @@ use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use std::sync::Arc;
 use uuid::Uuid;
 
 pub trait Table: 'static + Send + Sync + Sized {
@@ -83,6 +81,19 @@ impl<M> Uuid7<M> {
 			phantom_data: default(),
 		}
 	}
+	/// Wrap an existing [`Uuid`] as a typed id, for pinning a stable identity in
+	/// a scene (eg `ActorId::from_uuid(Uuid::from_u128(1))`).
+	pub const fn from_uuid(uuid_v7: Uuid) -> Self {
+		Self {
+			uuid_v7,
+			phantom_data: PhantomData,
+		}
+	}
+	/// Pin a stable typed id from a constant, eg `const AGENT: ActorId =
+	/// ActorId::from_u128(2)`, for persisted author scenes.
+	pub const fn from_u128(value: u128) -> Self {
+		Self::from_uuid(Uuid::from_u128(value))
+	}
 	pub fn uuid(&self) -> Uuid { self.uuid_v7 }
 }
 
@@ -126,40 +137,6 @@ impl<M> std::ops::Deref for Uuid7<M> {
 impl<M> std::fmt::Display for Uuid7<M> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.uuid_v7)
-	}
-}
-
-pub trait TableStore<T: Table> {
-	#[track_caller]
-	fn insert(&self, value: T) -> BoxedFuture<'_, Result<T::Id>>;
-	#[track_caller]
-	fn get(&self, id: T::Id) -> BoxedFuture<'_, Result<T>>
-	where
-		T: Clone;
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct ArcTableMap<T: Table>(Arc<RwLock<TableMap<T>>>);
-impl<T: Table> ArcTableMap<T> {
-	pub fn new(map: TableMap<T>) -> Self { Self(Arc::new(RwLock::new(map))) }
-}
-
-impl<T> TableStore<T> for ArcTableMap<T>
-where
-	T: Table,
-{
-	fn insert(&self, value: T) -> BoxedFuture<'_, Result<T::Id>> {
-		// let map = self.0.clone();
-		Box::pin(async move {
-			let mut map = self.0.write().await;
-			Ok(map.insert(value))
-		})
-	}
-	fn get(&self, id: T::Id) -> BoxedFuture<'_, Result<T>>
-	where
-		T: Clone,
-	{
-		Box::pin(async move { self.0.read().await.get(id).cloned() })
 	}
 }
 

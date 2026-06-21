@@ -1,0 +1,7 @@
+<div {Thread}>
+	<ActorDef name="System" kind="System">
+		<CreatePost text="you are robot, make beep boop noises"/>
+	</ActorDef>
+	<ActorDef name="BeepBot" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
+	<ActorDef name="Billy" kind="User"/>
+</div>

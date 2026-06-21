@@ -18,6 +18,10 @@ use bevy::platform::sync::Arc;
 pub struct ReactiveChildren {
 	/// Builds the spawn effect for an item, given its index and [`Value`].
 	build_item: Arc<dyn Fn(usize, &Value) -> OnSpawn + Send + Sync>,
+	/// Optional stable key per item. When set, a change reconciles by key
+	/// (reuse-matching / despawn-removed / spawn-new) instead of rebuilding
+	/// every child, so per-row entity state and bindings survive an append.
+	key_of: Option<Arc<dyn Fn(&Value) -> String + Send + Sync>>,
 }
 
 /// Marker on each child spawned by a [`ReactiveChildren`], so a rebuild can
@@ -25,9 +29,16 @@ pub struct ReactiveChildren {
 #[derive(Component)]
 pub struct ReactiveChild;
 
+/// The reconciliation key and current index of a keyed [`ReactiveChild`].
+#[derive(Component)]
+pub struct ReactiveChildKey {
+	key: String,
+	index: usize,
+}
+
 impl ReactiveChildren {
 	/// Build a [`ReactiveChildren`] that spawns a child per list item via
-	/// `build_item`.
+	/// `build_item`, rebuilding the whole generation on every change.
 	///
 	/// Spawn it beside the field that backs it, ie `(FieldRef::new("items"),
 	/// ReactiveChildren::new(..))` or `(items.field(), ReactiveChildren::new(..))`.
@@ -38,6 +49,22 @@ impl ReactiveChildren {
 	) -> Self {
 		ReactiveChildren {
 			build_item: Arc::new(build_item),
+			key_of: None,
+		}
+	}
+
+	/// As [`new`](Self::new), but reconciles by the stable key `key_of` returns
+	/// for each item: children whose key persists are reused (their entity,
+	/// state, and field bindings survive), removed keys are despawned, and new
+	/// keys are spawned. Appending an item therefore neither rebuilds existing
+	/// rows nor drops their in-progress streaming bindings.
+	pub fn keyed(
+		key_of: impl 'static + Send + Sync + Fn(&Value) -> String,
+		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
+	) -> Self {
+		ReactiveChildren {
+			build_item: Arc::new(build_item),
+			key_of: Some(Arc::new(key_of)),
 		}
 	}
 }
@@ -60,29 +87,85 @@ pub(super) fn update_reactive_children(
 		Changed<Value>,
 	>,
 	reactive_children: Query<(), With<ReactiveChild>>,
+	child_keys: Query<&ReactiveChildKey>,
 ) -> Result {
 	for (entity, value, resolved, reactive, children) in changed.iter() {
-		// despawn the previous generation: this entity's ReactiveChild children
-		if let Some(children) = children {
-			children
-				.iter()
-				.filter(|child| reactive_children.contains(*child))
-				.for_each(|child| commands.entity(child).despawn());
-		}
-		// spawn the new generation, each tagged ReactiveChild, via OnSpawn
-		if let Ok(items) = value.as_list() {
-			for (index, item) in items.iter().enumerate() {
-				commands.spawn((
-					ChildOf(entity),
-					ReactiveChild,
-					// the child's fully-resolved absolute item path, terminating
-					// so an inner FieldRef does not double-count outer scopes
-					DocumentScope {
-						path: resolved.field_path.with_pushed(index),
-						terminate: true,
-					},
-					(reactive.build_item)(index, item),
-				));
+		// the child's fully-resolved absolute item path, terminating so an inner
+		// FieldRef does not double-count outer scopes
+		let scope_at = |index: usize| DocumentScope {
+			path: resolved.field_path.with_pushed(index),
+			terminate: true,
+		};
+		match &reactive.key_of {
+			// unkeyed: despawn the previous generation and respawn it whole
+			None => {
+				if let Some(children) = children {
+					children
+						.iter()
+						.filter(|child| reactive_children.contains(*child))
+						.for_each(|child| commands.entity(child).despawn());
+				}
+				if let Ok(items) = value.as_list() {
+					for (index, item) in items.iter().enumerate() {
+						commands.spawn((
+							ChildOf(entity),
+							ReactiveChild,
+							scope_at(index),
+							(reactive.build_item)(index, item),
+						));
+					}
+				}
+			}
+			// keyed: reconcile by key, reusing matching children
+			Some(key_of) => {
+				let existing: HashMap<String, Entity> = children
+					.into_iter()
+					.flat_map(|children| children.iter())
+					.filter_map(|child| {
+						child_keys
+							.get(child)
+							.ok()
+							.map(|keyed| (keyed.key.clone(), child))
+					})
+					.collect();
+				let mut kept: HashSet<String> = HashSet::default();
+				if let Ok(items) = value.as_list() {
+					for (index, item) in items.iter().enumerate() {
+						let key = key_of(item);
+						kept.insert(key.clone());
+						match existing.get(&key) {
+							// reuse: only touch the child if its index shifted, so
+							// an append never re-resolves a settled row's bindings
+							Some(&child) => {
+								let unchanged = child_keys
+									.get(child)
+									.map(|keyed| keyed.index)
+									.unwrap_or(usize::MAX)
+									== index;
+								if !unchanged {
+									commands.entity(child).insert((
+										scope_at(index),
+										ReactiveChildKey { key, index },
+									));
+								}
+							}
+							None => {
+								commands.spawn((
+									ChildOf(entity),
+									ReactiveChild,
+									ReactiveChildKey { key, index },
+									scope_at(index),
+									(reactive.build_item)(index, item),
+								));
+							}
+						}
+					}
+				}
+				// despawn children whose key vanished
+				existing
+					.iter()
+					.filter(|(key, _)| !kept.contains(*key))
+					.for_each(|(_, child)| commands.entity(*child).despawn());
 			}
 		}
 	}
@@ -95,15 +178,64 @@ mod test {
 
 	/// Count the `ReactiveChild` children of `entity`.
 	fn child_count(world: &mut World, entity: Entity) -> usize {
-		let children: Vec<Entity> = world
+		reactive_children_of(world, entity).len()
+	}
+
+	/// The `ReactiveChild` children of `entity`, in `Children` order.
+	fn reactive_children_of(world: &mut World, entity: Entity) -> Vec<Entity> {
+		world
 			.entity(entity)
 			.get::<Children>()
-			.map(|children| children.iter().collect())
-			.unwrap_or_default();
-		children
-			.iter()
-			.filter(|child| world.entity(**child).contains::<ReactiveChild>())
-			.count()
+			.map(|children| children.iter().collect::<Vec<_>>())
+			.unwrap_or_default()
+			.into_iter()
+			.filter(|child| world.entity(*child).contains::<ReactiveChild>())
+			.collect()
+	}
+
+	/// Keyed reconciliation reuses children by key: an append keeps the existing
+	/// row entities (so their state and bindings survive), and a removal despawns
+	/// only the vanished key.
+	#[beet_core::test]
+	fn keyed_reuses_children_across_append_and_remove() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(val!({ "items": ["a", "b"] })))
+			.id();
+		let list = world
+			.spawn((
+				ChildOf(doc),
+				(
+					FieldRef::new("items"),
+					ReactiveChildren::keyed(
+						|item| item.as_str().unwrap_or_default().to_string(),
+						|_, value| OnSpawn::insert(value.clone()),
+					),
+				),
+			))
+			.id();
+		world.update_local();
+		let generation_1 = reactive_children_of(&mut world, list);
+		generation_1.len().xpect_eq(2);
+
+		// append "c": the two existing rows are reused (same entities), in order
+		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
+			val!({ "items": ["a", "b", "c"] });
+		world.update_local();
+		let generation_2 = reactive_children_of(&mut world, list);
+		generation_2.len().xpect_eq(3);
+		generation_2[0].xpect_eq(generation_1[0]);
+		generation_2[1].xpect_eq(generation_1[1]);
+
+		// remove "b": only its entity is despawned, "a" and "c" survive
+		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
+			val!({ "items": ["a", "c"] });
+		world.update_local();
+		let generation_3 = reactive_children_of(&mut world, list);
+		generation_3.len().xpect_eq(2);
+		generation_3[0].xpect_eq(generation_1[0]);
+		generation_3[1].xpect_eq(generation_2[2]);
+		world.entities().contains(generation_1[1]).xpect_false();
 	}
 
 	#[beet_core::test]

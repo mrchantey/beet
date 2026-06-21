@@ -1,5 +1,6 @@
-// Test cases for validating PostStreamer implementations using the
-// ThreadMut/ActorViewMut fluent builder API.
+// Test cases for validating PostStreamer implementations via the declarative
+// `run_oneshot` helper: a thread is authored as a roster of actors with seed
+// posts, the agent runs, and its reply is collected.
 use beet_core::prelude::*;
 use beet_thread::prelude::*;
 
@@ -7,70 +8,70 @@ use beet_thread::prelude::*;
 pub async fn basic_text_response(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
-	ThreadMut::spawn()
-		.insert_actor(Actor::user())
-		.insert_post("complete the sequence: one, two, three, ____")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer)
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.find(|post| post.intent().is_display())
-		.unwrap()
-		.to_string()
-		.xpect_contains("four");
+	run_oneshot(children![
+		(
+			Actor::user(),
+			children![Post::spawn(
+				"complete the sequence: one, two, three, ____"
+			)]
+		),
+		(Actor::agent(), streamer),
+	])
+	.await
+	.unwrap()
+	.into_iter()
+	.find(|post| post.intent().is_display())
+	.unwrap()
+	.to_string()
+	.xpect_contains("four");
 }
 
 /// Same as basic but with streaming enabled. Verify we get posts back.
 pub async fn streaming_response(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
-	ThreadMut::spawn()
-		.insert_actor(Actor::user())
-		.insert_post("Count from 1 to 5.")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer)
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.find(|post| post.intent().is_display())
-		.unwrap()
-		.to_string()
-		.is_empty()
-		.xpect_false();
+	run_oneshot(children![
+		(Actor::user(), children![Post::spawn("Count from 1 to 5.")]),
+		(Actor::agent(), streamer),
+	])
+	.await
+	.unwrap()
+	.into_iter()
+	.find(|post| post.intent().is_display())
+	.unwrap()
+	.to_string()
+	.is_empty()
+	.xpect_false();
 }
 
 /// Use a system prompt and verify the response follows it.
 pub async fn system_prompt(streamer: impl Component + PostStreamer + Clone) {
-	ThreadMut::spawn()
-		.insert_actor(Actor::system())
-		.insert_post(
-			"You are a pirate. Always respond in pirate speak, beginning with 'ahoy'.",
-		)
-		.thread_view()
-		.insert_actor(Actor::user())
-		.insert_post("Say hello in exactly 5 words.")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer)
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.filter(|post| post.intent().is_display())
-		.map(|post| post.to_string())
-		.collect::<String>()
-		.to_lowercase()
-		.xpect_contains("ahoy");
+	run_oneshot(children![
+		(
+			Actor::system(),
+			children![Post::spawn(
+				"You are a pirate. Always respond in pirate speak, beginning with 'ahoy'."
+			)]
+		),
+		(
+			Actor::user(),
+			children![Post::spawn("Say hello in exactly 5 words.")]
+		),
+		(Actor::agent(), streamer),
+	])
+	.await
+	.unwrap()
+	.into_iter()
+	.filter(|post| post.intent().is_display())
+	.map(|post| post.to_string())
+	.collect::<String>()
+	.to_lowercase()
+	.xpect_contains("ahoy");
 }
 
 /// Define a function tool and verify the model produces a function call.
 pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
-	let tool = FunctionToolDefinition::new(
+	let tool: ToolDefinition = FunctionToolDefinition::new(
 		"get_weather",
 		"Get the current weather for a location",
 		serde_json::json!({
@@ -83,27 +84,27 @@ pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
 			},
 			"required": ["location"]
 		}),
-	);
+	)
+	.into();
 
-	let (name, args) = ThreadMut::spawn()
-		.insert_actor(Actor::user())
-		.insert_post("What's the weather like in San Francisco?")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer)
-		.with_tool(tool)
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.filter_map(|post| match post.as_agent_post() {
-			AgentPost::FunctionCall(fc) => {
-				Some((fc.name().to_string(), fc.arguments().to_string()))
-			}
-			_ => None,
-		})
-		.next()
-		.unwrap();
+	let (name, args) = run_oneshot(children![
+		(
+			Actor::user(),
+			children![Post::spawn("What's the weather like in San Francisco?")]
+		),
+		(Actor::agent(), streamer, children![tool]),
+	])
+	.await
+	.unwrap()
+	.into_iter()
+	.filter_map(|post| match post.as_agent_post() {
+		AgentPost::FunctionCall(fc) => {
+			Some((fc.name().to_string(), fc.arguments().to_string()))
+		}
+		_ => None,
+	})
+	.next()
+	.unwrap();
 
 	name.xpect_contains("get_weather");
 	args.to_lowercase().xpect_contains("san francisco");
@@ -122,56 +123,54 @@ pub async fn image_input(streamer: impl Component + PostStreamer + Clone) {
 	)
 	.unwrap();
 
-	ThreadMut::spawn()
-		.insert_actor(Actor::user())
-		.insert_post(
-			"What color is this image? Answer in one word, either 'red' 'green' or 'blue'.",
-		)
-		.actor_view()
-		.insert_post(IntoPost::Bytes {
-			media_type: MediaType::Png,
-			bytes: image_bytes,
-			file_stem: None,
-		})
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer)
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.filter(|post| post.intent().is_display())
-		.map(|post| post.to_string())
-		.collect::<String>()
-		.to_lowercase()
-		.xpect_contains("blue");
+	run_oneshot(children![
+		(
+			Actor::user(),
+			children![
+				Post::spawn(
+					"What color is this image? Answer in one word, either 'red' 'green' or 'blue'."
+				),
+				Post::spawn(IntoPost::Bytes {
+					media_type: MediaType::Png,
+					bytes: image_bytes,
+					file_stem: None,
+				}),
+			]
+		),
+		(Actor::agent(), streamer),
+	])
+	.await
+	.unwrap()
+	.into_iter()
+	.filter(|post| post.intent().is_display())
+	.map(|post| post.to_string())
+	.collect::<String>()
+	.to_lowercase()
+	.xpect_contains("blue");
 }
 
 /// Multi-turn conversation: verify the model retains context across turns.
 pub async fn multi_turn_conversation(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
-	let mut thread = ThreadMut::spawn();
-	thread
-		.insert_actor(Actor::user())
-		.insert_post("My name is Alice.");
-	thread.insert_actor(Actor::agent()).insert_post(
-		"Hello Alice! Nice to meet you. How can I help you today?",
-	);
-	thread
-		.insert_actor(Actor::user())
-		.insert_post("What is my name?");
-	thread
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer)
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.filter(|post| post.intent().is_display())
-		.map(|post| post.to_string())
-		.collect::<String>()
-		.xpect_contains("Alice");
+	run_oneshot(children![
+		(Actor::user(), children![Post::spawn("My name is Alice.")]),
+		(
+			Actor::agent(),
+			children![Post::spawn(
+				"Hello Alice! Nice to meet you. How can I help you today?"
+			)]
+		),
+		(Actor::user(), children![Post::spawn("What is my name?")]),
+		(Actor::agent(), streamer),
+	])
+	.await
+	.unwrap()
+	.into_iter()
+	.filter(|post| post.intent().is_display())
+	.map(|post| post.to_string())
+	.collect::<String>()
+	.xpect_contains("Alice");
 }
 
 /// Image roundtrip: generate an image, then interpret it.
@@ -184,17 +183,17 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 	}
 
 	// Step 1: ask the agent to generate a blue image
-	let posts = ThreadMut::spawn()
-		.insert_actor(Actor::user())
-		.insert_post(
-			"Create a solid blue 1x1 pixel image. Return only the image.",
-		)
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer.clone())
-		.send_and_collect()
-		.await
-		.unwrap();
+	let posts = run_oneshot(children![
+		(
+			Actor::user(),
+			children![Post::spawn(
+				"Create a solid blue 1x1 pixel image. Return only the image."
+			)]
+		),
+		(Actor::agent(), streamer.clone()),
+	])
+	.await
+	.unwrap();
 
 	// Step 2: extract the generated image, falling back to a known blue pixel
 	// if the model or pipeline doesn't support image generation responses yet
@@ -217,23 +216,24 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 		});
 
 	// Step 3: ask the agent to interpret the image
-	ThreadMut::spawn()
-		.insert_actor(Actor::user())
-		.insert_post(
-			"What color is this image? Answer in one word, either 'red' 'green' or 'blue'.",
-		)
-		.actor_view()
-		.insert_post(image_post)
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(streamer)
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.find(|post| post.intent().is_display())
-		.unwrap()
-		.to_string()
-		.to_lowercase()
-		.xpect_contains("blue");
+	run_oneshot(children![
+		(
+			Actor::user(),
+			children![
+				Post::spawn(
+					"What color is this image? Answer in one word, either 'red' 'green' or 'blue'."
+				),
+				Post::spawn(image_post),
+			]
+		),
+		(Actor::agent(), streamer),
+	])
+	.await
+	.unwrap()
+	.into_iter()
+	.find(|post| post.intent().is_display())
+	.unwrap()
+	.to_string()
+	.to_lowercase()
+	.xpect_contains("blue");
 }

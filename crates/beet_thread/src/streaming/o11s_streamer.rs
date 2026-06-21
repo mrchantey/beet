@@ -69,6 +69,9 @@ impl O11sStreamer {
 		self
 	}
 
+	/// The system instructions sent with each request, if any.
+	pub fn instructions(&self) -> Option<&str> { self.instructions.as_deref() }
+
 	pub fn without_reasoning(mut self) -> Self {
 		self.reasoning = Some(ReasoningParam {
 			effort: Some(ReasoningEffort::None),
@@ -95,13 +98,14 @@ impl O11sStreamer {
 				move |actor_entity,
 				      query|
 				      -> Result<(o11s::RequestBody, ActorId, ThreadId)> {
-					let thread = query.thread(actor_entity)?;
-					let agent = thread.actor(actor_entity)?;
+					let (_, thread, window) =
+						query.thread_and_window(actor_entity)?;
+					let agent_id = query.actor_id(actor_entity)?;
 
 					// get last received response meta
 					let last_received = if this.use_previous_response_id {
-						thread.stored_response(
-							actor_entity,
+						window.stored_response(
+							agent_id,
 							&this.model.provider_slug,
 							&this.model.model_slug,
 						)
@@ -110,24 +114,23 @@ impl O11sStreamer {
 					};
 
 					// get input items (from last received if caching)
-					let items = thread
-						.posts_from(last_received.map(|(post, _)| post.id()))
+					let items = window
+						.posts_after(last_received.map(|(post_id, _)| post_id))
 						.into_iter()
 						.xtry_map(|post| {
-							o11s_mapper::post_to_o11s_input(agent.id(), post)
+							o11s_mapper::post_to_o11s_input(agent_id, post)
 						})?;
 
 					trace!("openresponses items: \n{items:#?}");
 
 					let tools = query
-						.tools(agent.entity)
+						.tools(actor_entity)
 						.into_iter()
 						.map(|(_entity, tool_def)| {
 							o11s_mapper::tool_to_function_param(tool_def)
 						})
 						.collect::<Vec<_>>();
 
-					// last_received.map(|(_, meta)| meta.clone())
 					// 4. build request body
 					let mut req_body = o11s::RequestBody::new(
 						this.model.model_slug.to_string(),
@@ -136,7 +139,7 @@ impl O11sStreamer {
 					.with_tools(tools)
 					.with_stream(this.stream);
 
-					if let Some(tool_choice) = &agent.tool_choice {
+					if let Some(tool_choice) = query.tool_choice(actor_entity) {
 						req_body = req_body.with_tool_choice(
 							o11s_mapper::tool_choice(tool_choice),
 						);
@@ -154,7 +157,7 @@ impl O11sStreamer {
 					if let Some(instructions) = this.instructions {
 						req_body = req_body.with_instructions(instructions);
 					}
-					(req_body, agent.id(), thread.id()).xok()
+					(req_body, agent_id, thread.id()).xok()
 				},
 			)
 			.await

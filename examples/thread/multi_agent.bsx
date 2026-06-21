@@ -1,0 +1,9 @@
+<div {Repeat}>
+	<div {Thread} {Sequence}>
+		<ActorDef name="System" kind="System">
+			<CreatePost text="this is a roleplay, keep responses under 50 words."/>
+		</ActorDef>
+		<ActorDef name="Beet lover" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You love beets"}}/>
+		<ActorDef name="Beet disliker" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You think beets are bad but dont want to hurt feelings"}}/>
+	</div>
+</div>

@@ -10,11 +10,10 @@ async fn has_pending_function_call_output(
 ) -> Result<bool> {
 	thread_entity
 		.with_state::<ThreadQuery, _>(|entity, query| -> Result<bool> {
-			let thread = query.thread(entity)?;
-			thread
-				.posts()
-				.last()
-				.map(|post| AgentPost::new(post.post).is_function_call_output())
+			query
+				.window(entity)?
+				.last_post()
+				.map(|post| AgentPost::new(post).is_function_call_output())
 				.unwrap_or(false)
 				.xok()
 		})

@@ -4,21 +4,19 @@ use beet::prelude::*;
 async fn main() {
 	env_ext::load_dotenv();
 
-	let posts = ThreadMut::spawn()
-		.insert_actor(Actor::system())
-		.insert_post("make like a duck and quack")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(
-			BedrockProvider::kimi_k2_5()
-				.unwrap()
-				// OllamaProvider::default_12gb()
-				// disable streaming since we're aggregating
-				.without_streaming(),
-		)
-		.send_and_collect()
-		.await
-		.unwrap();
+	let posts = run_oneshot(children![
+		(
+			Actor::system(),
+			children![Post::spawn("make like a duck and quack")]
+		),
+		(
+			Actor::agent(),
+			// disable streaming since we're aggregating
+			BedrockProvider::kimi_k2_5().unwrap().without_streaming(),
+		),
+	])
+	.await
+	.unwrap();
 
 	// hide reasoning in release builds
 	#[cfg(not(debug_assertions))]

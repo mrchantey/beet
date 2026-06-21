@@ -12,6 +12,7 @@ use beet_core::prelude::*;
 	Debug,
 	Clone,
 	Copy,
+	Default,
 	PartialEq,
 	Eq,
 	PartialOrd,
@@ -19,8 +20,11 @@ use beet_core::prelude::*;
 	Hash,
 	Serialize,
 	Deserialize,
+	Reflect,
 )]
+#[reflect(Default, Serialize, Deserialize)]
 pub enum PostStatus {
+	#[default]
 	Completed,
 	Interrupted,
 	InProgress,

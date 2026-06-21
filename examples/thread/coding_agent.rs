@@ -1,10 +1,15 @@
-//! Mini coding agent that creates HTML files in a local store.
+//! Mini coding agent that creates files in a local store. The roster + standard
+//! `<StoreToolset/>` are authored in `.bsx`; only the store and run glue are Rust.
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example coding_agent --features thread,fs
+//! cargo run --example coding_agent --features thread_ui,fs,router
 //! ```
 use beet::prelude::*;
+
+/// The author scene: an agent equipped with the store toolset, looped while it
+/// keeps calling tools.
+const SCENE: &str = include_str!("coding_agent.bsx");
 
 #[beet::main]
 async fn main() {
@@ -13,54 +18,37 @@ async fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			ThreadPlugin::default(),
-			ThreadStdoutPlugin::default(),
+			ThreadUiPlugin,
+			CharcellTuiPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run();
 }
 
-fn setup(mut commands: Commands) {
-	let store = FsStore::new(
-		AbsPathBuf::new_workspace_rel(".beet/coding_agent").unwrap(),
-	);
-
-	commands
-		.spawn((store, RepeatWhileFunctionCallOutput, children![(
-			Thread::default(),
-			Sequence::new(),
-			ExcludeErrors(ChildError::NO_ACTION),
-			children![
-				(Actor::system(), children![Post::spawn(PROMPT)]),
-				(
-					Actor::new("Coder", ActorKind::Agent),
-					OpenAiProvider::gpt_5_mini().unwrap(),
-					children![
-						exchange_route("list-blobs", ListBlobs),
-						exchange_route("read-blob", ReadBlob),
-						exchange_route("write-blob", WriteBlob),
-						exchange_route("edit-text", EditText),
-						exchange_route("remove-blob", RemoveBlob),
-					]
-				),
-			]
-		)]))
-		.call::<(), Outcome>((), OutHandler::exit());
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async move |world: AsyncWorld| -> Result {
+		let store = FsStore::new(
+			AbsPathBuf::new_workspace_rel(".beet/coding_agent").unwrap(),
+		);
+		// mount the store on the behavior root, reduce the scene, render the
+		// transcript, then run the tool loop to completion
+		let root = world
+			.with(move |world: &mut World| -> Result<Entity> {
+				let root =
+					BsxTemplate::parse_entry(world, SCENE)?.spawn(world)?;
+				world.entity_mut(root).insert(store);
+				reduce_threads_now(world);
+				let thread = world
+					.query_filtered::<Entity, With<Thread>>()
+					.iter(world)
+					.next()
+					.ok_or_else(|| bevyhow!("no Thread in scene"))?;
+				world.spawn(thread_tui(thread));
+				Ok(root)
+			})
+			.await?;
+		world.entity(root).call::<(), Outcome>(()).await?;
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }
-
-const PROMPT: &str = r#"
-You are a coding agent with access to a file store.
-Your available tools are: list-blobs, read-blob, write-blob, edit-text, remove-blob.
-
-We are testing that your tool calls work correctly.
-Please perform the following steps in order:
-
-1. Use list-blobs (path: "") to see what's in the store
-2. Use write-blob to create a file called "hello.txt" with the content "Hello, Beet!"
-   (pass the text as UTF-8 bytes)
-3. Use read-blob to verify the file was written correctly
-4. Use edit-text to change "Hello, Beet!" to "Hello, World!"
-5. Use read-blob again to confirm the edit
-6. Use remove-blob to delete "hello.txt"
-7. Use list-blobs to confirm it was deleted
-8. Finally, write a brief summary of what happened and whether all tools worked correctly
-"#;

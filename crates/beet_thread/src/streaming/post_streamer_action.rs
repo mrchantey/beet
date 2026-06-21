@@ -14,68 +14,59 @@ where
 	})
 	.await
 }
+
+/// Stream a model response into the thread's [`ThreadWindow`].
+///
+/// Created and modified posts are written straight into `window.posts` (the live
+/// slice the scene renders and persists), rather than spawning per-post
+/// entities. Completed function-call posts are collected and dispatched after
+/// the stream finishes.
 pub async fn post_streamer_action_stateful<T>(
 	cx: ActionContext<T>,
 ) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,
 {
-	// TODO somehow expose settings.. PostAction component?
-	let allow_multiple_modified = false;
-
 	let streamer = cx.input;
 	let mut stream = streamer.stream_posts(cx.caller.clone()).await?;
 	let mut function_calls = HashMap::new();
 
 	while let Some(changes) = stream.next().await {
 		let changes = changes?;
+
+		// collect completed function calls to dispatch after the stream
 		for post in changes
 			.iter_all()
 			.filter(|post| post.status() == PostStatus::Completed)
-		// .map(|post| post.as_agent_post())
 		{
-			info!("Received post changes: {:#?}", post);
-
-			match AgentPost::new(post) {
-				AgentPost::FunctionCall(view) => {
-					function_calls.insert(view.id(), view.into_owned());
-				}
-				_ => {}
+			if let AgentPost::FunctionCall(view) = AgentPost::new(post) {
+				function_calls.insert(view.id(), view.into_owned());
 			}
 		}
-		// info!("Received post changes: {:#?}", changes);
-		let meta_builder = stream.meta_builder()?;
+
+		// build response metas only once posts have been created
 		let PostChanges { created, modified } = changes;
+		let metas = if created.is_empty() {
+			Vec::new()
+		} else {
+			let meta_builder = stream.meta_builder()?;
+			created
+				.iter()
+				.map(|post| meta_builder.build(post.id()))
+				.collect::<Vec<_>>()
+		};
+
+		// apply the changes to the thread window
 		cx.caller
-			.with_state::<(Commands, Query<&mut Post>), _>(
-				move |agent, (mut commands, mut query)| -> Result {
-					// let view = query.view(entity)?;
-
-					let mut modified = modified
-						.into_iter()
-						.map(|modified| (modified.id(), modified))
-						.collect::<HashMap<_, _>>();
-
-					// 1. apply modified posts
-					for mut post in query.iter_mut() {
-						if allow_multiple_modified
-							&& let Some(new) = modified.get(&post.id()).cloned()
-						{
-							// clone if allow multiple
-							post.set_if_neq(new);
-						} else if let Some(new) = modified.remove(&post.id()) {
-							post.set_if_neq(new);
-						}
-					}
-					// 2. spawn created posts
-					for created_post in created {
-						let meta = meta_builder.build(created_post.id());
-						commands.spawn((ChildOf(agent), created_post, meta));
-					}
-
-					Ok(())
-				},
-			)
+			.with_state::<WindowMut, _>(move |entity, mut window_mut| -> Result {
+				let mut window = window_mut.window_mut(entity)?;
+				modified.into_iter().for_each(|post| window.upsert_post(post));
+				created.into_iter().zip(metas).for_each(|(post, meta)| {
+					window.set_meta(meta);
+					window.upsert_post(post);
+				});
+				Ok(())
+			})
 			.await??;
 	}
 

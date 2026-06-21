@@ -1,5 +1,10 @@
-//! Demonstrates tool calling
+//! A self-evolving agent whose only memory is a blob store it reads and writes
+//! across turns. The roster + standard `<StoreToolset/>` are authored in `.bsx`;
+//! only the store and run glue stay in Rust.
 use beet::prelude::*;
+
+/// The author scene: a ten-turn loop over an agent equipped with the store toolset.
+const SCENE: &str = include_str!("self_evolving.bsx");
 
 #[beet::main]
 async fn main() {
@@ -8,42 +13,38 @@ async fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			ThreadPlugin::default(),
-			ThreadStdoutPlugin::default(),
+			ThreadUiPlugin,
+			CharcellTuiPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run();
 }
 
-fn setup(mut commands: Commands) {
-	let store_path = WsPathBuf::new("target/examples/self_evolving");
-	fs_ext::remove(&store_path).ok();
-	let store = FsStore::new(store_path);
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async move |world: AsyncWorld| -> Result {
+		let store_path = WsPathBuf::new("target/examples/self_evolving");
+		fs_ext::remove(&store_path).ok();
+		let store = FsStore::new(store_path);
 
-	commands
-		.spawn((RepeatTimes::new(10), store, children![(
-			Thread::default(),
-			Sequence::new(),
-			ExcludeErrors(ChildError::NO_ACTION),
-			children![
-				(Actor::system(), children![Post::spawn(SYSTEM_PROMPT)]),
-				// (Actor::user(), StdinPost, children![Post::spawn(USER_PROMPT)]),
-				(
-					Actor::agent(),
-					// OllamaProvider::default_12gb(),
-					OpenAiProvider::gpt_5_mini().unwrap(),
-					children![
-						exchange_route("list-blobs", ListBlobs),
-						exchange_route("read-blob", ReadBlob),
-						exchange_route("write-blob", WriteBlob),
-						exchange_route("edit-text", EditText),
-						exchange_route("remove-blob", RemoveBlob),
-					]
-				),
-			]
-		),]))
-		.call::<(), Outcome>((), OutHandler::exit());
+		// mount the store on the behavior root (an ancestor of the toolset), reduce
+		// the scene, and render the transcript before the loop runs
+		let root = world
+			.with(move |world: &mut World| -> Result<Entity> {
+				let root =
+					BsxTemplate::parse_entry(world, SCENE)?.spawn(world)?;
+				world.entity_mut(root).insert(store);
+				reduce_threads_now(world);
+				let thread = world
+					.query_filtered::<Entity, With<Thread>>()
+					.iter(world)
+					.next()
+					.ok_or_else(|| bevyhow!("no Thread in scene"))?;
+				world.spawn(thread_tui(thread));
+				Ok(root)
+			})
+			.await?;
+		world.entity(root).call::<(), Outcome>(()).await?;
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }
-
-const SYSTEM_PROMPT: &'static str = r#"
-TODO
-"#;

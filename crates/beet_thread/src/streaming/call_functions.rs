@@ -52,21 +52,19 @@ pub async fn call_functions(
 			};
 
 		agent
-			.with_state::<ThreadQuery, Result>(move |entity, mut query| {
-				let thread = query.thread(entity)?;
-				let actor = thread.actor(entity)?;
+			.with_state::<WindowMut, Result>(move |entity, mut window_mut| {
+				let actor_id = window_mut.actor_id(entity)?;
+				let thread_id = window_mut.thread_id(entity)?;
 
 				let post = AgentPost::new_function_call_output(
-					actor.id(),
-					thread.id(),
+					actor_id,
+					thread_id,
 					call.call_id().to_string(),
 					output,
 					call.name().to_string().xsome(),
 					PostStatus::Completed,
 				);
-				query.commands.spawn((ChildOf(entity), post));
-
-				Ok(())
+				window_mut.push_post(entity, post)
 			})
 			.await??;
 	}

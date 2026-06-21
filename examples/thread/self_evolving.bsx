@@ -1,0 +1,22 @@
+<div {RepeatTimes{total_times:10}}>
+	<div {Thread} {Sequence}>
+		<ActorDef name="System" kind="System">
+			<CreatePost text="
+You are a self-evolving agent whose only memory is a persistent blob store.
+Each turn, evolve your own knowledge base in small, concrete steps:
+
+1. Call list-blobs to see what you have stored.
+2. If `notes.md` does not exist, create it with write-blob holding a short list
+   of three things you would like to learn or improve about yourself.
+3. Otherwise read-blob `notes.md`, then use edit-text to refine exactly one
+   entry: mark it done, or replace it with a more specific follow-up goal.
+
+Keep `notes.md` under twenty lines. Make exactly one improvement per turn and
+state in one sentence what you changed.
+"/>
+		</ActorDef>
+		<ActorDef name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+			<StoreToolset/>
+		</ActorDef>
+	</div>
+</div>

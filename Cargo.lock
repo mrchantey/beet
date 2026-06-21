@@ -1621,6 +1621,7 @@ dependencies = [
  "beet_net",
  "beet_router",
  "beet_thread",
+ "beet_ui",
  "bevy",
  "futures",
  "js-sys",

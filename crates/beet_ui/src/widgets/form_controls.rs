@@ -161,6 +161,9 @@ impl Plugin for FormPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_observer(ensure_form_field_value)
 			.add_observer(fire_form_submit);
+		// Enter-to-submit needs the keyboard/focus stack, gated with the renderer.
+		#[cfg(feature = "tui")]
+		app.add_systems(Update, submit_form_on_enter);
 	}
 }
 
@@ -207,19 +210,79 @@ fn fire_form_submit(
 	let Some(form) = ancestor_form(&elements, &parents, target) else {
 		return;
 	};
+	trigger_form_submit(form, &elements, &values, &mut commands);
+}
 
-	// the named controls in document order, each its typed `Value` (a select
-	// with no edit falls back to its first option, like a browser).
-	let values = elements
+/// On Enter while a text control inside a form is focused, fire [`Submit`] on the
+/// form, the native analogue of a browser submitting a single-field form on
+/// Enter. The focused control is resolved per surface, so a multi-tenant terminal
+/// submits only the session that pressed Enter. A focused `<button>` is left to
+/// the click/activation path ([`fire_form_submit`]).
+#[cfg(feature = "tui")]
+fn submit_form_on_enter(
+	mut keys: MessageReader<bevy::input::keyboard::KeyboardInput>,
+	focused: Query<Entity, With<Focus>>,
+	elements: ElementQuery,
+	parents: Query<&ChildOf>,
+	surfaces: Query<&RenderSurface>,
+	values: Query<&Value>,
+	mut commands: Commands,
+) {
+	use bevy::input::ButtonState;
+	use bevy::input::keyboard::Key;
+	// the surfaces (windows) Enter was pressed on this frame.
+	let enter_windows = keys
+		.read()
+		.filter(|key| {
+			key.state == ButtonState::Pressed && key.logical_key == Key::Enter
+		})
+		.map(|key| key.window)
+		.collect::<HashSet<_>>();
+	if enter_windows.is_empty() {
+		return;
+	}
+	for target in focused.iter() {
+		// only text controls submit on Enter; a select/button does not
+		if !elements
+			.get(target)
+			.map(|view| matches!(view.tag(), "input" | "textarea"))
+			.unwrap_or(false)
+		{
+			continue;
+		}
+		let surface = surface_of(target, &parents, &surfaces);
+		if enter_windows
+			.iter()
+			.any(|window| surface_matches(surface, *window))
+			&& let Some(form) = ancestor_form(&elements, &parents, target)
+		{
+			trigger_form_submit(form, &elements, &values, &mut commands);
+		}
+	}
+}
+
+/// Gather a form's named controls in document order and fire [`Submit`] on it,
+/// each control carrying its typed [`Value`] (an untouched `<select>` falls back
+/// to its first option, like a browser). Shared by the button and Enter paths.
+fn trigger_form_submit(
+	form: Entity,
+	elements: &ElementQuery,
+	values: &Query<&Value>,
+	commands: &mut Commands,
+) {
+	let gathered = elements
 		.iter_descendants_inclusive(form)
 		.filter(|view| matches!(view.tag(), "input" | "textarea" | "select"))
 		.filter_map(|view| {
 			let name = view.attribute("name")?.value.as_str().ok()?.into();
-			(name, field_value(&elements, &values, &view)).xsome()
+			(name, field_value(elements, values, &view)).xsome()
 		})
 		.collect::<Map>()
 		.xmap(Value::Map);
-	commands.trigger(Submit { form, values });
+	commands.trigger(Submit {
+		form,
+		values: gathered,
+	});
 }
 
 /// The current value of a form field: its edited [`Value`], or for an untouched
@@ -463,5 +526,84 @@ mod test {
 			.as_str()
 			.unwrap()
 			.xpect_eq("engineer");
+	}
+
+	/// Pressing Enter while a text field is focused fires [`Submit`] on its form,
+	/// like a browser submitting a single-field form on Enter, so a terminal chat
+	/// composer needs no submit button.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn submit_fires_on_enter_in_input() {
+		use bevy::input::ButtonState;
+		use bevy::input::keyboard::Key;
+		use bevy::input::keyboard::KeyCode;
+		use bevy::input::keyboard::KeyboardInput;
+
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			bevy::input::InputPlugin,
+			CharcellPlugin,
+			RealtimeParsePlugin,
+			DocumentPlugin,
+			FocusPlugin,
+			FormPlugin,
+		));
+		let captured = Store::new(None::<Value>);
+		app.world_mut().add_observer(move |ev: On<Submit>| {
+			captured.set(Some(ev.values.clone()));
+		});
+		app.world_mut()
+			.spawn_template(rsx! {
+				<Form name="demo">
+					<TextField name="message"/>
+				</Form>
+			})
+			.unwrap();
+		app.update();
+
+		// focus the input on a surface and type a message.
+		let input = app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(app.world())
+			.find(|(_, el)| el.tag() == "input")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		let window = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.entity_mut(input)
+			.insert((Focus, RenderSurface(window)));
+		for ch in ["h", "i"] {
+			app.world_mut().write_message(KeyboardInput {
+				key_code: KeyCode::KeyH,
+				logical_key: Key::Character(ch.into()),
+				state: ButtonState::Pressed,
+				text: Some(ch.into()),
+				repeat: false,
+				window,
+			});
+		}
+		app.update();
+
+		// press Enter on the focused field: Submit fires with the typed value.
+		app.world_mut().write_message(KeyboardInput {
+			key_code: KeyCode::Enter,
+			logical_key: Key::Enter,
+			state: ButtonState::Pressed,
+			text: None,
+			repeat: false,
+			window,
+		});
+		app.update();
+
+		captured
+			.get()
+			.unwrap()
+			.get("message")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("hi");
 	}
 }

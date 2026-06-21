@@ -19,7 +19,10 @@ impl Plugin for ThreadPlugin {
 			.init_plugin::<NetPlugin>();
 
 		#[cfg(feature = "action")]
-		app.init_plugin::<ActionPlugin>();
+		app.init_plugin::<ActionPlugin>()
+			// agent-loop control flow + the standard store toolset, as markup
+			.register_type::<RepeatWhileFunctionCallOutput>()
+			.register_template::<StoreToolset>();
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────
@@ -34,11 +37,16 @@ impl Plugin for ThreadPlugin {
 			.register_type::<PostIntent>()
 			.register_type::<Timestamp>()
 			.register_type::<ResponseMeta>()
+			.register_type::<ActorRef>()
+			.register_type::<ThreadConfig>()
 			// ── Streaming types ───────────────────────────────────────────
 			.register_type::<EnvVar>()
 			.register_type::<ModelDef>()
 			.register_type::<O11sStreamer>()
 			.register_type::<CompletionsStreamer>()
+			.register_type::<Provider>()
+			.register_type::<ModelApi>()
+			.register_type::<ModelSize>()
 			// ── Reasoning sub-types ───────────────────────────────────────
 			.register_type::<ReasoningEffort>()
 			.register_type::<ReasoningSummary>()
@@ -48,14 +56,15 @@ impl Plugin for ThreadPlugin {
 			.register_type::<FunctionToolDefinition>()
 			.register_type::<ProviderToolDefinition>()
 			.register_type::<ToolChoice>()
-			// ── SkipIfLatest wrapper instantiations ───────────────────────
-			.register_type::<SkipIfLatest<StdinPost>>()
-			.register_type::<SkipIfLatest<O11sStreamer>>()
+			// ── Markup templates ──────────────────────────────────────────
+			.register_template::<CreatePost>()
+			.register_template::<ModelStreamer>()
+			.register_template::<ActorDef>()
 			.add_observer(insert_tool_definition)
 			// _
 			;
 
-		#[cfg(feature = "template_serde")]
-		app.add_systems(PostUpdate, thread_store::store_thread_on_post);
+		app.add_systems(First, reduce_threads)
+			.add_systems(PostUpdate, thread_store::sync_window_to_store);
 	}
 }

@@ -1,10 +1,12 @@
 mod bedrock;
 mod gemini;
 mod mock_provider;
+mod model_streamer;
 mod ollama;
 mod openai;
 pub use bedrock::*;
 pub use gemini::*;
 pub use mock_provider::*;
+pub use model_streamer::*;
 pub use ollama::*;
 pub use openai::*;

@@ -1,4 +1,9 @@
+//! Two agents converse: a `.bsx` roster reduced into a thread, looped by
+//! `Repeat` and rendered through the agnostic charcell UI.
 use beet::prelude::*;
+
+/// The author scene: a `Repeat` over a two-agent `Sequence`.
+const SCENE: &str = include_str!("multi_agent.bsx");
 
 fn main() {
 	env_ext::load_dotenv();
@@ -6,37 +11,26 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			ThreadPlugin::default(),
-			// logs all agent messages to stdout
-			ThreadStdoutPlugin::default(),
+			ThreadUiPlugin,
+			CharcellTuiPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run();
 }
 
-fn setup(mut commands: Commands) {
-	commands
-		.spawn((Repeat::new(), children![(
-			Thread::default(),
-			Sequence::new(),
-			ExcludeErrors(ChildError::NO_ACTION),
-			children![
-				(Actor::system(), children![Post::spawn(
-					"this is a roleplay, keep responses under 50 words."
-				)]),
-				(
-					Actor::new("Beet lover", ActorKind::Agent),
-					OpenAiProvider::gpt_5_mini()
-						.unwrap()
-						.with_instructions("You love beets")
-				),
-				(
-					Actor::new("Beet disliker", ActorKind::Agent),
-					OpenAiProvider::gpt_5_mini().unwrap().with_instructions(
-						"You think beets are bad but dont want to hurt feelings"
-					)
-				),
-				// (Actor::new("Some random blow-in", ActorKind::User), StdinPost),
-			]
-		),]))
-		.call::<(), Outcome>((), default());
+/// Reduce the scene, kick the endless exchange with `CallOnSpawn`, and render
+/// the transcript. The `Repeat` root drives the loop; no user input.
+fn setup(world: &mut World) -> Result {
+	let root = BsxTemplate::parse_entry(world, SCENE)?.spawn(world)?;
+	world
+		.entity_mut(root)
+		.insert(CallOnSpawn::<(), Outcome>::new(()));
+	reduce_threads_now(world);
+	let thread = world
+		.query_filtered::<Entity, With<Thread>>()
+		.iter(world)
+		.next()
+		.ok_or_else(|| bevyhow!("no Thread in scene"))?;
+	world.spawn(thread_tui(thread));
+	Ok(())
 }

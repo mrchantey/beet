@@ -1,4 +1,9 @@
+//! Interactive terminal chat: a `.bsx` roster reduced into a thread, rendered
+//! and driven through the agnostic charcell UI.
 use beet::prelude::*;
+
+/// The author scene: roster + system seed, reduced at runtime.
+const SCENE: &str = include_str!("chat.bsx");
 
 fn main() {
 	env_ext::load_dotenv();
@@ -6,29 +11,18 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			ThreadPlugin::default(),
-			// logs all agent messages to stdout
-			ThreadStdoutPlugin::default(),
+			ThreadUiPlugin,
+			CharcellTuiPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run();
 }
 
-fn setup(mut commands: Commands) {
-	commands
-		.spawn((Repeat::new(), children![(
-			Thread::default(),
-			ExcludeErrors(ChildError::NO_ACTION),
-			Sequence::new(),
-			children![
-				(Actor::system(), children![Post::spawn(
-					"you are robot, make beep boop noises"
-				)]),
-				(
-					Actor::new("BeepBot", ActorKind::Agent),
-					OpenAiProvider::gpt_5_mini().unwrap()
-				),
-				(Actor::new("Billy", ActorKind::User), StdinPost),
-			]
-		),]))
-		.call::<(), Outcome>((), default());
+/// Reduce the `.bsx` scene into a window + behavior, then mount an interactive
+/// charcell chat over it; the composer drives the agent's replies, no stdin.
+fn setup(world: &mut World) -> Result {
+	let thread = BsxTemplate::parse_entry(world, SCENE)?.spawn(world)?;
+	reduce_threads_now(world);
+	world.spawn(thread_chat_tui(thread));
+	Ok(())
 }

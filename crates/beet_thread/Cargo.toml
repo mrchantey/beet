@@ -21,12 +21,17 @@ template_serde = ["beet_net/template_serde", "beet_core/template_serde"]
 fs = ["beet_core/fs"]
 action = ["dep:beet_action"]
 agent = ["dep:async-openai"]
+# Reactive chat UI on top of beet_ui: the `ThreadView` charcell widget and the
+# `ThreadWindow` -> `Document` projection. Pulls beet_ui's template + charcell
+# (`tui`) stack plus the reactive document chain.
+ui = ["dep:beet_ui", "action"]
 
 [dependencies]
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "json"] }
 beet_core = { workspace = true, features = ["std", "serde","bevy_reflect_documentation"] }
 beet_router = { workspace = true, features = ["json"] }
 beet_action = { workspace = true, optional = true, features = ["std", "reflect", "json"] }
+beet_ui = { workspace = true, optional = true, features = ["tui", "template", "json"] }
 bevy.workspace = true
 uuid = { workspace = true, features = ["std", "v7", "js"] }
 async-openai = { version = "0.34", optional=true, default-features=false, features=["chat-completion-types"] }

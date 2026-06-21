@@ -111,22 +111,22 @@ impl PostStreamer for MockPostStreamer {
 						String,
 						Option<(String, Schema)>,
 					)> {
-						let thread = query.thread(actor_entity)?;
-						let agent = thread.actor(actor_entity)?;
+						let (_, thread, window) =
+							query.thread_and_window(actor_entity)?;
+						let agent_id = query.actor_id(actor_entity)?;
 
 						// Extract last user text
-						let last_text = thread
-							.posts
-							.iter()
-							.rev()
-							.find(|post| post.actor.kind() == ActorKind::User)
-							.and_then(|post| post.body_str().ok())
+						let last_text = window
+							.post_views()
+							.filter(|view| view.actor.kind() == ActorKind::User)
+							.last()
+							.and_then(|view| view.post.body_str().ok())
 							.unwrap_or_default()
 							.to_string();
 
 						// Get first tool if any
 						let first_tool = query
-							.tools(agent.entity)
+							.tools(actor_entity)
 							.into_iter()
 							.find_map(|(_, tool_def)| match tool_def {
 								ToolDefinition::Function(func) => Some((
@@ -136,7 +136,7 @@ impl PostStreamer for MockPostStreamer {
 								_ => None,
 							});
 
-						(agent.id(), thread.id(), last_text, first_tool).xok()
+						(agent_id, thread.id(), last_text, first_tool).xok()
 					},
 				)
 				.await??;
@@ -202,25 +202,22 @@ mod test {
 
 	#[beet_core::test]
 	async fn echoes_input_without_tools() {
-		ThreadMut::spawn()
-			.insert_actor(Actor::user())
-			.insert_post("Hello world!")
-			.thread_view()
-			.insert_actor(Actor::agent())
-			.with_bundle(MockPostStreamer::default())
-			.send_and_collect()
-			.await
-			.unwrap()
-			.into_iter()
-			.find(|post| post.intent().is_display())
-			.unwrap()
-			.to_string()
-			.xpect_eq("you said: Hello world!");
+		run_oneshot(children![
+			(Actor::user(), children![Post::spawn("Hello world!")]),
+			(Actor::agent(), MockPostStreamer::default()),
+		])
+		.await
+		.unwrap()
+		.into_iter()
+		.find(|post| post.intent().is_display())
+		.unwrap()
+		.to_string()
+		.xpect_eq("you said: Hello world!");
 	}
 
 	#[beet_core::test]
 	async fn calls_first_tool_when_present() {
-		let tool = FunctionToolDefinition::new(
+		let tool: ToolDefinition = FunctionToolDefinition::new(
 			"greet",
 			"Greet someone",
 			serde_json::json!({
@@ -230,27 +227,28 @@ mod test {
 					"age": { "type": "integer" }
 				}
 			}),
-		);
+		)
+		.into();
 
-		let (name, args) = ThreadMut::spawn()
-			.insert_actor(Actor::user())
-			.insert_post("Greet someone")
-			.thread_view()
-			.insert_actor(Actor::agent())
-			.with_bundle(MockPostStreamer::default())
-			.with_tool(tool)
-			.send_and_collect()
-			.await
-			.unwrap()
-			.into_iter()
-			.filter_map(|post| match post.as_agent_post() {
-				AgentPost::FunctionCall(fc) => {
-					Some((fc.name().to_string(), fc.arguments().to_string()))
-				}
-				_ => None,
-			})
-			.next()
-			.unwrap();
+		let (name, args) = run_oneshot(children![
+			(Actor::user(), children![Post::spawn("Greet someone")]),
+			(
+				Actor::agent(),
+				MockPostStreamer::default(),
+				children![tool]
+			),
+		])
+		.await
+		.unwrap()
+		.into_iter()
+		.filter_map(|post| match post.as_agent_post() {
+			AgentPost::FunctionCall(fc) => {
+				Some((fc.name().to_string(), fc.arguments().to_string()))
+			}
+			_ => None,
+		})
+		.next()
+		.unwrap();
 
 		name.xpect_eq("greet");
 		let parsed: serde_json::Value = serde_json::from_str(&args).unwrap();
@@ -260,19 +258,19 @@ mod test {
 
 	#[beet_core::test]
 	async fn custom_response_overrides_echo() {
-		ThreadMut::spawn()
-			.insert_actor(Actor::user())
-			.insert_post("Hello!")
-			.thread_view()
-			.insert_actor(Actor::agent())
-			.with_bundle(MockPostStreamer::with_response("Custom answer"))
-			.send_and_collect()
-			.await
-			.unwrap()
-			.into_iter()
-			.find(|post| post.intent().is_display())
-			.unwrap()
-			.to_string()
-			.xpect_eq("Custom answer");
+		run_oneshot(children![
+			(Actor::user(), children![Post::spawn("Hello!")]),
+			(
+				Actor::agent(),
+				MockPostStreamer::with_response("Custom answer")
+			),
+		])
+		.await
+		.unwrap()
+		.into_iter()
+		.find(|post| post.intent().is_display())
+		.unwrap()
+		.to_string()
+		.xpect_eq("Custom answer");
 	}
 }

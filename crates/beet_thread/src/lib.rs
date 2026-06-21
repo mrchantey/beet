@@ -11,6 +11,8 @@ mod streaming;
 pub mod table;
 mod tool;
 mod types;
+#[cfg(feature = "ui")]
+pub mod ui;
 
 pub mod prelude {
 	pub use crate::o11s;
@@ -21,4 +23,6 @@ pub mod prelude {
 	pub use crate::table::*;
 	pub use crate::tool::*;
 	pub use crate::types::*;
+	#[cfg(feature = "ui")]
+	pub use crate::ui::*;
 }

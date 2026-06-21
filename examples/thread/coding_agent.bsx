@@ -1,0 +1,26 @@
+<div {RepeatWhileFunctionCallOutput}>
+	<div {Thread} {Sequence}>
+		<ActorDef name="System" kind="System">
+			<CreatePost text='
+You are a coding agent with access to a file store.
+Your available tools are: list-blobs, read-blob, write-blob, edit-text, remove-blob.
+
+We are testing that your tool calls work correctly.
+Please perform the following steps in order:
+
+1. Use list-blobs (path: "") to see what is in the store
+2. Use write-blob to create a file called "hello.txt" with the content "Hello, Beet!"
+   (pass the text as UTF-8 bytes)
+3. Use read-blob to verify the file was written correctly
+4. Use edit-text to change "Hello, Beet!" to "Hello, World!"
+5. Use read-blob again to confirm the edit
+6. Use remove-blob to delete "hello.txt"
+7. Use list-blobs to confirm it was deleted
+8. Finally, write a brief summary of what happened and whether all tools worked correctly
+'/>
+		</ActorDef>
+		<ActorDef name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+			<StoreToolset/>
+		</ActorDef>
+	</div>
+</div>

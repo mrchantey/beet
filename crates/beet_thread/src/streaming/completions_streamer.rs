@@ -85,8 +85,9 @@ impl CompletionsStreamer {
 					ActorId,
 					ThreadId,
 				)> {
-					let thread = query.thread(actor_entity)?;
-					let agent = thread.actor(actor_entity)?;
+					let (_, thread, window) =
+						query.thread_and_window(actor_entity)?;
+					let agent_id = query.actor_id(actor_entity)?;
 
 					let mut messages = Vec::new();
 
@@ -106,19 +107,18 @@ impl CompletionsStreamer {
 						);
 					}
 
-					// Convert thread posts to completions messages
+					// Convert window posts to completions messages
 					let post_messages =
-						thread.posts.iter().xtry_map(|post| {
+						window.post_views().xtry_map(|post| {
 							completions_mapper::post_to_completions_message(
-								agent.id(),
-								post.clone(),
+								agent_id, post,
 							)
 						})?;
 					messages.extend(post_messages);
 
 					// Collect tools
 					let tools = query
-						.tools(agent.entity)
+						.tools(actor_entity)
 						.into_iter()
 						.map(|(_entity, tool_def)| {
 							completions_mapper::tool_to_completions_tool(
@@ -127,9 +127,10 @@ impl CompletionsStreamer {
 						})
 						.collect::<Vec<_>>();
 
-					let tool_choice = agent.tool_choice.map(|choice| {
-						completions_mapper::tool_choice_to_completions(choice)
-					});
+					let tool_choice =
+						query.tool_choice(actor_entity).map(|choice| {
+							completions_mapper::tool_choice_to_completions(choice)
+						});
 
 					#[allow(deprecated)]
 					let req = CreateChatCompletionRequest {
@@ -183,7 +184,7 @@ impl CompletionsStreamer {
 						metadata: None,
 					};
 
-					(req, agent.id(), thread.id()).xok()
+					(req, agent_id, thread.id()).xok()
 				},
 			)
 			.await

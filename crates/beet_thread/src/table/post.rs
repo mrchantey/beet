@@ -17,8 +17,13 @@ pub type PostId = Uuid7<Post>;
 	Deserialize,
 	Reflect,
 )]
-#[reflect(Serialize, Deserialize)]
+#[reflect(Default, Serialize, Deserialize)]
 pub struct PostIntent(u16);
+
+impl Default for PostIntent {
+	/// Defaults to [`PostIntent::OK`], the common authored intent.
+	fn default() -> Self { Self::OK }
+}
 
 impl PostIntent {
 	/// 1xx informational: reasoning content from a model.
@@ -244,21 +249,34 @@ impl Post {
 		}
 	}
 
-	/// For a given body, resolve the author id and thread id
-	/// on spawn by recursing up the tree.
-	pub fn spawn(content: impl Into<IntoPost>) -> OnSpawn {
-		let content = content.into();
-		OnSpawn::new(move |entity| {
-			let post = entity.with_state::<ThreadQuery, _>(
-				move |post_entity, query| -> Result<Post> {
-					let thread = query.thread(post_entity)?;
-					let actor = query.actor_from_post_entity(post_entity)?;
-					content.into_post(actor.id(), thread.id()).xok()
-				},
-			)?;
-			entity.insert(post);
-			Ok(())
-		})
+	/// Author a seed post in markup as a child of its `<Actor>`, ie
+	/// `children![Post::spawn("hello")]`. The author-to-behavior reduction
+	/// resolves its author (the actor parent) and thread, hoists it into the
+	/// [`ThreadWindow`], and despawns the entity, leaving only the record.
+	///
+	/// The intent follows the content (text is [`PostIntent::OK`]); see
+	/// [`Self::spawn_with`] / `<CreatePost>` to author refusals, reasoning, or
+	/// in-progress posts.
+	pub fn spawn(content: impl Into<IntoPost>) -> SeedPost {
+		SeedPost {
+			content: content.into(),
+			intent: PostIntent::OK,
+			status: PostStatus::Completed,
+		}
+	}
+
+	/// As [`Self::spawn`], overriding the [`PostIntent`] and [`PostStatus`].
+	/// This is the resolver `<CreatePost>` wraps.
+	pub fn spawn_with(
+		content: impl Into<IntoPost>,
+		intent: PostIntent,
+		status: PostStatus,
+	) -> SeedPost {
+		SeedPost {
+			content: content.into(),
+			intent,
+			status,
+		}
 	}
 
 	/// Returns the body as base64.
@@ -276,8 +294,9 @@ impl Post {
 
 /// Content for constructing a new [`Post`].
 ///
-/// Used by spawners like [`Post::spawn`] and [`ThreadQuery::spawn_post`].
+/// Used by spawners like [`Post::spawn`] (via [`SeedPost`]).
 /// Prefer [`AgentPost`] constructors for full control over intent and status.
+#[derive(Clone)]
 pub enum IntoPost {
 	Text(String),
 	Url {

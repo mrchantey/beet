@@ -5,9 +5,11 @@ pub mod completions_mapper;
 mod completions_streamer;
 pub mod o11s_mapper;
 mod o11s_streamer;
+mod oneshot;
 mod post_streamer;
 mod post_streamer_action;
 pub use call_functions::*;
+pub use oneshot::*;
 #[cfg(feature = "agent")]
 pub use completions_streamer::*;
 pub use o11s_streamer::*;
