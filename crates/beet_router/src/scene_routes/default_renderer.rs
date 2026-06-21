@@ -24,7 +24,12 @@ pub async fn default_renderer(
 			// page with bindings gets the thin-client wire format + the runtime
 			// (loaded from the shared, cached `/js/reactivity.js`), while a plain
 			// page emits no blob and no script, so the static output is unchanged.
+			//
+			// This is the http page handler, so HTML is the preferred type: a request
+			// with no `Accept` or a wildcard (`*/*`) renders the web document, not the
+			// build's default (markdown source when the markdown parser is linked).
 			let mut renderer = MediaRenderer::default()
+				.with_default_media_type(MediaType::Html)
 				.with_html_renderer(HtmlRenderer::new().reactive());
 
 			let mut cx = RenderContext::new(id, world).with_accepts(accepts);

@@ -127,18 +127,29 @@ pub async fn sleep_micros(micros: u64) {
 pub async fn sleep(duration: Duration) {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
+			use wasm_bindgen::JsCast;
+			use wasm_bindgen::JsValue;
 			use wasm_bindgen_futures::JsFuture;
-			use web_sys::window;
-			let window = window().unwrap();
+			// resolve the *global* `setTimeout` by reflection rather than reaching
+			// through `web_sys::window()`: a Cloudflare Worker (and other non-DOM
+			// hosts) has no `window`, so `window().unwrap()` would panic.
+			// `setTimeout` lives on `globalThis` in every JS host (browser, worker,
+			// deno). Reflection (vs a `#[wasm_bindgen] extern`) also avoids a
+			// duplicate `__wbindgen_describe___wbg_setTimeout` symbol when a `--lib`
+			// wasm test links this crate twice (cfg(test) + rlib).
+			let set_timeout: js_sys::Function =
+				js_sys::Reflect::get(&js_sys::global(), &"setTimeout".into())
+					.expect("globalThis.setTimeout")
+					.unchecked_into();
 			let promise = js_sys::Promise::new(&mut |resolve, _| {
-				window
-					.set_timeout_with_callback_and_timeout_and_arguments_0(
+				set_timeout
+					.call2(
+						&JsValue::NULL,
 						&resolve,
-						duration.as_millis() as i32,
+						&JsValue::from(duration.as_millis() as i32),
 					)
-					.expect("should register `setTimeout` OK");
+					.expect("call setTimeout");
 			});
-
 			JsFuture::from(promise)
 				.await
 				.expect("should await `setTimeout` OK");

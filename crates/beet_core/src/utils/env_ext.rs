@@ -52,7 +52,8 @@ pub fn args() -> Vec<String> {
 pub unsafe fn set_var(key: &str, value: &str) {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
-			unsafe { js_runtime::set_env(key, value); }
+			// presence-checked + safe (no-op where the host has no env global).
+			js_runtime::set_env(key, value);
 		} else if #[cfg(feature = "std")] {
 			unsafe { std::env::set_var(key, value); }
 		} else {

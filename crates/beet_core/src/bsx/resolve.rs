@@ -1278,6 +1278,11 @@ fn apply_spread(
 }
 
 /// Insert or build one named spread component/template onto `entity`.
+///
+/// A name with no registered type is a capability this binary did not link (eg a
+/// `<Router {(.., TuiServer)}>` spread loaded by a lean http-only deploy that
+/// dropped the `tui` feature). Skip it with a warning rather than failing the
+/// whole load, so the same site serves the subset each binary supports.
 fn apply_spread_named(
 	named: &NamedLiteral,
 	entity: &mut EntityWorldMut,
@@ -1287,13 +1292,16 @@ fn apply_spread_named(
 	let literal = DataLiteral::Enum(named.clone());
 	let (is_template, patch) = {
 		let registry = app_registry.read();
-		let info = type_info_by_name(&registry, &named.name);
-		let is_template = registry
-			.get_with_short_type_path(&named.name)
-			.map(|registration| {
-				registration.data::<ReflectTemplate>().is_some()
-			})
-			.unwrap_or(false);
+		let Some(registration) = registry.get_with_short_type_path(&named.name)
+		else {
+			warn!(
+				"skipping spread `{}`: no component or template of that name is registered in this binary",
+				named.name
+			);
+			return Ok(());
+		};
+		let info = Some(registration.type_info());
+		let is_template = registration.data::<ReflectTemplate>().is_some();
 		let mut resolver = entity_ref_resolver(entity_refs);
 		(
 			is_template,

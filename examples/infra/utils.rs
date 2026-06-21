@@ -60,10 +60,17 @@ pub fn site_bucket() -> S3BucketBlock {
 /// `BEET_SITE_BUCKET` names it. Injected uniformly through each block's
 /// `env_vars` (so it works for Fargate, Lightsail and Lambda alike); the
 /// Cloudflare variants extend this list with the R2 endpoint + credentials.
+///
+/// `BEET_SERVER=http` constrains the boot to the http transport: the site's
+/// `main.bsx` declares several servers (`http`/`tui`/`ssh`/`cli`) for local dev,
+/// but a deployed binary is launched with no `--server` arg, so without this it
+/// would boot them all, eg a one-shot `CliServer` whose finished exchange exits
+/// the process.
 pub fn remote_env(bucket_name: impl Into<SmolStr>) -> Vec<Variable> {
 	vec![
 		Variable::fixed("BEET_SERVICE_ACCESS", "remote"),
 		Variable::fixed("BEET_SITE_BUCKET", bucket_name),
+		Variable::fixed("BEET_SERVER", "http"),
 	]
 }
 

@@ -62,10 +62,11 @@ fn infra_scene() -> Result<impl Bundle> {
 		),
 		route(
 			"destroy",
-			(exchange_sequence(), children![CloudflareDestroy::new(
-				name.clone(),
-				bucket.clone()
-			)])
+			(exchange_sequence(), children![
+				CloudflareDestroy::new(name.clone(), bucket.clone())
+					// empty the synced site objects before deleting the bucket.
+					.with_local_dir("examples/bsx_site")
+			])
 		),
 	])
 		.xok()

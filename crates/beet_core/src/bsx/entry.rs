@@ -115,4 +115,30 @@ mod test {
 			.to_string()
 			.xpect_contains("single root element");
 	}
+
+	#[derive(Debug, Default, Component, Reflect)]
+	#[reflect(Default, Component)]
+	struct LinkedComp;
+
+	/// A spread naming a component the running binary did not register (eg a lean
+	/// http-only deploy loading a site whose `<Router {(.., TuiServer)}>` spread
+	/// includes the dropped `tui` capability) is skipped, not fatal: the entry still
+	/// builds and the registered components in the same spread still apply.
+	#[crate::test]
+	fn skips_unregistered_spread_component() {
+		let mut world = TemplatePlugin::world();
+		world.init_resource::<AppTypeRegistry>();
+		world.resource::<AppTypeRegistry>().write().register::<LinkedComp>();
+
+		let root = BsxTemplate::parse_entry(
+			&world,
+			"<div {(LinkedComp, NotLinkedHere)}/>",
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+
+		// the registered component applied; the unregistered name was skipped.
+		world.entity(root).get::<LinkedComp>().xpect_some();
+	}
 }

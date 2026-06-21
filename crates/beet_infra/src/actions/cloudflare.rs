@@ -27,28 +27,44 @@ const COMPATIBILITY_DATE: &str = "2025-06-01";
 /// `deploy` is idempotent.
 async fn wrangler_r2_create(bucket: &str) -> Result {
 	info!("ensuring R2 bucket `{bucket}`");
-	let output = ChildProcess::new("wrangler")
+	// `run_async` errors on a non-zero exit, folding wrangler's stderr into the
+	// error message, so match on that: `10004` / "already exists" / "already
+	// owned" are the idempotent cases (the bucket is already there and ours).
+	match ChildProcess::new("wrangler")
 		.with_args(["r2", "bucket", "create", bucket])
 		.run_async()
-		.await?;
-	if output.status.success() {
-		return Ok(());
-	}
-	let stderr = String::from_utf8_lossy(&output.stderr);
-	// 10004 / "already exists" / "already owned" are the idempotent cases.
-	if stderr.contains("already") || stderr.contains("10004") {
-		info!("R2 bucket `{bucket}` already exists");
-		Ok(())
-	} else {
-		bevybail!("wrangler r2 bucket create failed: {stderr}");
+		.await
+	{
+		Ok(_) => Ok(()),
+		Err(err) => {
+			let message = err.to_string();
+			if message.contains("already") || message.contains("10004") {
+				info!("R2 bucket `{bucket}` already exists");
+				Ok(())
+			} else {
+				Err(err)
+			}
+		}
 	}
 }
 
-/// `wrangler deploy` from the given project directory.
-async fn wrangler_deploy(project_dir: &AbsPathBuf) -> Result {
+/// `wrangler deploy` from the given project directory. When `secrets_file` is
+/// set, its keys are uploaded as real Worker secrets *with* this version
+/// (`--secrets-file`), the only way a deploy publishes secrets: a `.dev.vars`
+/// file is a local-dev artifact `wrangler deploy` otherwise ignores. The
+/// container path needs this so its `this.env.R2_*` reads resolve in production.
+async fn wrangler_deploy(
+	project_dir: &AbsPathBuf,
+	secrets_file: Option<&str>,
+) -> Result {
 	info!("wrangler deploy ({})", project_dir.display());
+	let mut args = vec!["deploy".to_string()];
+	if let Some(secrets_file) = secrets_file {
+		args.push("--secrets-file".to_string());
+		args.push(secrets_file.to_string());
+	}
 	ChildProcess::new("wrangler")
-		.with_args(["deploy"])
+		.with_args(args)
 		.with_cwd(project_dir.clone())
 		.run_async()
 		.await?;
@@ -124,10 +140,16 @@ pub async fn CloudflareContainerDeployAction(
 	write_container_dockerfile(&dir, binary_name, block.port())?;
 	write_container_worker_js(&dir, &block, &endpoint)?;
 	write_container_wrangler(&dir, &block)?;
-	write_r2_secrets_file(&dir)?;
+	write_container_package_json(&dir)?;
+	let secrets_file = write_r2_secrets_file(&dir)?;
 
+	// `wrangler deploy` bundles `worker.js`, whose `@cloudflare/containers` import
+	// is resolved from `node_modules`, so install deps before deploying.
+	npm_install(&dir).await?;
 	wrangler_r2_create(block.bucket()).await?;
-	wrangler_deploy(&dir).await?;
+	// upload the R2 keys as real Worker secrets with this version (`.dev.vars` is
+	// otherwise local-only), so the container's `this.env.R2_*` reads resolve.
+	wrangler_deploy(&dir, secrets_file.as_deref()).await?;
 	info!("deployed container worker `{}`", block.name());
 	Pass(cx.input).xok()
 }
@@ -166,8 +188,13 @@ fn write_container_worker_js(
 	let sleep_after = block.sleep_after();
 	let bucket = block.bucket();
 	// non-secret env as literals; secrets (R2 keys) read from `this.env` at runtime.
+	// `BEET_HOST=0.0.0.0` binds the server to all interfaces (matching Fargate /
+	// Lightsail): the fronting Worker proxies to the container's own IP, so a
+	// default localhost bind would be unreachable ("not listening in the TCP
+	// address <ip>:<port>").
 	let mut env_lines = format!(
 		"    BEET_SERVICE_ACCESS: \"remote\",\n\
+		 \x20   BEET_HOST: \"0.0.0.0\",\n\
 		 \x20   BEET_SITE_BUCKET: \"{bucket}\",\n\
 		 \x20   BEET_S3_ENDPOINT: \"{endpoint}\",\n\
 		 \x20   AWS_ACCESS_KEY_ID: this.env.R2_ACCESS_KEY_ID,\n\
@@ -199,6 +226,35 @@ fn write_container_worker_js(
 	Ok(())
 }
 
+/// Version of `@cloudflare/containers` the generated worker imports.
+const CONTAINERS_PKG_VERSION: &str = "^0.3.7";
+
+/// Write the `package.json` declaring `@cloudflare/containers`, which the
+/// generated `worker.js` imports. Wrangler's bundler resolves this from
+/// `node_modules` on `deploy`, so without it the deploy fails with
+/// `Could not resolve "@cloudflare/containers"`.
+fn write_container_package_json(dir: &AbsPathBuf) -> Result {
+	let json = serde_json::to_string_pretty(&serde_json::json!({
+		"name": "beet-container-worker",
+		"private": true,
+		"dependencies": { "@cloudflare/containers": CONTAINERS_PKG_VERSION },
+	}))?;
+	fs_ext::write(dir.join("package.json"), json)?;
+	Ok(())
+}
+
+/// `npm install` in the project dir, populating `node_modules` so wrangler can
+/// bundle the worker's npm imports. Quiet + no audit/fund noise.
+async fn npm_install(dir: &AbsPathBuf) -> Result {
+	info!("npm install ({})", dir.display());
+	ChildProcess::new("npm")
+		.with_args(["install", "--no-audit", "--no-fund", "--loglevel=error"])
+		.with_cwd(dir.clone())
+		.run_async()
+		.await?;
+	Ok(())
+}
+
 /// `wrangler.jsonc` binding the container Durable Object + the R2 bucket.
 fn write_container_wrangler(
 	dir: &AbsPathBuf,
@@ -212,7 +268,8 @@ fn write_container_wrangler(
 			"class_name": "BeetContainer",
 			"image": "./Dockerfile",
 			"max_instances": block.max_instances(),
-			"instance_type": "dev",
+			// the smallest instance; wrangler 4.103 renamed the former "dev" to "lite".
+			"instance_type": "lite",
 		}],
 		"durable_objects": {
 			"bindings": [{ "name": "BEET_CONTAINER", "class_name": "BeetContainer" }],
@@ -223,28 +280,33 @@ fn write_container_wrangler(
 	Ok(())
 }
 
-/// Write the R2 data-plane keys to a `.dev.vars`-style secrets file the deploy
-/// uploads (`wrangler deploy --secrets-file`). Skipped (with a warning) when the
-/// keys are absent, so a `--dry-run` still works.
-fn write_r2_secrets_file(dir: &AbsPathBuf) -> Result {
+/// Write the R2 data-plane keys to a `.env`-format secrets file (`secrets.env`)
+/// the deploy uploads as real Worker secrets (`wrangler deploy --secrets-file`).
+/// Returns the file name (relative to the project dir, which is the deploy cwd),
+/// or `None` when the keys are absent so a dry run still works.
+fn write_r2_secrets_file(dir: &AbsPathBuf) -> Result<Option<String>> {
 	match (
 		env_ext::var("R2_ACCESS_KEY_ID"),
 		env_ext::var("R2_SECRET_ACCESS_KEY"),
 	) {
 		(Ok(id), Ok(secret)) => {
+			let file_name = "secrets.env";
 			fs_ext::write(
-				dir.join(".dev.vars"),
+				dir.join(file_name),
 				format!(
 					"R2_ACCESS_KEY_ID={id}\nR2_SECRET_ACCESS_KEY={secret}\n"
 				),
 			)?;
+			Some(file_name.to_string()).xok()
 		}
-		_ => warn!(
-			"R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY unset; the container cannot \
-			 read R2 until they are uploaded as Worker secrets"
-		),
+		_ => {
+			warn!(
+				"R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY unset; the container \
+				 cannot read R2 until they are uploaded as Worker secrets"
+			);
+			None.xok()
+		}
 	}
-	Ok(())
 }
 
 // ───────────────────────────── worker deploy ───────────────────────────────
@@ -267,7 +329,7 @@ pub async fn CloudflareWorkerDeployAction(
 	write_worker_wrangler(&dir, &block)?;
 
 	wrangler_r2_create(block.bucket()).await?;
-	wrangler_deploy(&dir).await?;
+	wrangler_deploy(&dir, None).await?;
 	info!("deployed wasm worker `{}`", block.name());
 	Pass(cx.input).xok()
 }
@@ -279,6 +341,10 @@ fn write_worker_wrangler(
 	block: &CloudflareWorkerBlock,
 ) -> Result {
 	let cli_dir = AbsPathBuf::new_workspace_rel("crates/beet-cli")?;
+	// worker-build always writes its output relative to the *crate root*, not the
+	// process cwd (it emits `<crate>/build/worker/shim.mjs`), so `main` points at
+	// that absolute path rather than a path relative to this wrangler project dir.
+	let shim = cli_dir.join("build").join("worker").join("shim.mjs");
 	let vars = block
 		.env_vars()
 		.iter()
@@ -286,14 +352,15 @@ fn write_worker_wrangler(
 		.collect::<std::collections::BTreeMap<_, _>>();
 	let json = serde_json::to_string_pretty(&serde_json::json!({
 		"name": block.name(),
-		"main": "build/worker/shim.mjs",
+		"main": shim.to_string(),
 		"compatibility_date": COMPATIBILITY_DATE,
 		"compatibility_flags": ["nodejs_compat"],
-		// wrangler runs this before uploading: worker-build wraps wasm-bindgen +
-		// wasm-opt and emits build/worker/shim.mjs + the wasm.
+		// wrangler runs this before uploading; worker-build wraps wasm-bindgen +
+		// wasm-opt and emits `<beet-cli>/build/worker/shim.mjs` + the wasm, which
+		// `main` above points at.
 		"build": {
 			"command": format!(
-				"cd {} && worker-build --release -- --no-default-features --features cloudflare",
+				"worker-build --release {} -- --no-default-features --features cloudflare",
 				cli_dir.display()
 			),
 		},
@@ -352,6 +419,8 @@ pub async fn CloudflareR2SyncAction(
 		let rel = file.strip_prefix(&root).unwrap_or(file.as_path());
 		let key = rel.to_string_lossy().replace('\\', "/");
 		let file_arg = file.to_string_lossy().to_string();
+		// `--remote` targets the real R2 bucket; without it wrangler writes to its
+		// *local* Miniflare store, which a deployed Worker never reads.
 		ChildProcess::new("wrangler")
 			.with_args([
 				"r2",
@@ -360,6 +429,7 @@ pub async fn CloudflareR2SyncAction(
 				&format!("{}/{key}", sync.bucket()),
 				"--file",
 				&file_arg,
+				"--remote",
 			])
 			.run_async()
 			.await?;
@@ -423,6 +493,11 @@ pub struct CloudflareDestroy {
 	name: SmolStr,
 	/// R2 bucket to delete (after emptying).
 	bucket: SmolStr,
+	/// The site dir that was synced to the bucket (eg `examples/bsx_site`). When
+	/// set, the action deletes those objects first, since `wrangler r2 bucket
+	/// delete` refuses a non-empty bucket and has no `--force`/empty flag.
+	#[set_with(unwrap_option)]
+	local_dir: Option<SmolStr>,
 }
 
 impl CloudflareDestroy {
@@ -431,12 +506,14 @@ impl CloudflareDestroy {
 		Self {
 			name: name.into(),
 			bucket: bucket.into(),
+			local_dir: None,
 		}
 	}
 }
 
-/// `wrangler delete <worker>` then `wrangler r2 bucket delete <bucket>`,
-/// confirming both are gone. Missing resources are treated as already-destroyed.
+/// `wrangler delete <worker>`, empty the bucket (deleting the synced objects),
+/// then `wrangler r2 bucket delete <bucket>`. Missing resources are treated as
+/// already-destroyed.
 #[action]
 #[derive(Default, Component)]
 pub async fn CloudflareDestroyAction(
@@ -449,6 +526,12 @@ pub async fn CloudflareDestroyAction(
 		.run_async()
 		.await
 		.ok();
+	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty
+	// bucket, so delete the objects that were synced from `local_dir` (the same
+	// keys `CloudflareR2Sync` uploaded). Missing objects are ignored.
+	if let Some(local_dir) = destroy.local_dir() {
+		empty_synced_objects(local_dir.as_str(), destroy.bucket()).await?;
+	}
 	info!("deleting r2 bucket `{}`", destroy.bucket());
 	ChildProcess::new("wrangler")
 		.with_args(["r2", "bucket", "delete", destroy.bucket().as_str()])
@@ -456,4 +539,29 @@ pub async fn CloudflareDestroyAction(
 		.await
 		.ok();
 	Pass(cx.input).xok()
+}
+
+/// Delete every object in `bucket` whose key matches a file under `local_dir`,
+/// the inverse of [`CloudflareR2SyncAction`]. Per-object failures are ignored so
+/// an already-empty bucket (or a partial prior sync) still tears down.
+async fn empty_synced_objects(local_dir: &str, bucket: &str) -> Result {
+	let root = AbsPathBuf::new_workspace_rel(local_dir)?;
+	let files = ReadDir::files_recursive(&root)?;
+	info!("emptying {} synced objects from r2://{bucket}", files.len());
+	for file in files {
+		let rel = file.strip_prefix(&root).unwrap_or(file.as_path());
+		let key = rel.to_string_lossy().replace('\\', "/");
+		ChildProcess::new("wrangler")
+			.with_args([
+				"r2",
+				"object",
+				"delete",
+				&format!("{bucket}/{key}"),
+				"--remote",
+			])
+			.run_async()
+			.await
+			.ok();
+	}
+	Ok(())
 }

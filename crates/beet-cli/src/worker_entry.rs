@@ -59,7 +59,9 @@ async fn fetch(
 	let store = R2WorkersStore::new(SITE_BUCKET_BINDING);
 	set_worker_env(env);
 
-	// convert, route, convert back; map any beet error to a 500.
+	// convert, route, convert back; map any beet error to a 500. Log through the
+	// Worker console (`error!` routes to the `log` facade, which has no subscriber
+	// wired to the Worker console, so it would be silent in `wrangler tail`).
 	match handle(req, store).await {
 		Ok(response) => Ok(response),
 		Err(err) => {
@@ -128,11 +130,22 @@ async fn build_site(
 	let entry = site_root.0.get_media(&SmolPath::from(ENTRY_NAME)).await?;
 	world.insert_resource(site_root);
 
-	// build the entry markup, then spawn the discovered routes (the native
-	// `Insert, RoutesDir` observer is compiled out on wasm, so this is the
-	// wasm-async replacement).
-	TemplateLoader::new(world)
-		.load(&entry)
+	// build the entry into a root carrying `DisableBootOnLoad`, then spawn the
+	// discovered routes (the native `Insert, RoutesDir` observer is compiled out on
+	// wasm, so this is the wasm-async replacement).
+	//
+	// the Worker *is* the server: it routes each request through the host's `Router`
+	// action via `exchange`, so the servers the site's `main.bsx` declares
+	// (`HttpServer`, `TuiServer`, ...) must stay dormant. Without `DisableBootOnLoad`
+	// the entry's `BootOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
+	// start hits the (wasm-absent) backend and panics. Same suppression
+	// `export-static`/`check` use.
+	let template = EntryTemplate::from_bytes(world, &entry)
+		.map_err(|err| bevyhow!("failed to parse entry `{ENTRY_NAME}`: {err}"))?;
+	let root = world.spawn(DisableBootOnLoad).id();
+	world
+		.entity_mut(root)
+		.insert_template(template)
 		.map_err(|err| bevyhow!("failed to load entry `{ENTRY_NAME}`: {err}"))?;
 	world.flush();
 	spawn_routes_dir_async(world).await?;

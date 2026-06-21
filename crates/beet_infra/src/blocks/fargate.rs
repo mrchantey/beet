@@ -351,9 +351,9 @@ impl Block for FargateBlock {
 		// Security group for ALB
 		let alb_sg_ident = stack.resource_ident(self.build_label("alb-sg"));
 		let alb_sg = terra::ResourceDef::new_secondary(
-			alb_sg_ident,
+			alb_sg_ident.clone(),
 			AwsSecurityGroupDetails {
-				name: Some(self.build_label("alb-sg").into()),
+				name: Some(alb_sg_ident.primary_identifier().clone()),
 				description: Some("Security group for ALB".into()),
 				vpc_id: Some(vpc.field_ref("id").into()),
 				tags: Some(
@@ -417,9 +417,9 @@ impl Block for FargateBlock {
 		// Security group for ECS tasks
 		let task_sg_ident = stack.resource_ident(self.build_label("task-sg"));
 		let task_sg = terra::ResourceDef::new_secondary(
-			task_sg_ident,
+			task_sg_ident.clone(),
 			AwsSecurityGroupDetails {
-				name: Some(self.build_label("task-sg").into()),
+				name: Some(task_sg_ident.primary_identifier().clone()),
 				description: Some("Security group for ECS tasks".into()),
 				vpc_id: Some(vpc.field_ref("id").into()),
 				tags: Some(
@@ -507,7 +507,8 @@ impl Block for FargateBlock {
 		let target_group = terra::ResourceDef::new_secondary(
 			tg_ident,
 			AwsLbTargetGroupDetails {
-				name: Some(self.build_label("tg").into()),
+				// hash-capped name (TG names are account-region-global, max 32).
+				name: Some(self.short_name(stack, "tg")),
 				port: Some(self.container_port.into()),
 				protocol: Some("HTTP".into()),
 				target_type: Some("ip".into()),
@@ -579,7 +580,8 @@ impl Block for FargateBlock {
 			let ssh_target_group = terra::ResourceDef::new_secondary(
 				ssh_tg_ident,
 				AwsLbTargetGroupDetails {
-					name: Some(self.build_label("ssh-tg").into()),
+					// hash-capped name (TG names are account-region-global, max 32).
+					name: Some(self.short_name(stack, "ssh-tg")),
 					port: Some(self.ssh_container_port.into()),
 					protocol: Some("TCP".into()),
 					target_type: Some("ip".into()),
@@ -622,13 +624,15 @@ impl Block for FargateBlock {
 			(ssh_lb, ssh_target_group, ssh_listener)
 		});
 
-		// IAM execution role (for ECS to pull images and write logs)
+		// IAM execution role (for ECS to pull images and write logs). Named via
+		// `new_primary` so the role name is stack-prefixed (eg
+		// `my-app--dev--main-fargate--exec-role`); IAM role names are
+		// account-global, so two Fargate stacks must not share the bare label.
 		let exec_role_ident =
 			stack.resource_ident(self.build_label("exec-role"));
-		let exec_role = terra::ResourceDef::new_secondary(
+		let exec_role = terra::ResourceDef::new_primary(
 			exec_role_ident,
 			AwsIamRoleDetails {
-				name: Some(self.build_label("exec-role").into()),
 				assume_role_policy: json!({
 					"Version": "2012-10-17",
 					"Statement": [{
@@ -653,13 +657,13 @@ impl Block for FargateBlock {
 			},
 		);
 
-		// IAM task role (for application runtime S3 access)
+		// IAM task role (for application runtime S3 access). Stack-prefixed for the
+		// same account-global reason as the execution role above.
 		let task_role_ident =
 			stack.resource_ident(self.build_label("task-role"));
-		let task_role = terra::ResourceDef::new_secondary(
+		let task_role = terra::ResourceDef::new_primary(
 			task_role_ident,
 			AwsIamRoleDetails {
-				name: Some(self.build_label("task-role").into()),
 				assume_role_policy: json!({
 					"Version": "2012-10-17",
 					"Statement": [{

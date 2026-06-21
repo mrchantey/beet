@@ -91,10 +91,11 @@ impl Variable {
 	pub fn tf_declaration(&self) -> crate::terra::Variable {
 		crate::terra::Variable {
 			r#type: Some("string".into()),
-			// none even for fixed, this is more consistent
-			// they will definitely be inserted at the apply step,
-			// and any missing variables is a pre-apply error
-			default: None,
+			// an empty default so `destroy`/`plan` (which pass no `-var`) succeed:
+			// these values only feed runtime resource attributes (eg a lambda's env),
+			// never resource identity, so the default is irrelevant to a teardown.
+			// `apply` always overrides it with the resolved value via `-var`.
+			default: Some("".into()),
 			description: Some(format!("Variable: {}", self.key)),
 		}
 	}
@@ -154,5 +155,14 @@ mod test {
 	fn tf_var_ref_format() {
 		let var = Variable::fixed("MY_KEY", "val");
 		var.tf_var_ref().as_str().xpect_eq("${var.MY_KEY}");
+	}
+
+	// an empty default so `tofu destroy`/`plan` need no `-var`; `apply` overrides it.
+	#[beet_core::test]
+	fn tf_declaration_has_empty_default() {
+		Variable::fixed("MY_KEY", "val")
+			.tf_declaration()
+			.default
+			.xpect_eq(Some("".into()));
 	}
 }

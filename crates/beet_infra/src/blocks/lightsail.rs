@@ -109,8 +109,9 @@ impl LightsailBlock {
 
 		// build optional HTTPS setup via Caddy
 		let https_setup = if let Some(domain) = &self.domain {
-			let caddyfile =
-				format!("{domain} {{\n    reverse_proxy localhost:8337\n}}");
+			let caddyfile = format!(
+				"{domain} {{\n    reverse_proxy localhost:{app_port}\n}}"
+			);
 			format!(
 				r#"
 # install Caddy for HTTPS reverse proxy with automatic Let's Encrypt
@@ -128,8 +129,9 @@ systemctl enable --now caddy
 			String::new()
 		};
 
-		// build CloudWatch agent setup for log forwarding
-		let stage = stack.stage();
+		// build CloudWatch agent setup for log forwarding; the log group matches
+		// `AwsWatch::for_lightsail` so `watch` tails the same group
+		let log_group = self.log_group(stack);
 		let cloudwatch_setup = format!(
 			r#"
 # install and configure CloudWatch agent for log forwarding
@@ -151,7 +153,7 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF
         "collect_list": [
           {{
             "file_path": "/var/log/{app_name}.log",
-            "log_group_name": "/{app_name}/{stage}",
+            "log_group_name": "{log_group}",
             "log_stream_name": "{app_name}",
             "retention_in_days": 30
           }}
@@ -318,6 +320,19 @@ impl Block for LightsailBlock {
 			},
 		);
 
+		// log group the instance's CloudWatch agent forwards to; declared here so
+		// `tofu destroy` removes it (the agent reuses the existing group rather
+		// than auto-creating an unmanaged one that would leak on teardown)
+		let log_group_ident = stack.resource_ident(self.build_label("logs"));
+		let log_group = terra::ResourceDef::new_secondary(
+			log_group_ident,
+			AwsCloudwatchLogGroupDetails {
+				name: Some(self.log_group(stack).into()),
+				retention_in_days: Some(30),
+				..default()
+			},
+		);
+
 		// declare terraform variables for env_vars
 		for variable in &self.env_vars {
 			config.ensure_variable(
@@ -362,14 +377,10 @@ impl Block for LightsailBlock {
 		let instance =
 			terra::ResourceDef::new_secondary(instance_ident, instance_details);
 
-		// port rules: HTTP (80), SSH (22), and optionally HTTPS (443)
+		// SSH (22) is always open. With a domain Caddy terminates TLS on 80/443
+		// and proxies to the app's internal port; without one the app's own port
+		// (`app_port`) is opened directly so the binary is publicly reachable.
 		let mut port_info = vec![
-			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-				from_port: 80,
-				protocol: "tcp".into(),
-				to_port: 80,
-				..default()
-			},
 			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
 				from_port: 22,
 				protocol: "tcp".into(),
@@ -378,11 +389,27 @@ impl Block for LightsailBlock {
 			},
 		];
 		if self.domain.is_some() {
-			port_info.push(
+			port_info.extend([
+				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+					from_port: 80,
+					protocol: "tcp".into(),
+					to_port: 80,
+					..default()
+				},
 				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
 					from_port: 443,
 					protocol: "tcp".into(),
 					to_port: 443,
+					..default()
+				},
+			]);
+		} else {
+			let app_port = self.app_port();
+			port_info.push(
+				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+					from_port: app_port.into(),
+					protocol: "tcp".into(),
+					to_port: app_port.into(),
 					..default()
 				},
 			);
@@ -403,6 +430,7 @@ impl Block for LightsailBlock {
 			.add_resource(&cw_policy)?
 			.add_resource(&access_key)?
 			.add_resource(&keypair)?
+			.add_resource(&log_group)?
 			.add_resource(&instance)?
 			.add_resource(&ports)?;
 

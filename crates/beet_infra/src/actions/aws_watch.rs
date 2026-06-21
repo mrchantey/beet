@@ -34,16 +34,12 @@ impl AwsWatch {
 		Self::new(format!("/aws/lambda/{}", func_ident.primary_identifier()))
 	}
 
-	/// Create an [`AwsWatch`] for a Lightsail instance's CloudWatch log group.
-	/// Uses the convention `/{app-name}/{label}/{stage}`.
+	/// Create an [`AwsWatch`] for a Lightsail instance's CloudWatch log group,
+	/// the same group the instance's cloud-init agent forwards to
+	/// ([`LightsailBlock::log_group`]).
 	#[cfg(feature = "lightsail_block")]
 	pub fn for_lightsail(stack: &Stack, block: &LightsailBlock) -> Self {
-		Self::new(format!(
-			"/{}/{}/{}",
-			stack.app_name(),
-			block.label(),
-			stack.stage()
-		))
+		Self::new(block.log_group(stack))
 	}
 
 	/// Create an [`AwsWatch`] for a Fargate service's CloudWatch log group.

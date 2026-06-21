@@ -208,11 +208,24 @@ pub(crate) async fn stream_and_exit(
 /// `--server` params. Reads every `server` value (repeated flags) and splits each
 /// on commas (a glob list, eg `--server=cli,http`). An absent/empty value matches
 /// every present server; otherwise the name must pass the [`GlobFilter`].
+///
+/// With no `--server` param the `BEET_SERVER` env is the fallback, so a deployed
+/// binary launched with no args (a lambda bootstrap, a lightsail systemd unit)
+/// boots a single transport (`BEET_SERVER=http`) instead of every declared server,
+/// eg a one-shot `CliServer` whose finished exchange would exit the process.
 pub fn request_selects_server(request: &Request, name: &str) -> bool {
-	request
+	let mut globs = request
 		.get_params("server")
 		.into_iter()
 		.flatten()
+		.map(|value| value.to_string())
+		.collect::<Vec<_>>();
+	// absent an explicit `--server`, the `BEET_SERVER` env selects the servers.
+	if globs.is_empty() {
+		globs.extend(env_ext::var("BEET_SERVER").ok());
+	}
+	globs
+		.iter()
 		.flat_map(|value| value.split(','))
 		.map(str::trim)
 		.filter(|name| !name.is_empty())

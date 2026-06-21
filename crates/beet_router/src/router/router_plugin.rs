@@ -118,6 +118,12 @@ impl Plugin for RouterPlugin {
 				.add_observer(start_live_reload)
 				.add_observer(reload_site_on_change)
 				.register_template::<LiveReloadScript>();
+			// where client_io is compiled out (wasm Worker, no-dev-reload builds)
+			// register a no-op `<LiveReloadScript/>` so a site's layout that drops it
+			// still resolves and renders nothing, keeping the widget "always safe to
+			// include" regardless of target.
+			#[cfg(not(all(feature = "client_io", not(target_arch = "wasm32"))))]
+			app.register_template::<LiveReloadScript>();
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			// the `<Template src>` include handler (local-file includes resolved

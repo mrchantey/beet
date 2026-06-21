@@ -46,7 +46,10 @@ fn infra_scene() -> Result<impl Bundle> {
 				// wrangler runs worker-build (wasm) per the wrangler.jsonc build.command.
 				CloudflareWorkerDeployAction,
 				CloudflareR2Sync::new("examples/bsx_site", bucket.clone()),
-				CloudflareWatch::new(name.clone()),
+				// tail briefly then exit (the Cloudflare rollout is instant, unlike an
+				// ECS rollout), so `deploy` returns instead of following forever.
+				CloudflareWatch::new(name.clone())
+					.with_timeout(Duration::from_secs(10)),
 			])
 		),
 		route(
@@ -58,10 +61,11 @@ fn infra_scene() -> Result<impl Bundle> {
 		),
 		route(
 			"destroy",
-			(exchange_sequence(), children![CloudflareDestroy::new(
-				name.clone(),
-				bucket.clone()
-			)])
+			(exchange_sequence(), children![
+				CloudflareDestroy::new(name.clone(), bucket.clone())
+					// empty the synced site objects before deleting the bucket.
+					.with_local_dir("examples/bsx_site")
+			])
 		),
 	])
 		.xok()

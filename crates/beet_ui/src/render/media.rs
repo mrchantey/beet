@@ -172,11 +172,19 @@ impl NodeRenderer for MediaRenderer {
 
 		// Resolve the list of types to try: accepts list, or fallback to default.
 		// Collect into an owned Vec to avoid holding a borrow on `self` during
-		// the mutable dispatch calls below.
+		// the mutable dispatch calls below. A wildcard (`*/*`, `text/*`, eg a bare
+		// `curl` or an API Gateway default) accepts anything, so it resolves to the
+		// server's preferred type rather than falling through to plaintext.
 		let candidates: Vec<MediaType> = if cx.accepts.is_empty() {
 			vec![self.default_media_type.clone()]
 		} else {
-			cx.accepts.clone()
+			cx.accepts
+				.iter()
+				.map(|media_type| match media_type.is_wildcard() {
+					true => self.default_media_type.clone(),
+					false => media_type.clone(),
+				})
+				.collect()
 		};
 
 		// 1. first try each media type and see if we can do an exact match
@@ -294,6 +302,25 @@ mod test {
 			MediaType::Html,
 			MediaType::Text,
 		])
+		.xpect_eq("<div>hi</div>".to_string());
+	}
+
+	/// A wildcard accept (`*/*`, eg a bare `curl` or an API Gateway default)
+	/// resolves to the default media type, not the plaintext fallback: an http
+	/// page handler with an HTML default serves the web document.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn wildcard_resolves_to_default() {
+		let mut world = ui_world();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::new_html("<div>hi</div>");
+		BsxParser::html()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		// `*/*` with an HTML default renders HTML, not the stripped plaintext.
+		render(&mut world, entity, MediaType::Html, vec![MediaType::from(
+			"*/*",
+		)])
 		.xpect_eq("<div>hi</div>".to_string());
 	}
 
