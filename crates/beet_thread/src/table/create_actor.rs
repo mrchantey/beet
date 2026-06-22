@@ -89,7 +89,7 @@ mod test {
 
 	/// A routed `#[action]` referenced by tag in a runtime `.bsx` equips the same
 	/// tool an `rsx!` `children![Tool]` would: reflect-inserting the component
-	/// fires its `#[require]` chain (`Action`/`ExchangeAction`/`PathPartial`) and
+	/// fires its `#[require]` chain (`Action`/`ExchangeOverload`/`PathPartial`) and
 	/// the tool-definition pipeline derives the [`ToolDefinition`] the agent sends
 	/// to the model. This is the contract the markup examples lean on.
 	#[beet_core::test]
@@ -116,7 +116,7 @@ mod test {
 			.query_filtered::<Entity, With<ProbeTool>>()
 			.single(app.world())
 			.unwrap();
-		app.world().get::<ExchangeAction>(tool).xpect_some();
+		app.world().get::<ExchangeOverload>(tool).xpect_some();
 		app.world().get::<PathPartial>(tool).xpect_some();
 		app.world().get::<ToolDefinition>(tool).xpect_some();
 	}

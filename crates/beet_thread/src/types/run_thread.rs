@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 
 /// Markup verb that runs a thread as a *program*: on load it calls this entity's
 /// behavior (the thread's `Sequence`, or the loop wrapping it) and holds the
@@ -17,31 +16,20 @@ use beet_net::prelude::*;
 /// ```
 ///
 /// It is *not* a plain [`CallOnSpawn`]: calling the thread is async and can take
-/// the whole process lifetime, but the `beet` binary releases its load-scope
-/// [`KeepAlive`] claim the moment the entry finishes loading. So `RunThread`
-/// takes its own claim in `on_add` (synchronously, during load, before that
-/// release) and drops it when the run returns. An endless `Repeat` never returns,
-/// so an interactive or auto chat runs until Ctrl+C; a finite loop
-/// (`RepeatTimes`, `RepeatWhileFunctionCallOutput`) drops the claim on
-/// completion, and when the last claim goes the binary exits cleanly. Calling the
-/// **thread**, never an "agent", is the whole point: the `Sequence` is the
-/// behavior and runs its actors in order.
+/// the whole process lifetime. `RunThread` spawns that call as a task on load and,
+/// when it returns, writes [`AppExit`] to exit the binary (the native loop runs
+/// until an exit is written, so nothing holds the process open by hand). A finite
+/// loop (`RepeatTimes`, `RepeatWhileFunctionCallOutput`) exits cleanly on
+/// completion; an endless `Repeat` never returns, so an interactive or auto chat
+/// runs until Ctrl+C. Calling the **thread**, never an "agent", is the whole
+/// point: the `Sequence` is the behavior and runs its actors in order.
 ///
 /// When the thread carries a [`ThreadStore`] (eg via `{MountThreadStore{path:..}}`)
 /// the stored conversation is adopted by seed hash before the first turn, so a
 /// reload resumes instead of re-replying; `--new` discards it and starts fresh.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = run_thread_on_add)]
 pub struct RunThread;
-
-/// Take the process-lifetime claim during load, so the program does not exit
-/// before its first turn (the binary drops its own load-scope claim once the
-/// entry is built). A no-op where no [`KeepAlive`] resource exists (eg headless
-/// tests that pump frames manually).
-fn run_thread_on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).insert(KeepAliveGuard);
-}
 
 /// Call every freshly-spawned [`RunThread`] root, then release its [`KeepAlive`]
 /// claim once the run returns. A persistent thread is adopted by seed hash first.
@@ -75,15 +63,11 @@ pub fn run_thread_on_load(
 					.await;
 			}
 			let result = world.entity(entity).call::<(), Outcome>(()).await;
-			// drop the process-lifetime claim now the run is over; the binary exits
-			// when the last claim goes. Done regardless of the run's outcome.
-			world
-				.with(move |world: &mut World| {
-					if let Ok(mut entity) = world.get_entity_mut(entity) {
-						entity.remove::<KeepAliveGuard>();
-					}
-				})
-				.await;
+			// the run is over, so exit the binary: the native loop runs until an
+			// `AppExit` is written, so a finite loop exits here while an endless
+			// `Repeat` never reaches this. Write the exit regardless of outcome,
+			// then propagate any run error so it still surfaces.
+			world.write_message(AppExit::Success).await;
 			result?;
 			Ok(())
 		});
