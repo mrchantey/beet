@@ -301,13 +301,11 @@ mod std_impl {
 	}
 }
 
-// Native-only, but not because of the transport: these stub-backed cases drive a
-// *parked* server (the boot never resolves) with `update_async`, which settles to
-// the frame cap rather than to idle. That cap is fast natively but is thousands of
-// real event-loop turns on wasm, blowing the per-test timeout. The wasm-runnable
-// server-boot coverage is the `ChannelHttpServer` end-to-end test (drives until the
-// response lands, a bounded condition) - see `.agents/plans/channel-servers.md`.
-#[cfg(all(test, not(target_arch = "wasm32")))]
+// Generic boot-machinery tests over a stub backend (no real listener). They drive
+// to a bounded condition (the stub's flag, the shutdown handle) rather than settling
+// a parked server, so they run on native and wasm alike. The real-listener cases
+// (eg `shutdown_ends_accept_loop`) bind real TCP and stay native.
+#[cfg(test)]
 mod tests {
 	use super::*;
 
@@ -353,11 +351,11 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 8080, Request::get("/"));
-		app.update_async().await;
-		app.world()
-			.entity(entity)
-			.contains::<ServerStartFlag>()
-			.xpect_true();
+		app.update_until(|world| {
+			world.entity(entity).contains::<ServerStartFlag>()
+		})
+		.await
+		.xpect_true();
 		// a long-running server parks: the boot call's Running is unresolved.
 		app.world()
 			.entity(entity)
@@ -373,20 +371,21 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 0, Request::get("/"));
-		app.update_async().await;
-		// booted: the shutdown handle holds a live signal.
-		app.world()
-			.entity(entity)
-			.get::<HttpServerShutdown>()
-			.unwrap()
-			.0
-			.is_some()
-			.xpect_true();
+		// drive until booted: the shutdown handle holds a live signal.
+		app.update_until(|world| {
+			world
+				.entity(entity)
+				.get::<HttpServerShutdown>()
+				.map(|shutdown| shutdown.0.is_some())
+				.unwrap_or(false)
+		})
+		.await
+		.xpect_true();
 		// remove the boot's Running: the teardown observer signals shutdown.
 		app.world_mut()
 			.entity_mut(entity)
 			.remove::<Running<Response>>();
-		app.update_async().await;
+		app.update();
 		app.world()
 			.entity(entity)
 			.get::<HttpServerShutdown>()
@@ -444,7 +443,12 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 8080, Request::from_cli_str("--port=9090"));
-		app.update_async().await;
+		// the backend running means `on_action_in` already applied the `--port`.
+		app.update_until(|world| {
+			world.entity(entity).contains::<ServerStartFlag>()
+		})
+		.await
+		.xpect_true();
 		app.world()
 			.entity(entity)
 			.get::<HttpServer>()
@@ -460,7 +464,11 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 0, Request::from_cli_str("--server=cli"));
-		app.update_async().await;
+		// drive a bounded number of frames; the filter miss never flags the entity.
+		for _ in 0..16 {
+			app.update();
+			AsyncRunner::tick().await;
+		}
 		app.world()
 			.entity(entity)
 			.contains::<ServerStartFlag>()
@@ -470,7 +478,7 @@ mod tests {
 
 /// Marker the test backend hook inserts in place of binding a port, proving the
 /// boot fan-out reached the installed backend.
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 #[derive(Component)]
 struct ServerStartFlag;
 

@@ -32,6 +32,14 @@
 mod http_server;
 pub use http_server::*;
 
+// In-memory channel-backed HTTP server: shares `HttpServer`'s boot/park/dispatch
+// machinery over an `async_channel` instead of a socket. `std` for `async-channel`,
+// but deliberately not wasm-gated (the wasm-runnable server path).
+#[cfg(feature = "std")]
+mod channel_http_server;
+#[cfg(feature = "std")]
+pub use channel_http_server::*;
+
 // The boot path: the `BootOnLoad` / `ExchangeOnLoad` verbs call a host's action
 // slot with the process request and write `AppExit`. std-only (it reads CLI args,
 // streams to stdout, and writes the exit).

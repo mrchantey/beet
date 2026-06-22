@@ -30,12 +30,16 @@ pub use socket::Message;
 pub use socket::*;
 mod socket_server;
 pub use socket_server::*;
+// In-memory channel-backed WebSocket server: the socket analogue of
+// `ChannelHttpServer`, deliberately not wasm-gated (the wasm-runnable socket path).
+mod channel_socket_server;
+pub use channel_socket_server::*;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 mod impl_tungstenite;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 pub(crate) use impl_tungstenite::socket_from_upgraded;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-pub(crate) use impl_tungstenite::start_tungstenite_server;
+pub use impl_tungstenite::start_tungstenite_server;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 pub(crate) use impl_tungstenite::start_tungstenite_server_with_tcp;
 #[cfg(target_arch = "wasm32")]

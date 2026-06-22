@@ -5,7 +5,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example socket_server --features tungstenite
+//! cargo run --example socket_server --features tungstenite,action
 //! ```
 //! Test with a WebSocket client:
 //! ```sh
@@ -24,15 +24,20 @@ fn main() -> Result {
 			LogPlugin::default(),
 			SocketServerPlugin::default(),
 		))
-		.spawn((
-			SocketServer::new(9000),
-			OnSpawn::observe(my_handler),
-			// just echo back the close if you dont need to
-			// modify the CloseFrame
-			OnSpawn::observe(common_handlers::echo_close),
-			OnSpawn::observe(common_handlers::log_send),
-			OnSpawn::observe(common_handlers::log_recv),
-		))
+		.add_systems(Startup, |mut commands: Commands| {
+			commands
+				.spawn((
+					SocketServer::new(9000),
+					OnSpawn::observe(my_handler),
+					// just echo back the close if you dont need to
+					// modify the CloseFrame
+					OnSpawn::observe(common_handlers::echo_close),
+					OnSpawn::observe(common_handlers::log_send),
+					OnSpawn::observe(common_handlers::log_recv),
+				))
+				// boot through the fan-out, exactly like `HttpServer`
+				.trigger(StartRunning::boot);
+		})
 		.run();
 
 	Ok(())

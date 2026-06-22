@@ -181,13 +181,19 @@ pub(crate) async fn rustls_connect(
 	Ok((Box::pin(sink), Box::pin(stream)))
 }
 
-/// A tungstenite/bevy WebSocket server
+/// The native [`SocketServerFn`] backend: bind a TCP listener on the
+/// [`SocketServer`] address and accept WebSocket connections until `shutdown`
+/// resolves.
 ///
-/// This bevy system binds a TCP listener and spawns tasks to handle WebSocket connections.
-/// Similar to [`start_hyper_server`] but for WebSockets.
+/// Installed by [`SocketServerPlugin`] via [`set_socket_server`]. Mirrors
+/// [`start_mini_http_server`](crate::prelude::start_mini_http_server): it owns its
+/// teardown by racing the accept loop against the shutdown signal.
 ///
-/// Must be run on the main thread
-pub(crate) async fn start_tungstenite_server(entity: AsyncEntity) -> Result {
+/// Must be run on the main thread.
+pub async fn start_tungstenite_server(
+	entity: AsyncEntity,
+	shutdown: OnceValueRx<()>,
+) -> Result {
 	let addr = entity
 		.get::<SocketServer, _>(|server| server.local_address())
 		.await?;
@@ -196,13 +202,17 @@ pub(crate) async fn start_tungstenite_server(entity: AsyncEntity) -> Result {
 		.map_err(|e| bevyhow!("Invalid address {}: {}", addr, e))?;
 	let listener = Async::<TcpListener>::bind(socket_addr)
 		.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
-	start_tungstenite_server_with_tcp(entity, listener).await
+	start_tungstenite_server_with_tcp(entity, listener, shutdown).await
 }
 
-/// Accept WebSocket connections on a pre-bound listener.
+/// Accept WebSocket connections on a pre-bound listener until `shutdown` resolves.
+///
+/// Races the accept loop against the shutdown signal: when teardown signals, the
+/// loop future is dropped, releasing the listener so the port closes.
 pub(crate) async fn start_tungstenite_server_with_tcp(
 	entity: AsyncEntity,
 	listener: Async<TcpListener>,
+	shutdown: OnceValueRx<()>,
 ) -> Result {
 	let local_addr = listener
 		.get_ref()
@@ -211,6 +221,23 @@ pub(crate) async fn start_tungstenite_server_with_tcp(
 
 	info!("WebSocket server listening on ws://{}", local_addr);
 
+	beet_core::exports::futures_lite::future::or(
+		socket_accept_loop(entity, listener),
+		async move {
+			shutdown.wait().await;
+			Result::Ok(())
+		},
+	)
+	.await
+}
+
+/// The accept loop: adopt each accepted connection as a child [`Socket`] entity.
+/// Diverges (only the shutdown race in [`start_tungstenite_server_with_tcp`] ends
+/// it).
+async fn socket_accept_loop(
+	entity: AsyncEntity,
+	listener: Async<TcpListener>,
+) -> Result {
 	loop {
 		let (stream, addr) = listener
 			.accept()

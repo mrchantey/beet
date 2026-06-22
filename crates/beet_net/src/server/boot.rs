@@ -309,13 +309,7 @@ mod test {
 	/// stays and no `AppExit` is written, so the process persists. The `Running` is
 	/// inserted by the server's `ContinueRun<Boot, Response>` slot before the backend
 	/// runs, so the park holds whether or not a backend is present.
-	///
-	/// Native-only: drives a *parked* server with `update_async`, which settles to
-	/// the frame cap (fast natively, too many event-loop turns on wasm). The
-	/// `CliServer` boot cases above run on wasm because they `run_async` to a real
-	/// `AppExit` instead of settling a park. See `.agents/plans/channel-servers.md`.
 	#[beet_core::test]
-	#[cfg(not(target_arch = "wasm32"))]
 	async fn server_parks_and_stays_up() {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
@@ -327,11 +321,13 @@ mod test {
 				is_error: false,
 			})
 			.id();
-		app.update_async().await;
-		app.world()
-			.entity(entity)
-			.contains::<Running<Response>>()
-			.xpect_true();
+		// drive until the boot fan-out lands the parking `Running` (a bounded
+		// condition, unlike settling a parked server to the frame cap).
+		app.update_until(|world| {
+			world.entity(entity).contains::<Running<Response>>()
+		})
+		.await
+		.xpect_true();
 		app.world_mut()
 			.run_system_once(|mut exits: MessageReader<AppExit>| {
 				exits.read().count()

@@ -512,7 +512,7 @@ required-features = ["tungstenite", "json"]
 [[example]]
 name = "socket_server"
 path = "examples/net/socket_server.rs"
-required-features = ["tungstenite"]
+required-features = ["tungstenite", "action"]
 
 [[example]]
 name = "templating"
