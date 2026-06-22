@@ -26,8 +26,8 @@ pub use route_query::*;
 // it is always compiled, unlike the native-only directory-scan modules below.
 mod site_root;
 pub use site_root::*;
-// `RoutesDir` + its discovery is compiled on every std target: native scans at
-// spawn via the blocking observer, wasm awaits `spawn_routes_dir_async`.
+// `RoutesDir` + its discovery is compiled on every std target: one observer
+// scans the store off the async runtime, so native and wasm share the path.
 mod routes_dir;
 pub use routes_dir::*;
 // the static-asset mount is native-only (no wasm consumer needs it yet).

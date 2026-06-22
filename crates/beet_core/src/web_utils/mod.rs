@@ -13,13 +13,10 @@
 //! - [`search_params_ext`] - URL query string manipulation
 //! - [`lifecycle_ext`] - Async timeout and lifecycle utilities
 //! - [`js_runtime`] - Deno/browser runtime bindings for file I/O and environment
-//! - [`array_ext`] - JS array conversion helpers
 //! - [`iframe_ext`] - IFrame manipulation and loading utilities
 
 mod animation_frame;
 pub use self::animation_frame::*;
-/// Helpers for converting JS arrays to Rust collections.
-pub mod array_ext;
 /// File upload and download utilities for the browser.
 pub mod file_ext;
 /// Browser History API helpers for SPA navigation.

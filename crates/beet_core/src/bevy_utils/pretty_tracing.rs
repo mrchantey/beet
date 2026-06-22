@@ -104,7 +104,7 @@ impl PrettyTracing {
 				},
 			);
 
-		let sub = tracing_subscriber::fmt()
+		let builder = tracing_subscriber::fmt()
 			.compact()
 			.with_level(true)
 			.with_target(false)
@@ -113,19 +113,81 @@ impl PrettyTracing {
 			.with_file(true)
 			.without_time()
 			.with_line_number(true)
-			.with_env_filter(env_filter)
-			.with_writer(std::io::stdout);
-		// #[cfg(debug_assertions)]
-		// // remove timestamps from the output in debug mode
-		// let sub = sub.without_time();
+			.with_env_filter(env_filter);
 
-		// if self.aws_lambda && std::env::var("AWS_LAMBDA_LOG_FORMAT")
-		// 	.unwrap_or_default()
-		// 	.eq_ignore_ascii_case("json") {
-		// 	sub.json().try_init()
-		// }else{
-		// 	sub.pretty().try_init()
-		// }.ok();
-		sub.pretty().try_init().ok();
+		// wasm has no useful stdout (a Cloudflare Worker discards it), so route
+		// formatted events to the JS console instead: `error!`/`info!` then surface
+		// in browser devtools and `wrangler tail`, wiring diagnostics for every
+		// upstream system rather than just the Worker entry. native keeps the
+		// pretty stdout format.
+		#[cfg(target_arch = "wasm32")]
+		builder
+			.with_ansi(false)
+			.with_writer(console_writer::MakeConsoleWriter)
+			.try_init()
+			.ok();
+		#[cfg(not(target_arch = "wasm32"))]
+		builder.with_writer(std::io::stdout).pretty().try_init().ok();
+	}
+}
+
+/// A [`MakeWriter`](tracing_subscriber::fmt::MakeWriter) that routes formatted
+/// tracing events to the JS console, the wasm logging backend [`PrettyTracing`]
+/// installs. Each event becomes one `console.log`/`console.error` call, so the
+/// `tracing` macros work in the browser and in a Cloudflare Worker (`wrangler
+/// tail`) the same as they do on native stdout.
+#[cfg(target_arch = "wasm32")]
+mod console_writer {
+	use bevy::log::tracing::Level;
+	use bevy::log::tracing::Metadata;
+	use bevy::log::tracing_subscriber::fmt::MakeWriter;
+	use std::io;
+	use wasm_bindgen::JsValue;
+
+	/// Builds a fresh [`ConsoleWriter`] per event, tagged with the event's level.
+	pub struct MakeConsoleWriter;
+
+	impl<'a> MakeWriter<'a> for MakeConsoleWriter {
+		type Writer = ConsoleWriter;
+		fn make_writer(&'a self) -> Self::Writer {
+			ConsoleWriter::new(Level::INFO)
+		}
+		fn make_writer_for(&'a self, meta: &Metadata<'_>) -> Self::Writer {
+			ConsoleWriter::new(*meta.level())
+		}
+	}
+
+	/// Buffers one formatted event, emitting it to the console on drop (the point
+	/// at which the fmt layer has written the whole line).
+	pub struct ConsoleWriter {
+		level: Level,
+		buf: Vec<u8>,
+	}
+
+	impl ConsoleWriter {
+		fn new(level: Level) -> Self { Self { level, buf: Vec::new() } }
+	}
+
+	impl io::Write for ConsoleWriter {
+		fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+			self.buf.extend_from_slice(data);
+			Ok(data.len())
+		}
+		fn flush(&mut self) -> io::Result<()> { Ok(()) }
+	}
+
+	impl Drop for ConsoleWriter {
+		fn drop(&mut self) {
+			use crate::exports::web_sys::console;
+			// the fmt layer appends a trailing newline; the console adds its own.
+			let value =
+				JsValue::from_str(String::from_utf8_lossy(&self.buf).trim_end());
+			// errors to `console.error`, everything else to `console.log` (the level
+			// is also in the message text via `with_level(true)`).
+			match self.level {
+				Level::ERROR => console::error_1(&value),
+				_ => console::log_1(&value),
+			}
+		}
 	}
 }

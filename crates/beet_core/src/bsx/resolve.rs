@@ -761,6 +761,11 @@ fn build_uppercase(
 	};
 
 	let Some((kind, patch)) = registration_kind else {
+		// a known featured-out tag (eg `<LiveReloadScript/>` with `client_io`
+		// compiled out) resolves to nothing instead of erroring.
+		if is_allowed_unregistered(cx, &el.tag) {
+			return Ok(());
+		}
 		bevybail!(
 			"no component, resource or template registered for tag `{}`",
 			el.tag

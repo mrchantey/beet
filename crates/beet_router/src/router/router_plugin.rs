@@ -97,16 +97,16 @@ impl Plugin for RouterPlugin {
 				// the default app routes as a markup template, so a no-code BSX
 				// site requests them with `<DefaultAppRoutes/>`.
 				.register_template::<DefaultAppRoutes>();
-			// the markup-resolved `<RoutesDir src=".."/>` is registered on every std
-			// target so a no-code site loads. Native scans the store at spawn time
-			// via the blocking `spawn_routes_dir` observer; wasm (which cannot block)
-			// registers only the type and awaits `spawn_routes_dir_async` post-build.
-			app.register_type::<RoutesDir>();
+			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
+			// target so a no-code site loads. Its discovery observer scans the store
+			// asynchronously (off the runtime, see `spawn_routes_dir`), so it runs on
+			// wasm too rather than needing a separate blocking/async split.
+			app.register_type::<RoutesDir>()
+				.add_observer(spawn_routes_dir);
+			// the no-code static-asset mount, eg `<BlobStoreRoute src="assets"/>`: a
+			// template that expands to a blob-store-backed serve route. Native-only.
 			#[cfg(not(target_arch = "wasm32"))]
-			app.add_observer(spawn_routes_dir)
-				// the no-code static-asset mount, eg `<BlobStoreRoute src="assets"/>`:
-				// a template that expands to a blob-store-backed serve route.
-				.register_template::<BlobStoreRoute>();
+			app.register_template::<BlobStoreRoute>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `default_router` wires the
@@ -119,11 +119,11 @@ impl Plugin for RouterPlugin {
 				.add_observer(reload_site_on_change)
 				.register_template::<LiveReloadScript>();
 			// where client_io is compiled out (wasm Worker, no-dev-reload builds)
-			// register a no-op `<LiveReloadScript/>` so a site's layout that drops it
-			// still resolves and renders nothing, keeping the widget "always safe to
-			// include" regardless of target.
+			// mark `<LiveReloadScript/>` as a known featured-out tag, so a site
+			// layout that includes it still loads and renders nothing rather than
+			// failing template resolution.
 			#[cfg(not(all(feature = "client_io", not(target_arch = "wasm32"))))]
-			app.register_template::<LiveReloadScript>();
+			app.allow_unregistered("LiveReloadScript");
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			// the `<Template src>` include handler (local-file includes resolved

@@ -89,10 +89,7 @@ impl Default for HttpServer {
 		// `env_ext::var` returns "not found" on no_std, so this reads `BEET_PORT`
 		// / `BEET_HOST` where there is an environment and falls back to the static
 		// defaults everywhere else, no feature gate needed.
-		let port = env_ext::var("BEET_PORT")
-			.ok()
-			.and_then(|val| val.parse().ok())
-			.unwrap_or(DEFAULT_SERVER_PORT);
+		let port = resolve_server_port(None);
 		let host = env_ext::var("BEET_HOST")
 			.ok()
 			.map(|val| {

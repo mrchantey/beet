@@ -149,11 +149,14 @@ pub fn write_file(path: &str, content: &[u8]) -> Option<String> {
 
 /// Command-line args excluding the program name, ie `Deno.args`. Empty where
 /// unavailable (a Worker has no argv).
-pub fn env_args() -> js_sys::Array {
+///
+/// Marshals the host's JS string array into native [`SmolStr`]s here, so callers
+/// (eg [`env_ext`](crate::prelude::env_ext)) never touch `js_sys`.
+pub fn env_args() -> Vec<SmolStr> {
 	if has_global("env_args") {
-		raw::env_args()
+		js_strings(&raw::env_args())
 	} else {
-		js_sys::Array::new()
+		Vec::new()
 	}
 }
 
@@ -176,14 +179,34 @@ pub fn set_env(key: &str, value: &str) {
 	}
 }
 
-/// All environment variables as a 2D entries array, ie
+/// All environment variables as native `(key, value)` pairs, ie
 /// `Object.entries(Deno.env.toObject())`. Empty where unavailable.
-pub fn env_all() -> js_sys::Array {
-	if has_global("env_all") {
-		raw::env_all()
-	} else {
-		js_sys::Array::new()
+///
+/// Parses the host's 2D JS entries array here (skipping any malformed pair), so
+/// callers receive native types rather than a `js_sys::Array` to walk.
+pub fn env_all() -> Vec<(SmolStr, SmolStr)> {
+	if !has_global("env_all") {
+		return Vec::new();
 	}
+	let entries = raw::env_all();
+	(0..entries.length())
+		.filter_map(|i| {
+			let pair = js_sys::Array::from(&entries.get(i));
+			Some((
+				SmolStr::from(pair.get(0).as_string()?),
+				SmolStr::from(pair.get(1).as_string()?),
+			))
+		})
+		.collect()
+}
+
+/// Collect a JS array of strings into native [`SmolStr`]s, skipping any element
+/// that is not a string.
+fn js_strings(array: &js_sys::Array) -> Vec<SmolStr> {
+	(0..array.length())
+		.filter_map(|i| array.get(i).as_string())
+		.map(SmolStr::from)
+		.collect()
 }
 
 /// Runs a function and catches panics without aborting the wasm module.

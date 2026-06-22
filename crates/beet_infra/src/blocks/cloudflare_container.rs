@@ -23,11 +23,14 @@ pub struct CloudflareContainerBlock {
 	name: SmolStr,
 	/// R2 bucket the container reads the site from (created on deploy).
 	bucket: SmolStr,
-	/// Port the container exposes + the fronting Worker proxies to. Must match the
-	/// port the served site listens on (its markup `HttpServer{port}`), so it
-	/// defaults to `beet_net`'s `DEFAULT_SERVER_PORT` (8337), the same default
-	/// `bsx_site` declares and `FargateBlock` uses.
-	port: u16,
+	/// Explicit port the container exposes and the fronting Worker proxies to. When
+	/// `None`, resolved from `BEET_PORT` or
+	/// [`DEFAULT_SERVER_PORT`](beet_net::prelude::DEFAULT_SERVER_PORT) (8337) via
+	/// [`port`](Self::port). Must match the served site's markup `HttpServer{port}`
+	/// (the same default `bsx_site` declares and `FargateBlock` uses).
+	#[get(skip)]
+	#[set_with(unwrap_option)]
+	app_port: Option<u16>,
 	/// Scale-to-zero idle timeout (eg `5m`): the container sleeps after this.
 	sleep_after: SmolStr,
 	/// Maximum concurrent container instances.
@@ -43,8 +46,7 @@ impl Default for CloudflareContainerBlock {
 		Self {
 			name: "beet-container".into(),
 			bucket: "beet-site".into(),
-			// = beet_net DEFAULT_SERVER_PORT (8337); the served site's markup port.
-			port: 8337,
+			app_port: None,
 			sleep_after: "5m".into(),
 			max_instances: 3,
 			env_vars: Vec::new(),
@@ -59,5 +61,12 @@ impl CloudflareContainerBlock {
 			name: name.into(),
 			..default()
 		}
+	}
+
+	/// The resolved port the container exposes and the fronting Worker proxies to:
+	/// the explicit [`app_port`](Self::with_app_port) if set, else `BEET_PORT`, else
+	/// [`DEFAULT_SERVER_PORT`](beet_net::prelude::DEFAULT_SERVER_PORT) (8337).
+	pub fn port(&self) -> u16 {
+		beet_net::prelude::resolve_server_port(self.app_port)
 	}
 }

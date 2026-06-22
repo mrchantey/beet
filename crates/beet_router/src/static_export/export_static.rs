@@ -271,13 +271,16 @@ mod test {
 		AbsPathBuf::new(root).unwrap()
 	}
 
-	/// Spawn a `RoutesDir` router over `root`.
+	/// Spawn a `RoutesDir` router over `root`, settling the async runtime so the
+	/// discovery scan (an async task) completes before the export walks the routes.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
-	fn spawn_routes_dir(world: &mut World, root: AbsPathBuf) -> Entity {
+	async fn spawn_routes_dir(world: &mut World, root: AbsPathBuf) -> Entity {
 		world.insert_resource(SiteRoot::new_fs(root));
-		world
+		let router = world
 			.spawn((default_router(), children![RoutesDir::new("")]))
-			.flush()
+			.flush();
+		AsyncRunner::settle_async_tasks(world).await;
+		router
 	}
 
 	/// The `RoutesDir` shape in dev: a scan-time `draft = true` route is still
@@ -286,7 +289,8 @@ mod test {
 	#[beet_core::test]
 	async fn dev_keeps_draft_routes_dir() {
 		let mut world = world_with_stage("dev");
-		let router = spawn_routes_dir(&mut world, draft_content_dir("dev"));
+		let router =
+			spawn_routes_dir(&mut world, draft_content_dir("dev")).await;
 		let written = export(&mut world, router).await;
 		exported(&written, "published").xpect_true();
 		exported(&written, "secret").xpect_true();
@@ -298,7 +302,8 @@ mod test {
 	#[beet_core::test]
 	async fn prod_drops_draft_routes_dir() {
 		let mut world = world_with_stage("prod");
-		let router = spawn_routes_dir(&mut world, draft_content_dir("prod"));
+		let router =
+			spawn_routes_dir(&mut world, draft_content_dir("prod")).await;
 		let written = export(&mut world, router).await;
 		exported(&written, "published").xpect_true();
 		exported(&written, "secret").xpect_false();

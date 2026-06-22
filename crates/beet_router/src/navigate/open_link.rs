@@ -36,9 +36,10 @@ pub enum OnOpenLink {
 /// followed under [`OnOpenLink::External`].
 ///
 /// The default handler [`open_external_link`] launches the system browser via the
-/// `webbrowser` crate; a test or embedder can observe this instead to intercept
-/// the open without spawning a process (the open is authoritative through this
-/// event, not delegated to OSC-8 in the live buffer).
+/// `webbrowser` crate (native) or opens a new tab via `window.open` (wasm); a test
+/// or embedder can observe this instead to intercept the open without spawning a
+/// process (the open is authoritative through this event, not delegated to OSC-8
+/// in the live buffer).
 #[derive(Debug, Clone, Message)]
 pub struct OpenExternalLink {
 	/// The absolute URL to open.
@@ -108,21 +109,44 @@ fn on_link_click(
 	Ok(())
 }
 
-/// System: open each [`OpenExternalLink`] in the system browser.
+/// System: open each [`OpenExternalLink`] in the system browser (native) or a
+/// new browser tab (wasm).
 ///
 /// The default external-open behavior. A test that wants to assert intent
 /// without launching a browser observes [`OpenExternalLink`] instead (this
 /// system still runs but `webbrowser::open` failing in a headless CI is ignored).
 fn open_external_link(mut events: MessageReader<OpenExternalLink>) {
 	for ev in events.read() {
-		// a failed launch (eg headless CI) is non-fatal; the intent was recorded.
-		// `webbrowser` is native-only (the `native` feature); the wasm render
-		// target records the intent via the event but has no system browser to open.
+		let url = ev.url.to_string();
+		// native: a failed launch (eg headless CI) is non-fatal; the intent was
+		// recorded. `webbrowser` is native-only.
 		#[cfg(not(target_arch = "wasm32"))]
-		let _ = webbrowser::open(&ev.url.to_string());
+		let _ = webbrowser::open(&url);
+		// wasm: the browser opens the link in a new tab. A failure (no window, or a
+		// popup blocker) is surfaced as an error rather than dropped silently.
 		#[cfg(target_arch = "wasm32")]
-		let _ = ev;
+		if let Err(err) = open_in_new_tab(&url) {
+			error!("{err}");
+		}
 	}
+}
+
+/// Open `url` in a new browser tab via `window.open(url, "_blank")`.
+///
+/// Errors when there is no window, the call throws, or the browser returns no
+/// window handle (a popup blocker), so the caller can report the failure.
+#[cfg(target_arch = "wasm32")]
+fn open_in_new_tab(url: &str) -> Result {
+	use beet_core::exports::web_sys;
+	let window = web_sys::window()
+		.ok_or_else(|| bevyhow!("no browser window available to open `{url}`"))?;
+	window
+		.open_with_url_and_target(url, "_blank")
+		.map_err(|err| bevyhow!("browser refused to open `{url}`: {err:?}"))?
+		.ok_or_else(|| {
+			bevyhow!("browser blocked opening `{url}` in a new tab (popup blocker?)")
+		})?;
+	Ok(())
 }
 
 #[cfg(test)]

@@ -67,6 +67,22 @@ pub mod prelude {
 	/// Default port for WebSocket connections in webdriver sessions.
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
+	/// Resolve the port a beet server listens on: the `explicit` value if set,
+	/// else the `BEET_PORT` environment variable, else [`DEFAULT_SERVER_PORT`].
+	///
+	/// The single source of truth for "which port", shared by [`HttpServer`] and
+	/// the deploy blocks (`LightsailBlock`, `CloudflareContainerBlock`) so a markup
+	/// port, an env override and the static default all resolve the same way.
+	pub fn resolve_server_port(explicit: Option<u16>) -> u16 {
+		explicit
+			.or_else(|| {
+				beet_core::prelude::env_ext::var("BEET_PORT")
+					.ok()
+					.and_then(|val| val.parse().ok())
+			})
+			.unwrap_or(DEFAULT_SERVER_PORT)
+	}
+
 	#[cfg(feature = "action")]
 	pub use crate::actions::*;
 	pub use crate::client::*;

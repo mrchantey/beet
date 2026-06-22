@@ -159,6 +159,62 @@ pub impl App {
 	}
 }
 
+/// Tag names allowed to resolve to nothing when nothing is registered under them.
+///
+/// A featured-out widget (eg `<LiveReloadScript/>` when `client_io` is compiled
+/// out) marks its tag here via
+/// [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered), so a site
+/// layout that includes the tag still loads and renders nothing instead of failing
+/// with "no ... registered for tag". Uniform over components, resources and
+/// templates: the check sits on the shared not-found path of both lookups.
+#[derive(Debug, Default, Clone, Resource)]
+pub struct AllowedUnregistered {
+	names: HashSet<SmolStr>,
+}
+
+impl AllowedUnregistered {
+	/// Allow `tag` to resolve to a no-op when nothing is registered under it.
+	pub fn insert(&mut self, tag: impl Into<SmolStr>) {
+		self.names.insert(tag.into());
+	}
+	/// Whether `tag` is allowed to be unregistered.
+	pub fn contains(&self, tag: &str) -> bool { self.names.contains(tag) }
+}
+
+/// Marks tags as known-but-featured-out on a [`World`].
+#[extend::ext(name=WorldAllowUnregisteredExt)]
+pub impl World {
+	/// Mark `tag` as a known featured-out name: when nothing is registered under
+	/// it, the loader resolves it to a no-op instead of erroring. See
+	/// [`AllowedUnregistered`].
+	fn allow_unregistered(&mut self, tag: impl Into<SmolStr>) -> &mut Self {
+		self.get_resource_or_init::<AllowedUnregistered>().insert(tag);
+		self
+	}
+}
+
+/// Marks tags as known-but-featured-out on an [`App`].
+#[extend::ext(name=AppAllowUnregisteredExt)]
+pub impl App {
+	/// Mark `tag` as a known featured-out name. See
+	/// [`WorldAllowUnregisteredExt::allow_unregistered`].
+	fn allow_unregistered(&mut self, tag: impl Into<SmolStr>) -> &mut Self {
+		self.world_mut().allow_unregistered(tag);
+		self
+	}
+}
+
+/// Whether `tag` was marked [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered),
+/// ie a known featured-out name the loader resolves to nothing rather than error.
+/// Consulted by both lookup paths on a missing registration.
+pub fn is_allowed_unregistered(cx: &mut TemplateContext, tag: &str) -> bool {
+	cx.entity.world_scope(|world| {
+		world
+			.get_resource::<AllowedUnregistered>()
+			.is_some_and(|allowed| allowed.contains(tag))
+	})
+}
+
 /// The prop [`ValueSchema`] registered for the template under short type path
 /// `tag`, if any. The schema-side companion of [`build_template_by_name`].
 pub fn template_schema_by_name(
@@ -182,11 +238,14 @@ pub fn build_template_by_name(
 	value: &dyn PartialReflect,
 	cx: &mut TemplateContext,
 ) -> Result {
-	let registry = registry.read();
-	let registration =
-		registry.get_with_short_type_path(tag).ok_or_else(|| {
+	let guard = registry.read();
+	let Some(registration) = guard.get_with_short_type_path(tag) else {
+		drop(guard);
+		// a known featured-out tag resolves to nothing instead of erroring.
+		return is_allowed_unregistered(cx, tag).then_some(()).ok_or_else(|| {
 			bevyhow!("no type registered for template tag `{tag}`")
-		})?;
+		});
+	};
 	let reflect_template =
 		registration.data::<ReflectTemplate>().ok_or_else(|| {
 			bevyhow!("type `{tag}` is registered but is not a template")
@@ -265,5 +324,23 @@ mod test {
 				build_template_by_name(&registry, "Nope", &patch, cx)
 			})
 			.unwrap_err();
+	}
+
+	/// A tag marked [`allow_unregistered`](WorldAllowUnregisteredExt::allow_unregistered)
+	/// builds to nothing instead of erroring (the featured-out widget contract).
+	#[beet_core::test]
+	fn allowed_unregistered_tag_is_noop() {
+		let world = TemplatePlugin::world();
+		let registry = world.resource::<AppTypeRegistry>().clone();
+		let patch = DynamicStruct::default();
+		let mut other = World::new();
+		other.allow_unregistered("Nope");
+		let root = other.spawn_empty().id();
+		other
+			.entity_mut(root)
+			.template_context(|cx| {
+				build_template_by_name(&registry, "Nope", &patch, cx)
+			})
+			.unwrap();
 	}
 }

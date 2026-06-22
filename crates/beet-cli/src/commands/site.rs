@@ -13,9 +13,13 @@ pub(crate) async fn build_site(
 	site_dir: AbsPathBuf,
 	entry: AbsPathBuf,
 ) -> Result<Entity> {
-	caller
+	let root = caller
 		.with_world(move |world, _caller| load_site(world, site_dir, entry))
-		.await?
+		.await??;
+	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
+	// every discovered route exists before the caller renders/exports the site.
+	settle_routes_dirs(caller.world()).await?;
+	Ok(root)
 }
 
 /// The synchronous site load: register the site's `templates/`, set the

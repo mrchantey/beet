@@ -70,7 +70,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 				error!("Navigator failed to load home page: {err}");
 				let message = err.to_string();
 				world
-					.with(move |world| match host_of(world, navigator) {
+					.with(move |world| match PageHost::of(world, navigator) {
 						Some(host) => set_error_page(world, host, message),
 						None => error!(
 							"navigator {navigator} has no page host for the error page"
@@ -341,7 +341,7 @@ impl Navigator {
 		let navigator = entity.id();
 		entity
 			.world()
-			.with(move |world| match host_of(world, navigator) {
+			.with(move |world| match PageHost::of(world, navigator) {
 				Some(host) => bind_surface_page(world, host, page),
 				None => {
 					error!(

@@ -193,22 +193,24 @@ pub fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
 	}
 }
 
-/// The [`PageHost`] surface a navigator drives: the nearest self-or-ancestor host,
-/// walking `ChildOf`.
-///
-/// A navigator is co-located on (or nested under) its host, so which surface it
-/// drives is structural rather than a nullable field. `None` only for a navigator
-/// with no host (a misconfiguration the caller logs).
-pub fn host_of(world: &World, entity: Entity) -> Option<Entity> {
-	let mut current = entity;
-	loop {
-		let entity_ref = world.get_entity(current).ok()?;
-		if entity_ref.contains::<PageHost>() {
-			return Some(current);
-		}
-		match entity_ref.get::<ChildOf>() {
-			Some(child_of) => current = child_of.parent(),
-			None => return None,
+impl PageHost {
+	/// The [`PageHost`] surface a navigator drives: the nearest self-or-ancestor
+	/// host, walking `ChildOf`.
+	///
+	/// A navigator is co-located on (or nested under) its host, so which surface
+	/// it drives is structural rather than a nullable field. `None` only for a
+	/// navigator with no host (a misconfiguration the caller logs).
+	pub fn of(world: &World, entity: Entity) -> Option<Entity> {
+		let mut current = entity;
+		loop {
+			let entity_ref = world.get_entity(current).ok()?;
+			if entity_ref.contains::<PageHost>() {
+				return Some(current);
+			}
+			match entity_ref.get::<ChildOf>() {
+				Some(child_of) => current = child_of.parent(),
+				None => return None,
+			}
 		}
 	}
 }

@@ -397,14 +397,14 @@ fn write_worker_wrangler(
 #[require(CloudflareR2SyncAction)]
 pub struct CloudflareR2Sync {
 	/// Local directory to publish (workspace-relative), eg `examples/bsx_site`.
-	local_dir: SmolStr,
+	local_dir: SmolPath,
 	/// Target R2 bucket.
 	bucket: SmolStr,
 }
 
 impl CloudflareR2Sync {
 	/// Publish `local_dir` to `bucket`.
-	pub fn new(local_dir: impl Into<SmolStr>, bucket: impl Into<SmolStr>) -> Self {
+	pub fn new(local_dir: impl Into<SmolPath>, bucket: impl Into<SmolStr>) -> Self {
 		Self {
 			local_dir: local_dir.into(),
 			bucket: bucket.into(),
@@ -510,7 +510,7 @@ pub struct CloudflareDestroy {
 	/// set, the action deletes those objects first, since `wrangler r2 bucket
 	/// delete` refuses a non-empty bucket and has no `--force`/empty flag.
 	#[set_with(unwrap_option)]
-	local_dir: Option<SmolStr>,
+	local_dir: Option<SmolPath>,
 }
 
 impl CloudflareDestroy {

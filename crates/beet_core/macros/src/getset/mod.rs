@@ -339,7 +339,8 @@ pub fn trait_bounds_tokens(ty: &Type) -> Option<TokenStream> {
 }
 
 /// Returns true if the type should automatically use `impl Into<T>`.
-/// Covers `String` and `Cow<'_, …>` types.
+/// Covers the common string-like owned types: `String`, `Cow<'_, …>`, `SmolStr`
+/// and `SmolPath`.
 pub fn is_auto_into_type(ty: &syn::Type) -> bool {
 	let syn::Type::Path(path) = ty else {
 		return false;
@@ -347,7 +348,10 @@ pub fn is_auto_into_type(ty: &syn::Type) -> bool {
 	let Some(seg) = path.path.segments.last() else {
 		return false;
 	};
-	matches!(seg.ident.to_string().as_str(), "String" | "Cow" | "SmolStr")
+	matches!(
+		seg.ident.to_string().as_str(),
+		"String" | "Cow" | "SmolStr" | "SmolPath"
+	)
 }
 
 /// Returns `true` for primitive types that implement `Copy`:

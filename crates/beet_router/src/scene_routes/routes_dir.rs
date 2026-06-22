@@ -39,85 +39,47 @@ const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 
 /// Observer: scan the [`RoutesDir`] store and spawn its routes (see the module docs).
 ///
-/// Native-only: it blocks on the store scan at spawn time. The wasm site-load
-/// path (the Cloudflare Worker) cannot block, so it awaits
-/// [`spawn_routes_dir_async`] after the entry build instead.
-#[cfg(not(target_arch = "wasm32"))]
+/// The scan is store I/O (the filesystem in dev, S3 in a deployed task, R2 in a
+/// Worker), so it runs as an [`AsyncEntity`] task rather than blocking the runtime
+/// (which is single-threaded on wasm). The route children therefore appear a few
+/// async ticks after the insert, so a boot path settles the async runtime before
+/// serving: the Worker entry awaits
+/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner), the
+/// native binary's run loop drives it, and tests await the same settle.
 pub fn spawn_routes_dir(
 	ev: On<Insert, RoutesDir>,
 	dirs: Query<&RoutesDir>,
 	site_root: Option<Res<SiteRoot>>,
 	mut commands: Commands,
 ) -> Result {
+	let entity = ev.entity;
 	// the site store scoped to `src`; the BlobScene routes read their bytes from it.
 	let store = site_root
 		.map(|root| root.0.clone())
 		.unwrap_or_else(|| SiteRoot::default().0)
-		.with_subdir(SmolPath::from(dirs.get(ev.entity)?.src.as_str()));
-	commands.entity(ev.entity).insert(store.clone());
-
-	// discover routes + read frontmatter through the store, a one-time blocking
-	// scan at spawn (boot): fs-backed in dev, S3-backed in a deployed task.
-	let specs = async_ext::block_on(discover_routes(&store))?;
-	for spec in specs {
-		#[allow(unused_mut, unused_variables)]
-		let mut route_entity = commands.spawn((
-			ChildOf(ev.entity),
-			route(&spec.route_path, BlobScene::new(spec.store_path)),
-			HttpMethod::Get,
-			ExportStrategy::Static,
-			// a discovered content file is a user-facing page, so it carries
-			// `PageRoute` and appears in the nav, like its codegen blob equivalent.
-			PageRoute,
-		));
-		// scan-time page metadata, so navigation knows titles/order up front
-		#[cfg(feature = "markdown_parser")]
-		if let Some(meta) = spec.meta {
-			route_entity.insert(meta);
-		}
-	}
-	Ok(())
-}
-
-/// Async counterpart to [`spawn_routes_dir`] for wasm, where a blocking scan
-/// would hang the single-threaded runtime.
-///
-/// Resolves the [`SiteRoot`]-scoped store for every [`RoutesDir`] in the world,
-/// awaits its content scan, then spawns each route child and flushes so the
-/// route-tree observers settle. Run once after the entry build, since the
-/// build's `Insert, RoutesDir` observer is native-only.
-#[cfg(target_arch = "wasm32")]
-pub async fn spawn_routes_dir_async(world: &mut World) -> Result {
-	// snapshot the (entity, scoped store) pairs, the SiteRoot scoped to each `src`.
-	let site_store = world
-		.get_resource::<SiteRoot>()
-		.map(|root| root.0.clone())
-		.unwrap_or_else(|| SiteRoot::default().0);
-	let dirs = world
-		.query::<(Entity, &RoutesDir)>()
-		.iter(world)
-		.map(|(entity, dir)| {
-			(entity, site_store.with_subdir(SmolPath::from(dir.src.as_str())))
-		})
-		.collect::<Vec<_>>();
-
-	for (entity, store) in dirs {
-		// compose the scoped store onto the entity so its routes read from it.
-		world.entity_mut(entity).insert(store.clone());
-		// await the content scan (the wasm-safe replacement for the native
-		// observer's `block_on`), then spawn the route children directly.
-		for spec in discover_routes(&store).await? {
-			spawn_route_spec(world, entity, spec);
-		}
-		// flush so the `Insert, PathPattern` route-tree observers run against the
-		// settled hierarchy before the next exchange.
-		world.flush();
-	}
+		.with_subdir(SmolPath::from(dirs.get(entity)?.src.as_str()));
+	// off the async runtime: await the content scan, then compose the scoped store
+	// onto the entity, spawn the route children, and flush so the route-tree
+	// observers settle against the whole hierarchy.
+	commands.entity(entity).queue_async(
+		async move |dir: AsyncEntity| -> Result {
+			let specs = discover_routes(&store).await?;
+			dir.world()
+				.with(move |world| {
+					world.entity_mut(entity).insert(store);
+					for spec in specs {
+						spawn_route_spec(world, entity, spec);
+					}
+					world.flush();
+				})
+				.await;
+			Ok(())
+		},
+	);
 	Ok(())
 }
 
 /// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
-#[cfg(target_arch = "wasm32")]
 fn spawn_route_spec(world: &mut World, parent: Entity, spec: RouteSpec) {
 	#[allow(unused_mut, unused_variables)]
 	let mut route_entity = world.spawn((
@@ -134,6 +96,37 @@ fn spawn_route_spec(world: &mut World, parent: Entity, spec: RouteSpec) {
 	if let Some(meta) = spec.meta {
 		route_entity.insert(meta);
 	}
+}
+
+/// Wait for every [`RoutesDir`]'s async discovery to finish, for a caller that
+/// renders the routes immediately after building (eg the `export-static` /
+/// `check` commands).
+///
+/// [`spawn_routes_dir`] runs the discovery as an async task, so the routes appear
+/// a few ticks after the insert. A top-level driver (the Worker, tests) settles
+/// the whole runtime with
+/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner). A caller
+/// running *inside* the app (an action) cannot drive the loop without re-entering
+/// it, so this yields (via the world bridge) to let the runtime drive the task,
+/// detecting completion by the scoped store the task composes onto each
+/// [`RoutesDir`] entity. Capped so an unresolvable scan errors rather than hangs.
+pub async fn settle_routes_dirs(world: &AsyncWorld) -> Result {
+	for _ in 0..10_000 {
+		let pending = world
+			.with(|world| {
+				world
+					.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>()
+					.iter(world)
+					.count()
+			})
+			.await;
+		if pending == 0 {
+			return Ok(());
+		}
+		// yield so the runtime can drive the discovery task between checks.
+		async_ext::yield_now().await;
+	}
+	bevybail!("RoutesDir discovery did not settle within the frame budget")
 }
 
 /// A discovered content file: its route path, the store path its bytes load from,
@@ -207,6 +200,15 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
+	/// Spawn `bundle` and settle the async runtime so the [`RoutesDir`] discovery
+	/// task (an async store scan) completes, returning the root entity. Mirrors a
+	/// boot path settling before it serves.
+	async fn spawn_routes(world: &mut World, bundle: impl Bundle) -> Entity {
+		let root = world.spawn(bundle).flush();
+		AsyncRunner::settle_async_tasks(world).await;
+		root
+	}
+
 	/// Write a routes dir fixture under `target/tests` and return a [`SiteRoot`]
 	/// backed by an [`FsStore`] rooted at it.
 	fn fs_fixture(name: &str, files: &[(&str, &str)]) -> SiteRoot {
@@ -274,9 +276,11 @@ mod test {
 	async fn discovers_and_serves_routes() {
 		let mut world = router_world();
 		world.insert_resource(fs_fixture("serves", SERVES_FILES));
-		let root = world
-			.spawn((default_router(), children![RoutesDir::new("")]))
-			.flush();
+		let root =
+			spawn_routes(&mut world, (default_router(), children![
+				RoutesDir::new("")
+			]))
+			.await;
 		assert_serves(&mut world, root).await;
 	}
 
@@ -286,16 +290,18 @@ mod test {
 	async fn discovers_and_serves_from_memory_store() {
 		let mut world = router_world();
 		world.insert_resource(memory_fixture(SERVES_FILES).await);
-		let root = world
-			.spawn((default_router(), children![RoutesDir::new("")]))
-			.flush();
+		let root =
+			spawn_routes(&mut world, (default_router(), children![
+				RoutesDir::new("")
+			]))
+			.await;
 		assert_serves(&mut world, root).await;
 	}
 
 	/// Discovered files are sorted lexically before spawning, so the [`RouteTree`]
 	/// children come out in filename order regardless of store list order.
 	#[beet_core::test]
-	fn routes_spawn_in_sorted_order() {
+	async fn routes_spawn_in_sorted_order() {
 		let mut world = router_world();
 		// deliberately out-of-order, zero-padded like the slide deck
 		world.insert_resource(fs_fixture("sorted", &[
@@ -305,7 +311,9 @@ mod test {
 		]));
 		// a bare `Router` (not `default_router`) so the opinionated app routes do
 		// not appear as extra top-level children alongside the discovered slides.
-		let root = world.spawn((Router, children![RoutesDir::new("")])).flush();
+		let root =
+			spawn_routes(&mut world, (Router, children![RoutesDir::new("")]))
+				.await;
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 		// the discovered slide routes, in tree-child order
@@ -319,15 +327,17 @@ mod test {
 
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
-	fn scan_time_frontmatter_meta() {
+	async fn scan_time_frontmatter_meta() {
 		let mut world = router_world();
 		world.insert_resource(fs_fixture("meta", &[(
 			"docs/intro.md",
 			"+++\ntitle = \"Getting Started\"\norder = 2\n+++\n\n# Intro",
 		)]));
-		let root = world
-			.spawn((default_router(), children![RoutesDir::new("")]))
-			.flush();
+		let root =
+			spawn_routes(&mut world, (default_router(), children![
+				RoutesDir::new("")
+			]))
+			.await;
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 		let node = tree.find(&["docs", "intro"]).unwrap().clone();

@@ -43,6 +43,13 @@ pub struct LightsailBlock {
 	bundle_id: SmolStr,
 	/// Networking mode, defaults to static IPv4.
 	networking: LightsailNetworking,
+	/// Explicit port the app server listens on. When `None`, resolved from
+	/// `BEET_PORT` or [`DEFAULT_SERVER_PORT`](beet_net::prelude::DEFAULT_SERVER_PORT)
+	/// via [`app_port`](Self::app_port). Until infra declaration is wired to the
+	/// served site's state (like SST), this must match the markup `HttpServer{port}`.
+	#[get(skip)]
+	#[set_with(unwrap_option)]
+	app_port: Option<u16>,
 }
 
 impl Default for LightsailBlock {
@@ -55,6 +62,7 @@ impl Default for LightsailBlock {
 			bundle_id: "nano_3_0".into(),
 			networking: LightsailNetworking::default(),
 			env_vars: Vec::new(),
+			app_port: None,
 		}
 	}
 }
@@ -75,15 +83,21 @@ impl LightsailBlock {
 		}
 	}
 
-	/// The port the application server listens on.
-	/// When a domain is set (HTTPS mode), the app runs behind Caddy on an
-	/// internal port. Otherwise the app binds directly to port 80.
+	/// The port the application server listens on: the block's explicit
+	/// [`app_port`](Self::with_app_port) if set, else `BEET_PORT`, else
+	/// [`DEFAULT_SERVER_PORT`](beet_net::prelude::DEFAULT_SERVER_PORT) (8337). Must
+	/// match the served site's markup port. With a domain Caddy reverse-proxies
+	/// 443 -> this port; without one the instance opens this port publicly.
 	fn app_port(&self) -> u16 {
-		if self.domain.is_some() {
-			beet_net::prelude::DEFAULT_SERVER_PORT
-		} else {
-			80
-		}
+		beet_net::prelude::resolve_server_port(self.app_port)
+	}
+
+	/// The CloudWatch log group the instance forwards its app logs to, the
+	/// single source of truth shared by the cloud-init agent config and
+	/// [`AwsWatch::for_lightsail`](crate::prelude::AwsWatch::for_lightsail).
+	/// Includes the label so distinct blocks in one stack do not collide.
+	pub fn log_group(&self, stack: &Stack) -> String {
+		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
 	}
 
 	/// Build the user data script that provisions the instance.

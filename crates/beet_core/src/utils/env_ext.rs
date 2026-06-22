@@ -34,7 +34,10 @@ pub fn args() -> Vec<String> {
 			if web_sys::window().is_some() {
 				return search_params_ext::location_args();
 			}
-			return array_ext::into_vec_str(js_runtime::env_args());
+			return js_runtime::env_args()
+				.into_iter()
+				.map(Into::into)
+				.collect();
 		} else if #[cfg(feature = "std")] {
 			return std::env::args().skip(1).collect();
 		} else {
@@ -102,24 +105,15 @@ pub fn var(key: &str) -> Result<String, EnvError> {
 }
 
 /// Get all environment variables.
-///
-/// ## Panics
-/// In wasm this will panic if `js_runtime::env_all` returns a malformed array
 pub fn vars() -> Vec<(String, String)> {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
-			// Enumerate via JS 2D array: Object.entries(Deno.env.toObject())
-			use js_sys::Array;
-			let entries = js_runtime::env_all();
-			let mut out: Vec<(String, String)> = Vec::new();
-			let len = entries.length();
-			for i in 0..len {
-				let pair = Array::from(&entries.get(i));
-				let key = pair.get(0).as_string().unwrap();
-				let value = pair.get(1).as_string().unwrap();
-				out.push((key, value));
-			}
-			return out;
+			// `env_all` already marshals `Object.entries(Deno.env.toObject())`
+			// into native pairs, so just widen `SmolStr` -> `String`.
+			return js_runtime::env_all()
+				.into_iter()
+				.map(|(key, value)| (key.into(), value.into()))
+				.collect();
 		} else if #[cfg(feature = "std")] {
 			return std::env::vars().collect();
 		} else {

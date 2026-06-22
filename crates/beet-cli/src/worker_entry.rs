@@ -6,11 +6,12 @@
 //! [`World`] is built (or reused) and the request is routed through it. Building
 //! mirrors the native `load_entry` path, but every store read is awaited rather
 //! than blocked on (the Worker runtime is single-threaded): templates register
-//! via [`SiteRoot::register_templates_async`], the entry builds through the
-//! [`TemplateLoader`], and the `<RoutesDir/>` routes spawn via
-//! [`spawn_routes_dir_async`] (the native blocking observer is compiled out on
-//! wasm). The universal seam is the same `entity.exchange(request) -> Response`
-//! the native servers use.
+//! via [`SiteRoot::register_templates_async`], the entry builds into a
+//! [`DisableBootOnLoad`] root (so its declared servers stay dormant; the Worker
+//! itself serves each request), and the `<RoutesDir/>` discovery observer scans the
+//! store as an async task, which the build settles via
+//! [`AsyncRunner::settle_async_tasks`] before serving. The universal seam is the
+//! same `entity.exchange(request) -> Response` the native servers use.
 
 use crate::prelude::*;
 use beet::prelude::*;
@@ -59,9 +60,10 @@ async fn fetch(
 	let store = R2WorkersStore::new(SITE_BUCKET_BINDING);
 	set_worker_env(env);
 
-	// convert, route, convert back; map any beet error to a 500. Log through the
-	// Worker console (`error!` routes to the `log` facade, which has no subscriber
-	// wired to the Worker console, so it would be silent in `wrangler tail`).
+	// convert, route, convert back; map any beet error to a 500. `error!` reaches
+	// `wrangler tail`: the site's `LogPlugin` installs a JS-console tracing
+	// subscriber on wasm (see `PrettyTracing`), so the whole stack's diagnostics
+	// surface, not just this entry.
 	match handle(req, store).await {
 		Ok(response) => Ok(response),
 		Err(err) => {
@@ -130,16 +132,15 @@ async fn build_site(
 	let entry = site_root.0.get_media(&SmolPath::from(ENTRY_NAME)).await?;
 	world.insert_resource(site_root);
 
-	// build the entry into a root carrying `DisableBootOnLoad`, then spawn the
-	// discovered routes (the native `Insert, RoutesDir` observer is compiled out on
-	// wasm, so this is the wasm-async replacement).
+	// build the entry into a root carrying `DisableBootOnLoad`: the Worker itself
+	// routes each request through the host's `Router` action via `exchange`, so the
+	// servers the site's `main.bsx` declares (`HttpServer`, `TuiServer`, ...) must
+	// stay dormant. Without `DisableBootOnLoad` the entry's `BootOnLoad` verb boots
+	// them on `LoadTemplate`, and `HttpServer`'s start hits the (wasm-absent) backend
+	// and panics. Same suppression `export-static`/`check` use.
 	//
-	// the Worker *is* the server: it routes each request through the host's `Router`
-	// action via `exchange`, so the servers the site's `main.bsx` declares
-	// (`HttpServer`, `TuiServer`, ...) must stay dormant. Without `DisableBootOnLoad`
-	// the entry's `BootOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
-	// start hits the (wasm-absent) backend and panics. Same suppression
-	// `export-static`/`check` use.
+	// the build's `Insert, RoutesDir` observer queues the route discovery (a store
+	// scan) as an async task, settled below before the host is served.
 	let template = EntryTemplate::from_bytes(world, &entry)
 		.map_err(|err| bevyhow!("failed to parse entry `{ENTRY_NAME}`: {err}"))?;
 	let root = world.spawn(DisableBootOnLoad).id();
@@ -148,7 +149,9 @@ async fn build_site(
 		.insert_template(template)
 		.map_err(|err| bevyhow!("failed to load entry `{ENTRY_NAME}`: {err}"))?;
 	world.flush();
-	spawn_routes_dir_async(world).await?;
+	// settle the async runtime so the discovered routes (and any other boot-time
+	// async) land before the host is queried and served.
+	AsyncRunner::settle_async_tasks(world).await;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world
