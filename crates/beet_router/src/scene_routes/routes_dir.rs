@@ -210,7 +210,8 @@ mod test {
 	}
 
 	/// Write a routes dir fixture under `target/tests` and return a [`SiteRoot`]
-	/// backed by an [`FsStore`] rooted at it.
+	/// backed by an [`FsStore`] rooted at it. Native-only: writes real files.
+	#[cfg(not(target_arch = "wasm32"))]
 	fn fs_fixture(name: &str, files: &[(&str, &str)]) -> SiteRoot {
 		let root = fs_ext::workspace_root()
 			.join("target/tests/routes_dir")
@@ -272,6 +273,10 @@ mod test {
 		("about.bsx", "<main><h1>About</h1></main>"),
 	];
 
+	/// The filesystem-backed variant: discovery reads real files through an
+	/// [`FsStore`]. Native-only (no real fs on wasm); the wasm path is covered by
+	/// [`discovers_and_serves_from_memory_store`] over the same files.
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn discovers_and_serves_routes() {
 		let mut world = router_world();
@@ -299,16 +304,20 @@ mod test {
 	}
 
 	/// Discovered files are sorted lexically before spawning, so the [`RouteTree`]
-	/// children come out in filename order regardless of store list order.
+	/// children come out in filename order regardless of store list order. Store
+	/// agnostic, so it runs over the in-memory store and covers wasm too.
 	#[beet_core::test]
 	async fn routes_spawn_in_sorted_order() {
 		let mut world = router_world();
 		// deliberately out-of-order, zero-padded like the slide deck
-		world.insert_resource(fs_fixture("sorted", &[
-			("03-gamma.md", "# Gamma"),
-			("01-alpha.md", "# Alpha"),
-			("02-beta.md", "# Beta"),
-		]));
+		world.insert_resource(
+			memory_fixture(&[
+				("03-gamma.md", "# Gamma"),
+				("01-alpha.md", "# Alpha"),
+				("02-beta.md", "# Beta"),
+			])
+			.await,
+		);
 		// a bare `Router` (not `default_router`) so the opinionated app routes do
 		// not appear as extra top-level children alongside the discovered slides.
 		let root =
@@ -325,14 +334,19 @@ mod test {
 			.xpect_eq(vec!["01-alpha", "02-beta", "03-gamma"]);
 	}
 
+	/// Frontmatter is scanned from file content through the store, so it is store
+	/// agnostic and runs over the in-memory store (covering wasm too).
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	async fn scan_time_frontmatter_meta() {
 		let mut world = router_world();
-		world.insert_resource(fs_fixture("meta", &[(
-			"docs/intro.md",
-			"+++\ntitle = \"Getting Started\"\norder = 2\n+++\n\n# Intro",
-		)]));
+		world.insert_resource(
+			memory_fixture(&[(
+				"docs/intro.md",
+				"+++\ntitle = \"Getting Started\"\norder = 2\n+++\n\n# Intro",
+			)])
+			.await,
+		);
 		let root =
 			spawn_routes(&mut world, (default_router(), children![
 				RoutesDir::new("")

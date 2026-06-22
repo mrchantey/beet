@@ -301,7 +301,13 @@ mod std_impl {
 	}
 }
 
-#[cfg(test)]
+// Native-only, but not because of the transport: these stub-backed cases drive a
+// *parked* server (the boot never resolves) with `update_async`, which settles to
+// the frame cap rather than to idle. That cap is fast natively but is thousands of
+// real event-loop turns on wasm, blowing the per-test timeout. The wasm-runnable
+// server-boot coverage is the `ChannelHttpServer` end-to-end test (drives until the
+// response lands, a bounded condition) - see `.agents/plans/channel-servers.md`.
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
 	use super::*;
 
@@ -464,7 +470,7 @@ mod tests {
 
 /// Marker the test backend hook inserts in place of binding a port, proving the
 /// boot fan-out reached the installed backend.
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 #[derive(Component)]
 struct ServerStartFlag;
 
