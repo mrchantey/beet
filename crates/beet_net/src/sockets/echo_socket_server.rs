@@ -41,8 +41,7 @@ impl EchoSocketServer {
 	}
 }
 
-// binds a real native echo server + `Socket::connect`, native-only.
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod tests {
 	use super::*;
 	use crate::sockets::Message;
