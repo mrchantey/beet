@@ -142,20 +142,24 @@ pub async fn load_thread(
 	scene: impl Bundle,
 ) -> Result<Entity> {
 	let store_component = store.clone();
-	// spawn + reduce, then mount the store on the Thread entity (root or nested)
+	// spawn + reduce, then locate the Thread entity (root or nested)
 	let (root, thread) = world
 		.with(move |world: &mut World| -> Result<(Entity, Entity)> {
 			let root = world.spawn(scene).id();
 			ThreadWindow::reduce_now(world);
 			let thread = thread_entity_under(world, root)?;
-			world.entity_mut(thread).insert(store_component);
 			Ok((root, thread))
 		})
 		.await?;
+	// adopt by seed hash *before* mounting the store, so the persistence sync
+	// never flushes a fresh, un-adopted thread (which would fork a duplicate on
+	// every reload). `adopt_thread` reads the store by argument, not the entity.
 	adopt_thread(world.clone(), store, thread).await?;
-	// kick the root (the loop, or the Thread itself) now the window is correct
+	// mount the store on the Thread entity (root or nested) now the window is
+	// adopted, then kick the root (the loop, or the Thread itself) to run the turn
 	world
 		.with(move |world: &mut World| {
+			world.entity_mut(thread).insert(store_component);
 			world
 				.entity_mut(root)
 				.insert(CallOnSpawn::<(), Outcome>::new(()));

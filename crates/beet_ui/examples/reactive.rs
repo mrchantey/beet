@@ -3,6 +3,8 @@
 use beet_core::prelude::*;
 
 fn main() -> Result {
+	// a subscriber so the closing `info!("success")` actually prints
+	PrettyTracing::default().init();
 	let mut world = DocumentPlugin::world();
 	let count = TypedFieldRef::<i64>::new("count").with_init(7);
 

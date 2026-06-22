@@ -13,6 +13,11 @@
 //!   `@token:Role` token-to-token binding form.
 use crate::prelude::*;
 use crate::style::common_props::*;
+// disambiguate the common_props tokens from bevy's same-named `FontSize` /
+// `BackgroundColor`, which `beet_core::prelude` re-exports under `bevy_default`;
+// an explicit import shadows both globs (the compiler's suggested fix).
+use crate::style::common_props::BackgroundColor;
+use crate::style::common_props::FontSize;
 use crate::style::material::colors;
 use beet_core::prelude::*;
 use bevy::reflect::FromReflect;

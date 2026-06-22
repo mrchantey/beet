@@ -288,7 +288,10 @@ fn storage_event_to_blob(ev: &web_sys::StorageEvent) -> Option<BlobEvent> {
 mod test {
 	use crate::prelude::*;
 
+	// localStorage requires a browser environment; the beet wasm test runner
+	// uses Deno which has no `window.localStorage`.
 	#[beet_core::test]
+	#[ignore = "requires browser environment"]
 	async fn works() {
 		let provider = LocalStorageStore::new("test-store");
 		store_test::run(provider).await;

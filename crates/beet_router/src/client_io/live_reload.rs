@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_net::sockets::Message;
 #[cfg(test)]
 use beet_net::sockets::MessageSend;
@@ -73,8 +74,10 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 	if fs_ext::exists(&templates)? {
 		world.register_bsx_templates(&templates)?;
 	}
-	// respawn each RoutesDir's routes: the Insert observer re-scans the dir
-	// and the respawned PathPatterns rebuild the route tree
+	// respawn each RoutesDir's routes: re-inserting the `RoutesDir` re-fires the
+	// async discovery observer, which respawns the route children and rebuilds the
+	// tree. The scoped `BlobStore` is also dropped so the rescan's completion (it
+	// re-composes the store) is observable via `settle_routes_dirs`.
 	let dirs = world.with_state::<Query<(Entity, &RoutesDir)>, _>(|query| {
 		query
 			.iter()
@@ -85,28 +88,30 @@ pub fn reload_site(world: &mut World, site: &LiveReload) -> Result {
 		world
 			.entity_mut(entity)
 			.despawn_related::<Children>()
+			.remove::<BlobStore>()
 			.insert(dir);
 	}
 	world.flush();
-	// the respawn replaced the RoutesDir's route children, never the router, so the
-	// router's `CardDeck` marker (and any other router component) survives; the
-	// `insert_route_tree` observer rebuilt the tree on the router from the sorted,
-	// respawned routes, so navigation resolves the fresh cards in order.
 
 	// the in-world TUI navigator has no `ClientIo` client, so repaint it directly:
 	// re-fetch its current page through the rebuilt route tree and the page host
 	// repaints. The web client has no in-world navigator and reloads via the
 	// broadcast below instead.
-	// dev-loop "type-check" then repaint, sequenced in one task: first re-render
-	// every route to surface problems (an unknown tag, dead link or unknown class an
-	// edit introduced logs loudly), then repaint each in-world navigator. The repaint
-	// runs *after* the diagnostics so a navigator's freshly-built page is the last
-	// render of each shared route node; otherwise the diagnostics' ephemeral cleanup
-	// races the repaint and blanks the live TUI. The web client has no in-world
-	// navigator and repaints via the broadcast below. Fire-and-forget (route
-	// rendering is async), so the reload never blocks.
+	// The discovery rescan is async, so first await it (`settle_routes_dirs`):
+	// rendering against a half-scanned tree would paint stale content. Then dev-loop
+	// "type-check" then repaint, sequenced in one task: first re-render every route
+	// to surface problems (an unknown tag, dead link or unknown class an edit
+	// introduced logs loudly), then repaint each in-world navigator. The repaint runs
+	// *after* the diagnostics so a navigator's freshly-built page is the last render
+	// of each shared route node; otherwise the diagnostics' ephemeral cleanup races
+	// the repaint and blanks the live TUI. The web client has no in-world navigator
+	// and repaints via the broadcast below. Fire-and-forget (route rendering is
+	// async), so the reload never blocks.
 	let navigators = in_world_navigators(world);
 	world.run_async(move |world| async move {
+		if let Err(err) = settle_routes_dirs(&world).await {
+			error!("live reload route rescan failed: {err}");
+		}
 		log_all_render_diagnostics(&world).await;
 		for navigator in navigators {
 			if let Err(err) = Navigator::reload(world.entity(navigator)).await {
@@ -182,6 +187,9 @@ mod test {
 			.register_bsx_templates(site_dir.join("templates"))
 			.unwrap();
 		world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
+		// the reload's render diagnostics paint the layout chrome, which reads
+		// `PackageConfig`; seed it so the bare render world has it (see `site_layout`).
+		world.init_resource::<PackageConfig>();
 		let root = world
 			.spawn((default_router(), children![RoutesDir::new("routes")]))
 			.flush();
@@ -192,10 +200,12 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn respawns_routes_and_reregisters_templates() {
+	async fn respawns_routes_and_reregisters_templates() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = site_fixture("respawns");
 		let (root, watcher) = spawn_site(&mut world, &site_dir);
+		// the RoutesDir scan is async, so settle it before reading the tree
+		AsyncRunner::settle_async_tasks(&mut world).await;
 		let routes_dir =
 			world.with_state::<Query<Entity, With<RoutesDir>>, _>(|query| {
 				query.single().unwrap()
@@ -222,6 +232,8 @@ mod test {
 			.entity_mut(watcher)
 			.trigger_target(DirEvent::default());
 		world.flush();
+		// the respawn re-scans each RoutesDir asynchronously, so settle again
+		AsyncRunner::settle_async_tasks(&mut world).await;
 
 		// the new route landed in the rebuilt tree
 		world
@@ -330,20 +342,27 @@ mod test {
 	/// the cards in sorted order: the respawn replaces the route children, not the
 	/// router, so the marker survives and the rebuilt tree is still ordered.
 	#[beet_core::test]
-	fn reload_preserves_card_deck_marker_and_order() {
+	async fn reload_preserves_card_deck_marker_and_order() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = deck_fixture("deck_marker");
 		world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
+		// the reload's render diagnostics paint the layout chrome, which reads
+		// `PackageConfig`; seed it so the bare render world has it (see `site_layout`).
+		world.init_resource::<PackageConfig>();
 		// a deck router: the CardDeck marker (declared in the deck's markup spread).
 		let router = world
 			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
 			.flush();
+		// the RoutesDir scan is async, so settle it before reading the tree
+		AsyncRunner::settle_async_tasks(&mut world).await;
 		card_order(&mut world, router)
 			.xpect_eq(vec!["01-alpha".to_string(), "02-beta".to_string()]);
 
 		// a new card, then a live reload (the watcher's change path).
 		fs_ext::write(site_dir.join("slides/03-gamma.md"), "# Gamma").unwrap();
 		reload_site(&mut world, &LiveReload::new(site_dir.clone())).unwrap();
+		// the respawn re-scans each RoutesDir asynchronously, so settle again
+		AsyncRunner::settle_async_tasks(&mut world).await;
 
 		// the marker survived the route respawn ...
 		world.entity(router).contains::<CardDeck>().xpect_true();
@@ -367,25 +386,45 @@ mod test {
 			LivePagePlugin,
 			NavigatorPlugin,
 		));
+		// the reload's render diagnostics paint the layout chrome (header/sidebar)
+		// outside the request middleware that normally seeds it, so a bare live
+		// render world must seed `PackageConfig` itself (see `site_layout`).
+		app.init_resource::<PackageConfig>();
 		app
 	}
 
-	/// The page host buffer's painted frame as plain text after one frame.
-	fn frame(app: &mut App, host: Entity) -> String {
-		app.update();
-		app.world()
-			.get::<DoubleBuffer>(host)
-			.unwrap()
-			.current_buffer()
-			.render_plain()
-	}
-
 	/// Drive the app until the host frame contains `needle`, returning the frame.
-	fn drive_until(app: &mut App, host: Entity, needle: &str) -> String {
-		for _ in 0..400 {
-			let frame = frame(app, host);
+	///
+	/// Each frame updates the app, ticks the async runtime, then yields a slice of
+	/// real time so the route scan + repaint's blocking store I/O can land. The
+	/// painted buffer is snapshotted between frames so the first match is caught
+	/// before any later repaint can blank it. Rather than a fixed time budget (a
+	/// busy shared task pool can stretch the async work arbitrarily), failure is
+	/// concluded only once the runtime has gone idle for several frames with the
+	/// needle still absent, ie the repaint has landed and will never show it.
+	async fn drive_until(app: &mut App, host: Entity, needle: &str) -> String {
+		let mut idle_without_match = 0;
+		for _ in 0..10_000 {
+			app.update();
+			AsyncRunner::tick().await;
+			time_ext::sleep_millis(1).await;
+			let frame = app
+				.world()
+				.get::<DoubleBuffer>(host)
+				.unwrap()
+				.current_buffer()
+				.render_plain();
 			if frame.contains(needle) {
 				return frame;
+			}
+			idle_without_match =
+				if app.world().resource::<AsyncSpawner>().in_flight() == 0 {
+					idle_without_match + 1
+				} else {
+					0
+				};
+			if idle_without_match >= 16 {
+				break;
 			}
 		}
 		panic!("host frame never contained '{needle}'");
@@ -407,6 +446,11 @@ mod test {
 			.world_mut()
 			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
 			.flush();
+		// settle the async RoutesDir scan so the route tree exists before the
+		// navigator resolves its initial page; otherwise the navigator's one-shot
+		// initial load hits the not-yet-built tree, paints the error page, and never
+		// retries (the TUI boot settles the same way before composing the host).
+		AsyncRunner::settle_async_tasks(app.world_mut()).await;
 		// the host with its in-world navigator co-located, opened on the first card,
 		// as the TUI boot composes them.
 		let host = app
@@ -416,7 +460,7 @@ mod test {
 				Navigator::in_world(router, "/01-alpha"),
 			))
 			.id();
-		drive_until(&mut app, host, "Alpha first");
+		drive_until(&mut app, host, "Alpha first").await;
 
 		// edit the current card on disk, then drive the watched-change reload.
 		fs_ext::write(site_dir.join("slides/01-alpha.md"), "# Alpha edited")
@@ -427,6 +471,7 @@ mod test {
 			.queue(move |world: &mut World| reload_site(world, &site).unwrap());
 		// the navigator re-fetches the current card and the host repaints it.
 		drive_until(&mut app, host, "Alpha edited")
+			.await
 			.xnot()
 			.xpect_contains("Alpha first");
 		// the marker survived the respawn, so card nav still works.

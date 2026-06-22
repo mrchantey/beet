@@ -67,7 +67,6 @@ pub fn DefaultAppRoutes() -> impl Bundle { default_app_routes() }
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 

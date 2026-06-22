@@ -242,7 +242,9 @@ mod test {
 
 	#[crate::test]
 	async fn timeout_completes_before_timeout() {
-		async_ext::timeout(Duration::from_millis(500), async {
+		// generous timeout vs tiny work: stays green even when the wasm event loop
+		// is starved under heavy parallel test load.
+		async_ext::timeout(Duration::from_secs(5), async {
 			time_ext::sleep(Duration::from_millis(10)).await;
 			42
 		})

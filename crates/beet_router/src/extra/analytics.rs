@@ -27,7 +27,6 @@ fn AnalyticsHandler(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 

@@ -177,10 +177,12 @@ _test-pkgs pkgs *args:
 # Shared wasm cargo test runner over a space-separated list of crates.
 # Excludes `testing_embedded`: its `linkme` distributed slice is unsupported on
 # wasm32 (the embedded runner is bare-metal only).
+# Excludes `cloudflare`: it pulls the `worker` SDK, whose module init expects the
+# Cloudflare Workers runtime and hangs under the Deno wasm test runner.
 _test-pkgs-wasm pkgs *args:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	feats=$(just _core-features "{{ pkgs }}" "testing_embedded")
+	feats=$(just _core-features "{{ pkgs }}" "testing_embedded|cloudflare")
 	crates=$(printf -- "-p %s " {{ pkgs }})
 	cargo test $crates --lib --target wasm32-unknown-unknown $feats {{ args }} -- {{ test-threads }}
 

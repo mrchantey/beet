@@ -572,15 +572,20 @@ async fn delete_container_app(worker_name: &str) {
 	else {
 		return;
 	};
-	// `[{ id, name, ... }]`; match our app by name and delete by id.
-	let id = serde_json::from_str::<serde_json::Value>(&json)
-		.ok()
-		.as_ref()
-		.and_then(|apps| apps.as_array())
-		.and_then(|apps| {
-			apps.iter().find(|app| app["name"] == app_name.as_str())
-		})
-		.and_then(|app| app["id"].as_str().map(str::to_string));
+	// `[{ id, name, ... }]`; match our app by name and delete by id. Explicit
+	// loop rather than iterator closures: closures borrowing from `&Value` trip
+	// a higher-ranked-lifetime inference bug once this future is boxed by `#[action]`.
+	let mut id = None;
+	if let Ok(serde_json::Value::Array(apps)) =
+		serde_json::from_str::<serde_json::Value>(&json)
+	{
+		for app in &apps {
+			if app["name"] == app_name.as_str() {
+				id = app["id"].as_str().map(str::to_string);
+				break;
+			}
+		}
+	}
 	if let Some(id) = id {
 		info!("deleting container app `{app_name}` ({id})");
 		ChildProcess::new("wrangler")
@@ -603,25 +608,32 @@ async fn delete_container_images(worker_name: &str) {
 	else {
 		return;
 	};
-	let Ok(repos) = serde_json::from_str::<serde_json::Value>(&json) else {
+	let Ok(serde_json::Value::Array(repos)) =
+		serde_json::from_str::<serde_json::Value>(&json)
+	else {
 		return;
 	};
-	let tags = repos
-		.as_array()
-		.into_iter()
-		.flatten()
-		.filter(|entry| entry["name"] == repo.as_str())
-		.filter_map(|entry| entry["tags"].as_array())
-		.flatten()
-		.filter_map(|tag| tag.as_str());
-	for tag in tags {
-		let image = format!("{repo}:{tag}");
-		info!("deleting container image `{image}`");
-		ChildProcess::new("wrangler")
-			.with_args(["containers", "images", "delete", &image])
-			.run_async()
-			.await
-			.ok();
+	// Explicit loops over the json (see `delete_container_app`): iterator closures
+	// borrowing from `&Value` break HRTB inference inside the boxed `#[action]` future.
+	for entry in &repos {
+		if entry["name"] != repo.as_str() {
+			continue;
+		}
+		let Some(tags) = entry["tags"].as_array() else {
+			continue;
+		};
+		for tag in tags {
+			let Some(tag) = tag.as_str() else {
+				continue;
+			};
+			let image = format!("{repo}:{tag}");
+			info!("deleting container image `{image}`");
+			ChildProcess::new("wrangler")
+				.with_args(["containers", "images", "delete", &image])
+				.run_async()
+				.await
+				.ok();
+		}
 	}
 }
 

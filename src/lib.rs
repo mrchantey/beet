@@ -117,7 +117,9 @@ pub mod prelude {
 			pub use crate::ui::prelude::style::AlignContent;
 			pub use crate::ui::prelude::style::Visibility;
 			pub use crate::ui::prelude::style::FlexWrap;
+			pub use crate::ui::prelude::style::Overflow;
 			pub use crate::ui::prelude::Pointer;
+			pub use crate::ui::prelude::ScrollPosition;
 		}
 	}
 	cfg_if! {

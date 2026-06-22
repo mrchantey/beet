@@ -92,6 +92,16 @@ impl AsyncRunner {
 		}
 	}
 
+	/// Advance the async runtime one tick: tick the task pools and yield to the
+	/// executor so spawned tasks make progress. Pair with `app.update()` to drive
+	/// a frame-by-frame loop that inspects state between ticks (eg a test polling a
+	/// render buffer), where [`settle_async_tasks`](Self::settle_async_tasks) would
+	/// over-run the awaited state.
+	pub async fn tick() {
+		tick_task_pools();
+		yield_to_executor().await;
+	}
+
 	/// Drives the app until it has been idle (no async tasks in flight) for
 	/// several consecutive frames, settling pipelines that span multiple frames
 	/// and only spawn a follow-up task after some synchronous frames (eg an

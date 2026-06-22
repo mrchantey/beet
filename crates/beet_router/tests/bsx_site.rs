@@ -4,7 +4,6 @@
 //! route-aware widgets (`RouteHead`, `RouteSidebar`).
 beet_core::test_main!();
 
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
@@ -72,17 +71,21 @@ fn site_fixture() -> AbsPathBuf {
 /// The example's `main.rs` setup in miniature: plugins + the compile-time
 /// package config (the title/description come from `MAIN_BSX`), then register
 /// the site templates and spawn the entry.
-fn spawn_site(world: &mut World) -> Entity {
+async fn spawn_site(world: &mut World) -> Entity {
 	let site_dir = site_fixture();
 	world.insert_resource(pkg_config!());
 	world
 		.register_bsx_templates(site_dir.join("templates"))
 		.unwrap();
 	world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
-	BsxTemplate::load_entry(world, site_dir.join("main.bsx"))
+	let root = BsxTemplate::load_entry(world, site_dir.join("main.bsx"))
 		.unwrap()
 		.spawn(world)
-		.unwrap()
+		.unwrap();
+	// the `<RoutesDir>` scan is async, so settle it before reading the route tree
+	// or serving requests (else the discovered routes 404)
+	AsyncRunner::settle_async_tasks(world).await;
+	root
 }
 
 /// Request `path`, negotiating HTML, and return the rendered body.
@@ -101,7 +104,7 @@ async fn get(world: &mut World, root: Entity, path: &str) -> String {
 #[beet_core::test]
 async fn entry_components_land_on_root() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = spawn_site(&mut world);
+	let root = spawn_site(&mut world).await;
 	// the entry's root element is the spawned entity itself, with the spread
 	// middleware stacked alongside the router
 	world.entity(root).contains::<Router>().xpect_true();
@@ -134,7 +137,7 @@ async fn entry_components_land_on_root() {
 #[beet_core::test]
 async fn blob_store_route_serves_assets() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = spawn_site(&mut world);
+	let root = spawn_site(&mut world).await;
 	world
 		.entity_mut(root)
 		.exchange(Request::get("assets/style.css"))
@@ -212,7 +215,7 @@ struct ServerBooted;
 #[beet_core::test]
 async fn page_renders_in_layout() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = spawn_site(&mut world);
+	let root = spawn_site(&mut world).await;
 	get(&mut world, root, "docs/intro")
 		.await
 		.as_str()
@@ -239,7 +242,7 @@ async fn page_renders_in_layout() {
 #[beet_core::test]
 async fn counter_page_renders_reactively() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = spawn_site(&mut world);
+	let root = spawn_site(&mut world).await;
 	let html = get(&mut world, root, "counter").await;
 	html.as_str()
 		// --- binding values, correct first paint ---
@@ -275,7 +278,7 @@ async fn counter_page_renders_reactively() {
 #[beet_core::test]
 async fn plain_page_stays_clean() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = spawn_site(&mut world);
+	let root = spawn_site(&mut world).await;
 	get(&mut world, root, "docs/intro")
 		.await
 		.as_str()
@@ -317,7 +320,7 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	]);
 	// the served site, a distinct root in the same world, plus a per-request page
 	// whose content is built detached (the `fixed_func_route` shape).
-	let root = spawn_site(&mut world);
+	let root = spawn_site(&mut world).await;
 	world.spawn((
 		ChildOf(root),
 		render_action::fixed_func_route("page", || rsx! { <p>"detached"</p> }),
@@ -347,7 +350,7 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 #[beet_core::test]
 async fn home_route_serves_index() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = spawn_site(&mut world);
+	let root = spawn_site(&mut world).await;
 	get(&mut world, root, "")
 		.await
 		.as_str()
