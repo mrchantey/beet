@@ -1,9 +1,27 @@
-<div {Repeat} {RunThread}>
-	<div {Thread} {Sequence}>
-		<CreateActor name="System" kind="System">
-			<CreatePost text="you are robot, make beep boop noises"/>
-		</CreateActor>
-		<CreateActor name="BeepBot" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
-		<CreateActor name="Billy" kind="User" {UserInput}/>
+<!--
+Interactive terminal chat, the whole program in one scene. Run it through the
+one binary:
+
+    beet --main=examples/thread/chat.bsx
+
+The behavior is `Repeat[Sequence[agent, user]]`: the agent greets from the system
+prompt, the user's turn (`{UserInput}`) waits for the composer, looped forever.
+`{RunThread}` runs it as a program (holding the process open until Ctrl+C). The
+UI is a sibling of the behavior tree, bound to it by the `bx:ref="thread"` /
+`$thread` reference, so the view + composer render the same thread the loop drives.
+-->
+<div>
+	<div {Repeat} {RunThread}>
+		<div bx:ref="thread" {Thread} {Sequence}>
+			<CreateActor name="System" kind="System">
+				<CreatePost text="you are robot, make beep boop noises"/>
+			</CreateActor>
+			<CreateActor name="BeepBot" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
+			<CreateActor name="Billy" kind="User" {UserInput}/>
+		</div>
 	</div>
+	<ThreadChat>
+		<div {ThreadView{thread:$thread}}/>
+		<div {ThreadComposer{thread:$thread}}/>
+	</ThreadChat>
 </div>

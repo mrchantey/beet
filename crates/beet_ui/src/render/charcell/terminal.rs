@@ -54,7 +54,23 @@ impl StdioTerminal {
 
 	fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		let stdio = world.entity(cx.entity).get::<StdioTerminal>().unwrap();
-		stdio.register_restore_hook().unwrap();
+		// `BEET_HEADLESS` (tests, CI, automation): a buffered terminal that never
+		// touches the real tty (no raw mode, alt screen, mouse, or restore hook), so
+		// a scene that declares a `StdioTerminal` still spawns and reduces without
+		// taking over or leaking escapes into the controlling terminal.
+		if env_ext::var("BEET_HEADLESS").is_ok() {
+			world
+				.commands()
+				.entity(cx.entity)
+				.insert(Terminal::new_buffered());
+			return;
+		}
+		// best-effort: a process needs only one restore hook, so a second terminal
+		// (eg several spawned across headless tests) reuses the first rather than
+		// panicking. The real single-terminal app registers cleanly.
+		if let Err(err) = stdio.register_restore_hook() {
+			warn!("terminal restore hook not registered: {err}");
+		}
 		/// Large write buffer prevents mid-frame flushes and terminal flicker.
 		const TERMINAL_BUFFER_CAPACITY: usize = 4 * 1024 * 1024;
 
@@ -303,7 +319,14 @@ impl Terminal {
 
 	fn apply_config(&mut self) -> Result {
 		if self.config.raw_mode {
-			raw_mode::enable()?;
+			// a raw-mode terminal needs a real tty; without one (a sandbox, a
+			// headless test, or a piped run) degrade to inert rather than panicking
+			// on `tcgetattr` or corrupting output with alt-screen escapes. The host
+			// still exists so the scene reduces, it just paints nothing.
+			if let Err(err) = raw_mode::enable() {
+				warn!("terminal raw mode unavailable, running inert: {err}");
+				return Ok(());
+			}
 		}
 		if self.config.alternate_screen {
 			self.writer.write_all(escape::ENTER_ALT_SCREEN.as_bytes())?;

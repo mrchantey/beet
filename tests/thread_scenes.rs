@@ -8,11 +8,14 @@ use beet::prelude::*;
 use std::sync::Once;
 
 /// Set a dummy auth env once so `{ModelStreamer{provider:OpenAi}}` builds during
-/// reduction without a real key (no request is ever made).
+/// reduction without a real key (no request is ever made), and `BEET_HEADLESS` so
+/// the scenes' `<ThreadChat>`/`<ThreadTranscript>` hosts spawn inert rather than
+/// taking over the controlling terminal.
 fn ensure_auth_env() {
 	static INIT: Once = Once::new();
 	INIT.call_once(|| unsafe {
 		env_ext::set_var("OPENAI_API_KEY", "test-dummy-key");
+		env_ext::set_var("BEET_HEADLESS", "1");
 	});
 }
 

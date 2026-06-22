@@ -1,7 +1,19 @@
-<div {RepeatWhileFunctionCallOutput} {RunThread}>
-	<div {Thread} {Sequence} {MountFsStore{path:".beet/coding_agent"}}>
-		<CreateActor name="System" kind="System">
-			<CreatePost text='
+<!--
+A mini coding agent that creates files in a local store. Run it through the one
+binary:
+
+    beet --main=examples/thread/coding_agent.bsx
+
+`{MountFsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
+resolves), the agent exercises the five blob tools, and
+`{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools, then
+`{RunThread}` exits. The transcript renders inline.
+-->
+<div>
+	<div {RepeatWhileFunctionCallOutput} {RunThread}>
+		<div {Thread} {Sequence} {MountFsStore{path:".beet/coding_agent"}} bx:ref="thread">
+			<CreateActor name="System" kind="System">
+				<CreatePost text='
 You are a coding agent with access to a file store.
 Your available tools are: list-blobs, read-blob, write-blob, edit-text, remove-blob.
 
@@ -18,9 +30,13 @@ Please perform the following steps in order:
 7. Use list-blobs to confirm it was deleted
 8. Finally, write a brief summary of what happened and whether all tools worked correctly
 '/>
-		</CreateActor>
-		<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-			<StoreToolset/>
-		</CreateActor>
+			</CreateActor>
+			<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+				<StoreToolset/>
+			</CreateActor>
+		</div>
 	</div>
+	<ThreadTranscript>
+		<div {ThreadView{thread:$thread}}/>
+	</ThreadTranscript>
 </div>

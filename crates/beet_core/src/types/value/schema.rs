@@ -632,9 +632,8 @@ fn map_primitive_type(type_path: &str) -> &'static str {
 		.trim_start_matches('&');
 
 	match short_name {
-		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString" => {
-			"string"
-		}
+		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString"
+		| "SmolStr" | "SmolPath" => "string",
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => "integer",
 		"i8" | "i16" | "i32" | "i64" | "i128" | "isize" => "integer",
 		"f32" | "f64" => "number",
@@ -1062,11 +1061,38 @@ mod test {
 	fn primitive_type_mapping() {
 		map_primitive_type("alloc::string::String").xpect_eq("string");
 		map_primitive_type("String").xpect_eq("string");
+		// string-like newtypes must lower to `string`, not the `object`
+		// fallthrough (an empty object trips OpenAI strict-mode validation)
+		map_primitive_type("smol_str::SmolStr").xpect_eq("string");
+		map_primitive_type("beet_core::path::smol_path::SmolPath")
+			.xpect_eq("string");
 		map_primitive_type("u32").xpect_eq("integer");
 		map_primitive_type("i64").xpect_eq("integer");
 		map_primitive_type("f64").xpect_eq("number");
 		map_primitive_type("bool").xpect_eq("boolean");
 		map_primitive_type("()").xpect_eq("null");
 		map_primitive_type("MyCustomType").xpect_eq("object");
+	}
+
+	/// A `SmolPath` newtype field unwraps to its inner `SmolStr` and must lower
+	/// to a `string` property, mirroring the blob-store action params. The
+	/// `object` fallthrough produced an empty object schema that OpenAI strict
+	/// mode rejected.
+	#[crate::test]
+	fn string_newtype_field_is_string() {
+		#[derive(Reflect)]
+		struct WithPath {
+			path: SmolPath,
+		}
+		let schema = Schema::new::<WithPath>();
+		let props = schema.get("properties").unwrap().as_map().unwrap();
+		props
+			.get("path")
+			.unwrap()
+			.get("type")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("string");
 	}
 }

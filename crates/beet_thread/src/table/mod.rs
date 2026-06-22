@@ -12,6 +12,8 @@ pub mod thread_store;
 mod thread_window;
 pub use thread_store::SyncedPosts;
 mod thread_store_provider;
+mod blob_thread_store;
+pub use blob_thread_store::*;
 pub use document::*;
 pub use thread_store_provider::*;
 mod agent_post;

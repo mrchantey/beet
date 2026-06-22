@@ -2,6 +2,35 @@ use crate::prelude::*;
 #[cfg(feature = "action")]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
+
+/// Declare a filesystem-backed thread store from markup, persisting the thread's
+/// records (its whole conversation) to a single JSON object under `path`, so a
+/// reload of the scene resumes rather than starting fresh:
+/// `<div {Thread} {Sequence} {MountThreadStore{path:"examples/thread/chat"}}>`.
+///
+/// `path` is workspace-relative. This is a *deferred* mount: [`RunThread`] builds
+/// the [`ThreadStore`], adopts the stored conversation by seed hash, and only then
+/// inserts the store onto the thread, so the persistence sync never flushes a
+/// fresh, un-adopted thread (which would fork a duplicate on every reload). This
+/// is the thread-record store (the conversation); [`MountFsStore`] is the separate
+/// blob store an agent's tools read and write.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct MountThreadStore {
+	/// The workspace-relative directory the thread's records persist under.
+	pub path: String,
+}
+
+impl MountThreadStore {
+	/// Build the [`ThreadStore`] this declares: a single-JSON-object
+	/// [`BlobThreadStore`] over an [`FsStore`] at the workspace-relative `path`.
+	pub fn build(&self) -> ThreadStore {
+		ThreadStore::new(BlobThreadStore::new(BlobStore::new(FsStore::new(
+			WsPathBuf::new(self.path.clone()),
+		))))
+	}
+}
 
 /// Governs the fate of a superseded thread when the author scene's seed is
 /// edited (forking a new thread under a new seed hash).

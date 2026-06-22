@@ -34,6 +34,10 @@ fn main() -> AppExit {
 	add_serve_plugins(&mut app);
 	// the native-only dev-command and terminal targets layered on top.
 	add_native_serve_plugins(&mut app);
+	// the agent-thread runtime + chat UI + example tool types, so a `main.bsx`
+	// declaring a `<Thread>` chat (eg `examples/thread/chat.bsx`) loads and runs.
+	#[cfg(feature = "thread")]
+	app.add_plugins(ThreadExamplesPlugin);
 
 	// the process exits when `boot` writes `AppExit` for the one-shot it
 	// resolves; a long-running server parks its boot call, so its unresolved

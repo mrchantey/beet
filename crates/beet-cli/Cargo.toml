@@ -16,8 +16,14 @@ name = "beet"
 path = "src/main.rs"
 
 [features]
-default = ["qrcode", "net", "tui", "ssh"]
+default = ["qrcode", "net", "tui", "ssh", "thread"]
 qrcode = ["dep:qrcode", "dep:image"]
+# The agent-thread runtime + its charcell chat UI, so a `main.bsx` declaring a
+# `<Thread>` chat (eg `examples/thread/chat.bsx`) loads and runs through the one
+# `beet` binary. Pulls `beet/ui` so `ThreadUiPlugin` (the `ThreadView` document
+# chain) and the charcell host are present; `ThreadExamplesPlugin` registers the
+# thread example tool types so their `.bsx` tags resolve.
+thread = ["beet/thread", "beet/ui", "dep:serde"]
 # HTTP transport for the remote scene-control commands. Native-only: the
 # ureq/rustls stack does not build on wasm, so it is enabled via the non-wasm
 # target table below rather than wired into this feature directly.
@@ -84,6 +90,9 @@ beet = { workspace = true, features = [
 ] }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }
+# the thread example tool types (`ChoiceInput`) derive serde for tool-arg
+# (de)serialization; only pulled in with the `thread` feature.
+serde = { workspace = true, optional = true }
 
 # the wasm Worker target's extra deps: the Workers SDK (the `#[event(fetch)]`
 # entry + request/response conversion) and a panic hook for readable errors.

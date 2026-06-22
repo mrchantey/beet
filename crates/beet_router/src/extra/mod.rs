@@ -11,6 +11,12 @@ pub use html_store::*;
 // `BlobStoreRoute` and the HTML-store gate (no_std core).
 mod blob_store;
 pub use blob_store::*;
+// the standard blob-store agent toolset + a markup store mount, composing
+// `exchange_route` with beet_net's blob-store actions.
+#[cfg(feature = "std")]
+mod store_toolset;
+#[cfg(feature = "std")]
+pub use store_toolset::*;
 
 // std-only: the analytics route stores into beet_net's `AnalyticsEvent`, which
 // is part of beet_net's std-only store surface.

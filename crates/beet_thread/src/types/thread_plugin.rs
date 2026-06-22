@@ -20,11 +20,12 @@ impl Plugin for ThreadPlugin {
 
 		#[cfg(feature = "action")]
 		app.init_plugin::<ActionPlugin>()
-			// agent-loop control flow + the standard store toolset, as markup
+			// agent-loop control flow, as markup. `StoreToolset` + `MountFsStore`
+			// are registered upstream by `RouterPlugin` (init above).
 			.register_type::<RepeatWhileFunctionCallOutput>()
 			.register_type::<RunThread>()
-			.register_template::<StoreToolset>()
-			.register_template::<MountFsStore>()
+			// markup persistence: declare a thread-record store from `.bsx`
+			.register_type::<MountThreadStore>()
 			// markup kick: call the thread on load, exit when it completes
 			.add_systems(Update, run_thread_on_load);
 

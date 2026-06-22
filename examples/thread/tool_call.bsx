@@ -1,7 +1,18 @@
-<div {RepeatTimes{total_times:2}} {RunThread}>
-	<div {Thread} {Sequence}>
-		<CreateActor name="System" kind="System">
-			<CreatePost text='
+<!--
+Tool calling, the whole program in one scene. Run it through the one binary:
+
+    beet --main=examples/thread/tool_call.bsx
+
+A finite dungeon turn whose agent is equipped with the inline `<AgentChoiceAction/>`
+tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
+`{RunThread}`, which exits the process once the two turns complete. The transcript
+renders inline so it stays in the terminal scrollback after exit.
+-->
+<div>
+	<div {RepeatTimes{total_times:2}} {RunThread}>
+		<div bx:ref="thread" {Thread} {Sequence}>
+			<CreateActor name="System" kind="System">
+				<CreatePost text='
 This is a tool call test. You will get two responses.
 
 For the first, respond in the first person:
@@ -17,9 +28,13 @@ This will be your final response so do not attempt to continue the conversation.
 
 You enter the cave, and from the ceiling drops a glowing red beet..
 '/>
-		</CreateActor>
-		<CreateActor name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-			<AgentChoiceAction/>
-		</CreateActor>
+			</CreateActor>
+			<CreateActor name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+				<AgentChoiceAction/>
+			</CreateActor>
+		</div>
 	</div>
+	<ThreadTranscript>
+		<div {ThreadView{thread:$thread}}/>
+	</ThreadTranscript>
 </div>

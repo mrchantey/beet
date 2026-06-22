@@ -96,7 +96,12 @@ impl Plugin for RouterPlugin {
 				.register_template::<SiteLayout>()
 				// the default app routes as a markup template, so a no-code BSX
 				// site requests them with `<DefaultAppRoutes/>`.
-				.register_template::<DefaultAppRoutes>();
+				.register_template::<DefaultAppRoutes>()
+				// the standard blob-store agent toolset + a markup fs-store mount,
+				// for agent scenes (eg a thread's `<StoreToolset/>` /
+				// `{MountFsStore{path:..}}`).
+				.register_template::<StoreToolset>()
+				.register_template::<MountFsStore>();
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
 			// asynchronously (off the runtime, see `spawn_routes_dir`), so it runs on

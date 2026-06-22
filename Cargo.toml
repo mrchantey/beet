@@ -623,42 +623,13 @@ path = "examples/file_based_routes/main.rs"
 required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq", "rustls-tls"]
 
 # 💡 Examples - Thread
-
-[[example]]
-name = "chat"
-path = "examples/thread/chat.rs"
-required-features = ["thread", "tui", "rustls-tls"]
-
-[[example]]
-name = "multi_agent"
-path = "examples/thread/multi_agent.rs"
-required-features = ["thread", "tui", "rustls-tls"]
-
-[[example]]
-name = "oneshot"
-path = "examples/thread/oneshot.rs"
-required-features = ["thread", "rustls-tls"]
-
-[[example]]
-name = "tool_call"
-path = "examples/thread/tool_call.rs"
-required-features = ["thread", "tui", "router", "rustls-tls"]
-
-[[example]]
-name = "self_evolving"
-path = "examples/thread/self_evolving.rs"
-required-features = ["thread", "tui", "fs", "router", "rustls-tls"]
-
-[[example]]
-name = "coding_agent"
-path = "examples/thread/coding_agent.rs"
-required-features = ["thread", "tui", "fs", "router", "rustls-tls"]
-
-[[example]]
-name = "persistent_chat"
-path = "examples/thread/persistent_chat.rs"
-required-features = ["thread", "tui", "template_serde", "rustls-tls"]
-
+#
+# The thread examples are no-code `.bsx` scenes, run through the one `beet`
+# binary rather than as per-example `cargo` binaries:
+#
+#     beet --main=examples/thread/chat.bsx
+#
+# See `examples/thread/*.bsx`. Their reduction is guarded by `tests/thread_scenes.rs`.
 
 
 # 💡 Examples - infra
