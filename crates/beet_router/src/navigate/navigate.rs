@@ -180,7 +180,8 @@ fn resolve_sibling(
 	current_path: &[SmolStr],
 	direction: SiblingDirection,
 ) -> Result<Vec<SmolStr>> {
-	let (siblings, current_idx) = siblings_and_index(tree, current_path)?;
+	let (siblings, current_idx) =
+		siblings_and_index(tree, current_path, false)?;
 	let target_idx = match direction {
 		SiblingDirection::Next => (current_idx + 1) % siblings.len(),
 		SiblingDirection::Prev => {
@@ -197,9 +198,16 @@ fn resolve_sibling(
 /// The routable siblings at the current path's tree level, paired with the
 /// current path's index among them. Shared by [`resolve_sibling`] (wrapping
 /// history shortcuts) and the card-stack `resolve_card` (clamped card navigation).
+///
+/// `page_only` keeps just the user-facing [`PageRoute`] siblings, dropping the
+/// infrastructure routes (`/health`, the reactivity-runtime asset, the
+/// `client_io` websocket, a mounted blob store) a real deck/site declares
+/// alongside its pages. A card stack steps only between its cards, so it passes
+/// `true`; plain sibling history navigation passes `false` to keep every route.
 pub(crate) fn siblings_and_index<'a>(
 	tree: &'a RouteTree,
 	current_path: &[SmolStr],
+	page_only: bool,
 ) -> Result<(Vec<&'a RouteTree>, usize)> {
 	if current_path.is_empty() {
 		bevybail!("Cannot navigate to a sibling of the root");
@@ -219,7 +227,11 @@ pub(crate) fn siblings_and_index<'a>(
 	let siblings: Vec<&RouteTree> = parent_subtree
 		.children
 		.iter()
-		.filter(|child| child.node().is_some())
+		.filter(|child| {
+			child
+				.node()
+				.is_some_and(|node| !page_only || node.is_page_route)
+		})
 		.collect();
 
 	if siblings.is_empty() {

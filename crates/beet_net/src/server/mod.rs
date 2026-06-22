@@ -40,6 +40,13 @@ mod channel_http_server;
 #[cfg(feature = "std")]
 pub use channel_http_server::*;
 
+// The no_std core of the boot path: the `Boot` exchange newtype and the
+// `request_selects_server` predicate the unconditionally-compiled `HttpServer`
+// observer needs. Compiles everywhere; the std-only verbs that drive it are in
+// `boot` below.
+mod boot_exchange;
+pub use boot_exchange::*;
+
 // The boot path: the `BootOnLoad` / `ExchangeOnLoad` verbs call a host's action
 // slot with the process request and write `AppExit`. std-only (it reads CLI args,
 // streams to stdout, and writes the exit).

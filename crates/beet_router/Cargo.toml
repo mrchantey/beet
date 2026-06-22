@@ -16,11 +16,11 @@ categories.workspace = true
 default = ["std", "markdown"]
 # The std render surface: the scene-rendering router pieces (help/navigate scene
 # routes + rendering via `beet_ui`), media parsing, sidebar, help, the route tree,
-# and the runtime BSX parser. Wasm-safe (eg the Cloudflare Worker render target):
-# it deliberately omits the native-only filesystem store / http transport /
-# browser opener, which ride the separate `fs`/`http`/`webbrowser` features the
-# native `router` pulls. The no_std core (route tree, path patterns, navigation,
-# standalone middleware, server-action client) builds with this off.
+# the runtime BSX parser, and the system-browser link opener (`open_link`, native
+# only). Wasm-safe (eg the Cloudflare Worker render target): it deliberately omits
+# the native-only filesystem store / http transport, which ride the separate
+# `fs`/`http` features the native `router` pulls. The no_std core (route tree, path
+# patterns, navigation, standalone middleware, server-action client) builds with this off.
 std = [
 	"beet_core/std",
 	"beet_action/std",
@@ -33,10 +33,15 @@ std = [
 	"beet_ui/net",
 	# markup parsing for media negotiation routes `MediaType::Html` through BSX.
 	"bsx",
+	# the std-gated `open_link` opens external links in the system browser on
+	# native (the wasm render target uses `window.open`). `webbrowser` lives in the
+	# non-wasm target table, so this activates it only off wasm; the no_std embedded
+	# router leaves `std` off, keeping `webbrowser`/`url`/std out of the firmware.
+	"dep:webbrowser",
 ]
 # The native-only filesystem store + http transport, layered onto `std`. The
 # native `router` enables this; the wasm render target leaves it off. (The
-# `webbrowser` link opener is a non-optional native dep, always present off wasm.)
+# `webbrowser` link opener rides `std` itself, off wasm — see the `std` feature.)
 native = ["std", "beet_net/fs", "beet_net/http"]
 interface = ["serde"]
 # The BSX markup parser, forwarded to `beet_ui` (which delegates to the core
@@ -115,11 +120,13 @@ proc-macro2 = { workspace = true, optional = true }
 prettyplease = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 
-# the system-browser link opener (`open_external_link`), always present on native
-# std builds. In the non-wasm target table — the wasm render target records the
-# open intent via the event but has no system browser, so it is excluded there.
+# the system-browser link opener (`open_external_link`). Optional, enabled by the
+# `std` feature (the std render surface compiles `open_link`), and in the non-wasm
+# target table — the wasm render target records the open intent via the event but
+# has no system browser, so it is excluded there. Optional so the no_std embedded
+# router (`std` off) keeps `webbrowser`/`url`/std out of the firmware build.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-webbrowser = { workspace = true }
+webbrowser = { workspace = true, optional = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

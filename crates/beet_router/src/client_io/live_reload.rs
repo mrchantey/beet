@@ -493,4 +493,40 @@ mod test {
 			.contains::<CardDeck>()
 			.xpect_true();
 	}
+
+	/// A deck's in-world navigator opens the first card on boot even when the
+	/// cards are still being discovered: `CardStackPlugin`'s `open_initial_card`
+	/// polls the route tree until a card resolves, rather than resolving once
+	/// before the async `RoutesDir` scan lands and stranding the navigator on the
+	/// generic home (which a deck has no route for). The navigator boots at `/`
+	/// here *without* a pre-settle, the race the retry exists to absorb.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	async fn deck_opens_first_card_despite_async_discovery() {
+		use bevy::math::UVec2;
+
+		let mut app = tui_app();
+		// the stack-of-cards machinery contributes `open_initial_card`, the boot
+		// patch under test (the serve binary adds it via `CardStackPlugin`).
+		app.add_plugins(CardStackPlugin);
+		let site_dir = deck_fixture("deck_boot");
+		app.world_mut()
+			.insert_resource(SiteRoot::new_fs(site_dir.clone()));
+		let router = app
+			.world_mut()
+			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
+			.flush();
+		// deliberately no `settle_async_tasks` here: spawn the navigator at the
+		// generic home while the RoutesDir scan is still in flight.
+		let host = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "/"),
+			))
+			.id();
+		// `/` has no route on a deck, so the only way "Alpha first" paints is the
+		// retry resolving the first card once discovery lands.
+		drive_until(&mut app, host, "Alpha first").await;
+	}
 }

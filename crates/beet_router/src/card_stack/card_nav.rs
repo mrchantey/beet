@@ -44,10 +44,14 @@ pub enum CardNav {
 /// so its cards are the routable children at the tree root, in sorted order.
 /// Backs the initial-card `--slide=N` patch in [`CardStackPlugin`].
 pub fn resolve_nth_card(tree: &RouteTree, n: usize) -> Result<Vec<SmolStr>> {
+	// only user-facing page routes are cards: the infrastructure routes a deck
+	// serves alongside its slides (`/health`, the reactivity-runtime asset, the
+	// `client_io` websocket, a mounted blob store of assets) are not steppable
+	// cards, so they never become the opening card or land in the stack.
 	let cards: Vec<&RouteTree> = tree
 		.children
 		.iter()
-		.filter(|child| child.node().is_some())
+		.filter(|child| child.node().is_some_and(|node| node.is_page_route))
 		.collect();
 	if cards.is_empty() {
 		bevybail!("card stack has no cards");
@@ -63,7 +67,8 @@ pub fn resolve_card(
 	current_path: &[SmolStr],
 	nav: CardNav,
 ) -> Result<Vec<SmolStr>> {
-	let (siblings, current_idx) = siblings_and_index(tree, current_path)?;
+	let (siblings, current_idx) =
+		siblings_and_index(tree, current_path, true)?;
 	let target_idx = match nav {
 		CardNav::Prev => current_idx.saturating_sub(1),
 		CardNav::Next => (current_idx + 1).min(siblings.len() - 1),
@@ -161,14 +166,28 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_func_route(
-					"alpha",
-					|| rsx! { <p>"a"</p> }
+				// cards are page routes (the marker `RoutesDir` content gets), so the
+				// page-only card resolvers see them; a bare route would be filtered out.
+				(
+					render_action::fixed_func_route(
+						"alpha",
+						|| rsx! { <p>"a"</p> }
+					),
+					PageRoute
 				),
-				render_action::fixed_func_route("beta", || rsx! { <p>"b"</p> }),
-				render_action::fixed_func_route(
-					"gamma",
-					|| rsx! { <p>"c"</p> }
+				(
+					render_action::fixed_func_route(
+						"beta",
+						|| rsx! { <p>"b"</p> }
+					),
+					PageRoute
+				),
+				(
+					render_action::fixed_func_route(
+						"gamma",
+						|| rsx! { <p>"c"</p> }
+					),
+					PageRoute
 				),
 			]))
 			.flush();

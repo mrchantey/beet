@@ -278,6 +278,12 @@ where
 	///
 	/// [`Stdout`]: ConsoleStream::Stdout
 	/// [`Stderr`]: ConsoleStream::Stderr
+	///
+	/// `std`-only: collects lines through the arena-backed [`Store`], which the
+	/// no_std build lacks. The console-capturing `<script>` route that calls this
+	/// (`beet_router`'s `exchange_script`) is itself std-gated; the embedded device
+	/// runs scripts as typed [`run`](Self::run) transforms, never for stdout.
+	#[cfg(feature = "std")]
 	pub fn run_captured(&self, input: Input) -> Result<String> {
 		let lines = Store::<Vec<String>>::default();
 		let captured = lines.clone();

@@ -80,38 +80,72 @@ impl Plugin for CardStackPlugin {
 /// first card. The navigator's own home navigation runs first (a component hook,
 /// before this observer), so a brief generic first-paint before the card is
 /// possible; the card navigation lands last and wins.
+///
+/// A deck's cards are discovered asynchronously (`RoutesDir` lists its directory
+/// off the runtime, so the card routes appear a few ticks after boot), and this
+/// observer fires the moment the navigator is added — typically before any card
+/// exists. So the open is queued as an async task that polls the router's route
+/// tree for a short window until a card resolves, rather than resolving once up
+/// front and giving up; without this the navigator is stranded on the generic
+/// home (which a deck has no route for). A failed open logs rather than crashing
+/// the host, mirroring the navigator's graceful home-load handling.
 #[cfg(feature = "std")]
 fn open_initial_card(
 	ev: On<Add, Navigator>,
 	navigators: Query<&Navigator>,
 	decks: Query<(), With<CardDeck>>,
-	route_trees: Query<&RouteTree>,
 	mut commands: Commands,
 ) {
-	// only an in-world navigator pointed at a built `CardDeck` router opens a card;
-	// an HTTP navigator or a plain router is left at its generic home.
+	// only an in-world navigator pointed at a `CardDeck` router opens a card; an
+	// HTTP navigator or a plain router is left at its generic home.
 	let Ok(navigator) = navigators.get(ev.entity) else {
 		return;
 	};
 	let NavigatorTransport::InWorld { router } = navigator.transport() else {
 		return;
 	};
-	let (true, Ok(tree)) = (decks.contains(*router), route_trees.get(*router))
-	else {
+	let router = *router;
+	if !decks.contains(router) {
 		return;
-	};
+	}
 
 	// `--slide=N` (1-based) over the first card. Read from the launch argv, the
 	// downstream stand-in for the deck-specific boot config the server no longer
 	// owns.
 	let slide = Request::from_cli_args(CliArgs::parse_env())
 		.get_param("slide")
-		.and_then(|val| val.parse().ok());
-	let Ok(segments) = resolve_nth_card(tree, slide.unwrap_or(1)) else {
-		return;
-	};
-	let url = Url::parse(format!("/{}", segments.join("/")));
+		.and_then(|val| val.parse().ok())
+		.unwrap_or(1);
+
 	commands.entity(ev.entity).queue_async(async move |entity| {
-		Navigator::navigate_to(entity, url).await
+		let world = entity.world().clone();
+		// poll for the async-discovered cards for up to ~1s, then open the Nth.
+		for _ in 0..50 {
+			let path = world
+				.with(move |world: &mut World| {
+					world
+						.get_entity(router)
+						.ok()
+						.and_then(|router| router.get::<RouteTree>())
+						.and_then(|tree| resolve_nth_card(tree, slide).ok())
+						.map(|segments| format!("/{}", segments.join("/")))
+				})
+				.await;
+			match path {
+				Some(path) => {
+					if let Err(err) =
+						Navigator::navigate_to(entity, Url::parse(path.clone()))
+							.await
+					{
+						error!("failed to open initial card `{path}`: {err}");
+					}
+					return Ok(());
+				}
+				// cards not discovered yet: wait a tick and retry.
+				None => time_ext::sleep_millis(20).await,
+			}
+		}
+		error!("deck navigator found no cards to open");
+		Ok(())
 	});
 }
