@@ -50,9 +50,9 @@ push-assets:
 #💡 CLI
 
 # Run a cli command as if it was installed
-cli *args:
-  beet {{ args }}
-  # cargo run -p beet-cli -- {{ args }}
+beet *args:
+  cargo run -p beet-cli -- {{ args }}
+  # beet {{ args }}
 
 install-cli *args:
   # --locked pins the workspace bevy rc; a bare install re-resolves the
@@ -214,12 +214,6 @@ test-wasm-feat crate *args:
 
 test-wasm-e2e crate test_name *args:
 	just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
-
-test-clanker:
-	just cli clanker 										\
-	--oneshot --image										\
-	-f=assets/tests/agents/prompt.txt		\
-	--out-dir=assets/tests/agents/out
 
 example-chat *args:
 	just watch cargo run --example chat 	--features=native-tls,thread -- {{ args }}
