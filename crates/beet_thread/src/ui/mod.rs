@@ -37,8 +37,8 @@ impl Plugin for ThreadUiPlugin {
 			.register_type::<ThreadComposer>()
 			.register_type::<UserInput>()
 			// the local charcell host shells, declarable from markup
-			.register_template::<ThreadChat>()
-			.register_template::<ThreadTranscript>()
+			.register_template::<TuiThreadChat>()
+			.register_template::<TuiThreadTranscript>()
 			// project each window into its views' documents, then pin to the bottom
 			.add_systems(
 				Update,

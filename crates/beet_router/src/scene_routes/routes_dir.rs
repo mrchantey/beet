@@ -45,7 +45,8 @@ const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 /// (which is single-threaded on wasm). The nearest ancestor [`BlobStore`] (the site
 /// store composed on the loaded root) is resolved *inside* that task, where the
 /// whole tree is already built, so the ancestor link is reliably present; a
-/// store-less app falls back to an [`FsStore`] at the workspace root. The route
+/// store-less app is an error (never an implicit filesystem store, which has none
+/// on wasm). The route
 /// children therefore appear a few async ticks after the insert, so a boot path
 /// settles the async runtime before serving: the Worker entry awaits
 /// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner), the
@@ -64,15 +65,10 @@ pub fn spawn_routes_dir(
 	commands.entity(entity).queue_async(
 		async move |dir: AsyncEntity| -> Result {
 			let store = dir
-				.with_state::<AncestorQuery<&BlobStore>, BlobStore>(
-					|entity, stores| {
-						stores
-							.get(entity)
-							.map(BlobStore::clone)
-							.unwrap_or_else(|_| BlobStore::new(FsStore::default()))
-					},
+				.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
+					|entity, stores| stores.get(entity).map(BlobStore::clone),
 				)
-				.await?
+				.await??
 				.with_subdir(src);
 			let specs = discover_routes(&store).await?;
 			dir.world()
@@ -315,7 +311,7 @@ mod test {
 		let root = spawn_routes(
 			&mut world,
 			fs_fixture("serves", SERVES_FILES),
-			(default_router(), children![RoutesDir::new("")]),
+			(default_router(), children![RoutesDir::default()]),
 		)
 		.await;
 		assert_serves(&mut world, root).await;
@@ -329,7 +325,7 @@ mod test {
 		let root = spawn_routes(
 			&mut world,
 			memory_fixture(SERVES_FILES).await,
-			(default_router(), children![RoutesDir::new("")]),
+			(default_router(), children![RoutesDir::default()]),
 		)
 		.await;
 		assert_serves(&mut world, root).await;
@@ -352,7 +348,7 @@ mod test {
 				("02-beta.md", "# Beta"),
 			])
 			.await,
-			(Router, children![RoutesDir::new("")]),
+			(Router, children![RoutesDir::default()]),
 		)
 		.await;
 
@@ -379,7 +375,7 @@ mod test {
 				"+++\ntitle = \"Getting Started\"\norder = 2\n+++\n\n# Intro",
 			)])
 			.await,
-			(default_router(), children![RoutesDir::new("")]),
+			(default_router(), children![RoutesDir::default()]),
 		)
 		.await;
 

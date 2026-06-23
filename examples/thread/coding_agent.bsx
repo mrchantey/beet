@@ -4,14 +4,14 @@ binary:
 
     beet --main=examples/thread/coding_agent.bsx
 
-`{MountFsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
+`{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent exercises the five blob tools, and
 `{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools, then
 `{RunThread}` exits. The transcript renders inline.
 -->
 <div>
 	<div {RepeatWhileFunctionCallOutput} {RunThread}>
-		<div {Thread} {Sequence} {MountFsStore{path:".beet/coding_agent"}} bx:ref="thread">
+		<div {Thread} {Sequence} {FsStore{path:".beet/coding_agent"}} bx:ref="thread">
 			<CreateActor name="System" kind="System">
 				<CreatePost text='
 You are a coding agent with access to a file store.
@@ -36,7 +36,7 @@ Please perform the following steps in order:
 			</CreateActor>
 		</div>
 	</div>
-	<ThreadTranscript>
+	<TuiThreadTranscript>
 		<div {ThreadView{thread:$thread}}/>
-	</ThreadTranscript>
+	</TuiThreadTranscript>
 </div>

@@ -20,8 +20,8 @@ UI is a sibling of the behavior tree, bound to it by the `bx:ref="thread"` /
 			<CreateActor name="Billy" kind="User" {UserInput}/>
 		</div>
 	</div>
-	<ThreadChat>
+	<TuiThreadChat>
 		<div {ThreadView{thread:$thread}}/>
 		<div {ThreadComposer{thread:$thread}}/>
-	</ThreadChat>
+	</TuiThreadChat>
 </div>

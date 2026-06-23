@@ -279,9 +279,9 @@ mod test {
 		// ancestry, then settle the discovery scan before the export walks the routes.
 		let router = world
 			.spawn((
-				BlobStore::new(FsStore::new(root)),
+				FsStore::new(root),
 				default_router(),
-				children![RoutesDir::new("")],
+				children![RoutesDir::default()],
 			))
 			.flush();
 		AsyncRunner::settle_async_tasks(world).await;

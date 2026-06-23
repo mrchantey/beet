@@ -51,6 +51,10 @@ impl Plugin for RouterPlugin {
 		#[cfg(feature = "std")]
 		{
 			app
+				// store types + the store-path resolution observers (`DirPath` /
+				// `BlobPath` -> scoped `BlobStore` / `Blob`), which `RoutesDir` and
+				// `BlobStoreRoute` resolve by ancestry.
+				.init_plugin::<StorePlugin>()
 				// the server model: routers and servers go together, so a server
 				// spread on a router boots when the boot fan-out reaches it.
 				// `ServerPlugin` installs the `HttpServer` backend and registers the
@@ -97,11 +101,10 @@ impl Plugin for RouterPlugin {
 				// the default app routes as a markup template, so a no-code BSX
 				// site requests them with `<DefaultAppRoutes/>`.
 				.register_template::<DefaultAppRoutes>()
-				// the standard blob-store agent toolset + a markup fs-store mount,
-				// for agent scenes (eg a thread's `<StoreToolset/>` /
-				// `{MountFsStore{path:..}}`).
-				.register_template::<StoreToolset>()
-				.register_template::<MountFsStore>();
+				// the standard blob-store agent toolset, for agent scenes (eg a
+				// thread's `<StoreToolset/>`); the store itself is mounted with a
+				// plain `{FsStore{path:..}}`.
+				.register_template::<StoreToolset>();
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
 			// asynchronously (off the runtime, see `spawn_routes_dir`), so it runs on

@@ -387,7 +387,9 @@ impl Request {
 	/// A `--body=<value>` argument is lifted out of the query parameters and
 	/// set as the request body with a JSON `content-type`, mirroring an HTTP
 	/// request carrying a payload.
-	#[cfg(feature = "std")]
+	///
+	/// no_std-clean (the boot verbs build a request from argv on every platform):
+	/// `CliArgs` and its `RequestParts` conversion need no std.
 	pub fn from_cli_args(mut args: CliArgs) -> Self {
 		let body = args.params.remove("body");
 		let request = Self {
@@ -403,7 +405,6 @@ impl Request {
 	}
 
 	/// Creates a request by parsing a CLI-style string.
-	#[cfg(feature = "std")]
 	pub fn from_cli_str(args: &str) -> Self {
 		Self::from_cli_args(CliArgs::parse(args))
 	}
@@ -462,7 +463,6 @@ impl From<&str> for Request {
 	fn from(path: &str) -> Self { Request::get(path) }
 }
 
-#[cfg(feature = "std")]
 impl From<CliArgs> for Request {
 	fn from(args: CliArgs) -> Self { Self::from_cli_args(args) }
 }

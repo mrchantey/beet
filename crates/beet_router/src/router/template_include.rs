@@ -87,7 +87,8 @@ async fn resolve_include(
 
 /// Resolve the include base (the nearest ancestor [`BlobStore`], the site store on
 /// the loaded root), read `src` through it, then parse and build the entry at the
-/// include site. A store-less tree falls back to a cwd-relative filesystem read.
+/// include site. A store-less tree is an error: every platform resolves includes
+/// through the store, never the filesystem directly (there is none on wasm).
 async fn read_and_build(
 	async_world: &AsyncWorld,
 	src: &str,
@@ -95,14 +96,11 @@ async fn read_and_build(
 ) -> Result {
 	let store = async_world
 		.entity(target)
-		.with_state::<AncestorQuery<&BlobStore>, Option<BlobStore>>(
-			|entity, stores| stores.get(entity).cloned().ok(),
+		.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
+			|entity, stores| stores.get(entity).cloned(),
 		)
-		.await?;
-	let media = match store {
-		Some(store) => store.get_media(&SmolPath::from(src)).await?,
-		None => fs_ext::read_media(AbsPathBuf::new(src)?)?,
-	};
+		.await??;
+	let media = store.get_media(&SmolPath::from(src)).await?;
 	async_world
 		.with(move |world: &mut World| -> Result {
 			let entry = EntryTemplate::from_bytes(world, &media)?;
@@ -136,20 +134,11 @@ fn template_src(el: &BsxElement) -> Option<SmolStr> {
 mod test {
 	use super::*;
 
-	/// Write `source` to a temp file and return its absolute path.
-	fn temp_entry(name: &str, source: &str) -> AbsPathBuf {
-		let path = fs_ext::workspace_root()
-			.join("target/tests/template_include")
-			.join(name);
-		fs_ext::write(&path, source).unwrap();
-		AbsPathBuf::new(path).unwrap()
-	}
-
-	/// An entry that includes two local `.bsx` files builds both at the include
-	/// sites: each `<Template src>` becomes the included entry's root. The includes
-	/// resolve asynchronously (the pending path), so the build settles the async
-	/// runtime before the children are asserted. A store-less root makes each
-	/// absolute `src` resolve through the filesystem fallback.
+	/// An entry that includes two `.bsx` files builds both at the include sites:
+	/// each `<Template src>` becomes the included entry's root. The includes resolve
+	/// through the ancestor store (an in-memory store seeded with the two entries, so
+	/// the test is storage agnostic and runs on wasm), asynchronously (the pending
+	/// path), so the build settles the async runtime before the children are asserted.
 	#[beet_core::test]
 	async fn includes_local_files() {
 		// the include path is an async pending dependency, so the world needs the
@@ -157,18 +146,26 @@ mod test {
 		let mut world = (AsyncPlugin, TemplatePlugin).into_world();
 		register_template_include(&mut world);
 
-		let first = temp_entry("first.bsx", "<section class=\"card\"/>");
-		let second = temp_entry("second.bsx", "<article/>");
+		// the include base: an in-memory store seeded with the two entries.
+		let store = BlobStore::temp();
+		store
+			.insert(&SmolPath::from("first.bsx"), "<section class=\"card\"/>")
+			.await
+			.unwrap();
+		store
+			.insert(&SmolPath::from("second.bsx"), "<article/>")
+			.await
+			.unwrap();
 
 		let root = BsxTemplate::parse_entry(
 			&world,
-			&format!(
-				"<main><Template src=\"{first}\"/><Template src=\"{second}\"/></main>"
-			),
+			"<main><Template src=\"first.bsx\"/><Template src=\"second.bsx\"/></main>",
 		)
 		.unwrap()
 		.spawn(&mut world)
 		.unwrap();
+		// compose the store on the root so the includes resolve it by ancestry.
+		world.entity_mut(root).insert(store);
 		// the includes resolve as async pending dependencies; settle before asserting.
 		AsyncRunner::settle_async_tasks(&mut world).await;
 

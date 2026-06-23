@@ -6,10 +6,10 @@
 //! composer (bound to a `bx:ref` thread) as the host's children:
 //!
 //! ```rsx
-//! <ThreadChat>
+//! <TuiThreadChat>
 //!   <div {ThreadView{thread:$thread}}/>
 //!   <div {ThreadComposer{thread:$thread}}/>
-//! </ThreadChat>
+//! </TuiThreadChat>
 //! ```
 
 use beet_core::prelude::*;
@@ -21,7 +21,7 @@ use beet_ui::prelude::*;
 /// [`ThreadComposer`] as its children. Used by the interactive and auto-loop
 /// examples (the process runs until Ctrl+C).
 #[template]
-pub fn ThreadChat() -> impl Bundle {
+pub fn TuiThreadChat() -> impl Bundle {
 	rsx! {
 		<div {(
 			StdioTerminal::default(),
@@ -41,7 +41,7 @@ pub fn ThreadChat() -> impl Bundle {
 /// request tracing never interleaves with the transcript; the normal screen
 /// buffer keeps the transcript in scrollback after exit.
 #[template]
-pub fn ThreadTranscript() -> impl Bundle {
+pub fn TuiThreadTranscript() -> impl Bundle {
 	rsx! {
 		<div {(
 			StdioTerminal::inline()
@@ -221,7 +221,7 @@ mod test {
 	/// The full deterministic interaction: real keystrokes through the input
 	/// bridge type into the focused composer and Enter submits, advancing the
 	/// user turn so the mock agent replies. The charcell host is wired by
-	/// [`focus_chat_composer`] exactly as the local `ThreadChat` wires the real one.
+	/// [`focus_chat_composer`] exactly as the local `TuiThreadChat` wires the real one.
 	#[beet_core::test]
 	async fn keyboard_submit_drives_reply() {
 		let (mut app, host) = charcell_app();
@@ -236,7 +236,7 @@ mod test {
 			.id();
 		app.update();
 
-		// mount the chat UI on the host (as the local `ThreadChat` does), then kick
+		// mount the chat UI on the host (as the local `TuiThreadChat` does), then kick
 		app.world_mut().entity_mut(host).insert((
 			LayoutStyle::flex_col(),
 			children![ThreadView::new(thread), ThreadComposer::new(thread)],

@@ -161,75 +161,26 @@ impl HttpServer {
 	}
 }
 
-/// Registers the boot ([`StartRunning<Boot>`]) and teardown
-/// (`On<Remove, Running<Response>>`) observers on the host. no_std-clean: the
-/// async runtime (`queue_async_local`) and the installed backend hook both build
-/// without std.
+/// Registers the shared boot + teardown observers on the host (see
+/// [`ServerShutdown`]). no_std-clean: the async runtime (`queue_async_local`) and the
+/// installed backend hook both build without std.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_action_in)
-		.observe_any(on_running_removed);
+	ServerShutdown::<HttpServer>::add_observers(&mut world, cx.entity);
 }
 
-/// Shutdown signal for a running [`HttpServer`]: [`on_action_in`] stores the
-/// sender on the host and hands the receiver to the backend, and
-/// [`on_running_removed`] signals it so the backend stops accepting and drops its
-/// listener. A no_std one-shot channel, so an embedded backend tears down the same
-/// way. Replaced on each boot, so a reboot installs a fresh one.
-#[derive(Component)]
-struct HttpServerShutdown(Option<OnceValue<()>>);
+impl BootServer for HttpServer {
+	const SELECTOR: &'static str = "http";
 
-/// Boots the HTTP backend on the boot fan-out, if `--server` selects `"http"`.
-/// Applies the boot request's `--port` / `--host` onto the component, then queues
-/// the installed [`HttpServerFn`], handing it the shutdown receiver so it owns its
-/// own teardown. Reads the request without consuming it (never the taker), and
-/// never resolves the boot call, so the host's [`Running<Response>`] parks the
-/// process up.
-fn on_action_in(
-	ev: On<StartRunning<Boot>>,
-	mut servers: Query<&mut HttpServer>,
-	mut commands: Commands,
-) -> Result {
-	let entity = ev.entity;
-	// read the boot (without consuming it: the http server is a reader, never the
-	// taker) for the `--server` selection and the `--port` / `--host` config.
-	let selected = ev.with(|boot| {
-		let selected = request_selects_server(boot, "http");
-		if selected {
-			if let Ok(mut server) = servers.get_mut(entity) {
-				server.apply_request(boot);
-			}
-		}
-		selected
-	})?;
-	if !selected {
-		return Ok(());
+	fn serve(
+		entity: AsyncEntity,
+		shutdown: OnceValueRx<()>,
+	) -> LocalBoxedFuture<'static, Result> {
+		Box::pin(start_http_server(entity, shutdown))
 	}
-	// store the shutdown sender on the host; hand the receiver to the backend.
-	let (signal, shutdown) = oneshot::<()>();
-	commands
-		.entity(entity)
-		.insert(HttpServerShutdown(Some(signal)))
-		.queue_async_local(move |entity| start_http_server(entity, shutdown));
-	Ok(())
-}
 
-/// Tears down the HTTP backend when the host's [`Running<Response>`] is removed (a
-/// reload, an interrupt, or a despawn, since Bevy runs remove hooks on despawn):
-/// signals the shutdown channel so the backend stops accepting and drops its
-/// listener. Cause-agnostic, so any teardown closes the socket. Idempotent: a
-/// missing shutdown handle is a no-op.
-fn on_running_removed(
-	ev: On<Remove, Running<Response>>,
-	mut shutdowns: Query<&mut HttpServerShutdown>,
-) {
-	if let Ok(mut shutdown) = shutdowns.get_mut(ev.event().event_target())
-		&& let Some(signal) = shutdown.0.take()
-	{
-		signal.signal(());
-	}
+	/// `HttpServer` overlays `--port` / `--host` from the boot before the backend
+	/// reads the bind address.
+	fn apply_boot(&mut self, boot: &Request) { self.apply_request(boot); }
 }
 
 /// Invoke the installed backend on a started host, handing it the `shutdown`
@@ -351,7 +302,7 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 8080, Request::get("/"));
-		app.update_until(|world| {
+		app_ext::update_until(&mut app, |world| {
 			world.entity(entity).contains::<ServerStartFlag>()
 		})
 		.await
@@ -372,11 +323,11 @@ mod tests {
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 0, Request::get("/"));
 		// drive until booted: the shutdown handle holds a live signal.
-		app.update_until(|world| {
+		app_ext::update_until(&mut app, |world| {
 			world
 				.entity(entity)
-				.get::<HttpServerShutdown>()
-				.map(|shutdown| shutdown.0.is_some())
+				.get::<ServerShutdown<HttpServer>>()
+				.map(|shutdown| shutdown.is_live())
 				.unwrap_or(false)
 		})
 		.await
@@ -388,11 +339,10 @@ mod tests {
 		app.update();
 		app.world()
 			.entity(entity)
-			.get::<HttpServerShutdown>()
+			.get::<ServerShutdown<HttpServer>>()
 			.unwrap()
-			.0
-			.is_none()
-			.xpect_true();
+			.is_live()
+			.xpect_false();
 	}
 
 	/// Closing the shutdown channel ends the accept loop and drops the listener,
@@ -444,7 +394,7 @@ mod tests {
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 8080, Request::from_cli_str("--port=9090"));
 		// the backend running means `on_action_in` already applied the `--port`.
-		app.update_until(|world| {
+		app_ext::update_until(&mut app, |world| {
 			world.entity(entity).contains::<ServerStartFlag>()
 		})
 		.await

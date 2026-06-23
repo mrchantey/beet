@@ -18,7 +18,7 @@ transcript renders full-screen with no composer (there is no user turn).
 			<CreateActor name="Beet disliker" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You think beets are bad but dont want to hurt feelings"}}/>
 		</div>
 	</div>
-	<ThreadChat>
+	<TuiThreadChat>
 		<div {ThreadView{thread:$thread}}/>
-	</ThreadChat>
+	</TuiThreadChat>
 </div>

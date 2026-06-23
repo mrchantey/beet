@@ -4,13 +4,13 @@ across turns. Run it through the one binary:
 
     beet --main=examples/thread/self_evolving.bsx
 
-`{MountFsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
+`{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent evolves `notes.md` over ten turns (`{RepeatTimes}`), and
 `{RunThread}` exits when they complete. The transcript renders inline.
 -->
 <div>
 	<div {RepeatTimes{total_times:10}} {RunThread}>
-		<div {Thread} {Sequence} {MountFsStore{path:"target/examples/self_evolving"}} bx:ref="thread">
+		<div {Thread} {Sequence} {FsStore{path:"target/examples/self_evolving"}} bx:ref="thread">
 			<CreateActor name="System" kind="System">
 				<CreatePost text="
 You are a self-evolving agent whose only memory is a persistent blob store.
@@ -31,7 +31,7 @@ state in one sentence what you changed.
 			</CreateActor>
 		</div>
 	</div>
-	<ThreadTranscript>
+	<TuiThreadTranscript>
 		<div {ThreadView{thread:$thread}}/>
-	</ThreadTranscript>
+	</TuiThreadTranscript>
 </div>

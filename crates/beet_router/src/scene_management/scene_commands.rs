@@ -49,7 +49,9 @@ fn device_url(parts: &RequestParts) -> Result<String> {
 }
 
 /// `load <path> --url=<device>` — POST a scene file to the device's `/load`.
-/// `<path>` is greedy so a slash-bearing path is captured whole.
+/// `<path>` is greedy so a slash-bearing path is captured whole, and is read
+/// through the nearest ancestor [`BlobStore`] (the workspace store in dev, S3 in a
+/// deployed task), never the filesystem directly, so it works on every platform.
 #[action(route = "load/*scene", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -63,7 +65,14 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 		bevybail!("usage: load <path-to-scene.json> --url=<device>");
 	}
 	let url = device_url(&cx.input)?;
-	let media = fs_ext::read_media(&AbsPathBuf::new(&path)?)?;
+	// read the scene through the nearest ancestor store (absent is an error).
+	let store = cx
+		.caller
+		.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
+			|entity, stores| stores.get(entity).cloned(),
+		)
+		.await??;
+	let media = store.get_media(&SmolPath::from(path.as_str())).await?;
 	Request::post(format!("{url}/load"))
 		.with_content_type(media.media_type().clone())
 		.with_body(media.bytes())

@@ -26,5 +26,5 @@ color=.../>` seeds the brand colour the whole Material palette derives from, and
 	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
-	<BlobStoreRoute src="assets"/>
+	<BlobStoreRoute mount="assets" {DirPath("assets")}/>
 </Router>

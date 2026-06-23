@@ -130,49 +130,20 @@ impl SocketWriter for ChannelSocketWriter {
 	}
 }
 
-/// Shutdown signal for a running [`ChannelSocketServer`], mirroring the other
-/// servers: stored on the host, the receiver handed to the accept loop and signaled
-/// when the host's [`Running<Response>`] is removed.
-#[derive(Component)]
-struct ChannelSocketServerShutdown(Option<OnceValue<()>>);
-
-/// Registers the boot ([`StartRunning<Boot>`]) and teardown
-/// (`On<Remove, Running<Response>>`) observers, mirroring [`SocketServer`].
+/// Registers the shared boot + teardown observers, mirroring [`SocketServer`] (see
+/// [`ServerShutdown`]).
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_action_in)
-		.observe_any(on_running_removed);
+	ServerShutdown::<ChannelSocketServer>::add_observers(&mut world, cx.entity);
 }
 
-/// Boots the accept loop on the boot fan-out, if `--server` selects `"channel"`.
-/// Never resolves the boot call, so the host's [`Running<Response>`] parks it.
-fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
-	let entity = ev.entity;
-	if !ev.with(|boot| request_selects_server(boot, "channel"))? {
-		return Ok(());
-	}
-	let (signal, shutdown) = oneshot::<()>();
-	commands
-		.entity(entity)
-		.insert(ChannelSocketServerShutdown(Some(signal)))
-		.queue_async_local(move |entity| {
-			start_channel_socket_server(entity, shutdown)
-		});
-	Ok(())
-}
+impl BootServer for ChannelSocketServer {
+	const SELECTOR: &'static str = "channel";
 
-/// Tears down the accept loop when the host's [`Running<Response>`] is removed:
-/// signals the shutdown channel. Idempotent: a missing handle is a no-op.
-fn on_running_removed(
-	ev: On<Remove, Running<Response>>,
-	mut shutdowns: Query<&mut ChannelSocketServerShutdown>,
-) {
-	if let Ok(mut shutdown) = shutdowns.get_mut(ev.event().event_target())
-		&& let Some(signal) = shutdown.0.take()
-	{
-		signal.signal(());
+	fn serve(
+		entity: AsyncEntity,
+		shutdown: OnceValueRx<()>,
+	) -> LocalBoxedFuture<'static, Result> {
+		Box::pin(start_channel_socket_server(entity, shutdown))
 	}
 }
 

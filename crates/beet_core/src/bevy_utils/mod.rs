@@ -34,6 +34,9 @@
 //! - [`bevybail!`](crate::bevybail) - Early return with a [`BevyError`](bevy::ecs::error::BevyError)
 
 mod ancestor_query;
+// niche [`App`] free functions, kept off the `BeetCoreAppExt` trait
+#[cfg(all(feature = "bevy_async", feature = "std"))]
+pub mod app_ext;
 #[cfg(feature = "bevy_async")]
 mod async_commands;
 // the app runner needs a sleep/yield + task pool, so it is std-only

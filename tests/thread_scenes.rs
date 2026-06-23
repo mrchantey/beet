@@ -9,7 +9,7 @@ use std::sync::Once;
 
 /// Set a dummy auth env once so `{ModelStreamer{provider:OpenAi}}` builds during
 /// reduction without a real key (no request is ever made), and `BEET_HEADLESS` so
-/// the scenes' `<ThreadChat>`/`<ThreadTranscript>` hosts spawn inert rather than
+/// the scenes' `<TuiThreadChat>`/`<TuiThreadTranscript>` hosts spawn inert rather than
 /// taking over the controlling terminal.
 fn ensure_auth_env() {
 	static INIT: Once = Once::new();

@@ -147,6 +147,16 @@ fn scalar_to_reflect(
 		return Ok(Box::new(SmolPath::new(string.as_str())));
 	}
 
+	// a string targeting an `AbsPathBuf` field is treated as workspace-relative and
+	// joined onto the workspace root, mirroring `AbsPathBuf`'s workspace-relative
+	// serde. This lets eg `<FsStore path="assets"/>` take a string attribute directly,
+	// rather than through a thin string-prop template adapter.
+	if let (Value::Str(string), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<AbsPathBuf>()
+	{
+		return Ok(Box::new(WsPathBuf::new(string.as_str()).into_abs()));
+	}
+
 	// a string targeting an enum field coerces to that unit variant by name, so a
 	// markup attribute `kind="User"` resolves to `ActorKind::User` (the quoted
 	// twin of the `{Foo{kind:User}}` spread's bare-variant form).
@@ -426,6 +436,15 @@ mod test {
 		// a second instantiation makes the bare name ambiguous
 		registry.register::<GenericMarker<bool>>();
 		type_info_by_name(&registry, "GenericMarker").xpect_none();
+	}
+
+	/// A string attribute targeting an `AbsPathBuf` field coerces workspace-relative,
+	/// so `<FsStore path="assets"/>` resolves under the workspace root (the seam that
+	/// replaced the `MountFsStore` string-prop adapter).
+	#[beet_core::test]
+	fn coerces_string_to_abs_path() {
+		resolve::<AbsPathBuf>(DataLiteral::Scalar(Value::str("assets")))
+			.xpect_eq(WsPathBuf::new("assets").into_abs());
 	}
 
 	#[beet_core::test]

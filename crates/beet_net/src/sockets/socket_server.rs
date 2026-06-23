@@ -142,52 +142,20 @@ impl SocketServer {
 	}
 }
 
-/// Shutdown signal for a running [`SocketServer`], mirroring `HttpServerShutdown`:
-/// [`on_action_in`] stores the sender on the host and hands the receiver to the
-/// backend, and [`on_running_removed`] signals it so the backend stops accepting.
-/// Replaced on each boot, so a reboot installs a fresh one.
-#[derive(Component)]
-struct SocketServerShutdown(Option<OnceValue<()>>);
-
-/// Registers the boot ([`StartRunning<Boot>`]) and teardown
-/// (`On<Remove, Running<Response>>`) observers, mirroring [`HttpServer`].
+/// Registers the shared boot + teardown observers, mirroring [`HttpServer`] (see
+/// [`ServerShutdown`]).
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_action_in)
-		.observe_any(on_running_removed);
+	ServerShutdown::<SocketServer>::add_observers(&mut world, cx.entity);
 }
 
-/// Boots the socket backend on the boot fan-out, if `--server` selects `"socket"`.
-/// Queues the installed [`SocketServerFn`], handing it the shutdown receiver, and
-/// never resolves the boot call so the host's [`Running<Response>`] parks the
-/// process.
-fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
-	let entity = ev.entity;
-	if !ev.with(|boot| request_selects_server(boot, "socket"))? {
-		return Ok(());
-	}
-	// store the shutdown sender on the host; hand the receiver to the backend.
-	let (signal, shutdown) = oneshot::<()>();
-	commands
-		.entity(entity)
-		.insert(SocketServerShutdown(Some(signal)))
-		.queue_async_local(move |entity| start_socket_server(entity, shutdown));
-	Ok(())
-}
+impl BootServer for SocketServer {
+	const SELECTOR: &'static str = "socket";
 
-/// Tears down the socket backend when the host's [`Running<Response>`] is removed:
-/// signals the shutdown channel so the backend stops accepting and drops its
-/// listener. Idempotent: a missing shutdown handle is a no-op.
-fn on_running_removed(
-	ev: On<Remove, Running<Response>>,
-	mut shutdowns: Query<&mut SocketServerShutdown>,
-) {
-	if let Ok(mut shutdown) = shutdowns.get_mut(ev.event().event_target())
-		&& let Some(signal) = shutdown.0.take()
-	{
-		signal.signal(());
+	fn serve(
+		entity: AsyncEntity,
+		shutdown: OnceValueRx<()>,
+	) -> LocalBoxedFuture<'static, Result> {
+		Box::pin(start_socket_server(entity, shutdown))
 	}
 }
 
@@ -263,7 +231,7 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, SocketServerPlugin::default()));
 		let entity = boot(&mut app, Request::get("/"));
-		app.update_until(|world| {
+		app_ext::update_until(&mut app, |world| {
 			world.entity(entity).contains::<SocketStartFlag>()
 		})
 		.await
@@ -284,11 +252,11 @@ mod tests {
 		app.add_plugins((MinimalPlugins, SocketServerPlugin::default()));
 		let entity = boot(&mut app, Request::get("/"));
 		// drive until booted: the shutdown handle holds a live signal.
-		app.update_until(|world| {
+		app_ext::update_until(&mut app, |world| {
 			world
 				.entity(entity)
-				.get::<SocketServerShutdown>()
-				.map(|shutdown| shutdown.0.is_some())
+				.get::<ServerShutdown<SocketServer>>()
+				.map(|shutdown| shutdown.is_live())
 				.unwrap_or(false)
 		})
 		.await
@@ -300,11 +268,10 @@ mod tests {
 		app.update();
 		app.world()
 			.entity(entity)
-			.get::<SocketServerShutdown>()
+			.get::<ServerShutdown<SocketServer>>()
 			.unwrap()
-			.0
-			.is_none()
-			.xpect_true();
+			.is_live()
+			.xpect_false();
 	}
 
 	/// A boot whose `--server` does not select `"socket"` leaves the server

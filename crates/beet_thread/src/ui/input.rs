@@ -87,7 +87,7 @@ pub fn clear_composer_on_submit(
 
 /// When a [`ThreadComposer`]'s text input is added under a charcell host, scope
 /// the composer to that host surface and focus the input, so typing and Enter
-/// reach it. A directly-spawned charcell host (the local `ThreadChat`) skips the
+/// reach it. A directly-spawned charcell host (the local `TuiThreadChat`) skips the
 /// router's page-host wiring (`RenderSurface` + focus) that would otherwise do
 /// this; the web path keeps its own wiring (no [`DoubleBuffer`] host, so this is
 /// a no-op).

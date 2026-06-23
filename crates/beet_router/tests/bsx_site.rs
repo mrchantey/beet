@@ -15,7 +15,7 @@ the package resource patched from markup -->
 <Router {(RequestLogger, BsxLayout{template:"Layout"})}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
 	<RoutesDir src="routes"/>
-	<BlobStoreRoute src="assets"/>
+	<BlobStoreRoute mount="assets" {DirPath("assets")}/>
 </Router>
 "#;
 
@@ -87,7 +87,10 @@ async fn spawn_site(world: &mut World) -> Entity {
 	// that store so `RoutesDir` and `<Template src>` resolve it by ancestry.
 	let store = BlobStore::new(FsStore::new(site_dir));
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let sources = read_site_templates(&store, &formats).await.unwrap();
+	let sources =
+		read_site_templates(&store, &formats, &SmolPath::from(DEFAULT_TEMPLATES_DIR))
+			.await
+			.unwrap();
 	register_site_templates(world, &formats, sources).unwrap();
 	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
 	let template =
@@ -144,8 +147,9 @@ async fn entry_components_land_on_root() {
 	tree.find(&["docs", "intro"]).is_some().xpect_true();
 }
 
-/// The markup `<BlobStoreRoute src="assets"/>` resolves its `SmolPath` prop and
-/// mounts the on-disk `assets/` directory, streaming files beneath it.
+/// The markup `<BlobStoreRoute mount="assets" {DirPath("assets")}/>` mounts the
+/// on-disk `assets/` directory (the `DirPath` scopes the site store to that subdir,
+/// resolved at insert time) and streams files beneath it.
 #[beet_core::test]
 async fn blob_store_route_serves_assets() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();

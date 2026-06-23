@@ -13,16 +13,26 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Read every template source under the site store's `templates/` directory as
+/// The conventional site templates subdirectory, the default `templates_dir`
+/// passed to [`read_site_templates`]. A bootstrap that wants a different layout
+/// passes its own path (this load happens before the entry markup parses, so the
+/// directory cannot itself come from the entry).
+pub const DEFAULT_TEMPLATES_DIR: &str = "templates";
+
+/// Read every template source under the site store's `templates_dir` as
 /// `(path, source)` pairs (paths relative to that directory), keeping only files
 /// whose [`MediaType`] `formats` recognizes (`.bsx`, `.js`). Async (store I/O), so
-/// a load path awaits it off the runtime rather than blocking. A site with no
-/// `templates/` directory (eg a single-file entry) yields no pairs.
+/// a load path awaits it off the runtime rather than blocking. A site with no such
+/// directory (eg a single-file entry) yields no pairs.
+///
+/// The directory is a parameter rather than a hardcoded `templates/` so a site can
+/// relocate it ([`DEFAULT_TEMPLATES_DIR`] is the convention).
 pub async fn read_site_templates(
 	store: &BlobStore,
 	formats: &TemplateFormats,
+	templates_dir: &SmolPath,
 ) -> Result<Vec<(SmolPath, String)>> {
-	let store = store.with_subdir(SmolPath::from("templates"));
+	let store = store.with_subdir(templates_dir.clone());
 	// no `templates/` dir: nothing to register.
 	if !store.store_exists().await? {
 		return Ok(Vec::new());

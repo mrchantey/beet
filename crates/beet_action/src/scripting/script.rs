@@ -279,22 +279,23 @@ where
 	/// [`Stdout`]: ConsoleStream::Stdout
 	/// [`Stderr`]: ConsoleStream::Stderr
 	///
-	/// `std`-only: collects lines through the arena-backed [`Store`], which the
-	/// no_std build lacks. The console-capturing `<script>` route that calls this
-	/// (`beet_router`'s `exchange_script`) is itself std-gated; the embedded device
-	/// runs scripts as typed [`run`](Self::run) transforms, never for stdout.
-	#[cfg(feature = "std")]
+	/// Accumulates through a shared `Rc<RefCell<Vec<String>>>` (no_std-safe: the
+	/// single-threaded engine's sink needs no `Send`), so this builds wherever
+	/// [`run_console`](Self::run_console) does, not only on `std`.
 	pub fn run_captured(&self, input: Input) -> Result<String> {
-		let lines = Store::<Vec<String>>::default();
+		use alloc::rc::Rc;
+		use core::cell::RefCell;
+		let lines = Rc::new(RefCell::new(Vec::<String>::new()));
 		let captured = lines.clone();
 		self.run_console(input, move |stream, line| match stream {
-			ConsoleStream::Stdout => captured.push(line.to_string()),
+			ConsoleStream::Stdout => captured.borrow_mut().push(line.to_string()),
 			ConsoleStream::Stderr => cross_log_error!("{line}"),
 		})?;
+		// the sink (and its `captured` clone) is dropped by now, so the borrow is sole.
 		lines
-			.get()
-			.into_iter()
-			.map(|line| line + "\n")
+			.borrow()
+			.iter()
+			.map(|line| line.clone() + "\n")
 			.collect::<String>()
 			.xok()
 	}

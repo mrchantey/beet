@@ -130,7 +130,12 @@ async fn build_site(
 	// and `<Template src>` all resolve through it (composed on the root below).
 	let store = BlobStore::new(store);
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let sources = read_site_templates(&store, &formats).await?;
+	let sources = read_site_templates(
+		&store,
+		&formats,
+		&SmolPath::from(DEFAULT_TEMPLATES_DIR),
+	)
+	.await?;
 	register_site_templates(world, &formats, sources)?;
 	let entry = store.get_media(&SmolPath::from(ENTRY_NAME)).await?;
 

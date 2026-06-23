@@ -34,9 +34,11 @@ pub use blob_event::*;
 pub use blob_store_provider::*;
 mod blob_store;
 mod in_memory_store;
+mod store_path;
 pub use blob::*;
 pub use blob_store::*;
 pub use in_memory_store::*;
+pub use store_path::*;
 
 #[cfg(all(feature = "json", feature = "std"))]
 mod analytics;
@@ -101,7 +103,15 @@ impl Plugin for StorePlugin {
 		app.register_type::<FsStore>()
 			.register_type::<TypedBlob<FsStore>>()
 			.register_type::<InMemoryStore>()
-			.register_type::<TypedBlob<InMemoryStore>>();
+			.register_type::<TypedBlob<InMemoryStore>>()
+			// store-path components: resolve a scoped store / blob from the nearest
+			// ancestor store, kept correct as stores churn above them.
+			.register_type::<DirPath>()
+			.register_type::<BlobPath>()
+			.add_observer(on_insert_dir_path)
+			.add_observer(on_insert_blob_path)
+			.add_observer(on_insert_store)
+			.add_observer(on_remove_store);
 
 		// reactive substrate: global event bus, drain, and the two propagation
 		// observers marking matching BlobStore / Blob components Changed.

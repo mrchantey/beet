@@ -32,6 +32,11 @@
 mod http_server;
 pub use http_server::*;
 
+// The shared park-and-shutdown machinery every bootable server uses, keyed by the
+// server marker. no_std-capable like `HttpServer`, which depends on it.
+mod server_shutdown;
+pub use server_shutdown::*;
+
 // In-memory channel-backed HTTP server: shares `HttpServer`'s boot/park/dispatch
 // machinery over an `async_channel` instead of a socket. `std` for `async-channel`,
 // but deliberately not wasm-gated (the wasm-runnable server path).
@@ -48,16 +53,18 @@ mod boot_exchange;
 pub use boot_exchange::*;
 
 // The boot path: the `BootOnLoad` / `ExchangeOnLoad` verbs call a host's action
-// slot with the process request and write `AppExit`. std-only (it reads CLI args,
-// streams to stdout, and writes the exit).
-#[cfg(feature = "std")]
+// slot with the process request and write `AppExit`. Gated on `action` (the
+// `Action<Boot, Response>` slot), not `std`: `CliArgs::parse_env` no-ops on no_std,
+// the stdout tail goes through the cross-platform `cross_log_noline!`, and the boot
+// verbs / `AppExit` writer are all no_std-clean, so an embedded boot works too.
+#[cfg(feature = "action")]
 mod boot;
-#[cfg(feature = "std")]
+#[cfg(feature = "action")]
 pub use boot::*;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "action")]
 mod cli_server;
-#[cfg(feature = "std")]
+#[cfg(feature = "action")]
 pub use cli_server::*;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod repl_server;

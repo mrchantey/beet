@@ -13,8 +13,8 @@ use beet_net::prelude::*;
 /// the [`ThreadStore`], adopts the stored conversation by seed hash, and only then
 /// inserts the store onto the thread, so the persistence sync never flushes a
 /// fresh, un-adopted thread (which would fork a duplicate on every reload). This
-/// is the thread-record store (the conversation); [`MountFsStore`] is the separate
-/// blob store an agent's tools read and write.
+/// is the thread-record store (the conversation); a plain `FsStore` mounted on the
+/// thread is the separate blob store an agent's tools read and write.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct MountThreadStore {

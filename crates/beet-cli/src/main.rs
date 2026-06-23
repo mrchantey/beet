@@ -91,7 +91,12 @@ async fn build_entry(
 	watch_dir: Option<AbsPathBuf>,
 	formats: TemplateFormats,
 ) -> Result {
-	let sources = read_site_templates(&store, &formats).await?;
+	let sources = read_site_templates(
+		&store,
+		&formats,
+		&SmolPath::from(DEFAULT_TEMPLATES_DIR),
+	)
+	.await?;
 	let media =
 		store.get_media(&SmolPath::from(entry_name.as_str())).await?;
 	world
@@ -170,8 +175,10 @@ fn remote_access() -> bool {
 }
 
 /// A [`BlobStore`] backed by the deploy's S3 site bucket (`BEET_SITE_BUCKET`); the
-/// entry document is `server.bsx` at the bucket root (the lean serve entry the
-/// container loads directly, skipping the dev `main.bsx` include indirection).
+/// entry document is `BEET_SITE_ENTRY` (default `server.bsx`) at the bucket root
+/// (the lean serve entry the container loads directly, skipping the dev `main.bsx`
+/// include indirection). It is deploy config, not discovery, since a remote task
+/// has no local `main.bsx` to walk to.
 ///
 /// An explicit `BEET_S3_ENDPOINT` (eg `https://<account>.r2.cloudflarestorage.com`)
 /// switches the store onto an S3-compatible service such as Cloudflare R2: the
@@ -195,7 +202,9 @@ fn remote_site_store() -> Result<(BlobStore, String)> {
 			S3Store::new(bucket, region)
 		}
 	};
-	Ok((BlobStore::new(store), "server.bsx".to_string()))
+	let entry_name = env_ext::var("BEET_SITE_ENTRY")
+		.unwrap_or_else(|_| "server.bsx".to_string());
+	Ok((BlobStore::new(store), entry_name))
 }
 
 /// Walk the cwd and its ancestors for the first [`ENTRY_NAMES`] match, erroring

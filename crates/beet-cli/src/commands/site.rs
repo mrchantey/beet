@@ -42,7 +42,7 @@ pub(crate) fn load_site(
 	// carrying `DisableBootOnLoad` so the entry's `BootOnLoad` verb stays dormant.
 	// The site store on the root backs `RoutesDir`/`<Template src>` by ancestry.
 	let root = world
-		.spawn((DisableBootOnLoad, BlobStore::new(FsStore::new(site_dir))))
+		.spawn((DisableBootOnLoad, FsStore::new(site_dir)))
 		.id();
 	world.entity_mut(root).insert_template(template)?;
 	Ok(root)

@@ -37,6 +37,12 @@ impl Blob {
 		Self { path, store }
 	}
 
+	/// Whether `other` targets the same object: same backing store, subdir, and
+	/// path. The [`BlobPath`] change-detection uses it to skip a no-op re-resolve.
+	pub fn same_target(&self, other: &Blob) -> bool {
+		self.path == other.path && self.store.same_scope(&other.store)
+	}
+
 	/// True if `event` is this exact object: same backing and the
 	/// root-relative locations are equal (object-exact, not scope-covering).
 	pub fn matches_event(&self, event: &BlobEvent) -> bool {

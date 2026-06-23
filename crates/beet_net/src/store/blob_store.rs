@@ -61,6 +61,13 @@ impl BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
 	}
 
+	/// Whether `other` resolves the same scope: same backing store and subdir. The
+	/// [`DirPath`] change-detection uses it to skip a no-op re-scope, so a cascade of
+	/// ancestor [`BlobStore`] inserts settles instead of re-firing forever.
+	pub fn same_scope(&self, other: &BlobStore) -> bool {
+		self.root_key() == other.root_key() && self.subdir() == other.subdir()
+	}
+
 	/// Get an object and infer the [`MediaType`] from its path extension.
 	pub async fn get_media(&self, path: &SmolPath) -> Result<MediaBytes> {
 		let media_type = path.media_type().unwrap_or(MediaType::Bytes);

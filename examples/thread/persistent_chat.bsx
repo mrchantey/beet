@@ -20,8 +20,8 @@ are pinned so the seed hash, and thus the adopted thread, stay stable across run
 			<CreateActor id=3 name="User" kind="User" {UserInput}/>
 		</div>
 	</div>
-	<ThreadChat>
+	<TuiThreadChat>
 		<div {ThreadView{thread:$thread}}/>
 		<div {ThreadComposer{thread:$thread}}/>
-	</ThreadChat>
+	</TuiThreadChat>
 </div>

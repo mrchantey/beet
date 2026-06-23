@@ -276,7 +276,7 @@ mod test {
 			.id();
 		// drive until the boot fan-out lands the parking `Running` (a bounded
 		// condition, unlike settling a parked server to the frame cap).
-		app.update_until(|world| {
+		app_ext::update_until(&mut app, |world| {
 			world.entity(entity).contains::<Running<Response>>()
 		})
 		.await

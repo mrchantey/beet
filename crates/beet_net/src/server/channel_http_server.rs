@@ -95,49 +95,20 @@ impl ChannelHttpClient {
 	}
 }
 
-/// Shutdown signal for a running [`ChannelHttpServer`], mirroring the socket/http
-/// servers: stored on the host, the receiver handed to the serve loop and signaled
-/// when the host's [`Running<Response>`] is removed.
-#[derive(Component)]
-struct ChannelHttpServerShutdown(Option<OnceValue<()>>);
-
-/// Registers the boot ([`StartRunning<Boot>`]) and teardown
-/// (`On<Remove, Running<Response>>`) observers, mirroring [`HttpServer`].
+/// Registers the shared boot + teardown observers, mirroring [`HttpServer`] (see
+/// [`ServerShutdown`]).
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_action_in)
-		.observe_any(on_running_removed);
+	ServerShutdown::<ChannelHttpServer>::add_observers(&mut world, cx.entity);
 }
 
-/// Boots the serve loop on the boot fan-out, if `--server` selects `"channel"`.
-/// Never resolves the boot call, so the host's [`Running<Response>`] parks it.
-fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
-	let entity = ev.entity;
-	if !ev.with(|boot| request_selects_server(boot, "channel"))? {
-		return Ok(());
-	}
-	let (signal, shutdown) = oneshot::<()>();
-	commands
-		.entity(entity)
-		.insert(ChannelHttpServerShutdown(Some(signal)))
-		.queue_async_local(move |entity| {
-			start_channel_http_server(entity, shutdown)
-		});
-	Ok(())
-}
+impl BootServer for ChannelHttpServer {
+	const SELECTOR: &'static str = "channel";
 
-/// Tears down the serve loop when the host's [`Running<Response>`] is removed:
-/// signals the shutdown channel. Idempotent: a missing handle is a no-op.
-fn on_running_removed(
-	ev: On<Remove, Running<Response>>,
-	mut shutdowns: Query<&mut ChannelHttpServerShutdown>,
-) {
-	if let Ok(mut shutdown) = shutdowns.get_mut(ev.event().event_target())
-		&& let Some(signal) = shutdown.0.take()
-	{
-		signal.signal(());
+	fn serve(
+		entity: AsyncEntity,
+		shutdown: OnceValueRx<()>,
+	) -> LocalBoxedFuture<'static, Result> {
+		Box::pin(start_channel_http_server(entity, shutdown))
 	}
 }
 

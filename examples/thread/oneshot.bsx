@@ -14,7 +14,7 @@ in the terminal scrollback after exit.
 		</CreateActor>
 		<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
 	</div>
-	<ThreadTranscript>
+	<TuiThreadTranscript>
 		<div {ThreadView{thread:$thread}}/>
-	</ThreadTranscript>
+	</TuiThreadTranscript>
 </div>

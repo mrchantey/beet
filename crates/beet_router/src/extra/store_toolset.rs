@@ -1,8 +1,8 @@
-//! The standard blob-store agent toolset and a markup store mount.
+//! The standard blob-store agent toolset.
 //!
-//! These compose [`exchange_route`] with `beet_net`'s blob-store actions, so they
-//! live with the other `extra` router pieces (eg [`BlobStoreRoute`]) rather than
-//! in a downstream crate. An agent crate re-exports them for its scenes.
+//! This composes [`exchange_route`] with `beet_net`'s blob-store actions, so it
+//! lives with the other `extra` router pieces (eg [`BlobStoreRoute`]) rather than
+//! in a downstream crate. An agent crate re-exports it for its scenes.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -25,17 +25,6 @@ pub fn StoreToolset() -> impl Bundle {
 		exchange_route("edit-text", EditText),
 		exchange_route("remove-blob", RemoveBlob),
 	]
-}
-
-/// Mount a filesystem-backed [`BlobStore`] from markup, so a [`StoreToolset`]
-/// nested under the same root resolves it without Rust glue:
-/// `<div {Thread} {Sequence} {MountFsStore{path:"target/examples/agent"}}>`.
-///
-/// The `path` is workspace-relative; [`FsStore`]'s own `path` is an `AbsPathBuf`
-/// (not attribute-coercible), so this thin template adapts a coercible string.
-#[template]
-pub fn MountFsStore(#[prop(into)] path: String) -> impl Bundle {
-	FsStore::new(WsPathBuf::new(path))
 }
 
 // `<StoreToolset/>` equipping the five routed blob tools (and the `ToolDefinition`

@@ -165,15 +165,14 @@ impl BlobScene {
 #[action(route)]
 #[derive(Default, Component)]
 async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
+	// the nearest ancestor store backs this page's bytes; absent is an error, never
+	// an implicit filesystem store (there is none on wasm).
 	let store = cx
 		.caller
-		.with_state::<AncestorQuery<&BlobStore>, BlobStore>(|entity, query| {
-			query
-				.get(entity)
-				.cloned()
-				.unwrap_or_else(|_| BlobStore::new(FsStore::default()))
-		})
-		.await?;
+		.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
+			|entity, query| query.get(entity).cloned(),
+		)
+		.await??;
 
 	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
 	let bytes = store.get_media(&path).await?;

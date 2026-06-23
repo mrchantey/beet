@@ -33,7 +33,6 @@ use beet_core::prelude::*;
 const DEFAULT_HTTP_VERSION: &str = "1.1";
 
 /// The default CLI version string.
-#[cfg(feature = "std")]
 const DEFAULT_CLI_VERSION: &str = "0.1.0";
 
 /// Request-specific parts including HTTP method, URL, headers, and version.
@@ -414,7 +413,6 @@ impl From<&http::response::Parts> for ResponseParts {
 // Conversion: CliArgs -> RequestParts
 // ============================================================================
 
-#[cfg(feature = "std")]
 impl From<CliArgs> for RequestParts {
 	fn from(cli: CliArgs) -> Self {
 		// `cli.path` segments are carried verbatim, so an absolute-path positional

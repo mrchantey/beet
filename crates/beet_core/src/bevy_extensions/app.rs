@@ -111,33 +111,6 @@ pub impl App {
 		AsyncRunner::settle_async_tasks(self.world_mut()).await;
 	}
 
-	/// Drives the app frame-by-frame until `cond` holds (checked before each
-	/// update), ticking the async runtime between frames, up to a safety cap.
-	/// Returns whether the condition was met.
-	///
-	/// Unlike [`update_async`](Self::update_async), which settles to idle, this
-	/// stops at a concrete world condition, so it drives a *parked* task that
-	/// never goes idle (eg an http/socket server holding its accept loop open)
-	/// to an observable state. The cap fails fast on a never-met condition
-	/// rather than hanging, notably on the wasm event loop where settling to
-	/// idle would burn the frame budget. See [`AsyncRunner::tick`].
-	#[cfg(all(feature = "bevy_async", feature = "std"))]
-	async fn update_until(
-		&mut self,
-		mut cond: impl FnMut(&mut World) -> bool,
-	) -> bool {
-		// guard against a condition that never holds (eg a misbehaving server)
-		const MAX_FRAMES: usize = 10_000;
-		for _ in 0..MAX_FRAMES {
-			if cond(self.world_mut()) {
-				return true;
-			}
-			self.update();
-			AsyncRunner::tick().await;
-		}
-		cond(self.world_mut())
-	}
-
 	/// Runs an IO task to completion, polling at 10 millisecond intervals.
 	#[cfg(feature = "std")]
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O

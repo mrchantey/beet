@@ -34,7 +34,7 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 			</CreateActor>
 		</div>
 	</div>
-	<ThreadTranscript>
+	<TuiThreadTranscript>
 		<div {ThreadView{thread:$thread}}/>
-	</ThreadTranscript>
+	</TuiThreadTranscript>
 </div>
