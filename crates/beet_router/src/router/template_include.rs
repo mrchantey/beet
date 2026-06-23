@@ -6,13 +6,23 @@
 //! [`EntryTemplate`], then built where the `<Template>` tag sits. Installed
 //! through the [`BsxTagResolvers`] seam, so it overrides the core stub when a
 //! router app is present.
+//!
+//! The read is an async *pending* dependency, not a blocking call: the handler
+//! parks a [`PendingId`] on the build root and spawns a task that resolves the
+//! nearest ancestor [`BlobStore`] (the site store on the loaded root), reads `src`
+//! through it, and builds the included entry at the include site, then resolves the
+//! dependency so `LoadTemplate` proceeds. So an include never blocks the runtime
+//! (single-threaded on wasm) and an S3-backed site composes the same way as a local
+//! one. This reuses the same wiring [`register_pending_fetch`] gives the remote
+//! front-ends in `beet_core`'s `remote.rs`.
 
-use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// Register the `<Template src="..">` include handler into the [`BsxTagResolvers`]
-/// seam: a local `src` (resolved against the [`SiteRoot`], the entry's project
-/// root) is read and its parsed entry built at the include site.
+/// seam: a local `src` is read through the nearest ancestor [`BlobStore`] (the site
+/// store composed on the loaded root) as an async pending dependency, and its
+/// parsed entry built at the include site.
 pub fn register_template_include(world: &mut World) {
 	world.get_resource_or_init::<BsxTagResolvers>().insert(
 		"Template",
@@ -22,33 +32,84 @@ pub fn register_template_include(world: &mut World) {
 				return Ok(());
 			};
 			// remote (`http(s)://`, `s3://`) includes resolve through the async
-			// pending path so `LoadTemplate` waits for them; not yet wired to a real
-			// `BlobStore` fetch (TODO).
+			// pending path too, but the transport is not yet wired (TODO).
 			if is_remote(&src) {
 				bevybail!(
 					"remote `<Template src=\"{src}\">` includes are not yet \
 					supported; use a local path"
 				);
 			}
-			// resolve `src` against the SiteRoot store (the including entry's dir),
-			// reading it through the store so an S3-backed site composes the same
-			// way; fall back to the cwd for a SiteRoot-less include.
-			let store = entity.world_scope(|world| {
-				world.get_resource::<SiteRoot>().map(|root| root.0.clone())
-			});
-			let media = match store {
-				Some(store) => async_ext::block_on(
-					store.get_media(&SmolPath::from(src.as_str())),
-				)?,
-				None => fs_ext::read_media(AbsPathBuf::new(src.as_str())?)?,
-			};
-			let entry = entity.world_scope(|world| {
-				EntryTemplate::from_bytes(world, &media)
-			})?;
-			entity.build_template(&entry)?;
-			Ok(())
+			let target = entity.id();
+			// park a pending dependency on the build root and spawn the async read +
+			// build, so `LoadTemplate` waits for the include and the runtime is never
+			// blocked. The ancestor store is resolved inside the task, where the whole
+			// tree is built, so it is reachable by ancestry.
+			entity.world_scope(|world| -> Result {
+				let (async_world, spawner, root, pending_id) =
+					register_pending_fetch(world, target)?;
+				spawner.spawn(resolve_include(
+					async_world,
+					src,
+					target,
+					root,
+					pending_id,
+				));
+				Ok(())
+			})
 		},
 	);
+}
+
+/// Read + build a local `<Template src>` include, then resolve its pending
+/// dependency so `LoadTemplate` proceeds. Logs (rather than panics) on failure,
+/// leaving the include site empty, mirroring the remote-template resolver.
+async fn resolve_include(
+	async_world: AsyncWorld,
+	src: SmolStr,
+	target: Entity,
+	root: Entity,
+	pending_id: PendingId,
+) {
+	if let Err(err) = read_and_build(&async_world, &src, target).await {
+		error!("`<Template src=\"{src}\">` include failed: {err}");
+	}
+	// resolve the dependency and drain the set, firing `LoadTemplate` once settled.
+	async_world
+		.with(move |world: &mut World| {
+			let mut root_entity = world.entity_mut(root);
+			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>() {
+				pending.resolve(pending_id);
+			}
+			drain_pending_dependencies(&mut root_entity);
+		})
+		.await;
+}
+
+/// Resolve the include base (the nearest ancestor [`BlobStore`], the site store on
+/// the loaded root), read `src` through it, then parse and build the entry at the
+/// include site. A store-less tree falls back to a cwd-relative filesystem read.
+async fn read_and_build(
+	async_world: &AsyncWorld,
+	src: &str,
+	target: Entity,
+) -> Result {
+	let store = async_world
+		.entity(target)
+		.with_state::<AncestorQuery<&BlobStore>, Option<BlobStore>>(
+			|entity, stores| stores.get(entity).cloned().ok(),
+		)
+		.await?;
+	let media = match store {
+		Some(store) => store.get_media(&SmolPath::from(src)).await?,
+		None => fs_ext::read_media(AbsPathBuf::new(src)?)?,
+	};
+	async_world
+		.with(move |world: &mut World| -> Result {
+			let entry = EntryTemplate::from_bytes(world, &media)?;
+			world.entity_mut(target).build_template(&entry)?;
+			Ok(())
+		})
+		.await
 }
 
 /// Whether `src` names a remote endpoint rather than a local path.
@@ -71,7 +132,7 @@ fn template_src(el: &BsxElement) -> Option<SmolStr> {
 	})
 }
 
-#[cfg(all(test, feature = "json"))]
+#[cfg(test)]
 mod test {
 	use super::*;
 
@@ -84,41 +145,34 @@ mod test {
 		AbsPathBuf::new(path).unwrap()
 	}
 
-	/// An entry that includes a local `.bsx` and a local `.json` builds both at
-	/// the include sites: each `<Template src>` becomes the included entry's root.
+	/// An entry that includes two local `.bsx` files builds both at the include
+	/// sites: each `<Template src>` becomes the included entry's root. The includes
+	/// resolve asynchronously (the pending path), so the build settles the async
+	/// runtime before the children are asserted. A store-less root makes each
+	/// absolute `src` resolve through the filesystem fallback.
 	#[beet_core::test]
-	fn includes_local_bsx_and_json() {
-		let mut world = TemplatePlugin::world();
+	async fn includes_local_files() {
+		// the include path is an async pending dependency, so the world needs the
+		// async runtime alongside the template machinery.
+		let mut world = (AsyncPlugin, TemplatePlugin).into_world();
 		register_template_include(&mut world);
-		world
-			.resource::<AppTypeRegistry>()
-			.write()
-			.register::<Name>();
 
-		// a bsx fragment and a json scene (a single `Name` node), included by path.
-		let bsx = temp_entry("included.bsx", "<section class=\"card\"/>");
-		let json_root = {
-			let mut src = TemplatePlugin::world();
-			src.resource::<AppTypeRegistry>().write().register::<Name>();
-			let entity = src.spawn(Name::new("from-json")).id();
-			TemplateSaver::new()
-				.with_entity_tree(&src, entity)
-				.save(&src, MediaType::Json)
-				.unwrap()
-		};
-		let json = temp_entry("included.json", json_root.as_utf8().unwrap());
+		let first = temp_entry("first.bsx", "<section class=\"card\"/>");
+		let second = temp_entry("second.bsx", "<article/>");
 
 		let root = BsxTemplate::parse_entry(
 			&world,
 			&format!(
-				"<main><Template src=\"{bsx}\"/><Template src=\"{json}\"/></main>"
+				"<main><Template src=\"{first}\"/><Template src=\"{second}\"/></main>"
 			),
 		)
 		.unwrap()
 		.spawn(&mut world)
 		.unwrap();
+		// the includes resolve as async pending dependencies; settle before asserting.
+		AsyncRunner::settle_async_tasks(&mut world).await;
 
-		// the two includes built at their sites: a `section` element and a `Name`.
+		// the two includes built at their sites, in order: a `section` and an `article`.
 		let children: Vec<Entity> = world
 			.entity(root)
 			.get::<Children>()
@@ -133,9 +187,9 @@ mod test {
 			.xpect_eq("section");
 		world
 			.entity(children[1])
-			.get::<Name>()
+			.get::<Element>()
 			.unwrap()
-			.as_str()
-			.xpect_eq("from-json");
+			.tag()
+			.xpect_eq("article");
 	}
 }

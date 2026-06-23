@@ -47,7 +47,13 @@ pub fn register_remote_schema(
 
 /// Park a [`PendingId`] on the build root's pending set and read the async
 /// runtime handles, erroring gracefully if the async runtime is absent.
-fn register_pending_fetch(
+///
+/// Returns the [`AsyncWorld`] + [`AsyncSpawner`] to drive the fetch, the build
+/// `root` carrying the pending set, and the [`PendingId`] to resolve once the
+/// dependency lands. Public so a higher layer can build its own store-backed
+/// front-end on the same wiring (eg `beet_router`'s `<Template src>` include reads
+/// the bytes through a `BlobStore` it alone can reference).
+pub fn register_pending_fetch(
 	world: &mut World,
 	entity: Entity,
 ) -> Result<(AsyncWorld, AsyncSpawner, Entity, PendingId)> {

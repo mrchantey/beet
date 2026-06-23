@@ -22,10 +22,12 @@ pub mod render_action;
 pub use default_renderer::*;
 mod route_query;
 pub use route_query::*;
-// the site root (a path) backs both `RoutesDir` and `<Template src>` includes, so
-// it is always compiled, unlike the native-only directory-scan modules below.
-mod site_root;
-pub use site_root::*;
+// reading a site's `templates/` through its [`BlobStore`]; the store itself is
+// composed on the loaded root entity and resolved by `AncestorQuery<&BlobStore>`.
+#[cfg(feature = "bsx")]
+mod site_templates;
+#[cfg(feature = "bsx")]
+pub use site_templates::*;
 // `RoutesDir` + its discovery is compiled on every std target: one observer
 // scans the store off the async runtime, so native and wasm share the path.
 mod routes_dir;

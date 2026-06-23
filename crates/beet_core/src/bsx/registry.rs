@@ -76,6 +76,25 @@ impl BsxTemplateRegistry {
 		Ok(())
 	}
 
+	/// Parse `source` and register it under the module path derived from `path`,
+	/// a `.bsx` file path relative to a `templates/` root: `path/to/X.bsx`
+	/// registers under `path::to::X`, so `<path::to::X>` resolves to it.
+	///
+	/// The store-backed counterpart to [`register_dir`](Self::register_dir): a
+	/// caller reading `templates/` through a `BlobStore` (the filesystem in dev, S3
+	/// when deployed) hands each `(path, source)` pair here. Pure (no I/O), so it
+	/// lives here rather than on the higher store layer.
+	pub fn insert_source_from_path(
+		&mut self,
+		path: &SmolPath,
+		source: &str,
+	) -> Result {
+		let module = module_path_from_rel(path).ok_or_else(|| {
+			bevyhow!("could not derive a module path from `{path}`")
+		})?;
+		self.insert_source(module, source)
+	}
+
 	/// Index a directory of `.bsx` files, registering each by its module path.
 	///
 	/// A file `<dir>/path/to/X.bsx` registers under the module path
@@ -197,9 +216,29 @@ fn module_path_of(dir: &Path, path: &Path) -> Result<String> {
 	Ok(module)
 }
 
+/// The `::`-joined module path of a `.bsx` template at `path`, relative to a
+/// `templates/` root: `path/to/X.bsx` -> `path::to::X`. The store-backed
+/// counterpart to [`module_path_of`], which strips a filesystem `dir` prefix.
+fn module_path_from_rel(path: &SmolPath) -> Option<String> {
+	let mut segments = path.segments();
+	let stem = path.file_stem()?;
+	*segments.last_mut()? = stem;
+	(!segments.is_empty()).then(|| segments.join("::"))
+}
+
 #[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test {
 	use super::*;
+
+	#[beet_core::test]
+	fn module_path_from_rel_derives_module() {
+		module_path_from_rel(&SmolPath::from("path/to/X.bsx"))
+			.unwrap()
+			.xpect_eq("path::to::X".to_string());
+		module_path_from_rel(&SmolPath::from("Todo.bsx"))
+			.unwrap()
+			.xpect_eq("Todo".to_string());
+	}
 
 	#[beet_core::test]
 	fn module_path_from_file() {

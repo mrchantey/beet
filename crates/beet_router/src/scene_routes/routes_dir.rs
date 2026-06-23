@@ -2,8 +2,9 @@
 //! spawn time, no codegen.
 //!
 //! Inserting a [`RoutesDir`] (eg from a `main.bsx` entry via
-//! `<RoutesDir src="routes"/>`) triggers [`spawn_routes_dir`]: the [`SiteRoot`]
-//! store is scoped to `src` and listed, and each content file
+//! `<RoutesDir src="routes"/>`) triggers [`spawn_routes_dir`]: the nearest ancestor
+//! [`BlobStore`] (the site store composed on the loaded root) is scoped to `src` and
+//! listed, and each content file
 //! (`.md`/`.mdx`/`.bsx`/`.html`) spawns a [`BlobScene`] route child served through
 //! the shared media-parse pipeline. The scoped [`BlobStore`] is composed onto the
 //! [`RoutesDir`] entity so the routes read their bytes from it, and markdown
@@ -25,12 +26,12 @@ use beet_net::prelude::*;
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct RoutesDir {
-	/// The content directory, relative to [`SiteRoot`].
+	/// The content directory, relative to the nearest ancestor [`BlobStore`].
 	pub src: String,
 }
 
 impl RoutesDir {
-	/// Discover routes under `src`, relative to [`SiteRoot`].
+	/// Discover routes under `src`, relative to the nearest ancestor [`BlobStore`].
 	pub fn new(src: impl Into<String>) -> Self { Self { src: src.into() } }
 }
 
@@ -41,28 +42,38 @@ const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 ///
 /// The scan is store I/O (the filesystem in dev, S3 in a deployed task, R2 in a
 /// Worker), so it runs as an [`AsyncEntity`] task rather than blocking the runtime
-/// (which is single-threaded on wasm). The route children therefore appear a few
-/// async ticks after the insert, so a boot path settles the async runtime before
-/// serving: the Worker entry awaits
+/// (which is single-threaded on wasm). The nearest ancestor [`BlobStore`] (the site
+/// store composed on the loaded root) is resolved *inside* that task, where the
+/// whole tree is already built, so the ancestor link is reliably present; a
+/// store-less app falls back to an [`FsStore`] at the workspace root. The route
+/// children therefore appear a few async ticks after the insert, so a boot path
+/// settles the async runtime before serving: the Worker entry awaits
 /// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner), the
 /// native binary's run loop drives it, and tests await the same settle.
 pub fn spawn_routes_dir(
 	ev: On<Insert, RoutesDir>,
 	dirs: Query<&RoutesDir>,
-	site_root: Option<Res<SiteRoot>>,
 	mut commands: Commands,
 ) -> Result {
 	let entity = ev.entity;
-	// the site store scoped to `src`; the BlobScene routes read their bytes from it.
-	let store = site_root
-		.map(|root| root.0.clone())
-		.unwrap_or_else(|| SiteRoot::default().0)
-		.with_subdir(SmolPath::from(dirs.get(entity)?.src.as_str()));
-	// off the async runtime: await the content scan, then compose the scoped store
-	// onto the entity, spawn the route children, and flush so the route-tree
-	// observers settle against the whole hierarchy.
+	let src = SmolPath::from(dirs.get(entity)?.src.as_str());
+	// off the async runtime: resolve the nearest ancestor store + scope it to `src`,
+	// await the content scan, then compose the scoped store onto the entity, spawn
+	// the route children, and flush so the route-tree observers settle against the
+	// whole hierarchy.
 	commands.entity(entity).queue_async(
 		async move |dir: AsyncEntity| -> Result {
+			let store = dir
+				.with_state::<AncestorQuery<&BlobStore>, BlobStore>(
+					|entity, stores| {
+						stores
+							.get(entity)
+							.map(BlobStore::clone)
+							.unwrap_or_else(|_| BlobStore::new(FsStore::default()))
+					},
+				)
+				.await?
+				.with_subdir(src);
 			let specs = discover_routes(&store).await?;
 			dir.world()
 				.with(move |world| {
@@ -114,19 +125,32 @@ pub async fn settle_routes_dirs(world: &AsyncWorld) -> Result {
 	for _ in 0..10_000 {
 		let pending = world
 			.with(|world| {
-				world
+				// routes still discovering (no scoped store composed onto them yet) ...
+				let dirs = world
 					.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>()
 					.iter(world)
-					.count()
+					.count();
+				// ... plus any unresolved `<Template src>` include: it builds the
+				// included entry (and its own `RoutesDir`) asynchronously as a pending
+				// dependency, so wait for the set to drain before reading the tree.
+				let includes = world
+					.query::<&TemplatePending>()
+					.iter(world)
+					.filter(|pending| !pending.is_empty())
+					.count();
+				dirs + includes
 			})
 			.await;
 		if pending == 0 {
 			return Ok(());
 		}
-		// yield so the runtime can drive the discovery task between checks.
+		// yield so the runtime can drive the discovery/include tasks between checks.
 		async_ext::yield_now().await;
 	}
-	bevybail!("RoutesDir discovery did not settle within the frame budget")
+	bevybail!(
+		"RoutesDir discovery / `<Template src>` includes did not settle within the \
+		frame budget"
+	)
 }
 
 /// A discovered content file: its route path, the store path its bytes load from,
@@ -203,16 +227,24 @@ mod test {
 	/// Spawn `bundle` and settle the async runtime so the [`RoutesDir`] discovery
 	/// task (an async store scan) completes, returning the root entity. Mirrors a
 	/// boot path settling before it serves.
-	async fn spawn_routes(world: &mut World, bundle: impl Bundle) -> Entity {
-		let root = world.spawn(bundle).flush();
+	/// Compose `store` on the root (the site store an entry carries) so the
+	/// [`RoutesDir`] resolves it by ancestry, then settle the async runtime so the
+	/// discovery task (an async store scan) completes. Mirrors a boot path settling
+	/// before it serves.
+	async fn spawn_routes(
+		world: &mut World,
+		store: BlobStore,
+		bundle: impl Bundle,
+	) -> Entity {
+		let root = world.spawn((store, bundle)).flush();
 		AsyncRunner::settle_async_tasks(world).await;
 		root
 	}
 
-	/// Write a routes dir fixture under `target/tests` and return a [`SiteRoot`]
+	/// Write a routes dir fixture under `target/tests` and return a [`BlobStore`]
 	/// backed by an [`FsStore`] rooted at it. Native-only: writes real files.
 	#[cfg(not(target_arch = "wasm32"))]
-	fn fs_fixture(name: &str, files: &[(&str, &str)]) -> SiteRoot {
+	fn fs_fixture(name: &str, files: &[(&str, &str)]) -> BlobStore {
 		let root = fs_ext::workspace_root()
 			.join("target/tests/routes_dir")
 			.join(name);
@@ -221,12 +253,12 @@ mod test {
 		for (rel, content) in files {
 			fs_ext::write(root.join(rel), content).unwrap();
 		}
-		SiteRoot::new_fs(AbsPathBuf::new(root).unwrap())
+		BlobStore::new(FsStore::new(AbsPathBuf::new(root).unwrap()))
 	}
 
-	/// A [`SiteRoot`] backed by an in-memory store seeded with `files`, proving
-	/// discovery is provider-agnostic (the same scan the S3-backed task runs).
-	async fn memory_fixture(files: &[(&str, &str)]) -> SiteRoot {
+	/// An in-memory [`BlobStore`] seeded with `files`, proving discovery is
+	/// provider-agnostic (the same scan the S3-backed task runs).
+	async fn memory_fixture(files: &[(&str, &str)]) -> BlobStore {
 		let store = BlobStore::temp();
 		for (rel, content) in files {
 			store
@@ -234,7 +266,7 @@ mod test {
 				.await
 				.unwrap();
 		}
-		SiteRoot(store)
+		store
 	}
 
 	#[beet_core::test]
@@ -280,12 +312,12 @@ mod test {
 	#[beet_core::test]
 	async fn discovers_and_serves_routes() {
 		let mut world = router_world();
-		world.insert_resource(fs_fixture("serves", SERVES_FILES));
-		let root =
-			spawn_routes(&mut world, (default_router(), children![
-				RoutesDir::new("")
-			]))
-			.await;
+		let root = spawn_routes(
+			&mut world,
+			fs_fixture("serves", SERVES_FILES),
+			(default_router(), children![RoutesDir::new("")]),
+		)
+		.await;
 		assert_serves(&mut world, root).await;
 	}
 
@@ -294,12 +326,12 @@ mod test {
 	#[beet_core::test]
 	async fn discovers_and_serves_from_memory_store() {
 		let mut world = router_world();
-		world.insert_resource(memory_fixture(SERVES_FILES).await);
-		let root =
-			spawn_routes(&mut world, (default_router(), children![
-				RoutesDir::new("")
-			]))
-			.await;
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(SERVES_FILES).await,
+			(default_router(), children![RoutesDir::new("")]),
+		)
+		.await;
 		assert_serves(&mut world, root).await;
 	}
 
@@ -309,20 +341,20 @@ mod test {
 	#[beet_core::test]
 	async fn routes_spawn_in_sorted_order() {
 		let mut world = router_world();
-		// deliberately out-of-order, zero-padded like the slide deck
-		world.insert_resource(
+		// a bare `Router` (not `default_router`) so the opinionated app routes do
+		// not appear as extra top-level children alongside the discovered slides.
+		// deliberately out-of-order, zero-padded like the slide deck.
+		let root = spawn_routes(
+			&mut world,
 			memory_fixture(&[
 				("03-gamma.md", "# Gamma"),
 				("01-alpha.md", "# Alpha"),
 				("02-beta.md", "# Beta"),
 			])
 			.await,
-		);
-		// a bare `Router` (not `default_router`) so the opinionated app routes do
-		// not appear as extra top-level children alongside the discovered slides.
-		let root =
-			spawn_routes(&mut world, (Router, children![RoutesDir::new("")]))
-				.await;
+			(Router, children![RoutesDir::new("")]),
+		)
+		.await;
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 		// the discovered slide routes, in tree-child order
@@ -340,18 +372,16 @@ mod test {
 	#[beet_core::test]
 	async fn scan_time_frontmatter_meta() {
 		let mut world = router_world();
-		world.insert_resource(
+		let root = spawn_routes(
+			&mut world,
 			memory_fixture(&[(
 				"docs/intro.md",
 				"+++\ntitle = \"Getting Started\"\norder = 2\n+++\n\n# Intro",
 			)])
 			.await,
-		);
-		let root =
-			spawn_routes(&mut world, (default_router(), children![
-				RoutesDir::new("")
-			]))
-			.await;
+			(default_router(), children![RoutesDir::new("")]),
+		)
+		.await;
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 		let node = tree.find(&["docs", "intro"]).unwrap().clone();

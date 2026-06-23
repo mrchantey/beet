@@ -22,32 +22,28 @@ pub(crate) async fn build_site(
 	Ok(root)
 }
 
-/// The synchronous site load: register the site's `templates/`, set the
-/// [`SiteRoot`] (which `<RoutesDir/>` resolves against), and spawn the
-/// `main.bsx` entry as the app root.
+/// The synchronous site load: register the site's `templates/` and build the
+/// `main.bsx` entry into a root carrying the site [`BlobStore`] (which `<RoutesDir>`
+/// and `<Template src>` resolve by ancestry). Reads the local filesystem directly
+/// (`check`/`export-static` always run on a local site dir), so it never blocks.
 pub(crate) fn load_site(
 	world: &mut World,
 	site_dir: AbsPathBuf,
 	entry: AbsPathBuf,
 ) -> Result<Entity> {
-	let entry_name = entry
-		.file_name()
-		.and_then(|name| name.to_str())
-		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?;
-	let site_root = SiteRoot::new_fs(site_dir);
-	// register `templates/` and read the entry document through the site store
-	// (the same path a deployed task takes against S3).
-	site_root.register_templates(world)?;
-	let bytes =
-		async_ext::block_on(site_root.0.get(&SmolPath::from(entry_name)))?;
-	let source = core::str::from_utf8(&bytes)?;
-	// insert the `SiteRoot` resource before spawning so the route-discovery
-	// observer and `<Template src>` includes resolve against it.
-	world.insert_resource(site_root);
-	let template = BsxTemplate::parse_entry(world, source)?;
+	// register `templates/` from the filesystem, if the site declares any.
+	let templates = site_dir.join("templates");
+	if fs_ext::exists(&templates)? {
+		world.register_bsx_templates(&templates)?;
+	}
+	let source = fs_ext::read_to_string(&entry)?;
+	let template = BsxTemplate::parse_entry(world, &source)?;
 	// `check`/`export-static` render the site, never serve it: build into a root
 	// carrying `DisableBootOnLoad` so the entry's `BootOnLoad` verb stays dormant.
-	let root = world.spawn(DisableBootOnLoad).id();
+	// The site store on the root backs `RoutesDir`/`<Template src>` by ancestry.
+	let root = world
+		.spawn((DisableBootOnLoad, BlobStore::new(FsStore::new(site_dir))))
+		.id();
 	world.entity_mut(root).insert_template(template)?;
 	Ok(root)
 }

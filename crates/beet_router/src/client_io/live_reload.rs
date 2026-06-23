@@ -186,12 +186,16 @@ mod test {
 		world
 			.register_bsx_templates(site_dir.join("templates"))
 			.unwrap();
-		world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
 		// the reload's render diagnostics paint the layout chrome, which reads
 		// `PackageConfig`; seed it so the bare render world has it (see `site_layout`).
 		world.init_resource::<PackageConfig>();
+		// compose the site store on the router root so `RoutesDir` resolves it by ancestry.
 		let root = world
-			.spawn((default_router(), children![RoutesDir::new("routes")]))
+			.spawn((
+				BlobStore::new(FsStore::new(site_dir.clone())),
+				default_router(),
+				children![RoutesDir::new("routes")],
+			))
 			.flush();
 		let watcher = world
 			.spawn((LiveReload::new(site_dir.clone()), ClientIo))
@@ -345,13 +349,18 @@ mod test {
 	async fn reload_preserves_card_deck_marker_and_order() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let site_dir = deck_fixture("deck_marker");
-		world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
 		// the reload's render diagnostics paint the layout chrome, which reads
 		// `PackageConfig`; seed it so the bare render world has it (see `site_layout`).
 		world.init_resource::<PackageConfig>();
-		// a deck router: the CardDeck marker (declared in the deck's markup spread).
+		// a deck router: the CardDeck marker (declared in the deck's markup spread);
+		// the site store on the root backs the `RoutesDir` scan by ancestry.
 		let router = world
-			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
+			.spawn((
+				BlobStore::new(FsStore::new(site_dir.clone())),
+				Router,
+				CardDeck,
+				children![RoutesDir::new("slides")],
+			))
 			.flush();
 		// the RoutesDir scan is async, so settle it before reading the tree
 		AsyncRunner::settle_async_tasks(&mut world).await;
@@ -440,11 +449,15 @@ mod test {
 
 		let mut app = tui_app();
 		let site_dir = deck_fixture("tui_repaint");
-		app.world_mut()
-			.insert_resource(SiteRoot::new_fs(site_dir.clone()));
+		// the site store on the router root backs the `RoutesDir` scan by ancestry.
 		let router = app
 			.world_mut()
-			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
+			.spawn((
+				BlobStore::new(FsStore::new(site_dir.clone())),
+				Router,
+				CardDeck,
+				children![RoutesDir::new("slides")],
+			))
 			.flush();
 		// settle the async RoutesDir scan so the route tree exists before the
 		// navigator resolves its initial page; otherwise the navigator's one-shot

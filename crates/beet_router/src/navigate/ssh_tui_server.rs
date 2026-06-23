@@ -181,13 +181,17 @@ fn ssh_write(
 	}
 }
 
-/// System: ctrl+c closes only the originating session (sends [`SshEvent::Close`]),
-/// never the process; the resulting [`SshRecv`] close despawns its surface.
+/// System: ctrl+c closes only the originating session, never the process. It
+/// restores the client terminal (the leave sequences) *before* sending
+/// [`SshEvent::Close`], so the client is not left in raw mouse-tracking mode; the
+/// resulting [`SshRecv`] close despawns its surface.
 fn close_session_on_ctrl_c(
 	mut keys: MessageReader<KeyboardInput>,
 	connections: Query<(), With<SshPeerInfo>>,
+	mut surfaces: Query<&mut Terminal>,
+	mut channels: Query<&mut ChannelTerminal>,
 	mut commands: Commands,
-) {
+) -> Result {
 	// group this frame's pressed keys by window: (ctrl seen, c seen).
 	let mut per_window = HashMap::<Entity, (bool, bool)>::default();
 	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
@@ -200,11 +204,46 @@ fn close_session_on_ctrl_c(
 	}
 	for (window, (ctrl, c)) in per_window {
 		if ctrl && c && connections.contains(window) {
+			// restore the client terminal, then close: the russh send loop forwards
+			// the leave sequences (a `Data` event) before it processes the `Close`,
+			// so the client receives them before the channel shuts.
+			restore_session(window, &mut surfaces, &mut channels, &mut commands)?;
 			commands
 				.entity(window)
 				.trigger_target(SshSend(SshEvent::Close(None)));
 		}
 	}
+	Ok(())
+}
+
+/// Emit a connection's terminal-restore sequences to its SSH client: exit the
+/// alternate screen, disable mouse tracking, and show the cursor (the inverse of
+/// the setup `ChannelTerminal::new` wrote). Raw mode is the client's to restore (its
+/// `TerminalConfig` has `raw_mode: false`), so this writes only the in-band escapes.
+///
+/// Writes the leave sequences into the surface, drains them, and sends them to the
+/// client as a [`SshSend`] data event; the caller closes the channel afterwards.
+/// A connection without a built surface (eg before its pty) is a no-op.
+fn restore_session(
+	connection: Entity,
+	surfaces: &mut Query<&mut Terminal>,
+	channels: &mut Query<&mut ChannelTerminal>,
+	commands: &mut Commands,
+) -> Result {
+	let Ok(mut surface) = surfaces.get_mut(connection) else {
+		return Ok(());
+	};
+	surface.restore_config()?;
+	surface.flush()?;
+	if let Ok(mut channel) = channels.get_mut(connection) {
+		let output = channel.drain_write();
+		if !output.is_empty() {
+			commands
+				.entity(connection)
+				.trigger_target(SshSend(SshEvent::bytes(output)));
+		}
+	}
+	Ok(())
 }
 
 #[cfg(test)]
@@ -335,5 +374,60 @@ mod test {
 			.xpect_contains("Alpha page")
 			.xnot()
 			.xpect_contains("Beta page");
+	}
+
+	/// Regression: on ctrl+c the session restores the client terminal (disable mouse
+	/// tracking, show the cursor, leave the alternate screen) *before* it closes, so
+	/// the client is not left spewing escape sequences on mouse movement. The local
+	/// `TuiServer` restores via `restore_terminals` on `AppExit`; the SSH path emits
+	/// the same leave sequences in-band over the channel ahead of the close.
+	#[beet_core::test]
+	async fn ctrl_c_restores_client_terminal_before_close() {
+		let mut app = ssh_tui_app();
+		let router = spawn_router(&mut app);
+		let connection = open_connection(&mut app, router, UVec2::new(40, 8));
+		drive_until(&mut app, connection, "Alpha page");
+
+		// record, in order, every event the session would send to its client.
+		let sent = std::sync::Arc::new(std::sync::Mutex::new(Vec::<SshEvent>::new()));
+		let recorder = sent.clone();
+		app.world_mut().entity_mut(connection).observe_any(
+			move |ev: On<SshSend>| {
+				recorder.lock().unwrap().push(ev.event().inner().clone());
+			},
+		);
+
+		// ctrl+c from this connection's window (ctrl and c pressed together).
+		for key_code in [KeyCode::ControlLeft, KeyCode::KeyC] {
+			app.world_mut().write_message(KeyboardInput {
+				key_code,
+				logical_key: bevy::input::keyboard::Key::Character("c".into()),
+				state: ButtonState::Pressed,
+				text: None,
+				repeat: false,
+				window: connection,
+			});
+		}
+		app.update();
+
+		let events = sent.lock().unwrap().clone();
+		// a data event carrying the leave sequences (disable any-motion mouse + show
+		// cursor) was sent ...
+		let restore = events
+			.iter()
+			.position(|ev| match ev {
+				SshEvent::Data(bytes) => {
+					let text = String::from_utf8_lossy(bytes);
+					text.contains("\x1b[?1003l") && text.contains("\x1b[?25h")
+				}
+				_ => false,
+			})
+			.expect("ctrl+c did not emit the terminal restore sequences");
+		// ... and it preceded the channel close.
+		let close = events
+			.iter()
+			.position(|ev| matches!(ev, SshEvent::Close(_)))
+			.expect("ctrl+c did not close the session");
+		(restore < close).xpect_true();
 	}
 }

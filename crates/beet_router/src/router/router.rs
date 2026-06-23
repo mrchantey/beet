@@ -403,8 +403,10 @@ mod test {
 	}
 
 	/// A route can stream Server-Sent Events by returning a streaming
-	/// [`Response`] via [`sse_response`] — no special router needed.
-	#[cfg(feature = "json")]
+	/// [`Response`] via [`sse_response`] — no special router needed. `sse_response`
+	/// and [`SseBody`] live behind `beet_net/http` (pulled by `native`); the json
+	/// payload behind `beet_net/json` (pulled by `json`), so the test needs both.
+	#[cfg(all(feature = "json", feature = "native"))]
 	#[beet_core::test]
 	async fn sse_route_streams_events() {
 		#[derive(serde::Serialize)]

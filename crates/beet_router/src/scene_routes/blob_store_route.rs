@@ -16,24 +16,24 @@ pub(crate) const STORE_PATH_PARAM: &str = "store_path";
 /// route, composed rather than created on the fly. The trailing path is captured
 /// greedily; serving rules mirror a static host (see [`serve_blob`]).
 ///
-/// A no-code site has no Rust seam to compose a store, so the optional `src` seeds
-/// a local [`FsStore`] on the route itself: `<BlobStoreRoute src="assets"/>` roots
-/// a store at `src` (relative to [`SiteRoot`]) and serves it at `assets/…`. Provide
-/// `src` to mount a directory, or omit it to serve from an adjacent store.
+/// The optional `src` scopes the resolved ancestor store to a subdirectory:
+/// `<BlobStoreRoute src="assets"/>` serves `assets/…` from the store's `assets/`
+/// subdir (the one-bucket layout, site at the root and assets under `assets/`).
+/// Omit `src` to serve straight from the nearest ancestor store (the two-bucket
+/// layout, where an assets store is composed directly above this route).
 ///
 /// Unlike [`RoutesDir`] (which discovers content *pages*) this streams any file. It
 /// is a [`template`](macro@template) rather than a marker component, so it expands
 /// to its serve route at build time with no component left to re-fire on reload.
-#[template(system)]
+#[template]
 pub fn BlobStoreRoute(
 	/// The url path the files mount at; defaults to `src`, else the root.
 	#[prop(into)]
 	mount: Option<SmolPath>,
-	/// An optional directory (relative to [`SiteRoot`]) seeding a local [`FsStore`]
-	/// on this route; omit to serve from an adjacent [`BlobStore`].
+	/// An optional subdirectory to scope the resolved ancestor [`BlobStore`] to
+	/// before serving; omit to serve straight from the nearest ancestor store.
 	#[prop(into)]
 	src: Option<SmolPath>,
-	site_root: Option<Res<SiteRoot>>,
 ) -> impl Bundle {
 	// the mount defaults to `src` (so `src="assets"` serves at `assets/…`), else the
 	// root; the trailing file path is captured greedily.
@@ -44,21 +44,19 @@ pub fn BlobStoreRoute(
 	} else {
 		format!("{mount}/*{STORE_PATH_PARAM}?")
 	};
-	// `src` scopes the site store to that subdirectory and seeds it on the route;
-	// otherwise the serve action resolves the nearest ancestor store (composed by
-	// the caller).
-	let store = src.map(|src| {
-		site_root
-			.map(|root| root.0.clone())
-			.unwrap_or_else(|| SiteRoot::default().0)
-			.with_subdir(src)
-	});
 	(
 		PathPartial::new(path),
 		ServeStoreAction,
-		OnSpawn::insert_option(store),
+		// `src` scopes the resolved ancestor store at serve time (see `StoreSubdir`).
+		OnSpawn::insert_option(src.map(StoreSubdir)),
 	)
 }
+
+/// A subdirectory a [`BlobStoreRoute`] scopes its resolved ancestor [`BlobStore`]
+/// to before serving (the `src` prop), applied at request time by
+/// [`ServeStoreAction`]. Absent, the route serves straight from the ancestor store.
+#[derive(Debug, Clone, Component)]
+pub(crate) struct StoreSubdir(pub SmolPath);
 
 /// Serves the captured path from the nearest self-or-ancestor [`BlobStore`], the
 /// handler [`BlobStoreRoute`] expands to.
@@ -71,10 +69,17 @@ pub fn BlobStoreRoute(
 pub(crate) async fn ServeStoreAction(
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
+	// resolve the nearest ancestor store, scoped to this route's `src` subdir if any.
 	let store = cx
 		.caller
-		.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-			|entity, query| query.get(entity).cloned(),
+		.with_state::<(AncestorQuery<&BlobStore>, Query<&StoreSubdir>), Result<BlobStore>>(
+			|entity, (stores, subdirs)| -> Result<BlobStore> {
+				let store = stores.get(entity).cloned()?;
+				Ok(match subdirs.get(entity) {
+					Ok(subdir) => store.with_subdir(subdir.0.clone()),
+					Err(_) => store,
+				})
+			},
 		)
 		.await??;
 	let path = cx

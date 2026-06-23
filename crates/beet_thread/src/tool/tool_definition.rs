@@ -11,9 +11,14 @@ pub(crate) fn insert_tool_definition(
 	query: Query<(&ActionMeta, &PathPattern)>,
 ) -> Result {
 	let tool = query.get(ev.entity)?;
-	let def: ToolDefinition = FunctionToolDefinition::from_meta(tool)?.into();
-	commands.entity(ev.entity).insert(def);
-
+	// only routes shaped as a callable tool — a static path with a description and
+	// an input schema — become a `FunctionToolDefinition`. Other routes (wildcard or
+	// parameterized paths like `run-wasm/*args`, and system routes with no tool
+	// metadata) are not agent-callable tools, so they are skipped rather than erroring:
+	// the observer fires on every route, but most routes are not tools.
+	if let Some(def) = FunctionToolDefinition::from_meta(tool)? {
+		commands.entity(ev.entity).insert(ToolDefinition::from(def));
+	}
 	Ok(())
 }
 
@@ -43,12 +48,12 @@ impl ToolDefinition {
 	}
 }
 
-impl Into<ToolDefinition> for FunctionToolDefinition {
-	fn into(self) -> ToolDefinition { ToolDefinition::Function(self) }
+impl From<FunctionToolDefinition> for ToolDefinition {
+	fn from(def: FunctionToolDefinition) -> Self { Self::Function(def) }
 }
 
-impl Into<ToolDefinition> for ProviderToolDefinition {
-	fn into(self) -> ToolDefinition { ToolDefinition::Provider(self) }
+impl From<ProviderToolDefinition> for ToolDefinition {
+	fn from(def: ProviderToolDefinition) -> Self { Self::Provider(def) }
 }
 
 /// Tool defined by the model provider,
@@ -91,24 +96,27 @@ impl FunctionToolDefinition {
 	pub fn description(&self) -> &str { &self.description }
 	pub fn params_schema(&self) -> &Schema { &self.params_schema }
 
+	/// Build a tool definition from a route's metadata, or `None` if the route is
+	/// not a callable tool: a wildcard/parameterized path (eg `run-wasm/*args`)
+	/// cannot be a tool, and a route with no description or input schema is a plain
+	/// route rather than an agent tool. The observer fires on every route, so this
+	/// skips the non-tools instead of erroring.
 	pub fn from_meta(
 		(meta, path): (&ActionMeta, &PathPattern),
-	) -> Result<Self> {
-		if !path.is_static() {
-			bevybail!(
-				"Tool path must be static (no parameters or wildcards) to create a FunctionToolDefinition.\nPath provided: {path}"
-			);
-		}
-		let path = path.annotated_path().to_string();
-		let description = meta
-			.description()
-			.ok_or_else(||{
-				bevyhow!("ActionMeta lacks description, which is required to create a FunctionToolDefinition.\n{meta:?}")
-			})?;
-		let params_schema = meta.input_json_schema().ok_or_else(||{
-			bevyhow!("ActionMeta lacks input json schema, which is required to create a FunctionToolDefinition.\n{meta:?}")
-		})?;
-		Ok(Self::new(path, description, params_schema))
+	) -> Result<Option<Self>> {
+		// a tool needs a concrete callable path with a description and input schema.
+		let (true, Some(description), Some(params_schema)) = (
+			path.is_static(),
+			meta.description(),
+			meta.input_json_schema(),
+		) else {
+			return Ok(None);
+		};
+		Ok(Some(Self::new(
+			path.annotated_path().to_string(),
+			description,
+			params_schema,
+		)))
 	}
 }
 

@@ -142,7 +142,7 @@ impl TemplatePending {
 /// resolver makes once it observes the set has drained. Calling it while
 /// dependencies remain is a no-op, so a resolver may call it unconditionally
 /// after [`TemplatePending::resolve`] returns `true`.
-pub(crate) fn drain_pending_dependencies(root: &mut EntityWorldMut) {
+pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
 	let pending_empty = root
 		.get::<TemplatePending>()
 		.map(TemplatePending::is_empty)

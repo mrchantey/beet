@@ -132,7 +132,7 @@ impl Plugin for RouterPlugin {
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			// the `<Template src>` include handler (local-file includes resolved
-			// against the `SiteRoot`), into the BSX tag seam.
+			// against the nearest ancestor `BlobStore`), into the BSX tag seam.
 			#[cfg(all(feature = "bsx", feature = "template_serde"))]
 			register_template_include(app.world_mut());
 			// the live-TUI server, declarable in a router markup spread

@@ -6,8 +6,9 @@
 //! [`World`] is built (or reused) and the request is routed through it. Building
 //! mirrors the native `load_entry` path, but every store read is awaited rather
 //! than blocked on (the Worker runtime is single-threaded): templates register
-//! via [`SiteRoot::register_templates_async`], the entry builds into a
-//! [`DisableBootOnLoad`] root (so its declared servers stay dormant; the Worker
+//! via [`read_site_templates`]/[`register_site_templates`], the entry builds into a
+//! root carrying the site store plus [`DisableBootOnLoad`] (so its declared servers
+//! stay dormant; the Worker
 //! itself serves each request), and the `<RoutesDir/>` discovery observer scans the
 //! store as an async task, which the build settles via
 //! [`AsyncRunner::settle_async_tasks`] before serving. The universal seam is the
@@ -125,25 +126,26 @@ async fn build_site(
 	app.cleanup();
 	let world = app.world_mut();
 
-	// the site root the R2 store backs; the entry, `templates/` and `<RoutesDir/>`
-	// all resolve against it.
-	let site_root = SiteRoot(BlobStore::new(store));
-	site_root.register_templates_async(world).await?;
-	let entry = site_root.0.get_media(&SmolPath::from(ENTRY_NAME)).await?;
-	world.insert_resource(site_root);
+	// the site store the R2 bucket backs; the entry, `templates/`, `<RoutesDir/>`
+	// and `<Template src>` all resolve through it (composed on the root below).
+	let store = BlobStore::new(store);
+	let sources = read_site_templates(&store).await?;
+	register_site_templates(world, sources)?;
+	let entry = store.get_media(&SmolPath::from(ENTRY_NAME)).await?;
 
-	// build the entry into a root carrying `DisableBootOnLoad`: the Worker itself
-	// routes each request through the host's `Router` action via `exchange`, so the
-	// servers the site's `main.bsx` declares (`HttpServer`, `TuiServer`, ...) must
-	// stay dormant. Without `DisableBootOnLoad` the entry's `BootOnLoad` verb boots
-	// them on `LoadTemplate`, and `HttpServer`'s start hits the (wasm-absent) backend
-	// and panics. Same suppression `export-static`/`check` use.
+	// build the entry into a root carrying the site store (so `RoutesDir` and
+	// `<Template src>` resolve it by ancestry) plus `DisableBootOnLoad`: the Worker
+	// itself routes each request through the host's `Router` action via `exchange`,
+	// so the servers the site's `main.bsx` declares (`HttpServer`, `TuiServer`, ...)
+	// must stay dormant. Without `DisableBootOnLoad` the entry's `BootOnLoad` verb
+	// boots them on `LoadTemplate`, and `HttpServer`'s start hits the (wasm-absent)
+	// backend and panics. Same suppression `export-static`/`check` use.
 	//
 	// the build's `Insert, RoutesDir` observer queues the route discovery (a store
 	// scan) as an async task, settled below before the host is served.
 	let template = EntryTemplate::from_bytes(world, &entry)
 		.map_err(|err| bevyhow!("failed to parse entry `{ENTRY_NAME}`: {err}"))?;
-	let root = world.spawn(DisableBootOnLoad).id();
+	let root = world.spawn((DisableBootOnLoad, store)).id();
 	world
 		.entity_mut(root)
 		.insert_template(template)

@@ -4,6 +4,7 @@
 //! route-aware widgets (`RouteHead`, `RouteSidebar`).
 beet_core::test_main!();
 
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
@@ -74,14 +75,17 @@ fn site_fixture() -> AbsPathBuf {
 async fn spawn_site(world: &mut World) -> Entity {
 	let site_dir = site_fixture();
 	world.insert_resource(pkg_config!());
-	world
-		.register_bsx_templates(site_dir.join("templates"))
-		.unwrap();
-	world.insert_resource(SiteRoot::new_fs(site_dir.clone()));
-	let root = BsxTemplate::load_entry(world, site_dir.join("main.bsx"))
-		.unwrap()
-		.spawn(world)
-		.unwrap();
+	// the same store-backed load the binary and Worker run: register `templates/`
+	// and read the entry through the site store, then build into a root carrying
+	// that store so `RoutesDir` and `<Template src>` resolve it by ancestry.
+	let store = BlobStore::new(FsStore::new(site_dir));
+	let sources = read_site_templates(&store).await.unwrap();
+	register_site_templates(world, sources).unwrap();
+	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
+	let template =
+		BsxTemplate::parse_entry(world, entry.as_utf8().unwrap()).unwrap();
+	let root = world.spawn(store).id();
+	world.entity_mut(root).insert_template(template).unwrap();
 	// the `<RoutesDir>` scan is async, so settle it before reading the route tree
 	// or serving requests (else the discovered routes 404)
 	AsyncRunner::settle_async_tasks(world).await;

@@ -255,7 +255,7 @@ mod test {
 	/// Write a `published`/`secret` (frontmatter `draft = true`) content dir under
 	/// a per-test `name` (so parallel cases never share a directory) and return
 	/// its root.
-	// `RoutesDir`/`SiteRoot` scan the filesystem, so this is native-only.
+	// `RoutesDir` scans the filesystem store, so this is native-only.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	fn draft_content_dir(name: &str) -> AbsPathBuf {
 		let root = fs_ext::workspace_root()
@@ -275,9 +275,14 @@ mod test {
 	/// discovery scan (an async task) completes before the export walks the routes.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	async fn spawn_routes_dir(world: &mut World, root: AbsPathBuf) -> Entity {
-		world.insert_resource(SiteRoot::new_fs(root));
+		// compose the site store on the router root so `RoutesDir` resolves it by
+		// ancestry, then settle the discovery scan before the export walks the routes.
 		let router = world
-			.spawn((default_router(), children![RoutesDir::new("")]))
+			.spawn((
+				BlobStore::new(FsStore::new(root)),
+				default_router(),
+				children![RoutesDir::new("")],
+			))
 			.flush();
 		AsyncRunner::settle_async_tasks(world).await;
 		router
