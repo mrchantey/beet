@@ -4,7 +4,7 @@ use beet::prelude::*;
 #[rustfmt::skip]
 pub fn main() {
 	App::new()
-		.add_plugins(running_beet_example_plugin)
+		.add_plugins((BeetPlugins, BeetExamplePlugins))
 		.init_resource::<RandomSource>()
 		.init_resource::<WrapAround>()
 		// .add_plugins(DebugGroupSteerPlugin::<GroupSteerAgent>::default())

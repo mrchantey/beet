@@ -14,7 +14,6 @@
 //! [`AsyncRunner::settle_async_tasks`] before serving. The universal seam is the
 //! same `entity.exchange(request) -> Response` the native servers use.
 
-use crate::prelude::*;
 use beet::prelude::*;
 use std::cell::RefCell;
 use worker::Context;
@@ -120,7 +119,9 @@ async fn build_site(
 	version: Option<String>,
 ) -> Result<LoadedSite> {
 	let mut app = App::new();
-	add_serve_plugins(&mut app);
+	// the same trusted defaults the native binary uses; on wasm `BeetPlugins`
+	// resolves to the headless runner + the render router stack.
+	app.add_plugins(BeetPlugins);
 	// run plugin `finish`/`cleanup` so deferred plugin setup lands before the build.
 	app.finish();
 	app.cleanup();

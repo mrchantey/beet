@@ -1,43 +1,11 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::asset::AssetMetaCheck;
 
-/// A minimal app with flow and spatial
-pub fn minimal_beet_example_plugin(app: &mut App) {
-	app.add_plugins((
-		MinimalPlugins,
-		LogPlugin::default(),
-		beet_example_plugin,
-	));
-}
-
-/// A running app with flow and spatial
-pub fn running_beet_example_plugin(app: &mut App) {
-	app.add_plugins((
-		// beet's `LogPlugin` replaces bevy's, so disable bevy's here and add ours.
-		DefaultPlugins
-			.set(AssetPlugin {
-				// file_path: "../../assets".into(),
-				meta_check: AssetMetaCheck::Never,
-				..default()
-			})
-			.build()
-			.disable::<bevy::log::LogPlugin>(),
-		LogPlugin {
-			level: Level::WARN,
-			..default()
-		},
-		beet_example_plugin,
-	))
-	.add_systems(Update, (close_on_esc, toggle_fullscreen));
-}
-
-/// Simple default plugins
-pub fn crate_test_beet_example_plugin(app: &mut App) {
-	app.add_plugins((beet_example_plugin,));
-}
-
+/// The capabilities every beet example shares: the action + spatial systems, the
+/// 2d/3d helper systems, the terminal UI, and the window conveniences (esc to
+/// close, F11 fullscreen). The runner and window are [`BeetPlugins`](beet)' job;
+/// this only adds behaviour, so it composes under either runner.
 pub fn beet_example_plugin(app: &mut App) {
 	assert_local_assets();
 
@@ -47,9 +15,8 @@ pub fn beet_example_plugin(app: &mut App) {
 		plugin_2d,
 		plugin_3d,
 		UiTerminalPlugin,
-		// BeetDefaultPlugins,
-		// DefaultReplicatePlugin,
 	))
+	.add_systems(Update, (close_on_esc, toggle_fullscreen))
 	.init_resource::<RandomSource>()
 	.register_type::<Collectable>();
 }

@@ -22,12 +22,21 @@ bevy_default = [
 ]
 # enable beet_ml integration; pulled in by the top-level `ml` feature
 ml = ["dep:beet_ml"]
+# The agent-thread example tool wiring (`ThreadExamplesPlugin`): the thread runtime
+# + its charcell chat UI + the example inline tools, so the `beet` binary can run
+# `examples/thread/*.bsx`. Headless-friendly (no render), so it is independent of
+# `bevy_default`. The inline tool is a `#[action(route)]`, so it pulls the
+# router/net surface the route registration expands to.
+thread = ["dep:beet_thread", "dep:beet_net", "dep:beet_router", "beet_action/json"]
 
 [dependencies]
 beet_action = { workspace = true, features = ["std", "reflect"] }
 beet_ml = { workspace = true, features = ["spatial"], optional = true }
 beet_spatial = { workspace = true, features = ["std"] }
 beet_core = { workspace = true, features = ["std", "rand","bevy_keyboard"] }
+beet_thread = { workspace = true, features = ["ui"], optional = true }
+beet_net = { workspace = true, features = ["std", "serde", "json"], optional = true }
+beet_router = { workspace = true, features = ["json"], optional = true }
 
 
 serde.workspace = true

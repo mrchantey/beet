@@ -309,6 +309,11 @@ bevy_default = [
 	"beet_examples?/bevy_default",
 	"beet_spatial?/bevy_default",
 ]
+# Link bevy's full `DefaultPlugins` (winit + wgpu + windowing) and make
+# `BeetPlugins` select the winit event-loop runner instead of the headless 30Hz
+# schedule loop, opening a default window. (Override the `WindowPlugin` to boot
+# windowless and open the window from data.) Off by default, so the CLI stays headless.
+winit = ["bevy_default"]
 template_serde = ["beet_core/template_serde", "beet_net?/template_serde", "beet_router?/template_serde", "beet_thread?/template_serde"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
@@ -430,7 +435,9 @@ bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
 
 
-examples = ["bevy_default", "spatial", "dep:beet_examples"]
+# the example binaries are all windowed, so `examples` turns on `winit`: `(BeetPlugins,
+# BeetExamplePlugins)` then boots a real window with no per-example runner wiring.
+examples = ["bevy_default", "winit", "spatial", "dep:beet_examples"]
 ml = ["spatial", "dep:beet_ml", "beet_examples?/ml"]
 cuda = ["ml", "beet_ml/cuda"]
 # flow = ["dep:beet_flow"]

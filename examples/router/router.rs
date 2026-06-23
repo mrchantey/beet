@@ -31,14 +31,12 @@ use beet::prelude::*;
 
 fn main() -> AppExit {
 	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			LogPlugin {
-				level: Level::TRACE,
-				..default()
-			},
-			ClientAppPlugin,
-		))
+		// `BeetPlugins` is a `PluginGroup`, so override its `LogPlugin` to raise the
+		// level rather than re-listing the runner/router stack.
+		.add_plugins(BeetPlugins.set(LogPlugin {
+			level: Level::TRACE,
+			..default()
+		}))
 		.add_systems(Startup, setup)
 		.run()
 }

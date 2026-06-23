@@ -6,7 +6,8 @@
 //! tool types so a scene's `<AgentChoiceAction/>` tag resolves from markup with
 //! no per-example `.rs`.
 
-use beet::prelude::*;
+use crate::beet::prelude::*;
+use beet_core::prelude::*;
 
 /// Adds the thread runtime ([`ThreadPlugin`]) and chat UI ([`ThreadUiPlugin`]),
 /// and registers the thread examples' inline tool types, so a loaded thread

@@ -37,9 +37,9 @@ const WORLD_SERDE_FILE: &str = "examples/router/router_serde.json";
 
 fn main() -> AppExit {
 	App::new()
-		.add_plugins((MinimalPlugins, ClientAppPlugin))
+		.add_plugins(BeetPlugins)
 		// only the example-specific [`GreetRequest`] instantiations need
-		// registering — ClientAppPlugin's RouterPlugin / ActionPlugin
+		// registering, BeetPlugins' RouterPlugin / ActionPlugin
 		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
 		.register_type::<ExchangeOverloadScript<QueryParams<GreetRequest>, String, _, _>>(

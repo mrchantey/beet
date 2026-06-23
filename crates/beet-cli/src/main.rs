@@ -30,20 +30,26 @@ fn main() -> AppExit {
 	// load any local `.env` (eg `BEET_REMOTE_URL`) before the app starts.
 	env_ext::load_dotenv();
 
-	let mut app = App::new();
-	// the cross-platform serve plugins, shared with the wasm Worker entry.
-	add_serve_plugins(&mut app);
-	// the native-only dev-command and terminal targets layered on top.
-	add_native_serve_plugins(&mut app);
-	// the agent-thread runtime + chat UI + example tool types, so a `main.bsx`
-	// declaring a `<Thread>` chat (eg `examples/thread/chat.bsx`) loads and runs.
-	#[cfg(feature = "thread")]
-	app.add_plugins(ThreadExamplesPlugin);
-
-	// the process exits when `boot` writes `AppExit` for the one-shot it
-	// resolves; a long-running server parks its boot call, so its unresolved
-	// `Running<Response>` persists the process with no refcount.
-	app.add_systems(Startup, load_entry).run()
+	App::new();
+		.add_plugins((
+		// the trusted defaults: the runner (the headless 30Hz loop here), beet's
+		// logging, the async runtime, and the router/scene/server + native terminal
+		// capabilities, all selected by feature flag.
+		BeetPlugins,
+		// the native-only dev-command capabilities, linked as registered types and
+		// inert until a `main.bsx` names them.
+		CliCommandsPlugin,
+		// the agent-thread runtime + chat UI + example tool types, so a `main.bsx`
+		// declaring a `<Thread>` chat (eg `examples/thread/chat.bsx`) loads and runs.
+		#[cfg(feature = "thread")]
+		beet_examples::prelude::BeetExamplePlugins,
+	))
+	.add_systems(Startup,
+		// the process exits when `boot` writes `AppExit` for the one-shot it
+		// resolves; a long-running server parks its boot call, so its unresolved
+		// `Running<Response>` persists the process with no refcount
+		load_entry)
+	.run()
 }
 
 /// `Startup`: resolve the site store + entry name (env/discovery only, no I/O),

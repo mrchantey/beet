@@ -25,7 +25,7 @@ use serde::Serialize;
 
 fn main() -> AppExit {
 	App::new()
-		.add_plugins((MinimalPlugins, ClientAppPlugin))
+		.add_plugins(BeetPlugins)
 		.add_systems(Startup, setup)
 		.run()
 }

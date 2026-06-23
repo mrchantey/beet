@@ -1332,11 +1332,11 @@ name = "beet-cli"
 version = "0.0.9-dev.16"
 dependencies = [
  "beet",
+ "beet_examples",
  "console_error_panic_hook",
  "getrandom 0.3.4",
  "image",
  "qrcode",
- "serde",
  "worker",
 ]
 
@@ -1457,7 +1457,10 @@ dependencies = [
  "beet_action",
  "beet_core",
  "beet_ml",
+ "beet_net",
+ "beet_router",
  "beet_spatial",
+ "beet_thread",
  "bevy",
  "serde",
  "serde_json",

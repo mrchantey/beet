@@ -4,7 +4,7 @@ use bevy::color::palettes::tailwind;
 
 fn main() {
 	App::new()
-		.add_plugins(running_beet_example_plugin)
+		.add_plugins((BeetPlugins, BeetExamplePlugins))
 		.add_systems(
 			Startup,
 			(

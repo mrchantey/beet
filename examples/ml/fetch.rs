@@ -14,7 +14,7 @@ use beet::prelude::*;
 
 pub fn main() {
 	App::new()
-		.add_plugins((running_beet_example_plugin, plugin_ml))
+		.add_plugins((BeetPlugins, BeetExamplePlugins))
 		.add_systems(
 			Startup,
 			(
