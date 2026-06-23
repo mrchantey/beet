@@ -7,15 +7,23 @@ file by walking up from the cwd and runs one command per invocation.
 The wasm test runner depends on it: `.cargo/config.toml` sets
 `runner = 'beet run-wasm'`, so `cargo test --target wasm32-...` invokes
 `beet run-wasm <module>`, which discovers this entry and dispatches the
-`<RunWasm/>` route. The rest are convenience: build, check, static export, pdf,
-s3 sync.
+`<RunWasm/>` route. The rest are convenience: serve, build, check, static export,
+pdf, s3 sync.
+
+It is a one-shot `<CliServer>`: the binary injects the boot (no markup boot verb),
+the positional route arg selects the command, and the command resolves and the
+process exits — except `<Serve/>`, which loads a site and boots *its* servers through
+the exchange->boot bridge, parking so the process serves. So the workspace entry's
+server boots only when `serve` is invoked, never on load.
 
     cargo install --path crates/beet-cli   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
+    beet serve examples/bsx_site           # load + serve a site
     beet check examples/bsx_site           # lint a no-code site
     beet export-static examples/bsx_site   # write its dist/
 -->
-<Router {(CliServer, BootOnLoad)}>
+<Router {CliServer}>
+	<Serve/>
 	<RunWasm/>
 	<BuildWasm/>
 	<Check/>

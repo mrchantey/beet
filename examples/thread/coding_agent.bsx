@@ -7,10 +7,10 @@ binary:
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent exercises the five blob tools, and
 `{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools, then
-`{RunThread}` exits. The transcript renders inline.
+`{ThreadProgram}` exits. The transcript renders inline.
 -->
 <div>
-	<div {RepeatWhileFunctionCallOutput} {RunThread}>
+	<div {RepeatWhileFunctionCallOutput} {ThreadProgram}>
 		<div {Thread} {Sequence} {FsStore{path:".beet/coding_agent"}} bx:ref="thread">
 			<CreateActor name="System" kind="System">
 				<CreatePost text='
@@ -37,6 +37,6 @@ Please perform the following steps in order:
 		</div>
 	</div>
 	<TuiThreadTranscript>
-		<div {ThreadView{thread:$thread}}/>
+		<div {(ThreadView, OfThread($thread))}/>
 	</TuiThreadTranscript>
 </div>

@@ -16,11 +16,15 @@ mod thread_examples;
 mod worker_entry;
 
 mod serve_plugins;
+// the cross-platform site build core (read a store + build the entry into a root),
+// shared by the native binary, the wasm Worker, and the check/export-static commands.
+mod site_build;
 
 pub mod prelude {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::commands::*;
 	pub use crate::serve_plugins::*;
+	pub use crate::site_build::*;
 	#[cfg(feature = "thread")]
 	pub use crate::thread_examples::*;
 }

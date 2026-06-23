@@ -217,4 +217,31 @@ mod test {
 		(app.world().resource::<Changes>().owner > 0).xpect_true();
 		app.world().resource::<Changes>().sibling.xpect_eq(0);
 	}
+
+	/// The in-memory watcher emits a `Created` then a `Removed` [`BlobEvent`] for an
+	/// insert then a remove of the same object, drained through the bus into the
+	/// global `On<BlobEvent>`. The store-agnostic watcher path live reload rides.
+	#[beet_core::test]
+	async fn in_memory_watcher_emits_created_then_removed() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin));
+		let kinds = Store::<Vec<BlobEventKind>>::default();
+		let captor = kinds.clone();
+		app.world_mut()
+			.add_observer(move |ev: On<BlobEvent>| captor.push(ev.kind));
+		// spawning the store subscribes its watcher; the first update flushes it
+		let store = InMemoryStore::new();
+		app.world_mut().spawn(store.clone());
+		app.update();
+
+		let handle = BlobStore::new(store);
+		handle.insert(&SmolPath::new("a.txt"), "a").await.unwrap();
+		app.update();
+		handle.remove(&SmolPath::new("a.txt")).await.unwrap();
+		app.update();
+
+		kinds
+			.get()
+			.xpect_eq(vec![BlobEventKind::Created, BlobEventKind::Removed]);
+	}
 }

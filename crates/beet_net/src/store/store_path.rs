@@ -25,8 +25,8 @@ use beet_core::prelude::*;
 /// store on the same entity (which then backs that entity's descendants).
 ///
 /// The markup-spawnable "serve/read this subtree of the site store", eg a
-/// [`BlobStoreRoute`](crate::prelude) paired with `DirPath("assets")` to serve the
-/// store's `assets/` subdir.
+/// `ServeBlobs` route paired with `DirPath("assets")` to serve the store's
+/// `assets/` subdir.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
 pub struct DirPath(pub SmolPath);

@@ -8,7 +8,7 @@
 mod html_store;
 pub use html_store::*;
 // the shared static-host serve rules (`serve_blob`) for a [`BlobStore`], used by
-// `BlobStoreRoute` and the HTML-store gate (no_std core).
+// `ServeBlobs` and the HTML-store gate (no_std core).
 mod blob_store;
 pub use blob_store::*;
 // the standard blob-store agent toolset + a markup store mount, composing

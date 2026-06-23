@@ -57,7 +57,7 @@ fn main() -> AppExit {
 /// exits with an error rather than panicking.
 #[cfg(not(target_arch = "wasm32"))]
 fn load_entry(world: &mut World) {
-	let (store, entry_name, watch_dir) = match resolve_site_store() {
+	let resolved = match resolve_site_store() {
 		Ok(resolved) => resolved,
 		Err(err) => {
 			error!("{err}");
@@ -69,13 +69,20 @@ fn load_entry(world: &mut World) {
 	// build can both filter the `templates/` read and lower each source by format.
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	world.run_async_local(async move |world: AsyncWorld| {
-		if let Err(err) =
-			build_entry(&world, store, entry_name, watch_dir, formats).await
-		{
+		if let Err(err) = build_entry(&world, resolved, formats).await {
 			error!("{err}");
 			world.write_message(AppExit::error()).await;
 		}
 	});
+}
+
+/// A resolved site entry: its store, the entry document name within it, and the
+/// local dir to watch for live reload (`None` for a remote site).
+#[cfg(not(target_arch = "wasm32"))]
+struct ResolvedSite {
+	store: BlobStore,
+	entry_name: String,
+	watch_dir: Option<AbsPathBuf>,
 }
 
 /// Build the resolved entry on the async runtime: register the site `templates/`
@@ -86,42 +93,36 @@ fn load_entry(world: &mut World) {
 #[cfg(not(target_arch = "wasm32"))]
 async fn build_entry(
 	world: &AsyncWorld,
-	store: BlobStore,
-	entry_name: String,
-	watch_dir: Option<AbsPathBuf>,
+	resolved: ResolvedSite,
 	formats: TemplateFormats,
 ) -> Result {
-	let sources = read_site_templates(
-		&store,
-		&formats,
-		&SmolPath::from(DEFAULT_TEMPLATES_DIR),
-	)
-	.await?;
-	let media =
-		store.get_media(&SmolPath::from(entry_name.as_str())).await?;
+	let ResolvedSite {
+		store,
+		entry_name,
+		watch_dir,
+	} = resolved;
+	let sources = read_site_sources(&store, formats, entry_name).await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			register_site_templates(world, &formats, sources)?;
-			let template = EntryTemplate::from_bytes(world, &media)
-				.map_err(|err| {
-					bevyhow!("failed to parse entry `{entry_name}`: {err}")
-				})?;
-			// the site store on the root: descendants resolve it by ancestry.
-			let root = world.spawn(store).id();
-			world.entity_mut(root).insert_template(template).map_err(
-				|err| bevyhow!("failed to load entry `{entry_name}`: {err}"),
-			)?;
-			// `--watch` (local dev): spawn a filesystem watcher on the site dir so
-			// editing a template/slide/style hot-reloads connected browsers, the
-			// deck's `<LiveReloadScript/>` widget turning the broadcast into a reload.
-			// Opt-in, so a running presentation never reloads underfoot; a deployed
-			// (S3) site has no local dir to watch.
-			if let Some(dir) = watch_dir {
-				if CliArgs::parse_env().params.contains_key("watch") {
-					world.spawn(LiveReload::new(dir));
-				}
+			// the binary's job is to run the entry, so it injects `BootOnLoad` onto the
+			// root: an entry's markup never declares its own boot (server entries can be
+			// included or loaded directly, the include would clobber a spread anyway),
+			// so the loader fires the boot uniformly. A self-booting verb that requires
+			// `BootOnLoad` (eg a thread's `{ThreadProgram}`) dedups against the injected
+			// one. `BootOnLoad` rides the root spawn so it is present before the build
+			// fires `LoadTemplate`.
+			let root = build_site_root(world, store, sources, BootOnLoad)?;
+			// `--watch` (local dev): mark the root for live reload. Its `FsStore`'s
+			// watcher already emits `BlobEvent`s, so editing a template/slide/style
+			// hot-reloads connected browsers, the deck's `<LiveReloadScript/>` widget
+			// turning the broadcast into a reload. Opt-in, so a running presentation
+			// never reloads underfoot; a deployed (S3) site has no local dir to watch.
+			if watch_dir.is_some()
+				&& CliArgs::parse_env().params.contains_key("watch")
+			{
+				world.entity_mut(root).insert(LiveReload::new());
+				world.flush();
 			}
-			world.flush();
 			Ok(())
 		})
 		.await
@@ -134,13 +135,17 @@ async fn build_entry(
 /// A deployed task (`BEET_SERVICE_ACCESS=remote`) loads the site from its S3
 /// bucket; otherwise discovery walks the filesystem for a local `main.bsx`.
 #[cfg(not(target_arch = "wasm32"))]
-fn resolve_site_store() -> Result<(BlobStore, String, Option<AbsPathBuf>)> {
+fn resolve_site_store() -> Result<ResolvedSite> {
 	// remote: pull the whole site from the S3 bucket the deploy injected; there is
 	// no local directory to watch.
 	#[cfg(feature = "aws_sdk")]
 	if remote_access() {
 		let (store, entry_name) = remote_site_store()?;
-		return Ok((store, entry_name, None));
+		return Ok(ResolvedSite {
+			store,
+			entry_name,
+			watch_dir: None,
+		});
 	}
 
 	// local: the binary's own `--main` overrides discovery; the loaded tree
@@ -162,7 +167,11 @@ fn resolve_site_store() -> Result<(BlobStore, String, Option<AbsPathBuf>)> {
 		.and_then(|name| name.to_str())
 		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
 		.to_string();
-	Ok((BlobStore::new(FsStore::new(dir.clone())), entry_name, Some(dir)))
+	Ok(ResolvedSite {
+		store: BlobStore::new(FsStore::new(dir.clone())),
+		entry_name,
+		watch_dir: Some(dir),
+	})
 }
 
 /// Whether the runtime should access services remotely (the deployed task), read

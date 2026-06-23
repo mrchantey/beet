@@ -15,7 +15,7 @@ the package resource patched from markup -->
 <Router {(RequestLogger, BsxLayout{template:"Layout"})}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
 	<RoutesDir src="routes"/>
-	<BlobStoreRoute mount="assets" {DirPath("assets")}/>
+	<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>
 </Router>
 "#;
 
@@ -45,47 +45,37 @@ const COUNTER_BSX: &str = r#"
 </article>
 "#;
 
-/// Write the site fixture (entry, layout template, content routes) and return
-/// its root directory.
-///
-/// Each call gets its own numbered directory: the suite's async tests run
-/// concurrently, so a shared fixture dir would let one test's `fs_ext::remove`
-/// wipe another's `templates/` mid-scan (a spurious "no template registered").
-fn site_fixture() -> AbsPathBuf {
-	static SEQ: std::sync::atomic::AtomicU32 =
-		std::sync::atomic::AtomicU32::new(0);
-	let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-	let root = AbsPathBuf::new(
-		fs_ext::workspace_root().join(format!("target/tests/bsx_site_e2e/{seq}")),
-	)
-	.unwrap();
-	fs_ext::remove(&root).ok();
-	fs_ext::write(root.join("main.bsx"), MAIN_BSX).unwrap();
-	fs_ext::write(root.join("templates/Layout.bsx"), LAYOUT_BSX).unwrap();
-	fs_ext::write(root.join("templates/widgets/Card.bsx"), CARD_BSX).unwrap();
-	fs_ext::write(root.join("routes/index.md"), "# Home\n\nwelcome").unwrap();
-	fs_ext::write(root.join("routes/counter.bsx"), COUNTER_BSX).unwrap();
-	// a static asset the `<BlobStoreRoute src="assets"/>` mount streams
-	fs_ext::write(root.join("assets/style.css"), "body { color: red; }")
-		.unwrap();
-	fs_ext::write(
-		root.join("routes/docs/intro.md"),
-		"+++\ntitle = \"The Intro\"\norder = 1\n+++\n\n# Intro\n\nintro body",
-	)
-	.unwrap();
-	root
+/// Seed an in-memory site store (entry, layout template, content routes) so the
+/// suite runs storage-agnostic, on wasm too, with no temp-dir concurrency hazard.
+async fn site_store() -> BlobStore {
+	let store = BlobStore::temp();
+	for (path, content) in [
+		("main.bsx", MAIN_BSX),
+		("templates/Layout.bsx", LAYOUT_BSX),
+		("templates/widgets/Card.bsx", CARD_BSX),
+		("routes/index.md", "# Home\n\nwelcome"),
+		("routes/counter.bsx", COUNTER_BSX),
+		// a static asset the `<Route ... {ServeBlobs}/>` mount streams
+		("assets/style.css", "body { color: red; }"),
+		(
+			"routes/docs/intro.md",
+			"+++\ntitle = \"The Intro\"\norder = 1\n+++\n\n# Intro\n\nintro body",
+		),
+	] {
+		store.insert(&SmolPath::from(path), content).await.unwrap();
+	}
+	store
 }
 
 /// The example's `main.rs` setup in miniature: plugins + the compile-time
 /// package config (the title/description come from `MAIN_BSX`), then register
 /// the site templates and spawn the entry.
 async fn spawn_site(world: &mut World) -> Entity {
-	let site_dir = site_fixture();
 	world.insert_resource(pkg_config!());
 	// the same store-backed load the binary and Worker run: register `templates/`
 	// and read the entry through the site store, then build into a root carrying
 	// that store so `RoutesDir` and `<Template src>` resolve it by ancestry.
-	let store = BlobStore::new(FsStore::new(site_dir));
+	let store = site_store().await;
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	let sources =
 		read_site_templates(&store, &formats, &SmolPath::from(DEFAULT_TEMPLATES_DIR))
@@ -147,11 +137,11 @@ async fn entry_components_land_on_root() {
 	tree.find(&["docs", "intro"]).is_some().xpect_true();
 }
 
-/// The markup `<BlobStoreRoute mount="assets" {DirPath("assets")}/>` mounts the
-/// on-disk `assets/` directory (the `DirPath` scopes the site store to that subdir,
-/// resolved at insert time) and streams files beneath it.
+/// The markup `<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>`
+/// mounts the on-disk `assets/` directory (the `DirPath` scopes the site store to
+/// that subdir, resolved at insert time) and streams files beneath it.
 #[beet_core::test]
-async fn blob_store_route_serves_assets() {
+async fn serve_blobs_serves_assets() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let root = spawn_site(&mut world).await;
 	world
@@ -361,6 +351,39 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 			.xnot()
 			.xpect_contains("export-static");
 	}
+}
+
+/// `site/main.bsx`'s shape: an entry root injected with `BootOnLoad` (the way the
+/// binary boots a local entry) keeps it through a `<Template src="server.bsx"/>`
+/// include, so `BootOnLoad` co-resides with the server's boot slot (`CliServer`
+/// here) on the included root and the boot resolves. The regression guard for moving
+/// `BootOnLoad` off `server.bsx`.
+#[beet_core::test]
+async fn main_bsx_include_co_resides_boot_with_server() {
+	let store = BlobStore::temp();
+	store
+		.insert(&SmolPath::from("server.bsx"), "<Router {CliServer}/>")
+		.await
+		.unwrap();
+	store
+		.insert(&SmolPath::from("main.bsx"), "<Template src=\"server.bsx\"/>")
+		.await
+		.unwrap();
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
+	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
+	let template =
+		BsxTemplate::parse_entry(&world, entry.as_utf8().unwrap()).unwrap();
+	// the binary boots a local entry by spawning the root with `BootOnLoad` (as
+	// `build_site_root`'s `extra`), then building the entry onto it.
+	let root = world.spawn((BootOnLoad, store)).id();
+	world.entity_mut(root).insert_template(template).unwrap();
+	// the include resolves as an async pending dependency, so settle first
+	AsyncRunner::settle_async_tasks(&mut world).await;
+	// the included Router's boot slot (`CliServer`) + the injected `BootOnLoad`
+	// co-reside on the entry root, so the boot can resolve.
+	world.entity(root).contains::<Router>().xpect_true();
+	world.entity(root).contains::<CliServer>().xpect_true();
+	world.entity(root).contains::<BootOnLoad>().xpect_true();
 }
 
 #[beet_core::test]

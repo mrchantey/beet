@@ -32,10 +32,10 @@
 mod http_server;
 pub use http_server::*;
 
-// The shared park-and-shutdown machinery every bootable server uses, keyed by the
-// server marker. no_std-capable like `HttpServer`, which depends on it.
-mod server_shutdown;
-pub use server_shutdown::*;
+// The shared boot, park and shutdown lifecycle every bootable server uses, keyed by
+// the server marker. no_std-capable like `HttpServer`, which depends on it.
+mod server_lifecycle;
+pub use server_lifecycle::*;
 
 // In-memory channel-backed HTTP server: shares `HttpServer`'s boot/park/dispatch
 // machinery over an `async_channel` instead of a socket. `std` for `async-channel`,
@@ -61,6 +61,14 @@ pub use boot_exchange::*;
 mod boot;
 #[cfg(feature = "action")]
 pub use boot::*;
+
+// the boot<->exchange bridges: a boot drives the request pipeline (`BootToExchange`)
+// or a request handler boots another entry (`ExchangeToBoot`). no_std-clean like the
+// boot path, gated on the `Action` slots they install.
+#[cfg(feature = "action")]
+mod boot_bridge;
+#[cfg(feature = "action")]
+pub use boot_bridge::*;
 
 #[cfg(feature = "action")]
 mod cli_server;

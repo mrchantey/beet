@@ -9,7 +9,7 @@ use beet_net::prelude::*;
 /// reload of the scene resumes rather than starting fresh:
 /// `<div {Thread} {Sequence} {MountThreadStore{path:"examples/thread/chat"}}>`.
 ///
-/// `path` is workspace-relative. This is a *deferred* mount: [`RunThread`] builds
+/// `path` is workspace-relative. This is a *deferred* mount: [`ThreadProgram`] builds
 /// the [`ThreadStore`], adopts the stored conversation by seed hash, and only then
 /// inserts the store onto the thread, so the persistence sync never flushes a
 /// fresh, un-adopted thread (which would fork a duplicate on every reload). This

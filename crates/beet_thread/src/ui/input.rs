@@ -15,30 +15,19 @@ use beet_ui::prelude::*;
 /// both drive it through `beet_ui`'s form + focus-input machinery, the
 /// cross-platform input for a thread (no blocking stdin read).
 ///
-/// Host-agnostic content bound to a thread, so from markup it is a component
-/// spread pointing at a `bx:ref` thread: `<div {ThreadComposer{thread:$thread}}/>`.
-#[derive(Debug, Clone, Copy, Component, Reflect, MapEntities)]
-#[reflect(Component, MapEntities, Default)]
+/// Host-agnostic content bound to a thread with an [`OfThread`] relationship. A
+/// marker, so the bound thread lives in the relationship, not a stored field. From
+/// markup the two spread together onto one entity:
+/// `<div {(ThreadComposer, OfThread($thread))}/>`.
+#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
+#[reflect(Component, Default)]
 #[component(on_add = thread_composer_on_add)]
-pub struct ThreadComposer {
-	/// The thread entity whose window a submitted message is appended to.
-	/// `#[entities]` so a markup `$thread` reference remaps after spawn.
-	#[entities]
-	pub thread: Entity,
-}
-
-impl Default for ThreadComposer {
-	fn default() -> Self {
-		Self {
-			thread: Entity::PLACEHOLDER,
-		}
-	}
-}
+pub struct ThreadComposer;
 
 impl ThreadComposer {
-	/// A composer for `thread`. Its `<form>` content is attached in `on_add`, so
-	/// the component works both as a direct spawn and as a markup spread.
-	pub fn new(thread: Entity) -> Self { Self { thread } }
+	/// A composer bound to `thread`. Its `<form>` content is attached in `on_add`,
+	/// so the bundle works both as a direct spawn and as a markup spread.
+	pub fn new(thread: Entity) -> impl Bundle { (Self, OfThread(thread)) }
 }
 
 /// Attach the composer's `<form>` (a `message` field + submit button) when added,
@@ -220,18 +209,21 @@ pub async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 /// [`user_input_action`] can await its [`Submit`].
 #[derive(SystemParam)]
 pub struct ComposerForms<'w, 's> {
-	composers: Query<'w, 's, (Entity, &'static ThreadComposer)>,
+	items: Query<'w, 's, &'static ThreadItems>,
+	composers: Query<'w, 's, (), With<ThreadComposer>>,
 	elements: ElementQuery<'w, 's>,
 }
 
 impl ComposerForms<'_, '_> {
-	/// The `<form>` entity of the composer bound to `thread`, if one is mounted.
+	/// The `<form>` entity of the composer bound to `thread`, if one is mounted:
+	/// the thread's first `ThreadItems` member that is a [`ThreadComposer`].
 	fn form_for_thread(&self, thread: Entity) -> Option<Entity> {
 		let composer = self
-			.composers
+			.items
+			.get(thread)
+			.ok()?
 			.iter()
-			.find(|(_, composer)| composer.thread == thread)
-			.map(|(entity, _)| entity)?;
+			.find(|item| self.composers.contains(*item))?;
 		self.elements
 			.iter_descendants_inclusive(composer)
 			.find(|view| view.tag() == "form")

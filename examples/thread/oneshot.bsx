@@ -3,18 +3,18 @@ The simplest thread: one agent, one turn, no loop. Run it through the one binary
 
     beet --main=examples/thread/oneshot.bsx
 
-`{RunThread}` calls the `{Sequence}` once (the system seed, then the agent's
+`{ThreadProgram}` calls the `{Sequence}` once (the system seed, then the agent's
 single reply), then exits the process. The transcript renders inline so it stays
 in the terminal scrollback after exit.
 -->
 <div>
-	<div bx:ref="thread" {Thread} {Sequence} {RunThread}>
+	<div bx:ref="thread" {Thread} {Sequence} {ThreadProgram}>
 		<CreateActor name="System" kind="System">
 			<CreatePost text="make like a duck and quack"/>
 		</CreateActor>
 		<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
 	</div>
 	<TuiThreadTranscript>
-		<div {ThreadView{thread:$thread}}/>
+		<div {(ThreadView, OfThread($thread))}/>
 	</TuiThreadTranscript>
 </div>

@@ -130,33 +130,19 @@ async fn build_site(
 	// and `<Template src>` all resolve through it (composed on the root below).
 	let store = BlobStore::new(store);
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let sources = read_site_templates(
-		&store,
-		&formats,
-		&SmolPath::from(DEFAULT_TEMPLATES_DIR),
-	)
-	.await?;
-	register_site_templates(world, &formats, sources)?;
-	let entry = store.get_media(&SmolPath::from(ENTRY_NAME)).await?;
-
-	// build the entry into a root carrying the site store (so `RoutesDir` and
-	// `<Template src>` resolve it by ancestry) plus `DisableBootOnLoad`: the Worker
-	// itself routes each request through the host's `Router` action via `exchange`,
-	// so the servers the site's `main.bsx` declares (`HttpServer`, `TuiServer`, ...)
-	// must stay dormant. Without `DisableBootOnLoad` the entry's `BootOnLoad` verb
-	// boots them on `LoadTemplate`, and `HttpServer`'s start hits the (wasm-absent)
-	// backend and panics. Same suppression `export-static`/`check` use.
+	// read the `templates/` and entry document through the store (awaited, never
+	// blocked), then build the entry into a root carrying the site store plus
+	// `DisableBootOnLoad`: the Worker itself routes each request through the host's
+	// `Router` action via `exchange`, so the servers the site's `main.bsx` declares
+	// (`HttpServer`, `TuiServer`, ...) must stay dormant. Without `DisableBootOnLoad`
+	// the entry's `BootOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
+	// start hits the (wasm-absent) backend and panics. Same suppression
+	// `export-static`/`check` use.
 	//
 	// the build's `Insert, RoutesDir` observer queues the route discovery (a store
 	// scan) as an async task, settled below before the host is served.
-	let template = EntryTemplate::from_bytes(world, &entry)
-		.map_err(|err| bevyhow!("failed to parse entry `{ENTRY_NAME}`: {err}"))?;
-	let root = world.spawn((DisableBootOnLoad, store)).id();
-	world
-		.entity_mut(root)
-		.insert_template(template)
-		.map_err(|err| bevyhow!("failed to load entry `{ENTRY_NAME}`: {err}"))?;
-	world.flush();
+	let sources = read_site_sources(&store, formats, ENTRY_NAME).await?;
+	build_site_root(world, store, sources, DisableBootOnLoad)?;
 	// settle the async runtime so the discovered routes (and any other boot-time
 	// async) land before the host is queried and served.
 	AsyncRunner::settle_async_tasks(world).await;

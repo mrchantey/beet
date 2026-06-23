@@ -53,7 +53,7 @@ impl Plugin for RouterPlugin {
 			app
 				// store types + the store-path resolution observers (`DirPath` /
 				// `BlobPath` -> scoped `BlobStore` / `Blob`), which `RoutesDir` and
-				// `BlobStoreRoute` resolve by ancestry.
+				// `ServeBlobs` resolve by ancestry.
 				.init_plugin::<StorePlugin>()
 				// the server model: routers and servers go together, so a server
 				// spread on a router boots when the boot fan-out reaches it.
@@ -111,10 +111,11 @@ impl Plugin for RouterPlugin {
 			// wasm too rather than needing a separate blocking/async split.
 			app.register_type::<RoutesDir>()
 				.add_observer(spawn_routes_dir);
-			// the no-code static-asset mount, eg `<BlobStoreRoute src="assets"/>`: a
-			// template that expands to a blob-store-backed serve route. Native-only.
-			#[cfg(not(target_arch = "wasm32"))]
-			app.register_template::<BlobStoreRoute>();
+			// the no-code static-asset mount: the `<Route>` element (a `PathPartial`)
+			// plus the `ServeBlobs` blob-store-backed handler spread onto it, eg
+			// `<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>`.
+			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
+			app.register_template::<Route>().register_type::<ServeBlobs>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `default_router` wires the
@@ -125,6 +126,10 @@ impl Plugin for RouterPlugin {
 				.add_observer(broadcast_to_clients)
 				.add_observer(start_live_reload)
 				.add_observer(reload_site_on_change)
+				.add_systems(
+					Update,
+					process_live_reloads.run_if(any_with_component::<NeedsReload>),
+				)
 				.register_template::<LiveReloadScript>();
 			// where client_io is compiled out (wasm Worker, no-dev-reload builds)
 			// mark `<LiveReloadScript/>` as a known featured-out tag, so a site

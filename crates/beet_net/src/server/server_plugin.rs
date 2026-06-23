@@ -19,7 +19,11 @@ impl Plugin for ServerPlugin {
 			// `<Router {(.., BootOnLoad)}>` entry resolves them.
 			.register_type::<BootOnLoad>()
 			.register_type::<ExchangeOnLoad>()
-			.register_type::<DisableBootOnLoad>();
+			.register_type::<DisableBootOnLoad>()
+			// the boot<->exchange bridges, markup-spawnable so an entry can wire a
+			// boot into its request pipeline or boot another entry from a route.
+			.register_type::<BootToExchange>()
+			.register_type::<ExchangeToBoot>();
 
 		// the process exits when `boot` writes `AppExit` for the one-shot it
 		// resolves; a long-running server never resolves its boot call, so its

@@ -7,6 +7,7 @@ mod export_static;
 mod qrcode;
 mod run_wasm;
 mod s3_sync;
+mod serve;
 mod site;
 
 pub use check::*;
@@ -16,6 +17,7 @@ pub use export_static::*;
 pub use qrcode::*;
 pub use run_wasm::*;
 pub use s3_sync::*;
+pub use serve::*;
 pub(crate) use site::*;
 
 use beet::prelude::*;
@@ -29,6 +31,9 @@ impl Plugin for CliCommandsPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<Check>()
 			.register_type::<ExportStatic>()
+			// `serve <site>` loads a site and boots its servers (the only command
+			// that boots the workspace entry's server, via the exchange->boot bridge)
+			.register_type::<Serve>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()
 			.register_type::<ExportPdf>()

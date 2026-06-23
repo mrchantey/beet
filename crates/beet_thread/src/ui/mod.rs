@@ -17,6 +17,8 @@
 
 mod input;
 pub use input::*;
+mod of_thread;
+pub use of_thread::*;
 mod scene;
 pub use scene::*;
 mod thread_view;
@@ -35,6 +37,9 @@ impl Plugin for ThreadUiPlugin {
 		app.register_type::<ThreadView>()
 			.register_type::<ThreadScroll>()
 			.register_type::<ThreadComposer>()
+			// the thread<->UI relationship binding views/composers to their thread
+			.register_type::<OfThread>()
+			.register_type::<ThreadItems>()
 			.register_type::<UserInput>()
 			// the local charcell host shells, declarable from markup
 			.register_template::<TuiThreadChat>()

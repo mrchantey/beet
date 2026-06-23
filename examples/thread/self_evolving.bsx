@@ -6,10 +6,10 @@ across turns. Run it through the one binary:
 
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent evolves `notes.md` over ten turns (`{RepeatTimes}`), and
-`{RunThread}` exits when they complete. The transcript renders inline.
+`{ThreadProgram}` exits when they complete. The transcript renders inline.
 -->
 <div>
-	<div {RepeatTimes{total_times:10}} {RunThread}>
+	<div {RepeatTimes{total_times:10}} {ThreadProgram}>
 		<div {Thread} {Sequence} {FsStore{path:"target/examples/self_evolving"}} bx:ref="thread">
 			<CreateActor name="System" kind="System">
 				<CreatePost text="
@@ -32,6 +32,6 @@ state in one sentence what you changed.
 		</div>
 	</div>
 	<TuiThreadTranscript>
-		<div {ThreadView{thread:$thread}}/>
+		<div {(ThreadView, OfThread($thread))}/>
 	</TuiThreadTranscript>
 </div>

@@ -5,46 +5,42 @@
 //! the app root with its `templates/` registered. The site declares its own
 //! servers and app routes in `main.bsx`; these helpers only resolve and load it.
 
+use crate::prelude::*;
 use beet::prelude::*;
 
-/// Load the site onto the caller's world, returning its root entity.
+/// Load the site onto the caller's world through its [`BlobStore`], returning its
+/// root entity.
+///
+/// `check`/`export-static` render the site rather than serve it, so the root carries
+/// [`DisableBootOnLoad`] to keep the entry's `BootOnLoad` verb dormant. The reads go
+/// through the store ([`read_site_sources`]/[`build_site_root`]), the same agnostic
+/// core the native binary and the wasm Worker use, so the command is store-driven
+/// rather than filesystem-bound.
 pub(crate) async fn build_site(
 	caller: &AsyncEntity,
 	site_dir: AbsPathBuf,
 	entry: AbsPathBuf,
 ) -> Result<Entity> {
+	let entry_name = entry
+		.file_name()
+		.and_then(|name| name.to_str())
+		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
+		.to_string();
+	let store = BlobStore::new(FsStore::new(site_dir));
+	let formats = caller
+		.with_world(|world, _| {
+			world.get_resource_or_init::<TemplateFormats>().clone()
+		})
+		.await?;
+	let sources = read_site_sources(&store, formats, entry_name).await?;
 	let root = caller
-		.with_world(move |world, _caller| load_site(world, site_dir, entry))
+		.with_world(move |world, _| {
+			build_site_root(world, store, sources, DisableBootOnLoad)
+		})
 		.await??;
 	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
 	// every discovered route exists before the caller renders/exports the site.
 	settle_routes_dirs(caller.world()).await?;
-	Ok(root)
-}
-
-/// The synchronous site load: register the site's `templates/` and build the
-/// `main.bsx` entry into a root carrying the site [`BlobStore`] (which `<RoutesDir>`
-/// and `<Template src>` resolve by ancestry). Reads the local filesystem directly
-/// (`check`/`export-static` always run on a local site dir), so it never blocks.
-pub(crate) fn load_site(
-	world: &mut World,
-	site_dir: AbsPathBuf,
-	entry: AbsPathBuf,
-) -> Result<Entity> {
-	// register `templates/` from the filesystem, if the site declares any.
-	let templates = site_dir.join("templates");
-	if fs_ext::exists(&templates)? {
-		world.register_bsx_templates(&templates)?;
-	}
-	let source = fs_ext::read_to_string(&entry)?;
-	let template = BsxTemplate::parse_entry(world, &source)?;
-	// `check`/`export-static` render the site, never serve it: build into a root
-	// carrying `DisableBootOnLoad` so the entry's `BootOnLoad` verb stays dormant.
-	// The site store on the root backs `RoutesDir`/`<Template src>` by ancestry.
-	let root = world
-		.spawn((DisableBootOnLoad, FsStore::new(site_dir)))
-		.id();
-	world.entity_mut(root).insert_template(template)?;
 	Ok(root)
 }
 
@@ -142,16 +138,23 @@ mod test {
 			.xpect_contains("site not found");
 	}
 
-	/// The site declares its own server and app routes: loading `main.bsx` yields
-	/// a root carrying the markup-declared `HttpServer` plus the default app
-	/// routes it requested with `<DefaultAppRoutes/>` (eg `/js/reactivity.js`).
+	/// The site declares its own server and app routes: loading `main.bsx` through
+	/// the site store yields a root carrying the markup-declared `HttpServer` plus
+	/// the default app routes it requested with `<DefaultAppRoutes/>` (eg
+	/// `/js/reactivity.js`).
 	#[beet::test]
-	fn site_declares_server_and_app_routes() {
+	async fn site_declares_server_and_app_routes() {
 		let mut world = render_world();
 		let SiteEntry { site_dir, entry } =
 			resolve_site(site_path().to_string_lossy().as_ref()).unwrap();
-		let root = load_site(&mut world, site_dir, entry).unwrap();
-		world.flush();
+		let entry_name =
+			entry.file_name().and_then(|name| name.to_str()).unwrap().to_string();
+		let store = BlobStore::new(FsStore::new(site_dir));
+		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+		let sources =
+			read_site_sources(&store, formats, entry_name).await.unwrap();
+		let root =
+			build_site_root(&mut world, store, sources, DisableBootOnLoad).unwrap();
 		// the markup `<Router {(.., HttpServer{..})}>` declared a server
 		world.entity(root).contains::<HttpServer>().xpect_true();
 		// and `<DefaultAppRoutes/>` wired the reactivity-runtime route

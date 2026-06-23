@@ -260,6 +260,8 @@ async fn upgrade_connection(
 
 #[cfg(test)]
 mod test {
+	// only the `ureq`-gated roundtrip below reads the parent module's items.
+	#[cfg(feature = "ureq")]
 	use super::*;
 
 	// -- integration test via shared suite --

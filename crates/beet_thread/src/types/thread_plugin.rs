@@ -23,11 +23,11 @@ impl Plugin for ThreadPlugin {
 			// agent-loop control flow, as markup. `StoreToolset` is registered
 			// upstream by `RouterPlugin` (init above); the store is a plain `FsStore`.
 			.register_type::<RepeatWhileFunctionCallOutput>()
-			.register_type::<RunThread>()
+			// markup verb: boot the thread as a program on load (via `BootOnLoad` +
+			// an `Action<Boot, Response>` slot), exiting when it completes
+			.register_type::<ThreadProgram>()
 			// markup persistence: declare a thread-record store from `.bsx`
-			.register_type::<MountThreadStore>()
-			// markup kick: call the thread on load, exit when it completes
-			.add_systems(Update, run_thread_on_load);
+			.register_type::<MountThreadStore>();
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────

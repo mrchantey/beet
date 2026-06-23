@@ -7,8 +7,8 @@
 //!
 //! ```rsx
 //! <TuiThreadChat>
-//!   <div {ThreadView{thread:$thread}}/>
-//!   <div {ThreadComposer{thread:$thread}}/>
+//!   <div {(ThreadView, OfThread($thread))}/>
+//!   <div {(ThreadComposer, OfThread($thread))}/>
 //! </TuiThreadChat>
 //! ```
 

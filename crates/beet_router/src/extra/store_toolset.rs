@@ -1,7 +1,7 @@
 //! The standard blob-store agent toolset.
 //!
 //! This composes [`exchange_route`] with `beet_net`'s blob-store actions, so it
-//! lives with the other `extra` router pieces (eg [`BlobStoreRoute`]) rather than
+//! lives with the other `extra` router pieces (eg [`ServeBlobs`]) rather than
 //! in a downstream crate. An agent crate re-exports it for its scenes.
 
 use crate::prelude::*;

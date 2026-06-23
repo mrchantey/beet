@@ -1,11 +1,11 @@
-//! The shared park-and-shutdown machinery every bootable server uses.
+//! The shared boot, park and shutdown lifecycle every bootable server uses.
 //!
 //! A long-running server (http, socket, and their channel variants) boots on the
 //! [`StartRunning<Boot>`] fan-out, parks on the host's [`Running<Response>`]
 //! keep-alive, and tears down when that `Running` is removed. The only per-server
 //! differences are the `--server` selector and the serve-loop launcher, so this
 //! captures the rest once: [`BootServer`] supplies those two seams (plus an
-//! optional boot-request hook) and [`ServerShutdown<S>`] holds the teardown signal,
+//! optional boot-request hook) and [`ServerLifecycle<S>`] holds the teardown signal,
 //! keyed by the server marker so co-resident servers never clobber a shared one.
 
 use crate::prelude::*;
@@ -15,7 +15,7 @@ use bevy::ecs::component::Mutable;
 use core::marker::PhantomData;
 
 /// A bootable, parking server: supplies the `--server` selector and the serve-loop
-/// launcher the shared [`ServerShutdown<Self>`] machinery drives.
+/// launcher the shared [`ServerLifecycle<Self>`] machinery drives.
 ///
 /// The four built-in servers ([`HttpServer`], [`SocketServer`] and their channel
 /// variants) implement it; a downstream server does too rather than re-deriving the
@@ -47,12 +47,12 @@ pub trait BootServer: Component<Mutability = Mutable> {
 /// on one Router) each hold their own, never clobbering a shared signal. Replaced on
 /// each boot, so a reboot installs a fresh one.
 #[derive(Component)]
-pub struct ServerShutdown<S: BootServer> {
+pub struct ServerLifecycle<S: BootServer> {
 	signal: Option<OnceValue<()>>,
 	_marker: PhantomData<fn() -> S>,
 }
 
-impl<S: BootServer> ServerShutdown<S> {
+impl<S: BootServer> ServerLifecycle<S> {
 	/// Register the shared boot + teardown observers on the host: the one place the
 	/// observer pair is wired. Each server's `on_add` hook calls this with its marker.
 	pub fn add_observers(world: &mut DeferredWorld, entity: Entity) {
@@ -93,7 +93,7 @@ fn boot_server<S: BootServer>(
 	let (signal, shutdown) = oneshot::<()>();
 	commands
 		.entity(entity)
-		.insert(ServerShutdown::<S> {
+		.insert(ServerLifecycle::<S> {
 			signal: Some(signal),
 			_marker: PhantomData,
 		})
@@ -108,7 +108,7 @@ fn boot_server<S: BootServer>(
 /// is a no-op.
 fn teardown_server<S: BootServer>(
 	ev: On<Remove, Running<Response>>,
-	mut shutdowns: Query<&mut ServerShutdown<S>>,
+	mut shutdowns: Query<&mut ServerLifecycle<S>>,
 ) {
 	if let Ok(mut shutdown) = shutdowns.get_mut(ev.event().event_target())
 		&& let Some(signal) = shutdown.signal.take()

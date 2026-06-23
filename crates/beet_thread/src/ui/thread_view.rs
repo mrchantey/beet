@@ -18,37 +18,26 @@ use beet_ui::prelude::*;
 /// per-row [`FieldRef`]s resolve against it via `DocumentPath::Ancestor`.
 ///
 /// Host-agnostic content, not a host: spawn it under any render surface (a
-/// charcell terminal host, a web page) and point it at the thread entity. From
-/// markup it is a component spread bound to a `bx:ref` thread, so the same view
-/// serves a local terminal and a per-connection server surface alike:
+/// charcell terminal host, a web page) and bind it to its thread with an
+/// [`OfThread`] relationship. A marker, so the bound thread lives in the
+/// relationship, not a stored field. From markup the two spread together onto one
+/// entity, so the same view serves a local terminal and a per-connection server
+/// surface alike:
 ///
 /// ```rsx
 /// <div bx:ref="thread" {Thread} {Sequence}>..</div>
-/// <div {ThreadView{thread:$thread}}/>
+/// <div {(ThreadView, OfThread($thread))}/>
 /// ```
-#[derive(Debug, Clone, Copy, Component, Reflect, MapEntities)]
-#[reflect(Component, MapEntities, Default)]
+#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
+#[reflect(Component, Default)]
 #[require(Document)]
 #[component(on_add = thread_view_on_add)]
-pub struct ThreadView {
-	/// The thread entity whose [`ThreadWindow`] this view renders. `#[entities]`
-	/// so a markup `$thread` reference remaps to the real entity after spawn.
-	#[entities]
-	pub thread: Entity,
-}
-
-impl Default for ThreadView {
-	fn default() -> Self {
-		Self {
-			thread: Entity::PLACEHOLDER,
-		}
-	}
-}
+pub struct ThreadView;
 
 impl ThreadView {
-	/// A view of `thread`. Its reactive content is attached in `on_add`, so the
-	/// component works both as a direct spawn and as a markup spread.
-	pub fn new(thread: Entity) -> Self { Self { thread } }
+	/// A view bound to `thread`. Its reactive content is attached in `on_add`, so
+	/// the bundle works both as a direct spawn and as a markup spread.
+	pub fn new(thread: Entity) -> impl Bundle { (Self, OfThread(thread)) }
 }
 
 /// Attach the reactive post list when a [`ThreadView`] is added: a scroll
@@ -111,19 +100,21 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 /// rather than rebuilding it, so streaming flows through the bound [`Value`].
 pub fn project_window_to_document(
 	mut commands: Commands,
-	windows: Query<(Entity, &ThreadWindow), Changed<ThreadWindow>>,
-	views: Query<(Entity, &ThreadView)>,
+	windows: Query<(Entity, &ThreadWindow, Option<&ThreadItems>), Changed<ThreadWindow>>,
+	views: Query<(), With<ThreadView>>,
 	mut documents: Query<&mut Document>,
 ) -> Result {
-	for (thread_entity, window) in windows.iter() {
+	for (thread_entity, window, items) in windows.iter() {
 		let value = project_window(window);
 		// the contract's thread-side document, inserted if absent
 		set_document(&mut commands, &mut documents, thread_entity, value.clone());
-		// every view of this thread renders against its own co-located document
-		views
-			.iter()
-			.filter(|(_, view)| view.thread == thread_entity)
-			.for_each(|(view_entity, _)| {
+		// every view item of this thread renders against its own co-located document,
+		// reached by traversing the thread's `ThreadItems` instead of scanning views.
+		items
+			.into_iter()
+			.flat_map(|items| items.iter())
+			.filter(|item| views.contains(*item))
+			.for_each(|view_entity| {
 				set_document(
 					&mut commands,
 					&mut documents,
@@ -192,10 +183,11 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// The declarative binding the scenes rely on: a `{ThreadView{thread:$thread}}`
-	/// spread resolves its `$thread` reference to the `bx:ref="thread"` Thread
-	/// entity (via `#[entities]` + `MapEntities`), so the view renders the thread a
-	/// sibling subtree declares, with no Rust glue.
+	/// The declarative binding the scenes rely on: an `{(ThreadView, OfThread($thread))}`
+	/// spread resolves its `$thread` reference to the `bx:ref="thread"` Thread entity
+	/// (the relationship machinery remaps it), so the view renders the thread a sibling
+	/// subtree declares, with no Rust glue. The thread then names the view through its
+	/// `ThreadItems`.
 	#[beet_core::test]
 	fn thread_view_binds_to_referenced_thread() {
 		let mut app = App::new();
@@ -205,7 +197,7 @@ mod test {
 		let source = r#"
 <div>
 	<div bx:ref="thread" {Thread} {Sequence}/>
-	<span {ThreadView{thread:$thread}}/>
+	<span {(ThreadView, OfThread($thread))}/>
 </div>
 "#;
 		BsxTemplate::parse_entry(app.world(), source)
@@ -219,13 +211,20 @@ mod test {
 			.query_filtered::<Entity, With<Thread>>()
 			.single(app.world())
 			.unwrap();
-		let bound = app
+		let (view, of_thread) = app
 			.world_mut()
-			.query::<&ThreadView>()
+			.query_filtered::<(Entity, &OfThread), With<ThreadView>>()
 			.single(app.world())
+			.unwrap();
+		// the `$thread` placeholder remapped to the real Thread entity ...
+		of_thread.thread().xpect_eq(thread);
+		// ... and the thread names the view back through its `ThreadItems`.
+		app.world()
+			.entity(thread)
+			.get::<ThreadItems>()
 			.unwrap()
-			.thread;
-		// the `$thread` placeholder remapped to the real Thread entity
-		bound.xpect_eq(thread);
+			.iter()
+			.any(|item| item == view)
+			.xpect_true();
 	}
 }
