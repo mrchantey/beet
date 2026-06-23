@@ -25,7 +25,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<RepeatWhileFunctionCallOutput>()
 			// markup verb: boot the thread as a program on load (via `BootOnLoad` +
 			// an `Action<Boot, Response>` slot), exiting when it completes
-			.register_type::<ThreadProgram>()
+			.register_type::<CreateThread>()
 			// markup persistence: declare a thread-record store from `.bsx`
 			.register_type::<MountThreadStore>();
 

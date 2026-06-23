@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// with no hand-written kick glue:
 ///
 /// ```rsx
-/// <div {(Repeat, ThreadProgram)}>
+/// <div {(Repeat, CreateThread)}>
 ///     <div {Thread} {Sequence}> ..actors.. </div>
 /// </div>
 /// ```
@@ -33,9 +33,9 @@ use beet_net::prelude::*;
 #[reflect(Component, Default)]
 #[require(BootOnLoad)]
 #[require(Action<Boot, Response> = Action::new_async_local(run_thread_on_boot))]
-pub struct ThreadProgram;
+pub struct CreateThread;
 
-/// The `Action<Boot, Response>` boot slot [`ThreadProgram`] installs: adopt the
+/// The `Action<Boot, Response>` boot slot [`CreateThread`] installs: adopt the
 /// thread's persistent store (honoring `--new` from the boot args), then call the
 /// thread's behavior to completion. An empty `Response::ok()` exits successfully;
 /// the conversation streams through the actors' own streamers, not this response.
@@ -121,7 +121,7 @@ mod test {
 			.spawn((
 				Thread::default(),
 				Sequence::new(),
-				ThreadProgram,
+				CreateThread,
 				MountThreadStore {
 					path: path.to_string(),
 				},

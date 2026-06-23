@@ -19,6 +19,11 @@ use beet_ui::prelude::style::common_props;
 // the layout value enums (`Display`, `Direction`, `Length`, …) reached via the
 // `style::*` glob, mirroring beet_ui's own rule modules.
 use beet_ui::prelude::style::*;
+// pin the enums bevy also names (reached via `beet_core::prelude` under
+// `bevy_default`) to beet_ui's own, so the card rules resolve unambiguously.
+use beet_ui::prelude::style::Display;
+use beet_ui::prelude::style::AlignItems;
+use beet_ui::prelude::style::JustifyContent;
 
 /// A card frame — the per-card full-viewport flex column.
 pub const CARD: ClassName = ClassName::new_static("card");

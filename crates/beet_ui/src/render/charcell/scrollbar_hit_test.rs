@@ -9,7 +9,10 @@
 //! the painted bar.
 
 use super::*;
-use crate::prelude::*;
+// pin `ScrollPosition` to beet_ui's own: bevy's same-named ui type arrives through
+// `beet_core::prelude` under `bevy_default` and would otherwise clash. It is the only
+// item used from `crate::prelude`, so the explicit import replaces the glob.
+use crate::prelude::ScrollPosition;
 use beet_core::prelude::*;
 use bevy::input::ButtonState;
 use bevy::input::mouse::MouseButtonInput;

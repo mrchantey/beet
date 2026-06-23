@@ -7,10 +7,10 @@ binary:
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent exercises the five blob tools, and
 `{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools, then
-`{ThreadProgram}` exits. The transcript renders inline.
+`{CreateThread}` exits. The transcript renders inline.
 -->
 <div>
-	<div {RepeatWhileFunctionCallOutput} {ThreadProgram}>
+	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
 		<div {Thread} {Sequence} {FsStore{path:".beet/coding_agent"}} bx:ref="thread">
 			<CreateActor name="System" kind="System">
 				<CreatePost text='

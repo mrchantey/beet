@@ -5,11 +5,11 @@ Tool calling, the whole program in one scene. Run it through the one binary:
 
 A finite dungeon turn whose agent is equipped with the inline `<AgentChoiceAction/>`
 tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
-`{ThreadProgram}`, which exits the process once the two turns complete. The transcript
+`{CreateThread}`, which exits the process once the two turns complete. The transcript
 renders inline so it stays in the terminal scrollback after exit.
 -->
 <div>
-	<div {RepeatTimes{total_times:2}} {ThreadProgram}>
+	<div {RepeatTimes{total_times:2}} {CreateThread}>
 		<div bx:ref="thread" {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text='

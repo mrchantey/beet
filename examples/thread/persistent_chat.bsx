@@ -6,12 +6,12 @@ binary:
     beet --main=examples/thread/persistent_chat.bsx -- --new   # start fresh
 
 `{MountThreadStore}` persists the thread's records (one JSON object under the
-path); `{ThreadProgram}` adopts the stored conversation by seed hash before the first
+path); `{CreateThread}` adopts the stored conversation by seed hash before the first
 turn, so a re-run resumes where it left off (`--new` discards it). The actor ids
 are pinned so the seed hash, and thus the adopted thread, stay stable across runs.
 -->
 <div>
-	<div {Repeat} {ThreadProgram}>
+	<div {Repeat} {CreateThread}>
 		<div bx:ref="thread" {Thread} {Sequence} {MountThreadStore{path:"examples/thread/persistent_chat"}}>
 			<CreateActor id=1 name="System" kind="System">
 				<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>

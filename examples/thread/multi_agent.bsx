@@ -5,11 +5,11 @@ binary:
     beet --main=examples/thread/multi_agent.bsx
 
 The behavior is `Repeat[Sequence[agent, agent]]`: two differently-instructed
-agents take turns forever, kicked by `{ThreadProgram}` (runs until Ctrl+C). The
+agents take turns forever, kicked by `{CreateThread}` (runs until Ctrl+C). The
 transcript renders full-screen with no composer (there is no user turn).
 -->
 <div>
-	<div {Repeat} {ThreadProgram}>
+	<div {Repeat} {CreateThread}>
 		<div bx:ref="thread" {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text="this is a roleplay, keep responses under 50 words."/>

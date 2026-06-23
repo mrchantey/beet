@@ -162,10 +162,10 @@ impl HttpServer {
 }
 
 /// Registers the shared boot + teardown observers on the host (see
-/// [`ServerLifecycle`]). no_std-clean: the async runtime (`queue_async_local`) and the
+/// [`ServerShutdown`]). no_std-clean: the async runtime (`queue_async_local`) and the
 /// installed backend hook both build without std.
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerLifecycle::<HttpServer>::add_observers(&mut world, cx.entity);
+	ServerShutdown::<HttpServer>::add_observers(&mut world, cx.entity);
 }
 
 impl BootServer for HttpServer {
@@ -326,7 +326,7 @@ mod tests {
 		app_ext::update_until(&mut app, |world| {
 			world
 				.entity(entity)
-				.get::<ServerLifecycle<HttpServer>>()
+				.get::<ServerShutdown<HttpServer>>()
 				.map(|shutdown| shutdown.is_live())
 				.unwrap_or(false)
 		})
@@ -339,7 +339,7 @@ mod tests {
 		app.update();
 		app.world()
 			.entity(entity)
-			.get::<ServerLifecycle<HttpServer>>()
+			.get::<ServerShutdown<HttpServer>>()
 			.unwrap()
 			.is_live()
 			.xpect_false();

@@ -134,7 +134,8 @@ impl RefBindings {
 	fn reference(&mut self, name: &str) -> SceneEntityReference {
 		let next = self.names.len();
 		*self.names.entry(name.into()).or_insert_with(|| {
-			SceneEntityReference::new(("bsx_ref", 0, 0), next)
+			// deterministic ref (no runtime disambiguator): identity is the pinned name index.
+			SceneEntityReference::new(("bsx_ref", 0, 0), next, 0)
 		})
 	}
 
@@ -667,7 +668,7 @@ fn stable_reference(name: &str) -> SceneEntityReference {
 	let hash = name.bytes().fold(0u64, |acc, byte| {
 		acc.wrapping_mul(31).wrapping_add(byte as u64)
 	});
-	SceneEntityReference::new(("bsx_ref", 0, 0), hash as usize)
+	SceneEntityReference::new(("bsx_ref", 0, 0), hash as usize, 0)
 }
 
 /// Build a capitalized tag: a component (reflect-patched) or a template (built

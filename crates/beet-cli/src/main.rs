@@ -118,7 +118,7 @@ async fn build_entry(
 			// root: an entry's markup never declares its own boot (server entries can be
 			// included or loaded directly, the include would clobber a spread anyway),
 			// so the loader fires the boot uniformly. A self-booting verb that requires
-			// `BootOnLoad` (eg a thread's `{ThreadProgram}`) dedups against the injected
+			// `BootOnLoad` (eg a thread's `{CreateThread}`) dedups against the injected
 			// one. `BootOnLoad` rides the root spawn so it is present before the build
 			// fires `LoadTemplate`.
 			let root = build_site_root(world, store, sources, BootOnLoad)?;

@@ -98,9 +98,9 @@ impl ChannelHttpClient {
 }
 
 /// Registers the shared boot + teardown observers, mirroring [`HttpServer`] (see
-/// [`ServerLifecycle`]).
+/// [`ServerShutdown`]).
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerLifecycle::<ChannelHttpServer>::add_observers(&mut world, cx.entity);
+	ServerShutdown::<ChannelHttpServer>::add_observers(&mut world, cx.entity);
 }
 
 impl BootServer for ChannelHttpServer {

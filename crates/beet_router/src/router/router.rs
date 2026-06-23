@@ -19,6 +19,29 @@ use beet_net::prelude::*;
 #[require(Action<Request, Response> = route_action())]
 pub struct Router;
 
+/// A markup-spawnable route: its `path` prop becomes a [`PathPartial`], and its
+/// declared children slot in, so a handler and any sub-content can be nested inside.
+///
+/// The url and the behavior are separate concerns, both declared at the call site:
+/// the `path` prop is the route pattern, and the handler (plus any store scoping)
+/// rides a component spread on the same entity. The static-asset mount is
+/// `<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>`: the
+/// greedy `store_path` capture streams any file beneath `assets/`, and the
+/// [`DirPath`] scopes the resolved store to the site store's `assets/` subdir.
+///
+/// The Rust equivalent is the [`route`](crate::prelude::route) helper. It is a
+/// [`template`](macro@template) rather than a marker component, so it expands to a
+/// [`PathPartial`] (carrying a default [`Slot`](beet_core::prelude::SlotTarget) for
+/// the declared children) at build time, with no component left to re-fire on reload.
+#[template]
+pub fn Route(
+	/// The route path pattern, eg `assets/*store_path?`; defaults to the root.
+	#[prop(into)]
+	path: String,
+) -> impl Bundle {
+	(PathPartial::new(path), children![SlotTarget::new()])
+}
+
 /// The route-tree dispatch behind a router's `Action<Request, Response>` slot:
 /// matches the request against the ancestor [`RouteTree`] and applies ancestor
 /// [`MiddlewareList`] around the matched action.

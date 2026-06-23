@@ -109,7 +109,7 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.16" }
 # std / bevy_log / debug are NOT forced here so that no_std consumers (e.g. the
 # esp32 firmware) can depend on a bare bevy. They are re-enabled for normal
 # builds via `beet_core/std`, which every std beet crate pulls transitively.
-bevy = { version = "0.19.0-rc.2", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
@@ -117,7 +117,7 @@ bevy = { version = "0.19.0-rc.2", default-features = false, features = [
 	# "track_location",
 	# "keyboard",
 ] }
-bevy_reflect = { version = "0.19.0-rc.2", default-features = false, features = ["smol_str"] }
+bevy_reflect = { version = "0.19", default-features = false, features = ["smol_str"] }
 
 #💡 utility
 # default-features disabled so beet_core can build no_std; std consumers get the

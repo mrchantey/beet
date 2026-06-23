@@ -143,9 +143,9 @@ impl SocketServer {
 }
 
 /// Registers the shared boot + teardown observers, mirroring [`HttpServer`] (see
-/// [`ServerLifecycle`]).
+/// [`ServerShutdown`]).
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerLifecycle::<SocketServer>::add_observers(&mut world, cx.entity);
+	ServerShutdown::<SocketServer>::add_observers(&mut world, cx.entity);
 }
 
 impl BootServer for SocketServer {
@@ -255,7 +255,7 @@ mod tests {
 		app_ext::update_until(&mut app, |world| {
 			world
 				.entity(entity)
-				.get::<ServerLifecycle<SocketServer>>()
+				.get::<ServerShutdown<SocketServer>>()
 				.map(|shutdown| shutdown.is_live())
 				.unwrap_or(false)
 		})
@@ -268,7 +268,7 @@ mod tests {
 		app.update();
 		app.world()
 			.entity(entity)
-			.get::<ServerLifecycle<SocketServer>>()
+			.get::<ServerShutdown<SocketServer>>()
 			.unwrap()
 			.is_live()
 			.xpect_false();

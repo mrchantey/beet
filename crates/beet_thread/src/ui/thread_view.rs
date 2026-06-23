@@ -6,7 +6,10 @@ use crate::prelude::*;
 // otherwise shadows the prelude re-export of this trait.
 use crate::table::Table;
 use beet_core::prelude::*;
-use beet_ui::prelude::*;
+// `ScrollPosition` is beet_ui's renderer-agnostic type; pin it explicitly so it wins
+// over bevy's same-named ui type (reached via `beet_core::prelude` under
+// `bevy_default`). The rest of beet_ui's prelude arrives via `crate::prelude`.
+use beet_ui::prelude::ScrollPosition;
 
 // ═══════════════════════════════════════════════════════════════════════
 // ThreadView: the reactive chat widget

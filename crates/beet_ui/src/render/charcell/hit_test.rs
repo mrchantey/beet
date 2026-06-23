@@ -15,6 +15,10 @@
 use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+// pin the agnostic input types to beet_ui's own: bevy's same-named picking/ui types
+// arrive through `beet_core::prelude` under `bevy_default` and would otherwise clash.
+use crate::prelude::Pointer;
+use crate::prelude::ScrollPosition;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyCode;
 use bevy::input::keyboard::KeyboardInput;
