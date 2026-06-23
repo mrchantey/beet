@@ -54,11 +54,20 @@ pub fn card_rules() -> Vec<Rule> {
 /// Card frame - a full-width flex column with comfortable padding, so each card
 /// fills the viewport (web, via [`card_fill_viewport`]) or grows to fit (the
 /// terminal).
+///
+/// `align-items: stretch` is the CSS flexbox default but *not* beet's
+/// ([`AlignItems`] defaults to `Start`), so it is set explicitly here: without it
+/// the charcell terminal hugs the body to its content and pins it to the left,
+/// while the browser stretches it full-width — a card body that centres on the
+/// web (eg `card-center`) would sit left in the terminal. Setting it keeps the
+/// slide horizontally consistent across both targets (a no-op on the web, which
+/// already defaults to stretch).
 pub fn card() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
+		.with_value(common_props::AlignItemsProp, AlignItems::Stretch)
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(2.0)))
 }
 

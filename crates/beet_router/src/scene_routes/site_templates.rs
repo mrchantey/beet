@@ -13,43 +13,66 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// The conventional site templates subdirectory, the default `templates_dir`
-/// passed to [`read_site_templates`]. A bootstrap that wants a different layout
-/// passes its own path (this load happens before the entry markup parses, so the
-/// directory cannot itself come from the entry).
-pub const DEFAULT_TEMPLATES_DIR: &str = "templates";
+/// The default site subdirectory scanned for BSX/JS templates.
+pub const DEFAULT_TEMPLATE_DIR: &str = "templates";
 
-/// Read every template source under the site store's `templates_dir` as
-/// `(path, source)` pairs (paths relative to that directory), keeping only files
-/// whose [`MediaType`] `formats` recognizes (`.bsx`, `.js`). Async (store I/O), so
-/// a load path awaits it off the runtime rather than blocking. A site with no such
-/// directory (eg a single-file entry) yields no pairs.
+/// The site subdirectories scanned for BSX/JS templates, each relative to the
+/// site store root and registered by the module path *relative to that
+/// directory* (so `templates/widgets/Card.bsx` registers `widgets::Card`).
 ///
-/// The directory is a parameter rather than a hardcoded `templates/` so a site can
-/// relocate it ([`DEFAULT_TEMPLATES_DIR`] is the convention).
+/// Defaults to a single `templates/` directory. The `BEET_TEMPLATE_DIRS` env var
+/// overrides it with a comma-separated list, letting a no-code site keep its
+/// source under `src/` (eg `BEET_TEMPLATE_DIRS=src/templates,src/controls`, where
+/// `src/controls/PresentationControls.js` registers as `PresentationControls`).
+/// Scanned in order, so a later directory's name wins a collision.
+pub fn site_template_dirs() -> Vec<SmolPath> {
+	env_ext::var("BEET_TEMPLATE_DIRS")
+		.ok()
+		.map(|raw| {
+			raw.split(',')
+				.map(str::trim)
+				.filter(|dir| !dir.is_empty())
+				.map(SmolPath::from)
+				.collect::<Vec<_>>()
+		})
+		.filter(|dirs| !dirs.is_empty())
+		.unwrap_or_else(|| vec![SmolPath::from(DEFAULT_TEMPLATE_DIR)])
+}
+
+/// Read every template source under the site store's template directories (see
+/// [`site_template_dirs`]) as `(path, source)` pairs (each path relative to its
+/// scan directory), keeping only files whose [`MediaType`] `formats` recognizes
+/// (`.bsx`, `.js`). Async (store I/O), so a load path awaits it off the runtime
+/// rather than blocking. A site with no template directory (eg a single-file
+/// entry) yields no pairs.
 pub async fn read_site_templates(
 	store: &BlobStore,
 	formats: &TemplateFormats,
-	templates_dir: &SmolPath,
 ) -> Result<Vec<(SmolPath, String)>> {
-	let store = store.with_subdir(templates_dir.clone());
-	// no `templates/` dir: nothing to register.
-	if !store.store_exists().await? {
-		return Ok(Vec::new());
+	let mut sources = Vec::new();
+	for dir in site_template_dirs() {
+		let store = store.with_subdir(dir);
+		// a missing template dir is skipped, so a site can declare more dirs than
+		// it ships.
+		if !store.store_exists().await? {
+			continue;
+		}
+		let dir_sources = store
+			.list()
+			.await?
+			.into_iter()
+			.filter(|path| {
+				path.media_type().and_then(|ty| formats.get(&ty)).is_some()
+			})
+			.map(async |path| -> Result<(SmolPath, String)> {
+				let bytes = store.get(&path).await?;
+				Ok((path, String::from_utf8(bytes.to_vec())?))
+			})
+			.xmap(async_ext::try_join_all)
+			.await?;
+		sources.extend(dir_sources);
 	}
-	store
-		.list()
-		.await?
-		.into_iter()
-		.filter(|path| {
-			path.media_type().and_then(|ty| formats.get(&ty)).is_some()
-		})
-		.map(async |path| {
-			let bytes = store.get(&path).await?;
-			Ok((path, String::from_utf8(bytes.to_vec())?))
-		})
-		.xmap(async_ext::try_join_all)
-		.await
+	Ok(sources)
 }
 
 /// Register each `(path, source)` template into the world's

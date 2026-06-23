@@ -77,10 +77,7 @@ async fn spawn_site(world: &mut World) -> Entity {
 	// that store so `RoutesDir` and `<Template src>` resolve it by ancestry.
 	let store = site_store().await;
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let sources =
-		read_site_templates(&store, &formats, &SmolPath::from(DEFAULT_TEMPLATES_DIR))
-			.await
-			.unwrap();
+	let sources = read_site_templates(&store, &formats).await.unwrap();
 	register_site_templates(world, &formats, sources).unwrap();
 	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
 	let template =

@@ -90,22 +90,35 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 	// `CardStackPlugin`) may patch a more specific opening route after boot.
 	let home = entity.get(|route: &OpeningRoute| route.0.clone()).await?;
 	// the live host: a stdio terminal paired with the page-host buffer (rendered
-	// together by `render_terminal`) plus the in-world navigator co-located on it,
-	// browsing this router from `home`. `--color-scheme` pins the session scheme
-	// app-wide (the single local surface).
+	// together by `render_terminal`). Spawned with a "Loading…" placeholder and
+	// *without* the navigator yet, so the first frames paint loading rather than a
+	// blank screen. `--color-scheme` pins the session scheme app-wide.
 	let host = entity
 		.world()
 		.with(move |world: &mut World| {
 			if let Some(scheme) = scheme {
 				world.get_resource_or_init::<Theme>().scheme = scheme;
 			}
+			let host = world
+				.spawn((StdioTerminal::default(), page_host(terminal_ext::size())))
+				.id();
+			set_loading_page(world, host);
+			host
+		})
+		.await;
+	// `<RoutesDir>` discovery runs as an async task a few ticks behind boot, so the
+	// opening route is not in the tree the instant the navigator loads it. Settle it
+	// first so the home page resolves on the first load rather than flashing a
+	// "no route matched /" error; the loading placeholder shows in the meantime.
+	settle_routes_dirs(&entity.world()).await.ok();
+	// now co-locate the in-world navigator on the host: its `on_add` browses this
+	// router from `home`, binding the home page over the loading placeholder.
+	entity
+		.world()
+		.with(move |world: &mut World| {
 			world
-				.spawn((
-					StdioTerminal::default(),
-					page_host(terminal_ext::size()),
-					Navigator::in_world(router, home),
-				))
-				.id()
+				.entity_mut(host)
+				.insert(Navigator::in_world(router, home));
 		})
 		.await;
 	// record the host so teardown can despawn it

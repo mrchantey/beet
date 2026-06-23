@@ -50,18 +50,33 @@ pub enum CardNav {
 /// in the stack.
 fn deck_cards(tree: &RouteTree) -> Vec<&RouteTree> {
 	let mut cards = Vec::new();
-	// the router's own route (an empty-path `index`) is the deck's home card, so a
-	// deck whose `/` is a slide opens and steps from it like any other card.
-	if tree.node().is_some_and(|node| node.is_page_route) {
-		cards.push(tree);
-	}
-	cards.extend(
-		tree.children
-			.iter()
-			.filter(|child| child.node().is_some_and(|node| node.is_page_route)),
-	);
+	// the deck's home card is the `/` route (an `index` content file): usually the
+	// router's own node, but a store-discovered `index` can instead land as an
+	// empty-path child. Either way it is listed once, first, so the deck opens and
+	// steps from it like any other card.
+	let home = if tree.node().is_some_and(|node| node.is_page_route) {
+		Some(tree)
+	} else {
+		tree.children.iter().find(|child| {
+			is_empty_path(child)
+				&& child.node().is_some_and(|node| node.is_page_route)
+		})
+	};
+	cards.extend(home);
+	// the remaining page-route children in tree order, excluding any empty-path
+	// home child (handled above). Without this, a deck whose `index` sorts last
+	// among the slides appends a duplicate empty-path card after the final slide,
+	// so stepping `Next` off the last card lands on the blank `/` clone and back —
+	// the last-card → empty-page oscillation.
+	cards.extend(tree.children.iter().filter(|child| {
+		!is_empty_path(child)
+			&& child.node().is_some_and(|node| node.is_page_route)
+	}));
 	cards
 }
+
+/// Whether `card` sits at the deck root (an empty path, ie the `/` home card).
+fn is_empty_path(card: &RouteTree) -> bool { card.path.iter().count() == 0 }
 
 /// Whether `card`'s full path equals `path` by segment name, so the empty-path
 /// home card matches `/` and a child card matches its own path.

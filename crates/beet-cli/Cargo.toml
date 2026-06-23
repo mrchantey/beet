@@ -25,6 +25,13 @@ qrcode = ["dep:qrcode", "dep:image"]
 # `ThreadExamplesPlugin` (runtime + inline tool types), added via `BeetExamplePlugins`
 # so the example `.bsx` tags resolve.
 thread = ["beet/thread", "beet/ui", "dep:beet_examples", "beet_examples/thread"]
+# The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
+# spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
+# `beet/examples` (winit + bevy_default + spatial), and the local `beet_examples`
+# (`bevy_default`) for the example component types + scene templates that
+# `BeetExamplePlugins` registers. Opt-in, so deploy/headless builds never link wgpu.
+# Run a scene with: `cargo run -p beet-cli --features render -- --main=<scene.bsx>`.
+render = ["beet/examples", "dep:beet_examples", "beet_examples/bevy_default"]
 # HTTP transport for the remote scene-control commands. Native-only: the
 # ureq/rustls stack does not build on wasm, so it is enabled via the non-wasm
 # target table below rather than wired into this feature directly.

@@ -56,6 +56,37 @@ pub fn set_error_page(
 	}
 }
 
+/// A loading placeholder: a centered card shown on a surface before its first
+/// page resolves, so the live host paints "Loading…" rather than a blank screen
+/// or a transient "no route" error while route discovery is still settling.
+#[template]
+pub fn LoadingPage() -> impl Bundle {
+	rsx! {
+		<div {Classes::new([classes::CARD_FILLED])}>
+			<h1 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Loading…"</h1>
+		</div>
+	}
+}
+
+/// Build the [`LoadingPage`] and bind it to `host` (a surface's [`PageHost`]), so
+/// the live host paints it until the first navigation replaces it. Mirrors
+/// [`set_error_page`]: built through `spawn_template` and marked
+/// [`DespawnAfterRender`] so the next page cleans it up.
+pub fn set_loading_page(world: &mut World, host: Entity) {
+	let page = world
+		.spawn_template(rsx! { <LoadingPage/> })
+		.map(|entity| entity.id());
+	match page {
+		Ok(page) => {
+			world
+				.entity_mut(page)
+				.insert(DespawnAfterRender(vec![page]));
+			bind_surface_page(world, host, page);
+		}
+		Err(err) => error!("failed to build loading page: {err}"),
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;

@@ -79,6 +79,29 @@ pub const OSC8_LINK: &str = "\x1b]8;;";
 /// String Terminator (`ESC \`), ending an OSC sequence.
 pub const ST: &str = "\x1b\\";
 
+// ── Window title (OSC-0) ──────────────────────────────────────────────────────
+
+/// OSC-0 set-title introducer (`ESC ] 0 ;`): sets both the window and icon title.
+/// Follow with the title text and [`BEL`]. See [`set_window_title`].
+pub const OSC_WINDOW_TITLE: &str = "\x1b]0;";
+/// BEL (`0x07`), the legacy OSC terminator: more widely accepted than [`ST`] for
+/// the title sequence.
+pub const BEL: &str = "\x07";
+
+/// Write an OSC-0 set-window-title sequence (`ESC ] 0 ; <title> BEL`), setting the
+/// terminal's window (and icon) title. Control characters in `title` would break
+/// out of the sequence, so the caller must strip them first.
+///
+/// `?Sized` so it accepts a `&mut dyn Write` (eg a terminal's type-erased
+/// writer) as well as a concrete writer.
+#[cfg(feature = "std")]
+pub fn set_window_title<W: Write + ?Sized>(
+	w: &mut W,
+	title: &str,
+) -> io::Result<()> {
+	write!(w, "{OSC_WINDOW_TITLE}{title}{BEL}")
+}
+
 // ── SGR attributes ────────────────────────────────────────────────────────────
 
 /// Reset all SGR attributes.

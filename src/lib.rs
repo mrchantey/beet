@@ -8,6 +8,11 @@ extern crate alloc;
 #[cfg(feature = "std")]
 mod beet_plugins;
 
+// the winit render path (window lifecycle + screenshot verification), linked when
+// the `winit` feature brings the windowed render stack.
+#[cfg(feature = "winit")]
+mod render;
+
 // #[cfg(feature = "build")]
 // pub use beet_build as build;
 #[cfg(feature = "action")]
@@ -54,6 +59,8 @@ pub mod prelude {
 	pub use crate::action::prelude::*;
 	#[cfg(feature = "std")]
 	pub use crate::beet_plugins::*;
+	#[cfg(feature = "winit")]
+	pub use crate::render::*;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::prelude::*;

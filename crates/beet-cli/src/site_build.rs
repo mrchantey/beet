@@ -29,9 +29,7 @@ pub async fn read_site_sources(
 	entry_name: impl Into<String>,
 ) -> Result<SiteSources> {
 	let entry_name = entry_name.into();
-	let templates =
-		read_site_templates(store, &formats, &SmolPath::from(DEFAULT_TEMPLATES_DIR))
-			.await?;
+	let templates = read_site_templates(store, &formats).await?;
 	let entry = store.get_media(&SmolPath::from(entry_name.as_str())).await?;
 	SiteSources {
 		entry_name,

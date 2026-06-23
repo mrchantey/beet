@@ -13,12 +13,11 @@ use bevy::app::PluginGroupBuilder;
 /// adds the example capabilities and leaves the runner to this one.
 ///
 /// ## Window (`winit` feature)
-/// A default primary window opens on launch, so a hand-written scene (eg an
-/// example) renders with no extra wiring. A consumer that wants the window opened
-/// from data instead can override the `WindowPlugin`, eg
-/// `BeetPlugins.set(WindowPlugin { primary_window: None, exit_condition:
-/// ExitCondition::DontExit, ..default() })`, then spawn a `Window` entity from the
-/// loaded scene.
+/// The render stack links as a capability, not a window: no primary window opens
+/// and the loop survives with none (`ExitCondition::DontExit`). The window is data,
+/// spawned by the loaded scene (a `Window` entity, eg `<Window/>`), so one binary
+/// runs a windowed scene `.bsx` and a headless server `.bsx` from the same build.
+/// [`render_window_plugin`] drives the window lifecycle.
 pub struct BeetPlugins;
 
 impl PluginGroup for BeetPlugins {
@@ -30,7 +29,9 @@ impl PluginGroup for BeetPlugins {
 		// cooperative 30Hz loop paces headless servers/tools instead of busy-spinning.
 		cfg_if! {
 			if #[cfg(feature = "winit")] {
-				builder = builder.add_group(winit_default_plugins());
+				builder = builder
+					.add_group(winit_default_plugins())
+					.add(render_window_plugin);
 			} else {
 				builder = builder.add_group(MinimalPlugins.set(
 					ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 30.0)),
@@ -82,14 +83,27 @@ impl PluginGroup for BeetPlugins {
 
 /// The configured bevy `DefaultPlugins` for a windowed beet app: skip asset meta
 /// lookups (beet sites ship no `.meta` sidecars) and disable bevy's `LogPlugin` so
-/// beet's tracing one replaces it. The default primary window opens on launch;
-/// override the `WindowPlugin` (see [`BeetPlugins`]) to boot windowless instead.
+/// beet's tracing one replaces it.
+///
+/// Critically it links the render stack as a *capability*, not a window: no primary
+/// window opens (`primary_window: None`) and `ExitCondition::DontExit` keeps the
+/// loop alive with no window. The window comes from the loaded scene, which spawns
+/// a `Window` entity (eg `<Window/>`), so one render-built binary serves both a
+/// windowed scene `.bsx` and a headless server `.bsx`. [`render_window_plugin`]
+/// then owns the window lifecycle (continuous updates, escape/close-to-exit).
 #[cfg(feature = "winit")]
 fn winit_default_plugins() -> PluginGroupBuilder {
 	use bevy::asset::AssetMetaCheck;
+	use bevy::window::ExitCondition;
+	use bevy::window::WindowPlugin;
 	DefaultPlugins
 		.set(AssetPlugin {
 			meta_check: AssetMetaCheck::Never,
+			..default()
+		})
+		.set(WindowPlugin {
+			primary_window: None,
+			exit_condition: ExitCondition::DontExit,
 			..default()
 		})
 		.disable::<bevy::log::LogPlugin>()

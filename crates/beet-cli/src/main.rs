@@ -30,7 +30,7 @@ fn main() -> AppExit {
 	// load any local `.env` (eg `BEET_REMOTE_URL`) before the app starts.
 	env_ext::load_dotenv();
 
-	App::new();
+	App::new()
 		.add_plugins((
 		// the trusted defaults: the runner (the headless 30Hz loop here), beet's
 		// logging, the async runtime, and the router/scene/server + native terminal
@@ -39,9 +39,11 @@ fn main() -> AppExit {
 		// the native-only dev-command capabilities, linked as registered types and
 		// inert until a `main.bsx` names them.
 		CliCommandsPlugin,
-		// the agent-thread runtime + chat UI + example tool types, so a `main.bsx`
-		// declaring a `<Thread>` chat (eg `examples/thread/chat.bsx`) loads and runs.
-		#[cfg(feature = "thread")]
+		// the example capabilities, so a `main.bsx` declaring example tags resolves:
+		// the agent-thread runtime + chat UI (`thread`, eg `examples/thread/chat.bsx`)
+		// and the windowed spatial/animation scene types + templates (`render`, eg
+		// `examples/spatial/seek_3d.bsx`). The group self-selects by sub-feature.
+		#[cfg(any(feature = "thread", feature = "render"))]
 		beet_examples::prelude::BeetExamplePlugins,
 	))
 	.add_systems(Startup,

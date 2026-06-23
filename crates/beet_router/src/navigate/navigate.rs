@@ -11,6 +11,13 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// The direction to navigate relative to the current path.
+///
+/// Two families: the *tree* moves (`parent`/`first-child`/`next-sibling`/
+/// `prev-sibling`) walk the [`RouteTree`] generically, wrapping at the ends, and
+/// dispatch the target inline; the *card* steps (`next`/`prev`/`first`/`last`)
+/// resolve against a [`CardDeck`](crate::prelude::CardDeck)'s flat card list
+/// (home-aware, clamping at the ends) and redirect the browser to the resolved
+/// card (see [`NavigateHandler`]).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum NavigateTo {
 	/// Move to the parent route or root.
@@ -22,25 +29,46 @@ pub enum NavigateTo {
 	NextSibling,
 	/// Move to the previous sibling route.
 	PrevSibling,
+	/// Step to the next card in the deck, clamped at the last.
+	NextCard,
+	/// Step to the previous card in the deck, clamped at the first.
+	PrevCard,
+	/// Jump to the first card in the deck.
+	FirstCard,
+	/// Jump to the last card in the deck.
+	LastCard,
 }
 
 impl NavigateTo {
-	/// Parse a CLI-style string into a [`NavigateTo`] variant.
+	/// Parse a CLI/query string into a [`NavigateTo`] variant.
 	///
-	/// Accepts kebab-case values: `parent`, `first-child`,
-	/// `next-sibling`, `prev-sibling`.
+	/// Tree moves: `parent`, `first-child`, `next-sibling`, `prev-sibling`.
+	/// Card steps: `next`, `prev`, `first`, `last`.
 	pub fn from_str_param(value: &str) -> Result<Self> {
 		match value {
 			"parent" => Ok(Self::Parent),
 			"first-child" => Ok(Self::FirstChild),
 			"next-sibling" => Ok(Self::NextSibling),
 			"prev-sibling" => Ok(Self::PrevSibling),
+			"next" => Ok(Self::NextCard),
+			"prev" => Ok(Self::PrevCard),
+			"first" => Ok(Self::FirstCard),
+			"last" => Ok(Self::LastCard),
 			other => bevybail!(
-				"Unknown navigate direction '{}'. \
-				 Expected: parent, first-child, next-sibling, prev-sibling",
+				"Unknown navigate direction '{}'. Expected one of: parent, \
+				 first-child, next-sibling, prev-sibling, next, prev, first, last",
 				other
 			),
 		}
+	}
+
+	/// Whether this is a card-stack step (resolved against the deck's card list
+	/// and redirected) rather than a generic tree move (dispatched inline).
+	pub fn is_card(&self) -> bool {
+		matches!(
+			self,
+			Self::NextCard | Self::PrevCard | Self::FirstCard | Self::LastCard
+		)
 	}
 }
 
@@ -51,6 +79,10 @@ impl core::fmt::Display for NavigateTo {
 			Self::FirstChild => write!(f, "first-child"),
 			Self::NextSibling => write!(f, "next-sibling"),
 			Self::PrevSibling => write!(f, "prev-sibling"),
+			Self::NextCard => write!(f, "next"),
+			Self::PrevCard => write!(f, "prev"),
+			Self::FirstCard => write!(f, "first"),
+			Self::LastCard => write!(f, "last"),
 		}
 	}
 }
@@ -78,11 +110,29 @@ pub async fn NavigateHandler(
 	let action_entity = caller.id();
 	let world = caller.world();
 
+	// resolve the target path against the route tree (card steps resolve against
+	// the deck's card list, tree moves against the generic sibling/parent tree).
+	let target_path = world
+		.with_state::<AncestorQuery<&RouteTree>, Result<Vec<SmolStr>>>(
+			move |query| {
+				let tree = query.get(action_entity)?;
+				resolve_navigation(tree, &current_path, direction)
+			},
+		)
+		.await?;
+
+	// a card step redirects the browser to the resolved card so its address bar
+	// updates (the deck's keyboard JS just sets `window.location`) and the last
+	// card clamps rather than looping; the generic tree moves keep dispatching
+	// inline for programmatic / CLI callers.
+	if direction.is_card() {
+		let location = format!("/{}", target_path.join("/"));
+		return Response::temporary_redirect(location).xok();
+	}
+
 	let resolved = world
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(move |query| {
 			let tree = query.get(action_entity)?;
-			let target_path =
-				resolve_navigation(tree, &current_path, direction)?;
 			tree.find(&target_path).cloned().xok()
 		})
 		.await?;
@@ -121,6 +171,10 @@ fn resolve_navigation(
 		NavigateTo::PrevSibling => {
 			resolve_sibling(tree, current_path, SiblingDirection::Prev)
 		}
+		NavigateTo::NextCard => resolve_card(tree, current_path, CardNav::Next),
+		NavigateTo::PrevCard => resolve_card(tree, current_path, CardNav::Prev),
+		NavigateTo::FirstCard => resolve_card(tree, current_path, CardNav::First),
+		NavigateTo::LastCard => resolve_card(tree, current_path, CardNav::Last),
 	}
 }
 
@@ -284,6 +338,74 @@ mod test {
 			.unwrap()
 			.xpect_eq(NavigateTo::PrevSibling);
 		NavigateTo::from_str_param("bogus").unwrap_err();
+	}
+
+	#[beet_core::test]
+	fn navigate_card_from_str() {
+		NavigateTo::from_str_param("next")
+			.unwrap()
+			.xpect_eq(NavigateTo::NextCard);
+		NavigateTo::from_str_param("prev")
+			.unwrap()
+			.xpect_eq(NavigateTo::PrevCard);
+		NavigateTo::from_str_param("first")
+			.unwrap()
+			.xpect_eq(NavigateTo::FirstCard);
+		NavigateTo::from_str_param("last")
+			.unwrap()
+			.xpect_eq(NavigateTo::LastCard);
+		// the card steps redirect; the tree moves dispatch inline.
+		NavigateTo::NextCard.is_card().xpect_true();
+		NavigateTo::NextSibling.is_card().xpect_false();
+	}
+
+	/// A card step over HTTP resolves the deck card and redirects the browser to
+	/// it (so its address bar updates), clamping at the last card rather than
+	/// wrapping. The deck's keyboard JS relies on this `?navigate=next` redirect.
+	#[beet_core::test]
+	async fn navigate_card_redirects_and_clamps() {
+		let mut world = router_world();
+		let root = world
+			.spawn((nav_router(), children![
+				(
+					render_action::fixed_func_route("alpha", || rsx! {
+						<p>"a"</p>
+					}),
+					PageRoute
+				),
+				(
+					render_action::fixed_func_route("beta", || rsx! {
+						<p>"b"</p>
+					}),
+					PageRoute
+				),
+			]))
+			.flush();
+
+		// alpha -> next -> redirect to /beta
+		let res = world
+			.entity_mut(root)
+			.exchange(Request::from_cli_str("alpha --navigate=next"))
+			.await;
+		res.status().xpect_eq(StatusCode::TEMPORARY_REDIRECT);
+		res.parts
+			.headers
+			.get::<header::Location>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq("/beta");
+
+		// beta -> next -> clamps, redirect back to /beta (no wrap to alpha)
+		let res = world
+			.entity_mut(root)
+			.exchange(Request::from_cli_str("beta --navigate=next"))
+			.await;
+		res.parts
+			.headers
+			.get::<header::Location>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq("/beta");
 	}
 
 	#[beet_core::test]

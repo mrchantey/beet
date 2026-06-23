@@ -53,6 +53,8 @@ mod terminal;
 #[cfg(all(test, feature = "tui"))]
 pub(crate) mod test_host;
 mod text;
+#[cfg(feature = "tui")]
+mod title;
 
 pub use backend::*;
 pub use buffer::*;
@@ -73,6 +75,8 @@ pub use plugin::*;
 pub(crate) use prepare::*;
 #[cfg(feature = "tui")]
 pub use terminal::*;
+#[cfg(feature = "tui")]
+pub use title::*;
 
 pub(self) use box_model::*;
 pub(self) use flex::*;

@@ -123,12 +123,7 @@ pub fn reload_site(world: &mut World, root: Entity) {
 	world.run_async(move |world| async move {
 		// re-register `templates/` through the store so the registry serves the
 		// edited sources (store-agnostic: fs, in-memory, remote all work).
-		let sources = read_site_templates(
-			&store,
-			&formats,
-			&SmolPath::from(DEFAULT_TEMPLATES_DIR),
-		)
-		.await?;
+		let sources = read_site_templates(&store, &formats).await?;
 		world
 			.with(move |world: &mut World| -> Result {
 				register_site_templates(world, &formats, sources)?;

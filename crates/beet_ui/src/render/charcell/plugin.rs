@@ -129,6 +129,9 @@ impl Plugin for CharcellPlugin {
 				(
 					render_terminal,
 					place_kitty_images,
+					// reflect the document `<title>` onto the terminal title bar
+					// before the flush carries its bytes to stdout.
+					update_terminal_title,
 					flush_terminals,
 					restore_terminals
 						.run_if(common_conditions::on_message::<AppExit>),
