@@ -54,7 +54,8 @@ mod test {
 	#[beet_core::test]
 	fn kind_attribute_resolves_to_variant() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.init_plugin::<ThreadPlugin>();
 		let source = r#"
 <div {Thread}>
 	<CreateActor name="Sys" kind="System"/>

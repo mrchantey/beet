@@ -54,7 +54,8 @@ struct ChannelSocketConn {
 impl ChannelSocketServer {
 	/// Creates a paired server and client over a fresh connections channel.
 	pub fn new() -> (ChannelSocketServer, ChannelSocketClient) {
-		let (conn_tx, conn_rx) = async_channel::unbounded::<ChannelSocketConn>();
+		let (conn_tx, conn_rx) =
+			async_channel::unbounded::<ChannelSocketConn>();
 		(
 			ChannelSocketServer {
 				connections: conn_rx,
@@ -133,7 +134,9 @@ impl SocketWriter for ChannelSocketWriter {
 /// Registers the shared boot + teardown observers, mirroring [`SocketServer`] (see
 /// [`ServerLifecycle`]).
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerLifecycle::<ChannelSocketServer>::add_observers(&mut world, cx.entity);
+	ServerLifecycle::<ChannelSocketServer>::add_observers(
+		&mut world, cx.entity,
+	);
 }
 
 impl BootServer for ChannelSocketServer {
@@ -196,15 +199,16 @@ mod test {
 		app.add_plugins((MinimalPlugins, AsyncPlugin));
 		let (server, client) = ChannelSocketServer::new();
 		// the server echoes Text/Binary back on each accepted child socket
-		let entity = app.world_mut().spawn(server).observe_any(echo_message).id();
+		let entity =
+			app.world_mut().spawn(server).observe_any(echo_message).id();
 		// boot through the fan-out (fire-and-forget: the call fans out and parks)
-		app.world_mut().entity_mut(entity).run_async_local(
-			|host| async move {
+		app.world_mut()
+			.entity_mut(entity)
+			.run_async_local(|host| async move {
 				host.call::<Boot, Response>(Boot::from(Request::get("/")))
 					.await?;
 				Ok(())
-			},
-		);
+			});
 
 		// a client connection, used as a raw socket (not spawned into the ECS)
 		let mut socket = client.connect().await.unwrap();

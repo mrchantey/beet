@@ -15,41 +15,39 @@ pub async fn call_functions(
 			.with_header::<header::ContentType>(MediaType::Json)
 			.with_header::<header::Accept>(MediaType::Json);
 
-		let output =
-			match agent.call_detached(route_action(), request).await {
-				Ok(res) => match res.into_result().await {
-					Ok(res) => {
-						let is_json = res
-							.parts
-							.headers
-							.get::<header::ContentType>()
-							.and_then(|r| r.ok())
-							.map_or(false, |ct| ct == MediaType::Json);
-						let body = res.body.into_string().await.unwrap_or_else(
-							|err| {
-								format!(
-									"Failed to read response body as string: {err}"
-								)
-							},
-						);
-						if is_json {
-							body
-						} else {
-							// Wrap non-JSON responses as a JSON string value
-							serde_json::to_string(&body).unwrap_or(body)
-						}
+		let output = match agent.call_detached(route_action(), request).await {
+			Ok(res) => match res.into_result().await {
+				Ok(res) => {
+					let is_json = res
+						.parts
+						.headers
+						.get::<header::ContentType>()
+						.and_then(|r| r.ok())
+						.map_or(false, |ct| ct == MediaType::Json);
+					let body =
+						res.body.into_string().await.unwrap_or_else(|err| {
+							format!(
+								"Failed to read response body as string: {err}"
+							)
+						});
+					if is_json {
+						body
+					} else {
+						// Wrap non-JSON responses as a JSON string value
+						serde_json::to_string(&body).unwrap_or(body)
 					}
-					Err(err) => {
-						format!(
-							"Function call returned error '{}': {err}",
-							call.name()
-						)
-					}
-				},
-				Err(err) => {
-					format!("Function call failed '{}': {err}", call.name())
 				}
-			};
+				Err(err) => {
+					format!(
+						"Function call returned error '{}': {err}",
+						call.name()
+					)
+				}
+			},
+			Err(err) => {
+				format!("Function call failed '{}': {err}", call.name())
+			}
+		};
 
 		agent
 			.with_state::<ThreadWindowQuery, Result>(

@@ -94,7 +94,8 @@ impl BsxTemplateRegistry {
 		source: &str,
 	) -> Result {
 		// a type with no registered format is skipped, mirroring `register_dir`.
-		let Some(parse) = path.media_type().and_then(|ty| formats.get(&ty)) else {
+		let Some(parse) = path.media_type().and_then(|ty| formats.get(&ty))
+		else {
 			return Ok(());
 		};
 		let module = module_path_from_rel(path).ok_or_else(|| {

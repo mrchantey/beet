@@ -71,7 +71,8 @@ mod test {
 		app.add_plugins((MinimalPlugins, CharcellTuiPlugin))
 			.init_plugin::<ThreadPlugin>()
 			.init_plugin::<ThreadUiPlugin>();
-		let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
+		let (channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
 		let host = app
 			.world_mut()
 			.spawn((channel, terminal, DoubleBuffer::new(UVec2::new(40, 12))))

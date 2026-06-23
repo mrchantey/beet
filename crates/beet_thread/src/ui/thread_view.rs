@@ -100,14 +100,22 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 /// rather than rebuilding it, so streaming flows through the bound [`Value`].
 pub fn project_window_to_document(
 	mut commands: Commands,
-	windows: Query<(Entity, &ThreadWindow, Option<&ThreadItems>), Changed<ThreadWindow>>,
+	windows: Query<
+		(Entity, &ThreadWindow, Option<&ThreadItems>),
+		Changed<ThreadWindow>,
+	>,
 	views: Query<(), With<ThreadView>>,
 	mut documents: Query<&mut Document>,
 ) -> Result {
 	for (thread_entity, window, items) in windows.iter() {
 		let value = project_window(window);
 		// the contract's thread-side document, inserted if absent
-		set_document(&mut commands, &mut documents, thread_entity, value.clone());
+		set_document(
+			&mut commands,
+			&mut documents,
+			thread_entity,
+			value.clone(),
+		);
 		// every view item of this thread renders against its own co-located document,
 		// reached by traversing the thread's `ThreadItems` instead of scanning views.
 		items

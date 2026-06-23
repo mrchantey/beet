@@ -115,7 +115,8 @@ mod test {
 	/// flushes. One agent turn, no loop, so the run finishes.
 	fn run_once(path: &str, system: ActorId, agent: ActorId) {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.init_plugin::<ThreadPlugin>();
 		app.world_mut()
 			.spawn((
 				Thread::default(),
@@ -166,10 +167,12 @@ mod test {
 		// stable ids so the seed hash matches across runs
 		let system = ActorId::from_u128(1);
 		let agent = ActorId::from_u128(2);
-		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPathBuf::new(path))))
-			.store_remove()
-			.await
-			.ok();
+		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPathBuf::new(
+			path,
+		))))
+		.store_remove()
+		.await
+		.ok();
 
 		run_once(path, system, agent);
 		stored_threads(path).await.xpect_eq(1);

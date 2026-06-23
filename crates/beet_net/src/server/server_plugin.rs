@@ -79,9 +79,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn((
 					server,
-					exchange_handler(|_| {
-						Response::ok().with_body("hello")
-					}),
+					exchange_handler(|_| Response::ok().with_body("hello")),
 				))
 				.run();
 		});

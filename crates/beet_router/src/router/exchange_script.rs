@@ -78,7 +78,8 @@ pub async fn ExchangeScriptElement(
 		return Response::ok().xok();
 	}
 	let input = request_input(cx.take()).await?;
-	let body = Script::<Value, ()>::new(language, script).run_captured(input)?;
+	let body =
+		Script::<Value, ()>::new(language, script).run_captured(input)?;
 	Response::ok().with_body(body).xok()
 }
 
@@ -279,10 +280,9 @@ mod entry_test {
 	#[beet_core::test]
 	async fn script_entry_captures_console() {
 		AsyncPlugin::world()
-			.spawn((
-				ExchangeScriptElement,
-				children![Value::Str(r#"console.log("hi")"#.into())]
-			))
+			.spawn((ExchangeScriptElement, children![Value::Str(
+				r#"console.log("hi")"#.into()
+			)]))
 			.call::<Request, Response>(Request::get("/"))
 			.await
 			.unwrap()
@@ -296,11 +296,12 @@ mod entry_test {
 	#[beet_core::test]
 	async fn script_entry_reads_body() {
 		AsyncPlugin::world()
-			.spawn((
-				ExchangeScriptElement,
-				children![Value::Str(r#"console.log(input.body)"#.into())]
-			))
-			.call::<Request, Response>(Request::post("/").with_body("hello body"))
+			.spawn((ExchangeScriptElement, children![Value::Str(
+				r#"console.log(input.body)"#.into()
+			)]))
+			.call::<Request, Response>(
+				Request::post("/").with_body("hello body"),
+			)
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -317,10 +318,9 @@ mod entry_test {
 	async fn script_entry_reads_language_attribute() {
 		let mut world = AsyncPlugin::world();
 		let element = world
-			.spawn((
-				ExchangeScriptElement,
-				children![Value::Str(r#"print("from rhai")"#.into())]
-			))
+			.spawn((ExchangeScriptElement, children![Value::Str(
+				r#"print("from rhai")"#.into()
+			)]))
 			.id();
 		world.spawn((
 			AttributeOf::new(element),

@@ -32,26 +32,28 @@ fn main() -> AppExit {
 
 	App::new()
 		.add_plugins((
-		// the trusted defaults: the runner (the headless 30Hz loop here), beet's
-		// logging, the async runtime, and the router/scene/server + native terminal
-		// capabilities, all selected by feature flag.
-		BeetPlugins,
-		// the native-only dev-command capabilities, linked as registered types and
-		// inert until a `main.bsx` names them.
-		CliCommandsPlugin,
-		// the example capabilities, so a `main.bsx` declaring example tags resolves:
-		// the agent-thread runtime + chat UI (`thread`, eg `examples/thread/chat.bsx`)
-		// and the windowed spatial/animation scene types + templates (`render`, eg
-		// `examples/spatial/seek_3d.bsx`). The group self-selects by sub-feature.
-		#[cfg(any(feature = "thread", feature = "render"))]
-		beet_examples::prelude::BeetExamplePlugins,
-	))
-	.add_systems(Startup,
-		// the process exits when `boot` writes `AppExit` for the one-shot it
-		// resolves; a long-running server parks its boot call, so its unresolved
-		// `Running<Response>` persists the process with no refcount
-		load_entry)
-	.run()
+			// the trusted defaults: the runner (the headless 30Hz loop here), beet's
+			// logging, the async runtime, and the router/scene/server + native terminal
+			// capabilities, all selected by feature flag.
+			BeetPlugins,
+			// the native-only dev-command capabilities, linked as registered types and
+			// inert until a `main.bsx` names them.
+			CliCommandsPlugin,
+			// the example capabilities, so a `main.bsx` declaring example tags resolves:
+			// the agent-thread runtime + chat UI (`thread`, eg `examples/thread/chat.bsx`)
+			// and the windowed spatial/animation scene types + templates (`render`, eg
+			// `examples/spatial/seek_3d.bsx`). The group self-selects by sub-feature.
+			#[cfg(any(feature = "thread", feature = "render"))]
+			beet_examples::prelude::BeetExamplePlugins,
+		))
+		.add_systems(
+			Startup,
+			// the process exits when `boot` writes `AppExit` for the one-shot it
+			// resolves; a long-running server parks its boot call, so its unresolved
+			// `Running<Response>` persists the process with no refcount
+			load_entry,
+		)
+		.run()
 }
 
 /// `Startup`: resolve the site store + entry name (env/discovery only, no I/O),

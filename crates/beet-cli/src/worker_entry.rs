@@ -162,7 +162,11 @@ async fn build_site(
 /// when the head lookup fails or the object is absent, in which case every
 /// request rebuilds (a safe, if slower, fallback).
 async fn head_version(store: &R2WorkersStore, path: &str) -> Option<String> {
-	store.head_version(&SmolPath::from(path)).await.ok().flatten()
+	store
+		.head_version(&SmolPath::from(path))
+		.await
+		.ok()
+		.flatten()
 }
 
 /// Convert a [`worker::Request`] into a beet [`Request`]: method, full URL,

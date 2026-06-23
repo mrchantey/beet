@@ -123,7 +123,8 @@ pub async fn settle_routes_dirs(world: &AsyncWorld) -> Result {
 			.with(|world| {
 				// routes still discovering (no scoped store composed onto them yet) ...
 				let dirs = world
-					.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>()
+					.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>(
+					)
 					.iter(world)
 					.count();
 				// ... plus any unresolved `<Template src>` include: it builds the

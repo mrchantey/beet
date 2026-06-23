@@ -67,4 +67,3 @@ impl Plugin for CardStackPlugin {
 			.add_systems(Update, card_nav);
 	}
 }
-

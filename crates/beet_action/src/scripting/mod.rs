@@ -40,7 +40,11 @@ pub(crate) use quickjs_runtime::run_quickjs_console;
 pub(crate) use rhai_runtime::run_rhai;
 // the rhai console runtime backs the native `Script::run_console`; on wasm the
 // host JS realm is the console, so this is native-only.
-#[cfg(all(feature = "rhai", feature = "serde", not(target_arch = "wasm32")))]
+#[cfg(all(
+	feature = "rhai",
+	feature = "serde",
+	not(target_arch = "wasm32")
+))]
 pub(crate) use rhai_runtime::run_rhai_console;
 #[cfg(all(
 	feature = "serde",

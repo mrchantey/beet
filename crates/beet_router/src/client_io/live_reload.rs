@@ -278,7 +278,8 @@ mod test {
 			.xpect_none();
 
 		// mutate the site: a new route, an edited template, a new template
-		fs_ext::write(site_dir.join("routes/docs/intro.md"), "# Intro").unwrap();
+		fs_ext::write(site_dir.join("routes/docs/intro.md"), "# Intro")
+			.unwrap();
 		fs_ext::write(
 			site_dir.join("templates/Card.bsx"),
 			"<section>second card</section>",
@@ -469,7 +470,10 @@ mod test {
 		AsyncRunner::settle_async_tasks(app.world_mut()).await;
 
 		// the marker survived the route respawn ...
-		app.world().entity(router).contains::<CardDeck>().xpect_true();
+		app.world()
+			.entity(router)
+			.contains::<CardDeck>()
+			.xpect_true();
 		// ... and the rebuilt tree still lists the cards in sorted order.
 		card_order(app.world_mut(), router).xpect_eq(vec![
 			"01-alpha".to_string(),

@@ -30,7 +30,9 @@ impl Plugin for ThreadExamplesPlugin {
 #[reflect(Component)]
 fn AgentChoiceAction(cx: ActionContext<ChoiceInput>) -> String {
 	match cx.choice {
-		Choice::Attack => "the attack was successful, you must feel very smug..",
+		Choice::Attack => {
+			"the attack was successful, you must feel very smug.."
+		}
 		Choice::Defend => "you exhibited cowardice, the shame..",
 		Choice::GreetWarmly => {
 			"its almost as if the glowing beet winked in response.."

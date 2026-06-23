@@ -331,8 +331,14 @@ mod test {
 		let tree = card_stack_with_home();
 		// the home card (empty path) is card 1, the children follow.
 		resolve_nth_card(&tree, 1).unwrap().join("/").xpect_eq("");
-		resolve_nth_card(&tree, 2).unwrap().join("/").xpect_eq("alpha");
-		resolve_nth_card(&tree, 3).unwrap().join("/").xpect_eq("beta");
+		resolve_nth_card(&tree, 2)
+			.unwrap()
+			.join("/")
+			.xpect_eq("alpha");
+		resolve_nth_card(&tree, 3)
+			.unwrap()
+			.join("/")
+			.xpect_eq("beta");
 	}
 
 	/// Stepping in and out of the `/` home card: next leaves it for the first

@@ -30,7 +30,9 @@ pub async fn read_site_sources(
 ) -> Result<SiteSources> {
 	let entry_name = entry_name.into();
 	let templates = read_site_templates(store, &formats).await?;
-	let entry = store.get_media(&SmolPath::from(entry_name.as_str())).await?;
+	let entry = store
+		.get_media(&SmolPath::from(entry_name.as_str()))
+		.await?;
 	SiteSources {
 		entry_name,
 		entry,
@@ -57,14 +59,17 @@ pub fn build_site_root(
 		formats,
 	} = sources;
 	register_site_templates(world, &formats, templates)?;
-	let template = EntryTemplate::from_bytes(world, &entry)
-		.map_err(|err| bevyhow!("failed to parse entry `{entry_name}`: {err}"))?;
+	let template = EntryTemplate::from_bytes(world, &entry).map_err(|err| {
+		bevyhow!("failed to parse entry `{entry_name}`: {err}")
+	})?;
 	// the site store on the root: descendants resolve it by ancestry.
 	let root = world.spawn((extra, store)).id();
 	world
 		.entity_mut(root)
 		.insert_template(template)
-		.map_err(|err| bevyhow!("failed to load entry `{entry_name}`: {err}"))?;
+		.map_err(|err| {
+			bevyhow!("failed to load entry `{entry_name}`: {err}")
+		})?;
 	world.flush();
 	Ok(root)
 }
@@ -88,10 +93,12 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources =
-			read_site_sources(&store, formats, "main.bsx").await.unwrap();
+		let sources = read_site_sources(&store, formats, "main.bsx")
+			.await
+			.unwrap();
 		let root =
-			build_site_root(&mut world, store, sources, DisableBootOnLoad).unwrap();
+			build_site_root(&mut world, store, sources, DisableBootOnLoad)
+				.unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world

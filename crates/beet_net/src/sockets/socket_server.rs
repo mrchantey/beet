@@ -396,7 +396,9 @@ mod real_listener_tests {
 							text.xpect_eq("hello matey");
 							commands
 								.entity(ev.original_target())
-								.trigger_target(MessageSend(Message::Close(None)));
+								.trigger_target(MessageSend(Message::Close(
+									None,
+								)));
 						}
 						Message::Close(_) => {
 							store.set(true);

@@ -188,7 +188,8 @@ pub impl World {
 	/// it, the loader resolves it to a no-op instead of erroring. See
 	/// [`AllowedUnregistered`].
 	fn allow_unregistered(&mut self, tag: impl Into<SmolStr>) -> &mut Self {
-		self.get_resource_or_init::<AllowedUnregistered>().insert(tag);
+		self.get_resource_or_init::<AllowedUnregistered>()
+			.insert(tag);
 		self
 	}
 }
@@ -242,9 +243,9 @@ pub fn build_template_by_name(
 	let Some(registration) = guard.get_with_short_type_path(tag) else {
 		drop(guard);
 		// a known featured-out tag resolves to nothing instead of erroring.
-		return is_allowed_unregistered(cx, tag).then_some(()).ok_or_else(|| {
-			bevyhow!("no type registered for template tag `{tag}`")
-		});
+		return is_allowed_unregistered(cx, tag).then_some(()).ok_or_else(
+			|| bevyhow!("no type registered for template tag `{tag}`"),
+		);
 	};
 	let reflect_template =
 		registration.data::<ReflectTemplate>().ok_or_else(|| {

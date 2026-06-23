@@ -518,9 +518,7 @@ pub(crate) mod test {
 						port: Some(port),
 						..default()
 					},
-					exchange_handler(|_| {
-						Response::ok().with_body("up")
-					}),
+					exchange_handler(|_| Response::ok().with_body("up")),
 					OnSpawn::new_async(move |entity| {
 						start_mini_http_server_with_tcp(
 							entity, listener, shutdown,

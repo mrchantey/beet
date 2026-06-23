@@ -147,14 +147,19 @@ mod test {
 		let mut world = render_world();
 		let SiteEntry { site_dir, entry } =
 			resolve_site(site_path().to_string_lossy().as_ref()).unwrap();
-		let entry_name =
-			entry.file_name().and_then(|name| name.to_str()).unwrap().to_string();
+		let entry_name = entry
+			.file_name()
+			.and_then(|name| name.to_str())
+			.unwrap()
+			.to_string();
 		let store = BlobStore::new(FsStore::new(site_dir));
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources =
-			read_site_sources(&store, formats, entry_name).await.unwrap();
+		let sources = read_site_sources(&store, formats, entry_name)
+			.await
+			.unwrap();
 		let root =
-			build_site_root(&mut world, store, sources, DisableBootOnLoad).unwrap();
+			build_site_root(&mut world, store, sources, DisableBootOnLoad)
+				.unwrap();
 		// the markup `<Router {(.., HttpServer{..})}>` declared a server
 		world.entity(root).contains::<HttpServer>().xpect_true();
 		// and `<DefaultAppRoutes/>` wired the reactivity-runtime route

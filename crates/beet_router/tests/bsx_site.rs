@@ -363,7 +363,10 @@ async fn main_bsx_include_co_resides_boot_with_server() {
 		.await
 		.unwrap();
 	store
-		.insert(&SmolPath::from("main.bsx"), "<Template src=\"server.bsx\"/>")
+		.insert(
+			&SmolPath::from("main.bsx"),
+			"<Template src=\"server.bsx\"/>",
+		)
 		.await
 		.unwrap();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();

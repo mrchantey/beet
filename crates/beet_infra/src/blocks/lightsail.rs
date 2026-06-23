@@ -394,14 +394,13 @@ impl Block for LightsailBlock {
 		// SSH (22) is always open. With a domain Caddy terminates TLS on 80/443
 		// and proxies to the app's internal port; without one the app's own port
 		// (`app_port`) is opened directly so the binary is publicly reachable.
-		let mut port_info = vec![
-			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+		let mut port_info =
+			vec![AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
 				from_port: 22,
 				protocol: "tcp".into(),
 				to_port: 22,
 				..default()
-			},
-		];
+			}];
 		if self.domain.is_some() {
 			port_info.extend([
 				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {

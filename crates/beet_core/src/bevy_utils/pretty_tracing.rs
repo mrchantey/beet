@@ -127,7 +127,11 @@ impl PrettyTracing {
 			.try_init()
 			.ok();
 		#[cfg(not(target_arch = "wasm32"))]
-		builder.with_writer(std::io::stdout).pretty().try_init().ok();
+		builder
+			.with_writer(std::io::stdout)
+			.pretty()
+			.try_init()
+			.ok();
 	}
 }
 
@@ -165,7 +169,12 @@ mod console_writer {
 	}
 
 	impl ConsoleWriter {
-		fn new(level: Level) -> Self { Self { level, buf: Vec::new() } }
+		fn new(level: Level) -> Self {
+			Self {
+				level,
+				buf: Vec::new(),
+			}
+		}
 	}
 
 	impl io::Write for ConsoleWriter {
@@ -180,8 +189,9 @@ mod console_writer {
 		fn drop(&mut self) {
 			use crate::exports::web_sys::console;
 			// the fmt layer appends a trailing newline; the console adds its own.
-			let value =
-				JsValue::from_str(String::from_utf8_lossy(&self.buf).trim_end());
+			let value = JsValue::from_str(
+				String::from_utf8_lossy(&self.buf).trim_end(),
+			);
 			// errors to `console.error`, everything else to `console.log` (the level
 			// is also in the message text via `with_level(true)`).
 			match self.level {

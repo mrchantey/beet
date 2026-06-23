@@ -96,7 +96,9 @@ fn cf_project_dir(name: &str) -> Result<AbsPathBuf> {
 
 /// Find a sibling component of type `T` by walking the action's parent's children
 /// (the same pattern [`BuildDockerImageAction`] uses for its block + artifact).
-async fn sibling<T: Component + Clone>(cx: &ActionContext<Request>) -> Result<T> {
+async fn sibling<T: Component + Clone>(
+	cx: &ActionContext<Request>,
+) -> Result<T> {
 	cx.caller
 		.with_state::<(Query<&Children>, Query<&ChildOf>, Query<&T>), _>(
 			|entity, (children_q, child_of_q, comp_q)| -> Result<T> {
@@ -404,7 +406,10 @@ pub struct CloudflareR2Sync {
 
 impl CloudflareR2Sync {
 	/// Publish `local_dir` to `bucket`.
-	pub fn new(local_dir: impl Into<SmolPath>, bucket: impl Into<SmolStr>) -> Self {
+	pub fn new(
+		local_dir: impl Into<SmolPath>,
+		bucket: impl Into<SmolStr>,
+	) -> Self {
 		Self {
 			local_dir: local_dir.into(),
 			bucket: bucket.into(),

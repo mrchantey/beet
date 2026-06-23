@@ -128,7 +128,10 @@ mod test {
 	fn skips_unregistered_spread_component() {
 		let mut world = TemplatePlugin::world();
 		world.init_resource::<AppTypeRegistry>();
-		world.resource::<AppTypeRegistry>().write().register::<LinkedComp>();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<LinkedComp>();
 
 		let root = BsxTemplate::parse_entry(
 			&world,

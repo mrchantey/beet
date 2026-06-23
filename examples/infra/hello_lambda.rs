@@ -31,8 +31,8 @@ fn main() -> AppExit { deploy_main(infra_scene) }
 
 fn infra_scene() -> Result<impl Bundle> {
 	let stk = stack("hello_lambda");
-	let block =
-		LambdaBlock::default().with_env_vars(remote_env(site_bucket_name(&stk)));
+	let block = LambdaBlock::default()
+		.with_env_vars(remote_env(site_bucket_name(&stk)));
 
 	(
 		stack("hello_lambda"),

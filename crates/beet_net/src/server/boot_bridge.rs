@@ -36,7 +36,9 @@ async fn boot_to_exchange_action(cx: ActionContext<Boot>) -> Result<Response> {
 	let boot = cx.take();
 	let filter = caller
 		.with(|entity| {
-			entity.get::<BootToExchange>().map(|bridge| bridge.filter.clone())
+			entity
+				.get::<BootToExchange>()
+				.map(|bridge| bridge.filter.clone())
 		})
 		.await?
 		.ok_or_else(|| {
@@ -137,7 +139,8 @@ mod test {
 					.get_param("kept")
 					.map(|value| value.to_string())
 					.unwrap_or_default();
-				Response::ok().with_body(format!("{} kept={kept}", request.path_string()))
+				Response::ok()
+					.with_body(format!("{} kept={kept}", request.path_string()))
 			}),
 			BootToExchange::default(),
 		)
@@ -169,14 +172,17 @@ mod test {
 					let request = cx.take();
 					let secret = request.get_param("secret").is_some();
 					let kept = request.get_param("kept").is_some();
-					Response::ok().with_body(format!("secret={secret} kept={kept}"))
+					Response::ok()
+						.with_body(format!("secret={secret} kept={kept}"))
 				}),
 				BootToExchange {
 					filter: GlobFilter::default().with_exclude("secret"),
 				},
 			))
 			.call::<Boot, Response>(Boot(
-				Request::get("cmd").with_param("secret", "x").with_param("kept", "y"),
+				Request::get("cmd")
+					.with_param("secret", "x")
+					.with_param("kept", "y"),
 			))
 			.await
 			.unwrap()

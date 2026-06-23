@@ -81,7 +81,9 @@ impl ChannelHttpClient {
 	}
 
 	/// Take a ready response without awaiting, if one has landed.
-	pub fn try_recv(&self) -> Option<Response> { self.responses.try_recv().ok() }
+	pub fn try_recv(&self) -> Option<Response> {
+		self.responses.try_recv().ok()
+	}
 
 	/// Send a request and await its response: [`Self::send`] then [`Self::recv`],
 	/// for when the server is driven elsewhere (eg a background thread or a test
@@ -170,13 +172,13 @@ mod test {
 			))
 			.id();
 		// boot through the fan-out (fire-and-forget: the call fans out and parks)
-		app.world_mut().entity_mut(entity).run_async_local(
-			|host| async move {
+		app.world_mut()
+			.entity_mut(entity)
+			.run_async_local(|host| async move {
 				host.call::<Boot, Response>(Boot::from(Request::get("/")))
 					.await?;
 				Ok(())
-			},
-		);
+			});
 		// drive the app until the posted request round-trips to a response
 		let response = AsyncRunner::poll_and_update(
 			|| {

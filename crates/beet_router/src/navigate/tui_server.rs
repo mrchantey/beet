@@ -100,7 +100,10 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 				world.get_resource_or_init::<Theme>().scheme = scheme;
 			}
 			let host = world
-				.spawn((StdioTerminal::default(), page_host(terminal_ext::size())))
+				.spawn((
+					StdioTerminal::default(),
+					page_host(terminal_ext::size()),
+				))
 				.id();
 			set_loading_page(world, host);
 			host

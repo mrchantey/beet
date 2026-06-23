@@ -278,11 +278,9 @@ mod test {
 		// compose the site store on the router root so `RoutesDir` resolves it by
 		// ancestry, then settle the discovery scan before the export walks the routes.
 		let router = world
-			.spawn((
-				FsStore::new(root),
-				default_router(),
-				children![RoutesDir::default()],
-			))
+			.spawn((FsStore::new(root), default_router(), children![
+				RoutesDir::default()
+			]))
 			.flush();
 		AsyncRunner::settle_async_tasks(world).await;
 		router

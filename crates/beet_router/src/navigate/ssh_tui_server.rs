@@ -207,7 +207,12 @@ fn close_session_on_ctrl_c(
 			// restore the client terminal, then close: the russh send loop forwards
 			// the leave sequences (a `Data` event) before it processes the `Close`,
 			// so the client receives them before the channel shuts.
-			restore_session(window, &mut surfaces, &mut channels, &mut commands)?;
+			restore_session(
+				window,
+				&mut surfaces,
+				&mut channels,
+				&mut commands,
+			)?;
 			commands
 				.entity(window)
 				.trigger_target(SshSend(SshEvent::Close(None)));
@@ -389,7 +394,8 @@ mod test {
 		drive_until(&mut app, connection, "Alpha page");
 
 		// record, in order, every event the session would send to its client.
-		let sent = std::sync::Arc::new(std::sync::Mutex::new(Vec::<SshEvent>::new()));
+		let sent =
+			std::sync::Arc::new(std::sync::Mutex::new(Vec::<SshEvent>::new()));
 		let recorder = sent.clone();
 		app.world_mut().entity_mut(connection).observe_any(
 			move |ev: On<SshSend>| {

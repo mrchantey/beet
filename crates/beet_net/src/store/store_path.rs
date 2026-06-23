@@ -65,7 +65,10 @@ fn resolve_dir_path(
 		return;
 	};
 	let scoped = store.with_subdir(dir.0.clone());
-	if stores.get(entity).is_ok_and(|current| current.same_scope(&scoped)) {
+	if stores
+		.get(entity)
+		.is_ok_and(|current| current.same_scope(&scoped))
+	{
 		return;
 	}
 	commands.entity(entity).insert(scoped);
@@ -81,12 +84,17 @@ fn resolve_blob_path(
 	blobs: &Query<&Blob>,
 	commands: &mut Commands,
 ) {
-	let Ok(blob_path) = blob_paths.get(entity) else { return };
+	let Ok(blob_path) = blob_paths.get(entity) else {
+		return;
+	};
 	let Some((_, store)) = nearest_store(entity, parents, stores) else {
 		return;
 	};
 	let blob = store.blob(blob_path.0.clone());
-	if blobs.get(entity).is_ok_and(|current| current.same_target(&blob)) {
+	if blobs
+		.get(entity)
+		.is_ok_and(|current| current.same_target(&blob))
+	{
 		return;
 	}
 	commands.entity(entity).insert(blob);
@@ -138,7 +146,13 @@ pub fn on_insert_store(
 ) {
 	for descendant in children.iter_descendants(ev.entity) {
 		if dirs.contains(descendant) {
-			resolve_dir_path(descendant, &dirs, &parents, &stores, &mut commands);
+			resolve_dir_path(
+				descendant,
+				&dirs,
+				&parents,
+				&stores,
+				&mut commands,
+			);
 		} else if blob_paths.contains(descendant) {
 			resolve_blob_path(
 				descendant,
@@ -207,7 +221,9 @@ mod test {
 		let store = BlobStore::temp();
 		let root = app
 			.world_mut()
-			.spawn((store.clone(), children![DirPath(SmolPath::from("assets"))]))
+			.spawn((store.clone(), children![DirPath(SmolPath::from(
+				"assets"
+			))]))
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);

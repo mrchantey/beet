@@ -31,8 +31,8 @@ fn main() -> AppExit { deploy_main(infra_scene) }
 fn infra_scene() -> Result<impl Bundle> {
 	let stk = stack("hello_fargate");
 	// the container reconstructs the site store from these.
-	let block =
-		FargateBlock::default().with_env_vars(remote_env(site_bucket_name(&stk)));
+	let block = FargateBlock::default()
+		.with_env_vars(remote_env(site_bucket_name(&stk)));
 
 	// `stack_cli()` carries the IaC verbs; the custom routes append via
 	// `OnSpawn::insert_child` (a second `children!` would clobber them).

@@ -106,7 +106,8 @@ impl S3Store {
 					}
 				})
 			});
-		POOL.get(&(self.region.clone(), self.endpoint.clone())).await
+		POOL.get(&(self.region.clone(), self.endpoint.clone()))
+			.await
 	}
 
 	/// Resolve the S3 object key from a [`SmolPath`].

@@ -68,14 +68,14 @@ mod indexed_db_store;
 mod local_storage_store;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod r2_workers_store;
-#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
-pub use r2_workers_store::*;
 #[cfg(feature = "std")]
 pub use fs_store::*;
 #[cfg(target_arch = "wasm32")]
 pub use indexed_db_store::*;
 #[cfg(target_arch = "wasm32")]
 pub use local_storage_store::*;
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+pub use r2_workers_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub use s3_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]

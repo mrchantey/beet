@@ -149,7 +149,10 @@ pub async fn NavigateHandler(
 	// Dispatch through the route's Action<Request, Response> slot
 	node.merge_path_params(&mut request);
 	let entity = world.entity(node.entity);
-	let action = entity.clone().get_cloned::<Action<Request, Response>>().await?;
+	let action = entity
+		.clone()
+		.get_cloned::<Action<Request, Response>>()
+		.await?;
 	let response = entity.call_detached(action, request).await?;
 
 	response.xok()
@@ -173,7 +176,9 @@ fn resolve_navigation(
 		}
 		NavigateTo::NextCard => resolve_card(tree, current_path, CardNav::Next),
 		NavigateTo::PrevCard => resolve_card(tree, current_path, CardNav::Prev),
-		NavigateTo::FirstCard => resolve_card(tree, current_path, CardNav::First),
+		NavigateTo::FirstCard => {
+			resolve_card(tree, current_path, CardNav::First)
+		}
 		NavigateTo::LastCard => resolve_card(tree, current_path, CardNav::Last),
 	}
 }

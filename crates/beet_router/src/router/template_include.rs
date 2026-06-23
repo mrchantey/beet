@@ -77,7 +77,8 @@ async fn resolve_include(
 	async_world
 		.with(move |world: &mut World| {
 			let mut root_entity = world.entity_mut(root);
-			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>() {
+			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>()
+			{
 				pending.resolve(pending_id);
 			}
 			drain_pending_dependencies(&mut root_entity);

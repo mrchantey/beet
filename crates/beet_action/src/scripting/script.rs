@@ -120,7 +120,9 @@ impl core::str::FromStr for ScriptLanguage {
 			"rhai" => Ok(Self::Rhai),
 			#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
 			"quickjs" | "js" | "javascript" => Ok(Self::QuickJs),
-			other => bevybail!("unknown or unavailable script language: {other:?}"),
+			other => {
+				bevybail!("unknown or unavailable script language: {other:?}")
+			}
 		}
 	}
 }
@@ -227,9 +229,11 @@ where
 				feature = "json",
 				not(target_arch = "wasm32")
 			))]
-			ScriptLanguage::QuickJs => {
-				crate::scripting::run_quickjs_console(&self.content, input, sink)
-			}
+			ScriptLanguage::QuickJs => crate::scripting::run_quickjs_console(
+				&self.content,
+				input,
+				sink,
+			),
 			#[cfg(all(
 				feature = "quickjs",
 				not(feature = "json"),
@@ -288,7 +292,9 @@ where
 		let lines = Rc::new(RefCell::new(Vec::<String>::new()));
 		let captured = lines.clone();
 		self.run_console(input, move |stream, line| match stream {
-			ConsoleStream::Stdout => captured.borrow_mut().push(line.to_string()),
+			ConsoleStream::Stdout => {
+				captured.borrow_mut().push(line.to_string())
+			}
 			ConsoleStream::Stderr => cross_log_error!("{line}"),
 		})?;
 		// the sink (and its `captured` clone) is dropped by now, so the borrow is sole.

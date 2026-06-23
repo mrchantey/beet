@@ -85,10 +85,7 @@ async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 				Response::internal_error()
 			}),
 		Err(_) => {
-			error!(
-				"No Action<Request, Response> on entity {:?}",
-				entity.id()
-			);
+			error!("No Action<Request, Response> on entity {:?}", entity.id());
 			Response::internal_error()
 		}
 	};

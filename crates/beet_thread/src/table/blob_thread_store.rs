@@ -215,8 +215,10 @@ impl ThreadStoreProvider for BlobThreadStore {
 	) -> BoxedFuture<'_, Result<ThreadId>> {
 		Box::pin(async move {
 			let id = thread.id();
-			self.write(move |data| upsert(&mut data.threads, thread, Thread::id))
-				.await?;
+			self.write(move |data| {
+				upsert(&mut data.threads, thread, Thread::id)
+			})
+			.await?;
 			Ok(id)
 		})
 	}

@@ -138,13 +138,16 @@ fn open_external_link(mut events: MessageReader<OpenExternalLink>) {
 #[cfg(target_arch = "wasm32")]
 fn open_in_new_tab(url: &str) -> Result {
 	use beet_core::exports::web_sys;
-	let window = web_sys::window()
-		.ok_or_else(|| bevyhow!("no browser window available to open `{url}`"))?;
+	let window = web_sys::window().ok_or_else(|| {
+		bevyhow!("no browser window available to open `{url}`")
+	})?;
 	window
 		.open_with_url_and_target(url, "_blank")
 		.map_err(|err| bevyhow!("browser refused to open `{url}`: {err:?}"))?
 		.ok_or_else(|| {
-			bevyhow!("browser blocked opening `{url}` in a new tab (popup blocker?)")
+			bevyhow!(
+				"browser blocked opening `{url}` in a new tab (popup blocker?)"
+			)
 		})?;
 	Ok(())
 }

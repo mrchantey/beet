@@ -31,10 +31,7 @@ fn main() {
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands
-				.spawn((
-					HttpServer::default(),
-					Handler.into_action(),
-				))
+				.spawn((HttpServer::default(), Handler.into_action()))
 				.trigger(StartRunning::boot);
 		})
 		.run();

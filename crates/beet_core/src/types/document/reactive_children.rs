@@ -140,8 +140,7 @@ pub(super) fn update_reactive_children(
 								let unchanged = child_keys
 									.get(child)
 									.map(|keyed| keyed.index)
-									.unwrap_or(usize::MAX)
-									== index;
+									.unwrap_or(usize::MAX) == index;
 								if !unchanged {
 									commands.entity(child).insert((
 										scope_at(index),

@@ -88,7 +88,10 @@ fn on_add_boot(mut world: DeferredWorld, cx: HookContext) {
 }
 
 fn on_add_exchange(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_load_exchange);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_load_exchange);
 }
 
 /// On the entry root's `LoadTemplate`, queue [`Boot::boot`] with the process request.

@@ -68,11 +68,18 @@ impl R2WorkersStore {
 	/// The R2 object version of `path` (its `head` metadata), or `None` if the
 	/// object is absent. Used as a cheap rebuild marker: a re-synced object gets a
 	/// new version, so a deployed Worker can rebuild its world on the next request.
-	pub async fn head_version(&self, path: &SmolPath) -> Result<Option<String>> {
+	pub async fn head_version(
+		&self,
+		path: &SmolPath,
+	) -> Result<Option<String>> {
 		let bucket = self.bucket();
 		let key = self.effective_key(path);
 		SendWrapper::new(async move {
-			bucket?.head(key).await?.map(|object| object.version()).xok()
+			bucket?
+				.head(key)
+				.await?
+				.map(|object| object.version())
+				.xok()
 		})
 		.await
 	}
@@ -109,7 +116,9 @@ impl BlobStoreProvider for R2WorkersStore {
 
 	fn id(&self) -> &'static str { "r2_workers" }
 
-	fn root_key(&self) -> SmolStr { format!("r2_workers:{}", self.binding).into() }
+	fn root_key(&self) -> SmolStr {
+		format!("r2_workers:{}", self.binding).into()
+	}
 
 	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
 
@@ -167,14 +176,18 @@ impl BlobStoreProvider for R2WorkersStore {
 					req = req.cursor(cursor);
 				}
 				let objects = req.execute().await?;
-				paths.extend(objects.objects().into_iter().filter_map(|object| {
-					let key = object.key();
-					let rel = match &prefix {
-						Some(prefix) => key.strip_prefix(prefix.as_str())?,
-						None => &key,
-					};
-					Some(SmolPath::new(rel))
-				}));
+				paths.extend(objects.objects().into_iter().filter_map(
+					|object| {
+						let key = object.key();
+						let rel = match &prefix {
+							Some(prefix) => {
+								key.strip_prefix(prefix.as_str())?
+							}
+							None => &key,
+						};
+						Some(SmolPath::new(rel))
+					},
+				));
 				match objects.truncated() {
 					true => cursor = objects.cursor(),
 					false => break,
