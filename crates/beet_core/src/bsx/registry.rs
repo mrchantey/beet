@@ -8,8 +8,10 @@
 //! Templates are named by file path as modules, Rust-style: `<path::to::X>`
 //! resolves to `path/to/X.bsx`. [`BsxTemplateRegistry::register_dir`] indexes a
 //! directory into a name -> (schema, parsed tree) registry, the manifest a
-//! reactive client layer also reads. A `<script type="json" bx:schema>` block in
-//! a `.bsx` declares the template's prop schema (see [`super::schema`]).
+//! reactive client layer also reads. The source format is pluggable per file
+//! type via [`TemplateFormats`]: `.bsx` parses through the markup grammar, `.js`
+//! wraps in a `<script>`. A `<script type="json" bx:schema>` block in a `.bsx`
+//! declares the template's prop schema (see [`super::schema`]).
 
 use super::ast::*;
 use crate::prelude::*;
@@ -76,9 +78,10 @@ impl BsxTemplateRegistry {
 		Ok(())
 	}
 
-	/// Parse `source` and register it under the module path derived from `path`,
-	/// a `.bsx` file path relative to a `templates/` root: `path/to/X.bsx`
-	/// registers under `path::to::X`, so `<path::to::X>` resolves to it.
+	/// Parse `source` through the format `formats` registers for its [`MediaType`]
+	/// and register it under the module path derived from `path`, relative to a
+	/// `templates/` root: `path/to/X.bsx` registers under `path::to::X`, so
+	/// `<path::to::X>` resolves to it. A type with no registered format is skipped.
 	///
 	/// The store-backed counterpart to [`register_dir`](Self::register_dir): a
 	/// caller reading `templates/` through a `BlobStore` (the filesystem in dev, S3
@@ -86,31 +89,46 @@ impl BsxTemplateRegistry {
 	/// lives here rather than on the higher store layer.
 	pub fn insert_source_from_path(
 		&mut self,
+		formats: &TemplateFormats,
 		path: &SmolPath,
 		source: &str,
 	) -> Result {
+		// a type with no registered format is skipped, mirroring `register_dir`.
+		let Some(parse) = path.media_type().and_then(|ty| formats.get(&ty)) else {
+			return Ok(());
+		};
 		let module = module_path_from_rel(path).ok_or_else(|| {
 			bevyhow!("could not derive a module path from `{path}`")
 		})?;
-		self.insert_source(module, source)
+		self.insert(module, parse(source)?);
+		Ok(())
 	}
 
-	/// Index a directory of `.bsx` files, registering each by its module path.
+	/// Index a directory of template source files, registering each by its module
+	/// path.
 	///
-	/// A file `<dir>/path/to/X.bsx` registers under the module path
-	/// `path::to::X`, so `<path::to::X>` resolves to it. This is the registration
-	/// pass: all templates are registered before any are loaded, so a tag resolves
-	/// to a known template and its schema. Uses `fs_ext` (cross-platform).
+	/// A file `<dir>/path/to/X.bsx` registers under the module path `path::to::X`,
+	/// so `<path::to::X>` resolves to it; a `path/to/X.js` registers the same name,
+	/// its body the `<script>` wrapper. The file's [`MediaType`] selects its parser
+	/// from `formats`, and a type with no registered format is skipped. This is the
+	/// registration pass: all templates are registered before any are loaded, so a
+	/// tag resolves to a known template and its schema. Uses `fs_ext`
+	/// (cross-platform).
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	pub fn register_dir(&mut self, dir: impl AsRef<Path>) -> Result {
+	pub fn register_dir(
+		&mut self,
+		formats: &TemplateFormats,
+		dir: impl AsRef<Path>,
+	) -> Result {
 		let dir = dir.as_ref();
 		for path in ReadDir::files_recursive(dir)? {
-			if path.extension().and_then(|ext| ext.to_str()) != Some("bsx") {
+			let Some(parse) = path.media_type().and_then(|ty| formats.get(&ty))
+			else {
 				continue;
-			}
+			};
 			let module = module_path_of(dir, &path)?;
-			let source = fs_ext::read_to_string(&path)?;
-			self.insert_source(module, &source)?;
+			let nodes = parse(&fs_ext::read_to_string(&path)?)?;
+			self.insert(module, nodes);
 		}
 		Ok(())
 	}
@@ -148,18 +166,21 @@ impl BsxTemplateRegistry {
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 #[extend::ext(name=WorldRegisterBsxExt)]
 pub impl World {
-	/// Register every `.bsx` under `dir` by its module path, populating the
+	/// Register every template source under `dir` by its module path, populating the
 	/// [`BsxTemplateRegistry`] and copying each template's prop schema into the
-	/// [`SchemaRegistry`] so a composable [`ValueSchema::Reference`] resolves.
+	/// [`SchemaRegistry`] so a composable [`ValueSchema::Reference`] resolves. The
+	/// recognized formats are the world's [`TemplateFormats`] (`.bsx` and `.js` by
+	/// default).
 	///
-	/// This is the registration pass: all BSX templates are registered before any
-	/// are loaded, so a tag resolves to a known template and its schema and a
-	/// missing required field is a real error.
+	/// This is the registration pass: all templates are registered before any are
+	/// loaded, so a tag resolves to a known template and its schema and a missing
+	/// required field is a real error.
 	fn register_bsx_templates(&mut self, dir: impl AsRef<Path>) -> Result {
+		let formats = self.get_resource_or_init::<TemplateFormats>().clone();
 		let mut registry = self
 			.remove_resource::<BsxTemplateRegistry>()
 			.unwrap_or_default();
-		registry.register_dir(dir)?;
+		registry.register_dir(&formats, dir)?;
 		self.insert_resource(registry);
 		self.register_bsx_schemas();
 		Ok(())

@@ -337,6 +337,36 @@ fn spread_on_bsx_template_tag() {
 	render_html(&mut world, root).xpect_contains("Body");
 }
 
+// ---- template formats: a `.js` file registers as a `<script>` template ------
+
+#[beet_core::test]
+fn js_file_registers_as_script_template() {
+	let mut world = world();
+	// a `PresentationControls.js` in the template dir registers
+	// `<PresentationControls>` exactly as a `.bsx` would, but its body is the file
+	// wrapped verbatim in a `<script>` (a process-unique dir so parallel runs do
+	// not collide).
+	let dir = std::env::temp_dir()
+		.join(format!("beet_js_template_{}", std::process::id()));
+	let _ = fs_ext::remove(&dir);
+	// the `<` proves the body is raw text, not HTML-escaped.
+	fs_ext::write(dir.join("PresentationControls.js"), "console.log(1 < 2);")
+		.unwrap();
+
+	world.register_bsx_templates(&dir).unwrap();
+	world
+		.resource::<BsxTemplateRegistry>()
+		.contains("PresentationControls")
+		.xpect_true();
+
+	// `<PresentationControls/>` resolves to the registered template, rendering its
+	// JS inside a raw-text `<script>`, `<` unescaped.
+	let root = spawn_bsx(&mut world, "<head><PresentationControls/></head>");
+	let html = render_html(&mut world, root);
+	let _ = fs_ext::remove(&dir);
+	html.xpect_contains("<script>console.log(1 < 2);</script>");
+}
+
 // ---- bx:scope ---------------------------------------------------------------
 
 #[beet_core::test]

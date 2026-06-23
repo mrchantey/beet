@@ -145,6 +145,7 @@ mod resolve;
 mod schema;
 mod style_resolver;
 mod tag_resolver;
+mod template_format;
 mod value;
 
 pub use ast::*;
@@ -158,6 +159,7 @@ pub use resolve::*;
 pub use schema::*;
 pub use style_resolver::*;
 pub use tag_resolver::*;
+pub use template_format::*;
 pub use value::parse_value_expr_str;
 
 use crate::prelude::*;
@@ -176,6 +178,7 @@ impl Plugin for BsxPlugin {
 			.init_resource::<VerbRegistry>()
 			.init_resource::<BsxTagResolvers>()
 			.init_resource::<StyleResolver>()
+			.init_resource::<TemplateFormats>()
 			.init_resource::<BsxTemplateRegistry>();
 	}
 }

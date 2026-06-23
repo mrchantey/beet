@@ -39,20 +39,46 @@ pub enum CardNav {
 	Last,
 }
 
-/// The path of the `n`th (1-based) top-level card, clamped to the stack range
-/// (`n < 1` lands on the first, `n > len` on the last). A stack is a flat list,
-/// so its cards are the routable children at the tree root, in sorted order.
-/// Backs the initial-card `--slide=N` patch in [`CardStackPlugin`].
+/// The ordered cards of a deck: the router's own page route — the `/` home card
+/// a deck declares via an `index` content file — first, then its page-route
+/// children, in tree order.
+///
+/// Only user-facing [`PageRoute`](crate::prelude::PageRoute)s are cards: the
+/// infrastructure routes a deck serves alongside its slides (`/health`, the
+/// reactivity-runtime asset, the `client_io` websocket, a mounted blob store of
+/// assets) are not steppable cards, so they never become the opening card or land
+/// in the stack.
+fn deck_cards(tree: &RouteTree) -> Vec<&RouteTree> {
+	let mut cards = Vec::new();
+	// the router's own route (an empty-path `index`) is the deck's home card, so a
+	// deck whose `/` is a slide opens and steps from it like any other card.
+	if tree.node().is_some_and(|node| node.is_page_route) {
+		cards.push(tree);
+	}
+	cards.extend(
+		tree.children
+			.iter()
+			.filter(|child| child.node().is_some_and(|node| node.is_page_route)),
+	);
+	cards
+}
+
+/// Whether `card`'s full path equals `path` by segment name, so the empty-path
+/// home card matches `/` and a child card matches its own path.
+fn card_path_matches(card: &RouteTree, path: &[SmolStr]) -> bool {
+	card.path.iter().count() == path.len()
+		&& card
+			.path
+			.iter()
+			.zip(path)
+			.all(|(seg, want)| seg.name() == want.as_str())
+}
+
+/// The path of the `n`th (1-based) card, clamped to the stack range (`n < 1`
+/// lands on the first, `n > len` on the last). Backs the initial-card `--slide=N`
+/// patch in [`CardStackPlugin`].
 pub fn resolve_nth_card(tree: &RouteTree, n: usize) -> Result<Vec<SmolStr>> {
-	// only user-facing page routes are cards: the infrastructure routes a deck
-	// serves alongside its slides (`/health`, the reactivity-runtime asset, the
-	// `client_io` websocket, a mounted blob store of assets) are not steppable
-	// cards, so they never become the opening card or land in the stack.
-	let cards: Vec<&RouteTree> = tree
-		.children
-		.iter()
-		.filter(|child| child.node().is_some_and(|node| node.is_page_route))
-		.collect();
+	let cards = deck_cards(tree);
 	if cards.is_empty() {
 		bevybail!("card stack has no cards");
 	}
@@ -67,15 +93,28 @@ pub fn resolve_card(
 	current_path: &[SmolStr],
 	nav: CardNav,
 ) -> Result<Vec<SmolStr>> {
-	let (siblings, current_idx) =
-		siblings_and_index(tree, current_path, true)?;
+	let cards = deck_cards(tree);
+	if cards.is_empty() {
+		bevybail!("card stack has no cards");
+	}
+	// the current card is the one whose full path matches the navigator's path;
+	// the home card matches the empty path (`/`).
+	let current_idx = cards
+		.iter()
+		.position(|card| card_path_matches(card, current_path))
+		.ok_or_else(|| {
+			bevyhow!(
+				"current path /{} is not a card in this deck",
+				current_path.join("/")
+			)
+		})?;
 	let target_idx = match nav {
 		CardNav::Prev => current_idx.saturating_sub(1),
-		CardNav::Next => (current_idx + 1).min(siblings.len() - 1),
+		CardNav::Next => (current_idx + 1).min(cards.len() - 1),
 		CardNav::First => 0,
-		CardNav::Last => siblings.len() - 1,
+		CardNav::Last => cards.len() - 1,
 	};
-	path_segments(&siblings[target_idx].path)
+	path_segments(&cards[target_idx].path)
 }
 
 /// System: arrow / space / page / home / end keys step the navigator between
@@ -237,5 +276,77 @@ mod test {
 		// out of range clamps to the ends
 		nth(0).xpect_eq("alpha");
 		nth(99).xpect_eq("gamma");
+	}
+
+	/// A deck whose `/` is a slide (an empty-path `index` card on the router's own
+	/// node) plus two child cards. The empty-path route lands on the tree root, so
+	/// it is the deck's home card, not a child.
+	fn card_stack_with_home() -> RouteTree {
+		let mut world = router_world();
+		let root = world
+			.spawn((nav_router(), children![
+				// empty path → the route attaches to the tree root: the home card.
+				(
+					render_action::fixed_func_route("", || rsx! {
+						<p>"home"</p>
+					}),
+					PageRoute
+				),
+				(
+					render_action::fixed_func_route("alpha", || rsx! {
+						<p>"a"</p>
+					}),
+					PageRoute
+				),
+				(
+					render_action::fixed_func_route("beta", || rsx! {
+						<p>"b"</p>
+					}),
+					PageRoute
+				),
+			]))
+			.flush();
+		world.entity(root).get::<RouteTree>().unwrap().clone()
+	}
+
+	/// The `/` home card is the first card: `--slide=1` opens it, and prev clamps
+	/// on it rather than stepping off the deck.
+	#[beet_core::test]
+	fn home_card_is_first() {
+		let tree = card_stack_with_home();
+		// the home card (empty path) is card 1, the children follow.
+		resolve_nth_card(&tree, 1).unwrap().join("/").xpect_eq("");
+		resolve_nth_card(&tree, 2).unwrap().join("/").xpect_eq("alpha");
+		resolve_nth_card(&tree, 3).unwrap().join("/").xpect_eq("beta");
+	}
+
+	/// Stepping in and out of the `/` home card: next leaves it for the first
+	/// child, prev returns to it, and prev on it clamps (the deck does not wrap).
+	#[beet_core::test]
+	fn home_card_steps_and_clamps() {
+		let tree = card_stack_with_home();
+		// from the home card (empty current path), next → first child, prev clamps.
+		resolve_card(&tree, &[], CardNav::Next)
+			.unwrap()
+			.join("/")
+			.xpect_eq("alpha");
+		resolve_card(&tree, &[], CardNav::Prev)
+			.unwrap()
+			.join("/")
+			.xpect_eq("");
+		// from the first child, prev returns to the home card.
+		resolve_card(&tree, &["alpha".into()], CardNav::Prev)
+			.unwrap()
+			.join("/")
+			.xpect_eq("");
+		// first/last still reach the deck ends.
+		resolve_card(&tree, &["alpha".into()], CardNav::First)
+			.unwrap()
+			.join("/")
+			.xpect_eq("");
+		resolve_card(&tree, &[], CardNav::Last)
+			.unwrap()
+			.join("/")
+			.xpect_eq("beta");
 	}
 }

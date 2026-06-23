@@ -510,11 +510,15 @@ mod test {
 		// patch under test (the serve binary adds it via `CardStackPlugin`).
 		app.add_plugins(CardStackPlugin);
 		let site_dir = deck_fixture("deck_boot");
-		app.world_mut()
-			.insert_resource(SiteRoot::new_fs(site_dir.clone()));
+		// the site store on the root backs the `RoutesDir` scan by ancestry.
 		let router = app
 			.world_mut()
-			.spawn((Router, CardDeck, children![RoutesDir::new("slides")]))
+			.spawn((
+				BlobStore::new(FsStore::new(site_dir.clone())),
+				Router,
+				CardDeck,
+				children![RoutesDir::new("slides")],
+			))
 			.flush();
 		// deliberately no `settle_async_tasks` here: spawn the navigator at the
 		// generic home while the RoutesDir scan is still in flight.
@@ -528,5 +532,81 @@ mod test {
 		// `/` has no route on a deck, so the only way "Alpha first" paints is the
 		// retry resolving the first card once discovery lands.
 		drive_until(&mut app, host, "Alpha first").await;
+	}
+
+	/// Card nav clamps at the first card and steps without skipping: prev on the
+	/// opening card stays put (a deck does not wrap), next then advances to the
+	/// second card, and prev returns to the first. Regression for prev stepping
+	/// "past" the first card (onto the home or an error page) and a following next
+	/// then skipping it.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	async fn card_nav_clamps_at_first_and_steps_without_skip() {
+		use bevy::input::ButtonState;
+		use bevy::input::keyboard::Key;
+		use bevy::input::keyboard::KeyCode;
+		use bevy::input::keyboard::KeyboardInput;
+		use bevy::math::UVec2;
+
+		let mut app = tui_app();
+		app.add_plugins(CardStackPlugin);
+		let site_dir = deck_fixture("deck_nav");
+		// the site store on the root backs the `RoutesDir` scan by ancestry.
+		let router = app
+			.world_mut()
+			.spawn((
+				BlobStore::new(FsStore::new(site_dir.clone())),
+				Router,
+				CardDeck,
+				children![RoutesDir::new("slides")],
+			))
+			.flush();
+		AsyncRunner::settle_async_tasks(app.world_mut()).await;
+		let host = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "/01-alpha"),
+			))
+			.id();
+		drive_until(&mut app, host, "Alpha first").await;
+
+		// the card the navigator currently shows (its path segments joined).
+		fn current_card(app: &App, host: Entity) -> String {
+			app.world()
+				.entity(host)
+				.get::<Navigator>()
+				.unwrap()
+				.current_url()
+				.path()
+				.join("/")
+		}
+		// press an arrow (card_nav reads `key_code`), then settle card_nav's queued
+		// async navigation over a few frames.
+		async fn press(app: &mut App, host: Entity, code: KeyCode) {
+			app.world_mut().write_message(KeyboardInput {
+				key_code: code,
+				logical_key: Key::ArrowLeft,
+				state: ButtonState::Pressed,
+				text: None,
+				repeat: false,
+				window: host,
+			});
+			for _ in 0..40 {
+				app.update();
+				AsyncRunner::tick().await;
+				time_ext::sleep_millis(1).await;
+			}
+		}
+
+		// prev on the first card clamps: still Alpha, never the home or beta.
+		press(&mut app, host, KeyCode::ArrowLeft).await;
+		current_card(&app, host).xpect_eq("01-alpha");
+		// next advances to the second card (not skipped).
+		press(&mut app, host, KeyCode::ArrowRight).await;
+		current_card(&app, host).xpect_eq("02-beta");
+		// prev returns to the first card.
+		press(&mut app, host, KeyCode::ArrowLeft).await;
+		current_card(&app, host).xpect_eq("01-alpha");
 	}
 }
