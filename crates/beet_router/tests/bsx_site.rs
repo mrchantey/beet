@@ -47,9 +47,16 @@ const COUNTER_BSX: &str = r#"
 
 /// Write the site fixture (entry, layout template, content routes) and return
 /// its root directory.
+///
+/// Each call gets its own numbered directory: the suite's async tests run
+/// concurrently, so a shared fixture dir would let one test's `fs_ext::remove`
+/// wipe another's `templates/` mid-scan (a spurious "no template registered").
 fn site_fixture() -> AbsPathBuf {
+	static SEQ: std::sync::atomic::AtomicU32 =
+		std::sync::atomic::AtomicU32::new(0);
+	let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 	let root = AbsPathBuf::new(
-		fs_ext::workspace_root().join("target/tests/bsx_site_e2e"),
+		fs_ext::workspace_root().join(format!("target/tests/bsx_site_e2e/{seq}")),
 	)
 	.unwrap();
 	fs_ext::remove(&root).ok();
