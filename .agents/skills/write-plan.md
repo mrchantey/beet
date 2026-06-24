@@ -1,0 +1,4 @@
+Make sure that all of the items that need doing are very clearly specified and that the agent is aware that every single one of them must be completed as a requirement of the completion of the task.
+They have no limit to sub-agents, to tokens or time. It's a matter of getting every single item done and done properly. using sub-agents to update markup, etc. It's an enormous task and it should be stated as so with the expectation that the agent work for a long period of time to complete the enormous task.
+
+After you've written the plan, let me know if any outstanding issues or potential blockers are standing out at this point.
