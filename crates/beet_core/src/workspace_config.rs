@@ -246,16 +246,7 @@ impl Default for WorkspaceConfig {
 				.with_include("*/launch/*")
 				.with_include("*/launch.rs"),
 			launch_file: WsPathBuf::new("launch.ron"),
-			root_dir: {
-				#[cfg(test)]
-				{
-					WsPathBuf::new("tests/test_site")
-				}
-				#[cfg(not(test))]
-				{
-					WsPathBuf::default()
-				}
-			},
+			root_dir: WsPathBuf::default(),
 			snippets_dir: WsPathBuf::new("target/snippets"),
 			html_dir: WsPathBuf::new("target/client"),
 			assets_dir: WsPathBuf::new("assets"),
@@ -266,13 +257,6 @@ impl Default for WorkspaceConfig {
 }
 
 impl WorkspaceConfig {
-	/// Creates a [`WorkspaceConfig`] for the test site directory.
-	pub fn test_site() -> Self {
-		let mut this = Self::default();
-		this.root_dir = WsPathBuf::new("tests/test_site");
-		this
-	}
-
 	/// Returns the snippets directory.
 	pub fn snippets_dir(&self) -> &WsPathBuf { &self.snippets_dir }
 

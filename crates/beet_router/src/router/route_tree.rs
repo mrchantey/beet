@@ -1,3 +1,4 @@
+use alloc::collections::VecDeque;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -206,35 +207,54 @@ impl RouteTree {
 		Ok(())
 	}
 
-	/// Returns all route paths in the tree as a flat list.
-	/// Nodes with no matching route are skipped.
-	pub fn flatten(&self) -> Vec<PathPattern> {
-		let mut patterns = Vec::new();
-		fn inner(patterns: &mut Vec<PathPattern>, node: &RouteTree) {
-			if node.node.is_some() {
-				patterns.push(node.path.clone());
-			}
-			for child in &node.children {
-				inner(patterns, child);
-			}
-		}
-		inner(&mut patterns, self);
-		patterns
-	}
-
-	/// Returns all route nodes in the tree as a flat list.
-	pub fn flatten_nodes(&self) -> Vec<&ActionNode> {
+	/// All nodes of the tree in depth-first pre-order (reading order): each node
+	/// before its children, children in their sorted order. The natural order
+	/// for rendering a route tree as a document.
+	pub fn iter_dfs(&self) -> Vec<&RouteTree> {
 		let mut nodes = Vec::new();
-		fn inner<'a>(nodes: &mut Vec<&'a ActionNode>, tree: &'a RouteTree) {
-			if let Some(route) = &tree.node {
-				nodes.push(route);
-			}
+		fn inner<'a>(nodes: &mut Vec<&'a RouteTree>, tree: &'a RouteTree) {
+			nodes.push(tree);
 			for child in &tree.children {
 				inner(nodes, child);
 			}
 		}
 		inner(&mut nodes, self);
 		nodes
+	}
+
+	/// All nodes of the tree in breadth-first order (level order): every node at
+	/// a given depth before any node deeper. The natural order for stepping
+	/// siblings before descending.
+	pub fn iter_bfs(&self) -> Vec<&RouteTree> {
+		let mut nodes = Vec::new();
+		let mut queue = VecDeque::from([self]);
+		while let Some(tree) = queue.pop_front() {
+			nodes.push(tree);
+			queue.extend(tree.children.iter());
+		}
+		nodes
+	}
+
+	/// Returns all route paths in the tree as a flat list, in [`iter_dfs`]
+	/// (reading) order. Nodes with no matching route are skipped.
+	///
+	/// [`iter_dfs`]: Self::iter_dfs
+	pub fn flatten(&self) -> Vec<PathPattern> {
+		self.iter_dfs()
+			.into_iter()
+			.filter_map(|tree| tree.node.as_ref().map(|_| tree.path.clone()))
+			.collect()
+	}
+
+	/// Returns all route nodes in the tree as a flat list, in [`iter_dfs`]
+	/// (reading) order.
+	///
+	/// [`iter_dfs`]: Self::iter_dfs
+	pub fn flatten_nodes(&self) -> Vec<&ActionNode> {
+		self.iter_dfs()
+			.into_iter()
+			.filter_map(|tree| tree.node.as_ref())
+			.collect()
 	}
 
 	/// Returns all action nodes in the tree as a flat list, skipping scene route nodes.
@@ -685,6 +705,57 @@ mod test {
 		// 3 actions
 		tree.flatten_nodes().len().xpect_eq(3);
 		tree.flatten_action_nodes().len().xpect_eq(3);
+	}
+
+	/// A tree with a nested folder, used to pin the iterator orderings: a root
+	/// over `outer` and an `inner` folder holding `deep`.
+	fn nested_tree(world: &mut World) -> Entity {
+		world
+			.spawn(children![
+				action_at("outer"),
+				(PathPartial::new("inner"), children![action_at("deep")])
+			])
+			.flush()
+	}
+
+	/// Maps a node list to its annotated paths for order assertions.
+	fn paths_of(nodes: &[&RouteTree]) -> Vec<String> {
+		nodes
+			.iter()
+			.map(|tree| tree.path.annotated_path().to_string())
+			.collect()
+	}
+
+	/// DFS yields each node before its children: the `inner` folder node comes
+	/// immediately before its `deep` child, ahead of the sorted-later `outer`.
+	#[beet_core::test]
+	fn iter_dfs_is_reading_order() {
+		let mut world = router_world();
+		let root = nested_tree(&mut world);
+		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		// root (empty), then sorted children: inner before its deep child, then outer
+		paths_of(&tree.iter_dfs()).xpect_eq(vec![
+			"".to_string(),
+			"inner".to_string(),
+			"inner/deep".to_string(),
+			"outer".to_string(),
+		]);
+	}
+
+	/// BFS yields every node at a depth before any deeper node: both top-level
+	/// nodes precede the nested `deep` child.
+	#[beet_core::test]
+	fn iter_bfs_is_level_order() {
+		let mut world = router_world();
+		let root = nested_tree(&mut world);
+		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		// root, then the full first level, then the deeper child
+		paths_of(&tree.iter_bfs()).xpect_eq(vec![
+			"".to_string(),
+			"inner".to_string(),
+			"outer".to_string(),
+			"inner/deep".to_string(),
+		]);
 	}
 
 	#[beet_core::test]

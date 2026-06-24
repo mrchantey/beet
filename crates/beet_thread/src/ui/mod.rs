@@ -34,6 +34,14 @@ pub struct ThreadUiPlugin;
 
 impl Plugin for ThreadUiPlugin {
 	fn build(&self, app: &mut App) {
+		// TODO(cli-rework): interim template loading. Register the crate-shipped
+		// `ThreadComposer.bsx` source so `thread_composer_on_add` can resolve it.
+		// Swap this one line for the blob-store load once crate-shipped templates
+		// travel through the blob store (`.agents/plans/cli-rework.md`).
+		app.world_mut()
+			.get_resource_or_init::<BsxTemplateRegistry>()
+			.insert_source(THREAD_COMPOSER_TEMPLATE, THREAD_COMPOSER_BSX)
+			.unwrap();
 		app.register_type::<ThreadView>()
 			.register_type::<ThreadScroll>()
 			.register_type::<ThreadComposer>()
@@ -48,11 +56,9 @@ impl Plugin for ThreadUiPlugin {
 			.add_systems(
 				Update,
 				(project_window_to_document, follow_thread_scroll).chain(),
-			)
-			// scope + focus a charcell chat composer (the router's page-host does
-			// this for web; a directly-spawned terminal host needs it here)
-			.add_observer(focus_chat_composer)
-			// empty the composer's field once its message is submitted
-			.add_observer(clear_composer_on_submit);
+			);
+		// The composer's empty-on-submit (`ClearOnSubmit`) and initial focus
+		// (`FocusOnAdd`) are generic `beet_ui` markers spread in `ThreadComposer.bsx`;
+		// its host-surface scoping rides `thread_composer_on_add`.
 	}
 }

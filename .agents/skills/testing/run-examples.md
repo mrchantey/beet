@@ -47,9 +47,11 @@ cargo run --example router           --features=router,markdown -- about
 cargo run --example cli              --features=router,rhai_serde -- greet --name=world
 cargo run --example router_serde     --features=router,rhai_serde,template_serde
 cargo run --example router_serde     --features=router,rhai_serde,template_serde -- greet --name=world
-cargo run --example file_based_routes -- codegen            --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls
-cargo run --example file_based_routes -- about              --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls
-cargo run --example file_based_routes -- call-add --a=10 --b=20  --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls
+# rsx_site is a crate, not a root example: generate its routes, then serve. It
+# scans typed pages, markdown content and a server action from three collections.
+cargo run -p rsx_site --no-default-features --features codegen   # regenerate src/codegen/
+cargo run -p rsx_site                                            # http server (default)
+cargo run -p rsx_site --features cli -- guide --accept=text/html # render one route to stdout
 ```
 
 ### 4. Todo (`--features=router,json`)

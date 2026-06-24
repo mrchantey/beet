@@ -114,7 +114,7 @@ mod test {
 
 	fn site_dir(sub: &str) -> AbsPathBuf {
 		AbsPathBuf::new_workspace_rel(format!(
-			"crates/beet_router/tests/test_site/{sub}"
+			"examples/rsx_site/tests/fixtures/codegen_site/{sub}"
 		))
 		.unwrap()
 	}

@@ -33,6 +33,57 @@ async fn home_in_document_layout() {
 }
 
 #[beet::test]
+async fn markdown_content_route_renders_in_layout() {
+	// the `content` collection serves `guide.md` through a `BlobScene`, parsed per
+	// request, wrapped in the same document layout as the typed pages.
+	site_world()
+		.spawn(rsx_site_router())
+		.exchange_str(html_get("guide"))
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8""#)
+		// the markdown body, parsed to elements
+		.xpect_contains("Guide")
+		.xpect_contains("markdown")
+		// header chrome from the shared layout
+		.xpect_contains("Counter");
+}
+
+#[beet::test]
+async fn dynamic_page_reads_request() {
+	// the `about` page is `async fn get(ActionContext<Request>)` (the `async_route`
+	// codegen branch), built per request with access to the live request path.
+	site_world()
+		.spawn(rsx_site_router())
+		.exchange_str(html_get("about"))
+		.await
+		.xpect_contains("About")
+		// the per-request body echoes the negotiated path
+		.xpect_contains("/about");
+}
+
+#[beet::test]
+async fn add_server_action_sums_json_body() {
+	// the migrated server action: a POST route exchanging a `Json<AddArgs>` body for
+	// the sum, dispatched in-process through the same router the pages serve.
+	let sum: i32 = site_world()
+		.spawn(rsx_site_router())
+		.exchange(
+			Request::post("add")
+				.with_accept(MediaType::Json)
+				.with_json_body(&AddArgs { a: 10, b: 20 })
+				.unwrap(),
+		)
+		.await
+		.into_result()
+		.await
+		.unwrap()
+		.json()
+		.await
+		.unwrap();
+	sum.xpect_eq(30);
+}
+
+#[beet::test]
 async fn buttons_page_renders_in_layout() {
 	site_world()
 		.spawn(rsx_site_router())

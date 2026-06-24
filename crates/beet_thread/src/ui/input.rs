@@ -30,86 +30,63 @@ impl ThreadComposer {
 	pub fn new(thread: Entity) -> impl Bundle { (Self, OfThread(thread)) }
 }
 
-/// Attach the composer's `<form>` (a `message` field + submit button) when added,
-/// so the component works as a bare spawn or markup spread. Submitting fires
-/// `beet_ui`'s [`Submit`], consumed by the active [`UserInput`] turn.
+/// The in-crate `ThreadComposer.bsx` source, registered into the
+/// [`BsxTemplateRegistry`] by [`ThreadUiPlugin`] so [`thread_composer_on_add`]
+/// can resolve it.
+///
+/// TODO(cli-rework): this single `include_str!` + `insert_source` registration is
+/// the interim loader. Once crate-shipped templates travel through the blob store
+/// (see `.agents/plans/cli-rework.md`), swap the registration line in
+/// `ThreadUiPlugin::build` for the blob-store load; the resolve in
+/// `thread_composer_on_add` is unaffected.
+pub const THREAD_COMPOSER_BSX: &str = include_str!("ThreadComposer.bsx");
+
+/// The name [`ThreadComposer`]'s `.bsx` template is registered under.
+pub const THREAD_COMPOSER_TEMPLATE: &str = "ThreadComposer";
+
+/// Build the composer's `<form>` from the registered `ThreadComposer.bsx` and
+/// scope its subtree to the charcell host surface, so the component works as a
+/// bare spawn or markup spread. Submitting fires `beet_ui`'s [`Submit`],
+/// consumed by the active [`UserInput`] turn; `{FocusOnAdd}` on the form's
+/// `<input>` (in the `.bsx`) gives it initial focus.
 fn thread_composer_on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).insert(rsx! {
-		<form>
-			<input name="message" type="text"/>
-			<button>"Send"</button>
-		</form>
-	});
-}
-
-/// Clear a [`ThreadComposer`]'s text field after it submits, so the next turn
-/// starts from an empty input (the submitted value is already gathered into the
-/// [`Submit`], so clearing here never drops it).
-pub fn clear_composer_on_submit(
-	ev: On<Submit>,
-	parents: Query<&ChildOf>,
-	composers: Query<(), With<ThreadComposer>>,
-	children: Query<&Children>,
-	elements: Query<&Element>,
-	mut values: Query<&mut Value>,
-) {
-	// only forms belonging to a ThreadComposer
-	if !parents
-		.iter_ancestors_inclusive(ev.form)
-		.any(|ancestor| composers.contains(ancestor))
-	{
-		return;
-	}
-	for input in std::iter::once(ev.form)
-		.chain(children.iter_descendants(ev.form))
-		.filter(|entity| {
-			elements
-				.get(*entity)
-				.map(|element| matches!(element.tag(), "input" | "textarea"))
-				.unwrap_or(false)
-		}) {
-		if let Ok(mut value) = values.get_mut(input) {
-			*value = Value::str("");
+	let entity = cx.entity;
+	// a DeferredWorld cannot read the template registry or insert a template
+	// inline, so queue the resolve + surface scoping as a command closure
+	// (the same escape hatch `Focus::on_add` uses).
+	world.commands().queue(move |world: &mut World| -> Result {
+		let registry = world
+			.get_resource::<BsxTemplateRegistry>()
+			.cloned()
+			.unwrap_or_default();
+		let nodes = registry
+			.get(THREAD_COMPOSER_TEMPLATE)
+			.ok_or_else(|| {
+				bevyhow!(
+					"no BSX template registered under `{THREAD_COMPOSER_TEMPLATE}`"
+				)
+			})?
+			.nodes
+			.clone();
+		world
+			.entity_mut(entity)
+			.insert_template(BsxTemplate::new(nodes, registry))?;
+		// scope the composer to its charcell host so typed bytes route to it: the
+		// host (the window keyboard events carry) is the nearest `DoubleBuffer`
+		// ancestor. `RenderSurface(host)` rides the composer root, not the host
+		// itself (a self-referential relationship is stripped by Bevy), so any
+		// descendant `<input>` resolves to the host through `SurfaceQuery`
+		// regardless of intervening wrappers. The web path has no `DoubleBuffer`
+		// host, so this is a no-op there.
+		if let Ok(host) = world
+			.with_state::<AncestorQuery<(), With<DoubleBuffer>>, _>(|hosts| {
+				hosts.get_entity(entity)
+			})
+		{
+			world.entity_mut(entity).insert(RenderSurface(host));
 		}
-	}
-}
-
-/// When a [`ThreadComposer`]'s text input is added under a charcell host, scope
-/// the composer to that host surface and focus the input, so typing and Enter
-/// reach it. A directly-spawned charcell host (the local `TuiThreadChat`) skips the
-/// router's page-host wiring (`RenderSurface` + focus) that would otherwise do
-/// this; the web path keeps its own wiring (no [`DoubleBuffer`] host, so this is
-/// a no-op).
-pub fn focus_chat_composer(
-	ev: On<Add, Element>,
-	elements: Query<&Element>,
-	parents: Query<&ChildOf>,
-	composers: Query<(), With<ThreadComposer>>,
-	hosts: Query<(), With<DoubleBuffer>>,
-	mut commands: Commands,
-) {
-	// only the composer's text input
-	let Ok(element) = elements.get(ev.entity) else {
-		return;
-	};
-	if !matches!(element.tag(), "input" | "textarea") {
-		return;
-	}
-	let Some(composer) = parents
-		.iter_ancestors_inclusive(ev.entity)
-		.find(|ancestor| composers.contains(*ancestor))
-	else {
-		return;
-	};
-	// charcell only: the terminal host (the window keyboard events carry)
-	let Some(host) = parents
-		.iter_ancestors_inclusive(composer)
-		.find(|ancestor| hosts.contains(*ancestor))
-	else {
-		return;
-	};
-	commands.entity(composer).insert(RenderSurface(host));
-	commands.entity(ev.entity).insert(Focus);
+		Ok(())
+	});
 }
 
 // ═══════════════════════════════════════════════════════════════════════

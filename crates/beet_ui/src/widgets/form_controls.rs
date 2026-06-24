@@ -231,7 +231,7 @@ fn submit_form_on_enter(
 	focused: Query<Entity, With<Focus>>,
 	elements: ElementQuery,
 	parents: Query<&ChildOf>,
-	surfaces: Query<&RenderSurface>,
+	surfaces: SurfaceQuery,
 	values: Query<&Value>,
 	mut commands: Commands,
 ) {
@@ -257,10 +257,9 @@ fn submit_form_on_enter(
 		{
 			continue;
 		}
-		let surface = surface_of(target, &parents, &surfaces);
 		if enter_windows
 			.iter()
-			.any(|window| surface_matches(surface, *window))
+			.any(|window| surfaces.matches(target, *window))
 			&& let Some(form) = ancestor_form(&elements, &parents, target)
 		{
 			trigger_form_submit(form, &elements, &values, &mut commands);

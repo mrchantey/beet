@@ -35,15 +35,24 @@ pub fn server_plugin(app: &mut App) {
 		.insert_rule(design_row_rule());
 }
 
-/// The site router: the typed page collection wrapped in the global
-/// [`BeetLayout`] via the [`BaseLayout`] render middleware, so every route's body
-/// is placed into the layout's `<main>`. The batteries-included [`default_router`]
-/// adds `/app-info` and the cached `/js/reactivity.js` runtime the reactive
-/// counter loads.
+/// The store backing the markdown `content` routes, read at request time by each
+/// route's [`BlobScene`].
+fn content_store() -> FsStore {
+	FsStore::new(WsPathBuf::new("examples/rsx_site/content"))
+}
+
+/// The site router: the typed `pages`, the markdown `content`, and the `add`
+/// server `actions` collections, all wrapped in the global [`BeetLayout`] via the
+/// [`BaseLayout`] render middleware, so every route's body is placed into the
+/// layout's `<main>`. The batteries-included [`default_router`] adds `/app-info`
+/// and the cached `/js/reactivity.js` runtime the reactive counter loads.
 pub fn rsx_site_router() -> impl Bundle {
 	(
+		content_store(),
 		default_router(),
 		pages_routes(),
+		content_routes(),
+		actions_routes(),
 		BaseLayout::<BeetLayout>::default(),
 	)
 }

@@ -354,6 +354,7 @@ impl ScrollWrite {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::prelude::*;
 	use crate::render::charcell::test_host::TestHost;
 	use crate::style::*;
 

@@ -40,7 +40,7 @@ pub(crate) async fn build_site(
 		.await??;
 	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
 	// every discovered route exists before the caller renders/exports the site.
-	settle_routes_dirs(caller.world()).await?;
+	RoutesDir::settle_all(caller.world()).await?;
 	Ok(root)
 }
 

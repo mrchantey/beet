@@ -22,10 +22,11 @@
 //! - `<script type="application/json" data-bx-verbs>{"name": "js src"}</script>`:
 //!   the JS verbs to install (omitted when none).
 //!
-//! The blob, the verbs, and the runtime `<script>` are injected into `<head>`
-//! during the single render walk (a post-walk append is the fallback for a
-//! fragment with no `<head>`). Only `@doc`/`@prop` document state is in scope;
-//! `@res`/`@comp` (reflect) are server-rendered only, a later WASM concern.
+//! The blob, the verbs, and the runtime `<script>` are contributed as a single
+//! [`HtmlRenderer::hoist_into_head`] fragment, emitted into `<head>` during the
+//! single render walk (a post-walk append is the fallback for a fragment with no
+//! `<head>`). Only `@doc`/`@prop` document state is in scope; `@res`/`@comp`
+//! (reflect) are server-rendered only, a later WASM concern.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -78,9 +79,6 @@ pub(crate) struct ReactiveHtmlRender {
 	verbs: Vec<(SmolStr, String)>,
 	/// Walk state: the governing document of each enclosing visited element.
 	element_doc_stack: Vec<Option<usize>>,
-	/// Walk state: set once the `<head>` injection has been emitted, so the
-	/// post-walk fallback only fires for a fragment with no `<head>`.
-	head_injected: bool,
 }
 
 impl ReactiveHtmlRender {
@@ -373,15 +371,11 @@ impl ReactiveHtmlRender {
 			|| !self.events.is_empty()
 	}
 
-	/// The `<head>` injection (blob + verbs + runtime script) to emit once, or
-	/// `None` in `Auto` mode for a page with no reactive content. Marks the
-	/// injection consumed, so the caller emits it exactly once: at `</head>`, or
-	/// the post-walk fallback for a fragment with no `<head>`.
-	pub(crate) fn take_head_injection(&mut self) -> Option<String> {
-		if self.head_injected {
-			return None;
-		}
-		self.head_injected = true;
+	/// The `<head>` fragment (blob + verbs + runtime script) this reactive render
+	/// contributes, or `None` in `Auto` mode for a page with no reactive content.
+	/// Once-only emission is the head-hoist collection's concern (see
+	/// [`HtmlRenderer::hoist_into_head`]); this just reports the fragment.
+	pub(crate) fn into_head_fragment(&self) -> Option<String> {
 		let emit = match self.insert_reactive {
 			InsertReactive::Always => true,
 			InsertReactive::Auto => self.has_reactive_content(),

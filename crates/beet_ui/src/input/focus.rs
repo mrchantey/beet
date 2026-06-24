@@ -15,9 +15,9 @@ use crate::prelude::ElementState;
 use crate::prelude::ElementStateMap;
 use crate::prelude::PointerDown;
 use crate::prelude::PointerUp;
-use crate::prelude::RenderSurface;
-use crate::prelude::surface_matches;
-use crate::prelude::surface_of;
+use crate::prelude::SurfaceQuery;
+#[cfg(feature = "template")]
+use crate::prelude::Submit;
 use beet_core::prelude::*;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::Key;
@@ -25,7 +25,8 @@ use bevy::input::keyboard::KeyboardInput;
 
 /// Marker for the focused entity that receives keyboard input on a surface.
 ///
-/// At most one entity carries `Focus` *per surface* (per [`RenderSurface`]): the
+/// At most one entity carries `Focus` *per surface* (per
+/// [`RenderSurface`](crate::prelude::RenderSurface)): the
 /// `on_add` hook clears `Focus` from every other entity on the same surface, so
 /// each session (one per SSH connection) keeps its own focused element. Having no
 /// focused entity is a valid steady state.
@@ -45,16 +46,14 @@ impl Focus {
 		world.commands().queue(move |world: &mut World| {
 			let stale = world.with_state::<(
 				Query<Entity, With<Focus>>,
-				Query<&ChildOf>,
-				Query<&RenderSurface>,
-			), _>(|(focused, parents, surfaces)| {
-				let added_surface = surface_of(added, &parents, &surfaces);
+				SurfaceQuery,
+			), _>(|(focused, surfaces)| {
+				let added_surface = surfaces.surface_of(added);
 				focused
 					.iter()
 					.filter(|entity| *entity != added)
 					.filter(|entity| {
-						surface_of(*entity, &parents, &surfaces)
-							== added_surface
+						surfaces.surface_of(*entity) == added_surface
 					})
 					.collect::<Vec<_>>()
 			});
@@ -62,6 +61,72 @@ impl Focus {
 				world.entity_mut(entity).remove::<Focus>();
 			}
 		});
+	}
+}
+
+/// Marker that focuses its element the moment it is added.
+///
+/// The declarative form of "this element should start focused": its `on_add`
+/// inserts [`Focus`] (whose own `on_add` enforces one-focus-per-surface), so
+/// markup or a constructor can request initial focus without an observer that
+/// re-fires on scene reload. Insert it where the page is built (eg a chat
+/// composer's `<input>`).
+#[derive(Debug, Default, Clone, Copy, Reflect, Component)]
+#[reflect(Component)]
+#[component(on_add = Self::on_add)]
+pub struct FocusOnAdd;
+
+impl FocusOnAdd {
+	/// A [`DeferredWorld`] hook may insert a component (it queues via
+	/// `commands()`), exactly as [`Focus::on_add`] does.
+	fn on_add(mut world: DeferredWorld, cx: HookContext) {
+		world.commands().entity(cx.entity).insert(Focus);
+	}
+}
+
+/// Marks a `<form>` whose `<input>`/`<textarea>` values clear when it submits,
+/// so the next entry starts empty.
+///
+/// Generic form behavior, sat beside [`Focus`]: the submitted value is already
+/// gathered into the `Submit` event before the clearing observer fires, so
+/// clearing never drops it. Knows nothing of any specific composer.
+#[derive(Debug, Default, Clone, Copy, Reflect, Component)]
+#[reflect(Component)]
+pub struct ClearOnSubmit;
+
+/// Observer: on [`Submit`], clear every `<input>`/`<textarea>` [`Value`] inside
+/// the submitted form's own subtree.
+///
+/// Gated solely on the submitted form carrying [`ClearOnSubmit`] (no ancestor
+/// walk). The target entities are collected before the `&mut Value` loop because
+/// the descendant walk borrows immutably while the write borrows mutably. The
+/// descendant walk reads `Children`/`Element` rather than
+/// [`ElementQuery`](crate::prelude::ElementQuery), so the read and the
+/// `&mut Value` write stay disjoint queries.
+#[cfg(feature = "template")]
+fn clear_on_submit(
+	ev: On<Submit>,
+	forms: Query<(), With<ClearOnSubmit>>,
+	children: Query<&Children>,
+	elements: Query<&Element>,
+	mut values: Query<&mut Value>,
+) {
+	if !forms.contains(ev.form) {
+		return;
+	}
+	let inputs = children
+		.iter_descendants_inclusive::<Children>(ev.form)
+		.filter(|entity| {
+			elements
+				.get(*entity)
+				.map(|element| matches!(element.tag(), "input" | "textarea"))
+				.unwrap_or(false)
+		})
+		.collect::<Vec<_>>();
+	for input in inputs {
+		if let Ok(mut value) = values.get_mut(input) {
+			*value = Value::str("");
+		}
 	}
 }
 
@@ -90,7 +155,9 @@ pub struct FocusPlugin;
 impl Plugin for FocusPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<Focus>()
+			.register_type::<FocusOnAdd>()
 			.register_type::<Focusable>()
+			.register_type::<ClearOnSubmit>()
 			.add_observer(infer_focusable)
 			.add_observer(focus_on_click)
 			.add_systems(
@@ -98,6 +165,10 @@ impl Plugin for FocusPlugin {
 				(tab_focus, activate_focused_on_enter, write_focus_input),
 			)
 			.add_systems(PostUpdate, sync_focus_state);
+		// `clear_on_submit` reads the `Submit` event, which lives in the
+		// `template`-gated form widgets.
+		#[cfg(feature = "template")]
+		app.add_observer(clear_on_submit);
 	}
 }
 
@@ -111,8 +182,7 @@ impl Plugin for FocusPlugin {
 fn activate_focused_on_enter(
 	mut keys: MessageReader<KeyboardInput>,
 	focused: Query<Entity, With<Focus>>,
-	parents: Query<&ChildOf>,
-	surfaces: Query<&RenderSurface>,
+	surfaces: SurfaceQuery,
 	mut commands: Commands,
 ) {
 	// the surfaces (windows) Enter was pressed on this frame.
@@ -128,10 +198,9 @@ fn activate_focused_on_enter(
 	}
 	// activate the focused element of each surface Enter landed on.
 	for target in focused.iter() {
-		let surface = surface_of(target, &parents, &surfaces);
 		if enter_windows
 			.iter()
-			.any(|window| surface_matches(surface, *window))
+			.any(|window| surfaces.matches(target, *window))
 		{
 			// the activation reuses the click path; consumers read the target, not
 			// the pointer, so the target itself stands in as the pointer entity.
@@ -180,7 +249,7 @@ fn tab_focus(
 	focusables: Query<Entity, With<Focusable>>,
 	children: Query<&Children>,
 	parents: Query<&ChildOf>,
-	surfaces: Query<&RenderSurface>,
+	surfaces: SurfaceQuery,
 	focused: Query<Entity, With<Focus>>,
 	mut commands: Commands,
 ) {
@@ -207,20 +276,15 @@ fn tab_focus(
 		let order = full_order
 			.iter()
 			.copied()
-			.filter(|entity| {
-				surface_matches(
-					surface_of(*entity, &parents, &surfaces),
-					window,
-				)
-			})
+			.filter(|entity| surfaces.matches(*entity, window))
 			.collect::<Vec<_>>();
 		if order.is_empty() {
 			continue;
 		}
 		// the element currently focused on this surface, if any.
-		let current = focused.iter().find(|entity| {
-			surface_matches(surface_of(*entity, &parents, &surfaces), window)
-		});
+		let current = focused
+			.iter()
+			.find(|entity| surfaces.matches(*entity, window));
 		let next =
 			match current.and_then(|c| order.iter().position(|&e| e == c)) {
 				// wrap forward/back around the focusable ring
@@ -316,8 +380,7 @@ fn sync_focus_state(
 pub fn write_focus_input(
 	mut keys: MessageReader<KeyboardInput>,
 	mut focused: Query<(Entity, &mut Value), With<Focus>>,
-	parents: Query<&ChildOf>,
-	surfaces: Query<&RenderSurface>,
+	surfaces: SurfaceQuery,
 ) {
 	// collect editing keys grouped by their source surface (window).
 	let mut edits_by_window = HashMap::<Entity, Vec<KeyEdit>>::default();
@@ -343,10 +406,9 @@ pub fn write_focus_input(
 
 	// apply each surface's edits to its own focused element.
 	for (entity, value) in focused.iter_mut() {
-		let surface = surface_of(entity, &parents, &surfaces);
 		let edits = edits_by_window
 			.iter()
-			.filter(|(window, _)| surface_matches(surface, **window))
+			.filter(|(window, _)| surfaces.matches(entity, **window))
 			.flat_map(|(_, edits)| edits.iter().cloned())
 			.collect::<Vec<_>>();
 		if !edits.is_empty() {
@@ -396,6 +458,7 @@ enum KeyEdit {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::prelude::RenderSurface;
 	use bevy::input::InputPlugin;
 
 	/// Builds an [`App`] with the focus and input messaging wired up.
@@ -728,5 +791,95 @@ mod test {
 			.get::<ElementStateMap>()
 			.is_some_and(|map| map.contains(&ElementState::Focused))
 			.xpect_true();
+	}
+
+	/// [`FocusOnAdd`] focuses its element the moment it is added.
+	#[beet_core::test]
+	fn focus_on_add_focuses() {
+		let mut app = app();
+		let entity = app.world_mut().spawn(FocusOnAdd).id();
+		// the on_add hook inserts Focus via a command, settled on the next update.
+		app.update();
+		is_focused(&app, entity).xpect_true();
+	}
+
+	/// [`SurfaceQuery`] resolves an element to its surface through an extra
+	/// wrapper element between it and the [`RenderSurface`] host: the walk follows
+	/// `ChildOf` to the host regardless of depth.
+	#[beet_core::test]
+	fn surface_resolves_through_wrapper() {
+		let mut app = app();
+		let window = app.world_mut().spawn_empty().id();
+		// host(RenderSurface) > div wrapper > element, so the element is two hops
+		// below the surface, not directly on it.
+		let element = app.world_mut().spawn(Element::new("input")).id();
+		let wrapper = app
+			.world_mut()
+			.spawn(Element::new("div"))
+			.add_child(element)
+			.id();
+		app.world_mut()
+			.spawn(RenderSurface(window))
+			.add_child(wrapper);
+		app.world_mut()
+			.with_state::<SurfaceQuery, _>(|surfaces| surfaces.surface_of(element))
+			.xpect_eq(Some(window));
+	}
+
+	/// [`ClearOnSubmit`] empties a plain form's `<input>`/`<textarea>` values on
+	/// submit — no thread/composer involved, proving the marker is generic.
+	#[cfg(feature = "template")]
+	#[beet_core::test]
+	fn clear_on_submit_empties_plain_form() {
+		let mut app = app();
+		// a bare form carrying ClearOnSubmit, with a filled input and textarea.
+		let input = app
+			.world_mut()
+			.spawn((Element::new("input"), Value::str("typed")))
+			.id();
+		let area = app
+			.world_mut()
+			.spawn((Element::new("textarea"), Value::str("note")))
+			.id();
+		let form = app
+			.world_mut()
+			.spawn((Element::new("form"), ClearOnSubmit))
+			.add_children(&[input, area])
+			.id();
+		app.update();
+
+		// submitting the form clears both fields (the value is already gathered
+		// into Submit before the observer fires).
+		app.world_mut().trigger(Submit {
+			form,
+			values: Value::Null,
+		});
+		app.update();
+		value_of(&app, input).xpect_eq(Value::str(""));
+		value_of(&app, area).xpect_eq(Value::str(""));
+	}
+
+	/// [`ClearOnSubmit`] only touches a form that carries it: a submit on a form
+	/// without the marker leaves its fields untouched.
+	#[cfg(feature = "template")]
+	#[beet_core::test]
+	fn clear_on_submit_ignores_unmarked_form() {
+		let mut app = app();
+		let input = app
+			.world_mut()
+			.spawn((Element::new("input"), Value::str("typed")))
+			.id();
+		let form = app
+			.world_mut()
+			.spawn(Element::new("form"))
+			.add_child(input)
+			.id();
+		app.update();
+		app.world_mut().trigger(Submit {
+			form,
+			values: Value::Null,
+		});
+		app.update();
+		value_of(&app, input).xpect_eq(Value::str("typed"));
 	}
 }

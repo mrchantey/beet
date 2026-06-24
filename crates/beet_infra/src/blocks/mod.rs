@@ -19,9 +19,9 @@ mod dns;
 #[cfg(any(feature = "lambda_block", feature = "fargate_block"))]
 pub use dns::*;
 // The opt-in Cloudflare LB failover (uses the dns module + cloudflare LB bindings).
-#[cfg(any(feature = "lambda_block", feature = "fargate_block"))]
+#[cfg(feature = "cloudflare_dns")]
 mod failover;
-#[cfg(any(feature = "lambda_block", feature = "fargate_block"))]
+#[cfg(feature = "cloudflare_dns")]
 pub use failover::*;
 #[cfg(feature = "bindings_aws_common")]
 mod s3_bucket_block;

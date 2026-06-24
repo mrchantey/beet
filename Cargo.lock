@@ -3357,6 +3357,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bsx_site"
+version = "0.0.9-dev.16"
+dependencies = [
+ "beet",
+]
+
+[[package]]
 name = "built"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10501,6 +10508,7 @@ name = "rsx_site"
 version = "0.0.9-dev.16"
 dependencies = [
  "beet",
+ "serde",
 ]
 
 [[package]]

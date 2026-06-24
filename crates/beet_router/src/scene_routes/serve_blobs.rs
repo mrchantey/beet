@@ -5,20 +5,43 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// The greedy segment name [`ServeBlobs`] captures the trailing file path into.
+/// Private: callers give [`ServeBlobs`] a mount prefix, never this capture name.
 pub(crate) const STORE_PATH_PARAM: &str = "store_path";
 
-/// Serves the captured path from the nearest self-or-ancestor [`BlobStore`].
+/// Mounts a static-file route under `prefix`, serving the captured path from the
+/// nearest self-or-ancestor [`BlobStore`].
+///
+/// `prefix` is the only knob: `<ServeBlobs prefix="assets"/>` serves every file
+/// beneath `assets/`. The greedy trailing capture and the request/response adapter
+/// are private details ServeBlobs inserts for itself. Resolve the store by
+/// composition: pair with a co-located store-scoping component (eg [`DirPath`] or
+/// [`AssetsStore`]) on the same entity, or let it inherit an ancestor store.
+#[template]
+pub fn ServeBlobs(
+	/// The mount path the static files are served under, eg `assets`.
+	#[prop(into)]
+	prefix: String,
+) -> impl Bundle {
+	(
+		PathPartial::new(format!("{prefix}/*{STORE_PATH_PARAM}?")),
+		ServeBlobsHandler,
+		ExchangeOverload::new::<RequestParts, Response, _, _>(),
+	)
+}
+
+/// The static-file handler behind [`ServeBlobs`]: serves the greedy
+/// [`STORE_PATH_PARAM`] capture from the nearest self-or-ancestor [`BlobStore`].
 ///
 /// Resolves the store by composition rather than constructing one, so any adjacent
 /// store (filesystem, S3, in-memory) backs the route. A co-located [`DirPath`] has
-/// already scoped that store to its subdir, so this just reads the resolved store.
-/// The greedy [`STORE_PATH_PARAM`] capture is the file path relative to the mount
-/// point; serving rules mirror a static host (see [`serve_blob`]). Pair it with a
-/// [`Route`] carrying the `*store_path?` capture (and optionally a [`DirPath`]).
-#[action(route, handler_only)]
+/// already scoped that store to its subdir, so this just reads the resolved store;
+/// serving rules mirror a static host (see [`serve_blob`]).
+#[action(handler_only)]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub async fn ServeBlobs(cx: ActionContext<RequestParts>) -> Result<Response> {
+pub(crate) async fn ServeBlobsHandler(
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
 	// the nearest self-or-ancestor store (a `DirPath` co-located on this route has
 	// already scoped it to the served subdir).
 	let store = cx
@@ -88,10 +111,10 @@ mod test {
 	}
 
 	/// A serve route mounted at `mount`, serving the captured path from a
-	/// self-or-ancestor [`BlobStore`] (the [`Route`] + [`ServeBlobs`] expansion; the
+	/// self-or-ancestor [`BlobStore`] (the [`ServeBlobs`] template expansion; the
 	/// `DirPath`-scoped subdir case is covered by `bsx_site` end to end).
 	fn serve_route(mount: &str) -> impl Bundle {
-		route(&format!("{mount}/*{STORE_PATH_PARAM}?"), ServeBlobs)
+		ServeBlobs { prefix: mount.into() }.into_snippet_bundle()
 	}
 
 	/// A store on an ancestor (the router) backs a child serve route: the

@@ -2,6 +2,41 @@
 //! (focus, scroll) to one session when many coexist in one world.
 
 use beet_core::prelude::*;
+use bevy::ecs::system::SystemParam;
+
+/// Resolves which [`RenderSurface`] a (possibly deep) element belongs to: the
+/// nearest self-or-ancestor carrying a [`RenderSurface`], walking `ChildOf`.
+///
+/// The single per-surface resolver. Every input system (focus, typing, tab,
+/// form submit) and the terminal-title decoration share it instead of
+/// hand-rolling the ancestor walk, so the scoping rule lives in one place.
+/// Wraps the generalized [`AncestorQuery`] rather than re-walking `ChildOf`.
+#[derive(SystemParam)]
+pub struct SurfaceQuery<'w, 's> {
+	ancestors: AncestorQuery<'w, 's, &'static RenderSurface>,
+}
+
+impl SurfaceQuery<'_, '_> {
+	/// The surface entity `entity` is displayed on, or `None` if it sits outside
+	/// any surface.
+	///
+	/// The app path resolves a surface for every interactive element (the live
+	/// page root carries one), so a `None` here is a bare focusable with no page
+	/// tree, which the per-surface input systems treat as belonging to no surface
+	/// (it receives no scoped input).
+	pub fn surface_of(&self, entity: Entity) -> Option<Entity> {
+		self.ancestors.get(entity).ok().map(RenderSurface::surface)
+	}
+
+	/// Whether `entity` should receive input sourced from `window`: its surface
+	/// must resolve and equal `window`.
+	///
+	/// Fail-closed, so an unscoped element (no surface) never leaks into a
+	/// session.
+	pub fn matches(&self, entity: Entity, window: Entity) -> bool {
+		self.surface_of(entity) == Some(window)
+	}
+}
 
 /// The surface (the terminal/window entity) a rendered subtree is displayed on,
 /// the source half of the one-to-one [`RenderSurfaceOf`] relationship.
@@ -38,38 +73,4 @@ pub struct RenderSurfaceOf(Entity);
 impl RenderSurfaceOf {
 	/// The page currently displayed on this surface.
 	pub fn page(&self) -> Entity { self.0 }
-}
-
-/// The surface a (possibly deep) element belongs to: the nearest self-or-ancestor
-/// carrying a [`RenderSurface`], walking `ChildOf`.
-///
-/// `None` for an element outside any surface. The app path resolves a surface for
-/// every interactive element (the live page root carries one), so a `None` here is
-/// a bare focusable with no page tree, which the per-surface input systems treat as
-/// belonging to no surface (it receives no scoped input).
-pub fn surface_of(
-	entity: Entity,
-	parents: &Query<&ChildOf>,
-	surfaces: &Query<&RenderSurface>,
-) -> Option<Entity> {
-	let mut current = entity;
-	loop {
-		if let Ok(surface) = surfaces.get(current) {
-			return Some(surface.0);
-		}
-		match parents.get(current) {
-			Ok(child_of) => current = child_of.parent(),
-			Err(_) => return None,
-		}
-	}
-}
-
-/// Whether an element on `element_surface` should receive input from `window`: the
-/// element's surface must resolve and match. An element with no surface receives no
-/// scoped input (fail-closed, so an unscoped element never leaks into a session).
-pub fn surface_matches(
-	element_surface: Option<Entity>,
-	window: Entity,
-) -> bool {
-	element_surface == Some(window)
 }

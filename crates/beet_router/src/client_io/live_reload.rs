@@ -140,7 +140,7 @@ pub fn reload_site(world: &mut World, root: Entity) {
 		// render of each shared node (else the diagnostics' ephemeral cleanup races
 		// the repaint and blanks the live TUI). The web client has no in-world
 		// navigator and reloads via the broadcast above.
-		settle_routes_dirs(&world).await?;
+		RoutesDir::settle_all(&world).await?;
 		log_all_render_diagnostics(&world).await;
 		for navigator in navigators {
 			if let Err(err) = Navigator::reload(world.entity(navigator)).await {
@@ -161,7 +161,7 @@ pub fn reload_site(world: &mut World, root: Entity) {
 /// Respawn every [`RoutesDir`]'s route children: re-inserting the `RoutesDir`
 /// re-fires the async discovery observer, which respawns the routes and rebuilds the
 /// tree. The scoped [`BlobStore`] is dropped too, so the rescan's completion (it
-/// re-composes the store) is observable via [`settle_routes_dirs`].
+/// re-composes the store) is observable via [`RoutesDir::settle_all`].
 fn respawn_routes_dirs(world: &mut World) {
 	let dirs = world.with_state::<Query<(Entity, &RoutesDir)>, _>(|query| {
 		query

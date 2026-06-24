@@ -174,4 +174,5 @@ its require hooks. The runner must `register_type` every command (see
 - `crates/beet-cli/src/scene_management` — load/watch/reload `beet.json`
 - `crates/beet-cli/src/commands/qrcode.rs` — params + `parse_reflect`
 - `crates/beet-cli/src/commands/run_wasm.rs` — greedy route + `unparse_cli_args`
-- `examples/file_based_routes/main.rs` — a CLI/HTTP app sharing one router
+- `examples/rsx_site/src/server.rs` — a router serving typed pages, markdown
+  content and a server action, with the backend selected by build feature

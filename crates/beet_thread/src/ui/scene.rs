@@ -92,6 +92,17 @@ mod test {
 			.render_plain()
 	}
 
+	/// The first rendered element with `tag`, eg the composer's `<form>` or
+	/// `<input>` built from `ThreadComposer.bsx`.
+	fn element_by_tag(app: &mut App, tag: &str) -> Option<Entity> {
+		app.world_mut().with_state::<ElementQuery, _>(|elements| {
+			elements
+				.iter()
+				.find(|view| view.tag() == tag)
+				.map(|view| view.entity)
+		})
+	}
+
 	/// End to end: calling the thread runs the agent's turn (its `Sequence`
 	/// child), which projects into the view's document and renders as charcell
 	/// text, the agent's streamed echo included.
@@ -193,15 +204,7 @@ mod test {
 		}
 
 		// the user ends their turn by submitting "hello" on the composer's <form>
-		let form = app
-			.world_mut()
-			.with_state::<ElementQuery, _>(|elements| {
-				elements
-					.iter()
-					.find(|view| view.tag() == "form")
-					.map(|view| view.entity)
-			})
-			.unwrap();
+		let form = element_by_tag(&mut app, "form").unwrap();
 		let values = Value::Map(
 			[("message".into(), Value::new("hello"))]
 				.into_iter()
@@ -221,8 +224,9 @@ mod test {
 
 	/// The full deterministic interaction: real keystrokes through the input
 	/// bridge type into the focused composer and Enter submits, advancing the
-	/// user turn so the mock agent replies. The charcell host is wired by
-	/// [`focus_chat_composer`] exactly as the local `TuiThreadChat` wires the real one.
+	/// user turn so the mock agent replies. The composer scopes itself to the
+	/// host surface and `{FocusOnAdd}` focuses its `<input>`, exactly as the local
+	/// `TuiThreadChat` wires the real one.
 	#[beet_core::test]
 	async fn keyboard_submit_drives_reply() {
 		let (mut app, host) = charcell_app();
@@ -252,6 +256,103 @@ mod test {
 		}
 
 		// type "hello" + Enter through the real terminal input bridge
+		app.world_mut()
+			.get_mut::<ChannelTerminal>(host)
+			.unwrap()
+			.send_input(b"hello\r")
+			.unwrap();
+		for _ in 0..40 {
+			app.update();
+		}
+
+		let frame = frame_plain(&app, host);
+		frame.as_str().xpect_contains("User: hello");
+		frame.xpect_contains("Agent: you said: hello");
+	}
+
+	/// The composer builds its `<form>` from `ThreadComposer.bsx` (interim-loaded
+	/// into the `BsxTemplateRegistry`), not inline rsx: mounting one yields a
+	/// rendered `<form>` with the `message` `<input>` and the `Send` `<button>`.
+	#[beet_core::test]
+	async fn composer_renders_from_bsx() {
+		let (mut app, host) = charcell_app();
+		let thread =
+			app.world_mut().spawn((Thread::default(), Sequence::new())).id();
+		app.update();
+		app.world_mut()
+			.entity_mut(host)
+			.insert(children![ThreadComposer::new(thread)]);
+		for _ in 0..25 {
+			app.update();
+		}
+		element_by_tag(&mut app, "form").is_some().xpect_true();
+		element_by_tag(&mut app, "input").is_some().xpect_true();
+		element_by_tag(&mut app, "button").is_some().xpect_true();
+	}
+
+	/// Focus + surface scoping survive an extra wrapper element between the host
+	/// and the composer: the composer scopes its own subtree to the host surface
+	/// and `{FocusOnAdd}` focuses its `<input>`, so the resolver walks `ChildOf` to
+	/// the host regardless of depth (the regression the former fixed-depth
+	/// input-to-composer-to-host double-walk was prone to).
+	#[beet_core::test]
+	async fn composer_focus_survives_wrapper() {
+		let (mut app, host) = charcell_app();
+		let thread =
+			app.world_mut().spawn((Thread::default(), Sequence::new())).id();
+		app.update();
+		// nest the composer under an extra <div> wrapper under the host, not
+		// directly, so any fixed-depth walk would miss the host.
+		app.world_mut().entity_mut(host).insert((
+			LayoutStyle::flex_col(),
+			children![(
+				Element::new("div"),
+				children![ThreadComposer::new(thread)]
+			)],
+		));
+		for _ in 0..25 {
+			app.update();
+		}
+
+		// the composer's <input> ended up focused ...
+		let input = element_by_tag(&mut app, "input").unwrap();
+		app.world().entity(input).contains::<Focus>().xpect_true();
+		// ... and its resolved surface is the host (so typed bytes route to it).
+		app.world_mut()
+			.with_state::<SurfaceQuery, _>(|surfaces| surfaces.surface_of(input))
+			.xpect_eq(Some(host));
+	}
+
+	/// End-to-end proof the wiring survives a wrapper: with the composer nested
+	/// under an extra `<div>`, real keystrokes still reach the focused `<input>`
+	/// and Enter submits, advancing the user turn so the agent replies.
+	#[beet_core::test]
+	async fn keyboard_submit_drives_reply_through_wrapper() {
+		let (mut app, host) = charcell_app();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), Sequence::new(), children![
+				(Actor::user(), UserInput),
+				(Actor::agent(), MockPostStreamer::default()),
+			]))
+			.id();
+		app.update();
+
+		// mount the view directly but the composer under an extra wrapper <div>
+		app.world_mut().entity_mut(host).insert((
+			LayoutStyle::flex_col(),
+			children![
+				ThreadView::new(thread),
+				(Element::new("div"), children![ThreadComposer::new(thread)]),
+			],
+		));
+		app.world_mut()
+			.entity_mut(thread)
+			.insert(CallOnSpawn::<(), Outcome>::new(()));
+		for _ in 0..25 {
+			app.update();
+		}
+
 		app.world_mut()
 			.get_mut::<ChannelTerminal>(host)
 			.unwrap()

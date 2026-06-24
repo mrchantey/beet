@@ -17,7 +17,7 @@ serve-feature binary parses it cleanly.
 The router's middleware and the layout attach as component spreads (request
 logging, `--help`, terminal link navigation, the layout). `<DefaultAppRoutes/>`
 adds the default app routes (`/app-info`, the reactivity runtime, …),
-`<RoutesDir/>` discovers the `routes/` pages, and a `<Route>` carrying `ServeBlobs`
+`<RoutesDir/>` discovers the `routes/` pages, and `<ServeBlobs prefix="assets"/>`
 mounts the workspace assets the site and blog reference (the favicon, images). `<Theme
 color=.../>` seeds the brand colour the whole Material palette derives from, and
 `<Styles/>` registers the named style rules in `templates/Styles.bsx`.
@@ -28,5 +28,5 @@ color=.../>` seeds the brand colour the whole Material palette derives from, and
 	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
-	<Route path="assets/*store_path?" {(ServeBlobs, AssetsStore)}/>
+	<ServeBlobs prefix="assets" {AssetsStore}/>
 </Router>

@@ -107,18 +107,19 @@ impl Plugin for RouterPlugin {
 				.register_template::<StoreToolset>();
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
-			// asynchronously (off the runtime, see `spawn_routes_dir`), so it runs on
-			// wasm too rather than needing a separate blocking/async split.
+			// asynchronously (off the runtime, see `RoutesDir::spawn_on_insert`), so it
+			// runs on wasm too rather than needing a separate blocking/async split.
 			app.register_type::<RoutesDir>()
-				.add_observer(spawn_routes_dir);
-			// the no-code static-asset mount: the `<Route>` element (a `PathPartial`)
-			// plus the `ServeBlobs` blob-store-backed handler spread onto it, eg
-			// `<Route path="assets/*store_path?" {(ServeBlobs, AssetsStore)}/>`.
+				.add_observer(RoutesDir::spawn_on_insert);
+			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
+			// inserts its own greedy capture + handler, eg
+			// `<ServeBlobs prefix="assets" {AssetsStore}/>`.
 			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
 			// `AssetsStore` picks the backing (a `BEET_ASSETS_BUCKET` bucket, or the
 			// local `assets/` subdir) at build time.
 			app.register_template::<Route>()
-				.register_type::<ServeBlobs>()
+				.register_template::<ServeBlobs>()
+				.register_type::<ServeBlobsHandler>()
 				.register_template::<AssetsStore>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The

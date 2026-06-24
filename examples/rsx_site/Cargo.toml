@@ -18,8 +18,19 @@ keywords.workspace = true
 default = ["web", "terminal"]
 
 # Shared render substrate: the router, template system and style rule set, used by
-# both render targets. Page bodies and the layout live here.
-render = ["beet/router", "beet/style"]
+# both render targets. Page bodies and the layout live here. `json`/`markdown`/`fs`
+# back the migrated server `action` (`Json<AddArgs>`) and the markdown `content`
+# routes (`FsStore` + frontmatter); `ureq`/`rustls-tls` give the generated client
+# caller an http transport.
+render = [
+	"beet/router",
+	"beet/style",
+	"beet/json",
+	"beet/markdown",
+	"beet/fs",
+	"beet/ureq",
+	"beet/rustls-tls",
+]
 
 # Web render target: the document shell + HTTP server + `HtmlRenderer`.
 web = ["render", "beet/http_server"]
@@ -37,11 +48,16 @@ tui = ["terminal", "beet/tui_server"]
 
 # Build-time route codegen. Compiles without the generated `src/codegen` modules
 # so it can bootstrap them: `cargo run -p rsx_site --no-default-features
-# --features codegen`. Run this before a `web`/`terminal` build.
-codegen = ["beet/codegen"]
+# --features codegen`. Run this before a `web`/`terminal` build. `markdown` lets
+# the content collection scan read frontmatter so blob routes carry their
+# `ArticleMeta`; `json` matches the action collection's emitted body type.
+codegen = ["beet/codegen", "beet/markdown", "beet/json"]
 
 [dependencies]
 beet.workspace = true
+# the `AddArgs` server-action payload derives `Serialize`/`Deserialize`; the
+# derive needs `serde` reachable by name in this crate.
+serde.workspace = true
 
 [dev-dependencies]
 beet = { workspace = true, features = ["testing"] }

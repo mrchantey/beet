@@ -444,6 +444,10 @@ cloudflare_block = ["deploy", "beet_infra?/cloudflare_block", "fs", "rand"]
 bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
 bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
+# Opt-in Cloudflare DNS + load-balancer failover for the AWS blocks (eg a Fargate
+# deploy publishing records into a Cloudflare zone); without it the blocks are
+# Route53-only and compile no Cloudflare bindings.
+cloudflare_dns = ["infra","beet_infra?/cloudflare_dns"]
 
 
 # the example binaries are all windowed, so `examples` turns on `winit`: `(BeetPlugins,
@@ -635,11 +639,6 @@ name = "router_serde"
 path = "examples/router/router_serde.rs"
 required-features = ["router", "rhai_serde", "template_serde"]
 
-[[example]]
-name = "file_based_routes"
-path = "examples/file_based_routes/main.rs"
-required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq", "rustls-tls"]
-
 # 💡 Examples - Thread
 #
 # The thread examples are no-code `.bsx` scenes, run through the one `beet`
@@ -680,7 +679,7 @@ required-features = ["router", "fargate_block", "markdown"]
 [[example]]
 name = "deploy_beet_site"
 path = "examples/infra/deploy_beet_site.rs"
-required-features = ["router", "fargate_block", "markdown"]
+required-features = ["router", "fargate_block", "markdown", "cloudflare_dns"]
 
 [[example]]
 name = "hello_cloudflare_containers"

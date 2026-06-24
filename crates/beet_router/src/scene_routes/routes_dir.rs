@@ -2,9 +2,9 @@
 //! spawn time, no codegen.
 //!
 //! Inserting a [`RoutesDir`] (eg from a `main.bsx` entry via
-//! `<RoutesDir src="routes"/>`) triggers [`spawn_routes_dir`]: the nearest ancestor
-//! [`BlobStore`] (the site store composed on the loaded root) is scoped to `src` and
-//! listed, and each content file
+//! `<RoutesDir src="routes"/>`) triggers [`RoutesDir::spawn_on_insert`]: the
+//! nearest ancestor [`BlobStore`] (the site store composed on the loaded root) is
+//! scoped to `src` and listed, and each content file
 //! (`.md`/`.mdx`/`.bsx`/`.html`) spawns a [`BlobScene`] route child served through
 //! the shared media-parse pipeline. The scoped [`BlobStore`] is composed onto the
 //! [`RoutesDir`] entity so the routes read their bytes from it, and markdown
@@ -30,124 +30,178 @@ pub struct RoutesDir {
 	pub src: String,
 }
 
-impl RoutesDir {
-	/// Discover routes under `src`, relative to the nearest ancestor [`BlobStore`].
-	pub fn new(src: impl Into<String>) -> Self { Self { src: src.into() } }
-}
-
 /// The content file extensions served as [`BlobScene`] routes.
 const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 
-/// Observer: scan the [`RoutesDir`] store and spawn its routes (see the module docs).
-///
-/// The scan is store I/O (the filesystem in dev, S3 in a deployed task, R2 in a
-/// Worker), so it runs as an [`AsyncEntity`] task rather than blocking the runtime
-/// (which is single-threaded on wasm). The nearest ancestor [`BlobStore`] (the site
-/// store composed on the loaded root) is resolved *inside* that task, where the
-/// whole tree is already built, so the ancestor link is reliably present; a
-/// store-less app is an error (never an implicit filesystem store, which has none
-/// on wasm). The route
-/// children therefore appear a few async ticks after the insert, so a boot path
-/// settles the async runtime before serving: the Worker entry awaits
-/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner), the
-/// native binary's run loop drives it, and tests await the same settle.
-pub fn spawn_routes_dir(
-	ev: On<Insert, RoutesDir>,
-	dirs: Query<&RoutesDir>,
-	mut commands: Commands,
-) -> Result {
-	let entity = ev.entity;
-	let src = SmolPath::from(dirs.get(entity)?.src.as_str());
-	// off the async runtime: resolve the nearest ancestor store + scope it to `src`,
-	// await the content scan, then compose the scoped store onto the entity, spawn
-	// the route children, and flush so the route-tree observers settle against the
-	// whole hierarchy.
-	commands.entity(entity).queue_async(
-		async move |dir: AsyncEntity| -> Result {
-			let store = dir
-				.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-					|entity, stores| stores.get(entity).map(BlobStore::clone),
-				)
-				.await??
-				.with_subdir(src);
-			let specs = discover_routes(&store).await?;
-			dir.world()
-				.with(move |world| {
-					world.entity_mut(entity).insert(store);
-					for spec in specs {
-						spawn_route_spec(world, entity, spec);
-					}
-					world.flush();
+impl RoutesDir {
+	/// Discover routes under `src`, relative to the nearest ancestor [`BlobStore`].
+	pub fn new(src: impl Into<String>) -> Self { Self { src: src.into() } }
+
+	/// Observer: scan the [`RoutesDir`] store and spawn its routes (see the module docs).
+	///
+	/// The scan is store I/O (the filesystem in dev, S3 in a deployed task, R2 in a
+	/// Worker), so it runs as an [`AsyncEntity`] task rather than blocking the runtime
+	/// (which is single-threaded on wasm). The nearest ancestor [`BlobStore`] (the site
+	/// store composed on the loaded root) is resolved *inside* that task, where the
+	/// whole tree is already built, so the ancestor link is reliably present; a
+	/// store-less app is an error (never an implicit filesystem store, which has none
+	/// on wasm). The route
+	/// children therefore appear a few async ticks after the insert, so a boot path
+	/// settles the async runtime before serving: the Worker entry awaits
+	/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner), the
+	/// native binary's run loop drives it, and tests await the same settle.
+	pub fn spawn_on_insert(
+		ev: On<Insert, RoutesDir>,
+		dirs: Query<&RoutesDir>,
+		mut commands: Commands,
+	) -> Result {
+		let entity = ev.entity;
+		let src = SmolPath::from(dirs.get(entity)?.src.as_str());
+		// off the async runtime: resolve the nearest ancestor store + scope it to `src`,
+		// await the content scan, then compose the scoped store onto the entity, spawn
+		// the route children, and flush so the route-tree observers settle against the
+		// whole hierarchy.
+		commands.entity(entity).queue_async(
+			async move |dir: AsyncEntity| -> Result {
+				let store = dir
+					.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
+						|entity, stores| stores.get(entity).map(BlobStore::clone),
+					)
+					.await??
+					.with_subdir(src);
+				let specs = Self::discover_routes(&store).await?;
+				dir.world()
+					.with(move |world| {
+						world.entity_mut(entity).insert(store);
+						for spec in specs {
+							Self::spawn_route_spec(world, entity, spec);
+						}
+						world.flush();
+					})
+					.await;
+				Ok(())
+			},
+		);
+		Ok(())
+	}
+
+	/// Wait for every [`RoutesDir`]'s async discovery to finish, for a caller that
+	/// renders the routes immediately after building (eg the `export-static` /
+	/// `check` commands).
+	///
+	/// [`RoutesDir::spawn_on_insert`] runs the discovery as an async task, so the
+	/// routes appear a few ticks after the insert. A top-level driver (the Worker,
+	/// tests) settles the whole runtime with
+	/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner). A caller
+	/// running *inside* the app (an action) cannot drive the loop without re-entering
+	/// it, so this yields (via the world bridge) to let the runtime drive the task,
+	/// detecting completion by the scoped store the task composes onto each
+	/// [`RoutesDir`] entity. Capped so an unresolvable scan errors rather than hangs.
+	pub async fn settle_all(world: &AsyncWorld) -> Result {
+		for _ in 0..10_000 {
+			let pending = world
+				.with(|world| {
+					// routes still discovering (no scoped store composed onto them yet) ...
+					let dirs = world
+						.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>(
+						)
+						.iter(world)
+						.count();
+					// ... plus any unresolved `<Template src>` include: it builds the
+					// included entry (and its own `RoutesDir`) asynchronously as a pending
+					// dependency, so wait for the set to drain before reading the tree.
+					let includes = world
+						.query::<&TemplatePending>()
+						.iter(world)
+						.filter(|pending| !pending.is_empty())
+						.count();
+					dirs + includes
 				})
 				.await;
-			Ok(())
-		},
-	);
-	Ok(())
-}
-
-/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
-fn spawn_route_spec(world: &mut World, parent: Entity, spec: RouteSpec) {
-	#[allow(unused_mut, unused_variables)]
-	let mut route_entity = world.spawn((
-		ChildOf(parent),
-		route(&spec.route_path, BlobScene::new(spec.store_path)),
-		HttpMethod::Get,
-		ExportStrategy::Static,
-		// a discovered content file is a user-facing page, so it carries
-		// `PageRoute` and appears in the nav, like its codegen blob equivalent.
-		PageRoute,
-	));
-	// scan-time page metadata, so navigation knows titles/order up front
-	#[cfg(feature = "markdown_parser")]
-	if let Some(meta) = spec.meta {
-		route_entity.insert(meta);
-	}
-}
-
-/// Wait for every [`RoutesDir`]'s async discovery to finish, for a caller that
-/// renders the routes immediately after building (eg the `export-static` /
-/// `check` commands).
-///
-/// [`spawn_routes_dir`] runs the discovery as an async task, so the routes appear
-/// a few ticks after the insert. A top-level driver (the Worker, tests) settles
-/// the whole runtime with
-/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner). A caller
-/// running *inside* the app (an action) cannot drive the loop without re-entering
-/// it, so this yields (via the world bridge) to let the runtime drive the task,
-/// detecting completion by the scoped store the task composes onto each
-/// [`RoutesDir`] entity. Capped so an unresolvable scan errors rather than hangs.
-pub async fn settle_routes_dirs(world: &AsyncWorld) -> Result {
-	for _ in 0..10_000 {
-		let pending = world
-			.with(|world| {
-				// routes still discovering (no scoped store composed onto them yet) ...
-				let dirs = world
-					.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>(
-					)
-					.iter(world)
-					.count();
-				// ... plus any unresolved `<Template src>` include: it builds the
-				// included entry (and its own `RoutesDir`) asynchronously as a pending
-				// dependency, so wait for the set to drain before reading the tree.
-				let includes = world
-					.query::<&TemplatePending>()
-					.iter(world)
-					.filter(|pending| !pending.is_empty())
-					.count();
-				dirs + includes
-			})
-			.await;
-		if pending == 0 {
-			return Ok(());
+			if pending == 0 {
+				return Ok(());
+			}
+			// yield so the runtime can drive the discovery/include tasks between checks.
+			async_ext::yield_now().await;
 		}
-		// yield so the runtime can drive the discovery/include tasks between checks.
-		async_ext::yield_now().await;
+		bevybail!(
+			"RoutesDir discovery / `<Template src>` includes did not settle within the \
+			frame budget"
+		)
 	}
-	bevybail!(
-		"RoutesDir discovery / `<Template src>` includes did not settle within the \
-		frame budget"
-	)
+
+	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
+	fn spawn_route_spec(world: &mut World, parent: Entity, spec: RouteSpec) {
+		#[allow(unused_mut, unused_variables)]
+		let mut route_entity = world.spawn((
+			ChildOf(parent),
+			route(&spec.route_path, BlobScene::new(spec.store_path)),
+			HttpMethod::Get,
+			ExportStrategy::Static,
+			// a discovered content file is a user-facing page, so it carries
+			// `PageRoute` and appears in the nav, like its codegen blob equivalent.
+			PageRoute,
+		));
+		// scan-time page metadata, so navigation knows titles/order up front
+		#[cfg(feature = "markdown_parser")]
+		if let Some(meta) = spec.meta {
+			route_entity.insert(meta);
+		}
+	}
+
+	/// List the store's content files and read each markdown file's frontmatter,
+	/// returning route specs in lexical path order so zero-padded routes (eg slides
+	/// `01..20`) spawn in sequence, giving a deterministic [`RouteTree`] child order.
+	async fn discover_routes(store: &BlobStore) -> Result<Vec<RouteSpec>> {
+		let mut paths = store.list().await?;
+		paths.sort();
+		paths
+			.into_iter()
+			.filter(|path| Self::is_content(path))
+			.map(async |path| -> Result<RouteSpec> {
+				Ok(RouteSpec {
+					route_path: Self::route_path_of(&path),
+					#[cfg(feature = "markdown_parser")]
+					meta: Self::scan_meta(store, &path).await,
+					store_path: path,
+				})
+			})
+			.xmap(async_ext::try_join_all)
+			.await
+	}
+
+	/// Whether `path`'s extension marks it as a servable content file.
+	fn is_content(path: &SmolPath) -> bool {
+		path.extension()
+			.is_some_and(|ext| CONTENT_EXTENSIONS.contains(&ext))
+	}
+
+	/// The route path of a content file: the extension is dropped and a trailing
+	/// `index` collapses to its directory, eg `docs/index.md` -> `docs`.
+	fn route_path_of(rel: &SmolPath) -> String {
+		let mut segments = rel.segments();
+		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut()) {
+			*last = stem;
+		}
+		if segments.last() == Some(&"index") {
+			segments.pop();
+		}
+		segments.join("/")
+	}
+
+	/// Read a markdown file's leading frontmatter into [`ArticleMeta`] through the
+	/// store, if it is markdown and parses; any read/parse failure yields `None`.
+	#[cfg(feature = "markdown_parser")]
+	async fn scan_meta(store: &BlobStore, path: &SmolPath) -> Option<ArticleMeta> {
+		let is_markdown = path
+			.extension()
+			.is_some_and(|ext| matches!(ext, "md" | "mdx" | "markdown"));
+		if !is_markdown {
+			return None;
+		}
+		let bytes = store.get(path).await.ok()?;
+		ArticleMeta::from_markdown(core::str::from_utf8(&bytes).ok()?)
+	}
 }
 
 /// A discovered content file: its route path, the store path its bytes load from,
@@ -157,60 +211,6 @@ struct RouteSpec {
 	store_path: SmolPath,
 	#[cfg(feature = "markdown_parser")]
 	meta: Option<ArticleMeta>,
-}
-
-/// List the store's content files and read each markdown file's frontmatter,
-/// returning route specs in lexical path order so zero-padded routes (eg slides
-/// `01..20`) spawn in sequence, giving a deterministic [`RouteTree`] child order.
-async fn discover_routes(store: &BlobStore) -> Result<Vec<RouteSpec>> {
-	let mut paths = store.list().await?;
-	paths.sort();
-	paths
-		.into_iter()
-		.filter(is_content)
-		.map(async |path| -> Result<RouteSpec> {
-			Ok(RouteSpec {
-				route_path: route_path_of(&path),
-				#[cfg(feature = "markdown_parser")]
-				meta: scan_meta(store, &path).await,
-				store_path: path,
-			})
-		})
-		.xmap(async_ext::try_join_all)
-		.await
-}
-
-/// Whether `path`'s extension marks it as a servable content file.
-fn is_content(path: &SmolPath) -> bool {
-	path.extension()
-		.is_some_and(|ext| CONTENT_EXTENSIONS.contains(&ext))
-}
-
-/// The route path of a content file: the extension is dropped and a trailing
-/// `index` collapses to its directory, eg `docs/index.md` -> `docs`.
-fn route_path_of(rel: &SmolPath) -> String {
-	let mut segments = rel.segments();
-	if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut()) {
-		*last = stem;
-	}
-	if segments.last() == Some(&"index") {
-		segments.pop();
-	}
-	segments.join("/")
-}
-
-/// Read a markdown file's leading frontmatter into [`ArticleMeta`] through the
-/// store, if it is markdown and parses; any read/parse failure yields `None`.
-#[cfg(feature = "markdown_parser")]
-async fn scan_meta(store: &BlobStore, path: &SmolPath) -> Option<ArticleMeta> {
-	let is_markdown = path
-		.extension()
-		.is_some_and(|ext| matches!(ext, "md" | "mdx" | "markdown"));
-	if !is_markdown {
-		return None;
-	}
-	let bytes = store.get(path).await.ok()?;
-	ArticleMeta::from_markdown(core::str::from_utf8(&bytes).ok()?)
 }
 
 #[cfg(test)]
@@ -268,11 +268,12 @@ mod test {
 
 	#[beet_core::test]
 	fn route_path_of() {
-		use super::route_path_of;
-		route_path_of(&SmolPath::from("docs/intro.md")).xpect_eq("docs/intro");
-		route_path_of(&SmolPath::from("index.md")).xpect_eq("");
-		route_path_of(&SmolPath::from("docs/index.md")).xpect_eq("docs");
-		route_path_of(&SmolPath::from("about.bsx")).xpect_eq("about");
+		RoutesDir::route_path_of(&SmolPath::from("docs/intro.md"))
+			.xpect_eq("docs/intro");
+		RoutesDir::route_path_of(&SmolPath::from("index.md")).xpect_eq("");
+		RoutesDir::route_path_of(&SmolPath::from("docs/index.md"))
+			.xpect_eq("docs");
+		RoutesDir::route_path_of(&SmolPath::from("about.bsx")).xpect_eq("about");
 	}
 
 	/// Assert the three fixture routes render their content, shared by the

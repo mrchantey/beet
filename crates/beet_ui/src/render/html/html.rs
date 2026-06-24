@@ -9,6 +9,13 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HtmlRenderer {
 	buffer: String,
+	/// HTML fragments to hoist into `<head>` (emitted before `</head>`),
+	/// contributed by any render feature via [`hoist_into_head`](Self::hoist_into_head).
+	/// Drained once at the head close, or post-walk for a fragment with no
+	/// `<head>` (the emptied vec gives once-only semantics). The reactive renderer
+	/// is the first contributor; a future build-time `bx:hoist` directive is
+	/// intended to feed this same collection.
+	head_hoist: Vec<String>,
 	/// If `Some`, creates newlines after open/close tags
 	/// and indents children with the provided indentation.
 	indent: Option<Indent>,
@@ -68,6 +75,7 @@ impl HtmlRenderer {
 	pub fn new() -> Self {
 		Self {
 			buffer: String::new(),
+			head_hoist: Vec::new(),
 			indent: None,
 			render_expressions: false,
 			void_elements: default_void_elements(),
@@ -152,6 +160,13 @@ impl HtmlRenderer {
 		self
 	}
 
+	/// Contribute an HTML fragment to hoist into `<head>` (emitted before
+	/// `</head>`, or post-walk for a fragment with no `<head>`). Any feature can
+	/// push here; the reactive renderer is the first contributor.
+	pub fn hoist_into_head(&mut self, fragment: impl Into<String>) {
+		self.head_hoist.push(fragment.into());
+	}
+
 	/// Consume the renderer and return the accumulated HTML string.
 	pub fn into_string(self) -> String { self.buffer }
 
@@ -184,6 +199,17 @@ impl HtmlRenderer {
 		if self.is_pretty() {
 			self.buffer.push('\n');
 		}
+	}
+
+	/// Drain the hoisted head fragments, concatenated in push order, or `None`
+	/// when empty. Draining empties the collection, so the post-walk fallback
+	/// fires only when the in-walk `<head>` close did not (once-only without a
+	/// flag).
+	fn take_head_hoist(&mut self) -> Option<String> {
+		if self.head_hoist.is_empty() {
+			return None;
+		}
+		Some(core::mem::take(&mut self.head_hoist).concat())
 	}
 }
 
@@ -335,18 +361,15 @@ impl NodeVisitor for HtmlRenderer {
 			self.in_raw_text_element = false;
 		}
 
-		// reactive mode: inject the blob + runtime script inside `<head>`, before
-		// its close tag. `<head>` is the single injection point; a fragment with no
-		// head falls back to a post-walk append in `render`.
-		#[cfg(all(feature = "bsx", feature = "json"))]
+		// inject any hoisted head fragments inside `<head>`, before its close tag.
+		// `<head>` is the single injection point; a fragment with no head falls
+		// back to a post-walk append in `render`. Any feature can contribute (eg
+		// the reactive renderer's blob + runtime); a future build-time `bx:hoist`
+		// directive is intended to feed the same collection.
 		if element.tag() == "head" {
-			if let Some(injection) = self
-				.reactive
-				.as_mut()
-				.and_then(|reactive| reactive.take_head_injection())
-			{
+			if let Some(hoisted) = self.take_head_hoist() {
 				self.write_indent();
-				self.buffer.push_str(&injection);
+				self.buffer.push_str(&hoisted);
 				self.write_newline();
 			}
 		}
@@ -421,21 +444,20 @@ impl NodeRenderer for HtmlRenderer {
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Html])?;
 		// collect the reactivity annotations once (the only world-reading pass)
-		// before the walk, so the head injection is known when `<head>` closes.
+		// before the walk, then register them as one head-hoist contributor so the
+		// fragment is known when `<head>` closes.
 		#[cfg(all(feature = "bsx", feature = "json"))]
 		if let Some(reactive) = self.reactive.as_mut() {
 			reactive.collect(cx.world, cx.entity);
+			if let Some(fragment) = reactive.into_head_fragment() {
+				self.hoist_into_head(fragment);
+			}
 		}
 		cx.walk(self);
-		// fallback: a fragment with no `<head>` never triggered the in-walk
-		// injection, so emit it now (a no-op when the walk already did).
-		#[cfg(all(feature = "bsx", feature = "json"))]
-		if let Some(injection) = self
-			.reactive
-			.as_mut()
-			.and_then(|reactive| reactive.take_head_injection())
-		{
-			self.buffer.push_str(&injection);
+		// fallback: a fragment with no `<head>` never triggered the in-walk drain,
+		// so emit any remaining hoisted fragments now (a no-op when the walk did).
+		if let Some(hoisted) = self.take_head_hoist() {
+			self.buffer.push_str(&hoisted);
 		}
 		MediaBytes::new_string(
 			MediaType::Html,
@@ -475,34 +497,38 @@ mod test {
 	use super::*;
 
 	#[cfg(feature = "bsx")]
-	/// Parse HTML (via the BSX parser's HTML mode) then render it back.
-	fn roundtrip(html: &str) -> String {
+	/// Parse HTML (via the BSX parser's HTML mode) into a world, returning the
+	/// root entity ready to render.
+	fn parse_html(html: &str) -> (World, Entity) {
 		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		HtmlRenderer::new()
+		(world, entity)
+	}
+
+	#[cfg(feature = "bsx")]
+	/// Parse HTML then render it back with the given renderer.
+	fn roundtrip_with(html: &str, mut renderer: HtmlRenderer) -> String {
+		let (mut world, entity) = parse_html(html);
+		renderer
 			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
 			.to_string()
 	}
 
 	#[cfg(feature = "bsx")]
+	/// Parse HTML then render it back.
+	fn roundtrip(html: &str) -> String {
+		roundtrip_with(html, HtmlRenderer::new())
+	}
+
+	#[cfg(feature = "bsx")]
 	/// Parse then render with expression support.
 	fn roundtrip_expressions(html: &str) -> String {
-		let mut world = ui_world();
-		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::new_html(html);
-		BsxParser::html()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
-			.unwrap();
-		HtmlRenderer::new()
-			.with_expressions()
-			.render(&mut RenderContext::new(entity, &mut world))
-			.unwrap()
-			.to_string()
+		roundtrip_with(html, HtmlRenderer::new().with_expressions())
 	}
 
 	#[cfg(feature = "bsx")]
@@ -575,20 +601,32 @@ mod test {
 	}
 
 	#[cfg(feature = "bsx")]
-	/// Helper: parse HTML then render with escape_html enabled.
-	#[allow(dead_code)]
-	fn roundtrip_escaped(html: &str) -> String {
-		let mut world = ui_world();
-		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::new_html(html);
-		BsxParser::html()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
-			.unwrap();
-		HtmlRenderer::new()
-			.with_escape_html()
-			.render(&mut RenderContext::new(entity, &mut world))
-			.unwrap()
-			.to_string()
+	#[beet_core::test]
+	fn non_reactive_caller_hoists_into_head() {
+		// a plain (non-reactive) contributor pushes a <meta> that must land inside
+		// <head>, before </head>, with no reactive feature involved.
+		let mut renderer = HtmlRenderer::new();
+		renderer.hoist_into_head("<meta name=\"x\" content=\"y\">");
+		roundtrip_with(
+			"<html><head><title>t</title></head><body></body></html>",
+			renderer,
+		)
+		.split("</head>")
+		.next()
+		.unwrap()
+		.to_string()
+		.xpect_contains("<meta name=\"x\" content=\"y\">");
+	}
+
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn head_hoist_falls_back_with_no_head() {
+		// a fragment with no <head> never hits the in-walk drain, so the hoisted
+		// element is appended post-walk via the same collection.
+		let mut renderer = HtmlRenderer::new();
+		renderer.hoist_into_head("<meta name=\"x\">");
+		roundtrip_with("<div>hi</div>", renderer)
+			.xpect_contains("<meta name=\"x\">");
 	}
 
 	#[beet_core::test]

@@ -73,8 +73,7 @@ fn on_link_click(
 	ev: On<PointerUp>,
 	mut commands: Commands,
 	elements: ElementQuery,
-	parents: Query<&ChildOf>,
-	surfaces: Query<&RenderSurface>,
+	surfaces: SurfaceQuery,
 	navigators: Query<Option<&OnOpenLink>, With<Navigator>>,
 	mut open: MessageWriter<OpenExternalLink>,
 ) -> Result {
@@ -87,7 +86,7 @@ fn on_link_click(
 	// the navigator is co-located on the link's surface; resolve it from the link
 	// rather than assuming a single global navigator, so each session navigates
 	// independently.
-	let Some(navigator) = surface_of(link_entity, &parents, &surfaces) else {
+	let Some(navigator) = surfaces.surface_of(link_entity) else {
 		return Ok(());
 	};
 	let Ok(on_open) = navigators.get(navigator) else {

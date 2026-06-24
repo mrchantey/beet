@@ -12,12 +12,12 @@
 //! ## Usage
 //!
 //! ```sh
-//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk -- validate
-//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk -- plan
-//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk -- deploy
-//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk -- sync
-//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk -- watch
-//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk -- destroy --force
+//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk,cloudflare_dns -- validate
+//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk,cloudflare_dns -- plan
+//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk,cloudflare_dns -- deploy
+//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk,cloudflare_dns -- sync
+//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk,cloudflare_dns -- watch
+//! cargo run --example deploy_beet_site --features=router,fargate_block,markdown,aws_sdk,cloudflare_dns -- destroy --force
 //! ```
 //!
 //! Requires the AWS CLI, opentofu, a container engine (podman/docker), and zig

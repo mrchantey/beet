@@ -117,6 +117,7 @@ impl Plugin for CharcellPlugin {
 		#[cfg(feature = "tui")]
 		app.init_resource::<KittyGraphicsSupport>()
 			.init_resource::<KittyPlacements>()
+			.init_resource::<KittyWarned>()
 			// before the cascade so the `graphics` state (and the block box it
 			// selects) resolves the same frame the raster attaches — no
 			// one-frame alt-text flash.
@@ -124,14 +125,17 @@ impl Plugin for CharcellPlugin {
 				PostParseTree,
 				attach_kitty_images.before(ResolveStylesSet),
 			)
+			.register_type::<crate::prelude::Title>()
 			.add_systems(
 				PostParseTree,
 				(
 					render_terminal,
 					place_kitty_images,
-					// reflect the document `<title>` onto the terminal title bar
-					// before the flush carries its bytes to stdout.
-					update_terminal_title,
+					// reflect each surface's `<title>` onto its terminal title bar
+					// before the flush carries its bytes to stdout: collect the
+					// per-surface title, then write a changed one.
+					collect_terminal_titles,
+					flush_terminal_titles,
 					flush_terminals,
 					restore_terminals
 						.run_if(common_conditions::on_message::<AppExit>),

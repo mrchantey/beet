@@ -5,8 +5,6 @@ assets
 .playwright-cli
 .beet/infra
 out.txt
-examples/file_based_routes/generated
-examples/file_based_routes/dist
 examples/bsx_site/dist
 examples/thread/persistent_chat.json
 examples/router/router_serde.json

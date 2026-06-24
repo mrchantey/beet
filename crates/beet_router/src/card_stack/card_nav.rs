@@ -39,9 +39,10 @@ pub enum CardNav {
 	Last,
 }
 
-/// The ordered cards of a deck: the router's own page route — the `/` home card
-/// a deck declares via an `index` content file — first, then its page-route
-/// children, in tree order.
+/// The ordered cards of a deck: the `/` home card — the route a deck declares
+/// via an `index` content file — first, then every page route in the tree, in
+/// reading order, so the stack steps across nested folders, not just direct
+/// siblings.
 ///
 /// Only user-facing [`PageRoute`](crate::prelude::PageRoute)s are cards: the
 /// infrastructure routes a deck serves alongside its slides (`/health`, the
@@ -49,30 +50,28 @@ pub enum CardNav {
 /// assets) are not steppable cards, so they never become the opening card or land
 /// in the stack.
 fn deck_cards(tree: &RouteTree) -> Vec<&RouteTree> {
-	let mut cards = Vec::new();
-	// the deck's home card is the `/` route (an `index` content file): usually the
-	// router's own node, but a store-discovered `index` can instead land as an
-	// empty-path child. Either way it is listed once, first, so the deck opens and
-	// steps from it like any other card.
-	let home = if tree.node().is_some_and(|node| node.is_page_route) {
-		Some(tree)
-	} else {
-		tree.children.iter().find(|child| {
-			is_empty_path(child)
-				&& child.node().is_some_and(|node| node.is_page_route)
-		})
-	};
-	cards.extend(home);
-	// the remaining page-route children in tree order, excluding any empty-path
-	// home child (handled above). Without this, a deck whose `index` sorts last
-	// among the slides appends a duplicate empty-path card after the final slide,
-	// so stepping `Next` off the last card lands on the blank `/` clone and back —
-	// the last-card → empty-page oscillation.
-	cards.extend(tree.children.iter().filter(|child| {
-		!is_empty_path(child)
-			&& child.node().is_some_and(|node| node.is_page_route)
-	}));
-	cards
+	// DFS (reading order) by default; flip to `tree.iter_bfs()` to step level-order.
+	let nodes = tree.iter_dfs();
+	let is_card =
+		|tree: &&RouteTree| tree.node().is_some_and(|node| node.is_page_route);
+	// the deck's home card is the `/` route (an `index` content file): the
+	// router's own root node or a store-discovered empty-path child both land on
+	// an empty path, so one empty-path filter catches either. Hoisting it to the
+	// front emits it once, first, ahead of the slides it would otherwise sort
+	// among. The second pass excludes empty paths, so a deck whose `index` sorts
+	// last among the slides no longer appends a duplicate `/` card after the final
+	// slide — the last-card → empty-page oscillation.
+	nodes
+		.iter()
+		.copied()
+		.filter(|tree| is_empty_path(tree) && is_card(tree))
+		.chain(
+			nodes
+				.iter()
+				.copied()
+				.filter(|tree| !is_empty_path(tree) && is_card(tree)),
+		)
+		.collect()
 }
 
 /// Whether `card` sits at the deck root (an empty path, ie the `/` home card).
@@ -206,6 +205,7 @@ pub(crate) fn card_nav(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -248,11 +248,16 @@ mod test {
 		world.entity(root).get::<RouteTree>().unwrap().clone()
 	}
 
-	/// The single path segment a [`CardNav`] step lands on from `current`.
+	/// The path a [`CardNav`] step lands on from `current`, joined with `/`.
+	/// `current` may be a multi-segment path (eg `"chapter/one"`), split into
+	/// segments so a card inside a nested folder resolves.
 	fn card_to(tree: &RouteTree, current: &str, nav: CardNav) -> String {
-		resolve_card(tree, &[current.into()], nav)
-			.unwrap()
-			.join("/")
+		let current = current
+			.split('/')
+			.filter(|seg| !seg.is_empty())
+			.map(Into::into)
+			.collect::<Vec<SmolStr>>();
+		resolve_card(tree, &current, nav).unwrap().join("/")
 	}
 
 	/// Next/prev clamp at the ends rather than wrapping (a stack does not loop).
@@ -369,5 +374,77 @@ mod test {
 			.unwrap()
 			.join("/")
 			.xpect_eq("beta");
+	}
+
+	/// A deck whose slides span nested folders: a `chapter` folder with two
+	/// page-route children alongside top-level `intro` and `outro`. Proves cards
+	/// step across the hierarchy, not just direct siblings. Children sort by path
+	/// (`chapter` < `intro` < `outro`), so the deck reads
+	/// `chapter/one, chapter/two, intro, outro`.
+	fn nested_card_stack() -> RouteTree {
+		let mut world = router_world();
+		let root = world
+			.spawn((nav_router(), children![
+				(
+					render_action::fixed_func_route("intro", || rsx! {
+						<p>"i"</p>
+					}),
+					PageRoute
+				),
+				(PathPartial::new("chapter"), children![
+					(
+						render_action::fixed_func_route("one", || rsx! {
+							<p>"1"</p>
+						}),
+						PageRoute
+					),
+					(
+						render_action::fixed_func_route("two", || rsx! {
+							<p>"2"</p>
+						}),
+						PageRoute
+					),
+				]),
+				(
+					render_action::fixed_func_route("outro", || rsx! {
+						<p>"o"</p>
+					}),
+					PageRoute
+				),
+			]))
+			.flush();
+		world.entity(root).get::<RouteTree>().unwrap().clone()
+	}
+
+	/// Card navigation steps INTO and OUT OF a nested folder, not just across
+	/// top-level siblings. Reading order: chapter/one → chapter/two → intro → outro.
+	#[beet_core::test]
+	fn card_nav_steps_across_nested_folders() {
+		let tree = nested_card_stack();
+		// stepping next walks within the `chapter` folder then back out to siblings
+		card_to(&tree, "chapter/one", CardNav::Next).xpect_eq("chapter/two");
+		card_to(&tree, "chapter/two", CardNav::Next).xpect_eq("intro");
+		card_to(&tree, "intro", CardNav::Next).xpect_eq("outro");
+		// prev climbs back out of and into the folder
+		card_to(&tree, "intro", CardNav::Prev).xpect_eq("chapter/two");
+		card_to(&tree, "chapter/two", CardNav::Prev).xpect_eq("chapter/one");
+		// next/prev still clamp at the ends across the whole tree
+		card_to(&tree, "outro", CardNav::Next).xpect_eq("outro");
+		card_to(&tree, "chapter/one", CardNav::Prev).xpect_eq("chapter/one");
+		// first/last reach the deck ends across the hierarchy
+		card_to(&tree, "intro", CardNav::First).xpect_eq("chapter/one");
+		card_to(&tree, "chapter/one", CardNav::Last).xpect_eq("outro");
+	}
+
+	/// `--slide=N` indexes the flattened nested deck 1-based, clamping out of range.
+	#[beet_core::test]
+	fn nth_card_indexes_nested_deck() {
+		let tree = nested_card_stack();
+		let nth = |n| resolve_nth_card(&tree, n).unwrap().join("/");
+		nth(1).xpect_eq("chapter/one");
+		nth(2).xpect_eq("chapter/two");
+		nth(3).xpect_eq("intro");
+		nth(4).xpect_eq("outro");
+		nth(99).xpect_eq("outro"); // clamps
 	}
 }

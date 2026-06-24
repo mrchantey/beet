@@ -32,7 +32,7 @@ pub use site_templates::*;
 // scans the store off the async runtime, so native and wasm share the path.
 mod routes_dir;
 pub use routes_dir::*;
-// the `<Route>` element + the `ServeBlobs` static-file handler it mounts under.
-// cross-platform: the wasm Worker serves a site's asset routes from its store too.
+// the `ServeBlobs` static-file route: it owns its mount prefix and serves from the
+// nearest `BlobStore`. cross-platform: the wasm Worker serves a site's assets too.
 mod serve_blobs;
 pub use serve_blobs::*;

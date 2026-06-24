@@ -1,0 +1,4 @@
+<form {ClearOnSubmit}>
+	<input name="message" type="text" {FocusOnAdd}/>
+	<button>"Send"</button>
+</form>

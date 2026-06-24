@@ -5,6 +5,11 @@ You are the coding agent for the beet project. You should assume a personality o
 
 Beet is a pre-release (no current users) rust framework built on the bevy game engine, aligned with user-modifiable software like smalltalk and hypercard.
 
+## Core Principles
+1. Beet is entirely configurable. like pressing 'play' on a fresh game editor scene, running a beet binary does absolutely nothing by default and makes no assumptions about the kind of tool the user is creating.
+
+2. Beet is target agnostic. Everything everything everything. Http servers run on wasm, tui servers run on ssh etc. Use AncestorQuery<&BlobStore> instead of fs_ext
+
 ## Workflow
 - when provided a plan or list of work to do, just do it! dont ask which one to start with
 - when you think you're done, reread the instructions and double check you did not miss one.
@@ -14,6 +19,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - There is no time constraint. Be proactive, if asked to fix a bug or test and you encounter another issue, fix that too.
 - This is a rapidly changing, pre-release project, we do not care about backward compatibility, instead prioritizing clean refactors and cleaning up dead or experimental code.
 - Prefer iterative approaches, most tasks require trying something, learning from it, then trying something else. search the codebase as-needed instead of preloading everything
+- strongly prefer static member functions over free-floating ones, or extension modules, ie `pub mod fs_ext`. 
 - when told to run a command, run that command before doing anything else, including searching the codebase
 - Never use `cargo clippy`, we dont use cargo clippy in this workspace.
 - Never run `cargo clean` without permission, this project has many targets and dependencies, it takes hours to rebuild everything

@@ -23,11 +23,10 @@ pub struct Router;
 /// declared children slot in, so a handler and any sub-content can be nested inside.
 ///
 /// The url and the behavior are separate concerns, both declared at the call site:
-/// the `path` prop is the route pattern, and the handler (plus any store scoping)
-/// rides a component spread on the same entity. The static-asset mount is
-/// `<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>`: the
-/// greedy `store_path` capture streams any file beneath `assets/`, and the
-/// [`DirPath`] scopes the resolved store to the site store's `assets/` subdir.
+/// the `path` prop is the route pattern, and the handler rides a component spread on
+/// the same entity. A greedy `*name?` segment captures every trailing path part, eg
+/// `<Route path="docs/*rest?" {handler}/>` matches any path beneath `docs/`. (A
+/// self-mounting handler that owns its prefix, like [`ServeBlobs`], needs no `<Route>`.)
 ///
 /// The Rust equivalent is the [`route`](crate::prelude::route) helper. It is a
 /// [`template`](macro@template) rather than a marker component, so it expands to a
@@ -35,7 +34,7 @@ pub struct Router;
 /// the declared children) at build time, with no component left to re-fire on reload.
 #[template]
 pub fn Route(
-	/// The route path pattern, eg `assets/*store_path?`; defaults to the root.
+	/// The route path pattern, eg `docs/*rest?`; defaults to the root.
 	#[prop(into)]
 	path: String,
 ) -> impl Bundle {

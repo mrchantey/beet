@@ -6,13 +6,15 @@ use serde_json::json;
 
 /// A DNS record provider, embedded in a block that needs to publish a hostname
 /// (a [`LambdaBlock`] gateway, a [`FargateBlock`] load balancer). It emits a
-/// single `CNAME` pointing its `authority` at an alias target, plus, for
-/// Cloudflare, any auxiliary records (eg ACM DNS-validation) via
-/// [`emit_cloudflare_cname`].
+/// single `CNAME` pointing its `authority` at an alias target, plus any
+/// auxiliary records (eg ACM DNS-validation) via [`emit_validation_record`].
+///
+/// [`emit_validation_record`]: Self::emit_validation_record
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DnsProvider {
 	/// A record in a Cloudflare zone. Authenticates from the
 	/// `CLOUDFLARE_API_TOKEN` environment variable at apply time.
+	#[cfg(feature = "cloudflare_dns")]
 	Cloudflare {
 		/// Fully-qualified record name, eg `dev.beet.org`.
 		authority: SmolStr,
@@ -34,6 +36,7 @@ pub enum DnsProvider {
 
 impl DnsProvider {
 	/// A Cloudflare record, DNS-only (not proxied) by default.
+	#[cfg(feature = "cloudflare_dns")]
 	pub fn cloudflare(
 		authority: impl Into<SmolStr>,
 		zone_id: impl Into<SmolStr>,
@@ -57,6 +60,7 @@ impl DnsProvider {
 	}
 
 	/// Proxy a Cloudflare record through the edge (no effect on Route53).
+	#[cfg(feature = "cloudflare_dns")]
 	pub fn with_proxied(mut self, value: bool) -> Self {
 		if let Self::Cloudflare { proxied, .. } = &mut self {
 			*proxied = value;
@@ -67,16 +71,18 @@ impl DnsProvider {
 	/// The record name this provider publishes, eg `dev.beet.org`.
 	pub fn authority(&self) -> &SmolStr {
 		match self {
-			Self::Cloudflare { authority, .. }
-			| Self::Route53 { authority, .. } => authority,
+			#[cfg(feature = "cloudflare_dns")]
+			Self::Cloudflare { authority, .. } => authority,
+			Self::Route53 { authority, .. } => authority,
 		}
 	}
 
 	/// The zone id the records are emitted into.
 	pub fn zone_id(&self) -> &SmolStr {
 		match self {
-			Self::Cloudflare { zone_id, .. }
-			| Self::Route53 { zone_id, .. } => zone_id,
+			#[cfg(feature = "cloudflare_dns")]
+			Self::Cloudflare { zone_id, .. } => zone_id,
+			Self::Route53 { zone_id, .. } => zone_id,
 		}
 	}
 
@@ -90,7 +96,10 @@ impl DnsProvider {
 		label: &str,
 		alias_target: &str,
 	) -> Result {
+		#[cfg(feature = "cloudflare_dns")]
 		let proxied = matches!(self, Self::Cloudflare { proxied: true, .. });
+		#[cfg(not(feature = "cloudflare_dns"))]
+		let proxied = false;
 		self.emit_record(
 			stack,
 			config,
@@ -130,6 +139,7 @@ impl DnsProvider {
 	) -> Result<String> {
 		let ident = stack.resource_ident(label);
 		let address = match self {
+			#[cfg(feature = "cloudflare_dns")]
 			Self::Cloudflare { zone_id, .. } => {
 				ensure_cloudflare_provider(config)?;
 				let record = ResourceDef::new_secondary(
@@ -175,6 +185,7 @@ impl DnsProvider {
 /// empty: the provider authenticates from `CLOUDFLARE_API_TOKEN` in the
 /// environment (inherited by the tofu subprocess), keeping the secret out of
 /// `main.tf.json`.
+#[cfg(feature = "cloudflare_dns")]
 pub fn ensure_cloudflare_provider(config: &mut terra::Config) -> Result {
 	config.ensure_provider_config(&terra::Provider::CLOUDFLARE, &json!({}))?;
 	Ok(())

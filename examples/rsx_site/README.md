@@ -4,13 +4,20 @@ A deliberately small **typed** beet site, demonstrating the Rust authoring path
 that the no-code `examples/bsx_site` (and the canonical top-level `site/`) does
 not exercise. It is the compiled counterpart to the no-code `site/`.
 
-Three routes, exercising the interesting typed mechanisms:
+Routes exercising the interesting typed mechanisms, scanned from three
+collections (`src/pages`, `content`, `actions`) by the codegen pass:
 - **`/`** — an `rsx!` hero page using `inline_class!` for one-off layout.
 - **`/counter`** — native (typed) reactivity: a `Document` atom driven by
   `PointerUp` observers through a `FieldQuery`, the Rust twin of the no-code
   `bx:click` counter.
 - **`/buttons`** — the `Button`/`Link` widgets laid out by a typed `Rule`
   (`design_row_rule`).
+- **`/about`** — a dynamic page: `async fn get(ActionContext<Request>)`, built
+  per request (the `async_route` codegen branch).
+- **`/guide`** — markdown `content`: a `BlobScene` reading `content/guide.md` and
+  its frontmatter at request time (the no-codegen content path).
+- **`POST /add`** — a server `action` (`Json<AddArgs>` -> `i32`) plus a generated,
+  typed client caller in `codegen/client_actions.rs`.
 
 A trimmed typed `BeetLayout` composes the library `Header`/`Footer` around each
 route body, and `server_plugin` is the shared render substrate.

@@ -15,7 +15,7 @@ the package resource patched from markup -->
 <Router {(RequestLogger, BsxLayout{template:"Layout"})}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
 	<RoutesDir src="routes"/>
-	<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>
+	<ServeBlobs prefix="assets" {DirPath("assets")}/>
 </Router>
 "#;
 
@@ -55,7 +55,7 @@ async fn site_store() -> BlobStore {
 		("templates/widgets/Card.bsx", CARD_BSX),
 		("routes/index.md", "# Home\n\nwelcome"),
 		("routes/counter.bsx", COUNTER_BSX),
-		// a static asset the `<Route ... {ServeBlobs}/>` mount streams
+		// a static asset the `<ServeBlobs prefix="assets"/>` mount streams
 		("assets/style.css", "body { color: red; }"),
 		(
 			"routes/docs/intro.md",
@@ -134,7 +134,7 @@ async fn entry_components_land_on_root() {
 	tree.find(&["docs", "intro"]).is_some().xpect_true();
 }
 
-/// The markup `<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>`
+/// The markup `<ServeBlobs prefix="assets" {DirPath("assets")}/>`
 /// mounts the on-disk `assets/` directory (the `DirPath` scopes the site store to
 /// that subdir, resolved at insert time) and streams files beneath it.
 #[beet_core::test]

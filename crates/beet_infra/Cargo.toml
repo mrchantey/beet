@@ -19,9 +19,12 @@ deploy = ["beet_router", "dep:sha2", "dep:base64"]
 # enables `beet_router`, unlocking the route actions (eg `build-wasm`) that need
 # it for dispatch.
 beet_router = ["dep:beet_router"]
-lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
+lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail"]
-fargate_block = ["bindings_aws_common","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns","bindings_cloudflare_common"]
+fargate_block = ["bindings_aws_common","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns"]
+# Opt-in Cloudflare DNS + load-balancer failover paths for the AWS blocks. Pulls
+# the cloudflare terraform bindings; without it the AWS blocks are Route53-only.
+cloudflare_dns = ["bindings_cloudflare_common"]
 # The Cloudflare Containers + Workers blocks/actions. Wrangler-provisioned, so no
 # terraform bindings; needs `deploy` (the actions) and `aws_sdk` (the container's
 # `S3Store::r2` path) at the consumer.
@@ -82,6 +85,7 @@ beet_infra = { path = ".", features = [
 	"lambda_block",
 	"lightsail_block",
 	"fargate_block",
+	"cloudflare_dns",
 ] }
 
 [[example]]

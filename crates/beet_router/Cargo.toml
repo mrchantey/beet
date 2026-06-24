@@ -149,7 +149,10 @@ beet_core = { workspace = true, features = ["testing"] }
 name = "bsx_site"
 path = "tests/bsx_site.rs"
 harness = false
-required-features = ["markdown_parser"]
+# `template_serde` wires the `<Template src>` include handler (the
+# `main_bsx_include_co_resides_boot_with_server` case); without it the tag falls
+# through to the no-op remote stub and builds nothing.
+required-features = ["markdown_parser", "template_serde"]
 
 [lib]
 harness = false

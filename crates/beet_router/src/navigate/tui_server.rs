@@ -113,7 +113,7 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 	// opening route is not in the tree the instant the navigator loads it. Settle it
 	// first so the home page resolves on the first load rather than flashing a
 	// "no route matched /" error; the loading placeholder shows in the meantime.
-	settle_routes_dirs(&entity.world()).await.ok();
+	RoutesDir::settle_all(&entity.world()).await.ok();
 	// now co-locate the in-world navigator on the host: its `on_add` browses this
 	// router from `home`, binding the home page over the loading placeholder.
 	entity
@@ -131,5 +131,18 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 		})
 		.await
 		.ok();
+	// let the renderer read site-rooted `/assets/…` images straight off disk (no
+	// HTTP round-trip / dead port): point it at the same `assets/` store the
+	// `<ServeBlobs prefix="assets"/>` route serves. Native local TUI only; a
+	// deployed render host with no filesystem keeps the HTTP path.
+	#[cfg(not(target_arch = "wasm32"))]
+	if let Ok(assets) = AbsPathBuf::new_workspace_rel("assets") {
+		entity
+			.world()
+			.insert_resource(RenderAssetStore(BlobStore::new(FsStore::new(
+				assets,
+			))))
+			.await;
+	}
 	Ok(())
 }
