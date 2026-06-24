@@ -177,8 +177,17 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
 	let bytes = store.get_media(&path).await?;
 
+	// parse into a fresh entity per request, never the route node itself. The route
+	// node is persistent and shared: it serves http alongside many live TUI surfaces
+	// (one per SSH session), and the live path keeps each rendered tree alive. Parsing
+	// into the node would make every surface transclude the one shared content, so a
+	// second session navigating here doubles the body on every surface bound to it.
+	// The fresh tree is a self-referential render root, ephemeral and despawned after
+	// render, exactly like the per-request `spawn_render_step` content.
 	cx.caller
-		.with(move |mut entity| -> Result {
+		.world()
+		.with(move |world: &mut World| -> Result<PageRequest> {
+			let mut entity = world.spawn_empty();
 			MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
 			// derive per-page metadata from the parsed frontmatter, if any, so the
 			// render context can expose this route's title/description/sidebar info.
@@ -189,17 +198,9 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 			{
 				entity.insert(meta);
 			}
-			// The parsed tree is per-request: despawn it (recursively) after render
-			// so the persistent route entity does not accumulate every visited
-			// page's content. Otherwise the global `PostParseTree` systems reprocess
-			// an ever-growing world, ramping up render time with each distinct page.
-			let to_despawn = entity
-				.get::<Children>()
-				.map(|children| children.iter().collect())
-				.unwrap_or_default();
-			PageRoot::insert(&mut entity, to_despawn);
-			Ok(())
+			let id = entity.id();
+			PageRoot::insert(&mut entity, vec![id]);
+			Ok(PageRequest(id))
 		})
-		.await??;
-	PageRequest(cx.id()).xok()
+		.await
 }

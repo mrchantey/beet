@@ -381,6 +381,56 @@ mod test {
 			.xpect_contains("Beta page");
 	}
 
+	/// Regression: the real beet-site path — a [`BsxLayout`]-wrapped [`BlobScene`]
+	/// route (`RoutesDir` `.bsx` page + `BsxLayout{template:"Layout"}`) — must render
+	/// once per SSH session. The route's content lives on the shared route entity,
+	/// transcluded into each session's layout; a second session must not double it.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	async fn bsx_layout_blob_scene_renders_once_per_session() {
+		let mut app = ssh_tui_app();
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&"index.html".into(),
+				"<div><h3>Mind your step</h3></div>".to_string(),
+			)
+			.await
+			.unwrap();
+		let mut registry = BsxTemplateRegistry::default();
+		registry
+			.insert_source(
+				"Layout",
+				"<html><body><main><Slot/></main></body></html>",
+			)
+			.unwrap();
+		app.world_mut().insert_resource(registry);
+		let router = app
+			.world_mut()
+			.spawn((
+				store,
+				Router,
+				BsxLayout::default(),
+				SshTuiServer,
+				OpeningRoute(Url::parse("")),
+				children![route("", BlobScene::new("index.html"))],
+			))
+			.flush();
+		let first = open_connection(&mut app, router, UVec2::new(40, 8));
+		drive_until(&mut app, first, "Mind your step");
+		let second = open_connection(&mut app, router, UVec2::new(40, 8));
+		drive_until(&mut app, second, "Mind your step");
+
+		frame(&mut app, second)
+			.matches("Mind your step")
+			.count()
+			.xpect_eq(1);
+		frame(&mut app, first)
+			.matches("Mind your step")
+			.count()
+			.xpect_eq(1);
+	}
+
 	/// Regression: on ctrl+c the session restores the client terminal (disable mouse
 	/// tracking, show the cursor, leave the alternate screen) *before* it closes, so
 	/// the client is not left spewing escape sequences on mouse movement. The local

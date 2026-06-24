@@ -17,7 +17,7 @@ use crate::prelude::*;
 	Component,
 	Reflect,
 )]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct Document(pub Value);
 
 impl Document {
