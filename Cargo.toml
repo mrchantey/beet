@@ -419,7 +419,7 @@ quickjs = ["action","beet_action/quickjs"]
 # is for those, not the runtime).
 quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/quickjs"]
 # turning on `ui` also lights up beet_thread's chat UI (`ThreadView`,
-# `ThreadComposer`, `ThreadScenePlugin`) when `thread` is present.
+# `CreatePostForm`, `ThreadUiPlugin`) when `thread` is present.
 ui = ["dep:beet_ui", "beet_thread?/ui"]
 # The `beet_ui` function-component widget set (Header, Button, Sidebar, Table)
 # and the `rsx!`/`#[template]` lowering runtime. std-only, so it stays opt-in.
@@ -850,6 +850,21 @@ name = "thread_scenes"
 path = "tests/thread_scenes.rs"
 harness = false
 required-features = ["thread", "router", "fs", "testing"]
+
+# The no-code `examples/bsx_site` example, loaded on-disk and rendered/navigated
+# through `beet`'s public API. The example is pure `.bsx`/`.md` (not a crate); its
+# render + live-tui suites live here, run via `beet --main=examples/bsx_site/main.bsx`.
+[[test]]
+name = "bsx_site"
+path = "tests/bsx_site.rs"
+harness = false
+required-features = ["router", "style", "markdown", "fs", "http_server", "testing"]
+
+[[test]]
+name = "bsx_site_tui"
+path = "tests/bsx_site_tui.rs"
+harness = false
+required-features = ["router", "style", "markdown", "fs", "tui_server", "testing"]
 
 [[bench]]
 name = "bevy_coldstart"

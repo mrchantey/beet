@@ -131,18 +131,5 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 		})
 		.await
 		.ok();
-	// let the renderer read site-rooted `/assets/…` images straight off disk (no
-	// HTTP round-trip / dead port): point it at the same `assets/` store the
-	// `<ServeBlobs prefix="assets"/>` route serves. Native local TUI only; a
-	// deployed render host with no filesystem keeps the HTTP path.
-	#[cfg(not(target_arch = "wasm32"))]
-	if let Ok(assets) = AbsPathBuf::new_workspace_rel("assets") {
-		entity
-			.world()
-			.insert_resource(RenderAssetStore(BlobStore::new(FsStore::new(
-				assets,
-			))))
-			.await;
-	}
 	Ok(())
 }

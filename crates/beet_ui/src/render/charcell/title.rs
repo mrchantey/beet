@@ -20,7 +20,7 @@ use beet_core::prelude::*;
 /// title. The [`PartialEq`] derive is what makes the change-detection meaningful.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
 #[reflect(Component)]
-pub struct Title(pub String);
+pub(crate) struct Title(pub String);
 
 /// System: resolve each page `<title>` to its surface and record the
 /// (control-char-stripped) text as a [`Title`] on that surface.
@@ -31,7 +31,7 @@ pub struct Title(pub String);
 /// [`flush_terminal_titles`]' `Changed` gate stays meaningful. A `<title>`
 /// outside any surface is skipped.
 #[cfg(feature = "tui")]
-pub fn collect_terminal_titles(
+pub(crate) fn collect_terminal_titles(
 	elements: ElementQuery,
 	surfaces: SurfaceQuery,
 	titles: Query<&Title>,
@@ -63,7 +63,7 @@ pub fn collect_terminal_titles(
 /// since it writes through the [`Terminal`] on the same entity the [`Title`]
 /// sits on.
 #[cfg(feature = "tui")]
-pub fn flush_terminal_titles(
+pub(crate) fn flush_terminal_titles(
 	mut changed: Populated<(&Title, &mut Terminal), Changed<Title>>,
 ) -> Result {
 	for (title, mut terminal) in changed.iter_mut() {

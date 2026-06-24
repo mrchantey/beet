@@ -117,13 +117,14 @@ impl Plugin for CharcellPlugin {
 		#[cfg(feature = "tui")]
 		app.init_resource::<KittyGraphicsSupport>()
 			.init_resource::<KittyPlacements>()
-			.init_resource::<KittyWarned>()
 			// before the cascade so the `graphics` state (and the block box it
 			// selects) resolves the same frame the raster attaches — no
 			// one-frame alt-text flash.
 			.add_systems(
 				PostParseTree,
-				attach_kitty_images.before(ResolveStylesSet),
+				(attach_kitty_images, render_image_errors)
+						.chain()
+						.before(ResolveStylesSet),
 			)
 			.register_type::<crate::prelude::Title>()
 			.add_systems(
@@ -144,10 +145,6 @@ impl Plugin for CharcellPlugin {
 					.after(paint_nodes::<DoubleBuffer>)
 					.in_set(CharcellRenderSet),
 			);
-		// point the image renderer at our own HTTP server, so a site-rooted
-		// `<img src="/assets/…">` is fetched over HTTP and mapped to the blob store.
-		#[cfg(all(feature = "tui", feature = "net"))]
-		app.add_observer(set_render_server_origin);
 	}
 }
 

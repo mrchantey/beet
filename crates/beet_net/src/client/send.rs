@@ -7,7 +7,9 @@
 //! - `file` → local filesystem via [`FileClient`]
 //! - `data` → inline data URI, decoded to a 200 response
 //! - No scheme with authority → HTTP client
-//! - No scheme without authority → local filesystem via [`FileClient`]
+//! - No scheme without authority → the canonical loopback server on native
+//!   (the browser document origin on wasm), so a site-rooted `/assets/…`
+//!   fetches over HTTP exactly as a browser resolves it
 //! - Other → returns an error
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -75,6 +77,31 @@ async fn send_http(request: Request) -> Result<Response> {
 	}
 }
 
+/// Rewrite an authority-less request to the canonical loopback server: set its
+/// scheme to `http` and authority to `127.0.0.1:{current_port}`, leaving path,
+/// query, and fragment intact, so a site-rooted `/assets/…` fetches over HTTP
+/// exactly as a browser resolves it against the document origin.
+///
+/// Errors if no canonical server has bound a port yet
+/// ([`HttpServer::current_port`]); the fetch then fails with that error, which is
+/// the intended signal in a server-less context.
+#[cfg(not(target_arch = "wasm32"))]
+fn loopback_rewrite(request: Request) -> Result<Request> {
+	Ok(loopback_to_port(request, HttpServer::current_port()?))
+}
+
+/// Set a request's URL to the `127.0.0.1:{port}` loopback origin, leaving its
+/// path, query, and fragment intact. The pure half of [`loopback_rewrite`],
+/// split out so the rewrite is testable without the process-global port.
+#[cfg(not(target_arch = "wasm32"))]
+fn loopback_to_port(mut request: Request, port: u16) -> Request {
+	let url = request.url_mut();
+	*url = core::mem::replace(url, Url::NONE)
+		.with_scheme(Scheme::Http)
+		.with_authority(format!("127.0.0.1:{port}"));
+	request
+}
+
 /// Send a request via the local filesystem [`FileClient`].
 #[cfg(feature = "fs")]
 async fn send_file(request: Request) -> Result<Response> {
@@ -103,7 +130,7 @@ impl Request {
 	/// | `file` | Local filesystem via [`FileClient`] |
 	/// | `data` | Inline data URI decoded to a 200 response |
 	/// | None + authority present | HTTP client |
-	/// | None + no authority | Local filesystem via [`FileClient`] |
+	/// | None + no authority | Loopback to the canonical server (native) / document origin (wasm) |
 	/// | Other | Returns an error |
 	///
 	/// # Errors
@@ -130,14 +157,17 @@ impl Request {
 					// Authority present without a scheme, assume HTTP
 					send_http(self).await
 				} else {
-					// No authority — treat as a local file path
+					// No authority: an HTTP fetch, like a browser resolving a
+					// site-rooted `/assets/…` against the document origin. On native
+					// there is no document, so loopback-rewrite to the running
+					// canonical server (erroring cleanly if none is up); on wasm
+					// web-sys resolves it against the origin, so leave it untouched.
+					// Use `file://` for an explicit local-file read.
 					cfg_if! {
-						if #[cfg(feature = "fs")] {
-							send_file(self).await
+						if #[cfg(target_arch = "wasm32")] {
+							send_http(self).await
 						} else {
-							bevybail!(
-								"The 'fs' feature is required for local file requests"
-							);
+							send_http(loopback_rewrite(self)?).await
 						}
 					}
 				}
@@ -490,16 +520,38 @@ mod test_file_scheme {
 		response.text().await.unwrap().xpect_contains("[package]");
 	}
 
+}
+
+/// The native loopback rewrite an authority-less [`Request::send`] applies: a
+/// site-rooted `/assets/…` becomes a fetch against the canonical server's port.
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
+mod test_loopback {
+	use super::*;
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// An authority-less URL rewrites to the `127.0.0.1:{port}` loopback origin,
+	/// path and query preserved. The pure rewrite, so it is order-independent of
+	/// the process-global port other tests set.
 	#[beet_core::test]
-	async fn send_bare_path() {
-		let cwd = fs_ext::current_dir().unwrap();
-		let cargo_toml = cwd.join("Cargo.toml");
-		if !cargo_toml.exists() {
-			return;
-		}
-		// A bare relative path with no scheme or authority
-		let response = Request::get("Cargo.toml").send().await.unwrap();
-		response.status().xpect_eq(StatusCode::OK);
-		response.text().await.unwrap().xpect_contains("[package]");
+	fn rewrites_authority_less_to_loopback() {
+		loopback_to_port(Request::get("/assets/x.jpg?v=1"), 8339)
+			.url()
+			.to_string()
+			.xpect_eq("http://127.0.0.1:8339/assets/x.jpg?v=1");
+	}
+
+	/// With no canonical server bound, the rewrite surfaces the no-port error so
+	/// the fetch fails cleanly (the intended `--server=tui` signal) rather than
+	/// loosing the request at a bogus origin.
+	#[beet_core::test]
+	fn errors_when_no_port() {
+		// the process-global may be set by a parallel server test, so drive the
+		// error path through a fresh lock holding `None`.
+		HttpServer::current_port_from(None)
+			.map_err(|err| err.to_string())
+			.unwrap_err()
+			.xpect_contains("local port not assigned");
 	}
 }

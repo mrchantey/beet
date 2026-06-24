@@ -49,6 +49,17 @@ pub async fn start_mini_http_server_with_tcp(
 		.local_addr()
 		.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
 	info!("Mini HTTP server listening on http://{addr}");
+	// register the resolved port as the process loopback port when canonical, so an
+	// authority-less request loops back here (the real port even for `port: 0`). A
+	// listener bound on an entity with no `HttpServer` (eg a bare test router) still
+	// claims it, matching the `canonical` default of `true`.
+	if entity
+		.get::<HttpServer, bool>(|server| server.canonical)
+		.await
+		.unwrap_or(true)
+	{
+		HttpServer::set_current_port(addr.port());
+	}
 
 	// race the accept loop against the shutdown signal: when teardown signals,
 	// the loop future is dropped, releasing the listener so the port closes. The

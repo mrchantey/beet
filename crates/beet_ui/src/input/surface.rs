@@ -50,9 +50,13 @@ impl SurfaceQuery<'_, '_> {
 /// One page per surface: binding a new page's `RenderSurface` to a host replaces
 /// the previous page's, so the host's [`RenderSurfaceOf`] always names its single
 /// current page (like [`Portal`](crate::prelude::Portal) but one-to-one).
+///
+/// `allow_self_referential` so a host that *is* its own surface (eg a directly
+/// spawned charcell chat host that skips the router's page binding) can carry
+/// `RenderSurface(self)`, scoping its whole subtree to itself in one component.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[relationship(relationship_target = RenderSurfaceOf)]
+#[relationship(relationship_target = RenderSurfaceOf, allow_self_referential)]
 pub struct RenderSurface(#[entities] pub Entity);
 
 impl RenderSurface {

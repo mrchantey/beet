@@ -76,7 +76,7 @@ pub(crate) use prepare::*;
 #[cfg(feature = "tui")]
 pub use terminal::*;
 #[cfg(feature = "tui")]
-pub use title::*;
+pub(crate) use title::*;
 
 pub(self) use box_model::*;
 pub(self) use flex::*;

@@ -22,6 +22,6 @@ UI is a sibling of the behavior tree, bound to it by the `bx:ref="thread"` /
 	</div>
 	<TuiThreadChat>
 		<div {(ThreadView, OfThread($thread))}/>
-		<div {(ThreadComposer, OfThread($thread))}/>
+		<div {(CreatePostForm, OfThread($thread))}/>
 	</TuiThreadChat>
 </div>

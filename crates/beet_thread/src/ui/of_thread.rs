@@ -1,14 +1,14 @@
 //! The thread<->UI relationship: a [`ThreadView`](crate::prelude::ThreadView) or
-//! [`ThreadComposer`](crate::prelude::ThreadComposer) points at the thread it
+//! [`CreatePostForm`](crate::prelude::CreatePostForm) points at the thread it
 //! renders/drives via [`OfThread`], and the thread names all its UI items via
 //! [`ThreadItems`]. One relationship carries both kinds; the projection + input
 //! systems traverse `ThreadItems` (filtering by the item marker) rather than
-//! scanning every view/composer for a stored entity.
+//! scanning every view/form for a stored entity.
 
 use beet_core::prelude::*;
 
 /// The thread a [`ThreadView`](crate::prelude::ThreadView) or
-/// [`ThreadComposer`](crate::prelude::ThreadComposer) is bound to: the source half
+/// [`CreatePostForm`](crate::prelude::CreatePostForm) is bound to: the source half
 /// of the [`ThreadItems`] relationship.
 ///
 /// Spawn it directly beside the view/composer marker so the relationship machinery
@@ -26,9 +26,9 @@ impl OfThread {
 	pub fn thread(&self) -> Entity { self.0 }
 }
 
-/// Every UI item (view, composer) bound to a thread: the target half of the
+/// Every UI item (view, form) bound to a thread: the target half of the
 /// [`OfThread`] relationship, on the thread entity. The projection + input systems
-/// traverse this, filtering by `With<ThreadView>` / `With<ThreadComposer>`, rather
+/// traverse this, filtering by `With<ThreadView>` / `With<CreatePostForm>`, rather
 /// than scanning by a stored entity.
 #[derive(Debug, Default, Reflect, Component)]
 #[reflect(Component)]

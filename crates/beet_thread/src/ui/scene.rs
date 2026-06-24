@@ -1,14 +1,14 @@
 //! Charcell host shells that wrap a thread's agnostic UI for a local terminal.
 //!
 //! The host (a [`StdioTerminal`] paired with a [`DoubleBuffer`]) is supplied
-//! here, not baked into the view, so the same [`ThreadView`]/[`ThreadComposer`]
+//! here, not baked into the view, so the same [`ThreadView`]/[`CreatePostForm`]
 //! also serve a per-connection server surface. From markup, nest the view +
-//! composer (bound to a `bx:ref` thread) as the host's children:
+//! form (bound to a `bx:ref` thread) as the host's children:
 //!
 //! ```rsx
 //! <TuiThreadChat>
 //!   <div {(ThreadView, OfThread($thread))}/>
-//!   <div {(ThreadComposer, OfThread($thread))}/>
+//!   <div {(CreatePostForm, OfThread($thread))}/>
 //! </TuiThreadChat>
 //! ```
 
@@ -17,9 +17,13 @@ use beet_ui::prelude::style::LayoutStyle;
 use beet_ui::prelude::*;
 
 /// A full-screen charcell host for an interactive chat: the alt-screen terminal
-/// the transcript + composer paint into. Nest a [`ThreadView`] and
-/// [`ThreadComposer`] as its children. Used by the interactive and auto-loop
+/// the transcript + form paint into. Nest a [`ThreadView`] and a
+/// [`CreatePostForm`] as its children. Used by the interactive and auto-loop
 /// examples (the process runs until Ctrl+C).
+///
+/// The host carries [`SelfSurface`], so it *is* its own [`RenderSurface`] and the
+/// whole nested subtree (the [`CreatePostForm`], its `<input>`, the [`ThreadView`])
+/// resolves to it through `SurfaceQuery` with no per-widget wiring.
 #[template]
 pub fn TuiThreadChat() -> impl Bundle {
 	rsx! {
@@ -27,10 +31,31 @@ pub fn TuiThreadChat() -> impl Bundle {
 			StdioTerminal::default(),
 			DoubleBuffer::default(),
 			LayoutStyle::flex_col(),
+			SelfSurface,
 		)}>
 			<Slot/>
 		</div>
 	}
+}
+
+/// Marks a charcell host that is its own [`RenderSurface`]: its `on_add` inserts
+/// `RenderSurface(self)`, so every descendant resolves to this entity through
+/// `SurfaceQuery`.
+///
+/// For the directly-spawned chat host that skips the router's page-host binding
+/// (a routed page binds `RenderSurface(host)` instead). Such a host is never
+/// routed, so the self-link never collides with a page's.
+#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
+#[reflect(Component, Default)]
+#[component(on_add = self_surface_on_add)]
+pub struct SelfSurface;
+
+fn self_surface_on_add(mut world: DeferredWorld, cx: HookContext) {
+	let entity = cx.entity;
+	world
+		.commands()
+		.entity(entity)
+		.insert(RenderSurface(entity));
 }
 
 /// An inline charcell host for a finite, non-interactive run: it keeps the
@@ -65,7 +90,9 @@ mod test {
 
 	/// Replicates `beet_ui`'s `TestHost` (which is `pub(crate)`): a headless
 	/// charcell app whose host entity carries the channel terminal and the
-	/// [`DoubleBuffer`] the pipeline paints. Returns `(app, host)`.
+	/// [`DoubleBuffer`] the pipeline paints. Carries [`SelfSurface`], as the local
+	/// [`TuiThreadChat`] does, so the nested form subtree resolves to the host.
+	/// Returns `(app, host)`.
 	fn charcell_app() -> (App, Entity) {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, CharcellTuiPlugin))
@@ -75,7 +102,12 @@ mod test {
 			ChannelTerminal::new(TerminalConfig::default());
 		let host = app
 			.world_mut()
-			.spawn((channel, terminal, DoubleBuffer::new(UVec2::new(40, 12))))
+			.spawn((
+				channel,
+				terminal,
+				DoubleBuffer::new(UVec2::new(40, 12)),
+				SelfSurface,
+			))
 			.id();
 		// settle Startup before any content is attached
 		app.update();
@@ -92,8 +124,8 @@ mod test {
 			.render_plain()
 	}
 
-	/// The first rendered element with `tag`, eg the composer's `<form>` or
-	/// `<input>` built from `ThreadComposer.bsx`.
+	/// The first rendered element with `tag`, eg the form's `<form>` or
+	/// `<input>` built from `CreatePostForm.bsx`.
 	fn element_by_tag(app: &mut App, tag: &str) -> Option<Entity> {
 		app.world_mut().with_state::<ElementQuery, _>(|elements| {
 			elements
@@ -141,7 +173,7 @@ mod test {
 		frame.xpect_contains("Agent: you said: hello");
 	}
 
-	/// The chat layout (a [`ThreadView`] and a [`ThreadComposer`] as siblings
+	/// The chat layout (a [`ThreadView`] and a [`CreatePostForm`] as siblings
 	/// under the host) still renders the transcript, so the view works as a child
 	/// alongside the input, not only on the host.
 	#[beet_core::test]
@@ -157,7 +189,7 @@ mod test {
 		app.update();
 		app.world_mut().entity_mut(host).insert((
 			LayoutStyle::flex_col(),
-			children![ThreadView::new(thread), ThreadComposer::new(thread)],
+			children![ThreadView::new(thread), CreatePostForm::new(thread)],
 		));
 		app.world_mut()
 			.entity_mut(thread)
@@ -192,7 +224,7 @@ mod test {
 		// mount the chat UI so the composer's <form> exists for the turn to await
 		app.world_mut().entity_mut(host).insert((
 			LayoutStyle::flex_col(),
-			children![ThreadView::new(thread), ThreadComposer::new(thread)],
+			children![ThreadView::new(thread), CreatePostForm::new(thread)],
 		));
 		app.world_mut()
 			.entity_mut(thread)
@@ -223,10 +255,10 @@ mod test {
 	}
 
 	/// The full deterministic interaction: real keystrokes through the input
-	/// bridge type into the focused composer and Enter submits, advancing the
-	/// user turn so the mock agent replies. The composer scopes itself to the
-	/// host surface and `{FocusOnAdd}` focuses its `<input>`, exactly as the local
-	/// `TuiThreadChat` wires the real one.
+	/// bridge type into the focused form and Enter submits, advancing the user
+	/// turn so the mock agent replies. The host carries `RenderSurface(self)` so
+	/// the form's subtree resolves to it, and `{FocusOnAdd}` focuses its
+	/// `<input>`, exactly as the local `TuiThreadChat` wires the real one.
 	#[beet_core::test]
 	async fn keyboard_submit_drives_reply() {
 		let (mut app, host) = charcell_app();
@@ -244,7 +276,7 @@ mod test {
 		// mount the chat UI on the host (as the local `TuiThreadChat` does), then kick
 		app.world_mut().entity_mut(host).insert((
 			LayoutStyle::flex_col(),
-			children![ThreadView::new(thread), ThreadComposer::new(thread)],
+			children![ThreadView::new(thread), CreatePostForm::new(thread)],
 		));
 		app.world_mut()
 			.entity_mut(thread)
@@ -270,7 +302,7 @@ mod test {
 		frame.xpect_contains("Agent: you said: hello");
 	}
 
-	/// The composer builds its `<form>` from `ThreadComposer.bsx` (interim-loaded
+	/// The widget builds its `<form>` from `CreatePostForm.bsx` (interim-loaded
 	/// into the `BsxTemplateRegistry`), not inline rsx: mounting one yields a
 	/// rendered `<form>` with the `message` `<input>` and the `Send` `<button>`.
 	#[beet_core::test]
@@ -281,7 +313,7 @@ mod test {
 		app.update();
 		app.world_mut()
 			.entity_mut(host)
-			.insert(children![ThreadComposer::new(thread)]);
+			.insert(children![CreatePostForm::new(thread)]);
 		for _ in 0..25 {
 			app.update();
 		}
@@ -291,30 +323,29 @@ mod test {
 	}
 
 	/// Focus + surface scoping survive an extra wrapper element between the host
-	/// and the composer: the composer scopes its own subtree to the host surface
-	/// and `{FocusOnAdd}` focuses its `<input>`, so the resolver walks `ChildOf` to
-	/// the host regardless of depth (the regression the former fixed-depth
-	/// input-to-composer-to-host double-walk was prone to).
+	/// and the form: the host carries `RenderSurface(self)`, so the form's whole
+	/// subtree resolves to it through `SurfaceQuery` regardless of depth, and
+	/// `{FocusOnAdd}` focuses its `<input>` (no per-widget surface wiring, so no
+	/// fixed-depth walk to break).
 	#[beet_core::test]
 	async fn composer_focus_survives_wrapper() {
 		let (mut app, host) = charcell_app();
 		let thread =
 			app.world_mut().spawn((Thread::default(), Sequence::new())).id();
 		app.update();
-		// nest the composer under an extra <div> wrapper under the host, not
+		// nest the form under an extra <div> wrapper under the host, not
 		// directly, so any fixed-depth walk would miss the host.
 		app.world_mut().entity_mut(host).insert((
 			LayoutStyle::flex_col(),
 			children![(
 				Element::new("div"),
-				children![ThreadComposer::new(thread)]
+				children![CreatePostForm::new(thread)]
 			)],
 		));
-		for _ in 0..25 {
-			app.update();
-		}
+		// settle the build + focus deterministically rather than spinning frames
+		AsyncRunner::settle_async_tasks(app.world_mut()).await;
 
-		// the composer's <input> ended up focused ...
+		// the form's <input> ended up focused ...
 		let input = element_by_tag(&mut app, "input").unwrap();
 		app.world().entity(input).contains::<Focus>().xpect_true();
 		// ... and its resolved surface is the host (so typed bytes route to it).
@@ -343,7 +374,7 @@ mod test {
 			LayoutStyle::flex_col(),
 			children![
 				ThreadView::new(thread),
-				(Element::new("div"), children![ThreadComposer::new(thread)]),
+				(Element::new("div"), children![CreatePostForm::new(thread)]),
 			],
 		));
 		app.world_mut()

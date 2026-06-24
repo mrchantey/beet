@@ -50,6 +50,16 @@ pub async fn start_hyper_server_with_tcp(
 		.local_addr()
 		.map_err(|err| bevyhow!("Failed to get local address: {}", err))?;
 	info!("Server listening on http://{}", addr);
+	// register the resolved port as the process loopback port when canonical (the
+	// mini server does the same), so an authority-less request loops back here. An
+	// entity with no `HttpServer` still claims it, matching the `canonical` default.
+	if entity
+		.get::<HttpServer, bool>(|server| server.canonical)
+		.await
+		.unwrap_or(true)
+	{
+		HttpServer::set_current_port(addr.port());
+	}
 
 	// race the accept loop against the shutdown signal: signalling drops the loop
 	// future, releasing the listener so the port closes (the mini server pattern).

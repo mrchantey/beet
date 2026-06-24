@@ -1,17 +1,21 @@
 //! Raster images in the terminal via the kitty graphics protocol.
 //!
 //! Supported terminals (kitty, ghostty, WezTerm) draw real images over the
-//! cell grid using APC escapes. `attach_kitty_images` loads each `<img>`'s
-//! `src` — an absolute or site-rooted URL is fetched over HTTP (a site-rooted
-//! `/assets/…` against [`RenderServerOrigin`], our own server, which maps it to
-//! its blob store), a bare path reads the local filesystem; PNG bytes transmit
-//! directly, any other format decodes and re-encodes to PNG — then attaches a
-//! [`KittyImage`] and the `graphics` element
-//! state so the terminal-gated user-agent rule gives it a block box. The
-//! measure phase sizes that box from the pixel dimensions, paint reserves its
-//! cells, and `place_kitty_images` transmits the bytes once and (re)places the
-//! picture whenever its on-screen rect changes — scroll, reflow, or resize.
-//! Unsupported terminals keep the `[image]: alt` marker fallback.
+//! cell grid using APC escapes. `attach_kitty_images` fetches each `<img>`'s
+//! `src` over HTTP — an absolute `http(s)://` directly, a site-rooted
+//! `/assets/…` looped back to our own canonical server (which maps it to its
+//! blob store), exactly as a browser resolves it against the document origin, so
+//! there is no filesystem dependency on the render host (Lambda/Fargate). PNG
+//! bytes transmit directly, any other format decodes and re-encodes to PNG, then
+//! a [`KittyImage`] and the `graphics` element state attach so the
+//! terminal-gated user-agent rule gives it a block box. The measure phase sizes
+//! that box from the pixel dimensions, paint reserves its cells, and
+//! `place_kitty_images` transmits the bytes once and (re)places the picture
+//! whenever its on-screen rect changes — scroll, reflow, or resize.
+//!
+//! On any failure (no canonical server, a refused/non-2xx fetch, a decode error)
+//! the element shows both its `[image]: alt` marker and the styled error message
+//! ([`render_image_errors`]); unsupported terminals keep just the marker.
 //!
 //! Protocol reference: <https://sw.kovidgoyal.net/kitty/graphics-protocol/>
 
@@ -127,45 +131,22 @@ impl Default for KittyGraphicsSupport {
 
 // ── Attach ────────────────────────────────────────────────────────────────────
 
-/// The base [`Url`] a site-rooted image `src` (`/assets/…`) is fetched from, so
-/// the terminal renderer requests the image over HTTP from our own server exactly
-/// like the browser does — the server maps the path to its blob store (fs, S3,
-/// …), with no filesystem dependency on the render host (Lambda/Fargate). Set by
-/// [`set_render_server_origin`] from the running `HttpServer`'s loopback address;
-/// absent (no HTTP server listening), a `/`-rooted `src` is unresolvable and the
-/// `[image]: alt` marker presents.
-#[cfg(all(feature = "tui", feature = "net"))]
-#[derive(Debug, Clone, Resource)]
-pub struct RenderServerOrigin(pub beet_net::prelude::Url);
-
-/// Observer: point [`RenderServerOrigin`] at our own `HttpServer`'s loopback
-/// address when one lands, so a site-rooted image `src` is fetched over HTTP and
-/// mapped to the blob store (no filesystem on the render host). A `port: 0`
-/// (OS-assigned, pre-bind) is skipped; the fixed port is used as-is.
-#[cfg(all(feature = "tui", feature = "net"))]
-pub fn set_render_server_origin(
-	ev: On<Insert, beet_net::prelude::HttpServer>,
-	servers: Query<&beet_net::prelude::HttpServer>,
-	mut commands: Commands,
-) {
-	use beet_net::prelude::Url;
-	if let Ok(port) = servers
-		.get(ev.entity)
-		.map(|server| server.socket_addr().port())
-		&& port != 0
-	{
-		commands.insert_resource(RenderServerOrigin(Url::parse(format!(
-			"http://127.0.0.1:{port}"
-		))));
-	}
+/// Marks an `<img>` whose `src` could not back a raster (a failed or non-2xx
+/// fetch, not a decodable image), so the attach system tries it exactly once and
+/// the marker + error fallback presents it. Carries the failure message, rendered
+/// alongside the `[image]: alt` marker by [`render_image_errors`].
+#[cfg(feature = "tui")]
+#[derive(Debug, Clone, Component)]
+pub struct KittyImageUnavailable {
+	/// The failure message shown via the [`ErrorText`] widget styling.
+	pub error: SmolStr,
 }
 
-/// Marks an `<img>` whose `src` could not back a raster (missing file, not a
-/// PNG, a failed or unsupported fetch), so the attach system tries it exactly
-/// once and the `[image]: alt` marker fallback presents it.
+/// Marks an unavailable `<img>` whose alt + error fallback has been spawned, so
+/// [`render_image_errors`] builds it exactly once.
 #[cfg(feature = "tui")]
 #[derive(Debug, Clone, Copy, Component)]
-pub struct KittyImageUnavailable;
+pub struct KittyErrorShown;
 
 /// Marks an `<img>` whose remote `src` is being fetched, so exactly one fetch
 /// is in flight. The alt marker presents until the bytes arrive.
@@ -174,13 +155,15 @@ pub struct KittyImageUnavailable;
 pub struct KittyImageLoading;
 
 /// ECS system: back each new `<img>` with a [`KittyImage`] when the terminal
-/// supports graphics. A local `src` loads synchronously; an `http(s)` one
-/// fetches in the background (`net` feature) and attaches on arrival.
+/// supports graphics, by fetching its `src` over HTTP (`net` feature) and
+/// attaching on arrival. An absolute `http(s)://` fetches directly; a site-rooted
+/// `/assets/…` loops back to our own canonical server, exactly as a browser
+/// resolves it against the document origin. Without the `net` feature there is no
+/// transport, so an `<img>` is simply marked unavailable.
 #[cfg(feature = "tui")]
 pub fn attach_kitty_images(
 	support: Res<KittyGraphicsSupport>,
 	mut placements: ResMut<KittyPlacements>,
-	#[cfg(feature = "net")] origin: Option<Res<RenderServerOrigin>>,
 	elements: ElementQuery,
 	unvisited: Query<
 		(),
@@ -204,42 +187,33 @@ pub fn attach_kitty_images(
 			continue;
 		}
 		let src = view.attribute_string("src");
-		// an absolute or site-rooted URL is fetched over HTTP from our own server
-		// (which maps it to the blob store, no filesystem); needs the `net` client.
+		if src.is_empty() {
+			continue;
+		}
+		// fetch the `src` over HTTP in the background and attach on arrival. An
+		// authority-less `/assets/…` loops back to the canonical server (Part A).
 		#[cfg(feature = "net")]
-		if let Some(url) =
-			image_request_url(&src, origin.as_ref().map(|origin| &origin.0))
 		{
 			let id = placements.alloc_id();
+			let src = src.clone();
 			commands.entity(view.entity).insert(KittyImageLoading);
 			commands
 				.entity(view.entity)
-				.queue_async(move |entity| fetch_remote(entity, url, id));
-			continue;
+				.queue_async(move |entity| fetch_remote(entity, src, id));
 		}
-		// a bare/relative path is read from the local filesystem (test fixtures,
-		// offline renders); a site-rooted path with no server origin is unresolvable.
-		match load_local_image(&src) {
-			Some((data, px)) => {
-				let image = KittyImage {
-					id: placements.alloc_id(),
-					data,
-					px,
-				};
-				commands.entity(view.entity).queue(
-					move |entity: EntityWorldMut| attach_image(entity, image),
-				);
-			}
-			None => {
-				commands.entity(view.entity).insert(KittyImageUnavailable);
-			}
-		}
+		// no transport compiled in: nothing can load the image.
+		#[cfg(not(feature = "net"))]
+		commands.entity(view.entity).insert(KittyImageUnavailable {
+			error: "the 'net' feature is required to load images".into(),
+		});
 	}
 }
 
 /// Insert the raster and the `graphics` element state driving its block box,
 /// merging into any states the element already carries (eg hover).
-#[cfg(feature = "tui")]
+// the attach path is reached only by the `net` fetch (and the test harness that
+// attaches a raster directly); without either there is nothing to attach.
+#[cfg(all(feature = "tui", any(feature = "net", test)))]
 fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 	entity.insert(image);
 	match entity.get_mut::<ElementStateMap>() {
@@ -252,41 +226,35 @@ fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 	}
 }
 
-/// The [`Url`](beet_net::prelude::Url) an image `src` is fetched from over HTTP,
-/// or `None` for a local-file path read directly. An absolute `http(s)://` URL is
-/// used as-is; a site-rooted `/assets/…` is resolved against the server `origin`
-/// (our own server, which maps it to the blob store) like the browser does; a
-/// bare/relative path is a local file (`None`).
-#[cfg(all(feature = "tui", feature = "net"))]
-fn image_request_url(
-	src: &str,
-	origin: Option<&beet_net::prelude::Url>,
-) -> Option<beet_net::prelude::Url> {
-	use beet_net::prelude::Url;
-	if src.starts_with("http://") || src.starts_with("https://") {
-		Some(Url::parse(src))
-	} else if src.starts_with('/') {
-		origin.map(|origin| Url::parse(format!("{origin}{src}")))
-	} else {
-		None
-	}
-}
-
-/// Read and encode a local-file image `src` (a bare/relative path), or `None`
-/// when missing or undecodable. Non-PNG bytes (eg a `.jpg`) are decoded and
-/// re-encoded to PNG, the one format the kitty `t=d,f=100` path transmits.
+/// System: render an unavailable `<img>`'s error once, alongside its existing
+/// `[image]: alt` marker. The failed `<img>` keeps its [`Marker`] (the
+/// `[image]: alt` text, rendered as the gutter once it has children), and this
+/// spawns the [`ErrorText`] widget's `.error-text` span as a child carrying the
+/// failure — so a failed image shows both what it was and why it could not load.
 #[cfg(feature = "tui")]
-fn load_local_image(src: &str) -> Option<(String, UVec2)> {
-	if src.is_empty() {
-		return None;
+pub fn render_image_errors(
+	unavailable: Query<(Entity, &KittyImageUnavailable), Without<KittyErrorShown>>,
+	mut commands: Commands,
+) {
+	for (entity, image) in unavailable.iter() {
+		let error = image.error.clone();
+		commands.entity(entity).insert(KittyErrorShown).with_children(
+			|parent| {
+				// the material `ErrorText` widget's styled span (built directly: the
+				// live render world has no `TemplatePlugin` to expand the template).
+				parent.spawn((
+					Element::new("span").with_inner_text(&error),
+					Classes::new([classes::ERROR_TEXT]),
+				));
+			},
+		);
 	}
-	encode_png(to_png_bytes(fs_ext::read(src).ok()?)?)
 }
 
 /// PNG bytes for an image: PNG input passes through; any other format the
 /// `image` decoder understands (eg JPEG) is decoded to RGBA and re-encoded to
 /// PNG. `None` when the bytes are not a decodable image.
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "tui", any(feature = "net", test)))]
 fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
 	if png_dimensions(&bytes).is_some() {
 		return Some(bytes);
@@ -299,49 +267,58 @@ fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
 		.map(|_| png.into_inner())
 }
 
-/// Background fetch for a remote `src`: attach the raster on arrival, or mark
-/// the element unavailable so the alt marker stays.
+/// Background fetch for an image `src` over HTTP: attach the raster on arrival,
+/// or mark the element unavailable carrying the failure so [`render_image_errors`]
+/// shows the alt marker plus the styled error.
 #[cfg(all(feature = "tui", feature = "net"))]
-async fn fetch_remote(
-	entity: AsyncEntity,
-	url: beet_net::prelude::Url,
-	id: u32,
-) -> Result {
-	use beet_net::prelude::*;
-	// no `Accept` constraint: the server returns the stored file (jpg/png/…) and
-	// `to_png_bytes` decodes it; pinning `Accept: png` would reject a jpg asset.
-	let loaded = async {
-		Request::get(url)
-			.send()
-			.await
-			.ok()?
-			.into_result()
-			.await
-			.ok()?
-			.bytes_vec()
-			.await
-			.ok()
+async fn fetch_remote(entity: AsyncEntity, src: String, id: u32) -> Result {
+	let loaded = fetch_image_bytes(&src).await.and_then(|bytes| {
+		to_png_bytes(bytes).and_then(encode_png).ok_or_else(|| {
+			bevyhow!("response is not a decodable image")
+		})
+	});
+	// each failure mode warns the src so a no-port error reads differently from a
+	// refused connection, a non-2xx, or a decode error, instead of a silent blank.
+	if let Err(err) = &loaded {
+		warn!("img src {src:?}: {err}");
 	}
-	.await
-	.and_then(to_png_bytes)
-	.and_then(encode_png);
 	entity
 		.with(move |mut entity| {
 			entity.remove::<KittyImageLoading>();
 			match loaded {
-				Some((data, px)) => {
+				Ok((data, px)) => {
 					attach_image(entity, KittyImage { id, data, px });
 				}
-				None => {
-					entity.insert(KittyImageUnavailable);
+				Err(err) => {
+					entity.insert(KittyImageUnavailable {
+						error: err.to_string().into(),
+					});
 				}
 			}
 		})
 		.await
 }
 
+/// The raw response bytes for an image `src`, fetched over HTTP, or the precise
+/// failure: a refused/failed send (incl the no-port error when no canonical
+/// server is up), a non-2xx status, or a body-read error.
+#[cfg(all(feature = "tui", feature = "net"))]
+async fn fetch_image_bytes(src: &str) -> Result<Vec<u8>> {
+	use beet_net::prelude::*;
+	// no `Accept` constraint: the server returns the stored file (jpg/png/…) and
+	// `to_png_bytes` decodes it; pinning `Accept: png` would reject a jpg asset. An
+	// authority-less `/assets/…` loopback-rewrites in `send` (Part A).
+	Request::get(src)
+		.send()
+		.await?
+		.into_result()
+		.await?
+		.bytes_vec()
+		.await
+}
+
 /// Validate and base64-encode PNG bytes, with their parsed dimensions.
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "tui", any(feature = "net", test)))]
 fn encode_png(bytes: Vec<u8>) -> Option<(String, UVec2)> {
 	use base64::Engine;
 	let px = png_dimensions(&bytes)?;
@@ -604,31 +581,40 @@ mod test {
 	#[cfg(feature = "tui")]
 	use crate::render::charcell::test_host::TestHost;
 
-	/// A host with graphics forced on and an `<img>` whose `src` is a real
-	/// PNG file in a temp dir.
-	// the temp file + `fs_ext` load is native-only (no filesystem on wasm).
-	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
-	fn image_host(width: u32, height: u32) -> (TestHost, TempDir) {
+	/// A host with graphics forced on and an `<img>` backed by a [`KittyImage`]
+	/// of the given pixel dimensions, attached directly (no fetch) so the
+	/// placement/transmission paths can be exercised without a server.
+	#[cfg(feature = "tui")]
+	fn image_host(width: u32, height: u32) -> TestHost {
 		let mut host = TestHost::sized(UVec2::new(40, 14));
 		host.app
 			.insert_resource(KittyGraphicsSupport { enabled: true });
-		let dir = TempDir::new().unwrap();
-		let path = dir.path().join("test.png");
-		fs_ext::write(&path, png_bytes(width, height)).unwrap();
-		let src = path.to_string_lossy().to_string();
 		host.spawn_content(rsx! {
-			<div><img src=src alt="a test image"/></div>
+			<div><img src="x.png" alt="a test image"/></div>
 		});
+		// attach the raster directly before the first step: the fetch path is
+		// `net`-gated and needs a server, so seed the `KittyImage` so the attach
+		// system skips the img (placement is independent of how the bytes arrived).
+		let (data, px) =
+			encode_png(png_bytes(width, height)).expect("valid png");
+		let world = host.app.world_mut();
+		let img = world
+			.query_filtered::<(Entity, &Element), With<Element>>()
+			.iter(world)
+			.find(|(_, element)| element.tag() == "img")
+			.map(|(entity, _)| entity)
+			.expect("img element");
+		attach_image(world.entity_mut(img), KittyImage { id: 1, data, px });
 		host.step();
-		(host, dir)
+		host
 	}
 
 	/// A supported terminal transmits the PNG once and places it at its
 	/// laid-out cell rect; the alt-text fallback is not painted.
-	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn transmits_and_places_image() {
-		let (mut host, _dir) = image_host(100, 40);
+		let mut host = image_host(100, 40);
 		let out = String::from_utf8_lossy(&host.frame_ansi()).into_owned();
 		// transmitted as direct PNG data with the allocated id
 		out.as_str()
@@ -644,35 +630,8 @@ mod test {
 			.xpect_contains("\u{1b}_G");
 	}
 
-	/// An image `src` resolves to an HTTP request for a URL or a site-rooted path
-	/// (against the server origin), and a bare path stays a local-file read.
-	#[cfg(all(feature = "tui", feature = "net"))]
-	#[beet_core::test]
-	fn image_url_resolution() {
-		use beet_net::prelude::Url;
-		let origin = Url::parse("http://127.0.0.1:8339");
-		let url = |src| {
-			image_request_url(src, Some(&origin)).map(|url| url.to_string())
-		};
-		// a site-rooted path fetches from our own server (mapped to the blob store)
-		url("/assets/x.jpg")
-			.xpect_eq(Some("http://127.0.0.1:8339/assets/x.jpg".to_string()));
-		// an absolute URL is used as-is
-		url("https://cdn/x.png")
-			.xpect_eq(Some("https://cdn/x.png".to_string()));
-		// no origin: a site-rooted path is unresolvable (no HTTP, no local read)
-		image_request_url("/assets/x.jpg", None)
-			.is_none()
-			.xpect_true();
-		// a bare path is a local file, not an HTTP request
-		image_request_url("logo.png", Some(&origin))
-			.is_none()
-			.xpect_true();
-	}
-
 	/// A non-PNG image (a JPEG) is decoded and re-encoded to PNG so the kitty
-	/// `f=100` transmit handles it, with its dimensions preserved; a local-file
-	/// `src` reads from disk and decodes.
+	/// `f=100` transmit handles it, with its dimensions preserved.
 	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	fn decodes_jpeg_image() {
@@ -686,15 +645,8 @@ mod test {
 			buf.into_inner()
 		};
 		// decoded + re-encoded to a valid PNG of the same dimensions
-		to_png_bytes(jpeg.clone())
+		to_png_bytes(jpeg)
 			.and_then(encode_png)
-			.unwrap()
-			.1
-			.xpect_eq(UVec2::new(8, 6));
-		// a local-file jpeg src loads and decodes
-		let dir = TempDir::new().unwrap();
-		fs_ext::write(dir.path().join("x.jpg"), &jpeg).unwrap();
-		load_local_image(&dir.path().join("x.jpg").to_string_lossy())
 			.unwrap()
 			.1
 			.xpect_eq(UVec2::new(8, 6));
@@ -702,10 +654,10 @@ mod test {
 
 	/// Removing the image deletes its placement; a resize deletes all visible
 	/// placements and re-places from scratch.
-	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn removal_and_resize_replace_placements() {
-		let (mut host, _dir) = image_host(100, 40);
+		let mut host = image_host(100, 40);
 		host.frame_ansi();
 		// resize: every placement is dropped and re-emitted (payload retained)
 		host.resize(UVec2::new(50, 16));
@@ -747,5 +699,76 @@ mod test {
 			.into_owned()
 			.xnot()
 			.xpect_contains("\u{1b}_G");
+	}
+
+	// ── item 9: the folk-technology blog post image ────────────────────────────
+	// The real committed asset `<img src="/assets/blog/kiama-sea-shanty-club.jpg">`
+	// references. Outside the crate, under the workspace `assets/`; absent on a
+	// fresh checkout until `just pull-assets`, so the asset tests skip when missing.
+
+	/// The site-rooted src of the folk-technology post image.
+	#[cfg(all(feature = "tui", feature = "net"))]
+	const SHANTY_SRC: &str = "/assets/blog/kiama-sea-shanty-club.jpg";
+
+	/// The real folk-technology JPEG, or `None` on a checkout without `assets/`.
+	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]
+	fn shanty_jpeg() -> Option<Vec<u8>> {
+		fs_ext::read(
+			AbsPathBuf::new_workspace_rel("assets/blog/kiama-sea-shanty-club.jpg")
+				.unwrap(),
+		)
+		.ok()
+	}
+
+	/// The exact JPEG decode + PNG re-encode + dimension parse the renderer runs,
+	/// on the real asset: it round-trips to a 1280x960 PNG.
+	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn shanty_jpeg_reencodes_to_png() {
+		let Some(jpeg) = shanty_jpeg() else {
+			return; // no local assets/ (fresh checkout); covered by `decodes_jpeg_image`
+		};
+		to_png_bytes(jpeg)
+			.and_then(encode_png)
+			.unwrap()
+			.1
+			.xpect_eq(UVec2::new(1280, 960));
+	}
+
+	/// THE item-9 regression guard: a site-rooted `/assets/…` `<img>` with no
+	/// canonical server up (the pure-local `--server=tui` case) loopback-fetches,
+	/// fails with the no-port error, and renders BOTH the `[image]: alt` marker and
+	/// the styled error rather than a silent blank — and marks the element
+	/// unavailable so the fetch is not retried.
+	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	async fn site_rooted_img_without_server_shows_alt_and_error() {
+		// wide enough that the no-port message does not wrap mid-phrase.
+		let mut host = TestHost::sized(UVec2::new(80, 8));
+		// the fetch is queued async, so the host needs the async runtime.
+		host.app
+			.init_plugin::<AsyncPlugin>()
+			.insert_resource(KittyGraphicsSupport { enabled: true });
+		host.spawn_content(rsx! {
+			<div><img src=SHANTY_SRC alt="shanty"/></div>
+		});
+		// the loopback fetch is async and fails (no canonical server bound): settle
+		// until the element is marked unavailable, then the error fallback spawns.
+		app_ext::update_until(&mut host.app, |world| {
+			world
+				.query_filtered::<(), With<KittyImageUnavailable>>()
+				.iter(world)
+				.next()
+				.is_some()
+		})
+		.await
+		.xpect_true();
+		host.step();
+		// both the alt marker (the `[image]: alt` gutter) and the no-port error from
+		// the failed loopback fetch render — not a silent blank.
+		host.frame_plain()
+			.as_str()
+			.xpect_contains("[image]: shanty")
+			.xpect_contains("local port not assigned, is the server running yet?");
 	}
 }

@@ -192,6 +192,9 @@ pub mod prelude {
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;
+	// no_std-capable sync primitives with const initializers (`RwLock::new(None)`
+	// in a `static`), unlike `async_lock`'s; the cross-platform `std::sync` stand-in.
+	pub use bevy::platform::sync::RwLock;
 	pub use bevy_ecs::entity_disabling::Disabled;
 	// tracing's log macros are no_std, unlike bevy_log which is std-gated, so
 	// re-export them directly to give downstream crates a cross-platform surface.

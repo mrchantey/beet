@@ -35,17 +35,18 @@ pub struct ThreadUiPlugin;
 impl Plugin for ThreadUiPlugin {
 	fn build(&self, app: &mut App) {
 		// TODO(cli-rework): interim template loading. Register the crate-shipped
-		// `ThreadComposer.bsx` source so `thread_composer_on_add` can resolve it.
+		// `CreatePostForm.bsx` source so `create_post_form_on_add` can resolve it.
 		// Swap this one line for the blob-store load once crate-shipped templates
 		// travel through the blob store (`.agents/plans/cli-rework.md`).
 		app.world_mut()
 			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source(THREAD_COMPOSER_TEMPLATE, THREAD_COMPOSER_BSX)
+			.insert_source(CREATE_POST_FORM_TEMPLATE, CREATE_POST_FORM_BSX)
 			.unwrap();
 		app.register_type::<ThreadView>()
 			.register_type::<ThreadScroll>()
-			.register_type::<ThreadComposer>()
-			// the thread<->UI relationship binding views/composers to their thread
+			.register_type::<CreatePostForm>()
+			.register_type::<SelfSurface>()
+			// the thread<->UI relationship binding views/forms to their thread
 			.register_type::<OfThread>()
 			.register_type::<ThreadItems>()
 			.register_type::<UserInput>()
@@ -57,8 +58,8 @@ impl Plugin for ThreadUiPlugin {
 				Update,
 				(project_window_to_document, follow_thread_scroll).chain(),
 			);
-		// The composer's empty-on-submit (`ClearOnSubmit`) and initial focus
-		// (`FocusOnAdd`) are generic `beet_ui` markers spread in `ThreadComposer.bsx`;
-		// its host-surface scoping rides `thread_composer_on_add`.
+		// The form's empty-on-submit (`ClearOnSubmit`) and initial focus
+		// (`FocusOnAdd`) are generic `beet_ui` markers spread in `CreatePostForm.bsx`;
+		// surface scoping is the host's job (it carries `RenderSurface(self)`).
 	}
 }

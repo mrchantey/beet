@@ -1,4 +1,4 @@
-//! The user's input surface: the [`ThreadComposer`] form and the [`UserInput`]
+//! The user's input surface: the [`CreatePostForm`] widget and the [`UserInput`]
 //! Sequence action that consumes its [`Submit`] as the user's turn.
 
 use crate::prelude::*;
@@ -7,63 +7,68 @@ use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
 // ═══════════════════════════════════════════════════════════════════════
-// ThreadComposer: agnostic input
+// CreatePostForm: agnostic input
 // ═══════════════════════════════════════════════════════════════════════
 
-/// An agnostic chat composer: a form whose submit ends the user's turn (consumed
-/// by the active [`UserInput`] action, which appends the post). Terminal and web
-/// both drive it through `beet_ui`'s form + focus-input machinery, the
-/// cross-platform input for a thread (no blocking stdin read).
+/// An agnostic message-entry form: a `<form>` whose submit ends the user's turn
+/// (consumed by the active [`UserInput`] action, which appends the post).
+/// Terminal and web both drive it through `beet_ui`'s form + focus-input
+/// machinery, the cross-platform input for a thread (no blocking stdin read).
 ///
 /// Host-agnostic content bound to a thread with an [`OfThread`] relationship. A
 /// marker, so the bound thread lives in the relationship, not a stored field. From
 /// markup the two spread together onto one entity:
-/// `<div {(ThreadComposer, OfThread($thread))}/>`.
+/// `<div {(CreatePostForm, OfThread($thread))}/>`.
+///
+/// Surface scoping is the host's job: the charcell host carries
+/// `RenderSurface(self)`, so this widget's whole subtree (its `<input>`, included)
+/// resolves to it through [`SurfaceQuery`] with no per-widget wiring.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = thread_composer_on_add)]
-pub struct ThreadComposer;
+#[component(on_add = create_post_form_on_add)]
+pub struct CreatePostForm;
 
-impl ThreadComposer {
-	/// A composer bound to `thread`. Its `<form>` content is attached in `on_add`,
+impl CreatePostForm {
+	/// A form bound to `thread`. Its `<form>` content is attached in `on_add`,
 	/// so the bundle works both as a direct spawn and as a markup spread.
 	pub fn new(thread: Entity) -> impl Bundle { (Self, OfThread(thread)) }
 }
 
-/// The in-crate `ThreadComposer.bsx` source, registered into the
-/// [`BsxTemplateRegistry`] by [`ThreadUiPlugin`] so [`thread_composer_on_add`]
+/// The in-crate `CreatePostForm.bsx` source, registered into the
+/// [`BsxTemplateRegistry`] by [`ThreadUiPlugin`] so [`create_post_form_on_add`]
 /// can resolve it.
 ///
 /// TODO(cli-rework): this single `include_str!` + `insert_source` registration is
 /// the interim loader. Once crate-shipped templates travel through the blob store
 /// (see `.agents/plans/cli-rework.md`), swap the registration line in
 /// `ThreadUiPlugin::build` for the blob-store load; the resolve in
-/// `thread_composer_on_add` is unaffected.
-pub const THREAD_COMPOSER_BSX: &str = include_str!("ThreadComposer.bsx");
+/// `create_post_form_on_add` is unaffected.
+pub const CREATE_POST_FORM_BSX: &str = include_str!("CreatePostForm.bsx");
 
-/// The name [`ThreadComposer`]'s `.bsx` template is registered under.
-pub const THREAD_COMPOSER_TEMPLATE: &str = "ThreadComposer";
+/// The name [`CreatePostForm`]'s `.bsx` template is registered under.
+pub const CREATE_POST_FORM_TEMPLATE: &str = "CreatePostForm";
 
-/// Build the composer's `<form>` from the registered `ThreadComposer.bsx` and
-/// scope its subtree to the charcell host surface, so the component works as a
-/// bare spawn or markup spread. Submitting fires `beet_ui`'s [`Submit`],
-/// consumed by the active [`UserInput`] turn; `{FocusOnAdd}` on the form's
-/// `<input>` (in the `.bsx`) gives it initial focus.
-fn thread_composer_on_add(mut world: DeferredWorld, cx: HookContext) {
+/// Build the widget's `<form>` from the registered `CreatePostForm.bsx`, so the
+/// component works as a bare spawn or markup spread. Submitting fires `beet_ui`'s
+/// [`Submit`], consumed by the active [`UserInput`] turn; `{FocusOnAdd}` on the
+/// form's `<input>` (in the `.bsx`) gives it initial focus. The input surface is
+/// resolved from the host (which carries `RenderSurface(self)`), so this hook
+/// inserts no surface of its own.
+fn create_post_form_on_add(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	// a DeferredWorld cannot read the template registry or insert a template
-	// inline, so queue the resolve + surface scoping as a command closure
-	// (the same escape hatch `Focus::on_add` uses).
+	// inline, so queue the resolve as a command closure (the same escape hatch
+	// `Focus::on_add` uses).
 	world.commands().queue(move |world: &mut World| -> Result {
 		let registry = world
 			.get_resource::<BsxTemplateRegistry>()
 			.cloned()
 			.unwrap_or_default();
 		let nodes = registry
-			.get(THREAD_COMPOSER_TEMPLATE)
+			.get(CREATE_POST_FORM_TEMPLATE)
 			.ok_or_else(|| {
 				bevyhow!(
-					"no BSX template registered under `{THREAD_COMPOSER_TEMPLATE}`"
+					"no BSX template registered under `{CREATE_POST_FORM_TEMPLATE}`"
 				)
 			})?
 			.nodes
@@ -71,20 +76,6 @@ fn thread_composer_on_add(mut world: DeferredWorld, cx: HookContext) {
 		world
 			.entity_mut(entity)
 			.insert_template(BsxTemplate::new(nodes, registry))?;
-		// scope the composer to its charcell host so typed bytes route to it: the
-		// host (the window keyboard events carry) is the nearest `DoubleBuffer`
-		// ancestor. `RenderSurface(host)` rides the composer root, not the host
-		// itself (a self-referential relationship is stripped by Bevy), so any
-		// descendant `<input>` resolves to the host through `SurfaceQuery`
-		// regardless of intervening wrappers. The web path has no `DoubleBuffer`
-		// host, so this is a no-op there.
-		if let Ok(host) = world
-			.with_state::<AncestorQuery<(), With<DoubleBuffer>>, _>(|hosts| {
-				hosts.get_entity(entity)
-			})
-		{
-			world.entity_mut(entity).insert(RenderSurface(host));
-		}
 		Ok(())
 	});
 }
@@ -93,7 +84,7 @@ fn thread_composer_on_add(mut world: DeferredWorld, cx: HookContext) {
 // UserInput: the user's turn is a Sequence action
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Marks a `User` actor whose turn is to take input from a [`ThreadComposer`].
+/// Marks a `User` actor whose turn is to take input from a [`CreatePostForm`].
 ///
 /// Spread it onto a user actor (`<CreateActor name=".." kind="User" {UserInput}/>`);
 /// its `on_add` installs the [`user_input_action`]. When the thread's `Sequence`
@@ -182,27 +173,27 @@ pub async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 	Ok(Pass(()))
 }
 
-/// Resolves the `<form>` entity of the [`ThreadComposer`] bound to a thread, so
+/// Resolves the `<form>` entity of the [`CreatePostForm`] bound to a thread, so
 /// [`user_input_action`] can await its [`Submit`].
 #[derive(SystemParam)]
 pub struct ComposerForms<'w, 's> {
 	items: Query<'w, 's, &'static ThreadItems>,
-	composers: Query<'w, 's, (), With<ThreadComposer>>,
+	forms: Query<'w, 's, (), With<CreatePostForm>>,
 	elements: ElementQuery<'w, 's>,
 }
 
 impl ComposerForms<'_, '_> {
-	/// The `<form>` entity of the composer bound to `thread`, if one is mounted:
-	/// the thread's first `ThreadItems` member that is a [`ThreadComposer`].
+	/// The `<form>` entity of the widget bound to `thread`, if one is mounted:
+	/// the thread's first `ThreadItems` member that is a [`CreatePostForm`].
 	fn form_for_thread(&self, thread: Entity) -> Option<Entity> {
-		let composer = self
+		let widget = self
 			.items
 			.get(thread)
 			.ok()?
 			.iter()
-			.find(|item| self.composers.contains(*item))?;
+			.find(|item| self.forms.contains(*item))?;
 		self.elements
-			.iter_descendants_inclusive(composer)
+			.iter_descendants_inclusive(widget)
 			.find(|view| view.tag() == "form")
 			.map(|view| view.entity)
 	}

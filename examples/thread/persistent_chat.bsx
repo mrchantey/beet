@@ -22,6 +22,6 @@ are pinned so the seed hash, and thus the adopted thread, stay stable across run
 	</div>
 	<TuiThreadChat>
 		<div {(ThreadView, OfThread($thread))}/>
-		<div {(ThreadComposer, OfThread($thread))}/>
+		<div {(CreatePostForm, OfThread($thread))}/>
 	</TuiThreadChat>
 </div>
