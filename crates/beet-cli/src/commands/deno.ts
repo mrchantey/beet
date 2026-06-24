@@ -61,6 +61,14 @@ globalThis.env_var = (key: string) => {
 	return do_try(() => Deno.env.get(String(key)) ?? null);
 };
 
+globalThis.set_env = (key: string, value: string) => {
+	return do_try(() => Deno.env.set(String(key), String(value)));
+};
+
+globalThis.remove_env = (key: string) => {
+	return do_try(() => Deno.env.delete(String(key)));
+};
+
 // Expose all env vars as entries [[key, value], ...] to avoid serde on wasm side
 // ## Errors
 // if --allow-env not granted
@@ -79,6 +87,8 @@ globalThis.test_create_dir_all = globalThis.create_dir_all;
 globalThis.test_write_file = globalThis.write_file;
 globalThis.test_env_args = globalThis.env_args;
 globalThis.test_env_var = globalThis.env_var;
+globalThis.test_set_env = globalThis.set_env;
+globalThis.test_remove_env = globalThis.remove_env;
 globalThis.test_env_all = globalThis.env_all;
 
 const _wasm = await init().catch((err: any) => {

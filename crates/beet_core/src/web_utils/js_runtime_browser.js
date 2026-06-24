@@ -52,6 +52,11 @@ globalThis.set_env = (key, value) => {
 	return null;
 };
 
+globalThis.remove_env = (key) => {
+	console.warn(`remove_env not available in browser: ${key}`);
+	return null;
+};
+
 globalThis.env_all = () => {
 	console.warn(`env_all: ${key}`);
 	return [];
@@ -68,4 +73,5 @@ globalThis.test_write_file = globalThis.write_file;
 globalThis.test_env_args = globalThis.env_args;
 globalThis.test_env_var = globalThis.env_var;
 globalThis.test_set_env = globalThis.set_env;
+globalThis.test_remove_env = globalThis.remove_env;
 globalThis.test_env_all = globalThis.env_all;

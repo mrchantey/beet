@@ -4,17 +4,6 @@ use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use serde_json::json;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DnsProvider {
-	Cloudflare {
-		authority: SmolStr,
-	},
-	Route53 {
-		authority: SmolStr,
-		zone_id: SmolStr,
-	},
-}
-
 /// Opinionated terraform configuration for a standard web application:
 /// - Serverless lambda function with API Gateway v2
 /// - HTML and assets S3 buckets
@@ -275,43 +264,14 @@ impl Block for LambdaBlock {
 			.add_resource(&default_stage)?
 			.add_resource(&apigw_permission)?;
 
-		// DNS (conditional)
+		// DNS (conditional): point the authority at the gateway endpoint.
 		if let Some(dns) = &self.dns {
-			match dns {
-				DnsProvider::Cloudflare { authority } => {
-					let dns_def = ResourceDef::new_secondary(
-						stack.resource_ident(self.build_label("dns")),
-						CloudflareDnsRecordDetails {
-							name: authority.clone(),
-							ttl: 1,
-							r#type: "CNAME".into(),
-							zone_id: Some("CLOUDFLARE_ZONE_ID".into()),
-							content: Some(
-								gateway.field_ref("api_endpoint").into(),
-							),
-							proxied: Some(true),
-							..default()
-						},
-					);
-					config.add_resource(&dns_def)?;
-				}
-				DnsProvider::Route53 { authority, zone_id } => {
-					let dns_def = ResourceDef::new_secondary(
-						stack.resource_ident(self.build_label("dns")),
-						AwsRoute53RecordDetails {
-							name: authority.clone(),
-							r#type: "CNAME".into(),
-							zone_id: zone_id.clone(),
-							ttl: Some(300),
-							records: Some(vec![
-								gateway.field_ref("api_endpoint").into(),
-							]),
-							..default()
-						},
-					);
-					config.add_resource(&dns_def)?;
-				}
-			}
+			dns.emit(
+				stack,
+				config,
+				&self.build_label("dns"),
+				&gateway.field_ref("api_endpoint"),
+			)?;
 		}
 
 		// Outputs

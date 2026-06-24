@@ -113,10 +113,13 @@ impl Plugin for RouterPlugin {
 				.add_observer(spawn_routes_dir);
 			// the no-code static-asset mount: the `<Route>` element (a `PathPartial`)
 			// plus the `ServeBlobs` blob-store-backed handler spread onto it, eg
-			// `<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>`.
+			// `<Route path="assets/*store_path?" {(ServeBlobs, AssetsStore)}/>`.
 			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
+			// `AssetsStore` picks the backing (a `BEET_ASSETS_BUCKET` bucket, or the
+			// local `assets/` subdir) at build time.
 			app.register_template::<Route>()
-				.register_type::<ServeBlobs>();
+				.register_type::<ServeBlobs>()
+				.register_template::<AssetsStore>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `default_router` wires the

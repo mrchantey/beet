@@ -28,5 +28,5 @@ color=.../>` seeds the brand colour the whole Material palette derives from, and
 	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
-	<Route path="assets/*store_path?" {(ServeBlobs, DirPath("assets"))}/>
+	<Route path="assets/*store_path?" {(ServeBlobs, AssetsStore)}/>
 </Router>

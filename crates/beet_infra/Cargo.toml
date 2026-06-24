@@ -21,19 +21,21 @@ deploy = ["beet_router", "dep:sha2", "dep:base64"]
 beet_router = ["dep:beet_router"]
 lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail"]
-fargate_block = ["bindings_aws_common","bindings_aws_fargate"]
+fargate_block = ["bindings_aws_common","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns","bindings_cloudflare_common"]
 # The Cloudflare Containers + Workers blocks/actions. Wrangler-provisioned, so no
 # terraform bindings; needs `deploy` (the actions) and `aws_sdk` (the container's
 # `S3Store::r2` path) at the consumer.
 cloudflare_block = []
 bindings_aws_common = []
 bindings_aws_dns = []
+bindings_aws_acm = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
 bindings_aws_fargate = []
 bindings_aws_all = [
 	"bindings_aws_common",
 	"bindings_aws_dns",
+	"bindings_aws_acm",
 	"bindings_aws_lightsail",
 	"bindings_aws_lambda",
 	"bindings_aws_fargate",
@@ -68,7 +70,7 @@ prettyplease = { workspace = true, optional = true }
 async-process = { workspace = true }
 
 [dev-dependencies]
-beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "rustls-tls", "server"] }
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "rustls-tls", "server", "russh_client"] }
 beet_router = { workspace = true, features = ["http"] }
 beet_core = { workspace = true, features = ["testing"] }
 pretty_env_logger.workspace = true
@@ -103,6 +105,11 @@ harness = false
 [[test]]
 name = "fargate"
 path = "tests/fargate.rs"
+harness = false
+
+[[test]]
+name = "site_load_test"
+path = "tests/site_load_test.rs"
 harness = false
 
 [[test]]

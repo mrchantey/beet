@@ -1,4 +1,6 @@
 //! Shared utilities for Lambda, Lightsail, and Fargate integration tests.
+// each test binary that includes this module uses a different subset of helpers.
+#![allow(dead_code)]
 
 beet_core::test_main!();
 

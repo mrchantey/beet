@@ -35,6 +35,38 @@ pub async fn ServeBlobs(cx: ActionContext<RequestParts>) -> Result<Response> {
 	serve_blob(&store, &path).await
 }
 
+/// Composes the asset-serving [`BlobStore`] backing onto its route at build time:
+/// a dedicated `BEET_ASSETS_BUCKET` [`S3Store`] when set (the deployed container's
+/// separate, public-read assets bucket), else a [`DirPath`] scoping the inherited
+/// site store to its `assets/` subdir (local dev, one fs root). The two backings
+/// are mutually exclusive (each writes a `BlobStore` on this entity), so exactly
+/// one is emitted. Pair with [`ServeBlobs`] and a `*store_path?` capture:
+/// `<Route path="assets/*store_path?" {(ServeBlobs, AssetsStore)}/>`.
+#[template]
+pub fn AssetsStore() -> impl Bundle {
+	OnSpawn::new(|entity: &mut EntityWorldMut| {
+		// the deployed assets bucket, mirroring `remote_site_store`'s endpoint /
+		// region selection (R2 vs AWS S3). Only the native `aws_sdk` build can
+		// build an `S3Store`; every other build falls through to the subdir.
+		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+		if let Ok(bucket) = env_ext::var("BEET_ASSETS_BUCKET") {
+			let store = match env_ext::var("BEET_S3_ENDPOINT") {
+				Ok(endpoint) => {
+					S3Store::new(bucket, "auto").with_endpoint(endpoint)
+				}
+				Err(_) => S3Store::new(
+					bucket,
+					env_ext::var("AWS_REGION")
+						.unwrap_or_else(|_| "us-west-2".to_string()),
+				),
+			};
+			entity.insert(store);
+			return;
+		}
+		entity.insert(DirPath("assets".into()));
+	})
+}
+
 // the tests assemble a router with a temp store, both adjacent (on an ancestor) and
 // co-located (on the route), to prove the self-or-ancestor lookup.
 #[cfg(all(test, feature = "std"))]

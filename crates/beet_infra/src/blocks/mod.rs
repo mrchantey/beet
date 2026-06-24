@@ -13,6 +13,16 @@ mod fargate;
 pub use fargate::*;
 mod block;
 pub use block::*;
+// The DNS module is reused by the lambda and fargate blocks; gate it on either.
+#[cfg(any(feature = "lambda_block", feature = "fargate_block"))]
+mod dns;
+#[cfg(any(feature = "lambda_block", feature = "fargate_block"))]
+pub use dns::*;
+// The opt-in Cloudflare LB failover (uses the dns module + cloudflare LB bindings).
+#[cfg(any(feature = "lambda_block", feature = "fargate_block"))]
+mod failover;
+#[cfg(any(feature = "lambda_block", feature = "fargate_block"))]
+pub use failover::*;
 #[cfg(feature = "bindings_aws_common")]
 mod s3_bucket_block;
 #[cfg(feature = "bindings_aws_common")]

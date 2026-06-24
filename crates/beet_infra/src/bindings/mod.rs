@@ -23,6 +23,10 @@ pub use aws_fargate::*;
 mod aws_dns;
 #[cfg(feature = "bindings_aws_dns")]
 pub use aws_dns::*;
+#[cfg(feature = "bindings_aws_acm")]
+mod aws_acm;
+#[cfg(feature = "bindings_aws_acm")]
+pub use aws_acm::*;
 #[cfg(feature = "bindings_cloudflare_common")]
 mod cloudflare_common;
 #[cfg(feature = "bindings_cloudflare_common")]

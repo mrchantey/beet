@@ -269,6 +269,22 @@ impl Config {
 		Ok(self)
 	}
 
+	/// Add a provider configuration block only if one is not already present.
+	/// Unlike [`Config::add_provider_config`], silently succeeds when the
+	/// provider already has a config, so several blocks can each ensure a
+	/// shared provider (eg Cloudflare for DNS and ACM validation records)
+	/// without producing a spurious aliased array.
+	pub fn ensure_provider_config(
+		&mut self,
+		provider: &Provider,
+		config: &impl Serialize,
+	) -> Result<&mut Self> {
+		if self.providers.contains_key(provider.local_name()) {
+			return Ok(self);
+		}
+		self.add_provider_config(provider, config)
+	}
+
 	/// Add an aliased provider configuration block (chaining).
 	///
 	/// Use this when you need multiple configurations for the same provider,

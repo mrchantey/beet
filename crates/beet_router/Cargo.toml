@@ -43,6 +43,9 @@ std = [
 # native `router` enables this; the wasm render target leaves it off. (The
 # `webbrowser` link opener rides `std` itself, off wasm — see the `std` feature.)
 native = ["std", "beet_net/fs", "beet_net/http"]
+# The S3-backed store, native-only. Lets the no-code asset route (`AssetsStore`)
+# bind a dedicated `BEET_ASSETS_BUCKET` bucket in a deployed container.
+aws_sdk = ["std", "beet_net/aws_sdk"]
 interface = ["serde"]
 # The BSX markup parser, forwarded to `beet_ui` (which delegates to the core
 # parser). Routes `MediaType::Html` parsing through BSX for media negotiation.

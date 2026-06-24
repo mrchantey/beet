@@ -28,6 +28,10 @@ pub struct S3BucketBlock {
 	/// All objects will be nested under the deploy uuid,
 	/// ensuring unique files per deploy
 	deploy_versioned: bool,
+	/// Grant anonymous `s3:GetObject` on every object (via a public-access-block
+	/// that lifts the default block, plus a bucket policy). Needed when objects
+	/// are served by a 301 to the public S3 url, eg the assets bucket.
+	public_read: bool,
 }
 
 impl S3BucketBlock {
@@ -41,6 +45,7 @@ impl S3BucketBlock {
 			apply_region: true,
 			output: true,
 			deploy_versioned: true,
+			public_read: false,
 		}
 	}
 
@@ -114,6 +119,62 @@ impl Block for S3BucketBlock {
 				sensitive: None,
 			})?;
 		}
+		if self.public_read {
+			self.emit_public_read(stack, config, &bucket)?;
+		}
+		Ok(())
+	}
+}
+
+impl S3BucketBlock {
+	/// Emit the public-access-block (lifting the default block on public policies)
+	/// and the anonymous `s3:GetObject` bucket policy that depends on it.
+	fn emit_public_read(
+		&self,
+		stack: &Stack,
+		config: &mut terra::Config,
+		bucket: &ResourceDef<AwsS3BucketDetails>,
+	) -> Result {
+		let public_access = ResourceDef::new_secondary(
+			stack.resource_ident(format!("{}-public-access", self.label)),
+			AwsS3BucketPublicAccessBlockDetails {
+				bucket: bucket.field_ref("id").into(),
+				block_public_acls: Some(false),
+				block_public_policy: Some(false),
+				ignore_public_acls: Some(false),
+				restrict_public_buckets: Some(false),
+				..default()
+			},
+		);
+		let policy = ResourceDef::new_secondary(
+			stack.resource_ident(format!("{}-policy", self.label)),
+			AwsS3BucketPolicyDetails {
+				bucket: bucket.field_ref("id").into(),
+				policy: json!({
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Sid": "PublicReadGetObject",
+						"Effect": "Allow",
+						"Principal": "*",
+						"Action": "s3:GetObject",
+						"Resource": format!("{}/*", bucket.field_ref("arn"))
+					}]
+				})
+				.to_string()
+				.into(),
+				// the policy is rejected until the public-access-block lifts the
+				// account/bucket default block on public policies.
+				depends_on: Some(vec![
+					format!(
+						"aws_s3_bucket_public_access_block.{}",
+						public_access.ident().label()
+					)
+					.into(),
+				]),
+				..default()
+			},
+		);
+		config.add_resource(&public_access)?.add_resource(&policy)?;
 		Ok(())
 	}
 }
@@ -121,11 +182,9 @@ impl Block for S3BucketBlock {
 mod tests {
 	use super::*;
 
-	#[beet_core::test(timeout_ms = 120000)]
-	#[ignore = "very slow"]
-	async fn validate() {
+	/// The terraform json emitted by `block`.
+	fn build_json(block: S3BucketBlock) -> String {
 		let (stack, _dir) = Stack::default_local();
-		let block = LambdaBlock::default();
 		let mut config = stack.create_config();
 		let mut world = World::new();
 		block
@@ -135,7 +194,25 @@ mod tests {
 				&mut config,
 			)
 			.unwrap();
-		let project = terra::Project::new(&stack, config);
-		project.validate().await.unwrap();
+		config.to_json().to_string()
+	}
+
+	#[beet_core::test]
+	fn public_read_emits_access_block_and_policy() {
+		let json =
+			build_json(S3BucketBlock::new("assets").with_public_read(true));
+		json.as_str()
+			.xpect_contains("aws_s3_bucket_public_access_block")
+			.xpect_contains("aws_s3_bucket_policy")
+			.xpect_contains("s3:GetObject")
+			.xpect_contains("PublicReadGetObject");
+	}
+
+	#[beet_core::test]
+	fn private_by_default() {
+		build_json(S3BucketBlock::new("site"))
+			.as_str()
+			.xnot()
+			.xpect_contains("aws_s3_bucket_policy");
 	}
 }

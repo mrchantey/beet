@@ -59,9 +59,13 @@ impl PluginGroup for BeetPlugins {
 			}
 		}
 		// the host scene-push commands drive a remote device over the std http
-		// client, so they are native-only.
+		// client (native-only) and (de)serialize scenes through world serde.
 		cfg_if! {
-			if #[cfg(all(not(target_arch = "wasm32"), feature = "router"))] {
+			if #[cfg(all(
+				not(target_arch = "wasm32"),
+				feature = "router",
+				feature = "template_serde"
+			))] {
 				builder = builder.add(SceneManagementPlugin);
 			}
 		}
@@ -126,7 +130,11 @@ fn router_plugin(app: &mut App) {
 		.init_plugin::<RouterPlugin>()
 		.init_plugin::<ServerPlugin>()
 		.init_plugin::<NavigatorPlugin>()
-		.add_plugins((SceneServerPlugin, CardStackPlugin));
+		.add_plugins(CardStackPlugin);
+	// the scene-server meta-routes load/save scenes through world serde, so they
+	// are only available (and only useful) with `template_serde`.
+	#[cfg(feature = "template_serde")]
+	app.add_plugins(SceneServerPlugin);
 }
 
 /// The navigable charcell host the `TuiServer` boots into, plus live-page repaint.

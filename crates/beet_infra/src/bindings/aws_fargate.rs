@@ -709,10 +709,6 @@ pub struct AwsLbDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enable_http2: Option<bool>,
 	/// ## Attribute
-	/// `optional`, `computed`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub enable_prefix_for_ipv6_source_nat: Option<SmolStr>,
-	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enable_tls_version_and_cipher_suite_headers: Option<bool>,
@@ -1316,10 +1312,6 @@ pub struct AwsRouteDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub network_interface_id: Option<SmolStr>,
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub odb_network_arn: Option<SmolStr>,
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]

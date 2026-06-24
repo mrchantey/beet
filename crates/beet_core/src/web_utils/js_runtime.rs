@@ -40,6 +40,7 @@ mod raw {
 		pub fn env_args() -> js_sys::Array;
 		pub fn env_var(key: &str) -> Option<String>;
 		pub fn set_env(key: &str, value: &str);
+		pub fn remove_env(key: &str);
 		pub fn env_all() -> js_sys::Array;
 	}
 }
@@ -71,6 +72,8 @@ mod raw {
 		pub fn env_var(key: &str) -> Option<String>;
 		#[wasm_bindgen(js_name = "test_set_env")]
 		pub fn set_env(key: &str, value: &str);
+		#[wasm_bindgen(js_name = "test_remove_env")]
+		pub fn remove_env(key: &str);
 		#[wasm_bindgen(js_name = "test_env_all")]
 		pub fn env_all() -> js_sys::Array;
 	}
@@ -176,6 +179,14 @@ pub fn env_var(key: &str) -> Option<String> {
 pub fn set_env(key: &str, value: &str) {
 	if has_global("set_env") {
 		raw::set_env(key, value);
+	}
+}
+
+/// Remove an environment variable, ie `Deno.env.delete(key)`. A no-op where
+/// unavailable.
+pub fn remove_env(key: &str) {
+	if has_global("remove_env") {
+		raw::remove_env(key);
 	}
 }
 

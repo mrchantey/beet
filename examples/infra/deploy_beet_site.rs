@@ -5,8 +5,9 @@
 //! The container runs the `beet` binary as `beet serve --server=http,ssh`. The
 //! binary pulls the site from the S3 site bucket at boot (`BEET_SERVICE_ACCESS=remote`
 //! + `BEET_SITE_BUCKET`), so a site change re-publishes by re-syncing the bucket
-//! with no image rebuild. The ALB carries http (`/health` is the health check), an
-//! NLB carries ssh, and a cpu target-tracking policy autoscales the service.
+//! with no image rebuild. A single NLB carries http on 80 (`/health` is the
+//! health check), ssh on 22, and https on 443 (ACM cert, DNS-validated through
+//! Cloudflare), and a cpu target-tracking policy autoscales the service.
 //!
 //! ## Usage
 //!
@@ -64,12 +65,22 @@ fn setup(mut commands: Commands) -> Result {
 #[cfg(feature = "deploy")]
 fn stack() -> Stack { Stack::new("beet-site").with_aws_region("us-west-2") }
 
-/// The single S3 bucket the site is served from. Non-versioned so `beet sync`
-/// overwrites in place (live reload) and the running task reads a stable root:
-/// `./site` syncs to the bucket root, `./assets` to its `assets/` prefix.
+/// The private site bucket (`server.bsx`, `routes/`, `templates/`), read by the
+/// task's IAM role. Non-versioned so `beet sync` overwrites in place (live reload)
+/// and the running task reads a stable root: `./site` syncs to the bucket root.
 #[cfg(feature = "deploy")]
 fn site_bucket() -> S3BucketBlock {
 	S3BucketBlock::new("site").with_deploy_versioned(false)
+}
+
+/// The public-read assets bucket (`./assets`: images, favicon). Public-read so the
+/// asset route's 301 to the S3 object URL resolves; non-versioned so `./assets`
+/// syncs to a stable bucket root the container reads via `BEET_ASSETS_BUCKET`.
+#[cfg(feature = "deploy")]
+fn assets_bucket() -> S3BucketBlock {
+	S3BucketBlock::new("assets")
+		.with_deploy_versioned(false)
+		.with_public_read(true)
 }
 
 /// The infra scene: the standard IaC commands plus `deploy` (build → tofu →
@@ -78,29 +89,48 @@ fn site_bucket() -> S3BucketBlock {
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
 	let stk = stack();
-	// the container reconstructs the site store from these: the bucket name, plus
+	// the container reconstructs the two stores from these bucket names, plus
 	// `BEET_SERVICE_ACCESS`/`AWS_REGION`/`BEET_DEPLOY_ID` the block already injects.
 	let site_bucket_name = site_bucket().store(&stk).bucket_name().to_string();
+	let assets_bucket_name =
+		assets_bucket().store(&stk).bucket_name().to_string();
 	// the stable ssh host key, so all 1..N tasks present one fingerprint.
 	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
+	// the Cloudflare zone the dns + ACM-validation records are published into.
+	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 
-	// ssh + a domain (opens the 443 hole); autoscales on cpu between min/max_count.
-	// 1 vCPU / 2 GB: the default 0.25 vCPU is too small — even a paced idle server
-	// sits ~80% CPU on it, pinning above the 50% scale target so it never scales in.
+	// ssh + dns/https on one NLB; autoscales on cpu between min/max_count. 1 vCPU
+	// / 2 GB: the default 0.25 vCPU is too small, even a paced idle server sits
+	// ~80% CPU on it, pinning above the 50% scale target so it never scales in.
 	// At 1 vCPU an idle task is ~20%, leaving real headroom for the load ramp.
+	// Every hostname is DNS-only (not proxied) so it reaches the NLB directly for
+	// raw-TCP ssh and so the cert terminates at the origin; a single SAN cert
+	// covers them all. `beet.org`/`www.beet.org` (the apex prod hostnames) point
+	// here too, DNS-only bypasses the proxied `beet.org -> beetstack.dev` redirect
+	// rule, which is left intact, as is `beetstack.dev`.
 	let block = FargateBlock::default()
 		.with_allow_ssh(true)
-		.with_domain("dev.beet.org")
+		.with_dns(DnsProvider::cloudflare("dev.beet.org", zone_id.clone()))
+		.with_dns(DnsProvider::cloudflare("beet.org", zone_id.clone()))
+		.with_dns(DnsProvider::cloudflare("www.beet.org", zone_id))
 		.with_max_count(5)
 		.with_cpu(1024)
 		.with_memory(2048)
 		.with_static_env("BEET_SERVICE_ACCESS", "remote")
 		.with_static_env("BEET_SITE_BUCKET", site_bucket_name)
+		.with_static_env("BEET_ASSETS_BUCKET", assets_bucket_name)
 		.with_static_env("BEET_SSH_HOST_KEY", ssh_host_key);
 
-	// a `CliServer` host carrying this site's `deploy`/`sync`/`watch` commands, in
+	// a `CliServer` host carrying the standard IaC verbs (validate/plan/apply/
+	// show/list/destroy) plus this site's `deploy`/`sync`/`watch` commands, in
 	// one `children!` so the host has a single `Children` relation.
 	(stack(), CliServer::default(), default_router(), children![
+		Validate,
+		Plan,
+		Apply,
+		Show,
+		List,
+		Destroy,
 		route(
 			"watch",
 			(exchange_sequence(), children![AwsWatch::for_fargate(
@@ -112,8 +142,9 @@ fn infra_scene() -> Result<impl Bundle> {
 			"deploy",
 			(exchange_sequence(), children![
 				block.clone(),
-				// create the site bucket (and the ECR repo) via terraform.
+				// create the site + assets buckets (and the ECR repo) via terraform.
 				site_bucket(),
+				assets_bucket(),
 				// the `beet` binary to containerize: serve with http + ssh + S3.
 				build_beet_binary(),
 				// infrastructure first (creates the ECR repo the image pushes to,
@@ -175,15 +206,14 @@ fn sync_site(stack: &Stack) -> impl Bundle + use<> {
 	)
 }
 
-/// Sync `./assets` to the bucket's `assets/` prefix (images, favicon).
+/// Sync `./assets` to the dedicated public-read assets bucket root (images,
+/// favicon), which the container reads via `BEET_ASSETS_BUCKET`.
 #[cfg(feature = "deploy")]
 fn sync_assets(stack: &Stack) -> impl Bundle + use<> {
 	(
 		S3FsStore::new(
 			FsStore::new(WsPathBuf::new("assets")),
-			site_bucket()
-				.store(stack)
-				.with_subdir(SmolPath::new("assets")),
+			assets_bucket().store(stack),
 		),
 		SyncS3BucketAction,
 	)

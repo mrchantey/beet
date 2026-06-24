@@ -75,8 +75,8 @@ pub unsafe fn set_var(key: &str, value: &str) {
 pub unsafe fn remove_var(key: &str) {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
-			// no process environment to mutate from wasm.
-			let _ = key;
+			// presence-checked + safe (no-op where the host has no env global).
+			js_runtime::remove_env(key);
 		} else if #[cfg(feature = "std")] {
 			unsafe { std::env::remove_var(key); }
 		} else {

@@ -13,6 +13,17 @@ split-debuginfo = "unpacked"
 [profile.dev.package."*"]
 opt-level = 3
 
+# Workaround: the current nightly rustc ICEs optimizing `bevy_color 0.19`'s derived
+# `Deserialize` (eg `oklaba::visit_seq`) at opt-level 3. Drop it a notch in every
+# profile until the toolchain is fixed; color math is not hot for beet servers, and
+# this keeps `cargo test`/`build` and the release container build from crashing.
+# [profile.dev.package.bevy_color]
+# opt-level = 1
+# [profile.test.package.bevy_color]
+# opt-level = 1
+# [profile.release.package.bevy_color]
+# opt-level = 1
+
 # Size-minimal profile for the wasm Cloudflare Worker build: optimize for size
 # (`z`), fat LTO and a single codegen unit to let the linker drop dead code, abort
 # on panic (no unwinding tables), and strip symbols. Used as:
@@ -360,7 +371,7 @@ rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
 lambda = ["rustls-tls", "beet_net?/lambda"]
-aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk"]
+aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk","beet_router?/aws_sdk"]
 deploy = ["infra", "beet_infra?/deploy"]
 tungstenite = ["net", "beet_net?/tungstenite"]
 webdriver = ["net", "beet_net?/webdriver"]

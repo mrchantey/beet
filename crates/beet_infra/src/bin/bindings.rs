@@ -4,7 +4,7 @@
 //! so we commit these types to the repository.
 //!
 //! Run with:
-//!     cargo run -p beet_infra --bin generate_common --features bindings_generator
+//!     cargo run -p beet_infra --bin bindings --features bindings_generator
 
 use beet_core::prelude::*;
 use beet_infra::bindings_generator::BindingFile;
@@ -27,11 +27,20 @@ async fn main() -> Result {
 					"aws_iam_user",
 					"aws_iam_user_policy_attachment",
 					"aws_s3_bucket",
+					"aws_s3_bucket_policy",
+					"aws_s3_bucket_public_access_block",
 				]),
 		)
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_dns.rs")
 				.with_resources(terra::Provider::AWS, ["aws_route53_record"]),
+		)
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_acm.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_acm_certificate",
+					"aws_acm_certificate_validation",
+				]),
 		)
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_lambda.rs")
@@ -91,6 +100,9 @@ async fn main() -> Result {
 			)
 			.with_resources(terra::Provider::CLOUDFLARE, [
 				"cloudflare_dns_record",
+				"cloudflare_load_balancer",
+				"cloudflare_load_balancer_pool",
+				"cloudflare_load_balancer_monitor",
 			]),
 		)
 		.generate()

@@ -75,35 +75,35 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 /// Validate the stack configuration.
 #[action(route = "validate")]
 #[derive(Component)]
-async fn Validate(cx: ActionContext) -> Result<String> {
+pub async fn Validate(cx: ActionContext) -> Result<String> {
 	project(&cx.caller).await?.validate().await
 }
 
 /// Show the execution plan.
 #[action(route = "plan")]
 #[derive(Component)]
-async fn Plan(cx: ActionContext) -> Result<String> {
+pub async fn Plan(cx: ActionContext) -> Result<String> {
 	project(&cx.caller).await?.plan().await
 }
 
 /// Apply the execution plan.
 #[action(route = "apply")]
 #[derive(Component)]
-async fn Apply(cx: ActionContext) -> Result<String> {
+pub async fn Apply(cx: ActionContext) -> Result<String> {
 	project(&cx.caller).await?.apply().await
 }
 
 /// Show the current state.
 #[action(route = "show")]
 #[derive(Component)]
-async fn Show(cx: ActionContext) -> Result<String> {
+pub async fn Show(cx: ActionContext) -> Result<String> {
 	project(&cx.caller).await?.show().await
 }
 
 /// List all resources in the state.
 #[action(route = "list")]
 #[derive(Component)]
-async fn List(cx: ActionContext) -> Result<String> {
+pub async fn List(cx: ActionContext) -> Result<String> {
 	project(&cx.caller).await?.list().await
 }
 
@@ -118,7 +118,7 @@ struct DestroyParams {
 #[action(route = "destroy")]
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<DestroyParams>())]
-async fn Destroy(cx: ActionContext<Request>) -> Result<String> {
+pub async fn Destroy(cx: ActionContext<Request>) -> Result<String> {
 	let force = cx.has_param("force");
 	let proj = project(&cx.caller).await?;
 	if force {
@@ -147,7 +147,7 @@ struct RollbackParams {
 #[action(route = "rollback")]
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<RollbackParams>())]
-async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
+pub async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
 	let count = cx
 		.get_param("count")
 		.and_then(|val| val.parse::<usize>().ok())
@@ -164,7 +164,7 @@ async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
 /// with the latest deploy_id.
 #[action(route = "rollforward")]
 #[derive(Component)]
-async fn Rollforward(cx: ActionContext) -> Result<String> {
+pub async fn Rollforward(cx: ActionContext) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollforward().await?;
 	info!("rolled forward to version {version}");
