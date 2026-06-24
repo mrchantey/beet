@@ -6,6 +6,7 @@ pub mod fetch_bytes;
 #[cfg(feature = "bevy_default")]
 pub mod frozen_lake;
 pub mod language;
+pub mod plugins;
 #[cfg(feature = "bevy_default")]
 pub mod rl;
 #[cfg(feature = "bevy_default")]
@@ -26,6 +27,7 @@ pub mod prelude {
 	#[cfg(feature = "bevy_default")]
 	pub use crate::frozen_lake::*;
 	pub use crate::language::*;
+	pub use crate::plugins::*;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::rl::*;
 	#[cfg(feature = "bevy_default")]
@@ -59,7 +61,13 @@ pub struct BeetMlPlugins;
 impl PluginGroup for BeetMlPlugins {
 	fn build(self) -> PluginGroupBuilder {
 		#[allow(unused_mut)]
-		let mut builder = PluginGroupBuilder::start::<Self>().add(ml_set_plugin);
+		let mut builder = PluginGroupBuilder::start::<Self>()
+			.add(ml_set_plugin)
+			// shares Bevy's WGPU device with Burn when both render (`bevy_default`)
+			// and the wgpu backend (`wgpu`) are present; a no-op otherwise, so it is
+			// always safe to add. Must follow Bevy's render plugins in the final app
+			// so its `finish` sees the RenderApp.
+			.add(crate::prelude::SharedBurnWgpuPlugin);
 
 		#[cfg(feature = "bevy_default")]
 		(builder = builder

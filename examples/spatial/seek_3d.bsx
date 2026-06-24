@@ -1,0 +1,22 @@
+<Scene3d>
+	<AppWindow/>
+	<Camera3d {CameraDistance{width:80., offset:{x:0., y:20., z:40.}}}/>
+	<Lighting3d/>
+	<Ground3d/>
+	<WorldScene src="kaykit/cheese.glb#Scene0" x=20. z=40. scale=3. bx:ref="cheese" {FollowCursor3d}/>
+	<Foxie scale=0.1 seek_x=20. seek_z=40. {(RotateToVelocity3d, Velocity, Mass, Force, Impulse, MaxForce(0.5), MaxSpeed(10.), ArriveRadius(7.))}>
+		<div {(TriggerOnAnimationReady, Repeat)}>
+			<div {Sequence}>
+				<div {Sequence}>
+					<div {InsertOn{target_entity:Agent}}/>
+					<PlayAnimation clip="misc/fox.glb#Animation0"/>
+					<TriggerOnAnimationEnd clip="misc/fox.glb#Animation0"/>
+				</div>
+				<div {Sequence}>
+					<PlayAnimation clip="misc/fox.glb#Animation1" repeat="Forever"/>
+					<div {(Seek, EndOnArrive{radius:6.})}/>
+				</div>
+			</div>
+		</div>
+	</Foxie>
+</Scene3d>

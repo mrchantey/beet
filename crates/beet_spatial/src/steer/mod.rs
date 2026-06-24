@@ -40,8 +40,12 @@ pub fn steer_plugin(app: &mut App) {
 		)
 			.in_set(TickSet),
 	)
+	.add_observer(insert_steer_target)
 	.init_resource::<RandomSource>()
 	.register_type::<SteerTarget>()
+	.register_type::<SteerTargetEntity>()
+	.register_type::<Seek>()
+	.register_type::<EndOnArrive>()
 	.register_type::<MaxForce>()
 	.register_type::<MaxSpeed>()
 	.register_type::<ArriveRadius>()

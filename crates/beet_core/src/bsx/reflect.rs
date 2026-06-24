@@ -11,6 +11,7 @@ use super::ast::*;
 use crate::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
+use bevy::reflect::TypeRegistration;
 use bevy::reflect::TypeRegistry;
 use bevy::reflect::enums::DynamicEnum;
 use bevy::reflect::enums::DynamicVariant;
@@ -92,12 +93,12 @@ fn is_option_literal(literal: &DataLiteral) -> bool {
 /// `{Repeat}` spread or `<Repeat>` tag misses the exact lookup; it then falls
 /// back to the unique generic instantiation whose base name matches (the `<`
 /// boundary guards against prefix collisions like `Repeat` vs `RepeatTimes`).
-pub fn type_info_by_name(
-	registry: &TypeRegistry,
+pub fn registration_by_name<'a>(
+	registry: &'a TypeRegistry,
 	name: &str,
-) -> Option<&'static TypeInfo> {
+) -> Option<&'a TypeRegistration> {
 	if let Some(registration) = registry.get_with_short_type_path(name) {
-		return Some(registration.type_info());
+		return Some(registration);
 	}
 	let mut matches = registry.iter().filter(|registration| {
 		let short = registration.type_info().type_path_table().short_path();
@@ -106,7 +107,16 @@ pub fn type_info_by_name(
 			&& short.as_bytes()[name.len()] == b'<'
 	});
 	let first = matches.next()?;
-	matches.next().is_none().then(|| first.type_info())
+	matches.next().is_none().then_some(first)
+}
+
+/// The [`registration_by_name`] match's [`TypeInfo`], for callers that only need
+/// the type info (eg attribute field coercion).
+pub fn type_info_by_name(
+	registry: &TypeRegistry,
+	name: &str,
+) -> Option<&'static TypeInfo> {
+	registration_by_name(registry, name).map(|reg| reg.type_info())
 }
 
 /// Coerce a scalar [`Value`] to the field's concrete type, falling through to

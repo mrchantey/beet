@@ -1,0 +1,7 @@
+<Scene3d>
+	<AppWindow/>
+	<Camera3dLookAt x=0. y=7. z=7./>
+	<Lighting3d/>
+	<Ground3d/>
+	<IkArm/>
+</Scene3d>

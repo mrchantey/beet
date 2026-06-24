@@ -741,8 +741,9 @@ fn build_uppercase(
 	let entity_refs = resolve_entity_refs(el, refs, cx);
 	let registration_kind = {
 		let registry = app_registry.read();
-		registry
-			.get_with_short_type_path(&el.tag)
+		// resolve by base name so a generic tag (eg `<Repeat>` -> `Repeat<()>`)
+		// matches its sole instantiation, like a `{Repeat}` spread does.
+		registration_by_name(&registry, &el.tag)
 			.map(|registration| {
 				let kind = if registration.data::<ReflectTemplate>().is_some() {
 					UppercaseKind::Template
@@ -1327,7 +1328,9 @@ fn apply_spread_named(
 	let literal = DataLiteral::Enum(named.clone());
 	let (is_template, patch) = {
 		let registry = app_registry.read();
-		let Some(registration) = registry.get_with_short_type_path(&named.name)
+		// resolve by base name so a generic spread (eg `{Repeat}` -> `Repeat<()>`)
+		// matches its sole instantiation, exactly as a `<Repeat>` tag does.
+		let Some(registration) = registration_by_name(&registry, &named.name)
 		else {
 			warn!(
 				"skipping spread `{}`: no component or template of that name is registered in this binary",

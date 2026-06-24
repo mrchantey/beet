@@ -1,10 +1,12 @@
 #[cfg(feature = "ml")]
 pub mod ml;
+mod templates;
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::light::CascadeShadowConfigBuilder;
 use std::f32::consts::PI;
+pub use templates::*;
 
 pub fn ui_terminal_input(commands: Commands) {
 	spawn_ui_terminal(commands, true);

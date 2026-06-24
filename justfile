@@ -49,10 +49,14 @@ push-assets:
 
 #💡 CLI
 
-# Run a cli command as if it was installed
+# Run a beet cli command (scene/site/server) with no install step, eg
+#   just beet --main=examples/spatial/seek_3d.bsx
+# `--features render` links winit/wgpu + the example scene templates; BEVY_ASSET_ROOT
+# points bevy at the repo's `assets/` (the binary runs outside cargo's manifest dir).
+# Headless verification: prefix BEET_SCREENSHOT=/tmp/x.png BEET_SCREENSHOT_FRAME=N to
+# capture a frame to a PNG and exit (see `src/render.rs`).
 beet *args:
-  cargo run -p beet-cli -- {{ args }}
-  # beet {{ args }}
+  BEVY_ASSET_ROOT={{ justfile_directory() }} cargo run -p beet-cli --features render -- {{ args }}
 
 install-cli *args:
   # --locked pins the workspace bevy rc; a bare install re-resolves the

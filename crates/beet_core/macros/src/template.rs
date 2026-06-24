@@ -213,8 +213,13 @@ fn is_prop_param(pt: &syn::PatType) -> bool {
 
 /// Extract the identifier from a simple parameter pattern.
 fn param_ident(pt: &syn::PatType) -> syn::Result<syn::Ident> {
+	Ok(param_pat_ident(pt)?.ident)
+}
+
+/// Extract the full binding pattern (preserving `mut`) from a simple parameter.
+fn param_pat_ident(pt: &syn::PatType) -> syn::Result<syn::PatIdent> {
 	match pt.pat.as_ref() {
-		syn::Pat::Ident(pi) => Ok(pi.ident.clone()),
+		syn::Pat::Ident(pi) => Ok(pi.clone()),
 		other => {
 			synbail!(
 				other,
@@ -250,7 +255,7 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut props: Vec<Prop> = Vec::new();
 	let mut sys_types: Vec<TokenStream> = Vec::new();
-	let mut sys_pats: Vec<syn::Ident> = Vec::new();
+	let mut sys_pats: Vec<syn::PatIdent> = Vec::new();
 	for arg in &item.sig.inputs {
 		let pt = typed_arg(arg)?;
 		if is_prop_param(pt) {
@@ -258,7 +263,9 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 		} else {
 			let ty = &pt.ty;
 			sys_types.push(quote! { #ty });
-			sys_pats.push(param_ident(pt)?);
+			// keep the full `PatIdent` so a `mut` binding (eg `mut meshes:
+			// ResMut<..>`) stays mutable in the build closure pattern.
+			sys_pats.push(param_pat_ident(pt)?);
 		}
 	}
 	emit(
@@ -274,7 +281,7 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 /// The system-template data for a `#[template(system)]`.
 struct System {
 	sys_types: Vec<TokenStream>,
-	sys_pats: Vec<syn::Ident>,
+	sys_pats: Vec<syn::PatIdent>,
 }
 
 /// Emit the data struct, `Template` impl, `subtree_template!`, and registration

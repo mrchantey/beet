@@ -5,21 +5,40 @@ use crate::prelude::*;
 use bevy::render::view::screenshot::Screenshot;
 use bevy::render::view::screenshot::ScreenshotCaptured;
 use bevy::render::view::screenshot::save_to_disk;
+use bevy::winit::EventLoopProxyWrapper;
 use bevy::winit::WinitSettings;
+use bevy::winit::WinitUserEvent;
 
-/// Window lifecycle for the winit render path. `BeetPlugins` boots winit with
-/// `primary_window: None` + `ExitCondition::DontExit` (the window is spawned by the
-/// loaded scene, eg `<Window/>`), so this:
-/// - forces continuous updates ([`WinitSettings::continuous`]) so async asset loads
-///   and a no-input scene keep advancing even while the window is unfocused,
-/// - writes `AppExit` once the last window closes (`DontExit` suppresses bevy's own),
-/// - exits on the escape key, the conventional close affordance.
+/// Window lifecycle for the winit render path. `BeetPlugins` boots winit windowless
+/// (`primary_window: None` + `DontExit`), so this:
+/// - keeps the event loop ticking even with no window ([`keep_event_loop_awake`]),
+///   the fix that lets a data-spawned `<AppWindow/>` ever appear and a headless
+///   `.bsx` keep running under the render binary,
+/// - forces continuous updates so async asset loads and a no-input scene advance
+///   even while the window is unfocused (a screenshot harness rarely holds focus),
+/// - exits on the escape key, and once a window has existed and all have closed.
 ///
 /// It also installs the inert [`screenshot_verify_plugin`].
 pub fn render_window_plugin(app: &mut App) {
 	app.insert_resource(WinitSettings::continuous())
 		.add_plugins(screenshot_verify_plugin)
+		.add_systems(Startup, keep_event_loop_awake)
 		.add_systems(Update, (exit_on_esc, exit_when_all_windows_closed));
+}
+
+/// Keep the winit event loop ticking even with no window. On Wayland/X11 bevy parks
+/// the loop in `ControlFlow::Wait` in Continuous mode and only wakes it via a
+/// per-window redraw request (`bevy_winit` state.rs), so with `primary_window: None`
+/// and no window yet the app would never tick to build a window-spawning scene (or
+/// run a headless server). A background thread pings the event-loop proxy at ~30Hz;
+/// it ends when the loop closes (the send errors), so the app still exits cleanly.
+fn keep_event_loop_awake(proxy: Res<EventLoopProxyWrapper>) {
+	let proxy = (**proxy).clone();
+	std::thread::spawn(move || {
+		while proxy.send_event(WinitUserEvent::WakeUp).is_ok() {
+			std::thread::sleep(Duration::from_millis(33));
+		}
+	});
 }
 
 /// Escape ends the app, the conventional close affordance for a windowed example.
@@ -60,8 +79,26 @@ pub fn screenshot_verify_plugin(app: &mut App) {
 		.ok()
 		.and_then(|value| value.parse().ok())
 		.unwrap_or(30);
+	info!("screenshot harness armed: path={path}, capture frame={frame}");
 	app.insert_resource(ScreenshotVerify { path, frame })
-		.add_systems(Update, capture_screenshot);
+		.add_systems(Update, (capture_screenshot, screenshot_timeout));
+}
+
+// safety net: exit a few seconds past the target frame even if the capture never
+// completes, so a run always terminates (and flushes logs) instead of hanging.
+fn screenshot_timeout(
+	mut frame: Local<u32>,
+	config: Res<ScreenshotVerify>,
+	mut exit: MessageWriter<AppExit>,
+) {
+	*frame += 1;
+	if *frame > config.frame + 240 {
+		warn!(
+			"screenshot harness: timed out at frame {} with no capture, exiting",
+			*frame
+		);
+		exit.write(AppExit::Success);
+	}
 }
 
 #[derive(Resource)]
@@ -89,11 +126,13 @@ fn capture_screenshot(
 		return;
 	};
 	*done = true;
+	info!("screenshot harness: capturing -> {}", config.path);
 	commands
 		.spawn(Screenshot::window(window))
 		.observe(save_to_disk(config.path.clone()))
 		.observe(
 			|_: On<ScreenshotCaptured>, mut exit: MessageWriter<AppExit>| {
+				info!("screenshot harness: captured, exiting");
 				exit.write(AppExit::Success);
 			},
 		);

@@ -1,0 +1,20 @@
+<Scene3d>
+	<AppWindow/>
+	<Camera3d {CameraDistance{width:20., offset:{x:10., y:10., z:15.}}}/>
+	<Lighting3d/>
+	<Ground3d/>
+	<Foxie scale=0.1>
+		<div {(TriggerOnAnimationReady, Repeat)}>
+			<div {Sequence}>
+				<div {Sequence}>
+					<PlayAnimation clip="misc/fox.glb#Animation0"/>
+					<TriggerOnAnimationEnd clip="misc/fox.glb#Animation0"/>
+				</div>
+				<div {Sequence}>
+					<PlayAnimation clip="misc/fox.glb#Animation1"/>
+					<TriggerOnAnimationEnd clip="misc/fox.glb#Animation1"/>
+				</div>
+			</div>
+		</div>
+	</Foxie>
+</Scene3d>

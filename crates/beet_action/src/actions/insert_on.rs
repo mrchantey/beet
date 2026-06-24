@@ -13,16 +13,53 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn(InsertOn::new(Name::new("bill")));
 /// ```
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
 #[require(InsertOnAction<B>)]
-pub struct InsertOn<B: 'static + Send + Sync + Bundle + Clone> {
+pub struct InsertOn<
+	B: 'static
+		+ Send
+		+ Sync
+		+ Bundle
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
+> {
 	/// The bundle to be cloned and inserted.
 	pub bundle: B,
 	/// Which entity to insert the bundle on.
 	pub target_entity: TargetEntity,
 }
 
-impl<B: 'static + Send + Sync + Bundle + Clone> InsertOn<B> {
+impl<
+	B: 'static
+		+ Send
+		+ Sync
+		+ Bundle
+		+ Clone
+		+ Reflect
+		+ FromReflect
+		+ TypePath
+		+ Default,
+> Default for InsertOn<B>
+{
+	fn default() -> Self { Self::new(B::default()) }
+}
+
+impl<
+	B: 'static
+		+ Send
+		+ Sync
+		+ Bundle
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
+> InsertOn<B>
+{
 	/// Insert `bundle` on the action entity itself.
 	pub fn new(bundle: B) -> Self {
 		Self {
@@ -47,7 +84,15 @@ impl<B: 'static + Send + Sync + Bundle + Clone> InsertOn<B> {
 #[derive(Component)]
 pub async fn InsertOnAction<B>(cx: ActionContext) -> Result<Outcome>
 where
-	B: 'static + Send + Sync + Bundle + Clone,
+	B: 'static
+		+ Send
+		+ Sync
+		+ Bundle
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
 {
 	let action = cx.caller.id();
 	let world = cx.world();

@@ -11,6 +11,7 @@ pub use self::rotate_to_velocity::*;
 mod translate;
 pub use self::translate::*;
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// Add all systems and types for the base movement actions:
@@ -33,6 +34,7 @@ pub fn movement_plugin(app: &mut App) {
 	)
 	.register_type::<Mass>()
 	.register_type::<Velocity>()
+	.register_type::<InsertOn<Velocity>>()
 	.register_type::<Impulse>()
 	.register_type::<Force>()
 	.register_type::<RotateToVelocity2d>()

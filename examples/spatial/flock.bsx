@@ -1,0 +1,6 @@
+<Scene2d>
+	<AppWindow/>
+	<Camera2d/>
+	<SpaceScene/>
+	<Flock count=300/>
+</Scene2d>

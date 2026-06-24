@@ -14,18 +14,51 @@ use beet_core::prelude::*;
 /// 2. Find the parent [`WorldAssetRoot`].
 /// 3. Find all descendants with a [`TriggerOnAnimationReady`] component.
 /// 4. Call the action on those entities with the stored payload.
-#[derive(Component)]
+#[derive(Component, Reflect)]
+#[reflect(Component, Default)]
 pub struct TriggerOnAnimationReady<P = ()>
 where
-	P: 'static + Send + Sync + Clone,
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
 {
 	/// The input passed to the action when the animation player is ready.
 	pub payload: P,
 }
 
+impl<P> Default for TriggerOnAnimationReady<P>
+where
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
+{
+	fn default() -> Self {
+		Self {
+			payload: P::default(),
+		}
+	}
+}
+
 impl<P> TriggerOnAnimationReady<P>
 where
-	P: 'static + Send + Sync + Clone,
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
 {
 	/// Create a new [`TriggerOnAnimationReady`] with `payload`.
 	pub fn new(payload: P) -> Self { Self { payload } }
@@ -47,7 +80,14 @@ pub fn trigger_on_animation_ready<P>(
 	actions: Query<(Entity, &TriggerOnAnimationReady<P>)>,
 	players: Populated<Entity, Added<AnimationPlayer>>,
 ) where
-	P: 'static + Send + Sync + Clone,
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
 {
 	for entity in players.iter() {
 		for root in parents

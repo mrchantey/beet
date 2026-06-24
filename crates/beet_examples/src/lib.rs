@@ -14,6 +14,40 @@ pub mod prelude {
 	#[cfg(feature = "bevy_default")]
 	pub use crate::components::*;
 	pub use crate::plugins::*;
+	// the markup scene templates (`<Lighting3d/>`, `<Ground3d/>`, `<Sprite2d/>`, ...),
+	// so a `.bsx` names them and `beet_example_plugin` registers them by short type path.
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::AgentOf;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::AppWindow;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Camera3dLookAt;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Flock;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Foxie;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Ground3d;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::IkArm;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Lighting3d;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Scene2d;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Scene3d;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::SeekAgent2d;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::SpaceScene;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::Sprite2d;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::SteerTo;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::UiTerminal;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scenes::WorldScene;
 }
 
 // because of cyclic deps we cant use beet directly

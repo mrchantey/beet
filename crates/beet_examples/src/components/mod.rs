@@ -1,5 +1,3 @@
-mod foxie;
-pub use self::foxie::*;
 mod camera_distance;
 pub use self::camera_distance::*;
 mod collectable;

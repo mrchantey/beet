@@ -13,17 +13,30 @@ use core::time::Duration;
 /// [`transition_duration`] of finishing.
 ///
 /// [`transition_duration`]: TriggerOnAnimationEnd::transition_duration
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Reflect)]
 #[require(ContinueRun<(), P>)]
+#[reflect(Component, Default)]
 pub struct TriggerOnAnimationEnd<P>
 where
-	P: 'static + Send + Sync + Clone,
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
 {
 	/// The result payload to return when the animation ends.
 	pub payload: P,
-	/// The animation clip to check for end.
+	/// Path to the animation clip, resolved to [`Self::handle`] and
+	/// [`Self::animation_index`] at load.
+	pub clip: SmolStr,
+	/// The animation clip to check for end, resolved from [`Self::clip`].
+	#[reflect(ignore)]
 	pub handle: Handle<AnimationClip>,
-	/// The index of the animation to check for end.
+	/// The index of the animation to check for end, resolved from [`Self::clip`].
+	#[reflect(ignore)]
 	pub animation_index: AnimationNodeIndex,
 	/// The duration before the animation ends to trigger the action.
 	/// This should usually match the [`AnimationTransitions`] duration for
@@ -31,9 +44,38 @@ where
 	pub transition_duration: Duration,
 }
 
+impl<P> Default for TriggerOnAnimationEnd<P>
+where
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
+{
+	fn default() -> Self {
+		Self {
+			payload: P::default(),
+			clip: SmolStr::default(),
+			handle: Handle::default(),
+			animation_index: AnimationNodeIndex::default(),
+			transition_duration: DEFAULT_ANIMATION_TRANSITION,
+		}
+	}
+}
+
 impl<P> TriggerOnAnimationEnd<P>
 where
-	P: 'static + Send + Sync + Clone,
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
 {
 	/// Create a new [`TriggerOnAnimationEnd`] action.
 	pub fn new(
@@ -45,6 +87,7 @@ where
 			handle,
 			animation_index,
 			payload,
+			clip: SmolStr::default(),
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
 	}
@@ -65,7 +108,14 @@ pub(crate) fn trigger_on_animation_end<P>(
 	agents: AgentQuery<&AnimationPlayer>,
 ) -> Result
 where
-	P: 'static + Send + Sync + Clone,
+	P: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
 {
 	for (action, on_end) in query.iter() {
 		let player = agents.get_descendent(action)?;

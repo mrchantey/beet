@@ -46,3 +46,7 @@ impl Outcome<(), ()> {
 	pub const FAIL: Self = Self::Fail(());
 	pub const PASS: Self = Self::Pass(());
 }
+
+impl<Pass,Fail> Default for Failcome<Pass, Fail> where Pass:Default {
+	fn default() -> Self { Self::Pass(default()) }
+}

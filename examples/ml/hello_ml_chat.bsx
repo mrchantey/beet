@@ -1,0 +1,9 @@
+<Scene2d>
+	<AppWindow/>
+	<Camera2d/>
+	<UiTerminal input=true/>
+	<ChatSentenceAgent src="ml/default-bert.ron">
+		<SentenceOption text="heal"/>
+		<SentenceOption text="attack"/>
+	</ChatSentenceAgent>
+</Scene2d>

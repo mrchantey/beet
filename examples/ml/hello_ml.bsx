@@ -1,0 +1,4 @@
+<NearestSentenceAgent prompt="please kill the baddies" src="ml/default-bert.ron">
+	<SentenceOption text="heal"/>
+	<SentenceOption text="attack"/>
+</NearestSentenceAgent>

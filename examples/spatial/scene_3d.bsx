@@ -1,0 +1,6 @@
+<Scene3d>
+	<AppWindow/>
+	<Camera3d {CameraDistance{width:80., offset:{x:0., y:20., z:40.}}}/>
+	<Lighting3d/>
+	<Ground3d/>
+</Scene3d>

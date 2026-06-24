@@ -22,7 +22,7 @@ pub fn language_plugin(app: &mut App) {
 /// A natural-language label attached to either an agent (the prompt) or a
 /// child behavior (a candidate). Used by sentence-similarity selectors.
 #[derive(Debug, Clone, Component, PartialEq, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct Sentence(pub Cow<'static, str>);
 
 impl Sentence {

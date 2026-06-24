@@ -746,31 +746,6 @@ required-features = ["action", "rand"]
 # name = "app"
 # path = "examples/app.rs"
 
-[[example]]
-name = "fetch"
-path = "examples/ml/fetch.rs"
-required-features = ["examples", "ml"]
-
-[[example]]
-name = "frozen_lake_train"
-path = "examples/ml/frozen_lake_train.rs"
-required-features = ["examples", "ml"]
-
-[[example]]
-name = "frozen_lake_run"
-path = "examples/ml/frozen_lake_run.rs"
-required-features = ["examples", "ml"]
-
-# [[example]]
-# name = "hello_ml_chat"
-# path = "examples/ml/hello_ml_chat.rs"
-# required-features = ["examples", "ml"]
-
-[[example]]
-name = "hello_ml"
-path = "examples/ml/hello_ml.rs"
-required-features = ["examples", "ml"]
-
 # [[package.metadata.scene]]
 # name = "hello-ml"
 # description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
@@ -780,11 +755,6 @@ required-features = ["examples", "ml"]
 
 # 💡 Examples - Spatial
 
-[[example]]
-name = "flock"
-path = "examples/spatial/flock.rs"
-required-features = ["examples", "spatial"]
-
 # Too big, we need to handle for loops in scene files
 # [[package.metadata.scene]]
 # name = "flock"
@@ -793,11 +763,6 @@ required-features = ["examples", "spatial"]
 # app = "app"
 # path = "scenes/flock.json"
 # include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
-
-[[example]]
-name = "hello_animation"
-path = "examples/spatial/hello_animation.rs"
-required-features = ["examples", "spatial"]
 
 # [[package.metadata.scene]]
 # name = "hello-animation"
@@ -811,21 +776,6 @@ required-features = ["examples", "spatial"]
 # 	"bevyhub/ground-3d",
 # 	"beet-debug",
 # ]
-
-[[example]]
-name = "inverse_kinematics"
-path = "examples/spatial/inverse_kinematics.rs"
-required-features = ["examples", "spatial"]
-
-[[example]]
-name = "seek"
-path = "examples/spatial/seek.rs"
-required-features = ["examples", "spatial"]
-
-[[example]]
-name = "seek_3d"
-path = "examples/spatial/seek_3d.rs"
-required-features = ["examples", "spatial"]
 
 # [[package.metadata.scene]]
 # name = "seek"
