@@ -159,28 +159,12 @@ pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
 	// (eg `RunOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
 	// Snapshot the subtree first, then fire: an observer may restructure the tree.
 	root.world_scope(|world| {
-		for entity in subtree_inclusive(world, root_id) {
+		let subtree =
+			world.entity_mut(root_id).iter_descendents_bfs_inclusive();
+		for entity in subtree {
 			if let Ok(mut entity) = world.get_entity_mut(entity) {
 				entity.trigger(move |entity| LoadTemplate { entity, is_error });
 			}
 		}
 	});
-}
-
-/// `root` and every descendant reachable through `Children`, depth-first.
-fn subtree_inclusive(world: &World, root: Entity) -> Vec<Entity> {
-	let mut out = vec![root];
-	let mut index = 0;
-	while index < out.len() {
-		let entity = out[index];
-		index += 1;
-		out.extend(
-			world
-				.entity(entity)
-				.get::<Children>()
-				.into_iter()
-				.flat_map(Children::iter),
-		);
-	}
-	out
 }

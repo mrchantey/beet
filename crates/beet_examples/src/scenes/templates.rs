@@ -4,6 +4,7 @@
 //! system. Registered by [`beet_example_plugin`](crate::prelude::beet_example_plugin).
 use crate::beet::prelude::*;
 use crate::components::KeyboardController;
+use crate::components::WrapAround;
 use crate::components::spawn_ui_terminal;
 use beet_core::prelude::*;
 use bevy::light::CascadeShadowConfigBuilder;
@@ -230,10 +231,24 @@ pub fn SeekAgent2d(
 		},
 		Transform::from_scale(Vec3::splat(scale)),
 		RotateToVelocity2d,
+		WrapAround,
 		ForceBundle::default(),
 		SteerBundle::default().scaled_dist(scaled_dist),
-		Seek::default(),
-		RunOnLoad,
+		// the seek runs on a behaviour child wired back to this agent via `ActionOf`,
+		// so it resolves its steering components here. A self-contained `Seek` on this
+		// (child-of-scene) entity would instead resolve its agent to the scene root,
+		// which has no steering (see `AgentQuery`); mirrors `FetchFox`'s wiring.
+		OnSpawn::new(|agent| {
+			let agent_id = agent.id();
+			agent.world_scope(|world| {
+				world.spawn((
+					ChildOf(agent_id),
+					ActionOf(agent_id),
+					RunOnLoad,
+					Seek::default(),
+				));
+			});
+		}),
 	)
 }
 
@@ -262,6 +277,7 @@ pub fn Flock(
 			},
 			Transform::from_translation(position).with_scale(Vec3::splat(0.5)),
 			RotateToVelocity2d,
+			WrapAround,
 			ForceBundle::default(),
 			SteerBundle::default().scaled_dist(SCALE),
 			VelocityScalar(Vec3::new(1., 1., 0.)),

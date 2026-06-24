@@ -291,15 +291,11 @@ mod test {
 			.contains::<PendingAssets>()
 			.xpect_true();
 
-		// pump frames until the asset loads and the pending set drains, yielding
-		// to the async runtime so the in-memory IO task can make progress.
-		for _ in 0..200 {
-			app.update();
-			if load_state.get().is_some() {
-				break;
-			}
-			time_ext::sleep_millis(5).await;
-		}
+		// pump frames until the asset loads and the pending set drains; `update_until`
+		// ticks the async runtime between frames so the in-memory IO task progresses.
+		app_ext::update_until(&mut app, |_world| load_state.get().is_some())
+			.await
+			.xpect_true();
 		// LoadTemplate fired, no error, once the asset finished loading.
 		load_state.get().xpect_eq(Some(false));
 	}

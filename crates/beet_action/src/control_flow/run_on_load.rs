@@ -54,15 +54,10 @@ mod test {
 			.spawn_template(Snippet::from_bundle((RunOnLoad, action)))
 			.unwrap();
 
-		// the `LoadTemplate` observer queues the call onto the AsyncWorld; drive the
-		// app until it runs.
-		for _ in 0..50 {
-			app.update();
-			if ran.get() {
-				break;
-			}
-			time_ext::sleep_millis(1).await;
-		}
-		ran.get().xpect_true();
+		// the `LoadTemplate` observer queues the call onto the AsyncWorld; `update_until`
+		// ticks the async runtime between frames so the queued call runs.
+		app_ext::update_until(&mut app, |_world| ran.get())
+			.await
+			.xpect_true();
 	}
 }

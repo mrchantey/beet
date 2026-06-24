@@ -91,19 +91,15 @@ fn resolve_pending_scene(
 /// under `scene_root`, mirroring `init_animators` but eagerly at scene-ready time.
 fn init_scene_animators(world: &mut World, scene_root: Entity) {
 	let graph = world.get::<AnimationGraphHandle>(scene_root).cloned();
-	// collect the spawned players in the scene subtree that are not yet set up.
-	let mut players = Vec::new();
-	let mut stack = vec![scene_root];
-	while let Some(entity) = stack.pop() {
-		if world.get::<AnimationPlayer>(entity).is_some()
-			&& world.get::<AnimationTransitions>(entity).is_none()
-		{
-			players.push(entity);
-		}
-		if let Some(children) = world.get::<Children>(entity) {
-			stack.extend(children.iter());
-		}
-	}
+	// the spawned players in the scene subtree that are not yet set up.
+	let subtree = world.entity_mut(scene_root).iter_descendents_inclusive();
+	let players = subtree
+		.into_iter()
+		.filter(|&entity| {
+			world.get::<AnimationPlayer>(entity).is_some()
+				&& world.get::<AnimationTransitions>(entity).is_none()
+		})
+		.collect::<Vec<_>>();
 	for player in players {
 		let mut entity = world.entity_mut(player);
 		// bevy's animation systems skip a player lacking its graph handle.
@@ -123,7 +119,7 @@ mod test {
 	use bevy::world_serialization::WorldSerializationPlugin;
 
 	#[beet_core::test]
-	fn defers_load_until_scene_ready() {
+	async fn defers_load_until_scene_ready() {
 		let mut app = App::new();
 		app.add_plugins((
 			MinimalPlugins,
@@ -155,12 +151,8 @@ mod test {
 		fired.get().xpect_false();
 
 		// drive the spawner until it spawns the instance and fires WorldInstanceReady.
-		for _ in 0..20 {
-			app.update();
-			if fired.get() {
-				break;
-			}
-		}
-		fired.get().xpect_true();
+		app_ext::update_until(&mut app, |_world| fired.get())
+			.await
+			.xpect_true();
 	}
 }

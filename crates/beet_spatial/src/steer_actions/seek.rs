@@ -168,4 +168,34 @@ mod test {
 			.translation
 			.xpect_eq(Vec3::ZERO);
 	}
+
+	// regression: a 3d target offset on multiple axes must move the agent on all of
+	// them, not just X (the seek_3d "moves on X only" symptom). The steering math is
+	// fully 3d; this guards against any axis being flattened downstream.
+	#[beet_core::test]
+	fn seeks_on_all_axes() {
+		let mut app = App::new();
+		app.add_plugins(BeetSpatialPlugins).init_resource::<Time>();
+
+		let agent = app
+			.world_mut()
+			.spawn((
+				Transform::default(),
+				ForceBundle::default(),
+				SteerBundle::default(),
+				SteerTarget::Position(Vec3::new(1.0, 0., 1.0)),
+				Seek::default(),
+				Running::<Outcome>::new(OutHandler::default()),
+			))
+			.id();
+
+		app.update_with_secs(1);
+
+		let translation = app.world().get::<Transform>(agent).unwrap().translation;
+		// moved toward the target on both X and Z, symmetrically, not on Y.
+		(translation.x > 0.).xpect_true();
+		(translation.z > 0.).xpect_true();
+		translation.x.xpect_close(translation.z);
+		translation.y.xpect_eq(0.);
+	}
 }

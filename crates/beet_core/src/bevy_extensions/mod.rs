@@ -15,7 +15,9 @@
 //!
 //! # Entity Extensions
 //!
-//! - [`EntityExt`] - Entity lookup and relationship traversal
+//! - [`EntityRefExt`] - [`EntityRef`](bevy::prelude::EntityRef) component lookup
+//! - [`EntityWorldMutExt`] - [`EntityWorldMut`](bevy::prelude::EntityWorldMut)
+//!   lookup and descendant traversal
 //!
 //! # Transform Extensions
 //!

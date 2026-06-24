@@ -75,8 +75,9 @@ fn plugin_2d(app: &mut App) {
 			.chain()
 			.in_set(PostTickSet),
 		)
-		.init_resource::<WrapAround>()
+		.init_resource::<WrapAroundBounds>()
 		.register_type::<RandomizePosition>()
+		.register_type::<WrapAroundBounds>()
 		.register_type::<WrapAround>()
 		.register_type::<FollowCursor2d>()
 		// the markup 2d scene templates, so `<Scene2d/>`/`<Sprite2d/>`/`<SpaceScene/>`/

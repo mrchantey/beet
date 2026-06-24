@@ -18,8 +18,13 @@ impl AnimationGraphClips {
 
 /// Build an [`AnimationGraph`] from `clips` (asset paths), loading each clip
 /// through the deferred path ([`BuildAssets`]) so `LoadTemplate` waits for every
-/// clip, and returning the graph handle, transitions, and the clip-path ->
-/// node-index map ([`AnimationGraphClips`]) for actions to resolve against.
+/// clip, and returning the graph handle and the clip-path -> node-index map
+/// ([`AnimationGraphClips`]) for actions to resolve against.
+///
+/// [`AnimationTransitions`] is *not* part of this bundle: it belongs on the glb's
+/// [`AnimationPlayer`] (a descendant spawned later), where `init_scene_animators`
+/// adds it. Putting it on this (player-less) agent root would be dead weight bevy
+/// never advances, and a split-brain hazard against the real player's.
 ///
 /// The reusable core of a markup `<CreateAnimationGraph>` template, replacing the
 /// imperative `AnimationGraph::new()` + `graphs.add(..)` scene templates built by
@@ -41,7 +46,6 @@ pub fn build_animation_graph(
 		.collect();
 	(
 		AnimationGraphHandle(graphs.add(graph)),
-		AnimationTransitions::new(),
 		AnimationGraphClips(indices),
 	)
 }

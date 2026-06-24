@@ -8,7 +8,7 @@ pub(super) const DEFAULT_ANIMATION_TRANSITION: Duration =
 	Duration::from_millis(250);
 
 /// Play an animation on the agent when this action runs, then pass.
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[require(PlayAnimationAction)]
 #[reflect(Default, Component)]
 pub struct PlayAnimation {
@@ -24,14 +24,26 @@ pub struct PlayAnimation {
 	pub transition_duration: Duration,
 }
 
+// manual `Default` so a markup/reflect-spawned `<PlayAnimation clip=.../>` keeps the
+// crossfade: a derived default leaves `transition_duration` at zero, snapping the
+// idle<->walk switch instead of blending it.
+impl Default for PlayAnimation {
+	fn default() -> Self {
+		Self {
+			clip: SmolStr::default(),
+			trigger_if_playing: false,
+			repeat: RepeatAnimation::default(),
+			transition_duration: DEFAULT_ANIMATION_TRANSITION,
+		}
+	}
+}
+
 impl PlayAnimation {
 	/// Create a new [`PlayAnimation`] action for the clip at `clip`.
 	pub fn new(clip: impl Into<SmolStr>) -> Self {
 		Self {
 			clip: clip.into(),
-			trigger_if_playing: false,
-			repeat: RepeatAnimation::default(),
-			transition_duration: DEFAULT_ANIMATION_TRANSITION,
+			..Default::default()
 		}
 	}
 	/// Lerps into this animation over this duration.
@@ -230,5 +242,20 @@ mod test {
 		// the animation events have started firing
 		app.update_with_millis(1);
 		store.get().xpect_eq(vec![0]);
+	}
+
+	#[beet_core::test]
+	fn default_keeps_crossfade() {
+		// a markup `<PlayAnimation clip=.../>` builds via reflect `Default`; it must
+		// carry the crossfade duration or the idle<->walk switch snaps. Guards the
+		// regression where a derived `Default` left `transition_duration` at zero.
+		(super::DEFAULT_ANIMATION_TRANSITION > core::time::Duration::ZERO)
+			.xpect_true();
+		PlayAnimation::default()
+			.transition_duration
+			.xpect_eq(super::DEFAULT_ANIMATION_TRANSITION);
+		PlayAnimation::new("x")
+			.transition_duration
+			.xpect_eq(super::DEFAULT_ANIMATION_TRANSITION);
 	}
 }
