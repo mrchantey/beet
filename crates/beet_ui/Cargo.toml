@@ -65,7 +65,7 @@ template = ["std", "rsx", "style"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "dep:image", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
+tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "dep:image", "dep:resvg", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -105,6 +105,13 @@ base64 = { workspace = true, optional = true }
 # terminal raster decoding: a non-PNG `<img>` (eg a `.jpg`) is decoded and
 # re-encoded to PNG for the kitty `f=100` transmit. PNG + common web formats only.
 image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+# terminal SVG rasterisation: an `<img src=*.svg>` is rendered to an RGBA pixmap
+# (resvg bundles usvg + tiny-skia) and PNG-encoded for the kitty `f=100`
+# transmit, so a vector figure draws in the terminal like any other raster. The
+# default features include text layout + system fonts, which the deck's labelled
+# diagrams need; it tracks the tiny-skia 0.11 / ttf-parser 0.25 line already in
+# the tree, so it adds no duplicate graphics deps.
+resvg = { version = "0.45", optional = true }
 serde = { workspace = true, optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 serde_json = { workspace = true, optional = true }

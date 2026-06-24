@@ -6,12 +6,13 @@
 //! `/assets/…` looped back to our own canonical server (which maps it to its
 //! blob store), exactly as a browser resolves it against the document origin, so
 //! there is no filesystem dependency on the render host (Lambda/Fargate). PNG
-//! bytes transmit directly, any other format decodes and re-encodes to PNG, then
-//! a [`KittyImage`] and the `graphics` element state attach so the
-//! terminal-gated user-agent rule gives it a block box. The measure phase sizes
-//! that box from the pixel dimensions, paint reserves its cells, and
-//! `place_kitty_images` transmits the bytes once and (re)places the picture
-//! whenever its on-screen rect changes — scroll, reflow, or resize.
+//! bytes transmit directly, an `<img src=*.svg>` is rasterised to PNG (resvg),
+//! any other raster format decodes and re-encodes to PNG, then a [`KittyImage`]
+//! and the `graphics` element state attach so the terminal-gated user-agent rule
+//! gives it a block box. The measure phase sizes that box from the pixel
+//! dimensions, paint reserves its cells, and `place_kitty_images` transmits the
+//! bytes once and (re)places the picture whenever its on-screen rect changes —
+//! scroll, reflow, or resize.
 //!
 //! On any failure (no canonical server, a refused/non-2xx fetch, a decode error)
 //! the element shows both its `[image]: alt` marker and the styled error message
@@ -246,13 +247,17 @@ pub fn render_image_errors(
 	}
 }
 
-/// PNG bytes for an image: PNG input passes through; any other format the
-/// `image` decoder understands (eg JPEG) is decoded to RGBA and re-encoded to
-/// PNG. `None` when the bytes are not a decodable image.
+/// PNG bytes for an image: PNG input passes through; an SVG is rasterised to
+/// PNG ([`svg_to_png`]); any other format the `image` decoder understands (eg
+/// JPEG) is decoded to RGBA and re-encoded to PNG. `None` when the bytes are
+/// not a decodable image.
 #[cfg(all(feature = "tui", any(feature = "net", test)))]
 fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
 	if png_dimensions(&bytes).is_some() {
 		return Some(bytes);
+	}
+	if is_svg(&bytes) {
+		return svg_to_png(&bytes);
 	}
 	let image = image::load_from_memory(&bytes).ok()?;
 	let mut png = std::io::Cursor::new(Vec::new());
@@ -260,6 +265,68 @@ fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
 		.write_to(&mut png, image::ImageFormat::Png)
 		.ok()
 		.map(|_| png.into_inner())
+}
+
+/// Whether `bytes` look like an SVG: valid-ish UTF-8 text whose first non-blank
+/// byte opens a tag and which contains an `<svg` within the sniffed head. PNGs
+/// are returned before this is reached, and the other raster formats are binary
+/// (JPEG `\xff\xd8`, GIF `GIF8`, WebP `RIFF`), so none of them misfire here.
+#[cfg(all(feature = "tui", any(feature = "net", test)))]
+fn is_svg(bytes: &[u8]) -> bool {
+	let head = &bytes[..bytes.len().min(1024)];
+	let text = String::from_utf8_lossy(head);
+	let trimmed = text.trim_start_matches('\u{feff}').trim_start();
+	trimmed.starts_with('<') && text.contains("<svg")
+}
+
+/// System fonts for SVG `<text>`, loaded once. `load_system_fonts` walks the
+/// platform font directories, so the database is cached behind a `OnceLock`
+/// rather than rebuilt for every rasterised image.
+#[cfg(all(feature = "tui", any(feature = "net", test)))]
+fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
+	use std::sync::Arc;
+	use std::sync::OnceLock;
+	static FONTDB: OnceLock<Arc<resvg::usvg::fontdb::Database>> =
+		OnceLock::new();
+	FONTDB
+		.get_or_init(|| {
+			let mut db = resvg::usvg::fontdb::Database::new();
+			db.load_system_fonts();
+			Arc::new(db)
+		})
+		.clone()
+}
+
+/// Rasterise an SVG to PNG bytes, or `None` when the bytes do not parse as an
+/// SVG. Rendered at 2× and left for the terminal to downscale, so text and thin
+/// strokes stay crisp; the target is clamped so a pathological `viewBox` cannot
+/// allocate an unbounded pixmap. The figure's own colours are honoured verbatim
+/// — a deck SVG authored in the site palette therefore rasterises on-theme (the
+/// palette lives in the SVG, the single surface a re-theme would touch).
+#[cfg(all(feature = "tui", any(feature = "net", test)))]
+fn svg_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
+	use resvg::tiny_skia;
+	use resvg::usvg;
+
+	let options = usvg::Options {
+		fontdb: svg_fontdb(),
+		..Default::default()
+	};
+	let tree = usvg::Tree::from_data(bytes, &options).ok()?;
+
+	const SCALE: f32 = 2.0;
+	const MAX_PX: u32 = 4096;
+	let size = tree.size();
+	let width = ((size.width() * SCALE).ceil() as u32).clamp(1, MAX_PX);
+	let height = ((size.height() * SCALE).ceil() as u32).clamp(1, MAX_PX);
+
+	let mut pixmap = tiny_skia::Pixmap::new(width, height)?;
+	resvg::render(
+		&tree,
+		tiny_skia::Transform::from_scale(SCALE, SCALE),
+		&mut pixmap.as_mut(),
+	);
+	pixmap.encode_png().ok()
 }
 
 /// Background fetch for an image `src` over HTTP: attach the raster on arrival,
@@ -676,6 +743,55 @@ mod test {
 		String::from_utf8_lossy(&host.frame_ansi())
 			.into_owned()
 			.xpect_contains("a=d,d=i,i=1,q=2");
+	}
+
+	/// A small SVG exercising every feature the deck figures use — an internal
+	/// `<style>` with class selectors, a `userSpaceOnUse` gradient, a filled
+	/// polygon, a stroked path, a circle, and `<text>` — so the rasteriser is
+	/// proven against the real surface area. `viewBox` is 100×60.
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	const SAMPLE_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
+  <style>.peak{fill:#72de5e}.line{fill:none;stroke:#8dfb77;stroke-width:3;stroke-linejoin:round}</style>
+  <linearGradient id="g" x1="0" y1="0" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#5fc24e"/><stop offset="1" stop-color="#0c3d10"/>
+  </linearGradient>
+  <rect width="100" height="60" fill="url(#g)" opacity="0.3"/>
+  <polygon class="peak" points="10,55 30,15 50,55"/>
+  <path class="line" d="M5,50 40,40 60,20 95,12"/>
+  <circle cx="60" cy="20" r="3" fill="#8dfb77"/>
+  <text x="50" y="58" font-family="sans-serif" font-size="8" fill="#e2e3dc" text-anchor="middle">Godot</text>
+</svg>"##;
+
+	/// An `<img src=*.svg>` is rasterised to a valid PNG at 2× the `viewBox`,
+	/// covering the gradient/style/text surface the deck figures rely on.
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn rasterizes_svg_to_png() {
+		// detected as svg, and not mistaken for a raster
+		is_svg(SAMPLE_SVG.as_bytes()).xpect_true();
+		is_svg(&png_bytes(8, 6)).xpect_false();
+		// rasterised to a valid PNG at 2x the 100x60 viewBox
+		to_png_bytes(SAMPLE_SVG.as_bytes().to_vec())
+			.and_then(encode_png)
+			.unwrap()
+			.1
+			.xpect_eq(UVec2::new(200, 120));
+	}
+
+	/// Dev aid (no assertions): with `BEET_SVG_DUMP_OUT` set, rasterise the file
+	/// at `BEET_SVG_DUMP_IN` (or the built-in sample) to that PNG path, for
+	/// eyeballing the terminal raster. Inert in a normal run.
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn dump_svg_raster() {
+		let Ok(out) = std::env::var("BEET_SVG_DUMP_OUT") else {
+			return;
+		};
+		let svg = match std::env::var("BEET_SVG_DUMP_IN") {
+			Ok(path) => fs_ext::read(path).unwrap(),
+			Err(_) => SAMPLE_SVG.as_bytes().to_vec(),
+		};
+		fs_ext::write(out, to_png_bytes(svg).unwrap()).unwrap();
 	}
 
 	/// An unsupported terminal keeps the `[image]: alt` marker fallback.
