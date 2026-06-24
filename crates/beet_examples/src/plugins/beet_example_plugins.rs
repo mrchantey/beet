@@ -29,11 +29,6 @@ impl PluginGroup for BeetExamplePlugins {
 		{
 			builder = builder.add(crate::prelude::ThreadExamplesPlugin);
 		}
-		// the no-code document CRUD route templates (todo-style state from markup).
-		#[cfg(feature = "thread")]
-		{
-			builder = builder.add(crate::prelude::DocCrudExamplesPlugin);
-		}
 		// the headless behaviour-tree example (drive sequence from markup).
 		#[cfg(feature = "thread")]
 		{

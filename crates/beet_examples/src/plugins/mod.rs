@@ -14,13 +14,6 @@ mod thread_examples;
 #[cfg(feature = "thread")]
 pub use self::thread_examples::*;
 
-// the no-code document CRUD route templates: need the router/net deps the `thread`
-// feature pulls, headless-friendly.
-#[cfg(feature = "thread")]
-mod doc_crud;
-#[cfg(feature = "thread")]
-pub use self::doc_crud::*;
-
 // the headless behaviour-tree example: needs the net deps the `thread` feature
 // pulls (the boot verb), headless-friendly.
 #[cfg(feature = "thread")]
