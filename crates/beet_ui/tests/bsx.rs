@@ -284,6 +284,78 @@ impl Default for Linked {
 	}
 }
 
+// ---- enum-variant entity refs -----------------------------------------------
+
+/// An enum component with an `Entity` variant, mirroring `SteerTarget`, to
+/// exercise a markup ref resolving directly into a variant.
+#[derive(Component, Reflect, MapEntities, Default, Clone, Debug, PartialEq)]
+#[reflect(Component, MapEntities, Default)]
+enum Aim {
+	#[default]
+	Idle,
+	At(#[entities] Entity),
+}
+
+/// A `{EnumType::Variant($ref)}` spread resolves the ref into the real variant,
+/// eg `{SteerTarget::Entity($cheese)}`, so markup can target an enum variant
+/// directly (replacing the `SteerTargetEntity` on-insert adapter).
+#[beet_core::test]
+fn enum_variant_resolves_entity_ref() {
+	let mut world = world();
+	register::<Aim>(&mut world);
+	let root = spawn_bsx(
+		&mut world,
+		"<div><a {Aim::At($target)}/><b bx:ref=\"target\"/></div>",
+	);
+	let children = world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.collect::<Vec<_>>();
+	let target = children[1];
+	world
+		.entity(children[0])
+		.get::<Aim>()
+		.unwrap()
+		.clone()
+		.xpect_eq(Aim::At(target));
+}
+
+/// A tuple-struct component with an `Entity` field, mirroring `ActionOf`.
+#[derive(Component, Reflect, MapEntities, Clone, Debug, PartialEq)]
+#[reflect(Component, MapEntities, Default)]
+struct Bound(#[entities] Entity);
+
+impl Default for Bound {
+	fn default() -> Self { Self(Entity::PLACEHOLDER) }
+}
+
+/// A `{TupleStruct($ref)}` spread resolves the ref directly into the field, eg
+/// `{ActionOf($fox)}`, no newtype wrapper needed.
+#[beet_core::test]
+fn tuple_struct_resolves_entity_ref() {
+	let mut world = world();
+	register::<Bound>(&mut world);
+	let root = spawn_bsx(
+		&mut world,
+		"<div><a {Bound($target)}/><b bx:ref=\"target\"/></div>",
+	);
+	let children = world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.collect::<Vec<_>>();
+	let target = children[1];
+	world
+		.entity(children[0])
+		.get::<Bound>()
+		.unwrap()
+		.0
+		.xpect_eq(target);
+}
+
 // ---- spreads ----------------------------------------------------------------
 
 #[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
@@ -335,6 +407,46 @@ fn spread_on_bsx_template_tag() {
 	let root = spawn_bsx(&mut world, "<Card {Marker}>Body</Card>");
 	world.entity(root).contains::<Marker>().xpect_true();
 	render_html(&mut world, root).xpect_contains("Body");
+}
+
+#[beet_core::test]
+fn fragment_hosts_bundle_without_element() {
+	let mut world = world();
+	register::<Marker>(&mut world);
+	// the fragment carries the spread and hosts children, but emits no `Element`.
+	let root = spawn_bsx(&mut world, "<Fragment {Marker}><span/></Fragment>");
+	world.entity(root).contains::<Marker>().xpect_true();
+	world.entity(root).contains::<Element>().xpect_false();
+	world.entity(root).get::<Children>().unwrap().len().xpect_eq(1);
+}
+
+/// A second component sharing the short path `Transform`, forcing the same
+/// ambiguity the real CSS `beet_ui::style::values::layout::Transform` does.
+mod css_dup {
+	use beet_core::prelude::*;
+	#[derive(Component, Reflect, Default)]
+	#[reflect(Component, Default)]
+	pub struct Transform;
+}
+
+/// A fully-qualified tag (the registered reflect type path) resolves the bevy
+/// `Transform` from markup despite the ambiguous bare short path; the bare path
+/// errors clearly rather than silently picking one (item 6 / item 28's
+/// `<span>`-free scene roots).
+#[beet_core::test]
+fn qualified_transform_tag_disambiguates() {
+	use bevy::reflect::Typed;
+	let mut world = world();
+	register::<Transform>(&mut world);
+	register::<css_dup::Transform>(&mut world);
+	// the fully-qualified reflect path resolves the bevy transform, not the CSS one
+	let path = Transform::type_info().type_path();
+	let root = spawn_bsx(&mut world, &format!("<{path}/>"));
+	world.entity(root).contains::<Transform>().xpect_true();
+	world.entity(root).contains::<css_dup::Transform>().xpect_false();
+	// the bare, ambiguous short path resolves to neither: a clear error, never a
+	// silent wrong pick.
+	build_error(&mut world, "<Transform/>").xpect_contains("Transform");
 }
 
 // ---- template formats: a `.js` file registers as a `<script>` template ------

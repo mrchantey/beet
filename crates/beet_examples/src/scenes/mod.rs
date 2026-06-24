@@ -63,19 +63,3 @@ pub fn lighting_3d(mut commands: Commands) {
 		.build(),
 	));
 }
-
-pub fn space_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
-	commands.spawn((
-		Transform::from_translation(Vec3::new(0., 0., -1.))
-			.with_scale(Vec3::splat(100.)),
-		Sprite {
-			image: asset_server.load("space_background/Space_Stars2.png"),
-			image_mode: SpriteImageMode::Tiled {
-				tile_x: true,
-				tile_y: true,
-				stretch_value: 0.02,
-			},
-			..default()
-		},
-	));
-}

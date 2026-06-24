@@ -33,7 +33,7 @@ thread = ["dep:beet_thread", "dep:beet_net", "dep:beet_router", "beet_action/jso
 beet_action = { workspace = true, features = ["std", "reflect"] }
 beet_ml = { workspace = true, features = ["spatial"], optional = true }
 beet_spatial = { workspace = true, features = ["std"] }
-beet_core = { workspace = true, features = ["std", "rand","bevy_keyboard"] }
+beet_core = { workspace = true, features = ["std", "rand", "bevy_keyboard", "rsx"] }
 beet_thread = { workspace = true, features = ["ui"], optional = true }
 beet_net = { workspace = true, features = ["std", "serde", "json"], optional = true }
 beet_router = { workspace = true, features = ["json"], optional = true }

@@ -526,6 +526,12 @@ fn build_element(
 	if el.tag == "Slot" {
 		return build_slot(el, cx.entity);
 	}
+	// a `<Fragment>` is a neutral host: it carries spreads, directives and slot
+	// children but inserts no `Element`, so a bundle can wrap content without
+	// emitting a DOM node (the markup twin of returning `impl Bundle`).
+	if el.tag == "Fragment" {
+		return build_fragment(el, registry, refs, cx);
+	}
 	if is_uppercase_tag(&el.tag) {
 		return build_uppercase(el, registry, refs, cx);
 	}
@@ -542,8 +548,8 @@ fn is_uppercase_tag(tag: &str) -> bool {
 		.starts_with(|ch: char| ch.is_uppercase())
 }
 
-/// Build a lowercase HTML element: `Element` + directive components + attribute
-/// child entities + child node entities.
+/// Build a lowercase HTML element: an `Element` host plus the neutral
+/// [`build_fragment`] content (directives, attributes, children).
 fn build_html_element(
 	el: &BsxElement,
 	registry: &BsxTemplateRegistry,
@@ -551,6 +557,18 @@ fn build_html_element(
 	cx: &mut TemplateContext,
 ) -> Result<()> {
 	cx.entity.insert(Element::new(el.tag.clone()));
+	build_fragment(el, registry, refs, cx)
+}
+
+/// Build an element's neutral content onto its host: directive components,
+/// attribute child entities and child node entities, with no `Element` of its
+/// own. Shared by [`build_html_element`] and the reserved `<Fragment>` host.
+fn build_fragment(
+	el: &BsxElement,
+	registry: &BsxTemplateRegistry,
+	refs: &RefBindings,
+	cx: &mut TemplateContext,
+) -> Result<()> {
 	apply_common_directives(el, refs, cx)?;
 	// pre-resolve `$name` refs (forward-aware) so spreads have a plain lookup.
 	let entity_refs = resolve_entity_refs(el, refs, cx);
@@ -1329,8 +1347,11 @@ fn apply_spread_named(
 	let (is_template, patch) = {
 		let registry = app_registry.read();
 		// resolve by base name so a generic spread (eg `{Repeat}` -> `Repeat<()>`)
-		// matches its sole instantiation, exactly as a `<Repeat>` tag does.
+		// matches its sole instantiation, exactly as a `<Repeat>` tag does. A
+		// `::`-qualified name may be an enum variant (`{SteerTarget::Entity($x)}`):
+		// fall back to the enum type so the variant resolves through the literal.
 		let Some(registration) = registration_by_name(&registry, &named.name)
+			.or_else(|| enum_variant_registration(&registry, &named.name))
 		else {
 			warn!(
 				"skipping spread `{}`: no component or template of that name is registered in this binary",

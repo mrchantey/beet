@@ -99,11 +99,25 @@ fn on_load_boot(
 	ev: On<LoadTemplate>,
 	ancestors: Query<&ChildOf>,
 	disabled: Query<(), With<DisableBootOnLoad>>,
+	boot_slots: Query<(), With<Action<Boot, Response>>>,
 	mut exit: MessageWriter<AppExit>,
 	mut commands: Commands,
 ) {
 	let target = ev.event_target();
 	if !should_load(target, ev.is_error, &ancestors, &disabled, &mut exit) {
+		return;
+	}
+	// `BootOnLoad` with no `Action<Boot, Response>` slot is a misconfiguration: a
+	// render scene should carry `RunOnLoad`, a server should spread a server
+	// component (eg `HttpServer`) that installs the boot slot. Fail loudly rather
+	// than silently doing nothing.
+	if !boot_slots.contains(target) {
+		error!(
+			"`BootOnLoad` on {target} has no `Action<Boot, Response>` boot slot; a \
+			 render scene should use `RunOnLoad`, a server entry should spread a \
+			 server component such as `HttpServer`"
+		);
+		exit.write(AppExit::error());
 		return;
 	}
 	commands.entity(target).queue_async_local(|host| {

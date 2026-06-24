@@ -61,7 +61,11 @@ pub(crate) fn seek(
 			max_speed,
 			mut impulse,
 			arrive_radius,
-		) = agents.get_mut(action)?;
+		) = agents.get_mut(action).map_err(|_| {
+			bevyhow!(
+				"Seek action {action}: its resolved steering agent is missing required steering components (Transform/Velocity/MaxSpeed/Impulse/...)"
+			)
+		})?;
 		match (&seek.on_not_found, steer_target.get_position(&transforms)) {
 			(_, Ok(target_position)) => {
 				*impulse = seek_impulse(
@@ -120,5 +124,48 @@ mod test {
 			.unwrap()
 			.translation
 			.xpect_eq(Vec3::new(0.01, 0., 0.));
+	}
+
+	// regression: a steering behaviour-tree nested under a (non-steering) scene root
+	// must resolve its agent to the steering entity via an explicit `ActionOf`, not
+	// to the scene root (which lacks the steering components) - the seek_3d failure.
+	#[beet_core::test]
+	fn nested_tree_resolves_agent_and_seeks() {
+		let mut app = App::new();
+		app.add_plugins(BeetSpatialPlugins).init_resource::<Time>();
+		let world = app.world_mut();
+
+		// the steering agent, nested under a scene root that has no steering bundle.
+		let agent = world
+			.spawn((
+				Transform::default(),
+				ForceBundle::default(),
+				SteerBundle::default(),
+				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
+			))
+			.id();
+		let scene_root = world.spawn(Transform::default()).add_child(agent).id();
+		// the behaviour-tree action, a descendant of the agent, acting on it.
+		world.spawn((
+			ChildOf(agent),
+			ActionOf(agent),
+			Seek::default(),
+			Running::<Outcome>::new(OutHandler::default()),
+		));
+
+		app.update_with_secs(1);
+
+		// the seek resolved to the nested agent and moved it...
+		app.world()
+			.get::<Transform>(agent)
+			.unwrap()
+			.translation
+			.xpect_eq(Vec3::new(0.01, 0., 0.));
+		// ...not the scene root, which never had a steer target and never moved.
+		app.world()
+			.get::<Transform>(scene_root)
+			.unwrap()
+			.translation
+			.xpect_eq(Vec3::ZERO);
 	}
 }

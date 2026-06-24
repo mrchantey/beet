@@ -91,15 +91,18 @@ pub struct PendingId(u64);
 /// [`PendingId`] must park on, so [`LoadTemplate`] defers until it resolves.
 /// Absent outside a build, in which case a dependency registers on the entity it
 /// builds into.
+///
+/// Public so a downstream crate can build its own deferral on the same wiring
+/// (eg `beet_spatial`'s scene-spawn gate parks a `PendingId` on the resolved
+/// root), mirroring the asset/remote-fetch deferrals.
 #[derive(Debug, Clone, Copy, Deref, DerefMut, Resource)]
-pub(crate) struct TemplateBuildRoot(pub Entity);
+pub struct TemplateBuildRoot(pub Entity);
 
-#[cfg(any(feature = "bevy_asset", feature = "bsx"))]
 impl TemplateBuildRoot {
 	/// The build root recorded in `world`, falling back to `entity` when none is
 	/// set (a build outside the walker), so a deferred dependency always has a
 	/// root to park on.
-	pub(crate) fn resolve(world: &World, entity: Entity) -> Entity {
+	pub fn resolve(world: &World, entity: Entity) -> Entity {
 		world
 			.get_resource::<TemplateBuildRoot>()
 			.map(|root| **root)
@@ -151,5 +154,33 @@ pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
 		return;
 	}
 	let is_error = root.contains::<TemplateError>();
-	root.trigger(move |entity| LoadTemplate { entity, is_error });
+	let root_id = root.id();
+	// fire on the root *and* every descendant in the built subtree, so a load verb
+	// (eg `RunOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
+	// Snapshot the subtree first, then fire: an observer may restructure the tree.
+	root.world_scope(|world| {
+		for entity in subtree_inclusive(world, root_id) {
+			if let Ok(mut entity) = world.get_entity_mut(entity) {
+				entity.trigger(move |entity| LoadTemplate { entity, is_error });
+			}
+		}
+	});
+}
+
+/// `root` and every descendant reachable through `Children`, depth-first.
+fn subtree_inclusive(world: &World, root: Entity) -> Vec<Entity> {
+	let mut out = vec![root];
+	let mut index = 0;
+	while index < out.len() {
+		let entity = out[index];
+		index += 1;
+		out.extend(
+			world
+				.entity(entity)
+				.get::<Children>()
+				.into_iter()
+				.flat_map(Children::iter),
+		);
+	}
+	out
 }

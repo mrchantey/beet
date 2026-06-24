@@ -29,15 +29,9 @@ where
 {
 	/// The result payload to return when the animation ends.
 	pub payload: P,
-	/// Path to the animation clip, resolved to [`Self::handle`] and
-	/// [`Self::animation_index`] at load.
+	/// Path to the animation clip, resolved to a graph node index against the
+	/// agent's [`AnimationGraphClips`] each frame.
 	pub clip: SmolStr,
-	/// The animation clip to check for end, resolved from [`Self::clip`].
-	#[reflect(ignore)]
-	pub handle: Handle<AnimationClip>,
-	/// The index of the animation to check for end, resolved from [`Self::clip`].
-	#[reflect(ignore)]
-	pub animation_index: AnimationNodeIndex,
 	/// The duration before the animation ends to trigger the action.
 	/// This should usually match the [`AnimationTransitions`] duration for
 	/// smooth crossfade.
@@ -59,43 +53,8 @@ where
 		Self {
 			payload: P::default(),
 			clip: SmolStr::default(),
-			handle: Handle::default(),
-			animation_index: AnimationNodeIndex::default(),
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
-	}
-}
-
-impl<P> TriggerOnAnimationEnd<P>
-where
-	P: 'static
-		+ Send
-		+ Sync
-		+ Clone
-		+ Default
-		+ Reflect
-		+ FromReflect
-		+ TypePath,
-{
-	/// Create a new [`TriggerOnAnimationEnd`] action.
-	pub fn new(
-		handle: Handle<AnimationClip>,
-		animation_index: AnimationNodeIndex,
-		payload: P,
-	) -> Self {
-		Self {
-			handle,
-			animation_index,
-			payload,
-			clip: SmolStr::default(),
-			transition_duration: DEFAULT_ANIMATION_TRANSITION,
-		}
-	}
-
-	/// Set the [`Self::transition_duration`]
-	pub fn with_transition_duration(mut self, duration: Duration) -> Self {
-		self.transition_duration = duration;
-		self
 	}
 }
 
@@ -104,6 +63,8 @@ where
 pub(crate) fn trigger_on_animation_end<P>(
 	mut commands: Commands,
 	clips: When<Res<Assets<AnimationClip>>>,
+	asset_server: When<Res<AssetServer>>,
+	graph_clips: Query<&AnimationGraphClips>,
 	query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running<P>>>,
 	agents: AgentQuery<&AnimationPlayer>,
 ) -> Result
@@ -118,14 +79,29 @@ where
 		+ TypePath,
 {
 	for (action, on_end) in query.iter() {
+		// resolve the clip path to a node index and asset handle on the agent root
+		let agent = agents.entity(action);
+		let animation_index = graph_clips
+			.get(agent)
+			.map_err(|_| {
+				bevyhow!(
+					"TriggerOnAnimationEnd on {action} has no AnimationGraphClips on agent root {agent}"
+				)
+			})?
+			.index(&on_end.clip)
+			.ok_or_else(|| {
+				bevyhow!("clip `{}` not in agent's AnimationGraph", on_end.clip)
+			})?;
+		let handle = asset_server.load::<AnimationClip>(on_end.clip.to_string());
 		let player = agents.get_descendent(action)?;
-		let clip = clips
-			.get(&on_end.handle)
-			.ok_or_else(|| bevyhow!("clip not found"))?;
+		// assets are gated to be loaded before LoadTemplate, so a missing clip
+		// asset is a real error, not a wait.
+		let clip = clips.get(&handle).ok_or_else(|| {
+			bevyhow!("clip `{}` not loaded", on_end.clip)
+		})?;
 
-		let Some(active_animation) = player.animation(on_end.animation_index)
-		else {
-			// animation not playing yet
+		let Some(active_animation) = player.animation(animation_index) else {
+			// not playing yet: legitimately transient
 			continue;
 		};
 

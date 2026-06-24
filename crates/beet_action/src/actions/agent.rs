@@ -173,7 +173,9 @@ where
 				bevyhow!("No entity in agent descendents matches the query")
 			})?
 			.xmap(|entity| self.query.get_mut(entity))
-			.unwrap()
+			.expect(
+				"AgentQuery: contains() passed but get_mut() failed, query state changed mid-system",
+			)
 			.xok()
 	}
 }

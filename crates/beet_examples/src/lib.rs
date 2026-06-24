@@ -17,8 +17,6 @@ pub mod prelude {
 	// the markup scene templates (`<Lighting3d/>`, `<Ground3d/>`, `<Sprite2d/>`, ...),
 	// so a `.bsx` names them and `beet_example_plugin` registers them by short type path.
 	#[cfg(feature = "bevy_default")]
-	pub use crate::scenes::AgentOf;
-	#[cfg(feature = "bevy_default")]
 	pub use crate::scenes::AppWindow;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::scenes::Camera3dLookAt;
@@ -29,7 +27,7 @@ pub mod prelude {
 	#[cfg(feature = "bevy_default")]
 	pub use crate::scenes::Ground3d;
 	#[cfg(feature = "bevy_default")]
-	pub use crate::scenes::IkArm;
+	pub use crate::scenes::IkTarget;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::scenes::Lighting3d;
 	#[cfg(feature = "bevy_default")]
@@ -42,8 +40,6 @@ pub mod prelude {
 	pub use crate::scenes::SpaceScene;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::scenes::Sprite2d;
-	#[cfg(feature = "bevy_default")]
-	pub use crate::scenes::SteerTo;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::scenes::UiTerminal;
 	#[cfg(feature = "bevy_default")]

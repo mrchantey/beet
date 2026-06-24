@@ -22,7 +22,7 @@ server boots only when `serve` is invoked, never on load.
     beet check examples/bsx_site           # lint a no-code site
     beet export-static examples/bsx_site   # write its dist/
 -->
-<Router {CliServer}>
+<Router {(CliServer, BootOnLoad)}>
 	<Serve/>
 	<RunWasm/>
 	<BuildWasm/>

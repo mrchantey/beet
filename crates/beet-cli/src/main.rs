@@ -121,7 +121,7 @@ async fn build_entry(
 			// `BootOnLoad` (eg a thread's `{CreateThread}`) dedups against the injected
 			// one. `BootOnLoad` rides the root spawn so it is present before the build
 			// fires `LoadTemplate`.
-			let root = build_site_root(world, store, sources, BootOnLoad)?;
+			let root = build_site_root(world, store, sources, ())?;
 			// `--watch` (local dev): mark the root for live reload. Its `FsStore`'s
 			// watcher already emits `BlobEvent`s, so editing a template/slide/style
 			// hot-reloads connected browsers, the deck's `<LiveReloadScript/>` widget

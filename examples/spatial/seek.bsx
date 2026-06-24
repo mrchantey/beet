@@ -3,5 +3,5 @@
 	<Camera2d/>
 	<SpaceScene/>
 	<Sprite2d src="spaceship_pack/planet_6.png" x=200. bx:ref="planet" {FollowCursor2d}/>
-	<SeekAgent2d src="spaceship_pack/ship_2.png" {SteerTargetEntity{target:$planet}}/>
+	<SeekAgent2d src="spaceship_pack/ship_2.png" {SteerTarget::Entity($planet)}/>
 </Scene2d>

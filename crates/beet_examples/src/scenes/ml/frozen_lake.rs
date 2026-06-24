@@ -18,7 +18,7 @@ pub const FROZEN_LAKE_SCENE_SCALE: f32 = 1.;
 /// [`CameraDistance`]), so this only lays out the board.
 #[template(system)]
 pub fn FrozenLake(
-	asset_server: Res<AssetServer>,
+	mut assets: BuildAssets,
 	mut commands: Commands,
 ) -> impl Bundle {
 	let map = FrozenLakeMap::default_four_by_four();
@@ -32,7 +32,9 @@ pub fn FrozenLake(
 			pos.y -= grid_to_world.cell_width;
 			commands.spawn((
 				Transform::from_translation(pos).with_scale(tile_scale),
-				WorldAssetRoot(asset_server.load(frozen_lake_assets::TILE)),
+				WorldAssetRoot(
+					assets.load::<WorldAsset>(frozen_lake_assets::TILE),
+				),
 			));
 		}
 	}
@@ -47,13 +49,15 @@ pub fn FrozenLake(
 				commands.spawn((
 					Transform::from_translation(pos).with_scale(object_scale),
 					WorldAssetRoot(
-						asset_server.load(frozen_lake_assets::HAZARD),
+						assets.load::<WorldAsset>(frozen_lake_assets::HAZARD),
 					),
 				));
 			}
 			FrozenLakeCell::Goal => {
 				commands.spawn((
-					WorldAssetRoot(asset_server.load(frozen_lake_assets::GOAL)),
+					WorldAssetRoot(
+						assets.load::<WorldAsset>(frozen_lake_assets::GOAL),
+					),
 					Transform::from_translation(pos).with_scale(object_scale),
 				));
 			}
@@ -74,7 +78,7 @@ pub fn FrozenLake(
 #[template(system)]
 pub fn FrozenLakeRunAgent(
 	mut rng: ResMut<RandomSource>,
-	asset_server: Res<AssetServer>,
+	mut assets: BuildAssets,
 	mut commands: Commands,
 ) -> impl Bundle {
 	let map = FrozenLakeMap::default_four_by_four();
@@ -86,7 +90,7 @@ pub fn FrozenLakeRunAgent(
 	let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
 
 	let qtable =
-		asset_server.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.ron");
+		assets.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.ron");
 
 	// Spawned top-level (not as a child of the scene host) so the action tree
 	// resolves its agent to this entity — its root ancestor — rather than the
@@ -100,7 +104,7 @@ pub fn FrozenLakeRunAgent(
 	//       TranslateGrid — animate the move
 	commands.spawn((
 		Name::new("Inference Agent"),
-		WorldAssetRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
+		WorldAssetRoot(assets.load::<WorldAsset>(frozen_lake_assets::CHARACTER)),
 		Transform::from_translation(agent_pos).with_scale(object_scale),
 		grid_to_world,
 		agent_grid_pos,

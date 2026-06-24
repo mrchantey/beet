@@ -143,7 +143,7 @@ custom_test_frameworks = [
 ]
 http = ["dep:http"]
 crossterm = ["dep:crossterm", "dep:libc"]
-bevy_default = ["template_serde", "bevy_multithreaded"]
+bevy_default = ["template_serde", "bevy_multithreaded", "bevy_asset"]
 # template serialization, see src/template_serde. needs reflect + Entity serde
 template_serde = ["serde", "bevy/serialize"]
 bevy_keyboard = ["bevy/keyboard"]

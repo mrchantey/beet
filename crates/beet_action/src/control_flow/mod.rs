@@ -12,6 +12,8 @@ mod score;
 pub use score::*;
 mod repeat;
 pub use repeat::*;
+mod run_on_load;
+pub use run_on_load::*;
 mod running;
 pub use running::*;
 mod sequence;

@@ -408,6 +408,45 @@ mod test {
 	}
 
 	#[beet_core::test]
+	fn load_fires_on_every_descendant() {
+		use crate::prelude::*;
+		let mut world = TemplatePlugin::world();
+		// record every entity LoadTemplate fires on.
+		let targets = Store::new(Vec::<Entity>::new());
+		let rec = targets.clone();
+		world.add_observer(move |ev: On<LoadTemplate>| {
+			let mut fired = rec.get();
+			fired.push(ev.entity);
+			rec.set(fired);
+		});
+
+		// build root -> child -> grandchild.
+		let root = world
+			.spawn_template(bevy::ecs::template::template(
+				|cx: &mut TemplateContext| {
+					let root = cx.entity.id();
+					cx.entity.world_scope(|world| {
+						let child = world.spawn(ChildOf(root)).id();
+						world.spawn(ChildOf(child));
+					});
+					OK
+				},
+			))
+			.unwrap()
+			.id();
+		let child = world.entity(root).get::<Children>().unwrap()[0];
+		let grandchild = world.entity(child).get::<Children>().unwrap()[0];
+
+		// LoadTemplate reached the root and every descendant, each exactly once.
+		let fired = targets.get();
+		fired.len().xpect_eq(3);
+		[root, child, grandchild]
+			.iter()
+			.all(|entity| fired.contains(entity))
+			.xpect_true();
+	}
+
+	#[beet_core::test]
 	fn build_failure_rides_template_error() {
 		#[derive(Clone)]
 		struct Boom;

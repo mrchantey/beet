@@ -1,3 +1,4 @@
+use super::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::animation::RepeatAnimation;
@@ -11,7 +12,9 @@ pub(super) const DEFAULT_ANIMATION_TRANSITION: Duration =
 #[require(PlayAnimationAction)]
 #[reflect(Default, Component)]
 pub struct PlayAnimation {
-	animation: AnimationNodeIndex,
+	/// Path to the animation clip, resolved to a graph node index against the
+	/// agent's [`AnimationGraphClips`] when the action runs.
+	pub clip: SmolStr,
 	/// Trigger once again if the animation is already playing
 	pub trigger_if_playing: bool,
 	/// Amount of times to repeat the animation.
@@ -22,10 +25,10 @@ pub struct PlayAnimation {
 }
 
 impl PlayAnimation {
-	/// Create a new [`PlayAnimation`] action.
-	pub fn new(animation: AnimationNodeIndex) -> Self {
+	/// Create a new [`PlayAnimation`] action for the clip at `clip`.
+	pub fn new(clip: impl Into<SmolStr>) -> Self {
 		Self {
-			animation,
+			clip: clip.into(),
 			trigger_if_playing: false,
 			repeat: RepeatAnimation::default(),
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
@@ -63,63 +66,30 @@ impl PlayAnimation {
 pub fn PlayAnimationAction(
 	cx: In<ActionContext>,
 	query: Query<&PlayAnimation>,
+	graph_clips: Query<&AnimationGraphClips>,
 	mut agents: AgentQuery<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 ) -> Result<Outcome> {
 	let play_animation = query.get(cx.id())?;
+	// resolve the clip path to a node index before borrowing the player mutably
+	let agent = agents.entity(cx.id());
+	let animation = graph_clips.get(agent)
+		.map_err(|_| bevyhow!("PlayAnimation on {} has no AnimationGraphClips on its agent root {agent}; build the graph with build_animation_graph/<CreateAnimationGraph>", cx.id()))?
+		.index(&play_animation.clip)
+		.ok_or_else(|| bevyhow!("clip `{}` is not in the agent's AnimationGraph", play_animation.clip))?;
 	let (mut player, mut transitions) = agents.get_descendent_mut(cx.id())?;
 
-	if !player.is_playing_animation(play_animation.animation)
-		|| play_animation.trigger_if_playing
+	if !player.is_playing_animation(animation) || play_animation.trigger_if_playing
 	{
 		transitions
-			.play(
-				&mut player,
-				play_animation.animation,
-				play_animation.transition_duration,
-			)
+			.play(&mut player, animation, play_animation.transition_duration)
 			.set_repeat(play_animation.repeat);
 	}
 	Outcome::PASS.xok()
 }
 
-// /// Play animations for animators that load after the behavior starts
-// pub(super) fn play_animation_on_load(
-// 	parents: Query<&Parent>,
-// 	mut loaded_animators: Query<
-// 		(Entity, &mut AnimationPlayer, &mut AnimationTransitions),
-// 		Added<AnimationPlayer>,
-// 	>,
-// 	query: Query<(&Running, &PlayAnimation)>,
-// ) {
-// 	for (entity, mut player, mut transitions) in loaded_animators.iter_mut() {
-// 		let Some(play_animation) =
-// 			parents.iter_ancestors_inclusive(entity).find_map(|parent| {
-// 				query.iter().find_map(|(target, play_animation)| {
-// 					if target.origin == parent {
-// 						Some(play_animation)
-// 					} else {
-// 						None
-// 					}
-// 				})
-// 			})
-// 		else {
-// 			continue;
-// 		};
-// 		if !player.is_playing_animation(play_animation.animation)
-// 			|| play_animation.trigger_if_playing
-// 		{
-// 			transitions
-// 				.play(
-// 					&mut player,
-// 					play_animation.animation,
-// 					play_animation.transition_duration,
-// 				)
-// 				.set_repeat(play_animation.repeat);
-// 		}
-// 	}
-// }
-
-/// convenience system to create an [`AnimationPlayer`] from a clip
+/// Convenience system to create an [`AnimationPlayer`] from a clip, exposing the
+/// clip under the path `"test"` via [`AnimationGraphClips`] so the new clip-path
+/// resolution flow can be driven in tests.
 #[cfg(test)]
 pub fn clip_to_player(
 	clip: In<AnimationClip>,
@@ -129,14 +99,16 @@ pub fn clip_to_player(
 ) -> (Entity, AnimationNodeIndex) {
 	let (graph, animation_index) =
 		AnimationGraph::from_clip(animations.add(clip.0));
-	let player = AnimationPlayer::default();
-	// player.play(animation_index).repeat();
+	let graph_clips = AnimationGraphClips::new(
+		[(SmolStr::new("test"), animation_index)].into_iter().collect(),
+	);
 
 	let player_entity = commands
 		.spawn((
 			AnimationGraphHandle(graphs.add(graph)),
-			player,
+			AnimationPlayer::default(),
 			AnimationTransitions::new(),
+			graph_clips,
 		))
 		.id();
 	(player_entity, animation_index)
@@ -205,10 +177,10 @@ mod test {
 
 	#[beet_core::test]
 	fn works() {
-		let (mut app, store, entity, index) = setup();
+		let (mut app, store, entity, _index) = setup();
 
 		app.world_mut()
-			.spawn((ChildOf(entity), PlayAnimation::new(index)))
+			.spawn((ChildOf(entity), PlayAnimation::new("test")))
 			.call_blocking::<(), Outcome>(())
 			.unwrap();
 		store.get().xpect_empty();
@@ -229,12 +201,12 @@ mod test {
 	// Sequence → Sequence(Idle) → PlayAnimation
 	#[beet_core::test]
 	async fn example_tree_plays_animation() {
-		let (mut app, store, agent, index) = setup();
+		let (mut app, store, agent, _index) = setup();
 
 		app.world_mut().entity_mut(agent).with_children(|builder| {
 			builder.spawn((Sequence::new(), children![(
 				Sequence::new(),
-				children![PlayAnimation::new(index)],
+				children![PlayAnimation::new("test")],
 			)]));
 		});
 

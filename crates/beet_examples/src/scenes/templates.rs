@@ -49,10 +49,10 @@ pub fn Ground3d(
 }
 
 /// Loads a glb/gltf scene by path and spawns its model as children, the markup
-/// form of `WorldAssetRoot(asset_server.load(path))`, eg
+/// form of `WorldAssetRoot(assets.load(path))`, eg
 /// `<WorldScene src="misc/fox.glb#Scene0" scale=0.1/>`. A `#[template(system)]`
-/// since the handle is minted from the [`AssetServer`] at build time. Named
-/// `WorldScene` (not `Scene`) to avoid bevy's `Scene` + beet's `Scene` trait.
+/// loading through [`BuildAssets`] so `LoadTemplate` defers until the scene loads.
+/// Named `WorldScene` (not `Scene`) to avoid bevy's `Scene` + beet's `Scene` trait.
 ///
 /// `x`/`y`/`z`/`scale` set the model's transform in Rust because `Transform`
 /// cannot be a markup spread (beet registers two `Transform` short paths, so it
@@ -65,31 +65,12 @@ pub fn WorldScene(
 	#[prop(default)] y: f32,
 	#[prop(default)] z: f32,
 	#[prop(default = 1.0_f32)] scale: f32,
-	asset_server: Res<AssetServer>,
+	mut assets: BuildAssets,
 ) -> impl Bundle {
 	(
-		WorldAssetRoot(asset_server.load(src)),
+		WorldAssetRoot(assets.load::<WorldAsset>(src)),
 		Transform::from_xyz(x, y, z).with_scale(Vec3::splat(scale)),
 	)
-}
-
-/// Marks a behaviour-tree subtree as acting on `agent` (an `ActionOf`
-/// relationship), so its actions resolve their agent by ref instead of by walking
-/// to the scene root. Needed when the agent is nested (eg `<Foxie bx:ref="fox">`
-/// under a `<Scene3d>`), unlike a top-level Rust spawn where the agent is the root.
-/// Hosts the subtree via `<Slot/>`: `<AgentOf agent=$fox {Repeat}>...</AgentOf>`.
-#[template]
-pub fn AgentOf(#[prop(required)] agent: Entity) -> impl Bundle {
-	rsx! { <span {ActionOf(agent)}><Slot/></span> }
-}
-
-/// Points a steering agent's `SteerTarget` at another entity by markup ref, eg
-/// `<Foxie {SteerTo{target:$cheese}}>`. `SteerTarget` is an enum so it can't be
-/// spread with a variant directly; this template builds the `Entity` variant in
-/// Rust, and the ref resolves at build time to the real entity.
-#[template]
-pub fn SteerTo(#[prop(required)] target: Entity) -> impl Bundle {
-	SteerTarget::Entity(target)
 }
 
 /// The primary application window, spawned from data: the render binary links winit
@@ -117,43 +98,32 @@ pub fn UiTerminal(
 	spawn_ui_terminal(commands, input);
 }
 
-/// The animated fox agent: loads `misc/fox.glb`, builds its idle (`Animation0`) +
-/// walk (`Animation1`) `AnimationGraph`, and attaches the runtime animation
-/// components. A `.bsx` authors `<Foxie scale=0.1>` and the behaviour-tree children
-/// reference clips by path (`<PlayAnimation clip="misc/fox.glb#Animation1"/>`),
-/// resolved at load by `resolve_animation_clips`. Hosts the behaviour tree as
-/// children via `<Slot/>`; steering components spread onto the same tag.
+/// The animated fox agent: loads `misc/fox.glb` and its idle (`Animation0`) + walk
+/// (`Animation1`) `AnimationGraph` through the deferred [`BuildAssets`] path, so
+/// `LoadTemplate` waits for every clip and the glb scene before the tree runs.
+/// Hosts the behaviour tree as children via `<Slot/>` and carries the
+/// [`AnimationGraphClips`] those children resolve clips against
+/// (`<PlayAnimation clip="misc/fox.glb#Animation1"/>`). A `.bsx` authors
+/// `<Foxie scale=0.1>`; the scene supplies the steer target as a spread
+/// (`{SteerTarget::Entity($cheese)}`), and steering components ride the same tag.
 #[template(system)]
 pub fn Foxie(
 	#[prop(default = 1.0_f32)] scale: f32,
-	// the fixed seek-target position (eg `seek_x=20 seek_z=40`). `SteerTarget` is an
-	// enum so it can't be a markup spread, and a markup entity-ref into a template
-	// prop does not resolve yet, so the agent seeks a position set from scalar props.
-	#[prop(default)] seek_x: f32,
-	#[prop(default)] seek_y: f32,
-	#[prop(default)] seek_z: f32,
-	asset_server: Res<AssetServer>,
 	mut graphs: ResMut<Assets<AnimationGraph>>,
+	mut assets: BuildAssets,
 ) -> impl Bundle {
-	let mut graph = AnimationGraph::new();
-	let root = graph.root;
-	graph.add_clip(
-		asset_server.load::<AnimationClip>("misc/fox.glb#Animation0"),
-		1.0,
-		root,
-	);
-	graph.add_clip(
-		asset_server.load::<AnimationClip>("misc/fox.glb#Animation1"),
-		1.0,
-		root,
-	);
+	let clips = vec![
+		"misc/fox.glb#Animation0".to_string(),
+		"misc/fox.glb#Animation1".to_string(),
+	];
+	// the `<span>` hosts the behaviour-tree `<Slot/>` children; a Rust `#[template]`
+	// has no neutral host element (`<Fragment>` is `.bsx`-only), and the inert
+	// `Element` is harmless on a render entity.
 	rsx! {
 		<span {(
-			WorldAssetRoot(asset_server.load("misc/fox.glb#Scene0")),
+			WorldAssetRoot(assets.load::<WorldAsset>("misc/fox.glb#Scene0")),
 			Transform::from_scale(Vec3::splat(scale)),
-			AnimationGraphHandle(graphs.add(graph)),
-			AnimationTransitions::new(),
-			SteerTarget::Position(Vec3::new(seek_x, seek_y, seek_z)),
+			build_animation_graph(&clips, &mut graphs, &mut assets),
 		)}><Slot/></span>
 	}
 }
@@ -161,9 +131,8 @@ pub fn Foxie(
 /// An identity-transform, visible scene root that hosts 3d scene entities as
 /// children, eg `<Scene3d><Camera3d/><Ground3d/></Scene3d>`. The entry's store
 /// entity has no transform, so a scene needs this root for child
-/// `GlobalTransform`s to propagate. `Transform` itself can't be a markup tag —
-/// beet registers two `Transform` short paths (bevy's + ui's), so it resolves
-/// ambiguously — but a Rust `#[template]` body names bevy's unambiguously.
+/// `GlobalTransform`s to propagate. Carries the transform on its own entity
+/// alongside the slot, so it emits no wrapper element.
 #[template]
 pub fn Scene3d() -> impl Bundle {
 	rsx! { <span {(Transform::default(), Visibility::default())}><Slot/></span> }
@@ -184,43 +153,33 @@ pub fn Camera3dLookAt(
 	)
 }
 
-/// A 4-DOF inverse-kinematics robot arm that reaches for a keyboard-movable target,
-/// the data form of the imperative `inverse_kinematics` setup. Spawns the target (a
-/// blue sphere with a [`KeyboardController`]) here in Rust and returns the arm: the
-/// `robot-arm.glb` model with an [`IkSpawner`] (which builds the IK chain from the
-/// loaded model) pointed at the target via `TargetEntity::Other`. The target ref is
-/// wired in Rust because a markup entity-ref cannot reach an enum variant.
+/// The keyboard-movable target for the inverse-kinematics arm: a blue sphere with a
+/// [`KeyboardController`], the data form of the imperative `inverse_kinematics`
+/// target spawn. A thin `#[template(system)]` because the sphere mints `Mesh` +
+/// `StandardMaterial` assets, which are not markup values; the arm itself is authored
+/// in `.bsx` (a `<WorldScene>` with `{(IkSpawner, TargetEntity::Other($target))}`)
+/// pointed at this target by `bx:ref`.
 #[template(system)]
-pub fn IkArm(
-	asset_server: Res<AssetServer>,
+pub fn IkTarget(
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<StandardMaterial>>,
-	mut commands: Commands,
 ) -> impl Bundle {
-	let target = commands
-		.spawn((
-			KeyboardController::default(),
-			Transform::from_xyz(0., 1.5, 2.5).looking_to(-Vec3::Z, Vec3::Y),
-			Mesh3d(meshes.add(Sphere::new(0.2))),
-			MeshMaterial3d(materials.add(StandardMaterial {
-				base_color: bevy::color::palettes::tailwind::BLUE_500.into(),
-				unlit: true,
-				..default()
-			})),
-		))
-		.id();
 	(
-		WorldAssetRoot(asset_server.load("robot-arm/robot-arm.glb#Scene0")),
-		Transform::from_scale(Vec3::splat(10.)),
-		TargetEntity::Other(target),
-		IkSpawner::default(),
+		KeyboardController::default(),
+		Transform::from_xyz(0., 1.5, 2.5).looking_to(-Vec3::Z, Vec3::Y),
+		Mesh3d(meshes.add(Sphere::new(0.2))),
+		MeshMaterial3d(materials.add(StandardMaterial {
+			base_color: bevy::color::palettes::tailwind::BLUE_500.into(),
+			unlit: true,
+			..default()
+		})),
 	)
 }
 
 /// The 2d counterpart of [`Scene3d`]: an identity-transform, visible root that hosts
 /// 2d scene entities as children, eg `<Scene2d><Camera2d/><SpaceScene/></Scene2d>`.
 /// Same role as [`Scene3d`] (a transform root the entry's transformless store entity
-/// lacks) — kept separate so a 2d `.bsx` reads in its own dimension.
+/// lacks), kept separate so a 2d `.bsx` reads in its own dimension.
 #[template]
 pub fn Scene2d() -> impl Bundle {
 	rsx! { <span {(Transform::default(), Visibility::default())}><Slot/></span> }
@@ -228,7 +187,7 @@ pub fn Scene2d() -> impl Bundle {
 
 /// Loads an image by path into a [`Sprite`], the 2d counterpart of [`WorldScene`],
 /// eg `<Sprite2d src="spaceship_pack/ship_2.png" scale=0.5/>`. A `#[template(system)]`
-/// since the image handle is minted from the [`AssetServer`] at build time;
+/// loading the image through [`BuildAssets`] so `LoadTemplate` defers until it loads;
 /// `x`/`y`/`z`/`scale` set the transform in Rust (a `Vec3` markup prop coerces as a
 /// string). Other markers (eg `FollowCursor2d`, `RotateToVelocity2d`) spread normally.
 #[template(system)]
@@ -238,11 +197,11 @@ pub fn Sprite2d(
 	#[prop(default)] y: f32,
 	#[prop(default)] z: f32,
 	#[prop(default = 1.0_f32)] scale: f32,
-	asset_server: Res<AssetServer>,
+	mut assets: BuildAssets,
 ) -> impl Bundle {
 	(
 		Sprite {
-			image: asset_server.load(src),
+			image: assets.load(src),
 			..default()
 		},
 		Transform::from_xyz(x, y, z).with_scale(Vec3::splat(scale)),
@@ -250,22 +209,23 @@ pub fn Sprite2d(
 }
 
 /// A 2d steering agent that seeks a target forever: a sprite with the force/steer
-/// bundles, `RotateToVelocity2d`, a [`Seek`] action, and the `CallOnSpawn` that kicks
-/// the action into `Running` on spawn. The data form of the imperative `seek` setup,
-/// so `<SeekAgent2d src="..." {SteerTargetEntity{target:$planet}}/>` flies a ship at a
-/// markup-referenced target. The kickoff and bundles are built here in Rust because
-/// `CallOnSpawn` is generic (not a markup spread); the target rides a spread because a
-/// markup entity-ref reaches a reflect component field but not a template prop.
+/// bundles, `RotateToVelocity2d`, a [`Seek`] action, and the [`RunOnLoad`] that
+/// kicks the action into `Running` once the deferred sprite image has loaded. The
+/// data form of the imperative `seek` setup, so
+/// `<SeekAgent2d src="..." {SteerTarget::Entity($planet)}/>` flies a ship at a
+/// markup-referenced target. The image loads through [`BuildAssets`] so the run
+/// defers until it exists; the target rides a spread that resolves the ref into the
+/// `SteerTarget::Entity` variant.
 #[template(system)]
 pub fn SeekAgent2d(
 	#[prop(into)] src: String,
 	#[prop(default = 1.0_f32)] scale: f32,
 	#[prop(default = 500.0_f32)] scaled_dist: f32,
-	asset_server: Res<AssetServer>,
+	mut assets: BuildAssets,
 ) -> impl Bundle {
 	(
 		Sprite {
-			image: asset_server.load(src),
+			image: assets.load(src),
 			..default()
 		},
 		Transform::from_scale(Vec3::splat(scale)),
@@ -273,7 +233,7 @@ pub fn SeekAgent2d(
 		ForceBundle::default(),
 		SteerBundle::default().scaled_dist(scaled_dist),
 		Seek::default(),
-		CallOnSpawn::<(), Outcome>::default(),
+		RunOnLoad,
 	)
 }
 
@@ -286,11 +246,11 @@ pub fn SeekAgent2d(
 #[template(system)]
 pub fn Flock(
 	#[prop(default = 300_usize)] count: usize,
-	asset_server: Res<AssetServer>,
 	mut rand: ResMut<RandomSource>,
+	mut assets: BuildAssets,
 	mut commands: Commands,
 ) -> impl Bundle {
-	let ship = asset_server.load::<Image>("spaceship_pack/ship_2.png");
+	let ship = assets.load::<Image>("spaceship_pack/ship_2.png");
 	// pixel space, so scale the steering params up from their 0..1 defaults.
 	const SCALE: f32 = 100.;
 	for _ in 0..count {
@@ -317,14 +277,14 @@ pub fn Flock(
 
 /// A tiled starfield backdrop behind a 2d scene, the data form of the imperative
 /// `space_scene`, so `<SpaceScene/>` backs a 2d `.bsx`. A `#[template(system)]`
-/// since the image is loaded from the [`AssetServer`] at build time.
+/// loading the image through [`BuildAssets`] so `LoadTemplate` defers until it loads.
 #[template(system)]
-pub fn SpaceScene(asset_server: Res<AssetServer>) -> impl Bundle {
+pub fn SpaceScene(mut assets: BuildAssets) -> impl Bundle {
 	(
 		Transform::from_translation(Vec3::new(0., 0., -1.))
 			.with_scale(Vec3::splat(100.)),
 		Sprite {
-			image: asset_server.load("space_background/Space_Stars2.png"),
+			image: assets.load("space_background/Space_Stars2.png"),
 			image_mode: SpriteImageMode::Tiled {
 				tile_x: true,
 				tile_y: true,

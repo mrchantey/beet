@@ -103,6 +103,13 @@ fn winit_default_plugins() -> PluginGroupBuilder {
 	DefaultPlugins
 		.set(AssetPlugin {
 			meta_check: AssetMetaCheck::Never,
+			// resolve the assets dir from the workspace root (the nearest ancestor
+			// with a `Cargo.lock`), so a render scene loads its assets regardless of
+			// the process cwd and with no `BEVY_ASSET_ROOT` set.
+			file_path: workspace_root()
+				.join("assets")
+				.to_string_lossy()
+				.into_owned(),
 			..default()
 		})
 		.set(WindowPlugin {

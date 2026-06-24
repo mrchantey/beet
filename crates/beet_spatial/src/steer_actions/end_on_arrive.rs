@@ -34,7 +34,11 @@ pub(crate) fn end_on_arrive(
 	query: Populated<(Entity, &EndOnArrive), With<Running<Outcome>>>,
 ) -> Result {
 	for (action, end_on_arrive) in query.iter() {
-		let (transform, target) = agents.get(action)?;
+		let (transform, target) = agents.get(action).map_err(|_| {
+			bevyhow!(
+				"EndOnArrive action {action}: its resolved steering agent is missing Transform/SteerTarget"
+			)
+		})?;
 		match target.get_position(&transforms) {
 			Ok(target) => {
 				if transform.translation().distance_squared(target)

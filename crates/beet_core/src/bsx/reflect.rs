@@ -100,6 +100,15 @@ pub fn registration_by_name<'a>(
 	if let Some(registration) = registry.get_with_short_type_path(name) {
 		return Some(registration);
 	}
+	// a `::`-qualified name may be a fully-qualified type path: the way to name a
+	// type whose short path is ambiguous (eg the two registered `Transform`s,
+	// `bevy::transform::components::Transform` vs the CSS one). A bare ambiguous
+	// short path resolves to nothing above rather than guessing.
+	if name.contains("::")
+		&& let Some(registration) = registry.get_with_type_path(name)
+	{
+		return Some(registration);
+	}
 	let mut matches = registry.iter().filter(|registration| {
 		let short = registration.type_info().type_path_table().short_path();
 		short.len() > name.len()
@@ -117,6 +126,23 @@ pub fn type_info_by_name(
 	name: &str,
 ) -> Option<&'static TypeInfo> {
 	registration_by_name(registry, name).map(|reg| reg.type_info())
+}
+
+/// Resolve a `Type::Variant` spread name (eg `SteerTarget::Entity`) to the
+/// *enum's* registration, so a `{SteerTarget::Entity($cheese)}` spread builds
+/// the variant through [`enum_to_reflect`] (which reduces the qualified name to
+/// its last segment). `None` when the prefix is not a registered enum carrying
+/// that variant, so a genuine miss still falls through to the unknown-name path.
+pub fn enum_variant_registration<'a>(
+	registry: &'a TypeRegistry,
+	name: &str,
+) -> Option<&'a TypeRegistration> {
+	let (type_name, variant) = name.rsplit_once("::")?;
+	let registration = registration_by_name(registry, type_name)?;
+	let TypeInfo::Enum(enum_info) = registration.type_info() else {
+		return None;
+	};
+	enum_info.variant(variant).is_some().then_some(registration)
 }
 
 /// Coerce a scalar [`Value`] to the field's concrete type, falling through to
@@ -446,6 +472,33 @@ mod test {
 		// a second instantiation makes the bare name ambiguous
 		registry.register::<GenericMarker<bool>>();
 		type_info_by_name(&registry, "GenericMarker").xpect_none();
+	}
+
+	/// A fully-qualified type path resolves a type whose short path is ambiguous
+	/// (two registered `Dup`s), where the bare short name resolves to nothing.
+	#[beet_core::test]
+	fn qualified_type_path_disambiguates() {
+		mod outer {
+			#[derive(bevy::prelude::Reflect)]
+			pub struct Dup;
+		}
+		#[derive(Reflect)]
+		struct Dup;
+
+		let mut registry = TypeRegistry::default();
+		registry.register::<Dup>();
+		registry.register::<outer::Dup>();
+		// the bare short name is ambiguous, so it resolves to nothing
+		type_info_by_name(&registry, "Dup").xpect_none();
+		// each fully-qualified path resolves unambiguously
+		type_info_by_name(&registry, Dup::type_info().type_path())
+			.unwrap()
+			.type_path()
+			.xpect_eq(Dup::type_info().type_path());
+		type_info_by_name(&registry, outer::Dup::type_info().type_path())
+			.unwrap()
+			.type_path()
+			.xpect_eq(outer::Dup::type_info().type_path());
 	}
 
 	/// A string attribute targeting an `AbsPathBuf` field coerces workspace-relative,

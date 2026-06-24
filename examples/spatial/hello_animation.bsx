@@ -3,8 +3,8 @@
 	<Camera3d {CameraDistance{width:20., offset:{x:10., y:10., z:15.}}}/>
 	<Lighting3d/>
 	<Ground3d/>
-	<Foxie scale=0.1>
-		<div {(TriggerOnAnimationReady, Repeat)}>
+	<Foxie scale=0.1 bx:ref="fox">
+		<div {(RunOnLoad, Repeat, ActionOf($fox))}>
 			<div {Sequence}>
 				<div {Sequence}>
 					<PlayAnimation clip="misc/fox.glb#Animation0"/>

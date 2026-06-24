@@ -1,8 +1,10 @@
 <!--
 The smallest beet entry: a script that runs on load and prints, the
 `node main.js` shape. `<script>` is a raw-text element so the JavaScript body is
-verbatim; `ScriptEntry` fills the entry's action slot (it runs the script and
-returns its `console.log` as the response), and `BootOnLoad` calls it once the
-entry is built, streaming the output to stdout, then exiting.
+verbatim; `ExchangeScriptElement` fills the entry's `Action<Request, Response>`
+slot (it runs the script and returns its `console.log` as the response), and
+`ExchangeOnLoad` calls that slot once the entry is built, streaming the output to
+stdout, then exiting. (`BootOnLoad` would expect an `Action<Boot, Response>`
+slot, which a script element does not install.)
 -->
-<script {(ScriptEntry, BootOnLoad)}>console.log("hello world")</script>
+<script {(ExchangeScriptElement, ExchangeOnLoad)}>console.log("hello world")</script>

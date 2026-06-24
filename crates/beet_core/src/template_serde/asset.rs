@@ -20,6 +20,7 @@ use bevy::asset::AssetServer;
 use bevy::asset::Handle;
 use bevy::asset::RecursiveDependencyLoadState;
 use bevy::asset::UntypedHandle;
+use bevy::ecs::system::SystemParam;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
 
@@ -75,8 +76,7 @@ impl<A: Asset> Template for AssetLoadTemplate<A> {
 			.entry::<PendingAssets>()
 			.or_default()
 			.get_mut()
-			.0
-			.push((handle.clone().untyped(), pending_id));
+			.push(handle.clone().untyped(), pending_id);
 
 		Ok(handle)
 	}
@@ -89,11 +89,76 @@ impl<A: Asset> Template for AssetLoadTemplate<A> {
 	}
 }
 
+/// A [`SystemParam`] for loading assets from inside a `#[template(system)]`, so
+/// the load defers [`LoadTemplate`] until the asset finishes loading. The
+/// system-side counterpart of [`AssetLoadTemplate`].
+///
+/// A raw `asset_server.load(..)` inside a template mints a handle but lets
+/// `LoadTemplate` fire immediately; `BuildAssets::load` parks a pending
+/// dependency on the build root instead, so behaviours never run before their
+/// assets exist.
+#[derive(SystemParam)]
+pub struct BuildAssets<'w, 's> {
+	server: Res<'w, AssetServer>,
+	build_root: Option<Res<'w, TemplateBuildRoot>>,
+	commands: Commands<'w, 's>,
+}
+
+impl BuildAssets<'_, '_> {
+	/// Load the asset at `path`, registering it as a pending dependency on the
+	/// current template build root so `LoadTemplate` defers until it loads.
+	///
+	/// Outside a template build (no [`TemplateBuildRoot`]) it loads without
+	/// deferral, like a plain `asset_server.load`.
+	pub fn load<A: Asset>(&mut self, path: impl Into<String>) -> Handle<A> {
+		let handle = self.server.load::<A>(path.into());
+		let Some(root) = self.build_root.as_deref().map(|root| **root) else {
+			return handle;
+		};
+		// register synchronously (the queue drains in `with_state::apply`, before
+		// the build's `drain_pending_dependencies`), keeping a strong handle so the
+		// load is not cancelled before it settles.
+		let untyped = handle.clone().untyped();
+		self.commands.queue(move |world: &mut World| {
+			let mut root = world.entity_mut(root);
+			let id = root
+				.entry::<TemplatePending>()
+				.or_default()
+				.get_mut()
+				.register();
+			root.entry::<PendingAssets>()
+				.or_default()
+				.get_mut()
+				.push(untyped, id);
+		});
+		handle
+	}
+}
+
 /// Tracks the outstanding asset dependencies registered on a template root: each
 /// pairs a strong asset handle (kept alive so the load is not cancelled) with the
 /// [`PendingId`] it parked on [`TemplatePending`].
 #[derive(Debug, Default, Component)]
 pub struct PendingAssets(Vec<(UntypedHandle, PendingId)>);
+
+impl PendingAssets {
+	/// Track a strong handle against the [`PendingId`] it parked on the root.
+	fn push(&mut self, handle: UntypedHandle, id: PendingId) {
+		self.0.push((handle, id));
+	}
+}
+
+/// Registers [`drain_loaded_assets`] so a deferred asset load (via
+/// [`AssetLoadTemplate`] or [`BuildAssets`]) resolves once the asset finishes
+/// loading. Add to any running app whose templates load assets.
+#[derive(Default)]
+pub struct AssetTemplatePlugin;
+
+impl Plugin for AssetTemplatePlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(Update, drain_loaded_assets);
+	}
+}
 
 /// Resolves loaded (or failed) tracked assets and drains the root's pending set.
 ///
@@ -237,5 +302,37 @@ mod test {
 		}
 		// LoadTemplate fired, no error, once the asset finished loading.
 		load_state.get().xpect_eq(Some(false));
+	}
+
+	/// `BuildAssets::load` (the system-side helper) parks the load as a pending
+	/// dependency on the build root, so `LoadTemplate` defers. The full
+	/// load-then-fire cycle is covered by [`defers_load_until_asset_loaded`];
+	/// both drain through the same [`drain_loaded_assets`].
+	#[beet_core::test]
+	fn build_assets_defers_load() {
+		let mut app = asset_app();
+		let world = app.world_mut();
+
+		let fired = Store::new(false);
+		let f = fired.clone();
+		world.add_observer(move |_: On<LoadTemplate>| f.set(true));
+
+		// a `#[template(system)]`-style build that loads through `BuildAssets`.
+		let root = world
+			.spawn_template(system_template::<BuildAssets, _, _>(
+				|_entity, mut assets: BuildAssets| {
+					assets.load::<TextAsset>("hello.txt");
+					Snippet::from_bundle(())
+				},
+			))
+			.unwrap()
+			.id();
+
+		// LoadTemplate deferred: the asset is parked pending on the build root.
+		fired.get().xpect_false();
+		app.world()
+			.entity(root)
+			.contains::<PendingAssets>()
+			.xpect_true();
 	}
 }

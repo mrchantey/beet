@@ -18,10 +18,12 @@ pub const FETCH_ITEM_OFFSET: f32 = 2.;
 /// spawned here in Rust (the spawn-N pattern, like [`Flock`](crate::prelude::Flock));
 /// they sit at world positions, so they are top-level rather than children of the
 /// inert template host. Each carries a [`Sentence`] the fox matches against, and a
-/// scaled glb model child. The camera + terminal live in the `.bsx`.
+/// scaled glb model child loaded through the deferred [`BuildAssets`] path so the
+/// scene's `LoadTemplate` waits for every model. The camera + terminal live in the
+/// `.bsx`.
 #[template(system)]
 pub fn FetchItems(
-	asset_server: Res<AssetServer>,
+	mut assets: BuildAssets,
 	mut commands: Commands,
 ) -> impl Bundle {
 	let scale = Vec3::splat(0.5);
@@ -72,7 +74,7 @@ pub fn FetchItems(
 			Visibility::default(),
 			children![(
 				Transform::from_xyz(0., model_y, 0.).with_scale(scale),
-				WorldAssetRoot(asset_server.load(src)),
+				WorldAssetRoot(assets.load::<WorldAsset>(src)),
 			)],
 		));
 	}
@@ -82,15 +84,19 @@ pub fn FetchItems(
 /// user-driven behaviour tree that converts the typed prompt into a
 /// [`SteerTarget`], walks the fox there, then returns it to idle.
 ///
-/// Spawned top-level (not as the returned bundle) so the action tree resolves its
-/// agent to this entity — its root ancestor, which carries the steering
-/// components — rather than the transformless scene root (the frozen-lake lesson).
-/// The `Handle<Bert>` is minted from the [`AssetServer`] here because a handle is
-/// not a markup value, and [`SentenceSteerTarget`] is a generic action, not a
-/// markup spread, so the whole tree is built in Rust `children!`.
+/// The `<FetchFox/>` tag entity *is* the fox: the template returns the fox bundle,
+/// so the fox is hosted under the scene's build root (eg `<Scene3d>`) and receives
+/// `LoadTemplate` once its deferred assets load. The behaviour tree is spawned as
+/// the fox's children via an [`OnSpawn`] hook (which yields the fox entity), each
+/// tree root wired with `ActionOf(fox)` so the actions resolve their agent to the
+/// fox (its [`AnimationGraphClips`], [`SteerBundle`] and [`SteerTarget`] live here).
+/// The graph is built through the deferred [`BuildAssets`] path so `LoadTemplate`
+/// waits for both fox clips and the glb scene; the `Handle<Bert>` is minted the
+/// same way because a handle is not a markup value and [`SentenceSteerTarget`] is a
+/// generic action, not a markup spread, so the whole tree is built in Rust.
 ///
 /// Behaviour tree (mirrors `fetch_npc`):
-///   Initial Idle   — play idle once the [`AnimationPlayer`] is ready
+///   Initial Idle   — play idle once the fox's assets load ([`RunOnLoad`])
 ///   Fetch Behavior — on each user sentence:
 ///     Sequence
 ///       Apply Sentence Steer Target — closest [`Collectable`] -> [`SteerTarget`]
@@ -98,70 +104,67 @@ pub fn FetchItems(
 ///       Return to Idle — stop moving, play idle
 #[template(system)]
 pub fn FetchFox(
-	asset_server: Res<AssetServer>,
 	mut graphs: ResMut<Assets<AnimationGraph>>,
-	mut commands: Commands,
+	mut assets: BuildAssets,
 ) -> impl Bundle {
-	let bert = asset_server.load::<Bert>("ml/default-bert.ron");
+	let bert = assets.load::<Bert>("ml/default-bert.ron");
+	// the idle (Animation0) + walk (Animation1) graph; the actions resolve their
+	// clip paths against the `AnimationGraphClips` it puts on the fox.
+	let clips = vec![
+		"misc/fox.glb#Animation0".to_string(),
+		"misc/fox.glb#Animation1".to_string(),
+	];
+	(
+		Name::new("Fox"),
+		Transform::from_scale(Vec3::splat(0.01)),
+		WorldAssetRoot(assets.load::<WorldAsset>("misc/fox.glb#Scene0")),
+		build_animation_graph(&clips, &mut graphs, &mut assets),
+		RotateToVelocity3d::default(),
+		ForceBundle::default(),
+		SteerBundle {
+			max_force: MaxForce(0.05),
+			max_speed: MaxSpeed(2.),
+			..default()
+		},
+		// announce the chosen item to the terminal when the fetch action sets
+		// the fox's `SteerTarget` (scoped to the fox via `observe`).
+		OnSpawn::observe(announce_fetch),
+		// build the behaviour tree as the fox's children, wiring each tree root's
+		// agent to the fox so its actions resolve here (`AnimationGraphClips`,
+		// `SteerBundle`, `SteerTarget`).
+		OnSpawn::new(move |fox| {
+			let fox_id = fox.id();
+			fox.world_scope(|world| spawn_fetch_tree(world, fox_id, bert));
+		}),
+	)
+}
 
-	// build the idle (Animation0) + walk (Animation1) graph, keeping the node
-	// indices the tree's `PlayAnimation` actions play. Built here (not via the
-	// `<Foxie>` template) so the fox is spawned top-level with its tree attached.
-	let mut graph = AnimationGraph::new();
-	let root = graph.root;
-	let idle_index = graph.add_clip(
-		asset_server.load::<AnimationClip>("misc/fox.glb#Animation0"),
-		1.0,
-		root,
-	);
-	let walk_index = graph.add_clip(
-		asset_server.load::<AnimationClip>("misc/fox.glb#Animation1"),
-		1.0,
-		root,
-	);
+/// Spawn the fetch behaviour tree as children of `fox`, each root acting on the
+/// fox via [`ActionOf`]. Split out of [`FetchFox`]'s [`OnSpawn`] hook so the tree
+/// structure reads top-down.
+fn spawn_fetch_tree(world: &mut World, fox: Entity, bert: Handle<Bert>) {
+	// plays idle once the fox's assets load (`RunOnLoad`), so the fox has a resting
+	// pose before the user types a command.
+	world.spawn((
+		Name::new("Initial Idle"),
+		ChildOf(fox),
+		ActionOf(fox),
+		RunOnLoad,
+		PlayAnimation::new("misc/fox.glb#Animation0").repeat_forever(),
+	));
 
-	let fox = commands
-		.spawn((
-			Name::new("Fox"),
-			Transform::from_scale(Vec3::splat(0.01)),
-			WorldAssetRoot(asset_server.load("misc/fox.glb#Scene0")),
-			AnimationGraphHandle(graphs.add(graph)),
-			AnimationTransitions::new(),
-			RotateToVelocity3d::default(),
-			ForceBundle::default(),
-			SteerBundle {
-				max_force: MaxForce(0.05),
-				max_speed: MaxSpeed(2.),
-				..default()
-			},
-			// announce the chosen item to the terminal when the fetch action sets
-			// the fox's `SteerTarget` (scoped to the fox via `observe`).
-			OnSpawn::observe(announce_fetch),
-		))
-		.id();
-
-	// the `TriggerWithUserSentence` node holds the user's typed prompt, so the
-	// steer-target search reads its `Sentence` (`TargetEntity::Other`).
-	let fetch_behavior = commands
+	// the `TriggerWithUserSentence` node holds the user's typed prompt, so spawn it
+	// first to get its id, then point the steer-target search at its `Sentence`.
+	let fetch_behavior = world
 		.spawn((
 			Name::new("Fetch Behavior"),
 			ChildOf(fox),
+			ActionOf(fox),
 			TriggerWithUserSentence,
 			Sequence::new(),
 		))
 		.id();
-
-	commands.entity(fox).with_children(|fox| {
-		// plays idle once the `AnimationPlayer` is ready so the fox has a resting
-		// pose before the user types a command.
-		fox.spawn((
-			Name::new("Initial Idle"),
-			TriggerOnAnimationReady::run(),
-			PlayAnimation::new(idle_index).repeat_forever(),
-		));
-	});
-
-	commands.entity(fetch_behavior).with_children(|seq| {
+	world.entity_mut(fetch_behavior).with_children(|seq| {
 		seq.spawn((
 			Name::new("Apply Sentence Steer Target"),
 			SentenceSteerTarget::<Collectable>::new(
@@ -172,7 +175,7 @@ pub fn FetchFox(
 		seq.spawn((Name::new("Fetch"), Sequence::new(), children![
 			(
 				Name::new("Play Walk"),
-				PlayAnimation::new(walk_index).repeat_forever(),
+				PlayAnimation::new("misc/fox.glb#Animation1").repeat_forever(),
 			),
 			(
 				Name::new("Seek to Arrive"),
@@ -190,7 +193,7 @@ pub fn FetchFox(
 			),
 			(
 				Name::new("Play Idle"),
-				PlayAnimation::new(idle_index).repeat_forever(),
+				PlayAnimation::new("misc/fox.glb#Animation0").repeat_forever(),
 			),
 		]));
 	});

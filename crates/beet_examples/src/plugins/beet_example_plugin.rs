@@ -7,13 +7,14 @@ use beet_core::prelude::*;
 /// close, F11 fullscreen). The runner and window are [`BeetPlugins`](beet)' job;
 /// this only adds behaviour, so it composes under either runner.
 pub fn beet_example_plugin(app: &mut App) {
-	assert_local_assets();
-
 	// `ActionPlugin` may already be present (the router stack adds it via
 	// `init_plugin` on the CLI render path), so add it idempotently rather than
 	// panic on the double-add when this group composes with a router-bearing app.
 	app.init_plugin::<ActionPlugin>()
 		.add_plugins((
+			// drains deferred asset loads (clips, Bert) so a scene's `LoadTemplate`
+			// (and its `RunOnLoad` gate) fires once every asset has settled.
+			AssetTemplatePlugin,
 			BeetSpatialPlugins,
 			plugin_2d,
 			plugin_3d,
@@ -21,45 +22,20 @@ pub fn beet_example_plugin(app: &mut App) {
 		))
 		.add_systems(
 			Update,
-			(
-				close_on_esc,
-				toggle_fullscreen,
-				ensure_spatial_roots,
-				wire_behaviour_agents,
-			),
+			(close_on_esc, toggle_fullscreen, ensure_spatial_roots),
 		)
 		.init_resource::<RandomSource>()
 		.register_type::<Collectable>();
 }
 
-/// In a `.bsx` a behaviour tree is nested under its agent (eg `<Foxie>`) under the
-/// scene root, so a steering action's agent would resolve to the scene root (no
-/// steering components) instead of the agent. Wire the `ActionOf` relationship
-/// explicitly: a steering agent's behaviour-tree-root child (a `Repeat`) acts on
-/// the agent. (A top-level Rust spawn needs none of this; the agent is the root.)
-fn wire_behaviour_agents(
-	mut commands: Commands,
-	agents: Query<Entity, With<SteerTarget>>,
-	children: Query<&Children>,
-	roots: Query<(), (With<Repeat>, Without<ActionOf>)>,
-) {
-	for agent in agents.iter() {
-		// the behaviour-tree root is a descendant (the `<Foxie>` slot nests it), not
-		// a direct child, so search the whole subtree.
-		for entity in children.iter_descendants(agent) {
-			if roots.contains(entity) {
-				commands.entity(entity).insert(ActionOf(agent));
-			}
-		}
-	}
-}
-
-/// A scene `.bsx` builds under the entry's store-root entity (and a `<Scene3d>`
-/// slot wrapper), neither of which carries a `Transform`. Bevy's propagation skips
-/// any subtree whose chain to the root is broken by a transformless link, so the
-/// scene keeps identity `GlobalTransform`s (a camera stuck at the origin renders
-/// nothing). Give every transformless entity that has children the spatial
-/// components so the whole chain propagates; inert for non-spatial markup.
+/// A scene `.bsx` builds under the entry's store-root entity, which carries no
+/// `Transform`: even though `<Scene3d>` now hosts its transform without a wrapper
+/// element, the entry store-root above it is still transformless, so the chain to
+/// the scene root has a transformless link. Bevy's propagation skips any subtree
+/// broken by such a link, so the scene keeps identity `GlobalTransform`s (a camera
+/// stuck at the origin renders nothing). Give every transformless entity that has
+/// children the spatial components so the whole chain propagates; inert for
+/// non-spatial markup. Kept until a later verification phase confirms scenes render.
 fn ensure_spatial_roots(
 	mut commands: Commands,
 	parents: Query<Entity, (With<Children>, Without<Transform>)>,
@@ -75,8 +51,6 @@ fn ensure_spatial_roots(
 pub fn plugin_ml(app: &mut App) {
 	use crate::scenes::ml::*;
 	app.add_plugins((BeetMlPlugins, FrozenLakePlugin))
-		.add_systems(Update, choose_nearest_on_load)
-		.register_type::<ChooseNearestOnLoad>()
 		// the markup ml scene templates, so `<NearestSentenceAgent/>` /
 		// `<SentenceOption/>` / `<ChatSentenceAgent/>` / `<FrozenLake/>` etc resolve
 		// in a `.bsx`.
@@ -133,43 +107,12 @@ fn plugin_3d(app: &mut App) {
 		.register_template::<Scene3d>()
 		.register_template::<WorldScene>()
 		.register_template::<Foxie>()
-		.register_template::<SteerTo>()
-		.register_template::<AgentOf>()
 		.register_template::<Lighting3d>()
 		.register_template::<Ground3d>()
 		.register_template::<Camera3dLookAt>()
-		.register_template::<IkArm>()
+		.register_template::<IkTarget>()
 		/*-*/;
 }
-fn assert_local_assets() {
-	#[cfg(target_arch = "wasm32")]
-	return;
-	#[allow(unreachable_code)]
-	if !std::path::Path::new("assets/README.md").exists() {
-		panic!(
-			r#"
-🌱🌱🌱
-
-Welcome! This Beet example uses large assets that are stored remotely.
-Until bevy supports http asset sources these must be downloaded manually:
-
-Unix:
-
-curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-tar -xzvf ./assets.tar.gz
-rm ./assets.tar.gz
-
-Windows:
-
-1. Download https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-2. Unzip into `./assets`
-
-🌱🌱🌱
-"#
-		);
-	}
-}
-
 /// Toggles fullscreen mode when F11 is pressed.
 fn toggle_fullscreen(
 	input: When<Res<ButtonInput<KeyCode>>>,

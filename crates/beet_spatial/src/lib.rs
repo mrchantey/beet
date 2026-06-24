@@ -15,6 +15,8 @@ pub mod inverse_kinematics;
 pub mod movement;
 pub mod procedural_animation;
 pub mod robotics;
+#[cfg(feature = "bevy_default")]
+pub mod scene;
 pub mod steer;
 pub mod steer_actions;
 #[cfg(feature = "bevy_default")]
@@ -35,6 +37,8 @@ pub mod prelude {
 	pub use crate::movement::*;
 	pub use crate::procedural_animation::*;
 	pub use crate::robotics::*;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::scene::*;
 	pub use crate::steer::*;
 	pub use crate::steer_actions::*;
 	#[cfg(feature = "bevy_default")]
@@ -75,7 +79,9 @@ impl PluginGroup for BeetSpatialPlugins {
 		/*-*/;
 
 		#[cfg(feature = "bevy_default")]
-		(builder = builder.add(crate::prelude::AnimationFlowPlugin));
+		(builder = builder
+			.add(crate::prelude::AnimationFlowPlugin)
+			.add(crate::prelude::SceneReadyPlugin));
 		builder
 	}
 }
