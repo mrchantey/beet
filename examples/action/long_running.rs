@@ -27,19 +27,31 @@ async fn Patrol(cx: ActionContext) -> Result<Outcome> {
 	Outcome::PASS.xok()
 }
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = (MinimalPlugins, AsyncPlugin, ActionPlugin).into_world();
-	world
-		.spawn((Name::new("root"), Sequence::new(), children![
-			(Name::new("patrol"), Patrol),
-			(
-				Name::new("cooldown"),
-				EndInDuration::pass(Duration::from_millis(300)),
-			),
-			(Name::new("after"), Log::new("patrol complete")),
-		]))
-		.call::<(), Outcome>(())
-		.await?;
-	Ok(())
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), ActionPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
+
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let root = world
+			.with(|world: &mut World| {
+				world
+					.spawn((Name::new("root"), Sequence::new(), children![
+						(Name::new("patrol"), Patrol),
+						(
+							Name::new("cooldown"),
+							EndInDuration::pass(Duration::from_millis(300)),
+						),
+						(Name::new("after"), Log::new("patrol complete")),
+					]))
+					.id()
+			})
+			.await;
+		world.entity(root).call::<(), Outcome>(()).await?;
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

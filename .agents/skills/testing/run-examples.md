@@ -109,6 +109,21 @@ self-terminating CLI smoke here. The runtime ML smoke lives in the crate
 skip-set check below (and is the only coverage, since `beet_examples` is
 excluded from the test crates).
 
+### 8. BSX scenes (`just beet --main=<file>.bsx`)
+
+The no-code `.bsx` scenes run through the beet CLI (`just beet` = `cargo run -p
+beet-cli --features render,ml`). The self-terminating ones render and exit:
+
+```sh
+just beet --main=examples/hello/main.bsx       # prints "hello world"
+just beet --main=examples/ml/hello_ml.bsx      # logs "NearestSentence chose: ..."
+```
+
+Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed),
+`examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP
+server). `examples/calculator/main.bsx` currently SIGSEGVs on process teardown
+under the render+ml backend — flagged for investigation.
+
 ## Not Verifiable Via CLI (skip)
 
 Documented so future passes don't waste time on them:

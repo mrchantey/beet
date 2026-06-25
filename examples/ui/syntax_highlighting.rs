@@ -34,7 +34,7 @@ fn main() {
 		.render(&mut RenderContext::new(entity, app.world_mut()))
 		.unwrap()
 		.to_string();
-	println!("{output}");
+	cross_log!("{output}");
 }
 
 const MARKDOWN: &str = r#"

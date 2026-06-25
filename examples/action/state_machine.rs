@@ -17,38 +17,50 @@
 //! ```
 use beet::prelude::*;
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
 
-	// state2 is the terminal state: it just returns its input.
-	let state2 = world
-		.spawn((
-			Name::new("state2"),
-			trace_action.wrap(Action::<Outcome, Outcome>::new_pure(
-				|cx: ActionContext<Outcome>| cx.input,
-			)),
-		))
-		.id();
-
-	// transition forwards to state2.
-	let transition = world
-		.spawn((
-			Name::new("transition"),
-			RunNext::new(state2),
-			trace_action.wrap(RunNextAction::<Outcome>::default()),
-		))
-		.id();
-
-	// state1 begins the machine and jumps to the transition.
-	let outcome = world
-		.spawn((
-			Name::new("state1"),
-			RunNext::new(transition),
-			trace_action.wrap(RunNextAction::<Outcome>::default()),
-		))
-		.call::<Outcome, Outcome>(Outcome::PASS)
-		.await?;
-	info!("machine finished: {outcome:?}");
-	Ok(())
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let state1 = world
+			.with(|world: &mut World| {
+				// state2 is the terminal state: it just returns its input.
+				let state2 = world
+					.spawn((
+						Name::new("state2"),
+						trace_action.wrap(Action::<Outcome, Outcome>::new_pure(
+							|cx: ActionContext<Outcome>| cx.input,
+						)),
+					))
+					.id();
+				// transition forwards to state2.
+				let transition = world
+					.spawn((
+						Name::new("transition"),
+						RunNext::new(state2),
+						trace_action.wrap(RunNextAction::<Outcome>::default()),
+					))
+					.id();
+				// state1 begins the machine and jumps to the transition.
+				world
+					.spawn((
+						Name::new("state1"),
+						RunNext::new(transition),
+						trace_action.wrap(RunNextAction::<Outcome>::default()),
+					))
+					.id()
+			})
+			.await;
+		let outcome = world
+			.entity(state1)
+			.call::<Outcome, Outcome>(Outcome::PASS)
+			.await?;
+		info!("machine finished: {outcome:?}");
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

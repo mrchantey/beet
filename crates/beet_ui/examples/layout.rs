@@ -11,7 +11,7 @@ use beet_ui::prelude::*;
 
 fn main() {
 	let size = terminal_ext::size();
-	println!("=== Beet Layout Engine Demo ({}×{}) ===\n", size.x, size.y);
+	cross_log!("=== Beet Layout Engine Demo ({}×{}) ===\n", size.x, size.y);
 
 	let mut overflow = 0;
 	overflow += render("JustifyContent::Start", setup_justify_start);
@@ -55,12 +55,12 @@ fn main() {
 
 	// Render width must never exceed the measured terminal width, otherwise the
 	// terminal soft-wraps and every box appears one column too wide.
-	println!();
+	cross_log!("");
 	match overflow {
 		0 => {
-			println!("✓ all lines render within the {}-column terminal", size.x)
+			cross_log!("✓ all lines render within the {}-column terminal", size.x)
 		}
-		n => println!("✗ {n} line(s) exceeded the {}-column terminal", size.x),
+		n => cross_log!("✗ {n} line(s) exceeded the {}-column terminal", size.x),
 	}
 }
 
@@ -74,9 +74,9 @@ fn render<B: Bundle>(name: &str, setup: fn() -> B) -> usize {
 		.lines()
 		.filter(|line| display_width(line) > width)
 		.count();
-	println!("\n{name}: \n{out}");
+	cross_log!("\n{name}: \n{out}");
 	if over > 0 {
-		println!("  ⚠ {over} line(s) exceed the {width}-column width");
+		cross_log!("  ⚠ {over} line(s) exceed the {width}-column width");
 	}
 	over
 }

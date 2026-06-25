@@ -59,7 +59,7 @@ fn my_handler(ev: On<MessageRecv>, mut commands: Commands) {
 		}
 		// exit the app when the close is acknowledged
 		Message::Close(_) => {
-			println!("done!");
+			info!("done!");
 			commands.write_message(AppExit::Success);
 		}
 		_ => {}

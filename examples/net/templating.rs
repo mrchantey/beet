@@ -49,7 +49,7 @@ fn router(
 ) -> Result<Response> {
 	let entity = cx.caller.id();
 	let request = cx.input;
-	println!("{}: {}", request.method(), request.path_string());
+	info!("{}: {}", request.method(), request.path_string());
 
 	match request.path_string().as_str() {
 		"/" => {

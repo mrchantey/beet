@@ -67,6 +67,61 @@ impl Default for PrettyTracing {
 	}
 }
 
+/// Non-beet log targets pinned to `warn` by [`PrettyTracing::init`]: the bevy
+/// render / window / GPU / asset stack plus a few other chatty dependencies.
+/// These are never the beet app's own output, so their `debug`/`info` spam (eg
+/// `offset_allocator` freelist churn, `bevy_shader` setup) is suppressed while
+/// beet's crates and the running app keep the resolved level. Add origins here
+/// as new noise appears.
+const QUIET_TARGETS: &[&str] = &[
+	// gpu / allocator / shader churn
+	"offset_allocator",
+	"gpu_allocator",
+	"naga",
+	// bevy render + windowing stack
+	"bevy_app",
+	"bevy_render",
+	"bevy_shader",
+	"bevy_pbr",
+	"bevy_core_pipeline",
+	"bevy_sprite",
+	"bevy_sprite_render",
+	"bevy_text",
+	"bevy_ui",
+	"bevy_ui_render",
+	"bevy_gltf",
+	"bevy_scene",
+	"bevy_image",
+	"bevy_mesh",
+	"bevy_camera",
+	"bevy_light",
+	"bevy_material",
+	"bevy_anti_alias",
+	"bevy_post_process",
+	"bevy_gizmos",
+	"bevy_gizmos_render",
+	"bevy_picking",
+	"bevy_animation",
+	"bevy_audio",
+	"bevy_winit",
+	"bevy_window",
+	"bevy_a11y",
+	"bevy_gilrs",
+	"bevy_asset",
+	"bevy_diagnostic",
+	"bevy_dev_tools",
+	// windowing / input / text deps
+	"winit",
+	"gilrs",
+	"gilrs_core",
+	"cosmic_text",
+	"fontdb",
+	// networking / cloud / wasm tooling
+	"walrus",
+	"aws",
+	"hyper_util",
+];
+
 impl PrettyTracing {
 	/// Opinionated tracing defaults for bevy, using the provided level
 	/// if none in environment variables.
@@ -84,25 +139,26 @@ impl PrettyTracing {
 			.flatten()
 			.unwrap_or(self.default_level.into());
 
-		// caller-supplied directives win over the defaults below, so append them last.
+		// every non-beet origin in `QUIET_TARGETS` is pinned to `warn` (`wgpu`
+		// lower still); the resolved level applies to everything else, ie the
+		// beet crates and the running app. caller-supplied directives win, so
+		// they are folded in last.
+		let base = QUIET_TARGETS.iter().fold(
+			tracing_subscriber::EnvFilter::from_default_env()
+				.add_directive("wgpu=error".parse().unwrap())
+				.add_directive(log_level.into()),
+			|filter, target| {
+				filter.add_directive(format!("{target}=warn").parse().unwrap())
+			},
+		);
 		let env_filter = self
 			.filter
 			.split(',')
 			.map(str::trim)
 			.filter(|directive| !directive.is_empty())
-			.fold(
-				tracing_subscriber::EnvFilter::from_default_env()
-					.add_directive("wgpu=error".parse().unwrap())
-					.add_directive("naga=warn".parse().unwrap())
-					.add_directive("bevy_app=warn".parse().unwrap())
-					.add_directive("walrus=warn".parse().unwrap())
-					.add_directive("aws=warn".parse().unwrap())
-					.add_directive("hyper-util=warn".parse().unwrap())
-					.add_directive(log_level.into()),
-				|filter, directive| {
-					filter.add_directive(directive.parse().unwrap())
-				},
-			);
+			.fold(base, |filter, directive| {
+				filter.add_directive(directive.parse().unwrap())
+			});
 
 		let builder = tracing_subscriber::fmt()
 			.compact()

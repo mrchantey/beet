@@ -21,20 +21,32 @@
 //! ```
 use beet::prelude::*;
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
-	let outcome = world
-		.spawn((Name::new("root"), Repeat::new(), children![(
-			Name::new("loop body"),
-			Sequence::new(),
-			children![
-				(Name::new("condition"), SucceedTimes::new(2)),
-				(Name::new("work"), Log::new("doing work")),
-			],
-		)]))
-		.call::<(), Outcome>(())
-		.await?;
-	info!("loop exited with {outcome:?}");
-	Ok(())
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
+
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let root = world
+			.with(|world: &mut World| {
+				world
+					.spawn((Name::new("root"), Repeat::new(), children![(
+						Name::new("loop body"),
+						Sequence::new(),
+						children![
+							(Name::new("condition"), SucceedTimes::new(2)),
+							(Name::new("work"), Log::new("doing work")),
+						],
+					)]))
+					.id()
+			})
+			.await;
+		let outcome = world.entity(root).call::<(), Outcome>(()).await?;
+		info!("loop exited with {outcome:?}");
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

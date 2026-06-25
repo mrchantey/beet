@@ -51,7 +51,7 @@ fn main() {
 		"`.bsx` and `rsx!` produced different trees:\n  bsx: {bsx_collapsed}\n  rsx: {rsx_html}"
 	);
 
-	println!("rsx!/.bsx trees match:\n{rsx_html}");
+	cross_log!("rsx!/.bsx trees match:\n{rsx_html}");
 }
 
 /// Render `root` to an HTML string through the substrate's [`HtmlRenderer`].

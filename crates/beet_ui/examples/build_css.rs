@@ -8,7 +8,7 @@ fn main() {
 			color: palettes::basic::YELLOW.into(),
 			..default()
 		})
-		.add_plugins((material::MaterialStylePlugin,))
+		.add_plugins((material::MaterialStylePlugin, LogPlugin::default()))
 		.add_systems(Startup, setup)
 		.run();
 }
@@ -21,7 +21,7 @@ fn setup(ruleset: Res<RuleSet>, query: StyleQuery) -> Result {
 	// write the store for inspection
 	let json = serde_json::to_string_pretty(&*ruleset).unwrap();
 	fs_ext::write(&ruleset_path, json).unwrap();
-	println!("Ruleset written to: {}", ruleset_path.display());
+	info!("Ruleset written to: {}", ruleset_path.display());
 
 	let css = query.build_css(
 		&CssBuilder::default()
@@ -56,6 +56,6 @@ fn setup(ruleset: Res<RuleSet>, query: StyleQuery) -> Result {
 	// write the html for inspection
 	fs_ext::write(&html_path, &html)?;
 
-	println!("HTML written to: {}", html_path.display());
+	info!("HTML written to: {}", html_path.display());
 	Ok(())
 }

@@ -21,13 +21,22 @@ use beet::prelude::*;
 #[derive(Component)]
 fn Greet(name: String) -> String { format!("Hello, {name}!") }
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
-	let message = world
-		.spawn(Greet)
-		.call::<String, String>("world".to_string())
-		.await?;
-	info!("{message}");
-	Ok(())
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
+
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let greeter = world.with(|world: &mut World| world.spawn(Greet).id()).await;
+		let message = world
+			.entity(greeter)
+			.call::<String, String>("world".to_string())
+			.await?;
+		info!("{message}");
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

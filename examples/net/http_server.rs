@@ -57,7 +57,7 @@ fn Handler(
 	// only accept `/` routes
 	if !request.path().is_empty() {
 		let message = format!("Not Found: {}", request.path_string());
-		println!(
+		info!(
 			"{}: {} - Not Found",
 			request.method(),
 			request.path_string()
@@ -86,6 +86,6 @@ pass the 'name' parameter to receive a warm personal greeting.
 		name, count.0
 	);
 
-	println!("{}: {}", request.method(), request.path_string());
+	info!("{}: {}", request.method(), request.path_string());
 	Response::ok_body(message, MimeType::Text).xok()
 }

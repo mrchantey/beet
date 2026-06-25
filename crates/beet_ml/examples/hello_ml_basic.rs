@@ -9,7 +9,7 @@ use beet_ml::prelude::*;
 
 #[beet_core::main]
 async fn main() -> Result {
-	pretty_env_logger::try_init().ok();
+	PrettyTracing::default().init();
 	let mut bert = Bert::new(BertConfig::default()).await?;
 	let embeddings = bert.get_embeddings(vec![
 		"The cat sits outside".into(),
@@ -28,6 +28,6 @@ async fn main() -> Result {
 		"The cat plays in the garden"
 	);
 
-	println!("Results: {:?}", results);
+	info!("Results: {:?}", results);
 	Ok(())
 }

@@ -63,7 +63,7 @@ fn main() {
 		"expected `user.unread` seeded to 0, got {seeded}"
 	);
 
-	println!("rendered `.bsx` with document bindings:\n{html}");
+	cross_log!("rendered `.bsx` with document bindings:\n{html}");
 }
 
 /// Render `root` to an HTML string through the substrate's [`HtmlRenderer`].

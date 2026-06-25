@@ -17,16 +17,28 @@
 //! ```
 use beet::prelude::*;
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
-	let outcome = world
-		.spawn((Name::new("root"), Sequence::new(), children![
-			(Name::new("child1"), Log::new("running child1")),
-			(Name::new("child2"), Log::new("running child2")),
-		]))
-		.call::<(), Outcome>(())
-		.await?;
-	info!("sequence finished: {outcome:?}");
-	Ok(())
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
+
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let root = world
+			.with(|world: &mut World| {
+				world
+					.spawn((Name::new("root"), Sequence::new(), children![
+						(Name::new("child1"), Log::new("running child1")),
+						(Name::new("child2"), Log::new("running child2")),
+					]))
+					.id()
+			})
+			.await;
+		let outcome = world.entity(root).call::<(), Outcome>(()).await?;
+		info!("sequence finished: {outcome:?}");
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

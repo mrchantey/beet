@@ -13,24 +13,36 @@
 //! ```
 use beet::prelude::*;
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
-	let outcome = world
-		.spawn((Name::new("selector"), HighestScore::new(), children![
-			(
-				Name::new("low score, skipped"),
-				ScoreProvider::<()>::fixed(Score(0.4)),
-				Log::new("this child does not run"),
-			),
-			(
-				Name::new("high score, selected"),
-				ScoreProvider::<()>::fixed(Score(0.6)),
-				Log::new("this child runs"),
-			),
-		]))
-		.call::<(), Outcome>(())
-		.await?;
-	info!("selector finished: {outcome:?}");
-	Ok(())
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
+
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let selector = world
+			.with(|world: &mut World| {
+				world
+					.spawn((Name::new("selector"), HighestScore::new(), children![
+						(
+							Name::new("low score, skipped"),
+							ScoreProvider::<()>::fixed(Score(0.4)),
+							Log::new("this child does not run"),
+						),
+						(
+							Name::new("high score, selected"),
+							ScoreProvider::<()>::fixed(Score(0.6)),
+							Log::new("this child runs"),
+						),
+					]))
+					.id()
+			})
+			.await;
+		let outcome = world.entity(selector).call::<(), Outcome>(()).await?;
+		info!("selector finished: {outcome:?}");
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

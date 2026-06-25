@@ -37,7 +37,7 @@ fn main() {
 		.run(&mut entity, vec![media_type])
 		.unwrap()
 		.to_string();
-	println!("{output}");
+	cross_log!("{output}");
 }
 
 const MARKDOWN: &str = r#"

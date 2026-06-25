@@ -12,10 +12,10 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, AsyncPlugin::default()))
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin::default()))
 		.add_systems(Startup, ping_example)
 		.run();
-	println!("Done");
+	info!("Done");
 }
 
 fn ping_example(async_commands: AsyncCommands) {

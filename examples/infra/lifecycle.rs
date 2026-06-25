@@ -15,7 +15,7 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((MinimalPlugins, InfraPlugin, LogPlugin {
-			level: Level::WARN,
+			level: Level::INFO,
 			..default()
 		}))
 		.add_systems(Startup, setup)
@@ -51,56 +51,56 @@ fn setup(mut commands: Commands) {
 			// Reset state in case of backend change
 			project.force_destroy().await;
 			if store.store_exists().await.unwrap_or(false) {
-				println!("🧹 Cleaning up stale store..");
+				info!("🧹 Cleaning up stale store..");
 				store.store_remove().await.ok();
 			}
 
-			println!("🔨 Validating..");
+			info!("🔨 Validating..");
 			project.validate().await?;
 
-			println!("🔨 Planning..");
+			info!("🔨 Planning..");
 			let _plan = project.plan().await?;
 
 			// state file and bucket dont exist yet, we are pre-apply
-			println!(
+			info!(
 				"📦 State file exists: {}",
 				project.state_file().exists().await?
 			);
-			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
+			info!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
-			println!("🔨 Applying..");
+			info!("🔨 Applying..");
 			project.apply().await?;
 
-			println!(
+			info!(
 				"📦 State File exists: {}",
 				project.state_file().exists().await?
 			);
-			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
+			info!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
 			let path = SmolPath::new("foo.md");
 			let content = "bar";
 
-			println!(
+			info!(
 				"📄 BlobStore File Exists: {}",
 				store.get(&path).await.is_ok()
 			);
 
-			println!("🔨 Inserting File..");
+			info!("🔨 Inserting File..");
 			store.insert(&path, content).await?;
 			let bytes = store.get(&path).await?;
-			println!(
+			info!(
 				"📄 BlobStore File Matches: {}",
 				bytes == content.as_bytes()
 			);
 
-			println!("🔨 Destroying..");
+			info!("🔨 Destroying..");
 			project.destroy().await?;
 
-			println!(
+			info!(
 				"📦 State file exists: {}",
 				project.state_file().exists().await?
 			);
-			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
+			info!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
 			entity.world().write_message(AppExit::Success).await;
 			Ok(())

@@ -35,7 +35,7 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 			.path
 			.first()
 			.cloned()
-			.unwrap_or_else(|| "http://example.com".to_string());
+			.unwrap_or_else(|| "http://example.com".into());
 
 		let output_type = args
 			.params
@@ -44,7 +44,7 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 			.unwrap_or(MediaType::AnsiTerm);
 
 		// 1. Fetch the URL
-		let input_bytes = Request::get(url)
+		let input_bytes = Request::get(url.as_str())
 			.send()
 			.await
 			.unwrap()
@@ -72,7 +72,7 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 					.run(&mut entity, vec![output_type])
 					.unwrap()
 					.to_string();
-				println!("{output}");
+				cross_log!("{output}");
 			})
 			.await;
 

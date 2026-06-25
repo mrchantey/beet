@@ -131,45 +131,56 @@ fn random_score() -> ScoreProvider<()> {
 	))
 }
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
-	world.init_resource::<RandomSource>();
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
+		.init_resource::<RandomSource>()
+		.add_systems(Startup, setup)
+		.run()
+}
 
-	let player = world.spawn((Name::new("Elden Lord"), Health(100.0))).id();
-
-	let outcome = world
-		.spawn((
-			Name::new("Malenia"),
-			Health(100.0),
-			HealingPotions(2),
-			Repeat::new(),
-			children![(Name::new("round"), Fallback::new(), children![
-				(Name::new("Try Heal Self"), TryHealSelf),
-				(Name::new("Attack"), HighestScore::new(), children![
-					(
-						Name::new("Waterfoul Dance"),
-						random_score(),
-						AttackPlayer {
-							max_damage: 15.0,
-							max_recoil: 30.0,
-							player,
-						},
-					),
-					(
-						Name::new("Scarlet Aeonia"),
-						ScoreProvider::<()>::fixed(Score(0.05)),
-						AttackPlayer {
-							max_damage: 10_000.0,
-							max_recoil: 10.0,
-							player,
-						},
-					),
-				],),
-			],)],
-		))
-		.call::<(), Outcome>(())
-		.await?;
-	info!("battle over: {outcome:?}");
-	Ok(())
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let malenia = world
+			.with(|world: &mut World| {
+				let player =
+					world.spawn((Name::new("Elden Lord"), Health(100.0))).id();
+				world
+					.spawn((
+						Name::new("Malenia"),
+						Health(100.0),
+						HealingPotions(2),
+						Repeat::new(),
+						children![(Name::new("round"), Fallback::new(), children![
+							(Name::new("Try Heal Self"), TryHealSelf),
+							(Name::new("Attack"), HighestScore::new(), children![
+								(
+									Name::new("Waterfoul Dance"),
+									random_score(),
+									AttackPlayer {
+										max_damage: 15.0,
+										max_recoil: 30.0,
+										player,
+									},
+								),
+								(
+									Name::new("Scarlet Aeonia"),
+									ScoreProvider::<()>::fixed(Score(0.05)),
+									AttackPlayer {
+										max_damage: 10_000.0,
+										max_recoil: 10.0,
+										player,
+									},
+								),
+							],),
+						],)],
+					))
+					.id()
+			})
+			.await;
+		let outcome = world.entity(malenia).call::<(), Outcome>(()).await?;
+		info!("battle over: {outcome:?}");
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

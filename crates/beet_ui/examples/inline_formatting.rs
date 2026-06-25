@@ -6,7 +6,7 @@ use beet_ui::prelude::*;
 use bevy::math::UVec2;
 
 fn main() {
-	println!("=== Beet Inline Formatting Demo ===");
+	cross_log!("=== Beet Inline Formatting Demo ===");
 
 	render("Mixed inline runs", 40, mixed_runs);
 	render("Wrapping a long paragraph", 24, wrapping);
@@ -21,7 +21,7 @@ fn main() {
 fn render<B: Bundle>(name: &str, width: u32, setup: fn() -> B) {
 	let out = Buffer::render_oneshot_sized(UVec2::new(width, 12), setup())
 		.trim_lines();
-	println!("\n{name} (width {width}):\n{out}");
+	cross_log!("\n{name} (width {width}):\n{out}");
 }
 
 // ── Demos ───────────────────────────────────────────────────────────────────

@@ -27,13 +27,23 @@ async fn Greet(cx: ActionContext) -> Result<Outcome> {
 	Outcome::PASS.xok()
 }
 
-#[beet::main]
-async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
-	let outcome = world
-		.spawn((Name::new("greeter"), trace_action.wrap(Greet)))
-		.call::<(), Outcome>(())
-		.await?;
-	info!("done: {outcome:?}");
-	Ok(())
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
+
+fn setup(async_commands: AsyncCommands) {
+	async_commands.run(async |world: AsyncWorld| -> Result {
+		let greeter = world
+			.with(|world: &mut World| {
+				world.spawn((Name::new("greeter"), trace_action.wrap(Greet))).id()
+			})
+			.await;
+		let outcome = world.entity(greeter).call::<(), Outcome>(()).await?;
+		info!("done: {outcome:?}");
+		world.write_message(AppExit::Success).await;
+		Ok(())
+	});
 }

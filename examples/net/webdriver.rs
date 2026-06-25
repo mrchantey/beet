@@ -15,10 +15,10 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, AsyncPlugin::default()))
+		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin::default()))
 		.add_systems(Startup, run_webdriver)
 		.run();
-	println!("Done");
+	info!("Done");
 }
 
 fn run_webdriver(async_commands: AsyncCommands) {
