@@ -114,13 +114,11 @@ async fn build_entry(
 	let sources = read_site_sources(&store, formats, entry_name).await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			// the binary's job is to run the entry, so it injects `BootOnLoad` onto the
-			// root: an entry's markup never declares its own boot (server entries can be
-			// included or loaded directly, the include would clobber a spread anyway),
-			// so the loader fires the boot uniformly. A self-booting verb that requires
-			// `BootOnLoad` (eg a thread's `{CreateThread}`) dedups against the injected
-			// one. `BootOnLoad` rides the root spawn so it is present before the build
-			// fires `LoadTemplate`.
+			// the binary stays unopinionated: it spawns the entry root with no load
+			// verb of its own, so the entry's own markup declares how it loads. A
+			// server entry spreads `BootOnLoad` beside its servers, a script entry
+			// spreads `ExchangeOnLoad`, a render scene `RunOnLoad`, and a self-booting
+			// verb (eg a thread's `{CreateThread}`) `#[require]`s `BootOnLoad` itself.
 			let root = build_site_root(world, store, sources, ())?;
 			// `--watch` (local dev): mark the root for live reload. Its `FsStore`'s
 			// watcher already emits `BlobEvent`s, so editing a template/slide/style

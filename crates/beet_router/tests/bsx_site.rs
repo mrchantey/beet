@@ -350,16 +350,19 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	}
 }
 
-/// `site/main.bsx`'s shape: an entry root injected with `BootOnLoad` (the way the
-/// binary boots a local entry) keeps it through a `<Template src="server.bsx"/>`
-/// include, so `BootOnLoad` co-resides with the server's boot slot (`CliServer`
-/// here) on the included root and the boot resolves. The regression guard for moving
-/// `BootOnLoad` off `server.bsx`.
+/// `site/main.bsx`'s shape: `server.bsx`'s `Router` declares `BootOnLoad` beside its
+/// boot slot (`CliServer` here), and a `<Template src="server.bsx"/>` include builds
+/// that `Router` onto the entry root, so the boot verb co-resides with the boot slot
+/// and the boot resolves. The binary injects no verb of its own. The regression guard
+/// for the include carrying `server.bsx`'s boot verb onto the root.
 #[beet_core::test]
 async fn main_bsx_include_co_resides_boot_with_server() {
 	let store = BlobStore::temp();
 	store
-		.insert(&SmolPath::from("server.bsx"), "<Router {CliServer}/>")
+		.insert(
+			&SmolPath::from("server.bsx"),
+			"<Router {(CliServer, BootOnLoad)}/>",
+		)
 		.await
 		.unwrap();
 	store
@@ -373,13 +376,13 @@ async fn main_bsx_include_co_resides_boot_with_server() {
 	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
 	let template =
 		BsxTemplate::parse_entry(&world, entry.as_utf8().unwrap()).unwrap();
-	// the binary boots a local entry by spawning the root with `BootOnLoad` (as
-	// `build_site_root`'s `extra`), then building the entry onto it.
-	let root = world.spawn((BootOnLoad, store)).id();
+	// the binary spawns the root with no load verb of its own (`build_site_root`'s
+	// empty `extra`), then builds the entry onto it; the verb rides the markup.
+	let root = world.spawn((store,)).id();
 	world.entity_mut(root).insert_template(template).unwrap();
 	// the include resolves as an async pending dependency, so settle first
 	AsyncRunner::settle_async_tasks(&mut world).await;
-	// the included Router's boot slot (`CliServer`) + the injected `BootOnLoad`
+	// the included Router's boot slot (`CliServer`) and its declared `BootOnLoad`
 	// co-reside on the entry root, so the boot can resolve.
 	world.entity(root).contains::<Router>().xpect_true();
 	world.entity(root).contains::<CliServer>().xpect_true();

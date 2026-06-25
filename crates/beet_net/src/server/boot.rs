@@ -30,26 +30,7 @@ impl Boot {
 	/// parks here and the process stays up; a one-shot [`CliServer`] resolves it,
 	/// streams, and exits. Used by [`BootOnLoad`].
 	pub async fn boot(host: AsyncEntity, request: Request) -> Result {
-		// The loader injects `BootOnLoad` uniformly, but an entry fills one of two
-		// slots: a server (or `CreateThread`) provides `Action<Boot, Response>`, while
-		// a plain script/exchange entry (eg `ExchangeScriptElement`) provides only an
-		// `Action<Request, Response>`. Prefer the boot slot, falling back to the
-		// request slot, so the one injected verb boots either kind without the markup
-		// having to declare `ExchangeOnLoad` alongside.
-		//
-		// TODO this is a massive hack, we intend to
-		// remove the BootOnLoad automatic insertion then all these hacks must be removed, and bsx files will need to manually insert a BootOnLoad
-		// boot without an Action<Boot,Response> should be a hard error, ie .get_cloned().await?
-		let response = if host
-			.clone()
-			.get_cloned::<Action<Boot, Response>>()
-			.await
-			.is_ok()
-		{
-			host.call::<Boot, Response>(Boot(request)).await?
-		} else {
-			host.call::<Request, Response>(request).await?
-		};
+		let response = host.call::<Boot, Response>(Boot(request)).await?;
 		// reached only for the one-shot; a long-running server parks the await.
 		stream_and_exit(&host, response).await
 	}

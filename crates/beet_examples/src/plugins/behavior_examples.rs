@@ -3,15 +3,15 @@
 //! window or renderer:
 //!
 //! ```bsx
-//! <RunSequence>
+//! <div {Behavior} {RunBehavior}>
 //!   <TwoWheelDrive left=1. right=1./>
 //!   <TwoWheelDrive left=0. right=1./>
 //!   <TwoWheelDrive left=1. right=1./>
-//! </RunSequence>
+//! </div>
 //! ```
 //!
 //! `{Behavior}` is a non-generic marker for a `Sequence<(), ()>` (a bare generic
-//! `{Sequence}` tag does not resolve by name); [`RunOnLoad`] runs the entity's
+//! `{Sequence}` tag does not resolve by name); [`RunBehavior`] runs the entity's
 //! behaviour to completion on load and then exits. `<TwoWheelDrive>` lowers to a
 //! [`Log`] action printing its wheel speeds; swap it for a real long-running motor
 //! action to move a body.
@@ -22,13 +22,17 @@ use beet_net::prelude::*;
 /// Boot verb for a plain behaviour tree: on load it runs the entity's
 /// `Action<(), Outcome>` (eg a `Sequence`) to completion, then exits. The
 /// behaviour-tree counterpart of `CreateThread`, without the conversation store.
+///
+/// Distinct from the render-scene [`RunOnLoad`](beet_action::prelude::RunOnLoad),
+/// which only kicks a behaviour into `Running`: this also drives the one-shot
+/// process exit, so it `#[require]`s `BootOnLoad` and fills the boot slot.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(BootOnLoad)]
 #[require(Action<Boot, Response> = Action::new_async_local(run_on_boot))]
-pub struct RunOnLoad;
+pub struct RunBehavior;
 
-/// The `Action<Boot, Response>` boot slot [`RunOnLoad`] installs: run the
+/// The `Action<Boot, Response>` boot slot [`RunBehavior`] installs: run the
 /// behaviour to completion, then resolve with an empty response so the one-shot
 /// exits.
 async fn run_on_boot(cx: ActionContext<Boot>) -> Result<Response> {
@@ -45,13 +49,13 @@ pub fn TwoWheelDrive(left: f32, right: f32) -> impl Bundle {
 }
 
 /// Registers the headless behaviour example types, so a `main.bsx` declaring
-/// `{RunOnLoad}`/`<TwoWheelDrive>` resolves (the `{Behavior}` sequence marker is
+/// `{RunBehavior}`/`<TwoWheelDrive>` resolves (the `{Behavior}` sequence marker is
 /// registered by `AgentExamplesPlugin`).
 pub struct BehaviorExamplesPlugin;
 
 impl Plugin for BehaviorExamplesPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<RunOnLoad>()
+		app.register_type::<RunBehavior>()
 			.register_template::<TwoWheelDrive>();
 	}
 }

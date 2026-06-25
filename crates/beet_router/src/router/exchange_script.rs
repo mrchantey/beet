@@ -28,20 +28,22 @@ use std::marker::PhantomData;
 /// action, capturing `console.log` into the response body (`console.error` to
 /// stderr).
 ///
-/// The "`node main.js`" entry: occupy an entry's action slot with it and the boot
-/// ([`BootOnLoad`](beet_net::prelude::BootOnLoad)) calls it like any exchangeable
-/// action, streaming the captured output. The script source is the marked
-/// element's raw-text body, with the [`Request`] shaped into its `input`:
+/// The "`node main.js`" entry: occupy an entry's `Action<Request, Response>` slot
+/// with it and [`ExchangeOnLoad`](beet_net::prelude::ExchangeOnLoad) calls that
+/// slot once the entry loads, streaming the captured output. (A script element
+/// installs no `Action<Boot, Response>`, so its load verb is `ExchangeOnLoad`, not
+/// the server-side `BootOnLoad`.) The script source is the marked element's
+/// raw-text body, with the [`Request`] shaped into its `input`:
 ///
 /// ```bsx
-/// <script {(ExchangeScriptElement, BootOnLoad)}>console.log("hello world")</script>
+/// <script {(ExchangeScriptElement, ExchangeOnLoad)}>console.log("hello world")</script>
 /// ```
 ///
 /// The backend is the element's `language` attribute ([`ScriptLanguage::from_str`]),
 /// falling back to the build default ([`ScriptLanguage::default`]) when absent:
 ///
 /// ```bsx
-/// <script language="rhai" {(ExchangeScriptElement, BootOnLoad)}>print("hello world")</script>
+/// <script language="rhai" {(ExchangeScriptElement, ExchangeOnLoad)}>print("hello world")</script>
 /// ```
 ///
 /// Being async, it awaits the full request body and includes it in the `input` (so

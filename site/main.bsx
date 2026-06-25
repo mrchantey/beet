@@ -5,12 +5,11 @@ so `cd site && beet serve` (and `beet present`, `beet check`, `beet export-stati
 all reuse the one canonical site, while the deployed container loads `server.bsx`
 directly from S3.
 
-The boot fires locally because the `beet` binary injects `BootOnLoad` onto whatever
-entry it runs: the include builds `server.bsx`'s `Router` (with its servers) onto
-this entry root, so the injected `BootOnLoad` lands beside the boot slot the servers
-provide and boots them once the whole subtree is built. `server.bsx` itself carries
-no boot verb, so it never always-boots when included (and the deployed container,
-loading `server.bsx` directly, gets the same binary-injected boot).
+The boot fires locally because `server.bsx`'s `Router` carries `BootOnLoad`: the
+include builds that `Router` (with its servers) onto this entry root, so the boot
+verb sits beside the boot slot the servers provide and boots them once the whole
+subtree is built. The deployed container, loading `server.bsx` directly, boots the
+same way.
 
 The infra commands (`deploy`, `sync`, the validate/plan/apply/destroy IaC verbs)
 live in the Rust deploy host (`examples/infra/deploy_beet_site.rs`): the terraform

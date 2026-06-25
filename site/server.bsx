@@ -3,16 +3,15 @@ The lean serve entry for the beet website: the content Router serving the
 `routes/` directory, every page wrapped in `templates/Layout.bsx`. This is the
 canonical site definition; the dev entry `main.bsx` pulls it in via
 `<Template src="server.bsx"/>`, and the deployed Fargate container loads it directly
-from S3 (`beet serve --server=http,ssh`). Either way the `beet` binary injects the
-`BootOnLoad` that fires the boot, so this entry carries no boot verb of its own.
+from S3 (`beet serve --server=http,ssh`). Either way this entry's `Router` carries
+the `BootOnLoad` verb that fires the boot once the build loads.
 
 It declares the three long-running servers (`HttpServer`, the local live
 `TuiServer`, and the multi-tenant `SshTuiServer`), so `--server` picks them once
 booted: the default boots them all, `--server=http,ssh` serves html over http and
 a live terminal over ssh, `--server=tui` runs the local `beet present` terminal. It
-carries no `CliServer` (a one-shot would resolve the boot and exit) and no boot verb
-of its own (the binary injects the boot, never an always-on `BootOnLoad`), so the
-serve-feature binary parses it cleanly.
+carries no `CliServer` (a one-shot would resolve the boot and exit), so the boot
+parks on the servers' keep-alive and the serve-feature binary stays up.
 
 The router's middleware and the layout attach as component spreads (request
 logging, `--help`, terminal link navigation, the layout). `<DefaultAppRoutes/>`
