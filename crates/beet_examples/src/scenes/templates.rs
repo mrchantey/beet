@@ -79,9 +79,22 @@ pub fn WorldScene(
 /// `.bsx` declares `<AppWindow/>` to open the window its `Camera3d` renders to; a
 /// headless CLI/server `.bsx` omits it and runs windowless (closing the window does
 /// not exit the app — see `BeetPlugins`).
-#[template]
-pub fn AppWindow() -> impl Bundle {
-	(bevy::window::Window::default(), bevy::window::PrimaryWindow)
+///
+/// Spawns the [`Window`] as a *root* entity rather than returning it as a bundle,
+/// because `<AppWindow/>` is authored inside a scene (eg `<Scene3d>`) and a returned
+/// bundle would inherit that parent's [`ChildOf`]. bevy_picking's `PointerTraversal`
+/// walks `ChildOf` up to a scene root then jumps to the pointer's window and stops
+/// only if that window has no parent; a parented window cycles root<->window forever,
+/// hanging the app on the first click/hover. Guarded so a scene reload reuses the
+/// existing window instead of spawning a second [`PrimaryWindow`].
+#[template(system)]
+pub fn AppWindow(
+	windows: Query<(), With<bevy::window::Window>>,
+	mut commands: Commands,
+) -> impl Bundle {
+	if windows.is_empty() {
+		commands.spawn((bevy::window::Window::default(), bevy::window::PrimaryWindow));
+	}
 }
 
 /// A terminal-style log UI, the data form of the imperative
@@ -309,4 +322,37 @@ pub fn SpaceScene(mut assets: BuildAssets) -> impl Bundle {
 			..default()
 		},
 	)
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use bevy::window::Window;
+
+	// `<AppWindow/>` is authored inside a scene, so a returned `Window` bundle would
+	// inherit the scene root's `ChildOf`. bevy_picking's `PointerTraversal` walks
+	// `ChildOf` up to a scene root then jumps to the pointer's window, halting only if
+	// that window is itself a root; a parented window makes pointer propagation cycle
+	// root<->window forever, hanging the app on the first click. So the window must be
+	// a root regardless of where `<AppWindow/>` sits in the markup.
+	#[beet_core::test]
+	fn app_window_spawns_root_window() {
+		let mut world = TemplatePlugin::world();
+		// `<AppWindow/>` nested under a host, so its template entity has a `ChildOf`.
+		world
+			.spawn_template(rsx! { <span><AppWindow/></span> })
+			.unwrap();
+		world.flush();
+
+		let mut windows = world.query_filtered::<Entity, With<Window>>();
+		let window = windows
+			.iter(&world)
+			.next()
+			.expect("AppWindow spawned a window");
+		// the window is a root, so pointer propagation terminates at it.
+		world.get::<ChildOf>(window).xpect_none();
+		// guarded so a reload reuses the window rather than adding a second.
+		windows.iter(&world).count().xpect_eq(1);
+	}
 }

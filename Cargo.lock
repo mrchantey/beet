@@ -1320,7 +1320,6 @@ dependencies = [
  "beet_ui",
  "bevy",
  "console_error_panic_hook",
- "ctrlc",
  "futures",
  "serde",
  "serde_json",
