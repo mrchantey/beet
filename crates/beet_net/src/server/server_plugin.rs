@@ -15,10 +15,12 @@ impl Plugin for ServerPlugin {
 		app.init_plugin::<AsyncPlugin>()
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
-			// the markup load verb (and its opt-out), so a
-			// `<Router {(.., BootOnLoad)}>` entry resolves them.
+			// the markup load verbs (and their opt-out), so a
+			// `<Router {(.., BootOnLoad)}>` server entry, an `ExchangeOnLoad` script,
+			// or a `RunOnLoad` behaviour scene resolves them.
 			.register_type::<BootOnLoad>()
 			.register_type::<ExchangeOnLoad>()
+			.register_type::<RunOnLoad>()
 			.register_type::<DisableBootOnLoad>()
 			// the boot<->exchange bridges, markup-spawnable so an entry can wire a
 			// boot into its request pipeline or boot another entry from a route.

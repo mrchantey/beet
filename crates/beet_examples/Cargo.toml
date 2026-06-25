@@ -18,6 +18,9 @@ bevy_default = [
 	"beet_core/bevy_default",
 	"beet_spatial/bevy_default",
 	"beet_ml?/bevy_default",
+	# the render scenes start their behaviour trees with `RunOnLoad`, the load verb
+	# that lives with the rest of the family in `beet_net`.
+	"dep:beet_net",
 	# "beet_bevy/bevy_default",
 ]
 # enable beet_ml integration; pulled in by the top-level `ml` feature

@@ -43,6 +43,19 @@ impl Boot {
 		let response = host.call::<Request, Response>(request).await?;
 		stream_and_exit(&host, response).await
 	}
+
+	/// Run the host's `Action<(), Outcome>` (a behaviour, eg a `Sequence`) and, once
+	/// it resolves, write [`AppExit::Success`]. The behaviour counterpart of
+	/// [`Boot::boot`]/[`Boot::exchange_boot`]: it dispatches the entry's own slot
+	/// rather than a server's. A long-running behaviour (eg a `Repeat`, or a windowed
+	/// render scene) never resolves, so the await parks here and the process stays up;
+	/// a one-shot behaviour resolves and the process exits. Used by [`RunOnLoad`].
+	pub async fn run(host: AsyncEntity) -> Result {
+		host.call::<(), Outcome>(()).await?;
+		// reached only for a one-shot behaviour; a long-running one parks the await.
+		host.world().write_message(AppExit::Success).await;
+		Ok(())
+	}
 }
 
 /// Load verb for a server entry: on its `LoadTemplate`, calls the entity's
@@ -75,7 +88,24 @@ pub struct BootOnLoad;
 #[component(on_add = on_add_exchange)]
 pub struct ExchangeOnLoad;
 
-/// Opts an entity (and its subtree) out of [`BootOnLoad`] / [`ExchangeOnLoad`]:
+/// Load verb for a behaviour entry with no server/request slot: on its
+/// `LoadTemplate`, runs the entity's own `Action<(), Outcome>` (eg a `Sequence`)
+/// via [`Boot::run`], exiting once it resolves.
+///
+/// The behaviour-tree member of the load-verb family ([`BootOnLoad`] calls an
+/// `Action<Boot, Response>` slot, [`ExchangeOnLoad`] an `Action<Request, Response>`
+/// slot, this the entry's own behaviour). Sits on any node whose subtree should
+/// start on load, eg a render scene's behaviour-tree root or a headless one-shot.
+/// A long-running behaviour (a `Repeat`, a windowed scene) never resolves, so the
+/// process stays up; a one-shot resolves and exits. A [`DisableBootOnLoad`] on the
+/// entity or an ancestor opts the subtree out (eg a render/inspect build).
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+#[component(on_add = on_add_run)]
+pub struct RunOnLoad;
+
+/// Opts an entity (and its subtree) out of [`BootOnLoad`] / [`ExchangeOnLoad`] /
+/// [`RunOnLoad`]:
 /// the tree is built to render or inspect (eg `export-static`, `check`), not to
 /// run. A component, not a resource, so a single world can build some entries
 /// dormant and run others.
@@ -92,6 +122,10 @@ fn on_add_exchange(mut world: DeferredWorld, cx: HookContext) {
 		.commands()
 		.entity(cx.entity)
 		.observe_any(on_load_exchange);
+}
+
+fn on_add_run(mut world: DeferredWorld, cx: HookContext) {
+	world.commands().entity(cx.entity).observe_any(on_load_run);
 }
 
 /// On the entry root's `LoadTemplate`, queue [`Boot::boot`] with the process request.
@@ -141,6 +175,21 @@ fn on_load_exchange(
 	commands.entity(target).queue_async_local(|host| {
 		Boot::exchange_boot(host, Request::from_cli_args(CliArgs::parse_env()))
 	});
+}
+
+/// On the entity's `LoadTemplate`, queue [`Boot::run`] to start its behaviour.
+fn on_load_run(
+	ev: On<LoadTemplate>,
+	ancestors: Query<&ChildOf>,
+	disabled: Query<(), With<DisableBootOnLoad>>,
+	mut exit: MessageWriter<AppExit>,
+	mut commands: Commands,
+) {
+	let target = ev.event_target();
+	if !should_load(target, ev.is_error, &ancestors, &disabled, &mut exit) {
+		return;
+	}
+	commands.entity(target).queue_async_local(|host| Boot::run(host));
 }
 
 /// Whether a `LoadTemplate` on `target` should drive a load: the build succeeded
@@ -304,5 +353,29 @@ mod test {
 			})
 			.unwrap()
 			.xpect_eq(0);
+	}
+
+	/// `RunOnLoad` runs the entity's own `Action<(), Outcome>` on its `LoadTemplate`:
+	/// a one-shot behaviour resolves (recorded here) and `Boot::run` exits.
+	#[beet_core::test]
+	async fn run_on_load_runs_behaviour() {
+		let ran = Store::new(false);
+		let recorder = ran.clone();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
+		// a behaviour root that runs on `LoadTemplate`, recording when its action runs.
+		let action: Action<(), Outcome> =
+			Action::new_pure(move |_: ActionContext| -> Result<Outcome> {
+				recorder.set(true);
+				Outcome::PASS.xok()
+			});
+		app.world_mut()
+			.spawn_template(Snippet::from_bundle((RunOnLoad, action)))
+			.unwrap();
+		// the `LoadTemplate` observer queues `Boot::run` onto the AsyncWorld;
+		// `update_until` ticks the runtime between frames so the queued call runs.
+		app_ext::update_until(&mut app, |_world| ran.get())
+			.await
+			.xpect_true();
 	}
 }

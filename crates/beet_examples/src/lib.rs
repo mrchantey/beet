@@ -58,6 +58,11 @@ pub(crate) mod beet {
 		// only the render example set (`beet_example_plugin`) uses the spatial prelude.
 		#[cfg(feature = "bevy_default")]
 		pub use beet_spatial::prelude::*;
+		// the render scenes' `RunOnLoad` load verb lives in `beet_net` with the rest
+		// of the family; pull just it in (not the whole net prelude) so the render set
+		// resolves it without depending on the `thread` example wiring.
+		#[cfg(feature = "bevy_default")]
+		pub use beet_net::prelude::RunOnLoad;
 		#[cfg(feature = "thread")]
 		pub use beet_thread::prelude::*;
 	}
