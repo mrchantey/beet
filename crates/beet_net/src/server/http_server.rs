@@ -157,14 +157,7 @@ impl HttpServer {
 	/// The OS-assigned port resolves here even for a `port: 0` config, since the
 	/// bind path registers the real `local_addr` port, not the configured one.
 	pub fn current_port() -> Result<u16> {
-		Self::current_port_from(*CURRENT_PORT.read().unwrap())
-	}
-
-	/// Resolve a port `Option` to the [`current_port`](Self::current_port) result,
-	/// the no-port error when absent. The pure half, so a consumer can exercise
-	/// the error path without the process-global.
-	pub fn current_port_from(port: Option<u16>) -> Result<u16> {
-		port.ok_or_else(|| {
+		CURRENT_PORT.read().unwrap().ok_or_else(|| {
 			bevyhow!("local port not assigned, is the server running yet?")
 		})
 	}

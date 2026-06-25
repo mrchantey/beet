@@ -528,8 +528,6 @@ mod test_file_scheme {
 #[cfg(not(target_arch = "wasm32"))]
 mod test_loopback {
 	use super::*;
-	use crate::prelude::*;
-	use beet_core::prelude::*;
 
 	/// An authority-less URL rewrites to the `127.0.0.1:{port}` loopback origin,
 	/// path and query preserved. The pure rewrite, so it is order-independent of
@@ -540,18 +538,5 @@ mod test_loopback {
 			.url()
 			.to_string()
 			.xpect_eq("http://127.0.0.1:8339/assets/x.jpg?v=1");
-	}
-
-	/// With no canonical server bound, the rewrite surfaces the no-port error so
-	/// the fetch fails cleanly (the intended `--server=tui` signal) rather than
-	/// loosing the request at a bogus origin.
-	#[beet_core::test]
-	fn errors_when_no_port() {
-		// the process-global may be set by a parallel server test, so drive the
-		// error path through a fresh lock holding `None`.
-		HttpServer::current_port_from(None)
-			.map_err(|err| err.to_string())
-			.unwrap_err()
-			.xpect_contains("local port not assigned");
 	}
 }

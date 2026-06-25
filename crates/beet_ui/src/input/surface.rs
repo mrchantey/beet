@@ -62,6 +62,17 @@ pub struct RenderSurface(#[entities] pub Entity);
 impl RenderSurface {
 	/// The surface entity this subtree is displayed on.
 	pub fn surface(&self) -> Entity { self.0 }
+
+	/// An [`OnSpawn`] that makes the entity its own surface: it inserts
+	/// `RenderSurface(self)`, so the whole subtree resolves to this entity through
+	/// [`SurfaceQuery`] with no per-widget wiring. For a directly-spawned host that
+	/// skips the router's page binding (eg a charcell chat host).
+	pub fn self_referential() -> OnSpawn {
+		OnSpawn::new(|entity: &mut EntityWorldMut| {
+			let entity_id = entity.id();
+			entity.insert(RenderSurface(entity_id));
+		})
+	}
 }
 
 /// The page currently bound to this surface, the target half of the

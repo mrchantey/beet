@@ -21,9 +21,9 @@ use beet_ui::prelude::*;
 /// [`CreatePostForm`] as its children. Used by the interactive and auto-loop
 /// examples (the process runs until Ctrl+C).
 ///
-/// The host carries [`SelfSurface`], so it *is* its own [`RenderSurface`] and the
-/// whole nested subtree (the [`CreatePostForm`], its `<input>`, the [`ThreadView`])
-/// resolves to it through `SurfaceQuery` with no per-widget wiring.
+/// The host *is* its own [`RenderSurface`] (via [`RenderSurface::self_referential`]),
+/// so the whole nested subtree (the [`CreatePostForm`], its `<input>`, the
+/// [`ThreadView`]) resolves to it through `SurfaceQuery` with no per-widget wiring.
 #[template]
 pub fn TuiThreadChat() -> impl Bundle {
 	rsx! {
@@ -31,31 +31,11 @@ pub fn TuiThreadChat() -> impl Bundle {
 			StdioTerminal::default(),
 			DoubleBuffer::default(),
 			LayoutStyle::flex_col(),
-			SelfSurface,
+			RenderSurface::self_referential(),
 		)}>
 			<Slot/>
 		</div>
 	}
-}
-
-/// Marks a charcell host that is its own [`RenderSurface`]: its `on_add` inserts
-/// `RenderSurface(self)`, so every descendant resolves to this entity through
-/// `SurfaceQuery`.
-///
-/// For the directly-spawned chat host that skips the router's page-host binding
-/// (a routed page binds `RenderSurface(host)` instead). Such a host is never
-/// routed, so the self-link never collides with a page's.
-#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
-#[reflect(Component, Default)]
-#[component(on_add = self_surface_on_add)]
-pub struct SelfSurface;
-
-fn self_surface_on_add(mut world: DeferredWorld, cx: HookContext) {
-	let entity = cx.entity;
-	world
-		.commands()
-		.entity(entity)
-		.insert(RenderSurface(entity));
 }
 
 /// An inline charcell host for a finite, non-interactive run: it keeps the
@@ -90,8 +70,9 @@ mod test {
 
 	/// Replicates `beet_ui`'s `TestHost` (which is `pub(crate)`): a headless
 	/// charcell app whose host entity carries the channel terminal and the
-	/// [`DoubleBuffer`] the pipeline paints. Carries [`SelfSurface`], as the local
-	/// [`TuiThreadChat`] does, so the nested form subtree resolves to the host.
+	/// [`DoubleBuffer`] the pipeline paints. The host is its own [`RenderSurface`]
+	/// (via [`RenderSurface::self_referential`]), as the local [`TuiThreadChat`] is,
+	/// so the nested form subtree resolves to the host.
 	/// Returns `(app, host)`.
 	fn charcell_app() -> (App, Entity) {
 		let mut app = App::new();
@@ -106,7 +87,7 @@ mod test {
 				channel,
 				terminal,
 				DoubleBuffer::new(UVec2::new(40, 12)),
-				SelfSurface,
+				RenderSurface::self_referential(),
 			))
 			.id();
 		// settle Startup before any content is attached

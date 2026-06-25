@@ -16,6 +16,7 @@ pub const SELECT_TEXT: ClassName = ClassName::new_static("select-text");
 pub const SELECT_DROPDOWN: ClassName = ClassName::new_static("select-dropdown");
 pub const SELECT_OPTION: ClassName = ClassName::new_static("select-option");
 pub const ERROR_TEXT: ClassName = ClassName::new_static("error-text");
+pub const ERROR: ClassName = ClassName::new_static("error");
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
@@ -196,5 +197,16 @@ pub fn error_text() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(ERROR_TEXT))
 		.with_token(common_props::ForegroundColor,colors::Error).unwrap()
+		.with_token(TypographyProps,typography::BodySmall).unwrap()
+}
+
+/// An error box: the [`Error`](crate::prelude::Error) container painted on the
+/// material `Error`/`OnError` pair, for surfacing a failure inline (eg a render
+/// error beside a broken widget).
+pub fn error() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(ERROR))
+		.with_token(common_props::BackgroundColor,colors::Error).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnError).unwrap()
 		.with_token(TypographyProps,typography::BodySmall).unwrap()
 }

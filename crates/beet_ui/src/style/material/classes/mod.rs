@@ -122,6 +122,7 @@ pub fn all_rules() -> Vec<Rule> {
 		select_option_active(),
 		select_option_selected(),
 		error_text(),
+		error(),
 		// table (the `.table-vertical-borders` column dividers are drawn per target:
 		// an adjacent-sibling rule in `reset.css` on the web, the
 		// `apply_table_vertical_borders` decorate system on the terminal)

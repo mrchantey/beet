@@ -45,7 +45,6 @@ impl Plugin for ThreadUiPlugin {
 		app.register_type::<ThreadView>()
 			.register_type::<ThreadScroll>()
 			.register_type::<CreatePostForm>()
-			.register_type::<SelfSurface>()
 			// the thread<->UI relationship binding views/forms to their thread
 			.register_type::<OfThread>()
 			.register_type::<ThreadItems>()

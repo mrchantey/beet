@@ -138,7 +138,7 @@ impl Default for KittyGraphicsSupport {
 #[cfg(feature = "tui")]
 #[derive(Debug, Clone, Component)]
 pub struct KittyImageUnavailable {
-	/// The failure message shown via the [`ErrorText`] widget styling.
+	/// The failure message, rendered in the material [`Error`] box.
 	pub error: SmolStr,
 }
 
@@ -229,8 +229,8 @@ fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 /// System: render an unavailable `<img>`'s error once, alongside its existing
 /// `[image]: alt` marker. The failed `<img>` keeps its [`Marker`] (the
 /// `[image]: alt` text, rendered as the gutter once it has children), and this
-/// spawns the [`ErrorText`] widget's `.error-text` span as a child carrying the
-/// failure — so a failed image shows both what it was and why it could not load.
+/// spawns the material [`Error`] box carrying the failure as a child, so a failed
+/// image shows both what it was and why it could not load.
 #[cfg(feature = "tui")]
 pub fn render_image_errors(
 	unavailable: Query<(Entity, &KittyImageUnavailable), Without<KittyErrorShown>>,
@@ -240,12 +240,7 @@ pub fn render_image_errors(
 		let error = image.error.clone();
 		commands.entity(entity).insert(KittyErrorShown).with_children(
 			|parent| {
-				// the material `ErrorText` widget's styled span (built directly: the
-				// live render world has no `TemplatePlugin` to expand the template).
-				parent.spawn((
-					Element::new("span").with_inner_text(&error),
-					Classes::new([classes::ERROR_TEXT]),
-				));
+				parent.spawn(rsx! { <Error>{error}</Error> });
 			},
 		);
 	}
