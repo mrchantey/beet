@@ -159,8 +159,7 @@ pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
 	// (eg `RunOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
 	// Snapshot the subtree first, then fire: an observer may restructure the tree.
 	root.world_scope(|world| {
-		let subtree =
-			world.entity_mut(root_id).iter_descendents_bfs_inclusive();
+		let subtree = world.entity_mut(root_id).iter_descendents_inclusive();
 		for entity in subtree {
 			if let Ok(mut entity) = world.get_entity_mut(entity) {
 				entity.trigger(move |entity| LoadTemplate { entity, is_error });

@@ -436,7 +436,7 @@ pub impl<'w> EntityWorldMut<'w> {
 	/// Removes the component of the given type from the entity and all its descendants
 	/// and returns their values, in depth-first pre-order.
 	fn take_recursive<C: Component>(&mut self) -> Vec<C> {
-		let subtree = self.iter_descendents_inclusive();
+		let subtree = self.iter_descendents_dfs_inclusive();
 		self.world_scope(|world| {
 			subtree
 				.into_iter()

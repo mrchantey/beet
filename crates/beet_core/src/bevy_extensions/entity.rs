@@ -35,33 +35,33 @@ pub impl<'a> EntityWorldMut<'a> {
 			.collect()
 	}
 
-	/// All descendants reachable through [`Children`], depth-first pre-order,
-	/// excluding this entity.
-	fn iter_descendents(&mut self) -> Vec<Entity> {
-		self.with_state::<Query<&Children>, _>(|entity, query| {
-			query.iter_descendants_depth_first(entity).collect()
-		})
-	}
-
-	/// This entity followed by all its descendants, depth-first pre-order.
-	fn iter_descendents_inclusive(&mut self) -> Vec<Entity> {
-		self.with_state::<Query<&Children>, _>(|entity, query| {
-			query.iter_descendants_inclusive_depth_first(entity).collect()
-		})
-	}
-
 	/// All descendants reachable through [`Children`], breadth-first,
 	/// excluding this entity.
-	fn iter_descendents_bfs(&mut self) -> Vec<Entity> {
+	fn iter_descendents(&mut self) -> Vec<Entity> {
 		self.with_state::<Query<&Children>, _>(|entity, query| {
 			query.iter_descendants(entity).collect()
 		})
 	}
 
 	/// This entity followed by all its descendants, breadth-first.
-	fn iter_descendents_bfs_inclusive(&mut self) -> Vec<Entity> {
+	fn iter_descendents_inclusive(&mut self) -> Vec<Entity> {
 		self.with_state::<Query<&Children>, _>(|entity, query| {
 			query.iter_descendants_inclusive(entity).collect()
+		})
+	}
+
+	/// All descendants reachable through [`Children`], depth-first pre-order,
+	/// excluding this entity.
+	fn iter_descendents_dfs(&mut self) -> Vec<Entity> {
+		self.with_state::<Query<&Children>, _>(|entity, query| {
+			query.iter_descendants_depth_first(entity).collect()
+		})
+	}
+
+	/// This entity followed by all its descendants, depth-first pre-order.
+	fn iter_descendents_dfs_inclusive(&mut self) -> Vec<Entity> {
+		self.with_state::<Query<&Children>, _>(|entity, query| {
+			query.iter_descendants_inclusive_depth_first(entity).collect()
 		})
 	}
 
@@ -214,20 +214,20 @@ mod test {
 		let root = world.spawn_empty().add_children(&[a, b]).id();
 
 		world.entity_mut(root).iter_descendents().xpect_eq(vec![
-			a, c, d, b,
+			a, b, c, d,
 		]);
 		world
 			.entity_mut(root)
 			.iter_descendents_inclusive()
-			.xpect_eq(vec![root, a, c, d, b]);
-		world
-			.entity_mut(root)
-			.iter_descendents_bfs()
-			.xpect_eq(vec![a, b, c, d]);
-		world
-			.entity_mut(root)
-			.iter_descendents_bfs_inclusive()
 			.xpect_eq(vec![root, a, b, c, d]);
+		world
+			.entity_mut(root)
+			.iter_descendents_dfs()
+			.xpect_eq(vec![a, c, d, b]);
+		world
+			.entity_mut(root)
+			.iter_descendents_dfs_inclusive()
+			.xpect_eq(vec![root, a, c, d, b]);
 		// a leaf yields only itself (inclusive) or nothing (exclusive)
 		world.entity_mut(c).iter_descendents().xpect_eq(vec![]);
 		world
