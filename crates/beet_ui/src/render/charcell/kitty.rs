@@ -818,7 +818,7 @@ mod test {
 	// fresh checkout until `just pull-assets`, so the asset tests skip when missing.
 
 	/// The site-rooted src of the folk-technology post image.
-	#[cfg(all(feature = "tui", feature = "net"))]
+	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]
 	const SHANTY_SRC: &str = "/assets/blog/kiama-sea-shanty-club.jpg";
 
 	/// The real folk-technology JPEG, or `None` on a checkout without `assets/`.

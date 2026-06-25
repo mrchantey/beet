@@ -161,7 +161,9 @@ mod test {
 	/// stored thread on reload rather than forking a duplicate. Regression for the
 	/// deferred mount: the sync used to flush the fresh, un-adopted thread before
 	/// adoption ran, growing the store to two threads on the second run.
-	#[beet_core::test]
+	// runs a full app twice against real disk; the async fs flushes can exceed
+	// the 5s default under parallel test load.
+	#[beet_core::test(timeout_ms = 30000)]
 	async fn reload_adopts_without_duplicating() {
 		let path = "target/tests/beet_thread/run-thread-reload";
 		// stable ids so the seed hash matches across runs

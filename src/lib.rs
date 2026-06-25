@@ -74,6 +74,11 @@ pub mod prelude {
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
+	// `Button`: with `ui` but not `template`, both `core` and `ui` glob bevy's
+	// marker, so an explicit re-export disambiguates. The `template` case is
+	// covered by the widget re-export further down.
+	#[cfg(all(feature = "ui", not(feature = "template")))]
+	pub use crate::ui::prelude::Button;
 	#[cfg(feature = "ui")]
 	pub use crate::ui::prelude::*;
 	#[cfg(any(

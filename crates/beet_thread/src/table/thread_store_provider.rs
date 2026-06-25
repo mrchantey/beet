@@ -265,7 +265,9 @@ pub mod thread_store_test {
 	#[beet_core::test]
 	async fn memory() { run(BlobThreadStore::temp()).await; }
 
-	#[beet_core::test]
+	// full-store conformance over real disk: a dozen blob read-modify-writes,
+	// which can exceed the 5s default under parallel test load.
+	#[beet_core::test(timeout_ms = 30000)]
 	async fn fs() {
 		use beet_net::prelude::*;
 		let blob = BlobStore::new(FsStore::new(

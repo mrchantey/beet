@@ -102,29 +102,32 @@ cargo run -p beet_ml   --example hello_rl_basic --features=bevy_default
 
 ### 7. Workspace ML (`--features=examples,ml`)
 
-```sh
-cargo run --example hello_ml --features=examples,ml        # logs "NearestSentence chose: Attack Behavior"
-```
+The `examples,ml` feature only gates windowed scene code (now scene modules in
+`beet_examples`, not runnable `--example` targets), so there is no
+self-terminating CLI smoke here. The runtime ML smoke lives in the crate
+(`hello_ml_basic`, section 6); this feature's compilation is covered by the
+skip-set check below (and is the only coverage, since `beet_examples` is
+excluded from the test crates).
 
 ## Not Verifiable Via CLI (skip)
 
 Documented so future passes don't waste time on them:
 
-- **Spatial:** `flock`, `seek`, `seek_3d`, `hello_animation`, `inverse_kinematics` — Bevy windowed apps.
-- **ML windowed:** `fetch`, `frozen_lake_run`.
-- **Interactive TUI/stdin:** `thread/chat`, `thread/multi_agent`, `ui/term_input`, `ui/tui`, `ui/state`.
+- **Spatial / ML scenes:** `flock`, `seek`, `fetch`, `frozen_lake_run` etc. are no longer `--example` targets — they live as scene modules in `beet_examples`, reached only by building the `examples,spatial` / `examples,ml` features.
+- **Thread scenes:** `chat`, `multi_agent`, `oneshot`, `persistent_chat`, `tool_call`, `self_evolving`, `coding_agent` are `.bsx` markup scenes under `examples/thread/`, not `--example` targets. Several also need an LLM key (`OPENAI_API_KEY` / `BEDROCK_*`).
+- **Interactive TUI/stdin:** `ui/term_input`, `ui/tui`, `ui/state` — real examples that block on stdin.
 - **Browser required:** `ui/crud`, `ui/syntax_highlighting`, `ui/media_renderer` (interactive output).
-- **Needs LLM API key:** `thread/oneshot`, `thread/persistent_chat`, `thread/tool_call`, `thread/self_evolving`, `thread/coding_agent`. Compile-check these but don't run unless `OPENAI_API_KEY` / `BEDROCK_*` env is set.
 - **Needs AWS:** `hello_lambda`, `hello_lightsail`, `hello_fargate`, `lifecycle`. Compile-check only.
 - **Needs sshd:** `ssh_server`, `ssh_client`, `ssh_tui`.
 
-A pure compile check is still useful for the skipped set:
+A pure compile check is still useful for the skipped set. The first three cover
+`beet_examples` and the feature gates, which no test crate compiles:
 
 ```sh
-cargo check --example fetch              --features=examples,ml
-cargo check --example flock              --features=examples,spatial
-cargo check --example hello_lambda       --features=router,lambda_block,markdown
-cargo check --example chat               --features=thread
+cargo check -p beet --features=examples,ml       # beet_examples ML scenes (fetch etc.)
+cargo check -p beet --features=examples,spatial  # beet_examples spatial scenes (flock etc.)
+cargo check -p beet --features=thread            # thread scene templates
+cargo check --example hello_lambda --features=router,lambda_block,markdown
 ```
 
 ## Instructions

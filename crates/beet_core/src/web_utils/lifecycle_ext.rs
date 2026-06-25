@@ -92,14 +92,17 @@ mod test {
 	use crate::prelude::*;
 	use std::time::Duration;
 
-	#[crate::test]
+	// the success path resolves in ~100ms, but a congested wasm event loop can
+	// delay that resolution; a wide deadline (well under the lifted runner
+	// timeout) keeps the race from flaking without slowing the common case.
+	#[crate::test(timeout_ms = 10000)]
 	pub async fn works() {
 		lifecycle_ext::future_timeout(
 			|| async {
 				time_ext::sleep(Duration::from_millis(100)).await;
 				39
 			},
-			Duration::from_millis(1000),
+			Duration::from_millis(5000),
 		)
 		.await
 		.unwrap()

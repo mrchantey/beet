@@ -87,12 +87,17 @@ where
 	result
 }
 
-/// Log at debug level and emit an [`OnLogMessage`].
+/// Log at debug level and, when a log-UI consumer has registered
+/// [`OnLogMessage`] (eg via [`DebugActionPlugin`]), emit it too.
 async fn emit(world: &AsyncWorld, msg: String) {
 	debug!("{msg}");
 	world
 		.with(move |world| {
-			world.write_message(OnLogMessage::new(msg));
+			// the message is optional: without a consumer the resource is
+			// absent, and an unguarded write logs a spurious "unable to send"
+			if world.contains_resource::<Messages<OnLogMessage>>() {
+				world.write_message(OnLogMessage::new(msg));
+			}
 		})
 		.await;
 }
@@ -145,9 +150,28 @@ fn log_running(
 mod tests {
 	use super::*;
 
+	// no [`DebugActionPlugin`], so `OnLogMessage` is unregistered: the guarded
+	// emit must stay silent and forward, not log "unable to send".
 	#[beet_core::test]
 	async fn traces_and_forwards() {
 		AsyncPlugin::world()
+			.spawn((
+				Name::new("leaf"),
+				trace_action
+					.wrap(Action::<(), Outcome>::new_fixed(Outcome::PASS)),
+			))
+			.call::<(), Outcome>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::PASS);
+	}
+
+	// with a log-UI consumer registered, the guarded emit runs its write path
+	// and still forwards.
+	#[beet_core::test]
+	async fn traces_with_log_consumer() {
+		(MinimalPlugins, AsyncPlugin, ActionPlugin, DebugActionPlugin)
+			.into_world()
 			.spawn((
 				Name::new("leaf"),
 				trace_action

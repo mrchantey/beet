@@ -141,7 +141,7 @@ fn sequence() -> impl Bundle {
 		(exchange_sequence(), children![
 			Action::<Request, Outcome<Request, Response>>::new_pure(
 				|cx: ActionContext<Request>| {
-					println!("in sequence!");
+					info!("in sequence!");
 					Pass(cx.input)
 				},
 			),
