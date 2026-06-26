@@ -32,7 +32,7 @@ pub enum MediaType {
 	Ron,
 	/// `text/markdown`
 	Markdown,
-	/// `text/x-bsx` — Beet Script XML, the `.bsx` template format.
+	/// `application/x-bsx` — Beet Scripting XML, the `.bsx` template format.
 	Bsx,
 	/// `text/event-stream` — Server-Sent Events.
 	EventStream,
@@ -145,7 +145,7 @@ impl MediaType {
 	const HTML: &'static str = "text/html";
 	const XML: &'static str = "application/xml";
 	const MARKDOWN: &'static str = "text/markdown";
-	const BSX: &'static str = "text/x-bsx";
+	const BSX: &'static str = "application/x-bsx";
 	const BYTES: &'static str = "application/octet-stream";
 	const EVENT_STREAM: &'static str = "text/event-stream";
 	const CSS: &'static str = "text/css";

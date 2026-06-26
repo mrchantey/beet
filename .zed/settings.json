@@ -98,7 +98,7 @@
 	],
 	"file_scan_exclusions": [
 		".agents/tmp*",
-		".agents/reference*",
+		// ".agents/reference",
 		".cargo",
 		".beet",
 		".claude",

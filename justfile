@@ -57,7 +57,7 @@ push-assets:
 # Headless verification: prefix BEET_SCREENSHOT=/tmp/x.png BEET_SCREENSHOT_FRAME=N to
 # capture a frame to a PNG and exit (see `crates/beet-cli/src/render.rs`).
 beet *args:
-  cargo run -p beet-cli --features winit,ml -- {{ args }}
+  cargo run -p beet-cli -- {{ args }}
 
 # Deploy the beet website to AWS Fargate; --stage=prod targets prod (default dev).
 # Lean headless build (no winit/ml) and AWS_PROFILE cleared so tofu/aws/s3 use the
