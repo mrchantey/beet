@@ -1,12 +1,15 @@
-//! Bridges between the boot slot (`Action<Boot, Response>`) and the dispatch slot
-//! (`Action<Request, Response>`), so a boot can drive the normal request pipeline
-//! and one entry can boot another, without a bespoke server.
+//! Bridges between a host's boot slot (`Action<Boot, Response>`) and its dispatch
+//! slot (`Action<Request, Response>`), so a boot can drive the normal request
+//! pipeline (or the reverse) without a bespoke server.
 //!
-//! [`BootToExchange`] makes a host's boot slot dispatch through its own request
-//! pipeline. [`ExchangeToBoot`] makes a request handler boot another entity. Both
-//! carry a [`GlobFilter`] selecting which of the boot/request params (the CliArgs)
-//! propagate across the bridge; the rest stay behind. Gated on `action` like the
-//! rest of the boot path, so an embedded boot bridges the same way.
+//! The two are inverses on the *same* entity: [`BootToExchange`] makes a host's boot
+//! slot dispatch through its own request pipeline, [`ExchangeToBoot`] makes a host's
+//! request slot drive its own boot. Neither targets another entity; cross-entity
+//! propagation flows through the standard `Sequence`/call graph or a direct
+//! `entity.call::<Boot, Response>`. Both carry a [`GlobFilter`] selecting which of the
+//! boot/request params (the CliArgs) propagate across the bridge; the rest stay
+//! behind. Gated on `action` like the rest of the boot path, so an embedded boot
+//! bridges the same way.
 
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -47,63 +50,39 @@ async fn boot_to_exchange_action(cx: ActionContext<Boot>) -> Result<Response> {
 	Ok(caller.exchange(propagate_args(boot.0, &filter)).await)
 }
 
-/// Bridges a request handler to another entity's boot slot: an
-/// `Action<Request, Response>` that propagates the incoming request into a [`Boot`]
-/// call on [`target`](Self::target). The mechanism for one entry to boot another, eg
-/// a workspace CLI's `serve` route booting the loaded site entry.
+/// Bridges a host's dispatch slot to its boot slot: an `Action<Request, Response>`
+/// that reinterprets the [`Request`] as a [`Boot`] and calls the host's own
+/// `Action<Boot, Response>`. The inverse of [`BootToExchange`], eg a host whose
+/// request slot should run the booted path (a server start, a `CreateThread`).
 ///
 /// The [`filter`](Self::filter) selects which request params propagate into the
 /// boot; the rest stay behind. The default propagates all.
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(Action<Request, Response> = Action::new_async_local(exchange_to_boot_action))]
 pub struct ExchangeToBoot {
-	/// The entity whose `Action<Boot, Response>` boot slot this drives.
-	#[entities]
-	pub target: Entity,
 	/// Which request params carry into the boot (the rest stay behind).
 	pub filter: GlobFilter,
 }
 
-impl Default for ExchangeToBoot {
-	fn default() -> Self {
-		Self {
-			target: Entity::PLACEHOLDER,
-			filter: GlobFilter::default(),
-		}
-	}
-}
-
-impl ExchangeToBoot {
-	/// Boot `target` (propagating all request params) when this handler's route runs.
-	pub fn new(target: Entity) -> Self {
-		Self {
-			target,
-			..Default::default()
-		}
-	}
-}
-
 /// The `Action<Request, Response>` handler [`ExchangeToBoot`] installs: propagate the
-/// request (filtered) into a boot call on the target entity.
+/// request (filtered) into a boot call on the caller's own boot slot.
 async fn exchange_to_boot_action(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let request = cx.take();
-	let (target, filter) = caller
+	let filter = caller
 		.with(|entity| {
 			entity
 				.get::<ExchangeToBoot>()
-				.map(|bridge| (bridge.target, bridge.filter.clone()))
+				.map(|bridge| bridge.filter.clone())
 		})
 		.await?
 		.ok_or_else(|| {
 			bevyhow!("ExchangeToBoot action ran without its component")
 		})?;
 	caller
-		.world()
-		.entity(target)
 		.call::<Boot, Response>(Boot(propagate_args(request, &filter)))
 		.await
 }
@@ -191,14 +170,30 @@ mod test {
 			.xpect_eq("secret=false kept=true");
 	}
 
-	/// `ExchangeToBoot` boots another entity: a request handler propagates into the
-	/// target's boot slot, which dispatches the target's pipeline.
+	/// A boot slot echoing the boot's path + its `kept` param, so a bridge into it
+	/// proves what propagated. Pairs with [`ExchangeToBoot`] so the entity also has a
+	/// request slot driving this boot.
+	async fn boot_echo_action(cx: ActionContext<Boot>) -> Result<Response> {
+		let request = cx.take().0;
+		let kept = request
+			.get_param("kept")
+			.map(|value| value.to_string())
+			.unwrap_or_default();
+		Ok(Response::ok()
+			.with_body(format!("{} kept={kept}", request.path_string())))
+	}
+
+	/// `ExchangeToBoot` drives the host's own boot slot: calling
+	/// `Action<Request, Response>` runs the request through `Action<Boot, Response>`,
+	/// the inverse of [`BootToExchange`].
 	#[beet_core::test]
-	async fn exchange_to_boot_boots_target() {
-		let mut world = (MinimalPlugins, ServerPlugin).into_world();
-		let target = world.spawn(echo()).flush();
-		world
-			.spawn(ExchangeToBoot::new(target))
+	async fn exchange_to_boot_dispatches_boot() {
+		(MinimalPlugins, ServerPlugin)
+			.into_world()
+			.spawn((
+				ExchangeToBoot::default(),
+				Action::<Boot, Response>::new_async_local(boot_echo_action),
+			))
 			.call::<Request, Response>(Request::get("baz"))
 			.await
 			.unwrap()

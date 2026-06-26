@@ -454,18 +454,20 @@ fn qualified_transform_tag_disambiguates() {
 #[beet_core::test]
 fn js_file_registers_as_script_template() {
 	let mut world = world();
-	// a `PresentationControls.js` in the template dir registers
-	// `<PresentationControls>` exactly as a `.bsx` would, but its body is the file
-	// wrapped verbatim in a `<script>` (a process-unique dir so parallel runs do
-	// not collide).
-	let dir = std::env::temp_dir()
-		.join(format!("beet_js_template_{}", std::process::id()));
-	let _ = fs_ext::remove(&dir);
-	// the `<` proves the body is raw text, not HTML-escaped.
-	fs_ext::write(dir.join("PresentationControls.js"), "console.log(1 < 2);")
+	// a `PresentationControls.js` template registers `<PresentationControls>`
+	// exactly as a `.bsx` would, but its body is the file wrapped verbatim in a
+	// `<script>`. Registered by store-relative path (the `.js` extension selects the
+	// script-wrapping format), the `<` proving the body is raw text, not HTML-escaped.
+	let mut registry = BsxTemplateRegistry::default();
+	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+	registry
+		.insert_source_from_path(
+			&formats,
+			&SmolPath::from("PresentationControls.js"),
+			"console.log(1 < 2);",
+		)
 		.unwrap();
-
-	world.register_bsx_templates(&dir).unwrap();
+	world.insert_resource(registry);
 	world
 		.resource::<BsxTemplateRegistry>()
 		.contains("PresentationControls")
@@ -475,7 +477,6 @@ fn js_file_registers_as_script_template() {
 	// JS inside a raw-text `<script>`, `<` unescaped.
 	let root = spawn_bsx(&mut world, "<head><PresentationControls/></head>");
 	let html = render_html(&mut world, root);
-	let _ = fs_ext::remove(&dir);
 	html.xpect_contains("<script>console.log(1 < 2);</script>");
 }
 

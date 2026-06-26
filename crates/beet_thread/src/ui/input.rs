@@ -34,26 +34,26 @@ impl CreatePostForm {
 	pub fn new(thread: Entity) -> impl Bundle { (Self, OfThread(thread)) }
 }
 
-/// The in-crate `CreatePostForm.bsx` source, registered into the
-/// [`BsxTemplateRegistry`] by [`ThreadUiPlugin`] so [`create_post_form_on_add`]
-/// can resolve it.
-///
-/// TODO(cli-rework): this single `include_str!` + `insert_source` registration is
-/// the interim loader. Once crate-shipped templates travel through the blob store
-/// (see `.agents/plans/cli-rework.md`), swap the registration line in
-/// `ThreadUiPlugin::build` for the blob-store load; the resolve in
-/// `create_post_form_on_add` is unaffected.
+/// The crate-shipped `CreatePostForm.bsx` source, embedded at compile time so a
+/// deployed binary (with no source tree on disk) still carries the bytes. The
+/// bytes are seeded into an in-memory [`BlobStore`] and registered through the
+/// same store-backed path as site templates (see [`ThreadUiPlugin`]); a site
+/// shipping its own `CreatePostForm.bsx` overrides it.
 pub const CREATE_POST_FORM_BSX: &str = include_str!("CreatePostForm.bsx");
 
-/// The name [`CreatePostForm`]'s `.bsx` template is registered under.
+/// The name [`CreatePostForm`]'s `.bsx` template is registered under, the module
+/// path derived from its store key `templates/CreatePostForm.bsx`.
 pub const CREATE_POST_FORM_TEMPLATE: &str = "CreatePostForm";
 
-/// Build the widget's `<form>` from the registered `CreatePostForm.bsx`, so the
-/// component works as a bare spawn or markup spread. Submitting fires `beet_ui`'s
-/// [`Submit`], consumed by the active [`UserInput`] turn; `{FocusOnAdd}` on the
-/// form's `<input>` (in the `.bsx`) gives it initial focus. The input surface is
-/// resolved from the host (which carries `RenderSurface(self)`), so this hook
-/// inserts no surface of its own.
+/// Build the widget's `<form>` from the [`BsxTemplateRegistry`]-registered
+/// `CreatePostForm.bsx`, so the component works as a bare spawn or markup spread.
+/// [`ThreadUiPlugin`] registers that template through an embedded blob store
+/// asynchronously, so a spawn path must let the registration settle first (the
+/// thread servers' run loop does; tests `AsyncRunner::settle_async_tasks`).
+/// Submitting fires `beet_ui`'s [`Submit`], consumed by the active [`UserInput`]
+/// turn; `{FocusOnAdd}` on the form's `<input>` (in the `.bsx`) gives it initial
+/// focus. The input surface is resolved from the host (which carries
+/// `RenderSurface(self)`), so this hook inserts no surface of its own.
 fn create_post_form_on_add(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	// a DeferredWorld cannot read the template registry or insert a template

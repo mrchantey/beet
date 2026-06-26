@@ -65,7 +65,7 @@ fn setup(mut commands: Commands) -> Result {
 #[cfg(feature = "deploy")]
 fn stack() -> Stack { Stack::new("beet-site").with_aws_region("us-west-2") }
 
-/// The private site bucket (`server.bsx`, `routes/`, `templates/`), read by the
+/// The private site bucket (`main.bsx`, `routes/`, `templates/`), read by the
 /// task's IAM role. Non-versioned so `beet sync` overwrites in place (live reload)
 /// and the running task reads a stable root: `./site` syncs to the bucket root.
 #[cfg(feature = "deploy")]

@@ -22,8 +22,8 @@ impl Plugin for ServerPlugin {
 			.register_type::<ExchangeOnLoad>()
 			.register_type::<RunOnLoad>()
 			.register_type::<DisableBootOnLoad>()
-			// the boot<->exchange bridges, markup-spawnable so an entry can wire a
-			// boot into its request pipeline or boot another entry from a route.
+			// the boot<->exchange bridges, markup-spawnable so an entry can wire its
+			// own boot into its request pipeline, or its own request into its boot.
 			.register_type::<BootToExchange>()
 			.register_type::<ExchangeToBoot>();
 

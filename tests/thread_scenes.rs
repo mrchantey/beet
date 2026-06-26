@@ -34,14 +34,21 @@ struct ChoiceInput {
 }
 
 /// Parse + spawn + reduce a scene, returning the reduced app.
-fn reduce(source: &str) -> App {
+///
+/// Settles async tasks before spawning so `ThreadUiPlugin`'s store-backed
+/// `CreatePostForm` registration (seeded into an in-memory `BlobStore`, loaded by
+/// a `TemplateDir` off the runtime) lands before the interactive chat scenes'
+/// composer resolves it.
+async fn reduce(source: &str) -> App {
 	ensure_auth_env();
 	let mut app = App::new();
 	app.add_plugins(MinimalPlugins)
 		.init_plugin::<ThreadPlugin>()
-		// registers `{UserInput}` so the interactive chat scenes resolve
+		// registers `{UserInput}` + the store-backed `CreatePostForm` template so
+		// the interactive chat scenes resolve
 		.init_plugin::<ThreadUiPlugin>()
 		.register_type::<AgentChoiceAction>();
+	AsyncRunner::settle_async_tasks(app.world_mut()).await;
 	BsxTemplate::parse_entry(app.world(), source)
 		.unwrap()
 		.spawn(app.world_mut())
@@ -83,8 +90,8 @@ fn tool_count(app: &mut App) -> usize {
 }
 
 #[beet::test]
-fn chat_scene_reduces() {
-	let mut app = reduce(include_str!("../examples/thread/chat.bsx"));
+async fn chat_scene_reduces() {
+	let mut app = reduce(include_str!("../examples/thread/chat.bsx")).await;
 	window_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the `kind="System"` / `kind="User"` attributes resolve, rather than
@@ -95,16 +102,18 @@ fn chat_scene_reduces() {
 }
 
 #[beet::test]
-fn multi_agent_scene_reduces() {
-	let mut app = reduce(include_str!("../examples/thread/multi_agent.bsx"));
+async fn multi_agent_scene_reduces() {
+	let mut app =
+		reduce(include_str!("../examples/thread/multi_agent.bsx")).await;
 	window_counts(&mut app).xpect_eq((3, 1));
 	// two differently-instructed agents reduce side by side
 	agent_count(&mut app).xpect_eq(2);
 }
 
 #[beet::test]
-fn tool_call_scene_reduces() {
-	let mut app = reduce(include_str!("../examples/thread/tool_call.bsx"));
+async fn tool_call_scene_reduces() {
+	let mut app =
+		reduce(include_str!("../examples/thread/tool_call.bsx")).await;
 	window_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the inline `<AgentChoiceAction/>` reduced to a routed tool
@@ -112,8 +121,9 @@ fn tool_call_scene_reduces() {
 }
 
 #[beet::test]
-fn self_evolving_scene_reduces() {
-	let mut app = reduce(include_str!("../examples/thread/self_evolving.bsx"));
+async fn self_evolving_scene_reduces() {
+	let mut app =
+		reduce(include_str!("../examples/thread/self_evolving.bsx")).await;
 	window_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the `<StoreToolset/>` reduced to the five blob tools
@@ -121,17 +131,18 @@ fn self_evolving_scene_reduces() {
 }
 
 #[beet::test]
-fn coding_agent_scene_reduces() {
-	let mut app = reduce(include_str!("../examples/thread/coding_agent.bsx"));
+async fn coding_agent_scene_reduces() {
+	let mut app =
+		reduce(include_str!("../examples/thread/coding_agent.bsx")).await;
 	window_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	tool_count(&mut app).xpect_eq(5);
 }
 
 #[beet::test]
-fn persistent_chat_scene_reduces() {
+async fn persistent_chat_scene_reduces() {
 	let mut app =
-		reduce(include_str!("../examples/thread/persistent_chat.bsx"));
+		reduce(include_str!("../examples/thread/persistent_chat.bsx")).await;
 	window_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
 	let kinds = actor_kinds(&mut app);

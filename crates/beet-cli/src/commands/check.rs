@@ -34,7 +34,8 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<CheckParams>()?;
 	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
-	let root = build_site(&cx.caller, site_dir.clone(), entry).await?;
+	let root =
+		build_site(&cx.caller, parts.params(), site_dir.clone(), entry).await?;
 	let report = check_routes(&cx.world(), root).await?;
 
 	// surface every diagnostic loudly through the log facade, then summarize.
@@ -118,5 +119,32 @@ mod test {
 			.as_str()
 			.xpect_contains("checked")
 			.xpect_contains("0 error(s)");
+	}
+
+	/// A no-code site uses the beet_ui widgets (`<Form>`/`<Header>`/`<Sidebar>`/…) as live
+	/// tags resolved by name against the template registry at build time. The render
+	/// world mirrors `BeetPlugins`, which links the widget library, so each widget tag
+	/// resolves to a registered template rather than failing with "no template registered
+	/// for tag `Form`". Guards the capability-library gap that left widget sites
+	/// unrenderable: without the linked library these lookups return `None` and every
+	/// widget page is an error.
+	#[beet::test]
+	fn render_world_registers_ui_widgets() {
+		let world = crate::commands::render_world();
+		let registry = world.resource::<AppTypeRegistry>();
+		// the widget tags a no-code site relies on each resolve to a registered template
+		// (the `Some` the build path needs; `None` is the Finding-A failure). `Button` is
+		// deliberately omitted: its short path collides with bevy_ui's `Button` under the
+		// `bevy_default` render stack the `winit` feature pulls, a separate ambiguity from
+		// this library-registration gap.
+		for tag in ["Form", "Header", "Sidebar", "Table", "Footer", "TextField"] {
+			template_schema_by_name(registry, tag)
+				.is_some()
+				.xpect_true();
+		}
+		// a genuinely unknown tag still resolves to nothing, so the guard is meaningful.
+		template_schema_by_name(registry, "Nonexistent")
+			.is_some()
+			.xpect_false();
 	}
 }

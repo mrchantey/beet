@@ -13,8 +13,8 @@ use beet_net::prelude::*;
 /// transclusion semantics).
 ///
 /// The name resolves against the [`BsxTemplateRegistry`] at render time, eg
-/// `Layout` for a `Layout.bsx` registered via `register_bsx_templates`. Add it
-/// to an ancestor of the routes it should wrap, typically the router entity.
+/// `Layout` for a `Layout.bsx` registered via a `<TemplateDir src="templates"/>`.
+/// Add it to an ancestor of the routes it should wrap, typically the router entity.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(BsxLayoutAction)]

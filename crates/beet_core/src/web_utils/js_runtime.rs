@@ -34,6 +34,7 @@ mod raw {
 			f: &mut dyn FnMut() -> Result<(), String>,
 		) -> Result<(), JsValue>;
 		pub fn read_file(path: &str) -> Option<Vec<u8>>;
+		pub fn read_dir(path: &str) -> js_sys::Array;
 		pub fn create_dir_all(path: &str);
 		pub fn exists(path: &str) -> bool;
 		pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
@@ -60,6 +61,8 @@ mod raw {
 		) -> Result<(), JsValue>;
 		#[wasm_bindgen(js_name = "test_read_file")]
 		pub fn read_file(path: &str) -> Option<Vec<u8>>;
+		#[wasm_bindgen(js_name = "test_read_dir")]
+		pub fn read_dir(path: &str) -> js_sys::Array;
 		#[wasm_bindgen(js_name = "test_exists")]
 		pub fn exists(path: &str) -> bool;
 		#[wasm_bindgen(js_name = "test_create_dir_all")]
@@ -124,6 +127,19 @@ pub fn read_file(path: &str) -> Option<Vec<u8>> {
 	}
 }
 
+/// List the files under a directory recursively, returning each path relative to
+/// `path` (forward-slash separated), ie a `Deno.readDirSync` walk. Empty where the
+/// fs global is absent or the directory does not exist. The native `FsStore` uses
+/// `ReadDir::files_recursive_async`; this is its wasm/deno counterpart, so a
+/// `DenoFsStore` lists the same files.
+pub fn read_dir(path: &str) -> Vec<SmolStr> {
+	if has_global("read_dir") {
+		js_strings(&raw::read_dir(path))
+	} else {
+		Vec::new()
+	}
+}
+
 /// Ensure a directory exists, ie `Deno.mkdirSync()`. A no-op where unavailable.
 pub fn create_dir_all(path: &str) {
 	if has_global("create_dir_all") {
@@ -149,6 +165,12 @@ pub fn write_file(path: &str, content: &[u8]) -> Option<String> {
 		None
 	}
 }
+
+/// Whether the host exposes the `env_args` global, ie the deno/node runner (which
+/// provides `Deno.args`). False in a browser / Worker, where there is no process
+/// argv. Lets a caller prefer real argv over a browser location fallback, since deno
+/// also polyfills a `window`.
+pub fn has_args() -> bool { has_global("env_args") }
 
 /// Command-line args excluding the program name, ie `Deno.args`. Empty where
 /// unavailable (a Worker has no argv).

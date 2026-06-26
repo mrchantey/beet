@@ -53,6 +53,10 @@ pub struct ExchangeStats {
 }
 
 impl ExchangeStats {
+	/// A counter seeded with `request_count` already processed, for tests and
+	/// diagnostics that need a non-zero starting count.
+	pub fn new(request_count: u128) -> Self { Self { request_count } }
+
 	/// Returns the total number of requests processed.
 	pub fn request_count(&self) -> u128 { self.request_count }
 

@@ -62,6 +62,19 @@ impl TemplateError {
 	}
 }
 
+/// Inserted on an entry root once its declared template sources (its
+/// `<TemplateDir>` directories) are registered into the
+/// [`BsxTemplateRegistry`](crate::prelude::BsxTemplateRegistry) and the schemas
+/// refreshed.
+///
+/// The build registers the entry's own template dirs *before* parsing the entry
+/// (so entry-level tags like `<Styles/>` resolve), then marks the root. A driver
+/// that must not serve before the entry is ready (the wasm Worker) waits for this
+/// marker; the native run loop settles it naturally before the first request.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct TemplatesLoaded;
+
 /// The set of outstanding dependencies gating [`LoadTemplate`] on a root.
 ///
 /// Generalized so assets, schemas, and remote fetches register into it later.

@@ -32,7 +32,7 @@ impl Plugin for CliCommandsPlugin {
 		app.register_type::<Check>()
 			.register_type::<ExportStatic>()
 			// `serve <site>` loads a site and boots its servers (the only command
-			// that boots the workspace entry's server, via the exchange->boot bridge)
+			// that boots the workspace entry's server, via a direct boot call)
 			.register_type::<Serve>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()

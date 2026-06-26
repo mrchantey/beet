@@ -111,6 +111,14 @@ impl Plugin for RouterPlugin {
 			// runs on wasm too rather than needing a separate blocking/async split.
 			app.register_type::<RoutesDir>()
 				.add_observer(RoutesDir::spawn_on_insert);
+			// the markup-resolved `<TemplateDir src="templates"/>`: its insert
+			// observer reads the dir through the nearest ancestor `BlobStore` and
+			// registers each `.bsx`/`.js` template by module path, off the runtime
+			// (so it runs on wasm too). An entry's own template dirs are also
+			// pre-scanned synchronously by the cli before the entry parses, so
+			// entry-level tags like `<Styles/>` resolve.
+			app.register_type::<TemplateDir>()
+				.add_observer(TemplateDir::register_on_insert);
 			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
 			// inserts its own greedy capture + handler, eg
 			// `<ServeBlobs prefix="assets" {AssetsStore}/>`.

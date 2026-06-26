@@ -4,6 +4,7 @@
 //! route-aware widgets (`RouteHead`, `RouteSidebar`).
 beet_core::test_main!();
 
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
@@ -13,6 +14,7 @@ const MAIN_BSX: &str = r#"
 the package resource patched from markup -->
 <Router {(RequestLogger, BsxLayout{template:"Layout"})}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
+	<TemplateDir src="templates"/>
 	<RoutesDir src="routes"/>
 	<ServeBlobs prefix="assets" {DirPath("assets")}/>
 </Router>
@@ -67,24 +69,24 @@ async fn site_store() -> BlobStore {
 }
 
 /// The example's `main.rs` setup in miniature: plugins + the compile-time
-/// package config (the title/description come from `MAIN_BSX`), then register
-/// the site templates and spawn the entry.
+/// package config (the title/description come from `MAIN_BSX`), then build the
+/// entry into a root carrying the site store so the markup-declared `<TemplateDir>`
+/// and `<RoutesDir>` resolve it by ancestry.
 async fn spawn_site(world: &mut World) -> Entity {
 	world.insert_resource(pkg_config!());
-	// the same store-backed load the binary and Worker run: register `templates/`
-	// and read the entry through the site store, then build into a root carrying
-	// that store so `RoutesDir` and `<Template src>` resolve it by ancestry.
+	// the same store-backed load the binary and Worker run: read the entry through
+	// the site store and build into a root carrying that store, so `<TemplateDir>`
+	// (registering `templates/`), `<RoutesDir>` and `<Template src>` resolve it by
+	// ancestry. None of the entry's own tags are dir-loaded templates, so the
+	// reactive `<TemplateDir>` registration settles below before any route renders.
 	let store = site_store().await;
-	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let sources = read_site_templates(&store, &formats).await.unwrap();
-	register_site_templates(world, &formats, sources).unwrap();
 	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
 	let template =
 		BsxTemplate::parse_entry(world, entry.as_utf8().unwrap()).unwrap();
 	let root = world.spawn(store).id();
 	world.entity_mut(root).insert_template(template).unwrap();
-	// the `<RoutesDir>` scan is async, so settle it before reading the route tree
-	// or serving requests (else the discovered routes 404)
+	// the `<TemplateDir>`/`<RoutesDir>` scans are async, so settle them before
+	// reading the route tree or serving requests (else routes 404 / templates miss)
 	AsyncRunner::settle_async_tasks(world).await;
 	root
 }
@@ -349,26 +351,24 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	}
 }
 
-/// `site/main.bsx`'s shape: `server.bsx`'s `Router` declares `BootOnLoad` beside its
-/// boot slot (`CliServer` here), and a `<Template src="server.bsx"/>` include builds
-/// that `Router` onto the entry root, so the boot verb co-resides with the boot slot
-/// and the boot resolves. The binary injects no verb of its own. The regression guard
-/// for the include carrying `server.bsx`'s boot verb onto the root.
+/// An included entry carries its boot verb onto the root: the included `Router`
+/// declares `BootOnLoad` beside its boot slot (`CliServer` here), and a
+/// `<Template src=.../>` include builds that `Router` onto the entry root, so the
+/// boot verb co-resides with the boot slot and the boot resolves. The binary injects
+/// no verb of its own. The regression guard for an include carrying its boot verb
+/// onto the root.
 #[beet_core::test]
-async fn main_bsx_include_co_resides_boot_with_server() {
+async fn include_co_resides_boot_with_server() {
 	let store = BlobStore::temp();
 	store
 		.insert(
-			&SmolPath::from("server.bsx"),
+			&SmolPath::from("serve.bsx"),
 			"<Router {(CliServer, BootOnLoad)}/>",
 		)
 		.await
 		.unwrap();
 	store
-		.insert(
-			&SmolPath::from("main.bsx"),
-			"<Template src=\"server.bsx\"/>",
-		)
+		.insert(&SmolPath::from("main.bsx"), "<Template src=\"serve.bsx\"/>")
 		.await
 		.unwrap();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();

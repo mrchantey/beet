@@ -70,9 +70,9 @@ pub(crate) async fn ServeBlobsHandler(
 #[template]
 pub fn AssetsStore() -> impl Bundle {
 	OnSpawn::new(|entity: &mut EntityWorldMut| {
-		// the deployed assets bucket, mirroring `remote_site_store`'s endpoint /
+		// the deployed assets bucket, mirroring `remote_entry_store`'s endpoint /
 		// region selection (R2 vs AWS S3). Only the native `aws_sdk` build can
-		// build an `S3Store`; every other build scopes the ancestor site store.
+		// build an `S3Store`; every other build scopes the ancestor entry store.
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		if let Ok(bucket) = env_ext::var("BEET_ASSETS_BUCKET") {
 			let store = match env_ext::var("BEET_S3_ENDPOINT") {

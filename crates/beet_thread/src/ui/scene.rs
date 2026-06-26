@@ -74,7 +74,7 @@ mod test {
 	/// (via [`RenderSurface::self_referential`]), as the local [`TuiThreadChat`] is,
 	/// so the nested form subtree resolves to the host.
 	/// Returns `(app, host)`.
-	fn charcell_app() -> (App, Entity) {
+	async fn charcell_app() -> (App, Entity) {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, CharcellTuiPlugin))
 			.init_plugin::<ThreadPlugin>()
@@ -90,8 +90,10 @@ mod test {
 				RenderSurface::self_referential(),
 			))
 			.id();
-		// settle Startup before any content is attached
-		app.update();
+		// settle Startup + the async `CreatePostForm` registration (seeded into an
+		// in-memory store, loaded by `ThreadUiPlugin`'s `TemplateDir`) before any
+		// content is attached, so a form spawned below resolves it deterministically.
+		AsyncRunner::settle_async_tasks(app.world_mut()).await;
 		(app, host)
 	}
 
@@ -121,7 +123,7 @@ mod test {
 	/// text, the agent's streamed echo included.
 	#[beet_core::test]
 	async fn renders_window_posts() {
-		let (mut app, host) = charcell_app();
+		let (mut app, host) = charcell_app().await;
 
 		// author an ephemeral thread; the user seed gives the agent something to
 		// echo, the Sequence makes calling the thread run the agent's turn
@@ -159,7 +161,7 @@ mod test {
 	/// alongside the input, not only on the host.
 	#[beet_core::test]
 	async fn chat_layout_renders_transcript() {
-		let (mut app, host) = charcell_app();
+		let (mut app, host) = charcell_app().await;
 		let thread = app
 			.world_mut()
 			.spawn((Thread::default(), Sequence::new(), children![
@@ -190,7 +192,7 @@ mod test {
 	/// full keystroke run is `keyboard_submit_drives_reply`.
 	#[beet_core::test]
 	async fn user_input_advances_on_submit() {
-		let (mut app, host) = charcell_app();
+		let (mut app, host) = charcell_app().await;
 
 		// user turn first, then the agent: one Sequence call exercises both
 		let thread = app
@@ -242,7 +244,7 @@ mod test {
 	/// `<input>`, exactly as the local `TuiThreadChat` wires the real one.
 	#[beet_core::test]
 	async fn keyboard_submit_drives_reply() {
-		let (mut app, host) = charcell_app();
+		let (mut app, host) = charcell_app().await;
 
 		// user turn first, then the agent, so one exchange yields a reply
 		let thread = app
@@ -288,7 +290,7 @@ mod test {
 	/// rendered `<form>` with the `message` `<input>` and the `Send` `<button>`.
 	#[beet_core::test]
 	async fn composer_renders_from_bsx() {
-		let (mut app, host) = charcell_app();
+		let (mut app, host) = charcell_app().await;
 		let thread =
 			app.world_mut().spawn((Thread::default(), Sequence::new())).id();
 		app.update();
@@ -310,7 +312,7 @@ mod test {
 	/// fixed-depth walk to break).
 	#[beet_core::test]
 	async fn composer_focus_survives_wrapper() {
-		let (mut app, host) = charcell_app();
+		let (mut app, host) = charcell_app().await;
 		let thread =
 			app.world_mut().spawn((Thread::default(), Sequence::new())).id();
 		app.update();
@@ -340,7 +342,7 @@ mod test {
 	/// and Enter submits, advancing the user turn so the agent replies.
 	#[beet_core::test]
 	async fn keyboard_submit_drives_reply_through_wrapper() {
-		let (mut app, host) = charcell_app();
+		let (mut app, host) = charcell_app().await;
 		let thread = app
 			.world_mut()
 			.spawn((Thread::default(), Sequence::new(), children![

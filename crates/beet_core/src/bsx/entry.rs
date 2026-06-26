@@ -20,9 +20,9 @@ impl BsxTemplate {
 	/// Like an XML document element, exactly one root element is required;
 	/// comments and whitespace at the root are ignored. `<path::to::X>` tags
 	/// resolve against the world's current [`BsxTemplateRegistry`] (snapshotted
-	/// here), so register any template directories (see
-	/// [`register_bsx_templates`](WorldRegisterBsxExt::register_bsx_templates))
-	/// before parsing the entry.
+	/// here), so register any template directories (eg via a `<TemplateDir>` the
+	/// loader pre-scans, or [`BsxTemplateRegistry::insert_source_from_path`]) before
+	/// parsing the entry.
 	///
 	/// This is the single BSX entry-parse path: the unified
 	/// [`TemplateLoader`](crate::prelude::TemplateLoader) dispatches `.bsx`/`.html`
@@ -143,5 +143,67 @@ mod test {
 
 		// the registered component applied; the unregistered name was skipped.
 		world.entity(root).get::<LinkedComp>().xpect_some();
+	}
+
+	#[derive(Debug, Default, Component, Reflect)]
+	#[reflect(Default, Component)]
+	struct SpreadComp {
+		value: i64,
+	}
+	#[derive(Debug, Default, Resource, Reflect)]
+	#[reflect(Default, Resource)]
+	struct SpreadRes {
+		value: i64,
+	}
+
+	/// Register `SpreadComp` + `SpreadRes` into a fresh template world.
+	fn spread_world() -> World {
+		let mut world = TemplatePlugin::world();
+		world.init_resource::<AppTypeRegistry>();
+		let registry = world.resource::<AppTypeRegistry>();
+		let mut registry = registry.write();
+		registry.register::<SpreadComp>();
+		registry.register::<SpreadRes>();
+		drop(registry);
+		world
+	}
+
+	/// A `#[reflect(Resource)]` named in a spread declares the resource (patching a
+	/// live one), never a component on the host; sibling components in the same
+	/// spread still land on the host.
+	#[crate::test]
+	fn spread_resource_patches_live_and_keeps_host_clean() {
+		let mut world = spread_world();
+		world.insert_resource(SpreadRes { value: 1 });
+
+		let root = BsxTemplate::parse_entry(
+			&world,
+			"<div {(SpreadRes{value:42}, SpreadComp{value:7})}/>",
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+
+		// the resource field was patched in place.
+		world.resource::<SpreadRes>().value.xpect_eq(42);
+		// the sibling component landed on the host.
+		world.entity(root).get::<SpreadComp>().unwrap().value.xpect_eq(7);
+		// the resource was NOT attached as a component on the host.
+		world.entity(root).get::<SpreadRes>().xpect_none();
+	}
+
+	/// A spread resource on an absent resource spawns it from the type's default
+	/// with the patched field applied over it.
+	#[crate::test]
+	fn spread_resource_spawns_absent_from_default() {
+		let mut world = spread_world();
+
+		BsxTemplate::parse_entry(&world, "<div {(SpreadRes{value:9})}/>")
+			.unwrap()
+			.spawn(&mut world)
+			.unwrap();
+
+		// absent before the build, now present with the patched field over default.
+		world.resource::<SpreadRes>().value.xpect_eq(9);
 	}
 }

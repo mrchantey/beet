@@ -22,12 +22,13 @@ pub mod render_action;
 pub use default_renderer::*;
 mod route_query;
 pub use route_query::*;
-// reading a site's `templates/` through its [`BlobStore`]; the store itself is
-// composed on the loaded root entity and resolved by `AncestorQuery<&BlobStore>`.
+// reactive template registration: a `<TemplateDir src="templates"/>` reads its
+// dir through the nearest ancestor [`BlobStore`] and registers each template,
+// resolved by `AncestorQuery<&BlobStore>` like `RoutesDir`.
 #[cfg(feature = "bsx")]
-mod site_templates;
+mod template_dir;
 #[cfg(feature = "bsx")]
-pub use site_templates::*;
+pub use template_dir::*;
 // `RoutesDir` + its discovery is compiled on every std target: one observer
 // scans the store off the async runtime, so native and wasm share the path.
 mod routes_dir;

@@ -1,7 +1,8 @@
 //! The winit render-path runtime: window lifecycle plus an env-var screenshot
-//! hook for headless verification. Added by [`BeetPlugins`](crate::prelude::BeetPlugins)
-//! when the `winit` feature links the windowed render stack.
-use crate::prelude::*;
+//! hook for headless verification. The binary adds [`render_window_plugin`] on top
+//! of `BeetPlugins` when the `winit` feature links the windowed render stack.
+use beet::exports::bevy;
+use beet::prelude::*;
 use bevy::render::view::screenshot::Screenshot;
 use bevy::render::view::screenshot::ScreenshotCaptured;
 use bevy::render::view::screenshot::save_to_disk;

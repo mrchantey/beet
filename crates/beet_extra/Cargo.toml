@@ -1,8 +1,8 @@
 [package]
-name = "beet_examples"
+name = "beet_extra"
 version.workspace = true
 edition.workspace = true
-description = "Bits and pieces for substantial beet examples"
+description = "Extra components and systems for high-level beet examples and workflows"
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -25,12 +25,19 @@ bevy_default = [
 ]
 # enable beet_ml integration; pulled in by the top-level `ml` feature
 ml = ["dep:beet_ml"]
+# serde (de)serialization, used by the thread examples' tool schemas (eg
+# `ChoiceInput`/`BinaryOp`). Pulled in by `json`/`thread`, not standalone.
+serde = ["dep:serde", "dep:serde_json"]
+# JSON (de)serialization across the sub-crate surface, mirroring the umbrella
+# `beet` crate's `json` feature shape for whichever sub-crates are deps here.
+json = ["serde", "beet_core/json", "beet_action/json", "beet_net?/json", "beet_router?/json"]
 # The agent-thread example tool wiring (`ThreadExamplesPlugin`): the thread runtime
 # + its charcell chat UI + the example inline tools, so the `beet` binary can run
 # `examples/thread/*.bsx`. Headless-friendly (no render), so it is independent of
 # `bevy_default`. The inline tool is a `#[action(route)]`, so it pulls the
-# router/net surface the route registration expands to.
-thread = ["dep:beet_thread", "dep:beet_net", "dep:beet_router", "beet_action/json"]
+# router/net surface the route registration expands to, and `json` for the tool
+# schemas' serde derives (which `json` forwards to `beet_action/json`).
+thread = ["json", "dep:beet_thread", "dep:beet_net", "dep:beet_router"]
 
 [dependencies]
 beet_action = { workspace = true, features = ["std", "reflect"] }
@@ -42,8 +49,8 @@ beet_net = { workspace = true, features = ["std", "serde", "json"], optional = t
 beet_router = { workspace = true, features = ["json"], optional = true }
 
 
-serde.workspace = true
-serde_json.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true }
 # bevy-inspector-egui = "0.25.0"

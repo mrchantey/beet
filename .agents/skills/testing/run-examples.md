@@ -103,10 +103,10 @@ cargo run -p beet_ml   --example hello_rl_basic --features=bevy_default
 ### 7. Workspace ML (`--features=examples,ml`)
 
 The `examples,ml` feature only gates windowed scene code (now scene modules in
-`beet_examples`, not runnable `--example` targets), so there is no
+`beet_extra`, not runnable `--example` targets), so there is no
 self-terminating CLI smoke here. The runtime ML smoke lives in the crate
 (`hello_ml_basic`, section 6); this feature's compilation is covered by the
-skip-set check below (and is the only coverage, since `beet_examples` is
+skip-set check below (and is the only coverage, since `beet_extra` is
 excluded from the test crates).
 
 ### 8. BSX scenes (`just beet --main=<file>.bsx`)
@@ -128,7 +128,7 @@ under the render+ml backend — flagged for investigation.
 
 Documented so future passes don't waste time on them:
 
-- **Spatial / ML scenes:** `flock`, `seek`, `fetch`, `frozen_lake_run` etc. are no longer `--example` targets — they live as scene modules in `beet_examples`, reached only by building the `examples,spatial` / `examples,ml` features.
+- **Spatial / ML scenes:** `flock`, `seek`, `fetch`, `frozen_lake_run` etc. are no longer `--example` targets — they live as scene modules in `beet_extra`, reached only by building the `examples,spatial` / `examples,ml` features.
 - **Thread scenes:** `chat`, `multi_agent`, `oneshot`, `persistent_chat`, `tool_call`, `self_evolving`, `coding_agent` are `.bsx` markup scenes under `examples/thread/`, not `--example` targets. Several also need an LLM key (`OPENAI_API_KEY` / `BEDROCK_*`).
 - **Interactive TUI/stdin:** `ui/term_input`, `ui/tui`, `ui/state` — real examples that block on stdin.
 - **Browser required:** `ui/crud`, `ui/syntax_highlighting`, `ui/media_renderer` (interactive output).
@@ -136,11 +136,11 @@ Documented so future passes don't waste time on them:
 - **Needs sshd:** `ssh_server`, `ssh_client`, `ssh_tui`.
 
 A pure compile check is still useful for the skipped set. The first three cover
-`beet_examples` and the feature gates, which no test crate compiles:
+`beet_extra` and the feature gates, which no test crate compiles:
 
 ```sh
-cargo check -p beet --features=examples,ml       # beet_examples ML scenes (fetch etc.)
-cargo check -p beet --features=examples,spatial  # beet_examples spatial scenes (flock etc.)
+cargo check -p beet --features=examples,ml       # beet_extra ML scenes (fetch etc.)
+cargo check -p beet --features=examples,spatial  # beet_extra spatial scenes (flock etc.)
 cargo check -p beet --features=thread            # thread scene templates
 cargo check --example hello_lambda --features=router,lambda_block,markdown
 ```

@@ -62,9 +62,9 @@ mod boot;
 #[cfg(feature = "action")]
 pub use boot::*;
 
-// the boot<->exchange bridges: a boot drives the request pipeline (`BootToExchange`)
-// or a request handler boots another entry (`ExchangeToBoot`). no_std-clean like the
-// boot path, gated on the `Action` slots they install.
+// the boot<->exchange bridges, inverses on the same host: a boot drives its request
+// pipeline (`BootToExchange`) or a request drives its boot (`ExchangeToBoot`).
+// no_std-clean like the boot path, gated on the `Action` slots they install.
 #[cfg(feature = "action")]
 mod boot_bridge;
 #[cfg(feature = "action")]

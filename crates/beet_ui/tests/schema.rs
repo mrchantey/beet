@@ -119,18 +119,21 @@ fn loader_missing_required_rides_template_error() {
 // ---- module-path resolution: <path::to::X> from path/to/X.bsx ----------------
 
 #[beet_core::test]
-fn module_path_resolution_from_directory() {
+fn module_path_resolution_from_path() {
 	let mut world = world();
-	// lay out a template directory: <dir>/path/to/X.bsx (a process-unique dir so
-	// parallel runs do not collide).
-	let dir = std::env::temp_dir()
-		.join(format!("beet_bsx_templates_{}", std::process::id()));
-	let _ = fs_ext::remove(&dir);
-	let file = dir.join("path/to/X.bsx");
-	fs_ext::write(&file, "<strong>indexed</strong>").unwrap();
-
-	// the registration pass indexes the directory, so `<path::to::X>` resolves.
-	world.register_bsx_templates(&dir).unwrap();
+	// register a template by its store-relative path, so its module path derives
+	// `path::to::X` and `<path::to::X>` resolves (the store-backed loader hands each
+	// `(path, source)` pair here).
+	let mut registry = BsxTemplateRegistry::default();
+	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+	registry
+		.insert_source_from_path(
+			&formats,
+			&SmolPath::from("path/to/X.bsx"),
+			"<strong>indexed</strong>",
+		)
+		.unwrap();
+	world.insert_resource(registry);
 	world
 		.resource::<BsxTemplateRegistry>()
 		.contains("path::to::X")
@@ -141,7 +144,6 @@ fn module_path_resolution_from_directory() {
 		.render(&mut RenderContext::new(root, &mut world))
 		.unwrap()
 		.to_string();
-	let _ = fs_ext::remove(&dir);
 	html.xpect_contains("indexed");
 }
 
@@ -168,7 +170,7 @@ fn composable_schema_validates_recursively() {
 	world.insert_resource(registry);
 	// mirror the BSX schemas into the shared schema registry so the `TodoItem`
 	// reference resolves.
-	world.register_bsx_schemas();
+	BsxTemplateRegistry::refresh_schemas(&mut world);
 
 	// a valid list of todo items passes recursive validation.
 	let ok =

@@ -81,7 +81,7 @@ members = [
 	"crates/beet_action",
 
 	## 💡 Flow
-	"crates/beet_examples",
+	"crates/beet_extra",
 	# "crates/beet_flow",
 	"crates/beet_ml",
 	"crates/beet_spatial",
@@ -113,7 +113,7 @@ beet_action = { path = "crates/beet_action", version = "0.0.9-dev.16", default-f
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.16" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.16", default-features = false }
 beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.16" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.16" }
+beet_extra = { path = "crates/beet_extra", version = "0.0.9-dev.16" }
 
 #💡 local
 # bevy_ecs = {version = "0.19", default-features = false, features = ["backtrace"]}
@@ -317,7 +317,7 @@ fs = ["beet_core/fs","beet_net?/fs"]
 bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_default",
-	"beet_examples?/bevy_default",
+	"beet_extra?/bevy_default",
 	"beet_spatial?/bevy_default",
 ]
 # Link bevy's full `DefaultPlugins` (winit + wgpu + windowing) and make
@@ -452,8 +452,8 @@ cloudflare_dns = ["infra","beet_infra?/cloudflare_dns"]
 
 # the example binaries are all windowed, so `examples` turns on `winit`: `(BeetPlugins,
 # BeetExamplePlugins)` then boots a real window with no per-example runner wiring.
-examples = ["bevy_default", "winit", "spatial", "dep:beet_examples"]
-ml = ["spatial", "dep:beet_ml", "beet_examples?/ml"]
+examples = ["bevy_default", "winit", "spatial", "dep:beet_extra"]
+ml = ["spatial", "dep:beet_ml", "beet_extra?/ml"]
 cuda = ["ml", "beet_ml/cuda"]
 # flow = ["dep:beet_flow"]
 # 💡 Server
@@ -486,7 +486,7 @@ beet_action = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 
-beet_examples = { workspace = true, optional = true }
+beet_extra = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # pins uuid's wasm RNG to its `js` (WebCrypto) backend; `rng-getrandom` would

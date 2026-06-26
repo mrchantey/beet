@@ -79,6 +79,16 @@ impl InMemoryStore {
 	/// Creates a new uncreated in-memory provider.
 	pub fn new_empty() -> Self { Self::with_map(None) }
 
+	/// Creates a new already-created provider seeded with `entries`, so a crate
+	/// can ship compile-time bytes (eg `include_str!`) into a store synchronously
+	/// without an async `insert`. The store is then read like any other (eg a
+	/// [`TemplateDir`](beet_core::prelude::TemplateDir) over it).
+	pub fn new_seeded(
+		entries: impl IntoIterator<Item = (SmolPath, Bytes)>,
+	) -> Self {
+		Self::with_map(Some(entries.into_iter().collect()))
+	}
+
 	/// Build a store with the given initial map and a fresh `instance_id`.
 	fn with_map(map: Option<HashMap<SmolPath, Bytes>>) -> Self {
 		Self {

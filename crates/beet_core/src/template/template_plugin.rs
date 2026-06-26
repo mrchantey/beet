@@ -21,7 +21,8 @@ impl Plugin for TemplatePlugin {
 			// slot markers, the error path, and the pending-dependency set.
 			.register_type::<SlotTarget>()
 			.register_type::<SlotChild>()
-			.register_type::<TemplatePending>();
+			.register_type::<TemplatePending>()
+			.register_type::<TemplatesLoaded>();
 	}
 }
 

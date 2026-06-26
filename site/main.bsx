@@ -1,19 +1,38 @@
 <!--
-The dev entry for the beet website, discovered by the `beet` binary when run from
-the `site/` directory. It pulls in the lean serve definition from `server.bsx`,
-so `cd site && beet serve` (and `beet present`, `beet check`, `beet export-static`)
-all reuse the one canonical site, while the deployed container loads `server.bsx`
-directly from S3.
+The single canonical entry for the beet website: the content Router serving the
+`routes/` directory, every page wrapped in `templates/Layout.bsx`. Discovery loads
+it locally when the `beet` binary runs from the `site/` directory (`cd site && beet
+serve`, and `beet present`, `beet check`, `beet export-static`), and the deployed
+Fargate container loads the same entry directly from the bucket root. Either way
+this entry's `Router` carries the `BootOnLoad` verb that fires the boot once the
+build loads.
 
-The boot fires locally because `server.bsx`'s `Router` carries `BootOnLoad`: the
-include builds that `Router` (with its servers) onto this entry root, so the boot
-verb sits beside the boot slot the servers provide and boots them once the whole
-subtree is built. The deployed container, loading `server.bsx` directly, boots the
-same way.
+It declares the three long-running servers (`HttpServer`, the local live
+`TuiServer`, and the multi-tenant `SshTuiServer`), so `--server` picks them once
+booted: the default boots them all, `--server=http,ssh` serves html over http and
+a live terminal over ssh, `--server=tui` runs the local `beet present` terminal. It
+carries no `CliServer` (a one-shot would resolve the boot and exit), so the boot
+parks on the servers' keep-alive and the serve-feature binary stays up.
+
+The router's middleware and the layout attach as component spreads (request
+logging, `--help`, terminal link navigation, the layout). `<DefaultAppRoutes/>`
+adds the default app routes (`/app-info`, the reactivity runtime, …),
+`<RoutesDir/>` discovers the `routes/` pages, and `<ServeBlobs prefix="assets"/>`
+mounts the workspace assets the site and blog reference (the favicon, images). `<Theme
+color=.../>` seeds the brand colour the whole Material palette derives from, and
+`<Styles/>` registers the named style rules in `templates/Styles.bsx`.
 
 The infra commands (`deploy`, `sync`, the validate/plan/apply/destroy IaC verbs)
 live in the Rust deploy host (`examples/infra/deploy_beet_site.rs`): the terraform
 and docker blocks are not registered for markup, so the deploy stays Rust-expressed
 while the serve definition is shared from here.
 -->
-<Template src="server.bsx"/>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, BootOnLoad)}>
+	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
+	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
+	<TemplateDir src="templates"/>
+	<Styles/>
+	<DefaultAppRoutes/>
+	<RoutesDir src="routes"/>
+	<ServeBlobs prefix="assets" {AssetsStore}/>
+</Router>

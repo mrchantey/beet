@@ -9,7 +9,7 @@ use bevy::app::PluginGroupBuilder;
 ///
 /// It is a [`PluginGroup`], so any inner plugin can be reconfigured, eg
 /// `BeetPlugins.set(LogPlugin::new(Level::TRACE))`. Pairs with
-/// `BeetExamplePlugins` (from `beet_examples`) for the example scenes: that group
+/// `BeetExamplePlugins` (from `beet_extra`) for the example scenes: that group
 /// adds the example capabilities and leaves the runner to this one.
 ///
 /// ## Window (`winit` feature)
@@ -17,7 +17,9 @@ use bevy::app::PluginGroupBuilder;
 /// and the loop survives with none (`ExitCondition::DontExit`). The window is data,
 /// spawned by the loaded scene (a `Window` entity, eg `<Window/>`), so one binary
 /// runs a windowed scene `.bsx` and a headless server `.bsx` from the same build.
-/// [`render_window_plugin`] drives the window lifecycle.
+/// The window lifecycle (continuous updates, escape/close-to-exit, the screenshot
+/// harness) is the binary's concern, added on top of this group (eg beet-cli's
+/// `render_window_plugin` under its own `winit` feature).
 pub struct BeetPlugins;
 
 impl PluginGroup for BeetPlugins {
@@ -29,9 +31,7 @@ impl PluginGroup for BeetPlugins {
 		// cooperative 30Hz loop paces headless servers/tools instead of busy-spinning.
 		cfg_if! {
 			if #[cfg(feature = "winit")] {
-				builder = builder
-					.add_group(winit_default_plugins())
-					.add(render_window_plugin);
+				builder = builder.add_group(winit_default_plugins());
 			} else {
 				builder = builder.add_group(MinimalPlugins.set(
 					ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 30.0)),
@@ -44,6 +44,18 @@ impl PluginGroup for BeetPlugins {
 		builder = builder
 			.add(LogPlugin::new(Level::DEBUG))
 			.add(beet_runtime_plugin);
+
+		// the beet_ui widget library, registered as an inert capability: it registers
+		// the `<Button>`/`<Form>`/`<Header>`/`<Sidebar>`/… widget templates by name and
+		// the default `bx:` event/verb vocabulary (`increment`/`decrement`/…), so a
+		// markup-only site that uses live widgets or reactive verbs resolves them. Added
+		// *before* the router so its inner `BsxPlugin` registers once: the router's
+		// charcell stack reaches `BsxDefaultsPlugin` through `init_plugin` (idempotent),
+		// which then no-ops rather than double-adding `BsxPlugin`.
+		#[cfg(feature = "ui")]
+		{
+			builder = builder.add(BsxDefaultsPlugin);
+		}
 
 		// the route tree / document / server / navigation observers (the former
 		// `ClientAppPlugin`) plus the scene-server meta-routes and card-stack host.
@@ -93,8 +105,8 @@ impl PluginGroup for BeetPlugins {
 /// window opens (`primary_window: None`) and `ExitCondition::DontExit` keeps the
 /// loop alive with no window. The window comes from the loaded scene, which spawns
 /// a `Window` entity (eg `<Window/>`), so one render-built binary serves both a
-/// windowed scene `.bsx` and a headless server `.bsx`. [`render_window_plugin`]
-/// then owns the window lifecycle (continuous updates, escape/close-to-exit).
+/// windowed scene `.bsx` and a headless server `.bsx`. The consuming binary then
+/// owns the window lifecycle (continuous updates, escape/close-to-exit).
 #[cfg(feature = "winit")]
 fn winit_default_plugins() -> PluginGroupBuilder {
 	use bevy::asset::AssetMetaCheck;

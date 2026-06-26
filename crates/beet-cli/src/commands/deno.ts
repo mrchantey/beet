@@ -40,6 +40,26 @@ globalThis.read_file = (path: string) => {
 	return do_try(() => Deno.readFileSync(path), null, true);
 };
 
+// List files under `path` recursively, returning each path relative to `path`
+// with forward slashes (the beet store list contract). Empty if `path` is absent.
+globalThis.read_dir = (path: string) => {
+	return do_try(() => {
+		const out: string[] = [];
+		const walk = (dir: string, prefix: string) => {
+			for (const entry of Deno.readDirSync(dir)) {
+				const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+				if (entry.isDirectory) {
+					walk(`${dir}/${entry.name}`, rel);
+				} else {
+					out.push(rel);
+				}
+			}
+		};
+		walk(path, "");
+		return out;
+	}, [], true);
+};
+
 globalThis.exists = (path: string) => {
 	return do_try(() => existsSync(path), false);
 };
@@ -83,6 +103,7 @@ globalThis.test_exit = globalThis.exit;
 globalThis.test_exists = globalThis.exists;
 globalThis.test_catch_no_abort_inner = globalThis.catch_no_abort_inner;
 globalThis.test_read_file = globalThis.read_file;
+globalThis.test_read_dir = globalThis.read_dir;
 globalThis.test_create_dir_all = globalThis.create_dir_all;
 globalThis.test_write_file = globalThis.write_file;
 globalThis.test_env_args = globalThis.env_args;

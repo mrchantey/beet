@@ -1344,7 +1344,7 @@ fn apply_spread_named(
 	entity_refs: &HashMap<SmolStr, Entity>,
 ) -> Result<()> {
 	let literal = DataLiteral::Enum(named.clone());
-	let (is_template, patch) = {
+	let (kind, patch) = {
 		let registry = app_registry.read();
 		// resolve by base name so a generic spread (eg `{Repeat}` -> `Repeat<()>`)
 		// matches its sole instantiation, exactly as a `<Repeat>` tag does. A
@@ -1360,29 +1360,55 @@ fn apply_spread_named(
 			return Ok(());
 		};
 		let info = Some(registration.type_info());
-		let is_template = registration.data::<ReflectTemplate>().is_some();
+		// classify the spread type like an uppercase tag: a `#[template]` builds,
+		// a `#[reflect(Resource)]` writes the resource, the rest insert as a component.
+		let kind = if registration.data::<ReflectTemplate>().is_some() {
+			UppercaseKind::Template
+		} else if registration
+			.data::<bevy::ecs::reflect::ReflectResource>()
+			.is_some()
+		{
+			UppercaseKind::Resource
+		} else {
+			UppercaseKind::Component
+		};
 		let mut resolver = entity_ref_resolver(entity_refs);
 		(
-			is_template,
+			kind,
 			literal_to_reflect(&literal, info, &registry, &mut resolver)?,
 		)
 	};
-	if is_template {
-		let id = entity.id();
-		entity.world_scope(|world| -> Result<()> {
-			let mut references =
-				bevy::ecs::template::SceneEntityReferences::default();
-			let mut entity_mut = world.entity_mut(id);
-			let mut cx = TemplateContext::new(&mut entity_mut, &mut references);
-			build_template_by_name(
-				app_registry,
-				&named.name,
-				patch.as_ref(),
-				&mut cx,
-			)
-		})?;
-	} else {
-		insert_component(entity, patch.as_ref(), app_registry)?;
+	match kind {
+		UppercaseKind::Template => {
+			let id = entity.id();
+			entity.world_scope(|world| -> Result<()> {
+				let mut references =
+					bevy::ecs::template::SceneEntityReferences::default();
+				let mut entity_mut = world.entity_mut(id);
+				let mut cx =
+					TemplateContext::new(&mut entity_mut, &mut references);
+				build_template_by_name(
+					app_registry,
+					&named.name,
+					patch.as_ref(),
+					&mut cx,
+				)
+			})?;
+		}
+		// a spread resource patches the resource itself, never the host entity.
+		UppercaseKind::Resource => {
+			entity.world_scope(|world| -> Result<()> {
+				write_resource_patch(
+					world,
+					app_registry,
+					&named.name,
+					patch.as_ref(),
+				)
+			})?;
+		}
+		UppercaseKind::Component => {
+			insert_component(entity, patch.as_ref(), app_registry)?;
+		}
 	}
 	Ok(())
 }
@@ -1514,7 +1540,6 @@ fn apply_resource_tag(
 	app_registry: &AppTypeRegistry,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
-	use bevy::ecs::reflect::ReflectComponent;
 	if !el.children.is_empty() {
 		bevybail!(
 			"`<{}>` declares a resource and cannot have children",
@@ -1532,53 +1557,70 @@ fn apply_resource_tag(
 		);
 	}
 	cx.entity.world_scope(|world| -> Result<()> {
-		let registry = app_registry.read();
-		let type_info = patch
-			.get_represented_type_info()
-			.ok_or_else(|| bevyhow!("resource patch has no represented type"))?;
-		let registration = registry.get(type_info.type_id()).ok_or_else(|| {
-			bevyhow!("type `{}` is not registered", type_info.type_path())
-		})?;
-		// resources are entity-backed: write through the implied ReflectComponent.
-		let reflect_component = registration
-			.data::<ReflectComponent>()
-			.expect("ReflectComponent is depended on by ReflectResource");
-		let component_id = reflect_component.register_component(world);
-		match world.resource_entities().get(component_id) {
-			// patch the live resource: missing fields keep their values.
-			Some(resource_entity) => reflect_component
-				.apply(&mut world.entity_mut(resource_entity), patch),
-			// absent: insert the patch over the type's default.
-			None => {
-				use bevy::ecs::reflect::ReflectFromWorld;
-				use bevy::reflect::ReflectFromReflect;
-				use bevy::reflect::std_traits::ReflectDefault;
-				// ReflectComponent::insert panics on unconstructible types,
-				// so check before reaching it
-				let constructible = registration.data::<ReflectDefault>().is_some()
-					|| registration.data::<ReflectFromWorld>().is_some()
-					|| registration
-						.data::<ReflectFromReflect>()
-						.is_some_and(|from_reflect| {
-							from_reflect.from_reflect(patch).is_some()
-						});
-				if !constructible {
-					bevybail!(
-						"`<{}>`: the resource is not in the world and `{}` cannot be constructed from the patch, add `#[reflect(Default)]` or insert the resource first",
-						el.tag,
-						type_info.type_path()
-					);
-				}
-				let resource_entity = world.spawn_empty().id();
-				reflect_component.insert(
-					&mut world.entity_mut(resource_entity),
-					patch,
-					&registry,
+		write_resource_patch(world, app_registry, &el.tag, patch)
+	})
+}
+
+/// Write a reflect patch to a [`ReflectResource`]-backed type: patch the live
+/// resource (missing fields keep their values) or, when absent, spawn it over
+/// the type's default. Resources are entity-backed, so this writes through the
+/// resource's implied [`ReflectComponent`]. `tag` only names the type in errors
+/// (an uppercase tag's name or a spread name). Shared by the resource-tag path
+/// ([`apply_resource_tag`]) and the spread path ([`apply_spread_named`]).
+fn write_resource_patch(
+	world: &mut World,
+	app_registry: &AppTypeRegistry,
+	tag: &str,
+	patch: &dyn bevy::reflect::PartialReflect,
+) -> Result<()> {
+	use bevy::ecs::reflect::ReflectComponent;
+	let registry = app_registry.read();
+	let type_info = patch
+		.get_represented_type_info()
+		.ok_or_else(|| bevyhow!("resource patch has no represented type"))?;
+	let registration = registry.get(type_info.type_id()).ok_or_else(|| {
+		bevyhow!("type `{}` is not registered", type_info.type_path())
+	})?;
+	// resources are entity-backed: write through the implied ReflectComponent.
+	let reflect_component = registration
+		.data::<ReflectComponent>()
+		.expect("ReflectComponent is depended on by ReflectResource");
+	let component_id = reflect_component.register_component(world);
+	match world.resource_entities().get(component_id) {
+		// patch the live resource: missing fields keep their values.
+		Some(resource_entity) => {
+			reflect_component.apply(&mut world.entity_mut(resource_entity), patch)
+		}
+		// absent: insert the patch over the type's default.
+		None => {
+			use bevy::ecs::reflect::ReflectFromWorld;
+			use bevy::reflect::ReflectFromReflect;
+			use bevy::reflect::std_traits::ReflectDefault;
+			// ReflectComponent::insert panics on unconstructible types,
+			// so check before reaching it
+			let constructible = registration.data::<ReflectDefault>().is_some()
+				|| registration.data::<ReflectFromWorld>().is_some()
+				|| registration
+					.data::<ReflectFromReflect>()
+					.is_some_and(|from_reflect| {
+						from_reflect.from_reflect(patch).is_some()
+					});
+			if !constructible {
+				bevybail!(
+					"`{}`: the resource is not in the world and `{}` cannot be constructed from the patch, add `#[reflect(Default)]` or insert the resource first",
+					tag,
+					type_info.type_path()
 				);
 			}
+			let resource_entity = world.spawn_empty().id();
+			reflect_component.insert(
+				&mut world.entity_mut(resource_entity),
+				patch,
+				&registry,
+			);
 		}
-		Ok(())
-	})
+	}
+	Ok(())
 }
 
 /// Insert a reflect-patched component over its default onto `entity`.

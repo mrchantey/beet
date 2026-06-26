@@ -13,7 +13,7 @@ pdf, s3 sync.
 It is a one-shot `<CliServer>`: the binary injects the boot (no markup boot verb),
 the positional route arg selects the command, and the command resolves and the
 process exits — except `<Serve/>`, which loads a site and boots *its* servers through
-the exchange->boot bridge, parking so the process serves. So the workspace entry's
+a direct boot call on the loaded root, parking so the process serves. So the workspace entry's
 server boots only when `serve` is invoked, never on load.
 
     cargo install --path crates/beet-cli   # then, from anywhere in the repo:
