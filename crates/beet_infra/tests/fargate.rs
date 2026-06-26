@@ -157,15 +157,16 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 			stack.clone(),
 			assets_s3_fs_store(stack, assets_dir),
 			assets_bucket_block(),
-			exchange_sequence(),
+			ExchangeSequence,
 			children![
 				block,
 				// build binary for containerization
 				build_fargate_binary(),
 				// deploy infrastructure first (creates ECR repo)
 				TofuApplyAction,
-				// build and push Docker image (ECR repo now exists)
-				BuildDockerImageAction,
+				// build and push Docker image (ECR repo now exists); the config
+				// component requires the action.
+				BuildDockerImage::default(),
 				// sync assets to S3
 				SyncS3BucketAction,
 			],

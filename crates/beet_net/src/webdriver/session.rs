@@ -116,8 +116,11 @@ impl Session {
 		);
 		Request::delete(&url).send().await?.into_result().await?;
 
-		// Try to close the socket (only once)
-		if let Some(mut writer) = self.inner.writer.lock().unwrap().take() {
+		// Take the writer out under the lock, then drop the guard before awaiting:
+		// holding the `MutexGuard` across the `close().await` would make this future
+		// non-`Send` (the guard is not `Send`), breaking the multithreaded build.
+		let writer = self.inner.writer.lock().unwrap().take();
+		if let Some(mut writer) = writer {
 			// Ignore close errors – session already deleted.
 			let _ = writer.close(None).await;
 		}

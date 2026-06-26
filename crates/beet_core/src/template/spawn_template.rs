@@ -365,18 +365,11 @@ mod test {
 		let header = world.entity(root).get::<Children>().unwrap()[0];
 		let body = world.entity(root).get::<Children>().unwrap()[1];
 
-		// the title slot resolved to the caller's title, fallback dropped.
-		let title_target = world.entity(header).get::<Children>().unwrap()[0];
-		child_names(&world, title_target)
-			.xpect_eq(vec!["the-title".to_string()]);
-		// the default slot resolved to the caller's body.
-		let body_target = world.entity(body).get::<Children>().unwrap()[0];
-		child_names(&world, body_target).xpect_eq(vec!["the-body".to_string()]);
-		// slot markers are stripped after resolution.
-		world
-			.entity(title_target)
-			.contains::<SlotTarget>()
-			.xpect_false();
+		// slots are transparent: the caller's title collapses into header at the
+		// slot's position (fallback dropped), the caller's body into body, with no
+		// intervening fragment entity.
+		child_names(&world, header).xpect_eq(vec!["the-title".to_string()]);
+		child_names(&world, body).xpect_eq(vec!["the-body".to_string()]);
 
 		// lifecycle: SpawnTemplate once, LoadTemplate immediately with no error.
 		spawn_count.get().xpect_eq(1);

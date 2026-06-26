@@ -9,7 +9,7 @@ between this and the wasm Worker (`hello_cloudflare_workers.bsx`) is a small swa
 - block: `CloudflareContainerBlock` <-> `CloudflareWorkerBlock`
 - build: a `<BeetBinaryBuild/>` (native binary baked into the image) vs none (the
   Worker IS `beet-cli` wasm, built by `worker-build` on deploy)
-- deploy: `<CloudflareContainerDeploy/>` (+ wrangler) <-> `<CloudflareWorkerDeploy/>`
+- deploy: `<CloudflareContainerDeployAction/>` (+ wrangler) <-> `<CloudflareWorkerDeployAction/>`
 
 The served content and the deploy/sync/destroy route shape are identical.
 
@@ -24,18 +24,18 @@ data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
 `wrangler` and a container engine. The Workers Paid plan is required for Containers.
 -->
 <Router {(CliServer, RequestLogger, BootOnLoad)}>
-	<div {(RoutePath("deploy"), ExchangeSequence)}>
+	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site"/>
 		<!-- build the native binary, then the deploy bakes it into the image -->
 		<BeetBinaryBuild features="aws_sdk"/>
-		<CloudflareContainerDeploy/>
+		<CloudflareContainerDeployAction/>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 		<CloudflareWatch name="beet-hello-container"/>
-	</div>
-	<div {(RoutePath("sync"), ExchangeSequence)}>
+	</Route>
+	<Route path="sync" {ExchangeSequence}>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
-	</div>
-	<div {(RoutePath("destroy"), ExchangeSequence)}>
+	</Route>
+	<Route path="destroy" {ExchangeSequence}>
 		<CloudflareDestroy name="beet-hello-container" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
-	</div>
+	</Route>
 </Router>

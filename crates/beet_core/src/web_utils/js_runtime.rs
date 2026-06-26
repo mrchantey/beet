@@ -169,14 +169,13 @@ pub fn write_file(path: &str, content: &[u8]) -> Option<String> {
 	}
 }
 
-/// Recursively remove a file or directory, ie `Deno.removeSync(.., recursive)`,
-/// returning an error string on failure (a missing path errors, like
-/// `std::fs::remove_*`). A no-op (`None`) where the fs global is absent.
-pub fn remove(path: &str) -> Option<String> {
-	if has_global("remove") {
-		raw::remove(path)
-	} else {
-		None
+/// Recursively remove a file or directory, ie `Deno.removeSync(.., recursive)`
+/// (a missing path errors, like `std::fs::remove_*`). A no-op where the fs global
+/// is absent.
+pub fn remove(path: &str) -> FsResult {
+	match has_global("remove").then(|| raw::remove(path)).flatten() {
+		Some(err) => Err(FsError::other(path, err)),
+		None => Ok(()),
 	}
 }
 

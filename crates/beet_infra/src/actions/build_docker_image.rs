@@ -6,7 +6,7 @@ use beet_net::prelude::*;
 
 /// Container engine to use for building images.
 #[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize,
+	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
 )]
 pub enum ContainerEngine {
 	#[default]
@@ -26,8 +26,11 @@ impl ContainerEngine {
 	}
 }
 
-/// Configuration for building Docker/Podman images.
-#[derive(Debug, Clone, Component, Serialize, Deserialize)]
+/// Configuration for building Docker/Podman images. Builds + pushes the image as
+/// part of a deploy sequence, so it requires its [`BuildDockerImageAction`].
+#[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
+#[reflect(Component, Default)]
+#[require(BuildDockerImageAction)]
 pub struct BuildDockerImage {
 	/// Container engine to use (Docker or Podman).
 	pub engine: ContainerEngine,
@@ -75,12 +78,12 @@ impl BuildDockerImage {
 
 /// Builds and pushes a container image to ECR for Fargate deployment.
 /// Looks for a [`BuildArtifact`] sibling to find the binary to containerize,
-/// and a [`FargateBlock`] sibling to determine the ECR repository name.
-/// Uses the [`BuildDockerImage`] component to determine which engine to use,
-/// defaulting to Podman if not present.
+/// and a [`FargateBlock`] sibling to determine the ECR repository name. Reads its
+/// own [`BuildDockerImage`] for the engine + `CMD` args, so the config component
+/// requires this action (not the reverse, which would cycle), eg
+/// `<BuildDockerImage/>` spawns both.
 #[action]
 #[derive(Default, Component)]
-#[require(BuildDockerImage)]
 pub async fn BuildDockerImageAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {

@@ -18,26 +18,27 @@ by re-running `sync` with no redeploy.
 `<StackHost>` is the IaC deployer host: a `Stack` (resolved by the blocks + verbs by
 ancestry), a one-shot `CliServer` with `BootOnLoad` (the CLI request fires on load
 and the matching verb runs), and the standard IaC verb routes
-(validate/plan/apply/...). Each verb below is a child-sequenced route: a plain element
-spreading `{(RoutePath(..), ExchangeSequence)}` so its block and actions run in order.
+(validate/plan/apply/...). Each verb below is a child-sequenced
+`<Route path=".." {ExchangeSequence}>`: its block and actions are direct children of
+the route and the sequence runs them in order.
 
 Live deploy needs AWS credentials in the environment, plus `tofu`,
 `cargo-zigbuild` and `zip`.
 -->
 <StackHost app_name="hello_lambda">
-	<div {(RoutePath("deploy"), ExchangeSequence)}>
+	<Route path="deploy" {ExchangeSequence}>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LambdaSiteBlock app_name="hello_lambda" features="lambda,aws_sdk"/>
 		<SiteBucket/>
-		<TofuApply/>
+		<TofuApplyAction/>
 		<SiteSync app_name="hello_lambda"/>
 		<!-- the rollout is quick, so tail briefly then exit -->
 		<LambdaWatch app_name="hello_lambda" timeout="30s"/>
-	</div>
-	<div {(RoutePath("sync"), ExchangeSequence)}>
+	</Route>
+	<Route path="sync" {ExchangeSequence}>
 		<SiteSync app_name="hello_lambda"/>
-	</div>
-	<div {(RoutePath("watch"), ExchangeSequence)}>
+	</Route>
+	<Route path="watch" {ExchangeSequence}>
 		<LambdaWatch app_name="hello_lambda"/>
-	</div>
+	</Route>
 </StackHost>

@@ -8,9 +8,9 @@ use bevy::app::PluginGroupBuilder;
 /// or presented site needs, each gated on the relevant feature.
 ///
 /// It is a [`PluginGroup`], so any inner plugin can be reconfigured, eg
-/// `BeetPlugins.set(LogPlugin::new(Level::TRACE))`. Pairs with
-/// `BeetExtraPlugins` (from `beet_extra`) for the example scenes: that group
-/// adds the example capabilities and leaves the runner to this one.
+/// `BeetPlugins.set(LogPlugin::new(Level::TRACE))`. With the `extra` feature it
+/// also adds `BeetExtraPlugin` (from `beet_extra`) for the example capabilities,
+/// each self-selected by a `beet_extra` sub-feature.
 ///
 /// ## Window (`winit` feature)
 /// The render stack links as a capability, not a window: no primary window opens
@@ -92,6 +92,14 @@ impl PluginGroup for BeetPlugins {
 			if #[cfg(all(not(target_arch = "wasm32"), feature = "ssh_tui"))] {
 				builder = builder.add(SshTuiPlugin);
 			}
+		}
+		// the example capabilities (the spatial/render scenes, the agent-thread
+		// runtime, the cloudflare/aws deploy types), each self-selected by a
+		// `beet_extra` sub-feature. A regular `Plugin`, so it nests in this group; its
+		// inner plugins are idempotent (`init_plugin`), safe under a double-add.
+		#[cfg(feature = "extra")]
+		{
+			builder = builder.add(beet_extra::prelude::BeetExtraPlugin);
 		}
 		builder
 	}

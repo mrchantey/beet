@@ -9,7 +9,7 @@ http on its own DNS name (no custom domain).
 
 Unlike the lambda/lightsail blocks (whose binary rides the S3 artifact ledger, so the
 block + build share one entity), fargate bakes the binary into a container image:
-`<BeetBinaryBuild/>` and `<DockerImageBuild/>` are separate steps, the image build
+`<BeetBinaryBuild/>` and `<BuildDockerImage/>` are separate steps, the image build
 reading the freshly built binary.
 
 ## Usage
@@ -24,20 +24,20 @@ Live deploy needs AWS credentials in the environment, plus `tofu`, `cargo-zigbui
 and a container engine.
 -->
 <StackHost app_name="hello_fargate">
-	<div {(RoutePath("deploy"), ExchangeSequence)}>
+	<Route path="deploy" {ExchangeSequence}>
 		<FargateSiteBlock app_name="hello_fargate"/>
 		<SiteBucket/>
 		<BeetBinaryBuild features="aws_sdk"/>
-		<TofuApply/>
+		<TofuApplyAction/>
 		<!-- bake the freshly built binary into the container image -->
-		<DockerImageBuild/>
+		<BuildDockerImage cmd_args={["serve", "--server=http", "--path=/"]}/>
 		<SiteSync app_name="hello_fargate"/>
 		<FargateWatch app_name="hello_fargate" timeout="300s"/>
-	</div>
-	<div {(RoutePath("sync"), ExchangeSequence)}>
+	</Route>
+	<Route path="sync" {ExchangeSequence}>
 		<SiteSync app_name="hello_fargate"/>
-	</div>
-	<div {(RoutePath("watch"), ExchangeSequence)}>
+	</Route>
+	<Route path="watch" {ExchangeSequence}>
 		<FargateWatch app_name="hello_fargate"/>
-	</div>
+	</Route>
 </StackHost>

@@ -10,8 +10,9 @@ use beet_net::prelude::*;
 /// stack descendants to build the [`ArtifactLedger`], using
 /// [`Block::artifact_label`] for the label and
 /// [`BuildArtifact::compute_source_hash`] for the hash.
-#[action]
-#[derive(Default, Component)]
+#[action(handler_only)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Component, Default)]
 pub async fn TofuApplyAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {

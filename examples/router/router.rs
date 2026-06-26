@@ -138,7 +138,7 @@ fn counter() -> impl Bundle {
 fn sequence() -> impl Bundle {
 	route(
 		"sequence",
-		(exchange_sequence(), children![
+		(ExchangeSequence, children![
 			Action::<Request, Outcome<Request, Response>>::new_pure(
 				|cx: ActionContext<Request>| {
 					info!("in sequence!");

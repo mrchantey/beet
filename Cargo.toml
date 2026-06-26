@@ -288,6 +288,11 @@ bevy_color = ["beet_core/bevy_color"]
 
 # 💡 Top Level
 
+# The `beet_extra` example capabilities, added to `BeetPlugins` as `BeetExtraPlugin`
+# (which self-selects the spatial/thread/infra example sets by `beet_extra`
+# sub-feature). A consumer turns on this plus the relevant `beet_extra/*` sub-features
+# (eg `beet_extra/thread`), and `BeetPlugins` wires the example plugin in.
+extra = ["dep:beet_extra"]
 http_server = ["net", "action","router", "beet_net/server", "beet_router?/http"]
 # The server-to-client websocket channel and the dev-mode live reload watcher.
 client_io = ["http_server", "tungstenite", "beet_router?/client_io"]
@@ -391,7 +396,10 @@ ssh_client = ["net", "beet_net?/russh_client", "rustls-tls"]
 ssh_tui = ["ssh_server", "tui_server", "beet_router?/ssh"]
 
 
-thread = ["dep:beet_thread","net","action"]
+# The agent-thread runtime. When `extra` is also on, forwards the example tool
+# wiring (`beet_extra/thread`, the `ThreadExamplesPlugin`) so `BeetExtraPlugin` adds
+# it; the `?` keeps it inert when `beet_extra` is not a dep.
+thread = ["dep:beet_thread","net","action","beet_extra?/thread"]
 
 
 # 💡 Stack
@@ -433,7 +441,10 @@ markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/m
 codegen = ["router", "beet_router?/codegen"]
 syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
 
-infra = ["dep:beet_infra"]
+# The infra deploy types (beet_infra). When `extra` is also on, forwards the deploy
+# example wiring (`beet_extra/infra`, the `InfraExamplesPlugin` templates) so
+# `BeetExtraPlugin` adds it; the `?` keeps it inert when `beet_extra` is not a dep.
+infra = ["dep:beet_infra", "beet_extra?/infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
 lightsail_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
 fargate_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/fargate_block", "fs", "rand"]
@@ -450,9 +461,10 @@ bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
 cloudflare_dns = ["infra","beet_infra?/cloudflare_dns"]
 
 
-# the example binaries are all windowed, so `examples` turns on `winit`: `(BeetPlugins,
-# BeetExtraPlugins)` then boots a real window with no per-example runner wiring.
-examples = ["bevy_default", "winit", "spatial", "dep:beet_extra"]
+# the example binaries are all windowed, so `examples` turns on `winit`: `BeetPlugins`
+# (with `extra`) then boots a real window and adds `BeetExtraPlugin`, no per-example
+# runner wiring.
+examples = ["bevy_default", "winit", "spatial", "extra", "beet_extra?/bevy_default"]
 ml = ["spatial", "dep:beet_ml", "beet_extra?/ml"]
 cuda = ["ml", "beet_ml/cuda"]
 # flow = ["dep:beet_flow"]

@@ -17,27 +17,26 @@ per request, and serves on `<name>.workers.dev`.
     cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` host (no long-running server); `BootOnLoad` fires the CLI
-request on load and the matching verb runs. Each verb is a child-sequenced route: a
-plain element spreading `{(RoutePath(..), ExchangeSequence)}` so its config block and
-actions run in order (the `<Route>` template would slot them one level too deep for
-the sequence to reach).
+request on load and the matching verb runs. Each verb is a child-sequenced
+`<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
+children of the route and the sequence runs them in order.
 
 Live deploy needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `.env`, plus
 `wrangler` and `worker-build`. No R2 keys are needed (native binding).
 -->
 <Router {(CliServer, RequestLogger, BootOnLoad)}>
-	<div {(RoutePath("deploy"), ExchangeSequence)}>
+	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareWorkerBlock name="beet-hello-worker" bucket="beet-hello-site"/>
-		<CloudflareWorkerDeploy/>
+		<CloudflareWorkerDeployAction/>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-worker" timeout="10s"/>
-	</div>
-	<div {(RoutePath("sync"), ExchangeSequence)}>
+	</Route>
+	<Route path="sync" {ExchangeSequence}>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
-	</div>
-	<div {(RoutePath("destroy"), ExchangeSequence)}>
+	</Route>
+	<Route path="destroy" {ExchangeSequence}>
 		<!-- `local_dir` empties the synced objects before deleting the bucket -->
 		<CloudflareDestroy name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
-	</div>
+	</Route>
 </Router>

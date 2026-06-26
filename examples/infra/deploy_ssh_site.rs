@@ -68,21 +68,22 @@ fn infra_scene() -> Result<impl Bundle> {
 	(stack(), stack_cli(), children![
 		route(
 			"watch",
-			(exchange_sequence(), children![AwsWatch::for_fargate(
+			(ExchangeSequence, children![AwsWatch::for_fargate(
 				&stack(),
 				&block
 			)])
 		),
 		route(
 			"deploy",
-			(exchange_sequence(), children![
+			(ExchangeSequence, children![
 				block.clone(),
 				// the static binary to containerize: the ssh_tui_site server.
 				build_site_binary(),
 				// infrastructure first (creates the ECR repo the image pushes to).
 				TofuApplyAction,
-				// build + push the image now the ECR repo exists.
-				BuildDockerImageAction,
+				// build + push the image now the ECR repo exists (the config
+				// component requires the action).
+				BuildDockerImage::default(),
 				// watch the service roll out the new task.
 				AwsWatch::for_fargate(&stack(), &block)
 					.with_timeout(Duration::from_secs(60)),

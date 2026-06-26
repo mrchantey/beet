@@ -20,18 +20,18 @@ watch shape and the served content are identical (see `crates/beet_extra/src/inf
 Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
 -->
 <StackHost app_name="hello_lightsail">
-	<div {(RoutePath("deploy"), ExchangeSequence)}>
+	<Route path="deploy" {ExchangeSequence}>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailSiteBlock app_name="hello_lightsail" features="aws_sdk"/>
 		<SiteBucket/>
-		<TofuApply/>
+		<TofuApplyAction/>
 		<SiteSync app_name="hello_lightsail"/>
 		<LightsailWatch app_name="hello_lightsail" timeout="30s"/>
-	</div>
-	<div {(RoutePath("sync"), ExchangeSequence)}>
+	</Route>
+	<Route path="sync" {ExchangeSequence}>
 		<SiteSync app_name="hello_lightsail"/>
-	</div>
-	<div {(RoutePath("watch"), ExchangeSequence)}>
+	</Route>
+	<Route path="watch" {ExchangeSequence}>
 		<LightsailWatch app_name="hello_lightsail"/>
-	</div>
+	</Route>
 </StackHost>

@@ -12,12 +12,14 @@
 //! - Only direct-descendant children of a composition scope are collected, so a
 //!   parent never steals a slot belonging to a nested template.
 //! - Unnamed children go to the default slot.
-//! - A [`SlotTarget`] is replaced by its resolved children (a fragment).
+//! - A filled [`SlotTarget`] is transparent: its content takes its exact position
+//!   among its parent's children and the placeholder entity is despawned.
 //! - Fallback children are used when no content is supplied, removed otherwise.
 //! - Unconsumed children are a [`TemplateError`], naming the missing slot and
 //!   listing available targets.
 //! - Astro-style transfers compose through levels: a [`SlotTarget`] that is also
-//!   a [`SlotChild`] re-opens as a target once filled, so deeper content flows.
+//!   a [`SlotChild`] re-opens as a target once filled, persisting (rather than
+//!   collapsing) so deeper content flows.
 //! - Resolution recurses into nested templates.
 
 use crate::prelude::*;
@@ -84,9 +86,10 @@ impl SlotChild {
 ///
 /// Synchronous over the world: collects each composition scope's direct
 /// [`SlotChild`]s and the [`SlotTarget`]s reachable in its subtree, then matches
-/// them positionally. A [`SlotTarget`] is replaced by its resolved children; an
-/// unfilled target keeps its fallback. An unmatched [`SlotChild`] returns an
-/// error naming the missing slot and listing the available targets.
+/// them positionally. A filled [`SlotTarget`] collapses, its content taking the
+/// placeholder's position; an unfilled target keeps its fallback. An unmatched
+/// [`SlotChild`] returns an error naming the missing slot and the available
+/// targets.
 ///
 /// Resolution iterates to a fixpoint: a pass splices each scope's matched
 /// content, which exposes deeper targets (a relay buried under another scope's
@@ -109,8 +112,13 @@ pub fn resolve_slots(world: &mut World, root: Entity) -> Result {
 
 /// Splices each wiring's content into its target.
 fn apply_wirings(world: &mut World, wirings: Vec<SlotWiring>) {
-	for SlotWiring { target, content } in wirings {
-		splice_into_target(world, target, content);
+	for SlotWiring {
+		target,
+		content,
+		is_relay,
+	} in wirings
+	{
+		splice_into_target(world, target, content, is_relay);
 	}
 }
 
@@ -131,6 +139,11 @@ fn report_unmatched(plan: SlotPlan) -> Result {
 struct SlotWiring {
 	target: Entity,
 	content: Vec<Entity>,
+	/// Whether `target` is a forwarding relay (a [`SlotTarget`] that is also a
+	/// [`SlotChild`]). Captured at plan time, when every marker is still intact,
+	/// so the relay stays correctly classified even if an earlier wiring in the
+	/// same pass strips its [`SlotChild`] by splicing it in as content.
+	is_relay: bool,
 }
 
 /// The materialized slot resolution: wirings to apply plus any unmatched
@@ -233,9 +246,13 @@ fn plan_scope(
 				targets.push((child_target.slot_name().into(), content));
 			}
 		}
+		// a relay target (also a `SlotChild`) must survive splicing to forward its
+		// new content onward; a structural target collapses transparently.
+		let is_relay = slot_children.contains(target);
 		plan.wirings.push(SlotWiring {
 			target,
 			content: matched,
+			is_relay,
 		});
 	}
 
@@ -288,12 +305,22 @@ fn collect_targets(
 	targets
 }
 
-/// Replaces a [`SlotTarget`]'s children with `content`, in order.
+/// Splices `content` into `target`'s position, transparently by default.
 ///
-/// The target keeps its identity (a transparent fragment) but loses its
-/// fallback children and its [`SlotTarget`] marker; the routed content becomes
-/// its children, each its own entity, with its [`SlotChild`] marker stripped.
-fn splice_into_target(world: &mut World, target: Entity, content: Vec<Entity>) {
+/// The fallback children are dropped and each content entity loses its
+/// [`SlotChild`] marker. For a structural target (`is_relay` false) the content
+/// takes the target's exact slot among its parent's children and the target
+/// entity is despawned, so a `<Slot>` leaves no wrapper. A relay target
+/// (`is_relay` true, a [`SlotTarget`] that is also a [`SlotChild`]) instead keeps
+/// its identity and adopts the content as children, losing only its
+/// [`SlotTarget`] marker, so its [`SlotChild`] side forwards the content into a
+/// deeper scope on a later pass.
+fn splice_into_target(
+	world: &mut World,
+	target: Entity,
+	content: Vec<Entity>,
+	is_relay: bool,
+) {
 	// drop the fallback children: they only render when no content is supplied.
 	let fallback: Vec<Entity> = world
 		.entity(target)
@@ -304,15 +331,41 @@ fn splice_into_target(world: &mut World, target: Entity, content: Vec<Entity>) {
 	for child in fallback {
 		world.entity_mut(child).despawn();
 	}
-	// route each content entity in as a child, stripping its routing marker.
+	// strip each content entity's routing marker, it is being consumed here.
 	for child in content.iter().copied() {
-		world
-			.entity_mut(child)
-			.remove::<SlotChild>()
-			.insert(ChildOf(target));
+		world.entity_mut(child).remove::<SlotChild>();
 	}
-	// the target is now a transparent fragment: drop its placeholder marker.
-	world.entity_mut(target).remove::<SlotTarget>();
+
+	// a relay keeps its identity so it forwards onward, adopting the content as
+	// children and shedding only its `SlotTarget` marker.
+	if is_relay {
+		world.entity_mut(target).add_children(&content);
+		world.entity_mut(target).remove::<SlotTarget>();
+		return;
+	}
+
+	// transparent splice: drop the content into the target's exact position in
+	// its parent, then despawn the now-empty target so no wrapper survives.
+	let parent = world.entity(target).get::<ChildOf>().map(ChildOf::parent);
+	match parent {
+		Some(parent) => {
+			let index = world
+				.entity(parent)
+				.get::<Children>()
+				.and_then(|children| {
+					children.iter().position(|child| child == target)
+				})
+				.unwrap_or(0);
+			world.entity_mut(parent).insert_children(index, &content);
+			world.entity_mut(target).despawn();
+		}
+		// a root-level slot has no parent to splice into: keep the content under
+		// the now-markerless target rather than orphaning it.
+		None => {
+			world.entity_mut(target).add_children(&content);
+			world.entity_mut(target).remove::<SlotTarget>();
+		}
+	}
 }
 
 #[cfg(test)]
@@ -361,15 +414,15 @@ mod test {
 
 		resolve_slots(&mut world, scope).unwrap();
 
-		child_names(&world, default_target).xpect_eq(vec!["body".to_string()]);
-		child_names(&world, header_target).xpect_eq(vec!["title".to_string()]);
-		// markers stripped.
+		// each filled slot collapses: its content lands in the scope at the slot's
+		// old position, the placeholder target despawned.
+		child_names(&world, scope)
+			.xpect_eq(vec!["body".to_string(), "title".to_string()]);
+		world.get_entity(default_target).is_err().xpect_true();
+		world.get_entity(header_target).is_err().xpect_true();
+		// routing markers stripped from the placed content.
 		world.entity(body).contains::<SlotChild>().xpect_false();
 		world.entity(title).contains::<SlotChild>().xpect_false();
-		world
-			.entity(default_target)
-			.contains::<SlotTarget>()
-			.xpect_false();
 	}
 
 	#[beet_core::test]
@@ -387,9 +440,12 @@ mod test {
 
 		resolve_slots(&mut world, scope).unwrap();
 
-		// header keeps its fallback; default is filled.
+		// the unfilled header target survives with its fallback intact.
+		world.get_entity(target).is_ok().xpect_true();
 		child_names(&world, target).xpect_eq(vec!["fallback".to_string()]);
-		child_names(&world, default_target).xpect_eq(vec!["body".to_string()]);
+		// the filled default target collapses, its body landing in the scope.
+		world.get_entity(default_target).is_err().xpect_true();
+		child_names(&world, scope).xpect_eq(vec!["body".to_string()]);
 	}
 
 	#[beet_core::test]
@@ -403,7 +459,9 @@ mod test {
 
 		resolve_slots(&mut world, scope).unwrap();
 
-		child_names(&world, target).xpect_eq(vec![
+		// the collapsed target leaves its three children in order in the scope.
+		world.get_entity(target).is_err().xpect_true();
+		child_names(&world, scope).xpect_eq(vec![
 			"one".to_string(),
 			"two".to_string(),
 			"three".to_string(),
@@ -449,113 +507,120 @@ mod test {
 
 		resolve_slots(&mut world, root).unwrap();
 
-		child_names(&world, target_a).xpect_eq(vec!["contentA".to_string()]);
-		child_names(&world, target_b).xpect_eq(vec!["contentB".to_string()]);
+		// each scope keeps only its own content, collapsed into the scope.
+		world.get_entity(target_a).is_err().xpect_true();
+		world.get_entity(target_b).is_err().xpect_true();
+		child_names(&world, scope_a).xpect_eq(vec!["contentA".to_string()]);
+		child_names(&world, scope_b).xpect_eq(vec!["contentB".to_string()]);
+	}
+
+	#[beet_core::test]
+	fn slot_child_of_root_lands_as_direct_children() {
+		// the `<Route path="x"><Foo/></Route>` shape: a `<Slot>` as a direct child
+		// of a root must place the caller content as direct children of that root,
+		// so a child-sequenced consumer reads them without an intervening fragment.
+		let mut world = World::new();
+		let root = node(&mut world, "root");
+		let target = world.spawn((SlotTarget::new(), ChildOf(root))).id();
+		let content: Vec<Entity> = ["foo", "bar", "baz"]
+			.into_iter()
+			.map(|name| {
+				world.spawn((Name::new(name), SlotChild::new(), ChildOf(root))).id()
+			})
+			.collect();
+
+		resolve_slots(&mut world, root).unwrap();
+
+		// the slot collapsed: its content are now direct children of the root, in
+		// order, with no intermediate entity.
+		world.get_entity(target).is_err().xpect_true();
+		child_names(&world, root).xpect_eq(vec![
+			"foo".to_string(),
+			"bar".to_string(),
+			"baz".to_string(),
+		]);
+		for entity in content {
+			world
+				.entity(entity)
+				.get::<ChildOf>()
+				.unwrap()
+				.parent()
+				.xpect_eq(root);
+		}
 	}
 
 	#[beet_core::test]
 	fn transfer_forwards_through_level() {
 		let mut world = World::new();
-		// Astro-style re-projection in a single composition scope, mirroring a
-		// built `Outer` whose body is `<Inner><Slot name="header"
-		// bx:slot="header"/></Inner>`: after the build splices Outer's caller
-		// content into the Inner scope, that scope's direct children are the
-		// transfer relay and the caller content, both targeting "header".
+		// Astro-style re-projection: a relay routed into a structural "outer" slot
+		// re-opens as an "inner" target, forwarding the caller's "inner" content a
+		// level deeper. The structural slot collapses transparently, but the relay
+		// must persist so its re-opened side can adopt the forwarded content.
 		let scope = node(&mut world, "scope");
-		// the inner template's structural header target.
-		let inner_header = world
-			.spawn((SlotTarget::named("header"), ChildOf(scope)))
+		// the structural slot the relay is routed into; collapses on fill.
+		let structural = world
+			.spawn((SlotTarget::named("outer"), ChildOf(scope)))
 			.id();
-		// the transfer relay: routed into inner ("header"), and itself a
-		// re-opening "header" target carrying the forwarded content.
-		world.spawn((
-			SlotChild::named("header"),
-			SlotTarget::named("header"),
-			ChildOf(scope),
-		));
-		// Outer's caller content for "header", spliced into the same scope.
-		world.spawn((
-			Name::new("title"),
-			SlotChild::named("header"),
-			ChildOf(scope),
-		));
+		// the relay: routed as "outer" content, re-opening as an "inner" target.
+		let relay = world
+			.spawn((
+				Name::new("relay"),
+				SlotChild::named("outer"),
+				SlotTarget::named("inner"),
+				ChildOf(scope),
+			))
+			.id();
+		// the caller's "inner" content, forwarded through the relay.
+		let title = world
+			.spawn((Name::new("title"), SlotChild::named("inner"), ChildOf(scope)))
+			.id();
 
 		resolve_slots(&mut world, scope).unwrap();
 
-		// the forwarded title lands in inner's header target's subtree, having
-		// flowed through the re-opening relay rather than being left unconsumed.
-		let title_under_header = world
-			.entity(inner_header)
-			.get::<Children>()
-			.into_iter()
-			.flat_map(|children| children.iter())
-			.flat_map(|child| {
-				core::iter::once(child).chain(
-					world.entity(child).get::<Children>().into_iter().flat_map(
-						|grandchildren| {
-							grandchildren.iter().collect::<Vec<_>>()
-						},
-					),
-				)
-			})
-			.any(|entity| {
-				world
-					.entity(entity)
-					.get::<Name>()
-					.map(|name| name.as_str() == "title")
-					.unwrap_or(false)
-			});
-		title_under_header.xpect_true();
+		// the structural slot collapsed, the relay taking its place in the scope.
+		world.get_entity(structural).is_err().xpect_true();
+		child_names(&world, scope).xpect_eq(vec!["relay".to_string()]);
+		// the relay persisted and adopted the forwarded title as its child.
+		world.entity(relay).contains::<SlotTarget>().xpect_false();
+		world.entity(relay).contains::<SlotChild>().xpect_false();
+		world.entity(title).get::<ChildOf>().unwrap().parent().xpect_eq(relay);
+		child_names(&world, relay).xpect_eq(vec!["title".to_string()]);
 	}
 
 	#[beet_core::test]
 	fn relay_does_not_consume_itself() {
 		// a relay whose `SlotChild` and `SlotTarget` sides share a slot name must
 		// forward sibling content rather than swallowing it into its own target.
+		// here the relay is the first "head" target, so it could match its own
+		// `SlotChild` side were the self-consume guard absent.
 		let mut world = World::new();
 		let scope = node(&mut world, "scope");
-		// the deeper structural target the relay forwards into.
-		let inner = world
+		// the relay: routed as "head" content, and itself a re-opening "head" target.
+		let relay = world
+			.spawn((
+				Name::new("relay"),
+				SlotChild::named("head"),
+				SlotTarget::named("head"),
+				ChildOf(scope),
+			))
+			.id();
+		// caller content for "head", which the relay must adopt rather than eat
+		// its own name.
+		let meta = world
+			.spawn((Name::new("meta"), SlotChild::named("head"), ChildOf(scope)))
+			.id();
+		// the structural slot the relay is finally routed into; collapses on fill.
+		let structural = world
 			.spawn((SlotTarget::named("head"), ChildOf(scope)))
 			.id();
-		// the relay: routed as "head" content, and itself a re-opening "head" target.
-		world.spawn((
-			SlotChild::named("head"),
-			SlotTarget::named("head"),
-			ChildOf(scope),
-		));
-		// caller content for "head", which must flow through the relay, not be
-		// eaten by the relay matching its own name.
-		world.spawn((
-			Name::new("meta"),
-			SlotChild::named("head"),
-			ChildOf(scope),
-		));
 
 		resolve_slots(&mut world, scope).unwrap();
 
-		// the meta reached the inner target's subtree (via the relay).
-		let reached = world
-			.entity(inner)
-			.get::<Children>()
-			.into_iter()
-			.flat_map(|children| children.iter())
-			.flat_map(|child| {
-				core::iter::once(child).chain(
-					world.entity(child).get::<Children>().into_iter().flat_map(
-						|grandchildren| {
-							grandchildren.iter().collect::<Vec<_>>()
-						},
-					),
-				)
-			})
-			.any(|entity| {
-				world
-					.entity(entity)
-					.get::<Name>()
-					.map(|name| name.as_str() == "meta")
-					.unwrap_or(false)
-			});
-		reached.xpect_true();
+		// the relay adopted meta (it did not consume itself) and took the
+		// collapsed structural slot's place in the scope.
+		world.get_entity(structural).is_err().xpect_true();
+		child_names(&world, scope).xpect_eq(vec!["relay".to_string()]);
+		child_names(&world, relay).xpect_eq(vec!["meta".to_string()]);
+		world.entity(meta).get::<ChildOf>().unwrap().parent().xpect_eq(relay);
 	}
 }

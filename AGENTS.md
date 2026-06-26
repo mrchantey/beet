@@ -24,6 +24,9 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Never use `cargo clippy`, we dont use cargo clippy in this workspace.
 - Never run `cargo clean` without permission, this project has many targets and dependencies, it takes hours to rebuild everything
 - aim to leave code better than you found it, add missing documentation, edit ambiguous language and clean up antipatterns.
+- Be fearless pushing changes upstream and finding generalizing patterns. If a type would reasonably always be used with another, wire it directly instead of papering over it with a wrapper template; massage a type into being `Reflect` (or make it `pub(crate)` with a public template) rather than reaching for a wrapper by default:
+	- bad: `#[template] pub fn BazzTemplate() -> impl Bundle { (Bazz, BazzAction) }`
+	- good: make `Bazz` `#[require(BazzAction)]` and use `<Bazz/>` directly
 - Do not create non-doc examples without being explictly asked to do so.
 - Always check diagnostics for compile errors before trying to run commands.
 - We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io`, `async-task`
@@ -152,3 +155,13 @@ async_ext::do_async_thing().await;
 - often a world.with_state::<MyQuery>(|my_query|{}) is more ergonomic than world.run_system_once(|my_query:MyQuery|{..});
 - Prefer Populated over Query which will skip system running if that query is empty, if its an 'any of these queries' pattern, use my_system.run_if(|a,b|!a.is_empty() || !b.is_empty()..)
 - A `#[template]` is a constructor returning `impl Bundle`, not a UI/content-only thing. `#[template(system)]` takes `SystemParam`s (`Commands`, queries, resources) and can do arbitrary ECS work at build time, eg spawn child entities or inject routes. Prefer a `<MyThing/>` template over a bespoke reflect-marker + `On<Insert>` observer for markup-spawnable setup: it expands away at build, leaving no component to re-fire on scene reload.
+- Templates may also return `()` for effects, or Result<impl Bundle>
+
+## BSX Cheatsheet
+
+- Use the most prominent type in a position. `<div>` is a UI element, never a generic wrapper to hang the real type off a spread.
+	- bad: `<div {(Route{path:"deploy"}, ExchangeSequence)}>`
+	- good: `<Route path="deploy" {ExchangeSequence}>`
+- When no component/resource/template fits a position (a plain grouping), use `<Template>`, not `<div>`.
+- `<Tag/>` resolves a component/template by short type path and spawns its own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity. String attributes coerce to the field type (`SmolStr`, `SmolPath`, `Duration` from `"30s"`, an `Option<T>` wrapping the value, an enum unit variant by name), so a reflect component is usually authorable directly without a template.
+- A `<Tag>`'s children land as its direct children (slots are transparent), so a child-reading handler like `{ExchangeSequence}` (a sequenced route) reads them: `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.

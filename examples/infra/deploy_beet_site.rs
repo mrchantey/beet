@@ -133,14 +133,14 @@ fn infra_scene() -> Result<impl Bundle> {
 		Destroy,
 		route(
 			"watch",
-			(exchange_sequence(), children![AwsWatch::for_fargate(
+			(ExchangeSequence, children![AwsWatch::for_fargate(
 				&stack(),
 				&block
 			)])
 		),
 		route(
 			"deploy",
-			(exchange_sequence(), children![
+			(ExchangeSequence, children![
 				block.clone(),
 				// create the site + assets buckets (and the ECR repo) via terraform.
 				site_bucket(),
@@ -153,14 +153,11 @@ fn infra_scene() -> Result<impl Bundle> {
 				// build + push the image now the ECR repo exists; the container runs
 				// `beet serve --server=http,ssh --path=/` so the ssh TUI opens on the
 				// home route (otherwise the `serve` positional becomes the route).
-				(
-					BuildDockerImage::default().with_cmd_args([
-						"serve",
-						"--server=http,ssh",
-						"--path=/",
-					]),
-					BuildDockerImageAction,
-				),
+				BuildDockerImage::default().with_cmd_args([
+					"serve",
+					"--server=http,ssh",
+					"--path=/",
+				]),
 				// publish the site, then the assets, to the one bucket.
 				sync_site(&stk),
 				sync_assets(&stk),
@@ -172,7 +169,7 @@ fn infra_scene() -> Result<impl Bundle> {
 		),
 		route(
 			"sync",
-			(exchange_sequence(), children![
+			(ExchangeSequence, children![
 				sync_site(&stk),
 				sync_assets(&stk),
 			])

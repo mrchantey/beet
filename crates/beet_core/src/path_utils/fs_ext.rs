@@ -126,10 +126,7 @@ pub fn remove(path: impl AsRef<Path>) -> FsResult {
 		if #[cfg(target_arch = "wasm32")] {
 			// the runner's recursive remove (`Deno.removeSync`); a missing path errors,
 			// matching the native `fs::metadata` probe below.
-			match js_runtime::remove(&path.to_string_lossy()) {
-				Some(err) => Err(FsError::other(path, err)),
-				None => Ok(()),
-			}
+			js_runtime::remove(&path.to_string_lossy())
 		} else {
 			match fs::metadata(path) {
 				Ok(meta) => {

@@ -1,29 +1,16 @@
-//! Markup wrappers for the standalone deploy actions.
+//! Markup wrappers for the infra example types that are not directly spawnable.
 //!
-//! The block/config types are reflect components spawned directly by tag (eg
-//! `<CloudflareWorkerBlock/>`), but the standalone deploy actions take a `Request`
-//! and return a `Response`, neither of which is `Reflect`, so they cannot be a
-//! reflect-spawned tag. A thin `#[template]` wraps each: its props struct is
-//! reflect-registered, its body inserts the action component.
+//! Most deploy types are reflect components spawned directly by tag (eg
+//! `<CloudflareWorkerBlock/>`, `<CloudflareWorkerDeployAction/>`). The wrappers here
+//! cover the rest: types that build a non-`Reflect` value (a [`Stack`]'s `MultiMap`, a
+//! [`BuildArtifact`]'s `ChildProcess`, an `S3BucketBlock`'s bindings) or compute
+//! stack-derived config. A thin `#[template]` wraps each: its props struct is
+//! reflect-registered, its body builds the bundle.
 use crate::infra::infra_ext;
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
-
-/// `<CloudflareWorkerDeploy/>` — the standalone wasm-Worker deploy action, the
-/// markup form of [`CloudflareWorkerDeployAction`]. Reads its sibling
-/// [`CloudflareWorkerBlock`] for the worker + bucket names.
-#[template]
-pub fn CloudflareWorkerDeploy() -> impl Bundle { CloudflareWorkerDeployAction }
-
-/// `<CloudflareContainerDeploy/>` — the standalone container deploy action, the
-/// markup form of [`CloudflareContainerDeployAction`]. Reads its sibling
-/// [`CloudflareContainerBlock`] + [`BuildArtifact`].
-#[template]
-pub fn CloudflareContainerDeploy() -> impl Bundle {
-	CloudflareContainerDeployAction
-}
 
 /// `<BeetBinaryBuild features="aws_sdk"/>` — builds the generic `beet` binary
 /// (release, zigbuild) with the given feature set as a [`BuildArtifact`], the markup
@@ -74,11 +61,6 @@ pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
 /// its [`Stack`] by ancestry. The markup form of `site_bucket()`.
 #[template]
 pub fn SiteBucket() -> impl Bundle { infra_ext::site_bucket() }
-
-/// `<TofuApply/>` — apply the stack's terraform config. The markup form of
-/// [`TofuApplyAction`].
-#[template]
-pub fn TofuApply() -> impl Bundle { TofuApplyAction }
 
 /// `<SiteSync app_name="hello_lambda"/>` — publish `examples/bsx_site` to the stack's
 /// site bucket. The markup form of `sync_site(stack)`.
@@ -178,20 +160,4 @@ pub fn FargateWatch(
 		Some(timeout) => watch.with_timeout(timeout),
 		None => watch,
 	}
-}
-
-/// `<DockerImageBuild/>` — build + push the container image for the fargate deploy:
-/// the native binary baked into a debian-slim image running `beet serve
-/// --server=http --path=/`. The markup form of the fargate example's image-build
-/// child (`(BuildDockerImage, BuildDockerImageAction)`).
-#[template]
-pub fn DockerImageBuild() -> impl Bundle {
-	(
-		BuildDockerImage::default().with_cmd_args([
-			"serve",
-			"--server=http",
-			"--path=/",
-		]),
-		BuildDockerImageAction,
-	)
 }

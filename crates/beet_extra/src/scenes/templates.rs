@@ -1,7 +1,8 @@
 //! Declarative `#[template]` forms of the imperative 3d scene setup
 //! ([`lighting_3d`](super::lighting_3d), [`ground_3d`](super::ground_3d)), so a
 //! scene `.bsx` names `<Lighting3d/>` / `<Ground3d/>` instead of a Rust `Startup`
-//! system. Registered by [`beet_extra_plugin`](crate::prelude::beet_extra_plugin).
+//! system. Registered by
+//! [`beet_extra_bevy_default_plugin`](crate::prelude::beet_extra_bevy_default_plugin).
 use crate::beet::prelude::*;
 use crate::components::KeyboardController;
 use crate::components::WrapAround;

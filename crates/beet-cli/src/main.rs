@@ -63,18 +63,6 @@ fn main() -> AppExit {
 			// the native-only dev-command capabilities, linked as registered types and
 			// inert until a `main.bsx` names them.
 			CliCommandsPlugin,
-			// the example capabilities, so a `main.bsx` declaring example tags resolves:
-			// the agent-thread runtime + chat UI (`thread`, eg `examples/thread/chat.bsx`),
-			// the windowed spatial/animation scene types + templates (`winit`, eg
-			// `examples/spatial/seek_3d.bsx`), and the cloudflare/aws deploy types
-			// (`infra`, eg `examples/infra/hello_cloudflare_workers.bsx`). The group
-			// self-selects by sub-feature.
-			#[cfg(any(
-				feature = "thread",
-				feature = "winit",
-				feature = "infra"
-			))]
-			beet_extra::prelude::BeetExtraPlugins,
 		))
 		.add_systems(
 			Startup,

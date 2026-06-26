@@ -1332,7 +1332,6 @@ name = "beet-cli"
 version = "0.0.9-dev.16"
 dependencies = [
  "beet",
- "beet_extra",
  "console_error_panic_hook",
  "getrandom 0.3.4",
  "image",

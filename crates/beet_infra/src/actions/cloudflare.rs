@@ -130,8 +130,9 @@ async fn sibling<T: Component + Clone>(
 /// `wrangler deploy` (which builds + pushes the image to Cloudflare's managed
 /// registry and deploys the fronting Worker). Reads the sibling
 /// [`CloudflareContainerBlock`] + [`BuildArtifact`].
-#[action]
-#[derive(Default, Component)]
+#[action(handler_only)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Component, Default)]
 pub async fn CloudflareContainerDeployAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
@@ -334,8 +335,9 @@ fn write_r2_secrets_file(dir: &AbsPathBuf) -> Result<Option<String>> {
 /// The wasm artifact is produced from the `beet-cli` crate (`--features
 /// cloudflare`) by `worker-build`, invoked by wrangler's `build.command`, so this
 /// action carries no separate [`BuildArtifact`].
-#[action]
-#[derive(Default, Component)]
+#[action(handler_only)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Component, Default)]
 pub async fn CloudflareWorkerDeployAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {

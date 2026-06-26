@@ -147,7 +147,7 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 			stack.clone(),
 			assets_s3_fs_store(stack, assets_dir),
 			assets_bucket_block(),
-			exchange_sequence(),
+			ExchangeSequence,
 			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],
 		))
 		.exchange(Request::get(""))
