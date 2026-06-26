@@ -23,6 +23,8 @@
 #[cfg(feature = "net")]
 mod analytics;
 mod button;
+#[cfg(all(feature = "net", feature = "syntax_highlighting"))]
+mod code_snippet;
 mod color_scheme;
 mod error_text;
 mod footer;
@@ -39,6 +41,8 @@ mod table;
 #[cfg(feature = "net")]
 pub use analytics::*;
 pub use button::*;
+#[cfg(all(feature = "net", feature = "syntax_highlighting"))]
+pub use code_snippet::*;
 pub use color_scheme::*;
 pub use error_text::*;
 pub use footer::*;
@@ -89,6 +93,8 @@ pub fn widget_plugin(app: &mut App) {
 		.register_template::<Table>();
 	#[cfg(feature = "net")]
 	app.register_template::<Analytics>();
+	#[cfg(all(feature = "net", feature = "syntax_highlighting"))]
+	app.register_template::<CodeSnippet>();
 	#[cfg(feature = "style")]
 	app.register_template::<Stylesheet>();
 }

@@ -55,7 +55,7 @@ action = ["dep:beet_action", "net"]
 # — it deliberately omits the native-only `fs`/`http` (a render/document consumer
 # does not touch the filesystem store or the http transport directly; native
 # consumers pull those through `beet_router/std`).
-net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde"]
+net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde", "beet_net/action"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 # The function-component widget layer: `#[template]` widgets and the `rsx!`
