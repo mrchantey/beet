@@ -1,8 +1,6 @@
 <!--
 beet's own entry: the dev commands, wired as routes over the capabilities linked
-into the `beet` binary. This replaces the old `default-cli.json` scene and the
-`just init-cli` load dance — there is no retained state, the binary discovers this
-file by walking up from the cwd and runs one command per invocation.
+into the `beet` binary.
 
 The wasm test runner depends on it: `.cargo/config.toml` sets
 `runner = 'beet run-wasm'`, so `cargo test --target wasm32-...` invokes
