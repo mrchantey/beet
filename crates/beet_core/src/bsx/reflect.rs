@@ -21,6 +21,7 @@ use bevy::reflect::structs::DynamicStruct;
 use bevy::reflect::tuple::DynamicTuple;
 use bevy::reflect::tuple_struct::DynamicTupleStruct;
 use core::any::TypeId;
+use core::time::Duration;
 
 /// Resolves a `$name` entity reference to a concrete (possibly forward-mapped)
 /// [`Entity`], threaded through nested literals so a spread component's
@@ -165,6 +166,21 @@ fn scalar_to_reflect(
 		}
 	}
 
+	// a human duration string targeting a `Duration` field, so a markup
+	// `<EndInDuration duration="50ms"/>` authors a delay directly. A malformed value
+	// (a non-string, or a missing/unknown unit) errors rather than silently falling
+	// through to a value that cannot apply. `Duration` is `core`, so no_std-safe.
+	if let Some(info) = field_info
+		&& info.type_id() == TypeId::of::<Duration>()
+	{
+		let Some(duration) = coerce_duration(value) else {
+			bevybail!(
+				"invalid duration {value:?}: expected a unit-suffixed string like \"50ms\" or \"1s\""
+			);
+		};
+		return Ok(Box::new(duration));
+	}
+
 	// a string targeting a `SmolStr` field coerces to `SmolStr`, mirroring the
 	// numeric cast above (the natural reflect type of a string is `String`).
 	if let (Value::Str(string), Some(TypeInfo::Opaque(opaque))) =
@@ -186,7 +202,10 @@ fn scalar_to_reflect(
 	// a string targeting an `AbsPathBuf` field is treated as workspace-relative and
 	// joined onto the workspace root, mirroring `AbsPathBuf`'s workspace-relative
 	// serde. This lets eg `<FsStore path="assets"/>` take a string attribute directly,
-	// rather than through a thin string-prop template adapter.
+	// rather than through a thin string-prop template adapter. `AbsPathBuf`/`WsPathBuf`
+	// live in the std-only `path_utils`, so the coercion is std-gated — a no_std
+	// (embedded) build has no filesystem paths to resolve.
+	#[cfg(feature = "std")]
 	if let (Value::Str(string), Some(info)) = (value, field_info)
 		&& info.type_id() == TypeId::of::<AbsPathBuf>()
 	{
@@ -250,6 +269,37 @@ fn cast_number(
 	} else {
 		None
 	}
+}
+
+/// Coerce a scalar [`Value`] to a [`Duration`] from a unit-suffixed string
+/// (eg `"50ms"`, `"1s"`). The unit is required; a bare number carries no unit and
+/// is rejected, so a duration is never silently assumed to be milliseconds.
+fn coerce_duration(value: &Value) -> Option<Duration> {
+	match value {
+		Value::Str(string) => parse_duration_str(string.as_str()),
+		_ => None,
+	}
+}
+
+/// Parse a human duration like `"50ms"`, `"1s"`, `"250us"` or `"2m"`. The unit
+/// (`ns`, `us`/`µs`, `ms`, `s`, `m`) is required; `None` on a missing/unknown unit
+/// or an unparseable value.
+fn parse_duration_str(string: &str) -> Option<Duration> {
+	let string = string.trim();
+	let split = string
+		.find(|c: char| !c.is_ascii_digit() && c != '.')
+		.unwrap_or(string.len());
+	let (number, unit) = string.split_at(split);
+	let number: f64 = number.parse().ok()?;
+	let secs = match unit.trim() {
+		"ns" => number / 1_000_000_000.0,
+		"us" | "µs" => number / 1_000_000.0,
+		"ms" => number / 1_000.0,
+		"s" => number,
+		"m" => number * 60.0,
+		_ => return None,
+	};
+	Some(Duration::from_secs_f64(secs))
 }
 
 /// Build a [`DynamicList`] from items, recursing per the list's item info.
@@ -504,10 +554,39 @@ mod test {
 	/// A string attribute targeting an `AbsPathBuf` field coerces workspace-relative,
 	/// so `<FsStore path="assets"/>` resolves under the workspace root (the seam that
 	/// replaced the `MountFsStore` string-prop adapter).
+	#[cfg(feature = "std")]
 	#[beet_core::test]
 	fn coerces_string_to_abs_path() {
 		resolve::<AbsPathBuf>(DataLiteral::Scalar(Value::str("assets")))
 			.xpect_eq(WsPathBuf::new("assets").into_abs());
+	}
+
+	/// A unit-suffixed string coerces to its duration, so a markup `duration="1s"`
+	/// authors an `EndInDuration` delay. The unit is required: a bare number or an
+	/// unknown unit does not parse, and a malformed value targeting a `Duration`
+	/// field is a hard error rather than a silent miss.
+	#[beet_core::test]
+	fn coerces_to_duration() {
+		resolve::<Duration>(DataLiteral::Scalar(Value::str("250ms")))
+			.xpect_eq(Duration::from_millis(250));
+		resolve::<Duration>(DataLiteral::Scalar(Value::str("2s")))
+			.xpect_eq(Duration::from_secs(2));
+		// the unit is required
+		parse_duration_str("50").xpect_none();
+		parse_duration_str("50years").xpect_none();
+		coerce_duration(&Value::Uint(50)).xpect_none();
+		// a malformed value targeting a `Duration` field errors, rather than
+		// silently falling through to a value that cannot apply
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		literal_to_reflect(
+			&DataLiteral::Scalar(Value::Uint(50)),
+			Some(Duration::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.is_err()
+		.xpect_true();
 	}
 
 	#[beet_core::test]
