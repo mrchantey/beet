@@ -3,6 +3,7 @@
 mod check;
 mod export_pdf;
 mod export_static;
+pub mod pdf_ext;
 #[cfg(feature = "qrcode")]
 mod qrcode;
 mod run_wasm;

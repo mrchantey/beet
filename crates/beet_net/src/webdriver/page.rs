@@ -91,6 +91,21 @@ impl Page {
 		Ok(())
 	}
 
+	/// Set the viewport (CSS px) of the bound context, so screen-media layout and
+	/// any `innerWidth`-driven script render at the given resolution.
+	pub async fn set_viewport(&self, width: u32, height: u32) -> Result<()> {
+		self.session
+			.command(
+				"browsingContext.setViewport",
+				json!({
+					"context": self.context_id,
+					"viewport": { "width": width, "height": height }
+				}),
+			)
+			.await?;
+		Ok(())
+	}
+
 	/// Evaluate a JavaScript expression in the page's browsing context.
 	/// Returns the full BiDi response JSON (caller can drill down).
 	pub async fn evaluate(&self, expression: &str) -> Result<Value> {

@@ -9,18 +9,19 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Renders every static route in the router to HTML.
+/// Collects the static-route paths a no-code site ships, in route-tree order.
 ///
-/// A route is exported when its path is fully static, its method is `GET`, and
-/// it is either a scene route or marked [`ExportStrategy::Static`]. Routes whose
+/// A route qualifies when its path is fully static, its method is `GET`, and it
+/// is either a scene route or marked [`ExportStrategy::Static`]. Routes whose
 /// [`ArticleMeta`] marks them a draft are skipped only on a `prod`
-/// [`PackageConfig::stage`]; dev/staging builds export drafts so they can be
-/// previewed.
-pub async fn collect_static_html(
+/// [`PackageConfig::stage`]; dev/staging builds keep drafts so they can be
+/// previewed. Shared by [`collect_static_html`] and the `export-pdf` command, so
+/// both ship exactly the same page set.
+pub async fn collect_static_paths(
 	world: &AsyncWorld,
 	router: Entity,
-) -> Result<Vec<(SmolPath, String)>> {
-	let paths = world
+) -> Result<Vec<SmolPath>> {
+	world
 		.with(move |world: &mut World| -> Result<Vec<SmolPath>> {
 			let tree = world
 				.entity(router)
@@ -66,8 +67,16 @@ pub async fn collect_static_html(
 			}
 			Ok(paths)
 		})
-		.await?;
+		.await
+}
 
+/// Renders every static route in the router to HTML, in route-tree order. See
+/// [`collect_static_paths`] for which routes qualify.
+pub async fn collect_static_html(
+	world: &AsyncWorld,
+	router: Entity,
+) -> Result<Vec<(SmolPath, String)>> {
+	let paths = collect_static_paths(world, router).await?;
 	let entity = world.entity(router);
 	let mut pages = Vec::new();
 	for path in paths {

@@ -7,8 +7,9 @@ Apply the worktree sync skill to the following worktrees.
 
 - Main Branch `~/me/beet`
 - Merge: changes in these worktrees are intended to be merged
-	- rendering `~/me/worktrees/beet/rendering/beet`
-	- apps `~/me/worktrees/beet/apps/beet`
+	- `~/me/worktrees/beet/rendering/beet`
+	- `~/me/worktrees/beet/apps/beet`
+	- `~/me/worktrees/beet/presentation/beet`
 - Ignore: experimental and not to be merged
 	- any other not explicitly listed above, ie coding, web
 
