@@ -233,6 +233,25 @@ pub fn sidebar_active() -> Rule {
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
 }
 
+/// The current page while hovered - keeps its raised pill. The shared
+/// [`hover_state_layer`](super::hover_state_layer) redirects a hovered row's
+/// background to the [`HoverSurface`](colors::HoverSurface) token, which is unset
+/// in the dark scheme and would otherwise resolve to nothing and *clear* the
+/// active row's fill (dropping the highlight on hover). This higher-specificity
+/// rule (class + `aria-current` + `:hover`, outweighing the `:hover` state layer)
+/// re-asserts the active surface, so the dark-mode hover dims the text alone and
+/// the pill stays. The light scheme already resolves an equal hover surface, so
+/// this only restores the dark case.
+pub fn sidebar_active_hover() -> Rule {
+	Rule::new()
+		.with_selector(Selector::AllOf(vec![
+			Selector::class(SIDEBAR_LINK),
+			Selector::attribute("aria-current", Some("page".into())),
+			Selector::state(ElementState::Hovered),
+		]))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHigh).unwrap()
+}
+
 /// Nested sidebar item - indented under its parent group. Each nesting level's
 /// padding insets the level below it, so the tree steps in per depth. Only the
 /// non-root `sidebar-item` carries it; `sidebar-item-root` stays flush left.

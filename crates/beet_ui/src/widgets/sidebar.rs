@@ -410,4 +410,56 @@ mod test {
 		// and the box is the link, not the bare rail divider trailing the row
 		(row[(width - 1) as usize].entity != Some(link)).xpect_true();
 	}
+
+	/// The resolved background of an active (`aria-current="page"`) sidebar link
+	/// under `scheme`, optionally while hovered, after the style cascade settles.
+	fn active_link_background(
+		scheme: ClassName,
+		hovered: bool,
+	) -> Option<bevy::prelude::Color> {
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<nav {Classes::new([scheme])}>
+					<a {Classes::new([classes::SIDEBAR_LINK])} href="/x" aria-current="page">"home"</a>
+				</nav>
+			})
+			.unwrap()
+			.id();
+		world.entity_mut(root).insert(FlexBuffer::new(20));
+		let link = world
+			.query::<(Entity, &Element)>()
+			.iter(&world)
+			.find(|(_, element)| element.tag() == "a")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		if hovered {
+			world
+				.entity_mut(link)
+				.insert(ElementStateMap::with(ElementState::Hovered));
+		}
+		world.run_schedule(crate::parse::PostParseTree);
+		world.get::<crate::style::VisualStyle>(link).unwrap().background
+	}
+
+	/// The active page keeps its raised pill background while hovered, in both
+	/// schemes. Regression: in the dark scheme the hover state layer redirected the
+	/// background to the (dark-unset) `HoverSurface` token, which resolved to nothing
+	/// and *cleared* the active row's fill — so hovering the current page in dark mode
+	/// dropped its highlight ("border") instead of leaving it and only dimming the text.
+	#[beet_core::test]
+	fn active_link_keeps_background_on_hover() {
+		// at rest both schemes paint the active pill.
+		active_link_background(classes::DARK_SCHEME, false).xpect_some();
+		active_link_background(classes::LIGHT_SCHEME, false).xpect_some();
+		// hovered, the pill must remain (not clear to the rail) in both schemes.
+		active_link_background(classes::DARK_SCHEME, true).xpect_some();
+		active_link_background(classes::LIGHT_SCHEME, true).xpect_some();
+	}
 }

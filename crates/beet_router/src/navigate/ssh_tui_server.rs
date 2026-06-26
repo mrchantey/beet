@@ -139,6 +139,10 @@ fn on_ssh_recv(
 				terminal,
 				page_host(size),
 				Navigator::in_world(router, opening.0.clone()),
+				// graphics support is the *client's* capability: detect it from the
+				// pty's forwarded terminal name, not the server's own env, so a kitty
+				// client renders rasters while a plain terminal keeps the alt marker.
+				KittyGraphicsSupport::from_term(&pty.terminal),
 			));
 		}
 		SshEvent::Data(bytes) => {
@@ -292,8 +296,19 @@ mod test {
 	}
 
 	/// Spawn a simulated SSH connection (a child of `router` with [`SshPeerInfo`])
-	/// and request a pty of `size`, as the russh accept loop would.
+	/// and request a pty of `size` on a plain `xterm`, as the russh accept loop would.
 	fn open_connection(app: &mut App, router: Entity, size: UVec2) -> Entity {
+		open_connection_with(app, router, size, "xterm")
+	}
+
+	/// [`open_connection`] with a chosen pty terminal name, so a test can drive the
+	/// per-session client-capability detection (eg graphics support).
+	fn open_connection_with(
+		app: &mut App,
+		router: Entity,
+		size: UVec2,
+		terminal: &str,
+	) -> Entity {
 		let connection = app
 			.world_mut()
 			.spawn((SshPeerInfo { username: None }, ChildOf(router)))
@@ -301,7 +316,7 @@ mod test {
 		app.world_mut()
 			.entity_mut(connection)
 			.trigger_target(SshRecv(SshEvent::RequestPty(RequestPty {
-				terminal: "xterm".into(),
+				terminal: terminal.into(),
 				window: SshWindowSize {
 					cells: size,
 					pixels: UVec2::ZERO,
@@ -353,6 +368,28 @@ mod test {
 			.xpect_true();
 		// and the home route paints into its buffer
 		drive_until(&mut app, connection, "Alpha page");
+	}
+
+	/// Each session's kitty-graphics support comes from its pty's forwarded
+	/// terminal name (the client's capability), not the server's own `TERM`: a
+	/// kitty client enables rasters while a plain xterm keeps the `[image]: alt`
+	/// marker. The image-loading regression — over SSH the server env never names
+	/// kitty, so the global-resource detection disabled graphics for every session.
+	#[beet_core::test]
+	async fn pty_terminal_sets_per_session_graphics_support() {
+		let mut app = ssh_tui_app();
+		let router = spawn_router(&mut app);
+		let size = UVec2::new(40, 8);
+		let kitty = open_connection_with(&mut app, router, size, "xterm-kitty");
+		let plain = open_connection_with(&mut app, router, size, "xterm-256color");
+		let enabled = |app: &App, connection: Entity| {
+			app.world()
+				.entity(connection)
+				.get::<KittyGraphicsSupport>()
+				.map(|support| support.enabled)
+		};
+		enabled(&app, kitty).xpect_eq(Some(true));
+		enabled(&app, plain).xpect_eq(Some(false));
 	}
 
 	/// Two concurrent connections each get their own surface and navigate

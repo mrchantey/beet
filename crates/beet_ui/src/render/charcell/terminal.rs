@@ -54,6 +54,10 @@ impl StdioTerminal {
 
 	fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		let stdio = world.entity(cx.entity).get::<StdioTerminal>().unwrap();
+		// kitty-graphics support is per-surface; a local stdio terminal detects it
+		// from the process env (an SSH session detects from its pty instead). Bundled
+		// with the Terminal insert below so the `stdio` borrow above is untouched.
+		let graphics = KittyGraphicsSupport::default();
 		// `BEET_HEADLESS` (tests, CI, automation): a buffered terminal that never
 		// touches the real tty (no raw mode, alt screen, mouse, or restore hook), so
 		// a scene that declares a `StdioTerminal` still spawns and reduces without
@@ -62,7 +66,7 @@ impl StdioTerminal {
 			world
 				.commands()
 				.entity(cx.entity)
-				.insert(Terminal::new_buffered());
+				.insert((Terminal::new_buffered(), graphics));
 			return;
 		}
 		// best-effort: a process needs only one restore hook, so a second terminal
@@ -92,7 +96,7 @@ impl StdioTerminal {
 			BufWriter::with_capacity(TERMINAL_BUFFER_CAPACITY, writer),
 			stdio.config.clone(),
 		);
-		world.commands().entity(cx.entity).insert(terminal);
+		world.commands().entity(cx.entity).insert((terminal, graphics));
 	}
 
 	/// Registers a hook that restores the terminal on ctrl+c or panic.

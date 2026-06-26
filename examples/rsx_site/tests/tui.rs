@@ -42,8 +42,6 @@ impl SiteHost {
 				..pkg_config!()
 			})
 			.add_plugins((CharcellTuiPlugin, NavigatorPlugin, LivePagePlugin));
-		// deterministic frames whatever terminal runs the tests: no kitty escapes.
-		app.insert_resource(KittyGraphicsSupport { enabled: false });
 		setup(&mut app);
 
 		// the router on its own entity; the in-world navigator dispatches to it.
@@ -59,6 +57,9 @@ impl SiteHost {
 				terminal,
 				page_host(size),
 				Navigator::in_world(router, home),
+				// deterministic frames whatever terminal runs the tests: graphics off
+				// per surface, so no kitty escapes interleave with the painted cells.
+				KittyGraphicsSupport { enabled: false },
 			))
 			.id();
 		app.update();

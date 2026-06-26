@@ -114,9 +114,11 @@ impl Plugin for CharcellPlugin {
 		// Terminal output: render the diffed buffer, overlay kitty rasters,
 		// flush, restore on exit. Input is bridged to bevy by
 		// `CharcellTuiPlugin` (the live app), not here.
+		// `KittyGraphicsSupport` is a per-surface component (each terminal detects
+		// its own client's capability), not a global resource; the terminal hosts
+		// insert it (a `StdioTerminal` from the env, an SSH session from its pty).
 		#[cfg(feature = "tui")]
-		app.init_resource::<KittyGraphicsSupport>()
-			.init_resource::<KittyPlacements>()
+		app.init_resource::<KittyPlacements>()
 			// before the cascade so the `graphics` state (and the block box it
 			// selects) resolves the same frame the raster attaches — no
 			// one-frame alt-text flash.

@@ -110,20 +110,40 @@ pub fn png_dimensions(bytes: &[u8]) -> Option<UVec2> {
 
 // ── Detection ─────────────────────────────────────────────────────────────────
 
-/// Whether the host terminal renders the kitty graphics protocol, detected
-/// from the environment. Overwrite the resource to force either way.
+/// Whether a surface's terminal renders the kitty graphics protocol.
+///
+/// A *per-surface* component (one terminal per session), not a global resource:
+/// over SSH the protocol is the *client's* capability, which the server process'
+/// own `TERM` cannot report, so each session detects from the terminal it
+/// actually talks to — a local [`StdioTerminal`] from the process env
+/// ([`Default`]), an SSH session from its pty's terminal name
+/// ([`from_term`](Self::from_term)). Absent or `enabled: false` keeps the
+/// `[image]: alt` marker; insert one with `enabled: true` to force it on.
 #[cfg(feature = "tui")]
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Clone, Component)]
 pub struct KittyGraphicsSupport {
 	pub enabled: bool,
 }
 
 #[cfg(feature = "tui")]
+impl KittyGraphicsSupport {
+	/// Detect support from a terminal-type name (a `TERM` value or an SSH pty's
+	/// terminal): kitty and ghostty advertise the protocol in their term name, so
+	/// a forwarded `xterm-kitty`/`xterm-ghostty` reports the client's capability.
+	pub fn from_term(term: &str) -> Self {
+		Self {
+			enabled: term.contains("kitty") || term.contains("ghostty"),
+		}
+	}
+}
+
+#[cfg(feature = "tui")]
 impl Default for KittyGraphicsSupport {
+	/// Detect from the local process environment, for a [`StdioTerminal`]: the
+	/// `TERM` name plus the marker vars kitty and WezTerm export.
 	fn default() -> Self {
 		let term = env_ext::var("TERM").unwrap_or_default();
-		let enabled = term.contains("kitty")
-			|| term.contains("ghostty")
+		let enabled = Self::from_term(&term).enabled
 			|| env_ext::var("KITTY_WINDOW_ID").is_ok()
 			|| env_ext::var("TERM_PROGRAM").is_ok_and(|prog| prog == "WezTerm");
 		Self { enabled }
@@ -163,9 +183,10 @@ pub struct KittyImageLoading;
 /// transport, so an `<img>` is simply marked unavailable.
 #[cfg(feature = "tui")]
 pub fn attach_kitty_images(
-	support: Res<KittyGraphicsSupport>,
 	mut placements: ResMut<KittyPlacements>,
 	elements: ElementQuery,
+	surfaces: SurfaceQuery,
+	support: Query<&KittyGraphicsSupport>,
 	unvisited: Query<
 		(),
 		(
@@ -180,11 +201,19 @@ pub fn attach_kitty_images(
 	// `placements` allocates raster ids only on the `net` fetch path.
 	#[cfg(not(feature = "net"))]
 	let _ = &mut placements;
-	if !support.enabled {
-		return;
-	}
 	for view in elements.iter() {
 		if view.tag() != "img" || !unvisited.contains(view.entity) {
+			continue;
+		}
+		// the img's own surface must render the graphics protocol; resolve it
+		// across the page's portal transclusion (route content has no `ChildOf`
+		// path to the page root that carries the surface). A session whose terminal
+		// has no graphics keeps the `[image]: alt` marker.
+		let supported = surfaces
+			.surface_of(view.entity)
+			.and_then(|surface| support.get(surface).ok())
+			.is_some_and(|support| support.enabled);
+		if !supported {
 			continue;
 		}
 		let src = view.attribute_string("src");
@@ -433,17 +462,22 @@ impl KittyPlacements {
 /// only emitted when an image appears, moves, resizes, or disappears.
 #[cfg(feature = "tui")]
 pub(crate) fn place_kitty_images(
-	support: Res<KittyGraphicsSupport>,
 	mut placements: ResMut<KittyPlacements>,
-	mut terminals: Query<(Entity, &mut Terminal, &DoubleBuffer)>,
+	mut terminals: Query<(
+		Entity,
+		&mut Terminal,
+		&DoubleBuffer,
+		Option<&KittyGraphicsSupport>,
+	)>,
 	charcell: CharcellQuery,
 	tree: CharcellTree,
 	images: Query<&KittyImage>,
 ) -> Result {
-	if !support.enabled {
-		return Ok(());
-	}
-	for (root, mut terminal, buffer) in terminals.iter_mut() {
+	for (root, mut terminal, buffer, support) in terminals.iter_mut() {
+		// only place into a surface whose terminal renders the graphics protocol.
+		if !support.is_some_and(|support| support.enabled) {
+			continue;
+		}
 		let viewport = buffer.size();
 		let state = placements.terminals.entry(root).or_default();
 		let writer = terminal.writer_mut();
@@ -650,7 +684,9 @@ mod test {
 	fn image_host(width: u32, height: u32) -> TestHost {
 		let mut host = TestHost::sized(UVec2::new(40, 14));
 		host.app
-			.insert_resource(KittyGraphicsSupport { enabled: true });
+			.world_mut()
+			.entity_mut(host.host)
+			.insert(KittyGraphicsSupport { enabled: true });
 		host.spawn_content(rsx! {
 			<div><img src="x.png" alt="a test image"/></div>
 		});
@@ -800,7 +836,9 @@ mod test {
 	fn unsupported_terminal_keeps_marker() {
 		let mut host = TestHost::sized(UVec2::new(40, 8));
 		host.app
-			.insert_resource(KittyGraphicsSupport { enabled: false });
+			.world_mut()
+			.entity_mut(host.host)
+			.insert(KittyGraphicsSupport { enabled: false });
 		host.spawn_content(rsx! {
 			<div><img src="missing.png" alt="fallback"/></div>
 		});
@@ -857,9 +895,12 @@ mod test {
 		// wide enough that the no-port message does not wrap mid-phrase.
 		let mut host = TestHost::sized(UVec2::new(80, 8));
 		// the fetch is queued async, so the host needs the async runtime.
-		host.app
-			.init_plugin::<AsyncPlugin>()
-			.insert_resource(KittyGraphicsSupport { enabled: true });
+		host.app.init_plugin::<AsyncPlugin>();
+		// the host is its own surface, so the img resolves its graphics support.
+		host.app.world_mut().entity_mut(host.host).insert((
+			KittyGraphicsSupport { enabled: true },
+			RenderSurface(host.host),
+		));
 		host.spawn_content(rsx! {
 			<div><img src=SHANTY_SRC alt="shanty"/></div>
 		});

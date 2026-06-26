@@ -144,6 +144,9 @@ pub fn all_rules() -> Vec<Rule> {
 		menu_button_visible(),
 		sidebar_link(),
 		sidebar_active(),
+		// keeps the active pill on hover (the dark-scheme hover state layer would
+		// otherwise clear it); higher specificity than the shared `:hover` layer.
+		sidebar_active_hover(),
 		sidebar_item(),
 		sidebar_label(),
 		// terminal padding-strip last so it wins the tie over both the web

@@ -446,6 +446,66 @@ mod test {
 			.xpect_contains("Beta page");
 	}
 
+	/// A document layout that transcludes the route content into its `<main>` slot
+	/// by reference (a [`Portal`]), the shape every live page has once wrapped in
+	/// [`BaseLayout`]. The chrome carries no link of its own.
+	#[template]
+	fn SlotLayout() -> impl Bundle {
+		rsx! { <body><main><Slot/></main></body> }
+	}
+
+	/// The first `<a>` element anywhere in the world (these tests spawn one link).
+	/// Unlike [`link_in`] it does not walk `Children`, so it finds a link inside
+	/// Portal-transcluded content that no `ChildOf` path reaches.
+	fn any_link(app: &mut App) -> Entity {
+		app.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(app.world())
+			.find(|(_, element)| element.tag() == "a")
+			.map(|(entity, _)| entity)
+			.expect("a link element exists")
+	}
+
+	/// Clicking a link inside Portal-transcluded layout content navigates. The
+	/// route content is layouted into the slot *by reference*, so the link has no
+	/// `ChildOf` path to the page root's [`RenderSurface`]; resolving the navigator
+	/// must cross the transclusion. Regression for the markdown-link bug — every
+	/// in-page link sat in such content, so a click resolved no surface and did
+	/// nothing, while the sidebar (a real `ChildOf` descendant of the page root)
+	/// worked.
+	#[beet_core::test]
+	async fn link_in_layouted_content_navigates() {
+		let mut app = nav_app();
+		let router = app
+			.world_mut()
+			.spawn((
+				Router,
+				BaseLayout::<SlotLayout>::default(),
+				children![
+					render_action::fixed_func_route("alpha", || {
+						rsx! { <p>"go "<a href="/beta">"to beta"</a>" now"</p> }
+					}),
+					render_action::fixed_func_route("beta", || {
+						rsx! { <p>"Beta page"</p> }
+					}),
+				],
+			))
+			.flush();
+		let host = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "alpha"),
+			))
+			.id();
+		drive_until(&mut app, host, "to beta");
+
+		// click the transcluded link (as the hit-test would, via PointerUp on it).
+		let link = any_link(&mut app);
+		app.world_mut().entity_mut(link).trigger(PointerUp::new(link));
+		drive_until(&mut app, host, "Beta page");
+	}
+
 	/// Whether `host`'s page slot has been bound to a page.
 	fn slot_bound(app: &App, host: Entity) -> bool {
 		page_slot_of(app.world(), host)

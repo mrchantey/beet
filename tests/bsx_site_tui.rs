@@ -48,8 +48,6 @@ impl SiteHost {
 			material::MaterialStylePlugin,
 		))
 		.insert_resource(pkg_config!());
-		// deterministic frames whatever terminal runs the tests: no kitty escapes.
-		app.insert_resource(KittyGraphicsSupport { enabled: false });
 
 		// the on-disk markup router, built into its own entity; the in-world
 		// navigator dispatches to it.
@@ -64,6 +62,9 @@ impl SiteHost {
 				terminal,
 				page_host(size),
 				Navigator::in_world(router, home),
+				// deterministic frames whatever terminal runs the tests: graphics off
+				// per surface, so no kitty escapes interleave with the painted cells.
+				KittyGraphicsSupport { enabled: false },
 			))
 			.id();
 		app.update();
@@ -200,5 +201,23 @@ async fn nav_link_click_navigates() {
 	let (col, row) = host.cell_of("counter");
 	host.click(col, row);
 	host.step_until("You have clicked 0 times.");
+	host.frame().xnot().xpect_contains("A site with no code");
+}
+
+/// Clicking an in-content link (not the sidebar chrome) navigates the TUI. The
+/// route content is layouted into the page by reference (a [`Portal`]), so the
+/// link has no `ChildOf` path to the page root's `RenderSurface`; resolving the
+/// navigator must cross the transclusion. Regression for the markdown-link bug:
+/// every in-page link did nothing (the click resolved no surface) while the
+/// sidebar — a real `ChildOf` descendant of the page root — worked.
+#[beet::test]
+async fn content_link_click_navigates() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
+	host.step_until("A site with no code");
+	// the hero's "Read the docs" link is an `<a href="/docs">` in the route
+	// content (not the layout chrome); clicking it navigates to the docs index.
+	let (col, row) = host.cell_of("Read the docs");
+	host.click(col, row);
+	host.step_until("from the entrypoint down");
 	host.frame().xnot().xpect_contains("A site with no code");
 }
