@@ -176,6 +176,10 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 
 	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
 	let bytes = store.get_media(&path).await?;
+	// carry the store onto the render root: the per-request tree is a detached root
+	// (below), so a render-time widget that reads a file (eg `<CodeSnippet src>`)
+	// resolves it by self-or-ancestor lookup rather than walking to the router.
+	let render_store = store.clone();
 
 	// parse into a fresh entity per request, never the route node itself. The route
 	// node is persistent and shared: it serves http alongside many live TUI surfaces
@@ -187,7 +191,7 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 	cx.caller
 		.world()
 		.with(move |world: &mut World| -> Result<PageRequest> {
-			let mut entity = world.spawn_empty();
+			let mut entity = world.spawn(render_store);
 			MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
 			// derive per-page metadata from the parsed frontmatter, if any, so the
 			// render context can expose this route's title/description/sidebar info.
