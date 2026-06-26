@@ -1,0 +1,16 @@
+<!--
+# State Machine - Graph Transitions
+
+A behavior tree flows through parent/child links; a state machine instead jumps
+between arbitrary entities. Each `{StateAction}` logs its entry, then jumps to
+its `{GoTo}` target; a state with no `{GoTo}` just passes. `bx:ref` + `$name`
+wire the jumps as forward references, so the graph reads top to bottom.
+
+    state1 -> transition -> state2
+
+    beet --main=examples/action/state_machine.bsx
+-->
+<Name("state1") {(StateAction, GoTo($transition), RunOnLoad)}>
+	<Name("transition") bx:ref="transition" {(StateAction, GoTo($state2))}/>
+	<Name("state2") bx:ref="state2" {StateAction}/>
+</Name>

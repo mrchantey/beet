@@ -604,6 +604,14 @@ fn resolve_entity_refs(
 			_ => {}
 		}
 	}
+	// a tag-position literal resolves its `$name` refs like a spread, so eg a
+	// `<GoTo($target)/>` field maps to the named entity.
+	if let Some(named) = &el.tag_literal {
+		collect_literal_entity_ref_names(
+			&DataLiteral::Enum(named.clone()),
+			&mut names,
+		);
+	}
 	for name in names {
 		// a reserved name never resolves through the `bx:ref` machinery: the
 		// build-time ones resolve from the build resources here, the lazy ones
@@ -809,8 +817,21 @@ fn build_uppercase(
 			apply_resource_tag(el, patch.as_ref(), &app_registry, cx)?;
 		}
 		UppercaseKind::Component => {
-			// a component: reflect-patch over default and insert.
-			insert_component(cx.entity, patch.as_ref(), &app_registry)?;
+			// a tag-position literal (`<Name("x")/>`, `<Log::Message("hi")/>`)
+			// builds the component from the literal, exactly as the `{..}` spread
+			// position does, instead of patching over `Default::default()`.
+			match &el.tag_literal {
+				Some(named) => apply_spread_named(
+					named,
+					cx.entity,
+					&app_registry,
+					&entity_refs,
+				)?,
+				// a bare/attribute component: reflect-patch over default and insert.
+				None => {
+					insert_component(cx.entity, patch.as_ref(), &app_registry)?
+				}
+			}
 			// a `<MyComponent value=@doc:path>` binding syncs the source field with
 			// the component field, both ways, via a reflect-field binding.
 			apply_component_field_bindings(el, cx.entity)?;
@@ -1459,7 +1480,13 @@ fn build_patch(
 		};
 		patch.insert_boxed(&attr.key, reflected);
 	}
-	patch.set_represented_type(Some(type_info));
+	// only a struct target can be represented by this `DynamicStruct`. A
+	// tuple-struct/enum target (a tag-position literal like `<Name("x")/>` or
+	// `<Log::Message("hi")/>`) builds from the literal instead, so this attribute
+	// patch is unused; setting its represented type to a non-struct would panic.
+	if struct_info.is_some() {
+		patch.set_represented_type(Some(type_info));
+	}
 	Ok(Box::new(patch))
 }
 
@@ -1644,9 +1671,52 @@ fn insert_component(
 				type_info.type_path()
 			)
 		})?;
+	// a `#[reflect(@RequiredField)]` field must be supplied by the patch, since the
+	// `from_reflect`-over-default fill would otherwise mask a missing one.
+	validate_required_fields(patch, type_info)?;
 	// `from_reflect` the partial patch over default, then insert. A `DynamicStruct`
 	// carrying only the provided fields fills the rest from the type's default.
 	reflect_component.insert(entity, patch, &registry);
+	Ok(())
+}
+
+/// Verify the patch supplies every `#[reflect(@RequiredField)]` field of its
+/// represented type, erroring with the offending type and field name. A
+/// `from_reflect`-over-default insert silently fills missing fields, so a
+/// required field is enforced here instead (the markup twin of a `#[template]`'s
+/// missing-required-prop check).
+fn validate_required_fields(
+	patch: &dyn bevy::reflect::PartialReflect,
+	type_info: &bevy::reflect::TypeInfo,
+) -> Result<()> {
+	use bevy::reflect::ReflectRef;
+	use bevy::reflect::TypeInfo;
+	let type_name = type_info.type_path_table().short_path();
+	match (type_info, patch.reflect_ref()) {
+		(TypeInfo::Struct(info), ReflectRef::Struct(patch)) => {
+			for field in info.iter() {
+				if field.has_attribute::<RequiredField>()
+					&& patch.field(field.name()).is_none()
+				{
+					bevybail!(
+						"{type_name}: missing required field '{}'",
+						field.name()
+					);
+				}
+			}
+		}
+		(TypeInfo::TupleStruct(info), ReflectRef::TupleStruct(patch)) => {
+			for index in 0..info.field_len() {
+				let required = info
+					.field_at(index)
+					.is_some_and(|field| field.has_attribute::<RequiredField>());
+				if required && patch.field(index).is_none() {
+					bevybail!("{type_name}: missing required field '{index}'");
+				}
+			}
+		}
+		_ => {}
+	}
 	Ok(())
 }
 

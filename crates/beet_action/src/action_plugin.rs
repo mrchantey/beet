@@ -21,6 +21,7 @@ impl Plugin for ActionPlugin {
 			.register_type::<ExcludeErrors>()
 			.register_type::<Sequence<(), ()>>()
 			.register_type::<InfallibleSequence<(), ()>>()
+			.register_type::<Fallback<(), ()>>()
 			.register_type::<Parallel<(), ()>>()
 			.register_type::<HighestScore<(), ()>>()
 			.register_type::<Score>()

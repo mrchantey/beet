@@ -1,0 +1,13 @@
+<!--
+# Long Running - Multi-Step Actions as Futures
+
+With async actions, "long running" is simply a future that takes a while to
+resolve. `<Patrol>` loops several times with a delay between steps, then a final
+log. `{RunOnLoad}` runs the sequence on load, then exits.
+
+    beet --main=examples/action/long_running.bsx
+-->
+<Sequence {RunOnLoad}>
+	<Patrol/>
+	<Log::Message("patrol complete")/>
+</Sequence>

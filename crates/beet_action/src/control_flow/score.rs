@@ -15,8 +15,9 @@ use beet_core::prelude::*;
 /// # let _ = score;
 /// ```
 #[derive(
-	Debug, Default, Copy, Clone, PartialEq, PartialOrd, Deref, Reflect,
+	Debug, Default, Copy, Clone, PartialEq, PartialOrd, Deref, Reflect, Component,
 )]
+#[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Score(pub f32);
 

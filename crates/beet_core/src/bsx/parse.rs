@@ -648,6 +648,11 @@ fn parse_element(
 	if tag.is_empty() {
 		bevybail!("expected a tag name after `<`");
 	}
+	// a tag-position component literal (`<Name("x")/>`, `<Log::Message("hi")/>`,
+	// `<Greet{name:"world"}/>`) parses with the same sub-parser as a `{..}` spread,
+	// building the component from the literal. The element's `tag` becomes the base
+	// segment so the registry classifies the component; the close tag matches it.
+	let (tag, tag_literal) = parse_tag_literal(cursor, tag, config)?;
 	let attributes = parse_attributes(cursor, config)?;
 	cursor.skip_ws();
 	let self_closing = cursor.eat("/>");
@@ -659,6 +664,7 @@ fn parse_element(
 	if self_closing || void {
 		return Ok(BsxNode::Element(BsxElement {
 			tag,
+			tag_literal,
 			attributes,
 			children: Vec::new(),
 			self_closing: true,
@@ -689,10 +695,39 @@ fn parse_element(
 
 	Ok(BsxNode::Element(BsxElement {
 		tag,
+		tag_literal,
 		attributes,
 		children,
 		self_closing: false,
 	}))
+}
+
+/// Detect and parse a tag-position component literal, returning the base
+/// component name and the literal. The `tag` was already read by the cursor; a
+/// literal is present when its first char is uppercase and either the tag is
+/// `::`-qualified (an enum variant, eg `Log::Message`) or the next char opens a
+/// tuple/struct body (`(`/`{`). The literal's fields parse via the shared
+/// [`parse_named_fields`]; the returned `tag` is the segment before `::` (so
+/// `Log::Message` classifies as `Log`, `Name` stays `Name`), and the close tag
+/// matches that base. Outside BSX mode (HTML), or for a plain tag, the tag is
+/// returned unchanged with no literal.
+fn parse_tag_literal(
+	cursor: &mut Cursor,
+	tag: String,
+	config: &BsxParseConfig,
+) -> Result<(String, Option<NamedLiteral>)> {
+	let uppercase = tag.starts_with(|ch: char| ch.is_uppercase());
+	let opens_fields = matches!(cursor.peek(), Some('(') | Some('{'));
+	if !config.bsx || !uppercase || !(tag.contains("::") || opens_fields) {
+		return Ok((tag, None));
+	}
+	let fields = parse_named_fields(cursor)?;
+	let base = tag.split("::").next().unwrap_or(&tag).to_string();
+	let literal = NamedLiteral {
+		name: tag.into(),
+		fields,
+	};
+	Ok((base, Some(literal)))
 }
 
 /// Parse the attribute list of an opening tag up to `>` or `/>`.
@@ -924,6 +959,46 @@ mod test {
 			panic!("expected p");
 		};
 		matches!(el.children[0], BsxNode::Expr(_)).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn tag_position_literal() {
+		// a tuple/struct/enum tag-position literal parses into `tag_literal`, with
+		// `tag` reduced to the base component name (the segment before `::`).
+		let element = |source: &str| -> BsxElement {
+			let nodes =
+				parse_document(source, &BsxParseConfig::bsx()).unwrap();
+			let BsxNode::Element(element) = nodes.into_iter().next().unwrap()
+			else {
+				panic!("expected an element");
+			};
+			element
+		};
+		// tuple form: base tag unchanged, literal carries the tuple field.
+		let name = element("<Name(\"x\")/>");
+		name.tag.clone().xpect_eq("Name".to_string());
+		let literal = name.tag_literal.clone().unwrap();
+		literal.name.as_str().xpect_eq("Name");
+		matches!(literal.fields, NamedFields::Tuple(_)).xpect_true();
+		// `::`-qualified enum variant: base tag is the segment before `::`.
+		let log = element("<Log::Message(\"hi\")/>");
+		log.tag.clone().xpect_eq("Log".to_string());
+		log.tag_literal.unwrap().name.as_str().xpect_eq("Log::Message");
+		// struct form.
+		let cfg = element("<Greet{name:\"world\"}/>");
+		cfg.tag.clone().xpect_eq("Greet".to_string());
+		matches!(
+			cfg.tag_literal.unwrap().fields,
+			NamedFields::Struct(_)
+		)
+		.xpect_true();
+		// a bare uppercase tag is not a literal, so children resolve as a component.
+		let bare = element("<Sequence>x</Sequence>");
+		bare.tag.clone().xpect_eq("Sequence".to_string());
+		bare.tag_literal.xpect_none();
+		// a lowercase or `path::to::X` tag is never a tag-position literal.
+		element("<div/>").tag_literal.xpect_none();
+		element("<path::to::X/>").tag_literal.xpect_none();
 	}
 
 	#[beet_core::test]

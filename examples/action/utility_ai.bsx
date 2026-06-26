@@ -1,0 +1,13 @@
+<!--
+# Utility AI - Score-Based Selection
+
+`<HighestScore>` is a selector: each child carries a fixed `{Score}` alongside
+its action. The selector scores every child, then runs only the highest-scoring
+one and returns its outcome. Here the 0.6 child wins over the 0.4 child.
+
+    beet --main=examples/action/utility_ai.bsx
+-->
+<HighestScore {RunOnLoad}>
+	<Log::Message("this child does not run") {Score(0.4)}/>
+	<Log::Message("this child runs") {Score(0.6)}/>
+</HighestScore>

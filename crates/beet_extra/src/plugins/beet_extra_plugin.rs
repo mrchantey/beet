@@ -17,6 +17,9 @@ pub struct BeetExtraPlugin;
 impl Plugin for BeetExtraPlugin {
 	#[allow(unused_variables)]
 	fn build(&self, app: &mut App) {
+		// the headless action examples (`examples/action/*.bsx`): example actions,
+		// components and templates. Only beet_action/beet_core, so always added.
+		app.add_plugins(crate::prelude::ActionExamplesPlugin);
 		// the spatial/steering/animation scenes + their 2d/3d systems.
 		#[cfg(feature = "bevy_default")]
 		app.add_plugins(crate::prelude::beet_extra_bevy_default_plugin);

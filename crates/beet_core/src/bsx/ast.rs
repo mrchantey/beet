@@ -29,8 +29,17 @@ pub enum BsxNode {
 /// An element: a tag, its attributes, and its children.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BsxElement {
-	/// The raw tag text, ie `div`, `MyTemplate`, `path::to::X`, `Slot`.
+	/// The raw tag text, ie `div`, `MyTemplate`, `path::to::X`, `Slot`. For a
+	/// tag-position literal (`<Name("x")/>`, `<Log::Message("hi")/>`) this is the
+	/// base component name (`Name`, `Log`), with the full literal in
+	/// [`tag_literal`](Self::tag_literal).
 	pub tag: String,
+	/// A tag-position component literal, ie `<Name("Malenia")/>`,
+	/// `<Log::Message("running")/>`, `<Greet{name:"world"}/>`. Resolved exactly
+	/// like the `{..}` spread position, building the component from the literal
+	/// rather than over `Default::default()`. `None` for a bare tag like
+	/// `<Sequence>`.
+	pub tag_literal: Option<NamedLiteral>,
 	/// The attributes in source order.
 	pub attributes: Vec<BsxAttribute>,
 	/// The child nodes in source order.

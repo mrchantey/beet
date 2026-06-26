@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 /// ```
 #[derive(Debug, Clone, Component, Reflect)]
 #[require(SucceedTimesAction<T>)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct SucceedTimes<T = ()>
 where
 	T: 'static + Send + Sync + Clone,

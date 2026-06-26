@@ -3,6 +3,12 @@
 mod beet_extra_plugin;
 pub use self::beet_extra_plugin::*;
 
+// the headless action examples (`examples/action/*.bsx`): the example actions,
+// components and templates. Only beet_action/beet_core, so always compiled and
+// added unconditionally by `BeetExtraPlugin`.
+mod action_examples;
+pub use self::action_examples::*;
+
 // the spatial/render example set: only compiled with the bevy render stack.
 #[cfg(feature = "bevy_default")]
 pub mod beet_extra_bevy_default_plugin;

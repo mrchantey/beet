@@ -1566,3 +1566,160 @@ fn parse_bsx_html(world: &mut World, bytes: &MediaBytes) -> Entity {
 		.unwrap();
 	entity.id()
 }
+
+// ---- tag-position literals --------------------------------------------------
+
+/// An enum component with a tuple variant, mirroring `beet_action`'s `Log`, so
+/// `<LogLike::Message("hi")/>` builds the variant from the tag-position literal.
+#[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
+#[reflect(Component, Default)]
+enum LogLike {
+	#[default]
+	Name,
+	Message(String),
+}
+
+/// A struct component, so `<SucceedTimesLike{max_times:2}/>` builds the field
+/// from the tag-position literal.
+#[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
+#[reflect(Component, Default)]
+struct SucceedTimesLike {
+	max_times: u32,
+}
+
+/// A bare marker component, used as a wrapping tag with children so the
+/// component path (not the slot path) builds them as real entity children.
+#[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
+#[reflect(Component, Default)]
+struct Holder;
+
+#[beet_core::test]
+fn tag_literal_name_coerces() {
+	// a tag-position tuple literal builds the component from its fields, and the
+	// string coerces into a real `Name` via `Name::new`.
+	let mut world = world();
+	register::<Name>(&mut world);
+	let root = spawn_bsx(&mut world, "<Name(\"greeter\")/>");
+	world
+		.entity(root)
+		.get::<Name>()
+		.unwrap()
+		.as_str()
+		.xpect_eq("greeter");
+}
+
+#[beet_core::test]
+fn tag_literal_enum_variant() {
+	// a `::`-qualified tag-position literal builds the enum variant, exactly as the
+	// `{Log::Message("..")}` spread does.
+	let mut world = world();
+	register::<LogLike>(&mut world);
+	let root = spawn_bsx(&mut world, "<LogLike::Message(\"hi\")/>");
+	world
+		.entity(root)
+		.get::<LogLike>()
+		.cloned()
+		.unwrap()
+		.xpect_eq(LogLike::Message("hi".to_string()));
+}
+
+#[beet_core::test]
+fn tag_literal_struct_sets_field() {
+	// a tag-position struct literal builds the component with its field set.
+	let mut world = world();
+	register::<SucceedTimesLike>(&mut world);
+	let root = spawn_bsx(&mut world, "<SucceedTimesLike{max_times:2}/>");
+	world
+		.entity(root)
+		.get::<SucceedTimesLike>()
+		.unwrap()
+		.max_times
+		.xpect_eq(2);
+}
+
+#[beet_core::test]
+fn bare_component_tag_keeps_children() {
+	// a bare uppercase component tag (no tag-position literal) builds its children
+	// as real entity children, not slot content, with no unconsumed-slot error.
+	let mut world = world();
+	register::<Holder>(&mut world);
+	let root = spawn_bsx(&mut world, "<Holder><span/><span/></Holder>");
+	world.entity(root).contains::<Holder>().xpect_true();
+	let children = world.entity(root).get::<Children>().unwrap();
+	children.len().xpect_eq(2);
+	world
+		.entity(children[0])
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("span");
+}
+
+#[beet_core::test]
+fn tag_literal_component_with_children() {
+	// a tag-position literal still builds children as entity children.
+	let mut world = world();
+	register::<Name>(&mut world);
+	let root = spawn_bsx(&mut world, "<Name(\"parent\")><span/></Name>");
+	world
+		.entity(root)
+		.get::<Name>()
+		.unwrap()
+		.as_str()
+		.xpect_eq("parent");
+	world.entity(root).get::<Children>().unwrap().len().xpect_eq(1);
+}
+
+#[beet_core::test]
+fn tag_literal_resolves_entity_ref() {
+	// a tag-position literal resolves a `$name` into an `Entity` field, the
+	// `<GoTo($target)/>` state-machine shape.
+	let mut world = world();
+	register::<Bound>(&mut world);
+	let root = spawn_bsx(
+		&mut world,
+		"<div><Bound($target)/><b bx:ref=\"target\"/></div>",
+	);
+	let children = world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.collect::<Vec<_>>();
+	let target = children[1];
+	world.entity(children[0]).get::<Bound>().unwrap().0.xpect_eq(target);
+}
+
+/// A component with a `#[reflect(@RequiredField)]` field, so the BSX loader errors
+/// when it is authored without it.
+#[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
+#[reflect(Component, Default)]
+struct NeedsField {
+	#[reflect(@RequiredField)]
+	required: u32,
+	optional: u32,
+}
+
+#[beet_core::test]
+fn required_field_missing_errors() {
+	// a missing `#[reflect(@RequiredField)]` field is a graceful build error,
+	// naming the type and field.
+	let mut world = world();
+	register::<NeedsField>(&mut world);
+	build_error(&mut world, "<NeedsField{optional:1}/>")
+		.xpect_contains("missing required field 'required'");
+}
+
+#[beet_core::test]
+fn required_field_present_succeeds() {
+	// the same component authored with its required field builds fine.
+	let mut world = world();
+	register::<NeedsField>(&mut world);
+	let root = spawn_bsx(&mut world, "<NeedsField{required:7}/>");
+	world
+		.entity(root)
+		.get::<NeedsField>()
+		.unwrap()
+		.required
+		.xpect_eq(7);
+}

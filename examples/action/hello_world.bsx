@@ -1,0 +1,10 @@
+<!--
+# Hello World - Entities as Functions
+
+`beet_action` lets an entity behave like a callable function. `<Greet>` carries
+a `name` field; `{RunOnLoad}` runs the entity's action once on load, which reads
+the name and prints the greeting, then exits.
+
+    beet --main=examples/action/hello_world.bsx
+-->
+<Greet{name:"world"} {RunOnLoad}/>

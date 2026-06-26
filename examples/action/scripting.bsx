@@ -1,0 +1,14 @@
+<!--
+# Scripting - User-Authored Behavior
+
+A `Script` turns an entity into a pure `Input -> Output` action whose body is
+JavaScript instead of compiled Rust. Each step below carries its source in a
+`script` attribute, so the behaviour is authored right in the markup: a numeric
+increment, then a string greeting. `{RunOnLoad}` runs the sequence on load.
+
+    beet --main=examples/action/scripting.bsx
+-->
+<Sequence {RunOnLoad}>
+	<NumberScript script="input + 1"/>
+	<TextScript script='"hello " + input'/>
+</Sequence>

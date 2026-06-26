@@ -85,6 +85,7 @@ fn parse_js_format(source: &str) -> Result<Vec<BsxNode>> {
 	};
 	vec![BsxNode::Element(BsxElement {
 		tag: "script".to_string(),
+		tag_literal: None,
 		attributes: Vec::new(),
 		children,
 		self_closing: false,

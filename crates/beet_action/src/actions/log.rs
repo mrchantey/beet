@@ -18,7 +18,7 @@ use beet_core::prelude::*;
 /// ```
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[require(LogAction)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub enum Log {
 	/// Log a fixed message.
 	Message(Cow<'static, str>),

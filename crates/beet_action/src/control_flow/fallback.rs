@@ -6,8 +6,9 @@ use beet_core::prelude::*;
 /// Runs child actions in order until one passes.
 /// Returns the first [`Outcome::Pass`] immediately, otherwise returns
 /// [`Outcome::Fail`] with the latest input after all children are tried.
-#[derive(Debug, Component)]
+#[derive(Debug, Component, Reflect)]
 #[require(FallbackAction<Input,Output>)]
+#[reflect(Component, Default)]
 pub struct Fallback<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
@@ -16,6 +17,7 @@ where
 	/// Which child errors to skip rather than propagate.
 	/// Defaults to [`ChildError::empty`].
 	exclude_errors: ChildError,
+	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 

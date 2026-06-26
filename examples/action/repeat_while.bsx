@@ -1,0 +1,17 @@
+<!--
+# Repeat While - Conditional Looping
+
+"Repeat while a condition holds" composes from existing pieces: `<Repeat>` calls
+its single child in a loop until it fails, and the child is a `<Sequence>` whose
+first node is the loop condition. `<SucceedTimes{max_times:2}>` passes twice then
+fails; when it fails the sequence fails, which stops the repeat. So the work runs
+exactly twice.
+
+    beet --main=examples/action/repeat_while.bsx
+-->
+<Repeat {RunOnLoad}>
+	<Sequence>
+		<SucceedTimes{max_times:2}/>
+		<Log::Message("doing work")/>
+	</Sequence>
+</Repeat>

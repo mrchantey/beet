@@ -51,6 +51,15 @@ pub fn literal_to_reflect(
 		option.set_represented_type(field_info);
 		return Ok(Box::new(option));
 	}
+	// a `Name` target builds via `Name::new` from its single string, whether
+	// authored as a bare scalar (`name: "x"`) or the tuple form (`<Name("x")/>`,
+	// `{Name("x")}`); its hashed inner field cannot be reflect-built field-by-field.
+	if let Some(info) = field_info
+		&& info.type_id() == TypeId::of::<Name>()
+		&& let Some(string) = name_literal_str(literal)
+	{
+		return scalar_to_reflect(&Value::Str(string.into()), field_info);
+	}
 	match literal {
 		DataLiteral::Scalar(value) => scalar_to_reflect(value, field_info),
 		DataLiteral::List(items) => {
@@ -86,6 +95,27 @@ fn option_some_inner(
 /// Whether a literal already names an `Option` variant (`Some`/`None`).
 fn is_option_literal(literal: &DataLiteral) -> bool {
 	matches!(literal, DataLiteral::Enum(named) if named.name == "Some" || named.name == "None")
+}
+
+/// The string a `Name` literal carries: a bare string scalar (`"x"`), or the
+/// single-string tuple form (`Name("x")`). `None` for any other shape, so it
+/// falls through to the ordinary path.
+fn name_literal_str(literal: &DataLiteral) -> Option<&str> {
+	match literal {
+		DataLiteral::Scalar(Value::Str(string)) => Some(string.as_str()),
+		DataLiteral::Enum(named) => match &named.fields {
+			NamedFields::Tuple(items) if items.len() == 1 => {
+				match &items[0] {
+					DataLiteral::Scalar(Value::Str(string)) => {
+						Some(string.as_str())
+					}
+					_ => None,
+				}
+			}
+			_ => None,
+		},
+		_ => None,
+	}
 }
 
 /// Look up a registered type's `'static` [`TypeInfo`] by short type path.
@@ -188,6 +218,27 @@ fn scalar_to_reflect(
 		&& opaque.type_id() == TypeId::of::<SmolStr>()
 	{
 		return Ok(Box::new(SmolStr::new(string)));
+	}
+
+	// a string targeting a `Cow<'static, str>` field coerces to an owned `Cow`, so
+	// a tuple/struct literal carrying a string (eg `<Log::Message("hi")/>`, whose
+	// variant field is `Cow<'static, str>`) reflect-applies instead of panicking on
+	// the `String`->`Cow` mismatch.
+	if let (Value::Str(string), Some(opaque)) = (value, field_info)
+		&& opaque.type_id() == TypeId::of::<alloc::borrow::Cow<'static, str>>()
+	{
+		return Ok(Box::new(alloc::borrow::Cow::<'static, str>::Owned(
+			string.to_string(),
+		)));
+	}
+
+	// a string targeting a `Name` coerces via `Name::new`, so `<Name("Malenia")/>`
+	// and a `name: "x"` field both reflect-construct a real `Name` (its hashed
+	// inner field cannot be built field-by-field from a plain string).
+	if let (Value::Str(string), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<Name>()
+	{
+		return Ok(Box::new(Name::new(string.to_string())));
 	}
 
 	// a string targeting a `SmolPath` field coerces to a logical path, so a markup
@@ -587,6 +638,17 @@ mod test {
 		)
 		.is_err()
 		.xpect_true();
+	}
+
+	/// A string coerces to a `Cow<'static, str>` field, so a tuple literal carrying
+	/// a string (eg `<Log::Message("hi")/>`, whose variant field is a `Cow`)
+	/// reflect-applies instead of panicking on the `String`->`Cow` mismatch.
+	#[beet_core::test]
+	fn coerces_to_cow_str() {
+		resolve::<alloc::borrow::Cow<'static, str>>(DataLiteral::Scalar(
+			Value::str("hi"),
+		))
+		.xpect_eq(alloc::borrow::Cow::Borrowed("hi"));
 	}
 
 	#[beet_core::test]

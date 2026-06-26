@@ -3,9 +3,9 @@ use beet_core::prelude::*;
 
 /// Utility AI selector, aka `UtilitySelector`.
 ///
-/// Each child carries a [`ScoreProvider`] alongside its action. This selector
-/// calls every provider, then runs the highest-scoring child and returns its
-/// [`Outcome`].
+/// Each child is scored via its [`ScoreProvider`], or a plain [`Score`]
+/// component used as a fixed value. This selector scores every child, then runs
+/// the highest-scoring one and returns its [`Outcome`].
 ///
 /// ## Example
 /// ```
@@ -46,12 +46,13 @@ impl HighestScore {
 	pub fn new() -> Self { Self::default() }
 }
 
-/// Scores every child via its [`ScoreProvider`], then runs the highest scorer.
+/// Scores every child via its [`ScoreProvider`] or fixed [`Score`], then runs
+/// the highest scorer.
 ///
 /// ## Errors
 ///
-/// Errors if the selector has no children, or a child lacks a
-/// [`ScoreProvider`].
+/// Errors if the selector has no children, or a child has neither a
+/// [`ScoreProvider`] nor a [`Score`].
 #[action(default)]
 #[derive(Component)]
 pub async fn HighestScoreAction<Input, Output>(
@@ -72,18 +73,27 @@ where
 
 	let mut best: Option<(Entity, f32)> = None;
 	for child in children {
-		let provider = world
+		// score via the child's provider if present, else a plain `Score`
+		// component used as a fixed value, else error.
+		let score = if let Ok(provider) = world
 			.entity(child)
 			.get_cloned::<ScoreProvider<Input>>()
 			.await
-			.map_err(|_| {
-				bevyhow!("HighestScore child {child:?} has no ScoreProvider")
-			})?;
-
-		let Score(score) = world
-			.entity(child)
-			.call_detached(provider.0, input.clone())
-			.await?;
+		{
+			let Score(score) = world
+				.entity(child)
+				.call_detached(provider.0, input.clone())
+				.await?;
+			score
+		} else if let Ok(score) =
+			world.entity(child).get(|score: &Score| score.0).await
+		{
+			score
+		} else {
+			bevybail!(
+				"HighestScore child {child:?} has no ScoreProvider or Score"
+			);
+		};
 
 		if best.map(|(_, best)| score > best).unwrap_or(true) {
 			best = Some((child, score));
@@ -131,6 +141,24 @@ mod tests {
 			.spawn((HighestScore::new(), children![
 				(ScoreProvider::<()>::fixed(Score::NEUTRAL), pass()),
 				(ScoreProvider::<()>::fixed(Score::PASS), fail()),
+			]))
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Fail(()));
+	}
+
+	#[beet_core::test]
+	async fn scores_plain_score_component() {
+		// children carry a fixed `Score` directly, no `ScoreProvider`; the
+		// 0.6 child wins and its action (Fail) runs over the 0.4 child (Pass).
+		fn fail() -> Action<(), Outcome<(), ()>> {
+			Action::new_pure(|_: ActionContext| Outcome::Fail(()).xok())
+		}
+		AsyncPlugin::world()
+			.spawn((HighestScore::new(), children![
+				(Score(0.4), pass()),
+				(Score(0.6), fail()),
 			]))
 			.call::<(), Outcome<(), ()>>(())
 			.await

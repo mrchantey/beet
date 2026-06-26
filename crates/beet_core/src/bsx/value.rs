@@ -380,8 +380,9 @@ fn parse_named_literal(cursor: &mut Cursor) -> Result<NamedLiteral> {
 }
 
 /// Parse the fields trailing a name: nothing (unit), `(..)` (tuple), or `{..}`
-/// (struct).
-fn parse_named_fields(cursor: &mut Cursor) -> Result<NamedFields> {
+/// (struct). Shared by spread/enum values and the tag-position literal parser
+/// (the tag name is read by the markup parser, the fields here).
+pub fn parse_named_fields(cursor: &mut Cursor) -> Result<NamedFields> {
 	match cursor.peek() {
 		Some('(') => {
 			cursor.bump();

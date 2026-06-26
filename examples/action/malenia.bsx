@@ -1,0 +1,30 @@
+<!--
+# Malenia - Behavior Tree + Utility AI
+
+A compact enemy AI mixing both paradigms. Malenia heals herself when low on
+health and holding potions, otherwise she attacks. Which attack she uses is
+chosen by utility AI scoring.
+
+    Repeat
+    + Fallback                 try each until one passes
+      + TryHealSelf            passes only if it could heal
+      + HighestScore           pick the best attack
+        + Waterfoul Dance      random score
+        + Scarlet Aeonia       low fixed score (a desperate move)
+
+The action tree is spawned under Malenia, so `AgentQuery` resolves her as the
+agent the attacks operate on. The `Elden Lord` player carries `{AttackTarget}` so
+the attacks resolve their target by query. The loop runs until someone falls.
+
+    beet --main=examples/action/malenia.bsx
+-->
+<Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, RunOnLoad)}>
+	<Fallback>
+		<TryHealSelf/>
+		<HighestScore>
+			<Name("Waterfoul Dance") {(AttackPlayer{max_damage:15.0,max_recoil:30.0}, RandomScore)}/>
+			<Name("Scarlet Aeonia") {(AttackPlayer{max_damage:10000.0,max_recoil:10.0}, Score(0.05))}/>
+		</HighestScore>
+	</Fallback>
+	<Name("Elden Lord") {(Health(100.0), AttackTarget)}/>
+</Name>

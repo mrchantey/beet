@@ -275,6 +275,7 @@ mod test {
 	fn element(attrs: &[(&str, AttrValue)]) -> BsxElement {
 		BsxElement {
 			tag: "Foo".into(),
+			tag_literal: None,
 			attributes: attrs
 				.iter()
 				.map(|(key, value)| BsxAttribute {

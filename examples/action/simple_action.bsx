@@ -1,0 +1,10 @@
+<!--
+# Simple Action - Writing Your Own Action
+
+A named entity carrying the `SayHello` action, which reads the caller entity's
+`Name` off the async world and greets it, then passes. `{RunOnLoad}` runs it on
+load, then exits.
+
+    beet --main=examples/action/simple_action.bsx
+-->
+<Name("greeter") {(SayHello, RunOnLoad)}/>

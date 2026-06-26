@@ -397,9 +397,10 @@ ssh_tui = ["ssh_server", "tui_server", "beet_router?/ssh"]
 
 
 # The agent-thread runtime. When `extra` is also on, forwards the example tool
-# wiring (`beet_extra/thread`, the `ThreadExamplesPlugin`) so `BeetExtraPlugin` adds
-# it; the `?` keeps it inert when `beet_extra` is not a dep.
-thread = ["dep:beet_thread","net","action","beet_extra?/thread"]
+# wiring (`beet_extra/thread`, the `ThreadExamplesPlugin`) plus the QuickJS scripting
+# example (`beet_extra/scripting`) so `BeetExtraPlugin` adds them; the `?` keeps them
+# inert when `beet_extra` is not a dep.
+thread = ["dep:beet_thread","net","action","beet_extra?/thread","beet_extra?/scripting"]
 
 
 # 💡 Stack

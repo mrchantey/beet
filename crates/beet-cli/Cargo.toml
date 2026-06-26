@@ -27,7 +27,8 @@ pdf = ["dep:lopdf"]
 # `beet` binary. Pulls `beet/ui` so `ThreadUiPlugin` (the `ThreadView` document
 # chain) and the charcell host are present; `beet/extra` adds `BeetExtraPlugin` and
 # `beet/thread` forwards `beet_extra/thread` (the `ThreadExamplesPlugin` runtime +
-# inline tool types) so the example `.bsx` tags resolve.
+# inline tool types) and `beet_extra/scripting` (the QuickJS scripting example) so
+# the example `.bsx` tags resolve.
 thread = ["beet/thread", "beet/ui", "beet/extra"]
 # The cloudflare/aws deploy examples, so one `beet` binary runs an infra deployer
 # `.bsx` (eg `examples/infra/hello_cloudflare_workers.bsx deploy`). Pulls

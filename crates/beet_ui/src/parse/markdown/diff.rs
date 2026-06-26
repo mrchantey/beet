@@ -240,6 +240,7 @@ fn html_node_to_bsx(node: &HtmlNode<'_>) -> Option<BsxNode> {
 			..
 		} => Some(BsxNode::Element(BsxElement {
 			tag: name.to_string(),
+			tag_literal: None,
 			attributes: attributes.clone(),
 			children: children.iter().filter_map(html_node_to_bsx).collect(),
 			self_closing: children.is_empty(),
