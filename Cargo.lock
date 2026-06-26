@@ -1457,6 +1457,7 @@ version = "0.0.9-dev.16"
 dependencies = [
  "beet_action",
  "beet_core",
+ "beet_infra",
  "beet_ml",
  "beet_net",
  "beet_router",

@@ -272,8 +272,10 @@ fn primitive_schema(type_path: &str) -> ValueSchema {
 	}
 	let short = type_path.rsplit("::").next().unwrap_or(type_path);
 	match short {
+		// `Duration` reflects as opaque but is authored as a unit-suffixed string
+		// (eg `"30s"`), coerced by `scalar_to_reflect`, so validate it as a string.
 		"String" | "str" | "char" | "PathBuf" | "OsString" | "SmolStr"
-		| "SmolPath" => ValueSchema::String(StringSchema::default()),
+		| "SmolPath" | "Duration" => ValueSchema::String(StringSchema::default()),
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
 			ValueSchema::U64(U64Schema::default())
 		}

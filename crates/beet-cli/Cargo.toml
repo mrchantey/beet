@@ -29,14 +29,22 @@ extra = ["dep:beet_extra"]
 # `<Thread>` chat (eg `examples/thread/chat.bsx`) loads and runs through the one
 # `beet` binary. Pulls `beet/ui` so `ThreadUiPlugin` (the `ThreadView` document
 # chain) and the charcell host are present; `beet_extra/thread` carries the
-# `ThreadExamplesPlugin` (runtime + inline tool types), added via `BeetExamplePlugins`
+# `ThreadExamplesPlugin` (runtime + inline tool types), added via `BeetExtraPlugins`
 # so the example `.bsx` tags resolve.
 thread = ["beet/thread", "beet/ui", "extra", "beet_extra/thread"]
+# The cloudflare/aws deploy examples, so one `beet` binary runs an infra deployer
+# `.bsx` (eg `examples/infra/hello_cloudflare_workers.bsx deploy`). Pulls
+# `beet/cloudflare_block` (the deploy blocks + route actions) and `beet_extra/infra`
+# (`InfraExamplesPlugin`, the type/template registrations), added via
+# `BeetExtraPlugins` so the example `.bsx` tags resolve. Opt-in (like `winit`), so a
+# plain `beet serve` never links the deploy machinery. Run with:
+# `cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_workers.bsx deploy`.
+infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "extra", "beet_extra/infra"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
 # `beet/examples` (winit + bevy_default + spatial) and the local `beet_extra`
 # (`bevy_default`) for the example component types + scene templates that
-# `BeetExamplePlugins` registers. The binary owns the window lifecycle + screenshot
+# `BeetExtraPlugins` registers. The binary owns the window lifecycle + screenshot
 # harness here (`render_window_plugin`, in `src/render.rs`), so this feature also
 # gates that module. Opt-in, so deploy/headless builds never link wgpu. The ml stack
 # (burn + the shared wgpu device) is split into the `ml` feature, so a windowed
@@ -125,7 +133,7 @@ lopdf = { version = "0.36", optional = true }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }
 # the thread example tools (`ThreadExamplesPlugin` + inline tool types), added via
-# `BeetExamplePlugins`; only pulled in with the `extra`/`thread`/`winit` features.
+# `BeetExtraPlugins`; only pulled in with the `extra`/`thread`/`winit` features.
 beet_extra = { workspace = true, optional = true }
 
 # the wasm target's extra deps. The portable render router rides every wasm build

@@ -16,7 +16,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Configuration for deploying the native `beet` binary to Cloudflare Containers.
-#[derive(Debug, Clone, Get, SetWith, Component)]
+#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
 pub struct CloudflareContainerBlock {
 	/// Worker + container name; the deployed host is
 	/// `<name>.<account-subdomain>.workers.dev`.

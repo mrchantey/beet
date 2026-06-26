@@ -1,0 +1,41 @@
+<!--
+# Hello Cloudflare Containers
+
+Deploys `examples/bsx_site` to Cloudflare Containers: the SAME native `beet` binary
+as `hello_fargate`, run in a container that reads the site from R2 at request time
+via `S3Store::r2`. Served on `<name>.workers.dev` (no custom domain). Toggling
+between this and the wasm Worker (`hello_cloudflare_workers.bsx`) is a small swap:
+
+- block: `CloudflareContainerBlock` <-> `CloudflareWorkerBlock`
+- build: a `<BeetBinaryBuild/>` (native binary baked into the image) vs none (the
+  Worker IS `beet-cli` wasm, built by `worker-build` on deploy)
+- deploy: `<CloudflareContainerDeploy/>` (+ wrangler) <-> `<CloudflareWorkerDeploy/>`
+
+The served content and the deploy/sync/destroy route shape are identical.
+
+## Usage
+
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_containers.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_containers.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_containers.bsx destroy
+
+Live deploy needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the R2
+data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
+`wrangler` and a container engine. The Workers Paid plan is required for Containers.
+-->
+<Router {(CliServer, RequestLogger, BootOnLoad)}>
+	<div {(RoutePath("deploy"), ExchangeSequence)}>
+		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site"/>
+		<!-- build the native binary, then the deploy bakes it into the image -->
+		<BeetBinaryBuild features="aws_sdk"/>
+		<CloudflareContainerDeploy/>
+		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
+		<CloudflareWatch name="beet-hello-container"/>
+	</div>
+	<div {(RoutePath("sync"), ExchangeSequence)}>
+		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
+	</div>
+	<div {(RoutePath("destroy"), ExchangeSequence)}>
+		<CloudflareDestroy name="beet-hello-container" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
+	</div>
+</Router>

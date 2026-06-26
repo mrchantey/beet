@@ -15,7 +15,8 @@ use beet_core::prelude::*;
 pub const WORKER_R2_BINDING: &str = "SITE_BUCKET";
 
 /// Configuration for deploying `beet-cli` (wasm) to a Cloudflare Worker.
-#[derive(Debug, Clone, Get, SetWith, Component)]
+#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
 pub struct CloudflareWorkerBlock {
 	/// Worker name; the deployed host is
 	/// `<name>.<account-subdomain>.workers.dev`.

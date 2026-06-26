@@ -2,12 +2,36 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Exchange control-flow that runs each child sequentially.
-/// Returns [`Response::ok`] if all children pass, or the first
-/// [`Fail`] response. Errors are converted to a response.
-pub fn exchange_sequence() -> impl Bundle {
+/// Marker that makes an entity a sequenced exchange: its `Action<Request, Response>`
+/// runs each child action in order, returning [`Response::ok`] if all pass or the
+/// first [`Fail`] response (errors convert to a response). A child without a matching
+/// action (eg a config-only block) is skipped via the required [`ExcludeErrors`].
+///
+/// The markup-spreadable form of [`exchange_sequence`]: spread on a routed element so
+/// its child actions run as one route. Pair it with [`RoutePath`] for the path, since
+/// the [`Route`] template slots its children one level down (under a fragment) but a
+/// sequence reads its *direct* children:
+///
+/// ```bsx
+/// <div {(RoutePath("deploy"), ExchangeSequence)}>
+///   <MyConfigBlock/>
+///   <MyDeployAction/>
+/// </div>
+/// ```
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+#[require(
+	ExcludeErrors = ExcludeErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
+	Action<Request, Response> = exchange_sequence_action(),
+)]
+pub struct ExchangeSequence;
+
+/// The `Action<Request, Response>` behind [`ExchangeSequence`] and
+/// [`exchange_sequence`]: runs the entity's children as a [`SequenceAction`],
+/// mapping its outcome to a response.
+fn exchange_sequence_action() -> Action<Request, Response> {
 	let sequence = SequenceAction::<Request, Response>::default().into_action();
-	let action = Action::<Request, Response>::new_async(
+	Action::<Request, Response>::new_async(
 		async move |cx: ActionContext<Request>| -> Response {
 			match cx.caller.call_detached(sequence, cx.input).await {
 				Ok(Pass(_req)) => Response::ok(),
@@ -16,10 +40,6 @@ pub fn exchange_sequence() -> impl Bundle {
 				Err(err) => err.into_response(),
 			}
 		},
-	);
-	(
-		ExcludeErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
-		action,
 	)
 }
 

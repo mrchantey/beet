@@ -1,0 +1,37 @@
+<!--
+# Hello Lightsail
+
+Deploys `examples/bsx_site` as an http-only Lightsail instance. The generic `beet`
+binary runs under systemd and reads the site from an S3 bucket at request time
+(`BEET_SERVICE_ACCESS=remote` + `BEET_SITE_BUCKET`), so a site change re-publishes by
+re-running `sync` with no redeploy. Served on the instance's public address.
+
+This is `hello_lambda` with the block swapped for a long-running VM: the deploy/sync/
+watch shape and the served content are identical (see `crates/beet_extra/src/infra`).
+
+## Usage
+
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lightsail.bsx validate
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lightsail.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lightsail.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lightsail.bsx watch
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lightsail.bsx destroy --force
+
+Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
+-->
+<StackHost app_name="hello_lightsail">
+	<div {(RoutePath("deploy"), ExchangeSequence)}>
+		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+		<LightsailSiteBlock app_name="hello_lightsail" features="aws_sdk"/>
+		<SiteBucket/>
+		<TofuApply/>
+		<SiteSync app_name="hello_lightsail"/>
+		<LightsailWatch app_name="hello_lightsail" timeout="30s"/>
+	</div>
+	<div {(RoutePath("sync"), ExchangeSequence)}>
+		<SiteSync app_name="hello_lightsail"/>
+	</div>
+	<div {(RoutePath("watch"), ExchangeSequence)}>
+		<LightsailWatch app_name="hello_lightsail"/>
+	</div>
+</StackHost>

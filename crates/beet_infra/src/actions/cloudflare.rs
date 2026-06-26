@@ -395,7 +395,8 @@ fn write_worker_wrangler(
 /// directory and runs `wrangler r2 object put` per file (using the API token, so
 /// no R2 S3 keys are needed for the sync itself). Read by
 /// [`CloudflareR2SyncAction`].
-#[derive(Debug, Clone, Get, SetWith, Component)]
+#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
 #[require(CloudflareR2SyncAction)]
 pub struct CloudflareR2Sync {
 	/// Local directory to publish (workspace-relative), eg `examples/bsx_site`.
@@ -460,7 +461,8 @@ pub async fn CloudflareR2SyncAction(
 /// Polls a deployed Worker for readiness (the deploy + rollout is near-instant on
 /// Cloudflare, unlike an ECS rollout). Reads the host (`<name>.workers.dev`) it
 /// was constructed with.
-#[derive(Debug, Clone, Get, SetWith, Component)]
+#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
 #[require(CloudflareWatchAction)]
 pub struct CloudflareWatch {
 	/// Worker name, used to list deployments and (optionally) poll the host.
@@ -504,7 +506,8 @@ pub async fn CloudflareWatchAction(
 /// Tears down a Cloudflare deploy: deletes the Worker and its R2 bucket. Reads
 /// the sibling block (container or worker) for the names; mandatory for the
 /// teardown gate.
-#[derive(Debug, Clone, Get, SetWith, Component)]
+#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
 #[require(CloudflareDestroyAction)]
 pub struct CloudflareDestroy {
 	/// Worker name to delete.

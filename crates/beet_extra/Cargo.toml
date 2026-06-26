@@ -38,6 +38,12 @@ json = ["serde", "beet_core/json", "beet_action/json", "beet_net?/json", "beet_r
 # router/net surface the route registration expands to, and `json` for the tool
 # schemas' serde derives (which `json` forwards to `beet_action/json`).
 thread = ["json", "dep:beet_thread", "dep:beet_net", "dep:beet_router"]
+# The cloudflare/aws deploy example wiring (`InfraExamplesPlugin`): the deploy
+# block/config types + the standalone deploy-action templates, so the `beet`
+# binary runs `examples/infra/*.bsx`. Headless (no render), so independent of
+# `bevy_default`. Pulls `beet_infra` with its `cloudflare_block` blocks + the
+# `deploy` route actions.
+infra = ["dep:beet_infra", "beet_infra/cloudflare_block", "beet_infra/deploy", "beet_infra/lambda_block", "beet_infra/lightsail_block", "beet_infra/fargate_block", "beet_infra/aws_sdk", "json", "dep:beet_net", "beet_net/server", "beet_net/fs", "beet_net/aws_sdk", "dep:beet_router", "beet_router/std", "beet_router/native"]
 
 [dependencies]
 beet_action = { workspace = true, features = ["std", "reflect"] }
@@ -47,6 +53,7 @@ beet_core = { workspace = true, features = ["std", "rand", "bevy_keyboard", "rsx
 beet_thread = { workspace = true, features = ["ui"], optional = true }
 beet_net = { workspace = true, features = ["std", "serde", "json"], optional = true }
 beet_router = { workspace = true, features = ["json"], optional = true }
+beet_infra = { workspace = true, optional = true }
 
 
 serde = { workspace = true, optional = true }

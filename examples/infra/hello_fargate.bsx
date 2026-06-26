@@ -1,0 +1,43 @@
+<!--
+# Hello Fargate
+
+Deploys `examples/bsx_site` as an http-only Fargate service. The generic `beet`
+binary runs in the container (`beet serve --server=http`) and reads the site from an
+S3 bucket at request time (`BEET_SERVICE_ACCESS=remote` + `BEET_SITE_BUCKET`), so a
+site change re-publishes by re-running `sync` with no image rebuild. The ALB serves
+http on its own DNS name (no custom domain).
+
+Unlike the lambda/lightsail blocks (whose binary rides the S3 artifact ledger, so the
+block + build share one entity), fargate bakes the binary into a container image:
+`<BeetBinaryBuild/>` and `<DockerImageBuild/>` are separate steps, the image build
+reading the freshly built binary.
+
+## Usage
+
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx validate
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx watch
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx destroy --force
+
+Live deploy needs AWS credentials in the environment, plus `tofu`, `cargo-zigbuild`
+and a container engine.
+-->
+<StackHost app_name="hello_fargate">
+	<div {(RoutePath("deploy"), ExchangeSequence)}>
+		<FargateSiteBlock app_name="hello_fargate"/>
+		<SiteBucket/>
+		<BeetBinaryBuild features="aws_sdk"/>
+		<TofuApply/>
+		<!-- bake the freshly built binary into the container image -->
+		<DockerImageBuild/>
+		<SiteSync app_name="hello_fargate"/>
+		<FargateWatch app_name="hello_fargate" timeout="300s"/>
+	</div>
+	<div {(RoutePath("sync"), ExchangeSequence)}>
+		<SiteSync app_name="hello_fargate"/>
+	</div>
+	<div {(RoutePath("watch"), ExchangeSequence)}>
+		<FargateWatch app_name="hello_fargate"/>
+	</div>
+</StackHost>

@@ -4,6 +4,10 @@ beet_core::test_main!();
 
 #[cfg(feature = "bevy_default")]
 pub mod components;
+// the cloudflare/aws deploy example wiring, so an `examples/infra/hello_*.bsx`
+// runs through the one `beet` binary (headless, no render).
+#[cfg(feature = "infra")]
+pub mod infra;
 // always compiled: `BeetExtraPlugins` selects its members by feature flag, so
 // the thread-only (`thread`, no `bevy_default`) build still gets the group.
 pub mod plugins;
@@ -13,6 +17,8 @@ pub mod scenes;
 pub mod prelude {
 	#[cfg(feature = "bevy_default")]
 	pub use crate::components::*;
+	#[cfg(feature = "infra")]
+	pub use crate::infra::*;
 	pub use crate::plugins::*;
 	// the markup scene templates (`<Lighting3d/>`, `<Ground3d/>`, `<Sprite2d/>`, ...),
 	// so a `.bsx` names them and `beet_extra_plugin` registers them by short type path.

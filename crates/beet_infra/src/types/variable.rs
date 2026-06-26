@@ -5,14 +5,14 @@ use beet_net::prelude::*;
 /// A variable to be passed to tofu commands, commonly used
 /// for inserting application-specific environment variables in runtimes,
 /// catching missing variables before deploy.
-#[derive(Debug, Clone, Get, Serialize, Deserialize)]
+#[derive(Debug, Clone, Get, Serialize, Deserialize, Reflect)]
 pub struct Variable {
 	key: SmolStr,
 	value: VariableValue,
 }
 
 /// How a [`Variable`] value is resolved at deploy time.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
 pub enum VariableValue {
 	/// A fixed literal value.
 	Fixed(SmolStr),

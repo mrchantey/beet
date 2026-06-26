@@ -39,6 +39,12 @@ impl PluginGroup for BeetExtraPlugins {
 		{
 			builder = builder.add(crate::prelude::AgentExamplesPlugin);
 		}
+		// the cloudflare/aws deploy example types, so an `examples/infra/*.bsx`
+		// deployer runs through the one binary (headless, no render).
+		#[cfg(feature = "infra")]
+		{
+			builder = builder.add(crate::prelude::InfraExamplesPlugin);
+		}
 		builder
 	}
 }

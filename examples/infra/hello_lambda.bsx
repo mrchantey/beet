@@ -1,0 +1,43 @@
+<!--
+# Hello Lambda
+
+Deploys `examples/bsx_site` as an http-only AWS Lambda (behind an API Gateway URL,
+no custom domain). The generic `beet` binary is packaged as a `provided.al2023`
+function and reads the site from an S3 bucket at request time
+(`BEET_SERVICE_ACCESS=remote` + `BEET_SITE_BUCKET`), so a site change re-publishes
+by re-running `sync` with no redeploy.
+
+## Usage
+
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx validate
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx watch
+    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx destroy --force
+
+`<StackHost>` is the IaC deployer host: a `Stack` (resolved by the blocks + verbs by
+ancestry), a one-shot `CliServer` with `BootOnLoad` (the CLI request fires on load
+and the matching verb runs), and the standard IaC verb routes
+(validate/plan/apply/...). Each verb below is a child-sequenced route: a plain element
+spreading `{(RoutePath(..), ExchangeSequence)}` so its block and actions run in order.
+
+Live deploy needs AWS credentials in the environment, plus `tofu`,
+`cargo-zigbuild` and `zip`.
+-->
+<StackHost app_name="hello_lambda">
+	<div {(RoutePath("deploy"), ExchangeSequence)}>
+		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+		<LambdaSiteBlock app_name="hello_lambda" features="lambda,aws_sdk"/>
+		<SiteBucket/>
+		<TofuApply/>
+		<SiteSync app_name="hello_lambda"/>
+		<!-- the rollout is quick, so tail briefly then exit -->
+		<LambdaWatch app_name="hello_lambda" timeout="30s"/>
+	</div>
+	<div {(RoutePath("sync"), ExchangeSequence)}>
+		<SiteSync app_name="hello_lambda"/>
+	</div>
+	<div {(RoutePath("watch"), ExchangeSequence)}>
+		<LambdaWatch app_name="hello_lambda"/>
+	</div>
+</StackHost>
