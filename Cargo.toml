@@ -510,9 +510,6 @@ beet = { path = ".", features = ["fs"] }
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_error_panic_hook.workspace = true
 web-sys.workspace = true
-# js-sys.workspace = true
-# wasm-bindgen.workspace = true
-# wasm-bindgen-futures.workspace = true
 
 # 💡 Examples - Net
 
@@ -639,15 +636,6 @@ name = "router_serde"
 path = "examples/router/router_serde.rs"
 required-features = ["router", "rhai_serde", "template_serde"]
 
-# 💡 Examples - Thread
-#
-# The thread examples are no-code `.bsx` scenes, run through the one `beet`
-# binary rather than as per-example `cargo` binaries:
-#
-#     beet --main=examples/thread/chat.bsx
-#
-# See `examples/thread/*.bsx`. Their reduction is guarded by `tests/thread_scenes.rs`.
-
 
 # 💡 Examples - infra
 
@@ -713,61 +701,6 @@ name = "malenia"
 path = "examples/action/malenia.rs"
 required-features = ["action", "rand"]
 
-# [[example]]
-# name = "app_ml"
-# path = "examples/app_ml.rs"
-
-# [[example]]
-# name = "app"
-# path = "examples/app.rs"
-
-# [[package.metadata.scene]]
-# name = "hello-ml"
-# description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
-# path = "scenes/hello-ml.json"
-# include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
-
-# 💡 Examples - Spatial
-
-# Too big, we need to handle for loops in scene files
-# [[package.metadata.scene]]
-# name = "flock"
-# description = "Demonstration of flocking behaviors."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
-# app = "app"
-# path = "scenes/flock.json"
-# include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
-
-# [[package.metadata.scene]]
-# name = "hello-animation"
-# description = "A simple behavior demonstrating animation control."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
-# app = "app"
-# path = "scenes/hello-animation.json"
-# include = [
-# 	"bevyhub/ui-terminal",
-# 	"bevyhub/lighting-3d",
-# 	"bevyhub/ground-3d",
-# 	"beet-debug",
-# ]
-
-# [[package.metadata.scene]]
-# name = "seek"
-# description = "Demonstration of the seek behavior."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek.png"
-# app = "app"
-# path = "scenes/seek.json"
-# include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
-
-# [[package.metadata.scene]]
-# name = "seek-3d"
-# description = "A 3D demonstration of the seek behavior."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek-3d.png"
-# app = "app"
-# path = "scenes/seek-3d.json"
-# include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
-
 # 💡 Benches
 
 [[test]]
@@ -815,13 +748,6 @@ harness = false
 name = "server_bench"
 path = "tests/benches/beet_net/server_bench.rs"
 harness = false
-# required-features = ["server_app"]
-
-# [[bench]]
-# name = "router_bench"
-# path = "tests/benches/beet_router/router_bench.rs"
-# harness = false
-# required-features = ["server_app"]
 
 [[bench]]
 name = "bench_observer_global"
