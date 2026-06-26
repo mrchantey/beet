@@ -61,7 +61,9 @@ fn site_server() -> impl beet::prelude::Bundle {
 	any(feature = "cli", not(feature = "web")),
 	not(feature = "tui")
 ))]
-fn site_server() -> impl beet::prelude::Bundle { beet::prelude::CliServer }
+fn site_server() -> impl beet::prelude::Bundle {
+	beet::prelude::CliServer::default()
+}
 
 #[cfg(not(any(feature = "codegen", feature = "render")))]
 fn main() {

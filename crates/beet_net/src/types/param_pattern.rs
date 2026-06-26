@@ -149,8 +149,12 @@ pub struct ParamMeta {
 	/// The kebab-case key of the route param, ie the `foo-bar` in `--foo-bar=3`.
 	/// Automatically converted from snake_case field names (e.g., `help_format` → `help-format`).
 	key: String,
-	/// The kind of param value
+	/// The param value arity (flag / single / multiple).
 	value: ParamValue,
+	/// The concrete Rust type the param parses into, eg `alloc::string::String`,
+	/// with any `Option<..>` wrapper stripped (its optionality is conveyed by
+	/// [`required`](Self::required)). This is the param's displayed `kind`.
+	type_path: String,
 	/// Additional details for the param
 	options: ParamOptions,
 	/// Whether specifying the param is required, usually inferred
@@ -168,7 +172,7 @@ impl core::fmt::Display for ParamMeta {
 			f,
 			", required: {}, kind: {}",
 			self.is_required(),
-			self.value
+			self.type_path
 		)?;
 		if let Some(desc) = self.description() {
 			write!(f, ", description: {}", desc)?;
@@ -178,9 +182,11 @@ impl core::fmt::Display for ParamMeta {
 }
 
 impl ParamMeta {
-	/// Creates a new `ParamMeta` with the given name and value type.
+	/// Creates a new `ParamMeta` with the given name and value arity, deriving a
+	/// representative concrete type for the arity (no reflected field to read).
 	pub fn new(name: impl Into<String>, value: ParamValue) -> Self {
 		Self {
+			type_path: value.placeholder_type_path().to_string(),
 			value,
 			key: name.into(),
 			options: default(),
@@ -190,17 +196,19 @@ impl ParamMeta {
 
 	/// Creates a `ParamMeta` from a reflected struct field.
 	pub fn from_field(field: &bevy::reflect::NamedField) -> Self {
-		let value = ParamValue::from_type_path(field.type_path());
+		let type_path = field.type_path();
+		let value = ParamValue::from_type_path(type_path);
 		let required = match value {
 			ParamValue::Single => {
-				!field.type_path().starts_with("core::option::Option<")
+				!type_path.starts_with("core::option::Option<")
 			}
 			_ => false,
 		};
 
 		Self {
 			key: field.name().to_kebab_case(),
-			value: ParamValue::from_type_path(field.type_path()),
+			value,
+			type_path: kind_from_type_path(type_path),
 			options: ParamOptions::from_reflect(field),
 			required,
 		}
@@ -208,6 +216,11 @@ impl ParamMeta {
 
 	/// The name of the param
 	pub fn name(&self) -> &str { &self.key }
+
+	/// The concrete Rust type the param parses into, the displayed `kind`
+	/// (an `Option<..>` wrapper is stripped, its optionality given by
+	/// [`is_required`](Self::is_required)).
+	pub fn type_path(&self) -> &str { &self.type_path }
 
 	/// The description of the param
 	pub fn description(&self) -> Option<&str> {
@@ -217,6 +230,12 @@ impl ParamMeta {
 	/// Marks this param as required.
 	pub fn required(mut self) -> Self {
 		self.required = true;
+		self
+	}
+
+	/// Sets the concrete type path shown as the param's `kind`.
+	pub fn with_type_path(mut self, type_path: impl Into<String>) -> Self {
+		self.type_path = type_path.into();
 		self
 	}
 
@@ -270,6 +289,26 @@ impl ParamValue {
 			_ => Self::Single,
 		}
 	}
+
+	/// A representative concrete type path for this arity, used when a
+	/// [`ParamMeta`] is built without a reflected field (eg [`ParamMeta::new`]).
+	fn placeholder_type_path(&self) -> &'static str {
+		match self {
+			Self::Flag => "bool",
+			Self::Single => "alloc::string::String",
+			Self::Multiple => "alloc::vec::Vec<alloc::string::String>",
+		}
+	}
+}
+
+/// The concrete type path shown as a param's `kind`, with a `core::option::Option<..>`
+/// wrapper stripped (its optionality is conveyed by the param's `required` flag).
+fn kind_from_type_path(type_path: &str) -> String {
+	type_path
+		.strip_prefix("core::option::Option<")
+		.and_then(|inner| inner.strip_suffix('>'))
+		.unwrap_or(type_path)
+		.to_string()
 }
 
 /// Additional options for parameter metadata.
@@ -332,6 +371,39 @@ impl ParamOptions {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// A reflected field's concrete type is captured as the param `kind`, with an
+	/// `Option<..>` wrapper stripped (the option drives `required`, not `kind`).
+	#[beet_core::test]
+	fn from_field_captures_concrete_type() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Params {
+			package: String,
+			out_dir: Option<String>,
+			release: bool,
+		}
+		let TypeInfo::Struct(info) = Params::type_info() else {
+			panic!("expected struct");
+		};
+		let by_name = |name: &str| {
+			ParamMeta::from_field(info.field(name).unwrap())
+		};
+		// a required `String` shows its concrete type, not the `single` arity
+		let package = by_name("package");
+		package.type_path().xpect_eq("alloc::string::String");
+		package.is_required().xpect_true();
+		// an `Option<String>` is not required and its `kind` strips the wrapper
+		let out_dir = by_name("out_dir");
+		out_dir.type_path().xpect_eq("alloc::string::String");
+		out_dir.is_required().xpect_false();
+		// a `bool` is a flag whose kind is `bool`
+		by_name("release").type_path().xpect_eq("bool");
+		// the Display form now carries the concrete type as `kind`
+		package
+			.to_string()
+			.xpect_contains("kind: alloc::string::String");
+	}
 
 	#[beet_core::test]
 	fn pattern_deduplication() {
@@ -435,14 +507,18 @@ mod test {
 
 		ParamsPartial::new::<MyParams>().xpect_eq(ParamsPartial {
 			items: vec![
-				ParamMeta::new("foo", ParamValue::Single).required(),
+				ParamMeta::new("foo", ParamValue::Single)
+					.with_type_path("u32")
+					.required(),
 				ParamMeta::new("bar", ParamValue::Single)
+					.with_type_path("alloc::string::String")
 					.with_description("all about 'bar'"),
 				ParamMeta::new("bazz", ParamValue::Multiple)
+					.with_type_path("alloc::vec::Vec<f64>")
 					.with_description("all about 'bazz'")
 					.with_short('b'),
 				// .required(),
-				ParamMeta::new("boo", ParamValue::Flag),
+				ParamMeta::new("boo", ParamValue::Flag).with_type_path("bool"),
 			],
 		});
 	}

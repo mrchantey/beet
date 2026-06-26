@@ -563,6 +563,24 @@ mod pipeline_tests {
 	}
 
 	#[beet_core::test]
+	fn unfilled_inline_slot_keeps_flow_inline() {
+		// a trailing `{Option::None}` lowers to an empty placeholder node; it must
+		// not break the paragraph's inline formatting context onto separate lines.
+		let trailing: Option<_> = None::<&str>.map(|ancestor: &str| {
+			rsx! { " more "<a href="/x">{ancestor}</a> }
+		});
+		FlexBuffer::render_oneshot_plain(
+			40,
+			rsx! { <p>"Route "<a href="/">"/"</a>" not found."{trailing}</p> },
+		)
+		.lines()
+		.map(|line| line.trim_end())
+		.filter(|line| !line.trim().is_empty())
+		.collect::<Vec<_>>()
+		.xpect_eq(vec!["Route / not found."]);
+	}
+
+	#[beet_core::test]
 	fn nested_emphasis_combines_bold_and_italic() {
 		// `<em><strong>` must resolve to both italic and bold via the
 		// independently-inheriting font-style and font-weight cascades.

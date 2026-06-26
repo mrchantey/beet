@@ -183,7 +183,8 @@ pub(crate) struct WrapperQuery<'w, 's> {
 		'w,
 		's,
 		(
-			&'static Children,
+			Option<&'static Children>,
+			Option<&'static Value>,
 			Option<&'static BoxStyle>,
 			Option<&'static VisualStyle>,
 		),
@@ -191,16 +192,42 @@ pub(crate) struct WrapperQuery<'w, 's> {
 	>,
 }
 
+/// How a tag-less child resolves into its parent's flow.
+pub(crate) enum FlowChild<'a> {
+	/// A real node (an element, a text leaf, or a hand-styled box): lays out as
+	/// itself.
+	Keep,
+	/// A transparent grouping wrapper: hoist its children into the parent's flow
+	/// in its place (eg a collected `{cells.collect()}` position).
+	Hoist(&'a Children),
+	/// An empty placeholder with nothing to paint (eg an unfilled `{Option::None}`
+	/// slot, a tag-less node with no children, value, or box): reserves no flow
+	/// slot, so it never breaks an inline formatting context.
+	Drop,
+}
+
 impl WrapperQuery<'_, '_> {
-	/// The children to hoist when `entity` is a transparent grouping wrapper, else
-	/// `None` (it is a real node and lays out as itself).
-	fn splice_children(&self, entity: Entity) -> Option<&Children> {
-		let (children, box_style, visual) = self.wrappers.get(entity).ok()?;
-		// transparent unless the node authored a box of its own: a non-default box
-		// model or a background fill both need the node's own painted rect.
-		(box_style.is_none_or(|style| *style == BoxStyle::default())
-			&& visual.is_none_or(|style| style.background.is_none()))
-		.then_some(children)
+	/// How `entity` participates in its parent's flow: kept as itself, hoisted as a
+	/// transparent wrapper, or dropped as an empty placeholder (see [`FlowChild`]).
+	fn resolve_flow(&self, entity: Entity) -> FlowChild<'_> {
+		// only a tag-less node can be transparent; an element always lays out as
+		// itself.
+		let Ok((children, value, box_style, visual)) =
+			self.wrappers.get(entity)
+		else {
+			return FlowChild::Keep;
+		};
+		// a text leaf (a `Value` with no tag) paints, and a hand-styled box (a
+		// non-default box model or a background) needs its own painted rect; both
+		// stay as real nodes.
+		let transparent = value.is_none()
+			&& box_style.is_none_or(|style| *style == BoxStyle::default())
+			&& visual.is_none_or(|style| style.background.is_none());
+		match (transparent, children) {
+			(false, _) => FlowChild::Keep,
+			(true, Some(children)) => FlowChild::Hoist(children),
+			(true, None) => FlowChild::Drop,
+		}
 	}
 }
 
@@ -242,16 +269,17 @@ impl CharcellTree<'_, '_> {
 	}
 
 	/// Resolve `child` into the flow, recursing through transparent wrappers so
-	/// their children take their place.
+	/// their children take their place and dropping empty placeholders.
 	fn push_flow_entity(&self, child: Entity, out: &mut Vec<Entity>) {
 		let child = self.resolve(child);
-		match self.wrappers.splice_children(child) {
-			Some(grandchildren) => {
+		match self.wrappers.resolve_flow(child) {
+			FlowChild::Keep => out.push(child),
+			FlowChild::Hoist(grandchildren) => {
 				for grandchild in grandchildren.iter() {
 					self.push_flow_entity(grandchild, out);
 				}
 			}
-			None => out.push(child),
+			FlowChild::Drop => {}
 		}
 	}
 
@@ -356,13 +384,14 @@ impl CharcellQuery<'_, '_> {
 		let entity = resolve_render_ref(&self.refs, entity);
 		// the wrapper is checked independently of `nodes`: it has no box, so it is
 		// never prepared into `nodes`, but its children must still be hoisted.
-		match self.wrappers.splice_children(entity) {
-			Some(children) => {
+		match self.wrappers.resolve_flow(entity) {
+			FlowChild::Keep => out.push(entity),
+			FlowChild::Hoist(children) => {
 				for child in children.iter() {
 					self.push_flow_entity(child, out);
 				}
 			}
-			None => out.push(entity),
+			FlowChild::Drop => {}
 		}
 	}
 

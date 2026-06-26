@@ -46,7 +46,7 @@ pub async fn HelpHandler(
 		)
 		.await??;
 
-	let root = spawn_route_list(&caller, None, entries).await?;
+	let root = spawn_route_list(&caller, &parts, None, entries).await?;
 	PageRoot::render(root, &caller, parts).await
 }
 
@@ -69,7 +69,9 @@ pub(crate) async fn ContextualNotFound(
 		)
 		.await??;
 
-	let root = spawn_route_list(&cx.caller, Some(notice), entries).await?;
+	let root =
+		spawn_route_list(&cx.caller, cx.input.parts(), Some(notice), entries)
+			.await?;
 	let mut response =
 		PageRoot::render(root, &cx.caller, cx.input.parts().clone()).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
@@ -94,8 +96,26 @@ pub struct RouteEntry {
 	pub href: String,
 	/// A kind tag rendered beside the path, eg `scene` or an HTTP method.
 	pub tag: Option<String>,
-	/// Detail rows (`label`, `value`): description, input/output types, params.
+	/// Detail rows (`label`, `value`): description, input/output types.
 	pub details: Vec<(String, String)>,
+	/// The route's params, rendered as a table beneath the details.
+	pub params: Vec<RouteParam>,
+}
+
+/// One row of a route's params table: a CLI flag / query param with its concrete
+/// type and whether it must be supplied.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+pub struct RouteParam {
+	/// The param name, eg `out-dir` in `--out-dir=…`.
+	pub name: String,
+	/// The concrete Rust type the param parses into, eg `alloc::string::String`.
+	pub kind: String,
+	/// Whether the param must be supplied.
+	pub required: bool,
+	/// A single-character short flag, if any (eg `r` for `-r`).
+	pub short: Option<String>,
+	/// The param description, if any.
+	pub description: Option<String>,
 }
 
 /// The help view: a material list of [`RouteEntry`] rows under an "Available
@@ -143,9 +163,15 @@ fn not_found_notice(notice: NotFoundNotice) -> impl Bundle {
 	}
 }
 
-/// One route row: the path heading with its kind tag, and a nested detail list.
+/// One route row: the path heading with its kind tag, a nested detail list, and
+/// (when the route takes params) a params table.
 fn route_entry_item(entry: RouteEntry) -> impl Bundle {
-	let RouteEntry { href, tag, details } = entry;
+	let RouteEntry {
+		href,
+		tag,
+		details,
+		params,
+	} = entry;
 	// the kind tag (eg `[scene]`/`[GET]`) folds into the heading text so the row
 	// stays a single link plus a flat detail list.
 	let tag = tag.map(|tag| format!(" [{tag}]")).unwrap_or_default();
@@ -160,33 +186,95 @@ fn route_entry_item(entry: RouteEntry) -> impl Bundle {
 			<a href=href.clone()>{href}</a>
 			{tag}
 			{(!details.is_empty()).then(|| rsx! { <ul>{details}</ul> })}
+			{(!params.is_empty()).then(|| params_table(params))}
 		</li>
 	}
 }
 
-/// Spawn the [`RouteList`] template as an ephemeral render root, returning its id.
+/// A route's params as a table: name (with any short flag), the concrete `kind`
+/// (Rust type), whether it is required, and a description column when any param
+/// carries one.
+fn params_table(params: Vec<RouteParam>) -> impl Bundle {
+	let with_desc = params.iter().any(|param| param.description.is_some());
+	let rows: Vec<_> = params
+		.into_iter()
+		.map(|param| {
+			let RouteParam {
+				name,
+				kind,
+				required,
+				short,
+				description,
+			} = param;
+			// fold a short flag into the name cell, eg `release (-r)`
+			let name = match short {
+				Some(short) => format!("{name} (-{short})"),
+				None => name,
+			};
+			let required = if required { "yes" } else { "no" };
+			let desc_cell = with_desc
+				.then(|| rsx! { <td>{description.unwrap_or_default()}</td> });
+			rsx! {
+				<tr>
+					<td>{name}</td>
+					<td>{kind}</td>
+					<td>{required.to_string()}</td>
+					{desc_cell}
+				</tr>
+			}
+		})
+		.collect();
+	let desc_header = with_desc.then(|| rsx! { <th>"description"</th> });
+	rsx! {
+		<table>
+			<thead>
+				<tr>
+					<th>"name"</th>
+					<th>"kind"</th>
+					<th>"required"</th>
+					{desc_header}
+				</tr>
+			</thead>
+			<tbody>{rows}</tbody>
+		</table>
+	}
+}
+
+/// Spawn the [`RouteList`] inside a themed page as an ephemeral render root,
+/// returning its id.
+///
+/// The `<RouteList>` card is wrapped in a [`page_classes`] root (`PAGE` plus the
+/// resolved color scheme) so a bare render with no host layout — the dev CLI
+/// `--help`, where the entry declares no `BsxLayout` — still paints a readable
+/// page (a dark surface with light text on the terminal) rather than the
+/// black-on-black light `:root` fallback. A site that renders the help through
+/// its own layout simply nests the same scheme, which resolves identically.
 ///
 /// Built through `spawn_template` so the widget's slots and lifecycle resolve,
 /// then marked a self-referential [`PageRoot`] so [`PageRoot::render`] walks
-/// it (wrapping it in the ancestor layout) and despawns it after rendering.
+/// it (wrapping it in any ancestor layout) and despawns it after rendering.
 async fn spawn_route_list(
 	caller: &AsyncEntity,
+	parts: &RequestParts,
 	notice: Option<NotFoundNotice>,
 	entries: Vec<RouteEntry>,
 ) -> Result<Entity> {
+	let parts = parts.clone();
 	caller
 		.world()
 		.with(move |world: &mut World| -> Result<Entity> {
 			// an `Option` prop takes the inner value at the call site (auto-`Some`)
 			// or is omitted (defaults to `None`); branch on the notice rather than
 			// passing the `Option` through.
-			let snippet = match notice {
+			let list = match notice {
 				Some(notice) => {
 					rsx! { <RouteList notice=notice entries=entries/> }
 				}
 				None => rsx! { <RouteList entries=entries/> },
 			};
-			let mut entity = world.spawn_template(snippet)?;
+			let page = page_classes(&parts, &world.resource::<Theme>().clone());
+			let mut entity =
+				world.spawn_template(rsx! { <div {page}>{list}</div> })?;
 			let id = entity.id();
 			PageRoot::insert(&mut entity, vec![id]);
 			id.xok()
@@ -229,14 +317,23 @@ fn route_entry(node: &ActionNode) -> RouteEntry {
 		details.push(("input".into(), input_type.to_string()));
 		details.push(("output".into(), output_type.to_string()));
 	}
-	for param in node.params.iter() {
-		details.push(("param".into(), param.to_string()));
-	}
+	let params = node
+		.params
+		.iter()
+		.map(|param| RouteParam {
+			name: param.name().to_string(),
+			kind: param.type_path().to_string(),
+			required: param.is_required(),
+			short: param.short().map(|short| short.to_string()),
+			description: param.description().map(String::from),
+		})
+		.collect();
 
 	RouteEntry {
 		href: format!("/{path}"),
 		tag,
 		details,
+		params,
 	}
 }
 
@@ -449,6 +546,36 @@ mod test {
 			.xpect_contains("increment")
 			.xnot()
 			.xpect_contains("about");
+	}
+
+	#[beet_core::test]
+	async fn help_renders_param_table_with_concrete_type() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct BuildParams {
+			out_dir: Option<String>,
+			release: bool,
+		}
+		let mut world = router_world();
+		let root = world
+			.spawn((default_router(), children![(
+				render_action::fixed_func_route("build", || {
+					rsx! { <p>"build"</p> }
+				}),
+				ParamsPartial::new::<BuildParams>(),
+			)]))
+			.flush();
+
+		help_body(&mut world, root, "--help")
+			.await
+			// the kebab-cased param name and the table column headers
+			.xpect_contains("out-dir")
+			.xpect_contains("kind")
+			.xpect_contains("required")
+			// the concrete Rust type, not the `single` arity
+			.xpect_contains("alloc::string::String")
+			.xnot()
+			.xpect_contains("kind:single");
 	}
 
 	#[beet_core::test]

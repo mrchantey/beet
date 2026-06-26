@@ -2,6 +2,7 @@
 //! BSX author wraps their pages in, with every region an overridable slot.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::RequestParts;
 use beet_ui::prelude::*;
 // the document-chrome widgets, imported by name so the tags resolve regardless of
 // which feature set's glob (`crate::prelude` vs `beet_ui::prelude`) also defines a
@@ -49,24 +50,10 @@ pub fn SiteLayout(
 	theme: Res<Theme>,
 ) -> impl Bundle {
 	let cx = stack.current();
-	// an explicit `?color-scheme=light|dark` pins the scheme on both targets via
-	// a body class. Absent it, the web follows the OS (`color_scheme.js`); a
-	// non-html target (the terminal) uses the session's app-wide scheme,
-	// defaulting to dark.
-	let mut body_classes = Classes::new([classes::PAGE]);
-	match cx
-		.parts()
-		.get_param("color-scheme")
-		.and_then(ColorScheme::parse)
-	{
-		Some(scheme) => {
-			body_classes.insert_class(scheme.class());
-		}
-		None if !cx.parts().accepts(MediaType::Html) => {
-			body_classes.insert_class(theme.scheme.class());
-		}
-		None => {}
-	}
+	// `PAGE` plus the resolved scheme class (an explicit `?color-scheme=` on both
+	// targets, else the session default on the terminal, else none on the web so
+	// `color_scheme.js` follows the OS); shared with the help/not-found page.
+	let body_classes = page_classes(cx.parts(), &theme);
 	// The web `<head>` chrome (the `<Stylesheet/>` CSS bake, preflight/reset,
 	// color-scheme script) is non-visual in the terminal, where `<head>` is
 	// `display: none`. Baking the whole rule set to CSS on every navigation is
@@ -109,6 +96,31 @@ pub fn SiteLayout(
 			</body>
 		</html>
 	}
+}
+
+/// The page body classes for a request: [`classes::PAGE`] plus the resolved
+/// color-scheme class.
+///
+/// An explicit `?color-scheme=light|dark` pins the scheme on both targets; absent
+/// it, a non-html target (the terminal) uses the session [`Theme::scheme`]
+/// (defaulting to dark), and the web adds no class so its `color_scheme.js`
+/// follows the OS. Shared by [`SiteLayout`] and the help/not-found page so a
+/// bare-rendered page (eg the dev CLI help, with no layout) is themed the same.
+pub(crate) fn page_classes(
+	parts: &RequestParts,
+	theme: &Theme,
+) -> Classes {
+	let mut classes = Classes::new([classes::PAGE]);
+	let scheme = match parts.get_param("color-scheme").and_then(ColorScheme::parse)
+	{
+		Some(scheme) => Some(scheme),
+		None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
+		None => None,
+	};
+	if let Some(scheme) = scheme {
+		classes.insert_class(scheme.class());
+	}
+	classes
 }
 
 #[cfg(test)]
@@ -189,5 +201,29 @@ mod test {
 			.xpect_contains("page")
 			.xnot()
 			.xpect_contains("<style");
+	}
+
+	/// [`page_classes`] resolution: a terminal request defaults to the session
+	/// scheme (dark), the web adds no scheme class (it follows the OS), and an
+	/// explicit `?color-scheme=` pins the scheme on either target.
+	#[beet_core::test]
+	fn page_classes_resolves_scheme() {
+		let theme = Theme::default();
+		let has = |classes: &Classes, name: &ClassName| {
+			classes.contains_name(name)
+		};
+		// a terminal request with no override → PAGE + the dark session default
+		let terminal = page_classes(&request("", MediaType::AnsiTerm), &theme);
+		has(&terminal, &classes::PAGE).xpect_true();
+		has(&terminal, &classes::DARK_SCHEME).xpect_true();
+		// the web adds no scheme class, leaving the OS to drive `color_scheme.js`
+		let web = page_classes(&request("", MediaType::Html), &theme);
+		has(&web, &classes::PAGE).xpect_true();
+		has(&web, &classes::DARK_SCHEME).xpect_false();
+		has(&web, &classes::LIGHT_SCHEME).xpect_false();
+		// an explicit pin wins on both targets
+		let pinned =
+			page_classes(&request("?color-scheme=light", MediaType::Html), &theme);
+		has(&pinned, &classes::LIGHT_SCHEME).xpect_true();
 	}
 }

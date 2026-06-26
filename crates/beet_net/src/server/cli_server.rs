@@ -32,17 +32,33 @@ use beet_core::prelude::*;
 #[reflect(Component, Default)]
 #[require(ContinueRun<Boot, Response>)]
 #[component(on_add = on_add)]
-pub struct CliServer;
+pub struct CliServer {
+	/// Dispatch on every boot, ignoring `--server`.
+	///
+	/// A site's default `CliServer` only acts when `--server` selects `cli`, so
+	/// `--server=http` serves http rather than streaming once to stdout. The
+	/// workspace command entry sets this: it carries no long-running servers, and a
+	/// `--server` on a `beet serve <site>` invocation selects the *site's* servers,
+	/// so the command dispatch itself must still run.
+	pub always: bool,
+}
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(on_action_in);
 }
 
-/// On the boot fan-out, if `--server` selects `cli`, route the request and resolve
-/// the boot call. The selection check reads the boot (without consuming it); the
-/// take is deferred into the task, so a co-observer's read never races it.
-fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
-	if !ev.with(|boot| request_selects_server(boot, "cli"))? {
+/// On the boot fan-out, route the request and resolve the boot call when this server
+/// should act: an `always` dispatcher (the workspace command entry) on every boot,
+/// otherwise only when `--server` selects `cli`. The selection check reads the boot
+/// (without consuming it); the take is deferred into the task, so a co-observer's
+/// read never races it.
+fn on_action_in(
+	ev: On<StartRunning<Boot>>,
+	servers: Query<&CliServer>,
+	mut commands: Commands,
+) -> Result {
+	let always = servers.get(ev.entity).is_ok_and(|server| server.always);
+	if !always && !ev.with(|boot| request_selects_server(boot, "cli"))? {
 		return Ok(());
 	}
 	let action_in = ev.clone();

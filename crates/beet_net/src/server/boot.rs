@@ -291,7 +291,7 @@ mod test {
 				commands
 					.spawn((
 						exchange_handler(|_| Response::ok().with_body("hi")),
-						CliServer,
+						CliServer::default(),
 						BootOnLoad,
 					))
 					.trigger(|entity| LoadTemplate {
@@ -316,7 +316,7 @@ mod test {
 				commands
 					.spawn((
 						exchange_handler(|_| Response::ok().with_body("hi")),
-						CliServer,
+						CliServer::default(),
 					))
 					.trigger(StartRunning::boot);
 			},
