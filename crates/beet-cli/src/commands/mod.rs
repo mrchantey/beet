@@ -3,6 +3,7 @@
 mod check;
 mod export_pdf;
 mod export_static;
+#[cfg(feature = "pdf")]
 pub mod pdf_ext;
 #[cfg(feature = "qrcode")]
 mod qrcode;

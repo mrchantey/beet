@@ -1,3 +1,4 @@
+#[cfg(feature = "pdf")]
 use super::pdf_ext;
 use crate::prelude::*;
 use beet::prelude::webdriver::*;
@@ -13,9 +14,12 @@ struct ExportPdfParams {
 	height: f64,
 	/// Unit for `--width`/`--height`: `mm` (default) or `px` (96 dpi).
 	unit: Option<String>,
-	/// Whether tall content stretches the page to fit (`stretch`, default) or is
-	/// clipped to the page size (`clip`).
-	overflow: Option<String>,
+	/// Zoom factor for the content, `0.1` to `2.0` (default `1.0`). Raise it when
+	/// a large `--width`/`--height` renders the text too small.
+	zoom: f64,
+	/// Limit each route's printed pages, ie `--page-ranges=1` for a single page,
+	/// or `--page-ranges=1-3,5`.
+	page_ranges: Option<String>,
 	/// Glob of route paths to include, ie `--include="blog/**"`.
 	include: Option<String>,
 	/// Glob of route paths to exclude, ie `--exclude="draft/**"`.
@@ -23,25 +27,29 @@ struct ExportPdfParams {
 	/// Query string appended to every page request, ie
 	/// `--search-params="color-scheme=dark"`.
 	search_params: Option<String>,
-	/// Output file, defaults to `<site>/site.pdf`.
+	/// Write one PDF per route to `<output>/<route>.pdf` instead of merging them
+	/// into a single document.
+	separate: bool,
+	/// Output path: the merged file (default `<site>/site.pdf`), or with
+	/// `--separate` the directory for per-route files (default `<site>/pdf`).
 	output: Option<String>,
 	/// Disable page margins.
 	no_margin: bool,
 }
 
-/// Exports every page of a no-code site to a single PDF, in route order, via a
-/// headless browser (webdriver).
+/// Exports the pages of a no-code site to PDF via a headless browser (webdriver),
+/// merged into one document in route order or, with `--separate`, one file per route.
 ///
 /// Builds and validates the site, boots its declared `HttpServer` on an ephemeral
-/// port, then prints each static route and merges the results. `--width`/`--height`
-/// set the page size (in `--unit`s: `mm` default, or `px`), `--include`/`--exclude`
-/// glob-filter the routes, and `--search-params` rides every request (eg to drive
-/// `color-scheme`). `--overflow=clip` keeps one page per route at exactly
-/// `width`x`height`; the default `stretch` flows tall content across as many
-/// `width`x`height` pages as it needs.
+/// port, then prints each static route. `--width`/`--height` set the page size (in
+/// `--unit`s: `mm` default, or `px`), `--zoom` scales the content, `--page-ranges`
+/// limits each route's pages (ie `--page-ranges=1` for a single page),
+/// `--include`/`--exclude` glob-filter the routes, and `--search-params` rides every
+/// request (eg to drive `color-scheme`). Merging needs the `pdf` feature; `--separate`
+/// does not.
 ///
 /// ```sh
-/// beet export-pdf site --width=1920 --height=1080 --unit=px \
+/// beet export-pdf site --width=1920 --height=1080 --unit=px --zoom=1.5 \
 ///   --search-params="color-scheme=light"
 /// ```
 #[action(route = "export-pdf/*site", handler_only)]
@@ -73,7 +81,6 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	// resolve the page size (cm, the `PdfPageSize` unit) and matching browser
 	// viewport (px), defaulting to A4 when a dimension is unset.
 	let unit = PdfUnit::parse(params.unit.as_deref())?;
-	let overflow = PdfOverflow::parse(params.overflow.as_deref())?;
 	let (page_size, viewport) =
 		resolve_size(params.width, params.height, unit);
 	let mut options = PdfOptions {
@@ -82,6 +89,18 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	};
 	if params.no_margin {
 		options.margin = PdfMargin::none();
+	}
+	// `--page-ranges` limits each route's printed pages, eg `1` for a single page.
+	if let Some(ranges) = &params.page_ranges {
+		options.page_ranges =
+			ranges.split(',').map(|range| range.trim().to_string()).collect();
+	}
+	// `--zoom` scales the content, eg to enlarge text on a large page.
+	if params.zoom > 0.0 {
+		if !(0.1..=2.0).contains(&params.zoom) {
+			bevybail!("--zoom must be between 0.1 and 2.0");
+		}
+		options.scale = params.zoom;
 	}
 
 	// the site's static pages, glob-filtered by `--include`/`--exclude`.
@@ -126,37 +145,39 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 		.map(|search| format!("?{search}"))
 		.unwrap_or_default();
 	let base = format!("http://127.0.0.1:{port}");
-	let pdfs =
-		export_pages(&paths, &base, &query, viewport, overflow, &options).await?;
+	let pages = export_pages(&paths, &base, &query, viewport, &options).await?;
 
-	// stop the server (the teardown observer drops its listener) and write the
-	// merged document.
+	// stop the server: the teardown observer drops its listener.
 	cx.world()
 		.with(move |world: &mut World| {
 			world.entity_mut(root).remove::<Running<Response>>();
 		})
 		.await;
 
+	// `--separate` writes one file per route to a dir; the default merges into one
+	// file (which needs the `pdf` feature).
 	let output = match params.output {
 		Some(output) => AbsPathBuf::new(output)?,
-		None => site_dir.join("site.pdf"),
+		None => site_dir.join(if params.separate { "pdf" } else { "site.pdf" }),
 	};
-	fs_ext::write_async(&output, pdf_ext::merge(pdfs)?).await?;
-	Response::ok_text(format!("exported {} pages to {output}\n", paths.len()))
-		.xok()
+	let count = if params.separate {
+		write_separate(pages, &output).await?
+	} else {
+		write_concat(pages, &output).await?
+	};
+	Response::ok_text(format!("exported {count} pages to {output}\n")).xok()
 }
 
-/// Drives one headless browser session over `paths`, returning a single-page PDF
-/// per route. Reusing the session (navigating between routes) avoids a browser
-/// process per page.
+/// Drives one headless browser session over `paths`, returning each route paired
+/// with its printed PDF. Reusing the session (navigating between routes) avoids a
+/// browser process per page.
 async fn export_pages(
 	paths: &[SmolPath],
 	base: &str,
 	query: &str,
 	viewport: (u32, u32),
-	overflow: PdfOverflow,
 	options: &PdfOptions,
-) -> Result<Vec<Vec<u8>>> {
+) -> Result<Vec<(SmolPath, Vec<u8>)>> {
 	let process = ClientProcess::new()?;
 	let session = process.client().new_session().await?;
 	let mut page = Page::from_session(session).await?;
@@ -166,18 +187,54 @@ async fn export_pages(
 	for path in paths {
 		let url = format!("{base}{}{query}", path.with_leading_slash());
 		page.navigate(&url).await?;
-		let mut options = options.clone();
-		// `Clip` keeps only the first printed page (content beyond width x height is
-		// cut off); `Stretch` leaves the default, so tall content flows across as
-		// many width x height pages as it needs.
-		if overflow == PdfOverflow::Clip {
-			options.page_ranges = vec!["1".to_string()];
-		}
-		pdfs.push(page.export_pdf_with_options(&options).await?);
+		pdfs.push((path.clone(), page.export_pdf_with_options(options).await?));
 	}
 	page.kill().await?;
 	process.kill()?;
 	Ok(pdfs)
+}
+
+/// Writes one PDF per route under `dir` as `<route>.pdf` (the home route as
+/// `index.pdf`), returning the count.
+async fn write_separate(
+	pages: Vec<(SmolPath, Vec<u8>)>,
+	dir: &AbsPathBuf,
+) -> Result<usize> {
+	let count = pages.len();
+	for (path, bytes) in pages {
+		let name = match path.as_str() {
+			"" => "index",
+			path => path,
+		};
+		fs_ext::write_async(&dir.join(format!("{name}.pdf")), bytes).await?;
+	}
+	Ok(count)
+}
+
+/// Merges the per-route PDFs into one document at `output`, in route order.
+#[cfg(feature = "pdf")]
+async fn write_concat(
+	pages: Vec<(SmolPath, Vec<u8>)>,
+	output: &AbsPathBuf,
+) -> Result<usize> {
+	let count = pages.len();
+	let merged =
+		pdf_ext::merge(pages.into_iter().map(|(_, bytes)| bytes).collect())?;
+	fs_ext::write_async(output, merged).await?;
+	Ok(count)
+}
+
+/// Without the `pdf` feature there is no merge backend, so concatenation errors
+/// with guidance toward `--separate` or a `pdf`-enabled build.
+#[cfg(not(feature = "pdf"))]
+async fn write_concat(
+	_pages: Vec<(SmolPath, Vec<u8>)>,
+	_output: &AbsPathBuf,
+) -> Result<usize> {
+	bevybail!(
+		"merging into one PDF needs the `pdf` feature; rebuild with \
+		 `--features pdf`, or pass `--separate` to write one file per route"
+	)
 }
 
 /// Polls the process-global server port until the booted http server binds,
@@ -260,44 +317,15 @@ impl PdfUnit {
 	fn cm_to_px(cm: f64) -> f64 { cm / 2.54 * Self::DPI }
 }
 
-/// How content taller than the page is handled.
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-enum PdfOverflow {
-	/// Let the document flow across as many width x height pages as it needs
-	/// (the default), so nothing is lost.
-	#[default]
-	Stretch,
-	/// Keep one width x height page per route, clipping any content beyond it.
-	Clip,
-}
-
-impl PdfOverflow {
-	/// Parse the `--overflow` param, defaulting to `Stretch` when unset.
-	fn parse(value: Option<&str>) -> Result<Self> {
-		match value.map(str::trim) {
-			None | Some("") | Some("stretch") => Ok(Self::Stretch),
-			Some("clip") => Ok(Self::Clip),
-			Some(other) => bevybail!(
-				"unknown --overflow '{other}', expected 'stretch' or 'clip'"
-			),
-		}
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
 
 	#[beet::test]
-	fn parses_units_and_overflow() {
+	fn parses_unit() {
 		PdfUnit::parse(None).unwrap().xpect_eq(PdfUnit::Mm);
 		PdfUnit::parse(Some("px")).unwrap().xpect_eq(PdfUnit::Px);
 		PdfUnit::parse(Some("bad")).xpect_err();
-		PdfOverflow::parse(None).unwrap().xpect_eq(PdfOverflow::Stretch);
-		PdfOverflow::parse(Some("clip"))
-			.unwrap()
-			.xpect_eq(PdfOverflow::Clip);
-		PdfOverflow::parse(Some("bad")).xpect_err();
 	}
 
 	#[beet::test]

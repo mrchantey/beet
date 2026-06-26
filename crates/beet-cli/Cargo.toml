@@ -16,8 +16,12 @@ name = "beet"
 path = "src/main.rs"
 
 [features]
-default = ["qrcode", "net", "tui", "ssh", "thread"]
+default = ["qrcode", "net", "tui", "ssh", "thread", "pdf"]
 qrcode = ["dep:qrcode", "dep:image"]
+# `beet export-pdf` page concatenation: pulls `lopdf` to merge the per-route
+# prints into one document. Optional so a build that only emits separate
+# per-route PDFs (or skips the command) never links `lopdf`.
+pdf = ["dep:lopdf"]
 # Extra components and systems for high-level examples and workflows (the
 # `beet_extra` crate).
 extra = ["dep:beet_extra"]
@@ -116,8 +120,8 @@ beet = { workspace = true, features = [
 	"quickjs_serde",
 ] }
 # `export-pdf` merges the per-page PDFs a headless browser prints into one
-# document.
-lopdf = "0.36"
+# document; pulled only by the `pdf` feature.
+lopdf = { version = "0.36", optional = true }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }
 # the thread example tools (`ThreadExamplesPlugin` + inline tool types), added via
