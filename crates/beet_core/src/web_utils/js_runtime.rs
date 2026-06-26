@@ -38,6 +38,7 @@ mod raw {
 		pub fn create_dir_all(path: &str);
 		pub fn exists(path: &str) -> bool;
 		pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
+		pub fn remove(path: &str) -> Option<String>;
 		pub fn env_args() -> js_sys::Array;
 		pub fn env_var(key: &str) -> Option<String>;
 		pub fn set_env(key: &str, value: &str);
@@ -69,6 +70,8 @@ mod raw {
 		pub fn create_dir_all(path: &str);
 		#[wasm_bindgen(js_name = "test_write_file")]
 		pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
+		#[wasm_bindgen(js_name = "test_remove")]
+		pub fn remove(path: &str) -> Option<String>;
 		#[wasm_bindgen(js_name = "test_env_args")]
 		pub fn env_args() -> js_sys::Array;
 		#[wasm_bindgen(js_name = "test_env_var")]
@@ -129,9 +132,9 @@ pub fn read_file(path: &str) -> Option<Vec<u8>> {
 
 /// List the files under a directory recursively, returning each path relative to
 /// `path` (forward-slash separated), ie a `Deno.readDirSync` walk. Empty where the
-/// fs global is absent or the directory does not exist. The native `FsStore` uses
-/// `ReadDir::files_recursive_async`; this is its wasm/deno counterpart, so a
-/// `DenoFsStore` lists the same files.
+/// fs global is absent or the directory does not exist. This backs `ReadDir`'s wasm
+/// directory walk (see `read_dir.rs`), so an `FsStore` lists the same files on wasm
+/// as native.
 pub fn read_dir(path: &str) -> Vec<SmolStr> {
 	if has_global("read_dir") {
 		js_strings(&raw::read_dir(path))
@@ -166,23 +169,36 @@ pub fn write_file(path: &str, content: &[u8]) -> Option<String> {
 	}
 }
 
-/// Whether the host exposes the `env_args` global, ie the deno/node runner (which
-/// provides `Deno.args`). False in a browser / Worker, where there is no process
-/// argv. Lets a caller prefer real argv over a browser location fallback, since deno
-/// also polyfills a `window`.
-pub fn has_args() -> bool { has_global("env_args") }
-
-/// Command-line args excluding the program name, ie `Deno.args`. Empty where
-/// unavailable (a Worker has no argv).
-///
-/// Marshals the host's JS string array into native [`SmolStr`]s here, so callers
-/// (eg [`env_ext`](crate::prelude::env_ext)) never touch `js_sys`.
-pub fn env_args() -> Vec<SmolStr> {
-	if has_global("env_args") {
-		js_strings(&raw::env_args())
+/// Recursively remove a file or directory, ie `Deno.removeSync(.., recursive)`,
+/// returning an error string on failure (a missing path errors, like
+/// `std::fs::remove_*`). A no-op (`None`) where the fs global is absent.
+pub fn remove(path: &str) -> Option<String> {
+	if has_global("remove") {
+		raw::remove(path)
 	} else {
-		Vec::new()
+		None
 	}
+}
+
+/// The wasm equivalent of process argv (excluding the program name): the deno
+/// runner's `Deno.args` when present, else the browser location's path + query as
+/// CLI args ([`search_params_ext::location_args`]), else empty (a Worker has
+/// neither). The global check comes first since deno also polyfills a `window`, so a
+/// deno run must not fall to the browser path.
+///
+/// This is the single wasm arg decision; [`env_ext::args`](crate::prelude::env_ext)
+/// delegates here rather than branching itself.
+pub fn args() -> Vec<String> {
+	if has_global("env_args") {
+		return js_strings(&raw::env_args())
+			.into_iter()
+			.map(Into::into)
+			.collect();
+	}
+	if web_sys::window().is_some() {
+		return search_params_ext::location_args();
+	}
+	Vec::new()
 }
 
 /// A single environment variable, ie `Deno.env.get(key)`. `None` where the env

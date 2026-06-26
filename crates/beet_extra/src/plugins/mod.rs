@@ -1,12 +1,12 @@
-mod beet_example_plugins;
-pub use self::beet_example_plugins::*;
+mod beet_extra_plugins;
+pub use self::beet_extra_plugins::*;
 
 // the spatial/render example set: only compiled with the bevy render stack.
 #[cfg(feature = "bevy_default")]
-pub mod beet_example_plugin;
+pub mod beet_extra_plugin;
 #[cfg(feature = "bevy_default")]
 #[allow(unused_imports)]
-pub use self::beet_example_plugin::*;
+pub use self::beet_extra_plugin::*;
 
 // the agent-thread example tools: headless-friendly, so independent of bevy_default.
 #[cfg(feature = "thread")]

@@ -23,15 +23,14 @@ pub const ENTRY_NAMES: &[&str] = &["main.bsx", "main.json", "main.ron"];
 /// by the binary's entry resolution and the `check`/`serve`/`export-static` commands
 /// so every entry/site load is store-driven rather than filesystem-bound.
 ///
-/// The backends are target-specific, since the store is the platform seam:
-/// - native — `fs` (default): a filesystem store at `dir`; `memory`: a temporary
-///   in-memory store.
-/// - wasm — `deno-fs` (default): the same on-disk files read through the Deno runner's
-///   fs globals; `memory`: a temporary in-memory store.
+/// Cross-platform, since [`FsStore`] is cross-platform: it reads through `fs_ext`,
+/// which routes to the deno runner's fs globals on wasm, so the wasm `beet` binary
+/// resolves the same on-disk entry native does, no separate backend needed.
+/// - `fs` (default): a filesystem store rooted at `dir`.
+/// - `memory`: a temporary in-memory store.
 ///
 /// `memory` is only meaningful with an explicit entry, since it has no seeded entry to
 /// discover. An unknown kind errors with the supported list.
-#[cfg(not(target_arch = "wasm32"))]
 pub fn resolve_store(
 	params: &MultiMap<SmolStr, SmolStr>,
 	dir: AbsPathBuf,
@@ -41,25 +40,6 @@ pub fn resolve_store(
 		"memory" => BlobStore::temp().xok(),
 		other => {
 			bevybail!("unknown --store `{other}`, supported kinds: fs, memory")
-		}
-	}
-}
-
-/// See the native [`resolve_store`]. On wasm the default `fs` store has no target, so
-/// `deno-fs` (the Deno-runner filesystem) is the default and `dir` is a plain path
-/// string (`std::path::absolute` is unavailable under wasm).
-#[cfg(target_arch = "wasm32")]
-pub fn resolve_store(
-	params: &MultiMap<SmolStr, SmolStr>,
-	dir: SmolStr,
-) -> Result<BlobStore> {
-	match params.get("store").map(SmolStr::as_str).unwrap_or("deno-fs") {
-		"deno-fs" => BlobStore::new(DenoFsStore::new(dir)).xok(),
-		"memory" => BlobStore::temp().xok(),
-		other => {
-			bevybail!(
-				"unknown --store `{other}`, supported kinds: deno-fs, memory"
-			)
 		}
 	}
 }

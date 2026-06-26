@@ -28,22 +28,9 @@ pub fn load_dotenv() {
 pub fn args() -> Vec<String> {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
-			// deno/node expose `Deno.args` (already excluding the program name) via the
-			// runner's `env_args` global; prefer it when present. deno also polyfills a
-			// `window`, so the global check must come first, else a deno run would wrongly
-			// fall to the browser path. A real browser has no `env_args` global, so it
-			// derives args from the location instead (path -> positionals, query ->
-			// `--key=value`).
-			if js_runtime::has_args() {
-				return js_runtime::env_args()
-					.into_iter()
-					.map(Into::into)
-					.collect();
-			}
-			if web_sys::window().is_some() {
-				return search_params_ext::location_args();
-			}
-			return Vec::new();
+			// the wasm arg decision (deno argv, else browser location, else empty)
+			// lives in `js_runtime`, so this stays a thin platform switch.
+			return js_runtime::args();
 		} else if #[cfg(feature = "std")] {
 			return std::env::args().skip(1).collect();
 		} else {

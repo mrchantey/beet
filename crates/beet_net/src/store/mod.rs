@@ -4,7 +4,8 @@
 //! across different storage backends:
 //!
 //! - [`InMemoryStore`]: Ephemeral storage for testing
-//! - [`FsStore`]: Local filesystem storage (native only)
+//! - [`FsStore`]: Local filesystem storage, cross-platform via `fs_ext` (the deno
+//!   runner's fs globals back it on wasm)
 //! - [`LocalStorageStore`]: Browser localStorage (WASM only)
 //! - [`S3Store`]: AWS S3 storage (requires `aws_sdk` feature)
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
@@ -56,6 +57,9 @@ pub use aws_cli::*;
 pub use table::*;
 #[cfg(feature = "template_serde")]
 pub use template_store::*;
+// the notify-based directory watcher backing reactive `FsStore`s. Native-only for
+// now (deno directory watching is unimplemented), so a wasm `FsStore` works without
+// live reload; a future wasm watcher slots into this same seam (see `StorePlugin`).
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_blob_watchers;
 #[cfg(feature = "std")]
@@ -122,7 +126,10 @@ impl Plugin for StorePlugin {
 			.add_observer(add_memory_store_watcher)
 			.add_observer(remove_memory_store_watcher);
 
-		// fs watcher lifecycle, one notify debouncer per base path
+		// fs watcher lifecycle, one notify debouncer per base path. Native-only:
+		// deno directory watching is unimplemented, so a wasm `FsStore` serves
+		// reads through `fs_ext` with no live reload. A future wasm watcher wires
+		// the same `add_fs_store_watcher`/`remove_fs_store_watcher` seam here.
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		app.init_resource::<FsBlobWatchers>()
 			.add_observer(add_fs_store_watcher)

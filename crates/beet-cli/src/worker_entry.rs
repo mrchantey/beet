@@ -28,8 +28,6 @@ use worker::event;
 
 /// The R2 binding name the site bucket is bound to in `wrangler.toml`.
 const SITE_BUCKET_BINDING: &str = "SITE_BUCKET";
-/// The entry document at the bucket root.
-const ENTRY_NAME: &str = "main.bsx";
 
 /// The Worker `fetch` handler: route an incoming request through the site world.
 #[event(fetch)]
@@ -66,19 +64,24 @@ async fn handle(
 ) -> Result<WorkerResponse> {
 	let request = worker_to_request(req).await?;
 
+	// resolve the entry document the same way native discovery does: the first
+	// `ENTRY_NAMES` match present in the bucket.
+	let entry_name = discover_entry_name(&store).await?;
+
 	// take the per-isolate world out so the exchange can borrow it mutably across
 	// the await.
 	let mut worker_world = WorkerWorld::take();
 
 	// rebuild if absent or the bucket's entry version changed (a re-synced site
 	// reflects on the next request).
-	let current_version = head_version(&store, ENTRY_NAME).await;
+	let current_version = head_version(&store, &entry_name).await;
 	let stale = worker_world
 		.as_ref()
 		.map(|loaded| loaded.version != current_version)
 		.unwrap_or(true);
 	if stale {
-		worker_world = Some(build_site(store, current_version).await?);
+		worker_world =
+			Some(build_site(store, entry_name, current_version).await?);
 	}
 	let mut worker_world = worker_world.expect("world built above");
 
@@ -103,6 +106,7 @@ async fn handle(
 /// store read awaited, never blocked).
 async fn build_site(
 	store: R2WorkersStore,
+	entry_name: String,
 	version: Option<String>,
 ) -> Result<WorkerWorld> {
 	// the same app the native binary builds, plus `WorkersPlugin`'s no-op runner
@@ -128,7 +132,7 @@ async fn build_site(
 	//
 	// the build's `Insert, RoutesDir` observer queues the route discovery (a store
 	// scan) as an async task, settled below before the host is served.
-	let sources = read_entry_sources(&store, formats, ENTRY_NAME).await?;
+	let sources = read_entry_sources(&store, formats, entry_name).await?;
 	build_entry_root(&mut world, store, sources, DisableBootOnLoad)?;
 	// settle until the entry's templates are registered (not just until idle): the
 	// `<RoutesDir>`/`<TemplateDir>` scans land before the host is queried and served.
@@ -147,6 +151,18 @@ async fn build_site(
 		version,
 	}
 	.xok()
+}
+
+/// Resolve the entry document name in the bucket: the first [`ENTRY_NAMES`] match
+/// present, matching the native binary's discovery order. Errors with the searched
+/// list if none exist (an empty / mis-synced bucket).
+async fn discover_entry_name(store: &R2WorkersStore) -> Result<String> {
+	for name in ENTRY_NAMES {
+		if store.exists(&SmolPath::from(*name)).await? {
+			return name.to_string().xok();
+		}
+	}
+	bevybail!("no entry document {ENTRY_NAMES:?} in the site bucket")
 }
 
 /// The R2 object version of `path`, used as the rebuild marker. Returns `None`

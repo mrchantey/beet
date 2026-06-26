@@ -4,7 +4,7 @@ beet_core::test_main!();
 
 #[cfg(feature = "bevy_default")]
 pub mod components;
-// always compiled: `BeetExamplePlugins` selects its members by feature flag, so
+// always compiled: `BeetExtraPlugins` selects its members by feature flag, so
 // the thread-only (`thread`, no `bevy_default`) build still gets the group.
 pub mod plugins;
 #[cfg(feature = "bevy_default")]
@@ -15,7 +15,7 @@ pub mod prelude {
 	pub use crate::components::*;
 	pub use crate::plugins::*;
 	// the markup scene templates (`<Lighting3d/>`, `<Ground3d/>`, `<Sprite2d/>`, ...),
-	// so a `.bsx` names them and `beet_example_plugin` registers them by short type path.
+	// so a `.bsx` names them and `beet_extra_plugin` registers them by short type path.
 	#[cfg(feature = "bevy_default")]
 	pub use crate::scenes::AppWindow;
 	#[cfg(feature = "bevy_default")]
@@ -55,7 +55,7 @@ pub(crate) mod beet {
 		pub use beet_action::prelude::*;
 		#[cfg(feature = "ml")]
 		pub use beet_ml::prelude::*;
-		// only the render example set (`beet_example_plugin`) uses the spatial prelude.
+		// only the render example set (`beet_extra_plugin`) uses the spatial prelude.
 		#[cfg(feature = "bevy_default")]
 		pub use beet_spatial::prelude::*;
 		// the render scenes' `RunOnLoad` load verb lives in `beet_net` with the rest

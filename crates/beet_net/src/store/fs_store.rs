@@ -163,12 +163,14 @@ impl BlobStoreProvider for FsStore {
 }
 
 #[cfg(test)]
-// TODO js_runtime fs support
-#[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	// cross-platform: `FsStore` reads/writes through `fs_ext`, which routes to the
+	// deno runner's fs globals on wasm, so the same suite runs under both. On wasm
+	// the runner supplies `WORKSPACE_ROOT` (resolving the workspace-relative dir) and
+	// `--allow-write`.
 	#[beet_core::test]
 	async fn works() {
 		let dir = "target/tests/beet_net/test-store-001";

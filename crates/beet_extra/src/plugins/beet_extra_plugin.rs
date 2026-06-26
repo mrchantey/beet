@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 /// 2d/3d helper systems, the terminal UI, and the window conveniences (esc to
 /// close, F11 fullscreen). The runner and window are [`BeetPlugins`](beet)' job;
 /// this only adds behaviour, so it composes under either runner.
-pub fn beet_example_plugin(app: &mut App) {
+pub fn beet_extra_plugin(app: &mut App) {
 	// `ActionPlugin` may already be present (the router stack adds it via
 	// `init_plugin` on the CLI render path), so add it idempotently rather than
 	// panic on the double-add when this group composes with a router-bearing app.

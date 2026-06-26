@@ -13,10 +13,10 @@
 //! The entry load is target-agnostic (the shared `site_build` core reads any
 //! [`BlobStore`]); only entry *resolution* differs by target. Native walks the
 //! filesystem for `main.bsx` (or honours `--main`) and selects an `fs`/`memory`
-//! store; wasm has no filesystem walk, so it requires an explicit `--main` and a
-//! `deno-fs`/`memory` store, and is driven by `run_async` (native `run()` busy-waits
-//! on the JS event loop). The dev-command, winit-render and remote/S3 paths are
-//! native-only.
+//! store; wasm has no filesystem walk, so it requires an explicit `--main` (the same
+//! `fs`/`memory` store, the `fs` store reading through the deno runner's fs globals),
+//! and is driven by `run_async` (native `run()` busy-waits on the JS event loop). The
+//! dev-command, winit-render and remote/S3 paths are native-only.
 use beet::prelude::*;
 // `ENTRY_NAMES` (the entry-document name list discovery looks for) and `resolve_store`
 // (the `--store` backend selector) are shared with the `check`/`serve`/`export-static`
@@ -25,7 +25,7 @@ use beet_cli::prelude::*;
 
 // the wasm `beet` binary: the same unopinionated entry load as native, driven by
 // `run_async` on the JS event loop (native `run()` busy-waits there and would block
-// it). It requires an explicit `--main` + `--store` (default `deno-fs`): there is no
+// it). It requires an explicit `--main` + `--store` (default `fs`): there is no
 // filesystem ancestor walk to discover an entry, and no winit/dev-command/remote
 // surface (all native-only). The entry's own `BootOnLoad`/`CliServer` drives output
 // and writes `AppExit`, which `AppExitPlugin` turns into `Deno.exit`.
@@ -68,7 +68,7 @@ fn main() -> AppExit {
 			// and the windowed spatial/animation scene types + templates (`winit`, eg
 			// `examples/spatial/seek_3d.bsx`). The group self-selects by sub-feature.
 			#[cfg(any(feature = "thread", feature = "winit"))]
-			beet_extra::prelude::BeetExamplePlugins,
+			beet_extra::prelude::BeetExtraPlugins,
 		))
 		.add_systems(
 			Startup,
@@ -187,27 +187,33 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 }
 
 /// Resolve the entry on wasm: there is no filesystem ancestor walk and no remote
-/// backend, so `--main` is required and `--store` (default `deno-fs`) picks the
-/// backend. The entry dir is the path's parent (`std::path::absolute` is unavailable
-/// under wasm, so this is plain string splitting); descendants resolve the store by
-/// ancestry just as on native.
+/// backend, so `--main` is required and `--store` (default `fs`) picks the backend.
+/// The entry dir is the path's parent and the store is rooted there; descendants
+/// resolve it by ancestry just as on native. The `fs` store reads through the deno
+/// runner's fs globals (see [`resolve_store`]), so the same on-disk entry loads.
 #[cfg(target_arch = "wasm32")]
 async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
-	let entry = args.params.get("main").ok_or_else(|| {
-		bevyhow!(
-			"the wasm `beet` binary requires an explicit `--main=<path>` (there is \
-			no filesystem entry discovery on wasm)"
-		)
-	})?;
-	let (dir, entry_name) = entry.rsplit_once('/').ok_or_else(|| {
+	let entry = args
+		.params
+		.get("main")
+		.map(|path| AbsPathBuf::new(path.as_str()))
+		.ok_or_else(|| {
+			bevyhow!(
+				"the wasm `beet` binary requires an explicit `--main=<path>` (there is \
+				no filesystem entry discovery on wasm)"
+			)
+		})??;
+	let dir = entry.parent().ok_or_else(|| {
 		bevyhow!("entry `{entry}` has no parent directory")
 	})?;
-	if entry_name.is_empty() {
-		bevybail!("entry `{entry}` has no file name");
-	}
+	let entry_name = entry
+		.file_name()
+		.and_then(|name| name.to_str())
+		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
+		.to_string();
 	Ok(ResolvedEntry {
-		store: resolve_store(&args.params, SmolStr::from(dir))?,
-		entry_name: entry_name.to_string(),
+		store: resolve_store(&args.params, dir)?,
+		entry_name,
 	})
 }
 
@@ -236,7 +242,7 @@ async fn resolve_entry_native(args: &CliArgs) -> Result<ResolvedEntry> {
 	}
 
 	// the wasm runner forwards the *module's* flags on this same argv, so a
-	// `beet run-wasm <module> --main=<wasm-entry> --store=deno-fs ...` invocation
+	// `beet run-wasm <module> --main=<wasm-entry> --store=fs ...` invocation
 	// carries a `--main`/`--store` meant for the wasm module, not this native
 	// runner. When acting as the runner (first positional `run-wasm`), ignore them
 	// and discover the workspace command entry; the `<RunWasm/>` route forwards the

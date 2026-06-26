@@ -9,7 +9,7 @@ use bevy::app::PluginGroupBuilder;
 ///
 /// It is a [`PluginGroup`], so any inner plugin can be reconfigured, eg
 /// `BeetPlugins.set(LogPlugin::new(Level::TRACE))`. Pairs with
-/// `BeetExamplePlugins` (from `beet_extra`) for the example scenes: that group
+/// `BeetExtraPlugins` (from `beet_extra`) for the example scenes: that group
 /// adds the example capabilities and leaves the runner to this one.
 ///
 /// ## Window (`winit` feature)

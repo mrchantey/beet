@@ -142,16 +142,18 @@ mod std_ext {
 	/// Wraps [`std::path::absolute`] error with a [`FsError`],
 	/// outputting the path that caused the error.
 	///
-	/// On wasm platforms this will just ensure the path begins with a `/`
+	/// On wasm a relative path is resolved against the runtime cwd
+	/// ([`js_runtime::cwd`], ie `Deno.cwd()`), mirroring [`std::path::absolute`]'s
+	/// cwd prefixing; an already-absolute path is returned as is. So an `FsStore`
+	/// rooted at a workspace-relative entry resolves the same file native does.
 	pub fn absolute(path: impl AsRef<Path>) -> FsResult<PathBuf> {
 		let path = path.as_ref();
 		cfg_if! {
 			if #[cfg(target_arch = "wasm32")] {
-				let path_str = path.to_string_lossy();
-				if path_str.starts_with('/') {
+				if path.is_absolute() {
 					Ok(path.to_path_buf())
 				} else {
-					Ok(PathBuf::from(format!("/{}", path_str)))
+					Ok(PathBuf::from(js_runtime::cwd()).join(path))
 				}
 			} else {
 				std::path::absolute(path).map_err(|e| FsError::io(path, e))
@@ -258,5 +260,20 @@ mod test {
 		path_ext::is_relative_url("../style.css").xpect_true();
 		path_ext::is_relative_url("/style.css").xpect_false();
 		path_ext::is_relative_url("https://example.com").xpect_false();
+	}
+
+	/// A relative path resolves to an absolute one (cwd-prefixed) and an
+	/// already-absolute path round-trips. Cross-platform: on wasm the cwd comes
+	/// from `js_runtime::cwd`, so a workspace-relative `FsStore` entry resolves the
+	/// same file native does (regression: wasm used to only prepend a bare `/`).
+	#[crate::test]
+	#[cfg(feature = "std")]
+	fn absolute() {
+		let resolved = path_ext::absolute("foo/bar.txt").unwrap();
+		resolved.is_absolute().xpect_true();
+		resolved.ends_with("foo/bar.txt").xpect_true();
+		path_ext::absolute("/already/abs.txt")
+			.unwrap()
+			.xpect_eq(std::path::PathBuf::from("/already/abs.txt"));
 	}
 }

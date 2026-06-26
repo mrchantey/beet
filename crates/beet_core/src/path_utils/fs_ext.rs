@@ -122,17 +122,28 @@ pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
 /// recursively remove a file or directory
 pub fn remove(path: impl AsRef<Path>) -> FsResult {
 	let path = path.as_ref();
-	match fs::metadata(path) {
-		Ok(meta) => {
-			if meta.is_dir() {
-				fs::remove_dir_all(path)
-					.map_err(|err| FsError::io(path, err))?;
-			} else {
-				fs::remove_file(path).map_err(|err| FsError::io(path, err))?;
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			// the runner's recursive remove (`Deno.removeSync`); a missing path errors,
+			// matching the native `fs::metadata` probe below.
+			match js_runtime::remove(&path.to_string_lossy()) {
+				Some(err) => Err(FsError::other(path, err)),
+				None => Ok(()),
 			}
-			Ok(())
+		} else {
+			match fs::metadata(path) {
+				Ok(meta) => {
+					if meta.is_dir() {
+						fs::remove_dir_all(path)
+							.map_err(|err| FsError::io(path, err))?;
+					} else {
+						fs::remove_file(path).map_err(|err| FsError::io(path, err))?;
+					}
+					Ok(())
+				}
+				Err(err) => Err(FsError::io(path, err)),
+			}
 		}
-		Err(err) => Err(FsError::io(path, err)),
 	}
 }
 

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -209,9 +210,51 @@ impl ReadDir {
 		if self.root {
 			paths.push(root.as_ref().to_path_buf());
 		}
-		self.read_inner(root, &mut paths)?;
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				self.read_inner_wasm(root, &mut paths);
+			} else {
+				self.read_inner(root, &mut paths)?;
+			}
+		}
 		Ok(paths)
 	}
+
+	/// The wasm directory walk: [`js_runtime::read_dir`] does the recursive file
+	/// walk (relative, forward-slash paths), from which the [`dirs`](Self::dirs) /
+	/// [`recursive`](Self::recursive) flags are honoured by deriving the ancestor
+	/// directories. The deno runner backs this; a browser / Worker has no fs, so it
+	/// is empty.
+	#[cfg(target_arch = "wasm32")]
+	fn read_inner_wasm(&self, root: impl AsRef<Path>, paths: &mut Vec<PathBuf>) {
+		let root = root.as_ref();
+		// every relative file path under `root`, recursively, eg `a/b.txt`.
+		let entries = js_runtime::read_dir(&root.to_string_lossy());
+		// ancestor dirs derived from the file paths, deduped (a small set).
+		let mut seen_dirs: Vec<String> = Vec::new();
+		for rel in entries {
+			// a direct child has no `/`; nested ones only count when recursive.
+			let is_nested = rel.contains('/');
+			if self.dirs {
+				// each ancestor dir of the file, eg `a/b/c.txt` -> `a`, `a/b`.
+				let segments = rel.split('/').collect::<Vec<_>>();
+				for end in 1..segments.len() {
+					let prefix = segments[..end].join("/");
+					if (self.recursive || end == 1)
+						&& !seen_dirs.contains(&prefix)
+					{
+						paths.push(root.join(&prefix));
+						seen_dirs.push(prefix);
+					}
+				}
+			}
+			if self.files && (self.recursive || !is_nested) {
+				paths.push(root.join(rel.as_str()));
+			}
+		}
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
 	fn read_inner(
 		&self,
 		file_or_dir: impl AsRef<Path>,

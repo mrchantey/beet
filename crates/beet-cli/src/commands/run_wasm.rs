@@ -15,18 +15,20 @@ const DENO_TS: &str = include_str!("deno.ts");
 /// runner = "beet run-wasm"
 /// ```
 ///
-/// As a route it is served greedily (`run-wasm/*args`): the segments after
+/// As a route it is served greedily (`run-wasm/*run-wasm-args`): the segments after
 /// `run-wasm` rejoin into the binary path, and any query params are forwarded to
 /// the running module as flags — the beet wasm test runner reads them back via
 /// `Deno.args`. cargo passes an absolute binary path, which `CliArgs` keeps as
-/// one intact segment, so the rejoin reproduces it leading-`/` and all.
-#[action(route = "run-wasm/*args", handler_only)]
+/// one intact segment, so the rejoin reproduces it leading-`/` and all. The capture
+/// is named `run-wasm-args` to distinguish the route's own path capture from the
+/// module args it forwards.
+#[action(route = "run-wasm/*run-wasm-args", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn RunWasm(parts: RequestParts) -> Result<Response> {
 	let mut cli = parts.to_cli_args();
-	// route `run-wasm/*args`: the first segment is the command, the rest rejoin
-	// into the binary path (absolute, as cargo passes it).
+	// route `run-wasm/*run-wasm-args`: the first segment is the command, the rest
+	// rejoin into the binary path (absolute, as cargo passes it).
 	let mut segments = core::mem::take(&mut cli.path);
 	if segments.is_empty() {
 		bevybail!("usage: beet run-wasm <binary-path> [args..]");
@@ -36,17 +38,15 @@ pub async fn RunWasm(parts: RequestParts) -> Result<Response> {
 		bevybail!("usage: beet run-wasm <binary-path> [args..]");
 	}
 	let exe_path = segments.join("/");
-	// `cli` now holds only the forwarded params; drop the route's own `args` capture
-	// so it never leaks into the module's `Deno.args`, then flatten the rest to
-	// `--key[=value]` flags the running module reads back via `Deno.args`.
-	cli.params.remove("args");
+	// `cli` now holds only the forwarded params; drop the route's own `run-wasm-args`
+	// capture so it never leaks into the module's `Deno.args`, then flatten the rest
+	// to `--key[=value]` flags the running module reads back via `Deno.args`.
+	cli.params.remove("run-wasm-args");
 	let forwarded = cli.into_args();
 	run_wasm(Path::new(&exe_path), forwarded).await?;
-	// the module's output already streamed via inherited stdio, so this response is
-	// only a success status. Return an explicit text body (not a negotiated `String`)
-	// so a forwarded `--accept` meant for the module never fails *this* runner
-	// request's content negotiation.
-	Response::ok_text(String::new()).xok()
+	// the module's output already streamed via inherited stdio, so the runner's own
+	// response carries no body, only a success status.
+	Response::ok().xok()
 }
 
 /// The directory the runner artifacts (`bindgen*.js`, `deno.ts`) are written to.
@@ -87,6 +87,10 @@ async fn run_wasm(exe_path: &Path, args: Vec<String>) -> Result {
 	// code propagates — essential for a cargo runner.
 	let mut deno_args = vec![
 		"--allow-read".to_string(),
+		// `FsStore` is cross-platform and writes through the runner's fs globals
+		// (`Deno.writeFileSync`/`ensureDirSync`), so its `insert`/`store_create`
+		// need write access under the runner.
+		"--allow-write".to_string(),
 		"--allow-net".to_string(),
 		"--allow-env".to_string(),
 		runner_dir.join("deno.ts").to_string_lossy().to_string(),

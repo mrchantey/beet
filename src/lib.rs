@@ -26,8 +26,9 @@ pub use beet_core::test_main;
 pub use beet_core::test_runner;
 #[cfg(any(feature = "testing", feature = "testing_embedded"))]
 pub use beet_core::testing;
+// the `extra` crate, gated on the `examples` feature (the feature keeps its name).
 #[cfg(feature = "examples")]
-pub use beet_extra as examples;
+pub use beet_extra as extra;
 #[cfg(feature = "infra")]
 pub use beet_infra as infra;
 #[cfg(feature = "net")]
@@ -88,7 +89,7 @@ pub mod prelude {
 	// #[cfg(feature = "design")]
 	// pub use crate::design::prelude::*;
 	#[cfg(feature = "examples")]
-	pub use crate::examples::prelude::*;
+	pub use crate::extra::prelude::*;
 	// #[cfg(feature = "flow")]
 	// pub use crate::flow::prelude::*;
 	#[cfg(feature = "ml")]

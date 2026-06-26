@@ -70,6 +70,15 @@ globalThis.write_file = (path: string, content: Uint8Array) => {
 	return do_try(() => Deno.writeFileSync(path, content));
 };
 
+// Recursively remove a file or directory, returning an error string on failure
+// (the `write_file` Option<String> contract). A missing path errors, matching
+// `std::fs::remove_*` so `fs_ext::remove` behaves the same on both targets.
+globalThis.remove = (path: string) => {
+	return do_try_err(() => {
+		Deno.removeSync(path, { recursive: true });
+	});
+};
+
 globalThis.env_args = () => {
 	return do_try(() => Deno.args, []);
 };
@@ -106,6 +115,7 @@ globalThis.test_read_file = globalThis.read_file;
 globalThis.test_read_dir = globalThis.read_dir;
 globalThis.test_create_dir_all = globalThis.create_dir_all;
 globalThis.test_write_file = globalThis.write_file;
+globalThis.test_remove = globalThis.remove;
 globalThis.test_env_args = globalThis.env_args;
 globalThis.test_env_var = globalThis.env_var;
 globalThis.test_set_env = globalThis.set_env;
@@ -139,6 +149,16 @@ function do_try<Ok, Err = null>(
 			console.error(err);
 		}
 		return on_err;
+	}
+}
+// Run a fallible side-effect, returning null on success or the error string on
+// throw: the `Option<String>` contract the Rust `write_file`/`remove` bindings read.
+function do_try_err(func: () => void): string | null {
+	try {
+		func();
+		return null;
+	} catch (err) {
+		return String(err);
 	}
 }
 async function loop_forever() {
