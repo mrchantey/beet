@@ -2,9 +2,9 @@
 # Hello Cloudflare Containers
 
 Deploys `examples/bsx_site` to Cloudflare Containers: the SAME native `beet` binary
-as `hello_fargate`, run in a container that reads the site from R2 at request time
+as `fargate`, run in a container that reads the site from R2 at request time
 via `S3Store::r2`. Served on `<name>.workers.dev` (no custom domain). Toggling
-between this and the wasm Worker (`hello_cloudflare_workers.bsx`) is a small swap:
+between this and the wasm Worker (`cloudflare_workers.bsx`) is a small swap:
 
 - block: `CloudflareContainerBlock` <-> `CloudflareWorkerBlock`
 - build: a `<BeetBinaryBuild/>` (native binary baked into the image) vs none (the
@@ -15,9 +15,9 @@ The served content and the deploy/sync/destroy route shape are identical.
 
 ## Usage
 
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_containers.bsx deploy
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_containers.bsx sync
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_containers.bsx destroy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_containers.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_containers.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_containers.bsx destroy
 
 Live deploy needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the R2
 data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
@@ -30,7 +30,8 @@ data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
 		<BeetBinaryBuild features="aws_sdk"/>
 		<CloudflareContainerDeployAction/>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
-		<CloudflareWatch name="beet-hello-container"/>
+		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
+		<CloudflareWatch name="beet-hello-container" timeout="10s"/>
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>

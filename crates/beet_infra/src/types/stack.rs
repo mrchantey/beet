@@ -7,7 +7,8 @@ use beet_net::prelude::*;
 pub struct Stack {
 	/// The app name, defaults to `CARGO_PKG_NAME`
 	app_name: SmolStr,
-	/// The deployment stage, defaults to `dev`
+	/// The deployment stage, namespacing every resource. Resolved by [`Stack::new`]
+	/// from the `--stage=<x>` cli arg, else the `BEET_STAGE` env var, else `dev`.
 	stage: SmolStr,
 	/// Name of the production stage, which often receives
 	/// special treatment like bucket locking and no subdomain.
@@ -56,11 +57,20 @@ impl Stack {
 			.ok()
 			.unwrap_or_else(crate::types::artifacts::now_timestamp);
 
+		// the stage flows from `--stage=<x>`, else `BEET_STAGE`, else `dev`, so it
+		// reaches every stack in every scene without per-template threading.
+		let stage = CliArgs::parse_env()
+			.params
+			.get("stage")
+			.cloned()
+			.or_else(|| env_ext::var("BEET_STAGE").ok().map(SmolStr::from))
+			.unwrap_or_else(|| "dev".into());
+
 		Self {
 			app_name,
 			work_directory,
 			state_suffix: "tofu.tfstate".into(),
-			stage: "dev".into(),
+			stage,
 			prod_stage: "prod".into(),
 			params: default(),
 			artifact_bucket_suffix: "artifacts".into(),
@@ -232,5 +242,30 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Get the [`BlobStore`] component from this entity.
 	pub fn store(&self, entity: Entity) -> Result<&BlobStore> {
 		self.stores.get(entity)?.xok()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	#[beet_core::test]
+	fn stage_defaults_to_dev() {
+		// the beet test runner passes no `--stage`/`BEET_STAGE`, so a fresh stack
+		// resolves the `dev` default and is not production.
+		let stack = Stack::new("x");
+		stack.stage().xpect_eq("dev");
+		stack.is_production().xpect_false();
+	}
+
+	#[beet_core::test]
+	fn prod_stage_is_production() {
+		// the `prod` stage (what `--stage=prod` resolves to) marks production,
+		// flipping the stage-aware paths (eg the beet-site apex dns).
+		Stack::new("x")
+			.with_stage("prod")
+			.is_production()
+			.xpect_true();
 	}
 }

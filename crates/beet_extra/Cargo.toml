@@ -42,8 +42,9 @@ thread = ["json", "dep:beet_thread", "dep:beet_net", "dep:beet_router"]
 # block/config types + the standalone deploy-action templates, so the `beet`
 # binary runs `examples/infra/*.bsx`. Headless (no render), so independent of
 # `bevy_default`. Pulls `beet_infra` with its `cloudflare_block` blocks + the
-# `deploy` route actions.
-infra = ["dep:beet_infra", "beet_infra/cloudflare_block", "beet_infra/deploy", "beet_infra/lambda_block", "beet_infra/lightsail_block", "beet_infra/fargate_block", "beet_infra/aws_sdk", "json", "dep:beet_net", "beet_net/server", "beet_net/fs", "beet_net/aws_sdk", "dep:beet_router", "beet_router/std", "beet_router/native"]
+# `deploy` route actions, plus `cloudflare_dns` for the beet-site block's
+# `DnsProvider::cloudflare` records.
+infra = ["dep:beet_infra", "beet_infra/cloudflare_block", "beet_infra/cloudflare_dns", "beet_infra/deploy", "beet_infra/lambda_block", "beet_infra/lightsail_block", "beet_infra/fargate_block", "beet_infra/aws_sdk", "json", "dep:beet_net", "beet_net/server", "beet_net/fs", "beet_net/aws_sdk", "dep:beet_router", "beet_router/std", "beet_router/native"]
 # The QuickJS runtime for the `scripting` action example (`<Scripting>`), so the
 # `beet` binary can run `examples/action/scripting.bsx`. Pulls `beet_action`'s
 # typed `Script`/`ScriptAction` and the QuickJS engine; gated so a headless build

@@ -12,4 +12,4 @@ Building on [OpenTofu](https://opentofu.org) means beet does not reinvent the de
 - `bindings` ships pre-generated typed bindings for common providers, with a `bindings_generator` to derive new ones from a provider schema.
 - the `deploy` feature adds actions for the full lifecycle: validate, plan, deploy, watch, show and destroy.
 
-The deploy examples (`hello_lambda`, `hello_fargate`, `hello_lightsail`) take the router example and stand it up on AWS, so the application and the infrastructure it lands on are described in the same language.
+The deploy examples (`lambda`, `fargate`, `lightsail`) take the router example and stand it up on AWS, so the application and the infrastructure it lands on are described in the same language.

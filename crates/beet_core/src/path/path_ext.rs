@@ -266,11 +266,16 @@ mod test {
 	/// already-absolute path round-trips. Cross-platform: on wasm the cwd comes
 	/// from `js_runtime::cwd`, so a workspace-relative `FsStore` entry resolves the
 	/// same file native does (regression: wasm used to only prepend a bare `/`).
+	///
+	/// Rootedness is asserted via a leading `/` rather than [`Path::is_absolute`]:
+	/// `wasm32-unknown-unknown` has no platform path semantics so `is_absolute`
+	/// always returns `false` there, the same reason [`clean`] keys off
+	/// `starts_with('/')`.
 	#[crate::test]
 	#[cfg(feature = "std")]
 	fn absolute() {
 		let resolved = path_ext::absolute("foo/bar.txt").unwrap();
-		resolved.is_absolute().xpect_true();
+		resolved.to_string_lossy().starts_with('/').xpect_true();
 		resolved.ends_with("foo/bar.txt").xpect_true();
 		path_ext::absolute("/already/abs.txt")
 			.unwrap()

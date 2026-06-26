@@ -2,7 +2,7 @@
 //! independent live terminal per ssh connection, from one process.
 //!
 //! The multi-tenant demo and the deployable entrypoint pattern (a dedicated
-//! binary that spawns the router + servers, like `hello_fargate`).
+//! binary that spawns the router + servers, like `fargate`).
 //!
 //! ```sh
 //! cargo run --example ssh_tui_site --features ssh_tui,http_server,markdown

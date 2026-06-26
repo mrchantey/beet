@@ -59,6 +59,18 @@ push-assets:
 beet *args:
   cargo run -p beet-cli --features winit,ml -- {{ args }}
 
+# Deploy the beet website to AWS Fargate; --stage=prod targets prod (default dev).
+# Lean headless build (no winit/ml) and AWS_PROFILE cleared so tofu/aws/s3 use the
+# explicit `.env` keys rather than a global profile.
+beet-deploy *args:
+  AWS_PROFILE= cargo run -p beet-cli -- deploy {{ args }}
+# Re-publish the site + assets to S3 without an image rebuild.
+beet-sync *args:
+  AWS_PROFILE= cargo run -p beet-cli -- sync {{ args }}
+# Poll the deployed service's rollout.
+beet-watch *args:
+  AWS_PROFILE= cargo run -p beet-cli -- watch {{ args }}
+
 install-cli *args:
   # --locked pins the workspace bevy rc; a bare install re-resolves the
   # pre-release deps to a newer, incompatible candidate.

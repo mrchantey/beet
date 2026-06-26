@@ -649,24 +649,6 @@ name = "router_serde"
 path = "examples/router/router_serde.rs"
 required-features = ["router", "rhai_serde", "template_serde"]
 
-
-# 💡 Examples - infra
-
-[[example]]
-name = "lifecycle"
-path = "examples/infra/lifecycle.rs"
-required-features = ["bindings_aws_common", "aws_sdk"]
-
-[[example]]
-name = "deploy_ssh_site"
-path = "examples/infra/deploy_ssh_site.rs"
-required-features = ["router", "fargate_block", "markdown"]
-
-[[example]]
-name = "deploy_beet_site"
-path = "examples/infra/deploy_beet_site.rs"
-required-features = ["router", "fargate_block", "markdown", "cloudflare_dns"]
-
 # 💡 Examples - action
 
 [[example]]

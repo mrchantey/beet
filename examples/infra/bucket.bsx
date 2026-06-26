@@ -1,0 +1,20 @@
+<!--
+# Bucket Lifecycle
+
+Stands up a stack with a single S3 bucket, then exercises its full lifecycle
+(validate / plan / apply, write a file to the bucket's BlobStore + read it back,
+destroy), logging each step. Switch the tofu state backend between local and S3
+with `--s3-backend`.
+
+## Usage
+
+    just beet --main=examples/infra/bucket.bsx run               # local backend
+    just beet --main=examples/infra/bucket.bsx run --s3-backend  # s3 backend
+
+Live run needs AWS credentials and `tofu`.
+-->
+<BucketStack app_name="bucket-example">
+	<Route path="run" {ExchangeSequence}>
+		<NamedBucket label="my-bucket" {LifecycleProbe}/>
+	</Route>
+</BucketStack>

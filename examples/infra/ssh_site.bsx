@@ -1,0 +1,35 @@
+<!--
+# SSH Site
+
+Deploys the `ssh_tui_site` example binary (html over http + a multi-tenant live
+terminal over ssh) to AWS Fargate, with cpu autoscaling and an ssh-capable NLB
+(see `FargateBlock`). The container runs the `ssh_tui_site` binary, which reads
+`BEET_HOST`/`BEET_PORT`/`BEET_SSH_PORT` (injected by the ssh-enabled block) and
+serves both protocols; `/health` is the http health check.
+
+Unlike the other site deployers this bakes a *specific example binary* into the
+image (`<ExampleBinaryBuild/>`) rather than the generic `beet` binary; the ssh
+TUI is compiled in, so there is no S3 site sync.
+
+## Usage
+
+    just beet --main=examples/infra/ssh_site.bsx validate
+    just beet --main=examples/infra/ssh_site.bsx deploy
+    just beet --main=examples/infra/ssh_site.bsx watch
+    just beet --main=examples/infra/ssh_site.bsx destroy --force
+
+Live deploy needs AWS credentials, plus `tofu`, `cargo-zigbuild` and a container
+engine.
+-->
+<StackHost app_name="ssh-site">
+	<Route path="deploy" {ExchangeSequence}>
+		<FargateSshBlock app_name="ssh-site"/>
+		<ExampleBinaryBuild example="ssh_tui_site" features="ssh_tui,http_server,markdown"/>
+		<TofuApplyAction/>
+		<BuildDockerImage/>
+		<FargateWatch app_name="ssh-site" timeout="60s"/>
+	</Route>
+	<Route path="watch" {ExchangeSequence}>
+		<FargateWatch app_name="ssh-site"/>
+	</Route>
+</StackHost>

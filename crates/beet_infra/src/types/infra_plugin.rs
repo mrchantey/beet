@@ -35,6 +35,12 @@ impl Plugin for InfraPlugin {
 		#[cfg(feature = "deploy")]
 		app.register_type::<crate::prelude::TofuApplyAction>();
 
+		// the full-lifecycle smoke-test action: reads a bucket's `BlobStore` (so
+		// `aws_sdk`-gated like the store) and lives in the `actions` module (so
+		// `deploy`-gated). Register it only when both compile it.
+		#[cfg(all(feature = "deploy", feature = "aws_sdk"))]
+		app.register_type::<crate::prelude::LifecycleProbe>();
+
 		// the docker/podman image build action + its engine selector (the
 		// `build_docker_image` module is gated on `fargate_block`).
 		#[cfg(feature = "fargate_block")]

@@ -29,6 +29,19 @@ holding an entry document, or the entry file itself):
     beet serve site/main.bsx               # ..the entry file resolves the same site
     beet serve site --server=tui           # ..as a live terminal (like `beet present`)
     beet serve site --server=http,ssh      # ..http plus a multi-tenant ssh terminal
+
+It also deploys the beet website to AWS Fargate (the site served from S3, html
+over http + a live ssh terminal). The deploy routes hang off a stack-bearing
+`<BeetSiteDeployHost>` so they resolve a `Stack` by ancestry without a second
+server. `--stage=prod` targets production (apex `beet.org` + `www`); the default
+`dev` stage publishes only `dev.beet.org`:
+
+    just beet deploy [--stage=prod]        # build -> tofu -> image -> sync -> watch
+    just beet sync                         # re-publish the site (no image rebuild)
+    just beet watch                        # poll the rollout
+
+Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID` in
+`.env`, plus `tofu`, `cargo-zigbuild` and a container engine.
 -->
 <Router {(CliServer{always:true}, BootOnLoad)}>
 	<Serve/>
@@ -38,4 +51,24 @@ holding an entry document, or the entry file itself):
 	<ExportStatic/>
 	<ExportPdf/>
 	<SyncS3/>
+	<BeetSiteDeployHost>
+		<Route path="deploy" {ExchangeSequence}>
+			<FargateBeetSiteBlock app_name="beet-site"/>
+			<SiteBucket/>
+			<AssetsBucket/>
+			<BeetBinaryBuild features="aws_sdk"/>
+			<TofuApplyAction/>
+			<BuildDockerImage cmd_args={["serve", "--server=http,ssh", "--path=/"]}/>
+			<DirSync app_name="beet-site" bucket="site" dir="site"/>
+			<DirSync app_name="beet-site" bucket="assets" dir="assets"/>
+			<FargateWatch app_name="beet-site" timeout="300s"/>
+		</Route>
+		<Route path="sync" {ExchangeSequence}>
+			<DirSync app_name="beet-site" bucket="site" dir="site"/>
+			<DirSync app_name="beet-site" bucket="assets" dir="assets"/>
+		</Route>
+		<Route path="watch" {ExchangeSequence}>
+			<FargateWatch app_name="beet-site" timeout="300s"/>
+		</Route>
+	</BeetSiteDeployHost>
 </Router>

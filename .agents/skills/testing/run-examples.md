@@ -132,7 +132,6 @@ Documented so future passes don't waste time on them:
 - **Thread scenes:** `chat`, `multi_agent`, `oneshot`, `persistent_chat`, `tool_call`, `self_evolving`, `coding_agent` are `.bsx` markup scenes under `examples/thread/`, not `--example` targets. Several also need an LLM key (`OPENAI_API_KEY` / `BEDROCK_*`).
 - **Interactive TUI/stdin:** `ui/term_input`, `ui/tui`, `ui/state` — real examples that block on stdin.
 - **Browser required:** `ui/crud`, `ui/syntax_highlighting`, `ui/media_renderer` (interactive output).
-- **Needs AWS:** `hello_lambda`, `hello_lightsail`, `hello_fargate`, `lifecycle`. Compile-check only.
 - **Needs sshd:** `ssh_server`, `ssh_client`, `ssh_tui`.
 
 A pure compile check is still useful for the skipped set. The first three cover
@@ -142,7 +141,7 @@ A pure compile check is still useful for the skipped set. The first three cover
 cargo check -p beet --features=examples,ml       # beet_extra ML scenes (fetch etc.)
 cargo check -p beet --features=examples,spatial  # beet_extra spatial scenes (flock etc.)
 cargo check -p beet --features=thread            # thread scene templates
-cargo check --example hello_lambda --features=router,lambda_block,markdown
+cargo check -p beet-cli --features infra         # examples/infra/*.bsx deploy templates
 ```
 
 ## Instructions

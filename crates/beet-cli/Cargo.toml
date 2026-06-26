@@ -31,12 +31,12 @@ pdf = ["dep:lopdf"]
 # the example `.bsx` tags resolve.
 thread = ["beet/thread", "beet/ui", "beet/extra"]
 # The cloudflare/aws deploy examples, so one `beet` binary runs an infra deployer
-# `.bsx` (eg `examples/infra/hello_cloudflare_workers.bsx deploy`). Pulls
+# `.bsx` (eg `examples/infra/cloudflare_workers.bsx deploy`). Pulls
 # `beet/cloudflare_block` (the deploy blocks + route actions); `beet/extra` adds
 # `BeetExtraPlugin` and `beet/infra` forwards `beet_extra/infra` (the
 # `InfraExamplesPlugin` templates) so the example `.bsx` tags resolve. Opt-in (like
 # `winit`), so a plain `beet serve` never links the deploy machinery. Run with:
-# `cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_workers.bsx deploy`.
+# `cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx deploy`.
 infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/extra"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
@@ -113,6 +113,9 @@ beet = { workspace = true, features = [
 	"router",
 	"fs",
 	"infra",
+	# Cloudflare DNS for the AWS blocks, so the root `main.bsx` beet-site deployer
+	# resolves `<FargateBeetSiteBlock>`'s `DnsProvider::cloudflare` records.
+	"cloudflare_dns",
 	"webdriver",
 	# the `serve` command spawns and serves a no-code BSX site
 	"http_server",

@@ -9,11 +9,11 @@ by re-running `sync` with no redeploy.
 
 ## Usage
 
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx validate
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx deploy
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx sync
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx watch
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_lambda.bsx destroy --force
+    cargo run -p beet-cli --features infra -- --main=examples/infra/lambda.bsx validate
+    cargo run -p beet-cli --features infra -- --main=examples/infra/lambda.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/lambda.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/lambda.bsx watch
+    cargo run -p beet-cli --features infra -- --main=examples/infra/lambda.bsx destroy --force
 
 `<StackHost>` is the IaC deployer host: a `Stack` (resolved by the blocks + verbs by
 ancestry), a one-shot `CliServer` with `BootOnLoad` (the CLI request fires on load
@@ -25,20 +25,20 @@ the route and the sequence runs them in order.
 Live deploy needs AWS credentials in the environment, plus `tofu`,
 `cargo-zigbuild` and `zip`.
 -->
-<StackHost app_name="hello_lambda">
+<StackHost app_name="lambda">
 	<Route path="deploy" {ExchangeSequence}>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-		<LambdaSiteBlock app_name="hello_lambda" features="lambda,aws_sdk"/>
+		<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>
 		<SiteBucket/>
 		<TofuApplyAction/>
-		<SiteSync app_name="hello_lambda"/>
+		<SiteSync app_name="lambda"/>
 		<!-- the rollout is quick, so tail briefly then exit -->
-		<LambdaWatch app_name="hello_lambda" timeout="30s"/>
+		<LambdaWatch app_name="lambda" timeout="30s"/>
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
-		<SiteSync app_name="hello_lambda"/>
+		<SiteSync app_name="lambda"/>
 	</Route>
 	<Route path="watch" {ExchangeSequence}>
-		<LambdaWatch app_name="hello_lambda"/>
+		<LambdaWatch app_name="lambda"/>
 	</Route>
 </StackHost>

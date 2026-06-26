@@ -14,30 +14,30 @@ reading the freshly built binary.
 
 ## Usage
 
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx validate
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx deploy
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx sync
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx watch
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_fargate.bsx destroy --force
+    cargo run -p beet-cli --features infra -- --main=examples/infra/fargate.bsx validate
+    cargo run -p beet-cli --features infra -- --main=examples/infra/fargate.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/fargate.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/fargate.bsx watch
+    cargo run -p beet-cli --features infra -- --main=examples/infra/fargate.bsx destroy --force
 
 Live deploy needs AWS credentials in the environment, plus `tofu`, `cargo-zigbuild`
 and a container engine.
 -->
-<StackHost app_name="hello_fargate">
+<StackHost app_name="fargate">
 	<Route path="deploy" {ExchangeSequence}>
-		<FargateSiteBlock app_name="hello_fargate"/>
+		<FargateSiteBlock app_name="fargate"/>
 		<SiteBucket/>
 		<BeetBinaryBuild features="aws_sdk"/>
 		<TofuApplyAction/>
 		<!-- bake the freshly built binary into the container image -->
 		<BuildDockerImage cmd_args={["serve", "--server=http", "--path=/"]}/>
-		<SiteSync app_name="hello_fargate"/>
-		<FargateWatch app_name="hello_fargate" timeout="300s"/>
+		<SiteSync app_name="fargate"/>
+		<FargateWatch app_name="fargate" timeout="300s"/>
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
-		<SiteSync app_name="hello_fargate"/>
+		<SiteSync app_name="fargate"/>
 	</Route>
 	<Route path="watch" {ExchangeSequence}>
-		<FargateWatch app_name="hello_fargate"/>
+		<FargateWatch app_name="fargate"/>
 	</Route>
 </StackHost>

@@ -12,9 +12,9 @@ per request, and serves on `<name>.workers.dev`.
 
 ## Usage
 
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_workers.bsx deploy
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_workers.bsx sync
-    cargo run -p beet-cli --features infra -- --main=examples/infra/hello_cloudflare_workers.bsx destroy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx deploy
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` host (no long-running server); `BootOnLoad` fires the CLI
 request on load and the matching verb runs. Each verb is a child-sequenced

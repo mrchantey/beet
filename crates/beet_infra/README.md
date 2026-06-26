@@ -2,7 +2,7 @@
 
 Infrastructure as code for beet, built on [OpenTofu](https://opentofu.org).
 
-Cloud resources are declared as Bevy entities and exported to Terraform/OpenTofu JSON, so a beet app can plan, deploy and destroy its own infrastructure. The deploy examples (`hello_lambda`, `hello_fargate`, `hello_lightsail`) stand up the router example on AWS.
+Cloud resources are declared as Bevy entities and exported to Terraform/OpenTofu JSON, so a beet app can plan, deploy and destroy its own infrastructure. The deploy examples (`lambda`, `fargate`, `lightsail`) stand up the router example on AWS.
 
 - `terra` - build and export OpenTofu JSON configurations
 - `bindings` - pre-generated typed bindings for common providers

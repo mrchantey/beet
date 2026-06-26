@@ -24,7 +24,9 @@ lightsail_block = ["bindings_aws_common","bindings_aws_lightsail"]
 fargate_block = ["bindings_aws_common","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns"]
 # Opt-in Cloudflare DNS + load-balancer failover paths for the AWS blocks. Pulls
 # the cloudflare terraform bindings; without it the AWS blocks are Route53-only.
-cloudflare_dns = ["bindings_cloudflare_common"]
+# Also pulls `bindings_aws_dns`: enabling this compiles the shared `dns` module
+# whose always-present `Route53` variant needs the Route53 binding.
+cloudflare_dns = ["bindings_cloudflare_common", "bindings_aws_dns"]
 # The Cloudflare Containers + Workers blocks/actions. Wrangler-provisioned, so no
 # terraform bindings; needs `deploy` (the actions) and `aws_sdk` (the container's
 # `S3Store::r2` path) at the consumer.

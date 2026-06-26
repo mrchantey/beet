@@ -151,7 +151,7 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 	info!("deploy: starting fargate deployment");
 	let block = FargateBlock::default();
 
-	// spawn entity with action sequence, similar to hello_fargate example
+	// spawn entity with action sequence, similar to fargate example
 	let response = AsyncPlugin::world()
 		.spawn((
 			stack.clone(),
