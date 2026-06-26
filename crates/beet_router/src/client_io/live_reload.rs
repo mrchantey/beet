@@ -293,8 +293,8 @@ mod test {
 		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
 		// the RoutesDir scan is async, so settle it before reading the tree
 		AsyncRunner::settle_async_tasks(&mut world).await;
-		let routes_dir = world
-			.with_state::<Query<Entity, With<RoutesDir>>, _>(|query| {
+		let routes_dir =
+			world.with_state::<Query<Entity, With<RoutesDir>>, _>(|query| {
 				query.single().unwrap()
 			});
 		world
@@ -396,8 +396,8 @@ mod test {
 		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		// the `ClientIo` channel `start_live_reload` spawned as the root's child
-		let channel = world
-			.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
+		let channel =
+			world.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
 				query.single().unwrap()
 			});
 		let received = Store::<Vec<Message>>::default();
@@ -495,10 +495,7 @@ mod test {
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
 		// the marker survived the route respawn ...
-		world
-			.entity(router)
-			.contains::<CardDeck>()
-			.xpect_true();
+		world.entity(router).contains::<CardDeck>().xpect_true();
 		// ... and the rebuilt tree still lists the cards in sorted order.
 		card_order(&mut world, router).xpect_eq(vec![
 			"01-alpha".to_string(),

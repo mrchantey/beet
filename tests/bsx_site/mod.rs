@@ -32,8 +32,9 @@ pub async fn build_site(world: &mut World) -> Entity {
 	// entry-level tags resolve against them.
 	let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
 	for dir in TemplateDir::extract_dirs(&nodes) {
-		let sources =
-			TemplateDir::read_sources(&store, &dir, &formats).await.unwrap();
+		let sources = TemplateDir::read_sources(&store, &dir, &formats)
+			.await
+			.unwrap();
 		TemplateDir::register_sources(world, &formats, sources).unwrap();
 	}
 	let template = BsxTemplate::parse_entry(world, source).unwrap();

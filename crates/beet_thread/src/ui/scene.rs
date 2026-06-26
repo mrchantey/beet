@@ -291,8 +291,10 @@ mod test {
 	#[beet_core::test]
 	async fn composer_renders_from_bsx() {
 		let (mut app, host) = charcell_app().await;
-		let thread =
-			app.world_mut().spawn((Thread::default(), Sequence::new())).id();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), Sequence::new()))
+			.id();
 		app.update();
 		app.world_mut()
 			.entity_mut(host)
@@ -313,17 +315,18 @@ mod test {
 	#[beet_core::test]
 	async fn composer_focus_survives_wrapper() {
 		let (mut app, host) = charcell_app().await;
-		let thread =
-			app.world_mut().spawn((Thread::default(), Sequence::new())).id();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), Sequence::new()))
+			.id();
 		app.update();
 		// nest the form under an extra <div> wrapper under the host, not
 		// directly, so any fixed-depth walk would miss the host.
 		app.world_mut().entity_mut(host).insert((
 			LayoutStyle::flex_col(),
-			children![(
-				Element::new("div"),
-				children![CreatePostForm::new(thread)]
-			)],
+			children![(Element::new("div"), children![CreatePostForm::new(
+				thread
+			)])],
 		));
 		// settle the build + focus deterministically rather than spinning frames
 		AsyncRunner::settle_async_tasks(app.world_mut()).await;
@@ -333,7 +336,9 @@ mod test {
 		app.world().entity(input).contains::<Focus>().xpect_true();
 		// ... and its resolved surface is the host (so typed bytes route to it).
 		app.world_mut()
-			.with_state::<SurfaceQuery, _>(|surfaces| surfaces.surface_of(input))
+			.with_state::<SurfaceQuery, _>(|surfaces| {
+				surfaces.surface_of(input)
+			})
 			.xpect_eq(Some(host));
 	}
 

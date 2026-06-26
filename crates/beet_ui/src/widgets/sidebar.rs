@@ -445,7 +445,10 @@ mod test {
 				.insert(ElementStateMap::with(ElementState::Hovered));
 		}
 		world.run_schedule(crate::parse::PostParseTree);
-		world.get::<crate::style::VisualStyle>(link).unwrap().background
+		world
+			.get::<crate::style::VisualStyle>(link)
+			.unwrap()
+			.background
 	}
 
 	/// The active page keeps its raised pill background while hovered, in both

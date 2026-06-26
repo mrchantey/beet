@@ -96,7 +96,10 @@ impl StdioTerminal {
 			BufWriter::with_capacity(TERMINAL_BUFFER_CAPACITY, writer),
 			stdio.config.clone(),
 		);
-		world.commands().entity(cx.entity).insert((terminal, graphics));
+		world
+			.commands()
+			.entity(cx.entity)
+			.insert((terminal, graphics));
 	}
 
 	/// Registers a hook that restores the terminal on ctrl+c or panic.

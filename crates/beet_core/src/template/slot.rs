@@ -525,7 +525,9 @@ mod test {
 		let content: Vec<Entity> = ["foo", "bar", "baz"]
 			.into_iter()
 			.map(|name| {
-				world.spawn((Name::new(name), SlotChild::new(), ChildOf(root))).id()
+				world
+					.spawn((Name::new(name), SlotChild::new(), ChildOf(root)))
+					.id()
 			})
 			.collect();
 
@@ -572,7 +574,11 @@ mod test {
 			.id();
 		// the caller's "inner" content, forwarded through the relay.
 		let title = world
-			.spawn((Name::new("title"), SlotChild::named("inner"), ChildOf(scope)))
+			.spawn((
+				Name::new("title"),
+				SlotChild::named("inner"),
+				ChildOf(scope),
+			))
 			.id();
 
 		resolve_slots(&mut world, scope).unwrap();
@@ -583,7 +589,12 @@ mod test {
 		// the relay persisted and adopted the forwarded title as its child.
 		world.entity(relay).contains::<SlotTarget>().xpect_false();
 		world.entity(relay).contains::<SlotChild>().xpect_false();
-		world.entity(title).get::<ChildOf>().unwrap().parent().xpect_eq(relay);
+		world
+			.entity(title)
+			.get::<ChildOf>()
+			.unwrap()
+			.parent()
+			.xpect_eq(relay);
 		child_names(&world, relay).xpect_eq(vec!["title".to_string()]);
 	}
 
@@ -607,7 +618,11 @@ mod test {
 		// caller content for "head", which the relay must adopt rather than eat
 		// its own name.
 		let meta = world
-			.spawn((Name::new("meta"), SlotChild::named("head"), ChildOf(scope)))
+			.spawn((
+				Name::new("meta"),
+				SlotChild::named("head"),
+				ChildOf(scope),
+			))
 			.id();
 		// the structural slot the relay is finally routed into; collapses on fill.
 		let structural = world
@@ -621,6 +636,11 @@ mod test {
 		world.get_entity(structural).is_err().xpect_true();
 		child_names(&world, scope).xpect_eq(vec!["relay".to_string()]);
 		child_names(&world, relay).xpect_eq(vec!["meta".to_string()]);
-		world.entity(meta).get::<ChildOf>().unwrap().parent().xpect_eq(relay);
+		world
+			.entity(meta)
+			.get::<ChildOf>()
+			.unwrap()
+			.parent()
+			.xpect_eq(relay);
 	}
 }

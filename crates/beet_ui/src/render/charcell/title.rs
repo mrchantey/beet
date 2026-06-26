@@ -50,7 +50,11 @@ pub(crate) fn collect_terminal_titles(
 		};
 		// write only on a real change, so PartialEq gates the Changed flag the
 		// flush system reads.
-		if titles.get(surface).map(|title| title.0 != text).unwrap_or(true) {
+		if titles
+			.get(surface)
+			.map(|title| title.0 != text)
+			.unwrap_or(true)
+		{
 			commands.entity(surface).insert(Title(text));
 		}
 	}
@@ -92,15 +96,13 @@ mod test {
 	/// page tree carrying a `<title>` bound to that host via
 	/// [`RenderSurface`](crate::prelude::RenderSurface). Returns the host entity.
 	fn surface(app: &mut App, title: &str) -> Entity {
-		let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
+		let (channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
 		let host = app.world_mut().spawn((channel, terminal)).id();
-		app.world_mut().spawn((
-			RenderSurface(host),
-			children![(
-				Element::new("title"),
-				children![Value::str(title)]
-			)],
-		));
+		app.world_mut().spawn((RenderSurface(host), children![(
+			Element::new("title"),
+			children![Value::str(title)]
+		)]));
 		host
 	}
 
@@ -140,6 +142,8 @@ mod test {
 
 		// an unchanged title does not re-write: the next frame emits no set-title.
 		app.update();
-		drain(&mut app, alpha).xnot().xpect_contains(&osc_title("Alpha"));
+		drain(&mut app, alpha)
+			.xnot()
+			.xpect_contains(&osc_title("Alpha"));
 	}
 }

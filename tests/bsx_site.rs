@@ -155,7 +155,8 @@ async fn terminal_renders_full_layout() {
 	world
 		.entity_mut(root)
 		.exchange_str(
-			Request::get("").with_header::<header::Accept>(vec![MediaType::Text]),
+			Request::get("")
+				.with_header::<header::Accept>(vec![MediaType::Text]),
 		)
 		.await
 		// the page body is present ...

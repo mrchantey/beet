@@ -152,7 +152,9 @@ mod test {
 		let mut world = World::new();
 		let orphan = world.spawn(Element::new("a")).id();
 		world
-			.with_state::<SurfaceQuery, _>(|surfaces| surfaces.surface_of(orphan))
+			.with_state::<SurfaceQuery, _>(|surfaces| {
+				surfaces.surface_of(orphan)
+			})
 			.xpect_eq(None);
 	}
 }

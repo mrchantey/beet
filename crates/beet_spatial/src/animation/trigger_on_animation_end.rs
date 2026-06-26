@@ -92,13 +92,14 @@ where
 			.ok_or_else(|| {
 				bevyhow!("clip `{}` not in agent's AnimationGraph", on_end.clip)
 			})?;
-		let handle = asset_server.load::<AnimationClip>(on_end.clip.to_string());
+		let handle =
+			asset_server.load::<AnimationClip>(on_end.clip.to_string());
 		let player = agents.get_descendent(action)?;
 		// assets are gated to be loaded before LoadTemplate, so a missing clip
 		// asset is a real error, not a wait.
-		let clip = clips.get(&handle).ok_or_else(|| {
-			bevyhow!("clip `{}` not loaded", on_end.clip)
-		})?;
+		let clip = clips
+			.get(&handle)
+			.ok_or_else(|| bevyhow!("clip `{}` not loaded", on_end.clip))?;
 
 		let Some(active_animation) = player.animation(animation_index) else {
 			// not playing yet: legitimately transient

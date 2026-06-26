@@ -226,7 +226,11 @@ impl ReadDir {
 	/// directories. The deno runner backs this; a browser / Worker has no fs, so it
 	/// is empty.
 	#[cfg(target_arch = "wasm32")]
-	fn read_inner_wasm(&self, root: impl AsRef<Path>, paths: &mut Vec<PathBuf>) {
+	fn read_inner_wasm(
+		&self,
+		root: impl AsRef<Path>,
+		paths: &mut Vec<PathBuf>,
+	) {
 		let root = root.as_ref();
 		// every relative file path under `root`, recursively, eg `a/b.txt`.
 		let entries = js_runtime::read_dir(&root.to_string_lossy());

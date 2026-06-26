@@ -74,8 +74,15 @@ fn infer_language(src: &str) -> String {
 /// Build `<pre><code class="language-X">…spans…</code></pre>` under `target`,
 /// highlighting `source` inline (the same span tree [`apply_syntax_highlighting`]
 /// emits), so the post-parse pass need not see this async-built subtree.
-fn build_code_block(world: &mut World, target: Entity, lang: &str, source: &str) {
-	let spans = world.resource::<SyntaxHighlighting>().highlight(lang, source);
+fn build_code_block(
+	world: &mut World,
+	target: Entity,
+	lang: &str,
+	source: &str,
+) {
+	let spans = world
+		.resource::<SyntaxHighlighting>()
+		.highlight(lang, source);
 	let pre = world.spawn((Element::new("pre"), ChildOf(target))).id();
 	let code = world.spawn((Element::new("code"), ChildOf(pre))).id();
 	world.spawn((

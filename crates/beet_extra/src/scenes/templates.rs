@@ -94,7 +94,10 @@ pub fn AppWindow(
 	mut commands: Commands,
 ) -> impl Bundle {
 	if windows.is_empty() {
-		commands.spawn((bevy::window::Window::default(), bevy::window::PrimaryWindow));
+		commands.spawn((
+			bevy::window::Window::default(),
+			bevy::window::PrimaryWindow,
+		));
 	}
 }
 

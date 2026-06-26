@@ -125,8 +125,8 @@ impl Plugin for CharcellPlugin {
 			.add_systems(
 				PostParseTree,
 				(attach_kitty_images, render_image_errors)
-						.chain()
-						.before(ResolveStylesSet),
+					.chain()
+					.before(ResolveStylesSet),
 			)
 			.register_type::<crate::prelude::Title>()
 			.add_systems(

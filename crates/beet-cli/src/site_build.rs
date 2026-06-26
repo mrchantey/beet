@@ -72,7 +72,8 @@ pub async fn read_entry_sources(
 	// non-markup (serde) entry declares none.
 	let template_sources = match entry.media_type() {
 		MediaType::Bsx | MediaType::Html => {
-			let nodes = parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?;
+			let nodes =
+				parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?;
 			let mut sources = Vec::new();
 			for dir in TemplateDir::extract_dirs(&nodes) {
 				sources.extend(
@@ -210,11 +211,16 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources =
-			read_entry_sources(&store, formats, "main.bsx").await.unwrap();
-		let root = build_entry_root(&mut world, store, sources, DisableBootOnLoad)
+		let sources = read_entry_sources(&store, formats, "main.bsx")
+			.await
 			.unwrap();
-		world.entity(root).contains::<TemplatesLoaded>().xpect_true();
+		let root =
+			build_entry_root(&mut world, store, sources, DisableBootOnLoad)
+				.unwrap();
+		world
+			.entity(root)
+			.contains::<TemplatesLoaded>()
+			.xpect_true();
 		// returns rather than hanging, the root being already marked loaded.
 		settle_until_templates_loaded(&mut world).await;
 	}

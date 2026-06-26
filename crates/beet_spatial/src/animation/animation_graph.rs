@@ -59,17 +59,23 @@ mod test {
 	#[beet_core::test]
 	fn defers_clips_and_maps_indices() {
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AssetPlugin::default(), TemplatePlugin))
-			.init_asset::<AnimationClip>()
-			.init_asset::<AnimationGraph>();
+		app.add_plugins((
+			MinimalPlugins,
+			AssetPlugin::default(),
+			TemplatePlugin,
+		))
+		.init_asset::<AnimationClip>()
+		.init_asset::<AnimationGraph>();
 		let world = app.world_mut();
 
 		let fired = Store::new(false);
 		let f = fired.clone();
 		world.add_observer(move |_: On<LoadTemplate>| f.set(true));
 
-		let clips =
-			vec!["fox.glb#Animation0".to_string(), "fox.glb#Animation1".to_string()];
+		let clips = vec![
+			"fox.glb#Animation0".to_string(),
+			"fox.glb#Animation1".to_string(),
+		];
 		let root = world
 			.spawn_template(system_template::<
 				(ResMut<Assets<AnimationGraph>>, BuildAssets),

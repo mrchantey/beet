@@ -66,7 +66,9 @@ fn setup(async_commands: AsyncCommands) {
 			.with(|world: &mut World| {
 				world
 					.spawn((
-						Script::<Player, Player>::rhai("input.score += 100; input"),
+						Script::<Player, Player>::rhai(
+							"input.score += 100; input",
+						),
 						ScriptAction::<Player, Player>::default(),
 					))
 					.id()

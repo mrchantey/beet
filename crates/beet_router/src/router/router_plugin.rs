@@ -42,9 +42,9 @@ impl Plugin for RouterPlugin {
 			.register_type::<CorsConfig>()
 			.register_type::<HtmlStoreAction>()
 			.register_type::<Router>()
-				// a child-sequenced route is `<Route path=".." {ExchangeSequence}>` with
-				// the steps as direct children (the sequence reads its direct children).
-				.register_type::<ExchangeSequence>();
+			// a child-sequenced route is `<Route path=".." {ExchangeSequence}>` with
+			// the steps as direct children (the sequence reads its direct children).
+			.register_type::<ExchangeSequence>();
 
 		// std-only: the scene/asset/charcell rendering pipeline (help pages,
 		// markdown/html scenes → ANSI/text) and the reflect registrations for

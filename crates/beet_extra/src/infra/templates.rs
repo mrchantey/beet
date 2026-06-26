@@ -143,8 +143,9 @@ pub fn LightsailWatch(
 #[template]
 pub fn FargateSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 	let stack = infra_ext::stack(&app_name);
-	FargateBlock::default()
-		.with_env_vars(infra_ext::remote_env(infra_ext::site_bucket_name(&stack)))
+	FargateBlock::default().with_env_vars(infra_ext::remote_env(
+		infra_ext::site_bucket_name(&stack),
+	))
 }
 
 /// `<FargateWatch app_name="hello_fargate" timeout="300s"/>` — tail the deployed

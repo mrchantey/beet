@@ -61,7 +61,9 @@ pub impl<'a> EntityWorldMut<'a> {
 	/// This entity followed by all its descendants, depth-first pre-order.
 	fn iter_descendents_dfs_inclusive(&mut self) -> Vec<Entity> {
 		self.with_state::<Query<&Children>, _>(|entity, query| {
-			query.iter_descendants_inclusive_depth_first(entity).collect()
+			query
+				.iter_descendants_inclusive_depth_first(entity)
+				.collect()
 		})
 	}
 
@@ -213,9 +215,10 @@ mod test {
 		world.entity_mut(a).add_children(&[c, d]);
 		let root = world.spawn_empty().add_children(&[a, b]).id();
 
-		world.entity_mut(root).iter_descendents().xpect_eq(vec![
-			a, b, c, d,
-		]);
+		world
+			.entity_mut(root)
+			.iter_descendents()
+			.xpect_eq(vec![a, b, c, d]);
 		world
 			.entity_mut(root)
 			.iter_descendents_inclusive()

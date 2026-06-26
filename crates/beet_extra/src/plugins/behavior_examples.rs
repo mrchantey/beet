@@ -33,7 +33,5 @@ pub fn TwoWheelDrive(left: f32, right: f32) -> impl Bundle {
 pub struct BehaviorExamplesPlugin;
 
 impl Plugin for BehaviorExamplesPlugin {
-	fn build(&self, app: &mut App) {
-		app.register_template::<TwoWheelDrive>();
-	}
+	fn build(&self, app: &mut App) { app.register_template::<TwoWheelDrive>(); }
 }

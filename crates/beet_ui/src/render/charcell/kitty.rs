@@ -263,16 +263,20 @@ fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 /// image shows both what it was and why it could not load.
 #[cfg(feature = "tui")]
 pub fn render_image_errors(
-	unavailable: Query<(Entity, &KittyImageUnavailable), Without<KittyErrorShown>>,
+	unavailable: Query<
+		(Entity, &KittyImageUnavailable),
+		Without<KittyErrorShown>,
+	>,
 	mut commands: Commands,
 ) {
 	for (entity, image) in unavailable.iter() {
 		let error = image.error.clone();
-		commands.entity(entity).insert(KittyErrorShown).with_children(
-			|parent| {
+		commands
+			.entity(entity)
+			.insert(KittyErrorShown)
+			.with_children(|parent| {
 				parent.spawn(rsx! { <Error>{error}</Error> });
-			},
-		);
+			});
 	}
 }
 
@@ -364,9 +368,9 @@ fn svg_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
 #[cfg(all(feature = "tui", feature = "net"))]
 async fn fetch_remote(entity: AsyncEntity, src: String, id: u32) -> Result {
 	let loaded = fetch_image_bytes(&src).await.and_then(|bytes| {
-		to_png_bytes(bytes).and_then(encode_png).ok_or_else(|| {
-			bevyhow!("response is not a decodable image")
-		})
+		to_png_bytes(bytes)
+			.and_then(encode_png)
+			.ok_or_else(|| bevyhow!("response is not a decodable image"))
 	});
 	// each failure mode warns the src so a no-port error reads differently from a
 	// refused connection, a non-2xx, or a decode error, instead of a silent blank.
@@ -863,8 +867,10 @@ mod test {
 	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]
 	fn shanty_jpeg() -> Option<Vec<u8>> {
 		fs_ext::read(
-			AbsPathBuf::new_workspace_rel("assets/blog/kiama-sea-shanty-club.jpg")
-				.unwrap(),
+			AbsPathBuf::new_workspace_rel(
+				"assets/blog/kiama-sea-shanty-club.jpg",
+			)
+			.unwrap(),
 		)
 		.ok()
 	}
@@ -921,6 +927,8 @@ mod test {
 		host.frame_plain()
 			.as_str()
 			.xpect_contains("[image]: shanty")
-			.xpect_contains("local port not assigned, is the server running yet?");
+			.xpect_contains(
+				"local port not assigned, is the server running yet?",
+			);
 	}
 }

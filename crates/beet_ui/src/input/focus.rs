@@ -15,9 +15,9 @@ use crate::prelude::ElementState;
 use crate::prelude::ElementStateMap;
 use crate::prelude::PointerDown;
 use crate::prelude::PointerUp;
-use crate::prelude::SurfaceQuery;
 #[cfg(feature = "template")]
 use crate::prelude::Submit;
+use crate::prelude::SurfaceQuery;
 use beet_core::prelude::*;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::Key;
@@ -44,19 +44,19 @@ impl Focus {
 	fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		let added = cx.entity;
 		world.commands().queue(move |world: &mut World| {
-			let stale = world.with_state::<(
-				Query<Entity, With<Focus>>,
-				SurfaceQuery,
-			), _>(|(focused, surfaces)| {
-				let added_surface = surfaces.surface_of(added);
-				focused
-					.iter()
-					.filter(|entity| *entity != added)
-					.filter(|entity| {
-						surfaces.surface_of(*entity) == added_surface
-					})
-					.collect::<Vec<_>>()
-			});
+			let stale = world
+				.with_state::<(Query<Entity, With<Focus>>, SurfaceQuery), _>(
+					|(focused, surfaces)| {
+						let added_surface = surfaces.surface_of(added);
+						focused
+							.iter()
+							.filter(|entity| *entity != added)
+							.filter(|entity| {
+								surfaces.surface_of(*entity) == added_surface
+							})
+							.collect::<Vec<_>>()
+					},
+				);
 			for entity in stale {
 				world.entity_mut(entity).remove::<Focus>();
 			}
@@ -822,7 +822,9 @@ mod test {
 			.spawn(RenderSurface(window))
 			.add_child(wrapper);
 		app.world_mut()
-			.with_state::<SurfaceQuery, _>(|surfaces| surfaces.surface_of(element))
+			.with_state::<SurfaceQuery, _>(|surfaces| {
+				surfaces.surface_of(element)
+			})
 			.xpect_eq(Some(window));
 	}
 

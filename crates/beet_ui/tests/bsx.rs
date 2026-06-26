@@ -417,7 +417,12 @@ fn fragment_hosts_bundle_without_element() {
 	let root = spawn_bsx(&mut world, "<Fragment {Marker}><span/></Fragment>");
 	world.entity(root).contains::<Marker>().xpect_true();
 	world.entity(root).contains::<Element>().xpect_false();
-	world.entity(root).get::<Children>().unwrap().len().xpect_eq(1);
+	world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.len()
+		.xpect_eq(1);
 }
 
 /// A second component sharing the short path `Transform`, forcing the same
@@ -443,7 +448,10 @@ fn qualified_transform_tag_disambiguates() {
 	let path = Transform::type_info().type_path();
 	let root = spawn_bsx(&mut world, &format!("<{path}/>"));
 	world.entity(root).contains::<Transform>().xpect_true();
-	world.entity(root).contains::<css_dup::Transform>().xpect_false();
+	world
+		.entity(root)
+		.contains::<css_dup::Transform>()
+		.xpect_false();
 	// the bare, ambiguous short path resolves to neither: a clear error, never a
 	// silent wrong pick.
 	build_error(&mut world, "<Transform/>").xpect_contains("Transform");
@@ -1667,7 +1675,12 @@ fn tag_literal_component_with_children() {
 		.unwrap()
 		.as_str()
 		.xpect_eq("parent");
-	world.entity(root).get::<Children>().unwrap().len().xpect_eq(1);
+	world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.len()
+		.xpect_eq(1);
 }
 
 #[beet_core::test]
@@ -1687,7 +1700,12 @@ fn tag_literal_resolves_entity_ref() {
 		.iter()
 		.collect::<Vec<_>>();
 	let target = children[1];
-	world.entity(children[0]).get::<Bound>().unwrap().0.xpect_eq(target);
+	world
+		.entity(children[0])
+		.get::<Bound>()
+		.unwrap()
+		.0
+		.xpect_eq(target);
 }
 
 /// A component with a `#[reflect(@RequiredField)]` field, so the BSX loader errors

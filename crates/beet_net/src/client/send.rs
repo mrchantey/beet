@@ -519,7 +519,6 @@ mod test_file_scheme {
 		response.status().xpect_eq(StatusCode::OK);
 		response.text().await.unwrap().xpect_contains("[package]");
 	}
-
 }
 
 /// The native loopback rewrite an authority-less [`Request::send`] applies: a

@@ -478,18 +478,14 @@ mod test {
 		let mut app = nav_app();
 		let router = app
 			.world_mut()
-			.spawn((
-				Router,
-				BaseLayout::<SlotLayout>::default(),
-				children![
-					render_action::fixed_func_route("alpha", || {
-						rsx! { <p>"go "<a href="/beta">"to beta"</a>" now"</p> }
-					}),
-					render_action::fixed_func_route("beta", || {
-						rsx! { <p>"Beta page"</p> }
-					}),
-				],
-			))
+			.spawn((Router, BaseLayout::<SlotLayout>::default(), children![
+				render_action::fixed_func_route("alpha", || {
+					rsx! { <p>"go "<a href="/beta">"to beta"</a>" now"</p> }
+				}),
+				render_action::fixed_func_route("beta", || {
+					rsx! { <p>"Beta page"</p> }
+				}),
+			]))
 			.flush();
 		let host = app
 			.world_mut()
@@ -502,7 +498,9 @@ mod test {
 
 		// click the transcluded link (as the hit-test would, via PointerUp on it).
 		let link = any_link(&mut app);
-		app.world_mut().entity_mut(link).trigger(PointerUp::new(link));
+		app.world_mut()
+			.entity_mut(link)
+			.trigger(PointerUp::new(link));
 		drive_until(&mut app, host, "Beta page");
 	}
 

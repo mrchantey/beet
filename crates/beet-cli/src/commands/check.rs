@@ -137,7 +137,8 @@ mod test {
 		// deliberately omitted: its short path collides with bevy_ui's `Button` under the
 		// `bevy_default` render stack the `winit` feature pulls, a separate ambiguity from
 		// this library-registration gap.
-		for tag in ["Form", "Header", "Sidebar", "Table", "Footer", "TextField"] {
+		for tag in ["Form", "Header", "Sidebar", "Table", "Footer", "TextField"]
+		{
 			template_schema_by_name(registry, tag)
 				.is_some()
 				.xpect_true();

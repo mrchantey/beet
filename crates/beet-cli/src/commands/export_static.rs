@@ -78,8 +78,9 @@ mod test {
 	/// round-trips as absolute: `*site` keeps its leading `/`, which a stringified URL
 	/// would drop). Returns the response text.
 	async fn run(args: &str) -> String {
-		let req =
-			Request::from_cli_args(CliArgs::parse(&format!("export-static {args}")));
+		let req = Request::from_cli_args(CliArgs::parse(&format!(
+			"export-static {args}"
+		)));
 		let mut world = crate::commands::render_world();
 		let host = world.spawn((Router, children![ExportStatic])).id();
 		world

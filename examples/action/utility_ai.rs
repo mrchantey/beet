@@ -25,18 +25,22 @@ fn setup(async_commands: AsyncCommands) {
 		let selector = world
 			.with(|world: &mut World| {
 				world
-					.spawn((Name::new("selector"), HighestScore::new(), children![
-						(
-							Name::new("low score, skipped"),
-							ScoreProvider::<()>::fixed(Score(0.4)),
-							Log::new("this child does not run"),
-						),
-						(
-							Name::new("high score, selected"),
-							ScoreProvider::<()>::fixed(Score(0.6)),
-							Log::new("this child runs"),
-						),
-					]))
+					.spawn((
+						Name::new("selector"),
+						HighestScore::new(),
+						children![
+							(
+								Name::new("low score, skipped"),
+								ScoreProvider::<()>::fixed(Score(0.4)),
+								Log::new("this child does not run"),
+							),
+							(
+								Name::new("high score, selected"),
+								ScoreProvider::<()>::fixed(Score(0.6)),
+								Log::new("this child runs"),
+							),
+						],
+					))
 					.id()
 			})
 			.await;

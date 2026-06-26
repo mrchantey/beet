@@ -89,8 +89,7 @@ pub fn FrozenLakeRunAgent(
 	let agent_pos = grid_to_world.world_pos(*agent_grid_pos);
 	let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
 
-	let qtable =
-		assets.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.ron");
+	let qtable = assets.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.ron");
 
 	// Spawned top-level (not as a child of the scene host) so the action tree
 	// resolves its agent to this entity — its root ancestor — rather than the
@@ -104,7 +103,9 @@ pub fn FrozenLakeRunAgent(
 	//       TranslateGrid — animate the move
 	commands.spawn((
 		Name::new("Inference Agent"),
-		WorldAssetRoot(assets.load::<WorldAsset>(frozen_lake_assets::CHARACTER)),
+		WorldAssetRoot(
+			assets.load::<WorldAsset>(frozen_lake_assets::CHARACTER),
+		),
 		Transform::from_translation(agent_pos).with_scale(object_scale),
 		grid_to_world,
 		agent_grid_pos,

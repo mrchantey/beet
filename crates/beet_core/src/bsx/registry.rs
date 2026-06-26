@@ -145,7 +145,8 @@ impl BsxTemplateRegistry {
 				schema.map(|schema| (name.clone(), schema.clone()))
 			})
 			.collect::<Vec<_>>();
-		let mut schema_registry = world.get_resource_or_init::<SchemaRegistry>();
+		let mut schema_registry =
+			world.get_resource_or_init::<SchemaRegistry>();
 		for (name, schema) in schemas {
 			schema_registry.insert(name, schema);
 		}

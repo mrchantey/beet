@@ -1615,9 +1615,8 @@ fn write_resource_patch(
 	let component_id = reflect_component.register_component(world);
 	match world.resource_entities().get(component_id) {
 		// patch the live resource: missing fields keep their values.
-		Some(resource_entity) => {
-			reflect_component.apply(&mut world.entity_mut(resource_entity), patch)
-		}
+		Some(resource_entity) => reflect_component
+			.apply(&mut world.entity_mut(resource_entity), patch),
 		// absent: insert the patch over the type's default.
 		None => {
 			use bevy::ecs::reflect::ReflectFromWorld;
@@ -1627,11 +1626,9 @@ fn write_resource_patch(
 			// so check before reaching it
 			let constructible = registration.data::<ReflectDefault>().is_some()
 				|| registration.data::<ReflectFromWorld>().is_some()
-				|| registration
-					.data::<ReflectFromReflect>()
-					.is_some_and(|from_reflect| {
-						from_reflect.from_reflect(patch).is_some()
-					});
+				|| registration.data::<ReflectFromReflect>().is_some_and(
+					|from_reflect| from_reflect.from_reflect(patch).is_some(),
+				);
 			if !constructible {
 				bevybail!(
 					"`{}`: the resource is not in the world and `{}` cannot be constructed from the patch, add `#[reflect(Default)]` or insert the resource first",
@@ -1707,9 +1704,9 @@ fn validate_required_fields(
 		}
 		(TypeInfo::TupleStruct(info), ReflectRef::TupleStruct(patch)) => {
 			for index in 0..info.field_len() {
-				let required = info
-					.field_at(index)
-					.is_some_and(|field| field.has_attribute::<RequiredField>());
+				let required = info.field_at(index).is_some_and(|field| {
+					field.has_attribute::<RequiredField>()
+				});
 				if required && patch.field(index).is_none() {
 					bevybail!("{type_name}: missing required field '{index}'");
 				}

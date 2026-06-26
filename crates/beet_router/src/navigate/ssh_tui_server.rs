@@ -381,7 +381,8 @@ mod test {
 		let router = spawn_router(&mut app);
 		let size = UVec2::new(40, 8);
 		let kitty = open_connection_with(&mut app, router, size, "xterm-kitty");
-		let plain = open_connection_with(&mut app, router, size, "xterm-256color");
+		let plain =
+			open_connection_with(&mut app, router, size, "xterm-256color");
 		let enabled = |app: &App, connection: Entity| {
 			app.world()
 				.entity(connection)

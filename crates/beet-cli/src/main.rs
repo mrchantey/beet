@@ -33,7 +33,8 @@ use beet_cli::prelude::*;
 fn main() {
 	console_error_panic_hook::set_once();
 	let mut app = App::new();
-	app.add_plugins(BeetPlugins).add_systems(Startup, load_entry);
+	app.add_plugins(BeetPlugins)
+		.add_systems(Startup, load_entry);
 	// spawn the runner on the JS loop and detach; the Deno runner's `loop_forever`
 	// holds the process open until the entry writes `AppExit`.
 	async_ext::spawn_local(async move {
@@ -129,7 +130,8 @@ async fn build_entry(
 	formats: TemplateFormats,
 ) -> Result {
 	let store = resolved.store;
-	let sources = read_entry_sources(&store, formats, resolved.entry_name).await?;
+	let sources =
+		read_entry_sources(&store, formats, resolved.entry_name).await?;
 	// the `--watch` path (native-only) needs the entry dir and the args; on wasm
 	// neither is used, so they go unread there.
 	#[cfg(not(target_arch = "wasm32"))]
@@ -197,9 +199,9 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 				no filesystem entry discovery on wasm)"
 			)
 		})??;
-	let dir = entry.parent().ok_or_else(|| {
-		bevyhow!("entry `{entry}` has no parent directory")
-	})?;
+	let dir = entry
+		.parent()
+		.ok_or_else(|| bevyhow!("entry `{entry}` has no parent directory"))?;
 	let entry_name = entry
 		.file_name()
 		.and_then(|name| name.to_str())
@@ -309,8 +311,8 @@ fn remote_entry_store() -> Result<(BlobStore, String)> {
 			S3Store::new(bucket, region)
 		}
 	};
-	let entry_name =
-		env_ext::var("BEET_SITE_ENTRY").unwrap_or_else(|_| "main.bsx".to_string());
+	let entry_name = env_ext::var("BEET_SITE_ENTRY")
+		.unwrap_or_else(|_| "main.bsx".to_string());
 	Ok((BlobStore::new(store), entry_name))
 }
 

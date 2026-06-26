@@ -38,7 +38,9 @@ fn setup(async_commands: AsyncCommands) {
 	async_commands.run(async |world: AsyncWorld| -> Result {
 		let greeter = world
 			.with(|world: &mut World| {
-				world.spawn((Name::new("greeter"), trace_action.wrap(Greet))).id()
+				world
+					.spawn((Name::new("greeter"), trace_action.wrap(Greet)))
+					.id()
 			})
 			.await;
 		let outcome = world.entity(greeter).call::<(), Outcome>(()).await?;

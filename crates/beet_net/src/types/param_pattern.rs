@@ -386,9 +386,8 @@ mod test {
 		let TypeInfo::Struct(info) = Params::type_info() else {
 			panic!("expected struct");
 		};
-		let by_name = |name: &str| {
-			ParamMeta::from_field(info.field(name).unwrap())
-		};
+		let by_name =
+			|name: &str| ParamMeta::from_field(info.field(name).unwrap());
 		// a required `String` shows its concrete type, not the `single` arity
 		let package = by_name("package");
 		package.type_path().xpect_eq("alloc::string::String");

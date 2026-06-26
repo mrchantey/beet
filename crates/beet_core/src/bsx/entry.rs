@@ -187,7 +187,12 @@ mod test {
 		// the resource field was patched in place.
 		world.resource::<SpreadRes>().value.xpect_eq(42);
 		// the sibling component landed on the host.
-		world.entity(root).get::<SpreadComp>().unwrap().value.xpect_eq(7);
+		world
+			.entity(root)
+			.get::<SpreadComp>()
+			.unwrap()
+			.value
+			.xpect_eq(7);
 		// the resource was NOT attached as a component on the host.
 		world.entity(root).get::<SpreadRes>().xpect_none();
 	}

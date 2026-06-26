@@ -104,14 +104,12 @@ fn name_literal_str(literal: &DataLiteral) -> Option<&str> {
 	match literal {
 		DataLiteral::Scalar(Value::Str(string)) => Some(string.as_str()),
 		DataLiteral::Enum(named) => match &named.fields {
-			NamedFields::Tuple(items) if items.len() == 1 => {
-				match &items[0] {
-					DataLiteral::Scalar(Value::Str(string)) => {
-						Some(string.as_str())
-					}
-					_ => None,
+			NamedFields::Tuple(items) if items.len() == 1 => match &items[0] {
+				DataLiteral::Scalar(Value::Str(string)) => {
+					Some(string.as_str())
 				}
-			}
+				_ => None,
+			},
 			_ => None,
 		},
 		_ => None,

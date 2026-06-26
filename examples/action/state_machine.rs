@@ -32,9 +32,11 @@ fn setup(async_commands: AsyncCommands) {
 				let state2 = world
 					.spawn((
 						Name::new("state2"),
-						trace_action.wrap(Action::<Outcome, Outcome>::new_pure(
-							|cx: ActionContext<Outcome>| cx.input,
-						)),
+						trace_action.wrap(
+							Action::<Outcome, Outcome>::new_pure(
+								|cx: ActionContext<Outcome>| cx.input,
+							),
+						),
 					))
 					.id();
 				// transition forwards to state2.

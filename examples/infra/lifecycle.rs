@@ -88,10 +88,7 @@ fn setup(mut commands: Commands) {
 			info!("🔨 Inserting File..");
 			store.insert(&path, content).await?;
 			let bytes = store.get(&path).await?;
-			info!(
-				"📄 BlobStore File Matches: {}",
-				bytes == content.as_bytes()
-			);
+			info!("📄 BlobStore File Matches: {}", bytes == content.as_bytes());
 
 			info!("🔨 Destroying..");
 			project.destroy().await?;

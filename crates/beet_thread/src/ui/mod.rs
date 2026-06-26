@@ -95,11 +95,14 @@ mod test {
 	#[beet_core::test]
 	async fn registers_create_post_form_through_store() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).init_plugin::<ThreadUiPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.init_plugin::<ThreadUiPlugin>();
 		// not yet: registration is an async task spawned from `Startup`
 		app.world()
 			.get_resource::<BsxTemplateRegistry>()
-			.is_some_and(|registry| registry.contains(CREATE_POST_FORM_TEMPLATE))
+			.is_some_and(|registry| {
+				registry.contains(CREATE_POST_FORM_TEMPLATE)
+			})
 			.xpect_false();
 		AsyncRunner::settle_async_tasks(app.world_mut()).await;
 		app.world()

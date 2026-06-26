@@ -87,11 +87,7 @@ fn chat_nearest_sentence(
 		return Ok(Outcome::FAIL);
 	};
 	let text = closest_descendant_sentence(
-		agent,
-		&prompt.0,
-		&mut bert,
-		&children,
-		&sentences,
+		agent, &prompt.0, &mut bert, &children, &sentences,
 	)?;
 	log.write(
 		OnLogMessage::new(format!("Agent: {text}"))
@@ -121,11 +117,7 @@ fn choose_nearest(
 		.get_mut(&near.bert)
 		.ok_or_else(|| bevyhow!("Bert asset not loaded on RunOnLoad"))?;
 	let text = closest_descendant_sentence(
-		agent,
-		&prompt.0,
-		&mut bert,
-		&children,
-		&sentences,
+		agent, &prompt.0, &mut bert, &children, &sentences,
 	)?;
 	info!("NearestSentence chose: \"{text}\" for \"{}\"", prompt.0);
 	// the demo runs one inference; exit cleanly once it has logged.
@@ -151,8 +143,11 @@ fn closest_descendant_sentence(
 	if candidates.is_empty() {
 		bevybail!("no candidate sentences to choose from");
 	}
-	let chosen =
-		bert.closest_sentence_entity(prompt.to_string(), candidates, sentences)?;
+	let chosen = bert.closest_sentence_entity(
+		prompt.to_string(),
+		candidates,
+		sentences,
+	)?;
 	sentences
 		.get(chosen)
 		.map(|sentence| sentence.0.to_string())

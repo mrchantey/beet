@@ -23,17 +23,17 @@ mod style;
 
 // generated route modules (see `run_codegen`)
 #[cfg(all(feature = "render", not(feature = "codegen")))]
-#[path = "codegen/pages.rs"]
-mod pages_codegen;
-#[cfg(all(feature = "render", not(feature = "codegen")))]
-#[path = "codegen/content.rs"]
-mod content_codegen;
-#[cfg(all(feature = "render", not(feature = "codegen")))]
 #[path = "codegen/actions.rs"]
 mod actions_codegen;
 #[cfg(all(feature = "render", not(feature = "codegen")))]
 #[path = "codegen/client_actions.rs"]
 pub mod client_actions;
+#[cfg(all(feature = "render", not(feature = "codegen")))]
+#[path = "codegen/content.rs"]
+mod content_codegen;
+#[cfg(all(feature = "render", not(feature = "codegen")))]
+#[path = "codegen/pages.rs"]
+mod pages_codegen;
 #[cfg(all(feature = "render", not(feature = "codegen")))]
 #[path = "codegen/route_tree.rs"]
 mod route_tree;

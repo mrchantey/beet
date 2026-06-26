@@ -30,7 +30,9 @@ fn main() -> AppExit {
 
 fn setup(async_commands: AsyncCommands) {
 	async_commands.run(async |world: AsyncWorld| -> Result {
-		let greeter = world.with(|world: &mut World| world.spawn(Greet).id()).await;
+		let greeter = world
+			.with(|world: &mut World| world.spawn(Greet).id())
+			.await;
 		let message = world
 			.entity(greeter)
 			.call::<String, String>("world".to_string())

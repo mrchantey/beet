@@ -134,9 +134,7 @@ impl SocketWriter for ChannelSocketWriter {
 /// Registers the shared boot + teardown observers, mirroring [`SocketServer`] (see
 /// [`ServerShutdown`]).
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerShutdown::<ChannelSocketServer>::add_observers(
-		&mut world, cx.entity,
-	);
+	ServerShutdown::<ChannelSocketServer>::add_observers(&mut world, cx.entity);
 }
 
 impl BootServer for ChannelSocketServer {

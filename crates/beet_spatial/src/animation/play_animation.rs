@@ -90,7 +90,8 @@ pub fn PlayAnimationAction(
 		.ok_or_else(|| bevyhow!("clip `{}` is not in the agent's AnimationGraph", play_animation.clip))?;
 	let (mut player, mut transitions) = agents.get_descendent_mut(cx.id())?;
 
-	if !player.is_playing_animation(animation) || play_animation.trigger_if_playing
+	if !player.is_playing_animation(animation)
+		|| play_animation.trigger_if_playing
 	{
 		transitions
 			.play(&mut player, animation, play_animation.transition_duration)
@@ -112,7 +113,9 @@ pub fn clip_to_player(
 	let (graph, animation_index) =
 		AnimationGraph::from_clip(animations.add(clip.0));
 	let graph_clips = AnimationGraphClips::new(
-		[(SmolStr::new("test"), animation_index)].into_iter().collect(),
+		[(SmolStr::new("test"), animation_index)]
+			.into_iter()
+			.collect(),
 	);
 
 	let player_entity = commands

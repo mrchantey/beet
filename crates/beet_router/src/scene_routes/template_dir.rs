@@ -63,10 +63,13 @@ impl TemplateDir {
 			async move |dir: AsyncEntity| -> Result {
 				let store = dir
 					.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-						|entity, stores| stores.get(entity).map(BlobStore::clone),
+						|entity, stores| {
+							stores.get(entity).map(BlobStore::clone)
+						},
 					)
 					.await??;
-				let sources = Self::read_sources(&store, &src, &formats).await?;
+				let sources =
+					Self::read_sources(&store, &src, &formats).await?;
 				dir.world()
 					.with(move |world| -> Result {
 						Self::register_sources(world, &formats, sources)?;

@@ -37,9 +37,7 @@ struct BinaryOp {
 #[action(pure, route = "add")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-fn CalcAdd(cx: ActionContext<BinaryOp>) -> String {
-	format!("{}", cx.a + cx.b)
-}
+fn CalcAdd(cx: ActionContext<BinaryOp>) -> String { format!("{}", cx.a + cx.b) }
 
 /// Subtract the second number from the first.
 #[action(pure, route = "subtract")]

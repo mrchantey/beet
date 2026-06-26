@@ -151,29 +151,39 @@ fn setup(async_commands: AsyncCommands) {
 						Health(100.0),
 						HealingPotions(2),
 						Repeat::new(),
-						children![(Name::new("round"), Fallback::new(), children![
-							(Name::new("Try Heal Self"), TryHealSelf),
-							(Name::new("Attack"), HighestScore::new(), children![
+						children![(
+							Name::new("round"),
+							Fallback::new(),
+							children![
+								(Name::new("Try Heal Self"), TryHealSelf),
 								(
-									Name::new("Waterfoul Dance"),
-									random_score(),
-									AttackPlayer {
-										max_damage: 15.0,
-										max_recoil: 30.0,
-										player,
-									},
+									Name::new("Attack"),
+									HighestScore::new(),
+									children![
+										(
+											Name::new("Waterfoul Dance"),
+											random_score(),
+											AttackPlayer {
+												max_damage: 15.0,
+												max_recoil: 30.0,
+												player,
+											},
+										),
+										(
+											Name::new("Scarlet Aeonia"),
+											ScoreProvider::<()>::fixed(Score(
+												0.05
+											)),
+											AttackPlayer {
+												max_damage: 10_000.0,
+												max_recoil: 10.0,
+												player,
+											},
+										),
+									],
 								),
-								(
-									Name::new("Scarlet Aeonia"),
-									ScoreProvider::<()>::fixed(Score(0.05)),
-									AttackPlayer {
-										max_damage: 10_000.0,
-										max_recoil: 10.0,
-										player,
-									},
-								),
-							],),
-						],)],
+							],
+						)],
 					))
 					.id()
 			})

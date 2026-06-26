@@ -81,8 +81,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	// resolve the page size (cm, the `PdfPageSize` unit) and matching browser
 	// viewport (px), defaulting to A4 when a dimension is unset.
 	let unit = PdfUnit::parse(params.unit.as_deref())?;
-	let (page_size, viewport) =
-		resolve_size(params.width, params.height, unit);
+	let (page_size, viewport) = resolve_size(params.width, params.height, unit);
 	let mut options = PdfOptions {
 		page_size,
 		..default()
@@ -92,8 +91,10 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	}
 	// `--page-ranges` limits each route's printed pages, eg `1` for a single page.
 	if let Some(ranges) = &params.page_ranges {
-		options.page_ranges =
-			ranges.split(',').map(|range| range.trim().to_string()).collect();
+		options.page_ranges = ranges
+			.split(',')
+			.map(|range| range.trim().to_string())
+			.collect();
 	}
 	// `--zoom` scales the content, eg to enlarge text on a large page.
 	if params.zoom > 0.0 {

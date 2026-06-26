@@ -106,17 +106,14 @@ pub fn SiteLayout(
 /// (defaulting to dark), and the web adds no class so its `color_scheme.js`
 /// follows the OS. Shared by [`SiteLayout`] and the help/not-found page so a
 /// bare-rendered page (eg the dev CLI help, with no layout) is themed the same.
-pub(crate) fn page_classes(
-	parts: &RequestParts,
-	theme: &Theme,
-) -> Classes {
+pub(crate) fn page_classes(parts: &RequestParts, theme: &Theme) -> Classes {
 	let mut classes = Classes::new([classes::PAGE]);
-	let scheme = match parts.get_param("color-scheme").and_then(ColorScheme::parse)
-	{
-		Some(scheme) => Some(scheme),
-		None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
-		None => None,
-	};
+	let scheme =
+		match parts.get_param("color-scheme").and_then(ColorScheme::parse) {
+			Some(scheme) => Some(scheme),
+			None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
+			None => None,
+		};
 	if let Some(scheme) = scheme {
 		classes.insert_class(scheme.class());
 	}
@@ -209,9 +206,8 @@ mod test {
 	#[beet_core::test]
 	fn page_classes_resolves_scheme() {
 		let theme = Theme::default();
-		let has = |classes: &Classes, name: &ClassName| {
-			classes.contains_name(name)
-		};
+		let has =
+			|classes: &Classes, name: &ClassName| classes.contains_name(name);
 		// a terminal request with no override → PAGE + the dark session default
 		let terminal = page_classes(&request("", MediaType::AnsiTerm), &theme);
 		has(&terminal, &classes::PAGE).xpect_true();
@@ -222,8 +218,10 @@ mod test {
 		has(&web, &classes::DARK_SCHEME).xpect_false();
 		has(&web, &classes::LIGHT_SCHEME).xpect_false();
 		// an explicit pin wins on both targets
-		let pinned =
-			page_classes(&request("?color-scheme=light", MediaType::Html), &theme);
+		let pinned = page_classes(
+			&request("?color-scheme=light", MediaType::Html),
+			&theme,
+		);
 		has(&pinned, &classes::LIGHT_SCHEME).xpect_true();
 	}
 }

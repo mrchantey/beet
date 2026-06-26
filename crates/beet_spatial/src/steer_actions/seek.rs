@@ -144,7 +144,8 @@ mod test {
 				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
 			))
 			.id();
-		let scene_root = world.spawn(Transform::default()).add_child(agent).id();
+		let scene_root =
+			world.spawn(Transform::default()).add_child(agent).id();
 		// the behaviour-tree action, a descendant of the agent, acting on it.
 		world.spawn((
 			ChildOf(agent),
@@ -191,7 +192,8 @@ mod test {
 
 		app.update_with_secs(1);
 
-		let translation = app.world().get::<Transform>(agent).unwrap().translation;
+		let translation =
+			app.world().get::<Transform>(agent).unwrap().translation;
 		// moved toward the target on both X and Z, symmetrically, not on Y.
 		(translation.x > 0.).xpect_true();
 		(translation.z > 0.).xpect_true();

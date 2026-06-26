@@ -117,7 +117,10 @@ mod test {
 	/// self-or-ancestor [`BlobStore`] (the [`ServeBlobs`] template expansion; the
 	/// `DirPath`-scoped subdir case is covered by `bsx_site` end to end).
 	fn serve_route(mount: &str) -> impl Bundle {
-		ServeBlobs { prefix: mount.into() }.into_snippet_bundle()
+		ServeBlobs {
+			prefix: mount.into(),
+		}
+		.into_snippet_bundle()
 	}
 
 	/// A store on an ancestor (the router) backs a child serve route: the

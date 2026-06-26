@@ -67,7 +67,9 @@ install-cli *args:
 #💡 Aliases
 
 fmt *args:
+	rustup default nightly
 	cargo fmt {{ args }}
+	rustup default stable
 
 #💡 Test
 
@@ -93,9 +95,6 @@ test-all-lib *args:
 
 test-all-doc *args:
 	cargo test --workspace 			--doc 	--all-features																	{{ args }} -- {{ test-threads }}
-
-test-fmt:
-	cargo fmt 				--check
 
 test-ci *args:
 	just test-fmt

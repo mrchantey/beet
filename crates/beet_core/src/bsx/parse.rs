@@ -966,8 +966,7 @@ mod test {
 		// a tuple/struct/enum tag-position literal parses into `tag_literal`, with
 		// `tag` reduced to the base component name (the segment before `::`).
 		let element = |source: &str| -> BsxElement {
-			let nodes =
-				parse_document(source, &BsxParseConfig::bsx()).unwrap();
+			let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
 			let BsxNode::Element(element) = nodes.into_iter().next().unwrap()
 			else {
 				panic!("expected an element");
@@ -983,15 +982,16 @@ mod test {
 		// `::`-qualified enum variant: base tag is the segment before `::`.
 		let log = element("<Log::Message(\"hi\")/>");
 		log.tag.clone().xpect_eq("Log".to_string());
-		log.tag_literal.unwrap().name.as_str().xpect_eq("Log::Message");
+		log.tag_literal
+			.unwrap()
+			.name
+			.as_str()
+			.xpect_eq("Log::Message");
 		// struct form.
 		let cfg = element("<Greet{name:\"world\"}/>");
 		cfg.tag.clone().xpect_eq("Greet".to_string());
-		matches!(
-			cfg.tag_literal.unwrap().fields,
-			NamedFields::Struct(_)
-		)
-		.xpect_true();
+		matches!(cfg.tag_literal.unwrap().fields, NamedFields::Struct(_))
+			.xpect_true();
 		// a bare uppercase tag is not a literal, so children resolve as a component.
 		let bare = element("<Sequence>x</Sequence>");
 		bare.tag.clone().xpect_eq("Sequence".to_string());

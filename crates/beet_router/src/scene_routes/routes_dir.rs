@@ -76,7 +76,9 @@ impl RoutesDir {
 					.or_default()
 					.get_mut()
 					.register();
-				world.entity_mut(entity).insert(RoutesDirPending { root, id });
+				world
+					.entity_mut(entity)
+					.insert(RoutesDirPending { root, id });
 			});
 		}
 		// off the async runtime: resolve the nearest ancestor store + scope it to `src`,
@@ -95,7 +97,9 @@ impl RoutesDir {
 			async move |dir: AsyncEntity| -> Result {
 				let store = dir
 					.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-						|entity, stores| stores.get(entity).map(BlobStore::clone),
+						|entity, stores| {
+							stores.get(entity).map(BlobStore::clone)
+						},
 					)
 					.await??
 					.with_subdir(src);
@@ -169,7 +173,8 @@ impl RoutesDir {
 					// ... plus any `<TemplateDir>` still registering its templates (not
 					// yet marked `TemplatesLoaded`), so a render that resolves them waits ...
 					let templates = world
-						.query_filtered::<(), (With<TemplateDir>, Without<TemplatesLoaded>)>()
+						.query_filtered::<(), (With<TemplateDir>, Without<TemplatesLoaded>)>(
+						)
 						.iter(world)
 						.count();
 					// ... plus any unresolved `<Template src>` include: it builds the
@@ -253,7 +258,8 @@ impl RoutesDir {
 	/// `index` collapses to its directory, eg `docs/index.md` -> `docs`.
 	fn route_path_of(rel: &SmolPath) -> String {
 		let mut segments = rel.segments();
-		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut()) {
+		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut())
+		{
 			*last = stem;
 		}
 		if segments.last() == Some(&"index") {
@@ -265,7 +271,10 @@ impl RoutesDir {
 	/// Read a markdown file's leading frontmatter into [`ArticleMeta`] through the
 	/// store, if it is markdown and parses; any read/parse failure yields `None`.
 	#[cfg(feature = "markdown_parser")]
-	async fn scan_meta(store: &BlobStore, path: &SmolPath) -> Option<ArticleMeta> {
+	async fn scan_meta(
+		store: &BlobStore,
+		path: &SmolPath,
+	) -> Option<ArticleMeta> {
 		let is_markdown = path
 			.extension()
 			.is_some_and(|ext| matches!(ext, "md" | "mdx" | "markdown"));
@@ -357,7 +366,8 @@ mod test {
 		RoutesDir::route_path_of(&SmolPath::from("index.md")).xpect_eq("");
 		RoutesDir::route_path_of(&SmolPath::from("docs/index.md"))
 			.xpect_eq("docs");
-		RoutesDir::route_path_of(&SmolPath::from("about.bsx")).xpect_eq("about");
+		RoutesDir::route_path_of(&SmolPath::from("about.bsx"))
+			.xpect_eq("about");
 	}
 
 	/// Assert the three fixture routes render their content, shared by the

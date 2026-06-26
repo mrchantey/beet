@@ -118,13 +118,14 @@ mod test {
 		let mut doc = Document::with_version("1.5");
 		let pages_id = doc.new_object_id();
 		let content = lopdf::content::Content {
-			operations: vec![lopdf::content::Operation::new(
-				"Tj",
-				vec![Object::string_literal(text)],
-			)],
+			operations: vec![lopdf::content::Operation::new("Tj", vec![
+				Object::string_literal(text),
+			])],
 		};
-		let content_id =
-			doc.add_object(lopdf::Stream::new(dictionary! {}, content.encode().unwrap()));
+		let content_id = doc.add_object(lopdf::Stream::new(
+			dictionary! {},
+			content.encode().unwrap(),
+		));
 		let page_id = doc.add_object(dictionary! {
 			"Type" => "Page",
 			"Parent" => pages_id,
@@ -151,9 +152,12 @@ mod test {
 
 	#[beet::test]
 	fn merges_in_sequence() {
-		let merged =
-			merge(vec![one_page_pdf("a"), one_page_pdf("b"), one_page_pdf("c")])
-				.unwrap();
+		let merged = merge(vec![
+			one_page_pdf("a"),
+			one_page_pdf("b"),
+			one_page_pdf("c"),
+		])
+		.unwrap();
 		// the merged bytes re-parse, and every input page survives in one document
 		Document::load_mem(&merged)
 			.unwrap()

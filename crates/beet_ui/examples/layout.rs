@@ -58,9 +58,14 @@ fn main() {
 	cross_log!("");
 	match overflow {
 		0 => {
-			cross_log!("✓ all lines render within the {}-column terminal", size.x)
+			cross_log!(
+				"✓ all lines render within the {}-column terminal",
+				size.x
+			)
 		}
-		n => cross_log!("✗ {n} line(s) exceeded the {}-column terminal", size.x),
+		n => {
+			cross_log!("✗ {n} line(s) exceeded the {}-column terminal", size.x)
+		}
 	}
 }
 

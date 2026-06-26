@@ -54,7 +54,8 @@ impl SiteHost {
 		let router = build_site(app.world_mut()).await;
 		// the host pairs a channel terminal with the page-host buffer, the in-world
 		// navigator co-located on it (one surface), as the TUI boot composes them.
-		let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
+		let (channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
 		let host = app
 			.world_mut()
 			.spawn((

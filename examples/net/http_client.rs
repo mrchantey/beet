@@ -12,7 +12,11 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin::default()))
+		.add_plugins((
+			MinimalPlugins,
+			LogPlugin::default(),
+			AsyncPlugin::default(),
+		))
 		.add_systems(Startup, ping_example)
 		.run();
 	info!("Done");

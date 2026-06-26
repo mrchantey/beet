@@ -189,7 +189,9 @@ fn on_load_run(
 	if !should_load(target, ev.is_error, &ancestors, &disabled, &mut exit) {
 		return;
 	}
-	commands.entity(target).queue_async_local(|host| Boot::run(host));
+	commands
+		.entity(target)
+		.queue_async_local(|host| Boot::run(host));
 }
 
 /// Whether a `LoadTemplate` on `target` should drive a load: the build succeeded
