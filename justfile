@@ -41,11 +41,11 @@ init-repo:
 
 # Pull shared assets from the upstream bucket into ./assets.
 pull-assets:
-	beet s3-sync --src={{ assets-bucket }} --dst=./assets --delete
+	just beet s3-sync --src={{ assets-bucket }} --dst=./assets --delete
 
 # Push local ./assets up to the upstream bucket.
 push-assets:
-	beet s3-sync --src=./assets --dst={{ assets-bucket }} --delete
+	just beet s3-sync --src=./assets --dst={{ assets-bucket }} --delete
 
 #💡 CLI
 
