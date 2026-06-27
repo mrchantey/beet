@@ -7,13 +7,19 @@ Fargate/Lightsail/Lambda/Containers, wasm here. The Worker reads the site from R
 through the native `worker::Bucket` binding (no S3 credentials at runtime), renders
 per request, and serves on `<name>.workers.dev`.
 
-`wrangler deploy` runs `worker-build` (wasm-bindgen + wasm-opt) from the generated
-`wrangler.jsonc` `build.command`, so there is no separate binary-build step.
+The two resources are the Worker and the R2 bucket holding the site. The Worker is
+generic: it loads `main.bsx`, `routes/` and `templates/` from R2 and version-checks
+the entry on every request, so a `sync` updates the entire site behavior with no
+redeploy, live on the very next fetch. `build` compiles the wasm once; `deploy`
+uploads that prebuilt artifact (no recompile); `bench` times a `sync` against a
+full rebuild + redeploy.
 
 ## Usage
 
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx build
     cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx deploy
     cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx sync
+    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx bench
     cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` host (no long-running server); `BootOnLoad` fires the CLI
@@ -22,9 +28,14 @@ request on load and the matching verb runs. Each verb is a child-sequenced
 children of the route and the sequence runs them in order.
 
 Live deploy needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `.env`, plus
-`wrangler` and `worker-build`. No R2 keys are needed (native binding).
+`wrangler` and `worker-build`. No R2 keys are needed (native binding). `build` needs
+neither (a local compile).
 -->
 <Router {(CliServer, RequestLogger, BootOnLoad)}>
+	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->
+	<Route path="build" {ExchangeSequence}>
+		<CloudflareWorkerBuildAction/>
+	</Route>
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareWorkerBlock name="beet-hello-worker" bucket="beet-hello-site"/>
 		<CloudflareWorkerDeployAction/>
@@ -34,6 +45,11 @@ Live deploy needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `.env`, pl
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
+	</Route>
+	<!-- time a sync against a full rebuild + redeploy; add `url="https://
+	     beet-hello-worker.<subdomain>.workers.dev"` to also time the live fetch -->
+	<Route path="bench" {ExchangeSequence}>
+		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
 		<!-- `local_dir` empties the synced objects before deleting the bucket -->

@@ -24,10 +24,12 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::CloudflareWorkerBlock>()
 			.register_type::<crate::prelude::CloudflareContainerBlock>()
 			.register_type::<crate::prelude::CloudflareR2Sync>()
+			.register_type::<crate::prelude::CloudflareBench>()
 			.register_type::<crate::prelude::CloudflareWatch>()
 			.register_type::<crate::prelude::CloudflareDestroy>()
 			// the directly-spawnable cloudflare deploy actions (`#[action(handler_only)]`
 			// + `#[reflect(Component, Default)]`).
+			.register_type::<crate::prelude::CloudflareWorkerBuildAction>()
 			.register_type::<crate::prelude::CloudflareWorkerDeployAction>()
 			.register_type::<crate::prelude::CloudflareContainerDeployAction>();
 

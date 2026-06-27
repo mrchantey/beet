@@ -60,6 +60,25 @@ pub fn copy_recursive(
 	Ok(())
 }
 
+/// Copy a single file, creating the destination's parent directories if needed.
+/// Returns the number of bytes copied.
+pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> FsResult<u64> {
+	let from = from.as_ref();
+	let to = to.as_ref();
+	if let Some(parent) = to.parent() {
+		fs_ext::create_dir_all(parent)?;
+	}
+	fs::copy(from, to).map_err(|err| FsError::io(from, err))
+}
+
+/// The size of a file in bytes.
+pub fn file_size(path: impl AsRef<Path>) -> FsResult<u64> {
+	let path = path.as_ref();
+	fs::metadata(path)
+		.map(|meta| meta.len())
+		.map_err(|err| FsError::io(path, err))
+}
+
 /// Checks if a path exists on the filesystem.
 pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	let path = path.as_ref();

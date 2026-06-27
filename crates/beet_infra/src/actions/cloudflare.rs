@@ -21,6 +21,12 @@ use beet_net::prelude::*;
 /// Default Workers compatibility date stamped into generated `wrangler.jsonc`.
 const COMPATIBILITY_DATE: &str = "2025-06-01";
 
+/// Where the `build` verb publishes the deployable wasm Worker artifacts
+/// (`index.js`, `index_bg.wasm`, `package.json`), workspace-relative. `deploy`
+/// points the generated `wrangler.jsonc` `main` here, so the upload reuses the
+/// build output instead of recompiling. Under `assets/` so it is gitignored.
+const WORKER_ASSETS_DIR: &str = "assets/worker";
+
 /// The container Durable Object class name. Cloudflare derives the deployed
 /// container application name as `<worker-name>-<lowercased class name>`
 /// (eg `beet-hello-container-beetcontainer`) and names the managed-registry image
@@ -325,43 +331,132 @@ fn write_r2_secrets_file(dir: &AbsPathBuf) -> Result<Option<String>> {
 	}
 }
 
+// ───────────────────────────── worker build ────────────────────────────────
+
+/// Compile the wasm Worker and publish its artifacts to [`WORKER_ASSETS_DIR`]
+/// without deploying. The slow step (a full wasm-bindgen + wasm-opt build) that
+/// `deploy` and `bench` reuse; running it as its own verb makes the artifacts
+/// (and the wasm size) visible before an upload, and warms the build so a
+/// following `deploy` only uploads.
+#[action(handler_only)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn CloudflareWorkerBuildAction(
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let start = Instant::now();
+	let wasm_size = build_worker_artifacts().await?;
+	info!(
+		"built worker: {} wasm in {} (published to {WORKER_ASSETS_DIR}/)",
+		fmt_bytes(wasm_size),
+		time_ext::pretty_print_duration(start.elapsed()),
+	);
+	Pass(cx.input).xok()
+}
+
+/// Compile the `beet-cli` crate to a wasm Worker with `worker-build` and copy the
+/// deployable artifacts into [`WORKER_ASSETS_DIR`], returning the wasm size in
+/// bytes. `worker-build` wraps wasm-bindgen + wasm-opt and emits `index.js` +
+/// `index_bg.wasm` under `<crate>/build/`; the copy makes them inspectable and
+/// lets `deploy` upload them without a rebuild.
+async fn build_worker_artifacts() -> Result<u64> {
+	let cli_dir = AbsPathBuf::new_workspace_rel("crates/beet-cli")?;
+	let cli_arg = cli_dir.to_string();
+	info!("building wasm worker (worker-build --release)");
+	ChildProcess::new("worker-build")
+		.with_args([
+			"--release",
+			cli_arg.as_str(),
+			"--",
+			"--no-default-features",
+			"--features",
+			"cloudflare",
+		])
+		.run_async()
+		.await?;
+	// worker-build emits `<crate>/build/{index.js,index_bg.wasm,package.json}`;
+	// the `worker/shim.mjs` it also writes is a backwards-compat re-export of
+	// `index.js`, so these three files are the whole deployable set.
+	let build_dir = cli_dir.join("build");
+	let assets_dir = AbsPathBuf::new_workspace_rel(WORKER_ASSETS_DIR)?;
+	let mut wasm_size = 0;
+	for name in ["index.js", "index_bg.wasm", "package.json"] {
+		let bytes = fs_ext::copy(build_dir.join(name), assets_dir.join(name))?;
+		if name == "index_bg.wasm" {
+			wasm_size = bytes;
+		}
+	}
+	Ok(wasm_size)
+}
+
+/// Ensure the prebuilt Worker artifacts exist, building them first if the `build`
+/// verb has not run, so a bare `deploy` still works.
+async fn ensure_worker_artifacts() -> Result {
+	let index =
+		AbsPathBuf::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
+	if !index.exists() {
+		info!("no prebuilt worker at {WORKER_ASSETS_DIR}/, building first");
+		build_worker_artifacts().await?;
+	}
+	Ok(())
+}
+
+/// Format a byte count as a human-readable size, eg `17.4 MB`.
+fn fmt_bytes(bytes: u64) -> String {
+	const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+	let mut size = bytes as f64;
+	let mut unit = 0;
+	while size >= 1024.0 && unit < UNITS.len() - 1 {
+		size /= 1024.0;
+		unit += 1;
+	}
+	format!("{size:.1} {}", UNITS[unit])
+}
+
 // ───────────────────────────── worker deploy ───────────────────────────────
 
-/// Deploy `beet-cli` (wasm) as a Cloudflare Worker: write `wrangler.jsonc` with
-/// the R2 binding and a `worker-build` build command, ensure the R2 bucket, then
-/// `wrangler deploy` (which runs `worker-build` and uploads the wasm). Reads the
-/// sibling [`CloudflareWorkerBlock`].
+/// Deploy `beet-cli` (wasm) as a Cloudflare Worker: ensure the prebuilt artifacts
+/// (from `build`, or built now), write `wrangler.jsonc` pointing `main` at them
+/// plus the R2 binding, ensure the R2 bucket, then `wrangler deploy` (upload, no
+/// recompile). Reads the sibling [`CloudflareWorkerBlock`].
 ///
 /// The wasm artifact is produced from the `beet-cli` crate (`--features
-/// cloudflare`) by `worker-build`, invoked by wrangler's `build.command`, so this
-/// action carries no separate [`BuildArtifact`].
+/// cloudflare`) by `worker-build` in [`build_worker_artifacts`], so this action
+/// carries no separate [`BuildArtifact`].
 #[action(handler_only)]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareWorkerDeployAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let start = Instant::now();
 	let block = sibling::<CloudflareWorkerBlock>(&cx).await?;
+	ensure_worker_artifacts().await?;
 	let dir = cf_project_dir(block.name())?;
 	write_worker_wrangler(&dir, &block)?;
 
 	wrangler_r2_create(block.bucket()).await?;
 	wrangler_deploy(&dir, None).await?;
-	info!("deployed wasm worker `{}`", block.name());
+	info!(
+		"deployed wasm worker `{}` in {}",
+		block.name(),
+		time_ext::pretty_print_duration(start.elapsed()),
+	);
 	Pass(cx.input).xok()
 }
 
-/// `wrangler.jsonc` for the wasm Worker: a `worker-build` build command, the wasm
-/// main, and the R2 bucket bound by [`WORKER_R2_BINDING`].
+/// `wrangler.jsonc` for the wasm Worker: `main` points at the prebuilt artifacts
+/// (no `build.command`, so the deploy uploads them as-is), plus the R2 bucket
+/// bound by [`WORKER_R2_BINDING`].
 fn write_worker_wrangler(
 	dir: &AbsPathBuf,
 	block: &CloudflareWorkerBlock,
 ) -> Result {
-	let cli_dir = AbsPathBuf::new_workspace_rel("crates/beet-cli")?;
-	// worker-build always writes its output relative to the *crate root*, not the
-	// process cwd (it emits `<crate>/build/worker/shim.mjs`), so `main` points at
-	// that absolute path rather than a path relative to this wrangler project dir.
-	let shim = cli_dir.join("build").join("worker").join("shim.mjs");
+	// `main` is the prebuilt `index.js` (the wasm-bindgen entry; its `index_bg.wasm`
+	// sibling resolves by relative import). An absolute path outside this wrangler
+	// project dir is fine: wrangler bundles `main` and follows its wasm import.
+	let main_js =
+		AbsPathBuf::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
 	let vars = block
 		.env_vars()
 		.iter()
@@ -369,18 +464,9 @@ fn write_worker_wrangler(
 		.collect::<std::collections::BTreeMap<_, _>>();
 	let json = serde_json::to_string_pretty(&serde_json::json!({
 		"name": block.name(),
-		"main": shim.to_string(),
+		"main": main_js.to_string(),
 		"compatibility_date": COMPATIBILITY_DATE,
 		"compatibility_flags": ["nodejs_compat"],
-		// wrangler runs this before uploading; worker-build wraps wasm-bindgen +
-		// wasm-opt and emits `<beet-cli>/build/worker/shim.mjs` + the wasm, which
-		// `main` above points at.
-		"build": {
-			"command": format!(
-				"worker-build --release {} -- --no-default-features --features cloudflare",
-				cli_dir.display()
-			),
-		},
 		"r2_buckets": [{
 			"binding": WORKER_R2_BINDING,
 			"bucket_name": block.bucket(),
@@ -420,42 +506,172 @@ impl CloudflareR2Sync {
 	}
 }
 
-/// Walk the [`CloudflareR2Sync`] directory and upload each file to R2 via
-/// `wrangler r2 object put <bucket>/<key> --file <path>`.
+/// Walk the [`CloudflareR2Sync`] directory and upload each file to R2, timing the
+/// publish (the headline the `bench` verb measures against a full redeploy).
 #[action]
 #[derive(Default, Component)]
 pub async fn CloudflareR2SyncAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let start = Instant::now();
 	let sync = cx.caller.get_cloned::<CloudflareR2Sync>().await?;
-	let root = AbsPathBuf::new_workspace_rel(sync.local_dir().as_str())?;
+	sync_dir_to_r2(sync.local_dir().as_str(), sync.bucket()).await?;
+	info!(
+		"synced site in {} (live on the next fetch)",
+		time_ext::pretty_print_duration(start.elapsed()),
+	);
+	Pass(cx.input).xok()
+}
+
+/// Upload every file under `local_dir` to `bucket` via `wrangler r2 object put`.
+/// Shared by [`CloudflareR2SyncAction`] and [`CloudflareBenchAction`].
+///
+/// `local_dir` is resolved relative to the cwd (like `--main`), not the workspace:
+/// the site is the user's, and a deploy `.bsx` may be run from a different repo
+/// than the beet workspace that holds the Worker source.
+async fn sync_dir_to_r2(local_dir: &str, bucket: &str) -> Result {
+	let root = AbsPathBuf::new(local_dir)?;
 	let files = ReadDir::files_recursive(&root)?;
 	info!(
-		"syncing {} files from {} to r2://{}",
+		"syncing {} files from {} to r2://{bucket}",
 		files.len(),
 		root.display(),
-		sync.bucket()
 	);
-	for file in files {
-		let rel = file.strip_prefix(&root).unwrap_or(file.as_path());
-		let key = rel.to_string_lossy().replace('\\', "/");
-		let file_arg = file.to_string_lossy().to_string();
-		// `--remote` targets the real R2 bucket; without it wrangler writes to its
-		// *local* Miniflare store, which a deployed Worker never reads.
-		ChildProcess::new("wrangler")
-			.with_args([
-				"r2",
-				"object",
-				"put",
-				&format!("{}/{key}", sync.bucket()),
-				"--file",
-				&file_arg,
-				"--remote",
-			])
-			.run_async()
-			.await?;
+	// precompute owned `(bucket/key, file)` args so the uploads own their data.
+	let puts = files
+		.into_iter()
+		.map(|file| {
+			let rel = file.strip_prefix(&root).unwrap_or(file.as_path());
+			let key = rel.to_string_lossy().replace('\\', "/");
+			(format!("{bucket}/{key}"), file.to_string_lossy().to_string())
+		})
+		.collect::<Vec<_>>();
+	// each `wrangler r2 object put` is its own node process, so the per-file
+	// startup dominates; upload concurrently to cut the wall-clock to ~one put.
+	puts.into_iter()
+		.map(|(key, file_arg)| async move {
+			// `--remote` targets the real R2 bucket; without it wrangler writes to
+			// its *local* Miniflare store, which a deployed Worker never reads.
+			ChildProcess::new("wrangler")
+				.with_args([
+					"r2",
+					"object",
+					"put",
+					key.as_str(),
+					"--file",
+					file_arg.as_str(),
+					"--remote",
+				])
+				.run_async()
+				.await
+				.map(|_| ())
+		})
+		.xmap(async_ext::try_join_all)
+		.await?;
+	Ok(())
+}
+
+// ───────────────────────────── bench ───────────────────────────────────────
+
+/// Benchmarks the two ways to change a deployed Worker's behavior: an R2 `sync`
+/// (publish the site, served on the next fetch via the Worker's per-request
+/// version check) versus a full Worker rebuild + redeploy. Prints a side-by-side
+/// comparison: the headline of the infra demo.
+#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
+#[require(CloudflareBenchAction)]
+pub struct CloudflareBench {
+	/// Worker name, redeployed to time the full-redeploy path.
+	name: SmolStr,
+	/// R2 bucket the site is published to.
+	bucket: SmolStr,
+	/// Local site directory published on the sync path.
+	local_dir: SmolPath,
+	/// Optional live Worker URL; when set, the sync path also polls it until it
+	/// serves a 200, timing how soon the fresh site is live.
+	#[set_with(unwrap_option)]
+	url: Option<SmolStr>,
+}
+
+impl CloudflareBench {
+	/// Bench publishing `local_dir` to `bucket` against redeploying `name`.
+	pub fn new(
+		name: impl Into<SmolStr>,
+		bucket: impl Into<SmolStr>,
+		local_dir: impl Into<SmolPath>,
+	) -> Self {
+		Self {
+			name: name.into(),
+			bucket: bucket.into(),
+			local_dir: local_dir.into(),
+			url: None,
+		}
 	}
+}
+
+/// Time an R2 `sync` (and, with a `url`, how soon the live Worker serves it)
+/// against a full rebuild + redeploy, then print the comparison.
+#[action]
+#[derive(Default, Component)]
+pub async fn CloudflareBenchAction(
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let bench = cx.caller.get_cloned::<CloudflareBench>().await?;
+
+	// sync path: publish the site to R2; the Worker serves it on the next fetch.
+	let sync_start = Instant::now();
+	sync_dir_to_r2(bench.local_dir().as_str(), bench.bucket()).await?;
+	let sync_elapsed = sync_start.elapsed();
+
+	// with a url, also time how soon the live Worker serves the fresh site.
+	let live_elapsed = match bench.url() {
+		Some(url) => Some(poll_until_ok(url.as_str(), sync_start).await?),
+		None => None,
+	};
+
+	// redeploy path: a full wasm rebuild + Worker redeploy (the prebuilt artifacts
+	// are rebuilt, then uploaded).
+	let redeploy_start = Instant::now();
+	build_worker_artifacts().await?;
+	let block = CloudflareWorkerBlock::new(bench.name().clone())
+		.with_bucket(bench.bucket().clone());
+	let dir = cf_project_dir(bench.name())?;
+	write_worker_wrangler(&dir, &block)?;
+	wrangler_deploy(&dir, None).await?;
+	let redeploy_elapsed = redeploy_start.elapsed();
+
+	let speedup = redeploy_elapsed.as_secs_f64() / sync_elapsed.as_secs_f64();
+	cross_log!("\nupdate worker behavior — sync vs full redeploy");
+	cross_log!(
+		"  sync (R2 publish):       {}",
+		time_ext::pretty_print_duration(sync_elapsed)
+	);
+	if let Some(live_elapsed) = live_elapsed {
+		cross_log!(
+			"  first fresh fetch:       {}",
+			time_ext::pretty_print_duration(live_elapsed)
+		);
+	}
+	cross_log!(
+		"  full rebuild + redeploy: {}",
+		time_ext::pretty_print_duration(redeploy_elapsed)
+	);
+	cross_log!("  → sync is {speedup:.0}x faster\n");
 	Pass(cx.input).xok()
+}
+
+/// Poll `url` until it serves a 200, returning how long after `since` that took.
+/// Bounded so an unreachable Worker fails the bench instead of hanging.
+async fn poll_until_ok(url: &str, since: Instant) -> Result<Duration> {
+	for _ in 0..100 {
+		if let Ok(res) = Request::get(url).send().await
+			&& res.status().is_ok()
+		{
+			return since.elapsed().xok();
+		}
+		time_ext::sleep(Duration::from_millis(100)).await;
+	}
+	bevybail!("worker at {url} did not serve a 200 within the bench window");
 }
 
 // ───────────────────────────── watch + destroy ─────────────────────────────
@@ -651,7 +867,8 @@ async fn delete_container_images(worker_name: &str) {
 /// the inverse of [`CloudflareR2SyncAction`]. Per-object failures are ignored so
 /// an already-empty bucket (or a partial prior sync) still tears down.
 async fn empty_synced_objects(local_dir: &str, bucket: &str) -> Result {
-	let root = AbsPathBuf::new_workspace_rel(local_dir)?;
+	// cwd-relative, matching `sync_dir_to_r2` (the same keys it uploaded).
+	let root = AbsPathBuf::new(local_dir)?;
 	let files = ReadDir::files_recursive(&root)?;
 	info!("emptying {} synced objects from r2://{bucket}", files.len());
 	for file in files {
@@ -670,4 +887,17 @@ async fn empty_synced_objects(local_dir: &str, bucket: &str) -> Result {
 			.ok();
 	}
 	Ok(())
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[beet_core::test]
+	fn fmt_bytes_scales_units() {
+		fmt_bytes(512).as_str().xpect_eq("512.0 B");
+		fmt_bytes(1024).as_str().xpect_eq("1.0 KB");
+		fmt_bytes(1536).as_str().xpect_eq("1.5 KB");
+		fmt_bytes(17_500_000).as_str().xpect_eq("16.7 MB");
+	}
 }
