@@ -39,6 +39,7 @@ mod head;
 mod header;
 mod layout;
 mod preflight;
+mod render_console;
 mod sidebar;
 #[cfg(feature = "style")]
 mod stylesheet;
@@ -61,6 +62,7 @@ pub use head::*;
 pub use header::*;
 pub use layout::*;
 pub use preflight::*;
+pub use render_console::*;
 pub use sidebar::*;
 #[cfg(feature = "style")]
 pub use stylesheet::*;
@@ -97,6 +99,7 @@ pub fn widget_plugin(app: &mut App) {
 		.register_template::<ContentLayout>()
 		.register_template::<Preflight>()
 		.register_template::<Reset>()
+			.register_template::<RenderConsole>()
 		.register_template::<Sidebar>()
 		.register_template::<SidebarScript>()
 		.register_template::<MenuButton>()

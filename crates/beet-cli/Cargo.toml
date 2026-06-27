@@ -88,6 +88,13 @@ lambda = ["beet/lambda", "beet/aws_sdk"]
 # `console_error_panic_hook` is an unconditional wasm dep (the standalone binary
 # uses it too), so it is not a `dep:` activation here.
 cloudflare = ["beet/cloudflare", "dep:worker"]
+# The browser-wasm target (wasm32-only): builds the standalone `beet` binary for
+# the browser, which boots, reads its program from a `<script type="application/x-bsx">`
+# in the DOM (`js_runtime::environment() == Browser`), runs it headless and logs to
+# the console. The wasm-safe render base, no Worker SDK. `BuildWasm` defaults to this.
+# Build with: `cargo build --target wasm32-unknown-unknown -p beet-cli --bin beet \
+# --no-default-features --features web --profile wasm-release`.
+web = ["beet/web"]
 
 # the portable cross-platform base: the render router stack, media negotiation and
 # the runtime BSX parser the no-code site needs, on both native and wasm. beet's

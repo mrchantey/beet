@@ -1,0 +1,32 @@
+<!--
+# Wasm: a beet program running in the browser
+
+Serves a page that boots the wasm `beet` binary, which reads its program from an
+inlined `<script type="application/x-bsx">`, runs it headless, and renders its
+console output via `<RenderConsole>`.
+
+The store roots at the workspace (`--root=.`), so `<MainBsx src>` reaches any
+workspace-relative program and `--watch` live-reloads the browser on edit. Build
+the wasm artifact first (writes examples/wasm/assets/min.{wasm,js}):
+
+    beet build-wasm --package=beet-cli --bin=beet --out=examples/wasm/assets/min.wasm
+
+then serve:
+
+    beet --main=examples/wasm/main.bsx --root=. --watch
+
+`<RoutesDir>` serves examples/wasm/routes (the page), and `<AssetsDir>` mounts the
+built artifacts at `/assets`. Point `routes/index.bsx`'s `<MainBsx src>` at a
+different `.bsx` to run another program (its tags must be in the wasm binary's
+feature set; the `web` base covers the `Sequence`/`Log`/`RunOnLoad` core).
+-->
+<Router {(HttpServer, BootOnLoad)}>
+	<PackageConfig title="Beet Wasm" description="A headless beet program running in the browser"/>
+	<Theme color={Srgba(Srgba{red:0.0, green:0.8, blue:0.6, alpha:1.0})}/>
+	<DefaultAppRoutes/>
+	<RoutesDir src="examples/wasm/routes"/>
+	<!-- the wasm/js artifacts at /assets, and the examples tree at /examples so the
+	     browser can fetch any `<MainBsx src="/examples/..">` program over http. -->
+	<AssetsDir src="examples/wasm/assets" prefix="assets"/>
+	<AssetsDir src="examples" prefix="examples"/>
+</Router>

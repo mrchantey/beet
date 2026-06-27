@@ -2,10 +2,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// The `wasm-bindgen` output subdirectory under `out_dir`.
-const WASM_DIR: &str = "wasm";
-/// The `--out-name` passed to `wasm-bindgen`, ie `main` → `main_bg.wasm`.
-const WASM_NAME: &str = "main";
+/// The default `--out` when none is given: `dist/wasm/main.wasm` (+ `main.js`).
+const DEFAULT_OUT: &str = "dist/wasm/main.wasm";
 
 /// Request params for the [`BuildWasm`] command, surfaced in `--help`.
 #[derive(Reflect, Default)]
@@ -13,35 +11,91 @@ const WASM_NAME: &str = "main";
 struct BuildWasmParams {
 	/// Build in release mode and optimize the artifact with `wasm-opt -Oz`.
 	release: bool,
-	/// The cargo package to build, ie `--package my-app`.
+	/// The cargo package to build, ie `--package beet-cli`.
 	package: Option<String>,
-	/// Directory the `wasm-bindgen` output is written under, defaults to `dist`.
-	out_dir: Option<String>,
+	/// The binary target to build, ie `--bin beet`.
+	bin: Option<String>,
+	/// The example target to build, ie `--example my_scene`.
+	example: Option<String>,
+	/// Comma-separated features to activate, defaults to the wasm-safe `web` base.
+	features: Option<String>,
+	/// Activate all features (`--all-features`), overriding `features`.
+	all_features: bool,
+	/// Also activate the crate's `default` feature. Off by default, so the build is
+	/// `--no-default-features` like the wasm-safe `web`/`cloudflare` targets.
+	default_features: bool,
+	/// The output `.wasm` path; the sibling `.js` is written alongside it. The
+	/// `wasm-bindgen` `<name>_bg.wasm`/`<name>.js` pair is renamed to these exact
+	/// names, eg `--out=assets/wasm/min.wasm` yields `min.wasm` + `min.js`. Defaults
+	/// to `dist/wasm/main.wasm`.
+	out: Option<String>,
 }
 
 /// Compiles a package to wasm and prepares it for the browser.
 ///
-/// Runs `cargo build --target wasm32-unknown-unknown --no-default-features
-/// --features client`, then `wasm-bindgen` into `<out_dir>/wasm`, and in release
-/// mode `wasm-opt -Oz` over the result, returning the artifact size.
+/// Runs `cargo build --target wasm32-unknown-unknown` (by default
+/// `--no-default-features --features web`, the wasm-safe browser base), then
+/// `wasm-bindgen --target web`, then in release `wasm-opt -Oz`, and finally renames
+/// the `<name>_bg.wasm`/`<name>.js` pair to the exact `--out` names (patching the
+/// glue's wasm URL to match), returning the artifact size.
 #[action(route = "build-wasm", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<BuildWasmParams>())]
 pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
 	let params = parts.params().parse_reflect::<BuildWasmParams>()?;
+
+	// the cargo build: the wasm-safe `web` base by default, configurable per-arg.
 	let mut cargo = CargoBuild::default()
 		.with_release(params.release)
 		.with_target(BuildTarget::Wasm)
-		.with_no_default_features(true)
-		.with_features(vec!["client".into()]);
+		.with_no_default_features(!params.default_features)
+		.with_all_features(params.all_features);
+	if !params.all_features {
+		cargo = cargo.with_features(
+			params
+				.features
+				.as_deref()
+				.unwrap_or("web")
+				.split(',')
+				.filter(|feature| !feature.is_empty())
+				.map(SmolStr::from)
+				.collect(),
+		);
+	}
 	if let Some(package) = &params.package {
 		cargo = cargo.with_package(package.as_str());
 	}
+	if let Some(bin) = &params.bin {
+		cargo = cargo.with_binary(bin.as_str());
+	}
+	if let Some(example) = &params.example {
+		cargo = cargo.with_example(example.as_str());
+	}
 
-	let raw = params.out_dir.as_deref().unwrap_or("dist");
-	let out_dir =
-		AbsPathBuf::new(raw).unwrap_or_else(|_| AbsPathBuf::new_unchecked(raw));
+	// the requested artifact names, parsed from `--out`: the `.wasm` file, its
+	// `.js` sibling, and the interim `wasm-bindgen` `<stem>_bg.wasm` to rename from.
+	let out_raw = params.out.as_deref().unwrap_or(DEFAULT_OUT);
+	let out_path = std::path::Path::new(out_raw);
+	let stem = out_path
+		.file_stem()
+		.and_then(|stem| stem.to_str())
+		.ok_or_else(|| bevyhow!("--out `{out_raw}` has no file stem"))?
+		.to_string();
+	let wasm_name = out_path
+		.file_name()
+		.and_then(|name| name.to_str())
+		.ok_or_else(|| bevyhow!("--out `{out_raw}` has no file name"))?
+		.to_string();
+	let dir_raw = out_path
+		.parent()
+		.map(|dir| dir.to_string_lossy().to_string())
+		.unwrap_or_default();
+	let out_dir = AbsPathBuf::new(&dir_raw)
+		.unwrap_or_else(|_| AbsPathBuf::new_unchecked(&dir_raw));
+	let bindgen_wasm = out_dir.join(format!("{stem}_bg.wasm"));
+	let out_wasm = out_dir.join(&wasm_name);
+	let out_js = out_dir.join(format!("{stem}.js"));
 
 	// 1. cargo build
 	ChildProcess::new("cargo")
@@ -49,14 +103,14 @@ pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
 		.run_async()
 		.await?;
 
-	// 2. wasm-bindgen
-	let wasm_out = out_dir.join(WASM_DIR);
+	// 2. wasm-bindgen → <out_dir>/<stem>_bg.wasm + <out_dir>/<stem>.js
+	fs_ext::create_dir_all(&out_dir)?;
 	ChildProcess::new("wasm-bindgen")
 		.with_args([
 			"--out-dir".to_string(),
-			wasm_out.to_string_lossy().to_string(),
+			out_dir.to_string_lossy().to_string(),
 			"--out-name".to_string(),
-			WASM_NAME.to_string(),
+			stem.clone(),
 			"--target".to_string(),
 			"web".to_string(),
 			"--no-typescript".to_string(),
@@ -65,24 +119,34 @@ pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
 		.run_async()
 		.await?;
 
-	// 3. wasm-opt (release only)
-	let wasm_file = wasm_out.join(format!("{WASM_NAME}_bg.wasm"));
+	// 3. wasm-opt (release only), in place over the bindgen output
 	if cargo.release {
 		ChildProcess::new("wasm-opt")
 			.with_args([
 				"-Oz".to_string(),
 				"--output".to_string(),
-				wasm_file.to_string(),
-				wasm_file.to_string(),
+				bindgen_wasm.to_string_lossy().to_string(),
+				bindgen_wasm.to_string_lossy().to_string(),
 			])
 			.run_async()
 			.await?;
 	}
 
-	let size_kb = std::fs::metadata(&wasm_file)
+	// 4. rename `<stem>_bg.wasm` → the requested `.wasm` and patch the glue's
+	// `new URL('<stem>_bg.wasm', import.meta.url)` reference to match, so the
+	// `<name>.wasm`/`<name>.js` pair is self-consistent for a static load.
+	if bindgen_wasm != out_wasm {
+		fs_ext::write(&out_wasm, fs_ext::read(&bindgen_wasm)?)?;
+		fs_ext::remove(&bindgen_wasm)?;
+		let glue = fs_ext::read_to_string(&out_js)?
+			.replace(&format!("{stem}_bg.wasm"), &wasm_name);
+		fs_ext::write(&out_js, glue)?;
+	}
+
+	let size_kb = std::fs::metadata(&out_wasm)
 		.map(|meta| meta.len() as usize / 1024)
 		.unwrap_or(0);
-	let report = format!("🌱 wasm size: {size_kb} KB");
+	let report = format!("🌱 wasm size: {size_kb} KB ({wasm_name})");
 	info!("{report}");
 	Ok(report)
 }

@@ -92,6 +92,17 @@ fn load_entry(world: &mut World) {
 	// build can both filter the `templates/` read and lower each source by format.
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	world.run_async_local(async move |world: AsyncWorld| {
+		// browser: there is no filesystem and no `--main`; the program is inlined in a
+		// `<script type="application/x-bsx">`. Read it from the DOM and build it onto a
+		// storeless root through the same core as native, rather than resolving a store.
+		#[cfg(target_arch = "wasm32")]
+		if js_runtime::environment() == js_runtime::JsEnvironment::Browser {
+			if let Err(err) = browser_entry(&world, formats).await {
+				error!("{err}");
+				world.write_message(AppExit::error()).await;
+			}
+			return;
+		}
 		// resolve on the runtime, since discovery now awaits the store.
 		let resolved = match resolve_entry(&args).await {
 			Ok(resolved) => resolved,
@@ -106,6 +117,52 @@ fn load_entry(world: &mut World) {
 			world.write_message(AppExit::error()).await;
 		}
 	});
+}
+
+/// Build the browser entry: read the `<script type="application/x-bsx">` from the
+/// DOM and build its program onto a storeless root (see [`build_entry_from_bsx`]).
+/// The wasm `Browser` branch of [`load_entry`]; the program's own
+/// `RunOnLoad`/`ExchangeOnLoad` verb then drives it.
+///
+/// A `data-src` attribute names a program to fetch at runtime (the page emits a
+/// reference via `<MainBsx src>`, served over http); otherwise the script's own text
+/// is the program inline.
+#[cfg(target_arch = "wasm32")]
+async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
+	let script = document_ext::query_bsx_script().ok_or_else(|| {
+		bevyhow!(
+			"browser entry: no `<script type=\"{}\">` found in the document",
+			MediaType::Bsx.as_str()
+		)
+	})?;
+	let bsx = match script.get_attribute("data-src") {
+		Some(src) if !src.is_empty() => {
+			// cache-bust so a live-reload re-fetches the edited program rather than
+			// the browser's cached copy (the path the server serves ignores the query).
+			// A random nonce, not a timestamp: a reload resets the page clock, so a
+			// time value would repeat and the browser would still serve the cache.
+			let mut nonce = [0u8; 8];
+			getrandom::fill(&mut nonce).ok();
+			let sep = if src.contains('?') { '&' } else { '?' };
+			let url = format!("{src}{sep}_={}", u64::from_le_bytes(nonce));
+			Request::get(url.as_str())
+				.send()
+				.await?
+				.into_result()
+				.await?
+				.text()
+				.await?
+		}
+		_ => script
+			.text()
+			.map_err(|_| bevyhow!("browser entry: failed to read program text"))?,
+	};
+	world
+		.with(move |world: &mut World| {
+			build_entry_from_bsx(world, formats, "main.bsx", bsx, ())
+		})
+		.await?;
+	Ok(())
 }
 
 /// A resolved entry: its store, the entry document name within it, and the local
@@ -199,18 +256,50 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 				no filesystem entry discovery on wasm)"
 			)
 		})??;
-	let dir = entry
-		.parent()
-		.ok_or_else(|| bevyhow!("entry `{entry}` has no parent directory"))?;
-	let entry_name = entry
-		.file_name()
-		.and_then(|name| name.to_str())
-		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
-		.to_string();
+	let (dir, entry_name) = entry_root_and_name(&args.params, &entry)?;
 	Ok(ResolvedEntry {
 		store: resolve_store(&args.params, dir)?,
 		entry_name,
 	})
+}
+
+/// Resolve the (store root dir, entry name within it) for an explicit `--main`.
+///
+/// By default the store roots at the entry's parent (name = the file name). An
+/// optional `--root=<dir>` decouples the store root from the entry's own directory:
+/// it roots there and the name carries the entry path relative to it, so the entry
+/// can reach sibling/ancestor paths (eg the wasm page at `examples/wasm/main.bsx`
+/// inlining the workspace-relative `examples/action/hello_world.bsx`). Live reload
+/// then watches the whole root.
+fn entry_root_and_name(
+	params: &MultiMap<SmolStr, SmolStr>,
+	entry: &AbsPathBuf,
+) -> Result<(AbsPathBuf, String)> {
+	match params.get("root") {
+		Some(root) => {
+			let root = AbsPathBuf::new(root.as_str())?;
+			let entry_name = entry
+				.strip_prefix(&root)
+				.map_err(|_| {
+					bevyhow!("--main `{entry}` is not under --root `{root}`")
+				})?
+				.to_str()
+				.ok_or_else(|| bevyhow!("entry `{entry}` has a non-utf8 path"))?
+				.to_string();
+			Ok((root, entry_name))
+		}
+		None => {
+			let dir = entry.parent().ok_or_else(|| {
+				bevyhow!("entry `{entry}` has no parent directory")
+			})?;
+			let entry_name = entry
+				.file_name()
+				.and_then(|name| name.to_str())
+				.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
+				.to_string();
+			Ok((dir, entry_name))
+		}
+	}
 }
 
 /// The native entry resolution: a remote store, an explicit `--main`, or a
@@ -256,14 +345,7 @@ async fn resolve_entry_native(args: &CliArgs) -> Result<ResolvedEntry> {
 		.transpose()?
 	{
 		Some(entry) => {
-			let dir = entry.parent().ok_or_else(|| {
-				bevyhow!("entry `{entry}` has no parent directory")
-			})?;
-			let entry_name = entry
-				.file_name()
-				.and_then(|name| name.to_str())
-				.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
-				.to_string();
+			let (dir, entry_name) = entry_root_and_name(&args.params, &entry)?;
 			Ok(ResolvedEntry {
 				store: resolve_store(&args.params, dir.clone())?,
 				entry_name,

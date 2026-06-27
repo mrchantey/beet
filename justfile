@@ -243,6 +243,19 @@ test-wasm-e2e crate test_name *args:
 example-chat *args:
 	just watch cargo run --example chat 	--features=native-tls,thread -- {{ args }}
 
+# Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
+# to run a headless beet program (examples/wasm/hello.bsx) in the browser; its
+# console output renders on the page via <RenderConsole>. Needs `just install-cli`.
+# The store roots at the workspace (--root=.) so the served examples are reachable
+# and --watch live-reloads on edit.
+serve-wasm *args:
+	beet build-wasm --release --package=beet-cli --bin=beet --out=examples/wasm/assets/min.wasm
+	beet --main=examples/wasm/main.bsx --root=. --watch --server=http {{ args }}
+
+# Just (re)build the browser-wasm artifact into examples/wasm/assets/min.{wasm,js}.
+build-wasm-example *args:
+	beet build-wasm --release --package=beet-cli --bin=beet --out=examples/wasm/assets/min.wasm {{ args }}
+
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer
 

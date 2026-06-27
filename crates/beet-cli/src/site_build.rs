@@ -132,6 +132,28 @@ pub fn build_entry_root(
 	Ok(root)
 }
 
+/// Build an entry from in-memory BSX text rather than a store read: the browser
+/// path, where the program is inlined in a `<script type="application/x-bsx">`, not
+/// resolved from `--main`/a filesystem. Constructs [`EntrySources`] directly and
+/// builds onto a storeless ([`BlobStore::temp`]) root, so the same
+/// [`build_entry_root`] core runs as the store-backed native path. `extra` rides
+/// onto the root as for [`build_entry_root`].
+pub fn build_entry_from_bsx(
+	world: &mut World,
+	formats: TemplateFormats,
+	entry_name: impl Into<String>,
+	bsx: impl Into<String>,
+	extra: impl Bundle,
+) -> Result<Entity> {
+	let sources = EntrySources {
+		entry_name: entry_name.into(),
+		entry: MediaBytes::new_bsx(bsx.into()),
+		template_sources: Vec::new(),
+		formats,
+	};
+	build_entry_root(world, BlobStore::temp(), sources, extra)
+}
+
 /// Drive the async runtime until an entry root is marked [`TemplatesLoaded`], so a
 /// build-then-serve path (the wasm Worker, a wasm one-shot) never serves before the
 /// entry's templates registered.

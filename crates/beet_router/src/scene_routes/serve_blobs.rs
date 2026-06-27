@@ -93,6 +93,30 @@ pub fn AssetsStore() -> impl Bundle {
 	})
 }
 
+/// Mounts a named directory as static-file routes: serves the files under `src`
+/// (resolved against the nearest ancestor [`BlobStore`]) at the url `prefix`.
+///
+/// The declarative, env-free counterpart to [`AssetsStore`]: it pairs [`ServeBlobs`]
+/// (the mount path) with a [`DirPath`] (scoping the inherited store to `src`), so
+/// `<AssetsDir src="examples/wasm/assets" prefix="assets"/>` serves
+/// `examples/wasm/assets/…` at `/assets/…`. `prefix` defaults to `src`.
+#[template]
+pub fn AssetsDir(
+	/// The directory to mount, relative to the nearest ancestor store root.
+	#[prop(into)]
+	src: String,
+	/// The url prefix to serve under; defaults to `src`.
+	#[prop(into, default)]
+	prefix: String,
+) -> impl Bundle {
+	let prefix = if prefix.is_empty() {
+		src.clone()
+	} else {
+		prefix
+	};
+	rsx! { <ServeBlobs prefix={prefix} {DirPath(SmolPath::from(src.as_str()))}/> }
+}
+
 // the tests assemble a router with a temp store, both adjacent (on an ancestor) and
 // co-located (on the route), to prove the self-or-ancestor lookup.
 #[cfg(all(test, feature = "std"))]

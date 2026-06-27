@@ -28,21 +28,30 @@ const DENO_TS: &str = include_str!("deno.ts");
 pub async fn RunWasm(parts: RequestParts) -> Result<Response> {
 	let mut cli = parts.to_cli_args();
 	// route `run-wasm/*run-wasm-args`: the first segment is the command, the rest
-	// rejoin into the binary path (absolute, as cargo passes it).
+	// are the absolute binary path (split on `/`) followed by any positional module
+	// args (eg a libtest name filter cargo appends after the binary).
 	let mut segments = core::mem::take(&mut cli.path);
 	if segments.is_empty() {
 		bevybail!("usage: beet run-wasm <binary-path> [args..]");
 	}
 	segments.remove(0);
-	if segments.is_empty() {
-		bevybail!("usage: beet run-wasm <binary-path> [args..]");
-	}
+	// the binary path ends at the `.wasm` segment; segments after it are positional
+	// module args (the filter), so the path is not over-joined into them.
+	let wasm_idx = segments
+		.iter()
+		.position(|segment| segment.ends_with(".wasm"))
+		.ok_or_else(|| {
+			bevyhow!("usage: beet run-wasm <binary-path>.wasm [args..]")
+		})?;
+	let trailing = segments.split_off(wasm_idx + 1);
 	let exe_path = segments.join("/");
 	// `cli` now holds only the forwarded params; drop the route's own `run-wasm-args`
 	// capture so it never leaks into the module's `Deno.args`, then flatten the rest
-	// to `--key[=value]` flags the running module reads back via `Deno.args`.
+	// to `--key[=value]` flags plus the trailing positionals (eg the filter) the
+	// running module reads back via `Deno.args`.
 	cli.params.remove("run-wasm-args");
-	let forwarded = cli.into_args();
+	let mut forwarded = cli.into_args();
+	forwarded.extend(trailing.into_iter().map(Into::into));
 	run_wasm(Path::new(&exe_path), forwarded).await?;
 	// the module's output already streamed via inherited stdio, so the runner's own
 	// response carries no body, only a success status.

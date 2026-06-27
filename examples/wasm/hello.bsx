@@ -1,0 +1,15 @@
+<!--
+The program the wasm binary runs: a headless behavior tree that logs a greeting
+and exits. It uses only `web`-feature types (`Sequence`/`Log`/`RunOnLoad`), so it
+runs in a `--features web` wasm build with no extra registration.
+
+`<MainBsx src>` on the page can point at any `.bsx` program whose tags are compiled
+into the wasm binary; build the wasm with more features to run richer examples.
+
+    beet --main=examples/action/behavior_tree.bsx   # the same program, natively
+-->
+<Sequence {RunOnLoad}>
+	<Log::Message("Hello from beet, running headless in your browser.")/>
+	<Log::Message("This program was compiled to wasm and read from a script[type=application/x-bsx].")/>
+	<Log::Message("Edit examples/wasm/hello.bsx and the page live-reloads.")/>
+</Sequence>

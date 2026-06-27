@@ -55,6 +55,8 @@ pub struct CargoBuild {
 	pub root_crate_name: Option<SmolStr>,
 	/// Do not activate the `default` feature.
 	pub no_default_features: bool,
+	/// Activate all features, ie `--all-features`.
+	pub all_features: bool,
 	/// Features to activate, ie `--features client`.
 	pub features: Vec<SmolStr>,
 	/// Additional arguments passed to cargo.
@@ -141,7 +143,9 @@ impl CargoBuild {
 		if self.no_default_features {
 			args.push("--no-default-features".into());
 		}
-		if !self.features.is_empty() {
+		if self.all_features {
+			args.push("--all-features".into());
+		} else if !self.features.is_empty() {
 			args.push("--features".into());
 			args.push(self.features.join(",").into());
 		}
@@ -286,14 +290,26 @@ mod test {
 	fn cargo_args_wasm_features() {
 		CargoBuild::default()
 			.with_target(BuildTarget::Wasm)
-			.with_package("my-app")
+			.with_package("beet-cli")
+			.with_binary("beet")
 			.with_no_default_features(true)
-			.with_features(vec!["client".into()])
+			.with_features(vec!["web".into()])
 			.cargo_args()
 			.join(" ")
 			.xpect_eq(
-				"build --package my-app --target wasm32-unknown-unknown \
-				 --no-default-features --features client",
+				"build --package beet-cli --bin beet --target wasm32-unknown-unknown \
+				 --no-default-features --features web",
 			);
+	}
+
+	// `--all-features` wins over an explicit `--features` list.
+	#[beet_core::test]
+	fn cargo_args_all_features() {
+		CargoBuild::default()
+			.with_all_features(true)
+			.with_features(vec!["web".into()])
+			.cargo_args()
+			.join(" ")
+			.xpect_eq("build --all-features");
 	}
 }

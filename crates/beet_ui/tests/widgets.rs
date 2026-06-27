@@ -501,6 +501,33 @@ fn color_scheme_script_emits_scheme_classes() {
 	});
 }
 
+#[beet_core::test]
+fn render_console_emits_panel() {
+	let mut world = ui_world();
+	let root = world
+		.spawn_template(rsx! { <RenderConsole/> })
+		.unwrap()
+		.id();
+	// the `#beet-console` panel the captured console lines append to
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
+	world.with_state::<ElementQuery, _>(|query| {
+		let body = query
+			.iter_descendant_values(root)
+			.filter_map(|v| v.as_str().ok())
+			.collect::<String>();
+		// the bundled style (material tokens) and the console-wrapping script
+		body.as_str()
+			.xpect_contains("#beet-console")
+			.xpect_contains("var(--material-colors-error")
+			.xpect_contains("getElementById(\"beet-console\")");
+	});
+}
+
 #[cfg(feature = "net")]
 #[beet_core::test]
 fn analytics_emits_script() {

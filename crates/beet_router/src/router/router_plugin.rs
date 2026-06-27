@@ -131,7 +131,14 @@ impl Plugin for RouterPlugin {
 			app.register_template::<Route>()
 				.register_template::<ServeBlobs>()
 				.register_type::<ServeBlobsHandler>()
-				.register_template::<AssetsStore>();
+				.register_template::<AssetsStore>()
+				// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`),
+				// the env-free counterpart to `AssetsStore`.
+				.register_template::<AssetsDir>()
+				// the browser-wasm page templates: the module loader and the program
+				// reference a served page boots a wasm `beet` binary with.
+				.register_template::<Wasm>()
+				.register_template::<MainBsx>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `default_router` wires the

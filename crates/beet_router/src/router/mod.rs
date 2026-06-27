@@ -74,3 +74,11 @@ pub use sidebar::*;
 mod site_layout;
 #[cfg(feature = "std")]
 pub use site_layout::*;
+// the browser-wasm page templates `<Wasm>` + `<MainBsx>`: serve-side, building a
+// page that boots a wasm `beet` binary and references its `.bsx` program. Plain
+// synchronous templates, so they render inside a route's content (std-gated like
+// the rest of the render pipeline).
+#[cfg(feature = "std")]
+mod wasm;
+#[cfg(feature = "std")]
+pub use wasm::*;

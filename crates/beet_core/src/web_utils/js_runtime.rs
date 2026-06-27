@@ -103,6 +103,96 @@ fn has_global(name: &str) -> bool {
 		.unwrap_or(false)
 }
 
+/// The host JavaScript runtime the wasm module is executing in.
+///
+/// Unlike the `#[cfg(target_arch = "wasm32")]` split (which is compile-time:
+/// "am I wasm bytecode?"), this is a runtime decision: the same wasm binary boots
+/// under the Deno test runner, in a browser tab, or under another JS host, and
+/// branches here. The standalone `beet` binary uses it to choose its entry: a host
+/// with a filesystem (Deno/Node) loads `--main` through `fs_ext`, a `Browser` reads
+/// its program from the DOM instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JsEnvironment {
+	/// The Deno runtime, ie the beet wasm test runner. Has fs/env globals.
+	Deno,
+	/// Node.js (`process.versions.node`). Has fs/env globals.
+	Node,
+	/// An embedded engine with no DOM and no process host (eg QuickJs), the
+	/// catch-all when no other marker is present.
+	QuickJs,
+	/// A browser tab: a `window` carrying a `document`. No process / fs.
+	Browser,
+}
+
+impl JsEnvironment {
+	/// Decide the runtime from the presence of host markers. Pure, so the full
+	/// matrix is unit-testable off-host.
+	///
+	/// Ordering is load-bearing: the beet Deno runner polyfills a `window`, so a
+	/// `window` alone does not mean browser; `Deno` is therefore checked first and
+	/// `Browser` additionally requires a `document` (which Deno does not provide).
+	fn detect(
+		has_deno: bool,
+		has_node: bool,
+		has_window: bool,
+		has_document: bool,
+	) -> Self {
+		if has_deno {
+			JsEnvironment::Deno
+		} else if has_window && has_document {
+			JsEnvironment::Browser
+		} else if has_node {
+			JsEnvironment::Node
+		} else {
+			JsEnvironment::QuickJs
+		}
+	}
+
+	/// Whether this runtime has a filesystem reachable through the runner's fs
+	/// globals (so `--main` + an `FsStore` entry load), ie Deno or Node. A
+	/// `Browser`/`QuickJs` has none, degrading every `fs_ext` call to a no-op.
+	pub fn has_fs(&self) -> bool {
+		matches!(self, JsEnvironment::Deno | JsEnvironment::Node)
+	}
+}
+
+/// Whether the host defines a (non-function) global of the given name, eg the
+/// `Deno`/`process`/`document` runtime markers. Unlike [`has_global`] this probes
+/// the bare name (the markers are real host globals, not the runner's prefixed fs
+/// shims) and accepts any defined value, not only functions.
+fn global_defined(name: &str) -> bool {
+	js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str(name))
+		.map(|value| !value.is_undefined() && !value.is_null())
+		.unwrap_or(false)
+}
+
+/// Whether `process.versions.node` is a string, ie the host is Node.js.
+fn has_node_marker() -> bool {
+	js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str("process"))
+		.ok()
+		.filter(|process| !process.is_undefined() && !process.is_null())
+		.and_then(|process| {
+			js_sys::Reflect::get(&process, &JsValue::from_str("versions")).ok()
+		})
+		.and_then(|versions| {
+			js_sys::Reflect::get(&versions, &JsValue::from_str("node")).ok()
+		})
+		.map(|node| node.is_string())
+		.unwrap_or(false)
+}
+
+/// Detect the host JavaScript runtime by probing its globals; see [`JsEnvironment`].
+pub fn environment() -> JsEnvironment {
+	let window = web_sys::window();
+	let has_document = window.and_then(|win| win.document()).is_some();
+	JsEnvironment::detect(
+		global_defined("Deno"),
+		has_node_marker(),
+		web_sys::window().is_some(),
+		has_document,
+	)
+}
+
 /// Current working directory, ie `Deno.cwd()`. `/` when the host has no cwd
 /// (browser / Worker), matching a rooted virtual filesystem.
 pub fn cwd() -> String {
@@ -194,7 +284,7 @@ pub fn args() -> Vec<String> {
 			.map(Into::into)
 			.collect();
 	}
-	if web_sys::window().is_some() {
+	if environment() == JsEnvironment::Browser {
 		return search_params_ext::location_args();
 	}
 	Vec::new()
@@ -283,5 +373,41 @@ pub fn catch_no_abort(
 			Ok(Err(err.as_string().expect("checked")))
 		}
 		Err(_) => Err(()),
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	// the marker matrix: Deno wins even when it polyfills `window`; Browser needs
+	// both `window` and `document`; Node is the `process` host without a DOM;
+	// QuickJs is the marker-less catch-all.
+	#[crate::test]
+	fn detect_matrix() {
+		// (deno, node, window, document) -> env
+		JsEnvironment::detect(true, false, false, false)
+			.xpect_eq(JsEnvironment::Deno);
+		// deno polyfills window: still Deno, never Browser.
+		JsEnvironment::detect(true, false, true, false)
+			.xpect_eq(JsEnvironment::Deno);
+		JsEnvironment::detect(false, false, true, true)
+			.xpect_eq(JsEnvironment::Browser);
+		// window without a document is not a browser.
+		JsEnvironment::detect(false, false, true, false)
+			.xpect_eq(JsEnvironment::QuickJs);
+		JsEnvironment::detect(false, true, false, false)
+			.xpect_eq(JsEnvironment::Node);
+		JsEnvironment::detect(false, false, false, false)
+			.xpect_eq(JsEnvironment::QuickJs);
+		JsEnvironment::has_fs(&JsEnvironment::Deno).xpect_true();
+		JsEnvironment::has_fs(&JsEnvironment::Browser).xpect_false();
+	}
+
+	// the wasm test harness runs under Deno, so live detection resolves to Deno
+	// (a real `Deno` global), exercising the global-probing path end to end.
+	#[crate::test]
+	fn detects_the_deno_runner() {
+		environment().xpect_eq(JsEnvironment::Deno);
 	}
 }

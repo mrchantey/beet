@@ -42,5 +42,24 @@ impl Plugin for CliCommandsPlugin {
 			.register_type::<SyncS3>();
 		#[cfg(feature = "qrcode")]
 		app.register_type::<QrCode>();
+		// the root `main.bsx` names the infra deploy blocks, which only register
+		// under the `infra` feature. Without it (the default `beet`, `beet run-wasm`,
+		// `beet build-wasm`, `beet serve`), allow them as known-but-inert tags so the
+		// entry still loads and the `deploy`/`sync`/`watch` routes render nothing,
+		// mirroring how `<LiveReloadScript>` degrades without `client_io`.
+		#[cfg(not(feature = "infra"))]
+		for tag in [
+			"BeetSiteDeployHost",
+			"FargateBeetSiteBlock",
+			"SiteBucket",
+			"AssetsBucket",
+			"BeetBinaryBuild",
+			"TofuApplyAction",
+			"BuildDockerImage",
+			"DirSync",
+			"FargateWatch",
+		] {
+			app.allow_unregistered(tag);
+		}
 	}
 }

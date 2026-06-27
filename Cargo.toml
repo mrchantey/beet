@@ -372,6 +372,15 @@ router_embedded = ["action", "net", "dep:beet_router"]
 # backend, so a wasm `beet-cli` lib loads its site from an R2 bucket and serves
 # it through the router. wasm32-only (the `worker` crate is wasm-gated in beet_net).
 cloudflare = ["router_render", "json", "markdown", "serde_plain", "beet_net/cloudflare"]
+# The browser-wasm base: the minimum any in-browser `beet` binary needs regardless
+# of `--no-default-features`. The portable render router (bsx parse + template +
+# action runtime) plus media/route output and the ui `style` widgets `<RenderConsole>`
+# leans on. Wasm-safe like `cloudflare` (router_render, not the native-fs `router`),
+# but without the Worker SDK / R2 store: the program is read from the DOM, not a
+# bucket. Built as:
+#   cargo build --target wasm32-unknown-unknown -p beet-cli --bin beet \
+#     --no-default-features --features web --profile wasm-release
+web = ["router_render", "json", "markdown", "serde_plain", "style", "template"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
