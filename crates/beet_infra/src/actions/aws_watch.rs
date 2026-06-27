@@ -71,8 +71,10 @@ pub async fn AwsWatchAction(
 		watch.log_group()
 	);
 
-	// spawn aws logs tail with inherited stdout/stderr for streaming output
+	// spawn aws logs tail with inherited stdout/stderr for streaming output.
+	// drop a possibly-empty inherited `AWS_PROFILE` (see `build_docker_image`).
 	let mut child = ChildProcess::new("aws")
+		.without_env("AWS_PROFILE")
 		.with_args([
 			"logs",
 			"tail",

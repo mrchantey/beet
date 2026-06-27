@@ -97,9 +97,19 @@ fn on_link_click(
 	// internal, or external rendered in-app, both navigate the Navigator.
 	let navigate = !url.is_external() || on_open == OnOpenLink::Internal;
 	if navigate {
-		commands
-			.entity(navigator)
-			.queue_async(move |entity| Navigator::navigate_to(entity, url));
+		commands.entity(navigator).queue_async(move |entity| async move {
+			// a session can close (despawning its co-located navigator) between the
+			// click and this task, eg a multi-tenant SSH client that disconnects
+			// mid-navigation. A despawned navigator is a clean no-op; a genuine load
+			// failure is logged rather than escalated to the command error handler,
+			// as the boot navigation in `Navigator::on_add` also does.
+			if !entity.is_alive().await {
+				return;
+			}
+			if let Err(err) = Navigator::navigate_to(entity, url).await {
+				error!("navigation failed: {err}");
+			}
+		});
 	} else {
 		// external + OnOpenLink::External: open in the system browser, through the
 		// interceptable event so the open is authoritative (not OSC-8 delegated).

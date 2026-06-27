@@ -221,14 +221,16 @@ pub async fn BuildDockerImageAction(
 	// authenticate to ECR
 	let engine_cmd = engine.command();
 	info!("authenticating {} to ECR", engine_cmd);
-	let auth_cmd = ChildProcess::new("sh").with_args([
-		"-c",
-		&format!(
-			"aws ecr get-login-password --region {region} | {engine_cmd} login \
-			 --username AWS --password-stdin \
-			 {account_id}.dkr.ecr.{region}.amazonaws.com"
-		),
-	]);
+	let auth_cmd = ChildProcess::new("sh")
+		.without_env("AWS_PROFILE")
+		.with_args([
+			"-c",
+			&format!(
+				"aws ecr get-login-password --region {region} | {engine_cmd} \
+				 login --username AWS --password-stdin \
+				 {account_id}.dkr.ecr.{region}.amazonaws.com"
+			),
+		]);
 	auth_cmd
 		.run_async()
 		.await
@@ -265,7 +267,7 @@ pub async fn BuildDockerImageAction(
 
 /// Get AWS account ID.
 async fn get_aws_account_id() -> Result<String> {
-	let cmd = ChildProcess::new("aws").with_args([
+	let cmd = aws_cli().with_args([
 		"sts",
 		"get-caller-identity",
 		"--query",
@@ -282,9 +284,17 @@ async fn get_aws_account_id() -> Result<String> {
 		.map(|s| s.trim().to_string())
 }
 
+/// An `aws` cli invocation for the deploy path. Drops a possibly-empty inherited
+/// `AWS_PROFILE` (the lean `beet-*` recipes export `AWS_PROFILE=` to bypass a global
+/// profile), which the cli would otherwise read as a profile named `""` and reject,
+/// instead of falling back to the explicit `AWS_ACCESS_KEY_ID`/`_SECRET`/`_REGION`.
+fn aws_cli() -> ChildProcess {
+	ChildProcess::new("aws").without_env("AWS_PROFILE")
+}
+
 /// Verify ECR repository exists (should be created by Terraform).
 async fn ensure_ecr_repository(region: &str, repo_name: &str) -> Result {
-	let cmd = ChildProcess::new("aws").with_args([
+	let cmd = aws_cli().with_args([
 		"ecr",
 		"describe-repositories",
 		"--region",

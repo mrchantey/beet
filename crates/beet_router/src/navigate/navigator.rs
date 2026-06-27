@@ -58,8 +58,15 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.entity(cx.entity)
 		.queue_async(async |entity| {
 			let navigator = entity.id();
-			let home_url =
-				entity.get(|nav: &Navigator| nav.home_url.clone()).await?;
+			// a session can close (despawning its co-located navigator) before this
+			// boot task runs or between its await points, eg a multi-tenant SSH
+			// client that connects and immediately disconnects. A despawned entity is
+			// a clean exit, not an error to surface to the command error handler.
+			let Ok(home_url) =
+				entity.get(|nav: &Navigator| nav.home_url.clone()).await
+			else {
+				return Ok(());
+			};
 			// world handle kept before `navigate_to` consumes `entity`, for the
 			// error-page render below.
 			let world = entity.world().clone();

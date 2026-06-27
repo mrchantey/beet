@@ -39,6 +39,11 @@ pub struct PackageConfig {
 
 /// The defaults govern unset fields for markup-only sites: a markup-declared
 /// `<PackageConfig/>` is built over these when no host inserted a [`pkg_config!`].
+///
+/// Unlike the compile-time [`pkg_config!`], `stage` and `service_access` resolve
+/// from the *runtime* `BEET_STAGE`/`BEET_SERVICE_ACCESS` env vars (falling back to
+/// `dev`/`Local`), so the same markup binary deployed to multiple stages reports the
+/// stage it is actually running in.
 impl Default for PackageConfig {
 	fn default() -> Self {
 		Self {
@@ -48,8 +53,13 @@ impl Default for PackageConfig {
 			version: "0.0.1".into(),
 			homepage: None,
 			repository: None,
-			stage: "dev".into(),
-			service_access: ServiceAccess::Local,
+			stage: env_ext::var("BEET_STAGE")
+				.map(SmolStr::from)
+				.unwrap_or_else(|_| "dev".into()),
+			service_access: env_ext::var("BEET_SERVICE_ACCESS")
+				.ok()
+				.and_then(|access| access.parse().ok())
+				.unwrap_or(ServiceAccess::Local),
 		}
 	}
 }

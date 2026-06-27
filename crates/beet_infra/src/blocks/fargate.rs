@@ -526,6 +526,9 @@ impl Block for FargateBlock {
 		}
 		env_vars.insert("RUST_LOG".into(), "info".into());
 		env_vars.insert("AWS_REGION".into(), region.to_string());
+		// the deployed stage, so a markup `PackageConfig` (which reads `BEET_STAGE`
+		// at runtime) reports the stage it is actually running in.
+		env_vars.insert("BEET_STAGE".into(), stage.to_string().into());
 		// env_vars as terraform variable references
 		for variable in &self.env_vars {
 			env_vars
@@ -1004,5 +1007,18 @@ mod tests {
 			.xpect_contains("dns_www_example_org");
 		// exactly one ACM certificate resource for all authorities
 		json.matches("\"aws_acm_certificate\"").count().xpect_eq(1);
+	}
+
+	#[beet_core::test]
+	fn injects_beet_stage_env() {
+		// the container must carry BEET_STAGE (set to the stack's stage) so a markup
+		// PackageConfig reports the deployed stage at runtime.
+		let (config, stack, _dir) = build_config(&autoscaling_block());
+		// container_definitions is a JSON string nested in the config, so the env
+		// entry renders with escaped quotes (matching the BEET_SSH_PORT tests).
+		config.to_json().to_string().xpect_contains(&format!(
+			r#"{{\"name\":\"BEET_STAGE\",\"value\":\"{}\"}}"#,
+			stack.stage()
+		));
 	}
 }

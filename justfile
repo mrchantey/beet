@@ -70,6 +70,15 @@ beet-sync *args:
 # Poll the deployed service's rollout.
 beet-watch *args:
   AWS_PROFILE= cargo run -p beet-cli -- watch {{ args }}
+# Tear the deployed stack down (pass --stage=prod for the prod stack).
+beet-destroy *args:
+  AWS_PROFILE= cargo run -p beet-cli -- destroy --force {{ args }}
+# Resolve the deploy config without touching cloud (safe pre-apply check).
+beet-validate *args:
+  AWS_PROFILE= cargo run -p beet-cli -- validate {{ args }}
+# Show the tofu plan without applying (eyeball before deploy).
+beet-plan *args:
+  AWS_PROFILE= cargo run -p beet-cli -- plan {{ args }}
 
 install-cli *args:
   # --locked pins the workspace bevy rc; a bare install re-resolves the

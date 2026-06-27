@@ -56,7 +56,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID` in
 			<FargateBeetSiteBlock app_name="beet-site"/>
 			<SiteBucket/>
 			<AssetsBucket/>
-			<BeetBinaryBuild features="aws_sdk"/>
+			<BeetBinaryBuild features="aws_sdk,ssh"/>
 			<TofuApplyAction/>
 			<BuildDockerImage cmd_args={["serve", "--server=http,ssh", "--path=/"]}/>
 			<DirSync app_name="beet-site" bucket="site" dir="site"/>

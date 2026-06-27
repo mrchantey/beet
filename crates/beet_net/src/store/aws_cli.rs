@@ -98,12 +98,17 @@ impl AwsCli {
 	async fn run_argv(&self, argv: Vec<String>) -> Result {
 		let (prog, rest) =
 			argv.split_first().ok_or_else(|| bevyhow!("empty argv"))?;
-		let status = Command::new(prog)
-			.args(rest)
+		let mut cmd = Command::new(prog);
+		cmd.args(rest)
 			.stdout(Stdio::inherit())
-			.stderr(Stdio::inherit())
-			.status()
-			.await?;
+			.stderr(Stdio::inherit());
+		// without an explicit `--profile`, drop a possibly-empty inherited
+		// `AWS_PROFILE` (the lean `beet-*` recipes export `AWS_PROFILE=`) the cli
+		// would read as a profile named `""`; fall back to explicit keys instead.
+		if self.profile.is_none() {
+			cmd.env_remove("AWS_PROFILE");
+		}
+		let status = cmd.status().await?;
 
 		if !status.success() {
 			bevybail!("aws cli exited with non-zero status: {:?}", status);

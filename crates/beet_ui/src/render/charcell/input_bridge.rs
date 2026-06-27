@@ -290,13 +290,21 @@ pub fn resize_stdio_buffers(
 ///
 /// Reads the per-surface [`KeyboardInput`] stream (each event carries its source
 /// `window`): a terminal ctrl+c arrives as a Control press bracketing a `C` press
-/// on the same window. Only a non-[`ChannelTerminal`] surface (the local stdio
-/// terminal) exits the process; an SSH session is a [`ChannelTerminal`], whose
-/// ctrl+c the SSH server handles as a per-session close, never a global
-/// [`AppExit`] that would tear down every other session.
+/// on the same window. The surface is identified *positively* by
+/// [`StdioTerminal`]: only the local terminal exits the process. An SSH session
+/// ([`ChannelTerminal`]) handles its ctrl+c as a per-session close
+/// (`close_session_on_ctrl_c`), never a global [`AppExit`] that would tear down
+/// every other session.
+///
+/// The positive match is load-bearing: every SSH client sends a closing ctrl+c,
+/// and that keypress and the session despawn race within a frame. A negative
+/// "not a [`ChannelTerminal`]" test misfires the instant the despawn (or a not-yet
+/// built pre-pty surface, or a reused entity index) leaves the window without a
+/// [`ChannelTerminal`], killing the whole multi-tenant server. Keying on
+/// [`StdioTerminal`] — which an SSH window never carries — is immune to that race.
 pub fn exit_on_ctrl_c(
 	mut keys: MessageReader<KeyboardInput>,
-	channels: Query<(), With<ChannelTerminal>>,
+	local: Query<(), With<StdioTerminal>>,
 	mut exit: MessageWriter<AppExit>,
 ) {
 	// group this frame's pressed keys by window: (ctrl seen, c seen).
@@ -310,7 +318,7 @@ pub fn exit_on_ctrl_c(
 		}
 	}
 	for (window, (ctrl, c)) in per_window {
-		if ctrl && c && !channels.contains(window) {
+		if ctrl && c && local.contains(window) {
 			exit.write(AppExit::Success);
 		}
 	}
@@ -441,32 +449,57 @@ mod test {
 		host.messages::<AppExit>().is_empty().xpect_true();
 	}
 
-	/// ctrl+c on the local stdio surface (no [`ChannelTerminal`]) exits the process.
-	#[beet_core::test]
-	fn ctrl_c_exits_local_surface() {
+	/// Minimal app running just [`exit_on_ctrl_c`], plus a ctrl+c from `window`.
+	fn ctrl_c_from(window: impl FnOnce(&mut World) -> Entity) -> App {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.add_message::<KeyboardInput>()
 			.add_systems(Update, exit_on_ctrl_c);
-		// a local surface: a Terminal-bearing entity with no ChannelTerminal.
-		let local = app.world_mut().spawn(Terminal::new_buffered()).id();
+		let window = window(app.world_mut());
 		// ctrl+c arrives as a ControlLeft press bracketing a KeyC press.
-		for code in [KeyCode::ControlLeft, KeyCode::KeyC] {
+		for key_code in [KeyCode::ControlLeft, KeyCode::KeyC] {
 			app.world_mut().write_message(KeyboardInput {
-				key_code: code,
+				key_code,
 				logical_key: Key::Character("c".into()),
 				state: ButtonState::Pressed,
 				text: None,
 				repeat: false,
-				window: local,
+				window,
 			});
 		}
 		app.update();
-		let exited = app
-			.world()
+		app
+	}
+
+	fn exited(app: &App) -> bool {
+		!app.world()
 			.resource::<Messages<AppExit>>()
 			.iter_current_update_messages()
-			.count() > 0;
-		exited.xpect_true();
+			.count()
+			.eq(&0)
+	}
+
+	/// ctrl+c on the local stdio surface exits the process.
+	#[beet_core::test]
+	fn ctrl_c_exits_local_surface() {
+		// safety: single-threaded test; the buffered headless `StdioTerminal` skips
+		// the tty/raw-mode setup its `on_add` would otherwise run.
+		unsafe { env_ext::set_var("BEET_HEADLESS", "1") };
+		let app =
+			ctrl_c_from(|world| world.spawn(StdioTerminal::default()).id());
+		unsafe { std::env::remove_var("BEET_HEADLESS") };
+		exited(&app).xpect_true();
+	}
+
+	/// Regression (multi-tenant SSH crash): a ctrl+c from a session window that is
+	/// *not* a [`StdioTerminal`] must never exit the process — not even when the
+	/// window carries no [`ChannelTerminal`] (a session mid-teardown, before its
+	/// pty, or a reused entity index). The pre-fix negative `!ChannelTerminal` test
+	/// fired `AppExit` here, tearing down every other session; every SSH client
+	/// sends a closing ctrl+c, so concurrent sessions raced this constantly.
+	#[beet_core::test]
+	fn ctrl_c_on_bare_session_window_does_not_exit() {
+		let app = ctrl_c_from(|world| world.spawn_empty().id());
+		exited(&app).xpect_false();
 	}
 }

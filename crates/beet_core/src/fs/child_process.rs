@@ -14,6 +14,10 @@ pub struct ChildProcess {
 	/// Environment variables to set for the child process.
 	#[set_with(skip)]
 	envs: Vec<(SmolStr, SmolStr)>,
+	/// Environment variables to remove from the inherited environment, eg an empty
+	/// `AWS_PROFILE` the `aws` cli rejects.
+	#[set_with(skip)]
+	env_removals: Vec<SmolStr>,
 	/// Optional working directory for the command. If `None`, uses the current directory.
 	#[set_with(unwrap_option)]
 	cwd: Option<AbsPathBuf>,
@@ -66,6 +70,7 @@ impl ChildProcess {
 			command: command.into(),
 			args: Vec::new(),
 			envs: Vec::new(),
+			env_removals: Vec::new(),
 			cwd: None,
 			not_found: None,
 		}
@@ -92,12 +97,24 @@ impl ChildProcess {
 		self
 	}
 
+	/// Remove an environment variable from the inherited environment for the child
+	/// process. Needed when an inherited var is actively harmful, eg an empty
+	/// `AWS_PROFILE` (`AWS_PROFILE=`) which the `aws` cli reads as a profile literally
+	/// named `""` and rejects, rather than falling back to explicit keys.
+	pub fn without_env(mut self, key: impl Into<SmolStr>) -> Self {
+		self.env_removals.push(key.into());
+		self
+	}
+
 	/// Run the command, collecting stdout
 	#[track_caller]
 	pub fn run(self) -> Result<Output> {
 		let mut cmd = std::process::Command::new(self.command.as_str());
 		for (key, val) in &self.envs {
 			cmd.env(key.as_str(), val.as_str());
+		}
+		for key in &self.env_removals {
+			cmd.env_remove(key.as_str());
 		}
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
@@ -121,6 +138,9 @@ impl ChildProcess {
 		for (key, val) in &self.envs {
 			cmd.env(key.as_str(), val.as_str());
 		}
+		for key in &self.env_removals {
+			cmd.env_remove(key.as_str());
+		}
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
 		}
@@ -133,6 +153,9 @@ impl ChildProcess {
 		let mut cmd = async_process::Command::new(self.command.as_str());
 		for (key, val) in &self.envs {
 			cmd.env(key.as_str(), val.as_str());
+		}
+		for key in &self.env_removals {
+			cmd.env_remove(key.as_str());
 		}
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
@@ -157,6 +180,9 @@ impl ChildProcess {
 		let mut cmd = async_process::Command::new(self.command.as_str());
 		for (key, val) in &self.envs {
 			cmd.env(key.as_str(), val.as_str());
+		}
+		for key in &self.env_removals {
+			cmd.env_remove(key.as_str());
 		}
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
