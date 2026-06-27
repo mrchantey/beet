@@ -56,6 +56,50 @@ pub fn MainBsx(
 	rsx! { <script type="application/x-bsx" data-src=src></script> }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl MainBsx {
+	/// Read the program this template references from the DOM, the inverse of what
+	/// [`MainBsx`] emits: the first `<script type="application/x-bsx">`'s `data-src`
+	/// (fetched over http, cache-busted so a live-reload re-fetches the edited
+	/// program) or, absent `data-src`, the script's inline text. The wasm `Browser`
+	/// entry calls this to load the program it then runs headless.
+	pub async fn read_dom_program() -> Result<String> {
+		use beet_core::exports::js_sys;
+		use beet_core::exports::web_sys::HtmlScriptElement;
+		use beet_net::prelude::*;
+		let script = document_ext::query_selector::<HtmlScriptElement>(&format!(
+			"script[type={:?}]",
+			MediaType::Bsx.as_str()
+		))
+		.ok_or_else(|| {
+			bevyhow!(
+				"no `<script type=\"{}\">` found in the document",
+				MediaType::Bsx.as_str()
+			)
+		})?;
+		match script.get_attribute("data-src") {
+			Some(src) if !src.is_empty() => {
+				// cache-bust so a live-reload re-fetches the edited program (the
+				// served path ignores the query). Wall-clock ms, not a page-reset
+				// timer, so the value differs across reloads.
+				let sep = if src.contains('?') { '&' } else { '?' };
+				let url = format!("{src}{sep}_={}", js_sys::Date::now() as u64);
+				Request::get(url.as_str())
+					.send()
+					.await?
+					.into_result()
+					.await?
+					.text()
+					.await?
+					.xok()
+			}
+			_ => script
+				.text()
+				.map_err(|_| bevyhow!("failed to read program text")),
+		}
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;

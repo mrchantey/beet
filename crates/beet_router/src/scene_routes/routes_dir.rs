@@ -106,7 +106,14 @@ impl RoutesDir {
 				let specs = Self::discover_routes(&store).await?;
 				dir.world()
 					.with(move |world| {
-						world.entity_mut(entity).insert(store);
+						// watch the discovered routes dir for live reload (keyed to
+						// its base store); inert on a non-fs store / on wasm.
+						let watch = WatchDir::from_store(&store);
+						let mut entity_mut = world.entity_mut(entity);
+						entity_mut.insert(store);
+						if let Some(watch) = watch {
+							entity_mut.insert(watch);
+						}
 						for spec in specs {
 							Self::spawn_route_spec(world, entity, spec);
 						}

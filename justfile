@@ -249,12 +249,13 @@ example-chat *args:
 # The store roots at the workspace (--root=.) so the served examples are reachable
 # and --watch live-reloads on edit.
 serve-wasm *args:
-	beet build-wasm --release --package=beet-cli --bin=beet --out=examples/wasm/assets/min.wasm
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples --out=examples/wasm/assets/min.wasm
 	beet --main=examples/wasm/main.bsx --root=. --watch --server=http {{ args }}
 
 # Just (re)build the browser-wasm artifact into examples/wasm/assets/min.{wasm,js}.
+# `web_examples` includes the action example types so any examples/action/*.bsx runs.
 build-wasm-example *args:
-	beet build-wasm --release --package=beet-cli --bin=beet --out=examples/wasm/assets/min.wasm {{ args }}
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples --out=examples/wasm/assets/min.wasm {{ args }}
 
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer

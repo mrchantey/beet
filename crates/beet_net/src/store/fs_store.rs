@@ -85,6 +85,10 @@ impl BlobStoreProvider for FsStore {
 
 	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
 
+	fn watch_dir(&self) -> Option<AbsPathBuf> { Some(self.effective_root()) }
+
+	fn base_dir(&self) -> Option<AbsPathBuf> { Some(self.path.clone()) }
+
 	fn region(&self) -> Option<String> { None }
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {

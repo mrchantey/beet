@@ -92,17 +92,6 @@ where
 		.map(|el| el.dyn_into::<T>().unwrap())
 }
 
-/// The first `<script type="application/x-bsx">` in the document, ie the beet
-/// program a browser binary runs (see [`MediaType::Bsx`]): its `data-src` attribute
-/// names a program to fetch, otherwise its text is the program inline. `None` when
-/// no such script is present.
-pub fn query_bsx_script() -> Option<HtmlScriptElement> {
-	query_selector::<HtmlScriptElement>(&format!(
-		"script[type={:?}]",
-		MediaType::Bsx.as_str()
-	))
-}
-
 /// Create an `HtmlElement` with the provided tag name.
 pub fn create_element(local_name: &str) -> HtmlElement {
 	document()

@@ -73,7 +73,14 @@ impl TemplateDir {
 				dir.world()
 					.with(move |world| -> Result {
 						Self::register_sources(world, &formats, sources)?;
-						world.entity_mut(entity).insert(TemplatesLoaded);
+						// watch the templates dir for live reload (keyed to its base
+						// store); inert on a non-fs store / on wasm.
+						let scoped = store.with_subdir(SmolPath::from(src.as_str()));
+						let mut entity_mut = world.entity_mut(entity);
+						entity_mut.insert(TemplatesLoaded);
+						if let Some(watch) = WatchDir::from_store(&scoped) {
+							entity_mut.insert(watch);
+						}
 						world.flush();
 						Ok(())
 					})

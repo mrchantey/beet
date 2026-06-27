@@ -135,19 +135,22 @@ pub fn reload_site(world: &mut World, root: Entity) {
 	// the in-world TUI navigators (no `ClientIo` client) to repaint directly.
 	let navigators = in_world_navigators(world);
 	// re-fire the template/route observers (re-reading their dirs through the store
-	// by ancestry, store-agnostic), then broadcast. The async reads settle below.
+	// by ancestry, store-agnostic). The async rescan settles below, and only then do
+	// we broadcast: a web client reloads on the broadcast and immediately re-requests
+	// its routes, so broadcasting before the despawn/respawn settled returns a 500
+	// ("Entity despawned") for a route mid-rescan.
 	respawn_template_dirs(world);
 	respawn_routes_dirs(world);
-	broadcast_reload(world);
 	world.run_async(move |world| async move {
 		// the dev loop: settle the async rescan (rendering a half-scanned tree would
-		// paint stale content), surface render diagnostics (an unknown tag, dead link
-		// or unknown class an edit introduced logs loudly), then repaint each in-world
-		// navigator *after* the diagnostics so its freshly-built page is the last
-		// render of each shared node (else the diagnostics' ephemeral cleanup races
-		// the repaint and blanks the live TUI). The web client has no in-world
-		// navigator and reloads via the broadcast above.
+		// paint stale content), then broadcast so web clients reload into a ready
+		// route tree, surface render diagnostics (an unknown tag, dead link or unknown
+		// class an edit introduced logs loudly), then repaint each in-world navigator
+		// *after* the diagnostics so its freshly-built page is the last render of each
+		// shared node (else the diagnostics' ephemeral cleanup races the repaint and
+		// blanks the live TUI).
 		RoutesDir::settle_all(&world).await?;
+		world.with(|world: &mut World| broadcast_reload(world)).await;
 		log_all_render_diagnostics(&world).await;
 		for navigator in navigators {
 			if let Err(err) = Navigator::reload(world.entity(navigator)).await {

@@ -119,44 +119,13 @@ fn load_entry(world: &mut World) {
 	});
 }
 
-/// Build the browser entry: read the `<script type="application/x-bsx">` from the
-/// DOM and build its program onto a storeless root (see [`build_entry_from_bsx`]).
-/// The wasm `Browser` branch of [`load_entry`]; the program's own
-/// `RunOnLoad`/`ExchangeOnLoad` verb then drives it.
-///
-/// A `data-src` attribute names a program to fetch at runtime (the page emits a
-/// reference via `<MainBsx src>`, served over http); otherwise the script's own text
-/// is the program inline.
+/// Build the browser entry: read the program from the DOM via
+/// [`MainBsx::read_dom_program`] and build it onto a storeless root (see
+/// [`build_entry_from_bsx`]). The wasm `Browser` branch of [`load_entry`]; the
+/// program's own `RunOnLoad`/`ExchangeOnLoad` verb then drives it.
 #[cfg(target_arch = "wasm32")]
 async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
-	let script = document_ext::query_bsx_script().ok_or_else(|| {
-		bevyhow!(
-			"browser entry: no `<script type=\"{}\">` found in the document",
-			MediaType::Bsx.as_str()
-		)
-	})?;
-	let bsx = match script.get_attribute("data-src") {
-		Some(src) if !src.is_empty() => {
-			// cache-bust so a live-reload re-fetches the edited program rather than
-			// the browser's cached copy (the path the server serves ignores the query).
-			// A random nonce, not a timestamp: a reload resets the page clock, so a
-			// time value would repeat and the browser would still serve the cache.
-			let mut nonce = [0u8; 8];
-			getrandom::fill(&mut nonce).ok();
-			let sep = if src.contains('?') { '&' } else { '?' };
-			let url = format!("{src}{sep}_={}", u64::from_le_bytes(nonce));
-			Request::get(url.as_str())
-				.send()
-				.await?
-				.into_result()
-				.await?
-				.text()
-				.await?
-		}
-		_ => script
-			.text()
-			.map_err(|_| bevyhow!("browser entry: failed to read program text"))?,
-	};
+	let bsx = MainBsx::read_dom_program().await?;
 	world
 		.with(move |world: &mut World| {
 			build_entry_from_bsx(world, formats, "main.bsx", bsx, ())
@@ -187,14 +156,15 @@ async fn build_entry(
 	formats: TemplateFormats,
 ) -> Result {
 	let store = resolved.store;
+	let entry_name = resolved.entry_name;
 	let sources =
-		read_entry_sources(&store, formats, resolved.entry_name).await?;
+		read_entry_sources(&store, formats, entry_name.clone()).await?;
 	// the `--watch` path (native-only) needs the entry dir and the args; on wasm
 	// neither is used, so they go unread there.
 	#[cfg(not(target_arch = "wasm32"))]
 	let watch_dir = resolved.watch_dir;
 	#[cfg(target_arch = "wasm32")]
-	let _ = &args;
+	let _ = (&args, &entry_name);
 	world
 		.with(move |world: &mut World| -> Result {
 			// the binary stays unopinionated: it spawns the entry root with no load
@@ -202,16 +172,29 @@ async fn build_entry(
 			// server entry spreads `BootOnLoad` beside its servers, a script entry
 			// spreads `ExchangeOnLoad`, a render scene `RunOnLoad`, and a self-booting
 			// verb (eg a thread's `{CreateThread}`) `#[require]`s `BootOnLoad` itself.
+			// the entry document's own dir, watched for live reload (keyed to the
+			// entry store) so editing `main.bsx` itself hot-reloads; computed before
+			// `build_entry_root` consumes `store`. Inert on a non-fs store / on wasm.
+			#[cfg(not(target_arch = "wasm32"))]
+			let entry_watch = WatchDir::for_entry(&store, &entry_name);
+			#[cfg(target_arch = "wasm32")]
+			let _ = &entry_name;
 			let _root = build_entry_root(world, store, sources, ())?;
-			// `--watch` (local dev): mark the root for live reload. Its `FsStore`'s
-			// watcher already emits `BlobEvent`s, so editing a template/slide/style
-			// hot-reloads connected browsers, the deck's `<LiveReloadScript/>` widget
-			// turning the broadcast into a reload. Opt-in, so a running presentation
-			// never reloads underfoot; a deployed (remote) entry has no local dir to
-			// watch. Native-only: the wasm runner has no fs watcher.
+			// `--watch` (local dev): mark the root for live reload, and watch the entry
+			// document's own dir (its `<RoutesDir>`/`<TemplateDir>`/`<AssetsDir>` mounts
+			// register their own `WatchDir`s as they resolve). The watchers emit
+			// `BlobEvent`s, so editing a template/slide/style/the entry hot-reloads
+			// connected browsers, the deck's `<LiveReloadScript/>` widget turning the
+			// broadcast into a reload. Opt-in, so a running presentation never reloads
+			// underfoot; a deployed (remote) entry has no local dir to watch. Native-only:
+			// the wasm runner has no fs watcher.
 			#[cfg(not(target_arch = "wasm32"))]
 			if watch_dir.is_some() && args.params.contains_key("watch") {
-				world.entity_mut(_root).insert(LiveReload::new());
+				let mut root_mut = world.entity_mut(_root);
+				root_mut.insert(LiveReload::new());
+				if let Some(entry_watch) = entry_watch {
+					root_mut.insert(entry_watch);
+				}
 				world.flush();
 			}
 			Ok(())

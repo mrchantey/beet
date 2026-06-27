@@ -21,6 +21,7 @@ pub fn token_map()->CssTokenMap{
 		.insert(BackgroundColor)
 		.insert(ColorRoleProps)
 		.insert(Font)
+		.insert(FontFamilyProp)
 		.insert(Height)
 		.insert(MinHeight)
 		.insert(MaxHeight)
@@ -41,6 +42,7 @@ pub fn token_map()->CssTokenMap{
 		.insert(FontStyleProp)
 		.insert(DecorationLineProp)
 		.insert(WhiteSpaceProp)
+		.insert(WordBreakProp)
 		.insert(MarginProp)
 		.insert(FlexGrowProp)
 		.insert(AlignItemsProp)
@@ -97,6 +99,11 @@ canonical_property!(DecorationLineProp, DecorationLine, "text-decoration-line");
 canonical_property!(DecorationStyleProp, DecorationStyle, "text-decoration-style");
 
 css_property!(Font, Typography, "font-family");
+// Just the `font-family`, set independently of the full [`Typography`] (eg
+// pointing only the family at the monospace typeface). [`Typeface`] resolves to
+// the same comma-joined family list, so a rule may also point this at a typeface
+// ref token like `typography::TypefaceMono`.
+css_property!(FontFamilyProp, Typeface, "font-family");
 
 css_property!(Height, Length, TokenInheritance::NotInherited, "height");
 css_property!(MinHeight, Length, TokenInheritance::NotInherited, "min-height");
@@ -132,6 +139,7 @@ css_property!(TransitionEaseProp, EaseFunction, TokenInheritance::NotInherited, 
 css_property!(OpacityProp, f32, TokenInheritance::NotInherited, "opacity");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
+canonical_property!(WordBreakProp, WordBreak, "word-break");
 canonical_property!(ListStyleProp, ListStyle, "list-style-type");
 // overflow-x/-y share the `Overflow` value type, so neither can be the single
 // canonical token for it; author rules with `with_value(OverflowXProp, ..)`.

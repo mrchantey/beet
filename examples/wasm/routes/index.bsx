@@ -1,15 +1,17 @@
 <!--
 The wasm example page. A full `<HtmlDocument>` so the route renders the whole
-document directly (no layout middleware): `<Stylesheet>` + `<LiveReloadScript>` in
-the head, the console panel and the wasm loader in the body.
+document directly (no layout middleware): `<Stylesheet>` + `<ColorSchemeScript>` +
+`<LiveReloadScript>` in the head, the console panel and the wasm loader in the body.
 
-`<MainBsx>` inlines the program into a `<script type="application/x-bsx">`,
-`<Wasm>` boots the wasm `beet` binary which reads and runs it, and
+`<MainBsx>` emits a `<script type="application/x-bsx" data-src=..>` referencing the
+program, `<Wasm>` boots the wasm `beet` binary which fetches and runs it, and
 `<RenderConsole>` mirrors its console output onto the page. `<RenderConsole>` sits
 before `<Wasm>` so its console wrap installs before the (deferred) module boots.
 -->
 <HtmlDocument>
 	<Stylesheet slot="head"/>
+	<!-- seed the light/dark scheme class before paint; honors ?color-scheme=dark -->
+	<ColorSchemeScript slot="head"/>
 	<LiveReloadScript slot="head"/>
 	<h1>Beet in the browser</h1>
 	<p>

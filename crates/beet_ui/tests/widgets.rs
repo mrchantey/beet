@@ -508,22 +508,20 @@ fn render_console_emits_panel() {
 		.spawn_template(rsx! { <RenderConsole/> })
 		.unwrap()
 		.id();
-	// the `#beet-console` panel the captured console lines append to
-	world
-		.entity(root)
-		.get::<Element>()
-		.unwrap()
-		.tag()
-		.xpect_eq("div");
+	// the `#beet-console` panel the captured console lines append to: the
+	// styling now lives in the global rule set (emitted by `<Stylesheet>`), so
+	// the widget only carries the script handle (`id` + panel class) and the
+	// console-wrapping `<script>`.
 	world.with_state::<ElementQuery, _>(|query| {
-		let body = query
+		let view = query.get(root).unwrap();
+		view.tag().xpect_eq("div");
+		view.attribute_string("id").xpect_eq("beet-console");
+		view.contains_class_name(&classes::CONSOLE_PANEL).xpect_true();
+		query
 			.iter_descendant_values(root)
 			.filter_map(|v| v.as_str().ok())
-			.collect::<String>();
-		// the bundled style (material tokens) and the console-wrapping script
-		body.as_str()
-			.xpect_contains("#beet-console")
-			.xpect_contains("var(--material-colors-error")
+			.collect::<String>()
+			.as_str()
 			.xpect_contains("getElementById(\"beet-console\")");
 	});
 }

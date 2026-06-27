@@ -191,6 +191,8 @@ impl BlobStoreProvider for BlobStore {
 	fn id(&self) -> &'static str { self.provider.id() }
 	fn root_key(&self) -> SmolStr { self.provider.root_key() }
 	fn subdir(&self) -> SmolPath { self.provider.subdir() }
+	fn watch_dir(&self) -> Option<AbsPathBuf> { self.provider.watch_dir() }
+	fn base_dir(&self) -> Option<AbsPathBuf> { self.provider.base_dir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.provider.did_change(event)
 	}

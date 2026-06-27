@@ -394,6 +394,10 @@ pub enum WhiteSpace {
 	Normal,
 	/// Preserve whitespace and newlines verbatim, breaking only on `\n`.
 	Pre,
+	/// Preserve whitespace and newlines but still wrap at the content width,
+	/// mapping to CSS `white-space: pre-wrap`. The idiom for a console/log panel
+	/// that keeps its own line breaks yet reflows long lines.
+	PreWrap,
 }
 
 impl AsCssValue for WhiteSpace {
@@ -401,6 +405,33 @@ impl AsCssValue for WhiteSpace {
 		match self {
 			Self::Normal => "normal",
 			Self::Pre => "pre",
+			Self::PreWrap => "pre-wrap",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// How a word that overflows its line box is broken, mapping to CSS `word-break`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum WordBreak {
+	/// Break only at normal word boundaries.
+	#[default]
+	Normal,
+	/// Break an otherwise unbreakable word to avoid overflow (eg a long URL in a
+	/// console line).
+	BreakWord,
+	/// Break between any two characters.
+	BreakAll,
+}
+
+impl AsCssValue for WordBreak {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Normal => "normal",
+			Self::BreakWord => "break-word",
+			Self::BreakAll => "break-all",
 		}
 		.xmap(CssValue::expression)
 		.xok()

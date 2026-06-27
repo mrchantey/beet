@@ -57,14 +57,16 @@ pub use aws_cli::*;
 pub use table::*;
 #[cfg(feature = "template_serde")]
 pub use template_store::*;
-// the notify-based directory watcher backing reactive `FsStore`s. Native-only for
-// now (deno directory watching is unimplemented), so a wasm `FsStore` works without
-// live reload; a future wasm watcher slots into this same seam (see `StorePlugin`).
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+// the `WatchDir` registration component (any `std` target) and the notify-based
+// directory watcher backing it. The watcher itself is native+fs only for now (deno
+// directory watching is unimplemented), so a wasm `FsStore` works without live
+// reload; the `WatchDir` component is inert there. A future wasm watcher slots into
+// this same seam (see `StorePlugin`).
+#[cfg(feature = "std")]
 mod fs_blob_watchers;
 #[cfg(feature = "std")]
 mod fs_store;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(feature = "std")]
 pub use fs_blob_watchers::*;
 #[cfg(target_arch = "wasm32")]
 mod indexed_db_store;
@@ -126,14 +128,14 @@ impl Plugin for StorePlugin {
 			.add_observer(add_memory_store_watcher)
 			.add_observer(remove_memory_store_watcher);
 
-		// fs watcher lifecycle, one notify debouncer per base path. Native-only:
-		// deno directory watching is unimplemented, so a wasm `FsStore` serves
-		// reads through `fs_ext` with no live reload. A future wasm watcher wires
-		// the same `add_fs_store_watcher`/`remove_fs_store_watcher` seam here.
+		// fs watcher lifecycle, one notify debouncer per watched `WatchDir`. Native-only:
+		// deno directory watching is unimplemented, so a wasm `FsStore` serves reads
+		// through `fs_ext` with no live reload (the `WatchDir` component is inert there).
+		// A future wasm watcher wires the same `add_watch_dir`/`remove_watch_dir` seam.
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		app.init_resource::<FsBlobWatchers>()
-			.add_observer(add_fs_store_watcher)
-			.add_observer(remove_fs_store_watcher);
+			.add_observer(add_watch_dir)
+			.add_observer(remove_watch_dir);
 
 		#[cfg(feature = "template_serde")]
 		app.add_systems(PostUpdate, load_template_on_insert);

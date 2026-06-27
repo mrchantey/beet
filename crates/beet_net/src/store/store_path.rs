@@ -71,7 +71,14 @@ fn resolve_dir_path(
 	{
 		return;
 	}
-	commands.entity(entity).insert(scoped);
+	// watch the scoped subdir for live reload (keyed to its base store), so an
+	// `AssetsDir`/`ServeBlobs` mount's dir reloads; inert on a non-fs store / on wasm.
+	let watch = WatchDir::from_store(&scoped);
+	let mut entity_commands = commands.entity(entity);
+	entity_commands.insert(scoped);
+	if let Some(watch) = watch {
+		entity_commands.insert(watch);
+	}
 }
 
 /// (Re)compute a [`BlobPath`] entity's [`Blob`] from its nearest ancestor store,
@@ -186,7 +193,12 @@ pub fn on_remove_store(
 			continue;
 		}
 		if dirs.contains(descendant) {
-			commands.entity(descendant).remove::<BlobStore>();
+			// drop the scoped store *and* its watcher registration, so a re-resolve
+			// re-registers a `WatchDir` cleanly rather than leaving a stale one.
+			commands
+				.entity(descendant)
+				.remove::<BlobStore>()
+				.remove::<WatchDir>();
 		} else if blob_paths.contains(descendant) {
 			commands.entity(descendant).remove::<Blob>();
 		}

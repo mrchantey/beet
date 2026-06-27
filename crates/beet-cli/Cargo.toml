@@ -95,6 +95,11 @@ cloudflare = ["beet/cloudflare", "dep:worker"]
 # Build with: `cargo build --target wasm32-unknown-unknown -p beet-cli --bin beet \
 # --no-default-features --features web --profile wasm-release`.
 web = ["beet/web"]
+# The browser-wasm target plus the wasm-safe action/behaviour/utility-AI example
+# types (`ActionExamplesPlugin` via `beet/extra`), so the browser binary runs the
+# richer `examples/action/*.bsx` programs (eg malenia.bsx), not just the
+# Sequence/Log core. Stays wasm-clean: `beet/extra` pulls no winit/wgpu/bevy_default.
+web_examples = ["web", "beet/extra"]
 
 # the portable cross-platform base: the render router stack, media negotiation and
 # the runtime BSX parser the no-code site needs, on both native and wasm. beet's
