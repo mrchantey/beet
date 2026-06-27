@@ -775,7 +775,15 @@ impl FargateBlock {
 			AwsAcmCertificateDetails {
 				domain_name: Some(self.dns[0].authority().clone()),
 				validation_method: Some("DNS".into()),
-				subject_alternative_names: (!sans.is_empty()).then_some(sans),
+				// Always declare the SAN set explicitly, even when empty (a
+				// single-domain stack). `subject_alternative_names` is Optional +
+				// Computed, so OMITTING it makes tofu keep the prior cert's SANs
+				// rather than shrink the domain set, silently stranding a stale
+				// multi-SAN cert when a stack drops a hostname. The provider reports
+				// SANs as the extras only (excluding `domain_name`), so the declared
+				// list matches the live cert and a changed set replaces it (SANs are
+				// immutable; `create_before_destroy` below covers the swap).
+				subject_alternative_names: Some(sans),
 				..default()
 			},
 		);
@@ -982,6 +990,9 @@ mod tests {
 			.xpect_contains("aws_acm_certificate")
 			.xpect_contains("aws_acm_certificate_validation")
 			.xpect_contains("\"validation_method\":\"DNS\"")
+			// a single-domain stack still emits the SAN set explicitly (empty), so a
+			// later shrink to one domain is tracked instead of keeping a stale cert.
+			.xpect_contains("\"subject_alternative_names\":[]")
 			.xpect_contains("\"port\":443")
 			.xpect_contains("\"protocol\":\"TLS\"")
 			// the public record + validation record in the cloudflare zone
