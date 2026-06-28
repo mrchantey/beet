@@ -16,3 +16,7 @@ Apply the worktree sync skill to the following worktrees.
 Do Not run cargo fmt.
 
 Naturally, if you need to make changes to resolve conflicts, then after those conflicts are resolved, you'll need to re-sync with those child work trees so that everything is in lockstep finally.
+
+Use subagents where appropriate, ie to investigate and fix a nasty bug that may blow up your context.
+
+If asked to do the works, run `.agents/skills/testing/the-works.md` after synchronizing.

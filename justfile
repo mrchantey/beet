@@ -260,6 +260,7 @@ clear-all:
 	just clear-artifacts
 	just clear-rust-analyzer
 	cargo clean
+	sccache --stop-server && rm -rf $SCCACHE_DIR
 	rm -rf $CARGO_TARGET_DIR
 
 tree:
