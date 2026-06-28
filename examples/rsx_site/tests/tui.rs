@@ -125,11 +125,14 @@ impl SiteHost {
 	}
 
 	/// Advance frames until the frame contains `needle`, returning the frame.
+	///
+	/// Fullwidth glyphs (large-font text) are folded back to ASCII before the
+	/// match, so a plain-ASCII needle finds text painted at either width.
 	fn step_until(&mut self, needle: &str) -> String {
 		for _ in 0..200 {
 			self.app.update();
 			let frame = self.frame();
-			if frame.contains(needle) {
+			if from_fullwidth(&frame).contains(needle) {
 				return frame;
 			}
 		}
@@ -181,7 +184,7 @@ async fn nav_link_click_navigates() {
 	let (col, row) = host.cell_of("Counter");
 	host.click(col, row);
 	host.step_until("You have clicked 0 times.");
-	host.frame()
+	from_fullwidth(&host.frame())
 		.xnot()
 		.xpect_contains("malleable application framework");
 }

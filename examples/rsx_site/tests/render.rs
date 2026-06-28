@@ -205,6 +205,8 @@ async fn terminal_renders_charcell_layout() {
 		// some styling was applied (bold/colour escapes), proving the prose +
 		// material rules reach the charcell paint, not raw text
 		.xpect_contains("\u{1b}[");
-	// the body text survives the charcell paint
-	strip_ansi(&body).xpect_contains("malleable application framework");
+	// the body text survives the charcell paint (folded from fullwidth, as the
+	// large-font tagline paints in fullwidth glyphs)
+	from_fullwidth(&strip_ansi(&body))
+		.xpect_contains("malleable application framework");
 }

@@ -112,11 +112,14 @@ excluded from the test crates).
 ### 8. BSX scenes (`just beet --main=<file>.bsx`)
 
 The no-code `.bsx` scenes run through the beet CLI (`just beet` = `cargo run -p
-beet-cli --features render,ml`). The self-terminating ones render and exit:
+beet-cli -- {{args}}`, default features only). A core scene needs nothing extra,
+but ml scenes need the `ml` feature (`ml = ["winit", "beet/ml"]`, which registers
+`NearestSentenceAgent` etc.), so run those via `cargo run` directly. The
+self-terminating ones render and exit:
 
 ```sh
-just beet --main=examples/hello/main.bsx       # prints "hello world"
-just beet --main=examples/ml/hello_ml.bsx      # logs "NearestSentence chose: ..."
+just beet --main=examples/hello/main.bsx                                          # prints "hello world"
+cargo run -p beet-cli --features ml -- --main=examples/ml/hello_ml.bsx            # logs "NearestSentence chose: ..."
 ```
 
 Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed),

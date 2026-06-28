@@ -88,6 +88,25 @@ fn fullwidth_char(ch: char) -> char {
 	}
 }
 
+/// Inverse of [`to_fullwidth`]: fold fullwidth glyphs back to ASCII, leaving all
+/// other characters unchanged. Used by tests to search a charcell render for its
+/// plain text content.
+pub fn from_fullwidth(text: &str) -> String {
+	text.chars().map(from_fullwidth_char).collect()
+}
+
+/// ASCII twin of a single fullwidth character (see [`from_fullwidth`]).
+fn from_fullwidth_char(ch: char) -> char {
+	match ch {
+		FULLWIDTH_SPACE => ' ',
+		// fullwidth 'Ａ'..='～' sit 0xFEE0 above their ASCII forms '!'..='~'
+		'\u{ff01}'..='\u{ff5e}' => {
+			char::from_u32(ch as u32 - 0xFEE0).unwrap_or(ch)
+		}
+		_ => ch,
+	}
+}
+
 // ── Block font (> 2em) ──────────────────────────────────────────────────────
 
 /// Word-space width used when `font.txt` declares no `space` directive.
@@ -409,6 +428,8 @@ glyph I
 		to_fullwidth("A B").xpect_eq("Ａ　Ｂ".to_string());
 		// each fullwidth glyph measures two columns
 		display_width(&to_fullwidth("AB")).xpect_eq(4);
+		// `from_fullwidth` is the inverse round-trip
+		from_fullwidth(&to_fullwidth("A B!")).xpect_eq("A B!".to_string());
 	}
 
 	#[beet_core::test]

@@ -12,6 +12,10 @@ use crate::prelude::*;
 use crate::style::*;
 use crate::style::material::*;
 use beet_core::prelude::*;
+// `Display`/`Overflow` also live in bevy's prelude (glob'd via `beet_core` under the
+// `examples`/ml/spatial feature set); pin them to the style tokens used below.
+use crate::style::Display;
+use crate::style::Overflow;
 
 /// Emits the `#beet-console` panel and the `<script>` that wraps `console.*` to
 /// append a styled line per call (see `render_console.js`). The panel is the
@@ -119,7 +123,6 @@ fn console_level(class: ClassName, color: impl Into<Token>) -> Rule {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	/// End-to-end: `widget_plugin` (pulled in transitively by `StylePlugin` via
 	/// `BsxDefaultsPlugin`) registers the console rules into the global rule set at

@@ -16,6 +16,7 @@ mod flex;
 mod flex_buffer;
 mod font;
 pub use font::FontScale;
+pub use font::from_fullwidth;
 pub(self) use font::*;
 mod grid;
 pub(self) use grid::*;

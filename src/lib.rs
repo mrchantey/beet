@@ -53,6 +53,10 @@ pub use beet_spatial as spatial;
 pub mod prelude {
 	#[cfg(feature = "action")]
 	pub use crate::action::prelude::*;
+	// `Command`: beet_action's external-process action vs bevy's `Command` trait
+	// (glob'd via `core`). Prefer the action so the BSX `<Command>` tag resolves.
+	#[cfg(feature = "action")]
+	pub use crate::action::prelude::Command;
 	#[cfg(feature = "std")]
 	pub use crate::beet_plugins::*;
 	pub use crate::core::prelude::*;

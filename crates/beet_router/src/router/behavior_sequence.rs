@@ -73,7 +73,7 @@ mod test {
 		AsyncPlugin::world()
 			.spawn((BehaviorSequence, children![
 				Action::<(), Outcome>::new_async(async |_: ActionContext<()>| {
-					Err(bevyhow!("boom"))?
+					Err(bevyhow!("boom"))
 				}),
 			]))
 			.call::<Request, Response>(Request::get("test"))

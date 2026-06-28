@@ -347,20 +347,30 @@ mod test {
 	}
 
 	/// A real ctrl+c byte through the full [`CharcellTuiPlugin`] pipeline on a
-	/// LOCAL surface (a [`Terminal`] with no [`ChannelTerminal`]) exits the
-	/// process: the byte parses to a Control+`C` press pair, which
+	/// LOCAL surface (a [`StdioTerminal`]) exits the process: its buffered
+	/// headless [`Terminal`] is swapped for a channel-backed one so we can inject
+	/// a raw `0x03` byte, which parses to a Control+`C` press pair that
 	/// [`exit_on_ctrl_c`] turns into an [`AppExit`].
 	#[beet_core::test]
 	fn ctrl_c_byte_exits_local_surface() {
 		use crate::render::charcell::terminal::ChannelTerminal;
+		// safety: single-threaded test; the buffered headless `StdioTerminal` skips
+		// the tty/raw-mode setup its `on_add` would otherwise run.
+		unsafe { env_ext::set_var("BEET_HEADLESS", "1") };
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, CharcellTuiPlugin));
-		// a local surface: the real input-reading Terminal with NO ChannelTerminal
-		// filter component. Keep the channel handle to feed the reader.
+		// the channel-backed Terminal lets us feed bytes into the real reader.
 		let (mut channel, terminal) =
 			ChannelTerminal::new(TerminalConfig::default());
-		app.world_mut()
-			.spawn((terminal, DoubleBuffer::new(UVec2::new(40, 12))));
+		let surface = app
+			.world_mut()
+			.spawn((StdioTerminal::default(), DoubleBuffer::new(UVec2::new(40, 12))))
+			.id();
+		// flush the StdioTerminal on_add hook (it inserts a buffered Terminal),
+		// then overwrite that Terminal with the channel-backed one.
+		app.update();
+		app.world_mut().entity_mut(surface).insert(terminal);
+		unsafe { env_ext::remove_var("BEET_HEADLESS") };
 		app.update();
 		channel.send_input(&[0x03]).unwrap();
 		app.update();
@@ -519,7 +529,7 @@ mod test {
 		unsafe { env_ext::set_var("BEET_HEADLESS", "1") };
 		let app =
 			ctrl_c_from(|world| world.spawn(StdioTerminal::default()).id());
-		unsafe { std::env::remove_var("BEET_HEADLESS") };
+		unsafe { env_ext::remove_var("BEET_HEADLESS") };
 		exited(&app).xpect_true();
 	}
 
