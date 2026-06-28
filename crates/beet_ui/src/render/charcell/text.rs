@@ -1,11 +1,16 @@
 use crate::prelude::*;
+use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::IRect;
 use bevy::math::IVec2;
 use bevy::math::UVec2;
 
+use super::FontScale;
 use super::align_offset;
+use super::measure_block_text;
+use super::paint_block_text;
 use super::query::CharcellNodeData;
+use super::to_fullwidth;
 use super::truncate_to_width;
 
 /// Compute the intrinsic size of a text node.
@@ -25,7 +30,7 @@ pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 	if value.is_empty() && node.marker().is_none() {
 		return UVec2::ZERO;
 	}
-	measure_str(&value, max_width)
+	measure_scaled(node.visual_style(), &value, max_width)
 }
 
 /// Wrap `text` to `max_width` columns and return `(max_line_width, line_count)`.
@@ -35,6 +40,21 @@ pub(super) fn measure_str(text: &str, max_width: u32) -> UVec2 {
 		lines.iter().map(|l| display_width(l)).max().unwrap_or(0) as u32,
 		lines.len() as u32,
 	)
+}
+
+/// Measure `text` at `style`'s [`FontScale`]: the multi-row box-drawing block
+/// font above 2em, fullwidth glyphs above 1em, else the plain single-cell
+/// measure.
+pub(super) fn measure_scaled(
+	style: &VisualStyle,
+	text: &str,
+	max_width: u32,
+) -> UVec2 {
+	match FontScale::of_style(style) {
+		FontScale::Block => measure_block_text(text, max_width),
+		FontScale::Wide => measure_str(&to_fullwidth(text), max_width),
+		FontScale::Normal => measure_str(text, max_width),
+	}
 }
 
 /// Paint text into the buffer from a [`CharcellNodeData`].
@@ -49,13 +69,32 @@ pub(super) fn paint_text(
 	buffer: &mut impl AsBuffer,
 	clip: Clip,
 ) -> Result {
-	let text = match (node.marker(), node.value()) {
+	let mut text = match (node.marker(), node.value()) {
 		(Some(marker), _) => marker.to_string(),
 		(None, Some(value)) => value.to_string(),
 		(None, None) => return Ok(()),
 	};
 	let visual = node.visual_style();
 	let entity = node.entity;
+	// font-size scaling: the block font paints its own multi-row glyphs and
+	// returns; fullwidth remaps the text and falls through to the normal path
+	// (fullwidth glyphs already lay out as wide characters).
+	match FontScale::of_style(visual) {
+		FontScale::Block => {
+			paint_block_text(
+				&text,
+				content_rect,
+				visual,
+				visual.text_align,
+				entity,
+				buffer,
+				clip,
+			);
+			return Ok(());
+		}
+		FontScale::Wide => text = to_fullwidth(&text),
+		FontScale::Normal => {}
+	}
 	// a marker-only leaf can still carry a link (eg an `<iframe>`/`<img>` collapsed
 	// to its title/alt text); wrap its painted cells in the OSC-8 link, matching
 	// the inline flow.

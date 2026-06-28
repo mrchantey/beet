@@ -16,7 +16,7 @@ use super::explicit_box_size;
 use super::marker_gutter;
 use super::measure_grid;
 use super::measure_inline_flow;
-use super::measure_str;
+use super::measure_scaled;
 use super::measure_text;
 use super::node_bottom_margin;
 use super::query::CharcellNodeData;
@@ -208,7 +208,7 @@ pub(super) fn resolve_height(
 		_ if let Some(marker) =
 			node.marker().filter(|_| !node.has_child_nodes(query)) =>
 		{
-			measure_str(marker, content_width).y
+			measure_scaled(node.visual_style(), marker, content_width).y
 		}
 		// block container: stack children, each flowed at the constrained width
 		_ => resolve_block_height(node, query, content_width, viewport),

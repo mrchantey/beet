@@ -36,11 +36,14 @@ name = "showcase"
 path = "examples/showcase.rs"
 required-features = ["template", "style"]
 
-# measures the real terminal via crossterm, so requires the `tui` feature
+# measures the real terminal via crossterm, so requires the `tui` feature.
+# `harness = false` lets the in-file `#[beet_core::test]` layout-measurement
+# tests run under the beet test runner via `cargo test --example layout`.
 [[example]]
 name = "layout"
 path = "examples/layout.rs"
 required-features = ["tui"]
+harness = false
 
 
 [features]

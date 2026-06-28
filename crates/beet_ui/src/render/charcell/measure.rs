@@ -85,7 +85,7 @@ pub(super) fn measure_node(
 		_ if let Some(marker) =
 			node.marker().filter(|_| !node.has_child_nodes(query)) =>
 		{
-			measure_str(marker, content_available.x)
+			measure_scaled(node.visual_style(), marker, content_available.x)
 		}
 		// text leaf (eg a paragraph's text node)
 		_ if node.value().is_some() => measure_text(node, content_available.x),

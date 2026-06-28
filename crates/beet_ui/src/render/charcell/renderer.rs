@@ -147,6 +147,67 @@ mod tests {
 	}
 
 	#[beet_core::test]
+	fn material_headings_scale_with_font_size() {
+		// the MD3 type scale drives charcell glyph scaling: h1 (HeadlineLarge,
+		// 2rem) renders fullwidth, a display class (> 2rem) renders the block
+		// font, and body-sized h5 (TitleMedium, 1rem) stays plain ASCII.
+		let mut world = (
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let entity = world
+			.spawn((
+				Buffer::new(UVec2::new(60, 16)).into_double_buffer(),
+				rsx! {
+					<div>
+						<h1>"Hi"</h1>
+						<h5>"sub"</h5>
+						<p class="text-display-small">"Z"</p>
+					</div>
+				},
+			))
+			.id();
+		world.run_schedule(PostParseTree);
+		let out = world
+			.get::<DoubleBuffer>(entity)
+			.unwrap()
+			.current_buffer()
+			.render_plain();
+		// h1 -> fullwidth, h5 -> plain ASCII
+		out.as_str().xpect_contains("Ｈｉ").xpect_contains("sub");
+		// display-small -> 3-row block font (uppercase 'Z' double-pipe corner)
+		out.as_str().xpect_contains("╔");
+	}
+
+	#[beet_core::test]
+	fn heading_scales_inside_body_text_container() {
+		// a heading inside a body-sized content wrapper (the site layout wraps
+		// prose in `text-body-large`) must still scale to its own type-scale size,
+		// not inherit the wrapper's body composite. Regression for headings
+		// rendering plain in the live route render.
+		let mut world = (
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let entity = world
+			.spawn((
+				Buffer::new(UVec2::new(60, 12)).into_double_buffer(),
+				rsx! { <div class="text-body-large"><h1>"Hi"</h1><p>"body"</p></div> },
+			))
+			.id();
+		world.run_schedule(PostParseTree);
+		let out = world
+			.get::<DoubleBuffer>(entity)
+			.unwrap()
+			.current_buffer()
+			.render_plain();
+		// h1 stays fullwidth despite the body-large wrapper; body text plain
+		out.as_str().xpect_contains("Ｈｉ").xpect_contains("body");
+	}
+
+	#[beet_core::test]
 	fn auto_grow_oneshot_is_unbounded() {
 		// 30 preformatted lines exceed a typical short buffer; auto-grow keeps
 		// them all instead of clipping to a fixed height.

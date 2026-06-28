@@ -91,7 +91,16 @@ pub(super) fn measure_inline_flow(
 	query: &CharcellQuery,
 	available_width: u32,
 ) -> UVec2 {
-	let runs = collect_inline_runs(node, query);
+	let mut runs = collect_inline_runs(node, query);
+	// font-size scaling: above 2em the whole context is one block-font run;
+	// above 1em every run is remapped to fullwidth and flows as usual.
+	match FontScale::of_style(node.visual_style()) {
+		FontScale::Block => {
+			return measure_block_text(&inline_text(&runs), available_width);
+		}
+		FontScale::Wide => widen_runs(&mut runs),
+		FontScale::Normal => {}
+	}
 	let lines = flow_inline(&runs, available_width, is_preformatted(node));
 	let max_w = lines.iter().map(line_width).max().unwrap_or(0);
 	UVec2::new(max_w, lines.len() as u32)
@@ -106,7 +115,26 @@ pub(super) fn paint_inline_flow(
 	buffer: &mut impl AsBuffer,
 	clip: Clip,
 ) {
-	let runs = collect_inline_runs(node, query);
+	let mut runs = collect_inline_runs(node, query);
+	// font-size scaling mirrors `measure_inline_flow`: paint the context as one
+	// block-font run above 2em, or remap every run to fullwidth above 1em.
+	match FontScale::of_style(node.visual_style()) {
+		FontScale::Block => {
+			let visual = node.visual_style();
+			paint_block_text(
+				&inline_text(&runs),
+				content_rect,
+				visual,
+				visual.text_align,
+				node.entity,
+				buffer,
+				clip,
+			);
+			return;
+		}
+		FontScale::Wide => widen_runs(&mut runs),
+		FontScale::Normal => {}
+	}
 	let width = content_rect.width().max(0) as u32;
 	let lines = flow_inline(&runs, width, is_preformatted(node));
 	let align = node.visual_style().text_align;
@@ -195,6 +223,18 @@ fn collect_runs_inner(
 	}
 	for child in node.child_nodes(query) {
 		collect_runs_inner(&child, query, link, runs);
+	}
+}
+
+/// Concatenate run texts into the raw string the block font renders.
+fn inline_text(runs: &[InlineRun]) -> String {
+	runs.iter().map(|run| run.text.as_str()).collect()
+}
+
+/// Remap every run to fullwidth glyphs for the wide (> 1em) scale.
+fn widen_runs(runs: &mut [InlineRun]) {
+	for run in runs.iter_mut() {
+		run.text = to_fullwidth(&run.text);
 	}
 }
 

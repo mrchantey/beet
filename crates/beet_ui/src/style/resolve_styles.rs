@@ -169,6 +169,13 @@ fn resolve_visual(
 	let font_style = query
 		.resolve(entity, FontStyleProp, memo)
 		.unwrap_or_default();
+	// font-size drives charcell glyph scaling. MD3 sets it per-heading (`<h1>`..)
+	// and on the `text-*` typography classes, so the standard cascade (own beats
+	// inherited, class beats tag) resolves the effective size; absent, text is
+	// 1em (normal single-cell glyphs).
+	let font_size = query
+		.resolve(entity, FontSize, memo)
+		.unwrap_or(Length::Rem(1.0));
 	let blink = query
 		.resolve(entity, BlinkStyleProp, memo)
 		.unwrap_or_default();
@@ -187,6 +194,7 @@ fn resolve_visual(
 		decoration_style,
 		font_weight,
 		font_style,
+		font_size,
 		blink,
 		visibility,
 		text_align,

@@ -1,3 +1,6 @@
+// Under `cfg(test)` the demo `main` and its `setup_*` helpers are stripped, so
+// they read as dead code / unused imports; that is expected for the test build.
+#![cfg_attr(test, allow(dead_code, unused_imports))]
 use beet_core::prelude::*;
 use beet_ui::prelude::style::AlignItems;
 use beet_ui::prelude::style::Display;
@@ -9,6 +12,7 @@ use beet_ui::prelude::style::Visibility;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
 
+#[cfg(not(test))]
 fn main() {
 	let size = terminal_ext::size();
 	cross_log!("=== Beet Layout Engine Demo ({}×{}) ===\n", size.x, size.y);
@@ -52,6 +56,8 @@ fn main() {
 	overflow += render("Inline Wrap", setup_inline_wrap);
 	overflow += render("Text Align", setup_text_align);
 	overflow += render("Wide Characters (CJK)", setup_wide_chars);
+	overflow += render("Font Size: Wide (>1em)", setup_font_wide);
+	overflow += render("Font Size: Block (>2em)", setup_font_block);
 
 	// Render width must never exceed the measured terminal width, otherwise the
 	// terminal soft-wraps and every box appears one column too wide.
@@ -624,6 +630,37 @@ fn setup_wide_chars() -> impl Bundle {
 	)
 }
 
+// ── Font scaling ────────────────────────────────────────────────────────────
+
+/// A `font-size` above 1em renders text as fullwidth glyphs (2 columns each).
+fn setup_font_wide() -> impl Bundle {
+	let wide = VisualStyle::default().with_font_size(Length::Rem(1.5));
+	(
+		LayoutStyle::flex_row().column_gap(Length::Rem(2.)),
+		children![
+			(rsx! { "Title" }, wide.clone()),
+			(rsx! { "Heading 42" }, wide),
+		],
+	)
+}
+
+/// A `font-size` above 2em renders the box-drawing block font (3 rows tall),
+/// capitals in the double-pipe variant.
+fn setup_font_block() -> impl Bundle {
+	(LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
+		(
+			rsx! { "Beet" },
+			VisualStyle::default()
+				.with_font_size(Length::Rem(3.))
+				.with_foreground(Color::srgb(0.5, 0.9, 0.4)),
+		),
+		(
+			rsx! { "ui 2024" },
+			VisualStyle::default().with_font_size(Length::Rem(2.5))
+		),
+	])
+}
+
 fn setup_text_align() -> impl Bundle {
 	let item_styles = (
 		BoxStyle::default()
@@ -649,4 +686,150 @@ fn setup_text_align() -> impl Bundle {
 			},),
 		],
 	)
+}
+
+// ── Layout measurement tests ────────────────────────────────────────────────
+//
+// These run under the beet test runner via `cargo test --example layout
+// --features tui`. They pin the measurement contract the layout engine must
+// uphold: a text node's width is its display-column count, wrapping breaks on
+// word boundaries within the content width, and block children stack their
+// rows. They also lock in the wide/fullwidth and box-drawing font behaviour
+// driven by `font-size` (see `VisualStyle::font_size`).
+
+#[cfg(test)]
+beet_core::test_main!();
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use beet_core::prelude::*;
+
+	/// Render `bundle` into a `cols × rows` buffer, trimmed to its plain lines.
+	fn lines(cols: u32, rows: u32, bundle: impl Bundle) -> Vec<String> {
+		Buffer::render_oneshot_plain_sized(UVec2::new(cols, rows), bundle)
+			.trim_lines()
+			.lines()
+			.map(|line| line.trim_end().to_string())
+			.collect()
+	}
+
+	/// Widest rendered line, in display columns.
+	fn max_width(lines: &[String]) -> usize {
+		lines
+			.iter()
+			.map(|line| display_width(line))
+			.max()
+			.unwrap_or(0)
+	}
+
+	#[beet_core::test]
+	fn text_width_matches_glyph_count() {
+		// a short word measures its own column count, on a single row
+		let out = lines(20, 3, rsx! { <p>"Hello"</p> });
+		out.len().xpect_eq(1);
+		max_width(&out).xpect_eq(5);
+	}
+
+	#[beet_core::test]
+	fn paragraph_wraps_to_expected_rows() {
+		// four words in a 7-column content box wrap on word boundaries
+		lines(7, 6, rsx! { <p>"one two three four"</p> }).xpect_eq(vec![
+			"one two".to_string(),
+			"three".to_string(),
+			"four".to_string(),
+		]);
+	}
+
+	#[beet_core::test]
+	fn wrapped_text_never_exceeds_width() {
+		// no wrapped row may overflow the content width
+		let out =
+			lines(12, 8, rsx! { <p>"alpha beta gamma delta epsilon zeta"</p> });
+		(max_width(&out) <= 12).xpect_true();
+		(out.len() >= 3).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn block_children_stack_vertically() {
+		// three stacked paragraphs occupy three content rows
+		let out =
+			lines(20, 10, rsx! { <div><p>"A"</p><p>"B"</p><p>"C"</p></div> });
+		out.iter()
+			.filter(|line| !line.is_empty())
+			.count()
+			.xpect_eq(3);
+	}
+
+	#[beet_core::test]
+	fn wide_cjk_doubles_measured_width() {
+		// fullwidth/CJK glyphs occupy two columns each
+		let out = lines(20, 3, rsx! { <p>"中文"</p> });
+		max_width(&out).xpect_eq(4);
+	}
+
+	// ── Font scaling (font-size driven) ─────────────────────────────────────
+
+	/// A leaf carrying a `font-size`. A bare value node has no `Element`, so the
+	/// style cascade leaves the hand-attached `VisualStyle` intact.
+	fn sized(text: &'static str, rem: f32) -> impl Bundle {
+		(
+			rsx! { {text} },
+			VisualStyle::default().with_font_size(Length::Rem(rem)),
+		)
+	}
+
+	#[beet_core::test]
+	fn normal_font_renders_plain_ascii() {
+		// <= 1em keeps the unscaled single-cell glyphs
+		lines(20, 4, sized("AB", 1.0)).xpect_eq(vec!["AB".to_string()]);
+	}
+
+	#[beet_core::test]
+	fn wide_font_doubles_width() {
+		// (1em, 2em] renders fullwidth: two columns per glyph, one row
+		let out = lines(20, 4, sized("AB", 1.5));
+		out.len().xpect_eq(1);
+		max_width(&out).xpect_eq(4);
+		out[0].as_str().xpect_contains("Ａ");
+	}
+
+	#[beet_core::test]
+	fn block_font_is_three_rows_tall() {
+		// > 2em renders the box-drawing block font, three rows tall, with
+		// uppercase letters drawn in the double-pipe variant
+		let out = lines(40, 8, sized("AB", 2.5));
+		out.len().xpect_eq(3);
+		out.join("\n").as_str().xpect_contains("╔");
+	}
+
+	#[beet_core::test]
+	fn block_font_lowercase_uses_single_pipe() {
+		// lowercase keeps the single-pipe glyph; only capitals double the pipes
+		let out = lines(40, 8, sized("ab", 2.5));
+		out.len().xpect_eq(3);
+		let joined = out.join("\n");
+		joined.as_str().xpect_contains("┌");
+		joined.as_str().xnot().xpect_contains("╔");
+	}
+
+	#[beet_core::test]
+	fn block_font_wraps_within_width() {
+		// a block heading wider than the box wraps onto more three-row lines
+		let out = lines(18, 12, sized("ALPHA BETA GAMMA", 3.0));
+		// at least two wrapped lines (>= 6 rows incl. the inter-line gap)
+		(out.len() >= 6).xpect_true();
+		(max_width(&out) <= 18).xpect_true();
+	}
+
+	/// Visual snapshot of the box-drawing block font (uppercase double-pipe).
+	#[beet_core::test]
+	fn block_font_snapshot() {
+		Buffer::render_oneshot_plain_sized(
+			UVec2::new(60, 6),
+			sized("Beet", 3.0),
+		)
+		.trim_lines()
+		.xpect_snapshot();
+	}
 }

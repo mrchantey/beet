@@ -99,6 +99,10 @@ pub fn app_bar_title() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class("app-bar-title"))
 		.with_token(TypographyProps,typography::TitleLarge).unwrap()
+		// the longhand `font-size` mirrors the composite so the terminal scales
+		// the brand to fullwidth like other title-large text (the charcell
+		// renderer scales by `font-size`, not the composite token).
+		.with_token(common_props::FontSize,typography::FontSizeTitleLarge).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_canonical(DecorationLine::DEFAULT)
 }

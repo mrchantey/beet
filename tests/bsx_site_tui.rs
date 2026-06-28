@@ -148,10 +148,12 @@ impl SiteHost {
 #[beet::test]
 async fn homepage_boots_with_chrome() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
-	host.step_until("A site with no code");
-	// the `<SiteLayout>` chrome renders: the header brand and the sidebar.
-	let frame = host.frame();
-	frame.as_str().xpect_contains("BSX Site");
+	// the hero `<h1>` is 2rem, so on the terminal it renders fullwidth ("A site
+	// with no code" -> "Ａ ｓｉｔｅ ..."); gate on a contiguous fullwidth word.
+	let frame = host.step_until("ｓｉｔｅ");
+	// the `<SiteLayout>` chrome renders: the header brand and the sidebar. The
+	// brand is `title-large` (1.375rem), so on the terminal it renders fullwidth.
+	frame.as_str().xpect_contains("ＢＳＸ");
 	// the terminal target seeds the dark scheme (no web color-scheme script).
 	host.has_class("dark-scheme").xpect_true();
 }
@@ -161,10 +163,13 @@ async fn homepage_boots_with_chrome() {
 #[beet::test]
 async fn navigate_to_counter_page() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
-	host.step_until("A site with no code");
+	// homepage loaded: gate on the hero's "Read the docs" link (a button, body-
+	// sized so plain ASCII; the hero `<h1>` itself now renders fullwidth).
+	host.step_until("Read the docs");
 	host.navigate("/counter");
 	host.step_until("You have clicked 0 times.");
-	host.frame().xnot().xpect_contains("A site with no code");
+	// navigated away: the homepage's "Read the docs" link is gone.
+	host.frame().xnot().xpect_contains("Read the docs");
 }
 
 /// The no-code `routes/counter.bsx` is interactive in the terminal: clicking
@@ -196,13 +201,16 @@ async fn counter_clicks_update_count() {
 #[beet::test]
 async fn nav_link_click_navigates() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
-	host.step_until("A site with no code");
+	// homepage loaded: gate on the hero's "Read the docs" link (plain ASCII; the
+	// hero `<h1>` itself now renders fullwidth).
+	host.step_until("Read the docs");
 	// the sidebar grows a link per route, labelled by its last path segment
 	// (`counter.bsx` -> "counter"); click it to navigate.
 	let (col, row) = host.cell_of("counter");
 	host.click(col, row);
 	host.step_until("You have clicked 0 times.");
-	host.frame().xnot().xpect_contains("A site with no code");
+	// navigated away: the homepage's "Read the docs" link is gone.
+	host.frame().xnot().xpect_contains("Read the docs");
 }
 
 /// Clicking an in-content link (not the sidebar chrome) navigates the TUI. The
@@ -214,11 +222,14 @@ async fn nav_link_click_navigates() {
 #[beet::test]
 async fn content_link_click_navigates() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
-	host.step_until("A site with no code");
+	// homepage loaded: the hero `<h1>` (2rem) renders fullwidth ("A site with no
+	// code" -> "Ａ ｓｉｔｅ ..."); gate on the contiguous fullwidth word.
+	host.step_until("ｓｉｔｅ");
 	// the hero's "Read the docs" link is an `<a href="/docs">` in the route
 	// content (not the layout chrome); clicking it navigates to the docs index.
 	let (col, row) = host.cell_of("Read the docs");
 	host.click(col, row);
 	host.step_until("from the entrypoint down");
-	host.frame().xnot().xpect_contains("A site with no code");
+	// navigated away: the homepage hero's fullwidth heading is gone.
+	host.frame().xnot().xpect_contains("ｓｉｔｅ");
 }

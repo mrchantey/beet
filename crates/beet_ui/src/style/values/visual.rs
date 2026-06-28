@@ -8,6 +8,7 @@
 use crate::style::AsCssValue;
 use crate::style::CssValue;
 use crate::style::FontWeight;
+use crate::style::Length;
 use beet_core::prelude::*;
 use std::io;
 use std::io::Write;
@@ -15,8 +16,15 @@ use std::io::Write;
 /// The default [`VisualStyle`], usable in `const` contexts.
 pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
 
+// Manual rather than derived so `default()` matches [`VisualStyle::DEFAULT`]: the
+// derived `Default` would give `font_size` the `Length` default (`0px`) instead
+// of the `1rem` (normal text) the renderer expects.
+impl Default for VisualStyle {
+	fn default() -> Self { Self::DEFAULT }
+}
+
 /// Visual styling for a cell or run of text.
-#[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
+#[derive(Debug, Clone, PartialEq, SetWith, Component)]
 pub struct VisualStyle {
 	/// In ansi renderers an alpha channel of <50% will apply the `dim` attribute
 	#[set_with(unwrap_option, into)]
@@ -34,6 +42,11 @@ pub struct VisualStyle {
 	pub font_weight: FontWeight,
 	/// Slant of the text, eg italic.
 	pub font_style: FontStyle,
+	/// Resolved font size, from the CSS `font-size` cascade. The charcell
+	/// renderer scales glyphs by it (see [`FontScale`](crate::render::FontScale)):
+	/// text above 1em renders as fullwidth characters, above 2em as the multi-row
+	/// box-drawing block font. 1rem == 1 cell, the renderer's unit convention.
+	pub font_size: Length,
 	/// Blink attribute (terminal only).
 	pub blink: BlinkStyle,
 	/// Whether the text is visible or hidden.
@@ -52,6 +65,9 @@ impl VisualStyle {
 		decoration_style: DecorationStyle::Solid,
 		font_weight: FontWeight::Normal,
 		font_style: FontStyle::Normal,
+		// 1em == normal text; the charcell renderer treats `<= 1rem` as the
+		// unscaled single-cell glyph mode.
+		font_size: Length::Rem(1.0),
 		blink: BlinkStyle::None,
 		visibility: Visibility::Visible,
 		text_align: TextAlign::Left,
@@ -128,6 +144,7 @@ impl VisualStyle {
 			decoration_style: discrete.decoration_style,
 			font_weight: discrete.font_weight.clone(),
 			font_style: discrete.font_style,
+			font_size: discrete.font_size,
 			blink: discrete.blink,
 			visibility: discrete.visibility,
 			text_align: discrete.text_align,
