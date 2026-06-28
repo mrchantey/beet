@@ -73,9 +73,13 @@ fn resolve_dir_path(
 	}
 	// watch the scoped subdir for live reload (keyed to its base store), so an
 	// `AssetsDir`/`ServeBlobs` mount's dir reloads; inert on a non-fs store / on wasm.
+	// `WatchDir` is notify-backed and std-only, so a no_std target just mounts the
+	// scoped store with no live-reload watcher.
+	#[cfg(feature = "std")]
 	let watch = WatchDir::from_store(&scoped);
 	let mut entity_commands = commands.entity(entity);
 	entity_commands.insert(scoped);
+	#[cfg(feature = "std")]
 	if let Some(watch) = watch {
 		entity_commands.insert(watch);
 	}
@@ -195,10 +199,11 @@ pub fn on_remove_store(
 		if dirs.contains(descendant) {
 			// drop the scoped store *and* its watcher registration, so a re-resolve
 			// re-registers a `WatchDir` cleanly rather than leaving a stale one.
-			commands
-				.entity(descendant)
-				.remove::<BlobStore>()
-				.remove::<WatchDir>();
+			// `WatchDir` is std-only; nothing to drop on no_std.
+			let mut entity_commands = commands.entity(descendant);
+			entity_commands.remove::<BlobStore>();
+			#[cfg(feature = "std")]
+			entity_commands.remove::<WatchDir>();
 		} else if blob_paths.contains(descendant) {
 			commands.entity(descendant).remove::<Blob>();
 		}

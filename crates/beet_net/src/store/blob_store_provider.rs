@@ -41,11 +41,13 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// [`FsStore`]'s `effective_root` (base joined with subdir). `None` for a store
 	/// with no watchable directory (memory, S3). Drives [`WatchDir`](crate::prelude::WatchDir),
 	/// so only the mounted subtree is watched, never the whole store root.
+	#[cfg(feature = "std")]
 	fn watch_dir(&self) -> Option<AbsPathBuf> { None }
 
 	/// The store's base path, ie the directory its [`root_key`](Self::root_key) keys
 	/// to, used to strip a watched path back to a base-relative [`BlobEvent`] so it
 	/// routes via [`did_change`](Self::did_change). `None` for a non-fs store.
+	#[cfg(feature = "std")]
 	fn base_dir(&self) -> Option<AbsPathBuf> { None }
 
 	/// True if `event` concerns an object inside this store's scope: same
@@ -237,7 +239,9 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn id(&self) -> &'static str { self.as_ref().id() }
 	fn root_key(&self) -> SmolStr { self.as_ref().root_key() }
 	fn subdir(&self) -> SmolPath { self.as_ref().subdir() }
+	#[cfg(feature = "std")]
 	fn watch_dir(&self) -> Option<AbsPathBuf> { self.as_ref().watch_dir() }
+	#[cfg(feature = "std")]
 	fn base_dir(&self) -> Option<AbsPathBuf> { self.as_ref().base_dir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.as_ref().did_change(event)

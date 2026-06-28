@@ -73,11 +73,19 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 		)
 		.await??;
 	let media = store.get_media(&SmolPath::from(path.as_str())).await?;
-	Request::post(format!("{url}/load"))
+	let res = Request::post(format!("{url}/load"))
 		.with_content_type(media.media_type().clone())
 		.with_body(media.bytes())
 		.send()
 		.await?;
+	// the device may accept the upload but reject the scene (eg an unsupported
+	// media type, or a tag its firmware does not register), so surface its status
+	// rather than always reporting success.
+	let status = res.status();
+	if !status.is_success() {
+		let body = res.text().await.unwrap_or_default();
+		bevybail!("device rejected scene ({status}): {body}");
+	}
 	Response::ok_text("uploaded scene\n").xok()
 }
 
