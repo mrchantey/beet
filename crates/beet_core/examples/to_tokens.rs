@@ -10,5 +10,7 @@ pub struct ElementNode {
 }
 
 impl ElementNode {
-	pub fn new(self_closing: bool) -> Self { Self { self_closing } }
+	pub fn new(self_closing: bool) -> Self {
+		Self { self_closing }
+	}
 }

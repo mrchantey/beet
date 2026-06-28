@@ -712,6 +712,38 @@ fn slot_fallback_when_no_content() {
 	render_html(&mut world, root).xpect_contains("Fallback");
 }
 
+#[beet_core::test]
+fn fragment_forwards_children_into_slot() {
+	let mut world = world();
+	// a host with a `head` slot and a default slot, the `<HtmlDocument>` shape.
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source(
+			"Host",
+			"<html><head><Slot name=\"head\"/></head><body><Slot/></body></html>",
+		)
+		.unwrap();
+	world.insert_resource(registry);
+
+	// a single `<Fragment slot="head">` carries three children into the head slot,
+	// the markup twin of each child declaring `slot="head"`.
+	let root = spawn_bsx(
+		&mut world,
+		"<Host><Fragment slot=\"head\"><meta/><link/><style/></Fragment><p>body</p></Host>",
+	);
+	let head = render_html(&mut world, root)
+		.split("</head>")
+		.next()
+		.unwrap()
+		.to_string();
+	// every grouped child landed inside `<head>`, the transparent fragment leaving
+	// no wrapper element of its own.
+	head.clone().xpect_contains("<meta");
+	head.clone().xpect_contains("<link");
+	head.clone().xpect_contains("<style");
+	head.xnot().xpect_contains("<p>body</p>");
+}
+
 // ---- events -----------------------------------------------------------------
 
 #[beet_core::test]

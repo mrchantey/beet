@@ -28,7 +28,8 @@ pub const ELEVATION_5: ClassName = ClassName::new_static("elevation-5");
 
 /// Filled card - container with the highest surface elevation.
 ///
-/// Uses surface-container-highest background, no shadow.
+/// Uses surface-container-highest background, no shadow. A distinct surface tone
+/// (lifted off the page's `Background`) on both the web and the terminal.
 pub fn card_filled() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD_FILLED))

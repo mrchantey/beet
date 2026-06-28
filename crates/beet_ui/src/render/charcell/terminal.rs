@@ -13,12 +13,15 @@ use std::path::PathBuf;
 
 // ── StdioTerminal ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, SetWith, Component)]
+#[derive(Debug, Clone, Get, SetWith, Component)]
 #[component(on_add=Self::on_add)]
 pub struct StdioTerminal {
-	/// In raw mode, listen for ctrl+c events and exit the application.
-	/// Does nothing in cooked mode, ctrl+c would directly exit the process or
-	/// be handled by the restore_hook
+	/// Whether ctrl+c exits the process. Read by [`exit_on_ctrl_c`], which turns
+	/// the raw-mode ctrl+c keystroke (a `0x03` byte, never an OS `SIGINT` in raw
+	/// mode) into an [`AppExit`]. Set `false` for a local surface that handles
+	/// ctrl+c itself; in cooked mode the keystroke is the kernel's `SIGINT` and
+	/// this flag has no effect.
+	#[get(copy)]
 	ctrl_c_exit: bool,
 	/// When enabled, applies a ctrl+c and panic hook to restore terminal state.
 	restore_hook: bool,

@@ -12,8 +12,12 @@ fn main() {
 	]);
 }
 
-fn returns_ok() -> Result<(), String> { Ok(()) }
-fn returns_err() -> Result<(), String> { Err("foo".to_string()) }
+fn returns_ok() -> Result<(), String> {
+	Ok(())
+}
+fn returns_err() -> Result<(), String> {
+	Err("foo".to_string())
+}
 fn panics() -> Result<(), String> {
 	panic!("whoops");
 }

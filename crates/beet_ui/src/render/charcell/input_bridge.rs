@@ -290,11 +290,16 @@ pub fn resize_stdio_buffers(
 ///
 /// Reads the per-surface [`KeyboardInput`] stream (each event carries its source
 /// `window`): a terminal ctrl+c arrives as a Control press bracketing a `C` press
-/// on the same window. The surface is identified *positively* by
-/// [`StdioTerminal`]: only the local terminal exits the process. An SSH session
-/// ([`ChannelTerminal`]) handles its ctrl+c as a per-session close
-/// (`close_session_on_ctrl_c`), never a global [`AppExit`] that would tear down
-/// every other session.
+/// on the same window. The raw-mode terminal never receives an OS `SIGINT` (the
+/// kernel delivers ctrl+c as a `0x03` byte instead), so this is the only thing
+/// that exits a raw-mode app.
+///
+/// The surface is identified *positively* by [`StdioTerminal`]: only the local
+/// terminal exits the process. An SSH session ([`ChannelTerminal`]) handles its
+/// ctrl+c as a per-session close (`close_session_on_ctrl_c`), never a global
+/// [`AppExit`] that would tear down every other session. A [`StdioTerminal`] that
+/// opts out via [`ctrl_c_exit`](StdioTerminal::ctrl_c_exit)`= false` is also left
+/// alone, so an app can handle ctrl+c itself.
 ///
 /// The positive match is load-bearing: every SSH client sends a closing ctrl+c,
 /// and that keypress and the session despawn race within a frame. A negative
@@ -304,7 +309,7 @@ pub fn resize_stdio_buffers(
 /// [`StdioTerminal`] — which an SSH window never carries — is immune to that race.
 pub fn exit_on_ctrl_c(
 	mut keys: MessageReader<KeyboardInput>,
-	local: Query<(), With<StdioTerminal>>,
+	stdio: Query<&StdioTerminal>,
 	mut exit: MessageWriter<AppExit>,
 ) {
 	// group this frame's pressed keys by window: (ctrl seen, c seen).
@@ -318,7 +323,9 @@ pub fn exit_on_ctrl_c(
 		}
 	}
 	for (window, (ctrl, c)) in per_window {
-		if ctrl && c && local.contains(window) {
+		// a remote (channel) surface lacks a StdioTerminal and closes its session
+		// elsewhere; a local stdio surface exits unless it opts out.
+		if ctrl && c && stdio.get(window).is_ok_and(|stdio| stdio.ctrl_c_exit()) {
 			exit.write(AppExit::Success);
 		}
 	}
@@ -337,6 +344,31 @@ mod test {
 		host.messages::<KeyboardInput>()
 			.into_iter()
 			.find(|input| input.state == ButtonState::Pressed)
+	}
+
+	/// A real ctrl+c byte through the full [`CharcellTuiPlugin`] pipeline on a
+	/// LOCAL surface (a [`Terminal`] with no [`ChannelTerminal`]) exits the
+	/// process: the byte parses to a Control+`C` press pair, which
+	/// [`exit_on_ctrl_c`] turns into an [`AppExit`].
+	#[beet_core::test]
+	fn ctrl_c_byte_exits_local_surface() {
+		use crate::render::charcell::terminal::ChannelTerminal;
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, CharcellTuiPlugin));
+		// a local surface: the real input-reading Terminal with NO ChannelTerminal
+		// filter component. Keep the channel handle to feed the reader.
+		let (mut channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
+		app.world_mut()
+			.spawn((terminal, DoubleBuffer::new(UVec2::new(40, 12))));
+		app.update();
+		channel.send_input(&[0x03]).unwrap();
+		app.update();
+		app.world()
+			.resource::<Messages<AppExit>>()
+			.iter_current_update_messages()
+			.count()
+			.xpect_greater_than(0);
 	}
 
 	/// A character keypress maps to a `Key::Character` logical key and the right

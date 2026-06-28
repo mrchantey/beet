@@ -516,7 +516,9 @@ fn render_console_emits_panel() {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("div");
 		view.attribute_string("id").xpect_eq("beet-console");
-		view.contains_class_name(&classes::CONSOLE_PANEL).xpect_true();
+		// the panel class consts are `pub(crate)`, so assert via the class string
+		view.contains_class_name(&ClassName::new_static("beet-console-panel"))
+			.xpect_true();
 		query
 			.iter_descendant_values(root)
 			.filter_map(|v| v.as_str().ok())

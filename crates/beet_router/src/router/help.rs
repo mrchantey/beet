@@ -91,7 +91,7 @@ pub struct NotFoundNotice {
 /// A single route row in the [`RouteList`], flattened from an [`ActionNode`] into
 /// the render-friendly shape the template consumes.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
-pub struct RouteEntry {
+pub(crate) struct RouteEntry {
 	/// The route path with a leading slash, eg `/counter/increment`.
 	pub href: String,
 	/// A kind tag rendered beside the path, eg `scene` or an HTTP method.
@@ -105,7 +105,7 @@ pub struct RouteEntry {
 /// One row of a route's params table: a CLI flag / query param with its concrete
 /// type and whether it must be supplied.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
-pub struct RouteParam {
+pub(crate) struct RouteParam {
 	/// The param name, eg `out-dir` in `--out-dir=…`.
 	pub name: String,
 	/// The concrete Rust type the param parses into, eg `alloc::string::String`.
@@ -123,7 +123,10 @@ pub struct RouteParam {
 ///
 /// One template for both the CLI `--help` and the web `?help`: the document
 /// chrome (head/sidebar/footer) is the ancestor layout's job, applied by
-/// [`PageRoot::render`], so this widget only owns the route listing.
+/// [`PageRoot::render`], so this widget only owns the route listing. The list is
+/// a bare fragment that inherits the page `Background`, not a `.card-filled`
+/// surface, so the help reads as the conservative app base — the same near-black
+/// page as the regular site — rather than a lighter, tinted card tone.
 #[template]
 pub fn RouteList(
 	notice: Option<NotFoundNotice>,
@@ -131,11 +134,11 @@ pub fn RouteList(
 ) -> impl Bundle {
 	let items: Vec<_> = entries.into_iter().map(route_entry_item).collect();
 	rsx! {
-		<div {Classes::new([classes::CARD_FILLED])}>
+		<>
 			{notice.map(not_found_notice)}
 			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Available routes"</h2>
 			<ul>{items}</ul>
-		</div>
+		</>
 	}
 }
 
@@ -243,12 +246,15 @@ fn params_table(params: Vec<RouteParam>) -> impl Bundle {
 /// Spawn the [`RouteList`] inside a themed page as an ephemeral render root,
 /// returning its id.
 ///
-/// The `<RouteList>` card is wrapped in a [`page_classes`] root (`PAGE` plus the
+/// The `<RouteList>` is wrapped in a [`page_classes`] root (`PAGE` plus the
 /// resolved color scheme) so a bare render with no host layout — the dev CLI
-/// `--help`, where the entry declares no `BsxLayout` — still paints a readable
-/// page (a dark surface with light text on the terminal) rather than the
-/// black-on-black light `:root` fallback. A site that renders the help through
-/// its own layout simply nests the same scheme, which resolves identically.
+/// `--help`, where the entry declares no `BsxLayout` — resolves the scheme's
+/// `Background` base (the conservative app tone) and its foreground, rather than
+/// the black-on-black light `:root` fallback. The list inherits that same neutral
+/// `Background` on both the web and the terminal, reading as the regular site's
+/// near-black page rather than a lighter card surface. A site that renders the
+/// help through its own layout simply nests the same scheme, which resolves
+/// identically.
 ///
 /// Built through `spawn_template` so the widget's slots and lifecycle resolve,
 /// then marked a self-referential [`PageRoot`] so [`PageRoot::render`] walks

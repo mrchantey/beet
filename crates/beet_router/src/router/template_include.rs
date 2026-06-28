@@ -190,4 +190,46 @@ mod test {
 			.tag()
 			.xpect_eq("article");
 	}
+
+	/// A `<Fragment slot="x">` forwards every child into the named slot even with
+	/// the include resolver registered (it intercepts only `<Template>`), the
+	/// `<HtmlDocument>` `slot="head"` shape in concrete form: each grouped child
+	/// lands in the target slot, the transparent fragment leaving no wrapper.
+	#[beet_core::test]
+	fn fragment_forwards_children_into_slot() {
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		register_template_include(&mut world);
+
+		let root = BsxTemplate::parse_entry(
+			&world,
+			"<main><Slot name=\"x\"/><Fragment slot=\"x\"><b/><i/></Fragment></main>",
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+
+		// the slot collapsed and the fragment forwarded both children into `<main>`,
+		// the transparent fragment leaving no wrapper element of its own.
+		let tags = world
+			.with_state::<Query<(Option<&Element>, Option<&Children>)>, _>(
+				|query| {
+					let mut tags = Vec::new();
+					let mut stack = vec![root];
+					while let Some(entity) = stack.pop() {
+						let Ok((element, children)) = query.get(entity) else {
+							continue;
+						};
+						if let Some(element) = element {
+							tags.push(element.tag().to_string());
+						}
+						if let Some(children) = children {
+							stack.extend(children.iter());
+						}
+					}
+					tags
+				},
+			);
+		tags.contains(&"b".to_string()).xpect_true();
+		tags.contains(&"i".to_string()).xpect_true();
+	}
 }

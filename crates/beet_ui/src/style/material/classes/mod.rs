@@ -19,7 +19,6 @@ use crate::style::*;
 
 pub mod buttons;
 pub mod color_scheme;
-pub mod console;
 pub mod forms;
 pub mod geometry;
 pub mod layout;
@@ -30,7 +29,6 @@ pub mod utilities;
 
 pub use buttons::*;
 pub use color_scheme::*;
-pub use console::*;
 pub use forms::*;
 pub use geometry::*;
 pub use layout::*;
@@ -125,13 +123,6 @@ pub fn all_rules() -> Vec<Rule> {
 		select_option_selected(),
 		error_text(),
 		error(),
-		// render console panel + per-level line colors (the line classes are set
-		// by `render_console.js`)
-		console_panel(),
-		console_line(),
-		console_error(),
-		console_warn(),
-		console_info(),
 		// table (the `.table-vertical-borders` column dividers are drawn per target:
 		// an adjacent-sibling rule in `reset.css` on the web, the
 		// `apply_table_vertical_borders` decorate system on the terminal)

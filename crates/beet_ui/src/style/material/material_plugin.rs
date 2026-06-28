@@ -30,6 +30,11 @@ pub struct Theme {
 impl Default for Theme {
 	fn default() -> Self {
 		Self {
+			// the historical brand green the plugin baked, so a host that never
+			// touches the theme renders the framework's brand by default. The
+			// derived `Background`/`Surface` tones stay near-neutral (a faint green
+			// tint), conservative on both the web and the terminal. An app picks its
+			// own brand by inserting a seeded `Theme` (or `<Theme color=…/>`).
 			color: palettes::basic::GREEN.into(),
 			scheme: ColorScheme::Dark,
 		}
@@ -171,9 +176,9 @@ mod tests {
 			.xpect_true();
 	}
 
-	/// The [`Theme`] default is the historical brand green the plugin baked, so a
-	/// host that never touches the theme (and rsx_site, which sets it to its own
-	/// green) renders byte-identically across this refactor.
+	/// The [`Theme`] default is the historical brand green the plugin bakes, so a
+	/// host that never touches the theme renders the framework brand by default. An
+	/// app with its own brand inserts a seeded `Theme`.
 	#[beet_core::test]
 	fn theme_default_is_brand_green() {
 		Theme::default()
@@ -229,12 +234,30 @@ mod tests {
 			.xpect_contains("--io-crates-beet-ui-style-material-typography-headline-large-weight: var(--io-crates-beet-ui-style-material-typography-weight-regular);");
 	}
 
-	/// A deep `.card-filled` under a `.dark-scheme` ancestor resolves its
-	/// `BackgroundColor` (which points at `SurfaceContainerHighest`) to the dark
-	/// tone, not the light `:root` fallback — the "white card on a dark page" bug.
+	/// The page/card surface fills are ungated, so the built CSS paints them on
+	/// both targets: the charcell cascade (which skips `@media`-gated rules) reads
+	/// the same `.page`/`.card-filled` backgrounds as the web. The page sits on the
+	/// conservative `Background` role, the card on a distinct surface tone.
+	#[beet_core::test]
+	fn surface_fills_paint_on_both_targets() {
+		let builder =
+			CssBuilder::default().with_format_variables(FormatVariables::short());
+		MaterialStylePlugin::world()
+			.with_state::<StyleQuery, _>(|query| query.build_css(&builder))
+			.xunwrap()
+			.xpect_contains(".page")
+			.xpect_contains("var(--material-colors-background)")
+			.xpect_contains(".card-filled")
+			.xpect_contains("var(--material-colors-surface-container-highest)");
+	}
+
+	/// A deep `.card-filled` under a `.dark-scheme` ancestor resolves the card
+	/// surface tone (`SurfaceContainerHighest`, which the web fill points at) to
+	/// the dark value, not the light `:root` fallback — the "white card on a dark
+	/// page" bug. Asserted on the token rather than the now-web-only background
+	/// property, so it holds on both targets.
 	#[beet_core::test]
 	fn nested_card_inherits_dark_scheme() {
-		use crate::style::common_props::BackgroundColor;
 		let mut world = MaterialStylePlugin::world();
 		let body = world
 			.spawn((rsx! { <div/> }, Classes::new([classes::DARK_SCHEME])))
@@ -247,23 +270,36 @@ mod tests {
 				ChildOf(mid),
 			))
 			.id();
+		// a bare element with no scheme ancestor falls back to the light `:root`.
+		let bare = world.spawn(rsx! { <div/> }).id();
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let memo = &mut default();
-			let card_bg = query.resolve(card, BackgroundColor, memo).unwrap();
-			let dark_highest = query
-				.resolve(body, colors::SurfaceContainerHighest, memo)
+			let card_tone = query
+				.resolve(card, colors::SurfaceContainerHighest, memo)
 				.unwrap();
-			card_bg.xpect_eq(dark_highest);
+			// the nested card inherits the dark ancestor's tone ...
+			card_tone.xpect_eq(
+				query
+					.resolve(body, colors::SurfaceContainerHighest, memo)
+					.unwrap(),
+			);
+			// ... not the light `:root` fallback a bare element resolves.
+			(card_tone
+				!= query
+					.resolve(bare, colors::SurfaceContainerHighest, memo)
+					.unwrap())
+			.xpect_true();
 		});
 	}
 
 	/// Content transcluded into a `.dark-scheme` layout by [`Portal`] (no
 	/// `ChildOf` edge) still inherits the layout's scheme through the holder, so a
-	/// card in referenced content is dark, not the light `:root` fallback. This is
-	/// the document-layout transclusion path that produced the "white card".
+	/// card in referenced content resolves the dark surface tone, not the light
+	/// `:root` fallback. This is the document-layout transclusion path that
+	/// produced the "white card". Asserted on the surface token (the web fill
+	/// points at it) rather than the now-web-only background property.
 	#[beet_core::test]
 	fn render_ref_content_inherits_dark_scheme() {
-		use crate::style::common_props::BackgroundColor;
 		let mut world = MaterialStylePlugin::world();
 		// content is its own root (no ChildOf to the layout), holding a card
 		let content = world.spawn(rsx! { <main/> }).id();
@@ -281,11 +317,13 @@ mod tests {
 		world.spawn((Portal::new(content), ChildOf(body)));
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let memo = &mut default();
-			let card_bg = query.resolve(card, BackgroundColor, memo).unwrap();
+			let card_tone = query
+				.resolve(card, colors::SurfaceContainerHighest, memo)
+				.unwrap();
 			let dark_highest = query
 				.resolve(body, colors::SurfaceContainerHighest, memo)
 				.unwrap();
-			card_bg.xpect_eq(dark_highest);
+			card_tone.xpect_eq(dark_highest);
 		});
 	}
 
@@ -317,8 +355,10 @@ mod tests {
 		});
 	}
 
-	/// End-to-end: a `.page` root carrying a scheme class resolves a background,
-	/// and the light and dark schemes resolve to different colors.
+	/// End-to-end: a `.page` root carrying a scheme class resolves the scheme's
+	/// `Background` base and foreground on the charcell cascade too (the fill is
+	/// ungated, so the terminal paints it), and the light and dark schemes resolve
+	/// to different tones.
 	#[beet_core::test]
 	fn scheme_class_themes_page() {
 		// `RealtimeParsePlugin` wires `PostParseTree` into the main loop so
@@ -343,12 +383,17 @@ mod tests {
 			.id();
 
 		world.update_local();
-		let light_bg =
-			world.entity(light).get::<VisualStyle>().unwrap().background;
-		let dark_bg =
-			world.entity(dark).get::<VisualStyle>().unwrap().background;
+		let light_style =
+			world.entity(light).get::<VisualStyle>().unwrap().clone();
+		let dark_style =
+			world.entity(dark).get::<VisualStyle>().unwrap().clone();
 
-		light_bg.is_some().xpect_true();
-		(light_bg != dark_bg).xpect_true();
+		// the scheme themes the page foreground, differing between schemes ...
+		light_style.foreground.is_some().xpect_true();
+		(light_style.foreground != dark_style.foreground).xpect_true();
+		// ... and the ungated `Background` fill paints on charcell too, its tone
+		// differing between schemes.
+		light_style.background.is_some().xpect_true();
+		(light_style.background != dark_style.background).xpect_true();
 	}
 }

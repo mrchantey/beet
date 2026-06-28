@@ -88,7 +88,9 @@ mod test {
 	use crate::style::material::classes;
 
 	/// Toggling [`ColorScheme`] at runtime re-resolves the cached non-web style,
-	/// so the background flips between the light and dark schemes.
+	/// so the surface foreground flips between the light and dark schemes. The
+	/// page's surface *fill* is web-only, so the foreground (not the background)
+	/// is what the terminal cascade themes per scheme.
 	#[beet_core::test]
 	fn scheme_toggle_reresolves() {
 		// `RealtimeParsePlugin` wires `PostParseTree` into the main loop so
@@ -107,11 +109,11 @@ mod test {
 			))
 			.id();
 		world.update_local();
-		let light_bg = world
+		let light_fg = world
 			.entity(entity)
 			.get::<VisualStyle>()
 			.unwrap()
-			.background;
+			.foreground;
 
 		// flip to dark at runtime — only the typed handle changes
 		world
@@ -120,14 +122,14 @@ mod test {
 			.unwrap()
 			.toggle();
 		world.update_local();
-		let dark_bg = world
+		let dark_fg = world
 			.entity(entity)
 			.get::<VisualStyle>()
 			.unwrap()
-			.background;
+			.foreground;
 
-		light_bg.is_some().xpect_true();
-		(light_bg != dark_bg).xpect_true();
+		light_fg.is_some().xpect_true();
+		(light_fg != dark_fg).xpect_true();
 		// the handle also mirrored onto the cascade classes
 		world
 			.entity(entity)

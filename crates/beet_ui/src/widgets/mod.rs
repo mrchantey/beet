@@ -62,7 +62,9 @@ pub use head::*;
 pub use header::*;
 pub use layout::*;
 pub use preflight::*;
-pub use render_console::*;
+// only the widget is public; its style consts (`CONSOLE_*`) stay `pub(crate)`,
+// reached prefixed as `render_console::CONSOLE_INFO` within the crate.
+pub use render_console::RenderConsole;
 pub use sidebar::*;
 #[cfg(feature = "style")]
 pub use stylesheet::*;
@@ -72,6 +74,7 @@ pub use table::*;
 // the public `Button`, and downstream `prelude::Button`, to this crate's widget.
 pub use button::Button;
 
+use crate::prelude::RuleSet;
 use beet_core::prelude::*;
 
 /// Registers the widget set by short type path, so a name-resolved tag (eg a
@@ -99,11 +102,17 @@ pub fn widget_plugin(app: &mut App) {
 		.register_template::<ContentLayout>()
 		.register_template::<Preflight>()
 		.register_template::<Reset>()
-			.register_template::<RenderConsole>()
+		.register_template::<RenderConsole>()
 		.register_template::<Sidebar>()
 		.register_template::<SidebarScript>()
 		.register_template::<MenuButton>()
 		.register_template::<Table>();
+	// register the `RenderConsole` rules into the global rule set at build time, so
+	// `<Stylesheet>` emits them without coupling a generic widget to the material
+	// `classes` module (the line classes are set by `render_console.js`).
+	app.world_mut()
+		.get_resource_or_init::<RuleSet>()
+		.extend_rules(render_console::console_rules());
 	#[cfg(feature = "net")]
 	app.register_template::<Analytics>();
 	#[cfg(all(

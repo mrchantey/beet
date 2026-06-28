@@ -177,13 +177,18 @@ pub fn main_content() -> Rule {
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
-/// Page - full page background using the base surface color, with a comfortable
-/// large body type as the default reading size.
+/// Page - the full page background and foreground, with a comfortable large body
+/// type as the default reading size.
+///
+/// Points at the conservative `Background` role (the app base tone) rather than a
+/// `Surface`, so the page paints the same neutral base on both the web and the
+/// terminal — a card or app bar layered on top is what reads as a distinct
+/// surface.
 pub fn page() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(PAGE))
-		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(common_props::BackgroundColor,colors::Background).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnBackground).unwrap()
 		.with_token(TypographyProps,typography::BodyLarge).unwrap()
 }
 

@@ -9,10 +9,14 @@ program, `<Wasm>` boots the wasm `beet` binary which fetches and runs it, and
 before `<Wasm>` so its console wrap installs before the (deferred) module boots.
 -->
 <HtmlDocument>
-	<Stylesheet slot="head"/>
-	<!-- seed the light/dark scheme class before paint; honors ?color-scheme=dark -->
-	<ColorSchemeScript slot="head"/>
-	<LiveReloadScript slot="head"/>
+	<!-- a `<Fragment slot="head">` forwards all its children into the head slot;
+	     `<ColorSchemeScript>` seeds the light/dark class before paint and honors
+	     ?color-scheme=dark. -->
+	<Fragment slot="head">
+		<Stylesheet/>
+		<ColorSchemeScript/>
+		<LiveReloadScript/>
+	</Fragment>
 	<h1>Beet in the browser</h1>
 	<p>
 		A headless beet program, compiled to wasm, running in your browser. Its
