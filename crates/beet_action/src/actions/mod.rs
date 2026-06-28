@@ -5,6 +5,8 @@ mod agent;
 mod async_action;
 mod call_action;
 mod chain_action;
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+mod command;
 mod end_in_duration;
 mod end_with;
 mod insert_on;
@@ -37,6 +39,8 @@ pub use action_context::*;
 pub use action_meta::*;
 pub use call_action::*;
 pub use chain_action::*;
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+pub use command::*;
 #[cfg(feature = "serde")]
 pub use erased_action::*;
 pub use into_action::*;

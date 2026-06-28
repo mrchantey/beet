@@ -44,5 +44,12 @@ impl Plugin for ActionPlugin {
 		#[cfg(feature = "scripting")]
 		app.register_type::<ScriptLanguage>()
 			.register_type::<Script<(), String>>();
+		// the external-process leaf needs the native `ChildProcess` to spawn, so it
+		// (and its action marker) only exist on a native std build. `Command` is
+		// crate-qualified to disambiguate it from bevy's `Command` trait, both in
+		// scope here via glob.
+		#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+		app.register_type::<crate::prelude::Command>()
+			.register_type::<CommandAction>();
 	}
 }

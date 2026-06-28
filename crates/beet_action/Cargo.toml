@@ -18,7 +18,9 @@ default = ["std", "reflect"]
 # the `rhai` feature mode-agnostic so it never collides under `--all-features`.
 # The typed `Script` marshals through `Value` (not rhai's serde), so its runtimes
 # build `no_std`; `std` is no longer part of the scripting story.
-std = ["beet_core/std", "rhai?/std", "rquickjs?/std"]
+# `beet_core/fs` brings the native `ChildProcess` primitive the `Command` action
+# spawns (process + cwd/env), itself native-only (it pulls async-process/notify).
+std = ["beet_core/std", "beet_core/fs", "rhai?/std", "rquickjs?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
 template_serde = ["beet_core/template_serde"]

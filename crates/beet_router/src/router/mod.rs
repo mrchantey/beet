@@ -10,6 +10,8 @@ mod exchange_fallback;
 pub use exchange_fallback::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
+mod behavior_sequence;
+pub use behavior_sequence::*;
 // the typed `ExchangeOverloadScript` route marker, the `ScriptRoute` front-end,
 // and the `ExchangeScriptElement` console-capturing `<script>` entry action.
 #[cfg(feature = "scripting")]
