@@ -422,6 +422,12 @@ impl Terminal {
 	/// Style changes are diffed per-cell to minimise escape sequence output.
 	/// A single [`escape::RESET`] is emitted at the end of the frame.
 	///
+	/// OSC-8 hyperlinks are deliberately not emitted here: the live TUI captures
+	/// the mouse, so the terminal forwards clicks to the app rather than opening
+	/// links itself. Links are routed through the app instead (see
+	/// `on_link_click`), and OSC-8 stays a stdout-only affordance (see
+	/// [`render_cells_ansi`](super::render_cells_ansi)).
+	///
 	/// Callers are expected to pre-filter cells (eg. via [`DoubleBuffer::diff`])
 	/// so that only changed cells are passed.
 	fn draw<'a>(
@@ -582,6 +588,20 @@ mod test {
 		// re-targeting the column the wide char already covered.
 		out.as_str().xpect_contains("中x");
 		out.xnot().xpect_contains("\u{1b}[1;2H");
+	}
+
+	/// The live TUI does not emit OSC-8 hyperlinks (it captures the mouse, so the
+	/// terminal can't action them); links route through the app instead. OSC-8
+	/// stays a stdout-only affordance.
+	#[beet_core::test]
+	fn live_tui_emits_no_osc8() {
+		let mut host = TestHost::new();
+		host.spawn_content(rsx! { <a href="https://example.com">"site"</a> });
+		host.step();
+		String::from_utf8_lossy(&host.frame_ansi())
+			.into_owned()
+			.xnot()
+			.xpect_contains("\x1b]8;;");
 	}
 }
 

@@ -8,6 +8,8 @@
 mod backend;
 mod box_model;
 mod buffer;
+#[cfg(feature = "tui")]
+mod clipboard;
 mod decorate;
 mod double_buffer;
 mod flex;
@@ -61,6 +63,8 @@ mod title;
 
 pub use backend::*;
 pub use buffer::*;
+#[cfg(feature = "tui")]
+pub use clipboard::*;
 pub use decorate::*;
 pub use double_buffer::*;
 pub use flex_buffer::*;

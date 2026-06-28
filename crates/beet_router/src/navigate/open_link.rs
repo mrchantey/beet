@@ -4,11 +4,17 @@
 //! A clicked `<a>`'s href is classified internal (a relative/same-origin path)
 //! vs external (an absolute URL to another origin, see [`Url::is_external`]).
 //! Internal links always navigate the in-app [`Navigator`]. External links follow
-//! [`OnOpenLink`]: `External` (default) opens the system browser, `Internal`
-//! points the `Navigator` at the external URL (the in-terminal mini-browser).
+//! [`OnOpenLink`]: `External` (default) hands the link off outside the app,
+//! `Internal` points the `Navigator` at the external URL (the in-terminal
+//! mini-browser).
 //!
-//! The actual system-browser launch goes through the [`OpenExternalLink`] event,
-//! so a test (or an embedder) can intercept it without spawning a process.
+//! How an external hand-off happens depends on the surface's terminal, not a
+//! config flag: a remote (SSH) surface (a
+//! [`ChannelTerminal`](beet_ui::prelude::ChannelTerminal)) can't reach the user's
+//! browser, so the URL is copied to the *client's* clipboard via
+//! [`CopyToClipboard`](beet_ui::prelude::CopyToClipboard) (which works over SSH);
+//! a local surface launches the system browser through the [`OpenExternalLink`]
+//! event, which a test (or embedder) can intercept without spawning a process.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -33,13 +39,14 @@ pub enum OnOpenLink {
 }
 
 /// Request to open `url` in the system browser, fired when an external link is
-/// followed under [`OnOpenLink::External`].
+/// followed under [`OnOpenLink::External`] on a *local* surface.
 ///
 /// The default handler [`open_external_link`] launches the system browser via the
 /// `webbrowser` crate (native) or opens a new tab via `window.open` (wasm); a test
 /// or embedder can observe this instead to intercept the open without spawning a
-/// process (the open is authoritative through this event, not delegated to OSC-8
-/// in the live buffer).
+/// process. Not fired on a remote (SSH) surface, which copies the URL to the
+/// client clipboard via [`CopyToClipboard`](beet_ui::prelude::CopyToClipboard)
+/// instead.
 #[derive(Debug, Clone, Message)]
 pub struct OpenExternalLink {
 	/// The absolute URL to open.
@@ -63,12 +70,17 @@ impl Plugin for OpenLinkPlugin {
 /// Observer: classify a clicked `<a>` and route it.
 ///
 /// Internal links navigate the [`Navigator`]; external links follow the host's
-/// [`OnOpenLink`] (default: emit [`OpenExternalLink`] for the system browser;
-/// `Internal`: navigate the `Navigator` at the external URL).
+/// [`OnOpenLink`] (`Internal`: navigate the `Navigator` at the external URL;
+/// `External`, the default: hand off outside the app). The hand-off is chosen by
+/// the surface's terminal: a remote (SSH) surface (a
+/// [`ChannelTerminal`](beet_ui::prelude::ChannelTerminal)) can't reach the user's
+/// browser, so the URL is copied to the *client's* clipboard via
+/// [`CopyToClipboard`](beet_ui::prelude::CopyToClipboard); a local surface opens
+/// the system browser via [`OpenExternalLink`].
 ///
 /// The navigator is resolved from the clicked link's own surface (the
 /// [`RenderSurface`] ancestor, on which the [`Navigator`] is co-located), so a
-/// click navigates only that session when many surfaces coexist.
+/// click acts only on that session when many surfaces coexist.
 fn on_link_click(
 	ev: On<PointerUp>,
 	mut commands: Commands,
@@ -76,6 +88,10 @@ fn on_link_click(
 	surfaces: SurfaceQuery,
 	navigators: Query<Option<&OnOpenLink>, With<Navigator>>,
 	mut open: MessageWriter<OpenExternalLink>,
+	// a remote surface routes external links to the client clipboard instead of a
+	// server-side browser; both only exist under the terminal renderer.
+	#[cfg(feature = "tui")] remote: Query<(), With<ChannelTerminal>>,
+	#[cfg(feature = "tui")] mut copy: MessageWriter<CopyToClipboard>,
 ) -> Result {
 	// only `<a>` elements carry a LinkView; other targets are ignored.
 	let link_entity = ev.event().target;
@@ -84,7 +100,7 @@ fn on_link_click(
 	};
 	let url = Url::parse(link.href);
 	// the navigator is co-located on the link's surface; resolve it from the link
-	// rather than assuming a single global navigator, so each session navigates
+	// rather than assuming a single global navigator, so each session acts
 	// independently.
 	let Some(navigator) = surfaces.surface_of(link_entity) else {
 		return Ok(());
@@ -95,8 +111,7 @@ fn on_link_click(
 	let on_open = on_open.copied().unwrap_or_default();
 
 	// internal, or external rendered in-app, both navigate the Navigator.
-	let navigate = !url.is_external() || on_open == OnOpenLink::Internal;
-	if navigate {
+	if !url.is_external() || on_open == OnOpenLink::Internal {
 		commands.entity(navigator).queue_async(move |entity| async move {
 			// a session can close (despawning its co-located navigator) between the
 			// click and this task, eg a multi-tenant SSH client that disconnects
@@ -110,11 +125,23 @@ fn on_link_click(
 				error!("navigation failed: {err}");
 			}
 		});
-	} else {
-		// external + OnOpenLink::External: open in the system browser, through the
-		// interceptable event so the open is authoritative (not OSC-8 delegated).
-		open.write(OpenExternalLink { url });
+		return Ok(());
 	}
+
+	// external + OnOpenLink::External: hand off outside the app.
+	#[cfg(feature = "tui")]
+	if remote.contains(navigator) {
+		// remote (SSH): copy to the client's clipboard (a server-side browser
+		// would open on the wrong machine).
+		copy.write(CopyToClipboard {
+			surface: navigator,
+			content: url.to_string().into(),
+		});
+		return Ok(());
+	}
+	// local: open in the system browser, through the interceptable event so the
+	// open is authoritative (not OSC-8 delegated).
+	open.write(OpenExternalLink { url });
 	Ok(())
 }
 
@@ -165,14 +192,20 @@ fn open_in_new_tab(url: &str) -> Result {
 mod test {
 	use super::*;
 
-	/// Records every [`OpenExternalLink`] (an external-open intent), the test seam
-	/// over the system-browser launch.
+	/// Records every [`OpenExternalLink`] (a local browser-open intent), the test
+	/// seam over the system-browser launch.
 	#[derive(Resource, Default)]
 	struct ExternalOpens(Vec<Url>);
 
-	/// An app with the link plumbing and the document/template substrate, plus a
-	/// system recording external-open intents (the test seam over the browser
-	/// launch; the real `open_external_link` still runs but is a no-op in CI).
+	/// Records every [`CopyToClipboard`] (a remote clipboard-copy intent), the test
+	/// seam over the OSC-52 write.
+	#[cfg(feature = "tui")]
+	#[derive(Resource, Default)]
+	struct ClipboardCopies(Vec<SmolStr>);
+
+	/// An app with the link plumbing and the document/template substrate, plus
+	/// systems recording the two external-link intents (the test seams over the
+	/// browser launch and the OSC-52 write).
 	fn link_app() -> App {
 		let mut app = App::new();
 		// AsyncPlugin: the Navigator's on_add queues a home navigation through
@@ -195,21 +228,43 @@ mod test {
 				}
 			},
 		);
+		#[cfg(feature = "tui")]
+		{
+			app.init_resource::<ClipboardCopies>();
+			app.add_systems(
+				Update,
+				|mut events: MessageReader<CopyToClipboard>,
+				 mut copies: ResMut<ClipboardCopies>| {
+					for ev in events.read() {
+						copies.0.push(ev.content.clone());
+					}
+				},
+			);
+		}
 		app
 	}
 
 	/// Spawn a Navigator (with an optional [`OnOpenLink`]) co-located on a surface,
 	/// plus an `<a href>` page tree bound to that surface via [`RenderSurface`],
-	/// returning the `<a>` element entity. Mirrors the real app: the click handler
-	/// resolves the navigator from the link's surface.
+	/// returning the `<a>` element entity. A `remote` surface also carries a
+	/// [`ChannelTerminal`](beet_ui::prelude::ChannelTerminal), the SSH marker the
+	/// handler keys off. Mirrors the real app: the click handler resolves the
+	/// navigator from the link's surface.
 	fn spawn_link(
 		app: &mut App,
 		on_open: Option<OnOpenLink>,
+		remote: bool,
 		href: &str,
 	) -> Entity {
 		let mut nav = app.world_mut().spawn(Navigator::default());
 		if let Some(on_open) = on_open {
 			nav.insert(on_open);
+		}
+		// a remote (SSH) surface is marked by a ChannelTerminal; only the terminal
+		// renderer defines it, so the marker (and remote routing) is tui-only.
+		#[cfg(feature = "tui")]
+		if remote {
+			nav.insert(ChannelTerminal::new(TerminalConfig::default()).0);
 		}
 		let navigator = nav.id();
 		// build the <a> through the template substrate so it is a real Element with
@@ -241,32 +296,33 @@ mod test {
 		app.update();
 	}
 
-	/// An external link under the default `OnOpenLink::External` emits an
-	/// open-external intent with the URL and does not navigate in-app.
+	/// A local surface opens an external link in the system browser via
+	/// [`OpenExternalLink`].
 	#[beet_core::test]
-	#[ignore = "the default open_external_link system launches the real system browser; behavior verified, but it pops a browser tab on every run"]
-	fn external_link_opens_externally_by_default() {
+	#[ignore = "the open_external_link system launches the real system browser; behavior verified, but it pops a browser tab on every run"]
+	fn local_external_link_opens_browser() {
 		let mut app = link_app();
-		let link = spawn_link(&mut app, None, "https://example.com");
+		let link = spawn_link(&mut app, None, false, "https://example.com");
 		click(&mut app, link);
 		let opens = &app.world().resource::<ExternalOpens>().0;
 		opens.len().xpect_eq(1);
-		opens[0].is_external().xpect_true();
 		opens[0].authority().xpect_eq(Some("example.com"));
 	}
 
-	/// Under `OnOpenLink::Internal`, an external link does NOT open externally (it
-	/// is routed to the in-app Navigator instead).
+	/// A remote (SSH) surface copies an external link to the client clipboard
+	/// instead of launching a server-side browser.
+	#[cfg(feature = "tui")]
 	#[beet_core::test]
-	fn external_link_internal_mode_does_not_open_browser() {
+	fn remote_external_link_copies_to_clipboard() {
 		let mut app = link_app();
-		let link = spawn_link(
-			&mut app,
-			Some(OnOpenLink::Internal),
-			"https://example.com",
-		);
+		let link = spawn_link(&mut app, None, true, "https://example.com");
 		click(&mut app, link);
-		// no external open: the Internal mode navigated the Navigator instead.
+		// copied to the client, not opened server-side (the URL is canonicalized
+		// with a trailing slash by `Url::to_string`).
+		app.world()
+			.resource::<ClipboardCopies>()
+			.0
+			.xpect_eq(vec![SmolStr::new("https://example.com/")]);
 		app.world()
 			.resource::<ExternalOpens>()
 			.0
@@ -274,15 +330,47 @@ mod test {
 			.xpect_true();
 	}
 
-	/// An internal (relative) link never opens externally regardless of
-	/// `OnOpenLink`; it navigates the in-app Navigator.
+	/// Under `OnOpenLink::Internal`, an external link does NOT hand off (it is
+	/// routed to the in-app Navigator instead), even on a remote surface.
 	#[beet_core::test]
-	fn internal_link_never_opens_externally() {
+	fn external_link_internal_mode_navigates_in_app() {
 		let mut app = link_app();
-		let link = spawn_link(&mut app, None, "/beta");
+		let link = spawn_link(
+			&mut app,
+			Some(OnOpenLink::Internal),
+			true,
+			"https://example.com",
+		);
+		click(&mut app, link);
+		// no hand-off: the Internal mode navigated the Navigator instead.
+		app.world()
+			.resource::<ExternalOpens>()
+			.0
+			.is_empty()
+			.xpect_true();
+		#[cfg(feature = "tui")]
+		app.world()
+			.resource::<ClipboardCopies>()
+			.0
+			.is_empty()
+			.xpect_true();
+	}
+
+	/// An internal (relative) link never hands off regardless of surface; it
+	/// navigates the in-app Navigator.
+	#[beet_core::test]
+	fn internal_link_never_hands_off() {
+		let mut app = link_app();
+		let link = spawn_link(&mut app, None, true, "/beta");
 		click(&mut app, link);
 		app.world()
 			.resource::<ExternalOpens>()
+			.0
+			.is_empty()
+			.xpect_true();
+		#[cfg(feature = "tui")]
+		app.world()
+			.resource::<ClipboardCopies>()
 			.0
 			.is_empty()
 			.xpect_true();

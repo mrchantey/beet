@@ -79,6 +79,14 @@ pub const OSC8_LINK: &str = "\x1b]8;;";
 /// String Terminator (`ESC \`), ending an OSC sequence.
 pub const ST: &str = "\x1b\\";
 
+// ── Clipboard (OSC-52) ────────────────────────────────────────────────────────
+
+/// OSC-52 clipboard-write introducer (`ESC ] 5 2 ; c ;`), targeting the `c`
+/// (clipboard) selection. Follow with base64-encoded data and [`ST`]. Sets the
+/// *client's* clipboard, so it works over SSH where the app can't reach the
+/// user's machine directly.
+pub const OSC52_CLIPBOARD: &str = "\x1b]52;c;";
+
 // ── Window title (OSC-0) ──────────────────────────────────────────────────────
 
 /// OSC-0 set-title introducer (`ESC ] 0 ;`): sets both the window and icon title.

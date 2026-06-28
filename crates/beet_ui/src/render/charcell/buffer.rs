@@ -84,12 +84,21 @@ pub trait AsBuffer {
 	/// Alias for [`clear`](Self::clear).
 	fn reset(&mut self) { self.clear(); }
 
-	/// Attach an OSC-8 hyperlink target to the cell at `pos`.
+	/// Attach an OSC-8 hyperlink target to the glyph cell at `pos`.
 	///
-	/// A no-op for backings that don't carry links — the fixed [`Buffer`] and
-	/// the TUI [`DoubleBuffer`], which route clicks through their own handlers.
-	/// Only the stdout [`FlexBuffer`] records and emits links.
-	fn set_link(&mut self, _pos: UVec2, _url: &str) {}
+	/// Stored on the [`Cell`] itself, so every backing carries links uniformly:
+	/// the stdout [`render_cells_ansi`] and the live TUI draw both read them. A
+	/// position with no glyph (blank padding) is skipped, so a link covers only its
+	/// text run rather than the row-filling padding.
+	fn set_link(&mut self, pos: UVec2, url: &str) {
+		let Some(mut cell) =
+			self.get(pos).filter(|cell| cell.symbol.is_some()).cloned()
+		else {
+			return;
+		};
+		cell.link = Some(url.into());
+		self.set(pos, cell);
+	}
 
 	/// Write text starting at signed `pos`, advancing by each character's display
 	/// width, dropping any cell outside `clip`.
@@ -128,6 +137,7 @@ pub trait AsBuffer {
 						symbol: None,
 						style: style.clone(),
 						entity: Some(entity),
+						link: None,
 					},
 					clip,
 				);
@@ -268,7 +278,6 @@ impl Buffer {
 			&self.cells,
 			self.size.x as usize,
 			self.size.y as usize,
-			|_| None,
 		)
 	}
 }
@@ -335,15 +344,15 @@ pub(crate) fn render_cells_plain(
 
 /// Render a row-major cell grid to a string with ANSI styling.
 ///
-/// `link_at` supplies an optional [OSC-8 hyperlink](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda)
-/// target per position — always `None` for the fixed [`Buffer`], the links map
-/// for a [`FlexBuffer`]. Links are emitted only by this stdout backend; the live
-/// TUI routes clicks through its hit-test instead.
+/// Each glyph cell's [`link`](Cell::link) is emitted as an
+/// [OSC-8 hyperlink](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda),
+/// opened and closed as the active link changes across the run. This stdout
+/// backend emits every link; the live TUI draw filters to external links only
+/// (internal links navigate in-app through its hit-test).
 pub(crate) fn render_cells_ansi(
 	cells: &[Cell],
 	width: usize,
 	height: usize,
-	mut link_at: impl FnMut(UVec2) -> Option<SmolStr>,
 ) -> String {
 	let mut out: Vec<u8> = Vec::with_capacity(cells.len() * 8);
 	let mut prev_style: Option<VisualStyle> = None;
@@ -358,11 +367,8 @@ pub(crate) fn render_cells_ansi(
 				continue;
 			}
 			// open/close OSC-8 hyperlinks as the active link changes
-			let link = if cell.symbol.is_some() {
-				link_at(UVec2::new(x as u32, y as u32))
-			} else {
-				None
-			};
+			let link =
+				cell.symbol.is_some().then(|| cell.link.clone()).flatten();
 			if link != prev_link {
 				write_osc8(&mut out, link.as_deref());
 				prev_link = link;
@@ -419,6 +425,10 @@ pub struct Cell {
 	pub style: VisualStyle,
 	/// The entity that last wrote this cell. `None` for truly blank cells.
 	pub entity: Option<Entity>,
+	/// OSC-8 hyperlink target (the source `<a>`/`<img>` href), attached over the
+	/// link's glyph cells by [`AsBuffer::set_link`]. Emitted as an OSC-8 sequence
+	/// by the stdout [`render_cells_ansi`] and the live TUI's terminal draw.
+	pub link: Option<SmolStr>,
 }
 
 impl Cell {
@@ -427,6 +437,7 @@ impl Cell {
 		symbol: None,
 		style: VisualStyle::DEFAULT,
 		entity: None,
+		link: None,
 	};
 
 	/// Create a cell with a symbol.
@@ -439,6 +450,7 @@ impl Cell {
 			symbol: Some(symbol.into()),
 			style: style.into(),
 			entity: Some(entity),
+			link: None,
 		}
 	}
 
@@ -474,13 +486,17 @@ impl Cell {
 			.unwrap_or(1)
 	}
 
-	/// Visual equality: same symbol and same style. `None` != `Some(" ")`.
+	/// Visual equality: same symbol, style, and link. `None` != `Some(" ")`.
 	///
-	/// Entity is disregarded.
+	/// The link participates so a cell whose hyperlink changed (even with an
+	/// unchanged glyph) is repainted by the [diff](DoubleBuffer::diff), letting the
+	/// terminal draw open or close its OSC-8 sequence. Entity is disregarded.
 	pub fn visual_eq(&self, other: &Self) -> bool {
 		match (&self.symbol, &other.symbol) {
 			(None, None) => true,
-			(Some(a), Some(b)) => a == b && self.style == other.style,
+			(Some(a), Some(b)) => {
+				a == b && self.style == other.style && self.link == other.link
+			}
 			_ => false,
 		}
 	}

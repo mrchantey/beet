@@ -14,8 +14,10 @@ use beet_core::prelude::*;
 /// An OSC-8 hyperlink target attached to an `<a>` or `<img>` element.
 ///
 /// Populated by [`apply_hyperlinks`] in the [`PostParseTree`](crate::prelude::PostParseTree)
-/// schedule and threaded through the inline flow so the stdout [`FlexBuffer`]
-/// wraps the element's run in an OSC-8 sequence. The TUI ignores it.
+/// schedule and threaded through the inline flow onto each glyph's [`Cell`], so
+/// the stdout buffer wraps the run in an OSC-8 sequence. The live TUI does not
+/// emit it (it captures the mouse, so the terminal can't action links); there
+/// clicks route through the app instead.
 #[derive(Debug, Clone, Component)]
 pub struct Hyperlink(pub SmolStr);
 

@@ -129,6 +129,7 @@ impl Plugin for CharcellPlugin {
 					.before(ResolveStylesSet),
 			)
 			.register_type::<crate::prelude::Title>()
+			.add_message::<crate::prelude::CopyToClipboard>()
 			.add_systems(
 				PostParseTree,
 				(
@@ -139,6 +140,8 @@ impl Plugin for CharcellPlugin {
 					// per-surface title, then write a changed one.
 					collect_terminal_titles,
 					flush_terminal_titles,
+					// write any pending OSC-52 clipboard copies before the flush.
+					flush_clipboard,
 					flush_terminals,
 					restore_terminals
 						.run_if(common_conditions::on_message::<AppExit>),
@@ -147,6 +150,12 @@ impl Plugin for CharcellPlugin {
 					.after(paint_nodes::<DoubleBuffer>)
 					.in_set(CharcellRenderSet),
 			);
+
+		// transient toasts (the clipboard-copy confirmation `flush_clipboard`
+		// pops) plus their self-despawn timer, co-located with `flush_clipboard`
+		// so any router/live app that can copy can also expire the toast.
+		#[cfg(all(feature = "tui", feature = "template"))]
+		app.init_plugin::<crate::prelude::ToastPlugin>();
 	}
 }
 

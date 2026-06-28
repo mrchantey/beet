@@ -177,6 +177,7 @@ mod test {
 			symbol: None,
 			style: VisualStyle::default(),
 			entity: Some(Entity::PLACEHOLDER),
+			link: None,
 		});
 		let diffed: Vec<_> = buffer.diff().collect();
 		// both changed cells resolve to the owner glyph at column 0

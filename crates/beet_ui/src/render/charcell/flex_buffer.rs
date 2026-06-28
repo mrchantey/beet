@@ -16,15 +16,12 @@ pub const AUTO_GROW_VIEWPORT_HEIGHT: u32 = u16::MAX as u32;
 ///
 /// Layout sees a [sentinel](AUTO_GROW_VIEWPORT_HEIGHT) height; the backing rows
 /// grow lazily as paints land and trailing blank rows are trimmed on render.
-/// Unlike the fixed [`Buffer`] it can carry per-cell OSC-8 hyperlinks, kept in a
-/// [separate map](Self::set_link) so [`Cell`] stays shared between both kinds.
+/// OSC-8 hyperlinks ride on the [`Cell`] (see [`Cell::link`]), so the same
+/// [`render_cells_ansi`] emits them here as on the fixed [`Buffer`].
 #[derive(Component)]
 pub struct FlexBuffer {
 	width: u32,
 	cells: Vec<Cell>,
-	/// Per-position OSC-8 hyperlink targets, emitted around their cell's run by
-	/// [`render`](Self::render).
-	links: HashMap<UVec2, SmolStr>,
 }
 
 impl FlexBuffer {
@@ -33,7 +30,6 @@ impl FlexBuffer {
 		Self {
 			width,
 			cells: Vec::new(),
-			links: HashMap::default(),
 		}
 	}
 
@@ -42,7 +38,7 @@ impl FlexBuffer {
 
 	/// The OSC-8 hyperlink target attached to the cell at `pos`, if any.
 	pub fn link_at(&self, pos: UVec2) -> Option<&str> {
-		self.links.get(&pos).map(SmolStr::as_str)
+		self.get(pos).and_then(|cell| cell.link.as_deref())
 	}
 
 	/// Convert position to buffer index, bounds-checked against allocated rows.
@@ -95,12 +91,10 @@ impl FlexBuffer {
 	/// Render to a string with ANSI styling and OSC-8 hyperlinks, trimming
 	/// trailing blank rows and per-row trailing blank padding.
 	pub fn render(&self) -> String {
-		let links = &self.links;
 		render_cells_ansi(
 			&self.cells,
 			self.width as usize,
 			self.render_height() as usize,
-			|pos| links.get(&pos).cloned(),
 		)
 	}
 }
@@ -155,14 +149,7 @@ impl AsBuffer for FlexBuffer {
 		}
 	}
 
-	fn clear(&mut self) {
-		self.cells.clear();
-		self.links.clear();
-	}
-
-	fn set_link(&mut self, pos: UVec2, url: &str) {
-		self.links.insert(pos, url.into());
-	}
+	fn clear(&mut self) { self.cells.clear(); }
 }
 
 #[cfg(test)]

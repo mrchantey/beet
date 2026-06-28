@@ -44,6 +44,7 @@ mod sidebar;
 #[cfg(feature = "style")]
 mod stylesheet;
 mod table;
+mod toast;
 
 #[cfg(feature = "net")]
 pub use analytics::*;
@@ -69,6 +70,7 @@ pub use sidebar::*;
 #[cfg(feature = "style")]
 pub use stylesheet::*;
 pub use table::*;
+pub use toast::*;
 // `button::Button` collides with the bevy_ui `Button` that leaks in via the
 // `beet_core::prelude` glob below (under `bevy_default`); the explicit re-export pins
 // the public `Button`, and downstream `prelude::Button`, to this crate's widget.
