@@ -157,6 +157,27 @@ where
 	}
 }
 
+/// A pre-built [`inline_class!`] declaration, the escape hatch for a declaration
+/// that isn't a plain `(prop, value)` pair (see [`token`]). A distinct type
+/// rather than a `(prop, _)` tuple so it can't collide with the value impl above.
+pub struct Declaration(TokenKey, TokenValue);
+
+impl IntoDeclaration for Declaration {
+	fn into_declaration(self) -> (TokenKey, TokenValue) { (self.0, self.1) }
+}
+
+/// A token-referencing [`inline_class!`] declaration: point `prop` at a design
+/// token (a palette role, shape, or typography ramp) rather than a literal, eg
+/// `token(BackgroundColor, colors::InverseSurface)`. The inline analogue of
+/// [`Rule::with_token`](crate::prelude::Rule::with_token).
+pub fn token<T>(prop: T, value: impl Into<Token>) -> Declaration
+where
+	T: TypedToken + Into<Token>,
+{
+	let key = Into::<Token>::into(prop).key().clone();
+	Declaration(key, TokenValue::token(value))
+}
+
 /// Register a rule inline at the callsite, returning an [`OnSpawn`] effect that
 /// adds a unique inline class to the entity and registers the rule (only once)
 /// in the global [`RuleSet`].

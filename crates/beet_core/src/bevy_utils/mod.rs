@@ -44,6 +44,7 @@ mod async_commands;
 mod async_runner;
 mod bevyhow;
 mod common_systems;
+mod despawn_after;
 mod entity_target_event;
 mod garbage_collect;
 mod id_counter;
@@ -68,6 +69,7 @@ pub use async_commands::*;
 #[cfg(all(feature = "bevy_async", feature = "std"))]
 pub use async_runner::*;
 pub use common_systems::*;
+pub use despawn_after::*;
 pub use entity_target_event::*;
 pub use garbage_collect::*;
 pub use id_counter::*;

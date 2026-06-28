@@ -24,7 +24,6 @@ pub mod geometry;
 pub mod layout;
 pub mod sidebar;
 pub mod table;
-pub mod toast;
 pub mod typography;
 pub mod utilities;
 
@@ -35,7 +34,6 @@ pub use geometry::*;
 pub use layout::*;
 pub use sidebar::*;
 pub use table::*;
-pub use toast::*;
 pub use typography::*;
 pub use utilities::*;
 
@@ -125,8 +123,6 @@ pub fn all_rules() -> Vec<Rule> {
 		select_option_selected(),
 		error_text(),
 		error(),
-		// transient overlay: fixed to the viewport, lifted above the dropdown
-		toast(),
 		// table (the `.table-vertical-borders` column dividers are drawn per target:
 		// an adjacent-sibling rule in `reset.css` on the web, the
 		// `apply_table_vertical_borders` decorate system on the terminal)
@@ -241,7 +237,6 @@ mod tests {
 			.xpect_contains(".btn")
 			.xpect_contains(".btn-error")
 			.xpect_contains(".error-text")
-			.xpect_contains(".toast")
 			.xpect_contains(".sidebar-summary")
 			.xpect_contains(".hidden")
 			.xpect_contains(".text-center")
