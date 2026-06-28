@@ -90,8 +90,8 @@ fn fullwidth_char(ch: char) -> char {
 
 // ── Block font (> 2em) ──────────────────────────────────────────────────────
 
-/// Columns advanced for a space between words in the block font.
-const BLOCK_WORD_SPACE: u32 = 1;
+/// Word-space width used when `font.txt` declares no `space` directive.
+const DEFAULT_WORD_SPACE: u32 = 1;
 /// Blank rows inserted between wrapped block-font lines.
 const BLOCK_LINE_GAP: u32 = 1;
 /// Advance (and fallback fullwidth width) for a character with no block glyph.
@@ -109,6 +109,8 @@ struct Glyph {
 /// case selects the pipe style at paint time (uppercase -> double pipe).
 pub(super) struct BlockFont {
 	height: u32,
+	/// Columns advanced for a space between words, from the `space` directive.
+	word_space: u32,
 	glyphs: HashMap<char, Glyph>,
 }
 
@@ -121,11 +123,13 @@ pub(super) fn block_font() -> &'static BlockFont { &BLOCK_FONT }
 
 /// Parse a `font.txt` source into a [`BlockFont`].
 ///
-/// `height N` (first) sets the glyph row count; each `glyph <CHAR>` header is
-/// followed by exactly `height` row lines, read verbatim so blank rows survive.
-/// Rows are right-padded to the widest row, which sets the glyph's width.
+/// `height N` (first) sets the glyph row count and `space N` the word-space
+/// width; each `glyph <CHAR>` header is followed by exactly `height` row lines,
+/// read verbatim so blank rows survive. Rows are right-padded to the widest row,
+/// which sets the glyph's width.
 fn parse_block_font(src: &str) -> BlockFont {
 	let mut height = 3usize;
+	let mut word_space = DEFAULT_WORD_SPACE;
 	let mut glyphs = HashMap::<char, Glyph>::default();
 	let mut lines = src.lines();
 	while let Some(line) = lines.next() {
@@ -135,6 +139,10 @@ fn parse_block_font(src: &str) -> BlockFont {
 		}
 		if let Some(rest) = trimmed.strip_prefix("height ") {
 			height = rest.trim().parse().unwrap_or(3);
+			continue;
+		}
+		if let Some(rest) = trimmed.strip_prefix("space ") {
+			word_space = rest.trim().parse().unwrap_or(DEFAULT_WORD_SPACE);
 			continue;
 		}
 		let Some(rest) = line.strip_prefix("glyph ") else {
@@ -156,6 +164,7 @@ fn parse_block_font(src: &str) -> BlockFont {
 	}
 	BlockFont {
 		height: height as u32,
+		word_space,
 		glyphs,
 	}
 }
@@ -179,11 +188,11 @@ impl BlockFont {
 		self.glyphs.get(&ch.to_ascii_uppercase())
 	}
 
-	/// Columns a character advances: a word space, its glyph width, or the
-	/// fallback width when the font has no glyph for it.
+	/// Columns a character advances: the configured word space, its glyph width,
+	/// or the fallback width when the font has no glyph for it.
 	fn advance(&self, ch: char) -> u32 {
 		match ch {
-			' ' => BLOCK_WORD_SPACE,
+			' ' => self.word_space,
 			_ => self.glyph(ch).map_or(BLOCK_FALLBACK_WIDTH, |g| g.width),
 		}
 	}
@@ -225,7 +234,7 @@ fn block_wrap(font: &BlockFont, text: &str, max_w: u32) -> Vec<String> {
 		let mut cur_w = 0u32;
 		for word in para.split_whitespace() {
 			let word_w = word.chars().map(|ch| font.advance(ch)).sum::<u32>();
-			let space_w = if cur.is_empty() { 0 } else { BLOCK_WORD_SPACE };
+			let space_w = if cur.is_empty() { 0 } else { font.word_space };
 			// wrap before a word that would overflow the current line
 			if !cur.is_empty() && cur_w + space_w + word_w > max_w {
 				lines.push(core::mem::take(&mut cur));
@@ -233,7 +242,7 @@ fn block_wrap(font: &BlockFont, text: &str, max_w: u32) -> Vec<String> {
 			}
 			if !cur.is_empty() {
 				cur.push(' ');
-				cur_w += BLOCK_WORD_SPACE;
+				cur_w += font.word_space;
 			}
 			if word_w > max_w {
 				// hard-break a word wider than the whole line
@@ -435,5 +444,16 @@ glyph I
 		// "AI" = 3 + 1, "A A" = 3 + 1(space) + 3
 		font.line_width("AI").xpect_eq(4);
 		font.line_width("A A").xpect_eq(7);
+	}
+
+	#[beet_core::test]
+	fn space_directive_sets_word_space() {
+		// no directive -> the 1-cell default
+		parse_block_font(TEST_SRC).word_space.xpect_eq(1);
+		// `space N` widens the inter-word gap: "A A" = 3 + 3(space) + 3
+		let wide =
+			parse_block_font("height 3\nspace 3\nglyph A\n┌─┐\n├─┤\n┴ ┴\n");
+		wide.word_space.xpect_eq(3);
+		wide.line_width("A A").xpect_eq(9);
 	}
 }

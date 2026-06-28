@@ -4,10 +4,12 @@
 #
 # Format:
 #   `height N`     sets the glyph row count (first non-comment line).
+#   `space N`      sets the columns advanced for a space between words.
 #   `glyph <CHAR>` begins a glyph; the next N lines are its rows, verbatim.
 # Leading spaces in rows are significant. Trailing spaces are insignificant
 # (the parser right-pads each row to the widest row in the glyph).
 height 3
+space 3
 glyph A
 ┌─┐
 ├─┤

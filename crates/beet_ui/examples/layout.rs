@@ -841,12 +841,13 @@ mod test {
 		(max_width(&out) <= 18).xpect_true();
 	}
 
-	/// Visual snapshot of the box-drawing block font (uppercase double-pipe).
+	/// Visual snapshot of the box-drawing block font: uppercase double-pipe,
+	/// lowercase single-pipe, and the 3-cell word space from `font.txt`.
 	#[beet_core::test]
 	fn block_font_snapshot() {
 		Buffer::render_oneshot_plain_sized(
 			UVec2::new(60, 6),
-			sized("Beet", 3.0),
+			sized("Beet App", 3.0),
 		)
 		.trim_lines()
 		.xpect_snapshot();
