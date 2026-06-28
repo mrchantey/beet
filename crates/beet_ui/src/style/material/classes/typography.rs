@@ -33,12 +33,20 @@ pub const TEXT_XL: ClassName = ClassName::new_static("text-xl");
 pub const TEXT_2XL: ClassName = ClassName::new_static("text-2xl");
 
 // ── Typography scale rules ──────────────────────────────────────────────────────
+//
+// Each class sets the MD3 [`Typography`] composite (which serializes the whole
+// type scale to CSS for the web) and, in addition, the longhand `font-size`. The
+// charcell renderer scales glyphs by `font-size`, not the composite (a separate
+// cascade token), so the size is set as a longhand too; it carries the class's
+// specificity, resolving with normal precedence (an element's own size beats an
+// inherited one, a class beats a tag).
 
 /// Display large - largest hero text.
 pub fn text_display_large() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_DISPLAY_LARGE))
 		.with_token(TypographyProps,typography::DisplayLarge).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeDisplayLarge).unwrap()
 }
 
 /// Display medium - medium hero text.
@@ -46,6 +54,7 @@ pub fn text_display_medium() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_DISPLAY_MEDIUM))
 		.with_token(TypographyProps,typography::DisplayMedium).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeDisplayMedium).unwrap()
 }
 
 /// Display small - small hero text.
@@ -53,6 +62,7 @@ pub fn text_display_small() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_DISPLAY_SMALL))
 		.with_token(TypographyProps,typography::DisplaySmall).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeDisplaySmall).unwrap()
 }
 
 /// Headline large - large section heading.
@@ -60,6 +70,7 @@ pub fn text_headline_large() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_HEADLINE_LARGE))
 		.with_token(TypographyProps,typography::HeadlineLarge).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeHeadlineLarge).unwrap()
 }
 
 /// Headline medium - medium section heading.
@@ -67,6 +78,7 @@ pub fn text_headline_medium() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_HEADLINE_MEDIUM))
 		.with_token(TypographyProps,typography::HeadlineMedium).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeHeadlineMedium).unwrap()
 }
 
 /// Headline small - small section heading.
@@ -74,6 +86,7 @@ pub fn text_headline_small() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_HEADLINE_SMALL))
 		.with_token(TypographyProps,typography::HeadlineSmall).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeHeadlineSmall).unwrap()
 }
 
 /// Title large - large title text.
@@ -81,6 +94,7 @@ pub fn text_title_large() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_TITLE_LARGE))
 		.with_token(TypographyProps,typography::TitleLarge).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeTitleLarge).unwrap()
 }
 
 /// Title medium - medium title text.
@@ -88,6 +102,7 @@ pub fn text_title_medium() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_TITLE_MEDIUM))
 		.with_token(TypographyProps,typography::TitleMedium).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeTitleMedium).unwrap()
 }
 
 /// Title small - small title text.
@@ -95,6 +110,7 @@ pub fn text_title_small() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_TITLE_SMALL))
 		.with_token(TypographyProps,typography::TitleSmall).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeTitleSmall).unwrap()
 }
 
 /// Body large - large body text.
@@ -102,6 +118,7 @@ pub fn text_body_large() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_BODY_LARGE))
 		.with_token(TypographyProps,typography::BodyLarge).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeBodyLarge).unwrap()
 }
 
 /// Body medium - medium body text (default).
@@ -109,6 +126,7 @@ pub fn text_body_medium() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_BODY_MEDIUM))
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeBodyMedium).unwrap()
 }
 
 /// Body small - small body text.
@@ -116,6 +134,7 @@ pub fn text_body_small() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_BODY_SMALL))
 		.with_token(TypographyProps,typography::BodySmall).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeBodySmall).unwrap()
 }
 
 /// Label large - large label text.
@@ -123,6 +142,7 @@ pub fn text_label_large() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_LABEL_LARGE))
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeLabelLarge).unwrap()
 }
 
 /// Label medium - medium label text.
@@ -130,6 +150,7 @@ pub fn text_label_medium() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_LABEL_MEDIUM))
 		.with_token(TypographyProps,typography::LabelMedium).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeLabelMedium).unwrap()
 }
 
 /// Label small - small label text.
@@ -137,6 +158,7 @@ pub fn text_label_small() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TEXT_LABEL_SMALL))
 		.with_token(TypographyProps,typography::LabelSmall).unwrap()
+		.with_token(common_props::FontSize,typography::FontSizeLabelSmall).unwrap()
 }
 
 // ── Prose element overrides ───────────────────────────────────────────────────
@@ -223,7 +245,9 @@ pub fn terminal_headings() -> Rule {
 /// then title sizes) so headings step down in size as on the web reference,
 /// rather than all rendering at the body size. Only `font-size`/`line-height`
 /// are set, leaving the user-agent bold weight from [`default_element_rules`]
-/// intact; the terminal ignores both so its headings stay bold and `Primary`.
+/// intact. The terminal honours the `font-size` too, scaling headings to
+/// fullwidth (`> 1em`) or the box-drawing block font (`> 2em`); see
+/// [`FontScale`](crate::render::FontScale).
 pub fn heading_sizes() -> Vec<Rule> {
 	vec![
 		heading_size("h1", typography::FontSizeHeadlineLarge,  typography::LineHeightHeadlineLarge),

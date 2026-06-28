@@ -5,6 +5,7 @@ use bevy::math::IRect;
 use bevy::math::IVec2;
 use bevy::math::UVec2;
 
+use super::FULLWIDTH_SPACE;
 use super::FontScale;
 use super::align_offset;
 use super::measure_block_text;
@@ -35,7 +36,12 @@ pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 
 /// Wrap `text` to `max_width` columns and return `(max_line_width, line_count)`.
 pub(super) fn measure_str(text: &str, max_width: u32) -> UVec2 {
-	let lines = word_wrap(text, max_width);
+	measure_str_spaced(text, max_width, ' ')
+}
+
+/// [`measure_str`] joining words with `space` (see [`word_wrap`]).
+fn measure_str_spaced(text: &str, max_width: u32, space: char) -> UVec2 {
+	let lines = word_wrap(text, max_width, space);
 	UVec2::new(
 		lines.iter().map(|l| display_width(l)).max().unwrap_or(0) as u32,
 		lines.len() as u32,
@@ -52,7 +58,9 @@ pub(super) fn measure_scaled(
 ) -> UVec2 {
 	match FontScale::of_style(style) {
 		FontScale::Block => measure_block_text(text, max_width),
-		FontScale::Wide => measure_str(&to_fullwidth(text), max_width),
+		FontScale::Wide => {
+			measure_str_spaced(&to_fullwidth(text), max_width, FULLWIDTH_SPACE)
+		}
 		FontScale::Normal => measure_str(text, max_width),
 	}
 }
@@ -74,17 +82,19 @@ pub(super) fn paint_text(
 		(None, Some(value)) => value.to_string(),
 		(None, None) => return Ok(()),
 	};
-	let visual = node.visual_style();
+	let mut visual = node.visual_style().clone();
 	let entity = node.entity;
 	// font-size scaling: the block font paints its own multi-row glyphs and
-	// returns; fullwidth remaps the text and falls through to the normal path
-	// (fullwidth glyphs already lay out as wide characters).
-	match FontScale::of_style(visual) {
+	// returns; fullwidth remaps the text (and is always bold) and falls through
+	// to the normal path, where fullwidth glyphs lay out as wide characters and
+	// words are joined by the 2-cell `FULLWIDTH_SPACE`.
+	let scale = FontScale::of_style(&visual);
+	match scale {
 		FontScale::Block => {
 			paint_block_text(
 				&text,
 				content_rect,
-				visual,
+				&visual,
 				visual.text_align,
 				entity,
 				buffer,
@@ -92,9 +102,16 @@ pub(super) fn paint_text(
 			);
 			return Ok(());
 		}
-		FontScale::Wide => text = to_fullwidth(&text),
+		FontScale::Wide => {
+			text = to_fullwidth(&text);
+			visual = visual.bold();
+		}
 		FontScale::Normal => {}
 	}
+	let space = match scale {
+		FontScale::Wide => FULLWIDTH_SPACE,
+		_ => ' ',
+	};
 	// a marker-only leaf can still carry a link (eg an `<iframe>`/`<img>` collapsed
 	// to its title/alt text); wrap its painted cells in the OSC-8 link, matching
 	// the inline flow.
@@ -107,7 +124,7 @@ pub(super) fn paint_text(
 	let undecorated =
 		visual.clone().with_decoration_line(DecorationLine::DEFAULT);
 	let width = content_rect.width().max(0) as u32;
-	let lines = word_wrap(&text, width);
+	let lines = word_wrap(&text, width, space);
 	for (i, line) in lines.iter().enumerate() {
 		let y = content_rect.min.y + i as i32;
 		if y >= content_rect.max.y {
@@ -173,11 +190,15 @@ fn split_at_display_width(text: &str, max_cols: usize) -> (&str, &str) {
 	(&text[..byte_idx], &text[byte_idx..])
 }
 
-pub(super) fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
+/// Wrap `text` to `max_w` columns on word boundaries, joining words with
+/// `space`: a plain space normally, the 2-cell [`FULLWIDTH_SPACE`] for fullwidth
+/// text so the inter-word gap scales with the glyphs.
+pub(super) fn word_wrap(text: &str, max_w: u32, space: char) -> Vec<String> {
 	let max_w = max_w as usize;
 	if max_w == 0 {
 		return vec![];
 	}
+	let space_w = unicode_width(space) as usize;
 	let mut lines = Vec::new();
 
 	for para in text.split('\n') {
@@ -192,9 +213,10 @@ pub(super) fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
 					w = tail;
 				}
 				current = w.to_string();
-			} else if display_width(&current) + 1 + display_width(word) <= max_w
+			} else if display_width(&current) + space_w + display_width(word)
+				<= max_w
 			{
-				current.push(' ');
+				current.push(space);
 				current.push_str(word);
 			} else {
 				lines.push(std::mem::take(&mut current));
@@ -203,7 +225,7 @@ pub(super) fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
 		}
 		// Preserve trailing whitespace from original paragraph
 		if para.ends_with(|c: char| c.is_whitespace()) && !current.is_empty() {
-			current.push(' ');
+			current.push(space);
 		}
 		lines.push(current);
 	}
@@ -356,12 +378,12 @@ mod tests {
 		// the crates-index status emoji are width-2; at a 1-cell column the old
 		// loop never made progress. Reaching here at all proves termination;
 		// each glyph lands on its own (overflowing) line, in order.
-		word_wrap("🦢🐣🐉", 1)
+		word_wrap("🦢🐣🐉", 1, ' ')
 			.into_iter()
 			.filter(|line| !line.is_empty())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["🦢", "🐣", "🐉"]);
 		// a mixed word also terminates and preserves every glyph
-		word_wrap("a🦢b", 1).join("").xpect_contains("🦢");
+		word_wrap("a🦢b", 1, ' ').join("").xpect_contains("🦢");
 	}
 }

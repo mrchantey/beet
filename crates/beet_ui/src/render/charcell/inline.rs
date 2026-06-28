@@ -10,6 +10,7 @@
 //! plain text, emphasis, links and inline code on the same wrapped line.
 use super::*;
 use crate::style::Display;
+use crate::style::FontWeight;
 use crate::style::TextAlign;
 use crate::style::VisualStyle;
 use crate::style::WhiteSpace;
@@ -231,10 +232,12 @@ fn inline_text(runs: &[InlineRun]) -> String {
 	runs.iter().map(|run| run.text.as_str()).collect()
 }
 
-/// Remap every run to fullwidth glyphs for the wide (> 1em) scale.
+/// Remap every run to fullwidth glyphs and bold weight for the wide (> 1em)
+/// scale. Fullwidth text always renders bold.
 fn widen_runs(runs: &mut [InlineRun]) {
 	for run in runs.iter_mut() {
 		run.text = to_fullwidth(&run.text);
+		run.style.font_weight = FontWeight::Bold;
 	}
 }
 
@@ -322,8 +325,10 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 	let mut lines = Vec::new();
 	let mut cur: Vec<(char, usize)> = Vec::new();
 	let mut cur_w = 0usize;
-	// style index of a collapsed-whitespace gap awaiting the next word
-	let mut pending_space: Option<usize> = None;
+	// the collapsed-whitespace gap awaiting the next word: its space char (a
+	// 2-cell `FULLWIDTH_SPACE` is preserved so fullwidth runs keep a wide gap)
+	// and the style index it belongs to.
+	let mut pending_space: Option<(char, usize)> = None;
 
 	let mut i = 0;
 	while i < chars.len() {
@@ -332,7 +337,8 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 		// single inter-word gap; only `white-space: pre` preserves newlines.
 		if ch.is_whitespace() {
 			if !cur.is_empty() {
-				pending_space = Some(idx);
+				let space = if ch == FULLWIDTH_SPACE { ch } else { ' ' };
+				pending_space = Some((space, idx));
 			}
 			i += 1;
 			continue;
@@ -345,7 +351,8 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 			i += 1;
 		}
 		let word = &chars[start..i];
-		let space_w = pending_space.map_or(0, |_| 1);
+		let space_w =
+			pending_space.map_or(0, |(c, _)| unicode_width(c) as usize);
 
 		// wrap before the word if it would overflow the current line
 		if !cur.is_empty() && cur_w + space_w + word_w > max_w {
@@ -353,10 +360,10 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 			cur_w = 0;
 			pending_space = None;
 		}
-		if let Some(space_idx) = pending_space.take() {
+		if let Some((space, space_idx)) = pending_space.take() {
 			if !cur.is_empty() {
-				cur.push((' ', space_idx));
-				cur_w += 1;
+				cur.push((space, space_idx));
+				cur_w += unicode_width(space) as usize;
 			}
 		}
 		if word_w > max_w {

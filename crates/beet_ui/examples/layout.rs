@@ -649,13 +649,13 @@ fn setup_font_wide() -> impl Bundle {
 fn setup_font_block() -> impl Bundle {
 	(LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
 		(
-			rsx! { "Beet" },
+			rsx! { "Beet is a VERY cool engine" },
 			VisualStyle::default()
 				.with_font_size(Length::Rem(3.))
 				.with_foreground(Color::srgb(0.5, 0.9, 0.4)),
 		),
 		(
-			rsx! { "ui 2024" },
+			rsx! { "ui 2026" },
 			VisualStyle::default().with_font_size(Length::Rem(2.5))
 		),
 	])
@@ -792,6 +792,25 @@ mod test {
 		out.len().xpect_eq(1);
 		max_width(&out).xpect_eq(4);
 		out[0].as_str().xpect_contains("Ａ");
+	}
+
+	#[beet_core::test]
+	fn wide_space_is_two_cells() {
+		// the inter-word gap is the 2-cell fullwidth space: "A B" -> 2 + 2 + 2
+		let out = lines(20, 4, sized("A B", 1.5));
+		out.len().xpect_eq(1);
+		max_width(&out).xpect_eq(6);
+		out[0].as_str().xpect_contains("　"); // U+3000
+	}
+
+	#[beet_core::test]
+	fn wide_font_is_always_bold() {
+		// fullwidth text emits the bold SGR; normal-size text does not
+		Buffer::render_oneshot_sized(UVec2::new(20, 4), sized("AB", 1.5))
+			.xpect_contains("\x1b[1m");
+		Buffer::render_oneshot_sized(UVec2::new(20, 4), sized("AB", 1.0))
+			.xnot()
+			.xpect_contains("\x1b[1m");
 	}
 
 	#[beet_core::test]

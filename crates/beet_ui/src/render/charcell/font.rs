@@ -66,10 +66,14 @@ impl FontScale {
 
 // ── Fullwidth (> 1em) ───────────────────────────────────────────────────────
 
+/// The fullwidth (ideographic) space, two cells wide. Used as the inter-word
+/// separator for fullwidth text so the gap scales with the glyphs.
+pub(super) const FULLWIDTH_SPACE: char = '\u{3000}';
+
 /// Map ASCII printable characters to their Unicode fullwidth twins, so they
 /// render at double width through the existing wide-character path. Space maps
-/// to the ideographic space (`U+3000`, also two cells); other characters pass
-/// through unchanged.
+/// to the [`FULLWIDTH_SPACE`] (also two cells); other characters pass through
+/// unchanged.
 pub(super) fn to_fullwidth(text: &str) -> String {
 	text.chars().map(fullwidth_char).collect()
 }
@@ -77,7 +81,7 @@ pub(super) fn to_fullwidth(text: &str) -> String {
 /// Fullwidth twin of a single character (see [`to_fullwidth`]).
 fn fullwidth_char(ch: char) -> char {
 	match ch {
-		' ' => '\u{3000}',
+		' ' => FULLWIDTH_SPACE,
 		// ASCII '!'..='~' sit 0xFEE0 below their fullwidth forms 'Ａ'..
 		'\u{21}'..='\u{7e}' => char::from_u32(ch as u32 + 0xFEE0).unwrap_or(ch),
 		_ => ch,
