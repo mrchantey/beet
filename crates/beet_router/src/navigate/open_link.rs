@@ -87,18 +87,29 @@ fn on_link_click(
 	elements: ElementQuery,
 	surfaces: SurfaceQuery,
 	navigators: Query<Option<&OnOpenLink>, With<Navigator>>,
+	// an `<img>`/`<iframe>` collapsed to its alt/title link carries a `Hyperlink`
+	// (its src/alt-src), so the fallback follows its link exactly like an anchor.
+	hyperlinks: Query<&Hyperlink>,
 	mut open: MessageWriter<OpenExternalLink>,
 	// a remote surface routes external links to the client clipboard instead of a
 	// server-side browser; both only exist under the terminal renderer.
 	#[cfg(feature = "tui")] remote: Query<(), With<ChannelTerminal>>,
 	#[cfg(feature = "tui")] mut copy: MessageWriter<CopyToClipboard>,
 ) -> Result {
-	// only `<a>` elements carry a LinkView; other targets are ignored.
+	// an `<a>`'s href (LinkView), or an `<img>`/`<iframe>`'s collapsed hyperlink;
+	// any other target carries neither and is ignored.
 	let link_entity = ev.event().target;
-	let Ok(link) = elements.get_as::<LinkView>(link_entity) else {
+	let Some(href) = elements
+		.get_as::<LinkView>(link_entity)
+		.map(|link| link.href.to_string())
+		.ok()
+		.or_else(|| {
+			hyperlinks.get(link_entity).ok().map(|link| link.0.to_string())
+		})
+	else {
 		return Ok(());
 	};
-	let url = Url::parse(link.href);
+	let url = Url::parse(&href);
 	// the navigator is co-located on the link's surface; resolve it from the link
 	// rather than assuming a single global navigator, so each session acts
 	// independently.
@@ -110,8 +121,13 @@ fn on_link_click(
 	};
 	let on_open = on_open.copied().unwrap_or_default();
 
-	// internal, or external rendered in-app, both navigate the Navigator.
-	if !url.is_external() || on_open == OnOpenLink::Internal {
+	// a link to a static file (a path with a file extension, eg an image's src)
+	// is not an in-app route: hand it off like an external link rather than
+	// navigating the router to a path that has no page.
+	let is_file = url.has_file_extension();
+	// internal, or external rendered in-app, both navigate the Navigator; a
+	// static file is never navigated in-app.
+	if !is_file && (!url.is_external() || on_open == OnOpenLink::Internal) {
 		commands.entity(navigator).queue_async(move |entity| async move {
 			// a session can close (despawning its co-located navigator) between the
 			// click and this task, eg a multi-tenant SSH client that disconnects
@@ -250,6 +266,9 @@ mod test {
 	/// [`ChannelTerminal`](beet_ui::prelude::ChannelTerminal), the SSH marker the
 	/// handler keys off. Mirrors the real app: the click handler resolves the
 	/// navigator from the link's surface.
+	// `remote` only routes under the terminal renderer, so a non-tui build never
+	// reads it.
+	#[cfg_attr(not(feature = "tui"), allow(unused_variables))]
 	fn spawn_link(
 		app: &mut App,
 		on_open: Option<OnOpenLink>,
@@ -285,6 +304,56 @@ mod test {
 			.find(|(_, element)| element.tag() == "a")
 			.map(|(entity, _)| entity)
 			.unwrap_or(root)
+	}
+
+	/// Spawn an `<img>`/`<iframe>` element carrying a [`Hyperlink`] (its collapsed
+	/// src/alt-src), bound to a Navigator's surface, returning the element entity.
+	/// The terminal anchor-fallback path: the decorator attaches the `Hyperlink`, so
+	/// the click handler follows it exactly as it does an `<a>`.
+	// `remote` only routes under the terminal renderer, so a non-tui build never
+	// reads it.
+	#[cfg_attr(not(feature = "tui"), allow(unused_variables))]
+	fn spawn_media_link(
+		app: &mut App,
+		tag: &str,
+		remote: bool,
+		href: &str,
+	) -> Entity {
+		let navigator = app.world_mut().spawn(Navigator::default()).id();
+		#[cfg(feature = "tui")]
+		if remote {
+			app.world_mut()
+				.entity_mut(navigator)
+				.insert(ChannelTerminal::new(TerminalConfig::default()).0);
+		}
+		let root = if tag == "iframe" {
+			app.world_mut()
+				.spawn_template(rsx! { <iframe src=href.to_string()/> })
+				.unwrap()
+				.id()
+		} else {
+			app.world_mut()
+				.spawn_template(rsx! { <img src=href.to_string()/> })
+				.unwrap()
+				.id()
+		};
+		app.world_mut()
+			.entity_mut(root)
+			.insert(RenderSurface(navigator));
+		app.update();
+		let element = app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(app.world())
+			.find(|(_, element)| element.tag() == tag)
+			.map(|(entity, _)| entity)
+			.unwrap_or(root);
+		// the decorator attaches this in the charcell PostParseTree pass; insert it
+		// directly so the test exercises the handler, not the decorate schedule.
+		app.world_mut()
+			.entity_mut(element)
+			.insert(Hyperlink(href.into()));
+		element
 	}
 
 	/// Trigger a `PointerUp` on `entity`, as the hit-test would on a click.
@@ -374,6 +443,33 @@ mod test {
 			.0
 			.is_empty()
 			.xpect_true();
+	}
+
+	/// An `<img>` whose collapsed hyperlink is a static file (`/assets/…`) is not
+	/// an in-app route: clicking it hands off (here, the local browser-open intent)
+	/// rather than navigating the router to a path with no page.
+	#[beet_core::test]
+	fn img_file_link_hands_off_not_navigated() {
+		let mut app = link_app();
+		let img = spawn_media_link(&mut app, "img", false, "/assets/blog/x.jpg");
+		click(&mut app, img);
+		let opens = &app.world().resource::<ExternalOpens>().0;
+		opens.len().xpect_eq(1);
+		opens[0].path_string().xpect_eq("/assets/blog/x.jpg");
+	}
+
+	/// An `<iframe>` collapsed to an external watch link follows its hyperlink like
+	/// an anchor: on a remote (SSH) surface it copies to the client clipboard.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn iframe_external_link_follows_hyperlink() {
+		let mut app = link_app();
+		let iframe =
+			spawn_media_link(&mut app, "iframe", true, "https://youtu.be/abc123");
+		click(&mut app, iframe);
+		let copies = &app.world().resource::<ClipboardCopies>().0;
+		copies.len().xpect_eq(1);
+		copies[0].as_str().xpect_contains("youtu.be/abc123");
 	}
 
 	/// `Url::is_external` classifies absolute (has authority) vs relative URLs.

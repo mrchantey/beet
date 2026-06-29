@@ -10,7 +10,6 @@
 //! plain text, emphasis, links and inline code on the same wrapped line.
 use super::*;
 use crate::style::Display;
-use crate::style::FontWeight;
 use crate::style::TextAlign;
 use crate::style::VisualStyle;
 use crate::style::WhiteSpace;
@@ -232,12 +231,12 @@ fn inline_text(runs: &[InlineRun]) -> String {
 	runs.iter().map(|run| run.text.as_str()).collect()
 }
 
-/// Remap every run to fullwidth glyphs and bold weight for the wide (> 1em)
-/// scale. Fullwidth text always renders bold.
+/// Remap every run to fullwidth glyphs for the wide (> 1em) scale, leaving each
+/// run's weight to the cascade — headings carry their user-agent bold, so wide
+/// non-heading text stays plain rather than being forced bold.
 fn widen_runs(runs: &mut [InlineRun]) {
 	for run in runs.iter_mut() {
 		run.text = to_fullwidth(&run.text);
-		run.style.font_weight = FontWeight::Bold;
 	}
 }
 

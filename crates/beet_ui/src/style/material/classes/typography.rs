@@ -170,10 +170,15 @@ pub fn text_label_small() -> Rule {
 // `Primary`, code spans/blocks a `SurfaceContainerHighest` fill with `OnSurface`
 // text.
 
-/// Anchor text in the theme's primary color.
+/// Anchor text in the theme's primary color. Also covers the `<img>`/`<iframe>`
+/// link fallbacks, so the alt/title placeholders read as themed links.
 pub fn link_prose() -> Rule {
 	Rule::new()
-		.with_selector(Selector::tag("a"))
+		.with_selector(Selector::AnyOf(vec![
+			Selector::tag("a"),
+			Selector::tag("img"),
+			Selector::tag("iframe"),
+		]))
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 }
 

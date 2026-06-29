@@ -197,6 +197,25 @@ impl Url {
 	/// decide whether a link navigates in-app or leaves it.
 	pub fn is_external(&self) -> bool { self.authority.is_some() }
 
+	/// Whether the last path segment names a static file (carries a file
+	/// extension), eg `/assets/x.jpg`, `/style.css`, or `/doc.pdf`.
+	///
+	/// A page route (`/about`, `/blog/post-6`) has no extension; a served file
+	/// does. The link handler treats such a link like an external one (hand it
+	/// off / open it) rather than navigating the in-app router to a path that has
+	/// no page route. An extension is a final `.` with a non-empty alphanumeric
+	/// stem and suffix, so a dotted route segment without a real suffix is not
+	/// mistaken for a file.
+	pub fn has_file_extension(&self) -> bool {
+		self.last_segment()
+			.and_then(|segment| segment.rsplit_once('.'))
+			.is_some_and(|(stem, ext)| {
+				!stem.is_empty()
+					&& !ext.is_empty()
+					&& ext.chars().all(|char| char.is_ascii_alphanumeric())
+			})
+	}
+
 	/// Set the authority.
 	pub fn with_authority(mut self, authority: impl Into<SmolStr>) -> Self {
 		self.authority = Some(authority.into());
@@ -623,6 +642,20 @@ mod test {
 		Scheme::from_str("").xpect_eq(Scheme::None);
 		Scheme::from_str("custom")
 			.xpect_eq(Scheme::Other("custom".to_string()));
+	}
+
+	#[beet_core::test]
+	fn file_extension_classification() {
+		// served files carry a real extension
+		Url::parse("/assets/blog/x.jpg").has_file_extension().xpect_true();
+		Url::parse("/style.css").has_file_extension().xpect_true();
+		Url::parse("/index.html").has_file_extension().xpect_true();
+		// page routes do not
+		Url::parse("/about").has_file_extension().xpect_false();
+		Url::parse("/blog/post-6").has_file_extension().xpect_false();
+		Url::parse("/").has_file_extension().xpect_false();
+		// a leading-dot segment is not an extension (empty stem)
+		Url::parse("/.gitignore").has_file_extension().xpect_false();
 	}
 
 	#[beet_core::test]

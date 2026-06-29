@@ -82,12 +82,13 @@ pub(super) fn paint_text(
 		(None, Some(value)) => value.to_string(),
 		(None, None) => return Ok(()),
 	};
-	let mut visual = node.visual_style().clone();
+	let visual = node.visual_style().clone();
 	let entity = node.entity;
 	// font-size scaling: the block font paints its own multi-row glyphs and
-	// returns; fullwidth remaps the text (and is always bold) and falls through
-	// to the normal path, where fullwidth glyphs lay out as wide characters and
-	// words are joined by the 2-cell `FULLWIDTH_SPACE`.
+	// returns; fullwidth remaps the text and falls through to the normal path,
+	// where fullwidth glyphs lay out as wide characters and words are joined by
+	// the 2-cell `FULLWIDTH_SPACE`. Weight is left to the cascade — headings are
+	// bold via their user-agent rule, so wide non-heading text stays plain.
 	let scale = FontScale::of_style(&visual);
 	match scale {
 		FontScale::Block => {
@@ -104,7 +105,6 @@ pub(super) fn paint_text(
 		}
 		FontScale::Wide => {
 			text = to_fullwidth(&text);
-			visual = visual.bold();
 		}
 		FontScale::Normal => {}
 	}

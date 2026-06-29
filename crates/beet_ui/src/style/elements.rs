@@ -92,15 +92,21 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// inserted text mirrors deleted text, underlined rather than struck
 		inline(&["ins", "u"]).with_canonical(DecorationLine::underline()),
 		link(),
-		inline(&["img"]).with_value(ForegroundColor, faint()),
+		// an `<img>`'s alt placeholder and an `<iframe>`'s collapsed title both
+		// render as links (the charcell decorator gives them a `Marker` +
+		// `Hyperlink`), so they style, hover, and click exactly like an `<a>`: the
+		// same link colour and underline. A raster-backed `<img>` overlays this
+		// with its block box (see the `graphics` rule below).
+		inline(&["img"])
+			.with_value(ForegroundColor, link_fg())
+			.with_canonical(DecorationLine::underline()),
 		// an embedded `<iframe>` can't render in the terminal; the charcell
 		// decorator collapses it to a titled OSC-8 link (its `Marker` text +
 		// `Hyperlink`, painted as a link by `paint_text`), underlined as a block
-		// on its own line and faded like the `<img>` alt placeholder. Web
-		// serializes the real iframe and ignores this.
+		// on its own line. Web serializes the real iframe and ignores this.
 		block_spaced(&["iframe"])
 			.with_canonical(DecorationLine::underline())
-			.with_value(ForegroundColor, faint()),
+			.with_value(ForegroundColor, link_fg()),
 		// a closed `<select>` shows only its value label (a charcell `Marker`);
 		// its options never lay out — the select dropdown spawns its own rows.
 		// Terminal-gated: the web's native select needs its options visible.
@@ -185,9 +191,14 @@ fn strikethrough(tags: &[&str]) -> Rule {
 
 fn link() -> Rule {
 	inline(&["a"])
-		.with_value(ForegroundColor, Color::srgb(0., 0., 0.502))
+		.with_value(ForegroundColor, link_fg())
 		.with_canonical(DecorationLine::underline())
 }
+
+/// The user-agent hyperlink colour, shared by `<a>` and the `<img>`/`<iframe>`
+/// link fallbacks so they read identically. The Material theme overrides it with
+/// its `Primary` accent (see `link_prose`).
+fn link_fg() -> Color { Color::srgb(0., 0., 0.502) }
 
 // A `blockquote` is a block with the usual gap below; its callout look (lifted
 // surface, primary left rule) comes from the theme's `blockquote_prose` rule.

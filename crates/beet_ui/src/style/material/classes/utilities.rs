@@ -63,18 +63,32 @@ pub fn reduced_motion() -> Rule {
 // ── Interaction ─────────────────────────────────────────────────────────────
 
 /// The set of interactive elements that share the hover affordance: every
-/// `<button>` (and `.btn`-styled link) plus any `<a>`, so buttons, prose links,
-/// and sidebar anchors all respond to hover identically.
+/// `<button>` (and `.btn`-styled link), any `<a>`, and the `<img>`/`<iframe>`
+/// link fallbacks, so buttons, prose links, sidebar anchors, and the alt/title
+/// placeholders all respond to hover identically.
 fn interactive() -> Selector {
-	Selector::AnyOf(vec![Selector::tag("button"), Selector::tag("a")])
+	Selector::AnyOf(vec![
+		Selector::tag("button"),
+		Selector::tag("a"),
+		Selector::tag("img"),
+		Selector::tag("iframe"),
+	])
 }
 
 /// `:hover` over an interactive element: the same selectors, gated on the
 /// [`Hovered`](ElementState::Hovered) state.
 fn interactive_hover() -> Selector {
+	let hovered = |tag: &str| {
+		Selector::AllOf(vec![
+			Selector::tag(tag),
+			Selector::state(ElementState::Hovered),
+		])
+	};
 	Selector::AnyOf(vec![
-		Selector::AllOf(vec![Selector::tag("button"), Selector::state(ElementState::Hovered)]),
-		Selector::AllOf(vec![Selector::tag("a"), Selector::state(ElementState::Hovered)]),
+		hovered("button"),
+		hovered("a"),
+		hovered("img"),
+		hovered("iframe"),
 	])
 }
 

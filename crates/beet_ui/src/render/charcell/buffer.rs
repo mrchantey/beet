@@ -569,6 +569,31 @@ mod tests {
 		out.xpect_contains("\x1b[1m");
 	}
 
+	/// Wide (> 1em) text takes its weight from the cascade rather than being
+	/// force-bold: plain wide text is not bold, while a bold weight still renders
+	/// bold — so wide headings (which carry the user-agent bold) stay bold but a
+	/// merely large run does not.
+	#[beet_core::test]
+	fn wide_text_keeps_cascade_weight() {
+		let plain = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Hi" },
+			VisualStyle {
+				font_size: Length::Rem(1.5),
+				..default()
+			}
+		)]));
+		plain.xnot().xpect_contains("\x1b[1m");
+		let bold = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Hi" },
+			VisualStyle {
+				font_size: Length::Rem(1.5),
+				font_weight: FontWeight::Bold,
+				..default()
+			}
+		)]));
+		bold.xpect_contains("\x1b[1m");
+	}
+
 	#[beet_core::test]
 	fn full_box_border_carries_fill_background() {
 		// a bordered box with a background clips the fill to the border edge, so

@@ -88,7 +88,20 @@ pub fn AssetsStore() -> impl Bundle {
 			entity.insert(store);
 			return;
 		}
-		// local dev: scope the inherited site store to its `assets/` subdir.
+		// local dev (native): serve the workspace `assets/` directory the site
+		// mirrors from the bucket (`just pull-assets`). It lives at the workspace
+		// root, not under the site store (which roots at the entry's dir, eg
+		// `site/`), so a concrete store reaches it — the local mirror of the S3
+		// branch above. Falls back to the inherited store's `assets/` subdir when
+		// absent (a standalone site that co-locates its assets).
+		#[cfg(not(target_arch = "wasm32"))]
+		if let Ok(assets) = AbsPathBuf::new_workspace_rel("assets") {
+			if assets.exists() {
+				entity.insert(FsStore::new(assets));
+				return;
+			}
+		}
+		// scope the inherited site store to its `assets/` subdir.
 		entity.insert(DirPath("assets".into()));
 	})
 }
@@ -176,6 +189,31 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_contains("color: red");
+	}
+
+	/// The local-dev backing [`AssetsStore`] installs — an [`FsStore`] rooted at the
+	/// workspace `assets/` mirror — serves a `/assets/…` blog image through
+	/// [`ServeBlobs`]. This is the path the `site/` entry relies on: its site store
+	/// roots at the entry's dir (`site/`, where `assets/` is empty), so the workspace
+	/// mirror, not the inherited store's subdir, is what resolves. Skipped on a
+	/// checkout without the workspace assets (a fresh clone before `just pull-assets`).
+	#[beet_core::test]
+	async fn workspace_assets_backing_serves_blog_image() {
+		let Ok(assets) = AbsPathBuf::new_workspace_rel("assets") else {
+			return;
+		};
+		if !assets.join("blog/kiama-sea-shanty-club.jpg").exists() {
+			return;
+		}
+		router_world()
+			.spawn((default_router(), children![(
+				serve_route("assets"),
+				FsStore::new(assets)
+			)]))
+			.exchange(Request::get("assets/blog/kiama-sea-shanty-club.jpg"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
 	}
 
 	/// An extensionless path serves `<path>/index.html`, the static-host fallback.
