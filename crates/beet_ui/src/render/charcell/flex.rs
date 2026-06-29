@@ -346,19 +346,32 @@ fn resolve_line_sizes(
 			} else {
 				size.x
 			};
-			let content_height = query
-				.unresolved_node(*entity)
-				.map(|child| resolve_height(&child, query, width, viewport))
+			let node = query.unresolved_node(*entity).ok();
+			let content_height = node
+				.as_ref()
+				.map(|child| resolve_height(child, query, width, viewport))
 				.unwrap_or(size.y);
+			// A scroll container (overflow clipped on the main axis) keeps its
+			// flex-grown size, so it clips and scrolls its own content instead of
+			// growing the line and pushing later items (eg a chat composer) off
+			// screen. A normal column item's height is the *main* axis, so keep the
+			// larger of its flex-grown size and its content (a `flex-grow` item
+			// filling the surplus, eg the page's sidebar+main row pushing the footer
+			// to the bottom), never clipping wrapped content below it.
+			let clips_main = node.as_ref().is_some_and(|child| {
+				let overflow = if vertical {
+					child.layout_style().overflow_y
+				} else {
+					child.layout_style().overflow_x
+				};
+				overflow.is_clipped()
+			});
 			// a row's height is the cross axis: take it from the content at the
-			// assigned width. A column's height is the *main* axis, so keep the
-			// flex-grown size (a `flex-grow` item filling the surplus, eg the page's
-			// sidebar+main row pushing the footer to the bottom), never clipping
-			// wrapped content below it.
-			let height = if vertical {
-				size.y.max(content_height)
-			} else {
-				content_height
+			// assigned width.
+			let height = match (vertical, clips_main) {
+				(true, true) => size.y,
+				(true, false) => size.y.max(content_height),
+				(false, _) => content_height,
 			};
 			UVec2::new(width, height)
 		})

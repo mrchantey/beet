@@ -1,4 +1,4 @@
-<form {ClearOnSubmit} bx:style="display=Flex flex-direction=Horizontal align-items=Center column-gap=Rem(1.0) border-top-width=Rem(1.0) border-color=@token:OutlineVariant">
+<form {ClearOnSubmit} bx:style="display=Flex flex-direction=Horizontal align-items=Stretch column-gap=Rem(1.0) border-top-width=Rem(1.0) border-color=@token:OutlineVariant">
 	<input name="message" type="text" {FocusOnAdd} bx:style="flex-grow=1 background-color=@token:SurfaceContainerHigh color=@token:OnSurface"/>
 	<button bx:style="font-weight=Bold background-color=@token:Primary color=@token:OnPrimary">Send</button>
 </form>

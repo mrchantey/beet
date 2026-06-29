@@ -23,15 +23,24 @@ use beet_ui::prelude::*;
 /// `resolve_styles` rebuilds every node's `LayoutStyle` from the cascade, which
 /// would clobber a set component.
 fn host_column() -> impl Bundle {
-	inline_class![
-		(style::common_props::DisplayProp, style::Display::Flex),
-		(style::common_props::FlexDirectionProp, style::Direction::Vertical),
-		// stretch children across the full width, so the transcript and the
-		// composer (and its top-border separator) span the terminal
-		(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
-		token(style::common_props::BackgroundColor, colors::Surface),
-		token(style::common_props::ForegroundColor, colors::OnSurface),
-	]
+	(
+		// default the chat to dark mode: `sync_color_scheme` mirrors this onto the
+		// `.dark-scheme` class, which the Material cascade inherits down the whole
+		// subtree (a `--main` scene gets no scheme from the router's site layout).
+		ColorScheme::Dark,
+		inline_class![
+			(style::common_props::DisplayProp, style::Display::Flex),
+			(
+				style::common_props::FlexDirectionProp,
+				style::Direction::Vertical
+			),
+			// stretch children across the full width, so the transcript and the
+			// composer (and its top-border separator) span the terminal
+			(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
+			token(style::common_props::BackgroundColor, colors::Surface),
+			token(style::common_props::ForegroundColor, colors::OnSurface),
+		],
+	)
 }
 
 /// A full-screen charcell host for an interactive chat: the alt-screen terminal
@@ -248,6 +257,72 @@ mod test {
 			app.update();
 		}
 		frame_plain(&app, host).xpect_snapshot();
+	}
+
+	/// Append `count` numbered text posts authored by the thread's agent, so a
+	/// transcript can be made taller than its viewport.
+	fn push_numbered_posts(app: &mut App, thread: Entity, count: usize) {
+		let thread_id = app.world().get::<Thread>(thread).unwrap().id();
+		let agent_id = app
+			.world()
+			.get::<ThreadWindow>(thread)
+			.unwrap()
+			.actors()
+			.values()
+			.find(|actor| actor.kind() == ActorKind::Agent)
+			.unwrap()
+			.id();
+		for index in 1..=count {
+			app.world_mut()
+				.get_mut::<ThreadWindow>(thread)
+				.unwrap()
+				.upsert_post(AgentPost::new_text(
+					agent_id,
+					thread_id,
+					format!("line {index:02}"),
+					PostStatus::Completed,
+				));
+		}
+	}
+
+	/// A transcript taller than its viewport scrolls *inside its own region*
+	/// rather than pushing the composer off screen: the composer stays visible,
+	/// and `follow_thread_scroll` pins the view to the latest post (the earliest
+	/// are clipped out the top). Regression for charcell internal scroll, where a
+	/// `flex-grow` + `overflow-y: auto` child used to grow to its full content
+	/// height and shove later flex items past the screen.
+	#[beet_core::test]
+	async fn chat_scroll_keeps_composer_visible() {
+		let (mut app, host) = charcell_app_sized(UVec2::new(48, 16)).await;
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), Sequence::new(), children![
+				(
+					Actor::new("System", ActorKind::System),
+					children![Post::spawn("be brief")],
+				),
+				(Actor::new("Agent", ActorKind::Agent),),
+			]))
+			.id();
+		app.update();
+		ThreadWindow::reduce_now(app.world_mut());
+		// far more posts than the 16-row viewport can hold
+		push_numbered_posts(&mut app, thread, 14);
+		app.world_mut().entity_mut(host).insert((
+			super::host_column(),
+			children![ThreadView::new(thread), CreatePostForm::new(thread)],
+		));
+		for _ in 0..30 {
+			app.update();
+		}
+		let frame = frame_plain(&app, host);
+		// the composer survived (the transcript clipped instead of pushing it off) ...
+		frame.as_str().xpect_contains("Send");
+		// ... the latest post is pinned into view ...
+		frame.as_str().xpect_contains("line 14");
+		// ... and the earliest is scrolled out of the clipped region.
+		frame.as_str().xnot().xpect_contains("line 01");
+		frame.xpect_snapshot();
 	}
 
 	/// The chat layout (a [`ThreadView`] and a [`CreatePostForm`] as siblings
