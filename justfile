@@ -81,9 +81,7 @@ beet-plan *args:
   AWS_PROFILE= cargo run -p beet-cli -- plan {{ args }}
 
 install-cli *args:
-  # --locked pins the workspace bevy rc; a bare install re-resolves the
-  # pre-release deps to a newer, incompatible candidate.
-  cargo install --locked --path crates/beet-cli {{ args }}
+  cargo install --path crates/beet-cli {{ args }}
 
 #💡 Aliases
 

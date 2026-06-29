@@ -7,6 +7,13 @@ expanded = true
 
 # The Full Moon Harvest
 
+#### [#13 — Engines, not frameworks](/blog/post-13)
+*Pete Hayman — 29th June, 2026*
+
+Apps are avocado slicers, reflecting the frameworks used to build them. Out of necessity, game engines are extremely generalizable and the natural fit for 'tools, not apps'.
+
+<br/>
+
 #### [#12 — Gentle Slopes up Lonely Mountains](/blog/post-12)
 *Pete Hayman — 2nd June, 2026*
 
