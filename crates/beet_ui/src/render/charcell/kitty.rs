@@ -135,6 +135,23 @@ impl KittyGraphicsSupport {
 			enabled: term.contains("kitty") || term.contains("ghostty"),
 		}
 	}
+
+	/// Detect from an SSH pty request: the forwarded terminal name advertises
+	/// kitty/ghostty ([`from_term`](Self::from_term)), OR the client reports a
+	/// non-zero pixel window size.
+	///
+	/// A kitty-graphics terminal (kitty, ghostty, WezTerm, iTerm2, foot) reports
+	/// its pixel size in the pty request, where `TERM` is commonly flattened to
+	/// `xterm-256color` over SSH (the server lacks the client's terminfo). A
+	/// terminal that reports pixels without graphics support silently ignores the
+	/// APC escapes (they are not echoed as garbage), so this errs toward enabling
+	/// rich rendering for modern clients rather than forcing the alt marker.
+	pub fn from_pty(term: &str, pixels: UVec2) -> Self {
+		Self {
+			enabled: Self::from_term(term).enabled
+				|| (pixels.x > 0 && pixels.y > 0),
+		}
+	}
 }
 
 #[cfg(feature = "tui")]
@@ -486,14 +503,17 @@ pub(crate) fn place_kitty_images(
 		let state = placements.terminals.entry(root).or_default();
 		let writer = terminal.writer_mut();
 
-		// a resize reallocated the screen: drop every placement and start over
-		// (the cell renderer erased the screen; image data survives on the
-		// terminal so only the cheap placements re-emit).
+		// a resize reallocated the screen: drop every placement and re-send each
+		// image from scratch. Terminals discard image data when the screen is
+		// cleared/reflowed on resize (ghostty does), so the transmit cache is
+		// cleared too — the next placement retransmits the bytes rather than
+		// placing a now-absent image and leaving a blank.
 		if state.viewport != viewport {
 			if !state.placed.is_empty() {
 				write_delete_all(writer)?;
 			}
 			state.placed.clear();
+			state.transmitted.clear();
 			state.viewport = viewport;
 		}
 
@@ -755,21 +775,23 @@ mod test {
 	}
 
 	/// Removing the image deletes its placement; a resize deletes all visible
-	/// placements and re-places from scratch.
+	/// placements and re-sends each image (data + placement) from scratch, since a
+	/// terminal may discard image data when the screen reflows on resize.
 	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn removal_and_resize_replace_placements() {
 		let mut host = image_host(100, 40);
 		host.frame_ansi();
-		// resize: every placement is dropped and re-emitted (payload retained)
+		// resize: every placement is dropped, then each image is retransmitted and
+		// re-placed.
 		host.resize(UVec2::new(50, 16));
 		host.step();
 		let resized = String::from_utf8_lossy(&host.frame_ansi()).into_owned();
 		resized
 			.as_str()
 			.xpect_contains("a=d,d=a,q=2")
+			.xpect_contains("a=t,f=100,q=2,i=1")
 			.xpect_contains("a=p,i=1");
-		resized.xnot().xpect_contains("a=t");
 
 		// despawning the img deletes its placement
 		let img = host
@@ -832,6 +854,23 @@ mod test {
 			Err(_) => SAMPLE_SVG.as_bytes().to_vec(),
 		};
 		fs_ext::write(out, to_png_bytes(svg).unwrap()).unwrap();
+	}
+
+	/// SSH detection: a flattened `TERM` plus a non-zero pixel window (eg ghostty
+	/// over SSH) enables graphics, while a plain terminal reporting no pixels keeps
+	/// the alt marker. The term name alone still enables it without pixels.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn pixel_window_enables_graphics() {
+		KittyGraphicsSupport::from_pty("xterm-256color", UVec2::new(1666, 2170))
+			.enabled
+			.xpect_true();
+		KittyGraphicsSupport::from_pty("xterm-256color", UVec2::ZERO)
+			.enabled
+			.xpect_false();
+		KittyGraphicsSupport::from_pty("xterm-ghostty", UVec2::ZERO)
+			.enabled
+			.xpect_true();
 	}
 
 	/// An unsupported terminal keeps the `[image]: alt` marker fallback.

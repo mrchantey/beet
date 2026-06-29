@@ -12,6 +12,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
+use bevy::ecs::schedule::common_conditions;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyCode;
 use bevy::input::keyboard::KeyboardInput;
@@ -93,7 +94,15 @@ impl Plugin for SshTuiPlugin {
 			// drain each surface's painted frame to its client after the render
 			// pipeline (PostParseTree, which RealtimeParsePlugin runs after Update).
 			.add_systems(PostUpdate, ssh_write)
-			.add_systems(Update, close_session_on_ctrl_c);
+			.add_systems(Update, close_session_on_ctrl_c)
+			// on a graceful shutdown restore every client terminal before the
+			// process exits, the multi-tenant counterpart of `restore_terminals`.
+			.add_systems(
+				PostUpdate,
+				restore_sessions_on_exit
+					.after(ssh_write)
+					.run_if(common_conditions::on_message::<AppExit>),
+			);
 	}
 }
 
@@ -125,7 +134,8 @@ fn on_ssh_recv(
 			// terminal, plus the resulting graphics detection. The `terminal` name
 			// and pixel window size are the only signals a kitty/ghostty client can
 			// forward over SSH, so dump them to tune `KittyGraphicsSupport`.
-			let graphics = KittyGraphicsSupport::from_term(&pty.terminal);
+			let graphics =
+				KittyGraphicsSupport::from_pty(&pty.terminal, pty.window.pixels);
 			info!(
 				"ssh pty request: terminal={:?} cells={:?} pixels={:?} \
 				 terminal_modes={:?} → kitty_graphics={}",
@@ -235,6 +245,26 @@ fn close_session_on_ctrl_c(
 				.entity(window)
 				.trigger_target(SshSend(SshEvent::Close(None)));
 		}
+	}
+	Ok(())
+}
+
+/// System: on a graceful [`AppExit`] (server shutdown), restore and close every
+/// SSH session, so a clean exit does not leave clients stuck in the alternate
+/// screen / raw mouse-tracking mode. Best-effort: a hard kill (`SIGKILL`, or a
+/// `SIGINT` that bypasses [`AppExit`]) gives the process no chance to send the
+/// leave sequences, so the client must reset itself.
+fn restore_sessions_on_exit(
+	connections: Query<Entity, With<SshPeerInfo>>,
+	mut surfaces: Query<&mut Terminal>,
+	mut channels: Query<&mut ChannelTerminal>,
+	mut commands: Commands,
+) -> Result {
+	for connection in connections.iter() {
+		restore_session(connection, &mut surfaces, &mut channels, &mut commands)?;
+		commands
+			.entity(connection)
+			.trigger_target(SshSend(SshEvent::Close(None)));
 	}
 	Ok(())
 }
