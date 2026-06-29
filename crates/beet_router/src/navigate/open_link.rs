@@ -90,15 +90,22 @@ fn on_link_click(
 	// an `<img>`/`<iframe>` collapsed to its alt/title link carries a `Hyperlink`
 	// (its src/alt-src), so the fallback follows its link exactly like an anchor.
 	hyperlinks: Query<&Hyperlink>,
+	// a raster-backed `<img>` is drawn as a real image, not a link, so it is not
+	// clickable; only the alt-text fallback (no `KittyImage`) acts as an anchor.
+	kitty: Query<(), With<KittyImage>>,
 	mut open: MessageWriter<OpenExternalLink>,
 	// a remote surface routes external links to the client clipboard instead of a
 	// server-side browser; both only exist under the terminal renderer.
 	#[cfg(feature = "tui")] remote: Query<(), With<ChannelTerminal>>,
 	#[cfg(feature = "tui")] mut copy: MessageWriter<CopyToClipboard>,
 ) -> Result {
+	let link_entity = ev.event().target;
+	// a kitty-rendered image is its picture, not a link.
+	if kitty.contains(link_entity) {
+		return Ok(());
+	}
 	// an `<a>`'s href (LinkView), or an `<img>`/`<iframe>`'s collapsed hyperlink;
 	// any other target carries neither and is ignored.
-	let link_entity = ev.event().target;
 	let Some(href) = elements
 		.get_as::<LinkView>(link_entity)
 		.map(|link| link.href.to_string())
@@ -124,7 +131,7 @@ fn on_link_click(
 	// a link to a static file (a path with a file extension, eg an image's src)
 	// is not an in-app route: hand it off like an external link rather than
 	// navigating the router to a path that has no page.
-	let is_file = url.has_file_extension();
+	let is_file = url.file_extension().is_some();
 	// internal, or external rendered in-app, both navigate the Navigator; a
 	// static file is never navigated in-app.
 	if !is_file && (!url.is_external() || on_open == OnOpenLink::Internal) {
@@ -143,6 +150,26 @@ fn on_link_click(
 		});
 		return Ok(());
 	}
+
+	// hand off outside the app (an external link, or a static file). An
+	// authority-less file link (`/assets/x.jpg`) is rewritten to the running
+	// server's loopback origin so the opened/copied URL is absolute and fetchable;
+	// an already-absolute URL is left untouched. (On wasm a relative URL resolves
+	// against the document origin in the browser, so no rewrite is needed.)
+	#[cfg(not(target_arch = "wasm32"))]
+	let url = if is_file && !url.is_external() {
+		match HttpServer::current_port() {
+			Ok(port) => url
+				.with_scheme(Scheme::Http)
+				.with_authority(format!("127.0.0.1:{port}")),
+			Err(err) => {
+				warn!("no loopback origin for {}: {err}", url.path_string());
+				url
+			}
+		}
+	} else {
+		url
+	};
 
 	// external + OnOpenLink::External: hand off outside the app.
 	#[cfg(feature = "tui")]
@@ -470,6 +497,25 @@ mod test {
 		let copies = &app.world().resource::<ClipboardCopies>().0;
 		copies.len().xpect_eq(1);
 		copies[0].as_str().xpect_contains("youtu.be/abc123");
+	}
+
+	/// A raster-backed `<img>` (one carrying a [`KittyImage`]) is its picture, not
+	/// a link: clicking it does nothing, so only the alt-text fallback is an anchor.
+	#[beet_core::test]
+	fn kitty_rendered_image_is_not_clickable() {
+		let mut app = link_app();
+		let img = spawn_media_link(&mut app, "img", false, "/assets/blog/x.jpg");
+		app.world_mut().entity_mut(img).insert(KittyImage {
+			id: 1,
+			data: String::new(),
+			px: UVec2::ONE,
+		});
+		click(&mut app, img);
+		app.world()
+			.resource::<ExternalOpens>()
+			.0
+			.is_empty()
+			.xpect_true();
 	}
 
 	/// `Url::is_external` classifies absolute (has authority) vs relative URLs.

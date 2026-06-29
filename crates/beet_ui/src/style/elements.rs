@@ -94,19 +94,17 @@ pub fn default_element_rules() -> Vec<Rule> {
 		link(),
 		// an `<img>`'s alt placeholder and an `<iframe>`'s collapsed title both
 		// render as links (the charcell decorator gives them a `Marker` +
-		// `Hyperlink`), so they style, hover, and click exactly like an `<a>`: the
-		// same link colour and underline. A raster-backed `<img>` overlays this
-		// with its block box (see the `graphics` rule below).
-		inline(&["img"])
-			.with_value(ForegroundColor, link_fg())
-			.with_canonical(DecorationLine::underline()),
+		// `Hyperlink`), so they style, hover, and click like an `<a>`. The link
+		// colour comes from the theme token (`link_prose`, `colors::Primary`),
+		// covering all three; only the underline is a user-agent default here. A
+		// raster-backed `<img>` overlays this with its block box (the `graphics`
+		// rule below) and is its picture, not a link.
+		inline(&["img"]).with_canonical(DecorationLine::underline()),
 		// an embedded `<iframe>` can't render in the terminal; the charcell
 		// decorator collapses it to a titled OSC-8 link (its `Marker` text +
 		// `Hyperlink`, painted as a link by `paint_text`), underlined as a block
 		// on its own line. Web serializes the real iframe and ignores this.
-		block_spaced(&["iframe"])
-			.with_canonical(DecorationLine::underline())
-			.with_value(ForegroundColor, link_fg()),
+		block_spaced(&["iframe"]).with_canonical(DecorationLine::underline()),
 		// a closed `<select>` shows only its value label (a charcell `Marker`);
 		// its options never lay out — the select dropdown spawns its own rows.
 		// Terminal-gated: the web's native select needs its options visible.
@@ -189,16 +187,14 @@ fn strikethrough(tags: &[&str]) -> Rule {
 	inline(tags).with_canonical(DecorationLine::line_through())
 }
 
+// the user-agent hyperlink colour is a plain fallback for token-less renders; the
+// Material theme overrides it (and colours `<img>`/`<iframe>` links alike) with its
+// `Primary` accent token, see `link_prose`.
 fn link() -> Rule {
 	inline(&["a"])
-		.with_value(ForegroundColor, link_fg())
+		.with_value(ForegroundColor, Color::srgb(0., 0., 0.502))
 		.with_canonical(DecorationLine::underline())
 }
-
-/// The user-agent hyperlink colour, shared by `<a>` and the `<img>`/`<iframe>`
-/// link fallbacks so they read identically. The Material theme overrides it with
-/// its `Primary` accent (see `link_prose`).
-fn link_fg() -> Color { Color::srgb(0., 0., 0.502) }
 
 // A `blockquote` is a block with the usual gap below; its callout look (lifted
 // surface, primary left rule) comes from the theme's `blockquote_prose` rule.

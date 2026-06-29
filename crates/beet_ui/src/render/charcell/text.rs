@@ -82,7 +82,7 @@ pub(super) fn paint_text(
 		(None, Some(value)) => value.to_string(),
 		(None, None) => return Ok(()),
 	};
-	let visual = node.visual_style().clone();
+	let mut visual = node.visual_style().clone();
 	let entity = node.entity;
 	// font-size scaling: the block font paints its own multi-row glyphs and
 	// returns; fullwidth remaps the text and falls through to the normal path,
@@ -105,6 +105,9 @@ pub(super) fn paint_text(
 		}
 		FontScale::Wide => {
 			text = to_fullwidth(&text);
+			// an underline (eg a wide link) reads poorly under fullwidth glyphs, so
+			// drop the decoration at this scale; the link colour and hover remain.
+			visual.decoration_line = DecorationLine::DEFAULT;
 		}
 		FontScale::Normal => {}
 	}

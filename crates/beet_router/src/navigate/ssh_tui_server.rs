@@ -121,6 +121,20 @@ fn on_ssh_recv(
 		// wait for the pty before building the surface; its size sizes the buffer.
 		SshEvent::Connect => {}
 		SshEvent::RequestPty(pty) => {
+			// diagnostic: everything the pty request carries about the client
+			// terminal, plus the resulting graphics detection. The `terminal` name
+			// and pixel window size are the only signals a kitty/ghostty client can
+			// forward over SSH, so dump them to tune `KittyGraphicsSupport`.
+			let graphics = KittyGraphicsSupport::from_term(&pty.terminal);
+			info!(
+				"ssh pty request: terminal={:?} cells={:?} pixels={:?} \
+				 terminal_modes={:?} → kitty_graphics={}",
+				pty.terminal,
+				pty.window.cells,
+				pty.window.pixels,
+				pty.terminal_modes,
+				graphics.enabled
+			);
 			// some clients (or a pty with no controlling terminal) report a
 			// 0-sized window; fall back to a usable default that a later
 			// window-change resizes, so the surface always renders.
@@ -142,7 +156,7 @@ fn on_ssh_recv(
 				// graphics support is the *client's* capability: detect it from the
 				// pty's forwarded terminal name, not the server's own env, so a kitty
 				// client renders rasters while a plain terminal keeps the alt marker.
-				KittyGraphicsSupport::from_term(&pty.terminal),
+				graphics,
 			));
 		}
 		SshEvent::Data(bytes) => {

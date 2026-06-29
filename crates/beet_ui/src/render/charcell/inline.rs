@@ -9,6 +9,7 @@
 //! run's characters with that run's style. This is what lets a paragraph mix
 //! plain text, emphasis, links and inline code on the same wrapped line.
 use super::*;
+use crate::style::DecorationLine;
 use crate::style::Display;
 use crate::style::TextAlign;
 use crate::style::VisualStyle;
@@ -233,10 +234,13 @@ fn inline_text(runs: &[InlineRun]) -> String {
 
 /// Remap every run to fullwidth glyphs for the wide (> 1em) scale, leaving each
 /// run's weight to the cascade — headings carry their user-agent bold, so wide
-/// non-heading text stays plain rather than being forced bold.
+/// non-heading text stays plain rather than being forced bold. An underline (eg a
+/// wide link) reads poorly under fullwidth glyphs, so the decoration is dropped at
+/// this scale; the link colour and hover remain.
 fn widen_runs(runs: &mut [InlineRun]) {
 	for run in runs.iter_mut() {
 		run.text = to_fullwidth(&run.text);
+		run.style.decoration_line = DecorationLine::DEFAULT;
 	}
 }
 

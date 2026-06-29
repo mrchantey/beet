@@ -197,23 +197,24 @@ impl Url {
 	/// decide whether a link navigates in-app or leaves it.
 	pub fn is_external(&self) -> bool { self.authority.is_some() }
 
-	/// Whether the last path segment names a static file (carries a file
-	/// extension), eg `/assets/x.jpg`, `/style.css`, or `/doc.pdf`.
+	/// The last path segment's file extension, eg `Some("jpg")` for
+	/// `/assets/x.jpg`, `Some("css")` for `/style.css`, `None` for a page route
+	/// (`/about`, `/blog/post-6`).
 	///
-	/// A page route (`/about`, `/blog/post-6`) has no extension; a served file
-	/// does. The link handler treats such a link like an external one (hand it
-	/// off / open it) rather than navigating the in-app router to a path that has
-	/// no page route. An extension is a final `.` with a non-empty alphanumeric
-	/// stem and suffix, so a dotted route segment without a real suffix is not
-	/// mistaken for a file.
-	pub fn has_file_extension(&self) -> bool {
+	/// The link handler keys off this: a link to a served file is handed off /
+	/// opened rather than navigating the in-app router to a path that has no page
+	/// route. An extension is a final `.` with a non-empty alphanumeric stem and
+	/// suffix, so a dotted route segment without a real suffix is not mistaken for
+	/// a file.
+	pub fn file_extension(&self) -> Option<&str> {
 		self.last_segment()
 			.and_then(|segment| segment.rsplit_once('.'))
-			.is_some_and(|(stem, ext)| {
+			.filter(|(stem, ext)| {
 				!stem.is_empty()
 					&& !ext.is_empty()
 					&& ext.chars().all(|char| char.is_ascii_alphanumeric())
 			})
+			.map(|(_, ext)| ext)
 	}
 
 	/// Set the authority.
@@ -647,15 +648,15 @@ mod test {
 	#[beet_core::test]
 	fn file_extension_classification() {
 		// served files carry a real extension
-		Url::parse("/assets/blog/x.jpg").has_file_extension().xpect_true();
-		Url::parse("/style.css").has_file_extension().xpect_true();
-		Url::parse("/index.html").has_file_extension().xpect_true();
+		Url::parse("/assets/blog/x.jpg").file_extension().xpect_eq(Some("jpg"));
+		Url::parse("/style.css").file_extension().xpect_eq(Some("css"));
+		Url::parse("/index.html").file_extension().xpect_eq(Some("html"));
 		// page routes do not
-		Url::parse("/about").has_file_extension().xpect_false();
-		Url::parse("/blog/post-6").has_file_extension().xpect_false();
-		Url::parse("/").has_file_extension().xpect_false();
+		Url::parse("/about").file_extension().xpect_eq(None);
+		Url::parse("/blog/post-6").file_extension().xpect_eq(None);
+		Url::parse("/").file_extension().xpect_eq(None);
 		// a leading-dot segment is not an extension (empty stem)
-		Url::parse("/.gitignore").has_file_extension().xpect_false();
+		Url::parse("/.gitignore").file_extension().xpect_eq(None);
 	}
 
 	#[beet_core::test]
