@@ -194,6 +194,21 @@ fn scalar_to_reflect(
 		}
 	}
 
+	// a number targeting a single-field tuple-struct wrapping a scalar (a newtype like
+	// `LinearVelocity(f32)`) builds that newtype from the bare number, so `<Drive
+	// linear=60>` authors a typed velocity directly. The inner field's type id drives
+	// the cast, mirroring the opaque branch above.
+	if let (Some(number), Some(TypeInfo::TupleStruct(info))) = (as_f64, field_info)
+		&& info.field_len() == 1
+		&& let Some(field) = info.field_at(0)
+		&& let Some(cast) = cast_number(number, field.type_id())
+	{
+		let mut dynamic = DynamicTupleStruct::default();
+		dynamic.insert_boxed(cast);
+		dynamic.set_represented_type(field_info);
+		return Ok(Box::new(dynamic));
+	}
+
 	// a human duration string targeting a `Duration` field, so a markup
 	// `<EndInDuration duration="50ms"/>` authors a delay directly. A malformed value
 	// (a non-string, or a missing/unknown unit) errors rather than silently falling
@@ -544,6 +559,20 @@ mod test {
 		)
 		.unwrap();
 		T::from_reflect(reflected.as_ref()).unwrap()
+	}
+
+	/// A bare number coerces into a single-field tuple-struct newtype (eg
+	/// `LinearVelocity(f32)`), so `<Drive linear=60>` builds the typed wrapper from a
+	/// plain attribute. The stored field takes the number directly, in whatever unit
+	/// the newtype stores.
+	#[beet_core::test]
+	fn coerces_number_to_newtype() {
+		#[derive(Reflect, PartialEq, Debug)]
+		struct Speed(f32);
+		resolve::<Speed>(DataLiteral::Scalar(Value::Float(60.0)))
+			.xpect_eq(Speed(60.0));
+		resolve::<Speed>(DataLiteral::Scalar(Value::Int(90)))
+			.xpect_eq(Speed(90.0));
 	}
 
 	/// A generic marker whose registered short path keeps its argument

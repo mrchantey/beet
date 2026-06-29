@@ -6,10 +6,10 @@
 //! `Drive` action takes and returns these rather than bare `f32`; a transport layer
 //! converts them to its wire's fixed units at the encode boundary only.
 //!
-//! [`LinearVelocity`] and [`AngularVelocity`] are also [`Component`]s, so a driven
-//! body (the Alvik robot root, a rendered character) carries its commanded motion as
-//! data the way Avian carries velocity. The cross-unit ratios mirror
-//! `arduino-alvik`'s `conversions.py`.
+//! A driven body carries its commanded [`LinearVelocity`] + [`AngularVelocity`]
+//! inside a `DifferentialDrive` component (in `beet_action`); the units themselves are
+//! plain values, not components. The cross-unit ratios mirror `arduino-alvik`'s
+//! `conversions.py`.
 
 use crate::prelude::*;
 use core::f32::consts::PI;
@@ -46,41 +46,40 @@ impl Angle {
 	pub fn as_percent(self) -> f32 { self.0 / TAU * 100.0 }
 }
 
-/// An angular velocity. Inner unit is **radians per second**.
+/// An angular velocity. Inner unit is **degrees per second** — the unit the robot
+/// wire and a markup `angular=90` both use, so a bare number coerces correctly (the
+/// reflect path sets the stored field, and the stored field *is* deg/s).
 ///
-/// A [`Component`]: a driven body carries one as its turn rate (the Alvik robot's
-/// measured `v` status, or the commanded rate a `Drive` leaf writes), in the spirit
-/// of Avian's velocity components.
+/// A plain value, not a component: a driven body carries its commanded turn rate
+/// inside a `DifferentialDrive` component, not as a bare `AngularVelocity`.
 ///
 /// The `%`-of-max forms are context-dependent (`MOTOR_MAX_RPM` for a wheel,
 /// `ROBOT_MAX_DEG_S` for the robot), so they live on the robot/wheel helpers,
 /// not here.
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, PartialOrd, Component, Reflect,
-)]
-#[reflect(Component, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Reflect)]
+#[reflect(Default)]
 pub struct AngularVelocity(f32);
 
 impl AngularVelocity {
-	/// A rate of `rad_per_sec` radians per second.
-	pub fn from_rad_per_sec(rad_per_sec: f32) -> Self { Self(rad_per_sec) }
 	/// A rate of `deg_per_sec` degrees per second.
-	pub fn from_deg_per_sec(deg_per_sec: f32) -> Self {
-		Self(deg_per_sec * PI / 180.0)
+	pub fn from_deg_per_sec(deg_per_sec: f32) -> Self { Self(deg_per_sec) }
+	/// A rate of `rad_per_sec` radians per second.
+	pub fn from_rad_per_sec(rad_per_sec: f32) -> Self {
+		Self(rad_per_sec * 180.0 / PI)
 	}
-	/// A rate of `rpm` revolutions per minute.
-	pub fn from_rpm(rpm: f32) -> Self { Self(rpm * TAU / 60.0) }
+	/// A rate of `rpm` revolutions per minute (`1 rpm = 6 deg/s`).
+	pub fn from_rpm(rpm: f32) -> Self { Self(rpm * 6.0) }
 	/// A rate of `rev_per_sec` revolutions per second.
-	pub fn from_rev_per_sec(rev_per_sec: f32) -> Self { Self(rev_per_sec * TAU) }
+	pub fn from_rev_per_sec(rev_per_sec: f32) -> Self { Self(rev_per_sec * 360.0) }
 
-	/// This rate in radians per second.
-	pub fn as_rad_per_sec(self) -> f32 { self.0 }
 	/// This rate in degrees per second.
-	pub fn as_deg_per_sec(self) -> f32 { self.0 * 180.0 / PI }
+	pub fn as_deg_per_sec(self) -> f32 { self.0 }
+	/// This rate in radians per second.
+	pub fn as_rad_per_sec(self) -> f32 { self.0 * PI / 180.0 }
 	/// This rate in revolutions per minute.
-	pub fn as_rpm(self) -> f32 { self.0 * 60.0 / TAU }
+	pub fn as_rpm(self) -> f32 { self.0 / 6.0 }
 	/// This rate in revolutions per second.
-	pub fn as_rev_per_sec(self) -> f32 { self.0 / TAU }
+	pub fn as_rev_per_sec(self) -> f32 { self.0 / 360.0 }
 }
 
 /// A linear distance. Inner unit is **millimeters**.
@@ -109,13 +108,12 @@ impl Distance {
 
 /// A linear velocity. Inner unit is **millimeters per second**.
 ///
-/// A [`Component`]: a driven body carries one as its forward speed (the Alvik
-/// robot's measured `v` status, or the commanded speed a `Drive` leaf writes), in
-/// the spirit of Avian's velocity components.
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, PartialOrd, Component, Reflect,
-)]
-#[reflect(Component, Default)]
+/// A plain value, not a component: a driven body carries its commanded forward speed
+/// inside a `DifferentialDrive` component,
+/// not as a bare `LinearVelocity`. Markup may write a bare number (`linear=60`,
+/// interpreted as mm/s) via the [`From`] impls below.
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Reflect)]
+#[reflect(Default)]
 pub struct LinearVelocity(f32);
 
 impl LinearVelocity {
@@ -161,6 +159,29 @@ impl_quantity_ops!(Angle);
 impl_quantity_ops!(AngularVelocity);
 impl_quantity_ops!(Distance);
 impl_quantity_ops!(LinearVelocity);
+
+// A bare markup number (`<Drive linear=60 angular=90>`) coerces into the velocity
+// through `From`, in the type's natural authoring unit (mm/s for linear, deg/s for
+// angular), so a scene reads in real-world units without a constructor call.
+macro_rules! impl_velocity_from {
+	($ty:ident, $ctor:ident) => {
+		impl From<f32> for $ty {
+			fn from(value: f32) -> Self { Self::$ctor(value) }
+		}
+		impl From<f64> for $ty {
+			fn from(value: f64) -> Self { Self::$ctor(value as f32) }
+		}
+		impl From<i32> for $ty {
+			fn from(value: i32) -> Self { Self::$ctor(value as f32) }
+		}
+		impl From<u32> for $ty {
+			fn from(value: u32) -> Self { Self::$ctor(value as f32) }
+		}
+	};
+}
+
+impl_velocity_from!(LinearVelocity, from_mm_per_sec);
+impl_velocity_from!(AngularVelocity, from_deg_per_sec);
 
 #[cfg(test)]
 mod test {
