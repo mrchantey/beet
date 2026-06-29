@@ -22,12 +22,12 @@ mod thread_examples;
 #[cfg(feature = "thread")]
 pub use self::thread_examples::*;
 
-// the headless behaviour-tree example: needs the net deps the `thread` feature
-// pulls (the boot verb), headless-friendly.
-#[cfg(feature = "thread")]
-mod behavior_examples;
-#[cfg(feature = "thread")]
-pub use self::behavior_examples::*;
+// the environment-agnostic drive example: the headless `Drive`/`DriveCommand` need
+// only beet_action/beet_core (always compiled), and the wgpu `CharacterDrive` body is
+// gated inside on `bevy_default`. Added unconditionally by `BeetExtraPlugin`, so the
+// same `<Drive>` resolves headless (`just beet`) and windowed (`--features winit`).
+mod drive_examples;
+pub use self::drive_examples::*;
 
 // the agent calculator toolset + the `Behavior` sequence marker.
 #[cfg(feature = "thread")]

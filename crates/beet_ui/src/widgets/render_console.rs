@@ -13,7 +13,7 @@ use crate::style::*;
 use crate::style::material::*;
 use beet_core::prelude::*;
 // `Display`/`Overflow` also live in bevy's prelude (glob'd via `beet_core` under the
-// `examples`/ml/spatial feature set); pin them to the style tokens used below.
+// render stack); pin them to the style tokens used below, as in `scrollbar.rs`/`elements.rs`.
 use crate::style::Display;
 use crate::style::Overflow;
 

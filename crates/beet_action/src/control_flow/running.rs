@@ -309,11 +309,18 @@ where
 		+ Send
 		+ Sync
 		+ Clone
+		+ Default
 		+ FromReflect
 		+ Typed
 		+ GetTypeRegistration,
 {
+	use bevy::reflect::std_traits::ReflectDefault;
 	app.register_type::<EndInDuration<In, Out>>()
+		// a markup `<EndInDuration duration="1s"/>` only sets `duration`, so the
+		// reflect path builds the rest from `Default`; register `ReflectDefault` for
+		// the concrete type (the derive can't carry `#[reflect(Default)]`, since not
+		// every `Out` is `Default`).
+		.register_type_data::<EndInDuration<In, Out>, ReflectDefault>()
 		.add_systems(Update, end_in_duration::<In, Out>.after(tick_run_timers))
 		.add_observer(reset_run_time_started::<Out>)
 		.add_observer(reset_run_timer_stopped::<Out>);
