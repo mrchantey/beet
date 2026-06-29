@@ -13,8 +13,26 @@
 //! ```
 
 use beet_core::prelude::*;
-use beet_ui::prelude::style::LayoutStyle;
+use beet_ui::prelude::material::colors;
 use beet_ui::prelude::*;
+
+/// Shared shell styling for a charcell thread host: a full-screen column (the
+/// render root already fills the viewport) tinted with the surface palette, so the
+/// transcript grows and a composer pins to the bottom. Cascade styling
+/// (`inline_class!`), since the thread UI's rows are cascade-styled and
+/// `resolve_styles` rebuilds every node's `LayoutStyle` from the cascade, which
+/// would clobber a set component.
+fn host_column() -> impl Bundle {
+	inline_class![
+		(style::common_props::DisplayProp, style::Display::Flex),
+		(style::common_props::FlexDirectionProp, style::Direction::Vertical),
+		// stretch children across the full width, so the transcript and the
+		// composer (and its top-border separator) span the terminal
+		(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
+		token(style::common_props::BackgroundColor, colors::Surface),
+		token(style::common_props::ForegroundColor, colors::OnSurface),
+	]
+}
 
 /// A full-screen charcell host for an interactive chat: the alt-screen terminal
 /// the transcript + form paint into. Nest a [`ThreadView`] and a
@@ -30,7 +48,7 @@ pub fn TuiThreadChat() -> impl Bundle {
 		<div {(
 			StdioTerminal::default(),
 			DoubleBuffer::default(),
-			LayoutStyle::flex_col(),
+			host_column(),
 			RenderSurface::self_referential(),
 		)}>
 			<Slot/>
@@ -52,7 +70,7 @@ pub fn TuiThreadTranscript() -> impl Bundle {
 			StdioTerminal::inline()
 				.with_log_file(Some(std::path::PathBuf::from("target/beet-log.txt"))),
 			DoubleBuffer::default(),
-			LayoutStyle::flex_col(),
+			host_column(),
 		)}>
 			<Slot/>
 		</div>
@@ -62,6 +80,9 @@ pub fn TuiThreadTranscript() -> impl Bundle {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	// `Thread::id()` / `Actor::id()` / `Actor::kind()` come from this trait; the
+	// `beet_ui` glob below otherwise shadows the prelude re-export.
+	use crate::table::Table;
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_ui::prelude::style::LayoutStyle;
@@ -75,6 +96,12 @@ mod test {
 	/// so the nested form subtree resolves to the host.
 	/// Returns `(app, host)`.
 	async fn charcell_app() -> (App, Entity) {
+		charcell_app_sized(UVec2::new(40, 12)).await
+	}
+
+	/// As [`charcell_app`], with an explicit buffer size for layout-sensitive
+	/// renders (eg the full chat snapshot).
+	async fn charcell_app_sized(size: UVec2) -> (App, Entity) {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, CharcellTuiPlugin))
 			.init_plugin::<ThreadPlugin>()
@@ -84,9 +111,12 @@ mod test {
 		let host = app
 			.world_mut()
 			.spawn((
+				// a `<div>` like the real `TuiThreadChat` host, so cascade-resolved
+				// layout (element-only in `resolve_styles`) applies to it
+				Element::new("div"),
 				channel,
 				terminal,
-				DoubleBuffer::new(UVec2::new(40, 12)),
+				DoubleBuffer::new(size),
 				RenderSurface::self_referential(),
 			))
 			.id();
@@ -152,8 +182,72 @@ mod test {
 		// both rows render: author label + body, with the agent's streamed echo
 		// flowing through the per-row FieldRef binding
 		let frame = frame_plain(&app, host);
-		frame.as_str().xpect_contains("User: hello");
-		frame.xpect_contains("Agent: you said: hello");
+		// author label and body render on their own lines now, role-styled
+		frame.as_str().xpect_contains("User");
+		frame.as_str().xpect_contains("hello");
+		frame.as_str().xpect_contains("Agent");
+		frame.as_str().xpect_contains("you said: hello");
+	}
+
+	/// Push an error post (5xx intent) authored by the thread's agent into its
+	/// window, so the transcript snapshot exercises the `error` role styling
+	/// without a failing network call.
+	fn push_error_post(app: &mut App, thread: Entity) {
+		let thread_id = app.world().get::<Thread>(thread).unwrap().id();
+		let agent_id = app
+			.world()
+			.get::<ThreadWindow>(thread)
+			.unwrap()
+			.actors()
+			.values()
+			.find(|actor| actor.kind() == ActorKind::Agent)
+			.unwrap()
+			.id();
+		app.world_mut()
+			.get_mut::<ThreadWindow>(thread)
+			.unwrap()
+			.upsert_post(AgentPost::new_error(
+				agent_id,
+				thread_id,
+				"model request failed: 401 Unauthorized",
+				PostStatus::Completed,
+			));
+	}
+
+	/// The full chat surface (scrollable transcript + composer) renders every
+	/// role with its own styling. A static thread (seed posts, no streamers) plus
+	/// a pushed error post keeps the snapshot deterministic and offline.
+	#[beet_core::test]
+	async fn chat_surface_snapshot() {
+		let (mut app, host) = charcell_app_sized(UVec2::new(56, 24)).await;
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), Sequence::new(), children![
+				(
+					Actor::new("System", ActorKind::System),
+					children![Post::spawn("you are a friendly robot")],
+				),
+				(
+					Actor::new("Billy", ActorKind::User),
+					children![Post::spawn("hello there robot")],
+				),
+				(
+					Actor::new("BeepBot", ActorKind::Agent),
+					children![Post::spawn("Beep boop! Greetings, human.")],
+				),
+			]))
+			.id();
+		app.update();
+		ThreadWindow::reduce_now(app.world_mut());
+		push_error_post(&mut app, thread);
+		app.world_mut().entity_mut(host).insert((
+			super::host_column(),
+			children![ThreadView::new(thread), CreatePostForm::new(thread)],
+		));
+		for _ in 0..30 {
+			app.update();
+		}
+		frame_plain(&app, host).xpect_snapshot();
 	}
 
 	/// The chat layout (a [`ThreadView`] and a [`CreatePostForm`] as siblings
@@ -181,8 +275,11 @@ mod test {
 			app.update();
 		}
 		let frame = frame_plain(&app, host);
-		frame.as_str().xpect_contains("User: hello");
-		frame.xpect_contains("Agent: you said: hello");
+		// author label and body render on their own lines now, role-styled
+		frame.as_str().xpect_contains("User");
+		frame.as_str().xpect_contains("hello");
+		frame.as_str().xpect_contains("Agent");
+		frame.as_str().xpect_contains("you said: hello");
 	}
 
 	/// The user's turn is a Sequence action: calling the thread reaches the
@@ -233,8 +330,11 @@ mod test {
 		}
 
 		let frame = frame_plain(&app, host);
-		frame.as_str().xpect_contains("User: hello");
-		frame.xpect_contains("Agent: you said: hello");
+		// author label and body render on their own lines now, role-styled
+		frame.as_str().xpect_contains("User");
+		frame.as_str().xpect_contains("hello");
+		frame.as_str().xpect_contains("Agent");
+		frame.as_str().xpect_contains("you said: hello");
 	}
 
 	/// The full deterministic interaction: real keystrokes through the input
@@ -281,8 +381,11 @@ mod test {
 		}
 
 		let frame = frame_plain(&app, host);
-		frame.as_str().xpect_contains("User: hello");
-		frame.xpect_contains("Agent: you said: hello");
+		// author label and body render on their own lines now, role-styled
+		frame.as_str().xpect_contains("User");
+		frame.as_str().xpect_contains("hello");
+		frame.as_str().xpect_contains("Agent");
+		frame.as_str().xpect_contains("you said: hello");
 	}
 
 	/// The widget builds its `<form>` from `CreatePostForm.bsx` (interim-loaded
@@ -382,7 +485,10 @@ mod test {
 		}
 
 		let frame = frame_plain(&app, host);
-		frame.as_str().xpect_contains("User: hello");
-		frame.xpect_contains("Agent: you said: hello");
+		// author label and body render on their own lines now, role-styled
+		frame.as_str().xpect_contains("User");
+		frame.as_str().xpect_contains("hello");
+		frame.as_str().xpect_contains("Agent");
+		frame.as_str().xpect_contains("you said: hello");
 	}
 }

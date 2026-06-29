@@ -152,6 +152,11 @@ impl TerminalConfig {
 		Self {
 			alternate_screen: false,
 			hide_cursor: false,
+			// inline shares the live screen with no raw mode, so mouse tracking has
+			// nowhere to be consumed: enabling it would spew SGR escape sequences into
+			// the user's terminal on every pointer move. A static transcript needs no
+			// pointer input anyway.
+			enable_mouse: false,
 			..default()
 		}
 	}

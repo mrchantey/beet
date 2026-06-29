@@ -48,36 +48,53 @@ pub const CREATE_POST_FORM_TEMPLATE: &str = "CreatePostForm";
 /// Build the widget's `<form>` from the [`BsxTemplateRegistry`]-registered
 /// `CreatePostForm.bsx`, so the component works as a bare spawn or markup spread.
 /// [`ThreadUiPlugin`] registers that template through an embedded blob store
-/// asynchronously, so a spawn path must let the registration settle first (the
-/// thread servers' run loop does; tests `AsyncRunner::settle_async_tasks`).
-/// Submitting fires `beet_ui`'s [`Submit`], consumed by the active [`UserInput`]
-/// turn; `{FocusOnAdd}` on the form's `<input>` (in the `.bsx`) gives it initial
-/// focus. The input surface is resolved from the host (which carries
-/// `RenderSurface(self)`), so this hook inserts no surface of its own.
+/// *asynchronously* at [`Startup`], so a composer spawned by a booting scene can
+/// run before it settles. Rather than fail, this awaits the registration (a
+/// queued async task that yields until the template lands), then builds the form;
+/// a site shipping its own `CreatePostForm.bsx` registers under the same path and
+/// is picked up here. Submitting fires `beet_ui`'s [`Submit`], consumed by the
+/// active [`UserInput`] turn; `{FocusOnAdd}` on the form's `<input>` (in the
+/// `.bsx`) gives it initial focus. The input surface is resolved from the host
+/// (which carries `RenderSurface(self)`), so this hook inserts no surface of its own.
 fn create_post_form_on_add(mut world: DeferredWorld, cx: HookContext) {
-	let entity = cx.entity;
-	// a DeferredWorld cannot read the template registry or insert a template
-	// inline, so queue the resolve as a command closure (the same escape hatch
-	// `Focus::on_add` uses).
-	world.commands().queue(move |world: &mut World| -> Result {
-		let registry = world
-			.get_resource::<BsxTemplateRegistry>()
-			.cloned()
-			.unwrap_or_default();
-		let nodes = registry
-			.get(CREATE_POST_FORM_TEMPLATE)
-			.ok_or_else(|| {
-				bevyhow!(
-					"no BSX template registered under `{CREATE_POST_FORM_TEMPLATE}`"
-				)
-			})?
-			.nodes
-			.clone();
-		world
-			.entity_mut(entity)
-			.insert_template(BsxTemplate::new(nodes, registry))?;
-		Ok(())
-	});
+	world.commands().entity(cx.entity).queue_async_local(
+		move |entity: AsyncEntity| async move {
+			// await the (async) template registration, yielding a tick between polls
+			let registry = loop {
+				if let Some(registry) = entity
+					.world()
+					.with(|world: &mut World| {
+						world
+							.get_resource::<BsxTemplateRegistry>()
+							.filter(|registry| {
+								registry.contains(CREATE_POST_FORM_TEMPLATE)
+							})
+							.cloned()
+					})
+					.await
+				{
+					break registry;
+				}
+				entity.with(|_| ()).await?;
+			};
+			let nodes = registry
+				.get(CREATE_POST_FORM_TEMPLATE)
+				.ok_or_else(|| {
+					bevyhow!(
+						"no BSX template registered under `{CREATE_POST_FORM_TEMPLATE}`"
+					)
+				})?
+				.nodes
+				.clone();
+			entity
+				.with(move |mut entity| -> Result {
+					entity.insert_template(BsxTemplate::new(nodes, registry))?;
+					Ok(())
+				})
+				.await??;
+			Ok(())
+		},
+	);
 }
 
 // ═══════════════════════════════════════════════════════════════════════

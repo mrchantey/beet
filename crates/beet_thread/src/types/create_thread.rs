@@ -47,6 +47,15 @@ async fn run_thread_on_boot(cx: ActionContext<Boot>) -> Result<Response> {
 	// env read mid-load.
 	let new = boot.0.get_param("new").is_some();
 	adopt_program_store(caller.world().clone(), root, new).await?;
+	// Reduce the authored scene into its `ThreadWindow` + behavior scene before
+	// running it. The boot drives the behavior directly, ahead of the scheduled
+	// `First` reduce, so without this the `Sequence` would receive raw, action-less
+	// `<CreateActor>` spans and fail. Idempotent (`Without<ThreadWindow>`), so the
+	// store path (already reduced in `adopt_thread`) is unaffected.
+	caller
+		.world()
+		.with(|world: &mut World| ThreadWindow::reduce_now(world))
+		.await;
 	// run the thread behavior: an endless `Repeat` parks here (holding the process
 	// open), a finite loop returns and the boot writes `AppExit`.
 	caller.call::<(), Outcome>(()).await?;

@@ -15,15 +15,56 @@ where
 	.await
 }
 
-/// Stream a model response into the thread's [`ThreadWindow`].
+/// Stream a model response into the thread's [`ThreadWindow`], surfacing a
+/// failure as an error post rather than a swallowed error.
 ///
-/// Created and modified posts are written straight into `window.posts` (the live
-/// slice the scene renders and persists), rather than spawning per-post
-/// entities. Completed function-call posts are collected and dispatched after
-/// the stream finishes.
+/// On any streaming failure (missing/invalid key, network error, or a mid-stream
+/// error event) the message is appended to the window as a 5xx error post, so it
+/// renders in the thread view as an `Error` node (TUI mode hides stderr), and the
+/// turn [`Pass`]es so a finite program still completes instead of hanging.
 pub async fn post_streamer_action_stateful<T>(
 	cx: ActionContext<T>,
 ) -> Result<Outcome>
+where
+	T: Clone + Component + PostStreamer,
+{
+	let caller = cx.caller.clone();
+	if let Err(err) = stream_into_window(cx).await {
+		let message = err.to_string();
+		// also log for headless/non-TUI runs where the thread view isn't visible
+		error!("model streaming failed: {message}");
+		let (actor_id, thread_id) = caller
+			.with_state::<ThreadWindowQuery, _>(
+				|entity, window| -> Result<(ActorId, ThreadId)> {
+					Ok((window.actor_id(entity)?, window.thread_id(entity)?))
+				},
+			)
+			.await??;
+		caller
+			.with_state::<ThreadWindowQuery, _>(
+				move |entity, mut window| -> Result {
+					window.push_post(
+						entity,
+						AgentPost::new_error(
+							actor_id,
+							thread_id,
+							message,
+							PostStatus::Completed,
+						),
+					)
+				},
+			)
+			.await??;
+	}
+	Ok(Pass(()))
+}
+
+/// The streaming core: drive the model response into `window.posts` (the live
+/// slice the scene renders and persists), rather than spawning per-post entities.
+/// Completed function-call posts are collected and dispatched after the stream
+/// finishes. Errors propagate to [`post_streamer_action_stateful`], which renders
+/// them as an error post.
+async fn stream_into_window<T>(cx: ActionContext<T>) -> Result
 where
 	T: Clone + Component + PostStreamer,
 {
@@ -76,5 +117,5 @@ where
 
 	call_functions(cx.caller, function_calls.into_values()).await?;
 
-	Ok(Pass(()))
+	Ok(())
 }
