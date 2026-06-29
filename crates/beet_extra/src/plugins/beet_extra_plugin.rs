@@ -20,11 +20,8 @@ impl Plugin for BeetExtraPlugin {
 		// the headless action examples (`examples/action/*.bsx`): example actions,
 		// components and templates. Only beet_action/beet_core, so always added.
 		app.add_plugins(crate::prelude::ActionExamplesPlugin);
-		// the environment-agnostic `Drive` leaf + `DriveCommand`, plus (with the render
-		// stack) the wgpu `CharacterDrive` body. Always added: the same `<Drive>` markup
-		// resolves headless and windowed.
-		app.add_plugins(crate::prelude::DriveExamplesPlugin);
-		// the spatial/steering/animation scenes + their 2d/3d systems.
+		// the spatial/steering/animation scenes + their 2d/3d systems (and the render
+		// `CharacterDrive` body for the agnostic `<Drive>` action).
 		#[cfg(feature = "bevy_default")]
 		app.add_plugins(crate::prelude::beet_extra_bevy_default_plugin);
 		// the ml example plugins (bert + frozen-lake), which need the render scenes.

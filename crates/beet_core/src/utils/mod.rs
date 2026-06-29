@@ -54,6 +54,11 @@ pub use stream_ext::TextStream;
 /// Time and duration utilities. Sleep/clock helpers are std-gated per-function;
 /// [`time_ext::pretty_print_duration`] works on no_std.
 pub mod time_ext;
+/// Typed physical quantities ([`units::Angle`], [`units::Distance`],
+/// [`units::LinearVelocity`], [`units::AngularVelocity`]) shared by the robot
+/// transport and the `Drive` action.
+pub mod units;
+pub use units::*;
 #[cfg(feature = "std")]
 pub use lazy_pool::*;
 mod tree;

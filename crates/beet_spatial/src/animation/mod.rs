@@ -8,6 +8,8 @@ mod trigger_on_animation_end;
 pub use self::trigger_on_animation_end::*;
 mod play_animation;
 pub use self::play_animation::*;
+mod play_animation_on_load;
+pub use self::play_animation_on_load::*;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -25,7 +27,9 @@ impl Plugin for AnimationFlowPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<PlayAnimation>()
 			.register_type::<TriggerOnAnimationEnd<Outcome>>()
+			.register_type::<PlayAnimationOnLoad>()
 			.add_systems(Update, init_animators)
+			.add_systems(Update, play_animation_on_load)
 			.add_systems(
 				Update,
 				trigger_on_animation_end::<Outcome>.in_set(TickSet),

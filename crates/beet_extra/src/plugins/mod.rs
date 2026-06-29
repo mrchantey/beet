@@ -22,12 +22,14 @@ mod thread_examples;
 #[cfg(feature = "thread")]
 pub use self::thread_examples::*;
 
-// the environment-agnostic drive example: the headless `Drive`/`DriveCommand` need
-// only beet_action/beet_core (always compiled), and the wgpu `CharacterDrive` body is
-// gated inside on `bevy_default`. Added unconditionally by `BeetExtraPlugin`, so the
-// same `<Drive>` resolves headless (`just beet`) and windowed (`--features winit`).
-mod drive_examples;
-pub use self::drive_examples::*;
+// the render body for the agnostic `<Drive>` action (`beet_action::Drive`): a
+// `CharacterDrive` that integrates the agent's commanded velocity into a `Transform`
+// and animates it. Render-only, so gated on `bevy_default` and wired by
+// `beet_extra_bevy_default_plugin`.
+#[cfg(feature = "bevy_default")]
+mod character_drive;
+#[cfg(feature = "bevy_default")]
+pub use self::character_drive::*;
 
 // the agent calculator toolset + the `Behavior` sequence marker.
 #[cfg(feature = "thread")]

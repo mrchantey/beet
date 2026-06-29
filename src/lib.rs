@@ -55,7 +55,11 @@ pub mod prelude {
 	pub use crate::action::prelude::*;
 	// `Command`: beet_action's external-process action vs bevy's `Command` trait
 	// (glob'd via `core`). Prefer the action so the BSX `<Command>` tag resolves.
-	#[cfg(feature = "action")]
+	// The action is native-only (it shells out a child process), gated in
+	// `beet_action` as `all(feature = "std", not(target_arch = "wasm32"))`; mirror
+	// that gate here so the wasm build (eg `--features web`) doesn't try to re-export
+	// a `Command` the action layer never defines on wasm.
+	#[cfg(all(feature = "action", feature = "std", not(target_arch = "wasm32")))]
 	pub use crate::action::prelude::Command;
 	#[cfg(feature = "std")]
 	pub use crate::beet_plugins::*;

@@ -117,6 +117,9 @@ fn plugin_3d(app: &mut App) {
 		.register_template::<Ground3d>()
 		.register_template::<Camera3dLookAt>()
 		.register_template::<IkTarget>()
+		// the render body for the agnostic `<Drive>` action: `{CharacterDrive}`
+		// integrates the agent's commanded velocity into a `Transform` and animates it.
+		.add_plugins(crate::prelude::character_drive_plugin)
 		/*-*/;
 }
 /// Toggles fullscreen mode when F11 is pressed.

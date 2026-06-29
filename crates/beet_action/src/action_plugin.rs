@@ -34,6 +34,12 @@ impl Plugin for ActionPlugin {
 			// leaf / util actions
 			.register_type::<EndWith<Outcome>>()
 			.register_type::<Log>()
+			// the environment-agnostic drive leaf + the typed velocity it writes
+			// onto a driven body (resolved via `AgentQuery`).
+			.register_type::<Drive>()
+			.register_type::<DriveAction>()
+			.register_type::<LinearVelocity>()
+			.register_type::<AngularVelocity>()
 			.register_type::<SucceedTimes>()
 			.register_type::<RunTimer>()
 			.register_type::<RunNext>()

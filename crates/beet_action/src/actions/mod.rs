@@ -7,6 +7,7 @@ mod call_action;
 mod chain_action;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod command;
+mod drive;
 mod end_in_duration;
 mod end_with;
 mod insert_on;
@@ -23,6 +24,7 @@ mod trace_action;
 mod wrap_action;
 pub use agent::*;
 pub use async_action::*;
+pub use drive::*;
 pub use end_in_duration::*;
 pub use end_with::*;
 pub use insert_on::*;
