@@ -57,6 +57,10 @@ impl Plugin for CharcellTuiPlugin {
 			)
 			// SIGWINCH-equivalent: poll the real tty size and resize stdio buffers.
 			.add_systems(PreUpdate, resize_stdio_buffers)
+			// bind every terminal surface to the app-wide color scheme so a TUI app
+			// is themed without each host opting in (the terminal analogue of the
+			// router's `page_classes`).
+			.add_systems(PreUpdate, sync_terminal_color_scheme)
 			// hit-test + scroll input ride the bridged bevy mouse/key messages.
 			// pointer_input runs first so a wheel's own hover is current when
 			// scroll_input reads it; scrollbar_mouse claims gutter presses, others
@@ -72,6 +76,38 @@ impl Plugin for CharcellTuiPlugin {
 			// clicking a `<summary>` toggles its `<details>` (the terminal stand-in
 			// for the web's native disclosure).
 			.add_observer(toggle_details_on_click);
+	}
+}
+
+/// Bind every terminal surface to the app-wide colour scheme
+/// ([`Theme::scheme`](crate::style::material::Theme), dark by default), so a TUI
+/// scene loaded with no router (eg `--main`) is themed like a routed site. This is
+/// the terminal analogue of the router's `page_classes`: it applies the session
+/// scheme to the render root via the same [`ColorScheme`](crate::style::ColorScheme)
+/// handle (`sync_color_scheme` mirrors it onto the `.dark-scheme`/`.light-scheme`
+/// class), rather than re-implementing the cascade.
+///
+/// It *tracks* the live `Theme`, so seeding a `Theme`, a `<Theme scheme=..>`, or a
+/// `--color-scheme` argument re-themes the running app rather than being snapshot
+/// at spawn.
+///
+///
+/// TODO This is a hack because TuiThreadChat bypasses TuiServer,
+/// remove once we implement .agents/plans/agnostic-thread-ui.md
+#[cfg(feature = "tui")]
+fn sync_terminal_color_scheme(
+	theme: Option<Res<crate::style::material::Theme>>,
+	mut commands: Commands,
+	surfaces: Query<
+		(Entity, Option<&crate::style::ColorScheme>),
+		With<Terminal>,
+	>,
+) {
+	let scheme = theme.map(|theme| theme.scheme).unwrap_or_default();
+	for (entity, current) in surfaces.iter() {
+		if current != Some(&scheme) {
+			commands.entity(entity).insert(scheme);
+		}
 	}
 }
 

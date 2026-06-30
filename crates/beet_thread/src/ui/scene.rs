@@ -323,6 +323,42 @@ mod test {
 		frame.xpect_snapshot();
 	}
 
+	/// The terminal surface follows the app-wide [`Theme::scheme`] (the override
+	/// the router already uses), live: it defaults dark, a seeded light theme
+	/// themes the host, and switching the theme re-themes it. Regression for a
+	/// one-shot snapshot that ignored later theme changes.
+	#[beet_core::test]
+	async fn terminal_follows_theme_scheme() {
+		use beet_ui::prelude::ColorScheme;
+		use beet_ui::prelude::material::Theme;
+		let (mut app, host) = charcell_app().await;
+		// no theme seeded: the surface defaults to dark
+		app.update();
+		app.world()
+			.get::<ColorScheme>(host)
+			.copied()
+			.xpect_eq(Some(ColorScheme::Dark));
+		// an app-wide light theme themes the host ...
+		app.world_mut().insert_resource(Theme {
+			scheme: ColorScheme::Light,
+			..Default::default()
+		});
+		app.update();
+		app.update();
+		app.world()
+			.get::<ColorScheme>(host)
+			.copied()
+			.xpect_eq(Some(ColorScheme::Light));
+		// ... and switching it back re-themes the running surface
+		app.world_mut().resource_mut::<Theme>().scheme = ColorScheme::Dark;
+		app.update();
+		app.update();
+		app.world()
+			.get::<ColorScheme>(host)
+			.copied()
+			.xpect_eq(Some(ColorScheme::Dark));
+	}
+
 	/// Follow-to-bottom only sticks while the reader is at the bottom: once they
 	/// scroll up, a new post does not yank them back down. Regression for
 	/// `follow_thread_scroll` wrestling the scroll from the user.
