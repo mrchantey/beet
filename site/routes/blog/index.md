@@ -10,7 +10,7 @@ expanded = true
 #### [#13 — Engines, not frameworks](/blog/post-13)
 *Pete Hayman — 29th June, 2026*
 
-Apps are avocado slicers, reflecting the frameworks used to build them. Out of necessity, game engines are extremely generalizable and the natural fit for 'tools, not apps'.
+Apps are avocado slicers, reflecting the frameworks used to build them. Out of necessity, game engines are generalizable and the natural fit for 'tools, not apps'.
 
 <br/>
 
