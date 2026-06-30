@@ -53,17 +53,13 @@ pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
 }
 
 /// Initialize an opentofu directory, using the `./providers.tf.json`.
-/// Uses `-reconfigure` to allow backend type changes without migrating state.
-pub async fn init(dir: &AbsPathBuf, force: bool) -> Result {
-	let args = if force {
-		vec!["init", "-reconfigure"]
-	} else {
-		vec!["init"]
-	};
-
+/// Always passes `-reconfigure` so the shared per-app work directory can
+/// re-point at a different backend key when switching stages (eg `dev` ->
+/// `prod`), which each own an independent remote state and so need no migration.
+pub async fn init(dir: &AbsPathBuf) -> Result {
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(args)
+		.with_args(["init", "-reconfigure"])
 		.run_async()
 		.await?;
 	Ok(())

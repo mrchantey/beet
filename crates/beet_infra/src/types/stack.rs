@@ -13,8 +13,6 @@ pub struct Stack {
 	/// Name of the production stage, which often receives
 	/// special treatment like bucket locking and no subdomain.
 	prod_stage: SmolStr,
-	/// Allow reconfiguring the backend without migrating state
-	reconfigure: bool,
 	/// A suffix to append to the state backend, defaults to `tofu.tfstate`,
 	/// making the final state key `app-name--stage--state-suffix`
 	state_suffix: SmolStr,
@@ -74,7 +72,6 @@ impl Stack {
 			prod_stage: "prod".into(),
 			params: default(),
 			artifact_bucket_suffix: "artifacts".into(),
-			reconfigure: false,
 			backend: default(),
 			aws_region: crate::bindings::aws::region::DEFAULT.into(),
 			deploy_id,
