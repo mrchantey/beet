@@ -1,34 +1,60 @@
-//! `TakePhoto`: read the next floor photo and have a vision model describe it.
+//! `TakePhoto`: capture what is in front of the robot and have a vision model
+//! describe it. v1 ships only the mock camera (the floor-photo fixtures); the real
+//! camera (the browser webcam) lands in v3.
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Take a photo of what is in front of you and get back a description of it.
 ///
-/// Reads the next floor photo through the nearest ancestor [`BlobStore`], one-shots
-/// it to a vision model, and returns the model's description. Successive calls return
-/// successive photos (see [`PhotoStream`]), mocking a moving robot's camera.
+/// Captures an image (the mock camera reads the floor-photo fixtures; the real
+/// camera is not yet wired), one-shots it to a vision model, and returns the
+/// description.
 #[action(route = "take-photo")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn TakePhoto(cx: ActionContext<()>) -> Result<String> {
+pub async fn TakePhoto(cx: ActionContext<TakePhotoInput>) -> Result<String> {
+	let media = if cx.input.mock {
+		mock_capture(&cx.caller).await?
+	} else {
+		// the real camera (browser getUserMedia) lands in v3.
+		unimplemented!(
+			"real camera capture is not wired yet; call take-photo with mock = true"
+		)
+	};
+	describe_image(media).await
+}
+
+/// How to capture the photo.
+#[derive(Reflect, serde::Deserialize, serde::Serialize)]
+pub struct TakePhotoInput {
+	/// Use the mock camera (the floor-photo fixtures). The real camera is not yet
+	/// available, so set this `true` for now.
+	pub mock: bool,
+}
+
+// --- mock camera (v1) ---
+
+/// Capture from the mock camera: read the next floor photo through the nearest
+/// ancestor [`BlobStore`], cycling via [`PhotoStream`] so successive calls see
+/// successive photos. The v1 stand-in for the real webcam.
+async fn mock_capture(caller: &AsyncEntity) -> Result<MediaBytes> {
 	// resolve the photo store (scoped to the photo dir) and the next cursor in one
 	// world access, advancing the cursor so the following call sees the next photo.
-	let (dir_store, cursor) = cx
-		.caller
+	let (dir_store, cursor) = caller
 		.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
 			|entity, (stores, mut photos)| -> Result<(BlobStore, usize)> {
-				let dir_store = stores.get(entity)?.with_subdir(photos.dir.clone());
+				let dir_store =
+					stores.get(entity)?.with_subdir(photos.dir.clone());
 				Ok((dir_store, photos.advance()))
 			},
 		)
 		.await??;
-	let media = read_next_photo(&dir_store, cursor).await?;
-	describe_image(media).await
+	read_next_photo(&dir_store, cursor).await
 }
 
-/// The floor photos [`TakePhoto`] cycles through. The cursor advances each call and
-/// wraps, so the loop keeps seeing fresh scenes.
+/// The floor photos the mock camera cycles through. The cursor advances each call
+/// and wraps, so the loop keeps seeing fresh scenes.
 #[derive(Debug, Clone, Resource)]
 pub struct PhotoStream {
 	/// The store-relative directory the photos live in.
@@ -56,7 +82,7 @@ impl PhotoStream {
 }
 
 /// List the photo dir, sort for a stable order, and read the `cursor`-th photo
-/// (wrapping). Split out from the model call so the cycling is testable offline.
+/// (wrapping). Split out so the cycling is testable offline.
 async fn read_next_photo(
 	dir_store: &BlobStore,
 	cursor: usize,
@@ -69,7 +95,9 @@ async fn read_next_photo(
 	dir_store.get_media(&paths[cursor % paths.len()]).await
 }
 
-/// One-shot the photo to a vision model and return its description. Swap the
+// --- vision (shared by every camera) ---
+
+/// One-shot the captured photo to a vision model and return its description. Swap the
 /// streamer line to change provider (the agent itself is set in the scene's
 /// `{ModelStreamer}`).
 async fn describe_image(media: MediaBytes) -> Result<String> {

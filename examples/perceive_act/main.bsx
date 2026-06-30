@@ -1,14 +1,15 @@
 <!--
-Perceive-act loop, v1. Run it through the one binary, with the repo as the store
-root so `take-photo` can reach `assets/floor-photos`:
+Perceive-act loop, v1. Run it through the one binary (the store roots at the
+workspace root by default, so `take-photo` reaches `assets/floor-photos`):
 
-    beet --main=examples/perceive_act/main.bsx --root=.
+    beet --main=examples/perceive_act/main.bsx
 
 Each of the three turns (`{RepeatTimes{total_times:3}}`) the agent takes a photo
 (a floor photo described by a vision model), thinks out loud (the transcript),
-then acts: sets a face, says a line out loud (spoken via `tts`), and drives a
-heading. `Drive` and `SetEmotion` are mocked in v1. `{CreateThread}` exits once
-the turns complete; the transcript renders inline so it stays in scrollback.
+then acts: sets a face, says a line out loud (spoken via `tts`), and sets a
+heading. `SetHeading` and `SetEmotion` only record a component in v1.
+`{CreateThread}` exits once the turns complete; the transcript renders inline so
+it stays in scrollback.
 
 Needs `OPENAI_API_KEY` (the agent and the vision model both use OpenAI).
 -->
@@ -21,19 +22,22 @@ You are a small, curious floor robot exploring a room. You perceive the world on
 photo at a time and act on what you see.
 
 Each turn:
-1. Call take-photo to look at what is in front of you.
+1. Call take-photo (with mock set to true) to look at what is in front of you.
 2. Think briefly about what you see (text output is your private inner voice).
 3. Call set-emotion to match how you feel about it.
 4. Call remark to say one short line out loud, in character.
-5. Call drive to choose where to go next (Forward unless something blocks you,
-   then Left or Right to avoid it).
+5. Call set-heading to choose where to go next (Forward unless something blocks
+   you, then Left or Right to avoid it).
 
 Keep remarks short and full of personality. You are not narrating to a user, you
 are a robot living its little life.
 '/>
 			</CreateActor>
 			<CreateActor name="Robot" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<PerceiveActToolset/>
+				<TakePhoto/>
+				<Remark/>
+				<SetHeading/>
+				<SetEmotion/>
 			</CreateActor>
 		</div>
 	</div>

@@ -1,33 +1,42 @@
-//! `SetEmotion`: the agent sets its face. Mocked in v1 (records the emotion); v2
-//! renders the matching sprite cell in the TUI.
+//! `SetEmotion`: the agent sets its face, recorded as an [`Emotion`] component. Mocked
+//! in v1 (only records it); v2 renders the matching sprite cell in the TUI.
 use beet_core::prelude::*;
 
 /// Set your facial expression to match how you feel about what is happening.
+///
+/// Records the chosen [`Emotion`] on the caller; read it elsewhere with
+/// `Single<&Emotion>`.
 #[action(route = "set-emotion")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn SetEmotion(cx: ActionContext<SetEmotionInput>) -> Result<()> {
 	let emotion = cx.input.emotion;
-	info!("SetEmotion (mock): {emotion:?}");
-	cx.caller
-		.with_state::<ResMut<CurrentEmotion>, _>(move |_entity, mut current| {
-			current.0 = emotion;
-		})
-		.await?;
+	info!("SetEmotion: {emotion:?}");
+	cx.caller.insert(emotion).await?;
 	Ok(())
 }
 
-/// A facial expression the agent can wear.
+/// What expression to wear.
+#[derive(Reflect, serde::Deserialize, serde::Serialize)]
+pub struct SetEmotionInput {
+	/// The expression to show on the face.
+	pub emotion: Emotion,
+}
+
+/// The expression currently shown on the face, set by [`SetEmotion`] and read with
+/// `Single<&Emotion>`. v2 binds the TUI face sprite to it.
 #[derive(
 	Debug,
 	Default,
 	Clone,
 	Copy,
 	PartialEq,
+	Component,
 	Reflect,
 	serde::Deserialize,
 	serde::Serialize,
 )]
+#[reflect(Component, Default)]
 pub enum Emotion {
 	/// Eager and energetic.
 	#[default]
@@ -40,18 +49,6 @@ pub enum Emotion {
 	Angry,
 }
 
-/// What expression to wear.
-#[derive(Reflect, serde::Deserialize, serde::Serialize)]
-pub struct SetEmotionInput {
-	/// The expression to show on the face.
-	pub emotion: Emotion,
-}
-
-/// The emotion currently shown on the face, set by [`SetEmotion`]. v2 binds the TUI
-/// face sprite to this.
-#[derive(Debug, Default, Clone, Resource)]
-pub struct CurrentEmotion(pub Emotion);
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -60,7 +57,6 @@ mod test {
 	#[beet_core::test]
 	async fn records_emotion() {
 		let mut world = AsyncPlugin::world();
-		world.insert_resource(CurrentEmotion::default());
 		let entity = world.spawn(SetEmotion).id();
 		world
 			.entity_mut(entity)
@@ -69,6 +65,10 @@ mod test {
 			})
 			.await
 			.unwrap();
-		world.resource::<CurrentEmotion>().0.xpect_eq(Emotion::Angry);
+		world
+			.entity(entity)
+			.get::<Emotion>()
+			.copied()
+			.xpect_eq(Some(Emotion::Angry));
 	}
 }
