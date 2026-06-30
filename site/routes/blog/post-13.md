@@ -7,6 +7,8 @@ created="2026-06-30"
 
 *Pete Hayman — 30th June, 2026*
 
+<iframe src="https://www.youtube.com/embed/TVPtTf-ThjM" alt-src="https://youtu.be/TVPtTf-ThjM" title="The Harvest #13 - Engines, not frameworks" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 Until now I've been using the term "Malleable Application Framework" to describe beet, which in some ways fits perfectly:
 - The ECS and scene architecture make it very **malleable**
 - The entrypoint is literally a Bevy **App**
