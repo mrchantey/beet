@@ -34,6 +34,12 @@ pub use socket_server::*;
 // `ChannelHttpServer`, deliberately not wasm-gated (the wasm-runnable socket path).
 mod channel_socket_server;
 pub use channel_socket_server::*;
+// The Request/Response exchange carried over a socket; needs the `RequestParts` /
+// `ResponseParts` serde derives the frame serializes.
+#[cfg(feature = "serde")]
+mod socket_exchange;
+#[cfg(feature = "serde")]
+pub use socket_exchange::*;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 mod impl_tungstenite;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
