@@ -1,9 +1,11 @@
 +++
 title="Engines, not frameworks"
-created="2026-06-29"
+created="2026-06-30"
 +++
 
 # Engines, not frameworks
+
+*Pete Hayman — 30th June, 2026*
 
 Until now I've been using the term "Malleable Application Framework" to describe beet, which in some ways fits perfectly:
 - The ECS and scene architecture make it very **malleable**
