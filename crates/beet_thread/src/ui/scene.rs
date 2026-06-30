@@ -23,24 +23,15 @@ use beet_ui::prelude::*;
 /// `resolve_styles` rebuilds every node's `LayoutStyle` from the cascade, which
 /// would clobber a set component.
 fn host_column() -> impl Bundle {
-	(
-		// default the chat to dark mode: `sync_color_scheme` mirrors this onto the
-		// `.dark-scheme` class, which the Material cascade inherits down the whole
-		// subtree (a `--main` scene gets no scheme from the router's site layout).
-		ColorScheme::Dark,
-		inline_class![
-			(style::common_props::DisplayProp, style::Display::Flex),
-			(
-				style::common_props::FlexDirectionProp,
-				style::Direction::Vertical
-			),
-			// stretch children across the full width, so the transcript and the
-			// composer (and its top-border separator) span the terminal
-			(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
-			token(style::common_props::BackgroundColor, colors::Surface),
-			token(style::common_props::ForegroundColor, colors::OnSurface),
-		],
-	)
+	inline_class![
+		(style::common_props::DisplayProp, style::Display::Flex),
+		(style::common_props::FlexDirectionProp, style::Direction::Vertical),
+		// stretch children across the full width, so the transcript and the
+		// composer (and its top-border separator) span the terminal
+		(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
+		token(style::common_props::BackgroundColor, colors::Surface),
+		token(style::common_props::ForegroundColor, colors::OnSurface),
+	]
 }
 
 /// A full-screen charcell host for an interactive chat: the alt-screen terminal
@@ -65,21 +56,24 @@ pub fn TuiThreadChat() -> impl Bundle {
 	}
 }
 
-/// An inline charcell host for a finite, non-interactive run: it keeps the
-/// rendered transcript in the terminal scrollback after the process exits. Nest a
-/// [`ThreadView`] as its child (no composer). Used by the auto/finite examples.
+/// A full-screen charcell host for a finite, non-interactive run: the alt-screen
+/// terminal a transcript paints into, restored to the prior screen when the
+/// process exits (a self-exiting program leaves the alternate screen the same way
+/// Ctrl+C does). Nest a [`ThreadView`] as its child (no composer). Used by the
+/// auto/finite examples.
 ///
-/// Logs redirect to a file (frames paint to `/dev/tty`) so a verbose binary's
-/// request tracing never interleaves with the transcript; the normal screen
-/// buffer keeps the transcript in scrollback after exit.
+/// Like [`TuiThreadChat`] but without a composer; the alternate screen keeps the
+/// run from scrolling the terminal and returns it clean on exit. Logs redirect to
+/// a file (frames paint to `/dev/tty`, the default) so request tracing never
+/// corrupts the screen.
 #[template]
 pub fn TuiThreadTranscript() -> impl Bundle {
 	rsx! {
 		<div {(
-			StdioTerminal::inline()
-				.with_log_file(Some(std::path::PathBuf::from("target/beet-log.txt"))),
+			StdioTerminal::default(),
 			DoubleBuffer::default(),
 			host_column(),
+			RenderSurface::self_referential(),
 		)}>
 			<Slot/>
 		</div>
@@ -259,9 +253,13 @@ mod test {
 		frame_plain(&app, host).xpect_snapshot();
 	}
 
-	/// Append `count` numbered text posts authored by the thread's agent, so a
-	/// transcript can be made taller than its viewport.
-	fn push_numbered_posts(app: &mut App, thread: Entity, count: usize) {
+	/// Append numbered text posts (`line NN`) authored by the thread's agent over
+	/// `lines`, so a transcript can be grown past its viewport.
+	fn push_numbered_posts(
+		app: &mut App,
+		thread: Entity,
+		lines: std::ops::RangeInclusive<usize>,
+	) {
 		let thread_id = app.world().get::<Thread>(thread).unwrap().id();
 		let agent_id = app
 			.world()
@@ -272,7 +270,7 @@ mod test {
 			.find(|actor| actor.kind() == ActorKind::Agent)
 			.unwrap()
 			.id();
-		for index in 1..=count {
+		for index in lines {
 			app.world_mut()
 				.get_mut::<ThreadWindow>(thread)
 				.unwrap()
@@ -307,7 +305,7 @@ mod test {
 		app.update();
 		ThreadWindow::reduce_now(app.world_mut());
 		// far more posts than the 16-row viewport can hold
-		push_numbered_posts(&mut app, thread, 14);
+		push_numbered_posts(&mut app, thread, 1..=14);
 		app.world_mut().entity_mut(host).insert((
 			super::host_column(),
 			children![ThreadView::new(thread), CreatePostForm::new(thread)],
@@ -323,6 +321,59 @@ mod test {
 		// ... and the earliest is scrolled out of the clipped region.
 		frame.as_str().xnot().xpect_contains("line 01");
 		frame.xpect_snapshot();
+	}
+
+	/// Follow-to-bottom only sticks while the reader is at the bottom: once they
+	/// scroll up, a new post does not yank them back down. Regression for
+	/// `follow_thread_scroll` wrestling the scroll from the user.
+	#[beet_core::test]
+	async fn follow_leaves_scrolled_up_reader() {
+		let (mut app, host) = charcell_app_sized(UVec2::new(48, 16)).await;
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), Sequence::new(), children![
+				(
+					Actor::new("System", ActorKind::System),
+					children![Post::spawn("be brief")],
+				),
+				(Actor::new("Agent", ActorKind::Agent),),
+			]))
+			.id();
+		app.update();
+		ThreadWindow::reduce_now(app.world_mut());
+		push_numbered_posts(&mut app, thread, 1..=12);
+		app.world_mut()
+			.entity_mut(host)
+			.insert((super::host_column(), children![ThreadView::new(thread)]));
+		for _ in 0..30 {
+			app.update();
+		}
+		// the view auto-followed to the bottom; scroll the reader back to the top
+		let scroll = app
+			.world_mut()
+			.query_filtered::<Entity, With<ThreadScroll>>()
+			.single(app.world())
+			.unwrap();
+		app.world_mut()
+			.get_mut::<beet_ui::prelude::ScrollPosition>(scroll)
+			.unwrap()
+			.offset
+			.y = 0;
+		for _ in 0..5 {
+			app.update();
+		}
+		// a new post arrives: the scrolled-up reader is left in place, not yanked
+		push_numbered_posts(&mut app, thread, 13..=13);
+		for _ in 0..15 {
+			app.update();
+		}
+		let pos = app
+			.world()
+			.get::<beet_ui::prelude::ScrollPosition>(scroll)
+			.unwrap();
+		(pos.offset.y < pos.max.y).xpect_true();
+		// still showing the top, not pinned to the latest
+		frame_plain(&app, host).as_str().xpect_contains("line 01");
 	}
 
 	/// The chat layout (a [`ThreadView`] and a [`CreatePostForm`] as siblings

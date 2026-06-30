@@ -25,11 +25,25 @@ use bevy::math::UVec2;
 pub struct ScrollPosition {
 	/// Scrolled distance in cells from the content origin, per axis.
 	pub offset: IVec2,
+	/// The maximum scrollable offset (`content - scrollport`, per axis), written
+	/// by the renderer's clamp pass. Lets a consumer tell whether the view is at
+	/// the end without recomputing layout (eg a chat that follows the latest post
+	/// only while pinned to the bottom).
+	pub max: IVec2,
 }
 
 impl ScrollPosition {
 	/// A scroll position at the given cell offset.
-	pub fn new(offset: IVec2) -> Self { Self { offset } }
+	pub fn new(offset: IVec2) -> Self {
+		Self {
+			offset,
+			max: IVec2::ZERO,
+		}
+	}
+
+	/// Whether the vertical offset is at (or past) the bottom, ie nothing more to
+	/// scroll down to. Reads the [`max`](Self::max) the clamp pass recorded.
+	pub fn at_bottom(&self) -> bool { self.offset.y >= self.max.y }
 
 	/// Clamp the offset into the valid range for `state`, ie after a content or
 	/// scrollport size change. Returns whether the offset changed.

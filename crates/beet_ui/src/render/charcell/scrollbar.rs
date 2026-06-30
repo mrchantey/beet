@@ -56,6 +56,12 @@ pub fn clamp_scroll_positions<B: Component + AsBuffer>(
 				if clamped != scroll.offset {
 					scroll.offset = clamped;
 				}
+				// record the max so consumers can tell if the view is at the end
+				// (eg follow-to-bottom) without recomputing layout; guarded so a
+				// stable max doesn't spuriously mark the scroll changed.
+				if scroll.max != max_offset {
+					scroll.max = max_offset;
+				}
 			}
 		}
 	}

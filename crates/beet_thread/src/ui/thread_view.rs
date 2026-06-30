@@ -249,11 +249,15 @@ pub fn project_window_to_document(
 /// or grew) *or* its keyed rows spawn in (`Changed<Children>`), pin its
 /// [`ThreadScroll`] container to the bottom by parking the offset past the end.
 /// `clamp_scroll_positions` re-clamps it to the true max against the laid-out
-/// content. The `Changed<Children>` trigger matters because the reactive rows
-/// spawn a frame *after* the document is set, so a document-only trigger would pin
-/// against an empty (un-laid-out) container and clamp back to the top; re-pinning
-/// as the rows land lands the view at the bottom. Gating on a change (not every
-/// frame) leaves a user's scroll-up in place between updates.
+/// content.
+///
+/// Two subtleties:
+/// - The `Changed<Children>` trigger matters because the reactive rows spawn a
+///   frame *after* the document is set, so a document-only trigger would pin
+///   against an empty (un-laid-out) container and clamp back to the top.
+/// - It only follows while the view is already at the bottom
+///   ([`ScrollPosition::at_bottom`]); once a user scrolls up, new posts no longer
+///   yank them back to the latest.
 pub fn follow_thread_scroll(
 	views: Query<
 		Entity,
@@ -268,7 +272,11 @@ pub fn follow_thread_scroll(
 		for entity in std::iter::once(view).chain(children.iter_descendants(view))
 		{
 			if let Ok(mut scroll) = scrolls.get_mut(entity) {
-				scroll.offset.y = i32::MAX;
+				// leave a scrolled-up reader where they are; only stick to the
+				// bottom when already there.
+				if scroll.at_bottom() {
+					scroll.offset.y = i32::MAX;
+				}
 			}
 		}
 	}
