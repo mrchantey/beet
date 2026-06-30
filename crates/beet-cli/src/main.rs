@@ -248,20 +248,20 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 
 /// Resolve the (store root dir, entry name within it) for an explicit `--main`.
 ///
-/// By default the store roots at the **workspace root** (the nearest ancestor with a
-/// `Cargo.lock`, or `$WORKSPACE_ROOT`), with the name carrying the entry path
-/// relative to it, so an entry reaches workspace paths (eg `assets/`) with no flag.
-/// `--root=<dir>` overrides that root explicitly. Either way the entry can reach
-/// sibling/ancestor paths (eg the wasm page at `examples/wasm/main.bsx` inlining the
-/// workspace-relative `examples/action/hello_world.bsx`), and live reload watches the
-/// whole root. Falls back to the entry's own directory when it is not under the
-/// resolved root (or on wasm, which has no workspace).
+/// By default the store roots at the entry's **own directory**, with the entry's file
+/// name as the name, so an entry's `<TemplateDir src>` / `<RoutesDir src>` resolve
+/// relative to it (matching discovery, which roots the store at the dir holding the
+/// entry). `--root=<dir>` overrides that to a wider root the entry must live under, so
+/// an entry can reach sibling/ancestor paths (eg the wasm page at
+/// `examples/wasm/main.bsx`, run with `--root=.`, serving the workspace `examples/`
+/// tree). Either way live reload watches the resolved root.
 fn entry_root_and_name(
 	params: &MultiMap<SmolStr, SmolStr>,
 	entry: &AbsPathBuf,
 ) -> Result<(AbsPathBuf, String)> {
 	match params.get("root") {
-		// explicit `--root`: the entry must live under it.
+		// explicit `--root`: a wider root the entry must live under, so its `src`
+		// paths resolve workspace-relative.
 		Some(root) => {
 			let root = AbsPathBuf::new(root.as_str())?;
 			let entry_name = entry_name_under(entry, &root).ok_or_else(|| {
@@ -269,25 +269,19 @@ fn entry_root_and_name(
 			})?;
 			Ok((root, entry_name))
 		}
-		// default: the workspace root, falling back to the entry's own dir.
-		None => match default_entry_root()
-			.and_then(|root| Some((entry_name_under(entry, &root)?, root)))
-		{
-			Some((entry_name, root)) => Ok((root, entry_name)),
-			None => {
-				let dir = entry.parent().ok_or_else(|| {
-					bevyhow!("entry `{entry}` has no parent directory")
-				})?;
-				let entry_name = entry
-					.file_name()
-					.and_then(|name| name.to_str())
-					.ok_or_else(|| {
-						bevyhow!("entry `{entry}` has no file name")
-					})?
-					.to_string();
-				Ok((dir, entry_name))
-			}
-		},
+		// default: the entry's own directory, so its `src` paths resolve relative to
+		// the entry (matching discovery).
+		None => {
+			let dir = entry.parent().ok_or_else(|| {
+				bevyhow!("entry `{entry}` has no parent directory")
+			})?;
+			let entry_name = entry
+				.file_name()
+				.and_then(|name| name.to_str())
+				.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
+				.to_string();
+			Ok((dir, entry_name))
+		}
 	}
 }
 
@@ -296,16 +290,6 @@ fn entry_root_and_name(
 fn entry_name_under(entry: &AbsPathBuf, root: &AbsPathBuf) -> Option<String> {
 	entry.strip_prefix(root).ok()?.to_str().map(str::to_string)
 }
-
-/// The default store root when no `--root` is given: the workspace root, so an entry
-/// reaches workspace paths (eg `assets/`) with no flag. `None` on wasm (no workspace)
-/// or if detection fails, so the caller falls back to the entry's own directory.
-#[cfg(not(target_arch = "wasm32"))]
-fn default_entry_root() -> Option<AbsPathBuf> {
-	AbsPathBuf::new(fs_ext::workspace_root()).ok()
-}
-#[cfg(target_arch = "wasm32")]
-fn default_entry_root() -> Option<AbsPathBuf> { None }
 
 /// The native entry resolution: a remote store, an explicit `--main`, or a
 /// filesystem ancestor walk; see [`resolve_entry`].

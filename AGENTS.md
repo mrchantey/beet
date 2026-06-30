@@ -112,6 +112,10 @@ async_ext::do_async_thing().await;
 	- good: `does foo, ie bar`
 	- bad: `does foo, i.e., bar`
 
+## Permissions
+
+- 
+
 ## Testing
 
 

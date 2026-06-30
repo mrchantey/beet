@@ -35,41 +35,31 @@ pub struct TakePhotoInput {
 
 // --- mock camera (v1) ---
 
-/// Capture from the mock camera: read the next floor photo through the nearest
-/// ancestor [`BlobStore`], cycling via [`PhotoStream`] so successive calls see
-/// successive photos. The v1 stand-in for the real webcam.
+/// Capture from the mock camera: read the next floor photo from the nearest
+/// self-or-ancestor [`BlobStore`], cycling via [`PhotoStream`] so successive calls
+/// see successive photos. The store is mounted in markup at the floor-photo dir, eg
+/// `<TakePhoto {FsStore{path:"assets/floor-photos"}}/>`. The v1 stand-in for the
+/// real webcam.
 async fn mock_capture(caller: &AsyncEntity) -> Result<MediaBytes> {
-	// resolve the photo store (scoped to the photo dir) and the next cursor in one
-	// world access, advancing the cursor so the following call sees the next photo.
-	let (dir_store, cursor) = caller
+	// resolve the photo store and the next cursor in one world access, advancing the
+	// cursor so the following call sees the next photo.
+	let (store, cursor) = caller
 		.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
 			|entity, (stores, mut photos)| -> Result<(BlobStore, usize)> {
-				let dir_store =
-					stores.get(entity)?.with_subdir(photos.dir.clone());
-				Ok((dir_store, photos.advance()))
+				Ok((stores.get(entity)?.clone(), photos.advance()))
 			},
 		)
 		.await??;
-	read_next_photo(&dir_store, cursor).await
+	read_next_photo(&store, cursor).await
 }
 
-/// The floor photos the mock camera cycles through. The cursor advances each call
-/// and wraps, so the loop keeps seeing fresh scenes.
-#[derive(Debug, Clone, Resource)]
+/// The mock camera's cursor over its photo store: it advances each call and wraps,
+/// so the loop keeps seeing fresh scenes. The photos themselves come from the
+/// nearest self-or-ancestor [`BlobStore`] (see [`mock_capture`]).
+#[derive(Debug, Default, Clone, Resource)]
 pub struct PhotoStream {
-	/// The store-relative directory the photos live in.
-	pub dir: SmolPath,
 	/// The index of the next photo to return.
 	pub cursor: usize,
-}
-
-impl Default for PhotoStream {
-	fn default() -> Self {
-		Self {
-			dir: SmolPath::from("assets/floor-photos"),
-			cursor: 0,
-		}
-	}
 }
 
 impl PhotoStream {
@@ -162,5 +152,33 @@ mod test {
 		read_next_photo(&photo_store("photos", 0).await, 0)
 			.await
 			.xpect_err();
+	}
+
+	/// The mock camera resolves its photos from the nearest self-or-ancestor
+	/// [`BlobStore`] (the markup-mounted `{FsStore}`) and advances the shared cursor
+	/// across calls, the offline half of [`mock_capture`].
+	#[beet_core::test]
+	async fn resolves_photos_from_ancestor_store() {
+		let mut world = World::new();
+		world.init_resource::<PhotoStream>();
+		// store on an ancestor, camera reads it via self-or-ancestor lookup.
+		let parent = world.spawn(photo_store("photos", 3).await).id();
+		let camera = world.spawn(ChildOf(parent)).id();
+		world.flush();
+		// resolve the store + advance the cursor exactly as `mock_capture` does.
+		let resolve = |world: &mut World| {
+			world.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
+				|(stores, mut photos)| -> Result<(BlobStore, usize)> {
+					Ok((stores.get(camera)?.clone(), photos.advance()))
+				},
+			)
+		};
+		let (store, cursor) = resolve(&mut world).unwrap();
+		let first = read_next_photo(&store, cursor).await.unwrap();
+		let (store, cursor) = resolve(&mut world).unwrap();
+		let second = read_next_photo(&store, cursor).await.unwrap();
+		// the cursor advanced, so successive calls see successive photos.
+		cursor.xpect_eq(1);
+		(first.bytes() != second.bytes()).xpect_true();
 	}
 }
