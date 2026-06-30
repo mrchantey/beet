@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A malleable application framework</strong>
+    <strong>A malleable tool engine</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -16,7 +16,7 @@
   </h3>
 </div>
 
-Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a [Bevy App](https://bevy.org), and all structure and behavior is written in Entity Component System architecture.
+Beet is an engine for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a [Bevy App](https://bevy.org), and all structure and behavior is written in Entity Component System architecture.
 
 > 🚧 Mind your step! 🚧
 >

@@ -10,9 +10,9 @@ use beet::prelude::*;
 pub fn get() -> impl Bundle {
 	rsx! {
 		<div {hero_column()}>
-			<h1 {Classes::new([classes::TEXT_DISPLAY_MEDIUM])}>"Beet"</h1>
+			<h1 {Classes::new([classes::TEXT_DISPLAY_MEDIUM])}>"RSX Site"</h1>
 			<p {Classes::new([classes::TEXT_TITLE_LARGE])}>
-				<b>"A malleable application framework"</b>
+				<b>"A very cool site"</b>
 			</p>
 			<div {block_measure()}>
 				<p {Classes::new([classes::TEXT_BODY_LARGE, classes::TEXT_LEFT])}>

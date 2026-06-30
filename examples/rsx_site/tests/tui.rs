@@ -145,7 +145,7 @@ impl SiteHost {
 #[beet::test]
 async fn homepage_boots_with_chrome_and_scheme() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/");
-	host.step_until("malleable application framework");
+	host.step_until("very cool site");
 	// the BaseLayout chrome renders: header nav and footer.
 	let frame = host.frame();
 	frame
@@ -179,14 +179,14 @@ async fn app_fills_terminal_height() {
 #[beet::test]
 async fn nav_link_click_navigates() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/");
-	host.step_until("malleable application framework");
+	host.step_until("very cool site");
 	// click the header "Counter" link -> navigate to the counter page.
 	let (col, row) = host.cell_of("Counter");
 	host.click(col, row);
 	host.step_until("You have clicked 0 times.");
 	from_fullwidth(&host.frame())
 		.xnot()
-		.xpect_contains("malleable application framework");
+		.xpect_contains("very cool site");
 }
 
 /// The Rust reactive counter is interactive in the terminal: clicking a button
@@ -221,7 +221,7 @@ async fn color_scheme_resource_pins_light() {
 		app.world_mut().get_resource_or_init::<Theme>().scheme =
 			ColorScheme::Light;
 	});
-	host.step_until("malleable application framework");
+	host.step_until("very cool site");
 	host.has_class("light-scheme").xpect_true();
 	host.has_class("dark-scheme").xpect_false();
 	host.navigate("/buttons");

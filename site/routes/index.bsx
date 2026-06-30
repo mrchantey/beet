@@ -8,7 +8,7 @@ else is the shipped widget library (`<Link>`) and real semantic classes.
 <div bx:style="display=Flex flex-direction=Vertical align-items=Center text-align=Center row-gap=Rem(1.5)">
 	<h1 class="text-display-medium">Beet</h1>
 	<p class="text-title-large">
-		<b>A malleable application framework</b>
+		<b>A malleable tool engine</b>
 	</p>
 	<div bx:style="max-width=Rem(34.0)">
 		<div class="card-filled">
@@ -25,7 +25,7 @@ else is the shipped widget library (`<Link>`) and real semantic classes.
 	</div>
 	<div bx:style="max-width=Rem(34.0)">
 		<p class="text-body-large text-left">
-			Beet is a framework for building user-modifiable applications, like Smalltalk or HyperCard. Everything from the CLI to client applications is a
+			Beet is an engine for building user-modifiable applications, like Smalltalk or HyperCard. Everything from the CLI to client applications is a
 			<a href="https://bevy.org">Bevy App</a>, and all structure and behavior is written in Entity Component System architecture.
 		</p>
 	</div>

@@ -26,7 +26,7 @@ async fn home_in_document_layout() {
 		// document layout from the layout middleware
 		.xpect_contains(r#"<meta charset="UTF-8""#)
 		// page body transcluded into the layout's <main>
-		.xpect_contains("A malleable application framework")
+		.xpect_contains("A very cool site")
 		// header chrome: the nav links the layout composes
 		.xpect_contains("Counter")
 		.xpect_contains("Buttons");
@@ -141,7 +141,7 @@ async fn terminal_renders_full_layout() {
 		)
 		.await
 		// the page body is present ...
-		.xpect_contains("A malleable application framework")
+		.xpect_contains("A very cool site")
 		// ... wrapped in the layout chrome (a header nav link) ...
 		.xpect_contains("Counter")
 		// ... while the non-visual document head never leaks as text
@@ -208,5 +208,5 @@ async fn terminal_renders_charcell_layout() {
 	// the body text survives the charcell paint (folded from fullwidth, as the
 	// large-font tagline paints in fullwidth glyphs)
 	from_fullwidth(&strip_ansi(&body))
-		.xpect_contains("malleable application framework");
+		.xpect_contains("very cool site");
 }
