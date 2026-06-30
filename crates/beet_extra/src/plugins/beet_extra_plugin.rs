@@ -34,6 +34,7 @@ impl Plugin for BeetExtraPlugin {
 		app.add_plugins((
 			crate::prelude::ThreadExamplesPlugin,
 			crate::prelude::AgentExamplesPlugin,
+			crate::prelude::PerceiveActPlugin,
 		));
 		// the cloudflare/aws deploy example types + templates, so an
 		// `examples/infra/*.bsx` deployer runs through the one binary (headless).

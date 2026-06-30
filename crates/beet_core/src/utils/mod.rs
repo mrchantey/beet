@@ -56,7 +56,7 @@ pub use stream_ext::TextStream;
 pub mod time_ext;
 /// Typed physical quantities ([`units::Angle`], [`units::Distance`],
 /// [`units::LinearVelocity`], [`units::AngularVelocity`]) shared by the robot
-/// transport and the `Drive` action.
+/// transport and the `SetDrive` action.
 pub mod units;
 pub use units::*;
 #[cfg(feature = "std")]

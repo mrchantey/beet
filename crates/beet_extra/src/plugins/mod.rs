@@ -22,7 +22,7 @@ mod thread_examples;
 #[cfg(feature = "thread")]
 pub use self::thread_examples::*;
 
-// the render body for the agnostic `<Drive>` action (`beet_action::Drive`): a
+// the render body for the agnostic `<SetDrive>` action (`beet_action::SetDrive`): a
 // `CharacterDrive` that integrates the agent's commanded velocity into a `Transform`
 // and animates it. Render-only, so gated on `bevy_default` and wired by
 // `beet_extra_bevy_default_plugin`.

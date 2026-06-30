@@ -8,6 +8,11 @@ pub mod components;
 // runs through the one `beet` binary (headless, no render).
 #[cfg(feature = "infra")]
 pub mod infra;
+// the embodied perceive-act agent tools, so an `examples/perceive_act/*.bsx`
+// scene runs through the one binary (headless, no render needed). Needs the
+// thread runtime, blob store and child-process exec the `thread` feature pulls.
+#[cfg(feature = "thread")]
+pub mod perceive_act;
 // always compiled: `BeetExtraPlugin` selects its members by feature flag, so
 // the thread-only (`thread`, no `bevy_default`) build still gets the plugin.
 pub mod plugins;
@@ -19,6 +24,8 @@ pub mod prelude {
 	pub use crate::components::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::*;
+	#[cfg(feature = "thread")]
+	pub use crate::perceive_act::*;
 	pub use crate::plugins::*;
 	// the markup scene templates (`<Lighting3d/>`, `<Ground3d/>`, `<Sprite2d/>`, ...),
 	// so a `.bsx` names them and `beet_extra_bevy_default_plugin` registers them by

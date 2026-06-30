@@ -195,7 +195,7 @@ fn scalar_to_reflect(
 	}
 
 	// a number targeting a single-field tuple-struct wrapping a scalar (a newtype like
-	// `LinearVelocity(f32)`) builds that newtype from the bare number, so `<Drive
+	// `LinearVelocity(f32)`) builds that newtype from the bare number, so `<SetDrive
 	// linear=60>` authors a typed velocity directly. The inner field's type id drives
 	// the cast, mirroring the opaque branch above.
 	if let (Some(number), Some(TypeInfo::TupleStruct(info))) = (as_f64, field_info)
@@ -562,7 +562,7 @@ mod test {
 	}
 
 	/// A bare number coerces into a single-field tuple-struct newtype (eg
-	/// `LinearVelocity(f32)`), so `<Drive linear=60>` builds the typed wrapper from a
+	/// `LinearVelocity(f32)`), so `<SetDrive linear=60>` builds the typed wrapper from a
 	/// plain attribute. The stored field takes the number directly, in whatever unit
 	/// the newtype stores.
 	#[beet_core::test]

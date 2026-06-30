@@ -5,9 +5,9 @@ use beet_core::prelude::*;
 /// The commanded motion of a driven body: a forward speed plus a turn rate.
 ///
 /// Declared on the body (the agent) at spawn — the wgpu `CharacterDrive`, the Alvik
-/// robot root — and written by the [`Drive`] leaf through [`AgentQuery`]. Each
+/// robot root — and written by the [`SetDrive`] leaf through [`AgentQuery`]. Each
 /// environment reads this one component for the body it owns (the fox integrates it
-/// into a `Transform`, the Alvik maps it to its wheels), so the *same* `<Drive>`
+/// into a `Transform`, the Alvik maps it to its wheels), so the *same* `<SetDrive>`
 /// square patrol runs headless, on-screen, and on the robot.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -18,7 +18,7 @@ pub struct DifferentialDrive {
 	pub angular: AngularVelocity,
 }
 
-/// `<Drive linear=.. angular=..>` — the environment-agnostic motor leaf. On run it
+/// `<SetDrive linear=.. angular=..>` — the environment-agnostic motor leaf. On run it
 /// writes its `(linear, angular)` onto the agent's [`DifferentialDrive`] (resolved
 /// through [`AgentQuery`]), logs the step, then passes. `linear` is mm/s, `angular`
 /// is deg/s, so the same numbers mean the same commanded motion everywhere. Pair with
@@ -29,15 +29,15 @@ pub struct DifferentialDrive {
 /// action errors loudly if it is missing rather than silently doing nothing.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(DriveAction)]
-pub struct Drive {
+#[require(SetDriveAction)]
+pub struct SetDrive {
 	/// Forward speed, mm/s (negative = reverse).
 	pub linear: LinearVelocity,
 	/// Turn rate, deg/s (positive = left).
 	pub angular: AngularVelocity,
 }
 
-impl Drive {
+impl SetDrive {
 	/// A drive at the given linear + angular velocity.
 	pub fn new(
 		linear: impl Into<LinearVelocity>,
@@ -50,7 +50,7 @@ impl Drive {
 	}
 }
 
-/// The action behind [`Drive`]: reads the caller's [`Drive`], logs the step, and
+/// The action behind [`SetDrive`]: reads the caller's [`SetDrive`], logs the step, and
 /// applies it to the agent's [`DifferentialDrive`], then passes.
 ///
 /// ## Errors
@@ -59,20 +59,20 @@ impl Drive {
 #[action(handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-pub fn DriveAction(
+pub fn SetDriveAction(
 	cx: In<ActionContext>,
-	drives: Query<&Drive>,
+	drives: Query<&SetDrive>,
 	mut agents: AgentQuery<&'static mut DifferentialDrive>,
 ) -> Result<Outcome> {
 	let drive = drives.get(cx.id())?;
 	info!(
-		"Drive: linear={} angular={}",
+		"SetDrive: linear={} angular={}",
 		drive.linear.as_mm_per_sec(),
 		drive.angular.as_deg_per_sec()
 	);
 	let mut command = agents.get_mut(cx.id()).map_err(|_| {
 		bevyhow!(
-			"Drive action {}: its agent has no `DifferentialDrive` component — \
+			"SetDrive action {}: its agent has no `DifferentialDrive` component — \
 			declare it on the driven body at spawn",
 			cx.id()
 		)

@@ -3,7 +3,7 @@
 //! Each is a single-field `f32` newtype with a *hidden* inner unit (like
 //! [`core::time::Duration`]), so callers must go through the named constructors
 //! and accessors and can never confuse, say, degrees for radians. A robot API or a
-//! `Drive` action takes and returns these rather than bare `f32`; a transport layer
+//! `SetDrive` action takes and returns these rather than bare `f32`; a transport layer
 //! converts them to its wire's fixed units at the encode boundary only.
 //!
 //! A driven body carries its commanded [`LinearVelocity`] + [`AngularVelocity`]
@@ -160,7 +160,7 @@ impl_quantity_ops!(AngularVelocity);
 impl_quantity_ops!(Distance);
 impl_quantity_ops!(LinearVelocity);
 
-// A bare markup number (`<Drive linear=60 angular=90>`) coerces into the velocity
+// A bare markup number (`<SetDrive linear=60 angular=90>`) coerces into the velocity
 // through `From`, in the type's natural authoring unit (mm/s for linear, deg/s for
 // angular), so a scene reads in real-world units without a constructor call.
 macro_rules! impl_velocity_from {
