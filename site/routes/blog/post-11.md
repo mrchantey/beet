@@ -120,4 +120,4 @@ The architechture I'm currently exploring is inspired by design tokens, where ea
 
 Token keys can be universally unique, using urls or reverse domain name notation, and possibly even versioned for integration with document migration projects like [Cambria](https://www.inkandswitch.com/cambria/). 
 
-I'm currently exploring using this same pattern for state, a typed version of my declarative state proposal from [post 5](https://beetstack.dev/blog/post-5).
+I'm currently exploring using this same pattern for state, a typed version of my declarative state proposal from [post 5](https://beet.org/blog/post-5).

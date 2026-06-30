@@ -89,7 +89,7 @@ The primitives of an exchange are now as follows, simplified for brevity:
 	- ie http status, cli exit code, tool error
 - parts: `Parts`
 
-With this generalization things can get very weird, for example a http sitemap, cli `--help` flag and clanker tool definition list are now the same thing. Visit [`https://beetstack.dev/?help`](https://beetstack.dev/?help) to see it in action!
+With this generalization things can get very weird, for example a http sitemap, cli `--help` flag and clanker tool definition list are now the same thing. Visit [`https://beet.org/?help`](https://beet.org/?help) to see it in action!
 
 The change has removed some massive dependencies from `beet` alongside their bespoke architectures. The website, cli and clanker tools now all share the same exchange and routing patterns.
 

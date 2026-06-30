@@ -19,7 +19,7 @@ Last month I [began exploring](/blog/post-8) an agnostic `Request/Response` patt
 | `Vec<String>` | path | positional args |
 | `HashMap<String,Vec<String>>` | query params | options/flags |
 
-This is how [beetstack.dev works currently](https://github.com/mrchantey/beet/blob/83c8feb5ce60b64417baf97c0f2000c5cda09d5e/crates/beet_build/src/actions/beet_cli.rs#L14), the cli that builds the server and static html uses the same router as the server itself. A single project often contains several applications and using the same primitives reduces complexity.
+This is how [beet.org works currently](https://github.com/mrchantey/beet/blob/83c8feb5ce60b64417baf97c0f2000c5cda09d5e/crates/beet_build/src/actions/beet_cli.rs#L14), the cli that builds the server and static html uses the same router as the server itself. A single project often contains several applications and using the same primitives reduces complexity.
 
 But what happens if you go the other way? A single application with multiple interfaces?
 

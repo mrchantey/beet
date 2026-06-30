@@ -2,7 +2,7 @@
 
 Transport agnostic networking for bevy applications.
 
-The `Request` / `Response` pattern is generalized and not tied to any transport, with implementations in `http` and `stdio`. See [this blog post](https://beetstack.dev/blog/post-8) for more about the agnostic philosophy.
+The `Request` / `Response` pattern is generalized and not tied to any transport, with implementations in `http` and `stdio`. See [this blog post](https://beet.org/blog/post-8) for more about the agnostic philosophy.
 
 ## Features
 

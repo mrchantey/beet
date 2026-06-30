@@ -44,7 +44,7 @@ fn main() {
 			description: "A gallery of beet_ui rules and widgets".into(),
 			binary_name: Some("showcase".into()),
 			version: "0.0.0".into(),
-			homepage: Some("https://beetstack.dev".into()),
+			homepage: Some("https://beet.org".into()),
 			repository: None,
 			stage: "dev".into(),
 			service_access: ServiceAccess::Local,

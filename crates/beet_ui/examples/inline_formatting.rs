@@ -46,7 +46,7 @@ fn nested_emphasis() -> impl Bundle {
 
 fn link_and_code() -> impl Bundle {
 	rsx! {
-		<p>"See "<a href="https://beetstack.dev">"the docs"</a>
+		<p>"See "<a href="https://beet.org">"the docs"</a>
 			" or run "<code>"cargo test"</code>"."</p>
 	}
 }

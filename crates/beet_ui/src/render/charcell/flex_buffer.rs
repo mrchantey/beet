@@ -214,10 +214,10 @@ mod tests {
 		// closed again when the link clears on the following blank cell.
 		let mut buf = FlexBuffer::new(6);
 		buf.set(UVec2::new(0, 0), cell("x"));
-		buf.set_link(UVec2::new(0, 0), "https://beetstack.dev");
+		buf.set_link(UVec2::new(0, 0), "https://beet.org");
 		buf.render()
 			.as_str()
-			.xpect_contains("\x1b]8;;https://beetstack.dev\x1b\\")
+			.xpect_contains("\x1b]8;;https://beet.org\x1b\\")
 			.xpect_contains("\x1b]8;;\x1b\\");
 	}
 
