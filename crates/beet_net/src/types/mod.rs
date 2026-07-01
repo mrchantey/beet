@@ -56,6 +56,11 @@ mod status_code;
 pub use http_method::*;
 pub use status_code::*;
 pub mod http_ext;
+/// WebSocket (RFC 6455) frame codec and client handshake helpers (no_std), the
+/// socket analogue of [`http_ext`]. Rides the `sockets` feature, which supplies
+/// the [`Message`](crate::sockets::Message) type it maps to and from.
+#[cfg(feature = "sockets")]
+pub mod ws_ext;
 // the upgrade response type is part of the public route API, so it rides the
 // prelude; the pure detection/accept helpers stay namespaced under `http_ext`.
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]

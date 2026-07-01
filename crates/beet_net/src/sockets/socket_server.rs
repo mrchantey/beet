@@ -95,6 +95,10 @@ impl Plugin for SocketServerPlugin {
 pub struct SocketServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
+	/// The host/interface to bind to. `None` binds loopback (`127.0.0.1`); set
+	/// `0.0.0.0` (see [`bind_all`](Self::bind_all)) to accept connections from
+	/// other hosts on the network, eg an esp device.
+	pub host: Option<String>,
 }
 
 impl Default for SocketServer {
@@ -102,13 +106,30 @@ impl Default for SocketServer {
 }
 
 impl SocketServer {
-	/// Creates a new socket server bound to the specified port.
-	pub fn new(port: u16) -> Self { Self { port: Some(port) } }
+	/// Creates a new socket server bound to the specified port (on loopback).
+	pub fn new(port: u16) -> Self {
+		Self {
+			port: Some(port),
+			host: None,
+		}
+	}
+
+	/// Bind to `host` (an interface address) instead of loopback, so remote hosts
+	/// can connect. Pair with a routable address, ie `0.0.0.0` for all interfaces.
+	pub fn with_host(mut self, host: impl Into<String>) -> Self {
+		self.host = Some(host.into());
+		self
+	}
+
+	/// Bind to `0.0.0.0` (all interfaces), accepting connections from other hosts
+	/// on the network (eg an esp device connecting over Wi-Fi).
+	pub fn bind_all(self) -> Self { self.with_host("0.0.0.0") }
 
 	/// The host and port without the protocol, ie `127.0.0.1:3000`
 	pub fn local_address(&self) -> String {
+		let host = self.host.as_deref().unwrap_or("127.0.0.1");
 		let port = self.port.unwrap_or(0);
-		format!("127.0.0.1:{}", port)
+		format!("{}:{}", host, port)
 	}
 	/// Returns the full WebSocket URL for local connections, e.g. `ws://127.0.0.1:8339`.
 	pub fn local_url(&self) -> String {
@@ -132,7 +153,10 @@ impl SocketServer {
 			.expect("failed to create async listener");
 		let (_signal, shutdown) = oneshot::<()>();
 		(
-			Self { port: Some(port) },
+			Self {
+				port: Some(port),
+				host: None,
+			},
 			OnSpawn::new_async_local(move |entity| {
 				super::start_tungstenite_server_with_tcp(
 					entity, listener, shutdown,

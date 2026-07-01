@@ -41,7 +41,7 @@ mod udp;
 #[cfg(feature = "mdns")]
 mod mdns;
 /// WebSocket client and server implementations.
-#[cfg(feature = "std")]
+#[cfg(feature = "sockets")]
 pub mod sockets;
 /// SSH client and server implementations.
 #[cfg(any(feature = "russh_server", feature = "russh_client"))]
@@ -91,7 +91,7 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
 	pub use crate::server::*;
-	#[cfg(feature = "std")]
+	#[cfg(feature = "sockets")]
 	pub use crate::sockets;
 	#[cfg(any(feature = "russh_server", feature = "russh_client"))]
 	pub use crate::ssh::*;

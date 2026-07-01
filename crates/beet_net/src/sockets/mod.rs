@@ -28,17 +28,28 @@ mod echo_socket_server;
 mod socket;
 pub use socket::Message;
 pub use socket::*;
+// the agnostic no_std writer-feed mpsc for `Socket::effect`.
+mod writer_channel;
+// The server backend boots through `HttpServer`'s installable-backend model and
+// its `new_test` binds real TCP: std-only. The no_std client core does not need
+// it, so it rides `std` (the bare-metal device is a client).
+#[cfg(feature = "std")]
 mod socket_server;
+#[cfg(feature = "std")]
 pub use socket_server::*;
 // In-memory channel-backed WebSocket server: the socket analogue of
-// `ChannelHttpServer`, deliberately not wasm-gated (the wasm-runnable socket path).
+// `ChannelHttpServer`. Built on `async_channel` (std-only), so gated on `std`.
+#[cfg(feature = "std")]
 mod channel_socket_server;
+#[cfg(feature = "std")]
 pub use channel_socket_server::*;
 // The Request/Response exchange carried over a socket; needs the `RequestParts` /
-// `ResponseParts` serde derives the frame serializes.
-#[cfg(feature = "serde")]
+// `ResponseParts` serde derives the frame serializes. Desirable on device
+// eventually, but out of scope here, so gate on `std` so it does not force std
+// into the esp build.
+#[cfg(all(feature = "serde", feature = "std"))]
 mod socket_exchange;
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 pub use socket_exchange::*;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 mod impl_tungstenite;

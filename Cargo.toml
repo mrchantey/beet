@@ -346,6 +346,10 @@ bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithrea
 # beet_router's std HTTP-server surface, which a no_std consumer (`router_embedded`)
 # must avoid. The std `router`/`http_server` features re-add it explicitly.
 net = ["dep:beet_net"]
+# the no_std-capable WebSocket socket core (client, `Message`, events,
+# `common_handlers`, `ws_ext`, `set_socket_client`); a bare-metal transport
+# (esp) installs its own client on top. `std` builds get it via `beet_net/std`.
+sockets = ["net", "action", "beet_net?/sockets"]
 # The agnostic mDNS service browser engine + pure wire helpers (no_std). esp
 # enables this for the browser and supplies its own `edge-nal`-backed UDP socket
 # impl; on a host, pair with `udp` to get the std `async-io` socket driver.
@@ -557,6 +561,11 @@ required-features = ["tungstenite", "json"]
 [[example]]
 name = "socket_server"
 path = "examples/net/socket_server.rs"
+required-features = ["tungstenite", "action"]
+
+[[example]]
+name = "socket_echo_server"
+path = "examples/net/socket_echo_server.rs"
 required-features = ["tungstenite", "action"]
 
 [[example]]

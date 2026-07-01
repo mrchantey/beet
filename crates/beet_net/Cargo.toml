@@ -25,6 +25,9 @@ std = [
 	# the action/exchange integration; no_std-capable, so split out as its own
 	# feature `std` simply turns on (see `action` below).
 	"action",
+	# the no_std-capable WebSocket socket core; `std` always has it, esp enables
+	# it directly. See the `sockets` feature below.
+	"sockets",
 	"beet_action/std",
 	"beet_action/reflect",
 	"dep:async-channel",
@@ -43,6 +46,14 @@ std = [
 # the full std surface), so a bare-metal consumer can route incoming requests
 # through the async action layer. `std` enables it automatically.
 action = ["dep:beet_action"]
+# The no_std-capable WebSocket socket core: the `Socket` client, `Message`, the
+# events, `common_handlers`, the `ws_ext` frame codec and `set_socket_client`.
+# Rides `action` (the async ECS effect), plus `sha1`/`base64` for the handshake
+# `Sec-WebSocket-Accept` and `futures-channel` for the agnostic writer-feed
+# channel. `std` turns it on; a bare-metal client (esp) enables it directly. The
+# tungstenite/web-sys transports and the server/channel backends ride their own
+# features on top of it.
+sockets = ["action", "dep:sha1", "dep:base64"]
 json = ["serde",	"dep:serde_json", "beet_core/json", "beet_action?/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`

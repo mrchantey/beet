@@ -1,23 +1,49 @@
 use beet_core::prelude::*;
+use bevy::platform::sync::OnceLock;
 use bytes::Bytes;
-use futures::Stream;
-use futures::future::BoxFuture;
-use send_wrapper::SendWrapper;
-use std::pin::Pin;
+use core::pin::Pin;
+use futures_core::Stream;
+
+cfg_if! {
+	if #[cfg(feature = "std")] {
+		// On std the real `SendWrapper` enforces thread-affinity at runtime, so the
+		// thread-bound reader/writer are only ever touched on their creating thread.
+		use send_wrapper::SendWrapper as SocketCell;
+	} else {
+		// no_std single-threaded stand-in for `send_wrapper::SendWrapper` (which
+		// uses `std::thread`): nothing is ever sent across threads on the esp
+		// cooperative executor, so asserting `Send`/`Sync` for the boxed
+		// reader/writer — required for `Socket` to be a valid Component — is sound.
+		pub(crate) struct SocketCell<T>(T);
+		unsafe impl<T> Send for SocketCell<T> {}
+		unsafe impl<T> Sync for SocketCell<T> {}
+		impl<T> SocketCell<T> {
+			fn new(value: T) -> Self { Self(value) }
+		}
+		impl<T> core::ops::Deref for SocketCell<T> {
+			type Target = T;
+			fn deref(&self) -> &T { &self.0 }
+		}
+		impl<T> core::ops::DerefMut for SocketCell<T> {
+			fn deref_mut(&mut self) -> &mut T { &mut self.0 }
+		}
+	}
+}
 
 /// A cross-platform WebSocket that implements Stream of inbound [`Message`]
 /// and provides methods to send messages and close the connection.
 ///
 #[derive(BundleEffect)]
 pub struct Socket {
-	// SendWrapper for usage in bevy components
-	pub(crate) reader: SendWrapper<Pin<Box<dyn SocketReader>>>,
-	// SendWrapper for usage in bevy components
-	pub(crate) writer: SendWrapper<Box<dyn SocketWriter>>,
+	// `SocketCell` (a `SendWrapper` on std, an unsafe no_std stand-in otherwise)
+	// so `Socket` is `Send + Sync` for use as a bevy Component despite the
+	// thread-bound reader/writer.
+	pub(crate) reader: SocketCell<Pin<Box<dyn SocketReader>>>,
+	pub(crate) writer: SocketCell<Box<dyn SocketWriter>>,
 }
 
-impl std::fmt::Debug for Socket {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for Socket {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_struct("Socket").finish_non_exhaustive()
 	}
 }
@@ -40,21 +66,22 @@ pub struct OnWebSocketUpgrade {
 impl Socket {
 	fn effect(self, entity: &mut EntityWorldMut) {
 		let (mut send, mut recv) = self.split();
-		// Feed the writer task over a channel. Both halves are `SendWrapper`s
-		// (under `bevy_multithreaded`) bound to the thread they were created on,
+		// Feed the writer task over a channel. Both halves are `SocketCell`s
+		// bound to the thread they were created on,
 		// so they must only be touched from a `_local` task. The observer runs on
 		// an arbitrary pool thread, so it only pushes `Send` messages into the
-		// channel rather than touching the writer directly.
+		// channel rather than touching the writer directly. `futures-channel` is
+		// the agnostic no_std + alloc mpsc here (`async-channel` is std-only).
 		let (message_send, message_recv) =
-			async_channel::unbounded::<Message>();
+			super::writer_channel::unbounded::<Message>();
 		entity
 			.observe_any(move |ev: On<MessageSend>| -> Result {
-				message_send.try_send(ev.event().clone().take()).ok();
+				message_send.send(ev.event().clone().take());
 				Ok(())
 			})
 			// writer task: owns `send` and drains the channel on its creation thread.
 			.run_async_local(async move |_| {
-				while let Ok(message) = message_recv.recv().await {
+				while let Some(message) = message_recv.recv().await {
 					// socket send errors are non-fatal
 					send.send(message).await.unwrap_or_else(|err| {
 						error!("{:?}", err);
@@ -91,31 +118,46 @@ impl Socket {
 			} else if #[cfg(feature = "tungstenite")] {
 				super::impl_tungstenite::connect_tungstenite(url).await
 			} else {
-				panic!(
-					"WebSocket implementation not available - enable the tungstenite feature or target wasm32"
-				)
+				// no backend compiled in: defer to a transport installed at
+				// runtime via `set_socket_client` (eg the esp WiFi adapter),
+				// mirroring `send_http`'s bare-metal fallthrough.
+				match SOCKET_CLIENT.get() {
+					Some(connect) => connect(url.as_ref()).await,
+					None => bevybail!(
+						"No WebSocket transport configured. Enable the tungstenite \
+						 feature, target wasm32, or install one via set_socket_client(...)."
+					),
+				}
 			}
 		}
 	}
 	/// Returns an [`OnSpawn`] callback that connects to the URL and inserts the socket.
 	pub fn insert_on_connect(url: impl AsRef<str>) -> OnSpawn {
 		let url = url.as_ref().to_owned();
-		OnSpawn::new_async_local(async move |entity| -> Result {
-			let socket = Socket::connect(url).await?;
-			entity.insert(socket).await?;
-			Ok(())
+		// `OnSpawn::new_async_local` is std-only; drive the connect on the
+		// entity's own `run_async_local` instead (available on no_std via
+		// `bevy_async`), matching `effect`'s reader/writer tasks.
+		OnSpawn::new(move |entity: &mut EntityWorldMut| {
+			entity.run_async_local(async move |entity| -> Result {
+				let socket = Socket::connect(url).await?;
+				entity.insert(socket).await?;
+				Ok(())
+			});
 		})
 	}
 
-	/// Create a new socket from a message stream and writer.
-	#[allow(dead_code)]
-	pub(crate) fn new(
+	/// Create a [`Socket`] from a message stream reader and a writer.
+	///
+	/// The seam a downstream transport uses to build a `Socket` from its own
+	/// channel ends after installing [`set_socket_client`] (the esp WiFi backend
+	/// does exactly this); the built-in tungstenite/web-sys backends use it too.
+	pub fn new(
 		reader: impl SocketReader,
 		writer: impl SocketWriter,
 	) -> Self {
 		Self {
-			reader: SendWrapper::new(Box::pin(reader)),
-			writer: SendWrapper::new(Box::new(writer)),
+			reader: SocketCell::new(Box::pin(reader)),
+			writer: SocketCell::new(Box::new(writer)),
 		}
 	}
 
@@ -146,13 +188,33 @@ impl Socket {
 	}
 }
 
+/// A runtime-installed WebSocket connect transport, mirroring `HttpSendFn`.
+///
+/// The no_std-friendly client hook: when no backend is compiled in (`tungstenite`
+/// or wasm/web-sys), [`Socket::connect`] falls through to a function installed
+/// here, letting a bare-metal adapter (an esp WiFi crate, …) plug in its own
+/// transport without living in `beet_net`.
+pub type SocketConnectFn =
+	fn(url: &str) -> MaybeSendBoxedFuture<'static, Result<Socket>>;
+
+static SOCKET_CLIENT: OnceLock<SocketConnectFn> = OnceLock::new();
+
+/// Install the WebSocket transport [`Socket::connect`] uses when no client
+/// backend is compiled in, mirroring `set_http_client`. Errors if one is already
+/// installed.
+pub fn set_socket_client(client: SocketConnectFn) -> Result<()> {
+	SOCKET_CLIENT
+		.set(client)
+		.map_err(|_| bevyhow!("Socket client already installed"))
+}
+
 impl Stream for Socket {
 	type Item = Result<Message>;
 
 	fn poll_next(
 		mut self: Pin<&mut Self>,
-		cx: &mut std::task::Context<'_>,
-	) -> std::task::Poll<Option<Self::Item>> {
+		cx: &mut core::task::Context<'_>,
+	) -> core::task::Poll<Option<Self::Item>> {
 		Pin::new(&mut self.reader).poll_next(cx)
 	}
 }
@@ -172,7 +234,7 @@ impl<T> SocketReader for T where
 
 /// Read half returned by `Socket::split()`.
 pub struct SocketRead {
-	pub(crate) reader: SendWrapper<Pin<Box<dyn SocketReader>>>,
+	pub(crate) reader: SocketCell<Pin<Box<dyn SocketReader>>>,
 }
 
 impl Stream for SocketRead {
@@ -180,8 +242,8 @@ impl Stream for SocketRead {
 
 	fn poll_next(
 		mut self: Pin<&mut Self>,
-		cx: &mut std::task::Context<'_>,
-	) -> std::task::Poll<Option<Self::Item>> {
+		cx: &mut core::task::Context<'_>,
+	) -> core::task::Poll<Option<Self::Item>> {
 		Pin::new(&mut self.reader).poll_next(cx)
 	}
 }
@@ -192,18 +254,21 @@ impl Stream for SocketRead {
 /// boxed into `Socket`.
 pub trait SocketWriter: 'static + MaybeSend {
 	/// Send a message to the socket peer.
-	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
+	fn send_boxed(
+		&mut self,
+		msg: Message,
+	) -> SendBoxedFuture<Result<()>>;
 	/// Close the socket with an optional close frame.
 	fn close_boxed(
 		&mut self,
 		close: Option<CloseFrame>,
-	) -> BoxFuture<'static, Result<()>>;
+	) -> SendBoxedFuture<Result<()>>;
 }
 
 /// Write half returned by `Socket::split()`.
 
 pub struct SocketWrite {
-	pub(crate) writer: SendWrapper<Box<dyn SocketWriter>>,
+	pub(crate) writer: SocketCell<Box<dyn SocketWriter>>,
 }
 
 impl SocketWrite {
@@ -307,7 +372,6 @@ pub struct CloseFrame {
 #[cfg(any(feature = "tungstenite", target_arch = "wasm32"))]
 mod tests {
 	use super::*;
-	use futures::FutureExt;
 	use futures::StreamExt;
 	use futures::stream;
 
@@ -321,16 +385,16 @@ mod tests {
 		fn send_boxed(
 			&mut self,
 			msg: Message,
-		) -> BoxFuture<'static, Result<()>> {
+		) -> SendBoxedFuture<Result<()>> {
 			self.sent.push(msg);
-			async { Ok(()) }.boxed()
+			Box::pin(async { Ok(()) })
 		}
 		fn close_boxed(
 			&mut self,
 			close: Option<CloseFrame>,
-		) -> BoxFuture<'static, Result<()>> {
+		) -> SendBoxedFuture<Result<()>> {
 			self.closed.set(close);
-			async { Ok(()) }.boxed()
+			Box::pin(async { Ok(()) })
 		}
 	}
 

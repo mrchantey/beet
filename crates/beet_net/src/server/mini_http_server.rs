@@ -273,8 +273,9 @@ async fn upgrade_connection(
 
 #[cfg(test)]
 mod test {
-	// only the `ureq`-gated roundtrip below reads the parent module's items.
-	#[cfg(feature = "ureq")]
+	// both the `ureq` roundtrip and the `tungstenite` upgrade test below read the
+	// parent module's items (and its glob imports, eg StreamExt and the matchers).
+	#[cfg(any(feature = "ureq", feature = "tungstenite"))]
 	use super::*;
 
 	// -- integration test via shared suite --

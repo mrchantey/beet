@@ -1,7 +1,7 @@
 use super::Message;
 use super::*;
 use beet_core::prelude::*;
-use std::time::SystemTime;
+use bevy::platform::sync::OnceLock;
 
 /// Log the received socket message to info output
 pub fn log_recv(ev: On<MessageRecv>) {
@@ -39,16 +39,27 @@ pub fn echo_close(ev: On<MessageRecv>, mut commands: Commands) {
 	}
 }
 
+/// Microseconds elapsed on a process-global monotonic clock, the cross-platform
+/// (no_std) serializable stand-in for a wall-clock timestamp.
+fn ping_epoch_micros() -> u64 {
+	static EPOCH: OnceLock<Instant> = OnceLock::new();
+	EPOCH.get_or_init(Instant::now).elapsed().as_micros() as u64
+}
+
 /// A timestamp payload for WebSocket ping/pong round-trip time measurement.
+///
+/// Carries microseconds from a process-global monotonic [`Instant`] epoch (a
+/// serializable `u64`), so the round trip is measured against beet's
+/// cross-platform clock rather than the std-only `SystemTime`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PingTime {
-	timestamp: SystemTime,
+	elapsed_micros: u64,
 }
 
 impl Default for PingTime {
 	fn default() -> Self {
 		Self {
-			timestamp: SystemTime::now(),
+			elapsed_micros: ping_epoch_micros(),
 		}
 	}
 }
@@ -73,9 +84,12 @@ pub fn echo_pingtime(ev: On<MessageRecv>) {
 			else {
 				return;
 			};
-			let now = SystemTime::now();
-			let rtt = now.duration_since(ping_time.timestamp).unwrap();
-			info!("Round Trip Time: {}", time_ext::pretty_print_duration(rtt));
+			let rtt =
+				ping_epoch_micros().saturating_sub(ping_time.elapsed_micros);
+			info!(
+				"Round Trip Time: {}",
+				time_ext::pretty_print_duration(Duration::from_micros(rtt))
+			);
 		}
 		_ => {}
 	}

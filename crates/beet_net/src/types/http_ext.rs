@@ -307,7 +307,10 @@ pub fn sec_websocket_key(headers: &HeaderMap) -> Option<&str> {
 ///
 /// Reuses the workspace `sha1` (the RustCrypto sibling of `sha2`, used for the
 /// `aws_sdk` signing) and `base64` crates, so no new crypto dependency is added.
-#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+///
+/// Rides the no_std `sockets` feature (not `tungstenite`): the bare-metal client
+/// (`ws_ext`) computes it to validate the server's `101` handshake response.
+#[cfg(feature = "sockets")]
 pub fn sec_websocket_accept(key: &str) -> String {
 	/// The GUID concatenated with `Sec-WebSocket-Key` before hashing, per
 	/// [RFC 6455 §1.3](https://datatracker.ietf.org/doc/html/rfc6455#section-1.3).
