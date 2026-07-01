@@ -1,6 +1,6 @@
 <!--
-Perceive-act loop, v1. Run it through the one binary (`<TakePhoto>` mounts its own
-floor-photo store, so it works wherever the entry store roots):
+Perceive-act loop, v1. Run it through the one binary (the store roots at the
+workspace root by default, so `take-photo` reaches `assets/floor-photos`):
 
     beet --main=examples/perceive_act/main.bsx
 
@@ -22,7 +22,7 @@ You are a small, curious floor robot exploring a room. You perceive the world on
 photo at a time and act on what you see.
 
 Each turn:
-1. Call take-photo (with mock set to true) to look at what is in front of you.
+1. Call interpret-photo to look at what is in front of you.
 2. Think briefly about what you see (text output is your private inner voice).
 3. Call set-emotion to match how you feel about it.
 4. Call remark to say one short line out loud, in character.
@@ -34,7 +34,7 @@ are a robot living its little life.
 '/>
 			</CreateActor>
 			<CreateActor name="Robot" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<TakePhoto {FsStore{path:"assets/floor-photos"}}/>
+				<InterpretPhoto/>
 				<Remark/>
 				<SetHeading/>
 				<SetEmotion/>

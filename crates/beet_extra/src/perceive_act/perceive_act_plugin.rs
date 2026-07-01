@@ -14,6 +14,7 @@ impl Plugin for PerceiveActPlugin {
 			.init_plugin::<ThreadUiPlugin>()
 			.init_resource::<PhotoStream>()
 			.register_type::<TakePhoto>()
+			.register_type::<InterpretPhoto>()
 			.register_type::<Remark>()
 			.register_type::<SetHeading>()
 			.register_type::<SetEmotion>()
@@ -34,7 +35,7 @@ mod test {
 		app.add_plugins(MinimalPlugins)
 			.init_plugin::<ThreadPlugin>();
 		app.world_mut()
-			.spawn(children![TakePhoto, Remark, SetHeading, SetEmotion]);
+			.spawn(children![InterpretPhoto, Remark, SetHeading, SetEmotion]);
 		app.world_mut().flush();
 		app.world_mut()
 			.run_system_once(|tools: Query<(), With<ToolDefinition>>| {

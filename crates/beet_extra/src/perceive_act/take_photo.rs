@@ -1,65 +1,55 @@
-//! `TakePhoto`: capture what is in front of the robot and have a vision model
-//! describe it. v1 ships only the mock camera (the floor-photo fixtures); the real
-//! camera (the browser webcam) lands in v3.
-use crate::beet::prelude::*;
+//! `TakePhoto`: the raw photo capture, `In = ()`, `Out = MediaBytes`. Pure: no model,
+//! no describe. The head client serves this `take-photo` capability (this desktop
+//! binary captures the floor-photo fixtures; the browser binary serves the same route
+//! from the real webcam in V3). [`InterpretPhoto`](super::InterpretPhoto) calls it.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Take a photo of what is in front of you and get back a description of it.
-///
-/// Captures an image (the mock camera reads the floor-photo fixtures; the real
-/// camera is not yet wired), one-shots it to a vision model, and returns the
-/// description.
+/// Capture a photo and return its bytes (the raw image, no description).
 #[action(route = "take-photo")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn TakePhoto(cx: ActionContext<TakePhotoInput>) -> Result<String> {
-	let media = if cx.input.mock {
-		mock_capture(&cx.caller).await?
-	} else {
-		// the real camera (browser getUserMedia) lands in v3.
-		unimplemented!(
-			"real camera capture is not wired yet; call take-photo with mock = true"
-		)
-	};
-	describe_image(media).await
+pub async fn TakePhoto(cx: ActionContext<()>) -> Result<MediaBytes> {
+	capture(&cx.caller).await
 }
 
-/// How to capture the photo.
-#[derive(Reflect, serde::Deserialize, serde::Serialize)]
-pub struct TakePhotoInput {
-	/// Use the mock camera (the floor-photo fixtures). The real camera is not yet
-	/// available, so set this `true` for now.
-	pub mock: bool,
-}
-
-// --- mock camera (v1) ---
-
-/// Capture from the mock camera: read the next floor photo from the nearest
-/// self-or-ancestor [`BlobStore`], cycling via [`PhotoStream`] so successive calls
-/// see successive photos. The store is mounted in markup at the floor-photo dir, eg
-/// `<TakePhoto {FsStore{path:"assets/floor-photos"}}/>`. The v1 stand-in for the
-/// real webcam.
-async fn mock_capture(caller: &AsyncEntity) -> Result<MediaBytes> {
-	// resolve the photo store and the next cursor in one world access, advancing the
-	// cursor so the following call sees the next photo.
-	let (store, cursor) = caller
+/// Read the next floor photo through the nearest ancestor [`BlobStore`], cycling via
+/// [`PhotoStream`] so successive calls see successive photos. This desktop binary's
+/// capture; the browser binary serves the same `take-photo` route from the real webcam
+/// in V3. `pub(crate)` so the single-binary [`InterpretPhoto`](super::InterpretPhoto)
+/// can capture without a round trip until V2 moves it to the head client.
+pub(crate) async fn capture(caller: &AsyncEntity) -> Result<MediaBytes> {
+	// resolve the photo store (scoped to the photo dir) and the next cursor in one
+	// world access, advancing the cursor so the following call sees the next photo.
+	let (dir_store, cursor) = caller
 		.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
 			|entity, (stores, mut photos)| -> Result<(BlobStore, usize)> {
-				Ok((stores.get(entity)?.clone(), photos.advance()))
+				let dir_store =
+					stores.get(entity)?.with_subdir(photos.dir.clone());
+				Ok((dir_store, photos.advance()))
 			},
 		)
 		.await??;
-	read_next_photo(&store, cursor).await
+	read_next_photo(&dir_store, cursor).await
 }
 
-/// The mock camera's cursor over its photo store: it advances each call and wraps,
-/// so the loop keeps seeing fresh scenes. The photos themselves come from the
-/// nearest self-or-ancestor [`BlobStore`] (see [`mock_capture`]).
-#[derive(Debug, Default, Clone, Resource)]
+/// The floor photos the capture cycles through. The cursor advances each call and
+/// wraps, so the loop keeps seeing fresh scenes.
+#[derive(Debug, Clone, Resource)]
 pub struct PhotoStream {
+	/// The store-relative directory the photos live in.
+	pub dir: SmolPath,
 	/// The index of the next photo to return.
 	pub cursor: usize,
+}
+
+impl Default for PhotoStream {
+	fn default() -> Self {
+		Self {
+			dir: SmolPath::from("assets/floor-photos"),
+			cursor: 0,
+		}
+	}
 }
 
 impl PhotoStream {
@@ -83,37 +73,6 @@ async fn read_next_photo(
 	}
 	paths.sort();
 	dir_store.get_media(&paths[cursor % paths.len()]).await
-}
-
-// --- vision (shared by every camera) ---
-
-/// One-shot the captured photo to a vision model and return its description. Swap the
-/// streamer line to change provider (the agent itself is set in the scene's
-/// `{ModelStreamer}`).
-async fn describe_image(media: MediaBytes) -> Result<String> {
-	run_oneshot(children![
-		(
-			Actor::user(),
-			children![
-				Post::spawn(
-					"You are the eyes of a small floor robot. In one or two sentences, \
-					describe anything of interest in front of you, and any obstacle worth avoiding."
-				),
-				Post::spawn(IntoPost::Bytes {
-					media_type: media.media_type().clone(),
-					bytes: media.bytes().to_vec(),
-					file_stem: None,
-				}),
-			]
-		),
-		(Actor::agent(), OpenAiProvider::gpt_5_mini()?),
-	])
-	.await?
-	.into_iter()
-	.filter(|post| post.intent().is_display())
-	.map(|post| post.to_string())
-	.collect::<String>()
-	.xok()
 }
 
 #[cfg(test)]
@@ -152,33 +111,5 @@ mod test {
 		read_next_photo(&photo_store("photos", 0).await, 0)
 			.await
 			.xpect_err();
-	}
-
-	/// The mock camera resolves its photos from the nearest self-or-ancestor
-	/// [`BlobStore`] (the markup-mounted `{FsStore}`) and advances the shared cursor
-	/// across calls, the offline half of [`mock_capture`].
-	#[beet_core::test]
-	async fn resolves_photos_from_ancestor_store() {
-		let mut world = World::new();
-		world.init_resource::<PhotoStream>();
-		// store on an ancestor, camera reads it via self-or-ancestor lookup.
-		let parent = world.spawn(photo_store("photos", 3).await).id();
-		let camera = world.spawn(ChildOf(parent)).id();
-		world.flush();
-		// resolve the store + advance the cursor exactly as `mock_capture` does.
-		let resolve = |world: &mut World| {
-			world.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
-				|(stores, mut photos)| -> Result<(BlobStore, usize)> {
-					Ok((stores.get(camera)?.clone(), photos.advance()))
-				},
-			)
-		};
-		let (store, cursor) = resolve(&mut world).unwrap();
-		let first = read_next_photo(&store, cursor).await.unwrap();
-		let (store, cursor) = resolve(&mut world).unwrap();
-		let second = read_next_photo(&store, cursor).await.unwrap();
-		// the cursor advanced, so successive calls see successive photos.
-		cursor.xpect_eq(1);
-		(first.bytes() != second.bytes()).xpect_true();
 	}
 }

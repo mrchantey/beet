@@ -1,0 +1,40 @@
+<!--
+The fox driving the environment-agnostic `SetDrive` action in a wgpu scene: it walks a
+square patrol (drive forward 1s, turn 90 for 1s, repeat). Run it with the windowed
+stack:
+
+    cargo run -p beet-cli --features winit -- --main=examples/action/wgpu-action.bsx
+
+This is the reference for the perceive-act body client (V2): `ApplyHeading` maps a
+`Heading` onto the fox's `DifferentialDrive` exactly as these `SetDrive` +
+`EndInDuration` steps do. Copied upstream from a downstream demo; `Drive` was renamed
+to `SetDrive` to match the current API.
+-->
+<Scene3d>
+	<AppWindow/>
+	<Camera3d {CameraDistance{width:95., offset:{x:0., y:42., z:60.}}}/>
+	<Lighting3d/>
+	<Ground3d/>
+	<Foxie scale=0.1 bx:ref="fox" {CharacterDrive}>
+		<div {(RunOnLoad, Repeat, ActionOf($fox))}>
+			<Sequence>
+				<SetDrive linear=40. angular=0./>
+				<EndInDuration duration="1s"/>
+				<SetDrive linear=0. angular=90./>
+				<EndInDuration duration="1s"/>
+				<SetDrive linear=40. angular=0./>
+				<EndInDuration duration="1s"/>
+				<SetDrive linear=0. angular=90./>
+				<EndInDuration duration="1s"/>
+				<SetDrive linear=40. angular=0./>
+				<EndInDuration duration="1s"/>
+				<SetDrive linear=0. angular=90./>
+				<EndInDuration duration="1s"/>
+				<SetDrive linear=40. angular=0./>
+				<EndInDuration duration="1s"/>
+				<SetDrive linear=0. angular=90./>
+				<EndInDuration duration="1s"/>
+			</Sequence>
+		</div>
+	</Foxie>
+</Scene3d>
