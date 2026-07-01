@@ -93,6 +93,14 @@ impl PluginGroup for BeetPlugins {
 				builder = builder.add(SshTuiPlugin);
 			}
 		}
+		// the websocket socket-server backend (the tungstenite accept loop) so a
+		// markup `{SocketServer}` boots, eg the perceive-act agent. Opt-in via the
+		// `tungstenite` feature so a plain server build never links it.
+		cfg_if! {
+			if #[cfg(all(not(target_arch = "wasm32"), feature = "tungstenite"))] {
+				builder = builder.add(beet_net::sockets::SocketServerPlugin::default());
+			}
+		}
 		// the example capabilities (the spatial/render scenes, the agent-thread
 		// runtime, the cloudflare/aws deploy types), each self-selected by a
 		// `beet_extra` sub-feature. A regular `Plugin`, so it nests in this group; its

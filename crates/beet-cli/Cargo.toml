@@ -67,6 +67,12 @@ ml = ["winit", "beet/ml"]
 # ureq/rustls stack does not build on wasm, so it is enabled via the non-wasm
 # target table below rather than wired into this feature directly.
 net = ["beet/ureq","beet/rustls-tls"]
+# The websocket socket-server + client backend (tungstenite), so a markup
+# `{SocketServer}` boots and `Socket::connect` works, eg the perceive-act agent and
+# its in-process head/body clients. Opt-in (like `winit`), so a plain `beet serve`
+# never links tungstenite. Run with:
+# `cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket`.
+sockets = ["beet/tungstenite"]
 # The live terminal target for `beet present`: the navigable charcell host and
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.

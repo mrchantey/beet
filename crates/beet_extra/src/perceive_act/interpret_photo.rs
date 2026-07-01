@@ -2,21 +2,30 @@
 //! `Out = String`. It captures a photo and one-shots it to a vision model for a
 //! description. Distinct from [`TakePhoto`](super::TakePhoto), the raw capture: this
 //! is the agent-facing tool that adds the describe.
-use super::take_photo::capture;
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
+use beet_router::prelude::*;
 
 /// Look at what is in front of you and get back a description of it.
 ///
-/// V1 captures locally (the floor-photo fixtures, via [`TakePhoto`](super::TakePhoto)'s
-/// capture) then describes. V2 instead calls the `take-photo` route on the nearest
-/// ancestor router, so the capture runs on the head client while the describe stays
-/// here on the agent (the brief's "client captures, server describes").
+/// Captures via the `take-photo` route on the agent's own router (rather than a direct
+/// local capture), so a bound head client serves the capture while the describe stays
+/// here on the agent (the brief's "client captures, agent describes"). With no head
+/// bound, `take-photo`'s local handler captures the floor-photo fixtures instead.
 #[action(route = "interpret-photo")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn InterpretPhoto(cx: ActionContext<InterpretPhotoInput>) -> Result<String> {
-	describe_image(capture(&cx.caller).await?).await
+	let media = cx
+		.caller
+		.call_detached(route_action(), Request::get("take-photo"))
+		.await?
+		.into_result()
+		.await?
+		.into_media_bytes()
+		.await?;
+	describe_image(media).await
 }
 
 /// No arguments. An empty struct rather than `()` so the tool schema is a JSON object

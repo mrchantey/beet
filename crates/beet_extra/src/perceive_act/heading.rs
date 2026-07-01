@@ -1,24 +1,24 @@
-//! `SetHeading`: the agent chooses where to head, recorded as a [`Heading`] component.
+//! `ApplyHeading`: the agent chooses where to head, recorded as a [`Heading`] component.
 use beet_core::prelude::*;
 
 /// Set the direction the body should head, based on what you can see.
 ///
 /// Records the chosen [`Heading`] on the caller; read it elsewhere with
-/// `Single<&Heading>`. v1 only records it; v2 maps it onto the body's
-/// `DifferentialDrive` so the on-screen fox (and later the robot) moves.
-#[action(route = "set-heading")]
+/// `Single<&Heading>`. The mock body only logs it; the wgpu body (v2) maps it onto the
+/// fox's `DifferentialDrive` so the on-screen fox (and later the robot) moves.
+#[action(route = "apply-heading")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn SetHeading(cx: ActionContext<SetHeadingInput>) -> Result<()> {
+pub async fn ApplyHeading(cx: ActionContext<ApplyHeadingInput>) -> Result<()> {
 	let heading = cx.input.heading;
-	info!("SetHeading: {heading:?}");
+	info!("driving: {heading:?}");
 	cx.caller.insert(heading).await?;
 	Ok(())
 }
 
-/// What heading to set.
+/// What heading to apply.
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
-pub struct SetHeadingInput {
+pub struct ApplyHeadingInput {
 	/// The direction to head next. Prefer `Forward`, turning `Left` or `Right` only
 	/// to avoid an obstacle.
 	pub heading: Heading,
@@ -56,10 +56,10 @@ mod test {
 	#[beet_core::test]
 	async fn records_heading() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn(SetHeading).id();
+		let entity = world.spawn(ApplyHeading).id();
 		world
 			.entity_mut(entity)
-			.call::<SetHeadingInput, ()>(SetHeadingInput {
+			.call::<ApplyHeadingInput, ()>(ApplyHeadingInput {
 				heading: Heading::Left,
 			})
 			.await

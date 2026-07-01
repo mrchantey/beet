@@ -155,7 +155,7 @@ impl SocketServer {
 		(
 			Self {
 				port: Some(port),
-				host: None,
+				host: [127, 0, 0, 1],
 			},
 			OnSpawn::new_async_local(move |entity| {
 				super::start_tungstenite_server_with_tcp(
