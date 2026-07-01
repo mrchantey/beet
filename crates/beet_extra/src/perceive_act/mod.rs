@@ -13,6 +13,12 @@ mod capability_socket;
 pub use capability_socket::*;
 mod mock_clients;
 pub use mock_clients::*;
+// the wgpu render body (v2) swaps the logging mock body for a driven 3d fox; it needs
+// the render stack (`CharacterDrive`, `<Foxie>`), so it rides the `bevy_default` set.
+#[cfg(feature = "bevy_default")]
+mod wgpu_body;
+#[cfg(feature = "bevy_default")]
+pub use wgpu_body::*;
 mod take_photo;
 pub use take_photo::*;
 mod interpret_photo;

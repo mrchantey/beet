@@ -24,6 +24,11 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<Emotion>()
 			.register_template::<MockHead>()
 			.register_template::<MockBody>();
+		// the wgpu render body (v2): the driven fox and its `apply-heading` handler, so
+		// `<WgpuBody/>` resolves once the render stack is linked.
+		#[cfg(feature = "bevy_default")]
+		app.register_type::<DriveFox>()
+			.register_template::<WgpuBody>();
 	}
 }
 

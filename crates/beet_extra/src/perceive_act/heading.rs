@@ -3,9 +3,10 @@ use beet_core::prelude::*;
 
 /// Set the direction the body should head, based on what you can see.
 ///
-/// Records the chosen [`Heading`] on the caller; read it elsewhere with
-/// `Single<&Heading>`. The mock body only logs it; the wgpu body (v2) maps it onto the
-/// fox's `DifferentialDrive` so the on-screen fox (and later the robot) moves.
+/// The agent's `apply-heading` tool and the mock body's handler: logs the choice and
+/// records the [`Heading`] on the caller (read it with `Single<&Heading>`). The wgpu body
+/// (v2) serves the same route with `DriveFox` instead, mapping the heading onto the fox's
+/// `DifferentialDrive` so the on-screen fox (and later the robot) moves.
 #[action(route = "apply-heading")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]

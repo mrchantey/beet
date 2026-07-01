@@ -228,7 +228,7 @@ mod test {
 						route_action(),
 						Request::get("set-emotion")
 							.with_body(serde_json::to_string(&SetEmotionInput {
-								emotion: Emotion::Angry,
+								emotion: Emotion::Anger,
 							})?)
 							.with_header::<header::ContentType>(MediaType::Json),
 					)
@@ -246,6 +246,6 @@ mod test {
 		app.world_mut()
 			.get::<Emotion>(head_emotion)
 			.copied()
-			.xpect_eq(Some(Emotion::Angry));
+			.xpect_eq(Some(Emotion::Anger));
 	}
 }

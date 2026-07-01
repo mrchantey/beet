@@ -34,9 +34,27 @@ pub async fn InterpretPhoto(cx: ActionContext<InterpretPhotoInput>) -> Result<St
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
 pub struct InterpretPhotoInput {}
 
-/// One-shot the photo to a vision model and return its description. Swap the streamer
-/// line to change provider (the agent itself is set in the scene's `{ModelStreamer}`).
+/// One-shot the photo to a vision model and return its description.
+///
+/// [`run_oneshot`] spins up a self-driving nested [`App`], which stalls if it is driven
+/// from within the render runtime's async runner (the winit v2/v3 build re-enters it and
+/// never progresses). So the whole one-shot runs on a dedicated thread, its runtime fully
+/// isolated and its `!Send` `App` never crossing back; only the `String` result bridges
+/// home over a channel. Native-only, matching `run_oneshot` (std-only) and the describe's
+/// vision call.
 async fn describe_image(media: MediaBytes) -> Result<String> {
+	let (send, recv) =
+		beet_core::exports::async_channel::bounded::<Result<String>>(1);
+	std::thread::spawn(move || {
+		let _ = send.send_blocking(async_ext::block_on(describe_oneshot(media)));
+	});
+	recv.recv().await?
+}
+
+/// The vision one-shot itself: a mini-thread of a user post (prompt + image) and an
+/// OpenAI agent, run to completion, its display reply collected. Swap the streamer line
+/// to change provider (the agent itself is set in the scene's `{ModelStreamer}`).
+async fn describe_oneshot(media: MediaBytes) -> Result<String> {
 	run_oneshot(children![
 		(
 			Actor::user(),

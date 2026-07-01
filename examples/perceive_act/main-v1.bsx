@@ -1,7 +1,7 @@
 <!--
-Perceive-act loop, v1. One process: the agent (a socket server) plus two in-process
-mock clients (a mock head and a mock body) that connect back over the socket. Run it
-with the sockets backend, selecting the socket server:
+Perceive-act loop, v1. One process: the shared always-socket agent (`agent.bsx`) plus two
+in-process mock clients, a mock head and a mock body, that connect back over the socket.
+Run it with the sockets backend, selecting the socket server:
 
     cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket
 
@@ -11,40 +11,14 @@ head captures the floor-photo fixtures, speaks via `tts` and logs the emotion; t
 logs the heading. `{RepeatWhileFunctionCallOutput}` loops while the robot keeps acting,
 then exits.
 
+Only the body client differs from v2 (which swaps the mock body for a wgpu fox), so the
+agent block is factored into `agent.bsx` and shared verbatim.
+
 Needs `OPENAI_API_KEY` (the agent and the vision describe) and the kokoro `tts` on PATH.
 -->
-<Router {(SocketServer, BootOnLoad, CapabilityServer)}>
-	<!-- routable by interpret-photo, not offered to the model (outside the actor) -->
-	<TakePhoto/>
-	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
-		<div {Thread} {Sequence}>
-			<CreateActor name="System" kind="System">
-				<CreatePost text='
-You are a small, curious and very emotional floor robot exploring a room.
-You perceive the world one photo at a time and act on what you see.
-
-Repeat this cycle about three times to explore the room:
-1. Call interpret-photo to look at what is in front of you.
-2. Call set-emotion to match how you feel about what you see.
-3. Call speak-text to say one short line out loud, in character.
-4. Call apply-heading to choose where to go next (Forward, Left or Right).
-
-Always complete all four steps, in order, every cycle. After about three cycles, stop
-calling tools and give one short closing remark to end your exploration.
-
-Keep spoken lines short and full of personality. You are not narrating to a user, you
-are a robot living its little life.
-'/>
-			</CreateActor>
-			<CreateActor name="Robot" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<InterpretPhoto/>
-				<SpeakText/>
-				<SetEmotion/>
-				<ApplyHeading/>
-			</CreateActor>
-		</div>
-	</div>
+<Fragment>
+	<Template src="examples/perceive_act/agent.bsx"/>
 	<!-- in-process clients, each its own socket root -->
 	<MockHead url="ws://127.0.0.1:8338"/>
 	<MockBody url="ws://127.0.0.1:8338"/>
-</Router>
+</Fragment>
