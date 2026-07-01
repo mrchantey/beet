@@ -134,7 +134,7 @@ test-rsx *args:
 # client for the ssh_server example
 # the constant debug host key means fingerprints are stable between restarts
 ssh-client:
-	ssh -p 8322 127.0.0.1
+	ssh -p 8339 127.0.0.1
 
 snap:
 	cargo test -p beet_core 				--lib --all-features -- --snap

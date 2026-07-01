@@ -14,7 +14,7 @@
 //! ```
 //! Connect (the default port is [`DEFAULT_SSH_PORT`]):
 //! ```sh
-//! ssh -p 8322 guest@127.0.0.1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+//! ssh -p 8339 guest@127.0.0.1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
 //! ```
 
 use beet::net::prelude::*;

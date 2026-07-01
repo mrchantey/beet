@@ -31,7 +31,7 @@ async fn main_async() {
 
 	let futures = (0..num_requests).map(|_| async {
 		let start = Instant::now();
-		Request::get(DEFAULT_SERVER_LOCAL_URL).send().await.unwrap();
+		Request::get(DEFAULT_HTTP_LOCAL_URL).send().await.unwrap();
 		start.elapsed()
 	});
 	let durations = futures::future::join_all(futures).await;

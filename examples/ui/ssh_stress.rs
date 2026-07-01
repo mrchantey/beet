@@ -16,7 +16,7 @@
 //! cargo run --example ssh_stress --features ssh_client -- --count=50
 //! # steady-state: hold N sessions for 20s, driving 2 inputs/sec each:
 //! cargo run --example ssh_stress --features ssh_client -- --hold --count=50 --hold-secs=20 --input-hz=2
-//! cargo run --example ssh_stress --features ssh_client -- --hold --count=200 --addr=1.2.3.4:8322
+//! cargo run --example ssh_stress --features ssh_client -- --hold --count=200 --addr=1.2.3.4:8339
 //! ```
 //!
 //! Each session connects anonymously and requests an 80x24 pty + shell.

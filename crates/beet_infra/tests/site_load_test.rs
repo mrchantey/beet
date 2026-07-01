@@ -16,7 +16,7 @@
 //! scale-in is meaningful.
 //!
 //! Two topology changes since that report: ssh is now on the unified NLB at
-//! **port 22** (no `-p`, no separate ssh NLB on 8322), and the cluster/service are
+//! **port 22** (no `-p`, no separate ssh NLB on 8339), and the cluster/service are
 //! `beet-site--dev--main-fargate-cluster` / `main-fargate--service`.
 //!
 //! Run it (after the site is deployed) with:

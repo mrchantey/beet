@@ -44,7 +44,7 @@ pub struct LightsailBlock {
 	/// Networking mode, defaults to static IPv4.
 	networking: LightsailNetworking,
 	/// Explicit port the app server listens on. When `None`, resolved from
-	/// `BEET_PORT` or [`DEFAULT_SERVER_PORT`](beet_net::prelude::DEFAULT_SERVER_PORT)
+	/// `BEET_PORT` or [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT)
 	/// via [`app_port`](Self::app_port). Until infra declaration is wired to the
 	/// served site's state (like SST), this must match the markup `HttpServer{port}`.
 	#[get(skip)]
@@ -85,7 +85,7 @@ impl LightsailBlock {
 
 	/// The port the application server listens on: the block's explicit
 	/// [`app_port`](Self::with_app_port) if set, else `BEET_PORT`, else
-	/// [`DEFAULT_SERVER_PORT`](beet_net::prelude::DEFAULT_SERVER_PORT) (8337). Must
+	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337). Must
 	/// match the served site's markup port. With a domain Caddy reverse-proxies
 	/// 443 -> this port; without one the instance opens this port publicly.
 	fn app_port(&self) -> u16 {

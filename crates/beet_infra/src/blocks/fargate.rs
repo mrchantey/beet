@@ -106,7 +106,7 @@ impl Default for FargateBlock {
 		Self {
 			label: "main-fargate".into(),
 			dns: Vec::new(),
-			container_port: beet_net::prelude::DEFAULT_SERVER_PORT,
+			container_port: beet_net::prelude::DEFAULT_HTTP_PORT,
 			ssh_container_port: 22,
 			allow_ssh: false,
 			cpu: 256,

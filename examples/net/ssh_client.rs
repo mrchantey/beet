@@ -22,7 +22,7 @@ fn main() {
 			AsyncPlugin::default(),
 		))
 		.spawn((
-			SshSession::insert_on_connect("127.0.0.1:8322", "guest", "beet"),
+			SshSession::insert_on_connect("127.0.0.1:8339", "guest", "beet"),
 			OnSpawn::observe(on_recv),
 		))
 		.run();

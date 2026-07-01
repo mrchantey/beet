@@ -54,21 +54,21 @@ pub mod webdriver;
 pub mod prelude {
 	/// JavaScript analytics snippet for client-side tracking.
 	pub const ANALYTICS_JS: &str = include_str!("store/analytics/analytics.js");
-	/// Default port for a beet server: `8337` (BEET).
-	pub const DEFAULT_SERVER_PORT: u16 = 8337;
-	/// Default port for SSH connections: `8322`.
-	pub const DEFAULT_SSH_PORT: u16 = 8322;
-	/// Default port for WebSocket connections.
-	pub const DEFAULT_SOCKET_PORT: u16 = 8339;
 	/// Default URL for local server connections.
-	pub const DEFAULT_SERVER_LOCAL_URL: &str = "http://127.0.0.1:8337";
+	pub const DEFAULT_HTTP_LOCAL_URL: &str = "http://127.0.0.1:8337";
+	/// Default port for a beet server.
+	pub const DEFAULT_HTTP_PORT: u16 = 8337;
+	/// Default port for WebSocket connections.
+	pub const DEFAULT_SOCKET_PORT: u16 = 8338;
+	/// Default port for SSH connections.
+	pub const DEFAULT_SSH_PORT: u16 = 8339;
 	/// Default port for the webdriver (chromedriver, geckodriver, etc.).
 	pub const DEFAULT_WEBDRIVER_PORT: u16 = 8340;
-	/// Default port for WebSocket connections in webdriver sessions.
+	/// Default port for WebSocket connections in webdriver sessions: `8341`.
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
 	/// Resolve the port a beet server listens on: the `explicit` value if set,
-	/// else the `BEET_PORT` environment variable, else [`DEFAULT_SERVER_PORT`].
+	/// else the `BEET_PORT` environment variable, else [`DEFAULT_HTTP_PORT`].
 	///
 	/// The single source of truth for "which port", shared by [`HttpServer`] and
 	/// the deploy blocks (`LightsailBlock`, `CloudflareContainerBlock`) so a markup
@@ -80,7 +80,7 @@ pub mod prelude {
 					.ok()
 					.and_then(|val| val.parse().ok())
 			})
-			.unwrap_or(DEFAULT_SERVER_PORT)
+			.unwrap_or(DEFAULT_HTTP_PORT)
 	}
 
 	#[cfg(feature = "action")]

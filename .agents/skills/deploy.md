@@ -111,7 +111,7 @@ two clients run at once:
 Use the reusable scripts in `.agents/tmp/deploy-verify/` (built and shaken out
 locally): `ssh.sh <HOST> <PORT>` runs the whole check (single session + two-client
 multi-tenancy) and `ssh_pty.py <HOST> <PORT> '<SCRIPT>'` is the underlying pty
-driver. Local is `ssh.sh 127.0.0.1 8322`; dev/prod are `ssh.sh dev.beet.org 22` /
+driver. Local is `ssh.sh 127.0.0.1 8339`; dev/prod are `ssh.sh dev.beet.org 22` /
 `ssh.sh beet.org 22`. The script scales its waits up for the non-local port.
 
 Connection (what the driver runs per session):

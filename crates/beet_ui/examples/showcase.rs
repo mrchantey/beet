@@ -15,7 +15,7 @@
 //! content written between the tags lands in the widget's default `<Slot>`, and
 //! `slot="head"` rows route to the named `head` slot (see `<Slot>`).
 use beet_core::prelude::*;
-use beet_net::prelude::DEFAULT_SERVER_PORT;
+use beet_net::prelude::DEFAULT_HTTP_PORT;
 use beet_net::prelude::HttpServer;
 use beet_net::prelude::MediaType;
 use beet_net::prelude::Response;
@@ -69,7 +69,7 @@ fn serve_showcase(world: &mut World) -> Result {
 
 	// serve the pre-rendered page on every route
 	let server = HttpServer::default();
-	let port = server.port.unwrap_or(DEFAULT_SERVER_PORT);
+	let port = server.port.unwrap_or(DEFAULT_HTTP_PORT);
 	world.spawn((
 		server,
 		exchange_handler(move |_| {

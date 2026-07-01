@@ -10,7 +10,7 @@
 //! curl localhost:8337
 //! curl localhost:8337/health
 //! # a live TUI over ssh (open many at once, each independent):
-//! ssh -p 8322 guest@localhost -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+//! ssh -p 8339 guest@localhost -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
 //! ```
 //!
 //! In the terminal: arrow keys scroll, links navigate, Tab moves focus, alt+left
