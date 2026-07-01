@@ -131,22 +131,42 @@ fn method_token(method: &HttpMethod) -> &'static str {
 	}
 }
 
-/// Headers [`encode_request`] sets itself; user-supplied copies are skipped to
-/// avoid duplicates.
-fn is_managed_header(key: &str) -> bool {
-	key.eq_ignore_ascii_case("host")
-		|| key.eq_ignore_ascii_case("content-length")
-		|| key.eq_ignore_ascii_case("connection")
+/// Options controlling [`encode_request`]'s framing headers, so an upgrade
+/// handshake (`Connection: Upgrade`, no body) can reuse the same encoder as a
+/// one-shot request.
+#[derive(Debug, Clone, Copy)]
+pub struct EncodeRequestOptions {
+	/// Emit `Connection: close` (a one-shot request). When false no `Connection`
+	/// is forced, so the request's own (eg `Upgrade`) is written from its headers.
+	pub close_connection: bool,
+	/// Emit a `Content-Length` for the body. When false (eg a WebSocket upgrade
+	/// with no body) it is omitted.
+	pub content_length: bool,
+}
+
+impl Default for EncodeRequestOptions {
+	/// A one-shot request: `Connection: close` with a `Content-Length`.
+	fn default() -> Self {
+		Self {
+			close_connection: true,
+			content_length: true,
+		}
+	}
 }
 
 /// Serialize a beet [`Request`] into raw HTTP/1.1 bytes (origin-form target).
 ///
 /// The inverse of [`parse_http_request`]: writes the request line, a `Host`
-/// header from the request authority, the user headers (minus the ones this
-/// encoder manages), a computed `content-length`, a `connection: close`, and the
-/// body. Returns an error for a [`Body::Stream`], which can't be buffered here;
-/// drain it to a [`Body::Bytes`] first if you need to send a stream.
-pub fn encode_request(request: &Request) -> Result<Vec<u8>> {
+/// header from the request authority, the user headers, and the body. Framing
+/// (`Content-Length`, `Connection: close`) is controlled by `options`, so a
+/// WebSocket upgrade reuses this encoder with `close_connection: false` and
+/// `content_length: false` (see [`ws_ext`](super::ws_ext)). Returns an error for
+/// a [`Body::Stream`], which can't be buffered here; drain it to [`Body::Bytes`]
+/// first.
+pub fn encode_request(
+	request: &Request,
+	options: EncodeRequestOptions,
+) -> Result<Vec<u8>> {
 	let body = match &request.body {
 		Body::Bytes(bytes) => bytes,
 		Body::Stream(_) => {
@@ -174,15 +194,26 @@ pub fn encode_request(request: &Request) -> Result<Vec<u8>> {
 	.ok();
 	write!(head, "Host: {}\r\n", request.authority()).ok();
 	for (key, values) in request.headers().iter_all() {
-		if is_managed_header(key) {
+		// Host and Content-Length are always encoder-managed; a user `Connection`
+		// is skipped only when we force `close` below (an upgrade writes its own).
+		let managed = key.eq_ignore_ascii_case("host")
+			|| key.eq_ignore_ascii_case("content-length")
+			|| (options.close_connection
+				&& key.eq_ignore_ascii_case("connection"));
+		if managed {
 			continue;
 		}
 		for value in values {
 			write!(head, "{key}: {value}\r\n").ok();
 		}
 	}
-	write!(head, "Content-Length: {}\r\n", body.len()).ok();
-	head.push_str("Connection: close\r\n\r\n");
+	if options.content_length {
+		write!(head, "Content-Length: {}\r\n", body.len()).ok();
+	}
+	if options.close_connection {
+		head.push_str("Connection: close\r\n");
+	}
+	head.push_str("\r\n");
 
 	let mut bytes = head.into_bytes();
 	bytes.extend_from_slice(body);
@@ -495,7 +526,7 @@ mod test {
 	#[beet_core::test]
 	fn encode_get_roundtrips_through_parse() {
 		let request = Request::get("http://localhost/hello?q=world");
-		let raw = encode_request(&request).unwrap();
+		let raw = encode_request(&request, Default::default()).unwrap();
 		let raw_str = String::from_utf8(raw.clone()).unwrap();
 		raw_str
 			.as_str()
@@ -513,7 +544,7 @@ mod test {
 	fn encode_post_with_body() {
 		let mut request = Request::post("http://localhost/api");
 		request.set_body("hello body");
-		let raw = encode_request(&request).unwrap();
+		let raw = encode_request(&request, Default::default()).unwrap();
 		let raw_str = String::from_utf8(raw.clone()).unwrap();
 		raw_str.as_str().xpect_contains("POST /api HTTP/1.1");
 		raw_str.as_str().xpect_contains("Content-Length: 10");
@@ -530,7 +561,7 @@ mod test {
 			futures::stream::once(async { Ok(bytes::Bytes::from("x")) });
 		let mut request = Request::post("http://localhost/api");
 		request.body = Body::stream(stream);
-		encode_request(&request).xpect_err();
+		encode_request(&request, Default::default()).xpect_err();
 	}
 
 	// -- parse_response --

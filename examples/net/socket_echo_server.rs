@@ -1,7 +1,7 @@
 //! A LAN-reachable WebSocket echo server, for testing a remote client (eg an esp
-//! device) against beet's `Socket` API. Binds `0.0.0.0` on the `SOCKET_SERVER`
-//! port (default `1111`) and echoes every text/binary message back, logging the
-//! traffic so the device's round-trip is visible in the host terminal.
+//! device) against beet's `Socket` API. Binds `0.0.0.0` on the `BEET_SOCKET_SERVER`
+//! port (default [`DEFAULT_SOCKET_PORT`]) and echoes every text/binary message
+//! back, logging the traffic so the device's round-trip is visible on the host.
 //!
 //! This is the server behind the `beet socket-server` verb (see
 //! `beet_esp/main.bsx`); unlike `socket_server.rs` (a loopback demo with a fixed
@@ -37,12 +37,13 @@ fn main() -> Result {
 	Ok(())
 }
 
-/// The port from the `SOCKET_SERVER` (`host:port`) env var, else `1111`.
+/// The port from the `BEET_SOCKET_SERVER` (`host:port`) env var, else the
+/// [`DEFAULT_SOCKET_PORT`].
 fn socket_server_port() -> u16 {
-	env_ext::var("SOCKET_SERVER")
+	env_ext::var("BEET_SOCKET_SERVER")
 		.ok()
 		.and_then(|addr| {
 			addr.rsplit_once(':').and_then(|(_, port)| port.parse().ok())
 		})
-		.unwrap_or(1111)
+		.unwrap_or(DEFAULT_SOCKET_PORT)
 }

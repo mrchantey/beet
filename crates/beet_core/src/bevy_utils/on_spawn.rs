@@ -190,8 +190,11 @@ impl OnSpawn {
 		}))
 	}
 
-	/// Creates a new [`OnSpawn`] effect that runs an async function on the local thread.
-	#[cfg(feature = "std")]
+	/// Creates a new [`OnSpawn`] effect that runs an async function on the local
+	/// thread. Rides `bevy_async` (not `std`): the local runtime is
+	/// single-threaded, so unlike the `Send` [`new_async`](Self::new_async) it
+	/// works on no_std targets too (eg an esp firmware).
+	#[cfg(feature = "bevy_async")]
 	pub fn new_async_local<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self

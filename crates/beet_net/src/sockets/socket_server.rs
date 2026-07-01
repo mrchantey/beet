@@ -95,10 +95,10 @@ impl Plugin for SocketServerPlugin {
 pub struct SocketServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
-	/// The host/interface to bind to. `None` binds loopback (`127.0.0.1`); set
-	/// `0.0.0.0` (see [`bind_all`](Self::bind_all)) to accept connections from
-	/// other hosts on the network, eg an esp device.
-	pub host: Option<String>,
+	/// The IPv4 interface to bind to, defaults to `127.0.0.1`; set
+	/// `[0, 0, 0, 0]` (see [`bind_all`](Self::bind_all)) to accept connections
+	/// from other hosts on the network, eg an esp device.
+	pub host: [u8; 4],
 }
 
 impl Default for SocketServer {
@@ -110,26 +110,26 @@ impl SocketServer {
 	pub fn new(port: u16) -> Self {
 		Self {
 			port: Some(port),
-			host: None,
+			host: [127, 0, 0, 1],
 		}
 	}
 
-	/// Bind to `host` (an interface address) instead of loopback, so remote hosts
-	/// can connect. Pair with a routable address, ie `0.0.0.0` for all interfaces.
-	pub fn with_host(mut self, host: impl Into<String>) -> Self {
-		self.host = Some(host.into());
+	/// Bind to `host` (an IPv4 interface) instead of loopback, so remote hosts can
+	/// connect. Pair with a routable address, ie `[0, 0, 0, 0]` for all interfaces.
+	pub fn with_host(mut self, host: [u8; 4]) -> Self {
+		self.host = host;
 		self
 	}
 
 	/// Bind to `0.0.0.0` (all interfaces), accepting connections from other hosts
 	/// on the network (eg an esp device connecting over Wi-Fi).
-	pub fn bind_all(self) -> Self { self.with_host("0.0.0.0") }
+	pub fn bind_all(self) -> Self { self.with_host([0, 0, 0, 0]) }
 
 	/// The host and port without the protocol, ie `127.0.0.1:3000`
 	pub fn local_address(&self) -> String {
-		let host = self.host.as_deref().unwrap_or("127.0.0.1");
+		let [a, b, c, d] = self.host;
 		let port = self.port.unwrap_or(0);
-		format!("{}:{}", host, port)
+		format!("{a}.{b}.{c}.{d}:{port}")
 	}
 	/// Returns the full WebSocket URL for local connections, e.g. `ws://127.0.0.1:8339`.
 	pub fn local_url(&self) -> String {

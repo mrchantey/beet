@@ -11,9 +11,10 @@ cfg_if! {
 		use send_wrapper::SendWrapper as SocketCell;
 	} else {
 		// no_std single-threaded stand-in for `send_wrapper::SendWrapper` (which
-		// uses `std::thread`): nothing is ever sent across threads on the esp
-		// cooperative executor, so asserting `Send`/`Sync` for the boxed
-		// reader/writer — required for `Socket` to be a valid Component — is sound.
+		// uses `std::thread`): beet runs bevy single-threaded on no_std (no
+		// `bevy_multithreaded`), so nothing is ever sent across threads and
+		// asserting `Send`/`Sync` for the boxed reader/writer — required for
+		// `Socket` to be a valid Component — is sound.
 		pub(crate) struct SocketCell<T>(T);
 		unsafe impl<T> Send for SocketCell<T> {}
 		unsafe impl<T> Sync for SocketCell<T> {}
@@ -134,15 +135,10 @@ impl Socket {
 	/// Returns an [`OnSpawn`] callback that connects to the URL and inserts the socket.
 	pub fn insert_on_connect(url: impl AsRef<str>) -> OnSpawn {
 		let url = url.as_ref().to_owned();
-		// `OnSpawn::new_async_local` is std-only; drive the connect on the
-		// entity's own `run_async_local` instead (available on no_std via
-		// `bevy_async`), matching `effect`'s reader/writer tasks.
-		OnSpawn::new(move |entity: &mut EntityWorldMut| {
-			entity.run_async_local(async move |entity| -> Result {
-				let socket = Socket::connect(url).await?;
-				entity.insert(socket).await?;
-				Ok(())
-			});
+		OnSpawn::new_async_local(async move |entity| -> Result {
+			let socket = Socket::connect(url).await?;
+			entity.insert(socket).await?;
+			Ok(())
 		})
 	}
 

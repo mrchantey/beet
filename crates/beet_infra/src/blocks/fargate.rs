@@ -516,8 +516,10 @@ impl Block for FargateBlock {
 			deploy_timestamp.to_string().into(),
 		);
 		env_vars.insert("BEET_HOST".into(), "0.0.0.0".into());
-		env_vars
-			.insert("BEET_PORT".into(), self.container_port.to_string().into());
+		env_vars.insert(
+			"BEET_HTTP_PORT".into(),
+			self.container_port.to_string().into(),
+		);
 		if self.allow_ssh {
 			env_vars.insert(
 				"BEET_SSH_PORT".into(),

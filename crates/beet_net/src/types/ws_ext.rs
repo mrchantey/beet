@@ -17,7 +17,6 @@ use crate::prelude::*;
 use crate::sockets::CloseFrame;
 use crate::sockets::Message;
 use beet_core::prelude::*;
-use core::fmt::Write;
 
 /// [RFC 6455 §5.2] frame opcodes.
 ///
@@ -161,21 +160,29 @@ pub fn encode_client_key(random: [u8; 16]) -> String {
 /// Build the raw HTTP/1.1 client handshake request bytes ([RFC 6455 §4.1]) for
 /// `host`/`path` with the given `Sec-WebSocket-Key`.
 ///
-/// A dedicated encoder rather than [`http_ext::encode_request`], which forces
-/// `Connection: close` and a `Content-Length`; a handshake needs
-/// `Connection: Upgrade` and no body.
+/// Reuses [`http_ext::encode_request`] with `close_connection: false` (an upgrade
+/// keeps the connection) and `content_length: false` (no body), so the wire
+/// framing stays in one encoder.
 ///
 /// [RFC 6455 §4.1]: https://datatracker.ietf.org/doc/html/rfc6455#section-4.1
-pub fn encode_handshake_request(host: &str, path: &str, key: &str) -> Vec<u8> {
+pub fn encode_handshake_request(
+	host: &str,
+	path: &str,
+	key: &str,
+) -> Result<Vec<u8>> {
 	let path = if path.is_empty() { "/" } else { path };
-	let mut head = String::new();
-	write!(head, "GET {path} HTTP/1.1\r\n").ok();
-	write!(head, "Host: {host}\r\n").ok();
-	head.push_str("Upgrade: websocket\r\n");
-	head.push_str("Connection: Upgrade\r\n");
-	write!(head, "Sec-WebSocket-Key: {key}\r\n").ok();
-	head.push_str("Sec-WebSocket-Version: 13\r\n\r\n");
-	head.into_bytes()
+	let request = Request::get(format!("http://{host}{path}"))
+		.with_header_raw("Upgrade", "websocket")
+		.with_header_raw("Connection", "Upgrade")
+		.with_header_raw("Sec-WebSocket-Key", key)
+		.with_header_raw("Sec-WebSocket-Version", "13");
+	http_ext::encode_request(
+		&request,
+		http_ext::EncodeRequestOptions {
+			close_connection: false,
+			content_length: false,
+		},
+	)
 }
 
 /// Validate the server's handshake response against the sent `Sec-WebSocket-Key`
@@ -330,7 +337,7 @@ mod tests {
 	#[beet_core::test]
 	fn builds_and_parses_handshake_request() {
 		let key = encode_client_key([7u8; 16]);
-		let raw = encode_handshake_request("192.168.86.222:1111", "/", &key);
+		let raw = encode_handshake_request("127.0.0.1:8338", "/", &key).unwrap();
 		let request = http_ext::parse_http_request(&raw).unwrap();
 		request
 			.headers()

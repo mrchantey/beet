@@ -100,7 +100,7 @@ pub struct HttpServer {
 
 impl Default for HttpServer {
 	fn default() -> Self {
-		// `env_ext::var` returns "not found" on no_std, so this reads `BEET_PORT`
+		// `env_ext::var` returns "not found" on no_std, so this reads `BEET_HTTP_PORT`
 		// / `BEET_HOST` where there is an environment and falls back to the static
 		// defaults everywhere else, no feature gate needed.
 		let port = resolve_server_port(None);
