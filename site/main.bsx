@@ -27,7 +27,7 @@ live in the Rust deploy host (`examples/infra/deploy_beet_site.rs`): the terrafo
 and docker blocks are not registered for markup, so the deploy stays Rust-expressed
 while the serve definition is shared from here.
 -->
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, BootOnLoad)}>
+<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, BootOnLoad)}>
 	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 	<TemplateDir src="templates"/>

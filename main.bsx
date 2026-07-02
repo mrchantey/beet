@@ -48,6 +48,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID` in
 	<RunWasm/>
 	<BuildWasm/>
 	<Check/>
+	<AnalyticsReport/>
 	<ExportStatic/>
 	<ExportPdf/>
 	<SyncS3/>

@@ -110,7 +110,7 @@ async fn accept_loop(
 async fn handle_connection(
 	entity: AsyncEntity,
 	mut stream: async_io::Async<std::net::TcpStream>,
-	_peer_addr: SocketAddr,
+	peer_addr: SocketAddr,
 ) -> Result {
 	use futures_lite::AsyncReadExt;
 	use futures_lite::AsyncWriteExt;
@@ -149,8 +149,10 @@ async fn handle_connection(
 		}
 	}
 
-	// Parse the raw HTTP request into our Request type
-	let request = http_ext::parse_http_request(&buf)?;
+	// Parse the raw HTTP request into our Request type, tagging the direct peer
+	// address so a router middleware (eg analytics) can read the client address.
+	let request = http_ext::parse_http_request(&buf)?
+		.with_header_raw(PEER_ADDR_HEADER, &peer_addr.to_string());
 
 	// Dispatch through the host's routing
 	let response: Response = entity.exchange(request).await;

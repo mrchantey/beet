@@ -355,7 +355,7 @@ mod test {
 	) -> Entity {
 		let connection = app
 			.world_mut()
-			.spawn((SshPeerInfo { username: None }, ChildOf(router)))
+			.spawn((SshPeerInfo::default(), ChildOf(router)))
 			.id();
 		app.world_mut()
 			.entity_mut(connection)

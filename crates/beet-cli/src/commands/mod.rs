@@ -1,5 +1,6 @@
 //! The individual `beet` CLI commands, each implemented as an action.
 
+mod analytics;
 mod check;
 mod export_pdf;
 mod export_static;
@@ -12,6 +13,7 @@ mod s3_sync;
 mod serve;
 mod site;
 
+pub use analytics::*;
 pub use check::*;
 pub use export_pdf::*;
 pub use export_static::*;
@@ -31,7 +33,8 @@ pub struct CliCommandsPlugin;
 
 impl Plugin for CliCommandsPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<Check>()
+		app.register_type::<AnalyticsReport>()
+			.register_type::<Check>()
 			.register_type::<ExportStatic>()
 			// `serve <site>` loads a site and boots its servers (the only command
 			// that boots the workspace entry's server, via a direct boot call)

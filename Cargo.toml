@@ -306,6 +306,10 @@ serde = ["beet_core/serde", "beet_action?/serde", "beet_net?/serde", "beet_route
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
+# offline geoip country lookup for analytics (pulls the pure-rust `maxminddb`
+# reader). Off by default; a deployed site enables it and commits a
+# `country.mmdb` to `assets/databases/` to populate the analytics country field.
+geoip = ["beet_net?/geoip"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 # RON text format for `MediaType::Ron` and `template_serde` loading.
 ron = ["serde", "beet_core/ron"]

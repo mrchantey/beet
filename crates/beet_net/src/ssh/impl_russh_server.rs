@@ -17,6 +17,7 @@ pub(crate) struct NewConnectionInfo {
 	pub to_client: async_channel::Sender<SshEvent>,
 	pub from_client: async_channel::Receiver<SshEvent>,
 	pub username: Option<String>,
+	pub peer_addr: Option<std::net::SocketAddr>,
 }
 
 /// Beet async fn: binds the SSH server and enters the accept loop.
@@ -78,6 +79,7 @@ async fn handle_connection(
 	let to_client = info.to_client;
 	let from_client = info.from_client;
 	let username = info.username.map(|u| u.into());
+	let peer_addr = info.peer_addr;
 
 	// Clone for the send observer (the recv loop takes the original).
 	let to_client_obs = to_client.clone();
@@ -86,8 +88,13 @@ async fn handle_connection(
 	let child_id = server
 		.world()
 		.with(move |world: &mut World| -> Entity {
-			let mut entity_mut =
-				world.spawn((SshPeerInfo { username }, ChildOf(server_id)));
+			let mut entity_mut = world.spawn((
+				SshPeerInfo {
+					username,
+					peer_addr,
+				},
+				ChildOf(server_id),
+			));
 			let child_id = entity_mut.id();
 			entity_mut
 				.observe_any(
@@ -202,7 +209,7 @@ impl RusshServer for BeetSshApp {
 
 	fn new_client(
 		&mut self,
-		_addr: Option<std::net::SocketAddr>,
+		addr: Option<std::net::SocketAddr>,
 	) -> BeetSshHandler {
 		BeetSshHandler {
 			new_conn_tx: self.new_conn_tx.clone(),
@@ -210,6 +217,7 @@ impl RusshServer for BeetSshApp {
 			authenticated_user: None,
 			from_client_tx: None,
 			channel_id: None,
+			peer_addr: addr,
 		}
 	}
 
@@ -236,6 +244,8 @@ struct BeetSshHandler {
 	authenticated_user: Option<String>,
 	from_client_tx: Option<async_channel::Sender<SshEvent>>,
 	channel_id: Option<ChannelId>,
+	/// The client's network address, forwarded by russh's `new_client`.
+	peer_addr: Option<std::net::SocketAddr>,
 }
 
 impl russh::server::Handler for BeetSshHandler {
@@ -284,6 +294,7 @@ impl russh::server::Handler for BeetSshHandler {
 				to_client: to_client_tx,
 				from_client: from_client_rx,
 				username: self.authenticated_user.clone(),
+				peer_addr: self.peer_addr,
 			})
 			.await
 			.map_err(|err| {

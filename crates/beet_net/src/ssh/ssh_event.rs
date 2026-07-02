@@ -141,8 +141,11 @@ pub struct RequestX11 {
 }
 
 /// Per-connection info inserted on each connection entity when a client opens a session.
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Default, Clone, Component)]
 pub struct SshPeerInfo {
 	/// The username supplied during authentication, if any.
 	pub username: Option<SmolStr>,
+	/// The client's network address, if the transport exposed it. Read by
+	/// analytics for a country lookup; not all connections carry one.
+	pub peer_addr: Option<std::net::SocketAddr>,
 }

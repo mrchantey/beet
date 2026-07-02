@@ -5,5 +5,11 @@ footer chrome plus the body `page` + color-scheme class. The layout middleware
 transcludes each route's body in as SiteLayout's default-slot child, so it lands
 in <main> with no relay here. No overrides: the no-code site is the full beet
 chrome with nothing excluded.
+
+<Analytics/> injects the page-view beacon script on every page (web only; the
+runtime ignores the <script> on terminal targets, whose page views come from the
+in-world navigator instead).
 -->
-<SiteLayout/>
+<SiteLayout>
+	<Analytics/>
+</SiteLayout>

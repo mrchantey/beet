@@ -197,6 +197,14 @@ impl Plugin for RouterPlugin {
 			// backend-agnostic `scripting` feature, not `json`.
 			#[cfg(feature = "scripting")]
 			app.register_type::<ExchangeScriptElement>();
+
+			// cross-transport analytics (std+json): the storage + persistence
+			// observer, inert until an `<AnalyticsConfig/>` is spawned, plus the
+			// request-middleware type so `<SiteAnalytics/>` can author it. Nothing
+			// records until a site opts in with that on-switch.
+			#[cfg(feature = "json")]
+			app.add_plugins(analytics_plugin)
+				.register_type::<AnalyticsMiddleware>();
 		}
 	}
 }

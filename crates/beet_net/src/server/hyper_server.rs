@@ -102,7 +102,7 @@ async fn hyper_accept_loop(
 							not(target_arch = "wasm32")
 						))]
 						let on_upgrade = hyper::upgrade::on(&mut req);
-						let req = hyper_to_request(req).await;
+						let req = hyper_to_request(req, addr).await;
 						let res = entity.exchange(req).await;
 						#[cfg(all(
 							feature = "tungstenite",
@@ -178,6 +178,7 @@ async fn spawn_hyper_upgrade(
 
 async fn hyper_to_request(
 	req: hyper::Request<hyper::body::Incoming>,
+	peer_addr: std::net::SocketAddr,
 ) -> Request {
 	let (parts, body) = req.into_parts();
 
@@ -194,7 +195,10 @@ async fn hyper_to_request(
 	// Create body based on size
 	let body = Body::stream(stream);
 
+	// tag the direct peer address so a router middleware (eg analytics) can read
+	// the client address (a proxy's `x-forwarded-for` takes precedence downstream).
 	Request::from_parts(RequestParts::from(parts), body)
+		.with_header_raw(PEER_ADDR_HEADER, &peer_addr.to_string())
 }
 
 async fn response_to_hyper(

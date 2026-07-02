@@ -50,6 +50,15 @@ pub struct Navigator {
 	history: VecDeque<Url>,
 	/// Index into `history` for the currently displayed page.
 	history_cursor: usize,
+	/// The analytics session id: one session per surface (a terminal
+	/// connection), stamped on every page view this navigator records.
+	#[cfg(feature = "json")]
+	session: Uuid,
+	/// The current in-world page's land time and url, used to emit a page-view
+	/// analytics event with its dwell duration when navigating away or on
+	/// despawn. `None` until the first in-world page, and for network browsing.
+	#[cfg(feature = "json")]
+	current_page: Option<(Instant, Url)>,
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -111,6 +120,10 @@ impl Default for Navigator {
 			// home navigated to by on_add
 			history: default(),
 			history_cursor: 0,
+			#[cfg(feature = "json")]
+			session: Uuid::now_v7(),
+			#[cfg(feature = "json")]
+			current_page: None,
 		}
 	}
 }
@@ -315,6 +328,11 @@ impl Navigator {
 				.await;
 		}
 
+		// remember the url for the page-view analytics record after binding, since
+		// the http branch consumes `url`.
+		#[cfg(feature = "json")]
+		let record_url = url.clone();
+
 		let page = match transport {
 			NavigatorTransport::Http => {
 				// a real network fetch, then parse the bytes into a living tree
@@ -336,6 +354,10 @@ impl Navigator {
 		// bind the new tree to this navigator's surface (the host repaints) and
 		// clear loading
 		Self::bind_page(&entity, page).await;
+		// record the page-view analytics: finalize the previous page's dwell and
+		// open the new one. A no-op for network browsing and without an observer.
+		#[cfg(feature = "json")]
+		record_page_view(&entity, &record_url).await?;
 		entity
 			.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)
 			.await?;
@@ -387,6 +409,29 @@ impl Navigator {
 			.into_media_bytes()
 			.await
 	}
+
+	/// This navigator's analytics session id (one session per surface).
+	#[cfg(feature = "json")]
+	pub(crate) fn analytics_session(&self) -> Uuid { self.session }
+
+	/// Take the currently-tracked in-world page (its land time and url), leaving
+	/// none. Used by the page-view recorder when navigating away.
+	#[cfg(feature = "json")]
+	pub(crate) fn take_current_page(&mut self) -> Option<(Instant, Url)> {
+		self.current_page.take()
+	}
+
+	/// Set the currently-tracked in-world page.
+	#[cfg(feature = "json")]
+	pub(crate) fn set_current_page(&mut self, page: Option<(Instant, Url)>) {
+		self.current_page = page;
+	}
+
+	/// The currently-tracked in-world page, for finalizing its dwell on despawn.
+	#[cfg(feature = "json")]
+	pub(crate) fn current_page(&self) -> Option<&(Instant, Url)> {
+		self.current_page.as_ref()
+	}
 }
 
 /// The route a freshly-opened TUI surface navigates to, recorded on the router by
@@ -425,5 +470,90 @@ mod test {
 	fn defaults_to_http_transport() {
 		matches!(Navigator::default().transport(), NavigatorTransport::Http)
 			.xpect_true();
+	}
+
+	/// An in-world navigation records a terminal page view for the page it leaves,
+	/// carrying the session, path and a dwell duration; despawning the navigator
+	/// (a session closing) finalizes the current page's view.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn records_terminal_page_views() {
+		use beet_net::prelude::*;
+		use beet_ui::prelude::*;
+		use bevy::math::UVec2;
+		use std::sync::Arc;
+		use std::sync::Mutex;
+
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			RouterPlugin,
+			RealtimeParsePlugin,
+			LivePagePlugin,
+			NavigatorPlugin,
+		));
+		let events = Arc::new(Mutex::new(Vec::<AnalyticsEvent>::new()));
+		let captor = events.clone();
+		app.world_mut().add_observer(move |ev: On<AnalyticsEvent>| {
+			captor.lock().unwrap().push(ev.event().clone());
+		});
+		let router = app
+			.world_mut()
+			.spawn((Router, children![
+				render_action::fixed_func_route("alpha", || rsx! {
+					<p>"Alpha page"</p>
+				}),
+				render_action::fixed_func_route("beta", || rsx! {
+					<p>"Beta page"</p>
+				}),
+			]))
+			.flush();
+		let host = app
+			.world_mut()
+			.spawn((
+				page_host(UVec2::new(40, 8)),
+				Navigator::in_world(router, "alpha"),
+			))
+			.id();
+
+		let drive_until = |app: &mut App, needle: &str| {
+			for _ in 0..200 {
+				app.update();
+				let frame = app
+					.world()
+					.get::<DoubleBuffer>(host)
+					.map(|buffer| buffer.current_buffer().render_plain())
+					.unwrap_or_default();
+				if frame.contains(needle) {
+					return;
+				}
+			}
+			panic!("frame never contained '{needle}'");
+		};
+
+		// the home page renders; still on the first page, so nothing recorded yet.
+		drive_until(&mut app, "Alpha page");
+		events.lock().unwrap().is_empty().xpect_true();
+
+		// navigating to beta emits the page view for the alpha page it leaves.
+		let url = Url::parse("beta");
+		app.world_mut()
+			.entity_mut(host)
+			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
+		drive_until(&mut app, "Beta page");
+
+		let leaving = events.lock().unwrap().clone();
+		leaving.len().xpect_eq(1);
+		leaving[0].kind.xpect_eq(AnalyticsKind::PageView);
+		leaving[0].client_kind.xpect_eq(ClientKind::Terminal);
+		leaving[0].path.as_str().xpect_eq("/alpha");
+		leaving[0].session.is_some().xpect_true();
+
+		// closing the session (despawning the surface) finalizes the beta view.
+		app.world_mut().entity_mut(host).despawn();
+		app.update();
+		let all = events.lock().unwrap().clone();
+		all.len().xpect_eq(2);
+		all[1].path.as_str().xpect_eq("/beta");
 	}
 }

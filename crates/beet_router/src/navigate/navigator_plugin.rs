@@ -9,6 +9,10 @@ impl Plugin for NavigatorPlugin {
 		// link click handling (internal nav vs external open) lives in
 		// OpenLinkPlugin, which classifies a clicked `<a>` and routes it.
 		app.init_plugin::<OpenLinkPlugin>();
+		// finalize a terminal session's last page-view dwell when its navigator is
+		// removed (the session closes); a no-op without an analytics observer.
+		#[cfg(feature = "json")]
+		app.add_observer(finalize_page_view_on_remove);
 		// keyboard history shortcuts (alt+left/right) ride the terminal input
 		// layer. The message registration is idempotent and makes the shortcut
 		// system validate even when no input plugin is composed in. Stepping

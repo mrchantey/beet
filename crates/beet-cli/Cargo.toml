@@ -18,6 +18,11 @@ path = "src/main.rs"
 [features]
 default = ["qrcode", "net", "tui", "ssh", "thread", "pdf"]
 qrcode = ["dep:qrcode", "dep:image"]
+# Offline geoip country lookup for analytics, so a served/deployed site derives a
+# visitor country (needs a `country.mmdb` in `assets/databases/`). Opt-in, so a
+# plain dev build never links `maxminddb`. Deployed via `<BeetBinaryBuild
+# features="..,geoip"/>` in the site entry.
+geoip = ["beet/geoip"]
 # `beet export-pdf` page concatenation: pulls `lopdf` to merge the per-route
 # prints into one document. Optional so a build that only emits separate
 # per-route PDFs (or skips the command) never links `lopdf`.

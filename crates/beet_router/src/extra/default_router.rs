@@ -102,7 +102,7 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::OK);
 
-		let payload = r#"{"event_type":"x","client_timestamp":0,"event_data":{},"session_data":{}}"#;
+		let payload = r#"{"page_view_id":"0192f8a0-0000-7000-8000-000000000002","path":"/x","duration_ms":0}"#;
 		world
 			.entity_mut(root)
 			.exchange(Request::with_json_str("analytics", payload))
