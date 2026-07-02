@@ -21,7 +21,6 @@ async fn main() -> Result {
 			BindingFile::new("crates/beet_infra/src/bindings/aws_common.rs")
 				.with_resources(terra::Provider::AWS, [
 					"aws_cloudwatch_log_group",
-					"aws_dynamodb_table",
 					"aws_iam_access_key",
 					"aws_iam_role",
 					"aws_iam_role_policy_attachment",
@@ -31,6 +30,10 @@ async fn main() -> Result {
 					"aws_s3_bucket_policy",
 					"aws_s3_bucket_public_access_block",
 				]),
+		)
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_dynamo.rs")
+				.with_resources(terra::Provider::AWS, ["aws_dynamodb_table"]),
 		)
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_dns.rs")

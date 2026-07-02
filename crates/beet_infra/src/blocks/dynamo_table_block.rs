@@ -1,6 +1,6 @@
 //! A DynamoDB table deploy block, for the analytics store's remote backend.
 //!
-//! Uses the generated [`AwsDynamodbTableDetails`] binding (in `bindings/aws_common.rs`).
+//! Uses the generated [`AwsDynamodbTableDetails`] binding (in `bindings/aws_dynamo.rs`).
 use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;

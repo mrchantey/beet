@@ -26,7 +26,7 @@ impl terra::PrimaryResource for AwsIamRoleDetails {
 impl terra::PrimaryResource for AwsIamUserDetails {
 	fn set_primary_identifier(&mut self, name: &str) { self.name = name.into() }
 }
-#[cfg(feature = "bindings_aws_common")]
+#[cfg(feature = "bindings_aws_dynamo")]
 impl terra::PrimaryResource for AwsDynamodbTableDetails {
 	fn set_primary_identifier(&mut self, name: &str) { self.name = name.into() }
 }

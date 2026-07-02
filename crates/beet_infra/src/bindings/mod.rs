@@ -3,6 +3,10 @@ pub mod aws;
 mod aws_common;
 #[cfg(feature = "bindings_aws_common")]
 pub use aws_common::*;
+#[cfg(feature = "bindings_aws_dynamo")]
+mod aws_dynamo;
+#[cfg(feature = "bindings_aws_dynamo")]
+pub use aws_dynamo::*;
 #[cfg(feature = "bindings_aws_lambda")]
 mod aws_lambda;
 #[cfg(feature = "bindings_aws_lambda")]

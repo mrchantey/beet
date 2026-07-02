@@ -21,7 +21,7 @@ deploy = ["beet_router", "dep:sha2", "dep:base64"]
 beet_router = ["dep:beet_router"]
 lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail"]
-fargate_block = ["bindings_aws_common","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns"]
+fargate_block = ["bindings_aws_common","bindings_aws_dynamo","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns"]
 # Opt-in Cloudflare DNS + load-balancer failover paths for the AWS blocks. Pulls
 # the cloudflare terraform bindings; without it the AWS blocks are Route53-only.
 # Also pulls `bindings_aws_dns`: enabling this compiles the shared `dns` module
@@ -32,6 +32,7 @@ cloudflare_dns = ["bindings_cloudflare_common", "bindings_aws_dns"]
 # `S3Store::r2` path) at the consumer.
 cloudflare_block = []
 bindings_aws_common = []
+bindings_aws_dynamo = []
 bindings_aws_dns = []
 bindings_aws_acm = []
 bindings_aws_lightsail = []
@@ -39,6 +40,7 @@ bindings_aws_lambda = []
 bindings_aws_fargate = []
 bindings_aws_all = [
 	"bindings_aws_common",
+	"bindings_aws_dynamo",
 	"bindings_aws_dns",
 	"bindings_aws_acm",
 	"bindings_aws_lightsail",
