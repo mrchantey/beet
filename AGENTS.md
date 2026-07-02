@@ -53,6 +53,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 	4.1 boom
 ```
 - Its perfectly acceptable for functions longer than ~20 lines to have brief comments describing each step
+- Never insert arbitrary ie 80 col manual reflow newlines in markdown documents
 - Never consider backward-compatibility. when asked to change something, remove the old implementation
 - all shared dependencies should be declared in the workspace Cargo.toml. if one needs no-default-features, disable that at the workspace level, and reenable as required
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.

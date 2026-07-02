@@ -22,7 +22,7 @@ pub struct AnalyticsSummary {
 	/// Page-view counts per path, most-visited first.
 	pub by_path: Vec<(SmolStr, usize)>,
 	/// Event counts per kind, most-common first.
-	pub by_kind: Vec<(AnalyticsKind, usize)>,
+	pub by_kind: Vec<(AnalyticsEventKind, usize)>,
 	/// Event counts per client kind, most-common first.
 	pub by_client_kind: Vec<(ClientKind, usize)>,
 	/// Event counts per country code, most-common first.
@@ -33,24 +33,22 @@ impl AnalyticsSummary {
 	/// Aggregates a slice of events into a summary.
 	pub fn from_events(events: &[AnalyticsEvent]) -> Self {
 		let mut by_path = HashMap::<SmolStr, usize>::default();
-		let mut by_kind = HashMap::<AnalyticsKind, usize>::default();
+		let mut by_kind = HashMap::<AnalyticsEventKind, usize>::default();
 		let mut by_client_kind = HashMap::<ClientKind, usize>::default();
 		let mut by_country = HashMap::<SmolStr, usize>::default();
 		let mut sessions = HashSet::<Uuid>::default();
 		let (mut page_views, mut requests) = (0, 0);
 		let (mut dwell_sum, mut dwell_count) = (0u64, 0u64);
 		for event in events {
-			*by_kind.entry(event.kind).or_default() += 1;
-			match event.kind {
-				AnalyticsKind::PageView => {
+			*by_kind.entry(event.event_kind).or_default() += 1;
+			match &event.data {
+				AnalyticsEventData::PageView { duration_ms, .. } => {
 					page_views += 1;
 					*by_path.entry(event.path.clone()).or_default() += 1;
-					if let Some(dwell) = event.duration_ms {
-						dwell_sum += dwell;
-						dwell_count += 1;
-					}
+					dwell_sum += duration_ms;
+					dwell_count += 1;
 				}
-				AnalyticsKind::Request => requests += 1,
+				AnalyticsEventData::Request { .. } => requests += 1,
 				_ => {}
 			}
 			*by_client_kind.entry(event.client_kind).or_default() += 1;

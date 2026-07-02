@@ -74,7 +74,10 @@ mod test {
 		world.init_resource::<AnalyticsHits>();
 		world.add_observer(
 			|ev: On<AnalyticsEvent>, mut hits: ResMut<AnalyticsHits>| {
-				ev.event().kind.xpect_eq(AnalyticsKind::PageView);
+				// the body must actually be parsed: the path comes from it, not a
+				// default (guarding the json-body deserialize).
+				ev.event().event_kind.xpect_eq(AnalyticsEventKind::PageView);
+				ev.event().path.as_str().xpect_eq("/docs");
 				hits.0 += 1;
 			},
 		);

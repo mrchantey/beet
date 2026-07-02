@@ -52,12 +52,10 @@ pub struct Navigator {
 	history_cursor: usize,
 	/// The analytics session id: one session per surface (a terminal
 	/// connection), stamped on every page view this navigator records.
-	#[cfg(feature = "json")]
 	session: Uuid,
 	/// The current in-world page's land time and url, used to emit a page-view
 	/// analytics event with its dwell duration when navigating away or on
 	/// despawn. `None` until the first in-world page, and for network browsing.
-	#[cfg(feature = "json")]
 	current_page: Option<(Instant, Url)>,
 }
 
@@ -120,9 +118,7 @@ impl Default for Navigator {
 			// home navigated to by on_add
 			history: default(),
 			history_cursor: 0,
-			#[cfg(feature = "json")]
 			session: Uuid::now_v7(),
-			#[cfg(feature = "json")]
 			current_page: None,
 		}
 	}
@@ -330,7 +326,6 @@ impl Navigator {
 
 		// remember the url for the page-view analytics record after binding, since
 		// the http branch consumes `url`.
-		#[cfg(feature = "json")]
 		let record_url = url.clone();
 
 		let page = match transport {
@@ -356,7 +351,6 @@ impl Navigator {
 		Self::bind_page(&entity, page).await;
 		// record the page-view analytics: finalize the previous page's dwell and
 		// open the new one. A no-op for network browsing and without an observer.
-		#[cfg(feature = "json")]
 		record_page_view(&entity, &record_url).await?;
 		entity
 			.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)
@@ -411,24 +405,20 @@ impl Navigator {
 	}
 
 	/// This navigator's analytics session id (one session per surface).
-	#[cfg(feature = "json")]
 	pub(crate) fn analytics_session(&self) -> Uuid { self.session }
 
 	/// Take the currently-tracked in-world page (its land time and url), leaving
 	/// none. Used by the page-view recorder when navigating away.
-	#[cfg(feature = "json")]
 	pub(crate) fn take_current_page(&mut self) -> Option<(Instant, Url)> {
 		self.current_page.take()
 	}
 
 	/// Set the currently-tracked in-world page.
-	#[cfg(feature = "json")]
 	pub(crate) fn set_current_page(&mut self, page: Option<(Instant, Url)>) {
 		self.current_page = page;
 	}
 
 	/// The currently-tracked in-world page, for finalizing its dwell on despawn.
-	#[cfg(feature = "json")]
 	pub(crate) fn current_page(&self) -> Option<&(Instant, Url)> {
 		self.current_page.as_ref()
 	}
@@ -475,7 +465,6 @@ mod test {
 	/// An in-world navigation records a terminal page view for the page it leaves,
 	/// carrying the session, path and a dwell duration; despawning the navigator
 	/// (a session closing) finalizes the current page's view.
-	#[cfg(feature = "json")]
 	#[beet_core::test]
 	async fn records_terminal_page_views() {
 		use beet_net::prelude::*;
@@ -544,7 +533,7 @@ mod test {
 
 		let leaving = events.lock().unwrap().clone();
 		leaving.len().xpect_eq(1);
-		leaving[0].kind.xpect_eq(AnalyticsKind::PageView);
+		leaving[0].event_kind.xpect_eq(AnalyticsEventKind::PageView);
 		leaving[0].client_kind.xpect_eq(ClientKind::Terminal);
 		leaving[0].path.as_str().xpect_eq("/alpha");
 		leaving[0].session.is_some().xpect_true();

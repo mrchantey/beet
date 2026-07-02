@@ -41,7 +41,9 @@ pub use blob_store::*;
 pub use in_memory_store::*;
 pub use store_path::*;
 
-#[cfg(all(feature = "json", feature = "std"))]
+// the analytics types + emission need only serde (which `std` pulls); the store
+// persistence inside needs `json` (the TableStore surface) and gates itself.
+#[cfg(feature = "std")]
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
@@ -49,7 +51,7 @@ mod aws_cli;
 mod table;
 #[cfg(feature = "template_serde")]
 mod template_store;
-#[cfg(all(feature = "json", feature = "std"))]
+#[cfg(feature = "std")]
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;

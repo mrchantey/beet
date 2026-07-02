@@ -45,10 +45,10 @@ winit/ml build and can hit a wgpu teardown SIGSEGV).
 
 ## Verification (IDENTICAL for every step)
 
-Each step verifies its environment with the same four checks. Parameters: a
+Each step verifies its environment with the same five checks. Parameters: a
 `BASE_URL` (`http://localhost:<port>` for local, `https://dev.beet.org` for dev,
 `https://beet.org` for prod) and an SSH target (`127.0.0.1` + the local ssh port for
-local; the hostname + port 22 for dev/prod). All four must pass.
+local; the hostname + port 22 for dev/prod). All five must pass.
 
 ### a. curl (raw http)
 
@@ -160,6 +160,42 @@ If outbound port 22 is unexpectedly blocked at runtime, fall back to confirming 
 NLB ssh listener + target-group health via the AWS CLI and record the limitation, but
 note port 22 was confirmed open from this host at authoring time.
 
+### e. analytics (the cross-transport event log)
+
+The site records analytics for every transport: a server `Request` event per routed
+request, a `PageView` (with dwell) per web/terminal page visit, and `Click` / `Scroll`
+/ `Error` events from the web client beacon. Verify the visits from checks b-d landed
+in the store and that any prior data was not lost. Query with the `beet analytics`
+subcommand (built with `aws_sdk` so `--remote` reads the live DynamoDB table, not a
+local fallback):
+
+- local: `cargo run -p beet-cli -- analytics summary --dir target/analytics`
+- dev/prod: `cargo run -p beet-cli --features infra -- analytics summary --remote --bucket beet-site--<stage>--analytics`
+
+Recipe (run around the b-d checks so the delta is attributable):
+
+1. BASELINE: query once before the b-d checks and record the total (`N events: ...`).
+   A brand-new environment reports `0 events`; an existing one is non-zero.
+2. Drive the visits: checks b (playwright: home -> docs -> counter, click "More")
+   and d (ssh: navigate to the counter). These generate page views, a `Click`, and
+   request events.
+3. DELTA: query again and assert, from the summary:
+   - the total went UP (new events recorded) and is `>=` the baseline (prior events
+     retained, since the store is append/upsert, never truncated).
+   - `PageView` events for the visited paths appear under `pages` (eg
+     `/docs/design/counter`).
+   - both client kinds are present under `client kinds`: `Web` (the http/playwright
+     visits) and `Terminal` (the ssh session).
+   - for dev/prod (geoip enabled in the deploy build), a country appears under
+     `countries` for the web visits.
+
+An automated in-process version of the web half of this flow (http request ->
+request event, beacon -> page view, prior events retained, the beacon endpoint
+skipped) lives in `tests/beet_site_analytics.rs`; run it with `cargo test --test
+beet_site_analytics --features "router,json,fs,testing"` for a fast pre-deploy check
+of the wiring. The terminal page-view path is unit-tested in
+`beet_router/src/navigate/navigator.rs`.
+
 ## Step 1: Local
 
 ```sh
@@ -167,7 +203,7 @@ cargo run -p beet-cli -- serve site --server=http,ssh    # run in background
 ```
 
 Read the bound http + ssh ports from the serve output. Run the full verification
-(a-d) against `http://localhost:<http_port>` and `127.0.0.1:<ssh_port>`. This step
+(a-e) against `http://localhost:<http_port>` and `127.0.0.1:<ssh_port>`. This step
 is also the shakedown: settle the exact playwright script and ssh driver here and
 record them above. Kill the server when done. No cloud or DNS impact.
 
@@ -179,7 +215,7 @@ just beet-plan                # EYEBALL: dev must touch only beet-site--dev--* a
 just beet-deploy              # build -> tofu -> image -> sync site/ + assets/ -> watch rollout
 ```
 
-Run the full verification (a-d) against `https://dev.beet.org` (port 22 for ssh),
+Run the full verification (a-e) against `https://dev.beet.org` (port 22 for ssh),
 allowing a few minutes for rollout + DNS/ACM to settle (retry with a sane budget).
 Then ALWAYS tear down:
 
@@ -198,7 +234,7 @@ just beet-plan --stage=prod   # EYEBALL: prod creates beet.org + www.beet.org on
 just beet-deploy --stage=prod
 ```
 
-Run the full verification (a-d) against `https://beet.org` (and confirm
+Run the full verification (a-e) against `https://beet.org` (and confirm
 `https://www.beet.org` serves too; ssh on port 22). LEAVE PROD UP. Teardown, if ever
 needed, is `just beet-destroy --stage=prod`.
 

@@ -9,10 +9,14 @@ pub fn page_view_event(
 	url: &Url,
 	dwell: Duration,
 ) -> AnalyticsEvent {
-	AnalyticsEvent::new(AnalyticsKind::PageView, url.path_string())
-		.with_client_kind(ClientKind::Terminal)
-		.with_session(Some(session))
-		.with_duration_ms(dwell.as_millis() as u64)
+	AnalyticsEvent::new(url.path_string(), AnalyticsEventData::PageView {
+		duration_ms: dwell.as_millis() as u64,
+		referrer: None,
+		title: None,
+		client: Value::Null,
+	})
+	.with_client_kind(ClientKind::Terminal)
+	.with_session(Some(session))
 }
 
 /// The client kind for a routed request: a web client when it carries a user

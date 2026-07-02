@@ -37,6 +37,7 @@ impl Plugin for InfraExamplesPlugin {
 			// the beet-site deployer (root main.bsx): assets bucket, generic dir
 			// sync, the stage-aware fargate block, and its stack-bearing host.
 			.register_template::<AssetsBucket>()
+			.register_template::<AnalyticsTable>()
 			.register_template::<DirSync>()
 			.register_template::<FargateBeetSiteBlock>()
 			.register_template::<BeetSiteDeployHost>()

@@ -129,6 +129,14 @@ pub fn AssetsBucket() -> impl Bundle {
 		.with_public_read(true)
 }
 
+/// `<AnalyticsTable/>` — the DynamoDB table backing the analytics store's remote
+/// mode (`<app>--<stage>--analytics`, keyed by the event `id`). The deployed
+/// binary reaches it via `BEET_ANALYTICS_TABLE` (set by [`FargateBeetSiteBlock`]),
+/// so the created name and the runtime name agree. Resolves its [`Stack`] by
+/// ancestry.
+#[template]
+pub fn AnalyticsTable() -> impl Bundle { DynamoTableBlock::new("analytics") }
+
 /// `<DirSync app_name=".." bucket="site" dir="site"/>` — sync a local dir to a named
 /// bucket of the stack. Generalizes [`SiteSync`] (which hardcodes `examples/bsx_site`
 /// -> site bucket) to any (dir, bucket-label) pair.
@@ -280,6 +288,8 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 		.store(&stack)
 		.bucket_name()
 		.to_string();
+	// the analytics DynamoDB table name, the same value `<AnalyticsTable/>` creates.
+	let analytics_table = DynamoTableBlock::new("analytics").table_name(&stack);
 	let block = FargateBlock::default()
 		.with_allow_ssh(true)
 		.with_max_count(5)
@@ -288,6 +298,7 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 		.with_static_env("BEET_SERVICE_ACCESS", "remote")
 		.with_static_env("BEET_SITE_BUCKET", site_bucket)
 		.with_static_env("BEET_ASSETS_BUCKET", assets_bucket)
+		.with_static_env("BEET_ANALYTICS_TABLE", analytics_table)
 		.with_static_env("BEET_SSH_HOST_KEY", ssh_host_key);
 	// prod claims the apex + www; every other stage gets only its subdomain.
 	if stack.is_production() {

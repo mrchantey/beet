@@ -80,17 +80,16 @@ pub async fn AnalyticsMiddleware(
 		)
 		.and_then(|(ip, geoip)| geoip.country(ip));
 
-	let mut event = AnalyticsEvent::new(AnalyticsKind::Request, path)
-		.with_client_kind(router_analytics_ext::request_client_kind(
-			user_agent.is_some(),
-		))
-		.with_session(session);
-	event.status = Some(status);
+	let mut event = AnalyticsEvent::new(path, AnalyticsEventData::Request {
+		status,
+		method: method.into(),
+		user_agent: user_agent.as_deref().map(SmolStr::from),
+	})
+	.with_client_kind(router_analytics_ext::request_client_kind(
+		user_agent.is_some(),
+	))
+	.with_session(session);
 	event.country = country;
-	event.insert_data("method", method);
-	if let Some(user_agent) = user_agent {
-		event.insert_data("user_agent", user_agent);
-	}
 	if config.store_ip {
 		if let Some(ip) = ip {
 			event.ip = Some(ip.to_string().into());
@@ -150,17 +149,20 @@ mod test {
 		let events = world.resource::<Captured>().lock().unwrap().clone();
 		events.len().xpect_eq(1);
 		let event = &events[0];
-		event.kind.xpect_eq(AnalyticsKind::Request);
+		event.event_kind.xpect_eq(AnalyticsEventKind::Request);
 		event.client_kind.xpect_eq(ClientKind::Web);
 		event.path.as_str().xpect_eq("/about");
-		event.status.xpect_eq(Some(200));
-		event
-			.data
-			.get("user_agent")
-			.unwrap()
-			.as_str()
-			.unwrap()
-			.xpect_eq("Mozilla/5.0 Test");
+		match &event.data {
+			AnalyticsEventData::Request {
+				status,
+				user_agent,
+				..
+			} => {
+				(*status).xpect_eq(200);
+				user_agent.as_deref().xpect_eq(Some("Mozilla/5.0 Test"));
+			}
+			_ => panic!("expected a request event"),
+		}
 	}
 
 	#[beet_core::test]

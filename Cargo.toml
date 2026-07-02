@@ -530,7 +530,7 @@ async-executor.workspace = true
 futures.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet = { path = ".", features = ["fs"] }
+beet = { path = ".", features = ["fs", "json"] }
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
@@ -731,6 +731,14 @@ name = "bsx_site_tui"
 path = "tests/bsx_site_tui.rs"
 harness = false
 required-features = ["router", "style", "markdown", "fs", "tui_server", "testing"]
+
+# The cross-transport analytics flow: an http request + web beacon persist to the
+# store (with prior data retained), the web half of the deploy skill's check `e`.
+[[test]]
+name = "beet_site_analytics"
+path = "tests/beet_site_analytics.rs"
+harness = false
+required-features = ["router", "json", "fs", "testing"]
 
 [[bench]]
 name = "bevy_coldstart"

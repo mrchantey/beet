@@ -18,11 +18,11 @@ mod store_toolset;
 #[cfg(feature = "std")]
 pub use store_toolset::*;
 
-// std-only: the analytics route stores into beet_net's `AnalyticsEvent`, which
-// is part of beet_net's std-only store surface.
-#[cfg(all(feature = "json", feature = "std"))]
+// std: the analytics emitters build beet_net's `AnalyticsEvent` (serde, via std);
+// only the beacon route's json-body parsing needs `json`, gated inside.
+#[cfg(feature = "std")]
 mod analytics;
-#[cfg(all(feature = "json", feature = "std"))]
+#[cfg(feature = "std")]
 pub use analytics::*;
 
 // std-only: the app-info scene route renders through beet_ui, and the

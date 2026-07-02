@@ -51,10 +51,15 @@ pub(super) fn spawn_store_on_config(
 					.get_resource::<PackageConfig>()
 					.cloned()
 					.unwrap_or_default();
+				// the remote table name is the deploy-provided `BEET_ANALYTICS_TABLE`
+				// (like `BEET_SITE_BUCKET`), so the deploy owns the name; the
+				// package-derived name is the fallback for a self-named build.
+				let table_name = env_ext::var("BEET_ANALYTICS_TABLE")
+					.unwrap_or_else(|_| pkg.analytics_bucket_name());
 				(
 					ws.analytics_dir.into_abs(),
 					ws.assets_dir.into_abs(),
-					pkg.analytics_bucket_name(),
+					table_name,
 					pkg.service_access,
 				)
 			})
@@ -102,12 +107,16 @@ mod test {
 	#[beet_core::test]
 	async fn event_roundtrips_through_store() {
 		let store = temp_table::<AnalyticsEvent>();
-		let event = AnalyticsEvent::new(AnalyticsKind::Request, "/about")
-			.with_client_kind(ClientKind::Web);
+		let event = AnalyticsEvent::new("/about", AnalyticsEventData::Request {
+			status: 200,
+			method: "GET".into(),
+			user_agent: None,
+		})
+		.with_client_kind(ClientKind::Web);
 		let id = event.id;
 		store.push(event).await.unwrap();
 		let loaded = store.get(id).await.unwrap();
 		loaded.path.as_str().xpect_eq("/about");
-		loaded.kind.xpect_eq(AnalyticsKind::Request);
+		loaded.event_kind.xpect_eq(AnalyticsEventKind::Request);
 	}
 }

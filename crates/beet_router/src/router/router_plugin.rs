@@ -198,13 +198,14 @@ impl Plugin for RouterPlugin {
 			#[cfg(feature = "scripting")]
 			app.register_type::<ExchangeScriptElement>();
 
-			// cross-transport analytics (std+json): the storage + persistence
-			// observer, inert until an `<AnalyticsConfig/>` is spawned, plus the
-			// request-middleware type so `<SiteAnalytics/>` can author it. Nothing
-			// records until a site opts in with that on-switch.
+			// cross-transport analytics: the request-middleware type is serde/std,
+			// registered so `<SiteAnalytics/>` can author it. The storage +
+			// persistence observer need the json store surface, and are inert until
+			// an `<AnalyticsConfig/>` is spawned, so nothing records until a site
+			// opts in with that on-switch.
+			app.register_type::<AnalyticsMiddleware>();
 			#[cfg(feature = "json")]
-			app.add_plugins(analytics_plugin)
-				.register_type::<AnalyticsMiddleware>();
+			app.add_plugins(analytics_plugin);
 		}
 	}
 }
