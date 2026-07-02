@@ -7,6 +7,9 @@
 //! it). The agent forwards each capability over a socket to the client that serves it,
 //! bound by the [`capability_socket`] handshake; run standalone, the tools' own local
 //! handlers apply.
+// the wire types + socket-client primitives shared with the wasm head; re-exported so
+// `crate::perceive_act::{Emotion, WhoAmI, connect_with_retry, ..}` still resolve here.
+pub use crate::perceive_act_core::*;
 mod perceive_act_plugin;
 pub use perceive_act_plugin::*;
 mod capability_socket;

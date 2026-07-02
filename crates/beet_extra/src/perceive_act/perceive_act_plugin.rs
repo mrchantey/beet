@@ -21,7 +21,6 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<ApplyHeading>()
 			.register_type::<SetEmotion>()
 			.register_type::<Heading>()
-			.register_type::<Emotion>()
 			.register_template::<MockHead>()
 			.register_template::<MockBody>();
 		// the wgpu render body (v2): the driven fox and its `apply-heading` handler, so

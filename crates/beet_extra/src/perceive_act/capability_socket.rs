@@ -12,6 +12,7 @@ use beet_net::prelude::*;
 // `ChannelSocketServer`) is a module in the net prelude, not a glob.
 use beet_net::sockets::*;
 use beet_router::prelude::*;
+use crate::perceive_act_core::PerceiveActCorePlugin;
 
 /// Marker on the agent's socket-server host. Each connection it accepts is asked for
 /// its role via `whoami`, and that role's capability routes are bound to forward over
@@ -20,42 +21,13 @@ use beet_router::prelude::*;
 #[reflect(Component, Default)]
 pub struct CapabilityServer;
 
-/// A [`CapabilityServer`] serves remote clients (a browser head, a device body), so it
-/// always wants its [`SocketServer`] on all interfaces, not just loopback. Bind it wide
-/// on add, before the server boots, so the shared agent block is LAN-reachable in every
-/// stage. Done here rather than a bsx `SocketServer { host: [0,0,0,0] }` literal, since a
-/// `[u8; 4]` host is a reflect array the `{..}` list grammar cannot build.
-fn capability_server_binds_all(
-	ev: On<Add, CapabilityServer>,
-	mut servers: Query<&mut SocketServer>,
-) {
-	if let Ok(mut server) = servers.get_mut(ev.entity) {
-		server.host = [0, 0, 0, 0];
-	}
-}
-
-/// The role a client serves ("head"/"body"), on the client's socket root. Read by `whoami`.
-#[derive(Debug, Clone, Component, Reflect, Deref)]
-#[reflect(Component)]
-pub struct ClientRole(pub SmolStr);
-
 /// Marker inserted on an agent route once it is bound to a connection (for observability/tests).
+///
+/// The client-side handshake types ([`WhoAmI`], [`ClientRole`]) live in
+/// `perceive_act_core`, shared with the wasm head.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct CapabilityBound;
-
-/// Announce which role this client serves, so the server can bind the matching
-/// capabilities.
-#[action(route = "whoami")]
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-pub async fn WhoAmI(cx: ActionContext<()>) -> Result<String> {
-	cx.caller
-		.with_state::<AncestorQuery<&ClientRole>, _>(|entity, roles| {
-			roles.get(entity).map(|role| role.0.to_string())
-		})
-		.await?
-}
 
 /// The hardcoded role -> capability-path table wiring the perceive-act demo. Pure
 /// glue: delete it (and the socket machinery around it) once roles are declared in
@@ -161,11 +133,9 @@ pub struct CapabilityBindingPlugin;
 
 impl Plugin for CapabilityBindingPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<CapabilityServer>()
-			.register_type::<ClientRole>()
+		app.init_plugin::<PerceiveActCorePlugin>()
+			.register_type::<CapabilityServer>()
 			.register_type::<CapabilityBound>()
-			.register_type::<WhoAmI>()
-			.add_observer(capability_server_binds_all)
 			.add_observer(bind_on_connection_ready);
 	}
 }
@@ -173,33 +143,13 @@ impl Plugin for CapabilityBindingPlugin {
 #[cfg(test)]
 mod test {
 	use super::*;
-	// the head capability the test forwards: `SetEmotion` and its `Emotion`, siblings
-	// under `perceive_act`.
+	// the shared client handshake types + the head capability the test forwards, all
+	// re-exported from `perceive_act` (the wire types now live in `perceive_act_core`).
+	use crate::perceive_act::ClientRole;
 	use crate::perceive_act::Emotion;
 	use crate::perceive_act::SetEmotion;
 	use crate::perceive_act::SetEmotionInput;
-
-	/// A `CapabilityServer` widens its `SocketServer` to all interfaces on add, so a
-	/// browser head or a device body can reach the agent, not just loopback. Without
-	/// this the distributed v3 clients silently fail to connect.
-	#[beet_core::test]
-	fn capability_server_binds_all() {
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ThreadPlugin::default()))
-			.add_plugins(CapabilityBindingPlugin);
-		// `SocketServer::default()` binds loopback; the observer must widen it on add.
-		let agent = app
-			.world_mut()
-			.spawn((SocketServer::default(), CapabilityServer))
-			.id();
-		app.world_mut().flush();
-		app.world()
-			.entity(agent)
-			.get::<SocketServer>()
-			.unwrap()
-			.host
-			.xpect_eq([0, 0, 0, 0]);
-	}
+	use crate::perceive_act::WhoAmI;
 
 	/// The whole core: the agent (a socket server) accepts a mock head client,
 	/// originates `whoami`, binds `set-emotion` to the connection, and a

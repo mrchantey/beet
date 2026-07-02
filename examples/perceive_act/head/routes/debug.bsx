@@ -1,0 +1,32 @@
+<!--
+The perceive-act web head, debug route (v3). The same head as `/`, but instrumented: the
+live webcam the agent sees, the head's `info!`/`warn!` log, and the face it shows, all on
+one page. Use it to watch a run; `/` is the same head with just the face, fullscreen, for
+a display.
+
+The `<video id="webcam">` is declared here (shared markup contract with `/`) and shown at
+size, so `take-photo`'s captured frames are visible as the live feed. `<RenderConsole>`
+mirrors the head's logs; `<MainBsx>` + `<Wasm>` boot the same `web_head` binary and head
+program as `/`.
+-->
+<HtmlDocument>
+	<Fragment slot="head">
+		<Stylesheet/>
+		<ColorSchemeScript/>
+		<LiveReloadScript/>
+	</Fragment>
+	<h1>Perceive-act web head (debug)</h1>
+	<p>
+		This tab is the robot's head, instrumented: the webcam the agent sees, its spoken
+		lines in the log, and the face it shows. The <code>/</code> route is the same head
+		with just the face, fullscreen, for a display.
+	</p>
+	<h2>Face</h2>
+	<img id="face" src="/assets/extra/robot-eyes/calm.png" alt="the robot's face" width="240"/>
+	<h2>Webcam (what the agent sees)</h2>
+	<video id="webcam" autoplay muted playsinline width="320"/>
+	<h2>Head log</h2>
+	<RenderConsole/>
+	<MainBsx src="/examples/perceive_act/head/head.bsx"/>
+	<Wasm src="/wasm/perceive-act-head.wasm"/>
+</HtmlDocument>

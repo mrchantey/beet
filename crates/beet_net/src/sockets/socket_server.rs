@@ -95,9 +95,9 @@ impl Plugin for SocketServerPlugin {
 pub struct SocketServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
-	/// The IPv4 interface to bind to, defaults to `127.0.0.1`; set
-	/// `[0, 0, 0, 0]` (see [`bind_all`](Self::bind_all)) to accept connections
-	/// from other hosts on the network, eg an esp device.
+	/// The IPv4 interface to bind to, defaulting to `0.0.0.0` (all interfaces) so a
+	/// remote host - a browser tab, an esp device over Wi-Fi - can connect. Narrow it
+	/// with [`with_host`](Self::with_host), eg `[127, 0, 0, 1]` to bind loopback only.
 	pub host: [u8; 4],
 }
 
@@ -106,11 +106,13 @@ impl Default for SocketServer {
 }
 
 impl SocketServer {
-	/// Creates a new socket server bound to the specified port (on loopback).
+	/// Creates a new socket server on `port`, bound to all interfaces (`0.0.0.0`) so a
+	/// browser or a device on the network can reach it. Narrow with
+	/// [`with_host`](Self::with_host), eg `[127, 0, 0, 1]` for loopback only.
 	pub fn new(port: u16) -> Self {
 		Self {
 			port: Some(port),
-			host: [127, 0, 0, 1],
+			host: [0, 0, 0, 0],
 		}
 	}
 
@@ -121,8 +123,8 @@ impl SocketServer {
 		self
 	}
 
-	/// Bind to `0.0.0.0` (all interfaces), accepting connections from other hosts
-	/// on the network (eg an esp device connecting over Wi-Fi).
+	/// Bind to `0.0.0.0` (all interfaces) - the [`new`](Self::new) default, kept as an
+	/// explicit spelling for a server that wants to state its reach.
 	pub fn bind_all(self) -> Self { self.with_host([0, 0, 0, 0]) }
 
 	/// The host and port without the protocol, ie `127.0.0.1:3000`

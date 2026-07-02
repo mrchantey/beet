@@ -55,23 +55,3 @@ pub fn MockBody(
 		children![WhoAmI, ApplyHeading],
 	));
 }
-
-/// Connect to `url`, retrying until the server's listener is up (it binds after the
-/// scene builds, so an in-process client races it), then insert the [`Socket`].
-pub fn connect_with_retry(url: impl Into<String>) -> OnSpawn {
-	let url = url.into();
-	OnSpawn::new_async_local(async move |entity| -> Result {
-		for attempt in 0..50u32 {
-			match Socket::connect(&url).await {
-				Ok(socket) => {
-					entity.insert(socket).await?;
-					return Ok(());
-				}
-				// keep retrying until the last attempt, then surface the error.
-				Err(err) if attempt == 49 => return Err(err),
-				Err(_) => time_ext::sleep_millis(100).await,
-			}
-		}
-		Ok(())
-	})
-}

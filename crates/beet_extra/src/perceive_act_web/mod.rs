@@ -10,7 +10,11 @@
 //! This module is deliberately independent of the `thread`-gated `perceive_act` module
 //! (which pulls the native LLM `beet_thread`, absent from a wasm build): it needs only
 //! the `web` base (`Socket`/`ExchangeSocket`/`Router`/`#[action]`) plus the browser
-//! web-sys APIs. The tiny JSON wire types are mirrored locally ([`web_head`]).
+//! web-sys APIs. The shared wire types + client primitives come from `perceive_act_core`.
+// the wire types (`Emotion`, the tool inputs) + client primitives (`WhoAmI`,
+// `ClientRole`, `connect_with_retry`), mirrored once in `perceive_act_core` and shared
+// with the native agent, so the head does not redefine them.
+pub use crate::perceive_act_core::*;
 mod perceive_act_web_plugin;
 pub use perceive_act_web_plugin::*;
 mod web_head;

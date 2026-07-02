@@ -9,12 +9,10 @@ pub struct PerceiveActWebPlugin;
 
 impl Plugin for PerceiveActWebPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<ClientRole>()
-			.register_type::<WhoAmI>()
+		app.init_plugin::<PerceiveActCorePlugin>()
 			.register_type::<TakePhoto>()
 			.register_type::<SpeakText>()
 			.register_type::<SetEmotion>()
-			.register_type::<Emotion>()
 			.register_template::<WebHead>()
 			.add_observer(render_face);
 	}

@@ -112,4 +112,48 @@ mod test {
 			.await
 			.xpect_err();
 	}
+
+	/// The capture resolves its photos from the nearest self-or-ancestor
+	/// [`BlobStore`] scoped to [`PhotoStream::dir`] and advances the shared cursor
+	/// across calls, the offline half of [`capture`].
+	#[beet_core::test]
+	async fn resolves_photos_from_ancestor_store() {
+		let mut world = World::new();
+		world.insert_resource(PhotoStream {
+			dir: SmolPath::from("photos"),
+			cursor: 0,
+		});
+		// store on an ancestor, the camera reads it via self-or-ancestor lookup.
+		// unscoped root: `capture` applies the `PhotoStream::dir` subdir itself.
+		let store = BlobStore::temp();
+		for index in 0..3usize {
+			store
+				.insert(
+					&SmolPath::from(format!("photos/{index}.jpg")),
+					vec![index as u8],
+				)
+				.await
+				.unwrap();
+		}
+		let parent = world.spawn(store).id();
+		let camera = world.spawn(ChildOf(parent)).id();
+		world.flush();
+		// resolve the store + advance the cursor exactly as `capture` does.
+		let resolve = |world: &mut World| {
+			world.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
+				|(stores, mut photos)| -> Result<(BlobStore, usize)> {
+					let dir_store =
+						stores.get(camera)?.with_subdir(photos.dir.clone());
+					Ok((dir_store, photos.advance()))
+				},
+			)
+		};
+		let (store, cursor) = resolve(&mut world).unwrap();
+		let first = read_next_photo(&store, cursor).await.unwrap();
+		let (store, cursor) = resolve(&mut world).unwrap();
+		let second = read_next_photo(&store, cursor).await.unwrap();
+		// the cursor advanced, so successive calls see successive photos.
+		cursor.xpect_eq(1);
+		(first.bytes() != second.bytes()).xpect_true();
+	}
 }

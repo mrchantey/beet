@@ -8,6 +8,11 @@ pub mod components;
 // runs through the one `beet` binary (headless, no render).
 #[cfg(feature = "infra")]
 pub mod infra;
+// the perceive-act types the agent and every head/body client share (the wire
+// types + the socket-client primitives), split out so the wasm head reuses them
+// without the `thread` runtime. Present whenever the agent or the web head is.
+#[cfg(any(feature = "thread", feature = "perceive_act_web"))]
+pub mod perceive_act_core;
 // the embodied perceive-act agent tools, so an `examples/perceive_act/*.bsx`
 // scene runs through the one binary (headless, no render needed). Needs the
 // thread runtime, blob store and child-process exec the `thread` feature pulls.
@@ -30,6 +35,8 @@ pub mod prelude {
 	pub use crate::components::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::*;
+	#[cfg(any(feature = "thread", feature = "perceive_act_web"))]
+	pub use crate::perceive_act_core::*;
 	#[cfg(feature = "thread")]
 	pub use crate::perceive_act::*;
 	#[cfg(feature = "perceive_act_web")]

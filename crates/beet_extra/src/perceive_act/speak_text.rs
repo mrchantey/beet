@@ -1,5 +1,6 @@
-//! `SpeakText`: the agent's spoken, in-character voice.
-use super::speech_ext;
+//! `SpeakText`: the agent's spoken, in-character voice. The [`SpeakTextInput`] wire type
+//! is shared from `perceive_act_core`.
+use super::*;
 use beet_core::prelude::*;
 
 /// Say something out loud, in character. This is your spoken voice, heard by whoever
@@ -15,11 +16,4 @@ pub async fn SpeakText(cx: ActionContext<SpeakTextInput>) -> Result<()> {
 		warn!("could not speak: {err}");
 	}
 	Ok(())
-}
-
-/// What to say out loud.
-#[derive(Reflect, serde::Deserialize, serde::Serialize)]
-pub struct SpeakTextInput {
-	/// The line to say out loud, in character. Keep it short and full of personality.
-	pub text: String,
 }

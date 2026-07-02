@@ -1,29 +1,26 @@
 <!--
-The perceive-act web head page (v3). A full `<HtmlDocument>` so the route renders the
-whole document directly: `<Stylesheet>` + `<ColorSchemeScript>` + `<LiveReloadScript>` in
-the head, and in the body the rendered face, the head's console output, and the wasm
-loader.
+The perceive-act web head, home route (v3). The robot's face and nothing else: this page
+is the display you point at a screen. The `<img id="face">` fills the viewport, centered
+and letterboxed (never stretched) on black; `set-emotion` swaps its sprite. No text, no
+console - that lives on `/debug`.
 
-`<MainBsx>` references the head program (`head.bsx`, which spawns `<WebHead>`); `<Wasm>`
-boots the `web_head` wasm binary, which fetches and runs it, connecting back to the agent
-over the socket and serving the head capabilities from this tab. `set-emotion` points the
-`<img id="face">` at the matching robot-eyes sprite; it starts on the calm resting face.
-`<RenderConsole>` (before `<Wasm>`, so its console wrap installs first) mirrors the head's
-`info!`/`warn!` logs onto the page.
+The `<video id="webcam">` is declared here (not created in wasm) so `take-photo` just
+reads it; it is kept live but visually hidden (a 2px transparent element, not
+`display:none`, so it keeps decoding frames). `<MainBsx>` references the head program
+(`head.bsx`, which spawns `<WebHead>`); `<Wasm>` boots the `web_head` binary that runs it.
 -->
 <HtmlDocument>
 	<Fragment slot="head">
-		<Stylesheet/>
-		<ColorSchemeScript/>
 		<LiveReloadScript/>
+		<style>
+			html, body { margin: 0; height: 100vh; background: #000; overflow: hidden; }
+			#face { width: 100vw; height: 100vh; object-fit: contain; display: block; }
+			/* feeds `take-photo`; hidden on the display but kept live (not display:none). */
+			#webcam { position: fixed; top: 0; left: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+		</style>
 	</Fragment>
-	<h1>Perceive-act web head</h1>
-	<p>
-		This browser tab is the robot's head: it captures the webcam for the agent's
-		vision, speaks the agent's lines aloud, and shows its face below.
-	</p>
-	<img id="face" src="/assets/extra/robot-eyes/calm.png" alt="the robot's face" width="320"/>
-	<RenderConsole/>
+	<img id="face" src="/assets/extra/robot-eyes/calm.png" alt="the robot's face"/>
+	<video id="webcam" autoplay muted playsinline/>
 	<MainBsx src="/examples/perceive_act/head/head.bsx"/>
 	<Wasm src="/wasm/perceive-act-head.wasm"/>
 </HtmlDocument>

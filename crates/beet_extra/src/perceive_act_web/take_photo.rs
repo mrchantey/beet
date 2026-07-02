@@ -1,8 +1,10 @@
 //! `TakePhoto`: the browser head's webcam capture, `In = ()`, `Out = MediaBytes`.
 //!
 //! Serves the same `take-photo` route the desktop head does, but from the real
-//! webcam: `getUserMedia({video:true})` -> draw a frame onto a canvas ->
-//! `canvas.toDataURL("image/jpeg")` -> [`MediaBytes`]. The agent's `interpret-photo`
+//! webcam. The `<video id="webcam">` element is declared in the page markup (visible on
+//! `/debug`, hidden on `/`), so the capture is easy to reason about: open the camera
+//! once, attach it to that element, and each shot draws its current frame onto a canvas
+//! -> `canvas.toDataURL("image/jpeg")` -> [`MediaBytes`]. The agent's `interpret-photo`
 //! calls this over the socket, then one-shots the bytes to a vision model.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -12,7 +14,6 @@ use web_sys::CanvasRenderingContext2d;
 use web_sys::HtmlVideoElement;
 use web_sys::MediaStream;
 use web_sys::MediaStreamConstraints;
-use web_sys::MediaStreamTrack;
 
 /// Capture a webcam frame and return its bytes (a jpeg, no description).
 #[action(route = "take-photo")]
@@ -22,22 +23,22 @@ pub async fn TakePhoto(_cx: ActionContext<()>) -> Result<MediaBytes> {
 	capture_webcam().await
 }
 
-/// Grab one webcam frame as jpeg [`MediaBytes`].
+/// Grab the current frame of the page's `<video id="webcam">` as jpeg [`MediaBytes`].
 ///
-/// Opens the camera, plays the stream into an offscreen `<video>`, waits for its first
-/// frame so the dimensions are known, draws that frame onto a matching canvas, then
-/// reads a jpeg `data:` URL and decodes it. The `MediaStream` tracks are stopped so
-/// the camera light goes off between shots.
+/// Opens the camera the first time (attaching the live stream to the markup video, which
+/// keeps playing so `/debug` shows the feed and later shots reuse it), waits for a frame
+/// so the dimensions are known, then draws that frame onto a matching canvas and reads a
+/// jpeg `data:` URL.
 async fn capture_webcam() -> Result<MediaBytes> {
-	let stream = open_camera().await?;
-	let video = document_ext::create_element("video")
-		.dyn_into::<HtmlVideoElement>()
-		.map_err(|_| bevyhow!("not a video element"))?;
-	// muted + inline so autoplay is allowed and the frame is ready to draw.
-	video.set_muted(true);
-	video.set_autoplay(true);
-	video.set_src_object(Some(&stream));
-	JsFuture::from(video.play().map_jserr()?).await.map_jserr()?;
+	let video = document_ext::query_selector::<HtmlVideoElement>("#webcam")
+		.ok_or_else(|| bevyhow!("no `#webcam` <video> in the page"))?;
+	// open the camera once, then reuse the live stream on the markup element.
+	if video.src_object().is_none() {
+		let stream = open_camera().await?;
+		video.set_muted(true);
+		video.set_src_object(Some(&stream));
+		JsFuture::from(video.play().map_jserr()?).await.map_jserr()?;
+	}
 	await_first_frame(&video).await;
 
 	// draw the current frame onto a canvas sized to the video, then read it back as jpeg.
@@ -60,8 +61,6 @@ async fn capture_webcam() -> Result<MediaBytes> {
 	)
 	.map_jserr()?;
 
-	// stop the tracks so the camera light goes off, then decode the jpeg data URL.
-	stop_tracks(&stream);
 	let data_url = canvas.to_data_url_with_type("image/jpeg").map_jserr()?;
 	MediaBytes::from_url(&Url::parse(data_url))
 }
@@ -87,24 +86,14 @@ async fn open_camera() -> Result<MediaStream> {
 	.map_jserr()
 }
 
-/// Wait until the `<video>` has decoded its first frame (non-zero dimensions), so the
-/// canvas is sized correctly and the draw is not blank. Polls a short interval rather
-/// than wiring a `loadeddata` listener, keeping the capture a plain await.
+/// Wait until the `<video>` has decoded a frame (non-zero dimensions), so the canvas is
+/// sized correctly and the draw is not blank. Polls a short interval rather than wiring
+/// a `loadeddata` listener, keeping the capture a plain await.
 async fn await_first_frame(video: &HtmlVideoElement) {
 	for _ in 0..100u32 {
 		if video.video_width() > 0 && video.ready_state() >= 2 {
 			return;
 		}
 		time_ext::sleep_millis(20).await;
-	}
-}
-
-/// Stop every track on the stream, releasing the camera.
-fn stop_tracks(stream: &MediaStream) {
-	let tracks = stream.get_tracks();
-	for i in 0..tracks.length() {
-		if let Ok(track) = tracks.get(i).dyn_into::<MediaStreamTrack>() {
-			track.stop();
-		}
 	}
 }
