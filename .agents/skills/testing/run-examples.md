@@ -102,30 +102,18 @@ cargo run -p beet_ml   --example hello_rl_basic --features=bevy_default
 
 ### 7. Workspace ML (`--features=examples,ml`)
 
-The `examples,ml` feature only gates windowed scene code (now scene modules in
-`beet_extra`, not runnable `--example` targets), so there is no
-self-terminating CLI smoke here. The runtime ML smoke lives in the crate
-(`hello_ml_basic`, section 6); this feature's compilation is covered by the
-skip-set check below (and is the only coverage, since `beet_extra` is
-excluded from the test crates).
+The `examples,ml` feature only gates windowed scene code (now scene modules in `beet_extra`, not runnable `--example` targets), so there is no self-terminating CLI smoke here. The runtime ML smoke lives in the crate (`hello_ml_basic`, section 6); this feature's compilation is covered by the skip-set check below (and is the only coverage, since `beet_extra` is excluded from the test crates).
 
 ### 8. BSX scenes (`just beet --main=<file>.bsx`)
 
-The no-code `.bsx` scenes run through the beet CLI (`just beet` = `cargo run -p
-beet-cli -- {{args}}`, default features only). A core scene needs nothing extra,
-but ml scenes need the `ml` feature (`ml = ["winit", "beet/ml"]`, which registers
-`NearestSentenceAgent` etc.), so run those via `cargo run` directly. The
-self-terminating ones render and exit:
+The no-code `.bsx` scenes run through the beet CLI (`just beet` = `cargo run -p beet-cli -- {{args}}`, default features only). A core scene needs nothing extra, but ml scenes need the `ml` feature (`ml = ["winit", "beet/ml"]`, which registers `NearestSentenceAgent` etc.), so run those via `cargo run` directly. The self-terminating ones render and exit:
 
 ```sh
 just beet --main=examples/hello/main.bsx                                          # prints "hello world"
 cargo run -p beet-cli --features ml -- --main=examples/ml/hello_ml.bsx            # logs "NearestSentence chose: ..."
 ```
 
-Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed),
-`examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP
-server). `examples/calculator/main.bsx` currently SIGSEGVs on process teardown
-under the render+ml backend — flagged for investigation.
+Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server). `examples/calculator/main.bsx` currently SIGSEGVs on process teardown under the render+ml backend — flagged for investigation.
 
 ## Not Verifiable Via CLI (skip)
 
@@ -137,8 +125,7 @@ Documented so future passes don't waste time on them:
 - **Browser required:** `ui/crud`, `ui/syntax_highlighting`, `ui/media_renderer` (interactive output).
 - **Needs sshd:** `ssh_server`, `ssh_client`, `ssh_tui`.
 
-A pure compile check is still useful for the skipped set. The first three cover
-`beet_extra` and the feature gates, which no test crate compiles:
+A pure compile check is still useful for the skipped set. The first three cover `beet_extra` and the feature gates, which no test crate compiles:
 
 ```sh
 cargo check -p beet --features=examples,ml       # beet_extra ML scenes (fetch etc.)

@@ -1,7 +1,6 @@
 # Site docs
 
-How to write and edit the public website docs in `site/routes/docs`.
-These are the high-level docs at [beet.org](https://beet.org/docs), distinct from the crate READMEs and the rustdoc API docs.
+How to write and edit the public website docs in `site/routes/docs`. These are the high-level docs at [beet.org](https://beet.org/docs), distinct from the crate READMEs and the rustdoc API docs.
 
 ## Audience
 

@@ -2,8 +2,7 @@
 
 We will now sync the main branch with the specified work tree branches.
 
-Apply the worktree sync skill to the following worktrees.
-.agents/skills/git/worktree-sync.md
+Apply the worktree sync skill to the following worktrees. .agents/skills/git/worktree-sync.md
 
 - Main Branch `~/me/beet`
 - Merge: changes in these worktrees are intended to be merged

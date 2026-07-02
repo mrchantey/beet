@@ -1,4 +1,4 @@
-Prepare the speficied crates for release, one by one. For each crate follow the below procedure. 
+Prepare the specified crates for release, one by one. For each crate follow the below procedure. 
 
 **Do not actually release the crate.**
 

@@ -5,10 +5,7 @@ description: Entry point for writing or improving software documentation using t
 
 # Diátaxis
 
-Diátaxis is a framework for the structure of technical documentation. It identifies
-four distinct documentation modes, each serving a different user need. Mixing modes
-in a single document is the most common cause of poor docs, so the first job is
-always to decide which mode you are writing in.
+Diátaxis is a framework for the structure of technical documentation. It identifies four distinct documentation modes, each serving a different user need. Mixing modes in a single document is the most common cause of poor docs, so the first job is always to decide which mode you are writing in.
 
 ## The four modes
 
@@ -41,10 +38,7 @@ Rules of thumb:
 - "Let a user look up exact facts while they work" -> **Reference**
 - "Help a user understand why/how something is, the context and alternatives" -> **Explanation**
 
-Apply the compass at every level, from a whole document down to a single paragraph.
-A symptom that you have picked the wrong mode is content that feels like it is
-fighting itself, ie a tutorial that keeps stopping to explain, or reference that
-keeps telling the reader what to do.
+Apply the compass at every level, from a whole document down to a single paragraph. A symptom that you have picked the wrong mode is content that feels like it is fighting itself, ie a tutorial that keeps stopping to explain, or reference that keeps telling the reader what to do.
 
 ## Route to the right skill
 
@@ -55,11 +49,8 @@ Once you know the mode, load the matching skill and follow it:
 - Reference -> `writing-reference`
 - Explanation -> `writing-explanation`
 
-If the task is auditing, restructuring, or improving existing docs rather than
-writing one new piece, load `improving-docs`.
+If the task is auditing, restructuring, or improving existing docs rather than writing one new piece, load `improving-docs`.
 
 ## Working principle
 
-Do not try to design the whole documentation structure up front. Good structure
-emerges from incremental improvement: pick one piece, make it serve its single
-mode better, publish, repeat. See `improving-docs` for the full workflow.
+Do not try to design the whole documentation structure up front. Good structure emerges from incremental improvement: pick one piece, make it serve its single mode better, publish, repeat. See `improving-docs` for the full workflow.
