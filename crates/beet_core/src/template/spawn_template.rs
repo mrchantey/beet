@@ -216,14 +216,14 @@ fn root_slot_children(world: &World, root: Entity) -> Vec<Entity> {
 ///   `children!`/`Children::spawn` *sets* the root's [`Children`], detaching them
 ///   (Bevy drops the [`ChildOf`] rather than despawning);
 /// - a multi-root document (eg a leading `<!-- comment -->` before `<SiteLayout>`)
-///   builds the content under a tag-less wrapper one level below the root, so a
-///   child of the root sits in a *different composition scope* than the content's
-///   `<Slot>`s and never matches.
+///   builds the content under a tag-less wrapper below the root (one level per
+///   multi-root layer, which can nest), so a child of the root sits in a
+///   *different composition scope* than the content's `<Slot>`s and never matches.
 ///
-/// Both are fixed by re-homing each pre-added slot child onto the content root:
-/// the root itself if it built an [`Element`], else its sole element child (the
-/// wrapper's content). This keeps the portal in the same scope as the layout's
-/// slot targets, matching the additive single-root element-root case.
+/// Both are fixed by re-homing each pre-added slot child onto the content root
+/// resolved by [`content_root`] (the built [`Element`], however many tag-less
+/// wrappers deep). This keeps the portal in the same scope as the layout's slot
+/// targets, matching the additive single-root element-root case.
 fn anchor_pre_slot_children(
 	world: &mut World,
 	root: Entity,
@@ -243,20 +243,43 @@ fn anchor_pre_slot_children(
 }
 
 /// The entity a layout's `<Slot>`s live under: the root if it built an
-/// [`Element`], else its sole [`Element`] child (a multi-root document nests the
-/// real content under a tag-less wrapper, eg a leading comment before the layout
-/// element), else the root unchanged.
+/// [`Element`], else the content [`Element`] nested below it, else the root
+/// unchanged.
+///
+/// A multi-root document nests the content element under a tag-less wrapper, and
+/// the nesting can be more than one level deep: a layout `<!-- comment --><Layout>`
+/// whose `<Layout>` template *itself* returns `<!DOCTYPE html><html>` builds the
+/// `<html>` two wrappers below the root. Anchoring the transcluded body on the
+/// wrong level widens its composition scope so the default body matches a nested
+/// widget's default `<Slot>` (eg `RouteHead`'s, first in document order) instead
+/// of the layout's own, so the descent must reach the real content element.
 fn content_root(world: &World, root: Entity) -> Entity {
 	if world.entity(root).contains::<Element>() {
 		return root;
 	}
-	world
-		.entity(root)
+	descend_to_content_element(world, root).unwrap_or(root)
+}
+
+/// The first [`Element`] reachable below `entity` through tag-less wrapper nodes,
+/// searching each level breadth-first (an element sibling wins over descending)
+/// so the topmost content element (eg `<html>`) is found, never one of its
+/// descendants. Non-element leaves (a comment/doctype sibling) are skipped.
+fn descend_to_content_element(world: &World, entity: Entity) -> Option<Entity> {
+	let children: Vec<Entity> = world
+		.entity(entity)
 		.get::<Children>()
 		.into_iter()
 		.flat_map(Children::iter)
+		.collect();
+	children
+		.iter()
+		.copied()
 		.find(|child| world.entity(*child).contains::<Element>())
-		.unwrap_or(root)
+		.or_else(|| {
+			children
+				.iter()
+				.find_map(|&child| descend_to_content_element(world, child))
+		})
 }
 
 #[cfg(test)]
@@ -511,5 +534,35 @@ mod test {
 		entity.get_mut::<TemplatePending>().unwrap().resolve(id);
 		drain_pending_dependencies(&mut entity);
 		load_fired.get().xpect_true();
+	}
+
+	#[beet_core::test]
+	fn content_root_descends_nested_wrappers() {
+		let mut world = World::new();
+		// an element root is its own content root.
+		let element = world.spawn(Element::new("html")).id();
+		content_root(&world, element).xpect_eq(element);
+
+		// a single-wrapper multi-root document (`<!-- c --><html>`): the element is a
+		// direct child of the tag-less root.
+		let root = world.spawn_empty().id();
+		world.spawn((Comment::new(" c "), ChildOf(root)));
+		let html = world.spawn((Element::new("html"), ChildOf(root))).id();
+		content_root(&world, root).xpect_eq(html);
+
+		// a doubly-nested multi-root document (`<!-- c --><Layout>` whose `<Layout>`
+		// is itself `<!DOCTYPE html><html>`): the element sits two wrappers below the
+		// root, so the descent must reach it rather than stop at the root.
+		let outer = world.spawn_empty().id();
+		world.spawn((Comment::new(" c "), ChildOf(outer)));
+		let inner = world.spawn(ChildOf(outer)).id();
+		world.spawn((Doctype::new("html"), ChildOf(inner)));
+		let deep_html = world.spawn((Element::new("html"), ChildOf(inner))).id();
+		content_root(&world, outer).xpect_eq(deep_html);
+
+		// a wrapper with no element anywhere below falls back to the root itself.
+		let empty = world.spawn_empty().id();
+		world.spawn((Comment::new(" c "), ChildOf(empty)));
+		content_root(&world, empty).xpect_eq(empty);
 	}
 }

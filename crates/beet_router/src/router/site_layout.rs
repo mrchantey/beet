@@ -68,6 +68,7 @@ pub fn SiteLayout(
 		}
 	});
 	rsx! {
+		<!DOCTYPE html>
 		<html lang="en">
 			<RouteHead>
 				{html_head}

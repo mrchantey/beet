@@ -21,8 +21,8 @@ pub enum DnsProvider {
 		/// The Cloudflare zone id (from `CLOUDFLARE_ZONE_ID`).
 		zone_id: SmolStr,
 		/// Whether to proxy through Cloudflare's edge. DNS-only (`false`) is
-		/// required when the origin must be reached directly, eg raw TCP ssh,
-		/// terminating TLS at the origin, or bypassing a zone-level redirect.
+		/// required when the origin must be reached directly, eg raw TCP ssh
+		/// without a Spectrum app, or terminating TLS at the origin.
 		proxied: bool,
 	},
 	/// A record in a Route53 hosted zone.

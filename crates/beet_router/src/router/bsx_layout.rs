@@ -238,6 +238,57 @@ mod test {
 		(body_at > main_open && body_at < main_close).xpect_true();
 	}
 
+	/// The doubly-nested multi-root case: the `Layout.bsx` idiom (a leading comment
+	/// before `<SiteLayout>`) wrapping the shipped `<SiteLayout>`, which itself is
+	/// multi-root (its `<!DOCTYPE html>` sits before `<html>`). So `<html>` builds
+	/// two tag-less wrappers below the layout root, and the transcluded body must
+	/// still anchor at `<html>` to reach `<main>`'s default slot rather than widen
+	/// its scope into `RouteHead`'s default slot (first in document order). On the
+	/// web that head-leak is merely invisible; on the terminal `<head>` is
+	/// `display:none`, so the misrouted body vanishes entirely. Regression for the
+	/// body landing in the head instead of `<main>` when nested layouts are
+	/// multi-root.
+	#[beet_core::test]
+	async fn site_layout_nested_multiroot_routes_body_into_main() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.init_resource::<PackageConfig>();
+		let mut registry = BsxTemplateRegistry::default();
+		registry
+			.insert_source(
+				"Layout",
+				"<!-- layout -->\n<SiteLayout>\n\t<meta slot=\"head\" name=\"x-custom\"/>\n\t<div slot=\"sidebar\">\"custom rail\"</div>\n</SiteLayout>",
+			)
+			.unwrap();
+		world.insert_resource(registry);
+		let root = world
+			.spawn((Router, BsxLayout::default(), children![
+				render_action::fixed_func_route(
+					"",
+					|| rsx! { <p>"page body"</p> }
+				)
+			]))
+			.flush();
+		// the web lands the body inside <main>, not leaked up into the <head>.
+		let html = get(&mut world, root, "").await;
+		let main_open = html.find("<main").unwrap();
+		let main_close = html.find("</main>").unwrap();
+		let body_at = html.find("page body").unwrap();
+		(body_at > main_open && body_at < main_close).xpect_true();
+		// the terminal must keep the body too: a body misrouted into the non-visual
+		// <head> would paint nothing, so `contains` is the meaningful terminal check.
+		world
+			.entity_mut(root)
+			.exchange(
+				Request::get("")
+					.with_header::<header::Accept>(vec![MediaType::Text]),
+			)
+			.await
+			.unwrap_str()
+			.await
+			.as_str()
+			.xpect_contains("page body");
+	}
+
 	#[beet_core::test]
 	async fn missing_template_errors() {
 		let mut world = router_world();

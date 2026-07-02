@@ -6,7 +6,6 @@ in as SiteLayout's default-slot child, so it lands in <main> with no relay here;
 <LiveReloadScript/> appends to the head chrome, and the sidebar override excludes
 the `export` route.
 -->
-<!DOCTYPE html>
 <SiteLayout>
 	<LiveReloadScript slot="head"/>
 	<RouteSidebar home=false exclude={["export"]} slot="sidebar"/>
