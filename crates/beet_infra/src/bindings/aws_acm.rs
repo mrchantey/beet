@@ -88,6 +88,14 @@ pub struct AwsAcmCertificateDetails {
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
+	pub private_key_wo: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub private_key_wo_version: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub provider: Option<SmolStr>,
 	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
 	/// ## Attribute

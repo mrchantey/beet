@@ -125,9 +125,9 @@ pub struct CloudflareDnsRecordDetails {
 	pub r#type: SmolStr,
 	/// Identifier.
 	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub zone_id: Option<SmolStr>,
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub zone_id: SmolStr,
 }
 impl terra::ToJson for CloudflareDnsRecordDetails {
 	fn to_json(&self) -> serde_json::Value {
@@ -208,6 +208,12 @@ impl terra::Resource for CloudflareDnsRecordDetails {
 			return Err(terra::ResourceValidationError::MissingRequiredField {
 				resource_type: self.resource_type(),
 				field_name: "type",
+			});
+		}
+		if self.zone_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "zone_id",
 			});
 		}
 		Ok(())
@@ -358,9 +364,9 @@ pub struct CloudflareLoadBalancerDetails {
 	pub ttl: Option<i64>,
 	/// Identifier.
 	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub zone_id: Option<SmolStr>,
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub zone_id: SmolStr,
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -421,6 +427,12 @@ impl terra::Resource for CloudflareLoadBalancerDetails {
 				field_name: "name",
 			});
 		}
+		if self.zone_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "zone_id",
+			});
+		}
 		if self.zone_name.is_some() {
 			return Err(
 				terra::ResourceValidationError::NonEmptyComputedField {
@@ -438,9 +450,9 @@ impl terra::Resource for CloudflareLoadBalancerDetails {
 pub struct CloudflareLoadBalancerMonitorDetails {
 	/// Identifier.
 	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub account_id: Option<SmolStr>,
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub account_id: SmolStr,
 	/// Do not validate the certificate when monitor use HTTPS. This parameter is currently only valid for HTTP and HTTPS monitors.
 	/// ## Attribute
 	/// `optional`, `computed`
@@ -565,6 +577,12 @@ impl terra::Resource for CloudflareLoadBalancerMonitorDetails {
 	fn validate_definition(
 		&self,
 	) -> Result<(), terra::ResourceValidationError> {
+		if self.account_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "account_id",
+			});
+		}
 		if self.created_on.is_some() {
 			return Err(
 				terra::ResourceValidationError::NonEmptyComputedField {
@@ -598,9 +616,9 @@ impl terra::Resource for CloudflareLoadBalancerMonitorDetails {
 pub struct CloudflareLoadBalancerPoolDetails {
 	/// Identifier.
 	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub account_id: Option<SmolStr>,
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub account_id: SmolStr,
 	/// A list of regions from which to run health checks. Null means every Cloudflare data center.
 	/// ## Attribute
 	/// `optional`
@@ -725,6 +743,12 @@ impl terra::Resource for CloudflareLoadBalancerPoolDetails {
 	fn validate_definition(
 		&self,
 	) -> Result<(), terra::ResourceValidationError> {
+		if self.account_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "account_id",
+			});
+		}
 		if self.created_on.is_some() {
 			return Err(
 				terra::ResourceValidationError::NonEmptyComputedField {

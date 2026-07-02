@@ -58,6 +58,10 @@ pub struct AwsApiGatewayRestApiDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub disable_execute_api_endpoint: Option<bool>,
 	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub endpoint_access_mode: Option<SmolStr>,
+	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub execution_arn: Option<SmolStr>,
@@ -106,6 +110,10 @@ pub struct AwsApiGatewayRestApiDetails {
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub root_resource_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub security_policy: Option<SmolStr>,
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]

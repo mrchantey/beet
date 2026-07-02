@@ -339,7 +339,7 @@ pub struct AwsLightsailKeyPairDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub pgp_key: Option<SmolStr>,
 	/// ## Attribute
-	/// `computed`
+	/// `computed`, `sensitive`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub private_key: Option<SmolStr>,
 	/// ## Attribute
