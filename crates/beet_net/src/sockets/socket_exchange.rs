@@ -298,7 +298,9 @@ fn drain_pending(socket: &mut ExchangeSocket) {
 	}
 }
 
-#[cfg(all(test, feature = "postcard"))]
+// the in-memory `socket_pair` rides `async_channel` + `AsyncPlugin::world`, both
+// std-only, so the test module needs `std` even though the module under test does not.
+#[cfg(all(test, feature = "postcard", feature = "std"))]
 mod test {
 	use super::*;
 

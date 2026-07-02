@@ -1463,9 +1463,11 @@ dependencies = [
  "beet_spatial",
  "beet_thread",
  "bevy",
+ "js-sys",
  "serde",
  "serde_json",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 

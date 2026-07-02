@@ -31,6 +31,13 @@ serde = ["dep:serde", "dep:serde_json"]
 # JSON (de)serialization across the sub-crate surface, mirroring the umbrella
 # `beet` crate's `json` feature shape for whichever sub-crates are deps here.
 json = ["serde", "beet_core/json", "beet_action/json", "beet_net?/json", "beet_router?/json"]
+# The wasm browser head for the perceive-act demo (v3): the `<WebHead>` socket client
+# served to a browser tab, capturing the webcam, speaking via the Web Speech API and
+# rendering an `<img>` face. Wasm-safe: it needs only the socket/router/action surface
+# `json` + beet_net + beet_router pull, plus the wasm web-sys deps, NOT the native LLM
+# `beet_thread` the `thread` set drags in. Built into the wasm binary via
+# `beet-cli`'s `web_head` feature.
+perceive_act_web = ["json", "dep:beet_net", "beet_net?/sockets", "dep:beet_router"]
 # The agent-thread example tool wiring (`ThreadExamplesPlugin`): the thread runtime
 # + its charcell chat UI + the example inline tools, so the `beet` binary can run
 # `examples/thread/*.bsx`. Headless-friendly (no render), so it is independent of
@@ -74,6 +81,35 @@ beet_core = { workspace = true, features = ["testing"] }
 [lib]
 harness = false
 
+
+# the wasm browser head (`perceive_act_web`) drives the webcam, Web Speech and the
+# `<img>` face through web-sys. The bindings ride beet_core transitively; these tables
+# just add the extra feature gates the head APIs need (mirroring beet_thread's webrtc
+# table). Harmless on a wasm build that leaves `perceive_act_web` off (the module is
+# feature-gated, so nothing references them).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+js-sys.workspace = true
+# https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
+web-sys = { workspace = true, features = [
+	"Document",
+	"Element",
+	"Window",
+	"Navigator",
+	"HtmlImageElement",
+	"HtmlCanvasElement",
+	"HtmlVideoElement",
+	"HtmlMediaElement",
+	"CanvasRenderingContext2d",
+	"MediaDevices",
+	"MediaStream",
+	"MediaStreamTrack",
+	"MediaStreamConstraints",
+	"SpeechSynthesis",
+	"SpeechSynthesisUtterance",
+	"Url",
+] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 web-sys.workspace = true

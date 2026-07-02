@@ -419,6 +419,13 @@ ssh_tui = ["ssh_server", "tui_server", "beet_router?/ssh"]
 # inert when `beet_extra` is not a dep.
 thread = ["dep:beet_thread","net","action","beet_extra?/thread","beet_extra?/scripting"]
 
+# The wasm browser head for the perceive-act demo (v3). Pairs the `web` render base
+# (the socket/router/action surface the head client rides) with `beet_extra`'s wasm-safe
+# `<WebHead>` + webcam/speech/face handlers, forwarded via `beet_extra/perceive_act_web`;
+# the `?` keeps it inert when `beet_extra` is not a dep. No `thread` (the native LLM), so
+# it stays wasm-clean.
+perceive_act_web = ["web", "extra", "beet_extra?/perceive_act_web"]
+
 
 # 💡 Stack
 

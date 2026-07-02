@@ -44,12 +44,13 @@ mod channel_socket_server;
 #[cfg(feature = "std")]
 pub use channel_socket_server::*;
 // The Request/Response exchange carried over a socket; needs the `RequestParts` /
-// `ResponseParts` serde derives the frame serializes. Desirable on device
-// eventually, but out of scope here, so gate on `std` so it does not force std
-// into the esp build.
-#[cfg(all(feature = "serde", feature = "std"))]
+// `ResponseParts` serde derives the frame serializes, plus the `action` layer
+// that `sockets` already pulls. It is no_std-capable, so it rides `serde` +
+// `sockets` and reaches the bare-metal device build (the esp body serves
+// `apply-heading` over it), not just `std` (which turns `sockets` on anyway).
+#[cfg(all(feature = "serde", feature = "sockets"))]
 mod socket_exchange;
-#[cfg(all(feature = "serde", feature = "std"))]
+#[cfg(all(feature = "serde", feature = "sockets"))]
 pub use socket_exchange::*;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 mod impl_tungstenite;

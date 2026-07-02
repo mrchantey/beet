@@ -1,0 +1,40 @@
+<!--
+Perceive-act loop, v3. The same shared always-socket agent (`agent.bsx`) as v1/v2, but
+with NO in-process clients: instead a second server, an `HttpServer`, serves a wasm
+browser head. A browser tab loading the head page boots the `web_head` wasm binary, which
+connects back to the agent's socket server as the `head` client and serves `take-photo`
+(the real webcam), `speak-text` (the Web Speech API) and `set-emotion` (a rendered `<img>`
+face). A device body (eg the esp Alvik) can connect for `apply-heading`; none runs here.
+
+Two servers in one process, each its own root with its own `BootOnLoad`: the agent's
+`SocketServer` (bound to all interfaces by its `CapabilityServer`, so a browser or device
+on the LAN can reach it) on `:8338`, and the head `HttpServer` on `:8337`. Build the head
+wasm first, then run both servers (no `--server` flag boots every declared server, or name
+them explicitly):
+
+    beet build-wasm --package=beet-cli --bin=beet --features=web_head --out=examples/perceive_act/head/assets/perceive-act-head.wasm
+    cargo run -p beet-cli --features thread,sockets -- --main=examples/perceive_act/main-v3.bsx --root=. --server=socket,http
+
+Then open http://127.0.0.1:8337 and grant camera access. Needs `OPENAI_API_KEY` (the agent
++ the vision describe). `sockets` links the websocket transport, `thread` the agent LLM;
+serving the page + assets rides the default native router.
+-->
+<Fragment>
+	<!-- the always-socket agent: a socket server whose head capabilities forward to the
+	     browser head over the socket, bound by the `whoami` handshake. -->
+	<Template src="examples/perceive_act/agent.bsx"/>
+	<!-- the head server: serves the head page + the wasm binary + the examples/assets the
+	     browser fetches. Its own root, so its route tree is isolated from the agent. -->
+	<Router {(HttpServer, BootOnLoad)}>
+		<PackageConfig title="Perceive-act head" description="The robot's browser head"/>
+		<DefaultAppRoutes/>
+		<RoutesDir src="examples/perceive_act/head/routes"/>
+		<!-- the wasm/js head artifacts at /wasm, the workspace assets tree at /assets (the
+		     robot-eyes sprites the face renders, eg /assets/extra/robot-eyes/joy.png), and
+		     the examples tree at /examples (the head program the browser fetches). Distinct
+		     prefixes, since each `<AssetsDir>` owns its mount path. -->
+		<AssetsDir src="examples/perceive_act/head/assets" prefix="wasm"/>
+		<AssetsDir src="assets" prefix="assets"/>
+		<AssetsDir src="examples" prefix="examples"/>
+	</Router>
+</Fragment>

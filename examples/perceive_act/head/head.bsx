@@ -1,0 +1,14 @@
+<!--
+The program the wasm head binary runs in the browser: spawn the `<WebHead>` socket
+client, which connects back to the perceive-act agent's socket server as the `head`
+client and serves the head capabilities from this tab: `take-photo` (the real webcam),
+`speak-text` (the Web Speech API) and `set-emotion` (the `<img id="face">` on the page).
+
+The url is the agent's socket server (`ws://<host>:8338`, bound to all interfaces by the
+agent's `CapabilityServer`). Loopback here, since main-v3 serves the page and runs the
+agent on the same host; point it at the host's LAN address to drive from another device.
+
+Needs a `web_head` wasm build (`beet build-wasm --features=web_head`), so `<WebHead>`
+resolves; the plain `web` base does not carry it.
+-->
+<WebHead url="ws://127.0.0.1:8338"/>

@@ -1,0 +1,29 @@
+<!--
+The perceive-act web head page (v3). A full `<HtmlDocument>` so the route renders the
+whole document directly: `<Stylesheet>` + `<ColorSchemeScript>` + `<LiveReloadScript>` in
+the head, and in the body the rendered face, the head's console output, and the wasm
+loader.
+
+`<MainBsx>` references the head program (`head.bsx`, which spawns `<WebHead>`); `<Wasm>`
+boots the `web_head` wasm binary, which fetches and runs it, connecting back to the agent
+over the socket and serving the head capabilities from this tab. `set-emotion` points the
+`<img id="face">` at the matching robot-eyes sprite; it starts on the calm resting face.
+`<RenderConsole>` (before `<Wasm>`, so its console wrap installs first) mirrors the head's
+`info!`/`warn!` logs onto the page.
+-->
+<HtmlDocument>
+	<Fragment slot="head">
+		<Stylesheet/>
+		<ColorSchemeScript/>
+		<LiveReloadScript/>
+	</Fragment>
+	<h1>Perceive-act web head</h1>
+	<p>
+		This browser tab is the robot's head: it captures the webcam for the agent's
+		vision, speaks the agent's lines aloud, and shows its face below.
+	</p>
+	<img id="face" src="/assets/extra/robot-eyes/calm.png" alt="the robot's face" width="320"/>
+	<RenderConsole/>
+	<MainBsx src="/examples/perceive_act/head/head.bsx"/>
+	<Wasm src="/wasm/perceive-act-head.wasm"/>
+</HtmlDocument>

@@ -111,6 +111,12 @@ web = ["beet/web"]
 # richer `examples/action/*.bsx` programs (eg malenia.bsx), not just the
 # Sequence/Log core. Stays wasm-clean: `beet/extra` pulls no winit/wgpu/bevy_default.
 web_examples = ["web", "beet/extra"]
+# The browser-wasm target plus the perceive-act wasm head (`<WebHead>` + its webcam /
+# speech / face handlers, via `beet/perceive_act_web`), so the browser binary serves as
+# the perceive-act head client (v3). Wasm-safe: no `thread` (the native LLM agent runs in
+# the separate native binary serving this head over a socket). Build with:
+# `beet build-wasm --package=beet-cli --bin=beet --features=web_head --out=<path>.wasm`.
+web_head = ["web", "beet/perceive_act_web"]
 
 # the portable cross-platform base: the render router stack, media negotiation and
 # the runtime BSX parser the no-code site needs, on both native and wasm. beet's
