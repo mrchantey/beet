@@ -209,12 +209,14 @@ impl Body {
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
 
-	/// Consumes the body and decodes it into a [`Value`], a string or bytes per
-	/// `content_type` (or UTF-8 validity when `None`).
+	/// Consumes the body and decodes it into a [`Value`].
 	///
-	/// A declared text media type decodes (lossily) as a [`Value::Str`]; a declared
-	/// non-text type stays [`Value::Bytes`]; with no type the bytes are a string if
-	/// valid UTF-8, else bytes. Uses beet's own [`Value`], so it is not json-gated.
+	/// A `json` body is parsed into a structured [`Value`] (a [`Value::Map`] for an
+	/// object), so callers can read fields directly. Any other declared text media
+	/// type decodes (lossily) as a [`Value::Str`]; a declared non-text type stays
+	/// [`Value::Bytes`]; with no type the bytes are a string if valid UTF-8, else
+	/// bytes. Uses beet's own [`Value`]; the json parse rides the `json` feature
+	/// (without it, a json body falls back to a string).
 	/// The shared body of [`Request::into_value`](crate::prelude::Request::into_value)
 	/// and [`Response::into_value`](crate::prelude::Response::into_value).
 	pub async fn into_value(
@@ -222,7 +224,21 @@ impl Body {
 		content_type: Option<MediaType>,
 	) -> Result<Value> {
 		let bytes = self.into_bytes().await?;
-		match content_type {
+		let value = match content_type {
+			// json parses into a structured value so fields are directly readable.
+			#[cfg(feature = "json")]
+			Some(MediaType::Json) => {
+				let slice = if bytes.is_empty() {
+					b"null".as_slice()
+				} else {
+					bytes.as_ref()
+				};
+				let json: serde_json::Value =
+					serde_json::from_slice(slice).map_err(|err| {
+						bevyhow!("failed to parse json body: {err}")
+					})?;
+				Value::from_json(json)
+			}
 			// a declared text type is decoded as UTF-8 (lossily, never failing).
 			Some(media_type) if media_type.is_text() => {
 				Value::str(String::from_utf8_lossy(&bytes).into_owned())
@@ -234,8 +250,8 @@ impl Body {
 				Ok(text) => Value::str(text),
 				Err(err) => Value::Bytes(err.into_bytes()),
 			},
-		}
-		.xok()
+		};
+		value.xok()
 	}
 
 	/// Attempts to extract bytes without consuming a stream.

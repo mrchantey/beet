@@ -13,7 +13,7 @@ pub fn page_view_event(
 		duration_ms: dwell.as_millis() as u64,
 		referrer: None,
 		title: None,
-		client: Value::Null,
+		client: ClientDescriptor::default(),
 	})
 	.with_client_kind(ClientKind::Terminal)
 	.with_session(Some(session))

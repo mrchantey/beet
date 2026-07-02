@@ -52,6 +52,7 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 		.then(|| ip.map(|ip| SmolStr::from(ip.to_string())))
 		.flatten();
 
+	// the beacon posts a json body; `into_value` parses it into a `Value` map.
 	let body = request.into_value().await?;
 	let event = AnalyticsEvent::from_beacon(body, session, ip, country)?;
 	world.with(move |world: &mut World| world.trigger(event)).await;

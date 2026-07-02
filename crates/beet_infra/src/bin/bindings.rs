@@ -21,6 +21,7 @@ async fn main() -> Result {
 			BindingFile::new("crates/beet_infra/src/bindings/aws_common.rs")
 				.with_resources(terra::Provider::AWS, [
 					"aws_cloudwatch_log_group",
+					"aws_dynamodb_table",
 					"aws_iam_access_key",
 					"aws_iam_role",
 					"aws_iam_role_policy_attachment",

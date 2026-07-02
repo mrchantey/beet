@@ -18,7 +18,7 @@ async fn seeded_store() -> (AnalyticsStore, Uuid) {
 		duration_ms: 500,
 		referrer: None,
 		title: None,
-		client: Value::Null,
+		client: ClientDescriptor::default(),
 	})
 	.with_client_kind(ClientKind::Web);
 	let prior_id = prior.id;

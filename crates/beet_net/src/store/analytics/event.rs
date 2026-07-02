@@ -51,16 +51,15 @@ pub enum AnalyticsEventData {
 		referrer: Option<SmolStr>,
 		/// The document title, if any.
 		title: Option<SmolStr>,
-		/// The browser client descriptor (user agent, screen, viewport, ...), a
-		/// flexible map since it is web-only and every field is optional.
-		client: Value,
+		/// The browser client descriptor (user agent, screen, viewport, ...).
+		client: ClientDescriptor,
 	},
 	/// A click on an interactive element.
 	Click {
 		/// Why it was recorded, eg `anchor-click` / `button-click`.
 		reason: SmolStr,
-		/// The clicked element (tag, id, class, text).
-		element: Value,
+		/// The clicked element.
+		element: ClickElement,
 	},
 	/// A max scroll depth reached on a page.
 	Scroll {
@@ -93,6 +92,48 @@ impl AnalyticsEventData {
 			Self::Error { .. } => AnalyticsEventKind::Error,
 		}
 	}
+}
+
+/// The browser client descriptor a web page view carries: what kind of client is
+/// viewing, no identifiers. Every field is optional (a partial beacon, or a
+/// non-browser client, may omit any).
+#[derive(
+	Debug, Default, Clone, PartialEq, Serialize, Deserialize,
+)]
+pub struct ClientDescriptor {
+	/// The `navigator.userAgent`.
+	pub user_agent: Option<SmolStr>,
+	/// The `navigator.language`.
+	pub language: Option<SmolStr>,
+	/// The `navigator.platform`.
+	pub platform: Option<SmolStr>,
+	/// The screen width in pixels.
+	pub screen_width: Option<u32>,
+	/// The screen height in pixels.
+	pub screen_height: Option<u32>,
+	/// The viewport width in pixels.
+	pub viewport_width: Option<u32>,
+	/// The viewport height in pixels.
+	pub viewport_height: Option<u32>,
+	/// The device pixel ratio.
+	pub device_pixel_ratio: Option<f64>,
+	/// The IANA timezone name.
+	pub timezone: Option<SmolStr>,
+}
+
+/// The element a click event recorded, for locating what was clicked.
+#[derive(
+	Debug, Default, Clone, PartialEq, Serialize, Deserialize,
+)]
+pub struct ClickElement {
+	/// The element tag name, eg `A` / `BUTTON`.
+	pub tag: Option<SmolStr>,
+	/// The element id attribute.
+	pub id: Option<SmolStr>,
+	/// The element class attribute.
+	pub class: Option<SmolStr>,
+	/// The element's text content (truncated by the client).
+	pub text: Option<SmolStr>,
 }
 
 /// The coarse kind of client that produced an [`AnalyticsEvent`].
@@ -190,7 +231,6 @@ impl AnalyticsEvent {
 			body.get(key).and_then(|value| value.as_str().ok()).map(SmolStr::from)
 		};
 		let u64 = |key: &str| body.get(key).and_then(|value| value.as_u64().ok());
-		let value = |key: &str| body.get(key).cloned().unwrap_or(Value::Null);
 		let uuid = |key: &str| {
 			body.get(key)
 				.and_then(|value| value.as_str().ok())
@@ -198,11 +238,16 @@ impl AnalyticsEvent {
 		};
 
 		// the kind selects the typed payload; the client never sends `request`, so
-		// an unknown/absent kind falls back to a page view.
+		// an unknown/absent kind falls back to a page view. A nested object (client /
+		// element) deserializes into its typed struct, defaulting when malformed.
 		let data = match body.get("kind").and_then(|value| value.as_str().ok()) {
 			Some("click") => AnalyticsEventData::Click {
 				reason: str("reason").unwrap_or_default(),
-				element: value("element"),
+				element: body
+					.get("element")
+					.cloned()
+					.and_then(|value| value.into_serde().ok())
+					.unwrap_or_default(),
 			},
 			Some("scroll") => AnalyticsEventData::Scroll {
 				max_percent: u64("max_percent").unwrap_or(0) as u32,
@@ -218,7 +263,11 @@ impl AnalyticsEvent {
 				duration_ms: u64("duration_ms").unwrap_or(0),
 				referrer: str("referrer"),
 				title: str("title"),
-				client: value("client"),
+				client: body
+					.get("client")
+					.cloned()
+					.and_then(|value| value.into_serde().ok())
+					.unwrap_or_default(),
 			},
 		};
 
@@ -280,12 +329,8 @@ mod test {
 				..
 			} => {
 				duration_ms.xpect_eq(4200);
-				client
-					.get("user_agent")
-					.unwrap()
-					.as_str()
-					.unwrap()
-					.xpect_eq("Mozilla/5.0");
+				// the nested client descriptor deserialized into its typed struct.
+				client.user_agent.as_deref().xpect_eq(Some("Mozilla/5.0"));
 			}
 			_ => panic!("expected a page view"),
 		}
