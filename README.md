@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A malleable tool engine</strong>
+    <strong>A creative tool engine</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>

@@ -8,7 +8,7 @@ else is the shipped widget library (`<Link>`) and real semantic classes.
 <div bx:style="display=Flex flex-direction=Vertical align-items=Center text-align=Center row-gap=Rem(1.5)">
 	<h1 class="text-display-medium">Beet</h1>
 	<p class="text-title-large">
-		<b>A malleable tool engine</b>
+		<b>A creative tool engine</b>
 	</p>
 	<div bx:style="max-width=Rem(34.0)">
 		<div class="card-filled">
