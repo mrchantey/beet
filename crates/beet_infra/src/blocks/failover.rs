@@ -108,7 +108,7 @@ impl Block for CloudflareFailoverBlock {
 		let monitor = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("monitor")),
 			CloudflareLoadBalancerMonitorDetails {
-				account_id: Some(self.account_id.clone()),
+				account_id: self.account_id.clone(),
 				r#type: Some("http".into()),
 				method: Some("GET".into()),
 				path: Some(self.health_check_path.clone()),
@@ -142,7 +142,7 @@ impl Block for CloudflareFailoverBlock {
 			stack.resource_ident(self.build_label("lb")),
 			CloudflareLoadBalancerDetails {
 				name: self.hostname.clone(),
-				zone_id: Some(self.zone_id.clone()),
+				zone_id: self.zone_id.clone(),
 				default_pools: vec![primary_pool.into()],
 				fallback_pool: fallback_pool.into(),
 				proxied: Some(true),

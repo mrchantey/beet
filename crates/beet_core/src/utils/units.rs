@@ -186,7 +186,6 @@ impl_velocity_from!(AngularVelocity, from_deg_per_sec);
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	#[crate::test]
 	fn angle_round_trips() {

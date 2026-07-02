@@ -6,9 +6,11 @@
 //! an unresolvable ip, [`GeoIp::country`] returns `None` and callers omit the
 //! country.
 //!
-//! The database is a static asset at `<assets_dir>/databases/country.mmdb`. Use a
+//! The database is a static asset at `databases/country.mmdb` under the assets
+//! store (the local `assets/` dir, or the deployed assets bucket). Use a
 //! redistributable database (db-ip Lite or IP2Location LITE, both CC-licensed)
 //! rather than MaxMind GeoLite2, whose license restricts committing the file.
+use crate::prelude::*;
 use beet_core::prelude::*;
 use std::net::IpAddr;
 
@@ -24,17 +26,19 @@ pub struct GeoIp {
 }
 
 impl GeoIp {
-	/// Loads the country database from `<assets_dir>/databases/country.mmdb`.
+	/// Loads the country database from `databases/country.mmdb` in the assets
+	/// store, so a deployed site reads the same bucket-backed store it serves
+	/// assets from (a local fs path would be empty in a container).
 	///
-	/// Best-effort: a missing file, an unreadable file, or a parse failure logs
+	/// Best-effort: a missing blob, an unreadable blob, or a parse failure logs
 	/// and yields an empty [`GeoIp`] whose lookups return `None`, rather than
 	/// failing analytics setup.
-	pub async fn load(assets_dir: &AbsPathBuf) -> Self {
+	pub async fn load(assets: &BlobStore) -> Self {
 		cfg_if! {
 			if #[cfg(feature = "geoip")] {
-				let path = assets_dir.join(COUNTRY_DB_PATH);
-				match fs_ext::read_async(&path).await {
-					Ok(bytes) => match GeoIpDb::from_bytes(bytes) {
+				let path = SmolPath::new(COUNTRY_DB_PATH);
+				match assets.get(&path).await {
+					Ok(bytes) => match GeoIpDb::from_bytes(bytes.to_vec()) {
 						Ok(db) => {
 							debug!("geoip: country database loaded from {path}");
 							Self { db: Some(std::sync::Arc::new(db)) }
@@ -50,7 +54,7 @@ impl GeoIp {
 					}
 				}
 			} else {
-				let _ = assets_dir;
+				let _ = assets;
 				Self::default()
 			}
 		}
@@ -117,7 +121,9 @@ mod test {
 	#[cfg(feature = "geoip")]
 	#[beet_core::test]
 	async fn resolves_known_ip_from_committed_db() {
-		let assets = AbsPathBuf::new_workspace_rel("assets").unwrap();
+		let assets = BlobStore::new(FsStore::new(
+			AbsPathBuf::new_workspace_rel("assets").unwrap(),
+		));
 		let geoip = GeoIp::load(&assets).await;
 		// google public dns is a stable US address in the db-ip country database.
 		geoip.country_str("8.8.8.8").xpect_eq(Some("US".into()));

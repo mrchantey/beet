@@ -62,33 +62,47 @@ pub fn reduced_motion() -> Rule {
 
 // ── Interaction ─────────────────────────────────────────────────────────────
 
-/// The set of interactive elements that share the hover affordance: every
-/// `<button>` (and `.btn`-styled link), any `<a>`, and the `<img>`/`<iframe>`
-/// link fallbacks, so buttons, prose links, sidebar anchors, and the alt/title
-/// placeholders all respond to hover identically.
+/// The set of interactive elements that share the hover affordance on every
+/// target: every `<button>` (and `.btn`-styled link) and any `<a>`, so buttons,
+/// prose links, and sidebar anchors all respond to hover identically.
 fn interactive() -> Selector {
 	Selector::AnyOf(vec![
 		Selector::tag("button"),
 		Selector::tag("a"),
+	])
+}
+
+/// The terminal's link fallbacks: an `<img>`'s alt placeholder and an
+/// `<iframe>`'s collapsed title render as links there, so they share the hover
+/// affordance. Rules on this selector must be terminal-gated: on the web these
+/// are a real image/frame, never hoverable.
+fn interactive_fallback() -> Selector {
+	Selector::AnyOf(vec![
 		Selector::tag("img"),
 		Selector::tag("iframe"),
 	])
 }
 
-/// `:hover` over an interactive element: the same selectors, gated on the
-/// [`Hovered`](ElementState::Hovered) state.
+/// Gates a selector on the [`Hovered`](ElementState::Hovered) state.
+fn hovered(selector: Selector) -> Selector {
+	Selector::AllOf(vec![selector, Selector::state(ElementState::Hovered)])
+}
+
+/// `:hover` over an interactive element: the [`interactive`] tags, each gated
+/// on the [`Hovered`](ElementState::Hovered) state.
 fn interactive_hover() -> Selector {
-	let hovered = |tag: &str| {
-		Selector::AllOf(vec![
-			Selector::tag(tag),
-			Selector::state(ElementState::Hovered),
-		])
-	};
 	Selector::AnyOf(vec![
-		hovered("button"),
-		hovered("a"),
-		hovered("img"),
-		hovered("iframe"),
+		hovered(Selector::tag("button")),
+		hovered(Selector::tag("a")),
+	])
+}
+
+/// `:hover` over a terminal link fallback: the [`interactive_fallback`] tags,
+/// each gated on the [`Hovered`](ElementState::Hovered) state.
+fn interactive_fallback_hover() -> Selector {
+	Selector::AnyOf(vec![
+		hovered(Selector::tag("img")),
+		hovered(Selector::tag("iframe")),
 	])
 }
 
@@ -98,6 +112,15 @@ fn interactive_hover() -> Selector {
 pub fn interactive_transition() -> Rule {
 	Rule::new()
 		.with_selector(interactive())
+		.with_token(common_props::TransitionDurationProp,motion::Short4).unwrap()
+}
+
+/// Terminal companion of [`interactive_transition`] for the `<img>`/`<iframe>`
+/// link fallbacks.
+pub fn interactive_fallback_transition() -> Rule {
+	Rule::new()
+		.with_selector(interactive_fallback())
+		.with_media(MediaQuery::Terminal)
 		.with_token(common_props::TransitionDurationProp,motion::Short4).unwrap()
 }
 
@@ -111,14 +134,20 @@ pub fn hover_dim() -> Rule {
 		.with_value(common_props::OpacityProp, 0.8_f32)
 }
 
+/// Terminal companion of [`hover_dim`] for the `<img>`/`<iframe>` link
+/// fallbacks, so a hovered alt/title placeholder dims like an `<a>`.
+pub fn hover_dim_fallback() -> Rule {
+	Rule::new()
+		.with_selector(interactive_fallback_hover())
+		.with_media(MediaQuery::Terminal)
+		.with_value(common_props::OpacityProp, 0.8_f32)
+}
+
 /// The container-less interactives that need a hover *fill* (the opacity dim is
 /// invisible on them in a light scheme): text/outline buttons, links, sidebar
 /// rows, and disclosure summaries/carets — the latter so a `<details>` arrow
 /// hovers like a text button.
 fn container_less_hover() -> Selector {
-	let hovered = |sel: Selector| {
-		Selector::AllOf(vec![sel, Selector::state(ElementState::Hovered)])
-	};
 	Selector::AnyOf(vec![
 		hovered(Selector::class(super::BTN_TEXT)),
 		hovered(Selector::class(super::BTN_OUTLINED)),

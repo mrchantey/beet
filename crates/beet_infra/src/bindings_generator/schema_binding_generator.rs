@@ -312,9 +312,38 @@ impl SchemaBindingGenerator {
 			info!("[schema_binding_generator] wrote {}", file.path.display());
 		}
 
+		self.format_generated_files()?;
+
+		Ok(())
+	}
+
+	/// Format the generated files with nightly rustfmt, matching `just fmt`,
+	/// so a generate run leaves no git diff.
+	fn format_generated_files(&self) -> Result {
+		ChildProcess::new("rustfmt")
+			.with_args(
+				["+nightly", "--edition", "2024"]
+					.into_iter()
+					.map(SmolStr::new)
+					.chain(self.files.iter().map(|file| {
+						SmolStr::new(file.path.to_string_lossy())
+					})),
+			)
+			.with_not_found(RUSTFMT_NOT_FOUND)
+			.run()?;
+		info!(
+			"[schema_binding_generator] formatted {} files",
+			self.files.len()
+		);
 		Ok(())
 	}
 }
+
+const RUSTFMT_NOT_FOUND: &str = r#"
+It looks like rustfmt is not installed, this is required for formatting generated bindings.
+Please install the nightly toolchain and try again:
+	rustup toolchain install nightly
+"#;
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -148,7 +148,7 @@ impl DnsProvider {
 						name: name.into(),
 						ttl: 1,
 						r#type: "CNAME".into(),
-						zone_id: Some(zone_id.clone()),
+						zone_id: zone_id.clone(),
 						content: Some(content.into()),
 						proxied: Some(proxied),
 						..default()

@@ -170,15 +170,23 @@ pub fn text_label_small() -> Rule {
 // `Primary`, code spans/blocks a `SurfaceContainerHighest` fill with `OnSurface`
 // text.
 
-/// Anchor text in the theme's primary color. Also covers the `<img>`/`<iframe>`
-/// link fallbacks, so the alt/title placeholders read as themed links.
+/// Anchor text in the theme's primary color.
 pub fn link_prose() -> Rule {
 	Rule::new()
+		.with_selector(Selector::tag("a"))
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+}
+
+/// The terminal's `<img>`/`<iframe>` link fallbacks in the same primary color,
+/// so the alt/title placeholders read as themed links. Terminal-gated: on the
+/// web these are a real image/frame, not links.
+pub fn link_fallback_prose() -> Rule {
+	Rule::new()
 		.with_selector(Selector::AnyOf(vec![
-			Selector::tag("a"),
 			Selector::tag("img"),
 			Selector::tag("iframe"),
 		]))
+		.with_media(MediaQuery::Terminal)
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 }
 
@@ -239,7 +247,7 @@ pub fn blockquote_prose() -> Rule {
 
 /// Terminal-only heading color - every heading level renders in the theme's
 /// `Primary`, so headings read as the brand accent against the body text. Gated
-/// behind [`MediaQuery::Terminal`] so the web and print stay plain bold.
+/// behind [`MediaQuery::Terminal`] so the web and print stay plain.
 pub fn terminal_headings() -> Rule {
 	Rule::tags(&["h1", "h2", "h3", "h4", "h5", "h6"])
 		.with_media(MediaQuery::Terminal)
@@ -249,10 +257,9 @@ pub fn terminal_headings() -> Rule {
 /// Prose heading sizes - maps `<h1>`..`<h6>` onto the MD3 type scale (headline
 /// then title sizes) so headings step down in size as on the web reference,
 /// rather than all rendering at the body size. Only `font-size`/`line-height`
-/// are set, leaving the user-agent bold weight from [`default_element_rules`]
-/// intact. The terminal honours the `font-size` too, scaling headings to
-/// fullwidth (`> 1em`) or the box-drawing block font (`> 2em`); see
-/// [`FontScale`](crate::render::FontScale).
+/// are set. The terminal honours the `font-size` too, scaling headings to
+/// fullwidth (`> 1em`) or the box-drawing block font (`> 2em`), both rendered
+/// hardcoded-bold; see [`FontScale`](crate::render::FontScale).
 pub fn heading_sizes() -> Vec<Rule> {
 	vec![
 		heading_size("h1", typography::FontSizeHeadlineLarge,  typography::LineHeightHeadlineLarge),

@@ -1,8 +1,8 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 //! Default presentation rules for prose HTML elements.
 //!
-//! These are the terminal/char-cell "user agent stylesheet": a heading is
-//! bold and coloured, emphasis is italic, links are underlined, and so on.
+//! These are the terminal/char-cell "user agent stylesheet": emphasis is
+//! italic, links are underlined, headings are spaced blocks, and so on.
 //! They are plain [`Rule`]s keyed on tag selectors so all styling flows
 //! through the single [`RuleSet`] cascade rather than any renderer-local
 //! lookup. Registered by [`StylePlugin`] so they are present when
@@ -62,15 +62,11 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// from every list item inside it on both targets — the charcell decorator
 		// reads the resolved value, the web honors it directly.
 		nav_list_style(),
-		// headings are plain bold on every target; the terminal-only accent
-		// hue comes from `classes::terminal_headings`, keeping these user-agent
-		// defaults free of any hardcoded palette.
-		heading("h1"),
-		heading("h2"),
-		heading("h3"),
-		heading("h4"),
-		heading("h5"),
-		heading("h6"),
+		// headings are plain spaced blocks: the web keeps its native bold, the
+		// terminal-only accent hue comes from `classes::terminal_headings`, and
+		// the charcell wide-glyph render (fullwidth/block, `FontScale`) hardcodes
+		// bold itself, so no user-agent weight is set here.
+		block_spaced(&["h1", "h2", "h3", "h4", "h5", "h6"]),
 		blockquote(),
 		block_spaced(&["pre"])
 			.with_canonical(WhiteSpace::Pre)
@@ -92,14 +88,17 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// inserted text mirrors deleted text, underlined rather than struck
 		inline(&["ins", "u"]).with_canonical(DecorationLine::underline()),
 		link(),
-		// an `<img>`'s alt placeholder and an `<iframe>`'s collapsed title both
-		// render as links (the charcell decorator gives them a `Marker` +
-		// `Hyperlink`), so they style, hover, and click like an `<a>`. The link
-		// colour comes from the theme token (`link_prose`, `colors::Primary`),
-		// covering all three; only the underline is a user-agent default here. A
+		// an `<img>` that can't render in the terminal falls back to its alt
+		// placeholder as a link (the charcell decorator gives it a `Marker` +
+		// `Hyperlink`), so it styles, hovers, and clicks like an `<a>`. The link
+		// colour comes from the theme token (`link_fallback_prose`,
+		// `colors::Primary`); only the underline is a user-agent default here.
+		// Terminal-gated: on the web an `<img>` is its picture, never a link. A
 		// raster-backed `<img>` overlays this with its block box (the `graphics`
-		// rule below) and is its picture, not a link.
-		inline(&["img"]).with_canonical(DecorationLine::underline()),
+		// rule below) and is likewise its picture, not a link.
+		inline(&["img"])
+			.with_media(MediaQuery::Terminal)
+			.with_canonical(DecorationLine::underline()),
 		// an embedded `<iframe>` can't render in the terminal; the charcell
 		// decorator collapses it to a titled OSC-8 link (its `Marker` text +
 		// `Hyperlink`, painted as a link by `paint_text`), underlined as a block
@@ -171,10 +170,6 @@ fn inline(tags: &[&str]) -> Rule {
 	Rule::tags(tags).with_canonical(Display::Inline)
 }
 
-fn heading(tag: &str) -> Rule {
-	block_spaced(&[tag]).with_canonical(FontWeight::Bold)
-}
-
 fn bold(tags: &[&str]) -> Rule {
 	inline(tags).with_canonical(FontWeight::Bold)
 }
@@ -188,8 +183,8 @@ fn strikethrough(tags: &[&str]) -> Rule {
 }
 
 // the user-agent hyperlink colour is a plain fallback for token-less renders; the
-// Material theme overrides it (and colours `<img>`/`<iframe>` links alike) with its
-// `Primary` accent token, see `link_prose`.
+// Material theme overrides it with its `Primary` accent token, see `link_prose`
+// (and `link_fallback_prose` for the terminal's `<img>`/`<iframe>` link fallbacks).
 fn link() -> Rule {
 	inline(&["a"])
 		.with_value(ForegroundColor, Color::srgb(0., 0., 0.502))

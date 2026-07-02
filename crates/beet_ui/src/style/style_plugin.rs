@@ -33,7 +33,7 @@ impl Plugin for StylePlugin {
 			);
 
 		// terminal/char-cell defaults for prose elements (em → italic,
-		// h1 → bold colour, …), expressed as ordinary tag rules.
+		// a → underline, …), expressed as ordinary tag rules.
 		app.world_mut()
 			.get_resource_or_init::<RuleSet>()
 			.extend_rules(default_element_rules());

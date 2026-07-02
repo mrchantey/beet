@@ -569,12 +569,11 @@ mod tests {
 		out.xpect_contains("\x1b[1m");
 	}
 
-	/// Wide (> 1em) text takes its weight from the cascade rather than being
-	/// force-bold: plain wide text is not bold, while a bold weight still renders
-	/// bold — so wide headings (which carry the user-agent bold) stay bold but a
-	/// merely large run does not.
+	/// Wide (> 1em) text is always bold regardless of the cascade weight: thin
+	/// fullwidth glyphs read spindly, so the font render hardcodes the weight
+	/// (see the `font` module docs).
 	#[beet_core::test]
-	fn wide_text_keeps_cascade_weight() {
+	fn wide_text_is_always_bold() {
 		let plain = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Hi" },
 			VisualStyle {
@@ -582,16 +581,7 @@ mod tests {
 				..default()
 			}
 		)]));
-		plain.xnot().xpect_contains("\x1b[1m");
-		let bold = render((LayoutStyle::flex_row(), children![(
-			rsx! { "Hi" },
-			VisualStyle {
-				font_size: Length::Rem(1.5),
-				font_weight: FontWeight::Bold,
-				..default()
-			}
-		)]));
-		bold.xpect_contains("\x1b[1m");
+		plain.xpect_contains("\x1b[1m");
 	}
 
 	#[beet_core::test]

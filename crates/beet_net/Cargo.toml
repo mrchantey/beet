@@ -57,8 +57,8 @@ sockets = ["action", "dep:sha1", "dep:base64"]
 json = ["serde",	"dep:serde_json", "beet_core/json", "beet_action?/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`
-# reader (native-only). Off by default; the analytics country field stays `None`
-# until enabled and a `.mmdb` is committed to `assets/databases/`.
+# reader (cross-platform, in-memory). Off by default; the analytics country field
+# stays `None` until enabled and a `.mmdb` is committed to `assets/databases/`.
 geoip = ["std", "dep:maxminddb"]
 # for conditional compilation in hooks; pulls reactive store effects that use
 # the std-only spawn_local runtime driver
@@ -167,6 +167,9 @@ russh_client = [
 ]
 
 [dependencies]
+#💡 geoip (offline country lookup, pure rust, no tokio). Reads a committed `.mmdb`
+# from an in-memory buffer; `default-features = false` drops its mmap backend.
+maxminddb = { version = "0.24", default-features = false, optional = true }
 beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
 # only needed for the std action/exchange integration
 beet_action = { workspace = true, default-features = false, optional = true }
@@ -234,9 +237,6 @@ http-body-util = {workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 pin-project = { workspace = true, optional = true }
 
-#💡 geoip (offline country lookup, pure rust, no tokio). Reads a committed `.mmdb`
-# from an in-memory buffer; `default-features = false` drops its mmap backend.
-maxminddb = { version = "0.24", default-features = false, optional = true }
 
 #💡 lambda
 lambda_http = { version = "0.16", optional = true }

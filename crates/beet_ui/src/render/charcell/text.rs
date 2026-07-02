@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::style::FontWeight;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::IRect;
@@ -87,8 +88,8 @@ pub(super) fn paint_text(
 	// font-size scaling: the block font paints its own multi-row glyphs and
 	// returns; fullwidth remaps the text and falls through to the normal path,
 	// where fullwidth glyphs lay out as wide characters and words are joined by
-	// the 2-cell `FULLWIDTH_SPACE`. Weight is left to the cascade — headings are
-	// bold via their user-agent rule, so wide non-heading text stays plain.
+	// the 2-cell `FULLWIDTH_SPACE`. Both scaled paths hardcode bold — thin wide
+	// glyphs read spindly — rather than leaving weight to the cascade.
 	let scale = FontScale::of_style(&visual);
 	match scale {
 		FontScale::Block => {
@@ -105,6 +106,7 @@ pub(super) fn paint_text(
 		}
 		FontScale::Wide => {
 			text = to_fullwidth(&text);
+			visual.font_weight = FontWeight::Bold;
 			// an underline (eg a wide link) reads poorly under fullwidth glyphs, so
 			// drop the decoration at this scale; the link colour and hover remain.
 			visual.decoration_line = DecorationLine::DEFAULT;

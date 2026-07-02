@@ -1,8 +1,10 @@
-// Responsive sidebar behaviour. The rail starts hidden below `BREAKPOINT` and
-// visible above it, follows the viewport across resizes, and is toggled by the
-// header menu button. Visibility is expressed as `aria-hidden` on `#sidebar`,
-// which the `sidebar-hidden` style rule reacts to. `BREAKPOINT` is injected by
-// the `Sidebar` widget so it tracks `SIDEBAR_BREAKPOINT_PX`.
+// Responsive sidebar behaviour. The served nav has no `aria-hidden` attribute,
+// so the `sidebar-hidden` CSS rule already hides the rail below `BREAKPOINT`
+// before this script runs (no flash). This script only keeps the attribute in
+// sync for assistive tech and wires the menu-button toggle: `aria-hidden` on
+// `#sidebar` is what the rule reacts to (`:not([aria-hidden="false"])`).
+// `BREAKPOINT` is injected by the `Sidebar` widget so it tracks
+// `SIDEBAR_BREAKPOINT_PX`.
 (function () {
 	function init() {
 		const sidebar = document.getElementById("sidebar");

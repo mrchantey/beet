@@ -95,6 +95,8 @@ pub fn all_rules() -> Vec<Rule> {
 		// prose overrides — appended so they win the tag cascade over the
 		// user-agent element defaults (later rule wins ties)
 		link_prose(),
+		// terminal-only: the `<img>`/`<iframe>` link fallbacks read as links
+		link_fallback_prose(),
 		mark_prose(),
 		code_prose(),
 		pre_prose(),
@@ -168,9 +170,12 @@ pub fn all_rules() -> Vec<Rule> {
 		page_break(),
 		// reduced motion — gated behind `@media (prefers-reduced-motion)`
 		reduced_motion(),
-		// interaction — shared hover affordance for buttons and links
+		// interaction — shared hover affordance for buttons and links, plus the
+		// terminal-only companions for the `<img>`/`<iframe>` link fallbacks
 		interactive_transition(),
+		interactive_fallback_transition(),
 		hover_dim(),
+		hover_dim_fallback(),
 		// container-less interactives get a light-scheme hover fill; dark keeps
 		// the dim alone (the token is unset there)
 		hover_state_layer(),
@@ -250,6 +255,28 @@ mod tests {
 			.xpect_contains("transition-duration");
 	}
 
+	/// The narrow-screen sidebar collapse is CSS-first: below the breakpoint the
+	/// rule hides the rail unless `sidebar.js` has marked it
+	/// `aria-hidden="false"`, so the served page (which carries no `aria-hidden`
+	/// attribute) never flashes the rail before the deferred script runs.
+	#[beet_core::test]
+	fn sidebar_hidden_is_css_first() {
+		let css = CssBuilder::default()
+			.with_minify(true)
+			.with_format_variables(FormatVariables::short())
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(vec![sidebar_hidden()]),
+			)
+			.unwrap();
+		css.as_str()
+			.xpect_contains(&format!(
+				"@media (max-width: {SIDEBAR_BREAKPOINT_PX}px)"
+			))
+			.xpect_contains(".sidebar:not([aria-hidden=\"false\"])")
+			.xpect_contains("display: none;");
+	}
+
 	/// A media-gated rule serializes wrapped in its `@media` at-rule, with the
 	/// selector + declaration nested inside the block.
 	#[beet_core::test]
@@ -293,7 +320,7 @@ mod tests {
 
 	/// Terminal cascade: every heading level resolves its foreground to the
 	/// theme's `Primary` via the `Terminal`-gated [`terminal_headings`] rule,
-	/// overriding the plain-bold user-agent heading default.
+	/// colouring the plain user-agent heading default.
 	#[beet_core::test]
 	fn terminal_headings_resolve_to_primary() {
 		let mut world =
@@ -306,6 +333,40 @@ mod tests {
 			let primary = query
 				.resolve(heading, colors::Primary, &mut default())
 				.unwrap();
+			foreground.xpect_eq(primary);
+		});
+	}
+
+	/// Regression: an `<img>` is a link only as the terminal fallback; its link
+	/// colour, underline, and hover affordance are all `Terminal`-gated, so the
+	/// serialized web stylesheet never mentions the tag — a web image is its
+	/// picture, not a hoverable link.
+	#[beet_core::test]
+	fn img_link_fallback_stays_off_the_web() {
+		(MaterialStylePlugin::default(), StylePlugin)
+			.into_world()
+			.with_state::<StyleQuery, _>(|query| query.build_css(&default()))
+			.xunwrap()
+			// the shared hover affordance still reaches buttons and anchors
+			.xpect_contains("a:hover")
+			.xnot()
+			.xpect_contains("img");
+	}
+
+	/// Terminal cascade: the `<img>` link fallback still reads as a themed link
+	/// there, resolving its foreground to `Primary` via the terminal-gated
+	/// [`link_fallback_prose`] rule.
+	#[beet_core::test]
+	fn img_fallback_resolves_to_primary_in_terminal() {
+		let mut world =
+			(MaterialStylePlugin::default(), StylePlugin).into_world();
+		let img = world.spawn(rsx! { <img src="foo.png"/> }).id();
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let foreground = query
+				.resolve(img, common_props::ForegroundColor, &mut default())
+				.unwrap();
+			let primary =
+				query.resolve(img, colors::Primary, &mut default()).unwrap();
 			foreground.xpect_eq(primary);
 		});
 	}

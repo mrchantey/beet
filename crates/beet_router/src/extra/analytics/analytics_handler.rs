@@ -53,7 +53,14 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 		.flatten();
 
 	// the beacon posts a json body; `into_value` parses it into a `Value` map.
-	let body = request.into_value().await?;
+	// A `sendBeacon` implementation may still declare `text/plain`, so a string
+	// body is re-parsed as json rather than trusting the declared type.
+	let body = match request.into_value().await? {
+		Value::Str(text) => serde_json::from_str::<serde_json::Value>(&text)
+			.map(Value::from_json)
+			.map_err(|err| bevyhow!("failed to parse beacon body: {err}"))?,
+		body => body,
+	};
 	let event = AnalyticsEvent::from_beacon(body, session, ip, country)?;
 	world.with(move |world: &mut World| world.trigger(event)).await;
 
@@ -69,14 +76,16 @@ mod test {
 	#[derive(Resource, Default)]
 	struct AnalyticsHits(u32);
 
-	#[beet_core::test]
-	async fn accepts_post_and_triggers_page_view() {
+	const PAYLOAD: &str = r#"{"page_view_id":"0192f8a0-0000-7000-8000-000000000001","path":"/docs","duration_ms":1200}"#;
+
+	/// Exchange a beacon `request` against a default router, asserting the body
+	/// actually parsed (the `/docs` path comes from it, not a default) and
+	/// returning the observed event count.
+	async fn beacon_hits(request: Request) -> u32 {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.init_resource::<AnalyticsHits>();
 		world.add_observer(
 			|ev: On<AnalyticsEvent>, mut hits: ResMut<AnalyticsHits>| {
-				// the body must actually be parsed: the path comes from it, not a
-				// default (guarding the json-body deserialize).
 				ev.event().event_kind.xpect_eq(AnalyticsEventKind::PageView);
 				ev.event().path.as_str().xpect_eq("/docs");
 				hits.0 += 1;
@@ -84,15 +93,32 @@ mod test {
 		);
 		// `default_router` already wires `analytics_handler()` under json + std.
 		let root = world.spawn(default_router()).flush();
-		let payload = r#"{"page_view_id":"0192f8a0-0000-7000-8000-000000000001","path":"/docs","duration_ms":1200}"#;
-
 		world
 			.entity_mut(root)
-			.exchange(Request::with_json_str("analytics", payload))
+			.exchange(request)
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
+		world.resource::<AnalyticsHits>().0
+	}
 
-		world.resource::<AnalyticsHits>().0.xpect_eq(1);
+	#[beet_core::test]
+	async fn accepts_post_and_triggers_page_view() {
+		beacon_hits(Request::with_json_str("analytics", PAYLOAD))
+			.await
+			.xpect_eq(1);
+	}
+
+	/// A `sendBeacon` may post the json body declared as `text/plain`; the
+	/// handler re-parses a string body (guarding the regression where every web
+	/// page view collapsed to a phantom `/`).
+	#[beet_core::test]
+	async fn accepts_text_plain_beacon() {
+		beacon_hits(Request::with_media(
+			"analytics",
+			MediaBytes::new(MediaType::Text, PAYLOAD.as_bytes().to_vec()),
+		))
+		.await
+		.xpect_eq(1);
 	}
 }

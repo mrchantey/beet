@@ -383,7 +383,9 @@ impl Block for FargateBlock {
 		);
 
 		// HTTP target group (TCP at layer 4, HTTP `/health` check). 80 and 443
-		// both forward here.
+		// both forward here. `preserve_client_ip` is off by default for ip
+		// targets, which would make every peer addr the NLB's private ip; the
+		// real client ip is needed for the analytics geoip country.
 		let http_tg = terra::ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("tg")),
 			AwsLbTargetGroupDetails {
@@ -391,6 +393,7 @@ impl Block for FargateBlock {
 				port: Some(self.container_port.into()),
 				protocol: Some("TCP".into()),
 				target_type: Some("ip".into()),
+				preserve_client_ip: Some("true".into()),
 				vpc_id: Some(vpc.field_ref("id").into()),
 				health_check: Some(vec![
 					AwsLbTargetGroupResourceBlockTypeHealthCheck {
@@ -430,6 +433,7 @@ impl Block for FargateBlock {
 					port: Some(self.ssh_container_port.into()),
 					protocol: Some("TCP".into()),
 					target_type: Some("ip".into()),
+					preserve_client_ip: Some("true".into()),
 					vpc_id: Some(vpc.field_ref("id").into()),
 					health_check: Some(vec![
 						AwsLbTargetGroupResourceBlockTypeHealthCheck {
@@ -482,7 +486,8 @@ impl Block for FargateBlock {
 			},
 		);
 
-		// IAM task role (runtime S3 access), stack-prefixed for the same reason.
+		// IAM task role (runtime S3 + DynamoDB access, ie the site bucket and the
+		// analytics table), stack-prefixed for the same reason.
 		let task_role = terra::ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("task-role")),
 			AwsIamRoleDetails {
@@ -494,6 +499,15 @@ impl Block for FargateBlock {
 			stack.resource_ident(self.build_label("task-s3-policy")),
 			AwsIamRolePolicyAttachmentDetails {
 				policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess".into(),
+				role: task_role.field_ref("name").into(),
+				..default()
+			},
+		);
+		let task_dynamo_policy = terra::ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("task-dynamo-policy")),
+			AwsIamRolePolicyAttachmentDetails {
+				policy_arn: "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+					.into(),
 				role: task_role.field_ref("name").into(),
 				..default()
 			},
@@ -698,6 +712,7 @@ impl Block for FargateBlock {
 			.add_resource(&exec_policy)?
 			.add_resource(&task_role)?
 			.add_resource(&task_s3_policy)?
+			.add_resource(&task_dynamo_policy)?
 			.add_resource(&cluster)?
 			.add_resource(&task_def)?
 			.add_resource(&service)?

@@ -58,7 +58,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID` in
 			<SiteBucket/>
 			<AssetsBucket/>
 			<AnalyticsTable/>
-			<BeetBinaryBuild features="aws_sdk,ssh"/>
+			<BeetBinaryBuild features="aws_sdk,ssh,geoip"/>
 			<TofuApplyAction/>
 			<BuildDockerImage cmd_args={["serve", "--server=http,ssh", "--path=/"]}/>
 			<DirSync app_name="beet-site" bucket="site" dir="site"/>

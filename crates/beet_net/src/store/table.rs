@@ -213,6 +213,36 @@ impl<T: TableStoreRow> TableStore<T> {
 			.await
 	}
 
+	/// Like [`Self::get_all`], but a row that fails to parse or deserialize is
+	/// skipped with a warning instead of failing the whole read.
+	///
+	/// Prefer for telemetry-style tables (eg analytics) where a legacy-schema or
+	/// corrupt row must not brick every aggregate query over the table.
+	pub async fn get_all_lossy(&self) -> Result<Vec<(SmolPath, T)>> {
+		self.list()
+			.await?
+			.into_iter()
+			.map(async |path| {
+				let row = match path.to_string().parse::<Uuid>() {
+					Ok(id) => match self.get(id).await {
+						Ok(row) => Some((path, row)),
+						Err(err) => {
+							warn!("skipping unreadable row {path}: {err}");
+							None
+						}
+					},
+					Err(err) => {
+						warn!("skipping non-uuid row {path}: {err}");
+						None
+					}
+				};
+				Ok::<_, BevyError>(row)
+			})
+			.xmap(async_ext::try_join_all)
+			.await
+			.map(|rows| rows.into_iter().flatten().collect())
+	}
+
 	/// Remove object from table by id.
 	///
 	/// # Example
@@ -438,5 +468,42 @@ pub mod table_test {
 
 		table.store_remove().await.unwrap();
 		table.store_exists().await.unwrap().xpect_false();
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use uuid::Uuid;
+
+	/// A row that fails to deserialize (eg a legacy schema) or has a non-uuid
+	/// path is skipped by the lossy read instead of failing the whole scan.
+	#[beet_core::test]
+	async fn get_all_lossy_skips_unreadable_rows() {
+		let provider = InMemoryStore::new();
+		let table = TableStore::<TableItem<u32>>::new(provider.clone());
+		table.store_try_create().await.unwrap();
+		let valid = TableItem::new(7u32);
+		let valid_id = valid.id();
+		table.push(valid).await.unwrap();
+		// a legacy-schema row: a valid uuid path with an undecodable body.
+		BlobStoreProvider::insert(
+			&provider,
+			&SmolPath::new(Uuid::now_v7().to_string()),
+			r#"{"schema":"legacy"}"#.into(),
+		)
+		.await
+		.unwrap();
+		// a non-uuid path.
+		BlobStoreProvider::insert(&provider, &SmolPath::new("junk"), "{}".into())
+			.await
+			.unwrap();
+
+		// the strict read fails, the lossy read yields only the valid row.
+		table.get_all().await.xpect_err();
+		let rows = table.get_all_lossy().await.unwrap();
+		rows.len().xpect_eq(1);
+		rows[0].1.id.xpect_eq(valid_id);
 	}
 }

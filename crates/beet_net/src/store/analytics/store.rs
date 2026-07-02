@@ -70,10 +70,26 @@ pub(super) fn spawn_store_on_config(
 		world.insert_resource(AnalyticsStore { store }).await;
 		// the offline country database is a best-effort static asset: a missing
 		// or unreadable db just leaves country lookups returning `None`.
-		let geoip = GeoIp::load(&assets_dir).await;
+		let geoip = GeoIp::load(&assets_store(&assets_dir, access)).await;
 		world.insert_resource(geoip).await;
 		Ok(())
 	});
+}
+
+/// The assets [`BlobStore`]: the deploy-provided `BEET_ASSETS_BUCKET` when
+/// running remote (the container has no local assets, see `AssetsStore` in
+/// beet_router), else the local assets dir.
+#[allow(unused_variables)]
+fn assets_store(assets_dir: &AbsPathBuf, access: ServiceAccess) -> BlobStore {
+	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+	if access == ServiceAccess::Remote {
+		if let Ok(bucket) = env_ext::var("BEET_ASSETS_BUCKET") {
+			let region = env_ext::var("AWS_REGION")
+				.unwrap_or_else(|_| DEFAULT_REGION.to_string());
+			return BlobStore::new(S3Store::new(bucket, region));
+		}
+	}
+	BlobStore::new(FsStore::new(assets_dir.clone()))
 }
 
 /// Observer: persist a triggered [`AnalyticsEvent`] to the [`AnalyticsStore`].

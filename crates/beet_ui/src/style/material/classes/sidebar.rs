@@ -142,16 +142,17 @@ pub fn sidebar_terminal() -> Rule {
 }
 
 /// Web sidebar collapse - on screens at or below [`SIDEBAR_BREAKPOINT_PX`] the
-/// rail is taken out of flow when `sidebar.js` marks it `aria-hidden="true"`
-/// (its default on load below the breakpoint, toggled by the [`MENU_BUTTON`]).
-/// Screen-gated and attribute-driven, so the terminal - which never sets the
-/// attribute - keeps the rail.
+/// rail is taken out of flow unless `sidebar.js` has marked it
+/// `aria-hidden="false"` (the [`MENU_BUTTON`] toggle). The served nav carries
+/// no `aria-hidden` attribute, so a narrow-screen load is hidden by CSS alone
+/// with no flash while the script defers. Media-gated, so the terminal cascade
+/// skips it and keeps the rail.
 pub fn sidebar_hidden() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::MaxWidth(SIDEBAR_BREAKPOINT_PX))
 		.with_selector(Selector::AllOf(vec![
 			Selector::class(SIDEBAR),
-			Selector::attribute("aria-hidden", Some("true".into())),
+			Selector::not(Selector::attribute("aria-hidden", Some("false".into()))),
 		]))
 		.with_value(common_props::DisplayProp, Display::None)
 }

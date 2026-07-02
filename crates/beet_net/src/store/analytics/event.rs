@@ -227,6 +227,11 @@ impl AnalyticsEvent {
 		ip: Option<SmolStr>,
 		country: Option<SmolStr>,
 	) -> Result<Self> {
+		// a non-object body (eg an unparsed `text/plain` beacon) would default
+		// every field into a phantom `/` page view, so reject it instead.
+		if !matches!(body, Value::Map(_)) {
+			bevybail!("beacon body must be a json object, got: {body:?}");
+		}
 		let str = |key: &str| {
 			body.get(key).and_then(|value| value.as_str().ok()).map(SmolStr::from)
 		};
@@ -376,6 +381,19 @@ mod test {
 		.unwrap()
 		.event_kind
 		.xpect_eq(AnalyticsEventKind::Error);
+	}
+
+	/// A non-object body (eg an unparsed `text/plain` beacon) is rejected rather
+	/// than defaulting into a phantom `/` page view.
+	#[beet_core::test]
+	fn rejects_non_object_body() {
+		AnalyticsEvent::from_beacon(
+			Value::str(r#"{"path":"/docs"}"#),
+			None,
+			None,
+			None,
+		)
+		.xpect_err();
 	}
 
 	#[beet_core::test]

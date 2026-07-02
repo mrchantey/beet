@@ -130,9 +130,12 @@ mod test {
 	/// A router world (which installs the [`RequestContextStack`] and registers the
 	/// layout widgets) seeded with the request-scoped facts a layout reads: a
 	/// one-route tree the default [`RouteSidebar`] collects against, doubling as the
-	/// context's content/route/router anchor.
+	/// context's content/route/router anchor. Includes the Material rule set so
+	/// `<Stylesheet/>` bakes the same rules a deployed site serves.
 	fn layout_world(parts: RequestParts) -> World {
-		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let mut world =
+			(AsyncPlugin, RouterPlugin, material::MaterialStylePlugin::default())
+				.into_world();
 		// the `Header`/`RouteHead` chrome reads the site name off `PackageConfig`;
 		// the live middleware seeds it, so a bare render world must too.
 		world.init_resource::<PackageConfig>();
@@ -188,6 +191,27 @@ mod test {
 	#[beet_core::test]
 	fn chrome_present_for_html() {
 		render(request("", MediaType::Html)).xpect_contains("<style");
+	}
+
+	/// No-flash sidebar: the served `<nav id="sidebar">` carries no `aria-hidden`
+	/// attribute, and the baked stylesheet hides the rail below the breakpoint
+	/// unless `sidebar.js` has set `aria-hidden="false"` - so a narrow-screen
+	/// first paint never shows the rail while the script defers.
+	#[beet_core::test]
+	fn sidebar_hidden_before_script() {
+		let html = render(request("", MediaType::Html));
+		// the nav's open tag ships without an aria-hidden attribute
+		let idx = html.find("id=\"sidebar\"").unwrap();
+		let open = html[..idx].rfind('<').unwrap();
+		let close = idx + html[idx..].find('>').unwrap();
+		html[open..close].xnot().xpect_contains("aria-hidden");
+		// the stylesheet's CSS-first collapse rule is baked into the page
+		html.as_str()
+			.xpect_contains(&format!(
+				"(max-width: {}px)",
+				classes::SIDEBAR_BREAKPOINT_PX
+			))
+			.xpect_contains(":not([aria-hidden=");
 	}
 
 	/// The same chrome is gated off for a non-html (terminal) request: baking the

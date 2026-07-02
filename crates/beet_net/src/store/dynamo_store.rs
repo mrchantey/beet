@@ -139,6 +139,13 @@ impl DynamoStore {
 	}
 }
 
+/// Convert an SDK error to a [`BevyError`] carrying the full error chain.
+/// A plain `?` loses it: `SdkError`'s bare `Display` is just "service error",
+/// hiding eg an `AccessDeniedException` behind an opaque message.
+fn sdk_err<E: 'static + std::error::Error>(err: E) -> BevyError {
+	bevyhow!("{}", aws_sdk_dynamodb::error::DisplayErrorContext(&err))
+}
+
 impl BlobStoreProvider for DynamoStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
@@ -220,7 +227,8 @@ impl BlobStoreProvider for DynamoStore {
 				.delete_table()
 				.table_name(this.table_name.as_str())
 				.send()
-				.await?;
+				.await
+				.map_err(sdk_err)?;
 			this.await_table_remove().await?;
 			Ok(())
 		})
@@ -237,7 +245,8 @@ impl BlobStoreProvider for DynamoStore {
 				.item("id", key)
 				.item("data", AttributeValue::B(body.to_vec().into()))
 				.send()
-				.await?;
+				.await
+				.map_err(sdk_err)?;
 			Ok(())
 		})
 	}
@@ -251,7 +260,8 @@ impl BlobStoreProvider for DynamoStore {
 				.scan()
 				.table_name(this.table_name.as_str())
 				.send()
-				.await?;
+				.await
+				.map_err(sdk_err)?;
 			let mut paths = Vec::new();
 			if let Some(items) = out.items {
 				for item in items {
@@ -285,7 +295,8 @@ impl BlobStoreProvider for DynamoStore {
 				.table_name(this.table_name.as_str())
 				.key("id", key)
 				.send()
-				.await?;
+				.await
+				.map_err(sdk_err)?;
 			let Some(item) = out.item else {
 				bevybail!("Item not found");
 			};
@@ -333,7 +344,8 @@ impl BlobStoreProvider for DynamoStore {
 				.key("id", key)
 				.return_values(aws_sdk_dynamodb::types::ReturnValue::AllOld)
 				.send()
-				.await?;
+				.await
+				.map_err(sdk_err)?;
 			if result.attributes.is_none() {
 				bevybail!("Item not found");
 			}
@@ -369,7 +381,8 @@ impl<T: TableStoreRow> TableProvider<T> for DynamoStore {
 				.table_name(this.table_name.as_str())
 				.set_item(Some(item))
 				.send()
-				.await?;
+				.await
+				.map_err(sdk_err)?;
 			Ok(())
 		})
 	}
@@ -383,7 +396,8 @@ impl<T: TableStoreRow> TableProvider<T> for DynamoStore {
 				.table_name(this.table_name.as_str())
 				.key("id", AttributeValue::S(id.to_string()))
 				.send()
-				.await?;
+				.await
+				.map_err(sdk_err)?;
 			let Some(item) = out.item else {
 				bevybail!("Item not found");
 			};

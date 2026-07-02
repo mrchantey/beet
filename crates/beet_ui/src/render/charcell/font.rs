@@ -9,6 +9,10 @@
 //!   tall, with uppercase letters drawn in the double-pipe variant. This has a
 //!   dedicated path: [`measure_block_text`] and [`paint_block_text`], dispatched
 //!   from the measure and paint phases.
+//!
+//! Both scaled modes hardcode [`FontWeight::Bold`](crate::style::FontWeight):
+//! a thin-stroke fullwidth or box-drawing glyph reads spindly at these sizes,
+//! so the weight is baked into the font render rather than left to the cascade.
 use super::AsBuffer;
 use super::Clip;
 use super::align_offset;
@@ -309,7 +313,8 @@ pub(super) fn measure_block_text(text: &str, max_w: u32) -> UVec2 {
 }
 
 /// Paint `text` in the block font into `content_rect`, wrapping to its width and
-/// aligning each line. Uppercase letters use the double-pipe variant.
+/// aligning each line. Uppercase letters use the double-pipe variant. Always
+/// paints bold (see the module docs).
 pub(super) fn paint_block_text(
 	text: &str,
 	content_rect: IRect,
@@ -322,6 +327,8 @@ pub(super) fn paint_block_text(
 	if text.trim().is_empty() {
 		return;
 	}
+	// wide glyphs are always bold, thin box-drawing strokes read spindly
+	let style = &style.clone().bold();
 	let font = block_font();
 	let width = content_rect.width().max(0) as u32;
 	let lines = block_wrap(font, text, width);

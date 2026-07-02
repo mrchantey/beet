@@ -77,14 +77,17 @@ function createBeetAnalytics() {
 	let maxScroll = 0;
 
 	// POST a payload to the analytics endpoint, beacon-first for reliability.
+	// The Blob carries the json content type: `sendBeacon` with a plain string
+	// would post `text/plain` and the body would not parse as a map.
 	const post = (payload) => {
-		const body = JSON.stringify(payload);
+		const body = new Blob([JSON.stringify(payload)], {
+			type: "application/json",
+		});
 		if ("sendBeacon" in navigator) {
 			navigator.sendBeacon("/analytics", body);
 		} else {
 			fetch("/analytics", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
 				body,
 				keepalive: true,
 			}).catch((err) => console.warn("Analytics send failed:", err));

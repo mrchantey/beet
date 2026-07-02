@@ -52,10 +52,12 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	.await;
 
 	// a store that was never written to (no analytics collected yet) reads as
-	// empty rather than an error, so the command works on a fresh site.
+	// empty rather than an error, so the command works on a fresh site. The
+	// lossy read skips (and warns on) legacy-schema or corrupt rows rather than
+	// failing the whole summary.
 	let events = if store.store_exists().await.unwrap_or(false) {
 		store
-			.get_all()
+			.get_all_lossy()
 			.await?
 			.into_iter()
 			.map(|(_, event)| event)

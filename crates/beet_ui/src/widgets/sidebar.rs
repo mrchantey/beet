@@ -46,8 +46,11 @@ impl SidebarNode {
 ///
 /// Ships its own [`SidebarScript`]: on the web the rail collapses below
 /// [`classes::SIDEBAR_BREAKPOINT_PX`] and is toggled by a [`MenuButton`] in the
-/// header. The `aria-hidden="false"` default keeps it visible without script
-/// (and on the terminal, where the script is inert).
+/// header. Served with no `aria-hidden` attribute so the CSS-only default is
+/// correct before any script runs: the `sidebar-hidden` rule hides the rail
+/// below the breakpoint unless the script has set `aria-hidden="false"`, so a
+/// narrow-screen load never flashes the rail. Wide screens (and the terminal,
+/// where the script is inert and the rule is skipped) show it as before.
 #[template]
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	let items: Vec<_> = nodes
@@ -55,7 +58,7 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 		.map(|node| sidebar_item(node, true))
 		.collect();
 	rsx! {
-		<nav id="sidebar" aria-hidden="false" {Classes::new([classes::SIDEBAR, classes::PRINT_HIDDEN])}>
+		<nav id="sidebar" {Classes::new([classes::SIDEBAR, classes::PRINT_HIDDEN])}>
 			{items}
 			<SidebarScript/>
 		</nav>
