@@ -62,6 +62,9 @@ async fn home_renders_in_layout() {
 	render(&mut world, root, "")
 		.await
 		.as_str()
+		// the `templates/Layout.bsx` doctype leads the document, so the served page
+		// is a standards-mode HTML document
+		.xpect_starts_with("<!DOCTYPE html><html")
 		// the `templates/Layout.bsx` `<SiteLayout>` document wraps the page
 		.xpect_contains(r#"<meta charset="UTF-8""#)
 		// the markdown home body, parsed to elements and transcluded into <main>

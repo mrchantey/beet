@@ -10,6 +10,7 @@ chrome with nothing excluded.
 runtime ignores the <script> on terminal targets, whose page views come from the
 in-world navigator instead).
 -->
+<!DOCTYPE html>
 <SiteLayout>
 	<Analytics/>
 </SiteLayout>
