@@ -13,10 +13,9 @@ use serde_json::json;
 ///
 /// A Cloudflare Load Balancer only governs **proxied** (orange-cloud) traffic
 /// at the edge, so it applies only to hostnames published with
-/// `DnsProvider::with_proxied(true)` (ssh on a proxied hostname rides a
-/// Spectrum app, see `DnsProvider::with_ssh_spectrum`). SSH cannot fail over
-/// (Lambda has no ssh), so the failover is HTTP-only, and it is kept out of
-/// the core deploy behind a flag.
+/// `DnsProvider::with_proxied(true)`; ssh lives on a DNS-only hostname and
+/// cannot fail over (Lambda has no ssh), so the failover is HTTP-only, and it
+/// is kept out of the core deploy behind a flag.
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
 #[component(immutable, on_add = ErasedBlock::on_add::<CloudflareFailoverBlock>)]
 pub struct CloudflareFailoverBlock {

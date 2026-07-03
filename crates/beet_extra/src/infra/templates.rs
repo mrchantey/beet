@@ -269,10 +269,11 @@ pub fn FargateWatch(
 /// fingerprint. Bucket names derived from the stack (declared once). Markup form of
 /// deploy_beet_site's `block`.
 ///
-/// Every hostname is PROXIED: Cloudflare's edge caches per the origin's
-/// `CacheHeaders` and the zone rules `<CloudflareZoneSetup/>` publishes. TLS
-/// stays terminated at the origin's ACM cert, which the edge verifies (the
-/// zone runs Full strict).
+/// Every http hostname is PROXIED and edge-cached: Cloudflare's edge caches per
+/// the origin's `CacheHeaders` and the zone rules `<CloudflareZoneSetup/>`
+/// publishes. ssh lives on the DNS-only `app` hostname (`ssh app.beet.org` /
+/// `ssh app.dev.beet.org`). TLS stays terminated at the origin's ACM cert,
+/// which the edge verifies (the zone runs Full strict).
 ///
 /// SAFETY / stage-aware DNS (a deliberate change from the original, which always
 /// published all three hostnames): `dev` publishes ONLY `dev.beet.org`; `prod`
@@ -305,25 +306,30 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 		.with_static_env("BEET_ASSETS_BUCKET", assets_bucket)
 		.with_static_env("BEET_ANALYTICS_TABLE", analytics_table)
 		.with_static_env("BEET_SSH_HOST_KEY", ssh_host_key);
-	// prod claims the apex + www; every other stage gets only its subdomain.
-	// NOTE ssh-through-the-edge is parked: on a non-Enterprise plan a hostname
-	// is either proxied http OR a Spectrum app, never both (`ssh_spectrum`
-	// stays available but unused until that call is made). Holding config:
-	// the prod apex stays DNS-only so `ssh beet.org` keeps working (its http
-	// is origin-direct, uncached), while `www` and the dev subdomain are
-	// proxied and edge-cached.
+	// prod claims the apex + www (proxied, edge-cached) plus the DNS-only `app`
+	// hostname carrying ssh + future live apps; other stages get their
+	// subdomain (proxied) + `app.dev` (DNS-only ssh).
 	if stack.is_production() {
 		block
-			.with_dns(DnsProvider::cloudflare("beet.org", zone_id.clone()))
 			.with_dns(
-				DnsProvider::cloudflare("www.beet.org", zone_id)
+				DnsProvider::cloudflare("beet.org", zone_id.clone())
 					.with_proxied(true),
 			)
+			.with_dns(
+				DnsProvider::cloudflare("www.beet.org", zone_id.clone())
+					.with_proxied(true),
+			)
+			.with_dns(DnsProvider::cloudflare("app.beet.org", zone_id.clone()))
 	} else {
-		block.with_dns(
-			DnsProvider::cloudflare("dev.beet.org", zone_id)
-				.with_proxied(true),
-		)
+		block
+			.with_dns(
+				DnsProvider::cloudflare("dev.beet.org", zone_id.clone())
+					.with_proxied(true),
+			)
+			.with_dns(DnsProvider::cloudflare(
+				"app.dev.beet.org",
+				zone_id.clone(),
+			))
 	}
 }
 

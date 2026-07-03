@@ -22,18 +22,8 @@ pub enum DnsProvider {
 		zone_id: SmolStr,
 		/// Whether to proxy through Cloudflare's edge. DNS-only (`false`) is
 		/// required when the origin must be reached directly, eg raw TCP ssh
-		/// without a Spectrum app, or terminating TLS at the origin.
+		/// or terminating TLS at the origin.
 		proxied: bool,
-		/// Publish a Spectrum app forwarding raw-TCP port 22 to the origin, so
-		/// `ssh <authority>` keeps working while the record is proxied (the
-		/// HTTP proxy only carries HTTP ports). Declarative metadata read by
-		/// the `CloudflareZoneSetup` action, which manages the app through the
-		/// zone API: terraform cannot manage a non-Enterprise Spectrum app
-		/// (the provider always sends Enterprise-only fields, which the
-		/// plan-polymorphic API rejects). Spectrum's SSH preset needs a paid
-		/// plan (Pro+), is port-22 only, and takes only direct IP origins, so
-		/// the owning [`FargateBlock`] gives its NLB static EIPs.
-		ssh_spectrum: bool,
 	},
 	/// A record in a Route53 hosted zone.
 	Route53 {
@@ -55,7 +45,6 @@ impl DnsProvider {
 			authority: authority.into(),
 			zone_id: zone_id.into(),
 			proxied: false,
-			ssh_spectrum: false,
 		}
 	}
 
@@ -79,25 +68,6 @@ impl DnsProvider {
 		self
 	}
 
-	/// Carry raw-TCP ssh through a Spectrum app on a proxied Cloudflare record
-	/// (no effect on Route53), see [`Cloudflare::ssh_spectrum`](Self::Cloudflare).
-	#[cfg(feature = "cloudflare_dns")]
-	pub fn with_ssh_spectrum(mut self, value: bool) -> Self {
-		if let Self::Cloudflare { ssh_spectrum, .. } = &mut self {
-			*ssh_spectrum = value;
-		}
-		self
-	}
-
-	/// Whether this hostname carries ssh through a Spectrum app.
-	pub fn ssh_spectrum(&self) -> bool {
-		#[cfg(feature = "cloudflare_dns")]
-		if let Self::Cloudflare { ssh_spectrum, .. } = self {
-			return *ssh_spectrum;
-		}
-		false
-	}
-
 	/// The record name this provider publishes, eg `dev.beet.org`.
 	pub fn authority(&self) -> &SmolStr {
 		match self {
@@ -118,10 +88,7 @@ impl DnsProvider {
 
 	/// Emit a `CNAME` pointing [`authority`](Self::authority) at `alias_target`
 	/// (a terra field-ref like a load balancer's `dns_name` or an api gateway's
-	/// `api_endpoint`). `label` is the resource label suffix. An
-	/// [`ssh_spectrum`](Self::ssh_spectrum) hostname's Spectrum app is not
-	/// terraform (see the field docs): the `CloudflareZoneSetup` action
-	/// publishes it after the apply.
+	/// `api_endpoint`). `label` is the resource label suffix.
 	pub fn emit(
 		&self,
 		stack: &Stack,

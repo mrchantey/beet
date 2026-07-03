@@ -16,7 +16,8 @@
 //! scale-in is meaningful.
 //!
 //! Two topology changes since that report: ssh is now on the unified NLB at
-//! **port 22** (no `-p`, no separate ssh NLB on 8339), and the cluster/service are
+//! **port 22** via the DNS-only `app.dev.beet.org` hostname (no `-p`, no separate
+//! ssh NLB on 8339), and the cluster/service are
 //! `beet-site--dev--main-fargate-cluster` / `main-fargate--service`.
 //!
 //! Run it (after the site is deployed) with:
@@ -37,8 +38,9 @@ use runtime_utils::*;
 const REGION: &str = "us-west-2";
 const CLUSTER: &str = "beet-site--dev--main-fargate-cluster";
 const SERVICE: &str = "main-fargate--service";
-const SSH_ADDR: &str = "dev.beet.org:22";
-const HTTP_HEALTH: &str = "http://dev.beet.org/health";
+// the app hostname is DNS-only, so the load test bypasses the edge cache
+const SSH_ADDR: &str = "app.dev.beet.org:22";
+const HTTP_HEALTH: &str = "http://app.dev.beet.org/health";
 /// Driven sessions: ~1 per CPU point above idle, so ~40 crosses the 50% target.
 const SESSIONS: usize = 40;
 

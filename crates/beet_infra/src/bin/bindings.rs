@@ -85,7 +85,6 @@ async fn main() -> Result {
 					"aws_ecs_cluster",
 					"aws_ecs_service",
 					"aws_ecs_task_definition",
-					"aws_eip",
 					"aws_internet_gateway",
 					"aws_lb",
 					"aws_lb_listener",
@@ -110,6 +109,12 @@ async fn main() -> Result {
 				"cloudflare_load_balancer_monitor",
 			]),
 		)
+		// NOTE the cloudflare zone-level edge config (cache ruleset, zone settings)
+		// is deliberately NOT terraform: entrypoint rulesets are zone singletons
+		// that fight stack-scoped state, so the `CloudflareZoneSetup` action
+		// manages them through the idempotent zone APIs instead (the plan-polymorphic
+		// spectrum API was also incompatible: the provider always sends
+		// Enterprise-only fields, which non-Enterprise zones reject).
 		.generate()
 		.await?;
 	info!("Done!");

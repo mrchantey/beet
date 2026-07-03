@@ -31,11 +31,11 @@ holding an entry document, or the entry file itself):
     beet serve site --server=http,ssh      # ..http plus a multi-tenant ssh terminal
 
 It also deploys the beet website to AWS Fargate (the site served from S3, html
-over http + a live ssh terminal), fronted by Cloudflare's edge cache: hostnames
-are proxied, ssh rides a Spectrum app on the primary hostname (origined at the
-NLB's static EIPs), `<CloudflareZoneSetup/>` converges the zone-level edge
-config (cache ruleset, strict TLS, the spectrum apps) through the idempotent
-zone APIs, and every deploy or sync ends with a `<CloudflarePurgeCache/>` so
+over http + a live ssh terminal), fronted by Cloudflare's edge cache: http
+hostnames are proxied and edge-cached, ssh (and future live apps) ride the
+DNS-only `app.beet.org` / `app.dev.beet.org` hostnames straight to the NLB,
+`<CloudflareZoneSetup/>` converges the zone-level edge config (cache ruleset,
+strict TLS), and every deploy or sync ends with a `<CloudflarePurgeCache/>` so
 content changes are live at the edge immediately. The deploy routes hang off a stack-bearing
 `<BeetSiteDeployHost>` so they resolve a `Stack` by ancestry without a second
 server. `--stage=prod` targets production (apex `beet.org` + `www`); the default

@@ -4,6 +4,7 @@ mod build_artifact;
 mod build_docker_image;
 #[cfg(feature = "cloudflare_block")]
 mod cloudflare;
+mod cloudflare_zone;
 #[cfg(feature = "aws_sdk")]
 mod lifecycle_probe;
 pub mod ssh_utils;
@@ -16,6 +17,7 @@ pub use build_artifact::*;
 pub use build_docker_image::*;
 #[cfg(feature = "cloudflare_block")]
 pub use cloudflare::*;
+pub use cloudflare_zone::*;
 #[cfg(feature = "aws_sdk")]
 pub use lifecycle_probe::*;
 #[cfg(feature = "aws_sdk")]
