@@ -16,9 +16,18 @@
 		const isHidden = () => sidebar.getAttribute("aria-hidden") === "true";
 		const narrow = () => globalThis.innerWidth < BREAKPOINT;
 
-		// seed from the current viewport, then track resizes across the breakpoint
-		narrow() ? hide() : show();
-		globalThis.addEventListener("resize", () => (narrow() ? hide() : show()));
+		// seed from the current viewport, then track the breakpoint. Only react
+		// when `narrow()` actually flips: mobile browsers fire `resize` on every
+		// scroll as the URL bar shows/hides (a height-only change), and toggling
+		// on those would collapse an open rail mid-scroll.
+		let wasNarrow = narrow();
+		wasNarrow ? hide() : show();
+		globalThis.addEventListener("resize", () => {
+			const nowNarrow = narrow();
+			if (nowNarrow === wasNarrow) return;
+			wasNarrow = nowNarrow;
+			nowNarrow ? hide() : show();
+		});
 
 		// the menu button toggles the rail on narrow screens
 		menuButton?.addEventListener("click", () => isHidden() ? show() : hide());
