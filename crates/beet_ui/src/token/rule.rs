@@ -312,6 +312,16 @@ pub enum Selector {
 		ancestor: Arc<Self>,
 		descendant: Arc<Self>,
 	},
+	/// Match `child` when it is a *direct* child of an element matching
+	/// `parent`, ie in css `parent > child` (note the `>`). Like
+	/// [`Descendant`](Self::Descendant) but one level only. A web-only
+	/// combinator for the same reason: the charcell cascade has no ancestor
+	/// context in [`matches`](Self::matches), so rules using it are `@media
+	/// screen`-gated and skipped by that cascade.
+	Child {
+		parent: Arc<Self>,
+		child: Arc<Self>,
+	},
 }
 
 impl Selector {
@@ -345,6 +355,14 @@ impl Selector {
 		Self::Descendant {
 			ancestor: Arc::new(ancestor),
 			descendant: Arc::new(descendant),
+		}
+	}
+
+	/// A direct-child combinator, ie css `parent > child`.
+	pub fn child(parent: Selector, child: Selector) -> Self {
+		Self::Child {
+			parent: Arc::new(parent),
+			child: Arc::new(child),
 		}
 	}
 
@@ -393,6 +411,9 @@ impl Selector {
 				ancestor,
 				descendant,
 			} => ancestor.specificity() + descendant.specificity(),
+			Selector::Child { parent, child } => {
+				parent.specificity() + child.specificity()
+			}
 		}
 	}
 
@@ -415,9 +436,9 @@ impl Selector {
 			Selector::Class(class) => el.contains_class(class),
 			Selector::Not(inner) => !inner.matches(el),
 			// the charcell cascade resolves one element at a time without ancestor
-			// context, so a descendant combinator can't be evaluated here; it is a
-			// web-only construct serialized to CSS (see the variant docs).
-			Selector::Descendant { .. } => false,
+			// context, so the combinators can't be evaluated here; they are
+			// web-only constructs serialized to CSS (see the variant docs).
+			Selector::Descendant { .. } | Selector::Child { .. } => false,
 		}
 	}
 }

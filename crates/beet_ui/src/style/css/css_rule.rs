@@ -168,6 +168,12 @@ impl CssRule {
 				Self::selector_to_css_inner(ancestor),
 				Self::selector_to_css_inner(descendant)
 			),
+			// the direct-child combinator, ie `parent > child`.
+			Selector::Child { parent, child } => format!(
+				"{} > {}",
+				Self::selector_to_css_inner(parent),
+				Self::selector_to_css_inner(child)
+			),
 		}
 	}
 }
@@ -344,5 +350,22 @@ mod tests {
 			.key()
 			.to_string()
 			.xpect_eq("io.crates/beet_ui/style/css/css_rule/tests/Bar");
+	}
+
+	// the two combinators serialize with their css joiner: a space for
+	// descendant, ` > ` for direct child.
+	#[beet_core::test]
+	fn combinator_selectors() {
+		CssRule::default()
+			.with_selector(Selector::child(Selector::tag("main"), Selector::Any))
+			.selector_to_css()
+			.xpect_eq("main > *");
+		CssRule::default()
+			.with_selector(Selector::descendant(
+				Selector::tag("main"),
+				Selector::class("prose"),
+			))
+			.selector_to_css()
+			.xpect_eq("main .prose");
 	}
 }

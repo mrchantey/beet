@@ -359,7 +359,7 @@ pub fn rule_set_classes(rule_set: &RuleSet) -> impl Iterator<Item = &str> {
 }
 
 /// Every [`Class`](Selector::Class) name within a [`Selector`], recursing through
-/// the `AnyOf`/`AllOf`/`Not`/`Descendant` combinators.
+/// the `AnyOf`/`AllOf`/`Not`/`Descendant`/`Child` combinators.
 fn selector_classes(selector: &Selector) -> Vec<&str> {
 	match selector {
 		Selector::Class(class) => vec![class.as_str()],
@@ -369,11 +369,15 @@ fn selector_classes(selector: &Selector) -> Vec<&str> {
 			.collect(),
 		Selector::Not(inner) => selector_classes(inner),
 		Selector::Descendant {
-			ancestor,
-			descendant,
-		} => selector_classes(ancestor)
+			ancestor: left,
+			descendant: right,
+		}
+		| Selector::Child {
+			parent: left,
+			child: right,
+		} => selector_classes(left)
 			.into_iter()
-			.chain(selector_classes(descendant))
+			.chain(selector_classes(right))
 			.collect(),
 		_ => Vec::new(),
 	}

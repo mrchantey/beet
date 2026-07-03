@@ -197,6 +197,35 @@ pub fn main_content() -> Rule {
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
+/// The readable measure the main content column is capped at on wide viewports.
+const MAIN_MEASURE_REM: f32 = 70.;
+
+/// Centre the page content as a readable column on wide (web) viewports: a flex
+/// column that centres its children on the cross axis, paired with
+/// [`main_content_measure`] which caps each child at [`MAIN_MEASURE_REM`].
+/// Screen-gated so the terminal keeps its full-width flow — a fixed rem measure
+/// is meaningless in a character grid.
+pub fn main_content_centered() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("main"))
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
+		.with_media(MediaQuery::Screen)
+}
+
+/// Cap each direct child of `<main>` at [`MAIN_MEASURE_REM`] so page content
+/// (the index included) reads as a centred column (see
+/// [`main_content_centered`]). A direct-child combinator so only top-level
+/// blocks are capped, not nested inline content; screen-gated to match.
+pub fn main_content_measure() -> Rule {
+	Rule::new()
+		.with_selector(Selector::child(Selector::tag("main"), Selector::Any))
+		.with_value(common_props::Width, Length::Percent(100.))
+		.with_value(common_props::MaxWidth, Length::Rem(MAIN_MEASURE_REM))
+		.with_media(MediaQuery::Screen)
+}
+
 /// Page - the full page background and foreground, with a comfortable large body
 /// type as the default reading size.
 ///
