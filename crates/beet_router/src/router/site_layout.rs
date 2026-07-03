@@ -194,6 +194,16 @@ mod test {
 		render(request("", MediaType::Html)).xpect_contains("<style");
 	}
 
+	/// A wildcard `Accept` (`*/*`, the curl/bot default) gets the same styled
+	/// chrome: it renders the html page, so it must ship the html head.
+	/// Regression: the bare variant was cacheable html, so one wildcard request
+	/// poisoned the edge cache with an unstyled page for every browser.
+	#[beet_core::test]
+	fn chrome_present_for_wildcard() {
+		render(request("", MediaType::from_content_type("*/*")))
+			.xpect_contains("<style");
+	}
+
 	/// No-flash sidebar: the served `<nav id="sidebar">` carries no `aria-hidden`
 	/// attribute, and the baked stylesheet hides the rail below the breakpoint
 	/// unless `sidebar.js` has set `aria-hidden="false"` - so a narrow-screen

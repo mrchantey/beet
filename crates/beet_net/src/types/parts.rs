@@ -208,12 +208,15 @@ impl RequestParts {
 				.unwrap_or(false)
 	}
 
-	/// Whether the request's `Accept` header lists the given media type. A
-	/// request with no (or unparseable) `Accept` header is treated as accepting
-	/// anything, returning `true`.
+	/// Whether the request's `Accept` header lists the given media type or a
+	/// wildcard (`*/*`, the curl/bot default, or `text/*`). A request with no
+	/// (or unparseable) `Accept` header is treated as accepting anything,
+	/// returning `true`.
 	pub fn accepts(&self, media: MediaType) -> bool {
 		match self.headers.get::<header::Accept>() {
-			Some(Ok(types)) => types.contains(&media),
+			Some(Ok(types)) => {
+				types.contains(&media) || MediaType::any_wildcard(&types)
+			}
 			_ => true,
 		}
 	}
@@ -497,6 +500,24 @@ impl TryFrom<ResponseParts> for http::response::Parts {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// A wildcard `Accept` (`*/*`, the curl/bot default) accepts every media
+	/// type, an exact entry accepts only itself, and no header accepts anything.
+	#[beet_core::test]
+	fn accepts_honors_wildcards() {
+		let mut parts = RequestParts::get("");
+		parts.accepts(MediaType::Html).xpect_true();
+		parts
+			.headers_mut()
+			.set::<header::Accept>(vec![MediaType::from_content_type("*/*")]);
+		parts.accepts(MediaType::Html).xpect_true();
+		parts.accepts(MediaType::Json).xpect_true();
+		parts
+			.headers_mut()
+			.set::<header::Accept>(vec![MediaType::Markdown]);
+		parts.accepts(MediaType::Markdown).xpect_true();
+		parts.accepts(MediaType::Html).xpect_false();
+	}
 
 	#[beet_core::test]
 	fn request_parts_default() {
