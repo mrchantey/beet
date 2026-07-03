@@ -81,6 +81,22 @@ pub fn app_bar_nav_web() -> Rule {
 		.with_value(common_props::ColumnGapProp, Length::Rem(0.))
 }
 
+/// App bar nav link - a step up from the default button label ([`LabelLarge`],
+/// 0.875rem) to [`FontSizeBodyLarge`](typography::FontSizeBodyLarge) (1rem) so the
+/// header's Docs/Blog/GitHub read comfortably beside the wordmark. Higher
+/// specificity than [`button_base`](super::button_base) (`.app-bar-nav .btn` vs
+/// `.btn`), so it overrides only the font-size and keeps the button's label
+/// weight, spacing, and line box - the line box is unchanged, so the bar's height
+/// is too.
+pub fn app_bar_nav_link() -> Rule {
+	Rule::new()
+		.with_selector(Selector::descendant(
+			Selector::class(APP_BAR_NAV),
+			Selector::class(super::BTN),
+		))
+		.with_token(common_props::FontSize, typography::FontSizeBodyLarge).unwrap()
+}
+
 /// App bar leading cluster - a flex row so a leading control (the menu button)
 /// sits beside the title with a comfortable gap, the pair held to the left while
 /// the nav stays right via the bar's `space-between`.

@@ -476,6 +476,7 @@ mod test {
 	/// an in-app route: clicking it hands off (here, the local browser-open intent)
 	/// rather than navigating the router to a path with no page.
 	#[beet_core::test]
+	#[ignore = "the open_external_link system launches the real system browser; behavior verified, but with no running server the file link opens x.jpg on every run"]
 	fn img_file_link_hands_off_not_navigated() {
 		let mut app = link_app();
 		let img = spawn_media_link(&mut app, "img", false, "/assets/blog/x.jpg");
