@@ -208,6 +208,11 @@ pub fn mark_prose() -> Rule {
 pub fn code_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("code"))
+		// the mono ref token, since the vendored preflight's `font-family:
+		// --theme(--default-mono-font-family, ..)` is a Tailwind build-time
+		// function: served verbatim it is invalid CSS, so the browser drops the
+		// declaration and code falls back to the page font.
+		.with_token(common_props::FontFamilyProp,typography::TypefaceMono).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
@@ -224,6 +229,9 @@ pub fn code_prose() -> Rule {
 pub fn pre_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("pre"))
+		// mono ref token: see `code_prose` (the preflight mono declaration is
+		// invalid CSS in the browser, so it must be set here).
+		.with_token(common_props::FontFamilyProp,typography::TypefaceMono).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
 		.with_token(ShapeProps,geometry::ShapeSmall).unwrap()
