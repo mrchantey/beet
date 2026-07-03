@@ -160,20 +160,24 @@ pub fn sidebar_hidden() -> Rule {
 /// Menu button - hidden by default on every target; the wide-screen sidebar is
 /// always visible (and the terminal rail too) so the toggle is unnecessary.
 /// Ungated so the terminal cascade also hides it; the web reveals it below the
-/// breakpoint via [`menu_button_visible`]. A larger glyph than the nav buttons
-/// with no horizontal padding, so it reads as a compact icon affordance flush
-/// against the title.
+/// breakpoint via [`menu_button_visible`]. No horizontal padding, so it reads as
+/// a compact icon affordance flush against the title.
 pub fn menu_button() -> Rule {
+	// `icon_size` is the tuning knob: it's only the `font-size`, so it scales how
+	// large the `☰` glyph *draws*, not the button's box. The box is the bare line
+	// box (line-height pinned to the title's, zero padding), so it's exactly the
+	// title's height and never taller than the app bar's other content. The bar is
+	// a centered flex row sized by its tallest child, so revealing the button below
+	// the breakpoint doesn't grow it - a larger glyph overflows into the bar's own
+	// padding instead. Nudge `icon_size` freely; keep it within ~1.75rem of the
+	// line box so the overflow stays inside that padding.
+	let icon_size = Length::Rem(2.);
 	Rule::new()
 		.with_selector(Selector::class(MENU_BUTTON))
 		.with_value(common_props::DisplayProp, Display::None)
-		.with_value(common_props::FontSize, Length::Rem(2.))
-		.with_value(common_props::Padding, Spacing {
-			left: Length::Rem(0.),
-			right: Length::Rem(0.),
-			top: Length::Rem(0.4),
-			bottom: Length::Rem(0.4),
-		})
+		.with_value(common_props::FontSize, icon_size)
+		.with_token(common_props::LineHeight, typography::LineHeightTitleLarge).unwrap()
+		.with_value(common_props::Padding, Spacing::DEFAULT)
 }
 
 /// Menu button on narrow screens - shown at or below [`SIDEBAR_BREAKPOINT_PX`],
