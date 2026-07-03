@@ -85,6 +85,7 @@ pub fn all_rules() -> Vec<Rule> {
 		app_bar(),
 		app_bar_scrolled(),
 		app_bar_nav(),
+		app_bar_nav_link(),
 		app_bar_leading(),
 		app_bar_title(),
 		app_bar_terminal(),

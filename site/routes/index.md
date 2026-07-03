@@ -21,6 +21,7 @@ title = "Beet"
 		</div>
 	</div>
 </div>
+<br/>
 
 Beet helps you build the perfect stack for cross-domain projects. Websites, agents, robots, games and infra are all under one roof with great defaults and deep extensibility.
 

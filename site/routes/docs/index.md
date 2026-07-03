@@ -30,7 +30,6 @@ A CLI, a server and a GUI differ mostly in how bytes arrive and leave. Beet desc
 - [Tutorials](/docs/tutorials) walk you through building something from scratch, start here if you are new.
 - [Crates](/docs/crates) explain what each piece of beet does and how they fit together.
 - [Design](/docs/design) covers the target-agnostic design system.
-- [References](/docs/references) collects the reading that shapes beet's direction.
-- [About](/about) tells the story behind the project.
+- [About](/docs/about) tells the story behind the project and collects the reading that shapes its direction.
 
 The [blog](/blog) follows the project's month-to-month development, and the per-crate [API docs](https://docs.rs/beet) cover the details.

@@ -22,4 +22,32 @@ The ideas behind beet are not new, and it stands in a long line of tools and thi
 - **[Malleable software](https://www.inkandswitch.com/essay/malleable-software/)**: Ink & Switch's essay names the qualities beet is built around, above all the gentle slope from user to creator.
 - **Game engines**: the tradition of separating capability from behavior, an executable driven entirely by scene files. Beet is built on [Bevy](https://bevy.org), the engine that carries this tradition from microcontrollers to the web.
 
-The [references](/docs/references) page collects the reading behind these ideas, and the [blog](/blog) follows the journey month by month.
+The reading behind these ideas is collected below, and the [blog](/blog) follows the journey month by month.
+
+## References
+
+Malleable software, learning through making, and simulation as a medium all have a long lineage, and the work below shapes the project's direction.
+
+### Malleable software
+
+- 1967 - Marshall McLuhan - The Medium Is The Massage
+	- [youtube](https://youtu.be/cFwVCHkL-JU)
+	- [pdf](https://designopendata.wordpress.com/wp-content/uploads/2014/05/themediumisthemassage_marshallmcluhan_quentinfiore.pdf)
+- 2024 - Maggie Appleton - Home-Cooked Software and Barefoot Developers
+	- [youtube](https://youtu.be/qo5m92-9_QI)
+	- [blog](https://maggieappleton.com/home-cooked-software)
+- 2025 - Bryan Cantrill - The Complexity of Simplicity
+	- [youtube](https://youtu.be/Cum5uN2634o)
+
+### Education
+
+- [Summary - Mindstorms](https://medium.com/bits-and-behavior/mindstorms-what-did-papert-argue-and-what-does-it-mean-for-learning-and-education-c8324b58aca4)
+- [Article - STEM beyond robotics](https://www.theeducatoronline.com/k12/news/stem-education-must-go-beyond-focus-on-robotics-and-coding/284841)
+- [Research - Promoting engagement in STEM Australia](https://research.acer.edu.au/cgi/viewcontent.cgi?article=1285&context=research_conference)
+
+### Simulation
+
+- [The Washington Post - Social Distancing Sim](https://www.washingtonpost.com/graphics/2020/world/corona-simulator/)
+- [Parable of the Polygons](https://ncase.me/polygons/)
+</content>
+</invoke>
