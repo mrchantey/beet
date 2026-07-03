@@ -31,6 +31,13 @@ pub fn CodeSnippet(
 	/// extension when empty.
 	#[prop(into, default)]
 	language: String,
+	/// Strip a leading `<!-- … -->` doc comment (and the blank lines after it),
+	/// so a documented example file renders as a lean snippet. Author it as a bare
+	/// flag (`<CodeSnippet src=".." strip_doc/>`): the flag form reaches a typed
+	/// `bool` from every parse path, where a markdown-embedded `strip_doc=true`
+	/// currently arrives as the string `"true"` and fails prop validation.
+	#[prop(default)]
+	strip_doc: bool,
 ) -> impl Bundle {
 	// `new_async_local` (not `new_async`): the read resolves the ancestor store and
 	// builds nodes back on the world, both bridge-heavy, and the async bridge only
@@ -46,6 +53,11 @@ pub fn CodeSnippet(
 			.await??;
 		let bytes = store.get(&SmolPath::from(src.as_str())).await?;
 		let source = String::from_utf8(bytes.to_vec())?;
+		let source = if strip_doc {
+			strip_leading_doc(&source)
+		} else {
+			source
+		};
 		let lang = if language.is_empty() {
 			infer_language(&src)
 		} else {
@@ -60,6 +72,19 @@ pub fn CodeSnippet(
 			.await;
 		Ok(())
 	})
+}
+
+/// Remove a leading `<!-- … -->` comment block and the newlines that follow it,
+/// so an example file's doc header need not ride along into the snippet. A file
+/// that does not open with a comment (or never closes it) passes through as-is.
+fn strip_leading_doc(source: &str) -> String {
+	let Some(rest) = source.trim_start().strip_prefix("<!--") else {
+		return source.to_string();
+	};
+	match rest.find("-->") {
+		Some(end) => rest[end + 3..].trim_start_matches(['\r', '\n']).to_string(),
+		None => source.to_string(),
+	}
 }
 
 /// Infer the highlighter language from a file extension, treating a `.bsx` entry
@@ -100,5 +125,25 @@ fn build_code_block(
 			));
 		}
 		world.spawn((Value::Str(span.text), ChildOf(span_el)));
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn strips_leading_doc() {
+		assert_eq!(
+			strip_leading_doc("<!-- docs\n-->\n\n<Foo/>\n"),
+			"<Foo/>\n"
+		);
+		// no leading comment: unchanged
+		assert_eq!(
+			strip_leading_doc("<Foo/>\n<!-- inline -->\n"),
+			"<Foo/>\n<!-- inline -->\n"
+		);
+		// unterminated comment: unchanged
+		assert_eq!(strip_leading_doc("<!-- docs\n<Foo/>"), "<!-- docs\n<Foo/>");
 	}
 }

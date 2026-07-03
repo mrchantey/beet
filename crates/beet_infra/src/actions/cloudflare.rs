@@ -709,8 +709,11 @@ pub async fn CloudflareWatchAction(
 ) -> Result<Outcome<Request, Response>> {
 	let watch = cx.caller.get_cloned::<CloudflareWatch>().await?;
 	info!("tailing worker `{}`", watch.name());
+	// group: `wrangler` is a wrapper that spawns the real node process; a plain
+	// kill orphans it and the leaked tail holds stdio open past process exit.
 	let mut child = ChildProcess::new("wrangler")
 		.with_args(["tail", watch.name().as_str(), "--format", "pretty"])
+		.with_group(true)
 		.spawn()?;
 	if let Some(timeout) = watch.timeout() {
 		time_ext::sleep(*timeout).await;

@@ -25,12 +25,9 @@ struct SessionInner {
 	/// Pending command responses keyed by id.
 	pending: Mutex<HashMap<u64, async_channel::Sender<Value>>>,
 
-	/// Outbound command text frames.
+	/// Outbound command text frames, drained by the socket pump. Closing the
+	/// channel (see [`Session::kill`]) ends the pump, which closes the socket.
 	cmd_tx: async_channel::Sender<String>,
-	_cmd_rx: async_channel::Receiver<String>,
-
-	/// Optional writer half so we can close the socket gracefully.
-	writer: Mutex<Option<SocketWrite>>,
 
 	/// Event stream (BiDi messages without an id but with a method)
 	events_tx: async_channel::Sender<Value>,
@@ -52,19 +49,20 @@ struct SessionInner {
 ///      - Serializes the outbound JSON {id, method, params}
 ///      - Pushes the raw string onto `cmd_tx`
 ///
-/// 2. Writer Task (`spawn_writer`)
-///    A background task receives raw JSON strings from `cmd_rx` and
-///    sends them as websocket text frames. If the underlying writer
-///    handle is gone (socket closed / moved), the task exits.
-///
-/// 3. Reader Task (`spawn_reader`)
-///    Continuously reads websocket frames:
+/// 2. Socket Pump (`spawn_pump`)
+///    One background task owns the whole socket lifecycle: it connects,
+///    splits, drains `cmd_rx` into outbound text frames, and routes inbound
+///    frames:
 ///      - If a message parses and contains an `id`, it is a response.
 ///        The matching one‑shot sender (if still present) is removed
 ///        from `pending` and fulfilled with the full JSON object.
 ///      - If it lacks an `id` but contains `method`, it is treated as
 ///        an unsolicited event and pushed (non‑blocking try_send) onto
 ///        the `events_tx` channel for opportunistic consumption.
+///    The socket's reader/writer halves are thread-bound (`SendWrapper`),
+///    so the pump is a single `spawn_local` task: the socket is created and
+///    polled on one thread, never sent across the pool (a plain `spawn`
+///    migrates between pool threads and panics the `SendWrapper`).
 ///
 /// Error Handling & Backpressure
 /// -----------------------------
@@ -77,7 +75,7 @@ struct SessionInner {
 /// --------------------
 /// * `pending` is guarded by a `Mutex` because operations are short and
 ///   low contention (only command send / response match).
-/// * Writer + reader tasks run on `IoTaskPool` so they do not block user
+/// * The socket pump runs on the `IoTaskPool` so it does not block user
 ///   systems or async tests.
 ///
 /// High‑Level Extensions
@@ -116,14 +114,10 @@ impl Session {
 		);
 		Request::delete(&url).send().await?.into_result().await?;
 
-		// Take the writer out under the lock, then drop the guard before awaiting:
-		// holding the `MutexGuard` across the `close().await` would make this future
-		// non-`Send` (the guard is not `Send`), breaking the multithreaded build.
-		let writer = self.inner.writer.lock().unwrap().take();
-		if let Some(mut writer) = writer {
-			// Ignore close errors – session already deleted.
-			let _ = writer.close(None).await;
-		}
+		// Closing the command channel ends the pump's writer loop, which closes
+		// the socket on the pump's own thread (the writer half is thread-bound,
+		// so it must not be touched from this caller thread).
+		self.inner.cmd_tx.close();
 		Ok(())
 	}
 
@@ -195,15 +189,12 @@ impl Session {
 		Ok(())
 	}
 
-	/// Connect to the BiDi websocket and spawn dispatcher tasks.
+	/// Connect to the BiDi websocket and spawn its socket pump.
 	pub async fn connect(
 		driver_url: &str,
 		session_id: &str,
 		socket_url: &str,
 	) -> Result<Self> {
-		let socket = Socket::connect(socket_url).await?;
-
-		let (send, recv) = socket.split();
 		let (cmd_tx, cmd_rx) = async_channel::unbounded::<String>();
 		let (events_tx, events_rx) = async_channel::unbounded::<Value>();
 
@@ -214,80 +205,94 @@ impl Session {
 			next_id: AtomicUsize::new(1),
 			pending: Mutex::new(HashMap::new()),
 			cmd_tx,
-			_cmd_rx: cmd_rx.clone(),
-			writer: Mutex::new(Some(send)),
 			events_tx,
 			events_rx,
 		});
 
-		Self::spawn_writer(inner.clone(), cmd_rx);
-		Self::spawn_reader(inner.clone(), recv);
+		let ready = Self::spawn_pump(inner.clone(), cmd_rx);
+		ready
+			.recv()
+			.await
+			.map_err(|_| bevyhow!("socket pump exited before connecting"))??;
 
 		Ok(Self { inner })
 	}
 
-	/// Spawn the writer task:
-	/// Consumes outbound raw JSON command strings and forwards them
-	/// to the websocket writer half. If sending fails (socket closed),
-	/// the loop terminates gracefully.
-	fn spawn_writer(
+	/// Spawn the socket pump: a single task that connects the socket, drains
+	/// `cmd_rx` into outbound text frames, and routes inbound frames to the
+	/// pending map (responses) or the events channel.
+	///
+	/// The socket's halves are thread-bound (`SendWrapper`), so the whole
+	/// lifecycle lives in one `spawn_local` task: created and polled on the same
+	/// thread, never migrated across the pool. The returned channel yields the
+	/// connect result once the socket is up.
+	fn spawn_pump(
 		inner: Arc<SessionInner>,
 		cmd_rx: async_channel::Receiver<String>,
-	) {
+	) -> async_channel::Receiver<Result<()>> {
+		let (ready_tx, ready_rx) = async_channel::bounded::<Result<()>>(1);
 		IoTaskPool::get()
 			.spawn_local(async move {
-				while let Ok(raw) = cmd_rx.recv().await {
-					let send_result = {
-						let mut guard = inner.writer.lock().unwrap();
-						if let Some(writer) = guard.as_mut() {
-							writer.send(Message::text(raw)).await
-						} else {
-							Ok(())
-						}
-					};
-					if send_result.is_err() {
-						// Writer gone – stop writer task.
-						break;
+				let socket = match Socket::connect(&inner.socket_url).await {
+					Ok(socket) => {
+						ready_tx.send(Ok(())).await.ok();
+						socket
 					}
-				}
-			})
-			.detach();
-	}
+					Err(err) => {
+						ready_tx.send(Err(err)).await.ok();
+						return;
+					}
+				};
+				let (mut send, mut recv) = socket.split();
 
-	/// Spawn the reader task:
-	/// Parses inbound text frames. Routes:
-	/// * Responses (with `id`) -> matching pending one‑shot sender.
-	/// * Events (with `method` but no `id`) -> best effort broadcast.
-	fn spawn_reader(inner: Arc<SessionInner>, mut read: SocketRead) {
-		IoTaskPool::get()
-			.spawn(async move {
-				while let Some(item) = read.next().await {
-					let Ok(Message::Text(text)) = item else {
-						continue;
-					};
-					let Ok(val) = serde_json::from_str::<Value>(&text) else {
-						continue;
-					};
+				// outbound: drain the command channel; when it closes (`kill`) or a
+				// send fails, close the socket gracefully on this thread.
+				let writer = async move {
+					while let Ok(raw) = cmd_rx.recv().await {
+						if send.send(Message::text(raw)).await.is_err() {
+							break;
+						}
+					}
+					// Ignore close errors – session already deleted or socket gone.
+					let _ = send.close(None).await;
+				};
 
-					// Response (has id)
-					if let Some(id) = val.get("id").and_then(|v| v.as_u64()) {
-						let pending = {
-							let mut pending_map = inner.pending.lock().unwrap();
-							pending_map.remove(&id)
+				// inbound: route responses to their pending sender, events best-effort.
+				let reader = async move {
+					while let Some(item) = recv.next().await {
+						let Ok(Message::Text(text)) = item else {
+							continue;
 						};
-						if let Some(tx) = pending {
-							let _ = tx.send(val).await;
-						}
-						continue;
-					}
+						let Ok(val) = serde_json::from_str::<Value>(&text) else {
+							continue;
+						};
 
-					// Event (has method, no id)
-					if val.get("method").is_some() {
-						let _ = inner.events_tx.try_send(val);
+						// Response (has id)
+						if let Some(id) = val.get("id").and_then(|v| v.as_u64()) {
+							let pending = {
+								let mut pending_map = inner.pending.lock().unwrap();
+								pending_map.remove(&id)
+							};
+							if let Some(tx) = pending {
+								let _ = tx.send(val).await;
+							}
+							continue;
+						}
+
+						// Event (has method, no id)
+						if val.get("method").is_some() {
+							let _ = inner.events_tx.try_send(val);
+						}
 					}
-				}
+				};
+
+				// either half ending (channel closed, socket dropped) ends the pump;
+				// both halves drop here, on the thread that created them.
+				beet_core::exports::futures_lite::future::or(writer, reader)
+					.await;
 			})
 			.detach();
+		ready_rx
 	}
 }
 

@@ -24,6 +24,14 @@ pub struct ChildProcess {
 	/// Optional error message to use if the command is not found. If `None`, uses the default error.
 	#[set_with(unwrap_option)]
 	not_found: Option<SmolStr>,
+	/// Spawn the child into its own process group (unix only), so
+	/// [`ChildHandle::kill`] takes down the whole tree — a cli that is really a
+	/// wrapper script (eg `wrangler`) otherwise leaves its real process running
+	/// after the wrapper dies, holding inherited stdio open. Opt-in because a
+	/// grouped child no longer receives the terminal's Ctrl+C with the parent;
+	/// right for a child the caller kills itself (eg a bounded log tail), wrong
+	/// for an interactive child the user stops (eg a monitor).
+	group: bool,
 }
 
 impl std::fmt::Display for ChildProcess {
@@ -40,11 +48,28 @@ impl std::fmt::Display for ChildProcess {
 /// Kills the process on drop, and also supports explicit [`kill`](ChildHandle::kill).
 pub struct ChildHandle {
 	inner: async_process::Child,
+	/// The child leads its own process group (see [`ChildProcess::with_group`]),
+	/// so kill targets the group, not just the immediate child.
+	group: bool,
 }
 
 impl ChildHandle {
-	/// Kill the child process.
+	/// Kill the child process — the whole process group for a
+	/// [`with_group`](ChildProcess::with_group) child, so a wrapper-script cli's
+	/// real process dies with it.
 	pub fn kill(&mut self) -> Result<()> {
+		#[cfg(unix)]
+		if self.group {
+			// `process_group(0)` at spawn made the child the group leader, so its
+			// pid is the pgid; `kill -9 -- -PGID` signals the whole group. Run via
+			// bash's *builtin* kill: the standalone /usr/bin/kill (util-linux)
+			// rejects the negative-pgid form that the builtin accepts. Shelling out
+			// keeps this libc-free (this is process-spawning code anyway).
+			std::process::Command::new("bash")
+				.args(["-c", &format!("kill -9 -- -{}", self.inner.id())])
+				.output()
+				.ok();
+		}
 		self.inner
 			.kill()
 			.map_err(|err| bevyhow!("failed to kill child process: {err}"))
@@ -60,7 +85,7 @@ impl ChildHandle {
 }
 
 impl Drop for ChildHandle {
-	fn drop(&mut self) { self.inner.kill().ok(); }
+	fn drop(&mut self) { self.kill().ok(); }
 }
 
 impl ChildProcess {
@@ -73,6 +98,7 @@ impl ChildProcess {
 			env_removals: Vec::new(),
 			cwd: None,
 			not_found: None,
+			group: false,
 		}
 	}
 
@@ -177,20 +203,27 @@ impl ChildProcess {
 	/// Spawn the command as a long-running child process.
 	/// Returns a [`ChildHandle`] that kills the process on drop.
 	pub fn spawn(self) -> Result<ChildHandle> {
-		let mut cmd = async_process::Command::new(self.command.as_str());
+		// built as a std Command so the unix process-group extension applies
+		// (async_process's sealed CommandExt does not expose it), then converted.
+		let mut std_cmd = std::process::Command::new(self.command.as_str());
 		for (key, val) in &self.envs {
-			cmd.env(key.as_str(), val.as_str());
+			std_cmd.env(key.as_str(), val.as_str());
 		}
 		for key in &self.env_removals {
-			cmd.env_remove(key.as_str());
+			std_cmd.env_remove(key.as_str());
 		}
 		if let Some(dir) = &self.cwd {
-			cmd.current_dir(dir);
+			std_cmd.current_dir(dir);
 		}
-		let child = cmd
-			.args(self.args.iter().map(SmolStr::as_str))
-			.spawn()
-			.map_err(|err| {
+		std_cmd.args(self.args.iter().map(SmolStr::as_str));
+		#[cfg(unix)]
+		if self.group {
+			use std::os::unix::process::CommandExt;
+			// pgid 0 = a fresh group led by the child, so kill can target `-pid`.
+			std_cmd.process_group(0);
+		}
+		let child = async_process::Command::from(std_cmd).spawn().map_err(
+			|err| {
 				if err.kind() == ErrorKind::NotFound
 					&& let Some(msg) = &self.not_found
 				{
@@ -198,8 +231,12 @@ impl ChildProcess {
 				} else {
 					err.into()
 				}
-			})?;
-		Ok(ChildHandle { inner: child })
+			},
+		)?;
+		Ok(ChildHandle {
+			inner: child,
+			group: self.group,
+		})
 	}
 
 	fn map_result(

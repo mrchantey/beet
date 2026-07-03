@@ -66,11 +66,23 @@ pub fn TuiThreadChat() -> impl Bundle {
 /// run from scrolling the terminal and returns it clean on exit. Logs redirect to
 /// a file (frames paint to `/dev/tty`, the default) so request tracing never
 /// corrupts the screen.
+///
+/// `inline=true` selects [`StdioTerminal::inline`] instead: the transcript shares
+/// the live screen (no alternate buffer), so the final frame *stays in the
+/// terminal's scrollback* after the process exits — for a demo or CI capture
+/// where the deliverable is the conversation itself. Inline shares stdout, so
+/// logs are not split off to a file; silence them (or redirect) if they would
+/// interleave.
 #[template]
-pub fn TuiThreadTranscript() -> impl Bundle {
+pub fn TuiThreadTranscript(inline: Option<bool>) -> impl Bundle {
+	let terminal = if inline.unwrap_or(false) {
+		StdioTerminal::inline()
+	} else {
+		StdioTerminal::default()
+	};
 	rsx! {
 		<div {(
-			StdioTerminal::default(),
+			terminal,
 			DoubleBuffer::default(),
 			host_column(),
 			RenderSurface::self_referential(),
