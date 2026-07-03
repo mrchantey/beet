@@ -198,7 +198,8 @@ fn scalar_to_reflect(
 	// `LinearVelocity(f32)`) builds that newtype from the bare number, so `<SetDrive
 	// linear=60>` authors a typed velocity directly. The inner field's type id drives
 	// the cast, mirroring the opaque branch above.
-	if let (Some(number), Some(TypeInfo::TupleStruct(info))) = (as_f64, field_info)
+	if let (Some(number), Some(TypeInfo::TupleStruct(info))) =
+		(as_f64, field_info)
 		&& info.field_len() == 1
 		&& let Some(field) = info.field_at(0)
 		&& let Some(cast) = cast_number(number, field.type_id())
@@ -345,9 +346,9 @@ fn coerce_duration(value: &Value) -> Option<Duration> {
 	}
 }
 
-/// Parse a human duration like `"50ms"`, `"1s"`, `"250us"` or `"2m"`. The unit
-/// (`ns`, `us`/`µs`, `ms`, `s`, `m`) is required; `None` on a missing/unknown unit
-/// or an unparseable value.
+/// Parse a human duration like `"50ms"`, `"1s"`, `"2m"`, `"1h"` or `"7d"`. The
+/// unit (`ns`, `us`/`µs`, `ms`, `s`, `m`, `h`, `d`) is required; `None` on a
+/// missing/unknown unit or an unparseable value.
 fn parse_duration_str(string: &str) -> Option<Duration> {
 	let string = string.trim();
 	let split = string
@@ -361,6 +362,8 @@ fn parse_duration_str(string: &str) -> Option<Duration> {
 		"ms" => number / 1_000.0,
 		"s" => number,
 		"m" => number * 60.0,
+		"h" => number * 60.0 * 60.0,
+		"d" => number * 24.0 * 60.0 * 60.0,
 		_ => return None,
 	};
 	Some(Duration::from_secs_f64(secs))
@@ -649,6 +652,10 @@ mod test {
 			.xpect_eq(Duration::from_millis(250));
 		resolve::<Duration>(DataLiteral::Scalar(Value::str("2s")))
 			.xpect_eq(Duration::from_secs(2));
+		resolve::<Duration>(DataLiteral::Scalar(Value::str("1h")))
+			.xpect_eq(Duration::from_secs(60 * 60));
+		resolve::<Duration>(DataLiteral::Scalar(Value::str("7d")))
+			.xpect_eq(Duration::from_secs(7 * 24 * 60 * 60));
 		// the unit is required
 		parse_duration_str("50").xpect_none();
 		parse_duration_str("50years").xpect_none();

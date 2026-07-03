@@ -87,8 +87,15 @@ impl<'a> CodeGenerator<'a> {
 			.flatten()
 			.collect();
 
-		let known_sizes: HashSet<String> =
+		let mut known_sizes: HashSet<String> =
 			external_names.iter().cloned().collect();
+		// every registry container is sized: terraform schemas are trees (a
+		// nested type cannot reference an ancestor), so forward references
+		// never need a `Box`
+		known_sizes.extend(registry.keys().map(|(ns, name)| match ns {
+			Some(namespace) => format!("{}_{}", namespace, name),
+			None => name.clone(),
+		}));
 
 		let type_renames = if self.config.use_title_case {
 			Self::build_rename_map(registry)

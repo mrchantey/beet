@@ -54,6 +54,8 @@ impl Plugin for CliCommandsPlugin {
 		for tag in [
 			"BeetSiteDeployHost",
 			"FargateBeetSiteBlock",
+			"CloudflareZoneSetup",
+			"CloudflarePurgeCache",
 			"SiteBucket",
 			"AssetsBucket",
 			"BeetBinaryBuild",

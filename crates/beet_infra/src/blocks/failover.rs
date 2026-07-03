@@ -11,14 +11,12 @@ use serde_json::json;
 ///
 /// ## Why this is a separate, opt-in block
 ///
-/// A Cloudflare Load Balancer only governs **proxied** (orange-cloud) traffic at
-/// the edge, but the unified site is published **DNS-only** on every hostname,
-/// which is required both for raw-TCP ssh on 22 and for terminating the ACM cert
-/// at the origin. A hostname cannot be both proxied and DNS-only, so enabling this
-/// failover on a hostname trades ssh-on-that-hostname (and re-exposes any
-/// zone-level redirect rules) for HTTP failover. It is therefore kept entirely
-/// out of the core deploy and added only behind a flag. SSH cannot fail over
-/// (Lambda has no ssh), so the failover is HTTP-only.
+/// A Cloudflare Load Balancer only governs **proxied** (orange-cloud) traffic
+/// at the edge, so it applies only to hostnames published with
+/// `DnsProvider::with_proxied(true)` (ssh on a proxied hostname rides a
+/// Spectrum app, see `DnsProvider::with_ssh_spectrum`). SSH cannot fail over
+/// (Lambda has no ssh), so the failover is HTTP-only, and it is kept out of
+/// the core deploy behind a flag.
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
 #[component(immutable, on_add = ErasedBlock::on_add::<CloudflareFailoverBlock>)]
 pub struct CloudflareFailoverBlock {
@@ -169,6 +167,9 @@ mod tests {
 			"nlb.example",
 			"lambda.example",
 		)
+		// explicit ids: the env-derived defaults are absent in a test run
+		.with_zone_id("test-zone")
+		.with_account_id("test-account")
 		.apply_to_config(&world.spawn(()).as_readonly(), &stack, &mut config)
 		.unwrap();
 		config

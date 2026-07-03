@@ -85,6 +85,7 @@ async fn main() -> Result {
 					"aws_ecs_cluster",
 					"aws_ecs_service",
 					"aws_ecs_task_definition",
+					"aws_eip",
 					"aws_internet_gateway",
 					"aws_lb",
 					"aws_lb_listener",

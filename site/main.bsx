@@ -15,10 +15,13 @@ carries no `CliServer` (a one-shot would resolve the boot and exit), so the boot
 parks on the servers' keep-alive and the serve-feature binary stays up.
 
 The router's middleware and the layout attach as component spreads (request
-logging, `--help`, terminal link navigation, the layout). `<DefaultAppRoutes/>`
-adds the default app routes (`/app-info`, the reactivity runtime, …),
-`<RoutesDir/>` discovers the `routes/` pages, and `<ServeBlobs prefix="assets"/>`
-mounts the workspace assets the site and blog reference (the favicon, images). `<Theme
+logging, `--help`, terminal link navigation, the layout, and the cache policy:
+`CacheHeadersMiddleware` + `CacheHeaders` mark html pages edge-cacheable, which
+the Cloudflare proxy honors and the deploy/sync purge refreshes).
+`<DefaultAppRoutes/>` adds the default app routes (`/app-info`, the reactivity
+runtime, …), `<RoutesDir/>` discovers the `routes/` pages, and `<ServeBlobs
+prefix="assets" cache="1h"/>` mounts the workspace assets the site and blog
+reference (the favicon, images), browser-cacheable for an hour. `<Theme
 color=.../>` seeds the brand colour the whole Material palette derives from, and
 `<Styles/>` registers the named style rules in `templates/Styles.bsx`.
 
@@ -27,12 +30,12 @@ live in the Rust deploy host (`examples/infra/deploy_beet_site.rs`): the terrafo
 and docker blocks are not registered for markup, so the deploy stays Rust-expressed
 while the serve definition is shared from here.
 -->
-<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, BootOnLoad)}>
+<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, BootOnLoad)}>
 	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 	<TemplateDir src="templates"/>
 	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
-	<ServeBlobs prefix="assets" {AssetsStore}/>
+	<ServeBlobs prefix="assets" cache="1h" {AssetsStore}/>
 </Router>

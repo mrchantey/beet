@@ -6,7 +6,14 @@ use beet_net::prelude::*;
 ///
 /// Requires a [`PackageConfig`] resource (eg via `pkg_config!()`).
 pub fn app_info() -> impl Bundle {
-	render_action::func_route("app-info", |_: ()| rsx! { <AppInfoContent/> })
+	(
+		render_action::func_route(
+			"app-info",
+			|_: ()| rsx! { <AppInfoContent/> },
+		),
+		// live diagnostics (uptime, request count) must never be cached
+		CacheHeaders::no_store(),
+	)
 }
 
 /// Reads live diagnostics at template build into an `<article>`: the

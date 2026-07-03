@@ -33,9 +33,12 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::CloudflareWorkerDeployAction>()
 			.register_type::<crate::prelude::CloudflareContainerDeployAction>();
 
-		// the tofu apply action (the whole `actions` module is gated on `deploy`).
+		// the tofu apply action + the zone edge setup/purge (the whole `actions`
+		// module is gated on `deploy`).
 		#[cfg(feature = "deploy")]
-		app.register_type::<crate::prelude::TofuApplyAction>();
+		app.register_type::<crate::prelude::TofuApplyAction>()
+			.register_type::<crate::prelude::CloudflareZoneSetup>()
+			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
 		// the full-lifecycle smoke-test action: reads a bucket's `BlobStore` (so
 		// `aws_sdk`-gated like the store) and lives in the `actions` module (so

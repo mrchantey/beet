@@ -365,19 +365,71 @@ impl Block for FargateBlock {
 			},
 		);
 
+		// Static EIPs for the NLB when an ssh_spectrum hostname needs a direct
+		// IP origin (a non-Enterprise Spectrum app takes only `origin_direct`
+		// IPs, so the origin addresses must survive NLB node churn).
+		let ssh_eips = self
+			.dns
+			.iter()
+			.any(DnsProvider::ssh_spectrum)
+			.then(|| {
+				["a", "b"].map(|suffix| {
+					terra::ResourceDef::new_secondary(
+						stack.resource_ident(
+							self.build_label(&format!("ssh-eip-{suffix}")),
+						),
+						AwsEipDetails {
+							domain: Some("vpc".into()),
+							tags: Some(
+								self.name_tags(stack, &format!("eip-{suffix}")),
+							),
+							..default()
+						},
+					)
+				})
+			});
+
 		// The one Network Load Balancer. Cross-zone balancing lets either AZ's
-		// node reach a single task in the other AZ.
-		let nlb = terra::ResourceDef::new_secondary(
-			stack.resource_ident(self.build_label("lb")),
-			AwsLbDetails {
-				name: Some(self.short_name(stack, "lb")),
-				load_balancer_type: Some("network".into()),
-				enable_cross_zone_load_balancing: Some(true),
-				subnets: Some(vec![
+		// node reach a single task in the other AZ. With ssh EIPs the subnets
+		// become explicit mappings carrying the static allocations, under a
+		// DIFFERENT label: EIP associations cannot change on a live NLB
+		// (`SetSubnets` rejects them) and the provider fails to plan the
+		// replacement, so the new identity forces a clean replace (new
+		// `dns_name`; the records are refs, so they follow).
+		let lb_label = if ssh_eips.is_some() { "lb-static" } else { "lb" };
+		let (subnets, subnet_mapping) = match &ssh_eips {
+			Some([eip_a, eip_b]) => (
+				None,
+				Some(vec![
+					AwsLbResourceBlockTypeSubnetMapping {
+						subnet_id: subnet_a.field_ref("id").into(),
+						allocation_id: Some(eip_a.field_ref("id").into()),
+						..default()
+					},
+					AwsLbResourceBlockTypeSubnetMapping {
+						subnet_id: subnet_b.field_ref("id").into(),
+						allocation_id: Some(eip_b.field_ref("id").into()),
+						..default()
+					},
+				]),
+			),
+			None => (
+				Some(vec![
 					subnet_a.field_ref("id").into(),
 					subnet_b.field_ref("id").into(),
 				]),
-				tags: Some(self.name_tags(stack, "lb")),
+				None,
+			),
+		};
+		let nlb = terra::ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label(lb_label)),
+			AwsLbDetails {
+				name: Some(self.short_name(stack, lb_label)),
+				load_balancer_type: Some("network".into()),
+				enable_cross_zone_load_balancing: Some(true),
+				subnets,
+				subnet_mapping,
+				tags: Some(self.name_tags(stack, lb_label)),
 				..default()
 			},
 		);
@@ -728,6 +780,22 @@ impl Block for FargateBlock {
 		if let Some(https_listener) = &https_infra {
 			config.add_resource(https_listener)?;
 		}
+		if let Some([eip_a, eip_b]) = &ssh_eips {
+			config.add_resource(eip_a)?.add_resource(eip_b)?;
+			// the static ssh origins, read by `CloudflareZoneSetup` to publish
+			// the Spectrum apps (comma-joined: `tofu output -raw` is string-only)
+			config.add_output("ssh_static_ips", terra::Output {
+				value: json!(format!(
+					"{},{}",
+					eip_a.field_ref("public_ip"),
+					eip_b.field_ref("public_ip"),
+				)),
+				description: Some(
+					"The static EIPs carrying raw-TCP ssh into the NLB".into(),
+				),
+				sensitive: None,
+			})?;
+		}
 
 		// Outputs
 		config
@@ -1016,6 +1084,44 @@ mod tests {
 			.xpect_contains("cloudflare_dns_record")
 			.xpect_contains("dev.example.org")
 			.xpect_contains("zone123");
+	}
+
+	#[beet_core::test]
+	fn ssh_spectrum_dns_emits_proxied_record_and_static_eips() {
+		let json = build_json(
+			&autoscaling_block().with_allow_ssh(true).with_dns(
+				DnsProvider::cloudflare("example.org", "zone123")
+					.with_proxied(true)
+					.with_ssh_spectrum(true),
+			),
+		);
+		json.as_str()
+			// the record rides the edge
+			.xpect_contains("\"proxied\":true")
+			// static EIPs mapped onto the NLB: the spectrum apps (published by
+			// `CloudflareZoneSetup`, not terraform) need direct IP origins
+			.xpect_contains("aws_eip")
+			.xpect_contains("subnet_mapping")
+			.xpect_contains("allocation_id")
+			.xpect_contains("ssh_static_ips");
+		// ACM validation records stay unproxied even on a proxied deploy
+		json.matches("\"proxied\":false").count().xpect_eq(1);
+	}
+
+	#[beet_core::test]
+	fn no_ssh_spectrum_keeps_plain_subnets() {
+		let json =
+			build_json(&autoscaling_block().with_dns(DnsProvider::cloudflare(
+				"dev.example.org",
+				"zone123",
+			)));
+		json.as_str()
+			.xnot()
+			.xpect_contains("subnet_mapping")
+			.xnot()
+			.xpect_contains("aws_eip")
+			.xnot()
+			.xpect_contains("ssh_static_ips");
 	}
 
 	#[beet_core::test]

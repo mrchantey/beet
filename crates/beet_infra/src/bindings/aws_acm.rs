@@ -52,7 +52,8 @@ pub struct AwsAcmCertificateDetails {
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub domain_validation_options: Option<Vec<SmolStr>>,
+	pub domain_validation_options:
+		Option<Vec<AwsAcmCertificateDomainValidationOptions>>,
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -109,7 +110,7 @@ pub struct AwsAcmCertificateDetails {
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub renewal_summary: Option<Vec<SmolStr>>,
+	pub renewal_summary: Option<Vec<AwsAcmCertificateRenewalSummary>>,
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -235,6 +236,32 @@ impl terra::Resource for AwsAcmCertificateDetails {
 		}
 		Ok(())
 	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct AwsAcmCertificateDomainValidationOptions {
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub domain_name: SmolStr,
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub resource_record_name: SmolStr,
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub resource_record_type: SmolStr,
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub resource_record_value: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct AwsAcmCertificateRenewalSummary {
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub renewal_status: SmolStr,
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub renewal_status_reason: SmolStr,
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub updated_at: SmolStr,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,

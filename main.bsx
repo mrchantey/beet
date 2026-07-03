@@ -31,17 +31,23 @@ holding an entry document, or the entry file itself):
     beet serve site --server=http,ssh      # ..http plus a multi-tenant ssh terminal
 
 It also deploys the beet website to AWS Fargate (the site served from S3, html
-over http + a live ssh terminal). The deploy routes hang off a stack-bearing
+over http + a live ssh terminal), fronted by Cloudflare's edge cache: hostnames
+are proxied, ssh rides a Spectrum app on the primary hostname (origined at the
+NLB's static EIPs), `<CloudflareZoneSetup/>` converges the zone-level edge
+config (cache ruleset, strict TLS, the spectrum apps) through the idempotent
+zone APIs, and every deploy or sync ends with a `<CloudflarePurgeCache/>` so
+content changes are live at the edge immediately. The deploy routes hang off a stack-bearing
 `<BeetSiteDeployHost>` so they resolve a `Stack` by ancestry without a second
 server. `--stage=prod` targets production (apex `beet.org` + `www`); the default
 `dev` stage publishes only `dev.beet.org`:
 
-    just beet deploy [--stage=prod]        # build -> tofu -> image -> sync -> watch
+    just beet deploy [--stage=prod]        # build -> tofu -> image -> sync -> purge -> watch
     just beet sync                         # re-publish the site (no image rebuild)
     just beet watch                        # poll the rollout
 
-Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID` in
-`.env`, plus `tofu`, `cargo-zigbuild` and a container engine.
+Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
+`CLOUDFLARE_API_TOKEN` in `.env` (see `.env.example` for the token permissions),
+plus `tofu`, `cargo-zigbuild` and a container engine.
 -->
 <Router {(CliServer{always:true}, BootOnLoad)}>
 	<Serve/>
@@ -63,11 +69,14 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID` in
 			<BuildDockerImage cmd_args={["serve", "--server=http,ssh", "--path=/"]}/>
 			<DirSync app_name="beet-site" bucket="site" dir="site"/>
 			<DirSync app_name="beet-site" bucket="assets" dir="assets"/>
+			<CloudflareZoneSetup/>
+			<CloudflarePurgeCache/>
 			<FargateWatch app_name="beet-site" timeout="300s"/>
 		</Route>
 		<Route path="sync" {ExchangeSequence}>
 			<DirSync app_name="beet-site" bucket="site" dir="site"/>
 			<DirSync app_name="beet-site" bucket="assets" dir="assets"/>
+			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
 			<FargateWatch app_name="beet-site" timeout="300s"/>

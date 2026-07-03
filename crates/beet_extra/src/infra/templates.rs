@@ -269,6 +269,11 @@ pub fn FargateWatch(
 /// fingerprint. Bucket names derived from the stack (declared once). Markup form of
 /// deploy_beet_site's `block`.
 ///
+/// Every hostname is PROXIED: Cloudflare's edge caches per the origin's
+/// `CacheHeaders` and the zone rules `<CloudflareZoneSetup/>` publishes. TLS
+/// stays terminated at the origin's ACM cert, which the edge verifies (the
+/// zone runs Full strict).
+///
 /// SAFETY / stage-aware DNS (a deliberate change from the original, which always
 /// published all three hostnames): `dev` publishes ONLY `dev.beet.org`; `prod`
 /// publishes the production apex `beet.org` + `www.beet.org`. This is REQUIRED so a
@@ -301,12 +306,24 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 		.with_static_env("BEET_ANALYTICS_TABLE", analytics_table)
 		.with_static_env("BEET_SSH_HOST_KEY", ssh_host_key);
 	// prod claims the apex + www; every other stage gets only its subdomain.
+	// NOTE ssh-through-the-edge is parked: on a non-Enterprise plan a hostname
+	// is either proxied http OR a Spectrum app, never both (`ssh_spectrum`
+	// stays available but unused until that call is made). Holding config:
+	// the prod apex stays DNS-only so `ssh beet.org` keeps working (its http
+	// is origin-direct, uncached), while `www` and the dev subdomain are
+	// proxied and edge-cached.
 	if stack.is_production() {
 		block
 			.with_dns(DnsProvider::cloudflare("beet.org", zone_id.clone()))
-			.with_dns(DnsProvider::cloudflare("www.beet.org", zone_id))
+			.with_dns(
+				DnsProvider::cloudflare("www.beet.org", zone_id)
+					.with_proxied(true),
+			)
 	} else {
-		block.with_dns(DnsProvider::cloudflare("dev.beet.org", zone_id))
+		block.with_dns(
+			DnsProvider::cloudflare("dev.beet.org", zone_id)
+				.with_proxied(true),
+		)
 	}
 }
 
@@ -318,18 +335,15 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 /// declared `<Route>` deploy/sync/watch children land in.
 #[template]
 pub fn BeetSiteDeployHost() -> impl Bundle {
-	(
-		infra_ext::stack("beet-site"),
-		children![
-			Validate,
-			Plan,
-			Apply,
-			Show,
-			List,
-			Destroy,
-			Rollback,
-			Rollforward,
-			SlotTarget::new(),
-		],
-	)
+	(infra_ext::stack("beet-site"), children![
+		Validate,
+		Plan,
+		Apply,
+		Show,
+		List,
+		Destroy,
+		Rollback,
+		Rollforward,
+		SlotTarget::new(),
+	])
 }

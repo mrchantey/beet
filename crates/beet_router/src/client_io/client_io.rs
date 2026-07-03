@@ -30,7 +30,11 @@ pub struct ClientIo;
 /// wires in under the `client_io` feature, so every HTTP router exposes the
 /// upgrade endpoint on its own port.
 pub fn client_io_route() -> impl Bundle {
-	exchange_route("__client_io", exchange_handler(client_io_upgrade))
+	(
+		exchange_route("__client_io", exchange_handler(client_io_upgrade)),
+		// the upgrade handshake must never be cached
+		CacheHeaders::no_store(),
+	)
 }
 
 /// Handler: upgrade an incoming `/__client_io` request to a WebSocket.

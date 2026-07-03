@@ -4,6 +4,8 @@ mod cors;
 pub use cors::*;
 mod no_cache;
 pub use no_cache::*;
+mod cache_headers;
+pub use cache_headers::*;
 mod exchange_overload;
 pub use exchange_overload::*;
 mod exchange_fallback;

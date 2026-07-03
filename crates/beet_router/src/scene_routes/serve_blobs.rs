@@ -21,11 +21,23 @@ pub fn ServeBlobs(
 	/// The mount path the static files are served under, eg `assets`.
 	#[prop(into)]
 	prefix: String,
+	/// Mark served files cacheable with this browser TTL (eg `cache="1h"`); the
+	/// edge TTL is the [`CacheHeaders`] default, refreshed early by a deploy
+	/// purge. Unset serves with no cache header (a live dev mount).
+	cache: Option<Duration>,
 ) -> impl Bundle {
 	(
 		PathPartial::new(format!("{prefix}/*{STORE_PATH_PARAM}?")),
 		ServeBlobsHandler,
 		ExchangeOverload::new::<RequestParts, Response, _, _>(),
+		OnSpawn::new(move |entity: &mut EntityWorldMut| {
+			if let Some(browser_max_age) = cache {
+				entity.insert(CacheHeaders {
+					browser_max_age,
+					..CacheHeaders::assets()
+				});
+			}
+		}),
 	)
 }
 
@@ -156,6 +168,7 @@ mod test {
 	fn serve_route(mount: &str) -> impl Bundle {
 		ServeBlobs {
 			prefix: mount.into(),
+			cache: default(),
 		}
 		.into_snippet_bundle()
 	}

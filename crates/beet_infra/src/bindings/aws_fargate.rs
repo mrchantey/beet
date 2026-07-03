@@ -573,6 +573,216 @@ impl terra::Resource for AwsEcsTaskDefinitionDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsEipDetails {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub address: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub allocation_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub associate_with_private_ip: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub association_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub carrier_ip: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub customer_owned_ip: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub customer_owned_ipv4_pool: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub domain: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub instance: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub ipam_pool_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub network_border_group: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub network_interface: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub private_dns: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub private_ip: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub ptr_record: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub public_dns: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub public_ip: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub public_ipv4_pool: Option<SmolStr>,
+	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags_all: Option<Map<SmolStr, SmolStr>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeouts: Option<Vec<AwsEipResourceBlockTypeTimeouts>>,
+}
+impl terra::ToJson for AwsEipDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsEipDetails {
+	fn resource_type(&self) -> &'static str { "aws_eip" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.allocation_id.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "allocation_id",
+				},
+			);
+		}
+		if self.arn.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "arn",
+				},
+			);
+		}
+		if self.association_id.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "association_id",
+				},
+			);
+		}
+		if self.carrier_ip.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "carrier_ip",
+				},
+			);
+		}
+		if self.customer_owned_ip.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "customer_owned_ip",
+				},
+			);
+		}
+		if self.private_dns.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "private_dns",
+				},
+			);
+		}
+		if self.private_ip.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "private_ip",
+				},
+			);
+		}
+		if self.ptr_record.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "ptr_record",
+				},
+			);
+		}
+		if self.public_dns.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "public_dns",
+				},
+			);
+		}
+		if self.public_ip.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "public_ip",
+				},
+			);
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsInternetGatewayDetails {
 	/// ## Attribute
 	/// `computed`
@@ -1517,7 +1727,7 @@ pub struct AwsRouteTableDetails {
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub route: Option<Vec<SmolStr>>,
+	pub route: Option<Vec<AwsRouteTableRoute>>,
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1572,6 +1782,67 @@ impl terra::Resource for AwsRouteTableDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsRouteTableRoute {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub carrier_gateway_id: SmolStr,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub cidr_block: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub core_network_arn: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub destination_prefix_list_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub egress_only_gateway_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub gateway_id: SmolStr,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub ipv6_cidr_block: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub local_gateway_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub nat_gateway_id: SmolStr,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub network_interface_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub odb_network_arn: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub transit_gateway_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub vpc_endpoint_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub vpc_peering_connection_id: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsSecurityGroupDetails {
 	/// ## Attribute
 	/// `computed`
@@ -1592,7 +1863,7 @@ pub struct AwsSecurityGroupDetails {
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub egress: Option<Vec<SmolStr>>,
+	pub egress: Option<Vec<AwsSecurityGroupEgress>>,
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1604,7 +1875,7 @@ pub struct AwsSecurityGroupDetails {
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub ingress: Option<Vec<SmolStr>>,
+	pub ingress: Option<Vec<AwsSecurityGroupIngress>>,
 	/// ## Attribute
 	/// `required`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1674,6 +1945,78 @@ impl terra::Resource for AwsSecurityGroupDetails {
 		}
 		Ok(())
 	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct AwsSecurityGroupEgress {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub cidr_blocks: Vec<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub description: SmolStr,
+	/// ## Attribute
+	/// `required`
+	pub from_port: i64,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub ipv6_cidr_blocks: Vec<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub prefix_list_ids: Vec<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub protocol: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub security_groups: Vec<SmolStr>,
+	pub self_ref: bool,
+	/// ## Attribute
+	/// `required`
+	pub to_port: i64,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct AwsSecurityGroupIngress {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub cidr_blocks: Vec<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub description: SmolStr,
+	/// ## Attribute
+	/// `required`
+	pub from_port: i64,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub ipv6_cidr_blocks: Vec<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub prefix_list_ids: Vec<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub protocol: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub security_groups: Vec<SmolStr>,
+	pub self_ref: bool,
+	/// ## Attribute
+	/// `required`
+	pub to_port: i64,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
@@ -2558,6 +2901,24 @@ pub struct AwsEcsTaskDefinitionResourceBlockTypeVolume {
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
 #[serde(rename = "timeouts")]
+pub struct AwsEipResourceBlockTypeTimeouts {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub delete: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub read: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub update: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "timeouts")]
 pub struct AwsInternetGatewayResourceBlockTypeTimeouts {
 	/// ## Attribute
 	/// `optional`
@@ -2717,7 +3078,7 @@ pub struct AwsLbResourceBlockTypeMinimumLoadBalancerCapacity {
 #[serde(rename = "subnet_mapping")]
 pub struct AwsLbResourceBlockTypeSubnetMapping {
 	/// ## Attribute
-	/// `optional`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub allocation_id: Option<SmolStr>,
 	/// ## Attribute

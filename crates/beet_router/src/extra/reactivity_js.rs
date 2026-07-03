@@ -24,6 +24,9 @@ pub fn reactivity_js_route() -> impl Bundle {
 		),
 		HttpMethod::Get,
 		ExportStrategy::Static,
+		// compiled-in bytes, fetched on every page view: edge-cacheable, browsers
+		// revalidate (a deploy purge is what changes it)
+		CacheHeaders::any_media(),
 	)
 }
 

@@ -103,8 +103,18 @@ struct Attribute {
 	sensitive: Option<bool>,
 	description_kind: Option<StringKind>,
 	deprecated: Option<bool>,
-	/// Present when the attribute uses an inline structural type instead of `type`.
-	nested_type: Option<Value>,
+	/// Present when the attribute uses an inline structural type instead of
+	/// `type` (the plugin-framework style modern providers emit, eg cloudflare
+	/// v5). Exported as its own struct container, nested recursively.
+	nested_type: Option<NestedType>,
+}
+
+/// A plugin-framework structural attribute type: a full attribute map plus how
+/// it nests (`single`, `list`, `set` or `map`).
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct NestedType {
+	attributes: Option<BTreeMap<String, Attribute>>,
+	nesting_mode: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -309,29 +319,12 @@ fn collect_descriptions(
 	comments: &mut DocComments,
 ) {
 	if let Some(attrs) = &block.attributes {
-		for (attr_name, attr) in attrs {
-			let mut doc = attr.description.clone().unwrap_or_default();
-			let meta = super::ir::FieldMetadata {
-				required: attr.required.unwrap_or(false),
-				optional: attr.optional.unwrap_or(false),
-				computed: attr.computed.unwrap_or(false),
-				sensitive: attr.sensitive.unwrap_or(false),
-			};
-			if let Some(flags) = meta.flags_doc() {
-				if !doc.is_empty() {
-					doc.push('\n');
-				}
-				doc.push_str(&format!("## Attribute\n{}", flags));
-			}
-			if !doc.is_empty() {
-				let key = vec![
-					module_name.to_string(),
-					container_name.to_string(),
-					attr_name.clone(),
-				];
-				comments.insert(key, doc);
-			}
-		}
+		collect_attribute_descriptions(
+			module_name,
+			container_name,
+			attrs,
+			comments,
+		);
 	}
 
 	if let Some(block_types) = &block.block_types {
@@ -348,96 +341,90 @@ fn collect_descriptions(
 	}
 }
 
-fn export_attributes(
+/// Collect an attribute map's descriptions, recursing into `nested_type`
+/// attribute maps (their containers are named `{container}_{attr}`, matching
+/// [`export_nested_type`]).
+fn collect_attribute_descriptions(
+	module_name: &str,
+	container_name: &str,
 	attrs: &BTreeMap<String, Attribute>,
+	comments: &mut DocComments,
+) {
+	for (attr_name, attr) in attrs {
+		let mut doc = attr.description.clone().unwrap_or_default();
+		let meta = super::ir::FieldMetadata {
+			required: attr.required.unwrap_or(false),
+			optional: attr.optional.unwrap_or(false),
+			computed: attr.computed.unwrap_or(false),
+			sensitive: attr.sensitive.unwrap_or(false),
+		};
+		if let Some(flags) = meta.flags_doc() {
+			if !doc.is_empty() {
+				doc.push('\n');
+			}
+			doc.push_str(&format!("## Attribute\n{}", flags));
+		}
+		if !doc.is_empty() {
+			let key = vec![
+				module_name.to_string(),
+				container_name.to_string(),
+				attr_name.clone(),
+			];
+			comments.insert(key, doc);
+		}
+		if let Some(nested_attrs) = attr
+			.nested_type
+			.as_ref()
+			.and_then(|nested| nested.attributes.as_ref())
+		{
+			collect_attribute_descriptions(
+				module_name,
+				&format!("{container_name}_{attr_name}"),
+				nested_attrs,
+				comments,
+			);
+		}
+	}
+}
+
+/// Sanitize an attribute name for use as a Rust field identifier: `self` /
+/// `Self` (which cannot be raw identifiers) are renamed, other reserved words
+/// get the `r#` prefix.
+fn sanitize_field_name(name: &str) -> String {
+	if name == "self" {
+		"self_ref".to_string()
+	} else if name == "Self" {
+		"Self_ref".to_string()
+	} else {
+		RESERVED_WORDS
+			.iter()
+			.find(|word| name == &word.to_string())
+			.map(|word| format!("r#{}", word))
+			.unwrap_or_else(|| name.to_string())
+	}
+}
+
+/// Export an attribute map as a struct container, registering a nested
+/// container for every structural attribute (`nested_type` or a cty
+/// `object`) under `{parent_fqn}_{attr}`.
+fn export_attributes(
+	parent_fqn: &str,
+	attrs: &BTreeMap<String, Attribute>,
+	reg: &mut Registry,
 ) -> Result<Option<Container>> {
 	let mut target_attrs = Vec::new();
 	for (an, at) in attrs {
-		let an = if an == "self" {
-			// 'self' cannot use raw identifier syntax, rename to 'self_ref'
-			"self_ref".to_string()
-		} else if an == "Self" {
-			// 'Self' cannot use raw identifier syntax, rename to 'Self_ref'
-			"Self_ref".to_string()
-		} else {
-			RESERVED_WORDS
-				.iter()
-				.find(|word| an == &word.to_string())
-				.map(|word| format!("r#{}", word))
-				.unwrap_or_else(|| an.to_string())
-		};
-
-		// When `type` is absent the attribute uses `nested_type` (an inline
-		// structural definition).  Treat it as a map of strings for now.
-		let field_type = match &at.r#type {
-			Some(AttributeType(Value::String(type_str)))
-				if type_str == "string" =>
-			{
-				FieldType::Str
+		let field_type = match (&at.nested_type, &at.r#type) {
+			// plugin-framework structural attribute: a full nested attribute map
+			(Some(nested), _) => {
+				export_nested_type(parent_fqn, an, nested, reg)?
 			}
-			Some(AttributeType(Value::String(type_str)))
-				if type_str == "bool" =>
-			{
-				FieldType::Bool
+			(None, Some(AttributeType(value))) => {
+				cty_field_type(parent_fqn, an, value, reg)?
 			}
-			Some(AttributeType(Value::String(type_str)))
-				if type_str == "number" =>
-			{
-				FieldType::I64
+			(None, None) => {
+				bevybail!("attribute `{parent_fqn}.{an}` has no type");
 			}
-			Some(AttributeType(Value::String(type_str)))
-				if type_str == "set" || type_str == "list" =>
-			{
-				FieldType::Seq(Box::new(FieldType::Str))
-			}
-			Some(AttributeType(Value::String(type_str)))
-				if type_str == "map" =>
-			{
-				FieldType::Map {
-					key: Box::new(FieldType::Str),
-					value: Box::new(FieldType::Str),
-				}
-			}
-			// Terraform "dynamic" pseudo-type can hold any value; approximate as String.
-			Some(AttributeType(Value::String(type_str)))
-				if type_str == "dynamic" =>
-			{
-				FieldType::Str
-			}
-			Some(AttributeType(Value::String(type_str))) => {
-				bevybail!("Unknown type {}", type_str);
-			}
-			Some(AttributeType(Value::Array(type_arr)))
-				if type_arr.first().unwrap() == "set"
-					|| type_arr.first().unwrap() == "list" =>
-			{
-				FieldType::Seq(Box::new(FieldType::Str))
-			}
-			// Assumes a map of strings even for other map value types, ie map of object
-			Some(AttributeType(Value::Array(type_arr)))
-				if type_arr.first().unwrap() == "map" =>
-			{
-				FieldType::Map {
-					key: Box::new(FieldType::Str),
-					value: Box::new(FieldType::Str),
-				}
-			}
-			// ["object", {...}], ["tuple", [...]], or any other complex array
-			// type spec we don't fully model yet — approximate as a map of
-			// strings so code generation can proceed.
-			Some(AttributeType(Value::Array(_))) => FieldType::Map {
-				key: Box::new(FieldType::Str),
-				value: Box::new(FieldType::Str),
-			},
-			Some(unknown) => {
-				bevybail!("Type {:?} not supported", unknown);
-			}
-			// `nested_type` attribute — no top-level `type` field.
-			// Approximate as a map of JSON strings for now.
-			None => FieldType::Map {
-				key: Box::new(FieldType::Str),
-				value: Box::new(FieldType::Str),
-			},
 		};
 		let attr_fmt = match (at.optional, at.computed) {
 			(Some(opt), _) if opt => {
@@ -455,13 +442,193 @@ fn export_attributes(
 			computed: at.computed.unwrap_or(false),
 			sensitive: at.sensitive.unwrap_or(false),
 		};
-		target_attrs.push(Field::with_metadata(an, attr_fmt, metadata));
+		target_attrs.push(Field::with_metadata(
+			sanitize_field_name(an),
+			attr_fmt,
+			metadata,
+		));
 	}
 	if !target_attrs.is_empty() {
 		Ok(Some(Container::Struct(target_attrs)))
 	} else {
 		Ok(None)
 	}
+}
+
+/// Register the container for a plugin-framework `nested_type` attribute and
+/// return the field type referencing it, shaped by `nesting_mode`.
+fn export_nested_type(
+	parent_fqn: &str,
+	attr_name: &str,
+	nested: &NestedType,
+	reg: &mut Registry,
+) -> Result<FieldType> {
+	let fqn = format!("{parent_fqn}_{attr_name}");
+	let container = nested
+		.attributes
+		.as_ref()
+		.map(|attrs| export_attributes(&fqn, attrs, reg))
+		.transpose()?
+		.flatten()
+		.unwrap_or(Container::Struct(Vec::new()));
+	insert_nested_container(&fqn, container, reg)?;
+	let type_name = FieldType::TypeName(fqn);
+	match nested.nesting_mode.as_deref() {
+		Some("list") | Some("set") => Ok(FieldType::Seq(Box::new(type_name))),
+		Some("map") => Ok(FieldType::Map {
+			key: Box::new(FieldType::Str),
+			value: Box::new(type_name),
+		}),
+		Some("single") | None => Ok(type_name),
+		Some(other) => {
+			bevybail!(
+				"attribute `{parent_fqn}.{attr_name}` has unknown nesting_mode `{other}`"
+			)
+		}
+	}
+}
+
+/// Convert a cty type value (the `type` field of a legacy-SDK attribute) into
+/// a [`FieldType`], registering a struct container for every `object` under
+/// `{parent_fqn}_{attr_name}`.
+fn cty_field_type(
+	parent_fqn: &str,
+	attr_name: &str,
+	value: &Value,
+	reg: &mut Registry,
+) -> Result<FieldType> {
+	match value {
+		Value::String(type_str) => match type_str.as_str() {
+			"string" => Ok(FieldType::Str),
+			"bool" => Ok(FieldType::Bool),
+			"number" => Ok(FieldType::I64),
+			// "dynamic" can hold any value; approximate as a string
+			"dynamic" => Ok(FieldType::Str),
+			// bare collection names (the injected meta-arguments): element
+			// type unknown, approximate as strings
+			"set" | "list" => Ok(FieldType::Seq(Box::new(FieldType::Str))),
+			"map" => Ok(FieldType::Map {
+				key: Box::new(FieldType::Str),
+				value: Box::new(FieldType::Str),
+			}),
+			other => bevybail!("Unknown type {other}"),
+		},
+		Value::Array(type_arr) => {
+			let kind = type_arr
+				.first()
+				.and_then(Value::as_str)
+				.ok_or_else(|| bevyhow!("empty cty type array"))?;
+			match kind {
+				"set" | "list" => match type_arr.get(1) {
+					Some(elem) => {
+						cty_field_type(parent_fqn, attr_name, elem, reg)?
+							.xmap(Box::new)
+							.xmap(FieldType::Seq)
+							.xok()
+					}
+					None => Ok(FieldType::Seq(Box::new(FieldType::Str))),
+				},
+				"map" => match type_arr.get(1) {
+					Some(elem) => Ok(FieldType::Map {
+						key: Box::new(FieldType::Str),
+						value: cty_field_type(
+							parent_fqn, attr_name, elem, reg,
+						)?
+						.xmap(Box::new),
+					}),
+					None => Ok(FieldType::Map {
+						key: Box::new(FieldType::Str),
+						value: Box::new(FieldType::Str),
+					}),
+				},
+				"object" => {
+					let Some(Value::Object(attrs)) = type_arr.get(1) else {
+						bevybail!(
+							"cty object at `{parent_fqn}.{attr_name}` has no attribute map"
+						);
+					};
+					// the optional third element lists the optional attribute names
+					let optional_names = type_arr
+						.get(2)
+						.and_then(Value::as_array)
+						.map(|names| {
+							names
+								.iter()
+								.filter_map(Value::as_str)
+								.collect::<std::collections::HashSet<_>>()
+						})
+						.unwrap_or_default();
+					let fqn = format!("{parent_fqn}_{attr_name}");
+					let fields = attrs
+						.iter()
+						.map(|(field_name, field_value)| {
+							let field_type = cty_field_type(
+								&fqn,
+								field_name,
+								field_value,
+								reg,
+							)?;
+							let field_type = if optional_names
+								.contains(field_name.as_str())
+							{
+								FieldType::Option(Box::new(field_type))
+							} else {
+								field_type
+							};
+							Field::new(
+								sanitize_field_name(field_name),
+								field_type,
+							)
+							.xok()
+						})
+						.collect::<Result<Vec<_>>>()?;
+					insert_nested_container(
+						&fqn,
+						Container::Struct(fields),
+						reg,
+					)?;
+					Ok(FieldType::TypeName(fqn))
+				}
+				// a positional tuple of cty types
+				"tuple" => {
+					let elems = type_arr
+						.get(1)
+						.and_then(Value::as_array)
+						.ok_or_else(|| {
+							bevyhow!(
+								"cty tuple at `{parent_fqn}.{attr_name}` has no element list"
+							)
+						})?
+						.iter()
+						.map(|elem| {
+							cty_field_type(parent_fqn, attr_name, elem, reg)
+						})
+						.collect::<Result<Vec<_>>>()?;
+					Ok(FieldType::Tuple(elems))
+				}
+				other => bevybail!("Unknown cty type kind `{other}`"),
+			}
+		}
+		unknown => bevybail!("Type {unknown:?} not supported"),
+	}
+}
+
+/// Insert a nested container, failing loudly on a name collision with a
+/// *different* definition (two attribute paths flattening to the same fqn)
+/// rather than silently overwriting one of them.
+fn insert_nested_container(
+	fqn: &str,
+	container: Container,
+	reg: &mut Registry,
+) -> Result {
+	let key = (None, fqn.to_string());
+	if let Some(existing) = reg.get(&key)
+		&& existing != &container
+	{
+		bevybail!("nested container name collision at `{fqn}`");
+	}
+	reg.insert(key, container);
+	Ok(())
 }
 
 fn inject_meta_arguments(blk: &mut Block) {
@@ -502,7 +669,8 @@ fn export_block(
 	blk: Block,
 	reg: &mut Registry,
 ) -> Result {
-	let mut cf1 = export_attributes(blk.attributes.as_ref().unwrap())?;
+	let mut cf1 =
+		export_attributes(name, blk.attributes.as_ref().unwrap(), reg)?;
 	if let Some(bt) = &blk.block_types {
 		for (block_type_name, nested_block) in bt {
 			export_block_type(
@@ -531,7 +699,6 @@ fn export_block_type(
 ) -> Result {
 	let mut inner_block_types = Vec::new();
 	if let Some(attrs) = &blk.block.attributes {
-		let mut nested_cf = export_attributes(attrs)?;
 		let block_type_ns = namespace.map_or_else(
 			|| format!("{}_block_type", parent_name),
 			|val| format!("{}_{}_block_type", parent_name, val),
@@ -547,6 +714,7 @@ fn export_block_type(
 				)
 			},
 		);
+		let mut nested_cf = export_attributes(&block_type_fqn, attrs, reg)?;
 
 		// export inner block types
 		if let Some(bt) = &blk.block.block_types {
@@ -843,6 +1011,160 @@ mod test {
 			.xpect_eq(Some("REGEX".to_owned()));
 	}
 
+	/// A mini schema exercising the structural shapes: a `nested_type` list
+	/// (plugin-framework style) holding a `single` nested object, a cty
+	/// `object` with optional attribute names, and a cty list-of-object.
+	fn nested_schema() -> TerraformSchemaExport {
+		serde_json::from_value(serde_json::json!({
+			"format_version": "1.0",
+			"provider_schemas": {
+				"registry.opentofu.org/cloudflare/cloudflare": {
+					"provider": { "version": 0, "block": { "attributes": {} } },
+					"resource_schemas": {
+						"test_nested": {
+							"version": 0,
+							"block": {
+								"attributes": {
+									"zone_id": { "type": "string", "required": true },
+									"rules": {
+										"optional": true,
+										"nested_type": {
+											"nesting_mode": "list",
+											"attributes": {
+												"expression": { "type": "string", "required": true },
+												"action_parameters": {
+													"optional": true,
+													"nested_type": {
+														"nesting_mode": "single",
+														"attributes": {
+															"cache": { "type": "bool", "optional": true }
+														}
+													}
+												}
+											}
+										}
+									},
+									"origin": {
+										"optional": true,
+										"type": ["object", { "name": "string", "port": "number" }, ["port"]]
+									},
+									"items": {
+										"optional": true,
+										"type": ["list", ["object", { "value": "string" }]]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}))
+		.unwrap()
+	}
+
+	fn nested_filter() -> terra::ResourceFilter {
+		terra::ResourceFilter::default()
+			.with_resources("registry.opentofu.org/cloudflare/cloudflare", &[
+				"test_nested".to_string(),
+			])
+	}
+
+	/// Structural attributes register their own containers and the fields
+	/// reference them, shaped by nesting mode.
+	#[beet_core::test]
+	fn exports_nested_types() {
+		let (registry, _meta, _comments) = export_filtered_resources(
+			&nested_schema(),
+			&nested_filter(),
+			&CodeGeneratorConfig::new(),
+		)
+		.unwrap();
+
+		for name in [
+			"test_nested_details",
+			"test_nested_rules",
+			"test_nested_rules_action_parameters",
+			"test_nested_origin",
+			"test_nested_items",
+		] {
+			registry
+				.contains_key(&(None, name.to_string()))
+				.xpect_true();
+		}
+
+		let fields = registry[&(None, "test_nested_details".to_string())]
+			.fields()
+			.unwrap();
+		let field = |name: &str| {
+			fields.iter().find(|field| field.name == name).unwrap()
+		};
+		field("rules").value.xpect_eq(FieldType::Option(Box::new(
+			FieldType::Seq(Box::new(FieldType::TypeName(
+				"test_nested_rules".to_string(),
+			))),
+		)));
+		field("origin").value.xpect_eq(FieldType::Option(Box::new(
+			FieldType::TypeName("test_nested_origin".to_string()),
+		)));
+		field("items").value.xpect_eq(FieldType::Option(Box::new(
+			FieldType::Seq(Box::new(FieldType::TypeName(
+				"test_nested_items".to_string(),
+			))),
+		)));
+
+		// the single-nested object nests recursively
+		registry[&(None, "test_nested_rules".to_string())]
+			.fields()
+			.unwrap()
+			.iter()
+			.find(|field| field.name == "action_parameters")
+			.unwrap()
+			.value
+			.xpect_eq(FieldType::Option(Box::new(FieldType::TypeName(
+				"test_nested_rules_action_parameters".to_string(),
+			))));
+
+		// the cty object's third element marks `port` optional
+		let origin_fields = registry[&(None, "test_nested_origin".to_string())]
+			.fields()
+			.unwrap();
+		origin_fields
+			.iter()
+			.find(|field| field.name == "port")
+			.unwrap()
+			.value
+			.xpect_eq(FieldType::Option(Box::new(FieldType::I64)));
+		origin_fields
+			.iter()
+			.find(|field| field.name == "name")
+			.unwrap()
+			.value
+			.xpect_eq(FieldType::Str);
+	}
+
+	/// The generated Rust references the typed structs, unboxed.
+	#[beet_core::test]
+	fn generates_nested_structs() {
+		let output = crate::bindings_generator::BindingGenerator::new()
+			.with_title_case(true)
+			.with_trait_impls(true)
+			.with_filter(nested_filter())
+			.generate_to_string(&nested_schema())
+			.unwrap();
+		output
+			.xpect_contains("pub struct TestNestedDetails")
+			.xpect_contains("pub struct TestNestedRules")
+			.xpect_contains("pub struct TestNestedRulesActionParameters")
+			.xpect_contains("pub rules: Option<Vec<TestNestedRules>>")
+			.xpect_contains(
+				"pub action_parameters: Option<TestNestedRulesActionParameters>",
+			)
+			.xpect_contains("pub origin: Option<TestNestedOrigin>")
+			.xpect_contains("pub items: Option<Vec<TestNestedItems>>")
+			.xpect_contains("pub port: Option<i64>")
+			.xpect_contains("impl terra::Resource for TestNestedDetails");
+	}
+
 	#[beet_core::test]
 	fn handles_reserved_words_in_attributes() {
 		// Test that 'self' and 'Self' are renamed to avoid raw identifier issues
@@ -887,7 +1209,8 @@ mod test {
 			nested_type: None,
 		});
 
-		let result = export_attributes(&attrs);
+		let mut reg = Registry::new();
+		let result = export_attributes("test", &attrs, &mut reg);
 		result.is_ok().xpect_true();
 
 		let container = result.unwrap();

@@ -38,6 +38,8 @@ impl Plugin for RouterPlugin {
 			.register_type::<ParamsPattern>()
 			.register_type::<RequestLogger>()
 			.register_type::<NoCacheHeaders>()
+			.register_type::<CacheHeaders>()
+			.register_type::<CacheHeadersMiddleware>()
 			.register_type::<CorsHandler>()
 			.register_type::<CorsConfig>()
 			.register_type::<HtmlStoreAction>()
