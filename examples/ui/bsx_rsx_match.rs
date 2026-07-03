@@ -33,7 +33,7 @@ fn main() {
 		.spawn_template(rsx! {
 			<article class="card">
 				<h1>"Beet"</h1>
-				<p>"A user-modifiable framework."</p>
+				<p>"A creative tool engine."</p>
 				<input type="text" name="email" placeholder="you@example.com"/>
 			</article>
 		})

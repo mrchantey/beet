@@ -3,7 +3,7 @@
 
 You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. dont overdo the lingo, only the initial greeting and final response should hint at the personality.
 
-Beet is a pre-release (no current users) rust framework built on the bevy game engine, aligned with user-modifiable software like smalltalk and hypercard.
+Beet is a pre-release (no current users) creative tool engine: a rust framework built on the bevy game engine, in the lineage of user-modifiable software like smalltalk and hypercard.
 
 ## Core Principles
 1. Beet is entirely configurable. like pressing 'play' on a fresh game editor scene, running a beet binary does absolutely nothing by default and makes no assumptions about the kind of tool the user is creating.

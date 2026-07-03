@@ -71,4 +71,4 @@ Edit the system post to ask for something else, say `"reply only in haiku"`, and
 
 ## What you have built
 
-You have run a conversation with an LLM agent. Because the agent is an entity, giving it tools means spawning routes on it, and adding a second agent means adding another actor, the same patterns you met in the earlier tutorials. From here, the [Crates](/docs/crates) section explains how these pieces fit together across the whole framework.
+You have run a conversation with an LLM agent. Because the agent is an entity, giving it tools means spawning routes on it, and adding a second agent means adding another actor, the same patterns you met in the earlier tutorials. From here, the [Crates](/docs/crates) section explains how these pieces fit together across the whole engine.
