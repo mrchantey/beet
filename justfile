@@ -85,7 +85,7 @@ beet-plan *args:
   AWS_PROFILE= cargo run -p beet-cli -- plan {{ args }}
 
 install-cli *args:
-  cargo install --path crates/beet-cli {{ args }}
+  cargo install --path crates/beet-cli --all-features {{ args }}
 
 #💡 Aliases
 

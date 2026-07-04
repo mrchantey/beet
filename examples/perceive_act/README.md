@@ -1,6 +1,6 @@
 # Perceive-act
 
-A small floor robot living a perceive-act loop: it takes a photo, describes what it sees, picks an emotion, says a line in character, then chooses a heading, over and over. The loop runs until you stop it with Ctrl+C.
+A small floor embodied agent living a perceive-act loop: it takes a photo, describes what it sees, picks an emotion, says a line in character, then chooses a heading, over and over. The loop runs until you stop it with Ctrl+C.
 
 The agent is a socket server (`agent.bsx`, shared by every version); only the head and body clients change between versions. Run every command from the repo root.
 
