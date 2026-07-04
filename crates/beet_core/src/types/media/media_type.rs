@@ -578,6 +578,20 @@ impl MediaType {
 			MediaType::Mp4 | MediaType::VideoWebm | MediaType::VideoOgg
 		)
 	}
+
+	/// Whether this is an audio format.
+	pub fn is_audio(&self) -> bool {
+		matches!(
+			self,
+			MediaType::Mp3 | MediaType::Wav | MediaType::Flac | MediaType::Aac
+		)
+	}
+
+	/// Whether this is heavyweight media (image, video or audio), the kinds
+	/// worth pruning first from a bounded context window.
+	pub fn is_media(&self) -> bool {
+		self.is_image() || self.is_video() || self.is_audio()
+	}
 }
 
 impl core::str::FromStr for MediaType {

@@ -8,22 +8,22 @@ mod post_streamer;
 
 fn streamer() -> O11sStreamer {
 	env_ext::load_dotenv();
-	OpenAiProvider::gpt_5_mini().unwrap()
+	OpenAiProvider::gpt_5_4_mini().unwrap()
 }
 
 fn streamer_non_streaming() -> O11sStreamer {
 	env_ext::load_dotenv();
-	OpenAiProvider::gpt_5_mini().unwrap().without_streaming()
+	OpenAiProvider::gpt_5_4_mini().unwrap().without_streaming()
 }
 
 fn completions_streamer() -> CompletionsStreamer {
 	env_ext::load_dotenv();
-	OpenAiProvider::gpt_5_mini_completions().unwrap()
+	OpenAiProvider::gpt_5_4_mini_completions().unwrap()
 }
 
 fn completions_streamer_non_streaming() -> CompletionsStreamer {
 	env_ext::load_dotenv();
-	OpenAiProvider::gpt_5_mini_completions()
+	OpenAiProvider::gpt_5_4_mini_completions()
 		.unwrap()
 		.without_streaming()
 }

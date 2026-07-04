@@ -124,6 +124,78 @@ impl ThreadWindow {
 		self.posts = posts;
 		self.posts.sort_by_key(|post| post.id());
 	}
+
+	/// Trim the window for an endless loop, keeping the request bounded.
+	///
+	/// Retains every system/developer post (the seed prompt), the last
+	/// `keep_posts` other posts, and within those the last `keep_media` media
+	/// (image/video/audio) posts, dropping older ones. Any function-call-output
+	/// post whose paired call was dropped is dropped too, so providers never see
+	/// an orphaned tool output. Call between turns, when every call is paired.
+	pub fn prune(&mut self, keep_posts: usize, keep_media: usize) {
+		// the index the retained non-system tail begins at
+		let tail_start = self
+			.posts
+			.iter()
+			.filter(|post| !self.is_seed_kind(post))
+			.count()
+			.saturating_sub(keep_posts);
+		let mut media_seen = self
+			.posts
+			.iter()
+			.filter(|post| post.media_type().is_media())
+			.count();
+		let mut non_seed_seen = 0;
+		let mut retained_calls = HashSet::<String>::default();
+		let mut posts = std::mem::take(&mut self.posts);
+		posts.retain(|post| {
+			let is_media = post.media_type().is_media();
+			// count from the front so `media_seen`/`non_seed_seen` mark position
+			let media_index = media_seen - if is_media { 1 } else { 0 };
+			if is_media {
+				media_seen -= 1;
+			}
+			if self.is_seed_kind(post) {
+				return true;
+			}
+			let index = non_seed_seen;
+			non_seed_seen += 1;
+			if index < tail_start {
+				return false;
+			}
+			// within the tail: older media beyond the last `keep_media` drop out
+			if is_media && media_index >= keep_media {
+				return false;
+			}
+			// tool outputs only survive alongside their call
+			let agent_post = post.as_agent_post();
+			match &agent_post {
+				AgentPost::FunctionCall(call) => {
+					retained_calls.insert(call.call_id().to_string());
+					true
+				}
+				AgentPost::FunctionCallOutput(output) => {
+					retained_calls.contains(output.call_id())
+				}
+				_ => true,
+			}
+		});
+		self.posts = posts;
+		// drop metas for pruned posts so `stored_response` never chains to them
+		let retained = &self.posts;
+		self.metas
+			.retain(|post_id, _| retained.iter().any(|post| post.id() == *post_id));
+	}
+
+	/// Whether a post is part of the immutable seed (system/developer authored).
+	fn is_seed_kind(&self, post: &Post) -> bool {
+		self.actors
+			.get(&post.author())
+			.map(|actor| {
+				matches!(actor.kind(), ActorKind::System | ActorKind::Developer)
+			})
+			.unwrap_or(false)
+	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -437,6 +509,99 @@ mod test {
 			.iter(&world)
 			.count()
 			.xpect_eq(1);
+	}
+
+	/// Pruning keeps the seed prompt, the last `keep_posts` other posts and the
+	/// last `keep_media` media posts, and never orphans a tool output.
+	#[beet_core::test]
+	fn prune_bounds_the_window() {
+		let thread = ThreadId::new_now();
+		let system = ActorId::new_now();
+		let user = ActorId::new_now();
+		let agent = ActorId::new_now();
+		let mut window = ThreadWindow::new();
+		window.insert_actor(Actor::new_with_id(system, "Sys", ActorKind::System));
+		window.insert_actor(Actor::new_with_id(user, "Cam", ActorKind::User));
+		window.insert_actor(Actor::new_with_id(agent, "Bot", ActorKind::Agent));
+		window.upsert_post(AgentPost::new_text(
+			system,
+			thread,
+			"seed prompt",
+			PostStatus::Completed,
+		));
+		// three cycles of photo -> call -> output
+		for cycle in 0..3 {
+			window.upsert_post(AgentPost::new_bytes(
+				user,
+				thread,
+				MediaType::Jpeg,
+				vec![cycle as u8],
+				None,
+				PostStatus::Completed,
+			));
+			window.upsert_post(AgentPost::new_function_call(
+				agent,
+				thread,
+				"act",
+				format!("call-{cycle}"),
+				"{}",
+				PostStatus::Completed,
+			));
+			window.upsert_post(AgentPost::new_function_call_output(
+				agent,
+				thread,
+				format!("call-{cycle}"),
+				"done",
+				Some("act".into()),
+				PostStatus::Completed,
+			));
+		}
+		window.posts().len().xpect_eq(10);
+
+		// keep the last two cycles' posts but only the newest photo
+		window.prune(6, 1);
+		// seed + (photo dropped, call+output) + (photo, call, output) = 6
+		window.posts().len().xpect_eq(6);
+		window.posts()[0]
+			.to_string()
+			.xpect_eq("seed prompt".to_string());
+		window
+			.posts()
+			.iter()
+			.filter(|post| post.media_type().is_media())
+			.count()
+			.xpect_eq(1);
+		// every retained output still has its call
+		let calls = window
+			.posts()
+			.iter()
+			.filter_map(|post| match post.as_agent_post() {
+				AgentPost::FunctionCall(call) => {
+					Some(call.call_id().to_string())
+				}
+				_ => None,
+			})
+			.collect::<Vec<_>>();
+		window
+			.posts()
+			.iter()
+			.filter_map(|post| match post.as_agent_post() {
+				AgentPost::FunctionCallOutput(output) => {
+					Some(output.call_id().to_string())
+				}
+				_ => None,
+			})
+			.all(|call_id| calls.contains(&call_id))
+			.xpect_true();
+
+		// a tighter prune drops whole cycles, never leaving a leading orphan
+		window.prune(2, 1);
+		window.posts()[0]
+			.to_string()
+			.xpect_eq("seed prompt".to_string());
+		let first_non_seed = window.posts()[1].as_agent_post();
+		matches!(first_non_seed, AgentPost::FunctionCallOutput(_))
+			.xpect_false();
 	}
 
 	/// Streaming-shaped window mutation: upsert appends new posts and replaces

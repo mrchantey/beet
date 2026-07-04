@@ -263,6 +263,12 @@ impl Response {
 		Self::ok_body(text, MediaType::Text)
 	}
 
+	/// Create an OK (200) response with a JSON body.
+	#[cfg(feature = "json")]
+	pub fn ok_json<T: serde::Serialize>(value: &T) -> Result<Self> {
+		Self::ok_body(serde_json::to_string(value)?, MediaType::Json).xok()
+	}
+
 	/// Create a response with the given status and a plain-text body.
 	pub fn status_text(status: StatusCode, text: impl Into<Body>) -> Self {
 		let mut parts = ResponseParts::new(status);

@@ -1,19 +1,27 @@
 <!--
 The always-socket perceive-act agent, shared verbatim by every stage (`<Template src>`d
-by main-v1/main-v2/main-v3). It is a socket server whose capability routes forward over the
-socket to whichever client serves them (`interpret-photo` stays here on the brain and
-calls `take-photo`; `speak-text`/`set-emotion` go to the head, `apply-heading` to the
-body), bound by the `whoami` handshake as each client connects. Only the *clients* differ
-between stages, so this block never changes: v1 mocks head+body, v2 swaps a wgpu fox for
-the body, v3 serves a wasm head and lets a device body connect.
+by main-v1/main-v2/main-v3). It is a socket server whose capability routes forward over
+the socket to whichever client serves them (`take-photo`/`speak-text`/`set-emotion` to
+the head, `apply-heading` to the body), bound by the `whoami` handshake as each client
+connects; with no client bound, each route's local handler applies.
 
-`{Repeat}` loops the thread endlessly, so the robot keeps perceiving and acting until the
-process is killed (Ctrl+C); the boot call parks rather than writing `AppExit`. Needs
-`OPENAI_API_KEY` (the agent + the vision describe).
+One model call per cycle: the `Camera` actor (`{PostPhoto}`) captures via `take-photo`
+and posts the photo straight into the thread, then the `Robot` agent answers with a
+single forced `act` tool call ({ToolChoice::RequiredAny}, `<Act/>` its only tool), which
+fans out to `set-emotion`/`speak-text`/`apply-heading` concurrently and awaits them all,
+so the next photo waits for the body to stop moving. `{PostPhoto}` also prunes the
+window each cycle, keeping the endless loop's request small and fast.
+
+`{Repeat}` loops the thread until the process is killed (Ctrl+C); the boot call parks
+rather than writing `AppExit`. Needs `OPENAI_API_KEY`.
 -->
 <Router {(SocketServer, BootOnLoad, CapabilityServer)}>
-	<!-- routable by interpret-photo, not offered to the model (outside the actor) -->
+	<!-- capability routes, forwarded per role by the whoami binding; not offered to
+	     the model (outside the actor), the `act` fan-out and the camera call them -->
 	<TakePhoto/>
+	<SetEmotion/>
+	<SpeakText/>
+	<ApplyHeading/>
 	<div {Repeat} {CreateThread}>
 		<div {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">
@@ -21,24 +29,21 @@ process is killed (Ctrl+C); the boot call parks rather than writing `AppExit`. N
 You are a small, curious and very emotional floor robot exploring a room.
 You perceive the world one photo at a time and act on what you see.
 
-Explore the room continuously, one cycle after another, and never stop:
-1. Call interpret-photo to look at what is in front of you.
-2. Call set-emotion to match how you feel about what you see.
-3. Call speak-text to say one short line out loud, in character.
-4. Call apply-heading to choose where to go next (Forward, Left or Right).
+Each turn you are shown a fresh photo of what is in front of you. Respond by
+calling the act tool exactly once: the emotion you feel, one short spoken line,
+and the direction to drive next.
 
-Always complete all four steps, in order, every cycle, then begin the next cycle. Never
-give a closing remark or stop calling tools; your little life just goes on.
-
-Keep spoken lines short and full of personality. You are not narrating to a user, you
-are a robot living its little life.
+Keep spoken lines short and full of personality, and react to what changed
+since the last photo. Never repeat a line you already said. You are not
+narrating to a user, you are a robot living its little life. Prefer driving
+Forward, turn Left or Right when something blocks the way, and let your
+feelings swing with what you see.
 '/>
 			</CreateActor>
-			<CreateActor name="Robot" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<InterpretPhoto/>
-				<SpeakText/>
-				<SetEmotion/>
-				<ApplyHeading/>
+			<CreateActor name="Camera" kind="User" {PostPhoto}/>
+			<CreateActor name="Robot" kind="Agent"
+				{(ModelStreamer{provider:OpenAi, effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
+				<Act/>
 			</CreateActor>
 		</div>
 	</div>

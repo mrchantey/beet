@@ -58,6 +58,46 @@ where
 	.await
 }
 
+/// Polls a collection of futures concurrently, resolving to their outputs in
+/// iteration order once all complete.
+///
+/// A no_std drop-in for `futures::future::join_all`, backed only by
+/// `alloc` + `core`.
+pub async fn join_all<Fut, T>(
+	futures: impl IntoIterator<Item = Fut>,
+) -> Vec<T>
+where
+	Fut: Future<Output = T>,
+{
+	let mut futures: Vec<Option<Pin<Box<Fut>>>> =
+		futures.into_iter().map(|fut| Some(Box::pin(fut))).collect();
+	let mut results: Vec<Option<T>> = core::iter::repeat_with(|| None)
+		.take(futures.len())
+		.collect();
+
+	core::future::poll_fn(move |cx| {
+		let mut all_done = true;
+		for (idx, slot) in futures.iter_mut().enumerate() {
+			let Some(fut) = slot else { continue };
+			match fut.as_mut().poll(cx) {
+				Poll::Ready(value) => {
+					results[idx] = Some(value);
+					*slot = None;
+				}
+				Poll::Pending => all_done = false,
+			}
+		}
+		if all_done {
+			Poll::Ready(
+				results.iter_mut().map(|r| r.take().unwrap()).collect(),
+			)
+		} else {
+			Poll::Pending
+		}
+	})
+	.await
+}
+
 /// A 'static + Send, making it suitable for spawning on async runtimes
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
 /// A 'static + Send, making it suitable for spawning on async runtimes

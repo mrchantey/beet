@@ -3,6 +3,7 @@
 //!
 //! Analogous to [`o11s_mapper`](super::o11s_mapper) but targeting the
 //! OpenAI Chat Completions API.
+use crate::o11s::ReasoningEffort;
 use crate::prelude::*;
 use async_openai::types::chat::ChatCompletionMessageToolCall;
 use async_openai::types::chat::ChatCompletionMessageToolCalls;
@@ -502,6 +503,21 @@ pub fn tool_choice_to_completions(
 				ChatCompletionToolChoiceOption::Mode(ToolChoiceOptions::Auto)
 			}
 		}
+	}
+}
+
+/// Map the shared [`ReasoningEffort`] onto the completions wire type.
+pub fn reasoning_effort(
+	effort: ReasoningEffort,
+) -> async_openai::types::chat::ReasoningEffort {
+	use async_openai::types::chat::ReasoningEffort as Wire;
+	match effort {
+		ReasoningEffort::None => Wire::None,
+		ReasoningEffort::Minimal => Wire::Minimal,
+		ReasoningEffort::Low => Wire::Low,
+		ReasoningEffort::Medium => Wire::Medium,
+		ReasoningEffort::High => Wire::High,
+		ReasoningEffort::Xhigh => Wire::Xhigh,
 	}
 }
 

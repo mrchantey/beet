@@ -1,7 +1,7 @@
 //! `TakePhoto`: the raw photo capture, `In = ()`, `Out = MediaBytes`. Pure: no model,
 //! no describe. The head client serves this `take-photo` capability (this desktop
 //! binary captures the floor-photo fixtures; the browser binary serves the same route
-//! from the real webcam in V3). [`InterpretPhoto`](super::InterpretPhoto) calls it.
+//! from the real webcam in V3). [`PostPhoto`](super::PostPhoto) calls it each cycle.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -16,8 +16,7 @@ pub async fn TakePhoto(cx: ActionContext<()>) -> Result<MediaBytes> {
 /// Read the next floor photo through the nearest ancestor [`BlobStore`], cycling via
 /// [`PhotoStream`] so successive calls see successive photos. This desktop binary's
 /// capture; the browser binary serves the same `take-photo` route from the real webcam
-/// in V3. `pub(crate)` so the single-binary [`InterpretPhoto`](super::InterpretPhoto)
-/// can capture without a round trip until V2 moves it to the head client.
+/// in V3.
 pub(crate) async fn capture(caller: &AsyncEntity) -> Result<MediaBytes> {
 	// resolve the photo store (scoped to the photo dir) and the next cursor in one
 	// world access, advancing the cursor so the following call sees the next photo.

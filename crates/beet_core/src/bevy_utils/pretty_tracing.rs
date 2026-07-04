@@ -120,6 +120,7 @@ const QUIET_TARGETS: &[&str] = &[
 	"walrus",
 	"aws",
 	"hyper_util",
+	"ureq",
 ];
 
 impl PrettyTracing {
@@ -132,25 +133,32 @@ impl PrettyTracing {
 	/// as defined in [`lambda_http::tracing::init_default_subscriber_with_writer`]
 	///
 	pub fn init(&self) {
-		let log_level = env_ext::var("AWS_LAMBDA_LOG_LEVEL")
+		// The env may carry a plain level (`info`), a directive list
+		// (`info,beet_net=warn`), or nothing. A plain level (or the built-in
+		// default when the env is absent) becomes the catch-all directive; a
+		// directive list already carries its own catch-all through
+		// `EnvFilter::from_default_env`, so re-adding the default here would
+		// override the user's level (a bare level directive added later wins).
+		let env_level = env_ext::var("AWS_LAMBDA_LOG_LEVEL")
 			.or_else(|_| env_ext::var("RUST_LOG"))
-			.map(|val| LevelFilter::from_str(&val).ok())
-			.ok()
-			.flatten()
-			.unwrap_or(self.default_level.into());
+			.ok();
+		let log_level = match &env_level {
+			Some(val) => LevelFilter::from_str(val).ok(),
+			None => Some(self.default_level.into()),
+		};
 
 		// every non-beet origin in `QUIET_TARGETS` is pinned to `warn` (`wgpu`
 		// lower still); the resolved level applies to everything else, ie the
 		// beet crates and the running app. caller-supplied directives win, so
 		// they are folded in last.
-		let base = QUIET_TARGETS.iter().fold(
-			tracing_subscriber::EnvFilter::from_default_env()
-				.add_directive("wgpu=error".parse().unwrap())
-				.add_directive(log_level.into()),
-			|filter, target| {
-				filter.add_directive(format!("{target}=warn").parse().unwrap())
-			},
-		);
+		let mut base = tracing_subscriber::EnvFilter::from_default_env()
+			.add_directive("wgpu=error".parse().unwrap());
+		if let Some(log_level) = log_level {
+			base = base.add_directive(log_level.into());
+		}
+		let base = QUIET_TARGETS.iter().fold(base, |filter, target| {
+			filter.add_directive(format!("{target}=warn").parse().unwrap())
+		});
 		let env_filter = self
 			.filter
 			.split(',')

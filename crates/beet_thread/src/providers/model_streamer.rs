@@ -1,3 +1,4 @@
+use crate::o11s::ReasoningEffort;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -43,12 +44,15 @@ pub enum ModelSize {
 /// construct the streamers directly for fine control. Providers without an
 /// OpenResponses endpoint (Gemini) fall back to completions. `instructions`
 /// (the per-agent system prompt) is forwarded to the streamer when non-empty,
-/// so two agents on one model differ by markup alone.
+/// so two agents on one model differ by markup alone. `effort` pins the
+/// reasoning effort (eg `effort="None"` for the fastest response on a
+/// reasoning model); the default leaves it to the provider.
 #[template]
 pub fn ModelStreamer(
 	#[prop(default)] provider: Provider,
 	#[prop(default)] api: ModelApi,
 	#[prop(default)] size: ModelSize,
+	#[prop(default)] effort: Option<ReasoningEffort>,
 	#[prop(into, default)] instructions: String,
 ) -> impl Bundle {
 	OnSpawn::new(move |entity| -> Result {
@@ -69,12 +73,18 @@ pub fn ModelStreamer(
 				if !instructions.is_empty() {
 					streamer = streamer.with_instructions(instructions);
 				}
+				if let Some(effort) = effort {
+					streamer = streamer.with_reasoning_effort(effort);
+				}
 				entity.insert(streamer);
 			}
 			ModelApi::Completions => {
 				let mut streamer = CompletionsStreamer::new(model);
 				if !instructions.is_empty() {
 					streamer = streamer.with_instructions(instructions);
+				}
+				if let Some(effort) = effort {
+					streamer = streamer.with_reasoning_effort(effort);
 				}
 				entity.insert(streamer);
 			}
@@ -110,11 +120,11 @@ fn auth_env(provider: Provider) -> Option<&'static str> {
 
 fn model_slug(provider: Provider, size: ModelSize) -> &'static str {
 	match (provider, size) {
-		(Provider::OpenAi, ModelSize::Small) => OpenAiProvider::GPT_5_NANO,
-		(Provider::OpenAi, ModelSize::Medium) => OpenAiProvider::GPT_5_MINI,
-		(Provider::OpenAi, ModelSize::Large) => OpenAiProvider::GPT_5_2,
+		(Provider::OpenAi, ModelSize::Small) => OpenAiProvider::GPT_5_4_NANO,
+		(Provider::OpenAi, ModelSize::Medium) => OpenAiProvider::GPT_5_4_MINI,
+		(Provider::OpenAi, ModelSize::Large) => OpenAiProvider::GPT_5_5,
 		(Provider::Gemini, ModelSize::Small) => {
-			GeminiProvider::GEMINI_2_5_FLASH
+			GeminiProvider::GEMINI_3_1_FLASH_LITE
 		}
 		(Provider::Gemini, ModelSize::Medium) => {
 			GeminiProvider::GEMINI_2_5_FLASH

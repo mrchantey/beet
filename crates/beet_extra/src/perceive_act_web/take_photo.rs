@@ -4,8 +4,8 @@
 //! webcam. The `<video id="webcam">` element is declared in the page markup (visible on
 //! `/debug`, hidden on `/`), so the capture is easy to reason about: open the camera
 //! once, attach it to that element, and each shot draws its current frame onto a canvas
-//! -> `canvas.toDataURL("image/jpeg")` -> [`MediaBytes`]. The agent's `interpret-photo`
-//! calls this over the socket, then one-shots the bytes to a vision model.
+//! -> `canvas.toDataURL("image/jpeg")` -> [`MediaBytes`]. The agent's camera turn calls
+//! this over the socket each cycle and posts the bytes straight into the thread.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use wasm_bindgen::JsCast;
@@ -41,11 +41,18 @@ async fn capture_webcam() -> Result<MediaBytes> {
 	}
 	await_first_frame(&video).await;
 
-	// draw the current frame onto a canvas sized to the video, then read it back as jpeg.
+	// draw the current frame onto a canvas bounded to the vision-model sweet
+	// spot (phone cameras capture far larger frames than a model needs, and the
+	// bytes cross the socket + the model api every cycle), then read it as jpeg.
 	let (width, height) = (video.video_width(), video.video_height());
+	let scale = (MAX_PHOTO_WIDTH / width as f64).min(1.0);
+	let (out_width, out_height) = (
+		(width as f64 * scale).round() as u32,
+		(height as f64 * scale).round() as u32,
+	);
 	let canvas = document_ext::create_canvas();
-	canvas.set_width(width);
-	canvas.set_height(height);
+	canvas.set_width(out_width);
+	canvas.set_height(out_height);
 	let ctx = canvas
 		.get_context("2d")
 		.map_jserr()?
@@ -56,14 +63,25 @@ async fn capture_webcam() -> Result<MediaBytes> {
 		&video,
 		0.0,
 		0.0,
-		width as f64,
-		height as f64,
+		out_width as f64,
+		out_height as f64,
 	)
 	.map_jserr()?;
 
-	let data_url = canvas.to_data_url_with_type("image/jpeg").map_jserr()?;
+	let data_url = canvas
+		.to_data_url_with_type_and_encoder_options(
+			"image/jpeg",
+			&JPEG_QUALITY.into(),
+		)
+		.map_jserr()?;
 	MediaBytes::from_url(&Url::parse(data_url))
 }
+
+/// The longest edge a captured photo is scaled down to, matching what vision
+/// models resolve well while keeping per-cycle upload small.
+const MAX_PHOTO_WIDTH: f64 = 1024.0;
+/// Jpeg encoder quality for captured photos.
+const JPEG_QUALITY: f64 = 0.8;
 
 /// Open the default camera, returning its [`MediaStream`]. Mirrors the audio
 /// getUserMedia shape in `beet_thread`'s webrtc connect, but requesting video.

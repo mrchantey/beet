@@ -72,9 +72,14 @@ impl O11sStreamer {
 	/// The system instructions sent with each request, if any.
 	pub fn instructions(&self) -> Option<&str> { self.instructions.as_deref() }
 
-	pub fn without_reasoning(mut self) -> Self {
+	pub fn without_reasoning(self) -> Self {
+		self.with_reasoning_effort(ReasoningEffort::None)
+	}
+
+	/// Pin the reasoning effort sent with each request.
+	pub fn with_reasoning_effort(mut self, effort: ReasoningEffort) -> Self {
 		self.reasoning = Some(ReasoningParam {
-			effort: Some(ReasoningEffort::None),
+			effort: Some(effort),
 			summary: None,
 		});
 		self
@@ -277,7 +282,10 @@ where
 				let ev_result = match ev_result {
 					Ok(StreamingEventOrUnknown::Known(ev)) => Ok(ev),
 					Ok(StreamingEventOrUnknown::Unknown(ev)) => {
-						info!("Ignoring unknown streaming event: {:#?}", ev);
+						debug!("Ignoring unknown streaming event: {:#?}", ev);
+						// wake immediately: a bare Pending would stall the
+						// stream until the transport happens to wake it.
+						cx.waker().wake_by_ref();
 						return Poll::Pending;
 					}
 					Err(err) => Err(err),

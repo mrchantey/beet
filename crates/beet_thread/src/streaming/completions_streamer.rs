@@ -2,6 +2,7 @@
 //!
 //! Used by providers that support the completions endpoint but not
 //! the OpenResponses protocol, ie Gemini.
+use crate::o11s::ReasoningEffort;
 use crate::prelude::*;
 use crate::streaming::completions_mapper;
 use async_openai::types::chat::CreateChatCompletionRequest;
@@ -27,6 +28,8 @@ pub struct CompletionsStreamer {
 	stream: bool,
 	/// System instructions to include with each request.
 	instructions: Option<String>,
+	/// Reasoning effort to send with each request, if pinned.
+	effort: Option<ReasoningEffort>,
 }
 
 impl DefaultAction<(), Outcome> for CompletionsStreamer {
@@ -51,6 +54,7 @@ impl CompletionsStreamer {
 			model,
 			stream: true,
 			instructions: None,
+			effort: None,
 		}
 	}
 
@@ -66,6 +70,12 @@ impl CompletionsStreamer {
 		instructions: impl Into<String>,
 	) -> Self {
 		self.instructions = Some(instructions.into());
+		self
+	}
+
+	/// Pin the reasoning effort sent with each request.
+	pub fn with_reasoning_effort(mut self, effort: ReasoningEffort) -> Self {
+		self.effort = Some(effort);
 		self
 	}
 
@@ -158,7 +168,9 @@ impl CompletionsStreamer {
 						// Defaults for the rest
 						modalities: None,
 						verbosity: None,
-						reasoning_effort: None,
+						reasoning_effort: this
+							.effort
+							.map(completions_mapper::reasoning_effort),
 						max_completion_tokens: None,
 						frequency_penalty: None,
 						presence_penalty: None,

@@ -1,20 +1,19 @@
 <!--
 Perceive-act loop, v1. One process: the shared always-socket agent (`agent.bsx`) plus two
 in-process mock clients, a mock head and a mock body, that connect back over the socket.
-Run it with the sockets backend, selecting the socket server:
+Run it with the sockets backend, selecting the socket server (or `just perceive-act-v1`):
 
     cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --root=. --server=socket
 
 The agent's capability routes forward over the socket to whichever client serves them:
 `take-photo`/`speak-text`/`set-emotion` to the head, `apply-heading` to the body. The
 head captures the floor-photo fixtures, speaks via `tts` and logs the emotion; the body
-logs the heading. `{RepeatWhileFunctionCallOutput}` loops while the robot keeps acting,
-then exits.
+logs the heading. The loop runs until Ctrl+C.
 
 Only the body client differs from v2 (which swaps the mock body for a wgpu fox), so the
 agent block is factored into `agent.bsx` and shared verbatim.
 
-Needs `OPENAI_API_KEY` (the agent and the vision describe) and the kokoro `tts` on PATH.
+Needs `OPENAI_API_KEY` (the agent) and the kokoro `tts` on PATH for spoken audio.
 -->
 <Fragment>
 	<Template src="examples/perceive_act/agent.bsx"/>

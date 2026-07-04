@@ -16,6 +16,8 @@ impl GeminiProvider {
 	/// Environment variable for the Gemini API key.
 	pub const AUTH_ENV: &str = "GEMINI_API_KEY";
 
+	/// Gemini 3.1 Flash Lite - smallest and fastest model.
+	pub const GEMINI_3_1_FLASH_LITE: &str = "gemini-3.1-flash-lite";
 	/// Gemini 2.5 Flash - fast and efficient.
 	pub const GEMINI_2_5_FLASH: &str = "gemini-2.5-flash";
 	/// Gemini 2.5 Flash with image generation support.

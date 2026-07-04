@@ -28,8 +28,17 @@ mod echo_socket_server;
 mod socket;
 pub use socket::Message;
 pub use socket::*;
-// the agnostic no_std writer-feed mpsc for `Socket::effect`.
-mod writer_channel;
+/// The agnostic no_std mpsc used by the socket internals (`Socket::effect`'s
+/// writer feed, [`SocketClosedNotify`]); public so consumers can build the
+/// channel ends those components carry.
+pub mod writer_channel;
+// The self-reconnecting client socket. Its backoff sleeps ride the std-gated
+// `time_ext::sleep` (available on wasm too); a bare-metal transport reconnects
+// at its own driver layer instead.
+#[cfg(feature = "std")]
+mod persistent_socket;
+#[cfg(feature = "std")]
+pub use persistent_socket::*;
 // The server backend boots through `HttpServer`'s installable-backend model and
 // its `new_test` binds real TCP: std-only. The no_std client core does not need
 // it, so it rides `std` (the bare-metal device is a client).

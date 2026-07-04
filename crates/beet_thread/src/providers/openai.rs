@@ -14,12 +14,12 @@ impl OpenAiProvider {
 
 	/// Provider slug for OpenAI.
 	pub const PROVIDER_SLUG: &str = "openai";
-	/// GPT-5 Nano - smallest and fastest model.
-	pub const GPT_5_NANO: &str = "gpt-5-nano";
-	/// GPT-5 Mini - balanced speed and capability.
-	pub const GPT_5_MINI: &str = "gpt-5-mini";
-	/// GPT-5.2 - most capable model.
-	pub const GPT_5_2: &str = "gpt-5.2";
+	/// GPT-5.4 Nano - smallest and fastest model.
+	pub const GPT_5_4_NANO: &str = "gpt-5.4-nano";
+	/// GPT-5.4 Mini - balanced speed and capability.
+	pub const GPT_5_4_MINI: &str = "gpt-5.4-mini";
+	/// GPT-5.5 - most capable model.
+	pub const GPT_5_5: &str = "gpt-5.5";
 
 	/// OpenAI Responses API URL.
 	pub const RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
@@ -27,24 +27,24 @@ impl OpenAiProvider {
 	pub const COMPLETIONS_URL: &str =
 		"https://api.openai.com/v1/chat/completions";
 
-	/// Returns an [`O11sStreamer`] configured for GPT-5 Mini
+	/// Returns an [`O11sStreamer`] configured for GPT-5.4 Mini
 	/// via the OpenResponses endpoint.
-	pub fn gpt_5_mini() -> Result<O11sStreamer> {
+	pub fn gpt_5_4_mini() -> Result<O11sStreamer> {
 		O11sStreamer::new(ModelDef {
 			provider_slug: Self::PROVIDER_SLUG.into(),
-			model_slug: Self::GPT_5_MINI.into(),
+			model_slug: Self::GPT_5_4_MINI.into(),
 			url: Self::RESPONSES_URL.into(),
 			auth: EnvVar::new(Self::AUTH_ENV)?.xsome(),
 		})
 		.xok()
 	}
 
-	/// Returns a [`CompletionsStreamer`] configured for GPT-5 Mini
+	/// Returns a [`CompletionsStreamer`] configured for GPT-5.4 Mini
 	/// via the Chat Completions endpoint.
-	pub fn gpt_5_mini_completions() -> Result<CompletionsStreamer> {
+	pub fn gpt_5_4_mini_completions() -> Result<CompletionsStreamer> {
 		CompletionsStreamer::new(ModelDef {
 			provider_slug: Self::PROVIDER_SLUG.into(),
-			model_slug: Self::GPT_5_MINI.into(),
+			model_slug: Self::GPT_5_4_MINI.into(),
 			url: Self::COMPLETIONS_URL.into(),
 			auth: EnvVar::new(Self::AUTH_ENV)?.xsome(),
 		})

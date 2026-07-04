@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub async fn SpeakText(cx: ActionContext<SpeakTextInput>) -> Result<()> {
 	let line = cx.input.text;
-	info!("SpeakText: {line}");
+	info!("speak: \"{line}\"");
 	// speech is best-effort: a missing or failing `tts` must not break the loop.
 	if let Err(err) = speech_ext::speak(&line).await {
 		warn!("could not speak: {err}");

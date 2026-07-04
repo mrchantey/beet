@@ -1,14 +1,14 @@
-//! The perceive-act embodied-agent tools (see `.agents/plans/perceive-act.md`).
+//! The perceive-act embodied-agent tools (see `.agents/plans/percieve-act.md`).
 //!
-//! A floor robot that perceives one photo at a time and acts on what it sees:
-//! [`InterpretPhoto`] (look + describe), [`SpeakText`] (speak in character),
-//! [`ApplyHeading`] (choose a [`Heading`]) and [`SetEmotion`] (set an [`Emotion`]).
-//! [`TakePhoto`] is the raw capture [`InterpretPhoto`] routes to (a head client serves
-//! it). The agent forwards each capability over a socket to the client that serves it,
-//! bound by the [`capability_socket`] handshake; run standalone, the tools' own local
-//! handlers apply.
+//! A floor robot that perceives one photo at a time and acts on what it sees.
+//! Each cycle [`PostPhoto`] (the camera actor) captures via [`TakePhoto`] and
+//! posts the photo into the thread, then the agent's single model call answers
+//! with one [`Act`] tool call, which fans out to [`SetEmotion`], [`SpeakText`]
+//! and [`ApplyHeading`] concurrently. The agent forwards each capability over a
+//! socket to the client that serves it, bound by the [`capability_socket`]
+//! handshake; run standalone, the tools' own local handlers apply.
 // the wire types + socket-client primitives shared with the wasm head; re-exported so
-// `crate::perceive_act::{Emotion, WhoAmI, connect_with_retry, ..}` still resolve here.
+// `crate::perceive_act::{Emotion, WhoAmI, ClientRole, ..}` still resolve here.
 pub use crate::perceive_act_core::*;
 mod perceive_act_plugin;
 pub use perceive_act_plugin::*;
@@ -24,8 +24,10 @@ mod wgpu_body;
 pub use wgpu_body::*;
 mod take_photo;
 pub use take_photo::*;
-mod interpret_photo;
-pub use interpret_photo::*;
+mod post_photo;
+pub use post_photo::*;
+mod act;
+pub use act::*;
 mod speak_text;
 pub use speak_text::*;
 mod heading;

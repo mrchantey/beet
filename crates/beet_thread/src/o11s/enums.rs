@@ -86,6 +86,8 @@ pub enum ImageDetail {
 pub enum ReasoningEffort {
 	/// No reasoning before emitting a final answer.
 	None,
+	/// The fastest effort on models that predate `none` (eg `gpt-5-mini`).
+	Minimal,
 	/// Lower reasoning effort for faster responses.
 	Low,
 	/// Balanced reasoning effort.

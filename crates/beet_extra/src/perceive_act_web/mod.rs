@@ -12,7 +12,7 @@
 //! the `web` base (`Socket`/`ExchangeSocket`/`Router`/`#[action]`) plus the browser
 //! web-sys APIs. The shared wire types + client primitives come from `perceive_act_core`.
 // the wire types (`Emotion`, the tool inputs) + client primitives (`WhoAmI`,
-// `ClientRole`, `connect_with_retry`), mirrored once in `perceive_act_core` and shared
+// `ClientRole`, `PersistentSocket`), mirrored once in `perceive_act_core` and shared
 // with the native agent, so the head does not redefine them.
 pub use crate::perceive_act_core::*;
 mod perceive_act_web_plugin;

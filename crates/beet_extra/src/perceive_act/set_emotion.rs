@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub async fn SetEmotion(cx: ActionContext<SetEmotionInput>) -> Result<()> {
 	let emotion = cx.input.emotion;
-	info!("SetEmotion: {emotion:?}");
+	info!("face: {emotion:?}");
 	cx.caller.insert(emotion).await?;
 	Ok(())
 }

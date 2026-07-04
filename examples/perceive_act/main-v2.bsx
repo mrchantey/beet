@@ -11,7 +11,7 @@ mapping the chosen `Heading` onto the fox's `DifferentialDrive` through the agno
 `SetDrive` leaf (drive a step, then stop), the same command that will drive the v3 robot.
 The head still captures the floor-photo fixtures, speaks via `tts` and logs the emotion.
 
-Needs `OPENAI_API_KEY` (the agent and the vision describe) and the kokoro `tts` on PATH.
+Needs `OPENAI_API_KEY` (the agent) and the kokoro `tts` on PATH for spoken audio.
 -->
 <Fragment>
 	<Template src="examples/perceive_act/agent.bsx"/>

@@ -84,7 +84,7 @@ pub fn WgpuBody(
 	// the socket client: its own root, connecting with a bounded retry and serving
 	// `apply-heading` via `DriveFox`.
 	commands.spawn((
-		connect_with_retry(url),
+		PersistentSocket::new(url),
 		ExchangeSocket::json(),
 		Router,
 		ClientRole(SmolStr::new("body")),

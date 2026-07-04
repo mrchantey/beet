@@ -29,3 +29,25 @@ pub async fn update_until(
 	}
 	cond(app.world_mut())
 }
+
+/// Like [`update_until`], but bounded by wall-clock time rather than a frame
+/// count, sleeping briefly between frames. Use when the awaited condition
+/// depends on real time passing (eg a reconnect backoff or an external
+/// process), where `update_until`'s frame cap would burn out in milliseconds.
+#[cfg(feature = "std")]
+pub async fn update_until_timeout(
+	app: &mut App,
+	mut cond: impl FnMut(&mut World) -> bool,
+	timeout: Duration,
+) -> bool {
+	let started = Instant::now();
+	while started.elapsed() < timeout {
+		if cond(app.world_mut()) {
+			return true;
+		}
+		app.update();
+		AsyncRunner::tick().await;
+		time_ext::sleep_millis(10).await;
+	}
+	cond(app.world_mut())
+}

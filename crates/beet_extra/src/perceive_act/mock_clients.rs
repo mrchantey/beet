@@ -23,7 +23,7 @@ pub fn MockHead(
 	mut commands: Commands,
 ) {
 	commands.spawn((
-		connect_with_retry(url),
+		PersistentSocket::new(url),
 		ExchangeSocket::json(),
 		Router,
 		ClientRole(SmolStr::new("head")),
@@ -48,7 +48,7 @@ pub fn MockBody(
 	mut commands: Commands,
 ) {
 	commands.spawn((
-		connect_with_retry(url),
+		PersistentSocket::new(url),
 		ExchangeSocket::json(),
 		Router,
 		ClientRole(SmolStr::new("body")),

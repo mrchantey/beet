@@ -1,6 +1,7 @@
 //! WebSocket server component, aligned with [`HttpServer`]'s installable-backend
 //! boot model.
 use crate::prelude::*;
+use crate::sockets::PersistentSocket;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::OnceLock;
@@ -52,7 +53,8 @@ pub struct SocketServerPlugin;
 impl Plugin for SocketServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
-			.register_type::<SocketServer>();
+			.register_type::<SocketServer>()
+			.register_type::<PersistentSocket>();
 
 		// install the tungstenite backend; mirrors `ServerPlugin`. Skipped in
 		// beet_net's own tests, which install a stub per case. `set_socket_server`

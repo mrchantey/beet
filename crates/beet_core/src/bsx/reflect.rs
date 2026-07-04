@@ -13,6 +13,7 @@ use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::TypeRegistration;
 use bevy::reflect::TypeRegistry;
+use bevy::reflect::array::DynamicArray;
 use bevy::reflect::enums::DynamicEnum;
 use bevy::reflect::enums::DynamicVariant;
 use bevy::reflect::enums::VariantInfo;
@@ -369,7 +370,8 @@ fn parse_duration_str(string: &str) -> Option<Duration> {
 	Some(Duration::from_secs_f64(secs))
 }
 
-/// Build a [`DynamicList`] from items, recursing per the list's item info.
+/// Build a [`DynamicList`] (or a [`DynamicArray`] for an array-typed field, eg
+/// `host: [u8; 4]`) from items, recursing per the collection's item info.
 fn list_to_reflect(
 	items: &[DataLiteral],
 	field_info: Option<&'static TypeInfo>,
@@ -381,9 +383,18 @@ fn list_to_reflect(
 		Some(TypeInfo::Array(info)) => info.item_info(),
 		_ => None,
 	};
+	let values = items
+		.iter()
+		.map(|item| literal_to_reflect(item, item_info, registry, resolver))
+		.collect::<Result<Vec<_>>>()?;
+	if let Some(info @ TypeInfo::Array(_)) = field_info {
+		let mut array = DynamicArray::new(values.into_boxed_slice());
+		array.set_represented_type(Some(info));
+		return Ok(Box::new(array));
+	}
 	let mut list = DynamicList::default();
-	for item in items {
-		list.push_box(literal_to_reflect(item, item_info, registry, resolver)?);
+	for value in values {
+		list.push_box(value);
 	}
 	list.set_represented_type(field_info);
 	Ok(Box::new(list))
@@ -576,6 +587,41 @@ mod test {
 			.xpect_eq(Speed(60.0));
 		resolve::<Speed>(DataLiteral::Scalar(Value::Int(90)))
 			.xpect_eq(Speed(90.0));
+	}
+
+	/// A `[a, b, ..]` literal fills an array-typed field (eg an `HttpServer`'s
+	/// `host: [u8; 4]` from `{HttpServer{host:[0,0,0,0]}}`), not just a `Vec`.
+	#[beet_core::test]
+	fn coerces_list_to_array_field() {
+		#[derive(Reflect, PartialEq, Debug)]
+		struct Server {
+			host: [u8; 4],
+			ports: Vec<u16>,
+		}
+		resolve::<Server>(DataLiteral::Enum(NamedLiteral {
+			name: "Server".into(),
+			fields: NamedFields::Struct(vec![
+				(
+					"host".into(),
+					DataLiteral::List(vec![
+						DataLiteral::Scalar(Value::Int(0)),
+						DataLiteral::Scalar(Value::Int(0)),
+						DataLiteral::Scalar(Value::Int(0)),
+						DataLiteral::Scalar(Value::Int(0)),
+					]),
+				),
+				(
+					"ports".into(),
+					DataLiteral::List(vec![DataLiteral::Scalar(Value::Int(
+						8337,
+					))]),
+				),
+			]),
+		}))
+		.xpect_eq(Server {
+			host: [0, 0, 0, 0],
+			ports: vec![8337],
+		});
 	}
 
 	/// A generic marker whose registered short path keeps its argument

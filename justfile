@@ -87,6 +87,26 @@ beet-plan *args:
 install-cli *args:
   cargo install --path crates/beet-cli --all-features {{ args }}
 
+#💡 Perceive-act demo
+
+# Clean per-cycle output: the perceive-act stage logs at info, the exchange/socket
+# plumbing quieted to warn. Override with your own RUST_LOG to dig deeper.
+perceive-act-log := "info,beet_net=warn"
+
+# v1: mock head (floor-photo fixtures + tts) and mock body (logs the heading).
+perceive-act-v1 *args:
+	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --root=. --server=socket {{ args }}
+# v2: same mock head, the body is a wgpu fox driving off each heading.
+perceive-act-v2 *args:
+	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features winit,sockets -- --main=examples/perceive_act/main-v2.bsx --root=. --server=socket {{ args }}
+# v3: browser head over http (build the wasm head first: just perceive-act-build-head).
+# The head page + agent socket bind all interfaces so a phone on the LAN can connect.
+perceive-act-v3 *args:
+	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features thread,sockets -- --main=examples/perceive_act/main-v3.bsx --root=. --server=socket,http {{ args }}
+# Build the wasm browser head served by v3.
+perceive-act-build-head *args:
+	cargo run -p beet-cli -- build-wasm --package=beet-cli --bin=beet --features=web_head --out=examples/perceive_act/head/assets/perceive-act-head.wasm {{ args }}
+
 #💡 Aliases
 
 fmt *args:

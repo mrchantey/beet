@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub async fn ApplyHeading(cx: ActionContext<ApplyHeadingInput>) -> Result<()> {
 	let heading = cx.input.heading;
-	info!("driving: {heading:?}");
+	info!("drive: {heading:?}");
 	cx.caller.insert(heading).await?;
 	Ok(())
 }

@@ -20,7 +20,7 @@ async fn main() {
 		.insert_post("make like a duck and quack")
 		.thread_view()
 		.insert_actor(Actor::agent())
-		.with_bundle(OpenAiProvider::gpt_5_mini().unwrap())
+		.with_bundle(OpenAiProvider::gpt_5_4_mini().unwrap())
 		.send_and_collect()
 		.await
 		.unwrap();

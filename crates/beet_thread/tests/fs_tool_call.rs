@@ -43,7 +43,7 @@ fn main() {
 						(Actor::system(), children![Post::spawn(PROMPT)]),
 						(
 							Actor::new("Tester", ActorKind::Agent),
-							OpenAiProvider::gpt_5_mini().unwrap(),
+							OpenAiProvider::gpt_5_4_mini().unwrap(),
 							children![
 								exchange_route("list-blobs", ListBlobs),
 								exchange_route("read-blob", ReadBlob),

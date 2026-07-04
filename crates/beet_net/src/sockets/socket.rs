@@ -1,4 +1,6 @@
 use beet_core::prelude::*;
+use bevy::platform::sync::Arc;
+use bevy::platform::sync::Mutex;
 use bevy::platform::sync::OnceLock;
 use bytes::Bytes;
 use core::pin::Pin;
@@ -53,6 +55,31 @@ impl core::fmt::Debug for Socket {
 #[derive(EntityTargetEvent)]
 pub struct SocketReady;
 
+/// Triggered on a [`Socket`] entity when its connection ends, gracefully or
+/// not: the reader stream finished (peer close) or yielded an error (transport
+/// drop). Fired after the socket's tasks are torn down, so a reconnector (eg
+/// [`PersistentSocket`](super::PersistentSocket)) can insert a fresh [`Socket`]
+/// on the same entity.
+#[derive(EntityTargetEvent)]
+pub struct SocketClosed;
+
+/// The entity-lifetime writer feed: the `MessageSend` observer pushes into the
+/// current connection's writer channel through this swappable sender, so a
+/// replacement [`Socket`] (eg a reconnect) swaps the feed rather than re-wiring
+/// the observer. See [`Socket::effect`].
+#[derive(Component)]
+pub(crate) struct WriterFeed(
+	Arc<Mutex<super::writer_channel::Sender<Message>>>,
+);
+
+/// Signals this entity's connection end into a channel, alongside the
+/// [`SocketClosed`] trigger: insert it (eg a reconnector parking on the
+/// receiver) and the reader task sends `()` when its connection ends. A direct
+/// channel rather than an observer, so a teardown-time signal is never lost to
+/// trigger-dispatch ordering.
+#[derive(Clone, Component)]
+pub struct SocketClosedNotify(pub super::writer_channel::Sender<()>);
+
 /// Global event: an HTTP backend upgraded a connection to a WebSocket and
 /// spawned [`Self::socket`] as an orphan [`Socket`] entity.
 ///
@@ -71,15 +98,38 @@ impl Socket {
 		// bound to the thread they were created on,
 		// so they must only be touched from a `_local` task. The observer runs on
 		// an arbitrary pool thread, so it only pushes `Send` messages into the
-		// channel rather than touching the writer directly. `futures-channel` is
-		// the agnostic no_std + alloc mpsc here (`async-channel` is std-only).
+		// channel rather than touching the writer directly (the channel is
+		// `writer_channel`, the agnostic no_std + alloc mpsc).
 		let (message_send, message_recv) =
 			super::writer_channel::unbounded::<Message>();
+		// The `MessageSend` observer lives as long as the entity and pushes into
+		// the CURRENT connection's channel through the swappable [`WriterFeed`]:
+		// a replacement socket (eg a reconnect) swaps the sender rather than
+		// re-wiring the observer (despawning a triggered observer mid-flush is
+		// unsound in bevy), and the swapped-out sender's drop ends the previous
+		// writer task.
+		match entity.get::<WriterFeed>() {
+			Some(feed) => *feed.0.lock().unwrap() = message_send,
+			None => {
+				let feed = Arc::new(Mutex::new(message_send));
+				let read_feed = feed.clone();
+				let target = entity.id();
+				entity.world_scope(move |world| {
+					world.spawn(
+						Observer::new(move |ev: On<MessageSend>| -> Result {
+							read_feed
+								.lock()
+								.unwrap()
+								.send(ev.event().clone().take());
+							Ok(())
+						})
+						.with_entity(target),
+					);
+				});
+				entity.insert(WriterFeed(feed));
+			}
+		}
 		entity
-			.observe_any(move |ev: On<MessageSend>| -> Result {
-				message_send.send(ev.event().clone().take());
-				Ok(())
-			})
 			// writer task: owns `send` and drains the channel on its creation thread.
 			.run_async_local(async move |_| {
 				while let Some(message) = message_recv.recv().await {
@@ -104,6 +154,20 @@ impl Socket {
 						}
 					}
 				}
+				// the connection is over: give listeners a synthetic close (an
+				// exchange drains its in-flight requests on it), announce the
+				// closure, and signal any [`SocketClosedNotify`] channel (eg
+				// `PersistentSocket`'s redial loop).
+				entity
+					.trigger_target(MessageRecv(Message::Close(None)))
+					.await
+					.ok();
+				entity.trigger_target(SocketClosed).await.ok();
+				entity
+					.get(|notify: &SocketClosedNotify| notify.clone())
+					.await
+					.ok()
+					.map(|notify| notify.0.send(()));
 			})
 			.trigger_target(SocketReady);
 	}
