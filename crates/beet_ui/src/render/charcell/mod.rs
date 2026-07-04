@@ -68,7 +68,9 @@ pub use buffer::*;
 #[cfg(feature = "tui")]
 pub use clipboard::*;
 pub use decorate::*;
-pub use disclosure::*;
+// crate-internal: the aria-controls observer + attribute/id helpers, shared
+// with `widgets::sync_sidebar_breakpoint`
+pub(crate) use disclosure::*;
 pub use double_buffer::*;
 pub use flex_buffer::*;
 #[cfg(feature = "tui")]

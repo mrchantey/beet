@@ -18,7 +18,9 @@
 		const hide = () => sidebar.setAttribute("aria-hidden", "true");
 		const show = () => sidebar.setAttribute("aria-hidden", "false");
 		const isHidden = () => sidebar.getAttribute("aria-hidden") === "true";
-		const narrow = () => globalThis.innerWidth < BREAKPOINT;
+		// at-or-below, inclusive like the `max-width` rule: a strict `<` leaves
+		// one width where the menu button shows over a still-open rail.
+		const narrow = () => globalThis.innerWidth <= BREAKPOINT;
 
 		// seed from the current viewport, then track the breakpoint. Only react
 		// when `narrow()` actually flips: mobile browsers fire `resize` on every

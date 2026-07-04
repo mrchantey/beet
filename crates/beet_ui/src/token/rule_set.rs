@@ -345,16 +345,7 @@ impl RuleSetQuery<'_, '_> {
 	/// its original [`ChildOf`] spawn location — so the cascade (eg the color
 	/// scheme) crosses the transclusion boundary. Otherwise the `ChildOf` parent.
 	fn parent(&self, entity: Entity) -> Option<Entity> {
-		self.render_refs
-			.get(entity)
-			.ok()
-			.and_then(|render_ref_of| render_ref_of.holders().first().copied())
-			.or_else(|| {
-				self.ancestors
-					.get(entity)
-					.map(|child_of| child_of.get())
-					.ok()
-			})
+		Portal::visual_parent(&self.ancestors, &self.render_refs, entity)
 	}
 
 	/// The [`MediaViewport`] of the surface `entity` renders into: the nearest
@@ -461,7 +452,6 @@ impl RuleSetQuery<'_, '_> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use bevy::math::UVec2;
 
 	token!(Foo, u32);
 	token!(Bar, u32);
@@ -556,28 +546,25 @@ mod tests {
 			.with_value(Foo, 1u32)
 	}
 
-	/// Spawn `<div/>` under a surface `width` cells wide, returning the div.
-	fn div_under_viewport(world: &mut World, width: u32) -> Entity {
+	/// Spawn `<div/>` under a surface `width_px` wide, returning the div.
+	fn div_under_viewport(world: &mut World, width_px: f32) -> Entity {
 		let surface = world
-			.spawn((
-				MediaViewport::new(UVec2::new(width, 24)),
-				children![rsx! { <div/> }],
-			))
+			.spawn((MediaViewport::new(width_px), children![rsx! { <div/> }]))
 			.id();
 		world.entity(surface).get::<Children>().unwrap()[0]
 	}
 
-	// a `MaxWidth`-gated rule applies at or below its breakpoint (1024px = 64
-	// cells at 16px per cell), and is skipped above it or when no surface
+	// a `MaxWidth`-gated rule applies at or below its breakpoint (inclusive,
+	// like CSS `max-width`), and is skipped above it or when no surface
 	// viewport exists at all (eg building static HTML, where the browser
 	// evaluates the serialized `@media` instead).
 	#[beet_core::test]
 	fn max_width_cascade() {
 		let mut world = World::new();
 		world.insert_resource(RuleSet::default().with_rule(max_width_rule()));
-		let narrow = div_under_viewport(&mut world, 40);
-		let exact = div_under_viewport(&mut world, 64);
-		let wide = div_under_viewport(&mut world, 100);
+		let narrow = div_under_viewport(&mut world, 640.);
+		let exact = div_under_viewport(&mut world, 1024.);
+		let wide = div_under_viewport(&mut world, 1600.);
 		let unhosted = world.spawn(rsx! { <div/> }).id();
 		selects(&mut world, narrow).xpect_true();
 		selects(&mut world, exact).xpect_true();
@@ -593,7 +580,7 @@ mod tests {
 		world.insert_resource(RuleSet::default().with_rule(max_width_rule()));
 		let content = world.spawn(rsx! { <div/> }).id();
 		world.spawn((
-			MediaViewport::new(UVec2::new(40, 24)),
+			MediaViewport::new(640.),
 			children![Portal::new(content)],
 		));
 		selects(&mut world, content).xpect_true();

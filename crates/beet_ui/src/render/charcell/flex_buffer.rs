@@ -1,4 +1,5 @@
 use super::*;
+use crate::prelude::MediaViewport;
 use beet_core::prelude::*;
 use bevy::math::IRect;
 use bevy::math::UVec2;
@@ -18,7 +19,12 @@ pub const AUTO_GROW_VIEWPORT_HEIGHT: u32 = u16::MAX as u32;
 /// grow lazily as paints land and trailing blank rows are trimmed on render.
 /// OSC-8 hyperlinks ride on the [`Cell`] (see [`Cell::link`]), so the same
 /// [`render_cells_ansi`] emits them here as on the fixed [`Buffer`].
+///
+/// Requires a [`MediaViewport`], kept in lockstep with the buffer width by
+/// [`sync_media_viewport`](super::plugin), so width-gated media rules apply to
+/// one-shot renders exactly as they do to live surfaces.
 #[derive(Component)]
+#[require(MediaViewport)]
 pub struct FlexBuffer {
 	width: u32,
 	cells: Vec<Cell>,

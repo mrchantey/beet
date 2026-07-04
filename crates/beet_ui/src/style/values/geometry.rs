@@ -108,6 +108,9 @@ impl Default for Length {
 	fn default() -> Self { Self::DEFAULT }
 }
 
+/// Pixels per rem, the CSS-standard 16px default font size.
+const REM_PIXELS: f32 = 16.0;
+
 impl Length {
 	pub const DEFAULT: Self = Self::Px(0.0);
 	/// Convert to unit size, mapping [`REM_PIXELS`] (16) pixels to 1 rem

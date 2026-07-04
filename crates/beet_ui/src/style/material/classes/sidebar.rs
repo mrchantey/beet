@@ -8,9 +8,10 @@ use beet_core::prelude::Duration;
 /// Viewport width (px) at or below which the sidebar collapses behind the
 /// [`MENU_BUTTON`] toggle, on both targets: the width-gated rules here are
 /// evaluated by the browser (as serialized `@media`) and by the charcell
-/// cascade (against its surface's `MediaViewport`, at 16px per cell — 64
-/// columns). Also injected into the `sidebar.js` resize handler and read by
-/// its native twin `sync_sidebar_breakpoint`, so every evaluator agrees.
+/// cascade (against its surface's `MediaViewport`, whose cell→px density
+/// `MEDIA_PX_PER_CELL` lands this collapse at 90 columns). Also injected into
+/// the `sidebar.js` resize handler and read by its native twin
+/// `sync_sidebar_breakpoint`, so every evaluator agrees.
 pub const SIDEBAR_BREAKPOINT_PX: u32 = 1024;
 
 // ── Class names ─────────────────────────────────────────────────────────────────

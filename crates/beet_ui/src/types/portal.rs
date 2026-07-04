@@ -32,6 +32,45 @@ impl Portal {
 
 	/// The referenced entity.
 	pub fn target(&self) -> Entity { self.0 }
+
+	/// The Portal-aware parent of `entity`: the first holder rendering it in
+	/// place (transcluded content's visual parent), else the [`ChildOf`]
+	/// parent. The hop the style cascade inherits through; loop it to the top
+	/// with [`Self::render_root`].
+	pub fn visual_parent(
+		parents: &Query<&ChildOf>,
+		holders: &Query<&PortalOf>,
+		entity: Entity,
+	) -> Option<Entity> {
+		holders
+			.get(entity)
+			.ok()
+			.and_then(|portal_of| portal_of.holders().first().copied())
+			.or_else(|| {
+				parents.get(entity).ok().map(|child_of| child_of.parent())
+			})
+	}
+
+	/// The render root of `entity`: the top of the
+	/// [`visual_parent`](Self::visual_parent) chain — on a live surface, the
+	/// buffer host.
+	/// Scopes lookups (eg id resolution) to the tree an entity actually
+	/// renders in, so concurrent surfaces (one per SSH session) never cross
+	/// wires.
+	pub fn render_root(
+		parents: &Query<&ChildOf>,
+		holders: &Query<&PortalOf>,
+		entity: Entity,
+	) -> Entity {
+		let mut current = entity;
+		loop {
+			match Self::visual_parent(parents, holders, current) {
+				// a self-referential edge would loop; a malformed graph is a clean stop.
+				Some(parent) if parent != current => current = parent,
+				_ => return current,
+			}
+		}
+	}
 }
 
 /// The holders that render this entity in place by reference, the target half of

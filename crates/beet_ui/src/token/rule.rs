@@ -1,13 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::math::UVec2;
 use bevy::reflect::Typed;
 use std::sync::Arc;
-
-/// Pixels per rem: the web's CSS-standard 16px default font size, and the
-/// bridge between px-authored breakpoints and the terminal's cell grid (one
-/// cell = 1rem), eg `MaxWidth(1024)` is a 64-column terminal breakpoint.
-pub const REM_PIXELS: f32 = 16.0;
 
 /// A set of declarations applied to elements matching the given selector.
 ///
@@ -52,8 +46,8 @@ pub enum MediaQuery {
 	ReducedMotion,
 	/// `@media (max-width: {0}px)` — applies at or below the given viewport width
 	/// in pixels, the idiom for narrow-screen (mobile) overrides. The charcell
-	/// cascade evaluates it too, against the surface's [`MediaViewport`] at
-	/// [`REM_PIXELS`] per cell, so one responsive rule drives both targets.
+	/// cascade evaluates it too, against the surface's [`MediaViewport`], so
+	/// one responsive rule drives both targets.
 	MaxWidth(u32),
 }
 
@@ -91,26 +85,30 @@ impl MediaQuery {
 }
 
 /// The viewport that width-gated media queries ([`MediaQuery::MaxWidth`])
-/// evaluate against, in rem units (one terminal cell = 1rem).
+/// evaluate against, in px — the unit breakpoints are authored in. Target
+/// agnostic: whichever renderer hosts the tree supplies it, eg the charcell
+/// engine mirrors its buffer width (owning the cell→px density), and a
+/// windowed target would report logical pixels.
 ///
-/// Lives on a render surface (a charcell buffer host, mirrored from the
-/// buffer's cell size by `sync_media_viewport`) and is resolved for an element
-/// by walking the same Portal-aware parent chain inheritance uses. Maintained
-/// with `set_if_neq`, so `Changed<MediaViewport>` is a real resize signal —
-/// paint's per-frame buffer writes never touch it — and `resolve_styles`
-/// re-cascades the surface's tree when it fires. A world with no surface (eg a
-/// server building static HTML) resolves no viewport and skips width-gated
-/// rules, leaving them to the browser.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Component, Reflect)]
+/// A *required* component of every render surface (the charcell buffers
+/// require it), so it is never absent where a surface exists; the [`Default`]
+/// zero width (the narrowest possible) is only ever visible before the
+/// surface's first sync, which runs ahead of the cascade in the same frame.
+/// Maintained with `set_if_neq`, so `Changed<MediaViewport>` is a true resize
+/// signal — paint's per-frame buffer writes never touch it — and
+/// `resolve_styles` re-cascades the surface's tree when it fires. Resolved for
+/// an element by walking the same Portal-aware parent chain inheritance uses;
+/// a world with no surface (eg a server building static HTML) resolves none
+/// and skips width-gated rules, leaving them to the browser.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component)]
-pub struct MediaViewport(UVec2);
+pub struct MediaViewport(f32);
 
 impl MediaViewport {
-	pub fn new(size: UVec2) -> Self { Self(size) }
+	pub fn new(width_px: f32) -> Self { Self(width_px) }
 
-	/// Viewport width in px equivalents ([`REM_PIXELS`] per rem/cell), the
-	/// unit media breakpoints are authored in.
-	pub fn width_px(&self) -> f32 { self.0.x as f32 * REM_PIXELS }
+	/// Viewport width in px, the unit media breakpoints are authored in.
+	pub fn width_px(&self) -> f32 { self.0 }
 }
 
 impl Rule {

@@ -27,7 +27,7 @@ use beet_core::prelude::*;
 /// root, then down across [`Portal`] boundaries), so one surface's toggle never
 /// reaches another session's tree. Keyboard activation rides along for free:
 /// a focused button's Enter/Space synthesizes the same [`PointerUp`].
-pub fn toggle_aria_controls_on_click(
+pub(crate) fn toggle_aria_controls_on_click(
 	ev: On<PointerUp>,
 	parents: Query<&ChildOf>,
 	holders: Query<&PortalOf>,
@@ -49,7 +49,7 @@ pub fn toggle_aria_controls_on_click(
 	) else {
 		return;
 	};
-	let root = render_root(&parents, &holders, control);
+	let root = Portal::render_root(&parents, &holders, control);
 	let Some(target) = find_by_id(
 		&children, &portals, &attributes, &attr_keys, &values, root, &id,
 	) else {
@@ -72,7 +72,7 @@ pub fn toggle_aria_controls_on_click(
 }
 
 /// The attribute entity with `key` on `entity`, if present.
-pub fn attr_entity(
+pub(crate) fn attr_entity(
 	attributes: &Query<&Attributes>,
 	attr_keys: &Query<&Attribute>,
 	entity: Entity,
@@ -88,7 +88,7 @@ pub fn attr_entity(
 }
 
 /// The string value of the `key` attribute on `entity`, if present.
-pub fn attr_string(
+pub(crate) fn attr_string(
 	attributes: &Query<&Attributes>,
 	attr_keys: &Query<&Attribute>,
 	values: &Query<&mut Value>,
@@ -104,7 +104,7 @@ pub fn attr_string(
 /// and dirty the element's [`ElementStateMap`] so the cascade re-resolves its
 /// subtree the same frame (attribute values live on attribute entities, which
 /// the cascade's change filters cannot see).
-pub fn set_attr_str(
+pub(crate) fn set_attr_str(
 	commands: &mut Commands,
 	values: &mut Query<&mut Value>,
 	states: &mut Query<&mut ElementStateMap>,
@@ -135,37 +135,10 @@ pub fn set_attr_str(
 	}
 }
 
-/// The render root of `entity`: the top of the Portal-aware parent chain,
-/// preferring the holder that renders transcluded content in place (as the
-/// cascade does) over the [`ChildOf`] parent — on a live surface, the buffer
-/// host. Scopes id resolution to the tree that was actually clicked, so
-/// concurrent surfaces (one per SSH session) never cross wires.
-pub fn render_root(
-	parents: &Query<&ChildOf>,
-	holders: &Query<&PortalOf>,
-	entity: Entity,
-) -> Entity {
-	let mut current = entity;
-	loop {
-		let next = holders
-			.get(current)
-			.ok()
-			.and_then(|portal_of| portal_of.holders().first().copied())
-			.or_else(|| {
-				parents.get(current).ok().map(|child_of| child_of.parent())
-			});
-		match next {
-			// a self-referential edge would loop; a malformed graph is a clean stop.
-			Some(next) if next != current => current = next,
-			_ => return current,
-		}
-	}
-}
-
 /// The entity under `root` (inclusive) carrying an `id` attribute equal to
 /// `id`, in depth-first order, following [`Portal`] references into transcluded
 /// content so a control can reference a target across a transclusion boundary.
-pub fn find_by_id(
+pub(crate) fn find_by_id(
 	children: &Query<&Children>,
 	portals: &Query<&Portal>,
 	attributes: &Query<&Attributes>,

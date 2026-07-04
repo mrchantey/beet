@@ -109,6 +109,11 @@ pub fn SidebarScript() -> impl Bundle {
 /// terminal cannot scale it up via `font-size`. `三` (U+4E09) is unambiguously
 /// Wide: two cells on every terminal, three clean strokes, the largest
 /// single-line hamburger a char grid can draw.
+///
+/// Classed as a text button like the app bar's other controls — plain
+/// surface foreground at rest, the shared hover affordance — rather than
+/// `btn-icon`, whose resting `on-surface-variant` reads permanently greyed
+/// beside them.
 #[template]
 pub fn MenuButton() -> impl Bundle {
 	rsx! {
@@ -116,7 +121,7 @@ pub fn MenuButton() -> impl Bundle {
 			id="menu-button"
 			aria-controls="sidebar"
 			aria-label="Toggle navigation"
-			{Classes::new([classes::BTN, classes::BTN_ICON, classes::MENU_BUTTON])}>
+			{Classes::new([classes::BTN, classes::BTN_TEXT, classes::MENU_BUTTON])}>
 			<span {Classes::new([classes::TERMINAL_HIDDEN])}>"☰"</span>
 			<span {Classes::new([classes::TERMINAL_ONLY])}>"三"</span>
 		</button>
@@ -135,7 +140,7 @@ pub fn MenuButton() -> impl Bundle {
 /// same-side resizes, and a freshly built page — its rail carrying no
 /// `aria-hidden`, like a fresh DOM on page load — is seeded once; `Added`
 /// elements are the cheap signal a page may have been (re)built.
-pub fn sync_sidebar_breakpoint(
+pub(crate) fn sync_sidebar_breakpoint(
 	mut was_narrow: Local<HashMap<Entity, bool>>,
 	mut commands: Commands,
 	surfaces: Query<(Entity, &MediaViewport), With<DoubleBuffer>>,
@@ -149,9 +154,11 @@ pub fn sync_sidebar_breakpoint(
 ) {
 	let fresh_elements = !added_elements.is_empty();
 	for (surface, viewport) in surfaces.iter() {
-		// strictly-below, exactly like the script's `narrow()`
+		// at-or-below, inclusive like the `max-width` rule (and the script's
+		// `narrow()`): a strict `<` would leave one width where the button
+		// shows over a still-open rail.
 		let narrow =
-			viewport.width_px() < classes::SIDEBAR_BREAKPOINT_PX as f32;
+			viewport.width_px() <= classes::SIDEBAR_BREAKPOINT_PX as f32;
 		let crossed = was_narrow
 			.insert(surface, narrow)
 			.is_none_or(|previous| previous != narrow);
@@ -351,11 +358,11 @@ mod test {
 
 	/// Render `template` to plain charcell with the Material rule set, on a
 	/// surface wide enough that the rail sits above the responsive collapse
-	/// breakpoint (64 cells).
+	/// breakpoint (90 columns).
 	fn render_plain(
 		template: impl bevy::ecs::template::Template<Output = ()>,
 	) -> String {
-		render_plain_sized(80, template)
+		render_plain_sized(100, template)
 	}
 
 	/// [`render_plain`] at an explicit surface width, for tests that exercise
@@ -413,7 +420,7 @@ mod test {
 	}
 
 	/// The menu button is responsive on the terminal exactly like the web:
-	/// hidden above the collapse breakpoint (64 cells), shown below it — and
+	/// hidden above the collapse breakpoint (90 columns), shown below it — and
 	/// with the terminal's wide `三` glyph, never the web's ambiguous-width
 	/// `☰`. Rendered beside a sibling so the wide case distinguishes "hidden"
 	/// from "empty buffer".
@@ -428,7 +435,7 @@ mod test {
 			}
 		};
 		// wide: hidden, only the sibling paints
-		render_plain_sized(80, template())
+		render_plain_sized(100, template())
 			.xpect_contains("Beet")
 			.xnot()
 			.xpect_contains("三");
@@ -499,7 +506,7 @@ mod test {
 		let surface = world
 			.spawn((
 				DoubleBuffer::new(UVec2::new(40, 24)),
-				MediaViewport::new(UVec2::new(40, 24)),
+				MediaViewport::new(640.),
 			))
 			.id();
 		spawn_rail(&mut world, surface);
@@ -507,23 +514,19 @@ mod test {
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 		// crossing up re-seeds shown
-		world
-			.entity_mut(surface)
-			.insert(MediaViewport::new(UVec2::new(100, 24)));
+		world.entity_mut(surface).insert(MediaViewport::new(1600.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("false");
-		// crossing back down re-seeds hidden
-		world
-			.entity_mut(surface)
-			.insert(MediaViewport::new(UVec2::new(40, 24)));
+		// crossing down to *exactly* the breakpoint re-seeds hidden: the seed is
+		// inclusive like the `max-width` rule, so no width shows the menu button
+		// over a still-open rail
+		world.entity_mut(surface).insert(MediaViewport::new(1024.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 		// a manual toggle (the menu button opening the rail) survives a
 		// same-side resize, exactly like the script's `wasNarrow` guard
 		set_nav_hidden(&mut world, "false");
-		world
-			.entity_mut(surface)
-			.insert(MediaViewport::new(UVec2::new(50, 24)));
+		world.entity_mut(surface).insert(MediaViewport::new(800.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("false");
 		// a freshly built rail (a new page, no attribute yet) re-seeds

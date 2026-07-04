@@ -222,29 +222,30 @@ impl Plugin for CharcellPlugin {
 	}
 }
 
-/// Mirror each surface buffer's cell size onto its [`MediaViewport`], the
-/// context width-gated media rules
-/// ([`MediaQuery::MaxWidth`](crate::prelude::MediaQuery::MaxWidth)) resolve
-/// against.
-/// `set_if_neq`, so paint's per-frame buffer writes never dirty the cascade —
-/// only a real resize (or first sight) fires `Changed<MediaViewport>`, which
-/// `resolve_styles` picks up to re-cascade the surface's tree. A
-/// [`FlexBuffer`]'s auto-grow height sentinel is harmless here: media queries
-/// only read the width, which is real for every buffer.
+/// Px a terminal cell is worth to a width-gated media breakpoint
+/// ([`MediaQuery::MaxWidth`](crate::prelude::MediaQuery::MaxWidth)).
+///
+/// A cell is one character, while 16px of proportional web text averages
+/// roughly two, so mapping a cell to a full 16px rem makes the terminal look
+/// twice as spacious to a breakpoint as it reads — narrow layouts would
+/// persist into genuinely cramped column counts (the sidebar's 1024px
+/// collapse landed at 64 columns). Tuned denser so that collapse lands at 90
+/// columns; every px breakpoint shifts consistently.
+const MEDIA_PX_PER_CELL: f32 = 1024.0 / 90.0;
+
+/// Mirror each surface buffer's width onto its required [`MediaViewport`]
+/// ([`MEDIA_PX_PER_CELL`] px per cell), the context width-gated media rules
+/// resolve against. `set_if_neq`, so paint's per-frame buffer writes never
+/// dirty the cascade — only a real resize fires `Changed<MediaViewport>`,
+/// which `resolve_styles` picks up to re-cascade the surface's tree, ahead of
+/// which this is ordered.
 fn sync_media_viewport<B: Component + AsBuffer>(
-	mut commands: Commands,
-	mut buffers: Query<(Entity, &B, Option<&mut MediaViewport>)>,
+	mut buffers: Query<(&B, &mut MediaViewport)>,
 ) {
-	for (entity, buffer, viewport) in buffers.iter_mut() {
-		let size = MediaViewport::new(buffer.size());
-		match viewport {
-			Some(mut current) => {
-				current.set_if_neq(size);
-			}
-			None => {
-				commands.entity(entity).insert(size);
-			}
-		}
+	for (buffer, mut viewport) in buffers.iter_mut() {
+		viewport.set_if_neq(MediaViewport::new(
+			buffer.size().x as f32 * MEDIA_PX_PER_CELL,
+		));
 	}
 }
 

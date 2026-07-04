@@ -632,9 +632,9 @@ mod tests {
 			})
 			.unwrap()
 			.id();
-		// 80 cells: wide enough that the rail stays above the responsive
-		// collapse breakpoint (64 cells, see `sidebar_collapses_below_breakpoint`)
-		let size = UVec2::new(80, 24);
+		// 100 cells: wide enough that the rail stays above the responsive
+		// collapse breakpoint (90 columns, see `sidebar_collapses_below_breakpoint`)
+		let size = UVec2::new(100, 24);
 		world
 			.entity_mut(root)
 			.insert(Buffer::new(size).into_double_buffer());
@@ -648,8 +648,8 @@ mod tests {
 			.unwrap();
 		let rect = |tag: &str| rects[tag];
 		// header and footer span the full viewport width
-		rect("header").width().xpect_eq(80);
-		rect("footer").width().xpect_eq(80);
+		rect("header").width().xpect_eq(100);
+		rect("footer").width().xpect_eq(100);
 		// the footer pins to the bottom row of the 24-row viewport
 		rect("footer").max.y.xpect_eq(24);
 		// the sidebar rail runs the full height of the content row (its divider too)
@@ -707,10 +707,11 @@ mod tests {
 
 	/// The web's narrow-screen sidebar collapse applies in the terminal too:
 	/// the same `MaxWidth`-gated rules hide the rail and reveal the menu button
-	/// at or below the breakpoint (`SIDEBAR_BREAKPOINT_PX` = 64 cells at 16px
-	/// per cell), and a live resize across it re-resolves the cascade both
-	/// ways. End-to-end regression for width-gated media in the charcell
-	/// cascade (previously web-only, so the terminal always kept the rail).
+	/// at or below the breakpoint (`SIDEBAR_BREAKPOINT_PX` = 90 columns via
+	/// `MEDIA_PX_PER_CELL`, boundary inclusive like CSS `max-width`), and a
+	/// live resize across it re-resolves the cascade both ways. End-to-end
+	/// regression for width-gated media in the charcell cascade (previously
+	/// web-only, so the terminal always kept the rail).
 	#[beet_core::test]
 	fn sidebar_collapses_below_breakpoint() {
 		use crate::prelude::*;
@@ -755,7 +756,25 @@ mod tests {
 		world.run_schedule(crate::parse::PostParseTree);
 		display(&mut world, "nav").xpect_not_eq(Display::None);
 		display(&mut world, "button").xpect_eq(Display::None);
-		// resize below the breakpoint: the rail collapses behind the toggle
+		// one column above the breakpoint: still wide
+		world
+			.entity_mut(root)
+			.get_mut::<DoubleBuffer>()
+			.unwrap()
+			.resize(UVec2::new(91, 24));
+		world.run_schedule(crate::parse::PostParseTree);
+		display(&mut world, "nav").xpect_not_eq(Display::None);
+		display(&mut world, "button").xpect_eq(Display::None);
+		// exactly the breakpoint: collapsed (inclusive, like CSS `max-width`)
+		world
+			.entity_mut(root)
+			.get_mut::<DoubleBuffer>()
+			.unwrap()
+			.resize(UVec2::new(90, 24));
+		world.run_schedule(crate::parse::PostParseTree);
+		display(&mut world, "nav").xpect_eq(Display::None);
+		display(&mut world, "button").xpect_eq(Display::Flex);
+		// well below: the rail stays collapsed behind the toggle
 		world
 			.entity_mut(root)
 			.get_mut::<DoubleBuffer>()
