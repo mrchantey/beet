@@ -45,6 +45,13 @@ just perceive-act-v3
 
 Both servers bind all interfaces, so any device on the LAN works: open `http://<this-host>:8337` (or `127.0.0.1` locally) and grant camera access; the head derives the agent's socket url from the page host. The `/debug` route shows the webcam, face, and log on one page. All socket clients reconnect with exponential backoff, so the page survives an agent restart.
 
+Two ports must both be reachable from the phone: `8337` (the head page it loads first) and `8338` (the socket the head connects back to). If a device can't connect while `127.0.0.1` works locally, the host firewall is dropping inbound, not beet, since both servers already bind `0.0.0.0`. With `ufw` active (default-deny inbound), open both, scoped to the LAN subnet and tcp only (least privilege, adjust `192.168.86.0/24` to your subnet):
+
+```sh
+sudo ufw allow from 192.168.86.0/24 to any port 8337 proto tcp
+sudo ufw allow from 192.168.86.0/24 to any port 8338 proto tcp
+```
+
 ### Real device body (optional)
 
 Instead of the fox, an Arduino Alvik can connect as the body and drive off each heading. From the adjacent `../beet_esp`, with the device plugged in (see that repo for toolchain and flashing details):

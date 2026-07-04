@@ -171,7 +171,7 @@ async_ext::do_async_thing().await;
 - `<Tag/>` resolves a component/template by short type path and spawns its own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity. String attributes coerce to the field type (`SmolStr`, `SmolPath`, `Duration` from `"30s"`, an `Option<T>` wrapping the value, an enum unit variant by name), so a reflect component is usually authorable directly without a template.
 - A `<Tag>`'s children land as its direct children (slots are transparent), so a child-reading handler like `{ExchangeSequence}` (a sequenced route) reads them: `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
 
-## Styling
+## Styling Cheatsheet
 
 - Colocate a widget's classes with the widget, not in a central rules file. A widget owns its styling.
 - If a widget has only one class, use `inline_class!` rather than registering a named rule. A plain declaration is a `(prop, value)` pair; to point a prop at a design token use `token(prop, value)`, ie `token(BackgroundColor, colors::InverseSurface)`.
