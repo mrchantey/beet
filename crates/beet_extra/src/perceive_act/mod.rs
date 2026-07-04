@@ -3,10 +3,11 @@
 //! A floor robot that perceives one photo at a time and acts on what it sees.
 //! Each cycle [`PostPhoto`] (the camera actor) captures via [`TakePhoto`] and
 //! posts the photo into the thread, then the agent's single model call answers
-//! with one [`Act`] tool call, which fans out to [`SetEmotion`], [`SpeakText`]
-//! and [`ApplyHeading`] concurrently. The agent forwards each capability over a
-//! socket to the client that serves it, bound by the [`capability_socket`]
-//! handshake; run standalone, the tools' own local handlers apply.
+//! with one [`RespondMultiModal`] tool call, which fans out to [`SetEmotion`],
+//! [`SpeakText`] and [`ApplyHeading`] concurrently. The agent forwards each
+//! capability over a socket to the client that serves it, bound by the
+//! [`capability_socket`] handshake; run standalone, the tools' own local
+//! handlers apply.
 // the wire types + socket-client primitives shared with the wasm head; re-exported so
 // `crate::perceive_act::{Emotion, WhoAmI, ClientRole, ..}` still resolve here.
 pub use crate::perceive_act_core::*;
@@ -26,8 +27,8 @@ mod take_photo;
 pub use take_photo::*;
 mod post_photo;
 pub use post_photo::*;
-mod act;
-pub use act::*;
+mod respond_multi_modal;
+pub use respond_multi_modal::*;
 mod speak_text;
 pub use speak_text::*;
 mod heading;

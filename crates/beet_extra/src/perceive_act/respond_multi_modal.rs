@@ -1,4 +1,4 @@
-//! `Act`: the single tool the perceive-act agent calls each cycle, fanning out
+//! `RespondMultiModal`: the single tool the perceive-act agent calls each cycle, fanning out
 //! to the three capability routes (`set-emotion`, `speak-text`, `apply-heading`)
 //! concurrently and awaiting them all, so one model call per photo is the whole
 //! turn and the next photo waits for the body to finish moving.
@@ -17,11 +17,11 @@ use beet_router::prelude::*;
 /// slowest finishes. Face and speech failures are logged and tolerated (a
 /// missing client must not stop the robot's little life); the heading result
 /// is reported to the model so it knows whether it actually moved.
-#[action(route = "act")]
+#[action(route = "respond-multi-modal")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn Act(cx: ActionContext<ActInput>) -> Result<String> {
-	let ActInput {
+pub async fn RespondMultiModal(cx: ActionContext<RespondMultiModalInput>) -> Result<String> {
+	let RespondMultiModalInput {
 		emotion,
 		say,
 		heading,
@@ -97,7 +97,7 @@ const CAPABILITY_TIMEOUT: Duration = Duration::from_secs(30);
 /// Call a capability route on the agent's router with a JSON body.
 ///
 /// A body that cannot block on its own movement (the esp robot: no async-timer
-/// waker in its handler task) replies with [`ApplyHeadingReply::settle_secs`]
+/// waker in its handler task) replies with [`ApplyHeadingReply::settle`]
 /// instead, and the wait happens here, so the next photo still only follows a
 /// stopped robot.
 async fn call_capability(
@@ -119,8 +119,8 @@ async fn call_capability(
 	.into_result()
 	.await?;
 	if let Ok(reply) = response.json::<ApplyHeadingReply>().await {
-		if reply.settle_secs > 0.0 {
-			time_ext::sleep(Duration::from_secs_f32(reply.settle_secs)).await;
+		if !reply.settle.is_zero() {
+			time_ext::sleep(reply.settle).await;
 		}
 	}
 	Ok(())
@@ -131,14 +131,14 @@ async fn call_capability(
 /// Mirrored by the esp body's `ApplyHeadingReply`.
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 pub struct ApplyHeadingReply {
-	/// Seconds the drive step runs before the robot halts.
-	pub settle_secs: f32,
+	/// How long the drive step runs before the robot halts.
+	pub settle: Duration,
 }
 
 /// Everything the robot does with one photo: the face to wear, the line to say
 /// and the direction to drive, applied simultaneously.
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
-pub struct ActInput {
+pub struct RespondMultiModalInput {
 	/// The expression to show on the face, matching how you feel about what
 	/// you see.
 	pub emotion: Emotion,
@@ -153,10 +153,10 @@ pub struct ActInput {
 mod test {
 	use super::*;
 
-	/// One `act` call fans out to the capability routes concurrently: the local
-	/// handlers record the emotion and heading on their route entities. The
-	/// router deliberately serves no `speak-text`, proving a failed capability
-	/// is tolerated rather than failing the act.
+	/// One `respond-multi-modal` call fans out to the capability routes
+	/// concurrently: the local handlers record the emotion and heading on their
+	/// route entities. The router deliberately serves no `speak-text`, proving a
+	/// failed capability is tolerated rather than failing the response.
 	#[beet_core::test]
 	async fn fans_out_to_capabilities() {
 		let mut app = App::new();
@@ -166,7 +166,7 @@ mod test {
 			app.world_mut().spawn((SetEmotion, ChildOf(agent))).id();
 		let heading_entity =
 			app.world_mut().spawn((ApplyHeading, ChildOf(agent))).id();
-		app.world_mut().spawn((Act, ChildOf(agent)));
+		app.world_mut().spawn((RespondMultiModal, ChildOf(agent)));
 		app.world_mut().flush();
 
 		app.world_mut()
@@ -175,9 +175,9 @@ mod test {
 				agent
 					.call_detached(
 						route_action(),
-						Request::get("act")
+						Request::get("respond-multi-modal")
 							.with_body(
-								serde_json::to_string(&ActInput {
+								serde_json::to_string(&RespondMultiModalInput {
 									emotion: Emotion::Joy,
 									say: "onward!".into(),
 									heading: Heading::Left,

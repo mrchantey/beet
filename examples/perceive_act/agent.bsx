@@ -7,17 +7,19 @@ connects; with no client bound, each route's local handler applies.
 
 One model call per cycle: the `Camera` actor (`{PostPhoto}`) captures via `take-photo`
 and posts the photo straight into the thread, then the `Robot` agent answers with a
-single forced `act` tool call ({ToolChoice::RequiredAny}, `<Act/>` its only tool), which
-fans out to `set-emotion`/`speak-text`/`apply-heading` concurrently and awaits them all,
-so the next photo waits for the body to stop moving. `{PostPhoto}` also prunes the
-window each cycle, keeping the endless loop's request small and fast.
+single forced `respond-multi-modal` tool call ({ToolChoice::RequiredAny},
+`<RespondMultiModal/>` its only tool), which fans out to
+`set-emotion`/`speak-text`/`apply-heading` concurrently and awaits them all, so the
+next photo waits for the body to stop moving. `{PostPhoto}` also prunes the window
+each cycle, keeping the endless loop's request small and fast.
 
 `{Repeat}` loops the thread until the process is killed (Ctrl+C); the boot call parks
 rather than writing `AppExit`. Needs `OPENAI_API_KEY`.
 -->
 <Router {(SocketServer, BootOnLoad, CapabilityServer)}>
 	<!-- capability routes, forwarded per role by the whoami binding; not offered to
-	     the model (outside the actor), the `act` fan-out and the camera call them -->
+	     the model (outside the actor), the `respond-multi-modal` fan-out and the
+	     camera call them -->
 	<TakePhoto/>
 	<SetEmotion/>
 	<SpeakText/>
@@ -30,8 +32,8 @@ You are a small, curious and very emotional floor robot exploring a room.
 You perceive the world one photo at a time and act on what you see.
 
 Each turn you are shown a fresh photo of what is in front of you. Respond by
-calling the act tool exactly once: the emotion you feel, one short spoken line,
-and the direction to drive next.
+calling the respond-multi-modal tool exactly once: the emotion you feel, one
+short spoken line, and the direction to drive next.
 
 Keep spoken lines short and full of personality, and react to what changed
 since the last photo. Never repeat a line you already said. You are not
@@ -43,7 +45,7 @@ feelings swing with what you see.
 			<CreateActor name="Camera" kind="User" {PostPhoto}/>
 			<CreateActor name="Robot" kind="Agent"
 				{(ModelStreamer{provider:OpenAi, effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
-				<Act/>
+				<RespondMultiModal/>
 			</CreateActor>
 		</div>
 	</div>

@@ -1,8 +1,8 @@
 # Perceive-act
 
-A small floor embodied agent living a perceive-act loop: each cycle it is shown a fresh photo and answers with a single `act` tool call, setting its face, saying one line in character and choosing a heading, over and over. The loop runs until you stop it with Ctrl+C.
+A small floor embodied agent living a perceive-act loop: each cycle it is shown a fresh photo and answers with a single `respond-multi-modal` tool call, setting its face, saying one line in character and choosing a heading, over and over. The loop runs until you stop it with Ctrl+C.
 
-One model call per cycle: the `Camera` actor captures via the `take-photo` route and posts the photo straight into the thread, then the `Robot` agent (OpenAI `gpt-5.4-mini`, reasoning off, forced tool choice) answers with one `act` call, which fans out to `set-emotion`/`speak-text`/`apply-heading` concurrently and awaits them all, so the next photo waits for the body to stop moving. A cycle lands around 2 seconds plus speech.
+One model call per cycle: the `Camera` actor captures via the `take-photo` route and posts the photo straight into the thread, then the `Robot` agent (OpenAI `gpt-5.4-mini`, reasoning off, forced tool choice) answers with one `respond-multi-modal` call, which fans out to `set-emotion`/`speak-text`/`apply-heading` concurrently and awaits them all, so the next photo waits for the body to stop moving. A cycle lands around 2 seconds plus speech.
 
 The agent is a socket server (`agent.bsx`, shared by every version); only the head and body clients change between versions. Run every command from the repo root; the `just` recipes bake in a clean log filter (`RUST_LOG=info,beet_net=warn`), so the per-cycle output reads like:
 

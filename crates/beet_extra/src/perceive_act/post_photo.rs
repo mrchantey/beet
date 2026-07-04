@@ -37,7 +37,7 @@ impl Default for PostPhoto {
 }
 
 /// Marks the start of each perceive-act cycle, for the per-stage latency logs:
-/// [`PostPhoto`] stamps it, `Act` reads it to report the model latency.
+/// [`PostPhoto`] stamps it, `RespondMultiModal` reads it to report the model latency.
 #[derive(Debug, Resource)]
 pub struct CycleClock {
 	/// The current cycle, counting from 1.
@@ -88,7 +88,7 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 		})
 		.await??;
 
-	// stamp the cycle clock so `Act` can report the model latency
+	// stamp the cycle clock so `RespondMultiModal` can report the model latency
 	let (cycle, previous_photo_at) = cx
 		.caller
 		.world()

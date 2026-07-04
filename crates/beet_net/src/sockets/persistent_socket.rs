@@ -1,4 +1,5 @@
 //! [`PersistentSocket`]: a client [`Socket`] that keeps itself connected.
+use crate::prelude::Url;
 use crate::sockets::*;
 use beet_core::prelude::*;
 
@@ -17,7 +18,10 @@ use beet_core::prelude::*;
 #[component(on_add = on_add)]
 pub struct PersistentSocket {
 	/// The socket url to keep connected to, eg `ws://192.168.1.7:8338`.
-	pub url: String,
+	/// [`Url`] carries no `Reflect` impl (its params ride a `MultiMap`), so the
+	/// field is reflect-opaque; construct via [`Self::new`].
+	#[reflect(ignore)]
+	pub url: Url,
 	/// The redial policy: how long to wait between failed connection attempts.
 	#[reflect(ignore, default = "PersistentSocket::default_backoff")]
 	pub backoff: Backoff,
@@ -25,7 +29,7 @@ pub struct PersistentSocket {
 
 impl PersistentSocket {
 	/// A persistent socket to `url` with the default redial policy.
-	pub fn new(url: impl Into<String>) -> Self {
+	pub fn new(url: impl Into<Url>) -> Self {
 		Self {
 			url: url.into(),
 			backoff: Self::default_backoff(),
@@ -66,7 +70,7 @@ async fn connection_loop(entity: AsyncEntity) -> Result {
 		// dial until connected, backing off to the ceiling
 		let mut frames = config.backoff.iter();
 		let socket = loop {
-			match Socket::connect(&config.url).await {
+			match Socket::connect(config.url.to_string()).await {
 				Ok(socket) => break socket,
 				Err(err) => {
 					let delay = frames
@@ -133,7 +137,7 @@ mod test {
 		let echoes = Store::<Vec<Message>>::default();
 		let client = app
 			.world_mut()
-			.spawn(PersistentSocket::new(server.url().to_string()))
+			.spawn(PersistentSocket::new(server.url()))
 			.observe_any(move |_ev: On<SocketReady>| {
 				ready_count.push(());
 			})
