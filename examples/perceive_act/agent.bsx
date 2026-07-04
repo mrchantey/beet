@@ -1,33 +1,34 @@
 <!--
 The always-socket perceive-act agent, shared verbatim by every stage (`<Template src>`d
-by main-v1/main-v2). It is a socket server whose capability routes forward over the
+by main-v1/main-v2/main-v3). It is a socket server whose capability routes forward over the
 socket to whichever client serves them (`interpret-photo` stays here on the brain and
 calls `take-photo`; `speak-text`/`set-emotion` go to the head, `apply-heading` to the
 body), bound by the `whoami` handshake as each client connects. Only the *clients* differ
 between stages, so this block never changes: v1 mocks head+body, v2 swaps a wgpu fox for
 the body, v3 serves a wasm head and lets a device body connect.
 
-`{RepeatWhileFunctionCallOutput}` loops the thread while the robot keeps acting, then
-exits. Needs `OPENAI_API_KEY` (the agent + the vision describe).
+`{Repeat}` loops the thread endlessly, so the robot keeps perceiving and acting until the
+process is killed (Ctrl+C); the boot call parks rather than writing `AppExit`. Needs
+`OPENAI_API_KEY` (the agent + the vision describe).
 -->
 <Router {(SocketServer, BootOnLoad, CapabilityServer)}>
 	<!-- routable by interpret-photo, not offered to the model (outside the actor) -->
 	<TakePhoto/>
-	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
+	<div {Repeat} {CreateThread}>
 		<div {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text='
 You are a small, curious and very emotional floor robot exploring a room.
 You perceive the world one photo at a time and act on what you see.
 
-Repeat this cycle about three times to explore the room:
+Explore the room continuously, one cycle after another, and never stop:
 1. Call interpret-photo to look at what is in front of you.
 2. Call set-emotion to match how you feel about what you see.
 3. Call speak-text to say one short line out loud, in character.
 4. Call apply-heading to choose where to go next (Forward, Left or Right).
 
-Always complete all four steps, in order, every cycle. After about three cycles, stop
-calling tools and give one short closing remark to end your exploration.
+Always complete all four steps, in order, every cycle, then begin the next cycle. Never
+give a closing remark or stop calling tools; your little life just goes on.
 
 Keep spoken lines short and full of personality. You are not narrating to a user, you
 are a robot living its little life.
