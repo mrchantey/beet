@@ -22,7 +22,7 @@ impl ArtifactLedger {
 		}
 	}
 	#[cfg(test)]
-	fn default_test() -> Self { Self::new(Uuid::now_v7(), now_timestamp()) }
+	fn default_test() -> Self { Self::new(uuid_ext::now_v7(), now_timestamp()) }
 
 	/// Register an artifact in this ledger.
 	/// Returns an error if an artifact with this label already exists.
@@ -212,7 +212,7 @@ mod tests {
 	use super::*;
 
 	fn test_ledger(artifacts: Vec<(&str, &str, &str)>) -> ArtifactLedger {
-		let mut ledger = ArtifactLedger::new(Uuid::now_v7(), now_timestamp());
+		let mut ledger = ArtifactLedger::new(uuid_ext::now_v7(), now_timestamp());
 		for (name, artifact_key, hash) in artifacts {
 			ledger
 				.push_artifact(name, ArtifactEntry {

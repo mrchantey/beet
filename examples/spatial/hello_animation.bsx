@@ -1,4 +1,12 @@
+<!--
+# Hello Animation - Clip Sequencing
+
+The fox alternates its two glb clips: each `<PlayAnimation>` runs until its `<TriggerOnAnimationEnd>` passes, looped forever by `Repeat`.
+
+    beet --features=winit --main=examples/spatial/hello_animation.bsx
+-->
 <Scene3d>
+	<CrateCheck features="winit"/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:20., offset:{x:10., y:10., z:15.}}}/>
 	<Lighting3d/>

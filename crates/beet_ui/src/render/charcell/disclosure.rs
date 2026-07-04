@@ -12,6 +12,9 @@
 //! `toggle_details_on_click`. Helpers take raw queries rather than
 //! [`ElementQuery`]/`AttributeQuery` so callers can hold `&mut Value` without a
 //! query conflict.
+// the ungated `attr_entity` only needs the beet_core attribute types; the
+// crate prelude (Portal, ElementStateMap, ..) serves the tui-gated observer
+#[cfg(feature = "tui")]
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -27,6 +30,9 @@ use beet_core::prelude::*;
 /// root, then down across [`Portal`] boundaries), so one surface's toggle never
 /// reaches another session's tree. Keyboard activation rides along for free:
 /// a focused button's Enter/Space synthesizes the same [`PointerUp`].
+// registered by `CharcellTuiPlugin`, so gated like it (`attr_entity` below
+// stays ungated: `decorate` reads it in every build).
+#[cfg(feature = "tui")]
 pub(crate) fn toggle_aria_controls_on_click(
 	ev: On<PointerUp>,
 	parents: Query<&ChildOf>,
@@ -88,6 +94,7 @@ pub(crate) fn attr_entity(
 }
 
 /// The string value of the `key` attribute on `entity`, if present.
+#[cfg(feature = "tui")]
 pub(crate) fn attr_string(
 	attributes: &Query<&Attributes>,
 	attr_keys: &Query<&Attribute>,
@@ -104,6 +111,7 @@ pub(crate) fn attr_string(
 /// and dirty the element's [`ElementStateMap`] so the cascade re-resolves its
 /// subtree the same frame (attribute values live on attribute entities, which
 /// the cascade's change filters cannot see).
+#[cfg(feature = "tui")]
 pub(crate) fn set_attr_str(
 	commands: &mut Commands,
 	values: &mut Query<&mut Value>,
@@ -138,6 +146,7 @@ pub(crate) fn set_attr_str(
 /// The entity under `root` (inclusive) carrying an `id` attribute equal to
 /// `id`, in depth-first order, following [`Portal`] references into transcluded
 /// content so a control can reference a target across a transclusion boundary.
+#[cfg(feature = "tui")]
 pub(crate) fn find_by_id(
 	children: &Query<&Children>,
 	portals: &Query<&Portal>,
@@ -164,7 +173,7 @@ pub(crate) fn find_by_id(
 	None
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tui"))]
 mod tests {
 	use super::*;
 

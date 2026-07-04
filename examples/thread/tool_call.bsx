@@ -1,7 +1,7 @@
 <!--
 Tool calling, the whole program in one scene. Run it through the one binary:
 
-    beet --main=examples/thread/tool_call.bsx
+    beet --features=thread --main=examples/thread/tool_call.bsx
 
 A finite dungeon turn whose agent is equipped with the inline `<AgentChoiceAction/>`
 tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
@@ -9,6 +9,7 @@ tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
 renders inline so it stays in the terminal scrollback after exit.
 -->
 <div>
+	<CrateCheck features="thread"/>
 	<div {RepeatTimes{total_times:2}} {CreateThread}>
 		<div bx:ref="thread" {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">

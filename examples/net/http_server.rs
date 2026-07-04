@@ -8,9 +8,9 @@
 //! ## Running the Example
 //!
 //! ```sh
-//! cargo run --example server --features http_server
+//! cargo run --example http_server --features http_server
 //! # or with CliServer
-//! cargo run --example server --features http_server -- --name=billy
+//! cargo run --example http_server --features http_server -- --name=billy
 //! ```
 //!
 //! Then test it with:

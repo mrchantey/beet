@@ -10,7 +10,7 @@
 //! Test with a WebSocket client:
 //! ```sh
 //! # In another terminal, run the echo endpoint test
-//! cargo run --example socket_client --features tungstenite
+//! cargo run --example socket_client --features tungstenite,json
 //! ```
 
 use beet::net::prelude::sockets::Message;

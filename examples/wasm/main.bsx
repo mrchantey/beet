@@ -5,26 +5,23 @@ Serves a page that boots the wasm `beet` binary, which reads its program from a
 `<script type="application/x-bsx" data-src=..>`, fetches and runs it headless, and
 renders its console output via `<RenderConsole>`. Honors `?color-scheme=dark`.
 
-The one-step way (build the wasm + serve):
+Install the wasm binary once (the same single binary every wasm example mounts,
+at `assets/wasm/beet.wasm`), then serve:
 
-    just serve-wasm        # then open http://127.0.0.1:8337
+    beet build-wasm --release
+    beet --main=examples/wasm --watch    # then open http://127.0.0.1:8337
 
-`just serve-wasm` builds with the `web_examples` feature, so any
-`examples/action/*.bsx` runs (eg point `routes/index.bsx`'s `<MainBsx src>` at
-`/examples/action/malenia.bsx`). The plain `web` base covers the
-`Sequence`/`Log`/`RunOnLoad` core; richer programs need their tags compiled in.
+The standard build carries the full browser surface (`web_examples,web_head`), so
+any `examples/action/*.bsx` runs: point `routes/index.bsx`'s `<MainBsx src>` at eg
+`/examples/action/malenia.bsx`. The entry roots at the workspace (`<StoreRoot>`),
+so `<AssetsDir>` serves the examples the browser fetches and `--watch` live-reloads
+the browser on any edit under them.
 
-By hand: build the artifact (writes examples/wasm/assets/min.{wasm,js}), then serve.
-The store roots at the workspace (`--root=.`), so `<AssetsDir>` serves the examples
-the browser fetches and `--watch` live-reloads the browser on any edit under them:
-
-    beet build-wasm --bin=beet --package=beet-cli --features=web_examples --out=examples/wasm/assets/min.wasm
-    beet --main=examples/wasm/main.bsx --root=. --watch
-
-`<RoutesDir>` serves examples/wasm/routes (the page); `<AssetsDir>` mounts the built
-artifacts at `/assets` and the examples tree at `/examples`.
+`<RoutesDir>` serves examples/wasm/routes (the page); `<AssetsDir>` mounts the
+workspace assets (the wasm binary) at /assets and the examples tree at /examples.
 -->
 <Router {(HttpServer, BootOnLoad)}>
+	<StoreRoot src="../.."/>
 	<PackageConfig title="Beet Wasm" description="A headless beet program running in the browser"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:0.8, blue:0.6, alpha:1.0})}/>
 	<!-- the whole document tracks the scheme: surface bg + on-surface text, bound to
@@ -33,8 +30,9 @@ artifacts at `/assets` and the examples tree at `/examples`.
 	<Rule tag="html" background-color="@token:Surface" color="@token:OnSurface"/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="examples/wasm/routes"/>
-	<!-- the wasm/js artifacts at /assets, and the examples tree at /examples so the
-	     browser can fetch any `<MainBsx src="/examples/..">` program over http. -->
-	<AssetsDir src="examples/wasm/assets" prefix="assets"/>
+	<!-- the workspace assets at /assets (the wasm/js binary the page boots), and the
+	     examples tree at /examples so the browser can fetch any
+	     `<MainBsx src="/examples/..">` program over http. -->
+	<AssetsDir src="assets" prefix="assets"/>
 	<AssetsDir src="examples" prefix="examples"/>
 </Router>

@@ -36,6 +36,9 @@ use std::cell::RefCell;
 pub fn build_app() -> App {
 	let mut app = App::new();
 	app.add_plugins(BeetPlugins).add_plugins(WorkersPlugin);
+	// the binary's compiled surface, so a loaded site's `<CrateCheck/>` verifies
+	// against this Worker build like any other entry driver.
+	app.world_mut().spawn(cli_registration());
 	app
 }
 

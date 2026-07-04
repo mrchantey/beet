@@ -5,12 +5,12 @@
 //!
 //! Make sure the server is running first:
 //! ```sh
-//! cargo run --example socket_server --features tungstenite
+//! cargo run --example socket_server --features tungstenite,action
 //! ```
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example socket_client --features tungstenite
+//! cargo run --example socket_client --features tungstenite,json
 //! ```
 //!
 

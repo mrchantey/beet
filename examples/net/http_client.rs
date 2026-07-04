@@ -5,7 +5,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example client --features net,ureq,native-tls
+//! cargo run --example http_client --features net,ureq,native-tls
 //! ```
 
 use beet::prelude::*;

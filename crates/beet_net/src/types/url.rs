@@ -188,6 +188,41 @@ impl Url {
 	/// The authority (host and optional port), if present.
 	pub fn authority(&self) -> Option<&str> { self.authority.as_deref() }
 
+	/// The authority split into host and explicit port. An ipv6 host keeps its
+	/// brackets, ie `[::1]:80` -> `("[::1]", Some(80))`.
+	pub fn host_and_port(&self) -> Option<(&str, Option<u16>)> {
+		let authority = self.authority.as_deref()?;
+		// bracketed ipv6: the port is whatever follows the closing bracket
+		if let Some(end) = authority.find(']') {
+			let (host, rest) = authority.split_at(end + 1);
+			let port = rest.strip_prefix(':').and_then(|port| port.parse().ok());
+			return Some((host, port));
+		}
+		match authority.rsplit_once(':') {
+			Some((host, port)) => match port.parse().ok() {
+				Some(port) => Some((host, Some(port))),
+				None => Some((authority, None)),
+			},
+			None => Some((authority, None)),
+		}
+	}
+
+	/// The host portion of the authority, without the port.
+	pub fn host(&self) -> Option<&str> {
+		self.host_and_port().map(|(host, _)| host)
+	}
+
+	/// The explicit port in the authority, if any.
+	pub fn port(&self) -> Option<u16> {
+		self.host_and_port().and_then(|(_, port)| port)
+	}
+
+	/// The explicit port, or the scheme's well-known default
+	/// (see [`Scheme::default_port`]).
+	pub fn port_or_default(&self) -> Option<u16> {
+		self.port().or_else(|| self.scheme.default_port())
+	}
+
 	/// Whether this URL points to another origin (an absolute URL with a host),
 	/// rather than a relative/same-origin path.
 	///
@@ -496,6 +531,15 @@ impl Scheme {
 
 	/// Whether this is a WebSocket scheme.
 	pub fn is_ws(&self) -> bool { matches!(self, Self::Ws | Self::Wss) }
+
+	/// The scheme's well-known default port, if any.
+	pub fn default_port(&self) -> Option<u16> {
+		match self {
+			Self::Http | Self::Ws => Some(80),
+			Self::Https | Self::Wss => Some(443),
+			_ => None,
+		}
+	}
 
 	/// Whether this scheme uses TLS.
 	pub fn is_secure(&self) -> bool { matches!(self, Self::Https | Self::Wss) }

@@ -294,25 +294,9 @@ mod std_impl {
 mod tests {
 	use super::*;
 
-	/// Install the stub backend: flag the entity, standing in for a real server.
-	///
-	/// [`set_http_server`] is a process-global [`OnceLock`], so the first install
-	/// wins for the whole test binary (notably the single wasm module that runs
-	/// every case in series). Every test therefore installs this same idempotent
-	/// hook: flagging is observable where a start is expected and harmless where
-	/// it is not (a filter miss never invokes the hook).
-	fn stub_backend() {
-		set_http_server(|entity, _shutdown| {
-			Box::pin(async move {
-				entity
-					.with(|mut entity| {
-						entity.insert(ServerStartFlag);
-					})
-					.await
-			})
-		})
-		.ok();
-	}
+	// the shared idempotent stub backend lives at module level
+	// ([`stub_backend`]), so sibling test modules (eg `boot`) install the same
+	// hook and cases stay order-independent.
 
 	/// Fire the boot exchange on the host's `ContinueRun<Boot, Response>` slot
 	/// (fire-and-forget: the call fans out and parks). `HttpServer` provides that
@@ -464,7 +448,27 @@ mod tests {
 /// boot fan-out reached the installed backend.
 #[cfg(test)]
 #[derive(Component)]
-struct ServerStartFlag;
+pub(crate) struct ServerStartFlag;
+
+/// Install the shared test backend: flag the entity, standing in for a real
+/// server. [`set_http_server`] is a process-global [`OnceLock`], so the first
+/// install wins for the whole test binary (notably the single wasm module that
+/// runs every case in series). Every test that boots a server installs this
+/// same idempotent hook so cases stay order-independent: flagging is
+/// observable where a start is expected and harmless where it is not.
+#[cfg(test)]
+pub(crate) fn stub_backend() {
+	set_http_server(|entity, _shutdown| {
+		Box::pin(async move {
+			entity
+				.with(|mut entity| {
+					entity.insert(ServerStartFlag);
+				})
+				.await
+		})
+	})
+	.ok();
+}
 
 // needs `new_test` + `async_io` (server, native) and the ureq client.
 #[cfg(test)]

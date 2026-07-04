@@ -1,4 +1,12 @@
+<!--
+# Scene 3d - Minimal Windowed Scene
+
+The smallest wgpu scene: a window, a distance-framed camera, lighting and a ground plane.
+
+    beet --features=winit --main=examples/spatial/scene_3d.bsx
+-->
 <Scene3d>
+	<CrateCheck features="winit"/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:80., offset:{x:0., y:20., z:40.}}}/>
 	<Lighting3d/>

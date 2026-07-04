@@ -1,13 +1,14 @@
 <!--
 The simplest thread: one agent, one turn, no loop. Run it through the one binary:
 
-    beet --main=examples/thread/oneshot.bsx
+    beet --features=thread --main=examples/thread/oneshot.bsx
 
 `{CreateThread}` calls the `{Sequence}` once (the system seed, then the agent's
 single reply), then exits the process. The transcript renders inline so it stays
 in the terminal scrollback after exit.
 -->
 <div>
+	<CrateCheck features="thread"/>
 	<div bx:ref="thread" {Thread} {Sequence} {CreateThread}>
 		<CreateActor name="System" kind="System">
 			<CreatePost text="make like a duck and quack"/>

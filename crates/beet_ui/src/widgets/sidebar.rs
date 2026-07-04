@@ -140,6 +140,9 @@ pub fn MenuButton() -> impl Bundle {
 /// same-side resizes, and a freshly built page — its rail carrying no
 /// `aria-hidden`, like a fresh DOM on page load — is seeded once; `Added`
 /// elements are the cheap signal a page may have been (re)built.
+// registered by `CharcellTuiPlugin` (and reads the tui-gated disclosure
+// helpers), so gated like it.
+#[cfg(feature = "tui")]
 pub(crate) fn sync_sidebar_breakpoint(
 	mut was_narrow: Local<HashMap<Entity, bool>>,
 	mut commands: Commands,

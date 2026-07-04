@@ -329,9 +329,12 @@ mod test {
 	/// A long-running server parks the boot call: its `Running<Response>` keep-alive
 	/// stays and no `AppExit` is written, so the process persists. The `Running` is
 	/// inserted by the server's `ContinueRun<Boot, Response>` slot before the backend
-	/// runs, so the park holds whether or not a backend is present.
+	/// runs, so the park holds regardless of what the backend does.
 	#[beet_core::test]
 	async fn server_parks_and_stays_up() {
+		// the global backend hook is first-install-wins for the whole test
+		// binary; installing the shared stub keeps this case order-independent
+		crate::server::http_server::stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app

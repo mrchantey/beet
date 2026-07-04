@@ -1,3 +1,4 @@
+use crate::prelude::Url;
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
 use bevy::platform::sync::Mutex;
@@ -172,22 +173,24 @@ impl Socket {
 			.trigger_target(SocketReady);
 	}
 
-	/// Connects to a WebSocket server at the given URL.
+	/// Connects to a WebSocket server at the given [`Url`], eg
+	/// `ws://127.0.0.1:8338` (strings convert via `Url::parse`).
 	///
 	/// Returns a connected [`Socket`] that can be used to send and receive messages.
 	#[allow(unused_variables)]
-	pub async fn connect(url: impl AsRef<str>) -> Result<Socket> {
+	pub async fn connect(url: impl Into<Url>) -> Result<Socket> {
+		let url = url.into();
 		cfg_if! {
 			if #[cfg(target_arch = "wasm32")] {
-				super::impl_web_sys::connect_wasm(url).await
+				super::impl_web_sys::connect_wasm(&url).await
 			} else if #[cfg(feature = "tungstenite")] {
-				super::impl_tungstenite::connect_tungstenite(url).await
+				super::impl_tungstenite::connect_tungstenite(&url).await
 			} else {
 				// no backend compiled in: defer to a transport installed at
 				// runtime via `set_socket_client` (eg the esp WiFi adapter),
 				// mirroring `send_http`'s bare-metal fallthrough.
 				match SOCKET_CLIENT.get() {
-					Some(connect) => connect(url.as_ref()).await,
+					Some(connect) => connect(url).await,
 					None => bevybail!(
 						"No WebSocket transport configured. Enable the tungstenite \
 						 feature, target wasm32, or install one via set_socket_client(...)."
@@ -197,8 +200,8 @@ impl Socket {
 		}
 	}
 	/// Returns an [`OnSpawn`] callback that connects to the URL and inserts the socket.
-	pub fn insert_on_connect(url: impl AsRef<str>) -> OnSpawn {
-		let url = url.as_ref().to_owned();
+	pub fn insert_on_connect(url: impl Into<Url>) -> OnSpawn {
+		let url = url.into();
 		OnSpawn::new_async_local(async move |entity| -> Result {
 			let socket = Socket::connect(url).await?;
 			entity.insert(socket).await?;
@@ -253,9 +256,10 @@ impl Socket {
 /// The no_std-friendly client hook: when no backend is compiled in (`tungstenite`
 /// or wasm/web-sys), [`Socket::connect`] falls through to a function installed
 /// here, letting a bare-metal adapter (an esp WiFi crate, …) plug in its own
-/// transport without living in `beet_net`.
+/// transport without living in `beet_net`. Owns the [`Url`] so the returned
+/// future carries it; `url.host()`/`url.port_or_default()` split the authority.
 pub type SocketConnectFn =
-	fn(url: &str) -> MaybeSendBoxedFuture<'static, Result<Socket>>;
+	fn(url: Url) -> MaybeSendBoxedFuture<'static, Result<Socket>>;
 
 static SOCKET_CLIENT: OnceLock<SocketConnectFn> = OnceLock::new();
 

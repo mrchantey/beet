@@ -4,7 +4,7 @@ in-process mock head as v1, but the mock body is swapped for a real wgpu body: a
 that drives off the model's `apply-heading`. That one client swap is the only change from
 v1. Run it with the windowed render stack plus the sockets backend:
 
-    cargo run -p beet-cli --features winit,sockets -- --main=examples/perceive_act/main-v2.bsx --root=. --server=socket
+    beet --features=thread,sockets,winit --main=examples/perceive_act/main-v2.bsx --server=socket
 
 `<WgpuBody>` opens a window with the fox over a ground plane and serves `apply-heading` by
 mapping the chosen `Heading` onto the fox's `DifferentialDrive` through the agnostic
@@ -14,6 +14,9 @@ The head still captures the floor-photo fixtures, speaks via `tts` and logs the 
 Needs `OPENAI_API_KEY` (the agent) and the kokoro `tts` on PATH for spoken audio.
 -->
 <Fragment>
+	<!-- the agent + fixtures live workspace-relative, so this entry roots there -->
+	<StoreRoot src="../.."/>
+	<CrateCheck features="thread,sockets,winit"/>
 	<Template src="examples/perceive_act/agent.bsx"/>
 	<!-- in-process clients, each its own socket root -->
 	<MockHead url="ws://127.0.0.1:8338"/>

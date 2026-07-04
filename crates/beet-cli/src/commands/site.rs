@@ -11,8 +11,9 @@ use beet::prelude::*;
 
 /// Load the site onto the caller's world through its [`BlobStore`], returning its
 /// root entity. The store comes from the request's `--store` param ([`resolve_store`],
-/// default an `fs` store rooted at `site_dir`), so the same `--store` selector serves
-/// the binary and these commands.
+/// default an `fs` store rooted at `site_dir`, widened by the entry's own
+/// `<StoreRoot src>` declaration like the binary's `--main`), so the same
+/// resolution serves the binary and these commands.
 ///
 /// `check`/`export-static` render the site rather than serve it, so the root carries
 /// [`DisableBootOnLoad`] to keep the entry's `BootOnLoad` verb dormant. The reads go
@@ -30,7 +31,8 @@ pub(crate) async fn build_site(
 		.and_then(|name| name.to_str())
 		.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
 		.to_string();
-	let store = resolve_store(params, site_dir)?;
+	let (store, entry_name, _root) =
+		widen_store_root(params, site_dir, entry_name).await?;
 	let formats = caller
 		.with_world(|world, _| {
 			world.get_resource_or_init::<TemplateFormats>().clone()

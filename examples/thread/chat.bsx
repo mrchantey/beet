@@ -2,7 +2,7 @@
 Interactive terminal chat, the whole program in one scene. Run it through the
 one binary:
 
-    beet --main=examples/thread/chat.bsx
+    beet --features=thread --main=examples/thread/chat.bsx
 
 The behavior is `Repeat[Sequence[agent, user]]`: the agent greets from the system
 prompt, the user's turn (`{UserInput}`) waits for the composer, looped forever.
@@ -11,6 +11,7 @@ UI is a sibling of the behavior tree, bound to it by the `bx:ref="thread"` /
 `$thread` reference, so the view + composer render the same thread the loop drives.
 -->
 <div>
+	<CrateCheck features="thread"/>
 	<div {Repeat} {CreateThread}>
 		<div bx:ref="thread" {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">

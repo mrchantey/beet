@@ -39,10 +39,19 @@ impl Plugin for ServerPlugin {
 		// one is already installed, so ignore a re-install across plugin adds.
 		#[cfg(not(test))]
 		{
+			// the lambda backend serves only inside an actual Lambda task (its
+			// runtime sets AWS_LAMBDA_FUNCTION_NAME); anywhere else a
+			// lambda-featured binary (eg an --all-features install) falls
+			// through to the standard backends below.
+			#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
+			if env_ext::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
+				set_http_server(|entity, shutdown| {
+					Box::pin(super::start_lambda_server(entity, shutdown))
+				})
+				.ok();
+			}
 			cfg_if! {
-				if #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))] {
-					set_http_server(|entity, shutdown| Box::pin(super::start_lambda_server(entity, shutdown))).ok();
-				} else if #[cfg(all(feature = "hyper", not(target_arch = "wasm32")))] {
+				if #[cfg(all(feature = "hyper", not(target_arch = "wasm32")))] {
 					set_http_server(|entity, shutdown| Box::pin(super::start_hyper_server(entity, shutdown))).ok();
 				} else if #[cfg(all(feature = "server", not(target_arch = "wasm32")))] {
 					set_http_server(|entity, shutdown| Box::pin(super::start_mini_http_server(entity, shutdown))).ok();

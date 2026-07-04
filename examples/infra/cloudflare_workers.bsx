@@ -16,11 +16,11 @@ full rebuild + redeploy.
 
 ## Usage
 
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx build
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx deploy
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx sync
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx bench
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx destroy
+    beet --features=infra --main=examples/infra/cloudflare_workers.bsx build
+    beet --features=infra --main=examples/infra/cloudflare_workers.bsx deploy
+    beet --features=infra --main=examples/infra/cloudflare_workers.bsx sync
+    beet --features=infra --main=examples/infra/cloudflare_workers.bsx bench
+    beet --features=infra --main=examples/infra/cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` host (no long-running server); `BootOnLoad` fires the CLI
 request on load and the matching verb runs. Each verb is a child-sequenced
@@ -32,6 +32,7 @@ Live deploy needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `.env`, pl
 neither (a local compile).
 -->
 <Router {(CliServer, RequestLogger, BootOnLoad)}>
+	<CrateCheck features="infra"/>
 	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->
 	<Route path="build" {ExchangeSequence}>
 		<CloudflareWorkerBuildAction/>

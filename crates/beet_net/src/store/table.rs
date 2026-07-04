@@ -4,7 +4,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
-use std::time::SystemTime;
 use uuid::Uuid;
 
 /// Type-safe storage table for serializable objects.
@@ -328,8 +327,9 @@ impl<T> TableContent for T where
 pub struct TableItem<T> {
 	/// A uuid v7 used as the primary key.
 	pub id: Uuid,
-	/// Duration since Unix epoch.
-	pub created: SystemTime,
+	/// Duration since Unix epoch, from the cross-platform [`time_ext::now`]
+	/// (the std `SystemTime` has no wasm clock).
+	pub created: Duration,
 	/// The user-provided data payload.
 	pub data: T,
 }
@@ -338,8 +338,8 @@ impl<T> TableItem<T> {
 	/// Creates a new table item with an auto-generated UUID v7 and current timestamp.
 	pub fn new(data: T) -> Self {
 		Self {
-			id: Uuid::now_v7(),
-			created: SystemTime::now(),
+			id: uuid_ext::now_v7(),
+			created: time_ext::now(),
 			data,
 		}
 	}
@@ -475,7 +475,6 @@ pub mod table_test {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use uuid::Uuid;
 
 	/// A row that fails to deserialize (eg a legacy schema) or has a non-uuid
 	/// path is skipped by the lossy read instead of failing the whole scan.
@@ -490,7 +489,7 @@ mod test {
 		// a legacy-schema row: a valid uuid path with an undecodable body.
 		BlobStoreProvider::insert(
 			&provider,
-			&SmolPath::new(Uuid::now_v7().to_string()),
+			&SmolPath::new(uuid_ext::now_v7().to_string()),
 			r#"{"schema":"legacy"}"#.into(),
 		)
 		.await

@@ -91,21 +91,20 @@ install-cli *args:
 
 # Clean per-cycle output: the perceive-act stage logs at info, the exchange/socket
 # plumbing quieted to warn. Override with your own RUST_LOG to dig deeper.
+# The installed-cli commands live in examples/perceive_act/README.md; these recipes
+# are the local-dev (cargo run) mirrors.
 perceive-act-log := "info,beet_net=warn"
 
 # v1: mock head (floor-photo fixtures + tts) and mock body (logs the heading).
 perceive-act-v1 *args:
-	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --root=. --server=socket {{ args }}
+	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket {{ args }}
 # v2: same mock head, the body is a wgpu fox driving off each heading.
 perceive-act-v2 *args:
-	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features winit,sockets -- --main=examples/perceive_act/main-v2.bsx --root=. --server=socket {{ args }}
-# v3: browser head over http (build the wasm head first: just perceive-act-build-head).
+	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features winit,sockets -- --main=examples/perceive_act/main-v2.bsx --server=socket {{ args }}
+# v3: browser head over http (install the wasm binary first: just beet build-wasm --release).
 # The head page + agent socket bind all interfaces so a phone on the LAN can connect.
 perceive-act-v3 *args:
-	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features thread,sockets -- --main=examples/perceive_act/main-v3.bsx --root=. --server=socket,http {{ args }}
-# Build the wasm browser head served by v3.
-perceive-act-build-head *args:
-	cargo run -p beet-cli -- build-wasm --package=beet-cli --bin=beet --features=web_head --out=examples/perceive_act/head/assets/perceive-act-head.wasm {{ args }}
+	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features thread,sockets -- --main=examples/perceive_act/main-v3.bsx --server=socket,http {{ args }}
 
 #💡 Aliases
 
@@ -159,8 +158,7 @@ ssh-client:
 snap:
 	cargo test -p beet_core 				--lib --all-features -- --snap
 	cargo test -p beet_core_macros 	--lib --all-features -- --snap
-	cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls,flow -- --snap
-	cargo test -p beet_build 				--lib --all-features -- --snap
+	cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls -- --snap
 	cargo test -p beet_router 			--lib --all-features -- --snap
 
 # The libtest path (`custom_test_frameworks`) and the `nightly` feature are
@@ -262,22 +260,15 @@ test-wasm-feat crate *args:
 test-wasm-e2e crate test_name *args:
 	just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
 
-example-chat *args:
-	just watch cargo run --example chat 	--features=native-tls,thread -- {{ args }}
-
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet program (examples/wasm/hello.bsx) in the browser; its
 # console output renders on the page via <RenderConsole>. Needs `just install-cli`.
-# The store roots at the workspace (--root=.) so the served examples are reachable
-# and --watch live-reloads on edit.
+# `beet build-wasm` installs the standard browser binary (assets/wasm/beet.wasm);
+# the entry roots at the workspace (<StoreRoot>) so the served examples are
+# reachable and --watch live-reloads on edit.
 serve-wasm *args:
-	beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples --out=examples/wasm/assets/min.wasm
-	beet --main=examples/wasm/main.bsx --root=. --watch --server=http {{ args }}
-
-# Just (re)build the browser-wasm artifact into examples/wasm/assets/min.{wasm,js}.
-# `web_examples` includes the action example types so any examples/action/*.bsx runs.
-build-wasm-example *args:
-	beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples --out=examples/wasm/assets/min.wasm {{ args }}
+	beet build-wasm --release
+	beet --main=examples/wasm --watch --server=http {{ args }}
 
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer

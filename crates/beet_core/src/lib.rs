@@ -49,6 +49,7 @@ mod bevy_extensions;
 pub mod bevy_utils;
 #[cfg(feature = "bsx")]
 pub mod bsx;
+mod crate_check;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
@@ -144,6 +145,8 @@ pub mod prelude {
 	#[cfg(feature = "bsx")]
 	pub use crate::bsx::*;
 	pub use crate::cfg_if;
+	pub use crate::crate_check::*;
+	pub use crate::crate_registration;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;

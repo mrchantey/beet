@@ -132,18 +132,13 @@ fn build_code_block(
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn strips_leading_doc() {
-		assert_eq!(
-			strip_leading_doc("<!-- docs\n-->\n\n<Foo/>\n"),
-			"<Foo/>\n"
-		);
+		strip_leading_doc("<!-- docs\n-->\n\n<Foo/>\n").xpect_eq("<Foo/>\n");
 		// no leading comment: unchanged
-		assert_eq!(
-			strip_leading_doc("<Foo/>\n<!-- inline -->\n"),
-			"<Foo/>\n<!-- inline -->\n"
-		);
+		strip_leading_doc("<Foo/>\n<!-- inline -->\n")
+			.xpect_eq("<Foo/>\n<!-- inline -->\n");
 		// unterminated comment: unchanged
-		assert_eq!(strip_leading_doc("<!-- docs\n<Foo/>"), "<!-- docs\n<Foo/>");
+		strip_leading_doc("<!-- docs\n<Foo/>").xpect_eq("<!-- docs\n<Foo/>");
 	}
 }

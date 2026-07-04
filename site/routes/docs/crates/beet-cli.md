@@ -8,12 +8,21 @@ title = "beet-cli"
 
 | Command | Description |
 |---|---|
+| `serve` | Serve a no-code site over http/tui/ssh |
 | `run-wasm` | Cargo runner for `wasm32-unknown-unknown` targets |
-| `build-wasm` | Build a wasm module and its bindings |
+| `build-wasm` | Install the browser binary (`assets/wasm/beet.wasm`) |
+| `export-static` | Write a site's static `dist/` |
 | `export-pdf` | Render a route to PDF |
 | `qrcode` | Generate a QR code (`qrcode` feature) |
 
 ```sh
-cargo install beet-cli
+cargo binstall beet-cli    # or cargo install beet-cli --all-features
 beet --help
+```
+
+Running an entry is the zero-command path: `beet` discovers a `main.bsx` by walking the cwd and its ancestors, `--main` names an entry file or a directory holding one, and `--features=a,b` verifies the installed binary was compiled with those cargo features (entries also declare their own requirements with `<CrateCheck>`):
+
+```sh
+beet --main=examples/hello
+beet --features=thread,sockets --main=examples/perceive_act/main-v1.bsx --server=socket
 ```

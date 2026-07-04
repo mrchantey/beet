@@ -20,7 +20,7 @@ beet --server=tui
 beet export-static examples/bsx_site
 ```
 
-Because the site is runtime files, edits to `main.bsx`, the templates, and the routes need no rebuild, just rerun (or re-request, in HTTP mode). Install the CLI with `cargo install --path crates/beet-cli`.
+Because the site is runtime files, edits to `main.bsx`, the templates, and the routes need no rebuild, just rerun (or re-request, in HTTP mode). Install the CLI with `cargo binstall beet-cli`, or from a checkout `cargo install --path crates/beet-cli` (this site needs only default features).
 
 ## Layout
 

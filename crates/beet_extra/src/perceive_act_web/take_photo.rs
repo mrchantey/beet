@@ -85,12 +85,11 @@ const JPEG_QUALITY: f64 = 0.8;
 
 /// Open the default camera, returning its [`MediaStream`]. Mirrors the audio
 /// getUserMedia shape in `beet_thread`'s webrtc connect, but requesting video.
+/// `document_ext::media_devices` fails with remedies on an insecure origin (eg
+/// a phone opening the head page over plain LAN http), where `getUserMedia`
+/// would otherwise throw a cryptic `TypeError`.
 async fn open_camera() -> Result<MediaStream> {
-	let media_devices = web_sys::window()
-		.ok_or_else(|| bevyhow!("no window"))?
-		.navigator()
-		.media_devices()
-		.map_jserr()?;
+	let media_devices = document_ext::media_devices()?;
 	let constraints = MediaStreamConstraints::new();
 	constraints.set_video(&true.into());
 	JsFuture::from(

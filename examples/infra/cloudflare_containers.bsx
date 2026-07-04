@@ -15,15 +15,16 @@ The served content and the deploy/sync/destroy route shape are identical.
 
 ## Usage
 
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_containers.bsx deploy
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_containers.bsx sync
-    cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_containers.bsx destroy
+    beet --features=infra --main=examples/infra/cloudflare_containers.bsx deploy
+    beet --features=infra --main=examples/infra/cloudflare_containers.bsx sync
+    beet --features=infra --main=examples/infra/cloudflare_containers.bsx destroy
 
 Live deploy needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the R2
 data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
 `wrangler` and a container engine. The Workers Paid plan is required for Containers.
 -->
 <Router {(CliServer, RequestLogger, BootOnLoad)}>
+	<CrateCheck features="infra"/>
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site"/>
 		<!-- build the native binary, then the deploy bakes it into the image -->

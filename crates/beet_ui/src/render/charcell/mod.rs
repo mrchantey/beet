@@ -69,7 +69,7 @@ pub use buffer::*;
 pub use clipboard::*;
 pub use decorate::*;
 // crate-internal: the aria-controls observer + attribute/id helpers, shared
-// with `widgets::sync_sidebar_breakpoint`
+// with `widgets::sync_sidebar_breakpoint` and `decorate`
 pub(crate) use disclosure::*;
 pub use double_buffer::*;
 pub use flex_buffer::*;

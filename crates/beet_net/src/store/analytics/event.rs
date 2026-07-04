@@ -189,7 +189,7 @@ impl AnalyticsEvent {
 	/// current server time. [`Self::event_kind`] is taken from `data`.
 	pub fn new(path: impl Into<SmolStr>, data: AnalyticsEventData) -> Self {
 		Self {
-			id: Uuid::now_v7(),
+			id: uuid_ext::now_v7(),
 			timestamp: analytics_ext::now_ms(),
 			event_kind: data.kind(),
 			client_kind: ClientKind::Unknown,
@@ -398,7 +398,7 @@ mod test {
 
 	#[beet_core::test]
 	fn body_session_wins_over_cookie() {
-		let cookie = Uuid::now_v7();
+		let cookie = uuid_ext::now_v7();
 		let event =
 			AnalyticsEvent::from_beacon(page_view_body(), Some(cookie), None, None)
 				.unwrap();
@@ -411,7 +411,7 @@ mod test {
 
 	#[beet_core::test]
 	fn cookie_session_fills_when_body_absent() {
-		let cookie = Uuid::now_v7();
+		let cookie = uuid_ext::now_v7();
 		let body = val!({ "path": "/", "page_view_id": "not-a-uuid" });
 		let event =
 			AnalyticsEvent::from_beacon(body, Some(cookie), None, None).unwrap();

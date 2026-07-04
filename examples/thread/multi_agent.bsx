@@ -2,13 +2,14 @@
 Two agents converse, the whole program in one scene. Run it through the one
 binary:
 
-    beet --main=examples/thread/multi_agent.bsx
+    beet --features=thread --main=examples/thread/multi_agent.bsx
 
 The behavior is `Repeat[Sequence[agent, agent]]`: two differently-instructed
 agents take turns forever, kicked by `{CreateThread}` (runs until Ctrl+C). The
 transcript renders full-screen with no composer (there is no user turn).
 -->
 <div>
+	<CrateCheck features="thread"/>
 	<div {Repeat} {CreateThread}>
 		<div bx:ref="thread" {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">

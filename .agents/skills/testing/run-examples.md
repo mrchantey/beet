@@ -104,16 +104,20 @@ cargo run -p beet_ml   --example hello_rl_basic --features=bevy_default
 
 The `examples,ml` feature only gates windowed scene code (now scene modules in `beet_extra`, not runnable `--example` targets), so there is no self-terminating CLI smoke here. The runtime ML smoke lives in the crate (`hello_ml_basic`, section 6); this feature's compilation is covered by the skip-set check below (and is the only coverage, since `beet_extra` is excluded from the test crates).
 
-### 8. BSX scenes (`just beet --main=<file>.bsx`)
+### 8. BSX scenes (`beet --main=<file>.bsx`)
 
-The no-code `.bsx` scenes run through the beet CLI (`just beet` = `cargo run -p beet-cli -- {{args}}`, default features only). A core scene needs nothing extra, but ml scenes need the `ml` feature (`ml = ["winit", "beet/ml"]`, which registers `NearestSentenceAgent` etc.), so run those via `cargo run` directly. The self-terminating ones render and exit:
+The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead). Every entry documents its own `beet --features=..` command in its header, and entries declare hard requirements with `<CrateCheck>`, so a leaner binary fails fast with the missing list. The self-terminating ones render and exit:
 
 ```sh
-just beet --main=examples/hello/main.bsx                                          # prints "hello world"
-cargo run -p beet-cli --features ml -- --main=examples/ml/hello_ml.bsx            # logs "NearestSentence chose: ..."
+beet --main=examples/hello                                       # prints "hello world"
+beet --main=examples/action/behavior_tree.bsx                    # sequence + log
+beet --features=ml --main=examples/ml/hello_ml.bsx               # logs "NearestSentence chose: ..."
+beet --main=examples/calculator/main.bsx --server=cli add --a=3 --b=4   # result: 7
 ```
 
-Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server). `examples/calculator/main.bsx` currently SIGSEGVs on process teardown under the render+ml backend — flagged for investigation.
+Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --main=examples/bsx_site --server=cli` instead).
+
+Known all-features-binary quirks (each exits 0 on a default/targeted binary): `scripting.bsx` completes then segfaults at process exit; `malenia.bsx` completes the fight but the winit runner keeps the resolved one-shot alive. The former calculator teardown SIGSEGV was fixed by the lazy Burn device init.
 
 ## Not Verifiable Via CLI (skip)
 

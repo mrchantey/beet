@@ -56,6 +56,10 @@ mod status_code;
 pub use http_method::*;
 pub use status_code::*;
 pub mod http_ext;
+/// Cross-platform uuid creation ([`uuid_ext::now_v7`]); `uuid`'s own clock is
+/// std-only. Rides `std`, which activates the `uuid` dep.
+#[cfg(feature = "std")]
+pub mod uuid_ext;
 /// WebSocket (RFC 6455) frame codec and client handshake helpers (no_std), the
 /// socket analogue of [`http_ext`]. Rides the `sockets` feature, which supplies
 /// the [`Message`](crate::sockets::Message) type it maps to and from.

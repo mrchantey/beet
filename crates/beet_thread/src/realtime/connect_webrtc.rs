@@ -1,11 +1,11 @@
 use beet_core::prelude::debug;
+use beet_core::web_utils::document_ext;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::HtmlAudioElement;
 use web_sys::MediaDevices;
 use web_sys::MediaStreamConstraints;
-use web_sys::Navigator;
 use web_sys::RtcPeerConnection;
 use web_sys::RtcSessionDescriptionInit;
 use web_sys::window;
@@ -36,9 +36,10 @@ pub(super) async fn connect_webrtc(
 		ontrack.forget();
 	}
 
-	// Get user media (microphone)
-	let navigator: Navigator = window.navigator();
-	let media_devices: MediaDevices = navigator.media_devices()?;
+	// Get user media (microphone); `document_ext::media_devices` fails with
+	// remedies on an insecure origin instead of a cryptic getUserMedia TypeError
+	let media_devices: MediaDevices = document_ext::media_devices()
+		.map_err(|err| JsValue::from_str(&err.to_string()))?;
 	let constraints = MediaStreamConstraints::new();
 	constraints.set_audio(&JsValue::TRUE);
 	let ms_promise =

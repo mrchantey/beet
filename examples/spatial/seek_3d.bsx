@@ -1,4 +1,12 @@
+<!--
+# Seek 3d - Steering + Animation
+
+The fox chases a cursor-following cheese: its action tree plays the idle clip, then walks (`Seek`) with the walk clip until `EndOnArrive` passes, looping via `Repeat`.
+
+    beet --features=winit --main=examples/spatial/seek_3d.bsx
+-->
 <Scene3d>
+	<CrateCheck features="winit"/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:80., offset:{x:0., y:20., z:40.}}}/>
 	<Lighting3d/>

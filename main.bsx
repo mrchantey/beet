@@ -16,10 +16,11 @@ this entry's. The one exception to exiting is `<Serve/>`, which loads a site and
 boots *its* servers through a direct boot call on the loaded root, parking so the
 process serves.
 
-    cargo install --path crates/beet-cli   # then, from anywhere in the repo:
+    cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
     beet check examples/bsx_site           # lint a no-code site
     beet export-static examples/bsx_site   # write its dist/
+    beet build-wasm --release              # install the browser binary (assets/wasm/beet.wasm)
 
 The two sites in this repo both serve through `<Serve/>` (`<site>` is a directory
 holding an entry document, or the entry file itself):

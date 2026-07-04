@@ -125,7 +125,7 @@ ureq = ["std", "http", "dep:ureq", "dep:blocking"]
 # the same-port upgrade seam (`WebSocketUpgrade`, the `mini_http_server` hand-off)
 # is a server concern, so `tungstenite` pulls `server`; the side-port `SocketServer`
 # and the `Socket` client ride the same feature.
-tungstenite = ["std", "server", "dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url", "dep:sha1", "dep:base64"]
+tungstenite = ["std", "server", "dep:async-tungstenite","dep:async-io","dep:blocking", "dep:sha1", "dep:base64"]
 webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
 native-tls = [
 	"reqwest?/default",
@@ -204,7 +204,6 @@ postcard = { workspace = true, optional = true }
 # http
 http = { workspace = true, optional = true }
 eventsource-stream = { version = "0.2.3", optional = true }
-url = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true, optional = true }

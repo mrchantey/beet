@@ -70,7 +70,7 @@ async fn connection_loop(entity: AsyncEntity) -> Result {
 		// dial until connected, backing off to the ceiling
 		let mut frames = config.backoff.iter();
 		let socket = loop {
-			match Socket::connect(config.url.to_string()).await {
+			match Socket::connect(&config.url).await {
 				Ok(socket) => break socket,
 				Err(err) => {
 					let delay = frames

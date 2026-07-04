@@ -121,9 +121,30 @@ let outcome = AsyncPlugin::world()
 | 0.14   | 0.0.2   |
 | 0.12   | 0.0.1   |
 
+## Installation
+
+Install the `beet` cli with [cargo binstall](https://github.com/cargo-bins/cargo-binstall) (or plain `cargo install`), with `--all-features` for the full spectrum of examples:
+
+```sh
+cargo binstall beet-cli --all-features
+# or from a checkout, building every capability in
+cargo install --path crates/beet-cli --all-features
+```
+
+Every example documents itself with a `beet` command, eg:
+
+```sh
+beet --main=examples/hello
+beet --features=thread,sockets --main=examples/perceive_act/main-v1.bsx --server=socket
+```
+
+`--features` verifies the installed binary was compiled with those cargo features, and entries declare their own requirements with `<CrateCheck>`, so a leaner install fails fast with the full missing list instead of unresolved tags.
+
 ## Local Development
 
 ### Running
+
+When editing beet itself, run the cli from source: `cargo run -p beet-cli --features=feat1,feat2 -- <args>`.
 
 Note that testing all involves compiling *many* crates, doing so from scratch usually results in a stack overflow in the rust compiler.
 To prevent this either run with RUST_MIN_STACK='some_gigantic_number', or just keep re-running the command until its all compiled.

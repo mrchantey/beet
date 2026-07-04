@@ -38,8 +38,9 @@ impl Plugin for BeetExtraPlugin {
 		));
 		// the wasm browser head (v3): the `<WebHead>` socket client + its webcam /
 		// speech / face handlers, so a head program `.bsx` served to a browser tab
-		// resolves. Wasm-safe (the `web` base, no `thread`), so its own feature.
-		#[cfg(feature = "perceive_act_web")]
+		// resolves. Wasm-only (web_sys), inert when the feature rides a native
+		// `--all-features` build.
+		#[cfg(all(feature = "perceive_act_web", target_arch = "wasm32"))]
 		app.add_plugins(crate::prelude::PerceiveActWebPlugin);
 		// the cloudflare/aws deploy example types + templates, so an
 		// `examples/infra/*.bsx` deployer runs through the one binary (headless).

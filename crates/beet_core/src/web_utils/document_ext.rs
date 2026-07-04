@@ -62,6 +62,30 @@ fn window() -> Window { web_sys::window().unwrap() }
 /// Return the current document.
 pub fn document() -> Document { window().document().unwrap() }
 
+/// The page's [`MediaDevices`](web_sys::MediaDevices), erroring with remedies
+/// when unavailable.
+///
+/// Browsers expose `navigator.mediaDevices` only in a secure context: https,
+/// `localhost` or `127.0.0.1`. A page served over plain http on a LAN address
+/// (eg a phone opening `http://192.168.x.x:8337`) gets `undefined`, which
+/// otherwise surfaces as a cryptic `TypeError` deep inside `getUserMedia`.
+pub fn media_devices() -> Result<web_sys::MediaDevices> {
+	let window = window();
+	let devices = window.navigator().media_devices().map_jserr()?;
+	if !window.is_secure_context() || devices.is_undefined() {
+		bevybail!(
+			"navigator.mediaDevices is unavailable: camera/microphone access \
+			requires a secure context (https, localhost or 127.0.0.1) and this \
+			page's origin is insecure. Remedies: open the page on the serving \
+			machine via localhost; on android forward the ports over usb \
+			(`adb reverse tcp:<port> tcp:<port>` per port) and open the \
+			localhost url; or allowlist the origin in \
+			chrome://flags/#unsafely-treat-insecure-origin-as-secure"
+		);
+	}
+	Ok(devices)
+}
+
 /// Return the `<head>` element of the current document.
 pub fn head() -> HtmlHeadElement { document().head().unwrap() }
 

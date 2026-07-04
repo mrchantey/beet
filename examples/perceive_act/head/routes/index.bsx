@@ -22,5 +22,5 @@ reads it; it is kept live but visually hidden (a 2px transparent element, not
 	<img id="face" src="/assets/extra/robot-eyes/calm.png" alt="the robot's face"/>
 	<video id="webcam" autoplay muted playsinline/>
 	<MainBsx src="/examples/perceive_act/head/head.bsx"/>
-	<Wasm src="/wasm/perceive-act-head.wasm"/>
+	<Wasm src="/assets/wasm/beet.wasm"/>
 </HtmlDocument>

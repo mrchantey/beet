@@ -19,6 +19,94 @@ use beet::prelude::*;
 /// agree on what an entry document is named.
 pub const ENTRY_NAMES: &[&str] = &["main.bsx", "main.json", "main.ron"];
 
+/// The binary's own [`CrateRegistration`]: every feature `beet-cli` can be
+/// compiled with, each recorded if enabled, so an entry's `<CrateCheck/>` and
+/// the `--features` flag verify against the running binary. Spawned by every
+/// entry driver (the native binary, the wasm binary, the Worker).
+pub fn cli_registration() -> CrateRegistration {
+	crate_registration!({
+		features: [
+			"aws_sdk",
+			"cloudflare",
+			"geoip",
+			"infra",
+			"lambda",
+			"ml",
+			"net",
+			"pdf",
+			"qrcode",
+			"sockets",
+			"ssh",
+			"thread",
+			"tui",
+			"web",
+			"web_examples",
+			"web_head",
+			"winit",
+		]
+	})
+	.with_skip_prefix()
+}
+
+/// The entry's declared `<StoreRoot src>`, if any: a registry-free pre-scan of
+/// the raw entry document, run before the store builds so the declaration can
+/// widen the store root (markup only; a serde entry declares none).
+pub async fn read_store_root(
+	store: &BlobStore,
+	entry_name: &str,
+) -> Result<Option<String>> {
+	let entry = store.get_media(&SmolPath::from(entry_name)).await?;
+	match entry.media_type() {
+		MediaType::Bsx | MediaType::Html => {
+			parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?
+				.xmap(|nodes| StoreRoot::extract_root(&nodes))
+				.xok()
+		}
+		_ => Ok(None),
+	}
+}
+
+/// Build the entry's store, honouring its own `<StoreRoot src>` declaration:
+/// the root widens to `dir/src` (cleaned) and the entry name becomes the entry
+/// path relative to it. Without a declaration the store roots at the entry's
+/// own directory. Returns `(store, entry_name, root_dir)`; every local entry
+/// load (the binary, `serve`/`check`/`export-static`) resolves through this so
+/// an entry's declared root applies everywhere.
+pub async fn widen_store_root(
+	params: &MultiMap<SmolStr, SmolStr>,
+	dir: AbsPathBuf,
+	entry_name: String,
+) -> Result<(BlobStore, String, AbsPathBuf)> {
+	let store = resolve_store(params, dir.clone())?;
+	let Some(src) = read_store_root(&store, &entry_name).await? else {
+		return Ok((store, entry_name, dir));
+	};
+	let root = dir.join(&src);
+	let entry_name = dir
+		.join(&entry_name)
+		.strip_prefix(&root)
+		.ok()
+		.and_then(|rel| rel.to_str())
+		.map(str::to_string)
+		.ok_or_else(|| {
+			bevyhow!(
+				"entry `{dir}/{entry_name}` is not under its declared \
+				`<StoreRoot src=\"{src}\"/>` (`{root}`)"
+			)
+		})?;
+	Ok((resolve_store(params, root.clone())?, entry_name, root))
+}
+
+/// The first [`ENTRY_NAMES`] match at the store's root, if any.
+pub async fn probe_entry_names(store: &BlobStore) -> Result<Option<String>> {
+	for name in ENTRY_NAMES {
+		if store.exists(&SmolPath::from(*name)).await? {
+			return Ok(Some(name.to_string()));
+		}
+	}
+	Ok(None)
+}
+
 /// Build the [`BlobStore`] selected by the `--store` param, rooted at `dir`. Shared
 /// by the binary's entry resolution and the `check`/`serve`/`export-static` commands
 /// so every entry/site load is store-driven rather than filesystem-bound.
@@ -111,6 +199,18 @@ pub fn build_entry_root(
 		template_sources,
 		formats,
 	} = sources;
+	// registry-free pre-scan: spawn the entry's `<CrateCheck>`s before the tree
+	// builds, so a check fires with its missing-feature list even when the tree
+	// itself cannot build (eg its root tag is feature-gated out of this binary).
+	if matches!(entry.media_type(), MediaType::Bsx | MediaType::Html)
+		&& let Ok(text) = entry.as_utf8()
+		&& let Ok(nodes) = parse_document(text, &BsxParseConfig::bsx())
+	{
+		for check in CrateCheck::extract_checks(&nodes) {
+			world.spawn(check);
+		}
+		world.flush();
+	}
 	// the entry's own template dirs, registered before the entry parses so its
 	// entry-level tags (eg `<Styles/>`) resolve. The reactive `<TemplateDir>` observer
 	// re-registers them (plus any crate/route dirs) once the tree is built.

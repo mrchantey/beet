@@ -11,15 +11,16 @@ watch shape and the served content are identical (see `crates/beet_extra/src/inf
 
 ## Usage
 
-    cargo run -p beet-cli --features infra -- --main=examples/infra/lightsail.bsx validate
-    cargo run -p beet-cli --features infra -- --main=examples/infra/lightsail.bsx deploy
-    cargo run -p beet-cli --features infra -- --main=examples/infra/lightsail.bsx sync
-    cargo run -p beet-cli --features infra -- --main=examples/infra/lightsail.bsx watch
-    cargo run -p beet-cli --features infra -- --main=examples/infra/lightsail.bsx destroy --force
+    beet --features=infra --main=examples/infra/lightsail.bsx validate
+    beet --features=infra --main=examples/infra/lightsail.bsx deploy
+    beet --features=infra --main=examples/infra/lightsail.bsx sync
+    beet --features=infra --main=examples/infra/lightsail.bsx watch
+    beet --features=infra --main=examples/infra/lightsail.bsx destroy --force
 
 Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
 -->
 <StackHost app_name="lightsail">
+	<CrateCheck features="infra"/>
 	<Route path="deploy" {ExchangeSequence}>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailSiteBlock app_name="lightsail" features="aws_sdk"/>

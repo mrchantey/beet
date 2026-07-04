@@ -2,13 +2,20 @@
 //! let the loaded tree run itself, and exit unless something kept it alive.
 //!
 //! beet is unopinionated like a game engine: it links a library of capabilities
-//! (registered reflect types) but ships zero behaviour. It discovers `main.bsx`
-//! (or `main.json`/`main.ron`) by walking the cwd and its ancestors, consumes
-//! only its own `--main` flag, and builds the entry on the async runtime through
-//! its [`BlobStore`] (so every store read is awaited, never blocked), then lets the
-//! `BootOnLoad` verb fan the process request out on the build's `LoadTemplate`. A
-//! one-shot streams its response and exits; a long-running server parks its boot
-//! call to persist the process.
+//! (registered reflect types) but ships zero behaviour. The entry resolves from
+//! `--main`, which names the entry file itself (`--main=examples/hello/main.bsx`,
+//! any recognized extension) or a directory probed for [`ENTRY_NAMES`]
+//! (`--main=examples/hello`); with no `--main` discovery walks the cwd and its
+//! ancestors for the first match, so a bare `beet` is `--main=.` plus the walk.
+//! The entry may widen its own store root with a `<StoreRoot src="../.."/>`
+//! declaration (see [`StoreRoot`]), so callers never re-supply it. The entry
+//! builds on the async runtime through its [`BlobStore`] (so every store read is
+//! awaited, never blocked), then the `BootOnLoad` verb fans the process request
+//! out on the build's `LoadTemplate`. A one-shot streams its response and exits;
+//! a long-running server parks its boot call to persist the process.
+//!
+//! `--features=a,b` verifies the running binary was compiled with those cargo
+//! features (see [`CrateCheck`]), failing fast with the full missing list.
 //!
 //! The entry load is target-agnostic (the shared `site_build` core reads any
 //! [`BlobStore`]); only entry *resolution* differs by target. Native walks the
@@ -88,6 +95,12 @@ fn main() -> AppExit {
 fn load_entry(world: &mut World) {
 	// the binary consumes only its own args here; the loaded tree re-parses argv.
 	let args = CliArgs::parse_env();
+	// the binary's compiled surface: `--features` and any loaded `<CrateCheck/>`
+	// verify against it.
+	world.spawn(cli_registration());
+	if let Some(check) = features_self_check(&args) {
+		world.spawn(check);
+	}
 	// the recognized template formats (`.bsx`, `.js`), read once here so the async
 	// build can both filter the `templates/` read and lower each source by format.
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
@@ -210,13 +223,14 @@ async fn build_entry(
 /// 1. `BEET_SERVICE_ACCESS=remote` (a deployed task): load from a remote store. The
 ///    remote-access concept is general, but only a compiled-in backend can serve it
 ///    (`aws_sdk` → S3/R2); without one this errors rather than falling through.
-/// 2. `--main=<path>`: the entry dir is the path's parent, the name its file name,
-///    and the store is the `--store` kind rooted at that dir.
+/// 2. `--main=<path>`: the entry file itself (a recognized extension) or a
+///    directory probed for [`ENTRY_NAMES`]; see [`resolve_main`].
 /// 3. otherwise: discovery walks the cwd and its ancestors through an `fs` store for
 ///    the first [`ENTRY_NAMES`] match.
 ///
-/// The `--store` arg selects the backend (default `fs`); see [`resolve_store`] for
-/// the supported kinds.
+/// A local entry may widen its own store root with a `<StoreRoot src>` declaration
+/// (a remote store is already rooted at the site). The `--store` arg selects the
+/// backend (default `fs`); see [`resolve_store`] for the supported kinds.
 #[cfg(not(target_arch = "wasm32"))]
 async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 	resolve_entry_native(args).await
@@ -224,71 +238,88 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 
 /// Resolve the entry on wasm: there is no filesystem ancestor walk and no remote
 /// backend, so `--main` is required and `--store` (default `fs`) picks the backend.
-/// The entry dir is the path's parent and the store is rooted there; descendants
-/// resolve it by ancestry just as on native. The `fs` store reads through the deno
-/// runner's fs globals (see [`resolve_store`]), so the same on-disk entry loads.
+/// The same file-or-directory resolution as native ([`resolve_main`]); the `fs`
+/// store reads through the deno runner's fs globals (see [`resolve_store`]), so
+/// the same on-disk entry loads.
 #[cfg(target_arch = "wasm32")]
 async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
-	let entry = args
-		.params
-		.get("main")
-		.map(|path| AbsPathBuf::new(path.as_str()))
-		.ok_or_else(|| {
+	let main = args.params.get("main").ok_or_else(|| {
+		bevyhow!(
+			"the wasm `beet` binary requires an explicit `--main=<path>` (there is \
+			no filesystem entry discovery on wasm)"
+		)
+	})?;
+	resolve_main(&args.params, main).await
+}
+
+/// Resolve an explicit `--main`: a path with an extension names the entry file
+/// itself, anything else is a directory probed for the first [`ENTRY_NAMES`]
+/// match. Either way the entry may widen its own store root with a
+/// `<StoreRoot src>` declaration (see [`widen_store_root`]).
+async fn resolve_main(
+	params: &MultiMap<SmolStr, SmolStr>,
+	main: &SmolStr,
+) -> Result<ResolvedEntry> {
+	let path = AbsPathBuf::new(main.as_str())?;
+	let (dir, entry_name) = if path.extension().is_some() {
+		// an entry file: its parent is the initial root
+		let dir = path.parent().ok_or_else(|| {
+			bevyhow!("entry `{path}` has no parent directory")
+		})?;
+		let entry_name = path
+			.file_name()
+			.and_then(|name| name.to_str())
+			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
+			.to_string();
+		(dir, entry_name)
+	} else {
+		// a directory: probe it for an entry document
+		let store = resolve_store(params, path.clone())?;
+		let entry_name = probe_entry_names(&store).await?.ok_or_else(|| {
 			bevyhow!(
-				"the wasm `beet` binary requires an explicit `--main=<path>` (there is \
-				no filesystem entry discovery on wasm)"
+				"no entry document found in `{path}`: looked for {ENTRY_NAMES:?}. \
+				Create one, or point `--main` at the entry file itself."
 			)
-		})??;
-	let (dir, entry_name) = entry_root_and_name(&args.params, &entry)?;
+		})?;
+		(path, entry_name)
+	};
+	resolve_widened(params, dir, entry_name).await
+}
+
+/// [`widen_store_root`] into a [`ResolvedEntry`], live reload watching the
+/// resolved root.
+async fn resolve_widened(
+	params: &MultiMap<SmolStr, SmolStr>,
+	dir: AbsPathBuf,
+	entry_name: String,
+) -> Result<ResolvedEntry> {
+	let (store, entry_name, _root) =
+		widen_store_root(params, dir, entry_name).await?;
 	Ok(ResolvedEntry {
-		store: resolve_store(&args.params, dir)?,
+		store,
 		entry_name,
+		#[cfg(not(target_arch = "wasm32"))]
+		watch_dir: Some(_root),
 	})
 }
 
-/// Resolve the (store root dir, entry name within it) for an explicit `--main`.
-///
-/// By default the store roots at the entry's **own directory**, with the entry's file
-/// name as the name, so an entry's `<TemplateDir src>` / `<RoutesDir src>` resolve
-/// relative to it (matching discovery, which roots the store at the dir holding the
-/// entry). `--root=<dir>` overrides that to a wider root the entry must live under, so
-/// an entry can reach sibling/ancestor paths (eg the wasm page at
-/// `examples/wasm/main.bsx`, run with `--root=.`, serving the workspace `examples/`
-/// tree). Either way live reload watches the resolved root.
-fn entry_root_and_name(
-	params: &MultiMap<SmolStr, SmolStr>,
-	entry: &AbsPathBuf,
-) -> Result<(AbsPathBuf, String)> {
-	match params.get("root") {
-		// explicit `--root`: a wider root the entry must live under, so its `src`
-		// paths resolve workspace-relative.
-		Some(root) => {
-			let root = AbsPathBuf::new(root.as_str())?;
-			let entry_name = entry_name_under(entry, &root).ok_or_else(|| {
-				bevyhow!("--main `{entry}` is not under --root `{root}`")
-			})?;
-			Ok((root, entry_name))
-		}
-		// default: the entry's own directory, so its `src` paths resolve relative to
-		// the entry (matching discovery).
-		None => {
-			let dir = entry.parent().ok_or_else(|| {
-				bevyhow!("entry `{entry}` has no parent directory")
-			})?;
-			let entry_name = entry
-				.file_name()
-				.and_then(|name| name.to_str())
-				.ok_or_else(|| bevyhow!("entry `{entry}` has no file name"))?
-				.to_string();
-			Ok((dir, entry_name))
-		}
+/// The `--features` flag as a [`CrateCheck`]: verify this binary was compiled
+/// with the named cargo features, failing with the full missing list rather
+/// than degrading into unresolved tags. Applies when running an entry (an
+/// explicit `--main`, or no positional command); a command dispatch (eg `beet
+/// build-wasm --features=..`) owns its own `--features` meaning, and the wasm
+/// runner forwards the module's flags untouched.
+fn features_self_check(args: &CliArgs) -> Option<CrateCheck> {
+	let is_wasm_runner =
+		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
+	let runs_entry =
+		args.params.contains_key("main") || args.path.is_empty();
+	if is_wasm_runner || !runs_entry {
+		return None;
 	}
-}
-
-/// The entry path relative to `root` as a utf8 string, or `None` if `entry` is not
-/// under `root` (or the relative path is not utf8).
-fn entry_name_under(entry: &AbsPathBuf, root: &AbsPathBuf) -> Option<String> {
-	entry.strip_prefix(root).ok()?.to_str().map(str::to_string)
+	args.params
+		.get_vec("features")
+		.map(|features| CrateCheck::features(features.join(",")))
 }
 
 /// The native entry resolution: a remote store, an explicit `--main`, or a
@@ -326,22 +357,9 @@ async fn resolve_entry_native(args: &CliArgs) -> Result<ResolvedEntry> {
 
 	// local: the binary's own `--main` overrides discovery, otherwise discovery walks
 	// for the dir + entry name. Either way the `--store` arg picks the backend.
-	match args
-		.params
-		.get("main")
-		.filter(|_| !is_wasm_runner)
-		.map(|path| AbsPathBuf::new(path.as_str()))
-		.transpose()?
-	{
-		Some(entry) => {
-			let (dir, entry_name) = entry_root_and_name(&args.params, &entry)?;
-			Ok(ResolvedEntry {
-				store: resolve_store(&args.params, dir.clone())?,
-				entry_name,
-				watch_dir: Some(dir),
-			})
-		}
-		None => discover_entry().await,
+	match args.params.get("main").filter(|_| !is_wasm_runner) {
+		Some(main) => resolve_main(&args.params, main).await,
+		None => discover_entry(&args.params).await,
 	}
 }
 
@@ -390,22 +408,18 @@ fn remote_entry_store() -> Result<(BlobStore, String)> {
 /// Walk the cwd and its ancestors for the first [`ENTRY_NAMES`] match, resolving
 /// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only native
-/// place a filesystem walk makes sense; it returns the matched store, entry name,
-/// and dir, erroring with guidance when none is found.
+/// place a filesystem walk makes sense; the matched entry may still widen its own
+/// root ([`widen_store_root`]), and no match errors with guidance.
 #[cfg(not(target_arch = "wasm32"))]
-async fn discover_entry() -> Result<ResolvedEntry> {
+async fn discover_entry(
+	params: &MultiMap<SmolStr, SmolStr>,
+) -> Result<ResolvedEntry> {
 	let start = AbsPathBuf::new(".")?;
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
 		let store = BlobStore::new(FsStore::new(current.clone()));
-		for name in ENTRY_NAMES {
-			if store.exists(&SmolPath::from(*name)).await? {
-				return Ok(ResolvedEntry {
-					store,
-					entry_name: name.to_string(),
-					watch_dir: Some(current),
-				});
-			}
+		if let Some(entry_name) = probe_entry_names(&store).await? {
+			return resolve_widened(params, current, entry_name).await;
 		}
 		dir = current.parent();
 	}

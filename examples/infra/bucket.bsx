@@ -8,12 +8,13 @@ with `--s3-backend`.
 
 ## Usage
 
-    just beet --main=examples/infra/bucket.bsx run               # local backend
-    just beet --main=examples/infra/bucket.bsx run --s3-backend  # s3 backend
+    beet --features=infra --main=examples/infra/bucket.bsx run               # local backend
+    beet --features=infra --main=examples/infra/bucket.bsx run --s3-backend  # s3 backend
 
 Live run needs AWS credentials and `tofu`.
 -->
 <BucketStack app_name="bucket-example">
+	<CrateCheck features="infra"/>
 	<Route path="run" {ExchangeSequence}>
 		<NamedBucket label="my-bucket" {LifecycleProbe}/>
 	</Route>

@@ -148,11 +148,13 @@ fn winit_default_plugins() -> PluginGroupBuilder {
 		.disable::<bevy::log::LogPlugin>()
 }
 
-/// The async command runtime, app-exit handling, and the panic error handler. Uses
-/// `init_plugin` so it composes with plugins that pull these in themselves.
+/// The async command runtime, app-exit handling, the crate feature check, and
+/// the panic error handler. Uses `init_plugin` so it composes with plugins
+/// that pull these in themselves.
 fn beet_runtime_plugin(app: &mut App) {
 	app.init_plugin::<AsyncPlugin>()
 		.init_plugin::<AppExitPlugin>()
+		.init_plugin::<CrateCheckPlugin>()
 		.try_set_error_handler(bevy::ecs::error::panic);
 }
 

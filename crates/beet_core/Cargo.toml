@@ -344,6 +344,7 @@ web-sys = {workspace = true, features = [
 	# JS
 	"console",
 	"Navigator",
+	"MediaDevices",
 	"Performance",
 	# Url
 	"Url",

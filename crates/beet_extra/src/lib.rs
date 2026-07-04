@@ -20,9 +20,11 @@ pub mod perceive_act_core;
 pub mod perceive_act;
 // the wasm browser head for the perceive-act demo (v3): a socket client served to a
 // browser tab, capturing the webcam, speaking via the Web Speech API and rendering an
-// `<img>` face. Wasm-safe, so gated on its own `perceive_act_web` feature (the `web`
-// base, no `thread`), not on the native `thread` set.
-#[cfg(feature = "perceive_act_web")]
+// `<img>` face. Gated on its own `perceive_act_web` feature (the `web` base, no
+// `thread`), not on the native `thread` set. Wasm-*only* (web_sys/wasm_bindgen), so
+// also target-gated: a native `--all-features` build (eg `cargo install`) compiles
+// with the feature inert rather than failing on the wasm-only deps.
+#[cfg(all(feature = "perceive_act_web", target_arch = "wasm32"))]
 pub mod perceive_act_web;
 // always compiled: `BeetExtraPlugin` selects its members by feature flag, so
 // the thread-only (`thread`, no `bevy_default`) build still gets the plugin.
@@ -35,11 +37,14 @@ pub mod prelude {
 	pub use crate::components::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::*;
+	// redundant when `perceive_act`/`perceive_act_web` re-export it, but the
+	// direct path covers a native build where the web module is compiled out
+	#[allow(unused_imports)]
 	#[cfg(any(feature = "thread", feature = "perceive_act_web"))]
 	pub use crate::perceive_act_core::*;
 	#[cfg(feature = "thread")]
 	pub use crate::perceive_act::*;
-	#[cfg(feature = "perceive_act_web")]
+	#[cfg(all(feature = "perceive_act_web", target_arch = "wasm32"))]
 	pub use crate::perceive_act_web::*;
 	pub use crate::plugins::*;
 	// the markup scene templates (`<Lighting3d/>`, `<Ground3d/>`, `<Sprite2d/>`, ...),

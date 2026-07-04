@@ -7,12 +7,11 @@
 
 /// Shares Bevy's WGPU device, queue, adapter and instance with Burn's wgpu backend,
 /// so ML inference and rendering draw on one GPU context. Add it after Bevy's render
-/// plugins; in [`finish`](Plugin::finish) it reads the
-/// [`RenderApp`](bevy::render::RenderApp) wgpu resources, registers them with Burn
-/// via `init_device`, and stores the resulting [`BurnWgpuDevice`].
-/// [`default_device`](crate::prelude::default_device) then hands that device to every
-/// [`Bert`](crate::prelude::Bert) model, so loading a model reuses Bevy's GPU rather
-/// than initialising a second wgpu instance.
+/// plugins; in [`finish`](Plugin::finish) it captures the
+/// [`RenderApp`](bevy::render::RenderApp) wgpu handles (cheap `Arc` clones), and the
+/// first [`default_device`](crate::prelude::default_device) call registers them with
+/// Burn via `init_device`. Lazy on purpose: registering compiles Burn's kernels on
+/// the device, so a binary with ml compiled in but not used pays (and risks) nothing.
 ///
 /// Inert unless both `bevy_default` (Bevy's render stack) and `wgpu` (Burn's wgpu
 /// backend) are enabled: a headless Burn app, or a non-wgpu backend, needs neither
@@ -27,11 +26,21 @@ pub struct SharedBurnWgpuPlugin;
 static SHARED_DEVICE: std::sync::OnceLock<burn::backend::wgpu::WgpuDevice> =
 	std::sync::OnceLock::new();
 
-/// The WGPU device [`SharedBurnWgpuPlugin`] shared from Bevy, or `None` when no
-/// Bevy device has been shared (a headless Burn app, where Burn makes its own).
+/// The WGPU device shared from Bevy by [`SharedBurnWgpuPlugin`], initialising
+/// Burn on it on first call, or `None` when no Bevy device has been shared (a
+/// headless Burn app, where Burn makes its own).
 #[cfg(feature = "wgpu")]
 pub fn shared_burn_wgpu_device() -> Option<burn::backend::wgpu::WgpuDevice> {
-	SHARED_DEVICE.get().cloned()
+	if let Some(device) = SHARED_DEVICE.get() {
+		return Some(device.clone());
+	}
+	beet_core::prelude::cfg_if! {
+		if #[cfg(feature = "bevy_default")] {
+			share::lazy_init_shared_device()
+		} else {
+			None
+		}
+	}
 }
 
 // the real device-sharing impl: needs Bevy's render stack (`bevy_default`) AND
@@ -53,12 +62,11 @@ mod share {
 	use burn::backend::wgpu::WgpuSetup;
 	use burn::backend::wgpu::init_device;
 	use std::sync::Arc;
+	use std::sync::Mutex;
 
-	/// Bevy's WGPU device, shared with Burn and stored so ml systems/assets can
-	/// name it. The same handle [`default_device`](crate::prelude::default_device)
-	/// returns, so a `Bert` model and the renderer share one GPU.
-	#[derive(Debug, Clone, Resource, Deref)]
-	pub struct BurnWgpuDevice(pub WgpuDevice);
+	/// Bevy's wgpu handles, captured at plugin finish and consumed by the first
+	/// [`lazy_init_shared_device`] call.
+	static SHARED_SETUP: Mutex<Option<WgpuSetup>> = Mutex::new(None);
 
 	impl Plugin for SharedBurnWgpuPlugin {
 		fn build(&self, _app: &mut App) {}
@@ -73,7 +81,8 @@ mod share {
 				return;
 			};
 			let world = render_app.world();
-			// reuse bevy's instance/adapter/device/queue instead of making a second set.
+			// capture bevy's instance/adapter/device/queue (cheap Arc clones);
+			// Burn initialises on them lazily, on the first `default_device`.
 			let setup = WgpuSetup {
 				instance: clone_inner(&world.resource::<RenderInstance>().0),
 				adapter: clone_inner(&world.resource::<RenderAdapter>().0),
@@ -81,11 +90,23 @@ mod share {
 				queue: clone_inner(&world.resource::<RenderQueue>().0),
 				backend: world.resource::<RenderAdapterInfo>().backend,
 			};
-			let device = init_device(setup, RuntimeOptions::default());
-			let _ = SHARED_DEVICE.set(device.clone());
-			app.insert_resource(BurnWgpuDevice(device));
-			info!("SharedBurnWgpuPlugin: Burn now shares Bevy's WGPU device");
+			*SHARED_SETUP.lock().unwrap() = Some(setup);
 		}
+	}
+
+	/// Initialise Burn on the captured Bevy handles, caching the device. The
+	/// lock is held across `init_device` so a concurrent caller waits rather
+	/// than falling back to a second wgpu instance.
+	pub(super) fn lazy_init_shared_device() -> Option<WgpuDevice> {
+		let mut setup_slot = SHARED_SETUP.lock().unwrap();
+		if let Some(device) = SHARED_DEVICE.get() {
+			return Some(device.clone());
+		}
+		let setup = setup_slot.take()?;
+		let device = init_device(setup, RuntimeOptions::default());
+		let _ = SHARED_DEVICE.set(device.clone());
+		info!("SharedBurnWgpuPlugin: Burn now shares Bevy's WGPU device");
+		Some(device)
 	}
 
 	// bevy wraps each wgpu handle in `Arc<WgpuWrapper<T>>`; the inner handle is
@@ -94,8 +115,6 @@ mod share {
 		<T as Clone>::clone(wrapped)
 	}
 }
-#[cfg(all(feature = "bevy_default", feature = "wgpu"))]
-pub use share::BurnWgpuDevice;
 
 // inert when sharing is not meaningful (a headless Burn app, or a non-wgpu
 // backend): the plugin type still exists so an app can always add it unconditionally.

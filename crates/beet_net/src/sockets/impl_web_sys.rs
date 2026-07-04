@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::prelude::Url;
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use beet_core::prelude::*;
@@ -24,8 +25,8 @@ use web_sys::WebSocket;
 /// - Configures binary frames to arrive as `ArrayBuffer`
 /// - Hooks up event listeners to stream incoming messages as `Message`
 /// - Awaits the `open` event before returning so the socket is ready to send
-pub async fn connect_wasm(url: impl AsRef<str>) -> Result<Socket> {
-	let ws = WebSocket::new(url.as_ref()).map_jserr()?;
+pub async fn connect_wasm(url: &Url) -> Result<Socket> {
+	let ws = WebSocket::new(&url.to_string()).map_jserr()?;
 	ws.set_binary_type(BinaryType::Arraybuffer);
 
 	// Stream of inbound messages

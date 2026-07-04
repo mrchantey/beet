@@ -1,4 +1,12 @@
+<!--
+# Frozen Lake Train - Q-Learning
+
+An `RlSession` trains a Q-table over the 4x4 frozen-lake grid, writing `assets/ml/frozen_lake_qtable.ron` for `frozen_lake_run.bsx`.
+
+    beet --features=ml --main=examples/ml/frozen_lake_train.bsx
+-->
 <Scene3d>
+	<CrateCheck features="ml"/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:0.77, offset:{x:0., y:0.7, z:0.7}}}/>
 	<Lighting3d/>

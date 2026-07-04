@@ -1,3 +1,5 @@
+use crate::prelude::Scheme;
+use crate::prelude::Url;
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use async_io::Async;
@@ -42,17 +44,17 @@ type DynTungStream =
 /// - Splits the Tungstenite stream/sink
 /// - Adapts the inbound `tungstenite::Message` stream into our cross-platform `Message`
 /// - Wraps the sink in a writer that implements the `SocketWriter` trait
-pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
-	// Parse URL to get host and port
-	let parsed_url = url::Url::parse(url.as_ref())
-		.map_err(|e| bevyhow!("Invalid URL: {}", e))?;
-	let host = parsed_url
-		.host_str()
-		.ok_or_else(|| bevyhow!("URL missing host"))?
+pub async fn connect_tungstenite(url: &Url) -> Result<Socket> {
+	// split the authority; a bracketed ipv6 host is unwrapped for DNS/TLS
+	let host = url
+		.host()
+		.ok_or_else(|| bevyhow!("URL missing host: {url}"))?
+		.trim_matches(['[', ']'])
 		.to_string();
-	let port = parsed_url
-		.port_or_known_default()
-		.ok_or_else(|| bevyhow!("Cannot determine port"))?;
+	let port = url
+		.port_or_default()
+		.ok_or_else(|| bevyhow!("Cannot determine port: {url}"))?;
+	let url_string = url.to_string();
 
 	// Resolve DNS
 	let host_clone = host.clone();
@@ -76,20 +78,19 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 		.map_err(|e| bevyhow!("TCP connect failed: {}", e))?;
 
 	// Perform WebSocket handshake (with TLS if wss://)
-	let scheme = parsed_url.scheme();
-
 	let (sink_boxed, stream_boxed): (
 		Pin<Box<DynTungSink>>,
 		Pin<Box<DynTungStream>>,
-	) = match scheme {
-		"ws" => {
-			let (ws_stream, _resp) = client_async(url.as_ref(), tcp_stream)
-				.await
-				.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
+	) = match url.scheme() {
+		Scheme::Ws => {
+			let (ws_stream, _resp) =
+				client_async(url_string.as_str(), tcp_stream)
+					.await
+					.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
 			let (sink, stream) = ws_stream.split();
 			(Box::pin(sink), Box::pin(stream))
 		}
-		"wss" => {
+		Scheme::Wss => {
 			#[cfg(feature = "native-tls")]
 			{
 				let connector = TlsConnector::new();
@@ -97,18 +98,23 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 					.connect(&host, tcp_stream)
 					.await
 					.map_err(|e| bevyhow!("TLS connect failed: {}", e))?;
-				let (ws_stream, _resp) = client_async(url.as_ref(), tls_stream)
-					.await
-					.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
+				let (ws_stream, _resp) =
+					client_async(url_string.as_str(), tls_stream)
+						.await
+						.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
 				let (sink, stream) = ws_stream.split();
 				(Box::pin(sink), Box::pin(stream))
 			}
 			#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 			{
 				let config = default_rustls_client_config()?;
-				let (sink, stream) =
-					rustls_connect(url.as_ref(), tcp_stream, &host, config)
-						.await?;
+				let (sink, stream) = rustls_connect(
+					url_string.as_str(),
+					tcp_stream,
+					&host,
+					config,
+				)
+				.await?;
 				(sink, stream)
 			}
 			#[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
@@ -118,8 +124,8 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 				));
 			}
 		}
-		_ => {
-			return Err(bevyhow!("Unsupported URL scheme: {}", scheme));
+		other => {
+			return Err(bevyhow!("Unsupported URL scheme: {other}"));
 		}
 	};
 

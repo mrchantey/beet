@@ -232,7 +232,6 @@ toml = "0.8"
 #💡 http
 http = "1"
 http-body-util = "0.1"
-url = "2"
 
 #💡 tui
 vte = "0.15.0"
@@ -625,11 +624,6 @@ required-features = ["http_server", "style"]
 name = "pretty_curl"
 path = "examples/ui/pretty_curl.rs"
 required-features = ["_pretty_curl"]
-
-[[example]]
-name = "state"
-path = "examples/ui/state.rs"
-required-features = ["tui"]
 
 [[example]]
 name = "bsx_rsx_match"

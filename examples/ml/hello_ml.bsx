@@ -1,4 +1,12 @@
+<!--
+# Hello ML - Sentence Similarity
+
+A `<NearestSentenceAgent>` embeds its prompt with a bert model and logs the closest child `<SentenceOption>`, then exits. The model asset comes from `just init-repo` (the default bert model copy).
+
+    beet --features=ml --main=examples/ml/hello_ml.bsx
+-->
 <NearestSentenceAgent prompt="please kill the baddies" src="ml/default-bert.ron">
+	<CrateCheck features="ml"/>
 	<SentenceOption text="heal"/>
 	<SentenceOption text="attack"/>
 </NearestSentenceAgent>

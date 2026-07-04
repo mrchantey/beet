@@ -127,6 +127,9 @@ impl Plugin for RouterPlugin {
 			// entry-level tags like `<Styles/>` resolve.
 			app.register_type::<TemplateDir>()
 				.add_observer(TemplateDir::register_on_insert);
+			// the entry-declared store root (`<StoreRoot src="../.."/>`), read by
+			// entry resolution before the store builds; inert in the built tree.
+			app.register_type::<StoreRoot>();
 			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
 			// inserts its own greedy capture + handler, eg
 			// `<ServeBlobs prefix="assets" {AssetsStore}/>`.

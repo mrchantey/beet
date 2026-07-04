@@ -1,4 +1,12 @@
+<!--
+# Seek - 2d Steering
+
+A planet follows the cursor and a `<SeekAgent2d>` ship steers toward it via the `{SteerTarget::Entity($planet)}` reference.
+
+    beet --features=winit --main=examples/spatial/seek.bsx
+-->
 <Scene2d>
+	<CrateCheck features="winit"/>
 	<AppWindow/>
 	<Camera2d/>
 	<SpaceScene/>

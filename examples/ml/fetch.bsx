@@ -1,4 +1,12 @@
+<!--
+# Fetch - Semantic Steering
+
+Type a prompt in the terminal and the `<FetchFox/>` walks to whichever `<FetchItems/>` collectable's sentence best matches it.
+
+    beet --features=ml --main=examples/ml/fetch.bsx
+-->
 <Scene3d>
+	<CrateCheck features="ml"/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:2.8, offset:{x:0., y:1.6, z:2.}}}/>
 	<Lighting3d/>

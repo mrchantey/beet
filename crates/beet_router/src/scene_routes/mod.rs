@@ -29,6 +29,12 @@ pub use route_query::*;
 mod template_dir;
 #[cfg(feature = "bsx")]
 pub use template_dir::*;
+// the entry-declared store root (`<StoreRoot src="../.."/>`), pre-scanned by
+// entry resolution like an entry's own `<TemplateDir>`s.
+#[cfg(feature = "bsx")]
+mod store_root;
+#[cfg(feature = "bsx")]
+pub use store_root::*;
 // `RoutesDir` + its discovery is compiled on every std target: one observer
 // scans the store off the async runtime, so native and wasm share the path.
 mod routes_dir;

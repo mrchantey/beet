@@ -118,7 +118,7 @@ impl Default for Navigator {
 			// home navigated to by on_add
 			history: default(),
 			history_cursor: 0,
-			session: Uuid::now_v7(),
+			session: uuid_ext::now_v7(),
 			current_page: None,
 		}
 	}
