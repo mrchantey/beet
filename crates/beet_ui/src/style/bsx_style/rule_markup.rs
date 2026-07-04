@@ -170,7 +170,9 @@ fn parse_state(state: &str) -> Result<ElementState> {
 	}
 }
 
-/// Parse the optional `media` attribute to a [`MediaQuery`] gate.
+/// Parse the optional `media` attribute to a [`MediaQuery`] gate: one of the
+/// keyword queries, or a width gate like `max-width: 1024px` (evaluated by the
+/// browser via CSS and by the charcell cascade against its surface).
 fn parse_media(el: &BsxElement) -> Result<Option<MediaQuery>> {
 	let Some(value) = attr(el, "media") else {
 		return Ok(None);
@@ -181,10 +183,29 @@ fn parse_media(el: &BsxElement) -> Result<Option<MediaQuery>> {
 		"screen" => Ok(Some(MediaQuery::Screen)),
 		"print" => Ok(Some(MediaQuery::Print)),
 		"reduced-motion" => Ok(Some(MediaQuery::ReducedMotion)),
-		other => bevybail!(
-			"`<Rule>` `media=\"{other}\"` is not a known media query (terminal/screen/print/reduced-motion)"
-		),
+		other => match parse_max_width(other) {
+			Some(media) => Ok(Some(media)),
+			None => bevybail!(
+				"`<Rule>` `media=\"{other}\"` is not a known media query (terminal/screen/print/reduced-motion, or `max-width: 1024px`)"
+			),
+		},
 	}
+}
+
+/// Parse a width-gated media value, `max-width: 1024px`, to
+/// [`MediaQuery::MaxWidth`]. CSS-style parens and the `px` suffix are optional.
+fn parse_max_width(value: &str) -> Option<MediaQuery> {
+	let value = value.trim().trim_start_matches('(').trim_end_matches(')');
+	let (key, px) = value.split_once(':')?;
+	if key.trim() != "max-width" {
+		return None;
+	}
+	px.trim()
+		.trim_end_matches("px")
+		.trim()
+		.parse::<u32>()
+		.ok()
+		.map(MediaQuery::MaxWidth)
 }
 
 /// The `@token:Role` role name carried by an attribute value, if it is a quoted
@@ -283,6 +304,23 @@ mod test {
 		rule.get_typed::<style::Length>(&common_props::RowGapProp.into())
 			.unwrap()
 			.xpect_eq(style::Length::Rem(1.0));
+	}
+
+	// the width forms all resolve to `MaxWidth`; keywords stay themselves
+	#[beet_core::test]
+	fn media_parses_max_width() {
+		rule_from(r#"<Rule class="a" media="max-width: 1024px" display=None/>"#)
+			.media()
+			.xpect_eq(Some(MediaQuery::MaxWidth(1024)));
+		rule_from(r#"<Rule class="b" media="(max-width: 800px)" display=None/>"#)
+			.media()
+			.xpect_eq(Some(MediaQuery::MaxWidth(800)));
+		rule_from(r#"<Rule class="c" media="max-width:640" display=None/>"#)
+			.media()
+			.xpect_eq(Some(MediaQuery::MaxWidth(640)));
+		rule_from(r#"<Rule class="d" media="terminal" display=None/>"#)
+			.media()
+			.xpect_eq(Some(MediaQuery::Terminal));
 	}
 
 	#[beet_core::test]

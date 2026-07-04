@@ -12,6 +12,9 @@ pub const HIDDEN: ClassName = ClassName::new_static("hidden");
 // Print utilities, styled by `@media print` rules.
 pub const PRINT_HIDDEN: ClassName = ClassName::new_static("print-hidden");
 pub const PAGE_BREAK: ClassName = ClassName::new_static("page-break");
+// Target forks, styled by `@media` Terminal rules.
+pub const TERMINAL_HIDDEN: ClassName = ClassName::new_static("terminal-hidden");
+pub const TERMINAL_ONLY: ClassName = ClassName::new_static("terminal-only");
 
 // ── Color utility classes ─────────────────────────────────────────────────────
 
@@ -48,6 +51,36 @@ pub fn page_break() -> Rule {
 		.with_selector(Selector::class(PAGE_BREAK))
 		.with_media(MediaQuery::Print)
 		.with_value(common_props::BreakAfterProp, BreakAfter::Page)
+}
+
+/// Hides an element on the terminal alone: a `Terminal`-gated `display: none`
+/// never reaches the serialized CSS, so the web shows the element untouched.
+/// Pairs with [`terminal_only_hidden`]/[`terminal_only_shown`] for per-target
+/// content forks, eg the menu button's `☰`/`三` glyph spans.
+pub fn terminal_hidden() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(TERMINAL_HIDDEN))
+		.with_media(MediaQuery::Terminal)
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// The default half of the [`TERMINAL_ONLY`] pair: hidden everywhere. The
+/// only rule of the pair the web serializes, so there the element stays gone.
+pub fn terminal_only_hidden() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(TERMINAL_ONLY))
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// The terminal half of the [`TERMINAL_ONLY`] pair: a `Terminal`-gated rule
+/// restores inline flow (the utility targets inline content like glyph spans).
+/// Registered after [`terminal_only_hidden`] so it wins the specificity tie in
+/// the charcell cascade (later rule wins), while the web never receives it.
+pub fn terminal_only_shown() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(TERMINAL_ONLY))
+		.with_media(MediaQuery::Terminal)
+		.with_value(common_props::DisplayProp, Display::Inline)
 }
 
 /// Zeroes transition/animation duration when the user prefers reduced motion

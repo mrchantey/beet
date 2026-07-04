@@ -53,9 +53,11 @@ impl CssBuilder {
 	) -> Result<String> {
 		let css_rules = rule_set
 			.iter()
-			// `Terminal`-gated rules have no CSS equivalent, so they never reach
+			// rules gated on a query with no CSS condition (`Terminal`) never reach
 			// the serialized stylesheet (the charcell cascade applies them instead).
-			.filter(|rule| !rule.media().is_some_and(MediaQuery::is_terminal))
+			.filter(|rule| {
+				rule.media().is_none_or(|media| media.as_css().is_some())
+			})
 			.xtry_map(|rule| CssRule::from_rule(css_map, rule))?;
 
 		// iteration variables

@@ -6,8 +6,11 @@ use crate::style::material::*;
 use beet_core::prelude::Duration;
 
 /// Viewport width (px) at or below which the sidebar collapses behind the
-/// [`MENU_BUTTON`] toggle. Shared by the responsive rules here and the
-/// `sidebar.js` runtime so the CSS breakpoint and the resize handler agree.
+/// [`MENU_BUTTON`] toggle, on both targets: the width-gated rules here are
+/// evaluated by the browser (as serialized `@media`) and by the charcell
+/// cascade (against its surface's `MediaViewport`, at 16px per cell — 64
+/// columns). Also injected into the `sidebar.js` resize handler and read by
+/// its native twin `sync_sidebar_breakpoint`, so every evaluator agrees.
 pub const SIDEBAR_BREAKPOINT_PX: u32 = 1024;
 
 // ── Class names ─────────────────────────────────────────────────────────────────
@@ -60,8 +63,8 @@ pub fn sidebar_branch() -> Rule {
 /// larger than the row text so it reads as a clear affordance. A single
 /// down-caret glyph; the web rotates it to point right when the group is
 /// collapsed (see [`sidebar_caret_collapsed`]), the transition smoothing the
-/// flip. The terminal can't rotate and always shows children, so the static
-/// down-caret reads correctly there.
+/// flip. The terminal can't rotate, so `flip_sidebar_caret` rewrites the glyph
+/// (`▸`/`▾`) with the disclosure state instead.
 pub fn sidebar_caret() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_CARET))
@@ -71,9 +74,9 @@ pub fn sidebar_caret() -> Rule {
 }
 
 /// Web caret rotation - a collapsed `<details>` (no `open` attribute) points its
-/// caret right via a 90° rotation. A descendant combinator (`details:not([open])
-/// .sidebar-caret`), so it's web-only: the charcell cascade has no ancestor
-/// context and the terminal always renders children expanded anyway.
+/// caret right via a 90° rotation. Screen-gated: the terminal can't rotate a
+/// glyph, so its caret is *rewritten* to `▸`/`▾` by `flip_sidebar_caret`
+/// instead.
 pub fn sidebar_caret_collapsed() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
@@ -132,8 +135,8 @@ pub fn sidebar_web() -> Rule {
 
 /// Terminal sidebar - a fixed 20rem rail, so the nav is a stable column rather
 /// than sizing to its widest label. Long anchors wrap within it (the links are
-/// full-width blocks). Fixed rather than the web's responsive range since the
-/// charcell engine sizes from explicit `width` alone (no min/max-width).
+/// full-width blocks). Fixed rather than the web's responsive range: on a cell
+/// grid a stable rail reads better than one that shifts with the main column.
 pub fn sidebar_terminal() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Terminal)
@@ -141,12 +144,14 @@ pub fn sidebar_terminal() -> Rule {
 		.with_value(common_props::Width, Length::Rem(20.))
 }
 
-/// Web sidebar collapse - on screens at or below [`SIDEBAR_BREAKPOINT_PX`] the
-/// rail is taken out of flow unless `sidebar.js` has marked it
-/// `aria-hidden="false"` (the [`MENU_BUTTON`] toggle). The served nav carries
-/// no `aria-hidden` attribute, so a narrow-screen load is hidden by CSS alone
-/// with no flash while the script defers. Media-gated, so the terminal cascade
-/// skips it and keeps the rail.
+/// Responsive sidebar collapse - at or below [`SIDEBAR_BREAKPOINT_PX`] the
+/// rail is taken out of flow unless something has marked it
+/// `aria-hidden="false"` (the [`MENU_BUTTON`] toggle): `sidebar.js` on the
+/// web, the `aria-controls` disclosure observer plus `sync_sidebar_breakpoint`
+/// on the terminal. The served nav carries no `aria-hidden` attribute, so a
+/// narrow load is hidden by this rule alone with no flash before any runtime
+/// acts. One width-gated rule, both targets: the browser evaluates the
+/// serialized `@media`, the charcell cascade its surface's `MediaViewport`.
 pub fn sidebar_hidden() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::MaxWidth(SIDEBAR_BREAKPOINT_PX))
@@ -157,14 +162,14 @@ pub fn sidebar_hidden() -> Rule {
 		.with_value(common_props::DisplayProp, Display::None)
 }
 
-/// Menu button - hidden by default on every target; the wide-screen sidebar is
-/// always visible (and the terminal rail too) so the toggle is unnecessary.
-/// Ungated so the terminal cascade also hides it; the web reveals it below the
-/// breakpoint via [`menu_button_visible`]. No horizontal padding, so it reads as
-/// a compact icon affordance flush against the title.
+/// Menu button - hidden by default on every target; the wide-viewport sidebar
+/// is always visible so the toggle is unnecessary. Both targets reveal it
+/// below the breakpoint via [`menu_button_visible`]. No horizontal padding, so
+/// it reads as a compact icon affordance flush against the title.
 pub fn menu_button() -> Rule {
 	// `icon_size` is the tuning knob: it's only the `font-size`, so it scales how
-	// large the `☰` glyph *draws*, not the button's box. The box is the bare line
+	// large the web's `☰` glyph *draws*, not the button's box (the terminal's
+	// `三` span ignores it — a cell glyph can't scale). The box is the bare line
 	// box (line-height pinned to the title's, zero padding), so it's exactly the
 	// title's height and never taller than the app bar's other content. The bar is
 	// a centered flex row sized by its tallest child, so revealing the button below
@@ -180,8 +185,9 @@ pub fn menu_button() -> Rule {
 		.with_value(common_props::Padding, Spacing::DEFAULT)
 }
 
-/// Menu button on narrow screens - shown at or below [`SIDEBAR_BREAKPOINT_PX`],
-/// where the sidebar collapses and needs a toggle.
+/// Menu button on narrow viewports - shown at or below
+/// [`SIDEBAR_BREAKPOINT_PX`] on both targets, where the sidebar collapses and
+/// needs a toggle.
 pub fn menu_button_visible() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::MaxWidth(SIDEBAR_BREAKPOINT_PX))

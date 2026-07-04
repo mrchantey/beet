@@ -170,6 +170,11 @@ pub fn all_rules() -> Vec<Rule> {
 		// print utilities — gated behind `@media print`
 		print_hidden(),
 		page_break(),
+		// target forks — hide/show per target (eg the menu button's `☰`/`三`
+		// glyph spans); `terminal_only_shown` after its default so it wins ties
+		terminal_hidden(),
+		terminal_only_hidden(),
+		terminal_only_shown(),
 		// reduced motion — gated behind `@media (prefers-reduced-motion)`
 		reduced_motion(),
 		// interaction — shared hover affordance for buttons and links, plus the
@@ -280,6 +285,31 @@ mod tests {
 			))
 			.xpect_contains(".sidebar:not([aria-hidden=\"false\"])")
 			.xpect_contains("display: none;");
+	}
+
+	/// The target-fork utilities serialize asymmetrically: the ungated
+	/// `terminal-only` default reaches CSS (so the web hides the `三` span),
+	/// while both `Terminal`-gated halves never do (so the web shows the `☰`
+	/// span untouched, and the terminal restore leaks nowhere).
+	#[beet_core::test]
+	fn target_fork_utilities_serialize_asymmetrically() {
+		let css = CssBuilder::default()
+			.with_minify(true)
+			.with_format_variables(FormatVariables::short())
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(vec![
+					terminal_hidden(),
+					terminal_only_hidden(),
+					terminal_only_shown(),
+				]),
+			)
+			.unwrap();
+		css.as_str()
+			.xpect_contains(".terminal-only")
+			.xpect_contains("display: none;")
+			.xnot()
+			.xpect_contains(".terminal-hidden");
 	}
 
 	/// A media-gated rule serializes wrapped in its `@media` at-rule, with the

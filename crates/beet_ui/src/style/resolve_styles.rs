@@ -17,6 +17,11 @@ pub fn resolve_styles(
 		Entity,
 		Or<(Changed<Element>, Changed<Classes>, Changed<ElementStateMap>)>,
 	>,
+	// a resized surface re-evaluates width-gated media rules for its whole
+	// tree. `MediaViewport` is `set_if_neq`-maintained (`sync_media_viewport`),
+	// so this fires on a real resize or first sight, not on paint's per-frame
+	// buffer writes.
+	resized: Query<Entity, Changed<MediaViewport>>,
 	ancestors: Query<&ChildOf>,
 	children: Query<&Children>,
 	// content transcluded by reference has no `ChildOf` edge to the layout, so the
@@ -37,10 +42,16 @@ pub fn resolve_styles(
 ) -> Result {
 	// TODO fine-grained listeners
 	// reparenting etc. only update whats needed
-	let roots = query
+	let mut roots = query
 		.iter()
 		.map(|entity| ancestors.root_ancestor(entity))
 		.collect::<HashSet<_>>();
+	// a resized surface seeds the traversal directly (its whole tree, portals
+	// included, re-resolves below) — only worth it when a width-gated rule
+	// exists to change the outcome.
+	if !resized.is_empty() && ruleset_query.has_width_media() {
+		roots.extend(resized.iter());
+	}
 
 	// within-pass cascade memo, keyed by `(entity, token)`. Resolving the page
 	// touches ~30 properties per entity and inherited tokens re-walk ancestors;

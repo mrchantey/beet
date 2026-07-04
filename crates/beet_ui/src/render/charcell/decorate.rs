@@ -98,9 +98,10 @@ pub fn apply_markers(
 
 /// Draw internal column dividers for a `.table-vertical-borders` table on the
 /// terminal. The web does this with an adjacent-sibling rule in `reset.css`,
-/// which the charcell cascade can't express (it has no ancestor context), so
-/// here every cell but the first in its row gets a left border mirroring its own
-/// bottom rule — the dividers fall between columns, matching the web.
+/// which the charcell cascade can't express (no sibling combinator, only
+/// child/descendant), so here every cell but the first in its row gets a left
+/// border mirroring its own bottom rule — the dividers fall between columns,
+/// matching the web.
 pub fn apply_table_vertical_borders(
 	elements: ElementQuery,
 	children: Query<&Children>,
@@ -222,11 +223,7 @@ fn has_open_attr(
 	attributes: &Query<&Attributes>,
 	attr_keys: &Query<&Attribute>,
 ) -> bool {
-	attributes.get(entity).is_ok_and(|attrs| {
-		attrs.iter().any(|attr| {
-			attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open")
-		})
-	})
+	attr_entity(attributes, attr_keys, entity, "open").is_some()
 }
 
 /// Point a sidebar group's `.sidebar-caret` glyph down (`▾`, open) or right
@@ -300,7 +297,7 @@ pub fn toggle_details_on_click(
 		return;
 	};
 	// toggle the `open` attribute (presence = open)
-	match open_attr(details, &attributes, &attr_keys) {
+	match attr_entity(&attributes, &attr_keys, details, "open") {
 		Some(attr) => commands.entity(attr).despawn(),
 		None => {
 			commands.spawn((
@@ -361,20 +358,6 @@ fn nearest_details(
 		current = parent;
 	}
 	None
-}
-
-/// The `open` attribute entity on `entity`, if present.
-#[cfg(feature = "tui")]
-fn open_attr(
-	entity: Entity,
-	attributes: &Query<&Attributes>,
-	attr_keys: &Query<&Attribute>,
-) -> Option<Entity> {
-	attributes.get(entity).ok().and_then(|attrs| {
-		attrs.iter().find(|&attr| {
-			attr_keys.get(attr).is_ok_and(|key| key.as_str() == "open")
-		})
-	})
 }
 
 /// The bullet (`• `) or number (`N. `) prefix for a list item, from its parent

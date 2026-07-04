@@ -108,11 +108,9 @@ impl Default for Length {
 	fn default() -> Self { Self::DEFAULT }
 }
 
-const REM_PIXELS: f32 = 16.0;
-
 impl Length {
 	pub const DEFAULT: Self = Self::Px(0.0);
-	/// Convert to unit size, mapping 16 pixels to 1 rem
+	/// Convert to unit size, mapping [`REM_PIXELS`] (16) pixels to 1 rem
 	pub fn into_rem(self, viewport: Vec2) -> f32 {
 		match self {
 			Self::Px(value) => value / REM_PIXELS,

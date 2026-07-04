@@ -632,7 +632,9 @@ mod tests {
 			})
 			.unwrap()
 			.id();
-		let size = UVec2::new(60, 24);
+		// 80 cells: wide enough that the rail stays above the responsive
+		// collapse breakpoint (64 cells, see `sidebar_collapses_below_breakpoint`)
+		let size = UVec2::new(80, 24);
 		world
 			.entity_mut(root)
 			.insert(Buffer::new(size).into_double_buffer());
@@ -646,8 +648,8 @@ mod tests {
 			.unwrap();
 		let rect = |tag: &str| rects[tag];
 		// header and footer span the full viewport width
-		rect("header").width().xpect_eq(60);
-		rect("footer").width().xpect_eq(60);
+		rect("header").width().xpect_eq(80);
+		rect("footer").width().xpect_eq(80);
 		// the footer pins to the bottom row of the 24-row viewport
 		rect("footer").max.y.xpect_eq(24);
 		// the sidebar rail runs the full height of the content row (its divider too)
@@ -701,6 +703,76 @@ mod tests {
 		let (left, right) = (section.min.x - main.min.x, main.max.x - section.max.x);
 		(left > 1).xpect_true();
 		((left - right).abs() <= 1).xpect_true();
+	}
+
+	/// The web's narrow-screen sidebar collapse applies in the terminal too:
+	/// the same `MaxWidth`-gated rules hide the rail and reveal the menu button
+	/// at or below the breakpoint (`SIDEBAR_BREAKPOINT_PX` = 64 cells at 16px
+	/// per cell), and a live resize across it re-resolves the cascade both
+	/// ways. End-to-end regression for width-gated media in the charcell
+	/// cascade (previously web-only, so the terminal always kept the rail).
+	#[beet_core::test]
+	fn sidebar_collapses_below_breakpoint() {
+		use crate::prelude::*;
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<html lang="en">
+					<body {Classes::new([classes::PAGE])}>
+						<header {Classes::new([classes::APP_BAR])}>
+							<button {Classes::new([classes::MENU_BUTTON])}>"☰"</button>
+						</header>
+						<div {Classes::new([classes::CONTAINER])}>
+							<nav {Classes::new([classes::SIDEBAR])}>"Nav"</nav>
+							<main>"Content"</main>
+						</div>
+					</body>
+				</html>
+			})
+			.unwrap()
+			.id();
+		let display = |world: &mut World, tag: &'static str| {
+			world
+				.run_system_once(move |query: Query<(&Element, &LayoutStyle)>| {
+					query
+						.iter()
+						.find(|(el, _)| el.tag() == tag)
+						.map(|(_, layout)| layout.display)
+						.unwrap()
+				})
+				.unwrap()
+		};
+		// wide: the rail shows, the toggle stays hidden
+		world
+			.entity_mut(root)
+			.insert(Buffer::new(UVec2::new(100, 24)).into_double_buffer());
+		world.run_schedule(crate::parse::PostParseTree);
+		display(&mut world, "nav").xpect_not_eq(Display::None);
+		display(&mut world, "button").xpect_eq(Display::None);
+		// resize below the breakpoint: the rail collapses behind the toggle
+		world
+			.entity_mut(root)
+			.get_mut::<DoubleBuffer>()
+			.unwrap()
+			.resize(UVec2::new(40, 24));
+		world.run_schedule(crate::parse::PostParseTree);
+		display(&mut world, "nav").xpect_eq(Display::None);
+		display(&mut world, "button").xpect_eq(Display::Flex);
+		// and back up: the rail returns, the toggle hides again
+		world
+			.entity_mut(root)
+			.get_mut::<DoubleBuffer>()
+			.unwrap()
+			.resize(UVec2::new(100, 24));
+		world.run_schedule(crate::parse::PostParseTree);
+		display(&mut world, "nav").xpect_not_eq(Display::None);
+		display(&mut world, "button").xpect_eq(Display::None);
 	}
 
 	#[beet_core::test]

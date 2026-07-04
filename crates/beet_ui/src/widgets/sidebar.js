@@ -5,6 +5,10 @@
 // `#sidebar` is what the rule reacts to (`:not([aria-hidden="false"])`).
 // `BREAKPOINT` is injected by the `Sidebar` widget so it tracks
 // `SIDEBAR_BREAKPOINT_PX`.
+//
+// The terminal runs native twins of this exact logic — `sync_sidebar_breakpoint`
+// (the init/resize seeding below) and the `aria-controls` disclosure observer
+// (the menu-button click) — change one, change both.
 (function () {
 	function init() {
 		const sidebar = document.getElementById("sidebar");

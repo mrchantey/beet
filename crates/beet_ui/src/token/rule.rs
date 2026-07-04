@@ -1,14 +1,21 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::math::UVec2;
 use bevy::reflect::Typed;
 use std::sync::Arc;
+
+/// Pixels per rem: the web's CSS-standard 16px default font size, and the
+/// bridge between px-authored breakpoints and the terminal's cell grid (one
+/// cell = 1rem), eg `MaxWidth(1024)` is a 64-column terminal breakpoint.
+pub const REM_PIXELS: f32 = 16.0;
 
 /// A set of declarations applied to elements matching the given selector.
 ///
 /// An optional [`media`](Self::media) query gates the rule behind an `@media`
 /// at-rule: such rules serialize to CSS wrapped in `@media (…) { … }`, and the
-/// non-web cascade ([`RuleSet::cascade`](crate::prelude::RuleSet)) ignores them
-/// since there is no target media context for charcell/native yet.
+/// charcell cascade applies them per [`MediaQuery::applies_in_terminal`]:
+/// `Terminal` rules always, width-gated rules against the surface's
+/// [`MediaViewport`], web-only media never.
 #[derive(Debug, Default, Clone, Reflect, Get, GetMut, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
@@ -44,7 +51,9 @@ pub enum MediaQuery {
 	/// `@media (prefers-reduced-motion: reduce)`.
 	ReducedMotion,
 	/// `@media (max-width: {0}px)` — applies at or below the given viewport width
-	/// in pixels, the idiom for narrow-screen (mobile) overrides.
+	/// in pixels, the idiom for narrow-screen (mobile) overrides. The charcell
+	/// cascade evaluates it too, against the surface's [`MediaViewport`] at
+	/// [`REM_PIXELS`] per cell, so one responsive rule drives both targets.
 	MaxWidth(u32),
 }
 
@@ -64,10 +73,44 @@ impl MediaQuery {
 		}
 	}
 
-	/// `true` if the charcell/native cascade should apply rules gated by this
-	/// query. Only [`Terminal`](Self::Terminal) is a terminal context; the rest
-	/// are web/print and excluded.
-	pub fn is_terminal(self) -> bool { matches!(self, Self::Terminal) }
+	/// Whether the charcell cascade applies rules gated by this query.
+	/// [`Terminal`](Self::Terminal) always applies (the query whose context *is*
+	/// that cascade), and [`MaxWidth`](Self::MaxWidth) applies when the surface
+	/// `viewport` sits at or below the breakpoint — `None` (no surface, eg a
+	/// server world building static HTML) leaves width rules to the browser's
+	/// own evaluator. Print/screen/reduced-motion are web media and never apply.
+	pub fn applies_in_terminal(self, viewport: Option<MediaViewport>) -> bool {
+		match self {
+			Self::Terminal => true,
+			Self::MaxWidth(px) => {
+				viewport.is_some_and(|viewport| viewport.width_px() <= px as f32)
+			}
+			_ => false,
+		}
+	}
+}
+
+/// The viewport that width-gated media queries ([`MediaQuery::MaxWidth`])
+/// evaluate against, in rem units (one terminal cell = 1rem).
+///
+/// Lives on a render surface (a charcell buffer host, mirrored from the
+/// buffer's cell size by `sync_media_viewport`) and is resolved for an element
+/// by walking the same Portal-aware parent chain inheritance uses. Maintained
+/// with `set_if_neq`, so `Changed<MediaViewport>` is a real resize signal —
+/// paint's per-frame buffer writes never touch it — and `resolve_styles`
+/// re-cascades the surface's tree when it fires. A world with no surface (eg a
+/// server building static HTML) resolves no viewport and skips width-gated
+/// rules, leaving them to the browser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component)]
+pub struct MediaViewport(UVec2);
+
+impl MediaViewport {
+	pub fn new(size: UVec2) -> Self { Self(size) }
+
+	/// Viewport width in px equivalents ([`REM_PIXELS`] per rem/cell), the
+	/// unit media breakpoints are authored in.
+	pub fn width_px(&self) -> f32 { self.0.x as f32 * REM_PIXELS }
 }
 
 impl Rule {
@@ -306,20 +349,17 @@ pub enum Selector {
 	/// Negate a rule, ie must not have tag
 	Not(Arc<Self>),
 	/// Match `descendant` when nested anywhere under an element matching
-	/// `ancestor`, ie in css `ancestor descendant` (note the space). A web-only
-	/// combinator: it serializes to CSS but the charcell cascade has no ancestor
-	/// context in [`matches`](Self::matches), so it never matches there (every
-	/// rule using it is `@media screen`-gated and thus skipped by that cascade).
+	/// `ancestor`, ie in css `ancestor descendant` (note the space). Serializes
+	/// to CSS for the browser, and the charcell cascade evaluates it against
+	/// the real ancestor chain (see [`matches`](Self::matches)).
 	Descendant {
 		ancestor: Arc<Self>,
 		descendant: Arc<Self>,
 	},
 	/// Match `child` when it is a *direct* child of an element matching
 	/// `parent`, ie in css `parent > child` (note the `>`). Like
-	/// [`Descendant`](Self::Descendant) but one level only. A web-only
-	/// combinator for the same reason: the charcell cascade has no ancestor
-	/// context in [`matches`](Self::matches), so rules using it are `@media
-	/// screen`-gated and skipped by that cascade.
+	/// [`Descendant`](Self::Descendant) but one level only, likewise evaluated
+	/// on both targets.
 	Child {
 		parent: Arc<Self>,
 		child: Arc<Self>,

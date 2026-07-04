@@ -1,6 +1,17 @@
-//! Sidebar widget — a nav-tree built on native `<details>`/`<summary>`, so
-//! collapsible behavior works on the web with no JavaScript and in tui via the
-//! style system's `<details>` rendering. The legacy `sidebar.js` is gone.
+//! Sidebar widget — a nav-tree built on native `<details>`/`<summary>`
+//! disclosure, plus a responsive rail that collapses behind the header's
+//! [`MenuButton`] below [`classes::SIDEBAR_BREAKPOINT_PX`].
+//!
+//! The responsive behavior is authored once, as width-gated rules
+//! (`sidebar_hidden`/`menu_button_visible` in `classes/sidebar.rs`) both
+//! targets evaluate: the browser via the serialized `@media`, the charcell
+//! cascade against its surface's [`MediaViewport`]. Only the stateful half —
+//! seeding `aria-hidden` from the viewport and toggling it from the menu
+//! button — needs a runtime, and it exists as twins sharing the breakpoint
+//! constant: `sidebar.js` on the web, [`sync_sidebar_breakpoint`] plus the
+//! generic `aria-controls` disclosure observer
+//! ([`toggle_aria_controls_on_click`]) on the terminal. Keep the twins in
+//! lockstep.
 //!
 //! [`SidebarNode`] is the render tree the widget consumes; `beet_router`'s
 //! `SidebarState` collects it from a `RouteTree`, applying per-route
@@ -44,13 +55,14 @@ impl SidebarNode {
 /// its node is `expanded`); leaves become `<a>` links, marked `aria-current`
 /// when `active`.
 ///
-/// Ships its own [`SidebarScript`]: on the web the rail collapses below
+/// Ships its own [`SidebarScript`]: on both targets the rail collapses below
 /// [`classes::SIDEBAR_BREAKPOINT_PX`] and is toggled by a [`MenuButton`] in the
-/// header. Served with no `aria-hidden` attribute so the CSS-only default is
-/// correct before any script runs: the `sidebar-hidden` rule hides the rail
-/// below the breakpoint unless the script has set `aria-hidden="false"`, so a
-/// narrow-screen load never flashes the rail. Wide screens (and the terminal,
-/// where the script is inert and the rule is skipped) show it as before.
+/// header. Served with no `aria-hidden` attribute so the rule-only default is
+/// correct before any runtime acts: the `sidebar-hidden` rule hides the rail
+/// below the breakpoint unless something has set `aria-hidden="false"`, so a
+/// narrow load never flashes the rail. The script then keeps the attribute in
+/// sync on the web; [`sync_sidebar_breakpoint`] and the `aria-controls`
+/// observer do the same on the terminal.
 #[template]
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	let items: Vec<_> = nodes
@@ -66,9 +78,11 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 }
 
 /// Emits the bundled responsive-sidebar script as an inline `<script>`, with the
-/// breakpoint injected so the resize handler matches the CSS. Bundled with
-/// [`Sidebar`]; standalone only so its world-free body stays out of the tree
-/// match in [`sidebar_item`].
+/// breakpoint injected so the resize handler matches the CSS. Web-only in
+/// effect (a terminal never executes scripts); its native twin is
+/// [`sync_sidebar_breakpoint`] plus the `aria-controls` disclosure observer.
+/// Bundled with [`Sidebar`]; standalone only so its world-free body stays out
+/// of the tree match in [`sidebar_item`].
 #[template]
 pub fn SidebarScript() -> impl Bundle {
 	let body = format!(
@@ -83,9 +97,18 @@ pub fn SidebarScript() -> impl Bundle {
 
 /// The sidebar toggle for the app bar — a hamburger icon button wired to
 /// `#sidebar` via `aria-controls`. Hidden by default and revealed below
-/// [`classes::SIDEBAR_BREAKPOINT_PX`] by the `menu-button` rules; [`Sidebar`]'s
-/// [`SidebarScript`] binds its click to collapse/expand the rail. Place it in
-/// the header's leading slot, left of the title.
+/// [`classes::SIDEBAR_BREAKPOINT_PX`] by the `menu-button` rules on both
+/// targets; the click is bound by [`SidebarScript`] on the web and the generic
+/// `aria-controls` disclosure observer on the terminal. Place it in the
+/// header's leading slot, left of the title.
+///
+/// One hamburger glyph per target, forked by the `terminal-hidden`/
+/// `terminal-only` utility classes: `☰` (U+2630) suits the web but is East
+/// Asian *ambiguous-width* — a CJK-configured terminal renders it two cells
+/// wide while the charcell engine paints one, smearing neighbours — and a
+/// terminal cannot scale it up via `font-size`. `三` (U+4E09) is unambiguously
+/// Wide: two cells on every terminal, three clean strokes, the largest
+/// single-line hamburger a char grid can draw.
 #[template]
 pub fn MenuButton() -> impl Bundle {
 	rsx! {
@@ -94,8 +117,72 @@ pub fn MenuButton() -> impl Bundle {
 			aria-controls="sidebar"
 			aria-label="Toggle navigation"
 			{Classes::new([classes::BTN, classes::BTN_ICON, classes::MENU_BUTTON])}>
-			"☰"
+			<span {Classes::new([classes::TERMINAL_HIDDEN])}>"☰"</span>
+			<span {Classes::new([classes::TERMINAL_ONLY])}>"三"</span>
 		</button>
+	}
+}
+
+/// Native twin of `sidebar.js`'s init/`resize` wiring: seed the rail's
+/// `aria-hidden` from the surface width, and re-seed when a resize crosses
+/// [`classes::SIDEBAR_BREAKPOINT_PX`] — so the width-gated `sidebar-hidden`
+/// rule and the [`MenuButton`] toggle behave exactly like the web. The click
+/// itself rides the generic `aria-controls` disclosure observer
+/// ([`toggle_aria_controls_on_click`]).
+///
+/// Mirrors the script's rules per live surface (each SSH session tracks its
+/// own `wasNarrow`): only a *crossing* re-seeds, so a manual toggle survives
+/// same-side resizes, and a freshly built page — its rail carrying no
+/// `aria-hidden`, like a fresh DOM on page load — is seeded once; `Added`
+/// elements are the cheap signal a page may have been (re)built.
+pub fn sync_sidebar_breakpoint(
+	mut was_narrow: Local<HashMap<Entity, bool>>,
+	mut commands: Commands,
+	surfaces: Query<(Entity, &MediaViewport), With<DoubleBuffer>>,
+	added_elements: Query<(), Added<Element>>,
+	children: Query<&Children>,
+	portals: Query<&Portal>,
+	attributes: Query<&Attributes>,
+	attr_keys: Query<&Attribute>,
+	mut values: Query<&mut Value>,
+	mut states: Query<&mut ElementStateMap>,
+) {
+	let fresh_elements = !added_elements.is_empty();
+	for (surface, viewport) in surfaces.iter() {
+		// strictly-below, exactly like the script's `narrow()`
+		let narrow =
+			viewport.width_px() < classes::SIDEBAR_BREAKPOINT_PX as f32;
+		let crossed = was_narrow
+			.insert(surface, narrow)
+			.is_none_or(|previous| previous != narrow);
+		if !crossed && !fresh_elements {
+			continue;
+		}
+		let Some(sidebar) = find_by_id(
+			&children, &portals, &attributes, &attr_keys, &values, surface,
+			"sidebar",
+		) else {
+			continue;
+		};
+		// a crossing re-seeds unconditionally (collapsing/restoring even a
+		// manually toggled rail, like the script); a fresh page only seeds a
+		// rail that carries no attribute yet.
+		if !crossed
+			&& attr_entity(&attributes, &attr_keys, sidebar, "aria-hidden")
+				.is_some()
+		{
+			continue;
+		}
+		set_attr_str(
+			&mut commands,
+			&mut values,
+			&mut states,
+			&attributes,
+			&attr_keys,
+			sidebar,
+			"aria-hidden",
+			if narrow { "true" } else { "false" },
+		);
 	}
 }
 
@@ -137,11 +224,10 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Snippet {
 			.map(|child| sidebar_item(child, false))
 			.collect();
 		let summary = summary_content(display_name, href, active);
-		// One down-caret glyph, always. On the web it's pushed to the right edge
-		// (flex) and CSS rotates it to point right when the group is collapsed
-		// (`details:not([open])`), so it tracks the disclosure state reactively.
-		// The terminal can't rotate and always renders children, so a static
-		// down-caret reads correctly there.
+		// One down-caret glyph, pushed to the right edge (flex). The web rotates
+		// it to point right when the group is collapsed (`details:not([open])`),
+		// tracking the disclosure state reactively; the terminal can't rotate, so
+		// `flip_sidebar_caret` rewrites the glyph with the state instead.
 		let summary_row = rsx! {
 			<summary {Classes::new([classes::SIDEBAR_SUMMARY])}>
 				{summary}
@@ -263,8 +349,19 @@ mod test {
 		]
 	}
 
-	/// Render `template` to plain charcell with the Material rule set.
+	/// Render `template` to plain charcell with the Material rule set, on a
+	/// surface wide enough that the rail sits above the responsive collapse
+	/// breakpoint (64 cells).
 	fn render_plain(
+		template: impl bevy::ecs::template::Template<Output = ()>,
+	) -> String {
+		render_plain_sized(80, template)
+	}
+
+	/// [`render_plain`] at an explicit surface width, for tests that exercise
+	/// the responsive breakpoint.
+	fn render_plain_sized(
+		width: u32,
 		template: impl bevy::ecs::template::Template<Output = ()>,
 	) -> String {
 		let mut world = (
@@ -275,7 +372,7 @@ mod test {
 		)
 			.into_world();
 		let root = world.spawn_template(template).unwrap().id();
-		world.entity_mut(root).insert(FlexBuffer::new(40));
+		world.entity_mut(root).insert(FlexBuffer::new(width));
 		world.run_schedule(crate::parse::PostParseTree);
 		world
 			.entity_mut(root)
@@ -290,7 +387,9 @@ mod test {
 	}
 
 	/// Render the sidebar into a styled [`FlexBuffer`] of fixed `width`, for cell
-	/// inspection (entity ownership, background).
+	/// inspection (entity ownership, background). Narrow widths sit below the
+	/// responsive breakpoint, so the rail is marked `aria-hidden="false"` — the
+	/// open state the seed/toggle runtimes produce live — to keep it rendered.
 	fn render_sidebar_cells(width: u32, nodes: Vec<SidebarNode>) -> FlexBuffer {
 		let mut world = (
 			TemplatePlugin,
@@ -303,26 +402,136 @@ mod test {
 			.spawn_template(rsx! { <Sidebar nodes=nodes/> })
 			.unwrap()
 			.id();
+		world.spawn((
+			AttributeOf::new(root),
+			Attribute::new("aria-hidden"),
+			Value::str("false"),
+		));
 		world.entity_mut(root).insert(FlexBuffer::new(width));
 		world.run_schedule(crate::parse::PostParseTree);
 		world.entity_mut(root).take::<FlexBuffer>().unwrap()
 	}
 
-	/// The menu button is `display: none` on the styled (charcell) target - it is
-	/// a web-only affordance for the narrow-screen sidebar - so its glyph never
-	/// paints. Rendered beside a sibling so the test distinguishes "hidden" from
-	/// "empty buffer": only the sibling survives.
+	/// The menu button is responsive on the terminal exactly like the web:
+	/// hidden above the collapse breakpoint (64 cells), shown below it — and
+	/// with the terminal's wide `三` glyph, never the web's ambiguous-width
+	/// `☰`. Rendered beside a sibling so the wide case distinguishes "hidden"
+	/// from "empty buffer".
 	#[beet_core::test]
-	fn menu_button_hidden_on_terminal() {
-		render_plain(rsx! {
-			<div>
-				<MenuButton/>
-				<span>"Beet"</span>
-			</div>
+	fn menu_button_follows_breakpoint() {
+		let template = || {
+			rsx! {
+				<div>
+					<MenuButton/>
+					<span>"Beet"</span>
+				</div>
+			}
+		};
+		// wide: hidden, only the sibling paints
+		render_plain_sized(80, template())
+			.xpect_contains("Beet")
+			.xnot()
+			.xpect_contains("三");
+		// narrow: shown with the terminal glyph; the web `☰` span stays
+		// terminal-hidden
+		render_plain_sized(40, template())
+			.xpect_contains("三")
+			.xnot()
+			.xpect_contains("☰");
+	}
+
+	/// The entity of the sole `<nav>` element.
+	fn nav_entity(world: &mut World) -> Entity {
+		world
+			.query::<(Entity, &Element)>()
+			.iter(world)
+			.find(|(_, element)| element.tag() == "nav")
+			.map(|(entity, _)| entity)
+			.unwrap()
+	}
+
+	/// The `aria-hidden` value on the sole `<nav>`.
+	fn nav_hidden(world: &mut World) -> Option<SmolStr> {
+		let nav = nav_entity(world);
+		world.with_state::<(
+			Query<&Attributes>,
+			Query<&Attribute>,
+			Query<&mut Value>,
+		), _>(move |(attributes, attr_keys, values)| {
+			attr_string(&attributes, &attr_keys, &values, nav, "aria-hidden")
 		})
-		.xpect_contains("Beet")
-		.xnot()
-		.xpect_contains("☰");
+	}
+
+	/// Overwrite the seeded `aria-hidden` on the sole `<nav>`, simulating the
+	/// menu-button toggle.
+	fn set_nav_hidden(world: &mut World, value: &'static str) {
+		let nav = nav_entity(world);
+		world.with_state::<(
+			Query<&Attributes>,
+			Query<&Attribute>,
+			Query<&mut Value>,
+		), _>(move |(attributes, attr_keys, mut values)| {
+			let attr = attr_entity(&attributes, &attr_keys, nav, "aria-hidden")
+				.unwrap();
+			*values.get_mut(attr).unwrap() = Value::str(value);
+		});
+	}
+
+	/// [`sync_sidebar_breakpoint`] mirrors `sidebar.js`: seed on first sight,
+	/// re-seed only when a resize crosses the breakpoint, leave a manual toggle
+	/// alone on same-side resizes, and seed a freshly built rail like a page
+	/// load.
+	/// Spawn a `<nav id="sidebar">` under `surface` through the template
+	/// substrate (which materializes its attributes).
+	fn spawn_rail(world: &mut World, surface: Entity) {
+		let nav = world
+			.spawn_template(rsx! { <nav id="sidebar">"nav"</nav> })
+			.unwrap()
+			.id();
+		world.entity_mut(nav).insert(ChildOf(surface));
+	}
+
+	#[beet_core::test]
+	fn seeds_sidebar_across_breakpoint() {
+		use bevy::math::UVec2;
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		let system = world.register_system(sync_sidebar_breakpoint);
+		let surface = world
+			.spawn((
+				DoubleBuffer::new(UVec2::new(40, 24)),
+				MediaViewport::new(UVec2::new(40, 24)),
+			))
+			.id();
+		spawn_rail(&mut world, surface);
+		// first sight of a narrow surface seeds hidden, like the script's init
+		world.run_system(system).unwrap();
+		nav_hidden(&mut world).unwrap().xpect_eq("true");
+		// crossing up re-seeds shown
+		world
+			.entity_mut(surface)
+			.insert(MediaViewport::new(UVec2::new(100, 24)));
+		world.run_system(system).unwrap();
+		nav_hidden(&mut world).unwrap().xpect_eq("false");
+		// crossing back down re-seeds hidden
+		world
+			.entity_mut(surface)
+			.insert(MediaViewport::new(UVec2::new(40, 24)));
+		world.run_system(system).unwrap();
+		nav_hidden(&mut world).unwrap().xpect_eq("true");
+		// a manual toggle (the menu button opening the rail) survives a
+		// same-side resize, exactly like the script's `wasNarrow` guard
+		set_nav_hidden(&mut world, "false");
+		world
+			.entity_mut(surface)
+			.insert(MediaViewport::new(UVec2::new(50, 24)));
+		world.run_system(system).unwrap();
+		nav_hidden(&mut world).unwrap().xpect_eq("false");
+		// a freshly built rail (a new page, no attribute yet) re-seeds
+		let nav = nav_entity(&mut world);
+		world.entity_mut(nav).despawn();
+		spawn_rail(&mut world, surface);
+		world.run_system(system).unwrap();
+		nav_hidden(&mut world).unwrap().xpect_eq("true");
 	}
 
 	/// The leading-space indent of the row whose text starts with `label`.

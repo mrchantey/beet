@@ -160,24 +160,38 @@ impl RuleSet {
 	/// across that element's ~30 property lookups, so the 228-rule selector scan
 	/// runs once per element instead of once per property.
 	///
-	/// `@media`-gated rules are skipped *unless* gated by `Terminal`, the one
-	/// query whose context is this cascade: print/screen/reduced-motion are web
-	/// concerns that only affect CSS output, while a `Terminal` rule (eg the
-	/// colored prose headings) applies here and is excluded from CSS.
+	/// `@media`-gated rules apply per [`MediaQuery::applies_in_terminal`]: a
+	/// `Terminal` rule always (the one query whose context is this cascade), a
+	/// width-gated rule when the element's surface `viewport` sits at or below
+	/// its breakpoint, and the web-only queries (print/screen/reduced-motion)
+	/// never — those only affect CSS output.
 	fn matching_rule_indices(
 		&self,
 		el: &ElementView,
 		ancestors: &[ElementView],
+		viewport: Option<MediaViewport>,
 	) -> Vec<usize> {
 		self.rules
 			.iter()
 			.enumerate()
 			.filter(|(_, rule)| {
-				rule.media().is_none_or(MediaQuery::is_terminal)
+				rule.media()
+					.is_none_or(|media| media.applies_in_terminal(viewport))
 					&& rule.selector().matches(el, ancestors)
 			})
 			.map(|(index, _)| index)
 			.collect()
+	}
+
+	/// Whether any registered rule is gated on a viewport-width query
+	/// ([`MediaQuery::MaxWidth`]), ie whether the cascade must resolve each
+	/// element's surface [`MediaViewport`] to match. Width-free rule sets (the
+	/// common case) skip that walk, and `resolve_styles` only re-cascades on a
+	/// surface resize when this holds.
+	pub fn has_width_media(&self) -> bool {
+		self.rules
+			.iter()
+			.any(|rule| matches!(rule.media(), Some(MediaQuery::MaxWidth(_))))
 	}
 
 	/// Whether any registered rule uses a combinator selector (`>` or
@@ -237,6 +251,10 @@ pub struct CascadeMemo {
 	/// once per pass. `None` until first computed; gates the ancestor-chain walk
 	/// so combinator-free rule sets pay nothing for it.
 	has_combinators: Option<bool>,
+	/// Whether the rule set has any width-gated (`MaxWidth`) media rule,
+	/// resolved once per pass; gates the surface-viewport walk the same way
+	/// `has_combinators` gates the ancestor chain.
+	has_width_media: Option<bool>,
 }
 
 #[derive(SystemParam)]
@@ -249,6 +267,9 @@ pub struct RuleSetQuery<'w, 's> {
 	// edge to the layout, so inheritance (eg the color scheme) continues from the
 	// holder that renders it in place.
 	render_refs: Query<'w, 's, &'static PortalOf>,
+	// the surface viewport width-gated media rules resolve against, found by
+	// walking the same Portal-aware parent chain inheritance uses.
+	viewports: Query<'w, 's, &'static MediaViewport>,
 	element_query: ElementQuery<'w, 's>,
 }
 
@@ -336,6 +357,29 @@ impl RuleSetQuery<'_, '_> {
 			})
 	}
 
+	/// The [`MediaViewport`] of the surface `entity` renders into: the nearest
+	/// self-or-ancestor carrying one, walking the same Portal-aware
+	/// [`parent`](Self::parent) chain inheritance uses, so transcluded content
+	/// (eg a live page under a buffer host's slot) resolves the surface that
+	/// renders it. `None` when no surface exists (eg building static HTML
+	/// server-side), which skips width-gated rules.
+	fn surface_viewport(&self, entity: Entity) -> Option<MediaViewport> {
+		let mut current = entity;
+		loop {
+			if let Ok(viewport) = self.viewports.get(current) {
+				return Some(*viewport);
+			}
+			match self.parent(current) {
+				// a self-referential edge would loop; a malformed graph is a clean stop.
+				Some(parent) if parent != current => current = parent,
+				_ => return None,
+			}
+		}
+	}
+
+	/// See [`RuleSet::has_width_media`].
+	pub fn has_width_media(&self) -> bool { self.rule_set.has_width_media() }
+
 	/// The ancestor element views of `entity`, nearest-first, for evaluating the
 	/// combinator selectors (`>`, descendant). Walks the same Portal-aware
 	/// [`parent`](Self::parent) chain inheritance uses, so content transcluded
@@ -391,17 +435,24 @@ impl RuleSetQuery<'_, '_> {
 		// fragment nodes) and the rules matching it, caching both.
 		let el = self.element_query.get_in_ancestors(entity)?;
 		memo.nearest_element.insert(entity, el.entity);
-		// only a combinator rule (`main > *`) needs the ancestor chain, so build
-		// it lazily and only when the rule set has one.
+		// only a combinator rule (`main > *`) needs the ancestor chain, and only
+		// a width-gated rule needs the surface viewport, so resolve each lazily
+		// and only when the rule set calls for it.
 		let needs_ancestors =
 			*memo.has_combinators.get_or_insert_with(|| {
 				self.rule_set.has_combinator_rules()
 			});
+		let needs_viewport = *memo
+			.has_width_media
+			.get_or_insert_with(|| self.rule_set.has_width_media());
 		let matched = memo.matched_rules.entry(el.entity).or_insert_with(|| {
 			let ancestors = needs_ancestors
 				.then(|| self.ancestor_elements(el.entity))
 				.unwrap_or_default();
-			self.rule_set.matching_rule_indices(&el, &ancestors)
+			let viewport = needs_viewport
+				.then(|| self.surface_viewport(el.entity))
+				.flatten();
+			self.rule_set.matching_rule_indices(&el, &ancestors, viewport)
 		});
 		self.rule_set.cascade_in(matched, token)
 	}
@@ -410,6 +461,7 @@ impl RuleSetQuery<'_, '_> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use bevy::math::UVec2;
 
 	token!(Foo, u32);
 	token!(Bar, u32);
@@ -494,6 +546,57 @@ mod tests {
 		selects(&mut world, span).xpect_true();
 		selects(&mut world, em).xpect_false();
 		selects(&mut world, main).xpect_false();
+	}
+
+	/// A rule gating `Foo` behind `max-width: 1024px`.
+	fn max_width_rule() -> Rule {
+		Rule::new()
+			.with_media(MediaQuery::MaxWidth(1024))
+			.with_selector(Selector::Any)
+			.with_value(Foo, 1u32)
+	}
+
+	/// Spawn `<div/>` under a surface `width` cells wide, returning the div.
+	fn div_under_viewport(world: &mut World, width: u32) -> Entity {
+		let surface = world
+			.spawn((
+				MediaViewport::new(UVec2::new(width, 24)),
+				children![rsx! { <div/> }],
+			))
+			.id();
+		world.entity(surface).get::<Children>().unwrap()[0]
+	}
+
+	// a `MaxWidth`-gated rule applies at or below its breakpoint (1024px = 64
+	// cells at 16px per cell), and is skipped above it or when no surface
+	// viewport exists at all (eg building static HTML, where the browser
+	// evaluates the serialized `@media` instead).
+	#[beet_core::test]
+	fn max_width_cascade() {
+		let mut world = World::new();
+		world.insert_resource(RuleSet::default().with_rule(max_width_rule()));
+		let narrow = div_under_viewport(&mut world, 40);
+		let exact = div_under_viewport(&mut world, 64);
+		let wide = div_under_viewport(&mut world, 100);
+		let unhosted = world.spawn(rsx! { <div/> }).id();
+		selects(&mut world, narrow).xpect_true();
+		selects(&mut world, exact).xpect_true();
+		selects(&mut world, wide).xpect_false();
+		selects(&mut world, unhosted).xpect_false();
+	}
+
+	// transcluded content (eg a live page under a buffer host's `Portal` slot)
+	// resolves the surface that renders it across the transclusion boundary.
+	#[beet_core::test]
+	fn max_width_crosses_portals() {
+		let mut world = World::new();
+		world.insert_resource(RuleSet::default().with_rule(max_width_rule()));
+		let content = world.spawn(rsx! { <div/> }).id();
+		world.spawn((
+			MediaViewport::new(UVec2::new(40, 24)),
+			children![Portal::new(content)],
+		));
+		selects(&mut world, content).xpect_true();
 	}
 
 	// the descendant combinator `main em` matches at any depth, unlike `>`.

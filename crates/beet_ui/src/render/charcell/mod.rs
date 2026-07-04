@@ -11,6 +11,7 @@ mod buffer;
 #[cfg(feature = "tui")]
 mod clipboard;
 mod decorate;
+mod disclosure;
 mod double_buffer;
 mod flex;
 mod flex_buffer;
@@ -67,6 +68,7 @@ pub use buffer::*;
 #[cfg(feature = "tui")]
 pub use clipboard::*;
 pub use decorate::*;
+pub use disclosure::*;
 pub use double_buffer::*;
 pub use flex_buffer::*;
 #[cfg(feature = "tui")]

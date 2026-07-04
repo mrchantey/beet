@@ -2,6 +2,7 @@ use super::*;
 use crate::parse::PostParseTree;
 #[cfg(feature = "tui")]
 use crate::parse::RealtimeParsePlugin;
+use crate::prelude::MediaViewport;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
 use beet_core::prelude::*;
@@ -75,7 +76,22 @@ impl Plugin for CharcellTuiPlugin {
 			)
 			// clicking a `<summary>` toggles its `<details>` (the terminal stand-in
 			// for the web's native disclosure).
-			.add_observer(toggle_details_on_click);
+			.add_observer(toggle_details_on_click)
+			// clicking a control carrying `aria-controls` toggles `aria-hidden`
+			// on its target (the ARIA disclosure pattern, eg the menu button
+			// collapsing the sidebar rail).
+			.add_observer(toggle_aria_controls_on_click);
+		// the sidebar rail's breakpoint seeding — the native twin of
+		// `sidebar.js`'s init/resize wiring (the menu-button click rides the
+		// `aria-controls` observer above). After the viewport sync so a resize
+		// seeds the same frame the cascade re-evaluates the width rules.
+		#[cfg(feature = "template")]
+		app.add_systems(
+			PostParseTree,
+			crate::widgets::sync_sidebar_breakpoint
+				.after(sync_media_viewport::<DoubleBuffer>)
+				.before(ResolveStylesSet),
+		);
 	}
 }
 
@@ -118,12 +134,23 @@ impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<StylePlugin>()
 			.register_type::<crate::prelude::ScrollPosition>()
+			.register_type::<MediaViewport>()
 			.add_plugins((
 				// layout + paint pipeline per buffer type; each only acts on entities
 				// carrying its own buffer component, so registering both is harmless.
 				buffer_plugin::<DoubleBuffer>,
 				buffer_plugin::<FlexBuffer>,
 			))
+			// surface size → `MediaViewport`, before the cascade reads it (and
+			// before `resolve_styles`'s `Changed` trigger scans it this frame)
+			.add_systems(
+				PostParseTree,
+				(
+					sync_media_viewport::<DoubleBuffer>,
+					sync_media_viewport::<FlexBuffer>,
+				)
+					.before(ResolveStylesSet),
+			)
 			// decorations run after styles resolve, the paint pipeline after both
 			// decorations and the style transitions it reads displayed values from
 			.configure_sets(
@@ -192,6 +219,32 @@ impl Plugin for CharcellPlugin {
 		// so any router/live app that can copy can also expire the toast.
 		#[cfg(all(feature = "tui", feature = "template"))]
 		app.init_plugin::<crate::prelude::ToastPlugin>();
+	}
+}
+
+/// Mirror each surface buffer's cell size onto its [`MediaViewport`], the
+/// context width-gated media rules
+/// ([`MediaQuery::MaxWidth`](crate::prelude::MediaQuery::MaxWidth)) resolve
+/// against.
+/// `set_if_neq`, so paint's per-frame buffer writes never dirty the cascade —
+/// only a real resize (or first sight) fires `Changed<MediaViewport>`, which
+/// `resolve_styles` picks up to re-cascade the surface's tree. A
+/// [`FlexBuffer`]'s auto-grow height sentinel is harmless here: media queries
+/// only read the width, which is real for every buffer.
+fn sync_media_viewport<B: Component + AsBuffer>(
+	mut commands: Commands,
+	mut buffers: Query<(Entity, &B, Option<&mut MediaViewport>)>,
+) {
+	for (entity, buffer, viewport) in buffers.iter_mut() {
+		let size = MediaViewport::new(buffer.size());
+		match viewport {
+			Some(mut current) => {
+				current.set_if_neq(size);
+			}
+			None => {
+				commands.entity(entity).insert(size);
+			}
+		}
 	}
 }
 
