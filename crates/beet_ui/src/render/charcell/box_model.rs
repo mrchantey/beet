@@ -59,6 +59,9 @@ pub(super) struct BoxModel {
 	/// size to content.
 	pub width: Option<u32>,
 	pub height: Option<u32>,
+	/// Maximum content width in cells (CSS `max-width`), a ceiling the measure and
+	/// layout passes clamp the width down to. `None` for no cap.
+	pub max_width: Option<u32>,
 	/// Minimum content height in cells (CSS `min-height`), a floor the measure and
 	/// layout passes grow the node up to. `None` for no floor.
 	pub min_height: Option<u32>,
@@ -107,6 +110,7 @@ impl BoxModel {
 				padding: URect::default(),
 				width: None,
 				height: None,
+				max_width: None,
 				min_height: None,
 			};
 		};
@@ -133,10 +137,21 @@ impl BoxModel {
 			height: box_style.height.and_then(|length| {
 				explicit_cells(length, vp, containing.map(|c| c.y))
 			}),
+			max_width: box_style.max_width.and_then(|length| {
+				explicit_cells(length, vp, containing.map(|c| c.x))
+			}),
 			min_height: box_style.min_height.and_then(|length| {
 				min_height_cells(length, viewport, containing.map(|c| c.y))
 			}),
 		}
+	}
+
+	/// Clamp a content width (in cells) to the node's `max-width`, or return it
+	/// unchanged when there is no cap. The single point both the measure and
+	/// layout passes route a width through, so `max-width` caps content-sized and
+	/// explicit widths alike.
+	pub fn clamp_width(&self, width: u32) -> u32 {
+		self.max_width.map_or(width, |max| width.min(max))
 	}
 
 	/// The rect after subtracting margin from `containing`.
@@ -192,7 +207,11 @@ pub(super) fn explicit_box_size(
 	let box_model = BoxModel::from_node_in(node, viewport, containing);
 	let overhead = box_model.overhead();
 	(
-		box_model.width.map(|width| width + overhead.x),
+		// clamp the resolved width to `max-width` (eg a `width: 100%` column
+		// capped at its reading measure) before adding the box overhead.
+		box_model
+			.width
+			.map(|width| box_model.clamp_width(width) + overhead.x),
 		box_model.height.map(|height| height + overhead.y),
 	)
 }

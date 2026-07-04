@@ -164,16 +164,29 @@ impl RuleSet {
 	/// query whose context is this cascade: print/screen/reduced-motion are web
 	/// concerns that only affect CSS output, while a `Terminal` rule (eg the
 	/// colored prose headings) applies here and is excluded from CSS.
-	fn matching_rule_indices(&self, el: &ElementView) -> Vec<usize> {
+	fn matching_rule_indices(
+		&self,
+		el: &ElementView,
+		ancestors: &[ElementView],
+	) -> Vec<usize> {
 		self.rules
 			.iter()
 			.enumerate()
 			.filter(|(_, rule)| {
 				rule.media().is_none_or(MediaQuery::is_terminal)
-					&& rule.selector().matches(el)
+					&& rule.selector().matches(el, ancestors)
 			})
 			.map(|(index, _)| index)
 			.collect()
+	}
+
+	/// Whether any registered rule uses a combinator selector (`>` or
+	/// descendant), ie whether the cascade must build the ancestor element chain
+	/// to match. Combinator-free rule sets (the common case) skip that work.
+	fn has_combinator_rules(&self) -> bool {
+		self.rules
+			.iter()
+			.any(|rule| rule.selector().is_combinator_deep())
 	}
 
 	/// Pick the winning declaration for `key` among the pre-matched rules. The
@@ -220,6 +233,10 @@ pub struct CascadeMemo {
 	/// `get_in_ancestors` walk + [`ElementView`] build runs once per entity
 	/// rather than once per resolved property.
 	nearest_element: HashMap<Entity, Entity>,
+	/// Whether the rule set has any combinator (`>`/descendant) rule, resolved
+	/// once per pass. `None` until first computed; gates the ancestor-chain walk
+	/// so combinator-free rule sets pay nothing for it.
+	has_combinators: Option<bool>,
 }
 
 #[derive(SystemParam)]
@@ -319,6 +336,27 @@ impl RuleSetQuery<'_, '_> {
 			})
 	}
 
+	/// The ancestor element views of `entity`, nearest-first, for evaluating the
+	/// combinator selectors (`>`, descendant). Walks the same Portal-aware
+	/// [`parent`](Self::parent) chain inheritance uses, so content transcluded
+	/// into `<main>` is seen as its child, and skips non-element (text/fragment)
+	/// nodes so `main > *` reads the same tree the HTML serializer flattens to.
+	fn ancestor_elements(&self, entity: Entity) -> Vec<ElementView<'_>> {
+		let mut ancestors = Vec::new();
+		let mut current = entity;
+		while let Some(parent) = self.parent(current) {
+			// a self-referential edge would loop; a malformed graph is a clean stop.
+			if parent == current {
+				break;
+			}
+			current = parent;
+			if let Ok(view) = self.element_query.get(parent) {
+				ancestors.push(view);
+			}
+		}
+		ancestors
+	}
+
 	/// Resolves `token` against the `:root` default rule — the lowest-priority
 	/// fallback consulted once the cascade and ancestor walk find nothing.
 	fn resolve_default(
@@ -353,10 +391,18 @@ impl RuleSetQuery<'_, '_> {
 		// fragment nodes) and the rules matching it, caching both.
 		let el = self.element_query.get_in_ancestors(entity)?;
 		memo.nearest_element.insert(entity, el.entity);
-		let matched = memo
-			.matched_rules
-			.entry(el.entity)
-			.or_insert_with(|| self.rule_set.matching_rule_indices(&el));
+		// only a combinator rule (`main > *`) needs the ancestor chain, so build
+		// it lazily and only when the rule set has one.
+		let needs_ancestors =
+			*memo.has_combinators.get_or_insert_with(|| {
+				self.rule_set.has_combinator_rules()
+			});
+		let matched = memo.matched_rules.entry(el.entity).or_insert_with(|| {
+			let ancestors = needs_ancestors
+				.then(|| self.ancestor_elements(el.entity))
+				.unwrap_or_default();
+			self.rule_set.matching_rule_indices(&el, &ancestors)
+		});
 		self.rule_set.cascade_in(matched, token)
 	}
 }
@@ -405,5 +451,67 @@ mod tests {
 			})
 			.unwrap()
 			.xpect_eq(3u32.into());
+	}
+
+	/// The entity of the sole element with `tag`.
+	fn tag_entity(world: &mut World, tag: &str) -> Entity {
+		let mut query = world.query::<(Entity, &Element)>();
+		query
+			.iter(world)
+			.find(|(_, element)| element.tag() == tag)
+			.map(|(entity, _)| entity)
+			.unwrap()
+	}
+
+	/// Whether the combinator rule setting `Foo` selects `entity`. Uses `cascade`
+	/// (a direct selector match) rather than `resolve` so an inherited token's
+	/// ancestor fallback can't be mistaken for a combinator match.
+	fn selects(world: &mut World, entity: Entity) -> bool {
+		world.with_state::<RuleSetQuery, _>(|query| {
+			query.cascade(entity, &Foo.into(), &mut default()).is_ok()
+		})
+	}
+
+	// the charcell cascade evaluates `main > *` against the real ancestor chain:
+	// a direct child matches, a grandchild and main itself do not.
+	#[beet_core::test]
+	fn child_combinator_cascade() {
+		let mut world = World::new();
+		world.insert_resource(RuleSet::default().with_rule(
+			Rule::new()
+				.with_selector(Selector::child(
+					Selector::tag("main"),
+					Selector::Any,
+				))
+				.with_value(Foo, 1u32),
+		));
+		world.spawn(rsx! { <main><span><em/></span></main> });
+		let (span, em, main) = (
+			tag_entity(&mut world, "span"),
+			tag_entity(&mut world, "em"),
+			tag_entity(&mut world, "main"),
+		);
+		selects(&mut world, span).xpect_true();
+		selects(&mut world, em).xpect_false();
+		selects(&mut world, main).xpect_false();
+	}
+
+	// the descendant combinator `main em` matches at any depth, unlike `>`.
+	#[beet_core::test]
+	fn descendant_combinator_cascade() {
+		let mut world = World::new();
+		world.insert_resource(RuleSet::default().with_rule(
+			Rule::new()
+				.with_selector(Selector::descendant(
+					Selector::tag("main"),
+					Selector::tag("em"),
+				))
+				.with_value(Foo, 1u32),
+		));
+		world.spawn(rsx! { <main><span><em/></span></main> });
+		let (em, span) =
+			(tag_entity(&mut world, "em"), tag_entity(&mut world, "span"));
+		selects(&mut world, em).xpect_true();
+		selects(&mut world, span).xpect_false();
 	}
 }

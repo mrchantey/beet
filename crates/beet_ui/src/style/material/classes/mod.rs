@@ -105,7 +105,6 @@ pub fn all_rules() -> Vec<Rule> {
 		// terminal-only heading hue, gated behind `@media` Terminal
 		terminal_headings(),
 		main_content(),
-		main_content_centered(),
 		main_content_measure(),
 		page(),
 		// form controls — state/compound rules first so they win the cascade
@@ -256,9 +255,9 @@ mod tests {
 			// reduced-motion serializes wrapped in its own `@media` at-rule
 			.xpect_contains("@media (prefers-reduced-motion: reduce)")
 			.xpect_contains("transition-duration")
-			// the centred content column: a screen-gated direct-child measure cap
-			.xpect_contains("@media screen")
-			.xpect_contains("main > *");
+			// the centred content column: a direct-child measure cap
+			.xpect_contains("main > *")
+			.xpect_contains("70rem");
 	}
 
 	/// The narrow-screen sidebar collapse is CSS-first: below the breakpoint the

@@ -656,6 +656,53 @@ mod tests {
 		(container.height() > 10).xpect_true();
 	}
 
+	/// The content measure applies in the terminal too: on a wide viewport a
+	/// `main > *` child stops at the 70-cell measure and `align-items: center`
+	/// insets it equally. End-to-end regression for the charcell cascade honouring
+	/// the child combinator (previously web-only, so the terminal ignored it).
+	#[beet_core::test]
+	fn main_content_measure_caps_in_terminal() {
+		use crate::prelude::*;
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<html lang="en">
+					<body {Classes::new([classes::PAGE])}>
+						<div {Classes::new([classes::CONTAINER])}>
+							<main><section>"content"</section></main>
+						</div>
+					</body>
+				</html>
+			})
+			.unwrap()
+			.id();
+		world
+			.entity_mut(root)
+			.insert(Buffer::new(UVec2::new(100, 24)).into_double_buffer());
+		world.run_schedule(crate::parse::PostParseTree);
+		let rects = world
+			.run_system_once(|q: Query<(&Element, &LayoutRect)>| {
+				q.iter()
+					.map(|(el, r)| (el.tag().to_string(), r.0))
+					.collect::<HashMap<_, _>>()
+			})
+			.unwrap();
+		let (main, section) = (rects["main"], rects["section"]);
+		// capped at the 70-cell measure, not main's ~100-cell width
+		section.width().xpect_eq(70);
+		// centred: inset from the left, with equal gaps either side (±1 for an
+		// odd remainder).
+		let (left, right) = (section.min.x - main.min.x, main.max.x - section.max.x);
+		(left > 1).xpect_true();
+		((left - right).abs() <= 1).xpect_true();
+	}
+
 	#[beet_core::test]
 	fn inline_places_children_side_by_side() {
 		let out = render((

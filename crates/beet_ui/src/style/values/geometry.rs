@@ -19,6 +19,10 @@ pub struct BoxStyle {
 	/// `<input>` or a colour swatch) keeps its size on the terminal, not just the
 	/// web.
 	pub width: Option<Length>,
+	/// Maximum content width (CSS `max-width`); `None` for no cap. The charcell
+	/// engine clamps the resolved (or content-sized) width to it, so a
+	/// `max-width` reading column caps its measure on the terminal too.
+	pub max_width: Option<Length>,
 	/// Explicit content height (CSS `height`); `None` sizes to content.
 	pub height: Option<Length>,
 	/// Minimum content height (CSS `min-height`); `None` for no floor. The
@@ -39,6 +43,7 @@ impl BoxStyle {
 		margin: Spacing::DEFAULT,
 		padding: Spacing::DEFAULT,
 		width: None,
+		max_width: None,
 		height: None,
 		min_height: None,
 	};

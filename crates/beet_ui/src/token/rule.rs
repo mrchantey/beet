@@ -256,9 +256,11 @@ impl Rule {
 		self
 	}
 
-	/// Matches all rules, or `true` if empty
-	pub fn matches(&self, el: &ElementView) -> bool {
-		self.selector.matches(el)
+	/// Whether `el` matches this rule's selector; `ancestors` (nearest-first)
+	/// supplies the context the combinator selectors need. See
+	/// [`Selector::matches`].
+	pub fn matches(&self, el: &ElementView, ancestors: &[ElementView]) -> bool {
+		self.selector.matches(el, ancestors)
 	}
 }
 
@@ -417,13 +419,24 @@ impl Selector {
 		}
 	}
 
-	pub fn matches(&self, el: &ElementView) -> bool {
+	/// Whether `el` matches this selector. `ancestors` is `el`'s ancestor
+	/// element views, nearest-first (`ancestors[0]` is the immediate parent),
+	/// used to evaluate the [`Child`](Self::Child)/[`Descendant`](Self::Descendant)
+	/// combinators. Pass `&[]` when no ancestor context is available (as on the
+	/// web, where the browser evaluates combinators); the combinators then never
+	/// match. The charcell cascade supplies the real chain so `main > *` resolves
+	/// on both targets.
+	pub fn matches(&self, el: &ElementView, ancestors: &[ElementView]) -> bool {
 		match self {
 			Selector::Root => true,
 			Selector::Any => true,
 			Selector::Entity(entity) => el.entity == *entity,
-			Selector::AnyOf(rules) => rules.iter().any(|rule| rule.matches(el)),
-			Selector::AllOf(rules) => rules.iter().all(|rule| rule.matches(el)),
+			Selector::AnyOf(rules) => {
+				rules.iter().any(|rule| rule.matches(el, ancestors))
+			}
+			Selector::AllOf(rules) => {
+				rules.iter().all(|rule| rule.matches(el, ancestors))
+			}
 			Selector::Tag(tag) => el.element.tag() == tag.as_str(),
 			Selector::Attribute { key, value } => match value {
 				Some(expected) => el
@@ -434,11 +447,40 @@ impl Selector {
 			},
 			Selector::State(state) => el.contains_state(state),
 			Selector::Class(class) => el.contains_class(class),
-			Selector::Not(inner) => !inner.matches(el),
-			// the charcell cascade resolves one element at a time without ancestor
-			// context, so the combinators can't be evaluated here; they are
-			// web-only constructs serialized to CSS (see the variant docs).
-			Selector::Descendant { .. } | Selector::Child { .. } => false,
+			Selector::Not(inner) => !inner.matches(el, ancestors),
+			// `el` matches when `descendant` matches it and `ancestor` matches
+			// some element above it (evaluated against that ancestor's own tail).
+			Selector::Descendant {
+				ancestor,
+				descendant,
+			} => {
+				descendant.matches(el, ancestors)
+					&& ancestors.iter().enumerate().any(|(index, view)| {
+						ancestor.matches(view, &ancestors[index + 1..])
+					})
+			}
+			// like `Descendant` but the parent must be the *immediate* ancestor.
+			Selector::Child { parent, child } => {
+				child.matches(el, ancestors)
+					&& ancestors.first().is_some_and(|view| {
+						parent.matches(view, &ancestors[1..])
+					})
+			}
+		}
+	}
+
+	/// Whether this selector, or any nested part, is a combinator
+	/// ([`Child`](Self::Child)/[`Descendant`](Self::Descendant)) and so needs
+	/// ancestor context to match. Lets the cascade skip building the ancestor
+	/// chain for the common combinator-free rule set.
+	pub fn is_combinator_deep(&self) -> bool {
+		match self {
+			Selector::Child { .. } | Selector::Descendant { .. } => true,
+			Selector::AnyOf(parts) | Selector::AllOf(parts) => {
+				parts.iter().any(Selector::is_combinator_deep)
+			}
+			Selector::Not(inner) => inner.is_combinator_deep(),
+			_ => false,
 		}
 	}
 }
