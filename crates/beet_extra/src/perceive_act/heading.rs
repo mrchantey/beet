@@ -25,7 +25,7 @@ pub struct ApplyHeadingInput {
 	pub heading: Heading,
 }
 
-/// The direction the body is currently headed, set by [`SetHeading`] and read with
+/// The direction the body is currently headed, set by [`ApplyHeading`] and read with
 /// `Single<&Heading>`.
 #[derive(
 	Debug,

@@ -3,7 +3,7 @@ Perceive-act loop, v1. One process: the shared always-socket agent (`agent.bsx`)
 in-process mock clients, a mock head and a mock body, that connect back over the socket.
 Run it with the sockets backend, selecting the socket server:
 
-    cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket
+    cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --root=. --server=socket
 
 The agent's capability routes forward over the socket to whichever client serves them:
 `take-photo`/`speak-text`/`set-emotion` to the head, `apply-heading` to the body. The

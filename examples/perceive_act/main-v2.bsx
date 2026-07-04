@@ -4,7 +4,7 @@ in-process mock head as v1, but the mock body is swapped for a real wgpu body: a
 that drives off the model's `apply-heading`. That one client swap is the only change from
 v1. Run it with the windowed render stack plus the sockets backend:
 
-    cargo run -p beet-cli --features winit,sockets -- --main=examples/perceive_act/main-v2.bsx --server=socket
+    cargo run -p beet-cli --features winit,sockets -- --main=examples/perceive_act/main-v2.bsx --root=. --server=socket
 
 `<WgpuBody>` opens a window with the fox over a ground plane and serves `apply-heading` by
 mapping the chosen `Heading` onto the fox's `DifferentialDrive` through the agnostic
