@@ -102,10 +102,7 @@ pub(super) fn measure_node(
 	// terminal window).
 	let content_size = UVec2::new(
 		box_model.clamp_width(box_model.width.unwrap_or(content_size.x)),
-		box_model
-			.height
-			.unwrap_or(content_size.y)
-			.max(box_model.min_height.unwrap_or(0)),
+		box_model.clamp_height(box_model.height.unwrap_or(content_size.y)),
 	);
 	(content_size + overhead).xok()
 }

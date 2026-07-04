@@ -59,12 +59,16 @@ pub(super) struct BoxModel {
 	/// size to content.
 	pub width: Option<u32>,
 	pub height: Option<u32>,
-	/// Maximum content width in cells (CSS `max-width`), a ceiling the measure and
-	/// layout passes clamp the width down to. `None` for no cap.
+	/// Content-width bounds in cells (CSS `min-width`/`max-width`): a floor the
+	/// measure and layout passes grow the width up to, and a ceiling they clamp it
+	/// down to. `None` for no bound on that side.
+	pub min_width: Option<u32>,
 	pub max_width: Option<u32>,
-	/// Minimum content height in cells (CSS `min-height`), a floor the measure and
-	/// layout passes grow the node up to. `None` for no floor.
+	/// Content-height bounds in cells (CSS `min-height`/`max-height`), the height
+	/// twins of the width bounds (eg `min-height: 100vh` fills the terminal
+	/// window). `None` for no bound on that side.
 	pub min_height: Option<u32>,
+	pub max_height: Option<u32>,
 }
 
 impl BoxModel {
@@ -110,8 +114,10 @@ impl BoxModel {
 				padding: URect::default(),
 				width: None,
 				height: None,
+				min_width: None,
 				max_width: None,
 				min_height: None,
+				max_height: None,
 			};
 		};
 
@@ -137,21 +143,36 @@ impl BoxModel {
 			height: box_style.height.and_then(|length| {
 				explicit_cells(length, vp, containing.map(|c| c.y))
 			}),
+			min_width: box_style.min_width.and_then(|length| {
+				explicit_cells(length, vp, containing.map(|c| c.x))
+			}),
 			max_width: box_style.max_width.and_then(|length| {
 				explicit_cells(length, vp, containing.map(|c| c.x))
 			}),
 			min_height: box_style.min_height.and_then(|length| {
 				min_height_cells(length, viewport, containing.map(|c| c.y))
 			}),
+			max_height: box_style.max_height.and_then(|length| {
+				explicit_cells(length, vp, containing.map(|c| c.y))
+			}),
 		}
 	}
 
-	/// Clamp a content width (in cells) to the node's `max-width`, or return it
-	/// unchanged when there is no cap. The single point both the measure and
-	/// layout passes route a width through, so `max-width` caps content-sized and
-	/// explicit widths alike.
+	/// Clamp a content width (in cells) into the node's `min-width`/`max-width`
+	/// bounds, or return it unchanged when neither is set. CSS order: the cap
+	/// applies first, then the floor wins any conflict. The single point both the
+	/// measure and layout passes route a width through, so the bounds apply to
+	/// content-sized and explicit widths alike.
 	pub fn clamp_width(&self, width: u32) -> u32 {
-		self.max_width.map_or(width, |max| width.min(max))
+		let capped = self.max_width.map_or(width, |max| width.min(max));
+		self.min_width.map_or(capped, |min| capped.max(min))
+	}
+
+	/// Clamp a content height (in cells) into the node's `min-height`/`max-height`
+	/// bounds, the height twin of [`clamp_width`](Self::clamp_width).
+	pub fn clamp_height(&self, height: u32) -> u32 {
+		let capped = self.max_height.map_or(height, |max| height.min(max));
+		self.min_height.map_or(capped, |min| capped.max(min))
 	}
 
 	/// The rect after subtracting margin from `containing`.
@@ -207,12 +228,14 @@ pub(super) fn explicit_box_size(
 	let box_model = BoxModel::from_node_in(node, viewport, containing);
 	let overhead = box_model.overhead();
 	(
-		// clamp the resolved width to `max-width` (eg a `width: 100%` column
-		// capped at its reading measure) before adding the box overhead.
+		// clamp the resolved size into the `min`/`max` bounds (eg a `width: 100%`
+		// column capped at its reading measure) before adding the box overhead.
 		box_model
 			.width
 			.map(|width| box_model.clamp_width(width) + overhead.x),
-		box_model.height.map(|height| height + overhead.y),
+		box_model
+			.height
+			.map(|height| box_model.clamp_height(height) + overhead.y),
 	)
 }
 

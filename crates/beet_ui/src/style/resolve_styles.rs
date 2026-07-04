@@ -368,9 +368,11 @@ fn resolve_box(
 		margin,
 		padding,
 		width: query.resolve(entity, Width, memo).ok(),
+		min_width: query.resolve(entity, MinWidth, memo).ok(),
 		max_width: query.resolve(entity, MaxWidth, memo).ok(),
 		height: query.resolve(entity, Height, memo).ok(),
 		min_height: query.resolve(entity, MinHeight, memo).ok(),
+		max_height: query.resolve(entity, MaxHeight, memo).ok(),
 	}
 	.xok()
 }

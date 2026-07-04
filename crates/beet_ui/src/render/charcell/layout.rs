@@ -747,25 +747,30 @@ mod tests {
 			.count()
 	}
 
-	/// A percentage `width` resolves against the containing block in the layout
-	/// pass (the measure pass leaves it content-sized), so a `width: 50%` block in
-	/// block flow occupies half its container's content width on the terminal.
-	/// A half-width block child whose `width` is the given [`Length`], filled with
-	/// `bg`. Wrapped in an explicit block container so the child is block-level
-	/// (an inline-level node would not get a box fill, matching CSS).
-	fn sized_block(width: Length, bg: Color) -> impl Bundle {
+	/// A block child carrying `box_style`, filled with `bg`. Wrapped in an explicit
+	/// block container so the child is block-level (an inline-level node would not
+	/// get a box fill, matching CSS).
+	fn bg_block(box_style: BoxStyle, bg: Color) -> impl Bundle {
 		(LayoutStyle::default(), children![(
 			LayoutStyle::default(),
-			BoxStyle {
-				width: Some(width),
-				..default()
-			},
+			box_style,
 			VisualStyle {
 				background: Some(bg),
 				..default()
 			},
 			children![rsx! {"x"}],
 		)])
+	}
+
+	/// A block child whose `width` is the given [`Length`], filled with `bg`.
+	fn sized_block(width: Length, bg: Color) -> impl Bundle {
+		bg_block(
+			BoxStyle {
+				width: Some(width),
+				..default()
+			},
+			bg,
+		)
 	}
 
 	/// A percentage `width` resolves against the containing block in the layout
@@ -789,6 +794,38 @@ mod tests {
 		let buffer = Buffer::new(UVec2::new(20, 4))
 			.populate(sized_block(Length::ViewportWidth(50.), bg));
 		fill_width(&buffer, bg, 0).xpect_eq(10);
+	}
+
+	/// `min-width` floors a box narrower than it, growing a two-cell width up to it.
+	#[beet_core::test]
+	fn min_width_floors_narrow_box() {
+		let bg = Color::srgb(0.2, 0.4, 0.8);
+		let buffer = Buffer::new(UVec2::new(20, 4)).populate(bg_block(
+			BoxStyle {
+				width: Some(Length::Rem(2.)),
+				min_width: Some(Length::Rem(8.)),
+				..default()
+			},
+			bg,
+		));
+		fill_width(&buffer, bg, 0).xpect_eq(8);
+	}
+
+	/// `max-height` caps a box, clamping an explicit six-row height to two rows.
+	#[beet_core::test]
+	fn max_height_caps_box() {
+		let bg = Color::srgb(0.2, 0.4, 0.8);
+		let buffer = Buffer::new(UVec2::new(20, 8)).populate(bg_block(
+			BoxStyle {
+				height: Some(Length::Rem(6.)),
+				max_height: Some(Length::Rem(2.)),
+				..default()
+			},
+			bg,
+		));
+		// rows 0-1 are painted; row 2 is past the two-row cap
+		(fill_width(&buffer, bg, 1) > 0).xpect_true();
+		fill_width(&buffer, bg, 2).xpect_eq(0);
 	}
 
 	/// No rendered line may exceed the buffer width, otherwise the terminal

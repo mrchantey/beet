@@ -213,12 +213,10 @@ pub(super) fn resolve_height(
 		// block container: stack children, each flowed at the constrained width
 		_ => resolve_block_height(node, query, content_width, viewport),
 	};
-	// an explicit `height` overrides the resolved content height; a `min-height`
-	// floors it (eg `100vh` to fill the terminal window).
-	let content_height = box_model
-		.height
-		.unwrap_or(content_height)
-		.max(box_model.min_height.unwrap_or(0));
+	// an explicit `height` overrides the resolved content height; `min-height`
+	// floors it (eg `100vh` to fill the terminal window) and `max-height` caps it.
+	let content_height =
+		box_model.clamp_height(box_model.height.unwrap_or(content_height));
 	content_height + overhead.y
 }
 

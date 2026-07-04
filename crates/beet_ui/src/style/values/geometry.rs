@@ -19,6 +19,9 @@ pub struct BoxStyle {
 	/// `<input>` or a colour swatch) keeps its size on the terminal, not just the
 	/// web.
 	pub width: Option<Length>,
+	/// Minimum content width (CSS `min-width`); `None` for no floor. The charcell
+	/// engine grows the width up to it, the width twin of [`min_height`](Self::min_height).
+	pub min_width: Option<Length>,
 	/// Maximum content width (CSS `max-width`); `None` for no cap. The charcell
 	/// engine clamps the resolved (or content-sized) width to it, so a
 	/// `max-width` reading column caps its measure on the terminal too.
@@ -29,6 +32,10 @@ pub struct BoxStyle {
 	/// charcell engine grows a node up to it (eg `min-height: 100vh` fills the
 	/// terminal window), the terminal twin of the web's viewport-fill.
 	pub min_height: Option<Length>,
+	/// Maximum content height (CSS `max-height`); `None` for no cap. The charcell
+	/// engine clamps the resolved (or content-sized) height to it, the height twin
+	/// of [`max_width`](Self::max_width).
+	pub max_height: Option<Length>,
 }
 
 pub static BOX_STYLE_DEFAULT: BoxStyle = BoxStyle::DEFAULT;
@@ -43,9 +50,11 @@ impl BoxStyle {
 		margin: Spacing::DEFAULT,
 		padding: Spacing::DEFAULT,
 		width: None,
+		min_width: None,
 		max_width: None,
 		height: None,
 		min_height: None,
+		max_height: None,
 	};
 	/// Set all four border colors at once.
 	pub fn with_border_color(mut self, color: impl Into<Color>) -> Self {
