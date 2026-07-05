@@ -509,7 +509,7 @@ mod test {
 		let surface = world
 			.spawn((
 				DoubleBuffer::new(UVec2::new(40, 24)),
-				MediaViewport::new(640.),
+				MediaViewport::new(640., 768.),
 			))
 			.id();
 		spawn_rail(&mut world, surface);
@@ -517,19 +517,19 @@ mod test {
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 		// crossing up re-seeds shown
-		world.entity_mut(surface).insert(MediaViewport::new(1600.));
+		world.entity_mut(surface).insert(MediaViewport::new(1600., 768.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("false");
 		// crossing down to *exactly* the breakpoint re-seeds hidden: the seed is
 		// inclusive like the `max-width` rule, so no width shows the menu button
 		// over a still-open rail
-		world.entity_mut(surface).insert(MediaViewport::new(1024.));
+		world.entity_mut(surface).insert(MediaViewport::new(1024., 768.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 		// a manual toggle (the menu button opening the rail) survives a
 		// same-side resize, exactly like the script's `wasNarrow` guard
 		set_nav_hidden(&mut world, "false");
-		world.entity_mut(surface).insert(MediaViewport::new(800.));
+		world.entity_mut(surface).insert(MediaViewport::new(800., 768.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("false");
 		// a freshly built rail (a new page, no attribute yet) re-seeds
@@ -682,5 +682,66 @@ mod test {
 		// hovered, the pill must remain (not clear to the rail) in both schemes.
 		active_link_background(classes::DARK_SCHEME, true).xpect_some();
 		active_link_background(classes::LIGHT_SCHEME, true).xpect_some();
+	}
+
+	/// The rendered `三` glyph cell of the responsive [`MenuButton`] under `scheme`,
+	/// optionally hovered, after the terminal cascade settles — as `(foreground,
+	/// background)`. Rendered on a narrow surface (below the collapse breakpoint) so
+	/// the button is shown (`display: flex`).
+	fn menu_glyph_cell(
+		scheme: ClassName,
+		hovered: bool,
+	) -> (Option<bevy::prelude::Color>, Option<bevy::prelude::Color>) {
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<div {Classes::new([scheme])}>
+					<MenuButton/>
+				</div>
+			})
+			.unwrap()
+			.id();
+		world.entity_mut(root).insert(FlexBuffer::new(40));
+		if hovered {
+			let button = world
+				.query::<(Entity, &Element)>()
+				.iter(&world)
+				.find(|(_, element)| element.tag() == "button")
+				.map(|(entity, _)| entity)
+				.unwrap();
+			world
+				.entity_mut(button)
+				.insert(ElementStateMap::with(ElementState::Hovered));
+		}
+		world.run_schedule(crate::parse::PostParseTree);
+		let buffer = world.entity_mut(root).take::<FlexBuffer>().unwrap();
+		buffer
+			.cells()
+			.iter()
+			.find(|cell| cell.symbol_str() == "三")
+			.map(|cell| (cell.style.foreground, cell.style.background))
+			.expect("the `三` glyph paints")
+	}
+
+	/// The terminal menu button's glyph dims on hover exactly like any other
+	/// button: opacity propagates from the hovered `<button>` into the `<span>`
+	/// glyph it wraps, fading its foreground — no menu-button-specific rule.
+	/// Regression: opacity used not to reach the child span, so the glyph never
+	/// dimmed (see `OpacityProp`'s inheritance).
+	#[beet_core::test]
+	fn menu_button_glyph_dims_on_hover_in_terminal() {
+		let (rest_fg, _) = menu_glyph_cell(classes::DARK_SCHEME, false);
+		let (hover_fg, hover_bg) = menu_glyph_cell(classes::DARK_SCHEME, true);
+		// the glyph paints, and its colour fades on hover.
+		rest_fg.xpect_some();
+		(hover_fg != rest_fg).xpect_true();
+		// via the shared dim, not a menu-button-only background fill.
+		hover_bg.xpect_none();
 	}
 }

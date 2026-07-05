@@ -15,6 +15,8 @@ servers (the socket and http servers both default-boot, so no --server flag is n
 
     beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
     beet --main=examples/perceive_act/main-v3.bsx
+    # for running on esp32, cd ../beet_esp and load
+    beet load templates/alvik/perceive-act-body.bsx
 
 Then open https://<this-host>:8337 (any device on the LAN, one-time certificate warning)
 or plain http://127.0.0.1:8337 locally, and grant camera access; the head derives the

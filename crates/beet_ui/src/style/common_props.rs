@@ -135,8 +135,13 @@ css_property!(TransitionDurationProp, Duration, TokenInheritance::NotInherited, 
 css_property!(TransitionEaseProp, EaseFunction, TokenInheritance::NotInherited, "transition-timing-function");
 // Whole-element opacity, driving the interactive hover/active dim. A unitless
 // `f32` in `[0,1]`; the charcell target approximates it by blending colours
-// toward the element surface (see `VisualStyle::apply_opacity`).
-css_property!(OpacityProp, f32, TokenInheritance::NotInherited, "opacity");
+// toward the element surface (see `VisualStyle::apply_opacity`). Inherited so a
+// hovered element's dim reaches the glyphs it wraps in child elements (eg the
+// menu button's `<span>` hamburger) — a char grid can't composite a subtree the
+// way web `opacity` does. The web is unaffected: it keeps its native `opacity`
+// composite from the serialized `:hover` rule.
+// We may need to revisit this in the future with bevy native ui etc
+css_property!(OpacityProp, f32, TokenInheritance::Inherited, "opacity");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 canonical_property!(WordBreakProp, WordBreak, "word-break");
