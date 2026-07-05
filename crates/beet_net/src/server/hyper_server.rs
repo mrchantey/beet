@@ -49,7 +49,9 @@ pub async fn start_hyper_server_with_tcp(
 		.get_ref()
 		.local_addr()
 		.map_err(|err| bevyhow!("Failed to get local address: {}", err))?;
-	info!("Server listening on http://{}", addr);
+	// build the TLS acceptor (if any) before logging so the printed scheme is real
+	let tls = MaybeTls::resolve(&entity).await?;
+	info!("Server listening on {}://{}", tls.http_scheme(), addr);
 	// register the resolved port as the process loopback port when canonical (the
 	// mini server does the same), so an authority-less request loops back here. An
 	// entity with no `HttpServer` still claims it, matching the `canonical` default.
@@ -64,7 +66,7 @@ pub async fn start_hyper_server_with_tcp(
 	// race the accept loop against the shutdown signal: signalling drops the loop
 	// future, releasing the listener so the port closes (the mini server pattern).
 	beet_core::exports::futures_lite::future::or(
-		hyper_accept_loop(entity, listener),
+		hyper_accept_loop(entity, listener, tls),
 		async move {
 			shutdown.wait().await;
 			Result::Ok(())
@@ -78,6 +80,7 @@ pub async fn start_hyper_server_with_tcp(
 async fn hyper_accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
+	tls: MaybeTls,
 ) -> Result {
 	loop {
 		let (tcp, addr) = listener
@@ -86,60 +89,102 @@ async fn hyper_accept_loop(
 			.map_err(|err| bevyhow!("Failed to accept connection: {}", err))
 			.unwrap();
 		trace!("New connection from: {}", addr);
-		let io = BevyIo::new(tcp);
 
+		let tls = tls.clone();
 		entity
 			.run_async_local(async move |entity| {
-				// pass an AsyncEntity to the service_fn
-				let service = service_fn(move |mut req| {
-					let entity = entity.clone();
-
-					async move {
-						// grab the upgrade future before consuming the request; if
-						// the route answers with a `101` we drive it to a `Socket`
-						#[cfg(all(
-							feature = "tungstenite",
-							not(target_arch = "wasm32")
-						))]
-						let on_upgrade = hyper::upgrade::on(&mut req);
-						let req = hyper_to_request(req, addr).await;
-						let res = entity.exchange(req).await;
-						#[cfg(all(
-							feature = "tungstenite",
-							not(target_arch = "wasm32")
-						))]
-						if http_ext::is_websocket_response(&res) {
-							spawn_hyper_upgrade(entity, on_upgrade).await;
-						}
-						let res = response_to_hyper(res).await;
-						res.xok::<Infallible>()
-					}
-				});
-
-				// `.with_upgrades()`: keep the connection alive past the `101` so
-				// hyper can yield the upgraded IO to `hyper::upgrade::on`.
-				if let Err(err) = http1::Builder::new()
-					.timer(BevyTimer)
-					.header_read_timeout(Duration::from_secs(2))
-					// .keep_alive(false)
-					.serve_connection(io, service)
-					.with_upgrades()
-					.await
-				{
-					if err.is_timeout()
-						&& err.xfmt_debug() == "hyper::Error(HeaderTimeout)"
-					{
-						trace!(
-							"Connection closed due to header timeout (normal behavior)"
-						);
-					} else {
-						error!("Error serving connection: {:?}", err);
-					}
+				if let Err(err) = serve_sniffed(entity, tcp, addr, tls).await {
+					error!("Error handling connection from {addr}: {err}");
 				}
 			})
 			.await
 			.ok();
 	}
+}
+
+/// Classify the connection's first bytes and dispatch, mirroring the mini
+/// server: TLS is accepted onto the hyper handler, plaintext is served for
+/// loopback peers and `307`-redirected to https for remote peers. Without
+/// [`Tls`] every connection takes the plaintext path untouched.
+async fn serve_sniffed(
+	entity: AsyncEntity,
+	tcp: async_io::Async<std::net::TcpStream>,
+	addr: SocketAddr,
+	tls: MaybeTls,
+) -> Result {
+	use stream_sniff::Protocol;
+	let (protocol, replay) = Protocol::sniff(tcp).await?;
+	match protocol {
+		Protocol::Empty => Ok(()),
+		Protocol::PlainHttp => {
+			if tls.is_active() && !addr.ip().is_loopback() {
+				let response =
+					stream_sniff::https_redirect_response(replay.prefix())
+						.unwrap_or_else(stream_sniff::tls_required_response);
+				return stream_sniff::write_and_close(replay, response).await;
+			}
+			serve_connection(entity, replay, addr).await
+		}
+		Protocol::Tls => {
+			#[cfg(feature = "secure")]
+			if let Some(server_tls) = tls.get() {
+				let tls_stream = server_tls.accept(replay).await?;
+				return serve_connection(entity, tls_stream, addr).await;
+			}
+			debug!("TLS ClientHello on a plaintext listener, dropping");
+			Ok(())
+		}
+	}
+}
+
+/// Drive one (possibly TLS) connection through hyper's http1 machinery.
+async fn serve_connection<S>(
+	entity: AsyncEntity,
+	stream: S,
+	addr: SocketAddr,
+) -> Result
+where
+	S: 'static + Send + Unpin + futures::AsyncRead + futures::AsyncWrite,
+{
+	let io = BevyIo::new(stream);
+	// pass an AsyncEntity to the service_fn
+	let service = service_fn(move |mut req| {
+		let entity = entity.clone();
+
+		async move {
+			// grab the upgrade future before consuming the request; if
+			// the route answers with a `101` we drive it to a `Socket`
+			#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+			let on_upgrade = hyper::upgrade::on(&mut req);
+			let req = hyper_to_request(req, addr).await;
+			let res = entity.exchange(req).await;
+			#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+			if http_ext::is_websocket_response(&res) {
+				spawn_hyper_upgrade(entity, on_upgrade).await;
+			}
+			let res = response_to_hyper(res).await;
+			res.xok::<Infallible>()
+		}
+	});
+
+	// `.with_upgrades()`: keep the connection alive past the `101` so
+	// hyper can yield the upgraded IO to `hyper::upgrade::on`.
+	if let Err(err) = http1::Builder::new()
+		.timer(BevyTimer)
+		.header_read_timeout(Duration::from_secs(2))
+		// .keep_alive(false)
+		.serve_connection(io, service)
+		.with_upgrades()
+		.await
+	{
+		if err.is_timeout() && err.xfmt_debug() == "hyper::Error(HeaderTimeout)"
+		{
+			trace!("Connection closed due to header timeout (normal behavior)");
+		} else {
+			error!("Error serving connection: {:?}", err);
+		}
+	}
+	Ok(())
 }
 
 /// Drive a hyper connection upgrade to a [`Socket`]: await the upgraded IO,

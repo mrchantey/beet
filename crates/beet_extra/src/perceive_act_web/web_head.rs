@@ -43,11 +43,22 @@ pub fn WebHead(
 
 /// The agent socket url assumed when none is given: the host serving this page,
 /// on the default socket port (the v3 scene runs the head http server and the
-/// agent socket server on one machine).
+/// agent socket server on one machine). Follows the page scheme: an https page
+/// (a `--secure` serve) connects back over wss, since a secure page blocks
+/// plaintext `ws://` as mixed content.
 fn default_agent_url() -> String {
-	let hostname = web_sys::window()
-		.and_then(|window| window.location().hostname().ok())
+	let location = web_sys::window().map(|window| window.location());
+	let hostname = location
+		.as_ref()
+		.and_then(|location| location.hostname().ok())
 		.filter(|hostname| !hostname.is_empty())
 		.unwrap_or_else(|| "127.0.0.1".to_string());
-	format!("ws://{hostname}:8338")
+	let scheme = match location
+		.and_then(|location| location.protocol().ok())
+		.as_deref()
+	{
+		Some("https:") => "wss",
+		_ => "ws",
+	};
+	format!("{scheme}://{hostname}:8338")
 }

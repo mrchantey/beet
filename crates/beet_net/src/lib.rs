@@ -46,6 +46,11 @@ pub mod sockets;
 /// SSH client and server implementations.
 #[cfg(any(feature = "russh_server", feature = "russh_client"))]
 pub mod ssh;
+// TLS serving: the `Tls` component + `MaybeTls` compile under `std` (pure
+// config the native listeners resolve); the rustls acceptor + dev cert
+// machinery stays behind `secure` (native only).
+#[cfg(feature = "std")]
+mod tls;
 /// WebDriver BiDi client for automated browser testing.
 #[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
 pub mod webdriver;
@@ -98,6 +103,8 @@ pub mod prelude {
 	pub use crate::store::*;
 	#[cfg(feature = "std")]
 	pub use crate::store_actions::*;
+	#[cfg(feature = "std")]
+	pub use crate::tls::*;
 	pub use crate::types::*;
 	pub use crate::udp::*;
 	#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]

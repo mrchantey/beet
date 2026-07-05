@@ -50,3 +50,4 @@ App::new()
 | `mdns` / `udp` | mDNS service discovery and UDP sockets |
 | `rustls-tls` | Use rustls for TLS |
 | `native-tls` | Use native TLS implementation |
+| `secure` | TLS serving: the `Tls` component + `--secure` boot flag (self-signed dev cert or provided PEM files) |

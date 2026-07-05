@@ -144,6 +144,11 @@ rustls-tls = [
 	"dep:webpki-roots",
 	"russh?/aws-lc-rs",
 ]
+# TLS serving: a `Tls` component beside `HttpServer`/`SocketServer` wraps the
+# native listeners in a rustls acceptor, with a generated + cached self-signed
+# dev cert (rcgen) or provided PEM files. Grants browsers a secure context on
+# LAN origins (`getUserMedia` etc); see the `tls` module docs.
+secure = ["server", "fs", "rustls-tls", "dep:rcgen", "dep:rustls-pki-types"]
 template_serde = ["beet_core/template_serde", "beet_action?/template_serde"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
@@ -221,6 +226,9 @@ async-native-tls = { version = "0.5", optional = true }
 # ureq uses ring instead of aws-lc-rs so we must too
 futures-rustls = { version = "0.26", optional = true, default-features = false, features = ["ring", "logging", "tls12"] }
 webpki-roots = { version = "1", optional = true }
+#💡 secure (TLS serving): self-signed dev cert generation + PEM loading
+rcgen = { version = "0.14", optional = true }
+rustls-pki-types = { version = "1", optional = true, features = ["std"] }
 
 #💡 server
 async-io = { workspace = true, optional = true }

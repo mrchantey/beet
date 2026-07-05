@@ -15,6 +15,7 @@ impl Plugin for ServerPlugin {
 		app.init_plugin::<AsyncPlugin>()
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
+			.register_type::<Tls>()
 			// the markup load verbs (and their opt-out), so a
 			// `<Router {(.., BootOnLoad)}>` server entry, an `ExchangeOnLoad` script,
 			// or a `RunOnLoad` behaviour scene resolves them.

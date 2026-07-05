@@ -48,7 +48,12 @@ pub async fn start_mini_http_server_with_tcp(
 		.get_ref()
 		.local_addr()
 		.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
-	info!("Mini HTTP server listening on http://{addr}");
+	// build the TLS acceptor (if any) before logging so the printed scheme is real
+	let tls = MaybeTls::resolve(&entity).await?;
+	info!(
+		"Mini HTTP server listening on {}://{addr}",
+		tls.http_scheme()
+	);
 	// register the resolved port as the process loopback port when canonical, so an
 	// authority-less request loops back here (the real port even for `port: 0`). A
 	// listener bound on an entity with no `HttpServer` (eg a bare test router) still
@@ -67,7 +72,7 @@ pub async fn start_mini_http_server_with_tcp(
 	// requests finish on their own (or are cut by process exit when nothing else
 	// holds the process up).
 	beet_core::exports::futures_lite::future::or(
-		accept_loop(entity, listener),
+		accept_loop(entity, listener, tls),
 		async move {
 			shutdown.wait().await;
 			Result::Ok(())
@@ -81,6 +86,7 @@ pub async fn start_mini_http_server_with_tcp(
 async fn accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
+	tls: MaybeTls,
 ) -> Result {
 	loop {
 		let accept_result = listener.accept().await;
@@ -92,10 +98,11 @@ async fn accept_loop(
 			}
 		};
 
+		let tls = tls.clone();
 		entity
 			.run_async(async move |entity| {
 				if let Err(err) =
-					handle_connection(entity, stream, peer_addr).await
+					serve_sniffed(entity, stream, peer_addr, tls).await
 				{
 					error!("Error handling connection from {peer_addr}: {err}");
 				}
@@ -105,13 +112,57 @@ async fn accept_loop(
 	}
 }
 
-/// Handle a single HTTP connection: read the request, dispatch it,
-/// and write the response.
-async fn handle_connection(
+/// Classify the connection's first bytes and dispatch: TLS is accepted onto
+/// the regular handler, plaintext is served for loopback peers (localhost is
+/// already a secure context, and the reload watcher connects there) and
+/// `307`-redirected to https for remote peers. Without [`Tls`] every
+/// connection takes the plaintext path untouched.
+async fn serve_sniffed(
 	entity: AsyncEntity,
-	mut stream: async_io::Async<std::net::TcpStream>,
+	stream: async_io::Async<std::net::TcpStream>,
 	peer_addr: SocketAddr,
+	tls: MaybeTls,
 ) -> Result {
+	use stream_sniff::Protocol;
+	let (protocol, replay) = Protocol::sniff(stream).await?;
+	match protocol {
+		Protocol::Empty => Ok(()),
+		Protocol::PlainHttp => {
+			if tls.is_active() && !peer_addr.ip().is_loopback() {
+				let response =
+					stream_sniff::https_redirect_response(replay.prefix())
+						.unwrap_or_else(stream_sniff::tls_required_response);
+				return stream_sniff::write_and_close(replay, response).await;
+			}
+			handle_connection(entity, replay, peer_addr).await
+		}
+		Protocol::Tls => {
+			#[cfg(feature = "secure")]
+			if let Some(server_tls) = tls.get() {
+				let tls_stream = server_tls.accept(replay).await?;
+				return handle_connection(entity, tls_stream, peer_addr).await;
+			}
+			debug!("TLS ClientHello on a plaintext listener, dropping");
+			Ok(())
+		}
+	}
+}
+
+/// Handle a single HTTP connection: read the request, dispatch it,
+/// and write the response. Generic over the transport so the sniffed
+/// plaintext ([`stream_sniff::ReplayStream`]) and TLS streams land here alike.
+async fn handle_connection<S>(
+	entity: AsyncEntity,
+	mut stream: S,
+	peer_addr: SocketAddr,
+) -> Result
+where
+	S: 'static
+		+ Send
+		+ Unpin
+		+ futures_lite::AsyncRead
+		+ futures_lite::AsyncWrite,
+{
 	use futures_lite::AsyncReadExt;
 	use futures_lite::AsyncWriteExt;
 
@@ -227,11 +278,18 @@ async fn handle_connection(
 /// `Socket`'s thread-bound `SendWrapper` reader is created and polled, mirroring
 /// the side-port [`start_tungstenite_server`](crate::sockets) accept loop.
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-async fn upgrade_connection(
+async fn upgrade_connection<S>(
 	entity: AsyncEntity,
-	stream: async_io::Async<std::net::TcpStream>,
+	stream: S,
 	response: Response,
-) -> Result {
+) -> Result
+where
+	S: 'static
+		+ Send
+		+ Unpin
+		+ futures_lite::AsyncRead
+		+ futures_lite::AsyncWrite,
+{
 	// write the handshake by hand: a `101` keeps the connection open, so it must
 	// not get the `content-length`/`connection: close` `serialize_http_response`
 	// appends for a normal body.
@@ -269,6 +327,52 @@ async fn upgrade_connection(
 		})
 		.await?;
 	Ok(())
+}
+
+/// The mini server behind an active [`Tls`]: https served, plaintext loopback
+/// exempt from the redirect (the reload watcher path).
+#[cfg(all(test, feature = "secure"))]
+mod secure_test {
+	use super::*;
+	use crate::tls::test_client;
+
+	#[beet_core::test]
+	async fn serves_https_and_plaintext_loopback() {
+		let server = HttpServer::new_test(start_mini_http_server_with_tcp);
+		let port = server.0.port.unwrap();
+		std::thread::spawn(move || {
+			App::new()
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn((
+					server,
+					Tls::default(),
+					exchange_handler(|_| {
+						Response::ok().with_body("secure hello")
+					}),
+				))
+				.run();
+		});
+		time_ext::sleep_millis(300).await;
+		let addr: SocketAddr = ([127, 0, 0, 1], port).into();
+
+		// https: a TLS client trusting the dev cert
+		let tls_stream = test_client::connect(addr).await.unwrap();
+		test_client::raw_get(tls_stream, "/")
+			.await
+			.unwrap()
+			.xpect_contains("200")
+			.xpect_contains("secure hello");
+
+		// plaintext from loopback stays served beside TLS
+		let plain = async_io::Async::<std::net::TcpStream>::connect(addr)
+			.await
+			.unwrap();
+		test_client::raw_get(plain, "/")
+			.await
+			.unwrap()
+			.xpect_contains("200")
+			.xpect_contains("secure hello");
+	}
 }
 
 #[cfg(test)]

@@ -391,6 +391,9 @@ web = ["router_render", "json", "markdown", "serde_plain", "style", "template"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
+# TLS serving: the `Tls` component + `--secure` boot flag (self-signed dev
+# certs for a LAN secure context, or provided PEM files). See beet_net's docs.
+secure = ["rustls-tls", "beet_net/secure"]
 lambda = ["rustls-tls", "beet_net?/lambda"]
 aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk","beet_router?/aws_sdk"]
 deploy = ["infra", "beet_infra?/deploy"]

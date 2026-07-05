@@ -73,6 +73,9 @@ net = ["beet/ureq","beet/rustls-tls"]
 # never links tungstenite. Run with:
 # `cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket`.
 sockets = ["beet/tungstenite"]
+# TLS serving (`--secure`, the `Tls` component): https/wss with a generated
+# self-signed dev cert, so LAN devices get a secure context (webcam, mic).
+secure = ["beet/secure"]
 # The live terminal target for `beet present`: the navigable charcell host and
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.

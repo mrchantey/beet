@@ -17,8 +17,9 @@ servers (no `--server` flag boots every declared server, or name them explicitly
     beet --features=thread,sockets --main=examples/perceive_act/main-v3.bsx --server=socket,http
 
 Then open http://<this-host>:8337 (any device on the LAN) and grant camera access; the
-head derives the agent's socket url from the page host. The webcam needs a secure
-context: localhost is fine, but a phone over plain LAN http is not, see the README.
+head derives the agent's socket url (and its ws/wss scheme) from the page location. The
+webcam needs a secure context: localhost is fine, but a phone over plain LAN http is
+not; add the `secure` feature and the `--secure` flag to serve https/wss, see the README.
 Needs `OPENAI_API_KEY`. `sockets` links the websocket transport, `thread` the agent
 LLM; serving the page + assets rides the default native router.
 -->

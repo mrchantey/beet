@@ -88,6 +88,11 @@ mod lambda_server;
 mod mini_http_server;
 #[cfg(feature = "std")]
 mod server_plugin;
+// Classify accepted connections by their first bytes (TLS ClientHello vs
+// plaintext http) with replay: the seam that lets a `Tls` listener keep
+// serving plaintext peers, and any socket listener answer a browser `GET`.
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+pub mod stream_sniff;
 #[cfg(all(
 	feature = "server",
 	feature = "json",

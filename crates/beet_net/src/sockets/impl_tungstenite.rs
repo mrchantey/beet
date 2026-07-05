@@ -1,7 +1,9 @@
+use crate::prelude::MaybeTls;
 use crate::prelude::Scheme;
 use crate::prelude::Url;
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
+use crate::prelude::stream_sniff;
 use async_io::Async;
 use async_lock::Mutex;
 use async_tungstenite::accept_async;
@@ -101,7 +103,9 @@ pub async fn connect_tungstenite(url: &Url) -> Result<Socket> {
 				let (ws_stream, _resp) =
 					client_async(url_string.as_str(), tls_stream)
 						.await
-						.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
+						.map_err(|e| {
+							bevyhow!("WebSocket connect failed: {}", e)
+						})?;
 				let (sink, stream) = ws_stream.split();
 				(Box::pin(sink), Box::pin(stream))
 			}
@@ -225,10 +229,16 @@ pub(crate) async fn start_tungstenite_server_with_tcp(
 		.local_addr()
 		.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
 
-	info!("WebSocket server listening on ws://{}", local_addr);
+	// build the TLS acceptor (if any) before logging so the printed scheme is real
+	let tls = MaybeTls::resolve(&entity).await?;
+	info!(
+		"WebSocket server listening on {}://{}",
+		tls.ws_scheme(),
+		local_addr
+	);
 
 	beet_core::exports::futures_lite::future::or(
-		socket_accept_loop(entity, listener),
+		socket_accept_loop(entity, listener, tls),
 		async move {
 			shutdown.wait().await;
 			Result::Ok(())
@@ -243,6 +253,7 @@ pub(crate) async fn start_tungstenite_server_with_tcp(
 async fn socket_accept_loop(
 	entity: AsyncEntity,
 	listener: Async<TcpListener>,
+	tls: MaybeTls,
 ) -> Result {
 	loop {
 		let (stream, addr) = listener
@@ -252,21 +263,90 @@ async fn socket_accept_loop(
 
 		trace!("New WebSocket connection from: {}", addr);
 
+		let tls = tls.clone();
 		entity
-			.run_async_local(move |entity| handle_connection(entity, stream))
+			.run_async_local(move |entity| async move {
+				if let Err(err) =
+					handle_connection(entity, stream, addr, tls).await
+				{
+					debug!("socket connection from {addr} failed: {err}");
+				}
+			})
 			.await
 			.ok();
 	}
 }
+
+/// Classify one accepted connection and serve it: a TLS `ClientHello` is
+/// accepted (when [`Tls`] is active) and handled inside the tunnel; plaintext
+/// stays served, so native and embedded `ws://` peers (which have no
+/// secure-context requirement) keep working beside a TLS-served browser. With
+/// provided (real) certificates remote plaintext is rejected instead: the
+/// generated dev cert grants no transport security, real certs might.
 async fn handle_connection(
 	server: AsyncEntity,
 	stream: Async<TcpStream>,
+	peer_addr: std::net::SocketAddr,
+	tls: MaybeTls,
 ) -> Result {
-	let ws_stream = accept_async(stream)
-		.await
-		.map_err(|e| bevyhow!("WebSocket handshake failed: {}", e))?;
-	server.spawn_child(socket_from_ws_stream(ws_stream)).await;
-	Ok(())
+	use crate::prelude::stream_sniff::Protocol;
+	let (protocol, replay) = Protocol::sniff(stream).await?;
+	match protocol {
+		Protocol::Empty => Ok(()),
+		Protocol::Tls => {
+			#[cfg(feature = "secure")]
+			if let Some(server_tls) = tls.get() {
+				let tls_stream = server_tls.accept(replay).await?;
+				return serve_socket(server, tls_stream, true).await;
+			}
+			debug!("TLS ClientHello on a plaintext socket listener, dropping");
+			Ok(())
+		}
+		Protocol::PlainHttp => {
+			if tls.provided() && !peer_addr.ip().is_loopback() {
+				return stream_sniff::write_and_close(
+					replay,
+					stream_sniff::tls_required_response(),
+				)
+				.await;
+			}
+			serve_socket(server, replay, false).await
+		}
+	}
+}
+
+/// Sniff the (possibly decrypted) http head: a websocket handshake becomes a
+/// child [`Socket`], anything else (a browser `GET`) gets the landing page
+/// instead of a failed handshake. Over TLS the landing page doubles as the
+/// per-origin cert acceptance step: browsers show no acceptance UI for a
+/// failed `wss://` handshake, so visiting the socket port over https once is
+/// how the exception lands.
+async fn serve_socket<S>(server: AsyncEntity, stream: S, tls: bool) -> Result
+where
+	S: 'static + Send + Unpin + futures::AsyncRead + futures::AsyncWrite,
+{
+	use crate::prelude::stream_sniff::Protocol;
+	let (protocol, replay) = Protocol::sniff(stream).await?;
+	match protocol {
+		Protocol::Empty => Ok(()),
+		Protocol::Tls => bevybail!("unexpected nested TLS handshake"),
+		Protocol::PlainHttp
+			if stream_sniff::head_is_websocket_upgrade(replay.prefix()) =>
+		{
+			let ws_stream = accept_async(replay)
+				.await
+				.map_err(|e| bevyhow!("WebSocket handshake failed: {}", e))?;
+			server.spawn_child(socket_from_ws_stream(ws_stream)).await;
+			Ok(())
+		}
+		Protocol::PlainHttp => {
+			stream_sniff::write_and_close(
+				replay,
+				stream_sniff::socket_landing_response(tls),
+			)
+			.await
+		}
+	}
 }
 
 /// Build a cross-platform [`Socket`] from an already-handshaked tungstenite
@@ -489,6 +569,70 @@ mod tests {
 				}
 			}
 			socket.close(None).await.ok();
+		}
+	}
+
+	/// The [`SocketServer`] behind an active [`Tls`]: wss served, plaintext
+	/// `ws://` peers (native, embedded) still served on the same port, and a
+	/// plain browser `GET` answered with the landing page.
+	#[cfg(feature = "secure")]
+	mod secure_tests {
+		use super::super::*;
+		use crate::prelude::Tls;
+		// explicit: the sockets enum must win over bevy's `Message` trait
+		use crate::sockets::Message;
+		use crate::tls::test_client;
+		use async_tungstenite::client_async;
+		use beet_core::prelude::*;
+
+		#[beet_core::test]
+		async fn serves_wss_plain_ws_and_landing() {
+			let server = SocketServer::new_test();
+			let port = server.0.port.unwrap();
+			std::thread::spawn(move || {
+				App::new()
+					.add_plugins((
+						MinimalPlugins,
+						SocketServerPlugin::default(),
+					))
+					.spawn((server, Tls::default()))
+					.run();
+			});
+			time_ext::sleep_millis(300).await;
+			let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
+
+			// wss: a websocket handshake through the dev-cert TLS tunnel
+			let tls_stream = test_client::connect(addr).await.unwrap();
+			let (mut ws, _resp) =
+				client_async(format!("ws://127.0.0.1:{port}"), tls_stream)
+					.await
+					.unwrap();
+			ws.send(TungMessage::text("over wss")).await.unwrap();
+			ws.close(None).await.ok();
+
+			// plaintext ws to the same port keeps working (native/esp peers)
+			let mut client = Socket::connect(format!("ws://127.0.0.1:{port}"))
+				.await
+				.unwrap();
+			client.send(Message::text("plain")).await.unwrap();
+			client.close(None).await.ok();
+
+			// a browser GET (no upgrade) over TLS gets the landing page, the
+			// per-origin cert acceptance step
+			let tls_stream = test_client::connect(addr).await.unwrap();
+			test_client::raw_get(tls_stream, "/")
+				.await
+				.unwrap()
+				.xpect_contains("beet socket server")
+				.xpect_contains("wss://");
+
+			// and a plaintext GET gets its ws flavour
+			let plain = Async::<TcpStream>::connect(addr).await.unwrap();
+			test_client::raw_get(plain, "/")
+				.await
+				.unwrap()
+				.xpect_contains("beet socket server")
+				.xpect_contains("ws://");
 		}
 	}
 
