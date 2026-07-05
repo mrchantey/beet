@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use bevy::ecs::system::command;
+use core::panic::Location;
 
 /// Extension trait adding utility methods to [`Commands`].
 #[extend::ext(name=CommandsExt)]
@@ -79,8 +80,16 @@ pub impl EntityCommands<'_> {
 		self
 	}
 
-	/// Queues an asynchronous task to be run in the world context.
+	/// Queues an asynchronous task for this entity.
+	///
+	/// The task receives an [`AsyncEntity`] handle and, being entity-scoped, ends
+	/// cleanly if the entity is despawned while it runs (a long-lived reconnect or
+	/// accept loop outliving a scene swap) rather than routing the resulting error
+	/// to the panicking handler. If the entity is already gone by the time the
+	/// command applies, the task is never spawned and the drop is logged at
+	/// `debug` against the queueing call site.
 	#[cfg(feature = "bevy_async")]
+	#[track_caller]
 	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
@@ -88,12 +97,26 @@ pub impl EntityCommands<'_> {
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
-		self.commands()
-			.queue_async(async move |world| func(world.entity(id)).await);
+		let location = Location::caller();
+		self.commands().queue(move |world: &mut World| {
+			match world.get_entity_mut(id) {
+				Ok(mut entity) => {
+					entity.run_async(func);
+				}
+				Err(_) => debug!(
+					"entity {id} despawned before its queued async task ran (at {location})"
+				),
+			}
+		});
 	}
 
-	/// Queues a local asynchronous task to be run in the world context.
+	/// Queues a local asynchronous task for this entity, the `_local` (thread-bound
+	/// `Fut`) sibling of [`queue_async`](Self::queue_async) with the same
+	/// entity-scoped semantics: it ends cleanly if the entity is despawned while it
+	/// runs, and is never spawned (a `debug` log against the queueing call site) if
+	/// the entity is already gone when the command applies.
 	#[cfg(feature = "bevy_async")]
+	#[track_caller]
 	fn queue_async_local<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
@@ -101,7 +124,16 @@ pub impl EntityCommands<'_> {
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
-		self.commands()
-			.queue_async_local(async move |world| func(world.entity(id)).await);
+		let location = Location::caller();
+		self.commands().queue(move |world: &mut World| {
+			match world.get_entity_mut(id) {
+				Ok(mut entity) => {
+					entity.run_async_local(func);
+				}
+				Err(_) => debug!(
+					"entity {id} despawned before its queued async task ran (at {location})"
+				),
+			}
+		});
 	}
 }

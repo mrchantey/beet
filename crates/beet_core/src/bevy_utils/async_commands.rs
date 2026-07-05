@@ -1238,11 +1238,15 @@ pub impl World {
 #[extend::ext(name=EntityWorldMutAsyncCommandsExt)]
 pub impl EntityWorldMut<'_> {
 	/// Spawns an async task for this entity.
+	///
+	/// `Fut` is [`MaybeSend`] (not `Send`), matching [`AsyncEntityCommands::run`]
+	/// and the other `run_async` variants: the future is only sent across threads
+	/// under `bevy_multithreaded`, where `MaybeSend` already resolves to `Send`.
 	#[track_caller]
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
-		Fut: 'static + Send + Future<Output = Out>,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
@@ -1511,5 +1515,34 @@ mod test {
 			AsyncRunner::tick().await;
 		}
 		reached.get().xpect_true();
+	}
+
+	/// A `queue_async_local` task whose entity is despawned *before* the queued
+	/// command applies is never spawned (it logs the drop at `debug` instead), so
+	/// its body never runs.
+	#[beet_core::test]
+	async fn queued_entity_task_skipped_when_despawned_before_run() {
+		let mut app = test_app();
+		let ran = Store::<bool>::default();
+		let entity = app.world_mut().spawn_empty().id();
+		let ran_inner = ran.clone();
+		// despawn first, then queue: the task's command applies against a gone
+		// entity, so it must skip rather than spawn.
+		app.world_mut()
+			.run_system_once(move |mut commands: Commands| {
+				commands.entity(entity).despawn();
+				commands.entity(entity).queue_async_local(move |_entity| {
+					let ran_inner = ran_inner.clone();
+					async move {
+						ran_inner.set(true);
+					}
+				});
+			})
+			.unwrap();
+		for _ in 0..5 {
+			app.update();
+			AsyncRunner::tick().await;
+		}
+		ran.get().xpect_false();
 	}
 }

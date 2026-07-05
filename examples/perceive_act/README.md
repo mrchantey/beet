@@ -68,8 +68,12 @@ sudo ufw allow from 192.168.86.0/24 to any port 8338 proto tcp
 Instead of the fox, an Arduino Alvik can connect as the body and drive off each heading. From the adjacent `../beet_esp`, with the device plugged in (see that repo for toolchain and flashing details):
 
 ```sh
-cargo run --release --features alvik,sockets        # flash the firmware + monitor
-beet load templates/alvik/perceive-act-body.bsx     # push the body scene (BEET_REMOTE_URL -> device)
+# 1. flash the firmware
+beet flash
+# 2. load the scene
+beet load templates/alvik/perceive-act-body.bsx
+# 3. monitor
+beet monitor
 ```
 
 Set the `url` in `perceive-act-body.bsx` to this host's socket server (`ws://<host>:8338`). The body holds each `apply-heading` reply until the drive step finishes, so the next photo waits for the robot to stop; tune the step with `DriveStepConfig` in that scene. Its transport reconnects with exponential backoff, so the pushed scene survives agent restarts.
