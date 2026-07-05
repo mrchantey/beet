@@ -8,6 +8,8 @@ The release process for the beet website. Validate the SAME site across three en
 
 Run each step as a SEPARATE sub-agent. Do them in series: Dev only after Local is green, Prod only after Dev is green and torn down.
 
+> **Dev MUST be torn down after verification. Only prod stays up.** Dev is a temporary proving ground for the cloud path, not a standing environment: a live dev stack is a real recurring monthly cost. The moment dev verification is green (or fails, or is abandoned), run `just beet-destroy` and confirm no `beet-site--dev--*` S3/ECR resources and no `dev.beet.org` DNS record remain. Never leave dev running.
+
 ## DNS topology
 
 The deploy block is stage-aware (`FargateBeetSiteBlock`, `crates/beet_extra/src/infra/templates.rs`):
