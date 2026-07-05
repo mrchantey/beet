@@ -35,6 +35,7 @@ pub fn cli_registration() -> CrateRegistration {
 			"net",
 			"pdf",
 			"qrcode",
+			"secure",
 			"sockets",
 			"ssh",
 			"thread",

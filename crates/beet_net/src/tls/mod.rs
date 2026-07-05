@@ -10,15 +10,16 @@
 //! certificate warning, on every device and platform.
 //!
 //! Listeners keep sniffing each connection
-//! ([`Protocol::sniff`](crate::prelude::stream_sniff::Protocol)), so serving
-//! TLS is additive: plaintext loopback (the reload watcher, `curl`,
+//! ([`SecureProtocol::sniff`](crate::prelude::stream_sniff::SecureProtocol)),
+//! so serving TLS is additive: plaintext loopback (the reload watcher, `curl`,
 //! `localhost` tabs) and plaintext native websocket peers (an esp body) keep
 //! working, and a remote browser typing `http://` is redirected to `https`.
 //!
 //! Certificates come from the cached self-signed [`DevCert`] by default, or
-//! from provided PEM paths for real certificates; `dev_only` keeps the
-//! component inert in release builds where a platform layer (an ALB in front
-//! of Fargate, a lambda gateway) terminates TLS instead.
+//! from provided PEM paths for real certificates. Managed-platform detection
+//! keeps the component inert where a platform layer terminates TLS instead
+//! (an ALB in front of Fargate, a lambda gateway); `BEET_TLS=on`/`off`
+//! overrides it.
 
 mod tls;
 pub use tls::*;

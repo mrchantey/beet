@@ -44,7 +44,7 @@ pub fn WebHead(
 /// The agent socket url assumed when none is given: the host serving this page,
 /// on the default socket port (the v3 scene runs the head http server and the
 /// agent socket server on one machine). Follows the page scheme: an https page
-/// (a `--secure` serve) connects back over wss, since a secure page blocks
+/// (a `Tls`-serving entry) connects back over wss, since a secure page blocks
 /// plaintext `ws://` as mixed content.
 fn default_agent_url() -> String {
 	let location = web_sys::window().map(|window| window.location());

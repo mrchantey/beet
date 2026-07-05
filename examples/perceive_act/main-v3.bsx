@@ -14,25 +14,28 @@ single binary every wasm example mounts, at `assets/wasm/beet.wasm`), then run b
 servers (no `--server` flag boots every declared server, or name them explicitly):
 
     beet build-wasm --release
-    beet --features=thread,sockets --main=examples/perceive_act/main-v3.bsx --server=socket,http
+    beet --features=thread,sockets,secure --main=examples/perceive_act/main-v3.bsx --server=socket,http
 
-Then open http://<this-host>:8337 (any device on the LAN) and grant camera access; the
-head derives the agent's socket url (and its ws/wss scheme) from the page location. The
-webcam needs a secure context: localhost is fine, but a phone over plain LAN http is
-not; add the `secure` feature and the `--secure` flag to serve https/wss, see the README.
+Then open https://<this-host>:8337 (any device on the LAN, one-time certificate warning)
+or plain http://127.0.0.1:8337 locally, and grant camera access; the head derives the
+agent's socket url (and its ws/wss scheme) from the page location. The webcam needs a
+secure context, so both servers declare `Tls`, serving https/wss from a cached
+self-signed cert while loopback http and native ws stay served, see the README.
 Needs `OPENAI_API_KEY`. `sockets` links the websocket transport, `thread` the agent
-LLM; serving the page + assets rides the default native router.
+LLM, `secure` the TLS serving; the page + assets ride the default native router.
 -->
 <Fragment>
 	<!-- the head routes, wasm binary and eye sprites live workspace-relative -->
 	<StoreRoot src="../.."/>
-	<CrateCheck features="thread,sockets"/>
+	<CrateCheck features="thread,sockets,secure"/>
 	<!-- the always-socket agent: a socket server whose head capabilities forward to the
 	     browser head over the socket, bound by the `whoami` handshake. -->
 	<Template src="examples/perceive_act/agent.bsx"/>
 	<!-- the head server: serves the head page + the wasm binary + the examples/assets the
-	     browser fetches. Its own root, so its route tree is isolated from the agent. -->
-	<Router {(HttpServer{host:[0,0,0,0]}, BootOnLoad)}>
+	     browser fetches. Its own root, so its route tree is isolated from the agent.
+	     `Tls` serves it https (loopback http stays served), the secure context a LAN
+	     device's webcam needs; the agent socket declares the same. -->
+	<Router {(HttpServer{host:[0,0,0,0]}, Tls, BootOnLoad)}>
 		<PackageConfig title="Perceive-act head" description="The robot's browser head"/>
 		<DefaultAppRoutes/>
 		<RoutesDir src="examples/perceive_act/head/routes"/>

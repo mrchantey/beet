@@ -54,7 +54,8 @@ impl Plugin for SocketServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
 			.register_type::<SocketServer>()
-			.register_type::<PersistentSocket>();
+			.register_type::<PersistentSocket>()
+			.register_type::<Tls>();
 
 		// install the tungstenite backend; mirrors `ServerPlugin`. Skipped in
 		// beet_net's own tests, which install a stub per case. `set_socket_server`

@@ -15,8 +15,12 @@ each cycle, keeping the endless loop's request small and fast.
 
 `{Repeat}` loops the thread until the process is killed (Ctrl+C); the boot call parks
 rather than writing `AppExit`. Needs `OPENAI_API_KEY`.
+
+`Tls` serves the socket over wss (`secure` feature), so a browser head on a LAN https
+page (v3) can connect back; plaintext `ws://` clients (the in-process v1/v2 heads, the
+esp body) are unaffected, and managed deployments (lambda/Fargate) serve plaintext.
 -->
-<Router {(SocketServer, BootOnLoad, CapabilityServer)}>
+<Router {(SocketServer, Tls, BootOnLoad, CapabilityServer)}>
 	<!-- capability routes, forwarded per role by the whoami binding; not offered to
 	     the model (outside the actor), the `respond-multi-modal` fan-out and the
 	     camera call them -->

@@ -41,10 +41,20 @@ No in-process clients. A second HTTP server serves a wasm browser head that conn
 
 ```sh
 beet build-wasm --release
-beet --features=thread,sockets --main=examples/perceive_act/main-v3.bsx --server=socket,http
+beet --features=thread,sockets,secure --main=examples/perceive_act/main-v3.bsx --server=socket,http
 ```
 
-Both servers bind all interfaces, so any device on the LAN works: open `http://<this-host>:8337` (or `127.0.0.1` locally) and grant camera access; the head derives the agent's socket url from the page host. The `/debug` route shows the webcam, face, and log on one page. All socket clients reconnect with exponential backoff, so the page survives an agent restart.
+Both servers bind all interfaces, so any device on the LAN works: open `https://<this-host>:8337` (or plain `http://127.0.0.1:8337` locally) and grant camera access; the head derives the agent's socket url from the page location. The `/debug` route shows the webcam, face, and log on one page. All socket clients reconnect with exponential backoff, so the page survives an agent restart.
+
+### Phones and the webcam secure context
+
+Browsers expose the webcam (`navigator.mediaDevices`) only in a secure context: https, `localhost` or `127.0.0.1`. A phone opening plain `http://192.168.x.x:8337` is an insecure origin, so `take-photo` fails (with remedies in the error). Both v3 servers therefore declare a `Tls` component in their scenes (`main-v3.bsx`, `agent.bsx`): a binary with the `secure` feature serves https and wss automatically, no flags.
+
+A self-signed certificate is generated and cached in `target/tls` (regenerated when the machine's addresses change) and both ports serve TLS from it: open `https://<this-host>:8337` and accept the one-time warning. The head then connects back over `wss`. If its socket stays disconnected (Firefox and iOS scope certificate exceptions per port), visit `https://<this-host>:8338` once and accept there too; the landing page confirms it and the head reconnects on its own. TLS here is additive, not a lockout: plaintext `ws://` clients (the Alvik body) and loopback http (a `127.0.0.1` tab, the reload watcher) keep working on the same ports, since the self-signed cert exists to grant a secure context, not transport security. On managed platforms (lambda, ECS/Fargate) `Tls` detects the environment and goes inert, deferring to the platform TLS layer; `BEET_TLS=off` forces the same anywhere.
+
+No phone involved? Use the serving machine's own browser at `http://127.0.0.1:8337`: loopback is plaintext-served and already a secure context (the face display and webcam run there; a phone can still be the display via `/` with the webcam machine on `/debug`).
+
+### Firewalls
 
 Two ports must both be reachable from the phone: `8337` (the head page it loads first) and `8338` (the socket the head connects back to). If a device can't connect while `127.0.0.1` works locally, the host firewall is dropping inbound, not beet, since both servers already bind `0.0.0.0`. With `ufw` active (default-deny inbound), open both, scoped to the LAN subnet and tcp only (least privilege, adjust `192.168.86.0/24` to your subnet):
 

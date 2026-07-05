@@ -89,28 +89,6 @@ fn boot_server<S: BootServer>(
 	if !selected {
 		return Ok(());
 	}
-	// `--secure` forces TLS on every server the boot selects: a session-scoped
-	// [`Tls`] with `dev_only` cleared, keeping any scene-declared cert paths.
-	// An explicit flag on a binary without the machinery fails the boot loudly
-	// (a scene-declared `Tls` merely warns instead: the same scene deploys to
-	// platforms that terminate TLS themselves).
-	#[cfg(feature = "std")]
-	if ev.with(|boot| boot.has_param("secure"))? {
-		#[cfg(not(all(feature = "secure", not(target_arch = "wasm32"))))]
-		bevybail!(
-			"`--secure` requires the `secure` feature: rebuild or reinstall \
-			with `--features secure`"
-		);
-		#[cfg(all(feature = "secure", not(target_arch = "wasm32")))]
-		commands.entity(entity).queue(
-			|mut entity: EntityWorldMut| match entity.get_mut::<Tls>() {
-				Some(mut tls) => tls.dev_only = false,
-				None => {
-					entity.insert(Tls::default().always());
-				}
-			},
-		);
-	}
 	// store the shutdown sender on the host; hand the receiver to the serve loop.
 	let (signal, shutdown) = oneshot::<()>();
 	commands

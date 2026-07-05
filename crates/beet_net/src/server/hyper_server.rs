@@ -112,11 +112,11 @@ async fn serve_sniffed(
 	addr: SocketAddr,
 	tls: MaybeTls,
 ) -> Result {
-	use stream_sniff::Protocol;
-	let (protocol, replay) = Protocol::sniff(tcp).await?;
+	use stream_sniff::SecureProtocol;
+	let (protocol, replay) = SecureProtocol::sniff(tcp).await?;
 	match protocol {
-		Protocol::Empty => Ok(()),
-		Protocol::PlainHttp => {
+		SecureProtocol::Empty => Ok(()),
+		SecureProtocol::PlainHttp => {
 			if tls.is_active() && !addr.ip().is_loopback() {
 				let response =
 					stream_sniff::https_redirect_response(replay.prefix())
@@ -125,7 +125,7 @@ async fn serve_sniffed(
 			}
 			serve_connection(entity, replay, addr).await
 		}
-		Protocol::Tls => {
+		SecureProtocol::Tls => {
 			#[cfg(feature = "secure")]
 			if let Some(server_tls) = tls.get() {
 				let tls_stream = server_tls.accept(replay).await?;

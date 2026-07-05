@@ -14,9 +14,8 @@ use beet_core::prelude::*;
 /// without it the component is registered but serving stays plaintext (with a
 /// warning).
 ///
-/// The `--secure` boot flag inserts this component (with `dev_only: false`)
-/// on every server the boot selects, so an entry needs no markup change to
-/// serve TLS for a session.
+/// Declared in markup like any component, so an entry states its own needs:
+/// `<Router {(HttpServer, Tls)}>`.
 ///
 /// ## Plaintext peers
 /// A TLS listener still classifies each connection by its first bytes:
@@ -29,12 +28,13 @@ use beet_core::prelude::*;
 ///   rejected instead.
 ///
 /// ## Deployed
-/// Platform deployments (Fargate behind an ALB, lambda behind a gateway)
-/// terminate TLS in front of the app, so `dev_only` (default `true`) makes
-/// the component inert in release builds: the same entry serves plain http
-/// there with zero config. Set `dev_only: false` for a self-hosted release
-/// with real certificates.
-#[derive(Clone, Debug, Component, Reflect)]
+/// Managed platforms (Fargate behind an ALB, lambda behind a gateway)
+/// terminate TLS in front of the app; their environments are detected
+/// ([`Self::platform_tls_layer`]) and the component goes inert, so the same
+/// entry serves plain http there with zero config. `BEET_TLS=on`/`off`
+/// overrides the detection either way, eg `off` behind a self-managed
+/// reverse proxy.
+#[derive(Default, Clone, Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct Tls {
 	/// PEM certificate chain path, eg a Let's Encrypt `fullchain.pem`. Both
@@ -43,31 +43,37 @@ pub struct Tls {
 	pub cert: Option<SmolStr>,
 	/// PEM private key path, eg a Let's Encrypt `privkey.pem`.
 	pub key: Option<SmolStr>,
-	/// Only serve TLS in debug builds (default `true`): a release build, eg
-	/// deployed behind a platform TLS layer, serves plaintext untouched.
-	pub dev_only: bool,
-}
-
-impl Default for Tls {
-	fn default() -> Self {
-		Self {
-			cert: None,
-			key: None,
-			dev_only: true,
-		}
-	}
 }
 
 impl Tls {
-	/// Serve TLS in release builds too, ie a self-hosted deployment with real
-	/// certificates, or the explicit `--secure` boot flag.
-	pub fn always(mut self) -> Self {
-		self.dev_only = false;
-		self
+	/// Whether this config serves TLS here: forced by a `BEET_TLS=on`/`off`
+	/// env, otherwise on unless a managed platform terminating TLS in front
+	/// of the app is detected ([`Self::platform_tls_layer`]). Deliberately
+	/// not keyed on the build profile: the installed cli is a release build
+	/// serving local machines, while deployment is an environment.
+	pub fn active(&self) -> bool {
+		match env_ext::var("BEET_TLS").as_deref().map(str::trim) {
+			Ok("1") | Ok("true") | Ok("on") => true,
+			Ok("0") | Ok("false") | Ok("off") => false,
+			_ => !Self::platform_tls_layer(),
+		}
 	}
 
-	/// Whether this config serves TLS in the current build profile.
-	pub fn active(&self) -> bool { !self.dev_only || cfg!(debug_assertions) }
+	/// Whether a managed platform that terminates TLS in front of the app is
+	/// detected: lambda (`AWS_LAMBDA_FUNCTION_NAME`) or ECS/Fargate (the
+	/// `ECS_CONTAINER_METADATA_URI*` / `AWS_EXECUTION_ENV` markers). A setup
+	/// fronting its own TLS some other way (a reverse proxy on a VPS) sets
+	/// `BEET_TLS=off` instead.
+	pub fn platform_tls_layer() -> bool {
+		[
+			"AWS_LAMBDA_FUNCTION_NAME",
+			"ECS_CONTAINER_METADATA_URI_V4",
+			"ECS_CONTAINER_METADATA_URI",
+			"AWS_EXECUTION_ENV",
+		]
+		.iter()
+		.any(|key| env_ext::var(key).is_ok())
+	}
 
 	/// Whether real certificates are provided (both paths set).
 	pub fn provided(&self) -> bool { self.cert.is_some() && self.key.is_some() }

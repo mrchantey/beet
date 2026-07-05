@@ -76,11 +76,11 @@ pub fn media_devices() -> Result<web_sys::MediaDevices> {
 		bevybail!(
 			"navigator.mediaDevices is unavailable: camera/microphone access \
 			requires a secure context (https, localhost or 127.0.0.1) and this \
-			page's origin is insecure. Remedies: serve over https by \
-			relaunching with the `--secure` flag (requires the `secure` \
-			feature; a `Tls` component on the server does the same), open \
-			https://<host>:<port> and accept the one-time certificate \
-			warning; or open the page on the serving machine via localhost"
+			page's origin is insecure. Remedies: serve over https by adding a \
+			`Tls` component to the http and socket servers (requires the \
+			`secure` feature), open https://<host>:<port> and accept the \
+			one-time certificate warning; or open the page on the serving \
+			machine via localhost"
 		);
 	}
 	Ok(devices)

@@ -2,7 +2,7 @@
 //!
 //! A listener serving TLS ([`Tls`](crate::prelude::Tls)) still receives
 //! plaintext peers: a browser typing `http://`, the loopback reload watcher, a
-//! native `ws://` client. [`Protocol::sniff`] reads just enough to tell a TLS
+//! native `ws://` client. [`SecureProtocol::sniff`] reads just enough to tell a TLS
 //! `ClientHello` (first byte `0x16`) from a plaintext http head, and returns a
 //! [`ReplayStream`] that replays the consumed bytes so the real handler (a
 //! rustls acceptor, the http parser, a websocket handshake) sees the full
@@ -23,7 +23,7 @@ pub const SNIFF_CAP: usize = 16 * 1024;
 
 /// The classified first bytes of a connection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Protocol {
+pub enum SecureProtocol {
 	/// First byte `0x16`: a TLS `ClientHello` record.
 	Tls,
 	/// Anything else: treated as a plaintext http head (websocket handshakes
@@ -33,12 +33,12 @@ pub enum Protocol {
 	Empty,
 }
 
-impl Protocol {
+impl SecureProtocol {
 	/// Read the first bytes off `stream` and classify them, returning the
 	/// stream wrapped in a [`ReplayStream`] so nothing is lost.
 	///
-	/// For [`Protocol::Tls`] only the first chunk is consumed (a `ClientHello`
-	/// has no http head to wait for); for [`Protocol::PlainHttp`] the read
+	/// For [`SecureProtocol::Tls`] only the first chunk is consumed (a `ClientHello`
+	/// has no http head to wait for); for [`SecureProtocol::PlainHttp`] the read
 	/// continues until the blank line ending the head, EOF, or [`SNIFF_CAP`].
 	pub async fn sniff<S: AsyncRead + Unpin>(
 		mut stream: S,
@@ -88,7 +88,7 @@ impl<S> ReplayStream<S> {
 	}
 
 	/// The sniffed bytes this stream will replay, ie the http head (and
-	/// possibly some body) for a [`Protocol::PlainHttp`] connection.
+	/// possibly some body) for a [`SecureProtocol::PlainHttp`] connection.
 	pub fn prefix(&self) -> &[u8] { &self.prefix }
 }
 
@@ -259,8 +259,10 @@ mod tests {
 	async fn sniffs_tls() {
 		let hello = [0x16, 0x03, 0x01, 0x00, 0x05, 0x01];
 		let (protocol, replay) =
-			Protocol::sniff(Cursor::new(hello.to_vec())).await.unwrap();
-		protocol.xpect_eq(Protocol::Tls);
+			SecureProtocol::sniff(Cursor::new(hello.to_vec()))
+				.await
+				.unwrap();
+		protocol.xpect_eq(SecureProtocol::Tls);
 		// the ClientHello bytes replay untouched
 		let mut replayed = Vec::new();
 		let mut replay = replay;
@@ -271,10 +273,10 @@ mod tests {
 	#[beet_core::test]
 	async fn sniffs_plaintext_and_replays() {
 		let (protocol, mut replay) =
-			Protocol::sniff(Cursor::new(GET_HEAD.to_vec()))
+			SecureProtocol::sniff(Cursor::new(GET_HEAD.to_vec()))
 				.await
 				.unwrap();
-		protocol.xpect_eq(Protocol::PlainHttp);
+		protocol.xpect_eq(SecureProtocol::PlainHttp);
 		let mut replayed = Vec::new();
 		replay.read_to_end(&mut replayed).await.unwrap();
 		replayed.xpect_eq(GET_HEAD.to_vec());
@@ -283,8 +285,10 @@ mod tests {
 	#[beet_core::test]
 	async fn sniffs_empty() {
 		let (protocol, _replay) =
-			Protocol::sniff(Cursor::new(Vec::new())).await.unwrap();
-		protocol.xpect_eq(Protocol::Empty);
+			SecureProtocol::sniff(Cursor::new(Vec::new()))
+				.await
+				.unwrap();
+		protocol.xpect_eq(SecureProtocol::Empty);
 	}
 
 	#[beet_core::test]

@@ -289,11 +289,11 @@ async fn handle_connection(
 	peer_addr: std::net::SocketAddr,
 	tls: MaybeTls,
 ) -> Result {
-	use crate::prelude::stream_sniff::Protocol;
-	let (protocol, replay) = Protocol::sniff(stream).await?;
+	use crate::prelude::stream_sniff::SecureProtocol;
+	let (protocol, replay) = SecureProtocol::sniff(stream).await?;
 	match protocol {
-		Protocol::Empty => Ok(()),
-		Protocol::Tls => {
+		SecureProtocol::Empty => Ok(()),
+		SecureProtocol::Tls => {
 			#[cfg(feature = "secure")]
 			if let Some(server_tls) = tls.get() {
 				let tls_stream = server_tls.accept(replay).await?;
@@ -302,7 +302,7 @@ async fn handle_connection(
 			debug!("TLS ClientHello on a plaintext socket listener, dropping");
 			Ok(())
 		}
-		Protocol::PlainHttp => {
+		SecureProtocol::PlainHttp => {
 			if tls.provided() && !peer_addr.ip().is_loopback() {
 				return stream_sniff::write_and_close(
 					replay,
@@ -325,12 +325,12 @@ async fn serve_socket<S>(server: AsyncEntity, stream: S, tls: bool) -> Result
 where
 	S: 'static + Send + Unpin + futures::AsyncRead + futures::AsyncWrite,
 {
-	use crate::prelude::stream_sniff::Protocol;
-	let (protocol, replay) = Protocol::sniff(stream).await?;
+	use crate::prelude::stream_sniff::SecureProtocol;
+	let (protocol, replay) = SecureProtocol::sniff(stream).await?;
 	match protocol {
-		Protocol::Empty => Ok(()),
-		Protocol::Tls => bevybail!("unexpected nested TLS handshake"),
-		Protocol::PlainHttp
+		SecureProtocol::Empty => Ok(()),
+		SecureProtocol::Tls => bevybail!("unexpected nested TLS handshake"),
+		SecureProtocol::PlainHttp
 			if stream_sniff::head_is_websocket_upgrade(replay.prefix()) =>
 		{
 			let ws_stream = accept_async(replay)
@@ -339,7 +339,7 @@ where
 			server.spawn_child(socket_from_ws_stream(ws_stream)).await;
 			Ok(())
 		}
-		Protocol::PlainHttp => {
+		SecureProtocol::PlainHttp => {
 			stream_sniff::write_and_close(
 				replay,
 				stream_sniff::socket_landing_response(tls),
