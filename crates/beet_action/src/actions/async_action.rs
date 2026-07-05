@@ -30,10 +30,16 @@ where
 					input,
 				};
 				let func = func.clone();
-				commands.run(async move |world: AsyncWorld| -> Result {
-					let result: Result<Out> = func(arg).await.into_result();
-					out_handler.call_async(world, result).await
-				});
+				// entity-scoped: if `caller` despawns while the handler future is in
+				// flight (a scene swap, an episode ending), the resulting despawn error
+				// is that entity's lifecycle ending — logged, not routed to the panicking
+				// error handler that would otherwise brick the whole schedule.
+				commands.entity(caller).run(
+					async move |entity: AsyncEntity| -> Result {
+						let result: Result<Out> = func(arg).await.into_result();
+						out_handler.call_async(entity.world().clone(), result).await
+					},
+				);
 				Ok(())
 			},
 		)
@@ -65,10 +71,14 @@ where
 					input,
 				};
 				let func = func.clone();
-				commands.run_local(async move |world: AsyncWorld| -> Result {
-					let result: Result<Out> = func(arg).await.into_result();
-					out_handler.call_async(world, result).await
-				});
+				// entity-scoped (see `new_async`): a caller despawned mid-flight ends the
+				// task cleanly rather than panicking the schedule.
+				commands.entity(caller).run_local(
+					async move |entity: AsyncEntity| -> Result {
+						let result: Result<Out> = func(arg).await.into_result();
+						out_handler.call_async(entity.world().clone(), result).await
+					},
+				);
 				Ok(())
 			},
 		)

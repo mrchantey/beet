@@ -1,15 +1,15 @@
 # Perceive-act
 
-A small floor embodied agent living a perceive-act loop: each cycle it is shown a fresh photo and answers with a single `respond-multi-modal` tool call, setting its face, saying one line in character and choosing a heading, over and over. The loop runs until you stop it with Ctrl+C.
+A small floor embodied agent living a perceive-act loop: each cycle it is shown a fresh photo and answers with a single `respond-multi-modal` tool call, setting its face, saying one line in character and driving off at a chosen velocity, over and over. The loop runs until you stop it with Ctrl+C.
 
-One model call per cycle: the `Camera` actor captures via the `take-photo` route and posts the photo straight into the thread, then the `Robot` agent (OpenAI `gpt-5.4-mini`, reasoning off, forced tool choice) answers with one `respond-multi-modal` call, which fans out to `set-emotion`/`speak-text`/`apply-heading` concurrently and awaits them all, so the next photo waits for the body to stop moving. A cycle lands around 2 seconds plus speech.
+One model call per cycle: the `Camera` actor captures via the `take-photo` route and posts the photo straight into the thread, then the `Robot` agent (OpenAI `gpt-5.4-mini`, reasoning off, forced tool choice) answers with one `respond-multi-modal` call, which fans out to `set-emotion`/`speak-text`/`drive` (by default finishing the spoken line before it drives) and awaits them all, so the next photo waits for the body to stop moving. A cycle lands around 2 seconds plus speech.
 
 The agent is a socket server (`agent.bsx`, shared by every version); only the head and body clients change between versions. Run every command from the repo root. For clean per-cycle output quiet the socket plumbing with `RUST_LOG=info,beet_net=warn`, which reads like:
 
 ```
 cycle 3: photo captured (100KB in 0.24s, previous cycle 1.76s)
-cycle 3: Surprised | "Whoa, hanging basket!" | Right (model 1.66s)
-cycle 3: acted in 0.10s (set-emotion 0.07s | speak-text 0.10s | apply-heading 0.07s)
+cycle 3: Surprised | "Whoa, hanging basket!" | drive lin=40 ang=-90 for 1.00s (model 1.66s)
+cycle 3: acted in 0.10s (set-emotion 0.07s | speak-text 0.10s | drive 0.07s)
 ```
 
 ## Prerequisites
@@ -21,7 +21,7 @@ cycle 3: acted in 0.10s (set-emotion 0.07s | speak-text 0.10s | apply-heading 0.
 
 ## v1: mock head and body
 
-One process, both clients mocked: the head reads the floor photos and logs the emotion, the body logs the heading.
+One process, both clients mocked: the head reads the floor photos and logs the emotion, the body records the drive command.
 
 ```sh
 beet --main=examples/perceive_act/main-v1.bsx
@@ -29,7 +29,7 @@ beet --main=examples/perceive_act/main-v1.bsx
 
 ## v2: wgpu fox body
 
-Same mock head, but the body is a 3d fox in a window that drives off each heading.
+Same mock head, but the body is a 3d fox in a window that drives off each command.
 
 ```sh
 beet --main=examples/perceive_act/main-v2.bsx
@@ -76,4 +76,4 @@ beet load templates/alvik/perceive-act-body.bsx
 beet monitor
 ```
 
-Set the `url` in `perceive-act-body.bsx` to this host's socket server (`ws://<host>:8338`). The body holds each `apply-heading` reply until the drive step finishes, so the next photo waits for the robot to stop; tune the step with `DriveStepConfig` in that scene. Its transport reconnects with exponential backoff, so the pushed scene survives agent restarts.
+Set the `url` in `perceive-act-body.bsx` to this host's socket server (`ws://<host>:8338`). The body drives the commanded velocity for the commanded duration and holds each `drive` reply until the step finishes, so the next photo waits for the robot to stop; cap how long any one response may drive with `max_drive_duration` on the agent's `RespondMultiModal`. Its transport reconnects with exponential backoff, so the pushed scene survives agent restarts.

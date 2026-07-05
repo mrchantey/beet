@@ -226,6 +226,22 @@ fn scalar_to_reflect(
 		return Ok(Box::new(duration));
 	}
 
+	// a `"true"`/`"false"` string targeting a `bool` field coerces to the bool, so a
+	// markup `edge_reload="true"` authors a flag directly (mirroring the duration string
+	// above). Any other string errors rather than silently applying `false`.
+	if let (Value::Str(string), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<bool>()
+	{
+		let parsed = match string.as_str().trim() {
+			"true" => true,
+			"false" => false,
+			other => {
+				bevybail!("invalid bool {other:?}: expected \"true\" or \"false\"")
+			}
+		};
+		return Ok(Box::new(parsed));
+	}
+
 	// a string targeting a `SmolStr` field coerces to `SmolStr`, mirroring the
 	// numeric cast above (the natural reflect type of a string is `String`).
 	if let (Value::Str(string), Some(TypeInfo::Opaque(opaque))) =
@@ -342,32 +358,9 @@ fn cast_number(
 /// is rejected, so a duration is never silently assumed to be milliseconds.
 fn coerce_duration(value: &Value) -> Option<Duration> {
 	match value {
-		Value::Str(string) => parse_duration_str(string.as_str()),
+		Value::Str(string) => Duration::from_human_str(string.as_str()),
 		_ => None,
 	}
-}
-
-/// Parse a human duration like `"50ms"`, `"1s"`, `"2m"`, `"1h"` or `"7d"`. The
-/// unit (`ns`, `us`/`µs`, `ms`, `s`, `m`, `h`, `d`) is required; `None` on a
-/// missing/unknown unit or an unparseable value.
-fn parse_duration_str(string: &str) -> Option<Duration> {
-	let string = string.trim();
-	let split = string
-		.find(|c: char| !c.is_ascii_digit() && c != '.')
-		.unwrap_or(string.len());
-	let (number, unit) = string.split_at(split);
-	let number: f64 = number.parse().ok()?;
-	let secs = match unit.trim() {
-		"ns" => number / 1_000_000_000.0,
-		"us" | "µs" => number / 1_000_000.0,
-		"ms" => number / 1_000.0,
-		"s" => number,
-		"m" => number * 60.0,
-		"h" => number * 60.0 * 60.0,
-		"d" => number * 24.0 * 60.0 * 60.0,
-		_ => return None,
-	};
-	Some(Duration::from_secs_f64(secs))
 }
 
 /// Build a [`DynamicList`] (or a [`DynamicArray`] for an array-typed field, eg
@@ -703,8 +696,8 @@ mod test {
 		resolve::<Duration>(DataLiteral::Scalar(Value::str("7d")))
 			.xpect_eq(Duration::from_secs(7 * 24 * 60 * 60));
 		// the unit is required
-		parse_duration_str("50").xpect_none();
-		parse_duration_str("50years").xpect_none();
+		Duration::from_human_str("50").xpect_none();
+		Duration::from_human_str("50years").xpect_none();
 		coerce_duration(&Value::Uint(50)).xpect_none();
 		// a malformed value targeting a `Duration` field errors, rather than
 		// silently falling through to a value that cannot apply
@@ -713,6 +706,25 @@ mod test {
 		literal_to_reflect(
 			&DataLiteral::Scalar(Value::Uint(50)),
 			Some(Duration::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.is_err()
+		.xpect_true();
+	}
+
+	/// A `"true"`/`"false"` string attribute coerces to a `bool` field, so a markup
+	/// `edge_reload="true"` authors a flag; a non-bool string is a hard error.
+	#[beet_core::test]
+	fn coerces_to_bool() {
+		resolve::<bool>(DataLiteral::Scalar(Value::str("true"))).xpect_eq(true);
+		resolve::<bool>(DataLiteral::Scalar(Value::str("false")))
+			.xpect_eq(false);
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		literal_to_reflect(
+			&DataLiteral::Scalar(Value::str("yes")),
+			Some(bool::type_info()),
 			&registry,
 			&mut resolver,
 		)

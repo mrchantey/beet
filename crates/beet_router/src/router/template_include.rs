@@ -111,6 +111,33 @@ async fn read_and_build(
 		.await
 }
 
+/// Collect the local `src` of every `<Template src=..>` include in a parsed entry
+/// tree, the registry-free pre-scan the live-reload driver runs to learn which
+/// sources are structural: a change to one drives a full entry rebuild, not the
+/// light content re-fire a markdown/template edit gets. Remote includes are
+/// skipped (they are not local files a watcher sees).
+pub fn extract_template_srcs(nodes: &[BsxNode]) -> Vec<SmolStr> {
+	let mut srcs = Vec::new();
+	collect_template_srcs(nodes, &mut srcs);
+	srcs
+}
+
+/// Recursively collect local `<Template src=..>` includes from `nodes`.
+fn collect_template_srcs(nodes: &[BsxNode], srcs: &mut Vec<SmolStr>) {
+	for node in nodes {
+		let BsxNode::Element(element) = node else {
+			continue;
+		};
+		if element.tag == "Template"
+			&& let Some(src) = template_src(element)
+			&& !is_remote(&src)
+		{
+			srcs.push(src);
+		}
+		collect_template_srcs(&element.children, srcs);
+	}
+}
+
 /// Whether `src` names a remote endpoint rather than a local path.
 fn is_remote(src: &str) -> bool {
 	src.starts_with("http://")

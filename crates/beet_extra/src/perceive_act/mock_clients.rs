@@ -38,8 +38,8 @@ pub fn MockHead(
 	));
 }
 
-/// The in-process mock body: connects to the agent and serves `apply-heading`, logging
-/// the heading (a real fox drive lands with the wgpu body in v2).
+/// The in-process mock body: connects to the agent and serves `drive`, recording the
+/// commanded velocity (a real fox drive lands with the wgpu body in v2).
 #[template(system)]
 pub fn MockBody(
 	/// The agent's socket url, eg `ws://127.0.0.1:8338`.
@@ -52,6 +52,6 @@ pub fn MockBody(
 		ExchangeSocket::json(),
 		Router,
 		ClientRole(SmolStr::new("body")),
-		children![WhoAmI, ApplyHeading],
+		children![WhoAmI, DriveForDurationAction],
 	));
 }

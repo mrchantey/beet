@@ -44,7 +44,10 @@ perceive_act_web = ["json", "dep:beet_net", "beet_net?/sockets", "dep:beet_route
 # `bevy_default`. The inline tool is a `#[action(route)]`, so it pulls the
 # router/net surface the route registration expands to, and `json` for the tool
 # schemas' serde derives (which `json` forwards to `beet_action/json`).
-thread = ["json", "dep:beet_thread", "dep:beet_net", "dep:beet_router"]
+# `template_serde` (on top of the `sockets` that `beet_thread` drags in) gives the
+# perceive-act agent the scene-management surface it now uses: `ResetOnDisconnect` on a
+# bound capability socket, so a dropped head/body cleanly resets the scene.
+thread = ["json", "dep:beet_thread", "dep:beet_net", "dep:beet_router", "beet_net/template_serde", "beet_router/template_serde"]
 # The cloudflare/aws deploy example wiring (`InfraExamplesPlugin`): the deploy
 # block/config types + the standalone deploy-action templates, so the `beet`
 # binary runs `examples/infra/*.bsx`. Headless (no render), so independent of

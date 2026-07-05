@@ -27,9 +27,14 @@ use beet_ui::prelude::Reset;
 /// to [`ColorScheme::Dark`], and the web adds no class (the browser's
 /// `color_scheme.js` follows the OS).
 ///
+/// The dev live-reload client ([`LiveReloadScript`]) is injected into the head
+/// centrally, so every site served through this shell reloads on a watched change
+/// without opting in; it self-gates on the [`ClientIo`] channel, rendering nothing
+/// unless `--watch` is active.
+///
 /// Slots, each defaulting to the standard chrome:
 /// - `head`: EXTRA head content appended to the always-emitted chrome inside
-///   [`RouteHead`] (eg a live-reload script), so a site adds to the head without
+///   [`RouteHead`] (eg a page-view beacon), so a site adds to the head without
 ///   losing the chrome.
 /// - `header`: defaults to the library [`Header`] with a [`MenuButton`] and the
 ///   Docs/Blog/GitHub nav links.
@@ -67,11 +72,21 @@ pub fn SiteLayout(
 			<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
 		}
 	});
+	// The dev live-reload client, injected centrally so every site served through
+	// `SiteLayout` reloads on a watched change without each layout remembering to
+	// add it. `LiveReloadScript` self-gates on the [`ClientIo`] channel (renders
+	// nothing in production / static export), so it is inert unless `--watch` is
+	// active; it compiles to nothing where `client_io` is featured out.
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+	let live_reload = rsx! { <LiveReloadScript/> };
+	#[cfg(not(all(feature = "client_io", not(target_arch = "wasm32"))))]
+	let live_reload = ();
 	rsx! {
 		<!DOCTYPE html>
 		<html lang="en">
 			<RouteHead>
 				{html_head}
+				{live_reload}
 				<Slot name="head"/>
 			</RouteHead>
 			<body {body_classes}>
@@ -163,7 +178,12 @@ mod test {
 	/// Render `<SiteLayout>` (with a page-body slot child) to HTML for the given
 	/// request parts.
 	fn render(parts: RequestParts) -> String {
-		let mut world = layout_world(parts);
+		render_world(&mut layout_world(parts))
+	}
+
+	/// Render `<SiteLayout>` (with a page-body slot child) to HTML in `world`, so a
+	/// test can seed the world first (eg spawn a `ClientIo` channel).
+	fn render_world(world: &mut World) -> String {
 		let entity = world
 			.spawn_template(rsx! {
 				<SiteLayout>
@@ -173,9 +193,27 @@ mod test {
 			.unwrap()
 			.id();
 		HtmlRenderer::new()
-			.render(&mut RenderContext::new(entity, &mut world))
+			.render(&mut RenderContext::new(entity, world))
 			.unwrap()
 			.to_string()
+	}
+
+	/// The dev live-reload client is injected into the head centrally: with a
+	/// [`ClientIo`] channel active (ie `--watch`), `<SiteLayout>` emits the reload
+	/// script, so every site served through the shell reloads without opting in.
+	/// Without a channel it renders nothing, so the other tests' channel-free worlds
+	/// stay unaffected.
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn injects_live_reload_client_when_watching() {
+		let mut world = layout_world(request("", MediaType::Html));
+		// simulate `--watch`: the `ClientIo` channel `LiveReload` spawns.
+		world.spawn(ClientIo);
+		render_world(&mut world).xpect_contains("CLIENT_IO_PATH");
+		// and without a channel the shell stays inert.
+		render(request("", MediaType::Html))
+			.xnot()
+			.xpect_contains("CLIENT_IO_PATH");
 	}
 
 	/// A pinned `?color-scheme=light` request paints `page` plus the light-scheme

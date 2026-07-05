@@ -87,12 +87,19 @@ pub(crate) fn start_live_reload(
 }
 
 /// Observer: a [`BlobEvent`] landed; mark every [`LiveReload`] site whose store
-/// owns the changed object (minus excluded churn) as needing a reload.
+/// owns the changed object (minus excluded churn) as needing a reload. A change to
+/// a *structural* source (the entry document or a `<Template src>` include, per the
+/// installed [`EntryReloader`]) additionally marks [`NeedsEntryRebuild`], so the
+/// reload is a full teardown+rebuild rather than the light content re-fire.
 pub(crate) fn reload_site_on_change(
 	ev: On<BlobEvent>,
 	sites: Query<(Entity, &LiveReload, &BlobStore)>,
+	reloader: Option<Res<EntryReloader>>,
 	mut commands: Commands,
 ) {
+	let structural = reloader
+		.as_ref()
+		.is_some_and(|reloader| reloader.is_structural(&ev.path));
 	sites
 		.iter()
 		.filter(|(_, site, store)| {
@@ -101,6 +108,9 @@ pub(crate) fn reload_site_on_change(
 		.for_each(|(entity, _, _)| {
 			debug!("site store changed, reloading: {}", ev.path);
 			commands.entity(entity).insert(NeedsReload);
+			if structural {
+				commands.entity(entity).insert(NeedsEntryRebuild);
+			}
 		});
 }
 
@@ -117,7 +127,14 @@ pub(crate) fn process_live_reloads(world: &mut World) {
 			.entity_mut(root)
 			.remove::<NeedsReload>()
 			.insert(Reloading);
-		reload_site(world, root);
+		// a structural change (the entry document or an included `<Template src>`)
+		// needs the full teardown+rebuild; a content change re-fires in place.
+		if world.entity(root).contains::<NeedsEntryRebuild>() {
+			world.entity_mut(root).remove::<NeedsEntryRebuild>();
+			rebuild_entry(world, root);
+		} else {
+			reload_site(world, root);
+		}
 	}
 }
 

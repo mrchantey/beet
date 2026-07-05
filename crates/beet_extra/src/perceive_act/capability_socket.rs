@@ -35,7 +35,7 @@ pub struct CapabilityBound;
 fn capability_routes(role: &str) -> &'static [&'static str] {
 	match role {
 		"head" => &["take-photo", "speak-text", "set-emotion"],
-		"body" => &["apply-heading"],
+		"body" => &["drive"],
 		_ => &[],
 	}
 }
@@ -93,6 +93,13 @@ async fn bind_connection(connection: AsyncEntity, server: Entity) -> Result {
 		.world()
 		.with(move |world| capability_route_entities(world, server, &role))
 		.await;
+	// a bound head/body dropping should return the scene to rest (eg halt the
+	// robot's hardware, close its connection), so a known-role connection resets on
+	// disconnect: its `SocketClosed` triggers a global `ResetScene`. An unknown-role
+	// connection binds nothing, so it never resets the scene.
+	if !targets.is_empty() {
+		connection.insert(ResetOnDisconnect).await?;
+	}
 	for target in targets {
 		connection
 			.world()

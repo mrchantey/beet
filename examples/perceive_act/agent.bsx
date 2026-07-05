@@ -2,15 +2,15 @@
 The always-socket perceive-act agent, shared verbatim by every stage (`<Template src>`d
 by main-v1/main-v2/main-v3). It is a socket server whose capability routes forward over
 the socket to whichever client serves them (`take-photo`/`speak-text`/`set-emotion` to
-the head, `apply-heading` to the body), bound by the `whoami` handshake as each client
+the head, `drive` to the body), bound by the `whoami` handshake as each client
 connects; with no client bound, each route's local handler applies.
 
 One model call per cycle: the `Camera` actor (`{PostPhoto}`) captures via `take-photo`
 and posts the photo straight into the thread, then the `Robot` agent answers with a
 single forced `respond-multi-modal` tool call ({ToolChoice::RequiredAny},
-`<RespondMultiModal/>` its only tool), which fans out to
-`set-emotion`/`speak-text`/`apply-heading` concurrently and awaits them all, so the
-next photo waits for the body to stop moving. `{PostPhoto}` also prunes the window
+`<RespondMultiModalAction/>` its only tool), which fans out to
+`set-emotion`/`speak-text`/`drive` and awaits them all (by default speaking before it
+drives), so the next photo waits for the body to stop moving. `{PostPhoto}` also prunes the window
 each cycle, keeping the endless loop's request small and fast.
 
 `{Repeat}` loops the thread until the process is killed (Ctrl+C); the boot call parks
@@ -27,7 +27,7 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 	<TakePhoto/>
 	<SetEmotion/>
 	<SpeakText/>
-	<ApplyHeading/>
+	<DriveForDurationAction/>
 	<div {Repeat} {CreateThread}>
 		<div {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">
@@ -37,20 +37,22 @@ You perceive the world one photo at a time and act on what you see.
 
 Each turn you are shown a fresh photo of what is in front of you. Respond by
 calling the respond-multi-modal tool exactly once: the emotion you feel, one
-short spoken line, and the direction to drive next.
+short spoken line, and how to drive next (a forward speed in mm/s, a turn rate
+in deg/s where positive turns left, and how many seconds to hold them).
 
 Keep spoken lines short and full of personality, and react to what changed
 since the last photo. Never repeat a line you already said. You are not
 narrating to a user, you are a robot living its little life. Prefer driving
-Forward, turn Left or Right when something blocks the way, and let your
-feelings swing with what you see. Do not announce your steering, instead
-engage with the surroundings, be playful.
+forward at a gentle speed, turning only when something blocks the way, and keep
+each drive short so you can look again soon. Let your feelings swing with what
+you see. Do not announce your steering, instead engage with the surroundings,
+be playful.
 '/>
 			</CreateActor>
 			<CreateActor name="Camera" kind="User" {PostPhoto}/>
 			<CreateActor name="Robot" kind="Agent"
 				{(ModelStreamer{provider:OpenAi, effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
-				<RespondMultiModal/>
+				<RespondMultiModalAction {RespondMultiModal{max_drive_duration:"2s"}}/>
 			</CreateActor>
 		</div>
 	</div>

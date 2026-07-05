@@ -233,6 +233,86 @@ pub fn build_entry_root(
 	Ok(root)
 }
 
+/// Rebuild the `--watch` entry into a fresh [`BeetSceneRoot`], the shared path the
+/// initial build and every structural reload run: tear down the previous entry
+/// scene via [`despawn_scene`] (servers close, sockets drop; a no-op on the first
+/// build), re-read the sources through the store, and build a fresh root marked
+/// [`BeetSceneRoot`] + [`LiveReload`] with its own entry [`WatchDir`]. The fresh
+/// root's `BootOnLoad` re-boots its servers (rebinding their ports), so a browser's
+/// dropped `/__client_io` socket reconnects and reloads into the new tree.
+///
+/// The [`EntryReloader`] resource (installed once) survives the teardown and drives
+/// this on a change to the entry document or an included `<Template src>`.
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn rebuild_watched_entry(
+	world: &AsyncWorld,
+	store: BlobStore,
+	entry_name: String,
+	formats: TemplateFormats,
+) -> Result {
+	let sources = read_entry_sources(&store, formats, entry_name.clone()).await?;
+	world
+		.with(move |world: &mut World| -> Result {
+			// the entry's own dir, watched for edits to the entry doc / its includes;
+			// computed before `build_entry_root` consumes `store`.
+			let entry_watch = WatchDir::for_entry(&store, &entry_name);
+			// tear down the previous entry scene so servers close and sockets drop
+			// before the fresh tree binds (a no-op on the first build).
+			despawn_scene(world);
+			let root = build_entry_root(
+				world,
+				store,
+				sources,
+				(BeetSceneRoot, LiveReload::new()),
+			)?;
+			if let Some(entry_watch) = entry_watch {
+				world.entity_mut(root).insert(entry_watch);
+			}
+			world.flush();
+			Ok(())
+		})
+		.await
+}
+
+/// The structural entry sources whose change triggers a full rebuild (versus the
+/// light content re-fire a markdown/template edit gets): the entry document plus
+/// every `<Template src>` include, resolved transitively through the store. Every
+/// path is store-root-relative, matching the [`BlobEvent`] paths the watcher emits.
+///
+/// A missing / unreadable / non-markup source is skipped rather than erroring, so a
+/// broken include never blocks watch startup.
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn entry_source_paths(
+	store: &BlobStore,
+	entry_name: &str,
+) -> HashSet<SmolPath> {
+	let mut seen = HashSet::default();
+	let mut stack = vec![SmolPath::from(entry_name)];
+	while let Some(path) = stack.pop() {
+		if !seen.insert(path.clone()) {
+			continue;
+		}
+		let Ok(media) = store.get_media(&path).await else {
+			continue;
+		};
+		if !matches!(media.media_type(), MediaType::Bsx | MediaType::Html) {
+			continue;
+		}
+		let Ok(text) = media.as_utf8() else {
+			continue;
+		};
+		let Ok(nodes) = parse_document(text, &BsxParseConfig::bsx()) else {
+			continue;
+		};
+		stack.extend(
+			extract_template_srcs(&nodes)
+				.into_iter()
+				.map(|src| SmolPath::from(src.as_str())),
+		);
+	}
+	seen
+}
+
 /// Build an entry from in-memory BSX text rather than a store read: the browser
 /// path, where the program is inlined in a `<script type="application/x-bsx">`, not
 /// resolved from `--main`/a filesystem. Constructs [`EntrySources`] directly and

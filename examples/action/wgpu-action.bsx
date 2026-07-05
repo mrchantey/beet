@@ -5,8 +5,8 @@ stack:
 
     beet --main=examples/action/wgpu-action.bsx
 
-This is the reference for the perceive-act body client (V2): `ApplyHeading` maps a
-`Heading` onto the fox's `DifferentialDrive` exactly as these `SetDrive` +
+This is the reference for the perceive-act body client (V2): `DriveFox` feeds the
+agent-chosen `DifferentialDrive` into the fox exactly as these `SetDrive` +
 `EndInDuration` steps do. Copied upstream from a downstream demo; `Drive` was renamed
 to `SetDrive` to match the current API.
 -->

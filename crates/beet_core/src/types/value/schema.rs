@@ -632,8 +632,11 @@ fn map_primitive_type(type_path: &str) -> &'static str {
 		.trim_start_matches('&');
 
 	match short_name {
+		// `Duration` reflects as opaque but is authored/serialized as a unit-suffixed
+		// string (eg `"1.5s"`), so it lowers to a string like the other string opaques
+		// — otherwise it falls through to `object` and a strict-mode tool schema breaks.
 		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString"
-		| "SmolStr" | "SmolPath" => "string",
+		| "SmolStr" | "SmolPath" | "Duration" => "string",
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => "integer",
 		"i8" | "i16" | "i32" | "i64" | "i128" | "isize" => "integer",
 		"f32" | "f64" => "number",
@@ -1066,6 +1069,8 @@ mod test {
 		map_primitive_type("smol_str::SmolStr").xpect_eq("string");
 		map_primitive_type("beet_core::path::smol_path::SmolPath")
 			.xpect_eq("string");
+		// `Duration` is a unit-suffixed string (eg `"1.5s"`), not an object
+		map_primitive_type("core::time::Duration").xpect_eq("string");
 		map_primitive_type("u32").xpect_eq("integer");
 		map_primitive_type("i64").xpect_eq("integer");
 		map_primitive_type("f64").xpect_eq("number");
@@ -1088,6 +1093,27 @@ mod test {
 		let props = schema.get("properties").unwrap().as_map().unwrap();
 		props
 			.get("path")
+			.unwrap()
+			.get("type")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("string");
+	}
+
+	/// A `Duration` field lowers to a `string` property (authored `"1.5s"`), not the
+	/// `object` fallthrough — the empty object broke the perceive-act tool schema under
+	/// OpenAI strict mode (nested `DriveForDuration { duration: Duration }`).
+	#[crate::test]
+	fn duration_field_is_string() {
+		#[derive(Reflect)]
+		struct WithDuration {
+			duration: core::time::Duration,
+		}
+		let schema = Schema::new::<WithDuration>();
+		let props = schema.get("properties").unwrap().as_map().unwrap();
+		props
+			.get("duration")
 			.unwrap()
 			.get("type")
 			.unwrap()

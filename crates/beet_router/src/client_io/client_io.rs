@@ -49,18 +49,29 @@ pub struct ClientIoBroadcast(pub Message);
 
 /// Observer: adopt a [`Socket`] the backend upgraded (via [`client_io_route`])
 /// into the [`ClientIo`] channel, re-parenting it so [`broadcast_to_clients`]
-/// reaches it. Despawns the orphan socket when no channel exists.
+/// reaches it, and despawning it on [`SocketClosed`] so a dropped client leaves
+/// no dead socket in the channel's registry. Despawns the orphan socket when no
+/// channel exists.
 pub(crate) fn adopt_client_io_socket(
 	ev: On<OnWebSocketUpgrade>,
 	channels: Query<Entity, With<ClientIo>>,
 	mut commands: Commands,
 ) {
+	let socket = ev.event().socket;
 	match channels.iter().next() {
 		Some(channel) => {
-			commands.entity(ev.event().socket).insert(ChildOf(channel));
+			// adopt the socket into the channel, and despawn it when the connection
+			// ends: each reload disconnects every client, so without this the dead
+			// sockets accumulate as channel children and `broadcast_to_clients` keeps
+			// fanning out to them.
+			commands.entity(socket).insert(ChildOf(channel)).observe_any(
+				move |_ev: On<SocketClosed>, mut commands: Commands| {
+					commands.entity(socket).try_despawn();
+				},
+			);
 		}
 		// no channel to adopt into: drop the connection rather than leak it
-		None => commands.entity(ev.event().socket).despawn(),
+		None => commands.entity(socket).despawn(),
 	}
 }
 
@@ -149,6 +160,31 @@ mod test {
 		world.trigger(OnWebSocketUpgrade { socket });
 		world.flush();
 		world.get_entity(socket).is_err().xpect_true();
+	}
+
+	/// A dropped client is despawned rather than left in the channel: after the
+	/// adopted socket's connection ends ([`SocketClosed`]), the socket entity is
+	/// gone, so repeated reconnect/disconnect cycles never accumulate dead sockets.
+	#[beet_core::test]
+	fn despawns_adopted_socket_on_close() {
+		let mut world = World::new();
+		world.add_observer(adopt_client_io_socket);
+		let channel = world.spawn(ClientIo).id();
+		let socket = world.spawn_empty().id();
+		world.trigger(OnWebSocketUpgrade { socket });
+		world.flush();
+		// adopted into the channel's registry
+		world
+			.entity(socket)
+			.get::<ChildOf>()
+			.unwrap()
+			.parent()
+			.xpect_eq(channel);
+		// the connection ends: the socket is despawned, leaving the channel empty
+		world.entity_mut(socket).trigger_target(SocketClosed);
+		world.flush();
+		world.get_entity(socket).is_err().xpect_true();
+		world.entity(channel).get::<Children>().xpect_none();
 	}
 
 	/// End to end over the main HTTP port: a browser-like client upgrades at

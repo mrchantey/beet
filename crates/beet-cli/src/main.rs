@@ -170,49 +170,69 @@ async fn build_entry(
 ) -> Result {
 	let store = resolved.store;
 	let entry_name = resolved.entry_name;
+	// native `--watch` (local dev): install the live-reload driver and build through
+	// the shared rebuild path, so the initial build and a structural rebuild are
+	// identical and the entry root is a `BeetSceneRoot` the reload can tear down.
+	// Opt-in, so a running presentation never reloads underfoot; a deployed (remote)
+	// entry has no local dir to watch, and the wasm runner has no fs watcher.
+	#[cfg(not(target_arch = "wasm32"))]
+	if resolved.watch_dir.is_some() && args.params.contains_key("watch") {
+		return build_watched_entry(world, store, entry_name, formats).await;
+	}
+	// otherwise the plain one-shot build. The binary stays unopinionated: it spawns
+	// the entry root with no load verb of its own, so the entry's own markup declares
+	// how it loads (a server spreads `BootOnLoad`, a script `ExchangeOnLoad`, a render
+	// scene `RunOnLoad`, a self-booting verb `#[require]`s `BootOnLoad`).
 	let sources =
 		read_entry_sources(&store, formats, entry_name.clone()).await?;
-	// the `--watch` path (native-only) needs the entry dir and the args; on wasm
-	// neither is used, so they go unread there.
-	#[cfg(not(target_arch = "wasm32"))]
-	let watch_dir = resolved.watch_dir;
 	#[cfg(target_arch = "wasm32")]
-	let _ = (&args, &entry_name);
+	let _ = &args;
 	world
 		.with(move |world: &mut World| -> Result {
-			// the binary stays unopinionated: it spawns the entry root with no load
-			// verb of its own, so the entry's own markup declares how it loads. A
-			// server entry spreads `BootOnLoad` beside its servers, a script entry
-			// spreads `ExchangeOnLoad`, a render scene `RunOnLoad`, and a self-booting
-			// verb (eg a thread's `{CreateThread}`) `#[require]`s `BootOnLoad` itself.
-			// the entry document's own dir, watched for live reload (keyed to the
-			// entry store) so editing `main.bsx` itself hot-reloads; computed before
-			// `build_entry_root` consumes `store`. Inert on a non-fs store / on wasm.
-			#[cfg(not(target_arch = "wasm32"))]
-			let entry_watch = WatchDir::for_entry(&store, &entry_name);
-			#[cfg(target_arch = "wasm32")]
-			let _ = &entry_name;
-			let _root = build_entry_root(world, store, sources, ())?;
-			// `--watch` (local dev): mark the root for live reload, and watch the entry
-			// document's own dir (its `<RoutesDir>`/`<TemplateDir>`/`<AssetsDir>` mounts
-			// register their own `WatchDir`s as they resolve). The watchers emit
-			// `BlobEvent`s, so editing a template/slide/style/the entry hot-reloads
-			// connected browsers, the deck's `<LiveReloadScript/>` widget turning the
-			// broadcast into a reload. Opt-in, so a running presentation never reloads
-			// underfoot; a deployed (remote) entry has no local dir to watch. Native-only:
-			// the wasm runner has no fs watcher.
-			#[cfg(not(target_arch = "wasm32"))]
-			if watch_dir.is_some() && args.params.contains_key("watch") {
-				let mut root_mut = world.entity_mut(_root);
-				root_mut.insert(LiveReload::new());
-				if let Some(entry_watch) = entry_watch {
-					root_mut.insert(entry_watch);
-				}
-				world.flush();
-			}
+			build_entry_root(world, store, sources, ())?;
 			Ok(())
 		})
 		.await
+}
+
+/// The `--watch` entry build (native-only): install the live-reload driver
+/// ([`EntryReloader`]) with the entry's structural source set (the entry document
+/// and its transitive `<Template src>` includes), then do the first build through
+/// the same [`rebuild_watched_entry`] path a structural change re-runs.
+///
+/// So editing the entry document or an included `<Template src>` tears the old
+/// scene down and rebuilds it with no leaked entities (servers rebind, sockets
+/// reconnect), while a markdown/template edit keeps the light content re-fire.
+#[cfg(not(target_arch = "wasm32"))]
+async fn build_watched_entry(
+	world: &AsyncWorld,
+	store: BlobStore,
+	entry_name: String,
+	formats: TemplateFormats,
+) -> Result {
+	// the structural sources whose change triggers a full rebuild (entry + includes).
+	let sources = entry_source_paths(&store, &entry_name).await;
+	// the driver's rebuild callback, re-cloning the store/name/formats per build
+	// (it is an `Fn`, re-run on every structural change).
+	let rebuild = {
+		let store = store.clone();
+		let entry_name = entry_name.clone();
+		let formats = formats.clone();
+		move |world: AsyncWorld| -> LocalBoxedFuture<'static, Result> {
+			let (store, entry_name, formats) =
+				(store.clone(), entry_name.clone(), formats.clone());
+			Box::pin(async move {
+				rebuild_watched_entry(&world, store, entry_name, formats).await
+			})
+		}
+	};
+	world
+		.with(move |world: &mut World| {
+			world.insert_resource(EntryReloader::new(sources, rebuild));
+		})
+		.await;
+	// the first build: a no-op teardown, then the fresh `BeetSceneRoot`.
+	rebuild_watched_entry(world, store, entry_name, formats).await
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the

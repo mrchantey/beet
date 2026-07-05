@@ -153,7 +153,12 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 				}
 				(false, _) => ev,
 			};
-			world.entity(entity).trigger_target(ev).await?;
+			// the watcher entity may be despawned while this task runs (a live-reload
+			// teardown drops its `WatchDir`): stop watching cleanly rather than
+			// erroring, so the drop is not reported as a fault.
+			if world.entity(entity).trigger_target(ev).await.is_err() {
+				break;
+			}
 		}
 		Ok(())
 	})

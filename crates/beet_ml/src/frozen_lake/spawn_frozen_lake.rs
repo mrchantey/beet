@@ -66,7 +66,10 @@ pub fn spawn_frozen_lake_episode(
 				children![
 					(
 						Name::new("Go to grid cell"),
-						TranslateGrid::new(Duration::from_millis(100)),
+						// slow enough that each step's hop is clearly visible — the
+						// signal that an episode is running, even when exploration
+						// keeps picking a wall-ward move that clamps in place.
+						TranslateGrid::new(Duration::from_millis(300)),
 					),
 					(
 						Name::new("Step environment"),

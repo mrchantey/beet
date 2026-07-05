@@ -4,7 +4,7 @@ with NO in-process clients: instead a second server, an `HttpServer`, serves a w
 browser head. A browser tab loading the head page boots the wasm `beet` binary, which
 connects back to the agent's socket server as the `head` client and serves `take-photo`
 (the real webcam), `speak-text` (the Web Speech API) and `set-emotion` (a rendered `<img>`
-face). A device body (eg the esp Alvik) can connect for `apply-heading`; none runs here.
+face). A device body (eg the esp Alvik) can connect for `drive`; none runs here.
 
 Two servers in one process, each its own root with its own `BootOnLoad`, both bound to
 all interfaces so a phone on the LAN can load the head page and connect back: the agent's

@@ -40,6 +40,7 @@ impl Plugin for ActionPlugin {
 			.register_type::<SetDrive>()
 			.register_type::<SetDriveAction>()
 			.register_type::<DifferentialDrive>()
+			.register_type::<DriveForDuration>()
 			.register_type::<LinearVelocity>()
 			.register_type::<AngularVelocity>()
 			.register_type::<SucceedTimes>()

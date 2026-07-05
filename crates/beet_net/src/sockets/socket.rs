@@ -116,7 +116,12 @@ impl Socket {
 				let read_feed = feed.clone();
 				let target = entity.id();
 				entity.world_scope(move |world| {
-					world.spawn(
+					// parent the observer to the socket so it is despawned with the
+					// socket: it holds a clone of the writer channel's sender, so a
+					// leaked observer would keep the channel open forever and the writer
+					// task would never end, leaving a despawned socket's connection open
+					// (a browser watching a torn-down server would never see the close).
+					world.spawn((
 						Observer::new(move |ev: On<MessageSend>| -> Result {
 							read_feed
 								.lock()
@@ -125,7 +130,8 @@ impl Socket {
 							Ok(())
 						})
 						.with_entity(target),
-					);
+						ChildOf(target),
+					));
 				});
 				entity.insert(WriterFeed(feed));
 			}
@@ -134,6 +140,16 @@ impl Socket {
 			// writer task: owns `send` and drains the channel on its creation thread.
 			.run_async_local(async move |_| {
 				while let Some(message) = message_recv.recv().await {
+					// a close message ends the connection: close the sink (flushing the
+					// close frame and shutting the write half) and stop the writer, so a
+					// despawn-time close (eg a live-reload teardown broadcasting a close)
+					// actually drops the connection rather than leaving the peer joined to
+					// a dead task. The writer task otherwise outlives the entity, so a bare
+					// despawn never closes the connection on its own.
+					if let Message::Close(frame) = message {
+						send.close(frame).await.ok();
+						break;
+					}
 					// socket send errors are non-fatal
 					send.send(message).await.unwrap_or_else(|err| {
 						error!("{:?}", err);

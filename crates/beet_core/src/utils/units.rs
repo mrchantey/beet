@@ -58,6 +58,10 @@ impl Angle {
 /// not here.
 #[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Reflect)]
 #[reflect(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// serialize as a plain number (deg/s), not a `{ 0: .. }` newtype wrapper, so a
+// model authors `angular=90` and the robot wire reads one bare value.
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct AngularVelocity(f32);
 
 impl AngularVelocity {
@@ -114,6 +118,10 @@ impl Distance {
 /// interpreted as mm/s) via the [`From`] impls below.
 #[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Reflect)]
 #[reflect(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// serialize as a plain number (mm/s), not a `{ 0: .. }` newtype wrapper, so a
+// model authors `linear=60` and the robot wire reads one bare value.
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct LinearVelocity(f32);
 
 impl LinearVelocity {

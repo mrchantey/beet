@@ -11,6 +11,8 @@
 
 mod client_io;
 pub use client_io::*;
+mod entry_reload;
+pub use entry_reload::*;
 mod live_reload;
 pub use live_reload::*;
 mod live_reload_script;

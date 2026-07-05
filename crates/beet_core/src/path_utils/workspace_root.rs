@@ -2,21 +2,26 @@ use crate::prelude::*;
 use std::path::PathBuf;
 
 /// 1. tries to get the `WORKSPACE_ROOT` env var.
-/// 2. if wasm, returns an empty path
+/// 2. if wasm, returns an empty path (the store root is the ambient origin — a bucket
+///    root on a Cloudflare Worker, the served page origin in a browser — so paths
+///    resolve relative to an empty root; a js runtime with a real root sets `WORKSPACE_ROOT`).
 /// 3. Otherwise return the closest ancestor (inclusive) that contains a `Cargo.lock` file
 /// 4. Otherwise returns cwd
 ///
 /// ## Panics
 /// - The current directory is not found
 /// - Insufficient permissions to access the current directory
-/// - In wasm and js_runtime::WORKSPACE_ROOT returns None
 pub fn workspace_root() -> PathBuf {
 	if let Ok(root_str) = env_ext::var("WORKSPACE_ROOT") {
 		return root_str.into();
 	}
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
-			panic!("no WORKSPACE_ROOT env in js runtime");
+			// no filesystem/workspace in a js runtime (browser, Cloudflare Worker): the
+			// store root is the ambient origin, so paths resolve relative to an empty root.
+			// A js runtime with a real root sets WORKSPACE_ROOT above; panicking here made
+			// serving any site from a Worker impossible.
+			return PathBuf::new();
 		} else {
 			use std::ffi::OsString;
 			let path = fs_ext::current_dir().unwrap();

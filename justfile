@@ -84,8 +84,19 @@ beet-validate *args:
 beet-plan *args:
   AWS_PROFILE= cargo run -p beet-cli -- plan {{ args }}
 
+# Build beet-cli in release into the real ./target (full incremental caching) and
+# symlink the binary into the cargo bin dir. This is far faster than `cargo install`,
+# which rebuilds from scratch in a throwaway target every time. Iterating? Just re-run
+# `cargo build --release -p beet-cli` on its own — the symlink points at
+# target/release/beet, so the fresh binary is picked up with no reinstall step.
 install-cli *args:
-  cargo install --path crates/beet-cli --all-features {{ args }}
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cargo build --release -p beet-cli --all-features {{ args }}
+  bin="$(realpath "${CARGO_TARGET_DIR:-target}/release/beet")"
+  dst="${CARGO_HOME:-$HOME/.cargo}/bin/beet"
+  ln -sf "$bin" "$dst"
+  echo "linked $dst -> $bin"
 
 #💡 Aliases
 
