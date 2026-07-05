@@ -281,32 +281,62 @@ where
 	Fut: 'static + Future<Output = Out>,
 	Out: 'static + IntoResult,
 {
+	run_async_task_inner(world, None, func).await
+}
+
+/// Shared body of [`run_async_task`] and [`run_async_task_entity`]: run `func`,
+/// catch panics (under `std`), and route any error through the world's error
+/// handler.
+///
+/// If `guard` is set and that entity has since been despawned, the error is the
+/// entity's lifecycle ending (a scene swap, a shutdown), not a fault, so it is
+/// logged at `debug` rather than routed to the handler — which panics by default
+/// (`Severity::Panic`), and a panic mid-schedule would brick eg robot firmware.
+/// An entity-scoped task (a `PersistentSocket` reconnect loop, a server accept
+/// loop) is designed to outlive its entity, so this is the expected path.
+#[cfg_attr(feature = "nightly", track_caller)]
+async fn run_async_task_inner<Func, Fut, Out>(
+	world: AsyncWorld,
+	guard: Option<AsyncEntity>,
+	func: Func,
+) where
+	Func: 'static + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Future<Output = Out>,
+	Out: 'static + IntoResult,
+{
+	let location = Location::caller();
 	#[cfg(feature = "std")]
-	{
+	let result = {
 		use futures_lite::future::FutureExt;
-		let result = std::panic::AssertUnwindSafe(func(world.clone()))
+		match std::panic::AssertUnwindSafe(func(world.clone()))
 			.catch_unwind()
-			.await;
-		match result {
-			Ok(output) => {
-				if let Err(err) = output.into_result() {
-					let location = Location::caller();
-					world.handle_command_error::<Func>(err, location).await;
-				}
-			}
+			.await
+		{
+			Ok(output) => output.into_result(),
 			Err(panic) => {
 				let msg = display_ext::try_downcast_str(&panic)
 					.unwrap_or_else(|| "unknown panic".to_string());
 				error!("Async task panicked: {}", msg);
+				return;
 			}
 		}
-	}
+	};
+	// no unwinding to catch under `panic=abort`
 	#[cfg(not(feature = "std"))]
-	{
-		// no unwinding to catch under `panic=abort`
-		if let Err(err) = func(world.clone()).await.into_result() {
-			let location = Location::caller();
-			world.handle_command_error::<Func>(err, location).await;
+	let result = func(world.clone()).await.into_result();
+
+	if let Err(err) = result {
+		// suppress the error if this is an entity-scoped task whose entity has
+		// gone away — its lifecycle ending, not a fault (see the fn docs).
+		let despawned = match &guard {
+			Some(entity) => (!entity.is_alive().await).then(|| entity.id()),
+			None => None,
+		};
+		match despawned {
+			Some(entity) => {
+				debug!("async task for despawned entity {entity} ended: {err}")
+			}
+			None => world.handle_command_error::<Func>(err, location).await,
 		}
 	}
 }
@@ -1308,7 +1338,11 @@ pub impl EntityWorldMut<'_> {
 	}
 }
 
-/// Like [`run_async_task`] but threads an [`AsyncEntity`] to the task.
+/// Like [`run_async_task`] but threads an [`AsyncEntity`] to the task, and
+/// treats that entity being despawned as the task's natural end rather than a
+/// fault (see [`run_async_task_inner`]): an entity-scoped task that outlives its
+/// entity (a reconnect loop when its scene is swapped, a server accept loop on
+/// shutdown) stops cleanly instead of panicking the app.
 async fn run_async_task_entity<Func, Fut, Out>(entity: AsyncEntity, func: Func)
 where
 	Func: 'static + FnOnce(AsyncEntity) -> Fut,
@@ -1316,7 +1350,8 @@ where
 	Out: 'static + IntoResult,
 {
 	let world = entity.world().clone();
-	run_async_task(world, move |_| func(entity)).await;
+	let guard = entity.clone();
+	run_async_task_inner(world, Some(guard), move |_| func(entity)).await;
 }
 
 #[cfg(test)]
@@ -1438,5 +1473,43 @@ mod test {
 			.await
 			.unwrap();
 		value.xpect_eq(7);
+	}
+
+	/// An entity-scoped task whose entity is despawned mid-flight has its
+	/// resulting error suppressed rather than routed to the (by-default
+	/// panicking) error handler — the guarantee a `PersistentSocket`'s connection
+	/// loop relies on when its scene is swapped out. Without the guard the failed
+	/// `insert` panics out of `update()` and fails the test.
+	#[beet_core::test]
+	async fn entity_task_survives_despawn() {
+		let mut app = test_app();
+		let reached = Store::<bool>::default();
+		let (gate_send, gate_recv) = oneshot::<()>();
+		let entity = app.world_mut().spawn_empty().id();
+		{
+			let reached = reached.clone();
+			app.world_mut().entity_mut(entity).run_async_local(
+				move |entity| async move {
+					// park until the test has despawned the entity
+					gate_recv.wait().await;
+					reached.set(true);
+					// the entity is gone, so this errors; the guard must suppress
+					// it instead of routing it to the panicking handler.
+					entity.insert(Name::new("late")).await?;
+					Ok(())
+				},
+			);
+		}
+		// let the task spawn and park on the gate
+		AsyncRunner::tick().await;
+		// despawn, then release the task so its `insert` runs against a dead entity
+		app.world_mut().entity_mut(entity).despawn();
+		gate_send.signal(());
+		// drive: the task resumes, its `insert` errors, and the guard suppresses it
+		for _ in 0..10 {
+			app.update();
+			AsyncRunner::tick().await;
+		}
+		reached.get().xpect_true();
 	}
 }

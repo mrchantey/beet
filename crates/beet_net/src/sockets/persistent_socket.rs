@@ -87,6 +87,13 @@ async fn connection_loop(entity: AsyncEntity) -> Result {
 						config.url
 					);
 					time_ext::sleep(delay).await;
+					// end cleanly if the entity (its scene) was despawned while we
+					// backed off, so a swapped-out client dialling an unreachable
+					// server does not retry forever. The connected path is covered
+					// by `entity.insert(socket)` erroring below.
+					if !entity.is_alive().await {
+						return Ok(());
+					}
 				}
 			}
 		};
