@@ -327,8 +327,11 @@ impl<T> TableContent for T where
 pub struct TableItem<T> {
 	/// A uuid v7 used as the primary key.
 	pub id: Uuid,
-	/// Duration since Unix epoch, from the cross-platform [`time_ext::now`]
-	/// (the std `SystemTime` has no wasm clock).
+	/// Wall-clock creation time as a [`Duration`] since the Unix epoch, from the
+	/// cross-platform [`time_ext::now`] (the std `SystemTime` has no wasm clock).
+	/// Deliberately not an [`Instant`]: that clock is monotonic (elapsed from an
+	/// arbitrary process-local zero), so it is meaningless once this row is
+	/// serialized and read back in another process.
 	pub created: Duration,
 	/// The user-provided data payload.
 	pub data: T,

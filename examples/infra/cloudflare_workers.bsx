@@ -16,11 +16,11 @@ full rebuild + redeploy.
 
 ## Usage
 
-    beet --features=infra --main=examples/infra/cloudflare_workers.bsx build
-    beet --features=infra --main=examples/infra/cloudflare_workers.bsx deploy
-    beet --features=infra --main=examples/infra/cloudflare_workers.bsx sync
-    beet --features=infra --main=examples/infra/cloudflare_workers.bsx bench
-    beet --features=infra --main=examples/infra/cloudflare_workers.bsx destroy
+    beet --main=examples/infra/cloudflare_workers.bsx build
+    beet --main=examples/infra/cloudflare_workers.bsx deploy
+    beet --main=examples/infra/cloudflare_workers.bsx sync
+    beet --main=examples/infra/cloudflare_workers.bsx bench
+    beet --main=examples/infra/cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` host (no long-running server); `BootOnLoad` fires the CLI
 request on load and the matching verb runs. Each verb is a child-sequenced

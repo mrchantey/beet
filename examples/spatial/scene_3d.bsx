@@ -3,7 +3,7 @@
 
 The smallest wgpu scene: a window, a distance-framed camera, lighting and a ground plane.
 
-    beet --features=winit --main=examples/spatial/scene_3d.bsx
+    beet --main=examples/spatial/scene_3d.bsx
 -->
 <Scene3d>
 	<CrateCheck features="winit"/>

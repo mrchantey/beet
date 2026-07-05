@@ -3,7 +3,7 @@
 
 A terminal chat where each typed sentence is bert-matched against the child `<SentenceOption>`s, logging the winner. The model asset comes from `just init-repo` (the default bert model copy).
 
-    beet --features=ml --main=examples/ml/hello_ml_chat.bsx
+    beet --main=examples/ml/hello_ml_chat.bsx
 -->
 <Scene2d>
 	<CrateCheck features="ml"/>

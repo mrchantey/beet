@@ -24,5 +24,5 @@ Running an entry is the zero-command path: `beet` discovers a `main.bsx` by walk
 
 ```sh
 beet --main=examples/hello
-beet --features=thread,sockets --main=examples/perceive_act/main-v1.bsx --server=socket
+beet --main=examples/perceive_act/main-v1.bsx
 ```

@@ -2,47 +2,38 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// The default `--out` when none is given: the single installed browser binary
-/// every wasm-serving example mounts, mirroring the native `cargo install`.
-const DEFAULT_OUT: &str = "assets/wasm/beet.wasm";
-/// The default features when none are given: the full browser surface, so the one
-/// installed binary serves every example page; a page's program declares what it
-/// actually needs with `<CrateCheck features=..>` and fails fast on a leaner build.
-const DEFAULT_FEATURES: &str = "web_examples,web_head";
-
 /// Request params for the [`BuildWasm`] command, surfaced in `--help`.
 #[derive(Reflect, Default)]
 #[reflect(Default)]
 struct BuildWasmParams {
 	/// Build in release mode and optimize the artifact with `wasm-opt -Oz`.
 	release: bool,
-	/// The cargo package to build, defaults to `beet-cli`.
+	/// The cargo package to build (`--package`). Omit to build the current
+	/// directory's crate, a non-workspace `main.bsx` wasm build.
 	package: Option<String>,
-	/// The binary target to build, defaults to `beet`.
+	/// The binary target to build (`--bin`).
 	bin: Option<String>,
 	/// The example target to build, ie `--example my_scene`, overriding `bin`.
 	example: Option<String>,
-	/// Comma-separated features to activate, defaults to the full browser surface
-	/// (`web_examples,web_head`).
+	/// Comma-separated features to activate (`--features`).
 	features: Option<String>,
 	/// Activate all features (`--all-features`), overriding `features`.
 	all_features: bool,
 	/// Also activate the crate's `default` feature. Off by default, so the build is
 	/// `--no-default-features` like the wasm-safe `web`/`cloudflare` targets.
 	default_features: bool,
-	/// The output `.wasm` path; the sibling `.js` is written alongside it. The
-	/// `wasm-bindgen` `<name>_bg.wasm`/`<name>.js` pair is renamed to these exact
-	/// names, eg `--out=dist/wasm/min.wasm` yields `min.wasm` + `min.js`. Defaults
-	/// to `assets/wasm/beet.wasm`.
+	/// The output `.wasm` path (required); the sibling `.js` is written alongside
+	/// it. The `wasm-bindgen` `<name>_bg.wasm`/`<name>.js` pair is renamed to these
+	/// exact names, eg `--out=dist/wasm/min.wasm` yields `min.wasm` + `min.js`.
 	out: Option<String>,
 }
 
 /// Compiles a package to wasm and prepares it for the browser.
 ///
-/// With no args this installs the standard browser binary: the `beet` bin with
-/// the full browser surface (`web_examples,web_head`) at `assets/wasm/beet.wasm`,
-/// the one artifact every wasm-serving example mounts (the browser analogue of
-/// `cargo install --path crates/beet-cli --all-features`).
+/// Target-agnostic: the invoking entry (a `main.bsx`, a justfile recipe) supplies
+/// the package, features and `--out` path, so nothing here defaults to a beet
+/// binary. With no `--package` it builds the current directory's crate (a
+/// non-workspace `main.bsx` build).
 ///
 /// Runs `cargo build --target wasm32-unknown-unknown` (`--no-default-features`
 /// plus the selected features), then `wasm-bindgen --target web`, then in release
@@ -56,35 +47,39 @@ struct BuildWasmParams {
 pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
 	let params = parts.params().parse_reflect::<BuildWasmParams>()?;
 
-	// the cargo build: the standard browser binary by default, configurable per-arg.
+	// the cargo build, fully driven by the invoking entry's args.
 	let mut cargo = CargoBuild::default()
 		.with_release(params.release)
 		.with_target(BuildTarget::Wasm)
 		.with_no_default_features(!params.default_features)
-		.with_all_features(params.all_features)
-		.with_package(params.package.as_deref().unwrap_or("beet-cli"));
-	if !params.all_features {
+		.with_all_features(params.all_features);
+	// no `--package` builds the current directory's crate (a non-workspace build).
+	if let Some(package) = &params.package {
+		cargo = cargo.with_package(package.as_str());
+	}
+	if !params.all_features
+		&& let Some(features) = &params.features
+	{
 		cargo = cargo.with_features(
-			params
-				.features
-				.as_deref()
-				.unwrap_or(DEFAULT_FEATURES)
+			features
 				.split(',')
 				.filter(|feature| !feature.is_empty())
 				.map(SmolStr::from)
 				.collect(),
 		);
 	}
-	// an `--example` target overrides the default `beet` bin
+	// an `--example` target overrides `--bin`
 	if let Some(example) = &params.example {
 		cargo = cargo.with_example(example.as_str());
-	} else {
-		cargo = cargo.with_binary(params.bin.as_deref().unwrap_or("beet"));
+	} else if let Some(bin) = &params.bin {
+		cargo = cargo.with_binary(bin.as_str());
 	}
 
-	// the requested artifact names, parsed from `--out`: the `.wasm` file, its
-	// `.js` sibling, and the interim `wasm-bindgen` `<stem>_bg.wasm` to rename from.
-	let out_raw = params.out.as_deref().unwrap_or(DEFAULT_OUT);
+	// the requested artifact names, parsed from the required `--out`: the `.wasm`
+	// file, its `.js` sibling, and the interim `wasm-bindgen` `<stem>_bg.wasm`.
+	let out_raw = params.out.as_deref().ok_or_else(|| {
+		bevyhow!("--out is required, eg --out=assets/wasm/beet-min.wasm")
+	})?;
 	let out_path = std::path::Path::new(out_raw);
 	let stem = out_path
 		.file_stem()

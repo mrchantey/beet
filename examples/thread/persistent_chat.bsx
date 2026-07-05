@@ -2,8 +2,8 @@
 A chat whose conversation persists to disk across runs. Run it through the one
 binary:
 
-    beet --features=thread --main=examples/thread/persistent_chat.bsx
-    beet --features=thread --main=examples/thread/persistent_chat.bsx -- --new   # start fresh
+    beet --main=examples/thread/persistent_chat.bsx
+    beet --main=examples/thread/persistent_chat.bsx -- --new   # start fresh
 
 `{MountThreadStore}` persists the thread's records (one JSON object under the
 path); `{CreateThread}` adopts the stored conversation by seed hash before the first

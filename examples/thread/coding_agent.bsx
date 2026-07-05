@@ -2,7 +2,7 @@
 A mini coding agent that creates files in a local store. Run it through the one
 binary:
 
-    beet --features=thread --main=examples/thread/coding_agent.bsx
+    beet --main=examples/thread/coding_agent.bsx
 
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent exercises the five blob tools, and

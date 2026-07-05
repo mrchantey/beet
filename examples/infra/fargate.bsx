@@ -14,11 +14,11 @@ reading the freshly built binary.
 
 ## Usage
 
-    beet --features=infra --main=examples/infra/fargate.bsx validate
-    beet --features=infra --main=examples/infra/fargate.bsx deploy
-    beet --features=infra --main=examples/infra/fargate.bsx sync
-    beet --features=infra --main=examples/infra/fargate.bsx watch
-    beet --features=infra --main=examples/infra/fargate.bsx destroy --force
+    beet --main=examples/infra/fargate.bsx validate
+    beet --main=examples/infra/fargate.bsx deploy
+    beet --main=examples/infra/fargate.bsx sync
+    beet --main=examples/infra/fargate.bsx watch
+    beet --main=examples/infra/fargate.bsx destroy --force
 
 Live deploy needs AWS credentials in the environment, plus `tofu`, `cargo-zigbuild`
 and a container engine.

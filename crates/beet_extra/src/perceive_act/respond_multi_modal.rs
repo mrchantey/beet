@@ -42,27 +42,42 @@ pub async fn RespondMultiModal(cx: ActionContext<RespondMultiModalInput>) -> Res
 	info!(
 		"cycle {cycle}: {emotion:?} | \"{say}\" | {heading:?} (model {model_secs:.2}s)"
 	);
+	// opt-in via [`SequentialResponse`] on this action: express the face and finish
+	// the spoken line before driving, so the robot never moves while it is still
+	// talking; otherwise the three fan out at once.
+	let sequential = cx.caller.get_cloned::<SequentialResponse>().await.is_ok();
 	let started = Instant::now();
-	let calls = [
-		("set-emotion", serde_json::to_string(&SetEmotionInput {
-			emotion,
-		})?),
-		("speak-text", serde_json::to_string(&SpeakTextInput {
-			text: say,
-		})?),
-		("apply-heading", serde_json::to_string(&ApplyHeadingInput {
-			heading,
-		})?),
-	];
-	let outcomes = async_ext::join_all(calls.map(|(path, body)| {
+	// each capability call, timed for the summary log below.
+	let run = |path: &'static str, body: String| {
 		let caller = cx.caller.clone();
 		async move {
 			let started = Instant::now();
 			let result = call_capability(&caller, path, body).await;
 			(path, started.elapsed(), result)
 		}
-	}))
-	.await;
+	};
+	let face =
+		("set-emotion", serde_json::to_string(&SetEmotionInput { emotion })?);
+	let speak =
+		("speak-text", serde_json::to_string(&SpeakTextInput { text: say })?);
+	let drive =
+		("apply-heading", serde_json::to_string(&ApplyHeadingInput { heading })?);
+	let outcomes = if sequential {
+		// face + speech first: `call_capability` waits each reply's settle, so the
+		// spoken line has ended; only then the drive step and its settle.
+		let mut outcomes =
+			async_ext::join_all([run(face.0, face.1), run(speak.0, speak.1)])
+				.await;
+		outcomes.push(run(drive.0, drive.1).await);
+		outcomes
+	} else {
+		async_ext::join_all([
+			run(face.0, face.1),
+			run(speak.0, speak.1),
+			run(drive.0, drive.1),
+		])
+		.await
+	};
 
 	let timings = outcomes
 		.iter()
@@ -96,10 +111,9 @@ const CAPABILITY_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Call a capability route on the agent's router with a JSON body.
 ///
-/// A body that cannot block on its own movement (the esp robot: no async-timer
-/// waker in its handler task) replies with [`ApplyHeadingReply::settle`]
-/// instead, and the wait happens here, so the next photo still only follows a
-/// stopped robot.
+/// A body that cannot block on its own effect (the esp robot: no async-timer
+/// waker in its handler task) replies with a [`SettleTime`] instead, and the
+/// wait happens here, so the next photo still only follows a settled robot.
 async fn call_capability(
 	caller: &AsyncEntity,
 	path: &str,
@@ -118,22 +132,22 @@ async fn call_capability(
 	.map_err(|_| bevyhow!("timed out after {CAPABILITY_TIMEOUT:?}"))??
 	.into_result()
 	.await?;
-	if let Ok(reply) = response.json::<ApplyHeadingReply>().await {
-		if !reply.settle.is_zero() {
-			time_ext::sleep(reply.settle).await;
+	if let Ok(settle) = response.json::<SettleTime>().await {
+		let settle = settle.duration_or_zero();
+		if !settle.is_zero() {
+			time_ext::sleep(settle).await;
 		}
 	}
 	Ok(())
 }
 
-/// An `apply-heading` reply from a body that steps on a timer rather than
-/// blocking: how long the commanded step runs, awaited by [`call_capability`].
-/// Mirrored by the esp body's `ApplyHeadingReply`.
-#[derive(Default, serde::Deserialize, serde::Serialize)]
-pub struct ApplyHeadingReply {
-	/// How long the drive step runs before the robot halts.
-	pub settle: Duration,
-}
+/// Opt-in marker on a [`RespondMultiModal`] action: express the face and finish
+/// speaking before driving (and await the movement), rather than fanning all
+/// three out at once. Spawn it beside the action, eg
+/// `<RespondMultiModal {SequentialResponse}/>`.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct SequentialResponse;
 
 /// Everything the robot does with one photo: the face to wear, the line to say
 /// and the direction to drive, applied simultaneously.
@@ -153,12 +167,12 @@ pub struct RespondMultiModalInput {
 mod test {
 	use super::*;
 
-	/// One `respond-multi-modal` call fans out to the capability routes
-	/// concurrently: the local handlers record the emotion and heading on their
-	/// route entities. The router deliberately serves no `speak-text`, proving a
-	/// failed capability is tolerated rather than failing the response.
-	#[beet_core::test]
-	async fn fans_out_to_capabilities() {
+	/// Drive one `respond-multi-modal` call through a router serving `set-emotion`
+	/// and `apply-heading` (but deliberately no `speak-text`, so a failed
+	/// capability is tolerated), optionally in `sequential` mode. Asserts both the
+	/// emotion and the heading are recorded on their route entities — the fan-out
+	/// completes either way.
+	async fn drive_and_assert(sequential: bool) {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ThreadPlugin::default()));
 		let agent = app.world_mut().spawn(Router).id();
@@ -166,7 +180,11 @@ mod test {
 			app.world_mut().spawn((SetEmotion, ChildOf(agent))).id();
 		let heading_entity =
 			app.world_mut().spawn((ApplyHeading, ChildOf(agent))).id();
-		app.world_mut().spawn((RespondMultiModal, ChildOf(agent)));
+		let action =
+			app.world_mut().spawn((RespondMultiModal, ChildOf(agent))).id();
+		if sequential {
+			app.world_mut().entity_mut(action).insert(SequentialResponse);
+		}
 		app.world_mut().flush();
 
 		app.world_mut()
@@ -184,9 +202,7 @@ mod test {
 								})
 								.unwrap(),
 							)
-							.with_header::<header::ContentType>(
-								MediaType::Json,
-							),
+							.with_header::<header::ContentType>(MediaType::Json),
 					)
 					.await?
 					.into_result()
@@ -209,4 +225,14 @@ mod test {
 			.copied()
 			.xpect_eq(Some(Heading::Left));
 	}
+
+	/// The default: one call fans out to the capability routes concurrently, the
+	/// local handlers recording the emotion and heading.
+	#[beet_core::test]
+	async fn fans_out_to_capabilities() { drive_and_assert(false).await; }
+
+	/// [`SequentialResponse`] expresses the face + speech first, then drives — but
+	/// the fan-out still completes, recording both the emotion and the heading.
+	#[beet_core::test]
+	async fn sequential_still_records_all() { drive_and_assert(true).await; }
 }

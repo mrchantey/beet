@@ -8,8 +8,8 @@ with `--s3-backend`.
 
 ## Usage
 
-    beet --features=infra --main=examples/infra/bucket.bsx run               # local backend
-    beet --features=infra --main=examples/infra/bucket.bsx run --s3-backend  # s3 backend
+    beet --main=examples/infra/bucket.bsx run               # local backend
+    beet --main=examples/infra/bucket.bsx run --s3-backend  # s3 backend
 
 Live run needs AWS credentials and `tofu`.
 -->

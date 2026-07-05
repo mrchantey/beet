@@ -19,12 +19,14 @@ use beet_net::sockets::*;
 pub struct ResetOnDisconnect;
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	let target = cx.entity;
-	world.commands().spawn(
-		Observer::new(move |_ev: On<SocketClosed>, mut commands: Commands| {
+	// attach the reset observer through the entity command (like the socket
+	// servers' own `observe_any` wiring) rather than hand-spawning an
+	// `Observer::new(..).with_entity(..)`. `observe_any`, not `observe`, since
+	// [`SocketClosed`] is an [`EntityTargetEvent`], not a Bevy `EntityEvent`.
+	world.commands().entity(cx.entity).observe_any(
+		|_ev: On<SocketClosed>, mut commands: Commands| {
 			commands.trigger(ResetScene);
-		})
-		.with_entity(target),
+		},
 	);
 }
 

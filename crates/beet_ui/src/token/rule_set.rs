@@ -549,7 +549,7 @@ mod tests {
 	/// Spawn `<div/>` under a surface `width_px` wide, returning the div.
 	fn div_under_viewport(world: &mut World, width_px: f32) -> Entity {
 		let surface = world
-			.spawn((MediaViewport::new(width_px), children![rsx! { <div/> }]))
+			.spawn((MediaViewport::new(width_px, 768.), children![rsx! { <div/> }]))
 			.id();
 		world.entity(surface).get::<Children>().unwrap()[0]
 	}
@@ -580,7 +580,7 @@ mod tests {
 		world.insert_resource(RuleSet::default().with_rule(max_width_rule()));
 		let content = world.spawn(rsx! { <div/> }).id();
 		world.spawn((
-			MediaViewport::new(640.),
+			MediaViewport::new(640., 768.),
 			children![Portal::new(content)],
 		));
 		selects(&mut world, content).xpect_true();

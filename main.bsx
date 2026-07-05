@@ -20,7 +20,7 @@ process serves.
     beet run-wasm <module.wasm>            # run a wasm test module
     beet check examples/bsx_site           # lint a no-code site
     beet export-static examples/bsx_site   # write its dist/
-    beet build-wasm --release              # install the browser binary (assets/wasm/beet.wasm)
+    beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm              # install the browser binary (assets/wasm/beet.wasm)
 
 The two sites in this repo both serve through `<Serve/>` (`<site>` is a directory
 holding an entry document, or the entry file itself):

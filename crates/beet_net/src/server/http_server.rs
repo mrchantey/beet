@@ -96,6 +96,10 @@ pub struct HttpServer {
 	/// loops back to it. Defaults to `true`; clear it on a secondary listener
 	/// that should not claim the loopback port.
 	pub canonical: bool,
+	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
+	/// so an entry declaring a single [`HttpServer`] needs no flag; clear it on a
+	/// server that should boot only when `--server=http` names it explicitly.
+	pub default_boot: bool,
 }
 
 impl Default for HttpServer {
@@ -118,6 +122,7 @@ impl Default for HttpServer {
 			port: Some(port),
 			host,
 			canonical: true,
+			default_boot: true,
 		}
 	}
 }
@@ -137,6 +142,7 @@ impl HttpServer {
 			port: Some(port),
 			host: [0, 0, 0, 0],
 			canonical: true,
+			default_boot: true,
 		}
 	}
 	/// Sets the host address to bind to.
@@ -215,6 +221,8 @@ impl BootServer for HttpServer {
 	/// `HttpServer` overlays `--port` / `--host` from the boot before the backend
 	/// reads the bind address.
 	fn apply_boot(&mut self, boot: &Request) { self.apply_request(boot); }
+
+	fn default_boot(&self) -> bool { self.default_boot }
 }
 
 /// Invoke the installed backend on a started host, handing it the `shutdown`
@@ -433,6 +441,39 @@ mod tests {
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = boot(&mut app, 0, Request::from_cli_str("--server=cli"));
 		// drive a bounded number of frames; the filter miss never flags the entity.
+		for _ in 0..16 {
+			app.update();
+			AsyncRunner::tick().await;
+		}
+		app.world()
+			.entity(entity)
+			.contains::<ServerStartFlag>()
+			.xpect_false();
+	}
+
+	/// A server with `default_boot: false` stays dormant on a bare boot (no
+	/// `--server`), where the default `default_boot: true` (see `boots_on_boot`)
+	/// would start it.
+	#[beet_core::test]
+	async fn default_boot_false_skips_bare_boot() {
+		stub_backend();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app
+			.world_mut()
+			.spawn(HttpServer {
+				default_boot: false,
+				..default()
+			})
+			.id();
+		app.world_mut()
+			.entity_mut(entity)
+			.run_async_local(|host| async move {
+				host.call::<Boot, Response>(Boot::from(Request::get("/")))
+					.await?;
+				Ok(())
+			});
+		// a bare boot selects `default_boot` servers only; this one opts out.
 		for _ in 0..16 {
 			app.update();
 			AsyncRunner::tick().await;

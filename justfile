@@ -87,25 +87,6 @@ beet-plan *args:
 install-cli *args:
   cargo install --path crates/beet-cli --all-features {{ args }}
 
-#💡 Perceive-act demo
-
-# Clean per-cycle output: the perceive-act stage logs at info, the exchange/socket
-# plumbing quieted to warn. Override with your own RUST_LOG to dig deeper.
-# The installed-cli commands live in examples/perceive_act/README.md; these recipes
-# are the local-dev (cargo run) mirrors.
-perceive-act-log := "info,beet_net=warn"
-
-# v1: mock head (floor-photo fixtures + tts) and mock body (logs the heading).
-perceive-act-v1 *args:
-	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket {{ args }}
-# v2: same mock head, the body is a wgpu fox driving off each heading.
-perceive-act-v2 *args:
-	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features winit,sockets -- --main=examples/perceive_act/main-v2.bsx --server=socket {{ args }}
-# v3: browser head over http (install the wasm binary first: just beet build-wasm --release).
-# The head page + agent socket bind all interfaces so a phone on the LAN can connect.
-perceive-act-v3 *args:
-	RUST_LOG={{ perceive-act-log }} cargo run -p beet-cli --features thread,sockets -- --main=examples/perceive_act/main-v3.bsx --server=socket,http {{ args }}
-
 #💡 Aliases
 
 fmt *args:
@@ -267,8 +248,8 @@ test-wasm-e2e crate test_name *args:
 # the entry roots at the workspace (<StoreRoot>) so the served examples are
 # reachable and --watch live-reloads on edit.
 serve-wasm *args:
-	beet build-wasm --release
-	beet --main=examples/wasm --watch --server=http {{ args }}
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
+	beet --main=examples/wasm --watch {{ args }}
 
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer

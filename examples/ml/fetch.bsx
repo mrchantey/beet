@@ -3,7 +3,7 @@
 
 Type a prompt in the terminal and the `<FetchFox/>` walks to whichever `<FetchItems/>` collectable's sentence best matches it.
 
-    beet --features=ml --main=examples/ml/fetch.bsx
+    beet --main=examples/ml/fetch.bsx
 -->
 <Scene3d>
 	<CrateCheck features="ml"/>

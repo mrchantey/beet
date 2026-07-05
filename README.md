@@ -135,7 +135,7 @@ Every example documents itself with a `beet` command, eg:
 
 ```sh
 beet --main=examples/hello
-beet --features=thread,sockets --main=examples/perceive_act/main-v1.bsx --server=socket
+beet --main=examples/perceive_act/main-v1.bsx
 ```
 
 `--features` verifies the installed binary was compiled with those cargo features, and entries declare their own requirements with `<CrateCheck>`, so a leaner install fails fast with the full missing list instead of unresolved tags.

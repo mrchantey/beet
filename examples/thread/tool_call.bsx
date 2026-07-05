@@ -1,7 +1,7 @@
 <!--
 Tool calling, the whole program in one scene. Run it through the one binary:
 
-    beet --features=thread --main=examples/thread/tool_call.bsx
+    beet --main=examples/thread/tool_call.bsx
 
 A finite dungeon turn whose agent is equipped with the inline `<AgentChoiceAction/>`
 tool (registered by the binary), looped twice by `{RepeatTimes}` and run by

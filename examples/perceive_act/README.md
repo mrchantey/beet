@@ -24,7 +24,7 @@ cycle 3: acted in 0.10s (set-emotion 0.07s | speak-text 0.10s | apply-heading 0.
 One process, both clients mocked: the head reads the floor photos and logs the emotion, the body logs the heading.
 
 ```sh
-beet --features=thread,sockets --main=examples/perceive_act/main-v1.bsx --server=socket
+beet --main=examples/perceive_act/main-v1.bsx
 ```
 
 ## v2: wgpu fox body
@@ -32,7 +32,7 @@ beet --features=thread,sockets --main=examples/perceive_act/main-v1.bsx --server
 Same mock head, but the body is a 3d fox in a window that drives off each heading.
 
 ```sh
-beet --features=thread,sockets,winit --main=examples/perceive_act/main-v2.bsx --server=socket
+beet --main=examples/perceive_act/main-v2.bsx
 ```
 
 ## v3: browser head
@@ -40,8 +40,8 @@ beet --features=thread,sockets,winit --main=examples/perceive_act/main-v2.bsx --
 No in-process clients. A second HTTP server serves a wasm browser head that connects back over the socket, serving the real webcam, Web Speech, and a rendered face. Install the wasm binary once (the same single `assets/wasm/beet.wasm` every wasm example mounts), then run both servers:
 
 ```sh
-beet build-wasm --release
-beet --features=thread,sockets,secure --main=examples/perceive_act/main-v3.bsx --server=socket,http
+beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
+beet --main=examples/perceive_act/main-v3.bsx
 ```
 
 Both servers bind all interfaces, so any device on the LAN works: open `https://<this-host>:8337` (or plain `http://127.0.0.1:8337` locally) and grant camera access; the head derives the agent's socket url from the page location. The `/debug` route shows the webcam, face, and log on one page. All socket clients reconnect with exponential backoff, so the page survives an agent restart.

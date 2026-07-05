@@ -35,6 +35,11 @@ pub trait BootServer: Component<Mutability = Mutable> {
 	/// Overlay the boot request onto the server config before the backend reads it.
 	/// Default: a no-op; [`HttpServer`] overrides it to apply `--port` / `--host`.
 	fn apply_boot(&mut self, _boot: &Request) {}
+
+	/// Whether this server boots when neither `--server` nor `BEET_SERVER` is
+	/// given. Defaults to `true` — a bare `beet` brings up the declared server;
+	/// override to `false` for one that must be named explicitly.
+	fn default_boot(&self) -> bool { true }
 }
 
 /// Shutdown signal for a running server of marker `S`: [`boot_server`] stores the
@@ -80,8 +85,12 @@ fn boot_server<S: BootServer>(
 ) -> Result {
 	let entity = ev.entity;
 	let selected = ev.with(|boot| {
-		let selected = request_selects_server(boot, S::SELECTOR);
-		if selected && let Ok(mut server) = servers.get_mut(entity) {
+		let Ok(mut server) = servers.get_mut(entity) else {
+			return false;
+		};
+		let selected =
+			request_selects_server(boot, S::SELECTOR, server.default_boot());
+		if selected {
 			server.apply_boot(boot);
 		}
 		selected

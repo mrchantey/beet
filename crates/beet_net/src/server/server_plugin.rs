@@ -43,7 +43,10 @@ impl Plugin for ServerPlugin {
 			// the lambda backend serves only inside an actual Lambda task (its
 			// runtime sets AWS_LAMBDA_FUNCTION_NAME); anywhere else a
 			// lambda-featured binary (eg an --all-features install) falls
-			// through to the standard backends below.
+			// through to the standard backends below. Installed *first*, so in a
+			// Lambda task the first-write-wins `set_http_server` (an `OnceLock`)
+			// keeps lambda: the hyper/mini install below then no-ops (its `.ok()`
+			// swallows the already-installed error), so hyper never clobbers it.
 			#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 			if env_ext::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
 				set_http_server(|entity, shutdown| {

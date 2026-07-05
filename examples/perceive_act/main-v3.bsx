@@ -11,10 +11,10 @@ all interfaces so a phone on the LAN can load the head page and connect back: th
 `SocketServer` (all interfaces by default) on `:8338`, and the head `HttpServer` (all
 interfaces via its `host` field) on `:8337`. Install the wasm binary once (the same
 single binary every wasm example mounts, at `assets/wasm/beet.wasm`), then run both
-servers (no `--server` flag boots every declared server, or name them explicitly):
+servers (the socket and http servers both default-boot, so no --server flag is needed):
 
-    beet build-wasm --release
-    beet --features=thread,sockets,secure --main=examples/perceive_act/main-v3.bsx --server=socket,http
+    beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
+    beet --main=examples/perceive_act/main-v3.bsx
 
 Then open https://<this-host>:8337 (any device on the LAN, one-time certificate warning)
 or plain http://127.0.0.1:8337 locally, and grant camera access; the head derives the

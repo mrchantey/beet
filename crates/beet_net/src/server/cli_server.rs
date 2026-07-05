@@ -58,7 +58,9 @@ fn on_action_in(
 	mut commands: Commands,
 ) -> Result {
 	let always = servers.get(ev.entity).is_ok_and(|server| server.always);
-	if !always && !ev.with(|boot| request_selects_server(boot, "cli"))? {
+	// default-boots (the shared default) unless `--server` names a different set;
+	// `always` additionally boots even when another server is named.
+	if !always && !ev.with(|boot| request_selects_server(boot, "cli", true))? {
 		return Ok(());
 	}
 	let action_in = ev.clone();

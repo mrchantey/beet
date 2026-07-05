@@ -33,7 +33,7 @@ impl RealtimeApi {
 	#[cfg(target_arch = "wasm32")]
 	pub async fn connect_webrtc(ephemeral_key: String) -> Result<()> {
 		// async_ext::spawn_local(async move {
-		connect_webrtc(ephemeral_key).await.map_jserr()
+		connect_webrtc(ephemeral_key).await
 		// });
 		// Ok(())
 	}

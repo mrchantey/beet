@@ -3,7 +3,7 @@
 
 The fox alternates its two glb clips: each `<PlayAnimation>` runs until its `<TriggerOnAnimationEnd>` passes, looped forever by `Repeat`.
 
-    beet --features=winit --main=examples/spatial/hello_animation.bsx
+    beet --main=examples/spatial/hello_animation.bsx
 -->
 <Scene3d>
 	<CrateCheck features="winit"/>

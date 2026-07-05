@@ -1,4 +1,4 @@
-use beet_core::prelude::debug;
+use beet_core::prelude::*;
 use beet_core::web_utils::document_ext;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
@@ -11,17 +11,19 @@ use web_sys::RtcSessionDescriptionInit;
 use web_sys::window;
 
 // TODO integrate with bevy app using async tasks
-pub(super) async fn connect_webrtc(
-	ephemeral_key: String,
-) -> Result<(), JsValue> {
+//
+// Speaks beet's [`Result`]: each web-sys call converts its [`JsValue`] error via
+// [`map_jserr`], so a bevy error (eg `document_ext::media_devices`) flows through
+// with a plain `?` rather than being round-tripped back into a `JsValue`.
+pub(super) async fn connect_webrtc(ephemeral_key: String) -> Result<()> {
 	// Get voice param from URL
-	let window = window().unwrap();
+	let window = window().ok_or_else(|| bevyhow!("no browser window"))?;
 
 	// Create RTCPeerConnection
-	let pc = RtcPeerConnection::new()?;
+	let pc = RtcPeerConnection::new().map_jserr()?;
 
 	// Set up to play remote audio from the model
-	let audio_el = HtmlAudioElement::new()?;
+	let audio_el = HtmlAudioElement::new().map_jserr()?;
 	audio_el.set_autoplay(true);
 
 	// Add local audio track for microphone input in the browser
@@ -38,14 +40,14 @@ pub(super) async fn connect_webrtc(
 
 	// Get user media (microphone); `document_ext::media_devices` fails with
 	// remedies on an insecure origin instead of a cryptic getUserMedia TypeError
-	let media_devices: MediaDevices = document_ext::media_devices()
-		.map_err(|err| JsValue::from_str(&err.to_string()))?;
+	let media_devices: MediaDevices = document_ext::media_devices()?;
 	let constraints = MediaStreamConstraints::new();
 	constraints.set_audio(&JsValue::TRUE);
-	let ms_promise =
-		media_devices.get_user_media_with_constraints(&constraints)?;
-	let ms = wasm_bindgen_futures::JsFuture::from(ms_promise).await?;
-	let ms = ms.dyn_into::<web_sys::MediaStream>()?;
+	let ms_promise = media_devices
+		.get_user_media_with_constraints(&constraints)
+		.map_jserr()?;
+	let ms = JsFuture::from(ms_promise).await.map_jserr()?;
+	let ms = ms.dyn_into::<web_sys::MediaStream>().map_jserr()?;
 	pc.add_track_0(ms.get_tracks().get(0).unchecked_ref(), &ms);
 
 	// Set up data channel for sending and receiving events
@@ -80,9 +82,11 @@ pub(super) async fn connect_webrtc(
 	// Create offer and set local description
 	debug!("creating offer");
 	let offer: RtcSessionDescriptionInit =
-		JsFuture::from(pc.create_offer()).await?.into();
+		JsFuture::from(pc.create_offer()).await.map_jserr()?.into();
 	debug!("setting local description");
-	JsFuture::from(pc.set_local_description(&offer)).await?;
+	JsFuture::from(pc.set_local_description(&offer))
+		.await
+		.map_jserr()?;
 	debug!("local description set");
 
 	// Fetch SDP answer
@@ -93,27 +97,30 @@ pub(super) async fn connect_webrtc(
 	let opts = web_sys::RequestInit::new();
 	opts.set_method("POST");
 	opts.set_body(&JsValue::from_str(&offer.get_sdp().unwrap_or_default()));
-	let headers = web_sys::Headers::new()?;
-	headers.append("Authorization", &format!("Bearer {}", ephemeral_key))?;
-	headers.append("Content-Type", "application/sdp")?;
+	let headers = web_sys::Headers::new().map_jserr()?;
+	headers
+		.append("Authorization", &format!("Bearer {}", ephemeral_key))
+		.map_jserr()?;
+	headers.append("Content-Type", "application/sdp").map_jserr()?;
 	opts.set_headers(&headers);
 
-	let request = web_sys::Request::new_with_str_and_init(&url, &opts)?;
-	let resp_value = wasm_bindgen_futures::JsFuture::from(
-		window.fetch_with_request(&request),
-	)
-	.await?;
+	let request =
+		web_sys::Request::new_with_str_and_init(&url, &opts).map_jserr()?;
+	let resp_value = JsFuture::from(window.fetch_with_request(&request))
+		.await
+		.map_jserr()?;
 	debug!("request made");
-	let resp: web_sys::Response = resp_value.dyn_into()?;
-	let sdp_text = wasm_bindgen_futures::JsFuture::from(resp.text()?).await?;
+	let resp: web_sys::Response = resp_value.dyn_into().map_jserr()?;
+	let sdp_text = JsFuture::from(resp.text().map_jserr()?).await.map_jserr()?;
 	let sdp_str = sdp_text.as_string().unwrap_or_default();
 
 	// Set remote description
 	let answer =
 		web_sys::RtcSessionDescriptionInit::new(web_sys::RtcSdpType::Answer);
 	answer.set_sdp(&sdp_str);
-	wasm_bindgen_futures::JsFuture::from(pc.set_remote_description(&answer))
-		.await?;
+	JsFuture::from(pc.set_remote_description(&answer))
+		.await
+		.map_jserr()?;
 	debug!("answer is set");
 
 	// Data channel open event

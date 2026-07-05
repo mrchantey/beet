@@ -8,7 +8,7 @@ renders its console output via `<RenderConsole>`. Honors `?color-scheme=dark`.
 Install the wasm binary once (the same single binary every wasm example mounts,
 at `assets/wasm/beet.wasm`), then serve:
 
-    beet build-wasm --release
+    beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
     beet --main=examples/wasm --watch    # then open http://127.0.0.1:8337
 
 The standard build carries the full browser surface (`web_examples,web_head`), so

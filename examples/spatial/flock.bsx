@@ -3,7 +3,7 @@
 
 `<Flock count=300/>` fills a 2d space scene with boids steered by separate/align/cohere/wander behaviors.
 
-    beet --features=winit --main=examples/spatial/flock.bsx
+    beet --main=examples/spatial/flock.bsx
 -->
 <Scene2d>
 	<CrateCheck features="winit"/>

@@ -9,11 +9,11 @@ by re-running `sync` with no redeploy.
 
 ## Usage
 
-    beet --features=infra --main=examples/infra/lambda.bsx validate
-    beet --features=infra --main=examples/infra/lambda.bsx deploy
-    beet --features=infra --main=examples/infra/lambda.bsx sync
-    beet --features=infra --main=examples/infra/lambda.bsx watch
-    beet --features=infra --main=examples/infra/lambda.bsx destroy --force
+    beet --main=examples/infra/lambda.bsx validate
+    beet --main=examples/infra/lambda.bsx deploy
+    beet --main=examples/infra/lambda.bsx sync
+    beet --main=examples/infra/lambda.bsx watch
+    beet --main=examples/infra/lambda.bsx destroy --force
 
 `<StackHost>` is the IaC deployer host: a `Stack` (resolved by the blocks + verbs by
 ancestry), a one-shot `CliServer` with `BootOnLoad` (the CLI request fires on load

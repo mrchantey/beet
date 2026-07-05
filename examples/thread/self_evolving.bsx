@@ -2,7 +2,7 @@
 A self-evolving agent whose only memory is a blob store it reads and writes
 across turns. Run it through the one binary:
 
-    beet --features=thread --main=examples/thread/self_evolving.bsx
+    beet --main=examples/thread/self_evolving.bsx
 
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent evolves `notes.md` over ten turns (`{RepeatTimes}`), and

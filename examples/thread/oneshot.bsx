@@ -1,7 +1,7 @@
 <!--
 The simplest thread: one agent, one turn, no loop. Run it through the one binary:
 
-    beet --features=thread --main=examples/thread/oneshot.bsx
+    beet --main=examples/thread/oneshot.bsx
 
 `{CreateThread}` calls the `{Sequence}` once (the system seed, then the agent's
 single reply), then exits the process. The transcript renders inline so it stays

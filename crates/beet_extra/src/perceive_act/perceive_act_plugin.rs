@@ -18,6 +18,7 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<TakePhoto>()
 			.register_type::<PostPhoto>()
 			.register_type::<RespondMultiModal>()
+			.register_type::<SequentialResponse>()
 			.register_type::<SpeakText>()
 			.register_type::<ApplyHeading>()
 			.register_type::<SetEmotion>()

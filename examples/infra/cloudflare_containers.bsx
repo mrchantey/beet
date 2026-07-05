@@ -15,9 +15,9 @@ The served content and the deploy/sync/destroy route shape are identical.
 
 ## Usage
 
-    beet --features=infra --main=examples/infra/cloudflare_containers.bsx deploy
-    beet --features=infra --main=examples/infra/cloudflare_containers.bsx sync
-    beet --features=infra --main=examples/infra/cloudflare_containers.bsx destroy
+    beet --main=examples/infra/cloudflare_containers.bsx deploy
+    beet --main=examples/infra/cloudflare_containers.bsx sync
+    beet --main=examples/infra/cloudflare_containers.bsx destroy
 
 Live deploy needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the R2
 data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus

@@ -233,7 +233,7 @@ impl Plugin for CharcellPlugin {
 /// columns; every px breakpoint shifts consistently.
 const MEDIA_PX_PER_CELL: f32 = 1024.0 / 90.0;
 
-/// Mirror each surface buffer's width onto its required [`MediaViewport`]
+/// Mirror each surface buffer's size onto its required [`MediaViewport`]
 /// ([`MEDIA_PX_PER_CELL`] px per cell), the context width-gated media rules
 /// resolve against. `set_if_neq`, so paint's per-frame buffer writes never
 /// dirty the cascade — only a real resize fires `Changed<MediaViewport>`,
@@ -245,6 +245,7 @@ fn sync_media_viewport<B: Component + AsBuffer>(
 	for (buffer, mut viewport) in buffers.iter_mut() {
 		viewport.set_if_neq(MediaViewport::new(
 			buffer.size().x as f32 * MEDIA_PX_PER_CELL,
+			buffer.size().y as f32 * MEDIA_PX_PER_CELL,
 		));
 	}
 }

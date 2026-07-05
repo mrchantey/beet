@@ -102,6 +102,10 @@ pub struct SocketServer {
 	/// remote host - a browser tab, an esp device over Wi-Fi - can connect. Narrow it
 	/// with [`with_host`](Self::with_host), eg `[127, 0, 0, 1]` to bind loopback only.
 	pub host: [u8; 4],
+	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
+	/// so an entry declaring a single [`SocketServer`] needs no flag; clear it on a
+	/// server that should boot only when `--server=socket` names it explicitly.
+	pub default_boot: bool,
 }
 
 impl Default for SocketServer {
@@ -116,6 +120,7 @@ impl SocketServer {
 		Self {
 			port: Some(port),
 			host: [0, 0, 0, 0],
+			default_boot: true,
 		}
 	}
 
@@ -161,6 +166,7 @@ impl SocketServer {
 			Self {
 				port: Some(port),
 				host: [127, 0, 0, 1],
+				default_boot: true,
 			},
 			OnSpawn::new_async_local(move |entity| {
 				super::start_tungstenite_server_with_tcp(
@@ -186,6 +192,8 @@ impl BootServer for SocketServer {
 	) -> LocalBoxedFuture<'static, Result> {
 		Box::pin(start_socket_server(entity, shutdown))
 	}
+
+	fn default_boot(&self) -> bool { self.default_boot }
 }
 
 /// Invoke the installed backend on a started host, handing it the `shutdown`

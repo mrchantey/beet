@@ -3,7 +3,7 @@ The fox driving the environment-agnostic `SetDrive` action in a wgpu scene: it w
 square patrol (drive forward 1s, turn 90 for 1s, repeat). Run it with the windowed
 stack:
 
-    beet --features=winit --main=examples/action/wgpu-action.bsx
+    beet --main=examples/action/wgpu-action.bsx
 
 This is the reference for the perceive-act body client (V2): `ApplyHeading` maps a
 `Heading` onto the fox's `DifferentialDrive` exactly as these `SetDrive` +

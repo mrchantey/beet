@@ -47,7 +47,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 	let (selected, port, host, opening) = ev.with(|boot| {
 		(
-			request_selects_server(boot, "ssh"),
+			request_selects_server(boot, "ssh", true),
 			boot.get_param("port").and_then(|port| port.parse().ok()),
 			boot.get_param("host").map(|host| {
 				if host == "0.0.0.0" {

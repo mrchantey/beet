@@ -156,12 +156,12 @@ async_ext::do_async_thing().await;
 
 - when editing rust and using the beet cli run `cargo run -p beet-cli --features=feat1,feat2 -- arg1 arg2`
 - when editing bsx files use the installed `beet` cli, ie `beet arg1 arg2`.
-- when writing documentation always specify `beet --features=..`, not `cargo run -p beet-cli`
+- when writing documentation, a runnable example command is plain `beet --main=..`: each entry declares its features with `<CrateCheck>`, so a copy-paste command needs no `beet --features=..`. Mention `--features` only to explain the verification mechanism, never in the runnable command itself.
 - in the case of `beet --features`, this will check that beet has these features enabled and error if it doesnt.
 - Install the beet cli via `cargo install --path crates/beet-cli --all-features`.
 - `--main` accepts an entry file (`--main=examples/hello/main.bsx`) or a directory probed for `main.bsx` (`--main=examples/hello`); with no `--main` discovery walks the cwd and its ancestors.
 - An entry that mounts paths outside its own directory declares `<StoreRoot src="../.."/>` (there is no `--root` flag), and declares its required features with `<CrateCheck features="thread,sockets"/>`.
-- Install the browser binary with `beet build-wasm --release` (the single `assets/wasm/beet.wasm` every wasm example mounts).
+- Install the browser binary with `beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm` (the artifact every wasm example mounts). `build-wasm` is target-agnostic, so package/features/out are always explicit, never defaulted to a beet binary.
 
 ## Bevy Cheatsheet
 

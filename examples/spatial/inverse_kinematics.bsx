@@ -3,7 +3,7 @@
 
 A robot arm glb with `{IkSpawner}` solves its joints toward the keyboard-movable `<IkTarget>` sphere.
 
-    beet --features=winit --main=examples/spatial/inverse_kinematics.bsx
+    beet --main=examples/spatial/inverse_kinematics.bsx
 -->
 <Scene3d>
 	<CrateCheck features="winit"/>

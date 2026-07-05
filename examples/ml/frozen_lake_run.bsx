@@ -3,7 +3,7 @@
 
 A greedy agent walks the 4x4 frozen-lake grid using the trained Q-table; run `frozen_lake_train.bsx` first to generate it.
 
-    beet --features=ml --main=examples/ml/frozen_lake_run.bsx
+    beet --main=examples/ml/frozen_lake_run.bsx
 -->
 <Scene3d>
 	<CrateCheck features="ml"/>

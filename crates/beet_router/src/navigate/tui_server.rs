@@ -51,7 +51,8 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 	let (selected, opening, scheme) = ev.with(|boot| {
 		(
-			request_selects_server(boot, "tui"),
+			// default-boots (the shared default) unless `--server` names a different set.
+			request_selects_server(boot, "tui", true),
 			OpeningRoute::from_request(boot),
 			boot.get_param("color-scheme").and_then(ColorScheme::parse),
 		)

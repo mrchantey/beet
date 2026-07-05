@@ -2,7 +2,7 @@
 Interactive terminal chat, the whole program in one scene. Run it through the
 one binary:
 
-    beet --features=thread --main=examples/thread/chat.bsx
+    beet --main=examples/thread/chat.bsx
 
 The behavior is `Repeat[Sequence[agent, user]]`: the agent greets from the system
 prompt, the user's turn (`{UserInput}`) waits for the composer, looped forever.
