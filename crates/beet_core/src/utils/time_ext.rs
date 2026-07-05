@@ -1,8 +1,8 @@
 //! Time utilities for cross-platform duration handling and async sleep.
 //!
-//! The wall-clock surface ([`now`]/[`now_millis`]/[`set_now`]) and
-//! [`pretty_print_duration`] are no_std; the sleep/timeout helpers are std-only
-//! (per-function gated, not whole-module).
+//! The wall-clock surface ([`now`]/[`now_millis`]/[`set_now`]) and the sleep
+//! helpers are no_std ([`sleep`] on a bare target rides a [`set_sleep`] hook);
+//! only [`timeout_sync`] is std-only.
 
 use crate::prelude::*;
 use bevy::platform::sync::OnceLock;
@@ -105,26 +105,50 @@ pub fn pretty_print_duration(dur: Duration) -> String {
 /// Milliseconds since the Unix epoch (`now().as_millis()`).
 pub fn now_millis() -> u128 { now().as_millis() }
 
+/// An async sleep source: a future resolving after the given [`Duration`].
+///
+/// The no_std-friendly sleep hook, mirroring [`NowFn`] (wall clock) and
+/// `set_http_client` (transport). Installed via [`set_sleep`] so a bare target
+/// can back [`sleep`] with its own timer, eg an `embassy_time::Timer`. The
+/// future is `Send` (not `MaybeSend`) because [`sleep`] is awaited inside
+/// `Send` futures even in single-threaded builds.
+pub type SleepFn = fn(Duration) -> SendBoxedFuture<()>;
+
+static SLEEP: OnceLock<SleepFn> = OnceLock::new();
+
+/// Install the sleep source used by [`sleep`].
+///
+/// Takes precedence over the platform default, so it can also be used to mock
+/// time. Returns an error if a source has already been installed.
+pub fn set_sleep(sleeper: SleepFn) -> Result {
+	SLEEP
+		.set(sleeper)
+		.map_err(|_| bevyhow!("a `sleep` source is already installed"))
+}
+
 /// Sleeps for the specified number of seconds.
-#[cfg(feature = "std")]
 pub async fn sleep_secs(secs: u64) { sleep(Duration::from_secs(secs)).await; }
 
 /// Sleeps for the specified number of milliseconds.
-#[cfg(feature = "std")]
 pub async fn sleep_millis(millis: u64) {
 	sleep(Duration::from_millis(millis)).await;
 }
 
 /// Sleeps for the specified number of microseconds.
-#[cfg(feature = "std")]
 pub async fn sleep_micros(micros: u64) {
 	sleep(Duration::from_micros(micros)).await;
 }
 
 /// Cross platform sleep function
-#[cfg(feature = "std")]
-#[allow(unused)]
+///
+/// Resolution order:
+/// 1. a source installed via [`set_sleep`];
+/// 2. the platform default: `setTimeout` on wasm, `async-io` on std native;
+/// 3. otherwise a panic — a bare target installs a source at boot.
 pub async fn sleep(duration: Duration) {
+	if let Some(sleeper) = SLEEP.get() {
+		return sleeper(duration).await;
+	}
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
 			use wasm_bindgen::JsCast;
@@ -153,8 +177,10 @@ pub async fn sleep(duration: Duration) {
 			JsFuture::from(promise)
 				.await
 				.expect("should await `setTimeout` OK");
-		} else {
+		} else if #[cfg(feature = "std")] {
 			async_io::Timer::after(duration).await;
+		} else {
+			panic!("no sleep source installed: call `set_sleep` at boot (eg an embassy timer)");
 		}
 	}
 }

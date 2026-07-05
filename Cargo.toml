@@ -348,7 +348,7 @@ net = ["dep:beet_net"]
 # the no_std-capable WebSocket socket core (client, `Message`, events,
 # `common_handlers`, `ws_ext`, `set_socket_client`); a bare-metal transport
 # (esp) installs its own client on top. `std` builds get it via `beet_net/std`.
-sockets = ["net", "action", "beet_net?/sockets"]
+sockets = ["net", "action", "beet_net?/sockets", "beet_router?/sockets"]
 # The agnostic mDNS service browser engine + pure wire helpers (no_std). esp
 # enables this for the browser and supplies its own `edge-nal`-backed UDP socket
 # impl; on a host, pair with `udp` to get the std `async-io` socket driver.

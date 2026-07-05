@@ -38,7 +38,13 @@ std = [
 	# non-wasm target table, so this activates it only off wasm; the no_std embedded
 	# router leaves `std` off, keeping `webbrowser`/`url`/std out of the firmware.
 	"dep:webbrowser",
+	# beet_net/std has the socket core anyway, so std hosts get the socket-aware
+	# scene management (`ResetOnDisconnect`) for free.
+	"sockets",
 ]
+# Socket-aware scene management (`ResetOnDisconnect`: a socket closure triggers
+# `ResetScene`). no_std-capable; a bare-metal body enables it directly.
+sockets = ["beet_net/sockets"]
 # The native-only filesystem store + http transport, layered onto `std`. The
 # native `router` enables this; the wasm render target leaves it off. (The
 # `webbrowser` link opener rides `std` itself, off wasm — see the `std` feature.)

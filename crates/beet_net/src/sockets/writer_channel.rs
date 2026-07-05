@@ -89,7 +89,10 @@ impl<T> Receiver<T> {
 		poll_fn(|cx| self.poll_recv(cx)).await
 	}
 
-	fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+	/// Poll for the next value, `Ready(None)` once the channel is empty and
+	/// every [`Sender`] has dropped — the seam for a `Stream` wrapper (eg a
+	/// transport's [`Socket`](super::Socket) reader).
+	pub fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Option<T>> {
 		if let Some(value) = self.shared.queue.lock().unwrap().pop_front() {
 			return Poll::Ready(Some(value));
 		}

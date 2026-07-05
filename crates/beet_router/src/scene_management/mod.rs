@@ -24,6 +24,14 @@ mod scene_server;
 #[cfg(feature = "template_serde")]
 pub use scene_server::*;
 
+// Socket-aware reset: a client socket whose closure triggers [`ResetScene`].
+// Rides the socket core (`sockets`) + the reset event's core (`template_serde`);
+// no_std-capable, so a bare-metal body halts its hardware when its agent drops.
+#[cfg(all(feature = "sockets", feature = "template_serde"))]
+mod reset_on_disconnect;
+#[cfg(all(feature = "sockets", feature = "template_serde"))]
+pub use reset_on_disconnect::*;
+
 // Host push commands: drive a remote device (std http client). Native-only.
 #[cfg(all(
 	feature = "std",
@@ -67,5 +75,7 @@ impl Plugin for SceneManagementPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<BeetSceneRoot>()
 			.add_plugins(SceneCommandsPlugin);
+		#[cfg(feature = "sockets")]
+		app.register_type::<ResetOnDisconnect>();
 	}
 }

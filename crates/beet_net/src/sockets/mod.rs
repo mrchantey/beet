@@ -32,12 +32,11 @@ pub use socket::*;
 /// writer feed, [`SocketClosedNotify`]); public so consumers can build the
 /// channel ends those components carry.
 pub mod writer_channel;
-// The self-reconnecting client socket. Its backoff sleeps ride the std-gated
-// `time_ext::sleep` (available on wasm too); a bare-metal transport reconnects
-// at its own driver layer instead.
-#[cfg(feature = "std")]
+// The self-reconnecting client socket. Its backoff sleeps ride the
+// cross-platform `time_ext::sleep` (a bare target installs a `set_sleep` source
+// at boot), so a bare-metal transport gets the same redial + [`SocketClosed`]
+// semantics as std/wasm rather than reconnecting invisibly at its driver layer.
 mod persistent_socket;
-#[cfg(feature = "std")]
 pub use persistent_socket::*;
 // The server backend boots through `HttpServer`'s installable-backend model and
 // its `new_test` binds real TCP: std-only. The no_std client core does not need
