@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::prelude::Url;
@@ -73,16 +75,37 @@ pub async fn connect_wasm(url: &Url) -> Result<Socket> {
 	}) as Box<dyn FnMut(MessageEvent)>);
 	ws.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
 
-	// onerror: surface an error into the stream
+	// The connect resolves when the socket opens (Ok) or fails before opening
+	// (Err): a dial against a down server fires onerror/onclose without ever firing
+	// onopen, so resolving only on onopen would await forever — the wasm reconnect
+	// hang that left a browser head dead after an agent restart (the native path
+	// returns Err here, so it redials). All three handlers share this slot; whichever
+	// fires first while it is still pending settles the connect.
+	let (open_tx, open_rx) = oneshot::channel::<Result<()>>();
+	let open_slot = Rc::new(RefCell::new(Some(open_tx)));
+
+	// onerror: fail a still-pending connect, and surface an error into the stream
 	let tx_err = tx.clone();
+	let open_err = open_slot.clone();
 	let on_error = Closure::wrap(Box::new(move |_e: Event| {
+		if let Some(open) = open_err.borrow_mut().take() {
+			let _ = open.send(Err(bevyhow!("WebSocket connect failed")));
+		}
 		let _ = tx_err.unbounded_send(Err(bevyhow!("WebSocket error event")));
 	}) as Box<dyn FnMut(Event)>);
 	ws.set_onerror(Some(on_error.as_ref().unchecked_ref()));
 
-	// onclose: translate to a Close frame and close the stream
+	// onclose: fail a still-pending connect (closed before open), else translate to
+	// a Close frame and close the stream
 	let tx_close = tx.clone();
+	let open_close = open_slot.clone();
 	let on_close = Closure::wrap(Box::new(move |e: CloseEvent| {
+		if let Some(open) = open_close.borrow_mut().take() {
+			let _ = open.send(Err(bevyhow!(
+				"WebSocket closed before open (code {})",
+				e.code()
+			)));
+		}
 		let _ = tx_close.unbounded_send(Ok(Message::Close(Some(CloseFrame {
 			code: e.code(),
 			reason: e.reason(),
@@ -92,20 +115,20 @@ pub async fn connect_wasm(url: &Url) -> Result<Socket> {
 	}) as Box<dyn FnMut(CloseEvent)>);
 	ws.set_onclose(Some(on_close.as_ref().unchecked_ref()));
 
-	// Wait until the socket is open before returning
-	let (open_tx, open_rx) = oneshot::channel::<()>();
-	let open_cell = std::cell::RefCell::new(Some(open_tx));
+	// onopen: succeed a still-pending connect
+	let open_ok = open_slot.clone();
 	let on_open = Closure::wrap(Box::new(move |_e: Event| {
-		if let Some(tx) = open_cell.borrow_mut().take() {
-			let _ = tx.send(());
+		if let Some(open) = open_ok.borrow_mut().take() {
+			let _ = open.send(Ok(()));
 		}
 	}) as Box<dyn FnMut(Event)>);
 	ws.set_onopen(Some(on_open.as_ref().unchecked_ref()));
 
-	// Await open
+	// Await the open-or-fail outcome; a failed dial returns Err so the caller redials
+	// with backoff instead of hanging on a dead socket.
 	open_rx
 		.await
-		.map_err(|_| bevyhow!("Failed to await WebSocket open"))?;
+		.map_err(|_| bevyhow!("WebSocket connect channel dropped"))??;
 
 	// We no longer need to retain the on_open closure; removing the handler avoids leaks
 	ws.set_onopen(None);

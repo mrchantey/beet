@@ -32,6 +32,8 @@ mod post_photo;
 pub use post_photo::*;
 mod respond_multi_modal;
 pub use respond_multi_modal::*;
+mod robot_streamer;
+pub use robot_streamer::*;
 mod speak_text;
 pub use speak_text::*;
 mod log_drive_for_duration;
