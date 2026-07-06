@@ -21,6 +21,12 @@ use bevy::winit::WinitUserEvent;
 ///
 /// It also installs the inert [`screenshot_verify_plugin`].
 pub fn render_window_plugin(app: &mut App) {
+	// no display server (headless WSL/CI/SSH): `BeetPlugins` fell back to the
+	// headless schedule loop, so there is no winit event loop to drive. Skip the
+	// window lifecycle rather than demand the absent `EventLoopProxyWrapper`.
+	if !env_ext::has_display() {
+		return;
+	}
 	app.insert_resource(WinitSettings::continuous())
 		.add_plugins(screenshot_verify_plugin)
 		.add_systems(Startup, keep_event_loop_awake)

@@ -29,13 +29,20 @@ impl PluginGroup for BeetPlugins {
 
 		// the runner. winit owns the OS event loop + main thread; without it the
 		// cooperative 30Hz loop paces headless servers/tools instead of busy-spinning.
+		// winit still needs a display server to build its event loop, so on a headless
+		// host (WSL, CI, bare SSH) with no display we fall back to the schedule loop
+		// rather than panicking: a server/tool `.bsx` runs anywhere, target-agnostic.
+		// With `winit` compiled, that fallback keeps the render capabilities linked but
+		// GPU-less (see [`headless_render_runner`]) so scene systems never panic.
 		cfg_if! {
 			if #[cfg(feature = "winit")] {
-				builder = builder.add_group(winit_default_plugins());
+				if env_ext::has_display() {
+					builder = builder.add_group(winit_default_plugins());
+				} else {
+					builder = builder.add_group(headless_render_runner());
+				}
 			} else {
-				builder = builder.add_group(MinimalPlugins.set(
-					ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 30.0)),
-				));
+				builder = builder.add_group(headless_runner());
 			}
 		}
 
@@ -113,6 +120,65 @@ impl PluginGroup for BeetPlugins {
 	}
 }
 
+/// The headless runner: the cooperative 30Hz schedule loop that paces servers and
+/// tools without an OS event loop. Used when the `winit` feature is off, so the
+/// render/asset stack is never linked and bare `MinimalPlugins` suffice.
+#[cfg(not(feature = "winit"))]
+fn headless_runner() -> PluginGroupBuilder {
+	MinimalPlugins
+		.set(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
+			1.0 / 30.0,
+		)))
+		.build()
+}
+
+/// The winit-compiled fallback when no display server is reachable (headless WSL,
+/// CI, bare SSH). Keeps the whole render/asset `DefaultPlugins` stack that
+/// `--all-features` links — so every render resource, event and asset type still
+/// exists and no scene system panics on a missing `WindowResized`/camera/asset — but:
+/// - swaps winit's OS event loop (which needs a display and panics building it) for
+///   the headless schedule loop, and
+/// - runs the render stack GPU-less (`WgpuSettings::backends = None`), so wgpu is
+///   never initialized on the displayless host (adapter creation would error).
+///
+/// So a CLI/server/TUI `.bsx` runs headless anywhere; a `<Window/>`/3d scene simply
+/// cannot render, rather than crashing the whole binary.
+#[cfg(feature = "winit")]
+fn headless_render_runner() -> PluginGroupBuilder {
+	use bevy::render::RenderPlugin;
+	use bevy::render::settings::RenderCreation;
+	use bevy::render::settings::WgpuSettings;
+	winit_default_plugins()
+		.disable::<bevy::winit::WinitPlugin>()
+		.add(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
+			1.0 / 30.0,
+		)))
+		.set(RenderPlugin {
+			render_creation: RenderCreation::Automatic(Box::new(WgpuSettings {
+				backends: None,
+				..default()
+			})),
+			..default()
+		})
+}
+
+/// The workspace-rooted [`AssetPlugin`], shared by the windowed and headless
+/// render-capable runners. Resolves the assets dir from the workspace root (the
+/// nearest ancestor with a `Cargo.lock`) so a scene loads its assets regardless of
+/// the process cwd, and skips `.meta` lookups (beet sites ship no sidecars).
+#[cfg(feature = "winit")]
+fn asset_plugin() -> AssetPlugin {
+	use bevy::asset::AssetMetaCheck;
+	AssetPlugin {
+		meta_check: AssetMetaCheck::Never,
+		file_path: workspace_root()
+			.join("assets")
+			.to_string_lossy()
+			.into_owned(),
+		..default()
+	}
+}
+
 /// The configured bevy `DefaultPlugins` for a windowed beet app: skip asset meta
 /// lookups (beet sites ship no `.meta` sidecars) and disable bevy's `LogPlugin` so
 /// beet's tracing one replaces it.
@@ -125,21 +191,10 @@ impl PluginGroup for BeetPlugins {
 /// owns the window lifecycle (continuous updates, escape/close-to-exit).
 #[cfg(feature = "winit")]
 fn winit_default_plugins() -> PluginGroupBuilder {
-	use bevy::asset::AssetMetaCheck;
 	use bevy::window::ExitCondition;
 	use bevy::window::WindowPlugin;
 	DefaultPlugins
-		.set(AssetPlugin {
-			meta_check: AssetMetaCheck::Never,
-			// resolve the assets dir from the workspace root (the nearest ancestor
-			// with a `Cargo.lock`), so a render scene loads its assets regardless of
-			// the process cwd and with no `BEVY_ASSET_ROOT` set.
-			file_path: workspace_root()
-				.join("assets")
-				.to_string_lossy()
-				.into_owned(),
-			..default()
-		})
+		.set(asset_plugin())
 		.set(WindowPlugin {
 			primary_window: None,
 			exit_condition: ExitCondition::DontExit,
