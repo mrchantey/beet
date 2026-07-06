@@ -31,6 +31,10 @@ pub fn CreateActor(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::Action;
+	use beet_action::prelude::ActionContext;
+	use beet_action::prelude::ActionMeta;
+	use beet_action::prelude::Outcome;
 	use beet_core::prelude::*;
 	use beet_net::prelude::PathPartial;
 	use beet_router::prelude::*;
@@ -47,6 +51,52 @@ mod test {
 	#[derive(Component, Reflect)]
 	#[reflect(Component)]
 	fn ProbeTool(cx: ActionContext<ProbeInput>) -> String { cx.value.clone() }
+
+	/// A bespoke, non-actor loop step: a hand-written unit struct whose async `Action`
+	/// is attached via `#[require]`, the shape a custom thread `Sequence` step takes.
+	async fn tick_action(_cx: ActionContext) -> Result<Outcome> {
+		Ok(Outcome::Pass(()))
+	}
+	#[derive(Component, Reflect, Default)]
+	#[reflect(Component, Default)]
+	#[require(Action<(), Outcome> = Action::new_async(tick_action))]
+	struct Tick;
+
+	/// A thread must behave as an extensible `Sequence`: a bespoke action authored as a
+	/// leading, non-actor child of the loop `Sequence` must survive reduce as a valid
+	/// child (carry `ActionMeta`), so it runs alongside the actor turns.
+	#[beet_core::test]
+	fn bespoke_action_is_valid_sequence_child() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins).init_plugin::<ThreadPlugin>();
+		app.register_type::<Tick>();
+		app.register_type::<ProbeTool>();
+		let source = r#"
+<div {Thread} {Sequence}>
+	<Tick/>
+	<CreateActor name="System" kind="System"><CreatePost text="x"/></CreateActor>
+	<CreateActor name="Camera" kind="User" {Tick}/>
+	<CreateActor name="Bot" kind="Agent" {ModelStreamer{provider:Ollama}}>
+		<ProbeTool/>
+	</CreateActor>
+</div>
+"#;
+		let root = BsxTemplate::parse_entry(app.world(), source)
+			.unwrap()
+			.spawn(app.world_mut())
+			.unwrap();
+		ThreadWindow::reduce_now(app.world_mut());
+		// every remaining direct child of the Sequence must carry ActionMeta, else
+		// `Sequence::valid_children` bails "sequence child has no action".
+		let children: Vec<Entity> = app
+			.world()
+			.get::<Children>(root)
+			.map(|children| children.iter().collect())
+			.unwrap_or_default();
+		for child in children {
+			app.world().get::<ActionMeta>(child).xpect_some();
+		}
+	}
 
 	/// A `kind="..."` attribute resolves to the named [`ActorKind`] variant rather
 	/// than silently defaulting to `Agent`: a string attribute coercing to a unit

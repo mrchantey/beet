@@ -23,5 +23,5 @@ mod take_photo;
 pub use take_photo::*;
 mod speak_text;
 pub use speak_text::*;
-mod show_image;
-pub use show_image::*;
+mod render_face;
+pub use render_face::*;

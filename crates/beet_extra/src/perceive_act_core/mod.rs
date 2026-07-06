@@ -9,18 +9,22 @@ mod tools;
 pub use tools::*;
 mod client;
 pub use client::*;
+mod show_image;
+pub use show_image::*;
 
 use beet_core::prelude::*;
 
-/// Registers the shared perceive-act types ([`DisplayedImage`], [`WhoAmI`], [`ClientRole`]).
-/// Added idempotently by both `PerceiveActPlugin` (the agent) and `PerceiveActWebPlugin`
-/// (the browser head), so whichever is present registers the common types once.
+/// Registers the shared perceive-act types ([`ShowImage`], [`DisplayedImage`],
+/// [`WhoAmI`], [`ClientRole`]). Added idempotently by both `PerceiveActPlugin` (the
+/// agent) and `PerceiveActWebPlugin` (the browser head), so whichever is present
+/// registers the common types once.
 #[derive(Default)]
 pub struct PerceiveActCorePlugin;
 
 impl Plugin for PerceiveActCorePlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<DisplayedImage>()
+		app.register_type::<ShowImage>()
+			.register_type::<DisplayedImage>()
 			.register_type::<ClientRole>()
 			.register_type::<WhoAmI>();
 	}

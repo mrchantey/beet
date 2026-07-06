@@ -47,9 +47,9 @@ pull-assets-delete:
 
 # Push local ./assets up to the upstream bucket.
 push-assets:
-	just beet s3-sync --src=./assets --dst={{ assets-bucket }} --delete
+	beet s3-sync --src=./assets --dst={{ assets-bucket }} --delete
 push-assets-delete:
-	just beet s3-sync --src=./assets --dst={{ assets-bucket }}
+	beet s3-sync --src=./assets --dst={{ assets-bucket }}
 
 #💡 CLI
 

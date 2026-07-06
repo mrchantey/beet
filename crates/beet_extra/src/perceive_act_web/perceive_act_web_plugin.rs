@@ -12,8 +12,9 @@ impl Plugin for PerceiveActWebPlugin {
 		app.init_plugin::<PerceiveActCorePlugin>()
 			.register_type::<TakePhoto>()
 			.register_type::<SpeakText>()
-			.register_type::<ShowImage>()
 			.register_template::<WebHead>()
+			// `ShowImage` is registered by `PerceiveActCorePlugin` (shared with the
+			// native mock); this observer renders its recorded url into the `<img>`.
 			.add_observer(render_face);
 	}
 }

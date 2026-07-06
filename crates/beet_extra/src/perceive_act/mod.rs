@@ -36,6 +36,4 @@ mod speak_text;
 pub use speak_text::*;
 mod log_drive_for_duration;
 pub use log_drive_for_duration::*;
-mod show_image;
-pub use show_image::*;
 pub mod speech_ext;

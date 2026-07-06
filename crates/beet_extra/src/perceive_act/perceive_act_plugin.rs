@@ -24,7 +24,6 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<RespondMultiModal>()
 			.register_type::<SpeakText>()
 			.register_type::<LogDriveForDuration>()
-			.register_type::<ShowImage>()
 			.register_type::<DriveForDuration>()
 			// scene rotation: config + state components, and the image-options sync.
 			.register_type::<SceneRotation>()
