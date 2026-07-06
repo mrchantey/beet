@@ -37,6 +37,7 @@ pub(crate) fn toggle_aria_controls_on_click(
 	ev: On<PointerUp>,
 	parents: Query<&ChildOf>,
 	holders: Query<&PortalOf>,
+	surfaces: Query<&RenderSurface>,
 	children: Query<&Children>,
 	portals: Query<&Portal>,
 	attributes: Query<&Attributes>,
@@ -55,7 +56,7 @@ pub(crate) fn toggle_aria_controls_on_click(
 	) else {
 		return;
 	};
-	let root = Portal::render_root(&parents, &holders, control);
+	let root = Portal::render_root(&parents, &holders, &surfaces, control);
 	let Some(target) = find_by_id(
 		&children, &portals, &attributes, &attr_keys, &values, root, &id,
 	) else {

@@ -35,7 +35,7 @@ Creds load from `.env` (AWS, `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ZONE_ID`, `BEET_
 
 ## Verification (IDENTICAL for every step)
 
-Each step verifies its environment with the same five checks. Parameters: a `BASE_URL` (`http://localhost:<port>` for local, `https://dev.beet.org` for dev, `https://beet.org` for prod) and an SSH target (`127.0.0.1` + the local ssh port for local; the hostname + port 22 for dev/prod). All five must pass.
+Each step verifies its environment with the same five checks. Parameters: a `BASE_URL` (`http://localhost:<port>` for local, `https://dev.beet.org` for dev, `https://beet.org` for prod) and an SSH target (`127.0.0.1` + the local ssh port for local; the DNS-only `app.` subdomain + port 22 for dev/prod, ie `app.dev.beet.org` / `app.beet.org` -- the bare `dev.beet.org`/`beet.org` are Cloudflare-proxied web-only and do NOT forward ssh). All five must pass.
 
 ### a. curl (raw http)
 
@@ -67,14 +67,14 @@ Screenshot the home page, the counter page, and `/docs/design/color_schemes`, ea
 
 The site is also a navigable charcell TUI over ssh (`SshTuiServer`, multi-tenant). Connect non-interactively over a pty and verify the SAME pages + counter, then prove two clients run at once:
 
-- connect: `ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -p <ssh_port> <user>@<host>` (local: `-p <port> root@127.0.0.1`; dev/prod: port 22, any user. The stable `BEET_SSH_HOST_KEY` gives a consistent fingerprint, so `StrictHostKeyChecking=no` is safe.)
+- connect: `ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -p <ssh_port> <user>@<host>` (local: `-p <port> root@127.0.0.1`; dev/prod: the `app.` subdomain `app.dev.beet.org` / `app.beet.org` on port 22, any user. The bare `dev.beet.org`/`beet.org` records are Cloudflare-proxied and do not forward ssh; only the DNS-only `app.*` record points straight at the NLB. The stable `BEET_SSH_HOST_KEY` gives a consistent fingerprint, so `StrictHostKeyChecking=no` is safe.)
 - the handshake completing + a rendered frame appearing confirms the ssh server is up.
 - drive the TUI by feeding navigation keystrokes to the pty (with short sleeps between) and capturing the rendered frames: reach the counter page, trigger an increment, and grep the captured output for `Counter` and the incremented count. Discover the exact nav keystrokes during the LOCAL step and record the recipe in the "ssh driver" note below so Dev/Prod reuse it verbatim.
 - multi-tenancy: launch TWO ssh sessions at once (both backgrounded), drive both, and confirm BOTH render the site and respond independently with no crash/hang on either.
 
 #### ssh driver (filled in by the Local step)
 
-Use the reusable scripts in `.agents/tmp/deploy-verify/` (built and shaken out locally): `ssh.sh <HOST> <PORT>` runs the whole check (single session + two-client multi-tenancy) and `ssh_pty.py <HOST> <PORT> '<SCRIPT>'` is the underlying pty driver. Local is `ssh.sh 127.0.0.1 <ssh_port>` (default 8339; trust the serve output); dev/prod are `ssh.sh dev.beet.org 22` / `ssh.sh beet.org 22`. The script scales its waits up for any non-localhost host.
+Use the reusable scripts in `.agents/tmp/deploy-verify/` (built and shaken out locally): `ssh.sh <HOST> <PORT>` runs the whole check (single session + two-client multi-tenancy) and `ssh_pty.py <HOST> <PORT> '<SCRIPT>'` is the underlying pty driver. Local is `ssh.sh 127.0.0.1 <ssh_port>` (default 8339; trust the serve output); dev/prod are `ssh.sh app.dev.beet.org 22` / `ssh.sh app.beet.org 22` (the DNS-only `app.*` NLB endpoint; the bare domain is Cloudflare-proxied web-only, so `:22` there is refused -- confirmed in `FargateBeetSiteBlock`, `crates/beet_extra/src/infra/templates.rs`, where the `app.*` records are created DNS-only, no `.with_proxied(true)`). The script scales its waits up for any non-localhost host.
 
 Connection (what the driver runs per session): `ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o LogLevel=ERROR -p <port> root@<host>` on an 80x24 pty.
 
@@ -107,7 +107,7 @@ Recipe (run around the b-d checks so the delta is attributable):
    - the total went UP (new events recorded) and is `>=` the baseline (prior events retained, since the store is append/upsert, never truncated).
    - `PageView` events for the visited paths appear under `pages` (eg `/docs/design/counter`).
    - both client kinds are present under `client kinds`: `Web` (the http/playwright visits) and `Terminal` (the ssh session).
-   - for dev/prod (geoip enabled in the deploy build), a country appears under `countries` for the web visits.
+   - for dev/prod (geoip enabled in the deploy build), a country appears under `countries` for the web visits. CAVEAT: the geoip database (`assets/databases/country.mmdb`, ~8MB) is gitignored, so it only reaches a bucket via the asset sync's filesystem walk. A long-lived prod bucket retains it across deploys and populates countries; a BRAND-NEW bucket (a fresh dev stack) may report empty `countries` on its first run even though everything else works. Treat empty countries on a fresh dev stack as a non-blocking known gap (confirm the site + multi-tenancy are otherwise green); on prod, expect countries to populate, and if they do not, verify `country.mmdb` is present under `s3://beet-site--prod--assets/databases/`.
 
 An automated in-process version of the web half of this flow (http request -> request event, beacon -> page view, prior events retained, the beacon endpoint skipped) lives in `tests/beet_site_analytics.rs`; run it with `cargo test --test beet_site_analytics --features "router,json,fs,testing"` for a fast pre-deploy check of the wiring. The terminal page-view path is unit-tested in `beet_router/src/navigate/navigator.rs`.
 
@@ -127,7 +127,7 @@ just beet-plan                # EYEBALL: dev must touch only beet-site--dev--* a
 just beet-deploy              # build -> tofu -> image -> sync site/ + assets/ -> watch rollout
 ```
 
-Run the full verification (a-e) against `https://dev.beet.org` (port 22 for ssh), allowing a few minutes for rollout + DNS/ACM to settle (retry with a sane budget). Then ALWAYS tear down:
+Run the full verification (a-e) against `https://dev.beet.org` (ssh on `app.dev.beet.org` port 22), allowing a few minutes for rollout + DNS/ACM to settle (retry with a sane budget). Then ALWAYS tear down:
 
 ```sh
 just beet-destroy             # removes the dev stack
@@ -143,7 +143,7 @@ just beet-plan --stage=prod   # EYEBALL: prod creates beet.org + www.beet.org on
 just beet-deploy --stage=prod
 ```
 
-Run the full verification (a-e) against `https://beet.org` (and confirm `https://www.beet.org` serves too; ssh on port 22). LEAVE PROD UP. Teardown, if ever needed, is `just beet-destroy --stage=prod`.
+Run the full verification (a-e) against `https://beet.org` (and confirm `https://www.beet.org` serves too; ssh on `app.beet.org` port 22). LEAVE PROD UP. Teardown, if ever needed, is `just beet-destroy --stage=prod`.
 
 ## First-run / migration note
 

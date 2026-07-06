@@ -451,6 +451,7 @@ mod test {
 	}
 
 	/// The entity of the sole `<nav>` element.
+	#[cfg(feature = "tui")]
 	fn nav_entity(world: &mut World) -> Entity {
 		world
 			.query::<(Entity, &Element)>()
@@ -461,6 +462,7 @@ mod test {
 	}
 
 	/// The `aria-hidden` value on the sole `<nav>`.
+	#[cfg(feature = "tui")]
 	fn nav_hidden(world: &mut World) -> Option<SmolStr> {
 		let nav = nav_entity(world);
 		world.with_state::<(
@@ -474,6 +476,7 @@ mod test {
 
 	/// Overwrite the seeded `aria-hidden` on the sole `<nav>`, simulating the
 	/// menu-button toggle.
+	#[cfg(feature = "tui")]
 	fn set_nav_hidden(world: &mut World, value: &'static str) {
 		let nav = nav_entity(world);
 		world.with_state::<(
@@ -493,6 +496,7 @@ mod test {
 	/// load.
 	/// Spawn a `<nav id="sidebar">` under `surface` through the template
 	/// substrate (which materializes its attributes).
+	#[cfg(feature = "tui")]
 	fn spawn_rail(world: &mut World, surface: Entity) {
 		let nav = world
 			.spawn_template(rsx! { <nav id="sidebar">"nav"</nav> })
@@ -501,6 +505,7 @@ mod test {
 		world.entity_mut(nav).insert(ChildOf(surface));
 	}
 
+	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn seeds_sidebar_across_breakpoint() {
 		use bevy::math::UVec2;

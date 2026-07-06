@@ -1,3 +1,4 @@
+use crate::prelude::RenderSurface;
 use beet_core::prelude::*;
 
 /// Renders another entity in place, by reference, without reparenting it.
@@ -51,19 +52,30 @@ impl Portal {
 			})
 	}
 
-	/// The render root of `entity`: the top of the
-	/// [`visual_parent`](Self::visual_parent) chain — on a live surface, the
-	/// buffer host.
-	/// Scopes lookups (eg id resolution) to the tree an entity actually
-	/// renders in, so concurrent surfaces (one per SSH session) never cross
-	/// wires.
+	/// The render root of `entity`: the surface it renders on — the buffer host
+	/// named by the nearest [`RenderSurface`] on its
+	/// [`visual_parent`](Self::visual_parent) chain — else the top of that chain
+	/// when it renders on no surface.
+	///
+	/// Scopes lookups (eg id resolution) to the tree an entity actually renders
+	/// in, so concurrent surfaces (one per SSH session) never cross wires. A
+	/// surface is a *visual* root even when it hangs under a shared owner by
+	/// `ChildOf` (an SSH connection surface is a child of its router), so the
+	/// walk must stop at the surface, never crossing up into that shared owner
+	/// (whose subtree holds every other session's tree).
 	pub fn render_root(
 		parents: &Query<&ChildOf>,
 		holders: &Query<&PortalOf>,
+		surfaces: &Query<&RenderSurface>,
 		entity: Entity,
 	) -> Entity {
 		let mut current = entity;
 		loop {
+			// a render surface is the visual root: resolve the host it renders into
+			// and stop, so id resolution stays within this session's own tree.
+			if let Ok(surface) = surfaces.get(current) {
+				return surface.surface();
+			}
 			match Self::visual_parent(parents, holders, current) {
 				// a self-referential edge would loop; a malformed graph is a clean stop.
 				Some(parent) if parent != current => current = parent,
@@ -126,5 +138,45 @@ mod test {
 			.unwrap()
 			.holders()
 			.xpect_eq(&[holder]);
+	}
+
+	/// Multi-tenant regression: [`render_root`](Portal::render_root) stops at the
+	/// render surface, not at a shared owner the surface hangs under. Two session
+	/// surfaces are `ChildOf` a common owner (as SSH connection surfaces are
+	/// children of their router); a control in one session must resolve to *its*
+	/// surface, so id-scoped lookups never reach the owner's subtree (which holds
+	/// the other session's tree). Before the fix the walk crossed `ChildOf` past
+	/// the surface up into the owner, so one session's disclosure toggled another
+	/// session's target.
+	#[beet_core::test]
+	fn render_root_stops_at_the_surface() {
+		let mut world = World::new();
+		// the shared owner, eg the router the two SSH connections hang off.
+		let owner = world.spawn_empty().id();
+		// build a session: a buffer-host surface that is a ChildOf child of the
+		// shared owner, its page transcluded into it by a Portal holder and
+		// carrying `RenderSurface(host)`, exactly as the live page binding wires it.
+		let session = |world: &mut World| -> (Entity, Entity) {
+			let host = world.spawn(ChildOf(owner)).id();
+			// the page carries `RenderSurface(host)` and holds the control; a holder
+			// child of the host transcludes the page into the surface by `Portal`.
+			let page = world.spawn(RenderSurface(host)).id();
+			let control = world.spawn(ChildOf(page)).id();
+			world.spawn((ChildOf(host), Portal::new(page)));
+			(host, control)
+		};
+		let (host_a, control_a) = session(&mut world);
+		let (host_b, _control_b) = session(&mut world);
+		// A's control resolves to A's surface, never the shared owner or B's.
+		world
+			.with_state::<(
+				Query<&ChildOf>,
+				Query<&PortalOf>,
+				Query<&RenderSurface>,
+			), _>(move |(parents, holders, surfaces)| {
+				Portal::render_root(&parents, &holders, &surfaces, control_a)
+			})
+			.xpect_eq(host_a);
+		(host_a != host_b).xpect_true();
 	}
 }

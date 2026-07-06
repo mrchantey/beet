@@ -568,4 +568,264 @@ mod test {
 			.expect("ctrl+c did not close the session");
 		(restore < close).xpect_true();
 	}
+
+	// ================================================================
+	// Multi-tenant INPUT regression coverage.
+	//
+	// The plain `ssh_tui_app` above omits `CharcellTuiPlugin`, so it has no
+	// input pipeline (no `pointer_input`, disclosure observers, or
+	// `sync_sidebar_breakpoint`) and its multi-session tests drive navigation
+	// directly. The harness below adds the full live-TUI stack the real
+	// `beet serve site --server=ssh` runs and drives real SGR mouse bytes across
+	// two concurrent sessions, so cross-session state leaks are actually
+	// exercised.
+	// ================================================================
+
+	use bevy::math::IVec2;
+
+	/// An SGR mouse sequence: button `b` at 1-indexed cell `(col+1, row+1)`,
+	/// pressed (`M`) or released (`m`). Mirrors the private helper the `beet_ui`
+	/// hit-test tests use.
+	fn sgr(b: u32, col: u32, row: u32, pressed: bool) -> Vec<u8> {
+		let m = if pressed { 'M' } else { 'm' };
+		format!("\x1b[<{b};{};{}{m}", col + 1, row + 1).into_bytes()
+	}
+
+	/// The live-TUI stack the real `beet serve site --server=ssh` runs, including
+	/// the input pipeline the plain [`ssh_tui_app`] omits: [`CharcellTuiPlugin`]
+	/// brings `pointer_input`/`scroll_input`, the disclosure observers, and
+	/// `sync_sidebar_breakpoint`, so concurrent SGR input is exercised.
+	fn ssh_tui_live_app() -> App {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			RouterPlugin,
+			NavigatorPlugin,
+			LivePagePlugin,
+			SshTuiPlugin,
+			CharcellTuiPlugin,
+		));
+		app
+	}
+
+	/// A per-session document layout with the responsive-drawer chrome: a menu
+	/// button wired to `#sidebar` via `aria-controls`, the `<nav id="sidebar">`
+	/// rail, and the route content transcluded into `<main>` — the shape every
+	/// live page has once wrapped by [`BaseLayout`].
+	#[template]
+	fn DrawerLayout() -> impl Bundle {
+		rsx! {
+			<body>
+				<button aria-controls="sidebar">"M"</button>
+				<nav id="sidebar">"NAV"</nav>
+				<main><Slot/></main>
+			</body>
+		}
+	}
+
+	/// A router carrying the drawer layout + the SSH-TUI server, serving one home
+	/// route and opening on it.
+	fn spawn_drawer_router(app: &mut App) -> Entity {
+		app.world_mut()
+			.spawn((
+				Router,
+				BaseLayout::<DrawerLayout>::default(),
+				SshTuiServer,
+				OpeningRoute(Url::parse("home")),
+				children![render_action::fixed_func_route("home", || {
+					rsx! { <p>"Home page"</p> }
+				})],
+			))
+			.flush()
+	}
+
+	/// The string value of attribute `key` on element `entity`, if present.
+	fn attr(app: &mut App, entity: Entity, key: &str) -> Option<String> {
+		app.world_mut()
+			.with_state::<(Query<&Attributes>, Query<&Attribute>, Query<&Value>), _>(
+				move |(attributes, attr_keys, values)| {
+					attributes
+						.get(entity)
+						.ok()
+						.and_then(|attrs| {
+							attrs.iter().find(|&attr| {
+								attr_keys
+									.get(attr)
+									.is_ok_and(|attr_key| attr_key.as_str() == key)
+							})
+						})
+						.and_then(|attr| values.get(attr).ok())
+						.and_then(|value| value.as_str().ok().map(String::from))
+				},
+			)
+	}
+
+	/// The sole element with `tag` whose owning render surface is `surface`,
+	/// resolved through [`SurfaceQuery`] so it works for both per-session chrome
+	/// (a `ChildOf` path to the page's [`RenderSurface`]) and Portal-transcluded
+	/// route content (which crosses the holder).
+	fn element_on(app: &mut App, surface: Entity, tag: &str) -> Entity {
+		let world = app.world_mut();
+		let matches: Vec<Entity> = world
+			.query::<(Entity, &Element)>()
+			.iter(world)
+			.filter(|(_, element)| element.tag() == tag)
+			.map(|(entity, _)| entity)
+			.collect();
+		world.with_state::<SurfaceQuery, _>(move |surfaces| {
+			matches
+				.into_iter()
+				.find(|&entity| surfaces.surface_of(entity) == Some(surface))
+				.unwrap_or_else(|| panic!("no <{tag}> for surface {surface:?}"))
+		})
+	}
+
+	/// Whether `entity` is `target` or a `ChildOf`-descendant of it.
+	fn is_within(world: &World, mut entity: Entity, target: Entity) -> bool {
+		loop {
+			if entity == target {
+				return true;
+			}
+			match world.get_entity(entity).ok().and_then(|e| e.get::<ChildOf>()) {
+				Some(child_of) => entity = child_of.parent(),
+				None => return false,
+			}
+		}
+	}
+
+	/// The first painted cell in `surface`'s front buffer owned by `target`'s
+	/// subtree, for aiming an SGR click at a rendered element.
+	fn cell_of(app: &mut App, surface: Entity, target: Entity) -> Option<IVec2> {
+		let painted: Vec<(IVec2, Entity)> = {
+			let buffer = app.world().get::<DoubleBuffer>(surface)?;
+			let front = buffer.front_buffer();
+			let size = front.size();
+			(0..size.y)
+				.flat_map(|y| (0..size.x).map(move |x| UVec2::new(x, y)))
+				.filter_map(|pos| {
+					front.get(pos).and_then(|cell| cell.entity).map(|entity| {
+						(IVec2::new(pos.x as i32, pos.y as i32), entity)
+					})
+				})
+				.collect()
+		};
+		painted
+			.into_iter()
+			.find(|(_, entity)| is_within(app.world(), *entity, target))
+			.map(|(pos, _)| pos)
+	}
+
+	/// Drive an SGR left-click (hover, press, release) at `cell` on `surface`'s
+	/// channel, stepping the app after each so the input pipeline consumes it.
+	fn click_at(app: &mut App, surface: Entity, cell: IVec2) {
+		let (col, row) = (cell.x as u32, cell.y as u32);
+		for seq in [
+			sgr(35, col, row, true),
+			sgr(0, col, row, true),
+			sgr(0, col, row, false),
+		] {
+			app.world_mut()
+				.get_mut::<ChannelTerminal>(surface)
+				.unwrap()
+				.send_input(&seq)
+				.unwrap();
+			app.update();
+		}
+	}
+
+	/// Regression (multi-tenant disclosure): clicking session A's menu button
+	/// toggles only A's own sidebar; the idle session B's rail is untouched. The
+	/// deploy verifier saw the opposite — A's own drawer stayed closed while the
+	/// idle B's drawer opened — i.e. one session's input crossing into another's
+	/// state. Driven through the full input pipeline (SGR bytes → hit-test →
+	/// disclosure observer), which no prior in-process test exercised.
+	#[beet_core::test]
+	async fn menu_button_toggles_only_its_own_session_sidebar() {
+		let mut app = ssh_tui_live_app();
+		let router = spawn_drawer_router(&mut app);
+		let session_a = open_connection(&mut app, router, UVec2::new(40, 8));
+		let session_b = open_connection(&mut app, router, UVec2::new(40, 8));
+		drive_until(&mut app, session_a, "Home page");
+		drive_until(&mut app, session_b, "Home page");
+
+		// each session's own rail + menu button (per-session layout entities)
+		let nav_a = element_on(&mut app, session_a, "nav");
+		let nav_b = element_on(&mut app, session_b, "nav");
+		let button_a = element_on(&mut app, session_a, "button");
+
+		let before_a = attr(&mut app, nav_a, "aria-hidden");
+		let before_b = attr(&mut app, nav_b, "aria-hidden");
+
+		// click A's menu button via real SGR bytes on A's channel only
+		let cell = cell_of(&mut app, session_a, button_a)
+			.expect("session A's menu button painted a cell");
+		click_at(&mut app, session_a, cell);
+		app.update();
+
+		let after_a = attr(&mut app, nav_a, "aria-hidden");
+		let after_b = attr(&mut app, nav_b, "aria-hidden");
+
+		// A's own rail toggled ...
+		(after_a != before_a).xpect_true();
+		// ... and B's rail is exactly as it was (no cross-session leak).
+		after_b.xpect_eq(before_b);
+	}
+
+	/// Regression (multi-tenant reactive state): incrementing session A's counter
+	/// advances only A's own count; the idle session B's count is unchanged — the
+	/// deploy's multi-tenant check asserts independent per-session counts. Driven
+	/// through the full input pipeline (SGR bytes → hit-test → `bx:click` verb)
+	/// over the real shared-content Portal structure: the `bx:scope`/`@doc:count`
+	/// reactive document is parsed fresh per session, so each binds its own.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	async fn counter_increments_only_its_own_session() {
+		let mut app = ssh_tui_live_app();
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&"counter.bsx".into(),
+				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:click=increment{ field: @doc:count }>More</button></article>"#
+					.to_string(),
+			)
+			.await
+			.unwrap();
+		let mut registry = BsxTemplateRegistry::default();
+		registry
+			.insert_source(
+				"Layout",
+				"<html><body><main><Slot/></main></body></html>",
+			)
+			.unwrap();
+		app.world_mut().insert_resource(registry);
+		let router = app
+			.world_mut()
+			.spawn((
+				store,
+				Router,
+				BsxLayout::default(),
+				SshTuiServer,
+				OpeningRoute(Url::parse("counter")),
+				children![route("counter", BlobScene::new("counter.bsx"))],
+			))
+			.flush();
+		let session_a = open_connection(&mut app, router, UVec2::new(40, 8));
+		let session_b = open_connection(&mut app, router, UVec2::new(40, 8));
+		drive_until(&mut app, session_a, "clicked 0 times");
+		drive_until(&mut app, session_b, "clicked 0 times");
+
+		// click A's "More" button via real SGR bytes on A's channel only
+		let button_a = element_on(&mut app, session_a, "button");
+		let cell = cell_of(&mut app, session_a, button_a)
+			.expect("session A's counter button painted a cell");
+		click_at(&mut app, session_a, cell);
+
+		// A's own count advanced to 1 ...
+		drive_until(&mut app, session_a, "clicked 1 times");
+		// ... and B's count is untouched (its reactive document is its own).
+		frame(&mut app, session_b)
+			.xpect_contains("clicked 0 times")
+			.xnot()
+			.xpect_contains("clicked 1 times");
+	}
 }
