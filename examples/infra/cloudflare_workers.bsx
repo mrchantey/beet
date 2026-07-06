@@ -53,7 +53,7 @@ neither (a local compile).
 		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
-		<!-- `local_dir` empties the synced objects before deleting the bucket -->
-		<CloudflareDestroy name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
+		<!-- empties the whole bucket before deleting it -->
+		<CloudflareDestroy name="beet-hello-worker" bucket="beet-hello-site"/>
 	</Route>
 </Router>

@@ -38,6 +38,6 @@ data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
-		<CloudflareDestroy name="beet-hello-container" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
+		<CloudflareDestroy name="beet-hello-container" bucket="beet-hello-site"/>
 	</Route>
 </Router>

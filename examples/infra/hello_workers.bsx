@@ -67,7 +67,7 @@ neither (a local compile).
 		<CloudflareR2Sync local_dir="assets" prefix="assets" bucket="beet-hello-site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
-		<!-- `local_dir` empties the synced site objects before deleting the bucket -->
-		<CloudflareDestroy name="beet-hello-site-worker" bucket="beet-hello-site" local_dir="site"/>
+		<!-- empties the whole bucket (site/ + assets/) before deleting it -->
+		<CloudflareDestroy name="beet-hello-site-worker" bucket="beet-hello-site"/>
 	</Route>
 </Router>

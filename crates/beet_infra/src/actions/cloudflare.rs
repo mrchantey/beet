@@ -11,8 +11,10 @@
 //! Live deploy needs `CLOUDFLARE_API_TOKEN` (+ `CLOUDFLARE_ACCOUNT_ID`) in the
 //! environment and, for the container path, the R2 data-plane keys
 //! (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) so the container reads the site
-//! via [`S3Store::r2`]. The Worker path needs neither (native `worker::Bucket`
-//! binding). All commands are `--dry-run`-able; see each example's module doc.
+//! via [`S3Store::r2`]. The Worker path needs neither to deploy (native
+//! `worker::Bucket` binding), but `destroy` needs the R2 keys for either path, to
+//! empty the bucket through the R2 S3 endpoint before deleting it. All commands are
+//! `--dry-run`-able; see each example's module doc.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -755,22 +757,18 @@ pub async fn CloudflareWatchAction(
 	Pass(cx.input).xok()
 }
 
-/// Tears down a Cloudflare deploy: deletes the Worker and its R2 bucket. Reads
-/// the sibling block (container or worker) for the names; mandatory for the
-/// teardown gate.
+/// Tears down a Cloudflare deploy: deletes the Worker (and any container app +
+/// image), then empties and deletes its R2 bucket. Reads the sibling block
+/// (container or worker) for the names; mandatory for the teardown gate.
 #[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(CloudflareDestroyAction)]
 pub struct CloudflareDestroy {
 	/// Worker name to delete.
 	name: SmolStr,
-	/// R2 bucket to delete (after emptying).
+	/// R2 bucket to empty + delete. Every object is removed regardless of prefix, so
+	/// no local-directory hint is needed to find the synced keys.
 	bucket: SmolStr,
-	/// The site dir that was synced to the bucket (eg `examples/bsx_site`). When
-	/// set, the action deletes those objects first, since `wrangler r2 bucket
-	/// delete` refuses a non-empty bucket and has no `--force`/empty flag.
-	#[set_with(unwrap_option)]
-	local_dir: Option<SmolPath>,
 }
 
 impl CloudflareDestroy {
@@ -779,13 +777,12 @@ impl CloudflareDestroy {
 		Self {
 			name: name.into(),
 			bucket: bucket.into(),
-			local_dir: None,
 		}
 	}
 }
 
-/// `wrangler delete <worker>`, empty the bucket (deleting the synced objects),
-/// then `wrangler r2 bucket delete <bucket>`. Missing resources are treated as
+/// `wrangler delete <worker>`, empty the bucket (deleting *every* object), then
+/// `wrangler r2 bucket delete <bucket>`. Missing resources are treated as
 /// already-destroyed.
 #[action]
 #[derive(Default, Component)]
@@ -804,12 +801,10 @@ pub async fn CloudflareDestroyAction(
 	// explicitly or they keep billing.
 	delete_container_app(destroy.name()).await;
 	delete_container_images(destroy.name()).await;
-	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty
-	// bucket, so delete the objects that were synced from `local_dir` (the same
-	// keys `CloudflareR2Sync` uploaded). Missing objects are ignored.
-	if let Some(local_dir) = destroy.local_dir() {
-		empty_synced_objects(local_dir.as_str(), destroy.bucket()).await?;
-	}
+	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty bucket
+	// and `wrangler r2 object` cannot list, so clear *every* object (any prefix,
+	// eg `site/*` and `assets/*`) through the R2 S3 endpoint before deleting.
+	empty_bucket(destroy.bucket()).await?;
 	info!("deleting r2 bucket `{}`", destroy.bucket());
 	ChildProcess::new("wrangler")
 		.with_args(["r2", "bucket", "delete", destroy.bucket().as_str()])
@@ -897,30 +892,66 @@ async fn delete_container_images(worker_name: &str) {
 	}
 }
 
-/// Delete every object in `bucket` whose key matches a file under `local_dir`,
-/// the inverse of [`CloudflareR2SyncAction`]. Per-object failures are ignored so
-/// an already-empty bucket (or a partial prior sync) still tears down.
-async fn empty_synced_objects(local_dir: &str, bucket: &str) -> Result {
-	// cwd-relative, matching `sync_dir_to_r2` (the same keys it uploaded).
-	let root = AbsPathBuf::new(local_dir)?;
-	let files = ReadDir::files_recursive(&root)?;
-	info!("emptying {} synced objects from r2://{bucket}", files.len());
-	for file in files {
-		let rel = file.strip_prefix(&root).unwrap_or(file.as_path());
-		let key = rel.to_string_lossy().replace('\\', "/");
-		ChildProcess::new("wrangler")
-			.with_args([
-				"r2",
-				"object",
-				"delete",
-				&format!("{bucket}/{key}"),
-				"--remote",
-			])
-			.run_async()
-			.await
-			.ok();
+/// Empty `bucket` completely — delete *every* object regardless of prefix — through
+/// the R2 S3-compatible endpoint. `wrangler r2 object` cannot list objects, so it
+/// cannot find keys synced under a prefix (eg the `assets/*` mount); `aws s3 rm
+/// --recursive` lists + deletes them all, which `wrangler r2 bucket delete` then
+/// requires (it refuses a non-empty bucket). The account id + R2 data-plane keys are
+/// read from the environment (loaded from `.env`); without them the empty is skipped
+/// with a warning so a no-creds teardown still deletes the worker.
+async fn empty_bucket(bucket: &str) -> Result {
+	let (account_id, access_key, secret_key) = match (
+		env_ext::var("CLOUDFLARE_ACCOUNT_ID"),
+		env_ext::var("R2_ACCESS_KEY_ID"),
+		env_ext::var("R2_SECRET_ACCESS_KEY"),
+	) {
+		(Ok(account_id), Ok(access_key), Ok(secret_key)) => {
+			(account_id, access_key, secret_key)
+		}
+		_ => {
+			warn!(
+				"CLOUDFLARE_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY \
+				 unset; skipping the R2 empty (bucket delete fails if non-empty)"
+			);
+			return Ok(());
+		}
+	};
+	let endpoint = format!("https://{account_id}.r2.cloudflarestorage.com");
+	info!("emptying all objects from r2://{bucket} via {endpoint}");
+	// the R2 data-plane keys go in as the standard AWS env vars, overriding any
+	// real-AWS creds the process inherited from `.env`, with `AWS_REGION=auto` as R2
+	// requires (also overriding the inherited region). Drop a possibly-empty inherited
+	// `AWS_PROFILE` the cli would otherwise reject (mirrors `build_docker_image`).
+	match ChildProcess::new("aws")
+		.without_env("AWS_PROFILE")
+		.with_envs([
+			("AWS_ACCESS_KEY_ID", access_key.as_str()),
+			("AWS_SECRET_ACCESS_KEY", secret_key.as_str()),
+			("AWS_REGION", "auto"),
+		])
+		.with_args([
+			"s3",
+			"rm",
+			&format!("s3://{bucket}"),
+			"--recursive",
+			"--endpoint-url",
+			&endpoint,
+		])
+		.run_async()
+		.await
+	{
+		Ok(_) => Ok(()),
+		// an already-deleted bucket has nothing to empty; treat as done so a repeat
+		// teardown is idempotent (mirrors `wrangler_r2_create`'s "already exists").
+		Err(err)
+			if err.to_string().contains("NoSuchBucket")
+				|| err.to_string().contains("does not exist") =>
+		{
+			info!("r2://{bucket} already gone, nothing to empty");
+			Ok(())
+		}
+		Err(err) => Err(err),
 	}
-	Ok(())
 }
 
 #[cfg(test)]
