@@ -54,19 +54,20 @@ pub fn RobotStreamer(
 /// and steps sub-2s (the agent also clamps to `max_drive_duration`), so the body stays
 /// tame.
 fn robot_mock_payloads() -> Result<Vec<String>> {
-	// (emotion, line, linear mm/s, angular deg/s (+left), seconds)
+	// (image title, line, linear mm/s, angular deg/s (+left), seconds); unknown
+	// titles fall back to the scene's fallback image.
 	[
-		(Emotion::Joy, "Ooh, shiny floor!", 60., 0., 1.2),
-		(Emotion::Confused, "What's over here?", 40., 30., 1.0),
-		(Emotion::Excited, "Zoom zoom!", 80., 0., 1.0),
-		(Emotion::Surprised, "Whoa, careful!", 20., -60., 1.2),
-		(Emotion::Calm, "Just cruising along.", 50., 0., 1.5),
-		(Emotion::Sad, "Aw, a dead end.", 15., 90., 1.0),
+		("joy", "Ooh, shiny floor!", 60., 0., 1.2),
+		("confused", "What's over here?", 40., 30., 1.0),
+		("excited", "Zoom zoom!", 80., 0., 1.0),
+		("surprised", "Whoa, careful!", 20., -60., 1.2),
+		("calm", "Just cruising along.", 50., 0., 1.5),
+		("sad", "Aw, a dead end.", 15., 90., 1.0),
 	]
 	.into_iter()
-	.map(|(emotion, say, linear, angular, secs)| {
+	.map(|(image, say, linear, angular, secs)| {
 		serde_json::to_string(&RespondMultiModalInput {
-			emotion,
+			image: image.into(),
 			say: say.into(),
 			drive: DriveForDuration {
 				drive: DifferentialDrive::new(linear, angular),
