@@ -583,7 +583,6 @@ mod tests {
 		use crate::sockets::Message;
 		use crate::tls::test_client;
 		use async_tungstenite::client_async;
-		use beet_core::prelude::*;
 
 		#[beet_core::test]
 		async fn serves_wss_plain_ws_and_landing() {

@@ -69,6 +69,7 @@ pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::LocalBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
+pub use async_ext::SendSyncBoxedFuture;
 pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
 pub use cli_args::*;

@@ -110,9 +110,11 @@ pub fn now_millis() -> u128 { now().as_millis() }
 /// The no_std-friendly sleep hook, mirroring [`NowFn`] (wall clock) and
 /// `set_http_client` (transport). Installed via [`set_sleep`] so a bare target
 /// can back [`sleep`] with its own timer, eg an `embassy_time::Timer`. The
-/// future is `Send` (not `MaybeSend`) because [`sleep`] is awaited inside
-/// `Send` futures even in single-threaded builds.
-pub type SleepFn = fn(Duration) -> SendBoxedFuture<()>;
+/// future is `Send + Sync` (not `MaybeSend`) because [`sleep`] is awaited
+/// inside `Send + Sync` values (eg an HTTP body stream, whose `Request`/
+/// `Response` must be `Sync` to serve as an action input) even in
+/// single-threaded builds.
+pub type SleepFn = fn(Duration) -> SendSyncBoxedFuture<()>;
 
 static SLEEP: OnceLock<SleepFn> = OnceLock::new();
 

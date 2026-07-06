@@ -100,6 +100,11 @@ where
 
 /// A 'static + Send, making it suitable for spawning on async runtimes
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
+/// A 'static + Send + Sync boxed [`Future`], required where the future is held
+/// across an await inside a `Send + Sync` value (eg a body stream awaiting
+/// [`time_ext::sleep`](crate::prelude::time_ext::sleep)).
+pub type SendSyncBoxedFuture<T> =
+	Pin<Box<dyn 'static + Send + Sync + Future<Output = T>>>;
 /// A 'static + Send, making it suitable for spawning on async runtimes
 pub type LifetimeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
