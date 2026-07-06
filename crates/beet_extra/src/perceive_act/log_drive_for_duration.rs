@@ -1,4 +1,4 @@
-//! `RecordDrive`: the perceive-act demo's mock `drive` handler, recording the commanded
+//! `LogDriveForDuration`: the perceive-act demo's mock `drive` handler, recording the commanded
 //! [`DriveForDuration`] for tests rather than moving anything. The agent's local `drive`
 //! fallback and the v1 mock body both serve `drive` with it; a real body drives instead —
 //! the wgpu body (v2) via [`DriveFox`](super::DriveFox), the esp robot via its own handler,
@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 #[action(route = "drive")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn RecordDrive(cx: ActionContext<DriveForDuration>) -> Result<()> {
+pub async fn LogDriveForDuration(cx: ActionContext<DriveForDuration>) -> Result<()> {
 	let command = cx.input;
 	info!(
 		"drive: lin={} ang={} for {:.2}s",
@@ -39,7 +39,7 @@ mod test {
 	#[beet_core::test]
 	async fn records_drive() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn(RecordDrive).id();
+		let entity = world.spawn(LogDriveForDuration).id();
 		let command = DriveForDuration {
 			drive: DifferentialDrive::new(40., 90.),
 			duration: Duration::from_secs(1),

@@ -20,7 +20,7 @@ use beet_router::prelude::*;
 /// Authors the agent-chosen [`DriveForDuration`] as an action of the fox, which brings the
 /// canonical [`DriveForDurationAction`] — the `SetDrive` + `EndInDuration` + `SetDrive(0, 0)`
 /// step that drives this fox and (v3) the real robot off the one command. Shares the `drive`
-/// route + [`DriveForDuration`] input with the mock [`RecordDrive`](super::RecordDrive); this
+/// route + [`DriveForDuration`] input with the mock [`LogDriveForDuration`](super::LogDriveForDuration); this
 /// is "the mock plus the actual effect".
 #[action(route = "drive")]
 #[derive(Component, Reflect)]
