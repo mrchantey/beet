@@ -22,7 +22,7 @@ program as `/`.
 		with just the face, fullscreen, for a display.
 	</p>
 	<h2>Face</h2>
-	<img id="face" src="/assets/extra/robot-eyes/calm.png" alt="the robot's face" width="240"/>
+	<img id="face" src="/assets/extra/perceive-act/explorer/images/calm.png" alt="the robot's face" width="240"/>
 	<h2>Webcam (what the agent sees)</h2>
 	<video id="webcam" autoplay muted playsinline width="320"/>
 	<h2>Head log</h2>

@@ -1,7 +1,7 @@
 <!--
 The perceive-act web head, home route (v3). The robot's face and nothing else: this page
 is the display you point at a screen. The `<img id="face">` fills the viewport, centered
-and letterboxed (never stretched) on black; `set-emotion` swaps its sprite. No text, no
+and letterboxed (never stretched) on black; `show-image` swaps its src. No text, no
 console - that lives on `/debug`.
 
 The `<video id="webcam">` is declared here (not created in wasm) so `take-photo` just
@@ -19,7 +19,7 @@ reads it; it is kept live but visually hidden (a 2px transparent element, not
 			#webcam { position: fixed; top: 0; left: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
 		</style>
 	</Fragment>
-	<img id="face" src="/assets/extra/robot-eyes/calm.png" alt="the robot's face"/>
+	<img id="face" src="/assets/extra/perceive-act/explorer/images/calm.png" alt="the robot's face"/>
 	<video id="webcam" autoplay muted playsinline/>
 	<MainBsx src="/examples/perceive_act/head/head.bsx"/>
 	<Wasm src="/assets/wasm/beet.wasm"/>

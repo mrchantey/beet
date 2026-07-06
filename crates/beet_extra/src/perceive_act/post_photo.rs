@@ -8,33 +8,35 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// The camera actor's behavior: capture a photo, prune the window, post the
-/// photo as this actor's turn.
+/// The camera actor's behavior: rotate the scene if due (appending a new character as a
+/// user turn), capture a photo, post it as this actor's turn, and stub older photos to
+/// text so the request stays bounded.
 ///
 /// Spread onto a `User`-kind `<CreateActor>` before the agent actor, so each
 /// `Sequence` iteration begins with a fresh photo in the window as a user-role
-/// image message. Pruning keeps the endless loop's request bounded: the seed
-/// prompt always survives, older photos drop out first ([`ThreadWindow::prune`]).
+/// image message. The window is append-only (no post is ever dropped), which keeps
+/// the LLM prompt-cache prefix stable; only the photo bytes are bounded, by replacing
+/// each photo older than the most recent `keep_media` with a short text stub in place
+/// (same post id + position). Since a photo is stubbed exactly once, the cached prefix
+/// grows with the conversation and only the last few turns churn.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(Action<(), Outcome> = Action::new_async(post_photo_action))]
 pub struct PostPhoto {
-	/// How many recent non-seed posts to keep in the window.
-	pub keep_posts: usize,
-	/// How many recent photos to keep in the window.
+	/// How many recent photos to keep as real images; older ones are stubbed to text.
 	pub keep_media: usize,
 }
 
 impl Default for PostPhoto {
 	fn default() -> Self {
-		Self {
-			// ~8 cycles of call/output pairs plus the current + previous photo
-			// (photos dominate request bytes; two are enough to see change)
-			keep_posts: 24,
-			keep_media: 2,
-		}
+		// the current + previous photo (photos dominate request bytes; two are
+		// enough to see what changed since the last turn).
+		Self { keep_media: 2 }
 	}
 }
+
+/// The text a stubbed-out older photo is replaced with.
+const STUBBED_PHOTO: &str = "[earlier photo, no longer shown]";
 
 /// Marks the start of each perceive-act cycle, for the per-stage latency logs:
 /// [`PostPhoto`] stamps it, `RespondMultiModalAction` reads it to report the model latency.
@@ -47,6 +49,9 @@ pub struct CycleClock {
 }
 
 async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
+	// rotate to a new scene if due (appending its character as a user turn) before this
+	// cycle's photo; on the first cycle this applies the initial scene.
+	super::maybe_rotate_scene(&cx.caller).await?;
 	let config = cx.caller.get_cloned::<PostPhoto>().await?;
 	let started = Instant::now();
 	// capture through the router: a bound head serves it, else the local handler.
@@ -69,13 +74,13 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 	let capture_secs = started.elapsed().as_secs_f32();
 	let size_kb = media.bytes().len() / 1024;
 
-	// prune old posts, then push the photo as this actor's turn
+	// append the photo as this actor's turn, then stub older photos to bound bytes
+	// without dropping posts (append-only keeps the LLM prompt-cache prefix stable).
 	cx.caller
 		.with_state::<ThreadWindowQuery, _>(move |entity, mut windows| -> Result {
 			let actor_id = windows.actor_id(entity)?;
 			let thread_id = windows.thread_id(entity)?;
 			let mut window = windows.window_mut(entity)?;
-			window.prune(config.keep_posts, config.keep_media);
 			window.upsert_post(AgentPost::new_bytes(
 				actor_id,
 				thread_id,
@@ -84,6 +89,7 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 				None,
 				PostStatus::Completed,
 			));
+			stub_old_photos(&mut window, config.keep_media);
 			Ok(())
 		})
 		.await??;
@@ -115,6 +121,38 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 		),
 	}
 	Ok(Pass(()))
+}
+
+/// Replace every image post older than the most recent `keep_media` with a text stub,
+/// in place (same post id + window position), so accumulated photo bytes stay bounded
+/// while the window remains append-only. Image posts are oldest-first (posts are
+/// id-ordered), and a photo is stubbed exactly once, so the prompt-cache prefix only
+/// churns at the tail.
+fn stub_old_photos(window: &mut ThreadWindow, keep_media: usize) {
+	let image_count = window
+		.posts()
+		.iter()
+		.filter(|post| post.media_type().is_image())
+		.count();
+	let stub_count = image_count.saturating_sub(keep_media);
+	if stub_count == 0 {
+		return;
+	}
+	let stubs: Vec<Post> = window
+		.posts()
+		.iter()
+		.filter(|post| post.media_type().is_image())
+		.take(stub_count)
+		.map(|post| {
+			let mut stub = post.clone();
+			stub.set_media_type(MediaType::Text);
+			stub.set_text(STUBBED_PHOTO);
+			stub
+		})
+		.collect();
+	for stub in stubs {
+		window.upsert_post(stub);
+	}
 }
 
 /// Ceiling on one capture attempt, so a wedged head (eg a half-open socket)

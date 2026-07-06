@@ -3,7 +3,7 @@ Perceive-act loop, v3. The same shared always-socket agent (`agent.bsx`) as v1/v
 with NO in-process clients: instead a second server, an `HttpServer`, serves a wasm
 browser head. A browser tab loading the head page boots the wasm `beet` binary, which
 connects back to the agent's socket server as the `head` client and serves `take-photo`
-(the real webcam), `speak-text` (the Web Speech API) and `set-emotion` (a rendered `<img>`
+(the real webcam), `speak-text` (the Web Speech API) and `show-image` (a rendered `<img>`
 face). A device body (eg the esp Alvik) can connect for `drive`; none runs here.
 
 Two servers in one process, each its own root with its own `BootOnLoad`, both bound to
@@ -42,9 +42,9 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 		<DefaultAppRoutes/>
 		<RoutesDir src="examples/perceive_act/head/routes"/>
 		<!-- the workspace assets tree at /assets: the wasm binary the pages boot
-		     (/assets/wasm/beet.wasm) and the robot-eyes sprites the face renders
-		     (/assets/extra/robot-eyes/joy.png). The examples tree at /examples serves
-		     the head program the browser fetches. -->
+		     (/assets/wasm/beet.wasm) and the scene face images the head renders
+		     (/assets/extra/perceive-act/explorer/images/joy.png). The examples tree at
+		     /examples serves the head program the browser fetches. -->
 		<AssetsDir src="assets" prefix="assets"/>
 		<AssetsDir src="examples" prefix="examples"/>
 	</Router>

@@ -206,6 +206,12 @@ impl Post {
 		let text = text.into();
 		self.body = text.into_bytes();
 	}
+
+	/// Set the media type, eg when replacing an image body with a text stub so the
+	/// mappers send it as text rather than a base64 image.
+	pub fn set_media_type(&mut self, media_type: MediaType) {
+		self.media_type = media_type;
+	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════

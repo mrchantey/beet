@@ -12,7 +12,7 @@ impl Plugin for PerceiveActWebPlugin {
 		app.init_plugin::<PerceiveActCorePlugin>()
 			.register_type::<TakePhoto>()
 			.register_type::<SpeakText>()
-			.register_type::<SetEmotion>()
+			.register_type::<ShowImage>()
 			.register_template::<WebHead>()
 			.add_observer(render_face);
 	}

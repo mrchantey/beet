@@ -67,6 +67,12 @@ impl PostStream {
 	/// Returns an iterator over the collected posts.
 	pub fn posts(&self) -> &TableMap<Post> { &self.posts }
 
+	/// The final response's token usage, once the stream has finished. Useful to
+	/// log prompt-cache hit rate (`cached_input_tokens / input_tokens`).
+	pub fn token_usage(&self) -> Option<&TokenUsage> {
+		self.response.as_ref()?.token_usage.as_ref()
+	}
+
 	pub fn meta_builder(&self) -> Result<MetaBuilder> {
 		let response = self
 			.response

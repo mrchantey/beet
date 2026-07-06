@@ -95,6 +95,9 @@ impl FunctionToolDefinition {
 	pub fn path(&self) -> &str { &self.path }
 	pub fn description(&self) -> &str { &self.description }
 	pub fn params_schema(&self) -> &Schema { &self.params_schema }
+	/// Mutable access to the parameter schema, eg to inject a runtime `enum`
+	/// constraint on a field (see [`StringEnumOptions`](crate::prelude::StringEnumOptions)).
+	pub fn params_schema_mut(&mut self) -> &mut Schema { &mut self.params_schema }
 
 	/// Build a tool definition from a route's metadata, or `None` if the route is
 	/// not a callable tool: a wildcard/parameterized path (eg `run-wasm/*args`)

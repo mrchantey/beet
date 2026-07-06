@@ -34,7 +34,7 @@ pub struct CapabilityBound;
 /// markup.
 fn capability_routes(role: &str) -> &'static [&'static str] {
 	match role {
-		"head" => &["take-photo", "speak-text", "set-emotion"],
+		"head" => &["take-photo", "speak-text", "show-image"],
 		"body" => &["drive"],
 		_ => &[],
 	}
@@ -153,15 +153,15 @@ mod test {
 	// the shared client handshake types + the head capability the test forwards, all
 	// re-exported from `perceive_act` (the wire types now live in `perceive_act_core`).
 	use crate::perceive_act::ClientRole;
-	use crate::perceive_act::Emotion;
-	use crate::perceive_act::SetEmotion;
-	use crate::perceive_act::SetEmotionInput;
+	use crate::perceive_act::DisplayedImage;
+	use crate::perceive_act::ShowImage;
+	use crate::perceive_act::ShowImageInput;
 	use crate::perceive_act::WhoAmI;
 
 	/// The whole core: the agent (a socket server) accepts a mock head client,
-	/// originates `whoami`, binds `set-emotion` to the connection, and a
-	/// `set-emotion` call on the agent forwards over the socket to the head, which
-	/// serves it and records the [`Emotion`].
+	/// originates `whoami`, binds `show-image` to the connection, and a
+	/// `show-image` call on the agent forwards over the socket to the head, which
+	/// serves it and records the [`DisplayedImage`].
 	#[beet_core::test]
 	async fn binds_role_and_forwards_call() {
 		let mut app = App::new();
@@ -170,14 +170,14 @@ mod test {
 			.add_plugins(CapabilityBindingPlugin);
 
 		let (server, client) = ChannelSocketServer::new();
-		// the agent root: its `set-emotion` child joins the root's route tree.
+		// the agent root: its `show-image` child joins the root's route tree.
 		let agent = app
 			.world_mut()
 			.spawn((CapabilityServer, server, Router))
 			.id();
-		// track the `set-emotion` route entity so the test can await its binding.
-		let agent_emotion =
-			app.world_mut().spawn((SetEmotion, ChildOf(agent))).id();
+		// track the `show-image` route entity so the test can await its binding.
+		let agent_image =
+			app.world_mut().spawn((ShowImage, ChildOf(agent))).id();
 		app.world_mut().flush();
 		// boot the agent's socket server through the fan-out (parks on its keep-alive).
 		app.world_mut()
@@ -201,28 +201,28 @@ mod test {
 			))
 			.id();
 		app.world_mut().spawn((WhoAmI, ChildOf(head)));
-		// track the head's `set-emotion` route entity to assert the forwarded call.
-		let head_emotion =
-			app.world_mut().spawn((SetEmotion, ChildOf(head))).id();
+		// track the head's `show-image` route entity to assert the forwarded call.
+		let head_image =
+			app.world_mut().spawn((ShowImage, ChildOf(head))).id();
 		app.world_mut().flush();
 
-		// drive until the agent's `set-emotion` route is bound to the connection.
+		// drive until the agent's `show-image` route is bound to the connection.
 		app_ext::update_until(&mut app, |world| {
-			world.get::<CapabilityBound>(agent_emotion).is_some()
+			world.get::<CapabilityBound>(agent_image).is_some()
 		})
 		.await
 		.xpect_true();
 
-		// call `set-emotion` on the agent; it forwards over the socket to the head.
+		// call `show-image` on the agent; it forwards over the socket to the head.
 		app.world_mut()
 			.entity_mut(agent)
 			.run_async_local(|agent| async move {
 				agent
 					.call_detached(
 						route_action(),
-						Request::get("set-emotion")
-							.with_body(serde_json::to_string(&SetEmotionInput {
-								emotion: Emotion::Anger,
+						Request::get("show-image")
+							.with_body(serde_json::to_string(&ShowImageInput {
+								src: "/img/anger.png".into(),
 							})?)
 							.with_header::<header::ContentType>(MediaType::Json),
 					)
@@ -230,16 +230,16 @@ mod test {
 				Ok(())
 			});
 
-		// drive until the mock head has recorded the forwarded emotion.
+		// drive until the mock head has recorded the forwarded image.
 		app_ext::update_until(&mut app, |world| {
-			world.get::<Emotion>(head_emotion).is_some()
+			world.get::<DisplayedImage>(head_image).is_some()
 		})
 		.await
 		.xpect_true();
 
 		app.world_mut()
-			.get::<Emotion>(head_emotion)
-			.copied()
-			.xpect_eq(Some(Emotion::Anger));
+			.get::<DisplayedImage>(head_image)
+			.cloned()
+			.xpect_eq(Some(DisplayedImage("/img/anger.png".into())));
 	}
 }

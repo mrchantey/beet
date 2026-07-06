@@ -2,7 +2,7 @@
 The program the wasm head binary runs in the browser: spawn the `<WebHead>` socket
 client, which connects back to the perceive-act agent's socket server as the `head`
 client and serves the head capabilities from this tab: `take-photo` (the real webcam),
-`speak-text` (the Web Speech API) and `set-emotion` (the `<img id="face">` on the page).
+`speak-text` (the Web Speech API) and `show-image` (the `<img id="face">` on the page).
 
 With no `url` the head connects to the host serving this page (`ws://<page-host>:8338`),
 so the same program works from the serving machine and from a phone on the LAN. Set

@@ -61,15 +61,18 @@ impl Plugin for ThreadPlugin {
 			.register_type::<FunctionToolDefinition>()
 			.register_type::<ProviderToolDefinition>()
 			.register_type::<ToolChoice>()
+			.register_type::<StringEnumOptions>()
 			// ── Markup templates ──────────────────────────────────────────
 			.register_template::<CreatePost>()
 			.register_template::<ModelStreamer>()
 			.register_template::<CreateActor>()
 			.add_observer(insert_tool_definition)
+			.add_observer(reapply_string_enum_options)
 			// _
 			;
 
 		app.add_systems(First, ThreadWindow::reduce)
+			.add_systems(Update, sync_string_enum_options)
 			.add_systems(PostUpdate, thread_store::sync_window_to_store);
 	}
 }

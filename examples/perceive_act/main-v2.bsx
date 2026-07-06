@@ -9,7 +9,7 @@ v1. Run it; the socket server default-boots and <WgpuBody> opens the render wind
 `<WgpuBody>` opens a window with the fox over a ground plane and serves `drive` by feeding
 the agent-chosen `DifferentialDrive` into the fox through the agnostic `SetDrive` leaf,
 holding it for the chosen duration then stopping, the same command that will drive the v3
-robot. The head still captures the floor-photo fixtures, speaks via `tts` and logs the emotion.
+robot. The head still captures the floor-photo fixtures, speaks via `tts` and logs the chosen image.
 
 Needs `OPENAI_API_KEY` (the agent) and the kokoro `tts` on PATH for spoken audio.
 -->

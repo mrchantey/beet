@@ -3,12 +3,12 @@
 //! Mirrors the in-process `<MockHead>` (the `thread`-gated `perceive_act` module),
 //! but in a browser tab: its own top-level root (route-tree isolation) connecting
 //! back to the agent's socket server as the `head` client, serving `take-photo`
-//! (webcam), `speak-text` (Web Speech) and `set-emotion` (a rendered `<img>` face).
+//! (webcam), `speak-text` (Web Speech) and `show-image` (a rendered `<img>` face).
 //! No `BlobStore`: the webcam replaces disk capture.
 //!
-//! The `WhoAmI`/`ClientRole` client primitives and the JSON wire types ([`Emotion`],
-//! [`SetEmotionInput`], [`SpeakTextInput`]) come from `perceive_act_core`, shared
-//! verbatim with the native agent - no local mirror.
+//! The `WhoAmI`/`ClientRole` client primitives and the JSON wire types
+//! ([`DisplayedImage`], [`ShowImageInput`], [`SpeakTextInput`]) come from
+//! `perceive_act_core`, shared verbatim with the native agent - no local mirror.
 use super::*;
 use beet_core::prelude::*;
 use beet_net::sockets::*;
@@ -37,7 +37,7 @@ pub fn WebHead(
 		ExchangeSocket::json(),
 		Router,
 		ClientRole(SmolStr::new("head")),
-		children![WhoAmI, TakePhoto, SpeakText, SetEmotion],
+		children![WhoAmI, TakePhoto, SpeakText, ShowImage],
 	));
 }
 

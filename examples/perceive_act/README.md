@@ -1,27 +1,31 @@
 # Perceive-act
 
-A small floor embodied agent living a perceive-act loop: each cycle it is shown a fresh photo and answers with a single `respond-multi-modal` tool call, setting its face, saying one line in character and driving off at a chosen velocity, over and over. The loop runs until you stop it with Ctrl+C.
+A small floor embodied agent living a perceive-act loop: each cycle it is shown a fresh photo and answers with a single `respond-multi-modal` tool call, displaying an image on its face, saying one line in character and driving off at a chosen velocity, over and over. The loop runs until you stop it with Ctrl+C.
 
-One model call per cycle: the `Camera` actor captures via the `take-photo` route and posts the photo straight into the thread, then the `Robot` agent (OpenAI `gpt-5.4-mini`, reasoning off, forced tool choice) answers with one `respond-multi-modal` call, which fans out to `set-emotion`/`speak-text`/`drive` (by default finishing the spoken line before it drives) and awaits them all, so the next photo waits for the body to stop moving. A cycle lands around 2 seconds plus speech.
+One model call per cycle: the `Camera` actor captures via the `take-photo` route and posts the photo straight into the thread, then the `Robot` agent (OpenAI `gpt-5.4-mini`, reasoning off, forced tool choice) answers with one `respond-multi-modal` call, which fans out to `show-image`/`speak-text`/`drive` (by default finishing the spoken line before it drives) and awaits them all, so the next photo waits for the body to stop moving. A cycle lands around 2 seconds plus speech.
+
+## Scenes
+
+What the robot is, and what it can display, is data in the blob store, not markup. Each scene is a directory under `assets/extra/perceive-act/<name>/` with a `main.bsx` (a single `<ScenePrompt text=".."/>` describing the character) and an `images/` set (the faces it can show; the file stem is the title the model chooses by). `<RotateScene/>` discovers the scenes on boot, plays the `initial` one, and every 8 cycles (`SceneRotation::every_cycles`) rotates to the next (sequential or random). The robot is one continuous creature: its system prompt is fixed and each scene's character is *appended* as a user turn, so it carries its memory across incarnations. The image options constrain the tool schema at runtime (via `StringEnumOptions`), so the model can only pick a title the scene actually ships.
 
 The agent is a socket server (`agent.bsx`, shared by every version); only the head and body clients change between versions. Run every command from the repo root. For clean per-cycle output quiet the socket plumbing with `RUST_LOG=info,beet_net=warn`, which reads like:
 
 ```
 cycle 3: photo captured (100KB in 0.24s, previous cycle 1.76s)
-cycle 3: Surprised | "Whoa, hanging basket!" | drive lin=40 ang=-90 for 1.00s (model 1.66s)
-cycle 3: acted in 0.10s (set-emotion 0.07s | speak-text 0.10s | drive 0.07s)
+cycle 3: surprised | "Whoa, hanging basket!" | drive lin=40 ang=-90 for 1.00s (model 1.66s)
+cycle 3: acted in 0.10s (show-image 0.07s | speak-text 0.10s | drive 0.07s)
 ```
 
 ## Prerequisites
 
 - The beet cli with the listed features, ie `cargo install --path crates/beet-cli --all-features` (each entry declares its requirements with `<CrateCheck>` and the command's `--features` verifies them, so a leaner install fails fast with the missing list).
 - `OPENAI_API_KEY` in `.env` (loaded automatically), used by the agent.
-- Assets: `just pull-assets`, for the floor-photo fixtures, the fox model, and the robot-eyes face sprites.
+- Assets: `just pull-assets`, for the floor-photo fixtures, the fox model, and the perceive-act scene face images.
 - Optional: the kokoro `tts` command on `PATH` for spoken audio. Without it, speech is logged and skipped.
 
 ## v1: mock head and body
 
-One process, both clients mocked: the head reads the floor photos and logs the emotion, the body records the drive command.
+One process, both clients mocked: the head reads the floor photos and logs the chosen image, the body records the drive command.
 
 ```sh
 beet --main=examples/perceive_act/main-v1.bsx

@@ -73,6 +73,29 @@ impl Schema {
 		sanitize_value_for_strict_mode(&mut self.0);
 		self
 	}
+
+	/// Constrain a top-level string property to a runtime set of allowed values by
+	/// injecting a JSON-schema `enum`, so a tool field's options can come from data
+	/// (eg a blob-store listing) rather than a fixed Rust enum. Rewrites the property
+	/// to `{"type":"string","enum":[..]}`, preserving any sibling keywords like
+	/// `description`; a no-op if `field` is absent. Pairs with `StringEnumOptions`
+	/// for a reactive, component-driven update.
+	pub fn set_field_enum(
+		&mut self,
+		field: &str,
+		options: impl IntoIterator<Item = SmolStr>,
+	) -> &mut Self {
+		let options = options.into_iter().map(Value::Str).collect::<Vec<_>>();
+		if let Some(field_schema) = self
+			.get_mut("properties")
+			.and_then(|properties| properties.get_mut(field))
+			.and_then(|field_schema| field_schema.as_map_mut().ok())
+		{
+			field_schema.insert("type", "string");
+			field_schema.insert("enum", Value::List(options));
+		}
+		self
+	}
 }
 
 fn sanitize_value_for_strict_mode(value: &mut Value) {
@@ -793,6 +816,22 @@ mod test {
 		simple_enum: SimpleEnum,
 		complex_enum: Option<ComplexEnum>,
 		field: bool,
+	}
+
+	#[crate::test]
+	fn set_field_enum_constrains_a_string_field() {
+		// a plain string field gains a runtime `enum` constraint at a top-level property.
+		let mut schema = Schema::new::<SimpleStruct>();
+		schema.set_field_enum("name", ["red", "green"].map(SmolStr::from));
+		schema
+			.get("properties")
+			.and_then(|props| props.get("name"))
+			.and_then(|field| field.get("enum"))
+			.cloned()
+			.xpect_eq(Some(Value::List(vec![
+				Value::str("red"),
+				Value::str("green"),
+			])));
 	}
 
 	#[crate::test]

@@ -13,65 +13,22 @@ pub struct SpeakTextInput {
 	pub text: String,
 }
 
-/// What expression to wear, the input to the `set-emotion` capability.
-#[derive(Reflect, serde::Deserialize, serde::Serialize)]
-pub struct SetEmotionInput {
-	/// The expression to show on the face.
-	pub emotion: Emotion,
-}
-
-/// The expression currently shown on the face, set by the `set-emotion` capability and
-/// read with `Single<&Emotion>`.
+/// What image to display, the input to the `show-image` capability.
 ///
-/// Each variant names one of the eight robot-eyes sprites in
-/// `assets/extra/robot-eyes/` ([`sprite_stem`](Emotion::sprite_stem) is the file
-/// stem), so the web head renders the current face as a pure lookup.
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	Copy,
-	PartialEq,
-	Component,
-	Reflect,
-	serde::Deserialize,
-	serde::Serialize,
-)]
-#[reflect(Component, Default)]
-pub enum Emotion {
-	/// Frustrated and hostile.
-	Anger,
-	/// At ease, the neutral resting face.
-	#[default]
-	Calm,
-	/// Puzzled by something unexpected.
-	Confused,
-	/// Repulsed by something unpleasant.
-	Disgust,
-	/// Eager and energetic.
-	Excited,
-	/// Delighted and happy.
-	Joy,
-	/// Downcast and withdrawn.
-	Sad,
-	/// Taken aback by something sudden.
-	Surprised,
+/// `src` is a resolved url the head points its `<img>` at. The agent maps the
+/// model's chosen image title (one of the current scene's options) to this url
+/// before forwarding, so the head stays a dumb display and never needs to know
+/// which scene is active.
+#[derive(Reflect, serde::Deserialize, serde::Serialize)]
+pub struct ShowImageInput {
+	/// The url of the image to display, eg
+	/// `/assets/extra/perceive-act/explorer/images/joy.png`.
+	pub src: String,
 }
 
-impl Emotion {
-	/// The file stem of this expression's sprite in `assets/extra/robot-eyes/`, eg
-	/// `Emotion::Joy` -> `"joy"` (`joy.png`). The lowercased variant name, so the
-	/// enum and the sprite set stay in lockstep.
-	pub fn sprite_stem(&self) -> &'static str {
-		match self {
-			Emotion::Anger => "anger",
-			Emotion::Calm => "calm",
-			Emotion::Confused => "confused",
-			Emotion::Disgust => "disgust",
-			Emotion::Excited => "excited",
-			Emotion::Joy => "joy",
-			Emotion::Sad => "sad",
-			Emotion::Surprised => "surprised",
-		}
-	}
-}
+/// The image currently shown on the face, recorded by the `show-image` capability
+/// and read with `Single<&DisplayedImage>`. Holds the resolved url; the web head
+/// renders it, the native mock only records it.
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct DisplayedImage(pub SmolStr);

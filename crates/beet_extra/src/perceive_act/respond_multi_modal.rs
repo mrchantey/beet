@@ -1,5 +1,5 @@
 //! `RespondMultiModalAction`: the single tool the perceive-act agent calls each cycle,
-//! fanning out to the three capability routes (`set-emotion`, `speak-text`, `drive`) and
+//! fanning out to the three capability routes (`show-image`, `speak-text`, `drive`) and
 //! awaiting them all, so one model call per photo is the whole turn and the next photo
 //! waits for the body to finish moving.
 use super::*;
@@ -28,7 +28,7 @@ pub async fn RespondMultiModalAction(
 	cx: ActionContext<RespondMultiModalInput>,
 ) -> Result<String> {
 	let RespondMultiModalInput {
-		emotion,
+		image,
 		say,
 		mut drive,
 		parallel,
@@ -43,6 +43,18 @@ pub async fn RespondMultiModalAction(
 	{
 		drive.duration = drive.duration.min(max);
 	}
+	// resolve the chosen image title to a url via the active scene (its fallback url
+	// for an unknown title; the title itself when no scene is configured, eg tests).
+	let src = cx
+		.caller
+		.with_state::<AncestorQuery<&ActiveScene>, _>({
+			let image = image.clone();
+			move |entity, scenes| match scenes.get(entity) {
+				Ok(scene) => scene.resolve_url(&image),
+				Err(_) => image.clone(),
+			}
+		})
+		.await?;
 	// the model latency: time since the cycle's photo landed in the window
 	let (cycle, model_secs) = cx
 		.caller
@@ -57,7 +69,7 @@ pub async fn RespondMultiModalAction(
 		})
 		.await;
 	info!(
-		"cycle {cycle}: {emotion:?} | \"{say}\" | drive lin={} ang={} for {:.2}s (model {model_secs:.2}s)",
+		"cycle {cycle}: {image} | \"{say}\" | drive lin={} ang={} for {:.2}s (model {model_secs:.2}s)",
 		drive.drive.linear.as_mm_per_sec(),
 		drive.drive.angular.as_deg_per_sec(),
 		drive.duration.as_secs_f32()
@@ -72,8 +84,10 @@ pub async fn RespondMultiModalAction(
 			(path, started.elapsed(), result)
 		}
 	};
-	let face =
-		("set-emotion", serde_json::to_string(&SetEmotionInput { emotion })?);
+	let face = (
+		"show-image",
+		serde_json::to_string(&ShowImageInput { src: src.to_string() })?,
+	);
 	let speak =
 		("speak-text", serde_json::to_string(&SpeakTextInput { text: say })?);
 	// the clamped, agent-chosen drive command sent to the `drive` capability route.
@@ -175,9 +189,10 @@ pub struct RespondMultiModal {
 /// and how to drive next.
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
 pub struct RespondMultiModalInput {
-	/// The expression to show on the face, matching how you feel about what
-	/// you see.
-	pub emotion: Emotion,
+	/// The title of the image to display on your face, chosen from the available
+	/// options to match your character and how you feel about what you see. Must be
+	/// one of the offered titles.
+	pub image: SmolStr,
 	/// One short line to say out loud, in character.
 	pub say: String,
 	/// How to drive next: a `drive` velocity (`linear` mm/s forward, `angular`
@@ -196,9 +211,9 @@ pub struct RespondMultiModalInput {
 mod test {
 	use super::*;
 
-	/// Build an agent serving `set-emotion` + `drive` (but deliberately no `speak-text`,
+	/// Build an agent serving `show-image` + `drive` (but deliberately no `speak-text`,
 	/// so a failed capability is exercised as tolerated), spawn a `RespondMultiModalAction`
-	/// carrying `config`, run one `input` through it, and return the app plus the emotion
+	/// carrying `config`, run one `input` through it, and return the app plus the image
 	/// and drive route entities so callers can assert what each recorded.
 	async fn run_response(
 		config: RespondMultiModal,
@@ -207,8 +222,8 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ThreadPlugin::default()));
 		let agent = app.world_mut().spawn(Router).id();
-		let emotion_entity =
-			app.world_mut().spawn((SetEmotion, ChildOf(agent))).id();
+		let image_entity =
+			app.world_mut().spawn((ShowImage, ChildOf(agent))).id();
 		let drive_entity =
 			app.world_mut().spawn((LogDriveForDuration, ChildOf(agent))).id();
 		app.world_mut()
@@ -237,18 +252,18 @@ mod test {
 		})
 		.await
 		.xpect_true();
-		(app, emotion_entity, drive_entity)
+		(app, image_entity, drive_entity)
 	}
 
 	/// Drive one `respond-multi-modal` call, with `parallel` either fanning all three
-	/// capabilities out or sequencing the drive after speech. Asserts both the emotion
+	/// capabilities out or sequencing the drive after speech. Asserts both the image
 	/// and the drive command are recorded on their route entities — the fan-out completes
-	/// either way.
+	/// either way. With no active scene, the chosen title passes through as the url.
 	async fn drive_and_assert(parallel: bool) {
-		let (mut app, emotion_entity, drive_entity) = run_response(
+		let (mut app, image_entity, drive_entity) = run_response(
 			RespondMultiModal::default(),
 			RespondMultiModalInput {
-				emotion: Emotion::Joy,
+				image: "joy".into(),
 				say: "onward!".into(),
 				drive: DriveForDuration {
 					drive: DifferentialDrive::new(40., 90.),
@@ -259,9 +274,9 @@ mod test {
 		)
 		.await;
 		app.world_mut()
-			.get::<Emotion>(emotion_entity)
-			.copied()
-			.xpect_eq(Some(Emotion::Joy));
+			.get::<DisplayedImage>(image_entity)
+			.cloned()
+			.xpect_eq(Some(DisplayedImage("joy".into())));
 		app.world_mut()
 			.get::<DriveForDuration>(drive_entity)
 			.map(|command| command.drive)
@@ -282,12 +297,12 @@ mod test {
 	/// never careens: a 5s command under a 1s cap records 1s.
 	#[beet_core::test]
 	async fn clamps_drive_duration() {
-		let (mut app, _emotion_entity, drive_entity) = run_response(
+		let (mut app, _image_entity, drive_entity) = run_response(
 			RespondMultiModal {
 				max_drive_duration: Some(Duration::from_secs(1)),
 			},
 			RespondMultiModalInput {
-				emotion: Emotion::Joy,
+				image: "joy".into(),
 				say: "onward!".into(),
 				drive: DriveForDuration {
 					drive: DifferentialDrive::new(40., 0.),

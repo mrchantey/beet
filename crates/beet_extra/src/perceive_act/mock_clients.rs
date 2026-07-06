@@ -13,7 +13,7 @@ use beet_router::prelude::*;
 
 /// The in-process mock head: connects to the agent and serves the head capabilities
 /// with mock effects. `take-photo` reads the floor-photo fixtures, `speak-text` speaks
-/// via `tts`, and `set-emotion` logs the expression (a rendered face lands with the web
+/// via `tts`, and `show-image` logs the chosen image (a rendered face lands with the web
 /// head in v3).
 #[template(system)]
 pub fn MockHead(
@@ -34,7 +34,7 @@ pub fn MockHead(
 			AbsPathBuf::new(fs_ext::workspace_root())
 				.expect("workspace root resolves"),
 		)),
-		children![WhoAmI, TakePhoto, SpeakText, SetEmotion],
+		children![WhoAmI, TakePhoto, SpeakText, ShowImage],
 	));
 }
 

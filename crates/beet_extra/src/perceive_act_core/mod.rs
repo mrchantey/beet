@@ -12,7 +12,7 @@ pub use client::*;
 
 use beet_core::prelude::*;
 
-/// Registers the shared perceive-act types ([`Emotion`], [`WhoAmI`], [`ClientRole`]).
+/// Registers the shared perceive-act types ([`DisplayedImage`], [`WhoAmI`], [`ClientRole`]).
 /// Added idempotently by both `PerceiveActPlugin` (the agent) and `PerceiveActWebPlugin`
 /// (the browser head), so whichever is present registers the common types once.
 #[derive(Default)]
@@ -20,7 +20,7 @@ pub struct PerceiveActCorePlugin;
 
 impl Plugin for PerceiveActCorePlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<Emotion>()
+		app.register_type::<DisplayedImage>()
 			.register_type::<ClientRole>()
 			.register_type::<WhoAmI>();
 	}

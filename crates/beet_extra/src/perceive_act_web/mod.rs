@@ -3,7 +3,7 @@
 //! A `web`-feature wasm binary serves this to a browser tab, where it connects back to
 //! the perceive-act agent's socket server as the `head` client (mirroring the desktop
 //! `<MockHead>`) and serves the head capabilities from the browser: [`TakePhoto`] from
-//! the real webcam, [`SpeakText`] via the Web Speech API, and [`SetEmotion`] as a
+//! the real webcam, [`SpeakText`] via the Web Speech API, and [`ShowImage`] as a
 //! rendered `<img>` face. The agent forwards each capability over the socket, so the
 //! In/Out wire types match its `perceive_act` definitions.
 //!
@@ -11,7 +11,7 @@
 //! (which pulls the native LLM `beet_thread`, absent from a wasm build): it needs only
 //! the `web` base (`Socket`/`ExchangeSocket`/`Router`/`#[action]`) plus the browser
 //! web-sys APIs. The shared wire types + client primitives come from `perceive_act_core`.
-// the wire types (`Emotion`, the tool inputs) + client primitives (`WhoAmI`,
+// the wire types (`DisplayedImage`, the tool inputs) + client primitives (`WhoAmI`,
 // `ClientRole`, `PersistentSocket`), mirrored once in `perceive_act_core` and shared
 // with the native agent, so the head does not redefine them.
 pub use crate::perceive_act_core::*;
@@ -23,5 +23,5 @@ mod take_photo;
 pub use take_photo::*;
 mod speak_text;
 pub use speak_text::*;
-mod set_emotion;
-pub use set_emotion::*;
+mod show_image;
+pub use show_image::*;

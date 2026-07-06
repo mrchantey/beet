@@ -115,6 +115,19 @@ where
 			.await??;
 	}
 
+	// log prompt-cache hit rate, for tuning the append-only window (see perceive-act).
+	if let Some(usage) = stream.token_usage() {
+		let cached = usage.cached_input_tokens.unwrap_or(0);
+		let pct = if usage.input_tokens > 0 {
+			cached as f32 / usage.input_tokens as f32 * 100.0
+		} else {
+			0.0
+		};
+		info!(
+			"tokens: {} in ({cached} cached {pct:.0}%), {} out",
+			usage.input_tokens, usage.output_tokens
+		);
+	}
 	call_functions(cx.caller, function_calls.into_values()).await?;
 
 	Ok(())

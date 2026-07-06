@@ -45,7 +45,8 @@ async fn capture_webcam() -> Result<MediaBytes> {
 	// spot (phone cameras capture far larger frames than a model needs, and the
 	// bytes cross the socket + the model api every cycle), then read it as jpeg.
 	let (width, height) = (video.video_width(), video.video_height());
-	let scale = (MAX_PHOTO_WIDTH / width as f64).min(1.0);
+	// bound the longest edge, so a portrait/rotated phone frame is capped too.
+	let scale = (MAX_PHOTO_EDGE / width.max(height) as f64).min(1.0);
 	let (out_width, out_height) = (
 		(width as f64 * scale).round() as u32,
 		(height as f64 * scale).round() as u32,
@@ -79,7 +80,7 @@ async fn capture_webcam() -> Result<MediaBytes> {
 
 /// The longest edge a captured photo is scaled down to, matching what vision
 /// models resolve well while keeping per-cycle upload small.
-const MAX_PHOTO_WIDTH: f64 = 1024.0;
+const MAX_PHOTO_EDGE: f64 = 1024.0;
 /// Jpeg encoder quality for captured photos.
 const JPEG_QUALITY: f64 = 0.8;
 

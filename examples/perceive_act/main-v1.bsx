@@ -6,8 +6,8 @@ Run it; the agent socket server default-boots, so no --server flag is needed:
     beet --main=examples/perceive_act/main-v1.bsx
 
 The agent's capability routes forward over the socket to whichever client serves them:
-`take-photo`/`speak-text`/`set-emotion` to the head, `drive` to the body. The
-head captures the floor-photo fixtures, speaks via `tts` and logs the emotion; the body
+`take-photo`/`speak-text`/`show-image` to the head, `drive` to the body. The
+head captures the floor-photo fixtures, speaks via `tts` and logs the chosen image; the body
 records the drive command. The loop runs until Ctrl+C.
 
 Only the body client differs from v2 (which swaps the mock body for a wgpu fox), so the
