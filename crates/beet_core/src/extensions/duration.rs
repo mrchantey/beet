@@ -1,6 +1,66 @@
 use crate::prelude::Duration;
 use extend::ext;
 
+/// Serde for a [`Duration`] as a unit-suffixed string, eg `"1.5s"` or `"800ms"` — the
+/// format [`Duration::from_human_str`] parses and a [`Duration`] markup attribute coerces
+/// from. Use via `#[serde(with = "beet_core::prelude::duration_str")]`.
+///
+/// Serialization always writes a seconds string (`"1.5s"`). Deserialization REQUIRES a
+/// unit: a bare number (a JSON number `1.5`, or a unit-less string `"1.5"`) errors rather
+/// than silently assuming seconds. Reflect renders a [`Duration`] as this same string, so a
+/// model authoring a value against the reflected tool schema emits one the deserializer
+/// accepts. Upstreamed here so any crate serializing a wire/config [`Duration`] adopts the
+/// same unit-required shape rather than re-deriving a lenient one.
+#[cfg(feature = "serde")]
+pub mod duration_str {
+	use crate::prelude::*;
+	use core::fmt;
+	use serde::Deserializer;
+	use serde::Serializer;
+	use serde::de::Visitor;
+
+	/// Serialize as a unit-suffixed seconds string, eg `"1.5s"`.
+	pub fn serialize<S>(
+		duration: &Duration,
+		serializer: S,
+	) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		serializer.serialize_str(&format!("{}s", duration.as_secs_f64()))
+	}
+
+	/// Deserialize a unit-suffixed string like `"1.5s"`. A bare number — a JSON number
+	/// or a unit-less string like `"1.5"` — errors, so a unit is always required.
+	pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		deserializer.deserialize_str(DurationVisitor)
+	}
+
+	struct DurationVisitor;
+
+	impl Visitor<'_> for DurationVisitor {
+		type Value = Duration;
+
+		fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+			f.write_str("a unit-suffixed duration like \"1.5s\" or \"800ms\"")
+		}
+
+		fn visit_str<E>(self, value: &str) -> Result<Duration, E>
+		where
+			E: serde::de::Error,
+		{
+			Duration::from_human_str(value).ok_or_else(|| {
+				E::custom(format!(
+					"expected a unit-suffixed duration like \"1.5s\" or \"800ms\", got {value:?}"
+				))
+			})
+		}
+	}
+}
+
 /// Extension trait for [`Duration`] providing convenient constructors.
 #[ext]
 pub impl Duration {
@@ -40,5 +100,36 @@ pub impl Duration {
 			_ => return None,
 		};
 		Some(Duration::from_secs_f64(secs))
+	}
+}
+
+#[cfg(all(test, feature = "json"))]
+mod test {
+	use crate::prelude::*;
+
+	/// A single [`Duration`] field, serialized via the [`duration_str`] helper.
+	#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+	struct Wrap(#[serde(with = "crate::prelude::duration_str")] Duration);
+
+	/// [`duration_str`] serializes a unit-suffixed string and round-trips one back;
+	/// a bare number — a JSON number or a unit-less string — is rejected, so a unit
+	/// is always required.
+	#[beet_core::test]
+	fn duration_str_requires_a_unit() {
+		// a unit string round-trips as `"1.5s"`
+		let json =
+			serde_json::to_string(&Wrap(Duration::from_secs_f64(1.5))).unwrap();
+		json.xpect_eq(r#""1.5s""#.to_string());
+		serde_json::from_str::<Wrap>(&json)
+			.unwrap()
+			.xpect_eq(Wrap(Duration::from_secs_f64(1.5)));
+		// other units decode
+		serde_json::from_str::<Wrap>(r#""250ms""#)
+			.unwrap()
+			.0
+			.xpect_eq(Duration::from_millis(250));
+		// a bare number is rejected, whether a JSON number or a unit-less string
+		serde_json::from_str::<Wrap>("1.5").is_err().xpect_true();
+		serde_json::from_str::<Wrap>(r#""1.5""#).is_err().xpect_true();
 	}
 }

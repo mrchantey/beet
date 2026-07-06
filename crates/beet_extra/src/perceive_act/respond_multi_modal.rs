@@ -209,10 +209,8 @@ mod test {
 		let agent = app.world_mut().spawn(Router).id();
 		let emotion_entity =
 			app.world_mut().spawn((SetEmotion, ChildOf(agent))).id();
-		let drive_entity = app
-			.world_mut()
-			.spawn((DriveForDurationAction, ChildOf(agent)))
-			.id();
+		let drive_entity =
+			app.world_mut().spawn((RecordDrive, ChildOf(agent))).id();
 		app.world_mut()
 			.spawn((RespondMultiModalAction, config, ChildOf(agent)));
 		app.world_mut().flush();

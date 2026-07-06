@@ -4,7 +4,7 @@
 //! Each cycle [`PostPhoto`] (the camera actor) captures via [`TakePhoto`] and
 //! posts the photo into the thread, then the agent's single model call answers
 //! with one [`RespondMultiModalAction`] tool call, which fans out to [`SetEmotion`],
-//! [`SpeakText`] and [`DriveForDurationAction`] concurrently. The agent forwards each
+//! [`SpeakText`] and [`RecordDrive`] (or a real body's `drive`) concurrently. The agent forwards each
 //! capability over a socket to the client that serves it, bound by the
 //! [`capability_socket`] handshake; run standalone, the tools' own local
 //! handlers apply.
@@ -31,8 +31,8 @@ mod respond_multi_modal;
 pub use respond_multi_modal::*;
 mod speak_text;
 pub use speak_text::*;
-mod drive_for_duration;
-pub use drive_for_duration::*;
+mod record_drive;
+pub use record_drive::*;
 mod set_emotion;
 pub use set_emotion::*;
 pub mod speech_ext;

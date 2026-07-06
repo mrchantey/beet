@@ -52,6 +52,6 @@ pub fn MockBody(
 		ExchangeSocket::json(),
 		Router,
 		ClientRole(SmolStr::new("body")),
-		children![WhoAmI, DriveForDurationAction],
+		children![WhoAmI, RecordDrive],
 	));
 }

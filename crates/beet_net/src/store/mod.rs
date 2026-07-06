@@ -35,12 +35,10 @@ pub use blob_event::*;
 pub use blob_store_provider::*;
 mod blob_store;
 mod in_memory_store;
-mod reload_sentinel;
 mod store_path;
 pub use blob::*;
 pub use blob_store::*;
 pub use in_memory_store::*;
-pub use reload_sentinel::*;
 pub use store_path::*;
 
 // the analytics types + emission need only serde (which `std` pulls); the store

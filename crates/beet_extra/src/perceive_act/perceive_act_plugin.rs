@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 /// Adds the agent-thread runtime + chat UI and the capability-binding glue, and
 /// registers the perceive-act tools and their state, so a `examples/perceive_act/*.bsx`
 /// scene runs and its `<TakePhoto/>`, `<RespondMultiModalAction/>`, `<SpeakText/>`,
-/// `<DriveForDurationAction/>` and `<SetEmotion/>` tags resolve from markup.
+/// `<RecordDrive/>` and `<SetEmotion/>` tags resolve from markup.
 pub struct PerceiveActPlugin;
 
 impl Plugin for PerceiveActPlugin {
@@ -20,7 +20,7 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<RespondMultiModalAction>()
 			.register_type::<RespondMultiModal>()
 			.register_type::<SpeakText>()
-			.register_type::<DriveForDurationAction>()
+			.register_type::<RecordDrive>()
 			.register_type::<SetEmotion>()
 			.register_type::<DriveForDuration>()
 			.register_template::<MockHead>()
@@ -47,7 +47,7 @@ mod test {
 		app.world_mut().spawn(children![
 			RespondMultiModalAction,
 			SpeakText,
-			DriveForDurationAction,
+			RecordDrive,
 			SetEmotion
 		]);
 		app.world_mut().flush();

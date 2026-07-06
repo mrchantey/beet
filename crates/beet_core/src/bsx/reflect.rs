@@ -227,8 +227,9 @@ fn scalar_to_reflect(
 	}
 
 	// a `"true"`/`"false"` string targeting a `bool` field coerces to the bool, so a
-	// markup `edge_reload="true"` authors a flag directly (mirroring the duration string
-	// above). Any other string errors rather than silently applying `false`.
+	// markup `<RouteSidebar home="false"/>` authors a flag directly (mirroring the
+	// duration string above). Any other string errors rather than silently applying
+	// `false`.
 	if let (Value::Str(string), Some(info)) = (value, field_info)
 		&& info.type_id() == TypeId::of::<bool>()
 	{
@@ -714,7 +715,7 @@ mod test {
 	}
 
 	/// A `"true"`/`"false"` string attribute coerces to a `bool` field, so a markup
-	/// `edge_reload="true"` authors a flag; a non-bool string is a hard error.
+	/// `home="false"` authors a flag; a non-bool string is a hard error.
 	#[beet_core::test]
 	fn coerces_to_bool() {
 		resolve::<bool>(DataLiteral::Scalar(Value::str("true"))).xpect_eq(true);

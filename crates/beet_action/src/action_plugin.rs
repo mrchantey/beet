@@ -40,6 +40,11 @@ impl Plugin for ActionPlugin {
 			.register_type::<SetDrive>()
 			.register_type::<SetDriveAction>()
 			.register_type::<DifferentialDrive>()
+			// `DriveForDuration` is registered; its required `DriveForDurationAction` is not —
+			// the require inserts it at runtime (via ComponentId, no reflect needed), so a
+			// derived companion stays out of serialized scenes, and its short type path does
+			// not collide with beet_esp's own `perceive_act::DriveForDurationAction` in a
+			// pushed body scene.
 			.register_type::<DriveForDuration>()
 			.register_type::<LinearVelocity>()
 			.register_type::<AngularVelocity>()

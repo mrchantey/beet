@@ -546,28 +546,33 @@ async fn sync_dir_to_r2(local_dir: &str, bucket: &str) -> Result {
 			(format!("{bucket}/{key}"), file.to_string_lossy().to_string())
 		})
 		.collect::<Vec<_>>();
-	// each `wrangler r2 object put` is its own node process, so the per-file
-	// startup dominates; upload concurrently to cut the wall-clock to ~one put.
-	puts.into_iter()
-		.map(|(key, file_arg)| async move {
-			// `--remote` targets the real R2 bucket; without it wrangler writes to
-			// its *local* Miniflare store, which a deployed Worker never reads.
-			ChildProcess::new("wrangler")
-				.with_args([
-					"r2",
-					"object",
-					"put",
-					key.as_str(),
-					"--file",
-					file_arg.as_str(),
-					"--remote",
-				])
-				.run_async()
-				.await
-				.map(|_| ())
-		})
-		.xmap(async_ext::try_join_all)
-		.await?;
+	// each `wrangler r2 object put` is its own node process, so the per-file startup
+	// dominates; upload concurrently. Bound the fan-out to 16: a large site (hundreds
+	// of files) would otherwise spawn hundreds of concurrent node processes and
+	// exhaust file descriptors / PIDs. 16 at a time keeps the wall-clock near one put.
+	for chunk in puts.chunks(16) {
+		chunk
+			.iter()
+			.map(|(key, file_arg)| async move {
+				// `--remote` targets the real R2 bucket; without it wrangler writes to
+				// its *local* Miniflare store, which a deployed Worker never reads.
+				ChildProcess::new("wrangler")
+					.with_args([
+						"r2",
+						"object",
+						"put",
+						key.as_str(),
+						"--file",
+						file_arg.as_str(),
+						"--remote",
+					])
+					.run_async()
+					.await
+					.map(|_| ())
+			})
+			.xmap(async_ext::try_join_all)
+			.await?;
+	}
 	Ok(())
 }
 

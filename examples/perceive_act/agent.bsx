@@ -27,7 +27,7 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 	<TakePhoto/>
 	<SetEmotion/>
 	<SpeakText/>
-	<DriveForDurationAction/>
+	<RecordDrive/>
 	<div {Repeat} {CreateThread}>
 		<div {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">

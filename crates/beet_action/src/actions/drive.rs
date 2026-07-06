@@ -1,4 +1,6 @@
-//! The environment-agnostic drive leaf and the commanded velocity it writes.
+//! The environment-agnostic drive leaves — [`SetDrive`] (set a velocity) and
+//! [`DriveForDuration`] (drive for a bounded step) — and the [`DifferentialDrive`] command
+//! they write onto the agent.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -39,99 +41,59 @@ impl DifferentialDrive {
 /// The shared wire type between the agent and whichever body serves the `drive`
 /// capability (the wgpu fox, the Alvik robot): the agent serializes one of these onto
 /// the route, and the body drives its [`DifferentialDrive`] for [`duration`](Self::duration)
-/// before zeroing. [`duration`](Self::duration) serializes as a unit-suffixed string (see
-/// [`duration_str`]) — eg `"1.5s"` — matching how a [`Duration`] is authored in markup and
-/// shown in the model's tool schema, so the model emits a value it reads straight from the schema.
+/// before zeroing. [`duration`](Self::duration) serializes as a unit-suffixed string (via
+/// [`duration_str`](beet_core::prelude::duration_str)) — eg `"1.5s"` — matching how a
+/// [`Duration`] is authored in markup and shown in the model's tool schema, so the model
+/// emits a value it reads straight from the schema.
+///
+/// Requires [`DriveForDurationAction`], so authoring a `<DriveForDuration/>` on a behavior
+/// leaf drives the agent for the duration then stops without a separate action tag.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
+#[require(DriveForDurationAction)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DriveForDuration {
 	/// The commanded velocity to hold.
 	pub drive: DifferentialDrive,
-	/// How long to hold the velocity before stopping, as a duration string like
-	/// `"1.5s"` or `"800ms"`.
-	#[cfg_attr(feature = "serde", serde(with = "duration_str"))]
+	/// How long to hold the velocity before stopping, as a unit-suffixed duration
+	/// string like `"1.5s"` or `"800ms"`.
+	#[cfg_attr(feature = "serde", serde(with = "beet_core::prelude::duration_str"))]
 	pub duration: Duration,
 }
 
-/// Serde for [`DriveForDuration::duration`]. Serializes as a unit-suffixed string (eg
-/// `"1.5s"`), matching how the reflect tool schema presents a [`Duration`] to the model (a
-/// string, coerced from `"30s"`-style markup) — so the model emits a value the deserializer
-/// accepts. Deserialization is lenient: a unit-suffixed string (`"250ms"`), a bare numeric
-/// string (`"1.5"` = seconds) or a raw JSON number (`1.5` = seconds) all decode; a
-/// non-finite or negative value decodes to [`Duration::ZERO`] rather than panicking.
-#[cfg(feature = "serde")]
-mod duration_str {
-	use beet_core::prelude::*;
-	use core::fmt;
-	use serde::Deserializer;
-	use serde::Serializer;
-	use serde::de::Visitor;
-
-	pub fn serialize<S>(
-		duration: &Duration,
-		serializer: S,
-	) -> Result<S::Ok, S::Error>
-	where
-		S: Serializer,
-	{
-		serializer.serialize_str(&format!("{}s", duration.as_secs_f64()))
-	}
-
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		deserializer.deserialize_any(DurationVisitor)
-	}
-
-	/// A finite, non-negative seconds value, else [`Duration::ZERO`].
-	fn secs_to_duration(secs: f64) -> Duration {
-		Duration::try_from_secs_f64(secs).unwrap_or(Duration::ZERO)
-	}
-
-	struct DurationVisitor;
-
-	impl<'de> Visitor<'de> for DurationVisitor {
-		type Value = Duration;
-
-		fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-			f.write_str("a duration string like \"1.5s\" or a number of seconds")
-		}
-
-		fn visit_str<E>(self, value: &str) -> Result<Duration, E>
-		where
-			E: serde::de::Error,
-		{
-			// prefer a unit-suffixed string, fall back to bare seconds
-			Duration::from_human_str(value)
-				.or_else(|| {
-					value.trim().parse::<f64>().ok().map(secs_to_duration)
-				})
-				.ok_or_else(|| E::custom(format!("invalid duration: {value:?}")))
-		}
-
-		fn visit_f64<E>(self, value: f64) -> Result<Duration, E>
-		where
-			E: serde::de::Error,
-		{
-			Ok(secs_to_duration(value))
-		}
-
-		fn visit_u64<E>(self, value: u64) -> Result<Duration, E>
-		where
-			E: serde::de::Error,
-		{
-			Ok(secs_to_duration(value as f64))
-		}
-
-		fn visit_i64<E>(self, value: i64) -> Result<Duration, E>
-		where
-			E: serde::de::Error,
-		{
-			Ok(secs_to_duration(value as f64))
-		}
-	}
+/// The action behind [`DriveForDuration`]: drive the agent at the commanded velocity for the
+/// commanded duration, then stop.
+///
+/// Reads its caller's [`DriveForDuration`], resolves the driven agent through [`AgentQuery`]
+/// (as [`SetDriveAction`] does), and runs a `SetDrive` + [`EndInDuration`] + `SetDrive(0, 0)`
+/// sequence on it — the same "drive this velocity for N seconds then halt" step the perceive-act
+/// wgpu body and the esp robot perform. Spawned automatically by [`DriveForDuration`]'s
+/// `#[require]`, so `<DriveForDuration/>` is a self-contained leaf.
+///
+/// ## Errors
+/// Errors if the agent has no [`DifferentialDrive`] (via the inner `SetDrive`) — declare it on
+/// the driven body at spawn.
+#[action(handler_only)]
+#[derive(Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn DriveForDurationAction(cx: ActionContext) -> Result<Outcome> {
+	let DriveForDuration { drive, duration } =
+		cx.caller.get_cloned::<DriveForDuration>().await?;
+	let world = cx.world();
+	// the agent this action drives, resolved the same way `SetDrive` resolves its own.
+	let agent = AgentQuery::entity_async(&world, cx.id()).await;
+	// drive the agent for the duration then stop, as an action of the agent so the inner
+	// `SetDrive`s resolve back to it; despawned after so steps never stack.
+	let step = world
+		.spawn((ActionOf(agent), Sequence::<(), ()>::default(), children![
+			SetDrive::new(drive.linear, drive.angular),
+			EndInDuration::pass(duration),
+			SetDrive::new(0., 0.),
+		]))
+		.await;
+	step.call::<(), Outcome>(()).await?;
+	step.despawn().await?;
+	Outcome::PASS.xok()
 }
 
 /// `<SetDrive linear=.. angular=..>` — the environment-agnostic motor leaf. On run it
@@ -198,14 +160,59 @@ pub fn SetDriveAction(
 	Outcome::PASS.xok()
 }
 
-#[cfg(all(test, feature = "json"))]
+#[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// `DriveForDuration` requires `DriveForDurationAction`, so running the leaf drives the
+	/// agent's `DifferentialDrive` at the commanded velocity, then zeroes it once the
+	/// duration elapses — a self-contained "drive for N then stop" step.
+	#[beet_core::test]
+	async fn drives_the_agent_then_stops() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin, ActionPlugin));
+		// the agent carries the `DifferentialDrive` the action writes.
+		let agent = app.world_mut().spawn(DifferentialDrive::default()).id();
+		// `<DriveForDuration/>` alone: its `#[require]` brings the action.
+		let action = app
+			.world_mut()
+			.spawn((ActionOf(agent), DriveForDuration {
+				drive: DifferentialDrive::new(40., 0.),
+				duration: Duration::from_millis(100),
+			}))
+			.id();
+		app.world_mut().flush();
+		// fire the run; it sets the drive, holds it, then zeroes.
+		app.world_mut().entity_mut(action).run_async_local(
+			|action| async move { action.call::<(), Outcome>(()).await.map(|_| ()) },
+		);
+		// the commanded velocity lands on the agent while the step runs
+		app_ext::update_until(&mut app, move |world| {
+			world
+				.get::<DifferentialDrive>(agent)
+				.is_some_and(|drive| drive.linear.as_mm_per_sec() > 0.)
+		})
+		.await
+		.xpect_true();
+		// then it zeroes once the duration elapses
+		app_ext::update_until_timeout(
+			&mut app,
+			move |world| {
+				world
+					.get::<DifferentialDrive>(agent)
+					.is_some_and(|drive| drive.linear.as_mm_per_sec() == 0.)
+			},
+			Duration::from_secs(2),
+		)
+		.await
+		.xpect_true();
+	}
+
 	/// The `drive` capability wire shape, shared verbatim with the esp body: a nested
 	/// `drive` velocity as plain numbers (mm/s, deg/s) and `duration` as a unit-suffixed
 	/// string. Locked — the esp side deserializes these identical bytes, so the shape is pinned.
+	#[cfg(feature = "json")]
 	#[beet_core::test]
 	fn drive_for_duration_wire_shape() {
 		let command = DriveForDuration {
@@ -223,20 +230,28 @@ mod test {
 	}
 
 	/// The model authors `duration` against a string-typed tool schema (reflect renders
-	/// `Duration` as a string), so decoding tolerates a unit-suffixed string, a bare numeric
-	/// string, or a raw number — all read as seconds. This is the live model boundary.
+	/// `Duration` as a string), so a unit-suffixed string decodes — but a bare number, a
+	/// JSON number or a unit-less string, is rejected: a unit must always be provided. This
+	/// is the live model boundary.
+	#[cfg(feature = "json")]
 	#[beet_core::test]
-	fn drive_duration_decodes_leniently() {
+	fn drive_duration_requires_a_unit() {
 		let decode = |duration: &str| {
 			serde_json::from_str::<DriveForDuration>(&format!(
 				r#"{{"drive":{{"linear":0.0,"angular":0.0}},"duration":{duration}}}"#
 			))
+		};
+		// unit-suffixed strings decode
+		decode(r#""1.5s""#)
 			.unwrap()
 			.duration
-		};
-		decode(r#""1.5s""#).xpect_eq(Duration::from_secs_f64(1.5));
-		decode(r#""250ms""#).xpect_eq(Duration::from_millis(250));
-		decode(r#""2""#).xpect_eq(Duration::from_secs(2));
-		decode("1.5").xpect_eq(Duration::from_secs_f64(1.5));
+			.xpect_eq(Duration::from_secs_f64(1.5));
+		decode(r#""250ms""#)
+			.unwrap()
+			.duration
+			.xpect_eq(Duration::from_millis(250));
+		// a bare number is rejected, whether a JSON number or a unit-less string
+		decode("1.5").is_err().xpect_true();
+		decode(r#""2""#).is_err().xpect_true();
 	}
 }

@@ -17,22 +17,21 @@ use beet_router::prelude::*;
 /// The wgpu body's `drive`: drive the on-screen fox at the commanded velocity for the
 /// commanded duration, then stop.
 ///
-/// Feeds the agent-chosen [`DifferentialDrive`] into the fox through the agnostic
-/// [`SetDrive`] leaf, held for the input's `duration` by an [`EndInDuration`] then zeroed
-/// - the same `SetDrive` + `EndInDuration` sequence the reference patrol uses, so the one
-/// command drives this fox and the v3 robot. Shares the `drive` route + [`DriveForDuration`]
-/// input with the mock [`DriveForDurationAction`](super::DriveForDurationAction); this is
-/// "the mock plus the actual effect".
+/// Authors the agent-chosen [`DriveForDuration`] as an action of the fox, which brings the
+/// canonical [`DriveForDurationAction`] — the `SetDrive` + `EndInDuration` + `SetDrive(0, 0)`
+/// step that drives this fox and (v3) the real robot off the one command. Shares the `drive`
+/// route + [`DriveForDuration`] input with the mock [`RecordDrive`](super::RecordDrive); this
+/// is "the mock plus the actual effect".
 #[action(route = "drive")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn DriveFox(cx: ActionContext<DriveForDuration>) -> Result<()> {
-	let DriveForDuration { drive, duration } = cx.input;
+	let command = cx.input;
 	info!(
 		"driving: lin={} ang={} for {:.2}s",
-		drive.linear.as_mm_per_sec(),
-		drive.angular.as_deg_per_sec(),
-		duration.as_secs_f32()
+		command.drive.linear.as_mm_per_sec(),
+		command.drive.angular.as_deg_per_sec(),
+		command.duration.as_secs_f32()
 	);
 	// the single fox this body renders; skip the step if the glb has not finished
 	// loading yet (the model trails several round-trips, so in practice it is up).
@@ -46,15 +45,10 @@ pub async fn DriveFox(cx: ActionContext<DriveForDuration>) -> Result<()> {
 		warn!("drive: no fox body loaded yet, skipping the drive step");
 		return Ok(());
 	};
-	// spawn the drive step as an action of the fox, run it (which drives the fox for
-	// the dwell then stops it), then despawn so steps never stack.
-	let step = world
-		.spawn((ActionOf(fox), Sequence::<(), ()>::default(), children![
-			SetDrive::new(drive.linear, drive.angular),
-			EndInDuration::pass(duration),
-			SetDrive::new(0., 0.),
-		]))
-		.await;
+	// author the command as an action of the fox: `DriveForDuration` brings the canonical
+	// `DriveForDurationAction`, which drives the fox for the duration then stops. Despawned
+	// after so steps never stack.
+	let step = world.spawn((ActionOf(fox), command)).await;
 	step.call::<(), Outcome>(()).await?;
 	step.despawn().await?;
 	Ok(())
