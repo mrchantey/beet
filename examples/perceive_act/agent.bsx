@@ -55,7 +55,7 @@ You are a robot living its little life.
 			</CreateActor>
 			<CreateActor name="Camera" kind="User" {PostPhoto}/>
 			<CreateActor name="Robot" kind="Agent"
-				{(ModelStreamer{provider:OpenAi, effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
+				{(RobotStreamer{effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
 				<RespondMultiModalAction {(RespondMultiModal{max_drive_duration:"2s"}, StringEnumOptions{field:"image"})}/>
 			</CreateActor>
 		</div>

@@ -73,10 +73,20 @@ impl KittyImage {
 			(None, Some(rows)) => {
 				// invert the 2:1 cell aspect: cols = rows * 2 * (px_w / px_h)
 				let rows = rows.max(1);
-				let cols = (rows * 2 * self.px.x)
-					.div_ceil(self.px.y.max(1))
-					.clamp(1, max_cols.max(1));
-				UVec2::new(cols, rows)
+				let cols = (rows * 2 * self.px.x).div_ceil(self.px.y.max(1)).max(1);
+				// a tall raster (eg a `height: 70vh` hero on a narrow terminal)
+				// derives a width wider than the available columns. Clamping only
+				// the width there would squash the aspect and, once the laid-out
+				// rect spills past the screen edge, the placement pass drops the
+				// image entirely. So when the height-driven width would overflow,
+				// fall back to a width-driven fit: the raster stays aspect-correct
+				// and on-screen, just shorter than the requested height.
+				let max_cols = max_cols.max(1);
+				if cols > max_cols {
+					UVec2::new(max_cols, self.rows_for(max_cols))
+				} else {
+					UVec2::new(cols, rows)
+				}
 			}
 			(None, None) => self.cell_size(max_cols),
 		}
@@ -694,6 +704,29 @@ mod test {
 		image.cell_size(80).xpect_eq(UVec2::new(20, 5));
 		// clamped to 10 cols, rows follow the aspect
 		image.cell_size(10).xpect_eq(UVec2::new(10, 3));
+	}
+
+	/// An explicit height derives the width from the aspect; when that width fits
+	/// it is honored, and when it would overflow the columns the box falls back to
+	/// a width-driven fit (aspect-correct, shorter) rather than squashing.
+	#[beet_core::test]
+	fn cell_size_constrained_contains_tall_height() {
+		// 16:9 raster, the deck's UHD hero shape.
+		let image = KittyImage {
+			id: 1,
+			data: String::new(),
+			px: UVec2::new(3840, 2160),
+		};
+		// height 10 rows -> width = 10 * 2 * 3840/2160 = 35.6 -> 36 cols; fits in
+		// 80, so the requested height stands.
+		image
+			.cell_size_constrained(None, Some(10), 80)
+			.xpect_eq(UVec2::new(36, 10));
+		// same height on a 30-col terminal: 36 cols would overflow, so fit to
+		// width instead (rows follow the aspect, shorter than the requested 10).
+		image
+			.cell_size_constrained(None, Some(10), 30)
+			.xpect_eq(UVec2::new(30, image.rows_for(30)));
 	}
 
 	// the live-terminal cases drive the `TestHost`/`KittyGraphicsSupport`

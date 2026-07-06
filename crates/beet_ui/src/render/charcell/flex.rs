@@ -191,11 +191,19 @@ pub(super) fn resolve_height(
 		Display::Table => {
 			resolve_table_height(node, query, content_width, viewport)
 		}
-		// a kitty raster's rows follow its aspect at the assigned width (an
-		// explicit `height` overrides below, like every other display)
+		// a kitty raster contains within the assigned width: it honors an explicit
+		// `height` only while that height's aspect-width still fits `content_width`,
+		// and past that (eg a `70vh` hero on a narrow terminal) falls to a
+		// width-driven fit so the picture stays on-screen and aspect-correct rather
+		// than overflowing. The generic explicit-`height` override below is skipped
+		// for rasters so it cannot re-impose the overflowing height.
 		_ if let Some(image) = node.kitty_image() => {
 			image
-				.cell_size_constrained(Some(content_width), None, content_width)
+				.cell_size_constrained(
+					box_model.width,
+					box_model.height,
+					content_width,
+				)
 				.y
 		}
 		// text leaf (eg a paragraph's text node)
@@ -215,8 +223,15 @@ pub(super) fn resolve_height(
 	};
 	// an explicit `height` overrides the resolved content height; `min-height`
 	// floors it (eg `100vh` to fill the terminal window) and `max-height` caps it.
-	let content_height =
-		box_model.clamp_height(box_model.height.unwrap_or(content_height));
+	// A raster already folded its explicit height into the aspect-contained value
+	// above, so it keeps that (only `min`/`max-height` still clamp) rather than
+	// re-imposing the raw height.
+	let base = if node.kitty_image().is_some() {
+		content_height
+	} else {
+		box_model.height.unwrap_or(content_height)
+	};
+	let content_height = box_model.clamp_height(base);
 	content_height + overhead.y
 }
 
@@ -415,16 +430,22 @@ pub fn flex_layout_rects(
 	let mut child_sizes: Vec<(Entity, UVec2)> = node
 		.flow_child_nodes(query)
 		.map(|child| {
-			let intrinsic = child.intrinsic_size();
 			let (explicit_w, explicit_h) =
 				explicit_box_size(&child, viewport, available);
-			(
-				child.entity,
+			// a raster is a replaced element: size it against *this line's*
+			// available width (the measure pass could only clamp to the viewport,
+			// which overflows a container narrower than the screen), aspect-
+			// containing so a tall `height` never pushes it past the line.
+			let size = if let Some(image) = child.kitty_image() {
+				image.cell_size_constrained(explicit_w, explicit_h, available.x)
+			} else {
+				let intrinsic = child.intrinsic_size();
 				UVec2::new(
 					explicit_w.unwrap_or(intrinsic.x),
 					explicit_h.unwrap_or(intrinsic.y),
-				),
-			)
+				)
+			};
+			(child.entity, size)
 		})
 		.collect();
 	// Sort by flex_order
