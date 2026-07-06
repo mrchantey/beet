@@ -335,36 +335,60 @@ pub fn build_entry_from_bsx(
 	build_entry_root(world, BlobStore::temp(), sources, extra)
 }
 
-/// Drive the async runtime until an entry root is marked [`TemplatesLoaded`], so a
-/// build-then-serve path (the wasm Worker, a wasm one-shot) never serves before the
-/// entry's templates registered.
+/// Drive the async runtime until a build-then-serve entry is fully ready to serve: its
+/// `<TemplateDir>` templates registered, its `<RoutesDir>` routes discovered, and any
+/// `<Template src>` includes resolved. A build-then-serve driver (the wasm Worker, a
+/// wasm one-shot) owns the world, so it settles + ticks and re-checks readiness itself
+/// rather than yielding to an outer loop (the in-app [`RoutesDir::settle_all`] path).
 ///
-/// [`AsyncRunner::settle_async_tasks`] settles the async runtime, but it can return
-/// inside a synchronous-only window before the `<TemplateDir>`/`<RoutesDir>` scan
-/// spawns its follow-up task, so idle alone is not readiness. This loops settle +
-/// the explicit `TemplatesLoaded` check, ticking between, until the marker is present
-/// or the safety cap is hit (so a never-loading entry returns rather than hanging).
+/// Readiness is entity state, not idle. [`build_entry_root`] marks the root
+/// [`TemplatesLoaded`] *synchronously*, and the route/template scans only spawn their
+/// follow-up tasks a few async ticks after the insert, so "the root is loaded" (or a
+/// single idle window) can precede any route existing, the cause of intermittent 404s
+/// on a multi-route site served from a Worker. This instead mirrors
+/// [`RoutesDir::settle_all`]'s conditions: a `<RoutesDir>` with no composed
+/// [`BlobStore`] is still discovering, a `<TemplateDir>` without [`TemplatesLoaded`] is
+/// still registering, and a non-empty [`TemplatePending`] is an unresolved include. It
+/// loops settle + check, ticking between, until nothing is pending or the safety cap is
+/// hit (so a never-loading entry returns rather than hanging).
 ///
 /// The native run loop ticks naturally and `BootOnLoad` waits on the load itself, so
 /// only the build-then-serve drivers need this explicit gate.
-pub async fn settle_until_templates_loaded(world: &mut World) {
+pub async fn settle_until_ready(world: &mut World) {
 	// each iteration is a full settle; the cap guards a never-loading entry.
 	const MAX_ITERS: usize = 64;
 	for _ in 0..MAX_ITERS {
 		AsyncRunner::settle_async_tasks(world).await;
-		if world
-			.query_filtered::<(), With<TemplatesLoaded>>()
-			.iter(world)
-			.next()
-			.is_some()
-		{
+		if entry_pending(world) == 0 {
 			return;
 		}
 		AsyncRunner::tick().await;
 	}
 	error!(
-		"templates did not load within {MAX_ITERS} settle iterations; serving anyway"
+		"entry did not settle within {MAX_ITERS} iterations; serving anyway \
+		(routes may be incomplete)"
 	);
+}
+
+/// The count of still-loading entry dependencies, mirroring [`RoutesDir::settle_all`]:
+/// routes still discovering (no scoped [`BlobStore`] composed yet), template dirs still
+/// registering (not yet [`TemplatesLoaded`]), and unresolved `<Template src>` includes
+/// (a non-empty [`TemplatePending`]). Zero means the entry is ready to serve.
+fn entry_pending(world: &mut World) -> usize {
+	let discovering_routes = world
+		.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>()
+		.iter(world)
+		.count();
+	let registering_templates = world
+		.query_filtered::<(), (With<TemplateDir>, Without<TemplatesLoaded>)>()
+		.iter(world)
+		.count();
+	let unresolved_includes = world
+		.query::<&TemplatePending>()
+		.iter(world)
+		.filter(|pending| !pending.is_empty())
+		.count();
+	discovering_routes + registering_templates + unresolved_includes
 }
 
 #[cfg(test)]
@@ -402,11 +426,11 @@ mod test {
 			.xpect_some();
 	}
 
-	/// The readiness gate settles and returns once the entry root carries
-	/// [`TemplatesLoaded`] (which `build_entry_root` inserts), the signal a
-	/// build-then-serve driver waits on before serving.
+	/// The readiness gate settles and returns once the entry has nothing pending.
+	/// This entry has no `<RoutesDir>`/`<TemplateDir>`, so it is ready the moment
+	/// `build_entry_root` returns; the gate must return rather than hang.
 	#[beet::test]
-	async fn gate_settles_on_templates_loaded() {
+	async fn gate_settles_when_ready() {
 		let store = BlobStore::temp();
 		store
 			.insert(&SmolPath::from("main.bsx"), "<Router/>")
@@ -424,7 +448,7 @@ mod test {
 			.entity(root)
 			.contains::<TemplatesLoaded>()
 			.xpect_true();
-		// returns rather than hanging, the root being already marked loaded.
-		settle_until_templates_loaded(&mut world).await;
+		// returns rather than hanging, nothing being pending on this entry.
+		settle_until_ready(&mut world).await;
 	}
 }

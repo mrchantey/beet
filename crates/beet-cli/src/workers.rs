@@ -21,7 +21,7 @@
 //! The build itself stays *lazy on first fetch*: the Worker runtime forbids
 //! blocking on the JS thread, so the runner cannot `block_on` the async entry
 //! build. The handler instead settles the build to readiness
-//! ([`settle_until_templates_loaded`]) the first time it takes the world.
+//! ([`settle_until_ready`]) the first time it takes the world.
 
 use crate::prelude::*;
 use beet::prelude::*;

@@ -1,0 +1,73 @@
+<!--
+# Hello Cloudflare Workers — the real beet site
+
+Deploys the actual beet `site/` (not the smaller `examples/bsx_site`) to a Cloudflare
+Worker, where the Worker IS `beet-cli` compiled to wasm (`--features cloudflare`): one
+binary for every target, native on Fargate/Lightsail/Lambda/Containers, wasm here. The
+Worker reads the site from R2 through the native `worker::Bucket` binding (no S3
+credentials at runtime), renders per request, and serves on `<name>.workers.dev`.
+
+The two resources are the Worker and the R2 bucket holding the site. The Worker is
+generic: it loads `main.bsx`, `routes/` and `templates/` from R2 and version-checks the
+entry on every request, so a `sync` updates the entire site with no redeploy, live on
+the very next fetch. `build` compiles the wasm once; `deploy` uploads that prebuilt
+artifact (no recompile) and seeds the bucket.
+
+Two directories are synced: `site/` to the bucket root (its `main.bsx`, `routes/`,
+`templates/`), and the workspace `assets/` under the `assets/` key prefix. The site's
+own `site/assets/` is empty and a Worker has no filesystem fallback, so its
+`ServeBlobs`/`AssetsStore` resolves `/assets/*` from bucket key `assets/*`; the prefixed
+sync is what lands the real assets there.
+
+## The edit → sync → live loop (no redeploy)
+
+    beet --main=examples/infra/hello_workers.bsx deploy   # worker up + bucket seeded
+    # visit https://<name>.workers.dev — the site renders
+    # edit a markdown file under site/routes/
+    beet --main=examples/infra/hello_workers.bsx sync     # re-upload site/ + assets/
+    # reload the page — the change is live
+
+`sync` re-uploads every `site/` file including `main.bsx`, giving `main.bsx` a fresh R2
+version. The Worker's per-request version check sees the change and rebuilds its
+per-isolate world, re-reading the edited routes, so the next fetch serves the new
+content. `destroy` deletes the Worker and empties + deletes the bucket.
+
+## Usage
+
+    beet --main=examples/infra/hello_workers.bsx build
+    beet --main=examples/infra/hello_workers.bsx deploy
+    beet --main=examples/infra/hello_workers.bsx sync
+    beet --main=examples/infra/hello_workers.bsx destroy
+
+A one-shot `CliServer` host (no long-running server); `BootOnLoad` fires the CLI
+request on load and the matching verb runs. Each verb is a child-sequenced
+`<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
+children of the route and the sequence runs them in order. Run from the workspace
+root: `local_dir` paths are cwd-relative.
+
+Live deploy needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `.env`, plus
+`wrangler` and `worker-build`. No R2 keys are needed (native binding). `build` needs
+neither (a local compile).
+-->
+<Router {(CliServer, RequestLogger, BootOnLoad)}>
+	<CrateCheck features="infra"/>
+	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->
+	<Route path="build" {ExchangeSequence}>
+		<CloudflareWorkerBuildAction/>
+	</Route>
+	<Route path="deploy" {ExchangeSequence}>
+		<CloudflareWorkerBlock name="beet-hello-site-worker" bucket="beet-hello-site"/>
+		<CloudflareWorkerDeployAction/>
+		<!-- the site to the bucket root; the workspace assets under the `assets/` prefix -->
+		<CloudflareR2Sync local_dir="site" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="assets" prefix="assets" bucket="beet-hello-site"/>
+	</Route>
+	<Route path="sync" {ExchangeSequence}>
+		<CloudflareR2Sync local_dir="site" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="assets" prefix="assets" bucket="beet-hello-site"/>
+	</Route>
+	<Route path="destroy" {ExchangeSequence}>
+		<!-- `local_dir` empties the synced site objects before deleting the bucket -->
+		<CloudflareDestroy name="beet-hello-site-worker" bucket="beet-hello-site" local_dir="site"/>
+	</Route>
+</Router>

@@ -487,14 +487,20 @@ fn write_worker_wrangler(
 #[reflect(Component, Default)]
 #[require(CloudflareR2SyncAction)]
 pub struct CloudflareR2Sync {
-	/// Local directory to publish (workspace-relative), eg `examples/bsx_site`.
+	/// Local directory to publish (cwd-relative), eg `examples/bsx_site`.
 	local_dir: SmolPath,
 	/// Target R2 bucket.
 	bucket: SmolStr,
+	/// Optional R2 key prefix: each uploaded key becomes `<prefix>/<relpath>`
+	/// instead of `<relpath>`. Mounts a local directory under a sub-path of the
+	/// bucket, eg the workspace `assets/` under the served site's `assets/` prefix
+	/// (where a Worker's `AssetsStore` reads them). `None` uploads to the bucket root.
+	#[set_with(unwrap_option)]
+	prefix: Option<SmolPath>,
 }
 
 impl CloudflareR2Sync {
-	/// Publish `local_dir` to `bucket`.
+	/// Publish `local_dir` to `bucket` at the bucket root.
 	pub fn new(
 		local_dir: impl Into<SmolPath>,
 		bucket: impl Into<SmolStr>,
@@ -502,6 +508,7 @@ impl CloudflareR2Sync {
 		Self {
 			local_dir: local_dir.into(),
 			bucket: bucket.into(),
+			prefix: None,
 		}
 	}
 }
@@ -515,7 +522,12 @@ pub async fn CloudflareR2SyncAction(
 ) -> Result<Outcome<Request, Response>> {
 	let start = Instant::now();
 	let sync = cx.caller.get_cloned::<CloudflareR2Sync>().await?;
-	sync_dir_to_r2(sync.local_dir().as_str(), sync.bucket()).await?;
+	sync_dir_to_r2(
+		sync.local_dir().as_str(),
+		sync.bucket(),
+		sync.prefix().as_ref().map(SmolPath::as_str),
+	)
+	.await?;
 	info!(
 		"synced site in {} (live on the next fetch)",
 		time_ext::pretty_print_duration(start.elapsed()),
@@ -529,20 +541,34 @@ pub async fn CloudflareR2SyncAction(
 /// `local_dir` is resolved relative to the cwd (like `--main`), not the workspace:
 /// the site is the user's, and a deploy `.bsx` may be run from a different repo
 /// than the beet workspace that holds the Worker source.
-async fn sync_dir_to_r2(local_dir: &str, bucket: &str) -> Result {
+///
+/// `prefix`, when set, is prepended to every key (`<prefix>/<relpath>`), so a
+/// directory can mount under a bucket sub-path (eg workspace `assets/` under the
+/// site's `assets/` prefix). `None` uploads to the bucket root.
+async fn sync_dir_to_r2(
+	local_dir: &str,
+	bucket: &str,
+	prefix: Option<&str>,
+) -> Result {
 	let root = AbsPathBuf::new(local_dir)?;
 	let files = ReadDir::files_recursive(&root)?;
 	info!(
-		"syncing {} files from {} to r2://{bucket}",
+		"syncing {} files from {} to r2://{bucket}{}",
 		files.len(),
 		root.display(),
+		prefix.map(|prefix| format!("/{prefix}")).unwrap_or_default(),
 	);
 	// precompute owned `(bucket/key, file)` args so the uploads own their data.
 	let puts = files
 		.into_iter()
 		.map(|file| {
 			let rel = file.strip_prefix(&root).unwrap_or(file.as_path());
-			let key = rel.to_string_lossy().replace('\\', "/");
+			let rel_key = rel.to_string_lossy().replace('\\', "/");
+			// mount under `prefix/` when set, else at the bucket root.
+			let key = match prefix {
+				Some(prefix) => format!("{prefix}/{rel_key}"),
+				None => rel_key,
+			};
 			(format!("{bucket}/{key}"), file.to_string_lossy().to_string())
 		})
 		.collect::<Vec<_>>();
@@ -625,7 +651,7 @@ pub async fn CloudflareBenchAction(
 
 	// sync path: publish the site to R2; the Worker serves it on the next fetch.
 	let sync_start = Instant::now();
-	sync_dir_to_r2(bench.local_dir().as_str(), bench.bucket()).await?;
+	sync_dir_to_r2(bench.local_dir().as_str(), bench.bucket(), None).await?;
 	let sync_elapsed = sync_start.elapsed();
 
 	// with a url, also time how soon the live Worker serves the fresh site.

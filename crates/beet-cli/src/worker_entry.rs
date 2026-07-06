@@ -14,7 +14,7 @@
 //! The entry's declared `<TemplateDir>` templates register through the store, the
 //! entry builds into a root carrying the site store plus [`DisableBootOnLoad`] (so
 //! its declared servers stay dormant; the Worker itself serves each request), and
-//! the build settles to readiness via [`settle_until_templates_loaded`] before
+//! the build settles to readiness via [`settle_until_ready`] before
 //! serving. The universal seam is the same `entity.exchange(request) -> Response`
 //! the native servers use.
 
@@ -134,9 +134,10 @@ async fn build_site(
 	// scan) as an async task, settled below before the host is served.
 	let sources = read_entry_sources(&store, formats, entry_name).await?;
 	build_entry_root(&mut world, store, sources, DisableBootOnLoad)?;
-	// settle until the entry's templates are registered (not just until idle): the
-	// `<RoutesDir>`/`<TemplateDir>` scans land before the host is queried and served.
-	settle_until_templates_loaded(&mut world).await;
+	// settle until the entry is ready to serve (not just until idle): the
+	// `<RoutesDir>`/`<TemplateDir>` scans land before the host is queried and served,
+	// so a multi-route site never serves a 404 for a route that has not discovered yet.
+	settle_until_ready(&mut world).await;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world
