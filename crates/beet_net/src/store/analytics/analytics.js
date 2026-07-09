@@ -16,8 +16,10 @@ Beet web analytics client.
 // dwell to the last beat rather than losing it.
 const HEARTBEAT_MS = 10000;
 
-// A time-ordered UUIDv7 (48-bit unix-ms timestamp + random), used as the
-// page-view row id so records sort by time and overwrite in place.
+// A time-ordered UUIDv7 (48-bit unix-ms timestamp + random). Used for the
+// page-view row id (so records sort by time and overwrite in place) and the
+// session id. Built on `crypto.getRandomValues`, which - unlike
+// `crypto.randomUUID` - is available in insecure contexts (plain http) too.
 function uuidv7() {
 	const ts = Date.now();
 	const bytes = new Uint8Array(16);
@@ -47,7 +49,7 @@ function uuidv7() {
 function sessionId() {
 	let id = sessionStorage.getItem("beet_session");
 	if (!id) {
-		id = crypto.randomUUID();
+		id = uuidv7();
 		sessionStorage.setItem("beet_session", id);
 	}
 	document.cookie = "beet_session=" + id + "; path=/; samesite=lax";

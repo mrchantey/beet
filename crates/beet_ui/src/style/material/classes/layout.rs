@@ -59,6 +59,19 @@ pub fn app_bar_terminal() -> Rule {
 		})
 }
 
+/// Web app bar - wraps its leading cluster and nav onto separate rows once they
+/// no longer fit on one line, so a very narrow screen (eg a 320px phone) drops
+/// the Docs/Blog/GitHub nav below the wordmark rather than overflowing the page
+/// width. Inert while the bar fits (a single-row `space-between` as before).
+/// Screen-gated: the terminal keeps its deliberately single-row app bar (see
+/// [`app_bar_terminal`]).
+pub fn app_bar_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(APP_BAR))
+		.with_value(common_props::FlexWrapProp, FlexWrap::Wrap)
+}
+
 /// App bar navigation - a flex row so its links are spaced rather than running
 /// together as adjacent inline anchors. Centers on the cross axis so links of
 /// differing heights (a bordered button beside a text link) sit on one line.
@@ -196,10 +209,18 @@ const MAIN_MEASURE_REM: f32 = 70.;
 /// beside the sidebar. Paired with [`main_content_measure`], which caps each
 /// child at [`MAIN_MEASURE_REM`], so page content (the index included) reads as
 /// a centred column on both the web and the terminal.
+///
+/// `min-width: 0` lets the column shrink below its intrinsic content width. As a
+/// flex item in [`container`], `<main>` would otherwise default to `min-width:
+/// auto` (`min-content`), so a wide unbreakable child - a long code line in a
+/// `<pre>`, a fixed-size embed - would force the column past the viewport on a
+/// narrow screen instead of the child scrolling/scaling within it. A no-op on
+/// the terminal, whose charcell box model applies no `min-content` floor.
 pub fn main_content() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("main"))
 		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::MinWidth, Length::Px(0.))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)

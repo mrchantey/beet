@@ -50,18 +50,31 @@ GET each key page; assert HTTP 200 and the expected marker:
 
 Also fetch `/docs/design/counter?color-scheme=light` and `?color-scheme=dark` and confirm 200 (the scheme is applied server-side for the screenshot check below).
 
-### b. playwright interactive (navigability + the counter)
+### b. playwright interactive (navigability, the counter, client errors, mobile layout)
 
 The counter (`site/routes/docs/design/counter.bsx`) is a reactive page: a "More" button increments and a "Less" button decrements a document field rendered as "You have clicked N times." Drive it with playwright (no MCP; use the CLI/library):
 
 - module: `NODE_PATH=/home/pete/.local/lib/node_modules` then `require('playwright')`
 - browsers: `PLAYWRIGHT_BROWSERS_PATH=/home/pete/.cache/ms-playwright` (chromium cached)
 
-Script (headless chromium): goto `BASE_URL/docs/design/counter`, wait for `Counter`, read the count, click "More" twice and assert it reaches "You have clicked 2 times", click "Less" and assert "1 times". Also navigate `/` -> a docs page -> the counter via in-page links to confirm the site is actually navigable (not just direct loads). Print `counter OK` on success and exit non-zero on any failed assertion.
+A reusable script lives at `.agents/tmp/deploy-verify/verify_client.js <BASE_URL>` (built and shaken out during the Local step); it runs everything below and exits non-zero on any client error or overflow. The checks:
+
+**Client errors (fail on any).** Before navigating, attach two collectors and fail the step if either fires, so a broken client script cannot ship silently -- exactly the miss that let `crypto.randomUUID is not a function` reach the analytics beacon in production:
+
+- `page.on('pageerror', ...)` -- uncaught exceptions.
+- `page.on('console', msg => msg.type() === 'error')` -- `console.error` plus failed-request console messages.
+
+Ignore nothing by default; if a message is genuinely benign, match it exactly and log that it was skipped. CAVEAT: some faults only surface in an insecure context -- `crypto.randomUUID`/`crypto.subtle` are gated to secure contexts, and localhost + `https://` are both secure, so this check does NOT reproduce that specific bug. The durable fix is keeping secure-context-only APIs out of the client (the beacon now derives its id from `crypto.getRandomValues`, available on plain http); the collectors still catch the broad class of client JS errors on every env.
+
+**Counter + navigability.** Headless chromium: goto `BASE_URL/docs/design/counter`, wait for `Counter`, read the count, click "More" twice and assert "You have clicked 2 times", click "Less" and assert "1 times". Then navigate `/` -> a docs page -> the counter via in-page links (proves the site is navigable, not just direct loads), and load `/blog` + a post (`/blog/post-3`) so the beacon runs on a content page -- the pages the client error was reported on.
+
+**Mobile layout (no horizontal overflow).** Set a narrow viewport (`page.setViewportSize({width: 375, height: 812})`, then repeat at `320`) and for `/`, `/blog`, and `/blog/post-3` assert `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`. On failure print the offending elements (those whose `getBoundingClientRect().right` exceeds the viewport) so the culprit is obvious. Regression guard: a `<pre>` code block or a wide embed used to blow `<main>` past the viewport (`<main>` is a flex item, fixed with `min-width: 0`), and the header nav overflowed at 320px (fixed with an `@media screen` app-bar `flex-wrap`).
+
+Assert ZERO collected client errors across every navigation above. Print `client OK` on success and exit non-zero on any failed assertion or collected error.
 
 ### c. playwright screenshot (styles + color schemes)
 
-Screenshot the home page, the counter page, and `/docs/design/color_schemes`, each in default, `?color-scheme=light`, and `?color-scheme=dark`. The CLI is enough: `PLAYWRIGHT_BROWSERS_PATH=/home/pete/.cache/ms-playwright playwright screenshot --url '<BASE_URL>/docs/design/counter?color-scheme=light' .agents/tmp/<step>-counter-light.png`. Save to `.agents/tmp/`, then `Read` the PNGs and confirm they render styled (typography, buttons, layout present; light vs dark visibly differ), not an unstyled or broken page.
+Screenshot the home page, the counter page, and `/docs/design/color_schemes`, each in default, `?color-scheme=light`, and `?color-scheme=dark`. The CLI is enough (the URL is a positional arg, not `--url`): `PLAYWRIGHT_BROWSERS_PATH=/home/pete/.cache/ms-playwright node /home/pete/.local/lib/node_modules/playwright/cli.js screenshot '<BASE_URL>/docs/design/counter?color-scheme=light' .agents/tmp/<step>-counter-light.png`. Save to `.agents/tmp/`, then `Read` the PNGs and confirm they render styled (typography, buttons, layout present; light vs dark visibly differ), not an unstyled or broken page.
 
 ### d. ssh (the live terminal + multi-tenancy)
 
@@ -78,13 +91,15 @@ Use the reusable scripts in `.agents/tmp/deploy-verify/` (built and shaken out l
 
 Connection (what the driver runs per session): `ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o LogLevel=ERROR -p <port> root@<host>` on an 80x24 pty.
 
-Navigation recipe. The TUI is a charcell render of the site: a left-click on a sidebar link navigates (focus also moves with Tab/Shift+Tab and Enter activates, but clicks are deterministic). The driver feeds SGR mouse press+release at 1-indexed cells and reconstructs the final frame through a small VT emulator, then greps it. From the home frame, the working sequence to reach the counter and increment is:
+Navigation recipe. The TUI is a charcell render of the site: a left-click on a sidebar link navigates (focus also moves with Tab/Shift+Tab and Enter activates, but clicks are deterministic). The driver feeds SGR mouse press+release at 1-indexed cells and reconstructs the final frame through a small VT emulator, then greps it. At 80x24 the site is in its narrow layout: the home/content pages hide the sidebar behind a hamburger menu (the `三`/`☰` glyph at the top-left), so the sequence opens the menu, navigates, then reopens it once Design has auto-expanded:
 
-1. click "Design" in the sidebar at cell (col 6, row 5): opens the Design subtree and loads `/docs/design`.
-2. click "counter" at cell (col 6, row 9): loads `/docs/design/counter`.
-3. click the main-area "More" button at cell (col 29, row 13): increments. The sidebar occupies the left column; the page body and its buttons start after the divider at col ~23, so main-area clicks use a high column. "Less" is at (col 38, row 13). Grep the frame for `Counter` and `You have clicked N times`.
+1. click the hamburger menu at cell (col 3, row 1): opens the sidebar overlay (Docs/Design/Blog tree).
+2. click "Design" at cell (col 6, row 6): loads `/docs/design` and closes the overlay.
+3. click the hamburger again at (col 3, row 1): reopens the overlay, now with the Design subtree expanded (button/color_schemes/counter/...) because the current page is under it.
+4. click "counter" at cell (col 6, row 10): loads `/docs/design/counter`.
+5. click the "More" button at cell (col 9, row 12): increments. On the counter page the sidebar is closed, so the body is full-width and "More" sits at the left; "Less" is at (col 18, row 12). The page title renders fullwidth (`Ｃｏｕｎｔｅｒ`), so an ASCII `grep Counter` will NOT match -- grep the normal-width body line `You have clicked N times` instead (it uniquely identifies the counter page and carries the count).
 
-As an `ssh_pty.py` script (locally; `w:` is a seconds wait, `m:col,row` a click): `w:4;m:6,5;w:2;m:6,9;w:2;m:29,13;w:2` reaches the counter and clicks More once (expect "clicked 1 times"); append another `m:29,13;w:2` for "2 times".
+As an `ssh_pty.py` script (locally; `w:` is a seconds wait, `m:col,row` a click): `w:4;m:3,1;w:2;m:6,6;w:3;m:3,1;w:2;m:6,10;w:3;m:9,12;w:2` reaches the counter and clicks More once (expect "clicked 1 times"); append another `m:9,12;w:2` for "2 times". `ssh_pty.py` accepts `PTY_RULER=1` to print 1-indexed col/row guides for re-discovering cells if the layout shifts.
 
 Two-client recipe: launch two `ssh_pty.py` runs at once (both backgrounded), drive them to DIFFERENT counts (A clicks More once, B twice), `wait`, then assert A shows "clicked 1 times" and B "clicked 2 times" and both rendered `Counter`. Independent counts prove per-session state. `ssh.sh` does exactly this.
 

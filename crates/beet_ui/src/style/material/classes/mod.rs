@@ -89,6 +89,8 @@ pub fn all_rules() -> Vec<Rule> {
 		app_bar_leading(),
 		app_bar_title(),
 		app_bar_terminal(),
+		// the `@media screen` narrow-screen app-bar wrap, ignored by charcell
+		app_bar_web(),
 		footer(),
 		footer_side(),
 		container(),
