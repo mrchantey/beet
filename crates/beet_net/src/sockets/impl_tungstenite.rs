@@ -296,7 +296,19 @@ async fn handle_connection(
 		SecureProtocol::Tls => {
 			#[cfg(feature = "secure")]
 			if let Some(server_tls) = tls.get() {
-				let tls_stream = server_tls.accept(replay).await?;
+				// a failed handshake here is a client rejecting our cert: a
+				// browser that has not accepted the dev cert for this port, or an
+				// embedded body whose pinned cert went stale. Surface it loudly
+				// (the accept loop otherwise only logs at debug), since a silent
+				// drop reads as "nothing ever connected".
+				let tls_stream = server_tls.accept(replay).await.map_err(|err| {
+					warn!(
+						"TLS handshake from {peer_addr} failed ({err}); a browser \
+						 must accept the dev cert for this port, an embedded body \
+						 must be reflashed if the cert was regenerated"
+					);
+					err
+				})?;
 				return serve_socket(server, tls_stream, true).await;
 			}
 			debug!("TLS ClientHello on a plaintext socket listener, dropping");

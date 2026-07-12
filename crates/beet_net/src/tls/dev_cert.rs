@@ -11,8 +11,10 @@ use std::sync::Arc;
 /// The self-signed dev certificate: generated with `rcgen` on first use and
 /// cached as PEM, so browser exceptions survive restarts (Firefox pins an
 /// exception to the certificate itself, a fresh cert per run would re-prompt
-/// every boot). Regenerated when the subject-alt-names change, eg the machine
-/// moved networks.
+/// every boot). Re-issued when the subject-alt-names change (eg the machine
+/// moved networks), but the private key is reused across re-issues, so a client
+/// that pins the public key (the esp body) keeps trusting the server after a
+/// move instead of needing a reflash.
 ///
 /// The cert is deliberately untrusted: browsers show a one-time warning to
 /// click through per origin. It grants a secure context, not transport
@@ -91,18 +93,29 @@ impl DevCert {
 			return Ok(pair);
 		}
 
-		let generated = rcgen::generate_simple_self_signed(sans.clone())?;
-		fs_ext::write(&cert_path, generated.cert.pem())?;
-		fs_ext::write(&key_path, generated.signing_key.serialize_pem())?;
+		// reuse the cached private key when it parses, so the public key stays
+		// stable across a re-issue (an esp body pins it); only the certificate,
+		// with its new names, changes. A missing or unparsable key starts fresh.
+		let signing_key = match fs_ext::read_to_string(&key_path)
+			.ok()
+			.and_then(|pem| rcgen::KeyPair::from_pem(&pem).ok())
+		{
+			Some(existing) => existing,
+			None => rcgen::KeyPair::generate()?,
+		};
+		let cert =
+			rcgen::CertificateParams::new(sans.clone())?.self_signed(&signing_key)?;
+		fs_ext::write(&cert_path, cert.pem())?;
+		fs_ext::write(&key_path, signing_key.serialize_pem())?;
 		fs_ext::write(Self::sans_path(dir), &sans_file)?;
 		info!(
-			"generated self-signed dev certificate for [{}] in {}",
+			"issued self-signed dev certificate for [{}] in {}",
 			sans.join(", "),
 			dir.display()
 		);
 		(
-			vec![CertificateDer::from(generated.cert.der().to_vec())],
-			PrivateKeyDer::Pkcs8(generated.signing_key.serialize_der().into()),
+			vec![CertificateDer::from(cert.der().to_vec())],
+			PrivateKeyDer::Pkcs8(signing_key.serialize_der().into()),
 		)
 			.xok()
 	}
@@ -163,5 +176,25 @@ mod tests {
 		fs_ext::read(dir.join("cert.pem"))
 			.unwrap()
 			.xpect_not_eq(cert_pem);
+	}
+
+	#[beet_core::test]
+	fn key_survives_san_change() {
+		let dir = fs_ext::workspace_root().join("target/tls-test-key");
+		fs_ext::remove(&dir).ok();
+
+		DevCert::load_or_generate_in(&dir).unwrap();
+		let key = fs_ext::read_to_string(dir.join("key.pem")).unwrap();
+		let cert = fs_ext::read_to_string(dir.join("cert.pem")).unwrap();
+
+		// a SAN change re-issues the cert but keeps the key, so a client pinning
+		// the public key still trusts the server (no reflash needed).
+		fs_ext::write(dir.join("sans.txt"), "stale.example").unwrap();
+		DevCert::load_or_generate_in(&dir).unwrap();
+
+		fs_ext::read_to_string(dir.join("key.pem")).unwrap().xpect_eq(key);
+		fs_ext::read_to_string(dir.join("cert.pem"))
+			.unwrap()
+			.xpect_not_eq(cert);
 	}
 }
