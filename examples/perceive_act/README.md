@@ -81,3 +81,5 @@ beet monitor
 ```
 
 Set the `url` in `perceive-act-body.bsx` to this host's socket server (`ws://<host>:8338`). The body drives the commanded velocity for the commanded duration and holds each `drive` reply until the step finishes, so the next photo waits for the robot to stop; cap how long any one response may drive with `max_drive_duration` on the agent's `RespondMultiModal`. Its transport reconnects with exponential backoff, so the pushed scene survives agent restarts.
+
+The plain `ws` body carries no certificate, so a regenerated host dev cert never affects it; for an encrypted LAN link load `perceive-act-body-wss.bsx` instead (a `secure` firmware pins beet's dev public key, so a host address change still connects without a reflash).
