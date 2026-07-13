@@ -40,17 +40,17 @@ neither (a local compile).
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareWorkerBlock name="beet-hello-worker" bucket="beet-hello-site"/>
 		<CloudflareWorkerDeployAction/>
-		<CloudflareR2Sync local_dir="site" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-worker" timeout="10s"/>
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
-		<CloudflareR2Sync local_dir="site" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 	</Route>
 	<!-- time a sync against a full rebuild + redeploy; add `url="https://
 	     beet-hello-worker.<subdomain>.workers.dev"` to also time the live fetch -->
 	<Route path="bench" {ExchangeSequence}>
-		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="site"/>
+		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
 		<!-- empties the whole bucket before deleting it -->
