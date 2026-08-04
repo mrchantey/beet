@@ -76,9 +76,11 @@ static CURRENT_PORT: RwLock<Option<u16>> = RwLock::new(None);
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// let host = world.spawn(exchange_handler(|req| req.mirror())).id();
-/// world.spawn((HttpServer::default(), ChildOf(host)))
-///     .trigger(StartRunning::from_cli);
+/// world.spawn((
+///     HttpServer::default(),
+///     children![exchange_handler(|req| req.mirror())],
+/// ))
+/// .trigger(StartRunning::from_cli);
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]

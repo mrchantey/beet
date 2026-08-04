@@ -1,7 +1,9 @@
 //! SSH TUI demo — an ANSI interactive counter over SSH.
 //!
-//! Demonstrates an interactive terminal UI served to SSH clients using the
-//! beet [`BufferedTerminal`] component for input parsing and output buffering.
+//! Demonstrates an interactive terminal UI served to SSH clients: a
+//! [`ChannelTerminal`] per connection buffers its output, and
+//! [`terminal_input_bridge`] parses its input bytes into bevy [`KeyboardInput`],
+//! which the app reads like any other input source.
 //!
 //! - Press `+` or `=` to increment the counter
 //! - Press `-` to decrement
@@ -20,20 +22,32 @@
 use beet::net::prelude::*;
 use beet::prelude::*;
 use bevy::color::Color;
+use bevy::input::ButtonState;
+use bevy::input::keyboard::KeyCode;
+use bevy::input::keyboard::KeyboardInput;
 
 fn main() -> Result {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
+			// registers the input message types `terminal_input_bridge` writes;
+			// headless, which is exactly what a terminal needs.
+			bevy::input::InputPlugin,
 			SshServerPlugin::default(),
 			CharcellPlugin,
 		))
 		.spawn(SshServer::default())
-		.add_systems(Update, render_frame)
+		// each connection's terminal bytes become bevy input, before InputPlugin
+		// folds this frame's messages into `ButtonInput`.
+		.add_systems(
+			PreUpdate,
+			terminal_input_bridge.before(bevy::input::InputSystems),
+		)
+		// a keypress lands before the frame it paints, so input is never a frame late
+		.add_systems(Update, (on_input, render_frame).chain())
 		.add_systems(PostUpdate, ssh_write.after(CharcellRenderSet))
 		.add_observer(ssh_read)
-		.add_observer(on_input)
 		.run();
 	Ok(())
 }
@@ -77,39 +91,76 @@ fn render(count: i32, mut writer: impl std::io::Write) -> Result {
 	Ok(())
 }
 
+/// One connection's key presses for this frame, folded before they are applied
+/// so a single pass over the message stream serves every surface.
+///
+/// `ctrl`/`key_c` are tracked apart from the typed characters because a modifier
+/// arrives as its own press/release around the key it modifies: ctrl+c is
+/// "both seen this frame, on the same window", and carries no typed text.
+#[derive(Default)]
+struct FrameKeys {
+	delta: i32,
+	reset: bool,
+	ctrl: bool,
+	key_c: bool,
+	quit: bool,
+}
+
+/// Applies each connection's key presses to its own counter, closing the session
+/// on `q` or ctrl+c.
+///
+/// [`terminal_input_bridge`] tags every [`KeyboardInput`] with the surface entity
+/// that produced it as its `window`, so grouping by window keeps one client's
+/// keystrokes off another's counter.
 fn on_input(
-	ev: On<TerminalEvent>,
+	mut keys: MessageReader<KeyboardInput>,
 	mut commands: Commands,
 	mut query: Query<(&mut Counter, &mut Terminal, &mut ChannelTerminal)>,
 ) -> Result {
-	use TerminalEvent::*;
-	let Ok((mut counter, mut terminal, mut channel_terminal)) =
-		query.get_mut(ev.target())
-	else {
-		return Ok(());
-	};
-	match ev.event() {
-		Key(key) if matches!(key.char, Some('+' | '=')) => counter.0 += 1,
-		Key(key) if key.char == Some('-') => counter.0 -= 1,
-		Key(key) if key.char == Some('r') => counter.0 = 0,
-		Key(key) if key.char == Some('q') || key == &KeyPress::CTRL_C => {
-			// Flush terminal state before closing.
-			terminal.restore_config()?;
-			terminal.flush()?;
-			let output = channel_terminal.drain_write();
-			if !output.is_empty() {
-				commands
-					.entity(ev.target())
-					.trigger_target(SshSend(SshEvent::bytes(output)));
-			}
-			// Send Close to initiate graceful shutdown; despawn happens
-			// in ssh_read when the resulting SshRecv(Close) arrives.
-			commands
-				.entity(ev.target())
-				.trigger_target(SshSend(SshEvent::Close(None)));
+	let mut per_window = HashMap::<Entity, FrameKeys>::default();
+	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		let frame = per_window.entry(key.window).or_default();
+		match key.key_code {
+			KeyCode::ControlLeft | KeyCode::ControlRight => frame.ctrl = true,
+			KeyCode::KeyC => frame.key_c = true,
+			_ => {}
 		}
+		match key.text.as_deref() {
+			Some("+" | "=") => frame.delta += 1,
+			Some("-") => frame.delta -= 1,
+			Some("r") => frame.reset = true,
+			Some("q") => frame.quit = true,
+			_ => {}
+		}
+	}
 
-		_ => {}
+	for (window, frame) in per_window {
+		let Ok((mut counter, mut terminal, mut channel_terminal)) =
+			query.get_mut(window)
+		else {
+			continue;
+		};
+		if frame.reset {
+			counter.0 = 0;
+		}
+		counter.0 += frame.delta;
+		if !(frame.quit || (frame.ctrl && frame.key_c)) {
+			continue;
+		}
+		// Flush terminal state before closing.
+		terminal.restore_config()?;
+		terminal.flush()?;
+		let output = channel_terminal.drain_write();
+		if !output.is_empty() {
+			commands
+				.entity(window)
+				.trigger_target(SshSend(SshEvent::bytes(output)));
+		}
+		// Send Close to initiate graceful shutdown; despawn happens
+		// in ssh_read when the resulting SshRecv(Close) arrives.
+		commands
+			.entity(window)
+			.trigger_target(SshSend(SshEvent::Close(None)));
 	}
 	Ok(())
 }

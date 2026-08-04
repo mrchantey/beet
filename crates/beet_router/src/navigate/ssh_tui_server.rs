@@ -313,7 +313,7 @@ mod test {
 
 	/// The live-navigation stack plus the SSH-TUI per-connection plugin, minus the
 	/// real socket: connections are simulated by triggering [`SshRecv`] on a child
-	/// of an [`SshTuiServer`] router, exactly as the russh task would.
+	/// of an [`SshTuiServer`], exactly as the russh accept loop would.
 	fn ssh_tui_app() -> App {
 		let mut app = App::new();
 		app.add_plugins((
@@ -327,46 +327,43 @@ mod test {
 		app
 	}
 
-	/// A router serving two routes, with an [`SshTuiServer`] child + its opening
-	/// home. Returns the server entity, the parent of simulated connections.
+	/// An [`SshTuiServer`] root with its opening home, the router serving two
+	/// routes as its dispatch child. Returns the server entity, the parent of
+	/// simulated connections.
 	fn spawn_server(app: &mut App) -> Entity {
-		let router = app
-			.world_mut()
-			.spawn((Router, children![
-				render_action::fixed_func_route("alpha", || {
-					rsx! { <p>"Alpha page"</p> }
-				}),
-				render_action::fixed_func_route("beta", || {
-					rsx! { <p>"Beta page"</p> }
-				}),
-			]))
-			.id();
 		app.world_mut()
 			.spawn((
 				SshTuiServer,
 				OpeningRoute(Url::parse("alpha")),
-				ChildOf(router),
+				children![(Router, children![
+					render_action::fixed_func_route("alpha", || {
+						rsx! { <p>"Alpha page"</p> }
+					}),
+					render_action::fixed_func_route("beta", || {
+						rsx! { <p>"Beta page"</p> }
+					}),
+				])],
 			))
 			.flush()
 	}
 
-	/// Spawn a simulated SSH connection (a child of `router` with [`SshPeerInfo`])
+	/// Spawn a simulated SSH connection (a child of `server` with [`SshPeerInfo`])
 	/// and request a pty of `size` on a plain `xterm`, as the russh accept loop would.
-	fn open_connection(app: &mut App, router: Entity, size: UVec2) -> Entity {
-		open_connection_with(app, router, size, "xterm")
+	fn open_connection(app: &mut App, server: Entity, size: UVec2) -> Entity {
+		open_connection_with(app, server, size, "xterm")
 	}
 
 	/// [`open_connection`] with a chosen pty terminal name, so a test can drive the
 	/// per-session client-capability detection (eg graphics support).
 	fn open_connection_with(
 		app: &mut App,
-		router: Entity,
+		server: Entity,
 		size: UVec2,
 		terminal: &str,
 	) -> Entity {
 		let connection = app
 			.world_mut()
-			.spawn((SshPeerInfo::default(), ChildOf(router)))
+			.spawn((SshPeerInfo::default(), ChildOf(server)))
 			.id();
 		app.world_mut()
 			.entity_mut(connection)
@@ -498,19 +495,17 @@ mod test {
 			)
 			.unwrap();
 		app.world_mut().insert_resource(registry);
-		let router = app
-			.world_mut()
-			.spawn((store, Router, BsxLayout::default(), children![route(
-				"",
-				BlobScene::new("index.html")
-			)]))
-			.id();
 		let server = app
 			.world_mut()
 			.spawn((
 				SshTuiServer,
 				OpeningRoute(Url::parse("")),
-				ChildOf(router),
+				children![(
+					store,
+					Router,
+					BsxLayout::default(),
+					children![route("", BlobScene::new("index.html"))]
+				)],
 			))
 			.flush();
 		let first = open_connection(&mut app, server, UVec2::new(40, 8));
@@ -638,22 +633,20 @@ mod test {
 		}
 	}
 
-	/// A router carrying the drawer layout, serving one home route, with an
-	/// SSH-TUI server child opening on it. Returns the server entity.
+	/// An SSH-TUI server root opening on `home`, its router child carrying the
+	/// drawer layout and serving that one route. Returns the server entity.
 	fn spawn_drawer_router(app: &mut App) -> Entity {
-		let router = app
-			.world_mut()
-			.spawn((Router, BaseLayout::<DrawerLayout>::default(), children![
-				render_action::fixed_func_route("home", || {
-					rsx! { <p>"Home page"</p> }
-				})
-			]))
-			.id();
 		app.world_mut()
 			.spawn((
 				SshTuiServer,
 				OpeningRoute(Url::parse("home")),
-				ChildOf(router),
+				children![(
+					Router,
+					BaseLayout::<DrawerLayout>::default(),
+					children![render_action::fixed_func_route("home", || {
+						rsx! { <p>"Home page"</p> }
+					})]
+				)],
 			))
 			.flush()
 	}
@@ -825,19 +818,17 @@ mod test {
 			)
 			.unwrap();
 		app.world_mut().insert_resource(registry);
-		let router = app
-			.world_mut()
-			.spawn((store, Router, BsxLayout::default(), children![route(
-				"counter",
-				BlobScene::new("counter.bsx")
-			)]))
-			.id();
 		let server = app
 			.world_mut()
 			.spawn((
 				SshTuiServer,
 				OpeningRoute(Url::parse("counter")),
-				ChildOf(router),
+				children![(
+					store,
+					Router,
+					BsxLayout::default(),
+					children![route("counter", BlobScene::new("counter.bsx"))]
+				)],
 			))
 			.flush();
 		let session_a = open_connection(&mut app, server, UVec2::new(40, 8));

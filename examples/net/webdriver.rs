@@ -12,6 +12,9 @@
 
 use beet::net::prelude::webdriver::*;
 use beet::prelude::*;
+// both preludes carry a `Provider` (the model streamer's is the other), so name
+// the webdriver one explicitly: an explicit import beats a glob.
+use beet::net::prelude::webdriver::Provider;
 
 fn main() {
 	App::new()

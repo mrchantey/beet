@@ -7,8 +7,8 @@
 //!
 //! Hardware-agnostic and no_std-friendly, so the same server runs on a host or
 //! on bare-metal firmware. Add [`SceneServerPlugin`] to register the reflectable
-//! types a scene can carry; spawn the meta-routes under an [`HttpServer`] (or any
-//! [`Router`]) to expose them.
+//! types a scene can carry; spawn the meta-routes under a [`Router`] (itself the
+//! dispatch child of whichever server exposes it) to expose them.
 
 use crate::prelude::*;
 use beet_action::prelude::*;

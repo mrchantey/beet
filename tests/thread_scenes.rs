@@ -47,7 +47,13 @@ async fn reduce(source: &str) -> App {
 		// registers `{UserInput}` + the store-backed `CreatePostForm` template so
 		// the interactive chat scenes resolve
 		.init_plugin::<ThreadUiPlugin>()
+		// resolves each scene's `<CrateCheck features="thread"/>` tag
+		.init_plugin::<CrateCheckPlugin>()
 		.register_type::<AgentChoiceAction>();
+	// this target stands in for the binary the scenes check against, and is itself
+	// gated on `thread`, so the declared requirement holds.
+	app.world_mut()
+		.spawn(crate_registration!({ features: ["thread"] }).with_skip_prefix());
 	AsyncRunner::settle_async_tasks(app.world_mut()).await;
 	BsxTemplate::parse_entry(app.world(), source)
 		.unwrap()
