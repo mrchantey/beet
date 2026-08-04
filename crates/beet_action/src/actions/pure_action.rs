@@ -24,7 +24,7 @@ where
 		RawOut: IntoResult<Out>,
 	{
 		Action::new(
-			TypeMeta::of::<Func>(),
+			ActionMeta::of::<Func, In, Out>(),
 			move |ActionCall {
 			          commands,
 			          caller,

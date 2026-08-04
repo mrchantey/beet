@@ -82,7 +82,9 @@ fn strip_leading_doc(source: &str) -> String {
 		return source.to_string();
 	};
 	match rest.find("-->") {
-		Some(end) => rest[end + 3..].trim_start_matches(['\r', '\n']).to_string(),
+		Some(end) => {
+			rest[end + 3..].trim_start_matches(['\r', '\n']).to_string()
+		}
 		None => source.to_string(),
 	}
 }

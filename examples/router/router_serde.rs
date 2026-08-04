@@ -6,10 +6,10 @@
 //! on subsequent runs. Pass `--new` to overwrite the file with a
 //! fresh copy.
 //!
-//! Every runtime component — [`CliServer`], the [`router`] bundle, the
-//! middleware and the [`ExchangeOverloadScript`] markers — is `Reflect`, so the
-//! components round-trip with no post-load patching; `BootOnLoad` is then added to
-//! the loaded root and a `LoadTemplate` fired to boot it.
+//! Every runtime component — the [`CliServer`] child, the [`router`] bundle, the
+//! middleware and the [`RouteScript`] markers — is `Reflect`, so the
+//! components round-trip with no post-load patching; the loaded root's servers
+//! are then booted explicitly via [`CallOnLoad::call_descendants`].
 //!
 //! ## Running the Example
 //!
@@ -42,8 +42,7 @@ fn main() -> AppExit {
 		// registering, BeetPlugins' RouterPlugin / ActionPlugin
 		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<ExchangeOverloadScript<QueryParams<GreetRequest>, String, _, _>>(
-		)
+		.register_type::<RouteScript<QueryParams<GreetRequest>, String, _, _>>()
 		.add_systems(Startup, setup)
 		.run()
 }
@@ -64,40 +63,44 @@ fn setup(async_commands: AsyncCommands) {
 		if new_world {
 			blob.remove().await.ok();
 		}
-		// the bundle stays serializable (`CliServer` + router, both reflect
-		// components); the boot runs on the loaded root, not via a spawn hook, so
-		// fire `StartRunning::boot` on each root once the scene lands.
+		// the bundle stays serializable (`CliServer` root + router child, both
+		// reflect components); the boot runs on the loaded root, not via a spawn
+		// hook, so boot each root's servers once the scene lands.
 		let roots =
 			TemplateStore::load_or_create(world.clone(), blob, async |_| {
 				route_bundle().xok()
 			})
 			.await?;
 		for root in roots {
-			world.entity(root).trigger(StartRunning::boot).await?;
+			CallOnLoad::call_descendants(world.entity(root), || {
+				Request::from_cli_args(CliArgs::parse_env())
+			})
+			.await?;
 		}
 		Ok(())
 	});
 }
 
 fn route_bundle() -> impl Bundle {
-	(
-		CliServer::default(),
-		(default_router(), children![
+	(CliServer::default(), children![(
+		default_router(),
+		children![
 			(
 				Script::<(), String>::rhai(r#""hello world""#),
-				ExchangeOverloadScript::<(), String>::default(),
+				RouteScript::<(), String>::default(),
 				PathPartial::new(""),
 			),
 			(
 				Script::<(), String>::rhai(r#""hello foo""#),
-				ExchangeOverloadScript::<(), String>::default(),
+				RouteScript::<(), String>::default(),
 				PathPartial::new("foo"),
 			),
 			(
 				Script::<QueryParams<GreetRequest>, String>::rhai(
 					r#""hello " + input.name"#,
 				),
-				ExchangeOverloadScript::<QueryParams<GreetRequest>, String, _, _>::default(),
+				RouteScript::<QueryParams<GreetRequest>, String, _, _>::default(
+				),
 				PathPartial::new("greet"),
 			),
 			// same idea, but the script receives the full [`RequestParts`]
@@ -106,9 +109,9 @@ fn route_bundle() -> impl Bundle {
 				Script::<RequestParts, String>::rhai(
 					r#""hello " + input.url.params.name[0]"#,
 				),
-				ExchangeOverloadScript::<RequestParts, String, _, _>::default(),
+				RouteScript::<RequestParts, String, _, _>::default(),
 				PathPartial::new("greet-request"),
 			),
-		]),
-	)
+		],
+	)])
 }

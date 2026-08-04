@@ -8,9 +8,10 @@ The wasm test runner depends on it: `.cargo/config.toml` sets
 `<RunWasm/>` route. The rest are convenience: serve, build, check, static export,
 pdf, s3 sync.
 
-It is a one-shot `<CliServer always=true>`: the binary injects the boot (no markup
-boot verb), the positional route arg selects the command, and the command resolves
-and the process exits. `always=true` makes this dispatcher run on every boot
+It is a one-shot `<CliServer{always:true}>` root with the `Router` as its child: the
+binary injects nothing, the server's `CallOnLoad` fires the process request on load,
+it hops down to the router, the positional route arg selects the command, and the
+command resolves and the process exits. `always=true` makes this dispatcher run on every boot
 regardless of `--server`, since `--server` selects the *served site's* servers, not
 this entry's. The one exception to exiting is `<Serve/>`, which loads a site and
 boots *its* servers through a direct boot call on the loaded root, parking so the
@@ -50,7 +51,8 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 `CLOUDFLARE_API_TOKEN` in `.env` (see `.env.example` for the token permissions),
 plus `tofu`, `cargo-zigbuild` and a container engine.
 -->
-<Router {(CliServer{always:true}, BootOnLoad)}>
+<StartOnLoad {CliServer{always:true}}>
+<Router>
 	<Serve/>
 	<RunWasm/>
 	<BuildWasm/>
@@ -84,3 +86,4 @@ plus `tofu`, `cargo-zigbuild` and a container engine.
 		</Route>
 	</BeetSiteDeployHost>
 </Router>
+</StartOnLoad>

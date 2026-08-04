@@ -28,7 +28,7 @@ where
 		RawOut: 'static + Send + Sync + IntoResult<Out>,
 	{
 		Action::new(
-			TypeMeta::of::<Func>(),
+			ActionMeta::of::<Func, In, Out>(),
 			move |ActionCall {
 			          mut commands,
 			          caller,

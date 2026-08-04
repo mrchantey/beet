@@ -122,17 +122,15 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	}
 
 	// boot the site's declared http server on an ephemeral port so the headless
-	// browser fetches real, asset-resolved pages. the boot parks on the host's
+	// browser fetches real, asset-resolved pages. the boot parks on the server's
 	// `Running` keep-alive, so launch it fire-and-forget (driven by the app loop)
 	// and wait for the bound port.
 	cx.world()
 		.run_async_local(move |world| async move {
-			world
-				.entity(root)
-				.call::<Boot, Response>(Boot::from(Request::from_cli_str(
-					"--server=http --port=0",
-				)))
-				.await?;
+			CallOnLoad::call_descendants(world.entity(root), || {
+				Request::from_cli_str("--server=http --port=0")
+			})
+			.await?;
 			Ok(())
 		})
 		.await;
@@ -148,10 +146,23 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	let base = format!("http://127.0.0.1:{port}");
 	let pages = export_pages(&paths, &base, &query, viewport, &options).await?;
 
-	// stop the server: the teardown observer drops its listener.
+	// stop the servers: removing a parked `Running` fires its teardown observer,
+	// which drops the listener. Servers are child entities under the root.
 	cx.world()
 		.with(move |world: &mut World| {
-			world.entity_mut(root).remove::<Running<Response>>();
+			let running =
+				world
+					.with_state::<(Query<(), With<Running<Response>>>, Query<&Children>), _>(
+						|(running, children)| {
+							children
+								.iter_descendants_inclusive(root)
+								.filter(|entity| running.contains(*entity))
+								.collect::<Vec<_>>()
+						},
+					);
+			for entity in running {
+				world.entity_mut(entity).remove::<Running<Response>>();
+			}
 		})
 		.await;
 

@@ -1,4 +1,4 @@
-//! The [`Script`] route surfaces: the typed [`ExchangeOverloadScript`] marker (a
+//! The [`Script`] route surfaces: the typed [`RouteScript`] marker (a
 //! route served from a sibling `Script`'s typed output) and the
 //! [`ExchangeScriptElement`] entry action (a `<script>` body run for its console
 //! output).
@@ -29,28 +29,28 @@ use std::marker::PhantomData;
 /// stderr).
 ///
 /// The "`node main.js`" entry: occupy an entry's `Action<Request, Response>` slot
-/// with it and [`ExchangeOnLoad`](beet_net::prelude::ExchangeOnLoad) calls that
+/// with it and [`CallOnLoad`](beet_net::prelude::CallOnLoad) calls that
 /// slot once the entry loads, streaming the captured output. (A script element
-/// installs no `Action<Boot, Response>`, so its load verb is `ExchangeOnLoad`, not
-/// the server-side `BootOnLoad`.) The script source is the marked element's
+/// installs a plain `Action<Request, Response>`, which the load verb calls
+/// directly.) The script source is the marked element's
 /// raw-text body, with the [`Request`] shaped into its `input`:
 ///
 /// ```bsx
-/// <script {(ExchangeScriptElement, ExchangeOnLoad)}>console.log("hello world")</script>
+/// <script {(ExchangeScriptElement, CallOnLoad)}>console.log("hello world")</script>
 /// ```
 ///
 /// The backend is the element's `language` attribute ([`ScriptLanguage::from_str`]),
 /// falling back to the build default ([`ScriptLanguage::default`]) when absent:
 ///
 /// ```bsx
-/// <script language="rhai" {(ExchangeScriptElement, ExchangeOnLoad)}>print("hello world")</script>
+/// <script language="rhai" {(ExchangeScriptElement, CallOnLoad)}>print("hello world")</script>
 /// ```
 ///
 /// Being async, it awaits the full request body and includes it in the `input` (so
 /// a `POST` body reaches the script at `input.body`). The console-capture machinery
 /// is [`Script::run_captured`]; this action only reads the element text/attributes
 /// and shapes the request into the script `input`. The sibling of the typed
-/// [`ExchangeOverloadScript`] route (which serves a `Script`'s typed output instead
+/// [`RouteScript`] route (which serves a `Script`'s typed output instead
 /// of its console).
 #[action(handler_only)]
 #[derive(Default, Component, Reflect)]
@@ -118,22 +118,22 @@ async fn request_input(request: Request) -> Result<Value> {
 }
 
 /// Reflect-able marker that installs the typed [`ScriptAction`] and the
-/// [`ExchangeOverload`] adapter for a [`Script<Input, Output>`] route.
+/// [`RouteOverload`] adapting it to request/response dispatch.
 ///
 /// Serves the script's typed [`Output`](Script) (eg a `String` the script
 /// returns), not its console output (that is [`ExchangeScriptElement`]). `M1`/`M2`
 /// are [`FromRequest`]/[`IntoResponseAsync`] markers. The defaults handle the serde
 /// blanket case; for custom extractors (eg [`QueryParams`], [`RequestParts`])
-/// instantiate as `ExchangeOverloadScript::<Input, Output, _, _>` and let inference
+/// instantiate as `RouteScript::<Input, Output, _, _>` and let inference
 /// pick them.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[reflect(where)]
 #[require(
 	ScriptAction<Input, Output>,
-	ExchangeOverload = ExchangeOverload::new::<Input, Output, M1, M2>(),
+	RouteOverload = route_overload::<Input, Output, M1, M2>(),
 )]
-pub struct ExchangeOverloadScript<
+pub struct RouteScript<
 	Input = (),
 	Output = (),
 	M1 = SerdeFromRequestMarker,
@@ -148,8 +148,7 @@ pub struct ExchangeOverloadScript<
 	_marker: PhantomData<fn() -> (Input, Output, M1, M2)>,
 }
 
-impl<Input, Output, M1, M2> Default
-	for ExchangeOverloadScript<Input, Output, M1, M2>
+impl<Input, Output, M1, M2> Default for RouteScript<Input, Output, M1, M2>
 where
 	Input: 'static + Send + Sync + Serialize + FromRequest<M1>,
 	Output: 'static + Send + Sync + DeserializeOwned + IntoResponseAsync<M2>,
@@ -163,8 +162,7 @@ where
 	}
 }
 
-impl<Input, Output, M1, M2> Clone
-	for ExchangeOverloadScript<Input, Output, M1, M2>
+impl<Input, Output, M1, M2> Clone for RouteScript<Input, Output, M1, M2>
 where
 	Input: 'static + Send + Sync + Serialize + FromRequest<M1>,
 	Output: 'static + Send + Sync + DeserializeOwned + IntoResponseAsync<M2>,
@@ -175,7 +173,7 @@ where
 }
 
 impl<Input, Output, M1, M2> std::fmt::Debug
-	for ExchangeOverloadScript<Input, Output, M1, M2>
+	for RouteScript<Input, Output, M1, M2>
 where
 	Input: 'static + Send + Sync + Serialize + FromRequest<M1>,
 	Output: 'static + Send + Sync + DeserializeOwned + IntoResponseAsync<M2>,
@@ -183,14 +181,14 @@ where
 	M2: 'static + Send + Sync,
 {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("ExchangeOverloadScript").finish()
+		f.debug_struct("RouteScript").finish()
 	}
 }
 
 /// A markup-friendly scripted route: a `path` plus a `script` over the request
 /// parts, serving the script's string output as the response.
 ///
-/// The non-generic front-end for a `(PathPartial, Script, ExchangeOverloadScript)`
+/// The non-generic front-end for a `(PathPartial, Script, RouteScript)`
 /// route, so a no-code entry declares one without spelling the generic types:
 ///
 /// ```bsx
@@ -215,12 +213,12 @@ pub fn ScriptRoute(
 	(
 		PathPartial::new(path),
 		Script::<RequestParts, String>::new(language, script),
-		ExchangeOverloadScript::<RequestParts, String, _, _>::default(),
+		RouteScript::<RequestParts, String, _, _>::default(),
 	)
 }
 
-/// A `ExchangeOverloadScript` route installs the typed `ScriptAction` (hence an
-/// `ActionMeta`) and the `ExchangeOverload` adapter, so the script's output is served
+/// A `RouteScript` route installs the typed `ScriptAction` (hence an
+/// `ActionMeta`) and the `RouteOverload` adapter, so the script's output is served
 /// as the route response. Regression: requiring only `Script` left the route without
 /// an `ActionMeta`, so it never joined the `RouteTree`.
 #[cfg(test)]
@@ -232,12 +230,12 @@ mod route_test {
 	use beet_net::prelude::*;
 
 	#[beet_core::test]
-	async fn exchange_script_route_dispatches() {
+	async fn route_script_route_dispatches() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((default_router(), children![(
 				Script::<(), String>::rhai(r#""hello world""#),
-				ExchangeOverloadScript::<(), String>::default(),
+				RouteScript::<(), String>::default(),
 				PathPartial::new("greet"),
 			)]))
 			.exchange(Request::get("greet"))

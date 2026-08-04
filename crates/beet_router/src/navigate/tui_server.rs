@@ -6,11 +6,11 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// A live-TUI server: spread alongside a router, the boot fan-out whose
+/// A live-TUI server: a child of its router, the boot fan-out whose
 /// `--server` selects `"tui"` boots the navigable terminal app. The interactive
 /// sibling of the one-shot [`CliServer`].
 ///
-/// A long-running server: it never resolves the boot call, so the host's
+/// A long-running server: it never resolves the boot call, so its
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up. The
 /// boot wires the live host: a [`StdioTerminal`] paired with a [`page_host`]
 /// buffer, plus an in-world [`Navigator`] pointed at this router, started at the
@@ -25,8 +25,8 @@ use beet_ui::prelude::*;
 /// this on its router entity, then booting it.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(ContinueRun<Boot, Response>)]
-#[component(on_add = on_add)]
+#[require(StartOnLoad)]
+#[component(on_add = on_add_ext::observe((on_action_in, on_running_removed)))]
 pub struct TuiServer;
 
 /// The live host entity (terminal + navigator) the boot spawned, despawned on
@@ -34,27 +34,22 @@ pub struct TuiServer;
 #[derive(Component)]
 struct TuiHost(Entity);
 
-/// Registers the boot ([`StartRunning<Boot>`]) and teardown
-/// (`On<Remove, Running<Response>>`) observers on the router.
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe_any(on_action_in)
-		.observe_any(on_running_removed);
-}
-
 /// Boots the live terminal app on the boot fan-out, if `--server` selects `"tui"`.
 /// Records the opening route on the router (the shared mechanism the SSH server
 /// also reads) and never resolves the boot call, so its `Running` parks the
 /// process up.
-fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
-	let (selected, opening, scheme) = ev.with(|boot| {
+fn on_action_in(
+	ev: On<StartRunning<Request>>,
+	mut commands: Commands,
+) -> Result {
+	let (selected, opening, scheme) = ev.with(|request| {
 		(
 			// default-boots (the shared default) unless `--server` names a different set.
-			request_selects_server(boot, "tui", true),
-			OpeningRoute::from_request(boot),
-			boot.get_param("color-scheme").and_then(ColorScheme::parse),
+			request_selects_server(request, "tui", true),
+			OpeningRoute::from_request(request),
+			request
+				.get_param("color-scheme")
+				.and_then(ColorScheme::parse),
 		)
 	})?;
 	if !selected {
@@ -62,7 +57,8 @@ fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 	}
 	commands
 		.entity(ev.entity)
-		.insert(opening)
+		// `ServerBooted` flags the boot as served, so `assert_server_booted` lets it park
+		.insert((ServerBooted, opening))
 		.queue_async_local(move |entity| start_tui(entity, scheme));
 	Ok(())
 }
@@ -85,8 +81,10 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 	if !entity.is_alive().await {
 		return Ok(());
 	}
+	// navigation targets the server entity; route lookups resolve the ancestor
+	// `RouteTree`, so a server child browses its router's routes.
 	let router = entity.id();
-	// the opening route is recorded on the router (the shared mechanism); read it
+	// the opening route is recorded on the server (the shared mechanism); read it
 	// back here. The server is route-agnostic; a downstream plugin (eg
 	// `CardStackPlugin`) may patch a more specific opening route after boot.
 	let home = entity.get(|route: &OpeningRoute| route.0.clone()).await?;

@@ -68,7 +68,8 @@ mod test {
 	#[beet_core::test]
 	fn bespoke_action_is_valid_sequence_child() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.init_plugin::<ThreadPlugin>();
 		app.register_type::<Tick>();
 		app.register_type::<ProbeTool>();
 		let source = r#"
@@ -140,7 +141,7 @@ mod test {
 
 	/// A routed `#[action]` referenced by tag in a runtime `.bsx` equips the same
 	/// tool an `rsx!` `children![Tool]` would: reflect-inserting the component
-	/// fires its `#[require]` chain (`Action`/`ExchangeOverload`/`PathPartial`) and
+	/// fires its `#[require]` chain (`Action`/`RouteOverload`/`PathPartial`) and
 	/// the tool-definition pipeline derives the [`ToolDefinition`] the agent sends
 	/// to the model. This is the contract the markup examples lean on.
 	#[beet_core::test]
@@ -167,7 +168,7 @@ mod test {
 			.query_filtered::<Entity, With<ProbeTool>>()
 			.single(app.world())
 			.unwrap();
-		app.world().get::<ExchangeOverload>(tool).xpect_some();
+		app.world().get::<RouteOverload>(tool).xpect_some();
 		app.world().get::<PathPartial>(tool).xpect_some();
 		app.world().get::<ToolDefinition>(tool).xpect_some();
 	}

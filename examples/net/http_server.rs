@@ -31,14 +31,13 @@ fn main() {
 			ServerPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
+			// the server owns the boot, its dispatch host is the child
 			commands
-				.spawn((
-					// CliServer::default(),
-					HttpServer::default(),
+				.spawn((HttpServer::default(), children![(
 					Count::default(),
-					Handler.into_action(),
-				))
-				.trigger(StartRunning::boot);
+					Handler.into_action()
+				)]))
+				.trigger(StartRunning::from_cli);
 		})
 		.run();
 }

@@ -15,19 +15,11 @@ use beet_net::sockets::*;
 /// than once per attempt.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = on_add)]
+#[component(on_add = on_add_ext::observe(reset_scene_on_close))]
 pub struct ResetOnDisconnect;
 
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	// attach the reset observer through the entity command (like the socket
-	// servers' own `observe_any` wiring) rather than hand-spawning an
-	// `Observer::new(..).with_entity(..)`. `observe_any`, not `observe`, since
-	// [`SocketClosed`] is an [`EntityTargetEvent`], not a Bevy `EntityEvent`.
-	world.commands().entity(cx.entity).observe_any(
-		|_ev: On<SocketClosed>, mut commands: Commands| {
-			commands.trigger(ResetScene);
-		},
-	);
+fn reset_scene_on_close(_ev: On<SocketClosed>, mut commands: Commands) {
+	commands.trigger(ResetScene);
 }
 
 #[cfg(test)]
@@ -67,9 +59,9 @@ mod test {
 		app.world_mut().spawn((
 			ResetOnDisconnect,
 			Socket::new(
-				futures_lite::stream::once(Err::<Message, BevyError>(bevyhow!(
-					"peer dropped"
-				))),
+				futures_lite::stream::once(Err::<Message, BevyError>(
+					bevyhow!("peer dropped"),
+				)),
 				NoopWriter,
 			),
 		));

@@ -27,12 +27,12 @@ fn main() {
 	#[cfg(feature = "tui")]
 	app.add_plugins((CharcellTuiPlugin, NavigatorPlugin, LivePagePlugin));
 	app.add_systems(Startup, |mut commands: Commands| {
-		// spawn the site host first (registering its server's `on_add` observers),
-		// then boot it: the empty filter matches whichever server the
-		// build feature selected.
+		// spawn the feature-selected server with the site router as its dispatch
+		// child, then boot it directly: a one-shot `CliServer` streams and exits
+		// itself, a long-running server parks.
 		commands
-			.spawn((site_server(), rsx_site_router()))
-			.trigger(StartRunning::boot);
+			.spawn((site_server(), children![rsx_site_router()]))
+			.trigger(StartRunning::from_cli);
 	});
 	app.run();
 }

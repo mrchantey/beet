@@ -6,7 +6,7 @@ connects back to the agent's socket server as the `head` client and serves `take
 (the real webcam), `speak-text` (the Web Speech API) and `show-image` (a rendered `<img>`
 face). A device body (eg the esp Alvik) can connect for `drive`; none runs here.
 
-Two servers in one process, each its own root with its own `BootOnLoad`, both bound to
+Two servers in one process, each a child of its own root, both bound to
 all interfaces so a phone on the LAN can load the head page and connect back: the agent's
 `SocketServer` (all interfaces by default) on `:8338`, and the head `HttpServer` (all
 interfaces via its `host` field) on `:8337`. Install the wasm binary once (the same
@@ -37,7 +37,8 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 	     browser fetches. Its own root, so its route tree is isolated from the agent.
 	     `Tls` serves it https (loopback http stays served), the secure context a LAN
 	     device's webcam needs; the agent socket declares the same. -->
-	<Router {(HttpServer{host:[0,0,0,0]}, Tls, BootOnLoad)}>
+	<HttpServer{host:[0,0,0,0]} {Tls}>
+	<Router>
 		<PackageConfig title="Perceive-act head" description="The robot's browser head"/>
 		<DefaultAppRoutes/>
 		<RoutesDir src="examples/perceive_act/head/routes"/>
@@ -48,4 +49,5 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 		<AssetsDir src="assets" prefix="assets"/>
 		<AssetsDir src="examples" prefix="examples"/>
 	</Router>
+	</HttpServer>
 </Fragment>

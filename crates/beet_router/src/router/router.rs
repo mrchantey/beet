@@ -7,17 +7,36 @@ use beet_net::prelude::*;
 /// `Action<Request, Response>` slot with [`route_action`], the route-tree dispatch
 /// reached via [`exchange`](beet_net::prelude::AsyncExchangeExt::exchange).
 ///
-/// `Router` is pure dispatch and observes nothing; the boot slot
-/// (`Action<Boot, Response>`) is provided by whatever server is spread alongside it
-/// (a [`CliServer`] resolves the boot by routing, an [`HttpServer`] parks and routes
-/// each socket request).
+/// `Router` is pure dispatch and observes nothing; booting belongs to the server
+/// it is a child of (a [`CliServer`] resolves its boot by routing down into this
+/// dispatch, an [`HttpServer`] parks and routes each socket request into it).
 ///
 /// `Reflect` is derived unconditionally: reflection works on no_std and is wanted
 /// there for scene loading.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Action<Request, Response> = route_action())]
+#[require(Action<Request, Response> = route_action().with_meta(ActionMeta::of::<Router, Request, Response>()))]
+#[component(on_add = Action::<Request, Response>::assert_provider::<Self>)]
 pub struct Router;
+
+/// The [`Router`] at or under `root`, the entity a request is dispatched to.
+///
+/// A built entry root is its *server*, which parks on its boot action rather than
+/// dispatching, so a caller holding that root (static export, pdf export) addresses
+/// the router beneath it. A bare router root resolves to itself.
+///
+/// # Errors
+/// Errors when no [`Router`] is at or under `root`.
+pub fn find_router(
+	In(root): In<Entity>,
+	children: Query<&Children>,
+	routers: Query<(), With<Router>>,
+) -> Result<Entity> {
+	children
+		.iter_descendants_inclusive(root)
+		.find(|entity| routers.contains(*entity))
+		.ok_or_else(|| bevyhow!("no Router at or under {root}"))
+}
 
 /// A markup-spawnable route: its `path` prop becomes a [`PathPartial`], and its
 /// declared children slot in, so a handler and any sub-content can be nested inside.
@@ -72,14 +91,15 @@ pub fn route_action() -> Action<Request, Response> {
 					// surface matched dynamic segments (`:id`) to the handler
 					node.merge_path_params(&mut request);
 					let entity = world.entity(node.entity);
-					match entity
-						.clone()
-						.get_cloned::<Action<Request, Response>>()
-						.await
-					{
-						Ok(action) => (action, entity),
-						Err(err) => return Ok(err.into_response()),
-					}
+					// dispatch through call resolution: the route's canonical
+					// `Action<Request, Response>`, else the `ActionOverload`
+					// adapting a typed handler or a `Sequence`
+					let action = Action::<Request, Response>::new_async(
+						async |cx: ActionContext<Request>| -> Result<Response> {
+							cx.caller.call::<Request, Response>(cx.input).await
+						},
+					);
+					(action, entity)
 				}
 				Ok(None) => {
 					// no matching route — std builds a not-found response through the

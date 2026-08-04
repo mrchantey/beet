@@ -48,18 +48,17 @@ pub fn ExampleBinaryBuild(
 		.into_build_artifact()
 }
 
-/// `<StackHost app_name="lambda">` — the IaC deployer host: a [`Stack`] (so the
-/// blocks + verbs resolve it by ancestry), a one-shot [`CliServer`], the default
-/// router, [`BootOnLoad`], the standard IaC verb routes (validate/plan/apply/...), and
-/// a slot for the example's own deploy/sync/watch routes. The markup form of
+/// `<StackHost app_name="lambda">` — the IaC deployer host: a one-shot
+/// [`CliServer`] owning the boot, with the default router as its dispatch child
+/// carrying the [`Stack`] (so the blocks + verbs resolve it by ancestry), the
+/// standard IaC verb routes (validate/plan/apply/...), and a slot for the
+/// example's own deploy/sync/watch routes. The markup form of
 /// `(stack(name), stack_cli())`.
 #[template]
 pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
-	(
+	(CliServer::default(), children![(
 		infra_ext::stack(app_name),
-		CliServer::default(),
 		default_router(),
-		BootOnLoad,
 		children![
 			Validate,
 			Plan,
@@ -71,7 +70,7 @@ pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
 			Rollforward,
 			SlotTarget::new(),
 		],
-	)
+	)])
 }
 
 /// `<SiteBucket/>` — the S3 bucket the site is served from (non-versioned). Resolves
@@ -92,10 +91,9 @@ pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
 		};
 	(
 		infra_ext::stack(app_name).with_backend(backend),
-		CliServer::default(),
 		default_router(),
-		BootOnLoad,
 		children![
+			CliServer::default(),
 			Validate,
 			Plan,
 			Apply,

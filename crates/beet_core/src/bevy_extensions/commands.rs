@@ -50,6 +50,22 @@ pub impl Commands<'_, '_> {
 		});
 	}
 
+	/// Raises `err` through the world's configured error handler, the
+	/// [`Commands`] sibling of [`World::handle_command_error`](crate::prelude::WorldExt::handle_command_error).
+	///
+	/// This is how code outside a system raises: a component hook reaches it via
+	/// [`DeferredWorld::commands`](bevy::ecs::world::DeferredWorld::commands),
+	/// never `panic!`, `debug_assert!` or a bare `error!`.
+	fn handle_command_error<F>(
+		&mut self,
+		err: BevyError,
+		location: &'static Location<'static>,
+	) {
+		self.queue(move |world: &mut World| {
+			world.handle_command_error::<F>(err, location);
+		});
+	}
+
 	/// Runs a system once with the given input.
 	fn run_system_once_with<I, M, S>(
 		&mut self,

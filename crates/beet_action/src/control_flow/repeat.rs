@@ -65,7 +65,7 @@ where
 
 	let action_meta = world
 		.entity(child)
-		.get(|meta: &ActionMeta| *meta)
+		.get(|meta: &ActionMeta| meta.clone())
 		.await
 		.map_err(|err| {
 			bevyhow!("repeat child has no action: {child:?}, error: {err}")
@@ -202,7 +202,7 @@ where
 
 	let action_meta = world
 		.entity(child)
-		.get(|meta: &ActionMeta| *meta)
+		.get(|meta: &ActionMeta| meta.clone())
 		.await
 		.map_err(|err| {
 			bevyhow!(

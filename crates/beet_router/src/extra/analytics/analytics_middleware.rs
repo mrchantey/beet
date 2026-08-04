@@ -75,7 +75,9 @@ pub async fn AnalyticsMiddleware(
 	let country = ip
 		.zip(
 			world
-				.with(|world: &mut World| world.get_resource::<GeoIp>().cloned())
+				.with(|world: &mut World| {
+					world.get_resource::<GeoIp>().cloned()
+				})
 				.await,
 		)
 		.and_then(|(ip, geoip)| geoip.country(ip));
@@ -97,7 +99,9 @@ pub async fn AnalyticsMiddleware(
 	}
 
 	// fire-and-forget: the analytics observer persists it off the request path.
-	world.with(move |world: &mut World| world.trigger(event)).await;
+	world
+		.with(move |world: &mut World| world.trigger(event))
+		.await;
 
 	Ok(response)
 }
@@ -138,9 +142,7 @@ mod test {
 		let root = analytics_router(&mut world);
 		world
 			.entity_mut(root)
-			.exchange(
-				Request::get("about").with_user_agent("Mozilla/5.0 Test"),
-			)
+			.exchange(Request::get("about").with_user_agent("Mozilla/5.0 Test"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
@@ -154,9 +156,7 @@ mod test {
 		event.path.as_str().xpect_eq("/about");
 		match &event.data {
 			AnalyticsEventData::Request {
-				status,
-				user_agent,
-				..
+				status, user_agent, ..
 			} => {
 				(*status).xpect_eq(200);
 				user_agent.as_deref().xpect_eq(Some("Mozilla/5.0 Test"));

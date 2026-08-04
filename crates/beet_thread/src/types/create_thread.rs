@@ -16,14 +16,17 @@ use beet_net::prelude::*;
 /// </div>
 /// ```
 ///
-/// It rides the one boot path: it `#[require]`s [`BootOnLoad`] (which fires on the
-/// entry's `LoadTemplate`) and installs the `Action<Boot, Response>` boot slot that
-/// adopts the thread's persistent store, then calls the thread's
-/// `Action<(), Outcome>` behavior. A finite loop (`RepeatTimes`,
-/// `RepeatWhileFunctionCallOutput`) returns and the boot writes [`AppExit`] to exit;
-/// an endless `Repeat` never returns, so the boot call parks and the chat runs until
-/// Ctrl+C. Calling the **thread**, never an "agent", is the whole point: the
-/// `Sequence` is the behavior and runs its actors in order.
+/// It rides the one load path: it `#[require]`s [`CallOnLoad`] (which fires on the
+/// entry's `LoadTemplate`) plus an [`ActionOverload`] serving `Request -> Response`
+/// on top of the loop's canonical `Action<(), Outcome>` behavior. The overload
+/// adopts the thread's persistent store, then calls that behavior. A finite loop
+/// ([`RepeatTimes`], [`RepeatWhileFunctionCallOutput`]) returns and the boot writes
+/// [`AppExit`] to exit; an endless [`Repeat`] never returns, so the boot call parks
+/// and the chat runs until Ctrl+C. Calling the **thread**, never an "agent", is the
+/// whole point: the `Sequence` is the behavior and runs its actors in order.
+///
+/// An overload rather than an action of its own precisely because the loop already
+/// owns the entity's action: one action per entity, extra signatures on top.
 ///
 /// When the thread carries a [`ThreadStore`] (eg via `{MountThreadStore{path:..}}`)
 /// the stored conversation is adopted by seed hash before the first turn, so a
@@ -31,21 +34,21 @@ use beet_net::prelude::*;
 /// discards it and starts fresh.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(BootOnLoad)]
-#[require(Action<Boot, Response> = Action::new_async_local(run_thread_on_boot))]
+#[require(CallOnLoad)]
+#[require(ActionOverload<Request, Response> = ActionOverload::new(Action::new_async_local(run_thread_on_boot)))]
 pub struct CreateThread;
 
-/// The `Action<Boot, Response>` boot slot [`CreateThread`] installs: adopt the
+/// The `Request -> Response` overload [`CreateThread`] installs: adopt the
 /// thread's persistent store (honoring `--new` from the boot args), then call the
 /// thread's behavior to completion. An empty `Response::ok()` exits successfully;
 /// the conversation streams through the actors' own streamers, not this response.
-async fn run_thread_on_boot(cx: ActionContext<Boot>) -> Result<Response> {
+async fn run_thread_on_boot(cx: ActionContext<Request>) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let root = caller.id();
-	let boot = cx.take();
-	// `--new` rides the boot request (built once by `BootOnLoad`), never a global
+	let request = cx.take();
+	// `--new` rides the boot request (built once by `CallOnLoad`), never a global
 	// env read mid-load.
-	let new = boot.0.get_param("new").is_some();
+	let new = request.get_param("new").is_some();
 	adopt_program_store(caller.world().clone(), root, new).await?;
 	// Reduce the authored scene into its `ThreadWindow` + behavior scene before
 	// running it. The boot drives the behavior directly, ahead of the scheduled
@@ -145,7 +148,7 @@ mod test {
 					),
 				],
 			))
-			// boot the entry the way `BootOnLoad` does on a real load
+			// boot the entry the way `CallOnLoad` does on a real load
 			.trigger(|entity| LoadTemplate {
 				entity,
 				is_error: false,

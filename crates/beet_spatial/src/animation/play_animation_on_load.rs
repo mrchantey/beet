@@ -8,7 +8,7 @@ use bevy::animation::RepeatAnimation;
 /// The declarative, behaviour-tree-free way to "just play this animation forever":
 /// where [`PlayAnimation`] is an action a `<Sequence>` runs, this is a plain
 /// component a scene spreads onto a model (eg `<Foxie {PlayAnimationOnLoad{clip:..}}/>`)
-/// to keep it idling with no `RunOnLoad`/`Sequence` at all. Resolves the clip against
+/// to keep it idling with no `CallOnLoad`/`Sequence` at all. Resolves the clip against
 /// the entity's own [`AnimationGraphClips`] and plays it on the [`AnimationPlayer`]
 /// the glb spawns as a descendant; it is a one-shot, so the model can later be driven
 /// by an action without contention.
@@ -58,7 +58,8 @@ pub(crate) fn play_animation_on_load(
 			continue;
 		};
 		for descendant in children.iter_descendants_inclusive(entity) {
-			if let Ok((mut player, mut transitions)) = players.get_mut(descendant)
+			if let Ok((mut player, mut transitions)) =
+				players.get_mut(descendant)
 			{
 				transitions
 					.play(&mut player, index, core::time::Duration::ZERO)

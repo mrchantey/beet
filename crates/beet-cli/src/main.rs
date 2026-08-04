@@ -10,7 +10,7 @@
 //! The entry may widen its own store root with a `<StoreRoot src="../.."/>`
 //! declaration (see [`StoreRoot`]), so callers never re-supply it. The entry
 //! builds on the async runtime through its [`BlobStore`] (so every store read is
-//! awaited, never blocked), then the `BootOnLoad` verb fans the process request
+//! awaited, never blocked), then the `CallOnLoad` verb fans the process request
 //! out on the build's `LoadTemplate`. A one-shot streams its response and exits;
 //! a long-running server parks its boot call to persist the process.
 //!
@@ -34,7 +34,7 @@ use beet_cli::prelude::*;
 // `run_async` on the JS event loop (native `run()` busy-waits there and would block
 // it). It requires an explicit `--main` + `--store` (default `fs`): there is no
 // filesystem ancestor walk to discover an entry, and no winit/dev-command/remote
-// surface (all native-only). The entry's own `BootOnLoad`/`CliServer` drives output
+// surface (all native-only). The entry's own `CallOnLoad`/`CliServer` drives output
 // and writes `AppExit`, which `AppExitPlugin` turns into `Deno.exit`.
 #[cfg(target_arch = "wasm32")]
 fn main() {
@@ -87,7 +87,7 @@ fn main() -> AppExit {
 /// (`templates/`, the entry document, `<RoutesDir>`/`<Template src>`) go through the
 /// one [`BlobStore`] without ever blocking the runtime (which is single-threaded on
 /// wasm). The app loop drives the task; its build fires `LoadTemplate` on the root,
-/// where the `BootOnLoad` verb fans the process request out to the entry's servers.
+/// where the `CallOnLoad` verb fans the process request out to the entry's servers.
 /// The app then stays alive until something writes `AppExit`, so nothing is held by
 /// hand here. A failed resolve/build logs and exits with an error rather than
 /// panicking. Target-agnostic: native and wasm build the same way, differing only in
@@ -135,7 +135,7 @@ fn load_entry(world: &mut World) {
 /// Build the browser entry: read the program from the DOM via
 /// [`MainBsx::read_dom_program`] and build it onto a storeless root (see
 /// [`build_entry_from_bsx`]). The wasm `Browser` branch of [`load_entry`]; the
-/// program's own `RunOnLoad`/`ExchangeOnLoad` verb then drives it.
+/// program's own `CallOnLoad` verb then drives it.
 #[cfg(target_arch = "wasm32")]
 async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 	let bsx = MainBsx::read_dom_program().await?;
@@ -160,7 +160,7 @@ struct ResolvedEntry {
 /// Build the resolved entry on the async runtime: register the entry's `templates/`
 /// and read the entry document through the store (awaited, not blocked), then build
 /// it into a root carrying the store so `<RoutesDir>` and `<Template src>` resolve
-/// the store by ancestry. The build fires `LoadTemplate`, where `BootOnLoad` boots
+/// the store by ancestry. The build fires `LoadTemplate`, where `CallOnLoad` boots
 /// the servers. Target-agnostic; the `--watch` live-reload path is native-only.
 async fn build_entry(
 	world: &AsyncWorld,
@@ -181,8 +181,8 @@ async fn build_entry(
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it spawns
 	// the entry root with no load verb of its own, so the entry's own markup declares
-	// how it loads (a server spreads `BootOnLoad`, a script `ExchangeOnLoad`, a render
-	// scene `RunOnLoad`, a self-booting verb `#[require]`s `BootOnLoad`).
+	// how it loads (servers, scripts and render scenes all carry `CallOnLoad`,
+	// a self-booting verb `#[require]`s it).
 	let sources =
 		read_entry_sources(&store, formats, entry_name.clone()).await?;
 	#[cfg(target_arch = "wasm32")]
@@ -332,8 +332,7 @@ async fn resolve_widened(
 fn features_self_check(args: &CliArgs) -> Option<CrateCheck> {
 	let is_wasm_runner =
 		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
-	let runs_entry =
-		args.params.contains_key("main") || args.path.is_empty();
+	let runs_entry = args.params.contains_key("main") || args.path.is_empty();
 	if is_wasm_runner || !runs_entry {
 		return None;
 	}

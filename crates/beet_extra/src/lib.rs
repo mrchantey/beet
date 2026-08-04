@@ -39,11 +39,11 @@ pub mod prelude {
 	pub use crate::infra::*;
 	// redundant when `perceive_act`/`perceive_act_web` re-export it, but the
 	// direct path covers a native build where the web module is compiled out
+	#[cfg(feature = "thread")]
+	pub use crate::perceive_act::*;
 	#[allow(unused_imports)]
 	#[cfg(any(feature = "thread", feature = "perceive_act_web"))]
 	pub use crate::perceive_act_core::*;
-	#[cfg(feature = "thread")]
-	pub use crate::perceive_act::*;
 	#[cfg(all(feature = "perceive_act_web", target_arch = "wasm32"))]
 	pub use crate::perceive_act_web::*;
 	pub use crate::plugins::*;
@@ -93,11 +93,11 @@ pub(crate) mod beet {
 		// spatial prelude.
 		#[cfg(feature = "bevy_default")]
 		pub use beet_spatial::prelude::*;
-		// the render scenes' `RunOnLoad` load verb lives in `beet_net` with the rest
+		// the render scenes' `CallOnLoad` load verb lives in `beet_net` with the rest
 		// of the family; pull just it in (not the whole net prelude) so the render set
 		// resolves it without depending on the `thread` example wiring.
 		#[cfg(feature = "bevy_default")]
-		pub use beet_net::prelude::RunOnLoad;
+		pub use beet_net::prelude::CallOnLoad;
 		#[cfg(feature = "thread")]
 		pub use beet_thread::prelude::*;
 	}

@@ -30,9 +30,12 @@ fn main() {
 			material::MaterialStylePlugin,
 		))
 		.add_systems(Startup, |mut commands: Commands| {
+			// the server owns the boot, its dispatch host is the child
 			commands
-				.spawn((HttpServer::default(), Handler.into_action()))
-				.trigger(StartRunning::boot);
+				.spawn((HttpServer::default(), children![
+					Handler.into_action()
+				]))
+				.trigger(StartRunning::from_cli);
 		})
 		.run();
 }

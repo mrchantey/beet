@@ -184,7 +184,7 @@ pub async fn read_entry_sources(
 
 /// Build read [`EntrySources`] into a root carrying `store` (resolved by ancestry for
 /// `<TemplateDir>`, `<RoutesDir>` and `<Template src>`), with `extra` riding onto the
-/// root (eg `DisableBootOnLoad` for a render-only build). Registers the entry's
+/// root (eg `DisableCallOnLoad` for a render-only build). Registers the entry's
 /// declared template sources *before* parsing the entry (so its own tags resolve),
 /// then marks the root [`TemplatesLoaded`]. The synchronous world-mutating tail of an
 /// entry load; returns the root entity.
@@ -238,7 +238,7 @@ pub fn build_entry_root(
 /// scene via [`despawn_scene`] (servers close, sockets drop; a no-op on the first
 /// build), re-read the sources through the store, and build a fresh root marked
 /// [`BeetSceneRoot`] + [`LiveReload`] with its own entry [`WatchDir`]. The fresh
-/// root's `BootOnLoad` re-boots its servers (rebinding their ports), so a browser's
+/// root's server children re-boot (rebinding their ports) (rebinding their ports), so a browser's
 /// dropped `/__client_io` socket reconnects and reloads into the new tree.
 ///
 /// The [`EntryReloader`] resource (installed once) survives the teardown and drives
@@ -250,7 +250,8 @@ pub async fn rebuild_watched_entry(
 	entry_name: String,
 	formats: TemplateFormats,
 ) -> Result {
-	let sources = read_entry_sources(&store, formats, entry_name.clone()).await?;
+	let sources =
+		read_entry_sources(&store, formats, entry_name.clone()).await?;
 	world
 		.with(move |world: &mut World| -> Result {
 			// the entry's own dir, watched for edits to the entry doc / its includes;
@@ -352,7 +353,7 @@ pub fn build_entry_from_bsx(
 /// loops settle + check, ticking between, until nothing is pending or the safety cap is
 /// hit (so a never-loading entry returns rather than hanging).
 ///
-/// The native run loop ticks naturally and `BootOnLoad` waits on the load itself, so
+/// The native run loop ticks naturally and `CallOnLoad` waits on the load itself, so
 /// only the build-then-serve drivers need this explicit gate.
 pub async fn settle_until_ready(world: &mut World) {
 	// each iteration is a full settle; the cap guards a never-loading entry.
@@ -414,7 +415,7 @@ mod test {
 			.await
 			.unwrap();
 		let root =
-			build_entry_root(&mut world, store, sources, DisableBootOnLoad)
+			build_entry_root(&mut world, store, sources, DisableCallOnLoad)
 				.unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
@@ -442,7 +443,7 @@ mod test {
 			.await
 			.unwrap();
 		let root =
-			build_entry_root(&mut world, store, sources, DisableBootOnLoad)
+			build_entry_root(&mut world, store, sources, DisableCallOnLoad)
 				.unwrap();
 		world
 			.entity(root)

@@ -1,12 +1,17 @@
-//! Request dispatch through an entity's `Action<Request, Response>` slot, plus
+//! Request dispatch through an entity's `Action<Request, Response>`, plus
 //! [`EndExchange`] for observability.
 //!
-//! [`exchange`](ExchangeExt::exchange) is the dispatch verb: it calls the entity's
-//! own `Action<Request, Response>` slot with the request, fires an [`EndExchange`]
-//! for the stats observer, and maps a missing slot or handler error to a `500`.
-//! The slot's handler is whatever the higher layer installed: `beet_router`'s
-//! `Router` fills it with the route-tree dispatch, a test fills it with a bare
-//! handler. This lets `beet_net` dispatch a request without naming the router.
+//! [`exchange`](ExchangeExt::exchange) is the dispatch verb: it calls *this*
+//! entity's `Request -> Response` action (its canonical one, else an
+//! [`ActionOverload`] serving that pair), fires an [`EndExchange`] for the stats
+//! observer, and maps a missing action or handler error to a `500`. The handler
+//! is whatever the higher layer installed: `beet_router`'s `Router` fills it with
+//! the route-tree dispatch, a test fills it with a bare handler. This lets
+//! `beet_net` dispatch a request without naming the router.
+//!
+//! A server holds no dispatch of its own, so it hops downward with
+//! [`exchange_child`](AsyncExchangeExt::exchange_child): the first child serving
+//! `Request -> Response` is its router.
 use super::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -66,29 +71,60 @@ pub impl AsyncEntity {
 		let fut = self.exchange(request);
 		async move { fut.await.unwrap_str().await }
 	}
+
+	/// Dispatch a request through the first child serving `Request -> Response`,
+	/// the downward hop from a server to its router.
+	///
+	/// A server parks on its own boot action and holds no dispatch, so it hands
+	/// each request to a child instead. Non-action children (config blocks) and
+	/// differently-shaped ones are skipped, so the router need not be first.
+	///
+	/// A missing child maps to [`Response::internal_error`], like a failed
+	/// [`exchange`](Self::exchange).
+	fn exchange_child(
+		&self,
+		request: impl Into<Request>,
+	) -> impl MaybeSend + Future<Output = Response> {
+		let server = self.clone();
+		let request = request.into();
+		async move {
+			let child = server
+				.world()
+				.run_system_cached_with::<_, Result<Entity>, _, _>(
+					first_serving_child::<Request, Response>,
+					server.id(),
+				)
+				.await
+				.map_err(BevyError::from)
+				.flatten();
+			match child {
+				Ok(child) => {
+					server.world().entity(child).exchange(request).await
+				}
+				Err(err) => {
+					error!("Exchange failed on {:?}: {err}", server.id());
+					Response::internal_error()
+				}
+			}
+		}
+	}
 }
 
-/// Dispatch `request` through `entity`'s `Action<Request, Response>` slot, then
-/// fire [`EndExchange`] so [`exchange_stats`] can log the request. The shared body
-/// of both `exchange` extension traits. A missing slot or a handler error maps to
-/// [`Response::internal_error`].
+/// Dispatch `request` through this entity's `Request -> Response` action, then
+/// fire [`EndExchange`] so [`exchange_stats`] can log the request. The shared
+/// body of both `exchange` extension traits. A missing action or a handler error
+/// maps to [`Response::internal_error`].
 async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 	let start_time = Instant::now();
 	let method = *request.method();
 	let path = request.path_string();
-	let res = match entity.get_cloned::<Action<Request, Response>>().await {
-		Ok(action) => entity
-			.call_detached(action, request)
-			.await
-			.unwrap_or_else(|err| {
-				error!("Exchange failed on {:?}: {}", entity.id(), err);
-				Response::internal_error()
-			}),
-		Err(_) => {
-			error!("No Action<Request, Response> on entity {:?}", entity.id());
+	let res = entity
+		.call::<Request, Response>(request)
+		.await
+		.unwrap_or_else(|err| {
+			error!("Exchange failed on {:?}: {err}", entity.id());
 			Response::internal_error()
-		}
-	};
+		});
 	let status = res.status();
 	entity
 		.trigger(move |entity| EndExchange {

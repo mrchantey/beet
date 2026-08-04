@@ -99,7 +99,10 @@ impl ActiveScene {
 	}
 	/// The image titles offered to the model.
 	pub fn titles(&self) -> Vec<SmolStr> {
-		self.images.iter().map(|image| image.title.clone()).collect()
+		self.images
+			.iter()
+			.map(|image| image.title.clone())
+			.collect()
 	}
 }
 
@@ -156,7 +159,9 @@ pub(crate) async fn maybe_rotate_scene(caller: &AsyncEntity) -> Result {
 			Option<Res<CycleClock>>,
 			Option<ResMut<RandomSource>>,
 		), _>(
-			|entity, (config, stores, clock, mut rng)| -> Result<Option<Gathered>> {
+			|entity,
+			 (config, stores, clock, mut rng)|
+			 -> Result<Option<Gathered>> {
 				let Ok((rotation, catalog, active)) = config.get(entity) else {
 					return Ok(None);
 				};
@@ -254,7 +259,9 @@ fn plan_rotation(gathered: &Gathered) -> Option<Plan> {
 			// refilling once every scene but the current has shown.
 			let mut bag: Vec<SmolStr> = scenes
 				.iter()
-				.filter(|&scene| !visited.contains(scene) && scene != active_name)
+				.filter(|&scene| {
+					!visited.contains(scene) && scene != active_name
+				})
 				.cloned()
 				.collect();
 			if bag.is_empty() {
@@ -268,12 +275,18 @@ fn plan_rotation(gathered: &Gathered) -> Option<Plan> {
 		}
 	};
 	// record the pick in the bag, resetting once the round is complete.
-	let mut visited =
-		if visited.len() >= scenes.len() { Vec::new() } else { visited.clone() };
+	let mut visited = if visited.len() >= scenes.len() {
+		Vec::new()
+	} else {
+		visited.clone()
+	};
 	if !visited.contains(&next) {
 		visited.push(next.clone());
 	}
-	Some(Plan { name: next, visited })
+	Some(Plan {
+		name: next,
+		visited,
+	})
 }
 
 /// Load a scene's prompt + images and apply it in place: append the character prompt
@@ -283,17 +296,23 @@ async fn apply_scene(
 	gathered: &Gathered,
 	plan: &Plan,
 ) -> Result {
-	let SceneRotation { dir, fallback_image, .. } = &gathered.rotation;
+	let SceneRotation {
+		dir,
+		fallback_image,
+		..
+	} = &gathered.rotation;
 	// read the scene's `main.bsx` and extract its `<ScenePrompt>` text.
 	let main_path = SmolPath::from(format!("{dir}/{}/main.bsx", plan.name));
-	let source = String::from_utf8(gathered.store.get(&main_path).await?.to_vec())?;
+	let source =
+		String::from_utf8(gathered.store.get(&main_path).await?.to_vec())?;
 	let prompt = caller
 		.world()
 		.with(move |world| extract_scene_prompt(world, &source))
 		.await?;
 	// list the scene's displayable images, falling back to the configured image.
 	let images =
-		list_scene_images(&gathered.store, dir, &plan.name, fallback_image).await?;
+		list_scene_images(&gathered.store, dir, &plan.name, fallback_image)
+			.await?;
 	let fallback_url = to_url(fallback_image);
 	let name = plan.name.clone();
 	let visited = plan.visited.clone();
@@ -332,7 +351,9 @@ fn extract_scene_prompt(world: &mut World, source: &str) -> Result<String> {
 		.get::<ScenePrompt>(root)
 		.map(|prompt| prompt.text.clone())
 		.ok_or_else(|| {
-			bevyhow!("a scene main.bsx must be a single <ScenePrompt text=..> element")
+			bevyhow!(
+				"a scene main.bsx must be a single <ScenePrompt text=..> element"
+			)
 		});
 	world.entity_mut(root).despawn();
 	text
@@ -370,8 +391,11 @@ async fn list_scene_images(
 	fallback_image: &SmolPath,
 ) -> Result<Vec<SceneImage>> {
 	let images_dir = SmolPath::from(format!("{dir}/{name}/images"));
-	let mut files =
-		store.with_subdir(images_dir).list().await.unwrap_or_default();
+	let mut files = store
+		.with_subdir(images_dir)
+		.list()
+		.await
+		.unwrap_or_default();
 	files.sort();
 	let images: Vec<SceneImage> = files
 		.iter()
@@ -466,7 +490,8 @@ mod test {
 			0,
 			0,
 		));
-		plan.map(|plan| plan.name).xpect_eq(Some(SmolStr::new("explorer")));
+		plan.map(|plan| plan.name)
+			.xpect_eq(Some(SmolStr::new("explorer")));
 	}
 
 	/// Sequential rotation advances on a cycle boundary and wraps.
@@ -474,17 +499,38 @@ mod test {
 	fn sequential_advances_on_boundary() {
 		let scenes = ["dopey", "explorer", "grumpy"];
 		// not a boundary: no rotation.
-		plan_rotation(&gathered(SceneOrder::Sequential, &scenes, "dopey", &[], 3, 0))
-			.map(|plan| plan.name)
-			.xpect_eq(None);
+		plan_rotation(&gathered(
+			SceneOrder::Sequential,
+			&scenes,
+			"dopey",
+			&[],
+			3,
+			0,
+		))
+		.map(|plan| plan.name)
+		.xpect_eq(None);
 		// boundary: advance to the next scene.
-		plan_rotation(&gathered(SceneOrder::Sequential, &scenes, "dopey", &[], 8, 0))
-			.map(|plan| plan.name)
-			.xpect_eq(Some(SmolStr::new("explorer")));
+		plan_rotation(&gathered(
+			SceneOrder::Sequential,
+			&scenes,
+			"dopey",
+			&[],
+			8,
+			0,
+		))
+		.map(|plan| plan.name)
+		.xpect_eq(Some(SmolStr::new("explorer")));
 		// wraps at the end.
-		plan_rotation(&gathered(SceneOrder::Sequential, &scenes, "grumpy", &[], 8, 0))
-			.map(|plan| plan.name)
-			.xpect_eq(Some(SmolStr::new("dopey")));
+		plan_rotation(&gathered(
+			SceneOrder::Sequential,
+			&scenes,
+			"grumpy",
+			&[],
+			8,
+			0,
+		))
+		.map(|plan| plan.name)
+		.xpect_eq(Some(SmolStr::new("dopey")));
 	}
 
 	/// Random rotation never repeats the current scene and covers the bag before
@@ -535,15 +581,22 @@ mod test {
 			.xpect_eq(vec![SmolStr::new("bar"), SmolStr::new("foo")]);
 		// images mapped to title (stem) + served url.
 		let fallback = SmolPath::from("scenes/foo/images/happy.png");
-		let images = list_scene_images(&store, &dir, "foo", &fallback).await.unwrap();
+		let images = list_scene_images(&store, &dir, "foo", &fallback)
+			.await
+			.unwrap();
 		images
 			.iter()
 			.map(|image| image.title.clone())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![SmolStr::new("happy"), SmolStr::new("sad")]);
-		images[0].url.clone().xpect_eq(SmolStr::new("/scenes/foo/images/happy.png"));
+		images[0]
+			.url
+			.clone()
+			.xpect_eq(SmolStr::new("/scenes/foo/images/happy.png"));
 		// an empty scene falls back to the configured image.
-		let bar = list_scene_images(&store, &dir, "bar", &fallback).await.unwrap();
+		let bar = list_scene_images(&store, &dir, "bar", &fallback)
+			.await
+			.unwrap();
 		bar.len().xpect_eq(1);
 		bar[0].title.clone().xpect_eq(SmolStr::new("happy"));
 	}

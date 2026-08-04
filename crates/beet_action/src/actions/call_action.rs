@@ -22,34 +22,45 @@ where
 	})
 }
 
-fn call_action_system<Input: Send + Sync, Out: Send + Sync>(
+/// Resolves and calls the caller's own action: its canonical
+/// `Action<Input, Out>`, else an [`ActionOverload<Input, Out>`] adapting it.
+///
+/// Resolution is self-only. [`ActionOf`]/[`Actions`] mean agent targeting, never
+/// action attachment, so calling an agent never dispatches into a behaviour
+/// pointed at it.
+fn call_action_system<Input, Out>(
 	In((caller, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
 	commands: AsyncCommands,
 	actions: Query<&Action<Input, Out>>,
+	overloads: Query<&ActionOverload<Input, Out>>,
 	metas: Query<&ActionMeta>,
-) -> Result {
-	let action = match actions.get(caller) {
-		Ok(action) => action,
-		Err(_) => {
-			// provide a detailed mismatch diagnostic when ActionMeta is present
-			if let Ok(meta) = metas.get(caller) {
-				meta.assert_match::<Input, Out>()?;
+) -> Result
+where
+	Input: 'static + Send + Sync,
+	Out: 'static + Send + Sync,
+{
+	// the canonical action is preferred, so a coinciding overload never runs
+	let action = actions
+		.get(caller)
+		.ok()
+		.or_else(|| overloads.get(caller).ok().map(ActionOverload::action));
+	match action {
+		Some(action) => action.call(ActionCall {
+			commands,
+			caller,
+			input,
+			out_handler,
+		}),
+		None => bevybail!(
+			"No Action<{}, {}> on {caller}, which serves {}",
+			core::any::type_name::<Input>(),
+			core::any::type_name::<Out>(),
+			match metas.get(caller) {
+				Ok(meta) => meta.signatures(),
+				Err(_) => "no action".into(),
 			}
-			bevybail!(
-				"No Action<{}, {}> on entity {caller:?}",
-				core::any::type_name::<Input>(),
-				core::any::type_name::<Out>()
-			);
-		}
-	};
-
-	action.call(ActionCall {
-		commands,
-		caller,
-		input,
-		out_handler,
-	})?;
-	Ok(())
+		),
+	}
 }
 
 /// Wires a [`oneshot`]-backed [`OutHandler`] and calls [`call_world`].
@@ -71,7 +82,7 @@ where
 		send.signal(result);
 		Ok(())
 	});
-	call_world(entity, input, out_handler)?;
+	call_world::<Input, Out>(entity, input, out_handler)?;
 	Ok(recv)
 }
 
@@ -102,8 +113,7 @@ pub impl EntityWorldMut<'_> {
 	/// Call an action and block until the result is ready.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`Action`] component
-	/// or the action call fails.
+	/// Errors if the entity serves no matching signature or the call fails.
 	#[cfg(feature = "std")]
 	fn call_blocking<
 		Input: 'static + Send + Sync,
@@ -112,21 +122,21 @@ pub impl EntityWorldMut<'_> {
 		self,
 		input: Input,
 	) -> Result<Out> {
-		async_ext::block_on(call_polling(self, input))
+		async_ext::block_on(call_polling::<Input, Out>(self, input))
 	}
 
 	/// Call an action asynchronously, polling the world until completion.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`Action`] component
-	/// or the action call fails.
+	/// Errors if the entity serves no matching signature or the call fails.
 	#[cfg(feature = "std")]
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		self,
 		input: Input,
 	) -> impl Future<Output = Result<Out>> {
-		call_polling(self, input)
+		call_polling::<Input, Out>(self, input)
 	}
+
 	fn call_with<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&mut self,
 		input: Input,
@@ -163,8 +173,7 @@ pub impl AsyncEntity {
 	/// this side just awaits the [`oneshot`] result.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`Action`] or the
-	/// action call fails.
+	/// Errors if the entity serves no matching signature or the call fails.
 	#[track_caller]
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&self,
@@ -231,5 +240,51 @@ pub impl EntityCommands<'_> {
 			call_world::<Input, Out>(&mut entity, input, out_handler)?;
 			Ok(())
 		});
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	fn double() -> Action<i32, i32> {
+		Action::new_pure(|cx: ActionContext<i32>| (*cx * 2).xok())
+	}
+
+	#[beet_core::test]
+	async fn calls_the_canonical_action() {
+		AsyncPlugin::world()
+			.spawn(double())
+			.call::<i32, i32>(21)
+			.await
+			.unwrap()
+			.xpect_eq(42);
+	}
+
+	/// Resolution is self-only: an action pointed at an agent via [`ActionOf`]
+	/// is agent targeting, never a dispatch candidate for that agent.
+	#[beet_core::test]
+	async fn ignores_agent_targeting() {
+		let mut world = AsyncPlugin::world();
+		let agent = world.spawn_empty().id();
+		world.spawn((double(), ActionOf(agent)));
+		world
+			.entity_mut(agent)
+			.call::<i32, i32>(21)
+			.await
+			.xpect_err();
+	}
+
+	#[beet_core::test]
+	async fn no_match_lists_signatures() {
+		AsyncPlugin::world()
+			.spawn(double())
+			.call::<String, String>("nope".into())
+			.await
+			.unwrap_err()
+			.to_string()
+			.xref()
+			.xpect_contains("i32 -> i32");
 	}
 }

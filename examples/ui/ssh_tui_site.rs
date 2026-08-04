@@ -43,23 +43,26 @@ fn main() -> Result {
 	))
 	.insert_resource(pkg_config!());
 
-	// one router carrying both servers + the demo routes; the boot fan-out boots
-	// every server present (http + ssh), each on its own async accept loop, while
-	// the bevy loop repaints every ssh surface each frame.
+	// one boot root carrying both servers, with the router + demo routes as its
+	// dispatch child; the boot fan-out boots every server present (http + ssh),
+	// each on its own async accept loop, while the bevy loop repaints every ssh
+	// surface each frame. `HttpServer::default()` reads `BEET_PORT` / `BEET_HOST`
+	// (a deployed task sets `BEET_HOST=0.0.0.0`), falling back to localhost:8337
+	// locally; `SshTuiServer` reads `BEET_SSH_PORT` / `BEET_HOST` the same way.
 	app.world_mut()
-		.spawn((
-			default_router(),
-			// `default()` reads `BEET_PORT` / `BEET_HOST` (a deployed task sets
-			// `BEET_HOST=0.0.0.0`), falling back to localhost:8337 locally. The
-			// SshTuiServer reads `BEET_SSH_PORT` / `BEET_HOST` the same way.
-			HttpServer::default(),
-			SshTuiServer,
-			children![
-				render_action::func_route("", |_: ()| home()),
-				render_action::func_route("about", |_: ()| about()),
-			],
-		))
-		.trigger(StartRunning::boot);
+		.spawn(
+			(StartOnLoad, SshTuiServer, HttpServer::default(), children![
+				(default_router(), children![
+					render_action::func_route("", |_: ()| home()),
+					render_action::func_route("about", |_: ()| about()),
+				])
+			]),
+		)
+		.queue_async_local(|host| {
+			CallOnLoad::call_descendants(host, || {
+				Request::from_cli_args(CliArgs::parse_env())
+			})
+		});
 
 	app.run();
 	Ok(())

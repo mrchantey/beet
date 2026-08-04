@@ -8,7 +8,6 @@ use crate::sockets::*;
 use crate::sockets::Message;
 use async_channel::Receiver;
 use async_channel::Sender;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use futures::FutureExt;
 use futures::future::BoxFuture;
@@ -20,15 +19,15 @@ use futures::future::BoxFuture;
 /// The socket analogue of [`ChannelHttpServer`]: a per-instance component (no
 /// global backend), so multiple can coexist, with the same wasm-first / mock /
 /// deterministic-test use. Boots through the fan-out like [`SocketServer`] - a
-/// [`StartRunning<Boot>`] whose `--server` selects `"channel"` starts the accept
+/// [`StartRunning<Request>`] whose `--server` selects `"channel"` starts the accept
 /// loop, which parks on the host's [`Running<Response>`] keep-alive and tears down
 /// on its removal.
 ///
 /// Runtime-only: it holds an [`async_channel`] end, which is not [`Reflect`], so it
 /// is not markup-spawnable. Construct it with [`ChannelSocketServer::new`].
 #[derive(Component)]
-#[component(on_add = on_add)]
-#[require(ContinueRun<Boot, Response>)]
+#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<ChannelSocketServer>::add_observers))]
+#[require(StartOnLoad)]
 pub struct ChannelSocketServer {
 	/// Incoming connections; each yields a fresh server-side [`Socket`].
 	connections: Receiver<ChannelSocketConn>,
@@ -133,10 +132,6 @@ impl SocketWriter for ChannelSocketWriter {
 
 /// Registers the shared boot + teardown observers, mirroring [`SocketServer`] (see
 /// [`ServerShutdown`]).
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerShutdown::<ChannelSocketServer>::add_observers(&mut world, cx.entity);
-}
-
 impl BootServer for ChannelSocketServer {
 	const SELECTOR: &'static str = "channel";
 
@@ -185,6 +180,7 @@ async fn start_channel_socket_server(
 mod test {
 	use super::*;
 	use crate::sockets::common_handlers::echo_message;
+	use beet_action::prelude::*;
 
 	/// Echo over the channel transport, the wasm-runnable port of the tungstenite
 	/// `ecs_sockets` test: boot a `ChannelSocketServer` whose accepted sockets echo
@@ -203,8 +199,7 @@ mod test {
 		app.world_mut()
 			.entity_mut(entity)
 			.run_async_local(|host| async move {
-				host.call::<Boot, Response>(Boot::from(Request::get("/")))
-					.await?;
+				host.call::<Request, Response>(Request::get("/")).await?;
 				Ok(())
 			});
 

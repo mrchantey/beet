@@ -9,8 +9,8 @@
 //!
 //! Run with: `cargo run --example socket_echo_server --features tungstenite,action`
 
-use beet::prelude::*;
 use beet::prelude::sockets::*;
+use beet::prelude::*;
 
 fn main() -> Result {
 	let port = socket_server_port();
@@ -30,7 +30,7 @@ fn main() -> Result {
 					OnSpawn::observe(common_handlers::log_send),
 					OnSpawn::observe(common_handlers::log_recv),
 				))
-				.trigger(StartRunning::boot);
+				.trigger(StartRunning::from_cli);
 		})
 		.run();
 
@@ -43,7 +43,8 @@ fn socket_server_port() -> u16 {
 	env_ext::var("BEET_SOCKET_SERVER")
 		.ok()
 		.and_then(|addr| {
-			addr.rsplit_once(':').and_then(|(_, port)| port.parse().ok())
+			addr.rsplit_once(':')
+				.and_then(|(_, port)| port.parse().ok())
 		})
 		.unwrap_or(DEFAULT_SOCKET_PORT)
 }

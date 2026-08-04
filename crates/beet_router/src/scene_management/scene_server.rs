@@ -34,7 +34,7 @@ impl Plugin for SceneServerPlugin {
 }
 
 /// The scene-server meta-routes as a markup-spawnable bundle: place
-/// `<SceneServer/>` under a `<Router {(HttpServer, BootOnLoad)}>` to expose
+/// `<SceneServer/>` under a `<Router>` with an `<HttpServer/>` child to expose
 /// `POST /load`, `GET /clear`, `GET /reset` and `GET /dump` — the device side of
 /// a scene push, receiving a scene over the wire and swapping it via
 /// [`set_scene`]. The host side is the `SceneLoad`/`SceneClear`/... push commands.
@@ -200,8 +200,8 @@ mod test {
 	/// live — the server received the bytes, swapped them in via `set_scene`, and
 	/// now dispatches the pushed route.
 	///
-	/// The route is a `ExchangeOverloadScript`: its reflectable component re-derives
-	/// its runtime dispatch (the `ExchangeOverload` adapter) from its `#[require]` hook on
+	/// The route is a `RouteScript`: its reflectable component re-derives
+	/// its runtime dispatch (the `RouteOverload` adapter) from its `#[require]` hook on
 	/// load, so it survives the round-trip (a bare `exchange_route`'s adapter does not,
 	/// the scene-routing constraint a device scene authors around).
 	#[beet_core::test(timeout_ms = 10000)]
@@ -211,7 +211,7 @@ mod test {
 		let root = host
 			.spawn((
 				Script::<(), String>::rhai(r#""pong""#),
-				ExchangeOverloadScript::<(), String>::default(),
+				RouteScript::<(), String>::default(),
 				PathPartial::new("ping"),
 			))
 			.flush();

@@ -1,13 +1,20 @@
+use alloc::format;
+use alloc::string::String;
 use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 
-/// Unified metadata for an action, combining handler/input/output type
-/// information with optional reflection data and description.
+/// Unified metadata for the one action an entity holds, combining
+/// handler/input/output type information with optional reflection data,
+/// description, and the extra signatures the entity's [`ActionOverload`]s serve.
 ///
-/// Created vian [`ActionMeta::of`], [`ActionMeta::of_action`],
+/// Constructed for [`Action::with_meta`], never inserted directly: [`Action`] is
+/// its only producer, inserting it on add and removing it on remove, so a
+/// hand-inserted one raises a clobber error when the real action lands.
+///
+/// Created via [`ActionMeta::of`], [`ActionMeta::of_action`],
 /// [`ActionMeta::of_handler`], or [`ActionMeta::of_reflect`].
-#[derive(Copy, Clone, Debug, Component, Get)]
+#[derive(Clone, Debug, Component, Get)]
 pub struct ActionMeta {
 	/// Type metadata for the action handler.
 	handler: TypeMeta,
@@ -19,7 +26,15 @@ pub struct ActionMeta {
 	/// Input/output [`TypeInfo`] is optionally available when those types
 	/// also implement [`Typed`].
 	type_info: Option<ActionTypeInfo>,
+	/// The additional `(input, output)` pairs this entity's
+	/// [`ActionOverload`]s serve.
+	overloads: HashSet<(TypeMeta, TypeMeta)>,
 }
+
+/// Sentinel handler for an [`ActionMeta`] an [`ActionOverload`] created before
+/// its entity's canonical [`Action`] landed. Private, so no real handler can
+/// collide with it and [`Action`] can safely fill it in.
+struct NoAction;
 
 impl ActionMeta {
 	/// Create an [`ActionMeta`] from explicit handler, input and output type parameters.
@@ -29,6 +44,7 @@ impl ActionMeta {
 			input: TypeMeta::of::<In>(),
 			output: TypeMeta::of::<Out>(),
 			type_info: None,
+			overloads: default(),
 		}
 	}
 
@@ -39,12 +55,7 @@ impl ActionMeta {
 		T::In: 'static,
 		T::Out: 'static,
 	{
-		Self {
-			handler: TypeMeta::of::<T>(),
-			input: TypeMeta::of::<T::In>(),
-			output: TypeMeta::of::<T::Out>(),
-			type_info: None,
-		}
+		Self::of::<T, T::In, T::Out>()
 	}
 
 	/// Create an [`ActionMeta`] with handler reflection data. Provides
@@ -57,10 +68,8 @@ impl ActionMeta {
 		T::Out: 'static,
 	{
 		Self {
-			handler: TypeMeta::of::<T>(),
-			input: TypeMeta::of::<T::In>(),
-			output: TypeMeta::of::<T::Out>(),
 			type_info: Some(ActionTypeInfo::of_handler::<T>()),
+			..Self::of::<T, T::In, T::Out>()
 		}
 	}
 
@@ -74,11 +83,63 @@ impl ActionMeta {
 		T::Out: 'static + Typed,
 	{
 		Self {
-			handler: TypeMeta::of::<T>(),
-			input: TypeMeta::of::<T::In>(),
-			output: TypeMeta::of::<T::Out>(),
 			type_info: Some(ActionTypeInfo::of_full::<T, M>()),
+			..Self::of::<T, T::In, T::Out>()
 		}
+	}
+
+	/// An [`ActionMeta`] with no canonical action yet, created by an
+	/// [`ActionOverload`] whose entity's [`Action`] has not landed. Filled in by
+	/// [`Action`]'s insert hook, so overload registration is order-independent.
+	pub(crate) fn unset() -> Self { Self::of::<NoAction, NoAction, NoAction>() }
+
+	/// Whether this meta is still waiting for its canonical action, see
+	/// [`unset`](Self::unset).
+	pub(crate) fn is_unset(&self) -> bool {
+		self.handler == TypeMeta::of::<NoAction>()
+	}
+
+	/// Adopt overloads already registered on the meta this one replaces, so
+	/// [`Action`] can refresh the canonical fields (and re-fire `Insert`) without
+	/// dropping its [`ActionOverload`] registrations.
+	pub(crate) fn with_overloads(
+		mut self,
+		overloads: HashSet<(TypeMeta, TypeMeta)>,
+	) -> Self {
+		self.overloads.extend(overloads);
+		self
+	}
+
+	/// Register an additional signature this action serves, see
+	/// [`ActionOverload`].
+	pub(crate) fn insert_overload<In: 'static, Out: 'static>(&mut self) {
+		self.overloads
+			.insert((TypeMeta::of::<In>(), TypeMeta::of::<Out>()));
+	}
+
+	/// Deregister a signature previously added by
+	/// [`insert_overload`](Self::insert_overload).
+	pub(crate) fn remove_overload<In: 'static, Out: 'static>(&mut self) {
+		self.overloads
+			.remove(&(TypeMeta::of::<In>(), TypeMeta::of::<Out>()));
+	}
+
+	/// Whether this action serves an `(In, Out)` call, either as its canonical
+	/// signature or through a registered [`ActionOverload`].
+	///
+	/// The single meta-matching predicate: call resolution, sequence child
+	/// validation and the child selector all ask this.
+	pub fn serves<In: 'static, Out: 'static>(&self) -> bool {
+		let pair = (TypeMeta::of::<In>(), TypeMeta::of::<Out>());
+		(self.input, self.output) == pair || self.overloads.contains(&pair)
+	}
+
+	/// The canonical signature plus any overloads, for diagnostics.
+	pub fn signatures(&self) -> String {
+		self.overloads.iter().fold(
+			format!("{} -> {}", self.input, self.output),
+			|acc, (input, output)| format!("{acc}, {input} -> {output}"),
+		)
 	}
 
 	/// The full type name of the handler function or type.
@@ -240,6 +301,15 @@ impl core::fmt::Display for TypeMeta {
 	}
 }
 
+/// Identity is the [`TypeId`](core::any::TypeId) alone; the name is display data
+/// derived from it.
 impl PartialEq for TypeMeta {
 	fn eq(&self, other: &Self) -> bool { self.type_id == other.type_id }
+}
+impl Eq for TypeMeta {}
+
+impl core::hash::Hash for TypeMeta {
+	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+		self.type_id.hash(state);
+	}
 }

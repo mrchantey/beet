@@ -29,7 +29,8 @@ Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component Sy
 Beet is a natural fit for distributed systems like embodied agents with a perceive-act loop. A perceive-act agent is made of three apps: a server for the resources, a smartphone for the head and an ESP32 for the body. The server is an agent whose routes are the capabilities, forwarding over the socket to whichever socket client serves them.
 
 ```jsx
-<Router {(SocketServer, BootOnLoad, CapabilityServer)}>
+<SocketServer {CapabilityServer}>
+<Router>
 	<!-- routable by interpret-photo, not offered to the model -->
 	<TakePhoto/>
 	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
@@ -50,6 +51,7 @@ You perceive the world one photo at a time and act on what you see.
 		</div>
 	</div>
 </Router>
+</SocketServer>
 ```
 
 The head is a web page whose tab serves `take-photo` (webcam), `speak-text` (speech synthesis) and `set-emotion` (the face on screen). The body is an ESP32 serving `apply-heading`, steering in the chosen direction. The full example, including mocked and 3d-rendered stages for running without hardware, lives at [examples/perceive_act](examples/perceive_act).

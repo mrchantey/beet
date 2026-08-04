@@ -77,8 +77,10 @@ where
 	// resolve valid children up-front, then run them concurrently
 	let mut calls = Vec::new();
 	for child in children {
-		let action_meta_result =
-			world.entity(child).get(|meta: &ActionMeta| *meta).await;
+		let action_meta_result = world
+			.entity(child)
+			.get(|meta: &ActionMeta| meta.clone())
+			.await;
 
 		let action_meta = match action_meta_result {
 			Ok(action_meta) => action_meta,

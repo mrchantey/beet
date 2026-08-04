@@ -26,7 +26,11 @@ fn next_id(prefix: &str) -> String {
 ///   else schema defaults (strings become "", integers become 0, etc.)
 /// - **Without tools**: Returns the user's input prefixed with "you said:"
 #[derive(Debug, Clone, Default, PartialEq, Eq, Component)]
-#[component(on_add = on_add)]
+#[component(on_add = on_add_ext::entity_hook(|entity| {
+	entity.insert(Action::<(), Outcome>::new_async(
+		post_streamer_action::<MockPostStreamer>,
+	));
+}))]
 pub struct MockPostStreamer {
 	/// Optional custom response text, overrides default echo behavior.
 	pub custom_response: Option<String>,
@@ -40,14 +44,6 @@ pub struct MockPostStreamer {
 
 /// Cursor cycling [`MockPostStreamer::tool_arguments`] across calls.
 static TOOL_ARG_CURSOR: AtomicU64 = AtomicU64::new(0);
-
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).insert(
-		Action::<(), Outcome>::new_async(
-			post_streamer_action::<MockPostStreamer>,
-		),
-	);
-}
 
 impl MockPostStreamer {
 	/// Creates a new mock streamer.

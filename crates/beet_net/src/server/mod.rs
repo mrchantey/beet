@@ -3,15 +3,18 @@
 //! This module provides server infrastructure that listens for HTTP requests
 //! and routes them to Bevy entities for processing via `Action<Request, Response>`.
 //!
-//! ## One boot path, servers are observers
+//! ## One load path, servers own the boot
 //!
-//! [`boot`] calls a host's `Action<Boot, Response>` slot with `Boot(request)`:
-//! the server-provided `ContinueRun<Boot, Response>` inserts a `Running<Response>`
-//! keep-alive claim and fires an `StartRunning<Boot>` the servers observe. A one-shot
-//! [`CliServer`] resolves the call (its response streams to stdout and the process
-//! exits); a long-running [`HttpServer`] / `TuiServer` parks the call, persisting
-//! the process until its `Running` is removed, which fires its teardown observer.
-//! `--server` selects which servers act. See [`boot`] for the model.
+//! [`CallOnLoad`] calls its entity's action with the process request. On a
+//! server that action is [`StartOnLoad`]'s: it inserts a `Running<Response>`
+//! keep-alive claim and fires an `StartRunning<Request>` every server on the
+//! entity observes. A one-shot [`CliServer`] resolves the call (its response
+//! streams to stdout and the process exits); a long-running [`HttpServer`] /
+//! `TuiServer` parks the call, persisting the process until its `Running` is
+//! removed, which fires its teardown observer. `--server` selects which servers
+//! act, and a selection matching none exits rather than parking. The dispatch
+//! host (a `Router`) is a child, reached with `exchange_child`. See
+//! [`call_on_load`] and [`start_on_load`] for the model.
 //!
 //! ## Implementations
 //!
@@ -27,8 +30,8 @@
 
 // The `HttpServer` component and its `set_http_server` install hook are
 // no_std-capable and compile unconditionally; the concrete backends below stay
-// std/feature-gated. A server is an `StartRunning<Boot>` observer torn down by
-// observing the removal of the boot exchange's `Running<Response>`.
+// std/feature-gated. A server is an `StartRunning<Request>` observer torn down
+// by observing the removal of `StartOnLoad`'s parked `Running<Response>`.
 mod http_server;
 pub use http_server::*;
 
@@ -45,30 +48,22 @@ mod channel_http_server;
 #[cfg(feature = "std")]
 pub use channel_http_server::*;
 
-// The no_std core of the boot path: the `Boot` exchange newtype and the
-// `request_selects_server` predicate the unconditionally-compiled `HttpServer`
-// observer needs. Compiles everywhere; the std-only verbs that drive it are in
-// `boot` below.
-mod boot_exchange;
-pub use boot_exchange::*;
+// The load path: the `CallOnLoad` verb calls an entity's action with the
+// process request and writes `AppExit`. Gated on `action` (the call machinery),
+// not `std`: `CliArgs::parse_env` no-ops on no_std, the stdout tail goes through
+// the cross-platform `cross_log_noline!`, and the verb / `AppExit` writer are
+// all no_std-clean, so an embedded boot works too.
+#[cfg(feature = "action")]
+mod call_on_load;
+#[cfg(feature = "action")]
+pub use call_on_load::*;
 
-// The boot path: the `BootOnLoad` / `ExchangeOnLoad` verbs call a host's action
-// slot with the process request and write `AppExit`. Gated on `action` (the
-// `Action<Boot, Response>` slot), not `std`: `CliArgs::parse_env` no-ops on no_std,
-// the stdout tail goes through the cross-platform `cross_log_noline!`, and the boot
-// verbs / `AppExit` writer are all no_std-clean, so an embedded boot works too.
+// The boot verb: parks the process and fans the request out to the servers on
+// its entity. Same `action` gate as the load verb it requires.
 #[cfg(feature = "action")]
-mod boot;
+mod start_on_load;
 #[cfg(feature = "action")]
-pub use boot::*;
-
-// the boot<->exchange bridges, inverses on the same host: a boot drives its request
-// pipeline (`BootToExchange`) or a request drives its boot (`ExchangeToBoot`).
-// no_std-clean like the boot path, gated on the `Action` slots they install.
-#[cfg(feature = "action")]
-mod boot_bridge;
-#[cfg(feature = "action")]
-pub use boot_bridge::*;
+pub use start_on_load::*;
 
 #[cfg(feature = "action")]
 mod cli_server;

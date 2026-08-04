@@ -14,6 +14,9 @@ use bevy::ecs::query::ROQueryItem;
 /// When an action needs to target a specific entity that isn't its root
 /// ancestor, use this component to specify the relationship explicitly.
 ///
+/// Agent targeting and nothing else: call resolution is self-only, so pointing an
+/// action at an agent never makes it a dispatch candidate for that agent.
+///
 /// # Example
 ///
 /// ```

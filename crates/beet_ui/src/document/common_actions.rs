@@ -538,29 +538,30 @@ mod test {
 		host_list(&world, host).xpect_eq(val!([7i64, 8i64]));
 	}
 
+	/// Two actions over one field are two entities: an entity holds at most one
+	/// action, so the push and the insert are siblings pointed at the same
+	/// [`FieldRef`] rather than colocated.
 	#[beet_core::test]
 	async fn push_and_insert() {
 		let mut world = AsyncPlugin::world();
 		let host = world.spawn(Document::default()).id();
-		let actor = world
+		let push = world
+			.spawn((ChildOf(host), todos_field(), PushField::<i32>::default()))
+			.id();
+		let insert = world
 			.spawn((
 				ChildOf(host),
 				todos_field(),
-				PushField::<i32>::default(),
 				InsertAtField::<i32>::default(),
 			))
 			.id();
 
 		for value in [1i32, 2, 3] {
-			world
-				.entity_mut(actor)
-				.call::<i32, ()>(value)
-				.await
-				.unwrap();
+			world.entity_mut(push).call::<i32, ()>(value).await.unwrap();
 		}
 		// list is now [1, 2, 3]
 		world
-			.entity_mut(actor)
+			.entity_mut(insert)
 			.call::<(usize, i32), ()>((1, 99))
 			.await
 			.unwrap();

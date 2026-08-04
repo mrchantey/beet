@@ -1,6 +1,7 @@
 mod action;
 mod action_context;
 mod action_meta;
+mod action_overload;
 mod agent;
 mod async_action;
 mod call_action;
@@ -39,6 +40,7 @@ mod erased_action;
 pub use action::*;
 pub use action_context::*;
 pub use action_meta::*;
+pub use action_overload::*;
 pub use call_action::*;
 pub use chain_action::*;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]

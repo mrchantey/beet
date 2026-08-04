@@ -39,9 +39,9 @@ struct GreetRequest {
 
 fn setup(mut commands: Commands) {
 	commands
-		.spawn((
-			CliServer::default(),
-			(default_router(), children![
+		.spawn((CliServer::default(), children![(
+			default_router(),
+			children![
 			exchange_route(
 				"",
 				Action::<(), &str>::new_pure(|_| { "hello world" })
@@ -50,13 +50,13 @@ fn setup(mut commands: Commands) {
 				"foo",
 				Action::<(), &str>::new_pure(|_| { "hello foo" })
 			),
-			// a `Script` is pure data, so pair it with an `ExchangeOverloadScript` to
+			// a `Script` is pure data, so pair it with an `RouteScript` to
 			// make the entity a dispatchable route.
 			(
 				Script::<QueryParams<GreetRequest>, String>::rhai(
 					r#""hello " + input.name"#,
 				),
-				ExchangeOverloadScript::<QueryParams<GreetRequest>, String, _, _>::default(),
+				RouteScript::<QueryParams<GreetRequest>, String, _, _>::default(),
 				PathPartial::new("greet"),
 			),
 			// same idea, but the script receives the full [`RequestParts`]
@@ -65,10 +65,10 @@ fn setup(mut commands: Commands) {
 				Script::<RequestParts, String>::rhai(
 					r#""hello " + input.url.params.name[0]"#,
 				),
-				ExchangeOverloadScript::<RequestParts, String, _, _>::default(),
+				RouteScript::<RequestParts, String, _, _>::default(),
 				PathPartial::new("greet-request"),
 			),
-		]),
-		))
-		.trigger(StartRunning::boot);
+		]
+		)]))
+		.trigger(StartRunning::from_cli);
 }

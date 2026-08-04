@@ -4,19 +4,23 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 pub fn stack_cli() -> impl Bundle {
-	// the infra CLI host bundle: a `CliServer` entrypoint + the IaC routes. The
-	// caller boots it after spawning, so the `on_add` observers are registered
-	// before the `cli` boot lands.
-	(CliServer::default(), default_router(), children![
-		Validate,
-		Plan,
-		Apply,
-		Show,
-		List,
-		Destroy,
-		Rollback,
-		Rollforward
-	])
+	// the infra CLI host bundle: a `CliServer` entrypoint owning the boot, with the
+	// router and IaC routes as its dispatch child (a server and a router never share
+	// an entity, they would collide on its one action). The caller boots it after
+	// spawning, so the `on_add` observers are registered before the `cli` boot lands.
+	(CliServer::default(), children![(
+		default_router(),
+		children![
+			Validate,
+			Plan,
+			Apply,
+			Show,
+			List,
+			Destroy,
+			Rollback,
+			Rollforward
+		]
+	)])
 }
 
 /// Build a [`terra::Project`] from the nearest ancestor [`Stack`].

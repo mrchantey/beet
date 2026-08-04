@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use alloc::format;
 use beet_core::prelude::*;
 
 /// Sequence control-flow component.
@@ -39,8 +40,9 @@ impl Sequence {
 	pub fn new() -> Self { Self::default() }
 }
 
-/// Skips child entities whose [`ActionMeta`] is missing or does not match
-/// the expected `Action<Input, Outcome<Input, Output>>` signature.
+/// Skips child entities whose [`ActionMeta`] is missing or does not
+/// [`serve`](ActionMeta::serves) the expected
+/// `Action<Input, Outcome<Input, Output>>` signature.
 ///
 /// Honours [`ExcludeErrors`]: when a flagged error is excluded the child is
 /// dropped from the returned list, otherwise the error is propagated.
@@ -51,47 +53,87 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	let exclude_errors = cx
-		.caller
-		.get_cloned::<ExcludeErrors>()
-		.await
-		.unwrap_or_default();
+	cx.world()
+		.run_system_cached_with(
+			collect_valid_children::<Input, Output>,
+			cx.id(),
+		)
+		.await?
+}
 
-	let children =
-		match cx.caller.get(|children: &Children| children.to_vec()).await {
-			Ok(children) => children,
-			Err(_) => return Ok(Vec::new()),
-		};
-
-	let world = cx.world();
+fn collect_valid_children<Input, Output>(
+	In(caller): In<Entity>,
+	excludes: Query<&ExcludeErrors>,
+	children: Query<&Children>,
+	metas: Query<&ActionMeta>,
+) -> Result<Vec<Entity>>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	let exclude_errors = excludes.get(caller).cloned().unwrap_or_default();
+	let Ok(children) = children.get(caller) else {
+		return Ok(Vec::new());
+	};
 	let mut valid = Vec::with_capacity(children.len());
-	for child in children {
-		let action_meta =
-			match world.entity(child).get(|meta: &ActionMeta| *meta).await {
-				Ok(action_meta) => action_meta,
-				Err(child_error) => {
-					if exclude_errors.contains(ChildError::NO_ACTION) {
-						continue;
-					}
-					bevybail!(
-						"sequence child has no action: {child:?}, error: {child_error}"
-					);
-				}
-			};
-
-		if let Err(mismatch_error) =
-			action_meta.assert_match::<Input, Outcome<Input, Output>>()
-		{
+	for child in children.iter() {
+		let Ok(meta) = metas.get(child) else {
+			if exclude_errors.contains(ChildError::NO_ACTION) {
+				continue;
+			}
+			bevybail!("sequence child has no action: {child:?}");
+		};
+		if !meta.serves::<Input, Outcome<Input, Output>>() {
 			if exclude_errors.contains(ChildError::ACTION_MISMATCH) {
 				continue;
 			}
 			bevybail!(
-				"sequence child wrong action signature: {child:?}, error: {mismatch_error}"
+				"sequence child wrong action signature: {child:?}, serves: {}",
+				meta.signatures()
 			);
 		}
 		valid.push(child);
 	}
 	Ok(valid)
+}
+
+/// Selects the first child whose [`ActionMeta`] [`serves`](ActionMeta::serves)
+/// `(Input, Out)`, the downward dispatch hop: a parent hands its call to the
+/// first child that can take it, ignoring config-only and differently-shaped
+/// children.
+///
+/// # Errors
+/// Errors when no child serves the signature, listing each child's signatures.
+pub fn first_serving_child<Input, Out>(
+	In(parent): In<Entity>,
+	children: Query<&Children>,
+	metas: Query<&ActionMeta>,
+) -> Result<Entity>
+where
+	Input: 'static,
+	Out: 'static,
+{
+	let children = children
+		.get(parent)
+		.map(Children::iter)
+		.into_iter()
+		.flatten();
+	let mut candidates = Vec::new();
+	for child in children {
+		match metas.get(child) {
+			Ok(meta) if meta.serves::<Input, Out>() => return Ok(child),
+			Ok(meta) => {
+				candidates.push(format!("\n  {child}: {}", meta.signatures()))
+			}
+			Err(_) => candidates.push(format!("\n  {child}: no action")),
+		}
+	}
+	bevybail!(
+		"no child of {parent} serves Action<{}, {}>.{}",
+		core::any::type_name::<Input>(),
+		core::any::type_name::<Out>(),
+		candidates.concat()
+	)
 }
 
 /// Runs children in order, returning the first [`Outcome::Fail`] immediately.
@@ -322,6 +364,64 @@ mod tests {
 			.await
 			.unwrap()
 			.xpect_eq(Outcome::Pass(()));
+	}
+
+	/// A child whose canonical action is the wrong shape still serves the
+	/// sequence when an [`ActionOverload`] adapts it.
+	#[beet_core::test]
+	async fn overloaded_child() {
+		AsyncPlugin::world()
+			.spawn((Sequence::new(), children![(
+				wrong_signature_action(),
+				ActionOverload::new(Action::<(), Outcome<(), ()>>::new_pure(
+					|_: ActionContext| Outcome::Pass(())
+				))
+			)]))
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Pass(()));
+	}
+
+	#[beet_core::test]
+	fn selects_the_first_serving_child() {
+		let mut world = World::new();
+		let parent = world
+			.spawn(children![
+				Name::new("config-only"),
+				wrong_signature_action(),
+				outcome_pass(),
+				outcome_fail(),
+			])
+			.id();
+		world.flush();
+		let serving = world
+			.run_system_cached_with::<_, Result<Entity>, _, _>(
+				first_serving_child::<(), Outcome<(), ()>>,
+				parent,
+			)
+			.unwrap()
+			.unwrap();
+		world.entity(serving).get::<ActionMeta>().xpect_some();
+		// the two skipped children come first, so the pass action is the third
+		serving.xpect_eq(world.entity(parent).get::<Children>().unwrap()[2]);
+	}
+
+	#[beet_core::test]
+	fn no_serving_child_lists_signatures() {
+		let mut world = World::new();
+		let parent = world.spawn(children![wrong_signature_action()]).id();
+		world.flush();
+		world
+			.run_system_cached_with::<_, Result<Entity>, _, _>(
+				first_serving_child::<(), Outcome<(), ()>>,
+				parent,
+			)
+			.unwrap()
+			.unwrap_err()
+			.to_string()
+			.xref()
+			.xpect_contains("i32");
 	}
 
 	#[beet_core::test]

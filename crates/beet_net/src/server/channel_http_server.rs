@@ -4,7 +4,6 @@
 use crate::prelude::*;
 use async_channel::Receiver;
 use async_channel::Sender;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// A self-contained HTTP server that reads [`Request`]s from a channel and writes
@@ -17,7 +16,7 @@ use beet_core::prelude::*;
 /// browser (a teaching sandbox) with no real listener; it is also the natural
 /// deterministic test harness (no ports, no timing).
 ///
-/// Boots through the fan-out exactly like [`HttpServer`]: a [`StartRunning<Boot>`]
+/// Boots through the fan-out exactly like [`HttpServer`]: a [`StartRunning<Request>`]
 /// whose `--server` selects `"channel"` starts the serve loop, which parks on the
 /// host's [`Running<Response>`] keep-alive and tears down on its removal.
 ///
@@ -25,8 +24,8 @@ use beet_core::prelude::*;
 /// (unlike [`HttpServer`]) it is not markup-spawnable. Construct it with
 /// [`ChannelHttpServer::new`].
 #[derive(Component)]
-#[component(on_add = on_add)]
-#[require(ExchangeStats, ContinueRun<Boot, Response>)]
+#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<ChannelHttpServer>::add_observers))]
+#[require(ExchangeStats, StartOnLoad)]
 pub struct ChannelHttpServer {
 	/// Inbound requests to dispatch.
 	requests: Receiver<Request>,
@@ -99,10 +98,6 @@ impl ChannelHttpClient {
 
 /// Registers the shared boot + teardown observers, mirroring [`HttpServer`] (see
 /// [`ServerShutdown`]).
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerShutdown::<ChannelHttpServer>::add_observers(&mut world, cx.entity);
-}
-
 impl BootServer for ChannelHttpServer {
 	const SELECTOR: &'static str = "channel";
 
@@ -136,7 +131,7 @@ async fn start_channel_http_server(
 		let entity = entity.clone();
 		async move {
 			while let Ok(request) = requests.recv().await {
-				let response = entity.exchange(request).await;
+				let response = entity.exchange_child(request).await;
 				responses.send(response).await.ok();
 			}
 			Result::Ok(())
@@ -153,32 +148,34 @@ async fn start_channel_http_server(
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_action::prelude::*;
 
 	/// Serve a real request/response over the channel transport: spawn a
-	/// `ChannelHttpServer` with a mirror handler, boot it through the fan-out, then
-	/// drive the app until the client's request round-trips. Drives to the bounded
-	/// response condition (via [`AsyncRunner::poll_and_update`]) rather than settling
-	/// a parked server, so it runs on native and wasm alike.
+	/// `ChannelHttpServer` as a child of its dispatch host (a mirror handler),
+	/// boot it through the fan-out, then drive the app until the client's request
+	/// round-trips. Drives to the bounded response condition (via
+	/// [`AsyncRunner::poll_and_update`]) rather than settling a parked server, so
+	/// it runs on native and wasm alike.
 	#[beet_core::test]
 	async fn serves_over_channel() {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let (server, client) = ChannelHttpServer::new();
+		// the server owns the boot, its dispatch host is the child: colocating the
+		// handler on the server would clobber its parking action
 		let entity = app
 			.world_mut()
-			.spawn((
-				server,
-				exchange_handler(|cx| Response::ok().with_body(cx.take().body)),
-			))
+			.spawn((server, children![exchange_handler(|cx| {
+				Response::ok().with_body(cx.take().body)
+			})]))
 			.id();
 		// boot through the fan-out (fire-and-forget: the call fans out and parks)
-		app.world_mut()
-			.entity_mut(entity)
-			.run_async_local(|host| async move {
-				host.call::<Boot, Response>(Boot::from(Request::get("/")))
-					.await?;
+		app.world_mut().entity_mut(entity).run_async_local(
+			|server| async move {
+				server.call::<Request, Response>(Request::get("/")).await?;
 				Ok(())
-			});
+			},
+		);
 		// drive the app until the posted request round-trips to a response
 		let response = AsyncRunner::poll_and_update(
 			|| {

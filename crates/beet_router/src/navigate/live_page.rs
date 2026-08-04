@@ -118,8 +118,9 @@ pub async fn build_live_page(
 	node.merge_path_params(&mut request);
 	let parts = request.parts().clone();
 	let route = router.world().entity(node.entity);
-	// build the route's own content (output `PageRequest`), skipping the
-	// `ExchangeOverload` adapter that would serialize then despawn the tree.
+	// build the route's own content (output `PageRequest`) through the route's
+	// canonical action, skipping the `RouteOverload` adapter that would serialize
+	// then despawn the tree.
 	let content = route.call::<Request, PageRequest>(request).await?.0;
 	// wrap it in the ancestor layout middleware (the `BaseLayout` document chrome),
 	// transcluding the content by reference, exactly as `PageRoot::render` does

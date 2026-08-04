@@ -73,7 +73,7 @@ fn resolve_pending_scene(
 	};
 	commands.queue(move |world: &mut World| {
 		// set up the scene's freshly-spawned (bare) AnimationPlayers BEFORE firing
-		// LoadTemplate, so a `RunOnLoad`-started tree never out-races the
+		// LoadTemplate, so a `CallOnLoad`-started tree never out-races the
 		// `init_animators` Update system for a player that lacks its graph handle
 		// and transitions.
 		init_scene_animators(world, entity);

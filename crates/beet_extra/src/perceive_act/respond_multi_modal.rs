@@ -86,10 +86,14 @@ pub async fn RespondMultiModalAction(
 	};
 	let face = (
 		"show-image",
-		serde_json::to_string(&ShowImageInput { src: src.to_string() })?,
+		serde_json::to_string(&ShowImageInput {
+			src: src.to_string(),
+		})?,
 	);
-	let speak =
-		("speak-text", serde_json::to_string(&SpeakTextInput { text: say })?);
+	let speak = (
+		"speak-text",
+		serde_json::to_string(&SpeakTextInput { text: say })?,
+	);
 	// the clamped, agent-chosen drive command sent to the `drive` capability route.
 	let drive = ("drive", serde_json::to_string(&drive)?);
 	let outcomes = if parallel {
@@ -112,7 +116,9 @@ pub async fn RespondMultiModalAction(
 
 	let timings = outcomes
 		.iter()
-		.map(|(path, elapsed, _)| format!("{path} {:.2}s", elapsed.as_secs_f32()))
+		.map(|(path, elapsed, _)| {
+			format!("{path} {:.2}s", elapsed.as_secs_f32())
+		})
 		.collect::<Vec<_>>()
 		.join(" | ");
 	info!(
@@ -224,16 +230,20 @@ mod test {
 		let agent = app.world_mut().spawn(Router).id();
 		let image_entity =
 			app.world_mut().spawn((ShowImage, ChildOf(agent))).id();
-		let drive_entity =
-			app.world_mut().spawn((LogDriveForDuration, ChildOf(agent))).id();
-		app.world_mut()
-			.spawn((RespondMultiModalAction, config, ChildOf(agent)));
+		let drive_entity = app
+			.world_mut()
+			.spawn((LogDriveForDuration, ChildOf(agent)))
+			.id();
+		app.world_mut().spawn((
+			RespondMultiModalAction,
+			config,
+			ChildOf(agent),
+		));
 		app.world_mut().flush();
 
 		let body = serde_json::to_string(&input).unwrap();
-		app.world_mut()
-			.entity_mut(agent)
-			.run_async_local(move |agent| async move {
+		app.world_mut().entity_mut(agent).run_async_local(
+			move |agent| async move {
 				agent
 					.call_detached(
 						route_action(),
@@ -245,10 +255,11 @@ mod test {
 					.into_result()
 					.await?;
 				Ok(())
-			});
+			},
+		);
 
 		app_ext::update_until(&mut app, move |world| {
-			world.get::<DriveForDuration>(drive_entity).is_some()
+			world.get::<LoggedDrive>(drive_entity).is_some()
 		})
 		.await
 		.xpect_true();
@@ -278,8 +289,8 @@ mod test {
 			.cloned()
 			.xpect_eq(Some(DisplayedImage("joy".into())));
 		app.world_mut()
-			.get::<DriveForDuration>(drive_entity)
-			.map(|command| command.drive)
+			.get::<LoggedDrive>(drive_entity)
+			.map(|logged| logged.drive)
 			.xpect_eq(Some(DifferentialDrive::new(40., 90.)));
 	}
 
@@ -313,8 +324,8 @@ mod test {
 		)
 		.await;
 		app.world_mut()
-			.get::<DriveForDuration>(drive_entity)
-			.map(|command| command.duration)
+			.get::<LoggedDrive>(drive_entity)
+			.map(|logged| logged.duration)
 			.xpect_eq(Some(Duration::from_secs(1)));
 	}
 }

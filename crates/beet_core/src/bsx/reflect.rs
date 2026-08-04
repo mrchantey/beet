@@ -182,10 +182,13 @@ fn scalar_to_reflect(
 	field_info: Option<&'static TypeInfo>,
 ) -> Result<Box<dyn PartialReflect>> {
 	// numeric coercion: read as f64 then cast to the field's concrete type id.
+	// A numeric string parses too (the quoted twin of the bare-number form), so
+	// a markup `port="0"` authors a numeric field directly.
 	let as_f64 = match value {
 		Value::Uint(uint) => Some(*uint as f64),
 		Value::Int(int) => Some(*int as f64),
 		Value::Float(float) => Some(*float),
+		Value::Str(string) => string.as_str().trim().parse::<f64>().ok(),
 		_ => None,
 	};
 	if let (Some(number), Some(TypeInfo::Opaque(opaque))) = (as_f64, field_info)
@@ -209,6 +212,18 @@ fn scalar_to_reflect(
 		dynamic.insert_boxed(cast);
 		dynamic.set_represented_type(field_info);
 		return Ok(Box::new(dynamic));
+	}
+
+	// a non-numeric string targeting a numeric field errors rather than silently
+	// falling through to `String` (whose `from_reflect` miss would keep the
+	// target's default, eg a `port="nope"` leaving the default port)
+	if let (Value::Str(string), None, Some(info)) = (value, as_f64, field_info)
+		&& is_numeric_target(info)
+	{
+		bevybail!(
+			"invalid number {string:?}: expected a numeric string for a `{}` field",
+			info.type_path()
+		);
 	}
 
 	// a human duration string targeting a `Duration` field, so a markup
@@ -237,7 +252,9 @@ fn scalar_to_reflect(
 			"true" => true,
 			"false" => false,
 			other => {
-				bevybail!("invalid bool {other:?}: expected \"true\" or \"false\"")
+				bevybail!(
+					"invalid bool {other:?}: expected \"true\" or \"false\""
+				)
 			}
 		};
 		return Ok(Box::new(parsed));
@@ -351,6 +368,20 @@ fn cast_number(
 		Some(Box::new(number as usize))
 	} else {
 		None
+	}
+}
+
+/// Whether a target [`TypeInfo`] is a numeric scalar (a [`cast_number`] id) or
+/// a single-field tuple-struct newtype wrapping one.
+fn is_numeric_target(info: &TypeInfo) -> bool {
+	match info {
+		TypeInfo::Opaque(opaque) => {
+			cast_number(0.0, opaque.type_id()).is_some()
+		}
+		TypeInfo::TupleStruct(info) if info.field_len() == 1 => info
+			.field_at(0)
+			.is_some_and(|field| cast_number(0.0, field.type_id()).is_some()),
+		_ => false,
 	}
 }
 
@@ -726,6 +757,32 @@ mod test {
 		literal_to_reflect(
 			&DataLiteral::Scalar(Value::str("yes")),
 			Some(bool::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.is_err()
+		.xpect_true();
+	}
+
+	/// A numeric string coerces to a numeric field, the quoted twin of the bare
+	/// number, so a markup `<HttpServer port="0"/>` authors an `Option<u16>`
+	/// port; a non-numeric string targeting a numeric field is a hard error
+	/// rather than a silent miss (`from_reflect` would keep the default).
+	#[beet_core::test]
+	fn coerces_string_to_number() {
+		resolve::<u16>(DataLiteral::Scalar(Value::str("0"))).xpect_eq(0);
+		resolve::<f32>(DataLiteral::Scalar(Value::str("1.5"))).xpect_eq(1.5);
+		resolve::<Option<u16>>(DataLiteral::Scalar(Value::str("8080")))
+			.xpect_eq(Some(8080));
+		#[derive(Reflect, PartialEq, Debug)]
+		struct Speed(f32);
+		resolve::<Speed>(DataLiteral::Scalar(Value::str("60")))
+			.xpect_eq(Speed(60.0));
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		literal_to_reflect(
+			&DataLiteral::Scalar(Value::str("nope")),
+			Some(u16::type_info()),
 			&registry,
 			&mut resolver,
 		)

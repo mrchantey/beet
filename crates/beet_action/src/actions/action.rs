@@ -2,48 +2,36 @@ use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
+use core::panic::Location;
 
+/// The one action an entity holds, keyed by its `(In, Out)` signature.
+///
+/// It is the sole producer of [`ActionMeta`]: inserting it inserts the meta,
+/// removing it removes the meta, and a second action with a different handler
+/// raises a clobber error rather than silently taking the slot. Additional
+/// signatures for the same behaviour belong on an [`ActionOverload`], which
+/// registers its pair in the meta and never touches the canonical fields.
 #[derive(Component)]
-#[component(on_add=on_add::<In, Out>)]
+#[component(on_insert = Action::<In, Out>::on_insert, on_remove = Action::<In, Out>::on_remove)]
 pub struct Action<In: 'static, Out: 'static> {
-	/// The full type name of the handler, for display and debugging.
-	handler_meta: TypeMeta,
+	/// Describes this action, becoming the entity's [`ActionMeta`] on insert.
+	meta: ActionMeta,
 	handler: Arc<dyn 'static + Send + Sync + Fn(ActionCall<In, Out>) -> Result>,
 }
 
 impl<In: 'static, Out: 'static> core::fmt::Debug for Action<In, Out> {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		f.debug_struct("Action")
-			.field("handler_meta", &self.handler_meta)
-			.finish()
+		f.debug_struct("Action").field("meta", &self.meta).finish()
 	}
 }
 
 impl<In: 'static, Out: 'static> Clone for Action<In, Out> {
 	fn clone(&self) -> Self {
 		Self {
-			handler_meta: self.handler_meta,
+			meta: self.meta.clone(),
 			handler: Arc::clone(&self.handler),
 		}
 	}
-}
-
-/// Fallback hook that inserts a basic [`ActionMeta`] when a `Action` is
-/// spawned without one. Actions created via the `#[action]` macro provide
-/// a richer [`ActionMeta`] through `#[require]`, which is already present
-/// by the time this hook runs, so the check short-circuits.
-// couldnt this just also be a require or would that clobber?
-fn on_add<In: 'static, Out: 'static>(
-	mut world: DeferredWorld,
-	cx: HookContext,
-) {
-	if world.entity(cx.entity).contains::<ActionMeta>() {
-		return;
-	}
-	world
-		.commands()
-		.entity(cx.entity)
-		.insert(ActionMeta::of::<(), In, Out>());
 }
 
 impl<In, Out> Action<In, Out>
@@ -52,16 +40,127 @@ where
 	Out: 'static,
 {
 	pub fn new(
-		handler_meta: TypeMeta,
+		meta: ActionMeta,
 		handler: impl 'static + Send + Sync + Fn(ActionCall<In, Out>) -> Result,
 	) -> Self {
 		Self {
-			handler_meta,
+			meta,
 			handler: Arc::new(handler),
 		}
 	}
 
-	pub fn handler_meta(&self) -> TypeMeta { self.handler_meta }
+	/// Replace this action's [`ActionMeta`], the richer descriptor a provider
+	/// supplies at its `#[require]` site so the meta names the provider rather
+	/// than an opaque closure type.
+	pub fn with_meta(mut self, meta: ActionMeta) -> Self {
+		self.meta = meta;
+		self
+	}
+
+	/// This action's descriptor, the entity's [`ActionMeta`] once inserted.
+	pub fn meta(&self) -> &ActionMeta { &self.meta }
+
+	/// The full type name of the handler, for display and debugging.
+	pub fn handler_meta(&self) -> TypeMeta { *self.meta.handler() }
+
+	/// Guard A: [`ActionMeta`] ownership. Deferred through [`Commands`] so two
+	/// actions inserted in one bundle are checked against each other rather than
+	/// both seeing an empty entity.
+	///
+	/// - no meta: insert this action's
+	/// - an unset or same-handler meta: replace it, keeping any
+	///   [`ActionOverload`] registrations, so a reload is idempotent
+	/// - any other handler: raise a clobber error
+	///
+	/// Always through `insert`, never an in-place edit, so consumers observing
+	/// `Insert<ActionMeta>` (route discovery) see the final meta rather than an
+	/// [`unset`](ActionMeta::unset) one an overload created first.
+	///
+	/// `on_insert` rather than `on_add` so an overwrite is caught too: bevy runs
+	/// `on_replace` then `on_insert` on overwrite and skips `on_add`.
+	fn on_insert(mut world: DeferredWorld, cx: HookContext) {
+		let Some(canonical) = world
+			.entity(cx.entity)
+			.get::<Self>()
+			.map(Action::meta)
+			.cloned()
+		else {
+			return;
+		};
+		let entity = cx.entity;
+		let location = Location::caller();
+		world.commands().queue(move |world: &mut World| {
+			let Ok(entity_ref) = world.get_entity(entity) else {
+				return;
+			};
+			let existing = entity_ref.get::<ActionMeta>().map(|meta| {
+				let clobbers =
+					!meta.is_unset() && *meta.handler() != *canonical.handler();
+				(clobbers, meta.name(), meta.overloads().clone())
+			});
+			match existing {
+				Some((true, existing_name, _)) => {
+					let err = bevyhow!(
+						"an entity holds at most one action, but {entity} already \
+						 holds {existing_name}. Remove it before inserting {}.",
+						canonical.name(),
+					);
+					world.handle_command_error::<Self>(err, location);
+				}
+				Some((false, _, overloads)) => {
+					world
+						.entity_mut(entity)
+						.insert(canonical.with_overloads(overloads));
+				}
+				None => {
+					world.entity_mut(entity).insert(canonical);
+				}
+			}
+		});
+	}
+
+	/// Removing the action removes its [`ActionMeta`], so a meta can never
+	/// outlive the action it describes.
+	fn on_remove(mut world: DeferredWorld, cx: HookContext) {
+		world
+			.commands()
+			.entity(cx.entity)
+			.try_remove::<ActionMeta>();
+	}
+
+	/// Guard B: provider integrity. Verifies the entity's `Action<In, Out>` is
+	/// still the one `P` provides, catching a colocated explicit action silently
+	/// taking the slot (bevy's `#[require]` yields to an explicit component), which
+	/// leaves exactly one truthful action behind and so is invisible to guard A.
+	///
+	/// Applied in path form, since a call expression cannot name a component's own
+	/// generic params:
+	/// `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`.
+	#[track_caller]
+	pub fn assert_provider<P: 'static>(
+		mut world: DeferredWorld,
+		cx: HookContext,
+	) {
+		let intact = world
+			.entity(cx.entity)
+			.get::<Self>()
+			.is_some_and(|action| action.handler_meta() == TypeMeta::of::<P>());
+		if intact {
+			return;
+		}
+		let err = bevyhow!(
+			"{} on {} lost its action slot: a colocated explicit Action<{}, {}> \
+			 replaced the one it requires, so everything depending on it is inert. \
+			 Move the explicit action (or this provider) to its own entity.",
+			core::any::type_name::<P>(),
+			cx.entity,
+			core::any::type_name::<In>(),
+			core::any::type_name::<Out>(),
+		);
+		world
+			.commands()
+			.handle_command_error::<P>(err, Location::caller());
+	}
 
 	/// Invoke this action handler with the given [`ActionCall`].
 	///
@@ -248,22 +347,90 @@ mod test {
 	#[derive(Reflect)]
 	fn add((a, b): (u32, u32)) -> u32 { a + b }
 
-	#[beet_core::test]
-	fn bare_action_auto_inserts_basic_meta() {
-		let mut world = World::new();
-		let entity = world.spawn(add.into_action());
-		let meta = entity.get::<ActionMeta>().unwrap();
-		// basic fallback meta has no type_info
-		meta.type_info().xpect_none();
+	/// A provider whose `#[require]` supplies the entity's action, the shape
+	/// guard B protects.
+	#[derive(Default, Component)]
+	#[require(Action<u32, u32> = double().with_meta(ActionMeta::of::<Provider, u32, u32>()))]
+	#[component(on_add = Action::<u32, u32>::assert_provider::<Self>)]
+	struct Provider;
+
+	fn double() -> Action<u32, u32> {
+		Action::new_pure(|cx: ActionContext<u32>| *cx * 2)
+	}
+	fn increment() -> Action<u32, u32> {
+		Action::new_pure(|cx: ActionContext<u32>| *cx + 1)
+	}
+	fn negate() -> Action<i32, i32> {
+		Action::new_pure(|cx: ActionContext<i32>| -*cx)
 	}
 
 	#[beet_core::test]
-	fn macro_meta_takes_priority() {
+	fn the_action_owns_the_meta() {
 		let mut world = World::new();
-		let meta = ActionMeta::of_handler::<add, add>();
-		let entity = world.spawn((add.into_action(), meta));
-		// the richer meta from of_handler is preserved
-		entity.get::<ActionMeta>().unwrap().type_info().xpect_some();
+		let entity = world.spawn(add.into_action()).id();
+		world.flush();
+		// the handler-derived meta carries no reflection data
+		world
+			.get::<ActionMeta>(entity)
+			.unwrap()
+			.type_info()
+			.xpect_none();
+
+		world.entity_mut(entity).remove::<Action<(u32, u32), u32>>();
+		world.flush();
+		// removing the action removes the meta it describes
+		world.get::<ActionMeta>(entity).xpect_none();
+	}
+
+	#[beet_core::test]
+	#[should_panic = "at most one action"]
+	fn two_actions_on_one_entity_raise() {
+		let mut world = World::new();
+		world.spawn((add.into_action(), negate()));
+		world.flush();
+	}
+
+	#[beet_core::test]
+	#[should_panic = "at most one action"]
+	fn overwrite_with_a_different_handler_raises() {
+		let mut world = World::new();
+		let entity = world.spawn(add.into_action()).id();
+		world.flush();
+		world.entity_mut(entity).insert(double());
+		world.flush();
+	}
+
+	/// A scene reload re-inserts the same required action, which must refresh the
+	/// meta in place rather than raise, keeping any overload registrations.
+	#[beet_core::test]
+	fn reinserting_the_same_provider_is_idempotent() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((
+				Provider,
+				ActionOverload::new(Action::<i32, i32>::new_pure(
+					|cx: ActionContext<i32>| *cx,
+				)),
+			))
+			.id();
+		world.flush();
+		world.entity_mut(entity).insert(Provider);
+		world.flush();
+
+		let meta = world.get::<ActionMeta>(entity).unwrap();
+		meta.name().xpect_contains("Provider");
+		meta.serves::<u32, u32>().xpect_true();
+		meta.serves::<i32, i32>().xpect_true();
+	}
+
+	/// A colocated explicit action wins over the provider's `#[require]`, leaving
+	/// one truthful action behind, which only guard B can see.
+	#[beet_core::test]
+	#[should_panic = "lost its action slot"]
+	fn provider_losing_its_slot_raises() {
+		let mut world = World::new();
+		world.spawn((Provider, increment()));
+		world.flush();
 	}
 
 	#[beet_core::test]

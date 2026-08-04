@@ -7,7 +7,7 @@ one and returns its outcome. Here the 0.6 child wins over the 0.4 child.
 
     beet --main=examples/action/utility_ai.bsx
 -->
-<HighestScore {RunOnLoad}>
+<HighestScore {CallOnLoad}>
 	<Log::Message("this child does not run") {Score(0.4)}/>
 	<Log::Message("this child runs") {Score(0.6)}/>
 </HighestScore>

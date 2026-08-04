@@ -429,22 +429,23 @@ impl RuleSetQuery<'_, '_> {
 		// only a combinator rule (`main > *`) needs the ancestor chain, and only
 		// a width-gated rule needs the surface viewport, so resolve each lazily
 		// and only when the rule set calls for it.
-		let needs_ancestors =
-			*memo.has_combinators.get_or_insert_with(|| {
-				self.rule_set.has_combinator_rules()
-			});
+		let needs_ancestors = *memo
+			.has_combinators
+			.get_or_insert_with(|| self.rule_set.has_combinator_rules());
 		let needs_viewport = *memo
 			.has_width_media
 			.get_or_insert_with(|| self.rule_set.has_width_media());
-		let matched = memo.matched_rules.entry(el.entity).or_insert_with(|| {
-			let ancestors = needs_ancestors
-				.then(|| self.ancestor_elements(el.entity))
-				.unwrap_or_default();
-			let viewport = needs_viewport
-				.then(|| self.surface_viewport(el.entity))
-				.flatten();
-			self.rule_set.matching_rule_indices(&el, &ancestors, viewport)
-		});
+		let matched =
+			memo.matched_rules.entry(el.entity).or_insert_with(|| {
+				let ancestors = needs_ancestors
+					.then(|| self.ancestor_elements(el.entity))
+					.unwrap_or_default();
+				let viewport = needs_viewport
+					.then(|| self.surface_viewport(el.entity))
+					.flatten();
+				self.rule_set
+					.matching_rule_indices(&el, &ancestors, viewport)
+			});
 		self.rule_set.cascade_in(matched, token)
 	}
 }
@@ -519,14 +520,16 @@ mod tests {
 	#[beet_core::test]
 	fn child_combinator_cascade() {
 		let mut world = World::new();
-		world.insert_resource(RuleSet::default().with_rule(
-			Rule::new()
-				.with_selector(Selector::child(
-					Selector::tag("main"),
-					Selector::Any,
-				))
-				.with_value(Foo, 1u32),
-		));
+		world.insert_resource(
+			RuleSet::default().with_rule(
+				Rule::new()
+					.with_selector(Selector::child(
+						Selector::tag("main"),
+						Selector::Any,
+					))
+					.with_value(Foo, 1u32),
+			),
+		);
 		world.spawn(rsx! { <main><span><em/></span></main> });
 		let (span, em, main) = (
 			tag_entity(&mut world, "span"),
@@ -549,7 +552,9 @@ mod tests {
 	/// Spawn `<div/>` under a surface `width_px` wide, returning the div.
 	fn div_under_viewport(world: &mut World, width_px: f32) -> Entity {
 		let surface = world
-			.spawn((MediaViewport::new(width_px, 768.), children![rsx! { <div/> }]))
+			.spawn((MediaViewport::new(width_px, 768.), children![
+				rsx! { <div/> }
+			]))
 			.id();
 		world.entity(surface).get::<Children>().unwrap()[0]
 	}
@@ -579,10 +584,9 @@ mod tests {
 		let mut world = World::new();
 		world.insert_resource(RuleSet::default().with_rule(max_width_rule()));
 		let content = world.spawn(rsx! { <div/> }).id();
-		world.spawn((
-			MediaViewport::new(640., 768.),
-			children![Portal::new(content)],
-		));
+		world.spawn((MediaViewport::new(640., 768.), children![Portal::new(
+			content
+		)]));
 		selects(&mut world, content).xpect_true();
 	}
 
@@ -590,14 +594,16 @@ mod tests {
 	#[beet_core::test]
 	fn descendant_combinator_cascade() {
 		let mut world = World::new();
-		world.insert_resource(RuleSet::default().with_rule(
-			Rule::new()
-				.with_selector(Selector::descendant(
-					Selector::tag("main"),
-					Selector::tag("em"),
-				))
-				.with_value(Foo, 1u32),
-		));
+		world.insert_resource(
+			RuleSet::default().with_rule(
+				Rule::new()
+					.with_selector(Selector::descendant(
+						Selector::tag("main"),
+						Selector::tag("em"),
+					))
+					.with_value(Foo, 1u32),
+			),
+		);
 		world.spawn(rsx! { <main><span><em/></span></main> });
 		let (em, span) =
 			(tag_entity(&mut world, "em"), tag_entity(&mut world, "span"));

@@ -18,11 +18,11 @@ use bevy::input::keyboard::KeyCode;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::math::UVec2;
 
-/// A multi-tenant SSH-TUI server, spread on a router: the boot fan-out whose
-/// `--server` selects `"ssh"` boots an [`SshServer`] on the router and serves every
-/// connection its own navigable terminal browsing this router.
+/// A multi-tenant SSH-TUI server, a child of its router: the boot fan-out whose
+/// `--server` selects `"ssh"` boots an [`SshServer`] on this entity and serves every
+/// connection its own navigable terminal browsing the ancestor router.
 ///
-/// A long-running server: it never resolves the boot call, so the host's
+/// A long-running server: it never resolves the boot call, so its
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up.
 /// Reads `--port` / `--host` from the boot request (defaulting from
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
@@ -30,33 +30,30 @@ use bevy::math::UVec2;
 /// [`HttpServer`] on the same router, so one process answers http and ssh at once.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(ContinueRun<Boot, Response>)]
-#[component(on_add = on_add)]
+#[require(StartOnLoad)]
+#[component(on_add = on_add_ext::observe(on_action_in))]
 pub struct SshTuiServer;
 
-/// Registers the boot ([`StartRunning<Boot>`]) observer on the router, so the SSH
-/// listener boots when the boot fan-out selects `"ssh"`.
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_action_in);
-}
-
 /// Boots the SSH listener on the boot fan-out, if `--server` selects `"ssh"`:
-/// builds an [`SshServer`] from the request and inserts it on the router (its
+/// builds an [`SshServer`] from the request and inserts it on this entity (its
 /// `on_add` starts the listener), and records the opening route. Never resolves
 /// the boot call, so its `Running` parks the process up.
-fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
-	let (selected, port, host, opening) = ev.with(|boot| {
+fn on_action_in(
+	ev: On<StartRunning<Request>>,
+	mut commands: Commands,
+) -> Result {
+	let (selected, port, host, opening) = ev.with(|request| {
 		(
-			request_selects_server(boot, "ssh", true),
-			boot.get_param("port").and_then(|port| port.parse().ok()),
-			boot.get_param("host").map(|host| {
+			request_selects_server(request, "ssh", true),
+			request.get_param("port").and_then(|port| port.parse().ok()),
+			request.get_param("host").map(|host| {
 				if host == "0.0.0.0" {
 					[0, 0, 0, 0]
 				} else {
 					[127, 0, 0, 1]
 				}
 			}),
-			OpeningRoute::from_request(boot),
+			OpeningRoute::from_request(request),
 		)
 	})?;
 	if !selected {
@@ -70,9 +67,12 @@ fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 	if let Some(host) = host {
 		server.host = host;
 	}
-	// the opening route each session navigates to, recorded on the router (the
+	// the opening route each session navigates to, recorded on the server (the
 	// shared mechanism the local TUI server also reads).
-	commands.entity(ev.entity).insert((server, opening));
+	// `ServerBooted` flags the boot as served, so `assert_server_booted` lets it park
+	commands
+		.entity(ev.entity)
+		.insert((ServerBooted, server, opening));
 	Ok(())
 }
 
@@ -80,7 +80,7 @@ fn on_action_in(ev: On<StartRunning<Boot>>, mut commands: Commands) -> Result {
 /// up a surface per connection, drains each surface's frame to its client, and
 /// closes a session on ctrl+c.
 ///
-/// The server component (on the router) boots the listener; this plugin provides
+/// The server component (a child of the router) boots the listener; this plugin provides
 /// the connection lifecycle, mirroring how [`TuiServer`] pairs with the live
 /// plugins ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]), which
 /// an SSH-TUI app must also add.
@@ -134,8 +134,10 @@ fn on_ssh_recv(
 			// terminal, plus the resulting graphics detection. The `terminal` name
 			// and pixel window size are the only signals a kitty/ghostty client can
 			// forward over SSH, so dump them to tune `KittyGraphicsSupport`.
-			let graphics =
-				KittyGraphicsSupport::from_pty(&pty.terminal, pty.window.pixels);
+			let graphics = KittyGraphicsSupport::from_pty(
+				&pty.terminal,
+				pty.window.pixels,
+			);
 			info!(
 				"ssh pty request: terminal={:?} cells={:?} pixels={:?} \
 				 terminal_modes={:?} → kitty_graphics={}",
@@ -261,7 +263,12 @@ fn restore_sessions_on_exit(
 	mut commands: Commands,
 ) -> Result {
 	for connection in connections.iter() {
-		restore_session(connection, &mut surfaces, &mut channels, &mut commands)?;
+		restore_session(
+			connection,
+			&mut surfaces,
+			&mut channels,
+			&mut commands,
+		)?;
 		commands
 			.entity(connection)
 			.trigger_target(SshSend(SshEvent::Close(None)));
@@ -320,21 +327,25 @@ mod test {
 		app
 	}
 
-	/// A router serving two routes, carrying an [`SshTuiServer`] + its opening home.
-	fn spawn_router(app: &mut App) -> Entity {
+	/// A router serving two routes, with an [`SshTuiServer`] child + its opening
+	/// home. Returns the server entity, the parent of simulated connections.
+	fn spawn_server(app: &mut App) -> Entity {
+		let router = app
+			.world_mut()
+			.spawn((Router, children![
+				render_action::fixed_func_route("alpha", || {
+					rsx! { <p>"Alpha page"</p> }
+				}),
+				render_action::fixed_func_route("beta", || {
+					rsx! { <p>"Beta page"</p> }
+				}),
+			]))
+			.id();
 		app.world_mut()
 			.spawn((
-				Router,
 				SshTuiServer,
 				OpeningRoute(Url::parse("alpha")),
-				children![
-					render_action::fixed_func_route("alpha", || {
-						rsx! { <p>"Alpha page"</p> }
-					}),
-					render_action::fixed_func_route("beta", || {
-						rsx! { <p>"Beta page"</p> }
-					}),
-				],
+				ChildOf(router),
 			))
 			.flush()
 	}
@@ -399,8 +410,8 @@ mod test {
 	#[beet_core::test]
 	async fn pty_request_serves_the_home_page() {
 		let mut app = ssh_tui_app();
-		let router = spawn_router(&mut app);
-		let connection = open_connection(&mut app, router, UVec2::new(40, 8));
+		let server = spawn_server(&mut app);
+		let connection = open_connection(&mut app, server, UVec2::new(40, 8));
 		// the surface components landed on the connection entity
 		app.world()
 			.entity(connection)
@@ -422,11 +433,11 @@ mod test {
 	#[beet_core::test]
 	async fn pty_terminal_sets_per_session_graphics_support() {
 		let mut app = ssh_tui_app();
-		let router = spawn_router(&mut app);
+		let server = spawn_server(&mut app);
 		let size = UVec2::new(40, 8);
-		let kitty = open_connection_with(&mut app, router, size, "xterm-kitty");
+		let kitty = open_connection_with(&mut app, server, size, "xterm-kitty");
 		let plain =
-			open_connection_with(&mut app, router, size, "xterm-256color");
+			open_connection_with(&mut app, server, size, "xterm-256color");
 		let enabled = |app: &App, connection: Entity| {
 			app.world()
 				.entity(connection)
@@ -442,9 +453,9 @@ mod test {
 	#[beet_core::test]
 	async fn two_sessions_navigate_independently() {
 		let mut app = ssh_tui_app();
-		let router = spawn_router(&mut app);
-		let first = open_connection(&mut app, router, UVec2::new(40, 8));
-		let second = open_connection(&mut app, router, UVec2::new(40, 8));
+		let server = spawn_server(&mut app);
+		let first = open_connection(&mut app, server, UVec2::new(40, 8));
+		let second = open_connection(&mut app, server, UVec2::new(40, 8));
 		drive_until(&mut app, first, "Alpha page");
 		drive_until(&mut app, second, "Alpha page");
 
@@ -489,18 +500,22 @@ mod test {
 		app.world_mut().insert_resource(registry);
 		let router = app
 			.world_mut()
+			.spawn((store, Router, BsxLayout::default(), children![route(
+				"",
+				BlobScene::new("index.html")
+			)]))
+			.id();
+		let server = app
+			.world_mut()
 			.spawn((
-				store,
-				Router,
-				BsxLayout::default(),
 				SshTuiServer,
 				OpeningRoute(Url::parse("")),
-				children![route("", BlobScene::new("index.html"))],
+				ChildOf(router),
 			))
 			.flush();
-		let first = open_connection(&mut app, router, UVec2::new(40, 8));
+		let first = open_connection(&mut app, server, UVec2::new(40, 8));
 		drive_until(&mut app, first, "Mind your step");
-		let second = open_connection(&mut app, router, UVec2::new(40, 8));
+		let second = open_connection(&mut app, server, UVec2::new(40, 8));
 		drive_until(&mut app, second, "Mind your step");
 
 		frame(&mut app, second)
@@ -521,8 +536,8 @@ mod test {
 	#[beet_core::test]
 	async fn ctrl_c_restores_client_terminal_before_close() {
 		let mut app = ssh_tui_app();
-		let router = spawn_router(&mut app);
-		let connection = open_connection(&mut app, router, UVec2::new(40, 8));
+		let server = spawn_server(&mut app);
+		let connection = open_connection(&mut app, server, UVec2::new(40, 8));
 		drive_until(&mut app, connection, "Alpha page");
 
 		// record, in order, every event the session would send to its client.
@@ -623,18 +638,22 @@ mod test {
 		}
 	}
 
-	/// A router carrying the drawer layout + the SSH-TUI server, serving one home
-	/// route and opening on it.
+	/// A router carrying the drawer layout, serving one home route, with an
+	/// SSH-TUI server child opening on it. Returns the server entity.
 	fn spawn_drawer_router(app: &mut App) -> Entity {
+		let router = app
+			.world_mut()
+			.spawn((Router, BaseLayout::<DrawerLayout>::default(), children![
+				render_action::fixed_func_route("home", || {
+					rsx! { <p>"Home page"</p> }
+				})
+			]))
+			.id();
 		app.world_mut()
 			.spawn((
-				Router,
-				BaseLayout::<DrawerLayout>::default(),
 				SshTuiServer,
 				OpeningRoute(Url::parse("home")),
-				children![render_action::fixed_func_route("home", || {
-					rsx! { <p>"Home page"</p> }
-				})],
+				ChildOf(router),
 			))
 			.flush()
 	}
@@ -649,9 +668,9 @@ mod test {
 						.ok()
 						.and_then(|attrs| {
 							attrs.iter().find(|&attr| {
-								attr_keys
-									.get(attr)
-									.is_ok_and(|attr_key| attr_key.as_str() == key)
+								attr_keys.get(attr).is_ok_and(|attr_key| {
+									attr_key.as_str() == key
+								})
 							})
 						})
 						.and_then(|attr| values.get(attr).ok())
@@ -686,7 +705,11 @@ mod test {
 			if entity == target {
 				return true;
 			}
-			match world.get_entity(entity).ok().and_then(|e| e.get::<ChildOf>()) {
+			match world
+				.get_entity(entity)
+				.ok()
+				.and_then(|e| e.get::<ChildOf>())
+			{
 				Some(child_of) => entity = child_of.parent(),
 				None => return false,
 			}
@@ -695,7 +718,11 @@ mod test {
 
 	/// The first painted cell in `surface`'s front buffer owned by `target`'s
 	/// subtree, for aiming an SGR click at a rendered element.
-	fn cell_of(app: &mut App, surface: Entity, target: Entity) -> Option<IVec2> {
+	fn cell_of(
+		app: &mut App,
+		surface: Entity,
+		target: Entity,
+	) -> Option<IVec2> {
 		let painted: Vec<(IVec2, Entity)> = {
 			let buffer = app.world().get::<DoubleBuffer>(surface)?;
 			let front = buffer.front_buffer();
@@ -742,9 +769,9 @@ mod test {
 	#[beet_core::test]
 	async fn menu_button_toggles_only_its_own_session_sidebar() {
 		let mut app = ssh_tui_live_app();
-		let router = spawn_drawer_router(&mut app);
-		let session_a = open_connection(&mut app, router, UVec2::new(40, 8));
-		let session_b = open_connection(&mut app, router, UVec2::new(40, 8));
+		let server = spawn_drawer_router(&mut app);
+		let session_a = open_connection(&mut app, server, UVec2::new(40, 8));
+		let session_b = open_connection(&mut app, server, UVec2::new(40, 8));
 		drive_until(&mut app, session_a, "Home page");
 		drive_until(&mut app, session_b, "Home page");
 
@@ -800,17 +827,21 @@ mod test {
 		app.world_mut().insert_resource(registry);
 		let router = app
 			.world_mut()
+			.spawn((store, Router, BsxLayout::default(), children![route(
+				"counter",
+				BlobScene::new("counter.bsx")
+			)]))
+			.id();
+		let server = app
+			.world_mut()
 			.spawn((
-				store,
-				Router,
-				BsxLayout::default(),
 				SshTuiServer,
 				OpeningRoute(Url::parse("counter")),
-				children![route("counter", BlobScene::new("counter.bsx"))],
+				ChildOf(router),
 			))
 			.flush();
-		let session_a = open_connection(&mut app, router, UVec2::new(40, 8));
-		let session_b = open_connection(&mut app, router, UVec2::new(40, 8));
+		let session_a = open_connection(&mut app, server, UVec2::new(40, 8));
+		let session_b = open_connection(&mut app, server, UVec2::new(40, 8));
 		drive_until(&mut app, session_a, "clicked 0 times");
 		drive_until(&mut app, session_b, "clicked 0 times");
 

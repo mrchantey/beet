@@ -62,7 +62,7 @@ where
 
 	fn into_action(self) -> Action<Self::In, Self::Out> {
 		Action::new(
-			TypeMeta::of::<WrapFn>(),
+			ActionMeta::of::<WrapFn, Self::In, Self::Out>(),
 			move |ActionCall {
 			          commands,
 			          caller: _,
@@ -108,7 +108,7 @@ where
 
 	fn into_action(self) -> Action<Self::In, Self::Out> {
 		Action::new(
-			TypeMeta::of::<WrapFn>(),
+			ActionMeta::of::<WrapFn, Self::In, Self::Out>(),
 			move |ActionCall {
 			          commands,
 			          caller: _,
@@ -169,7 +169,7 @@ where
 		let outer_handler = self.into_action();
 
 		Action::new(
-			TypeMeta::of::<(T, Inner)>(),
+			ActionMeta::of::<(T, Inner), OuterIn, OuterOut>(),
 			move |ActionCall {
 			          commands,
 			          caller,

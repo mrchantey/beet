@@ -99,7 +99,7 @@ pub(crate) fn rebuild_entry(world: &mut World, root: Entity) {
 	// what the browser observes.
 	disconnect_clients(world);
 	// drive the rebuild on the local pool (as the initial load runs), so the
-	// despawn+respawn and the fresh root's `BootOnLoad` boot land on the runtime.
+	// despawn+respawn and the fresh root's `CallOnLoad` boot land on the runtime.
 	world.run_async_local(move |world| async move {
 		if let Err(err) = (reloader.rebuild)(world).await {
 			error!("entry rebuild failed: {err}");
@@ -185,11 +185,12 @@ mod test {
 		// reload path (mark as `reload_site_on_change` would, then process).
 		spawn_entry_root(&mut world, &store);
 		for _ in 0..5 {
-			let root = world
-				.with_state::<Query<Entity, With<LiveReload>>, _>(|query| {
-					query.single().unwrap()
-				});
-			world.entity_mut(root).insert((NeedsReload, NeedsEntryRebuild));
+			let root = world.with_state::<Query<Entity, With<LiveReload>>, _>(
+				|query| query.single().unwrap(),
+			);
+			world
+				.entity_mut(root)
+				.insert((NeedsReload, NeedsEntryRebuild));
 			process_live_reloads(&mut world);
 			AsyncRunner::settle_async_tasks(&mut world).await;
 		}

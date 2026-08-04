@@ -9,10 +9,15 @@ use beet_net::prelude::*;
 const TEST_VERSION: &str = "test-v1";
 
 fn main() -> AppExit {
-	App::new()
-		.add_plugins((MinimalPlugins, ServerPlugin))
-		.spawn((HttpServer::default(), exchange_handler(handle_request)))
-		.run()
+	let mut app = App::new();
+	app.add_plugins((MinimalPlugins, ServerPlugin));
+	// the server owns the boot, its dispatch host is the child
+	app.world_mut()
+		.spawn((HttpServer::default(), children![exchange_handler(
+			handle_request
+		)]))
+		.trigger(StartRunning::from_cli);
+	app.run()
 }
 
 fn handle_request(req: ActionContext<Request>) -> Response {

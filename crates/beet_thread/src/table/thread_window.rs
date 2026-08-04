@@ -183,8 +183,9 @@ impl ThreadWindow {
 		self.posts = posts;
 		// drop metas for pruned posts so `stored_response` never chains to them
 		let retained = &self.posts;
-		self.metas
-			.retain(|post_id, _| retained.iter().any(|post| post.id() == *post_id));
+		self.metas.retain(|post_id, _| {
+			retained.iter().any(|post| post.id() == *post_id)
+		});
 	}
 
 	/// Whether a post is part of the immutable seed (system/developer authored).
@@ -520,7 +521,11 @@ mod test {
 		let user = ActorId::new_now();
 		let agent = ActorId::new_now();
 		let mut window = ThreadWindow::new();
-		window.insert_actor(Actor::new_with_id(system, "Sys", ActorKind::System));
+		window.insert_actor(Actor::new_with_id(
+			system,
+			"Sys",
+			ActorKind::System,
+		));
 		window.insert_actor(Actor::new_with_id(user, "Cam", ActorKind::User));
 		window.insert_actor(Actor::new_with_id(agent, "Bot", ActorKind::Agent));
 		window.upsert_post(AgentPost::new_text(

@@ -26,7 +26,7 @@ use bytes::Bytes;
 /// `on_add` wires the receive pump, and it holds the wire [`codec`](Self::new) plus
 /// the in-flight requests originated over it. Read by [`socket_exchange`].
 #[derive(Component)]
-#[component(on_add = on_add, on_remove = on_remove)]
+#[component(on_add = on_add_ext::observe(on_exchange_recv), on_remove = on_remove)]
 pub struct ExchangeSocket {
 	/// The wire codec; pluggable so a constrained peer can swap the encoding.
 	codec: Arc<dyn ExchangeCodec>,
@@ -80,7 +80,9 @@ pub fn socket_exchange(connection: Entity) -> Action<Request, Response> {
 			})
 			.await??;
 		let frame = ExchangeFrame::request(id, cx.input).await?;
-		connection.trigger_target(MessageSend(codec.encode(&frame)?)).await?;
+		connection
+			.trigger_target(MessageSend(codec.encode(&frame)?))
+			.await?;
 		reply.wait().await.xok()
 	})
 }
@@ -196,10 +198,6 @@ impl ExchangeFrame {
 }
 
 /// Wire the receive pump when an [`ExchangeSocket`] is added to a connection.
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_exchange_recv);
-}
-
 /// Resolve any in-flight requests when the connection's exchange is torn down (eg
 /// the connection entity despawns), so an originator never hangs on a dropped peer.
 fn on_remove(mut world: DeferredWorld, cx: HookContext) {
@@ -252,18 +250,27 @@ fn on_exchange_recv(
 			body,
 		} => {
 			let codec = socket.codec.clone();
-			commands.entity(connection).run_local(async move |connection| {
-				serve_request(connection, codec, id, method, url, headers, body)
+			commands
+				.entity(connection)
+				.run_local(async move |connection| {
+					serve_request(
+						connection, codec, id, method, url, headers, body,
+					)
 					.await
-			});
+				});
 		}
 	}
 	Ok(())
 }
 
-/// Dispatch an inbound request through the connection's nearest ancestor (inclusive)
-/// `Action<Request, Response>` slot, then frame and send the reply correlated by `id`.
-/// A missing router replies `500`, so an originator always gets an answer.
+/// Dispatch an inbound request through the connection's router, then frame and
+/// send the reply correlated by `id`. A missing router replies `500`, so an
+/// originator always gets an answer.
+///
+/// The router is the connection itself when it carries the dispatch (a client
+/// socket spread on a `Router`), else the serving sibling of a server-adopted
+/// connection, since a socket server adopts each connection as a child alongside
+/// its router.
 async fn serve_request(
 	connection: AsyncEntity,
 	codec: Arc<dyn ExchangeCodec>,
@@ -276,17 +283,27 @@ async fn serve_request(
 	let mut parts = RequestParts::new(method, url);
 	parts.headers = headers;
 	let request = Request::from_parts(parts, Body::Bytes(Bytes::from(body)));
-	let router = connection
-		.with_state::<AncestorQuery<&Action<Request, Response>>, _>(
-			|entity, query| query.get_entity(entity),
-		)
-		.await?;
-	let response = match router {
-		Ok(router) => connection.world().entity(router).exchange(request).await,
-		Err(_) => Response::internal_error(),
+	let response = if connection
+		.get(|meta: &ActionMeta| meta.serves::<Request, Response>())
+		.await
+		.unwrap_or(false)
+	{
+		connection.exchange(request).await
+	} else if let Ok(parent) =
+		connection.get(|parent: &ChildOf| parent.parent()).await
+	{
+		connection
+			.world()
+			.entity(parent)
+			.exchange_child(request)
+			.await
+	} else {
+		Response::internal_error()
 	};
 	let frame = ExchangeFrame::response(id, response).await?;
-	connection.trigger_target(MessageSend(codec.encode(&frame)?)).await?;
+	connection
+		.trigger_target(MessageSend(codec.encode(&frame)?))
+		.await?;
 	Ok(())
 }
 

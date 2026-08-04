@@ -58,9 +58,9 @@ pub mod time_ext;
 /// [`units::LinearVelocity`], [`units::AngularVelocity`]) shared by the robot
 /// transport and the `SetDrive` action.
 pub mod units;
-pub use units::*;
 #[cfg(feature = "std")]
 pub use lazy_pool::*;
+pub use units::*;
 mod tree;
 mod xtend;
 pub use as_any::*;

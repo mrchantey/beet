@@ -205,8 +205,8 @@ where
 	let request = http_ext::parse_http_request(&buf)?
 		.with_header_raw(PEER_ADDR_HEADER, &peer_addr.to_string());
 
-	// Dispatch through the host's routing
-	let response: Response = entity.exchange(request).await;
+	// Dispatch through the router child
+	let response: Response = entity.exchange_child(request).await;
 
 	// A `101 Switching Protocols` (a route returning `WebSocketUpgrade`) means we
 	// write the handshake then keep the raw stream as a `Socket`, instead of
@@ -343,13 +343,9 @@ mod secure_test {
 		std::thread::spawn(move || {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((
-					server,
-					Tls::default(),
-					exchange_handler(|_| {
-						Response::ok().with_body("secure hello")
-					}),
-				))
+				.spawn((server, Tls::default(), children![exchange_handler(
+					|_| { Response::ok().with_body("secure hello") }
+				)]))
 				.run();
 		});
 		time_ext::sleep_millis(300).await;
@@ -413,12 +409,9 @@ mod test {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			// a route that upgrades any request to a websocket
-			app.world_mut().spawn((
-				server,
-				exchange_handler(|cx| {
-					WebSocketUpgrade::from_request(&cx).into()
-				}),
-			));
+			app.world_mut().spawn((server, children![exchange_handler(
+				|cx| { WebSocketUpgrade::from_request(&cx).into() }
+			)]));
 			// record landed sockets
 			app.world_mut()
 				.add_observer(move |ev: On<OnWebSocketUpgrade>| {

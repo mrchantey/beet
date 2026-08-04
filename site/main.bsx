@@ -4,15 +4,16 @@ The single canonical entry for the beet website: the content Router serving the
 it locally when the `beet` binary runs from the `site/` directory (`cd site && beet
 serve`, and `beet present`, `beet check`, `beet export-static`), and the deployed
 Fargate container loads the same entry directly from the bucket root. Either way
-this entry's `Router` carries the `BootOnLoad` verb that fires the boot once the
-build loads.
+this entry's `StartOnLoad` root carries the servers, and its `CallOnLoad` fires
+once the build loads, fanning the request out to them.
 
 It declares the three long-running servers (`HttpServer`, the local live
 `TuiServer`, and the multi-tenant `SshTuiServer`), so `--server` picks them once
 booted: the default boots them all, `--server=http,ssh` serves html over http and
 a live terminal over ssh, `--server=tui` runs the local `beet present` terminal. It
 carries no `CliServer` (a one-shot would resolve the boot and exit), so the boot
-parks on the servers' keep-alive and the serve-feature binary stays up.
+parks on the servers' keep-alive and the serve-feature binary stays up. Each server
+dispatches down into the `Router` child.
 
 The router's middleware and the layout attach as component spreads (request
 logging, `--help`, terminal link navigation, the layout, and the cache policy:
@@ -30,7 +31,8 @@ live in the Rust deploy host (`examples/infra/deploy_beet_site.rs`): the terrafo
 and docker blocks are not registered for markup, so the deploy stays Rust-expressed
 while the serve definition is shared from here.
 -->
-<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer, TuiServer, SshTuiServer, BootOnLoad)}>
+<StartOnLoad {(HttpServer, TuiServer, SshTuiServer)}>
+<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
 	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 	<TemplateDir src="templates"/>
@@ -39,3 +41,4 @@ while the serve definition is shared from here.
 	<RoutesDir src="routes"/>
 	<ServeBlobs prefix="assets" cache="1h" {AssetsStore}/>
 </Router>
+</StartOnLoad>

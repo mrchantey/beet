@@ -77,7 +77,13 @@ pub async fn collect_static_html(
 	router: Entity,
 ) -> Result<Vec<(SmolPath, String)>> {
 	let paths = collect_static_paths(world, router).await?;
-	let entity = world.entity(router);
+	// the tree lives on the entry root, the dispatch on the router beneath it
+	let entity = world
+		.run_system_cached_with::<_, Result<Entity>, _, _>(find_router, router)
+		.await
+		.map_err(BevyError::from)
+		.flatten()
+		.map(|router| world.entity(router))?;
 	let mut pages = Vec::new();
 	for path in paths {
 		let request = Request::get(path.with_leading_slash())

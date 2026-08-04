@@ -16,7 +16,7 @@ use beet::prelude::*;
 /// resolution serves the binary and these commands.
 ///
 /// `check`/`export-static` render the site rather than serve it, so the root carries
-/// [`DisableBootOnLoad`] to keep the entry's `BootOnLoad` verb dormant. The reads go
+/// [`DisableCallOnLoad`] to keep the entry's `CallOnLoad` verb dormant. The reads go
 /// through the store ([`read_entry_sources`]/[`build_entry_root`]), the same agnostic
 /// core the native binary and the wasm Worker use, so the command is store-driven
 /// rather than filesystem-bound.
@@ -41,7 +41,7 @@ pub(crate) async fn build_site(
 	let sources = read_entry_sources(&store, formats, entry_name).await?;
 	let root = caller
 		.with_world(move |world, _| {
-			build_entry_root(world, store, sources, DisableBootOnLoad)
+			build_entry_root(world, store, sources, DisableCallOnLoad)
 		})
 		.await??;
 	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
@@ -113,7 +113,7 @@ pub(crate) fn resolve_site(site: &str) -> Result<SiteEntry> {
 /// idempotent `init_plugin`). It also registers the markup-declarable `SshTuiServer`
 /// *type* so a site's server spread resolves; the binary registers it through
 /// `SshTuiPlugin`, but the type alone suffices here without pulling the ssh runtime
-/// systems (which need an input backend), and `DisableBootOnLoad` keeps the declared
+/// systems (which need an input backend), and `DisableCallOnLoad` keeps the declared
 /// server dormant anyway.
 #[cfg(test)]
 pub(crate) fn render_world() -> World {
@@ -172,10 +172,10 @@ mod test {
 			.xpect_contains("no entry document");
 	}
 
-	/// The site declares its own server and app routes: loading its entry document
-	/// through the resolved site store yields a root carrying the markup-declared
-	/// `HttpServer` plus the default app routes it requested with `<DefaultAppRoutes/>`
-	/// (eg `/js/reactivity.js`).
+	/// The site declares its own servers and app routes: loading its entry document
+	/// through the resolved site store yields a markup-declared `<HttpServer>` root
+	/// carrying the router, plus the default app routes it requested with
+	/// `<DefaultAppRoutes/>` (eg `/js/reactivity.js`).
 	#[beet::test]
 	async fn site_declares_server_and_app_routes() {
 		let mut world = render_world();
@@ -193,9 +193,9 @@ mod test {
 			.await
 			.unwrap();
 		let root =
-			build_entry_root(&mut world, store, sources, DisableBootOnLoad)
+			build_entry_root(&mut world, store, sources, DisableCallOnLoad)
 				.unwrap();
-		// the markup `<Router {(.., HttpServer{..})}>` declared a server
+		// the markup `<HttpServer>` owns the boot, with the router as its child
 		world.entity(root).contains::<HttpServer>().xpect_true();
 		// and `<DefaultAppRoutes/>` wired the reactivity-runtime route
 		world

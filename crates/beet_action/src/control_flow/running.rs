@@ -136,12 +136,19 @@ impl<In: 'static + Send + Sync> StartRunning<In> {
 /// When called, the [`start_running`] handler stores the [`OutHandler`] on a
 /// [`Running`] component (so the call stays pending until an [`EndRun`] is
 /// queued) and fires an [`StartRunning`] carrying the input to any observers. A
-/// behaviour-tree action parks with no observer; a server host carries
+/// behaviour-tree action parks with no observer; a server entity carries
 /// `ContinueRun<Request, Response>` so a boot exchange reaches every server that
 /// observes [`StartRunning<Request>`].
+///
+/// Never colocate an explicit `Action<In, Out>` (eg a handler, or a `Router`)
+/// with a `ContinueRun<In, Out>`: explicit-beats-required would silently replace
+/// the parking action and every dependent (eg a server's boot) goes inert. The
+/// provider-integrity guard ([`Action::assert_provider`]) raises instead; move
+/// the explicit action to its own entity.
 #[derive(Component)]
 #[require(RunTimer)]
 #[require(Action<In, Out> = start_running::<In, Out>())]
+#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]
 pub struct ContinueRun<In = (), Out = Outcome>
 where
 	In: 'static + Send + Sync,
@@ -188,7 +195,7 @@ where
 	Out: 'static + Send + Sync,
 {
 	Action::new(
-		TypeMeta::of::<ContinueRun<In, Out>>(),
+		ActionMeta::of::<ContinueRun<In, Out>, In, Out>(),
 		|ActionCall {
 		     mut commands,
 		     caller,
@@ -388,6 +395,18 @@ mod test {
 		// the clone shares the slot, so it sees the value already taken
 		clone.take().xpect_err();
 		clone.with(|value| *value).xpect_err();
+	}
+
+	/// Colocating an explicit same-pair action with a [`ContinueRun`] silently
+	/// replaces its parking action (explicit-beats-required); the
+	/// provider-integrity guard raises instead of leaving a dead server.
+	#[beet_core::test]
+	#[should_panic = "lost its action slot"]
+	fn clobbered_parking_action_raises() {
+		World::new().spawn((
+			ContinueRun::<(), Outcome>::default(),
+			Action::<(), Outcome>::new_pure(|_: ActionContext| Outcome::PASS),
+		));
 	}
 
 	#[beet_core::test]

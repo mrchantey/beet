@@ -12,7 +12,7 @@
 //! blocking the JS thread, so the runner cannot drive the build).
 //!
 //! The entry's declared `<TemplateDir>` templates register through the store, the
-//! entry builds into a root carrying the site store plus [`DisableBootOnLoad`] (so
+//! entry builds into a root carrying the site store plus [`DisableCallOnLoad`] (so
 //! its declared servers stay dormant; the Worker itself serves each request), and
 //! the build settles to readiness via [`settle_until_ready`] before
 //! serving. The universal seam is the same `entity.exchange(request) -> Response`
@@ -123,17 +123,17 @@ async fn build_site(
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	// read the `templates/` and entry document through the store (awaited, never
 	// blocked), then build the entry into a root carrying the site store plus
-	// `DisableBootOnLoad`: the Worker itself routes each request through the host's
+	// `DisableCallOnLoad`: the Worker itself routes each request through the host's
 	// `Router` action via `exchange`, so the servers the site's `main.bsx` declares
-	// (`HttpServer`, `TuiServer`, ...) must stay dormant. Without `DisableBootOnLoad`
-	// the entry's `BootOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
+	// (`HttpServer`, `TuiServer`, ...) must stay dormant. Without `DisableCallOnLoad`
+	// the entry's `CallOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
 	// start hits the (wasm-absent) backend and panics. Same suppression
 	// `export-static`/`check` use.
 	//
 	// the build's `Insert, RoutesDir` observer queues the route discovery (a store
 	// scan) as an async task, settled below before the host is served.
 	let sources = read_entry_sources(&store, formats, entry_name).await?;
-	build_entry_root(&mut world, store, sources, DisableBootOnLoad)?;
+	build_entry_root(&mut world, store, sources, DisableCallOnLoad)?;
 	// settle until the entry is ready to serve (not just until idle): the
 	// `<RoutesDir>`/`<TemplateDir>` scans land before the host is queried and served,
 	// so a multi-route site never serves a 404 for a route that has not discovered yet.

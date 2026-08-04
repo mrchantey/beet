@@ -119,8 +119,12 @@ pub fn parse_frame(buf: &[u8]) -> Result<Option<(Message, usize)>> {
 	let mask_key = masked
 		.then(|| {
 			(buf.len() >= offset + 4).then(|| {
-				let key =
-					[buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]];
+				let key = [
+					buf[offset],
+					buf[offset + 1],
+					buf[offset + 2],
+					buf[offset + 3],
+				];
 				offset += 4;
 				key
 			})
@@ -176,13 +180,10 @@ pub fn encode_handshake_request(
 		.with_header_raw("Connection", "Upgrade")
 		.with_header_raw("Sec-WebSocket-Key", key)
 		.with_header_raw("Sec-WebSocket-Version", "13");
-	http_ext::encode_request(
-		&request,
-		http_ext::EncodeRequestOptions {
-			close_connection: false,
-			content_length: false,
-		},
-	)
+	http_ext::encode_request(&request, http_ext::EncodeRequestOptions {
+		close_connection: false,
+		content_length: false,
+	})
 }
 
 /// Validate the server's handshake response against the sent `Sec-WebSocket-Key`
@@ -204,7 +205,9 @@ pub fn validate_handshake_response(raw: &[u8], key: &str) -> Result<()> {
 		Some(actual) => bevybail!(
 			"Sec-WebSocket-Accept mismatch: expected {expected}, got {actual}"
 		),
-		None => bevybail!("server handshake response missing Sec-WebSocket-Accept"),
+		None => {
+			bevybail!("server handshake response missing Sec-WebSocket-Accept")
+		}
 	}
 }
 
@@ -242,7 +245,9 @@ fn decode_payload(opcode: u8, payload: Vec<u8>) -> Result<Message> {
 		opcode::PONG => Ok(Message::Pong(payload.into())),
 		opcode::CLOSE => Ok(Message::Close(parse_close(payload))),
 		opcode::CONTINUATION => {
-			bevybail!("received a continuation frame; fragmentation is not supported")
+			bevybail!(
+				"received a continuation frame; fragmentation is not supported"
+			)
 		}
 		other => bevybail!("unknown WebSocket opcode {other:#x}"),
 	}
@@ -294,7 +299,9 @@ mod tests {
 		// mask bit + payload len 2
 		frame[1].xpect_eq(0x82u8);
 		frame[2..6].to_vec().xpect_eq(key.to_vec());
-		frame[6..8].to_vec().xpect_eq(vec![b'h' ^ key[0], b'i' ^ key[1]]);
+		frame[6..8]
+			.to_vec()
+			.xpect_eq(vec![b'h' ^ key[0], b'i' ^ key[1]]);
 	}
 
 	#[beet_core::test]
@@ -337,7 +344,8 @@ mod tests {
 	#[beet_core::test]
 	fn builds_and_parses_handshake_request() {
 		let key = encode_client_key([7u8; 16]);
-		let raw = encode_handshake_request("127.0.0.1:8338", "/", &key).unwrap();
+		let raw =
+			encode_handshake_request("127.0.0.1:8338", "/", &key).unwrap();
 		let request = http_ext::parse_http_request(&raw).unwrap();
 		request
 			.headers()

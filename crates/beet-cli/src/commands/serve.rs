@@ -24,11 +24,11 @@ use beet::prelude::*;
 /// ```
 ///
 /// The site entry is built with boot suppressed ([`build_site`] adds
-/// [`DisableBootOnLoad`]), then booted explicitly through its boot slot — a direct
-/// `entity(root).call::<Boot, Response>` on the loaded root — so the workspace entry
-/// serves only when `serve` is invoked, never on an always-on `BootOnLoad`. The boot
-/// call parks on the servers' `Running` keep-alive, so this handler never returns and
-/// the process serves until interrupted.
+/// [`DisableCallOnLoad`]), then booted explicitly: [`CallOnLoad::call_descendants`]
+/// calls every declared server under the loaded root, so the workspace entry
+/// serves only when `serve` is invoked, never on its own load. A parked server
+/// holds the await, so this handler never returns and the process serves until
+/// interrupted.
 #[action(route = "serve/*site", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
@@ -38,17 +38,16 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = request.request_parts();
 	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
 	// load the site with boot suppressed, settling its `<RoutesDir>` discovery, then
-	// boot the loaded root explicitly: the servers' boot slot parks on a `Running`
-	// keep-alive, so this never returns and the process serves the site.
+	// boot the loaded root's servers explicitly: a parked server holds the await,
+	// so this never returns and the process serves the site.
 	let root = build_site(&caller, parts.params(), site_dir, entry).await?;
 	// boot the site at its own home with the serve flags (see `site_boot_request`),
 	// not the `serve/<site>` command request the dev router routed here.
-	let boot = site_boot_request(parts);
-	caller
-		.world()
-		.entity(root)
-		.call::<Boot, Response>(Boot(boot))
-		.await
+	CallOnLoad::call_descendants(caller.world().entity(root), || {
+		site_boot_request(parts)
+	})
+	.await?;
+	Response::ok().xok()
 }
 
 /// The boot request handed to the loaded site: a fresh request at the site's home

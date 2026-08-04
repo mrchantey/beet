@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// 10s ceiling, forever.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = on_add)]
+#[component(on_add = on_add_ext::entity_hook(|entity| { entity.queue_async_local(connection_loop); }))]
 pub struct PersistentSocket {
 	/// The socket url to keep connected to, eg `ws://192.168.1.7:8338`.
 	/// [`Url`] carries no `Reflect` impl (its params ride a `MultiMap`), so the
@@ -50,13 +50,6 @@ impl PersistentSocket {
 		self.backoff = backoff;
 		self
 	}
-}
-
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.queue_async_local(connection_loop);
 }
 
 /// The connection loop: dial until connected, park until closed, repeat. Ends
@@ -198,4 +191,3 @@ mod test {
 		echoes.len().xpect_eq(1usize);
 	}
 }
-

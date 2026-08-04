@@ -17,7 +17,7 @@ where
 		RawOut: IntoResult<Out>,
 	{
 		Action::new(
-			TypeMeta::of::<Func>(),
+			ActionMeta::of::<Func, In, Out>(),
 			move |ActionCall {
 			          commands,
 			          caller,
@@ -37,7 +37,9 @@ where
 				commands.entity(caller).run(
 					async move |entity: AsyncEntity| -> Result {
 						let result: Result<Out> = func(arg).await.into_result();
-						out_handler.call_async(entity.world().clone(), result).await
+						out_handler
+							.call_async(entity.world().clone(), result)
+							.await
 					},
 				);
 				Ok(())
@@ -58,7 +60,7 @@ where
 		RawOut: IntoResult<Out>,
 	{
 		Action::new(
-			TypeMeta::of::<Func>(),
+			ActionMeta::of::<Func, In, Out>(),
 			move |ActionCall {
 			          commands,
 			          caller,
@@ -76,7 +78,9 @@ where
 				commands.entity(caller).run_local(
 					async move |entity: AsyncEntity| -> Result {
 						let result: Result<Out> = func(arg).await.into_result();
-						out_handler.call_async(entity.world().clone(), result).await
+						out_handler
+							.call_async(entity.world().clone(), result)
+							.await
 					},
 				);
 				Ok(())

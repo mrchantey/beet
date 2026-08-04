@@ -22,7 +22,7 @@ where
 		let handler2 = other.into_action();
 
 		Action::new(
-			TypeMeta::of::<(Self, T2)>(),
+			ActionMeta::of::<(Self, T2), In, T2::Out>(),
 			move |ActionCall {
 			          commands,
 			          caller,

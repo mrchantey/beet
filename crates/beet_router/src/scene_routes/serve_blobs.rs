@@ -29,7 +29,7 @@ pub fn ServeBlobs(
 	(
 		PathPartial::new(format!("{prefix}/*{STORE_PATH_PARAM}?")),
 		ServeBlobsHandler,
-		ExchangeOverload::new::<RequestParts, Response, _, _>(),
+		route_overload::<RequestParts, Response, _, _>(),
 		OnSpawn::new(move |entity: &mut EntityWorldMut| {
 			if let Some(browser_max_age) = cache {
 				entity.insert(CacheHeaders {

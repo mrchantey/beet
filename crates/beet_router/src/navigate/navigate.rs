@@ -146,16 +146,10 @@ pub async fn NavigateHandler(
 		.xok();
 	};
 
-	// Dispatch through the route's Action<Request, Response> slot
+	// dispatch through the resolved route: its canonical `Request -> Response`
+	// action, else the `RouteOverload` adapting a typed handler
 	node.merge_path_params(&mut request);
-	let entity = world.entity(node.entity);
-	let action = entity
-		.clone()
-		.get_cloned::<Action<Request, Response>>()
-		.await?;
-	let response = entity.call_detached(action, request).await?;
-
-	response.xok()
+	world.entity(node.entity).call(request).await
 }
 
 /// Resolve a navigation direction against a [`RouteTree`] from the

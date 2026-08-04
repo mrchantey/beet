@@ -46,10 +46,7 @@ impl Plugin for RouterPlugin {
 			.register_type::<Router>()
 			// a child-sequenced route is `<Route path=".." {ExchangeSequence}>` with
 			// the steps as direct children (the sequence reads its direct children).
-			.register_type::<ExchangeSequence>()
-			// the behaviour-tree analogue: `<Route path=".." {BehaviorSequence}>` runs
-			// `()`-input steps (eg `<Command>`) that don't thread the request.
-			.register_type::<BehaviorSequence>();
+			.register_type::<ExchangeSequence>();
 
 		// std-only: the scene/asset/charcell rendering pipeline (help pages,
 		// markdown/html scenes → ANSI/text) and the reflect registrations for
@@ -185,8 +182,8 @@ impl Plugin for RouterPlugin {
 			app.register_type::<TuiServer>();
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
-				.register_type::<ExchangeOverloadScript<(), String>>()
-				.register_type::<ExchangeOverloadScript<
+				.register_type::<RouteScript<(), String>>()
+				.register_type::<RouteScript<
 					RequestParts,
 					String,
 					RequestParts,

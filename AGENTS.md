@@ -58,6 +58,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - all shared dependencies should be declared in the workspace Cargo.toml. if one needs no-default-features, disable that at the workspace level, and reenable as required
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
 - We prefer `use crate::prelude::*` and `use other_crate::prelude::*;`, instead of individual imports.
+- Never run `cargo fmt`
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Generally in beet mod files are just reexports, aside from the occasional high level plugin, prefer to split up into more specific sub files.
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
@@ -70,6 +71,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - Always use `bevyhow!{}`, `bevybail!{}` unless a result consumer needs to access the error type, in which case use `thiserror` which is now no_std. 
 - prefer SmolStr for string types that are likely to be small
 - It is almost never nessecary to wrap other errors, ie `.map_err(|e| bevyhow!("{e}"))?`, as BevyError blanket implements `From<E> where E: Error`, just use a `?`.
+- Outside of systems, where a `Result` cannot be returned (component hooks, commands, async tasks), raise through `World::handle_command_error`, `Commands::handle_command_error` or `AsyncWorld::handle_command_error`, never `panic!`, `debug_assert!` or a bare `error!`. The app's configured error handler decides what happens. A component hook reaches the helper via `DeferredWorld::commands()`.
 - Never use single letter variable names (except for `i` in loops) instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
@@ -172,6 +174,17 @@ async_ext::do_async_thing().await;
 - Prefer Populated over Query which will skip system running if that query is empty, if its an 'any of these queries' pattern, use my_system.run_if(|a,b|!a.is_empty() || !b.is_empty()..)
 - A `#[template]` is a constructor returning `impl Bundle`, not a UI/content-only thing. `#[template(system)]` takes `SystemParam`s (`Commands`, queries, resources) and can do arbitrary ECS work at build time, eg spawn child entities or inject routes. Prefer a `<MyThing/>` template over a bespoke reflect-marker + `On<Insert>` observer for markup-spawnable setup: it expands away at build, leaving no component to re-fire on scene reload.
 - Templates may also return `()` for effects, or Result<impl Bundle> if fallible
+- Component hooks: `#[component(on_add = ...)]` accepts a call yielding a closure, so use the constructors instead of a bespoke `fn on_add(world: DeferredWorld, cx: HookContext)`: `observe(my_observer)` / `observe((obs_a, obs_b))` registers observers watching the entity, `entity_hook(|entity| { ... })` runs any `EntityCommands` work. Both live in `beet_core::bevy_utils::on_add_ext`.
+
+## Action Cheatsheet
+
+- An entity holds **at most one** action, and `ActionMeta` describes it. `Action` is the only producer of `ActionMeta` (inserting it inserts the meta, removing it removes the meta); a second action with a different handler raises a clobber error rather than silently taking the slot.
+- Extra signatures for the same behaviour go on an `ActionOverload<In, Out>`, which holds a full `Action<In, Out>` adapting the canonical action, registers its pair in `ActionMeta.overloads`, and delegates to the canonical action directly (never back through resolution). `ActionMeta::serves::<In, Out>()` is the single matching predicate.
+- Resolution is **self-only**: `entity.call::<In, Out>(input)` takes the entity's canonical `Action<In, Out>`, else its `ActionOverload<In, Out>`. `ActionOf` / `Actions` mean agent targeting and nothing else.
+- A provider (`ContinueRun`, `Router`, `StartOnLoad`, every `#[action]` component) guards its `#[require]`d action with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
+- Servers (`HttpServer`, `CliServer`, `TuiServer`, ...) own the boot and the dispatch host is their **child**: each requires `StartOnLoad`, which parks a `Running<Response>` and fans `StartRunning<Request>` out to every server on the entity. One server reads as `<HttpServer><Router>..</Router></HttpServer>`, several as `<StartOnLoad {(A, B)}><Router>..</Router></StartOnLoad>`. A `--server` selecting nothing exits rather than parking.
+- `exchange()` calls *this* entity's `Request -> Response` action; `exchange_child()` is the downward hop a server uses to reach the first child serving that pair.
+- `CallOnLoad` is the one load verb: on the entity's `LoadTemplate` it calls the entity's action with the process request (`Request::from_cli_args`) and streams/exits. It tries `Request -> Response`, then `() -> Outcome` (`Pass` exits zero, `Fail` nonzero), then `() -> ()`, so a behavior scene is just `<Sequence {CallOnLoad}>`.
 
 ## BSX Cheatsheet
 

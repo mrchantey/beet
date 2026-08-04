@@ -96,7 +96,7 @@ pub fn FetchItems(
 /// generic action, not a markup spread, so the whole tree is built in Rust.
 ///
 /// Behaviour tree (mirrors `fetch_npc`):
-///   Initial Idle   — play idle once the fox's assets load ([`RunOnLoad`])
+///   Initial Idle   — play idle once the fox's assets load ([`CallOnLoad`])
 ///   Fetch Behavior — on each user sentence:
 ///     Sequence
 ///       Apply Sentence Steer Target — closest [`Collectable`] -> [`SteerTarget`]
@@ -143,13 +143,13 @@ pub fn FetchFox(
 /// fox via [`ActionOf`]. Split out of [`FetchFox`]'s [`OnSpawn`] hook so the tree
 /// structure reads top-down.
 fn spawn_fetch_tree(world: &mut World, fox: Entity, bert: Handle<Bert>) {
-	// plays idle once the fox's assets load (`RunOnLoad`), so the fox has a resting
+	// plays idle once the fox's assets load (`CallOnLoad`), so the fox has a resting
 	// pose before the user types a command.
 	world.spawn((
 		Name::new("Initial Idle"),
 		ChildOf(fox),
 		ActionOf(fox),
-		RunOnLoad,
+		CallOnLoad,
 		PlayAnimation::new("misc/fox.glb#Animation0").repeat_forever(),
 	));
 

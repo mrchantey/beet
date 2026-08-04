@@ -36,7 +36,7 @@ fn main() -> Result {
 					OnSpawn::observe(common_handlers::log_recv),
 				))
 				// boot through the fan-out, exactly like `HttpServer`
-				.trigger(StartRunning::boot);
+				.trigger(StartRunning::from_cli);
 		})
 		.run();
 

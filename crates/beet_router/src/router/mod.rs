@@ -6,20 +6,18 @@ mod no_cache;
 pub use no_cache::*;
 mod cache_headers;
 pub use cache_headers::*;
-mod exchange_overload;
-pub use exchange_overload::*;
+mod route_overload;
+pub use route_overload::*;
 mod exchange_fallback;
 pub use exchange_fallback::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
-mod behavior_sequence;
-pub use behavior_sequence::*;
-// the typed `ExchangeOverloadScript` route marker, the `ScriptRoute` front-end,
+// the typed `RouteScript` route marker, the `ScriptRoute` front-end,
 // and the `ExchangeScriptElement` console-capturing `<script>` entry action.
 #[cfg(feature = "scripting")]
-mod exchange_script;
+mod route_script;
 #[cfg(feature = "scripting")]
-pub use exchange_script::*;
+pub use route_script::*;
 // the `<Template src>` include: needs the BSX tag seam + the unified loader. It
 // reads through the store as an async pending dependency, so it relies on the
 // async runtime that `bsx` (→ `std`) pulls in (the same one `RoutesDir` uses).

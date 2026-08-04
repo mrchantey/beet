@@ -116,7 +116,9 @@ impl CrateCheck {
 
 	/// Split a comma-separated requirement list, skipping empty segments.
 	fn split_items(list: &str) -> impl Iterator<Item = &str> {
-		list.split(',').map(str::trim).filter(|item| !item.is_empty())
+		list.split(',')
+			.map(str::trim)
+			.filter(|item| !item.is_empty())
 	}
 
 	/// The registration for `crate_name`, or the primary one when unprefixed.
@@ -133,7 +135,9 @@ impl CrateCheck {
 	/// The failure line for an unregistered crate.
 	fn missing_crate(crate_name: Option<&str>) -> String {
 		match crate_name {
-			Some(name) => format!("{name} (crate not registered in this binary)"),
+			Some(name) => {
+				format!("{name} (crate not registered in this binary)")
+			}
 			None => "no primary crate registration in this binary (the binary \
 				must spawn a `crate_registration!`)"
 				.to_string(),

@@ -157,7 +157,7 @@ where
 			#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 			let on_upgrade = hyper::upgrade::on(&mut req);
 			let req = hyper_to_request(req, addr).await;
-			let res = entity.exchange(req).await;
+			let res = entity.exchange_child(req).await;
 			#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 			if http_ext::is_websocket_response(&res) {
 				spawn_hyper_upgrade(entity, on_upgrade).await;
@@ -474,12 +474,9 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((
-					server,
-					exchange_handler(move |req| {
-						Response::ok().with_body(req.take().body)
-					}),
-				))
+				.spawn((server, children![exchange_handler(move |req| {
+					Response::ok().with_body(req.take().body)
+				})]))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -500,7 +497,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, mirror_exchange()))
+				.spawn((server, children![mirror_exchange()]))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -530,29 +527,24 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((
-					exchange_handler(move |req| {
-						// Server adds 100ms delay per chunk
-						let delayed_stream = futures::stream::unfold(
-							req.take().body,
-							|mut body| async move {
-								match body.next().await {
-									Ok(Some(chunk)) => {
-										time_ext::sleep(Duration::from_millis(
-											100,
-										))
+				.spawn((server, children![exchange_handler(move |req| {
+					// Server adds 100ms delay per chunk
+					let delayed_stream = futures::stream::unfold(
+						req.take().body,
+						|mut body| async move {
+							match body.next().await {
+								Ok(Some(chunk)) => {
+									time_ext::sleep(Duration::from_millis(100))
 										.await;
-										Some((Ok(chunk), body))
-									}
-									Ok(None) => None,
-									Err(e) => Some((Err(e), body)),
+									Some((Ok(chunk), body))
 								}
-							},
-						);
-						Response::ok().with_body(Body::stream(delayed_stream))
-					}),
-					server,
-				))
+								Ok(None) => None,
+								Err(e) => Some((Err(e), body)),
+							}
+						},
+					);
+					Response::ok().with_body(Body::stream(delayed_stream))
+				})]))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -636,12 +628,9 @@ mod upgrade_test {
 		std::thread::spawn(move || {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
-			app.world_mut().spawn((
-				server,
-				exchange_handler(|cx| {
-					WebSocketUpgrade::from_request(&cx).into()
-				}),
-			));
+			app.world_mut().spawn((server, children![exchange_handler(
+				|cx| { WebSocketUpgrade::from_request(&cx).into() }
+			)]));
 			app.world_mut()
 				.add_observer(move |ev: On<OnWebSocketUpgrade>| {
 					captor.push(ev.event().socket);

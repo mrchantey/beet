@@ -7,7 +7,8 @@ Beet is a natural fit for distributed systems like embodied agents with a percei
 The agent lives on the server: a socket server whose routes are the robot's capabilities. Each cycle the model perceives through `interpret-photo`, then acts through the tools it was given. Capabilities the server can't provide itself, like taking photos and driving wheels, forward over the socket to whichever client serves them.
 
 ```jsx
-<Router {(SocketServer, BootOnLoad, CapabilityServer)}>
+<SocketServer {CapabilityServer}>
+<Router>
 	<!-- routable by interpret-photo, not offered to the model -->
 	<TakePhoto/>
 	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
@@ -27,6 +28,7 @@ You perceive the world one photo at a time and act on what you see.
 		</div>
 	</div>
 </Router>
+</SocketServer>
 ```
 
 ### Head

@@ -1,44 +1,53 @@
+//! Child-sequenced routes: a route whose children run as a [`Sequence`],
+//! served through a [`RouteOverload`] rather than a bespoke wrapper action.
+use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Marker that makes an entity a sequenced exchange: its `Action<Request, Response>`
-/// runs each child action in order, returning [`Response::ok`] if all pass or the
-/// first [`Fail`] response (errors convert to a response). A child without a matching
-/// action (eg a config-only block) is skipped via the required [`ExcludeErrors`].
-///
-/// Spread on a routed element so its child actions run as one route, eg on a
-/// [`Route`](crate::prelude::Route) whose children are its direct children (which the
-/// sequence reads):
+/// Marker for a route whose children run as a request-threading [`Sequence`]:
 ///
 /// ```bsx
 /// <Route path="deploy" {ExchangeSequence}>
-///   <MyConfigBlock/>
-///   <MyDeployAction/>
+///     <SomeConfig/>
+///     <SomeAction/>
 /// </Route>
 /// ```
+///
+/// A thin shell over [`Sequence<Request, Response>`], whose canonical action is
+/// `Request -> Outcome<Request, Response>`. Route dispatch reaches it through the
+/// required [`RouteOverload`], mapping `Pass` to `200` and `Fail` to the failing
+/// step's response. The request threads child to child, and children with no
+/// action at all (config blocks) or a differently-shaped one are skipped via
+/// [`ExcludeErrors`]; a step that is natively another shape carries its own
+/// [`ActionOverload`].
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(
 	ExcludeErrors = ExcludeErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
-	Action<Request, Response> = exchange_sequence_action(),
+	Sequence<Request, Response>,
+	RouteOverload = sequence_overload(),
 )]
 pub struct ExchangeSequence;
 
-/// The `Action<Request, Response>` behind [`ExchangeSequence`]: runs the entity's
-/// children as a [`SequenceAction`], mapping its outcome to a response.
-fn exchange_sequence_action() -> Action<Request, Response> {
-	let sequence = SequenceAction::<Request, Response>::default().into_action();
-	Action::<Request, Response>::new_async(
-		async move |cx: ActionContext<Request>| -> Response {
-			match cx.caller.call_detached(sequence, cx.input).await {
-				Ok(Pass(_req)) => Response::ok(),
-				// child returned Fail — use that response
-				Ok(Fail(res)) => res,
-				Err(err) => err.into_response(),
+/// The [`RouteOverload`] serving dispatch from a [`Sequence<Request, Response>`]:
+/// `Pass` becomes a `200`, `Fail` the failing step's response.
+fn sequence_overload() -> RouteOverload {
+	ActionOverload::new(Action::new_async(
+		async |cx: ActionContext<Request>| -> Result<Response> {
+			let sequence = cx
+				.caller
+				.get(|action: &Action<Request, Outcome<Request, Response>>| {
+					action.clone()
+				})
+				.await?;
+			match cx.caller.call_detached(sequence, cx.input).await? {
+				Pass(_) => Response::ok(),
+				Fail(response) => response,
 			}
+			.xok()
 		},
-	)
+	))
 }
 
 #[cfg(test)]
@@ -48,60 +57,104 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
+	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
+
+	fn passing_step() -> Action<Request, Outcome<Request, Response>> {
+		Action::new_pure(|cx: ActionContext<Request>| {
+			Outcome::Pass(cx.take()).xok()
+		})
+	}
+	fn failing_step() -> Action<Request, Outcome<Request, Response>> {
+		Action::new_pure(|_: ActionContext<Request>| {
+			Outcome::<Request, Response>::Fail(Response::from_status(
+				StatusCode::IM_A_TEAPOT,
+			))
+			.xok()
+		})
+	}
+
 	#[beet_core::test]
-	async fn all_pass() {
-		AsyncPlugin::world()
-			.spawn((ExchangeSequence, children![
-				Action::<Request, Outcome<Request, Response>>::new_pure(
-					|cx: ActionContext<Request>| Pass(cx.input),
-				),
-				Action::<Request, Outcome<Request, Response>>::new_pure(
-					|cx: ActionContext<Request>| Pass(cx.input),
-				),
-			]))
-			.call::<Request, Response>(Request::get("test"))
+	async fn all_passing_children_respond_ok() {
+		router_world()
+			.spawn((default_router(), children![(
+				PathPartial::new("run"),
+				ExchangeSequence,
+				children![passing_step(), passing_step()],
+			)]))
+			.exchange(Request::get("run"))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
-	async fn first_fail_stops() {
-		AsyncPlugin::world()
-			.spawn((ExchangeSequence, children![
-				Action::<Request, Outcome<Request, Response>>::new_pure(
-					|_cx: ActionContext<Request>| {
-						Fail(Response::from_status(StatusCode::IM_A_TEAPOT))
-					},
-				),
-				Action::<Request, Outcome<Request, Response>>::new_pure(
-					|cx: ActionContext<Request>| Pass(cx.input),
-				),
-			]))
-			.call::<Request, Response>(Request::get("test"))
+	async fn failing_child_returns_its_response() {
+		router_world()
+			.spawn((default_router(), children![(
+				PathPartial::new("run"),
+				ExchangeSequence,
+				children![passing_step(), failing_step(), passing_step()],
+			)]))
+			.exchange(Request::get("run"))
 			.await
-			.unwrap()
 			.status()
 			.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
 
 	#[beet_core::test]
-	async fn works_with_router() {
-		(AsyncPlugin, RouterPlugin)
-			.into_world()
-			.spawn((default_router(), children![route(
-				"seq",
-				(ExchangeSequence, children![Action::<
-					Request,
-					Outcome<Request, Response>,
-				>::new_pure(
-					|cx: ActionContext<Request>| Pass(cx.input),
-				),]),
+	async fn config_children_are_skipped() {
+		router_world()
+			.spawn((default_router(), children![(
+				PathPartial::new("run"),
+				ExchangeSequence,
+				children![Name::new("config-only"), passing_step()],
 			)]))
-			.exchange(Request::get("seq"))
+			.exchange(Request::get("run"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
+	}
+
+	/// A `() -> Outcome` behavior step serves the sequence through its own
+	/// [`ActionOverload`], threading the request onward: the old
+	/// `BehaviorSequence` semantics with no registry and no dedicated marker.
+	#[beet_core::test]
+	async fn overloaded_step_runs() {
+		let ran = Store::new(false);
+		let recorder = ran.clone();
+		router_world()
+			.spawn((default_router(), children![(
+				PathPartial::new("run"),
+				ExchangeSequence,
+				children![(
+					Action::<(), Outcome>::new_pure(move |_: ActionContext| {
+						recorder.set(true);
+						Outcome::PASS.xok()
+					}),
+					ActionOverload::<Request, Outcome<Request, Response>>::new(
+						Action::new_async(
+						async |cx: ActionContext<Request>| -> Result<
+							Outcome<Request, Response>,
+						> {
+							let behavior = cx
+								.caller
+								.get(|action: &Action<(), Outcome>| action.clone())
+								.await?;
+							match cx.caller.call_detached(behavior, ()).await? {
+								Pass(()) => Outcome::Pass(cx.input),
+								Fail(()) => {
+									Outcome::Fail(Response::internal_error())
+								}
+							}
+							.xok()
+						},
+					)),
+				)],
+			)]))
+			.exchange(Request::get("run"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		ran.get().xpect_true();
 	}
 }

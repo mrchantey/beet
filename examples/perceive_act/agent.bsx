@@ -29,8 +29,8 @@ rather than writing `AppExit`. Needs `OPENAI_API_KEY`.
 page (v3) can connect back; plaintext `ws://` clients (the in-process v1/v2 heads, the
 esp body) are unaffected, and managed deployments (lambda/Fargate) serve plaintext.
 -->
-<Router {(SocketServer, Tls, BootOnLoad, CapabilityServer,
-		SceneRotation{initial:"explorer", every_cycles:10000, order:SceneOrder::Sequential})}>
+<SocketServer {(Tls, CapabilityServer)}>
+<Router {SceneRotation{initial:"explorer", every_cycles:10000, order:SceneOrder::Sequential}}>
 	<!-- capability routes, forwarded per role by the whoami binding; not offered to
 	     the model (outside the actor), the `respond-multi-modal` fan-out and the
 	     camera call them -->
@@ -61,3 +61,4 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 		</div>
 	</div>
 </Router>
+</SocketServer>

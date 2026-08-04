@@ -92,23 +92,38 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	};
 
 	// ── 5. Build struct definition ──
-	let action_expr = quote! { #action_factory(#action_fn_name #turbofish) };
-	let require_action = make_require_action(
-		action_expr,
-		&in_type,
-		&out_type,
-		has_route,
-		&beet_action,
-	);
-	let handler_meta = has_next_type(&in_type) || handler_only;
+	// the meta rides on the action itself: `Action` is the sole producer of
+	// `ActionMeta`, and naming `Self` as the handler is what the provider-integrity
+	// guard checks against.
+	//
+	// Middleware (a `Next` in the input) wraps *another* entity's action rather
+	// than being one, and several middleware happily share a host, so it claims no
+	// action slot: its `on_add_middleware` hook pushes `into_action()` onto the
+	// host's `MiddlewareList` instead.
+	let is_middleware = has_next_type(&in_type);
+	let handler_meta = is_middleware || handler_only;
+	let meta_expr = make_meta_expr(fn_attrs, handler_meta, &beet_action);
+	let action_expr = quote! {
+		#action_factory(#action_fn_name #turbofish).with_meta(#meta_expr)
+	};
+	let require_action = (!is_middleware).then(|| {
+		make_require_action(
+			action_expr,
+			&in_type,
+			&out_type,
+			has_route,
+			&beet_action,
+		)
+	});
 	let struct_def = make_struct_def(
 		vis,
 		fn_name,
 		generics,
 		fn_attrs,
-		Some(require_action),
+		require_action,
 		route_expr,
-		handler_meta,
+		&in_type,
+		&out_type,
 		no_clone,
 	);
 	let default_impl = if !no_default && !has_derive(fn_attrs, "Default") {
@@ -450,11 +465,32 @@ fn compute_out_type(item: &ItemFn, result_out: bool) -> TokenStream {
 // Struct definition and require helpers
 // ---------------------------------------------------------------------------
 
+/// Build the `ActionMeta` expression threaded into the action.
+///
+/// The richest variant the derives support: full reflection when the struct is
+/// `Reflect` (description plus input/output schemas), handler-only reflection for
+/// middleware and `handler_only` actions whose input is not `Typed`, and plain
+/// type metadata otherwise.
+fn make_meta_expr(
+	fn_attrs: &[syn::Attribute],
+	handler_meta: bool,
+	beet_action: &syn::Path,
+) -> TokenStream {
+	let action_meta = quote! { #beet_action::prelude::ActionMeta };
+	if !has_derive(fn_attrs, "Reflect") {
+		quote! { #action_meta::of_action::<Self, _>() }
+	} else if handler_meta {
+		quote! { #action_meta::of_handler::<Self, _>() }
+	} else {
+		quote! { #action_meta::of_reflect::<Self, _>() }
+	}
+}
+
 /// Build the `#[require(...)]` expression for the `Action` component.
 ///
-/// When `has_route` is true, requires both `Action<In, Out>` (which inserts
-/// [`ActionMeta`] via its own on-add hook) and a [`ExchangeOverload`] adapter that
-/// bridges the typed action to request/response dispatch.
+/// When `has_route` is true, requires both `Action<In, Out>` and an
+/// [`ActionOverload<Request, Response>`] adapting the typed action to
+/// request/response dispatch.
 fn make_require_action(
 	action_expr: TokenStream,
 	in_type: &TokenStream,
@@ -466,7 +502,7 @@ fn make_require_action(
 		let beet_router = pkg_ext::internal_or_beet("beet_router");
 		quote! {
 			#beet_action::prelude::Action<#in_type, #out_type> = #action_expr,
-			#beet_router::prelude::ExchangeOverload = #beet_router::prelude::ExchangeOverload::new::<#in_type, #out_type, _, _>()
+			#beet_router::prelude::RouteOverload = #beet_router::prelude::route_overload::<#in_type, #out_type, _, _>()
 		}
 	} else {
 		quote! {
@@ -485,7 +521,8 @@ fn make_struct_def(
 	fn_attrs: &[syn::Attribute],
 	require_action: Option<TokenStream>,
 	route_expr: Option<&syn::Expr>,
-	handler_meta: bool,
+	in_type: &TokenStream,
+	out_type: &TokenStream,
 	no_clone: bool,
 ) -> TokenStream {
 	let has_component = has_derive(fn_attrs, "Component");
@@ -501,18 +538,12 @@ fn make_struct_def(
 		TokenStream::default()
 	};
 
+	// provider-integrity guard: fail loudly if a colocated explicit action takes
+	// the slot this struct's `#[require]` provides.
 	let beet_action = pkg_ext::internal_or_beet("beet_action");
-	let require_meta = if has_component && has_reflect && handler_meta {
+	let assert_provider = if has_component && !require_action.is_empty() {
 		quote! {
-			#[require(#beet_action::prelude::ActionMeta = #beet_action::prelude::ActionMeta::of_handler::<Self, _>())]
-		}
-	} else if has_component && has_reflect {
-		quote! {
-			#[require(#beet_action::prelude::ActionMeta = #beet_action::prelude::ActionMeta::of_reflect::<Self, _>())]
-		}
-	} else if has_component {
-		quote! {
-			#[require(#beet_action::prelude::ActionMeta = #beet_action::prelude::ActionMeta::of_action::<Self, _>())]
+			#[component(on_add = #beet_action::prelude::Action::<#in_type, #out_type>::assert_provider::<Self>)]
 		}
 	} else {
 		TokenStream::default()
@@ -543,7 +574,7 @@ fn make_struct_def(
 			#(#fn_attrs)*
 			#derive_clone
 			#require_action
-			#require_meta
+			#assert_provider
 			#require_path
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name;
@@ -573,7 +604,7 @@ fn make_struct_def(
 			#(#fn_attrs)*
 			#derive_clone
 			#require_action
-			#require_meta
+			#assert_provider
 			#require_path
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name #impl_generics (#reflect_ignore ::core::marker::PhantomData<#phantom>) #where_clause;
@@ -1222,11 +1253,31 @@ mod test {
 		assert!(!result.contains("of_reflect"));
 	}
 
+	/// Middleware wraps another entity's action rather than being one, and several
+	/// share a host, so it claims no action slot: no `Action` require, no meta, no
+	/// provider guard. Its `on_add_middleware` hook pushes `into_action()` onto the
+	/// host's `MiddlewareList` instead.
 	#[test]
-	fn middleware_reflect_uses_handler_meta() {
+	fn middleware_claims_no_action_slot() {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			#[derive(Default, Clone, Component, Reflect)]
 			async fn HelpHandler(cx: ActionContext<(Request, Next<Request, Response>)>) -> Result<Response> {
+				todo!()
+			}
+		});
+		assert!(!result.contains("# [require"));
+		assert!(!result.contains("ActionMeta"));
+		assert!(!result.contains("assert_provider"));
+		assert!(result.contains("fn into_action"));
+	}
+
+	/// A `handler_only` action whose input is not `Typed` still owns its slot, with
+	/// handler-only reflection data.
+	#[test]
+	fn handler_only_uses_handler_meta() {
+		let result = parse_str(quote!(handler_only), syn::parse_quote! {
+			#[derive(Default, Clone, Component, Reflect)]
+			async fn EchoParams(cx: ActionContext<RequestParts>) -> MediaBytes {
 				todo!()
 			}
 		});
@@ -1239,13 +1290,13 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[test]
-	fn route_bare_wraps_with_exchange() {
+	fn route_bare_adds_overload() {
 		let result = parse_str(quote!(route), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			async fn MyAction(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("ExchangeOverload"));
-		assert!(result.contains("ExchangeOverload :: new"));
+		assert!(result.contains("RouteOverload"));
+		assert!(result.contains("route_overload ::"));
 		assert!(result.contains("Action <"));
 		assert!(!result.contains("PathPartial"));
 	}
@@ -1256,7 +1307,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn MyAction(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("ExchangeOverload"));
+		assert!(result.contains("RouteOverload"));
 		assert!(result.contains("Action <"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (\"home\")"));
@@ -1269,7 +1320,7 @@ mod test {
 				#[derive(Component, Reflect)]
 				async fn MyAction(val: i32) -> String { val.to_string() }
 			});
-		assert!(result.contains("ExchangeOverload"));
+		assert!(result.contains("RouteOverload"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (get_route_path ())"));
 	}
@@ -1289,7 +1340,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn Validate(input: String) -> String { input }
 		});
-		assert!(result.contains("ExchangeOverload"));
+		assert!(result.contains("RouteOverload"));
 		assert!(result.contains("PathPartial :: new (\"validate\")"));
 		assert!(result.contains("of_reflect :: < Self , _ > ()"));
 	}

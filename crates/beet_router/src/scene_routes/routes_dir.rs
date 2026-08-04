@@ -50,7 +50,7 @@ impl RoutesDir {
 	/// The route children appear a few async ticks after the insert, so when the
 	/// `RoutesDir` is built into a template (an entry's `<RoutesDir>`) the scan parks a
 	/// [`PendingId`] on the build root, deferring its [`LoadTemplate`] until the routes
-	/// are spawned. So a boot verb (`BootOnLoad`) on the entry root only fans the
+	/// are spawned. So a load verb (`CallOnLoad`) under the entry root only fans the
 	/// request out once every discovered route exists, exactly as the asset / scene
 	/// deferrals gate it (see [`drain_pending_dependencies`]). A `RoutesDir` inserted
 	/// outside a build (no [`TemplateBuildRoot`]) gates nothing; a top-level driver

@@ -34,7 +34,9 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 	let country = ip
 		.zip(
 			world
-				.with(|world: &mut World| world.get_resource::<GeoIp>().cloned())
+				.with(|world: &mut World| {
+					world.get_resource::<GeoIp>().cloned()
+				})
 				.await,
 		)
 		.and_then(|(ip, geoip)| geoip.country(ip));
@@ -62,7 +64,9 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 		body => body,
 	};
 	let event = AnalyticsEvent::from_beacon(body, session, ip, country)?;
-	world.with(move |world: &mut World| world.trigger(event)).await;
+	world
+		.with(move |world: &mut World| world.trigger(event))
+		.await;
 
 	Ok(Response::ok())
 }

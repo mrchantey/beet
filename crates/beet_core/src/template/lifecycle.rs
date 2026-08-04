@@ -169,7 +169,7 @@ pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
 	let is_error = root.contains::<TemplateError>();
 	let root_id = root.id();
 	// fire on the root *and* every descendant in the built subtree, so a load verb
-	// (eg `RunOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
+	// (eg `CallOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
 	// Snapshot the subtree first, then fire: an observer may restructure the tree.
 	root.world_scope(|world| {
 		let subtree = world.entity_mut(root_id).iter_descendents_inclusive();

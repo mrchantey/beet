@@ -64,11 +64,14 @@ pub(crate) fn adopt_client_io_socket(
 			// ends: each reload disconnects every client, so without this the dead
 			// sockets accumulate as channel children and `broadcast_to_clients` keeps
 			// fanning out to them.
-			commands.entity(socket).insert(ChildOf(channel)).observe_any(
-				move |_ev: On<SocketClosed>, mut commands: Commands| {
-					commands.entity(socket).try_despawn();
-				},
-			);
+			commands
+				.entity(socket)
+				.insert(ChildOf(channel))
+				.observe_any(
+					move |_ev: On<SocketClosed>, mut commands: Commands| {
+						commands.entity(socket).try_despawn();
+					},
+				);
 		}
 		// no channel to adopt into: drop the connection rather than leak it
 		None => commands.entity(socket).despawn(),
@@ -202,9 +205,11 @@ mod test {
 		std::thread::spawn(move || {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin, RouterPlugin));
-			// the router (wires `/__client_io`), the channel, and the listener
+			// the channel clients are adopted into, plus the listener with the
+			// router (which wires `/__client_io`) as its dispatch child
+			app.world_mut().spawn(ClientIo);
 			app.world_mut()
-				.spawn((default_router(), ClientIo, on_spawn));
+				.spawn((on_spawn, children![default_router()]));
 			// once a client is adopted, broadcast `reload` to the channel each
 			// frame (the client breaks after the first message)
 			app.add_systems(

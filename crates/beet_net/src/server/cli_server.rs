@@ -12,17 +12,19 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint server: observes the boot [`StartRunning<Boot>`], routes the inner
-/// request through the host's dispatch slot, then either resolves the boot call or
-/// streams the response and exits itself, whichever the boot path needs.
+/// The entrypoint server: observes the boot [`StartRunning<Request>`], routes the
+/// request through its host's dispatch (see [`exchange`](AsyncExchangeExt::exchange)),
+/// then either resolves the boot call or streams the response and exits itself,
+/// whichever the boot path needs.
 ///
-/// Two boot paths land here. The full [`boot`] fires `StartRunning<Boot>` behind a
-/// `Running<Response>` keep-alive, so `CliServer` resolves it with an [`EndRun`]
-/// and `boot` streams the response. A direct `trigger(StartRunning::boot)` has no
-/// `Running`, so `CliServer` streams the response and writes the [`AppExit`] itself.
+/// Two boot paths land here. The load path ([`CallOnLoad`], required) fires
+/// `StartRunning<Request>` behind a `Running<Response>` keep-alive, so `CliServer`
+/// resolves it with an [`EndRun`] and [`CallOnLoad::call`] streams the response. A
+/// direct `trigger(StartRunning::from_cli)` has no `Running`, so `CliServer` streams
+/// the response and writes the [`AppExit`] itself.
 ///
-/// This is how every beet binary boots by default: spread it on the entry root,
-/// and the boot fan-out (no `--server`, or `--server=cli`) reaches it. Being a
+/// This is how every beet binary boots by default: spawn it as a child of the entry
+/// root, and the load path (no `--server`, or `--server=cli`) reaches it. Being a
 /// one-shot, it resolves the call rather than parking, so the process exits once
 /// its response is streamed.
 ///
@@ -30,8 +32,8 @@ use beet_core::prelude::*;
 /// for example `--accept=text/html,text/plain`.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ContinueRun<Boot, Response>)]
-#[component(on_add = on_add)]
+#[require(StartOnLoad)]
+#[component(on_add = on_add_ext::observe(on_action_in))]
 pub struct CliServer {
 	/// Dispatch on every boot, ignoring `--server`.
 	///
@@ -43,30 +45,30 @@ pub struct CliServer {
 	pub always: bool,
 }
 
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe_any(on_action_in);
-}
-
 /// On the boot fan-out, route the request and resolve the boot call when this server
 /// should act: an `always` dispatcher (the workspace command entry) on every boot,
 /// otherwise only when `--server` selects `cli`. The selection check reads the boot
 /// (without consuming it); the take is deferred into the task, so a co-observer's
 /// read never races it.
 fn on_action_in(
-	ev: On<StartRunning<Boot>>,
+	ev: On<StartRunning<Request>>,
 	servers: Query<&CliServer>,
 	mut commands: Commands,
 ) -> Result {
 	let always = servers.get(ev.entity).is_ok_and(|server| server.always);
 	// default-boots (the shared default) unless `--server` names a different set;
 	// `always` additionally boots even when another server is named.
-	if !always && !ev.with(|boot| request_selects_server(boot, "cli", true))? {
+	if !always
+		&& !ev.with(|request| request_selects_server(request, "cli", true))?
+	{
 		return Ok(());
 	}
-	let action_in = ev.clone();
+	let start = ev.clone();
 	commands
 		.entity(ev.entity)
-		.queue_async_local(move |host| route_and_end(host, action_in));
+		// flags the boot as served, so `assert_server_booted` lets it run
+		.insert(ServerBooted)
+		.queue_async_local(move |server| route_and_end(server, start));
 	Ok(())
 }
 
@@ -80,14 +82,14 @@ fn default_accept() -> Vec<MediaType> {
 	]
 }
 
-/// Route the request through the host, then hand the response to whichever boot
-/// path called us: resolve the `Running` keep-alive if [`boot`] set one (it
-/// streams and exits), otherwise stream and exit here ourselves.
+/// Route the request through the host's dispatch, then hand the response to
+/// whichever boot path called us: resolve the `Running` keep-alive if the load
+/// path set one (it streams and exits), otherwise stream and exit here ourselves.
 async fn route_and_end(
-	host: AsyncEntity,
-	action_in: StartRunning<Boot>,
+	server: AsyncEntity,
+	start: StartRunning<Request>,
 ) -> Result {
-	let request = action_in.take()?.0;
+	let request = start.take()?;
 	// `--accept` may arrive as several params (CliArgs splits comma lists), so
 	// gather every value's media types.
 	let accept = request
@@ -99,18 +101,19 @@ async fn route_and_end(
 				.collect::<Vec<_>>()
 		})
 		.unwrap_or_else(default_accept);
-	let response = host
-		.exchange(request.with_header::<header::Accept>(accept))
+	// a server holds no dispatch of its own: hop down to the router child.
+	let response = server
+		.exchange_child(request.with_header::<header::Accept>(accept))
 		.await;
-	// the full boot path parks on a Running; resolve it so `boot` streams.
-	// a direct `trigger(StartRunning::boot)` has none, so stream and exit ourselves.
-	if host
+	// the load path parks on a Running; resolve it so `CallOnLoad::call` streams.
+	// a direct `trigger(StartRunning::from_cli)` has none, so stream and exit ourselves.
+	if server
 		.with(|entity| entity.contains::<Running<Response>>())
 		.await?
 	{
-		host.queue(EndRun(response)).await??;
+		server.queue(EndRun(response)).await??;
 	} else {
-		stream_and_exit(&host, response).await?;
+		stream_and_exit(&server, response).await?;
 	}
 	Ok(())
 }

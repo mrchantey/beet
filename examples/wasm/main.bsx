@@ -20,7 +20,8 @@ the browser on any edit under them.
 `<RoutesDir>` serves examples/wasm/routes (the page); `<AssetsDir>` mounts the
 workspace assets (the wasm binary) at /assets and the examples tree at /examples.
 -->
-<Router {(HttpServer, BootOnLoad)}>
+<HttpServer>
+<Router>
 	<StoreRoot src="../.."/>
 	<PackageConfig title="Beet Wasm" description="A headless beet program running in the browser"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:0.8, blue:0.6, alpha:1.0})}/>
@@ -36,3 +37,4 @@ workspace assets (the wasm binary) at /assets and the examples tree at /examples
 	<AssetsDir src="assets" prefix="assets"/>
 	<AssetsDir src="examples" prefix="examples"/>
 </Router>
+</HttpServer>

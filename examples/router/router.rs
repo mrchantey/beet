@@ -47,7 +47,16 @@ fn setup(mut commands: Commands) -> Result {
 			FsStore::new(WsPathBuf::new("examples/assets")),
 			router_scene()?,
 		))
-		.trigger(StartRunning::boot);
+		// boot the declared server children; `.ok()` since the repl selection
+		// self-boots and declares no `CallOnLoad` target.
+		.queue_async_local(|host| async move {
+			CallOnLoad::call_descendants(host, || {
+				Request::from_cli_args(CliArgs::parse_env())
+			})
+			.await
+			.ok();
+			Ok(())
+		});
 	Ok(())
 }
 
@@ -66,7 +75,8 @@ pub fn router_scene() -> Result<impl Bundle> {
 		.xok()
 }
 
-// OnSpawn serves as a type erased bundle
+// OnSpawn serves as a type erased bundle; servers spawn as child entities
+// (`with_child` rather than a `children!` set, which would clobber the routes)
 fn server_from_cli() -> Result<OnSpawn> {
 	cfg_if! {
 		if #[cfg(feature="http_server")]{
@@ -83,11 +93,11 @@ fn server_from_cli() -> Result<OnSpawn> {
 		.unwrap_or_else(|| default_server.into())
 		.as_str()
 	{
-		// use on_spawn to avoid clobbering children!
 		#[cfg(feature = "http_server")]
 		"http" => HttpServer::default().any_bundle(),
 		#[cfg(not(feature = "http_server"))]
 		"http" => bevybail!("Add the 'http_server' feature for http servers"),
+		// the repl self-boots on spawn, riding the host entity itself
 		"repl" => ReplServer::default().any_bundle(),
 		"cli" => CliServer::default().any_bundle(),
 		_ => {

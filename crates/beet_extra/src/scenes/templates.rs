@@ -227,7 +227,7 @@ pub fn Sprite2d(
 }
 
 /// A 2d steering agent that seeks a target forever: a sprite with the force/steer
-/// bundles, `RotateToVelocity2d`, a [`Seek`] action, and the [`RunOnLoad`] that
+/// bundles, `RotateToVelocity2d`, a [`Seek`] action, and the [`CallOnLoad`] that
 /// kicks the action into `Running` once the deferred sprite image has loaded. The
 /// data form of the imperative `seek` setup, so
 /// `<SeekAgent2d src="..." {SteerTarget::Entity($planet)}/>` flies a ship at a
@@ -261,7 +261,7 @@ pub fn SeekAgent2d(
 				world.spawn((
 					ChildOf(agent_id),
 					ActionOf(agent_id),
-					RunOnLoad,
+					CallOnLoad,
 					Seek::default(),
 				));
 			});

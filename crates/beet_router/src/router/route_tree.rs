@@ -493,7 +493,6 @@ mod test {
 		(
 			PathPartial::new(path),
 			Action::<(), ()>::new_pure(|_: ActionContext| Ok(())),
-			ActionMeta::of::<(), (), ()>(),
 		)
 	}
 

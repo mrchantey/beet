@@ -16,20 +16,17 @@ impl Plugin for ServerPlugin {
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
 			.register_type::<Tls>()
-			// the markup load verbs (and their opt-out), so a
-			// `<Router {(.., BootOnLoad)}>` server entry, an `ExchangeOnLoad` script,
-			// or a `RunOnLoad` behaviour scene resolves them.
-			.register_type::<BootOnLoad>()
-			.register_type::<ExchangeOnLoad>()
-			.register_type::<RunOnLoad>()
-			.register_type::<DisableBootOnLoad>()
-			// the boot<->exchange bridges, markup-spawnable so an entry can wire its
-			// own boot into its request pipeline, or its own request into its boot.
-			.register_type::<BootToExchange>()
-			.register_type::<ExchangeToBoot>();
+			// the markup boot and load verbs (and the load opt-out), so an
+			// `<HttpServer>` entry, a `{CallOnLoad}` script or behaviour scene
+			// resolves them.
+			.register_type::<StartOnLoad>()
+			.register_type::<CallOnLoad>()
+			.register_type::<DisableCallOnLoad>()
+			// a boot whose `--server` selects nothing exits rather than parking
+			.add_systems(Update, assert_server_booted);
 
-		// the process exits when `boot` writes `AppExit` for the one-shot it
-		// resolves; a long-running server never resolves its boot call, so its
+		// the process exits when `CallOnLoad` writes `AppExit` for the one-shot
+		// it resolves; a long-running server never resolves its boot call, so its
 		// parked `Running<Response>` holds the run open with no refcount.
 
 		// install the HTTP backend `HttpServer` invokes on start. The cascade
@@ -90,13 +87,13 @@ mod test {
 		let server = HttpServer::new_test(start_mini_http_server_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
-			App::new()
-				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((
-					server,
-					exchange_handler(|_| Response::ok().with_body("hello")),
-				))
-				.run();
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, ServerPlugin));
+			// the server owns the boot, its dispatch host is the child
+			app.world_mut().spawn((server, children![exchange_handler(
+				|_| { Response::ok().with_body("hello") }
+			)]));
+			app.run();
 		});
 		time_ext::sleep_millis(200).await;
 		for _ in 0..10 {

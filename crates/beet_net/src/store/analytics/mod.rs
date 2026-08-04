@@ -27,9 +27,9 @@ pub mod analytics_ext;
 #[cfg(feature = "json")]
 mod store;
 #[cfg(feature = "json")]
-pub use store::*;
-#[cfg(feature = "json")]
 use beet_core::prelude::*;
+#[cfg(feature = "json")]
+pub use store::*;
 
 /// Plugin that wires analytics: the storage backend, the persistence observer,
 /// and the geoip country database.

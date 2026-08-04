@@ -10,9 +10,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 // the socket surface (`Socket`, `ExchangeSocket`, `socket_exchange`, `SocketReady`,
 // `ChannelSocketServer`) is a module in the net prelude, not a glob.
+use crate::perceive_act_core::PerceiveActCorePlugin;
 use beet_net::sockets::*;
 use beet_router::prelude::*;
-use crate::perceive_act_core::PerceiveActCorePlugin;
 
 /// Marker on the agent's socket-server host. Each connection it accepts is asked for
 /// its role via `whoami`, and that role's capability routes are bound to forward over
@@ -61,11 +61,13 @@ fn bind_on_connection_ready(
 	else {
 		return;
 	};
-	commands.entity(connection).run_local(async move |connection| {
-		if let Err(err) = bind_connection(connection, server).await {
-			warn!("failed to bind capability connection: {err}");
-		}
-	});
+	commands
+		.entity(connection)
+		.run_local(async move |connection| {
+			if let Err(err) = bind_connection(connection, server).await {
+				warn!("failed to bind capability connection: {err}");
+			}
+		});
 }
 
 /// Handshake a connection and rebind its role's routes to forward over it.
@@ -171,22 +173,24 @@ mod test {
 
 		let (server, client) = ChannelSocketServer::new();
 		// the agent root: its `show-image` child joins the root's route tree.
-		let agent = app
+		let agent = app.world_mut().spawn(Router).id();
+		// the socket server child; accepted connections spawn as its children, so
+		// the capability binding rides with it.
+		let socket_server = app
 			.world_mut()
-			.spawn((CapabilityServer, server, Router))
+			.spawn((CapabilityServer, server, ChildOf(agent)))
 			.id();
 		// track the `show-image` route entity so the test can await its binding.
 		let agent_image =
 			app.world_mut().spawn((ShowImage, ChildOf(agent))).id();
 		app.world_mut().flush();
 		// boot the agent's socket server through the fan-out (parks on its keep-alive).
-		app.world_mut()
-			.entity_mut(agent)
-			.run_async_local(|host| async move {
-				host.call::<Boot, Response>(Boot::from(Request::get("/")))
-					.await?;
+		app.world_mut().entity_mut(socket_server).run_async_local(
+			|server| async move {
+				server.call::<Request, Response>(Request::get("/")).await?;
 				Ok(())
-			});
+			},
+		);
 
 		// the mock head client: a SEPARATE root, so its identically-named routes live
 		// in their own route tree (proving per-root isolation).
@@ -202,8 +206,7 @@ mod test {
 			.id();
 		app.world_mut().spawn((WhoAmI, ChildOf(head)));
 		// track the head's `show-image` route entity to assert the forwarded call.
-		let head_image =
-			app.world_mut().spawn((ShowImage, ChildOf(head))).id();
+		let head_image = app.world_mut().spawn((ShowImage, ChildOf(head))).id();
 		app.world_mut().flush();
 
 		// drive until the agent's `show-image` route is bound to the connection.
@@ -221,10 +224,14 @@ mod test {
 					.call_detached(
 						route_action(),
 						Request::get("show-image")
-							.with_body(serde_json::to_string(&ShowImageInput {
-								src: "/img/anger.png".into(),
-							})?)
-							.with_header::<header::ContentType>(MediaType::Json),
+							.with_body(serde_json::to_string(
+								&ShowImageInput {
+									src: "/img/anger.png".into(),
+								},
+							)?)
+							.with_header::<header::ContentType>(
+								MediaType::Json,
+							),
 					)
 					.await?;
 				Ok(())

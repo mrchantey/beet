@@ -2,7 +2,6 @@
 //! boot model.
 use crate::prelude::*;
 use crate::sockets::PersistentSocket;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::OnceLock;
 
@@ -79,7 +78,7 @@ impl Plugin for SocketServerPlugin {
 /// A WebSocket server that accepts incoming connections, booting through the same
 /// fan-out as [`HttpServer`].
 ///
-/// The boot fan-out ([`StartRunning<Boot>`]) whose `--server` selects `"socket"`
+/// The boot fan-out ([`StartRunning<Request>`]) whose `--server` selects `"socket"`
 /// boots it through the backend installed via [`set_socket_server`]. It never
 /// resolves the boot call, so the host's [`Running<Response>`] keep-alive parks the
 /// process; when that `Running` is removed (a reload or shutdown) its teardown
@@ -93,8 +92,8 @@ impl Plugin for SocketServerPlugin {
 ///   [`set_socket_server`]
 #[derive(Clone, Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = on_add)]
-#[require(ContinueRun<Boot, Response>)]
+#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<SocketServer>::add_observers))]
+#[require(StartOnLoad)]
 pub struct SocketServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
@@ -179,10 +178,6 @@ impl SocketServer {
 
 /// Registers the shared boot + teardown observers, mirroring [`HttpServer`] (see
 /// [`ServerShutdown`]).
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerShutdown::<SocketServer>::add_observers(&mut world, cx.entity);
-}
-
 impl BootServer for SocketServer {
 	const SELECTOR: &'static str = "socket";
 
@@ -221,6 +216,7 @@ async fn start_socket_server(
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use beet_action::prelude::*;
 
 	/// Marker the stub backend inserts in place of binding a listener, proving the
 	/// boot fan-out reached the installed backend.
@@ -247,13 +243,13 @@ mod tests {
 		.ok();
 	}
 
-	/// Fire the boot exchange on the host's `ContinueRun<Boot, Response>` slot
+	/// Fire the boot exchange on the host's `ContinueRun<Request, Response>` action
 	/// (fire-and-forget: the call fans out and parks).
 	fn boot(app: &mut App, request: Request) -> Entity {
 		let entity = app.world_mut().spawn(SocketServer::default()).id();
 		app.world_mut().entity_mut(entity).run_async_local(
 			move |host| async move {
-				host.call::<Boot, Response>(Boot::from(request)).await?;
+				host.call::<Request, Response>(request).await?;
 				Ok(())
 			},
 		);

@@ -1,0 +1,199 @@
+//! The typed-route adapter layer: an [`ActionOverload<Request, Response>`] that
+//! bridges a typed handler into the router's request/response dispatch.
+//!
+//! A route handler is a typed `Action<In, Out>` where `In: FromRequest` and
+//! `Out: IntoResponseAsync`. Dispatch speaks `Request -> Response`, so
+//! [`route_overload`] builds the adapter serving that pair: it extracts the input
+//! from the request, calls the entity's canonical typed action, and converts the
+//! output into a response. A handler that is already `Request -> Response` is its
+//! own route action, and resolution prefers the canonical action, so its
+//! coinciding overload is simply never invoked. [`IntoResponseAsync`] is the
+//! output half of the conversion. The macro, [`exchange_route`], and
+//! [`RouteScript`] all build the adapter through this one layer.
+use beet_action::prelude::*;
+use beet_core::prelude::*;
+use beet_net::prelude::*;
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
+/// The route dispatch overload: an [`ActionOverload`] serving
+/// `Request -> Response` on top of a typed handler's canonical action.
+pub type RouteOverload = ActionOverload<Request, Response>;
+
+/// Builds the [`RouteOverload`] adapting a typed handler `Action<In, Out>` to
+/// request/response dispatch.
+///
+/// Called at the route's require site, where the typed `In`/`Out` and their
+/// [`FromRequest`] / [`IntoResponseAsync`] markers are known. The adapter calls
+/// the entity's canonical action directly rather than re-entering resolution, so
+/// a `Request -> Response` handler (whose overload pair coincides with its
+/// canonical one) can never recurse.
+pub fn route_overload<In, Out, M1, M2>() -> RouteOverload
+where
+	In: 'static + Send + Sync + FromRequest<M1>,
+	Out: 'static + Send + Sync + IntoResponseAsync<M2>,
+{
+	ActionOverload::new(Action::new_async(
+		async |cx: ActionContext<Request>| -> Result<Response> {
+			let parts = cx.input.parts().clone();
+			let input = In::from_request(cx.input).await?;
+			let handler = cx
+				.caller
+				.get(|action: &Action<In, Out>| action.clone())
+				.await?;
+			let output: Out = cx.caller.call_detached(handler, input).await?;
+			output.into_response_async(cx.caller, parts).await
+		},
+	))
+}
+
+/// Trait for converting a typed handler's output into a [`Response`], the output
+/// half of the [`RouteOverload`] conversion.
+///
+/// Blanket impls cover the main cases:
+/// - Types implementing [`Serialize`] (serde content negotiation)
+///
+/// Concrete impls exist for [`MediaBytes`] and [`PageRequest`] (a render root).
+pub trait IntoResponseAsync<M>
+where
+	Self: Sized,
+{
+	/// Converts this output value into a response.
+	fn into_response_async(
+		self,
+		caller: AsyncEntity,
+		parts: RequestParts,
+	) -> MaybeSendBoxedFuture<'static, Result<Response>>;
+}
+
+/// Concrete impl for [`Response`] — an action that already produced a
+/// fully-formed response (eg a redirect) passes it through unchanged.
+impl IntoResponseAsync<Self> for Response {
+	fn into_response_async(
+		self,
+		_caller: AsyncEntity,
+		_parts: RequestParts,
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
+		Box::pin(async move { Ok(self) })
+	}
+}
+
+/// Concrete impl for [`MediaBytes`] — wraps the bytes directly
+/// into a response without content negotiation.
+impl IntoResponseAsync<Self> for MediaBytes {
+	fn into_response_async(
+		self,
+		_caller: AsyncEntity,
+		_parts: RequestParts,
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
+		Box::pin(async move { Response::ok().with_media(self).xok() })
+	}
+}
+
+/// Marker type for the [`Serialize`] blanket impl of [`IntoResponseAsync`].
+#[cfg(feature = "serde")]
+#[derive(TypePath)]
+pub struct SerdeIntoResponseMarker;
+#[cfg(feature = "serde")]
+impl<T> IntoResponseAsync<SerdeIntoResponseMarker> for T
+where
+	T: 'static + Send + Sync + Serialize,
+{
+	fn into_response_async(
+		self,
+		_caller: AsyncEntity,
+		parts: RequestParts,
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
+		Box::pin(async move {
+			let accept = match parts.headers.get_or_default::<header::Accept>()
+			{
+				Ok(accept) => accept,
+				Err(err) => {
+					return HttpError::new(
+						StatusCode::BAD_REQUEST,
+						format!("failed to parse accept headers: {}", err),
+					)
+					.into_response()
+					.xok();
+				}
+			};
+			let bytes = MediaType::serialize_accepts(&accept, &self)?;
+			Response::ok().with_media(bytes).xok()
+		})
+	}
+}
+
+/// Creates a route from a path and bundle, the simplest route constructor.
+pub fn route<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {
+	(PathPartial::new(path), bundle)
+}
+
+/// Creates a route bundle from a path and a typed action, including the
+/// [`RouteOverload`] adapting the action to request/response dispatch.
+pub fn exchange_route<In, Out, M, M1, M2, B>(
+	path: &str,
+	action: B,
+) -> (PathPartial, B, RouteOverload)
+where
+	In: 'static + Send + Sync + FromRequest<M1>,
+	Out: 'static + Send + Sync + IntoResponseAsync<M2>,
+	B: Bundle + IntoAction<M, In = In, Out = Out>,
+{
+	(
+		PathPartial::new(path),
+		action,
+		route_overload::<In, Out, M1, M2>(),
+	)
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_action::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	/// An `In = Request` route handler is its own route action, so its overload
+	/// pair coincides with its canonical one. Resolution prefers the canonical
+	/// action, so the overload is never invoked and cannot recurse.
+	#[beet_core::test]
+	async fn request_route_dispatches_through_its_canonical_action() {
+		(AsyncPlugin, RouterPlugin)
+			.into_world()
+			.spawn((default_router(), children![exchange_route(
+				"echo",
+				exchange_handler(|req| {
+					Response::ok().with_body(req.take().path_string())
+				})
+			)]))
+			.exchange(Request::get("echo"))
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("echo");
+	}
+
+	/// Shouts the request path back, a typed `RequestParts -> MediaBytes` handler.
+	#[action(handler_only)]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	async fn Shout(cx: ActionContext<RequestParts>) -> MediaBytes {
+		MediaBytes::new_text(cx.take().path_string().to_uppercase())
+	}
+
+	/// A typed handler dispatches through its overload: the request becomes the
+	/// typed input and the typed output becomes the response.
+	#[beet_core::test]
+	async fn typed_route_dispatches_through_its_overload() {
+		(AsyncPlugin, RouterPlugin)
+			.into_world()
+			.spawn((default_router(), children![exchange_route(
+				"shout", Shout
+			)]))
+			.exchange(Request::get("shout"))
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("SHOUT");
+	}
+}

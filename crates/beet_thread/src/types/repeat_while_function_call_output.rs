@@ -50,7 +50,7 @@ pub async fn RepeatWhileFunctionCallOutput(
 	let child_entity = world.entity(child);
 
 	let action_meta = child_entity
-		.get(|meta: &ActionMeta| *meta)
+		.get(|meta: &ActionMeta| meta.clone())
 		.await
 		.map_err(|err| {
 			bevyhow!(

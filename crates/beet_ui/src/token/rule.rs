@@ -77,9 +77,8 @@ impl MediaQuery {
 	pub fn applies_in_terminal(self, viewport: Option<MediaViewport>) -> bool {
 		match self {
 			Self::Terminal => true,
-			Self::MaxWidth(px) => {
-				viewport.is_some_and(|viewport| viewport.width_px() <= px as f32)
-			}
+			Self::MaxWidth(px) => viewport
+				.is_some_and(|viewport| viewport.width_px() <= px as f32),
 			_ => false,
 		}
 	}
@@ -367,10 +366,7 @@ pub enum Selector {
 	/// `parent`, ie in css `parent > child` (note the `>`). Like
 	/// [`Descendant`](Self::Descendant) but one level only, likewise evaluated
 	/// on both targets.
-	Child {
-		parent: Arc<Self>,
-		child: Arc<Self>,
-	},
+	Child { parent: Arc<Self>, child: Arc<Self> },
 }
 
 impl Selector {

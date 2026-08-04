@@ -1,6 +1,5 @@
 //! HTTP server component for handling incoming requests.
 use crate::prelude::*;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::OnceLock;
 
@@ -13,9 +12,10 @@ use bevy::platform::sync::OnceLock;
 /// [`beet_net`]. [`HttpServer`]'s start observer invokes the installed function.
 ///
 /// It is handed an [`AsyncEntity`] for the spawned server and a shutdown
-/// [`OnceValueRx`] that resolves when the host's [`Running<Response>`] is removed,
+/// [`OnceValueRx`] that resolves when the server's [`Running<Response>`] is removed,
 /// and returns a boxed future. The backend reads the [`HttpServer`] config off the entity, opens its
-/// own listener, and dispatches each request through `entity.exchange(req)`. It owns
+/// own listener, and dispatches each request through `entity.exchange(req)`,
+/// which resolves the dispatch host (usually the server's parent). It owns
 /// its teardown: on the shutdown signal it stops accepting and drops its listener
 /// (and may abort tasks it spawned), since only the backend knows how it spawned its
 /// own work.
@@ -49,16 +49,18 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// image fetch) reads it through [`HttpServer::current_port`].
 static CURRENT_PORT: RwLock<Option<u16>> = RwLock::new(None);
 
-/// HTTP server that listens for incoming requests, dispatching each through the
-/// host's `Action<Request, Response>` dispatch slot via `entity.exchange`.
+/// HTTP server that listens for incoming requests, dispatching each through its
+/// host's `Request -> Response` action via `entity.exchange`.
 ///
-/// A long-running server: the boot fan-out ([`StartRunning<Boot>`]) whose
-/// `--server` selects `"http"` boots it through the backend [`ServerPlugin`]
-/// installed via [`set_http_server`], reading `--port` / `--host` from the boot
-/// request. It never resolves the boot call, so the host's [`Running<Response>`]
-/// keep-alive claim persists the process; when that `Running` is removed (a
-/// reload or shutdown) its teardown observer stops the listener. A markup-spawned
-/// `<Router {(HttpServer{port:0})}>` boots exactly the same way.
+/// A long-running server entity, usually a child of its dispatch host. The load
+/// path ([`CallOnLoad`], required) calls its [`ContinueRun<Request, Response>`]
+/// boot action, whose fan-out ([`StartRunning<Request>`]) boots it when
+/// `--server` selects `"http"`, through the backend [`ServerPlugin`] installed
+/// via [`set_http_server`], reading `--port` / `--host` from the boot request.
+/// It never resolves the boot call, so its [`Running<Response>`] keep-alive
+/// claim persists the process; when that `Running` is removed (a reload or
+/// shutdown) its teardown observer stops the listener. A markup-spawned
+/// `<Router><HttpServer port=0/></Router>` boots exactly the same way.
 ///
 /// The concrete backend depends on compile-time features:
 /// - Default (`server`): lightweight mini HTTP server using `async-io` TCP
@@ -73,15 +75,14 @@ static CURRENT_PORT: RwLock<Option<u16>> = RwLock::new(None);
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// world.spawn((
-///     HttpServer::default(),
-///     exchange_handler(|req| req.mirror()),
-/// )).trigger(StartRunning::boot);
+/// let host = world.spawn(exchange_handler(|req| req.mirror())).id();
+/// world.spawn((HttpServer::default(), ChildOf(host)))
+///     .trigger(StartRunning::from_cli);
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = on_add)]
-#[require(ExchangeStats, ContinueRun<Boot, Response>)]
+#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<HttpServer>::add_observers))]
+#[require(ExchangeStats, StartOnLoad)]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
 	/// an available port (equivalent to binding to port `0`).
@@ -201,13 +202,6 @@ impl HttpServer {
 	}
 }
 
-/// Registers the shared boot + teardown observers on the host (see
-/// [`ServerShutdown`]). no_std-clean: the async runtime (`queue_async_local`) and the
-/// installed backend hook both build without std.
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	ServerShutdown::<HttpServer>::add_observers(&mut world, cx.entity);
-}
-
 impl BootServer for HttpServer {
 	const SELECTOR: &'static str = "http";
 
@@ -220,7 +214,7 @@ impl BootServer for HttpServer {
 
 	/// `HttpServer` overlays `--port` / `--host` from the boot before the backend
 	/// reads the bind address.
-	fn apply_boot(&mut self, boot: &Request) { self.apply_request(boot); }
+	fn apply_boot(&mut self, request: &Request) { self.apply_request(request); }
 
 	fn default_boot(&self) -> bool { self.default_boot }
 }
@@ -301,19 +295,20 @@ mod std_impl {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use beet_action::prelude::*;
 
 	// the shared idempotent stub backend lives at module level
 	// ([`stub_backend`]), so sibling test modules (eg `boot`) install the same
 	// hook and cases stay order-independent.
 
-	/// Fire the boot exchange on the host's `ContinueRun<Boot, Response>` slot
+	/// Fire the boot call on the server's `ContinueRun<Request, Response>`
 	/// (fire-and-forget: the call fans out and parks). `HttpServer` provides that
-	/// slot, so the call reaches the http observer exactly as a real boot does.
+	/// action, so the call reaches the http observer exactly as a real boot does.
 	fn boot(app: &mut App, port: u16, request: Request) -> Entity {
 		let entity = app.world_mut().spawn(HttpServer::new(port)).id();
 		app.world_mut().entity_mut(entity).run_async_local(
-			move |host| async move {
-				host.call::<Boot, Response>(Boot::from(request)).await?;
+			move |server| async move {
+				server.call::<Request, Response>(request).await?;
 				Ok(())
 			},
 		);
@@ -466,13 +461,12 @@ mod tests {
 				..default()
 			})
 			.id();
-		app.world_mut()
-			.entity_mut(entity)
-			.run_async_local(|host| async move {
-				host.call::<Boot, Response>(Boot::from(Request::get("/")))
-					.await?;
+		app.world_mut().entity_mut(entity).run_async_local(
+			|server| async move {
+				server.call::<Request, Response>(Request::get("/")).await?;
 				Ok(())
-			});
+			},
+		);
 		// a bare boot selects `default_boot` servers only; this one opts out.
 		for _ in 0..16 {
 			app.update();
@@ -538,15 +532,13 @@ pub(crate) mod test {
 		let server = HttpServer::new_test(run_server);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
-			App::new()
-				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((
-					server,
-					exchange_handler(move |req| {
-						Response::ok().with_body(req.take().body)
-					}),
-				))
-				.run();
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, ServerPlugin));
+			// the server owns the boot, its dispatch host is the child
+			app.world_mut().spawn((server, children![exchange_handler(
+				move |req| Response::ok().with_body(req.take().body)
+			)]));
+			app.run();
 		});
 		time_ext::sleep_millis(100).await;
 
@@ -590,21 +582,20 @@ pub(crate) mod test {
 		// keep the sender in the test so we can stop the server ourselves.
 		let (signal, shutdown) = oneshot::<()>();
 		let _handle = std::thread::spawn(move || {
-			App::new()
-				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((
-					HttpServer {
-						port: Some(port),
-						..default()
-					},
-					exchange_handler(|_| Response::ok().with_body("up")),
-					OnSpawn::new_async(move |entity| {
-						start_mini_http_server_with_tcp(
-							entity, listener, shutdown,
-						)
-					}),
-				))
-				.run();
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, ServerPlugin));
+			app.world_mut().spawn((
+				HttpServer {
+					port: Some(port),
+					..default()
+				},
+				OnSpawn::new_async(move |entity| {
+					start_mini_http_server_with_tcp(entity, listener, shutdown)
+				}),
+				// the server's dispatch host, a child
+				children![exchange_handler(|_| Response::ok().with_body("up"))],
+			));
+			app.run();
 		});
 		time_ext::sleep_millis(150).await;
 		// serving before the stop
