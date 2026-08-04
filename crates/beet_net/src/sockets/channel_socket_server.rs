@@ -26,7 +26,7 @@ use futures::future::BoxFuture;
 /// Runtime-only: it holds an [`async_channel`] end, which is not [`Reflect`], so it
 /// is not markup-spawnable. Construct it with [`ChannelSocketServer::new`].
 #[derive(Component)]
-#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<ChannelSocketServer>::add_observers))]
+#[component(on_add = hook_ext::entity_hook(ServerShutdown::<ChannelSocketServer>::add_observers))]
 #[require(StartOnLoad)]
 pub struct ChannelSocketServer {
 	/// Incoming connections; each yields a fresh server-side [`Socket`].

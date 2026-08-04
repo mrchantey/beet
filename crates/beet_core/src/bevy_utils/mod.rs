@@ -51,7 +51,7 @@ mod id_counter;
 mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
-pub mod on_add_ext;
+pub mod hook_ext;
 
 pub use bevyhow::*;
 #[cfg(feature = "std")]

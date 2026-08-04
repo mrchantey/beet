@@ -26,7 +26,7 @@ fn next_id(prefix: &str) -> String {
 ///   else schema defaults (strings become "", integers become 0, etc.)
 /// - **Without tools**: Returns the user's input prefixed with "you said:"
 #[derive(Debug, Clone, Default, PartialEq, Eq, Component)]
-#[component(on_add = on_add_ext::entity_hook(|entity| {
+#[component(on_add = hook_ext::entity_hook(|entity| {
 	entity.insert(Action::<(), Outcome>::new_async(
 		post_streamer_action::<MockPostStreamer>,
 	));

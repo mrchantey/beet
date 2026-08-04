@@ -104,7 +104,7 @@ pub struct ServerShutdown<S: BootServer> {
 impl<S: BootServer> ServerShutdown<S> {
 	/// Register the shared boot + teardown observers on the server entity: the one
 	/// place the observer pair is wired. Each server's `on_add` hook is
-	/// `on_add_ext::entity_hook(ServerShutdown::<Marker>::add_observers)`.
+	/// `hook_ext::entity_hook(ServerShutdown::<Marker>::add_observers)`.
 	pub fn add_observers(entity: &mut EntityCommands) {
 		entity
 			.observe_any(boot_server::<S>)
@@ -145,7 +145,7 @@ fn boot_server<S: BootServer>(
 	let (signal, shutdown) = oneshot::<()>();
 	commands
 		.entity(entity)
-		// flags the boot as served, so `assert_server_booted` lets it park
+		// flags the boot as served, so `exit_if_no_server` lets it park
 		.insert((ServerBooted, ServerShutdown::<S> {
 			signal: Some(signal),
 			_marker: PhantomData,

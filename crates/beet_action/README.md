@@ -4,7 +4,7 @@ Functions as entities.
 
 An [`Action`] component turns an entity into a function: `call` runs its handler with an input and awaits the output. Control-flow nodes like [`Sequence`] are just actions that call their children, so behavior trees, state machines and utility AI are all built from the same primitive.
 
-An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor, and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::serves::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector.
+An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor, and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::matches::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector.
 
 ```rust
 # use beet_core::prelude::*;

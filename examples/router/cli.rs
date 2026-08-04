@@ -50,13 +50,13 @@ fn setup(mut commands: Commands) {
 				"foo",
 				Action::<(), &str>::new_pure(|_| { "hello foo" })
 			),
-			// a `Script` is pure data, so pair it with an `RouteScript` to
+			// a `Script` is pure data, so pair it with an `ExchangeScript` to
 			// make the entity a dispatchable route.
 			(
 				Script::<QueryParams<GreetRequest>, String>::rhai(
 					r#""hello " + input.name"#,
 				),
-				RouteScript::<QueryParams<GreetRequest>, String, _, _>::default(),
+				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(),
 				PathPartial::new("greet"),
 			),
 			// same idea, but the script receives the full [`RequestParts`]
@@ -65,7 +65,7 @@ fn setup(mut commands: Commands) {
 				Script::<RequestParts, String>::rhai(
 					r#""hello " + input.url.params.name[0]"#,
 				),
-				RouteScript::<RequestParts, String, _, _>::default(),
+				ExchangeScript::<RequestParts, String, _, _>::default(),
 				PathPartial::new("greet-request"),
 			),
 		]

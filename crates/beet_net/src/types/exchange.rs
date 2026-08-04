@@ -91,7 +91,7 @@ pub impl AsyncEntity {
 			let child = server
 				.world()
 				.run_system_cached_with::<_, Result<Entity>, _, _>(
-					first_serving_child::<Request, Response>,
+					first_matching_child::<Request, Response>,
 					server.id(),
 				)
 				.await

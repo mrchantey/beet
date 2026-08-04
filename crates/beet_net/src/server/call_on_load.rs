@@ -35,7 +35,7 @@ use beet_core::prelude::*;
 /// build).
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = on_add_ext::observe(on_load_call))]
+#[component(on_add = hook_ext::observe(on_load_call))]
 pub struct CallOnLoad;
 
 /// Opts an entity (and its subtree) out of [`CallOnLoad`]: the tree is built
@@ -63,13 +63,13 @@ impl CallOnLoad {
 	/// one-shot resolves, streams, and exits.
 	pub async fn call(entity: AsyncEntity, request: Request) -> Result {
 		let response = if entity
-			.get(|meta: &ActionMeta| meta.serves::<Request, Response>())
+			.get(|meta: &ActionMeta| meta.matches::<Request, Response>())
 			.await
 			.unwrap_or(false)
 		{
 			entity.call::<Request, Response>(request).await?
 		} else if entity
-			.get(|meta: &ActionMeta| meta.serves::<(), Outcome>())
+			.get(|meta: &ActionMeta| meta.matches::<(), Outcome>())
 			.await
 			.unwrap_or(false)
 		{
@@ -94,7 +94,7 @@ impl CallOnLoad {
 	///
 	/// # Errors
 	/// Errors if no target carries [`CallOnLoad`], or any call fails.
-	pub async fn call_descendants(
+	pub async fn call_recursive(
 		host: AsyncEntity,
 		make_request: impl Fn() -> Request,
 	) -> Result {

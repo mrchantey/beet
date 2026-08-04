@@ -15,7 +15,7 @@ use beet_net::sockets::*;
 /// than once per attempt.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = on_add_ext::observe(reset_scene_on_close))]
+#[component(on_add = hook_ext::observe(reset_scene_on_close))]
 pub struct ResetOnDisconnect;
 
 fn reset_scene_on_close(_ev: On<SocketClosed>, mut commands: Commands) {

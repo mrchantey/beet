@@ -23,7 +23,7 @@ impl Plugin for ServerPlugin {
 			.register_type::<CallOnLoad>()
 			.register_type::<DisableCallOnLoad>()
 			// a boot whose `--server` selects nothing exits rather than parking
-			.add_systems(Update, assert_server_booted);
+			.add_systems(Update, exit_if_no_server);
 
 		// the process exits when `CallOnLoad` writes `AppExit` for the one-shot
 		// it resolves; a long-running server never resolves its boot call, so its

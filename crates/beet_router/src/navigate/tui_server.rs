@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// A live-TUI server: a child of its router, the boot fan-out whose
+/// A live-TUI server owning the boot with its router as a child: the fan-out whose
 /// `--server` selects `"tui"` boots the navigable terminal app. The interactive
 /// sibling of the one-shot [`CliServer`].
 ///
@@ -22,11 +22,11 @@ use beet_ui::prelude::*;
 ///
 /// Reusable: any app gets a live TUI by adding the live plugins
 /// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]) and spreading
-/// this on its router entity, then booting it.
+/// this on its server root, then booting it.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(StartOnLoad)]
-#[component(on_add = on_add_ext::observe((on_action_in, on_running_removed)))]
+#[component(on_add = hook_ext::observe((on_action_in, on_running_removed)))]
 pub struct TuiServer;
 
 /// The live host entity (terminal + navigator) the boot spawned, despawned on
@@ -57,7 +57,7 @@ fn on_action_in(
 	}
 	commands
 		.entity(ev.entity)
-		// `ServerBooted` flags the boot as served, so `assert_server_booted` lets it park
+		// `ServerBooted` flags the boot as served, so `exit_if_no_server` lets it park
 		.insert((ServerBooted, opening))
 		.queue_async_local(move |entity| start_tui(entity, scheme));
 	Ok(())
@@ -81,8 +81,8 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 	if !entity.is_alive().await {
 		return Ok(());
 	}
-	// navigation targets the server entity; route lookups resolve the ancestor
-	// `RouteTree`, so a server child browses its router's routes.
+	// navigation targets the server entity; route lookups resolve the nearest
+	// `RouteTree` by ancestry, so the server browses its router's routes.
 	let router = entity.id();
 	// the opening route is recorded on the server (the shared mechanism); read it
 	// back here. The server is route-agnostic; a downstream plugin (eg

@@ -127,7 +127,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	// and wait for the bound port.
 	cx.world()
 		.run_async_local(move |world| async move {
-			CallOnLoad::call_descendants(world.entity(root), || {
+			CallOnLoad::call_recursive(world.entity(root), || {
 				Request::from_cli_str("--server=http --port=0")
 			})
 			.await?;
@@ -150,19 +150,9 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	// which drops the listener. Servers are child entities under the root.
 	cx.world()
 		.with(move |world: &mut World| {
-			let running =
-				world
-					.with_state::<(Query<(), With<Running<Response>>>, Query<&Children>), _>(
-						|(running, children)| {
-							children
-								.iter_descendants_inclusive(root)
-								.filter(|entity| running.contains(*entity))
-								.collect::<Vec<_>>()
-						},
-					);
-			for entity in running {
-				world.entity_mut(entity).remove::<Running<Response>>();
-			}
+			world
+				.entity_mut(root)
+				.remove_recursive::<Children, Running<Response>>();
 		})
 		.await;
 

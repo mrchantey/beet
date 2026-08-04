@@ -23,17 +23,18 @@ use beet_core::prelude::*;
 /// direct `trigger(StartRunning::from_cli)` has no `Running`, so `CliServer` streams
 /// the response and writes the [`AppExit`] itself.
 ///
-/// This is how every beet binary boots by default: spawn it as a child of the entry
-/// root, and the load path (no `--server`, or `--server=cli`) reaches it. Being a
-/// one-shot, it resolves the call rather than parking, so the process exits once
-/// its response is streamed.
+/// This is how every beet binary boots by default: it owns the entry root with the
+/// dispatch host as its child (`<CliServer><Router>..</Router></CliServer>`), and the
+/// load path (no `--server`, or `--server=cli`) reaches it. Being a one-shot, it
+/// resolves the call rather than parking, so the process exits once its response is
+/// streamed.
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
 /// for example `--accept=text/html,text/plain`.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(StartOnLoad)]
-#[component(on_add = on_add_ext::observe(on_action_in))]
+#[component(on_add = hook_ext::observe(on_action_in))]
 pub struct CliServer {
 	/// Dispatch on every boot, ignoring `--server`.
 	///
@@ -66,7 +67,7 @@ fn on_action_in(
 	let start = ev.clone();
 	commands
 		.entity(ev.entity)
-		// flags the boot as served, so `assert_server_booted` lets it run
+		// flags the boot as served, so `exit_if_no_server` lets it run
 		.insert(ServerBooted)
 		.queue_async_local(move |server| route_and_end(server, start));
 	Ok(())

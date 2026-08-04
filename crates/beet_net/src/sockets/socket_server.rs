@@ -92,7 +92,7 @@ impl Plugin for SocketServerPlugin {
 ///   [`set_socket_server`]
 #[derive(Clone, Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<SocketServer>::add_observers))]
+#[component(on_add = hook_ext::entity_hook(ServerShutdown::<SocketServer>::add_observers))]
 #[require(StartOnLoad)]
 pub struct SocketServer {
 	/// The port to bind to. `None` means the OS will assign a port.

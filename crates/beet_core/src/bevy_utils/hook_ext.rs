@@ -1,8 +1,9 @@
-//! Component hook constructors for common `on_add` patterns.
+//! Constructors for common component hooks.
 //!
-//! Bevy's `#[component(on_add = ...)]` attribute accepts a function call
-//! yielding a closure, evaluated fresh on every hook invocation. These
-//! constructors exploit that to express common hooks inline:
+//! Bevy's hook attributes (`on_add`, `on_insert`, `on_replace`, `on_remove`,
+//! `on_despawn`) accept a function call yielding a closure, evaluated fresh on
+//! every hook invocation. These constructors exploit that to express common
+//! hooks inline, and apply to any of the five:
 //!
 //! ```
 //! # use beet_core::prelude::*;
@@ -12,11 +13,11 @@
 //! fn log_event(ev: On<MyEvent>) {}
 //!
 //! #[derive(Component)]
-//! #[component(on_add = on_add_ext::observe(log_event))]
+//! #[component(on_add = hook_ext::observe(log_event))]
 //! struct Watched;
 //!
 //! #[derive(Component)]
-//! #[component(on_add = on_add_ext::entity_hook(|entity| { entity.insert(Name::new("hooked")); }))]
+//! #[component(on_add = hook_ext::entity_hook(|entity| { entity.insert(Name::new("hooked")); }))]
 //! struct Named;
 //! ```
 use bevy::ecs::lifecycle::HookContext;
@@ -29,7 +30,7 @@ use crate::prelude::EntityCommandsActionEventExt as _;
 /// Creates a component hook from a function receiving the hooked entity's
 /// [`EntityCommands`].
 ///
-/// Prefer this over a bespoke `fn on_add(world: DeferredWorld, cx: HookContext)`
+/// Prefer this over a bespoke `fn hook(world: DeferredWorld, cx: HookContext)`
 /// whenever the hook only queues entity commands.
 pub fn entity_hook(
 	func: impl FnOnce(&mut EntityCommands),
@@ -96,15 +97,15 @@ mod test {
 	fn increment(_ev: On<Ping>, mut count: ResMut<Count>) { count.0 += 1; }
 
 	#[derive(Component)]
-	#[component(on_add = on_add_ext::observe(increment))]
+	#[component(on_add = hook_ext::observe(increment))]
 	struct Single;
 
 	#[derive(Component)]
-	#[component(on_add = on_add_ext::observe((increment, increment)))]
+	#[component(on_add = hook_ext::observe((increment, increment)))]
 	struct Pair;
 
 	#[derive(Component)]
-	#[component(on_add = on_add_ext::entity_hook(|entity| { entity.insert(Name::new("hooked")); }))]
+	#[component(on_add = hook_ext::entity_hook(|entity| { entity.insert(Name::new("hooked")); }))]
 	struct Named;
 
 	#[beet_core::test]

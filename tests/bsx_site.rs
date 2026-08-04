@@ -16,14 +16,22 @@ mod bsx_site;
 use bsx_site::build_site;
 
 /// A world with the render substrate the on-disk site loads against, then the built
-/// site root: `RouterPlugin` brings the BSX engine + spread server/middleware types
-/// (+ `AsyncPlugin`), `MaterialStylePlugin` the style rules the `<Theme>`/`<Rule>`
-/// declarations resolve against.
-async fn site_world() -> (World, Entity) {
+/// site root and its dispatch router: `RouterPlugin` brings the BSX engine + spread
+/// server/middleware types (+ `AsyncPlugin`), `MaterialStylePlugin` the style rules
+/// the `<Theme>`/`<Rule>` declarations resolve against.
+///
+/// The entry root is the *server* (`main.bsx` declares its servers on a
+/// `<StartOnLoad>`), which parks on its boot action rather than dispatching, so a
+/// render addresses the [`Router`] beneath it.
+async fn site_world() -> (World, Entity, Entity) {
 	let mut world =
 		(AsyncPlugin, RouterPlugin, material::MaterialStylePlugin).into_world();
 	let root = build_site(&mut world).await;
-	(world, root)
+	let router = world
+		.run_system_cached_with::<_, Result<Entity>, _, _>(find_router, root)
+		.unwrap()
+		.unwrap();
+	(world, root, router)
 }
 
 /// A `GET {path}` request negotiating HTML (the web render target).
@@ -31,25 +39,28 @@ fn html_get(path: &str) -> Request {
 	Request::get(path).with_header::<header::Accept>(vec![MediaType::Html])
 }
 
-/// Render `path` against `root`, negotiating HTML.
-async fn render(world: &mut World, root: Entity, path: &str) -> String {
-	world.entity_mut(root).exchange_str(html_get(path)).await
+/// Render `path` against `router`, negotiating HTML.
+async fn render(world: &mut World, router: Entity, path: &str) -> String {
+	world.entity_mut(router).exchange_str(html_get(path)).await
 }
 
 #[beet::test]
 async fn entry_lands_on_root() {
-	let (world, root) = site_world().await;
-	// the spread middleware and servers `main.bsx` declares stack on the router
-	world.entity(root).contains::<Router>().xpect_true();
-	world.entity(root).contains::<RequestLogger>().xpect_true();
-	world.entity(root).contains::<BsxLayout>().xpect_true();
+	let (world, root, router) = site_world().await;
+	// the servers `main.bsx` declares own the entry root, the router is their child
+	world.entity(root).contains::<StartOnLoad>().xpect_true();
+	world.entity(root).contains::<HttpServer>().xpect_true();
+	// the spread middleware stacks on the router beside its dispatch
+	world.entity(router).contains::<Router>().xpect_true();
+	world.entity(router).contains::<RequestLogger>().xpect_true();
+	world.entity(router).contains::<BsxLayout>().xpect_true();
 	// the markup `<PackageConfig/>` patched the live resource
 	world
 		.resource::<PackageConfig>()
 		.title
 		.as_str()
 		.xpect_eq("BSX Site");
-	// the on-disk routes assembled into the root's tree
+	// the on-disk routes assembled into the entry root's tree
 	let tree = world.entity(root).get::<RouteTree>().unwrap();
 	tree.find(&["docs", "getting-started"]).xpect_some();
 	tree.find(&["blog", "hello-world"]).xpect_some();
@@ -58,8 +69,8 @@ async fn entry_lands_on_root() {
 
 #[beet::test]
 async fn home_renders_in_layout() {
-	let (mut world, root) = site_world().await;
-	render(&mut world, root, "")
+	let (mut world, _root, router) = site_world().await;
+	render(&mut world, router, "")
 		.await
 		.as_str()
 		// the `templates/Layout.bsx` doctype leads the document, so the served page
@@ -76,8 +87,8 @@ async fn home_renders_in_layout() {
 
 #[beet::test]
 async fn markdown_route_renders_in_layout() {
-	let (mut world, root) = site_world().await;
-	render(&mut world, root, "docs/getting-started")
+	let (mut world, _root, router) = site_world().await;
+	render(&mut world, router, "docs/getting-started")
 		.await
 		.as_str()
 		// the layout chrome
@@ -92,8 +103,8 @@ async fn markdown_route_renders_in_layout() {
 
 #[beet::test]
 async fn blog_markdown_route_renders() {
-	let (mut world, root) = site_world().await;
-	render(&mut world, root, "blog/hello-world")
+	let (mut world, _root, router) = site_world().await;
+	render(&mut world, router, "blog/hello-world")
 		.await
 		.as_str()
 		.xpect_contains("<title>Hello World</title>")
@@ -106,8 +117,8 @@ async fn blog_markdown_route_renders() {
 /// The Rust counter's web mirror, but authored entirely in `routes/counter.bsx`.
 #[beet::test]
 async fn counter_page_renders_reactively() {
-	let (mut world, root) = site_world().await;
-	let html = render(&mut world, root, "counter").await;
+	let (mut world, _root, router) = site_world().await;
+	let html = render(&mut world, router, "counter").await;
 	html.as_str()
 		// the Card template's `@prop:title` binds the caller's prop into the heading
 		.xpect_contains("<h2>Counter</h2>")
@@ -130,8 +141,8 @@ async fn counter_page_renders_reactively() {
 /// the `Auto` reactive renderer emits no blob and no runtime script.
 #[beet::test]
 async fn plain_page_stays_clean() {
-	let (mut world, root) = site_world().await;
-	render(&mut world, root, "blog/hello-world")
+	let (mut world, _root, router) = site_world().await;
+	render(&mut world, router, "blog/hello-world")
 		.await
 		.as_str()
 		.xnot()
@@ -142,21 +153,21 @@ async fn plain_page_stays_clean() {
 
 #[beet::test]
 async fn repeated_requests_are_stable() {
-	let (mut world, root) = site_world().await;
+	let (mut world, _root, router) = site_world().await;
 	// the shared layout/route content must survive request after request: each
 	// render byte-identical (the layout despawn-hazard regression).
-	let first = world.entity_mut(root).exchange_str(html_get("")).await;
-	let second = world.entity_mut(root).exchange_str(html_get("")).await;
+	let first = world.entity_mut(router).exchange_str(html_get("")).await;
+	let second = world.entity_mut(router).exchange_str(html_get("")).await;
 	first.xpect_eq(second);
 }
 
 #[beet::test]
 async fn terminal_renders_full_layout() {
-	let (mut world, root) = site_world().await;
+	let (mut world, _root, router) = site_world().await;
 	// the terminal target negotiates text, not HTML, but renders the *full* layout
 	// around the body; the non-visual `<head>`/`<style>` simply does not paint.
 	world
-		.entity_mut(root)
+		.entity_mut(router)
 		.exchange_str(
 			Request::get("")
 				.with_header::<header::Accept>(vec![MediaType::Text]),

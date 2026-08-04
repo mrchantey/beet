@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 /// (unlike [`HttpServer`]) it is not markup-spawnable. Construct it with
 /// [`ChannelHttpServer::new`].
 #[derive(Component)]
-#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<ChannelHttpServer>::add_observers))]
+#[component(on_add = hook_ext::entity_hook(ServerShutdown::<ChannelHttpServer>::add_observers))]
 #[require(ExchangeStats, StartOnLoad)]
 pub struct ChannelHttpServer {
 	/// Inbound requests to dispatch.
@@ -151,7 +151,8 @@ mod test {
 	use beet_action::prelude::*;
 
 	/// Serve a real request/response over the channel transport: spawn a
-	/// `ChannelHttpServer` as a child of its dispatch host (a mirror handler),
+	/// `ChannelHttpServer` owning the root with its dispatch host (a mirror handler)
+	/// as its child,
 	/// boot it through the fan-out, then drive the app until the client's request
 	/// round-trips. Drives to the bounded response condition (via
 	/// [`AsyncRunner::poll_and_update`]) rather than settling a parked server, so

@@ -182,8 +182,8 @@ impl Plugin for RouterPlugin {
 			app.register_type::<TuiServer>();
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
-				.register_type::<RouteScript<(), String>>()
-				.register_type::<RouteScript<
+				.register_type::<ExchangeScript<(), String>>()
+				.register_type::<ExchangeScript<
 					RequestParts,
 					String,
 					RequestParts,

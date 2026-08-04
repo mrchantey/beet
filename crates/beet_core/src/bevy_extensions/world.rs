@@ -99,8 +99,21 @@ pub impl World {
 		Ok(result)
 	}
 
-	/// Handle a command error, printing with a location.
-	fn handle_command_error<F>(
+	/// Raises `err` through the world's configured error handler, attributed to
+	/// the call site.
+	///
+	/// This is how code outside a system raises: a component hook, a command, an
+	/// async task, never `panic!`, `debug_assert!` or a bare `error!`.
+	#[track_caller]
+	fn handle_command_error<F>(&self, err: BevyError) {
+		self.handle_command_error_with_location::<F>(err, Location::caller());
+	}
+
+	/// Like [`handle_command_error`](Self::handle_command_error), but attributed
+	/// to an explicit `location`, for a raise deferred past its call site (a
+	/// queued command, a spawned task) where `Location::caller` would name the
+	/// runner rather than the origin.
+	fn handle_command_error_with_location<F>(
 		&self,
 		err: BevyError,
 		location: &'static Location<'static>,

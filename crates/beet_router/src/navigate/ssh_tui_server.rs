@@ -18,20 +18,20 @@ use bevy::input::keyboard::KeyCode;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::math::UVec2;
 
-/// A multi-tenant SSH-TUI server, a child of its router: the boot fan-out whose
+/// A multi-tenant SSH-TUI server owning the boot with its router as a child: the fan-out whose
 /// `--server` selects `"ssh"` boots an [`SshServer`] on this entity and serves every
-/// connection its own navigable terminal browsing the ancestor router.
+/// connection its own navigable terminal browsing that router.
 ///
 /// A long-running server: it never resolves the boot call, so its
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up.
 /// Reads `--port` / `--host` from the boot request (defaulting from
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
 /// Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
-/// [`HttpServer`] on the same router, so one process answers http and ssh at once.
+/// [`HttpServer`] on the same root, so one process answers http and ssh at once.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(StartOnLoad)]
-#[component(on_add = on_add_ext::observe(on_action_in))]
+#[component(on_add = hook_ext::observe(on_action_in))]
 pub struct SshTuiServer;
 
 /// Boots the SSH listener on the boot fan-out, if `--server` selects `"ssh"`:
@@ -69,7 +69,7 @@ fn on_action_in(
 	}
 	// the opening route each session navigates to, recorded on the server (the
 	// shared mechanism the local TUI server also reads).
-	// `ServerBooted` flags the boot as served, so `assert_server_booted` lets it park
+	// `ServerBooted` flags the boot as served, so `exit_if_no_server` lets it park
 	commands
 		.entity(ev.entity)
 		.insert((ServerBooted, server, opening));
@@ -80,7 +80,7 @@ fn on_action_in(
 /// up a surface per connection, drains each surface's frame to its client, and
 /// closes a session on ctrl+c.
 ///
-/// The server component (a child of the router) boots the listener; this plugin provides
+/// The server component boots the listener; this plugin provides
 /// the connection lifecycle, mirroring how [`TuiServer`] pairs with the live
 /// plugins ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]), which
 /// an SSH-TUI app must also add.

@@ -41,7 +41,7 @@ impl Sequence {
 }
 
 /// Skips child entities whose [`ActionMeta`] is missing or does not
-/// [`serve`](ActionMeta::serves) the expected
+/// [`match`](ActionMeta::matches) the expected
 /// `Action<Input, Outcome<Input, Output>>` signature.
 ///
 /// Honours [`ExcludeErrors`]: when a flagged error is excluded the child is
@@ -83,12 +83,12 @@ where
 			}
 			bevybail!("sequence child has no action: {child:?}");
 		};
-		if !meta.serves::<Input, Outcome<Input, Output>>() {
+		if !meta.matches::<Input, Outcome<Input, Output>>() {
 			if exclude_errors.contains(ChildError::ACTION_MISMATCH) {
 				continue;
 			}
 			bevybail!(
-				"sequence child wrong action signature: {child:?}, serves: {}",
+				"sequence child wrong action signature: {child:?}, matches: {}",
 				meta.signatures()
 			);
 		}
@@ -97,14 +97,14 @@ where
 	Ok(valid)
 }
 
-/// Selects the first child whose [`ActionMeta`] [`serves`](ActionMeta::serves)
+/// Selects the first child whose [`ActionMeta`] [`matches`](ActionMeta::matches)
 /// `(Input, Out)`, the downward dispatch hop: a parent hands its call to the
 /// first child that can take it, ignoring config-only and differently-shaped
 /// children.
 ///
 /// # Errors
-/// Errors when no child serves the signature, listing each child's signatures.
-pub fn first_serving_child<Input, Out>(
+/// Errors when no child matches the signature, listing each child's signatures.
+pub fn first_matching_child<Input, Out>(
 	In(parent): In<Entity>,
 	children: Query<&Children>,
 	metas: Query<&ActionMeta>,
@@ -121,7 +121,7 @@ where
 	let mut candidates = Vec::new();
 	for child in children {
 		match metas.get(child) {
-			Ok(meta) if meta.serves::<Input, Out>() => return Ok(child),
+			Ok(meta) if meta.matches::<Input, Out>() => return Ok(child),
 			Ok(meta) => {
 				candidates.push(format!("\n  {child}: {}", meta.signatures()))
 			}
@@ -129,7 +129,7 @@ where
 		}
 	}
 	bevybail!(
-		"no child of {parent} serves Action<{}, {}>.{}",
+		"no child of {parent} matches Action<{}, {}>.{}",
 		core::any::type_name::<Input>(),
 		core::any::type_name::<Out>(),
 		candidates.concat()
@@ -384,7 +384,7 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	fn selects_the_first_serving_child() {
+	fn selects_the_first_matching_child() {
 		let mut world = World::new();
 		let parent = world
 			.spawn(children![
@@ -397,7 +397,7 @@ mod tests {
 		world.flush();
 		let serving = world
 			.run_system_cached_with::<_, Result<Entity>, _, _>(
-				first_serving_child::<(), Outcome<(), ()>>,
+				first_matching_child::<(), Outcome<(), ()>>,
 				parent,
 			)
 			.unwrap()
@@ -414,7 +414,7 @@ mod tests {
 		world.flush();
 		world
 			.run_system_cached_with::<_, Result<Entity>, _, _>(
-				first_serving_child::<(), Outcome<(), ()>>,
+				first_matching_child::<(), Outcome<(), ()>>,
 				parent,
 			)
 			.unwrap()

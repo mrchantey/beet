@@ -6,15 +6,21 @@ use bevy::reflect::Typed;
 
 /// Unified metadata for the one action an entity holds, combining
 /// handler/input/output type information with optional reflection data,
-/// description, and the extra signatures the entity's [`ActionOverload`]s serve.
+/// description, and the extra signatures the entity's [`ActionOverload`]s match.
 ///
 /// Constructed for [`Action::with_meta`], never inserted directly: [`Action`] is
 /// its only producer, inserting it on add and removing it on remove, so a
 /// hand-inserted one raises a clobber error when the real action lands.
 ///
+/// Immutable, so every change is an insert: consumers observing
+/// `Insert<ActionMeta>` (route discovery) see the registered overloads as well
+/// as the canonical fields, whether an [`Action`] or an [`ActionOverload`]
+/// landed last. An in-place edit would be invisible to them.
+///
 /// Created via [`ActionMeta::of`], [`ActionMeta::of_action`],
 /// [`ActionMeta::of_handler`], or [`ActionMeta::of_reflect`].
 #[derive(Clone, Debug, Component, Get)]
+#[component(immutable)]
 pub struct ActionMeta {
 	/// Type metadata for the action handler.
 	handler: TypeMeta,
@@ -27,7 +33,7 @@ pub struct ActionMeta {
 	/// also implement [`Typed`].
 	type_info: Option<ActionTypeInfo>,
 	/// The additional `(input, output)` pairs this entity's
-	/// [`ActionOverload`]s serve.
+	/// [`ActionOverload`]s match.
 	overloads: HashSet<(TypeMeta, TypeMeta)>,
 }
 
@@ -110,7 +116,7 @@ impl ActionMeta {
 		self
 	}
 
-	/// Register an additional signature this action serves, see
+	/// Register an additional signature this action matches, see
 	/// [`ActionOverload`].
 	pub(crate) fn insert_overload<In: 'static, Out: 'static>(&mut self) {
 		self.overloads
@@ -124,12 +130,12 @@ impl ActionMeta {
 			.remove(&(TypeMeta::of::<In>(), TypeMeta::of::<Out>()));
 	}
 
-	/// Whether this action serves an `(In, Out)` call, either as its canonical
+	/// Whether this action matches an `(In, Out)` call, either as its canonical
 	/// signature or through a registered [`ActionOverload`].
 	///
 	/// The single meta-matching predicate: call resolution, sequence child
 	/// validation and the child selector all ask this.
-	pub fn serves<In: 'static, Out: 'static>(&self) -> bool {
+	pub fn matches<In: 'static, Out: 'static>(&self) -> bool {
 		let pair = (TypeMeta::of::<In>(), TypeMeta::of::<Out>());
 		(self.input, self.output) == pair || self.overloads.contains(&pair)
 	}

@@ -24,7 +24,7 @@ use beet::prelude::*;
 /// ```
 ///
 /// The site entry is built with boot suppressed ([`build_site`] adds
-/// [`DisableCallOnLoad`]), then booted explicitly: [`CallOnLoad::call_descendants`]
+/// [`DisableCallOnLoad`]), then booted explicitly: [`CallOnLoad::call_recursive`]
 /// calls every declared server under the loaded root, so the workspace entry
 /// serves only when `serve` is invoked, never on its own load. A parked server
 /// holds the await, so this handler never returns and the process serves until
@@ -43,7 +43,7 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	let root = build_site(&caller, parts.params(), site_dir, entry).await?;
 	// boot the site at its own home with the serve flags (see `site_boot_request`),
 	// not the `serve/<site>` command request the dev router routed here.
-	CallOnLoad::call_descendants(caller.world().entity(root), || {
+	CallOnLoad::call_recursive(caller.world().entity(root), || {
 		site_boot_request(parts)
 	})
 	.await?;

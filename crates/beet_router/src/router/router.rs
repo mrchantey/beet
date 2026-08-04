@@ -15,7 +15,7 @@ use beet_net::prelude::*;
 /// there for scene loading.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Action<Request, Response> = route_action().with_meta(ActionMeta::of::<Router, Request, Response>()))]
+#[require(Action<Request, Response> = route_action().with_meta(ActionMeta::of::<Self, Request, Response>()))]
 #[component(on_add = Action::<Request, Response>::assert_provider::<Self>)]
 pub struct Router;
 

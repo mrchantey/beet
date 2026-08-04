@@ -49,9 +49,26 @@ where
 		}
 	}
 
-	/// Replace this action's [`ActionMeta`], the richer descriptor a provider
-	/// supplies at its `#[require]` site so the meta names the provider rather
-	/// than an opaque closure type.
+	/// Replace this action's [`ActionMeta`] with one naming the provider.
+	///
+	/// The factories ([`new_pure`](Self::new_pure), [`new_async`](Self::new_async),
+	/// [`start_running`](crate::prelude::start_running), ...) can only describe
+	/// the handler they were handed: an unnameable closure type, or a generic
+	/// shared by every provider that reuses the factory. A provider requiring
+	/// such an action supplies its own meta at the `#[require]` site so the meta
+	/// names *it*:
+	///
+	/// ```text
+	/// #[require(Action<Request, Response> = route_action()
+	///     .with_meta(ActionMeta::of::<Self, Request, Response>()))]
+	/// ```
+	///
+	/// That is what makes [`assert_provider`](Self::assert_provider) work: guard
+	/// B recognises the action as the one `P` provides by comparing
+	/// [`handler_meta`](Self::handler_meta) to `P`, which a closure-typed meta
+	/// could never match. It also gives diagnostics a real name, and lets the
+	/// `#[action]` macro attach reflection data (the doc description, the
+	/// input/output schemas) a closure type has none of.
 	pub fn with_meta(mut self, meta: ActionMeta) -> Self {
 		self.meta = meta;
 		self
@@ -105,7 +122,7 @@ where
 						 holds {existing_name}. Remove it before inserting {}.",
 						canonical.name(),
 					);
-					world.handle_command_error::<Self>(err, location);
+					world.handle_command_error_with_location::<Self>(err, location);
 				}
 				Some((false, _, overloads)) => {
 					world
@@ -157,9 +174,7 @@ where
 			core::any::type_name::<In>(),
 			core::any::type_name::<Out>(),
 		);
-		world
-			.commands()
-			.handle_command_error::<P>(err, Location::caller());
+		world.commands().handle_command_error::<P>(err);
 	}
 
 	/// Invoke this action handler with the given [`ActionCall`].
@@ -419,8 +434,8 @@ mod test {
 
 		let meta = world.get::<ActionMeta>(entity).unwrap();
 		meta.name().xpect_contains("Provider");
-		meta.serves::<u32, u32>().xpect_true();
-		meta.serves::<i32, i32>().xpect_true();
+		meta.matches::<u32, u32>().xpect_true();
+		meta.matches::<i32, i32>().xpect_true();
 	}
 
 	/// A colocated explicit action wins over the provider's `#[require]`, leaving

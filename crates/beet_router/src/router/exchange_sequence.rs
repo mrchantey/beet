@@ -1,5 +1,5 @@
 //! Child-sequenced routes: a route whose children run as a [`Sequence`],
-//! served through a [`RouteOverload`] rather than a bespoke wrapper action.
+//! served through a [`ExchangeOverload`] rather than a bespoke wrapper action.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -16,7 +16,7 @@ use beet_net::prelude::*;
 ///
 /// A thin shell over [`Sequence<Request, Response>`], whose canonical action is
 /// `Request -> Outcome<Request, Response>`. Route dispatch reaches it through the
-/// required [`RouteOverload`], mapping `Pass` to `200` and `Fail` to the failing
+/// required [`ExchangeOverload`], mapping `Pass` to `200` and `Fail` to the failing
 /// step's response. The request threads child to child, and children with no
 /// action at all (config blocks) or a differently-shaped one are skipped via
 /// [`ExcludeErrors`]; a step that is natively another shape carries its own
@@ -26,22 +26,22 @@ use beet_net::prelude::*;
 #[require(
 	ExcludeErrors = ExcludeErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
 	Sequence<Request, Response>,
-	RouteOverload = sequence_overload(),
+	ExchangeOverload = sequence_overload(),
 )]
 pub struct ExchangeSequence;
 
-/// The [`RouteOverload`] serving dispatch from a [`Sequence<Request, Response>`]:
+/// The [`ExchangeOverload`] serving dispatch from a [`Sequence<Request, Response>`]:
 /// `Pass` becomes a `200`, `Fail` the failing step's response.
-fn sequence_overload() -> RouteOverload {
+fn sequence_overload() -> ExchangeOverload {
 	ActionOverload::new(Action::new_async(
 		async |cx: ActionContext<Request>| -> Result<Response> {
-			let sequence = cx
+			let action = cx
 				.caller
 				.get(|action: &Action<Request, Outcome<Request, Response>>| {
 					action.clone()
 				})
 				.await?;
-			match cx.caller.call_detached(sequence, cx.input).await? {
+			match cx.caller.call_detached(action, cx.input).await? {
 				Pass(_) => Response::ok(),
 				Fail(response) => response,
 			}

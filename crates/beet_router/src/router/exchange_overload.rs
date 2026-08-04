@@ -2,14 +2,14 @@
 //! bridges a typed handler into the router's request/response dispatch.
 //!
 //! A route handler is a typed `Action<In, Out>` where `In: FromRequest` and
-//! `Out: IntoResponseAsync`. Dispatch speaks `Request -> Response`, so
-//! [`route_overload`] builds the adapter serving that pair: it extracts the input
+//! `Out: IntoResponseWithRequestParts`. Dispatch speaks `Request -> Response`, so
+//! [`exchange_overload`] builds the adapter serving that pair: it extracts the input
 //! from the request, calls the entity's canonical typed action, and converts the
 //! output into a response. A handler that is already `Request -> Response` is its
 //! own route action, and resolution prefers the canonical action, so its
-//! coinciding overload is simply never invoked. [`IntoResponseAsync`] is the
+//! coinciding overload is simply never invoked. [`IntoResponseWithRequestParts`] is the
 //! output half of the conversion. The macro, [`exchange_route`], and
-//! [`RouteScript`] all build the adapter through this one layer.
+//! [`ExchangeScript`] all build the adapter through this one layer.
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -18,20 +18,20 @@ use serde::Serialize;
 
 /// The route dispatch overload: an [`ActionOverload`] serving
 /// `Request -> Response` on top of a typed handler's canonical action.
-pub type RouteOverload = ActionOverload<Request, Response>;
+pub type ExchangeOverload = ActionOverload<Request, Response>;
 
-/// Builds the [`RouteOverload`] adapting a typed handler `Action<In, Out>` to
+/// Builds the [`ExchangeOverload`] adapting a typed handler `Action<In, Out>` to
 /// request/response dispatch.
 ///
 /// Called at the route's require site, where the typed `In`/`Out` and their
-/// [`FromRequest`] / [`IntoResponseAsync`] markers are known. The adapter calls
+/// [`FromRequest`] / [`IntoResponseWithRequestParts`] markers are known. The adapter calls
 /// the entity's canonical action directly rather than re-entering resolution, so
 /// a `Request -> Response` handler (whose overload pair coincides with its
 /// canonical one) can never recurse.
-pub fn route_overload<In, Out, M1, M2>() -> RouteOverload
+pub fn exchange_overload<In, Out, M1, M2>() -> ExchangeOverload
 where
 	In: 'static + Send + Sync + FromRequest<M1>,
-	Out: 'static + Send + Sync + IntoResponseAsync<M2>,
+	Out: 'static + Send + Sync + IntoResponseWithRequestParts<M2>,
 {
 	ActionOverload::new(Action::new_async(
 		async |cx: ActionContext<Request>| -> Result<Response> {
@@ -42,24 +42,24 @@ where
 				.get(|action: &Action<In, Out>| action.clone())
 				.await?;
 			let output: Out = cx.caller.call_detached(handler, input).await?;
-			output.into_response_async(cx.caller, parts).await
+			output.into_response_with_request_parts(cx.caller, parts).await
 		},
 	))
 }
 
 /// Trait for converting a typed handler's output into a [`Response`], the output
-/// half of the [`RouteOverload`] conversion.
+/// half of the [`ExchangeOverload`] conversion.
 ///
 /// Blanket impls cover the main cases:
 /// - Types implementing [`Serialize`] (serde content negotiation)
 ///
 /// Concrete impls exist for [`MediaBytes`] and [`PageRequest`] (a render root).
-pub trait IntoResponseAsync<M>
+pub trait IntoResponseWithRequestParts<M>
 where
 	Self: Sized,
 {
 	/// Converts this output value into a response.
-	fn into_response_async(
+	fn into_response_with_request_parts(
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,
@@ -68,8 +68,8 @@ where
 
 /// Concrete impl for [`Response`] — an action that already produced a
 /// fully-formed response (eg a redirect) passes it through unchanged.
-impl IntoResponseAsync<Self> for Response {
-	fn into_response_async(
+impl IntoResponseWithRequestParts<Self> for Response {
+	fn into_response_with_request_parts(
 		self,
 		_caller: AsyncEntity,
 		_parts: RequestParts,
@@ -80,8 +80,8 @@ impl IntoResponseAsync<Self> for Response {
 
 /// Concrete impl for [`MediaBytes`] — wraps the bytes directly
 /// into a response without content negotiation.
-impl IntoResponseAsync<Self> for MediaBytes {
-	fn into_response_async(
+impl IntoResponseWithRequestParts<Self> for MediaBytes {
+	fn into_response_with_request_parts(
 		self,
 		_caller: AsyncEntity,
 		_parts: RequestParts,
@@ -90,16 +90,16 @@ impl IntoResponseAsync<Self> for MediaBytes {
 	}
 }
 
-/// Marker type for the [`Serialize`] blanket impl of [`IntoResponseAsync`].
+/// Marker type for the [`Serialize`] blanket impl of [`IntoResponseWithRequestParts`].
 #[cfg(feature = "serde")]
 #[derive(TypePath)]
 pub struct SerdeIntoResponseMarker;
 #[cfg(feature = "serde")]
-impl<T> IntoResponseAsync<SerdeIntoResponseMarker> for T
+impl<T> IntoResponseWithRequestParts<SerdeIntoResponseMarker> for T
 where
 	T: 'static + Send + Sync + Serialize,
 {
-	fn into_response_async(
+	fn into_response_with_request_parts(
 		self,
 		_caller: AsyncEntity,
 		parts: RequestParts,
@@ -129,27 +129,26 @@ pub fn route<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {
 }
 
 /// Creates a route bundle from a path and a typed action, including the
-/// [`RouteOverload`] adapting the action to request/response dispatch.
+/// [`ExchangeOverload`] adapting the action to request/response dispatch.
 pub fn exchange_route<In, Out, M, M1, M2, B>(
 	path: &str,
 	action: B,
-) -> (PathPartial, B, RouteOverload)
+) -> (PathPartial, B, ExchangeOverload)
 where
 	In: 'static + Send + Sync + FromRequest<M1>,
-	Out: 'static + Send + Sync + IntoResponseAsync<M2>,
+	Out: 'static + Send + Sync + IntoResponseWithRequestParts<M2>,
 	B: Bundle + IntoAction<M, In = In, Out = Out>,
 {
 	(
 		PathPartial::new(path),
 		action,
-		route_overload::<In, Out, M1, M2>(),
+		exchange_overload::<In, Out, M1, M2>(),
 	)
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 

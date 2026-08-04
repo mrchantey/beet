@@ -26,7 +26,7 @@ use bytes::Bytes;
 /// `on_add` wires the receive pump, and it holds the wire [`codec`](Self::new) plus
 /// the in-flight requests originated over it. Read by [`socket_exchange`].
 #[derive(Component)]
-#[component(on_add = on_add_ext::observe(on_exchange_recv), on_remove = on_remove)]
+#[component(on_add = hook_ext::observe(on_exchange_recv), on_remove = on_remove)]
 pub struct ExchangeSocket {
 	/// The wire codec; pluggable so a constrained peer can swap the encoding.
 	codec: Arc<dyn ExchangeCodec>,
@@ -284,7 +284,7 @@ async fn serve_request(
 	parts.headers = headers;
 	let request = Request::from_parts(parts, Body::Bytes(Bytes::from(body)));
 	let response = if connection
-		.get(|meta: &ActionMeta| meta.serves::<Request, Response>())
+		.get(|meta: &ActionMeta| meta.matches::<Request, Response>())
 		.await
 		.unwrap_or(false)
 	{

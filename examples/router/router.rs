@@ -50,7 +50,7 @@ fn setup(mut commands: Commands) -> Result {
 		// boot the declared server children; `.ok()` since the repl selection
 		// self-boots and declares no `CallOnLoad` target.
 		.queue_async_local(|host| async move {
-			CallOnLoad::call_descendants(host, || {
+			CallOnLoad::call_recursive(host, || {
 				Request::from_cli_args(CliArgs::parse_env())
 			})
 			.await

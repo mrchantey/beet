@@ -24,22 +24,22 @@ use beet_core::prelude::*;
 ///
 /// A one-shot server ([`CliServer`]) resolves the parked call instead, so the
 /// response streams and the process exits. When `--server` selects nothing, no
-/// server boots and [`assert_server_booted`] exits rather than parking forever.
+/// server boots and [`exit_if_no_server`] exits rather than parking forever.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(
 	CallOnLoad,
 	Action<Request, Response> = start_running::<Request, Response>()
-		.with_meta(ActionMeta::of::<StartOnLoad, Request, Response>())
+		.with_meta(ActionMeta::of::<Self, Request, Response>())
 )]
 #[component(
 	on_add = Action::<Request, Response>::assert_provider::<Self>,
-	on_add = on_add_ext::observe(await_server_boot)
+	on_add = hook_ext::observe(await_server_boot)
 )]
 pub struct StartOnLoad;
 
 /// Marks a [`StartOnLoad`] whose fan-out has gone out but whose servers have not
-/// yet been checked; [`assert_server_booted`] clears it on the next frame, once
+/// yet been checked; [`exit_if_no_server`] clears it on the next frame, once
 /// every observer's commands have flushed.
 #[derive(Component)]
 pub(crate) struct AwaitingServerBoot;
@@ -54,7 +54,7 @@ pub(crate) struct AwaitingServerBoot;
 #[derive(Component)]
 pub struct ServerBooted;
 
-/// Flags the fan-out for the [`assert_server_booted`] check.
+/// Flags the fan-out for the [`exit_if_no_server`] check.
 fn await_server_boot(ev: On<StartRunning<Request>>, mut commands: Commands) {
 	commands.entity(ev.entity).insert(AwaitingServerBoot);
 }
@@ -65,7 +65,7 @@ fn await_server_boot(ev: On<StartRunning<Request>>, mut commands: Commands) {
 /// Runs a frame after the fan-out, by which point every co-observer's commands
 /// have flushed, so a missing [`ServerBooted`] means nothing selected this
 /// request.
-pub(crate) fn assert_server_booted(
+pub(crate) fn exit_if_no_server(
 	mut commands: Commands,
 	mut exit: MessageWriter<AppExit>,
 	awaiting: Populated<(Entity, Has<ServerBooted>), With<AwaitingServerBoot>>,

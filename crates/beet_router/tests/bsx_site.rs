@@ -4,7 +4,6 @@
 //! route-aware widgets (`RouteHead`, `RouteSidebar`).
 beet_core::test_main!();
 
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
@@ -151,11 +150,12 @@ async fn serve_blobs_serves_assets() {
 		.xpect_contains("color: red");
 }
 
-/// `<Router><HttpServer port="0"/></Router>`: the http server is declarable from
-/// markup, landing as a child of the router via the reflect element path (port 0
-/// keeps any started backend on an OS-assigned port). The reflect insert
-/// registers the server's boot (`StartRunning<Request>`) observer through its
-/// `on_add`, so the boot fan-out boots it via the installed runtime hook.
+/// `<HttpServer port="0"><Router/></HttpServer>`: the http server is declarable
+/// from markup, owning the boot with the router as its dispatch child, via the
+/// reflect element path (port 0 keeps any started backend on an OS-assigned
+/// port). The reflect insert registers the server's boot (`StartRunning<Request>`)
+/// observer through its `on_add`, so the boot fan-out boots it via the installed
+/// runtime hook.
 // Only without a real HTTP backend: the test installs a stand-in runtime hook to
 // prove the wiring without a live server, but with the `http`/`client_io` backend
 // present, the boot fan-out boots a real listener (and, under `client_io`, its
@@ -176,26 +176,25 @@ async fn http_server_declarable_in_markup() {
 		})
 	})
 	.ok();
+	use beet_action::prelude::AsyncEntityActionExt;
 	// `RouterPlugin` brings in `ServerPlugin`, so it must not be added again.
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let holder = world.spawn_empty().id();
-	let root = spawn_bsx_under(
+	let server = spawn_bsx_under(
 		&mut world,
 		holder,
-		"<Router {RequestLogger}><HttpServer port=\"0\"/></Router>",
+		"<HttpServer port=\"0\"><Router {RequestLogger}/></HttpServer>",
 	);
-	world.entity(root).contains::<Router>().xpect_true();
-	world.entity(root).contains::<RequestLogger>().xpect_true();
-	let server =
-		world.with_state::<Query<Entity, With<HttpServer>>, _>(|servers| {
-			servers.single().unwrap()
-		});
 	world
 		.entity(server)
 		.get::<HttpServer>()
 		.unwrap()
 		.port
 		.xpect_eq(Some(0));
+	// the router is the server's dispatch child, carrying its middleware spread
+	let router = world.entity(server).get::<Children>().unwrap()[0];
+	world.entity(router).contains::<Router>().xpect_true();
+	world.entity(router).contains::<RequestLogger>().xpect_true();
 	// the boot fan-out boots the declared server via the runtime hook: calling
 	// the server's `ContinueRun<Request, Response>` action reaches the http
 	// observer. The call is fire-and-forget: the http boot never resolves (the
@@ -356,19 +355,23 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	}
 }
 
-/// An included entry carries its server child under the root: the included
-/// `Router` declares a `<CliServer/>` child (which requires `CallOnLoad`), and a
-/// `<Template src=.../>` include builds that `Router` onto the entry root, so the
-/// server child rides the include and the load path resolves. The binary injects
+/// An included entry carries its boot onto the root: the included `CliServer`
+/// (which requires `CallOnLoad`) owns the root with a `<Router/>` dispatch child,
+/// and a `<Template src=.../>` include builds that server onto the entry root, so
+/// the load verb rides the include and the load path finds it. The binary injects
 /// no verb of its own. The regression guard for an include carrying its boot
 /// machinery onto the root.
+///
+/// The root is built dormant ([`DisableCallOnLoad`]): the assertion is that the
+/// machinery *arrived*, and a real boot here would dispatch the test runner's own
+/// argv as its request.
 #[beet_core::test]
-async fn include_carries_server_child() {
+async fn include_carries_boot() {
 	let store = BlobStore::temp();
 	store
 		.insert(
 			&SmolPath::from("serve.bsx"),
-			"<Router><CliServer/></Router>",
+			"<CliServer><Router/></CliServer>",
 		)
 		.await
 		.unwrap();
@@ -382,17 +385,18 @@ async fn include_carries_server_child() {
 		BsxTemplate::parse_entry(&world, entry.as_utf8().unwrap()).unwrap();
 	// the binary spawns the root with no load verb of its own (`build_site_root`'s
 	// empty `extra`), then builds the entry onto it; the server rides the markup.
-	let root = world.spawn((store,)).id();
+	let root = world.spawn((store, DisableCallOnLoad)).id();
 	world.entity_mut(root).insert_template(template).unwrap();
 	// the include resolves as an async pending dependency, so settle first
 	AsyncRunner::settle_async_tasks(&mut world).await;
-	// the included Router lands on the entry root, its CliServer child carrying
-	// the load verb, so the load path can resolve.
-	world.entity(root).contains::<Router>().xpect_true();
+	// the included CliServer lands on the entry root carrying the load verb, so
+	// the load path can resolve, with the Router as its dispatch child.
+	world.entity(root).contains::<CliServer>().xpect_true();
+	world.entity(root).contains::<CallOnLoad>().xpect_true();
 	world
-		.with_state::<Query<(), (With<CliServer>, With<CallOnLoad>)>, _>(
-			|servers| servers.iter().count(),
-		)
+		.with_state::<Query<(), With<Router>>, _>(|routers| {
+			routers.iter().count()
+		})
 		.xpect_eq(1);
 }
 

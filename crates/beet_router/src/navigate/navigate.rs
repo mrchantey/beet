@@ -147,7 +147,7 @@ pub async fn NavigateHandler(
 	};
 
 	// dispatch through the resolved route: its canonical `Request -> Response`
-	// action, else the `RouteOverload` adapting a typed handler
+	// action, else the `ExchangeOverload` adapting a typed handler
 	node.merge_path_params(&mut request);
 	world.entity(node.entity).call(request).await
 }

@@ -142,8 +142,8 @@ impl PageRoot {
 	}
 }
 
-impl IntoResponseAsync<Self> for PageRequest {
-	fn into_response_async(
+impl IntoResponseWithRequestParts<Self> for PageRequest {
+	fn into_response_with_request_parts(
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,

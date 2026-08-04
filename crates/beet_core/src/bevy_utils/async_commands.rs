@@ -336,7 +336,7 @@ async fn run_async_task_inner<Func, Fut, Out>(
 			Some(entity) => {
 				debug!("async task for despawned entity {entity} ended: {err}")
 			}
-			None => world.handle_command_error::<Func>(err, location).await,
+			None => world.handle_command_error_with_location::<Func>(err, location).await,
 		}
 	}
 }
@@ -663,14 +663,25 @@ pub impl AsyncWorld {
 		build_template_async(self.clone(), None, template)
 	}
 
-	/// Handles an error using the world's default error handler.
+	/// Raises `err` through the world's configured error handler, attributed to
+	/// the call site.
+	#[track_caller]
 	fn handle_command_error<F>(
+		&self,
+		err: BevyError,
+	) -> impl Future<Output = ()> + Send {
+		self.handle_command_error_with_location::<F>(err, Location::caller())
+	}
+
+	/// Like [`handle_command_error`](Self::handle_command_error), but attributed
+	/// to an explicit `location`, for a raise deferred past its call site.
+	fn handle_command_error_with_location<F>(
 		&self,
 		err: BevyError,
 		location: &'static Location<'static>,
 	) -> impl Future<Output = ()> + Send {
 		self.with(move |world| {
-			world.handle_command_error::<F>(err, location);
+			world.handle_command_error_with_location::<F>(err, location);
 		})
 	}
 }

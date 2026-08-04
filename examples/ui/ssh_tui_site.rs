@@ -58,8 +58,8 @@ fn main() -> Result {
 				])
 			]),
 		)
-		.queue_async_local(|host| {
-			CallOnLoad::call_descendants(host, || {
+		.run_async_local(|host| {
+			CallOnLoad::call_recursive(host, || {
 				Request::from_cli_args(CliArgs::parse_env())
 			})
 		});

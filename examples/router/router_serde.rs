@@ -7,9 +7,9 @@
 //! fresh copy.
 //!
 //! Every runtime component — the [`CliServer`] child, the [`router`] bundle, the
-//! middleware and the [`RouteScript`] markers — is `Reflect`, so the
+//! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the
 //! components round-trip with no post-load patching; the loaded root's servers
-//! are then booted explicitly via [`CallOnLoad::call_descendants`].
+//! are then booted explicitly via [`CallOnLoad::call_recursive`].
 //!
 //! ## Running the Example
 //!
@@ -42,7 +42,7 @@ fn main() -> AppExit {
 		// registering, BeetPlugins' RouterPlugin / ActionPlugin
 		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<RouteScript<QueryParams<GreetRequest>, String, _, _>>()
+		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>()
 		.add_systems(Startup, setup)
 		.run()
 }
@@ -72,7 +72,7 @@ fn setup(async_commands: AsyncCommands) {
 			})
 			.await?;
 		for root in roots {
-			CallOnLoad::call_descendants(world.entity(root), || {
+			CallOnLoad::call_recursive(world.entity(root), || {
 				Request::from_cli_args(CliArgs::parse_env())
 			})
 			.await?;
@@ -87,19 +87,19 @@ fn route_bundle() -> impl Bundle {
 		children![
 			(
 				Script::<(), String>::rhai(r#""hello world""#),
-				RouteScript::<(), String>::default(),
+				ExchangeScript::<(), String>::default(),
 				PathPartial::new(""),
 			),
 			(
 				Script::<(), String>::rhai(r#""hello foo""#),
-				RouteScript::<(), String>::default(),
+				ExchangeScript::<(), String>::default(),
 				PathPartial::new("foo"),
 			),
 			(
 				Script::<QueryParams<GreetRequest>, String>::rhai(
 					r#""hello " + input.name"#,
 				),
-				RouteScript::<QueryParams<GreetRequest>, String, _, _>::default(
+				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(
 				),
 				PathPartial::new("greet"),
 			),
@@ -109,7 +109,7 @@ fn route_bundle() -> impl Bundle {
 				Script::<RequestParts, String>::rhai(
 					r#""hello " + input.url.params.name[0]"#,
 				),
-				RouteScript::<RequestParts, String, _, _>::default(),
+				ExchangeScript::<RequestParts, String, _, _>::default(),
 				PathPartial::new("greet-request"),
 			),
 		],

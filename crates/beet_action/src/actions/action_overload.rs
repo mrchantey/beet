@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// `Request -> Response`. Being no [`Action`] itself it never collides with the
 /// canonical one and never touches the canonical fields of [`ActionMeta`]; it
 /// registers its pair in the meta's overloads instead, which is what
-/// [`ActionMeta::serves`] and call resolution read.
+/// [`ActionMeta::matches`] and call resolution read.
 ///
 /// An overload delegates to its entity's canonical action directly, never back
 /// through resolution, so an overload whose pair coincides with the canonical
@@ -43,31 +43,47 @@ impl<In: 'static, Out: 'static> ActionOverload<In, Out> {
 
 	/// Register this pair in the entity's [`ActionMeta`], creating an
 	/// [`unset`](ActionMeta::unset) one if the canonical [`Action`] has not landed
-	/// yet. Deferred through [`Commands`], as is [`Action`]'s own meta insert, and
-	/// order-independent: whichever runs second merges into the first's meta.
-	fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	/// yet. Order-independent: whichever of the overload and the canonical action
+	/// runs second merges into the first's meta.
+	fn on_add(world: DeferredWorld, cx: HookContext) {
+		Self::update_meta(world, cx, |meta| {
+			let mut meta = meta.unwrap_or_else(ActionMeta::unset);
+			meta.insert_overload::<In, Out>();
+			Some(meta)
+		});
+	}
+
+	/// Deregister this pair, so the meta never advertises a signature the entity
+	/// no longer handles. A meta already gone (the canonical [`Action`] removed
+	/// alongside this overload) stays gone.
+	fn on_remove(world: DeferredWorld, cx: HookContext) {
+		Self::update_meta(world, cx, |meta| {
+			meta.map(|mut meta| {
+				meta.remove_overload::<In, Out>();
+				meta
+			})
+		});
+	}
+
+	/// Rebuild the entity's [`ActionMeta`] through `func` and insert the result.
+	/// Deferred through [`Commands`], as is [`Action`]'s own meta insert, so the
+	/// two land in a defined order. Always an insert, never an in-place edit:
+	/// [`ActionMeta`] is immutable so that `Insert<ActionMeta>` consumers see
+	/// every registration and deregistration.
+	fn update_meta(
+		mut world: DeferredWorld,
+		cx: HookContext,
+		func: fn(Option<ActionMeta>) -> Option<ActionMeta>,
+	) {
 		let entity = cx.entity;
 		world.commands().queue(move |world: &mut World| {
 			let Ok(mut entity_mut) = world.get_entity_mut(entity) else {
 				return;
 			};
-			let mut meta = entity_mut
-				.get::<ActionMeta>()
-				.cloned()
-				.unwrap_or_else(ActionMeta::unset);
-			meta.insert_overload::<In, Out>();
-			// insert rather than edit in place, so `Insert<ActionMeta>` consumers
-			// see the registered pair
-			entity_mut.insert(meta);
+			if let Some(meta) = func(entity_mut.get::<ActionMeta>().cloned()) {
+				entity_mut.insert(meta);
+			}
 		});
-	}
-
-	/// Deregister this pair, so the meta never advertises a signature the entity
-	/// no longer serves.
-	fn on_remove(mut world: DeferredWorld, cx: HookContext) {
-		if let Some(mut meta) = world.get_mut::<ActionMeta>(cx.entity) {
-			meta.remove_overload::<In, Out>();
-		}
 	}
 }
 
@@ -112,8 +128,8 @@ mod test {
 		let entity = world.spawn((double(), stringify())).id();
 		world.flush();
 		let meta = world.get::<ActionMeta>(entity).unwrap();
-		meta.serves::<String, String>().xpect_true();
-		meta.serves::<i32, i32>().xpect_true();
+		meta.matches::<String, String>().xpect_true();
+		meta.matches::<i32, i32>().xpect_true();
 
 		world
 			.entity_mut(entity)
@@ -122,7 +138,7 @@ mod test {
 		world
 			.get::<ActionMeta>(entity)
 			.unwrap()
-			.serves::<String, String>()
+			.matches::<String, String>()
 			.xpect_false();
 	}
 
@@ -135,7 +151,7 @@ mod test {
 		let entity = world.spawn((stringify(), double())).id();
 		world.flush();
 		let meta = world.get::<ActionMeta>(entity).unwrap();
-		meta.serves::<String, String>().xpect_true();
-		meta.serves::<i32, i32>().xpect_true();
+		meta.matches::<String, String>().xpect_true();
+		meta.matches::<i32, i32>().xpect_true();
 	}
 }

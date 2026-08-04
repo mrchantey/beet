@@ -52,7 +52,7 @@ impl OnSpawn {
 		Self(Box::new(move |entity| {
 			if let Err(err) = func(entity).into_result() {
 				entity.world_scope(move |world| {
-					world.handle_command_error::<F>(err, location);
+					world.handle_command_error_with_location::<F>(err, location);
 				});
 			}
 		}))

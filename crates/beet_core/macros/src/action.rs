@@ -502,7 +502,7 @@ fn make_require_action(
 		let beet_router = pkg_ext::internal_or_beet("beet_router");
 		quote! {
 			#beet_action::prelude::Action<#in_type, #out_type> = #action_expr,
-			#beet_router::prelude::RouteOverload = #beet_router::prelude::route_overload::<#in_type, #out_type, _, _>()
+			#beet_router::prelude::ExchangeOverload = #beet_router::prelude::exchange_overload::<#in_type, #out_type, _, _>()
 		}
 	} else {
 		quote! {
@@ -1295,8 +1295,8 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn MyAction(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("RouteOverload"));
-		assert!(result.contains("route_overload ::"));
+		assert!(result.contains("ExchangeOverload"));
+		assert!(result.contains("exchange_overload ::"));
 		assert!(result.contains("Action <"));
 		assert!(!result.contains("PathPartial"));
 	}
@@ -1307,7 +1307,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn MyAction(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("RouteOverload"));
+		assert!(result.contains("ExchangeOverload"));
 		assert!(result.contains("Action <"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (\"home\")"));
@@ -1320,7 +1320,7 @@ mod test {
 				#[derive(Component, Reflect)]
 				async fn MyAction(val: i32) -> String { val.to_string() }
 			});
-		assert!(result.contains("RouteOverload"));
+		assert!(result.contains("ExchangeOverload"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (get_route_path ())"));
 	}
@@ -1340,7 +1340,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn Validate(input: String) -> String { input }
 		});
-		assert!(result.contains("RouteOverload"));
+		assert!(result.contains("ExchangeOverload"));
 		assert!(result.contains("PathPartial :: new (\"validate\")"));
 		assert!(result.contains("of_reflect :: < Self , _ > ()"));
 	}

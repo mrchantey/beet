@@ -56,13 +56,20 @@ pub impl Commands<'_, '_> {
 	/// This is how code outside a system raises: a component hook reaches it via
 	/// [`DeferredWorld::commands`](bevy::ecs::world::DeferredWorld::commands),
 	/// never `panic!`, `debug_assert!` or a bare `error!`.
-	fn handle_command_error<F>(
+	#[track_caller]
+	fn handle_command_error<F>(&mut self, err: BevyError) {
+		self.handle_command_error_with_location::<F>(err, Location::caller());
+	}
+
+	/// Like [`handle_command_error`](Self::handle_command_error), but attributed
+	/// to an explicit `location`, for a raise deferred past its call site.
+	fn handle_command_error_with_location<F>(
 		&mut self,
 		err: BevyError,
 		location: &'static Location<'static>,
 	) {
 		self.queue(move |world: &mut World| {
-			world.handle_command_error::<F>(err, location);
+			world.handle_command_error_with_location::<F>(err, location);
 		});
 	}
 

@@ -52,7 +52,7 @@ where
 			out_handler,
 		}),
 		None => bevybail!(
-			"No Action<{}, {}> on {caller}, which serves {}",
+			"No Action<{}, {}> on {caller}, which matches {}",
 			core::any::type_name::<Input>(),
 			core::any::type_name::<Out>(),
 			match metas.get(caller) {

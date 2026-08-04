@@ -52,7 +52,8 @@ static CURRENT_PORT: RwLock<Option<u16>> = RwLock::new(None);
 /// HTTP server that listens for incoming requests, dispatching each through its
 /// host's `Request -> Response` action via `entity.exchange`.
 ///
-/// A long-running server entity, usually a child of its dispatch host. The load
+/// A long-running server entity, owning the boot with its dispatch host as a
+/// child. The load
 /// path ([`CallOnLoad`], required) calls its [`ContinueRun<Request, Response>`]
 /// boot action, whose fan-out ([`StartRunning<Request>`]) boots it when
 /// `--server` selects `"http"`, through the backend [`ServerPlugin`] installed
@@ -60,7 +61,7 @@ static CURRENT_PORT: RwLock<Option<u16>> = RwLock::new(None);
 /// It never resolves the boot call, so its [`Running<Response>`] keep-alive
 /// claim persists the process; when that `Running` is removed (a reload or
 /// shutdown) its teardown observer stops the listener. A markup-spawned
-/// `<Router><HttpServer port=0/></Router>` boots exactly the same way.
+/// `<HttpServer port=0><Router>..</Router></HttpServer>` boots exactly the same way.
 ///
 /// The concrete backend depends on compile-time features:
 /// - Default (`server`): lightweight mini HTTP server using `async-io` TCP
@@ -81,7 +82,7 @@ static CURRENT_PORT: RwLock<Option<u16>> = RwLock::new(None);
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = on_add_ext::entity_hook(ServerShutdown::<HttpServer>::add_observers))]
+#[component(on_add = hook_ext::entity_hook(ServerShutdown::<HttpServer>::add_observers))]
 #[require(ExchangeStats, StartOnLoad)]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
