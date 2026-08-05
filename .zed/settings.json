@@ -97,7 +97,7 @@
 		".agents*",
 	],
 	"file_scan_exclusions": [
-		".agents/tmp*",
+		// ".agents/tmp*",
 		// ".agents/reference",
 		".cargo",
 		".beet",
