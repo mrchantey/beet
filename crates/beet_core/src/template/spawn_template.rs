@@ -529,7 +529,7 @@ mod test {
 					.entry::<TemplatePending>()
 					.or_default()
 					.get_mut()
-					.register(PendingKind::Passive);
+					.register(PendingKind::Passive, "test passive");
 				self.0.set(Some(id));
 				OK
 			}
@@ -573,7 +573,7 @@ mod test {
 					.entry::<TemplatePending>()
 					.or_default()
 					.get_mut()
-					.register(PendingKind::Structural);
+					.register(PendingKind::Structural, "test include");
 				self.0.set(Some(id));
 				// SAFETY: building this template's own subtree under the root.
 				let world = unsafe { cx.entity.world_mut() };
@@ -626,7 +626,12 @@ mod test {
 
 		let root = world.spawn_empty().id();
 		let guard =
-			TemplatePending::park(&mut world, root, PendingKind::Passive);
+			TemplatePending::park(
+			&mut world,
+			root,
+			PendingKind::Passive,
+			"test passive",
+		);
 		// simulate a task dying without resolving.
 		drop(guard);
 		load_fired.get().xpect_false();

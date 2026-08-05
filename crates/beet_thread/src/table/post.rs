@@ -369,31 +369,3 @@ impl From<String> for IntoPost {
 impl From<&str> for IntoPost {
 	fn from(text: &str) -> Self { IntoPost::Text(text.to_string()) }
 }
-
-// ═══════════════════════════════════════════════════════════════════════
-// Timestamp
-// ═══════════════════════════════════════════════════════════════════════
-
-#[derive(
-	Debug,
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-	Reflect,
-)]
-#[reflect(Serialize, Deserialize)]
-pub struct Timestamp(Duration);
-impl Timestamp {
-	pub fn now() -> Self { Self(time_ext::now()) }
-	pub fn unix_epoch_elapsed(&self) -> Duration { self.0 }
-}
-
-impl Default for Timestamp {
-	fn default() -> Self { Self(Duration::ZERO) }
-}

@@ -60,7 +60,13 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ExportPdfParams>()?;
 	let entry_path = entry_arg(parts)?;
-	let root = build_entry(&cx.caller, parts.params(), &entry_path).await?;
+	let root = build_entry(
+		&cx.caller,
+		parts.params(),
+		&entry_path,
+		Some(ONE_SHOT_SETTLE_DEADLINE),
+	)
+	.await?;
 
 	// validate before exporting, like `export-static`: a broken no-code entry fails
 	// with a non-zero exit rather than shipping a broken PDF.
@@ -244,7 +250,7 @@ async fn write_concat(
 /// erroring after ~5s rather than hanging.
 async fn wait_for_port() -> Result<u16> {
 	for _ in 0..200 {
-		if let Ok(port) = HttpServer::current_port() {
+		if let Ok(port) = CanonicalPort::get() {
 			return Ok(port);
 		}
 		time_ext::sleep_millis(25).await;

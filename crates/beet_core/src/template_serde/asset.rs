@@ -60,8 +60,12 @@ impl<A: Asset> Template for AssetLoadTemplate<A> {
 		let world = unsafe { cx.entity.world_mut() };
 		// an asset gates readiness, not tree structure: passive. The park falls
 		// back to this entity if no surrounding template build set a root.
-		let guard =
-			TemplatePending::park(world, entity_id, PendingKind::Passive);
+		let guard = TemplatePending::park(
+			world,
+			entity_id,
+			PendingKind::Passive,
+			format!("asset `{}`", self.path),
+		);
 		// keep a strong handle alongside the guard so the load is not cancelled
 		// by the handle returned here being dropped before the asset finishes.
 		world
@@ -104,7 +108,9 @@ impl BuildAssets<'_, '_> {
 	/// Outside a template build (no [`TemplateBuildRoot`]) it loads without
 	/// deferral, like a plain `asset_server.load`.
 	pub fn load<A: Asset>(&mut self, path: impl Into<String>) -> Handle<A> {
-		let handle = self.server.load::<A>(path.into());
+		let path = path.into();
+		let label = format!("asset `{path}`");
+		let handle = self.server.load::<A>(path);
 		let Some(root) = self.build_root.as_deref().map(|root| **root) else {
 			return handle;
 		};
@@ -113,8 +119,12 @@ impl BuildAssets<'_, '_> {
 		// load is not cancelled before it settles.
 		let untyped = handle.clone().untyped();
 		self.commands.queue(move |world: &mut World| {
-			let guard =
-				TemplatePending::park_on(world, root, PendingKind::Passive);
+			let guard = TemplatePending::park_on(
+				world,
+				root,
+				PendingKind::Passive,
+				label,
+			);
 			world
 				.entity_mut(root)
 				.entry::<PendingAssets>()

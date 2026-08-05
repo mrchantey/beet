@@ -28,16 +28,31 @@
 //! All implementations route requests through the action-based exchange
 //! pattern, allowing the same handler code to work in every environment.
 
-// The `HttpServer` component and its `set_http_server` install hook are
-// no_std-capable and compile unconditionally; the concrete backends below stay
-// std/feature-gated. A server is an `StartRunning<Request>` observer torn down
-// by observing the removal of `StartOnLoad`'s parked `Running<Response>`.
+// The process-global loopback port. Action-free and unconditional, unlike
+// everything else here: a client rewriting an authority-less request reads it in
+// a build that compiled no server at all.
+mod canonical_port;
+pub use canonical_port::*;
+
+// The `HttpServer` component and its `set_http_server` install hook; the concrete
+// backends below stay std/feature-gated on top. A server is an
+// `StartRunning<Request>` observer torn down by observing the removal of
+// `StartOnLoad`'s parked `Running<Response>`.
+//
+// Gated on `action`, not `std`: a server dispatches through an
+// `Action<Request, Response>` by construction, so there is no server without the
+// action layer. `action` is itself no_std-capable, so an embedded host still gets
+// the whole lifecycle.
+#[cfg(feature = "action")]
 mod http_server;
+#[cfg(feature = "action")]
 pub use http_server::*;
 
-// The shared boot, park and shutdown lifecycle every bootable server uses, keyed by
-// the server marker. no_std-capable like `HttpServer`, which depends on it.
+// The shared boot, park and shutdown lifecycle every bootable server uses, keyed
+// by the server marker. Same `action` gate as `HttpServer`, which depends on it.
+#[cfg(feature = "action")]
 mod server_lifecycle;
+#[cfg(feature = "action")]
 pub use server_lifecycle::*;
 
 // In-memory channel-backed HTTP server: shares `HttpServer`'s boot/park/dispatch

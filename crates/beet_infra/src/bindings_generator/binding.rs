@@ -811,6 +811,12 @@ mod test {
 		registry.unwrap().len().xpect_eq(10);
 	}
 
+	/// Generous timeout because this test shells out to `cargo` against a scratch
+	/// crate, so it competes for the same build lock and cores as the rest of the
+	/// suite. It blew the 120s budget once under full-suite load (2026-08-05) while
+	/// passing in ~620ms when run isolated, so a future failure here is far more
+	/// likely to be contention than a codegen regression: re-run it alone before
+	/// investigating the generator.
 	#[beet_core::test(timeout_ms = 120000)]
 	async fn generate_serde_model_from_registry() {
 		let tf_schema = read_tf_schema_from_file(

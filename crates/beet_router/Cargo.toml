@@ -106,7 +106,10 @@ codegen = [
 ]
 
 [dependencies]
-beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
+# `rsx` is macro-only (it just enables `beet_core_macros/rsx`) and non-optional:
+# the no_std core authors `<Route>` as a `#[template]`, so the attribute has to be
+# in scope even in a build with no markup surface at all.
+beet_core = { workspace = true, default-features = false, features = ["bevy_async", "rsx"] }
 beet_action = { workspace = true, default-features = false }
 beet_net = { workspace = true, default-features = false }
 # std-only: the template/render pipeline backing template routes, media, help, sidebar.

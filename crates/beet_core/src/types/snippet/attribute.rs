@@ -53,6 +53,21 @@ impl Attribute {
 		key: impl Into<SmolStr>,
 		value: impl Into<Value>,
 	) -> impl Bundle {
+		Self::bundle_with(key, value, ())
+	}
+
+	/// A block attribute whose entity carries `extra` alongside its [`Value`].
+	///
+	/// The rsx counterpart of a bsx binding attribute: the `rsx!` macro has no
+	/// `@`-binding syntax (that vocabulary is parsed from bsx source), so a Rust
+	/// widget binding an attribute spawns the binding component onto the attribute
+	/// entity here, eg `content=@res:PackageConfig.title` becomes
+	/// `Attribute::bundle_with("content", title, ResourceFieldRef::new("PackageConfig", "title"))`.
+	pub fn bundle_with(
+		key: impl Into<SmolStr>,
+		value: impl Into<Value>,
+		extra: impl Bundle,
+	) -> impl Bundle {
 		let key = key.into();
 		let value = value.into();
 		OnSpawn::new(move |entity| {
@@ -62,6 +77,7 @@ impl Attribute {
 					AttributeOf::new(element),
 					Attribute::new(key),
 					value,
+					extra,
 				));
 			});
 		})

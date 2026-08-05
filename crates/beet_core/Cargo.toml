@@ -182,14 +182,16 @@ rand = [
 	"dep:getrandom",
 ]
 
-# fs is std-only (notify/async-fs); `uuid` lives here as `tempdir` is its only
-# user (`Uuid::now_v7`, which needs a clock).
+# Cross-platform uuid creation (`uuid_ext`). no_std-capable: the v7 timestamp
+# comes from `time_ext`, not uuid's own std-only clock.
+uuid = ["dep:uuid"]
+# fs is std-only (notify/async-fs); it rides `uuid` for `tempdir`'s directory names.
 fs = [
 	"dep:notify",
 	"dep:notify-debouncer-full",
 	"dep:async-fs",
 	"dep:async-process",
-	"dep:uuid",
+	"uuid",
 ]
 tokens = [
 	"serde",
@@ -268,8 +270,8 @@ prettyplease = { workspace = true, optional = true }
 rand = { workspace = true, optional = true, features = ["std_rng", "os_rng"] }
 rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
-# workspace sets default-features = false so uuid compiles on no_std (it is only
-# *used* by the std-only `tempdir`); `uuid/std` is re-added by the `std` feature.
+# workspace sets default-features = false so uuid compiles on no_std; `uuid/std`
+# is re-added by the `std` feature.
 # `js` (not `rng-getrandom`) supplies the wasm RNG: it keeps getrandom 0.4 out of
 # the wasm graph, whose `MaybeUninit` slice marshalling traps the test runner.
 uuid = { workspace = true, optional = true, features = ["v4", "v7", "js"] }

@@ -178,9 +178,9 @@ async fn call_capability(
 	Ok(())
 }
 
-/// Per-response config read off the [`RespondMultiModalAction`]'s own caller each call
-/// (like the esp body reads its drive-step config): a ceiling clamping how long the
-/// agent may drive in one response, so a demo never sends the fox or robot careening.
+/// Per-response config read off the [`RespondMultiModalAction`]'s own caller each
+/// call: a ceiling clamping how long the agent may drive in one response, so a demo
+/// never sends the fox or robot careening.
 /// `None` means no cap. Spawn it beside the action, eg
 /// `<RespondMultiModalAction {RespondMultiModal{max_drive_duration:"2s"}}/>`.
 #[derive(Debug, Default, Clone, Component, Reflect)]

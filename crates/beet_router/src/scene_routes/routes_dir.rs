@@ -79,6 +79,7 @@ impl RoutesDir {
 				world,
 				root.unwrap_or(entity),
 				PendingKind::Passive,
+				format!("<RoutesDir src=\"{src}\"> scan"),
 			);
 			let Ok(mut entity_mut) = world.get_entity_mut(entity) else {
 				// the dir despawned before the command ran: the dropped guard

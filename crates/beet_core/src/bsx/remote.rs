@@ -35,7 +35,12 @@ pub fn register_remote_schema(
 	let world = unsafe { cx.entity.world_mut() };
 	// a schema gates validation, not tree content: passive.
 	let (async_world, spawner, guard) =
-		register_pending_fetch(world, entity_id, PendingKind::Passive)?;
+		register_pending_fetch(
+			world,
+			entity_id,
+			PendingKind::Passive,
+			format!("remote schema `{name}` at `{url}`"),
+		)?;
 	spawner.spawn(resolve_remote_schema(async_world, name, url, guard));
 	Ok(())
 }
@@ -53,6 +58,7 @@ pub fn register_pending_fetch(
 	world: &mut World,
 	entity: Entity,
 	kind: PendingKind,
+	label: impl Into<SmolStr>,
 ) -> Result<(AsyncWorld, AsyncSpawner, PendingGuard)> {
 	let (Some(async_world), Some(spawner)) = (
 		world.get_resource::<AsyncWorld>().cloned(),
@@ -62,7 +68,7 @@ pub fn register_pending_fetch(
 			"a remote schema/template needs the async runtime (add `AsyncPlugin`)"
 		);
 	};
-	let guard = TemplatePending::park(world, entity, kind);
+	let guard = TemplatePending::park(world, entity, kind, label);
 	Ok((async_world, spawner, guard))
 }
 
@@ -110,7 +116,12 @@ pub fn register_remote_template(
 	let world = unsafe { cx.entity.world_mut() };
 	// a remote template builds content at the include site: structural.
 	let (async_world, spawner, guard) =
-		register_pending_fetch(world, entity_id, PendingKind::Structural)?;
+		register_pending_fetch(
+			world,
+			entity_id,
+			PendingKind::Structural,
+			format!("remote template `{src}`"),
+		)?;
 	spawner.spawn(resolve_remote_template(async_world, src, entity_id, guard));
 	Ok(())
 }

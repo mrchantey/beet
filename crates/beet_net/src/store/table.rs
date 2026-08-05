@@ -301,13 +301,13 @@ impl<T: TableStoreRow> TableStore<T> {
 pub trait TableStoreRow: TableContent {
 	/// Unique identifier for the object, used as the primary key in the table.
 	fn id(&self) -> Uuid;
-	/// Decodes uuid timestamp as time since unix epoch.
+	/// Decodes the uuid's embedded wall-clock time.
 	/// ## Panics
 	/// Panics if uuid is not v1, v6 or v7.
-	fn timestamp(&self) -> Duration {
+	fn timestamp(&self) -> Timestamp {
 		let timestamp = self.id().get_timestamp().unwrap();
 		let (secs, nanos) = timestamp.to_unix();
-		Duration::new(secs, nanos)
+		Timestamp::from_unix_epoch_elapsed(Duration::new(secs, nanos))
 	}
 }
 /// Helper blanket trait constraining types which may be included in a table.
@@ -327,12 +327,11 @@ impl<T> TableContent for T where
 pub struct TableItem<T> {
 	/// A uuid v7 used as the primary key.
 	pub id: Uuid,
-	/// Wall-clock creation time as a [`Duration`] since the Unix epoch, from the
-	/// cross-platform [`time_ext::now`] (the std `SystemTime` has no wasm clock).
-	/// Deliberately not an [`Instant`]: that clock is monotonic (elapsed from an
-	/// arbitrary process-local zero), so it is meaningless once this row is
-	/// serialized and read back in another process.
-	pub created: Duration,
+	/// Wall-clock creation time. Deliberately a [`Timestamp`] rather than an
+	/// [`Instant`]: that clock is monotonic (elapsed from an arbitrary
+	/// process-local zero), so it is meaningless once this row is serialized and
+	/// read back in another process.
+	pub created: Timestamp,
 	/// The user-provided data payload.
 	pub data: T,
 }
@@ -342,7 +341,7 @@ impl<T> TableItem<T> {
 	pub fn new(data: T) -> Self {
 		Self {
 			id: uuid_ext::now_v7(),
-			created: time_ext::now(),
+			created: Timestamp::now(),
 			data,
 		}
 	}

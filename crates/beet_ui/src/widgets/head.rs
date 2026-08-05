@@ -19,9 +19,9 @@
 //! document.
 //!
 //! `og:site_name` is bound to [`PackageConfig::title`] through a
-//! [`ResourceFieldRef`] (the `@res:PackageConfig.title` form, lowered here in
-//! Rust) so the site name stays live with the resource. The bind is gated behind
-//! `json`; a no-serde build degrades to the static title.
+//! [`ResourceFieldRef`] (the rsx counterpart of a bsx `@res:PackageConfig.title`
+//! binding) so the site name stays live with the resource. The bind is gated
+//! behind `json`; a no-serde build degrades to the static title.
 use beet_core::prelude::*;
 
 /// A `<head>` with sensible defaults sourced from [`PackageConfig`].
@@ -92,29 +92,24 @@ pub fn Head(
 /// The `content` block attribute for the `og:site_name` meta: a [`Value`] seeded
 /// with [`PackageConfig::title`] plus, under `json`, a [`ResourceFieldRef`]
 /// binding it to that field so the rendered site name tracks the live resource.
-/// Without `json` it stays the static title.
+/// Without `json` there is no serde-backed `Value`<->reflect bridge, so it
+/// degrades to the same static snapshot as every sibling meta above.
 ///
 /// Seeding the resource's *own* value (not a per-page title) is load-bearing:
 /// the bind is bidirectional, so a per-page seed would write that page's title
 /// back into the shared `PackageConfig.title`, leaking it across requests.
 ///
-/// This is the Rust counterpart of the `content=@res:PackageConfig.title`
-/// markup form, spawning the attribute as a related entity ([`AttributeOf`] the
-/// meta element) so it sits alongside the literal `property` attribute.
+/// The rsx counterpart of a bsx `content=@res:PackageConfig.title` binding; the
+/// Rust macro has no `@`-binding syntax, so the bind rides the attribute entity
+/// through [`Attribute::bundle_with`].
 fn site_name_attr(title: &SmolStr) -> impl Bundle {
 	let value = Value::new(title);
-	OnSpawn::new(move |entity| {
-		let element = entity.id();
-		entity.world_scope(move |world| {
-			let attr =
-				(AttributeOf::new(element), Attribute::new("content"), value);
-			// under `json` the resource bind tracks the live title; otherwise the
-			// seeded value renders as a static snapshot.
-			#[cfg(feature = "json")]
-			world
-				.spawn((attr, ResourceFieldRef::new("PackageConfig", "title")));
-			#[cfg(not(feature = "json"))]
-			world.spawn(attr);
-		});
-	})
+	#[cfg(feature = "json")]
+	return Attribute::bundle_with(
+		"content",
+		value,
+		ResourceFieldRef::new("PackageConfig", "title"),
+	);
+	#[cfg(not(feature = "json"))]
+	return Attribute::bundle("content", value);
 }

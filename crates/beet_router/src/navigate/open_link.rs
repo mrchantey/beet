@@ -158,7 +158,7 @@ fn on_link_click(
 	// against the document origin in the browser, so no rewrite is needed.)
 	#[cfg(not(target_arch = "wasm32"))]
 	let url = if is_file && !url.is_external() {
-		match HttpServer::current_port() {
+		match CanonicalPort::get() {
 			Ok(port) => url
 				.with_scheme(Scheme::Http)
 				.with_authority(format!("127.0.0.1:{port}")),

@@ -41,14 +41,6 @@ pub fn set_http_server(server: HttpServerFn) -> Result<()> {
 /// The installed backend, if any.
 pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 
-/// The process-global port the canonical [`HttpServer`] is listening on, set by
-/// the bind path once a listener binds (see [`HttpServer::set_current_port`]).
-///
-/// `None` until a canonical server binds. A loopback-bound consumer (eg
-/// [`Request::send`] rewriting an authority-less URL, or `beet_ui`'s terminal
-/// image fetch) reads it through [`HttpServer::current_port`].
-static CURRENT_PORT: RwLock<Option<u16>> = RwLock::new(None);
-
 /// HTTP server that listens for incoming requests, dispatching each through its
 /// host's `Request -> Response` action via `entity.exchange`.
 ///
@@ -95,10 +87,10 @@ pub struct HttpServer {
 	/// Use `[0, 0, 0, 0]` to listen on all interfaces (required for deployed servers).
 	pub host: [u8; 4],
 	/// Whether this is *the* canonical server: on bind it registers its real
-	/// local port as the process [`current_port`](Self::current_port), so an
-	/// authority-less [`Request::send`] (and `beet_ui`'s terminal image fetch)
-	/// loops back to it. Defaults to `true`; clear it on a secondary listener
-	/// that should not claim the loopback port.
+	/// local port as the process [`CanonicalPort`], so an authority-less
+	/// [`Request::send`] (and `beet_ui`'s terminal image fetch) loops back to it.
+	/// Defaults to `true`; clear it on a secondary listener that should not claim
+	/// the loopback port.
 	pub canonical: bool,
 	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
 	/// so an entry declaring a single [`HttpServer`] needs no flag; clear it on a
@@ -159,24 +151,6 @@ impl HttpServer {
 	pub fn local_url(&self) -> String {
 		let port = self.port.unwrap_or(0);
 		format!("http://127.0.0.1:{}", port)
-	}
-
-	/// The process-global port the canonical server bound (see
-	/// [`CURRENT_PORT`]), errors if no canonical server has bound yet.
-	///
-	/// The OS-assigned port resolves here even for a `port: 0` config, since the
-	/// bind path registers the real `local_addr` port, not the configured one.
-	pub fn current_port() -> Result<u16> {
-		CURRENT_PORT.read().unwrap().ok_or_else(|| {
-			bevyhow!("local port not assigned, is the server running yet?")
-		})
-	}
-
-	/// Register the canonical server's bound port, overwriting any existing
-	/// value. Called from the bind path the instant a canonical listener learns
-	/// its real `local_addr` (capturing the OS-assigned port for `port: 0`).
-	pub fn set_current_port(port: u16) {
-		*CURRENT_PORT.write().unwrap() = Some(port);
 	}
 
 	/// The socket address to bind, from the component fields (`0` = OS-assigned,

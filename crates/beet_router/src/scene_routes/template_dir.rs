@@ -106,6 +106,7 @@ impl TemplateDir {
 				world,
 				root.unwrap_or(entity),
 				PendingKind::Passive,
+				format!("<TemplateDir src=\"{src}\"> read"),
 			);
 			let Ok(mut entity_mut) = world.get_entity_mut(entity) else {
 				// the dir despawned before the command ran: the dropped guard

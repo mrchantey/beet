@@ -122,8 +122,8 @@ pub enum PendingKind {
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct TemplatePending {
-	/// The outstanding dependency ids and their kinds.
-	ids: HashMap<PendingId, PendingKind>,
+	/// The outstanding dependencies, keyed by id.
+	ids: HashMap<PendingId, PendingEntry>,
 	/// The next id to hand out from [`Self::register`].
 	next: u64,
 	/// The pre-build [`SlotChild`] snapshot the walker parked when it deferred
@@ -134,6 +134,17 @@ pub struct TemplatePending {
 /// An opaque identifier for one pending dependency on a [`TemplatePending`] set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub struct PendingId(u64);
+
+/// One parked dependency: how it gates the load, and what it is waiting on.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+struct PendingEntry {
+	kind: PendingKind,
+	/// Short, specific description of the dependency, named at the park site.
+	/// The only thing a bounded settle has to report when it gives up, so it
+	/// identifies the *source*, eg `<RoutesDir src="routes">` or
+	/// `asset "logo.png"`, not the mechanism.
+	label: SmolStr,
+}
 
 /// The template root currently being built, set by the build walker for the
 /// duration of a [`spawn_template`](crate::prelude::WorldTemplateExt) build.
@@ -192,10 +203,21 @@ impl TemplatePending {
 	/// While any dependency is registered, [`LoadTemplate`] is deferred until
 	/// every one is resolved via [`Self::resolve`]. Prefer [`Self::park`], whose
 	/// [`PendingGuard`] cannot leak the id.
-	pub fn register(&mut self, kind: PendingKind) -> PendingId {
+	///
+	/// `label` names what is being waited on (see [`PendingEntry::label`]); it is
+	/// what a bounded settle reports when it gives up, so name the source rather
+	/// than the mechanism.
+	pub fn register(
+		&mut self,
+		kind: PendingKind,
+		label: impl Into<SmolStr>,
+	) -> PendingId {
 		let id = PendingId(self.next);
 		self.next += 1;
-		self.ids.insert(id, kind);
+		self.ids.insert(id, PendingEntry {
+			kind,
+			label: label.into(),
+		});
 		id
 	}
 
@@ -218,7 +240,10 @@ impl TemplatePending {
 	/// outstanding, ie the tree's content has settled and deferred slot
 	/// resolution may run.
 	pub fn structural_empty(&self) -> bool {
-		!self.ids.values().any(|kind| *kind == PendingKind::Structural)
+		!self
+			.ids
+			.values()
+			.any(|entry| entry.kind == PendingKind::Structural)
 	}
 
 	/// Parks the walker's pre-build [`SlotChild`] snapshot, deferring slot
@@ -234,14 +259,15 @@ impl TemplatePending {
 
 	/// Parks a dependency for `entity`'s build on the current build root (or on
 	/// `entity` itself outside a build), returning the [`PendingGuard`] that
-	/// resolves it.
+	/// resolves it. `label` names what is being waited on, see [`Self::register`].
 	pub fn park(
 		world: &mut World,
 		entity: Entity,
 		kind: PendingKind,
+		label: impl Into<SmolStr>,
 	) -> PendingGuard {
 		let root = TemplateBuildRoot::resolve(world, entity);
-		Self::park_on(world, root, kind)
+		Self::park_on(world, root, kind, label)
 	}
 
 	/// Parks a dependency directly on `root`, returning the [`PendingGuard`]
@@ -251,13 +277,14 @@ impl TemplatePending {
 		world: &mut World,
 		root: Entity,
 		kind: PendingKind,
+		label: impl Into<SmolStr>,
 	) -> PendingGuard {
 		let id = world
 			.entity_mut(root)
 			.entry::<TemplatePending>()
 			.or_default()
 			.get_mut()
-			.register(kind);
+			.register(kind, label);
 		let queue = world.get_resource_or_init::<PendingDropQueue>().clone();
 		PendingGuard {
 			root,
@@ -298,6 +325,41 @@ impl TemplatePending {
 		for (root, id) in dropped {
 			Self::resolve_on(world, root, id);
 		}
+	}
+
+	/// Every dependency still outstanding anywhere in the world, as
+	/// `(root, label, kind)` triples: what a settle is actually waiting on.
+	fn outstanding(world: &mut World) -> Vec<(Entity, SmolStr, PendingKind)> {
+		world
+			.query::<(Entity, &TemplatePending)>()
+			.iter(world)
+			.flat_map(|(root, pending)| {
+				pending
+					.ids
+					.values()
+					.map(move |entry| (root, entry.label.clone(), entry.kind))
+			})
+			.collect()
+	}
+
+	/// The message a bounded settle fails with: every outstanding dependency
+	/// named alongside the entity carrying it, so the report identifies what
+	/// wedged rather than just how many did.
+	fn timeout_report(
+		deadline: Duration,
+		outstanding: &[(Entity, SmolStr, PendingKind)],
+	) -> String {
+		let plural = if outstanding.len() == 1 { "y" } else { "ies" };
+		let lines = outstanding
+			.iter()
+			.map(|(root, label, kind)| {
+				format!("\n  - {label} ({kind:?} dependency of {root})")
+			})
+			.collect::<String>();
+		format!(
+			"timed out after {deadline:?} waiting on {} unresolved template dependenc{plural}:{lines}",
+			outstanding.len(),
+		)
 	}
 }
 
@@ -475,7 +537,9 @@ pub fn sweep_dropped_pending(world: &mut World) {
 	TemplatePending::sweep_dropped(world);
 }
 
-#[cfg(feature = "bevy_async")]
+// both settles pace themselves with `async_ext::yield_now`, which rides
+// `futures_lite`: std-only, like the `settle_owned` block below.
+#[cfg(all(feature = "bevy_async", feature = "std"))]
 impl TemplatePending {
 	/// Awaits quiescence of every [`TemplatePending`] set in the world, the
 	/// in-app settle a caller on the async runtime uses (an action rendering
@@ -518,6 +582,41 @@ impl TemplatePending {
 			world.with(|_| ()).await;
 		}
 	}
+
+	/// [`Self::settle`] with a ceiling: fails once `deadline` elapses with a
+	/// dependency still outstanding.
+	///
+	/// The bounded settle a one-shot command uses (`check`, `export-static`,
+	/// `export-pdf`): those produce a result and exit, so a dependency that never
+	/// resolves has to fail the command rather than hang it. A long-running app
+	/// (`serve` included) settles through [`Self::settle`] instead, where a slow
+	/// dependency is a stall to wait out, not a failed run.
+	///
+	/// The error names every outstanding dependency and its entity, so a wedged
+	/// build reports which dependency wedged.
+	pub async fn settle_before(world: &AsyncWorld, deadline: Duration) -> Result {
+		let started = Instant::now();
+		loop {
+			let outstanding = world
+				.with(|world| {
+					// apply queued registrations so a just-inserted dependency counts.
+					world.flush();
+					Self::sweep_dropped(world);
+					Self::outstanding(world)
+				})
+				.await;
+			if outstanding.is_empty() {
+				return Ok(());
+			}
+			if started.elapsed() > deadline {
+				bevybail!("{}", Self::timeout_report(deadline, &outstanding));
+			}
+			// same two-step yield as `settle`: a single yield can lap the
+			// dependency tasks' bridge polls, see its comment.
+			async_ext::yield_now().await;
+			world.with(|_| ()).await;
+		}
+	}
 }
 
 // the world-owning settle drives [`AsyncRunner`], which needs a task pool: std-only.
@@ -549,5 +648,56 @@ impl TemplatePending {
 			}
 			AsyncRunner::tick().await;
 		}
+	}
+}
+
+// the bounded settle rides `bevy_async`, and driving it needs a task pool: std-only.
+#[cfg(all(test, feature = "bevy_async", feature = "std"))]
+mod test {
+	use crate::prelude::*;
+
+	/// A bounded settle fails rather than hanging on a dependency that never
+	/// resolves, and its error names that dependency and the entity carrying it,
+	/// so a wedged one-shot build reports *what* it waited on.
+	#[crate::test]
+	async fn settle_before_names_the_stuck_dependency() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin, TemplatePlugin));
+		let root = app.world_mut().spawn_empty().id();
+		// registered without a guard, so it can neither resolve nor be swept: the
+		// dependency a bounded settle exists to report.
+		app.world_mut()
+			.entity_mut(root)
+			.entry::<TemplatePending>()
+			.or_default()
+			.get_mut()
+			.register(PendingKind::Passive, "<RoutesDir src=\"routes\">");
+
+		let err = app
+			.world_mut()
+			.run_async_local_then(|world| async move {
+				TemplatePending::settle_before(&world, Duration::from_millis(50))
+					.await
+			})
+			.await
+			.unwrap_err()
+			.to_string();
+		err.clone().xpect_contains("<RoutesDir src=\"routes\">");
+		err.xpect_contains(root.to_string());
+	}
+
+	/// With nothing outstanding the bounded settle returns immediately, ie the
+	/// deadline only bites on a real stall.
+	#[crate::test]
+	async fn settle_before_passes_when_nothing_is_pending() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin, TemplatePlugin));
+		app.world_mut()
+			.run_async_local_then(|world| async move {
+				TemplatePending::settle_before(&world, Duration::from_secs(5))
+					.await
+			})
+			.await
+			.unwrap();
 	}
 }

@@ -34,7 +34,13 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<CheckParams>()?;
 	let root =
-		build_entry(&cx.caller, parts.params(), &entry_arg(parts)?).await?;
+		build_entry(
+			&cx.caller,
+			parts.params(),
+			&entry_arg(parts)?,
+			Some(ONE_SHOT_SETTLE_DEADLINE),
+		)
+		.await?;
 	let report = check_routes(&cx.world(), root).await?;
 
 	// surface every diagnostic loudly through the log facade, then summarize.

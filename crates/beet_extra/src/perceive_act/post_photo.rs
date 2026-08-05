@@ -14,11 +14,9 @@ use beet_router::prelude::*;
 ///
 /// Spread onto a `User`-kind `<CreateActor>` before the agent actor, so each
 /// `Sequence` iteration begins with a fresh photo in the window as a user-role
-/// image message. The window is append-only (no post is ever dropped), which keeps
-/// the LLM prompt-cache prefix stable; only the photo bytes are bounded, by replacing
-/// each photo older than the most recent `keep_media` with a short text stub in place
-/// (same post id + position). Since a photo is stubbed exactly once, the cached prefix
-/// grows with the conversation and only the last few turns churn.
+/// image message. Bounding is [`ThreadWindow::stub_old_images`], run inline here so
+/// a captured photo is bounded in the same turn it lands; a thread whose images
+/// arrive some other way sequences the standalone [`StubOldImages`] action instead.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(Action<(), Outcome> = Action::new_async(post_photo_action))]
@@ -34,9 +32,6 @@ impl Default for PostPhoto {
 		Self { keep_media: 2 }
 	}
 }
-
-/// The text a stubbed-out older photo is replaced with.
-const STUBBED_PHOTO: &str = "[earlier photo, no longer shown]";
 
 /// Marks the start of each perceive-act cycle, for the per-stage latency logs:
 /// [`PostPhoto`] stamps it, `RespondMultiModalAction` reads it to report the model latency.
@@ -86,7 +81,7 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 				None,
 				PostStatus::Completed,
 			));
-			stub_old_photos(&mut window, config.keep_media);
+			window.stub_old_images(config.keep_media);
 			Ok(())
 		})
 		.await??;
@@ -118,38 +113,6 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 		),
 	}
 	Ok(Pass(()))
-}
-
-/// Replace every image post older than the most recent `keep_media` with a text stub,
-/// in place (same post id + window position), so accumulated photo bytes stay bounded
-/// while the window remains append-only. Image posts are oldest-first (posts are
-/// id-ordered), and a photo is stubbed exactly once, so the prompt-cache prefix only
-/// churns at the tail.
-fn stub_old_photos(window: &mut ThreadWindow, keep_media: usize) {
-	let image_count = window
-		.posts()
-		.iter()
-		.filter(|post| post.media_type().is_image())
-		.count();
-	let stub_count = image_count.saturating_sub(keep_media);
-	if stub_count == 0 {
-		return;
-	}
-	let stubs: Vec<Post> = window
-		.posts()
-		.iter()
-		.filter(|post| post.media_type().is_image())
-		.take(stub_count)
-		.map(|post| {
-			let mut stub = post.clone();
-			stub.set_media_type(MediaType::Text);
-			stub.set_text(STUBBED_PHOTO);
-			stub
-		})
-		.collect();
-	for stub in stubs {
-		window.upsert_post(stub);
-	}
 }
 
 /// Ceiling on one capture attempt, so a wedged head (eg a half-open socket)

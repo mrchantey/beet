@@ -60,7 +60,7 @@ pub async fn start_hyper_server_with_tcp(
 		.await
 		.unwrap_or(true)
 	{
-		HttpServer::set_current_port(addr.port());
+		CanonicalPort::set(addr.port());
 	}
 
 	// race the accept loop against the shutdown signal: signalling drops the loop

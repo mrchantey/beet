@@ -34,9 +34,12 @@ std = [
 	"dep:async-lock",
 	"dep:futures",
 	"dep:send_wrapper",
+	# the `Uuid` type (table/analytics row keys); ids are *created* through
+	# beet_core's `uuid_ext`, whose clock works on every target.
 	"dep:uuid",
 	"uuid/v7",
 	"uuid/std",
+	"beet_core/uuid",
 	# url-encoded query-param extractors: serde_urlencoded forces serde/std,
 	# so it (and the extractors that use it) are std-only.
 	"dep:serde_urlencoded",

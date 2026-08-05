@@ -83,11 +83,11 @@ async fn send_http(request: Request) -> Result<Response> {
 /// exactly as a browser resolves it against the document origin.
 ///
 /// Errors if no canonical server has bound a port yet
-/// ([`HttpServer::current_port`]); the fetch then fails with that error, which is
+/// ([`CanonicalPort::get`]); the fetch then fails with that error, which is
 /// the intended signal in a server-less context.
 #[cfg(not(target_arch = "wasm32"))]
 fn loopback_rewrite(request: Request) -> Result<Request> {
-	Ok(loopback_to_port(request, HttpServer::current_port()?))
+	Ok(loopback_to_port(request, CanonicalPort::get()?))
 }
 
 /// Set a request's URL to the `127.0.0.1:{port}` loopback origin, leaving its

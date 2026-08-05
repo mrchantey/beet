@@ -54,6 +54,13 @@ pub use stream_ext::TextStream;
 /// Time and duration utilities. Sleep/clock helpers are std-gated per-function;
 /// [`time_ext::pretty_print_duration`] works on no_std.
 pub mod time_ext;
+/// An absolute, serializable wall-clock instant, the persistable counterpart of
+/// the monotonic [`Instant`].
+mod timestamp;
+/// Cross-platform uuid creation ([`uuid_ext::now_v7`]); `uuid`'s own v7 clock is
+/// std-only, so this derives its timestamp from [`time_ext`] instead.
+#[cfg(feature = "uuid")]
+pub mod uuid_ext;
 /// Typed physical quantities ([`units::Angle`], [`units::Distance`],
 /// [`units::LinearVelocity`], [`units::AngularVelocity`]) shared by the robot
 /// transport and the `SetDrive` action.
@@ -82,5 +89,6 @@ pub use once_value::*;
 pub use panic_context::*;
 #[cfg(feature = "rand")]
 pub use random_source::*;
+pub use timestamp::*;
 pub use tree::*;
 pub use xtend::*;

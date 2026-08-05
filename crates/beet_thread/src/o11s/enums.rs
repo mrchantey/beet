@@ -78,6 +78,10 @@ pub enum ImageDetail {
 }
 
 /// Reasoning effort level for reasoning models.
+///
+/// Exactly the spec's effort set (`none`, `low`, `medium`, `high`, `xhigh`); a
+/// provider-only effort (OpenAI's `minimal`) belongs in that provider's request
+/// mapper, not here.
 #[derive(
 	Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
 )]
@@ -86,8 +90,6 @@ pub enum ImageDetail {
 pub enum ReasoningEffort {
 	/// No reasoning before emitting a final answer.
 	None,
-	/// The fastest effort on models that predate `none` (eg `gpt-5-mini`).
-	Minimal,
 	/// Lower reasoning effort for faster responses.
 	Low,
 	/// Balanced reasoning effort.

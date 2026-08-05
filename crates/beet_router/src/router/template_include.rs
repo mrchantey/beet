@@ -50,6 +50,7 @@ pub fn register_template_include(world: &mut World) {
 					world,
 					target,
 					PendingKind::Structural,
+					format!("<Template src=\"{src}\">"),
 				)?;
 				spawner
 					.spawn(resolve_include(async_world, src, target, guard));

@@ -94,9 +94,15 @@ pub fn drain_blob_events(bus: Res<BlobEventBus>, mut commands: Commands) {
 
 /// Marks each [`BlobStore`] `Changed` when it owns the event scope.
 ///
-/// Listing only changes on `Created` / `Removed`, not on a byte `Changed`.
-/// Reading through `Mut`'s `Deref` in the filter does not mark; only the
-/// matched `set_changed()` marks, so unrelated stores stay unchanged.
+/// Deliberately asymmetric with [`propagate_blob_changes`]: a store's observable
+/// surface is its *listing*, and only `Created` / `Removed` change that. Rewritten
+/// bytes leave the listing identical, so marking every covering store on every
+/// write would re-run each listing consumer (a `<RoutesDir>` scan, a directory
+/// render) for a set that did not change. A consumer that wants the bytes watches
+/// the [`Blob`] instead.
+///
+/// Reading through `Mut`'s `Deref` in the filter does not mark; only the matched
+/// `set_changed()` marks, so unrelated stores stay unchanged.
 pub fn propagate_blob_store_changes(
 	ev: On<BlobEvent>,
 	mut stores: Query<&mut BlobStore>,
@@ -111,8 +117,12 @@ pub fn propagate_blob_store_changes(
 
 /// Marks each [`Blob`] `Changed` when the event is its object.
 ///
-/// `Removed` marks the [`Blob`] `Changed` but never despawns it: the handle
-/// stays and the object "may not exist", which `get` / `exists` already handle.
+/// `Removed` marks the [`Blob`] `Changed` but never despawns it, deliberately: a
+/// [`Blob`] is a handle to a *path*, not a claim that the object exists, and `get`
+/// / `exists` already model absence. Despawning would destroy the entity (and any
+/// components an app hung beside the handle) on a deletion the object may recover
+/// from moments later, eg an editor that writes by remove-then-create, whose
+/// re-creation then resurrects through the same untouched handle.
 pub fn propagate_blob_changes(ev: On<BlobEvent>, mut blobs: Query<&mut Blob>) {
 	blobs
 		.iter_mut()

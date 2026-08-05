@@ -27,10 +27,11 @@ mod actions;
 mod net_plugin;
 #[cfg(feature = "std")]
 mod store_actions;
-// The server module is no_std-capable: only the `HttpServer` component and its
-// `set_http_server` install hook compile unconditionally — the concrete
-// backends (mini/hyper/lambda) and the cli/repl servers stay std/feature-gated
-// inside the module.
+// The server module is no_std-capable, but not action-free: a server dispatches
+// through an `Action<Request, Response>`, so everything but the process-global
+// `CanonicalPort` rides the (no_std-capable) `action` feature. The concrete
+// backends (mini/hyper/lambda) and the cli/repl servers stay std/feature-gated on
+// top of that inside the module.
 mod server;
 // The udp module is no_std-capable: the trait-only `UdpEndpoint`/`UdpSocket`
 // seam compiles unconditionally; the std `async-io` impl is std-gated.

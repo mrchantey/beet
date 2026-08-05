@@ -40,8 +40,12 @@ fn register_pending_scene(
 	// register before this build's `drain_pending_dependencies`: the queue drains
 	// at the next world sync, ahead of the root's synchronous drain.
 	commands.queue(move |world: &mut World| {
-		let guard =
-			TemplatePending::park_on(world, root, PendingKind::Passive);
+		let guard = TemplatePending::park_on(
+			world,
+			root,
+			PendingKind::Passive,
+			format!("scene spawn on {entity}"),
+		);
 		let Ok(mut entity_mut) = world.get_entity_mut(entity) else {
 			// scene entity gone before the command ran: the dropped guard
 			// resolves through the sweep.

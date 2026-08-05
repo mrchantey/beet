@@ -39,7 +39,10 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	// load the entry with boot suppressed, settling its `<RoutesDir>` discovery,
 	// then boot the loaded root's servers explicitly: a parked server holds the
 	// await, so this never returns and the process serves the entry.
-	let root = build_entry(&caller, parts.params(), &entry_arg(parts)?).await?;
+	// `None`: a long-running server waits out a slow dependency rather than
+	// failing the run, see `build_entry`.
+	let root =
+		build_entry(&caller, parts.params(), &entry_arg(parts)?, None).await?;
 	// boot the entry at its own home with the serve flags (see
 	// `entry_boot_request`), not the `serve/<entry>` command request the dev
 	// router routed here.

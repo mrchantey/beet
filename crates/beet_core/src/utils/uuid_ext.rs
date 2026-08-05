@@ -1,9 +1,9 @@
 //! Cross-platform uuid creation. `uuid`'s own v7 clock is std-only (it panics
 //! `time not implemented` on wasm32-unknown-unknown), so time-based ids derive
 //! their timestamp from [`time_ext`], which has wasm and no_std backends.
-use beet_core::prelude::*;
-use std::sync::LazyLock;
-use std::sync::Mutex;
+use crate::prelude::*;
+use bevy::platform::sync::LazyLock;
+use bevy::platform::sync::Mutex;
 use uuid::Uuid;
 use uuid::timestamp::context::ContextV7;
 
@@ -29,10 +29,9 @@ pub fn now_v7() -> Uuid {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::*;
 
 	/// Runs on wasm too, where `Uuid::now_v7` itself panics.
-	#[beet_core::test]
+	#[crate::test]
 	fn embeds_the_wall_clock() {
 		let id = uuid_ext::now_v7();
 		id.get_version_num().xpect_eq(7);
@@ -43,7 +42,7 @@ mod test {
 	}
 
 	/// The shared counter context keeps same-tick ids in creation order.
-	#[beet_core::test]
+	#[crate::test]
 	fn ids_are_monotonic() {
 		let ids = (0..64).map(|_| uuid_ext::now_v7()).collect::<Vec<_>>();
 		let mut sorted = ids.clone();

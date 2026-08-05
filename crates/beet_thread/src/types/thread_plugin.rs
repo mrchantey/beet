@@ -27,7 +27,10 @@ impl Plugin for ThreadPlugin {
 			// a `Request -> Response` boot action), exiting when it completes
 			.register_type::<CreateThread>()
 			// markup persistence: declare a thread-record store from `.bsx`
-			.register_type::<MountThreadStore>();
+			.register_type::<MountThreadStore>()
+			// markup window bounding: stub older images so an endless loop's
+			// request stays bounded without dropping a post
+			.register_type::<StubOldImages>();
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────

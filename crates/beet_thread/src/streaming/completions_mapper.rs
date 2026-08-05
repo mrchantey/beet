@@ -507,13 +507,17 @@ pub fn tool_choice_to_completions(
 }
 
 /// Map the shared [`ReasoningEffort`] onto the completions wire type.
+///
+/// The wire type carries provider-specific variants the OpenResponses spec does
+/// not (`minimal`, an OpenAI-only effort for models predating `none`); the shared
+/// enum stays spec-shaped and this mapper is where a provider extension would be
+/// reintroduced, per-provider, if a configured model ever needed one.
 pub fn reasoning_effort(
 	effort: ReasoningEffort,
 ) -> async_openai::types::chat::ReasoningEffort {
 	use async_openai::types::chat::ReasoningEffort as Wire;
 	match effort {
 		ReasoningEffort::None => Wire::None,
-		ReasoningEffort::Minimal => Wire::Minimal,
 		ReasoningEffort::Low => Wire::Low,
 		ReasoningEffort::Medium => Wire::Medium,
 		ReasoningEffort::High => Wire::High,

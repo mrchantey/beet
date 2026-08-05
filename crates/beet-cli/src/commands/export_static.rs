@@ -31,7 +31,13 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ExportStaticParams>()?;
 	let entry_path = entry_arg(parts)?;
-	let root = build_entry(&cx.caller, parts.params(), &entry_path).await?;
+	let root = build_entry(
+		&cx.caller,
+		parts.params(),
+		&entry_path,
+		Some(ONE_SHOT_SETTLE_DEADLINE),
+	)
+	.await?;
 
 	// validate before writing: the render-diagnostics pass gates CI, so a broken
 	// no-code entry (unknown tag, dead link) fails the export with a non-zero exit

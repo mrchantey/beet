@@ -19,10 +19,17 @@ use beet::prelude::*;
 /// The reads go through the store ([`read_entry_sources`]/[`build_entry_root`]),
 /// the same agnostic core the native binary and the wasm Worker use, so the
 /// command is store-driven rather than filesystem-bound.
+///
+/// `settle_deadline` bounds the wait on the entry's discovery tasks. A one-shot
+/// command passes [`ONE_SHOT_SETTLE_DEADLINE`]: it produces a result and exits,
+/// so a dependency that never resolves must fail it rather than hang it. `serve`
+/// passes [`None`] and waits indefinitely, since a slow dependency there is a
+/// stall to wait out, not a failed run.
 pub(crate) async fn build_entry(
 	caller: &AsyncEntity,
 	params: &MultiMap<SmolStr, SmolStr>,
 	entry_path: &str,
+	settle_deadline: Option<Duration>,
 ) -> Result<Entity> {
 	let ResolvedEntry {
 		store, entry_name, ..
@@ -40,9 +47,23 @@ pub(crate) async fn build_entry(
 		.await??;
 	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
 	// every discovered route exists before the caller renders/exports the entry.
-	TemplatePending::settle(caller.world()).await;
+	match settle_deadline {
+		Some(deadline) => {
+			TemplatePending::settle_before(caller.world(), deadline).await?
+		}
+		None => TemplatePending::settle(caller.world()).await,
+	}
 	Ok(root)
 }
+
+/// How long a one-shot command (`check`, `export-static`, `export-pdf`) waits on
+/// the entry's dependencies before failing.
+///
+/// Generous, since it covers a whole `<RoutesDir>` scan or `<TemplateDir>` read
+/// over a large site on a cold cache; it exists to turn a genuinely stuck
+/// dependency into a named error rather than a hung command, not to police build
+/// speed.
+pub(crate) const ONE_SHOT_SETTLE_DEADLINE: Duration = Duration::from_secs(60);
 
 /// The entry's own directory (an entry file's parent, or the dir itself), the
 /// default home for command outputs like `dist/` and `site.pdf`. Deliberately
