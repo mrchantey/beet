@@ -5,6 +5,9 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
+// styling for the composer: an `inline_class!` per element keeps each rule
+// colocated with the widget (a callsite-keyed class per literal).
+use beet_ui::prelude::material::colors;
 
 // ═══════════════════════════════════════════════════════════════════════
 // CreatePostForm: agnostic input
@@ -34,67 +37,60 @@ impl CreatePostForm {
 	pub fn new(thread: Entity) -> impl Bundle { (Self, OfThread(thread)) }
 }
 
-/// The crate-shipped `CreatePostForm.bsx` source, embedded at compile time so a
-/// deployed binary (with no source tree on disk) still carries the bytes. The
-/// bytes are seeded into an in-memory [`BlobStore`] and registered through the
-/// same store-backed path as site templates (see [`ThreadUiPlugin`]); a site
-/// shipping its own `CreatePostForm.bsx` overrides it.
-pub const CREATE_POST_FORM_BSX: &str = include_str!("CreatePostForm.bsx");
-
-/// The name [`CreatePostForm`]'s `.bsx` template is registered under, the module
-/// path derived from its store key `templates/CreatePostForm.bsx`.
-pub const CREATE_POST_FORM_TEMPLATE: &str = "CreatePostForm";
-
-/// Build the widget's `<form>` from the [`BsxTemplateRegistry`]-registered
-/// `CreatePostForm.bsx`, so the component works as a bare spawn or markup spread.
-/// [`ThreadUiPlugin`] registers that template through an embedded blob store
-/// *asynchronously* at [`Startup`], so a composer spawned by a booting scene can
-/// run before it settles. Rather than fail, this awaits the registration (a
-/// queued async task that yields until the template lands), then builds the form;
-/// a site shipping its own `CreatePostForm.bsx` registers under the same path and
-/// is picked up here. Submitting fires `beet_ui`'s [`Submit`], consumed by the
-/// active [`UserInput`] turn; `{FocusOnAdd}` on the form's `<input>` (in the
-/// `.bsx`) gives it initial focus. The input surface is resolved from the host
-/// (which carries `RenderSurface(self)`), so this hook inserts no surface of its own.
+/// Build the widget's `<form>` when a [`CreatePostForm`] is added, so the
+/// component works as a bare spawn or markup spread. A plain rust template
+/// (`insert(rsx!{..})` merges the `<form>` element onto the entity, so the
+/// widget *is* the form), no registry involved; the wider crate-shipped-template
+/// question is spiked separately in `crate-templates.md`.
+///
+/// Submitting fires `beet_ui`'s [`Submit`], consumed by the active [`UserInput`]
+/// turn; `{FocusOnAdd}` gives the input initial focus and `{ClearOnSubmit}`
+/// empties it each turn. The input surface is resolved from the host (which
+/// carries `RenderSurface(self)`), so this hook inserts no surface of its own.
 fn create_post_form_on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).queue_async_local(
-		move |entity: AsyncEntity| async move {
-			// await the (async) template registration, yielding a tick between polls
-			let registry = loop {
-				if let Some(registry) = entity
-					.world()
-					.with(|world: &mut World| {
-						world
-							.get_resource::<BsxTemplateRegistry>()
-							.filter(|registry| {
-								registry.contains(CREATE_POST_FORM_TEMPLATE)
-							})
-							.cloned()
-					})
-					.await
-				{
-					break registry;
-				}
-				entity.with(|_| ()).await?;
-			};
-			let nodes = registry
-				.get(CREATE_POST_FORM_TEMPLATE)
-				.ok_or_else(|| {
-					bevyhow!(
-						"no BSX template registered under `{CREATE_POST_FORM_TEMPLATE}`"
-					)
-				})?
-				.nodes
-				.clone();
-			entity
-				.with(move |mut entity| -> Result {
-					entity.insert_template(BsxTemplate::new(nodes, registry))?;
-					Ok(())
-				})
-				.await??;
-			Ok(())
-		},
-	);
+	world.commands().entity(cx.entity).insert(rsx! {
+		<form {(ClearOnSubmit, form_style())}>
+			<input name="message" type="text" {(FocusOnAdd, input_style())}/>
+			<button {button_style()}>"Send"</button>
+		</form>
+	});
+}
+
+/// The composer row: a stretched horizontal flex, gapped, separated from the
+/// transcript by a top border.
+fn form_style() -> OnSpawn {
+	inline_class![
+		(style::common_props::DisplayProp, style::Display::Flex),
+		(
+			style::common_props::FlexDirectionProp,
+			style::Direction::Horizontal
+		),
+		(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
+		(style::common_props::ColumnGapProp, style::Length::Rem(1.)),
+		(style::common_props::BorderTopWidth, style::Length::Rem(1.)),
+		token(style::common_props::BorderColorProp, colors::OutlineVariant),
+	]
+}
+
+/// The message input: grows to fill the row, on the raised surface tint.
+fn input_style() -> OnSpawn {
+	inline_class![
+		(style::common_props::FlexGrowProp, 1u32),
+		token(
+			style::common_props::BackgroundColor,
+			colors::SurfaceContainerHigh
+		),
+		token(style::common_props::ForegroundColor, colors::OnSurface),
+	]
+}
+
+/// The send button: bold on the primary tint.
+fn button_style() -> OnSpawn {
+	inline_class![
+		(style::common_props::FontWeightProp, style::FontWeight::Bold),
+		token(style::common_props::BackgroundColor, colors::Primary),
+		token(style::common_props::ForegroundColor, colors::OnPrimary),
+	]
 }
 
 // ═══════════════════════════════════════════════════════════════════════

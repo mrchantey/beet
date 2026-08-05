@@ -19,21 +19,22 @@ mod render;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod workers;
 
-// the Cloudflare Worker entry: a wasm `#[event(fetch)]` that loads the site from
+// the Cloudflare Worker entry: a wasm `#[event(fetch)]` that loads the entry from
 // R2 and serves it through the render router. See [`worker_entry`].
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod worker_entry;
 
-// the cross-platform site build core (read a store + build the entry into a root),
-// shared by the native binary, the wasm Worker, and the check/export-static commands.
-mod site_build;
+// the cross-platform entry build core (resolve + read a store, build the entry
+// into a root), shared by the native binary, the wasm Worker, and the
+// check/export-static commands.
+mod entry_build;
 
 pub mod prelude {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::commands::*;
+	pub use crate::entry_build::*;
 	#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
 	pub use crate::render::*;
-	pub use crate::site_build::*;
 	#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 	pub use crate::workers::*;
 }

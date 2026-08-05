@@ -1,41 +1,40 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// The default output directory, relative to the site dir, when `--out` is unset.
+/// The default output directory, relative to the entry dir, when `--out` is unset.
 const DIST_DIR: &str = "dist";
 
 /// Request params for the [`ExportStatic`] command, surfaced in `--help`.
 #[derive(Reflect, Default)]
 #[reflect(Default)]
 struct ExportStaticParams {
-	/// Output directory for the rendered site (default `<site>/dist`).
+	/// Output directory for the rendered entry (default `<entry>/dist`).
 	out: Option<String>,
 }
 
-/// Statically exports a no-code site: builds the site world (loads its entry
+/// Statically exports a no-code entry: builds the entry world (loads its entry
 /// document), then renders every static route once and writes it to the output dir
-/// (default `<site>/dist`, overridable with `--out`).
+/// (default `<entry>/dist`, overridable with `--out`).
 ///
-/// A one-shot generation, not a serve mode: the site root is the router (the
+/// A one-shot generation, not a serve mode: the entry root is the router (the
 /// entry's root element is built into it), so it exports directly.
 ///
 /// ```sh
 /// beet export-static examples/bsx_site             # writes examples/bsx_site/dist
 /// beet export-static examples/bsx_site --out=public # ..or a chosen output dir (cwd-relative)
 /// ```
-#[action(route = "export-static/*site", handler_only)]
+#[action(route = "export-static/*entry", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<ExportStaticParams>())]
 pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ExportStaticParams>()?;
-	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
-	let root =
-		build_site(&cx.caller, parts.params(), site_dir.clone(), entry).await?;
+	let entry_path = entry_arg(parts)?;
+	let root = build_entry(&cx.caller, parts.params(), &entry_path).await?;
 
 	// validate before writing: the render-diagnostics pass gates CI, so a broken
-	// no-code site (unknown tag, dead link) fails the export with a non-zero exit
+	// no-code entry (unknown tag, dead link) fails the export with a non-zero exit
 	// rather than shipping a broken output.
 	let report = check_routes(&cx.world(), root).await?;
 	report.log();
@@ -51,10 +50,11 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	}
 
 	// the output is a local write target, so an `fs` store: `--out` (absolute, or
-	// relative to the cwd) overrides the default `<site>/dist`.
+	// relative to the cwd) overrides the default `<entry>/dist` (the entry's own
+	// dir, not a `<StoreRoot>`-widened root).
 	let out_dir = match params.out {
 		Some(out) => AbsPathBuf::new(out)?,
-		None => site_dir.join(DIST_DIR),
+		None => entry_dir(&entry_path)?.join(DIST_DIR),
 	};
 	let out = BlobStore::new(FsStore::new(out_dir.clone()));
 	let written = export_static(&cx.world(), root, &out).await?;
@@ -74,8 +74,8 @@ mod test {
 	}
 
 	/// Run `export-static <args>` through a host carrying only the route, the way the
-	/// CLI invokes it ([`Request::from_cli_args`], so an absolute `<site>` positional
-	/// round-trips as absolute: `*site` keeps its leading `/`, which a stringified URL
+	/// CLI invokes it ([`Request::from_cli_args`], so an absolute `<entry>` positional
+	/// round-trips as absolute: `*entry` keeps its leading `/`, which a stringified URL
 	/// would drop). Returns the response text.
 	async fn run(args: &str) -> String {
 		let req = Request::from_cli_args(CliArgs::parse(&format!(

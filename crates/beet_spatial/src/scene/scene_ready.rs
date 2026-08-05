@@ -23,20 +23,10 @@ impl Plugin for SceneReadyPlugin {
 	}
 }
 
-/// Parked on a [`WorldAssetRoot`] built into a template subtree: it records the
-/// pending dependency gating the build root's [`LoadTemplate`] until the scene's
-/// [`WorldInstanceReady`] fires.
-#[derive(Component)]
-struct PendingScene {
-	/// The template build root carrying the [`TemplatePending`] set.
-	root: Entity,
-	/// The dependency id parked on that root.
-	id: PendingId,
-}
-
-/// On a [`WorldAssetRoot`] added during a template build, park a [`PendingId`] on
-/// the build root and record it on the entity, so `LoadTemplate` waits for the
-/// scene to spawn. A `WorldAssetRoot` added outside a build gates nothing.
+/// On a [`WorldAssetRoot`] added during a template build, park a
+/// [`PendingDependency`] on the entity (its guard on the build root), so
+/// `LoadTemplate` waits for the scene to spawn; a despawned scene resolves it
+/// implicitly. A `WorldAssetRoot` added outside a build gates nothing.
 fn register_pending_scene(
 	add: On<Add, WorldAssetRoot>,
 	build_root: Option<Res<TemplateBuildRoot>>,
@@ -50,39 +40,37 @@ fn register_pending_scene(
 	// register before this build's `drain_pending_dependencies`: the queue drains
 	// at the next world sync, ahead of the root's synchronous drain.
 	commands.queue(move |world: &mut World| {
-		let id = world
-			.entity_mut(root)
-			.entry::<TemplatePending>()
-			.or_default()
-			.get_mut()
-			.register();
-		world.entity_mut(entity).insert(PendingScene { root, id });
+		let guard =
+			TemplatePending::park_on(world, root, PendingKind::Passive);
+		let Ok(mut entity_mut) = world.get_entity_mut(entity) else {
+			// scene entity gone before the command ran: the dropped guard
+			// resolves through the sweep.
+			return;
+		};
+		entity_mut.insert(PendingDependency::new(guard));
 	});
 }
 
-/// On a scene's [`WorldInstanceReady`], resolve the entity's [`PendingScene`] and
-/// drain its root, firing [`LoadTemplate`] once nothing else is pending.
+/// On a scene's [`WorldInstanceReady`], remove the entity's
+/// [`PendingDependency`] (which resolves it), firing [`LoadTemplate`] once
+/// nothing else is pending on the root.
 fn resolve_pending_scene(
 	ready: On<WorldInstanceReady>,
-	pending: Query<&PendingScene>,
+	pending: Query<(), With<PendingDependency>>,
 	mut commands: Commands,
 ) {
 	let entity = ready.entity;
-	let Ok(&PendingScene { root, id }) = pending.get(entity) else {
+	if !pending.contains(entity) {
 		return;
-	};
+	}
 	commands.queue(move |world: &mut World| {
 		// set up the scene's freshly-spawned (bare) AnimationPlayers BEFORE firing
 		// LoadTemplate, so a `CallOnLoad`-started tree never out-races the
 		// `init_animators` Update system for a player that lacks its graph handle
-		// and transitions.
+		// and transitions. The remove resolves the dependency via its hook, whose
+		// queued drain runs after this command.
 		init_scene_animators(world, entity);
-		let mut root_entity = world.entity_mut(root);
-		if let Some(mut pending) = root_entity.get_mut::<TemplatePending>() {
-			pending.resolve(id);
-		}
-		drain_pending_dependencies(&mut root_entity);
-		world.entity_mut(entity).remove::<PendingScene>();
+		world.entity_mut(entity).remove::<PendingDependency>();
 	});
 }
 

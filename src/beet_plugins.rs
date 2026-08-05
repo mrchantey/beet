@@ -108,10 +108,29 @@ impl PluginGroup for BeetPlugins {
 				builder = builder.add(beet_net::sockets::SocketServerPlugin::default());
 			}
 		}
-		// the example capabilities (the spatial/render scenes, the agent-thread
-		// runtime, the cloudflare/aws deploy types), each self-selected by a
-		// `beet_extra` sub-feature. A regular `Plugin`, so it nests in this group; its
-		// inner plugins are idempotent (`init_plugin`), safe under a double-add.
+		// the agent-thread runtime (+ its chat UI under `ui`): beet_thread's own
+		// capability, linked by the `thread` feature independent of the example
+		// wiring, so a `<Thread>` entry runs without `extra`.
+		#[cfg(feature = "thread")]
+		{
+			builder = builder.add(beet_thread::prelude::ThreadPlugin::default());
+		}
+		#[cfg(all(feature = "thread", feature = "ui"))]
+		{
+			builder = builder.add(beet_thread::prelude::ThreadUiPlugin);
+		}
+		// the infra deploy block/action type registrations, so a deployer entry
+		// resolves every compiled deploy type by tag independent of the example
+		// templates (`extra`).
+		#[cfg(feature = "infra")]
+		{
+			builder = builder.add(beet_infra::prelude::InfraPlugin);
+		}
+		// the example capabilities (the spatial/render scenes, the example
+		// tools/templates, the cloudflare/aws deploy example templates), each
+		// self-selected by a `beet_extra` sub-feature. A regular `Plugin`, so it
+		// nests in this group; its inner plugins are idempotent (`init_plugin`),
+		// safe under a double-add.
 		#[cfg(feature = "extra")]
 		{
 			builder = builder.add(beet_extra::prelude::BeetExtraPlugin);

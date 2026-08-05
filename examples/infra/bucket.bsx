@@ -14,7 +14,7 @@ with `--s3-backend`.
 Live run needs AWS credentials and `tofu`.
 -->
 <BucketStack app_name="bucket-example">
-	<CrateCheck features="infra"/>
+	<CrateCheck features="infra,extra"/>
 	<Route path="run" {ExchangeSequence}>
 		<NamedBucket label="my-bucket" {LifecycleProbe}/>
 	</Route>

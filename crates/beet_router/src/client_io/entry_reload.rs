@@ -65,14 +65,14 @@ impl EntryReloader {
 	pub fn is_structural(&self, path: &SmolPath) -> bool {
 		self.sources.contains(path)
 	}
-}
 
-/// Marks a [`LiveReload`](super::LiveReload) site whose pending reload is a full
-/// entry rebuild (a structural source changed), rather than the light content
-/// re-fire [`NeedsReload`](super::NeedsReload) alone drives. Always set alongside
-/// `NeedsReload`, so the shared reload gate and debounce still apply.
-#[derive(Component)]
-pub(crate) struct NeedsEntryRebuild;
+	/// Replace the structural source set. The driver recomputes it on every
+	/// rebuild (the entry and its transitive `<Template src>` includes may have
+	/// changed), so a newly added include becomes structural without a restart.
+	pub fn set_sources(&mut self, sources: HashSet<SmolPath>) {
+		self.sources = sources;
+	}
+}
 
 /// Full teardown+rebuild of the entry scene: hand off to the driver's
 /// [`EntryReloader`], which tears down the old [`BeetSceneRoot`] via `despawn_scene`
@@ -182,7 +182,7 @@ mod test {
 			},
 		));
 		// the initial entry root, then several structural rebuilds through the real
-		// reload path (mark as `reload_site_on_change` would, then process).
+		// reload path (latch as `reload_site_on_change` would, then process).
 		spawn_entry_root(&mut world, &store);
 		for _ in 0..5 {
 			let root = world.with_state::<Query<Entity, With<LiveReload>>, _>(
@@ -190,7 +190,7 @@ mod test {
 			);
 			world
 				.entity_mut(root)
-				.insert((NeedsReload, NeedsEntryRebuild));
+				.insert(NeedsReload { structural: true });
 			process_live_reloads(&mut world);
 			AsyncRunner::settle_async_tasks(&mut world).await;
 		}

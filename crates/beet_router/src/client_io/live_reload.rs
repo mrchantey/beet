@@ -50,28 +50,25 @@ impl LiveReload {
 	pub fn new() -> Self { Self::default() }
 }
 
-// Two markers latch the async reload, splitting "a change is pending" from "a
-// reload is running" so a site reload is both debounced and never overlapping:
-//
-// - debounce: a burst of `BlobEvent`s in one frame is `insert`ed onto `NeedsReload`
-//   idempotently, so `process_live_reloads` runs at most one reload per tick.
-// - no-overlap: the reload's tail is async, so `Reloading` guards the window; while
-//   it is set, `process_live_reloads` (filtering `Without<Reloading>`) skips the
-//   site, and a change landing mid-reload only re-sets `NeedsReload`. When the tail
-//   clears `Reloading`, the still-set `NeedsReload` drives exactly one follow-up.
-//
-// A single state component reads worse: `insert` is a *set*, so the change observer
-// would clobber an in-flight reload's state, and the `run_if(any_with_component)`
-// gate would need the component conditionally removed when idle. The two archetype
-// markers keep the observer an idempotent insert and the gate free.
-
-/// Marks a [`LiveReload`] site with a change pending a reload.
-#[derive(Component)]
-pub(crate) struct NeedsReload;
-
-/// Marks a [`LiveReload`] site whose async reload is in flight.
-#[derive(Component)]
-pub(crate) struct Reloading;
+/// Marks a [`LiveReload`] root with a change pending: the debounce latch (a
+/// burst of `BlobEvent`s folds into one reload), carrying whether any change was
+/// *structural* (the entry document or a `<Template src>` include per the
+/// installed [`EntryReloader`]), which upgrades the reload to a full
+/// teardown+rebuild.
+///
+/// This is the only bespoke reload state: "a reload is in flight" is not a
+/// second marker but the pending/settle primitive itself. The reload parks
+/// [`TemplatePending`] dependencies under the root (each respawned
+/// `TemplateDir`/`RoutesDir` holds a [`PendingGuard`]), and
+/// [`process_live_reloads`] defers dispatch while any set under the root is
+/// non-empty, so a change landing mid-reload only re-latches here and drives
+/// exactly one follow-up once the tree settles.
+#[derive(Debug, Default, Component)]
+pub(crate) struct NeedsReload {
+	/// Whether any latched change was structural, driving the full
+	/// teardown+rebuild rather than the light content re-fire.
+	pub structural: bool,
+}
 
 /// Observer: a spawned [`LiveReload`] gets a child [`ClientIo`] channel if the
 /// world has none (its store's watcher already emits the change events, so no
@@ -86,14 +83,19 @@ pub(crate) fn start_live_reload(
 	}
 }
 
-/// Observer: a [`BlobEvent`] landed; mark every [`LiveReload`] site whose store
-/// owns the changed object (minus excluded churn) as needing a reload. A change to
-/// a *structural* source (the entry document or a `<Template src>` include, per the
-/// installed [`EntryReloader`]) additionally marks [`NeedsEntryRebuild`], so the
-/// reload is a full teardown+rebuild rather than the light content re-fire.
+/// Observer: a [`BlobEvent`] landed; latch [`NeedsReload`] onto every
+/// [`LiveReload`] site whose store owns the changed object (minus excluded
+/// churn), upgrading an already-latched marker to structural rather than
+/// clobbering it, so a structural change is never demoted by a following
+/// content change in the same burst.
 pub(crate) fn reload_site_on_change(
 	ev: On<BlobEvent>,
-	sites: Query<(Entity, &LiveReload, &BlobStore)>,
+	mut sites: Query<(
+		Entity,
+		&LiveReload,
+		&BlobStore,
+		Option<&mut NeedsReload>,
+	)>,
 	reloader: Option<Res<EntryReloader>>,
 	mut commands: Commands,
 ) {
@@ -101,36 +103,43 @@ pub(crate) fn reload_site_on_change(
 		.as_ref()
 		.is_some_and(|reloader| reloader.is_structural(&ev.path));
 	sites
-		.iter()
-		.filter(|(_, site, store)| {
+		.iter_mut()
+		.filter(|(_, site, store, _)| {
 			store.did_change(ev.event()) && site.filter.passes(ev.path.as_str())
 		})
-		.for_each(|(entity, _, _)| {
+		.for_each(|(entity, _, _, needs)| {
 			debug!("site store changed, reloading: {}", ev.path);
-			commands.entity(entity).insert(NeedsReload);
-			if structural {
-				commands.entity(entity).insert(NeedsEntryRebuild);
+			match needs {
+				Some(mut needs) => needs.structural |= structural,
+				None => {
+					commands.entity(entity).insert(NeedsReload { structural });
+				}
 			}
 		});
 }
 
-/// Drive the pending reloads once per tick: refresh each [`NeedsReload`] site not
-/// already [`Reloading`], swapping the markers to latch the async reload (see the
-/// marker docs for the debounce + no-overlap rationale).
+/// Drive the latched reloads once per tick: dispatch each [`NeedsReload`] site
+/// whose subtree has settled (no [`TemplatePending`] set under the root is
+/// outstanding), so an in-flight reload's own parked dependencies defer the
+/// follow-up rather than a bespoke in-flight marker. A structural change (the
+/// entry document or an included `<Template src>`) takes the full
+/// teardown+rebuild; a content change re-fires in place.
 pub(crate) fn process_live_reloads(world: &mut World) {
-	let roots = world.with_state::<Query<
-		Entity,
-		(With<LiveReload>, With<NeedsReload>, Without<Reloading>),
-	>, _>(|query| query.iter().collect::<Vec<_>>());
-	for root in roots {
-		world
-			.entity_mut(root)
-			.remove::<NeedsReload>()
-			.insert(Reloading);
-		// a structural change (the entry document or an included `<Template src>`)
-		// needs the full teardown+rebuild; a content change re-fires in place.
-		if world.entity(root).contains::<NeedsEntryRebuild>() {
-			world.entity_mut(root).remove::<NeedsEntryRebuild>();
+	let latched = world
+		.with_state::<Query<(Entity, &NeedsReload), With<LiveReload>>, _>(
+			|query| {
+				query
+					.iter()
+					.map(|(entity, needs)| (entity, needs.structural))
+					.collect::<Vec<_>>()
+			},
+		);
+	for (root, structural) in latched {
+		if subtree_pending(world, root) {
+			continue;
+		}
+		world.entity_mut(root).remove::<NeedsReload>();
+		if structural {
 			rebuild_entry(world, root);
 		} else {
 			reload_site(world, root);
@@ -138,15 +147,29 @@ pub(crate) fn process_live_reloads(world: &mut World) {
 	}
 }
 
+/// Whether any [`TemplatePending`] set on `root` or a descendant is outstanding,
+/// ie a build or reload under this root has not settled yet.
+fn subtree_pending(world: &mut World, root: Entity) -> bool {
+	world
+		.entity_mut(root)
+		.iter_descendents_inclusive()
+		.into_iter()
+		.any(|entity| {
+			world
+				.get::<TemplatePending>(entity)
+				.is_some_and(|pending| !pending.is_empty())
+		})
+}
+
 /// Refresh the world from the site's [`BlobStore`]: re-fire every [`TemplateDir`]
 /// (re-registering its edited templates) and every [`RoutesDir`] (respawning its
 /// route children and rebuilding the route trees), then broadcast [`RELOAD_MESSAGE`]
-/// to connected clients. `root` is the [`LiveReload`] entity carrying the store;
-/// releases its [`Reloading`] guard when done.
+/// to connected clients. `root` is the [`LiveReload`] entity carrying the store.
+/// The respawned dirs park [`TemplatePending`] guards, so
+/// [`process_live_reloads`] defers a follow-up until this reload settles.
 pub fn reload_site(world: &mut World, root: Entity) {
 	if !world.entity(root).contains::<BlobStore>() {
 		warn!("live reload root {root} has no BlobStore");
-		world.entity_mut(root).remove::<Reloading>();
 		return;
 	}
 	// the in-world TUI navigators (no `ClientIo` client) to repaint directly.
@@ -166,7 +189,7 @@ pub fn reload_site(world: &mut World, root: Entity) {
 		// *after* the diagnostics so its freshly-built page is the last render of each
 		// shared node (else the diagnostics' ephemeral cleanup races the repaint and
 		// blanks the live TUI).
-		RoutesDir::settle_all(&world).await?;
+		TemplatePending::settle(&world).await;
 		world.with(|world: &mut World| broadcast_reload(world)).await;
 		log_all_render_diagnostics(&world).await;
 		for navigator in navigators {
@@ -174,21 +197,14 @@ pub fn reload_site(world: &mut World, root: Entity) {
 				error!("live reload repaint failed: {err}");
 			}
 		}
-		// release the guard; a change that landed mid-reload left `NeedsReload`, so
-		// the next tick reloads again.
-		world
-			.with(move |world: &mut World| {
-				world.entity_mut(root).remove::<Reloading>();
-			})
-			.await;
 		Ok(())
 	});
 }
 
 /// Re-register every [`TemplateDir`]'s templates: re-inserting the `TemplateDir`
 /// re-fires its async registration observer, which re-reads the edited sources
-/// through the store. The `TemplatesLoaded` marker is dropped so the re-registration's
-/// completion is observable via [`RoutesDir::settle_all`].
+/// through the store and parks a pending dependency observable via
+/// [`TemplatePending::settle`]. The `TemplatesLoaded` marker is dropped too.
 fn respawn_template_dirs(world: &mut World) {
 	let dirs = world.with_state::<Query<(Entity, &TemplateDir)>, _>(|query| {
 		query
@@ -207,8 +223,8 @@ fn respawn_template_dirs(world: &mut World) {
 
 /// Respawn every [`RoutesDir`]'s route children: re-inserting the `RoutesDir`
 /// re-fires the async discovery observer, which respawns the routes and rebuilds the
-/// tree. The scoped [`BlobStore`] is dropped too, so the rescan's completion (it
-/// re-composes the store) is observable via [`RoutesDir::settle_all`].
+/// tree, parking a pending dependency observable via [`TemplatePending::settle`].
+/// The scoped [`BlobStore`] is dropped too, so the rescan re-composes it fresh.
 fn respawn_routes_dirs(world: &mut World) {
 	let dirs = world.with_state::<Query<(Entity, &RoutesDir)>, _>(|query| {
 		query
@@ -324,7 +340,18 @@ mod test {
 			.find(&["docs"])
 			.xpect_none();
 
-		// mutate the site: a new route, an edited template, a new template
+		// seed a template the mutation below deletes, registered by the first load
+		fs_ext::write(site_dir.join("templates/Gone.bsx"), "<i>gone</i>")
+			.unwrap();
+		reload_site(&mut world, root);
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		world
+			.resource::<BsxTemplateRegistry>()
+			.contains("Gone")
+			.xpect_true();
+
+		// mutate the site: a new route, an edited template, a new template, a
+		// deleted template
 		fs_ext::write(site_dir.join("routes/docs/intro.md"), "# Intro")
 			.unwrap();
 		fs_ext::write(
@@ -334,6 +361,7 @@ mod test {
 		.unwrap();
 		fs_ext::write(site_dir.join("templates/Hero.bsx"), "<h1>hero</h1>")
 			.unwrap();
+		fs_ext::remove(site_dir.join("templates/Gone.bsx")).unwrap();
 		// reload the site (the store read picks up the edits); the async reload then
 		// re-registers templates and respawns the routes, so settle it.
 		reload_site(&mut world, root);
@@ -353,9 +381,11 @@ mod test {
 			.unwrap()
 			.len()
 			.xpect_eq(2);
-		// the registry serves the edited and the new template sources
+		// the registry serves the edited and the new template sources, and the
+		// deleted one unregistered (the owner diff, not an additive re-register)
 		let registry = world.resource::<BsxTemplateRegistry>();
 		registry.contains("Hero").xpect_true();
+		registry.contains("Gone").xpect_false();
 		registry
 			.get("Card")
 			.unwrap()

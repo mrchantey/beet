@@ -18,7 +18,7 @@ Needs `OPENAI_API_KEY` (the agent) and the kokoro `tts` on PATH for spoken audio
 <Fragment>
 	<!-- the agent + fixtures live workspace-relative, so this entry roots there -->
 	<StoreRoot src="../.."/>
-	<CrateCheck features="thread,sockets"/>
+	<CrateCheck features="thread,sockets,extra"/>
 	<Template src="examples/perceive_act/agent.bsx"/>
 	<!-- in-process clients, each its own socket root -->
 	<MockHead url="ws://127.0.0.1:8338"/>

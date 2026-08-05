@@ -10,12 +10,12 @@ struct CheckParams {
 	manifest: Option<String>,
 }
 
-/// Validates a no-code BSX site without rendering it to disk: builds the site
+/// Validates a no-code BSX entry without rendering it to disk: builds the entry
 /// world like [`ExportStatic`], then runs the render-diagnostics pass
 /// over every static route, printing a summary and exiting NON-ZERO if any
 /// error-level diagnostic fired.
 ///
-/// This is the no-code "type-checker": it recovers the guarantees a markup site
+/// This is the no-code "type-checker": it recovers the guarantees a markup entry
 /// loses without a compiler — an unknown `<Tag/>`, a broken internal `href`, an
 /// unknown class — and gates CI on them. With `--manifest` it additionally exports
 /// the *proactive* companion of those checks: a machine-readable
@@ -26,16 +26,15 @@ struct CheckParams {
 /// beet check examples/bsx_site --manifest out.json      # also dump the manifest to a file
 /// beet check examples/bsx_site --manifest=-             # ..or to stdout (then the summary)
 /// ```
-#[action(route = "check/*site", handler_only)]
+#[action(route = "check/*entry", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<CheckParams>())]
 pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<CheckParams>()?;
-	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
 	let root =
-		build_site(&cx.caller, parts.params(), site_dir.clone(), entry).await?;
+		build_entry(&cx.caller, parts.params(), &entry_arg(parts)?).await?;
 	let report = check_routes(&cx.world(), root).await?;
 
 	// surface every diagnostic loudly through the log facade, then summarize.
@@ -62,7 +61,7 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 	}
 }
 
-/// Build the site's [`DiagnosticsManifest`] and write it as pretty JSON to `out`
+/// Build the entry's [`DiagnosticsManifest`] and write it as pretty JSON to `out`
 /// (a file path, or `-` for stdout). Runs in the loaded world so the registries,
 /// `RuleSet` and `RouteTree` are all live.
 async fn write_manifest(world: &AsyncWorld, root: Entity, out: &str) -> Result {

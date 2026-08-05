@@ -73,7 +73,7 @@ impl CliArgs {
 				} else if arg.starts_with('/') {
 					// An absolute path the user typed (eg `beet load /abs/x.json`)
 					// is a single value, not a route: keep it intact so its leading
-					// `/` survives and consumers (`*scene`/`*site` joined by `/`)
+					// `/` survives and consumers (`*scene`/`*entry` joined by `/`)
 					// see it as absolute rather than relative-to-cwd.
 					path.push(arg.into());
 				} else {

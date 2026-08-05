@@ -41,7 +41,7 @@ pub struct CliServer {
 	/// A site's default `CliServer` only acts when `--server` selects `cli`, so
 	/// `--server=http` serves http rather than streaming once to stdout. The
 	/// workspace command entry sets this: it carries no long-running servers, and a
-	/// `--server` on a `beet serve <site>` invocation selects the *site's* servers,
+	/// `--server` on a `beet serve <entry>` invocation selects the *entry's* servers,
 	/// so the command dispatch itself must still run.
 	pub always: bool,
 }

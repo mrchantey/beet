@@ -2,10 +2,10 @@
 # Hello Fargate
 
 Deploys `examples/bsx_site` as an http-only Fargate service. The generic `beet`
-binary runs in the container (`beet serve --server=http`) and reads the site from an
-S3 bucket at request time (`BEET_SERVICE_ACCESS=remote` + `BEET_SITE_BUCKET`), so a
-site change re-publishes by re-running `sync` with no image rebuild. The ALB serves
-http on its own DNS name (no custom domain).
+binary runs in the container and reads the site from an S3 bucket at request time
+(the block bakes `--store=s3://<bucket> --server=http` into the container `CMD`),
+so a site change re-publishes by re-running `sync` with no image rebuild. The ALB
+serves http on its own DNS name (no custom domain).
 
 Unlike the lambda/lightsail blocks (whose binary rides the S3 artifact ledger, so the
 block + build share one entity), fargate bakes the binary into a container image:
@@ -24,14 +24,15 @@ Live deploy needs AWS credentials in the environment, plus `tofu`, `cargo-zigbui
 and a container engine.
 -->
 <StackHost app_name="fargate">
-	<CrateCheck features="infra"/>
+	<CrateCheck features="infra,extra"/>
 	<Route path="deploy" {ExchangeSequence}>
 		<FargateSiteBlock app_name="fargate"/>
 		<SiteBucket/>
 		<BeetBinaryBuild features="aws_sdk"/>
 		<TofuApplyAction/>
-		<!-- bake the freshly built binary into the container image -->
-		<BuildDockerImage cmd_args={["serve", "--server=http", "--path=/"]}/>
+		<!-- bake the freshly built binary into the container image; the block's
+		     runtime args (`--store=s3://<bucket> --server=http`) ride the CMD too -->
+		<BuildDockerImage cmd_args={["serve", "--path=/"]}/>
 		<SiteSync app_name="fargate"/>
 		<FargateWatch app_name="fargate" timeout="300s"/>
 	</Route>

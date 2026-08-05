@@ -66,18 +66,55 @@ pub fn set_scene(
 }
 
 /// Despawn the active scene: trigger [`ResetScene`] then despawn every
-/// [`BeetSceneRoot`] tree, rebuilding the route tree of each server the roots
-/// hung under so the cleared routes drop out of dispatch. A no-op when no scene
-/// is loaded.
+/// [`BeetSceneRoot`] tree and the [`SceneResource`]-backed resources *those roots*
+/// declared (so a rebuild reinserts each fresh from markup rather than patching
+/// stale live state), rebuilding the route tree of each server the roots hung
+/// under so the cleared routes drop out of dispatch. A no-op when no scene is
+/// loaded.
+///
+/// Resource removal is scoped by [`SceneResource::root`], never global: a
+/// non-scene build root (a `serve`/`export-static` entry, which carries no
+/// [`BeetSceneRoot`]) owns its resources for the process lifetime, and must not
+/// lose them when a scene swaps underneath it.
 pub fn despawn_scene(world: &mut World) {
 	let existing = world
 		.query_filtered::<Entity, With<BeetSceneRoot>>()
 		.iter(world)
+		.collect::<HashSet<_>>();
+	// the resources these roots created, plus any whose root is already gone: an
+	// orphan can never be rebuilt from markup, and leaving it live would make the
+	// next build patch a stale resource instead of creating a fresh one.
+	let resources = world
+		.query::<(Entity, &SceneResource)>()
+		.iter(world)
+		.filter(|(_, owned)| {
+			existing.contains(&owned.root)
+				|| world.get_entity(owned.root).is_err()
+		})
+		.map(|(entity, _)| entity)
 		.collect::<Vec<_>>();
-	if existing.is_empty() {
+	if existing.is_empty() && resources.is_empty() {
 		return;
 	}
 	world.trigger(ResetScene);
+	// fully remove each markup-created resource: take the resource component off
+	// its backing entity, discard the `IsResource` caretaker (whose hook cleans
+	// bevy's resource cache; flushed so the queued cleanup lands on a live
+	// entity), then despawn the husk. Bevy warns on despawning a *live* resource
+	// entity, so the caretaker must go first.
+	for entity in resources {
+		use bevy::ecs::resource::IsResource;
+		if let Some(id) = world
+			.entity(entity)
+			.get::<IsResource>()
+			.map(IsResource::resource_component_id)
+		{
+			world.entity_mut(entity).remove_by_id(id);
+		}
+		world.entity_mut(entity).remove::<IsResource>();
+		world.flush();
+		world.entity_mut(entity).despawn();
+	}
 	// the servers the scene was reparented under, captured before despawning so
 	// their route trees can be rebuilt without the now-gone routes.
 	let servers = existing
@@ -144,6 +181,88 @@ mod test {
 
 		let tree = world.entity(server).get::<RouteTree>().unwrap();
 		tree.find(&["ping"]).xpect_some();
+	}
+
+	/// A markup-declared resource is scene-owned: `despawn_scene` removes it
+	/// with the scene, and a rebuild reinserts it fresh from markup (the create
+	/// branch again, not a patch of stale live state).
+	#[beet_core::test]
+	async fn despawn_scene_removes_markup_resources() {
+		// no pre-inserted `PackageConfig` (unlike `test_world`), so the markup
+		// *creates* the resource and owns its lifetime.
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<PackageConfig>();
+		let spawn = |world: &mut World| -> Entity {
+			let nodes = parse_document(
+				r#"<PackageConfig title="Owned"/>"#,
+				&BsxParseConfig::bsx(),
+			)
+			.unwrap();
+			let root = world
+				.spawn_template(BsxTemplate::container(
+					nodes,
+					BsxTemplateRegistry::default(),
+				))
+				.unwrap()
+				.id();
+			world.entity_mut(root).insert(BeetSceneRoot);
+			root
+		};
+		spawn(&mut world);
+		world
+			.resource::<PackageConfig>()
+			.title
+			.as_str()
+			.xpect_eq("Owned");
+		// teardown removes the markup-created resource with the scene
+		despawn_scene(&mut world);
+		world.get_resource::<PackageConfig>().xpect_none();
+		// a rebuild reinserts it fresh from markup
+		spawn(&mut world);
+		world
+			.resource::<PackageConfig>()
+			.title
+			.as_str()
+			.xpect_eq("Owned");
+	}
+
+	/// Resource teardown is scoped to the roots being despawned: a resource
+	/// declared by a build root that is *not* a [`BeetSceneRoot`] (a `serve` /
+	/// `export-static` entry) survives a scene swap. A global sweep would take it,
+	/// leaving the host entry without the config it declared.
+	#[beet_core::test]
+	async fn despawn_scene_keeps_other_roots_resources() {
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<PackageConfig>();
+		// the host entry declares the resource and owns it, with no `BeetSceneRoot`
+		let entry = world
+			.spawn_template(BsxTemplate::container(
+				parse_document(
+					r#"<PackageConfig title="Host"/>"#,
+					&BsxParseConfig::bsx(),
+				)
+				.unwrap(),
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap()
+			.id();
+		world.resource::<PackageConfig>().title.as_str().xpect_eq("Host");
+
+		// a scene loads and is torn down beside it
+		let scene = world.spawn_template(()).unwrap().id();
+		world.entity_mut(scene).insert(BeetSceneRoot);
+		despawn_scene(&mut world);
+
+		// the scene is gone, the entry and its resource are untouched
+		world.get_entity(scene).is_err().xpect_true();
+		world.get_entity(entry).is_ok().xpect_true();
+		world.resource::<PackageConfig>().title.as_str().xpect_eq("Host");
 	}
 
 	/// A pushed scene round-trips: load a scene under a host, mark it

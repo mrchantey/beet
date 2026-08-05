@@ -1,22 +1,20 @@
 //! The Cloudflare Worker entry: a wasm `#[event(fetch)]` that serves the no-code
-//! BSX site from an R2 bucket through the beet render router.
+//! BSX entry from an R2 bucket through the beet render router.
 //!
 //! On each `fetch` the request's [`worker::Env`] is stashed so an
 //! [`R2WorkersStore`] can resolve its live bucket binding, then the per-isolate
 //! [`WorkerWorld`] is built (or reused) and the request is routed through it.
-//! Building reuses the native binary's construction: the same [`build_app`]
-//! ([`BeetPlugins`] + [`WorkersPlugin`]) and the same `read_entry_sources` /
-//! `build_entry_root` core `load_entry` uses, the only difference being that every
-//! store read is awaited rather than blocked on (the Worker runtime is
-//! single-threaded) and the build is lazy on first fetch (the runtime forbids
-//! blocking the JS thread, so the runner cannot drive the build).
+//! Building is the shared core end to end: the same [`build_app`]
+//! ([`BeetPlugins`] + [`WorkersPlugin`]), the same [`probe_entry_names`]
+//! discovery, and the same [`build_entry_owned`] build+settle every world-owning
+//! driver uses. The glue that remains here is genuinely platform-specific: the
+//! env binding to store, the worker request/response conversion, and the
+//! per-isolate world cache with version invalidation.
 //!
-//! The entry's declared `<TemplateDir>` templates register through the store, the
-//! entry builds into a root carrying the site store plus [`DisableCallOnLoad`] (so
-//! its declared servers stay dormant; the Worker itself serves each request), and
-//! the build settles to readiness via [`settle_until_ready`] before
-//! serving. The universal seam is the same `entity.exchange(request) -> Response`
-//! the native servers use.
+//! The entry builds into a root carrying the site store plus
+//! [`DisableCallOnLoad`] (so its declared servers stay dormant; the Worker itself
+//! serves each request). The universal seam is the same
+//! `entity.exchange(request) -> Response` the native servers use.
 
 use crate::prelude::*;
 use beet::prelude::*;
@@ -57,22 +55,26 @@ async fn fetch(
 }
 
 /// Convert the request, route it through the (lazily built, version-checked)
-/// site world, and convert the response back.
+/// entry world, and convert the response back.
 async fn handle(
 	req: WorkerRequest,
 	store: R2WorkersStore,
 ) -> Result<WorkerResponse> {
 	let request = worker_to_request(req).await?;
 
-	// resolve the entry document the same way native discovery does: the first
+	// resolve the entry document through the shared discovery: the first
 	// `ENTRY_NAMES` match present in the bucket.
-	let entry_name = discover_entry_name(&store).await?;
+	let blob_store = BlobStore::new(store.clone());
+	let entry_name =
+		probe_entry_names(&blob_store).await?.ok_or_else(|| {
+			bevyhow!("no entry document {ENTRY_NAMES:?} in the site bucket")
+		})?;
 
 	// take the per-isolate world out so the exchange can borrow it mutably across
 	// the await.
 	let mut worker_world = WorkerWorld::take();
 
-	// rebuild if absent or the bucket's entry version changed (a re-synced site
+	// rebuild if absent or the bucket's entry version changed (a re-synced entry
 	// reflects on the next request).
 	let current_version = head_version(&store, &entry_name).await;
 	let stale = worker_world
@@ -80,8 +82,9 @@ async fn handle(
 		.map(|loaded| loaded.version != current_version)
 		.unwrap_or(true);
 	if stale {
-		worker_world =
-			Some(build_site(store, entry_name, current_version).await?);
+		worker_world = Some(
+			build_worker_world(blob_store, entry_name, current_version).await?,
+		);
 	}
 	let mut worker_world = worker_world.expect("world built above");
 
@@ -99,13 +102,18 @@ async fn handle(
 	worker_response
 }
 
-/// Build the per-isolate site world from R2: take the native binary's [`build_app`]
-/// ([`BeetPlugins`] + [`WorkersPlugin`]), register the entry's templates, build the
-/// entry through the shared `build_entry_root`, settle the build to readiness, and
-/// resolve the host entity. Mirrors the native `load_entry` path, fully async (every
-/// store read awaited, never blocked).
-async fn build_site(
-	store: R2WorkersStore,
+/// Build the per-isolate entry world from R2: take the native binary's
+/// [`build_app`] ([`BeetPlugins`] + [`WorkersPlugin`]) and run the shared
+/// [`build_entry_owned`] build+settle, then resolve the host entity.
+///
+/// The root carries [`DisableCallOnLoad`]: the Worker itself routes each request
+/// through the host's `Router` action via `exchange`, so the servers the entry
+/// declares (`HttpServer`, `TuiServer`, ...) must stay dormant. Without it the
+/// entry's `CallOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
+/// start hits the (wasm-absent) backend and panics. Same suppression
+/// `export-static`/`check` use.
+async fn build_worker_world(
+	store: BlobStore,
 	entry_name: String,
 	version: Option<String>,
 ) -> Result<WorkerWorld> {
@@ -116,35 +124,14 @@ async fn build_site(
 	let mut app = build_app();
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
-
-	// the site store the R2 bucket backs; the entry, `templates/`, `<RoutesDir/>`
-	// and `<Template src>` all resolve through it (composed on the root below).
-	let store = BlobStore::new(store);
-	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	// read the `templates/` and entry document through the store (awaited, never
-	// blocked), then build the entry into a root carrying the site store plus
-	// `DisableCallOnLoad`: the Worker itself routes each request through the host's
-	// `Router` action via `exchange`, so the servers the site's `main.bsx` declares
-	// (`HttpServer`, `TuiServer`, ...) must stay dormant. Without `DisableCallOnLoad`
-	// the entry's `CallOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
-	// start hits the (wasm-absent) backend and panics. Same suppression
-	// `export-static`/`check` use.
-	//
-	// the build's `Insert, RoutesDir` observer queues the route discovery (a store
-	// scan) as an async task, settled below before the host is served.
-	let sources = read_entry_sources(&store, formats, entry_name).await?;
-	build_entry_root(&mut world, store, sources, DisableCallOnLoad)?;
-	// settle until the entry is ready to serve (not just until idle): the
-	// `<RoutesDir>`/`<TemplateDir>` scans land before the host is queried and served,
-	// so a multi-route site never serves a 404 for a route that has not discovered yet.
-	settle_until_ready(&mut world).await;
+	build_entry_owned(&mut world, store, entry_name, DisableCallOnLoad).await?;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world
 		.query_filtered::<Entity, With<Router>>()
 		.iter(&world)
 		.next()
-		.ok_or_else(|| bevyhow!("no `Router` host found in loaded site"))?;
+		.ok_or_else(|| bevyhow!("no `Router` host found in loaded entry"))?;
 
 	WorkerWorld {
 		world,
@@ -152,18 +139,6 @@ async fn build_site(
 		version,
 	}
 	.xok()
-}
-
-/// Resolve the entry document name in the bucket: the first [`ENTRY_NAMES`] match
-/// present, matching the native binary's discovery order. Errors with the searched
-/// list if none exist (an empty / mis-synced bucket).
-async fn discover_entry_name(store: &R2WorkersStore) -> Result<String> {
-	for name in ENTRY_NAMES {
-		if store.exists(&SmolPath::from(*name)).await? {
-			return name.to_string().xok();
-		}
-	}
-	bevybail!("no entry document {ENTRY_NAMES:?} in the site bucket")
 }
 
 /// The R2 object version of `path`, used as the rebuild marker. Returns `None`

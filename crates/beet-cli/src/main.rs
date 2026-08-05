@@ -17,69 +17,74 @@
 //! `--features=a,b` verifies the running binary was compiled with those cargo
 //! features (see [`CrateCheck`]), failing fast with the full missing list.
 //!
-//! The entry load is target-agnostic (the shared `site_build` core reads any
-//! [`BlobStore`]); only entry *resolution* differs by target. Native walks the
-//! filesystem for `main.bsx` (or honours `--main`) and selects an `fs`/`memory`
-//! store; wasm has no filesystem walk, so it requires an explicit `--main` (the same
-//! `fs`/`memory` store, the `fs` store reading through the deno runner's fs globals),
-//! and is driven by `run_async` (native `run()` busy-waits on the JS event loop). The
-//! dev-command, winit-render and remote/S3 paths are native-only.
+//! The entry load is target-agnostic (the shared `entry_build` core reads any
+//! [`BlobStore`]); only entry *resolution* differs by target where the platform
+//! genuinely differs: a runtime with a filesystem (native, deno/node through the
+//! runner's fs globals) walks for `main.bsx` or honours `--main`; a browser reads
+//! its DOM program; a fs-less runtime needs a self-rooted `--store`
+//! (`s3://<bucket>`, `local-storage`, `indexed-db`). The dev-command and
+//! winit-render paths are native-only.
 use beet::prelude::*;
-// `ENTRY_NAMES` (the entry-document name list discovery looks for) and `resolve_store`
-// (the `--store` backend selector) are shared with the `check`/`serve`/`export-static`
-// commands, so they live in the lib's `site_build` module rather than here.
+// `ENTRY_NAMES` (the entry-document name list discovery looks for), `resolve_main`
+// and `resolve_store` (the `--store` backend selector) are shared with the
+// `check`/`serve`/`export-static` commands, so they live in the lib's
+// `entry_build` module rather than here.
 use beet_cli::prelude::*;
-
-// the wasm `beet` binary: the same unopinionated entry load as native, driven by
-// `run_async` on the JS event loop (native `run()` busy-waits there and would block
-// it). It requires an explicit `--main` + `--store` (default `fs`): there is no
-// filesystem ancestor walk to discover an entry, and no winit/dev-command/remote
-// surface (all native-only). The entry's own `CallOnLoad`/`CliServer` drives output
-// and writes `AppExit`, which `AppExitPlugin` turns into `Deno.exit`.
-#[cfg(target_arch = "wasm32")]
-fn main() {
-	console_error_panic_hook::set_once();
-	let mut app = App::new();
-	app.add_plugins(BeetPlugins)
-		.add_systems(Startup, load_entry);
-	// spawn the runner on the JS loop and detach; the Deno runner's `loop_forever`
-	// holds the process open until the entry writes `AppExit`.
-	async_ext::spawn_local(async move {
-		let _ = app.run_async().await;
-	})
-	.detach();
-}
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> AppExit {
 	// load any local `.env` (eg `BEET_REMOTE_URL`) before the app starts.
 	env_ext::load_dotenv();
+	build_app().run()
+}
 
-	App::new()
-		.add_plugins((
-			// the trusted defaults: the runner (the headless 30Hz loop here), beet's
-			// logging, the async runtime, and the router/scene/server + native terminal
-			// capabilities, all selected by feature flag.
-			BeetPlugins,
-			// the windowed render path's window lifecycle + screenshot harness. The
-			// facade's `BeetPlugins` links winit windowless (a capability, not a window);
-			// the binary owns the lifecycle (continuous updates, escape/close-to-exit,
-			// `BEET_SCREENSHOT` capture), so a data-spawned `<Window/>` appears and a
-			// headless `.bsx` keeps running under the render binary.
-			#[cfg(feature = "winit")]
-			render_window_plugin,
-			// the native-only dev-command capabilities, linked as registered types and
-			// inert until a `main.bsx` names them.
-			CliCommandsPlugin,
-		))
-		.add_systems(
-			Startup,
-			// the process exits when `boot` writes `AppExit` for the one-shot it
-			// resolves; a long-running server parks its boot call, so its unresolved
-			// `Running<Response>` persists the process with no refcount
-			load_entry,
-		)
-		.run()
+// the wasm entry is the exported [`start`] below, awaited explicitly by the
+// host; `main` boots nothing, so nothing runs as a side effect of module init.
+// It does install the panic hook, which wasm-bindgen calls during `init()`, so a
+// panic *before* the host reaches `start` still reports rather than aborting mute.
+#[cfg(target_arch = "wasm32")]
+fn main() { console_error_panic_hook::set_once(); }
+
+/// The wasm start fn, exported for the host to await: the same app body as
+/// native, driven by `run_async` (native `run()` would busy-wait the JS event
+/// loop), resolving to the process exit code. The deno runner (`deno.ts`)
+/// awaits it and `Deno.exit`s with the code; the browser's `<Wasm>` loader
+/// awaits a future that simply never resolves for a long-running program.
+///
+/// Optional from the host's side: both loaders call it only if the module
+/// exports it, so they stay general wasm runners (a module without one boots
+/// from its own `main` and terminates through the `exit` global).
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub async fn start() -> i32 {
+	// idempotent: `main` already set it during `init()`.
+	console_error_panic_hook::set_once();
+	build_app().run_async().await.exit_code()
+}
+
+/// The one app body every target runs: the trusted defaults ([`BeetPlugins`]:
+/// the runner, beet's logging, the async runtime, and the router/scene/server
+/// capabilities selected by feature flag), the native-only extras where
+/// compiled, and the entry loader at `Startup`. The process exits when the
+/// loaded tree writes `AppExit` for the one-shot it resolves; a long-running
+/// server parks its boot call, so its unresolved `Running<Response>` persists
+/// the process with no refcount.
+fn build_app() -> App {
+	let mut app = App::new();
+	app.add_plugins(BeetPlugins);
+	// the windowed render path's window lifecycle + screenshot harness. The
+	// facade's `BeetPlugins` links winit windowless (a capability, not a window);
+	// the binary owns the lifecycle (continuous updates, escape/close-to-exit,
+	// `BEET_SCREENSHOT` capture), so a data-spawned `<Window/>` appears and a
+	// headless `.bsx` keeps running under the render binary.
+	#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
+	app.add_plugins(render_window_plugin);
+	// the native-only dev-command capabilities, linked as registered types and
+	// inert until a `main.bsx` names them.
+	#[cfg(not(target_arch = "wasm32"))]
+	app.add_plugins(CliCommandsPlugin);
+	app.add_systems(Startup, load_entry);
+	app
 }
 
 /// `Startup`: resolve the entry store + name and build the entry, all on the async
@@ -90,8 +95,8 @@ fn main() -> AppExit {
 /// where the `CallOnLoad` verb fans the process request out to the entry's servers.
 /// The app then stays alive until something writes `AppExit`, so nothing is held by
 /// hand here. A failed resolve/build logs and exits with an error rather than
-/// panicking. Target-agnostic: native and wasm build the same way, differing only in
-/// how [`resolve_entry`] finds the store (a filesystem walk vs an explicit `--main`).
+/// panicking. Target-agnostic: every runtime builds the same way, differing only
+/// in how [`resolve_entry`] finds the store.
 fn load_entry(world: &mut World) {
 	// the binary consumes only its own args here; the loaded tree re-parses argv.
 	let args = CliArgs::parse_env();
@@ -147,16 +152,6 @@ async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 	Ok(())
 }
 
-/// A resolved entry: its store, the entry document name within it, and the local
-/// dir to watch for live reload (`None` for a remote entry, and always `None` on
-/// wasm, where there is no local-dev watch path).
-struct ResolvedEntry {
-	store: BlobStore,
-	entry_name: String,
-	#[cfg(not(target_arch = "wasm32"))]
-	watch_dir: Option<AbsPathBuf>,
-}
-
 /// Build the resolved entry on the async runtime: register the entry's `templates/`
 /// and read the entry document through the store (awaited, not blocked), then build
 /// it into a root carrying the store so `<RoutesDir>` and `<Template src>` resolve
@@ -196,9 +191,10 @@ async fn build_entry(
 }
 
 /// The `--watch` entry build (native-only): install the live-reload driver
-/// ([`EntryReloader`]) with the entry's structural source set (the entry document
-/// and its transitive `<Template src>` includes), then do the first build through
-/// the same [`rebuild_watched_entry`] path a structural change re-runs.
+/// ([`EntryReloader`]), then do the first build through the same
+/// [`rebuild_watched_entry`] path a structural change re-runs (which also
+/// recomputes the structural source set — the entry document and its transitive
+/// `<Template src>` includes — per build).
 ///
 /// So editing the entry document or an included `<Template src>` tears the old
 /// scene down and rebuilds it with no leaked entities (servers rebind, sockets
@@ -210,10 +206,9 @@ async fn build_watched_entry(
 	entry_name: String,
 	formats: TemplateFormats,
 ) -> Result {
-	// the structural sources whose change triggers a full rebuild (entry + includes).
-	let sources = entry_source_paths(&store, &entry_name).await;
 	// the driver's rebuild callback, re-cloning the store/name/formats per build
-	// (it is an `Fn`, re-run on every structural change).
+	// (it is an `Fn`, re-run on every structural change). The structural source
+	// set starts empty; the first build below populates it.
 	let rebuild = {
 		let store = store.clone();
 		let entry_name = entry_name.clone();
@@ -228,7 +223,7 @@ async fn build_watched_entry(
 	};
 	world
 		.with(move |world: &mut World| {
-			world.insert_resource(EntryReloader::new(sources, rebuild));
+			world.insert_resource(EntryReloader::new(default(), rebuild));
 		})
 		.await;
 	// the first build: a no-op teardown, then the fresh `BeetSceneRoot`.
@@ -236,91 +231,71 @@ async fn build_watched_entry(
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the
-/// local directory to watch for dev live reload (`None` when there is no local dir,
-/// ie a remote entry).
+/// local directory to watch for dev live reload (`None` when there is no local
+/// dir, ie a self-rooted store).
 ///
 /// Resolution order:
-/// 1. `BEET_SERVICE_ACCESS=remote` (a deployed task): load from a remote store. The
-///    remote-access concept is general, but only a compiled-in backend can serve it
-///    (`aws_sdk` → S3/R2); without one this errors rather than falling through.
+/// 1. a self-rooted `--store` (`s3://<bucket>`, `local-storage`, `indexed-db`):
+///    the store roots itself, so `--main` names the entry document *within* it,
+///    defaulting to an [`ENTRY_NAMES`] probe. A deployed task passes
+///    `--store=s3://<bucket>` (deploy config as args, not env).
 /// 2. `--main=<path>`: the entry file itself (a recognized extension) or a
 ///    directory probed for [`ENTRY_NAMES`]; see [`resolve_main`].
-/// 3. otherwise: discovery walks the cwd and its ancestors through an `fs` store for
-///    the first [`ENTRY_NAMES`] match.
+/// 3. otherwise: discovery walks the cwd and its ancestors through an `fs` store
+///    for the first [`ENTRY_NAMES`] match.
 ///
-/// A local entry may widen its own store root with a `<StoreRoot src>` declaration
-/// (a remote store is already rooted at the site). The `--store` arg selects the
-/// backend (default `fs`); see [`resolve_store`] for the supported kinds.
-#[cfg(not(target_arch = "wasm32"))]
+/// A dir-rooted entry may widen its own store root with a `<StoreRoot src>`
+/// declaration (a self-rooted store is already rooted at the site). The `--store`
+/// arg selects the backend (default `fs`); see [`resolve_store`].
+///
+/// Target-agnostic: wasm runs the same walk wherever the runtime has a
+/// filesystem (deno/node through the runner's fs globals); a fs-less runtime
+/// errors with guidance (the browser never reaches here, reading its DOM program
+/// instead).
 async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
-	resolve_entry_native(args).await
-}
+	// the wasm runner forwards the *module's* flags on this same argv, so a
+	// `beet run-wasm <module> --main=<wasm-entry> --store=fs ...` invocation
+	// carries a `--main`/`--store` meant for the wasm module, not this native
+	// runner. When acting as the runner (first positional `run-wasm`), ignore them
+	// and discover the workspace command entry; the `<RunWasm/>` route forwards the
+	// flags on to the module via `Deno.args`.
+	let is_wasm_runner =
+		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
 
-/// Resolve the entry on wasm: there is no filesystem ancestor walk and no remote
-/// backend, so `--main` is required and `--store` (default `fs`) picks the backend.
-/// The same file-or-directory resolution as native ([`resolve_main`]); the `fs`
-/// store reads through the deno runner's fs globals (see [`resolve_store`]), so
-/// the same on-disk entry loads.
-#[cfg(target_arch = "wasm32")]
-async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
-	let main = args.params.get("main").ok_or_else(|| {
-		bevyhow!(
-			"the wasm `beet` binary requires an explicit `--main=<path>` (there is \
-			no filesystem entry discovery on wasm)"
-		)
-	})?;
-	resolve_main(&args.params, main).await
-}
+	// a self-rooted store: no local dir, no ancestor walk, no watch dir.
+	if !is_wasm_runner && store_is_self_rooted(&args.params) {
+		let store = resolve_store(&args.params, AbsPathBuf::new(".")?)?;
+		let entry_name = match args.params.get("main") {
+			Some(main) => main.to_string(),
+			None => probe_entry_names(&store).await?.ok_or_else(|| {
+				bevyhow!(
+					"no entry document found in the `--store` backend: looked \
+					for {ENTRY_NAMES:?}. Seed one, or pass `--main=<name>`."
+				)
+			})?,
+		};
+		return Ok(ResolvedEntry {
+			store,
+			entry_name,
+			#[cfg(not(target_arch = "wasm32"))]
+			watch_dir: None,
+		});
+	}
 
-/// Resolve an explicit `--main`: a path with an extension names the entry file
-/// itself, anything else is a directory probed for the first [`ENTRY_NAMES`]
-/// match. Either way the entry may widen its own store root with a
-/// `<StoreRoot src>` declaration (see [`widen_store_root`]).
-async fn resolve_main(
-	params: &MultiMap<SmolStr, SmolStr>,
-	main: &SmolStr,
-) -> Result<ResolvedEntry> {
-	let path = AbsPathBuf::new(main.as_str())?;
-	let (dir, entry_name) = if path.extension().is_some() {
-		// an entry file: its parent is the initial root
-		let dir = path.parent().ok_or_else(|| {
-			bevyhow!("entry `{path}` has no parent directory")
-		})?;
-		let entry_name = path
-			.file_name()
-			.and_then(|name| name.to_str())
-			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
-			.to_string();
-		(dir, entry_name)
-	} else {
-		// a directory: probe it for an entry document
-		let store = resolve_store(params, path.clone())?;
-		let entry_name = probe_entry_names(&store).await?.ok_or_else(|| {
-			bevyhow!(
-				"no entry document found in `{path}`: looked for {ENTRY_NAMES:?}. \
-				Create one, or point `--main` at the entry file itself."
-			)
-		})?;
-		(path, entry_name)
-	};
-	resolve_widened(params, dir, entry_name).await
-}
-
-/// [`widen_store_root`] into a [`ResolvedEntry`], live reload watching the
-/// resolved root.
-async fn resolve_widened(
-	params: &MultiMap<SmolStr, SmolStr>,
-	dir: AbsPathBuf,
-	entry_name: String,
-) -> Result<ResolvedEntry> {
-	let (store, entry_name, _root) =
-		widen_store_root(params, dir, entry_name).await?;
-	Ok(ResolvedEntry {
-		store,
-		entry_name,
-		#[cfg(not(target_arch = "wasm32"))]
-		watch_dir: Some(_root),
-	})
+	// dir-rooted: an explicit `--main`, else the ancestor walk. On wasm the `fs`
+	// store reads through the runner's fs globals, so a fs-less runtime cannot
+	// resolve a dir-rooted entry at all.
+	#[cfg(target_arch = "wasm32")]
+	if !js_runtime::environment().has_fs() {
+		bevybail!(
+			"this runtime has no filesystem: pass a self-rooted `--store` \
+			(s3://<bucket>, local-storage, indexed-db)"
+		);
+	}
+	match args.params.get("main").filter(|_| !is_wasm_runner) {
+		Some(main) => resolve_main(&args.params, main.as_str()).await,
+		None => discover_entry(&args.params).await,
+	}
 }
 
 /// The `--features` flag as a [`CrateCheck`]: verify this binary was compiled
@@ -341,95 +316,11 @@ fn features_self_check(args: &CliArgs) -> Option<CrateCheck> {
 		.map(|features| CrateCheck::features(features.join(",")))
 }
 
-/// The native entry resolution: a remote store, an explicit `--main`, or a
-/// filesystem ancestor walk; see [`resolve_entry`].
-#[cfg(not(target_arch = "wasm32"))]
-async fn resolve_entry_native(args: &CliArgs) -> Result<ResolvedEntry> {
-	// remote: load the whole entry from the store the deploy injected; there is no
-	// local directory to watch. The concept is feature-agnostic, only the backend is
-	// gated, so an unmatched remote-access request errors with guidance.
-	if remote_access() {
-		#[cfg(feature = "aws_sdk")]
-		{
-			let (store, entry_name) = remote_entry_store()?;
-			return Ok(ResolvedEntry {
-				store,
-				entry_name,
-				watch_dir: None,
-			});
-		}
-		#[cfg(not(feature = "aws_sdk"))]
-		bevybail!(
-			"BEET_SERVICE_ACCESS=remote but no remote store backend is compiled in \
-			(enable the `aws_sdk` feature)"
-		);
-	}
-
-	// the wasm runner forwards the *module's* flags on this same argv, so a
-	// `beet run-wasm <module> --main=<wasm-entry> --store=fs ...` invocation
-	// carries a `--main`/`--store` meant for the wasm module, not this native
-	// runner. When acting as the runner (first positional `run-wasm`), ignore them
-	// and discover the workspace command entry; the `<RunWasm/>` route forwards the
-	// flags on to the module via `Deno.args`.
-	let is_wasm_runner =
-		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
-
-	// local: the binary's own `--main` overrides discovery, otherwise discovery walks
-	// for the dir + entry name. Either way the `--store` arg picks the backend.
-	match args.params.get("main").filter(|_| !is_wasm_runner) {
-		Some(main) => resolve_main(&args.params, main).await,
-		None => discover_entry(&args.params).await,
-	}
-}
-
-/// Whether the runtime should access services remotely (the deployed task), read
-/// from `BEET_SERVICE_ACCESS`. Feature-agnostic: a remote backend (eg `aws_sdk`'s
-/// S3) is gated separately, since there are non-S3 reasons to access remotely.
-#[cfg(not(target_arch = "wasm32"))]
-fn remote_access() -> bool {
-	env_ext::var("BEET_SERVICE_ACCESS")
-		.map(|value| value.eq_ignore_ascii_case("remote"))
-		.unwrap_or(false)
-}
-
-/// A [`BlobStore`] backed by the deploy's S3 entry bucket (`BEET_SITE_BUCKET`); the
-/// entry document is `BEET_SITE_ENTRY` (default `main.bsx`) at the bucket root. It is
-/// deploy config, not discovery, since a remote task has no local `main.bsx` to walk
-/// to.
-///
-/// An explicit `BEET_S3_ENDPOINT` (eg `https://<account>.r2.cloudflarestorage.com`)
-/// switches the store onto an S3-compatible service such as Cloudflare R2: the
-/// region becomes `auto`, path-style addressing is used, and the same `AWS_*`
-/// keys carry the R2 credentials. Unset, it reads AWS S3 in `AWS_REGION`. So one
-/// container binary serves identically on Fargate (S3) and Cloudflare (R2).
-#[cfg(feature = "aws_sdk")]
-fn remote_entry_store() -> Result<(BlobStore, String)> {
-	let bucket = env_ext::var("BEET_SITE_BUCKET").map_err(|_| {
-		bevyhow!("BEET_SERVICE_ACCESS=remote but BEET_SITE_BUCKET is unset")
-	})?;
-	let store = match env_ext::var("BEET_S3_ENDPOINT") {
-		Ok(endpoint) => {
-			info!("loading entry from r2/s3 bucket `{bucket}` ({endpoint})");
-			S3Store::new(bucket, "auto").with_endpoint(endpoint)
-		}
-		Err(_) => {
-			let region = env_ext::var("AWS_REGION")
-				.unwrap_or_else(|_| "us-west-2".to_string());
-			info!("loading entry from s3 bucket `{bucket}` ({region})");
-			S3Store::new(bucket, region)
-		}
-	};
-	let entry_name = env_ext::var("BEET_SITE_ENTRY")
-		.unwrap_or_else(|_| "main.bsx".to_string());
-	Ok((BlobStore::new(store), entry_name))
-}
-
 /// Walk the cwd and its ancestors for the first [`ENTRY_NAMES`] match, resolving
 /// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
-/// API and async, rather than a raw `fs_ext` probe). Discovery is the only native
-/// place a filesystem walk makes sense; the matched entry may still widen its own
+/// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
+/// a filesystem walk makes sense; the matched entry may still widen its own
 /// root ([`widen_store_root`]), and no match errors with guidance.
-#[cfg(not(target_arch = "wasm32"))]
 async fn discover_entry(
 	params: &MultiMap<SmolStr, SmolStr>,
 ) -> Result<ResolvedEntry> {

@@ -438,6 +438,32 @@ mod test {
 		meta.matches::<i32, i32>().xpect_true();
 	}
 
+	/// The capability-rebind shape: removing a provider's required action then
+	/// inserting a replacement hands the slot over rather than raising, and the
+	/// meta describes the replacement.
+	#[beet_core::test]
+	fn remove_then_insert_replaces_provider_action() {
+		let mut world = World::new();
+		let entity = world.spawn(Provider).id();
+		world.flush();
+		world.entity_mut(entity).remove::<Action<u32, u32>>();
+		world.flush();
+		// the removal really vacated the slot (a `#[require]` only materializes
+		// at provider insertion, never re-inserts).
+		world
+			.entity(entity)
+			.contains::<Action<u32, u32>>()
+			.xpect_false();
+		world.get::<ActionMeta>(entity).xpect_none();
+		world.entity_mut(entity).insert(increment());
+		world.flush();
+		world
+			.get::<ActionMeta>(entity)
+			.unwrap()
+			.name()
+			.xpect_contains("increment");
+	}
+
 	/// A colocated explicit action wins over the provider's `#[require]`, leaving
 	/// one truthful action behind, which only guard B can see.
 	#[beet_core::test]

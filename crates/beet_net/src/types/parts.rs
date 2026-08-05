@@ -426,7 +426,7 @@ impl From<CliArgs> for RequestParts {
 	fn from(cli: CliArgs) -> Self {
 		// `cli.path` segments are carried verbatim, so an absolute-path positional
 		// (kept whole with its leading `/` by `CliArgs::parse_tokens`) round-trips
-		// as absolute: a `*scene`/`*site` wildcard rejoins it to `/abs/...` rather
+		// as absolute: a `*scene`/`*entry` wildcard rejoins it to `/abs/...` rather
 		// than a cwd-relative path. See `parts.rs`'s `absolute_positional_round_trips`.
 		let url = Url::new(Scheme::None, None, cli.path, cli.params, None);
 		RequestParts {

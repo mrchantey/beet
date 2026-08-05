@@ -29,16 +29,21 @@ pub fn site_bucket_name(stack: &Stack) -> String {
 	site_bucket().store(stack).bucket_name().to_string()
 }
 
-/// The env the deployed generic `beet` binary needs to serve the site from the
-/// bucket: `BEET_SERVICE_ACCESS=remote` selects the remote store, `BEET_SITE_BUCKET`
-/// names it, and `BEET_SERVER=http` constrains the boot to the http transport (a
-/// deployed binary is launched with no `--server` arg).
-pub fn remote_env(bucket_name: impl Into<SmolStr>) -> Vec<Variable> {
-	vec![
-		Variable::fixed("BEET_SERVICE_ACCESS", "remote"),
-		Variable::fixed("BEET_SITE_BUCKET", bucket_name),
-		Variable::fixed("BEET_SERVER", "http"),
-	]
+/// The self-rooted entry-store arg for a deployed site bucket:
+/// `--store=s3://<bucket>` (the entry document is probed at the bucket root).
+/// Deploy config rides argv, not env; each block converts at its platform
+/// boundary (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
+/// `bootstrap` script).
+pub fn store_arg(bucket_name: impl AsRef<str>) -> SmolStr {
+	format!("--store=s3://{}", bucket_name.as_ref()).into()
+}
+
+/// The args the deployed generic `beet` binary is launched with to serve the
+/// site from the bucket: [`store_arg`] plus `--server=http`, constraining the
+/// boot to the http transport. A deploy serving more transports passes
+/// [`store_arg`] and its own `--server` selection instead.
+pub fn remote_args(bucket_name: impl AsRef<str>) -> Vec<SmolStr> {
+	vec![store_arg(bucket_name), "--server=http".into()]
 }
 
 /// Shared `CargoBuild` for the generic `beet` binary; callers pick the terminal

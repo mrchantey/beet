@@ -16,7 +16,7 @@ name = "beet"
 path = "src/main.rs"
 
 [features]
-## All features added/removed here must be reflected in `crates/beet-cli/src/site_build.rs crate_registration!`
+## All features added/removed here must be reflected in `crates/beet-cli/src/entry_build.rs crate_registration!`
 default = ["qrcode", "net", "tui", "ssh", "thread", "pdf"]
 qrcode = ["dep:qrcode", "dep:image"]
 # Offline geoip country lookup for analytics, so a served/deployed site derives a
@@ -28,22 +28,27 @@ geoip = ["beet/geoip"]
 # prints into one document. Optional so a build that only emits separate
 # per-route PDFs (or skips the command) never links `lopdf`.
 pdf = ["dep:lopdf"]
+# The `beet_extra` example capabilities (`BeetExtraPlugin`): the example
+# actions/tools/templates the demo `.bsx` entries name (eg `<CalculatorToolset/>`,
+# `<StackHost>`, the perceive-act agent). Explicit opt-in: `thread`/`infra` link
+# their runtimes without it, and a demo entry declares
+# `<CrateCheck features="..,extra"/>`. The facade's `thread`/`infra` weakly
+# forward the matching `beet_extra` sub-feature, so co-enabling this lights the
+# relevant example set up.
+extra = ["beet/extra"]
 # The agent-thread runtime + its charcell chat UI, so a `main.bsx` declaring a
 # `<Thread>` chat (eg `examples/thread/chat.bsx`) loads and runs through the one
 # `beet` binary. Pulls `beet/ui` so `ThreadUiPlugin` (the `ThreadView` document
-# chain) and the charcell host are present; `beet/extra` adds `BeetExtraPlugin` and
-# `beet/thread` forwards `beet_extra/thread` (the `ThreadExamplesPlugin` runtime +
-# inline tool types) and `beet_extra/scripting` (the QuickJS scripting example) so
-# the example `.bsx` tags resolve.
-thread = ["beet/thread", "beet/ui", "beet/extra"]
-# The cloudflare/aws deploy examples, so one `beet` binary runs an infra deployer
-# `.bsx` (eg `examples/infra/cloudflare_workers.bsx deploy`). Pulls
-# `beet/cloudflare_block` (the deploy blocks + route actions); `beet/extra` adds
-# `BeetExtraPlugin` and `beet/infra` forwards `beet_extra/infra` (the
-# `InfraExamplesPlugin` templates) so the example `.bsx` tags resolve. Opt-in (like
-# `winit`), so a plain `beet serve` never links the deploy machinery. Run with:
-# `cargo run -p beet-cli --features infra -- --main=examples/infra/cloudflare_workers.bsx deploy`.
-infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/extra"]
+# chain) and the charcell host are present. Example tools (eg the `tool_call`
+# demo's inline tool) ride the separate `extra` feature.
+thread = ["beet/thread", "beet/ui"]
+# The cloudflare/aws deploy blocks + route actions, so one `beet` binary runs an
+# infra deployer `.bsx` (eg `examples/infra/cloudflare_workers.bsx deploy`).
+# Opt-in (like `winit`), so a plain `beet serve` never links the deploy
+# machinery. The example deploy templates (`<StackHost>`, `<SiteBucket>`, ...)
+# ride the separate `extra` feature. Run with:
+# `cargo run -p beet-cli --features infra,extra -- --main=examples/infra/cloudflare_workers.bsx deploy`.
+infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
 # `beet/examples` (winit + bevy_default + spatial + `extra`), so `BeetPlugins` adds
@@ -85,9 +90,9 @@ tui = ["beet/tui_server"]
 # --server=http,ssh` serves http and an ssh terminal from one process. Registers
 # the markup-declarable `SshTuiServer` via `SshTuiPlugin`.
 ssh = ["tui", "beet/ssh_tui"]
-# S3-backed stores, so a deployed `beet serve` task loads its site (`main.bsx`,
+# S3-backed stores, so a deployed `beet` task loads its entry (`main.bsx`,
 # `routes/`, `templates/`) from an S3 bucket instead of the local filesystem,
-# selected at runtime by `BEET_SERVICE_ACCESS=remote`. Adds no deploy/terraform
+# selected at runtime by `--store=s3://<bucket>`. Adds no deploy/terraform
 # machinery, keeping the container binary lean.
 aws_sdk = ["beet/aws_sdk"]
 # The AWS Lambda backend: builds the generic `beet` binary as a `provided.al2023`
@@ -111,10 +116,10 @@ cloudflare = ["beet/cloudflare", "dep:worker"]
 # --no-default-features --features web --profile wasm-release`.
 web = ["beet/web"]
 # The browser-wasm target plus the wasm-safe action/behaviour/utility-AI example
-# types (`ActionExamplesPlugin` via `beet/extra`), so the browser binary runs the
+# types (`ActionExamplesPlugin` via `extra`), so the browser binary runs the
 # richer `examples/action/*.bsx` programs (eg malenia.bsx), not just the
 # Sequence/Log core. Stays wasm-clean: `beet/extra` pulls no winit/wgpu/bevy_default.
-web_examples = ["web", "beet/extra"]
+web_examples = ["web", "extra"]
 # The browser-wasm target plus the perceive-act wasm head (`<WebHead>` + its webcam /
 # speech / face handlers, via `beet/perceive_act_web`), so the browser binary serves as
 # the perceive-act head client (v3). Wasm-safe: no `thread` (the native LLM agent runs in
@@ -178,6 +183,11 @@ image = { version = "0.25", optional = true }
 beet = { workspace = true, features = ["router"] }
 worker = { workspace = true, optional = true }
 console_error_panic_hook = { workspace = true }
+# the binary's exported async `start` entry the host (deno.ts / the browser
+# `<Wasm>` loader) awaits for the exit code; `-futures` bridges the async fn
+# into the returned JS promise.
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
 # force getrandom's `wasm_js` (WebCrypto) backend into the graph: fastrand/ahash
 # pull getrandom 0.3, which has no default wasm backend (see the `getrandom_backend`
 # cfg in `.cargo/config.toml`).

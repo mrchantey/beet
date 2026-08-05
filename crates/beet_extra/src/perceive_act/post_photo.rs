@@ -8,9 +8,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// The camera actor's behavior: rotate the scene if due (appending a new character as a
-/// user turn), capture a photo, post it as this actor's turn, and stub older photos to
-/// text so the request stays bounded.
+/// The camera actor's behavior: capture a photo, post it as this actor's turn, and
+/// stub older photos to text so the request stays bounded. Scene rotation is its
+/// own preceding step ([`RotateScene`](super::RotateScene)).
 ///
 /// Spread onto a `User`-kind `<CreateActor>` before the agent actor, so each
 /// `Sequence` iteration begins with a fresh photo in the window as a user-role
@@ -49,9 +49,6 @@ pub struct CycleClock {
 }
 
 async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
-	// rotate to a new scene if due (appending its character as a user turn) before this
-	// cycle's photo; on the first cycle this applies the initial scene.
-	super::maybe_rotate_scene(&cx.caller).await?;
 	let config = cx.caller.get_cloned::<PostPhoto>().await?;
 	let started = Instant::now();
 	// capture through the router: a bound head serves it, else the local handler.

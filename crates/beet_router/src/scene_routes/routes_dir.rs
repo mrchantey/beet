@@ -47,15 +47,13 @@ impl RoutesDir {
 	/// store-less app is an error (never an implicit filesystem store, which has none
 	/// on wasm).
 	///
-	/// The route children appear a few async ticks after the insert, so when the
-	/// `RoutesDir` is built into a template (an entry's `<RoutesDir>`) the scan parks a
-	/// [`PendingId`] on the build root, deferring its [`LoadTemplate`] until the routes
-	/// are spawned. So a load verb (`CallOnLoad`) under the entry root only fans the
-	/// request out once every discovered route exists, exactly as the asset / scene
-	/// deferrals gate it (see [`drain_pending_dependencies`]). A `RoutesDir` inserted
-	/// outside a build (no [`TemplateBuildRoot`]) gates nothing; a top-level driver
-	/// settles it instead (the Worker / tests await
-	/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner)).
+	/// The route children appear a few async ticks after the insert, so the scan
+	/// parks a [`PendingGuard`] on the build root (or on this entity outside a
+	/// build), deferring [`LoadTemplate`] until the routes are spawned. So a load
+	/// verb (`CallOnLoad`) under the entry root only fans the request out once
+	/// every discovered route exists, exactly as the asset / scene deferrals gate
+	/// it, and a settle ([`TemplatePending::settle`]) waits on the same set
+	/// wherever the dir was inserted.
 	pub fn spawn_on_insert(
 		ev: On<Insert, RoutesDir>,
 		dirs: Query<&RoutesDir>,
@@ -64,155 +62,68 @@ impl RoutesDir {
 	) -> Result {
 		let entity = ev.entity;
 		let src = SmolPath::from(dirs.get(entity)?.src.as_str());
-		// when built into a template, park a pending dependency on the build root so its
-		// `LoadTemplate` (and any boot verb on it) waits for the routes. Queued so it
-		// registers ahead of the build's synchronous drain, like the scene-ready gate.
-		let gate = build_root.map(|root| **root);
-		if let Some(root) = gate {
-			commands.queue(move |world: &mut World| {
-				let id = world
-					.entity_mut(root)
-					.entry::<TemplatePending>()
-					.or_default()
-					.get_mut()
-					.register();
-				world
-					.entity_mut(entity)
-					.insert(RoutesDirPending { root, id });
-			});
-		}
-		// off the async runtime: resolve the nearest ancestor store + scope it to `src`,
-		// await the content scan, then compose the scoped store onto the entity, spawn
-		// the route children, and flush so the route-tree observers settle against the
-		// whole hierarchy. Finally resolve the gate (if any) so `LoadTemplate` fires.
+		let root = build_root.map(|root| **root);
+		// one queued command parks the guard (ahead of the build's synchronous
+		// drain, like the scene-ready gate) and spawns the scan task holding it,
+		// so however the task ends the guard resolves.
 		//
-		// `queue_async_local` (not `queue_async`): the scan is bridge-heavy (resolve the
+		// `run_async_local` (not `run_async`): the scan is bridge-heavy (resolve the
 		// ancestor store, then compose it + spawn routes back on the world), and the async
 		// bridge only *guarantees* a bridge poll completes when the task runs on the
 		// runtime's local executor. A `bevy_multithreaded` build's `spawn` would run it on
 		// an `IoTaskPool` worker thread, whose bridge poll can perpetually miss the
 		// main-thread world-scope window and stall the scan. Pinning it local keeps
 		// discovery deterministic on every target.
-		commands.entity(entity).queue_async_local(
-			async move |dir: AsyncEntity| -> Result {
-				let store = dir
-					.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-						|entity, stores| {
-							stores.get(entity).map(BlobStore::clone)
-						},
-					)
-					.await??
-					.with_subdir(src);
-				let specs = Self::discover_routes(&store).await?;
-				dir.world()
-					.with(move |world| {
-						// watch the discovered routes dir for live reload (keyed to
-						// its base store); inert on a non-fs store / on wasm.
-						let watch = WatchDir::from_store(&store);
-						let mut entity_mut = world.entity_mut(entity);
-						entity_mut.insert(store);
-						if let Some(watch) = watch {
-							entity_mut.insert(watch);
-						}
-						for spec in specs {
-							Self::spawn_route_spec(world, entity, spec);
-						}
-						world.flush();
-						// routes are spawned: resolve the build-root gate, draining its
-						// pending set so the deferred `LoadTemplate` fires.
-						Self::resolve_gate(world, entity);
-					})
-					.await;
-				Ok(())
-			},
-		);
+		commands.queue(move |world: &mut World| {
+			let guard = TemplatePending::park_on(
+				world,
+				root.unwrap_or(entity),
+				PendingKind::Passive,
+			);
+			let Ok(mut entity_mut) = world.get_entity_mut(entity) else {
+				// the dir despawned before the command ran: the dropped guard
+				// resolves through the sweep.
+				return;
+			};
+			// off the async runtime: resolve the nearest ancestor store + scope it
+			// to `src`, await the content scan, then compose the scoped store onto
+			// the entity, spawn the route children, and flush so the route-tree
+			// observers settle against the whole hierarchy.
+			entity_mut.run_async_local(
+				async move |dir: AsyncEntity| -> Result {
+					let store = dir
+						.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
+							|entity, stores| {
+								stores.get(entity).map(BlobStore::clone)
+							},
+						)
+						.await??
+						.with_subdir(src);
+					let specs = Self::discover_routes(&store).await?;
+					dir.world()
+						.with(move |world| {
+							// watch the discovered routes dir for live reload (keyed to
+							// its base store); inert on a non-fs store / on wasm.
+							let watch = WatchDir::from_store(&store);
+							let mut entity_mut = world.entity_mut(entity);
+							entity_mut.insert(store);
+							if let Some(watch) = watch {
+								entity_mut.insert(watch);
+							}
+							for spec in specs {
+								Self::spawn_route_spec(world, entity, spec);
+							}
+							world.flush();
+							// routes are spawned: resolve, draining the root's set so
+							// the deferred `LoadTemplate` fires.
+							guard.resolve(world);
+						})
+						.await;
+					Ok(())
+				},
+			);
+		});
 		Ok(())
-	}
-
-	/// Resolve the [`RoutesDirPending`] gate the scan parked on the build root (if any),
-	/// draining the root's [`TemplatePending`] set so its [`LoadTemplate`] fires.
-	fn resolve_gate(world: &mut World, entity: Entity) {
-		let Some(RoutesDirPending { root, id }) =
-			world.entity_mut(entity).take::<RoutesDirPending>()
-		else {
-			return;
-		};
-		let mut root_entity = world.entity_mut(root);
-		if let Some(mut pending) = root_entity.get_mut::<TemplatePending>() {
-			pending.resolve(id);
-		}
-		drain_pending_dependencies(&mut root_entity);
-	}
-
-	/// Wait for every [`RoutesDir`]'s async discovery to finish, for a caller that
-	/// renders the routes immediately after building (eg the `export-static` /
-	/// `check` commands).
-	///
-	/// [`RoutesDir::spawn_on_insert`] runs the discovery as an async task, so the
-	/// routes appear a few ticks after the insert. A top-level driver (the Worker,
-	/// tests) settles the whole runtime with
-	/// [`AsyncRunner::settle_async_tasks`](beet_core::prelude::AsyncRunner). A caller
-	/// running *inside* the app (an action) cannot drive the loop without re-entering
-	/// it, so this yields (via the world bridge) to let the runtime drive the task,
-	/// detecting completion by the scoped store the task composes onto each
-	/// [`RoutesDir`] entity.
-	///
-	/// The wait is bounded by wall-clock time, not loop count: the discovery does real
-	/// store I/O (file/S3/R2 reads), and how many `settle` iterations elapse before it
-	/// completes depends on how the runtime interleaves this loop with the discovery
-	/// task's own bridge polls — which, under a parallel test harness, can take many
-	/// iterations per unit of real progress. An iteration cap would then bail on a
-	/// healthy-but-contended scan; a generous time budget bails only on a genuinely
-	/// stuck one.
-	pub async fn settle_all(world: &AsyncWorld) -> Result {
-		// generous: a real scan settles in well under a second; this only trips on a
-		// genuinely stuck discovery (eg a store-less app whose `RoutesDir` never resolves).
-		let deadline = Instant::now() + Duration::from_secs(30);
-		loop {
-			let pending = world
-				.with(|world| {
-					// routes still discovering (no scoped store composed onto them yet) ...
-					let dirs = world
-						.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>(
-						)
-						.iter(world)
-						.count();
-					// ... plus any `<TemplateDir>` still registering its templates (not
-					// yet marked `TemplatesLoaded`), so a render that resolves them waits ...
-					let templates = world
-						.query_filtered::<(), (With<TemplateDir>, Without<TemplatesLoaded>)>(
-						)
-						.iter(world)
-						.count();
-					// ... plus any unresolved `<Template src>` include: it builds the
-					// included entry (and its own `RoutesDir`) asynchronously as a pending
-					// dependency, so wait for the set to drain before reading the tree.
-					let includes = world
-						.query::<&TemplatePending>()
-						.iter(world)
-						.filter(|pending| !pending.is_empty())
-						.count();
-					dirs + templates + includes
-				})
-				.await;
-			if pending == 0 {
-				return Ok(());
-			}
-			if Instant::now() >= deadline {
-				bevybail!(
-					"RoutesDir discovery / `<Template src>` includes did not settle \
-					within the time budget"
-				);
-			}
-			// Yield, then take an extra bridge round-trip before the next count check.
-			// The discovery/include tasks bridge the world (resolve the ancestor store,
-			// compose it, spawn routes) between async store reads; a single yield + count
-			// check can lap them, re-reading the same pending counts while their just-woken
-			// bridge poll still waits for a sync-point window. The no-op round-trip drives
-			// one more sync point so a completed read makes progress before we re-count.
-			async_ext::yield_now().await;
-			world.with(|_| ()).await;
-		}
 	}
 
 	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
@@ -300,17 +211,6 @@ struct RouteSpec {
 	store_path: SmolPath,
 	#[cfg(feature = "markdown_parser")]
 	meta: Option<ArticleMeta>,
-}
-
-/// Parked on a [`RoutesDir`] discovered during a template build: it records the
-/// pending dependency gating the build root's [`LoadTemplate`] until the async route
-/// scan spawns its routes. Resolved by [`RoutesDir::resolve_gate`].
-#[derive(Component)]
-struct RoutesDirPending {
-	/// The template build root carrying the [`TemplatePending`] set.
-	root: Entity,
-	/// The dependency id parked on that root.
-	id: PendingId,
 }
 
 #[cfg(test)]

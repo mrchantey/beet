@@ -7,9 +7,9 @@ use crate::prelude::*;
 ///
 /// A minimal world built from this plugin can `spawn_template`. Mirrors
 /// [`DocumentPlugin`] in style; the build walker and slot resolution are
-/// synchronous over [`EntityWorldMut`], so this plugin registers types and the
-/// [`AppTypeRegistry`] (via Bevy's reflect plumbing) but installs no
-/// load-bearing systems.
+/// synchronous over [`EntityWorldMut`]. The one system is the
+/// [`sweep_dropped_pending`] backstop, resolving any [`PendingGuard`] dropped
+/// unresolved so a lost dependency never hangs a load.
 #[derive(Default)]
 pub struct TemplatePlugin;
 
@@ -18,11 +18,14 @@ impl Plugin for TemplatePlugin {
 		app
 			// ensure the type registry exists for `register_template`.
 			.init_resource::<AppTypeRegistry>()
+			// the dropped-guard side channel, shared with every `PendingGuard`.
+			.init_resource::<PendingDropQueue>()
 			// slot markers, the error path, and the pending-dependency set.
 			.register_type::<SlotTarget>()
 			.register_type::<SlotChild>()
 			.register_type::<TemplatePending>()
-			.register_type::<TemplatesLoaded>();
+			.register_type::<TemplatesLoaded>()
+			.add_systems(Update, sweep_dropped_pending);
 	}
 }
 

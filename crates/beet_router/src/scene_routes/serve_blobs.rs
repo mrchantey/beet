@@ -77,12 +77,15 @@ pub(crate) async fn ServeBlobsHandler(
 /// [`ServeBlobs`], which owns the mount path:
 /// `<ServeBlobs prefix="assets" {AssetsStore}/>`.
 ///
-/// The assets glue, resolving where the served files come from; a WIP shim the
-/// cli-rework will fold away.
+/// The assets glue, resolving where the served files come from. A WIP shim: it
+/// is the last store still selected by env (`BEET_ASSETS_BUCKET`,
+/// `BEET_S3_ENDPOINT`) rather than by the `--store` arg the entry store now uses,
+/// and it hardcodes a workspace-relative native fallback. Both fold away with the
+/// bootstrap-config work (`.agents/plans/bootstrap-config.md`).
 #[template]
 pub fn AssetsStore() -> impl Bundle {
 	OnSpawn::new(|entity: &mut EntityWorldMut| {
-		// the deployed assets bucket, mirroring `remote_entry_store`'s endpoint /
+		// the deployed assets bucket, mirroring the `--store=s3://..` endpoint /
 		// region selection (R2 vs AWS S3). Only the native `aws_sdk` build can
 		// build an `S3Store`; every other build scopes the ancestor entry store.
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]

@@ -118,8 +118,11 @@ test-all *args:
 	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" {{ args }}; done
 	for pkg in {{ _extra-pkgs-wasm }}; do just _test-pkgs-wasm "$pkg" {{ args }}; done
 	just test-rsx {{ args }}
-	# beet-cli is currently commented out of the workspace; re-add when restored.
-	# cargo test -p beet-cli --all-features {{ args }} -- {{ test-threads }}
+	# beet-cli is not in `_core-pkgs`: it is the binary crate, so `_core-features`'
+	# enumerate-everything approach would co-enable mutually exclusive target
+	# features (`web`/`cloudflare` alongside the native stack). `--all-features` is
+	# safe here because its wasm-only deps are already target-gated.
+	cargo test -p beet-cli --all-features {{ args }} -- {{ test-threads }}
 
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
@@ -167,10 +170,12 @@ _core-pkgs-wasm := "beet_core beet_net beet_ui beet_router beet_thread beet_acti
 
 # Crates that enable `bevy_default` — each runs in its own cargo invocation
 # in `test-all` (see comment there). Excluded from `test-core`.
-_extra-pkgs := "beet_spatial beet_ml"
+_extra-pkgs := "beet_spatial beet_ml beet_extra"
 
-# Subset of `_extra-pkgs` that builds for wasm (beet_ml doesn't — `getrandom`
-# needs the `wasm_js` feature).
+# Subset of `_extra-pkgs` that builds for wasm. beet_ml doesn't (`getrandom`
+# needs the `wasm_js` feature); beet_extra doesn't under the full feature set,
+# since its `infra` feature pulls `beet_infra`, which is native-only (note it is
+# absent from `_core-pkgs-wasm` for the same reason).
 _extra-pkgs-wasm := "beet_spatial"
 
 # Computes the cargo feature flag for the in-scope crates by enumerating each

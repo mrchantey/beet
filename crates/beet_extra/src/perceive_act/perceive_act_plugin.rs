@@ -26,6 +26,7 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<LogDriveForDuration>()
 			.register_type::<DriveForDuration>()
 			// scene rotation: config + state components, and the image-options sync.
+			.register_type::<RotateScene>()
 			.register_type::<SceneRotation>()
 			.register_type::<SceneCatalog>()
 			.register_type::<ActiveScene>()

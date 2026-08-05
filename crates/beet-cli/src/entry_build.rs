@@ -1,15 +1,18 @@
-//! The cross-platform entry build core shared by the native `beet` binary, the wasm
-//! Worker entry, and the `check`/`export-static` commands.
+//! The cross-platform entry resolution + build core shared by the native `beet`
+//! binary, the wasm Worker entry, and the `check`/`serve`/`export-static`
+//! commands.
 //!
-//! An entry load splits into a world-free async read ([`read_entry_sources`]: the
+//! An entry load splits into resolution ([`resolve_main`]: the store + the entry
+//! document name within it, honouring `--store` and the entry's own
+//! `<StoreRoot src>`), a world-free async read ([`read_entry_sources`]: the
 //! entry document and the templates under its declared `<TemplateDir>`s, through the
 //! [`BlobStore`]) and a synchronous world build ([`build_entry_root`]: register the
 //! templates, parse the entry, build it into a root carrying the store). The entry's
 //! own template dirs are registered *before* the entry parses, so entry-level tags
 //! (eg `<Styles/>`) resolve; the reactive `<TemplateDir>` observer covers everything
 //! that loads later (route pages, library widgets). The same path runs on the native
-//! async runtime and the single-threaded wasm Worker, so entry resolution comes from
-//! an injected store rather than a filesystem walk.
+//! async runtime and the single-threaded wasm Worker, so an entry build never
+//! requires a filesystem.
 
 use beet::prelude::*;
 
@@ -28,6 +31,7 @@ pub fn cli_registration() -> CrateRegistration {
 		features: [
 			"aws_sdk",
 			"cloudflare",
+			"extra",
 			"geoip",
 			"infra",
 			"lambda",
@@ -98,6 +102,68 @@ pub async fn widen_store_root(
 	Ok((resolve_store(params, root.clone())?, entry_name, root))
 }
 
+/// A resolved entry: its store, the entry document name within it, and the local
+/// dir to watch for dev live reload (`None` for a self-rooted store, and always
+/// `None` on wasm, where there is no fs-watcher backend).
+pub struct ResolvedEntry {
+	pub store: BlobStore,
+	pub entry_name: String,
+	#[cfg(not(target_arch = "wasm32"))]
+	pub watch_dir: Option<AbsPathBuf>,
+}
+
+/// Resolve an explicit entry path (the binary's `--main`, a command's `<entry>`
+/// positional): a path with an extension names the entry file itself, anything
+/// else is a directory probed for the first [`ENTRY_NAMES`] match. Either way
+/// the entry may widen its own store root with a `<StoreRoot src>` declaration
+/// (see [`widen_store_root`]), and the `--store` param picks the backend.
+pub async fn resolve_main(
+	params: &MultiMap<SmolStr, SmolStr>,
+	main: &str,
+) -> Result<ResolvedEntry> {
+	let path = AbsPathBuf::new(main)?;
+	let (dir, entry_name) = if path.extension().is_some() {
+		// an entry file: its parent is the initial root
+		let dir = path
+			.parent()
+			.ok_or_else(|| bevyhow!("entry `{path}` has no parent directory"))?;
+		let entry_name = path
+			.file_name()
+			.and_then(|name| name.to_str())
+			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
+			.to_string();
+		(dir, entry_name)
+	} else {
+		// a directory: probe it for an entry document
+		let store = resolve_store(params, path.clone())?;
+		let entry_name = probe_entry_names(&store).await?.ok_or_else(|| {
+			bevyhow!(
+				"no entry document found in `{path}`: looked for {ENTRY_NAMES:?}. \
+				Create one, or name the entry file itself."
+			)
+		})?;
+		(path, entry_name)
+	};
+	resolve_widened(params, dir, entry_name).await
+}
+
+/// [`widen_store_root`] into a [`ResolvedEntry`], live reload watching the
+/// resolved root.
+pub async fn resolve_widened(
+	params: &MultiMap<SmolStr, SmolStr>,
+	dir: AbsPathBuf,
+	entry_name: String,
+) -> Result<ResolvedEntry> {
+	let (store, entry_name, _root) =
+		widen_store_root(params, dir, entry_name).await?;
+	Ok(ResolvedEntry {
+		store,
+		entry_name,
+		#[cfg(not(target_arch = "wasm32"))]
+		watch_dir: Some(_root),
+	})
+}
+
 /// The first [`ENTRY_NAMES`] match at the store's root, if any.
 pub async fn probe_entry_names(store: &BlobStore) -> Result<Option<String>> {
 	for name in ENTRY_NAMES {
@@ -108,29 +174,112 @@ pub async fn probe_entry_names(store: &BlobStore) -> Result<Option<String>> {
 	Ok(None)
 }
 
-/// Build the [`BlobStore`] selected by the `--store` param, rooted at `dir`. Shared
-/// by the binary's entry resolution and the `check`/`serve`/`export-static` commands
-/// so every entry/site load is store-driven rather than filesystem-bound.
+/// Whether the `--store` param selects a self-rooted backend (a bucket / browser
+/// storage) needing no local directory or filesystem walk: `s3://<bucket>`,
+/// `local-storage`, `indexed-db`. For these `--main` names the entry document
+/// *within* the store (defaulting to an [`ENTRY_NAMES`] probe) and there is no
+/// live-reload watch dir.
+pub fn store_is_self_rooted(params: &MultiMap<SmolStr, SmolStr>) -> bool {
+	params
+		.get("store")
+		.map(|kind| {
+			kind.starts_with("s3://")
+				|| matches!(kind.as_str(), "local-storage" | "indexed-db")
+		})
+		.unwrap_or(false)
+}
+
+/// Build the [`BlobStore`] selected by the `--store` param. Shared by the binary's
+/// entry resolution and the `check`/`serve`/`export-static` commands so every
+/// entry load is store-driven rather than filesystem-bound. Dir-rooted kinds root
+/// at `dir` (the resolved entry directory); self-rooted kinds
+/// ([`store_is_self_rooted`]) ignore it.
 ///
-/// Cross-platform, since [`FsStore`] is cross-platform: it reads through `fs_ext`,
-/// which routes to the deno runner's fs globals on wasm, so the wasm `beet` binary
-/// resolves the same on-disk entry native does, no separate backend needed.
-/// - `fs` (default): a filesystem store rooted at `dir`.
-/// - `memory`: a temporary in-memory store.
+/// - `fs` (default): a filesystem store rooted at `dir`. Cross-platform, since
+///   [`FsStore`] reads through `fs_ext` (the deno runner's fs globals on wasm).
+/// - `memory`: a temporary in-memory store, only meaningful with an explicit
+///   entry since it has no seeded entry to discover.
+/// - `s3://<bucket>[?endpoint=<url>][&region=<region>]` (`aws_sdk`, native): the
+///   bucket a deployed task serves from; see [`resolve_s3_store`].
+/// - `local-storage` / `indexed-db` (wasm): browser storage.
 ///
-/// `memory` is only meaningful with an explicit entry, since it has no seeded entry to
-/// discover. An unknown kind errors with the supported list.
+/// An unknown kind errors with the supported list.
 pub fn resolve_store(
 	params: &MultiMap<SmolStr, SmolStr>,
 	dir: AbsPathBuf,
 ) -> Result<BlobStore> {
-	match params.get("store").map(SmolStr::as_str).unwrap_or("fs") {
+	let kind = params.get("store").map(SmolStr::as_str).unwrap_or("fs");
+	if let Some(rest) = kind.strip_prefix("s3://") {
+		return resolve_s3_store(rest);
+	}
+	match kind {
 		"fs" => BlobStore::new(FsStore::new(dir)).xok(),
 		"memory" => BlobStore::temp().xok(),
-		other => {
-			bevybail!("unknown --store `{other}`, supported kinds: fs, memory")
+		#[cfg(target_arch = "wasm32")]
+		"local-storage" => BlobStore::new(LocalStorageStore::new("beet")).xok(),
+		#[cfg(target_arch = "wasm32")]
+		"indexed-db" => BlobStore::new(IndexedDbStore::new("beet")).xok(),
+		#[cfg(not(target_arch = "wasm32"))]
+		"local-storage" | "indexed-db" => bevybail!(
+			"--store={kind} is browser storage, only available on wasm"
+		),
+		other => bevybail!(
+			"unknown --store `{other}`, supported kinds: fs, memory, \
+			s3://<bucket>[?endpoint=..][&region=..], local-storage (wasm), \
+			indexed-db (wasm)"
+		),
+	}
+}
+
+/// Parse the `s3://<bucket>[?endpoint=<url>][&region=<region>]` store uri into an
+/// [`S3Store`]-backed [`BlobStore`]. An `endpoint` (eg
+/// `https://<account>.r2.cloudflarestorage.com`) switches onto an S3-compatible
+/// service such as Cloudflare R2 with region `auto`, so one binary serves
+/// identically on AWS S3 and R2; otherwise the region falls back to the SDK's
+/// `AWS_REGION` convention, then `us-west-2`.
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+fn resolve_s3_store(rest: &str) -> Result<BlobStore> {
+	let (bucket, query) = rest.split_once('?').unwrap_or((rest, ""));
+	if bucket.is_empty() {
+		bevybail!("--store=s3:// is missing a bucket name");
+	}
+	let mut endpoint = None;
+	let mut region = None;
+	for pair in query.split('&').filter(|pair| !pair.is_empty()) {
+		match pair.split_once('=') {
+			Some(("endpoint", value)) => endpoint = Some(value.to_string()),
+			Some(("region", value)) => region = Some(value.to_string()),
+			_ => bevybail!(
+				"unknown --store=s3 query param `{pair}`, supported: endpoint, \
+				region"
+			),
 		}
 	}
+	let store = match endpoint {
+		Some(endpoint) => {
+			info!("entry store: r2/s3 bucket `{bucket}` ({endpoint})");
+			S3Store::new(bucket, region.unwrap_or_else(|| "auto".to_string()))
+				.with_endpoint(endpoint)
+		}
+		None => {
+			let region = region
+				.or_else(|| env_ext::var("AWS_REGION").ok())
+				.unwrap_or_else(|| "us-west-2".to_string());
+			info!("entry store: s3 bucket `{bucket}` ({region})");
+			S3Store::new(bucket, region)
+		}
+	};
+	BlobStore::new(store).xok()
+}
+
+/// Without a compiled S3 backend the request errors with guidance rather than
+/// degrading (the store concept is target-agnostic, only the backend is gated).
+#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
+fn resolve_s3_store(_rest: &str) -> Result<BlobStore> {
+	bevybail!(
+		"--store=s3://.. requires a compiled S3 backend (enable the `aws_sdk` \
+		feature, native only)"
+	)
 }
 
 /// The entry sources read from a store: the entry document bytes + name, the template
@@ -212,19 +361,23 @@ pub fn build_entry_root(
 		}
 		world.flush();
 	}
+	// the root is spawned first so it can own the entry-level template
+	// registrations: tearing the entry scene down (a structural live reload)
+	// unregisters them with it, so no stale template survives a rebuild.
+	let root = world.spawn(()).id();
 	// the entry's own template dirs, registered before the entry parses so its
 	// entry-level tags (eg `<Styles/>`) resolve. The reactive `<TemplateDir>` observer
 	// re-registers them (plus any crate/route dirs) once the tree is built.
-	TemplateDir::register_sources(world, &formats, template_sources)?;
+	TemplateDir::register_sources(world, root, &formats, template_sources)?;
 	let template = EntryTemplate::from_bytes(world, &entry).map_err(|err| {
 		bevyhow!("failed to parse entry `{entry_name}`: {err}")
 	})?;
 	// the site store on the root: descendants resolve it by ancestry. `TemplatesLoaded`
 	// marks the entry-level templates registered (the readiness signal a wasm Worker
 	// waits on before serving).
-	let root = world.spawn((extra, store, TemplatesLoaded)).id();
 	world
 		.entity_mut(root)
+		.insert((extra, store, TemplatesLoaded))
 		.insert_template(template)
 		.map_err(|err| {
 			bevyhow!("failed to load entry `{entry_name}`: {err}")
@@ -233,13 +386,33 @@ pub fn build_entry_root(
 	Ok(root)
 }
 
+/// Build an entry into an owned world and settle it to readiness: read the
+/// sources through `store`, build the root carrying `extra`, then drive the
+/// async runtime until every pending set drains
+/// ([`TemplatePending::settle_owned`]), so `<RoutesDir>`/`<TemplateDir>` scans
+/// land before the caller serves. The world-owning driver path (the wasm Worker,
+/// a one-shot build); an in-app caller settles via [`TemplatePending::settle`]
+/// instead. Returns the entry root.
+pub async fn build_entry_owned(
+	world: &mut World,
+	store: BlobStore,
+	entry_name: String,
+	extra: impl Bundle,
+) -> Result<Entity> {
+	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+	let sources = read_entry_sources(&store, formats, entry_name).await?;
+	let root = build_entry_root(world, store, sources, extra)?;
+	TemplatePending::settle_owned(world).await;
+	Ok(root)
+}
+
 /// Rebuild the `--watch` entry into a fresh [`BeetSceneRoot`], the shared path the
 /// initial build and every structural reload run: tear down the previous entry
 /// scene via [`despawn_scene`] (servers close, sockets drop; a no-op on the first
 /// build), re-read the sources through the store, and build a fresh root marked
 /// [`BeetSceneRoot`] + [`LiveReload`] with its own entry [`WatchDir`]. The fresh
-/// root's server children re-boot (rebinding their ports) (rebinding their ports), so a browser's
-/// dropped `/__client_io` socket reconnects and reloads into the new tree.
+/// root's server children re-boot (rebinding their ports), so a browser's dropped
+/// `/__client_io` socket reconnects and reloads into the new tree.
 ///
 /// The [`EntryReloader`] resource (installed once) survives the teardown and drives
 /// this on a change to the entry document or an included `<Template src>`.
@@ -252,8 +425,16 @@ pub async fn rebuild_watched_entry(
 ) -> Result {
 	let sources =
 		read_entry_sources(&store, formats, entry_name.clone()).await?;
+	// recompute the structural source set from the current content, so a
+	// `<Template src>` include added by this very edit is structural on the next
+	// one without a restart.
+	let structural = entry_source_paths(&store, &entry_name).await;
 	world
 		.with(move |world: &mut World| -> Result {
+			if let Some(mut reloader) = world.get_resource_mut::<EntryReloader>()
+			{
+				reloader.set_sources(structural);
+			}
 			// the entry's own dir, watched for edits to the entry doc / its includes;
 			// computed before `build_entry_root` consumes `store`.
 			let entry_watch = WatchDir::for_entry(&store, &entry_name);
@@ -336,62 +517,6 @@ pub fn build_entry_from_bsx(
 	build_entry_root(world, BlobStore::temp(), sources, extra)
 }
 
-/// Drive the async runtime until a build-then-serve entry is fully ready to serve: its
-/// `<TemplateDir>` templates registered, its `<RoutesDir>` routes discovered, and any
-/// `<Template src>` includes resolved. A build-then-serve driver (the wasm Worker, a
-/// wasm one-shot) owns the world, so it settles + ticks and re-checks readiness itself
-/// rather than yielding to an outer loop (the in-app [`RoutesDir::settle_all`] path).
-///
-/// Readiness is entity state, not idle. [`build_entry_root`] marks the root
-/// [`TemplatesLoaded`] *synchronously*, and the route/template scans only spawn their
-/// follow-up tasks a few async ticks after the insert, so "the root is loaded" (or a
-/// single idle window) can precede any route existing, the cause of intermittent 404s
-/// on a multi-route site served from a Worker. This instead mirrors
-/// [`RoutesDir::settle_all`]'s conditions: a `<RoutesDir>` with no composed
-/// [`BlobStore`] is still discovering, a `<TemplateDir>` without [`TemplatesLoaded`] is
-/// still registering, and a non-empty [`TemplatePending`] is an unresolved include. It
-/// loops settle + check, ticking between, until nothing is pending or the safety cap is
-/// hit (so a never-loading entry returns rather than hanging).
-///
-/// The native run loop ticks naturally and `CallOnLoad` waits on the load itself, so
-/// only the build-then-serve drivers need this explicit gate.
-pub async fn settle_until_ready(world: &mut World) {
-	// each iteration is a full settle; the cap guards a never-loading entry.
-	const MAX_ITERS: usize = 64;
-	for _ in 0..MAX_ITERS {
-		AsyncRunner::settle_async_tasks(world).await;
-		if entry_pending(world) == 0 {
-			return;
-		}
-		AsyncRunner::tick().await;
-	}
-	error!(
-		"entry did not settle within {MAX_ITERS} iterations; serving anyway \
-		(routes may be incomplete)"
-	);
-}
-
-/// The count of still-loading entry dependencies, mirroring [`RoutesDir::settle_all`]:
-/// routes still discovering (no scoped [`BlobStore`] composed yet), template dirs still
-/// registering (not yet [`TemplatesLoaded`]), and unresolved `<Template src>` includes
-/// (a non-empty [`TemplatePending`]). Zero means the entry is ready to serve.
-fn entry_pending(world: &mut World) -> usize {
-	let discovering_routes = world
-		.query_filtered::<(), (With<RoutesDir>, Without<BlobStore>)>()
-		.iter(world)
-		.count();
-	let registering_templates = world
-		.query_filtered::<(), (With<TemplateDir>, Without<TemplatesLoaded>)>()
-		.iter(world)
-		.count();
-	let unresolved_includes = world
-		.query::<&TemplatePending>()
-		.iter(world)
-		.filter(|pending| !pending.is_empty())
-		.count();
-	discovering_routes + registering_templates + unresolved_includes
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -450,6 +575,6 @@ mod test {
 			.contains::<TemplatesLoaded>()
 			.xpect_true();
 		// returns rather than hanging, nothing being pending on this entry.
-		settle_until_ready(&mut world).await;
+		TemplatePending::settle_owned(&mut world).await;
 	}
 }

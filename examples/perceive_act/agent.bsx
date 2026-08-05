@@ -9,8 +9,8 @@ Which prompt + images the robot plays is data, not markup: `{SceneRotation}` (on
 router) discovers scenes in the blob store (`assets/extra/perceive-act/<name>/`, each a
 `main.bsx` prompt plus an `images/` set). Its three knobs are authored inline: `initial`
 (the personality it boots as), `every_cycles` (how many `Camera` turns between flips) and
-`order` (`Sequential` or `Random`). At the start of each `Camera` turn the robot applies
-the initial scene on boot and rotates to the next on each boundary. The system
+`order` (`Sequential` or `Random`). The `<RotateScene/>` step before the `Camera` turn
+applies the initial scene on boot and rotates to the next on each boundary. The system
 prompt below is fixed and scene-agnostic; each scene's character is appended as a user
 turn, so the robot carries its memory across incarnations.
 
@@ -53,6 +53,7 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 - Each turn builds on the last as a cohesive story
 '/>
 			</CreateActor>
+			<RotateScene/>
 			<CreateActor name="Camera" kind="User" {PostPhoto}/>
 			<CreateActor name="Robot" kind="Agent"
 				{(RobotStreamer{effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>

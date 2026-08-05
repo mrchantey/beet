@@ -1337,6 +1337,8 @@ dependencies = [
  "image",
  "lopdf",
  "qrcode",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "worker",
 ]
 

@@ -81,7 +81,8 @@ impl BsxTemplateRegistry {
 	/// Parse `source` through the format `formats` registers for its [`MediaType`]
 	/// and register it under the module path derived from `path`, relative to a
 	/// `templates/` root: `path/to/X.bsx` registers under `path::to::X`, so
-	/// `<path::to::X>` resolves to it. A type with no registered format is skipped.
+	/// `<path::to::X>` resolves to it. Returns the registered name, or `None` for
+	/// a type with no registered format (skipped).
 	///
 	/// A caller reading a template directory through a `BlobStore` (the filesystem
 	/// in dev, S3/R2 when deployed) hands each `(path, source)` pair here. Pure (no
@@ -92,17 +93,26 @@ impl BsxTemplateRegistry {
 		formats: &TemplateFormats,
 		path: &SmolPath,
 		source: &str,
-	) -> Result {
+	) -> Result<Option<SmolStr>> {
 		// a type with no registered format is skipped.
 		let Some(parse) = path.media_type().and_then(|ty| formats.get(&ty))
 		else {
-			return Ok(());
+			return Ok(None);
 		};
-		let module = module_path_from_rel(path).ok_or_else(|| {
-			bevyhow!("could not derive a module path from `{path}`")
-		})?;
-		self.insert(module, parse(source)?);
-		Ok(())
+		let module = module_path_from_rel(path)
+			.ok_or_else(|| {
+				bevyhow!("could not derive a module path from `{path}`")
+			})?
+			.xmap(SmolStr::from);
+		self.insert(module.clone(), parse(source)?);
+		Ok(Some(module))
+	}
+
+	/// Unregister the template under `name`, returning whether it was present.
+	/// The reactive [`TemplateDir`](crate::prelude::TemplateDir) loader calls this
+	/// for sources its owner no longer ships (a deleted template on live reload).
+	pub fn remove(&mut self, name: &str) -> bool {
+		self.templates.remove(name).is_some()
 	}
 
 	/// Look up a registered template by its module path.

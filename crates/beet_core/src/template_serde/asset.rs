@@ -55,28 +55,21 @@ impl<A: Asset> Template for AssetLoadTemplate<A> {
 			.resource::<AssetServer>()
 			.load::<A>(self.path.to_string());
 
-		// the root carries the pending set; fall back to this entity if no
-		// surrounding template build set a root.
 		let entity_id = cx.entity.id();
-		let root = cx
-			.entity
-			.world_scope(|world| TemplateBuildRoot::resolve(world, entity_id));
-
 		// SAFETY: only used to register the pending dependency on the root.
 		let world = unsafe { cx.entity.world_mut() };
-		let mut root_entity = world.entity_mut(root);
-		let pending_id = root_entity
-			.entry::<TemplatePending>()
-			.or_default()
-			.get_mut()
-			.register();
-		// keep a strong handle alongside the id so the load is not cancelled by
-		// the handle returned here being dropped before the asset finishes.
-		root_entity
+		// an asset gates readiness, not tree structure: passive. The park falls
+		// back to this entity if no surrounding template build set a root.
+		let guard =
+			TemplatePending::park(world, entity_id, PendingKind::Passive);
+		// keep a strong handle alongside the guard so the load is not cancelled
+		// by the handle returned here being dropped before the asset finishes.
+		world
+			.entity_mut(guard.root())
 			.entry::<PendingAssets>()
 			.or_default()
 			.get_mut()
-			.push(handle.clone().untyped(), pending_id);
+			.push(handle.clone().untyped(), guard);
 
 		Ok(handle)
 	}
@@ -120,16 +113,14 @@ impl BuildAssets<'_, '_> {
 		// load is not cancelled before it settles.
 		let untyped = handle.clone().untyped();
 		self.commands.queue(move |world: &mut World| {
-			let mut root = world.entity_mut(root);
-			let id = root
-				.entry::<TemplatePending>()
+			let guard =
+				TemplatePending::park_on(world, root, PendingKind::Passive);
+			world
+				.entity_mut(root)
+				.entry::<PendingAssets>()
 				.or_default()
 				.get_mut()
-				.register();
-			root.entry::<PendingAssets>()
-				.or_default()
-				.get_mut()
-				.push(untyped, id);
+				.push(untyped, guard);
 		});
 		handle
 	}
@@ -137,14 +128,15 @@ impl BuildAssets<'_, '_> {
 
 /// Tracks the outstanding asset dependencies registered on a template root: each
 /// pairs a strong asset handle (kept alive so the load is not cancelled) with the
-/// [`PendingId`] it parked on [`TemplatePending`].
+/// [`PendingGuard`] it parked on [`TemplatePending`]. Dropping the component (a
+/// despawned root) resolves every guard through the sweep.
 #[derive(Debug, Default, Component)]
-pub struct PendingAssets(Vec<(UntypedHandle, PendingId)>);
+pub struct PendingAssets(Vec<(UntypedHandle, PendingGuard)>);
 
 impl PendingAssets {
-	/// Track a strong handle against the [`PendingId`] it parked on the root.
-	fn push(&mut self, handle: UntypedHandle, id: PendingId) {
-		self.0.push((handle, id));
+	/// Track a strong handle against the [`PendingGuard`] it parked on the root.
+	fn push(&mut self, handle: UntypedHandle, guard: PendingGuard) {
+		self.0.push((handle, guard));
 	}
 }
 
@@ -163,9 +155,8 @@ impl Plugin for AssetTemplatePlugin {
 /// Resolves loaded (or failed) tracked assets and drains the root's pending set.
 ///
 /// Each frame, for every root with outstanding [`PendingAssets`], an asset whose
-/// recursive dependency load state is settled (loaded or failed) is resolved on
-/// [`TemplatePending`] and dropped from tracking; when the set drains,
-/// [`drain_pending_dependencies`] fires [`LoadTemplate`].
+/// recursive dependency load state is settled (loaded or failed) is resolved,
+/// firing [`LoadTemplate`] once the root's whole set drains.
 pub fn drain_loaded_assets(world: &mut World) {
 	let roots = world
 		.query_filtered::<Entity, With<PendingAssets>>()
@@ -180,31 +171,22 @@ pub fn drain_loaded_assets(world: &mut World) {
 		);
 		let mut settled = Vec::new();
 		let mut still_pending = Vec::new();
-		for (handle, pending_id) in pending {
+		for (handle, guard) in pending {
 			match asset_server.get_recursive_dependency_load_state(handle.id())
 			{
 				Some(RecursiveDependencyLoadState::Loaded)
 				| Some(RecursiveDependencyLoadState::Failed(_)) => {
-					settled.push(pending_id);
+					settled.push(guard);
 				}
-				_ => still_pending.push((handle, pending_id)),
+				_ => still_pending.push((handle, guard)),
 			}
 		}
 
-		let mut root_entity = world.entity_mut(root);
-		root_entity.get_mut::<PendingAssets>().unwrap().0 = still_pending;
-		if settled.is_empty() {
-			continue;
+		world.entity_mut(root).get_mut::<PendingAssets>().unwrap().0 =
+			still_pending;
+		for guard in settled {
+			guard.resolve(world);
 		}
-		// resolve each settled dependency, then drain (fires LoadTemplate iff empty).
-		if let Some(mut template_pending) =
-			root_entity.get_mut::<TemplatePending>()
-		{
-			for pending_id in settled {
-				template_pending.resolve(pending_id);
-			}
-		}
-		drain_pending_dependencies(&mut root_entity);
 	}
 }
 

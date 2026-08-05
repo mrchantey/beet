@@ -61,6 +61,12 @@ pub struct CargoBuild {
 	pub features: Vec<SmolStr>,
 	/// Additional arguments passed to cargo.
 	pub additional_args: Vec<SmolStr>,
+	/// Args the *deployed* binary is launched with, eg `--store=s3://<bucket>`.
+	/// The lambda runtime offers no argv, so the zip converts at the container
+	/// boundary: it ships a one-line `bootstrap` script exec'ing the binary with
+	/// these (see [`into_lambda_build_artifact`](Self::into_lambda_build_artifact)).
+	/// Unused by non-lambda artifacts, whose launch path owns its args.
+	pub runtime_args: Vec<SmolStr>,
 }
 
 impl CargoBuild {
@@ -204,6 +210,10 @@ impl CargoBuild {
 	/// cross-compile, then packages the binary as `bootstrap.zip`.
 	/// Otherwise falls back to cargo-lambda which handles cross-compilation
 	/// and packaging itself.
+	///
+	/// With [`runtime_args`](Self::runtime_args) the zip ships the binary as
+	/// `beet` plus a one-line `bootstrap` script exec'ing it with the args: the
+	/// lambda runtime offers no argv, so the script is the env-to-args boundary.
 	#[cfg(feature = "deploy")]
 	pub fn into_lambda_build_artifact(mut self) -> BuildArtifact {
 		if self.target == BuildTarget::Zigbuild {
@@ -219,9 +229,10 @@ impl CargoBuild {
 				.join(" ");
 			// create lambda dir, copy binary as bootstrap, zip it
 			let pack_cmd = format!(
-				"mkdir -p {dir} && cp {exe} {dir}/bootstrap && cd {dir} && zip -j bootstrap.zip bootstrap",
+				"mkdir -p {dir} && cp {exe} {dir}/bootstrap && {zip}",
 				dir = lambda_dir.display(),
 				exe = exe_path.display(),
+				zip = self.lambda_zip_cmd(&lambda_dir),
 			);
 			let full_cmd = format!("{build_cmd} && {pack_cmd}");
 			BuildArtifact::new(
@@ -238,17 +249,39 @@ impl CargoBuild {
 				.chain(args)
 				.collect::<Vec<SmolStr>>()
 				.join(" ");
-			let zip_cmd = format!(
-				"cd {} && zip -j bootstrap.zip bootstrap",
-				lambda_dir.display()
-			);
-			let full_cmd = format!("{cargo_cmd} && {zip_cmd}");
+			let full_cmd =
+				format!("{cargo_cmd} && {}", self.lambda_zip_cmd(&lambda_dir));
 			BuildArtifact::new(
 				ChildProcess::new("sh")
 					.with_args([SmolStr::from("-c"), SmolStr::from(full_cmd)]),
 				zip_path,
 			)
 		}
+	}
+
+	/// The zip packaging tail, run with the built binary at `{dir}/bootstrap`.
+	/// With [`runtime_args`](Self::runtime_args) the binary shifts to `beet` and
+	/// a one-line `bootstrap` script exec's it with the args (the lambda runtime
+	/// offers no argv); without them the binary itself stays `bootstrap`.
+	#[cfg(feature = "deploy")]
+	fn lambda_zip_cmd(&self, dir: &std::path::Path) -> String {
+		if self.runtime_args.is_empty() {
+			return format!(
+				"cd {} && zip -j bootstrap.zip bootstrap",
+				dir.display()
+			);
+		}
+		// space-joined into the exec line, so an arg must not contain spaces or
+		// single quotes (a store uri / server glob never does).
+		let args = self
+			.runtime_args
+			.iter()
+			.map(|arg| format!(" {arg}"))
+			.collect::<String>();
+		format!(
+			"cd {dir} && mv bootstrap beet && printf '#!/bin/sh\\nexec /var/task/beet{args}\\n' > bootstrap && chmod +x bootstrap && zip -j bootstrap.zip bootstrap beet",
+			dir = dir.display(),
+		)
 	}
 }
 

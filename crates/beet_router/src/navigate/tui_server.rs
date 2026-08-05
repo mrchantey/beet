@@ -112,7 +112,7 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 	// opening route is not in the tree the instant the navigator loads it. Settle it
 	// first so the home page resolves on the first load rather than flashing a
 	// "no route matched /" error; the loading placeholder shows in the meantime.
-	RoutesDir::settle_all(&entity.world()).await.ok();
+	TemplatePending::settle(entity.world()).await;
 	// now co-locate the in-world navigator on the host: its `on_add` browses this
 	// router from `home`, binding the home page over the loading placeholder.
 	entity

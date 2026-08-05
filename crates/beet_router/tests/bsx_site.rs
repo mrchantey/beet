@@ -383,7 +383,7 @@ async fn include_carries_boot() {
 	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
 	let template =
 		BsxTemplate::parse_entry(&world, entry.as_utf8().unwrap()).unwrap();
-	// the binary spawns the root with no load verb of its own (`build_site_root`'s
+	// the binary spawns the root with no load verb of its own (`build_entry_root`'s
 	// empty `extra`), then builds the entry onto it; the server rides the markup.
 	let root = world.spawn((store, DisableCallOnLoad)).id();
 	world.entity_mut(root).insert_template(template).unwrap();

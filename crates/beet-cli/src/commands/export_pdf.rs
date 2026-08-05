@@ -30,17 +30,17 @@ struct ExportPdfParams {
 	/// Write one PDF per route to `<output>/<route>.pdf` instead of merging them
 	/// into a single document.
 	separate: bool,
-	/// Output path: the merged file (default `<site>/site.pdf`), or with
-	/// `--separate` the directory for per-route files (default `<site>/pdf`).
+	/// Output path: the merged file (default `<entry>/site.pdf`), or with
+	/// `--separate` the directory for per-route files (default `<entry>/pdf`).
 	output: Option<String>,
 	/// Disable page margins.
 	no_margin: bool,
 }
 
-/// Exports the pages of a no-code site to PDF via a headless browser (webdriver),
+/// Exports the pages of a no-code entry to PDF via a headless browser (webdriver),
 /// merged into one document in route order or, with `--separate`, one file per route.
 ///
-/// Builds and validates the site, boots its declared `HttpServer` on an ephemeral
+/// Builds and validates the entry, boots its declared `HttpServer` on an ephemeral
 /// port, then prints each static route. `--width`/`--height` set the page size (in
 /// `--unit`s: `mm` default, or `px`), `--zoom` scales the content, `--page-ranges`
 /// limits each route's pages (ie `--page-ranges=1` for a single page),
@@ -52,18 +52,17 @@ struct ExportPdfParams {
 /// beet export-pdf site --width=1920 --height=1080 --unit=px --zoom=1.5 \
 ///   --search-params="color-scheme=light"
 /// ```
-#[action(route = "export-pdf/*site", handler_only)]
+#[action(route = "export-pdf/*entry", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<ExportPdfParams>())]
 pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ExportPdfParams>()?;
-	let SiteEntry { site_dir, entry } = resolve_site(&site_arg(parts)?)?;
-	let root =
-		build_site(&cx.caller, parts.params(), site_dir.clone(), entry).await?;
+	let entry_path = entry_arg(parts)?;
+	let root = build_entry(&cx.caller, parts.params(), &entry_path).await?;
 
-	// validate before exporting, like `export-static`: a broken no-code site fails
+	// validate before exporting, like `export-static`: a broken no-code entry fails
 	// with a non-zero exit rather than shipping a broken PDF.
 	let report = check_routes(&cx.world(), root).await?;
 	report.log();
@@ -104,7 +103,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 		options.scale = params.zoom;
 	}
 
-	// the site's static pages, glob-filtered by `--include`/`--exclude`.
+	// the entry's static pages, glob-filtered by `--include`/`--exclude`.
 	let mut filter = GlobFilter::default();
 	if let Some(include) = &params.include {
 		filter = filter.with_include(include);
@@ -121,7 +120,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 		bevybail!("no pages matched, nothing to export");
 	}
 
-	// boot the site's declared http server on an ephemeral port so the headless
+	// boot the entry's declared http server on an ephemeral port so the headless
 	// browser fetches real, asset-resolved pages. the boot parks on the server's
 	// `Running` keep-alive, so launch it fire-and-forget (driven by the app loop)
 	// and wait for the bound port.
@@ -157,10 +156,12 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 		.await;
 
 	// `--separate` writes one file per route to a dir; the default merges into one
-	// file (which needs the `pdf` feature).
+	// file (which needs the `pdf` feature). The default lands in the entry's own
+	// dir (not a `<StoreRoot>`-widened root).
 	let output = match params.output {
 		Some(output) => AbsPathBuf::new(output)?,
-		None => site_dir.join(if params.separate { "pdf" } else { "site.pdf" }),
+		None => entry_dir(&entry_path)?
+			.join(if params.separate { "pdf" } else { "site.pdf" }),
 	};
 	let count = if params.separate {
 		write_separate(pages, &output).await?

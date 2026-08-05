@@ -1,15 +1,17 @@
 // @ts-nocheck
 // deno-lint-ignore-file
 //
-// The Beet Deno Wasm Runner, runs the provided
-// wasm binary until it calls `js_runtime::exit`
+// The Beet Deno Wasm Runner. A module exporting an async `start` (the beet
+// binary) is awaited and the process exits with the returned code; any other
+// module (eg a test binary) drives itself through the `exit` global, pending
+// timers keeping the process alive until it does.
 //
 // Includes utilty methods akin to `std::fs`
 //
 // For more info see [js_runtime.rs](crates/beet_core/src/web_utils/js_runtime.rs)
 // for context see how the wasm-bindgen deno runner works
 // https://github.com/wasm-bindgen/wasm-bindgen/blob/main/crates/cli/src/wasm_bindgen_test_runner/deno.rs
-import init from "./bindgen.js";
+import init, * as bindgen from "./bindgen.js";
 import { dirname } from "https://deno.land/std/path/mod.ts";
 import { ensureDirSync, existsSync } from "https://deno.land/std/fs/mod.ts";
 import { load } from "jsr:@std/dotenv";
@@ -128,8 +130,19 @@ const _wasm = await init().catch((err: any) => {
 	Deno.exit(1);
 });
 
-/// Keep the process alive, beet_core::runtime_ext::exit() will call js_runtime::exit() to terminate
-await loop_forever();
+// A module exporting an async `start` (the beet binary) resolves to its exit
+// code: await it and exit with the code, the one-shot shape where the code is a
+// return value rather than a side channel.
+if (typeof bindgen.start === "function") {
+	Deno.exit((await bindgen.start()) ?? 0);
+}
+
+// Otherwise the module is a daemon: it booted from `init()` (wasm-bindgen calls
+// its `main`), drives its own tasks, and terminates by calling the `exit` global.
+// Beet's wasm executor is not a JS macrotask, so the event loop can drain while
+// the module still has work; this keepalive holds the process open until it
+// exits itself. `start` is therefore a pure opt-in, never a requirement.
+await keep_alive();
 
 //-- Helpers --
 
@@ -161,7 +174,9 @@ function do_try_err(func: () => void): string | null {
 		return String(err);
 	}
 }
-async function loop_forever() {
+// Hold the deno event loop open indefinitely, for a module that terminates by
+// calling `globalThis.exit` rather than by resolving a `start` export.
+async function keep_alive() {
 	while (true) {
 		await new Promise((resolve) => setTimeout(resolve, 1_000));
 	}

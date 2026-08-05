@@ -189,10 +189,12 @@ pub async fn BuildDockerImageAction(
 		expose.push_str(&format!("EXPOSE {}\n", block.ssh_container_port()));
 	}
 	// the `CMD` runs the copied binary at `/app` with any configured args, eg
-	// `["/app", "serve", "--server=http,ssh"]` so the beet container serves the
-	// site over http + ssh (the site itself is pulled from S3 at boot, not baked in).
+	// `["/app", "serve", "--server=http,ssh"]`, then the block's runtime args
+	// (eg `--store=s3://<bucket>`), so deploy config reaches the binary as argv
+	// (the site itself is pulled from S3 at boot, not baked in).
 	let cmd_json = core::iter::once("/app")
 		.chain(docker_config.cmd_args.iter().map(SmolStr::as_str))
+		.chain(block.runtime_args().iter().map(SmolStr::as_str))
 		.map(|arg| format!("\"{arg}\""))
 		.collect::<Vec<_>>()
 		.join(", ");

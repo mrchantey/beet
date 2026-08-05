@@ -102,11 +102,23 @@ async fn bind_connection(connection: AsyncEntity, server: Entity) -> Result {
 	if !targets.is_empty() {
 		connection.insert(ResetOnDisconnect).await?;
 	}
+	let connection_id = connection.id();
 	for target in targets {
 		connection
 			.world()
 			.entity(target)
-			.insert((socket_exchange(connection.id()), CapabilityBound))
+			.with(move |mut entity| {
+				// a route provider serves its `Request -> Response` pair through an
+				// `ActionOverload` adapting its typed canonical action (eg
+				// `TakePhoto`'s `() -> MediaBytes`), so rebinding swaps that
+				// adapter for the socket forward rather than touching the
+				// canonical slot: route dispatch resolves the overload, and the
+				// local handler returns when the scene resets on disconnect.
+				entity.insert((
+					ActionOverload::new(socket_exchange(connection_id)),
+					CapabilityBound,
+				));
+			})
 			.await?;
 	}
 	Ok(())

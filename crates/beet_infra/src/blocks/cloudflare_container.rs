@@ -36,9 +36,9 @@ pub struct CloudflareContainerBlock {
 	sleep_after: SmolStr,
 	/// Maximum concurrent container instances.
 	max_instances: u32,
-	/// Extra literal env injected into the container, eg the remote-store config
-	/// from `remote_env(..)`. `BEET_S3_ENDPOINT` + the R2 credentials are added by
-	/// the deploy action from the process environment.
+	/// Extra literal env injected into the container. The entry-store selection is
+	/// *not* env: the deploy action bakes `--store=s3://<bucket>?endpoint=..` into
+	/// the image `CMD`; only the R2 credentials (SDK convention) ride env.
 	env_vars: Vec<Variable>,
 }
 

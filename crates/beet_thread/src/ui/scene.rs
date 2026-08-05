@@ -152,8 +152,8 @@ mod test {
 			.render_plain()
 	}
 
-	/// The first rendered element with `tag`, eg the form's `<form>` or
-	/// `<input>` built from `CreatePostForm.bsx`.
+	/// The first rendered element with `tag`, eg the composer's `<form>` or
+	/// `<input>`.
 	fn element_by_tag(app: &mut App, tag: &str) -> Option<Entity> {
 		app.world_mut().with_state::<ElementQuery, _>(|elements| {
 			elements
@@ -562,11 +562,11 @@ mod test {
 		frame.as_str().xpect_contains("you said: hello");
 	}
 
-	/// The widget builds its `<form>` from `CreatePostForm.bsx` (interim-loaded
-	/// into the `BsxTemplateRegistry`), not inline rsx: mounting one yields a
-	/// rendered `<form>` with the `message` `<input>` and the `Send` `<button>`.
+	/// The widget builds its `<form>` from its rust template on add: mounting one
+	/// yields a rendered `<form>` with the `message` `<input>` and the `Send`
+	/// `<button>`.
 	#[beet_core::test]
-	async fn composer_renders_from_bsx() {
+	async fn composer_renders_form() {
 		let (mut app, host) = charcell_app().await;
 		let thread = app
 			.world_mut()

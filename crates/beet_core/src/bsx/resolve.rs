@@ -1588,6 +1588,29 @@ fn apply_resource_tag(
 	})
 }
 
+/// Marks the backing entity of a resource a markup scene declared, recording the
+/// template build root that created it, so scene teardown (`despawn_scene`)
+/// removes the resource *with that scene* and a rebuild reinserts it fresh from
+/// markup rather than patching stale live state.
+///
+/// The root is carried rather than implied so teardown is scoped: with two scenes
+/// loaded, despawning one must not take the other's resources with it. A
+/// teardown removes only the resources whose root is among the roots it is
+/// despawning, and treats a resource whose root has already gone as orphaned (it
+/// goes too, since nothing can rebuild it).
+///
+/// Only set when the markup *creates* the resource inside a template build; a
+/// resource that pre-existed (a plugin default) keeps its own lifetime and the
+/// markup only patches it. Edge case: two scenes declaring the same resource
+/// share one backing entity (the first creates and owns it, the second only
+/// patches), so tearing down the creating scene removes the resource for both.
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component)]
+pub struct SceneResource {
+	/// The template build root whose scene created this resource.
+	pub root: Entity,
+}
+
 /// Write a reflect patch to a [`ReflectResource`]-backed type: patch the live
 /// resource (missing fields keep their values) or, when absent, spawn it over
 /// the type's default. Resources are entity-backed, so this writes through the
@@ -1636,12 +1659,23 @@ fn write_resource_patch(
 					type_info.type_path()
 				);
 			}
+			// created by the markup: tie the backing entity to the build root (when
+			// inside a template build) so that scene's teardown, and only that
+			// scene's, removes the resource with it.
+			let scene_root = world
+				.get_resource::<TemplateBuildRoot>()
+				.map(|root| **root);
 			let resource_entity = world.spawn_empty().id();
 			reflect_component.insert(
 				&mut world.entity_mut(resource_entity),
 				patch,
 				&registry,
 			);
+			if let Some(root) = scene_root {
+				world
+					.entity_mut(resource_entity)
+					.insert(SceneResource { root });
+			}
 		}
 	}
 	Ok(())

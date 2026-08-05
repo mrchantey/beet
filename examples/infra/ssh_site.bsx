@@ -22,9 +22,9 @@ Live deploy needs AWS credentials, plus `tofu`, `cargo-zigbuild` and a container
 engine.
 -->
 <StackHost app_name="ssh-site">
-	<CrateCheck features="infra"/>
+	<CrateCheck features="infra,extra"/>
 	<Route path="deploy" {ExchangeSequence}>
-		<FargateSshBlock app_name="ssh-site"/>
+		<FargateSshBlock/>
 		<ExampleBinaryBuild example="ssh_tui_site" features="ssh_tui,http_server,markdown"/>
 		<TofuApplyAction/>
 		<BuildDockerImage/>

@@ -40,20 +40,19 @@ pub fn register_template_include(world: &mut World) {
 				);
 			}
 			let target = entity.id();
-			// park a pending dependency on the build root and spawn the async read +
-			// build, so `LoadTemplate` waits for the include and the runtime is never
-			// blocked. The ancestor store is resolved inside the task, where the whole
-			// tree is built, so it is reachable by ancestry.
+			// park a structural dependency on the build root and spawn the async
+			// read + build, so slot resolution and `LoadTemplate` wait for the
+			// include and the runtime is never blocked. The ancestor store is
+			// resolved inside the task, where the whole tree is built, so it is
+			// reachable by ancestry.
 			entity.world_scope(|world| -> Result {
-				let (async_world, spawner, root, pending_id) =
-					register_pending_fetch(world, target)?;
-				spawner.spawn(resolve_include(
-					async_world,
-					src,
+				let (async_world, spawner, guard) = register_pending_fetch(
+					world,
 					target,
-					root,
-					pending_id,
-				));
+					PendingKind::Structural,
+				)?;
+				spawner
+					.spawn(resolve_include(async_world, src, target, guard));
 				Ok(())
 			})
 		},
@@ -61,28 +60,23 @@ pub fn register_template_include(world: &mut World) {
 }
 
 /// Read + build a local `<Template src>` include, then resolve its pending
-/// dependency so `LoadTemplate` proceeds. Logs (rather than panics) on failure,
-/// leaving the include site empty, mirroring the remote-template resolver.
+/// dependency so slot resolution and `LoadTemplate` proceed. Logs (rather than
+/// panics) on failure, leaving the include site empty, mirroring the
+/// remote-template resolver.
 async fn resolve_include(
 	async_world: AsyncWorld,
 	src: SmolStr,
 	target: Entity,
-	root: Entity,
-	pending_id: PendingId,
+	guard: PendingGuard,
 ) {
-	if let Err(err) = read_and_build(&async_world, &src, target).await {
+	let root = guard.root();
+	if let Err(err) = read_and_build(&async_world, &src, target, root).await {
 		error!("`<Template src=\"{src}\">` include failed: {err}");
 	}
-	// resolve the dependency and drain the set, firing `LoadTemplate` once settled.
+	// resolve the dependency and drain the set: once the last structural
+	// dependency lands, the deferred slot resolution runs over the settled tree.
 	async_world
-		.with(move |world: &mut World| {
-			let mut root_entity = world.entity_mut(root);
-			if let Some(mut pending) = root_entity.get_mut::<TemplatePending>()
-			{
-				pending.resolve(pending_id);
-			}
-			drain_pending_dependencies(&mut root_entity);
-		})
+		.with(move |world: &mut World| guard.resolve(world))
 		.await;
 }
 
@@ -90,10 +84,16 @@ async fn resolve_include(
 /// the loaded root), read `src` through it, then parse and build the entry at the
 /// include site. A store-less tree is an error: every platform resolves includes
 /// through the store, never the filesystem directly (there is none on wasm).
+///
+/// The build runs under [`TemplateBuildRoot::scoped`] with the *original* build
+/// root, so a nested `<Template src>` inside the included entry parks its own
+/// dependency on the same root: the root settles (and its slots resolve) only
+/// once every level has built.
 async fn read_and_build(
 	async_world: &AsyncWorld,
 	src: &str,
 	target: Entity,
+	root: Entity,
 ) -> Result {
 	let store = async_world
 		.entity(target)
@@ -104,9 +104,11 @@ async fn read_and_build(
 	let media = store.get_media(&SmolPath::from(src)).await?;
 	async_world
 		.with(move |world: &mut World| -> Result {
-			let entry = EntryTemplate::from_bytes(world, &media)?;
-			world.entity_mut(target).build_template(&entry)?;
-			Ok(())
+			TemplateBuildRoot::scoped(world, root, |world| {
+				let entry = EntryTemplate::from_bytes(world, &media)?;
+				world.entity_mut(target).build_template(&entry)?;
+				Ok(())
+			})
 		})
 		.await
 }
@@ -216,6 +218,142 @@ mod test {
 			.unwrap()
 			.tag()
 			.xpect_eq("article");
+	}
+
+	/// Slot content *inside* an included entry resolves once the include settles:
+	/// the included `<Fragment slot="x">` collapses into the included `<Slot
+	/// name="x"/>`, leaving no routing markers behind. The resolution cannot run
+	/// mid-`build_root` (the include has not built yet), so it must run when the
+	/// pending set drains, just before the deferred [`LoadTemplate`].
+	#[beet_core::test]
+	async fn resolves_slots_in_included_content() {
+		let mut world =
+			(AsyncPlugin, TemplatePlugin, DocumentPlugin).into_world();
+		register_template_include(&mut world);
+
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&SmolPath::from("card.bsx"),
+				"<main><Slot name=\"x\"/><Fragment slot=\"x\"><b/></Fragment></main>",
+			)
+			.await
+			.unwrap();
+
+		let root = BsxTemplate::parse_entry(
+			&world,
+			"<article><Template src=\"card.bsx\"/></article>",
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+		world.entity_mut(root).insert(store);
+
+		// record the slot state the deferred LoadTemplate observes on the root.
+		let loaded_with_unresolved_slots = Store::new(None);
+		let observed = loaded_with_unresolved_slots.clone();
+		world.entity_mut(root).observe(
+			move |ev: On<LoadTemplate>, slots: Query<&SlotChild>| {
+				if ev.entity == root {
+					observed.set(Some(slots.iter().count()));
+				}
+			},
+		);
+		AsyncRunner::settle_async_tasks(&mut world).await;
+
+		// the include's slot content resolved: no routing markers survive anywhere.
+		world
+			.query::<&SlotChild>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
+		world
+			.query::<&SlotTarget>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
+		// the `<b/>` collapsed into `<main>` at the slot's position.
+		let tags = collect_tags(&mut world, root);
+		tags.contains(&"b".to_string()).xpect_true();
+		// and LoadTemplate fired with the slots already resolved.
+		loaded_with_unresolved_slots.get().xpect_eq(Some(0));
+	}
+
+	/// A nested include (`first.bsx` including `second.bsx`) parks its pending
+	/// dependency on the *original* build root, so the root's [`LoadTemplate`]
+	/// fires exactly once, after the whole tree (both levels) has built.
+	#[beet_core::test]
+	async fn nested_include_defers_root_load() {
+		let mut world =
+			(AsyncPlugin, TemplatePlugin, DocumentPlugin).into_world();
+		register_template_include(&mut world);
+
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&SmolPath::from("first.bsx"),
+				"<div><Template src=\"second.bsx\"/></div>",
+			)
+			.await
+			.unwrap();
+		store
+			.insert(&SmolPath::from("second.bsx"), "<span/>")
+			.await
+			.unwrap();
+
+		let root = BsxTemplate::parse_entry(
+			&world,
+			"<article><Template src=\"first.bsx\"/></article>",
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+		world.entity_mut(root).insert(store);
+
+		// record, per root LoadTemplate fire, whether the nested content existed.
+		let fires = Store::new(Vec::<bool>::new());
+		let recorded = fires.clone();
+		world.entity_mut(root).observe(
+			move |ev: On<LoadTemplate>, elements: Query<&Element>| {
+				if ev.entity == root {
+					let has_span =
+						elements.iter().any(|element| element.tag() == "span");
+					let mut all = recorded.get();
+					all.push(has_span);
+					recorded.set(all);
+				}
+			},
+		);
+		AsyncRunner::settle_async_tasks(&mut world).await;
+
+		// the nested content built through both include levels.
+		collect_tags(&mut world, root)
+			.contains(&"span".to_string())
+			.xpect_true();
+		// the root loaded exactly once, and only after the nested include built.
+		fires.get().xpect_eq(vec![true]);
+	}
+
+	/// Every element tag reachable under `root`.
+	fn collect_tags(world: &mut World, root: Entity) -> Vec<String> {
+		world.with_state::<Query<(Option<&Element>, Option<&Children>)>, _>(
+			|query| {
+				let mut tags = Vec::new();
+				let mut stack = vec![root];
+				while let Some(entity) = stack.pop() {
+					let Ok((element, children)) = query.get(entity) else {
+						continue;
+					};
+					if let Some(element) = element {
+						tags.push(element.tag().to_string());
+					}
+					if let Some(children) = children {
+						stack.extend(children.iter());
+					}
+				}
+				tags
+			},
+		)
 	}
 
 	/// A `<Fragment slot="x">` forwards every child into the named slot even with

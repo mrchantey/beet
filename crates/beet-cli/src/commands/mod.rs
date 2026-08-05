@@ -2,6 +2,7 @@
 
 mod analytics;
 mod check;
+mod entry;
 mod export_pdf;
 mod export_static;
 #[cfg(feature = "pdf")]
@@ -11,10 +12,10 @@ mod qrcode;
 mod run_wasm;
 mod s3_sync;
 mod serve;
-mod site;
 
 pub use analytics::*;
 pub use check::*;
+pub(crate) use entry::*;
 pub use export_pdf::*;
 pub use export_static::*;
 #[cfg(feature = "qrcode")]
@@ -22,7 +23,6 @@ pub use qrcode::*;
 pub use run_wasm::*;
 pub use s3_sync::*;
 pub use serve::*;
-pub(crate) use site::*;
 
 use beet::prelude::*;
 
@@ -36,7 +36,7 @@ impl Plugin for CliCommandsPlugin {
 		app.register_type::<AnalyticsReport>()
 			.register_type::<Check>()
 			.register_type::<ExportStatic>()
-			// `serve <site>` loads a site and boots its servers (the only command
+			// `serve <entry>` loads an entry and boots its servers (the only command
 			// that boots the workspace entry's server, via a direct boot call)
 			.register_type::<Serve>()
 			.register_type::<RunWasm>()
@@ -45,12 +45,13 @@ impl Plugin for CliCommandsPlugin {
 			.register_type::<SyncS3>();
 		#[cfg(feature = "qrcode")]
 		app.register_type::<QrCode>();
-		// the root `main.bsx` names the infra deploy blocks, which only register
-		// under the `infra` feature. Without it (the default `beet`, `beet run-wasm`,
-		// `beet build-wasm`, `beet serve`), allow them as known-but-inert tags so the
-		// entry still loads and the `deploy`/`sync`/`watch` routes render nothing,
-		// mirroring how `<LiveReloadScript>` degrades without `client_io`.
-		#[cfg(not(feature = "infra"))]
+		// the root `main.bsx` names the infra deploy blocks and templates, which
+		// only register under `infra` + `extra`. Without both (the default `beet`,
+		// `beet run-wasm`, `beet build-wasm`, `beet serve`), allow them as
+		// known-but-inert tags so the entry still loads and the
+		// `deploy`/`sync`/`watch` routes render nothing, mirroring how
+		// `<LiveReloadScript>` degrades without `client_io`.
+		#[cfg(not(all(feature = "infra", feature = "extra")))]
 		for tag in [
 			"BeetSiteDeployHost",
 			"FargateBeetSiteBlock",

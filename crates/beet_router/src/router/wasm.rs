@@ -12,8 +12,16 @@
 //! program is fetched at runtime in the browser rather than inlined at serve time.
 use beet_core::prelude::*;
 
-/// Emits the `<script type="module">` loader that boots a wasm `beet` binary in the
-/// browser: it imports the wasm-bindgen glue and calls `init({ module_or_path })`.
+/// Emits the `<script type="module">` loader that boots a wasm binary in the
+/// browser: it imports the wasm-bindgen glue, calls `init({ module_or_path })`,
+/// then awaits an exported async `start` *if the module has one* (the beet
+/// binary's wasm entry, shared with the deno runner; a long-running program's
+/// future never resolves, which a browser tab is fine with).
+///
+/// `start` is optional so this stays a general wasm loader: a module that boots
+/// from its `main` and needs no entry call mounts here unchanged. A static
+/// `import { start }` would instead fail module resolution outright, since a
+/// missing named export is a link error, not a runtime one.
 ///
 /// `js` defaults to `src` with its `.wasm` extension swapped for `.js` (the
 /// wasm-bindgen pair `build-wasm` emits), so a page need only name the `.wasm`.
@@ -33,10 +41,14 @@ pub fn Wasm(
 	} else {
 		js
 	};
-	// `init({ module_or_path })` is the wasm-bindgen `--target web` entry; the object
-	// form lets the page point at an explicit `.wasm` rather than the glue's default.
-	let body =
-		format!("import init from {js:?};\ninit({{ module_or_path: {src:?} }});");
+	// a dynamic import (not a static one) so a missing `start` is a `undefined`
+	// property rather than a module-resolution failure. `default` is the glue's
+	// `init`, the wasm-bindgen `--target web` entry; the object form lets the page
+	// point at an explicit `.wasm` rather than the glue's default. Module scripts
+	// support top-level await, so `start` runs after init resolves.
+	let body = format!(
+		"const mod = await import({js:?});\nawait mod.default({{ module_or_path: {src:?} }});\nawait mod.start?.();"
+	);
 	rsx! { <script type="module">{body}</script> }
 }
 
@@ -114,7 +126,9 @@ mod test {
 	}
 
 	// `<Wasm src>` emits the module loader, deriving the `.js` glue url from the
-	// `.wasm` name and calling `init({ module_or_path })`.
+	// `.wasm` name, calling the glue's default export (`init`) with an explicit
+	// `module_or_path`, then optionally awaiting `start`. The import is dynamic and
+	// the `start` call optional, so a module without that export still mounts.
 	#[beet_core::test]
 	fn wasm_emits_module_loader() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -124,8 +138,9 @@ mod test {
 			.id();
 		render(&mut world, root)
 			.xpect_contains("<script type=\"module\"")
-			.xpect_contains("import init from \"/assets/min.js\"")
-			.xpect_contains("module_or_path: \"/assets/min.wasm\"");
+			.xpect_contains("await import(\"/assets/min.js\")")
+			.xpect_contains("module_or_path: \"/assets/min.wasm\"")
+			.xpect_contains("await mod.start?.();");
 	}
 
 	// `<Wasm src js>` honours an explicit `js` glue url over the derived default.
@@ -136,7 +151,7 @@ mod test {
 			.spawn_template(rsx! { <Wasm src="/a/min.wasm" js="/b/glue.js"/> })
 			.unwrap()
 			.id();
-		render(&mut world, root).xpect_contains("import init from \"/b/glue.js\"");
+		render(&mut world, root).xpect_contains("await import(\"/b/glue.js\")");
 	}
 
 	// `<MainBsx src>` emits a `<script type=application/x-bsx data-src=src>` the

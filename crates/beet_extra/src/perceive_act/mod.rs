@@ -8,7 +8,7 @@
 //! capability over a socket to the client that serves it, bound by the
 //! [`capability_socket`] handshake; run standalone, the tools' own local
 //! handlers apply. Which prompt + images the creature plays is data, rotated in place
-//! each camera turn ([`maybe_rotate_scene`]) from scenes discovered in the blob store.
+//! by the [`RotateScene`] step from scenes discovered in the blob store.
 // the wire types + socket-client primitives shared with the wasm head; re-exported so
 // `crate::perceive_act::{DisplayedImage, WhoAmI, ClientRole, ..}` still resolve here.
 pub use crate::perceive_act_core::*;

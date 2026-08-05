@@ -133,7 +133,9 @@ pub impl EntityCommands<'_> {
 /// The build walker, run synchronously on a freshly designated `root`.
 ///
 /// 1. Build the template into the root, capturing any failure.
-/// 2. Resolve slots across the built subtree (skipped on a build failure).
+/// 2. Resolve slots across the built subtree, or defer the resolution to the
+///    drain when a [`PendingKind::Structural`] dependency (an async include) is
+///    still building content into it (skipped entirely on a build failure).
 /// 3. Fire [`SpawnTemplate`] on the root (the post-build boundary).
 /// 4. Drain the pending-dependency set, firing [`LoadTemplate`] when empty.
 ///
@@ -145,28 +147,45 @@ fn build_root(
 	root: Entity,
 	template: impl Template<Output = ()>,
 ) -> Result<(), CloneError> {
-	// expose the root so a deferred dependency (asset, remote schema, remote
-	// template) parks its pending id on it; restore any outer root afterwards so a
-	// nested `insert_template` build does not leak its root to the parent.
-	let previous_root = world.remove_resource::<TemplateBuildRoot>();
-	world.insert_resource(TemplateBuildRoot(root));
-
 	// caller content routed to the root before the build (eg the layout
 	// middleware's transcluded body, a `SlotChild` portal), to anchor onto the
 	// built layout once it exists.
 	let pre_slot_children = root_slot_children(world, root);
 
-	// step 1: build into the root, recording a failure rather than escaping it.
-	let build_result = world
-		.entity_mut(root)
-		.build_template(&template)
-		// step 1b: anchor the pre-build slot children onto the built layout's content
-		// root, so the layout's `<Slot>`s receive them regardless of how the root
-		// template built (clobbering the root's `Children`, or nesting the content
-		// under a tag-less wrapper when the document is multi-root).
-		.map(|()| anchor_pre_slot_children(world, root, &pre_slot_children))
-		// step 2: slots, only when the build itself succeeded.
-		.and_then(|()| resolve_slots(world, root));
+	// step 1: build into the root with it exposed as the build root, so a
+	// deferred dependency (asset, include, remote schema) parks its pending id
+	// on it; failures are recorded rather than escaped.
+	let build_result = TemplateBuildRoot::scoped(world, root, |world| {
+		world.entity_mut(root).build_template(&template)
+	})
+	// step 2: slot resolution, only when the build itself succeeded.
+	.and_then(|()| {
+		// apply queued dependency registrations (a routes-dir gate, a scene
+		// gate) so the deferral decision sees every parked dependency.
+		world.flush();
+		let structural_pending = world
+			.entity(root)
+			.get::<TemplatePending>()
+			.is_some_and(|pending| !pending.structural_empty());
+		if structural_pending {
+			// content is still arriving (an async include): park the pre-build
+			// snapshot and resolve slots once the tree settles, at the drain.
+			world
+				.entity_mut(root)
+				.get_mut::<TemplatePending>()
+				.unwrap()
+				.defer_slots(pre_slot_children);
+			Ok(())
+		} else {
+			// anchor the pre-build slot children onto the built layout's content
+			// root, so the layout's `<Slot>`s receive them regardless of how the
+			// root template built (clobbering the root's `Children`, or nesting
+			// the content under a tag-less wrapper when the document is
+			// multi-root), then resolve.
+			anchor_pre_slot_children(world, root, &pre_slot_children);
+			resolve_slots(world, root)
+		}
+	});
 	// a failure rides `TemplateError` + `LoadTemplate` *and* is returned, all
 	// sharing one `CloneError`.
 	let outcome = match build_result {
@@ -179,13 +198,6 @@ fn build_root(
 			Err(error)
 		}
 	};
-
-	match previous_root {
-		Some(previous) => world.insert_resource(previous),
-		None => {
-			world.remove_resource::<TemplateBuildRoot>();
-		}
-	}
 
 	let mut entity = world.entity_mut(root);
 	// step 3: the built signal / post-build phase boundary.
@@ -210,6 +222,8 @@ fn root_slot_children(world: &World, root: Entity) -> Vec<Entity> {
 
 /// Anchor the layout's pre-build [`SlotChild`] content (the transcluded portal)
 /// onto the built layout's *content root*, so the layout's `<Slot>`s receive it.
+/// Crate-visible so the deferred path ([`drain_pending_dependencies`]) runs the
+/// same anchoring once an async include settles.
 ///
 /// The root template may build in two ways that strand pre-added slot children:
 /// - a template-invocation root (`<SiteLayout/>`) whose body lowers to
@@ -224,7 +238,7 @@ fn root_slot_children(world: &World, root: Entity) -> Vec<Entity> {
 /// resolved by [`content_root`] (the built [`Element`], however many tag-less
 /// wrappers deep). This keeps the portal in the same scope as the layout's slot
 /// targets, matching the additive single-root element-root case.
-fn anchor_pre_slot_children(
+pub(crate) fn anchor_pre_slot_children(
 	world: &mut World,
 	root: Entity,
 	pre_slot_children: &[Entity],
@@ -515,7 +529,7 @@ mod test {
 					.entry::<TemplatePending>()
 					.or_default()
 					.get_mut()
-					.register();
+					.register(PendingKind::Passive);
 				self.0.set(Some(id));
 				OK
 			}
@@ -528,12 +542,99 @@ mod test {
 		// LoadTemplate is deferred while the dependency is outstanding.
 		load_fired.get().xpect_false();
 
-		// resolve it, then drain: now LoadTemplate fires.
+		// resolve it via the shared tail: now LoadTemplate fires.
 		let id = id_slot.get().unwrap();
-		let mut entity = world.entity_mut(root);
-		entity.get_mut::<TemplatePending>().unwrap().resolve(id);
-		drain_pending_dependencies(&mut entity);
+		TemplatePending::resolve_on(&mut world, root, id);
 		load_fired.get().xpect_true();
+	}
+
+	/// A structural dependency defers slot resolution to the drain: content
+	/// arriving asynchronously (the include shape) is slotted once the last
+	/// structural dependency resolves, and [`LoadTemplate`] fires after it.
+	#[beet_core::test]
+	fn structural_pending_defers_slots() {
+		let mut world = TemplatePlugin::world();
+		let load_state = Store::new(None);
+		let ls = load_state;
+		world.add_observer(move |ev: On<LoadTemplate>| {
+			ls.set(Some(ev.is_error))
+		});
+
+		// a template that builds a slot target, registers a structural
+		// dependency, and leaves its slot content for the "include" to add.
+		#[derive(Clone)]
+		struct DeferredContent(Store<Option<PendingId>>);
+		impl Template for DeferredContent {
+			type Output = ();
+			fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
+				let root = cx.entity.id();
+				let id = cx
+					.entity
+					.entry::<TemplatePending>()
+					.or_default()
+					.get_mut()
+					.register(PendingKind::Structural);
+				self.0.set(Some(id));
+				// SAFETY: building this template's own subtree under the root.
+				let world = unsafe { cx.entity.world_mut() };
+				let body = world.spawn((Name::new("body"), ChildOf(root))).id();
+				world.spawn((SlotTarget::new(), ChildOf(body)));
+				OK
+			}
+			fn clone_template(&self) -> Self { self.clone() }
+		}
+
+		let id_slot = Store::new(None);
+		let root = world.spawn_template(DeferredContent(id_slot)).unwrap().id();
+
+		// slots were deferred: the empty target survives, LoadTemplate deferred.
+		world
+			.query::<&SlotTarget>()
+			.iter(&world)
+			.count()
+			.xpect_eq(1);
+		load_state.get().xpect_none();
+
+		// the "include" resolves: it adds slot content, then resolves the id.
+		world.spawn((Name::new("content"), SlotChild::new(), ChildOf(root)));
+		let id = id_slot.get().unwrap();
+		TemplatePending::resolve_on(&mut world, root, id);
+
+		// the deferred resolution ran over the settled tree: content slotted,
+		// markers gone, LoadTemplate fired without error.
+		world
+			.query::<&SlotTarget>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
+		world
+			.query::<&SlotChild>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
+		load_state.get().xpect_eq(Some(false));
+	}
+
+	/// A guard dropped unresolved (a dead task) resolves through the sweep, so
+	/// the root's [`LoadTemplate`] can never hang on a lost dependency.
+	#[beet_core::test]
+	fn dropped_guard_resolves_via_sweep() {
+		let mut world = TemplatePlugin::world();
+		let load_fired = Store::new(false);
+		let lf = load_fired;
+		world.add_observer(move |_: On<LoadTemplate>| lf.set(true));
+
+		let root = world.spawn_empty().id();
+		let guard =
+			TemplatePending::park(&mut world, root, PendingKind::Passive);
+		// simulate a task dying without resolving.
+		drop(guard);
+		load_fired.get().xpect_false();
+
+		TemplatePending::sweep_dropped(&mut world);
+		load_fired.get().xpect_true();
+		// a second sweep is a no-op: the id already resolved, no re-fire.
+		world.entity_mut(root).remove::<TemplatePending>();
 	}
 
 	#[beet_core::test]

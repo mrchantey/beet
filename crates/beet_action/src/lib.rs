@@ -21,7 +21,16 @@ pub mod prelude {
 	pub use crate::control_flow::Outcome::Fail;
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
-	#[cfg(feature = "scripting")]
+	// mirrors the `scripting::script` module gate: on a wasm quickjs-only build
+	// the module has no public surface, so a plain `scripting` gate would warn.
+	#[cfg(all(
+		feature = "scripting",
+		feature = "serde",
+		any(
+			feature = "rhai",
+			all(feature = "quickjs", not(target_arch = "wasm32"))
+		)
+	))]
 	pub use crate::scripting::*;
 }
 

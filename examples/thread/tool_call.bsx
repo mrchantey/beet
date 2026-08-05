@@ -9,7 +9,7 @@ tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
 renders inline so it stays in the terminal scrollback after exit.
 -->
 <div>
-	<CrateCheck features="thread"/>
+	<CrateCheck features="thread,extra"/>
 	<div {RepeatTimes{total_times:2}} {CreateThread}>
 		<div bx:ref="thread" {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">

@@ -29,6 +29,12 @@ pub struct LightsailBlock {
 	/// in the lightsail instance.
 	#[serde(default)]
 	env_vars: Vec<Variable>,
+	/// Args appended to the systemd `ExecStart` binary invocation, eg
+	/// `--store=s3://<bucket>` so the deployed binary loads its entry from the
+	/// site bucket. The env-free channel for deploy config the binary reads as
+	/// argv.
+	#[serde(default)]
+	runtime_args: Vec<SmolStr>,
 	/// Optional domain for HTTPS via Caddy reverse proxy with automatic
 	/// Let's Encrypt certificates. When `None`, serves plain HTTP on port 80.
 	/// DNS must be configured to point this domain to the instance's public IP.
@@ -62,6 +68,7 @@ impl Default for LightsailBlock {
 			bundle_id: "nano_3_0".into(),
 			networking: LightsailNetworking::default(),
 			env_vars: Vec::new(),
+			runtime_args: Vec::new(),
 			app_port: None,
 		}
 	}
@@ -120,6 +127,13 @@ impl LightsailBlock {
 		let deploy_timestamp = stack.deploy_timestamp();
 		let label = &self.label;
 		let app_port = self.app_port();
+		// runtime args ride the ExecStart invocation (space-joined, so an arg must
+		// not contain spaces), keeping deploy config on argv rather than env.
+		let exec_args = self
+			.runtime_args
+			.iter()
+			.map(|arg| format!(" {arg}"))
+			.collect::<String>();
 
 		// build optional HTTPS setup via Caddy
 		let https_setup = if let Some(domain) = &self.domain {
@@ -211,7 +225,7 @@ Description={app_name}
 After=network.target
 [Service]
 Type=simple
-ExecStart=/opt/{app_name}/app
+ExecStart=/opt/{app_name}/app{exec_args}
 WorkingDirectory=/opt/{app_name}
 Restart=always
 RestartSec=3

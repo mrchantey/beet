@@ -57,13 +57,19 @@ pub struct FargateBlock {
 	#[serde(default)]
 	env_vars: Vec<Variable>,
 	/// Plain static environment variables injected directly into the task, eg
-	/// `BEET_SERVICE_ACCESS=remote`, the S3 bucket names the container reads its
-	/// site and assets from, and `BEET_SSH_HOST_KEY` (so every task shares one
-	/// stable ssh fingerprint). Unlike [`env_vars`](Self::env_vars) these are
-	/// literal values, not terraform variable references.
+	/// the assets/analytics resource names and `BEET_SSH_HOST_KEY` (so every task
+	/// shares one stable ssh fingerprint). Unlike [`env_vars`](Self::env_vars)
+	/// these are literal values, not terraform variable references. Entry-store
+	/// selection is *not* env: it rides [`runtime_args`](Self::runtime_args).
 	#[serde(default)]
 	#[set_with(skip)]
 	static_env: Vec<(SmolStr, SmolStr)>,
+	/// Args appended to the container binary's `CMD` (after any
+	/// `BuildDockerImage` `cmd_args`), eg `--store=s3://<bucket>` so the deployed
+	/// binary loads its entry from the site bucket. The env-free channel for
+	/// deploy config the binary reads as argv.
+	#[serde(default)]
+	runtime_args: Vec<SmolStr>,
 	/// DNS + HTTPS configuration, one entry per hostname the NLB answers. When
 	/// non-empty, a single ACM certificate is provisioned covering every
 	/// authority (the first is the cert's primary domain, the rest are subject
@@ -119,6 +125,7 @@ impl Default for FargateBlock {
 			container_image: ContainerImage::default(),
 			env_vars: Vec::new(),
 			static_env: Vec::new(),
+			runtime_args: Vec::new(),
 		}
 	}
 }

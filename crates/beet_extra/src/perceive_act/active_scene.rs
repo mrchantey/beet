@@ -6,12 +6,12 @@
 //! turn (never mutating or clearing the window), so the creature carries its memory
 //! across incarnations.
 //!
-//! [`maybe_rotate_scene`] runs at the start of each camera turn ([`PostPhoto`]): it
-//! discovers the catalog on the first run and, every `every_cycles`, advances to the
-//! next scene. The chosen scene's images populate a [`StringEnumOptions`] (via
-//! [`sync_image_options`]) so the model's `respond-multi-modal` `image` field is
-//! constrained to the scene's titles, and [`RespondMultiModalAction`] maps the chosen
-//! title to its url.
+//! [`RotateScene`] runs as its own `Sequence` step before the camera turn
+//! ([`PostPhoto`]): it discovers the catalog on the first run and, every
+//! `every_cycles`, advances to the next scene. The chosen scene's images populate a
+//! [`StringEnumOptions`] (via [`sync_image_options`]) so the model's
+//! `respond-multi-modal` `image` field is constrained to the scene's titles, and
+//! [`RespondMultiModalAction`] maps the chosen title to its url.
 use super::*;
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
@@ -64,7 +64,22 @@ pub enum SceneOrder {
 	Random,
 }
 
-/// The discovered scene catalog, filled lazily on the first [`maybe_rotate_scene`] run.
+/// Rotate the scene if due, as its own step in the thread `Sequence`, placed
+/// before the camera's turn: the first run discovers the catalog and applies
+/// the configured initial scene; each [`SceneRotation::every_cycles`] boundary
+/// appends the next character as a user turn. A no-op without a
+/// [`SceneRotation`] ancestor.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+#[require(Action<(), Outcome> = Action::new_async(rotate_scene_action))]
+pub struct RotateScene;
+
+async fn rotate_scene_action(cx: ActionContext) -> Result<Outcome> {
+	maybe_rotate_scene(&cx.caller).await?;
+	Ok(Pass(()))
+}
+
+/// The discovered scene catalog, filled lazily on the first [`RotateScene`] run.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct SceneCatalog {
@@ -146,9 +161,10 @@ struct Plan {
 
 /// Discover the scene catalog on the first call, then every
 /// [`SceneRotation::every_cycles`] advance to the next scene, applying it in place.
-/// Called at the start of the camera's turn ([`PostPhoto`](super::PostPhoto)), so a
-/// fresh character is appended as a user turn just before the fresh photo.
-pub(crate) async fn maybe_rotate_scene(caller: &AsyncEntity) -> Result {
+/// Runs as the [`RotateScene`] step just before the camera's turn
+/// ([`PostPhoto`](super::PostPhoto)), so a fresh character is appended as a user
+/// turn just before the fresh photo.
+async fn maybe_rotate_scene(caller: &AsyncEntity) -> Result {
 	// gather config + rotation state (and one random seed) in a single world access.
 	// no `SceneRotation` ancestor means rotation is not configured (eg a standalone
 	// `PostPhoto`), so skip silently.
@@ -320,10 +336,29 @@ async fn apply_scene(
 	caller
 		.with_state::<(ThreadWindowQuery, AncestorQuery<&mut ActiveScene>), _>(
 			move |entity, (mut windows, mut actives)| -> Result {
-				// author the scene prompt as the camera actor this runs as (user role).
 				let thread_id = windows.thread_id(entity)?;
-				let author = windows.actor_id(entity)?;
-				windows.window_mut(entity)?.upsert_post(AgentPost::new_text(
+				// author as this entity's actor when it runs inside one (an
+				// `ActorRef`), else as the thread's first user-kind actor: the
+				// standalone `<RotateScene/>` step appends scene characters as
+				// user turns, the camera's role.
+				let author = windows.actor_id(entity).ok();
+				let mut window = windows.window_mut(entity)?;
+				let author = author
+					.or_else(|| {
+						window
+							.actors()
+							.values()
+							.filter(|actor| actor.kind() == ActorKind::User)
+							.map(|actor| actor.id())
+							.min()
+					})
+					.ok_or_else(|| {
+						bevyhow!(
+							"scene rotation needs an author: no ActorRef on \
+							the caller and no user-kind actor in the window"
+						)
+					})?;
+				window.upsert_post(AgentPost::new_text(
 					author,
 					thread_id,
 					prompt,
