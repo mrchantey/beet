@@ -4,15 +4,14 @@
 //! output).
 //!
 //! Both are thin Request/Response wrappers; the eval machinery (typed runs and
-//! console capture, for every backend) lives upstream on [`Script`] in
-//! `beet_action`. This module only bridges a [`Request`] into a script `input` and
-//! wraps the result in a [`Response`]. The request `input` is marshalled through
-//! beet's own [`Value`], so the module is backend-agnostic and not json-gated.
+//! console capture, and the compile-time backend selection behind them) lives
+//! upstream on [`Script`] in `beet_action`. This module only bridges a [`Request`]
+//! into a script `input` and wraps the result in a [`Response`], so it registers
+//! and compiles whether or not a backend is present.
 
 use crate::prelude::*;
 use beet_action::prelude::Script;
 use beet_action::prelude::ScriptAction;
-use beet_action::prelude::ScriptLanguage;
 use beet_core::prelude::*;
 use beet_net::prelude::FromRequest;
 use beet_net::prelude::PathPartial;
@@ -39,17 +38,10 @@ use std::marker::PhantomData;
 /// <script {(ExchangeScriptElement, CallOnLoad)}>console.log("hello world")</script>
 /// ```
 ///
-/// The backend is the element's `language` attribute ([`ScriptLanguage::from_str`]),
-/// falling back to the build default ([`ScriptLanguage::default`]) when absent:
-///
-/// ```bsx
-/// <script language="rhai" {(ExchangeScriptElement, CallOnLoad)}>print("hello world")</script>
-/// ```
-///
 /// Being async, it awaits the full request body and includes it in the `input` (so
 /// a `POST` body reaches the script at `input.body`). The console-capture machinery
-/// is [`Script::run_captured`]; this action only reads the element text/attributes
-/// and shapes the request into the script `input`. The sibling of the typed
+/// is [`Script::run_captured`]; this action only reads the element text and
+/// shapes the request into the script `input`. The sibling of the typed
 /// [`ExchangeScript`] route (which serves a `Script`'s typed output instead
 /// of its console).
 #[action(handler_only)]
@@ -59,29 +51,18 @@ pub async fn ExchangeScriptElement(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let entity = cx.id();
-	// the element's raw-text body and its `language`, read together from the world.
-	let (script, language) = cx
+	// the element's raw-text body, read from the world.
+	let script = cx
 		.world()
-		.with_state::<(ElementTextQuery, AttributeQuery), _>(
-			move |(elements, attributes)| {
-				let script = elements.text_content(entity);
-				// fall back to the build default when the attribute is absent or
-				// names an unavailable language.
-				let language = attributes
-					.find(entity, "language")
-					.and_then(|(_, value)| value.as_str().ok())
-					.and_then(|name| name.parse::<ScriptLanguage>().ok())
-					.unwrap_or_default();
-				(script, language)
-			},
-		)
+		.with_state::<ElementTextQuery, _>(move |elements| {
+			elements.text_content(entity)
+		})
 		.await;
 	if script.trim().is_empty() {
 		return Response::ok().xok();
 	}
 	let input = request_input(cx.take()).await?;
-	let body =
-		Script::<Value, ()>::new(language, script).run_captured(input)?;
+	let body = Script::<Value, ()>::new(script).run_captured(input).await?;
 	Response::ok().with_body(body).xok()
 }
 
@@ -192,27 +173,20 @@ where
 /// route, so a no-code entry declares one without spelling the generic types:
 ///
 /// ```bsx
-/// <ScriptRoute path="add" language="js"
+/// <ScriptRoute path="add"
 ///   script='"result: " + (Number(input.url.params.a[0]) + Number(input.url.params.b[0]))'/>
 /// ```
 ///
-/// The `language` attribute selects the backend ([`ScriptLanguage::from_str`]),
-/// falling back to the build default ([`ScriptLanguage::default`]) when absent or
-/// unavailable, so a quickjs binary runs JavaScript with the request as its `input`
-/// (a quickjs `RequestParts` exposes the query params at `input.url.params`).
+/// The script runs with the request as its `input`, so a `RequestParts` script
+/// reaches the query params at `input.url.params`.
 #[template]
 pub fn ScriptRoute(
 	#[prop(into)] path: String,
 	#[prop(into)] script: String,
-	language: Option<String>,
 ) -> impl Bundle {
-	// read the `language` attribute, falling back to the build default.
-	let language = language
-		.and_then(|name| name.parse::<ScriptLanguage>().ok())
-		.unwrap_or_default();
 	(
 		PathPartial::new(path),
-		Script::<RequestParts, String>::new(language, script),
+		Script::<RequestParts, String>::new(script),
 		ExchangeScript::<RequestParts, String, _, _>::default(),
 	)
 }
@@ -222,7 +196,7 @@ pub fn ScriptRoute(
 /// as the route response. Regression: requiring only `Script` left the route without
 /// an `ActionMeta`, so it never joined the `RouteTree`.
 #[cfg(test)]
-#[cfg(feature = "rhai")]
+#[cfg(feature = "quickjs")]
 mod route_test {
 	use crate::prelude::*;
 	use beet_action::prelude::*;
@@ -234,7 +208,7 @@ mod route_test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((default_router(), children![(
-				Script::<(), String>::rhai(r#""hello world""#),
+				Script::<(), String>::new(r#""hello world""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("greet"),
 			)]))
@@ -245,23 +219,27 @@ mod route_test {
 			.xpect_contains("hello world");
 	}
 
-	/// `ScriptRoute`'s `language` attribute is parsed into the built [`Script`]'s
-	/// backend, so `language="rhai"` yields a rhai script (not the build default).
+	/// The markup front-end builds a working route: `<ScriptRoute>` expands to the
+	/// `(PathPartial, Script, ExchangeScript)` triple, so the spawned entity serves
+	/// its script's output over the request parts it is dispatched with.
 	#[beet_core::test]
-	fn script_route_reads_language() {
+	async fn script_route_serves_its_script() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<ScriptRoute path="greet" language="rhai" script={r#""hi""#}/>
+				<ScriptRoute path="greet"
+					script={r#""hello " + input.url.params.name[0]"#}/>
 			})
 			.unwrap()
 			.id();
 		world
-			.entity(root)
-			.get::<Script<RequestParts, String>>()
+			.entity_mut(root)
+			.call::<Request, Response>(Request::get("greet?name=world"))
+			.await
 			.unwrap()
-			.language
-			.xpect_eq(ScriptLanguage::Rhai);
+			.unwrap_str()
+			.await
+			.xpect_contains("hello world");
 	}
 }
 
@@ -270,7 +248,7 @@ mod route_test {
 /// Tested through the quickjs backend (the json-bearing backend in the test matrix),
 /// whose `console.log` is the stdout channel.
 #[cfg(test)]
-#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
+#[cfg(feature = "quickjs")]
 mod entry_test {
 	use crate::prelude::*;
 	use beet_action::prelude::*;
@@ -309,31 +287,4 @@ mod entry_test {
 			.xpect_eq("hello body\n".to_string());
 	}
 
-	/// The `language` attribute selects the backend: a `language="rhai"` element runs
-	/// its body through rhai (a `print`, which the default quickjs backend would
-	/// reject) rather than the build default. Spawns the attribute as a related
-	/// [`AttributeOf`] entity, mirroring parsed markup.
-	#[cfg(feature = "rhai")]
-	#[beet_core::test]
-	async fn script_entry_reads_language_attribute() {
-		let mut world = AsyncPlugin::world();
-		let element = world
-			.spawn((ExchangeScriptElement, children![Value::Str(
-				r#"print("from rhai")"#.into()
-			)]))
-			.id();
-		world.spawn((
-			AttributeOf::new(element),
-			Attribute::new("language"),
-			Value::Str("rhai".into()),
-		));
-		world
-			.entity_mut(element)
-			.call::<Request, Response>(Request::get("/"))
-			.await
-			.unwrap()
-			.unwrap_str()
-			.await
-			.xpect_eq("from rhai\n".to_string());
-	}
 }

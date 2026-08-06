@@ -21,26 +21,21 @@ pub mod prelude {
 	pub use crate::control_flow::Outcome::Fail;
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
-	// mirrors the `scripting::script` module gate: on a wasm quickjs-only build
-	// the module has no public surface, so a plain `scripting` gate would warn.
-	#[cfg(all(
-		feature = "scripting",
-		feature = "serde",
-		any(
-			feature = "rhai",
-			all(feature = "quickjs", not(target_arch = "wasm32"))
-		)
-	))]
+	#[cfg(feature = "scripting")]
 	pub use crate::scripting::*;
 }
 
 /// Re-exported third-party crates, so downstream consumers (eg `no_std`
-/// embedded targets) can reach the [`rhai`] engine through beet rather than
+/// embedded targets) can reach the [`rquickjs`] engine through beet rather than
 /// declaring their own pinned dependency.
+///
+/// The wasm engine comes from a fork declared under a renamed key (see
+/// `beet_action/Cargo.toml`), aliased back here so consumers name `rquickjs` on
+/// either target.
 #[allow(unused)]
 pub mod exports {
-	#[cfg(feature = "rhai")]
-	pub use rhai;
 	#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
 	pub use rquickjs;
+	#[cfg(all(feature = "quickjs", target_arch = "wasm32"))]
+	pub use rquickjs_wasm as rquickjs;
 }

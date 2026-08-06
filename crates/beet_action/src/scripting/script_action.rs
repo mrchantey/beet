@@ -9,6 +9,10 @@ use serde::de::DeserializeOwned;
 /// Requires a [`Script`] sibling (via `#[require]`), so adding a `ScriptAction`
 /// is enough to make a scripted entity callable as a behaviour-tree leaf.
 ///
+/// Async, like [`Script::run`] itself: the embedded engine resolves immediately,
+/// while every other backend is a child process or host isolate reached over a
+/// message channel.
+///
 /// ## Errors
 ///
 /// Errors if the caller has no matching [`Script`] component, or if the
@@ -16,17 +20,24 @@ use serde::de::DeserializeOwned;
 #[action]
 #[derive(Component)]
 #[require(Script<Input, Output>)]
-pub fn ScriptAction<Input, Output>(
-	cx: In<ActionContext<Input>>,
-	scripts: Query<&Script<Input, Output>>,
+pub async fn ScriptAction<Input, Output>(
+	cx: ActionContext<Input>,
 ) -> Result<Output>
 where
 	Input: 'static + Send + Sync + Serialize,
 	Output: 'static + Send + Sync + DeserializeOwned,
 {
 	let entity = cx.id();
-	let script = scripts.get(entity).map_err(|err| {
-		bevyhow!("ScriptAction caller {entity:?} has no Script: {err}")
-	})?;
-	script.run(cx.input)
+	// the script is cloned out of the world rather than borrowed: the eval is
+	// awaited, and the world moves on in the meantime.
+	let script = cx
+		.world()
+		.with_state::<Query<&Script<Input, Output>>, _>(move |scripts| {
+			scripts.get(entity).ok().cloned()
+		})
+		.await
+		.ok_or_else(|| {
+			bevyhow!("ScriptAction caller {entity:?} has no Script")
+		})?;
+	script.run(cx.take()).await
 }

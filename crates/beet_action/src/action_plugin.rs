@@ -55,18 +55,8 @@ impl Plugin for ActionPlugin {
 			// long-running action lifecycle
 			.add_systems(Update, tick_run_timers)
 			.add_plugins(running_plugin::<(), Outcome>);
-		// mirrors the `scripting::script` module gate: the typed `Script` only
-		// exists with `serde` + a usable engine (quickjs is native-only).
-		#[cfg(all(
-			feature = "scripting",
-			feature = "serde",
-			any(
-				feature = "rhai",
-				all(feature = "quickjs", not(target_arch = "wasm32"))
-			)
-		))]
-		app.register_type::<ScriptLanguage>()
-			.register_type::<Script<(), String>>();
+		#[cfg(feature = "scripting")]
+		app.register_type::<Script<(), String>>();
 		// the external-process leaf needs the native `ChildProcess` to spawn, so it
 		// (and its action marker) only exist on a native std build. `Command` is
 		// crate-qualified to disambiguate it from bevy's `Command` trait, both in

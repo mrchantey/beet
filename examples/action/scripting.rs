@@ -1,13 +1,13 @@
 //! # Scripting - User-Authored Behavior
 //!
 //! A [`Script`] turns an entity into a pure `Input -> Output` action
-//! whose body is rhai source instead of compiled Rust. The action input
+//! whose body is JavaScript instead of compiled Rust. The action input
 //! is bound to a variable named `input`; the script's final expression
 //! is the output.
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example scripting --features rhai_serde
+//! cargo run --example scripting --features quickjs
 //! ```
 use beet::prelude::*;
 use serde::Deserialize;
@@ -35,7 +35,7 @@ fn setup(async_commands: AsyncCommands) {
 			.with(|world: &mut World| {
 				world
 					.spawn((
-						Script::<i64, i64>::rhai("input + 1"),
+						Script::<i64, i64>::new("input + 1"),
 						ScriptAction::<i64, i64>::default(),
 					))
 					.id()
@@ -49,7 +49,7 @@ fn setup(async_commands: AsyncCommands) {
 			.with(|world: &mut World| {
 				world
 					.spawn((
-						Script::<String, String>::rhai(r#""hello " + input"#),
+						Script::<String, String>::new(r#""hello " + input"#),
 						ScriptAction::<String, String>::default(),
 					))
 					.id()
@@ -66,7 +66,7 @@ fn setup(async_commands: AsyncCommands) {
 			.with(|world: &mut World| {
 				world
 					.spawn((
-						Script::<Player, Player>::rhai(
+						Script::<Player, Player>::new(
 							"input.score += 100; input",
 						),
 						ScriptAction::<Player, Player>::default(),

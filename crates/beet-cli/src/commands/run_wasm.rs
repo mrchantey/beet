@@ -102,6 +102,12 @@ async fn run_wasm(exe_path: &Path, args: Vec<String>) -> Result {
 		"--allow-write".to_string(),
 		"--allow-net".to_string(),
 		"--allow-env".to_string(),
+		// the `Script` worker backend spawns each eval in a `permissions: "none"`
+		// Worker, which deno still gates behind this flag. Without it the
+		// permission descriptor is rejected and the isolate would inherit the
+		// runner's own (wide) authority, so the backend refuses to run rather
+		// than silently downgrading.
+		"--unstable-worker-options".to_string(),
 		runner_dir.join("deno.ts").to_string_lossy().to_string(),
 	];
 	deno_args.extend(args);

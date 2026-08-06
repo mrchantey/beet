@@ -47,7 +47,7 @@ fn main() -> AppExit {
 		.run()
 }
 
-/// Query params for the scripted greet route, exposed to the rhai
+/// Query params for the scripted greet route, exposed to the
 /// script as `input.name`.
 #[derive(Serialize, Deserialize, TypePath)]
 struct GreetRequest {
@@ -86,17 +86,17 @@ fn route_bundle() -> impl Bundle {
 		default_router(),
 		children![
 			(
-				Script::<(), String>::rhai(r#""hello world""#),
+				Script::<(), String>::new(r#""hello world""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new(""),
 			),
 			(
-				Script::<(), String>::rhai(r#""hello foo""#),
+				Script::<(), String>::new(r#""hello foo""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("foo"),
 			),
 			(
-				Script::<QueryParams<GreetRequest>, String>::rhai(
+				Script::<QueryParams<GreetRequest>, String>::new(
 					r#""hello " + input.name"#,
 				),
 				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(
@@ -106,7 +106,7 @@ fn route_bundle() -> impl Bundle {
 			// same idea, but the script receives the full [`RequestParts`]
 			// and digs out the `name` query parameter itself.
 			(
-				Script::<RequestParts, String>::rhai(
+				Script::<RequestParts, String>::new(
 					r#""hello " + input.url.params.name[0]"#,
 				),
 				ExchangeScript::<RequestParts, String, _, _>::default(),

@@ -193,10 +193,9 @@ impl Plugin for RouterPlugin {
 				.register_template::<ScriptRoute>();
 
 			// the `ExchangeScriptElement` console-capturing entry action, so a
-			// `<script {ExchangeScriptElement}>` entry resolves it. Native runs through
-			// the default backend (quickjs/rhai); wasm runs in the host realm. The
-			// request `input` marshals through beet's [`Value`], so it rides the
-			// backend-agnostic `scripting` feature, not `json`.
+			// `<script {ExchangeScriptElement}>` entry resolves it. The backend it
+			// runs on is `Script`'s compile-time choice, so this registration rides
+			// the backend-agnostic `scripting` feature.
 			#[cfg(feature = "scripting")]
 			app.register_type::<ExchangeScriptElement>();
 

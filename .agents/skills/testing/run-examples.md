@@ -31,10 +31,10 @@ cargo run --example long_running    --features=action       # 1.3s timer chain
 cargo run --example malenia         --features=action,rand  # BT + utility AI
 ```
 
-### 2. Scripting (`--features=rhai_serde`)
+### 2. Scripting (`--features=quickjs`)
 
 ```sh
-cargo run --example scripting --features=rhai_serde         # rhai Script<I,O>
+cargo run --example scripting --features=quickjs             # JS Script<I,O>
 ```
 
 ### 3. Router (`--features=router,markdown` / plus extras)
@@ -44,9 +44,9 @@ CLI router server, persisted router, and the codegen pipeline.
 ```sh
 cargo run --example router           --features=router,markdown
 cargo run --example router           --features=router,markdown -- about
-cargo run --example cli              --features=router,rhai_serde -- greet --name=world
-cargo run --example router_serde     --features=router,rhai_serde,template_serde
-cargo run --example router_serde     --features=router,rhai_serde,template_serde -- greet --name=world
+cargo run --example cli              --features=router,quickjs -- greet --name=world
+cargo run --example router_serde     --features=router,quickjs,template_serde
+cargo run --example router_serde     --features=router,quickjs,template_serde -- greet --name=world
 # rsx_site is a crate, not a root example: generate its routes, then serve. It
 # scans typed pages, markdown content and a server action from three collections.
 cargo run -p rsx_site --no-default-features --features codegen   # regenerate src/codegen/

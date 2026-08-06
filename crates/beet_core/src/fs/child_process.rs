@@ -82,6 +82,24 @@ impl ChildHandle {
 			.await
 			.map_err(|err| bevyhow!("child process failed: {err}"))
 	}
+
+	/// Take the child's piped stdin, `None` unless spawned with
+	/// [`spawn_piped`](ChildProcess::spawn_piped) or already taken.
+	pub fn take_stdin(&mut self) -> Option<async_process::ChildStdin> {
+		self.inner.stdin.take()
+	}
+
+	/// Take the child's piped stdout, `None` unless spawned with
+	/// [`spawn_piped`](ChildProcess::spawn_piped) or already taken.
+	pub fn take_stdout(&mut self) -> Option<async_process::ChildStdout> {
+		self.inner.stdout.take()
+	}
+
+	/// Take the child's piped stderr, `None` unless spawned with
+	/// [`spawn_piped`](ChildProcess::spawn_piped) or already taken.
+	pub fn take_stderr(&mut self) -> Option<async_process::ChildStderr> {
+		self.inner.stderr.take()
+	}
 }
 
 impl Drop for ChildHandle {
@@ -132,9 +150,15 @@ impl ChildProcess {
 		self
 	}
 
-	/// Run the command, collecting stdout
-	#[track_caller]
-	pub fn run(self) -> Result<Output> {
+	/// The configured command: program, args, cwd, env additions and removals,
+	/// and the unix process group when requested. The single place that
+	/// translation happens, so every run/spawn variant below is only a choice of
+	/// how to drive it.
+	///
+	/// Built as a `std` command because the unix process-group extension applies
+	/// there and `async_process`'s sealed `CommandExt` does not expose it; an
+	/// async caller converts with `async_process::Command::from`.
+	fn into_command_std(&self) -> std::process::Command {
 		let mut cmd = std::process::Command::new(self.command.as_str());
 		for (key, val) in &self.envs {
 			cmd.env(key.as_str(), val.as_str());
@@ -145,7 +169,20 @@ impl ChildProcess {
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
 		}
-		cmd.args(self.args.iter().map(SmolStr::as_str))
+		cmd.args(self.args.iter().map(SmolStr::as_str));
+		#[cfg(unix)]
+		if self.group {
+			use std::os::unix::process::CommandExt;
+			// pgid 0 = a fresh group led by the child, so kill can target `-pid`.
+			cmd.process_group(0);
+		}
+		cmd
+	}
+
+	/// Run the command, collecting stdout
+	#[track_caller]
+	pub fn run(self) -> Result<Output> {
+		self.into_command_std()
 			.output()
 			.xmap(|result| self.map_result(result))?
 			.xmap(|output| self.map_output(output))
@@ -158,35 +195,15 @@ impl ChildProcess {
 			.map(|output| String::from_utf8_lossy(&output.stdout).to_string())
 	}
 
-	/// Convert this `ChildProcess` into a `std::process::Command` without running it.
+	/// Convert this `ChildProcess` into an `async_process::Command` without
+	/// running it.
 	pub fn into_command_async(self) -> async_process::Command {
-		let mut cmd = async_process::Command::new(self.command.as_str());
-		for (key, val) in &self.envs {
-			cmd.env(key.as_str(), val.as_str());
-		}
-		for key in &self.env_removals {
-			cmd.env_remove(key.as_str());
-		}
-		if let Some(dir) = &self.cwd {
-			cmd.current_dir(dir);
-		}
-		cmd.args(self.args.iter().map(SmolStr::as_str));
-		cmd
+		self.into_command_std().into()
 	}
 
 	/// Run the command asynchronously using `async_process`, collecting stdout.
 	pub async fn run_async(self) -> Result<Output> {
-		let mut cmd = async_process::Command::new(self.command.as_str());
-		for (key, val) in &self.envs {
-			cmd.env(key.as_str(), val.as_str());
-		}
-		for key in &self.env_removals {
-			cmd.env_remove(key.as_str());
-		}
-		if let Some(dir) = &self.cwd {
-			cmd.current_dir(dir);
-		}
-		cmd.args(self.args.iter().map(SmolStr::as_str))
+		async_process::Command::from(self.into_command_std())
 			.output()
 			.await
 			.xmap(|result| self.map_result(result))?
@@ -200,39 +217,39 @@ impl ChildProcess {
 			.map(|output| String::from_utf8_lossy(&output.stdout).to_string())
 	}
 
-	/// Spawn the command as a long-running child process.
-	/// Returns a [`ChildHandle`] that kills the process on drop.
+	/// Spawn the command as a long-running child process, sharing the parent's
+	/// stdio. Returns a [`ChildHandle`] that kills the process on drop.
 	pub fn spawn(self) -> Result<ChildHandle> {
-		// built as a std Command so the unix process-group extension applies
-		// (async_process's sealed CommandExt does not expose it), then converted.
-		let mut std_cmd = std::process::Command::new(self.command.as_str());
-		for (key, val) in &self.envs {
-			std_cmd.env(key.as_str(), val.as_str());
-		}
-		for key in &self.env_removals {
-			std_cmd.env_remove(key.as_str());
-		}
-		if let Some(dir) = &self.cwd {
-			std_cmd.current_dir(dir);
-		}
-		std_cmd.args(self.args.iter().map(SmolStr::as_str));
-		#[cfg(unix)]
-		if self.group {
-			use std::os::unix::process::CommandExt;
-			// pgid 0 = a fresh group led by the child, so kill can target `-pid`.
-			std_cmd.process_group(0);
-		}
-		let child = async_process::Command::from(std_cmd).spawn().map_err(
-			|err| {
-				if err.kind() == ErrorKind::NotFound
-					&& let Some(msg) = &self.not_found
-				{
-					bevyhow!("{msg}")
-				} else {
-					err.into()
-				}
-			},
-		)?;
+		self.spawn_with(async_process::Command::from(self.into_command_std()))
+	}
+
+	/// Spawn the command with stdin, stdout and stderr piped, so the caller
+	/// writes the child's input and reads its output instead of the child
+	/// sharing the terminal.
+	///
+	/// The shape a protocol-speaking child needs: a request written to
+	/// [`take_stdin`](ChildHandle::take_stdin), an event stream read from
+	/// [`take_stdout`](ChildHandle::take_stdout).
+	pub fn spawn_piped(self) -> Result<ChildHandle> {
+		let mut cmd = async_process::Command::from(self.into_command_std());
+		cmd.stdin(std::process::Stdio::piped())
+			.stdout(std::process::Stdio::piped())
+			.stderr(std::process::Stdio::piped());
+		self.spawn_with(cmd)
+	}
+
+	/// Spawn a prepared command, mapping a missing executable onto the
+	/// configured [`not_found`](Self::with_not_found) message.
+	fn spawn_with(&self, mut cmd: async_process::Command) -> Result<ChildHandle> {
+		let child = cmd.spawn().map_err(|err| {
+			if err.kind() == ErrorKind::NotFound
+				&& let Some(msg) = &self.not_found
+			{
+				bevyhow!("{msg}")
+			} else {
+				err.into()
+			}
+		})?;
 		Ok(ChildHandle {
 			inner: child,
 			group: self.group,

@@ -182,7 +182,7 @@ pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 		})
 }
 
-#[cfg(all(test, feature = "json", feature = "rhai"))]
+#[cfg(all(test, feature = "quickjs"))]
 mod test {
 	use crate::prelude::*;
 	use beet_action::prelude::*;
@@ -210,7 +210,7 @@ mod test {
 		let mut host = server_world();
 		let root = host
 			.spawn((
-				Script::<(), String>::rhai(r#""pong""#),
+				Script::<(), String>::new(r#""pong""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("ping"),
 			))

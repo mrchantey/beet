@@ -113,6 +113,7 @@ test-all *args:
 		exit 1; \
 	fi
 	just test-core {{ args }}
+	just test-scripting-fallback {{ args }}
 	# `bevy_default`-enabling crates each run in their own cargo invocation —
 	# unifying `bevy/default` across the whole graph has tripped a mold linker bug.
 	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" {{ args }}; done
@@ -234,6 +235,16 @@ test-core *args:
 
 test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
+
+# The `Script` backends are mutually exclusive at compile time, so the host-realm
+# fallbacks need their own invocations: `test-core`/`test-core-wasm` enumerate
+# every feature, which always selects the embedded `quickjs` engine and compiles
+# the fallbacks out. Native exercises the sandboxed deno child, wasm the
+# permissionless deno Worker. Both need deno on PATH, the same dependency the
+# wasm test runner already imposes.
+test-scripting-fallback *args:
+	cargo test -p beet_action --lib {{ args }} -- {{ test-threads }}
+	cargo test -p beet_action --lib --target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
 
 
 test crate *args:

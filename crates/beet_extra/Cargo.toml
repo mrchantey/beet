@@ -59,7 +59,7 @@ infra = ["dep:beet_infra", "beet_infra/cloudflare_block", "beet_infra/cloudflare
 # `beet` binary can run `examples/action/scripting.bsx`. Pulls `beet_action`'s
 # typed `Script`/`ScriptAction` and the QuickJS engine; gated so a headless build
 # that never runs the scripting example skips the C engine.
-scripting = ["beet_action/quickjs_serde"]
+scripting = ["beet_action/quickjs"]
 
 [dependencies]
 beet_action = { workspace = true, features = ["std", "reflect"] }

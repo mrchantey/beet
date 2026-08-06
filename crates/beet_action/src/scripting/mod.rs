@@ -1,64 +1,65 @@
 // The `Script`/`ScriptAction` types marshal their `Input`/`Output` through
-// `Value`, so they need `serde`; running one needs a backend, so they are gated
-// on `serde` + at least one usable backend (a build with neither has no
-// `ScriptLanguage` variant, so the typed `Script` could not pick a default).
-// `run_rhai` needs `rhai` + `serde`; `run_quickjs` additionally JSON-marshals
-// across the engine boundary, so it needs `json` and is native-only.
-#[cfg(all(feature = "quickjs", feature = "json", not(target_arch = "wasm32")))]
-mod quickjs_runtime;
-#[cfg(all(feature = "rhai", feature = "serde"))]
-mod rhai_runtime;
-#[cfg(all(
-	feature = "serde",
-	any(
-		feature = "rhai",
-		all(feature = "quickjs", not(target_arch = "wasm32"))
-	)
-))]
+// serde, and JSON is the wire currency of every backend, so the `scripting`
+// feature pulls both (`serde` + `json`) and one gate serves them.
+#[cfg(feature = "scripting")]
 mod script;
-#[cfg(all(
-	feature = "serde",
-	any(
-		feature = "rhai",
-		all(feature = "quickjs", not(target_arch = "wasm32"))
-	)
-))]
+#[cfg(feature = "scripting")]
 mod script_action;
-#[cfg(all(
-	feature = "quickjs",
-	feature = "json",
-	not(target_arch = "wasm32")
-))]
-pub(crate) use quickjs_runtime::run_quickjs;
-#[cfg(all(
-	feature = "quickjs",
-	feature = "json",
-	not(target_arch = "wasm32")
-))]
-pub(crate) use quickjs_runtime::run_quickjs_console;
-#[cfg(all(feature = "rhai", feature = "serde"))]
-pub(crate) use rhai_runtime::run_rhai;
-// the rhai console runtime backs the native `Script::run_console`; on wasm the
-// host JS realm is the console, so this is native-only.
-#[cfg(all(
-	feature = "rhai",
-	feature = "serde",
-	not(target_arch = "wasm32")
-))]
-pub(crate) use rhai_runtime::run_rhai_console;
-#[cfg(all(
-	feature = "serde",
-	any(
-		feature = "rhai",
-		all(feature = "quickjs", not(target_arch = "wasm32"))
-	)
-))]
+#[cfg(feature = "scripting")]
 pub use script::*;
-#[cfg(all(
-	feature = "serde",
-	any(
-		feature = "rhai",
-		all(feature = "quickjs", not(target_arch = "wasm32"))
-	)
-))]
+#[cfg(feature = "scripting")]
 pub use script_action::*;
+
+// The wire format, compiled with the host-realm backends that speak it and no
+// wider: the embedded engine calls the engine directly and needs none of it.
+// It is also not part of beet's surface — a consumer names `Script`, never a
+// `ScriptRequest` — so the re-export is crate-internal.
+#[cfg(all(
+	feature = "scripting",
+	feature = "std",
+	not(feature = "quickjs")
+))]
+pub(crate) mod protocol;
+#[cfg(all(
+	feature = "scripting",
+	feature = "std",
+	not(feature = "quickjs")
+))]
+pub(crate) use protocol::*;
+
+// The embedded engine: a separate axis from `scripting`, and a target-agnostic
+// one. `quickjs` compiles it in everywhere, wasm included.
+#[cfg(feature = "quickjs")]
+mod quickjs_backend;
+#[cfg(feature = "quickjs")]
+pub(crate) use quickjs_backend::run_quickjs;
+#[cfg(feature = "quickjs")]
+pub(crate) use quickjs_backend::run_quickjs_console;
+
+// The host-realm fallbacks, compiled only when the embedded engine is absent.
+// Each borrows its isolation from the surrounding runtime, so which ones exist
+// is a property of the target: a sandboxed child process on native, a child
+// isolate on wasm (picked between at runtime, since the wasm host is not known
+// until the module boots). `std` throughout — a bare-metal target has no host
+// realm to borrow from, which leaves the embedded engine as its only option.
+beet_core::cfg_if! {
+	if #[cfg(all(
+		feature = "scripting",
+		feature = "std",
+		not(feature = "quickjs"),
+	))] {
+		beet_core::cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				mod cloudflare_backend;
+				mod iframe_backend;
+				mod worker_backend;
+				pub(crate) use cloudflare_backend::run_cloudflare;
+				pub(crate) use iframe_backend::run_iframe;
+				pub(crate) use worker_backend::run_worker;
+			} else {
+				mod deno_backend;
+				pub(crate) use deno_backend::run_deno;
+			}
+		}
+	}
+}

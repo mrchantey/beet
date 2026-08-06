@@ -117,9 +117,13 @@ pub enum JsEnvironment {
 	Deno,
 	/// Node.js (`process.versions.node`). Has fs/env globals.
 	Node,
-	/// An embedded engine with no DOM and no process host (eg QuickJs), the
-	/// catch-all when no other marker is present.
-	QuickJs,
+	/// A Cloudflare Worker (`navigator.userAgent`). No process / fs, and no way
+	/// to spawn an attenuated child isolate short of Worker Loaders.
+	Cloudflare,
+	/// A JavaScript host carrying none of the markers above, the catch-all.
+	/// Nothing may be assumed about it, so capability-dependent code errors here
+	/// rather than guessing.
+	Unknown,
 	/// A browser tab: a `window` carrying a `document`. No process / fs.
 	Browser,
 }
@@ -131,11 +135,14 @@ impl JsEnvironment {
 	/// Ordering is load-bearing: the beet Deno runner polyfills a `window`, so a
 	/// `window` alone does not mean browser; `Deno` is therefore checked first and
 	/// `Browser` additionally requires a `document` (which Deno does not provide).
+	/// `Cloudflare` sits last before the catch-all, since its marker is the
+	/// weakest (a user-agent string) and every stronger marker should win.
 	fn detect(
 		has_deno: bool,
 		has_node: bool,
 		has_window: bool,
 		has_document: bool,
+		has_cloudflare: bool,
 	) -> Self {
 		if has_deno {
 			JsEnvironment::Deno
@@ -143,14 +150,16 @@ impl JsEnvironment {
 			JsEnvironment::Browser
 		} else if has_node {
 			JsEnvironment::Node
+		} else if has_cloudflare {
+			JsEnvironment::Cloudflare
 		} else {
-			JsEnvironment::QuickJs
+			JsEnvironment::Unknown
 		}
 	}
 
 	/// Whether this runtime has a filesystem reachable through the runner's fs
-	/// globals (so `--main` + an `FsStore` entry load), ie Deno or Node. A
-	/// `Browser`/`QuickJs` has none, degrading every `fs_ext` call to a no-op.
+	/// globals (so `--main` + an `FsStore` entry load), ie Deno or Node. Every
+	/// other host has none, degrading each `fs_ext` call to a no-op.
 	pub fn has_fs(&self) -> bool {
 		matches!(self, JsEnvironment::Deno | JsEnvironment::Node)
 	}
@@ -181,6 +190,21 @@ fn has_node_marker() -> bool {
 		.unwrap_or(false)
 }
 
+/// Whether `navigator.userAgent` is Cloudflare's, ie the host is a Worker. The
+/// runtime advertises itself there and nowhere else, so it is the only marker
+/// available.
+fn has_cloudflare_marker() -> bool {
+	js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str("navigator"))
+		.ok()
+		.filter(|navigator| !navigator.is_undefined() && !navigator.is_null())
+		.and_then(|navigator| {
+			js_sys::Reflect::get(&navigator, &JsValue::from_str("userAgent")).ok()
+		})
+		.and_then(|agent| agent.as_string())
+		.map(|agent| agent == "Cloudflare-Workers")
+		.unwrap_or(false)
+}
+
 /// Detect the host JavaScript runtime by probing its globals; see [`JsEnvironment`].
 pub fn environment() -> JsEnvironment {
 	let window = web_sys::window();
@@ -190,6 +214,7 @@ pub fn environment() -> JsEnvironment {
 		has_node_marker(),
 		web_sys::window().is_some(),
 		has_document,
+		has_cloudflare_marker(),
 	)
 }
 
@@ -382,26 +407,33 @@ mod test {
 
 	// the marker matrix: Deno wins even when it polyfills `window`; Browser needs
 	// both `window` and `document`; Node is the `process` host without a DOM;
-	// QuickJs is the marker-less catch-all.
+	// Cloudflare's user-agent marker is the weakest and loses to every other;
+	// Unknown is the marker-less catch-all.
 	#[crate::test]
 	fn detect_matrix() {
-		// (deno, node, window, document) -> env
-		JsEnvironment::detect(true, false, false, false)
+		// (deno, node, window, document, cloudflare) -> env
+		JsEnvironment::detect(true, false, false, false, false)
 			.xpect_eq(JsEnvironment::Deno);
 		// deno polyfills window: still Deno, never Browser.
-		JsEnvironment::detect(true, false, true, false)
+		JsEnvironment::detect(true, false, true, false, false)
 			.xpect_eq(JsEnvironment::Deno);
-		JsEnvironment::detect(false, false, true, true)
+		JsEnvironment::detect(false, false, true, true, false)
 			.xpect_eq(JsEnvironment::Browser);
 		// window without a document is not a browser.
-		JsEnvironment::detect(false, false, true, false)
-			.xpect_eq(JsEnvironment::QuickJs);
-		JsEnvironment::detect(false, true, false, false)
+		JsEnvironment::detect(false, false, true, false, false)
+			.xpect_eq(JsEnvironment::Unknown);
+		JsEnvironment::detect(false, true, false, false, false)
 			.xpect_eq(JsEnvironment::Node);
-		JsEnvironment::detect(false, false, false, false)
-			.xpect_eq(JsEnvironment::QuickJs);
+		JsEnvironment::detect(false, false, false, false, true)
+			.xpect_eq(JsEnvironment::Cloudflare);
+		// a stronger marker always beats the user-agent string.
+		JsEnvironment::detect(true, false, false, false, true)
+			.xpect_eq(JsEnvironment::Deno);
+		JsEnvironment::detect(false, false, false, false, false)
+			.xpect_eq(JsEnvironment::Unknown);
 		JsEnvironment::has_fs(&JsEnvironment::Deno).xpect_true();
 		JsEnvironment::has_fs(&JsEnvironment::Browser).xpect_false();
+		JsEnvironment::has_fs(&JsEnvironment::Cloudflare).xpect_false();
 	}
 
 	// the wasm test harness runs under Deno, so live detection resolves to Deno

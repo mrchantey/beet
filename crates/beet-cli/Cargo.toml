@@ -161,9 +161,9 @@ beet = { workspace = true, features = [
 	"client_io",
 	# fenced code blocks in served/presented decks render highlighted
 	"syntax_highlighting",
-	# the QuickJS scripting runtime: the `StartScript` load verb's `console.log`
-	# path and the `ExchangeScript` route backend a `main.bsx` wires.
-	"quickjs_serde",
+	# the embedded QuickJS engine: the `ExchangeScriptElement` console-capturing
+	# entry action and the `ExchangeScript` route backend a `main.bsx` wires.
+	"quickjs",
 ] }
 # `export-pdf` merges the per-page PDFs a headless browser prints into one
 # document; pulled only by the `pdf` feature.

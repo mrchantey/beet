@@ -13,57 +13,96 @@ categories.workspace = true
 
 [features]
 default = ["std", "reflect"]
-# a std build links rhai's std *mode*; no_std consumers (eg `beet_esp`) leave
-# `std` off and select rhai's `no_std` mode on their own dependency edge, keeping
-# the `rhai` feature mode-agnostic so it never collides under `--all-features`.
-# The typed `Script` marshals through `Value` (not rhai's serde), so its runtimes
-# build `no_std`; `std` is no longer part of the scripting story.
+# The typed `Script` marshals through JSON, which is `no_std` with alloc, so
+# `std` is no part of the scripting story.
 # `beet_core/fs` brings the native `ChildProcess` primitive the `Command` action
 # spawns (process + cwd/env), itself native-only (it pulls async-process/notify).
-std = ["beet_core/std", "beet_core/fs", "rhai?/std", "rquickjs?/std"]
+std = ["beet_core/std", "beet_core/fs", "rquickjs?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
 template_serde = ["beet_core/template_serde"]
 reflect = ["beet_core/bevy_reflect_documentation"]
-# Engine-agnostic scripting framework (`ScriptLanguage` + dispatch). Pulls
-# nothing — no serde, no engine, no std. The serde-marshalled `Script` /
-# `ScriptAction` additionally require `serde`; a runtime requires a backend.
-scripting = []
-# The rhai engine + `ScriptLanguage::Rhai` + `exports::rhai`. Builds on the
-# agnostic `scripting` layer (no point pulling the engine without it in a beet
-# app). Pair with `serde` for the typed `Script::run` rhai runtime, which
-# marshals through `Value` by hand and so needs neither std nor rhai's serde.
-rhai = ["scripting", "dep:rhai"]
-# Convenience alias: the rhai engine plus the typed `Script` runtime. `no_std`,
-# so embedded consumers (eg `beet_esp`) get a working `Script` without `std`.
-rhai_serde = ["rhai", "serde"]
-# The QuickJS engine + `ScriptLanguage::QuickJs` + `exports::quickjs`. Builds on
-# the agnostic `scripting` layer. QuickJS is a C engine, so it is native-only —
-# `rquickjs` is a `not(wasm32)` dependency and the engine code is cfg'd off wasm.
-# Pair with `json` for the typed `Script::run` quickjs runtime.
-quickjs = ["scripting", "dep:rquickjs"]
-# Convenience alias: the QuickJS engine plus the typed `Script` runtime, which
-# marshals input/output as JSON (QuickJS's native currency, no `Value` hop), so
-# it pulls `json` (serde_json, `no_std` with alloc). `rust-alloc` keeps the C
-# engine std/libc-light, so this no longer requires `std`.
-quickjs_serde = ["quickjs", "json"]
+# The engine-agnostic `Script` / `ScriptAction` surface: a JavaScript program as
+# data, plus the backend selection that runs it. A `Script` always marshals its
+# input/output, and JSON is the wire currency of every backend, so this pulls
+# `json` (serde_json, `no_std` with alloc) rather than leaving a half-built
+# `Script` that cannot talk to any of them. Backend-free on its own: a build with
+# `scripting` and no backend compiles, and errors when a script is run.
+# The remaining `dep:` entries are the host-realm backends' transports (async
+# stdio natively, the Worker/iframe bindings on wasm). Each is inert on the
+# target whose table does not declare it, and a wasm build without `scripting`
+# pays for none of the web-sys bindings — which is the point, since binary size
+# is the whole reason the iframe backend exists.
+scripting = [
+	"serde",
+	"json",
+	"dep:futures-lite",
+	"dep:js-sys",
+	"dep:wasm-bindgen",
+	"dep:async-channel",
+	"dep:web-sys",
+]
+# The embedded QuickJS engine, the primary backend, plus `exports::rquickjs`.
+# Serves every target including wasm, from the same engine code: the two `dep:`
+# entries are the same crate from two sources (see the target tables below), and
+# a `dep:` naming a dependency whose target table does not apply is inert.
+quickjs = ["scripting", "dep:rquickjs", "dep:rquickjs_wasm"]
 
 [dependencies]
 beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
 bevy = { workspace = true, features = ["bevy_color"] }
 bitflags.workspace = true
+# async stdio for the deno-cli scripting backend: the child's module source is
+# written to its stdin and its protocol events are read back line by line.
+futures-lite = { workspace = true, optional = true }
 extend.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-rhai = { workspace = true, optional = true }
 
-# QuickJS is a C engine with no wasm bindings, so its dependency is native-only.
+# QuickJS on native: pristine crates.io rquickjs.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rquickjs = { workspace = true, optional = true }
 
+# QuickJS on wasm: a fork adding `wasm32-unknown-unknown` (the upstream crate
+# builds its C engine for native and wasi only). Cargo forbids one dependency
+# name having different sources per target, so the wasm arm is a renamed key
+# aliased back in `quickjs_backend.rs` — every line of engine code reads
+# `rquickjs::` on both targets.
+#
+# Declared here rather than in the workspace table for the same name-collision
+# reason, and no other crate consumes it. Cargo fetches the git dep and its
+# submodules itself, so a beet developer sets up nothing.
+#
+# Swap this line in to develop against a local clone of the fork:
+# rquickjs_wasm = { package = "rquickjs", path = "../../../quickjs", optional = true, default-features = false, features = ["rust-alloc"] }
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+rquickjs_wasm = { package = "rquickjs", git = "https://github.com/mrchantey/rquickjs", branch = "wasm32-unknown-unknown", optional = true, default-features = false, features = ["rust-alloc"] }
+# `js-sys` covers both scripting axes on wasm: the embedded engine's one host
+# import (the clock) and the host backends' JS plumbing.
+js-sys = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+# the host-realm scripting backends: a `permissions: "none"` Worker under deno,
+# a sandboxed iframe in a browser. Both talk the script protocol over
+# postMessage, which reaches the awaiting future through an async channel.
+async-channel = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = [
+	"Blob",
+	"BlobPropertyBag",
+	"Document",
+	"Element",
+	"EventTarget",
+	"HtmlIFrameElement",
+	"MessageEvent",
+	"Url",
+	"Window",
+	"Worker",
+	"WorkerOptions",
+	"WorkerType",
+] }
+
 [dev-dependencies]
-beet_action = { path = ".", features= ["template_serde", "rhai_serde", "quickjs_serde"] }
+beet_action = { path = ".", features= ["template_serde", "scripting"] }
 beet_core = { workspace = true, features = ["testing", "ron"] }
 
 [lib]

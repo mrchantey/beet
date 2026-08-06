@@ -262,10 +262,10 @@ async fn StateAction(cx: ActionContext) -> Result<Outcome> {
 /// A typed `Script::<i64, i64>` cannot be authored in BSX (no generic syntax),
 /// so this small front-end carries the source as a `script` attribute and lowers
 /// to the typed script plus the call/log glue.
-#[cfg(all(feature = "scripting", not(target_arch = "wasm32")))]
+#[cfg(feature = "scripting")]
 #[template]
 pub fn NumberScript(#[prop(into)] script: String) -> impl Bundle {
-	let action = Script::<i64, i64>::quickjs(script).into_action();
+	let action = Script::<i64, i64>::new(script).into_action();
 	Action::<(), Outcome>::new_async(move |cx: ActionContext| {
 		let action = action.clone();
 		async move {
@@ -279,10 +279,10 @@ pub fn NumberScript(#[prop(into)] script: String) -> impl Bundle {
 /// `<TextScript script='"hello " + input'/>` - the string counterpart of
 /// [`NumberScript`]: a user-authored JavaScript transform of text, source
 /// visible in markup. Runs over a seed string, logs the result, then passes.
-#[cfg(all(feature = "scripting", not(target_arch = "wasm32")))]
+#[cfg(feature = "scripting")]
 #[template]
 pub fn TextScript(#[prop(into)] script: String) -> impl Bundle {
-	let action = Script::<String, String>::quickjs(script).into_action();
+	let action = Script::<String, String>::new(script).into_action();
 	Action::<(), Outcome>::new_async(move |cx: ActionContext| {
 		let action = action.clone();
 		async move {
@@ -320,8 +320,8 @@ impl Plugin for ActionExamplesPlugin {
 			// state_machine
 			.register_type::<GoTo>()
 			.register_type::<StateAction>();
-		// scripting (only with the QuickJS runtime linked, which is native-only)
-		#[cfg(all(feature = "scripting", not(target_arch = "wasm32")))]
+		// scripting, on every target: the embedded engine compiles to wasm too
+		#[cfg(feature = "scripting")]
 		app.register_template::<NumberScript>()
 			.register_template::<TextScript>();
 	}
