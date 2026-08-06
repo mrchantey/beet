@@ -15,7 +15,7 @@ use beet_ui::prelude::Reactivity;
 pub(crate) fn reactivity_js_route() -> impl Bundle {
 	(
 		// the route path is the src URL without its leading slash
-		Router::exchange_route(
+		route::exchange(
 			Reactivity::SRC.trim_start_matches('/'),
 			exchange_ext::handler(|_: ActionContext<Request>| {
 				Response::ok_body(Reactivity::JS, MediaType::Javascript)

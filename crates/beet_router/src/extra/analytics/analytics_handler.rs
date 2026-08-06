@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// when the server never sees the (cached) page load itself.
 pub(crate) fn analytics_handler() -> impl Bundle {
 	(
-		Router::exchange_route("analytics", AnalyticsHandler),
+		route::exchange("analytics", AnalyticsHandler),
 		HttpMethod::Post,
 	)
 }

@@ -176,9 +176,9 @@ fn emit_rust_route(
 			// dedicated `Json<T>` impl.
 			let exchange = if type_last_ident(&in_ty).as_deref() == Some("Json")
 			{
-				quote! { Router::exchange_route::<#in_ty, #out_ty, _, #in_ty, _, _>(#path, #ctor) }
+				quote! { route::exchange::<#in_ty, #out_ty, _, #in_ty, _, _>(#path, #ctor) }
 			} else {
-				quote! { Router::exchange_route(#path, #ctor) }
+				quote! { route::exchange(#path, #ctor) }
 			};
 			Ok(quote! { (#exchange, #http, ExportStrategy::Dynamic) })
 		}
@@ -227,7 +227,7 @@ fn emit_blob_route(
 	});
 	quote! {
 		(
-			Router::route(#path, BlobScene::new(#store_path)),
+			route::new(#path, BlobScene::new(#store_path)),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			PageRoute,

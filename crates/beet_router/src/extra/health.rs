@@ -19,7 +19,7 @@ use bevy::ecs::system::In;
 /// (and can also track `active_sessions` as a custom metric). Wired into the
 /// default app routes, so every site gets it.
 pub(crate) fn health_route() -> impl Bundle {
-	(Router::exchange_route("health", HealthHandler), HttpMethod::Get)
+	(route::exchange("health", HealthHandler), HttpMethod::Get)
 }
 
 /// Derives the health metrics from live world state: `uptime_secs` from the app

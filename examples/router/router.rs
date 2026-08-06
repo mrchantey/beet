@@ -115,8 +115,8 @@ fn routes() -> impl Bundle {
 		// `RouterLayout` document, transcluded in place at its `<Slot/>`
 		BaseLayout::<RouterLayout>::default(),
 		children![
-			Router::route("", BlobScene::new("content/home.md")),
-			Router::route("about", BlobScene::new("content/about.md")),
+			route::new("", BlobScene::new("content/home.md")),
+			route::new("about", BlobScene::new("content/about.md")),
 			counter(),
 			sequence()
 		],
@@ -146,7 +146,7 @@ fn counter() -> impl Bundle {
 }
 
 fn sequence() -> impl Bundle {
-	Router::route(
+	route::new(
 		"sequence",
 		(ExchangeSequence, children![
 			Action::<Request, Outcome<Request, Response>>::new_pure(

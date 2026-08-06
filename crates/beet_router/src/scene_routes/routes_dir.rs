@@ -132,7 +132,7 @@ impl RoutesDir {
 		#[allow(unused_mut, unused_variables)]
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
-			Router::route(&spec.route_path, BlobScene::new(spec.store_path)),
+			route::new(&spec.route_path, BlobScene::new(spec.store_path)),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			// a discovered content file is a user-facing page, so it carries

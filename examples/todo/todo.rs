@@ -104,23 +104,23 @@ fn todos() -> FieldRef {
 fn create() -> impl Bundle {
 	(
 		todos(),
-		Router::exchange_route("create", PushField::<Todo>::default()),
+		route::exchange("create", PushField::<Todo>::default()),
 	)
 }
 
 /// `read --body=<index>` — return a single todo by its index.
-fn read() -> impl Bundle { (todos(), Router::exchange_route("read", ReadTodo)) }
+fn read() -> impl Bundle { (todos(), route::exchange("read", ReadTodo)) }
 
 /// `update --body='[<index>,{..}]'` — replace the todo at an index.
-fn update() -> impl Bundle { (todos(), Router::exchange_route("update", UpdateTodo)) }
+fn update() -> impl Bundle { (todos(), route::exchange("update", UpdateTodo)) }
 
 /// `delete --body=<index>` — remove the todo at an index.
 fn delete() -> impl Bundle {
-	(todos(), Router::exchange_route("delete", RemoveAtField))
+	(todos(), route::exchange("delete", RemoveAtField))
 }
 
 /// `list` — return the entire list.
-fn list() -> impl Bundle { (todos(), Router::exchange_route("list", ReadField)) }
+fn list() -> impl Bundle { (todos(), route::exchange("list", ReadField)) }
 
 /// Returns a single todo by its index, erroring when out of bounds.
 ///

@@ -112,7 +112,7 @@ async fn request_input(request: Request) -> Result<Value> {
 #[reflect(where)]
 #[require(
 	ScriptAction<Input, Output>,
-	ExchangeOverload = Router::exchange_overload::<Input, Output, M1, M2>(),
+	ExchangeOverload = route::exchange_overload::<Input, Output, M1, M2>(),
 )]
 pub struct ExchangeScript<
 	Input = (),

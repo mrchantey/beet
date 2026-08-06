@@ -1,6 +1,6 @@
 //! The standard blob-store agent toolset.
 //!
-//! This composes [`Router::exchange_route`] with `beet_net`'s blob-store actions, so it
+//! This composes [`route::exchange`] with `beet_net`'s blob-store actions, so it
 //! lives with the other `extra` router pieces (eg [`ServeBlobs`]) rather than
 //! in a downstream crate. An agent crate re-exports it for its scenes.
 
@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 
 /// Equip an agent with the standard blob-store toolset: list, read, write,
 /// edit, and remove against the nearest ancestor [`BlobStore`]. Each entry is a
-/// routed [`Router::exchange_route`], so the agent both sees the tool's schema and can
+/// routed [`route::exchange`], so the agent both sees the tool's schema and can
 /// dispatch the call.
 ///
 /// A `#[template]`, so it nests under an agent in markup, ie
@@ -19,11 +19,11 @@ use beet_net::prelude::*;
 #[template]
 pub fn StoreToolset() -> impl Bundle {
 	children![
-		Router::exchange_route("list-blobs", ListBlobs),
-		Router::exchange_route("read-blob", ReadBlob),
-		Router::exchange_route("write-blob", WriteBlob),
-		Router::exchange_route("edit-text", EditText),
-		Router::exchange_route("remove-blob", RemoveBlob),
+		route::exchange("list-blobs", ListBlobs),
+		route::exchange("read-blob", ReadBlob),
+		route::exchange("write-blob", WriteBlob),
+		route::exchange("edit-text", EditText),
+		route::exchange("remove-blob", RemoveBlob),
 	]
 }
 

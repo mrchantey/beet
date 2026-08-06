@@ -41,10 +41,10 @@ impl Plugin for SceneServerPlugin {
 #[template]
 pub fn SceneServer() -> impl Bundle {
 	(
-		OnSpawn::insert_child(Router::exchange_route("load", LoadScene)),
-		OnSpawn::insert_child(Router::exchange_route("clear", ClearScene)),
-		OnSpawn::insert_child(Router::exchange_route("reset", Reset)),
-		OnSpawn::insert_child(Router::exchange_route("dump", DumpScene)),
+		OnSpawn::insert_child(route::exchange("load", LoadScene)),
+		OnSpawn::insert_child(route::exchange("clear", ClearScene)),
+		OnSpawn::insert_child(route::exchange("reset", Reset)),
+		OnSpawn::insert_child(route::exchange("dump", DumpScene)),
 	)
 }
 
@@ -223,7 +223,7 @@ mod test {
 		// the device runs the `SceneServer` meta-routes; POST the scene to /load.
 		let mut world = server_world();
 		let server = world
-			.spawn((Router::with_defaults(), children![Router::exchange_route(
+			.spawn((Router::with_defaults(), children![route::exchange(
 				"load", LoadScene
 			)]))
 			.flush();

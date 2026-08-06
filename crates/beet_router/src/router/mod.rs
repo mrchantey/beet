@@ -8,7 +8,8 @@ mod cache_headers;
 pub use cache_headers::*;
 mod exchange_overload;
 pub use exchange_overload::*;
-mod exchange_fallback;
+/// The Rust route constructors: `route::new`, `route::exchange`, `route::fallback`.
+pub mod route;
 mod exchange_sequence;
 pub use exchange_sequence::*;
 // the typed `ExchangeScript` route marker, the `ScriptRoute` front-end,

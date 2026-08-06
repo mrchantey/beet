@@ -199,8 +199,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((caching_router(), children![
-				Router::exchange_route("page", HelloHtml),
-				Router::exchange_route("page.md", HelloMarkdown),
+				route::exchange("page", HelloHtml),
+				route::exchange("page.md", HelloMarkdown),
 			]))
 			.flush();
 		cache_control(&mut world, root, "page")
@@ -222,7 +222,7 @@ mod test {
 				Router::with_defaults(),
 				CacheHeaders::assets(),
 				CacheHeadersMiddleware::default(),
-				children![Router::exchange_route("style", HelloMarkdown)],
+				children![route::exchange("style", HelloMarkdown)],
 			))
 			.flush();
 		cache_control(&mut world, root, "style")
@@ -238,10 +238,10 @@ mod test {
 		let root = world
 			.spawn((caching_router(), children![
 				(
-					Router::exchange_route("file", HelloMarkdown),
+					route::exchange("file", HelloMarkdown),
 					CacheHeaders::assets()
 				),
-				(Router::exchange_route("live", HelloHtml), CacheHeaders::no_store()),
+				(route::exchange("live", HelloHtml), CacheHeaders::no_store()),
 			]))
 			.flush();
 		cache_control(&mut world, root, "file")
@@ -262,7 +262,7 @@ mod test {
 			.spawn((
 				Router::with_defaults(),
 				CacheHeadersMiddleware::default(),
-				children![Router::exchange_route("page", HelloHtml)],
+				children![route::exchange("page", HelloHtml)],
 			))
 			.flush();
 		world

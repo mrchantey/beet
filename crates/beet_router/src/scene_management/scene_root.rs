@@ -166,7 +166,7 @@ mod test {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![Router::exchange_route("ping", Ping)]))
+			.spawn((Router::with_defaults(), children![route::exchange("ping", Ping)]))
 			.flush();
 		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)
@@ -275,7 +275,7 @@ mod test {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![Router::exchange_route("ping", Ping)]))
+			.spawn((Router::with_defaults(), children![route::exchange("ping", Ping)]))
 			.flush();
 		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)

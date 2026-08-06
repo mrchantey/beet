@@ -83,7 +83,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
 		let root = world
-			.spawn((Router::with_defaults(), children![Router::exchange_route(
+			.spawn((Router::with_defaults(), children![route::exchange(
 				"foobar", Foobar
 			)]))
 			.flush();
@@ -127,8 +127,8 @@ mod test {
 		world.insert_resource(pkg_config!());
 		let root = world
 			.spawn((Router::with_defaults(), children![
-				Router::exchange_route("foo", Foobar),
-				Router::exchange_route("bar", Foobar),
+				route::exchange("foo", Foobar),
+				route::exchange("bar", Foobar),
 			]))
 			.flush();
 

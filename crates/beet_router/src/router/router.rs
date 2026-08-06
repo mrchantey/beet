@@ -47,7 +47,7 @@ pub fn find_router(
 /// `<Route path="docs/*rest?" {handler}/>` matches any path beneath `docs/`. (A
 /// self-mounting handler that owns its prefix, like [`ServeBlobs`], needs no `<Route>`.)
 ///
-/// The Rust equivalent is the [`Router::route`](crate::prelude::route) helper. It is a
+/// The Rust equivalent is the [`route::new`](crate::prelude::route) helper. It is a
 /// [`template`](macro@template) rather than a marker component, so it expands to a
 /// [`PathPartial`] (carrying a default [`Slot`](beet_core::prelude::SlotTarget) for
 /// the declared children) at build time, with no component left to re-fire on reload.
@@ -214,7 +214,7 @@ mod test {
 	#[beet_core::test]
 	async fn dynamic_segment_reaches_handler() {
 		router_world()
-			.spawn((Router::with_defaults(), children![Router::exchange_route(
+			.spawn((Router::with_defaults(), children![route::exchange(
 				"users/:id",
 				EchoParams
 			)]))
@@ -228,7 +228,7 @@ mod test {
 	#[beet_core::test]
 	async fn greedy_segment_reaches_handler() {
 		router_world()
-			.spawn((Router::with_defaults(), children![Router::exchange_route(
+			.spawn((Router::with_defaults(), children![route::exchange(
 				"files/*path",
 				EchoParams
 			)]))
@@ -242,7 +242,7 @@ mod test {
 	#[beet_core::test]
 	async fn path_param_wins_over_query_param() {
 		router_world()
-			.spawn((Router::with_defaults(), children![Router::exchange_route(
+			.spawn((Router::with_defaults(), children![route::exchange(
 				"users/:id",
 				EchoParams
 			)]))
@@ -467,7 +467,7 @@ mod test {
 		}
 
 		router_world()
-			.spawn((Router::with_defaults(), children![Router::exchange_route(
+			.spawn((Router::with_defaults(), children![route::exchange(
 				"ticks", Ticks
 			)]))
 			.exchange(Request::get("ticks"))

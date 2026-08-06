@@ -42,11 +42,11 @@ fn setup(mut commands: Commands) {
 		.spawn((CliServer::default(), children![(
 			Router::with_defaults(),
 			children![
-			Router::exchange_route(
+			route::exchange(
 				"",
 				Action::<(), &str>::new_pure(|_| { "hello world" })
 			),
-			Router::exchange_route(
+			route::exchange(
 				"foo",
 				Action::<(), &str>::new_pure(|_| { "hello foo" })
 			),

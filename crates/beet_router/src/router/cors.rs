@@ -138,7 +138,7 @@ mod test {
 		world
 			.spawn((
 				Router::with_defaults(),
-				children![Router::exchange_route("", Hello)],
+				children![route::exchange("", Hello)],
 				CorsHandler::bundle(config),
 			))
 			.flush()

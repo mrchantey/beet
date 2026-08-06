@@ -61,7 +61,7 @@ impl ExchangeSocket {
 	///
 	/// Install it as a route handler so a server-side route forwards to a connected
 	/// client instead of handling locally, eg
-	/// `Router::exchange_route("take-photo", ExchangeSocket::action(web_connection))`. The user-facing
+	/// `route::exchange("take-photo", ExchangeSocket::action(web_connection))`. The user-facing
 	/// "SocketExchange action".
 	pub fn action(connection: Entity) -> Action<Request, Response> {
 		Action::new_async(move |cx: ActionContext<Request>| async move {

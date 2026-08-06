@@ -40,7 +40,7 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	B: 'static + Send + Sync + Bundle,
 {
-	Router::exchange_route(
+	route::exchange(
 		path,
 		Action::new_pure(handler).chain(spawn_render_step::<B>()),
 	)
@@ -58,7 +58,7 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	B: 'static + Send + Sync + Bundle,
 {
-	Router::exchange_route(
+	route::exchange(
 		path,
 		Action::new_async(handler).chain(spawn_render_step::<B>()),
 	)
@@ -78,7 +78,7 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	B: 'static + Send + Sync + Bundle,
 {
-	Router::exchange_route(
+	route::exchange(
 		path,
 		Action::new_system(handler).chain(spawn_render_step::<B>()),
 	)

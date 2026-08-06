@@ -504,7 +504,7 @@ mod test {
 					store,
 					Router,
 					BsxLayout::default(),
-					children![Router::route("", BlobScene::new("index.html"))]
+					children![route::new("", BlobScene::new("index.html"))]
 				)],
 			))
 			.flush();
@@ -827,7 +827,7 @@ mod test {
 					store,
 					Router,
 					BsxLayout::default(),
-					children![Router::route("counter", BlobScene::new("counter.bsx"))]
+					children![route::new("counter", BlobScene::new("counter.bsx"))]
 				)],
 			))
 			.flush();

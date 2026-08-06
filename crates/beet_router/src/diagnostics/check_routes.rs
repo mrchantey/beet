@@ -328,7 +328,7 @@ mod test {
 			.unwrap();
 		let mut world = check_world();
 		let router = world
-			.spawn((store, Router, children![Router::route(
+			.spawn((store, Router, children![route::new(
 				"post",
 				BlobScene::new("post.md")
 			)]))
