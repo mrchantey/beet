@@ -56,7 +56,7 @@ pub fn cli_registration() -> CrateRegistration {
 /// The entry's declared `<StoreRoot src>`, if any: a registry-free pre-scan of
 /// the raw entry document, run before the store builds so the declaration can
 /// widen the store root (markup only; a serde entry declares none).
-pub async fn read_store_root(
+async fn read_store_root(
 	store: &BlobStore,
 	entry_name: &str,
 ) -> Result<Option<String>> {
@@ -77,7 +77,7 @@ pub async fn read_store_root(
 /// own directory. Returns `(store, entry_name, root_dir)`; every local entry
 /// load (the binary, `serve`/`check`/`export-static`) resolves through this so
 /// an entry's declared root applies everywhere.
-pub async fn widen_store_root(
+async fn widen_store_root(
 	params: &MultiMap<SmolStr, SmolStr>,
 	dir: AbsPathBuf,
 	entry_name: String,
@@ -393,7 +393,7 @@ pub fn build_entry_root(
 /// land before the caller serves. The world-owning driver path (the wasm Worker,
 /// a one-shot build); an in-app caller settles via [`TemplatePending::settle`]
 /// instead. Returns the entry root.
-pub async fn build_entry_owned(
+pub(crate) async fn build_entry_owned(
 	world: &mut World,
 	store: BlobStore,
 	entry_name: String,
@@ -464,7 +464,7 @@ pub async fn rebuild_watched_entry(
 /// A missing / unreadable / non-markup source is skipped rather than erroring, so a
 /// broken include never blocks watch startup.
 #[cfg(not(target_arch = "wasm32"))]
-pub async fn entry_source_paths(
+async fn entry_source_paths(
 	store: &BlobStore,
 	entry_name: &str,
 ) -> HashSet<SmolPath> {

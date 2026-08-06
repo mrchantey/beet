@@ -149,7 +149,7 @@ impl LayoutContentOf {
 /// registry first ([`AppTypeRegistry`]), falling back to a registered
 /// component-info scan for unreflected types. `None` until the component has
 /// been registered with the world (eg inserted at least once).
-pub fn component_id_by_short_path(
+pub(crate) fn component_id_by_short_path(
 	world: &World,
 	name: &str,
 ) -> Option<ComponentId> {

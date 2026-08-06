@@ -46,7 +46,7 @@ type DynTungStream =
 /// - Splits the Tungstenite stream/sink
 /// - Adapts the inbound `tungstenite::Message` stream into our cross-platform `Message`
 /// - Wraps the sink in a writer that implements the `SocketWriter` trait
-pub async fn connect_tungstenite(url: &Url) -> Result<Socket> {
+pub(crate) async fn connect_tungstenite(url: &Url) -> Result<Socket> {
 	// split the authority; a bracketed ipv6 host is unwrapped for DNS/TLS
 	let host = url
 		.host()

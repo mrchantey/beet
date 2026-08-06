@@ -533,7 +533,7 @@ pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
 /// The system form of [`TemplatePending::sweep_dropped`], registered by the
 /// [`TemplatePlugin`](crate::prelude::TemplatePlugin) so a running app resolves
 /// dropped guards every frame.
-pub fn sweep_dropped_pending(world: &mut World) {
+pub(crate) fn sweep_dropped_pending(world: &mut World) {
 	TemplatePending::sweep_dropped(world);
 }
 

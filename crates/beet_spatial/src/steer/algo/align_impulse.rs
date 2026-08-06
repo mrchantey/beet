@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 /// Calculate an align impulse
 /// as described [here](https://youtu.be/fWqOdLI944M?list=PLRqwX-V7Uu6YHt0dtyf4uiw8tKOxQLvlW&t=349).
-pub fn align_impulse<'a, T>(
+pub(crate) fn align_impulse<'a, T>(
 	target_entity: Entity,
 	position: Vec3,
 	align: &Align<T>,

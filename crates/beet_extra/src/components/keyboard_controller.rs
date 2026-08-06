@@ -10,7 +10,7 @@ impl Default for KeyboardController {
 	fn default() -> Self { Self { speed: 3. } }
 }
 
-pub fn keyboard_controller(
+pub(crate) fn keyboard_controller(
 	time: When<Res<Time>>,
 	keys: When<Res<ButtonInput<KeyCode>>>,
 	mut query: Populated<(&mut Transform, &KeyboardController)>,

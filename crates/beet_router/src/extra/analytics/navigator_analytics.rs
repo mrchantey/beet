@@ -11,7 +11,10 @@ use beet_net::prelude::*;
 ///
 /// A no-op for network browsing (only the app's own in-world routes are its page
 /// views) and without an analytics observer listening.
-pub async fn record_page_view(entity: &AsyncEntity, url: &Url) -> Result {
+pub(crate) async fn record_page_view(
+	entity: &AsyncEntity,
+	url: &Url,
+) -> Result {
 	let now = Instant::now();
 	let url = url.clone();
 	// atomically roll the tracked page to the new one, taking the previous;
@@ -48,7 +51,7 @@ pub async fn record_page_view(entity: &AsyncEntity, url: &Url) -> Result {
 ///
 /// Runs before the component is gone, so it reads the tracked page. Registered by
 /// [`NavigatorPlugin`]; a no-op without an analytics observer listening.
-pub fn finalize_page_view_on_remove(
+pub(crate) fn finalize_page_view_on_remove(
 	ev: On<Remove, Navigator>,
 	navigators: Query<&Navigator>,
 	mut commands: Commands,

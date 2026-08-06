@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 
 /// World-space width of the 4x4 grid, shared by every frozen-lake template so the
 /// grid, agent and session all map cells to the same world positions.
-pub const FROZEN_LAKE_SCENE_SCALE: f32 = 1.;
+const FROZEN_LAKE_SCENE_SCALE: f32 = 1.;
 
 /// The 4x4 frozen-lake tile grid with its hazards and goal, the data form of
 /// `frozen_lake_scene`. Markup has no loop, so the tile + hazard + goal entities are

@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 /// Calculate a separation impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#example-59-separation).
-pub fn separate_impulse<'a, T>(
+pub(crate) fn separate_impulse<'a, T>(
 	target_entity: Entity,
 	position: Vec3,
 	max_speed: MaxSpeed,

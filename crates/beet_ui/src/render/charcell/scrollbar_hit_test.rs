@@ -205,7 +205,7 @@ fn set_axis_offset(offset: &mut IVec2, axis: ScrollAxis, value: i32) {
 /// gutter pages or begins a thumb drag; a `CursorMoved` while dragging maps the
 /// cursor to a clamped offset; a release ends the drag. A press outside every
 /// gutter is ignored here and falls through to the normal pointer hit-test.
-pub fn scrollbar_mouse(
+pub(crate) fn scrollbar_mouse(
 	mut buttons: MessageReader<MouseButtonInput>,
 	mut cursor: MessageReader<CursorMoved>,
 	// the hit-test reads ScrollPosition (via CharcellQuery), so it cannot coexist

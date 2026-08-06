@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 #[reflect(Default, Component)]
 pub struct FollowCursor2d;
 
-pub fn follow_cursor_2d(
+pub(crate) fn follow_cursor_2d(
 	camera_query: Single<(&Camera, &GlobalTransform)>,
 	windows: Single<&Window>,
 	mut cursor_query: Populated<&mut Transform, With<FollowCursor2d>>,
@@ -70,7 +70,7 @@ impl Default for FollowCursor3d {
 	fn default() -> Self { Self::ORIGIN_Y }
 }
 
-pub fn follow_cursor_3d(
+pub(crate) fn follow_cursor_3d(
 	camera_query: Single<(&Camera, &GlobalTransform)>,
 	windows: Single<&Window>,
 	mut cursor_query: Populated<(&mut Transform, &FollowCursor3d)>,

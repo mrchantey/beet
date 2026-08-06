@@ -99,13 +99,13 @@ impl Plugin for MaterialStylePlugin {
 /// default; this writes its ~85 tone declarations into the default rule, keyed
 /// by token so it overwrites in place (idempotent — the scheme/opacity/
 /// typography keys are untouched). Runs whenever [`Theme`] changes.
-pub fn rebuild_theme_tones(theme: Res<Theme>, mut rules: ResMut<RuleSet>) {
+pub(crate) fn rebuild_theme_tones(theme: Res<Theme>, mut rules: ResMut<RuleSet>) {
 	rules.default_rule_mut().push_declarations(
 		Rule::new().with_extend(themes::from_color(theme.color)),
 	);
 }
 
-pub fn default_token_map() -> CssTokenMap {
+pub(crate) fn default_token_map() -> CssTokenMap {
 	CssTokenMap::default()
 		.with_extend(tones::token_map())
 		.with_extend(colors::token_map())
@@ -117,7 +117,7 @@ pub fn default_token_map() -> CssTokenMap {
 /// All default material declarations and component rules, as a standalone rule
 /// set (no prose [`default_element_rules`]). [`MaterialStylePlugin`] instead
 /// extends the shared rule set so it composes with `StylePlugin`'s prose rules.
-pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
+pub(crate) fn default_rule_set(color: impl Into<Color>) -> RuleSet {
 	RuleSet::new(default_declarations(color))
 		.with_rules(default_material_rules())
 }
@@ -125,7 +125,7 @@ pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
 /// The Material component rules: the user-agent [`non_visual_rule`] (so
 /// metadata/scripting tags resolve to `display: none`), the component
 /// [`classes::all_rules`], and the light/dark scheme rules.
-pub fn default_material_rules() -> Vec<Rule> {
+pub(crate) fn default_material_rules() -> Vec<Rule> {
 	core::iter::once(non_visual_rule())
 		.chain(classes::all_rules())
 		.chain([themes::light_scheme(), themes::dark_scheme()])
@@ -140,7 +140,7 @@ pub fn default_material_rules() -> Vec<Rule> {
 /// it, mirroring `color_scheme.js`. The colour-dependent tones come from the
 /// seed via [`themes::from_color`]; the rest from
 /// [`scheme_independent_declarations`].
-pub fn default_declarations(color: impl Into<Color>) -> Rule {
+pub(crate) fn default_declarations(color: impl Into<Color>) -> Rule {
 	scheme_independent_declarations().with_extend(themes::from_color(color))
 }
 
@@ -148,7 +148,7 @@ pub fn default_declarations(color: impl Into<Color>) -> Rule {
 /// token bindings, opacities, typography, geometry, and motion. These never
 /// change with the seed colour, so [`MaterialStylePlugin`] bakes them once and
 /// lets [`rebuild_theme_tones`] own the colour-dependent tones.
-pub fn scheme_independent_declarations() -> Rule {
+pub(crate) fn scheme_independent_declarations() -> Rule {
 	Rule::new()
 		.with_extend(themes::light_scheme())
 		.with_extend(themes::default_opacities())

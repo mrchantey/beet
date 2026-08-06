@@ -10,7 +10,7 @@ use bevy::math::UVec2;
 /// never clipped, while the cell allocation only grows to the rows actually
 /// painted. Kept well below `u32::MAX` so any (unexpected) percentage spacing
 /// can't overflow the rem conversion.
-pub const AUTO_GROW_VIEWPORT_HEIGHT: u32 = u16::MAX as u32;
+pub(crate) const AUTO_GROW_VIEWPORT_HEIGHT: u32 = u16::MAX as u32;
 
 /// An auto-growing buffer of fixed width and unbounded height, for stdout
 /// output that must not clip to the terminal.

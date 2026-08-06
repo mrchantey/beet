@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 /// Utility functions for working with [`Vec`].
-pub struct VecExt<T> {
+pub(crate) struct VecExt<T> {
 	phantom: core::marker::PhantomData<T>,
 }
 

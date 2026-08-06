@@ -65,7 +65,7 @@ impl ResourceFieldRef {
 /// arbitrary resource types via the [`AppTypeRegistry`]. Runs in the document
 /// sync chain after the document drives [`Value`]. A missing or unregistered
 /// resource is silently skipped, like a missing component.
-pub fn sync_resource_field_bindings(world: &mut World) {
+pub(crate) fn sync_resource_field_bindings(world: &mut World) {
 	// collect the bindings and each Value's change state this pass.
 	let bindings = world
 		.query::<(Entity, Ref<Value>, &ResourceFieldRef)>()

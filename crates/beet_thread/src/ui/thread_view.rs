@@ -209,7 +209,7 @@ fn body_text() -> impl Bundle {
 /// traffic remain inspectable) as `{ "posts": [{ id, author, text }, ..] }`.
 /// Keyed reconciliation downstream means a grown in-progress body updates a row
 /// rather than rebuilding it, so streaming flows through the bound [`Value`].
-pub fn project_window_to_document(
+pub(crate) fn project_window_to_document(
 	mut commands: Commands,
 	windows: Query<
 		(Entity, &ThreadWindow, Option<&ThreadItems>),
@@ -258,7 +258,7 @@ pub fn project_window_to_document(
 /// - It only follows while the view is already at the bottom
 ///   ([`ScrollPosition::at_bottom`]); once a user scrolls up, new posts no longer
 ///   yank them back to the latest.
-pub fn follow_thread_scroll(
+pub(crate) fn follow_thread_scroll(
 	views: Query<
 		Entity,
 		(With<ThreadView>, Or<(Changed<Document>, Changed<Children>)>),

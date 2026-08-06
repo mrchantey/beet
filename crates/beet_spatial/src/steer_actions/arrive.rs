@@ -14,7 +14,7 @@ impl Default for ArriveRadius {
 
 /// Calculates an arrive speed
 /// as described [here](https://youtu.be/OxHJ-o_bbzs?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=439)
-pub fn arrive_speed(
+pub(crate) fn arrive_speed(
 	position: &Vec3,
 	target_position: &Vec3,
 	max_speed: MaxSpeed,

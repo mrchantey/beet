@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 /// Implementation of position, velocity, force integration
 /// as described by Daniel Shiffman
 /// https://natureofcode.com/vectors/#acceleration
-pub fn integrate_force(
+pub(crate) fn integrate_force(
 	time: When<Res<Time>>,
 	mut query: Populated<(
 		&mut Transform,

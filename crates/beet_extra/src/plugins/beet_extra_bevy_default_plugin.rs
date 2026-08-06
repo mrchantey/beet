@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 /// systems, the 2d/3d helper systems, the terminal UI, and the window conveniences
 /// (esc to close, F11 fullscreen). The runner and window are [`BeetPlugins`](beet)'
 /// job; this only adds behaviour, so it composes under either runner.
-pub fn beet_extra_bevy_default_plugin(app: &mut App) {
+pub(crate) fn beet_extra_bevy_default_plugin(app: &mut App) {
 	// `ActionPlugin` may already be present (the router stack adds it via
 	// `init_plugin` on the CLI render path), so add it idempotently rather than
 	// panic on the double-add when this group composes with a router-bearing app.
@@ -53,7 +53,7 @@ fn ensure_spatial_roots(
 }
 
 #[cfg(feature = "ml")]
-pub fn beet_extra_ml_plugin(app: &mut App) {
+pub(crate) fn beet_extra_ml_plugin(app: &mut App) {
 	use crate::scenes::ml::*;
 	app.add_plugins((BeetMlPlugins, FrozenLakePlugin))
 		// the markup ml scene templates, so `<NearestSentenceAgent/>` /

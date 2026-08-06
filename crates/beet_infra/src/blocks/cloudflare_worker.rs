@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// The wrangler R2 binding name the wasm Worker resolves its `Bucket` from, kept
 /// in sync with `beet-cli`'s `worker_entry` (`SITE_BUCKET_BINDING`). The
 /// `#[event(fetch)]` entry reads `env.SITE_BUCKET` to get the live bucket handle.
-pub const WORKER_R2_BINDING: &str = "SITE_BUCKET";
+pub(crate) const WORKER_R2_BINDING: &str = "SITE_BUCKET";
 
 /// Configuration for deploying `beet-cli` (wasm) to a Cloudflare Worker.
 #[derive(Debug, Clone, Get, SetWith, Component, Reflect)]

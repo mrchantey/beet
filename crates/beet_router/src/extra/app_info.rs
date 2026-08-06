@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 /// A template route at `/app-info` rendering the [`PackageConfig`] as an article.
 ///
 /// Requires a [`PackageConfig`] resource (eg via `pkg_config!()`).
-pub fn app_info() -> impl Bundle {
+pub(crate) fn app_info() -> impl Bundle {
 	(
 		render_action::func_route(
 			"app-info",

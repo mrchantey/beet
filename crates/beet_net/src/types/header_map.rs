@@ -36,7 +36,7 @@ pub struct HeaderMap(MultiMap<String, String>);
 ///
 /// Converts uppercase to lowercase and replaces `_` with `-`.
 /// Returns [`Cow::Borrowed`] if no transformation is needed.
-pub fn to_kebab_case(val: &str) -> Cow<'_, str> {
+pub(crate) fn to_kebab_case(val: &str) -> Cow<'_, str> {
 	let needs_transform = val
 		.bytes()
 		.any(|byte| byte.is_ascii_uppercase() || byte == b'_');

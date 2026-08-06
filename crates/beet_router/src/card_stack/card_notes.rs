@@ -37,7 +37,7 @@ const HTML_BLOCK: &str = "__html_block";
 ///
 /// Idempotent: once the notes are gone the card has no top-level `<hr>`, so a
 /// re-run (the live TUI repaints every frame) is a no-op.
-pub fn card_notes(
+pub(crate) fn card_notes(
 	mut commands: Commands,
 	elements: Query<(Entity, &Element)>,
 	children: Query<&Children>,

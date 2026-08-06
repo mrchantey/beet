@@ -34,7 +34,7 @@ impl<In: Default, Out> Default for CallOnSpawn<In, Out> {
 
 // we use system instead of hook or observer to ensure the rest of the tree
 // has spawned before calling
-pub fn call_on_spawn<
+pub(crate) fn call_on_spawn<
 	In: 'static + Send + Sync + Clone,
 	Out: 'static + Send + Sync,
 >(

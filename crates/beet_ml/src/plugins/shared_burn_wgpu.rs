@@ -30,7 +30,8 @@ static SHARED_DEVICE: std::sync::OnceLock<burn::backend::wgpu::WgpuDevice> =
 /// Burn on it on first call, or `None` when no Bevy device has been shared (a
 /// headless Burn app, where Burn makes its own).
 #[cfg(feature = "wgpu")]
-pub fn shared_burn_wgpu_device() -> Option<burn::backend::wgpu::WgpuDevice> {
+pub(crate) fn shared_burn_wgpu_device()
+-> Option<burn::backend::wgpu::WgpuDevice> {
 	if let Some(device) = SHARED_DEVICE.get() {
 		return Some(device.clone());
 	}

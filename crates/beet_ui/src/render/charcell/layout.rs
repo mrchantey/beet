@@ -26,7 +26,7 @@ use super::query::CharcellQuery;
 pub struct LayoutRect(pub IRect);
 
 /// ECS system: assign [`LayoutRect`] to all nodes top-down.
-pub fn layout_nodes<B: Component + AsBuffer>(
+pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut LayoutRect>)>,
 	tree: CharcellTree,
 	roots: Populated<(Entity, &B)>,
@@ -135,7 +135,7 @@ pub fn layout_nodes<B: Component + AsBuffer>(
 }
 
 /// Block flow: stack children top-to-bottom, each taking full parent width.
-pub fn block_layout_rects(
+pub(crate) fn block_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	container_rect: IRect,
@@ -216,7 +216,7 @@ pub fn block_layout_rects(
 /// Inline flow: place children left-to-right, wrapping rows when width is exceeded.
 ///
 /// Each row's height equals the tallest child in that row.
-pub fn inline_layout_rects(
+pub(crate) fn inline_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	container_rect: IRect,

@@ -23,7 +23,7 @@ pub(crate) struct BertEmbeddingsConfig {
 
 /// Word + position + token-type embeddings followed by LayerNorm and dropout.
 #[derive(Module, Debug)]
-pub struct BertEmbeddings<B: Backend> {
+pub(crate) struct BertEmbeddings<B: Backend> {
 	word_embeddings: Embedding<B>,
 	position_embeddings: Embedding<B>,
 	token_type_embeddings: Embedding<B>,

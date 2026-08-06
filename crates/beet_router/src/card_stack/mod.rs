@@ -23,7 +23,7 @@ pub use card_nav::*;
 #[cfg(feature = "std")]
 mod card_notes;
 #[cfg(feature = "std")]
-pub use card_notes::*;
+pub(crate) use card_notes::*;
 #[cfg(feature = "std")]
 mod card_stack_plugin;
 #[cfg(feature = "std")]

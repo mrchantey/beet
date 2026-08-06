@@ -10,7 +10,7 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 /// Registers every syntax highlight token with the [`CssTokenMap`].
-pub fn token_map() -> CssTokenMap {
+pub(crate) fn token_map() -> CssTokenMap {
 	CssTokenMap::default()
 		.insert(Attribute)
 		.insert(Boolean)
@@ -59,7 +59,7 @@ pub fn token_map() -> CssTokenMap {
 
 /// Ordered list of recognised tree-sitter capture names. Order is important
 /// for the longest-match rule used by tree-sitter's highlight resolution.
-pub fn recognised_names() -> &'static [&'static str] {
+pub(crate) fn recognised_names() -> &'static [&'static str] {
 	&[
 		"attribute",
 		"boolean",
@@ -108,7 +108,7 @@ pub fn recognised_names() -> &'static [&'static str] {
 }
 
 /// Maps a recognised capture name to its [`CssVariable`] for foreground colour.
-pub fn css_variable_for(name: &str) -> Option<CssVariable> {
+pub(crate) fn css_variable_for(name: &str) -> Option<CssVariable> {
 	let key = match name {
 		"attribute" => Attribute::token_key(),
 		"boolean" => Boolean::token_key(),

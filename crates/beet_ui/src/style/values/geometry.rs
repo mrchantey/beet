@@ -38,7 +38,7 @@ pub struct BoxStyle {
 	pub max_height: Option<Length>,
 }
 
-pub static BOX_STYLE_DEFAULT: BoxStyle = BoxStyle::DEFAULT;
+pub(crate) static BOX_STYLE_DEFAULT: BoxStyle = BoxStyle::DEFAULT;
 
 impl BoxStyle {
 	pub const DEFAULT: Self = Self {

@@ -56,7 +56,7 @@ pub use hierarchy::*;
 pub use key::*;
 pub use minimal_types_plugin::*;
 pub use plugin::*;
-pub use pose::*;
+pub(crate) use pose::*;
 pub use quat::*;
 pub use relationship::*;
 pub use schedule::*;

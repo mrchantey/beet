@@ -30,7 +30,7 @@ pub struct CopyToClipboard {
 /// A surface with no terminal (eg torn down mid-frame) is skipped. The bytes are
 /// flushed to the client by [`flush_terminals`](super::flush_terminals), so this
 /// runs in the same render chain before it.
-pub fn flush_clipboard(
+pub(crate) fn flush_clipboard(
 	mut events: MessageReader<CopyToClipboard>,
 	mut terminals: Query<&mut Terminal>,
 	// toasts are a template-gated widget; without it the copy still happens, just

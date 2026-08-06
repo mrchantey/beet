@@ -15,7 +15,7 @@ use crate::style::Overflow;
 use crate::style::*;
 use beet_core::prelude::*;
 
-pub fn token_map()->CssTokenMap{
+pub(crate) fn token_map()->CssTokenMap{
 	CssTokenMap::default()
 		.insert(ForegroundColor)
 		.insert(BackgroundColor)

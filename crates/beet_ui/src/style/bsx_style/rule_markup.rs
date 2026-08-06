@@ -28,7 +28,7 @@ use beet_core::prelude::*;
 
 /// Register the `<Rule>` custom-tag handler into the [`BsxTagResolvers`] seam, so
 /// a `<Rule>` element declares a named rule into the [`RuleSet`] at build time.
-pub fn register_rule_tag(world: &mut World) {
+pub(crate) fn register_rule_tag(world: &mut World) {
 	world.get_resource_or_init::<BsxTagResolvers>().insert(
 		"Rule",
 		|el, entity| {
@@ -67,7 +67,7 @@ fn parse_rule(el: &BsxElement) -> Result<Rule> {
 /// the two markup surfaces in lockstep with the typed `Rule::with_value` API.
 ///
 /// `context` names the caller for error messages, eg `<Rule>` or `bx:style`.
-pub fn apply_declarations<'a>(
+pub(crate) fn apply_declarations<'a>(
 	mut rule: Rule,
 	context: &str,
 	declarations: impl IntoIterator<Item = (&'a str, &'a AttrValue)>,

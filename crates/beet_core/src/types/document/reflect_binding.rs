@@ -85,7 +85,7 @@ impl ReflectFieldRef {
 /// [`AppTypeRegistry`], which a non-exclusive system cannot do over a dynamic
 /// type. Runs in the document sync chain after the document drives [`Value`].
 /// A missing component or target is silently skipped.
-pub fn sync_reflect_field_bindings(world: &mut World) {
+pub(crate) fn sync_reflect_field_bindings(world: &mut World) {
 	// collect the bindings and each Value's change state this pass.
 	let bindings = world
 		.query::<(Entity, Ref<Value>, &ReflectFieldRef)>()

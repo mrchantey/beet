@@ -5,7 +5,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ItemFn;
 
-pub fn impl_main_attr(
+pub(crate) fn impl_main_attr(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> syn::Result<TokenStream> {

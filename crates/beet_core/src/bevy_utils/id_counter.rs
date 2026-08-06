@@ -16,7 +16,7 @@ use crate::prelude::*;
 /// ```
 ///
 #[derive(Debug, Default, Clone, Resource)]
-pub struct IdCounter(u64);
+pub(crate) struct IdCounter(u64);
 impl IdCounter {
 	/// Get the next unique style id.
 	pub fn next(&mut self) -> u64 {

@@ -320,7 +320,7 @@ where
 // handle other events like keepalive
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-pub enum StreamingEventOrUnknown {
+enum StreamingEventOrUnknown {
 	Known(o11s::StreamingEvent),
 	Unknown(serde_json::Value),
 }

@@ -31,7 +31,7 @@ pub enum PostStatus {
 }
 
 /// Reads [`PostStatus`] from post metadata.
-pub fn post_status(post: &Post) -> PostStatus {
+pub(crate) fn post_status(post: &Post) -> PostStatus {
 	let interrupted = post
 		.metadata()
 		.get("interrupted")
@@ -52,7 +52,7 @@ pub fn post_status(post: &Post) -> PostStatus {
 }
 
 /// Writes [`PostStatus`] into post metadata.
-pub fn set_post_status(post: &mut Post, status: PostStatus) {
+fn set_post_status(post: &mut Post, status: PostStatus) {
 	let map = post.metadata_mut();
 	match status {
 		PostStatus::Completed => {

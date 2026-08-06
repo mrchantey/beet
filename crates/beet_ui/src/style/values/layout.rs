@@ -466,7 +466,7 @@ impl AsCssValue for ListStyle {
 	}
 }
 
-pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
+pub(crate) static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 
 /// Layout properties for a node.
 #[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]

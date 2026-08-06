@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-pub fn token_map() -> CssTokenMap {
+pub(crate) fn token_map() -> CssTokenMap {
 	CssTokenMap::default()
 		.insert(Primary)
 		.insert(OnPrimary)

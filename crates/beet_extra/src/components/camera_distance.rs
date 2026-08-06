@@ -23,7 +23,7 @@ impl CameraDistance {
 	}
 }
 
-pub fn camera_distance(
+pub(crate) fn camera_distance(
 	mut resize: MessageReader<WindowResized>,
 	main_window: Single<&Window, With<PrimaryWindow>>,
 	camera_added: Query<

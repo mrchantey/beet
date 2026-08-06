@@ -34,7 +34,7 @@ use std::cell::RefCell;
 /// Shares its plugin construction with the native binary's `main` (which builds
 /// `BeetPlugins` + a `Startup` `load_entry`); the Worker swaps that `Startup`
 /// build/run for a lazy per-fetch build, so it adds [`WorkersPlugin`] instead.
-pub fn build_app() -> App {
+pub(crate) fn build_app() -> App {
 	let mut app = App::new();
 	app.add_plugins(BeetPlugins).add_plugins(WorkersPlugin);
 	// the binary's compiled surface, so a loaded site's `<CrateCheck/>` verifies
@@ -47,7 +47,7 @@ pub fn build_app() -> App {
 /// drives the world per-fetch, never through the blocking schedule loop) and owns
 /// the per-isolate [`WorkerWorld`] cell. See the [module docs](self).
 #[derive(Default)]
-pub struct WorkersPlugin;
+struct WorkersPlugin;
 
 impl Plugin for WorkersPlugin {
 	fn build(&self, app: &mut App) {
@@ -71,7 +71,7 @@ thread_local! {
 
 /// The per-isolate built [`World`] plus the entry version it was built from, so a
 /// re-synced bucket rebuilds the world on the next request.
-pub struct WorkerWorld {
+pub(crate) struct WorkerWorld {
 	/// The built site world, driven per-fetch.
 	pub world: World,
 	/// The host entity carrying the [`Router`] action exchanges dispatch to.

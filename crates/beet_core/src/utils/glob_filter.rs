@@ -192,7 +192,7 @@ impl GlobFilter {
 /// A validated glob pattern, stored as a [`SmolStr`] for cheap clones.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GlobPattern(SmolStr);
+pub(crate) struct GlobPattern(SmolStr);
 
 impl GlobPattern {
 	/// Creates a new [`GlobPattern`], validating it is a valid glob pattern.

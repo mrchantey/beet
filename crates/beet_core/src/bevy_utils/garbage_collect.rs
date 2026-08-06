@@ -34,7 +34,7 @@ use bevy::ecs::world::DeferredWorld;
 #[derive(Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship(relationship_target = GarbageCollectTarget)]
-pub struct GarbageCollectRef(pub Entity);
+pub(crate) struct GarbageCollectRef(pub Entity);
 
 /// Marker for an entity that will be automatically despawned when all
 /// references to it are removed.
@@ -49,7 +49,7 @@ pub struct GarbageCollectRef(pub Entity);
 #[reflect(Component)]
 #[component(on_remove=on_remove)]
 #[relationship_target(relationship = GarbageCollectRef)]
-pub struct GarbageCollectTarget(Vec<Entity>);
+pub(crate) struct GarbageCollectTarget(Vec<Entity>);
 
 fn on_remove(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).try_despawn();

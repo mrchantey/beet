@@ -5,7 +5,7 @@ use burn::tensor::backend::Backend;
 /// Batch-tokenise `sentences` and produce padded input tensors.
 ///
 /// Returns `(input_ids, attention_mask)` both shaped `[batch, max_seq_len]`.
-pub fn tokenize_batch<B: Backend>(
+pub(crate) fn tokenize_batch<B: Backend>(
 	tokenizer: &tokenizers::Tokenizer,
 	sentences: &[&str],
 	device: &B::Device,

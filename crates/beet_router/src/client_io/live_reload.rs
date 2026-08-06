@@ -15,7 +15,7 @@ use beet_net::sockets::Message;
 use beet_net::sockets::MessageSend;
 
 /// The [`ClientIoBroadcast`] payload instructing clients to reload the page.
-pub const RELOAD_MESSAGE: &str = "reload";
+pub(crate) const RELOAD_MESSAGE: &str = "reload";
 
 /// Dev-mode live reload for a no-code site, placed on the site root (which carries
 /// the site [`BlobStore`]). Any change to that store surfaces as a [`BlobEvent`]
@@ -167,7 +167,7 @@ fn subtree_pending(world: &mut World, root: Entity) -> bool {
 /// to connected clients. `root` is the [`LiveReload`] entity carrying the store.
 /// The respawned dirs park [`TemplatePending`] guards, so
 /// [`process_live_reloads`] defers a follow-up until this reload settles.
-pub fn reload_site(world: &mut World, root: Entity) {
+pub(crate) fn reload_site(world: &mut World, root: Entity) {
 	if !world.entity(root).contains::<BlobStore>() {
 		warn!("live reload root {root} has no BlobStore");
 		return;

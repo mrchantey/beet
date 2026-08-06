@@ -59,7 +59,7 @@ impl Default for FsWatcher {
 }
 
 /// Parses a duration from a string of milliseconds.
-pub fn parse_duration(s: &str) -> Result<Duration, ParseIntError> {
+pub(crate) fn parse_duration(s: &str) -> Result<Duration, ParseIntError> {
 	s.parse().map(Duration::from_millis)
 }
 
@@ -195,7 +195,7 @@ impl std::fmt::Display for PathEvent {
 }
 
 /// Result type for watch events.
-pub type WatchEventResult = Result<DirEvent, Vec<notify::Error>>;
+pub(crate) type WatchEventResult = Result<DirEvent, Vec<notify::Error>>;
 
 /// Collection of [`PathEvent`]s present in a debounced event result.
 #[derive(Debug, Default, Deref, EntityTargetEvent)]

@@ -161,7 +161,7 @@ impl Diagnostic {
 /// the tree (eg the build's unresolved-tag bail) folds in as an
 /// [`UnknownTag`](DiagnosticKind::UnknownTag) error, so a no-code author sees the
 /// build failure loudly rather than as a blank page.
-pub fn render_diagnostics(
+pub(crate) fn render_diagnostics(
 	world: &mut World,
 	root: Entity,
 	route_tree: &RouteTree,
@@ -177,7 +177,7 @@ pub fn render_diagnostics(
 /// (with its attributes/classes) plus any [`TemplateError`] reachable from a
 /// render root.
 #[derive(SystemParam)]
-pub struct DiagnosticsQuery<'w, 's> {
+struct DiagnosticsQuery<'w, 's> {
 	elements: ElementQuery<'w, 's>,
 	errors: Query<'w, 's, (Entity, &'static TemplateError)>,
 	children: Query<'w, 's, &'static Children>,
@@ -352,7 +352,7 @@ fn rule_set_has_class(rule_set: &RuleSet, name: &str) -> bool {
 /// class catalog: both walk the same selectors, so the manifest can never list a
 /// class the check rejects (or vice versa). Names repeat across rules; the caller
 /// de-duplicates.
-pub fn rule_set_classes(rule_set: &RuleSet) -> impl Iterator<Item = &str> {
+pub(crate) fn rule_set_classes(rule_set: &RuleSet) -> impl Iterator<Item = &str> {
 	rule_set
 		.iter()
 		.flat_map(|rule| selector_classes(rule.selector()))

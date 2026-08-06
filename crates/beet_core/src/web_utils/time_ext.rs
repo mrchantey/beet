@@ -20,7 +20,7 @@ pub fn performance_now() -> f64 {
 /// Handle to a scheduled timeout that cancels on drop.
 ///
 /// When dropped, the associated timeout is cleared via `clearTimeout`.
-pub struct TimeoutHandle {
+pub(crate) struct TimeoutHandle {
 	_closure: Closure<dyn Fn()>,
 	handle: i32,
 }

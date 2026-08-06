@@ -91,6 +91,7 @@ pub async fn do_async_thing(){}
 // foo.rs
 async_ext::do_async_thing().await;
 ```
+- Free items: a top-level `pub fn`, `pub const` or `pub static` is permitted only in a `*_ext` utility module, in a sanctioned namespace module (a coherent API called module-qualified, ie `js_runtime::cwd()`, allowlisted in the audit skill), as a `#[template]` constructor, or in generated/ABI-mandated code, ie proc-macro entry points. Everything else is an associated fn/const on the type it mainly relates to, or is not pub (`pub(crate)` and private free items are fine, the rule governs public API shape). Bevy systems and observers keep the free fn shape (the bevy idiom) but are private by default, registered by their plugin. Visibility is private until needed, for types as well as functions. Audit recipe: `.agents/skills/code-quality/audit-free-fns`.
 - git: Whether on a branch, worktree or detacthed head, do not create branches or make commits unless explicitly told to. By default just keep things as unstaged changes.
 - when the world has to do something like a one-off traversal, just use with_state, ie world.with_state::<(Resource<Foo>,Query<&Children..>)>(||{resource.bar});.
 - never pass through bundles unnessecarily: fn default_router(bundle: impl Bundle)->impl Bundle ((bundle,Router)). it is pointless and obscures the function signature

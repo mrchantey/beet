@@ -45,7 +45,7 @@ const HR_RULE: &str = "───────────────────
 /// link: its [`Marker`] (see [`iframe_marker`]) carries the title text and this
 /// hyperlink its destination, preferring the `alt-src` (a normal watch URL) over
 /// the embed-only `src`.
-pub fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
+pub(crate) fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
 	for view in elements.iter() {
 		let url = match view.tag() {
 			"a" => view.attribute_string("href"),
@@ -63,7 +63,7 @@ pub fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
 /// `<li>` (bullet/number), `<hr>` (rule), `<img>` (alt text), and `<select>`
 /// (its selected option's label). The `<blockquote>` callout draws its own
 /// thick left border via the box model, so no per-paragraph quote bar is added.
-pub fn apply_markers(
+pub(crate) fn apply_markers(
 	mut commands: Commands,
 	ruleset: RuleSetQuery,
 	elements: ElementQuery,
@@ -102,7 +102,7 @@ pub fn apply_markers(
 /// child/descendant), so here every cell but the first in its row gets a left
 /// border mirroring its own bottom rule — the dividers fall between columns,
 /// matching the web.
-pub fn apply_table_vertical_borders(
+pub(crate) fn apply_table_vertical_borders(
 	elements: ElementQuery,
 	children: Query<&Children>,
 	mut box_styles: Query<&mut BoxStyle>,
@@ -167,7 +167,7 @@ fn collect_cell_rows(
 /// Built from raw queries rather than [`ElementQuery`]/`AttributeQuery` so it can
 /// take `&mut Value` (to flip the sidebar caret) without a query conflict over
 /// the shared `Value` access those system params hold.
-pub fn apply_disclosure(
+pub(crate) fn apply_disclosure(
 	mut commands: Commands,
 	elements: Query<(Entity, &Element)>,
 	class_q: Query<&Classes>,
@@ -268,7 +268,7 @@ fn flip_sidebar_caret(
 /// [`ElementStateMap`] so the cascade re-resolves the subtree, restoring the
 /// collapsed body's display when it reopens.
 #[cfg(feature = "tui")]
-pub fn toggle_details_on_click(
+pub(crate) fn toggle_details_on_click(
 	ev: On<crate::prelude::PointerUp>,
 	elements: Query<(Entity, &Element)>,
 	parents: Query<&ChildOf>,
@@ -435,7 +435,7 @@ fn select_marker(
 
 /// An `<option>`'s submission value: its `value` attribute, falling back to its
 /// label text like a browser.
-pub fn option_value(view: &ElementView) -> String {
+pub(crate) fn option_value(view: &ElementView) -> String {
 	let value = view.attribute_string("value");
 	if value.is_empty() {
 		option_label(view)
@@ -446,7 +446,7 @@ pub fn option_value(view: &ElementView) -> String {
 
 /// An `<option>`'s visible label: its inner text, falling back to its `value`
 /// attribute.
-pub fn option_label(view: &ElementView) -> String {
+pub(crate) fn option_label(view: &ElementView) -> String {
 	view.inner_text
 		.and_then(|(_, value)| value.as_str().ok())
 		.map(|label| label.to_string())
@@ -499,7 +499,7 @@ fn iframe_url(view: &ElementView) -> String {
 /// 	.add_plugins(CharcellPlugin)
 /// 	.add_systems(PostParseTree, heading_hash_markers.in_set(DecorateSet));
 /// ```
-pub fn heading_hash_markers(
+pub(crate) fn heading_hash_markers(
 	mut commands: Commands,
 	headings: Query<(Entity, &Element)>,
 ) {

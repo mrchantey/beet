@@ -57,14 +57,14 @@ use core::sync::atomic::Ordering;
 /// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
 /// otherwise is just the type itself.
 #[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
-pub type MaybeSendWrapper<T> = send_wrapper::SendWrapper<T>;
+pub(crate) type MaybeSendWrapper<T> = send_wrapper::SendWrapper<T>;
 /// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
 /// otherwise is just the type itself.
 #[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
-pub type MaybeSendWrapper<T> = T;
+pub(crate) type MaybeSendWrapper<T> = T;
 
 /// Wraps a value in [`MaybeSendWrapper`].
-pub fn maybe_send_wrapper<T>(value: T) -> MaybeSendWrapper<T> {
+pub(crate) fn maybe_send_wrapper<T>(value: T) -> MaybeSendWrapper<T> {
 	#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 	{
 		send_wrapper::SendWrapper::new(value)

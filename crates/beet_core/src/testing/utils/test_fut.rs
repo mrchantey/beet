@@ -65,6 +65,6 @@ where
 /// runner always drives async tests through the bevy_async executor instead.
 #[cfg(feature = "std")]
 #[track_caller]
-pub fn block_on_async_test<M>(fut: impl IntoFut<M>) {
+pub(crate) fn block_on_async_test<M>(fut: impl IntoFut<M>) {
 	futures_lite::future::block_on(fut.into_fut()).unwrap();
 }

@@ -8,7 +8,7 @@ use burn::tensor::backend::Backend;
 /// * `attention_mask`: `[batch, seq_len]` — 1.0 for real tokens, 0.0 for padding
 ///
 /// Returns `[batch, hidden]`.
-pub fn mean_pool<B: Backend>(
+pub(crate) fn mean_pool<B: Backend>(
 	hidden_states: Tensor<B, 3>,
 	attention_mask: Tensor<B, 2>,
 ) -> Tensor<B, 2> {
@@ -35,7 +35,9 @@ pub fn mean_pool<B: Backend>(
 /// L2-normalise each row of `embeddings` to unit length.
 ///
 /// Matches the default behaviour of sentence-transformers.
-pub fn normalize_l2<B: Backend>(embeddings: Tensor<B, 2>) -> Tensor<B, 2> {
+pub(crate) fn normalize_l2<B: Backend>(
+	embeddings: Tensor<B, 2>,
+) -> Tensor<B, 2> {
 	use burn::tensor::linalg::Norm;
 	use burn::tensor::linalg::vector_normalize;
 	vector_normalize(embeddings, Norm::L2, 1, 1e-12)

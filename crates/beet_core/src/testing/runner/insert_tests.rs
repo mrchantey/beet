@@ -35,7 +35,7 @@ impl<T> SendWrapper<T> {
 ///
 /// Panics if dynamic tests or benches are passed in (they cannot be cloned).
 #[cfg(feature = "custom_test_frameworks")]
-pub fn tests_bundle_borrowed(tests: &[&test::TestDescAndFn]) -> impl Bundle {
+pub(crate) fn tests_bundle_borrowed(tests: &[&test::TestDescAndFn]) -> impl Bundle {
 	let tests = tests
 		.iter()
 		.map(|test| TestDescAndFn::from(*test))
@@ -44,7 +44,7 @@ pub fn tests_bundle_borrowed(tests: &[&test::TestDescAndFn]) -> impl Bundle {
 }
 
 /// Inserts an owned set of tests.
-pub fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
+pub(crate) fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
 	let test_bundles: Vec<_> = tests.into_iter().map(test_bundle).collect();
 	(
 		// Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),

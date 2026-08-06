@@ -30,7 +30,7 @@ use bevy::ecs::template::TemplateContext;
 /// A tag with no registered schema, or props that are not plain values (an entity
 /// reference, a field binding), is left unverified, since those resolve by other
 /// means.
-pub fn verify_props(
+pub(crate) fn verify_props(
 	el: &BsxElement,
 	tag: &str,
 	app_registry: &AppTypeRegistry,
@@ -49,7 +49,7 @@ pub fn verify_props(
 /// Resolves composable [`ValueSchema::Reference`]s against the world's
 /// [`SchemaRegistry`], then validates. A missing required field or type mismatch
 /// is an `Err` that rides the root's `TemplateError`.
-pub fn verify_props_against(
+pub(crate) fn verify_props_against(
 	el: &BsxElement,
 	tag: &str,
 	schema: &ValueSchema,
@@ -197,7 +197,7 @@ pub enum SchemaDirective {
 
 /// Extract the `bx:schema` directive declared among `nodes`: the first
 /// `<script bx:schema>` block, inline (a JSON body) or remote (a `src` url).
-pub fn extract_schema_directive(nodes: &[BsxNode]) -> SchemaDirective {
+pub(crate) fn extract_schema_directive(nodes: &[BsxNode]) -> SchemaDirective {
 	nodes
 		.iter()
 		.find_map(|node| {
@@ -223,7 +223,7 @@ pub fn extract_schema_directive(nodes: &[BsxNode]) -> SchemaDirective {
 
 /// Extract the inline prop schema declared by a `<script bx:schema>` block, if
 /// present (the non-remote case).
-pub fn extract_bx_schema(nodes: &[BsxNode]) -> Option<ValueSchema> {
+pub(crate) fn extract_bx_schema(nodes: &[BsxNode]) -> Option<ValueSchema> {
 	match extract_schema_directive(nodes) {
 		SchemaDirective::Inline(schema) => Some(schema),
 		_ => None,
@@ -245,7 +245,7 @@ fn string_attr(el: &BsxElement, key: &str) -> Option<String> {
 
 /// Remove every `<script bx:schema>` block from `nodes`, so a template's body
 /// does not render its schema declaration.
-pub fn strip_schema_blocks(nodes: Vec<BsxNode>) -> Vec<BsxNode> {
+pub(crate) fn strip_schema_blocks(nodes: Vec<BsxNode>) -> Vec<BsxNode> {
 	nodes
 		.into_iter()
 		.filter(

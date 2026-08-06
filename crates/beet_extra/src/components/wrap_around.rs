@@ -1,6 +1,6 @@
 use beet_core::prelude::*;
 
-pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
+const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
 
 /// Marker for an entity that wraps around the screen edges, the 2d "asteroids"
 /// wrap. Opt-in: without it an entity is never wrapped, so 3d agents (which move
@@ -36,7 +36,7 @@ impl WrapAroundBounds {
 /// leaving the right edge reappears on the left. Opt-in via the [`WrapAround`]
 /// marker, so an agent that should move freely (eg a 3d steering agent on the
 /// ground plane) is never wrapped.
-pub fn wrap_around(
+pub(crate) fn wrap_around(
 	bounds: When<Res<WrapAroundBounds>>,
 	mut query: Populated<
 		&mut Transform,
@@ -62,7 +62,7 @@ pub fn wrap_around(
 	}
 }
 
-pub fn update_wrap_around(
+pub(crate) fn update_wrap_around(
 	mut bounds: When<ResMut<WrapAroundBounds>>,
 	windows: Populated<&Window, Changed<Window>>,
 ) {

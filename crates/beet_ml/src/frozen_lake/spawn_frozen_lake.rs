@@ -22,7 +22,7 @@ pub mod frozen_lake_assets {
 ///
 /// The agent is kicked off via [`CallOnSpawn`], so the action tree starts
 /// running as soon as the entity is fully spawned.
-pub fn spawn_frozen_lake_episode(
+pub(crate) fn spawn_frozen_lake_episode(
 	mut events: MessageReader<StartEpisode<FrozenLakeEpParams>>,
 	mut rng: ResMut<RandomSource>,
 	mut commands: Commands,

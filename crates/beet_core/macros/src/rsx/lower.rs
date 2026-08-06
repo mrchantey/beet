@@ -24,7 +24,7 @@ use quote::quote;
 
 /// Lower a list of root nodes to a single [`Bundle`] expression: one node
 /// directly, none to an empty bundle, many to a fragment spawning each child.
-pub fn lower_nodes(nodes: &[RsxNode]) -> TokenStream {
+pub(crate) fn lower_nodes(nodes: &[RsxNode]) -> TokenStream {
 	match nodes.len() {
 		1 => tokenize_node(&nodes[0]),
 		0 => quote! { () },

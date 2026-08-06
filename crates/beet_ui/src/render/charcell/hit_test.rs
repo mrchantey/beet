@@ -170,7 +170,7 @@ fn managed_set(
 /// `MouseButtonInput` fires `PointerDown`/`PointerUp` on the hit entity. The
 /// events auto-propagate up the tree, so a click on text inside an `<a>` reaches
 /// the `<a>` observer.
-pub fn pointer_input(
+pub(crate) fn pointer_input(
 	mut cursor: MessageReader<CursorMoved>,
 	mut buttons: MessageReader<MouseButtonInput>,
 	hit_test: HitTest,

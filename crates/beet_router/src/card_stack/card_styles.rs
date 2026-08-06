@@ -43,7 +43,7 @@ pub const CARD_COLUMN: ClassName = ClassName::new_static("card-column");
 /// Contributed by [`CardStackPlugin`](crate::prelude::CardStackPlugin) via
 /// [`RuleSet::extend_rules`], so they compose with (and override on a tie) the
 /// material set, and stay extensible by later plugins.
-pub fn card_rules() -> Vec<Rule> {
+pub(crate) fn card_rules() -> Vec<Rule> {
 	vec![
 		card(),
 		card_center(),
@@ -67,7 +67,7 @@ pub fn card_rules() -> Vec<Rule> {
 /// web (eg `card-center`) would sit left in the terminal. Setting it keeps the
 /// slide horizontally consistent across both targets (a no-op on the web, which
 /// already defaults to stretch).
-pub fn card() -> Rule {
+fn card() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD))
 		.with_value(common_props::DisplayProp, Display::Flex)
@@ -78,7 +78,7 @@ pub fn card() -> Rule {
 
 /// On the web, a card fills at least the viewport height, the deck's full-screen
 /// frame; the terminal ignores this media-gated rule and grows to fit instead.
-pub fn card_fill_viewport() -> Rule {
+fn card_fill_viewport() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::class(CARD))
@@ -87,7 +87,7 @@ pub fn card_fill_viewport() -> Rule {
 
 /// Centered card body (title cards) - grows to fill the card and centers its
 /// children on both axes, with text centered.
-pub fn card_center() -> Rule {
+fn card_center() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD_CENTER))
 		.with_value(common_props::DisplayProp, Display::Flex)
@@ -100,7 +100,7 @@ pub fn card_center() -> Rule {
 
 /// Content card body - a flex column filling the card: the heading band on top,
 /// the column row below growing to fill.
-pub fn card_content() -> Rule {
+fn card_content() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD_CONTENT))
 		.with_value(common_props::DisplayProp, Display::Flex)
@@ -109,7 +109,7 @@ pub fn card_content() -> Rule {
 }
 
 /// Card heading band - the heading row, holding its natural height (no growth).
-pub fn card_heading() -> Rule {
+fn card_heading() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD_HEADING))
 		.with_value(common_props::FlexGrowProp, 0u32)
@@ -117,7 +117,7 @@ pub fn card_heading() -> Rule {
 
 /// Card column row - a flex row growing to fill the height beneath the heading,
 /// with a comfortable gap between columns.
-pub fn card_columns() -> Rule {
+fn card_columns() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD_COLUMNS))
 		.with_value(common_props::DisplayProp, Display::Flex)
@@ -130,7 +130,7 @@ pub fn card_columns() -> Rule {
 /// fills the row. Empty columns never reach the tree: `ContentLayout` only emits
 /// a `card-column` for content the author supplies (see its template), so there
 /// is nothing to collapse.
-pub fn card_column() -> Rule {
+fn card_column() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CARD_COLUMN))
 		.with_value(common_props::FlexGrowProp, 1u32)

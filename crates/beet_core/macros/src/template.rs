@@ -42,7 +42,7 @@ use syn::FnArg;
 use syn::ItemFn;
 use syn::parse_macro_input;
 
-pub fn impl_template(
+pub(crate) fn impl_template(
 	attr: proc_macro::TokenStream,
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {

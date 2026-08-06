@@ -233,7 +233,7 @@ impl<F: Send + Sync + FnOnce(&mut EntityWorldMut)> OnSpawnTyped<F> {
 /// Unlike [`OnSpawn`], this does not run immediately when spawned.
 /// Instead, it must be flushed by running the [`OnSpawnDeferred::flush`] system.
 #[derive(Component)]
-pub struct OnSpawnDeferred(
+pub(crate) struct OnSpawnDeferred(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result>,
 );
 

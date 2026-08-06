@@ -1,10 +1,10 @@
 //! Shared types and utilities for the `Get`, `GetMut`, `Set`, and `SetWith` derive macros.
 extern crate alloc;
 
-pub mod get;
-pub mod get_mut;
-pub mod set;
-pub mod set_with;
+pub(crate) mod get;
+pub(crate) mod get_mut;
+pub(crate) mod set;
+pub(crate) mod set_with;
 
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -16,7 +16,7 @@ use syn::Type;
 
 /// Visibility of generated methods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Vis {
+pub(crate) enum Vis {
 	Private,
 	PubCrate,
 	PubSuper,
@@ -41,7 +41,7 @@ impl Vis {
 
 /// Return type strategy for `Get` derive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GetReturnType {
+pub(crate) enum GetReturnType {
 	/// Return `&T`.
 	Ref,
 	/// Return `T` via `.clone()`.
@@ -56,13 +56,13 @@ impl Default for GetReturnType {
 
 /// Kind of trait object wrapper.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TraitWrapperKind {
+pub(crate) enum TraitWrapperKind {
 	Box,
 	Arc,
 }
 
 /// Resolved config for a single field.
-pub struct FieldConfig {
+pub(crate) struct FieldConfig {
 	/// Visibility of the generated method.
 	pub vis: Vis,
 	/// Return type strategy, only used by `Get`.
@@ -80,7 +80,7 @@ pub struct FieldConfig {
 }
 
 /// Defaults parsed from struct-level attributes.
-pub struct StructConfig {
+pub(crate) struct StructConfig {
 	/// Default visibility for generated methods.
 	pub vis: Vis,
 	/// Default return type strategy.
@@ -109,7 +109,7 @@ impl Default for StructConfig {
 ///
 /// Note: `Pub` is the default and cannot be specified as an attribute value
 /// because `pub` is a Rust keyword that cannot appear as an expression.
-pub fn parse_vis(expr: &syn::Expr) -> syn::Result<Vis> {
+pub(crate) fn parse_vis(expr: &syn::Expr) -> syn::Result<Vis> {
 	let syn::Expr::Path(path) = expr else {
 		synbail!(
 			expr,
@@ -204,7 +204,7 @@ fn apply_common_keys(
 }
 
 /// Parse struct-level attributes into a [`StructConfig`].
-pub fn parse_struct_config(
+pub(crate) fn parse_struct_config(
 	attrs: &[syn::Attribute],
 	attr_name: &str,
 ) -> syn::Result<StructConfig> {
@@ -244,7 +244,7 @@ pub fn parse_struct_config(
 
 /// Parse field-level attributes into a [`FieldConfig`], inheriting from
 /// struct defaults.
-pub fn parse_field_config(
+pub(crate) fn parse_field_config(
 	attrs: &[syn::Attribute],
 	attr_name: &str,
 	defaults: &StructConfig,
@@ -290,7 +290,7 @@ pub fn parse_field_config(
 }
 
 /// If type is `Option<T>`, return the inner `T`.
-pub fn option_inner_type(ty: &Type) -> Option<&Type> {
+pub(crate) fn option_inner_type(ty: &Type) -> Option<&Type> {
 	let Type::Path(path) = ty else { return None };
 	let segment = path.path.segments.last()?;
 	if segment.ident != "Option" {
@@ -307,7 +307,7 @@ pub fn option_inner_type(ty: &Type) -> Option<&Type> {
 
 /// Detect `Box<dyn Trait>` or `Arc<dyn Trait>`, returning the wrapper kind
 /// and the `dyn Trait` type.
-pub fn trait_wrapper_info(ty: &Type) -> Option<(TraitWrapperKind, &Type)> {
+pub(crate) fn trait_wrapper_info(ty: &Type) -> Option<(TraitWrapperKind, &Type)> {
 	let Type::Path(path) = ty else { return None };
 	let segment = path.path.segments.last()?;
 	let kind = match segment.ident.to_string().as_str() {
@@ -329,7 +329,7 @@ pub fn trait_wrapper_info(ty: &Type) -> Option<(TraitWrapperKind, &Type)> {
 
 /// Extract trait bounds from a `dyn Trait` type for use in `impl` position.
 /// Strips the `dyn` keyword, ie `dyn Handler + Send` becomes `Handler + Send`.
-pub fn trait_bounds_tokens(ty: &Type) -> Option<TokenStream> {
+pub(crate) fn trait_bounds_tokens(ty: &Type) -> Option<TokenStream> {
 	if let Type::TraitObject(obj) = ty {
 		let bounds = &obj.bounds;
 		Some(quote! { #bounds })
@@ -341,7 +341,7 @@ pub fn trait_bounds_tokens(ty: &Type) -> Option<TokenStream> {
 /// Returns true if the type should automatically use `impl Into<T>`.
 /// Covers the common string-like owned types: `String`, `Cow<'_, …>`, `SmolStr`
 /// and `SmolPath`.
-pub fn is_auto_into_type(ty: &syn::Type) -> bool {
+pub(crate) fn is_auto_into_type(ty: &syn::Type) -> bool {
 	let syn::Type::Path(path) = ty else {
 		return false;
 	};
@@ -357,7 +357,7 @@ pub fn is_auto_into_type(ty: &syn::Type) -> bool {
 /// Returns `true` for primitive types that implement `Copy`:
 /// `bool`, `char`, all integer and float primitives.
 /// Used to automatically return by value instead of by reference in the `Get` derive.
-pub fn is_primitive_copy_type(ty: &syn::Type) -> bool {
+pub(crate) fn is_primitive_copy_type(ty: &syn::Type) -> bool {
 	let syn::Type::Path(path) = ty else {
 		return false;
 	};
@@ -392,7 +392,7 @@ pub fn is_primitive_copy_type(ty: &syn::Type) -> bool {
 /// - `String`  → `(&str,              as_str())`
 /// - `PathBuf` → `(&::std::path::Path, as_path())`
 /// - `OsString`→ `(&::std::ffi::OsStr, as_os_str())`
-pub fn str_like_return(ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
+pub(crate) fn str_like_return(ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
 	let syn::Type::Path(path) = ty else {
 		return None;
 	};
@@ -411,7 +411,7 @@ pub fn str_like_return(ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
 
 /// Resolve whether `impl Into<T>` should be used for a field, accounting for
 /// auto-detection and explicit flags.
-pub fn effective_use_into(ty: &syn::Type, config: &FieldConfig) -> bool {
+pub(crate) fn effective_use_into(ty: &syn::Type, config: &FieldConfig) -> bool {
 	if config.not_into {
 		return false;
 	}
@@ -422,7 +422,7 @@ pub fn effective_use_into(ty: &syn::Type, config: &FieldConfig) -> bool {
 ///
 /// The callback receives the full [`syn::Field`] so derives can forward
 /// doc attributes and inspect the type.
-pub fn produce(
+pub(crate) fn produce(
 	input: &DeriveInput,
 	attr_name: &str,
 	generate_field: impl Fn(&syn::Field, &FieldConfig) -> TokenStream,

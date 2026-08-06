@@ -12,7 +12,7 @@ mod runner_args;
 mod suite_outcome;
 mod test_outcome;
 mod test_plugin;
-pub use exit_on_suite_outcome::*;
+pub(crate) use exit_on_suite_outcome::*;
 pub use insert_tests::*;
 pub use register_test::*;
 pub use runner_args::*;
@@ -23,7 +23,7 @@ mod run_tests;
 pub(self) use register_test::TestRunResult;
 pub(self) use run_tests::*;
 mod filter_tests;
-pub use filter_tests::*;
+pub(crate) use filter_tests::*;
 mod logger;
 pub(self) use logger::*;
 /// Extensions for the test runner configuration. std-only test scaffolding

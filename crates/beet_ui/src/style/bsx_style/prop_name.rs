@@ -147,7 +147,7 @@ pub fn prop_name_map() -> HashMap<SmolStr, PropResolver> {
 /// Maps a Material colour-role name (`Primary`, `OnSurface`) to its token, the
 /// target of a `<Rule>` `@token:Role` binding. The names match the
 /// [`material::colors`](crate::style::material::colors) token idents.
-pub fn color_role_map() -> HashMap<SmolStr, Token> {
+pub(crate) fn color_role_map() -> HashMap<SmolStr, Token> {
 	use colors::*;
 	[
 		("Primary", Primary.into()),

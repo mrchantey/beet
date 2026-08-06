@@ -219,7 +219,7 @@ use std::rc::Rc;
 /// `!Send` (it owns the JS closure), so it lives in a [`NonSend`](bevy::ecs::system::NonSend)
 /// resource.
 #[derive(Default)]
-pub struct LocalStorageBlobWatcher {
+pub(crate) struct LocalStorageBlobWatcher {
 	/// Cleared on the last unsubscribe to stop the forwarding task.
 	alive: Option<Rc<AtomicBool>>,
 	/// Number of active [`LocalStorageStore`]s.
@@ -227,7 +227,7 @@ pub struct LocalStorageBlobWatcher {
 }
 
 /// Install the global `storage` listener on the first [`LocalStorageStore`].
-pub fn add_local_storage_store_watcher(
+pub(crate) fn add_local_storage_store_watcher(
 	_ev: On<Add, LocalStorageStore>,
 	bus: Res<BlobEventBus>,
 	spawner: Res<AsyncSpawner>,
@@ -256,7 +256,7 @@ pub fn add_local_storage_store_watcher(
 
 /// Drop the refcount, tearing down the listener on the last
 /// [`LocalStorageStore`].
-pub fn remove_local_storage_store_watcher(
+pub(crate) fn remove_local_storage_store_watcher(
 	_ev: On<Remove, LocalStorageStore>,
 	mut watcher: NonSendMut<LocalStorageBlobWatcher>,
 ) {

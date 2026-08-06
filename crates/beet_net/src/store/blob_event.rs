@@ -49,7 +49,7 @@ impl BlobEvent {
 /// Separator-aware prefix test: `true` if `key` is `scope` or a child of it.
 ///
 /// An empty `scope` covers all keys. `a/b` never matches `a/bc`.
-pub fn key_covers(scope: &SmolPath, key: &SmolPath) -> bool {
+pub(crate) fn key_covers(scope: &SmolPath, key: &SmolPath) -> bool {
 	scope.is_empty()
 		|| key.as_str() == scope.as_str()
 		|| key
@@ -64,7 +64,7 @@ pub fn key_covers(scope: &SmolPath, key: &SmolPath) -> bool {
 /// receives and triggers each event each [`PreUpdate`].
 #[cfg(feature = "std")]
 #[derive(Resource, Clone)]
-pub struct BlobEventBus {
+pub(crate) struct BlobEventBus {
 	/// Send half handed to provider watchers and write actions.
 	pub sender: async_channel::Sender<BlobEvent>,
 	receiver: async_channel::Receiver<BlobEvent>,
@@ -86,7 +86,7 @@ impl BlobEventBus {
 
 /// Drains the [`BlobEventBus`] channel, triggering each [`BlobEvent`] globally.
 #[cfg(feature = "std")]
-pub fn drain_blob_events(bus: Res<BlobEventBus>, mut commands: Commands) {
+pub(crate) fn drain_blob_events(bus: Res<BlobEventBus>, mut commands: Commands) {
 	while let Ok(event) = bus.receiver.try_recv() {
 		commands.trigger(event);
 	}
@@ -103,7 +103,7 @@ pub fn drain_blob_events(bus: Res<BlobEventBus>, mut commands: Commands) {
 ///
 /// Reading through `Mut`'s `Deref` in the filter does not mark; only the matched
 /// `set_changed()` marks, so unrelated stores stay unchanged.
-pub fn propagate_blob_store_changes(
+pub(crate) fn propagate_blob_store_changes(
 	ev: On<BlobEvent>,
 	mut stores: Query<&mut BlobStore>,
 ) {
@@ -123,7 +123,7 @@ pub fn propagate_blob_store_changes(
 /// components an app hung beside the handle) on a deletion the object may recover
 /// from moments later, eg an editor that writes by remove-then-create, whose
 /// re-creation then resurrects through the same untouched handle.
-pub fn propagate_blob_changes(ev: On<BlobEvent>, mut blobs: Query<&mut Blob>) {
+pub(crate) fn propagate_blob_changes(ev: On<BlobEvent>, mut blobs: Query<&mut Blob>) {
 	blobs
 		.iter_mut()
 		.filter(|blob| blob.matches_event(&ev))

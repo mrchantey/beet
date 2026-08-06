@@ -104,7 +104,7 @@ pub fn PlayAnimationAction(
 /// clip under the path `"test"` via [`AnimationGraphClips`] so the new clip-path
 /// resolution flow can be driven in tests.
 #[cfg(test)]
-pub fn clip_to_player(
+pub(crate) fn clip_to_player(
 	clip: In<AnimationClip>,
 	mut commands: Commands,
 	mut animations: ResMut<Assets<AnimationClip>>,

@@ -333,7 +333,7 @@ impl CharcellTree<'_, '_> {
 
 /// System parameter shared by all charcell render systems.
 #[derive(SystemParam)]
-pub struct CharcellQuery<'w, 's> {
+pub(crate) struct CharcellQuery<'w, 's> {
 	nodes: Query<
 		'w,
 		's,

@@ -513,7 +513,7 @@ impl BufferedTerminal {
 // ── Systems ───────────────────────────────────────────────────────────────────
 
 /// Render changed [`DoubleBuffer`]s into their terminal's writer.
-pub fn render_terminal(
+pub(crate) fn render_terminal(
 	mut query: Populated<
 		(&mut Terminal, &mut DoubleBuffer),
 		Changed<DoubleBuffer>,
@@ -532,7 +532,7 @@ pub fn render_terminal(
 }
 
 /// Flush all terminal writers in PostUpdate to avoid partial frames.
-pub fn flush_terminals(mut query: Query<&mut Terminal>) -> Result {
+pub(crate) fn flush_terminals(mut query: Query<&mut Terminal>) -> Result {
 	for mut terminal in query.iter_mut() {
 		terminal.flush()?;
 	}
@@ -540,7 +540,7 @@ pub fn flush_terminals(mut query: Query<&mut Terminal>) -> Result {
 }
 
 /// Restore terminals (leave alternate screen, show cursor) on shutdown.
-pub fn restore_terminals(mut query: Query<&mut Terminal>) -> Result {
+pub(crate) fn restore_terminals(mut query: Query<&mut Terminal>) -> Result {
 	for mut terminal in query.iter_mut() {
 		terminal.restore_config()?;
 		terminal.flush()?;

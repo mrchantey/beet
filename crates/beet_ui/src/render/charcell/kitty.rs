@@ -100,13 +100,13 @@ impl KittyImage {
 
 /// The element state the attach system sets on a raster-backed `<img>`, giving
 /// it the terminal-gated block box (see [`default_element_rules`]).
-pub fn graphics_state() -> ElementState {
+pub(crate) fn graphics_state() -> ElementState {
 	ElementState::Custom("graphics".into())
 }
 
 /// Pixel dimensions from a PNG header (`IHDR` width/height), or `None` when
 /// the bytes are not a PNG.
-pub fn png_dimensions(bytes: &[u8]) -> Option<UVec2> {
+pub(crate) fn png_dimensions(bytes: &[u8]) -> Option<UVec2> {
 	(bytes.len() >= 24
 		&& bytes.starts_with(b"\x89PNG\r\n\x1a\n")
 		&& &bytes[12..16] == b"IHDR")
@@ -209,7 +209,7 @@ pub struct KittyImageLoading;
 /// resolves it against the document origin. Without the `net` feature there is no
 /// transport, so an `<img>` is simply marked unavailable.
 #[cfg(feature = "tui")]
-pub fn attach_kitty_images(
+pub(crate) fn attach_kitty_images(
 	mut placements: ResMut<KittyPlacements>,
 	elements: ElementQuery,
 	surfaces: SurfaceQuery,
@@ -289,7 +289,7 @@ fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 /// spawns the material [`Error`] box carrying the failure as a child, so a failed
 /// image shows both what it was and why it could not load.
 #[cfg(feature = "tui")]
-pub fn render_image_errors(
+pub(crate) fn render_image_errors(
 	unavailable: Query<
 		(Entity, &KittyImageUnavailable),
 		Without<KittyErrorShown>,

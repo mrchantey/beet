@@ -89,7 +89,7 @@ impl Plugin for LivePagePlugin {
 /// document chrome) but forks at the output, handing back the built entity rather
 /// than serializing and despawning it. That entity is kept alive to be bound to a
 /// surface via [`bind_surface_page`]. The static path is untouched.
-pub async fn build_live_page(
+pub(crate) async fn build_live_page(
 	router: &AsyncEntity,
 	mut request: Request,
 ) -> Result<Entity> {
@@ -140,7 +140,7 @@ pub async fn build_live_page(
 /// bytes that must become a tree, so they parse through the same template
 /// substrate the route build uses (via [`MediaParser`]). The tree is marked for
 /// cleanup on the next page swap.
-pub fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
+pub(crate) fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
 	let mut entity = world.spawn_empty();
 	MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
 	let page = entity.id();
@@ -163,7 +163,7 @@ pub fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
 ///
 /// Scoped to one surface, so binding a page on one SSH session never disturbs
 /// another session's page.
-pub fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
+pub(crate) fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
 	let Some(slot) = page_slot_of(world, host) else {
 		error!("page host {host} has no PageSlot child");
 		return;

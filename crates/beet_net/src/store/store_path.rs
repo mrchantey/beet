@@ -112,7 +112,7 @@ fn resolve_blob_path(
 }
 
 /// On [`DirPath`] insert, scope the nearest ancestor store onto the entity.
-pub fn on_insert_dir_path(
+pub(crate) fn on_insert_dir_path(
 	ev: On<Insert, DirPath>,
 	dirs: Query<&DirPath>,
 	parents: Query<&ChildOf>,
@@ -123,7 +123,7 @@ pub fn on_insert_dir_path(
 }
 
 /// On [`BlobPath`] insert, resolve the [`Blob`] from the nearest ancestor store.
-pub fn on_insert_blob_path(
+pub(crate) fn on_insert_blob_path(
 	ev: On<Insert, BlobPath>,
 	blob_paths: Query<&BlobPath>,
 	parents: Query<&ChildOf>,
@@ -145,7 +145,7 @@ pub fn on_insert_blob_path(
 /// against its nearest ancestor store (this entity, or a nearer scoped store).
 /// Descendants only, never self: the scoped store this fired on is a [`DirPath`]'s
 /// own output, so re-resolving self would compound it.
-pub fn on_insert_store(
+pub(crate) fn on_insert_store(
 	ev: On<Insert, BlobStore>,
 	children: Query<&Children>,
 	dirs: Query<&DirPath>,
@@ -181,7 +181,7 @@ pub fn on_insert_store(
 /// whose nearest store is exactly the one going away (a nearer scoped store backs the
 /// rest, and cascades on its own removal). The removed store is still present during
 /// this observer, so `nearest_store` still identifies the descendants it backed.
-pub fn on_remove_store(
+pub(crate) fn on_remove_store(
 	ev: On<Remove, BlobStore>,
 	children: Query<&Children>,
 	dirs: Query<&DirPath>,

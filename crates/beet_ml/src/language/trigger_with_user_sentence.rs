@@ -17,7 +17,7 @@ pub struct TriggerWithUserSentence;
 
 /// Observer system: writes [`UserMessage`] text into each matching
 /// [`Sentence`] and queues an [`Action<(), Outcome>`] call.
-pub fn trigger_with_user_sentence(
+pub(crate) fn trigger_with_user_sentence(
 	ev: On<UserMessage>,
 	mut commands: Commands,
 	mut query: Query<(Entity, &mut Sentence), With<TriggerWithUserSentence>>,

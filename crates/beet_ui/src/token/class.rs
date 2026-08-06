@@ -206,7 +206,7 @@ pub fn inline_class(
 /// directive: the macro mints `class` from `panic::Location`, `bx:style` mints it
 /// from the BSX source span, but both register the rule and attach the class
 /// identically. The caller seeds `rule` with `Selector::Class(class.as_selector())`.
-pub fn register_inline_rule(
+pub(crate) fn register_inline_rule(
 	entity: &mut EntityWorldMut,
 	class: ClassName,
 	rule: Rule,

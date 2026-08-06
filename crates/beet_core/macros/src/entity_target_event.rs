@@ -6,13 +6,13 @@ use syn::DeriveInput;
 use syn::parse_macro_input;
 
 /// ActionEvent is now just an alias for EntityTargetEvent
-pub fn impl_action_event(
+pub(crate) fn impl_action_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	impl_entity_target_event(input)
 }
 
-pub fn impl_entity_target_event(
+pub(crate) fn impl_entity_target_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);

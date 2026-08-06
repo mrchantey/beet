@@ -123,7 +123,7 @@ fn name_literal_str(literal: &DataLiteral) -> Option<&str> {
 /// `{Repeat}` spread or `<Repeat>` tag misses the exact lookup; it then falls
 /// back to the unique generic instantiation whose base name matches (the `<`
 /// boundary guards against prefix collisions like `Repeat` vs `RepeatTimes`).
-pub fn registration_by_name<'a>(
+pub(crate) fn registration_by_name<'a>(
 	registry: &'a TypeRegistry,
 	name: &str,
 ) -> Option<&'a TypeRegistration> {
@@ -151,7 +151,7 @@ pub fn registration_by_name<'a>(
 
 /// The [`registration_by_name`] match's [`TypeInfo`], for callers that only need
 /// the type info (eg attribute field coercion).
-pub fn type_info_by_name(
+pub(crate) fn type_info_by_name(
 	registry: &TypeRegistry,
 	name: &str,
 ) -> Option<&'static TypeInfo> {
@@ -163,7 +163,7 @@ pub fn type_info_by_name(
 /// the variant through [`enum_to_reflect`] (which reduces the qualified name to
 /// its last segment). `None` when the prefix is not a registered enum carrying
 /// that variant, so a genuine miss still falls through to the unknown-name path.
-pub fn enum_variant_registration<'a>(
+pub(crate) fn enum_variant_registration<'a>(
 	registry: &'a TypeRegistry,
 	name: &str,
 ) -> Option<&'a TypeRegistration> {

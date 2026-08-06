@@ -382,7 +382,7 @@ fn nearest_ancestor_help(
 /// The help route itself is excluded from the listing. The interactive help
 /// surfaces render the material [`RouteList`]; this is the plaintext counterpart
 /// for non-rendered CLI output.
-pub fn format_route_help(tree: &RouteTree) -> String {
+fn format_route_help(tree: &RouteTree) -> String {
 	let mut output = String::new();
 	output.push_str("Available routes:\n\n");
 

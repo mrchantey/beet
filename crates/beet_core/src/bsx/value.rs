@@ -18,7 +18,7 @@ pub fn parse_value_expr_str(source: &str) -> Result<ValueExpr> {
 }
 
 /// Parse an attribute-value or text-position value: a literal or a reference.
-pub fn parse_value_expr(cursor: &mut Cursor) -> Result<ValueExpr> {
+pub(crate) fn parse_value_expr(cursor: &mut Cursor) -> Result<ValueExpr> {
 	cursor.skip_ws();
 	match cursor.peek() {
 		Some('#') => bevybail!(
@@ -32,7 +32,7 @@ pub fn parse_value_expr(cursor: &mut Cursor) -> Result<ValueExpr> {
 
 /// Parse a bare-position spread `{MyComponent{..}}` or `{(A, B)}`. A tuple item
 /// may also be an `@` binding, eg `{(Bar{boo:"bazz"}, @comp:Bar.boo)}`.
-pub fn parse_spread(cursor: &mut Cursor) -> Result<SpreadExpr> {
+pub(crate) fn parse_spread(cursor: &mut Cursor) -> Result<SpreadExpr> {
 	cursor.skip_ws();
 	if cursor.peek() == Some('(') {
 		cursor.bump();
@@ -58,7 +58,7 @@ pub fn parse_spread(cursor: &mut Cursor) -> Result<SpreadExpr> {
 }
 
 /// Parse a single literal: scalar, list, struct, or enum.
-pub fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
+pub(crate) fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 	cursor.skip_ws();
 	match cursor.peek() {
 		Some('"') => Ok(DataLiteral::Scalar(Value::Str(parse_string(cursor)?))),
@@ -92,7 +92,7 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 /// well-known name (`BuildRoot`, `SnippetRoot`, `PageRoot`, `Router`);
 /// reservation is the resolver's concern ([`ReservedRef`](super::resolve::ReservedRef)),
 /// the grammar does not distinguish them.
-pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
+pub(crate) fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 	cursor.eat("@");
 	let source_name = cursor.take_while(|ch| ch.is_alphanumeric());
 	let source = match source_name {
@@ -170,7 +170,7 @@ pub fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 /// may take no arguments, eg `submit`). Each argument value shares the
 /// attribute-value grammar ([`parse_value_expr`]), so a literal and an `@`
 /// binding both parse, the latter kept as a [`VerbArg::Binding`].
-pub fn parse_verb_call(cursor: &mut Cursor) -> Result<VerbCall> {
+pub(crate) fn parse_verb_call(cursor: &mut Cursor) -> Result<VerbCall> {
 	cursor.skip_ws();
 	let verb = cursor.take_while(|ch| ch.is_alphanumeric() || ch == '_');
 	if verb.is_empty() {
@@ -382,7 +382,7 @@ fn parse_named_literal(cursor: &mut Cursor) -> Result<NamedLiteral> {
 /// Parse the fields trailing a name: nothing (unit), `(..)` (tuple), or `{..}`
 /// (struct). Shared by spread/enum values and the tag-position literal parser
 /// (the tag name is read by the markup parser, the fields here).
-pub fn parse_named_fields(cursor: &mut Cursor) -> Result<NamedFields> {
+pub(crate) fn parse_named_fields(cursor: &mut Cursor) -> Result<NamedFields> {
 	match cursor.peek() {
 		Some('(') => {
 			cursor.bump();

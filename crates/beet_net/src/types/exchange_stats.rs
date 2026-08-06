@@ -20,7 +20,7 @@ use beet_core::prelude::*;
 /// The [`ExchangeStats`] counter it bumps is itself no_std (it backs the no_std
 /// [`HttpServer`] requirement).
 #[cfg(feature = "action")]
-pub fn exchange_stats(
+pub(crate) fn exchange_stats(
 	ev: On<EndExchange>,
 	mut servers: AncestorQuery<&mut ExchangeStats>,
 ) -> Result {

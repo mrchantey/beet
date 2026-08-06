@@ -10,7 +10,7 @@ use beet_net::sockets::*;
 use beet_net::sockets::Message;
 
 /// The main-port path a browser upgrades on to join the [`ClientIo`] channel.
-pub const CLIENT_IO_PATH: &str = "__client_io";
+pub(crate) const CLIENT_IO_PATH: &str = "__client_io";
 
 /// A general purpose server-to-client websocket channel.
 ///
@@ -29,7 +29,7 @@ pub struct ClientIo;
 /// The `/__client_io` route: a [`WebSocketUpgrade`] handler `default_router`
 /// wires in under the `client_io` feature, so every HTTP router exposes the
 /// upgrade endpoint on its own port.
-pub fn client_io_route() -> impl Bundle {
+pub(crate) fn client_io_route() -> impl Bundle {
 	(
 		exchange_route("__client_io", exchange_handler(client_io_upgrade)),
 		// the upgrade handshake must never be cached

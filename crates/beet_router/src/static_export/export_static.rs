@@ -72,7 +72,7 @@ pub async fn collect_static_paths(
 
 /// Renders every static route in the router to HTML, in route-tree order. See
 /// [`collect_static_paths`] for which routes qualify.
-pub async fn collect_static_html(
+async fn collect_static_html(
 	world: &AsyncWorld,
 	router: Entity,
 ) -> Result<Vec<(SmolPath, String)>> {

@@ -8,7 +8,7 @@ use bevy::app::AppExit;
 use bevy::diagnostic::FrameCount;
 
 /// Returns a system that exits the application after the specified number of frames.
-pub fn exit_in_frames(
+pub(crate) fn exit_in_frames(
 	count: u32,
 ) -> impl Fn(Res<FrameCount>, MessageWriter<AppExit>) {
 	move |frames, mut exit| {

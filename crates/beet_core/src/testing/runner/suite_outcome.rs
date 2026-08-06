@@ -44,7 +44,7 @@ impl SuiteOutcome {
 }
 
 /// Insert final when no tests to run
-pub fn insert_suite_outcome(
+pub(crate) fn insert_suite_outcome(
 	mut commands: Commands,
 	// matches runners even if the config was not just added
 	runners: Populated<

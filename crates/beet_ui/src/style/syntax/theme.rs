@@ -139,19 +139,19 @@ fn declarations(p: &SyntaxPalette) -> Vec<(TokenKey, TokenValue)> {
 
 /// The root-level fallback declarations (the dark palette), for contexts that
 /// carry no `.light-scheme`/`.dark-scheme` class.
-pub fn default_scheme() -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn default_scheme() -> Vec<(TokenKey, TokenValue)> {
 	declarations(&dark_palette())
 }
 
 /// Token values for a light background, gated on the `.light-scheme` body class.
-pub fn light_scheme() -> Rule {
+pub(crate) fn light_scheme() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(classes::LIGHT_SCHEME))
 		.with_extend(declarations(&light_palette()))
 }
 
 /// Token values for a dark background, gated on the `.dark-scheme` body class.
-pub fn dark_scheme() -> Rule {
+pub(crate) fn dark_scheme() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(classes::DARK_SCHEME))
 		.with_extend(declarations(&dark_palette()))
@@ -163,7 +163,7 @@ pub fn dark_scheme() -> Rule {
 /// Capture names that contain a dot (eg `string.escape`) are written
 /// verbatim into the class name, matching the output of
 /// [`apply_syntax_highlighting`](crate::parse::apply_syntax_highlighting).
-pub fn class_rules() -> Vec<Rule> {
+pub(crate) fn class_rules() -> Vec<Rule> {
 	vec![
 		hl_rule("attribute",             t::Attribute),
 		hl_rule("boolean",               t::Boolean),

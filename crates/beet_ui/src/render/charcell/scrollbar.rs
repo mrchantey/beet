@@ -25,7 +25,7 @@ use bevy::math::UVec2;
 /// runs after [`layout_nodes`](super::layout_nodes) and before
 /// [`paint_nodes`](super::paint_nodes), per buffer root so the real viewport
 /// drives the box model. A clamped change repaints via change detection.
-pub fn clamp_scroll_positions<B: Component + AsBuffer>(
+pub(crate) fn clamp_scroll_positions<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut ScrollPosition>)>,
 	tree: CharcellTree,
 	roots: Populated<(Entity, &B)>,

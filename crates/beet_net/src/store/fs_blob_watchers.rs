@@ -150,7 +150,7 @@ mod native {
 	/// stripped to `base` (so it is base-relative) and sent keyed to `store` (so
 	/// `store.root_key()` is the base, routing via `did_change`). A `None` `base`
 	/// or a path outside it is skipped.
-	pub fn forward_dir_event_for(
+	pub(crate) fn forward_dir_event_for(
 		event: &DirEvent,
 		base: Option<&AbsPathBuf>,
 		store: &BlobStore,

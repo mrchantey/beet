@@ -101,7 +101,7 @@ pub struct AnimateStylesSet;
 /// A [`Changed<VisualStyle>`] (the cascade writes targets with `set_if_neq`)
 /// retargets the ease from the currently displayed style; the bevy [`Timer`]
 /// then drives the interpolation each frame.
-pub fn animate_visual_transitions(
+pub(crate) fn animate_visual_transitions(
 	time: Res<Time>,
 	mut commands: Commands,
 	mut query: Query<(

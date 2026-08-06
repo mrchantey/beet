@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// The HTML block-level element names, the single list shared by everything that
 /// distinguishes block from inline elements for whitespace and layout decisions
 /// (renderers, the markdown tree builder, …).
-pub const BLOCK_ELEMENTS: &[&str] = &[
+pub(crate) const BLOCK_ELEMENTS: &[&str] = &[
 	"address",
 	"article",
 	"aside",
@@ -49,7 +49,7 @@ pub const BLOCK_ELEMENTS: &[&str] = &[
 
 /// Whether `name` is an HTML block-level element (case-insensitive), per
 /// [`BLOCK_ELEMENTS`].
-pub fn is_block_element(name: &str) -> bool {
+pub(crate) fn is_block_element(name: &str) -> bool {
 	BLOCK_ELEMENTS
 		.iter()
 		.any(|el| el.eq_ignore_ascii_case(name))
@@ -57,7 +57,7 @@ pub fn is_block_element(name: &str) -> bool {
 
 /// The default set of block-level element names as owned `Cow`s, for renderers
 /// that store an overridable list.
-pub fn default_block_elements() -> Vec<Cow<'static, str>> {
+pub(crate) fn default_block_elements() -> Vec<Cow<'static, str>> {
 	BLOCK_ELEMENTS.iter().map(|el| Cow::Borrowed(*el)).collect()
 }
 
@@ -143,7 +143,7 @@ fn escape_char(ch: &str) -> Option<&'static str> {
 /// unescape_html_text("&amp;amp;").xpect_eq("&amp;".to_string());
 /// unescape_html_text("no entities").xpect_eq("no entities".to_string());
 /// ```
-pub fn unescape_html_text(input: &str) -> String {
+pub(crate) fn unescape_html_text(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 	let mut remaining = input;
 
@@ -187,7 +187,7 @@ pub fn unescape_html_text(input: &str) -> String {
 /// escape_html_text("a & b").xpect_eq("a &amp; b".to_string());
 /// escape_html_text("no special").xpect_eq("no special".to_string());
 /// ```
-pub fn escape_html_text(input: &str) -> String {
+pub(crate) fn escape_html_text(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 
 	for ch in input.chars() {
@@ -218,7 +218,7 @@ pub fn escape_html_text(input: &str) -> String {
 /// escape_html_attribute("<not escaped>")
 ///     .xpect_eq("<not escaped>".to_string());
 /// ```
-pub fn escape_html_attribute(input: &str) -> String {
+pub(crate) fn escape_html_attribute(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 	for ch in input.chars() {
 		match ch {
@@ -243,7 +243,7 @@ pub fn escape_html_attribute(input: &str) -> String {
 /// unescape_html_attribute("say &quot;hello&quot; &amp; &apos;goodbye&apos;")
 ///     .xpect_eq(r#"say "hello" & 'goodbye'"#.to_string());
 /// ```
-pub fn unescape_html_attribute(input: &str) -> String {
+pub(crate) fn unescape_html_attribute(input: &str) -> String {
 	unescape_html_text(input)
 }
 
@@ -262,7 +262,7 @@ pub fn unescape_html_attribute(input: &str) -> String {
 ///     .xpect_contains("<")
 ///     .xpect_contains("/script>");
 /// ```
-pub fn escape_script_json(json: &str) -> String { json.replace('<', "\\u003c") }
+pub(crate) fn escape_script_json(json: &str) -> String { json.replace('<', "\\u003c") }
 
 #[cfg(test)]
 mod test {

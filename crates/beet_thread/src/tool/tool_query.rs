@@ -2,7 +2,7 @@ use beet_core::prelude::*;
 
 /// Creates a tool name by combining the entity bits with the path.
 /// Format: `tool_{entity_bits}_{path_with_underscores}`
-pub fn tool_name(entity: Entity, path: &str) -> String {
+fn tool_name(entity: Entity, path: &str) -> String {
 	// unique as long as entity is not despawned
 	// TODO to_bits better?
 	let index = entity.index_u32();
@@ -21,7 +21,7 @@ pub fn tool_name(entity: Entity, path: &str) -> String {
 
 /// Parses a tool name back into entity and path components.
 /// Returns `None` if the name doesn't match the expected format.
-pub fn parse_tool_name(world: &World, name: &str) -> Option<(Entity, String)> {
+fn parse_tool_name(world: &World, name: &str) -> Option<(Entity, String)> {
 	let name = name.strip_prefix("tool_")?;
 	let underscore_pos = name.find('_');
 

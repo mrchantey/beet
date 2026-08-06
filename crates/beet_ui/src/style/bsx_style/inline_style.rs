@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 /// Register the `bx:style` handler into the [`StyleResolver`] seam, so a
 /// `bx:style` directive declares a one-off rule and attaches a span-derived
 /// inline class at build time.
-pub fn register_inline_style(world: &mut World) {
+pub(crate) fn register_inline_style(world: &mut World) {
 	world.get_resource_or_init::<StyleResolver>().set(
 		|entity, source, _span| {
 			// key the class on the declaration content, not the BSX span: a

@@ -10,7 +10,7 @@ use syn::parse_macro_input;
 use super::*;
 
 /// Entry point for the `Get` derive macro.
-pub fn impl_get(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub(crate) fn impl_get(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
 	parse(input)
 		.unwrap_or_else(|err| err.into_compile_error())

@@ -306,7 +306,7 @@ impl BlobStoreProvider for InMemoryStore {
 /// `insert` / `remove` emit [`BlobEvent`]s. Refcounted per backing `Arc`, so a
 /// `with_subdir` clone adds no duplicate sends.
 #[cfg(feature = "std")]
-pub fn add_memory_store_watcher(
+pub(crate) fn add_memory_store_watcher(
 	ev: On<Add, InMemoryStore>,
 	bus: Res<BlobEventBus>,
 	stores: Query<&InMemoryStore>,
@@ -319,7 +319,7 @@ pub fn add_memory_store_watcher(
 /// Unsubscribe the removed [`InMemoryStore`], clearing the bus on the last
 /// subscriber.
 #[cfg(feature = "std")]
-pub fn remove_memory_store_watcher(
+pub(crate) fn remove_memory_store_watcher(
 	ev: On<Remove, InMemoryStore>,
 	stores: Query<&InMemoryStore>,
 ) {

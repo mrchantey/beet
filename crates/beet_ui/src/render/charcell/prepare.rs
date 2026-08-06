@@ -19,7 +19,7 @@ use beet_core::prelude::*;
 /// A [`Comment`]/[`Doctype`] node is non-visual (the terminal twin of the HTML
 /// renderer skipping comments): it gets no layout box, so it reserves no row and
 /// `CharcellQuery` drops it for lacking an [`IntrinsicSize`].
-pub fn prepare_charcell_tree<B: Component>(
+pub(crate) fn prepare_charcell_tree<B: Component>(
 	mut commands: Commands,
 	roots: Populated<Entity, With<B>>,
 	tree: CharcellTree,

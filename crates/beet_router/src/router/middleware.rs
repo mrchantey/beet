@@ -73,7 +73,10 @@ where
 /// middleware components (eg [`RequestLogger`], [`HelpHandler`])
 /// avoid the [`Middleware<T, _, _>`] wrapper, so they survive
 /// scene round-tripping unchanged.
-pub fn on_add_middleware<T, In, Out>(mut world: DeferredWorld, cx: HookContext)
+pub(crate) fn on_add_middleware<T, In, Out>(
+	mut world: DeferredWorld,
+	cx: HookContext,
+)
 where
 	In: 'static,
 	Out: 'static,
@@ -139,7 +142,7 @@ where
 
 /// System parameter for resolving ancestor middleware on an entity.
 #[derive(SystemParam)]
-pub struct MiddlewareQuery<'w, 's, In, Out>
+pub(crate) struct MiddlewareQuery<'w, 's, In, Out>
 where
 	In: 'static,
 	Out: 'static,

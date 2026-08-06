@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::Path;
 
-pub const RESERVED_WORDS: [&str; 32] = [
+const RESERVED_WORDS: [&str; 32] = [
 	"as",
 	"break",
 	"pub const",
@@ -128,7 +128,7 @@ struct NestedBlock {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct AttributeType(Value);
 
-pub fn generate_serde(
+pub(crate) fn generate_serde(
 	config: &str,
 	out: &mut dyn Write,
 	registry: &Registry,
@@ -140,7 +140,7 @@ pub fn generate_serde(
 	CodeGenerator::new(&config).output(out, registry)
 }
 
-pub fn export_schema_to_registry(
+pub(crate) fn export_schema_to_registry(
 	schema: &TerraformSchemaExport,
 ) -> Result<Registry> {
 	let mut registry = Registry::new();
@@ -200,7 +200,7 @@ pub fn export_schema_to_registry(
 /// and the top-level `config` struct.
 /// Returns the registry, metadata about every generated resource, and
 /// collected doc comments extracted from schema `description` fields.
-pub fn export_filtered_resources(
+pub(crate) fn export_filtered_resources(
 	schema: &TerraformSchemaExport,
 	filter: &terra::ResourceFilter,
 	config: &CodeGeneratorConfig,
@@ -748,7 +748,7 @@ fn export_block_type(
 }
 
 /// Read a Terraform schema export from a JSON file on disk.
-pub fn read_tf_schema_from_file<P: AsRef<Path>>(
+pub(crate) fn read_tf_schema_from_file<P: AsRef<Path>>(
 	path: P,
 ) -> Result<TerraformSchemaExport> {
 	let bytes = fs_ext::read(path)?;

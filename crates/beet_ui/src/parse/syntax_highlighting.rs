@@ -284,7 +284,7 @@ pub fn apply_syntax_highlighting(
 
 /// The list of capture names this module recognises, matching
 /// [`tokens_mod::recognised_names`].
-pub fn recognised_names() -> &'static [&'static str] {
+pub(crate) fn recognised_names() -> &'static [&'static str] {
 	tokens_mod::recognised_names()
 }
 

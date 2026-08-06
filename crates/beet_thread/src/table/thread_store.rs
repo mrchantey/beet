@@ -21,7 +21,7 @@ impl SyncedPosts {
 /// response metadata; the thread record is idempotent (keyed by id). In-progress
 /// (streaming) posts stay window-local until completion. Threads without a
 /// [`ThreadStore`] are ignored.
-pub fn sync_window_to_store(
+pub(crate) fn sync_window_to_store(
 	async_commands: AsyncCommands,
 	mut changed: Query<
 		(&Thread, &ThreadWindow, &ThreadStore, &mut SyncedPosts),

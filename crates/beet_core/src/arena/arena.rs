@@ -24,7 +24,7 @@ struct ArenaEntry {
 /// let removed = handle.remove();
 /// assert_eq!(removed, 42);
 /// ```
-pub struct Arena {
+pub(crate) struct Arena {
 	objects: Arc<Mutex<HashMap<usize, ArenaEntry>>>,
 	next_id: Arc<Mutex<usize>>,
 }
@@ -152,7 +152,7 @@ It may have been manually removed by another handle.
 ///
 /// When [`remove`](Self::remove) is called, all other handles to the same object
 /// become invalid. Accessing an invalid handle will panic.
-pub struct ArenaHandle<T> {
+pub(crate) struct ArenaHandle<T> {
 	id: usize,
 	_phantom: std::marker::PhantomData<T>,
 }

@@ -104,7 +104,7 @@ fn init_output(
 	}
 }
 
-pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
+pub(crate) fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 	commands
 		// ROOT CONTAINER
 		.spawn(

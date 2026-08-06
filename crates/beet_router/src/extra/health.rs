@@ -18,7 +18,7 @@ use bevy::ecs::system::In;
 /// The orchestrator probes this to know the task is live; autoscaling tracks CPU
 /// (and can also track `active_sessions` as a custom metric). Wired into the
 /// default app routes, so every site gets it.
-pub fn health_route() -> impl Bundle {
+pub(crate) fn health_route() -> impl Bundle {
 	(exchange_route("health", HealthHandler), HttpMethod::Get)
 }
 

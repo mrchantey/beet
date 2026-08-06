@@ -448,7 +448,7 @@ impl ActionNode {
 }
 
 /// The query tuple type used to collect action components for [`ActionNode::from_query`].
-pub type ActionQueryItem<'a> = (
+pub(crate) type ActionQueryItem<'a> = (
 	Entity,
 	&'a ActionMeta,
 	&'a PathPattern,

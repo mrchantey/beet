@@ -39,7 +39,7 @@ css_variable!(OutlineWidthThin,   Length);
 css_variable!(OutlineWidthMedium, Length);
 css_variable!(OutlineWidthThick,  Length);
 
-pub fn token_map() -> CssTokenMap {
+pub(crate) fn token_map() -> CssTokenMap {
 	CssTokenMap::default()
 		.insert(Elevation0)
 		.insert(Elevation1)
@@ -73,7 +73,7 @@ pub fn token_map() -> CssTokenMap {
 
 
 /// Returns all MD3 elevation default values.
-pub fn default_elevations() -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn default_elevations() -> Vec<(TokenKey, TokenValue)> {
 	let elevation_color = Color::srgba(0., 0., 0., 0.2);
 
 	Rule::new()
@@ -117,7 +117,7 @@ pub fn default_elevations() -> Vec<(TokenKey, TokenValue)> {
 }
 
 /// Returns all MD3 shape corner, composite shape, and outline width default values.
-pub fn default_shapes() -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn default_shapes() -> Vec<(TokenKey, TokenValue)> {
 	Rule::new()
 		// corner length ref tokens
 		.with_value(ShapeCornerNone, Length::Px(0.0))

@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 
 /// Calculate a seek impulse
 /// as described [here](https://www.youtube.com/watch?v=p1Ws1ZhG36g&list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=585s)
-pub fn seek_impulse(
+pub(crate) fn seek_impulse(
 	position: &Vec3,
 	velocity: &Velocity,
 	target_position: &Vec3,
@@ -29,7 +29,7 @@ pub fn seek_impulse(
 }
 /// Inverse of [`seek_impulse`]
 /// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=179)
-pub fn flee_impulse(
+pub(crate) fn flee_impulse(
 	position: &Vec3,
 	velocity: &Velocity,
 	target_position: &Vec3,
@@ -45,7 +45,7 @@ pub fn flee_impulse(
 /// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=544)
 /// Currently the tuning parameter is very coarse, based on distance to target.
 /// It assumes the pursuer is moving directly target at 1 m/s
-pub fn pursue_impulse(
+pub(crate) fn pursue_impulse(
 	position: &Vec3,
 	velocity: &Velocity,
 	target_position: &Vec3,
@@ -68,7 +68,7 @@ pub fn pursue_impulse(
 }
 /// Calculate an evade impulse
 /// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=584)
-pub fn evade_impulse(
+pub(crate) fn evade_impulse(
 	position: &Vec3,
 	velocity: &Velocity,
 	target_position: &Vec3,

@@ -54,7 +54,7 @@ use core::marker::PhantomData;
 /// assert!(!entity_ref.contains::<Maybe<A>>());
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Maybe<B: Bundle>(pub Option<B>);
+pub(crate) struct Maybe<B: Bundle>(pub Option<B>);
 
 impl<B: Bundle> Component for Maybe<B> {
 	type Mutability = Immutable;

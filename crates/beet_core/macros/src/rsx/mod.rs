@@ -13,4 +13,4 @@ mod lower;
 mod parse;
 mod rsx_macro;
 
-pub use rsx_macro::impl_rsx;
+pub(crate) use rsx_macro::impl_rsx;

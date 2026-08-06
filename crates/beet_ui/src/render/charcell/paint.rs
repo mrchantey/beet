@@ -37,7 +37,7 @@ impl Default for PaintContext {
 /// Each node carries a [`PaintContext`]: a clip (an overflow container narrows
 /// its descendants to its scrollport) and a scroll translation (a scroll
 /// container shifts its descendants by `-offset`). Both flow top-down.
-pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
+pub(crate) fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 	mut roots: Populated<(Entity, &mut B)>,
 	charcell: CharcellQuery,
 	tree: CharcellTree,

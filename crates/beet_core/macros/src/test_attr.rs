@@ -77,7 +77,7 @@ fn parse_std_attrs(
 	})
 }
 
-pub fn impl_test_attr(
+pub(crate) fn impl_test_attr(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> syn::Result<TokenStream> {

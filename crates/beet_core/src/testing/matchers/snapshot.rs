@@ -369,7 +369,7 @@ impl_string_comp_for_primitives!(&str, String, std::borrow::Cow<'static, str>);
 /// Attempts to parse the tokens with prettyplease,
 /// otherwise returns the tokens as a string.
 #[cfg(feature = "tokens")]
-pub fn pretty_parse(tokens: TokenStream) -> String {
+pub(crate) fn pretty_parse(tokens: TokenStream) -> String {
 	use syn::File;
 	match syn::parse2::<File>(tokens.clone()) {
 		Ok(file) => prettyplease::unparse(&file),

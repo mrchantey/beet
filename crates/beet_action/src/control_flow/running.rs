@@ -309,7 +309,7 @@ where
 ///
 /// [`tick_run_timers`] and [`RunTimer`] itself are registered once by
 /// [`ActionPlugin`] since they are not generic.
-pub fn running_plugin<In, Out>(app: &mut App)
+pub(crate) fn running_plugin<In, Out>(app: &mut App)
 where
 	In: 'static + Send + Sync + TypePath,
 	Out: 'static

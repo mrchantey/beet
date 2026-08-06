@@ -14,7 +14,7 @@ use bevy::tasks::ConditionalSendFuture;
 ///
 /// [`fetch_bytes`]: crate::fetch::fetch_bytes
 #[derive(Default, TypePath)]
-pub struct BertLoader;
+pub(crate) struct BertLoader;
 
 impl AssetLoader for BertLoader {
 	type Asset = Bert;

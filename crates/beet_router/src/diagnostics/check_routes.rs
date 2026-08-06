@@ -60,7 +60,7 @@ impl CheckReport {
 /// A best-effort console pass: a router that fails to scan is logged and skipped
 /// rather than aborting, so a transient build error never kills the dev loop.
 /// Returns whether any error-level diagnostic fired across all routers.
-pub async fn log_all_render_diagnostics(world: &AsyncWorld) -> bool {
+pub(crate) async fn log_all_render_diagnostics(world: &AsyncWorld) -> bool {
 	let routers = world
 		.with(|world: &mut World| {
 			world

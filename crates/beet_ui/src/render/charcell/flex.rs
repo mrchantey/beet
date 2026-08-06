@@ -75,7 +75,7 @@ fn cross_size(size: UVec2, direction: Direction, viewport: UVec2) -> u32 {
 ///
 /// `sizes` contains pre-measured intrinsic sizes for all children (bottom-up).
 /// `styles` is used to look up flex-order for line formation.
-pub fn measure_flex(
+pub(crate) fn measure_flex(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	sizes: &HashMap<Entity, UVec2>,
@@ -405,7 +405,7 @@ fn flex_order(entity: Entity, query: &CharcellQuery) -> i32 {
 ///
 /// Reads pre-computed [`IntrinsicSize`] from the query and writes
 /// each child's rect into `layout_rects`.
-pub fn flex_layout_rects(
+pub(crate) fn flex_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	container_rect: IRect,

@@ -11,7 +11,7 @@ use web_sys::HtmlImageElement;
 /// Point the page's `<img id="face">` at the url of a freshly-set [`DisplayedImage`].
 ///
 /// Runs on insert, so every `show-image` call re-renders the face.
-pub fn render_face(
+pub(crate) fn render_face(
 	ev: On<Insert, DisplayedImage>,
 	images: Query<&DisplayedImage>,
 ) {

@@ -5,7 +5,7 @@ use reqwest::RequestBuilder;
 use std::sync::LazyLock;
 
 /// Send a request using the reqwest client.
-pub async fn send_reqwest(req: Request) -> Result<Response> {
+pub(super) async fn send_reqwest(req: Request) -> Result<Response> {
 	super::send::check_https_features(&req)?;
 	let req: reqwest::Request = into_request(req)?;
 	async_ext::on_tokio(async move {

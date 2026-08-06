@@ -97,7 +97,7 @@ css_variable!(LabelMedium,    Typography);
 css_variable!(LabelSmall,     Typography);
 
 
-pub fn token_map() -> CssTokenMap {
+pub(crate) fn token_map() -> CssTokenMap {
 	CssTokenMap::default()
 		.insert(TypefaceBrand)
 		.insert(TypefacePlain)
@@ -175,7 +175,7 @@ pub fn token_map() -> CssTokenMap {
 ///
 /// Includes ref tokens (typefaces, weights, font sizes, line heights)
 /// and sys tokens (15 composite typescale entries).
-pub fn default_typography() -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn default_typography() -> Vec<(TokenKey, TokenValue)> {
 	Rule::new()
 		// ── Typeface ref tokens ───────────────────────────────────────────────
 		.with_value(TypefacePlain, 	Typeface::new(["Google Sans", "Product Sans", "Inter", "Work Sans", "system-ui", "sans-serif"]))

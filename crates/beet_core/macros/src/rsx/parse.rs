@@ -28,7 +28,7 @@ use syn::token::Brace;
 
 /// Parse a markup token stream into the node tree plus any diagnostics. Always
 /// returns a (possibly partial) tree; it never panics and never errors out.
-pub fn parse_rsx(input: TokenStream) -> (Vec<RsxNode>, Vec<Diagnostic>) {
+pub(crate) fn parse_rsx(input: TokenStream) -> (Vec<RsxNode>, Vec<Diagnostic>) {
 	let mut parser = RsxParser::default();
 	// the closure borrows the parser for the duration of the sub-parse, then
 	// releases it so the collected diagnostics can be read back out.

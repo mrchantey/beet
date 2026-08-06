@@ -28,11 +28,11 @@
 mod frozen_lake_map;
 pub use self::frozen_lake_map::*;
 mod frozen_lake_scene;
-pub use self::frozen_lake_scene::*;
+pub(crate) use self::frozen_lake_scene::*;
 mod grid;
 pub use self::grid::*;
 mod reward_grid;
-pub use self::reward_grid::*;
+pub(crate) use self::reward_grid::*;
 mod spawn_frozen_lake;
 pub use self::spawn_frozen_lake::*;
 mod translate_grid;

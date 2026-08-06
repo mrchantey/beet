@@ -22,7 +22,7 @@ pub impl Color {
 }
 
 /// Returns a [`Rule`] mapping semantic color tokens to their light-scheme tones.
-pub fn light_scheme() -> Rule {
+pub(crate) fn light_scheme() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(classes::LIGHT_SCHEME))
 		.with_token(colors::Primary, tones::Primary40).unwrap()
@@ -65,7 +65,7 @@ pub fn light_scheme() -> Rule {
 }
 
 /// Returns a [`Rule`] mapping semantic color tokens to their dark-scheme tones.
-pub fn dark_scheme() -> Rule {
+pub(crate) fn dark_scheme() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(classes::DARK_SCHEME))
 		.with_token(colors::Primary, tones::Primary80).unwrap()
@@ -108,7 +108,7 @@ pub fn dark_scheme() -> Rule {
 }
 
 /// Returns color values for every palette tone generated from a seed color.
-pub fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)> {
 	let theme = ThemeBuilder::with_source(color.into().to_argb()).build();
 	let Palettes { primary, secondary, tertiary, neutral, neutral_variant: nv, error } = theme.palettes;
 
@@ -201,7 +201,7 @@ pub fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)> {
 }
 
 /// Returns default opacity scalar values.
-pub fn default_opacities() -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn default_opacities() -> Vec<(TokenKey, TokenValue)> {
 	Rule::new()
 		.with_value(colors::OpacityHovered,0.08_f32)
 		.with_value(colors::OpacityFocused,0.12_f32)

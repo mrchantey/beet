@@ -377,7 +377,7 @@ fn sync_focus_state(
 /// element whose surface matches the key's `window`. `pub` so consumers can
 /// order against it (eg form submit runs after, so a one-frame input batch's
 /// chars land before its Enter gathers them).
-pub fn write_focus_input(
+pub(crate) fn write_focus_input(
 	mut keys: MessageReader<KeyboardInput>,
 	mut focused: Query<(Entity, &mut Value), With<Focus>>,
 	surfaces: SurfaceQuery,

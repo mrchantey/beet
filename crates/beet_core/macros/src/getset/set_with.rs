@@ -11,7 +11,7 @@ use syn::parse_macro_input;
 use super::*;
 
 /// Entry point for the `SetWith` derive macro.
-pub fn impl_set_with(
+pub(crate) fn impl_set_with(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);

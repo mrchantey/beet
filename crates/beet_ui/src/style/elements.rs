@@ -42,7 +42,7 @@ fn block_gap() -> Spacing {
 /// Each rule also declares its `display` so the charcell layout treats prose
 /// structure correctly: headings/paragraphs/lists/quotes/code blocks flow as
 /// blocks, while emphasis/links/inline code flow inline.
-pub fn default_element_rules() -> Vec<Rule> {
+pub(crate) fn default_element_rules() -> Vec<Rule> {
 	vec![
 		non_visual_rule(),
 		// ── Block structure ──
@@ -134,7 +134,7 @@ pub fn default_element_rules() -> Vec<Rule> {
 /// Kept separate from the prose [`default_element_rules`] so theme rule sets (eg
 /// Material) can include it without pulling in prose props that need their own
 /// CSS resolvers.
-pub fn non_visual_rule() -> Rule {
+pub(crate) fn non_visual_rule() -> Rule {
 	Rule::tags(&[
 		"head", "script", "style", "template", "noscript", "meta", "link",
 		"title", "base",

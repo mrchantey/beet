@@ -9,7 +9,7 @@ use beet_net::prelude::*;
 /// heartbeat, and `pagehide`) plus click / scroll / error events. A page view's
 /// `page_view_id` overwrites its stored row, so the final duration lands even
 /// when the server never sees the (cached) page load itself.
-pub fn analytics_handler() -> impl Bundle {
+pub(crate) fn analytics_handler() -> impl Bundle {
 	(
 		exchange_route("analytics", AnalyticsHandler),
 		HttpMethod::Post,

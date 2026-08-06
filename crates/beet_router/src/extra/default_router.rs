@@ -41,7 +41,7 @@ pub fn default_router() -> impl Bundle {
 /// keeps its own path. Shared by [`default_router`] and the [`DefaultAppRoutes`]
 /// template. `app_info`/`analytics` need a [`PackageConfig`] resource.
 #[cfg(feature = "std")]
-pub fn default_app_routes() -> impl Bundle {
+fn default_app_routes() -> impl Bundle {
 	(
 		OnSpawn::insert_child(app_info()),
 		OnSpawn::insert_child(reactivity_js_route()),

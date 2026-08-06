@@ -33,7 +33,7 @@ pub struct ResetScene;
 /// [`RouteTree`] is rebuilt explicitly, since reparenting does not retrigger
 /// route-tree construction; without a parent the roots stay where loaded and the
 /// [`rebuild_route_trees_on_load`] observer recomputes the tree.
-pub fn set_scene(
+pub(crate) fn set_scene(
 	world: &mut World,
 	media: &MediaBytes,
 	parent: Option<Entity>,

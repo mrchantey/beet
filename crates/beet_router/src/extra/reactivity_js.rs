@@ -13,7 +13,7 @@ use beet_ui::prelude::REACTIVITY_SRC;
 /// `default_router` wires it in, so a served page's auto-injected
 /// `<script defer src="/js/reactivity.js">` resolves, and `export-static` emits
 /// it as a file (a statically exported reactive site is self-contained).
-pub fn reactivity_js_route() -> impl Bundle {
+pub(crate) fn reactivity_js_route() -> impl Bundle {
 	(
 		// the route path is the src URL without its leading slash
 		exchange_route(

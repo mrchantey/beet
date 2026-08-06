@@ -119,7 +119,7 @@ impl<T: EpisodeParams> RlSession<T> {
 }
 
 /// On session-spawn, emits [`StartSession`] and the first [`StartEpisode`].
-pub fn start_session<T: EpisodeParams>(
+fn start_session<T: EpisodeParams>(
 	mut start_session: MessageWriter<StartSession<T>>,
 	mut start_episode: MessageWriter<StartEpisode<T>>,
 	sessions: Query<(Entity, &RlSession<T>), Added<RlSession<T>>>,
@@ -140,7 +140,7 @@ pub fn start_session<T: EpisodeParams>(
 /// Consumes [`EndEpisode`], advances the episode index, despawns entities
 /// tagged [`DespawnOnEpisodeEnd`], and either queues the next episode or
 /// ends the session.
-pub fn handle_episode_end<T: EpisodeParams>(
+fn handle_episode_end<T: EpisodeParams>(
 	mut commands: Commands,
 	mut start_ep: MessageWriter<StartEpisode<T>>,
 	mut end_ep: MessageReader<EndEpisode<T>>,

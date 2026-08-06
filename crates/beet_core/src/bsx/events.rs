@@ -657,7 +657,7 @@ fn resolve_args(
 /// [`VerbRegistry`] with the resolved [`VerbArgs`]); an unregistered event is a
 /// graceful no-op (the loader never fails on an unknown event). Authored
 /// arguments that do not match the verb's schema are an error.
-pub fn install_event(
+pub(crate) fn install_event(
 	entity: &mut EntityWorldMut,
 	binding: &EventBinding,
 	selector_target: impl Fn(Option<&SmolStr>) -> BindingTarget,

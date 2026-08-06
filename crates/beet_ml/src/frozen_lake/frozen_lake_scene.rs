@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-pub fn spawn_frozen_lake_scene(
+pub(crate) fn spawn_frozen_lake_scene(
 	mut commands: Commands,
 	map: &FrozenLakeMap,
 	grid_to_world: &GridToWorld,

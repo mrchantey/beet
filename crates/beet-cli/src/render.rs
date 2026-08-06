@@ -78,7 +78,7 @@ fn exit_when_all_windows_closed(
 /// `BEET_SCREENSHOT_FRAME` (default 30), saves the PNG, and exits once written. So
 /// any windowed beet scene is verifiable headlessly:
 /// `BEET_SCREENSHOT=/tmp/x.png beet --main=scene.bsx`.
-pub fn screenshot_verify_plugin(app: &mut App) {
+fn screenshot_verify_plugin(app: &mut App) {
 	let Ok(path) = env_ext::var("BEET_SCREENSHOT") else {
 		return;
 	};

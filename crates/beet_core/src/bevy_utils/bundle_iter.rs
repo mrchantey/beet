@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 ///
 /// This method will remove this entity, any other bundles attempting
 /// to access it after will panic.
-pub fn spawn_siblings<R, B>(
+pub(crate) fn spawn_siblings<R, B>(
 	iter: impl 'static + Send + Sync + IntoIterator<Item = B>,
 ) -> impl Bundle
 where
@@ -43,7 +43,7 @@ bundle effect race conditions, try reordering the effects")
 
 /// Like [`SpawnIter`] but for bundles, calling [`EntityWorldMut::insert`].
 #[derive(BundleEffect)]
-pub struct BundleIter<T, B>
+pub(crate) struct BundleIter<T, B>
 where
 	T: 'static + Send + Sync + Iterator<Item = B>,
 	B: Bundle,

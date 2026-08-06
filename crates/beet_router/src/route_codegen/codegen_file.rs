@@ -10,7 +10,7 @@ use syn::Expr;
 use syn::Item;
 
 /// Calls [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`].
-pub fn export_codegen(
+pub(crate) fn export_codegen(
 	query: Populated<&CodegenFile, Changed<CodegenFile>>,
 ) -> bevy::prelude::Result {
 	let num_files = query.iter().count();

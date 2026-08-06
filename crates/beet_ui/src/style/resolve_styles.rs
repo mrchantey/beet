@@ -7,7 +7,7 @@ use crate::style::common_props::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-pub fn resolve_styles(
+pub(crate) fn resolve_styles(
 	mut commands: Commands,
 	ruleset_query: RuleSetQuery,
 	// classes drive the cascade (eg `.dark-scheme`), so a runtime class change

@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 /// Calls functions and inserts the output as posts
-pub async fn call_functions(
+pub(crate) async fn call_functions(
 	agent: AsyncEntity,
 	function_calls: impl IntoIterator<Item = OwnedFunctionCall>,
 ) -> Result {

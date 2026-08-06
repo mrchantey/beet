@@ -44,7 +44,7 @@ use crate::prelude::*;
 /// make_ten.func.remove();
 /// ```
 #[derive(Debug)]
-pub struct FuncStore<I, O, F>
+pub(crate) struct FuncStore<I, O, F>
 where
 	O: 'static,
 	F: 'static,

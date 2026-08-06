@@ -275,7 +275,7 @@ fn emit_mouse(
 /// full repaint. Only [`StdioTerminal`]s are polled; a [`ChannelTerminal`] has a
 /// fixed, caller-controlled size (and is resized via `DoubleBuffer::resize`
 /// directly in tests), so it is left alone.
-pub fn resize_stdio_buffers(
+pub(crate) fn resize_stdio_buffers(
 	mut query: Query<&mut DoubleBuffer, With<StdioTerminal>>,
 ) {
 	let size = terminal_ext::size();
@@ -307,7 +307,7 @@ pub fn resize_stdio_buffers(
 /// built pre-pty surface, or a reused entity index) leaves the window without a
 /// [`ChannelTerminal`], killing the whole multi-tenant server. Keying on
 /// [`StdioTerminal`] — which an SSH window never carries — is immune to that race.
-pub fn exit_on_ctrl_c(
+pub(crate) fn exit_on_ctrl_c(
 	mut keys: MessageReader<KeyboardInput>,
 	stdio: Query<&StdioTerminal>,
 	mut exit: MessageWriter<AppExit>,

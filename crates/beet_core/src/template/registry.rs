@@ -208,7 +208,7 @@ pub impl App {
 /// Whether `tag` was marked [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered),
 /// ie a known featured-out name the loader resolves to nothing rather than error.
 /// Consulted by both lookup paths on a missing registration.
-pub fn is_allowed_unregistered(cx: &mut TemplateContext, tag: &str) -> bool {
+pub(crate) fn is_allowed_unregistered(cx: &mut TemplateContext, tag: &str) -> bool {
 	cx.entity.world_scope(|world| {
 		world
 			.get_resource::<AllowedUnregistered>()
@@ -233,7 +233,7 @@ pub fn template_schema_by_name(
 ///
 /// Resolves `tag` to a [`ReflectTemplate`] from `registry`, then builds it from
 /// `value`. Errors if no template is registered under that tag.
-pub fn build_template_by_name(
+pub(crate) fn build_template_by_name(
 	registry: &AppTypeRegistry,
 	tag: &str,
 	value: &dyn PartialReflect,

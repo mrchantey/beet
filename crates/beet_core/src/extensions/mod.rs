@@ -36,4 +36,4 @@ pub use result_x::*;
 pub use str::*;
 #[cfg(feature = "json")]
 pub use value::*;
-pub use vec::*;
+pub(crate) use vec::*;

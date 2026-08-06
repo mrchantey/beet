@@ -47,7 +47,7 @@ where
 
 /// Per-frame system: takes one environment step for every active
 /// [`StepEnvironment`] with [`Running`].
-pub fn step_environment<S: RlSessionTypes>(
+pub(crate) fn step_environment<S: RlSessionTypes>(
 	mut rng: ResMut<RandomSource>,
 	mut end_episode_events: MessageWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,

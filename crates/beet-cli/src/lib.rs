@@ -36,5 +36,5 @@ pub mod prelude {
 	#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
 	pub use crate::render::*;
 	#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
-	pub use crate::workers::*;
+	pub(crate) use crate::workers::*;
 }

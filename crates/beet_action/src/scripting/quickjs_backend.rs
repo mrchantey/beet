@@ -174,7 +174,7 @@ const CONSOLE_PRELUDE: &str = r#"
 /// the script's final expression is JSON-stringified and deserialized as the
 /// output. JSON is QuickJS's native marshalling currency, so this needs no
 /// intermediary `Value` hop — `serde_json` (alloc) is already `no_std`.
-pub fn run_quickjs<Input, Output>(
+pub(crate) fn run_quickjs<Input, Output>(
 	script: &str,
 	input: Input,
 	limits: &ScriptLimits,
@@ -204,7 +204,7 @@ where
 ///
 /// `sink` is `FnMut` and runs on the single-threaded [`Context::full`], so it needs
 /// no `Send`.
-pub fn run_quickjs_console<Input, Sink>(
+pub(crate) fn run_quickjs_console<Input, Sink>(
 	script: &str,
 	input: Input,
 	sink: Sink,

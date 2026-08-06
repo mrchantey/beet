@@ -186,7 +186,7 @@ impl DnsProvider {
 /// environment (inherited by the tofu subprocess), keeping the secret out of
 /// `main.tf.json`.
 #[cfg(feature = "cloudflare_dns")]
-pub fn ensure_cloudflare_provider(config: &mut terra::Config) -> Result {
+pub(crate) fn ensure_cloudflare_provider(config: &mut terra::Config) -> Result {
 	config.ensure_provider_config(&terra::Provider::CLOUDFLARE, &json!({}))?;
 	Ok(())
 }

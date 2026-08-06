@@ -4,7 +4,7 @@ use crate::prelude::*;
 use crate::testing::runner::*;
 
 /// Filters tests based on request parameters, marking non-matching tests as skipped.
-pub fn filter_tests(
+pub(crate) fn filter_tests(
 	mut commands: Commands,
 	requests: Populated<
 		(&TestRunnerConfig, &Children),

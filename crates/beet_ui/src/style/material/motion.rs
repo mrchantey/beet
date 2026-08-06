@@ -36,7 +36,7 @@ css_variable!(MotionEmphasizedDecelerate,Motion);
 
 
 
-pub fn token_map() -> CssTokenMap {
+pub(crate) fn token_map() -> CssTokenMap {
 	CssTokenMap::default()
     .insert(MotionProps)
 		.insert(Short1)
@@ -65,7 +65,7 @@ pub fn token_map() -> CssTokenMap {
 
 
 /// Returns all MD3 duration default values.
-pub fn default_durations() -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn default_durations() -> Vec<(TokenKey, TokenValue)> {
 	Rule::new()
 		.with_value(Short1, Duration::from_millis(50))
 		.with_value(Short2, Duration::from_millis(100))
@@ -90,7 +90,7 @@ pub fn default_durations() -> Vec<(TokenKey, TokenValue)> {
 ///
 /// Each [`Motion`] references a duration token via [`FieldRef`] rather than
 /// embedding the duration directly.
-pub fn default_motions() -> Vec<(TokenKey, TokenValue)> {
+pub(crate) fn default_motions() -> Vec<(TokenKey, TokenValue)> {
 	Rule::new()
 		.with_value(MotionStandard, Motion {
 			ease:     EaseFunction::CubicInOut,

@@ -6,7 +6,7 @@ use crate::prelude::*;
 ///
 /// This is a simpler alternative to [`Transform`] when scale is not needed.
 #[derive(Debug)]
-pub struct Pose {
+pub(crate) struct Pose {
 	/// The position in 3D space.
 	pub position: Vec3,
 	/// The rotation as a quaternion.

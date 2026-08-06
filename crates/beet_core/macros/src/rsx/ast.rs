@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use proc_macro2::Span;
 
 /// A single node in the markup tree.
-pub enum RsxNode {
+pub(crate) enum RsxNode {
 	/// `<tag ..>..</tag>` or `<tag ../>`.
 	Element(RsxElement),
 	/// A quoted text literal, ie `"hello"`. Dynamic text is a [`RsxNode::Block`].
@@ -26,7 +26,7 @@ pub enum RsxNode {
 }
 
 /// An element: a name, its attributes, and its children.
-pub struct RsxElement {
+pub(crate) struct RsxElement {
 	/// The tag name, ie `div`, `Foo`, `path::to::Foo`, `Slot`.
 	pub name: RsxName,
 	/// The attributes in source order.
@@ -36,13 +36,13 @@ pub struct RsxElement {
 }
 
 /// A `<>..</>` fragment: children with no enclosing element.
-pub struct RsxFragment {
+pub(crate) struct RsxFragment {
 	/// The child nodes in source order.
 	pub children: Vec<RsxNode>,
 }
 
 /// One attribute on an element.
-pub enum RsxAttr {
+pub(crate) enum RsxAttr {
 	/// A keyed attribute: `key`, `key=value`.
 	Keyed(RsxKeyedAttr),
 	/// A bare `{..}` spread: components/templates inserted onto the entity.
@@ -50,7 +50,7 @@ pub enum RsxAttr {
 }
 
 /// A keyed attribute, ie `class="card"`, `disabled`, `onclick={..}`.
-pub struct RsxKeyedAttr {
+pub(crate) struct RsxKeyedAttr {
 	/// The attribute key, ie `class`, `disabled`, `bx:slot`.
 	pub key: RsxName,
 	/// What the key holds.
@@ -77,7 +77,7 @@ impl RsxKeyedAttr {
 }
 
 /// What a keyed attribute holds: nothing (a flag) or a value expression.
-pub enum RsxAttrValue {
+pub(crate) enum RsxAttrValue {
 	/// A bare flag, ie `disabled`.
 	None,
 	/// A value, ie `="card"`, `=foo()`, `={block}`. Held opaque and re-emitted.
@@ -89,7 +89,7 @@ pub enum RsxAttrValue {
 /// Covers a Rust path (`div`, `Foo`, `path::to::Foo`) and an SGML-style
 /// punctuated name (`foo-bar`, `bx:slot`, `data-foo`). The slot/fragment
 /// specials are their own nodes, not names.
-pub enum RsxName {
+pub(crate) enum RsxName {
 	/// A path of `::`-separated idents, ie `div`, `Foo`, `path::to::Foo`.
 	Path {
 		/// The parsed path, reused directly for component/template tags.

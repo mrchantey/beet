@@ -25,7 +25,7 @@
 use crate::prelude::*;
 
 /// The default slot name, used when a [`SlotTarget`] or [`SlotChild`] is unnamed.
-pub const DEFAULT_SLOT: &str = "default";
+pub(crate) const DEFAULT_SLOT: &str = "default";
 
 /// A `<Slot>` placeholder in a built subtree.
 ///
@@ -98,7 +98,7 @@ impl SlotChild {
 /// leftover content an error.
 ///
 /// Returns `Err` so the walker can ride a failure onto [`TemplateError`].
-pub fn resolve_slots(world: &mut World, root: Entity) -> Result {
+pub(crate) fn resolve_slots(world: &mut World, root: Entity) -> Result {
 	loop {
 		let plan = world.run_system_cached_with(plan_slots, root)?;
 		// nothing matched this pass: the resolution is stable, so leftover content

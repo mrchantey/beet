@@ -9,7 +9,7 @@ use beet_net::prelude::*;
 /// - extensioned path + a store public URL → permanent redirect
 /// - extensioned path, no public URL → stream the bytes (mime from extension)
 /// - extensionless path → serve `<path>/index.html` as HTML
-pub async fn serve_blob(
+pub(crate) async fn serve_blob(
 	store: &BlobStore,
 	path: &SmolPath,
 ) -> Result<Response> {

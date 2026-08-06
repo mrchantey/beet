@@ -18,7 +18,7 @@ use bevy::reflect::tuple::TupleInfo;
 use bevy::reflect::tuple_struct::TupleStructInfo;
 
 /// Builds a [`ValueSchema`] from a bevy reflect [`TypeInfo`].
-pub fn build(type_info: &TypeInfo) -> ValueSchema {
+pub(crate) fn build(type_info: &TypeInfo) -> ValueSchema {
 	Builder::default().build(type_info)
 }
 

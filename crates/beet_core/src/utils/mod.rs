@@ -86,7 +86,7 @@ pub use glob_filter::*;
 pub use line_col::*;
 pub use once_value::*;
 #[cfg(any(feature = "std", feature = "testing_embedded"))]
-pub use panic_context::*;
+pub(crate) use panic_context::*;
 #[cfg(feature = "rand")]
 pub use random_source::*;
 pub use timestamp::*;

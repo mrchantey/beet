@@ -9,9 +9,9 @@
 mod analytics_middleware;
 pub use analytics_middleware::*;
 mod navigator_analytics;
-pub use navigator_analytics::*;
+pub(crate) use navigator_analytics::*;
 #[cfg(feature = "json")]
 mod analytics_handler;
 pub mod router_analytics_ext;
 #[cfg(feature = "json")]
-pub use analytics_handler::*;
+pub(crate) use analytics_handler::*;

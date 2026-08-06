@@ -210,7 +210,7 @@ inventory::collect!(BeetTestCase);
 
 /// Collects all [`BeetTestCase`]s registered via [`inventory`].
 #[cfg(feature = "testing")]
-pub fn inventory_tests() -> Vec<TestDescAndFn> {
+pub(crate) fn inventory_tests() -> Vec<TestDescAndFn> {
 	inventory::iter::<BeetTestCase>
 		.into_iter()
 		.map(BeetTestCase::to_desc_and_fn)
@@ -229,7 +229,7 @@ pub static BEET_TESTS: [BeetTestCase];
 /// Collects all [`BeetTestCase`]s registered via the [`BEET_TESTS`] `linkme`
 /// slice. The embedded mirror of [`inventory_tests`].
 #[cfg(feature = "testing_embedded")]
-pub fn embedded_tests() -> Vec<TestDescAndFn> {
+pub(crate) fn embedded_tests() -> Vec<TestDescAndFn> {
 	BEET_TESTS
 		.iter()
 		.map(BeetTestCase::to_desc_and_fn)

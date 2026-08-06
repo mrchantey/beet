@@ -42,17 +42,17 @@ impl CloseTo for f64 {
 }
 
 /// Checks if two f32 values are within delta of each other.
-pub fn is_close_f32(a: f32, b: f32, delta: f32) -> bool {
+pub(crate) fn is_close_f32(a: f32, b: f32, delta: f32) -> bool {
 	abs_diff(a, b) < delta
 }
 
 /// Checks if two f64 values are within delta of each other.
-pub fn is_close_f64(a: f64, b: f64, delta: f64) -> bool {
+pub(crate) fn is_close_f64(a: f64, b: f64, delta: f64) -> bool {
 	abs_diff(a, b) < delta
 }
 
 /// Returns the absolute difference between two values.
-pub fn abs_diff<T>(a: T, b: T) -> T
+pub(crate) fn abs_diff<T>(a: T, b: T) -> T
 where
 	T: PartialOrd + core::ops::Sub<Output = T>,
 {

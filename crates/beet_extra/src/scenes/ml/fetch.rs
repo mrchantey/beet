@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 
 /// World-space offset of each item from the origin, shared by [`FetchItems`] and
 /// the camera so the four collectibles frame the fox at the centre.
-pub const FETCH_ITEM_OFFSET: f32 = 2.;
+const FETCH_ITEM_OFFSET: f32 = 2.;
 
 /// The four fetchable [`Collectable`] items (potion / coin / sword / cheese), the
 /// data form of `fetch_scene`'s item spawns. Markup has no loop, so the items are

@@ -11,7 +11,7 @@ pub use self::bert_asset::*;
 mod bert_config;
 pub use self::bert_config::*;
 mod bert_loader;
-pub use self::bert_loader::*;
+pub(crate) use self::bert_loader::*;
 mod bert_embedding;
 pub(crate) use self::bert_embedding::*;
 mod bert_model;
@@ -19,10 +19,10 @@ pub use self::bert_model::*;
 mod nearest_sentence;
 pub use self::nearest_sentence::*;
 mod pooling;
-pub use self::pooling::*;
+pub(crate) use self::pooling::*;
 #[cfg(feature = "spatial")]
 mod sentence_steer_target;
 #[cfg(feature = "spatial")]
 pub use self::sentence_steer_target::*;
 mod tokenize;
-pub use self::tokenize::*;
+pub(crate) use self::tokenize::*;

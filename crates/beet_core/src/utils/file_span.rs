@@ -174,7 +174,7 @@ impl GetSpan for FileSpan {
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct FileSpanOf<C> {
+pub(crate) struct FileSpanOf<C> {
 	/// The underlying file span.
 	pub value: FileSpan,
 	/// Phantom data for the component type.

@@ -27,7 +27,7 @@ use web_sys::WebSocket;
 /// - Configures binary frames to arrive as `ArrayBuffer`
 /// - Hooks up event listeners to stream incoming messages as `Message`
 /// - Awaits the `open` event before returning so the socket is ready to send
-pub async fn connect_wasm(url: &Url) -> Result<Socket> {
+pub(crate) async fn connect_wasm(url: &Url) -> Result<Socket> {
 	let ws = WebSocket::new(&url.to_string()).map_jserr()?;
 	ws.set_binary_type(BinaryType::Arraybuffer);
 

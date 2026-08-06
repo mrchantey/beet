@@ -7,7 +7,7 @@
 //! them through a [`SpanLookup`](crate::prelude::SpanLookup) later.
 
 /// A forward-only character cursor over the BSX source.
-pub struct Cursor<'a> {
+pub(crate) struct Cursor<'a> {
 	/// The full source text.
 	source: &'a str,
 	/// The current byte offset into [`source`](Self::source).

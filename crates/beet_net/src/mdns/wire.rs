@@ -28,16 +28,16 @@ use beet_core::prelude::*;
 use core::net::Ipv4Addr;
 
 /// DNS `TYPE` for an IPv4 host address (`A`).
-pub const TYPE_A: u16 = 1;
+pub(crate) const TYPE_A: u16 = 1;
 /// DNS `TYPE` for a domain-name pointer (`PTR`) — the service-instance list.
-pub const TYPE_PTR: u16 = 12;
+pub(crate) const TYPE_PTR: u16 = 12;
 /// DNS `TYPE` for arbitrary text records (`TXT`) — service metadata.
-pub const TYPE_TXT: u16 = 16;
+pub(crate) const TYPE_TXT: u16 = 16;
 /// DNS `TYPE` for a service location record (`SRV`) — host + port.
-pub const TYPE_SRV: u16 = 33;
+pub(crate) const TYPE_SRV: u16 = 33;
 
 /// DNS `CLASS` `IN` (internet).
-pub const CLASS_IN: u16 = 1;
+pub(crate) const CLASS_IN: u16 = 1;
 /// Mask for the cache-flush / unicast-response bit mDNS overloads onto `CLASS`.
 pub const CLASS_MASK: u16 = 0x7fff;
 

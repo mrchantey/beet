@@ -119,7 +119,7 @@ fn user_input_on_add(mut world: DeferredWorld, cx: HookContext) {
 
 /// The user's turn: await the thread's composer [`Submit`], append the typed post
 /// authored by this actor, and [`Pass`] so the `Sequence` advances.
-pub async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
+async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 	// resolve which thread + actor this user turn belongs to
 	let (thread_entity, actor_id, thread_id) = cx
 		.caller
@@ -189,7 +189,7 @@ pub async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 /// Resolves the `<form>` entity of the [`CreatePostForm`] bound to a thread, so
 /// [`user_input_action`] can await its [`Submit`].
 #[derive(SystemParam)]
-pub struct ComposerForms<'w, 's> {
+struct ComposerForms<'w, 's> {
 	items: Query<'w, 's, &'static ThreadItems>,
 	forms: Query<'w, 's, (), With<CreatePostForm>>,
 	elements: ElementQuery<'w, 's>,

@@ -49,7 +49,7 @@ impl StyleResolver {
 
 /// The raw declaration text and source span of an element's `bx:style` directive,
 /// if it declares one.
-pub fn bsx_style_attr(el: &BsxElement) -> Option<(&str, &FileSpan)> {
+pub(crate) fn bsx_style_attr(el: &BsxElement) -> Option<(&str, &FileSpan)> {
 	el.attributes.iter().find_map(|attr| match &attr.value {
 		AttrValue::Style { source, span } if attr.key == "bx:style" => {
 			Some((source.as_str(), span))

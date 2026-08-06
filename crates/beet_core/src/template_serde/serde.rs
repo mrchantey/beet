@@ -38,16 +38,16 @@ use serde::ser::SerializeMap;
 use serde::ser::SerializeStruct;
 
 /// Name of the serialized template struct type.
-pub const TEMPLATE_STRUCT: &str = "Template";
+pub(crate) const TEMPLATE_STRUCT: &str = "Template";
 /// Name of the serialized resources field in a template struct.
-pub const TEMPLATE_RESOURCES: &str = "resources";
+pub(crate) const TEMPLATE_RESOURCES: &str = "resources";
 /// Name of the serialized nodes field in a template struct.
-pub const TEMPLATE_NODES: &str = "nodes";
+pub(crate) const TEMPLATE_NODES: &str = "nodes";
 
 /// Name of the serialized node struct type.
-pub const NODE_STRUCT: &str = "Node";
+pub(crate) const NODE_STRUCT: &str = "Node";
 /// Name of the serialized components field in a node struct.
-pub const NODE_FIELD_COMPONENTS: &str = "components";
+pub(crate) const NODE_FIELD_COMPONENTS: &str = "components";
 
 /// Serializer for a [`DynamicTemplate`] of resolved values.
 ///

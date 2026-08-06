@@ -11,7 +11,7 @@ use core::f32::consts::FRAC_PI_2;
 pub struct IkSpawner;
 
 /// Registers the observer for the IkSpawner component.
-pub fn ik_spawner_plugin(app: &mut App) {
+pub(crate) fn ik_spawner_plugin(app: &mut App) {
 	app.world_mut()
 		.register_component_hooks::<IkSpawner>()
 		.on_add(|mut world, cx| {

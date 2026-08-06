@@ -59,7 +59,7 @@ impl ColorScheme {
 
 /// Mirror [`ColorScheme`] onto an entity's [`Classes`] whenever it changes, so
 /// the class-based cascade (and thus `resolve_styles`) reflects the new scheme.
-pub fn sync_color_scheme(
+pub(crate) fn sync_color_scheme(
 	mut commands: Commands,
 	mut query: Query<
 		(Entity, &ColorScheme, Option<&mut Classes>),

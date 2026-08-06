@@ -130,21 +130,21 @@ impl NodeWalker<'_, '_> {
 /// [`Display::None`]: crate::style::Display
 /// [`default_element_rules`]: crate::style::default_element_rules
 /// [`HtmlRenderer`]: crate::prelude::HtmlRenderer
-pub const NON_VISUAL_TAGS: &[&str] = &[
+pub(crate) const NON_VISUAL_TAGS: &[&str] = &[
 	"head", "script", "style", "template", "noscript", "meta", "link", "title",
 	"base", "iframe", "object", "embed",
 ];
 
 /// Whether a tag carries no visual content, ie [`NON_VISUAL_TAGS`].
-pub fn is_non_visual(tag: &str) -> bool { NON_VISUAL_TAGS.contains(&tag) }
+pub(crate) fn is_non_visual(tag: &str) -> bool { NON_VISUAL_TAGS.contains(&tag) }
 
 /// Form-control tags whose own [`Value`] is their displayed content (eg the
 /// charcell editable textbox). Every other element treats a co-located
 /// [`Value`] as binding state, never rendered as text.
-pub const VALUE_ELEMENT_TAGS: &[&str] = &["input", "textarea", "select"];
+pub(crate) const VALUE_ELEMENT_TAGS: &[&str] = &["input", "textarea", "select"];
 
 /// Whether a tag displays its own [`Value`], ie [`VALUE_ELEMENT_TAGS`].
-pub fn is_value_element(tag: &str) -> bool { VALUE_ELEMENT_TAGS.contains(&tag) }
+pub(crate) fn is_value_element(tag: &str) -> bool { VALUE_ELEMENT_TAGS.contains(&tag) }
 
 pub trait NodeVisitor {
 	/// Return `true` to skip visiting this node and all its children.

@@ -130,7 +130,7 @@ impl TemplateStore {
 	}
 }
 
-pub fn load_template_on_insert(
+pub(crate) fn load_template_on_insert(
 	async_commands: AsyncCommands,
 	query: Populated<(Entity, &TemplateStore), Added<TemplateStore>>,
 ) {

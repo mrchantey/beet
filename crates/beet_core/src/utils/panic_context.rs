@@ -24,7 +24,7 @@ static INITIALIZED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 /// Cross-platform method for capturing panic info, including in
 /// non-unwind contexts like wasm. See [`Self::catch`]
 #[cfg(feature = "std")]
-pub struct PanicContext {
+pub(crate) struct PanicContext {
 	/// The payload downcast to a string if possible
 	payload: Option<String>,
 	/// The file and linecol of the location if available
@@ -36,7 +36,7 @@ pub struct PanicContext {
 /// a failing assertion panics and the device panic handler logs it then
 /// semihosting-exits (the abort-on-first-failure model).
 #[cfg(not(feature = "std"))]
-pub struct PanicContext;
+pub(crate) struct PanicContext;
 
 #[cfg(not(feature = "std"))]
 impl PanicContext {
@@ -171,7 +171,7 @@ impl PanicContext {
 
 /// Result of running code that may panic.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PanicResult {
+pub(crate) enum PanicResult {
 	/// The operation completed successfully.
 	Ok,
 	/// The operation returned an error.

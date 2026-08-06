@@ -8,12 +8,12 @@ use bevy::light::CascadeShadowConfigBuilder;
 use std::f32::consts::PI;
 pub use templates::*;
 
-pub fn ui_terminal_input(commands: Commands) {
+pub(crate) fn ui_terminal_input(commands: Commands) {
 	spawn_ui_terminal(commands, true);
 }
-pub fn ui_terminal(commands: Commands) { spawn_ui_terminal(commands, false); }
+pub(crate) fn ui_terminal(commands: Commands) { spawn_ui_terminal(commands, false); }
 
-pub fn hello_world(mut commands: Commands) {
+pub(crate) fn hello_world(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Hello World Sequence"),
 		CallOnSpawn::<(), Outcome>::default(),
@@ -25,13 +25,13 @@ pub fn hello_world(mut commands: Commands) {
 	));
 }
 
-pub fn camera_2d(mut commands: Commands) { commands.spawn(Camera2d); }
+pub(crate) fn camera_2d(mut commands: Commands) { commands.spawn(Camera2d); }
 
-pub fn camera_3d(mut commands: Commands) {
+pub(crate) fn camera_3d(mut commands: Commands) {
 	commands.spawn(Camera3d::default());
 }
 
-pub fn ground_3d(
+pub(crate) fn ground_3d(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<StandardMaterial>>,
@@ -42,7 +42,7 @@ pub fn ground_3d(
 	));
 }
 
-pub fn lighting_3d(mut commands: Commands) {
+pub(crate) fn lighting_3d(mut commands: Commands) {
 	// Light
 	commands.spawn((
 		DirectionalLight {

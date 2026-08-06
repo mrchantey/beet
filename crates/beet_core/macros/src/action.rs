@@ -11,7 +11,7 @@ use syn::ReturnType;
 use syn::Type;
 use syn::parse_macro_input;
 
-pub fn impl_action(
+pub(crate) fn impl_action(
 	attr: proc_macro::TokenStream,
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {

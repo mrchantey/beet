@@ -161,7 +161,7 @@ impl ThreadWindow {
 
 /// The text a stubbed-out older image is replaced with by
 /// [`ThreadWindow::stub_old_images`].
-pub const STUBBED_IMAGE: &str = "[earlier image, no longer shown]";
+const STUBBED_IMAGE: &str = "[earlier image, no longer shown]";
 
 // ═══════════════════════════════════════════════════════════════════════
 // PostView
@@ -430,6 +430,7 @@ impl ThreadWindowQuery<'_, '_> {
 
 #[cfg(test)]
 mod test {
+	use super::STUBBED_IMAGE;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 

@@ -37,7 +37,7 @@ pub struct TemplateDir {
 /// `on_remove` hook), so a torn-down entry scene leaves no stale templates.
 #[derive(Debug, Default, Clone, Deref, Component)]
 #[component(on_remove = RegisteredTemplates::on_remove())]
-pub struct RegisteredTemplates(Vec<SmolStr>);
+struct RegisteredTemplates(Vec<SmolStr>);
 
 impl RegisteredTemplates {
 	/// The `on_remove` hook: snapshot the owned names (still present during the

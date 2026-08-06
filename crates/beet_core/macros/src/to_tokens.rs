@@ -11,7 +11,7 @@ use syn::DeriveInput;
 use syn::WherePredicate;
 use syn::parse_macro_input;
 
-pub fn impl_derive_to_tokens(
+pub(crate) fn impl_derive_to_tokens(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);

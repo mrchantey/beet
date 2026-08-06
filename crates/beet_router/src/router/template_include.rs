@@ -23,7 +23,7 @@ use beet_net::prelude::*;
 /// seam: a local `src` is read through the nearest ancestor [`BlobStore`] (the site
 /// store composed on the loaded root) as an async pending dependency, and its
 /// parsed entry built at the include site.
-pub fn register_template_include(world: &mut World) {
+pub(crate) fn register_template_include(world: &mut World) {
 	world.get_resource_or_init::<BsxTagResolvers>().insert(
 		"Template",
 		|el, entity| {

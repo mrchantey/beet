@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// When this env var is set, [`RobotStreamer`] stubs the model with [`MockPostStreamer`]
 /// (a canned `respond-multi-modal` loop) instead of calling OpenAI, so socket testing
 /// makes no network calls.
-pub const MOCK_MODEL_ENV: &str = "BEET_MOCK_MODEL";
+const MOCK_MODEL_ENV: &str = "BEET_MOCK_MODEL";
 
 /// The `Robot` actor's model streamer: the real OpenAI streamer, or a mock cycling
 /// canned `respond-multi-modal` calls when [`MOCK_MODEL_ENV`] is set.

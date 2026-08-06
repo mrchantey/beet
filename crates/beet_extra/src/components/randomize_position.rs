@@ -15,7 +15,7 @@ impl Default for RandomizePosition {
 	}
 }
 
-pub fn randomize_position(
+pub(crate) fn randomize_position(
 	mut commands: Commands,
 	mut rand: ResMut<RandomSource>,
 	mut query: Populated<

@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 /// Calculate a wander impulse
 /// as described [here](https://youtu.be/ujsR2vcJlLk?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=249)
 /// except using the original Reynolds approach which works for 2d and 3d
-pub fn wander_impulse(
+pub(crate) fn wander_impulse(
 	position: &Vec3,
 	velocity: &Velocity,
 	wander: &mut Wander,

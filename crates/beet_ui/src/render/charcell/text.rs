@@ -24,7 +24,7 @@ use super::truncate_to_width;
 /// line — matching a control with no value at all. A `<select>` keeps its row: the
 /// empty value is submission state, but the marker label is what paints, so the box
 /// must still reserve a line for it.
-pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
+pub(crate) fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 	let value = node
 		.value()
 		.map(|value| value.to_string())

@@ -21,7 +21,7 @@ mod func_store;
 mod non_send_arena;
 mod store;
 
-pub use arena::*;
-pub use func_store::*;
+pub(crate) use arena::*;
+pub(crate) use func_store::*;
 pub use non_send_arena::*;
 pub use store::*;

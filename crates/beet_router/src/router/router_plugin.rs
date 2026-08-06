@@ -219,7 +219,7 @@ impl Plugin for RouterPlugin {
 ///
 /// Only actions whose entity directly carries a [`PathPartial`] become routes.
 /// Descendants of a route entity (eg sequence steps) are skipped.
-pub fn insert_action_path_and_params(
+fn insert_action_path_and_params(
 	ev: On<Insert, ActionMeta>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
@@ -240,7 +240,7 @@ pub fn insert_action_path_and_params(
 /// Observer that catches the scene-load case where [`PathPartial`] is
 /// inserted *after* [`ActionMeta`], so [`insert_action_path_and_params`]
 /// would have short-circuited. Re-runs the path/params collection here.
-pub fn insert_path_pattern_for_late_path_partial(
+fn insert_path_pattern_for_late_path_partial(
 	ev: On<Insert, PathPartial>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
@@ -267,7 +267,7 @@ pub fn insert_path_pattern_for_late_path_partial(
 /// type being [`PageRequest`], detected via [`ActionMeta::output_is`].
 // TODO this is a bit wasteful, if we used change detection could deduplicate added,
 // and only generate once, but we'd still want a guanratee the system runs immediately
-pub fn insert_route_tree(
+fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
 	children_query: Query<&Children>,
@@ -309,7 +309,7 @@ pub fn insert_route_tree(
 /// The load trigger fires synchronously once the hierarchy is whole, so each
 /// affected root is recomputed exactly once before any async serving begins.
 #[cfg(feature = "template_serde")]
-pub fn rebuild_route_trees_on_load(
+fn rebuild_route_trees_on_load(
 	ev: On<LoadTemplateSerde>,
 	mut commands: Commands,
 	ancestors: Query<&ChildOf>,

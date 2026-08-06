@@ -34,7 +34,7 @@ struct NonSendArenaEntry {
 /// assert_eq!(*handle.get(), Rc::new(42));
 /// drop(handle); // automatically cleaned up
 /// ```
-pub struct NonSendArena;
+pub(crate) struct NonSendArena;
 
 impl NonSendArena {
 	thread_local! {
@@ -68,7 +68,7 @@ impl NonSendArena {
 ///
 /// Stores heterogeneous non-`Send` objects with automatic cleanup via
 /// reference counting.
-pub struct NonSendArenaMap {
+pub(crate) struct NonSendArenaMap {
 	objects: RefCell<HashMap<usize, NonSendArenaEntry>>,
 	next_id: RefCell<usize>,
 }
@@ -255,7 +255,7 @@ impl<T: 'static> NonSendHandle for NonSendArenaHandle<T> {
 /// When all clones of this handle are dropped, the object is automatically
 /// removed from the arena. Use [`forget`](Self::forget) to convert to a
 /// non-reference-counted handle if automatic cleanup is not desired.
-pub struct NonSendRcArenaHandle<T: 'static> {
+pub(crate) struct NonSendRcArenaHandle<T: 'static> {
 	id: usize,
 	arena: *const NonSendArenaMap,
 	_phantom: std::marker::PhantomData<T>,
@@ -306,7 +306,7 @@ impl<T: 'static> Drop for NonSendRcArenaHandle<T> {
 /// Unlike [`NonSendRcArenaHandle`], this handle does not automatically clean up
 /// the object when dropped. The object must be manually removed or will leak.
 #[derive(Clone, Copy)]
-pub struct NonSendArenaHandle<T> {
+pub(crate) struct NonSendArenaHandle<T> {
 	id: usize,
 	arena: *const NonSendArenaMap,
 	_phantom: std::marker::PhantomData<T>,
