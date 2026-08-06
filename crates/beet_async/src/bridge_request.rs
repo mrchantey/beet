@@ -59,7 +59,7 @@ pub fn async_world_sync_point<SyncPoint: 'static>(world: &mut World) {
 		{
 			bevy::tasks::cfg::web! {
 				if {
-					crate::wasm_tick::tick();
+					crate::wasm_tick::WasmTickHook::tick();
 				} else {
 					bevy::tasks::tick_global_task_pools_on_main_thread();
 				}
@@ -199,7 +199,7 @@ fn wake_requests_and_wait(
 
 	bevy::tasks::cfg::web! {
 		if {
-			crate::wasm_tick::tick();
+			crate::wasm_tick::WasmTickHook::tick();
 		} else {
 			bevy::tasks::tick_global_task_pools_on_main_thread();
 		}

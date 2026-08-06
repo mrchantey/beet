@@ -27,12 +27,13 @@ mod worker_entry;
 // the cross-platform entry build core (resolve + read a store, build the entry
 // into a root), shared by the native binary, the wasm Worker, and the
 // check/export-static commands.
-mod entry_build;
+pub mod entry_build;
 
 pub mod prelude {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::commands::*;
-	pub use crate::entry_build::*;
+	pub use crate::entry_build;
+	pub use crate::entry_build::ResolvedEntry;
 	#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
 	pub use crate::render::*;
 	#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]

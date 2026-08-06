@@ -31,4 +31,4 @@ pub use card_stack_plugin::*;
 #[cfg(feature = "std")]
 mod card_styles;
 #[cfg(feature = "std")]
-pub use card_styles::*;
+pub(crate) use card_styles::*;

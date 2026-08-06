@@ -69,9 +69,9 @@ mod test {
 	async fn renders_package_title() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
-		// `default_router` already wires `app_info()` as a child under std.
+		// `Router::with_defaults` already wires `app_info()` as a child under std.
 		world
-			.spawn(default_router())
+			.spawn(Router::with_defaults())
 			.exchange(Request::get("app-info"))
 			.await
 			.unwrap_str()
@@ -91,7 +91,7 @@ mod test {
 		// a server entity that has already served two requests, summed into the count.
 		world.spawn(ExchangeStats::new(2));
 		world
-			.spawn(default_router())
+			.spawn(Router::with_defaults())
 			.exchange(Request::get("app-info"))
 			.await
 			.unwrap_str()

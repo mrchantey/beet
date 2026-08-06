@@ -60,6 +60,7 @@ mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
 pub mod reflect_ext;
+pub mod spawn_ext;
 
 mod when;
 

@@ -1,8 +1,8 @@
 //! Emits the per-collection route bundle function.
 //!
 //! Each collection emits a `pub fn <name>_routes() -> impl Bundle` that spawns
-//! one child per route via [`spawn_with`], so multiple collections can be merged
-//! onto a single router entity (eg passed together to `default_router`) without
+//! one child per route via [`spawn_ext::spawn_with`], so multiple collections can be merged
+//! onto a single router entity (eg passed together to `Router::with_defaults`) without
 //! clobbering each other's children.
 
 use crate::prelude::*;
@@ -176,9 +176,9 @@ fn emit_rust_route(
 			// dedicated `Json<T>` impl.
 			let exchange = if type_last_ident(&in_ty).as_deref() == Some("Json")
 			{
-				quote! { exchange_route::<#in_ty, #out_ty, _, #in_ty, _, _>(#path, #ctor) }
+				quote! { Router::exchange_route::<#in_ty, #out_ty, _, #in_ty, _, _>(#path, #ctor) }
 			} else {
-				quote! { exchange_route(#path, #ctor) }
+				quote! { Router::exchange_route(#path, #ctor) }
 			};
 			Ok(quote! { (#exchange, #http, ExportStrategy::Dynamic) })
 		}
@@ -227,7 +227,7 @@ fn emit_blob_route(
 	});
 	quote! {
 		(
-			route(#path, BlobScene::new(#store_path)),
+			Router::route(#path, BlobScene::new(#store_path)),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			PageRoute,

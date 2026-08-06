@@ -516,41 +516,13 @@ fn type_check_literal(
 	schema: &ValueSchema,
 	literal: &DataLiteral,
 ) -> Option<String> {
-	let Some(mut value) = literal_value(literal) else {
+	let Some(mut value) = literal.value() else {
 		return None;
 	};
 	let errors = async_ext::try_block_on(schema.validate(&mut value)).ok()?;
 	errors.first().map(|error| error.message.to_string())
 }
 
-/// The plain [`Value`] of a literal, or `None` for a non-literal (an entity ref
-/// carries no inline value).
-///
-/// Used both for build-time verification and by the reactive renderer to
-/// serialize a literal verb argument into the emitted `bx:<event>` attribute.
-pub fn literal_value(literal: &DataLiteral) -> Option<Value> {
-	match literal {
-		DataLiteral::Scalar(value) => Some(value.clone()),
-		DataLiteral::List(items) => items
-			.iter()
-			.map(literal_value)
-			.collect::<Option<Vec<_>>>()
-			.map(Value::List),
-		DataLiteral::Struct(fields) => {
-			let mut map = Map::default();
-			for (key, item) in fields {
-				map.insert(key.clone(), literal_value(item)?);
-			}
-			Some(Value::Map(map))
-		}
-		DataLiteral::Enum(named)
-			if matches!(named.fields, NamedFields::Unit) =>
-		{
-			Some(Value::Str(named.name.clone()))
-		}
-		DataLiteral::Enum(_) | DataLiteral::EntityRef(_) => None,
-	}
-}
 
 /// Resolve a parsed [`VerbArg`] binding to a [`BindingArg`] sink, mirroring the
 /// `@`-source dispatch the display bindings use (`apply_binding` in the resolver).
@@ -562,7 +534,7 @@ fn resolve_binding_arg(
 		BindingSource::Doc => {
 			let mut field = FieldRef::new(binding.field_path.clone());
 			if let Some(init) = &binding.init {
-				if let Some(value) = literal_value(init) {
+				if let Some(value) = init.value() {
 					field = field.with_init(value);
 				}
 			}
@@ -626,7 +598,7 @@ fn resolve_args(
 	for (name, arg) in &binding.args {
 		match arg {
 			VerbArg::Literal(literal) => {
-				if let Some(value) = literal_value(literal) {
+				if let Some(value) = literal.value() {
 					args.values.insert(name.clone(), value);
 				}
 			}

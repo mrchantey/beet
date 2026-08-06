@@ -13,7 +13,7 @@ use beet::prelude::*;
 /// An analytics store seeded with one prior event (to prove new events are added,
 /// not a fresh store), returned alongside its prior event's id.
 async fn seeded_store() -> (AnalyticsStore, Uuid) {
-	let store = temp_table::<AnalyticsEvent>();
+	let store = TableStore::<AnalyticsEvent>::temp();
 	let prior = AnalyticsEvent::new("/old", AnalyticsEventData::PageView {
 		duration_ms: 500,
 		referrer: None,
@@ -35,7 +35,7 @@ async fn analytics_world(store: AnalyticsStore) -> (World, Entity) {
 	world.insert_resource(store);
 	let root = world
 		.spawn((
-			default_router(),
+			Router::with_defaults(),
 			AnalyticsConfig::default(),
 			AnalyticsMiddleware::default(),
 			children![render_action::fixed_func_route("about", || rsx! {

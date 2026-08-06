@@ -11,7 +11,7 @@ use std::cell::RefCell;
 /// reads through the in-isolate binding (`env.bucket(..)`), so no credentials or
 /// network round-trip to the S3 endpoint are needed: the deployed Worker streams
 /// the site straight from R2. The live [`worker::Bucket`] is resolved per call
-/// from the ambient [`worker::Env`] stashed in [`set_worker_env`] at the top of
+/// from the ambient [`worker::Env`] stashed in [`R2WorkersStore::set_env`] at the top of
 /// the `fetch` handler, mirroring how [`IndexedDbStore`] resolves the ambient
 /// IndexedDB from `window`.
 ///
@@ -35,14 +35,14 @@ thread_local! {
 	static WORKER_ENV: RefCell<Option<worker::Env>> = const { RefCell::new(None) };
 }
 
-/// Stash the request's [`worker::Env`] so any [`R2WorkersStore`] can resolve its
-/// live bucket binding for the duration of the `fetch` invocation. Call this at
-/// the top of the Worker entry, before building or driving the app.
-pub fn set_worker_env(env: worker::Env) {
-	WORKER_ENV.with(|slot| *slot.borrow_mut() = Some(env));
-}
-
 impl R2WorkersStore {
+	/// Stash the request's [`worker::Env`] so any [`R2WorkersStore`] can resolve
+	/// its live bucket binding for the duration of the `fetch` invocation. Call
+	/// this at the top of the Worker entry, before building or driving the app.
+	pub fn set_env(env: worker::Env) {
+		WORKER_ENV.with(|slot| *slot.borrow_mut() = Some(env));
+	}
+
 	/// Creates a new R2-binding-backed store provider for the given binding name.
 	pub fn new(binding: impl Into<SmolStr>) -> Self {
 		Self {
@@ -91,7 +91,7 @@ impl R2WorkersStore {
 				.as_ref()
 				.ok_or_else(|| {
 					bevyhow!(
-						"R2WorkersStore: no worker::Env set; call set_worker_env \
+						"R2WorkersStore: no worker::Env set; call R2WorkersStore::set_env \
 						at the top of the fetch handler"
 					)
 				})?

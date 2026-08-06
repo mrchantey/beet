@@ -19,7 +19,7 @@ use bevy::ecs::system::In;
 /// (and can also track `active_sessions` as a custom metric). Wired into the
 /// default app routes, so every site gets it.
 pub(crate) fn health_route() -> impl Bundle {
-	(exchange_route("health", HealthHandler), HttpMethod::Get)
+	(Router::exchange_route("health", HealthHandler), HttpMethod::Get)
 }
 
 /// Derives the health metrics from live world state: `uptime_secs` from the app
@@ -58,7 +58,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
 		world
-			.spawn(default_router())
+			.spawn(Router::with_defaults())
 			.exchange(Request::get("health"))
 			.await
 			.unwrap_str()
@@ -80,7 +80,7 @@ mod test {
 			world.spawn(ChannelTerminal::new(TerminalConfig::default()).0);
 		}
 		world
-			.spawn(default_router())
+			.spawn(Router::with_defaults())
 			.exchange(Request::get("health"))
 			.await
 			.unwrap_str()

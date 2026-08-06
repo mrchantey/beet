@@ -207,6 +207,6 @@ async fn terminal_renders_charcell_layout() {
 		.xpect_contains("\u{1b}[");
 	// the body text survives the charcell paint (folded from fullwidth, as the
 	// large-font tagline paints in fullwidth glyphs)
-	from_fullwidth(&strip_ansi(&body))
+	FontScale::from_fullwidth(&strip_ansi(&body))
 		.xpect_contains("very cool site");
 }

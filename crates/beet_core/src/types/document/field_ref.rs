@@ -203,7 +203,10 @@ impl<T> TypedFieldRef<T> {
 }
 
 /// Marker disambiguating the [`TypedFieldRef`] markup-read [`IntoSnippet`] impl.
-pub(crate) struct SnippetTypedFieldRefMarker;
+///
+/// Public because it appears in the `IntoSnippet` type parameter that `rsx!`
+/// expansion names in downstream crates.
+pub struct SnippetTypedFieldRefMarker;
 
 /// Read a [`TypedFieldRef`] in markup, ie `rsx!{ <span>{count}</span> }`,
 /// lowering to the inner [`FieldRef`] that syncs on `Changed<Document>`.

@@ -4,7 +4,7 @@
 //! beet is unopinionated like a game engine: it links a library of capabilities
 //! (registered reflect types) but ships zero behaviour. The entry resolves from
 //! `--main`, which names the entry file itself (`--main=examples/hello/main.bsx`,
-//! any recognized extension) or a directory probed for [`ENTRY_NAMES`]
+//! any recognized extension) or a directory probed for [`entry_build::ENTRY_NAMES`]
 //! (`--main=examples/hello`); with no `--main` discovery walks the cwd and its
 //! ancestors for the first match, so a bare `beet` is `--main=.` plus the walk.
 //! The entry may widen its own store root with a `<StoreRoot src="../.."/>`
@@ -25,8 +25,8 @@
 //! (`s3://<bucket>`, `local-storage`, `indexed-db`). The dev-command and
 //! winit-render paths are native-only.
 use beet::prelude::*;
-// `ENTRY_NAMES` (the entry-document name list discovery looks for), `resolve_main`
-// and `resolve_store` (the `--store` backend selector) are shared with the
+// `entry_build::ENTRY_NAMES` (the entry-document name list discovery looks for), `entry_build::resolve_main`
+// and `entry_build::resolve_store` (the `--store` backend selector) are shared with the
 // `check`/`serve`/`export-static` commands, so they live in the lib's
 // `entry_build` module rather than here.
 use beet_cli::prelude::*;
@@ -102,7 +102,7 @@ fn load_entry(world: &mut World) {
 	let args = CliArgs::parse_env();
 	// the binary's compiled surface: `--features` and any loaded `<CrateCheck/>`
 	// verify against it.
-	world.spawn(cli_registration());
+	world.spawn(entry_build::cli_registration());
 	if let Some(check) = features_self_check(&args) {
 		world.spawn(check);
 	}
@@ -139,14 +139,14 @@ fn load_entry(world: &mut World) {
 
 /// Build the browser entry: read the program from the DOM via
 /// [`MainBsx::read_dom_program`] and build it onto a storeless root (see
-/// [`build_entry_from_bsx`]). The wasm `Browser` branch of [`load_entry`]; the
+/// [`entry_build::build_from_bsx`]). The wasm `Browser` branch of [`load_entry`]; the
 /// program's own `CallOnLoad` verb then drives it.
 #[cfg(target_arch = "wasm32")]
 async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 	let bsx = MainBsx::read_dom_program().await?;
 	world
 		.with(move |world: &mut World| {
-			build_entry_from_bsx(world, formats, "main.bsx", bsx, ())
+			entry_build::build_from_bsx(world, formats, "main.bsx", bsx, ())
 		})
 		.await?;
 	Ok(())
@@ -179,12 +179,12 @@ async fn build_entry(
 	// how it loads (servers, scripts and render scenes all carry `CallOnLoad`,
 	// a self-booting verb `#[require]`s it).
 	let sources =
-		read_entry_sources(&store, formats, entry_name.clone()).await?;
+		entry_build::read_sources(&store, formats, entry_name.clone()).await?;
 	#[cfg(target_arch = "wasm32")]
 	let _ = &args;
 	world
 		.with(move |world: &mut World| -> Result {
-			build_entry_root(world, store, sources, ())?;
+			entry_build::build_root(world, store, sources, ())?;
 			Ok(())
 		})
 		.await
@@ -192,7 +192,7 @@ async fn build_entry(
 
 /// The `--watch` entry build (native-only): install the live-reload driver
 /// ([`EntryReloader`]), then do the first build through the same
-/// [`rebuild_watched_entry`] path a structural change re-runs (which also
+/// [`entry_build::rebuild_watched`] path a structural change re-runs (which also
 /// recomputes the structural source set — the entry document and its transitive
 /// `<Template src>` includes — per build).
 ///
@@ -217,7 +217,7 @@ async fn build_watched_entry(
 			let (store, entry_name, formats) =
 				(store.clone(), entry_name.clone(), formats.clone());
 			Box::pin(async move {
-				rebuild_watched_entry(&world, store, entry_name, formats).await
+				entry_build::rebuild_watched(&world, store, entry_name, formats).await
 			})
 		}
 	};
@@ -227,7 +227,7 @@ async fn build_watched_entry(
 		})
 		.await;
 	// the first build: a no-op teardown, then the fresh `BeetSceneRoot`.
-	rebuild_watched_entry(world, store, entry_name, formats).await
+	entry_build::rebuild_watched(world, store, entry_name, formats).await
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the
@@ -237,16 +237,16 @@ async fn build_watched_entry(
 /// Resolution order:
 /// 1. a self-rooted `--store` (`s3://<bucket>`, `local-storage`, `indexed-db`):
 ///    the store roots itself, so `--main` names the entry document *within* it,
-///    defaulting to an [`ENTRY_NAMES`] probe. A deployed task passes
+///    defaulting to an [`entry_build::ENTRY_NAMES`] probe. A deployed task passes
 ///    `--store=s3://<bucket>` (deploy config as args, not env).
 /// 2. `--main=<path>`: the entry file itself (a recognized extension) or a
-///    directory probed for [`ENTRY_NAMES`]; see [`resolve_main`].
+///    directory probed for [`entry_build::ENTRY_NAMES`]; see [`entry_build::resolve_main`].
 /// 3. otherwise: discovery walks the cwd and its ancestors through an `fs` store
-///    for the first [`ENTRY_NAMES`] match.
+///    for the first [`entry_build::ENTRY_NAMES`] match.
 ///
 /// A dir-rooted entry may widen its own store root with a `<StoreRoot src>`
 /// declaration (a self-rooted store is already rooted at the site). The `--store`
-/// arg selects the backend (default `fs`); see [`resolve_store`].
+/// arg selects the backend (default `fs`); see [`entry_build::resolve_store`].
 ///
 /// Target-agnostic: wasm runs the same walk wherever the runtime has a
 /// filesystem (deno/node through the runner's fs globals); a fs-less runtime
@@ -263,14 +263,15 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
 
 	// a self-rooted store: no local dir, no ancestor walk, no watch dir.
-	if !is_wasm_runner && store_is_self_rooted(&args.params) {
-		let store = resolve_store(&args.params, AbsPathBuf::new(".")?)?;
+	if !is_wasm_runner && entry_build::store_is_self_rooted(&args.params) {
+		let store = entry_build::resolve_store(&args.params, AbsPathBuf::new(".")?)?;
 		let entry_name = match args.params.get("main") {
 			Some(main) => main.to_string(),
-			None => probe_entry_names(&store).await?.ok_or_else(|| {
+			None => entry_build::probe_entry_names(&store).await?.ok_or_else(|| {
 				bevyhow!(
 					"no entry document found in the `--store` backend: looked \
-					for {ENTRY_NAMES:?}. Seed one, or pass `--main=<name>`."
+					for {:?}. Seed one, or pass `--main=<name>`.",
+					entry_build::ENTRY_NAMES
 				)
 			})?,
 		};
@@ -293,7 +294,7 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 		);
 	}
 	match args.params.get("main").filter(|_| !is_wasm_runner) {
-		Some(main) => resolve_main(&args.params, main.as_str()).await,
+		Some(main) => entry_build::resolve_main(&args.params, main.as_str()).await,
 		None => discover_entry(&args.params).await,
 	}
 }
@@ -316,7 +317,7 @@ fn features_self_check(args: &CliArgs) -> Option<CrateCheck> {
 		.map(|features| CrateCheck::features(features.join(",")))
 }
 
-/// Walk the cwd and its ancestors for the first [`ENTRY_NAMES`] match, resolving
+/// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving
 /// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
 /// a filesystem walk makes sense; the matched entry may still widen its own
@@ -328,13 +329,14 @@ async fn discover_entry(
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
 		let store = BlobStore::new(FsStore::new(current.clone()));
-		if let Some(entry_name) = probe_entry_names(&store).await? {
-			return resolve_widened(params, current, entry_name).await;
+		if let Some(entry_name) = entry_build::probe_entry_names(&store).await? {
+			return entry_build::resolve_widened(params, current, entry_name).await;
 		}
 		dir = current.parent();
 	}
 	bevybail!(
-		"no entry document found: looked for {ENTRY_NAMES:?} in `{start}` and its \
-		ancestors. Create a `main.bsx` or pass `--main=<path>`."
+		"no entry document found: looked for {:?} in `{start}` and its \
+		ancestors. Create a `main.bsx` or pass `--main=<path>`.",
+		entry_build::ENTRY_NAMES
 	)
 }

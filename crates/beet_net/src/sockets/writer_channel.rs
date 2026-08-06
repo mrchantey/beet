@@ -18,21 +18,22 @@ use core::task::Context;
 use core::task::Poll;
 use core::task::Waker;
 
-/// Create a connected [`Sender`] / [`Receiver`] pair.
-pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
-	let shared = Arc::new(Shared {
-		queue: Mutex::new(VecDeque::new()),
-		waker: Mutex::new(None),
-		senders: AtomicUsize::new(1),
-	});
-	(
-		Sender {
-			shared: shared.clone(),
-		},
-		Receiver { shared },
-	)
+impl<T> Sender<T> {
+	/// Create a connected [`Sender`] / [`Receiver`] pair.
+	pub fn unbounded() -> (Sender<T>, Receiver<T>) {
+		let shared = Arc::new(Shared {
+			queue: Mutex::new(VecDeque::new()),
+			waker: Mutex::new(None),
+			senders: AtomicUsize::new(1),
+		});
+		(
+			Sender {
+				shared: shared.clone(),
+			},
+			Receiver { shared },
+		)
+	}
 }
-
 /// Sending half. Cloneable (multi-producer); the [`Receiver`] ends once the last
 /// clone drops.
 pub struct Sender<T> {
@@ -123,7 +124,7 @@ mod tests {
 
 	#[beet_core::test]
 	async fn delivers_in_fifo_order() {
-		let (send, recv) = unbounded::<u32>();
+		let (send, recv) = super::Sender::<u32>::unbounded();
 		send.send(1);
 		send.send(2);
 		recv.recv().await.unwrap().xpect_eq(1);
@@ -132,7 +133,7 @@ mod tests {
 
 	#[beet_core::test]
 	async fn closes_when_senders_drop() {
-		let (send, recv) = unbounded::<u32>();
+		let (send, recv) = super::Sender::<u32>::unbounded();
 		send.send(7);
 		drop(send);
 		// buffered items drain first, then the stream ends.

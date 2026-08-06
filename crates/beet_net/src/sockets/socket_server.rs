@@ -9,7 +9,7 @@ use bevy::platform::sync::OnceLock;
 /// [`HttpServerFn`].
 ///
 /// [`SocketServerPlugin`] installs the built-in tungstenite backend via
-/// [`set_socket_server`] when the feature is enabled; a downstream adapter (an
+/// [`SocketServer::set_backend`] when the feature is enabled; a downstream adapter (an
 /// embassy / esp WiFi crate, …) installs its own without living in [`beet_net`].
 /// [`SocketServer`]'s start observer invokes the installed function.
 ///
@@ -28,24 +28,12 @@ pub type SocketServerFn =
 
 static SOCKET_SERVER: OnceLock<SocketServerFn> = OnceLock::new();
 
-/// Install the backend [`SocketServer`] invokes on start. [`SocketServerPlugin`]
-/// calls this for the compile-time tungstenite backend; a no_std adapter with no
-/// compiled-in backend installs its own. Returns an error if one is already set.
-pub fn set_socket_server(server: SocketServerFn) -> Result<()> {
-	SOCKET_SERVER
-		.set(server)
-		.map_err(|_| bevyhow!("Socket server already installed"))
-}
 
-/// The installed backend, if any.
-pub fn socket_server() -> Option<SocketServerFn> {
-	SOCKET_SERVER.get().copied()
-}
 
 /// Plugin for running bevy WebSocket servers.
 ///
 /// Registers reflection for [`SocketServer`] and installs the compile-time
-/// tungstenite backend via [`set_socket_server`], mirroring [`ServerPlugin`].
+/// tungstenite backend via [`SocketServer::set_backend`], mirroring [`ServerPlugin`].
 #[derive(Default)]
 pub struct SocketServerPlugin;
 
@@ -57,18 +45,18 @@ impl Plugin for SocketServerPlugin {
 			.register_type::<Tls>();
 
 		// install the tungstenite backend; mirrors `ServerPlugin`. Skipped in
-		// beet_net's own tests, which install a stub per case. `set_socket_server`
+		// beet_net's own tests, which install a stub per case. `SocketServer::set_backend`
 		// errors if one is already installed, so ignore a re-install.
 		#[cfg(not(test))]
 		{
 			cfg_if! {
 				if #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))] {
-					set_socket_server(|entity, shutdown| {
-						Box::pin(super::start_tungstenite_server(entity, shutdown))
+					SocketServer::set_backend(|entity, shutdown| {
+						Box::pin(SocketServer::start_tungstenite(entity, shutdown))
 					})
 					.ok();
 				} else {
-					// no feature backend: a downstream `set_socket_server` supplies one.
+					// no feature backend: a downstream `SocketServer::set_backend` supplies one.
 				}
 			}
 		}
@@ -79,7 +67,7 @@ impl Plugin for SocketServerPlugin {
 /// fan-out as [`HttpServer`].
 ///
 /// The boot fan-out ([`StartRunning<Request>`]) whose `--server` selects `"socket"`
-/// boots it through the backend installed via [`set_socket_server`]. It never
+/// boots it through the backend installed via [`SocketServer::set_backend`]. It never
 /// resolves the boot call, so the host's [`Running<Response>`] keep-alive parks the
 /// process; when that `Running` is removed (a reload or shutdown) its teardown
 /// observer signals the backend to stop accepting and drop its listener. Each
@@ -89,7 +77,7 @@ impl Plugin for SocketServerPlugin {
 /// The concrete backend depends on compile-time features:
 /// - `tungstenite` (native): an `async-io` TCP WebSocket listener
 /// - none of the above (eg no_std embedded): a backend installed at runtime via
-///   [`set_socket_server`]
+///   [`SocketServer::set_backend`]
 #[derive(Clone, Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::entity_hook(ServerShutdown::<SocketServer>::add_observers))]
@@ -112,6 +100,18 @@ impl Default for SocketServer {
 }
 
 impl SocketServer {
+	/// Install the backend [`SocketServer`] invokes on start. [`SocketServerPlugin`]
+	/// calls this for the compile-time tungstenite backend; a no_std adapter with no
+	/// compiled-in backend installs its own. Returns an error if one is already set.
+	pub fn set_backend(server: SocketServerFn) -> Result<()> {
+		SOCKET_SERVER
+			.set(server)
+			.map_err(|_| bevyhow!("Socket server already installed"))
+	}
+
+	/// The installed backend, if any.
+	pub fn backend() -> Option<SocketServerFn> { SOCKET_SERVER.get().copied() }
+
 	/// Creates a new socket server on `port`, bound to all interfaces (`0.0.0.0`) so a
 	/// browser or a device on the network can reach it. Narrow with
 	/// [`with_host`](Self::with_host), eg `[127, 0, 0, 1]` for loopback only.
@@ -160,7 +160,7 @@ impl SocketServer {
 		let port = listener.local_addr().unwrap().port();
 		let listener = async_io::Async::new(listener)
 			.expect("failed to create async listener");
-		let (_signal, shutdown) = oneshot::<()>();
+		let (_signal, shutdown) = OnceValue::<()>::oneshot();
 		(
 			Self {
 				port: Some(port),
@@ -168,7 +168,7 @@ impl SocketServer {
 				default_boot: true,
 			},
 			OnSpawn::new_async_local(move |entity| {
-				super::start_tungstenite_server_with_tcp(
+				SocketServer::start_tungstenite_with_tcp(
 					entity, listener, shutdown,
 				)
 			}),
@@ -201,10 +201,10 @@ async fn start_socket_server(
 	if !entity.is_alive().await {
 		return Ok(());
 	}
-	let Some(backend) = socket_server() else {
+	let Some(backend) = SocketServer::backend() else {
 		bevybail!(
 			"No socket server backend installed. Enable the tungstenite feature \
-			 or install one via set_socket_server(...)."
+			 or install one via SocketServer::set_backend(...)."
 		)
 	};
 	backend(entity, shutdown).await
@@ -225,13 +225,13 @@ mod tests {
 
 	/// Install the stub backend: flag the entity, standing in for a real server.
 	///
-	/// [`set_socket_server`] is a process-global [`OnceLock`], so the first install
+	/// [`SocketServer::set_backend`] is a process-global [`OnceLock`], so the first install
 	/// wins for the whole test binary (notably the single wasm module that runs
 	/// every case in series). Every test therefore installs this same idempotent
 	/// hook: flagging is observable where a start is expected and harmless where it
 	/// is not (a filter miss never invokes the hook).
 	fn stub_backend() {
-		set_socket_server(|entity, _shutdown| {
+		SocketServer::set_backend(|entity, _shutdown| {
 			Box::pin(async move {
 				entity
 					.with(|mut entity| {

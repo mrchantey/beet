@@ -48,12 +48,12 @@ impl EchoHttpServer {
 	///
 	/// Use [`url()`](Self::url) to make requests against the running server.
 	pub async fn new() -> Self {
-		let server = HttpServer::new_test(start_mini_http_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
 		let url = Url::parse(&server.0.local_url());
 		std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, children![exchange_handler(echo_request)]))
+				.spawn((server, children![exchange_ext::handler(echo_request)]))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;

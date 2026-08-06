@@ -70,7 +70,7 @@ pub fn router_scene() -> Result<impl Bundle> {
 		server_from_cli()?,
 		// the batteries-included router: route lookup + the default app routes,
 		// wrapping the user routes (children with a PathPartial and action)
-		(default_router(), children![routes()]),
+		(Router::with_defaults(), children![routes()]),
 	)
 		.xok()
 }
@@ -115,8 +115,8 @@ fn routes() -> impl Bundle {
 		// `RouterLayout` document, transcluded in place at its `<Slot/>`
 		BaseLayout::<RouterLayout>::default(),
 		children![
-			route("", BlobScene::new("content/home.md")),
-			route("about", BlobScene::new("content/about.md")),
+			Router::route("", BlobScene::new("content/home.md")),
+			Router::route("about", BlobScene::new("content/about.md")),
 			counter(),
 			sequence()
 		],
@@ -138,7 +138,7 @@ fn counter() -> impl Bundle {
 				<div>
 					<h1>"Cookie Counter"</h1>
 					<p>"Value: "{field_ref.clone()}</p>
-					{increment(field_ref)}
+					{Increment::bundle(field_ref)}
 				</div>
 			}
 		}),
@@ -146,7 +146,7 @@ fn counter() -> impl Bundle {
 }
 
 fn sequence() -> impl Bundle {
-	route(
+	Router::route(
 		"sequence",
 		(ExchangeSequence, children![
 			Action::<Request, Outcome<Request, Response>>::new_pure(

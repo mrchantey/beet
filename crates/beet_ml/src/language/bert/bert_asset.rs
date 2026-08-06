@@ -11,7 +11,7 @@ use tokenizers::Tokenizer;
 /// A loaded bert encoder + tokenizer bundled as a bevy [`Asset`].
 ///
 /// Built via [`Bert::from_bytes`] when raw model bytes are already on
-/// hand (eg downloaded by [`fetch_bytes`](crate::fetch)) or via
+/// hand (eg downloaded by [`fetch_ext::fetch_bytes`]) or via
 /// [`Bert::new`] which adds the fetch step.
 ///
 /// The default backend is configurable via cargo features — see
@@ -32,15 +32,15 @@ impl Bert {
 	/// Download the model + tokenizer from the urls in `config` and
 	/// return a fully-constructed [`Bert`].
 	///
-	/// The network/storage work is done by [`fetch_bytes`](crate::fetch::fetch_bytes);
+	/// The network/storage work is done by [`fetch_ext::fetch_bytes`];
 	/// see its docs for the currently supported targets.
 	pub async fn new(config: BertConfig) -> Result<Self> {
 		let model_config_bytes =
-			crate::fetch_bytes::fetch_bytes(&config.model.config_url()).await?;
+			fetch_ext::fetch_bytes(&config.model.config_url()).await?;
 		let weights_bytes =
-			crate::fetch_bytes::fetch_bytes(&config.model.model_url()).await?;
+			fetch_ext::fetch_bytes(&config.model.model_url()).await?;
 		let tokenizer_bytes =
-			crate::fetch_bytes::fetch_bytes(&config.model.tokenizer_url())
+			fetch_ext::fetch_bytes(&config.model.tokenizer_url())
 				.await?;
 		Self::from_bytes(
 			config,

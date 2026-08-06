@@ -13,7 +13,7 @@ use beet::prelude::*;
 const GREETING_BSX: &str = include_str!("../assets/bsx/greeting.bsx");
 
 fn main() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 
 	// 1. A document holds the state the markup binds to. `unread` is omitted so
 	// the `@doc:unread=0` binding seeds its default.

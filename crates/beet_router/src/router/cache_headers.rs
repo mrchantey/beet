@@ -187,7 +187,7 @@ mod test {
 	/// The site-wide pair: the middleware + the html-only default policy.
 	fn caching_router() -> impl Bundle {
 		(
-			default_router(),
+			Router::with_defaults(),
 			CacheHeaders::default(),
 			CacheHeadersMiddleware::default(),
 		)
@@ -199,8 +199,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((caching_router(), children![
-				exchange_route("page", HelloHtml),
-				exchange_route("page.md", HelloMarkdown),
+				Router::exchange_route("page", HelloHtml),
+				Router::exchange_route("page.md", HelloMarkdown),
 			]))
 			.flush();
 		cache_control(&mut world, root, "page")
@@ -219,10 +219,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((
-				default_router(),
+				Router::with_defaults(),
 				CacheHeaders::assets(),
 				CacheHeadersMiddleware::default(),
-				children![exchange_route("style", HelloMarkdown)],
+				children![Router::exchange_route("style", HelloMarkdown)],
 			))
 			.flush();
 		cache_control(&mut world, root, "style")
@@ -238,10 +238,10 @@ mod test {
 		let root = world
 			.spawn((caching_router(), children![
 				(
-					exchange_route("file", HelloMarkdown),
+					Router::exchange_route("file", HelloMarkdown),
 					CacheHeaders::assets()
 				),
-				(exchange_route("live", HelloHtml), CacheHeaders::no_store()),
+				(Router::exchange_route("live", HelloHtml), CacheHeaders::no_store()),
 			]))
 			.flush();
 		cache_control(&mut world, root, "file")
@@ -260,9 +260,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((
-				default_router(),
+				Router::with_defaults(),
 				CacheHeadersMiddleware::default(),
-				children![exchange_route("page", HelloHtml)],
+				children![Router::exchange_route("page", HelloHtml)],
 			))
 			.flush();
 		world

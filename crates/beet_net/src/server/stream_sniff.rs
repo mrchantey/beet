@@ -16,18 +16,19 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-/// Stop sniffing for a plaintext http head after this many bytes; a peer that
-/// sent this much without a blank line is handed on as-is for the downstream
-/// parser to reject.
-pub const SNIFF_CAP: usize = 16 * 1024;
-
+impl SecureProtocol {
+	/// Stop sniffing for a plaintext http head after this many bytes; a peer that
+	/// sent this much without a blank line is handed on as-is for the downstream
+	/// parser to reject.
+	pub const SNIFF_CAP: usize = 16 * 1024;
+}
 /// The classified first bytes of a connection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecureProtocol {
 	/// First byte `0x16`: a TLS `ClientHello` record.
 	Tls,
 	/// Anything else: treated as a plaintext http head (websocket handshakes
-	/// included), buffered up to the header end or [`SNIFF_CAP`].
+	/// included), buffered up to the header end or [`SecureProtocol::SNIFF_CAP`].
 	PlainHttp,
 	/// The peer closed before sending anything.
 	Empty,
@@ -39,7 +40,7 @@ impl SecureProtocol {
 	///
 	/// For [`SecureProtocol::Tls`] only the first chunk is consumed (a `ClientHello`
 	/// has no http head to wait for); for [`SecureProtocol::PlainHttp`] the read
-	/// continues until the blank line ending the head, EOF, or [`SNIFF_CAP`].
+	/// continues until the blank line ending the head, EOF, or [`SecureProtocol::SNIFF_CAP`].
 	pub async fn sniff<S: AsyncRead + Unpin>(
 		mut stream: S,
 	) -> Result<(Self, ReplayStream<S>)> {
@@ -59,7 +60,7 @@ impl SecureProtocol {
 				break Self::Tls;
 			}
 			if http_ext::find_header_end(&consumed).is_some()
-				|| consumed.len() >= SNIFF_CAP
+				|| consumed.len() >= SecureProtocol::SNIFF_CAP
 			{
 				break Self::PlainHttp;
 			}

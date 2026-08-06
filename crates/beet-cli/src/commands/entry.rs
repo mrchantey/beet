@@ -1,7 +1,7 @@
 //! Resolving and loading a no-code entry, shared by the [`Serve`], [`Check`] and
 //! [`ExportStatic`] commands.
 //!
-//! An entry is a directory containing an entry document ([`ENTRY_NAMES`], eg
+//! An entry is a directory containing an entry document ([`entry_build::ENTRY_NAMES`], eg
 //! `main.bsx`) or the entry file itself, loaded as the app root with its declared
 //! `<TemplateDir>`s registered. The entry declares its own servers and app routes;
 //! these helpers only resolve and load it.
@@ -10,13 +10,13 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 /// Load the entry onto the caller's world through its [`BlobStore`], returning its
-/// root entity. Resolution is the binary's own [`resolve_main`] (the `--store`
+/// root entity. Resolution is the binary's own [`entry_build::resolve_main`] (the `--store`
 /// param picks the backend, the entry's `<StoreRoot src>` widens the root), so the
 /// same resolution serves `beet --main=..` and these commands.
 ///
 /// `check`/`export-static` render the entry rather than serve it, so the root
 /// carries [`DisableCallOnLoad`] to keep the entry's `CallOnLoad` verb dormant.
-/// The reads go through the store ([`read_entry_sources`]/[`build_entry_root`]),
+/// The reads go through the store ([`entry_build::read_sources`]/[`entry_build::build_root`]),
 /// the same agnostic core the native binary and the wasm Worker use, so the
 /// command is store-driven rather than filesystem-bound.
 ///
@@ -33,16 +33,16 @@ pub(crate) async fn build_entry(
 ) -> Result<Entity> {
 	let ResolvedEntry {
 		store, entry_name, ..
-	} = resolve_main(params, entry_path).await?;
+	} = entry_build::resolve_main(params, entry_path).await?;
 	let formats = caller
 		.with_world(|world, _| {
 			world.get_resource_or_init::<TemplateFormats>().clone()
 		})
 		.await?;
-	let sources = read_entry_sources(&store, formats, entry_name).await?;
+	let sources = entry_build::read_sources(&store, formats, entry_name).await?;
 	let root = caller
 		.with_world(move |world, _| {
-			build_entry_root(world, store, sources, DisableCallOnLoad)
+			entry_build::build_root(world, store, sources, DisableCallOnLoad)
 		})
 		.await??;
 	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
@@ -126,19 +126,19 @@ mod test {
 		AbsPathBuf::new_workspace_rel("examples/bsx_site").unwrap()
 	}
 
-	/// The shared [`resolve_main`] serves the commands' positional: a dir resolves
-	/// to its highest-priority [`ENTRY_NAMES`] entry through the store, an entry
+	/// The shared [`entry_build::resolve_main`] serves the commands' positional: a dir resolves
+	/// to its highest-priority [`entry_build::ENTRY_NAMES`] entry through the store, an entry
 	/// file names itself, and a dir with no entry document errors with guidance.
 	#[beet::test]
 	async fn resolves_dir_and_entry_file() {
-		// a dir resolves to its highest-priority `ENTRY_NAMES` entry (`main.bsx` here)
+		// a dir resolves to its highest-priority `entry_build::ENTRY_NAMES` entry (`main.bsx` here)
 		let dir =
-			resolve_main(&default(), entry_path().to_string_lossy().as_ref())
+			entry_build::resolve_main(&default(), entry_path().to_string_lossy().as_ref())
 				.await
 				.unwrap();
 		dir.entry_name.xpect_eq("main.bsx");
 		// passing the entry file itself roots the store at its parent
-		let file = resolve_main(
+		let file = entry_build::resolve_main(
 			&default(),
 			entry_path().join("main.bsx").to_string_lossy().as_ref(),
 		)
@@ -146,17 +146,17 @@ mod test {
 		.unwrap();
 		file.entry_name.xpect_eq("main.bsx");
 		file.watch_dir.xpect_eq(Some(entry_path()));
-		// a non-`main.bsx` entry name is still discovered (the search spans ENTRY_NAMES)
+		// a non-`main.bsx` entry name is still discovered (the search spans entry_build::ENTRY_NAMES)
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(tmp.path().join("main.json"), "{}").unwrap();
-		resolve_main(&default(), tmp.path().to_string_lossy().as_ref())
+		entry_build::resolve_main(&default(), tmp.path().to_string_lossy().as_ref())
 			.await
 			.unwrap()
 			.entry_name
 			.xpect_eq("main.json");
 		// a dir with no entry document errors with guidance
 		let empty = TempDir::new().unwrap();
-		resolve_main(&default(), empty.path().to_string_lossy().as_ref())
+		entry_build::resolve_main(&default(), empty.path().to_string_lossy().as_ref())
 			.await
 			.err()
 			.unwrap()
@@ -173,15 +173,15 @@ mod test {
 		let mut world = render_world();
 		let ResolvedEntry {
 			store, entry_name, ..
-		} = resolve_main(&default(), entry_path().to_string_lossy().as_ref())
+		} = entry_build::resolve_main(&default(), entry_path().to_string_lossy().as_ref())
 			.await
 			.unwrap();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources = read_entry_sources(&store, formats, entry_name)
+		let sources = entry_build::read_sources(&store, formats, entry_name)
 			.await
 			.unwrap();
 		let root =
-			build_entry_root(&mut world, store, sources, DisableCallOnLoad)
+			entry_build::build_root(&mut world, store, sources, DisableCallOnLoad)
 				.unwrap();
 		// the markup `<HttpServer>` owns the boot, with the router as its child
 		world.entity(root).contains::<HttpServer>().xpect_true();

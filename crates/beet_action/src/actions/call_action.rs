@@ -63,7 +63,7 @@ where
 	}
 }
 
-/// Wires a [`oneshot`]-backed [`OutHandler`] and calls [`call_world`].
+/// Wires a [`OnceValue::oneshot`]-backed [`OutHandler`] and calls [`call_world`].
 ///
 /// Returns the receiving half so the caller can await the result. The value
 /// carries `Result<Out>` so async action errors propagate back to the caller
@@ -77,7 +77,7 @@ where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	let (send, recv) = oneshot::<Result<Out>>();
+	let (send, recv) = OnceValue::<Result<Out>>::oneshot();
 	let out_handler = OutHandler::new(move |_commands, result: Result<Out>| {
 		send.signal(result);
 		Ok(())
@@ -91,7 +91,7 @@ where
 ///
 /// std-only: it owns and drives the world itself. The bridge-based
 /// [`AsyncEntityActionExt`] paths instead rely on the running app's update
-/// loop and resume via the [`oneshot`] waker, so they are no_std-clean.
+/// loop and resume via the [`OnceValue::oneshot`] waker, so they are no_std-clean.
 #[cfg(feature = "std")]
 async fn call_polling<Input, Out>(
 	mut entity: EntityWorldMut<'_>,
@@ -155,7 +155,7 @@ where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	let (send, recv) = oneshot::<Result<Out>>();
+	let (send, recv) = OnceValue::<Result<Out>>::oneshot();
 	let out_handler = OutHandler::new(move |_, result: Result<Out>| {
 		send.signal(result);
 		Ok(())
@@ -170,7 +170,7 @@ pub impl AsyncEntity {
 	/// Make an action call asynchronously.
 	///
 	/// The world's normal update loop drives any async work inside the action;
-	/// this side just awaits the [`oneshot`] result.
+	/// this side just awaits the [`OnceValue::oneshot`] result.
 	///
 	/// # Errors
 	/// Errors if the entity serves no matching signature or the call fails.

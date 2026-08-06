@@ -17,13 +17,13 @@
 //!
 //! The selector comes from `class`/`tag`/`state`/`media`; every other attribute
 //! is a declaration whose key is a kebab property name
-//! ([`prop_name_map`](crate::style::prop_name_map)) and whose value is the BSX
+//! [`PropResolver::name_map`] and whose value is the BSX
 //! enum form (`Flex`, `Rem(1.0)`), parsed identically to the typed
 //! `Rule::with_value`. A `"@token:Role"` value is a token-to-token binding
 //! (`Rule::with_token`), the markup form of `color_scheme_rules`.
 use crate::prelude::*;
+use crate::style::PropResolver;
 use crate::style::color_role_map;
-use crate::style::prop_name_map;
 use beet_core::prelude::*;
 
 /// Register the `<Rule>` custom-tag handler into the [`BsxTagResolvers`] seam, so
@@ -61,7 +61,7 @@ fn parse_rule(el: &BsxElement) -> Result<Rule> {
 
 /// Apply a sequence of `(kebab-prop-name, value)` declarations onto `rule`, the
 /// shared body of both [`parse_rule`] (the `<Rule>` tag) and the `bx:style`
-/// directive. Each prop name resolves through [`prop_name_map`] and its value is
+/// directive. Each prop name resolves through [`PropResolver::name_map`] and its value is
 /// either a `"@token:Role"` token-to-token binding ([`Rule::with_token`]) or a
 /// literal parsed against the property's value type ([`Rule::insert`]), keeping
 /// the two markup surfaces in lockstep with the typed `Rule::with_value` API.
@@ -72,7 +72,7 @@ pub(crate) fn apply_declarations<'a>(
 	context: &str,
 	declarations: impl IntoIterator<Item = (&'a str, &'a AttrValue)>,
 ) -> Result<Rule> {
-	let prop_names = prop_name_map();
+	let prop_names = PropResolver::name_map();
 	let role_names = color_role_map();
 	for (key, value) in declarations {
 		let resolver = prop_names.get(key).ok_or_else(|| {
@@ -270,7 +270,7 @@ mod test {
 	fn rule_from(markup: &str) -> Rule {
 		let mut world = MaterialStylePlugin::world();
 		let before = world.resource::<RuleSet>().rules().count();
-		let nodes = parse_document(markup, &BsxParseConfig::bsx()).unwrap();
+		let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
 		world
 			.spawn_template(BsxTemplate::container(
 				nodes,

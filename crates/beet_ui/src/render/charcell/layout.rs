@@ -941,7 +941,7 @@ mod tests {
 		);
 		Buffer::render_oneshot_sized(UVec2::new(width, 6), bundle)
 			.lines()
-			.map(display_width)
+			.map(text_ext::display_width)
 			.all(|line_width| line_width <= width as usize)
 			.xpect_true();
 	}

@@ -228,7 +228,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn echoes_input_without_tools() {
-		run_oneshot(children![
+		Post::run_oneshot(children![
 			(Actor::user(), children![Post::spawn("Hello world!")]),
 			(Actor::agent(), MockPostStreamer::default()),
 		])
@@ -256,7 +256,7 @@ mod test {
 		)
 		.into();
 
-		let (name, args) = run_oneshot(children![
+		let (name, args) = Post::run_oneshot(children![
 			(Actor::user(), children![Post::spawn("Greet someone")]),
 			(Actor::agent(), MockPostStreamer::default(), children![tool]),
 		])
@@ -292,7 +292,7 @@ mod test {
 		)
 		.into();
 
-		let (name, args) = run_oneshot(children![
+		let (name, args) = Post::run_oneshot(children![
 			(Actor::user(), children![Post::spawn("go")]),
 			(
 				Actor::agent(),
@@ -322,7 +322,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn custom_response_overrides_echo() {
-		run_oneshot(children![
+		Post::run_oneshot(children![
 			(Actor::user(), children![Post::spawn("Hello!")]),
 			(
 				Actor::agent(),

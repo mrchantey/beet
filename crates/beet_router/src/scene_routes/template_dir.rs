@@ -291,7 +291,7 @@ mod test {
 	/// entry tree.
 	#[beet_core::test]
 	fn extract_dirs_walks_tree() {
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			"<Router><TemplateDir src=\"templates\"/><div><TemplateDir src=\"more\"/></div></Router>",
 			&BsxParseConfig::bsx(),
 		)

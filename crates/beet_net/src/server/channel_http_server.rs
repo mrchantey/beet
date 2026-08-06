@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// [`Response`]s back, sharing all of [`HttpServer`]'s boot/park/dispatch
 /// machinery without binding a socket.
 ///
-/// Unlike the singular [`set_http_server`] backend (the one bind-a-port
+/// Unlike the singular [`HttpServer::set_backend`] backend (the one bind-a-port
 /// selection), this is a per-instance component, so multiple can coexist and each
 /// owns its own channel ends. The motivating use is a mock HTTP server inside a
 /// browser (a teaching sandbox) with no real listener; it is also the natural
@@ -137,7 +137,7 @@ async fn start_channel_http_server(
 			Result::Ok(())
 		}
 	};
-	// race the serve loop against teardown, mirroring `start_mini_http_server`.
+	// race the serve loop against teardown, mirroring `HttpServer::start_mini`.
 	beet_core::exports::futures_lite::future::or(serve, async move {
 		shutdown.wait().await;
 		Result::Ok(())
@@ -166,7 +166,7 @@ mod test {
 		// handler on the server would clobber its parking action
 		let entity = app
 			.world_mut()
-			.spawn((server, children![exchange_handler(|cx| {
+			.spawn((server, children![exchange_ext::handler(|cx| {
 				Response::ok().with_body(cx.take().body)
 			})]))
 			.id();

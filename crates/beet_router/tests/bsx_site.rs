@@ -166,7 +166,7 @@ async fn serve_blobs_serves_assets() {
 async fn http_server_declarable_in_markup() {
 	// no `server` backend feature here, so install the runtime hook the start
 	// observer invokes (idempotent: a prior test may have set it).
-	set_http_server(|entity, _shutdown| {
+	HttpServer::set_backend(|entity, _shutdown| {
 		Box::pin(async move {
 			entity
 				.with(|mut entity| {

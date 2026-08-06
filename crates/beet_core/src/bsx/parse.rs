@@ -41,15 +41,17 @@ const VOID_ELEMENTS: &[&str] = &[
 /// Elements whose content is raw text up to their closing tag.
 const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style"];
 
-/// Parse a full document into a flat list of root nodes.
-pub fn parse_document(
-	source: &str,
-	config: &BsxParseConfig,
-) -> Result<Vec<BsxNode>> {
-	let mut cursor = Cursor::new(source);
-	let mut nodes = parse_nodes(&mut cursor, config, None)?;
-	normalize_whitespace(&mut nodes);
-	Ok(nodes)
+impl BsxNode {
+	/// Parse a full document into a flat list of root nodes.
+	pub fn parse_document(
+		source: &str,
+		config: &BsxParseConfig,
+	) -> Result<Vec<BsxNode>> {
+		let mut cursor = Cursor::new(source);
+		let mut nodes = parse_nodes(&mut cursor, config, None)?;
+		normalize_whitespace(&mut nodes);
+		Ok(nodes)
+	}
 }
 
 /// Drop insignificant inter-element whitespace from a node tree, the runtime BSX
@@ -86,14 +88,14 @@ fn normalize_whitespace(nodes: &mut Vec<BsxNode>) {
 	// recurse into element children, leaving `<pre>`-family content verbatim.
 	for node in nodes.iter_mut() {
 		if let BsxNode::Element(element) = node {
-			if !PRE_ELEMENTS.contains(&element.tag.as_str()) {
+			if !Element::PRE_ELEMENTS.contains(&element.tag.as_str()) {
 				normalize_whitespace(&mut element.children);
 			}
 		}
 	}
 }
 
-/// One lenient, fragment-safe markup token produced by [`parse_fragment`].
+/// One lenient, fragment-safe markup token produced by [`BsxFragmentToken::parse_fragment`].
 ///
 /// Unlike [`BsxNode`], a token is *flat*: an open tag and its close are separate
 /// tokens, so a fragment need not balance. This is what lets a stack-based caller
@@ -132,7 +134,7 @@ pub enum BsxFragmentToken<'a> {
 	Expr(&'a str),
 }
 
-/// Configuration for [`parse_fragment`], mirroring the markup quirks an embedded
+/// Configuration for [`BsxFragmentToken::parse_fragment`], mirroring the markup quirks an embedded
 /// HTML fragment needs: `{expr}` splitting, `<script>`/`<style>` raw text, and
 /// `{{expr}}` inside that raw text.
 #[derive(Debug, Clone)]
@@ -172,42 +174,44 @@ impl BsxFragmentConfig {
 	}
 }
 
-/// Tokenize a markup fragment leniently into a flat [`BsxFragmentToken`] stream.
-///
-/// This is the fragment-level entry the markdown builder drives instead of its
-/// own HTML tokenizer: it reuses the BSX cursor, attribute parser, and value
-/// grammar, so embedded markup resolves through the one parser. It never
-/// requires the fragment to balance, a lone `<span>` or a lone `</span>` each
-/// produce a single token, because `pulldown-cmark` splits a tag and its close
-/// across separate events. It is no_std-clean (allocates only the attribute
-/// list, borrows every verbatim span from `source`).
-pub fn parse_fragment<'a>(
-	source: &'a str,
-	config: &BsxFragmentConfig,
-) -> Result<Vec<BsxFragmentToken<'a>>> {
-	let mut cursor = Cursor::new(source);
-	let mut tokens = Vec::new();
-	while !cursor.is_eof() {
-		let token = parse_fragment_token(&mut cursor, config)?;
-		let Some(token) = token else { continue };
-		// after an open tag for a raw-text element, take its content verbatim up
-		// to the matching close tag, so `<` inside `<script>` is not misparsed.
-		if let BsxFragmentToken::Open {
-			tag,
-			self_closing: false,
-			..
-		} = &token
-		{
-			if config.is_raw_text_element(tag) {
-				let tag = *tag;
-				tokens.push(token);
-				parse_raw_text(&mut cursor, tag, config, &mut tokens);
-				continue;
+impl<'a> BsxFragmentToken<'a> {
+	/// Tokenize a markup fragment leniently into a flat [`BsxFragmentToken`] stream.
+	///
+	/// This is the fragment-level entry the markdown builder drives instead of its
+	/// own HTML tokenizer: it reuses the BSX cursor, attribute parser, and value
+	/// grammar, so embedded markup resolves through the one parser. It never
+	/// requires the fragment to balance, a lone `<span>` or a lone `</span>` each
+	/// produce a single token, because `pulldown-cmark` splits a tag and its close
+	/// across separate events. It is no_std-clean (allocates only the attribute
+	/// list, borrows every verbatim span from `source`).
+	pub fn parse_fragment(
+		source: &'a str,
+		config: &BsxFragmentConfig,
+	) -> Result<Vec<BsxFragmentToken<'a>>> {
+		let mut cursor = Cursor::new(source);
+		let mut tokens = Vec::new();
+		while !cursor.is_eof() {
+			let token = parse_fragment_token(&mut cursor, config)?;
+			let Some(token) = token else { continue };
+			// after an open tag for a raw-text element, take its content verbatim up
+			// to the matching close tag, so `<` inside `<script>` is not misparsed.
+			if let BsxFragmentToken::Open {
+				tag,
+				self_closing: false,
+				..
+			} = &token
+			{
+				if config.is_raw_text_element(tag) {
+					let tag = *tag;
+					tokens.push(token);
+					parse_raw_text(&mut cursor, tag, config, &mut tokens);
+					continue;
+				}
 			}
+			tokens.push(token);
 		}
-		tokens.push(token);
+		Ok(tokens)
 	}
-	Ok(tokens)
 }
 
 /// Parse one fragment token, or `None` for a stray char that was skipped.
@@ -897,7 +901,7 @@ mod test {
 	#[beet_core::test]
 	fn simple_element() {
 		let nodes =
-			parse_document("<div>hi</div>", &BsxParseConfig::bsx()).unwrap();
+			BsxNode::parse_document("<div>hi</div>", &BsxParseConfig::bsx()).unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected element");
 		};
@@ -907,7 +911,7 @@ mod test {
 
 	#[beet_core::test]
 	fn nested_and_text() {
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			"<div><span>inner</span></div>",
 			&BsxParseConfig::bsx(),
 		)
@@ -923,7 +927,7 @@ mod test {
 
 	#[beet_core::test]
 	fn attributes() {
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			"<div class=\"card\" disabled/>",
 			&BsxParseConfig::bsx(),
 		)
@@ -942,7 +946,7 @@ mod test {
 	#[beet_core::test]
 	fn void_element() {
 		let nodes =
-			parse_document("<br>after", &BsxParseConfig::bsx()).unwrap();
+			BsxNode::parse_document("<br>after", &BsxParseConfig::bsx()).unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected br");
 		};
@@ -953,7 +957,7 @@ mod test {
 	#[beet_core::test]
 	fn text_block_expr() {
 		let nodes =
-			parse_document("<p>{@doc:count}</p>", &BsxParseConfig::bsx())
+			BsxNode::parse_document("<p>{@doc:count}</p>", &BsxParseConfig::bsx())
 				.unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected p");
@@ -966,7 +970,7 @@ mod test {
 		// a tuple/struct/enum tag-position literal parses into `tag_literal`, with
 		// `tag` reduced to the base component name (the segment before `::`).
 		let element = |source: &str| -> BsxElement {
-			let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
+			let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
 			let BsxNode::Element(element) = nodes.into_iter().next().unwrap()
 			else {
 				panic!("expected an element");
@@ -1003,7 +1007,7 @@ mod test {
 
 	#[beet_core::test]
 	fn comment_and_doctype() {
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			"<!DOCTYPE html><!-- hi -->",
 			&BsxParseConfig::bsx(),
 		)
@@ -1018,18 +1022,18 @@ mod test {
 
 	#[beet_core::test]
 	fn html_mode_rejects_braces() {
-		parse_document("<div {Foo}/>", &BsxParseConfig::html()).xpect_err();
+		BsxNode::parse_document("<div {Foo}/>", &BsxParseConfig::html()).xpect_err();
 	}
 
 	#[beet_core::test]
 	fn html_mode_rejects_bx() {
-		parse_document("<div bx:scope=\"x\"/>", &BsxParseConfig::html())
+		BsxNode::parse_document("<div bx:scope=\"x\"/>", &BsxParseConfig::html())
 			.xpect_err();
 	}
 
 	#[beet_core::test]
 	fn html_mode_plain_html() {
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			"<div class=\"a\">hi</div>",
 			&BsxParseConfig::html(),
 		)
@@ -1046,7 +1050,7 @@ mod test {
 	// -- fragment primitive --
 
 	fn fragment(source: &str) -> Vec<BsxFragmentToken<'_>> {
-		parse_fragment(source, &BsxFragmentConfig::default()).unwrap()
+		BsxFragmentToken::parse_fragment(source, &BsxFragmentConfig::default()).unwrap()
 	}
 
 	#[beet_core::test]
@@ -1197,7 +1201,7 @@ mod test {
 	#[beet_core::test]
 	fn fragment_script_raw_text() {
 		// `<` inside raw text is not a tag, so the script body stays one text run.
-		parse_fragment(
+		BsxFragmentToken::parse_fragment(
 			"<script>let x = 1 < 2;</script>",
 			&BsxFragmentConfig::default(),
 		)
@@ -1219,7 +1223,7 @@ mod test {
 			expressions: true,
 			..Default::default()
 		};
-		parse_fragment("<p>hi {name}</p>", &config)
+		BsxFragmentToken::parse_fragment("<p>hi {name}</p>", &config)
 			.unwrap()
 			.xpect_eq(vec![
 				BsxFragmentToken::Open {
@@ -1239,7 +1243,7 @@ mod test {
 			raw_text_expressions: true,
 			..Default::default()
 		};
-		parse_fragment("<style>a {{x}} b</style>", &config)
+		BsxFragmentToken::parse_fragment("<style>a {{x}} b</style>", &config)
 			.unwrap()
 			.xpect_eq(vec![
 				BsxFragmentToken::Open {
@@ -1256,7 +1260,7 @@ mod test {
 
 	/// The child nodes of a single root element parsed from `source`.
 	fn children_of(source: &str) -> Vec<BsxNode> {
-		let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
+		let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
 		let BsxNode::Element(element) = nodes.into_iter().next().unwrap()
 		else {
 			panic!("expected a root element");

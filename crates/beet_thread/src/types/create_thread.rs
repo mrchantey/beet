@@ -54,7 +54,7 @@ async fn run_thread_on_boot(cx: ActionContext<Request>) -> Result<Response> {
 	// running it. The boot drives the behavior directly, ahead of the scheduled
 	// `First` reduce, so without this the `Sequence` would receive raw, action-less
 	// `<CreateActor>` spans and fail. Idempotent (`Without<ThreadWindow>`), so the
-	// store path (already reduced in `adopt_thread`) is unaffected.
+	// store path (already reduced in `Thread::adopt`) is unaffected.
 	caller
 		.world()
 		.with(|world: &mut World| ThreadWindow::reduce_now(world))
@@ -86,7 +86,7 @@ async fn adopt_program_store(
 	if new {
 		store.store_remove().await.ok();
 	}
-	adopt_thread(world.clone(), store.clone(), thread).await?;
+	Thread::adopt(world.clone(), store.clone(), thread).await?;
 	world
 		.with(move |world: &mut World| {
 			if let Ok(mut thread) = world.get_entity_mut(thread) {

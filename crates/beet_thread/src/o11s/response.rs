@@ -68,7 +68,7 @@
 //! let request_body = o11s::RequestBody::new("gpt-4o-mini")
 //!     .with_simple_input("Hello!");
 //!
-//! let response = Request::post(o11s::OPENAI_RESPONSES_URL)
+//! let response = Request::post(o11s::RequestBody::OPENAI_URL)
 //!     .with_auth_bearer(&env_ext::var("OPENAI_API_KEY")?)
 //!     .with_json_body(&request_body)?
 //!     .send()

@@ -2,13 +2,13 @@
 //!
 //! The agent is a socket **server**. Each client that connects is asked its role
 //! via a `whoami` request the server originates, and that role's capability routes
-//! are rebound to forward over the connection ([`socket_exchange`]) instead of
+//! are rebound to forward over the connection ([`ExchangeSocket::action`]) instead of
 //! handling locally. Throwaway glue for the perceive-act demo: the role -> paths
 //! table ([`capability_routes`]) is hardcoded and deletable.
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-// the socket surface (`Socket`, `ExchangeSocket`, `socket_exchange`, `SocketReady`,
+// the socket surface (`Socket`, `ExchangeSocket`, `ExchangeSocket::action`, `SocketReady`,
 // `ChannelSocketServer`) is a module in the net prelude, not a glob.
 use crate::perceive_act_core::PerceiveActCorePlugin;
 use beet_net::sockets::*;
@@ -79,7 +79,7 @@ async fn bind_connection(connection: AsyncEntity, server: Entity) -> Result {
 	// originate `whoami` to the freshly-connected client and read its role.
 	let response = connection
 		.call_detached(
-			socket_exchange(connection.id()),
+			ExchangeSocket::action(connection.id()),
 			Request::get("whoami")
 				.with_header::<header::Accept>(MediaType::Json),
 		)
@@ -115,7 +115,7 @@ async fn bind_connection(connection: AsyncEntity, server: Entity) -> Result {
 				// canonical slot: route dispatch resolves the overload, and the
 				// local handler returns when the scene resets on disconnect.
 				entity.insert((
-					ActionOverload::new(socket_exchange(connection_id)),
+					ActionOverload::new(ExchangeSocket::action(connection_id)),
 					CapabilityBound,
 				));
 			})
@@ -234,7 +234,7 @@ mod test {
 			.run_async_local(|agent| async move {
 				agent
 					.call_detached(
-						route_action(),
+						Router::action(),
 						Request::get("show-image")
 							.with_body(serde_json::to_string(
 								&ShowImageInput {

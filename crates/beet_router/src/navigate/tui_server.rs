@@ -12,7 +12,7 @@ use beet_ui::prelude::*;
 ///
 /// A long-running server: it never resolves the boot call, so its
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up. The
-/// boot wires the live host: a [`StdioTerminal`] paired with a [`page_host`]
+/// boot wires the live host: a [`StdioTerminal`] paired with a [`PageHost::bundle`]
 /// buffer, plus an in-world [`Navigator`] pointed at this router, started at the
 /// request path (`-- docs/design/form`, default home `/`). A
 /// `--color-scheme=light|dark` argument seeds the app-wide [`Theme::scheme`], the
@@ -45,7 +45,7 @@ fn on_action_in(
 	let (selected, opening, scheme) = ev.with(|request| {
 		(
 			// default-boots (the shared default) unless `--server` names a different set.
-			request_selects_server(request, "tui", true),
+			Request::selects_server(request, "tui", true),
 			OpeningRoute::from_request(request),
 			request
 				.get_param("color-scheme")
@@ -101,7 +101,7 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 			let host = world
 				.spawn((
 					StdioTerminal::default(),
-					page_host(terminal_ext::size()),
+					PageHost::bundle(terminal_ext::size()),
 				))
 				.id();
 			set_loading_page(world, host);

@@ -20,7 +20,7 @@ use beet_net::prelude::HttpServer;
 use beet_net::prelude::MediaType;
 use beet_net::prelude::Response;
 use beet_net::prelude::ServerPlugin;
-use beet_net::prelude::exchange_handler;
+use beet_net::prelude::exchange_ext;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
 use bevy::MinimalPlugins;
@@ -72,7 +72,7 @@ fn serve_showcase(world: &mut World) -> Result {
 	let port = server.port.unwrap_or(DEFAULT_HTTP_PORT);
 	world.spawn((
 		server,
-		exchange_handler(move |_| {
+		exchange_ext::handler(move |_| {
 			Response::ok_body(html.clone(), MediaType::Html)
 		}),
 	));

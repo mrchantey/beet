@@ -12,14 +12,14 @@ pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use types::headers;
 // `client` is no_std-capable: only `send.rs` (scheme routing, the data: URI
-// path, and the `set_http_client` transport hook) compiles unconditionally —
+// path, and the `Request::set_http_client` transport hook) compiles unconditionally —
 // the concrete transports (reqwest/ureq/web-sys/file) stay feature-gated.
 mod client;
 // `store` is no_std-capable at its core (BlobStore, BlobStoreProvider,
 // InMemoryStore); the concrete backends (fs/s3/dynamo/local-storage) and
 // StorePlugin stay feature/std-gated inside the module.
 mod store;
-// The action/exchange integration (`exchange_handler`, …) only needs
+// The action/exchange integration (`exchange_ext::handler`, …) only needs
 // `beet_action`, so it rides the no_std-capable `action` feature, not `std`.
 #[cfg(feature = "action")]
 mod actions;
@@ -38,7 +38,7 @@ mod server;
 mod udp;
 // mDNS rides the udp seam but is a distinct protocol, so it lives in its own
 // module behind the `mdns` feature. The wire codec and browser engine are
-// no_std; only the std socket driver `run_mdns_browser` needs `udp` + `std`.
+// no_std; only the std socket driver `MdnsBrowser::run` needs `udp` + `std`.
 #[cfg(feature = "mdns")]
 mod mdns;
 /// WebSocket client and server implementations.

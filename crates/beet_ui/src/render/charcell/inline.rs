@@ -81,7 +81,7 @@ pub(super) fn marker_gutter(
 	}
 	match node.marker() {
 		Some(marker) if node.has_child_nodes(query) => {
-			display_width(marker) as u32
+			text_ext::display_width(marker) as u32
 		}
 		_ => 0,
 	}
@@ -161,7 +161,7 @@ pub(super) fn paint_inline_flow(
 				span.entity,
 				clip,
 			);
-			let span_width = display_width(text) as i32;
+			let span_width = text_ext::display_width(text) as i32;
 			// wrap the painted columns in this run's OSC-8 link (stdout only)
 			if let Some(link) = &span.link {
 				for col in x.max(0)..(x + span_width).max(0) {
@@ -415,7 +415,7 @@ fn group_spans(line: &[(char, usize)], runs: &[InlineRun]) -> Vec<InlineSpan> {
 /// Total display width of a flowed line.
 fn line_width(line: &Vec<InlineSpan>) -> u32 {
 	line.iter()
-		.map(|span| display_width(&span.text) as u32)
+		.map(|span| text_ext::display_width(&span.text) as u32)
 		.sum()
 }
 

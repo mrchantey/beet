@@ -12,6 +12,5 @@ pub(crate) use call_functions::*;
 #[cfg(feature = "agent")]
 pub use completions_streamer::*;
 pub use o11s_streamer::*;
-pub use oneshot::*;
 pub use post_streamer::*;
 pub use post_streamer_action::*;

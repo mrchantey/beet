@@ -30,7 +30,7 @@ pub async fn build_site(world: &mut World) -> Entity {
 	let source = entry.as_utf8().unwrap();
 	// pre-scan: register the entry's declared `<TemplateDir>`s before parsing, so
 	// entry-level tags resolve against them.
-	let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
+	let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
 	for dir in TemplateDir::extract_dirs(&nodes) {
 		let sources = TemplateDir::read_sources(&store, &dir, &formats)
 			.await

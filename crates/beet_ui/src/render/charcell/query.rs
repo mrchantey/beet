@@ -78,11 +78,11 @@ impl CharcellNodeData<'_> {
 
 	/// The visual style to display: the in-flight [`VisualTransition`] value
 	/// when the element is transitioning, else the resolved target style,
-	/// defaulting to [`VISUAL_STYLE_DEFAULT`].
+	/// defaulting to [`VisualStyle::DEFAULT`].
 	pub fn visual_style(&self) -> &VisualStyle {
 		self.transition
 			.map(|transition| &transition.current)
-			.unwrap_or_else(|| self.visual.unwrap_or(&VISUAL_STYLE_DEFAULT))
+			.unwrap_or_else(|| self.visual.unwrap_or(&VisualStyle::DEFAULT))
 	}
 
 	/// OSC-8 hyperlink target, if this element is an `<a>`/`<img>`.

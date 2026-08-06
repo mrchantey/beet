@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 ///
 /// Sets up the async runtime needed for action-based exchange handling,
 /// registers reflection for the server component and event types, and installs
-/// the compile-time-selected [`HttpServer`] backend via [`set_http_server`].
+/// the compile-time-selected [`HttpServer`] backend via [`HttpServer::set_backend`].
 #[derive(Default)]
 pub struct ServerPlugin;
 
@@ -31,9 +31,9 @@ impl Plugin for ServerPlugin {
 
 		// install the HTTP backend `HttpServer` invokes on start. The cascade
 		// mirrors the old per-component dispatch, now in one place: a downstream
-		// `set_http_server` (an embassy / esp adapter) replaces it on no_std,
+		// `HttpServer::set_backend` (an embassy / esp adapter) replaces it on no_std,
 		// where no feature backend is compiled in. Skipped in `beet_net`'s own
-		// tests, which install a stub hook per case. `set_http_server` errors if
+		// tests, which install a stub hook per case. `HttpServer::set_backend` errors if
 		// one is already installed, so ignore a re-install across plugin adds.
 		#[cfg(not(test))]
 		{
@@ -41,23 +41,23 @@ impl Plugin for ServerPlugin {
 			// runtime sets AWS_LAMBDA_FUNCTION_NAME); anywhere else a
 			// lambda-featured binary (eg an --all-features install) falls
 			// through to the standard backends below. Installed *first*, so in a
-			// Lambda task the first-write-wins `set_http_server` (an `OnceLock`)
+			// Lambda task the first-write-wins `HttpServer::set_backend` (an `OnceLock`)
 			// keeps lambda: the hyper/mini install below then no-ops (its `.ok()`
 			// swallows the already-installed error), so hyper never clobbers it.
 			#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 			if env_ext::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
-				set_http_server(|entity, shutdown| {
-					Box::pin(super::start_lambda_server(entity, shutdown))
+				HttpServer::set_backend(|entity, shutdown| {
+					Box::pin(HttpServer::start_lambda(entity, shutdown))
 				})
 				.ok();
 			}
 			cfg_if! {
 				if #[cfg(all(feature = "hyper", not(target_arch = "wasm32")))] {
-					set_http_server(|entity, shutdown| Box::pin(super::start_hyper_server(entity, shutdown))).ok();
+					HttpServer::set_backend(|entity, shutdown| Box::pin(HttpServer::start_hyper(entity, shutdown))).ok();
 				} else if #[cfg(all(feature = "server", not(target_arch = "wasm32")))] {
-					set_http_server(|entity, shutdown| Box::pin(super::start_mini_http_server(entity, shutdown))).ok();
+					HttpServer::set_backend(|entity, shutdown| Box::pin(HttpServer::start_mini(entity, shutdown))).ok();
 				} else {
-					// no feature backend: a downstream `set_http_server` supplies one.
+					// no feature backend: a downstream `HttpServer::set_backend` supplies one.
 				}
 			}
 		}
@@ -84,13 +84,13 @@ mod test {
 	#[beet_core::test]
 	// #[ignore = "flaky with all features?"]
 	async fn http_server() {
-		let server = HttpServer::new_test(start_mini_http_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			// the server owns the boot, its dispatch host is the child
-			app.world_mut().spawn((server, children![exchange_handler(
+			app.world_mut().spawn((server, children![exchange_ext::handler(
 				|_| { Response::ok().with_body("hello") }
 			)]));
 			app.run();

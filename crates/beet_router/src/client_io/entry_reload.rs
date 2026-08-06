@@ -146,7 +146,7 @@ mod test {
 	/// [`LiveReload`](super::LiveReload) site over `store`, as the cli's
 	/// `rebuild_watched_entry` does. Returns the new root.
 	fn spawn_entry_root(world: &mut World, store: &InMemoryStore) -> Entity {
-		despawn_scene(world);
+		BeetSceneRoot::despawn_all(world);
 		world
 			.spawn((
 				BlobStore::new(store.clone()),

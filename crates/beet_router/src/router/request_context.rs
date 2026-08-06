@@ -1,7 +1,7 @@
 //! Request-scoped facts threaded into a render, read by layout scene systems.
 //!
 //! A render needs three handles it cannot reach by traversal: the matched
-//! [`route`](RequestContext::route), the [`router`](RequestContext::router) that
+//! [`Router::route`](RequestContext::route), the [`router`](RequestContext::router) that
 //! owns its [`RouteTree`](crate::prelude::RouteTree), and the
 //! [`content`](RequestContext::content) entity holding the rendered body. The
 //! layout is built *detached* (the content is transcluded into a `<Slot>` by a
@@ -71,7 +71,7 @@ pub struct RequestContext {
 	/// in-tree anchor the [`router`](Self::router) is resolved from at build time.
 	route: Entity,
 	/// The entity owning this request's [`RouteTree`](crate::prelude::RouteTree),
-	/// resolved once as the nearest tree-bearing ancestor of [`route`](Self::route).
+	/// resolved once as the nearest tree-bearing ancestor of [`Router::route`](Self::route).
 	/// Tree-scoped widgets (eg [`RouteSidebar`](crate::prelude::RouteSidebar))
 	/// read the tree directly off this handle, never re-deriving it by an ancestor
 	/// walk, so the nav is scoped to *this* request's tree even when other

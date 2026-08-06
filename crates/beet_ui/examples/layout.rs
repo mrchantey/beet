@@ -83,7 +83,7 @@ fn render<B: Bundle>(name: &str, setup: fn() -> B) -> usize {
 	let out = Buffer::render_oneshot(setup()).trim_lines();
 	let over = out
 		.lines()
-		.filter(|line| display_width(line) > width)
+		.filter(|line| text_ext::display_width(line) > width)
 		.count();
 	cross_log!("\n{name}: \n{out}");
 	if over > 0 {
@@ -718,7 +718,7 @@ mod test {
 	fn max_width(lines: &[String]) -> usize {
 		lines
 			.iter()
-			.map(|line| display_width(line))
+			.map(|line| text_ext::display_width(line))
 			.max()
 			.unwrap_or(0)
 	}

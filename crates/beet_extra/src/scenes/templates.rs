@@ -141,7 +141,7 @@ pub fn Foxie(
 		<span {(
 			WorldAssetRoot(assets.load::<WorldAsset>("misc/fox.glb#Scene0")),
 			Transform::from_scale(Vec3::splat(scale)),
-			build_animation_graph(&clips, &mut graphs, &mut assets),
+			AnimationGraphClips::build(&clips, &mut graphs, &mut assets),
 		)}><Slot/></span>
 	}
 }

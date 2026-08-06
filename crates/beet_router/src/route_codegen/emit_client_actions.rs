@@ -115,7 +115,7 @@ fn client_fn(path: &SmolPath, method: &RouteMethod) -> Result<ItemFn> {
 		#(#docs)*
 		#[allow(unused)]
 		pub async fn #fn_ident(#args) -> Result<#out_ty> {
-			server_action_request(#http, #route)
+			ServerActionClient::request(#http, #route)
 				.with_accept(MediaType::Json)
 				#build
 				.send()

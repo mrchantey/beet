@@ -25,7 +25,7 @@ use crate::testing::runner::TestType;
 ///     .with_should_panic()
 ///     .with_ignore(false);
 /// ```
-pub(crate) trait TestDescExt {
+pub trait TestDescExt {
 	/// Get reference to the test descriptor
 	fn desc(&self) -> &TestDesc;
 	/// Get mutable reference to the test descriptor

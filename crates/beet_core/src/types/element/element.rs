@@ -34,6 +34,12 @@ use beet_core_macros::ToTokens;
 pub struct Element(SmolStr);
 
 impl Element {
+	/// Tags whose text content is whitespace-significant, so their children are
+	/// left verbatim (the cascade reads `white-space: pre` on these). The single
+	/// shared list for every whitespace-normalisation pass (the BSX parser, the
+	/// markdown tree builder).
+	pub const PRE_ELEMENTS: &[&str] = &["pre", "textarea", "script", "style"];
+
 	/// Construct an element with the given tag name.
 	pub fn new(name: impl Into<SmolStr>) -> Self { Self(name.into()) }
 	/// The tag name of this element, ie `div`, `span`, `p`.
@@ -44,12 +50,6 @@ impl Element {
 		(self, OnSpawn::insert_child(Value::Str(text.into())))
 	}
 }
-
-/// Tags whose text content is whitespace-significant, so their children are left
-/// verbatim (the cascade reads `white-space: pre` on these). The single shared
-/// list for every whitespace-normalisation pass (the BSX parser, the markdown
-/// tree builder).
-pub const PRE_ELEMENTS: &[&str] = &["pre", "textarea", "script", "style"];
 
 /// A comment node. The inner string is the comment content excluding the
 /// `<!--` and `-->` delimiters.

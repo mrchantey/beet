@@ -32,7 +32,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 
 	// build the store: a local FsStore directory, or the cloud store with
-	// `--remote` (the same `dynamo_fs_selector` a running server uses).
+	// `--remote` (the same `TableStore::dynamo_fs_selector` a running server uses).
 	let dir = match parts.get_param("dir") {
 		Some(dir) => AbsPathBuf::new(dir)?,
 		None => WorkspaceConfig::default().analytics_dir.into_abs(),
@@ -43,7 +43,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 		ServiceAccess::Local
 	};
 	let bucket = parts.get_param("bucket").unwrap_or("beet--analytics");
-	let store = dynamo_fs_selector::<AnalyticsEvent>(
+	let store = TableStore::<AnalyticsEvent>::dynamo_fs_selector(
 		&dir,
 		bucket,
 		"us-west-2",

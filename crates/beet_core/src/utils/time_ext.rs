@@ -11,7 +11,7 @@ use core::time::Duration;
 /// A wall-clock source: the current time as a [`Duration`] since the Unix epoch.
 ///
 /// This is the no_std-friendly clock hook, mirroring `Instant::set_elapsed` (for
-/// the monotonic clock) and `set_http_client` (for transport). Installed via
+/// the monotonic clock) and `Request::set_http_client` (for transport). Installed via
 /// [`set_now`] to override the platform default, eg so a bare target's SNTP
 /// client can supply wall-clock time once it has synced.
 pub type NowFn = fn() -> Duration;
@@ -133,7 +133,7 @@ pub fn now_millis() -> u128 { now().as_millis() }
 /// An async sleep source: a future resolving after the given [`Duration`].
 ///
 /// The no_std-friendly sleep hook, mirroring [`NowFn`] (wall clock) and
-/// `set_http_client` (transport). Installed via [`set_sleep`] so a bare target
+/// `Request::set_http_client` (transport). Installed via [`set_sleep`] so a bare target
 /// can back [`sleep`] with its own timer, eg an `embassy_time::Timer`. The
 /// future is `Send + Sync` (not `MaybeSend`) because [`sleep`] is awaited
 /// inside `Send + Sync` values (eg an HTTP body stream, whose `Request`/

@@ -132,7 +132,7 @@ impl RoutesDir {
 		#[allow(unused_mut, unused_variables)]
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
-			route(&spec.route_path, BlobScene::new(spec.store_path)),
+			Router::route(&spec.route_path, BlobScene::new(spec.store_path)),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			// a discovered content file is a user-facing page, so it carries
@@ -315,7 +315,7 @@ mod test {
 		let root = spawn_routes(
 			&mut world,
 			fs_fixture("serves", SERVES_FILES),
-			(default_router(), children![RoutesDir::default()]),
+			(Router::with_defaults(), children![RoutesDir::default()]),
 		)
 		.await;
 		assert_serves(&mut world, root).await;
@@ -329,7 +329,7 @@ mod test {
 		let root = spawn_routes(
 			&mut world,
 			memory_fixture(SERVES_FILES).await,
-			(default_router(), children![RoutesDir::default()]),
+			(Router::with_defaults(), children![RoutesDir::default()]),
 		)
 		.await;
 		assert_serves(&mut world, root).await;
@@ -341,7 +341,7 @@ mod test {
 	#[beet_core::test]
 	async fn routes_spawn_in_sorted_order() {
 		let mut world = router_world();
-		// a bare `Router` (not `default_router`) so the opinionated app routes do
+		// a bare `Router` (not `Router::with_defaults`) so the opinionated app routes do
 		// not appear as extra top-level children alongside the discovered slides.
 		// deliberately out-of-order, zero-padded like the slide deck.
 		let root = spawn_routes(
@@ -379,7 +379,7 @@ mod test {
 				"+++\ntitle = \"Getting Started\"\norder = 2\n+++\n\n# Intro",
 			)])
 			.await,
-			(default_router(), children![RoutesDir::default()]),
+			(Router::with_defaults(), children![RoutesDir::default()]),
 		)
 		.await;
 

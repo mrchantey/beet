@@ -9,10 +9,8 @@ use bevy::tasks::ConditionalSendFuture;
 /// `AssetLoader` for `.ron` files containing a [`BertConfig`].
 ///
 /// Reads the config, then awaits [`Bert::new`] (which downloads the
-/// underlying safetensors / tokenizer via [`fetch_bytes`]). Lets you
+/// underlying safetensors / tokenizer via [`fetch_ext::fetch_bytes`]). Lets you
 /// drop a config next to your other assets and `asset_server.load::<Bert>(...)`.
-///
-/// [`fetch_bytes`]: crate::fetch::fetch_bytes
 #[derive(Default, TypePath)]
 pub(crate) struct BertLoader;
 

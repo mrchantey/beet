@@ -76,7 +76,7 @@ mod test {
 	#[beet_core::test]
 	async fn all_passing_children_respond_ok() {
 		router_world()
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("run"),
 				ExchangeSequence,
 				children![passing_step(), passing_step()],
@@ -90,7 +90,7 @@ mod test {
 	#[beet_core::test]
 	async fn failing_child_returns_its_response() {
 		router_world()
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("run"),
 				ExchangeSequence,
 				children![passing_step(), failing_step(), passing_step()],
@@ -104,7 +104,7 @@ mod test {
 	#[beet_core::test]
 	async fn config_children_are_skipped() {
 		router_world()
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("run"),
 				ExchangeSequence,
 				children![Name::new("config-only"), passing_step()],
@@ -123,7 +123,7 @@ mod test {
 		let ran = Store::new(false);
 		let recorder = ran.clone();
 		router_world()
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("run"),
 				ExchangeSequence,
 				children![(

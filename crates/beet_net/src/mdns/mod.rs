@@ -13,32 +13,17 @@
 //! - [`browser`]: the agnostic service **browser** engine — a bytes-and-world
 //!   ECS layer that turns inbound datagrams into one entity per discovered
 //!   service ([`MDnsService`]). The parse + engine are `no_std`; only
-//!   [`run_mdns_browser`] (the std socket driver) needs `std`.
+//!   [`MdnsBrowser::run`] (the std socket driver) needs `std`.
 //!
 //! The platform-specific piece (binding the socket, joining multicast, sending
 //! the periodic query) is supplied by the caller via the [`udp`](crate::udp)
-//! traits — on std by [`run_mdns_browser`], on esp by a downstream embassy loop
+//! traits — on std by [`MdnsBrowser::run`], on esp by a downstream embassy loop
 //! that bridges datagrams into [`UdpPacket`].
 
-use core::net::Ipv4Addr;
-use core::net::SocketAddr;
-use core::net::SocketAddrV4;
-
 pub mod wire;
-pub use wire::*;
+pub use wire::MdnsResponse;
+pub use wire::Record;
 
 mod browser;
 pub use browser::*;
 
-/// The IPv4 mDNS multicast group, `224.0.0.251`.
-pub const MDNS_MULTICAST_V4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
-
-/// The mDNS UDP port, `5353`.
-pub const MDNS_PORT: u16 = 5353;
-
-/// The standard mDNS multicast socket address, `224.0.0.251:5353`.
-///
-/// Sent *to* by queriers and responders; the socket itself is bound on
-/// `0.0.0.0:5353` and joined to [`MDNS_MULTICAST_V4`] to receive it.
-pub const MDNS_ENDPOINT: SocketAddr =
-	SocketAddr::V4(SocketAddrV4::new(MDNS_MULTICAST_V4, MDNS_PORT));

@@ -190,7 +190,7 @@ fn asset_plugin() -> AssetPlugin {
 	use bevy::asset::AssetMetaCheck;
 	AssetPlugin {
 		meta_check: AssetMetaCheck::Never,
-		file_path: workspace_root()
+		file_path: fs_ext::workspace_root()
 			.join("assets")
 			.to_string_lossy()
 			.into_owned(),

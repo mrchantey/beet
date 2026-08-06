@@ -222,7 +222,7 @@ mod test {
 			Startup,
 			|mut commands: Commands| {
 				commands
-					.spawn((CliServer::default(), children![exchange_handler(
+					.spawn((CliServer::default(), children![exchange_ext::handler(
 						|_| { Response::ok().with_body("hi") }
 					)]))
 					.trigger(|entity| LoadTemplate {
@@ -246,7 +246,7 @@ mod test {
 			Startup,
 			|mut commands: Commands| {
 				commands
-					.spawn((CliServer::default(), children![exchange_handler(
+					.spawn((CliServer::default(), children![exchange_ext::handler(
 						|_| { Response::ok().with_body("hi") }
 					)]))
 					.trigger(StartRunning::from_cli);

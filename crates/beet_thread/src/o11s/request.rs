@@ -151,6 +151,9 @@ pub struct RequestBody {
 }
 
 impl RequestBody {
+	/// The default OpenResponses API endpoint for OpenAI.
+	pub const OPENAI_URL: &str = "https://api.openai.com/v1/responses";
+
 	/// Creates a new request body with the specified model.
 	pub fn new(model: impl Into<String>) -> Self {
 		Self {

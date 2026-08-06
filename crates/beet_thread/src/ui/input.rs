@@ -68,7 +68,7 @@ fn form_style() -> OnSpawn {
 		(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
 		(style::common_props::ColumnGapProp, style::Length::Rem(1.)),
 		(style::common_props::BorderTopWidth, style::Length::Rem(1.)),
-		token(style::common_props::BorderColorProp, colors::OutlineVariant),
+		Declaration::token(style::common_props::BorderColorProp, colors::OutlineVariant),
 	]
 }
 
@@ -76,11 +76,11 @@ fn form_style() -> OnSpawn {
 fn input_style() -> OnSpawn {
 	inline_class![
 		(style::common_props::FlexGrowProp, 1u32),
-		token(
+		Declaration::token(
 			style::common_props::BackgroundColor,
 			colors::SurfaceContainerHigh
 		),
-		token(style::common_props::ForegroundColor, colors::OnSurface),
+		Declaration::token(style::common_props::ForegroundColor, colors::OnSurface),
 	]
 }
 
@@ -88,8 +88,8 @@ fn input_style() -> OnSpawn {
 fn button_style() -> OnSpawn {
 	inline_class![
 		(style::common_props::FontWeightProp, style::FontWeight::Bold),
-		token(style::common_props::BackgroundColor, colors::Primary),
-		token(style::common_props::ForegroundColor, colors::OnPrimary),
+		Declaration::token(style::common_props::BackgroundColor, colors::Primary),
+		Declaration::token(style::common_props::ForegroundColor, colors::OnPrimary),
 	]
 }
 

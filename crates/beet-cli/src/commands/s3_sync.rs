@@ -37,7 +37,7 @@ struct SyncS3Params {
 #[require(ParamsPartial = ParamsPartial::new::<SyncS3Params>())]
 pub async fn SyncS3(parts: RequestParts) -> Result<String> {
 	let params = parts.params().parse_reflect::<SyncS3Params>()?;
-	if !is_s3_uri(&params.src) && !is_s3_uri(&params.dst) {
+	if !AwsCli::is_s3_uri(&params.src) && !AwsCli::is_s3_uri(&params.dst) {
 		bevybail!(
 			"expected one of --src/--dst to be an s3:// URI, got {} and {}",
 			params.src,

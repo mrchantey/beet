@@ -6,17 +6,6 @@
 //! self-retrieve their artifacts from S3.
 use beet_core::prelude::*;
 
-/// Standard SSH options for connecting to instances.
-/// Disables host key checking and uses a 30-second connection timeout.
-pub const SSH_OPTS: [&str; 6] = [
-	"-o",
-	"StrictHostKeyChecking=no",
-	"-o",
-	"UserKnownHostsFile=/dev/null",
-	"-o",
-	"ConnectTimeout=30",
-];
-
 /// SSH connection details for a remote instance.
 #[derive(Debug, Clone)]
 pub struct SshConnection {
@@ -29,6 +18,17 @@ pub struct SshConnection {
 }
 
 impl SshConnection {
+	/// Standard SSH options for connecting to instances.
+	/// Disables host key checking and uses a 30-second connection timeout.
+	pub const OPTS: [&str; 6] = [
+		"-o",
+		"StrictHostKeyChecking=no",
+		"-o",
+		"UserKnownHostsFile=/dev/null",
+		"-o",
+		"ConnectTimeout=30",
+	];
+
 	/// The `user@host` string for SSH commands.
 	pub fn remote_user(&self) -> String {
 		format!("{}@{}", self.user, self.host)
@@ -37,7 +37,7 @@ impl SshConnection {
 	/// Build SSH arguments including key and standard options.
 	fn ssh_args(&self) -> Vec<SmolStr> {
 		let mut args: Vec<SmolStr> =
-			SSH_OPTS.iter().map(|s| SmolStr::from(*s)).collect();
+			Self::OPTS.iter().map(|s| SmolStr::from(*s)).collect();
 		args.push("-i".into());
 		args.push(self.key_path.display().to_string().into());
 		args
@@ -82,58 +82,60 @@ impl SshConnection {
 	}
 }
 
-/// Read SSH connection details from terraform outputs in the given work directory.
-/// Returns an [`SshConnection`] with a temporary key file written to `{work_dir}/deploy_key.pem`.
-///
-/// Reads the following terraform outputs:
-/// - `public_address`: the instance IP or hostname
-/// - `ssh_user`: the SSH username
-/// - `ssh_private_key`: the PEM-encoded private key
-pub async fn connection_from_tofu_outputs(
-	work_dir: &AbsPathBuf,
-) -> Result<SshConnection> {
-	// read terraform outputs
-	let host = ChildProcess::new("tofu")
-		.with_args(["output", "-raw", "public_address"])
-		.with_cwd(work_dir.clone())
-		.run_async_stdout()
-		.await
-		.map_err(|err| bevyhow!("failed to read public_address: {err}"))?
-		.trim()
-		.to_string();
+impl SshConnection {
+	/// Read SSH connection details from terraform outputs in the given work directory.
+	/// Returns an [`SshConnection`] with a temporary key file written to `{work_dir}/deploy_key.pem`.
+	///
+	/// Reads the following terraform outputs:
+	/// - `public_address`: the instance IP or hostname
+	/// - `ssh_user`: the SSH username
+	/// - `ssh_private_key`: the PEM-encoded private key
+	pub async fn from_tofu_outputs(
+		work_dir: &AbsPathBuf,
+	) -> Result<SshConnection> {
+		// read terraform outputs
+		let host = ChildProcess::new("tofu")
+			.with_args(["output", "-raw", "public_address"])
+			.with_cwd(work_dir.clone())
+			.run_async_stdout()
+			.await
+			.map_err(|err| bevyhow!("failed to read public_address: {err}"))?
+			.trim()
+			.to_string();
 
-	let user = ChildProcess::new("tofu")
-		.with_args(["output", "-raw", "ssh_user"])
-		.with_cwd(work_dir.clone())
-		.run_async_stdout()
-		.await
-		.map_err(|err| bevyhow!("failed to read ssh_user: {err}"))?
-		.trim()
-		.to_string();
+		let user = ChildProcess::new("tofu")
+			.with_args(["output", "-raw", "ssh_user"])
+			.with_cwd(work_dir.clone())
+			.run_async_stdout()
+			.await
+			.map_err(|err| bevyhow!("failed to read ssh_user: {err}"))?
+			.trim()
+			.to_string();
 
-	let key_pem = ChildProcess::new("tofu")
-		.with_args(["output", "-raw", "ssh_private_key"])
-		.with_cwd(work_dir.clone())
-		.run_async_stdout()
-		.await
-		.map_err(|err| bevyhow!("failed to read ssh_private_key: {err}"))?;
+		let key_pem = ChildProcess::new("tofu")
+			.with_args(["output", "-raw", "ssh_private_key"])
+			.with_cwd(work_dir.clone())
+			.run_async_stdout()
+			.await
+			.map_err(|err| bevyhow!("failed to read ssh_private_key: {err}"))?;
 
-	// write key to temp file with restricted permissions
-	let key_path = work_dir.join("deploy_key.pem");
-	fs_ext::write_async(&key_path, key_pem.as_bytes()).await?;
-	#[cfg(unix)]
-	{
-		use std::os::unix::fs::PermissionsExt;
-		std::fs::set_permissions(
-			key_path.as_path(),
-			std::fs::Permissions::from_mode(0o600),
-		)?;
+		// write key to temp file with restricted permissions
+		let key_path = work_dir.join("deploy_key.pem");
+		fs_ext::write_async(&key_path, key_pem.as_bytes()).await?;
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			std::fs::set_permissions(
+				key_path.as_path(),
+				std::fs::Permissions::from_mode(0o600),
+			)?;
+		}
+
+		SshConnection {
+			host,
+			user,
+			key_path: AbsPathBuf::new(key_path)?,
+		}
+		.xok()
 	}
-
-	SshConnection {
-		host,
-		user,
-		key_path: AbsPathBuf::new(key_path)?,
-	}
-	.xok()
 }

@@ -102,7 +102,7 @@ impl Socket {
 		// channel rather than touching the writer directly (the channel is
 		// `writer_channel`, the agnostic no_std + alloc mpsc).
 		let (message_send, message_recv) =
-			super::writer_channel::unbounded::<Message>();
+			super::writer_channel::Sender::<Message>::unbounded();
 		// The `MessageSend` observer lives as long as the entity and pushes into
 		// the CURRENT connection's channel through the swappable [`WriterFeed`]:
 		// a replacement socket (eg a reconnect) swaps the sender rather than
@@ -203,13 +203,13 @@ impl Socket {
 				super::impl_tungstenite::connect_tungstenite(&url).await
 			} else {
 				// no backend compiled in: defer to a transport installed at
-				// runtime via `set_socket_client` (eg the esp WiFi adapter),
+				// runtime via `Socket::set_client` (eg the esp WiFi adapter),
 				// mirroring `send_http`'s bare-metal fallthrough.
 				match SOCKET_CLIENT.get() {
 					Some(connect) => connect(url).await,
 					None => bevybail!(
 						"No WebSocket transport configured. Enable the tungstenite \
-						 feature, target wasm32, or install one via set_socket_client(...)."
+						 feature, target wasm32, or install one via Socket::set_client(...)."
 					),
 				}
 			}
@@ -228,7 +228,7 @@ impl Socket {
 	/// Create a [`Socket`] from a message stream reader and a writer.
 	///
 	/// The seam a downstream transport uses to build a `Socket` from its own
-	/// channel ends after installing [`set_socket_client`] (the esp WiFi backend
+	/// channel ends after installing [`Socket::set_client`] (the esp WiFi backend
 	/// does exactly this); the built-in tungstenite/web-sys backends use it too.
 	pub fn new(
 		reader: impl SocketReader,
@@ -279,13 +279,15 @@ pub type SocketConnectFn =
 
 static SOCKET_CLIENT: OnceLock<SocketConnectFn> = OnceLock::new();
 
-/// Install the WebSocket transport [`Socket::connect`] uses when no client
-/// backend is compiled in, mirroring `set_http_client`. Errors if one is already
-/// installed.
-pub fn set_socket_client(client: SocketConnectFn) -> Result<()> {
-	SOCKET_CLIENT
-		.set(client)
-		.map_err(|_| bevyhow!("Socket client already installed"))
+impl Socket {
+	/// Install the WebSocket transport [`Socket::connect`] uses when no client
+	/// backend is compiled in, mirroring [`Request::set_http_client`]. Errors if
+	/// one is already installed.
+	pub fn set_client(client: SocketConnectFn) -> Result<()> {
+		SOCKET_CLIENT
+			.set(client)
+			.map_err(|_| bevyhow!("Socket client already installed"))
+	}
 }
 
 impl Stream for Socket {

@@ -255,7 +255,7 @@ fn html_node_to_bsx(node: &HtmlNode<'_>) -> Option<BsxNode> {
 
 /// Parse a markdown expression string into a BSX text-position value expression.
 fn parse_text_block_expr(expr: &str) -> Option<BsxNode> {
-	parse_value_expr_str(expr).ok().map(BsxNode::Expr)
+	ValueExpr::parse_str(expr).ok().map(BsxNode::Expr)
 }
 
 /// Collect the entity ids of the direct children of `entity`.

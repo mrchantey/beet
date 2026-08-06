@@ -19,64 +19,66 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-/// A hyper/bevy server.
-///
-/// This async function contains unopinionated machinery for handling
-/// hyper requests.
-/// See [`HttpServer`] for customizing handlers.
-pub async fn start_hyper_server(
-	entity: AsyncEntity,
-	shutdown: OnceValueRx<()>,
-) -> Result {
-	let addr = entity
-		.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
-		.await?;
+impl HttpServer {
+	/// A hyper/bevy server.
+	///
+	/// This async function contains unopinionated machinery for handling
+	/// hyper requests.
+	/// See [`HttpServer`] for customizing handlers.
+	pub async fn start_hyper(
+		entity: AsyncEntity,
+		shutdown: OnceValueRx<()>,
+	) -> Result {
+		let addr = entity
+			.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
+			.await?;
 
-	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
-		.map_err(|err| bevyhow!("Failed to bind to {}: {}", addr, err))?;
+		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
+			.map_err(|err| bevyhow!("Failed to bind to {}: {}", addr, err))?;
 
-	start_hyper_server_with_tcp(entity, listener, shutdown).await
-}
-
-/// Like [`start_hyper_server`] but accepts a pre-bound TCP listener,
-/// eliminating port race conditions in tests.
-pub async fn start_hyper_server_with_tcp(
-	entity: AsyncEntity,
-	listener: async_io::Async<std::net::TcpListener>,
-	shutdown: OnceValueRx<()>,
-) -> Result {
-	let addr = listener
-		.get_ref()
-		.local_addr()
-		.map_err(|err| bevyhow!("Failed to get local address: {}", err))?;
-	// build the TLS acceptor (if any) before logging so the printed scheme is real
-	let tls = MaybeTls::resolve(&entity).await?;
-	info!("Server listening on {}://{}", tls.http_scheme(), addr);
-	// register the resolved port as the process loopback port when canonical (the
-	// mini server does the same), so an authority-less request loops back here. An
-	// entity with no `HttpServer` still claims it, matching the `canonical` default.
-	if entity
-		.get::<HttpServer, bool>(|server| server.canonical)
-		.await
-		.unwrap_or(true)
-	{
-		CanonicalPort::set(addr.port());
+		HttpServer::start_hyper_with_tcp(entity, listener, shutdown).await
 	}
-
-	// race the accept loop against the shutdown signal: signalling drops the loop
-	// future, releasing the listener so the port closes (the mini server pattern).
-	beet_core::exports::futures_lite::future::or(
-		hyper_accept_loop(entity, listener, tls),
-		async move {
-			shutdown.wait().await;
-			Result::Ok(())
-		},
-	)
-	.await
 }
+impl HttpServer {
+	/// Like [`HttpServer::start_hyper`] but accepts a pre-bound TCP listener,
+	/// eliminating port race conditions in tests.
+	pub async fn start_hyper_with_tcp(
+		entity: AsyncEntity,
+		listener: async_io::Async<std::net::TcpListener>,
+		shutdown: OnceValueRx<()>,
+	) -> Result {
+		let addr = listener
+			.get_ref()
+			.local_addr()
+			.map_err(|err| bevyhow!("Failed to get local address: {}", err))?;
+		// build the TLS acceptor (if any) before logging so the printed scheme is real
+		let tls = MaybeTls::resolve(&entity).await?;
+		info!("Server listening on {}://{}", tls.http_scheme(), addr);
+		// register the resolved port as the process loopback port when canonical (the
+		// mini server does the same), so an authority-less request loops back here. An
+		// entity with no `HttpServer` still claims it, matching the `canonical` default.
+		if entity
+			.get::<HttpServer, bool>(|server| server.canonical)
+			.await
+			.unwrap_or(true)
+		{
+			CanonicalPort::set(addr.port());
+		}
 
+		// race the accept loop against the shutdown signal: signalling drops the loop
+		// future, releasing the listener so the port closes (the mini server pattern).
+		beet_core::exports::futures_lite::future::or(
+			hyper_accept_loop(entity, listener, tls),
+			async move {
+				shutdown.wait().await;
+				Result::Ok(())
+			},
+		)
+		.await
+	}
+}
 /// The hyper accept loop: serve each connection on its own spawned task. Diverges
-/// (only the shutdown race in [`start_hyper_server_with_tcp`] ends it).
+/// (only the shutdown race in [`HttpServer::start_hyper_with_tcp`] ends it).
 async fn hyper_accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
@@ -462,19 +464,19 @@ mod test {
 	#[beet_core::test]
 	async fn roundtrip() {
 		super::super::http_server::test::test_server(
-			start_hyper_server_with_tcp,
+			HttpServer::start_hyper_with_tcp,
 		)
 		.await;
 	}
 
 	#[beet_core::test]
 	async fn works() {
-		let server = HttpServer::new_test(start_hyper_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, children![exchange_handler(move |req| {
+				.spawn((server, children![exchange_ext::handler(move |req| {
 					Response::ok().with_body(req.take().body)
 				})]))
 				.run();
@@ -492,12 +494,12 @@ mod test {
 	}
 	#[beet_core::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test(start_hyper_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, children![mirror_exchange()]))
+				.spawn((server, children![exchange_ext::mirror()]))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -522,12 +524,12 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[beet_core::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test(start_hyper_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, children![exchange_handler(move |req| {
+				.spawn((server, children![exchange_ext::handler(move |req| {
 					// Server adds 100ms delay per chunk
 					let delayed_stream = futures::stream::unfold(
 						req.take().body,
@@ -620,7 +622,7 @@ mod upgrade_test {
 	/// `mini_http_server` upgrade test.
 	#[beet_core::test]
 	async fn upgrades_to_socket() {
-		let server = HttpServer::new_test(super::start_hyper_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
 		let port = server.0.port.unwrap();
 		let landed = Store::<Vec<Entity>>::default();
 		let captor = landed.clone();
@@ -628,7 +630,7 @@ mod upgrade_test {
 		std::thread::spawn(move || {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
-			app.world_mut().spawn((server, children![exchange_handler(
+			app.world_mut().spawn((server, children![exchange_ext::handler(
 				|cx| { WebSocketUpgrade::from_request(&cx).into() }
 			)]));
 			app.world_mut()

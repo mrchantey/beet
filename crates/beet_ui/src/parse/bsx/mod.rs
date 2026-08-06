@@ -42,7 +42,7 @@ impl BsxParser {
 
 	/// Parse `text` and build the result into `entity`.
 	fn parse_into(&self, entity: &mut EntityWorldMut, text: &str) -> Result {
-		let nodes = parse_document(text, &self.config)?;
+		let nodes = BsxNode::parse_document(text, &self.config)?;
 		// snapshot the BSX-template registry so `<path::to::X>` resolves mid-build.
 		let registry = entity
 			.world_scope(|world| {

@@ -8,6 +8,7 @@
 //! - [`TokenizeSelf`] - Trait for types that can convert themselves to tokens
 //! - [`TokenizeComponents`] - Utilities for tokenizing ECS components
 //! - [`Unspan`] - Remove span information from token streams
+//! - [`tokens_ext`] - Type-to-token utilities
 //!
 //! # Platform Support
 //!
@@ -16,6 +17,7 @@
 pub use beet_core_shared::prelude::*;
 mod tokenize_components;
 mod tokenize_self;
+pub mod tokens_ext;
 mod unspan;
 pub use tokenize_components::*;
 pub use tokenize_self::*;

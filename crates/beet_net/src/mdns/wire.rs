@@ -6,7 +6,7 @@
 //! shared by the agnostic [`browser`](super::browser) engine (and reusable by a
 //! downstream esp responder/resolver). The browser is the consumer: it builds a
 //! `PTR` query for a service type, sends it over the UDP seam, and feeds inbound
-//! datagrams back through [`parse_response`] to enumerate services.
+//! datagrams back through [`MdnsResponse::parse`] to enumerate services.
 //!
 //! Unlike the A-record-only codec in the esp firmware, this parses the four
 //! record types needed to *enumerate* a service:
@@ -26,6 +26,8 @@
 
 use beet_core::prelude::*;
 use core::net::Ipv4Addr;
+use core::net::SocketAddr;
+use core::net::SocketAddrV4;
 
 /// DNS `TYPE` for an IPv4 host address (`A`).
 pub(crate) const TYPE_A: u16 = 1;
@@ -40,6 +42,19 @@ pub(crate) const TYPE_SRV: u16 = 33;
 pub(crate) const CLASS_IN: u16 = 1;
 /// Mask for the cache-flush / unicast-response bit mDNS overloads onto `CLASS`.
 pub const CLASS_MASK: u16 = 0x7fff;
+
+/// The IPv4 mDNS multicast group, `224.0.0.251`.
+pub const MDNS_MULTICAST_V4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
+
+/// The mDNS UDP port, `5353`.
+pub const MDNS_PORT: u16 = 5353;
+
+/// The standard mDNS multicast socket address, `224.0.0.251:5353`.
+///
+/// Sent *to* by queriers and responders; the socket itself is bound on
+/// `0.0.0.0:5353` and joined to [`MDNS_MULTICAST_V4`] to receive it.
+pub const MDNS_ENDPOINT: SocketAddr =
+	SocketAddr::V4(SocketAddrV4::new(MDNS_MULTICAST_V4, MDNS_PORT));
 
 /// A single resource record parsed from an mDNS response.
 ///
@@ -99,7 +114,7 @@ pub enum Record {
 /// The parsed records from an mDNS response (the answer + additional sections).
 ///
 /// mDNS responders pack the `PTR`/`SRV`/`TXT`/`A` for a service across the
-/// answer and additional sections, so [`parse_response`] flattens both into one
+/// answer and additional sections, so [`MdnsResponse::parse`] flattens both into one
 /// list and the browser correlates them by name.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MdnsResponse {
@@ -149,7 +164,7 @@ impl MdnsResponse {
 /// into `buf`, returning its length, or `None` if it does not fit.
 ///
 /// This is the question a browser multicasts to enumerate a service type;
-/// responders reply with the `PTR`/`SRV`/`TXT`/`A` records [`parse_response`]
+/// responders reply with the `PTR`/`SRV`/`TXT`/`A` records [`MdnsResponse::parse`]
 /// decodes.
 pub fn build_ptr_query(buf: &mut [u8], service_type: &str) -> Option<usize> {
 	let mut w = Writer::new(buf);
@@ -165,41 +180,42 @@ pub fn build_ptr_query(buf: &mut [u8], service_type: &str) -> Option<usize> {
 	Some(w.pos)
 }
 
-/// Parse an mDNS response packet into its [`Record`]s.
-///
-/// Returns `None` if the header is malformed; an empty/non-response packet
-/// yields an empty record list. Tolerates compression pointers in names and
-/// skips record types it does not decode.
-pub fn parse_response(pkt: &[u8]) -> Option<MdnsResponse> {
-	let mut r = Reader::new(pkt)?;
-	// A response has QR=1; a pure query has no answers anyway, so we don't hard
-	// require the QR bit (some stacks set odd flags) — we just read whatever
-	// answer/additional records are present.
-	let qd = r.qdcount;
-	let an = r.ancount;
-	let ns = r.nscount;
-	let ar = r.arcount;
+impl MdnsResponse {
+	/// Parse an mDNS response packet into its [`Record`]s.
+	///
+	/// Returns `None` if the header is malformed; an empty/non-response packet
+	/// yields an empty record list. Tolerates compression pointers in names and
+	/// skips record types it does not decode.
+	pub fn parse(pkt: &[u8]) -> Option<MdnsResponse> {
+		let mut r = Reader::new(pkt)?;
+		// A response has QR=1; a pure query has no answers anyway, so we don't hard
+		// require the QR bit (some stacks set odd flags) — we just read whatever
+		// answer/additional records are present.
+		let qd = r.qdcount;
+		let an = r.ancount;
+		let ns = r.nscount;
+		let ar = r.arcount;
 
-	// Skip the question section.
-	for _ in 0..qd {
-		r.skip_name()?;
-		r.u16()?; // qtype
-		r.u16()?; // qclass
-	}
-
-	let mut records = Vec::new();
-	// Answer + authority + additional sections all carry RRs of the same shape.
-	for _ in 0..(an as usize + ns as usize + ar as usize) {
-		match r.read_record() {
-			Some(record) => records.push(record),
-			// A record we couldn't bounds-check cleanly: stop, keep what we have.
-			None => break,
+		// Skip the question section.
+		for _ in 0..qd {
+			r.skip_name()?;
+			r.u16()?; // qtype
+			r.u16()?; // qclass
 		}
+
+		let mut records = Vec::new();
+		// Answer + authority + additional sections all carry RRs of the same shape.
+		for _ in 0..(an as usize + ns as usize + ar as usize) {
+			match r.read_record() {
+				Some(record) => records.push(record),
+				// A record we couldn't bounds-check cleanly: stop, keep what we have.
+				None => break,
+			}
+		}
+
+		Some(MdnsResponse { records })
 	}
-
-	Some(MdnsResponse { records })
 }
-
 /// Tiny forward-only writer over a fixed buffer; every method returns `None` on
 /// overflow.
 struct Writer<'a> {
@@ -521,7 +537,7 @@ mod test {
 		// header (12) + name + qtype(2) + qclass(2)
 		(len > 12).xpect_true();
 		// a query has no answers, so parse yields no records
-		let parsed = parse_response(&buf[..len]).unwrap();
+		let parsed = MdnsResponse::parse(&buf[..len]).unwrap();
 		parsed.records.is_empty().xpect_true();
 	}
 
@@ -536,7 +552,7 @@ mod test {
 			120,
 			&[],
 		);
-		let resp = parse_response(&pkt).unwrap();
+		let resp = MdnsResponse::parse(&pkt).unwrap();
 
 		// PTR -> instance
 		let instances: Vec<_> =
@@ -572,7 +588,7 @@ mod test {
 			120,
 			&["path=/", "v=1"],
 		);
-		let resp = parse_response(&pkt).unwrap();
+		let resp = MdnsResponse::parse(&pkt).unwrap();
 		match resp.txt_for("My Device._http._tcp.local").unwrap() {
 			Record::Txt { entries, .. } => {
 				entries.clone().xpect_eq(vec![
@@ -595,7 +611,7 @@ mod test {
 			0, // goodbye
 			&[],
 		);
-		let resp = parse_response(&pkt).unwrap();
+		let resp = MdnsResponse::parse(&pkt).unwrap();
 		match resp.srv_for("My Device._http._tcp.local").unwrap() {
 			Record::Srv { ttl, .. } => {
 				(*ttl).xpect_eq(0);
@@ -648,7 +664,7 @@ mod test {
 		buf.extend_from_slice(&(srv_rdata.len() as u16).to_be_bytes());
 		buf.extend_from_slice(&srv_rdata);
 
-		let resp = parse_response(&buf).unwrap();
+		let resp = MdnsResponse::parse(&buf).unwrap();
 		match resp.srv_for("inst.local").unwrap() {
 			Record::Srv { host, port, .. } => {
 				host.as_str().xpect_eq("host.local");
@@ -666,6 +682,6 @@ mod test {
 
 	#[beet_core::test]
 	fn rejects_short_packet() {
-		parse_response(&[0u8; 4]).is_none().xpect_true();
+		MdnsResponse::parse(&[0u8; 4]).is_none().xpect_true();
 	}
 }

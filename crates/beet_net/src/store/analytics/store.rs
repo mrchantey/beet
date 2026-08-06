@@ -65,7 +65,7 @@ pub(super) fn spawn_store_on_config(
 			})
 			.await;
 		let store =
-			dynamo_fs_selector(&fs_dir, &bucket_name, DEFAULT_REGION, access)
+			TableStore::dynamo_fs_selector(&fs_dir, &bucket_name, DEFAULT_REGION, access)
 				.await;
 		world.insert_resource(AnalyticsStore { store }).await;
 		// the offline country database is a best-effort static asset: a missing
@@ -122,7 +122,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn event_roundtrips_through_store() {
-		let store = temp_table::<AnalyticsEvent>();
+		let store = TableStore::<AnalyticsEvent>::temp();
 		let event = AnalyticsEvent::new("/about", AnalyticsEventData::Request {
 			status: 200,
 			method: "GET".into(),

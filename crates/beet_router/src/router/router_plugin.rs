@@ -146,7 +146,7 @@ impl Plugin for RouterPlugin {
 				.register_template::<MainBsx>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
-			// channel rides the main HTTP port: `default_router` wires the
+			// channel rides the main HTTP port: `Router::with_defaults` wires the
 			// `/__client_io` upgrade route and `adopt_client_io_socket` adopts the
 			// landed `Socket`.
 			#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]

@@ -122,7 +122,7 @@ mod test {
 	#[beet_core::test]
 	fn error_page_paints_message() {
 		let mut app = live_app();
-		let host = app.world_mut().spawn(page_host(UVec2::new(60, 8))).id();
+		let host = app.world_mut().spawn(PageHost::bundle(UVec2::new(60, 8))).id();
 		set_error_page(app.world_mut(), host, "network down");
 		frame(&mut app, host)
 			.xpect_contains("Page failed to load")

@@ -44,7 +44,7 @@ pub(super) fn measure_str(text: &str, max_width: u32) -> UVec2 {
 fn measure_str_spaced(text: &str, max_width: u32, space: char) -> UVec2 {
 	let lines = word_wrap(text, max_width, space);
 	UVec2::new(
-		lines.iter().map(|l| display_width(l)).max().unwrap_or(0) as u32,
+		lines.iter().map(|l| text_ext::display_width(l)).max().unwrap_or(0) as u32,
 		lines.len() as u32,
 	)
 }
@@ -140,7 +140,7 @@ pub(super) fn paint_text(
 		// the glyph columns this row actually paints, used by both the decorated
 		// overlay and the OSC-8 link so neither bleeds into the padding.
 		let glyphs = truncate_to_width(line, width as usize);
-		let glyph_width = display_width(glyphs) as u32;
+		let glyph_width = text_ext::display_width(glyphs) as u32;
 		let offset = align_offset(glyph_width, width, visual.text_align);
 		if decorated {
 			buffer.write_text(
@@ -212,13 +212,13 @@ pub(super) fn word_wrap(text: &str, max_w: u32, space: char) -> Vec<String> {
 			if current.is_empty() {
 				// hard-break words longer than the column
 				let mut w = word;
-				while display_width(w) > max_w {
+				while text_ext::display_width(w) > max_w {
 					let (head, tail) = split_at_display_width(w, max_w);
 					lines.push(head.to_string());
 					w = tail;
 				}
 				current = w.to_string();
-			} else if display_width(&current) + space_w + display_width(word)
+			} else if text_ext::display_width(&current) + space_w + text_ext::display_width(word)
 				<= max_w
 			{
 				current.push(space);
@@ -237,26 +237,9 @@ pub(super) fn word_wrap(text: &str, max_w: u32, space: char) -> Vec<String> {
 	lines
 }
 
-/// Count visible columns, skipping ANSI escape sequences.
-///
-/// Wide (CJK/fullwidth) characters count as 2 columns.
-pub fn display_width(s: &str) -> usize {
-	let mut w = 0;
-	let mut in_esc = false;
-	for ch in s.chars() {
-		match ch {
-			escape::ESC => in_esc = true,
-			'm' if in_esc => in_esc = false,
-			_ if in_esc => {}
-			_ => w += unicode_width(ch) as usize,
-		}
-	}
-	w
-}
-
 pub(super) fn align_line(line: &str, width: u32, align: TextAlign) -> String {
 	let w = width as usize;
-	let len = display_width(line);
+	let len = text_ext::display_width(line);
 	if len >= w {
 		return line.chars().take(w).collect();
 	}
@@ -337,11 +320,11 @@ mod tests {
 	#[beet_core::test]
 	fn wide_char_display_width() {
 		// Each CJK character = 2 columns
-		display_width("中文").xpect_eq(4);
-		display_width("日本語").xpect_eq(6);
-		display_width("ＡＢＣ").xpect_eq(6);
+		text_ext::display_width("中文").xpect_eq(4);
+		text_ext::display_width("日本語").xpect_eq(6);
+		text_ext::display_width("ＡＢＣ").xpect_eq(6);
 		// ASCII is 1 column each
-		display_width("abc").xpect_eq(3);
+		text_ext::display_width("abc").xpect_eq(3);
 	}
 
 	/// An empty bound value reserves no content row, so a value-leaf with an empty

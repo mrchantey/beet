@@ -13,76 +13,78 @@ use beet_core::prelude::*;
 use std::io::Write;
 use std::net::SocketAddr;
 
-/// Start a mini HTTP server on the entity's [`HttpServer`] address.
-///
-/// This async function mirrors the signature of `start_hyper_server` and
-/// `start_lambda_server` so the `HttpServer` component can swap
-/// backends via feature flags.
-pub async fn start_mini_http_server(
-	entity: AsyncEntity,
-	shutdown: OnceValueRx<()>,
-) -> Result {
-	let addr: SocketAddr = entity
-		.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
-		.await?;
+impl HttpServer {
+	/// Start a mini HTTP server on the entity's [`HttpServer`] address.
+	///
+	/// This async function mirrors the signature of `HttpServer::start_hyper` and
+	/// `HttpServer::start_lambda` so the `HttpServer` component can swap
+	/// backends via feature flags.
+	pub async fn start_mini(
+		entity: AsyncEntity,
+		shutdown: OnceValueRx<()>,
+	) -> Result {
+		let addr: SocketAddr = entity
+			.get::<HttpServer, SocketAddr>(|server| server.socket_addr())
+			.await?;
 
-	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
-		.map_err(|err| {
-			bevyhow!("Failed to bind mini HTTP server to {addr}: {err}")
-		})?;
+		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
+			.map_err(|err| {
+				bevyhow!("Failed to bind mini HTTP server to {addr}: {err}")
+			})?;
 
-	start_mini_http_server_with_tcp(entity, listener, shutdown).await
-}
-
-/// Start a mini HTTP server using a pre-bound TCP listener.
-///
-/// This variant accepts an already-bound listener, which eliminates
-/// port race conditions in tests. See [`start_mini_http_server`] for
-/// the convenience wrapper that binds its own listener.
-pub async fn start_mini_http_server_with_tcp(
-	entity: AsyncEntity,
-	listener: async_io::Async<std::net::TcpListener>,
-	shutdown: OnceValueRx<()>,
-) -> Result {
-	let addr = listener
-		.get_ref()
-		.local_addr()
-		.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
-	// build the TLS acceptor (if any) before logging so the printed scheme is real
-	let tls = MaybeTls::resolve(&entity).await?;
-	info!(
-		"Mini HTTP server listening on {}://{addr}",
-		tls.http_scheme()
-	);
-	// register the resolved port as the process loopback port when canonical, so an
-	// authority-less request loops back here (the real port even for `port: 0`). A
-	// listener bound on an entity with no `HttpServer` (eg a bare test router) still
-	// claims it, matching the `canonical` default of `true`.
-	if entity
-		.get::<HttpServer, bool>(|server| server.canonical)
-		.await
-		.unwrap_or(true)
-	{
-		CanonicalPort::set(addr.port());
+		HttpServer::start_mini_with_tcp(entity, listener, shutdown).await
 	}
-
-	// race the accept loop against the shutdown signal: when teardown signals,
-	// the loop future is dropped, releasing the listener so the port closes. The
-	// per-connection tasks are spawned, so this is a minimal drain — in-flight
-	// requests finish on their own (or are cut by process exit when nothing else
-	// holds the process up).
-	beet_core::exports::futures_lite::future::or(
-		accept_loop(entity, listener, tls),
-		async move {
-			shutdown.wait().await;
-			Result::Ok(())
-		},
-	)
-	.await
 }
+impl HttpServer {
+	/// Start a mini HTTP server using a pre-bound TCP listener.
+	///
+	/// This variant accepts an already-bound listener, which eliminates
+	/// port race conditions in tests. See [`HttpServer::start_mini`] for
+	/// the convenience wrapper that binds its own listener.
+	pub async fn start_mini_with_tcp(
+		entity: AsyncEntity,
+		listener: async_io::Async<std::net::TcpListener>,
+		shutdown: OnceValueRx<()>,
+	) -> Result {
+		let addr = listener
+			.get_ref()
+			.local_addr()
+			.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
+		// build the TLS acceptor (if any) before logging so the printed scheme is real
+		let tls = MaybeTls::resolve(&entity).await?;
+		info!(
+			"Mini HTTP server listening on {}://{addr}",
+			tls.http_scheme()
+		);
+		// register the resolved port as the process loopback port when canonical, so an
+		// authority-less request loops back here (the real port even for `port: 0`). A
+		// listener bound on an entity with no `HttpServer` (eg a bare test router) still
+		// claims it, matching the `canonical` default of `true`.
+		if entity
+			.get::<HttpServer, bool>(|server| server.canonical)
+			.await
+			.unwrap_or(true)
+		{
+			CanonicalPort::set(addr.port());
+		}
 
+		// race the accept loop against the shutdown signal: when teardown signals,
+		// the loop future is dropped, releasing the listener so the port closes. The
+		// per-connection tasks are spawned, so this is a minimal drain — in-flight
+		// requests finish on their own (or are cut by process exit when nothing else
+		// holds the process up).
+		beet_core::exports::futures_lite::future::or(
+			accept_loop(entity, listener, tls),
+			async move {
+				shutdown.wait().await;
+				Result::Ok(())
+			},
+		)
+		.await
+	}
+}
 /// The accept loop: dispatch each connection on its own spawned task. Diverges
-/// (only [`start_mini_http_server_with_tcp`]'s shutdown race ends it).
+/// (only [`HttpServer::start_mini_with_tcp`]'s shutdown race ends it).
 async fn accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
@@ -276,7 +278,7 @@ where
 ///
 /// The whole hand-off runs `_local` on the world-owning thread, where the
 /// `Socket`'s thread-bound `SendWrapper` reader is created and polled, mirroring
-/// the side-port [`start_tungstenite_server`](crate::sockets) accept loop.
+/// the side-port [`SocketServer::start_tungstenite`](crate::sockets) accept loop.
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 async fn upgrade_connection<S>(
 	entity: AsyncEntity,
@@ -338,12 +340,12 @@ mod secure_test {
 
 	#[beet_core::test]
 	async fn serves_https_and_plaintext_loopback() {
-		let server = HttpServer::new_test(start_mini_http_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
 		let port = server.0.port.unwrap();
 		std::thread::spawn(move || {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, Tls::default(), children![exchange_handler(
+				.spawn((server, Tls::default(), children![exchange_ext::handler(
 					|_| { Response::ok().with_body("secure hello") }
 				)]))
 				.run();
@@ -386,7 +388,7 @@ mod test {
 	#[beet_core::test]
 	async fn roundtrip() {
 		super::super::http_server::test::test_server(
-			start_mini_http_server_with_tcp,
+			HttpServer::start_mini_with_tcp,
 		)
 		.await;
 	}
@@ -399,7 +401,7 @@ mod test {
 	async fn upgrades_to_socket() {
 		use crate::sockets::*;
 
-		let server = HttpServer::new_test(start_mini_http_server_with_tcp);
+		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
 		let port = server.0.port.unwrap();
 		// records each landed socket entity so the test can assert the upgrade
 		let landed = Store::<Vec<Entity>>::default();
@@ -409,7 +411,7 @@ mod test {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			// a route that upgrades any request to a websocket
-			app.world_mut().spawn((server, children![exchange_handler(
+			app.world_mut().spawn((server, children![exchange_ext::handler(
 				|cx| { WebSocketUpgrade::from_request(&cx).into() }
 			)]));
 			// record landed sockets

@@ -343,7 +343,7 @@ mod test {
 	fn render_html(
 		template: impl bevy::ecs::template::Template<Output = ()>,
 	) -> String {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = world.spawn_template(template).unwrap().id();
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(root, &mut world))

@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Markup component for an entry that routes: it fills the entity's
-/// `Action<Request, Response>` slot with [`route_action`], the route-tree dispatch
+/// `Action<Request, Response>` slot with [`Router::action`], the route-tree dispatch
 /// reached via [`exchange`](beet_net::prelude::AsyncExchangeExt::exchange).
 ///
 /// `Router` is pure dispatch and observes nothing; booting belongs to the server
@@ -15,7 +15,7 @@ use beet_net::prelude::*;
 /// there for scene loading.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Action<Request, Response> = route_action().with_meta(ActionMeta::of::<Self, Request, Response>()))]
+#[require(Action<Request, Response> = Router::action().with_meta(ActionMeta::of::<Self, Request, Response>()))]
 #[component(on_add = Action::<Request, Response>::assert_provider::<Self>)]
 pub struct Router;
 
@@ -47,7 +47,7 @@ pub fn find_router(
 /// `<Route path="docs/*rest?" {handler}/>` matches any path beneath `docs/`. (A
 /// self-mounting handler that owns its prefix, like [`ServeBlobs`], needs no `<Route>`.)
 ///
-/// The Rust equivalent is the [`route`](crate::prelude::route) helper. It is a
+/// The Rust equivalent is the [`Router::route`](crate::prelude::route) helper. It is a
 /// [`template`](macro@template) rather than a marker component, so it expands to a
 /// [`PathPartial`] (carrying a default [`Slot`](beet_core::prelude::SlotTarget) for
 /// the declared children) at build time, with no component left to re-fire on reload.
@@ -60,69 +60,70 @@ pub fn Route(
 	(PathPartial::new(path), children![SlotTarget::new()])
 }
 
-/// The route-tree dispatch behind a router's `Action<Request, Response>` slot:
-/// matches the request against the ancestor [`RouteTree`] and applies ancestor
-/// [`MiddlewareList`] around the matched action.
-///
-/// When no route matches, the std build renders contextual not-found help through
-/// the beet_ui scene pipeline; the no_std build falls back to a plain-text `404`
-/// listing the available routes. Middleware such as [`HelpHandler`] and
-/// [`NavigateHandler`] wrap the inner action so they can intercept before dispatch.
-pub fn route_action() -> Action<Request, Response> {
-	Action::new_async(
-		async move |cx: ActionContext<Request>| -> Result<Response> {
-			let caller = cx.caller.clone();
-			let world = cx.world();
-			let mut request = cx.input;
-			let path = request.path().clone();
+impl Router {
+	/// The route-tree dispatch behind a router's `Action<Request, Response>` slot:
+	/// matches the request against the ancestor [`RouteTree`] and applies ancestor
+	/// [`MiddlewareList`] around the matched action.
+	///
+	/// When no route matches, the std build renders contextual not-found help through
+	/// the beet_ui scene pipeline; the no_std build falls back to a plain-text `404`
+	/// listing the available routes. Middleware such as [`HelpHandler`] and
+	/// [`NavigateHandler`] wrap the inner action so they can intercept before dispatch.
+	pub fn action() -> Action<Request, Response> {
+		Action::new_async(
+			async move |cx: ActionContext<Request>| -> Result<Response> {
+				let caller = cx.caller.clone();
+				let world = cx.world();
+				let mut request = cx.input;
+				let path = request.path().clone();
 
-			// find the matching route in the tree
-			let node = world
-			.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
-				query.get(caller.id()).map(|tree| tree.find(&path).cloned()).map_err(|_|{
-					bevyhow!("Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?")
+				// find the matching route in the tree
+				let node = world
+				.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
+					query.get(caller.id()).map(|tree| tree.find(&path).cloned()).map_err(|_|{
+						bevyhow!("Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?")
+					})
 				})
-			})
-			.await;
+				.await;
 
-			// resolve the inner action and dispatch entity from the matched route
-			let (inner_action, dispatch_entity) = match &node {
-				Ok(Some(node)) => {
-					// surface matched dynamic segments (`:id`) to the handler
-					node.merge_path_params(&mut request);
-					let entity = world.entity(node.entity);
-					// dispatch through call resolution: the route's canonical
-					// `Action<Request, Response>`, else the `ActionOverload`
-					// adapting a typed handler or a `Sequence`
-					let action = Action::<Request, Response>::new_async(
-						async |cx: ActionContext<Request>| -> Result<Response> {
-							cx.caller.call::<Request, Response>(cx.input).await
-						},
-					);
-					(action, entity)
-				}
-				Ok(None) => {
-					// no matching route — std builds a not-found response through the
-					// contextual help system so middleware still applies; no_std falls
-					// back to a plain-text route listing (no scene pipeline).
-					#[cfg(feature = "std")]
-					let action = ContextualNotFound.into_action();
-					#[cfg(not(feature = "std"))]
-					let action = not_found_action();
-					(action, cx.caller.clone())
-				}
-				Err(err) => return Ok(bevyhow!("{err}").into_response()),
-			};
+				// resolve the inner action and dispatch entity from the matched route
+				let (inner_action, dispatch_entity) = match &node {
+					Ok(Some(node)) => {
+						// surface matched dynamic segments (`:id`) to the handler
+						node.merge_path_params(&mut request);
+						let entity = world.entity(node.entity);
+						// dispatch through call resolution: the route's canonical
+						// `Action<Request, Response>`, else the `ActionOverload`
+						// adapting a typed handler or a `Sequence`
+						let action = Action::<Request, Response>::new_async(
+							async |cx: ActionContext<Request>| -> Result<Response> {
+								cx.caller.call::<Request, Response>(cx.input).await
+							},
+						);
+						(action, entity)
+					}
+					Ok(None) => {
+						// no matching route — std builds a not-found response through the
+						// contextual help system so middleware still applies; no_std falls
+						// back to a plain-text route listing (no scene pipeline).
+						#[cfg(feature = "std")]
+						let action = ContextualNotFound.into_action();
+						#[cfg(not(feature = "std"))]
+						let action = not_found_action();
+						(action, cx.caller.clone())
+					}
+					Err(err) => return Ok(bevyhow!("{err}").into_response()),
+				};
 
-			dispatch_entity
-				.call_with_middleware(inner_action, request)
-				.await
-				.unwrap_or_else(|err| err.into_response())
-				.xok()
-		},
-	)
+				dispatch_entity
+					.call_with_middleware(inner_action, request)
+					.await
+					.unwrap_or_else(|err| err.into_response())
+					.xok()
+			},
+		)
+	}
 }
-
 /// Builds the no_std not-found fallback: a plain-text `404` listing the
 /// available routes, queried from the ancestor [`RouteTree`].
 ///
@@ -213,7 +214,7 @@ mod test {
 	#[beet_core::test]
 	async fn dynamic_segment_reaches_handler() {
 		router_world()
-			.spawn((default_router(), children![exchange_route(
+			.spawn((Router::with_defaults(), children![Router::exchange_route(
 				"users/:id",
 				EchoParams
 			)]))
@@ -227,7 +228,7 @@ mod test {
 	#[beet_core::test]
 	async fn greedy_segment_reaches_handler() {
 		router_world()
-			.spawn((default_router(), children![exchange_route(
+			.spawn((Router::with_defaults(), children![Router::exchange_route(
 				"files/*path",
 				EchoParams
 			)]))
@@ -241,7 +242,7 @@ mod test {
 	#[beet_core::test]
 	async fn path_param_wins_over_query_param() {
 		router_world()
-			.spawn((default_router(), children![exchange_route(
+			.spawn((Router::with_defaults(), children![Router::exchange_route(
 				"users/:id",
 				EchoParams
 			)]))
@@ -257,7 +258,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				render_action::fixed_func_route(
 					"about",
 					|| rsx! { <p>"About page"</p> }
@@ -274,7 +275,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				render_action::fixed_func_route(
 					"",
 					|| rsx! { <p>"Root content"</p> }
@@ -290,7 +291,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				render_action::fixed_func_route(
 					"",
 					|| rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
@@ -311,8 +312,8 @@ mod test {
 	#[beet_core::test]
 	async fn help_flag_returns_route_list() {
 		router_world()
-			.spawn((default_router(), children![
-				increment(FieldRef::new("count")),
+			.spawn((Router::with_defaults(), children![
+				Increment::bundle(FieldRef::new("count")),
 				render_action::fixed_func_route(
 					"about",
 					|| rsx! { <p>"about"</p> }
@@ -328,8 +329,8 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_help_request() {
 		router_world()
-			.spawn((default_router(), children![
-				increment(FieldRef::new("count")),
+			.spawn((Router::with_defaults(), children![
+				Increment::bundle(FieldRef::new("count")),
 				render_action::fixed_func_route(
 					"about",
 					|| rsx! { <p>"about"</p> }
@@ -344,7 +345,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		router_world()
-			.spawn((default_router(), children![increment(FieldRef::new(
+			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
 				"count"
 			)),]))
 			.exchange(Request::from_cli_str("nonexistent"))
@@ -356,7 +357,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				render_action::fixed_func_route(
 					"",
 					|| rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
@@ -379,12 +380,12 @@ mod test {
 		let mut world = router_world();
 
 		let root = world
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				(
 					render_action::fixed_func_route("counter", || {
 						Element::new("p").with_inner_text("counter")
 					}),
-					children![increment(FieldRef::new("count")),],
+					children![Increment::bundle(FieldRef::new("count")),],
 				),
 				render_action::fixed_func_route(
 					"about",
@@ -406,7 +407,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		router_world()
-			.spawn((default_router(), children![increment(FieldRef::new(
+			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
 				"count"
 			)),]))
 			.exchange(Request::from_cli_str("nonexistent"))
@@ -421,12 +422,12 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_scoped_ancestor_help() {
 		router_world()
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				(
 					render_action::fixed_func_route("counter", || {
 						Element::new("p").with_inner_text("counter")
 					}),
-					children![increment(FieldRef::new("count")),],
+					children![Increment::bundle(FieldRef::new("count")),],
 				),
 				render_action::fixed_func_route(
 					"about",
@@ -445,7 +446,7 @@ mod test {
 	}
 
 	/// A route can stream Server-Sent Events by returning a streaming
-	/// [`Response`] via [`sse_response`] — no special router needed. `sse_response`
+	/// [`Response`] via [`Response::sse`] — no special router needed. `Response::sse`
 	/// and [`SseBody`] live behind `beet_net/http` (pulled by `native`); the json
 	/// payload behind `beet_net/json` (pulled by `json`), so the test needs both.
 	#[cfg(all(feature = "json", feature = "native"))]
@@ -460,13 +461,13 @@ mod test {
 		#[derive(Default, Clone, Component, Reflect)]
 		#[reflect(Component)]
 		async fn Ticks(_cx: ActionContext<RequestParts>) -> Response {
-			sse_response(bevy::tasks::futures_lite::stream::iter(
+			Response::sse(bevy::tasks::futures_lite::stream::iter(
 				(0..3).map(|index| Ok(SseBody::message(Tick { index }))),
 			))
 		}
 
 		router_world()
-			.spawn((default_router(), children![exchange_route(
+			.spawn((Router::with_defaults(), children![Router::exchange_route(
 				"ticks", Ticks
 			)]))
 			.exchange(Request::get("ticks"))

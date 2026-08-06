@@ -70,7 +70,7 @@ impl BsxTemplateRegistry {
 		name: impl Into<SmolStr>,
 		source: &str,
 	) -> Result {
-		let nodes = super::parse::parse_document(
+		let nodes = BsxNode::parse_document(
 			source,
 			&super::parse::BsxParseConfig::bsx(),
 		)?;

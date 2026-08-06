@@ -3,45 +3,46 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use lambda_http::tower::service_fn;
 
-/// Sets up the Lambda runtime and runs the provided handler indefinitely.
-///
-/// The lambda runtime owns the lifecycle (it stops invoking when the function is
-/// torn down) and there is no listener to close, so the shutdown signal is unused.
-pub async fn start_lambda_server(
-	entity: AsyncEntity,
-	_shutdown: OnceValueRx<()>,
-) -> Result {
-	// This variable only applies to API Gateway stages,
-	// you can remove it if you don't use them.
-	// i.e
-	// - default: `GET /test-stage/todo/id/123`
-	// - ignored: `GET /todo/id/123`
-	unsafe {
-		std::env::set_var("AWS_LAMBDA_HTTP_IGNORE_STAGE_IN_PATH", "true");
-	};
-	// required to enable CloudWatch error logging by the runtime
-	// tracing::init_default_subscriber(); //we use PrettyTracing instead
+impl HttpServer {
+	/// Sets up the Lambda runtime and runs the provided handler indefinitely.
+	///
+	/// The lambda runtime owns the lifecycle (it stops invoking when the function is
+	/// torn down) and there is no listener to close, so the shutdown signal is unused.
+	pub async fn start_lambda(
+		entity: AsyncEntity,
+		_shutdown: OnceValueRx<()>,
+	) -> Result {
+		// This variable only applies to API Gateway stages,
+		// you can remove it if you don't use them.
+		// i.e
+		// - default: `GET /test-stage/todo/id/123`
+		// - ignored: `GET /todo/id/123`
+		unsafe {
+			std::env::set_var("AWS_LAMBDA_HTTP_IGNORE_STAGE_IN_PATH", "true");
+		};
+		// required to enable CloudWatch error logging by the runtime
+		// tracing::init_default_subscriber(); //we use PrettyTracing instead
 
-	info!("🌱 listening for lambda requests");
+		info!("🌱 listening for lambda requests");
 
-	// lambda_http uses Tokio internally, so we need a Tokio runtime context.
-	// The enter guard sets the Tokio reactor for I/O operations while
-	// beet's async-executor drives the future. The guard is `!Send` and held
-	// across the await, which is fine: `HttpServerFn` runs on the local thread
-	// (its future is a `LocalBoxedFuture`), never moved between threads.
-	let _guard = async_ext::tokio().enter();
+		// lambda_http uses Tokio internally, so we need a Tokio runtime context.
+		// The enter guard sets the Tokio reactor for I/O operations while
+		// beet's async-executor drives the future. The guard is `!Send` and held
+		// across the await, which is fine: `HttpServerFn` runs on the local thread
+		// (its future is a `LocalBoxedFuture`), never moved between threads.
+		let _guard = async_ext::tokio().enter();
 
-	lambda_http::run(service_fn(move |lambda_req| {
-		let entity = entity.clone();
-		handle_request(entity, lambda_req)
-	}))
-	.await
-	.map_err(|err| {
-		error!("Error running lambda: {:?}", err);
-		bevyhow!("{}", err)
-	})
+		lambda_http::run(service_fn(move |lambda_req| {
+			let entity = entity.clone();
+			handle_request(entity, lambda_req)
+		}))
+		.await
+		.map_err(|err| {
+			error!("Error running lambda: {:?}", err);
+			bevyhow!("{}", err)
+		})
+	}
 }
-
 /// Handler function that processes each lambda request
 async fn handle_request(
 	entity: AsyncEntity,

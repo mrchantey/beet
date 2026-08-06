@@ -35,6 +35,9 @@ pub struct AwsCli {
 }
 
 impl AwsCli {
+	/// Whether a string is an S3 URI, ie starts with `s3://`.
+	pub fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
+
 	/// Create an empty driver (no profile/region).
 	pub fn new() -> Self { Self::default() }
 
@@ -224,7 +227,7 @@ impl S3Sync {
 	/// Panics if `s3_uri` is not a valid S3 URI (does not start with `s3://`).
 	pub fn push(local_dir: AbsPathBuf, s3_uri: impl AsRef<str>) -> Self {
 		let s3_uri = s3_uri.as_ref();
-		if !is_s3_uri(&s3_uri) {
+		if !AwsCli::is_s3_uri(&s3_uri) {
 			panic!("expected S3 URI (s3://...), got: {}", &s3_uri);
 		}
 		Self {
@@ -254,7 +257,7 @@ impl S3Sync {
 	/// Panics if `s3_uri` is not a valid S3 URI (does not start with `s3://`).
 	pub fn pull(s3_uri: impl AsRef<str>, local_dir: AbsPathBuf) -> Self {
 		let s3_uri = s3_uri.as_ref();
-		if !is_s3_uri(&s3_uri) {
+		if !AwsCli::is_s3_uri(&s3_uri) {
 			panic!("expected S3 URI (s3://...), got: {}", &s3_uri);
 		}
 		Self {
@@ -362,8 +365,7 @@ impl S3Sync {
 	}
 }
 
-/// Whether a string is an S3 URI, ie starts with `s3://`.
-pub fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
+
 
 #[cfg(test)]
 mod test {

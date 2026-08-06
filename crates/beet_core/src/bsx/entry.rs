@@ -28,7 +28,7 @@ impl BsxTemplate {
 	/// [`TemplateLoader`](crate::prelude::TemplateLoader) dispatches `.bsx`/`.html`
 	/// bytes here, and [`load_entry`](Self::load_entry) is a file convenience over it.
 	pub fn parse_entry(world: &World, source: &str) -> Result<Self> {
-		let mut roots = parse_document(source, &BsxParseConfig::bsx())?
+		let mut roots = BsxNode::parse_document(source, &BsxParseConfig::bsx())?
 			.into_iter()
 			.filter(|node| match node {
 				BsxNode::Comment(_) => false,

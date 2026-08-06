@@ -64,24 +64,25 @@ impl<T: serde::Serialize> SseBody<T> {
 	}
 }
 
-/// Builds a `text/event-stream` [`Response`] from a stream of typed SSE events.
-///
-/// Each [`SseBody`] is serialized to an `event: <event>\ndata: <json>\n\n`
-/// chunk via [`SseBody::to_chunk`]. This is the server-side counterpart to the
-/// client's [`event_source_typed`](ResponseSseExt::event_source_typed): a route
-/// or handler returns it directly as a streaming response.
-#[cfg(feature = "json")]
-pub fn sse_response<S, T>(events: S) -> Response
-where
-	S: 'static + Send + Sync + Stream<Item = Result<SseBody<T>>>,
-	T: 'static + serde::Serialize,
-{
-	let bytes = events.map(|event| event.and_then(|body| body.to_chunk()));
-	Response::ok()
-		.with_content_type(MediaType::EventStream)
-		.with_body(Body::stream(bytes))
+impl Response {
+	/// Builds a `text/event-stream` [`Response`] from a stream of typed SSE events.
+	///
+	/// Each [`SseBody`] is serialized to an `event: <event>\ndata: <json>\n\n`
+	/// chunk via [`SseBody::to_chunk`]. This is the server-side counterpart to the
+	/// client's [`event_source_typed`](ResponseSseExt::event_source_typed): a route
+	/// or handler returns it directly as a streaming response.
+	#[cfg(feature = "json")]
+	pub fn sse<S, T>(events: S) -> Response
+	where
+		S: 'static + Send + Sync + Stream<Item = Result<SseBody<T>>>,
+		T: 'static + serde::Serialize,
+	{
+		let bytes = events.map(|event| event.and_then(|body| body.to_chunk()));
+		Response::ok()
+			.with_content_type(MediaType::EventStream)
+			.with_body(Body::stream(bytes))
+	}
 }
-
 /// A stream of mapped SSE events.
 ///
 /// This stream wraps an underlying `EventStream` and applies a mapping function
@@ -224,7 +225,7 @@ mod sse_builder_test {
 
 	#[beet_core::test]
 	async fn formats_event_stream() {
-		let response = sse_response(futures::stream::iter(
+		let response = Response::sse(futures::stream::iter(
 			(0..2).map(|index| Ok(SseBody::message(Tick { index }))),
 		));
 

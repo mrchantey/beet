@@ -36,14 +36,14 @@ pub(crate) fn verify_props(
 	app_registry: &AppTypeRegistry,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
-	let Some(schema) = template_schema_by_name(app_registry, tag) else {
+	let Some(schema) = ValueSchema::template_by_name(app_registry, tag) else {
 		return Ok(());
 	};
 	verify_props_against(el, tag, &schema, cx)
 }
 
 /// Verify a tag's props against an explicit `schema`, the shared path for both a
-/// Rust template (schema looked up via [`template_schema_by_name`]) and a BSX
+/// Rust template (schema looked up via [`ValueSchema::template_by_name`]) and a BSX
 /// template (schema from its `bx:schema` block).
 ///
 /// Resolves composable [`ValueSchema::Reference`]s against the world's

@@ -53,12 +53,12 @@ pub fn ExampleBinaryBuild(
 /// carrying the [`Stack`] (so the blocks + verbs resolve it by ancestry), the
 /// standard IaC verb routes (validate/plan/apply/...), and a slot for the
 /// example's own deploy/sync/watch routes. The markup form of
-/// `(stack(name), stack_cli())`.
+/// `(stack(name), Stack::cli())`.
 #[template]
 pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
 	(CliServer::default(), children![(
 		infra_ext::stack(app_name),
-		default_router(),
+		Router::with_defaults(),
 		children![
 			Validate,
 			Plan,
@@ -91,7 +91,7 @@ pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
 		};
 	(
 		infra_ext::stack(app_name).with_backend(backend),
-		default_router(),
+		Router::with_defaults(),
 		children![
 			CliServer::default(),
 			Validate,

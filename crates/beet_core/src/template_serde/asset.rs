@@ -115,7 +115,7 @@ impl BuildAssets<'_, '_> {
 			return handle;
 		};
 		// register synchronously (the queue drains in `with_state::apply`, before
-		// the build's `drain_pending_dependencies`), keeping a strong handle so the
+		// the build's `TemplatePending::drain_dependencies`), keeping a strong handle so the
 		// load is not cancelled before it settles.
 		let untyped = handle.clone().untyped();
 		self.commands.queue(move |world: &mut World| {
@@ -307,7 +307,7 @@ mod test {
 
 		// a `#[template(system)]`-style build that loads through `BuildAssets`.
 		let root = world
-			.spawn_template(system_template::<BuildAssets, _, _>(
+			.spawn_template(SystemTemplate::<BuildAssets, _, _>::new(
 				|_entity, mut assets: BuildAssets| {
 					assets.load::<TextAsset>("hello.txt");
 					Snippet::from_bundle(())

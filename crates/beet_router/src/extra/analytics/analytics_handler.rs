@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// when the server never sees the (cached) page load itself.
 pub(crate) fn analytics_handler() -> impl Bundle {
 	(
-		exchange_route("analytics", AnalyticsHandler),
+		Router::exchange_route("analytics", AnalyticsHandler),
 		HttpMethod::Post,
 	)
 }
@@ -95,8 +95,8 @@ mod test {
 				hits.0 += 1;
 			},
 		);
-		// `default_router` already wires `analytics_handler()` under json + std.
-		let root = world.spawn(default_router()).flush();
+		// `Router::with_defaults` already wires `analytics_handler()` under json + std.
+		let root = world.spawn(Router::with_defaults()).flush();
 		world
 			.entity_mut(root)
 			.exchange(request)

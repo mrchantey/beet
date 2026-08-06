@@ -2,7 +2,7 @@
 
 beet_core::test_main!();
 
-pub mod fetch_bytes;
+pub mod fetch_ext;
 #[cfg(feature = "bevy_default")]
 pub mod frozen_lake;
 pub mod language;
@@ -23,7 +23,7 @@ pub mod test_utils;
 /// `beet_ml::TickSet`.
 pub mod prelude {
 	pub use super::BeetMlPlugins;
-	pub use crate::fetch_bytes::*;
+	pub use crate::fetch_ext;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::frozen_lake::*;
 	pub use crate::language::*;

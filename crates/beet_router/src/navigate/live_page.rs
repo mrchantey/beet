@@ -20,7 +20,7 @@ use bevy::math::UVec2;
 /// A live-render host (a "surface"): a [`DoubleBuffer`] plus the [`Portal`] slot
 /// that transcludes the page currently bound to this surface.
 ///
-/// Spawn one with [`page_host`]. A [`Navigator`] co-located on this host calls
+/// Spawn one with [`PageHost::bundle`]. A [`Navigator`] co-located on this host calls
 /// [`bind_surface_page`] to point the slot at a built page, so the charcell
 /// pipeline paints it into the buffer. Navigating rebinds the slot and
 /// repaints. Each surface is independent, so many can coexist (one per SSH
@@ -34,23 +34,24 @@ pub struct PageHost;
 #[derive(Component)]
 pub struct PageSlot;
 
-/// Spawn a live-render host: a `size`-cell [`DoubleBuffer`] whose content is a
-/// viewport-filling `auto` scroll container holding the [`Portal`] slot that
-/// transcludes the surface's bound page.
-///
-/// The scroll container is the page's scrollport (like the browser's scrollable
-/// `<main>`): a page taller or wider than the viewport gets a scrollbar, a short
-/// one does not. [`bind_surface_page`] points the inner slot at the bound page.
-pub fn page_host(size: UVec2) -> impl Bundle {
-	(PageHost, DoubleBuffer::new(size), children![(
-		Element::new("div"),
-		page_viewport_style(),
-		// the slot carries no `Portal` until a page is bound: absence is the
-		// unresolved state, so `bind_surface_page` installs the reference.
-		children![PageSlot],
-	)])
+impl PageHost {
+	/// Spawn a live-render host: a `size`-cell [`DoubleBuffer`] whose content is a
+	/// viewport-filling `auto` scroll container holding the [`Portal`] slot that
+	/// transcludes the surface's bound page.
+	///
+	/// The scroll container is the page's scrollport (like the browser's scrollable
+	/// `<main>`): a page taller or wider than the viewport gets a scrollbar, a short
+	/// one does not. [`bind_surface_page`] points the inner slot at the bound page.
+	pub fn bundle(size: UVec2) -> impl Bundle {
+		(PageHost, DoubleBuffer::new(size), children![(
+			Element::new("div"),
+			page_viewport_style(),
+			// the slot carries no `Portal` until a page is bound: absence is the
+			// unresolved state, so `bind_surface_page` installs the reference.
+			children![PageSlot],
+		)])
+	}
 }
-
 /// The viewport-filling `overflow: auto` scroll container style for the page slot.
 fn page_viewport_style() -> impl Bundle {
 	inline_class![
@@ -67,7 +68,7 @@ fn page_viewport_style() -> impl Bundle {
 	]
 }
 
-/// Marks an app that paints live navigator pages into [`page_host`] surfaces.
+/// Marks an app that paints live navigator pages into [`PageHost::bundle`] surfaces.
 ///
 /// Pairs with [`CharcellPlugin`] + [`RealtimeParsePlugin`] (the repaint loop) and
 /// [`NavigatorPlugin`] (which navigates). The page-to-surface binding is now
@@ -216,7 +217,7 @@ impl PageHost {
 	}
 }
 
-/// The [`PageSlot`] descendant of `host` (a grandchild as [`page_host`] spawns it).
+/// The [`PageSlot`] descendant of `host` (a grandchild as [`PageHost::bundle`] spawns it).
 fn page_slot_of(world: &World, host: Entity) -> Option<Entity> {
 	let mut stack = vec![host];
 	while let Some(entity) = stack.pop() {
@@ -282,7 +283,7 @@ mod test {
 	#[beet_core::test]
 	fn renders_and_re_renders_active_page() {
 		let mut app = live_app();
-		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
+		let host = app.world_mut().spawn(PageHost::bundle(UVec2::new(40, 8))).id();
 
 		// initial page: Alpha
 		spawn_page(&mut app, host, rsx! { <p>"Alpha page"</p> });
@@ -352,7 +353,7 @@ mod test {
 		let host = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();
@@ -419,14 +420,14 @@ mod test {
 		let first = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();
 		let second = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();
@@ -491,7 +492,7 @@ mod test {
 		let host = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();
@@ -521,7 +522,7 @@ mod test {
 		// the navigator is co-located on its page host
 		let host = app
 			.world_mut()
-			.spawn((page_host(UVec2::new(40, 8)), Navigator::default()))
+			.spawn((PageHost::bundle(UVec2::new(40, 8)), Navigator::default()))
 			.id();
 		// drive the async on_add navigation until the surface slot is bound
 		for _ in 0..200 {
@@ -554,14 +555,14 @@ mod test {
 		let host_a = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();
 		let host_b = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "beta"),
 			))
 			.id();
@@ -590,7 +591,7 @@ mod test {
 	#[beet_core::test]
 	fn parse_primitive_paints() {
 		let mut app = live_app();
-		let host = app.world_mut().spawn(page_host(UVec2::new(40, 8))).id();
+		let host = app.world_mut().spawn(PageHost::bundle(UVec2::new(40, 8))).id();
 		let bytes = MediaBytes::new_markdown("# Hello");
 		let page = parse_page(app.world_mut(), bytes).unwrap();
 		bind_surface_page(app.world_mut(), host, page);

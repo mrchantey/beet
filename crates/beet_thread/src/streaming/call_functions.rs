@@ -15,7 +15,7 @@ pub(crate) async fn call_functions(
 			.with_header::<header::ContentType>(MediaType::Json)
 			.with_header::<header::Accept>(MediaType::Json);
 
-		let output = match agent.call_detached(route_action(), request).await {
+		let output = match agent.call_detached(Router::action(), request).await {
 			Ok(res) => match res.into_result().await {
 				Ok(res) => {
 					let is_json = res

@@ -41,10 +41,10 @@ impl Plugin for SceneServerPlugin {
 #[template]
 pub fn SceneServer() -> impl Bundle {
 	(
-		OnSpawn::insert_child(exchange_route("load", LoadScene)),
-		OnSpawn::insert_child(exchange_route("clear", ClearScene)),
-		OnSpawn::insert_child(exchange_route("reset", Reset)),
-		OnSpawn::insert_child(exchange_route("dump", DumpScene)),
+		OnSpawn::insert_child(Router::exchange_route("load", LoadScene)),
+		OnSpawn::insert_child(Router::exchange_route("clear", ClearScene)),
+		OnSpawn::insert_child(Router::exchange_route("reset", Reset)),
+		OnSpawn::insert_child(Router::exchange_route("dump", DumpScene)),
 	)
 }
 
@@ -123,12 +123,12 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 }
 
 /// `GET /clear` — despawn the loaded scene and reset the hardware. The route tree
-/// is rebuilt by [`despawn_scene`], so the cleared routes drop out of dispatch.
+/// is rebuilt by [`BeetSceneRoot::despawn_all`], so the cleared routes drop out of dispatch.
 #[action(handler_only)]
 #[derive(Default, Clone, Component)]
 pub async fn ClearScene(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller
-		.with_world(|world, _caller| despawn_scene(world))
+		.with_world(|world, _caller| BeetSceneRoot::despawn_all(world))
 		.await
 		.ok();
 	Response::ok_text("scene cleared\n")
@@ -223,7 +223,7 @@ mod test {
 		// the device runs the `SceneServer` meta-routes; POST the scene to /load.
 		let mut world = server_world();
 		let server = world
-			.spawn((default_router(), children![exchange_route(
+			.spawn((Router::with_defaults(), children![Router::exchange_route(
 				"load", LoadScene
 			)]))
 			.flush();

@@ -7,7 +7,7 @@
 //!   buffers and beet's [`Request`]/[`Response`] wire types, so they are
 //!   `no_std` and shared by the std `mini_http_server` and any downstream
 //!   embedded backend (eg an esp/embassy WiFi server) installed via
-//!   [`set_http_server`]. Only the *pure* parse/serialise half is shareable; the
+//!   [`HttpServer::set_backend`]. Only the *pure* parse/serialise half is shareable; the
 //!   connection + streaming half differs per transport (std `async-io` vs an
 //!   embassy `TcpSocket`) and stays in each backend.
 //! - **websocket upgrade helpers**: the transport-agnostic, mostly-pure

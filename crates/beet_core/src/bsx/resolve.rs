@@ -1396,7 +1396,7 @@ fn apply_spread_named(
 		let mut resolver = entity_ref_resolver(entity_refs);
 		(
 			kind,
-			literal_to_reflect(&literal, info, &registry, &mut resolver)?,
+			DataLiteral::to_reflect(&literal, info, &registry, &mut resolver)?,
 		)
 	};
 	match kind {
@@ -1471,7 +1471,7 @@ fn build_patch(
 				registry,
 				&mut resolver,
 			)?,
-			None => literal_to_reflect(
+			None => DataLiteral::to_reflect(
 				&literal,
 				field_info,
 				registry,
@@ -1530,7 +1530,7 @@ fn prop_opt_value(
 			.and_then(|field| field.type_info()),
 		_ => None,
 	};
-	let inner = literal_to_reflect(literal, inner_info, registry, resolver)?;
+	let inner = DataLiteral::to_reflect(literal, inner_info, registry, resolver)?;
 	// `Some(inner)`
 	let mut some = DynamicTuple::default();
 	some.insert_boxed(inner);

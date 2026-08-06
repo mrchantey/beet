@@ -70,7 +70,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 
 	// validate before exporting, like `export-static`: a broken no-code entry fails
 	// with a non-zero exit rather than shipping a broken PDF.
-	let report = check_routes(&cx.world(), root).await?;
+	let report = CheckReport::check_routes(&cx.world(), root).await?;
 	report.log();
 	if report.has_errors() {
 		return Response::status_text(
@@ -117,7 +117,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	if let Some(exclude) = &params.exclude {
 		filter = filter.with_exclude(exclude);
 	}
-	let paths = collect_static_paths(&cx.world(), root)
+	let paths = StaticExport::collect_paths(&cx.world(), root)
 		.await?
 		.into_iter()
 		.filter(|path| filter.passes(path.as_str()))

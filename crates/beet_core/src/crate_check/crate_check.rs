@@ -259,7 +259,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[crate::test]
 	fn extracts_checks_from_raw_markup() {
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			"<NotARegisteredTag><CrateCheck features=\"sockets\" versions=\"0.1.0\"/></NotARegisteredTag>",
 			&BsxParseConfig::bsx(),
 		)

@@ -16,8 +16,6 @@ mod reactive_html_render;
 #[cfg(all(feature = "bsx", feature = "json"))]
 pub use reactive_html_render::InsertReactive;
 #[cfg(all(feature = "bsx", feature = "json"))]
-pub use reactive_html_render::REACTIVITY_JS;
-#[cfg(all(feature = "bsx", feature = "json"))]
-pub use reactive_html_render::REACTIVITY_SRC;
+pub use reactive_html_render::Reactivity;
 mod html_utils;
 pub use html_utils::*;

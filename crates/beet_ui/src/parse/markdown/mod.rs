@@ -5,7 +5,7 @@
 //! [`diff`] engine reconciles against existing entities on reparse. Markdown
 //! owns the prose structure and the interleaving stack ([`tree_builder`]); the
 //! markup itself (tags, attributes, `bx:` directives, spreads, components) is
-//! parsed by the core BSX fragment primitive ([`parse_fragment`]), so BSX is the
+//! parsed by the core BSX fragment primitive ([`BsxFragmentToken::parse_fragment`]), so BSX is the
 //! single markup authority. An embedded uppercase component/template or `bx:`
 //! directive resolves per-tag through the BSX resolver during the diff.
 //!
@@ -23,7 +23,7 @@ use diff::diff_children;
 use pulldown_cmark::Options;
 
 /// Configuration for parsing embedded markup inside markdown, a thin wrapper over
-/// the core [`BsxFragmentConfig`] threaded through to [`parse_fragment`].
+/// the core [`BsxFragmentConfig`] threaded through to [`BsxFragmentToken::parse_fragment`].
 pub type HtmlParseConfig = BsxFragmentConfig;
 
 /// Helpers mirroring the markdown parser's expectations on [`HtmlParseConfig`].
@@ -46,7 +46,7 @@ impl HtmlParseConfigExt for HtmlParseConfig {
 ///
 /// Parses markdown into a tree of ECS entities via an [`HtmlNode`]
 /// representation and the markdown-owned diff engine. Embedded markup is parsed
-/// by the core BSX fragment primitive ([`parse_fragment`]); an embedded
+/// by the core BSX fragment primitive ([`BsxFragmentToken::parse_fragment`]); an embedded
 /// component/template tag or `bx:` directive resolves per-tag through the core
 /// BSX resolver during the diff.
 ///

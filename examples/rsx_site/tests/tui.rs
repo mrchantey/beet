@@ -55,7 +55,7 @@ impl SiteHost {
 			.spawn((
 				channel,
 				terminal,
-				page_host(size),
+				PageHost::bundle(size),
 				Navigator::in_world(router, home),
 				// deterministic frames whatever terminal runs the tests: graphics off
 				// per surface, so no kitty escapes interleave with the painted cells.
@@ -132,7 +132,7 @@ impl SiteHost {
 		for _ in 0..200 {
 			self.app.update();
 			let frame = self.frame();
-			if from_fullwidth(&frame).contains(needle) {
+			if FontScale::from_fullwidth(&frame).contains(needle) {
 				return frame;
 			}
 		}
@@ -184,7 +184,7 @@ async fn nav_link_click_navigates() {
 	let (col, row) = host.cell_of("Counter");
 	host.click(col, row);
 	host.step_until("You have clicked 0 times.");
-	from_fullwidth(&host.frame())
+	FontScale::from_fullwidth(&host.frame())
 		.xnot()
 		.xpect_contains("very cool site");
 }

@@ -17,6 +17,7 @@ use beet_core::prelude::*;
 use beet_ui::prelude::*;
 use beet_ui::prelude::style::common_props;
 // the layout value enums (`Display`, `Direction`, `Length`, …) reached via the
+use crate::prelude::CardDeck;
 // `style::*` glob, mirroring beet_ui's own rule modules.
 use beet_ui::prelude::style::*;
 // pin the enums bevy also names (reached via `beet_core::prelude` under
@@ -25,18 +26,20 @@ use beet_ui::prelude::style::Display;
 use beet_ui::prelude::style::AlignItems;
 use beet_ui::prelude::style::JustifyContent;
 
-/// A card frame — the per-card full-viewport flex column.
-pub const CARD: ClassName = ClassName::new_static("card");
-/// A card whose single content block is centered on both axes (title cards).
-pub const CARD_CENTER: ClassName = ClassName::new_static("card-center");
-/// A card laid out as a heading band over a row of content columns.
-pub const CARD_CONTENT: ClassName = ClassName::new_static("card-content");
-/// The heading band of a [`CARD_CONTENT`] card.
-pub const CARD_HEADING: ClassName = ClassName::new_static("card-heading");
-/// The growing column row of a [`CARD_CONTENT`] card.
-pub const CARD_COLUMNS: ClassName = ClassName::new_static("card-columns");
-/// A single column within [`CARD_COLUMNS`], sharing the row width evenly.
-pub const CARD_COLUMN: ClassName = ClassName::new_static("card-column");
+impl CardDeck {
+	/// A card frame — the per-card full-viewport flex column.
+	pub const CARD: ClassName = ClassName::new_static("card");
+	/// A card whose single content block is centered on both axes (title cards).
+	pub const CARD_CENTER: ClassName = ClassName::new_static("card-center");
+	/// A card laid out as a heading band over a row of content columns.
+	pub const CARD_CONTENT: ClassName = ClassName::new_static("card-content");
+	/// The heading band of a [`CardDeck::CARD_CONTENT`] card.
+	pub const CARD_HEADING: ClassName = ClassName::new_static("card-heading");
+	/// The growing column row of a [`CardDeck::CARD_CONTENT`] card.
+	pub const CARD_COLUMNS: ClassName = ClassName::new_static("card-columns");
+	/// A single column within [`CardDeck::CARD_COLUMNS`], sharing the row width evenly.
+	pub const CARD_COLUMN: ClassName = ClassName::new_static("card-column");
+}
 
 /// The card-stack layout rules: the per-card frame and its two body layouts.
 ///
@@ -69,7 +72,7 @@ pub(crate) fn card_rules() -> Vec<Rule> {
 /// already defaults to stretch).
 fn card() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(CARD))
+		.with_selector(Selector::class(CardDeck::CARD))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
 		.with_value(common_props::AlignItemsProp, AlignItems::Stretch)
@@ -81,7 +84,7 @@ fn card() -> Rule {
 fn card_fill_viewport() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
-		.with_selector(Selector::class(CARD))
+		.with_selector(Selector::class(CardDeck::CARD))
 		.with_value(common_props::MinHeight, Length::ViewportHeight(100.))
 }
 
@@ -89,7 +92,7 @@ fn card_fill_viewport() -> Rule {
 /// children on both axes, with text centered.
 fn card_center() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(CARD_CENTER))
+		.with_selector(Selector::class(CardDeck::CARD_CENTER))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
 		.with_value(common_props::FlexGrowProp, 1u32)
@@ -102,7 +105,7 @@ fn card_center() -> Rule {
 /// the column row below growing to fill.
 fn card_content() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(CARD_CONTENT))
+		.with_selector(Selector::class(CardDeck::CARD_CONTENT))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
 		.with_value(common_props::FlexGrowProp, 1u32)
@@ -111,7 +114,7 @@ fn card_content() -> Rule {
 /// Card heading band - the heading row, holding its natural height (no growth).
 fn card_heading() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(CARD_HEADING))
+		.with_selector(Selector::class(CardDeck::CARD_HEADING))
 		.with_value(common_props::FlexGrowProp, 0u32)
 }
 
@@ -119,7 +122,7 @@ fn card_heading() -> Rule {
 /// with a comfortable gap between columns.
 fn card_columns() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(CARD_COLUMNS))
+		.with_selector(Selector::class(CardDeck::CARD_COLUMNS))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Horizontal)
 		.with_value(common_props::FlexGrowProp, 1u32)
@@ -132,6 +135,6 @@ fn card_columns() -> Rule {
 /// is nothing to collapse.
 fn card_column() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(CARD_COLUMN))
+		.with_selector(Selector::class(CardDeck::CARD_COLUMN))
 		.with_value(common_props::FlexGrowProp, 1u32)
 }

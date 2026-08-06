@@ -78,7 +78,7 @@ fn setup(async_commands: AsyncCommands) {
 
 fn route_bundle() -> impl Bundle {
 	(CliServer::default(), children![(
-		default_router(),
+		Router::with_defaults(),
 		children![
 			(
 				Script::<(), String>::new(r#""hello world""#),

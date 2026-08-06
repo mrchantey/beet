@@ -65,7 +65,7 @@
 //! let body = o11s::RequestBody::new("gpt-4o-mini")
 //!     .with_simple_input("Say hello in exactly 3 words.");
 //!
-//! let response = Request::post(o11s::OPENAI_RESPONSES_URL)
+//! let response = Request::post(o11s::RequestBody::OPENAI_URL)
 //!     .with_auth_bearer(&env_ext::var("OPENAI_API_KEY")?)
 //!     .with_json_body(&body)?
 //!     .send()
@@ -134,6 +134,3 @@ pub use usage::*;
 // Re-export the main body types with clearer names
 pub use request::RequestBody;
 pub use response::Body as ResponseBody;
-
-/// The default OpenResponses API endpoint for OpenAI.
-pub const OPENAI_RESPONSES_URL: &str = "https://api.openai.com/v1/responses";

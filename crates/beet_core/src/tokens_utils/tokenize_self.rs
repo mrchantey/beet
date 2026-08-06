@@ -22,17 +22,6 @@ pub trait TokenizeSelf<M = Self> {
 	}
 }
 
-/// Returns the past part of an [`std::any::type_name`] as a [`syn::Path`],
-/// the user is expected to bring the type into scope.
-/// Where the typename is `"std::option::Option<std::vec::Vec<usize>>"`,
-/// the output is `Option<Vec<usize>>`
-pub fn short_type_path<T>() -> syn::Path {
-	let short_name = ShortName::of::<T>().to_string();
-	syn::parse_str::<syn::Path>(&short_name).expect(&format!(
-		"Failed to parse type name {short_name} into syn::Path"
-	))
-}
-
 impl<T> TokenizeSelf for SendWrapper<T>
 where
 	T: TokenizeSelf,
@@ -80,7 +69,7 @@ impl TokenizeSelf for PathBuf {
 
 impl<T> TokenizeSelf for PhantomData<T> {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
-		let type_name = short_type_path::<T>();
+		let type_name = tokens_ext::short_type_path::<T>();
 		tokens.extend(quote! { std::marker::PhantomData::<#type_name> });
 	}
 }
@@ -178,7 +167,7 @@ mod test {
 
 	#[crate::test]
 	fn works() {
-		short_type_path::<Option<Vec<u32>>>()
+		tokens_ext::short_type_path::<Option<Vec<u32>>>()
 			.to_token_stream()
 			.to_string()
 			.replace(" ", "")

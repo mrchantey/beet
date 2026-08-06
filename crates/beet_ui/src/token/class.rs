@@ -136,7 +136,7 @@ impl FromIterator<ClassName> for Classes {
 }
 
 /// Converts a `(Token, Value)` pair into a declaration for use with
-/// [`inline_class`].
+/// [`ClassName::inline_class`].
 pub trait IntoDeclaration {
 	fn into_declaration(self) -> (TokenKey, TokenValue);
 }
@@ -166,39 +166,41 @@ impl IntoDeclaration for Declaration {
 	fn into_declaration(self) -> (TokenKey, TokenValue) { (self.0, self.1) }
 }
 
-/// A token-referencing [`inline_class!`] declaration: point `prop` at a design
-/// token (a palette role, shape, or typography ramp) rather than a literal, eg
-/// `token(BackgroundColor, colors::InverseSurface)`. The inline analogue of
-/// [`Rule::with_token`](crate::prelude::Rule::with_token).
-pub fn token<T>(prop: T, value: impl Into<Token>) -> Declaration
-where
-	T: TypedToken + Into<Token>,
-{
-	let key = Into::<Token>::into(prop).key().clone();
-	Declaration(key, TokenValue::token(value))
+impl Declaration {
+	/// A token-referencing [`inline_class!`] declaration: point `prop` at a design
+	/// token (a palette role, shape, or typography ramp) rather than a literal, eg
+	/// `Declaration::token(BackgroundColor, colors::InverseSurface)`. The inline analogue of
+	/// [`Rule::with_token`](crate::prelude::Rule::with_token).
+	pub fn token<T>(prop: T, value: impl Into<Token>) -> Declaration
+	where
+		T: TypedToken + Into<Token>,
+	{
+		let key = Into::<Token>::into(prop).key().clone();
+		Declaration(key, TokenValue::token(value))
+	}
 }
-
-/// Register a rule inline at the callsite, returning an [`OnSpawn`] effect that
-/// adds a unique inline class to the entity and registers the rule (only once)
-/// in the global [`RuleSet`].
-///
-/// [`OnSpawn`] is a [`BundleEffect`], so it works as a block attribute in both
-/// the bundle `rsx!` and the scene `rsx!` lowerings (scenes lift it via
-/// [`IntoScene`](crate::prelude::IntoScene)). This pattern is somewhat analagous
-/// to Component Scoped Styles as seen in frameworks like Astro.
-#[track_caller]
-pub fn inline_class(
-	declarations: impl IntoIterator<Item = (TokenKey, TokenValue)>,
-) -> OnSpawn {
-	let class = ClassName::new_inline();
-	let rule = Rule::new()
-		.with_selector(Selector::Class(class.as_selector()))
-		.with_extend(declarations);
-	OnSpawn::new(move |entity| {
-		register_inline_rule(entity, class, rule.clone())
-	})
+impl ClassName {
+	/// Register a rule inline at the callsite, returning an [`OnSpawn`] effect that
+	/// adds a unique inline class to the entity and registers the rule (only once)
+	/// in the global [`RuleSet`].
+	///
+	/// [`OnSpawn`] is a [`BundleEffect`], so it works as a block attribute in both
+	/// the bundle `rsx!` and the scene `rsx!` lowerings (scenes lift it via
+	/// [`IntoScene`](crate::prelude::IntoScene)). This pattern is somewhat analagous
+	/// to Component Scoped Styles as seen in frameworks like Astro.
+	#[track_caller]
+	pub fn inline_class(
+		declarations: impl IntoIterator<Item = (TokenKey, TokenValue)>,
+	) -> OnSpawn {
+		let class = ClassName::new_inline();
+		let rule = Rule::new()
+			.with_selector(Selector::Class(class.as_selector()))
+			.with_extend(declarations);
+		OnSpawn::new(move |entity| {
+			register_inline_rule(entity, class, rule.clone())
+		})
+	}
 }
-
 /// Register a one-off `rule` keyed on `class` into the global [`RuleSet`] (only
 /// once) and add `class` to the element's [`Classes`].
 ///
@@ -235,7 +237,7 @@ pub(crate) fn register_inline_rule(
 #[macro_export]
 macro_rules! inline_class {
 	[$($decl:expr),* $(,)?] => {
-		$crate::prelude::inline_class([
+		$crate::prelude::ClassName::inline_class([
 			$($crate::prelude::IntoDeclaration::into_declaration($decl)),*
 		])
 	};

@@ -20,18 +20,18 @@ pub(crate) const CLIENT_IO_PATH: &str = "__client_io";
 /// [`LiveReload`](super::LiveReload) watcher's `reload`.
 ///
 /// The channel rides the main HTTP port: browsers upgrade at [`CLIENT_IO_PATH`]
-/// (the [`client_io_route`] `default_router` wires in), the backend lands the
+/// (the [`client_io_route`] `Router::with_defaults` wires in), the backend lands the
 /// upgraded connection as a [`Socket`] and fires [`OnWebSocketUpgrade`], and
 /// [`adopt_client_io_socket`] re-parents it under this channel.
 #[derive(Debug, Default, Clone, Component)]
 pub struct ClientIo;
 
-/// The `/__client_io` route: a [`WebSocketUpgrade`] handler `default_router`
+/// The `/__client_io` route: a [`WebSocketUpgrade`] handler `Router::with_defaults`
 /// wires in under the `client_io` feature, so every HTTP router exposes the
 /// upgrade endpoint on its own port.
 pub(crate) fn client_io_route() -> impl Bundle {
 	(
-		exchange_route("__client_io", exchange_handler(client_io_upgrade)),
+		Router::exchange_route("__client_io", exchange_ext::handler(client_io_upgrade)),
 		// the upgrade handshake must never be cached
 		CacheHeaders::no_store(),
 	)
@@ -191,7 +191,7 @@ mod test {
 	}
 
 	/// End to end over the main HTTP port: a browser-like client upgrades at
-	/// `/__client_io` (wired by `default_router`), is adopted into the channel,
+	/// `/__client_io` (wired by `Router::with_defaults`), is adopted into the channel,
 	/// and receives a [`ClientIoBroadcast`]. This is the side-port replacement.
 	#[beet_core::test]
 	async fn broadcasts_over_the_upgraded_main_port() {
@@ -199,7 +199,7 @@ mod test {
 		// race; spawn it on a bare router (no `HttpServer`, so the `Server`
 		// orchestrator does not also try to bind the same port).
 		let (server, on_spawn) =
-			HttpServer::new_test(start_mini_http_server_with_tcp);
+			HttpServer::new_test(HttpServer::start_mini_with_tcp);
 		let port = server.port.unwrap();
 
 		std::thread::spawn(move || {
@@ -209,7 +209,7 @@ mod test {
 			// router (which wires `/__client_io`) as its dispatch child
 			app.world_mut().spawn(ClientIo);
 			app.world_mut()
-				.spawn((on_spawn, children![default_router()]));
+				.spawn((on_spawn, children![Router::with_defaults()]));
 			// once a client is adopted, broadcast `reload` to the channel each
 			// frame (the client breaks after the first message)
 			app.add_systems(

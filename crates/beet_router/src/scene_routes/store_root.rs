@@ -50,13 +50,13 @@ mod test {
 
 	#[beet_core::test]
 	fn extracts_the_first_store_root() {
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			"<Router><StoreRoot src=\"../..\"/><TemplateDir src=\"templates\"/></Router>",
 			&BsxParseConfig::bsx(),
 		)
 		.unwrap();
 		StoreRoot::extract_root(&nodes).xpect_eq(Some("../..".to_string()));
-		let none = parse_document("<Router/>", &BsxParseConfig::bsx()).unwrap();
+		let none = BsxNode::parse_document("<Router/>", &BsxParseConfig::bsx()).unwrap();
 		StoreRoot::extract_root(&none).xpect_none();
 	}
 }

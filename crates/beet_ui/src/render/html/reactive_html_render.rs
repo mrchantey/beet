@@ -1,7 +1,7 @@
 //! The thin-client reactivity wire format: the annotations [`HtmlRenderer`] emits
 //! in reactive mode ([`HtmlRenderer::reactive`]) so a browser runtime can hydrate
 //! and drive a page with no WASM. This module is the single source of truth for
-//! that format; the JavaScript runtime ([`REACTIVITY_JS`]) mirrors it.
+//! that format; the JavaScript runtime ([`Reactivity::JS`]) mirrors it.
 //!
 //! The divide is deliberate: the JSON blob carries **state** (the typed values),
 //! the in-place markers carry **topology** (which node binds to which path), and
@@ -32,15 +32,18 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
 
-/// The thin-client reactivity runtime source (`reactivity.js`), the single asset
-/// the static route serves and the inline render embeds.
-pub const REACTIVITY_JS: &str = include_str!("./reactivity.js");
+/// The thin-client reactivity runtime: its source and the URL it is served from.
+pub struct Reactivity;
 
-/// The default URL the runtime `<script defer>` loads from, the single source
-/// shared by [`ReactiveHtmlRender`] and the static route serving
-/// [`REACTIVITY_JS`].
-pub const REACTIVITY_SRC: &str = "/js/reactivity.js";
-
+impl Reactivity {
+	/// The thin-client reactivity runtime source (`reactivity.js`), the single
+	/// asset the static route serves and the inline render embeds.
+	pub const JS: &str = include_str!("./reactivity.js");
+	/// The default URL the runtime `<script defer>` loads from, the single source
+	/// shared by [`ReactiveHtmlRender`] and the static route serving
+	/// [`Reactivity::JS`].
+	pub const SRC: &str = "/js/reactivity.js";
+}
 /// When [`ReactiveHtmlRender`] injects the runtime script.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum InsertReactive {
@@ -60,7 +63,7 @@ pub(crate) struct ReactiveHtmlRender {
 	/// When to inject the runtime script (see [`InsertReactive`]).
 	insert_reactive: InsertReactive,
 	/// `false` (default): emit `<script defer src="/js/reactivity.js">`. `true`:
-	/// inline [`REACTIVITY_JS`] as-is instead.
+	/// inline [`Reactivity::JS`] as-is instead.
 	inline_js_runtime: bool,
 	/// Document id -> its value, the hydration blob (referenced documents only).
 	blob: Vec<(usize, Value)>,
@@ -350,13 +353,13 @@ impl ReactiveHtmlRender {
 	}
 
 	/// The runtime `<script>`: an external `<script defer src>` by default, or
-	/// the inlined [`REACTIVITY_JS`] when
+	/// the inlined [`Reactivity::JS`] when
 	/// [`inline_js_runtime`](Self::inline_js_runtime) is set.
 	fn runtime_script(&self) -> String {
 		if self.inline_js_runtime {
-			format!("<script>{REACTIVITY_JS}</script>")
+			format!("<script>{}</script>", Reactivity::JS)
 		} else {
-			format!("<script defer src=\"{REACTIVITY_SRC}\"></script>")
+			format!("<script defer src=\"{}\"></script>", Reactivity::SRC)
 		}
 	}
 
@@ -450,7 +453,7 @@ fn render_verb_arg(
 			);
 			format!("{prefix}{}", dotted_path(&resolved))
 		}
-		VerbArg::Literal(literal) => literal_value(literal)
+		VerbArg::Literal(literal) => literal.value()
 			.map(|value| {
 				serde_json::to_string(&serde_json::Value::from(value))
 					.unwrap_or_else(|_| "null".into())
@@ -494,7 +497,7 @@ mod test {
 	fn build(world: &mut World, markup: &str) -> Entity {
 		let container = world
 			.spawn_template(BsxTemplate::container(
-				parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
+				BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
 				BsxTemplateRegistry::default(),
 			))
 			.unwrap()
@@ -535,7 +538,7 @@ mod test {
 
 	#[beet_core::test]
 	fn wraps_bound_text_run_keeping_static_text() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER);
 		// the dynamic run is wrapped, the surrounding static text untouched.
 		reactive_html(&mut world, root).xpect_contains(
@@ -545,7 +548,7 @@ mod test {
 
 	#[beet_core::test]
 	fn marks_document_and_emits_blob() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER);
 		reactive_html(&mut world, root)
 			.xpect_contains("data-bx-doc=\"d0\"")
@@ -556,7 +559,7 @@ mod test {
 
 	#[beet_core::test]
 	fn reemits_event_verbs_with_resolved_paths() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER);
 		// the `@doc:count` arg resolves through the `counter` scope to an absolute
 		// path, so the client needs no scope walk.
@@ -571,7 +574,7 @@ mod test {
 
 	#[beet_core::test]
 	fn static_render_has_no_annotations() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER);
 		static_html(&mut world, root)
 			.xnot()
@@ -584,7 +587,7 @@ mod test {
 
 	#[beet_core::test]
 	fn emits_default_verbs() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER);
 		// the runtime ships zero built-in verbs, so every default verb's JS twin is
 		// emitted into `data-bx-verbs` for the client to install.
@@ -595,7 +598,7 @@ mod test {
 
 	#[beet_core::test]
 	fn emits_app_registered_js_verb() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		// an app verb supplies its JS twin in the same registration.
 		world.resource_mut::<VerbRegistry>().insert(
 			"shout",
@@ -614,7 +617,7 @@ mod test {
 
 	#[beet_core::test]
 	fn injects_blob_and_runtime_into_head() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER_PAGE);
 		let html = reactive_html(&mut world, root);
 		// everything reactive lands inside <head>, before its close tag; the body
@@ -629,7 +632,7 @@ mod test {
 
 	#[beet_core::test]
 	fn auto_keeps_plain_page_clean() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, PLAIN_PAGE);
 		// no bindings: an Auto reactive render is byte-identical to the static one.
 		reactive_html(&mut world, root).xpect_eq(static_html(&mut world, root));
@@ -637,7 +640,7 @@ mod test {
 
 	#[beet_core::test]
 	fn always_injects_runtime_on_plain_page() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, PLAIN_PAGE);
 		// Always ships the runtime even with no bindings (no blob, just the script).
 		reactive_html_with(&mut world, root, InsertReactive::Always, false)
@@ -648,7 +651,7 @@ mod test {
 
 	#[beet_core::test]
 	fn inline_embeds_runtime_source() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER_PAGE);
 		// inline mode embeds the runtime source instead of referencing it by URL.
 		reactive_html_with(&mut world, root, InsertReactive::Auto, true)
@@ -662,7 +665,7 @@ mod test {
 	/// ancestors, so the entry element tops the document and the blob ships.
 	#[beet_core::test]
 	fn document_above_transclusion_entry_is_marked() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		// content tree: the document on the root, a bound run two levels below
 		let content_root = world
 			.spawn((
@@ -689,7 +692,7 @@ mod test {
 	/// so it must not emit a reactive run that the client would clear on load.
 	#[beet_core::test]
 	fn prop_binding_into_props_store_is_not_reactive() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let doc = world
 			.spawn((Element::new("div"), Document::new(val!({ "count": 0 }))))
 			.id();
@@ -743,7 +746,7 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn writes_playwright_fixture() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		// a custom app verb with its JS twin: proves the `data-bx-verbs` seam end to
 		// end in a real browser.
 		world.resource_mut::<VerbRegistry>().insert(
@@ -789,7 +792,7 @@ mod test {
 	}
 
 	/// End-to-end under deno (no DOM): render the counter reactively to get the
-	/// real blob and the emitted default verb twins, evaluate [`REACTIVITY_JS`],
+	/// real blob and the emitted default verb twins, evaluate [`Reactivity::JS`],
 	/// install those verbs, drive the non-DOM `EntityMut` through every default
 	/// verb, and marshal the resulting store state + recorded mutations back to
 	/// Rust. This exercises the actually-shipped JS, not a stand-in.
@@ -798,7 +801,7 @@ mod test {
 	#[cfg(target_arch = "wasm32")]
 	#[beet_core::test]
 	fn runtime_drives_emitted_default_verbs() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let root = build(&mut world, COUNTER);
 		let html = reactive_html(&mut world, root);
 		// the actual wire-format payloads the page ships
@@ -806,7 +809,7 @@ mod test {
 		let verbs = extract_script(&html, "data-bx-verbs");
 
 		// evaluate the real runtime: its IIFE publishes the api on `globalThis.beet`
-		js_sys::eval(REACTIVITY_JS).unwrap();
+		js_sys::eval(Reactivity::JS).unwrap();
 		// a driver that installs the emitted verbs and drives the non-DOM EntityMut
 		// through each default verb, recording every store mutation
 		let driver = format!(

@@ -21,12 +21,10 @@ mod env_var;
 mod fs_error;
 pub mod fs_ext;
 mod read_dir;
-mod workspace_root;
 mod ws_path_buf;
 
 pub use abs_path_buf::*;
 pub use env_var::*;
 pub use fs_error::*;
 pub use read_dir::*;
-pub use workspace_root::*;
 pub use ws_path_buf::*;

@@ -118,7 +118,7 @@ pub fn FetchFox(
 		Name::new("Fox"),
 		Transform::from_scale(Vec3::splat(0.01)),
 		WorldAssetRoot(assets.load::<WorldAsset>("misc/fox.glb#Scene0")),
-		build_animation_graph(&clips, &mut graphs, &mut assets),
+		AnimationGraphClips::build(&clips, &mut graphs, &mut assets),
 		RotateToVelocity3d::default(),
 		ForceBundle::default(),
 		SteerBundle {

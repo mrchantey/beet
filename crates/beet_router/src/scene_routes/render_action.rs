@@ -40,7 +40,7 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	B: 'static + Send + Sync + Bundle,
 {
-	exchange_route(
+	Router::exchange_route(
 		path,
 		Action::new_pure(handler).chain(spawn_render_step::<B>()),
 	)
@@ -58,7 +58,7 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	B: 'static + Send + Sync + Bundle,
 {
-	exchange_route(
+	Router::exchange_route(
 		path,
 		Action::new_async(handler).chain(spawn_render_step::<B>()),
 	)
@@ -78,7 +78,7 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	B: 'static + Send + Sync + Bundle,
 {
-	exchange_route(
+	Router::exchange_route(
 		path,
 		Action::new_system(handler).chain(spawn_render_step::<B>()),
 	)
@@ -160,7 +160,7 @@ mod test {
 			rsx! { <p>"async home"</p> }
 		}
 		router_world()
-			.spawn((default_router(), children![render_action::async_route(
+			.spawn((Router::with_defaults(), children![render_action::async_route(
 				"home", home
 			)]))
 			.exchange(Request::get("home"))
@@ -176,7 +176,7 @@ mod test {
 			rsx! { <p>"system home"</p> }
 		}
 		router_world()
-			.spawn((default_router(), children![render_action::system_route(
+			.spawn((Router::with_defaults(), children![render_action::system_route(
 				"home", home
 			)]))
 			.exchange(Request::get("home"))
@@ -193,7 +193,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![render_action::async_route(
+			.spawn((Router::with_defaults(), children![render_action::async_route(
 				"home", home
 			)]))
 			.flush();

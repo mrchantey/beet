@@ -471,9 +471,9 @@ mod test {
 	async fn help_lists_routes() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
-				increment(FieldRef::new("count")),
-				decrement(FieldRef::new("count")),
+			.spawn((Router::with_defaults(), children![
+				Increment::bundle(FieldRef::new("count")),
+				Decrement::bundle(FieldRef::new("count")),
 			]))
 			.flush();
 
@@ -493,7 +493,7 @@ mod test {
 	async fn web_help_query_renders_same_route_list() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![increment(FieldRef::new(
+			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
 				"count"
 			))]))
 			.flush();
@@ -515,11 +515,11 @@ mod test {
 	async fn help_shows_nested_routes() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				render_action::fixed_func_route("counter", || {
 					Element::new("p").with_inner_text("counter")
 				}),
-				children![increment(FieldRef::new("count"))],
+				children![Increment::bundle(FieldRef::new("count"))],
 			)]))
 			.flush();
 
@@ -532,12 +532,12 @@ mod test {
 	async fn help_scopes_to_subcommand() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				(
 					render_action::fixed_func_route("counter", || {
 						Element::new("p").with_inner_text("counter")
 					}),
-					children![increment(FieldRef::new("count"))],
+					children![Increment::bundle(FieldRef::new("count"))],
 				),
 				render_action::fixed_func_route(
 					"about",
@@ -564,7 +564,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				render_action::fixed_func_route("build", || {
 					rsx! { <p>"build"</p> }
 				}),
@@ -588,7 +588,7 @@ mod test {
 	async fn help_shows_input_output_types() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![add(FieldRef::new("value"))]))
+			.spawn((Router::with_defaults(), children![AddField::bundle(FieldRef::new("value"))]))
 			.flush();
 
 		// add takes i64 input and returns i64
@@ -601,12 +601,12 @@ mod test {
 	async fn help_includes_scenes() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				render_action::fixed_func_route(
 					"about",
 					|| rsx! { <p>"about"</p> }
 				),
-				increment(FieldRef::new("count")),
+				Increment::bundle(FieldRef::new("count")),
 			]))
 			.flush();
 
@@ -635,9 +635,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((
-				default_router(),
+				Router::with_defaults(),
 				BaseLayout::<PageLayout>::default(),
-				children![increment(FieldRef::new("count"))],
+				children![Increment::bundle(FieldRef::new("count"))],
 			))
 			.flush();
 
@@ -654,7 +654,7 @@ mod test {
 	async fn not_found_shows_route_list() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![increment(FieldRef::new(
+			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
 				"count"
 			))]))
 			.flush();
@@ -680,9 +680,9 @@ mod test {
 	async fn format_route_help_excludes_help_and_lists_routes() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
-				increment(FieldRef::new("count")),
-				decrement(FieldRef::new("count")),
+			.spawn((Router::with_defaults(), children![
+				Increment::bundle(FieldRef::new("count")),
+				Decrement::bundle(FieldRef::new("count")),
 			]))
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();

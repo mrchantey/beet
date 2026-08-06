@@ -21,7 +21,7 @@
 //! - **Mini HTTP**: Lightweight async-io TCP server (default for `server` feature)
 //! - **Hyper**: Full-featured HTTP server (requires `hyper` feature)
 //! - **Lambda**: AWS Lambda runtime adapter (requires `lambda` feature)
-//! - **Installed**: a backend supplied at runtime via [`set_http_server`], used
+//! - **Installed**: a backend supplied at runtime via [`HttpServer::set_backend`], used
 //!   on `no_std` targets with no compiled-in backend.
 //!
 //! The server backend is selected at compile time based on feature flags.
@@ -34,7 +34,7 @@
 mod canonical_port;
 pub use canonical_port::*;
 
-// The `HttpServer` component and its `set_http_server` install hook; the concrete
+// The `HttpServer` component and its `HttpServer::set_backend` install hook; the concrete
 // backends below stay std/feature-gated on top. A server is an
 // `StartRunning<Request>` observer torn down by observing the removal of
 // `StartOnLoad`'s parked `Running<Response>`.
@@ -109,15 +109,5 @@ pub mod stream_sniff;
 	not(target_arch = "wasm32")
 ))]
 pub use echo_http_server::*;
-#[cfg(all(
-	feature = "server",
-	feature = "hyper",
-	not(target_arch = "wasm32")
-))]
-pub use hyper_server::*;
-#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
-pub use lambda_server::*;
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-pub use mini_http_server::*;
 #[cfg(feature = "std")]
 pub use server_plugin::*;

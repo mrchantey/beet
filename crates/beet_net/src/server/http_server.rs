@@ -7,7 +7,7 @@ use bevy::platform::sync::OnceLock;
 /// [`HttpSendFn`] on the client side.
 ///
 /// [`ServerPlugin`] installs one of the built-in backends (mini / hyper / lambda)
-/// via [`set_http_server`] based on compile-time features; a downstream adapter
+/// via [`HttpServer::set_backend`] based on compile-time features; a downstream adapter
 /// (an embassy / esp WiFi crate, …) installs its own without living in
 /// [`beet_net`]. [`HttpServer`]'s start observer invokes the installed function.
 ///
@@ -29,17 +29,7 @@ pub type HttpServerFn =
 
 static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 
-/// Install the backend [`HttpServer`] invokes on start. [`ServerPlugin`] calls
-/// this for the compile-time-selected feature backend; a no_std adapter with no
-/// compiled-in backend installs its own. Returns an error if one is already set.
-pub fn set_http_server(server: HttpServerFn) -> Result<()> {
-	HTTP_SERVER
-		.set(server)
-		.map_err(|_| bevyhow!("HTTP server already installed"))
-}
 
-/// The installed backend, if any.
-pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 
 /// HTTP server that listens for incoming requests, dispatching each through its
 /// host's `Request -> Response` action via `entity.exchange`.
@@ -49,7 +39,7 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// path ([`CallOnLoad`], required) calls its [`ContinueRun<Request, Response>`]
 /// boot action, whose fan-out ([`StartRunning<Request>`]) boots it when
 /// `--server` selects `"http"`, through the backend [`ServerPlugin`] installed
-/// via [`set_http_server`], reading `--port` / `--host` from the boot request.
+/// via [`HttpServer::set_backend`], reading `--port` / `--host` from the boot request.
 /// It never resolves the boot call, so its [`Running<Response>`] keep-alive
 /// claim persists the process; when that `Running` is removed (a reload or
 /// shutdown) its teardown observer stops the listener. A markup-spawned
@@ -60,7 +50,7 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// - `hyper`: full-featured Hyper HTTP server
 /// - `lambda`: AWS Lambda runtime
 /// - none of the above (eg no_std embedded): a backend installed at runtime via
-///   [`set_http_server`]
+///   [`HttpServer::set_backend`]
 ///
 /// # Example
 ///
@@ -70,7 +60,7 @@ pub fn http_server() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
 /// let mut world = World::new();
 /// world.spawn((
 ///     HttpServer::default(),
-///     children![exchange_handler(|req| req.mirror())],
+///     children![exchange_ext::handler(|req| req.mirror())],
 /// ))
 /// .trigger(StartRunning::from_cli);
 /// ```
@@ -124,6 +114,18 @@ impl Default for HttpServer {
 }
 
 impl HttpServer {
+	/// Install the backend [`HttpServer`] invokes on start. [`ServerPlugin`] calls
+	/// this for the compile-time-selected feature backend; a no_std adapter with no
+	/// compiled-in backend installs its own. Returns an error if one is already set.
+	pub fn set_backend(server: HttpServerFn) -> Result<()> {
+		HTTP_SERVER
+			.set(server)
+			.map_err(|_| bevyhow!("HTTP server already installed"))
+	}
+
+	/// The installed backend, if any.
+	pub fn backend() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
+
 	/// Creates a new server configured to listen on the specified port.
 	pub fn new(port: u16) -> Self {
 		Self {
@@ -207,10 +209,10 @@ async fn start_http_server(
 	if !entity.is_alive().await {
 		return Ok(());
 	}
-	let Some(backend) = http_server() else {
+	let Some(backend) = HttpServer::backend() else {
 		bevybail!(
 			"No HTTP server backend installed. Enable a server feature \
-			 (server/hyper/lambda) or install one via set_http_server(...)."
+			 (server/hyper/lambda) or install one via HttpServer::set_backend(...)."
 		)
 	};
 	backend(entity, shutdown).await
@@ -251,7 +253,7 @@ mod std_impl {
 				.expect("failed to create async listener");
 			// these tests never stop the server, so the shutdown sender is dropped:
 			// the receiver never resolves and the server runs for the test's duration.
-			let (_signal, shutdown) = oneshot::<()>();
+			let (_signal, shutdown) = OnceValue::<()>::oneshot();
 			(
 				Self {
 					port: Some(port),
@@ -356,7 +358,7 @@ mod tests {
 		)
 		.unwrap();
 		let port = listener.get_ref().local_addr().unwrap().port();
-		let (signal, shutdown) = oneshot::<()>();
+		let (signal, shutdown) = OnceValue::<()>::oneshot();
 		// mirror `start_http_server`: the accept loop owns the listener, raced
 		// against the shutdown receiver.
 		let served =
@@ -463,14 +465,14 @@ mod tests {
 pub(crate) struct ServerStartFlag;
 
 /// Install the shared test backend: flag the entity, standing in for a real
-/// server. [`set_http_server`] is a process-global [`OnceLock`], so the first
+/// server. [`HttpServer::set_backend`] is a process-global [`OnceLock`], so the first
 /// install wins for the whole test binary (notably the single wasm module that
 /// runs every case in series). Every test that boots a server installs this
 /// same idempotent hook so cases stay order-independent: flagging is
 /// observable where a start is expected and harmless where it is not.
 #[cfg(test)]
 pub(crate) fn stub_backend() {
-	set_http_server(|entity, _shutdown| {
+	HttpServer::set_backend(|entity, _shutdown| {
 		Box::pin(async move {
 			entity
 				.with(|mut entity| {
@@ -512,7 +514,7 @@ pub(crate) mod test {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			// the server owns the boot, its dispatch host is the child
-			app.world_mut().spawn((server, children![exchange_handler(
+			app.world_mut().spawn((server, children![exchange_ext::handler(
 				move |req| Response::ok().with_body(req.take().body)
 			)]));
 			app.run();
@@ -557,7 +559,7 @@ pub(crate) mod test {
 		let port = listener.get_ref().local_addr().unwrap().port();
 		let url = format!("http://127.0.0.1:{port}");
 		// keep the sender in the test so we can stop the server ourselves.
-		let (signal, shutdown) = oneshot::<()>();
+		let (signal, shutdown) = OnceValue::<()>::oneshot();
 		let _handle = std::thread::spawn(move || {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
@@ -567,10 +569,10 @@ pub(crate) mod test {
 					..default()
 				},
 				OnSpawn::new_async(move |entity| {
-					start_mini_http_server_with_tcp(entity, listener, shutdown)
+					HttpServer::start_mini_with_tcp(entity, listener, shutdown)
 				}),
 				// the server's dispatch host, a child
-				children![exchange_handler(|_| Response::ok().with_body("up"))],
+				children![exchange_ext::handler(|_| Response::ok().with_body("up"))],
 			));
 			app.run();
 		});

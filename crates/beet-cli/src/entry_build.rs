@@ -4,9 +4,9 @@
 //!
 //! An entry load splits into resolution ([`resolve_main`]: the store + the entry
 //! document name within it, honouring `--store` and the entry's own
-//! `<StoreRoot src>`), a world-free async read ([`read_entry_sources`]: the
+//! `<StoreRoot src>`), a world-free async read ([`read_sources`]: the
 //! entry document and the templates under its declared `<TemplateDir>`s, through the
-//! [`BlobStore`]) and a synchronous world build ([`build_entry_root`]: register the
+//! [`BlobStore`]) and a synchronous world build ([`build_root`]: register the
 //! templates, parse the entry, build it into a root carrying the store). The entry's
 //! own template dirs are registered *before* the entry parses, so entry-level tags
 //! (eg `<Styles/>`) resolve; the reactive `<TemplateDir>` observer covers everything
@@ -63,7 +63,7 @@ async fn read_store_root(
 	let entry = store.get_media(&SmolPath::from(entry_name)).await?;
 	match entry.media_type() {
 		MediaType::Bsx | MediaType::Html => {
-			parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?
+			BsxNode::parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?
 				.xmap(|nodes| StoreRoot::extract_root(&nodes))
 				.xok()
 		}
@@ -284,7 +284,7 @@ fn resolve_s3_store(_rest: &str) -> Result<BlobStore> {
 
 /// The entry sources read from a store: the entry document bytes + name, the template
 /// `(path, source)` pairs from the entry's declared `<TemplateDir>`s, and the formats
-/// they register through. The world-free async read [`build_entry_root`] consumes.
+/// they register through. The world-free async read [`build_root`] consumes.
 pub struct EntrySources {
 	entry_name: String,
 	entry: MediaBytes,
@@ -296,7 +296,7 @@ pub struct EntrySources {
 /// through `store`, awaited off the runtime (never blocked, so it runs on the
 /// single-threaded Worker too). The caller reads `formats` from the world first,
 /// since the read itself is world-free.
-pub async fn read_entry_sources(
+pub async fn read_sources(
 	store: &BlobStore,
 	formats: TemplateFormats,
 	entry_name: impl Into<String>,
@@ -311,7 +311,7 @@ pub async fn read_entry_sources(
 	let template_sources = match entry.media_type() {
 		MediaType::Bsx | MediaType::Html => {
 			let nodes =
-				parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?;
+				BsxNode::parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?;
 			let mut sources = Vec::new();
 			for dir in TemplateDir::extract_dirs(&nodes) {
 				sources.extend(
@@ -337,7 +337,7 @@ pub async fn read_entry_sources(
 /// declared template sources *before* parsing the entry (so its own tags resolve),
 /// then marks the root [`TemplatesLoaded`]. The synchronous world-mutating tail of an
 /// entry load; returns the root entity.
-pub fn build_entry_root(
+pub fn build_root(
 	world: &mut World,
 	store: BlobStore,
 	sources: EntrySources,
@@ -354,7 +354,7 @@ pub fn build_entry_root(
 	// itself cannot build (eg its root tag is feature-gated out of this binary).
 	if matches!(entry.media_type(), MediaType::Bsx | MediaType::Html)
 		&& let Ok(text) = entry.as_utf8()
-		&& let Ok(nodes) = parse_document(text, &BsxParseConfig::bsx())
+		&& let Ok(nodes) = BsxNode::parse_document(text, &BsxParseConfig::bsx())
 	{
 		for check in CrateCheck::extract_checks(&nodes) {
 			world.spawn(check);
@@ -400,15 +400,15 @@ pub(crate) async fn build_entry_owned(
 	extra: impl Bundle,
 ) -> Result<Entity> {
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let sources = read_entry_sources(&store, formats, entry_name).await?;
-	let root = build_entry_root(world, store, sources, extra)?;
+	let sources = read_sources(&store, formats, entry_name).await?;
+	let root = build_root(world, store, sources, extra)?;
 	TemplatePending::settle_owned(world).await;
 	Ok(root)
 }
 
 /// Rebuild the `--watch` entry into a fresh [`BeetSceneRoot`], the shared path the
 /// initial build and every structural reload run: tear down the previous entry
-/// scene via [`despawn_scene`] (servers close, sockets drop; a no-op on the first
+/// scene via [`BeetSceneRoot::despawn_all`] (servers close, sockets drop; a no-op on the first
 /// build), re-read the sources through the store, and build a fresh root marked
 /// [`BeetSceneRoot`] + [`LiveReload`] with its own entry [`WatchDir`]. The fresh
 /// root's server children re-boot (rebinding their ports), so a browser's dropped
@@ -417,14 +417,14 @@ pub(crate) async fn build_entry_owned(
 /// The [`EntryReloader`] resource (installed once) survives the teardown and drives
 /// this on a change to the entry document or an included `<Template src>`.
 #[cfg(not(target_arch = "wasm32"))]
-pub async fn rebuild_watched_entry(
+pub async fn rebuild_watched(
 	world: &AsyncWorld,
 	store: BlobStore,
 	entry_name: String,
 	formats: TemplateFormats,
 ) -> Result {
 	let sources =
-		read_entry_sources(&store, formats, entry_name.clone()).await?;
+		read_sources(&store, formats, entry_name.clone()).await?;
 	// recompute the structural source set from the current content, so a
 	// `<Template src>` include added by this very edit is structural on the next
 	// one without a restart.
@@ -436,12 +436,12 @@ pub async fn rebuild_watched_entry(
 				reloader.set_sources(structural);
 			}
 			// the entry's own dir, watched for edits to the entry doc / its includes;
-			// computed before `build_entry_root` consumes `store`.
+			// computed before `build_root` consumes `store`.
 			let entry_watch = WatchDir::for_entry(&store, &entry_name);
 			// tear down the previous entry scene so servers close and sockets drop
 			// before the fresh tree binds (a no-op on the first build).
-			despawn_scene(world);
-			let root = build_entry_root(
+			BeetSceneRoot::despawn_all(world);
+			let root = build_root(
 				world,
 				store,
 				sources,
@@ -483,11 +483,11 @@ async fn entry_source_paths(
 		let Ok(text) = media.as_utf8() else {
 			continue;
 		};
-		let Ok(nodes) = parse_document(text, &BsxParseConfig::bsx()) else {
+		let Ok(nodes) = BsxNode::parse_document(text, &BsxParseConfig::bsx()) else {
 			continue;
 		};
 		stack.extend(
-			extract_template_srcs(&nodes)
+			TemplateInclude::extract_srcs(&nodes)
 				.into_iter()
 				.map(|src| SmolPath::from(src.as_str())),
 		);
@@ -499,9 +499,9 @@ async fn entry_source_paths(
 /// path, where the program is inlined in a `<script type="application/x-bsx">`, not
 /// resolved from `--main`/a filesystem. Constructs [`EntrySources`] directly and
 /// builds onto a storeless ([`BlobStore::temp`]) root, so the same
-/// [`build_entry_root`] core runs as the store-backed native path. `extra` rides
-/// onto the root as for [`build_entry_root`].
-pub fn build_entry_from_bsx(
+/// [`build_root`] core runs as the store-backed native path. `extra` rides
+/// onto the root as for [`build_root`].
+pub fn build_from_bsx(
 	world: &mut World,
 	formats: TemplateFormats,
 	entry_name: impl Into<String>,
@@ -514,7 +514,7 @@ pub fn build_entry_from_bsx(
 		template_sources: Vec::new(),
 		formats,
 	};
-	build_entry_root(world, BlobStore::temp(), sources, extra)
+	build_root(world, BlobStore::temp(), sources, extra)
 }
 
 #[cfg(test)]
@@ -536,11 +536,11 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources = read_entry_sources(&store, formats, "main.bsx")
+		let sources = read_sources(&store, formats, "main.bsx")
 			.await
 			.unwrap();
 		let root =
-			build_entry_root(&mut world, store, sources, DisableCallOnLoad)
+			build_root(&mut world, store, sources, DisableCallOnLoad)
 				.unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
@@ -554,7 +554,7 @@ mod test {
 
 	/// The readiness gate settles and returns once the entry has nothing pending.
 	/// This entry has no `<RoutesDir>`/`<TemplateDir>`, so it is ready the moment
-	/// `build_entry_root` returns; the gate must return rather than hang.
+	/// `build_root` returns; the gate must return rather than hang.
 	#[beet::test]
 	async fn gate_settles_when_ready() {
 		let store = BlobStore::temp();
@@ -564,11 +564,11 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources = read_entry_sources(&store, formats, "main.bsx")
+		let sources = read_sources(&store, formats, "main.bsx")
 			.await
 			.unwrap();
 		let root =
-			build_entry_root(&mut world, store, sources, DisableCallOnLoad)
+			build_root(&mut world, store, sources, DisableCallOnLoad)
 				.unwrap();
 		world
 			.entity(root)

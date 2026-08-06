@@ -251,7 +251,7 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 /// Build the data struct + `Template` impl for a `#[template(system)]`.
 ///
 /// `#[prop]` params are fields; every other param is a Bevy `SystemParam`
-/// fetched synchronously at build time via [`system_template`].
+/// fetched synchronously at build time via [`SystemTemplate`].
 fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut props: Vec<Prop> = Vec::new();
 	let mut sys_types: Vec<TokenStream> = Vec::new();
@@ -355,9 +355,9 @@ fn emit(
 			sys_types,
 			sys_pats,
 		}) => quote! {
-			let inner = #beet_core::prelude::system_template::<
+			let inner = #beet_core::prelude::SystemTemplate::<
 				(#(#sys_types,)*), _, _
-			>(move |_entity, (#(#sys_pats,)*)| {
+			>::new(move |_entity, (#(#sys_pats,)*)| {
 				let Self { #(#field_idents),* } = props.clone();
 				#(#required_unwraps)*
 				#(#body_bindings)*
@@ -642,7 +642,7 @@ mod test {
 		});
 		assert!(result.contains("struct Panel"));
 		assert!(result.contains("role : ColorRole"));
-		assert!(result.contains("system_template :: < (Res < Theme > ,)"));
+		assert!(result.contains("SystemTemplate :: < (Res < Theme > ,)"));
 		assert!(result.contains("let Self { role } = props . clone ()"));
 	}
 

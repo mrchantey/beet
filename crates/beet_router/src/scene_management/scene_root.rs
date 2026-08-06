@@ -38,7 +38,7 @@ pub(crate) fn set_scene(
 	media: &MediaBytes,
 	parent: Option<Entity>,
 ) -> Result<Vec<Entity>> {
-	despawn_scene(world);
+	BeetSceneRoot::despawn_all(world);
 
 	// roots are the spawned entities with no parent; mark them so the whole
 	// scene can be despawned together on the next swap.
@@ -65,75 +65,76 @@ pub(crate) fn set_scene(
 	Ok(roots)
 }
 
-/// Despawn the active scene: trigger [`ResetScene`] then despawn every
-/// [`BeetSceneRoot`] tree and the [`SceneResource`]-backed resources *those roots*
-/// declared (so a rebuild reinserts each fresh from markup rather than patching
-/// stale live state), rebuilding the route tree of each server the roots hung
-/// under so the cleared routes drop out of dispatch. A no-op when no scene is
-/// loaded.
-///
-/// Resource removal is scoped by [`SceneResource::root`], never global: a
-/// non-scene build root (a `serve`/`export-static` entry, which carries no
-/// [`BeetSceneRoot`]) owns its resources for the process lifetime, and must not
-/// lose them when a scene swaps underneath it.
-pub fn despawn_scene(world: &mut World) {
-	let existing = world
-		.query_filtered::<Entity, With<BeetSceneRoot>>()
-		.iter(world)
-		.collect::<HashSet<_>>();
-	// the resources these roots created, plus any whose root is already gone: an
-	// orphan can never be rebuilt from markup, and leaving it live would make the
-	// next build patch a stale resource instead of creating a fresh one.
-	let resources = world
-		.query::<(Entity, &SceneResource)>()
-		.iter(world)
-		.filter(|(_, owned)| {
-			existing.contains(&owned.root)
-				|| world.get_entity(owned.root).is_err()
-		})
-		.map(|(entity, _)| entity)
-		.collect::<Vec<_>>();
-	if existing.is_empty() && resources.is_empty() {
-		return;
-	}
-	world.trigger(ResetScene);
-	// fully remove each markup-created resource: take the resource component off
-	// its backing entity, discard the `IsResource` caretaker (whose hook cleans
-	// bevy's resource cache; flushed so the queued cleanup lands on a live
-	// entity), then despawn the husk. Bevy warns on despawning a *live* resource
-	// entity, so the caretaker must go first.
-	for entity in resources {
-		use bevy::ecs::resource::IsResource;
-		if let Some(id) = world
-			.entity(entity)
-			.get::<IsResource>()
-			.map(IsResource::resource_component_id)
-		{
-			world.entity_mut(entity).remove_by_id(id);
+impl BeetSceneRoot {
+	/// Despawn the active scene: trigger [`ResetScene`] then despawn every
+	/// [`BeetSceneRoot`] tree and the [`SceneResource`]-backed resources *those roots*
+	/// declared (so a rebuild reinserts each fresh from markup rather than patching
+	/// stale live state), rebuilding the route tree of each server the roots hung
+	/// under so the cleared routes drop out of dispatch. A no-op when no scene is
+	/// loaded.
+	///
+	/// Resource removal is scoped by [`SceneResource::root`], never global: a
+	/// non-scene build root (a `serve`/`export-static` entry, which carries no
+	/// [`BeetSceneRoot`]) owns its resources for the process lifetime, and must not
+	/// lose them when a scene swaps underneath it.
+	pub fn despawn_all(world: &mut World) {
+		let existing = world
+			.query_filtered::<Entity, With<BeetSceneRoot>>()
+			.iter(world)
+			.collect::<HashSet<_>>();
+		// the resources these roots created, plus any whose root is already gone: an
+		// orphan can never be rebuilt from markup, and leaving it live would make the
+		// next build patch a stale resource instead of creating a fresh one.
+		let resources = world
+			.query::<(Entity, &SceneResource)>()
+			.iter(world)
+			.filter(|(_, owned)| {
+				existing.contains(&owned.root)
+					|| world.get_entity(owned.root).is_err()
+			})
+			.map(|(entity, _)| entity)
+			.collect::<Vec<_>>();
+		if existing.is_empty() && resources.is_empty() {
+			return;
 		}
-		world.entity_mut(entity).remove::<IsResource>();
-		world.flush();
-		world.entity_mut(entity).despawn();
+		world.trigger(ResetScene);
+		// fully remove each markup-created resource: take the resource component off
+		// its backing entity, discard the `IsResource` caretaker (whose hook cleans
+		// bevy's resource cache; flushed so the queued cleanup lands on a live
+		// entity), then despawn the husk. Bevy warns on despawning a *live* resource
+		// entity, so the caretaker must go first.
+		for entity in resources {
+			use bevy::ecs::resource::IsResource;
+			if let Some(id) = world
+				.entity(entity)
+				.get::<IsResource>()
+				.map(IsResource::resource_component_id)
+			{
+				world.entity_mut(entity).remove_by_id(id);
+			}
+			world.entity_mut(entity).remove::<IsResource>();
+			world.flush();
+			world.entity_mut(entity).despawn();
+		}
+		// the servers the scene was reparented under, captured before despawning so
+		// their route trees can be rebuilt without the now-gone routes.
+		let servers = existing
+			.iter()
+			.filter_map(|entity| {
+				world.entity(*entity).get::<ChildOf>().map(ChildOf::parent)
+			})
+			.collect::<HashSet<_>>();
+		existing
+			.into_iter()
+			.for_each(|entity| world.entity_mut(entity).despawn());
+		servers.into_iter().for_each(|server| {
+			world
+				.run_system_cached_with(RouteTree::rebuild, server)
+				.unwrap_or(Ok(()))
+				.ok();
+		});
 	}
-	// the servers the scene was reparented under, captured before despawning so
-	// their route trees can be rebuilt without the now-gone routes.
-	let servers = existing
-		.iter()
-		.filter_map(|entity| {
-			world.entity(*entity).get::<ChildOf>().map(ChildOf::parent)
-		})
-		.collect::<HashSet<_>>();
-	existing
-		.into_iter()
-		.for_each(|entity| world.entity_mut(entity).despawn());
-	servers.into_iter().for_each(|server| {
-		world
-			.run_system_cached_with(RouteTree::rebuild, server)
-			.unwrap_or(Ok(()))
-			.ok();
-	});
 }
-
 #[cfg(all(test, feature = "template_serde", feature = "json"))]
 mod test {
 	use crate::prelude::*;
@@ -165,7 +166,7 @@ mod test {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
-			.spawn((default_router(), children![exchange_route("ping", Ping)]))
+			.spawn((Router::with_defaults(), children![Router::exchange_route("ping", Ping)]))
 			.flush();
 		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)
@@ -174,7 +175,7 @@ mod test {
 
 		// load it under a fresh server entity, as the scene server does.
 		let mut world = test_world();
-		let server = world.spawn(default_router()).flush();
+		let server = world.spawn(Router::with_defaults()).flush();
 		let roots = set_scene(&mut world, &json, Some(server)).unwrap();
 		roots.len().xpect_eq(1);
 		world.flush();
@@ -196,7 +197,7 @@ mod test {
 			.write()
 			.register::<PackageConfig>();
 		let spawn = |world: &mut World| -> Entity {
-			let nodes = parse_document(
+			let nodes = BsxNode::parse_document(
 				r#"<PackageConfig title="Owned"/>"#,
 				&BsxParseConfig::bsx(),
 			)
@@ -218,7 +219,7 @@ mod test {
 			.as_str()
 			.xpect_eq("Owned");
 		// teardown removes the markup-created resource with the scene
-		despawn_scene(&mut world);
+		BeetSceneRoot::despawn_all(&mut world);
 		world.get_resource::<PackageConfig>().xpect_none();
 		// a rebuild reinserts it fresh from markup
 		spawn(&mut world);
@@ -243,7 +244,7 @@ mod test {
 		// the host entry declares the resource and owns it, with no `BeetSceneRoot`
 		let entry = world
 			.spawn_template(BsxTemplate::container(
-				parse_document(
+				BsxNode::parse_document(
 					r#"<PackageConfig title="Host"/>"#,
 					&BsxParseConfig::bsx(),
 				)
@@ -257,7 +258,7 @@ mod test {
 		// a scene loads and is torn down beside it
 		let scene = world.spawn_template(()).unwrap().id();
 		world.entity_mut(scene).insert(BeetSceneRoot);
-		despawn_scene(&mut world);
+		BeetSceneRoot::despawn_all(&mut world);
 
 		// the scene is gone, the entry and its resource are untouched
 		world.get_entity(scene).is_err().xpect_true();
@@ -274,7 +275,7 @@ mod test {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
-			.spawn((default_router(), children![exchange_route("ping", Ping)]))
+			.spawn((Router::with_defaults(), children![Router::exchange_route("ping", Ping)]))
 			.flush();
 		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)
@@ -288,7 +289,7 @@ mod test {
 		let mut bytes = json;
 		for _ in 0..3 {
 			let mut world = test_world();
-			let host = world.spawn(default_router()).flush();
+			let host = world.spawn(Router::with_defaults()).flush();
 			set_scene(&mut world, &bytes, Some(host)).unwrap();
 			world.flush();
 			world

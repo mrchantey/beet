@@ -223,6 +223,37 @@ pub enum DataLiteral {
 	EntityRef(SmolStr),
 }
 
+impl DataLiteral {
+	/// The plain [`Value`] of this literal, or `None` for a non-literal (an
+	/// entity ref carries no inline value).
+	///
+	/// Used both for build-time verification and by the reactive renderer to
+	/// serialize a literal verb argument into the emitted `bx:<event>` attribute.
+	pub fn value(&self) -> Option<Value> {
+		match self {
+			DataLiteral::Scalar(value) => Some(value.clone()),
+			DataLiteral::List(items) => items
+				.iter()
+				.map(DataLiteral::value)
+				.collect::<Option<Vec<_>>>()
+				.map(Value::List),
+			DataLiteral::Struct(fields) => {
+				let mut map = Map::default();
+				for (key, item) in fields {
+					map.insert(key.clone(), item.value()?);
+				}
+				Some(Value::Map(map))
+			}
+			DataLiteral::Enum(named)
+				if matches!(named.fields, NamedFields::Unit) =>
+			{
+				Some(Value::Str(named.name.clone()))
+			}
+			DataLiteral::Enum(_) | DataLiteral::EntityRef(_) => None,
+		}
+	}
+}
+
 /// A name plus its fields, used for enum variants (`Center`, `Rgb(..)`) and
 /// spread components/templates (`MyComponent { .. }`). The name disambiguates a
 /// bare enum variant from a typed component only at resolution, against the

@@ -13,20 +13,9 @@ use core::sync::atomic::Ordering;
 use core::task::Poll;
 use core::task::Waker;
 
-/// Creates a one-shot value channel, returning the [`OnceValue`] sender and
-/// [`OnceValueRx`] receiver halves.
-pub fn oneshot<T>() -> (OnceValue<T>, OnceValueRx<T>) {
-	let inner = Arc::new(OnceValueInner {
-		value: Mutex::new(None),
-		waker: Mutex::new(None),
-		set: AtomicBool::new(false),
-	});
-	(OnceValue(inner.clone()), OnceValueRx(inner))
-}
-
-/// The sending half of a [`oneshot`] channel.
+/// The sending half of a [`OnceValue::oneshot`] channel.
 pub struct OnceValue<T>(Arc<OnceValueInner<T>>);
-/// The receiving half of a [`oneshot`] channel.
+/// The receiving half of a [`OnceValue::oneshot`] channel.
 pub struct OnceValueRx<T>(Arc<OnceValueInner<T>>);
 
 struct OnceValueInner<T> {
@@ -36,6 +25,17 @@ struct OnceValueInner<T> {
 }
 
 impl<T> OnceValue<T> {
+	/// Creates a one-shot value channel, returning the [`OnceValue`] sender and
+	/// [`OnceValueRx`] receiver halves.
+	pub fn oneshot() -> (OnceValue<T>, OnceValueRx<T>) {
+		let inner = Arc::new(OnceValueInner {
+			value: Mutex::new(None),
+			waker: Mutex::new(None),
+			set: AtomicBool::new(false),
+		});
+		(OnceValue(inner.clone()), OnceValueRx(inner))
+	}
+
 	/// Publishes the value and wakes the awaiting task.
 	pub fn signal(self, value: T) {
 		*self.0.value.lock().unwrap() = Some(value);

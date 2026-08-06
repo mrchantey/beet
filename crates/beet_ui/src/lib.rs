@@ -18,27 +18,10 @@ mod token;
 mod types;
 #[cfg(feature = "template")]
 mod widgets;
-
-/// A [`World`](beet_core::prelude::World) wired with the minimal plugins required
-/// to `spawn_template`: the substrate's
-/// [`TemplatePlugin`](beet_core::prelude::TemplatePlugin), the
-/// [`DocumentPlugin`](beet_core::prelude::DocumentPlugin) templates lean on, and
-/// (when `bsx` is enabled) the default BSX event/verb vocabulary
-/// ([`BsxDefaultsPlugin`](crate::prelude::BsxDefaultsPlugin)) so a parsed
-/// `bx:click` resolves. Insert any required resources before spawning.
-#[cfg(all(feature = "template", feature = "bsx"))]
-pub fn ui_world() -> beet_core::prelude::World {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-	(TemplatePlugin, DocumentPlugin, BsxDefaultsPlugin).into_world()
-}
-
-/// See [`ui_world`]; this variant omits the BSX vocabulary when `bsx` is off.
-#[cfg(all(feature = "template", not(feature = "bsx")))]
-pub fn ui_world() -> beet_core::prelude::World {
-	use beet_core::prelude::*;
-	(TemplatePlugin, DocumentPlugin).into_world()
-}
+/// A test/authoring [`World`](beet_core::prelude::World) wired with the minimal
+/// UI plugins.
+#[cfg(feature = "template")]
+pub mod world_ext;
 
 /// Exports the most commonly used items.
 pub mod prelude {
@@ -52,7 +35,7 @@ pub mod prelude {
 	pub use crate::inline_class;
 	pub use crate::input::*;
 	#[cfg(feature = "template")]
-	pub use crate::ui_world;
+	pub use crate::world_ext;
 	// the `rsx!` / `#[template]` snippet runtime moved to `beet_core`; re-export it
 	// so the macro output and `use beet_ui::prelude::*` call sites resolve.
 	pub use crate::parse::*;
@@ -76,7 +59,6 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::TextAlign;
 	#[cfg(feature = "style")]
-	pub use crate::style::VISUAL_STYLE_DEFAULT;
 	#[cfg(feature = "style")]
 	pub use crate::style::VisualStyle;
 	/// The Material styling system. Its design-token roles are deliberately

@@ -109,7 +109,7 @@ pub enum PendingKind {
 /// Generalized so assets, includes, remote fetches, route scans and scene
 /// spawns all register into it. Each dependency is an opaque [`PendingId`] with
 /// a [`PendingKind`]. The set fires [`LoadTemplate`] when it drains to empty
-/// (via [`drain_pending_dependencies`]); slot resolution deferred by the build
+/// (via [`TemplatePending::drain_dependencies`]); slot resolution deferred by the build
 /// walker runs when the last [`PendingKind::Structural`] entry resolves.
 ///
 /// A root that registers no dependencies drains immediately, so
@@ -127,7 +127,7 @@ pub struct TemplatePending {
 	/// The next id to hand out from [`Self::register`].
 	next: u64,
 	/// The pre-build [`SlotChild`] snapshot the walker parked when it deferred
-	/// slot resolution to the drain (see [`drain_pending_dependencies`]).
+	/// slot resolution to the drain (see [`TemplatePending::drain_dependencies`]).
 	deferred_slots: Option<Vec<Entity>>,
 }
 
@@ -247,7 +247,7 @@ impl TemplatePending {
 	}
 
 	/// Parks the walker's pre-build [`SlotChild`] snapshot, deferring slot
-	/// resolution to the drain (see [`drain_pending_dependencies`]).
+	/// resolution to the drain (see [`TemplatePending::drain_dependencies`]).
 	pub(crate) fn defer_slots(&mut self, pre_slot_children: Vec<Entity>) {
 		self.deferred_slots = Some(pre_slot_children);
 	}
@@ -307,7 +307,7 @@ impl TemplatePending {
 			.map(|mut pending| pending.resolve(id))
 			.unwrap_or(false);
 		if was_present {
-			drain_pending_dependencies(&mut root_entity);
+			TemplatePending::drain_dependencies(&mut root_entity);
 		}
 	}
 
@@ -473,61 +473,63 @@ impl PendingDependency {
 	}
 }
 
-/// Fires [`LoadTemplate`] on `root` if its [`TemplatePending`] set is empty (or
-/// absent), reporting the error state from the presence of [`TemplateError`].
-///
-/// This is the drain trigger, called synchronously by the walker after
-/// [`SpawnTemplate`] (the empty case) and by every dependency resolver via
-/// [`TemplatePending::resolve_on`]. Two things happen here:
-///
-/// 1. Once no [`PendingKind::Structural`] dependency remains, a deferred slot
-///    resolution (parked by the walker when content was still arriving) runs
-///    exactly once over the settled tree; a failure rides [`TemplateError`].
-/// 2. Once nothing at all remains, [`LoadTemplate`] fires on the root and every
-///    descendant.
-pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
-	// deferred slot resolution: the content has settled once every structural
-	// dependency resolved. `take_deferred_slots` yields at most once.
-	let structural_empty = root
-		.get::<TemplatePending>()
-		.map(TemplatePending::structural_empty)
-		.unwrap_or(true);
-	if structural_empty
-		&& let Some(pre_slot_children) = root
-			.get_mut::<TemplatePending>()
-			.and_then(|mut pending| pending.take_deferred_slots())
-		&& !root.contains::<TemplateError>()
-	{
-		let root_id = root.id();
-		let result = root.world_scope(|world| {
-			anchor_pre_slot_children(world, root_id, &pre_slot_children);
-			resolve_slots(world, root_id)
-		});
-		if let Err(err) = result {
-			root.insert(TemplateError::new(CloneError::new(err)));
-		}
-	}
-
-	let pending_empty = root
-		.get::<TemplatePending>()
-		.map(TemplatePending::is_empty)
-		.unwrap_or(true);
-	if !pending_empty {
-		return;
-	}
-	let is_error = root.contains::<TemplateError>();
-	let root_id = root.id();
-	// fire on the root *and* every descendant in the built subtree, so a load verb
-	// (eg `CallOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
-	// Snapshot the subtree first, then fire: an observer may restructure the tree.
-	root.world_scope(|world| {
-		let subtree = world.entity_mut(root_id).iter_descendents_inclusive();
-		for entity in subtree {
-			if let Ok(mut entity) = world.get_entity_mut(entity) {
-				entity.trigger(move |entity| LoadTemplate { entity, is_error });
+impl TemplatePending {
+	/// Fires [`LoadTemplate`] on `root` if its [`TemplatePending`] set is empty (or
+	/// absent), reporting the error state from the presence of [`TemplateError`].
+	///
+	/// This is the drain trigger, called synchronously by the walker after
+	/// [`SpawnTemplate`] (the empty case) and by every dependency resolver via
+	/// [`TemplatePending::resolve_on`]. Two things happen here:
+	///
+	/// 1. Once no [`PendingKind::Structural`] dependency remains, a deferred slot
+	///    resolution (parked by the walker when content was still arriving) runs
+	///    exactly once over the settled tree; a failure rides [`TemplateError`].
+	/// 2. Once nothing at all remains, [`LoadTemplate`] fires on the root and every
+	///    descendant.
+	pub fn drain_dependencies(root: &mut EntityWorldMut) {
+		// deferred slot resolution: the content has settled once every structural
+		// dependency resolved. `take_deferred_slots` yields at most once.
+		let structural_empty = root
+			.get::<TemplatePending>()
+			.map(TemplatePending::structural_empty)
+			.unwrap_or(true);
+		if structural_empty
+			&& let Some(pre_slot_children) = root
+				.get_mut::<TemplatePending>()
+				.and_then(|mut pending| pending.take_deferred_slots())
+			&& !root.contains::<TemplateError>()
+		{
+			let root_id = root.id();
+			let result = root.world_scope(|world| {
+				anchor_pre_slot_children(world, root_id, &pre_slot_children);
+				resolve_slots(world, root_id)
+			});
+			if let Err(err) = result {
+				root.insert(TemplateError::new(CloneError::new(err)));
 			}
 		}
-	});
+
+		let pending_empty = root
+			.get::<TemplatePending>()
+			.map(TemplatePending::is_empty)
+			.unwrap_or(true);
+		if !pending_empty {
+			return;
+		}
+		let is_error = root.contains::<TemplateError>();
+		let root_id = root.id();
+		// fire on the root *and* every descendant in the built subtree, so a load verb
+		// (eg `CallOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
+		// Snapshot the subtree first, then fire: an observer may restructure the tree.
+		root.world_scope(|world| {
+			let subtree = world.entity_mut(root_id).iter_descendents_inclusive();
+			for entity in subtree {
+				if let Ok(mut entity) = world.get_entity_mut(entity) {
+					entity.trigger(move |entity| LoadTemplate { entity, is_error });
+				}
+			}
+		});
+	}
 }
 
 /// The system form of [`TemplatePending::sweep_dropped`], registered by the

@@ -1,44 +1,45 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The single batteries-included router builder, available on std and no_std.
-///
-/// Wires the [`Router`] dispatch action plus the standard middleware and the
-/// default app-level routes around the provided `routes`:
-/// - [`Router`] for route lookup and dispatch (always).
-/// - [`RequestLogger`] middleware for per-request logging (no_std core, always).
-/// - [`HelpHandler`] / [`NavigateHandler`] middleware for `--help` / `--navigate`
-///   support (std-only: they render through the scene pipeline).
-/// - an `/app-info` scene route (std-only) and a `POST /analytics` route
-///   (`json` + std), both of which require a [`PackageConfig`] resource.
-/// - a `GET /health` route (std-only) returning 200 + json metrics, the
-///   load-balancer health check and autoscaling signal.
-/// - a cached `GET /js/reactivity.js` route (std-only) serving the thin-client
-///   reactivity runtime, the asset the reactive renderer's injected script loads.
-///
-/// On no_std the std-only children/middleware are omitted and the not-found
-/// fallback is a plain-text route listing; add any extra `Request`/`Response`
-/// [`Middleware`] to the spawned entity yourself if wanted.
-pub fn default_router() -> impl Bundle {
-	(
-		Router,
-		RequestLogger::default(),
-		// std-only middleware: rendered through the scene pipeline.
-		#[cfg(feature = "std")]
-		HelpHandler::default(),
-		#[cfg(feature = "std")]
-		NavigateHandler::default(),
-		// the default app routes, as children of this router entity (a no-code BSX
-		// site gets the same set from the `<DefaultAppRoutes/>` template).
-		#[cfg(feature = "std")]
-		default_app_routes(),
-	)
+impl Router {
+	/// The single batteries-included router builder, available on std and no_std.
+	///
+	/// Wires the [`Router`] dispatch action plus the standard middleware and the
+	/// default app-level routes around the provided `routes`:
+	/// - [`Router`] for route lookup and dispatch (always).
+	/// - [`RequestLogger`] middleware for per-request logging (no_std core, always).
+	/// - [`HelpHandler`] / [`NavigateHandler`] middleware for `--help` / `--navigate`
+	///   support (std-only: they render through the scene pipeline).
+	/// - an `/app-info` scene route (std-only) and a `POST /analytics` route
+	///   (`json` + std), both of which require a [`PackageConfig`] resource.
+	/// - a `GET /health` route (std-only) returning 200 + json metrics, the
+	///   load-balancer health check and autoscaling signal.
+	/// - a cached `GET /js/reactivity.js` route (std-only) serving the thin-client
+	///   reactivity runtime, the asset the reactive renderer's injected script loads.
+	///
+	/// On no_std the std-only children/middleware are omitted and the not-found
+	/// fallback is a plain-text route listing; add any extra `Request`/`Response`
+	/// [`Middleware`] to the spawned entity yourself if wanted.
+	pub fn with_defaults() -> impl Bundle {
+		(
+			Router,
+			RequestLogger::default(),
+			// std-only middleware: rendered through the scene pipeline.
+			#[cfg(feature = "std")]
+			HelpHandler::default(),
+			#[cfg(feature = "std")]
+			NavigateHandler::default(),
+			// the default app routes, as children of this router entity (a no-code BSX
+			// site gets the same set from the `<DefaultAppRoutes/>` template).
+			#[cfg(feature = "std")]
+			default_app_routes(),
+		)
+	}
 }
-
 /// The default app routes as a bundle of [`OnSpawn::insert_child`] effects: the
 /// reactivity-runtime asset (`/js/reactivity.js`), `/app-info`, `POST /analytics`,
 /// and the `/__client_io` websocket channel, each attached as its own child so it
-/// keeps its own path. Shared by [`default_router`] and the [`DefaultAppRoutes`]
+/// keeps its own path. Shared by [`Router::with_defaults`] and the [`DefaultAppRoutes`]
 /// template. `app_info`/`analytics` need a [`PackageConfig`] resource.
 #[cfg(feature = "std")]
 fn default_app_routes() -> impl Bundle {
@@ -56,7 +57,7 @@ fn default_app_routes() -> impl Bundle {
 
 /// Markup-spawnable [`default_app_routes`]: a template so a no-code BSX site
 /// requests the default app routes with `<DefaultAppRoutes/>`, the same way it
-/// places `<RouteSidebar/>` or `<RoutesDir/>`, without a Rust `default_router`.
+/// places `<RouteSidebar/>` or `<RoutesDir/>`, without a Rust `Router::with_defaults`.
 /// Expanding at build leaves no marker behind, so a saved scene round-trips
 /// cleanly.
 #[cfg(feature = "std")]
@@ -82,7 +83,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
 		let root = world
-			.spawn((default_router(), children![exchange_route(
+			.spawn((Router::with_defaults(), children![Router::exchange_route(
 				"foobar", Foobar
 			)]))
 			.flush();
@@ -118,16 +119,16 @@ mod test {
 			.xpect_eq(StatusCode::NOT_FOUND);
 	}
 
-	/// A `children![a, b]` group sits alongside `default_router` with both
+	/// A `children![a, b]` group sits alongside `Router::with_defaults` with both
 	/// routes preserved at top level.
 	#[beet_core::test(timeout_ms = 10000)]
 	async fn wires_multi_route_group() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
 		let root = world
-			.spawn((default_router(), children![
-				exchange_route("foo", Foobar),
-				exchange_route("bar", Foobar),
+			.spawn((Router::with_defaults(), children![
+				Router::exchange_route("foo", Foobar),
+				Router::exchange_route("bar", Foobar),
 			]))
 			.flush();
 

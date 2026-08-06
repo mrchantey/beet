@@ -88,49 +88,51 @@ fn card_path_matches(card: &RouteTree, path: &[SmolStr]) -> bool {
 			.all(|(seg, want)| seg.name() == want.as_str())
 }
 
-/// The path of the `n`th (1-based) card, clamped to the stack range (`n < 1`
-/// lands on the first, `n > len` on the last). Backs the initial-card `--slide=N`
-/// patch in [`CardStackPlugin`].
-pub fn resolve_nth_card(tree: &RouteTree, n: usize) -> Result<Vec<SmolStr>> {
-	let cards = deck_cards(tree);
-	if cards.is_empty() {
-		bevybail!("card stack has no cards");
+impl CardNav {
+	/// The path of the `n`th (1-based) card, clamped to the stack range (`n < 1`
+	/// lands on the first, `n > len` on the last). Backs the initial-card `--slide=N`
+	/// patch in [`CardStackPlugin`].
+	pub fn resolve_nth(tree: &RouteTree, n: usize) -> Result<Vec<SmolStr>> {
+		let cards = deck_cards(tree);
+		if cards.is_empty() {
+			bevybail!("card stack has no cards");
+		}
+		let idx = n.saturating_sub(1).min(cards.len() - 1);
+		path_segments(&cards[idx].path)
 	}
-	let idx = n.saturating_sub(1).min(cards.len() - 1);
-	path_segments(&cards[idx].path)
 }
-
-/// Resolve a [`CardNav`] step against a [`RouteTree`] from the current path,
-/// returning the target path segments. Clamps at the ends (no wrap).
-pub fn resolve_card(
-	tree: &RouteTree,
-	current_path: &[SmolStr],
-	nav: CardNav,
-) -> Result<Vec<SmolStr>> {
-	let cards = deck_cards(tree);
-	if cards.is_empty() {
-		bevybail!("card stack has no cards");
+impl CardNav {
+	/// Resolve a [`CardNav`] step against a [`RouteTree`] from the current path,
+	/// returning the target path segments. Clamps at the ends (no wrap).
+	pub fn resolve(
+		tree: &RouteTree,
+		current_path: &[SmolStr],
+		nav: CardNav,
+	) -> Result<Vec<SmolStr>> {
+		let cards = deck_cards(tree);
+		if cards.is_empty() {
+			bevybail!("card stack has no cards");
+		}
+		// the current card is the one whose full path matches the navigator's path;
+		// the home card matches the empty path (`/`).
+		let current_idx = cards
+			.iter()
+			.position(|card| card_path_matches(card, current_path))
+			.ok_or_else(|| {
+				bevyhow!(
+					"current path /{} is not a card in this deck",
+					current_path.join("/")
+				)
+			})?;
+		let target_idx = match nav {
+			CardNav::Prev => current_idx.saturating_sub(1),
+			CardNav::Next => (current_idx + 1).min(cards.len() - 1),
+			CardNav::First => 0,
+			CardNav::Last => cards.len() - 1,
+		};
+		path_segments(&cards[target_idx].path)
 	}
-	// the current card is the one whose full path matches the navigator's path;
-	// the home card matches the empty path (`/`).
-	let current_idx = cards
-		.iter()
-		.position(|card| card_path_matches(card, current_path))
-		.ok_or_else(|| {
-			bevyhow!(
-				"current path /{} is not a card in this deck",
-				current_path.join("/")
-			)
-		})?;
-	let target_idx = match nav {
-		CardNav::Prev => current_idx.saturating_sub(1),
-		CardNav::Next => (current_idx + 1).min(cards.len() - 1),
-		CardNav::First => 0,
-		CardNav::Last => cards.len() - 1,
-	};
-	path_segments(&cards[target_idx].path)
 }
-
 /// System: arrow / space / page / home / end keys step the navigator between
 /// sibling cards, opt-in via a [`CardDeck`] marker on the in-world router.
 ///
@@ -190,7 +192,7 @@ pub(crate) fn card_nav(
 		return;
 	};
 	let current_path = navigator.current_url().path().clone();
-	let Ok(target) = resolve_card(tree, &current_path, nav) else {
+	let Ok(target) = CardNav::resolve(tree, &current_path, nav) else {
 		return;
 	};
 
@@ -257,7 +259,7 @@ mod test {
 			.filter(|seg| !seg.is_empty())
 			.map(Into::into)
 			.collect::<Vec<SmolStr>>();
-		resolve_card(tree, &current, nav).unwrap().join("/")
+		CardNav::resolve(tree, &current, nav).unwrap().join("/")
 	}
 
 	/// Next/prev clamp at the ends rather than wrapping (a stack does not loop).
@@ -288,7 +290,7 @@ mod test {
 	#[beet_core::test]
 	fn nth_card_maps_and_clamps() {
 		let tree = card_stack();
-		let nth = |n| resolve_nth_card(&tree, n).unwrap().join("/");
+		let nth = |n| CardNav::resolve_nth(&tree, n).unwrap().join("/");
 		// 1-based: card 1 is the first, 3 the last
 		nth(1).xpect_eq("alpha");
 		nth(2).xpect_eq("beta");
@@ -335,12 +337,12 @@ mod test {
 	fn home_card_is_first() {
 		let tree = card_stack_with_home();
 		// the home card (empty path) is card 1, the children follow.
-		resolve_nth_card(&tree, 1).unwrap().join("/").xpect_eq("");
-		resolve_nth_card(&tree, 2)
+		CardNav::resolve_nth(&tree, 1).unwrap().join("/").xpect_eq("");
+		CardNav::resolve_nth(&tree, 2)
 			.unwrap()
 			.join("/")
 			.xpect_eq("alpha");
-		resolve_nth_card(&tree, 3)
+		CardNav::resolve_nth(&tree, 3)
 			.unwrap()
 			.join("/")
 			.xpect_eq("beta");
@@ -352,25 +354,25 @@ mod test {
 	fn home_card_steps_and_clamps() {
 		let tree = card_stack_with_home();
 		// from the home card (empty current path), next → first child, prev clamps.
-		resolve_card(&tree, &[], CardNav::Next)
+		CardNav::resolve(&tree, &[], CardNav::Next)
 			.unwrap()
 			.join("/")
 			.xpect_eq("alpha");
-		resolve_card(&tree, &[], CardNav::Prev)
+		CardNav::resolve(&tree, &[], CardNav::Prev)
 			.unwrap()
 			.join("/")
 			.xpect_eq("");
 		// from the first child, prev returns to the home card.
-		resolve_card(&tree, &["alpha".into()], CardNav::Prev)
+		CardNav::resolve(&tree, &["alpha".into()], CardNav::Prev)
 			.unwrap()
 			.join("/")
 			.xpect_eq("");
 		// first/last still reach the deck ends.
-		resolve_card(&tree, &["alpha".into()], CardNav::First)
+		CardNav::resolve(&tree, &["alpha".into()], CardNav::First)
 			.unwrap()
 			.join("/")
 			.xpect_eq("");
-		resolve_card(&tree, &[], CardNav::Last)
+		CardNav::resolve(&tree, &[], CardNav::Last)
 			.unwrap()
 			.join("/")
 			.xpect_eq("beta");
@@ -440,7 +442,7 @@ mod test {
 	#[beet_core::test]
 	fn nth_card_indexes_nested_deck() {
 		let tree = nested_card_stack();
-		let nth = |n| resolve_nth_card(&tree, n).unwrap().join("/");
+		let nth = |n| CardNav::resolve_nth(&tree, n).unwrap().join("/");
 		nth(1).xpect_eq("chapter/one");
 		nth(2).xpect_eq("chapter/two");
 		nth(3).xpect_eq("intro");

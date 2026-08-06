@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::RuleSet;
 
-/// The outcome of a [`check_routes`] pass: every [`Diagnostic`] collected across
+/// The outcome of a [`CheckReport::check_routes`] pass: every [`Diagnostic`] collected across
 /// the site's routes, with convenience accessors for the gated entry points.
 #[derive(Debug, Clone, Default)]
 pub struct CheckReport {
@@ -53,7 +53,7 @@ impl CheckReport {
 	}
 }
 
-/// Run [`check_routes`] over every router in the world and log each
+/// Run [`CheckReport::check_routes`] over every router in the world and log each
 /// [`Diagnostic`] loudly, the dev-serve surfacing path: after a build (or a
 /// `--watch` reload) every render problem prints to the console at its severity.
 ///
@@ -71,7 +71,7 @@ pub(crate) async fn log_all_render_diagnostics(world: &AsyncWorld) -> bool {
 		.await;
 	let mut had_error = false;
 	for router in routers {
-		match check_routes(world, router).await {
+		match CheckReport::check_routes(world, router).await {
 			Ok(report) => {
 				report.log();
 				had_error |= report.has_errors();
@@ -82,53 +82,54 @@ pub(crate) async fn log_all_render_diagnostics(world: &AsyncWorld) -> bool {
 	had_error
 }
 
-/// Render every static route under `router`, run [`render_diagnostics`] over each
-/// built content tree, and return the aggregated [`CheckReport`].
-///
-/// A route is checked when its path is fully static and its method is `GET`
-/// (mirroring `export-static`), so the scan covers exactly the pages a no-code
-/// site ships. The [`RenderDiagnostics`] config is read from the world (defaulting
-/// when absent); the [`RuleSet`] is re-read per route *after* its build, so a
-/// `bx:style`/`inline_class!` rule a route registers at build time is matched
-/// rather than flagged unknown.
-pub async fn check_routes(
-	world: &AsyncWorld,
-	router: Entity,
-) -> Result<CheckReport> {
-	// the static GET routes worth checking, plus the route tree + config snapshot
-	// every per-route scan validates against.
-	let (route_entities, route_tree, config) = world
-		.with(move |world: &mut World| -> Result<_> {
-			let route_tree = world
-				.entity(router)
-				.get::<RouteTree>()
-				.ok_or_else(|| {
-					bevyhow!("router entity {router} has no RouteTree")
-				})?
-				.clone();
-			let config = world
-				.get_resource::<RenderDiagnostics>()
-				.cloned()
-				.unwrap_or_default();
-			let route_entities = route_tree
-				.flatten_nodes()
-				.into_iter()
-				.filter(|node| checkable(node))
-				.map(|node| (node.entity, node.path.annotated_path()))
-				.collect::<Vec<_>>();
-			Ok((route_entities, route_tree, config))
-		})
-		.await?;
-
-	let mut report = CheckReport::default();
-	for (entity, path) in route_entities {
-		check_route(world, entity, &path, &route_tree, &config, &mut report)
+impl CheckReport {
+	/// Render every static route under `router`, run [`render_diagnostics`] over each
+	/// built content tree, and return the aggregated [`CheckReport`].
+	///
+	/// A route is checked when its path is fully static and its method is `GET`
+	/// (mirroring `export-static`), so the scan covers exactly the pages a no-code
+	/// site ships. The [`RenderDiagnostics`] config is read from the world (defaulting
+	/// when absent); the [`RuleSet`] is re-read per route *after* its build, so a
+	/// `bx:style`/`inline_class!` rule a route registers at build time is matched
+	/// rather than flagged unknown.
+	pub async fn check_routes(
+		world: &AsyncWorld,
+		router: Entity,
+	) -> Result<CheckReport> {
+		// the static GET routes worth checking, plus the route tree + config snapshot
+		// every per-route scan validates against.
+		let (route_entities, route_tree, config) = world
+			.with(move |world: &mut World| -> Result<_> {
+				let route_tree = world
+					.entity(router)
+					.get::<RouteTree>()
+					.ok_or_else(|| {
+						bevyhow!("router entity {router} has no RouteTree")
+					})?
+					.clone();
+				let config = world
+					.get_resource::<RenderDiagnostics>()
+					.cloned()
+					.unwrap_or_default();
+				let route_entities = route_tree
+					.flatten_nodes()
+					.into_iter()
+					.filter(|node| checkable(node))
+					.map(|node| (node.entity, node.path.annotated_path()))
+					.collect::<Vec<_>>();
+				Ok((route_entities, route_tree, config))
+			})
 			.await?;
-		report.checked.push(path);
-	}
-	Ok(report)
-}
 
+		let mut report = CheckReport::default();
+		for (entity, path) in route_entities {
+			check_route(world, entity, &path, &route_tree, &config, &mut report)
+				.await?;
+			report.checked.push(path);
+		}
+		Ok(report)
+	}
+}
 /// Whether a route node is a static `GET` page worth scanning: a fully-static
 /// path whose method is `GET` (or unset), and which builds a render tree (a scene
 /// route). Mirrors `export-static`'s selection.
@@ -250,11 +251,11 @@ mod test {
 		world
 	}
 
-	/// Run [`check_routes`] over `router` and return the report.
+	/// Run [`CheckReport::check_routes`] over `router` and return the report.
 	async fn check(world: &mut World, router: Entity) -> CheckReport {
 		world
 			.run_async_then(async move |world| {
-				check_routes(&world, router).await
+				CheckReport::check_routes(&world, router).await
 			})
 			.await
 			.unwrap()
@@ -327,7 +328,7 @@ mod test {
 			.unwrap();
 		let mut world = check_world();
 		let router = world
-			.spawn((store, Router, children![route(
+			.spawn((store, Router, children![Router::route(
 				"post",
 				BlobScene::new("post.md")
 			)]))

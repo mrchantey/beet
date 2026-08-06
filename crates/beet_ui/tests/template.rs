@@ -9,7 +9,7 @@ use beet_ui::prelude::classes;
 use beet_ui::prelude::*;
 
 /// A spawn-capable template world.
-fn world() -> World { ui_world() }
+fn world() -> World { world_ext::ui_world() }
 
 /// Render `root` to an HTML string.
 fn render_html(world: &mut World, root: Entity) -> String {

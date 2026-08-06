@@ -3,7 +3,7 @@
 //!
 //! The remote, multi-tenant sibling of the single-surface [`TuiServer`]. Where
 //! `TuiServer` drives one local stdio terminal, this accepts many SSH connections
-//! and gives each its own surface (a [`ChannelTerminal`] + [`page_host`] buffer +
+//! and gives each its own surface (a [`ChannelTerminal`] + [`PageHost::bundle`] buffer +
 //! an in-world [`Navigator`]), so sessions render, scroll, focus and navigate
 //! independently in one process, alongside the [`HttpServer`].
 
@@ -44,7 +44,7 @@ fn on_action_in(
 ) -> Result {
 	let (selected, port, host, opening) = ev.with(|request| {
 		(
-			request_selects_server(request, "ssh", true),
+			Request::selects_server(request, "ssh", true),
 			request.get_param("port").and_then(|port| port.parse().ok()),
 			request.get_param("host").map(|host| {
 				if host == "0.0.0.0" {
@@ -163,7 +163,7 @@ fn on_ssh_recv(
 			commands.entity(connection).insert((
 				channel,
 				terminal,
-				page_host(size),
+				PageHost::bundle(size),
 				Navigator::in_world(router, opening.0.clone()),
 				// graphics support is the *client's* capability: detect it from the
 				// pty's forwarded terminal name, not the server's own env, so a kitty
@@ -504,7 +504,7 @@ mod test {
 					store,
 					Router,
 					BsxLayout::default(),
-					children![route("", BlobScene::new("index.html"))]
+					children![Router::route("", BlobScene::new("index.html"))]
 				)],
 			))
 			.flush();
@@ -827,7 +827,7 @@ mod test {
 					store,
 					Router,
 					BsxLayout::default(),
-					children![route("counter", BlobScene::new("counter.bsx"))]
+					children![Router::route("counter", BlobScene::new("counter.bsx"))]
 				)],
 			))
 			.flush();

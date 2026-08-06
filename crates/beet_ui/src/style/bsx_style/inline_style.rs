@@ -52,7 +52,7 @@ fn parse_inline_style(class: ClassName, source: &str) -> Result<Rule> {
 }
 
 /// Split a `bx:style` value into `(kebab-prop-name, value)` pairs, parsing each
-/// value through the BSX value grammar ([`parse_value_expr_str`]) so `Flex` /
+/// value through the BSX value grammar ([`ValueExpr::parse_str`]) so `Flex` /
 /// `Rem(40.0)` reflect exactly as in the typed API. A `"@token:Role"` binding is
 /// kept as a string for [`apply_declarations`] to recognise.
 fn parse_declaration_pairs(source: &str) -> Result<Vec<(SmolStr, AttrValue)>> {
@@ -69,7 +69,7 @@ fn parse_declaration_pairs(source: &str) -> Result<Vec<(SmolStr, AttrValue)>> {
 			// expression resolved against the property's type downstream.
 			let value = match raw.strip_prefix("@token:") {
 				Some(_) => AttrValue::Str(raw.into()),
-				None => AttrValue::Expr(parse_value_expr_str(raw)?),
+				None => AttrValue::Expr(ValueExpr::parse_str(raw)?),
 			};
 			Ok((SmolStr::from(key), value))
 		})
@@ -89,7 +89,7 @@ mod test {
 		let mut world = MaterialStylePlugin::world();
 		let container = world
 			.spawn_template(BsxTemplate::container(
-				parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
+				BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
 				BsxTemplateRegistry::default(),
 			))
 			.unwrap()
@@ -225,7 +225,7 @@ mod test {
 		let mut world = MaterialStylePlugin::world();
 		world
 			.spawn_template(BsxTemplate::container(
-				parse_document(
+				BsxNode::parse_document(
 					r#"<div bx:style="not-a-prop=Flex"/>"#,
 					&BsxParseConfig::bsx(),
 				)

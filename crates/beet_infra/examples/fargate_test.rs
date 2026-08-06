@@ -13,7 +13,7 @@ fn main() -> AppExit {
 	app.add_plugins((MinimalPlugins, ServerPlugin));
 	// the server owns the boot, its dispatch host is the child
 	app.world_mut()
-		.spawn((HttpServer::default(), children![exchange_handler(
+		.spawn((HttpServer::default(), children![exchange_ext::handler(
 			handle_request
 		)]))
 		.trigger(StartRunning::from_cli);

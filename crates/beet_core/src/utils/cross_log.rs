@@ -6,46 +6,54 @@
 //! on the esp32). The `cfg` checks live here in `beet_core`, where `std` is a
 //! declared feature, so they are never evaluated in downstream crates.
 
-/// Internal helper: log a line.
-#[doc(hidden)]
-pub fn _cross_log(msg: &str) {
-	crate::cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
-			crate::exports::web_sys::console::log_1(&msg.into());
-		} else if #[cfg(feature = "std")] {
-			println!("{msg}");
-		} else {
-			tracing::info!("{msg}");
+/// The per-platform backends behind [`cross_log!`](crate::cross_log),
+/// [`cross_log_noline!`](crate::cross_log_noline) and
+/// [`cross_log_error!`](crate::cross_log_error). Called by macro expansion, not
+/// directly.
+pub struct CrossLog;
+
+impl CrossLog {
+	/// Log a line.
+	#[doc(hidden)]
+	pub fn line(msg: &str) {
+		crate::cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				crate::exports::web_sys::console::log_1(&msg.into());
+			} else if #[cfg(feature = "std")] {
+				println!("{msg}");
+			} else {
+				tracing::info!("{msg}");
+			}
 		}
 	}
-}
 
-/// Internal helper: log without a trailing newline, flushing after.
-#[doc(hidden)]
-pub fn _cross_log_noline(msg: &str) {
-	crate::cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
-			crate::exports::web_sys::console::log_1(&msg.into());
-		} else if #[cfg(feature = "std")] {
-			use std::io::Write;
-			print!("{msg}");
-			std::io::stdout().flush().unwrap();
-		} else {
-			tracing::info!("{msg}");
+	/// Log without a trailing newline, flushing after.
+	#[doc(hidden)]
+	pub fn inline(msg: &str) {
+		crate::cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				crate::exports::web_sys::console::log_1(&msg.into());
+			} else if #[cfg(feature = "std")] {
+				use std::io::Write;
+				print!("{msg}");
+				std::io::stdout().flush().unwrap();
+			} else {
+				tracing::info!("{msg}");
+			}
 		}
 	}
-}
 
-/// Internal helper: log a line to the error stream.
-#[doc(hidden)]
-pub fn _cross_log_error(msg: &str) {
-	crate::cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
-			crate::exports::web_sys::console::error_1(&msg.into());
-		} else if #[cfg(feature = "std")] {
-			eprintln!("{msg}");
-		} else {
-			tracing::error!("{msg}");
+	/// Log a line to the error stream.
+	#[doc(hidden)]
+	pub fn error(msg: &str) {
+		crate::cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				crate::exports::web_sys::console::error_1(&msg.into());
+			} else if #[cfg(feature = "std")] {
+				eprintln!("{msg}");
+			} else {
+				tracing::error!("{msg}");
+			}
 		}
 	}
 }
@@ -63,7 +71,7 @@ pub fn _cross_log_error(msg: &str) {
 #[macro_export]
 macro_rules! cross_log_noline {
 	($($t:tt)*) => {
-		$crate::_cross_log_noline(&$crate::_alloc::format!($($t)*))
+		$crate::CrossLog::inline(&$crate::_alloc::format!($($t)*))
 	};
 }
 
@@ -80,7 +88,7 @@ macro_rules! cross_log_noline {
 #[macro_export]
 macro_rules! cross_log {
 	($($t:tt)*) => {
-		$crate::_cross_log(&$crate::_alloc::format!($($t)*))
+		$crate::CrossLog::line(&$crate::_alloc::format!($($t)*))
 	};
 }
 
@@ -92,7 +100,7 @@ macro_rules! cross_log {
 #[macro_export]
 macro_rules! cross_log_error {
 	($($t:tt)*) => {
-		$crate::_cross_log_error(&$crate::_alloc::format!($($t)*))
+		$crate::CrossLog::error(&$crate::_alloc::format!($($t)*))
 	};
 }
 

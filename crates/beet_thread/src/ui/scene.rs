@@ -29,8 +29,8 @@ fn host_column() -> impl Bundle {
 		// stretch children across the full width, so the transcript and the
 		// composer (and its top-border separator) span the terminal
 		(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
-		token(style::common_props::BackgroundColor, colors::Surface),
-		token(style::common_props::ForegroundColor, colors::OnSurface),
+		Declaration::token(style::common_props::BackgroundColor, colors::Surface),
+		Declaration::token(style::common_props::ForegroundColor, colors::OnSurface),
 	]
 }
 

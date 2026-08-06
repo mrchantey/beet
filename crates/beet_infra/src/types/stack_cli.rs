@@ -3,26 +3,27 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-pub fn stack_cli() -> impl Bundle {
-	// the infra CLI host bundle: a `CliServer` entrypoint owning the boot, with the
-	// router and IaC routes as its dispatch child (a server and a router never share
-	// an entity, they would collide on its one action). The caller boots it after
-	// spawning, so the `on_add` observers are registered before the `cli` boot lands.
-	(CliServer::default(), children![(
-		default_router(),
-		children![
-			Validate,
-			Plan,
-			Apply,
-			Show,
-			List,
-			Destroy,
-			Rollback,
-			Rollforward
-		]
-	)])
+impl Stack {
+	pub fn cli() -> impl Bundle {
+		// the infra CLI host bundle: a `CliServer` entrypoint owning the boot, with the
+		// router and IaC routes as its dispatch child (a server and a router never share
+		// an entity, they would collide on its one action). The caller boots it after
+		// spawning, so the `on_add` observers are registered before the `cli` boot lands.
+		(CliServer::default(), children![(
+			Router::with_defaults(),
+			children![
+				Validate,
+				Plan,
+				Apply,
+				Show,
+				List,
+				Destroy,
+				Rollback,
+				Rollforward
+			]
+		)])
+	}
 }
-
 /// Build a [`terra::Project`] from the nearest ancestor [`Stack`].
 async fn project(caller: &AsyncEntity) -> Result<terra::Project> {
 	caller
@@ -192,7 +193,7 @@ mod tests {
 		let root = world
 			.spawn((
 				Stack::new("test-app").with_backend(LocalBackend::default()),
-				stack_cli(),
+				Stack::cli(),
 			))
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
@@ -214,7 +215,7 @@ mod tests {
 		let root = world
 			.spawn((
 				Stack::new("test-app").with_backend(LocalBackend::default()),
-				stack_cli(),
+				Stack::cli(),
 			))
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();

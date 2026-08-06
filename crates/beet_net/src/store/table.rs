@@ -13,7 +13,7 @@ use uuid::Uuid;
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
-/// let table = temp_table::<TableItem<String>>();
+/// let table = TableStore::<TableItem<String>>::temp();
 /// table.store_try_create().await?;
 ///
 /// let item = TableItem::new("Hello, world!".to_string());
@@ -47,7 +47,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// ```
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// ```
 	pub fn new(provider: impl TableProvider<T>) -> Self {
 		Self {
@@ -88,7 +88,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test data".to_string());
 	/// table.push(item).await?;
 	/// # Ok(())
@@ -105,7 +105,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test data".to_string());
 	/// table.try_push(item).await?;
 	/// # Ok(())
@@ -130,7 +130,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test".to_string());
 	/// let id = item.id();
 	/// let exists = table.exists(id).await?;
@@ -149,7 +149,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let paths = table.list().await?;
 	/// # Ok(())
 	/// # }
@@ -165,7 +165,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test".to_string());
 	/// let id = item.id();
 	/// let retrieved = table.get(id).await?;
@@ -186,7 +186,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let items = table.get_all().await?;
 	/// for (path, item) in items {
 	///     println!("Item at {}: {}", path, item.data);
@@ -249,7 +249,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test".to_string());
 	/// let id = item.id();
 	/// table.remove(id).await?;
@@ -271,7 +271,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<TableItem<String>>();
+	/// let table = TableStore::<TableItem<String>>::temp();
 	/// let path = SmolPath::from("some-uuid");
 	/// if let Some(url) = table.public_url(&path).await? {
 	///     println!("Public URL: {}", url);
@@ -393,39 +393,40 @@ impl<T: TableStoreRow> TableProvider<T> for BlobStore {
 	}
 }
 
-/// Create temporary in-memory table for testing.
-/// The returned table is pre-created and ready for immediate use.
-pub fn temp_table<T: TableStoreRow>() -> TableStore<T> {
-	TableStore::new(InMemoryStore::new())
+impl<T: TableStoreRow> TableStore<T> {
+	/// Create temporary in-memory table for testing.
+	/// The returned table is pre-created and ready for immediate use.
+	pub fn temp() -> TableStore<T> { TableStore::new(InMemoryStore::new()) }
 }
 
-/// Select filesystem or DynamoDB [`TableProvider`] based on [`ServiceAccess`]
-/// and feature flags.
-#[allow(unused_variables)]
-pub async fn dynamo_fs_selector<T: TableStoreRow>(
-	fs_path: &AbsPathBuf,
-	table_name: &str,
-	region: &str,
-	access: ServiceAccess,
-) -> TableStore<T> {
-	match access {
-		ServiceAccess::Local => {
-			debug!("Table Selector - FS: {fs_path}");
-			TableStore::new(FsStore::new(fs_path.clone()))
-		}
-		#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
-		ServiceAccess::Remote => {
-			debug!("Table Selector - FS (no aws_sdk feature): {fs_path}");
-			TableStore::new(FsStore::new(fs_path.clone()))
-		}
-		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-		ServiceAccess::Remote => {
-			debug!("Table Selector - Dynamo: {table_name}");
-			TableStore::new(DynamoStore::new(table_name, region))
+impl<T: TableStoreRow> TableStore<T> {
+	/// Select filesystem or DynamoDB [`TableProvider`] based on [`ServiceAccess`]
+	/// and feature flags.
+	#[allow(unused_variables)]
+	pub async fn dynamo_fs_selector(
+		fs_path: &AbsPathBuf,
+		table_name: &str,
+		region: &str,
+		access: ServiceAccess,
+	) -> TableStore<T> {
+		match access {
+			ServiceAccess::Local => {
+				debug!("Table Selector - FS: {fs_path}");
+				TableStore::new(FsStore::new(fs_path.clone()))
+			}
+			#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
+			ServiceAccess::Remote => {
+				debug!("Table Selector - FS (no aws_sdk feature): {fs_path}");
+				TableStore::new(FsStore::new(fs_path.clone()))
+			}
+			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+			ServiceAccess::Remote => {
+				debug!("Table Selector - Dynamo: {table_name}");
+				TableStore::new(DynamoStore::new(table_name, region))
+			}
 		}
 	}
 }
-
 /// Test utilities for table providers.
 #[cfg(test)]
 pub mod table_test {

@@ -18,7 +18,7 @@
 //! platform-specific piece is *driving the socket*: binding it, joining
 //! multicast, periodically sending the `PTR` query, and turning each
 //! `recv_from` into a [`UdpPacket`]. On std the socket runtime and the world
-//! runtime coincide, so [`run_mdns_browser`] drives the socket directly with no
+//! runtime coincide, so [`MdnsBrowser::run`] drives the socket directly with no
 //! bridge (see [`super::super::udp::impl_async_io`]). On esp that loop lives on
 //! embassy and bridges datagrams into `world.trigger(UdpPacket)`; everything in
 //! *this* module is reused unchanged.
@@ -80,7 +80,7 @@ impl MDnsService {
 /// Spawn an entity carrying this (and, on the driving side, the socket) to start
 /// a browser. The agnostic engine only reads the `service_type`; the
 /// [`UdpEndpoint`](crate::udp::UdpEndpoint) the socket is opened from is supplied
-/// by the driver ([`run_mdns_browser`] on std), keeping this component
+/// by the driver ([`MdnsBrowser::run`] on std), keeping this component
 /// platform-free.
 #[derive(Debug, Clone, Component)]
 pub struct MdnsBrowser {
@@ -103,7 +103,7 @@ impl MdnsBrowser {
 /// [`handle_udp_packet`] observer that maintains the [`MDnsService`] entities.
 ///
 /// This is all that's needed on *any* platform; the socket driver is added
-/// separately (on std via [`run_mdns_browser`]).
+/// separately (on std via [`MdnsBrowser::run`]).
 #[derive(Default)]
 pub struct MdnsBrowserPlugin;
 
@@ -125,7 +125,7 @@ fn handle_udp_packet(
 	mut services: Query<(Entity, &mut MDnsService)>,
 	mut commands: Commands,
 ) {
-	let Some(response) = wire::parse_response(&ev.event().bytes) else {
+	let Some(response) = wire::MdnsResponse::parse(&ev.event().bytes) else {
 		return;
 	};
 
@@ -264,129 +264,132 @@ fn reconcile_instance(
 // bridges into `world.trigger(UdpPacket)` instead.
 // ---------------------------------------------------------------------------
 
-/// How often the browser re-multicasts its `PTR` query, in milliseconds.
-#[cfg(feature = "udp")]
-pub const DEFAULT_QUERY_INTERVAL_MS: u64 = 5_000;
-
-/// Drive an mDNS browser against `endpoint` on std, feeding inbound datagrams
-/// into `world` as [`UdpPacket`] events and re-querying every
-/// `query_interval_ms`.
-///
-/// This is the std analogue of the esp embassy loop: it binds a socket on the
-/// mDNS port, joins the multicast group, sends an initial `PTR` query, then
-/// concurrently (a) reads datagrams and triggers [`UdpPacket`] (which the
-/// [`handle_udp_packet`] observer turns into [`MDnsService`] entities) and (b)
-/// re-sends the query on an interval. It never returns on its own; spawn it as
-/// an async task (e.g. via `run_async_local`).
-///
-/// `world` is an [`AsyncWorld`] handle so the loop can trigger events into the
-/// ECS without any bridge — on std the socket runtime *is* the world runtime.
-#[cfg(feature = "udp")]
-pub async fn run_mdns_browser<E: crate::udp::UdpEndpoint>(
-	world: AsyncWorld,
-	endpoint: E,
-	service_type: String,
-	query_interval_ms: u64,
-) -> Result {
-	use super::MDNS_ENDPOINT;
-	use super::MDNS_MULTICAST_V4;
-	use super::MDNS_PORT;
-	use core::net::Ipv4Addr;
-	use core::net::SocketAddr;
-	use core::net::SocketAddrV4;
-
-	// The default mDNS configuration: bind 0.0.0.0:5353, join the group, send
-	// queries to the multicast endpoint.
-	let bind =
-		SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, MDNS_PORT));
-	run_mdns_browser_on(
-		world,
-		endpoint,
-		service_type,
-		query_interval_ms,
-		bind,
-		MDNS_ENDPOINT,
-		Some(MDNS_MULTICAST_V4),
-	)
-	.await
+impl MdnsBrowser {
+	/// How often the browser re-multicasts its `PTR` query, in milliseconds.
+	#[cfg(feature = "udp")]
+	pub const DEFAULT_QUERY_INTERVAL_MS: u64 = 5_000;
 }
+impl MdnsBrowser {
+	/// Drive an mDNS browser against `endpoint` on std, feeding inbound datagrams
+	/// into `world` as [`UdpPacket`] events and re-querying every
+	/// `query_interval_ms`.
+	///
+	/// This is the std analogue of the esp embassy loop: it binds a socket on the
+	/// mDNS port, joins the multicast group, sends an initial `PTR` query, then
+	/// concurrently (a) reads datagrams and triggers [`UdpPacket`] (which the
+	/// [`handle_udp_packet`] observer turns into [`MDnsService`] entities) and (b)
+	/// re-sends the query on an interval. It never returns on its own; spawn it as
+	/// an async task (e.g. via `run_async_local`).
+	///
+	/// `world` is an [`AsyncWorld`] handle so the loop can trigger events into the
+	/// ECS without any bridge — on std the socket runtime *is* the world runtime.
+	#[cfg(feature = "udp")]
+	pub async fn run<E: crate::udp::UdpEndpoint>(
+		world: AsyncWorld,
+		endpoint: E,
+		service_type: String,
+		query_interval_ms: u64,
+	) -> Result {
+		use super::wire::MDNS_ENDPOINT;
+		use super::wire::MDNS_MULTICAST_V4;
+		use super::wire::MDNS_PORT;
+		use core::net::Ipv4Addr;
+		use core::net::SocketAddr;
+		use core::net::SocketAddrV4;
 
-/// Like [`run_mdns_browser`] but with explicit `bind` / query-`target`
-/// addresses and an optional multicast group to join.
-///
-/// [`run_mdns_browser`] is the mDNS-default specialisation of this. Exposed so a
-/// host (or test) can drive the same engine over loopback / unicast without the
-/// `5353` + multicast assumptions — useful where multicast is unavailable (CI).
-#[cfg(feature = "udp")]
-pub async fn run_mdns_browser_on<E: crate::udp::UdpEndpoint>(
-	world: AsyncWorld,
-	endpoint: E,
-	service_type: String,
-	query_interval_ms: u64,
-	bind: core::net::SocketAddr,
-	target: core::net::SocketAddr,
-	multicast_group: Option<core::net::Ipv4Addr>,
-) -> Result {
-	use crate::udp::UdpSocket;
-	use bevy::tasks::futures_lite::FutureExt;
-	use core::net::SocketAddr;
-
-	let socket = endpoint.bind(bind).await?;
-	if let Some(group) = multicast_group {
-		socket.join_multicast_v4(group).await?;
-	}
-
-	// Build the query once; it never changes for a given service type.
-	let mut query = [0u8; 256];
-	let query_len = wire::build_ptr_query(&mut query, &service_type)
-		.ok_or_else(|| {
-			bevyhow!("mDNS service type too long: {service_type}")
-		})?;
-	let query = &query[..query_len];
-
-	// Initial query.
-	socket.send_to(query, target).await?;
-	let mut next_query = std::time::Instant::now()
-		+ std::time::Duration::from_millis(query_interval_ms);
-
-	let mut buf = vec![0u8; 1536];
-	loop {
-		// Race a receive against the query timer.
-		let now = std::time::Instant::now();
-		let until_query = next_query.saturating_duration_since(now);
-
-		enum Wake {
-			Packet(usize, SocketAddr),
-			Query,
-		}
-
-		let recv = async {
-			let (n, from) = socket.recv_from(&mut buf).await?;
-			Result::<Wake>::Ok(Wake::Packet(n, from))
-		};
-		let timer = async {
-			time_ext::sleep(until_query).await;
-			Result::<Wake>::Ok(Wake::Query)
-		};
-
-		match recv.or(timer).await? {
-			Wake::Packet(n, from) => {
-				let bytes = buf[..n].to_vec();
-				world
-					.with(move |world: &mut World| {
-						world.trigger(UdpPacket { from, bytes });
-					})
-					.await;
-			}
-			Wake::Query => {
-				socket.send_to(query, target).await?;
-				next_query = std::time::Instant::now()
-					+ std::time::Duration::from_millis(query_interval_ms);
-			}
-		}
+		// The default mDNS configuration: bind 0.0.0.0:5353, join the group, send
+		// queries to the multicast endpoint.
+		let bind =
+			SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, MDNS_PORT));
+		MdnsBrowser::run_on(
+			world,
+			endpoint,
+			service_type,
+			query_interval_ms,
+			bind,
+			MDNS_ENDPOINT,
+			Some(MDNS_MULTICAST_V4),
+		)
+		.await
 	}
 }
+impl MdnsBrowser {
+	/// Like [`MdnsBrowser::run`] but with explicit `bind` / query-`target`
+	/// addresses and an optional multicast group to join.
+	///
+	/// [`MdnsBrowser::run`] is the mDNS-default specialisation of this. Exposed so a
+	/// host (or test) can drive the same engine over loopback / unicast without the
+	/// `5353` + multicast assumptions — useful where multicast is unavailable (CI).
+	#[cfg(feature = "udp")]
+	pub async fn run_on<E: crate::udp::UdpEndpoint>(
+		world: AsyncWorld,
+		endpoint: E,
+		service_type: String,
+		query_interval_ms: u64,
+		bind: core::net::SocketAddr,
+		target: core::net::SocketAddr,
+		multicast_group: Option<core::net::Ipv4Addr>,
+	) -> Result {
+		use crate::udp::UdpSocket;
+		use bevy::tasks::futures_lite::FutureExt;
+		use core::net::SocketAddr;
 
+		let socket = endpoint.bind(bind).await?;
+		if let Some(group) = multicast_group {
+			socket.join_multicast_v4(group).await?;
+		}
+
+		// Build the query once; it never changes for a given service type.
+		let mut query = [0u8; 256];
+		let query_len = wire::build_ptr_query(&mut query, &service_type)
+			.ok_or_else(|| {
+				bevyhow!("mDNS service type too long: {service_type}")
+			})?;
+		let query = &query[..query_len];
+
+		// Initial query.
+		socket.send_to(query, target).await?;
+		let mut next_query = std::time::Instant::now()
+			+ std::time::Duration::from_millis(query_interval_ms);
+
+		let mut buf = vec![0u8; 1536];
+		loop {
+			// Race a receive against the query timer.
+			let now = std::time::Instant::now();
+			let until_query = next_query.saturating_duration_since(now);
+
+			enum Wake {
+				Packet(usize, SocketAddr),
+				Query,
+			}
+
+			let recv = async {
+				let (n, from) = socket.recv_from(&mut buf).await?;
+				Result::<Wake>::Ok(Wake::Packet(n, from))
+			};
+			let timer = async {
+				time_ext::sleep(until_query).await;
+				Result::<Wake>::Ok(Wake::Query)
+			};
+
+			match recv.or(timer).await? {
+				Wake::Packet(n, from) => {
+					let bytes = buf[..n].to_vec();
+					world
+						.with(move |world: &mut World| {
+							world.trigger(UdpPacket { from, bytes });
+						})
+						.await;
+				}
+				Wake::Query => {
+					socket.send_to(query, target).await?;
+					next_query = std::time::Instant::now()
+						+ std::time::Duration::from_millis(query_interval_ms);
+				}
+			}
+		}
+	}
+}
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod test {
@@ -510,7 +513,7 @@ mod test {
 	/// it's deterministic in CI): a test "responder" socket answers the
 	/// browser's `PTR` query with a crafted `PTR`/`SRV`/`A` response, and we
 	/// assert an [`MDnsService`] entity appears, then a goodbye despawns it.
-	/// This drives the full std path: `run_mdns_browser_on` -> bind -> query ->
+	/// This drives the full std path: `MdnsBrowser::run_on` -> bind -> query ->
 	/// recv -> `UdpPacket` -> observer -> entity, with the socket runtime and
 	/// world runtime coincident (no bridge).
 	// real `async-io` UDP on loopback: native-only (no sockets/threads on wasm).
@@ -547,7 +550,7 @@ mod test {
 			app.add_systems(Startup, move |world: &mut World| {
 				world.run_async_local(
 					move |async_world: AsyncWorld| async move {
-						run_mdns_browser_on(
+						MdnsBrowser::run_on(
 							async_world,
 							AsyncIoUdpEndpoint,
 							SERVICE.to_string(),

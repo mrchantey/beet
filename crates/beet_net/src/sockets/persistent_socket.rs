@@ -57,7 +57,7 @@ impl PersistentSocket {
 async fn connection_loop(entity: AsyncEntity) -> Result {
 	let config = entity.get_cloned::<PersistentSocket>().await?;
 	// the reader task signals every connection end into this channel
-	let (closed_send, closed_recv) = writer_channel::unbounded::<()>();
+	let (closed_send, closed_recv) = writer_channel::Sender::<()>::unbounded();
 	entity.insert(SocketClosedNotify(closed_send)).await?;
 	loop {
 		// dial until connected, backing off to the ceiling

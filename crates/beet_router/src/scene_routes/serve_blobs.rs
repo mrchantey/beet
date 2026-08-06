@@ -29,7 +29,7 @@ pub fn ServeBlobs(
 	(
 		PathPartial::new(format!("{prefix}/*{STORE_PATH_PARAM}?")),
 		ServeBlobsHandler,
-		exchange_overload::<RequestParts, Response, _, _>(),
+		Router::exchange_overload::<RequestParts, Response, _, _>(),
 		OnSpawn::new(move |entity: &mut EntityWorldMut| {
 			if let Some(browser_max_age) = cache {
 				entity.insert(CacheHeaders {
@@ -181,7 +181,7 @@ mod test {
 	#[beet_core::test]
 	async fn serves_from_ancestor_store() {
 		router_world()
-			.spawn((default_router(), css_store().await, children![
+			.spawn((Router::with_defaults(), css_store().await, children![
 				serve_route("assets")
 			]))
 			.exchange(Request::get("assets/style.css"))
@@ -196,7 +196,7 @@ mod test {
 	#[beet_core::test]
 	async fn serves_from_colocated_store() {
 		router_world()
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				serve_route("assets"),
 				css_store().await
 			)]))
@@ -222,7 +222,7 @@ mod test {
 			return;
 		}
 		router_world()
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				serve_route("assets"),
 				FsStore::new(assets)
 			)]))
@@ -241,7 +241,7 @@ mod test {
 			.await
 			.unwrap();
 		router_world()
-			.spawn((default_router(), store, children![serve_route("foo")]))
+			.spawn((Router::with_defaults(), store, children![serve_route("foo")]))
 			.exchange(Request::get("foo/bar"))
 			.await
 			.unwrap_str()

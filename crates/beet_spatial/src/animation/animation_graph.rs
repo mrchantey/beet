@@ -16,40 +16,41 @@ impl AnimationGraphClips {
 	}
 }
 
-/// Build an [`AnimationGraph`] from `clips` (asset paths), loading each clip
-/// through the deferred path ([`BuildAssets`]) so `LoadTemplate` waits for every
-/// clip, and returning the graph handle and the clip-path -> node-index map
-/// ([`AnimationGraphClips`]) for actions to resolve against.
-///
-/// [`AnimationTransitions`] is *not* part of this bundle: it belongs on the glb's
-/// [`AnimationPlayer`] (a descendant spawned later), where `init_scene_animators`
-/// adds it. Putting it on this (player-less) agent root would be dead weight bevy
-/// never advances, and a split-brain hazard against the real player's.
-///
-/// The reusable core of a markup `<CreateAnimationGraph>` template, replacing the
-/// imperative `AnimationGraph::new()` + `graphs.add(..)` scene templates built by
-/// hand. A `RecursiveDependencyLoadState` on the graph handle does *not* cover its
-/// clips, so each clip handle is parked as its own pending dependency.
-pub fn build_animation_graph(
-	clips: &[String],
-	graphs: &mut Assets<AnimationGraph>,
-	assets: &mut BuildAssets,
-) -> impl Bundle {
-	let mut graph = AnimationGraph::new();
-	let root = graph.root;
-	let indices = clips
-		.iter()
-		.map(|path| {
-			let handle = assets.load::<AnimationClip>(path.clone());
-			(SmolStr::new(path), graph.add_clip(handle, 1.0, root))
-		})
-		.collect();
-	(
-		AnimationGraphHandle(graphs.add(graph)),
-		AnimationGraphClips(indices),
-	)
+impl AnimationGraphClips {
+	/// Build an [`AnimationGraph`] from `clips` (asset paths), loading each clip
+	/// through the deferred path ([`BuildAssets`]) so `LoadTemplate` waits for every
+	/// clip, and returning the graph handle and the clip-path -> node-index map
+	/// ([`AnimationGraphClips`]) for actions to resolve against.
+	///
+	/// [`AnimationTransitions`] is *not* part of this bundle: it belongs on the glb's
+	/// [`AnimationPlayer`] (a descendant spawned later), where `init_scene_animators`
+	/// adds it. Putting it on this (player-less) agent root would be dead weight bevy
+	/// never advances, and a split-brain hazard against the real player's.
+	///
+	/// The reusable core of a markup `<CreateAnimationGraph>` template, replacing the
+	/// imperative `AnimationGraph::new()` + `graphs.add(..)` scene templates built by
+	/// hand. A `RecursiveDependencyLoadState` on the graph handle does *not* cover its
+	/// clips, so each clip handle is parked as its own pending dependency.
+	pub fn build(
+		clips: &[String],
+		graphs: &mut Assets<AnimationGraph>,
+		assets: &mut BuildAssets,
+	) -> impl Bundle {
+		let mut graph = AnimationGraph::new();
+		let root = graph.root;
+		let indices = clips
+			.iter()
+			.map(|path| {
+				let handle = assets.load::<AnimationClip>(path.clone());
+				(SmolStr::new(path), graph.add_clip(handle, 1.0, root))
+			})
+			.collect();
+		(
+			AnimationGraphHandle(graphs.add(graph)),
+			AnimationGraphClips(indices),
+		)
+	}
 }
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -77,12 +78,12 @@ mod test {
 			"fox.glb#Animation1".to_string(),
 		];
 		let root = world
-			.spawn_template(system_template::<
+			.spawn_template(SystemTemplate::<
 				(ResMut<Assets<AnimationGraph>>, BuildAssets),
 				_,
 				_,
-			>(move |_entity, (mut graphs, mut assets)| {
-				Snippet::from_bundle(build_animation_graph(
+			>::new(move |_entity, (mut graphs, mut assets)| {
+				Snippet::from_bundle(AnimationGraphClips::build(
 					&clips,
 					&mut graphs,
 					&mut assets,

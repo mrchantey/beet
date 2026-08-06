@@ -13,7 +13,7 @@
 //! Gated on a [`CardDeck`] router being present in the world, so an `<hr>` in
 //! ordinary beet content stays a horizontal rule. The gate is world-level (not an
 //! ancestor walk) because per-request render content is spawned as a detached
-//! root (see [`spawn_render_step`](crate::prelude::pure_route)), so it has no
+//! root (see [`render_action::pure_route`]), so it has no
 //! router ancestor to walk to; a presented deck builds a single site, so "a deck
 //! router exists" means "this render is a card". Registered by
 //! [`CardStackPlugin`](crate::prelude::CardStackPlugin); it only runs when a deck

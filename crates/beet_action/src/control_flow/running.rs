@@ -23,7 +23,7 @@ use core::marker::PhantomData;
 /// Marks an action as actively running, holding the deferred [`OutHandler`]
 /// used to complete the original call.
 ///
-/// Inserted by [`start_running`] (the action behind [`ContinueRun`]) and
+/// Inserted by [`ContinueRun::start_running`] (the action behind [`ContinueRun`]) and
 /// removed by [`EndRun`]. Stored as
 /// [`SparseSet`](bevy::ecs::component::StorageType::SparseSet) since it is
 /// frequently added and removed.
@@ -73,7 +73,7 @@ pub enum ControlFlowError {
 /// Entity event carrying an action's input to its observers behind a shared
 /// handle, so many observers can read it and one can take it.
 ///
-/// Fired by [`start_running`] on the caller once a [`Running<Out>`] is in place.
+/// Fired by [`ContinueRun::start_running`] on the caller once a [`Running<Out>`] is in place.
 /// The response returns through that [`Running`] plus an [`EndRun`], not through
 /// this event, so the non-[`Clone`] `Request`/`Response` bodies are a non-issue.
 /// Cheaply cloned via the inner [`Arc`] (no `In: Clone` bound); all clones share
@@ -133,7 +133,7 @@ impl<In: 'static + Send + Sync> StartRunning<In> {
 /// Turns an action into a long-running, fan-out one: the single "park and emit"
 /// primitive.
 ///
-/// When called, the [`start_running`] handler stores the [`OutHandler`] on a
+/// When called, the [`ContinueRun::start_running`] handler stores the [`OutHandler`] on a
 /// [`Running`] component (so the call stays pending until an [`EndRun`] is
 /// queued) and fires an [`StartRunning`] carrying the input to any observers. A
 /// behaviour-tree action parks with no observer; a server entity carries
@@ -147,7 +147,7 @@ impl<In: 'static + Send + Sync> StartRunning<In> {
 /// the explicit action to its own entity.
 #[derive(Component)]
 #[require(RunTimer)]
-#[require(Action<In, Out> = start_running::<In, Out>())]
+#[require(Action<In, Out> = ContinueRun::<In, Out>::start_running())]
 #[component(on_add = Action::<In, Out>::assert_provider::<Self>)]
 pub struct ContinueRun<In = (), Out = Outcome>
 where
@@ -186,33 +186,35 @@ impl ContinueRun {
 	pub fn new() -> Self { Self::default() }
 }
 
-/// The [`Action`] backing [`ContinueRun`]: stores the [`OutHandler`] in a
-/// [`Running`] component (leaving the call pending) and fires an [`StartRunning`]
-/// with the input for any observers.
-pub fn start_running<In, Out>() -> Action<In, Out>
+impl<In, Out> ContinueRun<In, Out>
 where
 	In: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	Action::new(
-		ActionMeta::of::<ContinueRun<In, Out>, In, Out>(),
-		|ActionCall {
-		     mut commands,
-		     caller,
-		     input,
-		     out_handler,
-		 }| {
-			// park the call on a `Running<Out>`, then fan the input out to any
-			// `StartRunning<In>` observers; `Running` is inserted first so a
-			// synchronous `EndRun` from an observer always lands on it.
-			commands
-				.commands
-				.entity(caller)
-				.insert(Running::new(out_handler))
-				.trigger(move |entity| StartRunning::new(entity, input));
-			Ok(())
-		},
-	)
+	/// The [`Action`] backing [`ContinueRun`]: stores the [`OutHandler`] in a
+	/// [`Running`] component (leaving the call pending) and fires an [`StartRunning`]
+	/// with the input for any observers.
+	pub fn start_running() -> Action<In, Out> {
+		Action::new(
+			ActionMeta::of::<ContinueRun<In, Out>, In, Out>(),
+			|ActionCall {
+			     mut commands,
+			     caller,
+			     input,
+			     out_handler,
+			 }| {
+				// park the call on a `Running<Out>`, then fan the input out to any
+				// `StartRunning<In>` observers; `Running` is inserted first so a
+				// synchronous `EndRun` from an observer always lands on it.
+				commands
+					.commands
+					.entity(caller)
+					.insert(Running::new(out_handler))
+					.trigger(move |entity| StartRunning::new(entity, input));
+				Ok(())
+			},
+		)
+	}
 }
 
 /// Ends a [`Running`] action, resolving its deferred [`OutHandler`].

@@ -9,7 +9,7 @@ use syn::Ident;
 const BOUNDED_MAX: usize = 12;
 
 /// Emit a `related!` call when items fit a bevy tuple, otherwise fall back to
-/// `spawn_with::<R, _>` so an arbitrary number of children can be spawned.
+/// `spawn_ext::spawn_with::<R, _>` so an arbitrary number of children can be spawned.
 pub fn unbounded_related(
 	relation: &Ident,
 	related: Vec<TokenStream>,
@@ -17,7 +17,7 @@ pub fn unbounded_related(
 	if related.len() <= BOUNDED_MAX {
 		quote! { related!{ #relation [#(#related),*] } }
 	} else {
-		quote! { spawn_with::<#relation, _>(move |parent| {
+		quote! { spawn_ext::spawn_with::<#relation, _>(move |parent| {
 			#(parent.spawn(#related);)*
 		}) }
 	}

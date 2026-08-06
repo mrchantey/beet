@@ -196,13 +196,14 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			));
 		}
 	};
+	let beet_core = pkg_ext::internal_or_beet("beet_core");
+
 	let generic_defs = generic_idents.clone().map(|(ident, generic_ident)| {
 		quote! {
-			let #generic_ident = short_type_path::<#ident>();
+			let #generic_ident =
+				#beet_core::prelude::tokens_ext::short_type_path::<#ident>();
 		}
 	});
-
-	let beet_core = pkg_ext::internal_or_beet("beet_core");
 
 	let mut where_clause = where_clause
 		.cloned()
@@ -306,7 +307,7 @@ mod test {
 		};
 
 		let result = parse(input).unwrap().to_string();
-		let expected = "impl < U : Clone > beet_core :: prelude :: TokenizeSelf for MyGenericStruct < U > where U : beet_core :: prelude :: TokenizeSelf { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; let generic0 = short_type_path :: < U > () ; tokens . extend (quote :: quote ! { MyGenericStruct :: < # generic0 > { } }) ; } }";
+		let expected = "impl < U : Clone > beet_core :: prelude :: TokenizeSelf for MyGenericStruct < U > where U : beet_core :: prelude :: TokenizeSelf { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; let generic0 = beet_core :: prelude :: tokens_ext :: short_type_path :: < U > () ; tokens . extend (quote :: quote ! { MyGenericStruct :: < # generic0 > { } }) ; } }";
 		assert_eq!(expected, result);
 	}
 }

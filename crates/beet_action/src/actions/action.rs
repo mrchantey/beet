@@ -52,14 +52,14 @@ where
 	/// Replace this action's [`ActionMeta`] with one naming the provider.
 	///
 	/// The factories ([`new_pure`](Self::new_pure), [`new_async`](Self::new_async),
-	/// [`start_running`](crate::prelude::start_running), ...) can only describe
+	/// [`ContinueRun::start_running`], ...) can only describe
 	/// the handler they were handed: an unnameable closure type, or a generic
 	/// shared by every provider that reuses the factory. A provider requiring
 	/// such an action supplies its own meta at the `#[require]` site so the meta
 	/// names *it*:
 	///
 	/// ```text
-	/// #[require(Action<Request, Response> = route_action()
+	/// #[require(Action<Request, Response> = Router::action()
 	///     .with_meta(ActionMeta::of::<Self, Request, Response>()))]
 	/// ```
 	///

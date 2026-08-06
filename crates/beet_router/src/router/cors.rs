@@ -6,7 +6,7 @@ use beet_net::prelude::*;
 /// Configuration for the [`CorsHandler`] middleware, declaring which
 /// origins may make cross-origin requests.
 ///
-/// Spawn it alongside [`CorsHandler`] (see [`cors`]) on the router entity;
+/// Spawn it alongside [`CorsHandler`] (see [`CorsHandler::bundle`]) on the router entity;
 /// the middleware resolves it from the nearest ancestor.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -115,9 +115,10 @@ pub async fn CorsHandler(
 	Ok(response)
 }
 
-/// Bundle combining the [`CorsHandler`] middleware with its [`CorsConfig`].
-pub fn cors(config: CorsConfig) -> impl Bundle { (CorsHandler, config) }
-
+impl CorsHandler {
+	/// Bundle combining the [`CorsHandler`] middleware with its [`CorsConfig`].
+	pub fn bundle(config: CorsConfig) -> impl Bundle { (CorsHandler, config) }
+}
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -136,9 +137,9 @@ mod test {
 	fn spawn_cors(world: &mut World, config: CorsConfig) -> Entity {
 		world
 			.spawn((
-				default_router(),
-				children![exchange_route("", Hello)],
-				cors(config),
+				Router::with_defaults(),
+				children![Router::exchange_route("", Hello)],
+				CorsHandler::bundle(config),
 			))
 			.flush()
 	}

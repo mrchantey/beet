@@ -5,7 +5,7 @@
 //! [`R2WorkersStore`] can resolve its live bucket binding, then the per-isolate
 //! [`WorkerWorld`] is built (or reused) and the request is routed through it.
 //! Building is the shared core end to end: the same [`build_app`]
-//! ([`BeetPlugins`] + [`WorkersPlugin`]), the same [`probe_entry_names`]
+//! ([`BeetPlugins`] + [`WorkersPlugin`]), the same [`entry_build::probe_entry_names`]
 //! discovery, and the same [`build_entry_owned`] build+settle every world-owning
 //! driver uses. The glue that remains here is genuinely platform-specific: the
 //! env binding to store, the worker request/response conversion, and the
@@ -39,7 +39,7 @@ async fn fetch(
 	// stash the env so any `R2WorkersStore` resolves its live bucket binding for
 	// the duration of this invocation.
 	let store = R2WorkersStore::new(SITE_BUCKET_BINDING);
-	set_worker_env(env);
+	R2WorkersStore::set_env(env);
 
 	// convert, route, convert back; map any beet error to a 500. `error!` reaches
 	// `wrangler tail`: the site's `LogPlugin` installs a JS-console tracing
@@ -63,11 +63,11 @@ async fn handle(
 	let request = worker_to_request(req).await?;
 
 	// resolve the entry document through the shared discovery: the first
-	// `ENTRY_NAMES` match present in the bucket.
+	// `entry_build::ENTRY_NAMES` match present in the bucket.
 	let blob_store = BlobStore::new(store.clone());
 	let entry_name =
-		probe_entry_names(&blob_store).await?.ok_or_else(|| {
-			bevyhow!("no entry document {ENTRY_NAMES:?} in the site bucket")
+		entry_build::probe_entry_names(&blob_store).await?.ok_or_else(|| {
+			bevyhow!("no entry document {entry_build::ENTRY_NAMES:?} in the site bucket")
 		})?;
 
 	// take the per-isolate world out so the exchange can borrow it mutably across

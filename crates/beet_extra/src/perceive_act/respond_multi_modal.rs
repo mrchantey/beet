@@ -159,7 +159,7 @@ async fn call_capability(
 	let response = async_ext::timeout(
 		CAPABILITY_TIMEOUT,
 		caller.call_detached(
-			route_action(),
+			Router::action(),
 			Request::get(path)
 				.with_body(body)
 				.with_header::<header::ContentType>(MediaType::Json),
@@ -246,7 +246,7 @@ mod test {
 			move |agent| async move {
 				agent
 					.call_detached(
-						route_action(),
+						Router::action(),
 						Request::get("respond-multi-modal")
 							.with_body(body)
 							.with_header::<header::ContentType>(MediaType::Json),

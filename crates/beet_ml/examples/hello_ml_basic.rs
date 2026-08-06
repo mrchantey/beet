@@ -1,7 +1,7 @@
 //! Sentence-similarity demo using the bert sentence transformer.
 //!
 //! On first run this downloads the all-MiniLM-L6-v2 weights (≈90MB)
-//! through [`fetch_bytes`] and caches them under the system temp dir;
+//! through [`fetch_ext::fetch_bytes`] and caches them under the system temp dir;
 //! subsequent runs reuse the cache. To bypass the network entirely call
 //! [`Bert::from_bytes`] with bytes you've loaded yourself.
 use beet_core::prelude::*;

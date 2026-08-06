@@ -74,8 +74,9 @@ json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 # The markdown / MDX parser. Owns the prose structure and the diff engine (the
 # `diff` submodule), and parses embedded markup through the core BSX fragment
-# primitive (`parse_fragment`), so BSX is the single markup authority and an
-# embedded component/template/`bx:` resolves per-tag through the BSX resolver.
+# primitive (`BsxFragmentToken::parse_fragment`), so BSX is the single markup
+# authority and an embedded component/template/`bx:` resolves per-tag through the
+# BSX resolver.
 markdown_parser = ["bsx", "dep:pulldown-cmark"]
 # The `beet_ui` BSX front-end: a thin `NodeParser` delegating to the core BSX
 # parser (`beet_core/bsx`), plus the default `bx:click` event/verb registration.

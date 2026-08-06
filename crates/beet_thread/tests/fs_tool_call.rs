@@ -45,12 +45,12 @@ fn main() {
 							Actor::new("Tester", ActorKind::Agent),
 							OpenAiProvider::gpt_5_4_mini().unwrap(),
 							children![
-								exchange_route("list-blobs", ListBlobs),
-								exchange_route("read-blob", ReadBlob),
-								exchange_route("write-blob", WriteBlob),
-								exchange_route("edit-text", EditText),
-								exchange_route("remove-blob", RemoveBlob),
-								exchange_route(
+								Router::exchange_route("list-blobs", ListBlobs),
+								Router::exchange_route("read-blob", ReadBlob),
+								Router::exchange_route("write-blob", WriteBlob),
+								Router::exchange_route("edit-text", EditText),
+								Router::exchange_route("remove-blob", RemoveBlob),
+								Router::exchange_route(
 									"execution-outcome",
 									ExecutionOutcome
 								),

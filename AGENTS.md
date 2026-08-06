@@ -199,5 +199,5 @@ async_ext::do_async_thing().await;
 ## Styling Cheatsheet
 
 - Colocate a widget's classes with the widget, not in a central rules file. A widget owns its styling.
-- If a widget has only one class, use `inline_class!` rather than registering a named rule. A plain declaration is a `(prop, value)` pair; to point a prop at a design token use `token(prop, value)`, ie `token(BackgroundColor, colors::InverseSurface)`.
+- If a widget has only one class, use `inline_class!` rather than registering a named rule. A plain declaration is a `(prop, value)` pair; to point a prop at a design token use `Declaration::token(prop, value)`, ie `Declaration::token(BackgroundColor, colors::InverseSurface)`.
 - Put the `inline_class!` in a helper function (eg `fn toast_style() -> impl Bundle`) when it is more than two tokens long; keep it inline at the call site otherwise.

@@ -276,7 +276,7 @@ mod test {
 				store,
 				Router,
 				BaseLayout::<PageLayout>::default(),
-				children![route("post", BlobScene::new("post.md"))],
+				children![Router::route("post", BlobScene::new("post.md"))],
 			))
 			.flush();
 
@@ -311,7 +311,7 @@ mod test {
 				store,
 				Router,
 				BaseLayout::<PageLayout>::default(),
-				children![route("post", BlobScene::new("post.md"))],
+				children![Router::route("post", BlobScene::new("post.md"))],
 			))
 			.flush();
 

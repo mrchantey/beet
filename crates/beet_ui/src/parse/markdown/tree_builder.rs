@@ -3,7 +3,7 @@
 //!
 //! This is the markdown structure logic: a stack-based builder that interleaves
 //! prose with embedded markup. Each embedded HTML fragment is parsed by the core
-//! BSX fragment primitive ([`parse_fragment`]) and applied to the shared stack,
+//! BSX fragment primitive ([`BsxFragmentToken::parse_fragment`]) and applied to the shared stack,
 //! so a single element can span several `pulldown-cmark` events (the open tag on
 //! one line, the close on another) and a paired inline tag can wrap the markdown
 //! text between its open and close.
@@ -51,7 +51,7 @@ pub(crate) struct MarkdownTree<'a> {
 ///
 /// Uses `pulldown-cmark` with the given options, converts each event into an
 /// [`HtmlNode`] using HTML-equivalent tag names, and delegates embedded markup
-/// to the core BSX fragment primitive ([`parse_fragment`]).
+/// to the core BSX fragment primitive ([`BsxFragmentToken::parse_fragment`]).
 pub(crate) fn build_markdown_tree<'a>(
 	text: &'a str,
 	options: Options,
@@ -241,7 +241,7 @@ impl<'a> MdTreeBuilder<'a> {
 			// between its child tags, the markdown twin of the core BSX
 			// `normalize_whitespace`; skip `<pre>`-family frames whose whitespace is
 			// significant.
-			if !PRE_ELEMENTS.contains(&frame.name) {
+			if !Element::PRE_ELEMENTS.contains(&frame.name) {
 				drop_insignificant_whitespace(&mut frame.children);
 			}
 			// a tight list item mixing leading inline content with a nested list (or
@@ -616,7 +616,7 @@ impl<'a> MdTreeBuilder<'a> {
 	/// and lets a paired inline tag (`<strong>…</strong>`) wrap the markdown
 	/// text events that arrive between its open and close.
 	fn apply_html_fragment(&mut self, source: &'a str) {
-		let tokens = match parse_fragment(source, &self.html_parse_config) {
+		let tokens = match BsxFragmentToken::parse_fragment(source, &self.html_parse_config) {
 			Ok(tokens) => tokens,
 			// an unparseable fragment falls back to verbatim text
 			Err(_) => {

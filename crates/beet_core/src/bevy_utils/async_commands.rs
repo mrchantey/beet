@@ -119,7 +119,7 @@ impl Plugin for AsyncPlugin {
 		// on wasm the bridge drives our tickable executor instead of bevy's
 		// JS-event-loop `spawn_local`.
 		#[cfg(target_arch = "wasm32")]
-		beet_async::set_wasm_tick_hook(tick_bridge_executor);
+		beet_async::WasmTickHook::set(tick_bridge_executor);
 
 		app.init_plugin_with(MainSchedulePlugin)
 			// drives `tick_global_task_pools_on_main_thread()` in the Last schedule
@@ -619,7 +619,7 @@ pub impl AsyncWorld {
 	{
 		let world = self.clone();
 		async move {
-			let (send, recv) = oneshot();
+			let (send, recv) = OnceValue::oneshot();
 			let sender = Arc::new(Mutex::new(Some(send)));
 			let slot: Arc<Mutex<Option<Entity>>> = Arc::new(Mutex::new(None));
 			let capture_slot = slot.clone();
@@ -697,7 +697,7 @@ fn build_template_async(
 	template: impl Template<Output = ()> + Send + 'static,
 ) -> impl Future<Output = Result<Entity>> + Send {
 	async move {
-		let (send, recv) = oneshot();
+		let (send, recv) = OnceValue::oneshot();
 		let sender = Arc::new(Mutex::new(Some(send)));
 		let root = world
 			.with(move |world: &mut World| {
@@ -1021,7 +1021,7 @@ impl AsyncEntity {
 		let world = self.world.clone();
 		let target = self.entity;
 		async move {
-			let (send, recv) = oneshot();
+			let (send, recv) = OnceValue::oneshot();
 			let sender = Arc::new(Mutex::new(Some(send)));
 			// the temporary observer despawns itself on its first fire; its entity
 			// is parked here once spawned.
@@ -1215,7 +1215,7 @@ pub impl World {
 		Out: 'static + Send + Sync,
 	{
 		let world = self.resource::<AsyncWorld>().clone();
-		let (send, recv) = oneshot();
+		let (send, recv) = OnceValue::oneshot();
 		self.resource::<AsyncSpawner>().clone().spawn(async move {
 			send.signal(func(world).await);
 		});
@@ -1235,7 +1235,7 @@ pub impl World {
 		Out: 'static,
 	{
 		let world = self.resource::<AsyncWorld>().clone();
-		let (send, recv) = oneshot();
+		let (send, recv) = OnceValue::oneshot();
 		self.resource::<AsyncSpawner>()
 			.clone()
 			.spawn_local(async move {
@@ -1305,7 +1305,7 @@ pub impl EntityWorldMut<'_> {
 		Out: 'static + Send + Sync,
 	{
 		let id = self.id();
-		let (send, recv) = oneshot();
+		let (send, recv) = OnceValue::oneshot();
 		let (async_world, spawner) = self.world_scope(|world| {
 			(
 				world.resource::<AsyncWorld>().clone(),
@@ -1335,7 +1335,7 @@ pub impl EntityWorldMut<'_> {
 		Out: 'static,
 	{
 		let id = self.id();
-		let (send, recv) = oneshot();
+		let (send, recv) = OnceValue::oneshot();
 		let (async_world, spawner) = self.world_scope(|world| {
 			(
 				world.resource::<AsyncWorld>().clone(),
@@ -1499,7 +1499,7 @@ mod test {
 	async fn entity_task_survives_despawn() {
 		let mut app = test_app();
 		let reached = Store::<bool>::default();
-		let (gate_send, gate_recv) = oneshot::<()>();
+		let (gate_send, gate_recv) = OnceValue::<()>::oneshot();
 		let entity = app.world_mut().spawn_empty().id();
 		{
 			let reached = reached.clone();

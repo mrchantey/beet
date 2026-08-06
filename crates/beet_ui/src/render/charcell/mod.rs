@@ -17,7 +17,6 @@ mod flex;
 mod flex_buffer;
 mod font;
 pub use font::FontScale;
-pub use font::from_fullwidth;
 pub(self) use font::*;
 mod grid;
 pub(self) use grid::*;
@@ -60,6 +59,8 @@ mod terminal;
 #[cfg(all(test, feature = "tui"))]
 pub(crate) mod test_host;
 mod text;
+/// Terminal text measurement helpers.
+pub mod text_ext;
 #[cfg(feature = "tui")]
 mod title;
 
@@ -95,5 +96,4 @@ pub(self) use flex::*;
 pub(self) use inline::*;
 pub(self) use layout::*;
 pub(self) use measure::*;
-pub use text::display_width;
 pub(self) use text::*;

@@ -16,7 +16,7 @@ use beet_ui::prelude::*;
 /// A scene world with a [`PackageConfig`] resource. The document-layout widgets
 /// read this synchronously at template build via `#[template(system)]`.
 fn layout_world() -> World {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	world.insert_resource(PackageConfig {
 		title: "Beet UI".into(),
 		description: "test".into(),
@@ -226,7 +226,7 @@ fn content_layout_root_is_html() {
 
 #[beet_core::test]
 fn text_field_uses_input_classes() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <TextField name="username"/> })
 		.unwrap()
@@ -243,7 +243,7 @@ fn text_field_uses_input_classes() {
 
 #[beet_core::test]
 fn text_field_variant_changes_class() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! {
 			<TextField name="x" variant=TextFieldVariant::Filled/>
@@ -261,7 +261,7 @@ fn text_field_variant_changes_class() {
 
 #[beet_core::test]
 fn text_field_field_attaches_field_ref() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	// supplied: the FieldRef component attaches to the input entity
 	let root = world
 		.spawn_template(rsx! {
@@ -281,7 +281,7 @@ fn text_field_field_attaches_field_ref() {
 
 #[beet_core::test]
 fn text_field_omits_unset_optional_attrs() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	// omitted: no `name`/`placeholder` attributes (not an empty `name=""`)
 	let bare = world.spawn_template(rsx! { <TextField/> }).unwrap().id();
 	// supplied: the attribute is present with its value
@@ -303,7 +303,7 @@ fn text_field_omits_unset_optional_attrs() {
 
 #[beet_core::test]
 fn text_area_root_is_textarea() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <TextArea name="bio"/> })
 		.unwrap()
@@ -318,7 +318,7 @@ fn text_area_root_is_textarea() {
 
 #[beet_core::test]
 fn select_root_is_select() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <Select name="country"/> })
 		.unwrap()
@@ -334,7 +334,7 @@ fn select_root_is_select() {
 
 #[beet_core::test]
 fn form_root_is_form() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <Form name="signup"/> })
 		.unwrap()
@@ -349,7 +349,7 @@ fn form_root_is_form() {
 
 #[beet_core::test]
 fn error_text_carries_class() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <ErrorText message="oops"/> })
 		.unwrap()
@@ -367,7 +367,7 @@ fn error_text_carries_class() {
 
 #[beet_core::test]
 fn table_has_head_body_foot_sections() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world.spawn_template(rsx! { <Table/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
@@ -384,7 +384,7 @@ fn table_has_head_body_foot_sections() {
 
 #[beet_core::test]
 fn sidebar_renders_nav() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let nodes = vec![SidebarNode {
 		display_name: "Home".into(),
 		path: Some(SmolPath::new("/")),
@@ -403,7 +403,7 @@ fn sidebar_renders_nav() {
 
 #[beet_core::test]
 fn sidebar_branch_renders_details() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let nodes = vec![SidebarNode {
 		display_name: "Docs".into(),
 		path: None,
@@ -432,7 +432,7 @@ fn sidebar_branch_renders_details() {
 
 #[beet_core::test]
 fn sidebar_active_leaf_marks_aria_current() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let nodes = vec![SidebarNode {
 		display_name: "About".into(),
 		path: Some(SmolPath::new("about")),
@@ -457,7 +457,7 @@ fn sidebar_active_leaf_marks_aria_current() {
 
 #[beet_core::test]
 fn preflight_emits_style() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world.spawn_template(rsx! { <Preflight/> }).unwrap().id();
 	world
 		.entity(root)
@@ -476,7 +476,7 @@ fn preflight_emits_style() {
 
 #[beet_core::test]
 fn color_scheme_script_emits_scheme_classes() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <ColorSchemeScript/> })
 		.unwrap()
@@ -503,7 +503,7 @@ fn color_scheme_script_emits_scheme_classes() {
 
 #[beet_core::test]
 fn render_console_emits_panel() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <RenderConsole/> })
 		.unwrap()
@@ -531,7 +531,7 @@ fn render_console_emits_panel() {
 #[cfg(feature = "net")]
 #[beet_core::test]
 fn analytics_emits_script() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world.spawn_template(rsx! { <Analytics/> }).unwrap().id();
 	world
 		.entity(root)
@@ -543,7 +543,7 @@ fn analytics_emits_script() {
 
 #[beet_core::test]
 fn page_break_emits_page_break_class() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world.spawn_template(rsx! { <PageBreak/> }).unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		query
@@ -556,7 +556,7 @@ fn page_break_emits_page_break_class() {
 
 #[beet_core::test]
 fn button_emits_base_and_variant_class() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(
 			rsx! { <Button variant=ButtonVariant::Error>"Save"</Button> },
@@ -578,7 +578,7 @@ fn button_emits_base_and_variant_class() {
 
 #[beet_core::test]
 fn icon_button_adds_icon_class() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! { <IconButton>"+"</IconButton> })
 		.unwrap()
@@ -592,7 +592,7 @@ fn icon_button_adds_icon_class() {
 
 #[beet_core::test]
 fn link_is_anchor_styled_as_button() {
-	let mut world = ui_world();
+	let mut world = world_ext::ui_world();
 	let root = world
 		.spawn_template(rsx! {
 			<Link href="/" variant=ButtonVariant::Outlined>"Home"</Link>

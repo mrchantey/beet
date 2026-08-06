@@ -54,7 +54,7 @@ async fn main() -> Result {
 	let root = world
 		.spawn((
 			document,
-			(default_router(), children![
+			(Router::with_defaults(), children![
 				create(),
 				read(),
 				update(),
@@ -104,23 +104,23 @@ fn todos() -> FieldRef {
 fn create() -> impl Bundle {
 	(
 		todos(),
-		exchange_route("create", PushField::<Todo>::default()),
+		Router::exchange_route("create", PushField::<Todo>::default()),
 	)
 }
 
 /// `read --body=<index>` — return a single todo by its index.
-fn read() -> impl Bundle { (todos(), exchange_route("read", ReadTodo)) }
+fn read() -> impl Bundle { (todos(), Router::exchange_route("read", ReadTodo)) }
 
 /// `update --body='[<index>,{..}]'` — replace the todo at an index.
-fn update() -> impl Bundle { (todos(), exchange_route("update", UpdateTodo)) }
+fn update() -> impl Bundle { (todos(), Router::exchange_route("update", UpdateTodo)) }
 
 /// `delete --body=<index>` — remove the todo at an index.
 fn delete() -> impl Bundle {
-	(todos(), exchange_route("delete", RemoveAtField))
+	(todos(), Router::exchange_route("delete", RemoveAtField))
 }
 
 /// `list` — return the entire list.
-fn list() -> impl Bundle { (todos(), exchange_route("list", ReadField)) }
+fn list() -> impl Bundle { (todos(), Router::exchange_route("list", ReadField)) }
 
 /// Returns a single todo by its index, erroring when out of bounds.
 ///

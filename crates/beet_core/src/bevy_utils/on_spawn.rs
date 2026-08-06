@@ -14,22 +14,8 @@
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
 use bevy::ecs::component::Mutable;
-use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
-use bevy::ecs::spawn::SpawnRelatedBundle;
-use bevy::ecs::spawn::SpawnWith;
 use bevy::ecs::system::IntoObserverSystem;
-
-/// Type helper for [`SpawnWith`], useful for spawning any number of related entities
-/// like children.
-pub fn spawn_with<T: RelationshipTarget, F>(
-	func: F,
-) -> SpawnRelatedBundle<T::Relationship, SpawnWith<F>>
-where
-	F: 'static + Send + Sync + FnOnce(&mut RelatedSpawner<T::Relationship>),
-{
-	T::spawn(SpawnWith(func))
-}
 
 /// A type-erased [`BundleEffect`] that runs a function when the entity is spawned.
 ///

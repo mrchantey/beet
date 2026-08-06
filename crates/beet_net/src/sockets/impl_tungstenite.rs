@@ -191,64 +191,66 @@ pub(crate) async fn rustls_connect(
 	Ok((Box::pin(sink), Box::pin(stream)))
 }
 
-/// The native [`SocketServerFn`] backend: bind a TCP listener on the
-/// [`SocketServer`] address and accept WebSocket connections until `shutdown`
-/// resolves.
-///
-/// Installed by [`SocketServerPlugin`] via [`set_socket_server`]. Mirrors
-/// [`start_mini_http_server`](crate::prelude::start_mini_http_server): it owns its
-/// teardown by racing the accept loop against the shutdown signal.
-///
-/// Must be run on the main thread.
-pub async fn start_tungstenite_server(
-	entity: AsyncEntity,
-	shutdown: OnceValueRx<()>,
-) -> Result {
-	let addr = entity
-		.get::<SocketServer, _>(|server| server.local_address())
-		.await?;
-	let socket_addr: std::net::SocketAddr = addr
-		.parse()
-		.map_err(|e| bevyhow!("Invalid address {}: {}", addr, e))?;
-	let listener = Async::<TcpListener>::bind(socket_addr)
-		.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
-	start_tungstenite_server_with_tcp(entity, listener, shutdown).await
+impl SocketServer {
+	/// The native [`SocketServerFn`] backend: bind a TCP listener on the
+	/// [`SocketServer`] address and accept WebSocket connections until `shutdown`
+	/// resolves.
+	///
+	/// Installed by [`SocketServerPlugin`] via [`SocketServer::set_backend`]. Mirrors
+	/// [`HttpServer::start_mini`](HttpServer::start_mini): it owns its
+	/// teardown by racing the accept loop against the shutdown signal.
+	///
+	/// Must be run on the main thread.
+	pub async fn start_tungstenite(
+		entity: AsyncEntity,
+		shutdown: OnceValueRx<()>,
+	) -> Result {
+		let addr = entity
+			.get::<SocketServer, _>(|server| server.local_address())
+			.await?;
+		let socket_addr: std::net::SocketAddr = addr
+			.parse()
+			.map_err(|e| bevyhow!("Invalid address {}: {}", addr, e))?;
+		let listener = Async::<TcpListener>::bind(socket_addr)
+			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
+		SocketServer::start_tungstenite_with_tcp(entity, listener, shutdown).await
+	}
 }
+impl SocketServer {
+	/// Accept WebSocket connections on a pre-bound listener until `shutdown` resolves.
+	///
+	/// Races the accept loop against the shutdown signal: when teardown signals, the
+	/// loop future is dropped, releasing the listener so the port closes.
+	pub(crate) async fn start_tungstenite_with_tcp(
+		entity: AsyncEntity,
+		listener: Async<TcpListener>,
+		shutdown: OnceValueRx<()>,
+	) -> Result {
+		let local_addr = listener
+			.get_ref()
+			.local_addr()
+			.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
 
-/// Accept WebSocket connections on a pre-bound listener until `shutdown` resolves.
-///
-/// Races the accept loop against the shutdown signal: when teardown signals, the
-/// loop future is dropped, releasing the listener so the port closes.
-pub(crate) async fn start_tungstenite_server_with_tcp(
-	entity: AsyncEntity,
-	listener: Async<TcpListener>,
-	shutdown: OnceValueRx<()>,
-) -> Result {
-	let local_addr = listener
-		.get_ref()
-		.local_addr()
-		.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
+		// build the TLS acceptor (if any) before logging so the printed scheme is real
+		let tls = MaybeTls::resolve(&entity).await?;
+		info!(
+			"WebSocket server listening on {}://{}",
+			tls.ws_scheme(),
+			local_addr
+		);
 
-	// build the TLS acceptor (if any) before logging so the printed scheme is real
-	let tls = MaybeTls::resolve(&entity).await?;
-	info!(
-		"WebSocket server listening on {}://{}",
-		tls.ws_scheme(),
-		local_addr
-	);
-
-	beet_core::exports::futures_lite::future::or(
-		socket_accept_loop(entity, listener, tls),
-		async move {
-			shutdown.wait().await;
-			Result::Ok(())
-		},
-	)
-	.await
+		beet_core::exports::futures_lite::future::or(
+			socket_accept_loop(entity, listener, tls),
+			async move {
+				shutdown.wait().await;
+				Result::Ok(())
+			},
+		)
+		.await
+	}
 }
-
 /// The accept loop: adopt each accepted connection as a child [`Socket`] entity.
-/// Diverges (only the shutdown race in [`start_tungstenite_server_with_tcp`] ends
+/// Diverges (only the shutdown race in [`SocketServer::start_tungstenite_with_tcp`] ends
 /// it).
 async fn socket_accept_loop(
 	entity: AsyncEntity,

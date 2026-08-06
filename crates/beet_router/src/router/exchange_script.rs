@@ -112,7 +112,7 @@ async fn request_input(request: Request) -> Result<Value> {
 #[reflect(where)]
 #[require(
 	ScriptAction<Input, Output>,
-	ExchangeOverload = exchange_overload::<Input, Output, M1, M2>(),
+	ExchangeOverload = Router::exchange_overload::<Input, Output, M1, M2>(),
 )]
 pub struct ExchangeScript<
 	Input = (),
@@ -207,7 +207,7 @@ mod route_test {
 	async fn exchange_script_route_dispatches() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((default_router(), children![(
+			.spawn((Router::with_defaults(), children![(
 				Script::<(), String>::new(r#""hello world""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("greet"),

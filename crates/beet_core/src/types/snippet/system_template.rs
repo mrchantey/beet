@@ -20,19 +20,21 @@ pub struct SystemTemplate<P, F, T> {
 	marker: PhantomData<fn() -> (P, T)>,
 }
 
-/// Wrap a build closure into a [`SystemTemplate`]. `P` is the tuple of
-/// [`SystemParam`]s the closure reads; the closure also receives the [`Entity`]
-/// being built so it can read self/ancestor context, and returns the child
-/// template `T`.
-pub fn system_template<P, F, T>(build: F) -> SystemTemplate<P, F, T>
+impl<P, F, T> SystemTemplate<P, F, T>
 where
 	P: SystemParam + 'static,
 	F: Fn(Entity, P::Item<'_, '_>) -> T + Clone + Send + Sync + 'static,
 	T: Template<Output = ()>,
 {
-	SystemTemplate {
-		build,
-		marker: PhantomData,
+	/// Wrap a build closure into a [`SystemTemplate`]. `P` is the tuple of
+	/// [`SystemParam`]s the closure reads; the closure also receives the
+	/// [`Entity`] being built so it can read self/ancestor context, and returns
+	/// the child template `T`.
+	pub fn new(build: F) -> Self {
+		SystemTemplate {
+			build,
+			marker: PhantomData,
+		}
 	}
 }
 

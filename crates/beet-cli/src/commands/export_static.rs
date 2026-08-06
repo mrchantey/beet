@@ -42,7 +42,7 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	// validate before writing: the render-diagnostics pass gates CI, so a broken
 	// no-code entry (unknown tag, dead link) fails the export with a non-zero exit
 	// rather than shipping a broken output.
-	let report = check_routes(&cx.world(), root).await?;
+	let report = CheckReport::check_routes(&cx.world(), root).await?;
 	report.log();
 	if report.has_errors() {
 		return Response::status_text(
@@ -63,7 +63,7 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 		None => entry_dir(&entry_path)?.join(DIST_DIR),
 	};
 	let out = BlobStore::new(FsStore::new(out_dir.clone()));
-	let written = export_static(&cx.world(), root, &out).await?;
+	let written = StaticExport::export(&cx.world(), root, &out).await?;
 	Response::ok_text(format!(
 		"exported {} routes to {out_dir}\n",
 		written.len()

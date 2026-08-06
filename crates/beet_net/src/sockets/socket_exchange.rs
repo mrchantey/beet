@@ -2,12 +2,12 @@
 //! one peer is served by the other peer's router and the reply comes back.
 //!
 //! An exchange-enabled socket is a symmetric duplex channel: either peer can
-//! **originate** a request (the [`socket_exchange`] action frames it, sends it, and
+//! **originate** a request (the [`ExchangeSocket::action`] action frames it, sends it, and
 //! awaits the correlated reply) and **serve** the other's requests (the receive pump
 //! dispatches each inbound request through the connection's nearest ancestor
 //! `Action<Request, Response>` slot - typically a `Router` - and frames the reply).
 //! Everything rides on the existing exchange seam (`entity.exchange`), the existing
-//! socket events ([`MessageSend`] / [`MessageRecv`]), and the [`oneshot`] primitive;
+//! socket events ([`MessageSend`] / [`MessageRecv`]), and the [`OnceValue::oneshot`] primitive;
 //! the only new machinery is the [`ExchangeFrame`] envelope and a `u64` correlation
 //! id.
 use super::*;
@@ -24,7 +24,7 @@ use bytes::Bytes;
 /// Add it beside a `Socket` (a client's `Socket::connect`, or each connection a
 /// `SocketServer` accepts) to make that connection a Request/Response endpoint: its
 /// `on_add` wires the receive pump, and it holds the wire [`codec`](Self::new) plus
-/// the in-flight requests originated over it. Read by [`socket_exchange`].
+/// the in-flight requests originated over it. Read by [`ExchangeSocket::action`].
 #[derive(Component)]
 #[component(on_add = hook_ext::observe(on_exchange_recv), on_remove = on_remove)]
 pub struct ExchangeSocket {
@@ -55,38 +55,39 @@ impl ExchangeSocket {
 	pub fn json() -> Self { Self::new(JsonCodec) }
 }
 
-/// The originating side: an `Action<Request, Response>` that forwards its request over
-/// `connection` (an [`ExchangeSocket`]) and awaits the peer's reply.
-///
-/// Install it as a route handler so a server-side route forwards to a connected
-/// client instead of handling locally, eg
-/// `exchange_route("take-photo", socket_exchange(web_connection))`. The user-facing
-/// "SocketExchange action".
-pub fn socket_exchange(connection: Entity) -> Action<Request, Response> {
-	Action::new_async(move |cx: ActionContext<Request>| async move {
-		let connection = cx.caller.world().entity(connection);
-		// register a pending reply, take an id, and read the codec in one access.
-		let (reply, id, codec) = connection
-			.with(move |mut entity: EntityWorldMut| -> Result<_> {
-				let mut socket =
-					entity.get_mut::<ExchangeSocket>().ok_or_else(|| {
-						bevyhow!("connection has no `ExchangeSocket`")
-					})?;
-				let id = socket.next_id;
-				socket.next_id += 1;
-				let (sender, reply) = oneshot();
-				socket.pending.insert(id, sender);
-				Ok((reply, id, socket.codec.clone()))
-			})
-			.await??;
-		let frame = ExchangeFrame::request(id, cx.input).await?;
-		connection
-			.trigger_target(MessageSend(codec.encode(&frame)?))
-			.await?;
-		reply.wait().await.xok()
-	})
+impl ExchangeSocket {
+	/// The originating side: an `Action<Request, Response>` that forwards its request over
+	/// `connection` (an [`ExchangeSocket`]) and awaits the peer's reply.
+	///
+	/// Install it as a route handler so a server-side route forwards to a connected
+	/// client instead of handling locally, eg
+	/// `Router::exchange_route("take-photo", ExchangeSocket::action(web_connection))`. The user-facing
+	/// "SocketExchange action".
+	pub fn action(connection: Entity) -> Action<Request, Response> {
+		Action::new_async(move |cx: ActionContext<Request>| async move {
+			let connection = cx.caller.world().entity(connection);
+			// register a pending reply, take an id, and read the codec in one access.
+			let (reply, id, codec) = connection
+				.with(move |mut entity: EntityWorldMut| -> Result<_> {
+					let mut socket =
+						entity.get_mut::<ExchangeSocket>().ok_or_else(|| {
+							bevyhow!("connection has no `ExchangeSocket`")
+						})?;
+					let id = socket.next_id;
+					socket.next_id += 1;
+					let (sender, reply) = OnceValue::oneshot();
+					socket.pending.insert(id, sender);
+					Ok((reply, id, socket.codec.clone()))
+				})
+				.await??;
+			let frame = ExchangeFrame::request(id, cx.input).await?;
+			connection
+				.trigger_target(MessageSend(codec.encode(&frame)?))
+				.await?;
+			reply.wait().await.xok()
+		})
+	}
 }
-
 /// Encodes an [`ExchangeFrame`] to a socket [`Message`] and back. Pluggable per
 /// [`ExchangeSocket`] so other cases swap the wire format - a downstream crate (eg an
 /// embedded peer) can implement a bespoke codec without touching `beet_net`.
@@ -337,12 +338,12 @@ mod test {
 	async fn round_trip() {
 		let mut world = AsyncPlugin::world();
 		let (client, server) = socket_pair();
-		// the serving peer: its `exchange_handler` is the ancestor `Action` the pump
+		// the serving peer: its `exchange_ext::handler` is the ancestor `Action` the pump
 		// dispatches inbound requests to.
 		world.spawn((
 			server,
 			ExchangeSocket::postcard(),
-			exchange_handler(|req| {
+			exchange_ext::handler(|req| {
 				Response::ok().with_body(req.take().path_string())
 			}),
 		));
@@ -353,7 +354,7 @@ mod test {
 			.run_async_then(move |origin| async move {
 				origin
 					.call_detached(
-						socket_exchange(origin.id()),
+						ExchangeSocket::action(origin.id()),
 						Request::get("hello/world"),
 					)
 					.await
@@ -374,7 +375,7 @@ mod test {
 		world.spawn((
 			server,
 			ExchangeSocket::postcard(),
-			exchange_handler(|req| {
+			exchange_ext::handler(|req| {
 				Response::ok().with_body(req.take().path_string())
 			}),
 		));
@@ -383,7 +384,7 @@ mod test {
 		world
 			.entity_mut(origin)
 			.run_async_then(move |origin| async move {
-				let exchange = socket_exchange(origin.id());
+				let exchange = ExchangeSocket::action(origin.id());
 				let one = origin
 					.call_detached(exchange.clone(), Request::get("one"))
 					.await?;
@@ -405,7 +406,7 @@ mod test {
 	#[beet_core::test]
 	async fn drain_resolves_pending() {
 		let mut socket = ExchangeSocket::postcard();
-		let (sender, reply) = oneshot();
+		let (sender, reply) = OnceValue::oneshot();
 		socket.pending.insert(7, sender);
 		drain_pending(&mut socket);
 		reply.wait().await.status().as_u16().xpect_eq(502);

@@ -44,12 +44,12 @@ fn content_store() -> FsStore {
 /// The site router: the typed `pages`, the markdown `content`, and the `add`
 /// server `actions` collections, all wrapped in the global [`BeetLayout`] via the
 /// [`BaseLayout`] render middleware, so every route's body is placed into the
-/// layout's `<main>`. The batteries-included [`default_router`] adds `/app-info`
+/// layout's `<main>`. The batteries-included [`Router::with_defaults`] adds `/app-info`
 /// and the cached `/js/reactivity.js` runtime the reactive counter loads.
 pub fn rsx_site_router() -> impl Bundle {
 	(
 		content_store(),
-		default_router(),
+		Router::with_defaults(),
 		pages_routes(),
 		content_routes(),
 		actions_routes(),

@@ -168,12 +168,12 @@ fn resolve_navigation(
 		NavigateTo::PrevSibling => {
 			resolve_sibling(tree, current_path, SiblingDirection::Prev)
 		}
-		NavigateTo::NextCard => resolve_card(tree, current_path, CardNav::Next),
-		NavigateTo::PrevCard => resolve_card(tree, current_path, CardNav::Prev),
+		NavigateTo::NextCard => CardNav::resolve(tree, current_path, CardNav::Next),
+		NavigateTo::PrevCard => CardNav::resolve(tree, current_path, CardNav::Prev),
 		NavigateTo::FirstCard => {
-			resolve_card(tree, current_path, CardNav::First)
+			CardNav::resolve(tree, current_path, CardNav::First)
 		}
-		NavigateTo::LastCard => resolve_card(tree, current_path, CardNav::Last),
+		NavigateTo::LastCard => CardNav::resolve(tree, current_path, CardNav::Last),
 	}
 }
 
@@ -318,7 +318,7 @@ mod test {
 
 	/// A minimal router bundle for the navigation tests: the [`Router`] dispatch
 	/// action plus the [`NavigateHandler`] middleware under test, and nothing
-	/// else. Unlike [`default_router`], it wires no opinionated app routes, so
+	/// else. Unlike [`Router::with_defaults`], it wires no opinionated app routes, so
 	/// the sibling/first-child ordering these tests assert is not perturbed.
 	fn nav_router() -> impl Bundle { (Router, NavigateHandler::default()) }
 

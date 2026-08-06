@@ -11,10 +11,13 @@ use super::ast::*;
 use super::cursor::Cursor;
 use crate::prelude::*;
 
-/// Parse an attribute-value or text-position value expression from a string, the
-/// entry a non-cursor caller (eg the markdown front-end) uses for a `{..}` block.
-pub fn parse_value_expr_str(source: &str) -> Result<ValueExpr> {
-	parse_value_expr(&mut Cursor::new(source))
+impl ValueExpr {
+	/// Parse an attribute-value or text-position value expression from a string,
+	/// the entry a non-cursor caller (eg the markdown front-end) uses for a
+	/// `{..}` block.
+	pub fn parse_str(source: &str) -> Result<ValueExpr> {
+		parse_value_expr(&mut Cursor::new(source))
+	}
 }
 
 /// Parse an attribute-value or text-position value: a literal or a reference.

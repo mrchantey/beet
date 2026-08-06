@@ -37,7 +37,7 @@ fn register_pending_scene(
 	};
 	let entity = add.entity;
 	let root = **build_root;
-	// register before this build's `drain_pending_dependencies`: the queue drains
+	// register before this build's `TemplatePending::drain_dependencies`: the queue drains
 	// at the next world sync, ahead of the root's synchronous drain.
 	commands.queue(move |world: &mut World| {
 		let guard = TemplatePending::park_on(

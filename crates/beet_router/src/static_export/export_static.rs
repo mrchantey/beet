@@ -9,74 +9,79 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Collects the static-route paths a no-code site ships, in route-tree order.
-///
-/// A route qualifies when its path is fully static, its method is `GET`, and it
-/// is either a scene route or marked [`ExportStrategy::Static`]. Routes whose
-/// [`ArticleMeta`] marks them a draft are skipped only on a `prod`
-/// [`PackageConfig::stage`]; dev/staging builds keep drafts so they can be
-/// previewed. Shared by [`collect_static_html`] and the `export-pdf` command, so
-/// both ship exactly the same page set.
-pub async fn collect_static_paths(
-	world: &AsyncWorld,
-	router: Entity,
-) -> Result<Vec<SmolPath>> {
-	world
-		.with(move |world: &mut World| -> Result<Vec<SmolPath>> {
-			let tree = world
-				.entity(router)
-				.get::<RouteTree>()
-				.ok_or_else(|| {
-					bevyhow!("router entity {router} has no RouteTree")
-				})?
-				.clone();
-			// drafts are excluded only in production; the resource is present at
-			// export, defaulting to dev (keep drafts) when unset.
-			let is_prod = world
-				.get_resource::<PackageConfig>()
-				.is_some_and(|config| config.is_prod());
+/// Static-site export: collect the qualifying routes, render each, write the
+/// resulting HTML to a [`BlobStore`].
+pub struct StaticExport;
 
-			let mut paths = Vec::new();
-			for node in tree.flatten_nodes() {
-				if !node.path.is_static() {
-					continue;
+impl StaticExport {
+	/// Collects the static-route paths a no-code site ships, in route-tree order.
+	///
+	/// A route qualifies when its path is fully static, its method is `GET`, and it
+	/// is either a scene route or marked [`ExportStrategy::Static`]. Routes whose
+	/// [`ArticleMeta`] marks them a draft are skipped only on a `prod`
+	/// [`PackageConfig::stage`]; dev/staging builds keep drafts so they can be
+	/// previewed. Shared by [`collect_static_html`] and the `export-pdf` command, so
+	/// both ship exactly the same page set.
+	pub async fn collect_paths(
+		world: &AsyncWorld,
+		router: Entity,
+	) -> Result<Vec<SmolPath>> {
+		world
+			.with(move |world: &mut World| -> Result<Vec<SmolPath>> {
+				let tree = world
+					.entity(router)
+					.get::<RouteTree>()
+					.ok_or_else(|| {
+						bevyhow!("router entity {router} has no RouteTree")
+					})?
+					.clone();
+				// drafts are excluded only in production; the resource is present at
+				// export, defaulting to dev (keep drafts) when unset.
+				let is_prod = world
+					.get_resource::<PackageConfig>()
+					.is_some_and(|config| config.is_prod());
+
+				let mut paths = Vec::new();
+				for node in tree.flatten_nodes() {
+					if !node.path.is_static() {
+						continue;
+					}
+					if node
+						.method
+						.map(|method| method != HttpMethod::Get)
+						.unwrap_or(false)
+					{
+						continue;
+					}
+					// a draft route is dropped only on a prod stage
+					let is_draft = world
+						.entity(node.entity)
+						.get::<ArticleMeta>()
+						.is_some_and(|meta| meta.draft);
+					if is_prod && is_draft {
+						continue;
+					}
+					let cache = world
+						.entity(node.entity)
+						.get::<ExportStrategy>()
+						.copied()
+						.unwrap_or_default();
+					if node.is_scene() || cache == ExportStrategy::Static {
+						paths.push(node.path.annotated_path());
+					}
 				}
-				if node
-					.method
-					.map(|method| method != HttpMethod::Get)
-					.unwrap_or(false)
-				{
-					continue;
-				}
-				// a draft route is dropped only on a prod stage
-				let is_draft = world
-					.entity(node.entity)
-					.get::<ArticleMeta>()
-					.is_some_and(|meta| meta.draft);
-				if is_prod && is_draft {
-					continue;
-				}
-				let cache = world
-					.entity(node.entity)
-					.get::<ExportStrategy>()
-					.copied()
-					.unwrap_or_default();
-				if node.is_scene() || cache == ExportStrategy::Static {
-					paths.push(node.path.annotated_path());
-				}
-			}
-			Ok(paths)
-		})
-		.await
+				Ok(paths)
+			})
+			.await
+	}
 }
-
 /// Renders every static route in the router to HTML, in route-tree order. See
-/// [`collect_static_paths`] for which routes qualify.
+/// [`StaticExport::collect_paths`] for which routes qualify.
 async fn collect_static_html(
 	world: &AsyncWorld,
 	router: Entity,
 ) -> Result<Vec<(SmolPath, String)>> {
-	let paths = collect_static_paths(world, router).await?;
+	let paths = StaticExport::collect_paths(world, router).await?;
 	// the tree lives on the entry root, the dispatch on the router beneath it
 	let entity = world
 		.run_system_cached_with::<_, Result<Entity>, _, _>(find_router, router)
@@ -100,32 +105,33 @@ async fn collect_static_html(
 	Ok(pages)
 }
 
-/// Renders every static route and writes it to the output store, returning the
-/// written paths. A page writes to `<path>/index.html` (clean URLs); an asset
-/// route with a file extension (eg `js/reactivity.js`) writes its raw file, so
-/// the `<script src="/js/reactivity.js">` a reactive page references resolves and
-/// the export is self-contained.
-pub async fn export_static(
-	world: &AsyncWorld,
-	router: Entity,
-	out: &BlobStore,
-) -> Result<Vec<SmolPath>> {
-	let pages = collect_static_html(world, router).await?;
-	let mut written = Vec::new();
-	for (path, html) in pages {
-		let out_path = if path.segments().is_empty() {
-			SmolPath::new("index.html")
-		} else if path.extension().is_some() {
-			path
-		} else {
-			path.join("index.html")
-		};
-		out.insert(&out_path, html).await?;
-		written.push(out_path);
+impl StaticExport {
+	/// Renders every static route and writes it to the output store, returning the
+	/// written paths. A page writes to `<path>/index.html` (clean URLs); an asset
+	/// route with a file extension (eg `js/reactivity.js`) writes its raw file, so
+	/// the `<script src="/js/reactivity.js">` a reactive page references resolves and
+	/// the export is self-contained.
+	pub async fn export(
+		world: &AsyncWorld,
+		router: Entity,
+		out: &BlobStore,
+	) -> Result<Vec<SmolPath>> {
+		let pages = collect_static_html(world, router).await?;
+		let mut written = Vec::new();
+		for (path, html) in pages {
+			let out_path = if path.segments().is_empty() {
+				SmolPath::new("index.html")
+			} else if path.extension().is_some() {
+				path
+			} else {
+				path.join("index.html")
+			};
+			out.insert(&out_path, html).await?;
+			written.push(out_path);
+		}
+		Ok(written)
 	}
-	Ok(written)
 }
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -135,11 +141,11 @@ mod test {
 	#[beet_core::test]
 	async fn exports_static_scenes() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		// `default_router` also wires the std-only `/app-info` scene route, which
+		// `Router::with_defaults` also wires the std-only `/app-info` scene route, which
 		// reads a `PackageConfig` at render; insert one so it exports cleanly.
 		world.insert_resource(pkg_config!());
 		let router = world
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				(
 					render_action::fixed_func_route(
 						"about",
@@ -161,13 +167,13 @@ mod test {
 		let out2 = out.clone();
 		let written = world
 			.run_async_then(async move |world| {
-				export_static(&world, router, &out2).await
+				StaticExport::export(&world, router, &out2).await
 			})
 			.await
 			.unwrap();
 
 		// the two user scene routes plus the `app-info` scene and the
-		// `js/reactivity.js` runtime asset, both wired by `default_router`.
+		// `js/reactivity.js` runtime asset, both wired by `Router::with_defaults`.
 		written.len().xpect_eq(4);
 		out.get(&SmolPath::new("index.html"))
 			.await
@@ -198,7 +204,7 @@ mod test {
 		let out = BlobStore::temp();
 		world
 			.run_async_then(async move |world| {
-				export_static(&world, router, &out).await
+				StaticExport::export(&world, router, &out).await
 			})
 			.await
 			.unwrap()
@@ -224,7 +230,7 @@ mod test {
 	/// `ArticleMeta { draft: true }` (the codegen `BlobScene` shape).
 	fn spawn_draft_router(world: &mut World) -> Entity {
 		world
-			.spawn((default_router(), children![
+			.spawn((Router::with_defaults(), children![
 				(
 					render_action::fixed_func_route(
 						"published",
@@ -293,7 +299,7 @@ mod test {
 		// compose the site store on the router root so `RoutesDir` resolves it by
 		// ancestry, then settle the discovery scan before the export walks the routes.
 		let router = world
-			.spawn((FsStore::new(root), default_router(), children![
+			.spawn((FsStore::new(root), Router::with_defaults(), children![
 				RoutesDir::default()
 			]))
 			.flush();

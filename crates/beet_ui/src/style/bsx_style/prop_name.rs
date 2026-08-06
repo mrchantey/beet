@@ -7,7 +7,7 @@
 //! kebab-case property name (`display`, `column-gap`) and parses the value
 //! through the BSX value grammar. These maps bridge the two:
 //!
-//! - [`prop_name_map`]: a kebab property name -> a [`PropResolver`] that parses a
+//! - [`PropResolver::name_map`]: a kebab property name -> a [`PropResolver`] that parses a
 //!   [`DataLiteral`] into the same [`TokenValue`] the typed `with_value` produces;
 //! - [`color_role_map`]: a Material role name (`Primary`) -> its token, for the
 //!   `@token:Role` token-to-token binding form.
@@ -72,7 +72,7 @@ where
 	// the value types are self-describing, so nested-type lookups never hit the
 	// (empty) registry; `$name` entity refs are meaningless in a rule value.
 	let registry = TypeRegistry::empty();
-	let reflected = literal_to_reflect(
+	let reflected = DataLiteral::to_reflect(
 		literal,
 		Some(V::type_info()),
 		&registry,
@@ -84,66 +84,67 @@ where
 	TokenValue::value(value)
 }
 
-/// Maps a kebab-case CSS property name to the [`PropResolver`] for its
-/// [`common_props`](crate::style::common_props) token. The keys mirror the
-/// property strings the `css_property!` declarations emit, so a `<Rule>`
-/// attribute reads like the CSS it produces.
-pub fn prop_name_map() -> HashMap<SmolStr, PropResolver> {
-	[
-		("color", prop::<ForegroundColor>()),
-		("background-color", prop::<BackgroundColor>()),
-		("display", prop::<DisplayProp>()),
-		("flex-direction", prop::<FlexDirectionProp>()),
-		("flex-wrap", prop::<FlexWrapProp>()),
-		("flex-grow", prop::<FlexGrowProp>()),
-		("align-items", prop::<AlignItemsProp>()),
-		("align-content", prop::<AlignContentProp>()),
-		("align-self", prop::<AlignSelfProp>()),
-		("justify-content", prop::<JustifyContentProp>()),
-		("gap", prop::<GapProp>()),
-		("column-gap", prop::<ColumnGapProp>()),
-		("row-gap", prop::<RowGapProp>()),
-		("grid-template-columns", prop::<GridTemplateColumnsProp>()),
-		("grid-auto-rows", prop::<GridAutoRowsProp>()),
-		("width", prop::<Width>()),
-		("min-width", prop::<MinWidth>()),
-		("max-width", prop::<MaxWidth>()),
-		("height", prop::<Height>()),
-		("min-height", prop::<MinHeight>()),
-		("max-height", prop::<MaxHeight>()),
-		("padding", prop::<Padding>()),
-		("margin", prop::<MarginProp>()),
-		("border-radius", prop::<ShapeProp>()),
-		("box-shadow", prop::<ElevationProp>()),
-		("border-color", prop::<BorderColorProp>()),
-		("border-top-width", prop::<BorderTopWidth>()),
-		("border-right-width", prop::<BorderRightWidth>()),
-		("border-bottom-width", prop::<BorderBottomWidth>()),
-		("border-left-width", prop::<BorderLeftWidth>()),
-		("opacity", prop::<OpacityProp>()),
-		("overflow-x", prop::<OverflowXProp>()),
-		("overflow-y", prop::<OverflowYProp>()),
-		("position", prop::<PositionProp>()),
-		("top", prop::<InsetTop>()),
-		("right", prop::<InsetRight>()),
-		("bottom", prop::<InsetBottom>()),
-		("left", prop::<InsetLeft>()),
-		("z-index", prop::<ZIndexProp>()),
-		("cursor", prop::<CursorProp>()),
-		("transform", prop::<TransformProp>()),
-		("font-size", prop::<FontSize>()),
-		("font-weight", prop::<FontWeightProp>()),
-		("line-height", prop::<LineHeight>()),
-		("letter-spacing", prop::<Tracking>()),
-		("text-align", prop::<TextAlignProp>()),
-		("white-space", prop::<WhiteSpaceProp>()),
-		("list-style-type", prop::<ListStyleProp>()),
-	]
-	.into_iter()
-	.map(|(name, resolver)| (SmolStr::new_static(name), resolver))
-	.collect()
+impl PropResolver {
+	/// Maps a kebab-case CSS property name to the [`PropResolver`] for its
+	/// [`common_props`](crate::style::common_props) token. The keys mirror the
+	/// property strings the `css_property!` declarations emit, so a `<Rule>`
+	/// attribute reads like the CSS it produces.
+	pub fn name_map() -> HashMap<SmolStr, PropResolver> {
+		[
+			("color", prop::<ForegroundColor>()),
+			("background-color", prop::<BackgroundColor>()),
+			("display", prop::<DisplayProp>()),
+			("flex-direction", prop::<FlexDirectionProp>()),
+			("flex-wrap", prop::<FlexWrapProp>()),
+			("flex-grow", prop::<FlexGrowProp>()),
+			("align-items", prop::<AlignItemsProp>()),
+			("align-content", prop::<AlignContentProp>()),
+			("align-self", prop::<AlignSelfProp>()),
+			("justify-content", prop::<JustifyContentProp>()),
+			("gap", prop::<GapProp>()),
+			("column-gap", prop::<ColumnGapProp>()),
+			("row-gap", prop::<RowGapProp>()),
+			("grid-template-columns", prop::<GridTemplateColumnsProp>()),
+			("grid-auto-rows", prop::<GridAutoRowsProp>()),
+			("width", prop::<Width>()),
+			("min-width", prop::<MinWidth>()),
+			("max-width", prop::<MaxWidth>()),
+			("height", prop::<Height>()),
+			("min-height", prop::<MinHeight>()),
+			("max-height", prop::<MaxHeight>()),
+			("padding", prop::<Padding>()),
+			("margin", prop::<MarginProp>()),
+			("border-radius", prop::<ShapeProp>()),
+			("box-shadow", prop::<ElevationProp>()),
+			("border-color", prop::<BorderColorProp>()),
+			("border-top-width", prop::<BorderTopWidth>()),
+			("border-right-width", prop::<BorderRightWidth>()),
+			("border-bottom-width", prop::<BorderBottomWidth>()),
+			("border-left-width", prop::<BorderLeftWidth>()),
+			("opacity", prop::<OpacityProp>()),
+			("overflow-x", prop::<OverflowXProp>()),
+			("overflow-y", prop::<OverflowYProp>()),
+			("position", prop::<PositionProp>()),
+			("top", prop::<InsetTop>()),
+			("right", prop::<InsetRight>()),
+			("bottom", prop::<InsetBottom>()),
+			("left", prop::<InsetLeft>()),
+			("z-index", prop::<ZIndexProp>()),
+			("cursor", prop::<CursorProp>()),
+			("transform", prop::<TransformProp>()),
+			("font-size", prop::<FontSize>()),
+			("font-weight", prop::<FontWeightProp>()),
+			("line-height", prop::<LineHeight>()),
+			("letter-spacing", prop::<Tracking>()),
+			("text-align", prop::<TextAlignProp>()),
+			("white-space", prop::<WhiteSpaceProp>()),
+			("list-style-type", prop::<ListStyleProp>()),
+		]
+		.into_iter()
+		.map(|(name, resolver)| (SmolStr::new_static(name), resolver))
+		.collect()
+	}
 }
-
 /// Maps a Material colour-role name (`Primary`, `OnSurface`) to its token, the
 /// target of a `<Rule>` `@token:Role` binding. The names match the
 /// [`material::colors`](crate::style::material::colors) token idents.

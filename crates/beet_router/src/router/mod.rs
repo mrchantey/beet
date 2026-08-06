@@ -9,7 +9,6 @@ pub use cache_headers::*;
 mod exchange_overload;
 pub use exchange_overload::*;
 mod exchange_fallback;
-pub use exchange_fallback::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
 // the typed `ExchangeScript` route marker, the `ScriptRoute` front-end,
@@ -46,7 +45,7 @@ pub use server_action_client::*;
 
 // The `Router` dispatch action and the route-building `RouterPlugin` are shared
 // across std and no_std (one `Router` type, one plugin). The single builder that
-// assembles them with the standard middleware and app routes is `default_router`
+// assembles them with the standard middleware and app routes is `Router::with_defaults`
 // (in `extra`). The std-only scene/help rendering pipeline stays feature-gated
 // inside these and in the `help`/`sidebar` modules below; the no_std build falls
 // back to a plain-text route listing.

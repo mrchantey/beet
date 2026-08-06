@@ -106,7 +106,7 @@ impl HtmlRenderer {
 	}
 
 	/// [`reactive`](Self::reactive) with explicit config: when to inject the
-	/// runtime ([`InsertReactive`]) and whether to inline [`REACTIVITY_JS`] rather
+	/// runtime ([`InsertReactive`]) and whether to inline [`Reactivity::JS`] rather
 	/// than reference it by URL.
 	#[cfg(all(feature = "bsx", feature = "json"))]
 	pub fn reactive_with(
@@ -500,7 +500,7 @@ mod test {
 	/// Parse HTML (via the BSX parser's HTML mode) into a world, returning the
 	/// root entity ready to render.
 	fn parse_html(html: &str) -> (World, Entity) {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser::html()

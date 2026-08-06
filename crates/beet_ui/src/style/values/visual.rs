@@ -13,9 +13,6 @@ use beet_core::prelude::*;
 use std::io;
 use std::io::Write;
 
-/// The default [`VisualStyle`], usable in `const` contexts.
-pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
-
 // Manual rather than derived so `default()` matches [`VisualStyle::DEFAULT`]: the
 // derived `Default` would give `font_size` the `Length` default (`0px`) instead
 // of the `1rem` (normal text) the renderer expects.

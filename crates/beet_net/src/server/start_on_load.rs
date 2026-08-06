@@ -29,7 +29,8 @@ use beet_core::prelude::*;
 #[reflect(Component, Default)]
 #[require(
 	CallOnLoad,
-	Action<Request, Response> = start_running::<Request, Response>()
+	Action<Request, Response> =
+		ContinueRun::<Request, Response>::start_running()
 		.with_meta(ActionMeta::of::<Self, Request, Response>())
 )]
 #[component(

@@ -84,7 +84,7 @@ pub use crate::plugin::AsyncPlugin;
 pub use crate::plugin::AsyncTickBudget;
 pub use crate::plugin::AsyncWorld;
 #[cfg(target_arch = "wasm32")]
-pub use crate::wasm_tick::set_wasm_tick_hook;
+pub use crate::wasm_tick::WasmTickHook;
 
 /// The async prelude.
 ///

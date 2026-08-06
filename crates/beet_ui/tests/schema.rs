@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
 /// A spawn-capable template world.
-fn world() -> World { ui_world() }
+fn world() -> World { world_ext::ui_world() }
 
 /// Parse a `.bsx` source into a freshly spawned container, returning the root.
 fn parse_bsx(world: &mut World, source: &str) -> Entity {
@@ -54,7 +54,7 @@ fn rust_template_registers_schema() {
 	// the prop schema is attached alongside the build bridge, derived from the
 	// typed signature: `label` required, `count` optional.
 	let registry = world.resource::<AppTypeRegistry>().clone();
-	let schema = template_schema_by_name(&registry, "Badge").unwrap();
+	let schema = ValueSchema::template_by_name(&registry, "Badge").unwrap();
 	let ValueSchema::Struct(struct_schema) = schema else {
 		panic!("expected a struct schema");
 	};

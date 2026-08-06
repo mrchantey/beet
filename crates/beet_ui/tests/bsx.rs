@@ -10,7 +10,7 @@ use beet_ui::prelude::*;
 use bevy::reflect::GetTypeRegistration;
 
 /// A spawn-capable template world.
-fn world() -> World { ui_world() }
+fn world() -> World { world_ext::ui_world() }
 
 /// Register a reflect type into the world's [`AppTypeRegistry`].
 fn register<T: GetTypeRegistration>(world: &mut World) {
@@ -1146,7 +1146,7 @@ fn resource_tag_inserts_when_absent() {
 
 /// Build `source` and return the template error.
 fn build_error(world: &mut World, source: &str) -> String {
-	let nodes = parse_document(source, &BsxParseConfig::bsx()).unwrap();
+	let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
 	world
 		.spawn_template(BsxTemplate::container(
 			nodes,
@@ -1355,7 +1355,7 @@ fn binding_comp_router_lazy() {
 fn reserved_ref_shadow_errors() {
 	let mut world = world();
 	let nodes =
-		parse_document("<div bx:ref=\"Router\"/>", &BsxParseConfig::bsx())
+		BsxNode::parse_document("<div bx:ref=\"Router\"/>", &BsxParseConfig::bsx())
 			.unwrap();
 	world
 		.spawn_template(BsxTemplate::container(

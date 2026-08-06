@@ -3,7 +3,7 @@
 //! Unlike the generic middleware and dispatch in [`router`](crate::router),
 //! these are opinionated, ready-made building blocks: package-info and
 //! analytics routes, the [`HtmlStore`] prebuilt-HTML gate, and a
-//! batteries-included [`default_router`].
+//! batteries-included [`Router::with_defaults`].
 
 mod html_store;
 pub use html_store::*;
@@ -26,13 +26,13 @@ mod analytics;
 pub use analytics::*;
 
 // std-only: the app-info scene route renders through beet_ui, and the
-// batteries-included `default_router` wires it as one of its children when std.
+// batteries-included `Router::with_defaults` wires it as one of its children when std.
 #[cfg(feature = "std")]
 mod app_info;
 #[cfg(feature = "std")]
 pub(crate) use app_info::*;
 
-// std-only: the reactivity runtime route serves beet_ui's `REACTIVITY_JS`, the
+// std-only: the reactivity runtime route serves beet_ui's `Reactivity::JS`, the
 // shared asset the renderer's auto-injected `<script defer>` loads.
 #[cfg(feature = "std")]
 mod reactivity_js;

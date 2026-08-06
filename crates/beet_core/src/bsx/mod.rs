@@ -12,7 +12,7 @@
 //! Author + parse + build live here in `beet_core`; rendering the built tree to
 //! HTML or charcell lives in `beet_ui`. The `MediaParser`/`MediaRenderer`
 //! dispatch also stays in `beet_ui`, delegating BSX parsing to
-//! [`parse_document`] + [`BsxTemplate`].
+//! [`BsxNode::parse_document`] + [`BsxTemplate`].
 //!
 //! Internal split: the syntax tree ([`ast`]), the cursor
 //! ([`cursor`]), the markup parser ([`parse`]), the value grammar ([`value`]),
@@ -68,7 +68,7 @@
 //! use beet_core::prelude::*;
 //!
 //! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
-//! let nodes = parse_document(
+//! let nodes = BsxNode::parse_document(
 //!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click=increment{ field: @doc:clicks }>+</button></section>"#,
 //!     &BsxParseConfig::bsx(),
 //! )
@@ -110,7 +110,7 @@
 //!     .insert_source("Card", "<section><h2>{@prop:title}</h2><Slot/></section>")
 //!     .unwrap();
 //!
-//! let nodes = parse_document(
+//! let nodes = BsxNode::parse_document(
 //!     r#"<Card title="Intro"><p>hi</p></Card>"#,
 //!     &BsxParseConfig::bsx(),
 //! )
@@ -151,7 +151,6 @@ mod value;
 pub use ast::*;
 pub use events::*;
 pub use parse::*;
-pub use reflect::*;
 pub use registry::*;
 #[cfg(feature = "bevy_async")]
 pub use remote::*;
@@ -160,7 +159,6 @@ pub use schema::*;
 pub use style_resolver::*;
 pub use tag_resolver::*;
 pub use template_format::*;
-pub use value::parse_value_expr_str;
 
 use crate::prelude::*;
 

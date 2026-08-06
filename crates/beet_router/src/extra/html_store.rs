@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 
 /// Serves prebuilt HTML from a [`BlobStore`], gating live rendering.
 ///
-/// Add it alongside a [`default_router`](crate::prelude::default_router). It requires the
+/// Add it alongside a [`Router::with_defaults`](crate::prelude::default_router). It requires the
 /// [`HtmlStoreAction`] middleware, which in `ssg_mode` serves
 /// `<path>/index.html` from `store` and only renders live on a store miss; with
 /// `ssg_mode` off it always renders live.
@@ -91,7 +91,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![
+				(Router::with_defaults(), children![
 					render_action::fixed_func_route(
 						"about",
 						|| rsx! { <p>"live about"</p> }
@@ -113,7 +113,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![
+				(Router::with_defaults(), children![
 					render_action::fixed_func_route(
 						"about",
 						|| rsx! { <p>"live about"</p> }
@@ -133,7 +133,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((
-				(default_router(), children![
+				(Router::with_defaults(), children![
 					render_action::fixed_func_route(
 						"contact",
 						|| rsx! { <p>"live contact"</p> }

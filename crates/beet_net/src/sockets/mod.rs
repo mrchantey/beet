@@ -64,9 +64,5 @@ pub use socket_exchange::*;
 mod impl_tungstenite;
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 pub(crate) use impl_tungstenite::socket_from_upgraded;
-#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-pub use impl_tungstenite::start_tungstenite_server;
-#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-pub(crate) use impl_tungstenite::start_tungstenite_server_with_tcp;
 #[cfg(target_arch = "wasm32")]
 pub(self) mod impl_web_sys;

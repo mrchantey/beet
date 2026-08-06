@@ -500,7 +500,7 @@ mod test {
 		let host = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();

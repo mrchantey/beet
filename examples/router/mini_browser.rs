@@ -49,7 +49,7 @@ fn setup(mut commands: Commands) {
 	// terminal.
 	commands.spawn((
 		StdioTerminal::default(),
-		page_host(terminal_ext::size()),
+		PageHost::bundle(terminal_ext::size()),
 		Navigator::new(Url::parse(&url)),
 	));
 	// an editable URL bar bound to the document field `url`.

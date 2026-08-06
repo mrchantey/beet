@@ -12,6 +12,7 @@
 //! - [`history_ext`] - Browser History API wrappers
 //! - [`search_params_ext`] - URL query string manipulation
 //! - [`lifecycle_ext`] - Async timeout and lifecycle utilities
+//! - [`poll_ext`] - Poll a fallible function until it succeeds or times out
 //! - [`js_runtime`] - Deno/browser runtime bindings for file I/O and environment
 //! - [`iframe_ext`] - IFrame manipulation and loading utilities
 
@@ -29,8 +30,8 @@ pub use self::interval::*;
 pub mod js_runtime;
 /// Async timeout and lifecycle utilities.
 pub mod lifecycle_ext;
-mod poll;
-pub use self::poll::*;
+/// Repeatedly poll a fallible function until it succeeds or times out.
+pub mod poll_ext;
 mod resize_listener;
 pub use self::resize_listener::*;
 /// URL query string reading and writing utilities.

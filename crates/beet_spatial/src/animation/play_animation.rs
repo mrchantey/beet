@@ -85,7 +85,7 @@ pub fn PlayAnimationAction(
 	// resolve the clip path to a node index before borrowing the player mutably
 	let agent = agents.entity(cx.id());
 	let animation = graph_clips.get(agent)
-		.map_err(|_| bevyhow!("PlayAnimation on {} has no AnimationGraphClips on its agent root {agent}; build the graph with build_animation_graph/<CreateAnimationGraph>", cx.id()))?
+		.map_err(|_| bevyhow!("PlayAnimation on {} has no AnimationGraphClips on its agent root {agent}; build the graph with AnimationGraphClips::build/<CreateAnimationGraph>", cx.id()))?
 		.index(&play_animation.clip)
 		.ok_or_else(|| bevyhow!("clip `{}` is not in the agent's AnimationGraph", play_animation.clip))?;
 	let (mut player, mut transitions) = agents.get_descendent_mut(cx.id())?;

@@ -29,50 +29,52 @@ use core::time::Duration;
 /// `Entity`-typed field resolves through the one entity model.
 pub(crate) type EntityResolver<'a> = &'a mut dyn FnMut(&str) -> Entity;
 
-/// Resolve a literal to a reflected value against `field_info` (the target
-/// field's [`TypeInfo`], when known), looking nested types up in `registry` and
-/// resolving any nested `$name` through `resolver`.
-pub fn literal_to_reflect(
-	literal: &DataLiteral,
-	field_info: Option<&'static TypeInfo>,
-	registry: &TypeRegistry,
-	resolver: EntityResolver,
-) -> Result<Box<dyn PartialReflect>> {
-	// an `Option<T>` target wraps a plain value into `Some`: `title="x"` on an
-	// `Option<String>` field resolves to `Some("x")`. An explicit `Some`/`None`
-	// literal falls through to the ordinary enum path.
-	if let Some(some_info) = option_some_inner(field_info)
-		&& !is_option_literal(literal)
-	{
-		let inner =
-			literal_to_reflect(literal, Some(some_info), registry, resolver)?;
-		let mut tuple = DynamicTuple::default();
-		tuple.insert_boxed(inner);
-		let mut option = DynamicEnum::new("Some", DynamicVariant::Tuple(tuple));
-		option.set_represented_type(field_info);
-		return Ok(Box::new(option));
-	}
-	// a `Name` target builds via `Name::new` from its single string, whether
-	// authored as a bare scalar (`name: "x"`) or the tuple form (`<Name("x")/>`,
-	// `{Name("x")}`); its hashed inner field cannot be reflect-built field-by-field.
-	if let Some(info) = field_info
-		&& info.type_id() == TypeId::of::<Name>()
-		&& let Some(string) = name_literal_str(literal)
-	{
-		return scalar_to_reflect(&Value::Str(string.into()), field_info);
-	}
-	match literal {
-		DataLiteral::Scalar(value) => scalar_to_reflect(value, field_info),
-		DataLiteral::List(items) => {
-			list_to_reflect(items, field_info, registry, resolver)
+impl DataLiteral {
+	/// Resolve this literal to a reflected value against `field_info` (the target
+	/// field's [`TypeInfo`], when known), looking nested types up in `registry` and
+	/// resolving any nested `$name` through `resolver`.
+	pub fn to_reflect(
+		literal: &DataLiteral,
+		field_info: Option<&'static TypeInfo>,
+		registry: &TypeRegistry,
+		resolver: EntityResolver,
+	) -> Result<Box<dyn PartialReflect>> {
+		// an `Option<T>` target wraps a plain value into `Some`: `title="x"` on an
+		// `Option<String>` field resolves to `Some("x")`. An explicit `Some`/`None`
+		// literal falls through to the ordinary enum path.
+		if let Some(some_info) = option_some_inner(field_info)
+			&& !is_option_literal(literal)
+		{
+			let inner =
+				DataLiteral::to_reflect(literal, Some(some_info), registry, resolver)?;
+			let mut tuple = DynamicTuple::default();
+			tuple.insert_boxed(inner);
+			let mut option = DynamicEnum::new("Some", DynamicVariant::Tuple(tuple));
+			option.set_represented_type(field_info);
+			return Ok(Box::new(option));
 		}
-		DataLiteral::Struct(fields) => {
-			struct_to_reflect(fields, field_info, registry, resolver)
+		// a `Name` target builds via `Name::new` from its single string, whether
+		// authored as a bare scalar (`name: "x"`) or the tuple form (`<Name("x")/>`,
+		// `{Name("x")}`); its hashed inner field cannot be reflect-built field-by-field.
+		if let Some(info) = field_info
+			&& info.type_id() == TypeId::of::<Name>()
+			&& let Some(string) = name_literal_str(literal)
+		{
+			return scalar_to_reflect(&Value::Str(string.into()), field_info);
 		}
-		DataLiteral::Enum(named) => {
-			enum_to_reflect(named, field_info, registry, resolver)
+		match literal {
+			DataLiteral::Scalar(value) => scalar_to_reflect(value, field_info),
+			DataLiteral::List(items) => {
+				list_to_reflect(items, field_info, registry, resolver)
+			}
+			DataLiteral::Struct(fields) => {
+				struct_to_reflect(fields, field_info, registry, resolver)
+			}
+			DataLiteral::Enum(named) => {
+				enum_to_reflect(named, field_info, registry, resolver)
+			}
+			DataLiteral::EntityRef(name) => Ok(Box::new(resolver(name))),
 		}
-		DataLiteral::EntityRef(name) => Ok(Box::new(resolver(name))),
 	}
 }
 
@@ -410,7 +412,7 @@ fn list_to_reflect(
 	};
 	let values = items
 		.iter()
-		.map(|item| literal_to_reflect(item, item_info, registry, resolver))
+		.map(|item| DataLiteral::to_reflect(item, item_info, registry, resolver))
 		.collect::<Result<Vec<_>>>()?;
 	if let Some(info @ TypeInfo::Array(_)) = field_info {
 		let mut array = DynamicArray::new(values.into_boxed_slice());
@@ -443,7 +445,7 @@ fn struct_to_reflect(
 			.and_then(|field| field.type_info());
 		dynamic.insert_boxed(
 			name.as_str(),
-			literal_to_reflect(literal, nested, registry, resolver)?,
+			DataLiteral::to_reflect(literal, nested, registry, resolver)?,
 		);
 	}
 	dynamic.set_represented_type(field_info);
@@ -495,7 +497,7 @@ fn enum_to_reflect(
 					}
 					_ => None,
 				};
-				tuple.insert_boxed(literal_to_reflect(
+				tuple.insert_boxed(DataLiteral::to_reflect(
 					item, nested, registry, resolver,
 				)?);
 			}
@@ -512,7 +514,7 @@ fn enum_to_reflect(
 				};
 				dynamic.insert_boxed(
 					name.as_str(),
-					literal_to_reflect(literal, nested, registry, resolver)?,
+					DataLiteral::to_reflect(literal, nested, registry, resolver)?,
 				);
 			}
 			DynamicVariant::Struct(dynamic)
@@ -546,7 +548,7 @@ fn named_struct_to_reflect(
 				.and_then(|field| field.type_info());
 			dynamic.insert_boxed(
 				name.as_str(),
-				literal_to_reflect(literal, nested, registry, resolver)?,
+				DataLiteral::to_reflect(literal, nested, registry, resolver)?,
 			);
 		}
 	}
@@ -572,7 +574,7 @@ fn named_tuple_struct_to_reflect(
 			let nested = tuple_info
 				.and_then(|info| info.field_at(index))
 				.and_then(|field| field.type_info());
-			dynamic.insert_boxed(literal_to_reflect(
+			dynamic.insert_boxed(DataLiteral::to_reflect(
 				item, nested, registry, resolver,
 			)?);
 		}
@@ -590,7 +592,7 @@ mod test {
 	fn resolve<T: FromReflect + Typed>(literal: DataLiteral) -> T {
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		let reflected = literal_to_reflect(
+		let reflected = DataLiteral::to_reflect(
 			&literal,
 			Some(T::type_info()),
 			&registry,
@@ -735,7 +737,7 @@ mod test {
 		// silently falling through to a value that cannot apply
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		literal_to_reflect(
+		DataLiteral::to_reflect(
 			&DataLiteral::Scalar(Value::Uint(50)),
 			Some(Duration::type_info()),
 			&registry,
@@ -754,7 +756,7 @@ mod test {
 			.xpect_eq(false);
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		literal_to_reflect(
+		DataLiteral::to_reflect(
 			&DataLiteral::Scalar(Value::str("yes")),
 			Some(bool::type_info()),
 			&registry,
@@ -780,7 +782,7 @@ mod test {
 			.xpect_eq(Speed(60.0));
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		literal_to_reflect(
+		DataLiteral::to_reflect(
 			&DataLiteral::Scalar(Value::str("nope")),
 			Some(u16::type_info()),
 			&registry,

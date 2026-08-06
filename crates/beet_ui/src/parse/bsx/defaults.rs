@@ -167,7 +167,7 @@ mod test {
 	fn click_button(world: &mut World, doc: Entity, markup: &str) -> Entity {
 		let container = world
 			.spawn_template(BsxTemplate::container(
-				parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
+				BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
 				BsxTemplateRegistry::default(),
 			))
 			.unwrap()
@@ -179,7 +179,7 @@ mod test {
 
 	#[beet_core::test]
 	fn click_increments_document_field() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
 		let button = click_button(
 			&mut world,
@@ -200,7 +200,7 @@ mod test {
 
 	#[beet_core::test]
 	fn click_increments_by_amount() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
 		let button = click_button(
 			&mut world,
@@ -222,7 +222,7 @@ mod test {
 
 	#[beet_core::test]
 	fn set_writes_document_field() {
-		let mut world = ui_world();
+		let mut world = world_ext::ui_world();
 		let doc = world
 			.spawn(Document::new(val!({ "status": "pending" })))
 			.id();

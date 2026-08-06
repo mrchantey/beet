@@ -16,7 +16,7 @@ use beet_ui::prelude::ScrollPosition;
 use beet_ui::prelude::inline_class;
 use beet_ui::prelude::material::colors;
 use beet_ui::prelude::style;
-use beet_ui::prelude::token;
+use beet_ui::prelude::Declaration;
 
 // ═══════════════════════════════════════════════════════════════════════
 // ThreadView: the reactive chat widget
@@ -155,23 +155,23 @@ fn message_block(kind: &str) -> OnSpawn {
 	match kind {
 		"user" => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			token(style::common_props::BorderColorProp, colors::Primary),
+			Declaration::token(style::common_props::BorderColorProp, colors::Primary),
 			(style::common_props::Padding, block_padding()),
 		],
 		"error" => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			token(style::common_props::BorderColorProp, colors::Error),
+			Declaration::token(style::common_props::BorderColorProp, colors::Error),
 			(style::common_props::Padding, block_padding()),
 		],
 		"system" | "developer" => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			token(style::common_props::BorderColorProp, colors::Outline),
+			Declaration::token(style::common_props::BorderColorProp, colors::Outline),
 			(style::common_props::Padding, block_padding()),
 		],
 		// agent and any unknown role
 		_ => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			token(style::common_props::BorderColorProp, colors::Tertiary),
+			Declaration::token(style::common_props::BorderColorProp, colors::Tertiary),
 			(style::common_props::Padding, block_padding()),
 		],
 	}
@@ -192,19 +192,19 @@ fn author_label(kind: &str) -> OnSpawn {
 	match kind {
 		"user" => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			token(style::common_props::ForegroundColor, colors::Primary),
+			Declaration::token(style::common_props::ForegroundColor, colors::Primary),
 		],
 		"error" => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			token(style::common_props::ForegroundColor, colors::Error),
+			Declaration::token(style::common_props::ForegroundColor, colors::Error),
 		],
 		"system" | "developer" => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			token(style::common_props::ForegroundColor, colors::Outline),
+			Declaration::token(style::common_props::ForegroundColor, colors::Outline),
 		],
 		_ => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			token(style::common_props::ForegroundColor, colors::Tertiary),
+			Declaration::token(style::common_props::ForegroundColor, colors::Tertiary),
 		],
 	}
 }
@@ -214,7 +214,7 @@ fn body_text() -> impl Bundle {
 	inline_class![
 		(style::common_props::WhiteSpaceProp, style::WhiteSpace::PreWrap),
 		(style::common_props::WordBreakProp, style::WordBreak::BreakWord),
-		token(style::common_props::ForegroundColor, colors::OnSurface),
+		Declaration::token(style::common_props::ForegroundColor, colors::OnSurface),
 	]
 }
 
@@ -556,7 +556,7 @@ mod test {
 			.world_mut()
 			.spawn((Thread::default(), ThreadWindow::default()))
 			.id();
-		let host = app.world_mut().spawn(page_host(UVec2::new(40, 12))).id();
+		let host = app.world_mut().spawn(PageHost::bundle(UVec2::new(40, 12))).id();
 		let page = app
 			.world_mut()
 			.spawn_template(Snippet::from_bundle(rsx! {
@@ -565,15 +565,20 @@ mod test {
 			.unwrap()
 			.id();
 		// bind the page to the host surface (`bind_surface_page` is
-		// router-internal; a fresh host has no outgoing page to clean up)
-		let slot = app
-			.world()
-			.entity(host)
-			.get::<Children>()
-			.unwrap()
-			.iter()
-			.find(|child| app.world().get::<PageSlot>(*child).is_some())
-			.unwrap();
+		// router-internal; a fresh host has no outgoing page to clean up). The
+		// slot is a descendant of the host, a grandchild as `PageHost::bundle` spawns it.
+		let mut stack = vec![host];
+		let mut slot = None;
+		while let Some(entity) = stack.pop() {
+			if app.world().get::<PageSlot>(entity).is_some() {
+				slot = Some(entity);
+				break;
+			}
+			if let Some(children) = app.world().get::<Children>(entity) {
+				stack.extend(children.iter());
+			}
+		}
+		let slot = slot.unwrap();
 		app.world_mut().entity_mut(page).insert(RenderSurface(host));
 		app.world_mut().entity_mut(slot).insert(Portal::new(page));
 		(app, thread, host)

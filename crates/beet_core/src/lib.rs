@@ -51,12 +51,10 @@ extern crate test;
 pub use utils::async_ext;
 pub use utils::time_ext;
 
-// Re-export cross_log helpers at crate root so `$crate::` in macros resolves them.
+// Re-export the cross_log backend at crate root so `$crate::` in macros resolves it.
 // The platform checks live inside these functions (in beet_core where `std` is a
 // declared feature), avoiding unexpected_cfgs warnings in downstream crates.
-pub use utils::cross_log::_cross_log;
-pub use utils::cross_log::_cross_log_error;
-pub use utils::cross_log::_cross_log_noline;
+pub use utils::cross_log::CrossLog;
 
 #[cfg(feature = "std")]
 pub mod arena;

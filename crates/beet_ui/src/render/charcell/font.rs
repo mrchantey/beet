@@ -16,7 +16,7 @@
 use super::AsBuffer;
 use super::Clip;
 use super::align_offset;
-use super::display_width;
+use super::text_ext;
 use crate::style::Length;
 use crate::style::TextAlign;
 use crate::style::VisualStyle;
@@ -92,14 +92,15 @@ fn fullwidth_char(ch: char) -> char {
 	}
 }
 
-/// Inverse of [`to_fullwidth`]: fold fullwidth glyphs back to ASCII, leaving all
-/// other characters unchanged. Used by tests to search a charcell render for its
-/// plain text content.
-pub fn from_fullwidth(text: &str) -> String {
-	text.chars().map(from_fullwidth_char).collect()
+impl FontScale {
+	/// Inverse of [`to_fullwidth`]: fold fullwidth glyphs back to ASCII, leaving all
+	/// other characters unchanged. Used by tests to search a charcell render for its
+	/// plain text content.
+	pub fn from_fullwidth(text: &str) -> String {
+		text.chars().map(from_fullwidth_char).collect()
+	}
 }
-
-/// ASCII twin of a single fullwidth character (see [`from_fullwidth`]).
+/// ASCII twin of a single fullwidth character (see [`FontScale::from_fullwidth`]).
 fn from_fullwidth_char(ch: char) -> char {
 	match ch {
 		FULLWIDTH_SPACE => ' ',
@@ -178,7 +179,7 @@ fn parse_block_font(src: &str) -> BlockFont {
 		let rows: Vec<&str> =
 			(0..height).map(|_| lines.next().unwrap_or("")).collect();
 		let width =
-			rows.iter().map(|row| display_width(row)).max().unwrap_or(0);
+			rows.iter().map(|row| text_ext::display_width(row)).max().unwrap_or(0);
 		let rows = rows.iter().map(|row| pad_to_width(row, width)).collect();
 		glyphs.insert(ch, Glyph {
 			width: width as u32,
@@ -194,7 +195,7 @@ fn parse_block_font(src: &str) -> BlockFont {
 
 /// Right-pad `row` with spaces to `width` display columns.
 fn pad_to_width(row: &str, width: usize) -> SmolStr {
-	let pad = width.saturating_sub(display_width(row));
+	let pad = width.saturating_sub(text_ext::display_width(row));
 	if pad == 0 {
 		SmolStr::from(row)
 	} else {
@@ -434,9 +435,9 @@ glyph I
 		// 'A' -> 'Ａ' (U+FF21), ' ' -> ideographic space (U+3000)
 		to_fullwidth("A B").xpect_eq("Ａ　Ｂ".to_string());
 		// each fullwidth glyph measures two columns
-		display_width(&to_fullwidth("AB")).xpect_eq(4);
-		// `from_fullwidth` is the inverse round-trip
-		from_fullwidth(&to_fullwidth("A B!")).xpect_eq("A B!".to_string());
+		text_ext::display_width(&to_fullwidth("AB")).xpect_eq(4);
+		// `FontScale::from_fullwidth` is the inverse round-trip
+		FontScale::from_fullwidth(&to_fullwidth("A B!")).xpect_eq("A B!".to_string());
 	}
 
 	#[beet_core::test]
@@ -452,7 +453,7 @@ glyph I
 			.unwrap()
 			.rows
 			.iter()
-			.all(|row| display_width(row) == 3)
+			.all(|row| text_ext::display_width(row) == 3)
 			.xpect_true();
 	}
 

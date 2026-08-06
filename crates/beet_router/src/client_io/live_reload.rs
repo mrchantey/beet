@@ -312,7 +312,7 @@ mod test {
 	/// [`ClientIo`] child. Returns the root entity, which carries the store.
 	fn spawn_site(world: &mut World, store: impl Bundle) -> Entity {
 		world
-			.spawn((store, default_router(), LiveReload::new(), children![
+			.spawn((store, Router::with_defaults(), LiveReload::new(), children![
 				TemplateDir::new("templates"),
 				RoutesDir::new("routes")
 			]))
@@ -469,7 +469,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		// no pre-set ClientIo: `start_live_reload` spawns one as the root's child
 		let root = world
-			.spawn((InMemoryStore::new(), default_router(), LiveReload::new()))
+			.spawn((InMemoryStore::new(), Router::with_defaults(), LiveReload::new()))
 			.flush();
 		let channel = world
 			.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {
@@ -641,7 +641,7 @@ mod test {
 		let host = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "/01-alpha"),
 			))
 			.id();
@@ -696,7 +696,7 @@ mod test {
 		let host = app
 			.world_mut()
 			.spawn((
-				page_host(UVec2::new(40, 8)),
+				PageHost::bundle(UVec2::new(40, 8)),
 				Navigator::in_world(router, "/01-alpha"),
 			))
 			.id();

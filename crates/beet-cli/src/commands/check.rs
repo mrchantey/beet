@@ -41,7 +41,7 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 			Some(ONE_SHOT_SETTLE_DEADLINE),
 		)
 		.await?;
-	let report = check_routes(&cx.world(), root).await?;
+	let report = CheckReport::check_routes(&cx.world(), root).await?;
 
 	// surface every diagnostic loudly through the log facade, then summarize.
 	report.log();
@@ -72,7 +72,7 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 /// `RuleSet` and `RouteTree` are all live.
 async fn write_manifest(world: &AsyncWorld, root: Entity, out: &str) -> Result {
 	let manifest = world
-		.with(move |world: &mut World| build_diagnostics_manifest(world, root))
+		.with(move |world: &mut World| DiagnosticsManifest::build(world, root))
 		.await?;
 	// serialize through the codebase's `Value` JSON path rather than depending on
 	// `serde_json` directly.
@@ -144,12 +144,12 @@ mod test {
 		// this library-registration gap.
 		for tag in ["Form", "Header", "Sidebar", "Table", "Footer", "TextField"]
 		{
-			template_schema_by_name(registry, tag)
+			ValueSchema::template_by_name(registry, tag)
 				.is_some()
 				.xpect_true();
 		}
 		// a genuinely unknown tag still resolves to nothing, so the guard is meaningful.
-		template_schema_by_name(registry, "Nonexistent")
+		ValueSchema::template_by_name(registry, "Nonexistent")
 			.is_some()
 			.xpect_false();
 	}

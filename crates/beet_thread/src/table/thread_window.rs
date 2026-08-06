@@ -321,7 +321,7 @@ impl ThreadWindow {
 	}
 
 	/// Run [`ThreadWindow::reduce`] immediately and flush, for manual consumers that
-	/// pump the world directly (eg `run_oneshot`, tests) rather than the schedule.
+	/// pump the world directly (eg `Post::run_oneshot`, tests) rather than the schedule.
 	pub fn reduce_now(world: &mut World) {
 		let _ = world.run_system_cached::<Result, _, _>(Self::reduce);
 		world.flush();

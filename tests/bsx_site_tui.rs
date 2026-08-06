@@ -2,7 +2,7 @@
 //! entry loaded from disk through a [`BlobStore`] over an [`FsStore`], booted into
 //! an in-process [`ChannelTerminal`] and navigated, asserting the rendered frame.
 //!
-//! The no-code twin of `examples/rsx_site/tests/tui.rs`: same `page_host` +
+//! The no-code twin of `examples/rsx_site/tests/tui.rs`: same `PageHost::bundle` +
 //! `Navigator` + channel-terminal harness, but the router is the example's markup
 //! loaded from disk (the binary's `--server=tui` path) rather than a Rust
 //! `rsx_site_router()`. Headless and deterministic, the behavioral gate the binary
@@ -61,7 +61,7 @@ impl SiteHost {
 			.spawn((
 				channel,
 				terminal,
-				page_host(size),
+				PageHost::bundle(size),
 				Navigator::in_world(router, home),
 				// deterministic frames whatever terminal runs the tests: graphics off
 				// per surface, so no kitty escapes interleave with the painted cells.

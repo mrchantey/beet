@@ -176,7 +176,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(exchange_handler(|req| req.take().mirror()))
+			.spawn(exchange_ext::handler(|req| req.take().mirror()))
 			.exchange(Request::get("foo"))
 			.await
 			.status()
@@ -187,7 +187,7 @@ mod test {
 	#[beet_core::test]
 	async fn exchange_str_works() {
 		AsyncPlugin::world()
-			.spawn(exchange_handler(|_| Response::ok().with_body("hello")))
+			.spawn(exchange_ext::handler(|_| Response::ok().with_body("hello")))
 			.exchange_str(Request::get("foo"))
 			.await
 			.xpect_eq("hello".to_string());

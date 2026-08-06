@@ -350,7 +350,7 @@ mod test {
 			.resource_mut::<AppTypeRegistry>()
 			.write()
 			.register::<PackageConfig>();
-		let nodes = parse_document(
+		let nodes = BsxNode::parse_document(
 			r#"<PackageConfig title="Patched"/>"#,
 			&BsxParseConfig::bsx(),
 		)

@@ -71,7 +71,7 @@ impl TemplateFormats {
 
 /// Parse a `.bsx` source through the full BSX grammar.
 fn parse_bsx_format(source: &str) -> Result<Vec<BsxNode>> {
-	parse_document(source, &BsxParseConfig::bsx())
+	BsxNode::parse_document(source, &BsxParseConfig::bsx())
 }
 
 /// Wrap a `.js` source verbatim in a single `<script>`, the JS-as-template form.

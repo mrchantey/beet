@@ -13,7 +13,7 @@
 //! through it, and builds the included entry at the include site, then resolves the
 //! dependency so `LoadTemplate` proceeds. So an include never blocks the runtime
 //! (single-threaded on wasm) and an S3-backed site composes the same way as a local
-//! one. This reuses the same wiring [`register_pending_fetch`] gives the remote
+//! one. This reuses the same wiring [`TemplatePending::register_fetch`] gives the remote
 //! front-ends in `beet_core`'s `remote.rs`.
 
 use beet_core::prelude::*;
@@ -46,7 +46,7 @@ pub(crate) fn register_template_include(world: &mut World) {
 			// resolved inside the task, where the whole tree is built, so it is
 			// reachable by ancestry.
 			entity.world_scope(|world| -> Result {
-				let (async_world, spawner, guard) = register_pending_fetch(
+				let (async_world, spawner, guard) = TemplatePending::register_fetch(
 					world,
 					target,
 					PendingKind::Structural,
@@ -114,17 +114,22 @@ async fn read_and_build(
 		.await
 }
 
-/// Collect the local `src` of every `<Template src=..>` include in a parsed entry
-/// tree, the registry-free pre-scan the live-reload driver runs to learn which
-/// sources are structural: a change to one drives a full entry rebuild, not the
-/// light content re-fire a markdown/template edit gets. Remote includes are
-/// skipped (they are not local files a watcher sees).
-pub fn extract_template_srcs(nodes: &[BsxNode]) -> Vec<SmolStr> {
-	let mut srcs = Vec::new();
-	collect_template_srcs(nodes, &mut srcs);
-	srcs
-}
+/// The `<Template src=..>` include machinery: a build-time pre-scan and the
+/// resolver that fetches each source through the ambient [`BlobStore`].
+pub struct TemplateInclude;
 
+impl TemplateInclude {
+	/// Collect the local `src` of every `<Template src=..>` include in a parsed entry
+	/// tree, the registry-free pre-scan the live-reload driver runs to learn which
+	/// sources are structural: a change to one drives a full entry rebuild, not the
+	/// light content re-fire a markdown/template edit gets. Remote includes are
+	/// skipped (they are not local files a watcher sees).
+	pub fn extract_srcs(nodes: &[BsxNode]) -> Vec<SmolStr> {
+		let mut srcs = Vec::new();
+		collect_template_srcs(nodes, &mut srcs);
+		srcs
+	}
+}
 /// Recursively collect local `<Template src=..>` includes from `nodes`.
 fn collect_template_srcs(nodes: &[BsxNode], srcs: &mut Vec<SmolStr>) {
 	for node in nodes {

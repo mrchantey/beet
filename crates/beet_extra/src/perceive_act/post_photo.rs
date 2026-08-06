@@ -123,7 +123,7 @@ const CAPTURE_TIMEOUT: Duration = Duration::from_secs(20);
 async fn capture_via_router(caller: &AsyncEntity) -> Result<MediaBytes> {
 	async_ext::timeout(
 		CAPTURE_TIMEOUT,
-		caller.call_detached(route_action(), Request::get("take-photo")),
+		caller.call_detached(Router::action(), Request::get("take-photo")),
 	)
 	.await
 	.map_err(|_| bevyhow!("timed out after {CAPTURE_TIMEOUT:?}"))??

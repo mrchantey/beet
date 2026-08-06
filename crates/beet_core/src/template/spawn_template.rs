@@ -203,7 +203,7 @@ fn build_root(
 	// step 3: the built signal / post-build phase boundary.
 	entity.trigger(|entity| SpawnTemplate { entity });
 	// step 4: fire LoadTemplate when nothing is pending.
-	drain_pending_dependencies(&mut entity);
+	TemplatePending::drain_dependencies(&mut entity);
 
 	outcome
 }
@@ -222,7 +222,7 @@ fn root_slot_children(world: &World, root: Entity) -> Vec<Entity> {
 
 /// Anchor the layout's pre-build [`SlotChild`] content (the transcluded portal)
 /// onto the built layout's *content root*, so the layout's `<Slot>`s receive it.
-/// Crate-visible so the deferred path ([`drain_pending_dependencies`]) runs the
+/// Crate-visible so the deferred path ([`TemplatePending::drain_dependencies`]) runs the
 /// same anchoring once an async include settles.
 ///
 /// The root template may build in two ways that strand pre-added slot children:

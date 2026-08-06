@@ -216,17 +216,19 @@ pub(crate) fn is_allowed_unregistered(cx: &mut TemplateContext, tag: &str) -> bo
 	})
 }
 
-/// The prop [`ValueSchema`] registered for the template under short type path
-/// `tag`, if any. The schema-side companion of [`build_template_by_name`].
-pub fn template_schema_by_name(
-	registry: &AppTypeRegistry,
-	tag: &str,
-) -> Option<ValueSchema> {
-	let registry = registry.read();
-	registry
-		.get_with_short_type_path(tag)
-		.and_then(|registration| registration.data::<ReflectTemplateSchema>())
-		.map(|data| data.schema.clone())
+impl ValueSchema {
+	/// The prop [`ValueSchema`] registered for the template under short type path
+	/// `tag`, if any. The schema-side companion of [`build_template_by_name`].
+	pub fn template_by_name(
+		registry: &AppTypeRegistry,
+		tag: &str,
+	) -> Option<ValueSchema> {
+		let registry = registry.read();
+		registry
+			.get_with_short_type_path(tag)
+			.and_then(|registration| registration.data::<ReflectTemplateSchema>())
+			.map(|data| data.schema.clone())
+	}
 }
 
 /// Builds a registered template by its short type path into `cx`.

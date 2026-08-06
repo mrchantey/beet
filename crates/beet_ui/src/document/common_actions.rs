@@ -25,7 +25,7 @@ use bevy::reflect::Typed;
 ///
 /// let mut world = AsyncPlugin::world();
 /// let field = FieldRef::new("counter");
-/// let entity = world.spawn(increment(field)).id();
+/// let entity = world.spawn(Increment::bundle(field)).id();
 /// ```
 #[action]
 #[derive(Debug, Clone, Component, Reflect)]
@@ -40,11 +40,12 @@ pub fn Increment(
 	Ok(new_value)
 }
 
-/// Convenience constructor for increment with a field reference and path.
-pub fn increment(field: FieldRef) -> impl Bundle {
-	(field, PathPartial::new("increment"), Increment)
+impl Increment {
+	/// Convenience constructor for increment with a field reference and path.
+	pub fn bundle(field: FieldRef) -> impl Bundle {
+		(field, PathPartial::new("increment"), Increment)
+	}
 }
-
 /// An action that decrements a numeric field in a document, returning the new value.
 ///
 /// When triggered, this action:
@@ -69,11 +70,12 @@ pub fn Decrement(
 	Ok(new_value)
 }
 
-/// Convenience constructor for decrement with a field reference and path.
-pub fn decrement(field: FieldRef) -> impl Bundle {
-	(field, PathPartial::new("decrement"), Decrement)
+impl Decrement {
+	/// Convenience constructor for decrement with a field reference and path.
+	pub fn bundle(field: FieldRef) -> impl Bundle {
+		(field, PathPartial::new("decrement"), Decrement)
+	}
 }
-
 /// An action that adds a value to a numeric field in a document.
 ///
 /// Takes the amount to add as input and returns the new value.
@@ -93,11 +95,12 @@ pub fn AddField(
 	Ok(new_value)
 }
 
-/// Convenience constructor for add with a field reference and path.
-pub fn add(field: FieldRef) -> impl Bundle {
-	(field, PathPartial::new("add"), AddField)
+impl AddField {
+	/// Convenience constructor for add with a field reference and path.
+	pub fn bundle(field: FieldRef) -> impl Bundle {
+		(field, PathPartial::new("add"), AddField)
+	}
 }
-
 /// An action that sets a field to a specific [`Value`].
 ///
 /// Takes a [`Value`] as input and stores it in the specified field.
@@ -242,7 +245,7 @@ mod test {
 	#[beet_core::test]
 	async fn increment_initializes_to_one() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn(increment(count_field())).id();
+		let entity = world.spawn(Increment::bundle(count_field())).id();
 
 		world
 			.entity_mut(entity)
@@ -255,7 +258,7 @@ mod test {
 	#[beet_core::test]
 	async fn increment_works_multiple_times() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn(increment(count_field())).id();
+		let entity = world.spawn(Increment::bundle(count_field())).id();
 
 		world
 			.entity_mut(entity)
@@ -282,7 +285,7 @@ mod test {
 	#[beet_core::test]
 	async fn decrement_initializes_to_negative_one() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn(decrement(count_field())).id();
+		let entity = world.spawn(Decrement::bundle(count_field())).id();
 
 		world
 			.entity_mut(entity)
@@ -297,7 +300,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		// the field seeds the entity's Value, which the action reads and mutates
 		let entity = world
-			.spawn(decrement(count_field().with_init(Value::Int(5))))
+			.spawn(Decrement::bundle(count_field().with_init(Value::Int(5))))
 			.id();
 
 		world
@@ -312,7 +315,7 @@ mod test {
 	async fn add_works() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(add(count_field().with_init(Value::Int(10))))
+			.spawn(AddField::bundle(count_field().with_init(Value::Int(10))))
 			.id();
 
 		world
@@ -481,7 +484,7 @@ mod test {
 		app.init();
 		app.update();
 
-		let entity = app.world_mut().spawn(increment(count_field())).id();
+		let entity = app.world_mut().spawn(Increment::bundle(count_field())).id();
 
 		// Serialize
 		let template_bytes = TemplateSaver::new()

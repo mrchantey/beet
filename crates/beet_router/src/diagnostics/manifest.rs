@@ -26,7 +26,7 @@ use beet_ui::prelude::*;
 
 /// A machine-readable description of what a BSX site exposes to its author: the
 /// tags, classes, routes and style props a no-code editor would validate and
-/// autocomplete against. Built by [`build_diagnostics_manifest`] and serialized to
+/// autocomplete against. Built by [`DiagnosticsManifest::build`] and serialized to
 /// JSON; nothing in beet reads it back (the consumer is a future editor).
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct DiagnosticsManifest {
@@ -72,25 +72,26 @@ pub enum TagKind {
 	Handler,
 }
 
-/// Build the [`DiagnosticsManifest`] for the site rooted at `router`, gathering
-/// from the loaded world exactly as a future editor would: the registries for
-/// tags + schemas, the live [`RuleSet`] for classes, `router`'s [`RouteTree`] for
-/// routes, and [`prop_name_map`] for style props.
-///
-/// Mirrors [`check_routes`](crate::prelude::check_routes)'s site access — same
-/// `RouteTree` and `RuleSet` sources — so the manifest agrees with the checks.
-pub fn build_diagnostics_manifest(
-	world: &mut World,
-	router: Entity,
-) -> Result<DiagnosticsManifest> {
-	Ok(DiagnosticsManifest {
-		tags: manifest_tags(world),
-		classes: manifest_classes(world),
-		routes: manifest_routes(world, router)?,
-		style_props: manifest_style_props(),
-	})
+impl DiagnosticsManifest {
+	/// Build the [`DiagnosticsManifest`] for the site rooted at `router`, gathering
+	/// from the loaded world exactly as a future editor would: the registries for
+	/// tags + schemas, the live [`RuleSet`] for classes, `router`'s [`RouteTree`] for
+	/// routes, and [`PropResolver::name_map`] for style props.
+	///
+	/// Mirrors [`CheckReport::check_routes`](crate::prelude::check_routes)'s site access — same
+	/// `RouteTree` and `RuleSet` sources — so the manifest agrees with the checks.
+	pub fn build(
+		world: &mut World,
+		router: Entity,
+	) -> Result<DiagnosticsManifest> {
+		Ok(DiagnosticsManifest {
+			tags: manifest_tags(world),
+			classes: manifest_classes(world),
+			routes: manifest_routes(world, router)?,
+			style_props: manifest_style_props(),
+		})
+	}
 }
-
 /// Every uppercase tag a BSX author can write, sorted by name: registered Rust
 /// types (template/component/resource via [`AppTypeRegistry`]), `.bsx` templates
 /// ([`BsxTemplateRegistry`]) and handler tags ([`BsxTagResolvers`]), each with its
@@ -222,9 +223,9 @@ fn manifest_routes(world: &World, router: Entity) -> Result<Vec<SmolStr>> {
 }
 
 /// The kebab property names a `<Rule>`/`bx:style` declaration accepts, from A3's
-/// [`prop_name_map`](beet_ui::prelude::style::prop_name_map), sorted.
+/// [`PropResolver::name_map`](beet_ui::prelude::style::PropResolver::name_map), sorted.
 fn manifest_style_props() -> Vec<SmolStr> {
-	let mut props = style::prop_name_map().into_keys().collect::<Vec<_>>();
+	let mut props = style::PropResolver::name_map().into_keys().collect::<Vec<_>>();
 	props.sort();
 	props
 }
@@ -272,7 +273,7 @@ mod test {
 	#[beet_core::test]
 	fn manifest_lists_every_source() {
 		let (mut world, router) = manifest_world();
-		let manifest = build_diagnostics_manifest(&mut world, router).unwrap();
+		let manifest = DiagnosticsManifest::build(&mut world, router).unwrap();
 
 		// routes: both static scene routes, rooted.
 		manifest.routes.contains(&SmolStr::from("/")).xpect_true();
@@ -303,7 +304,7 @@ mod test {
 	#[beet_core::test]
 	fn tag_schema_is_wired() {
 		let (mut world, router) = manifest_world();
-		let manifest = build_diagnostics_manifest(&mut world, router).unwrap();
+		let manifest = DiagnosticsManifest::build(&mut world, router).unwrap();
 		// at least one registered template tag carries a real prop schema (the
 		// schema machinery is wired, not always-`None`).
 		manifest
@@ -319,7 +320,7 @@ mod test {
 	#[beet_core::test]
 	fn round_trips_to_valid_json() {
 		let (mut world, router) = manifest_world();
-		let manifest = build_diagnostics_manifest(&mut world, router).unwrap();
+		let manifest = DiagnosticsManifest::build(&mut world, router).unwrap();
 		let json = serde_json::to_string_pretty(&manifest).unwrap();
 		// re-parsing proves it is valid JSON carrying the expected sections.
 		let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();

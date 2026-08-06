@@ -17,47 +17,48 @@ use beet_core::prelude::*;
 use bevy::ecs::component::Mutable;
 use core::marker::PhantomData;
 
-/// Whether a server named `name` should boot for `request`, read from its
-/// `--server` params. Reads every `server` value (repeated flags) and splits each
-/// on commas (a glob list, eg `--server=cli,http`); the name must pass the
-/// resulting [`GlobFilter`].
-///
-/// With no `--server` param the `BEET_SERVER` env is the fallback, so a deployed
-/// binary launched with no args (a lambda bootstrap, a lightsail systemd unit)
-/// selects its transport that way. Absent both, the server's own `default_boot`
-/// decides: it defaults to `true`, so a bare `beet` brings up every declared
-/// server, and an entry clears it on one (eg a secondary [`HttpServer`]) that
-/// should boot only when `--server` names it.
-pub fn request_selects_server(
-	request: &Request,
-	name: &str,
-	default_boot: bool,
-) -> bool {
-	let mut globs = request
-		.get_params("server")
-		.into_iter()
-		.flatten()
-		.map(|value| value.to_string())
-		.collect::<Vec<_>>();
-	// absent an explicit `--server`, the `BEET_SERVER` env selects the servers.
-	if globs.is_empty() {
-		globs.extend(env_ext::var("BEET_SERVER").ok());
+impl Request {
+	/// Whether a server named `name` should boot for `request`, read from its
+	/// `--server` params. Reads every `server` value (repeated flags) and splits each
+	/// on commas (a glob list, eg `--server=cli,http`); the name must pass the
+	/// resulting [`GlobFilter`].
+	///
+	/// With no `--server` param the `BEET_SERVER` env is the fallback, so a deployed
+	/// binary launched with no args (a lambda bootstrap, a lightsail systemd unit)
+	/// selects its transport that way. Absent both, the server's own `default_boot`
+	/// decides: it defaults to `true`, so a bare `beet` brings up every declared
+	/// server, and an entry clears it on one (eg a secondary [`HttpServer`]) that
+	/// should boot only when `--server` names it.
+	pub fn selects_server(
+		request: &Request,
+		name: &str,
+		default_boot: bool,
+	) -> bool {
+		let mut globs = request
+			.get_params("server")
+			.into_iter()
+			.flatten()
+			.map(|value| value.to_string())
+			.collect::<Vec<_>>();
+		// absent an explicit `--server`, the `BEET_SERVER` env selects the servers.
+		if globs.is_empty() {
+			globs.extend(env_ext::var("BEET_SERVER").ok());
+		}
+		// absent both, fall back to this server's own default.
+		if globs.is_empty() {
+			return default_boot;
+		}
+		globs
+			.iter()
+			.flat_map(|value| value.split(','))
+			.map(str::trim)
+			.filter(|name| !name.is_empty())
+			.fold(GlobFilter::default(), |filter, name| {
+				filter.with_include(name)
+			})
+			.passes(name)
 	}
-	// absent both, fall back to this server's own default.
-	if globs.is_empty() {
-		return default_boot;
-	}
-	globs
-		.iter()
-		.flat_map(|value| value.split(','))
-		.map(str::trim)
-		.filter(|name| !name.is_empty())
-		.fold(GlobFilter::default(), |filter, name| {
-			filter.with_include(name)
-		})
-		.passes(name)
 }
-
 /// A bootable, parking server: supplies the `--server` selector and the serve-loop
 /// launcher the shared [`ServerShutdown<Self>`] machinery drives.
 ///
@@ -132,7 +133,7 @@ fn boot_server<S: BootServer>(
 			return false;
 		};
 		let selected =
-			request_selects_server(request, S::SELECTOR, server.default_boot());
+			Request::selects_server(request, S::SELECTOR, server.default_boot());
 		if selected {
 			server.apply_boot(request);
 		}
@@ -142,7 +143,7 @@ fn boot_server<S: BootServer>(
 		return Ok(());
 	}
 	// store the shutdown sender on the server entity; hand the receiver to the serve loop.
-	let (signal, shutdown) = oneshot::<()>();
+	let (signal, shutdown) = OnceValue::<()>::oneshot();
 	commands
 		.entity(entity)
 		// flags the boot as served, so `exit_if_no_server` lets it park
