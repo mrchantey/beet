@@ -21,6 +21,21 @@
 // allow name collision until exit_ok stablized
 #![allow(unstable_name_collisions)]
 
+// Beet's wasm target is `wasm32-unknown-unknown`, and only that: the browser,
+// the deno test runner and Cloudflare Workers all run it. `wasm32-wasip1`/`p2`
+// share the architecture but not the host model — they sit on a POSIX-ish OS,
+// where every `target_arch = "wasm32"` cfg across the workspace (several hundred
+// of them) assumes there is none beneath. Rather than qualify each one with
+// `target_os = "unknown"`, the invariant is asserted once, here: within beet,
+// `target_arch = "wasm32"` *means* `wasm32-unknown-unknown`. Every beet crate
+// depends on beet_core, so this reaches all of them.
+#[cfg(all(target_arch = "wasm32", not(target_os = "unknown")))]
+compile_error!(
+	"beet supports the `wasm32-unknown-unknown` target only; `wasm32-wasi*` is \
+not supported. Beet's wasm cfgs assume no host OS beneath the module, which a \
+wasi target does not satisfy."
+);
+
 extern crate alloc;
 
 #[cfg(feature = "std")]

@@ -309,11 +309,11 @@ where
 {
 	cfg_if! {
 		if #[cfg(not(target_arch = "wasm32"))] {
-			crate::scripting::run_deno(request, sink).await
+			crate::scripting::run_deno_cli(request, sink).await
 		} else {
 			match js_runtime::environment() {
 				js_runtime::JsEnvironment::Deno => {
-					crate::scripting::run_worker(request, sink).await
+					crate::scripting::run_deno_worker(request, sink).await
 				}
 				js_runtime::JsEnvironment::Browser => {
 					crate::scripting::run_iframe(request, sink).await

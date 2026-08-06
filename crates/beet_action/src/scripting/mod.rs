@@ -52,13 +52,13 @@ beet_core::cfg_if! {
 			if #[cfg(target_arch = "wasm32")] {
 				mod cloudflare_backend;
 				mod iframe_backend;
-				mod worker_backend;
+				mod deno_worker_backend;
 				pub(crate) use cloudflare_backend::run_cloudflare;
 				pub(crate) use iframe_backend::run_iframe;
-				pub(crate) use worker_backend::run_worker;
+				pub(crate) use deno_worker_backend::run_deno_worker;
 			} else {
-				mod deno_backend;
-				pub(crate) use deno_backend::run_deno;
+				mod deno_cli_backend;
+				pub(crate) use deno_cli_backend::run_deno_cli;
 			}
 		}
 	}

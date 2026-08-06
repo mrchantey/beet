@@ -8,8 +8,9 @@
 //!
 //! Every runtime component — the [`CliServer`] child, the [`router`] bundle, the
 //! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the
-//! components round-trip with no post-load patching; the loaded root's servers
-//! are then booted explicitly via [`CallOnLoad::call_recursive`].
+//! components round-trip with no post-load patching. Nothing boots the loaded
+//! scene by hand: [`CallOnLoad`] rides in on `CliServer` and fires on the
+//! scene's own `LoadTemplate`, so persisting the world persists its boot too.
 //!
 //! ## Running the Example
 //!
@@ -64,19 +65,13 @@ fn setup(async_commands: AsyncCommands) {
 			blob.remove().await.ok();
 		}
 		// the bundle stays serializable (`CliServer` root + router child, both
-		// reflect components); the boot runs on the loaded root, not via a spawn
-		// hook, so boot each root's servers once the scene lands.
-		let roots =
-			TemplateStore::load_or_create(world.clone(), blob, async |_| {
-				route_bundle().xok()
-			})
-			.await?;
-		for root in roots {
-			CallOnLoad::call_recursive(world.entity(root), || {
-				Request::from_cli_args(CliArgs::parse_env())
-			})
-			.await?;
-		}
+		// reflect components), and the `CallOnLoad` it carries boots it: the verb
+		// observes `LoadTemplate`, which the scene load fires. Booting explicitly
+		// on top of that answers the one request twice.
+		TemplateStore::load_or_create(world.clone(), blob, async |_| {
+			route_bundle().xok()
+		})
+		.await?;
 		Ok(())
 	});
 }

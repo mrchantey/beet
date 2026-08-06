@@ -17,9 +17,16 @@ use serde_json::Value as JsonValue;
 
 /// Refuses to evaluate, naming the one supported path.
 ///
-/// This is the sanctioned exception to the no-panic convention (Pete's call):
-/// the state is a build misconfiguration, not a runtime condition, and there is
-/// no sensible value to hand an error handler.
+/// An error rather than a panic: this runs inside a live Worker serving other
+/// requests, and a panicking wasm module takes the whole isolate down with it.
+/// One request failing is the correct blast radius for a build that reached a
+/// backend it does not have.
+///
+/// The error carries no HTTP status of its own — `HttpError` lives in beet_net,
+/// which depends on this crate — so a router surfaces it as a 500 through
+/// `HttpError::from_opaque`. `501 Not Implemented` would be the truer status; it
+/// needs a status-carrying error type further down the stack than beet_net to
+/// express, which is a larger call than this backend should make.
 pub(crate) async fn run_cloudflare<Sink>(
 	_request: ScriptRequest,
 	_sink: Sink,
@@ -27,7 +34,7 @@ pub(crate) async fn run_cloudflare<Sink>(
 where
 	Sink: FnMut(ConsoleStream, &str),
 {
-	unimplemented!(
+	bevybail!(
 		"`Script` has no host backend on Cloudflare Workers: a Worker cannot \
 spawn an attenuated child isolate. Enable the `quickjs` feature — the embedded \
 engine compiles into the Worker itself, with no ambient authority and enforced \

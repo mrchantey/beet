@@ -46,7 +46,7 @@ const emit = (event) => self.postMessage(JSON.stringify(event));
 
 /// Evaluate `request` in a permissionless Worker, forwarding each console line
 /// to `sink` and returning the script's completion value.
-pub(crate) async fn run_worker<Sink>(
+pub(crate) async fn run_deno_worker<Sink>(
 	request: ScriptRequest,
 	mut sink: Sink,
 ) -> Result<Option<JsonValue>>
@@ -90,14 +90,14 @@ where
 	let drain = async {
 		while let Ok(line) = receiver.recv().await {
 			if let Some(result) = protocol::apply_event(&line, &mut sink) {
-				return result.map_err(|err| bevyhow!("worker: {err}"));
+				return result.map_err(|err| bevyhow!("deno worker: {err}"));
 			}
 		}
-		bevybail!("worker: isolate closed without a result")
+		bevybail!("deno worker: isolate closed without a result")
 	};
 	async_ext::timeout(timeout, drain)
 		.await
-		.unwrap_or_else(|_| bevybail!("worker: script timed out"))
+		.unwrap_or_else(|_| bevybail!("deno worker: script timed out"))
 }
 
 /// Owns a running Worker and the blob URL its module was loaded from.
@@ -123,9 +123,9 @@ impl WorkerGuard {
 		properties.set_type("text/javascript");
 		let blob =
 			web_sys::Blob::new_with_str_sequence_and_options(&parts, &properties)
-				.map_err(|err| bevyhow!("worker: blob: {err:?}"))?;
+				.map_err(|err| bevyhow!("deno worker: blob: {err:?}"))?;
 		let url = web_sys::Url::create_object_url_with_blob(&blob)
-			.map_err(|err| bevyhow!("worker: blob url: {err:?}"))?;
+			.map_err(|err| bevyhow!("deno worker: blob url: {err:?}"))?;
 
 		// `WorkerOptions` has no `deno` field (it is not a web standard), so the
 		// descriptor is assembled by hand.
@@ -139,7 +139,7 @@ impl WorkerGuard {
 			.map_err(|err| {
 				web_sys::Url::revoke_object_url(&url).ok();
 				bevyhow!(
-					"worker: could not spawn a permissionless isolate: {err:?}. \
+					"deno worker: could not spawn a permissionless isolate: {err:?}. \
 Deno gates `permissions: \"none\"` behind `--unstable-worker-options`; pass it \
 to the host process, or enable the `quickjs` feature for the embedded engine \
 (which needs no host cooperation)."
@@ -168,7 +168,7 @@ impl Drop for WorkerGuard {
 fn set(target: &js_sys::Object, key: &str, value: &JsValue) -> Result<()> {
 	js_sys::Reflect::set(target, &JsValue::from_str(key), value)
 		.map(|_| ())
-		.map_err(|err| bevyhow!("worker: set `{key}`: {err:?}"))
+		.map_err(|err| bevyhow!("deno worker: set `{key}`: {err:?}"))
 }
 
 #[cfg(test)]

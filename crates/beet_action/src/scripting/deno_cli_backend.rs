@@ -66,7 +66,7 @@ const emit = (event) => {
 ///
 /// Backs both [`Script::run`] and [`Script::run_console`]: the pure transform
 /// ignores the console and needs the value, the console path is the reverse.
-pub(crate) async fn run_deno<Sink>(
+pub(crate) async fn run_deno_cli<Sink>(
 	request: ScriptRequest,
 	sink: Sink,
 ) -> Result<Option<JsonValue>>
@@ -88,13 +88,13 @@ where
 
 	let mut stdin = child
 		.take_stdin()
-		.ok_or_else(|| bevyhow!("deno: child has no stdin"))?;
+		.ok_or_else(|| bevyhow!("deno cli: child has no stdin"))?;
 	let stdout = child
 		.take_stdout()
-		.ok_or_else(|| bevyhow!("deno: child has no stdout"))?;
+		.ok_or_else(|| bevyhow!("deno cli: child has no stdout"))?;
 	let stderr = child
 		.take_stderr()
-		.ok_or_else(|| bevyhow!("deno: child has no stderr"))?;
+		.ok_or_else(|| bevyhow!("deno cli: child has no stderr"))?;
 
 	// the deadline is the host's own, not the script's: a script cannot be
 	// trusted to observe one. It covers the stdin write too, since a child that
@@ -106,11 +106,11 @@ where
 		stdin
 			.write_all(source.as_bytes())
 			.await
-			.map_err(|err| bevyhow!("deno: write module: {err}"))?;
+			.map_err(|err| bevyhow!("deno cli: write module: {err}"))?;
 		stdin
 			.close()
 			.await
-			.map_err(|err| bevyhow!("deno: close stdin: {err}"))?;
+			.map_err(|err| bevyhow!("deno cli: close stdin: {err}"))?;
 		drop(stdin);
 		read_events(stdout, stderr, sink).await
 	};
@@ -118,7 +118,7 @@ where
 		Ok(result) => result,
 		Err(_) => {
 			child.kill().ok();
-			bevybail!("deno: script timed out")
+			bevybail!("deno cli: script timed out")
 		}
 	}
 }
@@ -151,9 +151,9 @@ where
 	let events = async {
 		let mut lines = BufReader::new(stdout).lines();
 		while let Some(line) = lines.next().await {
-			let line = line.map_err(|err| bevyhow!("deno: read: {err}"))?;
+			let line = line.map_err(|err| bevyhow!("deno cli: read: {err}"))?;
 			if let Some(result) = protocol::apply_event(&line, &mut sink) {
-				return result.map_err(|err| bevyhow!("deno: {err}"));
+				return result.map_err(|err| bevyhow!("deno cli: {err}"));
 			}
 		}
 		// stdout closed with no terminal event, so the runner never got to emit
@@ -162,7 +162,7 @@ where
 			.read()
 			.map(|message| message.trim().to_string())
 			.unwrap_or_default();
-		bevybail!("deno: exited without a result: {message}")
+		bevybail!("deno cli: exited without a result: {message}")
 	};
 	// never resolves, so the race is decided by the event stream alone; draining
 	// is the point, not the result.
