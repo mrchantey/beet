@@ -24,6 +24,9 @@ pub impl<T> T {
 }
 
 /// A wrapper that tracks whether a value should be negated in assertions.
+///
+/// pub, not pub(crate): the return type of `.xnot()`, so downstream crates'
+/// tests that chain further matcher calls on the result need to name it.
 #[derive(Debug, Copy, Clone)]
 pub enum MaybeNot<T> {
 	/// The value's assertions should be negated.
@@ -141,7 +144,7 @@ impl<T> MaybeNot<T> {
 /// - `MaybeNot<T>` where `T: Display` (passed through)
 ///
 /// This allows assertions to accept both raw values and negated values.
-pub trait IntoMaybeNotDisplay<T>: Sized {
+pub(crate) trait IntoMaybeNotDisplay<T>: Sized {
 	/// Converts this value into a [`MaybeNot`] wrapper.
 	fn into_maybe_not(self) -> MaybeNot<T>;
 }

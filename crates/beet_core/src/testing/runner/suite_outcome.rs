@@ -3,7 +3,7 @@ use crate::testing::runner::*;
 
 /// Added to the [`TestRunnerConfig`] entity once all tests have completed
 #[derive(Component)]
-pub struct SuiteOutcome {
+pub(crate) struct SuiteOutcome {
 	num_pass: usize,
 	num_skip: usize,
 	num_fail: usize,

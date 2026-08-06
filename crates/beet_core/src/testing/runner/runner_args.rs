@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// This is a [`Component`] spawned alongside test bundles. All parameters
 /// are parsed eagerly at construction time rather than lazily extracted.
 #[derive(Debug, Clone, Component)]
-pub struct TestRunnerConfig {
+pub(crate) struct TestRunnerConfig {
 	/// The instant this was created, for timing.
 	started: Instant,
 	/// Clear the terminal on run and always exit ok for cleaner output when in watch mode.

@@ -7,7 +7,7 @@ pub fn panic_in_this_file() {
 }
 
 /// A helper function that returns an error, for testing error location reporting.
-pub fn error_in_this_file() -> Result<(), String> {
+pub(crate) fn error_in_this_file() -> Result<(), String> {
 	Err("error from panic_in_other_file.rs".into())
 }
 

@@ -31,7 +31,7 @@ pub struct ReactiveChild;
 
 /// The reconciliation key and current index of a keyed [`ReactiveChild`].
 #[derive(Component)]
-pub struct ReactiveChildKey {
+pub(crate) struct ReactiveChildKey {
 	key: String,
 	index: usize,
 }

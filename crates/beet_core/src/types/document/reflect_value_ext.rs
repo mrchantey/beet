@@ -18,7 +18,7 @@ use core::any::TypeId;
 /// resources ([`ReflectFieldRef`] and [`ResourceFieldRef`] each keep their own,
 /// the syncs run at different points so the `last_run` snapshots differ).
 #[derive(Default)]
-pub struct BindingTickCache {
+pub(crate) struct BindingTickCache {
 	/// The `world.change_tick()` snapshot of the previous sync pass.
 	pub last_run: Tick,
 	/// Resolved [`ComponentId`] per short type path.

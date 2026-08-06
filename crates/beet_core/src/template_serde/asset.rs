@@ -167,7 +167,7 @@ impl Plugin for AssetTemplatePlugin {
 /// Each frame, for every root with outstanding [`PendingAssets`], an asset whose
 /// recursive dependency load state is settled (loaded or failed) is resolved,
 /// firing [`LoadTemplate`] once the root's whole set drains.
-pub fn drain_loaded_assets(world: &mut World) {
+fn drain_loaded_assets(world: &mut World) {
 	let roots = world
 		.query_filtered::<Entity, With<PendingAssets>>()
 		.iter(world)

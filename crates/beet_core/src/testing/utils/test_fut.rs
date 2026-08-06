@@ -11,6 +11,9 @@ pub trait IntoFut<M> {
 	/// Converts this type into an async test future.
 	fn into_fut(self) -> impl AsyncTest;
 }
+// pub, not pub(crate): downstream `#[beet_core::test]` expansions select the
+// `IntoFut` impls by inferring these markers, so tightening them breaks every
+// external test crate.
 /// Marker for futures that return `Result<(), String>`.
 pub struct ReturnsStringResult;
 /// Marker for futures that return `Result<(), BevyError>`.

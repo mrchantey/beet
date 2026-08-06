@@ -185,7 +185,7 @@ fn variant_name(name: &str) -> &str { name.rsplit("::").next().unwrap_or(name) }
 /// A template's `bx:schema` declaration: an inline JSON schema, a remote schema
 /// referenced by `src` (resolved asynchronously), or none.
 #[derive(Debug, Clone, Default)]
-pub enum SchemaDirective {
+pub(crate) enum SchemaDirective {
 	/// No `bx:schema` block.
 	#[default]
 	None,

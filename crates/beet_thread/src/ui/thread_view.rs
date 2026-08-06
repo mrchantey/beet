@@ -9,6 +9,7 @@ use beet_core::prelude::*;
 // `ScrollPosition` is beet_ui's renderer-agnostic type; pin it explicitly so it wins
 // over bevy's same-named ui type (reached via `beet_core::prelude` under
 // `bevy_default`). The rest of beet_ui's prelude arrives via `crate::prelude`.
+use beet_ui::prelude::PortalOf;
 use beet_ui::prelude::ScrollPosition;
 // styling for the transcript: an `inline_class!` per role keeps the rule colocated
 // with the widget (a callsite-keyed class, so each role's literal is its own rule).
@@ -60,7 +61,7 @@ fn thread_view_on_add(mut world: DeferredWorld, cx: HookContext) {
 	// Rows are a keyed `ReactiveChildren` over the document's `posts`.
 	world.commands().entity(cx.entity).insert(rsx! {
 		<div {(
-			ThreadScroll,
+			ThreadScroll::default(),
 			ScrollPosition::default(),
 			FieldRef::new("posts"),
 			ReactiveChildren::keyed(post_key, post_row),
@@ -85,11 +86,31 @@ fn transcript_style() -> OnSpawn {
 	]
 }
 
-/// Marks a [`ThreadView`]'s scroll container, so [`follow_thread_scroll`] can
-/// pin it to the latest post on append.
+/// Marks a [`ThreadView`]'s transcript container, and carries the follow state
+/// [`follow_thread_scroll`] uses to keep the latest post in view.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[reflect(Component)]
-pub struct ThreadScroll;
+#[reflect(Component, Default)]
+pub struct ThreadScroll {
+	/// Whether the transcript tails the latest post. On by default, off while
+	/// the reader has scrolled up, back on when they return to the bottom.
+	following: bool,
+	/// Frames of pinning left to apply, counted down as the follow re-asserts
+	/// itself over the frames the new rows take to lay out.
+	pending_follow: u8,
+	/// The scrollable extent last seen, so growing content is not mistaken for
+	/// the reader scrolling.
+	last_max: i32,
+}
+
+impl Default for ThreadScroll {
+	fn default() -> Self {
+		Self {
+			following: true,
+			pending_follow: 0,
+			last_max: 0,
+		}
+	}
+}
 
 /// Stable reconciliation key for a post item: its `id` field (a uuid string), so
 /// reconciliation reuses a row across appends and in-progress body growth.
@@ -245,41 +266,110 @@ pub(crate) fn project_window_to_document(
 	Ok(())
 }
 
-/// Follow-on-append: when a [`ThreadView`]'s document changes (a post was added
-/// or grew) *or* its keyed rows spawn in (`Changed<Children>`), pin its
-/// [`ThreadScroll`] container to the bottom by parking the offset past the end.
-/// `clamp_scroll_positions` re-clamps it to the true max against the laid-out
-/// content.
+/// Follow-on-append: when a [`ThreadView`]'s document changes (a post was
+/// added or grew) *or* its keyed rows spawn in, arm a follow, then for the next
+/// few frames pin every scroll container showing the transcript to the bottom
+/// by parking its offset past the end. `clamp_scroll_positions` re-clamps that
+/// to the true max against the laid-out content.
 ///
-/// Two subtleties:
-/// - The `Changed<Children>` trigger matters because the reactive rows spawn a
-///   frame *after* the document is set, so a document-only trigger would pin
-///   against an empty (un-laid-out) container and clamp back to the top.
-/// - It only follows while the view is already at the bottom
-///   ([`ScrollPosition::at_bottom`]); once a user scrolls up, new posts no longer
-///   yank them back to the latest.
+/// The follow spans frames rather than landing in one because the geometry
+/// trails the content: rows spawn a frame after the document is set, then lay
+/// out and clamp, so a container's extent only reflects them afterwards. It can
+/// even change hands in that window, since a transcript that outgrows its host
+/// takes over the scrolling from the host's scrollport. Pinning the whole path
+/// for a few frames follows the tail whichever container ends up owning it, and
+/// each container simply clamps to its own bottom.
+///
+/// A reader who has scrolled up is left there. Their intent is read only on
+/// *settled* frames (no new content, no moving extent), where the scroll
+/// position is theirs alone: at the bottom keeps the tail on, anywhere else
+/// turns it off until they scroll back. Sampling it while content lands would
+/// instead read a transcript that has simply outgrown the viewport as a reader
+/// who scrolled away, and stop following on the first burst.
 pub(crate) fn follow_thread_scroll(
-	views: Query<
-		Entity,
-		(With<ThreadView>, Or<(Changed<Document>, Changed<Children>)>),
-	>,
+	views: Query<(Entity, Ref<Document>, Option<Ref<Children>>), With<ThreadView>>,
 	children: Query<&Children>,
-	mut scrolls: Query<&mut ScrollPosition, With<ThreadScroll>>,
+	parents: Query<&ChildOf>,
+	portals: Query<&PortalOf>,
+	mut transcripts: Query<&mut ThreadScroll>,
+	mut scrolls: Query<&mut ScrollPosition>,
 ) {
-	for view in views.iter() {
-		// the scroll container is the view entity itself (the `<div>` merges onto it
-		// on insert) or a descendant; pin whichever carries `ThreadScroll`.
-		for entity in std::iter::once(view).chain(children.iter_descendants(view))
+	for (view, document, rows) in views.iter() {
+		// the transcript container is the view entity itself (the `<div>` merges
+		// onto it on insert) or a descendant carrying `ThreadScroll`.
+		let Some(transcript) = std::iter::once(view)
+			.chain(children.iter_descendants(view))
+			.find(|entity| transcripts.contains(*entity))
+		else {
+			continue;
+		};
+		let path = scroll_path(transcript, &parents, &portals);
+		// the innermost container with somewhere to scroll owns the reader's
+		// position; with nothing scrollable yet there is nothing to follow.
+		let scroller = path
+			.iter()
+			.filter_map(|entity| scrolls.get(*entity).ok())
+			.find(|scroll| scroll.max.y > 0);
+		let max = scroller.map(|scroll| scroll.max.y).unwrap_or_default();
+		let at_bottom = scroller.is_none_or(|scroll| scroll.at_bottom());
+		let new_content =
+			document.is_changed() || rows.is_some_and(|rows| rows.is_changed());
+		let Ok(mut thread_scroll) = transcripts.get_mut(transcript) else {
+			continue;
+		};
+		// with the geometry stable and no new content, wherever the reader has
+		// left the scroll *is* their intent: at the bottom means keep tailing.
+		if !new_content && max == thread_scroll.last_max {
+			thread_scroll.following = at_bottom;
+		}
+		// new posts, or rows still laying out (the extent is still moving, and
+		// which container scrolls can change hands as the transcript outgrows
+		// its host), so re-assert the pin
+		if thread_scroll.following
+			&& (new_content || max != thread_scroll.last_max)
 		{
+			thread_scroll.pending_follow = FOLLOW_FRAMES;
+		}
+		thread_scroll.last_max = max;
+		if thread_scroll.pending_follow == 0 {
+			continue;
+		}
+		thread_scroll.pending_follow -= 1;
+		// `clamp_scroll_positions` settles each of these to its own bottom
+		for entity in path {
 			if let Ok(mut scroll) = scrolls.get_mut(entity) {
-				// leave a scrolled-up reader where they are; only stick to the
-				// bottom when already there.
-				if scroll.at_bottom() {
-					scroll.offset.y = i32::MAX;
-				}
+				scroll.offset.y = i32::MAX;
 			}
 		}
 	}
+}
+
+/// How many frames a follow keeps pinning: enough to outlast the row spawn, the
+/// layout pass and the clamp that gives the containers their extent.
+const FOLLOW_FRAMES: u8 = 4;
+
+/// The transcript and every container it renders inside, innermost first.
+///
+/// Ancestry is *visual*, so the walk crosses transclusion: a [`PortalOf`] holder
+/// is the visual parent of the content it renders in place, which is how a
+/// router page reaches the surface scrollport hosting it. The same walk the
+/// charcell wheel/key scrolling uses to resolve its container.
+fn scroll_path(
+	transcript: Entity,
+	parents: &Query<&ChildOf>,
+	portals: &Query<&PortalOf>,
+) -> Vec<Entity> {
+	let mut path = vec![transcript];
+	let mut current = Some(transcript);
+	while let Some(entity) = current {
+		current = portals
+			.get(entity)
+			.ok()
+			.and_then(|portal| portal.holders().first().copied())
+			.or_else(|| parents.get(entity).ok().map(|child_of| child_of.parent()));
+		path.extend(current);
+	}
+	path
 }
 
 /// Build the document value for a window: a `posts` list of `{ id, author, text }`.
@@ -335,6 +425,201 @@ fn set_document(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	// the live-TUI render stack the repaint test paints into
+	use beet_router::prelude::*;
+	use beet_ui::prelude::CharcellPlugin;
+	use beet_ui::prelude::DoubleBuffer;
+	use beet_ui::prelude::Portal;
+	use beet_ui::prelude::RealtimeParsePlugin;
+	use beet_ui::prelude::RenderSurface;
+	use bevy::math::UVec2;
+
+	/// The live tail: posts appended *after* the first projection must reach the
+	/// view too, both as document entries and as spawned rows. Regression for a
+	/// transcript that renders its first batch and then freezes.
+	#[beet_core::test]
+	fn projects_appended_posts() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins)
+			.init_plugin::<DocumentPlugin>()
+			.init_plugin::<ThreadPlugin>()
+			.init_plugin::<ThreadUiPlugin>();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), ThreadWindow::default()))
+			.id();
+		let view = app.world_mut().spawn(ThreadView::new(thread)).id();
+		app.update();
+
+		// the projection runs in `Update` and the document chain in the next
+		// frame's `PreUpdate`, so a row lands one frame after its post
+		push_post(&mut app, thread, "first");
+		app.update();
+		app.update();
+		row_count(&app, view).xpect_eq(1);
+
+		push_post(&mut app, thread, "second");
+		app.update();
+		app.update();
+		row_count(&app, view).xpect_eq(2);
+	}
+
+	/// The same live tail, but with the view built through the template
+	/// substrate (`spawn_template`), the path a router page takes.
+	#[beet_core::test]
+	fn projects_appended_posts_through_template() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins)
+			.init_plugin::<DocumentPlugin>()
+			.init_plugin::<ThreadPlugin>()
+			.init_plugin::<ThreadUiPlugin>();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), ThreadWindow::default()))
+			.id();
+		let page = app
+			.world_mut()
+			.spawn_template(Snippet::from_bundle(rsx! {
+				<div><div {(ThreadView, OfThread(thread))}/></div>
+			}))
+			.unwrap()
+			.id();
+		app.update();
+		let view = app
+			.world_mut()
+			.query_filtered::<Entity, With<ThreadView>>()
+			.single(app.world())
+			.unwrap();
+		app.world().entity(view).get::<OfThread>().unwrap().thread().xpect_eq(thread);
+		let _ = page;
+
+		push_post(&mut app, thread, "first");
+		app.update();
+		app.update();
+		row_count(&app, view).xpect_eq(1);
+
+		push_post(&mut app, thread, "second");
+		app.update();
+		app.update();
+		row_count(&app, view).xpect_eq(2);
+	}
+
+	/// The painted surface follows the tail: a post appended after the first
+	/// frame is repainted, not just projected.
+	#[beet_core::test]
+	fn repaints_appended_posts() {
+		let (mut app, thread, host) = live_host();
+		push_post(&mut app, thread, "first post");
+		settle(&mut app);
+		frame(&app, host).xpect_contains("first post");
+
+		push_post(&mut app, thread, "second post");
+		settle(&mut app);
+		frame(&app, host).xpect_contains("second post");
+	}
+
+	/// The tail stays visible when the transcript overflows its host, including
+	/// when the very first projection already overflows (a feed's opening page,
+	/// rather than a chat's one-post-at-a-time growth).
+	#[beet_core::test]
+	fn follows_the_tail_when_overflowing() {
+		let (mut app, thread, host) = live_host();
+		// a burst that overflows the 12 row viewport in one projection
+		(0..20).for_each(|index| {
+			push_post(&mut app, thread, &format!("post {index}"))
+		});
+		settle(&mut app);
+		frame(&app, host).xpect_contains("post 19");
+
+		// and it keeps following as later posts arrive
+		push_post(&mut app, thread, "newest post");
+		settle(&mut app);
+		frame(&app, host).xpect_contains("newest post");
+	}
+
+	/// The live-TUI render stack minus the terminal (as `live_page`'s own tests
+	/// build it), hosting a page-bound view of a fresh thread: the app, the
+	/// thread entity and the host whose buffer is painted.
+	fn live_host() -> (App, Entity, Entity) {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			RealtimeParsePlugin,
+			LivePagePlugin,
+		))
+		.init_plugin::<ThreadPlugin>()
+		.init_plugin::<ThreadUiPlugin>();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), ThreadWindow::default()))
+			.id();
+		let host = app.world_mut().spawn(page_host(UVec2::new(40, 12))).id();
+		let page = app
+			.world_mut()
+			.spawn_template(Snippet::from_bundle(rsx! {
+				<div {(ThreadView, OfThread(thread))}/>
+			}))
+			.unwrap()
+			.id();
+		// bind the page to the host surface (`bind_surface_page` is
+		// router-internal; a fresh host has no outgoing page to clean up)
+		let slot = app
+			.world()
+			.entity(host)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.find(|child| app.world().get::<PageSlot>(*child).is_some())
+			.unwrap();
+		app.world_mut().entity_mut(page).insert(RenderSurface(host));
+		app.world_mut().entity_mut(slot).insert(Portal::new(page));
+		(app, thread, host)
+	}
+
+	/// A few frames, enough for the projection, the document chain and the
+	/// paint to settle.
+	fn settle(app: &mut App) { (0..4).for_each(|_| app.update()); }
+
+	/// The host's painted frame as plain text.
+	fn frame(app: &App, host: Entity) -> String {
+		app.world()
+			.get::<DoubleBuffer>(host)
+			.unwrap()
+			.current_buffer()
+			.render_plain()
+	}
+
+	/// Append one completed text post to the thread's window.
+	fn push_post(app: &mut App, thread: Entity, text: &str) {
+		let thread_id = app.world().get::<Thread>(thread).unwrap().id();
+		let mut window = app.world_mut().get_mut::<ThreadWindow>(thread).unwrap();
+		let actor = window.insert_actor(Actor::agent());
+		window.upsert_post(AgentPost::new_text(
+			actor,
+			thread_id,
+			text,
+			PostStatus::Completed,
+		));
+	}
+
+	/// The reactive rows the view has spawned for its posts.
+	fn row_count(app: &App, view: Entity) -> usize {
+		app.world()
+			.entity(view)
+			.get::<Children>()
+			.map(|children| {
+				children
+					.iter()
+					.filter(|child| {
+						app.world().get::<ReactiveChild>(*child).is_some()
+					})
+					.count()
+			})
+			.unwrap_or_default()
+	}
 
 	/// The declarative binding the scenes rely on: an `{(ThreadView, OfThread($thread))}`
 	/// spread resolves its `$thread` reference to the `bx:ref="thread"` Thread entity

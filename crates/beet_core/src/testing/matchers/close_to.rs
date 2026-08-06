@@ -6,16 +6,16 @@
 use bevy::prelude::*;
 
 /// Default delta tolerance for f32 comparisons.
-pub const DEFAULT_DELTA_F32: f32 = 0.1;
+pub(crate) const DEFAULT_DELTA_F32: f32 = 0.1;
 
 /// Default delta tolerance for f64 comparisons.
-pub const DEFAULT_DELTA_F64: f64 = 0.1;
+pub(crate) const DEFAULT_DELTA_F64: f64 = 0.1;
 
 /// Trait for approximate equality comparisons.
 ///
 /// This is primarily used by [`xpect_close`](super::MatcherClose::xpect_close)
 /// to compare floating-point values within a tolerance.
-pub trait CloseTo: Sized {
+pub(crate) trait CloseTo: Sized {
 	/// Returns the default delta tolerance for this type.
 	fn default_delta() -> Self;
 

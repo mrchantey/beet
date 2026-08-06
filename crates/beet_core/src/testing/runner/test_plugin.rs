@@ -60,7 +60,7 @@ pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 
 /// Bevy plugin that sets up the test runner infrastructure.
 #[derive(Default)]
-pub struct TestPlugin;
+pub(crate) struct TestPlugin;
 
 impl Plugin for TestPlugin {
 	fn build(&self, app: &mut App) {
@@ -111,4 +111,4 @@ impl Plugin for TestPlugin {
 
 /// Schedule that runs test execution systems.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
-pub struct RunTests;
+pub(crate) struct RunTests;

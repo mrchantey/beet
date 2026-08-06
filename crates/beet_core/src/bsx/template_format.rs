@@ -15,7 +15,7 @@ use crate::prelude::*;
 ///
 /// A plain function pointer so a [`TemplateFormats`] entry is `Copy` and a plugin
 /// registers a format with a free function, not a boxed closure.
-pub type TemplateParseFn = fn(&str) -> Result<Vec<BsxNode>>;
+pub(crate) type TemplateParseFn = fn(&str) -> Result<Vec<BsxNode>>;
 
 /// Maps a [`MediaType`] to the [`TemplateParseFn`] that lowers a file of that type
 /// into a [`BsxNode`] tree, the pluggable layer beneath the [`BsxTemplateRegistry`]

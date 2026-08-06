@@ -125,7 +125,7 @@ impl From<i64> for FieldSegment {
 }
 
 /// Convert various types into a [`FieldPath`].
-pub trait IntoFieldPath<M> {
+pub(crate) trait IntoFieldPath<M> {
 	/// Convert this value into a [`FieldPath`].
 	fn into_field_path(self) -> FieldPath;
 }

@@ -19,7 +19,7 @@ use alloc::sync::Arc;
 /// A custom-tag handler: reads the parsed [`BsxElement`]'s raw attributes and
 /// mutates the build entity (and through it the world via
 /// [`EntityWorldMut::world_scope`]), producing no entity content.
-pub type TagResolverFn =
+pub(crate) type TagResolverFn =
 	Arc<dyn Fn(&BsxElement, &mut EntityWorldMut) -> Result<()> + Send + Sync>;
 
 /// Maps an uppercase tag name to its [`TagResolverFn`].

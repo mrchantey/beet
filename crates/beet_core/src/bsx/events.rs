@@ -58,7 +58,7 @@ impl EventBinding {
 /// resource) via [`EntityWorldMut::world_scope`] or a binding argument's
 /// read-modify-write helpers, which an inline observer closure cannot express.
 /// The event installer queues this to run as an exclusive command, never inline.
-pub type VerbFn = Arc<dyn Fn(&mut EntityWorldMut, &VerbArgs) + Send + Sync>;
+pub(crate) type VerbFn = Arc<dyn Fn(&mut EntityWorldMut, &VerbArgs) + Send + Sync>;
 
 /// The resolved arguments of a verb invocation: literal arguments as a plain
 /// [`Value`] map, plus the resolved binding-argument handles kept separate.
@@ -277,7 +277,7 @@ pub struct EventBindings(pub Vec<EventBinding>);
 /// and picking live; core never names one. It receives the host entity, the verb
 /// name (resolved against the [`VerbRegistry`] at fire time), and the resolved
 /// [`VerbArgs`].
-pub type EventInstaller =
+pub(crate) type EventInstaller =
 	Arc<dyn Fn(&mut EntityWorldMut, SmolStr, VerbArgs) + Send + Sync>;
 
 /// The event seam: event name -> [`EventInstaller`]. Empty by default; an app

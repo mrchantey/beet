@@ -27,7 +27,7 @@ use core::time::Duration;
 /// Resolves a `$name` entity reference to a concrete (possibly forward-mapped)
 /// [`Entity`], threaded through nested literals so a spread component's
 /// `Entity`-typed field resolves through the one entity model.
-pub type EntityResolver<'a> = &'a mut dyn FnMut(&str) -> Entity;
+pub(crate) type EntityResolver<'a> = &'a mut dyn FnMut(&str) -> Entity;
 
 /// Resolve a literal to a reflected value against `field_info` (the target
 /// field's [`TypeInfo`], when known), looking nested types up in `registry` and

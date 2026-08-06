@@ -114,7 +114,7 @@ impl TestCaseParams {
 
 /// Component representing a test case.
 #[derive(Debug, Component)]
-pub struct Test {
+pub(crate) struct Test {
 	/// The test description.
 	desc: TestDesc,
 	/// Counts the time elapsed since the test started.
@@ -158,7 +158,7 @@ impl TestDescExt for Test {
 
 /// Component wrapping a static test function.
 #[derive(Debug, Copy, Clone, Component)]
-pub struct TestFunc(fn() -> Result<(), String>);
+pub(crate) struct TestFunc(fn() -> Result<(), String>);
 
 impl TestFunc {
 	/// Creates a new [`TestFunc`] from a function pointer.
@@ -173,7 +173,7 @@ impl TestFunc {
 /// The `DynTestFn` boxed closure is [`Send`] but not [`Sync`].
 /// This type is for running these tests on the main thread.
 #[derive(Component)]
-pub struct NonSendTestFunc(
+pub(crate) struct NonSendTestFunc(
 	SendWrapper<Box<dyn 'static + FnOnce() -> Result<(), String>>>,
 );
 

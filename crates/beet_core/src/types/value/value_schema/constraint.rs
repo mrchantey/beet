@@ -5,7 +5,7 @@ use crate::prelude::*;
 ///
 /// Carries the borrows for `self`, the path and the value, so apply impls can
 /// freely borrow and recurse without `'static`.
-pub type ApplyFuture<'a> =
+pub(crate) type ApplyFuture<'a> =
 	core::pin::Pin<Box<dyn 'a + Send + Future<Output = Vec<ValidationError>>>>;
 
 /// Apply a constraint (or schema) to a value, producing validation errors.
@@ -13,7 +13,7 @@ pub type ApplyFuture<'a> =
 /// The trait is async (returns a [`ApplyFuture`]) so I/O-bound validations
 /// such as remote uniqueness checks can be implemented uniformly. Sync
 /// constraints just return a ready future.
-pub trait ApplyConstraints {
+pub(crate) trait ApplyConstraints {
 	/// The type of value this constraint can be applied to.
 	type Value;
 	/// Apply this constraint at the given path, possibly mutating `value`.
@@ -29,7 +29,7 @@ pub trait ApplyConstraints {
 	Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ConstraintBehavior {
+pub(crate) enum ConstraintBehavior {
 	/// Emit a [`ValidationError`].
 	#[default]
 	Error,
@@ -40,7 +40,7 @@ pub enum ConstraintBehavior {
 /// An error produced by validating a [`Value`] against a [`ValueSchema`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ValidationError {
+pub(crate) struct ValidationError {
 	/// The path within the root value where the error occurred.
 	pub path: FieldPath,
 	/// A human readable description of what failed.

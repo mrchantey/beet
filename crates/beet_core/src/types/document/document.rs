@@ -257,7 +257,7 @@ pub enum DocumentError {
 /// Specifies behavior when a field is missing from a document.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OnMissingField {
+pub(crate) enum OnMissingField {
 	/// Initialize the field with the provided value if it doesn't exist.
 	Init {
 		/// The value to initialize the field with.

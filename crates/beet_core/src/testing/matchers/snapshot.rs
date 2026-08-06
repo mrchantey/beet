@@ -315,13 +315,13 @@ fn parse_snapshot(
 }
 
 /// Trait for types that can be converted to strings for snapshot comparison.
-pub trait StringComp<M> {
+pub(crate) trait StringComp<M> {
 	/// Converts this value to a string for comparison.
 	fn to_comp_string(&self) -> String;
 }
 
 /// Marker type for [`ToTokens`] implementations of [`StringComp`].
-pub struct ToTokensStringCompMarker;
+pub(crate) struct ToTokensStringCompMarker;
 
 // we dont blanket ToTokens because collision with String
 #[cfg(feature = "tokens")]

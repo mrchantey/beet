@@ -20,7 +20,7 @@ use bevy::ecs::relationship::Relationship;
 /// walk directly over a `&World` for callers outside a system (see
 /// [`BindingTarget::resolve`](crate::prelude::BindingTarget::resolve)).
 #[derive(SystemParam)]
-pub struct ElementTraverseQuery<'w, 's> {
+pub(crate) struct ElementTraverseQuery<'w, 's> {
 	child_of: Query<'w, 's, &'static ChildOf>,
 	attribute_of: Query<'w, 's, &'static AttributeOf>,
 }

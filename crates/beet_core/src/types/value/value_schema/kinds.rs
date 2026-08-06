@@ -108,7 +108,7 @@ number_schema!(U64Schema, U64Constraint, U64Min, U64Max, U64Step, u64);
 /// Constraint applied to an [`F64Schema`].
 #[derive(Debug, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum F64Constraint {
+pub(crate) enum F64Constraint {
 	/// The value must be at least this number.
 	Min(F64Min),
 	/// The value must be at most this number.
@@ -120,7 +120,7 @@ pub enum F64Constraint {
 /// Minimum-value constraint for [`F64Schema`].
 #[derive(Debug, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct F64Min {
+pub(crate) struct F64Min {
 	/// The minimum allowed value.
 	pub value: f64,
 	/// What to do if `value` falls below the minimum.
@@ -129,7 +129,7 @@ pub struct F64Min {
 /// Maximum-value constraint for [`F64Schema`].
 #[derive(Debug, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct F64Max {
+pub(crate) struct F64Max {
 	/// The maximum allowed value.
 	pub value: f64,
 	/// What to do if `value` exceeds the maximum.
@@ -138,7 +138,7 @@ pub struct F64Max {
 /// Step (modulus) constraint for [`F64Schema`].
 #[derive(Debug, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct F64Step {
+pub(crate) struct F64Step {
 	/// The step value.
 	pub value: f64,
 	/// What to do if `value` is not aligned to the step.
@@ -148,7 +148,7 @@ pub struct F64Step {
 /// Schema for an [`f64`] value.
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct F64Schema {
+pub(crate) struct F64Schema {
 	/// Constraints applied to this number.
 	pub constraints: Vec<F64Constraint>,
 }
@@ -238,7 +238,7 @@ impl PartialOrd for F64Schema {
 /// Constraint applied to a string value.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum StringConstraint {
+pub(crate) enum StringConstraint {
 	/// Minimum length in chars.
 	MinLength {
 		/// The minimum allowed length.
@@ -262,7 +262,7 @@ pub enum StringConstraint {
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StringSchema {
+pub(crate) struct StringSchema {
 	/// Whether this value is sensitive (password etc), should be hidden
 	/// from logs and rendered as `***`.
 	pub sensitive: bool,
@@ -369,7 +369,7 @@ impl ApplyConstraints for StringSchema {
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BoolSchema {}
+pub(crate) struct BoolSchema {}
 
 impl ApplyConstraints for BoolSchema {
 	type Value = bool;
@@ -387,7 +387,7 @@ impl ApplyConstraints for BoolSchema {
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BytesSchema {
+pub(crate) struct BytesSchema {
 	/// Optional max byte length.
 	pub max_len: Option<usize>,
 }
@@ -608,7 +608,7 @@ pub struct NamedFieldSchema {
 /// A field within a [`TupleSchema`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UnnamedFieldSchema {
+pub(crate) struct UnnamedFieldSchema {
 	/// Whether this field must be present.
 	pub required: bool,
 	/// Optional description.
@@ -636,7 +636,7 @@ pub struct StructSchema {
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TupleSchema {
+pub(crate) struct TupleSchema {
 	/// The type's short name, if known.
 	pub name: Option<SmolStr>,
 	/// Field schemas in order.
@@ -649,7 +649,7 @@ pub struct TupleSchema {
 )]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ListSchema {
+pub(crate) struct ListSchema {
 	/// The schema each element must satisfy.
 	pub item: Box<ValueSchema>,
 	/// Minimum number of elements.
@@ -666,7 +666,7 @@ pub struct ListSchema {
 )]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MapSchema {
+pub(crate) struct MapSchema {
 	/// The schema each value in the map must satisfy.
 	pub value: Box<ValueSchema>,
 }
@@ -674,7 +674,7 @@ pub struct MapSchema {
 /// A variant within an [`EnumSchema`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct VariantSchema {
+pub(crate) struct VariantSchema {
 	/// The variant's name as it appears in serialized form.
 	pub name: SmolStr,
 	/// Optional payload schema; `None` for unit variants.
@@ -687,7 +687,7 @@ pub struct VariantSchema {
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnumSchema {
+pub(crate) struct EnumSchema {
 	/// The type's short name, if known.
 	pub name: Option<SmolStr>,
 	/// Variants in declaration order.

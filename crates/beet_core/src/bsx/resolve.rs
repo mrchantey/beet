@@ -173,7 +173,7 @@ fn collect_refs(nodes: &[BsxNode], refs: &mut RefBindings) -> Result<()> {
 /// instead of user `bx:ref` names. Declaring one via `bx:ref` is a build error
 /// (see [`collect_refs`]), so a reserved selector is never ambiguous.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReservedRef {
+pub(crate) enum ReservedRef {
 	/// The outermost root of the current `spawn_template` build, resolved at
 	/// build time from [`TemplateBuildRoot`].
 	BuildRoot,

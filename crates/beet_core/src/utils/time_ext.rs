@@ -76,6 +76,31 @@ pub fn current_year() -> i32 {
 	1970 + (secs as f64 / (365.2425 * 86400.0)) as i32
 }
 
+/// Formats a unix epoch [`Duration`] as an ISO 8601 / RFC 3339 UTC timestamp
+/// with millisecond precision, eg `2024-09-09T19:46:02.102Z`.
+///
+/// Uses the days-to-civil algorithm directly rather than pulling in a datetime
+/// crate; epoch durations are unsigned so pre-1970 dates cannot occur.
+pub fn format_iso8601(unix: Duration) -> String {
+	let secs = unix.as_secs();
+	let millis = unix.subsec_millis();
+	let (hour, min, sec) =
+		((secs / 3600) % 24, (secs / 60) % 60, secs % 60);
+	// days-to-civil (Howard Hinnant), valid for the unsigned epoch range
+	let days = secs / 86_400 + 719_468;
+	let era = days / 146_097;
+	let doe = days - era * 146_097;
+	let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+	let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+	let mp = (5 * doy + 2) / 153;
+	let day = doy - (153 * mp + 2) / 5 + 1;
+	let month = if mp < 10 { mp + 3 } else { mp - 9 };
+	let year = yoe + era * 400 + (month <= 2) as u64;
+	format!(
+		"{year:04}-{month:02}-{day:02}T{hour:02}:{min:02}:{sec:02}.{millis:03}Z"
+	)
+}
+
 /// Formats a duration as a human-readable string with appropriate units.
 ///
 /// Automatically selects the most appropriate unit (minutes, seconds,
@@ -225,6 +250,17 @@ mod test {
 		let now = Instant::now();
 		time_ext::sleep(Duration::from_millis(100)).await;
 		now.elapsed().as_millis().xpect_greater_or_equal_to(100);
+	}
+
+	#[crate::test]
+	fn formats_iso8601() {
+		time_ext::format_iso8601(Duration::ZERO)
+			.xpect_eq("1970-01-01T00:00:00.000Z");
+		time_ext::format_iso8601(Duration::from_millis(1_725_911_162_102))
+			.xpect_eq("2024-09-09T19:46:02.102Z");
+		// leap year day
+		time_ext::format_iso8601(Duration::from_secs(1_709_164_800))
+			.xpect_eq("2024-02-29T00:00:00.000Z");
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]

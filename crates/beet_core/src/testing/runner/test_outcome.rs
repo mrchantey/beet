@@ -10,7 +10,7 @@ use crate::testing::utils::*;
 /// The outcome of running a test.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 #[component(storage = "SparseSet")]
-pub enum TestOutcome {
+pub(crate) enum TestOutcome {
 	/// The test either returned ok, or was expected to panic and did so.
 	Pass,
 	/// The test was skipped for some reason.
@@ -42,7 +42,7 @@ impl TestOutcome {
 ///
 /// Applied to test entities either upon spawn or after applying a filter.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TestSkip {
+pub(crate) enum TestSkip {
 	/// The test has a `#[no_run]` attribute.
 	NoRun,
 	/// The test has a `#[compile_fail]` attribute.
@@ -55,7 +55,7 @@ pub enum TestSkip {
 
 /// Reasons why a test failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TestFail {
+pub(crate) enum TestFail {
 	/// The test returned an [`Err(String)`].
 	Err {
 		/// The error message.
