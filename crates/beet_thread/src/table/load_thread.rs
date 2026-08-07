@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 /// Declare a filesystem-backed thread store from markup, persisting the thread's
 /// records (its whole conversation) to a single JSON object under `path`, so a
 /// reload of the scene resumes rather than starting fresh:
-/// `<div {Thread} {Sequence} {MountThreadStore{path:"examples/thread/chat"}}>`.
+/// `<Thread {(Sequence, MountThreadStore{path:"examples/thread/chat"})}>`.
 ///
 /// `path` is workspace-relative. This is a *deferred* mount: [`RunThread`] builds
 /// the [`ThreadStore`], adopts the stored conversation by seed hash, and only then

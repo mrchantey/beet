@@ -73,7 +73,7 @@ mod test {
 		app.register_type::<Tick>();
 		app.register_type::<ProbeTool>();
 		let source = r#"
-<div {Thread} {Sequence}>
+<Thread {Sequence}>
 	<Tick/>
 	<CreateActor name="System" kind="System"><CreatePost text="x"/></CreateActor>
 	<CreateActor name="Camera" kind="User" {Tick}/>
@@ -108,7 +108,7 @@ mod test {
 		app.add_plugins(MinimalPlugins)
 			.init_plugin::<ThreadPlugin>();
 		let source = r#"
-<div {Thread}>
+<Thread>
 	<CreateActor name="Sys" kind="System"/>
 	<CreateActor name="Bot" kind="Agent"/>
 	<CreateActor name="Person" kind="User"/>
@@ -152,7 +152,7 @@ mod test {
 		app.register_type::<ProbeTool>();
 
 		let source = r#"
-<div {Thread}>
+<Thread>
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}>
 		<ProbeTool/>
 	</CreateActor>
@@ -182,7 +182,7 @@ mod test {
 		app.add_plugins(MinimalPlugins)
 			.init_plugin::<ThreadPlugin>();
 		let source = "
-<div {Thread}>
+<Thread>
 	<CreateActor name=\"System\" kind=\"System\">
 		<CreatePost text='line one
 respond: \"I open the door..\"
@@ -215,7 +215,7 @@ line three'/>
 		// nests children natively); actors are `<CreateActor>` tags that forward
 		// their seed/tool children through a `<Slot/>`.
 		let source = r#"
-<div {Thread}>
+<Thread>
 	<CreateActor name="System" kind="System">
 		<CreatePost text="be helpful"/>
 	</CreateActor>

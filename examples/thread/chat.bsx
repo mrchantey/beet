@@ -23,17 +23,17 @@ is a sibling of the page, kicked by the same boot.
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
-			<div {(ThreadView, OfThread($thread))}/>
-			<div {(CreatePostForm, OfThread($thread))}/>
+			<ThreadView {OfThread($thread)}/>
+			<CreatePostForm {OfThread($thread)}/>
 		</Route>
-		<div {Repeat} {RunThread}>
-			<div bx:ref="thread" {Thread} {Sequence}>
+		<Repeat {RunThread}>
+			<Thread bx:ref="thread" {Sequence}>
 				<CreateActor name="System" kind="System">
 					<CreatePost text="you are robot, make beep boop noises"/>
 				</CreateActor>
 				<CreateActor name="BeepBot" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
 				<CreateActor name="Billy" kind="User" {UserInput}/>
-			</div>
-		</div>
+			</Thread>
+		</Repeat>
 	</Router>
 </StartOnLoad>

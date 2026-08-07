@@ -195,7 +195,7 @@ mod test {
 		app.add_plugins(MinimalPlugins)
 			.init_plugin::<ThreadPlugin>();
 		let source = r#"
-<div {Thread}>
+<Thread>
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, instructions:"be terse"}}/>
 </div>
 "#;

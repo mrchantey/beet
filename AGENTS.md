@@ -189,10 +189,12 @@ async_ext::do_async_thing().await;
 
 ## BSX Cheatsheet
 
-- Use the most prominent type in a position. `<div>` is a UI element, never a generic wrapper to hang the real type off a spread.
-	- bad: `<div {(Route{path:"deploy"}, ExchangeSequence)}>`
-	- good: `<Route path="deploy" {ExchangeSequence}>`
-- When no component/resource/template fits a position (a plain grouping), use `<Template>`, not `<div>`.
+- **Every entity is authored under the tag of the type it most *is*.** `<div>`/`<span>` are UI elements and mean "this paints as a box of text"; they are never a generic carrier to hang the real type off a spread. This is not a UI-only rule, it applies to every position: a behavior loop is `<Repeat>`, a thread is `<Thread>`, a view is `<ThreadView>`, a route is `<Route>`. Whatever is left over rides a `{spread}` on that same entity.
+	- bad: `<div {(Route{path:"deploy"}, ExchangeSequence)}>` / `<div {Repeat} {RunThread}>` / `<div {(ThreadView, OfThread($thread))}/>`
+	- good: `<Route path="deploy" {ExchangeSequence}>` / `<Repeat {RunThread}>` / `<ThreadView {OfThread($thread)}/>`
+	- picking between co-located types: the entity's **action** wins (one action per entity, see the Action Cheatsheet), so `<Repeat {RunThread}>`, not `<RunThread {Repeat}>`. Absent an action, the noun the entity names wins: `<Thread {(Sequence, FsStore{path:".."})}>`.
+- A generic type resolves by base name to its sole registered instantiation, as a tag exactly as in a spread, so `<Repeat>`, `<Sequence>` and `<RepeatTimes total_times=2>` all author directly.
+- When no component/resource/template fits a position (a plain grouping), use `<Fragment>`, not `<div>`: it carries spreads, directives and children but emits no element, the markup twin of returning `impl Bundle`. (`<Template>` is the *include* front-end, `<Template src="..">`; with no `src` it is a directives-only no-op that builds no children.)
 - `<Tag/>` resolves a component/template by short type path and spawns its own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity. String attributes coerce to the field type (`SmolStr`, `SmolPath`, `Duration` from `"30s"`, an `Option<T>` wrapping the value, an enum unit variant by name), so a reflect component is usually authorable directly without a template.
 - A `<Tag>`'s children land as its direct children (slots are transparent), so a child-reading handler like `{ExchangeSequence}` (a sequenced route) reads them: `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
 

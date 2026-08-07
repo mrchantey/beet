@@ -12,10 +12,10 @@ complete and the terminal holds it until Ctrl+C.
 	<CrateCheck features="thread,tui,ssh,extra"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
-			<div {(ThreadView, OfThread($thread))}/>
+			<ThreadView {OfThread($thread)}/>
 		</Route>
-		<div {RepeatTimes{total_times:2}} {RunThread}>
-			<div bx:ref="thread" {Thread} {Sequence}>
+		<RepeatTimes total_times=2 {RunThread}>
+			<Thread bx:ref="thread" {Sequence}>
 				<CreateActor name="System" kind="System">
 					<CreatePost text='
 This is a tool call test. You will get two responses.
@@ -37,7 +37,7 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 				<CreateActor name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 					<AgentChoiceAction/>
 				</CreateActor>
-			</div>
-		</div>
+			</Thread>
+		</RepeatTimes>
 	</Router>
 </StartOnLoad>

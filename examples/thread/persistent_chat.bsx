@@ -15,17 +15,17 @@ thread, stay stable across runs.
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
-			<div {(ThreadView, OfThread($thread))}/>
-			<div {(CreatePostForm, OfThread($thread))}/>
+			<ThreadView {OfThread($thread)}/>
+			<CreatePostForm {OfThread($thread)}/>
 		</Route>
-		<div {Repeat} {RunThread}>
-			<div bx:ref="thread" {Thread} {Sequence} {MountThreadStore{path:"examples/thread/persistent_chat"}}>
+		<Repeat {RunThread}>
+			<Thread bx:ref="thread" {(Sequence, MountThreadStore{path:"examples/thread/persistent_chat"})}>
 				<CreateActor id=1 name="System" kind="System">
 					<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>
 				</CreateActor>
 				<CreateActor id=2 name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
 				<CreateActor id=3 name="User" kind="User" {UserInput}/>
-			</div>
-		</div>
+			</Thread>
+		</Repeat>
 	</Router>
 </StartOnLoad>

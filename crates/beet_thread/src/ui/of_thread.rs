@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// Spawn it directly beside the view/composer marker so the relationship machinery
 /// remaps its `$thread` reference (deriving it from a still-placeholder field at
 /// `on_add` would capture the placeholder):
-/// `<div {(ThreadView, OfThread($thread))}/>`. `allow_self_referential` so an item
+/// `<ThreadView {OfThread($thread)}/>`. `allow_self_referential` so an item
 /// co-located with its `Thread` on one entity still links.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
 #[reflect(Component)]

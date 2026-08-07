@@ -11,13 +11,13 @@ holds it until Ctrl+C; process lifetime belongs to the servers, not the thread.
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
-			<div {(ThreadView, OfThread($thread))}/>
+			<ThreadView {OfThread($thread)}/>
 		</Route>
-		<div bx:ref="thread" {Thread} {Sequence} {RunThread}>
+		<Thread bx:ref="thread" {(Sequence, RunThread)}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text="make like a duck and quack"/>
 			</CreateActor>
 			<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
-		</div>
+		</Thread>
 	</Router>
 </StartOnLoad>

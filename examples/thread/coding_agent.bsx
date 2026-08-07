@@ -13,10 +13,10 @@ finite, so the transcript settles and the terminal holds it until Ctrl+C.
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
-			<div {(ThreadView, OfThread($thread))}/>
+			<ThreadView {OfThread($thread)}/>
 		</Route>
-		<div {RepeatWhileFunctionCallOutput} {RunThread}>
-			<div {Thread} {Sequence} {FsStore{path:".beet/coding_agent"}} bx:ref="thread">
+		<RepeatWhileFunctionCallOutput {RunThread}>
+			<Thread bx:ref="thread" {(Sequence, FsStore{path:".beet/coding_agent"})}>
 				<CreateActor name="System" kind="System">
 					<CreatePost text='
 You are a coding agent with access to a file store.
@@ -39,7 +39,7 @@ Please perform the following steps in order:
 				<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 					<StoreToolset/>
 				</CreateActor>
-			</div>
-		</div>
+			</Thread>
+		</RepeatWhileFunctionCallOutput>
 	</Router>
 </StartOnLoad>

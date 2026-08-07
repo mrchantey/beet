@@ -12,9 +12,9 @@ use beet_net::prelude::*;
 /// ```rsx
 /// <StartOnLoad {TuiServer}>
 ///     <Router>
-///         <div {Repeat} {RunThread}>
-///             <div {Thread} {Sequence}> ..actors.. </div>
-///         </div>
+///         <Repeat {RunThread}>
+///             <Thread {Sequence}> ..actors.. </Thread>
+///         </Repeat>
 ///     </Router>
 /// </StartOnLoad>
 /// ```

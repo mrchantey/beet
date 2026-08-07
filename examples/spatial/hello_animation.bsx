@@ -12,17 +12,17 @@ The fox alternates its two glb clips: each `<PlayAnimation>` runs until its `<Tr
 	<Lighting3d/>
 	<Ground3d/>
 	<Foxie scale=0.1 bx:ref="fox">
-		<div {(CallOnLoad, Repeat, ActionOf($fox))}>
-			<div {Sequence}>
-				<div {Sequence}>
+		<Repeat {(CallOnLoad, ActionOf($fox))}>
+			<Sequence>
+				<Sequence>
 					<PlayAnimation clip="misc/fox.glb#Animation0"/>
 					<TriggerOnAnimationEnd clip="misc/fox.glb#Animation0"/>
-				</div>
-				<div {Sequence}>
+				</Sequence>
+				<Sequence>
 					<PlayAnimation clip="misc/fox.glb#Animation1"/>
 					<TriggerOnAnimationEnd clip="misc/fox.glb#Animation1"/>
-				</div>
-			</div>
-		</div>
+				</Sequence>
+			</Sequence>
+		</Repeat>
 	</Foxie>
 </Scene3d>

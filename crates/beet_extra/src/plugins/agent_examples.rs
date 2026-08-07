@@ -2,8 +2,8 @@
 //! routes that served a CLI or HTTP calculator become an agent's tools.
 //!
 //! ```bsx
-//! <div {RepeatWhileFunctionCallOutput} {RunThread}>
-//!   <div bx:ref="thread" {Thread} {Behavior}>
+//! <RepeatWhileFunctionCallOutput {RunThread}>
+//!   <Thread bx:ref="thread" {Behavior}>
 //!     <CreateActor name="System" kind="System">
 //!       <CreatePost text="You are great at using a calculator.."/>
 //!     </CreateActor>

@@ -11,8 +11,8 @@ The agent lives on the server: a socket server whose routes are the robot's capa
 <Router>
 	<!-- routable by interpret-photo, not offered to the model -->
 	<TakePhoto/>
-	<div {RepeatWhileFunctionCallOutput} {RunThread}>
-		<div {Thread} {Sequence}>
+	<RepeatWhileFunctionCallOutput {RunThread}>
+		<Thread {Sequence}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text='
 You are a small, curious and very emotional floor robot exploring a room.
@@ -25,8 +25,8 @@ You perceive the world one photo at a time and act on what you see.
 				<SetEmotion/>
 				<ApplyHeading/>
 			</CreateActor>
-		</div>
-	</div>
+		</Thread>
+	</RepeatWhileFunctionCallOutput>
 </Router>
 </SocketServer>
 ```

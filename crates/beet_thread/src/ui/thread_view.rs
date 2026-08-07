@@ -30,13 +30,13 @@ use beet_ui::prelude::Declaration;
 /// Host-agnostic content, not a host: spawn it under any render surface (a
 /// charcell terminal host, a web page) and bind it to its thread with an
 /// [`OfThread`] relationship. A marker, so the bound thread lives in the
-/// relationship, not a stored field. From markup the two spread together onto one
-/// entity, so the same view serves a local terminal and a per-connection server
-/// surface alike:
+/// relationship, not a stored field. From markup the view is the tag and its
+/// binding a spread on the same entity, so the same view serves a local terminal
+/// and a per-connection server surface alike:
 ///
 /// ```rsx
-/// <div bx:ref="thread" {Thread} {Sequence}>..</div>
-/// <div {(ThreadView, OfThread($thread))}/>
+/// <Thread bx:ref="thread" {Sequence}>..</Thread>
+/// <ThreadView {OfThread($thread)}/>
 /// ```
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -480,7 +480,7 @@ mod test {
 		let page = app
 			.world_mut()
 			.spawn_template(Snippet::from_bundle(rsx! {
-				<div><div {(ThreadView, OfThread(thread))}/></div>
+				<div><ThreadView {OfThread(thread)}/></div>
 			}))
 			.unwrap()
 			.id();
@@ -560,7 +560,7 @@ mod test {
 		let page = app
 			.world_mut()
 			.spawn_template(Snippet::from_bundle(rsx! {
-				<div {(ThreadView, OfThread(thread))}/>
+				<ThreadView {OfThread(thread)}/>
 			}))
 			.unwrap()
 			.id();
@@ -638,10 +638,10 @@ mod test {
 			.init_plugin::<ThreadPlugin>()
 			.init_plugin::<ThreadUiPlugin>();
 		let source = r#"
-<div>
-	<div bx:ref="thread" {Thread} {Sequence}/>
-	<span {(ThreadView, OfThread($thread))}/>
-</div>
+<Fragment>
+	<Thread bx:ref="thread" {Sequence}/>
+	<ThreadView {OfThread($thread)}/>
+</Fragment>
 "#;
 		BsxTemplate::parse_entry(app.world(), source)
 			.unwrap()

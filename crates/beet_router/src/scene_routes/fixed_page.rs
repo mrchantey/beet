@@ -14,7 +14,7 @@ use beet_net::prelude::*;
 ///
 /// ```bsx
 /// <Route path="/" {FixedPage}>
-///     <div {(ThreadView, OfThread($thread))}/>
+///     <ThreadView {OfThread($thread)}/>
 /// </Route>
 /// ```
 ///
@@ -24,14 +24,27 @@ use beet_net::prelude::*;
 /// than per request. An ancestor layout still wraps it per request, transcluding
 /// the fixed tree by reference (see [`BaseLayout`]).
 ///
-/// # Sharing
+/// # One surface only
 ///
-/// The tree is per *route*, not per app: three `FixedPage` routes over three
-/// threads each own their own. It is however shared by every surface viewing
-/// that route, so N ssh sessions transclude one tree with shared widget state
-/// (the doubling [`BlobScene`] documents avoiding). Correct for a single local
-/// terminal, acceptable for a read-only remote view; per-surface instances of a
-/// shared model are a later refinement, not a change to this contract.
+/// This is a *live surface* addressed by a route, not a page in the usual sense,
+/// and the distinction is a real limitation. The tree is per route (three
+/// `FixedPage` routes over three threads each own their own) but **shared by
+/// every surface viewing it**, widget state included: two terminals on one route
+/// share the same `<input>`, scroll offset and focus. A per-request route avoids
+/// this by construction — [`BlobScene`] reparses its document per request for
+/// exactly that reason.
+///
+/// It earns its keep for the single local terminal, where the surface repaints
+/// continuously rather than answering requests, so the tree *must* outlive any
+/// one response: the projection systems write into it between frames, and a
+/// `$ref` entity reference resolves once at entry build and cannot be re-resolved
+/// per request. Concurrent viewers are the case it does not serve.
+///
+/// The fix is per-surface instances over one shared model, which needs a way to
+/// name an entity across a build boundary (a lookup, not a build-scoped `$ref`) —
+/// the same primitive a separate page file would need, and squarely what the BSN
+/// asset format will redefine. Re-open it there, or sooner if a second concurrent
+/// surface is wanted.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(FixedPageAction)]
@@ -131,17 +144,20 @@ mod test {
 	#[beet_core::test]
 	async fn serves_route_template_children() {
 		let mut world = router_world();
-		let root = world
-			.spawn_template(rsx! {
-				<div {Router}>
+		let root = world.spawn(Router).flush();
+		// the route builds through the template substrate (so `<Route>`'s slot
+		// resolves) directly into its place under the router
+		world
+			.spawn_template(Snippet::from_bundle((
+				ChildOf(root),
+				rsx! {
 					<Route path="" {FixedPage}>
 						<p>"first"</p>
 						<p>"second"</p>
 					</Route>
-				</div>
-			})
-			.unwrap()
-			.id();
+				},
+			)))
+			.unwrap();
 
 		get(&mut world, root, "")
 			.await

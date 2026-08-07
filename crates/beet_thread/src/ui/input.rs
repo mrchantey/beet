@@ -21,7 +21,7 @@ use beet_ui::prelude::material::colors;
 /// Host-agnostic content bound to a thread with an [`OfThread`] relationship. A
 /// marker, so the bound thread lives in the relationship, not a stored field. From
 /// markup the two spread together onto one entity:
-/// `<div {(CreatePostForm, OfThread($thread))}/>`.
+/// `<CreatePostForm {OfThread($thread)}/>`.
 ///
 /// Surface scoping is the host's job: the charcell host carries
 /// `RenderSurface(self)`, so this widget's whole subtree (its `<input>`, included)

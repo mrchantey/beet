@@ -13,16 +13,16 @@ process runs until Ctrl+C.
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
-			<div {(ThreadView, OfThread($thread))}/>
+			<ThreadView {OfThread($thread)}/>
 		</Route>
-		<div {Repeat} {RunThread}>
-			<div bx:ref="thread" {Thread} {Sequence}>
+		<Repeat {RunThread}>
+			<Thread bx:ref="thread" {Sequence}>
 				<CreateActor name="System" kind="System">
 					<CreatePost text="this is a roleplay, keep responses under 50 words."/>
 				</CreateActor>
 				<CreateActor name="Beet lover" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You love beets"}}/>
 				<CreateActor name="Beet disliker" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You think beets are bad but dont want to hurt feelings"}}/>
-			</div>
-		</div>
+			</Thread>
+		</Repeat>
 	</Router>
 </StartOnLoad>

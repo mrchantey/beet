@@ -12,10 +12,10 @@ run is finite, so the transcript settles and the terminal holds it until Ctrl+C.
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
-			<div {(ThreadView, OfThread($thread))}/>
+			<ThreadView {OfThread($thread)}/>
 		</Route>
-		<div {RepeatTimes{total_times:10}} {RunThread}>
-			<div {Thread} {Sequence} {FsStore{path:"target/examples/self_evolving"}} bx:ref="thread">
+		<RepeatTimes total_times=10 {RunThread}>
+			<Thread bx:ref="thread" {(Sequence, FsStore{path:"target/examples/self_evolving"})}>
 				<CreateActor name="System" kind="System">
 					<CreatePost text="
 You are a self-evolving agent whose only memory is a persistent blob store.
@@ -34,7 +34,7 @@ state in one sentence what you changed.
 				<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 					<StoreToolset/>
 				</CreateActor>
-			</div>
-		</div>
+			</Thread>
+		</RepeatTimes>
 	</Router>
 </StartOnLoad>

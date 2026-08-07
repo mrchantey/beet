@@ -38,8 +38,8 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 	<ShowImage/>
 	<SpeakText/>
 	<LogDriveForDuration/>
-	<div {Repeat} {RunThread}>
-		<div {Thread} {Sequence}>
+	<Repeat {RunThread}>
+		<Thread {Sequence}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text='
 - You are a robot that perceives the world one photo at a time and act on what you see.
@@ -59,7 +59,7 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 				{(RobotStreamer{effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
 				<RespondMultiModalAction {(RespondMultiModal{max_drive_duration:"4s"}, StringEnumOptions{field:"image"})}/>
 			</CreateActor>
-		</div>
-	</div>
+		</Thread>
+	</Repeat>
 </Router>
 </SocketServer>

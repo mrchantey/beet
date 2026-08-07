@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// after whatever posts the image:
 ///
 /// ```rsx
-/// <div {Thread} {Sequence}>
+/// <Thread {Sequence}>
 ///     <CreateActor name="Camera" kind="User" {PostPhoto}/>
 ///     <Template {StubOldImages}/>
 /// </div>
