@@ -1,6 +1,4 @@
 use crate::prelude::*;
-#[cfg(feature = "action")]
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -9,7 +7,7 @@ use beet_net::prelude::*;
 /// reload of the scene resumes rather than starting fresh:
 /// `<div {Thread} {Sequence} {MountThreadStore{path:"examples/thread/chat"}}>`.
 ///
-/// `path` is workspace-relative. This is a *deferred* mount: [`CreateThread`] builds
+/// `path` is workspace-relative. This is a *deferred* mount: [`RunThread`] builds
 /// the [`ThreadStore`], adopts the stored conversation by seed hash, and only then
 /// inserts the store onto the thread, so the persistence sync never flushes a
 /// fresh, un-adopted thread (which would fork a duplicate on every reload). This
@@ -55,7 +53,8 @@ impl Thread {
 	/// immutable); no match **bootstraps** the seeds under a fresh id. Driving the
 	/// conversation is the caller's job (eg an event-driven composer), so this
 	/// suits a `.bsx`-spawned scene where the trigger would otherwise re-reply on
-	/// reload. See [`Thread::load`] for the spawn-and-run convenience.
+	/// reload. [`RunThread`] is the one caller in production, adopting before it
+	/// mounts the store and runs the behavior.
 	#[cfg(feature = "action")]
 	pub async fn adopt(
 		world: AsyncWorld,
@@ -127,67 +126,11 @@ impl Thread {
 			.map(|_| entity)
 	}
 }
-impl Thread {
-	/// Spawn an authored bundle `scene` with its record `store`, [`Thread::adopt`] it,
-	/// then attach the behavior trigger ([`CallOnSpawn`]) so the turn runs once the
-	/// window is correct. The trigger never fires against an empty or stale window
-	/// because it lands only after adoption, no `Hydrating` marker required.
-	///
-	/// Topology-agnostic: the `Thread` may be the spawned root or nested under a loop
-	/// (eg `Repeat[Thread+Sequence]` for an interactive chat). The store mounts on
-	/// the `Thread` entity, where the persistence sync reads it; the kick lands on
-	/// the root (the loop, or the `Thread` itself when flat). Returns the `Thread`.
-	#[cfg(feature = "action")]
-	pub async fn load(
-		world: AsyncWorld,
-		store: ThreadStore,
-		scene: impl Bundle,
-	) -> Result<Entity> {
-		let store_component = store.clone();
-		// spawn + reduce, then locate the Thread entity (root or nested)
-		let (root, thread) = world
-			.with(move |world: &mut World| -> Result<(Entity, Entity)> {
-				let root = world.spawn(scene).id();
-				ThreadWindow::reduce_now(world);
-				let thread = thread_entity_under(world, root)?;
-				Ok((root, thread))
-			})
-			.await?;
-		// adopt by seed hash *before* mounting the store, so the persistence sync
-		// never flushes a fresh, un-adopted thread (which would fork a duplicate on
-		// every reload). `Thread::adopt` reads the store by argument, not the entity.
-		Thread::adopt(world.clone(), store, thread).await?;
-		// mount the store on the Thread entity (root or nested) now the window is
-		// adopted, then kick the root (the loop, or the Thread itself) to run the turn
-		world
-			.with(move |world: &mut World| {
-				world.entity_mut(thread).insert(store_component);
-				world
-					.entity_mut(root)
-					.insert(CallOnSpawn::<(), Outcome>::new(()));
-			})
-			.await;
-		Ok(thread)
-	}
-}
-/// The [`Thread`] entity at or under `root`: the root itself, or nested beneath a
-/// loop wrapper (eg `Repeat`).
-#[cfg(feature = "action")]
-fn thread_entity_under(world: &mut World, root: Entity) -> Result<Entity> {
-	world
-		.with_state::<(Query<(), With<Thread>>, Query<&Children>), _>(
-			|(threads, children)| {
-				std::iter::once(root)
-					.chain(children.iter_descendants(root))
-					.find(|entity| threads.contains(*entity))
-			},
-		)
-		.ok_or_else(|| bevyhow!("spawned scene has no Thread"))
-}
 
 #[cfg(all(test, feature = "action"))]
 mod test {
 	use super::*;
+	use beet_action::prelude::*;
 
 	/// A persisted author scene: pinned actor ids, one user seed, one mock agent.
 	fn scene(user_id: ActorId, agent_id: ActorId, prompt: &str) -> impl Bundle {
@@ -221,8 +164,8 @@ mod test {
 		(hash("hi") != hash("howdy")).xpect_true();
 	}
 
-	/// Drive `load_thread` to completion against a store, returning the app so
-	/// the caller can keep pumping if needed.
+	/// Spawn the scene, adopt it against `backing`, mount the store and run one
+	/// turn: the sequence [`RunThread::kick`] performs, against an in-memory store.
 	fn drive_load(backing: &BlobThreadStore, user: ActorId, agent: ActorId) {
 		let store = ThreadStore::new(backing.clone());
 		let mut app = App::new();
@@ -231,7 +174,20 @@ mod test {
 		app.world_mut()
 			.with_state::<AsyncCommands, _>(move |commands| {
 				commands.run(async move |world: AsyncWorld| -> Result {
-					Thread::load(world, store, scene(user, agent, "hi")).await?;
+					let thread = world
+						.with(move |world: &mut World| {
+							world.spawn(scene(user, agent, "hi")).id()
+						})
+						.await;
+					// adopt before mounting, so the sync never flushes an
+					// un-adopted thread
+					Thread::adopt(world.clone(), store.clone(), thread).await?;
+					world
+						.with(move |world: &mut World| {
+							world.entity_mut(thread).insert(store);
+						})
+						.await;
+					world.entity(thread).call::<(), Outcome>(()).await?;
 					Ok(())
 				});
 			});

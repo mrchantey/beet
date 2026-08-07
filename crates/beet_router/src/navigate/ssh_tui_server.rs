@@ -28,11 +28,20 @@ use bevy::math::UVec2;
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
 /// Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
 /// [`HttpServer`] on the same root, so one process answers http and ssh at once.
-#[derive(Default, Component, Reflect)]
+#[derive(Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(StartOnLoad)]
 #[component(on_add = hook_ext::observe(on_action_in))]
-pub struct SshTuiServer;
+pub struct SshTuiServer {
+	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
+	/// so an entry declaring a single [`SshTuiServer`] needs no flag; clear it on a
+	/// server that should boot only when `--server=ssh` names it explicitly.
+	pub default_boot: bool,
+}
+
+impl Default for SshTuiServer {
+	fn default() -> Self { Self { default_boot: true } }
+}
 
 /// Boots the SSH listener on the boot fan-out, if `--server` selects `"ssh"`:
 /// builds an [`SshServer`] from the request and inserts it on this entity (its
@@ -40,11 +49,16 @@ pub struct SshTuiServer;
 /// the boot call, so its `Running` parks the process up.
 fn on_action_in(
 	ev: On<StartRunning<Request>>,
+	servers: Query<&SshTuiServer>,
 	mut commands: Commands,
 ) -> Result {
+	let Ok(default_boot) = servers.get(ev.entity).map(|server| server.default_boot)
+	else {
+		return Ok(());
+	};
 	let (selected, port, host, opening) = ev.with(|request| {
 		(
-			Request::selects_server(request, "ssh", true),
+			Request::selects_server(request, "ssh", default_boot),
 			request.get_param("port").and_then(|port| port.parse().ok()),
 			request.get_param("host").map(|host| {
 				if host == "0.0.0.0" {
@@ -333,7 +347,7 @@ mod test {
 	fn spawn_server(app: &mut App) -> Entity {
 		app.world_mut()
 			.spawn((
-				SshTuiServer,
+				SshTuiServer::default(),
 				OpeningRoute(Url::parse("alpha")),
 				children![(Router, children![
 					render_action::fixed_func_route("alpha", || {
@@ -498,7 +512,7 @@ mod test {
 		let server = app
 			.world_mut()
 			.spawn((
-				SshTuiServer,
+				SshTuiServer::default(),
 				OpeningRoute(Url::parse("")),
 				children![(
 					store,
@@ -638,7 +652,7 @@ mod test {
 	fn spawn_drawer_router(app: &mut App) -> Entity {
 		app.world_mut()
 			.spawn((
-				SshTuiServer,
+				SshTuiServer::default(),
 				OpeningRoute(Url::parse("home")),
 				children![(
 					Router,
@@ -821,7 +835,7 @@ mod test {
 		let server = app
 			.world_mut()
 			.spawn((
-				SshTuiServer,
+				SshTuiServer::default(),
 				OpeningRoute(Url::parse("counter")),
 				children![(
 					store,

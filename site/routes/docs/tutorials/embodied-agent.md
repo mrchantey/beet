@@ -11,7 +11,7 @@ The agent lives on the server: a socket server whose routes are the robot's capa
 <Router>
 	<!-- routable by interpret-photo, not offered to the model -->
 	<TakePhoto/>
-	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
+	<div {RepeatWhileFunctionCallOutput} {RunThread}>
 		<div {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text='

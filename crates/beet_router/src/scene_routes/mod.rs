@@ -13,10 +13,15 @@
 //! [`render_action::fixed_func_route`] (static, per request), and
 //! [`render_action::pure_route`] / [`render_action::async_route`] /
 //! [`render_action::system_route`] (per handler kind). The tree is serialized
-//! by [`default_renderer`].
+//! by [`default_renderer`]. [`FixedPage`] is the persistent exception: its route
+//! entity *is* the render root, so one live tree serves every request.
 
 mod page_root;
 pub use page_root::*;
+// the persistent counterpart of the per-request page routes: one live tree,
+// served request after request.
+mod fixed_page;
+pub use fixed_page::*;
 mod default_renderer;
 pub mod render_action;
 pub use default_renderer::*;

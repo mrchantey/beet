@@ -51,7 +51,7 @@ fn main() -> Result {
 	// locally; `SshTuiServer` reads `BEET_SSH_PORT` / `BEET_HOST` the same way.
 	app.world_mut()
 		.spawn(
-			(StartOnLoad, SshTuiServer, HttpServer::default(), children![
+			(StartOnLoad, SshTuiServer::default(), HttpServer::default(), children![
 				(Router::with_defaults(), children![
 					render_action::func_route("", |_: ()| home()),
 					render_action::func_route("about", |_: ()| about()),

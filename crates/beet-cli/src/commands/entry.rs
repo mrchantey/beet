@@ -96,26 +96,19 @@ pub(crate) fn entry_arg(parts: &RequestParts) -> Result<String> {
 /// and the default `bx:` verb vocabulary, so a markup entry using live widgets renders
 /// here as it would under `BeetPlugins`. It is added *before* [`RouterPlugin`] so its
 /// inner `BsxPlugin` registers once (the router's charcell stack reaches it through the
-/// idempotent `init_plugin`). It also registers the markup-declarable `SshTuiServer`
-/// *type* so an entry's server spread resolves; the binary registers it through
-/// `SshTuiPlugin`, but the type alone suffices here without pulling the ssh runtime
-/// systems (which need an input backend), and `DisableCallOnLoad` keeps the declared
-/// server dormant anyway.
+/// idempotent `init_plugin`). [`RouterPlugin`] registers the markup-declarable
+/// server *types* (`TuiServer`, `SshTuiServer`) by feature, so an entry's server
+/// spread resolves without the ssh runtime systems (which need an input backend);
+/// `DisableCallOnLoad` keeps the declared servers dormant anyway.
 #[cfg(test)]
 pub(crate) fn render_world() -> World {
-	let mut world = (
+	(
 		AsyncPlugin,
 		BsxDefaultsPlugin,
 		RouterPlugin,
 		material::MaterialStylePlugin::default(),
 	)
-		.into_world();
-	#[cfg(feature = "ssh")]
-	world
-		.resource_mut::<AppTypeRegistry>()
-		.write()
-		.register::<SshTuiServer>();
-	world
+		.into_world()
 }
 
 #[cfg(test)]

@@ -40,7 +40,9 @@ fn main() {
 /// Boots the navigable live TUI, the interactive terminal target. Wins over the
 /// `web`/`cli` arms when enabled (it is layered onto the default features).
 #[cfg(all(not(feature = "codegen"), feature = "tui"))]
-fn site_server() -> impl beet::prelude::Bundle { beet::prelude::TuiServer }
+fn site_server() -> impl beet::prelude::Bundle {
+	beet::prelude::TuiServer::default()
+}
 
 /// Boots an HTTP server, the default web target.
 #[cfg(all(

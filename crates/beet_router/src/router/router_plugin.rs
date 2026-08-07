@@ -134,6 +134,9 @@ impl Plugin for RouterPlugin {
 			// `AssetsStore` picks the backing (a `BEET_ASSETS_BUCKET` bucket, or the
 			// local `assets/` subdir) at build time.
 			app.register_template::<Route>()
+				// the persistent page route (`<Route path="/" {FixedPage}>`): its
+				// declared children are one live tree served by every request.
+				.register_type::<FixedPage>()
 				.register_template::<ServeBlobs>()
 				.register_type::<ServeBlobsHandler>()
 				.register_template::<AssetsStore>()
@@ -180,6 +183,12 @@ impl Plugin for RouterPlugin {
 			// terminal app when the boot fan-out selects `tui`.
 			#[cfg(feature = "tui")]
 			app.register_type::<TuiServer>();
+			// the multi-tenant SSH-TUI server, likewise declarable in a markup
+			// spread. Registered by feature rather than by `SshTuiPlugin` (which
+			// adds the per-connection behavior), so an entry naming it resolves in
+			// any binary that linked the transport.
+			#[cfg(feature = "ssh")]
+			app.register_type::<SshTuiServer>();
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
 				.register_type::<ExchangeScript<(), String>>()

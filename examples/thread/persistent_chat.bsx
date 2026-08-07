@@ -6,23 +6,26 @@ binary:
     beet --main=examples/thread/persistent_chat.bsx -- --new   # start fresh
 
 `{MountThreadStore}` persists the thread's records (one JSON object under the
-path); `{CreateThread}` adopts the stored conversation by seed hash before the first
-turn, so a re-run resumes where it left off (`--new` discards it). The actor ids
-are pinned so the seed hash, and thus the adopted thread, stay stable across runs.
+path); `{RunThread}` adopts the stored conversation by seed hash before the first
+turn, so a re-run resumes where it left off (`--new` discards it, read off the
+boot request). The actor ids are pinned so the seed hash, and thus the adopted
+thread, stay stable across runs.
 -->
-<div>
-	<CrateCheck features="thread"/>
-	<div {Repeat} {CreateThread}>
-		<div bx:ref="thread" {Thread} {Sequence} {MountThreadStore{path:"examples/thread/persistent_chat"}}>
-			<CreateActor id=1 name="System" kind="System">
-				<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>
-			</CreateActor>
-			<CreateActor id=2 name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
-			<CreateActor id=3 name="User" kind="User" {UserInput}/>
+<StartOnLoad {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+	<CrateCheck features="thread,tui,ssh"/>
+	<Router {ThreadLayout}>
+		<Route path="/" {FixedPage}>
+			<div {(ThreadView, OfThread($thread))}/>
+			<div {(CreatePostForm, OfThread($thread))}/>
+		</Route>
+		<div {Repeat} {RunThread}>
+			<div bx:ref="thread" {Thread} {Sequence} {MountThreadStore{path:"examples/thread/persistent_chat"}}>
+				<CreateActor id=1 name="System" kind="System">
+					<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>
+				</CreateActor>
+				<CreateActor id=2 name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
+				<CreateActor id=3 name="User" kind="User" {UserInput}/>
+			</div>
 		</div>
-	</div>
-	<TuiThreadChat>
-		<div {(ThreadView, OfThread($thread))}/>
-		<div {(CreatePostForm, OfThread($thread))}/>
-	</TuiThreadChat>
-</div>
+	</Router>
+</StartOnLoad>

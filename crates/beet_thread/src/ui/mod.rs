@@ -11,16 +11,17 @@
 //! Keying on the post id means an appended post reuses every settled row's
 //! entity and binding, and a growing in-progress body re-syncs that row's bound
 //! [`Value`] rather than respawning it. The view + composer are host-agnostic
-//! ([`thread_view`] / [`input`]); [`scene`] supplies a local charcell host shell.
+//! ([`thread_view`] / [`input`]); hosting is the server's job, and [`layout`]
+//! supplies the minimal document shell its routes render into.
 //! `beet_ui` never depends on `beet_thread`; this layer is additive, behind the
 //! `ui` feature.
 
 mod input;
 pub use input::*;
+mod layout;
+pub use layout::*;
 mod of_thread;
 pub use of_thread::*;
-mod scene;
-pub use scene::*;
 mod thread_view;
 pub use thread_view::*;
 
@@ -43,9 +44,8 @@ impl Plugin for ThreadUiPlugin {
 			.register_type::<OfThread>()
 			.register_type::<ThreadItems>()
 			.register_type::<UserInput>()
-			// the local charcell host shells, declarable from markup
-			.register_template::<TuiThreadChat>()
-			.register_template::<TuiThreadTranscript>()
+			// the document shell a thread scene's routes are wrapped in
+			.register_type::<ThreadLayout>()
 			// project each window into its views' documents, then pin to the bottom
 			.add_systems(
 				Update,

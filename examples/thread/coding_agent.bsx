@@ -6,15 +6,19 @@ binary:
 
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
 resolves), the agent exercises the five blob tools, and
-`{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools, then
-`{CreateThread}` exits. The transcript renders inline.
+`{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools. The run is
+finite, so the transcript settles and the terminal holds it until Ctrl+C.
 -->
-<div>
-	<CrateCheck features="thread"/>
-	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
-		<div {Thread} {Sequence} {FsStore{path:".beet/coding_agent"}} bx:ref="thread">
-			<CreateActor name="System" kind="System">
-				<CreatePost text='
+<StartOnLoad {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+	<CrateCheck features="thread,tui,ssh"/>
+	<Router {ThreadLayout}>
+		<Route path="/" {FixedPage}>
+			<div {(ThreadView, OfThread($thread))}/>
+		</Route>
+		<div {RepeatWhileFunctionCallOutput} {RunThread}>
+			<div {Thread} {Sequence} {FsStore{path:".beet/coding_agent"}} bx:ref="thread">
+				<CreateActor name="System" kind="System">
+					<CreatePost text='
 You are a coding agent with access to a file store.
 Your available tools are: list-blobs, read-blob, write-blob, edit-text, remove-blob.
 
@@ -31,13 +35,11 @@ Please perform the following steps in order:
 7. Use list-blobs to confirm it was deleted
 8. Finally, write a brief summary of what happened and whether all tools worked correctly
 '/>
-			</CreateActor>
-			<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<StoreToolset/>
-			</CreateActor>
+				</CreateActor>
+				<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+					<StoreToolset/>
+				</CreateActor>
+			</div>
 		</div>
-	</div>
-	<TuiThreadTranscript>
-		<div {(ThreadView, OfThread($thread))}/>
-	</TuiThreadTranscript>
-</div>
+	</Router>
+</StartOnLoad>

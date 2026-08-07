@@ -33,7 +33,7 @@ Beet is a natural fit for distributed systems like embodied agents with a percei
 <Router>
 	<!-- routable by interpret-photo, not offered to the model -->
 	<TakePhoto/>
-	<div {RepeatWhileFunctionCallOutput} {CreateThread}>
+	<div {RepeatWhileFunctionCallOutput} {RunThread}>
 		<div {Thread} {Sequence}>
 			<CreateActor name="System" kind="System">
 				<CreatePost text='

@@ -23,11 +23,20 @@ use beet_ui::prelude::*;
 /// Reusable: any app gets a live TUI by adding the live plugins
 /// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]) and spreading
 /// this on its server root, then booting it.
-#[derive(Default, Component, Reflect)]
+#[derive(Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(StartOnLoad)]
 #[component(on_add = hook_ext::observe((on_action_in, on_running_removed)))]
-pub struct TuiServer;
+pub struct TuiServer {
+	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
+	/// so an entry declaring a single [`TuiServer`] needs no flag; clear it on a
+	/// server that should boot only when `--server=tui` names it explicitly.
+	pub default_boot: bool,
+}
+
+impl Default for TuiServer {
+	fn default() -> Self { Self { default_boot: true } }
+}
 
 /// The live host entity (terminal + navigator) the boot spawned, despawned on
 /// teardown so a reload does not leak it.
@@ -40,12 +49,17 @@ struct TuiHost(Entity);
 /// process up.
 fn on_action_in(
 	ev: On<StartRunning<Request>>,
+	servers: Query<&TuiServer>,
 	mut commands: Commands,
 ) -> Result {
+	let Ok(default_boot) = servers.get(ev.entity).map(|server| server.default_boot)
+	else {
+		return Ok(());
+	};
 	let (selected, opening, scheme) = ev.with(|request| {
 		(
-			// default-boots (the shared default) unless `--server` names a different set.
-			Request::selects_server(request, "tui", true),
+			// this server's own default unless `--server` names a set.
+			Request::selects_server(request, "tui", default_boot),
 			OpeningRoute::from_request(request),
 			request
 				.get_param("color-scheme")

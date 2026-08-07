@@ -8,14 +8,13 @@ use beet::prelude::*;
 use std::sync::Once;
 
 /// Set a dummy auth env once so `{ModelStreamer{provider:OpenAi}}` builds during
-/// reduction without a real key (no request is ever made), and `BEET_HEADLESS` so
-/// the scenes' `<TuiThreadChat>`/`<TuiThreadTranscript>` hosts spawn inert rather than
-/// taking over the controlling terminal.
+/// reduction without a real key (no request is ever made). Nothing here boots, so
+/// the scenes' servers stay inert: a `TuiServer` only takes the terminal on the
+/// boot fan-out, which reduction never fires.
 fn ensure_auth_env() {
 	static INIT: Once = Once::new();
 	INIT.call_once(|| unsafe {
 		env_ext::set_var("OPENAI_API_KEY", "test-dummy-key");
-		env_ext::set_var("BEET_HEADLESS", "1");
 	});
 }
 
@@ -47,13 +46,10 @@ async fn reduce(source: &str) -> App {
 		// registers `{UserInput}` + the store-backed `CreatePostForm` template so
 		// the interactive chat scenes resolve
 		.init_plugin::<ThreadUiPlugin>()
-		// resolves each scene's `<CrateCheck features="thread"/>` tag
+		// resolves each scene's `<CrateCheck features=".."/>` tag
 		.init_plugin::<CrateCheckPlugin>()
 		.register_type::<AgentChoiceAction>();
-	// this target stands in for the binary the scenes check against, and is itself
-	// gated on `thread`, so the declared requirement holds.
-	app.world_mut()
-		.spawn(crate_registration!({ features: ["thread"] }).with_skip_prefix());
+	app.world_mut().spawn(cli_registration());
 	AsyncRunner::settle_async_tasks(app.world_mut()).await;
 	BsxTemplate::parse_entry(app.world(), source)
 		.unwrap()
@@ -62,6 +58,82 @@ async fn reduce(source: &str) -> App {
 	ThreadWindow::reduce_now(app.world_mut());
 	app.world_mut().flush();
 	app
+}
+
+/// A stand-in for the `beet` binary the scenes check against, declaring the cli
+/// feature names they name.
+///
+/// Hand-built rather than `crate_registration!`, whose `cfg!` reads the *calling*
+/// crate: `tui`/`ssh` are beet-cli features forwarding to this crate's
+/// `tui_server`/`ssh_tui`, which this test is gated on, so the declaration holds.
+/// `extra` supplies `tool_call`'s inline tool, stubbed here.
+fn cli_registration() -> CrateRegistration {
+	["thread", "tui", "ssh", "extra"]
+		.into_iter()
+		.fold(
+			CrateRegistration::new("beet", env!("CARGO_PKG_VERSION")),
+			CrateRegistration::with_feature,
+		)
+		.with_skip_prefix()
+}
+
+/// No `<CrateCheck>` failed: its observer reports a missing feature by writing
+/// `AppExit::error()`, which nothing else here reads, so an undeclared
+/// requirement would otherwise pass silently.
+fn assert_crate_check_passed(app: &mut App) {
+	app.world_mut()
+		.run_system_once(|mut exits: MessageReader<AppExit>| exits.read().count())
+		.unwrap()
+		.xpect_eq(0);
+}
+
+/// Every scene declares the same served shape: a `StartOnLoad` root carrying the
+/// local TUI server (default-booting) plus the two opt-in ones, a `ThreadLayout`
+/// router, one `FixedPage` route, and a `ThreadView` whose `$thread` reference
+/// resolved to the scene's own thread. Asserted per scene, since an unresolved
+/// tag would otherwise reduce to a thread that renders nowhere.
+fn assert_served_shape(app: &mut App) {
+	let world = app.world_mut();
+	// the local terminal boots by default, http and ssh only when named
+	world
+		.query_once::<&TuiServer>()
+		.into_iter()
+		.map(|server| server.default_boot)
+		.collect::<Vec<_>>()
+		.xpect_eq(vec![true]);
+	world
+		.query_once::<&HttpServer>()
+		.into_iter()
+		.map(|server| server.default_boot)
+		.collect::<Vec<_>>()
+		.xpect_eq(vec![false]);
+	world
+		.query_once::<&SshTuiServer>()
+		.into_iter()
+		.map(|server| server.default_boot)
+		.collect::<Vec<_>>()
+		.xpect_eq(vec![false]);
+	// one layout-wrapped router serving one persistent page
+	world
+		.query_filtered_once::<Entity, (With<Router>, With<ThreadLayout>)>()
+		.len()
+		.xpect_eq(1);
+	world
+		.query_filtered_once::<Entity, With<FixedPage>>()
+		.len()
+		.xpect_eq(1);
+	// the view's `$thread` reference resolved to the scene's thread
+	let thread = world
+		.query_filtered_once::<Entity, With<Thread>>()
+		.into_iter()
+		.next()
+		.unwrap();
+	let views = world
+		.query_filtered_once::<&OfThread, With<ThreadView>>()
+		.into_iter()
+		.map(|of_thread| of_thread.thread())
+		.collect::<Vec<_>>();
+	views.xpect_eq(vec![thread]);
 }
 
 /// The reduced thread's `(actor count, seed-post count)`.
@@ -98,6 +170,8 @@ fn tool_count(app: &mut App) -> usize {
 #[beet::test]
 async fn chat_scene_reduces() {
 	let mut app = reduce(include_str!("../examples/thread/chat.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	assert_served_shape(&mut app);
 	window_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the `kind="System"` / `kind="User"` attributes resolve, rather than
@@ -111,6 +185,8 @@ async fn chat_scene_reduces() {
 async fn multi_agent_scene_reduces() {
 	let mut app =
 		reduce(include_str!("../examples/thread/multi_agent.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	assert_served_shape(&mut app);
 	window_counts(&mut app).xpect_eq((3, 1));
 	// two differently-instructed agents reduce side by side
 	agent_count(&mut app).xpect_eq(2);
@@ -120,6 +196,8 @@ async fn multi_agent_scene_reduces() {
 async fn tool_call_scene_reduces() {
 	let mut app =
 		reduce(include_str!("../examples/thread/tool_call.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	assert_served_shape(&mut app);
 	window_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the inline `<AgentChoiceAction/>` reduced to a routed tool
@@ -130,6 +208,8 @@ async fn tool_call_scene_reduces() {
 async fn self_evolving_scene_reduces() {
 	let mut app =
 		reduce(include_str!("../examples/thread/self_evolving.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	assert_served_shape(&mut app);
 	window_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the `<StoreToolset/>` reduced to the five blob tools
@@ -140,6 +220,8 @@ async fn self_evolving_scene_reduces() {
 async fn coding_agent_scene_reduces() {
 	let mut app =
 		reduce(include_str!("../examples/thread/coding_agent.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	assert_served_shape(&mut app);
 	window_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	tool_count(&mut app).xpect_eq(5);
@@ -149,6 +231,8 @@ async fn coding_agent_scene_reduces() {
 async fn persistent_chat_scene_reduces() {
 	let mut app =
 		reduce(include_str!("../examples/thread/persistent_chat.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	assert_served_shape(&mut app);
 	window_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
 	let kinds = actor_kinds(&mut app);

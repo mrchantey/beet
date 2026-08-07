@@ -5,21 +5,24 @@ binary:
     beet --main=examples/thread/multi_agent.bsx
 
 The behavior is `Repeat[Sequence[agent, agent]]`: two differently-instructed
-agents take turns forever, kicked by `{CreateThread}` (runs until Ctrl+C). The
-transcript renders full-screen with no composer (there is no user turn).
+agents take turns forever, kicked by `{RunThread}` on the servers' boot. The
+transcript renders full-screen with no composer (there is no user turn), and the
+process runs until Ctrl+C.
 -->
-<div>
-	<CrateCheck features="thread"/>
-	<div {Repeat} {CreateThread}>
-		<div bx:ref="thread" {Thread} {Sequence}>
-			<CreateActor name="System" kind="System">
-				<CreatePost text="this is a roleplay, keep responses under 50 words."/>
-			</CreateActor>
-			<CreateActor name="Beet lover" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You love beets"}}/>
-			<CreateActor name="Beet disliker" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You think beets are bad but dont want to hurt feelings"}}/>
+<StartOnLoad {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+	<CrateCheck features="thread,tui,ssh"/>
+	<Router {ThreadLayout}>
+		<Route path="/" {FixedPage}>
+			<div {(ThreadView, OfThread($thread))}/>
+		</Route>
+		<div {Repeat} {RunThread}>
+			<div bx:ref="thread" {Thread} {Sequence}>
+				<CreateActor name="System" kind="System">
+					<CreatePost text="this is a roleplay, keep responses under 50 words."/>
+				</CreateActor>
+				<CreateActor name="Beet lover" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You love beets"}}/>
+				<CreateActor name="Beet disliker" kind="Agent" {ModelStreamer{provider:OpenAi, instructions:"You think beets are bad but dont want to hurt feelings"}}/>
+			</div>
 		</div>
-	</div>
-	<TuiThreadChat>
-		<div {(ThreadView, OfThread($thread))}/>
-	</TuiThreadChat>
-</div>
+	</Router>
+</StartOnLoad>

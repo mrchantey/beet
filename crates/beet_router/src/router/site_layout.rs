@@ -58,7 +58,7 @@ pub fn SiteLayout(
 	// `PAGE` plus the resolved scheme class (an explicit `?color-scheme=` on both
 	// targets, else the session default on the terminal, else none on the web so
 	// `color_scheme.js` follows the OS); shared with the help/not-found page.
-	let body_classes = page_classes(cx.parts(), &theme);
+	let body_classes = PageClasses::resolve(cx.parts(), &theme);
 	// The web `<head>` chrome (the `<Stylesheet/>` CSS bake, preflight/reset,
 	// color-scheme script) is non-visual in the terminal, where `<head>` is
 	// `display: none`. Baking the whole rule set to CSS on every navigation is
@@ -114,26 +114,36 @@ pub fn SiteLayout(
 	}
 }
 
-/// The page body classes for a request: [`classes::PAGE`] plus the resolved
-/// color-scheme class.
+/// The one page-body class resolution every layout shares: a document root is
+/// themed by request, not by host.
 ///
-/// An explicit `?color-scheme=light|dark` pins the scheme on both targets; absent
-/// it, a non-html target (the terminal) uses the session [`Theme::scheme`]
-/// (defaulting to dark), and the web adds no class so its `color_scheme.js`
-/// follows the OS. Shared by [`SiteLayout`] and the help/not-found page so a
-/// bare-rendered page (eg the dev CLI help, with no layout) is themed the same.
-pub(crate) fn page_classes(parts: &RequestParts, theme: &Theme) -> Classes {
-	let mut classes = Classes::new([classes::PAGE]);
-	let scheme =
-		match parts.get_param("color-scheme").and_then(ColorScheme::parse) {
-			Some(scheme) => Some(scheme),
-			None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
-			None => None,
-		};
-	if let Some(scheme) = scheme {
-		classes.insert_class(scheme.class());
+/// Public so a layout in another crate (eg `beet_thread`'s `ThreadLayout`) pins
+/// the scheme the same way rather than re-deriving it; the site layout, the
+/// help/not-found page and every downstream layout go through this.
+pub struct PageClasses;
+
+impl PageClasses {
+	/// The page body classes for a request: [`classes::PAGE`] plus the resolved
+	/// color-scheme class.
+	///
+	/// An explicit `?color-scheme=light|dark` pins the scheme on both targets;
+	/// absent it, a non-html target (the terminal) uses the session
+	/// [`Theme::scheme`] (defaulting to dark), and the web adds no class so its
+	/// `color_scheme.js` follows the OS. A bare-rendered page (eg the dev CLI
+	/// help, with no layout) is themed the same.
+	pub fn resolve(parts: &RequestParts, theme: &Theme) -> Classes {
+		let mut classes = Classes::new([classes::PAGE]);
+		let scheme =
+			match parts.get_param("color-scheme").and_then(ColorScheme::parse) {
+				Some(scheme) => Some(scheme),
+				None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
+				None => None,
+			};
+		if let Some(scheme) = scheme {
+			classes.insert_class(scheme.class());
+		}
+		classes
 	}
-	classes
 }
 
 #[cfg(test)]
@@ -273,7 +283,7 @@ mod test {
 			.xpect_contains("<style");
 	}
 
-	/// [`page_classes`] resolution: a terminal request defaults to the session
+	/// [`PageClasses`] resolution: a terminal request defaults to the session
 	/// scheme (dark), the web adds no scheme class (it follows the OS), and an
 	/// explicit `?color-scheme=` pins the scheme on either target.
 	#[beet_core::test]
@@ -282,16 +292,17 @@ mod test {
 		let has =
 			|classes: &Classes, name: &ClassName| classes.contains_name(name);
 		// a terminal request with no override → PAGE + the dark session default
-		let terminal = page_classes(&request("", MediaType::AnsiTerm), &theme);
+		let terminal =
+			PageClasses::resolve(&request("", MediaType::AnsiTerm), &theme);
 		has(&terminal, &classes::PAGE).xpect_true();
 		has(&terminal, &classes::DARK_SCHEME).xpect_true();
 		// the web adds no scheme class, leaving the OS to drive `color_scheme.js`
-		let web = page_classes(&request("", MediaType::Html), &theme);
+		let web = PageClasses::resolve(&request("", MediaType::Html), &theme);
 		has(&web, &classes::PAGE).xpect_true();
 		has(&web, &classes::DARK_SCHEME).xpect_false();
 		has(&web, &classes::LIGHT_SCHEME).xpect_false();
 		// an explicit pin wins on both targets
-		let pinned = page_classes(
+		let pinned = PageClasses::resolve(
 			&request("?color-scheme=light", MediaType::Html),
 			&theme,
 		);

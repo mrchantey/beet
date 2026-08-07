@@ -5,15 +5,19 @@ Tool calling, the whole program in one scene. Run it through the one binary:
 
 A finite dungeon turn whose agent is equipped with the inline `<AgentChoiceAction/>`
 tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
-`{CreateThread}`, which exits the process once the two turns complete. The transcript
-renders inline so it stays in the terminal scrollback after exit.
+`{RunThread}`. The run is finite, so the transcript settles once the two turns
+complete and the terminal holds it until Ctrl+C.
 -->
-<div>
-	<CrateCheck features="thread,extra"/>
-	<div {RepeatTimes{total_times:2}} {CreateThread}>
-		<div bx:ref="thread" {Thread} {Sequence}>
-			<CreateActor name="System" kind="System">
-				<CreatePost text='
+<StartOnLoad {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+	<CrateCheck features="thread,tui,ssh,extra"/>
+	<Router {ThreadLayout}>
+		<Route path="/" {FixedPage}>
+			<div {(ThreadView, OfThread($thread))}/>
+		</Route>
+		<div {RepeatTimes{total_times:2}} {RunThread}>
+			<div bx:ref="thread" {Thread} {Sequence}>
+				<CreateActor name="System" kind="System">
+					<CreatePost text='
 This is a tool call test. You will get two responses.
 
 For the first, respond in the first person:
@@ -29,13 +33,11 @@ This will be your final response so do not attempt to continue the conversation.
 
 You enter the cave, and from the ceiling drops a glowing red beet..
 '/>
-			</CreateActor>
-			<CreateActor name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<AgentChoiceAction/>
-			</CreateActor>
+				</CreateActor>
+				<CreateActor name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+					<AgentChoiceAction/>
+				</CreateActor>
+			</div>
 		</div>
-	</div>
-	<TuiThreadTranscript>
-		<div {(ThreadView, OfThread($thread))}/>
-	</TuiThreadTranscript>
-</div>
+	</Router>
+</StartOnLoad>

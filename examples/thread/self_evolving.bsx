@@ -5,15 +5,19 @@ across turns. Run it through the one binary:
     beet --main=examples/thread/self_evolving.bsx
 
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
-resolves), the agent evolves `notes.md` over ten turns (`{RepeatTimes}`), and
-`{CreateThread}` exits when they complete. The transcript renders inline.
+resolves) and the agent evolves `notes.md` over ten turns (`{RepeatTimes}`). The
+run is finite, so the transcript settles and the terminal holds it until Ctrl+C.
 -->
-<div>
-	<CrateCheck features="thread"/>
-	<div {RepeatTimes{total_times:10}} {CreateThread}>
-		<div {Thread} {Sequence} {FsStore{path:"target/examples/self_evolving"}} bx:ref="thread">
-			<CreateActor name="System" kind="System">
-				<CreatePost text="
+<StartOnLoad {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+	<CrateCheck features="thread,tui,ssh"/>
+	<Router {ThreadLayout}>
+		<Route path="/" {FixedPage}>
+			<div {(ThreadView, OfThread($thread))}/>
+		</Route>
+		<div {RepeatTimes{total_times:10}} {RunThread}>
+			<div {Thread} {Sequence} {FsStore{path:"target/examples/self_evolving"}} bx:ref="thread">
+				<CreateActor name="System" kind="System">
+					<CreatePost text="
 You are a self-evolving agent whose only memory is a persistent blob store.
 Each turn, evolve your own knowledge base in small, concrete steps:
 
@@ -26,13 +30,11 @@ Each turn, evolve your own knowledge base in small, concrete steps:
 Keep `notes.md` under twenty lines. Make exactly one improvement per turn and
 state in one sentence what you changed.
 "/>
-			</CreateActor>
-			<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<StoreToolset/>
-			</CreateActor>
+				</CreateActor>
+				<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+					<StoreToolset/>
+				</CreateActor>
+			</div>
 		</div>
-	</div>
-	<TuiThreadTranscript>
-		<div {(ThreadView, OfThread($thread))}/>
-	</TuiThreadTranscript>
-</div>
+	</Router>
+</StartOnLoad>

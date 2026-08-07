@@ -246,7 +246,7 @@ fn params_table(params: Vec<RouteParam>) -> impl Bundle {
 /// Spawn the [`RouteList`] inside a themed page as an ephemeral render root,
 /// returning its id.
 ///
-/// The `<RouteList>` is wrapped in a [`page_classes`] root (`PAGE` plus the
+/// The `<RouteList>` is wrapped in a [`PageClasses`] root (`PAGE` plus the
 /// resolved color scheme) so a bare render with no host layout — the dev CLI
 /// `--help`, where the entry declares no `BsxLayout` — resolves the scheme's
 /// `Background` base (the conservative app tone) and its foreground, rather than
@@ -278,7 +278,8 @@ async fn spawn_route_list(
 				}
 				None => rsx! { <RouteList entries=entries/> },
 			};
-			let page = page_classes(&parts, &world.resource::<Theme>().clone());
+			let page =
+				PageClasses::resolve(&parts, &world.resource::<Theme>().clone());
 			let mut entity =
 				world.spawn_template(rsx! { <div {page}>{list}</div> })?;
 			let id = entity.id();

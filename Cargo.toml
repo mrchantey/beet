@@ -714,7 +714,7 @@ required-features = ["action", "rand"]
 name = "thread_scenes"
 path = "tests/thread_scenes.rs"
 harness = false
-required-features = ["thread", "router", "fs", "testing"]
+required-features = ["thread", "router", "fs", "tui_server", "ssh_tui", "testing"]
 
 # The no-code `examples/bsx_site` example, loaded on-disk and rendered/navigated
 # through `beet`'s public API. The example is pure `.bsx`/`.md` (not a crate); its
