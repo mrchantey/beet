@@ -179,7 +179,7 @@ fn spawn_fetch_tree(world: &mut World, fox: Entity, bert: Handle<Bert>) {
 			),
 			(
 				Name::new("Seek to Arrive"),
-				Seek::default(),
+				Seek,
 				EndOnArrive::new(1.),
 			),
 		]));

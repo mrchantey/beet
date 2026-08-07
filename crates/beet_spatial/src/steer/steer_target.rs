@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Description of a target used by steering behaviors.
@@ -30,6 +31,17 @@ impl SteerTarget {
 				} else {
 					bevybail!("transform not found for entity {entity:?}")
 				}
+			}
+		}
+	}
+
+	/// The target's [`Velocity`], or zero for a fixed position or an entity that
+	/// has none. Read by the predictive behaviours ([`Pursue`], [`Evade`]).
+	pub fn get_velocity(&self, query: &Query<&Velocity>) -> Velocity {
+		match self {
+			Self::Position(_) => Velocity::default(),
+			Self::Entity(entity) => {
+				query.get(*entity).cloned().unwrap_or_default()
 			}
 		}
 	}

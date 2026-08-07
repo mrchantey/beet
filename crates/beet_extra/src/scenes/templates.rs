@@ -257,7 +257,7 @@ pub fn SeekAgent2d(
 					ChildOf(agent_id),
 					ActionOf(agent_id),
 					CallOnLoad,
-					Seek::default(),
+					Seek,
 				));
 			});
 		}),

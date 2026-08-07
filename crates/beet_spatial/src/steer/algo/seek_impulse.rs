@@ -30,10 +30,6 @@ pub(crate) fn seek_impulse(
 
 /// Inverse of [`seek_impulse`]
 /// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=179)
-///
-/// No steer action calls this yet, it is kept as the reference implementation of
-/// the behaviour, alongside [`pursue_impulse`] and [`evade_impulse`].
-#[allow(dead_code)]
 pub(crate) fn flee_impulse(
 	position: &Vec3,
 	velocity: &Velocity,
@@ -50,9 +46,6 @@ pub(crate) fn flee_impulse(
 /// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=544)
 /// Currently the tuning parameter is very coarse, based on distance to target.
 /// It assumes the pursuer is moving directly target at 1 m/s
-///
-/// Reference implementation, see [`flee_impulse`].
-#[allow(dead_code)]
 pub(crate) fn pursue_impulse(
 	position: &Vec3,
 	velocity: &Velocity,
@@ -77,9 +70,6 @@ pub(crate) fn pursue_impulse(
 
 /// Calculate an evade impulse
 /// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=584)
-///
-/// Reference implementation, see [`flee_impulse`].
-#[allow(dead_code)]
 pub(crate) fn evade_impulse(
 	position: &Vec3,
 	velocity: &Velocity,

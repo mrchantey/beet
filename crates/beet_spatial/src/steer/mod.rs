@@ -32,7 +32,10 @@ pub fn steer_plugin(app: &mut App) {
 		(
 			find_steer_target,
 			end_on_arrive,
-			seek,
+			steer_behavior::<Seek>,
+			steer_behavior::<Flee>,
+			steer_behavior::<Pursue>,
+			steer_behavior::<Evade>,
 			wander,
 			separate::<M>,
 			align::<M>,
@@ -43,6 +46,10 @@ pub fn steer_plugin(app: &mut App) {
 	.init_resource::<RandomSource>()
 	.register_type::<SteerTarget>()
 	.register_type::<Seek>()
+	.register_type::<Flee>()
+	.register_type::<Pursue>()
+	.register_type::<Evade>()
+	.register_type::<OnTargetNotFound>()
 	.register_type::<EndOnArrive>()
 	.register_type::<MaxForce>()
 	.register_type::<MaxSpeed>()
