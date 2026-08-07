@@ -1,8 +1,7 @@
 //! The data form of the frozen-lake demos: a `<FrozenLake/>` tile grid plus either
 //! a `<FrozenLakeRunAgent/>` (greedy inference over a trained Q-table) or a
-//! `<FrozenLakeTrainSession/>` (an [`RlSession`] that trains one). Mirrors the
-//! imperative `frozen_lake_scene` / `frozen_lake_run` / `frozen_lake_train` setups,
-//! so a scene `.bsx` names these instead of a Rust `Startup` system.
+//! `<FrozenLakeTrainSession/>` (an [`RlSession`] that trains one), so a scene
+//! `.bsx` names these instead of a Rust `Startup` system.
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
 
@@ -10,9 +9,9 @@ use beet_core::prelude::*;
 /// grid, agent and session all map cells to the same world positions.
 const FROZEN_LAKE_SCENE_SCALE: f32 = 1.;
 
-/// The 4x4 frozen-lake tile grid with its hazards and goal, the data form of
-/// `frozen_lake_scene`. Markup has no loop, so the tile + hazard + goal entities are
-/// spawned here in Rust (the spawn-N pattern, like [`Flock`](crate::prelude::Flock));
+/// The 4x4 frozen-lake tile grid with its hazards and goal. Markup has no loop, so
+/// the tile + hazard + goal entities are spawned here in Rust (the spawn-N pattern,
+/// like [`Flock`](crate::prelude::Flock));
 /// they sit at world positions, so they are top-level rather than children of the
 /// inert template host. The camera lives in the `.bsx` (a `<Camera3d>` with a
 /// [`CameraDistance`]), so this only lays out the board.
