@@ -221,15 +221,6 @@ pub(crate) fn extract_schema_directive(nodes: &[BsxNode]) -> SchemaDirective {
 		.unwrap_or(SchemaDirective::None)
 }
 
-/// Extract the inline prop schema declared by a `<script bx:schema>` block, if
-/// present (the non-remote case).
-pub(crate) fn extract_bx_schema(nodes: &[BsxNode]) -> Option<ValueSchema> {
-	match extract_schema_directive(nodes) {
-		SchemaDirective::Inline(schema) => Some(schema),
-		_ => None,
-	}
-}
-
 /// The string value of a literal-string attribute on `el`, if present.
 fn string_attr(el: &BsxElement, key: &str) -> Option<String> {
 	el.attributes.iter().find_map(|attr| {

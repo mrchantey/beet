@@ -9,18 +9,6 @@ use quote::ToTokens;
 use syn::Expr;
 use syn::Item;
 
-/// Calls [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`].
-pub(crate) fn export_codegen(
-	query: Populated<&CodegenFile, Changed<CodegenFile>>,
-) -> bevy::prelude::Result {
-	let num_files = query.iter().count();
-	info!("Exporting {} codegen files...", num_files);
-	for codegen_file in query.iter() {
-		codegen_file.build_and_write()?;
-	}
-	Ok(())
-}
-
 /// Represents a generated code file with its configuration and contents.
 ///
 /// Every codegen file is created via this struct, which provides utilities

@@ -7,7 +7,6 @@
 //!
 //! - [`DurationExt`] - Additional methods for [`Duration`](std::time::Duration)
 //! - [`ExitStatusExt`] - Convert exit status to [`Result`]
-//! - [`VecExt`] - Additional vector operations
 //! - [`OptionExt`] - Additional option operations
 //! - [`ResultXExt`] - Additional result operations
 //! - [`Multimap`] - Multi-value map operations
@@ -23,7 +22,6 @@ mod result_x;
 mod str;
 #[cfg(feature = "json")]
 mod value;
-mod vec;
 
 pub use duration::*;
 #[cfg(feature = "std")]
@@ -36,4 +34,3 @@ pub use result_x::*;
 pub use str::*;
 #[cfg(feature = "json")]
 pub use value::*;
-pub(crate) use vec::*;

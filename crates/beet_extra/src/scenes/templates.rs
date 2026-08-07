@@ -1,7 +1,6 @@
-//! Declarative `#[template]` forms of the imperative 3d scene setup
-//! ([`lighting_3d`](super::lighting_3d), [`ground_3d`](super::ground_3d)), so a
-//! scene `.bsx` names `<Lighting3d/>` / `<Ground3d/>` instead of a Rust `Startup`
-//! system. Registered by
+//! Declarative `#[template]` forms of the 3d scene setup, so a scene `.bsx`
+//! names `<Lighting3d/>` / `<Ground3d/>` instead of a Rust `Startup` system.
+//! Registered by
 //! [`beet_extra_bevy_default_plugin`](crate::prelude::beet_extra_bevy_default_plugin).
 use crate::beet::prelude::*;
 use crate::components::KeyboardController;
@@ -11,9 +10,8 @@ use beet_core::prelude::*;
 use bevy::light::CascadeShadowConfigBuilder;
 use std::f32::consts::PI;
 
-/// A shadow-casting directional key light angled like late afternoon, with the
-/// cascade config the imperative [`lighting_3d`](super::lighting_3d) used. The data
-/// form of that scene system, so `<Lighting3d/>` lights a `.bsx` scene.
+/// A shadow-casting directional key light angled like late afternoon, so
+/// `<Lighting3d/>` lights a `.bsx` scene.
 #[template]
 pub fn Lighting3d() -> impl Bundle {
 	(
@@ -36,9 +34,8 @@ pub fn Lighting3d() -> impl Bundle {
 	)
 }
 
-/// A 100x100 muted-green ground plane, the data form of the imperative
-/// [`ground_3d`](super::ground_3d) scene system. A `#[template(system)]` since the
-/// mesh + material are assets minted at build time, so `<Ground3d/>` floors a scene.
+/// A 100x100 muted-green ground plane. A `#[template(system)]` since the mesh +
+/// material are assets minted at build time, so `<Ground3d/>` floors a scene.
 #[template(system)]
 pub fn Ground3d(
 	mut meshes: ResMut<Assets<Mesh>>,
@@ -101,9 +98,7 @@ pub fn AppWindow(
 	}
 }
 
-/// A terminal-style log UI, the data form of the imperative
-/// [`ui_terminal`](super::ui_terminal) / [`ui_terminal_input`](super::ui_terminal_input)
-/// scene systems. A `#[template(system)]` returning `()` since
+/// A terminal-style log UI. A `#[template(system)]` returning `()` since
 /// [`spawn_ui_terminal`] spawns the UI tree top-level via [`Commands`] rather
 /// than returning a bundle. `<UiTerminal/>` renders agent log output; pass
 /// `input=true` (`<UiTerminal input=true/>`) to add the prompt row so the user

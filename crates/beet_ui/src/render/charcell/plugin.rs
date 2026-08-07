@@ -271,7 +271,7 @@ fn buffer_plugin<B: Component<Mutability = Mutable> + AsBuffer>(app: &mut App) {
 
 /// [`PostParseTree`] set for post-resolve structural decorations: list/quote
 /// markers and hyperlinks. A natural extension point — add your own
-/// [`Marker`]-inserting systems here (see [`heading_hash_markers`]).
+/// [`Marker`]-inserting systems here.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct DecorateSet;
 

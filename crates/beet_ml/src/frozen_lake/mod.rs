@@ -27,8 +27,6 @@
 //! - Reach Frozen(F): 0
 mod frozen_lake_map;
 pub use self::frozen_lake_map::*;
-mod frozen_lake_scene;
-pub(crate) use self::frozen_lake_scene::*;
 mod grid;
 pub use self::grid::*;
 mod reward_grid;

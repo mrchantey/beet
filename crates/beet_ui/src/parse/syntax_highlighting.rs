@@ -14,7 +14,6 @@
 //! Only enabled with the `syntax_highlighting` feature.
 
 use crate::prelude::*;
-use crate::style::syntax::tokens as tokens_mod;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
@@ -280,12 +279,6 @@ pub fn apply_syntax_highlighting(
 			spawn_highlight_span(&mut commands, view.entity, span);
 		}
 	}
-}
-
-/// The list of capture names this module recognises, matching
-/// [`tokens_mod::recognised_names`].
-pub(crate) fn recognised_names() -> &'static [&'static str] {
-	tokens_mod::recognised_names()
 }
 
 /// Spawn a single highlight span as a child of `parent`. When `span.capture`

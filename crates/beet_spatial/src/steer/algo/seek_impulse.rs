@@ -27,66 +27,6 @@ pub(crate) fn seek_impulse(
 
 	Impulse(impulse)
 }
-/// Inverse of [`seek_impulse`]
-/// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=179)
-pub(crate) fn flee_impulse(
-	position: &Vec3,
-	velocity: &Velocity,
-	target_position: &Vec3,
-	max_speed: MaxSpeed,
-) -> Impulse {
-	let mut impulse =
-		seek_impulse(position, velocity, target_position, max_speed, None);
-	*impulse *= -1.0;
-	impulse
-}
-
-/// Calculate a pursue impulse
-/// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=544)
-/// Currently the tuning parameter is very coarse, based on distance to target.
-/// It assumes the pursuer is moving directly target at 1 m/s
-pub(crate) fn pursue_impulse(
-	position: &Vec3,
-	velocity: &Velocity,
-	target_position: &Vec3,
-	target_velocity: &Velocity,
-	max_speed: MaxSpeed,
-	arrive_radius: Option<ArriveRadius>,
-) -> Impulse {
-	let delta_position = *target_position - *position;
-	let distance_to_target = delta_position.length();
-
-	let next_target_position =
-		*target_position + **target_velocity * distance_to_target;
-	seek_impulse(
-		position,
-		velocity,
-		&next_target_position,
-		max_speed,
-		arrive_radius,
-	)
-}
-/// Calculate an evade impulse
-/// as described [here](https://youtu.be/Q4MU7pkDYmQ?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=584)
-pub(crate) fn evade_impulse(
-	position: &Vec3,
-	velocity: &Velocity,
-	target_position: &Vec3,
-	target_velocity: &Velocity,
-	max_speed: MaxSpeed,
-) -> Impulse {
-	let mut impulse = pursue_impulse(
-		position,
-		velocity,
-		target_position,
-		target_velocity,
-		max_speed,
-		None,
-	);
-	*impulse *= -1.0;
-	impulse
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -155,9 +155,4 @@ pub impl Transform {
 		self.look_away(target, up);
 		self
 	}
-	/// Sets position and rotation from a [`Pose`].
-	fn from_pose(&mut self, pose: &Pose) {
-		self.translation = pose.position;
-		self.rotation = pose.rotation;
-	}
 }

@@ -31,7 +31,7 @@ pub struct Hyperlink(pub SmolStr);
 ///
 /// Markers are a general extension point: any system in the
 /// [`DecorateSet`](crate::prelude::DecorateSet) may insert a [`Marker`] to add
-/// generated content. See [`heading_hash_markers`] for an opt-in example.
+/// generated content.
 #[derive(Debug, Clone, Component)]
 pub struct Marker(pub SmolStr);
 
@@ -485,37 +485,6 @@ fn iframe_url(view: &ElementView) -> String {
 		view.attribute_string("src").to_string()
 	} else {
 		alt_src.to_string()
-	}
-}
-
-/// Prefix every heading (`<h1>`..`<h6>`) with a `#`-per-level [`Marker`],
-/// echoing markdown source. Not registered by default; opt in by adding it to
-/// the [`DecorateSet`](crate::prelude::DecorateSet):
-///
-/// ```
-/// # use beet_ui::prelude::*;
-/// # use beet_core::prelude::*;
-/// App::new()
-/// 	.add_plugins(CharcellPlugin)
-/// 	.add_systems(PostParseTree, heading_hash_markers.in_set(DecorateSet));
-/// ```
-pub(crate) fn heading_hash_markers(
-	mut commands: Commands,
-	headings: Query<(Entity, &Element)>,
-) {
-	for (entity, element) in &headings {
-		if let Some(level) = heading_level(element.tag()) {
-			let marker = format!("{} ", "#".repeat(level));
-			commands.entity(entity).insert(Marker(marker.into()));
-		}
-	}
-}
-
-/// The level of a heading tag (`h1`..`h6`), or `None` for any other tag.
-fn heading_level(tag: &str) -> Option<usize> {
-	match tag {
-		"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => tag[1..].parse().ok(),
-		_ => None,
 	}
 }
 

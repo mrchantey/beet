@@ -81,7 +81,7 @@ impl<T: 'static + Send> Store<T> {
 	where
 		T: Clone,
 	{
-		self.0.with(|val| val.clone())
+		self.0.get_cloned()
 	}
 
 	/// Replaces the inner value with `value`.

@@ -12,11 +12,9 @@
 //!
 //! - [`AncestorQuery`] - Query entities through ancestor relationships
 //! - [`EntityTargetEvent`] - Events targeting specific entities
-//! - [`Maybe`] - Optional component query wrapper
 //!
 //! # Systems and Plugins
 //!
-//! - [`GarbageCollect`] - Automatic cleanup of marked entities
 //! - [`OnSpawn`] - Run logic when entities are spawned
 //! - [`When`] - Conditional system execution
 //! - [`NonSendPlugin`] - Plugin trait for non-send resources
@@ -26,7 +24,6 @@
 //! - [`BevyhowError`] - Error type for use with Bevy's error handling
 //! - [`LogPlugin`] - Drop-in replacement for bevy's `LogPlugin` using [`PrettyTracing`]
 //! - [`PrettyTracing`] - Enhanced tracing output for Bevy apps
-//! - [`IdCounter`] - Unique ID generation
 //!
 //! # Macros
 //!
@@ -43,12 +40,10 @@ mod async_commands;
 #[cfg(all(feature = "bevy_async", feature = "std"))]
 mod async_runner;
 mod bevyhow;
+#[cfg(feature = "bevy_keyboard")]
 mod common_systems;
 mod despawn_after;
 mod entity_target_event;
-mod garbage_collect;
-mod id_counter;
-mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
 pub mod hook_ext;
@@ -60,7 +55,6 @@ mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
 pub mod reflect_ext;
-pub mod spawn_ext;
 
 mod when;
 
@@ -69,12 +63,10 @@ pub use ancestor_query::*;
 pub use async_commands::*;
 #[cfg(all(feature = "bevy_async", feature = "std"))]
 pub use async_runner::*;
+#[cfg(feature = "bevy_keyboard")]
 pub use common_systems::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
-pub(crate) use garbage_collect::*;
-pub(crate) use id_counter::*;
-pub(crate) use maybe::*;
 pub use non_send_marker::*;
 pub use non_send_plugin::*;
 pub use on_spawn::*;

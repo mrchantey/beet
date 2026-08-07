@@ -38,8 +38,6 @@ pub struct BoxStyle {
 	pub max_height: Option<Length>,
 }
 
-pub(crate) static BOX_STYLE_DEFAULT: BoxStyle = BoxStyle::DEFAULT;
-
 impl BoxStyle {
 	pub const DEFAULT: Self = Self {
 		border_left: None,

@@ -135,14 +135,6 @@ fn escape_char(ch: &str) -> Option<&'static str> {
 }
 
 /// Replace HTML entities with their corresponding characters.
-///
-/// ```rust
-/// # use beet_ui::prelude::*;
-/// # use beet_core::prelude::*;
-/// unescape_html_text("&lt;div&gt;").xpect_eq("<div>".to_string());
-/// unescape_html_text("&amp;amp;").xpect_eq("&amp;".to_string());
-/// unescape_html_text("no entities").xpect_eq("no entities".to_string());
-/// ```
 pub(crate) fn unescape_html_text(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 	let mut remaining = input;
@@ -179,14 +171,6 @@ pub(crate) fn unescape_html_text(input: &str) -> String {
 /// Only escapes characters present in [`HTML_ENTITY_PAIRS`]. Single
 /// characters are matched greedily so multi-byte sequences like
 /// `\u{2013}` are handled correctly.
-///
-/// ```rust
-/// # use beet_ui::prelude::*;
-/// # use beet_core::prelude::*;
-/// escape_html_text("<div>").xpect_eq("&lt;div&gt;".to_string());
-/// escape_html_text("a & b").xpect_eq("a &amp; b".to_string());
-/// escape_html_text("no special").xpect_eq("no special".to_string());
-/// ```
 pub(crate) fn escape_html_text(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 
@@ -209,15 +193,6 @@ pub(crate) fn escape_html_text(input: &str) -> String {
 /// to escape `<` or `>` (those are only meaningful in text content).
 /// This function only escapes the structurally required characters,
 /// leaving typographic entities untouched.
-///
-/// ```rust
-/// # use beet_ui::prelude::*;
-/// # use beet_core::prelude::*;
-/// escape_html_attribute(r#"say "hello" & 'goodbye'"#)
-///     .xpect_eq("say &quot;hello&quot; &amp; &apos;goodbye&apos;".to_string());
-/// escape_html_attribute("<not escaped>")
-///     .xpect_eq("<not escaped>".to_string());
-/// ```
 pub(crate) fn escape_html_attribute(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 	for ch in input.chars() {
@@ -236,13 +211,6 @@ pub(crate) fn escape_html_attribute(input: &str) -> String {
 /// This is functionally identical to [`unescape_html_text`] since
 /// both contexts use the same entity encoding, but is provided as a
 /// distinct function for clarity at call sites.
-///
-/// ```rust
-/// # use beet_ui::prelude::*;
-/// # use beet_core::prelude::*;
-/// unescape_html_attribute("say &quot;hello&quot; &amp; &apos;goodbye&apos;")
-///     .xpect_eq(r#"say "hello" & 'goodbye'"#.to_string());
-/// ```
 pub(crate) fn unescape_html_attribute(input: &str) -> String {
 	unescape_html_text(input)
 }
@@ -252,16 +220,6 @@ pub(crate) fn unescape_html_attribute(input: &str) -> String {
 /// Replaces every `<` with its JSON unicode escape, so an embedded value (a
 /// `</script>` substring, an HTML comment opener) can never close or break out
 /// of the host `<script>`. The result is still valid JSON.
-///
-/// ```rust
-/// # use beet_ui::prelude::*;
-/// # use beet_core::prelude::*;
-/// // no `<` survives, so the value cannot close the host <script>
-/// escape_script_json(r#"{"html":"</script>"}"#)
-///     .xnot()
-///     .xpect_contains("<")
-///     .xpect_contains("/script>");
-/// ```
 pub(crate) fn escape_script_json(json: &str) -> String { json.replace('<', "\\u003c") }
 
 #[cfg(test)]
@@ -354,5 +312,19 @@ mod test {
 		let original = r#"font-family: "Helvetica" & 'Arial'"#;
 		let escaped = escape_html_attribute(original);
 		unescape_html_attribute(&escaped).xpect_eq(original.to_string());
+	}
+
+	#[beet_core::test]
+	fn unescape_double_escaped_ampersand() {
+		unescape_html_text("&amp;amp;").xpect_eq("&amp;".to_string());
+	}
+
+	/// no `<` survives, so the value cannot close the host `<script>`
+	#[beet_core::test]
+	fn escape_script_json_neutralizes_angle_brackets() {
+		escape_script_json(r#"{"html":"</script>"}"#)
+			.xnot()
+			.xpect_contains("<")
+			.xpect_contains("/script>");
 	}
 }

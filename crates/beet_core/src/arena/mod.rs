@@ -7,9 +7,7 @@
 //! # Types
 //!
 //! - [`Arena`] / [`ArenaHandle`] - Thread-safe arena for `Send` types
-//! - [`NonSendArena`] / [`NonSendArenaHandle`] - Thread-local arena for non-`Send` types
 //! - [`Store`] - Ergonomic wrapper around `ArenaHandle` with value semantics
-//! - [`FuncStore`] - Function wrapper that records call outputs
 //!
 //! # Warning
 //!
@@ -17,11 +15,7 @@
 //! applications. In short-lived contexts like tests, leaking is usually harmless.
 
 mod arena;
-mod func_store;
-mod non_send_arena;
 mod store;
 
 pub(crate) use arena::*;
-pub(crate) use func_store::*;
-pub use non_send_arena::*;
 pub use store::*;

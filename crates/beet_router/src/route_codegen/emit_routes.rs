@@ -1,7 +1,7 @@
 //! Emits the per-collection route bundle function.
 //!
 //! Each collection emits a `pub fn <name>_routes() -> impl Bundle` that spawns
-//! one child per route via [`spawn_ext::spawn_with`], so multiple collections can be merged
+//! one child per route via [`OnSpawnTyped`], so multiple collections can be merged
 //! onto a single router entity (eg passed together to `Router::with_defaults`) without
 //! clobbering each other's children.
 

@@ -114,14 +114,6 @@ pub(crate) fn default_token_map() -> CssTokenMap {
 		.with_extend(typography::token_map())
 }
 
-/// All default material declarations and component rules, as a standalone rule
-/// set (no prose [`default_element_rules`]). [`MaterialStylePlugin`] instead
-/// extends the shared rule set so it composes with `StylePlugin`'s prose rules.
-pub(crate) fn default_rule_set(color: impl Into<Color>) -> RuleSet {
-	RuleSet::new(default_declarations(color))
-		.with_rules(default_material_rules())
-}
-
 /// The Material component rules: the user-agent [`non_visual_rule`] (so
 /// metadata/scripting tags resolve to `display: none`), the component
 /// [`classes::all_rules`], and the light/dark scheme rules.
@@ -130,18 +122,6 @@ pub(crate) fn default_material_rules() -> Vec<Rule> {
 		.chain(classes::all_rules())
 		.chain([themes::light_scheme(), themes::dark_scheme()])
 		.collect()
-}
-
-/// Returns a [`Rule`] with all material design default values.
-///
-/// This is the `:root` rule — the lowest-priority fallback in the cascade. It
-/// bakes in the **light** scheme so a document with no scheme class still gets
-/// colors; a `.dark-scheme` (or `.light-scheme`) class on an ancestor overrides
-/// it, mirroring `color_scheme.js`. The colour-dependent tones come from the
-/// seed via [`themes::from_color`]; the rest from
-/// [`scheme_independent_declarations`].
-pub(crate) fn default_declarations(color: impl Into<Color>) -> Rule {
-	scheme_independent_declarations().with_extend(themes::from_color(color))
 }
 
 /// The colour-**independent** half of the `:root` default: the light scheme

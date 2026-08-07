@@ -54,30 +54,6 @@ use core::pin::Pin;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
-/// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
-/// otherwise is just the type itself.
-#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
-pub(crate) type MaybeSendWrapper<T> = send_wrapper::SendWrapper<T>;
-/// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
-/// otherwise is just the type itself.
-#[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
-pub(crate) type MaybeSendWrapper<T> = T;
-
-/// Wraps a value in [`MaybeSendWrapper`].
-pub(crate) fn maybe_send_wrapper<T>(value: T) -> MaybeSendWrapper<T> {
-	#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
-	{
-		send_wrapper::SendWrapper::new(value)
-	}
-	#[cfg(not(all(
-		feature = "bevy_multithreaded",
-		not(target_arch = "wasm32")
-	)))]
-	{
-		value
-	}
-}
-
 /// Marker trait for types that are `Send` in multi-threaded environments.
 #[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 pub trait MaybeSend: Send {}

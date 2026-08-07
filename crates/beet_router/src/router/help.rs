@@ -376,76 +376,6 @@ fn nearest_ancestor_help(
 	)
 }
 
-/// Format a [`RouteTree`] as a help string, listing both scene routes and
-/// actions.
-///
-/// The help route itself is excluded from the listing. The interactive help
-/// surfaces render the material [`RouteList`]; this is the plaintext counterpart
-/// for non-rendered CLI output.
-fn format_route_help(tree: &RouteTree) -> String {
-	let mut output = String::new();
-	output.push_str("Available routes:\n\n");
-
-	let nodes = tree.flatten_nodes();
-
-	let filtered: Vec<&ActionNode> = nodes
-		.into_iter()
-		.filter(|node| {
-			node.path.annotated_path().last_segment() != Some("help")
-		})
-		.collect();
-
-	if filtered.is_empty() {
-		output.push_str("  (none)\n");
-		return output;
-	}
-
-	for node in filtered {
-		format_action_node_text(&mut output, node);
-	}
-
-	output
-}
-
-/// Format an [`ActionNode`] as plaintext for CLI output.
-fn format_action_node_text(output: &mut String, node: &ActionNode) {
-	let path = node.path.annotated_path();
-
-	if node.is_scene() {
-		output.push_str(&format!("  /{} [scene]\n", path));
-	} else {
-		output.push_str(&format!("  /{}", path));
-		if let Some(method) = &node.method {
-			output.push_str(&format!(" [{}]", method));
-		}
-		output.push('\n');
-
-		if let Some(description) = node.description() {
-			output.push_str(&format!("    {}\n", description));
-		}
-
-		let input_type = node.meta.input().type_name();
-		let output_type = node.meta.output().type_name();
-		// Skip Request->Response and scene action signatures
-		let is_exchange = input_type.ends_with("Request")
-			&& output_type.ends_with("Response");
-		if !is_exchange && !node.is_scene() {
-			if input_type != "()" {
-				output.push_str(&format!("    input:  {}\n", input_type));
-			}
-			if output_type != "()" {
-				output.push_str(&format!("    output: {}\n", output_type));
-			}
-		}
-	}
-
-	for param in node.params.iter() {
-		output.push_str(&format!("    {}\n", param));
-	}
-
-	output.push('\n');
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -674,22 +604,5 @@ mod test {
 			.xpect_contains("not found")
 			.xpect_contains("Available routes")
 			.xpect_contains("/increment");
-	}
-
-	#[beet_core::test]
-	async fn format_route_help_excludes_help_and_lists_routes() {
-		let mut world = router_world();
-		let root = world
-			.spawn((Router::with_defaults(), children![
-				Increment::bundle(FieldRef::new("count")),
-				Decrement::bundle(FieldRef::new("count")),
-			]))
-			.flush();
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-
-		format_route_help(&tree)
-			.xpect_contains("Available routes")
-			.xpect_contains("increment")
-			.xpect_contains("decrement");
 	}
 }

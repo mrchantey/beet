@@ -14,16 +14,6 @@ struct ArenaEntry {
 /// Objects are stored in a lazily-initialized global instance and accessed through
 /// [`ArenaHandle`] values. This enables passing around lightweight, copyable
 /// references without lifetime constraints.
-///
-/// # Examples
-///
-/// ```
-/// # use beet_core::prelude::*;
-/// let handle = Arena::insert(42u32);
-/// handle.with(|val| assert_eq!(*val, 42));
-/// let removed = handle.remove();
-/// assert_eq!(removed, 42);
-/// ```
 pub(crate) struct Arena {
 	objects: Arc<Mutex<HashMap<usize, ArenaEntry>>>,
 	next_id: Arc<Mutex<usize>>,
@@ -74,17 +64,6 @@ impl Arena {
 			.remove(&handle.id)
 			.and_then(|entry| entry.object.downcast().ok())
 			.map(|boxed| *boxed)
-	}
-
-	/// Returns the number of objects stored in the global arena.
-	pub fn len() -> usize { Self::get_global().objects.lock().unwrap().len() }
-
-	/// Removes all objects from the global arena, invalidating all handles.
-	pub fn clear() { Self::get_global().objects.lock().unwrap().clear(); }
-
-	/// Returns `true` if the global arena contains no objects.
-	pub fn is_empty() -> bool {
-		Self::get_global().objects.lock().unwrap().is_empty()
 	}
 
 	/// Executes a function with a reference to the object in this arena instance.
@@ -174,14 +153,7 @@ impl<T: Clone + 'static> ArenaHandle<T> {
 	/// # Panics
 	///
 	/// Panics if the object has been removed.
-	pub fn get_cloned(&self) -> T {
-		let objects = Arena::get_global().objects.lock().unwrap();
-		objects
-			.get(&self.id)
-			.and_then(|entry| entry.object.downcast_ref::<T>())
-			.cloned()
-			.expect(PANIC_MSG)
-	}
+	pub fn get_cloned(&self) -> T { Arena::get_global().get_cloned(self) }
 }
 
 impl<T: 'static> ArenaHandle<T> {
@@ -191,12 +163,7 @@ impl<T: 'static> ArenaHandle<T> {
 	///
 	/// Panics if the object has been removed.
 	pub fn with<R>(&self, func: impl FnOnce(&T) -> R) -> R {
-		let objects = Arena::get_global().objects.lock().unwrap();
-		let obj = objects
-			.get(&self.id)
-			.and_then(|entry| entry.object.downcast_ref::<T>())
-			.expect(PANIC_MSG);
-		func(obj)
+		Arena::get_global().with_ref(self, func)
 	}
 
 	/// Executes a function with a mutable reference to the object.
@@ -205,12 +172,7 @@ impl<T: 'static> ArenaHandle<T> {
 	///
 	/// Panics if the object has been removed.
 	pub fn with_mut<R>(&self, func: impl FnOnce(&mut T) -> R) -> R {
-		let mut objects = Arena::get_global().objects.lock().unwrap();
-		let obj = objects
-			.get_mut(&self.id)
-			.and_then(|entry| entry.object.downcast_mut::<T>())
-			.expect(PANIC_MSG);
-		func(obj)
+		Arena::get_global().with_mut(self, func)
 	}
 
 	/// Removes the object from the arena and returns it.
@@ -263,6 +225,15 @@ mod tests {
 		fn assert_send<T: Send>() {}
 		assert_copy::<ArenaHandle<i32>>();
 		assert_send::<ArenaHandle<i32>>();
+	}
+
+	#[crate::test]
+	fn global_arena() {
+		let handle = Arena::insert(42u32);
+		handle.with(|val| *val).xpect_eq(42);
+		handle.with_mut(|val| *val += 1);
+		handle.get_cloned().xpect_eq(43);
+		handle.remove().xpect_eq(43);
 	}
 
 	#[crate::test]
