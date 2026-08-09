@@ -41,11 +41,19 @@ strict TLS), and every deploy or sync ends with a `<CloudflarePurgeCache/>` so
 content changes are live at the edge immediately. The deploy routes hang off a stack-bearing
 `<BeetSiteDeployHost>` so they resolve a `Stack` by ancestry without a second
 server. `--stage=prod` targets production (apex `beet.org` + `www`); the default
-`dev` stage publishes only `dev.beet.org`:
+`dev` stage publishes only `dev.beet.org`.
+
+The assets bucket (`beet-site--shared--assets`, the source of record for files
+too large for git) lives on its own `shared` stage: a second `<BeetSiteDeployHost
+stage="shared">` under the `shared/` route prefix, provisioned as its own step
+since a source shared by developers is a different process from a stage deploy.
+No stage deploy or destroy touches it:
 
     just beet deploy [--stage=prod]        # build -> tofu -> image -> sync -> purge -> watch
     just beet sync                         # re-publish the site (no image rebuild)
     just beet watch                        # poll the rollout
+    just beet shared apply                 # provision the shared assets bucket
+    just beet shared push                  # publish ./assets to it (mirror + purge)
 
 Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 `CLOUDFLARE_API_TOKEN` in `.env` (see `.env.example` for the token permissions),
@@ -65,25 +73,31 @@ plus `tofu`, `cargo-zigbuild` and a container engine.
 		<Route path="deploy" {ExchangeSequence}>
 			<FargateBeetSiteBlock app_name="beet-site"/>
 			<SiteBucket/>
-			<AssetsBucket/>
 			<AnalyticsTable/>
 			<BeetBinaryBuild features="aws_sdk,ssh,geoip"/>
 			<TofuApplyAction/>
 			<BuildDockerImage cmd_args={["serve", "--server=http,ssh", "--path=/"]}/>
 			<DirSync app_name="beet-site" bucket="site" dir="site"/>
-			<DirSync app_name="beet-site" bucket="assets" dir="assets"/>
 			<CloudflareZoneSetup/>
 			<CloudflarePurgeCache/>
 			<FargateWatch app_name="beet-site" timeout="300s"/>
 		</Route>
 		<Route path="sync" {ExchangeSequence}>
 			<DirSync app_name="beet-site" bucket="site" dir="site"/>
-			<DirSync app_name="beet-site" bucket="assets" dir="assets"/>
 			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
 			<FargateWatch app_name="beet-site" timeout="300s"/>
 		</Route>
 	</BeetSiteDeployHost>
+	<Route path="shared">
+		<BeetSiteDeployHost stage="shared">
+			<AssetsBucket/>
+			<Route path="push" {ExchangeSequence}>
+				<DirSync app_name="beet-site" bucket="assets" dir="assets" stage="shared"/>
+				<CloudflarePurgeCache/>
+			</Route>
+		</BeetSiteDeployHost>
+	</Route>
 </Router>
 </StartOnLoad>

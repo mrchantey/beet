@@ -20,8 +20,9 @@ export RUST_MIN_STACK := '1073741824'
 
 test-threads := '--test-threads=8'
 
-# The upstream bucket holding shared assets (models, fonts, fixtures).
-assets-bucket := 's3://beet-site--prod--assets'
+# The upstream bucket holding shared assets (models, fonts, fixtures): the
+# `shared` stage's bucket, a source of record owned by no deploy stage.
+assets-bucket := 's3://beet-site--shared--assets'
 
 default:
 	just --list --unsorted
@@ -65,24 +66,29 @@ beet *args:
 
 # Deploy the beet website to AWS Fargate; --stage=prod targets prod (default dev).
 # Lean headless build (no winit/ml) and AWS_PROFILE cleared so tofu/aws/s3 use the
-# explicit `.env` keys rather than a global profile.
+# explicit `.env` keys rather than a global profile. `infra,extra` links the
+# beet-site deploy host (`<BeetSiteDeployHost>` + the IaC verb routes).
 beet-deploy *args:
-  AWS_PROFILE= cargo run -p beet-cli -- deploy {{ args }}
-# Re-publish the site + assets to S3 without an image rebuild.
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- deploy {{ args }}
+# Re-publish the site to S3 without an image rebuild (assets: `beet-shared push`).
 beet-sync *args:
-  AWS_PROFILE= cargo run -p beet-cli -- sync {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- sync {{ args }}
 # Poll the deployed service's rollout.
 beet-watch *args:
-  AWS_PROFILE= cargo run -p beet-cli -- watch {{ args }}
-# Tear the deployed stack down (pass --stage=prod for the prod stack).
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- watch {{ args }}
+# Tear the deployed stack down (pass --stage=prod for the prod stack). Stage only:
+# the `shared` stage (the assets bucket) has its own verbs under `beet-shared`.
 beet-destroy *args:
-  AWS_PROFILE= cargo run -p beet-cli -- destroy --force {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- destroy --force {{ args }}
 # Resolve the deploy config without touching cloud (safe pre-apply check).
 beet-validate *args:
-  AWS_PROFILE= cargo run -p beet-cli -- validate {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- validate {{ args }}
 # Show the tofu plan without applying (eyeball before deploy).
 beet-plan *args:
-  AWS_PROFILE= cargo run -p beet-cli -- plan {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- plan {{ args }}
+# The shared-stage verbs (the assets bucket): `just beet-shared plan|apply|push|..`.
+beet-shared *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- shared {{ args }}
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,

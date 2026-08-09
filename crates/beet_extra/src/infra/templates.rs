@@ -119,12 +119,22 @@ pub fn SiteSync(#[prop(into)] app_name: String) -> impl Bundle {
 	infra_ext::sync_site(&infra_ext::stack(app_name))
 }
 
-/// `<AssetsBucket/>` — the public-read, non-versioned assets bucket (`./assets`).
+/// `<AssetsBucket/>` — the assets bucket: the source of record for files too
+/// large for git, public-read so a fresh checkout can `pull-assets` without
+/// credentials. Declared under the `shared`-stage host (`app--shared--assets`):
+/// a source is shared by developers rather than owned by any deploy stage, so it
+/// is provisioned by the shared stack's own verbs (`beet shared apply`) and no
+/// stage deploy or destroy touches it. As a source of record it refuses a
+/// non-empty delete (`force_destroy=false`).
 #[template]
 pub fn AssetsBucket() -> impl Bundle {
 	S3BucketBlock::new("assets")
 		.with_deploy_versioned(false)
 		.with_public_read(true)
+		.xmap(|mut bucket| {
+			bucket.force_destroy = Some(false);
+			bucket
+		})
 }
 
 /// `<AnalyticsTable/>` — the DynamoDB table backing the analytics store's remote
@@ -137,14 +147,20 @@ pub fn AnalyticsTable() -> impl Bundle { DynamoTableBlock::new("analytics") }
 
 /// `<DirSync app_name=".." bucket="site" dir="site"/>` — sync a local dir to a named
 /// bucket of the stack. Generalizes [`SiteSync`] (which hardcodes `examples/bsx_site`
-/// -> site bucket) to any (dir, bucket-label) pair.
+/// -> site bucket) to any (dir, bucket-label) pair. `stage` overrides the stack
+/// stage (which otherwise flows from `--stage`), eg `stage="shared"` to push the
+/// shared assets bucket.
 #[template]
 pub fn DirSync(
 	#[prop(into)] app_name: String,
 	#[prop(into)] bucket: String,
 	#[prop(into)] dir: String,
+	stage: Option<String>,
 ) -> impl Bundle {
-	let stack = infra_ext::stack(&app_name);
+	let stack = match stage {
+		Some(stage) => infra_ext::stack(&app_name).with_stage(stage),
+		None => infra_ext::stack(&app_name),
+	};
 	(
 		S3FsStore::new(
 			FsStore::new(WsPathBuf::new(dir)),
@@ -290,9 +306,11 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 		.store(&stack)
 		.bucket_name()
 		.to_string();
+	// the assets bucket lives on the `shared` stage: a source of record shared
+	// by developers, not owned by any deploy stage (see `AssetsBucket`).
 	let assets_bucket = S3BucketBlock::new("assets")
 		.with_deploy_versioned(false)
-		.store(&stack)
+		.store(&infra_ext::stack(&app_name).with_stage("shared"))
 		.bucket_name()
 		.to_string();
 	// the analytics DynamoDB table name, the same value `<AnalyticsTable/>` creates.
@@ -344,9 +362,19 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 /// Carries the standard IaC verb routes (validate/plan/apply/show/list/destroy/...)
 /// so `just beet validate`/`destroy` operate on the beet site, and a slot the
 /// declared `<Route>` deploy/sync/watch children land in.
+///
+/// `stage` overrides the stack's stage (which otherwise flows from `--stage`):
+/// `<Route path="shared"><BeetSiteDeployHost stage="shared">..` hosts the
+/// shared-stage resources (the assets bucket) with the same verbs under the
+/// `shared/` route prefix, so provisioning them is its own step
+/// (`beet shared apply`), separate from any stage deploy.
 #[template]
-pub fn BeetSiteDeployHost() -> impl Bundle {
-	(infra_ext::stack("beet-site"), children![
+pub fn BeetSiteDeployHost(stage: Option<String>) -> impl Bundle {
+	let stack = match stage {
+		Some(stage) => infra_ext::stack("beet-site").with_stage(stage),
+		None => infra_ext::stack("beet-site"),
+	};
+	(stack, children![
 		Validate,
 		Plan,
 		Apply,
@@ -357,4 +385,86 @@ pub fn BeetSiteDeployHost() -> impl Bundle {
 		Rollforward,
 		SlotTarget::new(),
 	])
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::infra::InfraExamplesPlugin;
+
+	fn test_world() -> World {
+		(
+			AsyncPlugin,
+			TemplatePlugin,
+			DocumentPlugin,
+			RouterPlugin,
+			InfraExamplesPlugin,
+		)
+			.into_world()
+	}
+
+	fn spawn_markup(world: &mut World, router: Entity, markup: &str) {
+		let nodes =
+			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
+		world
+			.spawn(ChildOf(router))
+			.insert_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap();
+		world.flush();
+	}
+
+	/// The `shared`-stage host, the shape `main.bsx` declares: its verb routes
+	/// nest under the `shared/` prefix, and the assets bucket resolves the
+	/// shared stack by ancestry (`beet-site--shared--assets`).
+	#[beet_core::test]
+	fn shared_host_prefixes_verbs_and_names_bucket() {
+		let mut world = test_world();
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Route path="shared">
+				<BeetSiteDeployHost stage="shared">
+					<AssetsBucket/>
+					<Route path="push" {ExchangeSequence}>
+						<DirSync app_name="beet-site" bucket="assets" dir="assets" stage="shared"/>
+					</Route>
+				</BeetSiteDeployHost>
+			</Route>"#,
+		);
+		let tree = world.entity(router).get::<RouteTree>().unwrap();
+		tree.find(&["shared", "validate"]).xpect_some();
+		tree.find(&["shared", "apply"]).xpect_some();
+		tree.find(&["shared", "push"]).xpect_some();
+		// the bucket block resolved the shared-stage stack by ancestry
+		world
+			.query::<&S3Store>()
+			.single(&world)
+			.unwrap()
+			.bucket_name()
+			.xpect_eq("beet-site--shared--assets");
+	}
+
+	/// `<DirSync stage="shared"/>` overrides the argv stage; the default stays
+	/// stage-scoped.
+	#[beet_core::test]
+	fn dir_sync_stage_prop() {
+		let mut world = test_world();
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<DirSync app_name="beet-site" bucket="assets" dir="assets" stage="shared"/>"#,
+		);
+		world
+			.query::<&S3FsStore>()
+			.single(&world)
+			.unwrap()
+			.s3_store()
+			.bucket_name()
+			.xpect_eq("beet-site--shared--assets");
+	}
 }
