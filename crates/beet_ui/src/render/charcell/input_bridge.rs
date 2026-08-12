@@ -354,27 +354,25 @@ mod test {
 	#[beet_core::test]
 	fn ctrl_c_byte_exits_local_surface() {
 		use crate::render::charcell::terminal::ChannelTerminal;
-		// the buffered headless `StdioTerminal` skips the tty/raw-mode setup its
-		// `on_add` would otherwise run. Set on the process config rather than
-		// through `unsafe` env mutation, which races any other thread reading it.
-		BootstrapConfig::set(BootstrapConfig {
-			headless: true,
-			..default()
-		});
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, CharcellTuiPlugin));
 		// the channel-backed Terminal lets us feed bytes into the real reader.
 		let (mut channel, terminal) =
 			ChannelTerminal::new(TerminalConfig::default());
+		// a headless `StdioTerminal` skips the tty/raw-mode setup its `on_add`
+		// would otherwise run, declared on the surface rather than through the
+		// process config so the case configures only itself.
 		let surface = app
 			.world_mut()
-			.spawn((StdioTerminal::default(), DoubleBuffer::new(UVec2::new(40, 12))))
+			.spawn((
+				StdioTerminal::default().with_headless(true),
+				DoubleBuffer::new(UVec2::new(40, 12)),
+			))
 			.id();
 		// flush the StdioTerminal on_add hook (it inserts a buffered Terminal),
 		// then overwrite that Terminal with the channel-backed one.
 		app.update();
 		app.world_mut().entity_mut(surface).insert(terminal);
-		BootstrapConfig::set(default());
 		app.update();
 		channel.send_input(&[0x03]).unwrap();
 		app.update();
@@ -528,15 +526,11 @@ mod test {
 	/// ctrl+c on the local stdio surface exits the process.
 	#[beet_core::test]
 	fn ctrl_c_exits_local_surface() {
-		// the buffered headless `StdioTerminal` skips the tty/raw-mode setup its
-		// `on_add` would otherwise run.
-		BootstrapConfig::set(BootstrapConfig {
-			headless: true,
-			..default()
+		// headless, so `on_add` skips the tty/raw-mode setup, see the ctrl+c byte
+		// case above.
+		let app = ctrl_c_from(|world| {
+			world.spawn(StdioTerminal::default().with_headless(true)).id()
 		});
-		let app =
-			ctrl_c_from(|world| world.spawn(StdioTerminal::default()).id());
-		BootstrapConfig::set(default());
 		exited(&app).xpect_true();
 	}
 

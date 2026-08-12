@@ -79,9 +79,21 @@ fn exit_when_all_windows_closed(
 /// exits once written. So any windowed beet scene is verifiable headlessly:
 /// `BEET_SCREENSHOT=/tmp/x.png beet --main=scene.bsx`.
 ///
-/// Reads the config directly rather than the resource: this runs at plugin-build
-/// time, before any scene (or the resource `ServerPlugin` inserts) exists.
+/// The arming is a [`PreStartup`] system, not work done in `build`: a plugin
+/// registers systems, it does not read config and conditionally insert resources.
+/// The capture systems then run only while armed.
 fn screenshot_verify_plugin(app: &mut App) {
+	app.add_systems(PreStartup, arm_screenshot_verify)
+		.add_systems(
+			Update,
+			(capture_screenshot, screenshot_timeout)
+				.run_if(resource_exists::<ScreenshotVerify>),
+		);
+}
+
+/// Insert [`ScreenshotVerify`] when the process config names an output PNG,
+/// leaving the harness inert otherwise.
+fn arm_screenshot_verify(mut commands: Commands) {
 	let config = BootstrapConfig::get();
 	let Some(path) = config.screenshot.as_ref() else {
 		return;
@@ -89,8 +101,7 @@ fn screenshot_verify_plugin(app: &mut App) {
 	let path = path.to_string();
 	let frame = config.screenshot_frame.unwrap_or(30);
 	info!("screenshot harness armed: path={path}, capture frame={frame}");
-	app.insert_resource(ScreenshotVerify { path, frame })
-		.add_systems(Update, (capture_screenshot, screenshot_timeout));
+	commands.insert_resource(ScreenshotVerify { path, frame });
 }
 
 // safety net: exit a few seconds past the target frame even if the capture never

@@ -30,6 +30,15 @@ pub struct StdioTerminal {
 	/// corrupt the alternate screen. `None` renders to `stdout` as-is (eg for
 	/// inline mode). Relative paths resolve against the working directory.
 	log_file: Option<PathBuf>,
+	/// Render into a buffer instead of the real tty: no raw mode, alt screen,
+	/// mouse or restore hook, so a scene declaring a [`StdioTerminal`] still
+	/// spawns and reduces without taking over the controlling terminal or leaking
+	/// escapes into it. For tests, CI and automation.
+	///
+	/// Defaults from the process `--headless` / `BEET_HEADLESS`; a test that wants
+	/// a buffered surface sets the field rather than the process config.
+	#[get(copy)]
+	headless: bool,
 	config: TerminalConfig,
 }
 
@@ -39,6 +48,7 @@ impl Default for StdioTerminal {
 			restore_hook: true,
 			ctrl_c_exit: true,
 			log_file: Some(PathBuf::from("target/beet-log.txt")),
+			headless: BootstrapConfig::get().headless,
 			config: TerminalConfig::default().with_raw_mode(true),
 		}
 	}
@@ -61,14 +71,8 @@ impl StdioTerminal {
 		// from the process env (an SSH session detects from its pty instead). Bundled
 		// with the Terminal insert below so the `stdio` borrow above is untouched.
 		let graphics = KittyGraphicsSupport::default();
-		// `--headless` / `BEET_HEADLESS` (tests, CI, automation): a buffered terminal
-		// that never touches the real tty (no raw mode, alt screen, mouse, or restore
-		// hook), so a scene that declares a `StdioTerminal` still spawns and reduces
-		// without taking over or leaking escapes into the controlling terminal.
-		// Read from the process config rather than the resource: a terminal spawns in
-		// worlds with no server plugin (the charcell tests), which set the env
-		// directly.
-		if BootstrapConfig::get().headless {
+		// a buffered terminal never touches the real tty, see `headless`.
+		if stdio.headless {
 			world
 				.commands()
 				.entity(cx.entity)

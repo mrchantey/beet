@@ -40,13 +40,12 @@ pub struct PackageConfig {
 /// The defaults govern unset fields for markup-only sites: a markup-declared
 /// `<PackageConfig/>` is built over these when no host inserted a [`pkg_config!`].
 ///
-/// Unlike the compile-time [`pkg_config!`], `stage` and `service_access` resolve
-/// from the *runtime* [`BootstrapConfig`] (falling back to `dev`/`Local`), so the
-/// same markup binary deployed to multiple stages reports the stage it is
-/// actually running in.
+/// Static values only. The *runtime* stage and service access come from
+/// [`from_bootstrap`](PackageConfig::from_bootstrap), which `BootstrapPlugin`
+/// seeds at [`PreStartup`]: resolving config inside a `Default` impl hides where
+/// it happens and cannot be ordered.
 impl Default for PackageConfig {
 	fn default() -> Self {
-		let bootstrap = BootstrapConfig::get();
 		Self {
 			title: "My Beet App".into(),
 			description: "An app built with beet".into(),
@@ -54,10 +53,8 @@ impl Default for PackageConfig {
 			version: "0.0.1".into(),
 			homepage: None,
 			repository: None,
-			stage: bootstrap.stage.clone().unwrap_or_else(|| "dev".into()),
-			service_access: bootstrap
-				.service_access
-				.unwrap_or(ServiceAccess::Local),
+			stage: "dev".into(),
+			service_access: ServiceAccess::Local,
 		}
 	}
 }
@@ -97,6 +94,23 @@ impl std::fmt::Display for ServiceAccess {
 }
 
 impl PackageConfig {
+	/// The defaults with `stage` and `service_access` resolved from the process
+	/// [`BootstrapConfig`], so the same markup binary deployed to multiple stages
+	/// reports the stage it is actually running in.
+	///
+	/// Seeded by `BootstrapPlugin` at [`PreStartup`]; a markup `<PackageConfig/>`
+	/// then patches the live resource, keeping whatever it does not name.
+	pub fn from_bootstrap() -> Self {
+		let bootstrap = BootstrapConfig::get();
+		Self {
+			stage: bootstrap.stage.clone().unwrap_or_else(|| "dev".into()),
+			service_access: bootstrap
+				.service_access
+				.unwrap_or(ServiceAccess::Local),
+			..default()
+		}
+	}
+
 	/// Returns the binary name if set.
 	pub fn binary_name(&self) -> Option<&str> { self.binary_name.as_deref() }
 

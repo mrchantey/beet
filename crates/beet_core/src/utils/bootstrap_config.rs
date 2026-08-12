@@ -1,6 +1,7 @@
 //! The process-config type every beet binary boots from.
 
 use crate::prelude::*;
+use bevy::platform::sync::LazyLock;
 use core::fmt::Display;
 use core::net::IpAddr;
 use core::str::FromStr;
@@ -16,21 +17,34 @@ use core::str::FromStr;
 /// affordances: a human types argv, a platform writes env into a unit file or a
 /// task definition.
 ///
-/// ## Constructing it
+/// ## Reading it
 ///
-/// - [`from_env`](Self::from_env) once per process, before the registry or the
-///   scene exist. World-free consumers (a `Default` impl, `Stack::new`, the
-///   binary's pre-world entry resolution) call it directly, usually through
-///   [`from_env_or_warn`](Self::from_env_or_warn).
-/// - [`from_params`](Self::from_params) over a routed request's params, for the
-///   `serve` / `check` / `export-static` / `export-pdf` commands.
-/// - [`parse_params`](Self::parse_params) for an overlay that must *not* consult
-///   env, ie a server's boot request applied over its markup-declared fields.
-/// - As a resource for world consumers, which `ServerPlugin` inserts from
-///   [`from_env_or_warn`](Self::from_env_or_warn). Deliberately inserted rather
-///   than `init_resource`d: [`Default`] is the *empty* config (so a parent can
-///   build a child's config field by field with `..default()`), and a world with
-///   no plugin reading no ambient config is the right fallback.
+/// **The process config is a process-global singleton, not a resource.** Launch
+/// arguments are a fact about the process, not state an app owns: there is one
+/// argv, it never changes, and it must be readable from places that have no
+/// world at all (a [`Default`] impl, `Stack::new`, a plugin's `build`, the
+/// binary's pre-world entry resolution). Modelling it as a resource forced world
+/// access into all of those *and* left two sources of truth, since a `Default`
+/// impl could only reach the environment. So it follows `CanonicalPort`: one
+/// static, read through [`get`](Self::get) from anywhere.
+///
+/// - [`get`](Self::get): the process config, parsed from argv + env on first
+///   read and memoized. Never fails; a malformed field warns and falls back to
+///   its static default, since a `Default` impl has no error channel.
+/// - [`set`](Self::set): override it, for a host that supplies config some other
+///   way (an embedded target with no argv, a test pinning one field). Set it
+///   before the app boots; `BootstrapPlugin` otherwise assigns it at
+///   [`PreStartup`].
+/// - [`from_env`](Self::from_env): the same parse, *strict*. `BootstrapPlugin`
+///   runs it so a malformed `--port=nope` fails the app loudly instead of only
+///   warning.
+///
+/// A *request* is a different scope and keeps its own constructors:
+/// [`from_params`](Self::from_params) (a routed request's params, env as
+/// fallback) for the `serve` / `check` / `export-static` / `export-pdf` commands,
+/// and [`parse_params`](Self::parse_params) for an overlay that must not consult
+/// env at all, ie a server's boot request applied over its markup-declared
+/// fields.
 ///
 /// ## Rendering it
 ///
@@ -42,7 +56,7 @@ use core::str::FromStr;
 /// Secrets are deliberately absent: the type has no secret field, so no renderer
 /// can put one on an argv line, a `CMD` array or a systemd `ExecStart`. Secrets
 /// stay env on their existing channels.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
@@ -190,27 +204,31 @@ impl BootstrapConfig {
 		env: "BEET_SCREENSHOT_FRAME",
 	};
 
-	/// The process config: this process's argv, with the `BEET_*` environment as
-	/// the fallback for every field argv did not set.
+	/// Parse this process's argv, with the `BEET_*` environment as the fallback for
+	/// every field argv did not set. Strict: a malformed value errors.
 	///
-	/// Pure and cheap, callable before a world exists. In a browser
-	/// [`env_ext::args`] yields the location query, so `?server=http` still
-	/// selects; in a Cloudflare Worker both sources are empty and every field
+	/// Most callers want [`get`](Self::get), which memoizes and cannot fail. This
+	/// is what [`BootstrapPlugin`] runs at [`PreStartup`] so a malformed value is
+	/// still surfaced through the app's error handler.
+	///
+	/// In a browser [`env_ext::args`] yields the location query, so `?server=http`
+	/// still selects; in a Cloudflare Worker both sources are empty and every field
 	/// resolves to `None`, which is correct (the Worker resolves its store from
 	/// bindings).
 	pub fn from_env() -> Result<Self> {
 		Self::from_params(&CliArgs::parse_env().params)
 	}
 
-	/// [`from_env`](Self::from_env) for a context that cannot fail: a `Default`
-	/// impl, which has no error channel to raise on. A malformed field warns and
-	/// resolves to `None` (so that field falls back to its static default);
-	/// everything else still parses.
-	pub fn from_env_or_warn() -> Self {
-		Self::parse_lenient(&CliArgs::parse_env().params, &|key| {
-			env_ext::var(key).ok().map(SmolStr::from)
-		})
-	}
+	/// The process config, parsed from argv + env on first read and memoized
+	/// forever.
+	///
+	/// The single read path, callable from anywhere: a `Default` impl, a plugin's
+	/// `build`, a world-free helper. Never fails, because most callers have no
+	/// error channel; a malformed field warns and falls back to its static
+	/// default, and [`BootstrapPlugin`] re-runs the strict
+	/// [`from_env`](Self::from_env) at [`PreStartup`] to turn that into a real
+	/// error.
+	pub fn get() -> &'static Self { &BOOTSTRAP }
 
 	/// The config a routed request carries, with the `BEET_*` environment as the
 	/// fallback for every field the params did not set. What the `serve` /
@@ -532,6 +550,64 @@ impl BootstrapConfig {
 			);
 		}
 		Ok(())
+	}
+}
+
+/// The process config, parsed on first read and never mutated.
+///
+/// A [`LazyLock`] rather than a settable cell: argv and env do not change, so the
+/// value is the same whenever it is computed and *when* it freezes cannot matter.
+/// That removes the whole class of ordering hazards a mutable global carries (a
+/// lost write, a read that freezes the wrong value) rather than mitigating them.
+/// no_std-capable, like [`CanonicalPort`](crate::prelude::CanonicalPort).
+///
+/// The initializer is deliberately the *lenient* parse: a panicking [`LazyLock`]
+/// initializer poisons the cell, and this is reached from `Default` impls that
+/// cannot fail.
+static BOOTSTRAP: LazyLock<BootstrapConfig> = LazyLock::new(|| {
+	BootstrapConfig::parse_lenient(&CliArgs::parse_env().params, &|key| {
+		env_ext::var(key).ok().map(SmolStr::from)
+	})
+});
+
+/// Validates the process [`BootstrapConfig`] at [`PreStartup`], and seeds the
+/// [`PackageConfig`] derived from it.
+///
+/// It does not *assign* the config: [`BootstrapConfig::get`] owns that, lazily and
+/// immutably. What this adds is the strict [`BootstrapConfig::from_env`] parse, so
+/// a malformed `--port=nope` fails the app through its error handler instead of
+/// only warning. That matters more than it looks: the lazy parse can happen before
+/// `LogPlugin` initializes, where its warnings go nowhere, while a `PreStartup`
+/// system runs with logging up.
+#[derive(Default)]
+pub struct BootstrapPlugin;
+
+impl Plugin for BootstrapPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(
+			PreStartup,
+			(validate_process_config, seed_package_config).chain(),
+		);
+	}
+}
+
+/// The [`PreStartup`] validation, see [`BootstrapPlugin`]. The parsed value is
+/// discarded: [`BootstrapConfig::get`] already holds the equivalent lenient parse,
+/// so this exists purely to raise on a malformed field.
+fn validate_process_config() -> Result {
+	BootstrapConfig::from_env()?;
+	Ok(())
+}
+
+/// The [`PreStartup`] [`PackageConfig`] seed, see [`BootstrapPlugin`]. Inserts the
+/// bootstrap-derived config unless a host already supplied one (a
+/// [`pkg_config!`](crate::pkg_config) with the real crate metadata), so the
+/// stage-reporting fields are resolved in one place rather than inside
+/// `PackageConfig::default`. A markup `<PackageConfig/>` patches the live
+/// resource afterwards, keeping whatever it does not name.
+fn seed_package_config(world: &mut World) {
+	if !world.contains_resource::<PackageConfig>() {
+		world.insert_resource(PackageConfig::from_bootstrap());
 	}
 }
 
