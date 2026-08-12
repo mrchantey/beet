@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 /// Parses CLI args into request-style path and query parameters.
-// TODO deprecate, just use Parts directly
 #[derive(Debug, Clone)]
 pub struct CliArgs {
 	/// Positional arguments forming the path.

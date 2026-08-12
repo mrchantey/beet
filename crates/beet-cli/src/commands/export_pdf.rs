@@ -60,10 +60,9 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ExportPdfParams>()?;
 	let entry_path = entry_arg(parts)?;
-	let config = BootstrapConfig::from_params(parts.params())?;
 	let root = build_entry(
 		&cx.caller,
-		&config,
+		&BootstrapConfig::from_params(parts.params())?,
 		&entry_path,
 		Some(ONE_SHOT_SETTLE_DEADLINE),
 	)
@@ -118,7 +117,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	if let Some(exclude) = &params.exclude {
 		filter = filter.with_exclude(exclude);
 	}
-	let paths = StaticExport::collect_paths(&cx.world(), root, &config)
+	let paths = StaticExport::collect_paths(&cx.world(), root)
 		.await?
 		.into_iter()
 		.filter(|path| filter.passes(path.as_str()))

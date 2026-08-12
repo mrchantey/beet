@@ -18,6 +18,7 @@ mod as_any;
 pub mod async_ext;
 mod backoff;
 mod cfg_if;
+mod cli_args;
 /// Coalescing trigger for async write deduplication.
 mod coalescing_trigger;
 pub mod cross_log;
@@ -78,6 +79,7 @@ pub use async_ext::SendBoxedFuture;
 pub use async_ext::SendSyncBoxedFuture;
 pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
+pub use cli_args::*;
 pub use coalescing_trigger::*;
 pub use file_span::*;
 pub use glob_filter::*;
