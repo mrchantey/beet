@@ -150,14 +150,18 @@ impl Block for LambdaBlock {
 					AwsLambdaFunctionResourceBlockTypeEnvironment {
 						variables: Some({
 							let mut vars = std::collections::BTreeMap::new();
-							vars.insert(
-								"BEET_DEPLOY_ID".into(),
-								stack.deploy_id().to_string().into(),
-							);
-							vars.insert(
-								"BEET_DEPLOY_TIMESTAMP".into(),
-								stack.deploy_timestamp().to_string().into(),
-							);
+							// the deploy identity, named by the same table the
+							// runtime parses.
+							let runtime = BootstrapConfig {
+								deploy_id: Some(stack.deploy_id().to_string().into()),
+								deploy_timestamp: Some(
+									stack.deploy_timestamp().to_string().into(),
+								),
+								..default()
+							};
+							for (key, value) in runtime.to_env() {
+								vars.insert(key, value.to_string().into());
+							}
 							// add env_vars as terraform variable references
 							for variable in &self.env_vars {
 								vars.insert(

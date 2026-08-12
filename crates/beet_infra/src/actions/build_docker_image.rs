@@ -28,25 +28,16 @@ impl ContainerEngine {
 
 /// Configuration for building Docker/Podman images. Builds + pushes the image as
 /// part of a deploy sequence, so it requires its [`BuildDockerImageAction`].
-#[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
+///
+/// The image `CMD` is not configured here: it is rendered from the sibling
+/// [`FargateBlock`]'s [`BootstrapConfig`], so the deployed binary's argv and the
+/// task definition's env come from one declaration.
+#[derive(Debug, Default, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Component, Default)]
 #[require(BuildDockerImageAction)]
 pub struct BuildDockerImage {
 	/// Container engine to use (Docker or Podman).
 	pub engine: ContainerEngine,
-	/// Arguments appended to the binary in the image `CMD`, eg
-	/// `["serve", "--server=http,ssh"]` so the container runs
-	/// `beet serve --server=http,ssh`. Empty runs the bare binary.
-	pub cmd_args: Vec<SmolStr>,
-}
-
-impl Default for BuildDockerImage {
-	fn default() -> Self {
-		Self {
-			engine: ContainerEngine::default(),
-			cmd_args: Vec::new(),
-		}
-	}
 }
 
 impl BuildDockerImage {
@@ -54,7 +45,6 @@ impl BuildDockerImage {
 	pub fn with_docker() -> Self {
 		Self {
 			engine: ContainerEngine::Docker,
-			..default()
 		}
 	}
 
@@ -62,26 +52,16 @@ impl BuildDockerImage {
 	pub fn with_podman() -> Self {
 		Self {
 			engine: ContainerEngine::Podman,
-			..default()
 		}
-	}
-
-	/// Set the arguments appended to the binary in the image `CMD`.
-	pub fn with_cmd_args(
-		mut self,
-		args: impl IntoIterator<Item = impl Into<SmolStr>>,
-	) -> Self {
-		self.cmd_args = args.into_iter().map(Into::into).collect();
-		self
 	}
 }
 
 /// Builds and pushes a container image to ECR for Fargate deployment.
 /// Looks for a [`BuildArtifact`] sibling to find the binary to containerize,
-/// and a [`FargateBlock`] sibling to determine the ECR repository name. Reads its
-/// own [`BuildDockerImage`] for the engine + `CMD` args, so the config component
-/// requires this action (not the reverse, which would cycle), eg
-/// `<BuildDockerImage/>` spawns both.
+/// and a [`FargateBlock`] sibling for the ECR repository name and the `CMD`
+/// bootstrap config. Reads its own [`BuildDockerImage`] for the engine, so the
+/// config component requires this action (not the reverse, which would cycle),
+/// eg `<BuildDockerImage/>` spawns both.
 #[action]
 #[derive(Default, Component)]
 pub async fn BuildDockerImageAction(
@@ -188,18 +168,14 @@ pub async fn BuildDockerImageAction(
 	if block.allow_ssh() {
 		expose.push_str(&format!("EXPOSE {}\n", block.ssh_container_port()));
 	}
-	// the `CMD` runs the copied binary at `/app` with any configured args, eg
-	// `["/app", "serve", "--server=http,ssh"]`, then the block's runtime args
-	// (eg `--store=s3://<bucket>`), so deploy config reaches the binary as argv
-	// (the site itself is pulled from S3 at boot, not baked in).
-	let cmd_json = core::iter::once("/app")
-		.chain(docker_config.cmd_args.iter().map(SmolStr::as_str))
-		.chain(block.runtime_args().iter().map(SmolStr::as_str))
-		.map(|arg| format!("\"{arg}\""))
-		.collect::<Vec<_>>()
-		.join(", ");
+	// the `CMD` runs the copied binary at `/app` with the block's argv-channel
+	// bootstrap config, eg `["/app", "--store=s3://<bucket>", "--server=http,ssh"]`,
+	// so deploy config reaches the binary as argv (the site itself is pulled from
+	// S3 at boot, not baked in). Rendered as a real JSON array, so the encoding is
+	// correct by construction rather than by a hand-written quote join.
+	let cmd_json = block.cmd_bootstrap().to_cmd_json("/app")?;
 	let dockerfile_content = format!(
-		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\n{}CMD [{}]\n",
+		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\n{}CMD {}\n",
 		base_image,
 		setup_commands,
 		binary_filename.to_string_lossy(),

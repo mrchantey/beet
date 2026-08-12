@@ -13,9 +13,9 @@
 //! An entry's *own* markup may reference a template at parse time (eg `<Styles/>`),
 //! which must resolve before the entry builds. That case is handled by reading the
 //! entry's declared dirs and registering them synchronously *before* the entry
-//! parses (see [`TemplateDir::extract_dirs`] and the cli's `build_entry_root`); the
-//! reactive observer covers everything that resolves later (route pages, library
-//! widgets, live reload).
+//! parses (see [`EntryPrescan`] and the cli's entry build); the reactive observer
+//! covers everything that resolves later (route pages, library widgets, live
+//! reload).
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -228,42 +228,6 @@ impl TemplateDir {
 		BsxTemplateRegistry::refresh_schemas(world);
 		Ok(())
 	}
-
-	/// Collect the `src` of every `<TemplateDir>` element in a parsed entry tree,
-	/// the registry-free pre-scan the cli runs to register an entry's own template
-	/// dirs before the entry parses (so entry-level tags like `<Styles/>` resolve).
-	pub fn extract_dirs(nodes: &[BsxNode]) -> Vec<String> {
-		let mut dirs = Vec::new();
-		Self::collect_dirs(nodes, &mut dirs);
-		dirs
-	}
-
-	/// Recursively collect `<TemplateDir src=..>` declarations from `nodes`.
-	fn collect_dirs(nodes: &[BsxNode], dirs: &mut Vec<String>) {
-		for node in nodes {
-			let BsxNode::Element(element) = node else {
-				continue;
-			};
-			if element.tag == "TemplateDir"
-				&& let Some(src) = Self::element_src(element)
-			{
-				dirs.push(src);
-			}
-			Self::collect_dirs(&element.children, dirs);
-		}
-	}
-
-	/// The string value of an element's `src` attribute, if present.
-	fn element_src(element: &BsxElement) -> Option<String> {
-		element
-			.attributes
-			.iter()
-			.find(|attr| attr.key == "src")
-			.and_then(|attr| match &attr.value {
-				AttrValue::Str(src) => Some(src.clone()),
-				_ => None,
-			})
-	}
 }
 
 #[cfg(test)]
@@ -285,19 +249,6 @@ mod test {
 				.unwrap();
 		}
 		store
-	}
-
-	/// `extract_dirs` finds every `<TemplateDir>` src, at any depth, from a parsed
-	/// entry tree.
-	#[beet_core::test]
-	fn extract_dirs_walks_tree() {
-		let nodes = BsxNode::parse_document(
-			"<Router><TemplateDir src=\"templates\"/><div><TemplateDir src=\"more\"/></div></Router>",
-			&BsxParseConfig::bsx(),
-		)
-		.unwrap();
-		TemplateDir::extract_dirs(&nodes)
-			.xpect_eq(vec!["templates".to_string(), "more".to_string()]);
 	}
 
 	/// Inserting a [`TemplateDir`] over a store registers its templates so a

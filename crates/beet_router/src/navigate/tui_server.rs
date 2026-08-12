@@ -56,16 +56,17 @@ fn on_action_in(
 	else {
 		return Ok(());
 	};
-	let (selected, opening, scheme) = ev.with(|request| {
+	let (selected, opening, scheme) = ev.with(|request| -> Result<_> {
 		(
 			// this server's own default unless `--server` names a set.
-			Request::selects_server(request, "tui", default_boot),
-			OpeningRoute::from_request(request),
+			Request::selects_server(request, "tui", default_boot)?,
+			OpeningRoute::from_request(request)?,
 			request
 				.get_param("color-scheme")
 				.and_then(ColorScheme::parse),
 		)
-	})?;
+			.xok()
+	})??;
 	if !selected {
 		return Ok(());
 	}

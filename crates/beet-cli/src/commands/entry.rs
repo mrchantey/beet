@@ -10,9 +10,10 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 /// Load the entry onto the caller's world through its [`BlobStore`], returning its
-/// root entity. Resolution is the binary's own [`entry_build::resolve_main`] (the `--store`
-/// param picks the backend, the entry's `<StoreRoot src>` widens the root), so the
-/// same resolution serves `beet --main=..` and these commands.
+/// root entity. Resolution is the binary's own [`entry_build::resolve_main`] (the
+/// request's [`BootstrapConfig`] `--store` picks the backend, the entry's
+/// `<StoreRoot src>` widens the root), so the same resolution serves
+/// `beet --main=..` and these commands.
 ///
 /// `check`/`export-static` render the entry rather than serve it, so the root
 /// carries [`DisableCallOnLoad`] to keep the entry's `CallOnLoad` verb dormant.
@@ -27,19 +28,23 @@ use beet::prelude::*;
 /// stall to wait out, not a failed run.
 pub(crate) async fn build_entry(
 	caller: &AsyncEntity,
-	params: &MultiMap<SmolStr, SmolStr>,
+	config: &BootstrapConfig,
 	entry_path: &str,
 	settle_deadline: Option<Duration>,
 ) -> Result<Entity> {
 	let ResolvedEntry {
-		store, entry_name, ..
-	} = entry_build::resolve_main(params, entry_path).await?;
+		store,
+		entry_name,
+		prescan,
+		..
+	} = entry_build::resolve_main(config, entry_path).await?;
 	let formats = caller
 		.with_world(|world, _| {
 			world.get_resource_or_init::<TemplateFormats>().clone()
 		})
 		.await?;
-	let sources = entry_build::read_sources(&store, formats, entry_name).await?;
+	let sources =
+		entry_build::read_sources(&store, formats, entry_name, prescan).await?;
 	let root = caller
 		.with_world(move |world, _| {
 			entry_build::build_root(world, store, sources, DisableCallOnLoad)
@@ -125,10 +130,12 @@ mod test {
 	#[beet::test]
 	async fn resolves_dir_and_entry_file() {
 		// a dir resolves to its highest-priority `entry_build::ENTRY_NAMES` entry (`main.bsx` here)
-		let dir =
-			entry_build::resolve_main(&default(), entry_path().to_string_lossy().as_ref())
-				.await
-				.unwrap();
+		let dir = entry_build::resolve_main(
+			&default(),
+			entry_path().to_string_lossy().as_ref(),
+		)
+		.await
+		.unwrap();
 		dir.entry_name.xpect_eq("main.bsx");
 		// passing the entry file itself roots the store at its parent
 		let file = entry_build::resolve_main(
@@ -165,14 +172,21 @@ mod test {
 	async fn entry_declares_server_and_app_routes() {
 		let mut world = render_world();
 		let ResolvedEntry {
-			store, entry_name, ..
-		} = entry_build::resolve_main(&default(), entry_path().to_string_lossy().as_ref())
-			.await
-			.unwrap();
+			store,
+			entry_name,
+			prescan,
+			..
+		} = entry_build::resolve_main(
+			&default(),
+			entry_path().to_string_lossy().as_ref(),
+		)
+		.await
+		.unwrap();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources = entry_build::read_sources(&store, formats, entry_name)
-			.await
-			.unwrap();
+		let sources =
+			entry_build::read_sources(&store, formats, entry_name, prescan)
+				.await
+				.unwrap();
 		let root =
 			entry_build::build_root(&mut world, store, sources, DisableCallOnLoad)
 				.unwrap();

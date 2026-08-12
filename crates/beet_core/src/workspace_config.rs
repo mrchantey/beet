@@ -41,11 +41,12 @@ pub struct PackageConfig {
 /// `<PackageConfig/>` is built over these when no host inserted a [`pkg_config!`].
 ///
 /// Unlike the compile-time [`pkg_config!`], `stage` and `service_access` resolve
-/// from the *runtime* `BEET_STAGE`/`BEET_SERVICE_ACCESS` env vars (falling back to
-/// `dev`/`Local`), so the same markup binary deployed to multiple stages reports the
-/// stage it is actually running in.
+/// from the *runtime* [`BootstrapConfig`] (falling back to `dev`/`Local`), so the
+/// same markup binary deployed to multiple stages reports the stage it is
+/// actually running in.
 impl Default for PackageConfig {
 	fn default() -> Self {
+		let bootstrap = BootstrapConfig::from_env_or_warn();
 		Self {
 			title: "My Beet App".into(),
 			description: "An app built with beet".into(),
@@ -53,12 +54,9 @@ impl Default for PackageConfig {
 			version: "0.0.1".into(),
 			homepage: None,
 			repository: None,
-			stage: env_ext::var("BEET_STAGE")
-				.map(SmolStr::from)
-				.unwrap_or_else(|_| "dev".into()),
-			service_access: env_ext::var("BEET_SERVICE_ACCESS")
-				.ok()
-				.and_then(|access| access.parse().ok())
+			stage: bootstrap.stage.unwrap_or_else(|| "dev".into()),
+			service_access: bootstrap
+				.service_access
 				.unwrap_or(ServiceAccess::Local),
 		}
 	}
@@ -69,6 +67,7 @@ impl Default for PackageConfig {
 /// For instance, a bucket that should use the local file system during
 /// development but an s3 bucket when deployed.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ServiceAccess {
 	/// Services should be accessed via filesystem and local servers.
 	Local,

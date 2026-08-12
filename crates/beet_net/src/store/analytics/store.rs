@@ -51,11 +51,14 @@ pub(super) fn spawn_store_on_config(
 					.get_resource::<PackageConfig>()
 					.cloned()
 					.unwrap_or_default();
-				// the remote table name is the deploy-provided `BEET_ANALYTICS_TABLE`
-				// (like `BEET_SITE_BUCKET`), so the deploy owns the name; the
+				// the remote table name is the deploy-provided `--analytics-table`
+				// / `BEET_ANALYTICS_TABLE`, so the deploy owns the name; the
 				// package-derived name is the fallback for a self-named build.
-				let table_name = env_ext::var("BEET_ANALYTICS_TABLE")
-					.unwrap_or_else(|_| pkg.analytics_bucket_name());
+				let table_name = world
+					.get_resource::<BootstrapConfig>()
+					.and_then(|config| config.analytics_table.as_deref())
+					.map(str::to_string)
+					.unwrap_or_else(|| pkg.analytics_bucket_name());
 				(
 					ws.analytics_dir.into_abs(),
 					ws.assets_dir.into_abs(),
@@ -79,6 +82,12 @@ pub(super) fn spawn_store_on_config(
 /// The assets [`BlobStore`]: the deploy-provided `BEET_ASSETS_BUCKET` when
 /// running remote (the container has no local assets, see `AssetsStore` in
 /// beet_router), else the local assets dir.
+///
+/// The one sanctioned direct `BEET_*` read left outside [`BootstrapConfig`]:
+/// `BEET_ASSETS_BUCKET` / `BEET_S3_ENDPOINT` are not config fields because the
+/// store-topology phase deletes `AssetsStore` outright, at which point the
+/// deployed runtime reads one app bucket that physically contains `assets/` and
+/// there is no assets uri on any transport.
 #[allow(unused_variables)]
 fn assets_store(assets_dir: &AbsPathBuf, access: ServiceAccess) -> BlobStore {
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]

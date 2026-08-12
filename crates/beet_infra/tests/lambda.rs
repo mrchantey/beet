@@ -140,7 +140,7 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 			"--features".into(),
 			"deploy,beet_net/lambda".into(),
 		])
-		.into_lambda_build_artifact();
+		.into_lambda_build_artifact()?;
 
 	let _response = AsyncPlugin::world()
 		.spawn((

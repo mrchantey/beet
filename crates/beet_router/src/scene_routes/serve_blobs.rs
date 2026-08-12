@@ -77,11 +77,14 @@ pub(crate) async fn ServeBlobsHandler(
 /// [`ServeBlobs`], which owns the mount path:
 /// `<ServeBlobs prefix="assets" {AssetsStore}/>`.
 ///
-/// The assets glue, resolving where the served files come from. A WIP shim: it
-/// is the last store still selected by env (`BEET_ASSETS_BUCKET`,
-/// `BEET_S3_ENDPOINT`) rather than by the `--store` arg the entry store now uses,
-/// and it hardcodes a workspace-relative native fallback. Both fold away with the
-/// bootstrap-config work (`.agents/plans/bootstrap-config.md`).
+/// The assets glue, resolving where the served files come from. A WIP shim, and
+/// the one sanctioned direct `BEET_*` read left outside [`BootstrapConfig`]:
+/// `BEET_ASSETS_BUCKET` / `BEET_S3_ENDPOINT` are deliberately *not* config fields
+/// because the store-topology phase deletes this template outright rather than
+/// migrating it (`.agents/plans/bootstrap-config.md` section 8). At that point
+/// the deployed runtime reads one app bucket that physically contains `assets/`,
+/// serving becomes pure store inheritance (`<ServeBlobs prefix="assets"/>`), and
+/// there is no assets uri on any transport to name.
 #[template]
 pub fn AssetsStore() -> impl Bundle {
 	OnSpawn::new(|entity: &mut EntityWorldMut| {

@@ -56,6 +56,89 @@ impl BlobStore {
 		}
 	}
 
+	/// Build the store a [`StoreUri`] names, `dir` rooting the dir-rooted kinds
+	/// (the resolved entry directory for an entry store) and ignored by the
+	/// self-rooted ones.
+	///
+	/// The single construction seam for store selection, shared by the binary's
+	/// entry resolution and the `check`/`serve`/`export-static` commands, so every
+	/// entry load is store-driven rather than filesystem-bound. A kind whose
+	/// backend this build did not compile errors with guidance rather than
+	/// degrading: the store concept is target-agnostic, only the backend is gated.
+	#[cfg(feature = "std")]
+	pub fn from_uri(uri: &StoreUri, dir: AbsPathBuf) -> Result<BlobStore> {
+		match uri {
+			StoreUri::Fs { path: None } => BlobStore::new(FsStore::new(dir)).xok(),
+			StoreUri::Fs { path: Some(path) } => {
+				BlobStore::new(FsStore::new(dir.join(path.as_str()))).xok()
+			}
+			StoreUri::Memory => BlobStore::temp().xok(),
+			StoreUri::S3 {
+				bucket,
+				endpoint,
+				region,
+			} => Self::s3_from_uri(bucket, endpoint.as_deref(), region.as_deref()),
+			#[cfg(target_arch = "wasm32")]
+			StoreUri::LocalStorage => {
+				BlobStore::new(LocalStorageStore::new("beet")).xok()
+			}
+			#[cfg(target_arch = "wasm32")]
+			StoreUri::IndexedDb => {
+				BlobStore::new(IndexedDbStore::new("beet")).xok()
+			}
+			#[cfg(not(target_arch = "wasm32"))]
+			StoreUri::LocalStorage | StoreUri::IndexedDb => bevybail!(
+				"store `{uri}` is browser storage, only available on wasm"
+			),
+		}
+	}
+
+	/// The [`S3Store`]-backed store for an `s3://` uri. An `endpoint` (eg
+	/// `https://<account>.r2.cloudflarestorage.com`) switches onto an
+	/// S3-compatible service such as Cloudflare R2 with region `auto`, so one
+	/// binary serves identically on AWS S3 and R2; otherwise the region falls back
+	/// to the SDK's `AWS_REGION` convention, then `us-west-2`.
+	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+	fn s3_from_uri(
+		bucket: &str,
+		endpoint: Option<&str>,
+		region: Option<&str>,
+	) -> Result<BlobStore> {
+		let store = match endpoint {
+			Some(endpoint) => {
+				info!("entry store: r2/s3 bucket `{bucket}` ({endpoint})");
+				S3Store::new(bucket, region.unwrap_or("auto"))
+					.with_endpoint(endpoint)
+			}
+			None => {
+				let region = region
+					.map(str::to_string)
+					.or_else(|| env_ext::var("AWS_REGION").ok())
+					.unwrap_or_else(|| "us-west-2".to_string());
+				info!("entry store: s3 bucket `{bucket}` ({region})");
+				S3Store::new(bucket, region)
+			}
+		};
+		BlobStore::new(store).xok()
+	}
+
+	/// Without a compiled S3 backend the request errors with guidance rather than
+	/// degrading.
+	#[cfg(all(
+		feature = "std",
+		not(all(feature = "aws_sdk", not(target_arch = "wasm32")))
+	))]
+	fn s3_from_uri(
+		_bucket: &str,
+		_endpoint: Option<&str>,
+		_region: Option<&str>,
+	) -> Result<BlobStore> {
+		bevybail!(
+			"an s3:// store requires a compiled S3 backend (enable the `aws_sdk` \
+			feature, native only)"
+		)
+	}
+
 	/// Returns a new store scoped to the given subdirectory.
 	pub fn with_subdir(&self, path: SmolPath) -> BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))

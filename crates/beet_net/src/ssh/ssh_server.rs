@@ -161,27 +161,14 @@ impl SshServer {
 }
 
 impl Default for SshServer {
-	/// Reads `BEET_SSH_PORT` / `BEET_HOST` where there is an environment (a deployed
-	/// server sets `BEET_HOST=0.0.0.0`), falling back to localhost on
-	/// [`DEFAULT_SSH_PORT`] otherwise.
+	/// Reads the process [`BootstrapConfig`] (`--ssh-port` / `BEET_SSH_PORT` and
+	/// `--host` / `BEET_HOST`, a deployed server sets `BEET_HOST=0.0.0.0`),
+	/// falling back to localhost on [`DEFAULT_SSH_PORT`].
 	fn default() -> Self {
-		let port = env_ext::var("BEET_SSH_PORT")
-			.ok()
-			.and_then(|val| val.parse().ok())
-			.unwrap_or(DEFAULT_SSH_PORT);
-		let host = env_ext::var("BEET_HOST")
-			.ok()
-			.map(|val| {
-				if val == "0.0.0.0" {
-					[0, 0, 0, 0]
-				} else {
-					[127, 0, 0, 1]
-				}
-			})
-			.unwrap_or([127, 0, 0, 1]);
+		let config = BootstrapConfig::from_env_or_warn();
 		Self {
-			port: Some(port),
-			host,
+			port: Some(config.ssh_port.unwrap_or(DEFAULT_SSH_PORT)),
+			host: config.host_octets().unwrap_or([127, 0, 0, 1]),
 			credentials: None,
 		}
 	}

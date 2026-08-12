@@ -33,7 +33,7 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	let entry_path = entry_arg(parts)?;
 	let root = build_entry(
 		&cx.caller,
-		parts.params(),
+		&BootstrapConfig::from_params(parts.params())?,
 		&entry_path,
 		Some(ONE_SHOT_SETTLE_DEADLINE),
 	)

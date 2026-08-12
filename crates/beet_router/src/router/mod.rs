@@ -24,7 +24,7 @@ pub use exchange_script::*;
 #[cfg(all(feature = "bsx", feature = "template_serde"))]
 mod template_include;
 #[cfg(all(feature = "bsx", feature = "template_serde"))]
-pub use template_include::*;
+pub(crate) use template_include::*;
 mod request_logger;
 pub use request_logger::*;
 mod interrupt;

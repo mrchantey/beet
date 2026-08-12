@@ -73,19 +73,21 @@ fn exit_when_all_windows_closed(
 	}
 }
 
-/// A screenshot verification hook, inert unless `BEET_SCREENSHOT` names an output
-/// PNG. When set, it captures the first window's contents on frame
-/// `BEET_SCREENSHOT_FRAME` (default 30), saves the PNG, and exits once written. So
-/// any windowed beet scene is verifiable headlessly:
+/// A screenshot verification hook, inert unless `--screenshot` / `BEET_SCREENSHOT`
+/// names an output PNG. When set, it captures the first window's contents on frame
+/// `--screenshot-frame` / `BEET_SCREENSHOT_FRAME` (default 30), saves the PNG, and
+/// exits once written. So any windowed beet scene is verifiable headlessly:
 /// `BEET_SCREENSHOT=/tmp/x.png beet --main=scene.bsx`.
+///
+/// Reads the config directly rather than the resource: this runs at plugin-build
+/// time, before any scene (or the resource `ServerPlugin` inserts) exists.
 fn screenshot_verify_plugin(app: &mut App) {
-	let Ok(path) = env_ext::var("BEET_SCREENSHOT") else {
+	let config = BootstrapConfig::from_env_or_warn();
+	let Some(path) = config.screenshot else {
 		return;
 	};
-	let frame: u32 = env_ext::var("BEET_SCREENSHOT_FRAME")
-		.ok()
-		.and_then(|value| value.parse().ok())
-		.unwrap_or(30);
+	let path = path.to_string();
+	let frame = config.screenshot_frame.unwrap_or(30);
 	info!("screenshot harness armed: path={path}, capture frame={frame}");
 	app.insert_resource(ScreenshotVerify { path, frame })
 		.add_systems(Update, (capture_screenshot, screenshot_timeout));

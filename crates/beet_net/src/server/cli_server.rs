@@ -60,7 +60,7 @@ fn on_action_in(
 	// default-boots (the shared default) unless `--server` names a different set;
 	// `always` additionally boots even when another server is named.
 	if !always
-		&& !ev.with(|request| Request::selects_server(request, "cli", true))?
+		&& !ev.with(|request| Request::selects_server(request, "cli", true))??
 	{
 		return Ok(());
 	}

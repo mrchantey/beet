@@ -19,44 +19,24 @@ use core::marker::PhantomData;
 
 impl Request {
 	/// Whether a server named `name` should boot for `request`, read from its
-	/// `--server` params. Reads every `server` value (repeated flags) and splits each
-	/// on commas (a glob list, eg `--server=cli,http`); the name must pass the
-	/// resulting [`GlobFilter`].
+	/// [`BootstrapConfig`] [`ServerFilter`] (`--server`, else `BEET_SERVER`).
 	///
-	/// With no `--server` param the `BEET_SERVER` env is the fallback, so a deployed
-	/// binary launched with no args (a lambda bootstrap, a lightsail systemd unit)
-	/// selects its transport that way. Absent both, the server's own `default_boot`
-	/// decides: it defaults to `true`, so a bare `beet` brings up every declared
-	/// server, and an entry clears it on one (eg a secondary [`HttpServer`]) that
-	/// should boot only when `--server` names it.
+	/// The env fallback is why a deployed binary launched with no args (a lambda
+	/// bootstrap, a lightsail systemd unit) still selects its transport. Absent
+	/// both, the server's own `default_boot` decides: it defaults to `true`, so a
+	/// bare `beet` brings up every declared server, and an entry clears it on one
+	/// (eg a secondary [`HttpServer`]) that should boot only when `--server`
+	/// names it.
 	pub fn selects_server(
 		request: &Request,
 		name: &str,
 		default_boot: bool,
-	) -> bool {
-		let mut globs = request
-			.get_params("server")
-			.into_iter()
-			.flatten()
-			.map(|value| value.to_string())
-			.collect::<Vec<_>>();
-		// absent an explicit `--server`, the `BEET_SERVER` env selects the servers.
-		if globs.is_empty() {
-			globs.extend(env_ext::var("BEET_SERVER").ok());
+	) -> Result<bool> {
+		match BootstrapConfig::from_params(request.params())?.server {
+			Some(filter) => filter.passes(name),
+			None => default_boot,
 		}
-		// absent both, fall back to this server's own default.
-		if globs.is_empty() {
-			return default_boot;
-		}
-		globs
-			.iter()
-			.flat_map(|value| value.split(','))
-			.map(str::trim)
-			.filter(|name| !name.is_empty())
-			.fold(GlobFilter::default(), |filter, name| {
-				filter.with_include(name)
-			})
-			.passes(name)
+		.xok()
 	}
 }
 /// A bootable, parking server: supplies the `--server` selector and the serve-loop
@@ -79,7 +59,7 @@ pub trait BootServer: Component<Mutability = Mutable> {
 
 	/// Overlay the boot request onto the server config before the backend reads it.
 	/// Default: a no-op; [`HttpServer`] overrides it to apply `--port` / `--host`.
-	fn apply_boot(&mut self, _request: &Request) {}
+	fn apply_boot(&mut self, _request: &Request) -> Result { Ok(()) }
 
 	/// Whether this server boots when neither `--server` nor `BEET_SERVER` is
 	/// given. Defaults to `true` — a bare `beet` brings up the declared server;
@@ -128,17 +108,17 @@ fn boot_server<S: BootServer>(
 	mut commands: Commands,
 ) -> Result {
 	let entity = ev.entity;
-	let selected = ev.with(|request| {
+	let selected = ev.with(|request| -> Result<bool> {
 		let Ok(mut server) = servers.get_mut(entity) else {
-			return false;
+			return Ok(false);
 		};
 		let selected =
-			Request::selects_server(request, S::SELECTOR, server.default_boot());
+			Request::selects_server(request, S::SELECTOR, server.default_boot())?;
 		if selected {
-			server.apply_boot(request);
+			server.apply_boot(request)?;
 		}
-		selected
-	})?;
+		selected.xok()
+	})??;
 	if !selected {
 		return Ok(());
 	}

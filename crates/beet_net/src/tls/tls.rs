@@ -46,17 +46,16 @@ pub struct Tls {
 }
 
 impl Tls {
-	/// Whether this config serves TLS here: forced by a `BEET_TLS=on`/`off`
-	/// env, otherwise on unless a managed platform terminating TLS in front
-	/// of the app is detected ([`Self::platform_tls_layer`]). Deliberately
-	/// not keyed on the build profile: the installed cli is a release build
-	/// serving local machines, while deployment is an environment.
+	/// Whether this config serves TLS here: forced by the process
+	/// [`BootstrapConfig`]'s `--tls` / `BEET_TLS`, otherwise on unless a managed
+	/// platform terminating TLS in front of the app is detected
+	/// ([`Self::platform_tls_layer`]). Deliberately not keyed on the build
+	/// profile: the installed cli is a release build serving local machines,
+	/// while deployment is an environment.
 	pub fn active(&self) -> bool {
-		match env_ext::var("BEET_TLS").as_deref().map(str::trim) {
-			Ok("1") | Ok("true") | Ok("on") => true,
-			Ok("0") | Ok("false") | Ok("off") => false,
-			_ => !Self::platform_tls_layer(),
-		}
+		BootstrapConfig::from_env_or_warn()
+			.tls
+			.unwrap_or_else(|| !Self::platform_tls_layer())
 	}
 
 	/// Whether a managed platform that terminates TLS in front of the app is

@@ -61,12 +61,12 @@ pub struct CargoBuild {
 	pub features: Vec<SmolStr>,
 	/// Additional arguments passed to cargo.
 	pub additional_args: Vec<SmolStr>,
-	/// Args the *deployed* binary is launched with, eg `--store=s3://<bucket>`.
-	/// The lambda runtime offers no argv, so the zip converts at the container
-	/// boundary: it ships a one-line `bootstrap` script exec'ing the binary with
-	/// these (see [`into_lambda_build_artifact`](Self::into_lambda_build_artifact)).
-	/// Unused by non-lambda artifacts, whose launch path owns its args.
-	pub runtime_args: Vec<SmolStr>,
+	/// The *deployed* binary's [`BootstrapConfig`]. The lambda runtime offers no
+	/// argv, so the zip converts at the container boundary: it ships a one-line
+	/// `bootstrap` script exec'ing the binary with the config's argv channel (see
+	/// [`into_lambda_build_artifact`](Self::into_lambda_build_artifact)). Unused by
+	/// non-lambda artifacts, whose launch path owns its args.
+	pub bootstrap: BootstrapConfig,
 }
 
 impl CargoBuild {
@@ -211,11 +211,12 @@ impl CargoBuild {
 	/// Otherwise falls back to cargo-lambda which handles cross-compilation
 	/// and packaging itself.
 	///
-	/// With [`runtime_args`](Self::runtime_args) the zip ships the binary as
-	/// `beet` plus a one-line `bootstrap` script exec'ing it with the args: the
-	/// lambda runtime offers no argv, so the script is the env-to-args boundary.
+	/// With a non-empty [`bootstrap`](Self::bootstrap) the zip ships the binary as
+	/// `beet` plus a one-line `bootstrap` script exec'ing it with the config's
+	/// argv: the lambda runtime offers no argv, so the script is the env-to-args
+	/// boundary.
 	#[cfg(feature = "deploy")]
-	pub fn into_lambda_build_artifact(mut self) -> BuildArtifact {
+	pub fn into_lambda_build_artifact(mut self) -> Result<BuildArtifact> {
 		if self.target == BuildTarget::Zigbuild {
 			// zigbuild: cross-compile, then zip as bootstrap
 			self.release = true;
@@ -232,7 +233,7 @@ impl CargoBuild {
 				"mkdir -p {dir} && cp {exe} {dir}/bootstrap && {zip}",
 				dir = lambda_dir.display(),
 				exe = exe_path.display(),
-				zip = self.lambda_zip_cmd(&lambda_dir),
+				zip = self.lambda_zip_cmd(&lambda_dir)?,
 			);
 			let full_cmd = format!("{build_cmd} && {pack_cmd}");
 			BuildArtifact::new(
@@ -240,6 +241,7 @@ impl CargoBuild {
 					.with_args([SmolStr::from("-c"), SmolStr::from(full_cmd)]),
 				zip_path,
 			)
+			.xok()
 		} else {
 			// cargo-lambda: build and zip in one step
 			let lambda_dir = self.lambda_dir();
@@ -250,38 +252,44 @@ impl CargoBuild {
 				.collect::<Vec<SmolStr>>()
 				.join(" ");
 			let full_cmd =
-				format!("{cargo_cmd} && {}", self.lambda_zip_cmd(&lambda_dir));
+				format!("{cargo_cmd} && {}", self.lambda_zip_cmd(&lambda_dir)?);
 			BuildArtifact::new(
 				ChildProcess::new("sh")
 					.with_args([SmolStr::from("-c"), SmolStr::from(full_cmd)]),
 				zip_path,
 			)
+			.xok()
 		}
 	}
 
 	/// The zip packaging tail, run with the built binary at `{dir}/bootstrap`.
-	/// With [`runtime_args`](Self::runtime_args) the binary shifts to `beet` and
-	/// a one-line `bootstrap` script exec's it with the args (the lambda runtime
-	/// offers no argv); without them the binary itself stays `bootstrap`.
+	/// With a non-empty [`bootstrap`](Self::bootstrap) argv channel the binary
+	/// shifts to `beet` and a one-line `bootstrap` script exec's it with the args
+	/// (the lambda runtime offers no argv); without them the binary itself stays
+	/// `bootstrap`.
 	#[cfg(feature = "deploy")]
-	fn lambda_zip_cmd(&self, dir: &std::path::Path) -> String {
-		if self.runtime_args.is_empty() {
-			return format!(
-				"cd {} && zip -j bootstrap.zip bootstrap",
-				dir.display()
-			);
-		}
-		// space-joined into the exec line, so an arg must not contain spaces or
-		// single quotes (a store uri / server glob never does).
+	fn lambda_zip_cmd(&self, dir: &std::path::Path) -> Result<String> {
+		// `to_argv` validates every token against a shell-safe charset, so an arg
+		// that would corrupt the exec line is a render error rather than a
+		// silently broken deploy.
 		let args = self
-			.runtime_args
+			.bootstrap
+			.clone()
+			.split_channels()
+			.0
+			.to_argv()?
 			.iter()
 			.map(|arg| format!(" {arg}"))
 			.collect::<String>();
+		if args.is_empty() {
+			return format!("cd {} && zip -j bootstrap.zip bootstrap", dir.display())
+				.xok();
+		}
 		format!(
 			"cd {dir} && mv bootstrap beet && printf '#!/bin/sh\\nexec /var/task/beet{args}\\n' > bootstrap && chmod +x bootstrap && zip -j bootstrap.zip bootstrap beet",
 			dir = dir.display(),
 		)
+		.xok()
 	}
 }
 
@@ -310,6 +318,45 @@ mod test {
 		let path = build.exe_path();
 		path.ends_with("x86_64-unknown-linux-gnu/release/examples/my-app")
 			.xpect_true();
+	}
+
+	/// The lambda `bootstrap` script exec's the binary with the config's argv
+	/// channel; an empty config leaves the built binary as `bootstrap` itself.
+	#[cfg(feature = "deploy")]
+	#[beet_core::test]
+	fn lambda_zip_cmd_renders_bootstrap_argv() {
+		let dir = std::path::Path::new("/tmp/lam");
+		CargoBuild::default()
+			.lambda_zip_cmd(dir)
+			.unwrap()
+			.xpect_eq("cd /tmp/lam && zip -j bootstrap.zip bootstrap");
+		CargoBuild::default()
+			.with_bootstrap(BootstrapConfig {
+				store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+				server: Some(ServerFilter::new("http")),
+				..default()
+			})
+			.lambda_zip_cmd(dir)
+			.unwrap()
+			.xpect_contains(
+				"exec /var/task/beet --store=s3://beet--dev--app --server=http",
+			);
+	}
+
+	/// A token that cannot be rendered into the exec line is a loud error rather
+	/// than a corrupted `bootstrap` script: the old printf caveat, enforced.
+	#[cfg(feature = "deploy")]
+	#[beet_core::test]
+	fn lambda_zip_cmd_rejects_unencodable_args() {
+		CargoBuild::default()
+			.with_bootstrap(BootstrapConfig {
+				path: Some("/my page".into()),
+				..default()
+			})
+			.lambda_zip_cmd(std::path::Path::new("/tmp/lam"))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cannot be rendered");
 	}
 
 	#[beet_core::test]

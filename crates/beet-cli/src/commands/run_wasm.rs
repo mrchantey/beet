@@ -46,13 +46,15 @@ pub async fn RunWasm(parts: RequestParts) -> Result<Response> {
 	let trailing = segments.split_off(wasm_idx + 1);
 	let exe_path = segments.join("/");
 	// `cli` now holds only the forwarded params; drop the route's own `run-wasm-args`
-	// capture so it never leaks into the module's `Deno.args`, then flatten the rest
-	// to `--key[=value]` flags plus the trailing positionals (eg the filter) the
-	// running module reads back via `Deno.args`.
+	// capture so it never leaks into the module's `Deno.args`. The module's
+	// bootstrap knobs are taken out and delivered explicitly (see [`run_wasm`]);
+	// what remains (the test-runner flags) flattens to `--key[=value]` flags plus
+	// the trailing positionals (eg the filter) the module reads via `Deno.args`.
 	cli.params.remove("run-wasm-args");
+	let bootstrap = BootstrapConfig::take_params(&mut cli.params)?;
 	let mut forwarded = cli.into_args();
 	forwarded.extend(trailing.into_iter().map(Into::into));
-	run_wasm(Path::new(&exe_path), forwarded).await?;
+	run_wasm(Path::new(&exe_path), &bootstrap, forwarded).await?;
 	// the module's output already streamed via inherited stdio, so the runner's own
 	// response carries no body, only a success status.
 	Response::ok().xok()
@@ -65,7 +67,16 @@ fn runner_dir() -> PathBuf {
 
 /// Runs `wasm-bindgen`, writes the Deno runner, then executes the module,
 /// forwarding `args` and inheriting stdio so the module's output streams live.
-async fn run_wasm(exe_path: &Path, args: Vec<String>) -> Result {
+///
+/// The module's own [`BootstrapConfig`] is delivered explicitly through
+/// [`ChildProcess::with_bootstrap`], which also scrubs the runner's inherited
+/// `BEET_*` env: beet spawning beet never passes config ambiently, so a wasm test
+/// isolate cannot pick up the host's stage, store or ports by accident.
+async fn run_wasm(
+	exe_path: &Path,
+	bootstrap: &BootstrapConfig,
+	args: Vec<String>,
+) -> Result {
 	if !fs_ext::exists(exe_path)? {
 		bevybail!("wasm binary does not exist: {}", exe_path.display());
 	}
@@ -117,6 +128,8 @@ async fn run_wasm(exe_path: &Path, args: Vec<String>) -> Result {
 			fs_ext::workspace_root().to_string_lossy().to_string(),
 		)])
 		.with_args(deno_args)
+		// appended last, so the config lands among the module's own args
+		.with_bootstrap(bootstrap)?
 		.spawn()?
 		.status()
 		.await?;

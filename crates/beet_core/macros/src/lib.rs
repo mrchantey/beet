@@ -230,6 +230,12 @@ pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// (a missing required prop is a graceful error); `#[prop(into)]` accepts
 /// `impl Into`.
 ///
+/// A pure template may return `Result<impl Bundle>` when its body can genuinely
+/// fail (parsing a declared uri, rendering a deploy config): the `?` lands on the
+/// build's own result, so the failure rides `TemplateError` like any other build
+/// error instead of unwrapping. A `#[template(system)]` cannot be fallible (its
+/// body runs inside the build closure, which must yield a bundle).
+///
 /// ```rust ignore
 /// #[template]
 /// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Bundle {

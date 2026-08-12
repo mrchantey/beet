@@ -262,3 +262,38 @@ fn rsx_in_non_final_position() {
 		.tag()
 		.xpect_eq("section");
 }
+
+// a `-> Result<impl Bundle>` template raises through the build rather than
+// unwrapping: the `?` in its body lands on `build_template`'s own result.
+#[template]
+fn Parsed(#[prop(into)] count: String) -> Result<impl Bundle> {
+	let count: u32 = count.parse()?;
+	rsx! { <span>{count * 2}</span> }.xok()
+}
+
+#[beet_core::test]
+fn fallible_template_builds() {
+	let mut world = world();
+	let root = world
+		.spawn_template(rsx! { <Parsed count="21"/> })
+		.unwrap()
+		.id();
+	child_values(&world, root).xpect_eq(vec![Value::new(42u32)]);
+}
+
+#[beet_core::test]
+fn fallible_template_raises() {
+	let mut world = world();
+	world
+		.spawn_template(rsx! { <Parsed count="nope"/> })
+		.unwrap();
+	// the `?` in the body raised, so the failure rides the build's own error
+	// channel rather than panicking or silently building nothing.
+	world
+		.query::<&TemplateError>()
+		.single(&world)
+		.unwrap()
+		.error
+		.to_string()
+		.xpect_contains("invalid digit");
+}

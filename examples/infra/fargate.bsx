@@ -31,8 +31,8 @@ and a container engine.
 		<BeetBinaryBuild features="aws_sdk"/>
 		<TofuApplyAction/>
 		<!-- bake the freshly built binary into the container image; the block's
-		     runtime args (`--store=s3://<bucket> --server=http`) ride the CMD too -->
-		<BuildDockerImage cmd_args={["serve", "--path=/"]}/>
+		     bootstrap config (`--store=s3://<bucket> --server=http`) rides the CMD -->
+		<BuildDockerImage/>
 		<SiteSync app_name="fargate"/>
 		<FargateWatch app_name="fargate" timeout="300s"/>
 	</Route>

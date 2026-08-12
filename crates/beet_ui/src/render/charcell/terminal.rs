@@ -61,11 +61,14 @@ impl StdioTerminal {
 		// from the process env (an SSH session detects from its pty instead). Bundled
 		// with the Terminal insert below so the `stdio` borrow above is untouched.
 		let graphics = KittyGraphicsSupport::default();
-		// `BEET_HEADLESS` (tests, CI, automation): a buffered terminal that never
-		// touches the real tty (no raw mode, alt screen, mouse, or restore hook), so
-		// a scene that declares a `StdioTerminal` still spawns and reduces without
-		// taking over or leaking escapes into the controlling terminal.
-		if env_ext::var("BEET_HEADLESS").is_ok() {
+		// `--headless` / `BEET_HEADLESS` (tests, CI, automation): a buffered terminal
+		// that never touches the real tty (no raw mode, alt screen, mouse, or restore
+		// hook), so a scene that declares a `StdioTerminal` still spawns and reduces
+		// without taking over or leaking escapes into the controlling terminal.
+		// Read from the process config rather than the resource: a terminal spawns in
+		// worlds with no server plugin (the charcell tests), which set the env
+		// directly.
+		if BootstrapConfig::from_env_or_warn().headless {
 			world
 				.commands()
 				.entity(cx.entity)

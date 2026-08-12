@@ -13,7 +13,7 @@ use crate::prelude::*;
 ///
 /// An entry document declaring its requirements this way fails fast with the
 /// full missing list, instead of degrading into unresolved tags at load time.
-#[derive(Debug, Default, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct CrateCheck {
 	/// Comma-separated required features, each `feature` or `crate/feature`.
@@ -28,40 +28,6 @@ impl CrateCheck {
 		Self {
 			features: features.into(),
 			versions: default(),
-		}
-	}
-
-	/// Collect every `<CrateCheck>` element in a parsed entry tree, the
-	/// registry-free pre-scan entry building runs so a check fires even when
-	/// the tree itself fails to build (eg its root tag is feature-gated out).
-	#[cfg(feature = "bsx")]
-	pub fn extract_checks(nodes: &[BsxNode]) -> Vec<Self> {
-		let mut checks = Vec::new();
-		Self::collect_checks(nodes, &mut checks);
-		checks
-	}
-
-	/// Recursively collect `<CrateCheck>` declarations from `nodes`.
-	#[cfg(feature = "bsx")]
-	fn collect_checks(nodes: &[BsxNode], checks: &mut Vec<Self>) {
-		for node in nodes {
-			let BsxNode::Element(element) = node else {
-				continue;
-			};
-			if element.tag == "CrateCheck" {
-				let mut check = Self::default();
-				for attr in &element.attributes {
-					if let AttrValue::Str(value) = &attr.value {
-						match attr.key.as_str() {
-							"features" => check.features = value.into(),
-							"versions" => check.versions = value.into(),
-							_ => {}
-						}
-					}
-				}
-				checks.push(check);
-			}
-			Self::collect_checks(&element.children, checks);
 		}
 	}
 
@@ -254,20 +220,6 @@ mod test {
 		parse_version("0.5").xpect_eq((0, 5, 0));
 		parse_version("1.0.0-rc.1").xpect_eq((1, 0, 0));
 		(parse_version("0.10.0") > parse_version("0.9.9")).xpect_true();
-	}
-
-	#[cfg(feature = "bsx")]
-	#[crate::test]
-	fn extracts_checks_from_raw_markup() {
-		let nodes = BsxNode::parse_document(
-			"<NotARegisteredTag><CrateCheck features=\"sockets\" versions=\"0.1.0\"/></NotARegisteredTag>",
-			&BsxParseConfig::bsx(),
-		)
-		.unwrap();
-		let checks = CrateCheck::extract_checks(&nodes);
-		checks.len().xpect_eq(1);
-		checks[0].features.xpect_eq("sockets");
-		checks[0].versions.xpect_eq("0.1.0");
 	}
 
 	#[crate::test]

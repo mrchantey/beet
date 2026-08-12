@@ -35,14 +35,13 @@ impl Plugin for SceneCommandsPlugin {
 	}
 }
 
-/// The device URL a command targets: the `--url` request param, else the
-/// `BEET_REMOTE_URL` env var. Errors when neither is set, since these commands
-/// only drive a remote device.
+/// The device URL a command targets, from the request's [`BootstrapConfig`]:
+/// `--url`, else `BEET_REMOTE_URL`. Errors when neither is set, since these
+/// commands only drive a remote device.
 fn device_url(parts: &RequestParts) -> Result<String> {
-	parts
-		.get_param("url")
-		.map(String::from)
-		.or_else(|| env_ext::var("BEET_REMOTE_URL").ok())
+	BootstrapConfig::from_params(parts.params())?
+		.remote_url
+		.map(|url| url.to_string())
 		.ok_or_else(|| {
 			bevyhow!("a device `--url` (or `BEET_REMOTE_URL`) is required")
 		})

@@ -103,7 +103,16 @@ fn load_entry(world: &mut World) {
 	// the binary's compiled surface: `--features` and any loaded `<CrateCheck/>`
 	// verify against it.
 	world.spawn(entry_build::cli_registration());
-	if let Some(check) = features_self_check(&args) {
+	// the process config, parsed once: entry resolution and the build both read it.
+	let config = match BootstrapConfig::from_params(&args.params) {
+		Ok(config) => config,
+		Err(err) => {
+			error!("{err}");
+			world.write_message(AppExit::error());
+			return;
+		}
+	};
+	if let Some(check) = features_self_check(&args, &config) {
 		world.spawn(check);
 	}
 	// the recognized template formats (`.bsx`, `.js`), read once here so the async
@@ -122,7 +131,7 @@ fn load_entry(world: &mut World) {
 			return;
 		}
 		// resolve on the runtime, since discovery now awaits the store.
-		let resolved = match resolve_entry(&args).await {
+		let resolved = match resolve_entry(&args, &config).await {
 			Ok(resolved) => resolved,
 			Err(err) => {
 				error!("{err}");
@@ -130,7 +139,7 @@ fn load_entry(world: &mut World) {
 				return;
 			}
 		};
-		if let Err(err) = build_entry(&world, args, resolved, formats).await {
+		if let Err(err) = build_entry(&world, &config, resolved, formats).await {
 			error!("{err}");
 			world.write_message(AppExit::error()).await;
 		}
@@ -159,29 +168,35 @@ async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 /// the servers. Target-agnostic; the `--watch` live-reload path is native-only.
 async fn build_entry(
 	world: &AsyncWorld,
-	args: CliArgs,
+	config: &BootstrapConfig,
 	resolved: ResolvedEntry,
 	formats: TemplateFormats,
 ) -> Result {
-	let store = resolved.store;
-	let entry_name = resolved.entry_name;
+	let ResolvedEntry {
+		store,
+		entry_name,
+		prescan,
+		#[cfg(not(target_arch = "wasm32"))]
+		watch_dir,
+	} = resolved;
 	// native `--watch` (local dev): install the live-reload driver and build through
 	// the shared rebuild path, so the initial build and a structural rebuild are
 	// identical and the entry root is a `BeetSceneRoot` the reload can tear down.
 	// Opt-in, so a running presentation never reloads underfoot; a deployed (remote)
 	// entry has no local dir to watch, and the wasm runner has no fs watcher.
 	#[cfg(not(target_arch = "wasm32"))]
-	if resolved.watch_dir.is_some() && args.params.contains_key("watch") {
+	if watch_dir.is_some() && config.watch {
 		return build_watched_entry(world, store, entry_name, formats).await;
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it spawns
 	// the entry root with no load verb of its own, so the entry's own markup declares
 	// how it loads (servers, scripts and render scenes all carry `CallOnLoad`,
 	// a self-booting verb `#[require]`s it).
-	let sources =
-		entry_build::read_sources(&store, formats, entry_name.clone()).await?;
 	#[cfg(target_arch = "wasm32")]
-	let _ = &args;
+	let _ = config;
+	let sources =
+		entry_build::read_sources(&store, formats, entry_name.clone(), prescan)
+			.await?;
 	world
 		.with(move |world: &mut World| -> Result {
 			entry_build::build_root(world, store, sources, ())?;
@@ -245,27 +260,37 @@ async fn build_watched_entry(
 ///    for the first [`entry_build::ENTRY_NAMES`] match.
 ///
 /// A dir-rooted entry may widen its own store root with a `<StoreRoot src>`
-/// declaration (a self-rooted store is already rooted at the site). The `--store`
-/// arg selects the backend (default `fs`); see [`entry_build::resolve_store`].
+/// declaration (a self-rooted store is already rooted at the site). The config's
+/// [`StoreUri`] selects the backend (default `fs`).
 ///
 /// Target-agnostic: wasm runs the same walk wherever the runtime has a
 /// filesystem (deno/node through the runner's fs globals); a fs-less runtime
 /// errors with guidance (the browser never reaches here, reading its DOM program
 /// instead).
-async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
+async fn resolve_entry(
+	args: &CliArgs,
+	config: &BootstrapConfig,
+) -> Result<ResolvedEntry> {
 	// the wasm runner forwards the *module's* flags on this same argv, so a
 	// `beet run-wasm <module> --main=<wasm-entry> --store=fs ...` invocation
 	// carries a `--main`/`--store` meant for the wasm module, not this native
-	// runner. When acting as the runner (first positional `run-wasm`), ignore them
+	// runner. When acting as the runner (first positional `run-wasm`), drop them
 	// and discover the workspace command entry; the `<RunWasm/>` route forwards the
-	// flags on to the module via `Deno.args`.
-	let is_wasm_runner =
-		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
+	// module's own config on via `ChildProcess::with_bootstrap`.
+	let config = match args.path.first().map(SmolStr::as_str) == Some("run-wasm")
+	{
+		true => &BootstrapConfig::default(),
+		false => config,
+	};
 
 	// a self-rooted store: no local dir, no ancestor walk, no watch dir.
-	if !is_wasm_runner && entry_build::store_is_self_rooted(&args.params) {
-		let store = entry_build::resolve_store(&args.params, AbsPathBuf::new(".")?)?;
-		let entry_name = match args.params.get("main") {
+	if config
+		.store
+		.as_ref()
+		.is_some_and(StoreUri::is_self_rooted)
+	{
+		let store = entry_build::resolve_store(config, AbsPathBuf::new(".")?)?;
+		let entry_name = match &config.main {
 			Some(main) => main.to_string(),
 			None => entry_build::probe_entry_names(&store).await?.ok_or_else(|| {
 				bevyhow!(
@@ -275,9 +300,11 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 				)
 			})?,
 		};
+		let prescan = entry_build::read_prescan(&store, &entry_name).await?;
 		return Ok(ResolvedEntry {
 			store,
 			entry_name,
+			prescan,
 			#[cfg(not(target_arch = "wasm32"))]
 			watch_dir: None,
 		});
@@ -293,9 +320,9 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 			(s3://<bucket>, local-storage, indexed-db)"
 		);
 	}
-	match args.params.get("main").filter(|_| !is_wasm_runner) {
-		Some(main) => entry_build::resolve_main(&args.params, main.as_str()).await,
-		None => discover_entry(&args.params).await,
+	match &config.main {
+		Some(main) => entry_build::resolve_main(config, main.as_str()).await,
+		None => discover_entry(config).await,
 	}
 }
 
@@ -305,16 +332,17 @@ async fn resolve_entry(args: &CliArgs) -> Result<ResolvedEntry> {
 /// explicit `--main`, or no positional command); a command dispatch (eg `beet
 /// build-wasm --features=..`) owns its own `--features` meaning, and the wasm
 /// runner forwards the module's flags untouched.
-fn features_self_check(args: &CliArgs) -> Option<CrateCheck> {
+fn features_self_check(
+	args: &CliArgs,
+	config: &BootstrapConfig,
+) -> Option<CrateCheck> {
 	let is_wasm_runner =
 		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
-	let runs_entry = args.params.contains_key("main") || args.path.is_empty();
-	if is_wasm_runner || !runs_entry {
+	let runs_entry = config.main.is_some() || args.path.is_empty();
+	if is_wasm_runner || !runs_entry || config.features.is_empty() {
 		return None;
 	}
-	args.params
-		.get_vec("features")
-		.map(|features| CrateCheck::features(features.join(",")))
+	Some(CrateCheck::features(config.features.join(",")))
 }
 
 /// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving
@@ -322,15 +350,13 @@ fn features_self_check(args: &CliArgs) -> Option<CrateCheck> {
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
 /// a filesystem walk makes sense; the matched entry may still widen its own
 /// root ([`widen_store_root`]), and no match errors with guidance.
-async fn discover_entry(
-	params: &MultiMap<SmolStr, SmolStr>,
-) -> Result<ResolvedEntry> {
+async fn discover_entry(config: &BootstrapConfig) -> Result<ResolvedEntry> {
 	let start = AbsPathBuf::new(".")?;
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
 		let store = BlobStore::new(FsStore::new(current.clone()));
 		if let Some(entry_name) = entry_build::probe_entry_names(&store).await? {
-			return entry_build::resolve_widened(params, current, entry_name).await;
+			return entry_build::resolve_widened(config, current, entry_name).await;
 		}
 		dir = current.parent();
 	}

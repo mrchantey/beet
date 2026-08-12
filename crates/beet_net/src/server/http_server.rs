@@ -89,24 +89,15 @@ pub struct HttpServer {
 }
 
 impl Default for HttpServer {
+	/// Reads the process [`BootstrapConfig`] (`--port` / `BEET_HTTP_PORT` and
+	/// `--host` / `BEET_HOST`), falling back to [`DEFAULT_HTTP_PORT`] on
+	/// localhost. Both sources are empty where there is no process environment
+	/// or argv, so no feature gate is needed.
 	fn default() -> Self {
-		// `env_ext::var` returns "not found" on no_std, so this reads `BEET_HTTP_PORT`
-		// / `BEET_HOST` where there is an environment and falls back to the static
-		// defaults everywhere else, no feature gate needed.
-		let port = resolve_server_port(None);
-		let host = env_ext::var("BEET_HOST")
-			.ok()
-			.map(|val| {
-				if val == "0.0.0.0" {
-					[0, 0, 0, 0]
-				} else {
-					[127, 0, 0, 1]
-				}
-			})
-			.unwrap_or([127, 0, 0, 1]);
+		let config = BootstrapConfig::from_env_or_warn();
 		Self {
-			port: Some(port),
-			host,
+			port: Some(resolve_server_port(None)),
+			host: config.host_octets().unwrap_or([127, 0, 0, 1]),
 			canonical: true,
 			default_boot: true,
 		}
@@ -165,19 +156,19 @@ impl HttpServer {
 
 	/// Overlays `--port` / `--host` from the boot request onto these fields, the
 	/// resolved bind config the backend then reads.
-	fn apply_request(&mut self, request: &Request) {
-		if let Some(port) =
-			request.get_param("port").and_then(|val| val.parse().ok())
-		{
+	///
+	/// Parsed with [`BootstrapConfig::parse_params`], ie the request alone with no
+	/// env fallback: env already fed [`Default`], and a markup-declared field
+	/// out-ranks it, so consulting env again here would invert that precedence.
+	fn apply_request(&mut self, request: &Request) -> Result {
+		let config = BootstrapConfig::parse_params(request.params())?;
+		if let Some(port) = config.http_port {
 			self.port = Some(port);
 		}
-		if let Some(host) = request.get_param("host") {
-			self.host = if host == "0.0.0.0" {
-				[0, 0, 0, 0]
-			} else {
-				[127, 0, 0, 1]
-			};
+		if let Some(host) = config.host_octets() {
+			self.host = host;
 		}
+		Ok(())
 	}
 }
 
@@ -193,7 +184,9 @@ impl BootServer for HttpServer {
 
 	/// `HttpServer` overlays `--port` / `--host` from the boot before the backend
 	/// reads the bind address.
-	fn apply_boot(&mut self, request: &Request) { self.apply_request(request); }
+	fn apply_boot(&mut self, request: &Request) -> Result {
+		self.apply_request(request)
+	}
 
 	fn default_boot(&self) -> bool { self.default_boot }
 }

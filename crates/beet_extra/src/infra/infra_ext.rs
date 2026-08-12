@@ -29,21 +29,21 @@ pub fn site_bucket_name(stack: &Stack) -> String {
 	site_bucket().store(stack).bucket_name().to_string()
 }
 
-/// The self-rooted entry-store arg for a deployed site bucket:
-/// `--store=s3://<bucket>` (the entry document is probed at the bucket root).
-/// Deploy config rides argv, not env; each block converts at its platform
-/// boundary (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
-/// `bootstrap` script).
-pub fn store_arg(bucket_name: impl AsRef<str>) -> SmolStr {
-	format!("--store=s3://{}", bucket_name.as_ref()).into()
-}
-
-/// The args the deployed generic `beet` binary is launched with to serve the
-/// site from the bucket: [`store_arg`] plus `--server=http`, constraining the
-/// boot to the http transport. A deploy serving more transports passes
-/// [`store_arg`] and its own `--server` selection instead.
-pub fn remote_args(bucket_name: impl AsRef<str>) -> Vec<SmolStr> {
-	vec![store_arg(bucket_name), "--server=http".into()]
+/// The deployed generic `beet` binary's [`BootstrapConfig`] for serving the site
+/// from its bucket: the self-rooted `s3://<bucket>` entry store (the entry
+/// document is probed at the bucket root) constrained to the http transport. A
+/// deploy serving more transports overrides `server`.
+///
+/// Each block renders it at its own platform boundary, splitting boot selection
+/// onto argv (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
+/// `bootstrap` script) and service config onto env.
+pub fn remote_bootstrap(bucket_name: impl AsRef<str>) -> Result<BootstrapConfig> {
+	BootstrapConfig {
+		store: Some(StoreUri::parse(&format!("s3://{}", bucket_name.as_ref()))?),
+		server: Some(ServerFilter::new("http")),
+		..default()
+	}
+	.xok()
 }
 
 /// Shared `CargoBuild` for the generic `beet` binary; callers pick the terminal

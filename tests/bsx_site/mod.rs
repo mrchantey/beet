@@ -30,12 +30,12 @@ pub async fn build_site(world: &mut World) -> Entity {
 	let source = entry.as_utf8().unwrap();
 	// pre-scan: register the entry's declared `<TemplateDir>`s before parsing, so
 	// entry-level tags resolve against them.
-	let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
+	let prescan = EntryPrescan::parse(&entry).unwrap();
 	// the root is spawned first so it owns the entry-level registrations, as the
-	// binary's `build_entry_root` does.
+	// binary's entry build does.
 	let root = world.spawn_empty().id();
-	for dir in TemplateDir::extract_dirs(&nodes) {
-		let sources = TemplateDir::read_sources(&store, &dir, &formats)
+	for dir in &prescan.template_dirs {
+		let sources = TemplateDir::read_sources(&store, dir, &formats)
 			.await
 			.unwrap();
 		TemplateDir::register_sources(world, root, &formats, sources).unwrap();

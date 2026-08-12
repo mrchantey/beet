@@ -29,12 +29,14 @@ pub struct LightsailBlock {
 	/// in the lightsail instance.
 	#[serde(default)]
 	env_vars: Vec<Variable>,
-	/// Args appended to the systemd `ExecStart` binary invocation, eg
-	/// `--store=s3://<bucket>` so the deployed binary loads its entry from the
-	/// site bucket. The env-free channel for deploy config the binary reads as
-	/// argv.
+	/// The deployed binary's [`BootstrapConfig`], split at render time by
+	/// [`BootstrapConfig::split_channels`]: boot selection (the store, the
+	/// `--server` set) rides the systemd `ExecStart` invocation, ambient service
+	/// config rides the unit's `Environment=` lines. The platform bindings the
+	/// block owns (the bind host, the app port, the deploy identity) are merged in
+	/// at render time.
 	#[serde(default)]
-	runtime_args: Vec<SmolStr>,
+	bootstrap: BootstrapConfig,
 	/// Optional domain for HTTPS via Caddy reverse proxy with automatic
 	/// Let's Encrypt certificates. When `None`, serves plain HTTP on port 80.
 	/// DNS must be configured to point this domain to the instance's public IP.
@@ -50,8 +52,9 @@ pub struct LightsailBlock {
 	/// Networking mode, defaults to static IPv4.
 	networking: LightsailNetworking,
 	/// Explicit port the app server listens on. When `None`, resolved from
-	/// `BEET_PORT` or [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT)
-	/// via [`app_port`](Self::app_port). Until infra declaration is wired to the
+	/// `--port` / `BEET_HTTP_PORT` or
+	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) via
+	/// [`app_port`](Self::app_port). Until infra declaration is wired to the
 	/// served site's state (like SST), this must match the markup `HttpServer{port}`.
 	#[get(skip)]
 	#[set_with(unwrap_option)]
@@ -68,7 +71,7 @@ impl Default for LightsailBlock {
 			bundle_id: "nano_3_0".into(),
 			networking: LightsailNetworking::default(),
 			env_vars: Vec::new(),
-			runtime_args: Vec::new(),
+			bootstrap: default(),
 			app_port: None,
 		}
 	}
@@ -91,7 +94,8 @@ impl LightsailBlock {
 	}
 
 	/// The port the application server listens on: the block's explicit
-	/// [`app_port`](Self::with_app_port) if set, else `BEET_PORT`, else
+	/// [`app_port`](Self::with_app_port) if set, else `--port` /
+	/// `BEET_HTTP_PORT`, else
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337). Must
 	/// match the served site's markup port. With a domain Caddy reverse-proxies
 	/// 443 -> this port; without one the instance opens this port publicly.
@@ -119,7 +123,7 @@ impl LightsailBlock {
 		stack: &Stack,
 		access_key_id_ref: &str,
 		access_key_secret_ref: &str,
-	) -> SmolStr {
+	) -> Result<SmolStr> {
 		let app_name = stack.app_name();
 		let region = stack.aws_region();
 		let bucket = stack.artifact_bucket_name();
@@ -127,12 +131,28 @@ impl LightsailBlock {
 		let deploy_timestamp = stack.deploy_timestamp();
 		let label = &self.label;
 		let app_port = self.app_port();
-		// runtime args ride the ExecStart invocation (space-joined, so an arg must
-		// not contain spaces), keeping deploy config on argv rather than env.
-		let exec_args = self
-			.runtime_args
+		// the deployed binary's config, with the platform bindings this block owns
+		// merged in, then split onto its two channels.
+		let mut runtime = self.bootstrap.clone();
+		runtime.host = Some(core::net::Ipv4Addr::UNSPECIFIED.into());
+		runtime.http_port = Some(app_port);
+		runtime.deploy_id = Some(deploy_id.to_string().into());
+		runtime.deploy_timestamp = Some(deploy_timestamp.to_string().into());
+		let (argv, env) = runtime.split_channels();
+		// boot selection rides the `ExecStart` invocation. `to_argv` validates every
+		// token against a shell-safe charset, so an arg that would corrupt the unit
+		// file is a render error rather than a silently broken deploy.
+		let exec_args = argv
+			.to_argv()?
 			.iter()
 			.map(|arg| format!(" {arg}"))
+			.collect::<String>();
+		// ambient service config rides `Environment=` lines, named by the same
+		// table the runtime parses.
+		let bootstrap_env = env
+			.to_env()
+			.iter()
+			.map(|(key, value)| format!("Environment={key}={value}\n"))
 			.collect::<String>();
 
 		// build optional HTTPS setup via Caddy
@@ -232,14 +252,10 @@ RestartSec=3
 StandardOutput=append:/var/log/{app_name}.log
 StandardError=append:/var/log/{app_name}.log
 Environment=RUST_LOG=info
-Environment=BEET_HOST=0.0.0.0
-Environment=BEET_PORT={app_port}
-Environment=BEET_DEPLOY_ID={deploy_id}
-Environment=BEET_DEPLOY_TIMESTAMP={deploy_timestamp}
 Environment=AWS_REGION={region}
 Environment=AWS_ACCESS_KEY_ID=__ACCESS_KEY_ID__
 Environment=AWS_SECRET_ACCESS_KEY=__ACCESS_KEY_SECRET__
-__ENV_VARS__
+{bootstrap_env}__ENV_VARS__
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -276,7 +292,7 @@ systemctl enable --now {app_name}.service
 			);
 		}
 
-		script.into()
+		SmolStr::from(script).xok()
 	}
 }
 
@@ -375,7 +391,7 @@ impl Block for LightsailBlock {
 			stack,
 			&access_key_id_ref,
 			&access_key_secret_ref,
-		);
+		)?;
 		let mut instance_details = AwsLightsailInstanceDetails {
 			availability_zone: self
 				.availability_zone
@@ -533,6 +549,73 @@ impl Block for LightsailBlock {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	/// The rendered cloud-init user-data script for a block, ie the systemd unit
+	/// the instance provisions itself with.
+	fn build_user_data(block: &LightsailBlock) -> (String, TempDir) {
+		let (stack, dir) = Stack::default_local();
+		let script = block
+			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.unwrap();
+		(script.to_string(), dir)
+	}
+
+	/// REGRESSION: the unit must write `BEET_HTTP_PORT`, the name the runtime
+	/// actually reads. It used to write `BEET_PORT`, which nothing read, so a
+	/// deploy on a non-default port silently bound 8337 anyway. Rendering through
+	/// `BootstrapConfig` makes that drift unrepresentable.
+	#[beet_core::test]
+	fn writes_the_port_name_the_runtime_reads() {
+		let (script, _dir) =
+			build_user_data(&LightsailBlock::default().with_app_port(9001));
+		script
+			.as_str()
+			.xpect_contains("Environment=BEET_HTTP_PORT=9001")
+			.xpect_contains("Environment=BEET_HOST=0.0.0.0")
+			.xnot()
+			.xpect_contains("BEET_PORT=");
+	}
+
+	/// Boot selection rides `ExecStart` as validated argv; ambient service config
+	/// rides `Environment=` lines.
+	#[beet_core::test]
+	fn splits_exec_and_env_channels() {
+		let (script, _dir) =
+			build_user_data(&LightsailBlock::default().with_bootstrap(
+				BootstrapConfig {
+					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+					server: Some(ServerFilter::new("http")),
+					stage: Some("dev".into()),
+					..default()
+				},
+			));
+		script
+			.as_str()
+			.xpect_contains(
+				"ExecStart=/opt/beet_infra/app --store=s3://beet--dev--app \
+				--server=http",
+			)
+			.xpect_contains("Environment=BEET_STAGE=dev")
+			// the store never leaks onto the env channel
+			.xnot()
+			.xpect_contains("BEET_STORE");
+	}
+
+	/// A token that cannot be rendered into a systemd `ExecStart` is a loud error
+	/// rather than a corrupted unit file: the old space-join caveat, enforced.
+	#[beet_core::test]
+	fn rejects_unencodable_exec_args() {
+		let (stack, _dir) = Stack::default_local();
+		LightsailBlock::default()
+			.with_bootstrap(BootstrapConfig {
+				path: Some("/my page".into()),
+				..default()
+			})
+			.build_user_data(&stack, "id", "secret")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cannot be rendered");
+	}
 
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]

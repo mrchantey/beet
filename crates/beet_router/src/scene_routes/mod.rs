@@ -40,6 +40,12 @@ pub use template_dir::*;
 mod store_root;
 #[cfg(feature = "bsx")]
 pub use store_root::*;
+// the one registry-free walk entry resolution reads its pre-scanned declarations
+// (`<StoreRoot>`, `<TemplateDir>`, `<CrateCheck>`, `<Template src>`) from.
+#[cfg(feature = "bsx")]
+mod entry_prescan;
+#[cfg(feature = "bsx")]
+pub use entry_prescan::*;
 // `RoutesDir` + its discovery is compiled on every std target: one observer
 // scans the store off the async runtime, so native and wasm share the path.
 mod routes_dir;

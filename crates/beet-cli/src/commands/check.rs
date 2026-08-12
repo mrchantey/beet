@@ -36,7 +36,7 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 	let root =
 		build_entry(
 			&cx.caller,
-			parts.params(),
+			&BootstrapConfig::from_params(parts.params())?,
 			&entry_arg(parts)?,
 			Some(ONE_SHOT_SETTLE_DEADLINE),
 		)

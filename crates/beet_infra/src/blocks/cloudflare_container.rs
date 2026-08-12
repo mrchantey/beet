@@ -25,7 +25,7 @@ pub struct CloudflareContainerBlock {
 	/// R2 bucket the container reads the site from (created on deploy).
 	bucket: SmolStr,
 	/// Explicit port the container exposes and the fronting Worker proxies to. When
-	/// `None`, resolved from `BEET_PORT` or
+	/// `None`, resolved from `--port` / `BEET_HTTP_PORT` or
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337) via
 	/// [`port`](Self::port). Must match the served site's markup `HttpServer{port}`
 	/// (the same default `bsx_site` declares and `FargateBlock` uses).
@@ -65,9 +65,66 @@ impl CloudflareContainerBlock {
 	}
 
 	/// The resolved port the container exposes and the fronting Worker proxies to:
-	/// the explicit [`app_port`](Self::with_app_port) if set, else `BEET_PORT`, else
+	/// the explicit [`app_port`](Self::with_app_port) if set, else `--port` /
+	/// `BEET_HTTP_PORT`, else
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337).
 	pub fn port(&self) -> u16 {
 		beet_net::prelude::resolve_server_port(self.app_port)
+	}
+
+	/// The deployed binary's argv config, baked into the image `CMD`: the R2
+	/// store uri (bucket + account `endpoint`, both known only at deploy time)
+	/// constrained to the http transport.
+	pub fn cmd_bootstrap(&self, endpoint: &str) -> Result<BootstrapConfig> {
+		BootstrapConfig {
+			store: Some(StoreUri::parse(&format!(
+				"s3://{}?endpoint={endpoint}",
+				self.bucket
+			))?),
+			server: Some(ServerFilter::new("http")),
+			..default()
+		}
+		.xok()
+	}
+
+	/// The deployed binary's env config, rendered into the fronting Worker's
+	/// `envVars`. `0.0.0.0` binds all interfaces: the Worker proxies to the
+	/// container's own IP, so a localhost bind would be unreachable.
+	pub fn runtime_bootstrap(&self) -> BootstrapConfig {
+		BootstrapConfig {
+			host: Some(core::net::Ipv4Addr::UNSPECIFIED.into()),
+			..default()
+		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// The image `CMD` is a real JSON array carrying only the argv channel: the
+	/// R2 store uri and the transport selection, with no `serve` positional and no
+	/// `--path=/` workaround (an empty boot path already opens `/`).
+	#[beet_core::test]
+	fn renders_cmd_json() {
+		CloudflareContainerBlock::new("beet-hello")
+			.cmd_bootstrap("https://acc.r2.cloudflarestorage.com")
+			.unwrap()
+			.to_cmd_json("/app")
+			.unwrap()
+			.xpect_eq(
+				r#"["/app", "--store=s3://beet-site?endpoint=https://acc.r2.cloudflarestorage.com", "--server=http"]"#,
+			);
+	}
+
+	/// The Worker's `envVars` carry the bind host under the name the runtime
+	/// parses, and never a secret (those read from `this.env`).
+	#[beet_core::test]
+	fn renders_worker_env() {
+		CloudflareContainerBlock::default()
+			.runtime_bootstrap()
+			.to_env()
+			.xpect_eq(vec![(SmolStr::from("BEET_HOST"), SmolStr::from("0.0.0.0"))]);
 	}
 }

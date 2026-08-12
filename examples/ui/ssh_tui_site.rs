@@ -46,7 +46,7 @@ fn main() -> Result {
 	// one boot root carrying both servers, with the router + demo routes as its
 	// dispatch child; the boot fan-out boots every server present (http + ssh),
 	// each on its own async accept loop, while the bevy loop repaints every ssh
-	// surface each frame. `HttpServer::default()` reads `BEET_PORT` / `BEET_HOST`
+	// surface each frame. `HttpServer::default()` reads `BEET_HTTP_PORT` / `BEET_HOST`
 	// (a deployed task sets `BEET_HOST=0.0.0.0`), falling back to localhost:8337
 	// locally; `SshTuiServer` reads `BEET_SSH_PORT` / `BEET_HOST` the same way.
 	app.world_mut()

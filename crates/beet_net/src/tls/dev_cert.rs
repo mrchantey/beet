@@ -22,12 +22,13 @@ use std::sync::Arc;
 pub struct DevCert;
 
 impl DevCert {
-	/// The cache directory: `$BEET_TLS_DIR`, falling back to `target/tls`
-	/// under the workspace root.
+	/// The cache directory: `--tls-dir` / `BEET_TLS_DIR`, falling back to
+	/// `target/tls` under the workspace root.
 	pub fn dir() -> PathBuf {
-		env_ext::var("BEET_TLS_DIR")
-			.map(PathBuf::from)
-			.unwrap_or_else(|_| fs_ext::workspace_root().join("target/tls"))
+		BootstrapConfig::from_env_or_warn()
+			.tls_dir
+			.map(|dir| PathBuf::from(dir.as_str()))
+			.unwrap_or_else(|| fs_ext::workspace_root().join("target/tls"))
 	}
 
 	/// The cached PEM certificate. Also the file to import on a device that

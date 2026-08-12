@@ -74,18 +74,16 @@ pub mod prelude {
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
 	/// Resolve the port a beet server listens on: the `explicit` value if set,
-	/// else the `BEET_HTTP_PORT` environment variable, else [`DEFAULT_HTTP_PORT`].
+	/// else the process [`BootstrapConfig`]'s `--port` / `BEET_HTTP_PORT`, else
+	/// [`DEFAULT_HTTP_PORT`].
 	///
 	/// The single source of truth for "which port", shared by [`HttpServer`] and
 	/// the deploy blocks (`LightsailBlock`, `CloudflareContainerBlock`) so a markup
 	/// port, an env override and the static default all resolve the same way.
 	pub fn resolve_server_port(explicit: Option<u16>) -> u16 {
 		explicit
-			.or_else(|| {
-				beet_core::prelude::env_ext::var("BEET_HTTP_PORT")
-					.ok()
-					.and_then(|val| val.parse().ok())
-			})
+			.or(beet_core::prelude::BootstrapConfig::from_env_or_warn()
+				.http_port)
 			.unwrap_or(DEFAULT_HTTP_PORT)
 	}
 

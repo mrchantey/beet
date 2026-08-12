@@ -24,7 +24,7 @@ use bevy::math::UVec2;
 ///
 /// A long-running server: it never resolves the boot call, so its
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up.
-/// Reads `--port` / `--host` from the boot request (defaulting from
+/// Reads `--ssh-port` / `--host` from the boot request (defaulting from
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
 /// Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
 /// [`HttpServer`] on the same root, so one process answers http and ssh at once.
@@ -56,29 +56,26 @@ fn on_action_in(
 	else {
 		return Ok(());
 	};
-	let (selected, port, host, opening) = ev.with(|request| {
+	let (selected, boot, opening) = ev.with(|request| -> Result<_> {
 		(
-			Request::selects_server(request, "ssh", default_boot),
-			request.get_param("port").and_then(|port| port.parse().ok()),
-			request.get_param("host").map(|host| {
-				if host == "0.0.0.0" {
-					[0, 0, 0, 0]
-				} else {
-					[127, 0, 0, 1]
-				}
-			}),
-			OpeningRoute::from_request(request),
+			Request::selects_server(request, "ssh", default_boot)?,
+			// the request alone, with no env fallback: env already fed
+			// `SshServer::default` below, so consulting it again here would let it
+			// out-rank a markup-declared field.
+			BootstrapConfig::parse_params(request.params())?,
+			OpeningRoute::from_request(request)?,
 		)
-	})?;
+			.xok()
+	})??;
 	if !selected {
 		return Ok(());
 	}
 	// the bind config from the request, defaulting from env.
 	let mut server = SshServer::default();
-	if let Some(port) = port {
+	if let Some(port) = boot.ssh_port {
 		server.port = Some(port);
 	}
-	if let Some(host) = host {
+	if let Some(host) = boot.host_octets() {
 		server.host = host;
 	}
 	// the opening route each session navigates to, recorded on the server (the

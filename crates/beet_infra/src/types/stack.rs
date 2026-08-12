@@ -46,23 +46,22 @@ impl Stack {
 		let app_name = app_name.into();
 		let work_directory = WsPathBuf::new(format!("target/infra/{app_name}"));
 
-		let deploy_id = env_ext::var("BEET_DEPLOY_ID")
-			.ok()
-			.and_then(|s| Uuid::parse_str(&s).ok())
+		// the deploy identity and stage flow from the process `BootstrapConfig`
+		// (`--stage` / `BEET_STAGE` and friends), so they reach every stack in
+		// every scene without per-template threading.
+		let config = BootstrapConfig::from_env_or_warn();
+
+		let deploy_id = config
+			.deploy_id
+			.and_then(|id| Uuid::parse_str(&id).ok())
 			.unwrap_or_else(Uuid::now_v7);
 
-		let deploy_timestamp = env_ext::var("BEET_DEPLOY_TIMESTAMP")
-			.ok()
+		let deploy_timestamp = config
+			.deploy_timestamp
+			.map(|stamp| stamp.to_string())
 			.unwrap_or_else(crate::types::artifacts::now_timestamp);
 
-		// the stage flows from `--stage=<x>`, else `BEET_STAGE`, else `dev`, so it
-		// reaches every stack in every scene without per-template threading.
-		let stage = CliArgs::parse_env()
-			.params
-			.get("stage")
-			.cloned()
-			.or_else(|| env_ext::var("BEET_STAGE").ok().map(SmolStr::from))
-			.unwrap_or_else(|| "dev".into());
+		let stage = config.stage.unwrap_or_else(|| "dev".into());
 
 		Self {
 			app_name,

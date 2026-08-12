@@ -56,20 +56,33 @@ pub struct FargateBlock {
 	/// in the Fargate task.
 	#[serde(default)]
 	env_vars: Vec<Variable>,
-	/// Plain static environment variables injected directly into the task, eg
-	/// the assets/analytics resource names and `BEET_SSH_HOST_KEY` (so every task
-	/// shares one stable ssh fingerprint). Unlike [`env_vars`](Self::env_vars)
-	/// these are literal values, not terraform variable references. Entry-store
-	/// selection is *not* env: it rides [`runtime_args`](Self::runtime_args).
+	/// The deployed binary's [`BootstrapConfig`], split at render time by
+	/// [`BootstrapConfig::split_channels`]: boot selection (the store, the
+	/// `--server` set) rides the container `CMD` that [`BuildDockerImage`] writes,
+	/// ambient service config (the stage, the service access, the analytics table)
+	/// rides the task-definition env. The platform bindings the block itself owns
+	/// (the bind host, the container ports, the deploy identity) are merged in at
+	/// render time, so a caller never sets them.
+	#[serde(default)]
+	bootstrap: BootstrapConfig,
+	/// Secret env injected literally into the task definition, eg
+	/// `BEET_SSH_HOST_KEY` so every task shares one stable ssh fingerprint.
+	///
+	/// Its own list rather than a [`BootstrapConfig`] field, so the secret channel
+	/// is visible in the type and no renderer can ever put a secret on an argv
+	/// line, in a `CMD` array or in a systemd `ExecStart`. Baking a secret into
+	/// the task definition is a pre-existing exposure, noted, not widened.
 	#[serde(default)]
 	#[set_with(skip)]
-	static_env: Vec<(SmolStr, SmolStr)>,
-	/// Args appended to the container binary's `CMD` (after any
-	/// `BuildDockerImage` `cmd_args`), eg `--store=s3://<bucket>` so the deployed
-	/// binary loads its entry from the site bucket. The env-free channel for
-	/// deploy config the binary reads as argv.
+	secret_env: Vec<(SmolStr, SmolStr)>,
+	/// The public-read assets bucket the deployed container serves `/assets` from.
+	///
+	/// Deliberately not a [`BootstrapConfig`] field: the store-topology phase
+	/// deletes the `AssetsStore` that reads it, at which point the app bucket
+	/// physically contains `assets/` and there is no assets name on any transport.
 	#[serde(default)]
-	runtime_args: Vec<SmolStr>,
+	#[set_with(unwrap_option, into)]
+	assets_bucket: Option<SmolStr>,
 	/// DNS + HTTPS configuration, one entry per hostname the NLB answers. When
 	/// non-empty, a single ACM certificate is provisioned covering every
 	/// authority (the first is the cert's primary domain, the rest are subject
@@ -124,8 +137,9 @@ impl Default for FargateBlock {
 			health_check_path: "/health".into(),
 			container_image: ContainerImage::default(),
 			env_vars: Vec::new(),
-			static_env: Vec::new(),
-			runtime_args: Vec::new(),
+			bootstrap: default(),
+			secret_env: Vec::new(),
+			assets_bucket: None,
 		}
 	}
 }
@@ -143,15 +157,22 @@ impl FargateBlock {
 		self
 	}
 
-	/// Add a plain static environment variable to the task (see
-	/// [`static_env`](Self::static_env)).
-	pub fn with_static_env(
+	/// Add a secret environment variable to the task (see
+	/// [`secret_env`](Self::secret_env)).
+	pub fn with_secret_env(
 		mut self,
 		key: impl Into<SmolStr>,
 		value: impl Into<SmolStr>,
 	) -> Self {
-		self.static_env.push((key.into(), value.into()));
+		self.secret_env.push((key.into(), value.into()));
 		self
+	}
+
+	/// The deployed binary's argv config: the block's own [`bootstrap`](Self::bootstrap)
+	/// reduced to its argv channel, which [`BuildDockerImage`] renders into the
+	/// image `CMD`.
+	pub fn cmd_bootstrap(&self) -> BootstrapConfig {
+		self.bootstrap.clone().split_channels().0
 	}
 
 	/// Generate a shortened name for AWS resources with length limits (eg LB +
@@ -529,38 +550,37 @@ impl Block for FargateBlock {
 			},
 		);
 
-		// Container environment variables
+		// Container environment variables. The `BEET_*` set is rendered from the
+		// block's `BootstrapConfig` with the platform bindings merged in, so the
+		// names the deploy writes are by construction the names the runtime reads.
+		let mut runtime = self.bootstrap.clone();
+		runtime.host = Some(core::net::Ipv4Addr::UNSPECIFIED.into());
+		runtime.http_port = Some(self.container_port);
+		runtime.ssh_port = self.allow_ssh.then_some(self.ssh_container_port);
+		// the deployed stage, so a markup `PackageConfig` (which reads it at
+		// runtime) reports the stage it is actually running in.
+		runtime.stage = Some(stage.clone());
+		runtime.deploy_id = Some(deploy_id.to_string().into());
+		runtime.deploy_timestamp = Some(deploy_timestamp.into());
 		let mut env_vars = std::collections::BTreeMap::new();
-		env_vars.insert("BEET_DEPLOY_ID".into(), deploy_id.to_string().into());
-		env_vars.insert(
-			"BEET_DEPLOY_TIMESTAMP".into(),
-			deploy_timestamp.to_string().into(),
-		);
-		env_vars.insert("BEET_HOST".into(), "0.0.0.0".into());
-		env_vars.insert(
-			"BEET_HTTP_PORT".into(),
-			self.container_port.to_string().into(),
-		);
-		if self.allow_ssh {
-			env_vars.insert(
-				"BEET_SSH_PORT".into(),
-				self.ssh_container_port.to_string().into(),
-			);
+		for (key, value) in runtime.split_channels().1.to_env() {
+			env_vars.insert(key, value.to_string());
 		}
+		// third-party conventions the block emits directly; not beet config.
 		env_vars.insert("RUST_LOG".into(), "info".into());
 		env_vars.insert("AWS_REGION".into(), region.to_string());
-		// the deployed stage, so a markup `PackageConfig` (which reads `BEET_STAGE`
-		// at runtime) reports the stage it is actually running in.
-		env_vars.insert("BEET_STAGE".into(), stage.to_string().into());
+		// interim, dies with the store-topology phase: see `assets_bucket`.
+		if let Some(bucket) = &self.assets_bucket {
+			env_vars.insert("BEET_ASSETS_BUCKET".into(), bucket.to_string());
+		}
 		// env_vars as terraform variable references
 		for variable in &self.env_vars {
 			env_vars
 				.insert(variable.key().clone(), variable.tf_var_ref().into());
 		}
-		// plain static env (bucket names, service access, ssh host key), last so
-		// the deploy can override the defaults above if needed.
-		for (key, value) in &self.static_env {
-			env_vars.insert(key.clone(), value.to_string().into());
+		// secrets, last so a deploy can override any default above.
+		for (key, value) in &self.secret_env {
+			env_vars.insert(key.clone(), value.to_string());
 		}
 
 		// Task definition. The http port is always mapped; the ssh port only
@@ -1066,5 +1086,63 @@ mod tests {
 			r#"{{\"name\":\"BEET_STAGE\",\"value\":\"{}\"}}"#,
 			stack.stage()
 		));
+	}
+
+	/// The task-definition env is rendered from the block's `BootstrapConfig`, so
+	/// the names the deploy writes are the names the runtime parses: the platform
+	/// bindings the block owns plus whatever the deploy declared.
+	#[beet_core::test]
+	fn renders_bootstrap_env() {
+		let json = build_json(
+			&FargateBlock::default()
+				.with_allow_ssh(true)
+				.with_container_port(9001)
+				.with_bootstrap(BootstrapConfig {
+					service_access: Some(ServiceAccess::Remote),
+					analytics_table: Some("beet--dev--analytics".into()),
+					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+					..default()
+				}),
+		);
+		let json = json.as_str();
+		json
+			// the platform bindings the block merges in
+			.xpect_contains(r#"\"name\":\"BEET_HOST\",\"value\":\"0.0.0.0\""#)
+			.xpect_contains(r#"\"name\":\"BEET_HTTP_PORT\",\"value\":\"9001\""#)
+			.xpect_contains(r#"\"name\":\"BEET_SSH_PORT\",\"value\":\"22\""#)
+			// the deploy-declared service config
+			.xpect_contains(
+				r#"\"name\":\"BEET_SERVICE_ACCESS\",\"value\":\"remote\""#,
+			)
+			.xpect_contains(
+				r#"\"name\":\"BEET_ANALYTICS_TABLE\",\"value\":\"beet--dev--analytics\""#,
+			)
+			// entry-store selection rides argv (the image CMD), never env
+			.xnot()
+			.xpect_contains("BEET_STORE");
+	}
+
+	/// Boot selection rides the container `CMD` as a real JSON array, and the
+	/// secret channel is visible in the type: a secret can only reach env.
+	#[beet_core::test]
+	fn splits_cmd_and_secret_channels() {
+		let block = FargateBlock::default().with_bootstrap(BootstrapConfig {
+			store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+			server: Some(ServerFilter::new("http,ssh")),
+			stage: Some("dev".into()),
+			..default()
+		});
+		block
+			.cmd_bootstrap()
+			.to_cmd_json("/app")
+			.unwrap()
+			.xpect_eq(
+				r#"["/app", "--store=s3://beet--dev--app", "--server=http,ssh"]"#,
+			);
+		build_json(&block.with_secret_env("BEET_SSH_HOST_KEY", "abc123"))
+			.as_str()
+			.xpect_contains(
+				r#"\"name\":\"BEET_SSH_HOST_KEY\",\"value\":\"abc123\""#,
+			);
 	}
 }

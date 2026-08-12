@@ -150,6 +150,37 @@ impl ChildProcess {
 		self
 	}
 
+	/// Deliver `config` to a beet child process: scrub every inherited `BEET_*`
+	/// var from its environment, then append the config's argv.
+	///
+	/// When beet spawns beet, ambient config inheritance is a bug class rather
+	/// than a convenience: the parent constructs the child's config field by
+	/// field and this hands it over, so a leak is unrepresentable and propagation
+	/// is code you can read.
+	///
+	/// ```ignore
+	/// let child = BootstrapConfig {
+	///     store: config.store.clone(), // deliberate inheritance
+	///     ..default()                  // everything else: not inherited
+	/// };
+	/// ChildProcess::new("beet").with_bootstrap(&child)?
+	/// ```
+	///
+	/// Only `BEET_*` names are scrubbed, so SDK-convention secrets
+	/// (`AWS_ACCESS_KEY_ID`, …) still inherit where a child legitimately needs
+	/// them.
+	pub fn with_bootstrap(mut self, config: &BootstrapConfig) -> Result<Self> {
+		self.env_removals.extend(
+			env_ext::vars()
+				.into_iter()
+				.map(|(key, _)| key)
+				.filter(|key| key.starts_with("BEET_"))
+				.map(SmolStr::from),
+		);
+		self.args.extend(config.to_argv()?);
+		self.xok()
+	}
+
 	/// The configured command: program, args, cwd, env additions and removals,
 	/// and the unix process group when requested. The single place that
 	/// translation happens, so every run/spawn variant below is only a choice of

@@ -177,23 +177,24 @@ pub fn DirSync(
 /// because `TofuApplyAction` pairs the `BuildArtifact` with the block on the same
 /// entity to upload it under the block's label, the S3 key the lambda reads its
 /// code from. The lambda runtime offers no argv, so the site-store args
-/// (`remote_args`) bake into the zip's `bootstrap` script (the env-to-args
+/// (`remote_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
 /// boundary). The markup form of the rust example's
 /// `(block, build_beet_lambda_binary(features))` deploy child.
 #[template]
 pub fn LambdaSiteBlock(
 	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
-) -> impl Bundle {
+) -> Result<impl Bundle> {
 	let stack = infra_ext::stack(&app_name);
 	(
 		LambdaBlock::default(),
 		infra_ext::beet_cargo_build(features)
-			.with_runtime_args(infra_ext::remote_args(
+			.with_bootstrap(infra_ext::remote_bootstrap(
 				infra_ext::site_bucket_name(&stack),
-			))
-			.into_lambda_build_artifact(),
+			)?)
+			.into_lambda_build_artifact()?,
 	)
+		.xok()
 }
 
 /// `<LambdaWatch app_name="lambda" timeout="30s"/>` — tail the deployed
@@ -213,21 +214,22 @@ pub fn LambdaWatch(
 
 /// `<LightsailSiteBlock app_name="lightsail" features="aws_sdk"/>` — the
 /// lightsail deploy block (its systemd `ExecStart` launches the binary with the
-/// site-store args, `remote_args`) plus its build artifact, on one entity
+/// site-store config, `remote_bootstrap`) plus its build artifact, on one entity
 /// (paired by `TofuApplyAction`, see [`LambdaSiteBlock`]). The markup form of
 /// `(block, build_beet_binary(features))`.
 #[template]
 pub fn LightsailSiteBlock(
 	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
-) -> impl Bundle {
+) -> Result<impl Bundle> {
 	let stack = infra_ext::stack(&app_name);
 	(
-		LightsailBlock::default().with_runtime_args(infra_ext::remote_args(
+		LightsailBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::site_bucket_name(&stack),
-		)),
+		)?),
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
 	)
+		.xok()
 }
 
 /// `<LightsailWatch app_name="lightsail" timeout="30s"/>` — tail the deployed
@@ -246,15 +248,19 @@ pub fn LightsailWatch(
 }
 
 /// `<FargateSiteBlock app_name="fargate"/>` — the fargate deploy block wired to
-/// serve the site from the stack's bucket: the site-store args (`remote_args`)
-/// land in the container `CMD` via the sibling `<BuildDockerImage/>`. Named to
-/// avoid the [`FargateBlock`] it builds.
+/// serve the site from the stack's bucket: the site-store config
+/// (`remote_bootstrap`) lands in the container `CMD` via the sibling
+/// `<BuildDockerImage/>`. Named to avoid the [`FargateBlock`] it builds.
 #[template]
-pub fn FargateSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
+pub fn FargateSiteBlock(
+	#[prop(into)] app_name: String,
+) -> Result<impl Bundle> {
 	let stack = infra_ext::stack(&app_name);
-	FargateBlock::default().with_runtime_args(infra_ext::remote_args(
-		infra_ext::site_bucket_name(&stack),
-	))
+	FargateBlock::default()
+		.with_bootstrap(infra_ext::remote_bootstrap(
+			infra_ext::site_bucket_name(&stack),
+		)?)
+		.xok()
 }
 
 /// `<FargateSshBlock/>` — a [`FargateBlock`] with ssh enabled. No site-store
@@ -297,7 +303,9 @@ pub fn FargateWatch(
 /// publishes the production apex `beet.org` + `www.beet.org`. This is REQUIRED so a
 /// `dev` deploy never touches production apex DNS, and it makes `--stage` meaningful.
 #[template]
-pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
+pub fn FargateBeetSiteBlock(
+	#[prop(into)] app_name: String,
+) -> Result<impl Bundle> {
 	let stack = infra_ext::stack(&app_name);
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
@@ -320,15 +328,22 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 		.with_max_count(5)
 		.with_cpu(1024)
 		.with_memory(2048)
-		// entry-store selection rides argv (the container `CMD`), not env; the
-		// image's own `cmd_args` carry the `--server=http,ssh` selection.
-		.with_runtime_args(vec![infra_ext::store_arg(site_bucket)])
-		// service-access config the runtime `PackageConfig` reads (the analytics
-		// store's remote-mode selector), a separate concern from entry resolution.
-		.with_static_env("BEET_SERVICE_ACCESS", "remote")
-		.with_static_env("BEET_ASSETS_BUCKET", assets_bucket)
-		.with_static_env("BEET_ANALYTICS_TABLE", analytics_table)
-		.with_static_env("BEET_SSH_HOST_KEY", ssh_host_key);
+		// one declaration for both channels: the block splits boot selection (the
+		// entry store, the transports) onto the container `CMD` and the service
+		// config the runtime `PackageConfig`/analytics store read onto task env.
+		.with_bootstrap(BootstrapConfig {
+			store: Some(StoreUri::parse(&format!("s3://{site_bucket}"))?),
+			server: Some(ServerFilter::new("http,ssh")),
+			service_access: Some(ServiceAccess::Remote),
+			analytics_table: Some(analytics_table.into()),
+			..default()
+		})
+		// interim, dies with the store-topology phase (`AssetsStore` is deleted
+		// there, and the app bucket physically contains `assets/`).
+		.with_assets_bucket(assets_bucket)
+		// private key material: its own channel, so no renderer can ever put it
+		// on an argv line or in a `CMD` array.
+		.with_secret_env("BEET_SSH_HOST_KEY", ssh_host_key);
 	// prod claims the apex + www (proxied, edge-cached) plus the DNS-only `app`
 	// hostname carrying ssh + future live apps; other stages get their
 	// subdomain (proxied) + `app.dev` (DNS-only ssh).
@@ -354,6 +369,7 @@ pub fn FargateBeetSiteBlock(#[prop(into)] app_name: String) -> impl Bundle {
 				zone_id.clone(),
 			))
 	}
+	.xok()
 }
 
 /// `<BeetSiteDeployHost>` — the [`Stack`]-bearing parent for the beet-site deploy

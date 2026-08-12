@@ -4,7 +4,7 @@
 Deploys the `ssh_tui_site` example binary (html over http + a multi-tenant live
 terminal over ssh) to AWS Fargate, with cpu autoscaling and an ssh-capable NLB
 (see `FargateBlock`). The container runs the `ssh_tui_site` binary, which reads
-`BEET_HOST`/`BEET_PORT`/`BEET_SSH_PORT` (injected by the ssh-enabled block) and
+`BEET_HOST`/`BEET_HTTP_PORT`/`BEET_SSH_PORT` (injected by the ssh-enabled block) and
 serves both protocols; `/health` is the http health check.
 
 Unlike the other site deployers this bakes a *specific example binary* into the

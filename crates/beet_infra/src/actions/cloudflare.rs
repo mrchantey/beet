@@ -180,9 +180,10 @@ pub async fn CloudflareContainerDeployAction(
 
 /// The Dockerfile: the native `beet` binary on debian-slim, serving http on the
 /// container port. The site is pulled from R2 at boot, not baked in: the `CMD`
-/// bakes the entry-store selection as args (`--store=s3://<bucket>?endpoint=..`,
-/// both known at deploy time), so deploy config reaches the binary as argv; only
-/// the R2 credentials stay env (SDK convention, injected by the fronting Worker).
+/// renders the block's argv-channel [`BootstrapConfig`] (the R2 store uri and the
+/// `--server` selection, both known at deploy time), so deploy config reaches the
+/// binary as argv; only the R2 credentials stay env (SDK convention, injected by
+/// the fronting Worker).
 fn write_container_dockerfile(
 	dir: &AbsPathBuf,
 	binary_name: &str,
@@ -190,17 +191,17 @@ fn write_container_dockerfile(
 	endpoint: &str,
 ) -> Result {
 	let port = block.port();
-	let bucket = block.bucket();
 	// the port is driven by the served site's markup `HttpServer{port}` (the
-	// binary loads it from R2 at boot), so the container only needs to EXPOSE it;
-	// `--server=http --path=/` mirrors the proven Fargate invocation.
+	// binary loads it from R2 at boot), so the container only needs to EXPOSE it.
+	// A real JSON array, so the encoding is correct by construction.
+	let cmd = block.cmd_bootstrap(endpoint)?.to_cmd_json("/app")?;
 	let dockerfile = format!(
 		"FROM debian:bookworm-slim\n\
 		 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*\n\
 		 COPY {binary_name} /app\n\
 		 RUN chmod +x /app\n\
 		 EXPOSE {port}\n\
-		 CMD [\"/app\", \"serve\", \"--server=http\", \"--path=/\", \"--store=s3://{bucket}?endpoint={endpoint}\"]\n"
+		 CMD {cmd}\n"
 	);
 	fs_ext::write(dir.join("Dockerfile"), dockerfile)?;
 	Ok(())
@@ -217,14 +218,25 @@ fn write_container_worker_js(
 ) -> Result {
 	let port = block.port();
 	let sleep_after = block.sleep_after();
-	// non-secret env as literals; secrets (R2 keys) read from `this.env` at runtime.
+	// non-secret env as literals, rendered from the block's env-channel
+	// `BootstrapConfig` and JSON-escaped through serde rather than hand-written.
 	// `BEET_HOST=0.0.0.0` binds the server to all interfaces (matching Fargate /
 	// Lightsail): the fronting Worker proxies to the container's own IP, so a
 	// default localhost bind would be unreachable ("not listening in the TCP
 	// address <ip>:<port>").
-	let mut env_lines = String::from(
-		"    BEET_HOST: \"0.0.0.0\",\n\
-		 \x20   AWS_ACCESS_KEY_ID: this.env.R2_ACCESS_KEY_ID,\n\
+	let mut env_lines = block
+		.runtime_bootstrap()
+		.to_env()
+		.iter()
+		.map(|(key, value)| -> Result<String> {
+			format!("    {key}: {},\n", serde_json::to_string(value.as_str())?)
+				.xok()
+		})
+		.collect::<Result<String>>()?;
+	// secrets (the R2 keys) read from `this.env` at runtime, never rendered as a
+	// literal here.
+	env_lines.push_str(
+		"    AWS_ACCESS_KEY_ID: this.env.R2_ACCESS_KEY_ID,\n\
 		 \x20   AWS_SECRET_ACCESS_KEY: this.env.R2_SECRET_ACCESS_KEY,\n",
 	);
 	for var in block.env_vars() {

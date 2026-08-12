@@ -41,8 +41,13 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	// await, so this never returns and the process serves the entry.
 	// `None`: a long-running server waits out a slow dependency rather than
 	// failing the run, see `build_entry`.
-	let root =
-		build_entry(&caller, parts.params(), &entry_arg(parts)?, None).await?;
+	let root = build_entry(
+		&caller,
+		&BootstrapConfig::from_params(parts.params())?,
+		&entry_arg(parts)?,
+		None,
+	)
+	.await?;
 	// boot the entry at its own home with the serve flags (see
 	// `entry_boot_request`), not the `serve/<entry>` command request the dev
 	// router routed here.
