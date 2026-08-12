@@ -2,16 +2,12 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A page `<footer>` displaying the copyright + version + build stage from
-/// [`PackageConfig`].
+/// A page `<footer>` displaying the copyright + version from [`PackageConfig`],
+/// and the launch stage from [`BootstrapConfig`].
 #[template(system)]
 pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Bundle {
-	let PackageConfig {
-		title,
-		version,
-		stage,
-		..
-	} = &*pkg_config;
+	let PackageConfig { title, version, .. } = &*pkg_config;
+	let bootstrap = BootstrapConfig::get();
 
 	let current_year = time_ext::current_year();
 	let footer_text = format!("© {title} {current_year}");
@@ -19,8 +15,8 @@ pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Bundle {
 	let mut build_text = format!("v{version}");
 	#[cfg(debug_assertions)]
 	build_text.push_str(" | build=debug");
-	if stage != "prod" {
-		build_text.push_str(&format!(" | stage={stage}"));
+	if !bootstrap.is_prod() {
+		build_text.push_str(&format!(" | stage={}", bootstrap.stage));
 	}
 
 	rsx! {

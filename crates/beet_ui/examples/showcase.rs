@@ -46,8 +46,6 @@ fn main() {
 			version: "0.0.0".into(),
 			homepage: Some("https://beet.org".into()),
 			repository: None,
-			stage: "dev".into(),
-			service_access: ServiceAccess::Local,
 		})
 		.add_systems(Startup, serve_showcase)
 		.run();

@@ -253,14 +253,6 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 /// `#[prop]` params are fields; every other param is a Bevy `SystemParam`
 /// fetched synchronously at build time via [`SystemTemplate`].
 fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
-	if is_fallible(&item) {
-		return Err(syn::Error::new_spanned(
-			&item.sig.output,
-			"a `#[template(system)]` cannot be fallible: its body runs inside \
-			the build closure, which must yield a bundle. Return the bundle and \
-			raise through `Commands::handle_command_error` instead.",
-		));
-	}
 	let mut props: Vec<Prop> = Vec::new();
 	let mut sys_types: Vec<TokenStream> = Vec::new();
 	let mut sys_pats: Vec<syn::PatIdent> = Vec::new();
@@ -287,10 +279,11 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 }
 
 /// Whether the template returns a `Result<impl Bundle>`, so the body's value is
-/// unwrapped with `?` into the enclosing `build_template` result. Lets a template
-/// that can genuinely fail (parsing a declared uri, rendering a deploy config)
-/// surface the error where the build already handles one, rather than
-/// unwrapping.
+/// unwrapped with `?` into the enclosing result: `build_template`'s for a pure
+/// template, the [`SystemTemplate`] build closure's for a `#[template(system)]`.
+/// Lets a template that can genuinely fail (parsing a declared uri, rendering a
+/// deploy config) surface the error where the build already handles one, rather
+/// than unwrapping.
 fn is_fallible(item: &ItemFn) -> bool {
 	let syn::ReturnType::Type(_, ty) = &item.sig.output else {
 		return false;
@@ -373,6 +366,22 @@ fn emit(
 		props.iter().filter_map(Prop::body_binding).collect();
 
 	let is_system = system.is_some();
+	// a `-> Result<impl Bundle>` body unwraps with `?` into the enclosing result
+	// (`build_template`'s own, or the build closure's for a system template), so a
+	// fallible template needs no unwrap at the author site. The `impl Bundle`
+	// return type erases here, so the intermediate is annotated to pin the error
+	// type to `BevyError` (the one a template body raises, and the one both
+	// enclosing results carry).
+	let bundle = match is_fallible(item) {
+		true => quote! {
+			let bundle: #bevy::ecs::error::Result<_> =
+				{ use #beet_core::prelude::*; #body };
+			let bundle = bundle?;
+		},
+		false => quote! {
+			let bundle = { use #beet_core::prelude::*; #body };
+		},
+	};
 	// the inner build: bind props, run the body verbatim (it ends in an
 	// `impl Bundle`, commonly an `rsx!` that expands through the normal macro
 	// path), insert the resulting bundle into the build target.
@@ -387,36 +396,21 @@ fn emit(
 				let Self { #(#field_idents),* } = props.clone();
 				#(#required_unwraps)*
 				#(#body_bindings)*
-				let bundle = { use #beet_core::prelude::*; #body };
-				#beet_core::prelude::Snippet::from_bundle(bundle)
+				#bundle
+				::core::result::Result::Ok(
+					#beet_core::prelude::Snippet::from_bundle(bundle)
+				)
 			});
 			cx.entity.build_template(&inner)
 		},
-		None => {
-			// a `-> Result<impl Bundle>` body unwraps into `build_template`'s own
-			// result, so a fallible template needs no unwrap at the author site.
-			// The `impl Bundle` return type erases here, so the intermediate is
-			// annotated to pin the error type to `BevyError` (the one a template
-			// body raises, and the one `build_template` returns).
-			let bundle = match is_fallible(item) {
-				true => quote! {
-					let bundle: #bevy::ecs::error::Result<_> =
-						{ use #beet_core::prelude::*; #body };
-					let bundle = bundle?;
-				},
-				false => quote! {
-					let bundle = { use #beet_core::prelude::*; #body };
-				},
-			};
-			quote! {
-				let Self { #(#field_idents),* } = self.clone();
-				#(#required_unwraps)*
-				#(#body_bindings)*
-				#bundle
-				cx.entity.insert(bundle);
-				::core::result::Result::Ok(())
-			}
-		}
+		None => quote! {
+			let Self { #(#field_idents),* } = self.clone();
+			#(#required_unwraps)*
+			#(#body_bindings)*
+			#bundle
+			cx.entity.insert(bundle);
+			::core::result::Result::Ok(())
+		},
 	};
 
 	// system templates move `self` into a `FnOnce`, so bind a clone first.

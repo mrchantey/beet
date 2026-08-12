@@ -60,6 +60,7 @@ pub use utils::cross_log::CrossLog;
 pub mod arena;
 mod bevy_extensions;
 pub mod bevy_utils;
+pub mod bootstrap;
 #[cfg(feature = "bsx")]
 pub mod bsx;
 mod crate_check;
@@ -93,8 +94,6 @@ pub use beet_core_macros::*;
 #[cfg(target_arch = "wasm32")]
 pub use web_utils::js_runtime;
 
-#[cfg(feature = "std")]
-mod workspace_config;
 #[cfg(feature = "custom_test_frameworks")]
 pub use crate::testing::libtest_runner;
 #[cfg(feature = "testing")]
@@ -153,6 +152,7 @@ pub mod prelude {
 	pub use crate::arena::*;
 	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
+	pub use crate::bootstrap::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
 	#[cfg(feature = "bsx")]
@@ -245,8 +245,6 @@ pub mod prelude {
 	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::web_utils::*;
-	#[cfg(feature = "std")]
-	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
 	pub use core::time::Duration;
 	pub use futures_lite::StreamExt;

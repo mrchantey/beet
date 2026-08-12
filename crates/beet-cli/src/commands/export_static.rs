@@ -31,9 +31,10 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ExportStaticParams>()?;
 	let entry_path = entry_arg(parts)?;
+	let config = BootstrapConfig::from_params(parts.params())?;
 	let root = build_entry(
 		&cx.caller,
-		&BootstrapConfig::from_params(parts.params())?,
+		&config,
 		&entry_path,
 		Some(ONE_SHOT_SETTLE_DEADLINE),
 	)
@@ -63,7 +64,7 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 		None => entry_dir(&entry_path)?.join(DIST_DIR),
 	};
 	let out = BlobStore::new(FsStore::new(out_dir.clone()));
-	let written = StaticExport::export(&cx.world(), root, &out).await?;
+	let written = StaticExport::export(&cx.world(), root, &config, &out).await?;
 	Response::ok_text(format!(
 		"exported {} routes to {out_dir}\n",
 		written.len()

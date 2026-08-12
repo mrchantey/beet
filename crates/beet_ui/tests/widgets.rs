@@ -24,8 +24,6 @@ fn layout_world() -> World {
 		version: "0.0.0".into(),
 		homepage: Some("https://example.test".into()),
 		repository: None,
-		stage: "dev".into(),
-		service_access: ServiceAccess::Local,
 	});
 	world
 }

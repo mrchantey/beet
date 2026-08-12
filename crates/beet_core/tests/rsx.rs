@@ -297,3 +297,45 @@ fn fallible_template_raises() {
 		.to_string()
 		.xpect_contains("invalid digit");
 }
+
+/// The doubler the fallible system template reads from the world.
+#[derive(Resource)]
+struct Factor(u32);
+
+// a `#[template(system)]` is fallible on the same terms as a pure one: the `?`
+// is raised out of the build closure onto the build's own result.
+#[template(system)]
+fn ParsedScaled(
+	#[prop(into)] count: String,
+	factor: Res<Factor>,
+) -> Result<impl Bundle> {
+	let count: u32 = count.parse()?;
+	rsx! { <span>{count * factor.0}</span> }.xok()
+}
+
+#[beet_core::test]
+fn fallible_system_template_builds() {
+	let mut world = world();
+	world.insert_resource(Factor(2));
+	let root = world
+		.spawn_template(rsx! { <ParsedScaled count="21"/> })
+		.unwrap()
+		.id();
+	child_values(&world, root).xpect_eq(vec![Value::new(42u32)]);
+}
+
+#[beet_core::test]
+fn fallible_system_template_raises() {
+	let mut world = world();
+	world.insert_resource(Factor(2));
+	world
+		.spawn_template(rsx! { <ParsedScaled count="nope"/> })
+		.unwrap();
+	world
+		.query::<&TemplateError>()
+		.single(&world)
+		.unwrap()
+		.error
+		.to_string()
+		.xpect_contains("invalid digit");
+}

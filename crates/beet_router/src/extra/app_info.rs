@@ -17,9 +17,10 @@ pub(crate) fn app_info() -> impl Bundle {
 }
 
 /// Reads live diagnostics at template build into an `<article>`: the
-/// [`PackageConfig`] fields, process uptime (Bevy's [`Time::elapsed`], which tracks
-/// time since app start), and the running request count ([`ExchangeStats`], summed
-/// across server entities).
+/// [`PackageConfig`] fields, the launch [`stage`](BootstrapConfig::stage),
+/// process uptime (Bevy's [`Time::elapsed`], which tracks time since app start),
+/// and the running request count ([`ExchangeStats`], summed across server
+/// entities).
 ///
 /// `Time`/`ExchangeStats` are read optionally, so an app without them (eg a bare
 /// test world without Bevy's `TimePlugin`) still renders the package fields.
@@ -33,9 +34,9 @@ fn AppInfoContent(
 		title,
 		description,
 		version,
-		stage,
 		..
 	} = config.clone();
+	let stage = BootstrapConfig::get().stage.clone();
 	// uptime since app start; "unknown" without a `Time` resource (no `TimePlugin`,
 	// eg a bare router test world).
 	let uptime = time

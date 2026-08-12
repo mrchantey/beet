@@ -310,7 +310,7 @@ mod test {
 			.spawn_template(SystemTemplate::<BuildAssets, _, _>::new(
 				|_entity, mut assets: BuildAssets| {
 					assets.load::<TextAsset>("hello.txt");
-					Snippet::from_bundle(())
+					Snippet::from_bundle(()).xok()
 				},
 			))
 			.unwrap()

@@ -15,14 +15,17 @@ use beet_core::prelude::*;
 /// always safe to include.
 #[template(system)]
 pub fn LiveReloadScript(channels: Query<&ClientIo>) -> Snippet {
-	if channels.iter().next().is_none() {
-		return Snippet::from_bundle(());
+	match channels.iter().next() {
+		// no channel is active, so there is nothing to reconnect to
+		None => Snippet::from_bundle(()),
+		Some(_) => {
+			let body = format!(
+				"const CLIENT_IO_PATH={CLIENT_IO_PATH:?};\n{}",
+				include_str!("./live_reload.js")
+			);
+			rsx! { <script>{body}</script> }.any_snippet()
+		}
 	}
-	let body = format!(
-		"const CLIENT_IO_PATH={CLIENT_IO_PATH:?};\n{}",
-		include_str!("./live_reload.js")
-	);
-	rsx! { <script>{body}</script> }.any_snippet()
 }
 
 #[cfg(test)]

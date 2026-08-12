@@ -17,13 +17,7 @@ mod as_any;
 /// Async utilities and future helpers.
 pub mod async_ext;
 mod backoff;
-/// The process-config type every beet binary boots from, and the value types its
-/// fields parse into.
-mod bootstrap_config;
 mod cfg_if;
-mod cli_args;
-mod server_filter;
-mod store_uri;
 /// Coalescing trigger for async write deduplication.
 mod coalescing_trigger;
 pub mod cross_log;
@@ -84,10 +78,6 @@ pub use async_ext::SendBoxedFuture;
 pub use async_ext::SendSyncBoxedFuture;
 pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
-pub use bootstrap_config::*;
-pub use cli_args::*;
-pub use server_filter::*;
-pub use store_uri::*;
 pub use coalescing_trigger::*;
 pub use file_span::*;
 pub use glob_filter::*;

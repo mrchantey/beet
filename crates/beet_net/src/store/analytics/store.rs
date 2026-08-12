@@ -41,7 +41,7 @@ pub(super) fn spawn_store_on_config(
 		}
 		// read the backend config now (the scene has settled), defaulting when a
 		// PackageConfig/WorkspaceConfig was not inserted.
-		let (fs_dir, assets_dir, bucket_name, access) = world
+		let (fs_dir, assets_dir, bucket_name) = world
 			.with(|world: &mut World| {
 				let ws = world
 					.get_resource::<WorkspaceConfig>()
@@ -63,10 +63,10 @@ pub(super) fn spawn_store_on_config(
 					ws.analytics_dir.into_abs(),
 					ws.assets_dir.into_abs(),
 					table_name,
-					pkg.service_access,
 				)
 			})
 			.await;
+		let access = BootstrapConfig::get().service_access;
 		let store =
 			TableStore::dynamo_fs_selector(&fs_dir, &bucket_name, DEFAULT_REGION, access)
 				.await;

@@ -557,9 +557,9 @@ impl Block for FargateBlock {
 		runtime.host = Some(core::net::Ipv4Addr::UNSPECIFIED.into());
 		runtime.http_port = Some(self.container_port);
 		runtime.ssh_port = self.allow_ssh.then_some(self.ssh_container_port);
-		// the deployed stage, so a markup `PackageConfig` (which reads it at
-		// runtime) reports the stage it is actually running in.
-		runtime.stage = Some(stage.clone());
+		// the deployed stage, so the running process reports (and names cloud
+		// resources for) the stage it is actually deployed to.
+		runtime.stage = stage.clone();
 		runtime.deploy_id = Some(deploy_id.to_string().into());
 		runtime.deploy_timestamp = Some(deploy_timestamp.into());
 		let mut env_vars = std::collections::BTreeMap::new();
@@ -943,7 +943,16 @@ mod tests {
 	/// Build a config from the given block, returning the config, stack, and the
 	/// temp directory guard that keeps the local stack alive.
 	fn build_config(block: &FargateBlock) -> (terra::Config, Stack, TempDir) {
+		build_config_at(block, BootstrapConfig::DEFAULT_STAGE)
+	}
+
+	/// [`build_config`] against a stack deployed to `stage`.
+	fn build_config_at(
+		block: &FargateBlock,
+		stage: &str,
+	) -> (terra::Config, Stack, TempDir) {
 		let (stack, dir) = Stack::default_local();
+		let stack = stack.with_stage(stage);
 		let mut config = stack.create_config();
 		let mut world = World::new();
 		block
@@ -1077,9 +1086,10 @@ mod tests {
 
 	#[beet_core::test]
 	fn injects_beet_stage_env() {
-		// the container must carry BEET_STAGE (set to the stack's stage) so a markup
-		// PackageConfig reports the deployed stage at runtime.
-		let (config, stack, _dir) = build_config(&autoscaling_block());
+		// the container must carry BEET_STAGE (set to the stack's stage) so the
+		// deployed runtime reports the stage it is actually running in. Asserted
+		// against a named stage, since the `dev` default renders to nothing.
+		let (config, stack, _dir) = build_config_at(&autoscaling_block(), "prod");
 		// container_definitions is a JSON string nested in the config, so the env
 		// entry renders with escaped quotes (matching the BEET_SSH_PORT tests).
 		config.to_json().to_string().xpect_contains(&format!(
@@ -1098,7 +1108,7 @@ mod tests {
 				.with_allow_ssh(true)
 				.with_container_port(9001)
 				.with_bootstrap(BootstrapConfig {
-					service_access: Some(ServiceAccess::Remote),
+					service_access: ServiceAccess::Remote,
 					analytics_table: Some("beet--dev--analytics".into()),
 					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 					..default()
@@ -1129,7 +1139,7 @@ mod tests {
 		let block = FargateBlock::default().with_bootstrap(BootstrapConfig {
 			store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 			server: Some(ServerFilter::new("http,ssh")),
-			stage: Some("dev".into()),
+			stage: "staging".into(),
 			..default()
 		});
 		block

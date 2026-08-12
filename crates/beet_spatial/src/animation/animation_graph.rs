@@ -88,6 +88,7 @@ mod test {
 					&mut graphs,
 					&mut assets,
 				))
+				.xok()
 			}))
 			.unwrap()
 			.id();

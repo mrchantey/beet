@@ -23,13 +23,15 @@ pub struct SystemTemplate<P, F, T> {
 impl<P, F, T> SystemTemplate<P, F, T>
 where
 	P: SystemParam + 'static,
-	F: Fn(Entity, P::Item<'_, '_>) -> T + Clone + Send + Sync + 'static,
+	F: Fn(Entity, P::Item<'_, '_>) -> Result<T> + Clone + Send + Sync + 'static,
 	T: Template<Output = ()>,
 {
 	/// Wrap a build closure into a [`SystemTemplate`]. `P` is the tuple of
 	/// [`SystemParam`]s the closure reads; the closure also receives the
 	/// [`Entity`] being built so it can read self/ancestor context, and returns
-	/// the child template `T`.
+	/// the child template `T`. The closure is fallible, so a build that reads
+	/// the world *and* can fail (parsing a declared uri against a resource) is
+	/// raised through the build's own error channel rather than unwrapped.
 	pub fn new(build: F) -> Self {
 		SystemTemplate {
 			build,
@@ -41,7 +43,7 @@ where
 impl<P, F, T> Template for SystemTemplate<P, F, T>
 where
 	P: SystemParam + 'static,
-	F: Fn(Entity, P::Item<'_, '_>) -> T + Clone + Send + Sync + 'static,
+	F: Fn(Entity, P::Item<'_, '_>) -> Result<T> + Clone + Send + Sync + 'static,
 	T: Template<Output = ()>,
 {
 	type Output = ();
@@ -52,7 +54,7 @@ where
 		// the building entity so the closure can read self/ancestor context.
 		let inner = cx
 			.entity
-			.with_state::<P, T>(|entity, params| build(entity, params));
+			.with_state::<P, Result<T>>(|entity, params| build(entity, params))?;
 		// build the produced subtree into this entity (synchronous, no lifecycle).
 		cx.entity.build_template(&inner)
 	}

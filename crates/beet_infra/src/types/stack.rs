@@ -63,7 +63,7 @@ impl Stack {
 			.map(|stamp| stamp.to_string())
 			.unwrap_or_else(crate::types::artifacts::now_timestamp);
 
-		let stage = config.stage.clone().unwrap_or_else(|| "dev".into());
+		let stage = config.stage.clone();
 
 		Self {
 			app_name,

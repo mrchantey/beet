@@ -18,14 +18,18 @@ impl StaticExport {
 	///
 	/// A route qualifies when its path is fully static, its method is `GET`, and it
 	/// is either a scene route or marked [`ExportStrategy::Static`]. Routes whose
-	/// [`ArticleMeta`] marks them a draft are skipped only on a `prod`
-	/// [`PackageConfig::stage`]; dev/staging builds keep drafts so they can be
-	/// previewed. Shared by [`collect_static_html`] and the `export-pdf` command, so
-	/// both ship exactly the same page set.
+	/// [`ArticleMeta`] marks them a draft are skipped only when `config` names a
+	/// [prod stage](BootstrapConfig::is_prod); dev/staging builds keep drafts so
+	/// they can be previewed. Shared by [`collect_static_html`] and the
+	/// `export-pdf` command, so both ship exactly the same page set.
 	pub async fn collect_paths(
 		world: &AsyncWorld,
 		router: Entity,
+		config: &BootstrapConfig,
 	) -> Result<Vec<SmolPath>> {
+		// drafts are excluded only in production; the stage defaults to dev
+		// (keep drafts) when neither transport named one.
+		let is_prod = config.is_prod();
 		world
 			.with(move |world: &mut World| -> Result<Vec<SmolPath>> {
 				let tree = world
@@ -35,12 +39,6 @@ impl StaticExport {
 						bevyhow!("router entity {router} has no RouteTree")
 					})?
 					.clone();
-				// drafts are excluded only in production; the resource is present at
-				// export, defaulting to dev (keep drafts) when unset.
-				let is_prod = world
-					.get_resource::<PackageConfig>()
-					.is_some_and(|config| config.is_prod());
-
 				let mut paths = Vec::new();
 				for node in tree.flatten_nodes() {
 					if !node.path.is_static() {
@@ -80,8 +78,9 @@ impl StaticExport {
 async fn collect_static_html(
 	world: &AsyncWorld,
 	router: Entity,
+	config: &BootstrapConfig,
 ) -> Result<Vec<(SmolPath, String)>> {
-	let paths = StaticExport::collect_paths(world, router).await?;
+	let paths = StaticExport::collect_paths(world, router, config).await?;
 	// the tree lives on the entry root, the dispatch on the router beneath it
 	let entity = world
 		.run_system_cached_with::<_, Result<Entity>, _, _>(find_router, router)
@@ -114,9 +113,10 @@ impl StaticExport {
 	pub async fn export(
 		world: &AsyncWorld,
 		router: Entity,
+		config: &BootstrapConfig,
 		out: &BlobStore,
 	) -> Result<Vec<SmolPath>> {
-		let pages = collect_static_html(world, router).await?;
+		let pages = collect_static_html(world, router, config).await?;
 		let mut written = Vec::new();
 		for (path, html) in pages {
 			let out_path = if path.segments().is_empty() {
@@ -167,7 +167,7 @@ mod test {
 		let out2 = out.clone();
 		let written = world
 			.run_async_then(async move |world| {
-				StaticExport::export(&world, router, &out2).await
+				StaticExport::export(&world, router, &default(), &out2).await
 			})
 			.await
 			.unwrap();
@@ -199,25 +199,32 @@ mod test {
 			.xpect_contains("App Info");
 	}
 
-	/// Exports `router` to a temp store, returning the written paths.
-	async fn export(world: &mut World, router: Entity) -> Vec<SmolPath> {
+	/// Exports `router` at `stage` to a temp store, returning the written paths.
+	/// The stage is the export's own [`BootstrapConfig`], so the draft gate is
+	/// deterministic rather than keyed off the process launch.
+	async fn export(
+		world: &mut World,
+		router: Entity,
+		stage: &str,
+	) -> Vec<SmolPath> {
 		let out = BlobStore::temp();
+		let config = BootstrapConfig {
+			stage: stage.into(),
+			..default()
+		};
 		world
 			.run_async_then(async move |world| {
-				StaticExport::export(&world, router, &out).await
+				StaticExport::export(&world, router, &config, &out).await
 			})
 			.await
 			.unwrap()
 	}
 
-	/// A router world with the package `stage` set, so the draft gate keys off
-	/// it deterministically rather than the build profile.
-	fn world_with_stage(stage: &str) -> World {
+	/// A router world for the draft-gate cases, with the `PackageConfig` the
+	/// default `/app-info` route reads at render (see [`exports_static_scenes`]).
+	fn draft_world() -> World {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		world.insert_resource(PackageConfig {
-			stage: stage.into(),
-			..pkg_config!()
-		});
+		world.insert_resource(pkg_config!());
 		world
 	}
 
@@ -256,9 +263,9 @@ mod test {
 	/// Non-prod builds export drafts so they can be previewed.
 	#[beet_core::test]
 	async fn dev_keeps_draft_routes() {
-		let mut world = world_with_stage("dev");
+		let mut world = draft_world();
 		let router = spawn_draft_router(&mut world);
-		let written = export(&mut world, router).await;
+		let written = export(&mut world, router, "dev").await;
 		exported(&written, "published").xpect_true();
 		exported(&written, "secret").xpect_true();
 	}
@@ -266,9 +273,9 @@ mod test {
 	/// A `prod` stage drops the draft route from the export.
 	#[beet_core::test]
 	async fn prod_drops_draft_routes() {
-		let mut world = world_with_stage("prod");
+		let mut world = draft_world();
 		let router = spawn_draft_router(&mut world);
-		let written = export(&mut world, router).await;
+		let written = export(&mut world, router, "prod").await;
 		exported(&written, "published").xpect_true();
 		exported(&written, "secret").xpect_false();
 	}
@@ -312,10 +319,10 @@ mod test {
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn dev_keeps_draft_routes_dir() {
-		let mut world = world_with_stage("dev");
+		let mut world = draft_world();
 		let router =
 			spawn_routes_dir(&mut world, draft_content_dir("dev")).await;
-		let written = export(&mut world, router).await;
+		let written = export(&mut world, router, "dev").await;
 		exported(&written, "published").xpect_true();
 		exported(&written, "secret").xpect_true();
 	}
@@ -325,10 +332,10 @@ mod test {
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn prod_drops_draft_routes_dir() {
-		let mut world = world_with_stage("prod");
+		let mut world = draft_world();
 		let router =
 			spawn_routes_dir(&mut world, draft_content_dir("prod")).await;
-		let written = export(&mut world, router).await;
+		let written = export(&mut world, router, "prod").await;
 		exported(&written, "published").xpect_true();
 		exported(&written, "secret").xpect_false();
 	}

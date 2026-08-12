@@ -585,7 +585,7 @@ mod tests {
 				BootstrapConfig {
 					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 					server: Some(ServerFilter::new("http")),
-					stage: Some("dev".into()),
+					stage: "staging".into(),
 					..default()
 				},
 			));
@@ -595,7 +595,7 @@ mod tests {
 				"ExecStart=/opt/beet_infra/app --store=s3://beet--dev--app \
 				--server=http",
 			)
-			.xpect_contains("Environment=BEET_STAGE=dev")
+			.xpect_contains("Environment=BEET_STAGE=staging")
 			// the store never leaks onto the env channel
 			.xnot()
 			.xpect_contains("BEET_STORE");

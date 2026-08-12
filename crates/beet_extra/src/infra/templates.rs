@@ -334,7 +334,7 @@ pub fn FargateBeetSiteBlock(
 		.with_bootstrap(BootstrapConfig {
 			store: Some(StoreUri::parse(&format!("s3://{site_bucket}"))?),
 			server: Some(ServerFilter::new("http,ssh")),
-			service_access: Some(ServiceAccess::Remote),
+			service_access: ServiceAccess::Remote,
 			analytics_table: Some(analytics_table.into()),
 			..default()
 		})

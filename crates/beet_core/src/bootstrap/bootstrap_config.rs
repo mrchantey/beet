@@ -31,10 +31,6 @@ use core::str::FromStr;
 /// - [`get`](Self::get): the process config, parsed from argv + env on first
 ///   read and memoized. Never fails; a malformed field warns and falls back to
 ///   its static default, since a `Default` impl has no error channel.
-/// - [`set`](Self::set): override it, for a host that supplies config some other
-///   way (an embedded target with no argv, a test pinning one field). Set it
-///   before the app boots; `BootstrapPlugin` otherwise assigns it at
-///   [`PreStartup`].
 /// - [`from_env`](Self::from_env): the same parse, *strict*. `BootstrapPlugin`
 ///   runs it so a malformed `--port=nope` fails the app loudly instead of only
 ///   warning.
@@ -51,12 +47,13 @@ use core::str::FromStr;
 /// [`to_argv`](Self::to_argv), [`to_env`](Self::to_env) and
 /// [`to_cmd_json`](Self::to_cmd_json) are the deploy side of the same names, so
 /// the deploy and the runtime cannot disagree about what a knob is called. Only
-/// `Some` fields render, so a default config renders to nothing.
+/// a field differing from its default renders, so a default config renders to
+/// nothing and the renderers round-trip exactly.
 ///
 /// Secrets are deliberately absent: the type has no secret field, so no renderer
 /// can put one on an argv line, a `CMD` array or a systemd `ExecStart`. Secrets
 /// stay env on their existing channels.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
@@ -81,11 +78,12 @@ pub struct BootstrapConfig {
 	pub http_port: Option<u16>,
 	/// The ssh listener port. `--ssh-port` / `BEET_SSH_PORT`.
 	pub ssh_port: Option<u16>,
-	/// The infrastructure stage this process runs in. `--stage` / `BEET_STAGE`.
-	pub stage: Option<SmolStr>,
-	/// Whether services resolve locally or against the cloud.
-	/// `--service-access` / `BEET_SERVICE_ACCESS`.
-	pub service_access: Option<ServiceAccess>,
+	/// The infrastructure stage this process runs in, defaulting to
+	/// [`DEFAULT_STAGE`](Self::DEFAULT_STAGE). `--stage` / `BEET_STAGE`.
+	pub stage: SmolStr,
+	/// Whether services resolve locally or against the cloud, defaulting to
+	/// [`ServiceAccess::Local`]. `--service-access` / `BEET_SERVICE_ACCESS`.
+	pub service_access: ServiceAccess,
 	/// The deploy-provided analytics table name. `--analytics-table` /
 	/// `BEET_ANALYTICS_TABLE`.
 	pub analytics_table: Option<SmolStr>,
@@ -112,6 +110,36 @@ pub struct BootstrapConfig {
 	pub screenshot_frame: Option<u32>,
 }
 
+/// Every field's static default, ie what an unset knob resolves to. Also the
+/// baseline the renderers diff against, so a field left at its default never
+/// reaches an argv line or an env pair.
+impl Default for BootstrapConfig {
+	fn default() -> Self {
+		Self {
+			main: None,
+			store: None,
+			watch: false,
+			features: default(),
+			server: None,
+			path: None,
+			host: None,
+			http_port: None,
+			ssh_port: None,
+			stage: Self::DEFAULT_STAGE.into(),
+			service_access: default(),
+			analytics_table: None,
+			deploy_id: None,
+			deploy_timestamp: None,
+			remote_url: None,
+			tls: None,
+			tls_dir: None,
+			headless: false,
+			screenshot: None,
+			screenshot_frame: None,
+		}
+	}
+}
+
 /// One knob's two transport names: the `--kebab-name` argv key and the
 /// `BEET_SCREAMING_NAME` env key. Declared once per field so the parse and both
 /// renderers cannot drift, which is exactly the class of bug this type retires
@@ -123,6 +151,13 @@ struct Knob {
 }
 
 impl BootstrapConfig {
+	/// The stage an unqualified launch runs in. A deploy names its own stage on
+	/// either transport, so only a local run relies on this.
+	pub const DEFAULT_STAGE: &'static str = "dev";
+	/// The stage that turns on production behaviour, ie dropping draft routes
+	/// from a static export.
+	pub const PROD_STAGE: &'static str = "prod";
+
 	const MAIN: Knob = Knob {
 		arg: "main",
 		env: "BEET_MAIN",
@@ -327,8 +362,12 @@ impl BootstrapConfig {
 			host: reader.parsed(Self::HOST)?,
 			http_port: reader.parsed(Self::HTTP_PORT)?,
 			ssh_port: reader.parsed(Self::SSH_PORT)?,
-			stage: reader.value(Self::STAGE),
-			service_access: reader.parsed(Self::SERVICE_ACCESS)?,
+			stage: reader
+				.value(Self::STAGE)
+				.unwrap_or_else(|| Self::DEFAULT_STAGE.into()),
+			service_access: reader
+				.parsed(Self::SERVICE_ACCESS)?
+				.unwrap_or_default(),
 			analytics_table: reader.value(Self::ANALYTICS_TABLE),
 			deploy_id: reader.value(Self::DEPLOY_ID),
 			deploy_timestamp: reader.value(Self::DEPLOY_TIMESTAMP),
@@ -340,6 +379,25 @@ impl BootstrapConfig {
 			screenshot_frame: reader.parsed(Self::SCREENSHOT_FRAME)?,
 		}
 		.xok()
+	}
+
+	/// Whether this process runs in the [production stage](Self::PROD_STAGE), the
+	/// one stage that changes behaviour rather than just naming resources (a
+	/// static export drops draft routes there).
+	pub fn is_prod(&self) -> bool { self.stage == Self::PROD_STAGE }
+
+	/// The stage as a renderable value, `None` when it is
+	/// [`DEFAULT_STAGE`](Self::DEFAULT_STAGE): a field left at its default parses
+	/// back to that default anyway, so rendering it would only add noise.
+	fn rendered_stage(&self) -> Option<String> {
+		(self.stage != Self::DEFAULT_STAGE).then(|| self.stage.to_string())
+	}
+
+	/// The service access as a renderable value, `None` when it is the default.
+	/// See [`rendered_stage`](Self::rendered_stage).
+	fn rendered_service_access(&self) -> Option<String> {
+		(self.service_access != ServiceAccess::default())
+			.then(|| self.service_access.to_string())
 	}
 
 	/// Every set field as `--key=value` argv tokens, shell-safe by construction.
@@ -362,11 +420,8 @@ impl BootstrapConfig {
 		push(Self::HOST, self.host.as_ref().map(ToString::to_string));
 		push(Self::HTTP_PORT, self.http_port.map(|port| port.to_string()));
 		push(Self::SSH_PORT, self.ssh_port.map(|port| port.to_string()));
-		push(Self::STAGE, self.stage.as_ref().map(ToString::to_string));
-		push(
-			Self::SERVICE_ACCESS,
-			self.service_access.as_ref().map(ToString::to_string),
-		);
+		push(Self::STAGE, self.rendered_stage());
+		push(Self::SERVICE_ACCESS, self.rendered_service_access());
 		push(
 			Self::ANALYTICS_TABLE,
 			self.analytics_table.as_ref().map(ToString::to_string),
@@ -427,11 +482,8 @@ impl BootstrapConfig {
 		push(Self::HOST, self.host.as_ref().map(ToString::to_string));
 		push(Self::HTTP_PORT, self.http_port.map(|port| port.to_string()));
 		push(Self::SSH_PORT, self.ssh_port.map(|port| port.to_string()));
-		push(Self::STAGE, self.stage.as_ref().map(ToString::to_string));
-		push(
-			Self::SERVICE_ACCESS,
-			self.service_access.as_ref().map(ToString::to_string),
-		);
+		push(Self::STAGE, self.rendered_stage());
+		push(Self::SERVICE_ACCESS, self.rendered_service_access());
 		push(
 			Self::ANALYTICS_TABLE,
 			self.analytics_table.as_ref().map(ToString::to_string),
@@ -570,8 +622,8 @@ static BOOTSTRAP: LazyLock<BootstrapConfig> = LazyLock::new(|| {
 	})
 });
 
-/// Validates the process [`BootstrapConfig`] at [`PreStartup`], and seeds the
-/// [`PackageConfig`] derived from it.
+/// Validates the process [`BootstrapConfig`] at [`PreStartup`], and under `std`
+/// ensures a [`PackageConfig`] exists for the readers that expect one.
 ///
 /// It does not *assign* the config: [`BootstrapConfig::get`] owns that, lazily and
 /// immutably. What this adds is the strict [`BootstrapConfig::from_env`] parse, so
@@ -584,9 +636,12 @@ pub struct BootstrapPlugin;
 
 impl Plugin for BootstrapPlugin {
 	fn build(&self, app: &mut App) {
+		app.add_systems(PreStartup, validate_process_config);
+		// `PackageConfig` is std-only (it kebab-cases cloud resource names)
+		#[cfg(feature = "std")]
 		app.add_systems(
 			PreStartup,
-			(validate_process_config, seed_package_config).chain(),
+			seed_package_config.after(validate_process_config),
 		);
 	}
 }
@@ -599,16 +654,14 @@ fn validate_process_config() -> Result {
 	Ok(())
 }
 
-/// The [`PreStartup`] [`PackageConfig`] seed, see [`BootstrapPlugin`]. Inserts the
-/// bootstrap-derived config unless a host already supplied one (a
-/// [`pkg_config!`](crate::pkg_config) with the real crate metadata), so the
-/// stage-reporting fields are resolved in one place rather than inside
-/// `PackageConfig::default`. A markup `<PackageConfig/>` patches the live
-/// resource afterwards, keeping whatever it does not name.
+/// The [`PreStartup`] [`PackageConfig`] seed, see [`BootstrapPlugin`]. Inserts
+/// the defaults unless a host already supplied one (a
+/// [`pkg_config!`](crate::pkg_config) with the real crate metadata), so a
+/// `Res<PackageConfig>` reader never faces a missing resource. A markup
+/// `<PackageConfig/>` patches it afterwards, keeping whatever it does not name.
+#[cfg(feature = "std")]
 fn seed_package_config(world: &mut World) {
-	if !world.contains_resource::<PackageConfig>() {
-		world.insert_resource(PackageConfig::from_bootstrap());
-	}
+	world.init_resource::<PackageConfig>();
 }
 
 /// Resolves one field across both transports: the `--kebab` param when present,
@@ -733,8 +786,8 @@ mod test {
 			host: Some("0.0.0.0".parse().unwrap()),
 			http_port: Some(8337),
 			ssh_port: Some(2222),
-			stage: Some("prod".into()),
-			service_access: Some(ServiceAccess::Remote),
+			stage: "prod".into(),
+			service_access: ServiceAccess::Remote,
 			analytics_table: Some("beet--prod--analytics".into()),
 			deploy_id: Some("019823ff-0000-7000-8000-000000000000".into()),
 			deploy_timestamp: Some("2026-08-09T00:00:00Z".into()),
@@ -782,6 +835,28 @@ mod test {
 		BootstrapConfig::default().to_env().len().xpect_eq(0);
 	}
 
+	/// A field with a static default renders only when it differs from it: the
+	/// deploy never writes `BEET_STAGE=dev` because the runtime resolves `dev`
+	/// anyway, while a named stage always reaches both channels.
+	#[crate::test]
+	fn defaulted_fields_render_only_when_named() {
+		let named = BootstrapConfig {
+			stage: "staging".into(),
+			service_access: ServiceAccess::Remote,
+			..default()
+		};
+		named
+			.to_argv()
+			.unwrap()
+			.join(" ")
+			.xpect_eq("--stage=staging --service-access=remote");
+		// the defaults are what an unset knob parses back to, so dropping them is
+		// lossless
+		BootstrapConfig::parse_params(&default())
+			.unwrap()
+			.xpect_eq(BootstrapConfig::default());
+	}
+
 	/// Argv beats env, per field, with no exceptions.
 	#[crate::test]
 	fn argv_beats_env() {
@@ -794,7 +869,7 @@ mod test {
 		let config = BootstrapConfig::parse(&params, &env).unwrap();
 		config.http_port.xpect_eq(Some(9000));
 		// a field argv did not set still falls back to env
-		config.stage.xpect_eq(Some(SmolStr::from("prod")));
+		config.stage.as_str().xpect_eq("prod");
 	}
 
 	/// A token the renderers cannot encode is a loud error, not a corrupted
@@ -881,7 +956,7 @@ mod test {
 			&|_| None,
 		);
 		config.http_port.xpect_none();
-		config.stage.xpect_eq(Some(SmolStr::from("prod")));
+		config.stage.as_str().xpect_eq("prod");
 	}
 
 	/// `--server` present but empty is a selection with no constraint, distinct
