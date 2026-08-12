@@ -82,8 +82,8 @@ fn exit_when_all_windows_closed(
 /// Reads the config directly rather than the resource: this runs at plugin-build
 /// time, before any scene (or the resource `ServerPlugin` inserts) exists.
 fn screenshot_verify_plugin(app: &mut App) {
-	let config = BootstrapConfig::from_env_or_warn();
-	let Some(path) = config.screenshot else {
+	let config = BootstrapConfig::get();
+	let Some(path) = config.screenshot.as_ref() else {
 		return;
 	};
 	let path = path.to_string();

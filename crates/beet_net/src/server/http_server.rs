@@ -94,7 +94,7 @@ impl Default for HttpServer {
 	/// localhost. Both sources are empty where there is no process environment
 	/// or argv, so no feature gate is needed.
 	fn default() -> Self {
-		let config = BootstrapConfig::from_env_or_warn();
+		let config = BootstrapConfig::get();
 		Self {
 			port: Some(resolve_server_port(None)),
 			host: config.host_octets().unwrap_or([127, 0, 0, 1]),

@@ -25,8 +25,9 @@ impl DevCert {
 	/// The cache directory: `--tls-dir` / `BEET_TLS_DIR`, falling back to
 	/// `target/tls` under the workspace root.
 	pub fn dir() -> PathBuf {
-		BootstrapConfig::from_env_or_warn()
+		BootstrapConfig::get()
 			.tls_dir
+			.as_ref()
 			.map(|dir| PathBuf::from(dir.as_str()))
 			.unwrap_or_else(|| fs_ext::workspace_root().join("target/tls"))
 	}

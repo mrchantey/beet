@@ -13,11 +13,6 @@ pub struct ServerPlugin;
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
-			// the process config, read once here so world consumers (systems,
-			// templates, async actions) share one parse. Inserted rather than
-			// `init_resource`d because `BootstrapConfig::default` is the *empty*
-			// config; a test overrides this by inserting its own.
-			.insert_resource(BootstrapConfig::from_env_or_warn())
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
 			.register_type::<Tls>()

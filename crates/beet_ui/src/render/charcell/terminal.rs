@@ -68,7 +68,7 @@ impl StdioTerminal {
 		// Read from the process config rather than the resource: a terminal spawns in
 		// worlds with no server plugin (the charcell tests), which set the env
 		// directly.
-		if BootstrapConfig::from_env_or_warn().headless {
+		if BootstrapConfig::get().headless {
 			world
 				.commands()
 				.entity(cx.entity)

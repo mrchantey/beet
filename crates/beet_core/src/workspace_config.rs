@@ -46,7 +46,7 @@ pub struct PackageConfig {
 /// actually running in.
 impl Default for PackageConfig {
 	fn default() -> Self {
-		let bootstrap = BootstrapConfig::from_env_or_warn();
+		let bootstrap = BootstrapConfig::get();
 		Self {
 			title: "My Beet App".into(),
 			description: "An app built with beet".into(),
@@ -54,7 +54,7 @@ impl Default for PackageConfig {
 			version: "0.0.1".into(),
 			homepage: None,
 			repository: None,
-			stage: bootstrap.stage.unwrap_or_else(|| "dev".into()),
+			stage: bootstrap.stage.clone().unwrap_or_else(|| "dev".into()),
 			service_access: bootstrap
 				.service_access
 				.unwrap_or(ServiceAccess::Local),

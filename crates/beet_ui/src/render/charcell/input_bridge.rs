@@ -354,9 +354,13 @@ mod test {
 	#[beet_core::test]
 	fn ctrl_c_byte_exits_local_surface() {
 		use crate::render::charcell::terminal::ChannelTerminal;
-		// safety: single-threaded test; the buffered headless `StdioTerminal` skips
-		// the tty/raw-mode setup its `on_add` would otherwise run.
-		unsafe { env_ext::set_var("BEET_HEADLESS", "1") };
+		// the buffered headless `StdioTerminal` skips the tty/raw-mode setup its
+		// `on_add` would otherwise run. Set on the process config rather than
+		// through `unsafe` env mutation, which races any other thread reading it.
+		BootstrapConfig::set(BootstrapConfig {
+			headless: true,
+			..default()
+		});
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, CharcellTuiPlugin));
 		// the channel-backed Terminal lets us feed bytes into the real reader.
@@ -370,7 +374,7 @@ mod test {
 		// then overwrite that Terminal with the channel-backed one.
 		app.update();
 		app.world_mut().entity_mut(surface).insert(terminal);
-		unsafe { env_ext::remove_var("BEET_HEADLESS") };
+		BootstrapConfig::set(default());
 		app.update();
 		channel.send_input(&[0x03]).unwrap();
 		app.update();
@@ -524,12 +528,15 @@ mod test {
 	/// ctrl+c on the local stdio surface exits the process.
 	#[beet_core::test]
 	fn ctrl_c_exits_local_surface() {
-		// safety: single-threaded test; the buffered headless `StdioTerminal` skips
-		// the tty/raw-mode setup its `on_add` would otherwise run.
-		unsafe { env_ext::set_var("BEET_HEADLESS", "1") };
+		// the buffered headless `StdioTerminal` skips the tty/raw-mode setup its
+		// `on_add` would otherwise run.
+		BootstrapConfig::set(BootstrapConfig {
+			headless: true,
+			..default()
+		});
 		let app =
 			ctrl_c_from(|world| world.spawn(StdioTerminal::default()).id());
-		unsafe { env_ext::remove_var("BEET_HEADLESS") };
+		BootstrapConfig::set(default());
 		exited(&app).xpect_true();
 	}
 

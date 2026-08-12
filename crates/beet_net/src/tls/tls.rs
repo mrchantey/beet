@@ -53,7 +53,7 @@ impl Tls {
 	/// profile: the installed cli is a release build serving local machines,
 	/// while deployment is an environment.
 	pub fn active(&self) -> bool {
-		BootstrapConfig::from_env_or_warn()
+		BootstrapConfig::get()
 			.tls
 			.unwrap_or_else(|| !Self::platform_tls_layer())
 	}

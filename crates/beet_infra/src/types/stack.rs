@@ -49,19 +49,21 @@ impl Stack {
 		// the deploy identity and stage flow from the process `BootstrapConfig`
 		// (`--stage` / `BEET_STAGE` and friends), so they reach every stack in
 		// every scene without per-template threading.
-		let config = BootstrapConfig::from_env_or_warn();
+		let config = BootstrapConfig::get();
 
 		let deploy_id = config
 			.deploy_id
-			.and_then(|id| Uuid::parse_str(&id).ok())
+			.as_deref()
+			.and_then(|id| Uuid::parse_str(id).ok())
 			.unwrap_or_else(Uuid::now_v7);
 
 		let deploy_timestamp = config
 			.deploy_timestamp
+			.as_ref()
 			.map(|stamp| stamp.to_string())
 			.unwrap_or_else(crate::types::artifacts::now_timestamp);
 
-		let stage = config.stage.unwrap_or_else(|| "dev".into());
+		let stage = config.stage.clone().unwrap_or_else(|| "dev".into());
 
 		Self {
 			app_name,

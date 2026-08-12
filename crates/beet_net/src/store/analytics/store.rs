@@ -54,9 +54,9 @@ pub(super) fn spawn_store_on_config(
 				// the remote table name is the deploy-provided `--analytics-table`
 				// / `BEET_ANALYTICS_TABLE`, so the deploy owns the name; the
 				// package-derived name is the fallback for a self-named build.
-				let table_name = world
-					.get_resource::<BootstrapConfig>()
-					.and_then(|config| config.analytics_table.as_deref())
+				let table_name = BootstrapConfig::get()
+					.analytics_table
+					.as_deref()
 					.map(str::to_string)
 					.unwrap_or_else(|| pkg.analytics_bucket_name());
 				(

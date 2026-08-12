@@ -165,7 +165,7 @@ impl Default for SshServer {
 	/// `--host` / `BEET_HOST`, a deployed server sets `BEET_HOST=0.0.0.0`),
 	/// falling back to localhost on [`DEFAULT_SSH_PORT`].
 	fn default() -> Self {
-		let config = BootstrapConfig::from_env_or_warn();
+		let config = BootstrapConfig::get();
 		Self {
 			port: Some(config.ssh_port.unwrap_or(DEFAULT_SSH_PORT)),
 			host: config.host_octets().unwrap_or([127, 0, 0, 1]),
