@@ -58,7 +58,7 @@ pub(super) fn check_https_features(_req: &Request) -> Result {
 #[allow(unused)]
 async fn send_http(request: Request) -> Result<Response> {
 	cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			super::impl_web_sys::send_wasm(request).await
 		} else if #[cfg(feature = "ureq")] {
 			super::impl_ureq::send_ureq(request).await

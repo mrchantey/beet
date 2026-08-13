@@ -97,7 +97,10 @@ syntax_highlighting = [
 template_serde = ["beet_core/template_serde", "serde"]
 
 [dependencies]
-beet_core = { workspace = true, features = ["std"] }
+# `serde` is unconditional: beet_core's `document` module (the `Document`/
+# `FieldRef`/`DocumentSync` binding layer beet_ui's own `document` module extends)
+# is serde-gated there, and beet_ui's core is document-driven.
+beet_core = { workspace = true, features = ["std", "serde"] }
 beet_net = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true, features = ["std", "reflect"] }
 bevy.workspace = true

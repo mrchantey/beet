@@ -141,7 +141,8 @@ send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
 # Link-section test registration for bare-metal targets, where `inventory`'s
 # life-before-main ctors never run (xtensa-lx-rt does not walk `.init_array`).
-# Used by `beet_core/testing_embedded`; kept off the wasm build (unsupported).
+# Used by `beet_core/testing_embedded`, whose registration path is cfg'd out on
+# wasm (link sections do not resolve there), leaving the feature inert.
 linkme = "0.3"
 # no_std interrupt-free critical sections; backs the embedded test runner's
 # single-cell async-test registration. The impl is supplied by the target
@@ -159,6 +160,11 @@ rand_chacha = { version = "0.9", default-features = false }
 # wasm_js ignored in native. Backs ahash (via material-colors) and rand 0.9 on
 # wasm. uuid uses its own `js` backend, so getrandom 0.4 stays out of the graph.
 getrandom = { version = "0.3", features = ["wasm_js"] }
+# getrandom 0.4, a separate crate version reached only through `rand` 0.10 (which
+# `bevy_math` pulls under `bevy/default`). Same story as 0.3: no wasm backend
+# unless `wasm_js` is enabled. Kept as its own key so a crate opts in where the
+# 0.10 rand actually appears, rather than forcing 0.4 into every wasm build.
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 variadics_please = "1"
 webbrowser = "1"
 

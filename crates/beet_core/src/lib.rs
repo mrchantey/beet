@@ -85,13 +85,15 @@ pub mod tokens_utils;
 pub mod types;
 pub mod utils;
 
-#[cfg(target_arch = "wasm32")]
+// The browser/deno bindings are a `std` surface: they use `std` paths, and the
+// channels + `send_wrapper` they build on are `std`-gated deps.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub mod web_utils;
 // Re-export for ergonomic `#[beet_core::test]` and `#[beet_core::main]` usage
 pub use beet_core_macros::beet_main as main;
 pub use beet_core_macros::beet_test as test;
 pub use beet_core_macros::*;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub use web_utils::js_runtime;
 
 #[cfg(feature = "custom_test_frameworks")]
@@ -226,7 +228,7 @@ pub mod prelude {
 	pub use tracing::warn;
 	pub use tracing::warn_span;
 
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_arch = "wasm32", feature = "std"))]
 	pub use crate::js_runtime;
 
 	pub use bevy::prelude::*;
@@ -243,7 +245,7 @@ pub mod prelude {
 
 	#[cfg(feature = "std")]
 	pub use crate::pkg_config;
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_arch = "wasm32", feature = "std"))]
 	pub use crate::web_utils::*;
 	pub use beet_core_macros::*;
 	pub use core::time::Duration;

@@ -20,7 +20,10 @@ native-tls = ["beet_net/native-tls"]
 template_serde = ["beet_net/template_serde", "beet_core/template_serde"]
 fs = ["beet_core/fs"]
 action = ["dep:beet_action"]
-agent = ["dep:async-openai"]
+# The model-provider layer: the async-openai-backed completions protocol and the
+# per-provider streamer constructors. Rides `action`, since a streamer is an
+# action and the completions mapper drives one.
+agent = ["action", "dep:async-openai"]
 # Reactive chat UI on top of beet_ui: the `ThreadView` charcell widget and the
 # `ThreadWindow` -> `Document` projection. Pulls beet_ui's template + charcell
 # (`tui`) stack plus the reactive document chain.

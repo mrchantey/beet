@@ -28,7 +28,7 @@ fn tick_task_pools() {
 	bevy::tasks::tick_global_task_pools_on_main_thread();
 	// wasm: drive our tickable bridge executor (bevy's `spawn_local` uses the
 	// untickable JS event loop), so spawned tasks make progress between updates.
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_arch = "wasm32", feature = "std"))]
 	super::tick_bridge_executor();
 }
 

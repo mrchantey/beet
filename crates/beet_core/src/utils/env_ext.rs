@@ -1,4 +1,8 @@
 //! Cross-platform environment variable access.
+//!
+//! The wasm branches go through [`js_runtime`], which is a `std` surface, so each
+//! switch names both; a `std`-less wasm build takes the same inert branch a bare
+//! no_std target does.
 
 use crate::prelude::*;
 use thiserror::Error;
@@ -14,7 +18,7 @@ pub enum EnvError {
 /// Load environment variables from a `.env` file in the current directory.
 pub fn load_dotenv() {
 	cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			todo!("probs load from query params or something?")
 		} else if #[cfg(feature = "std")] {
 			dotenv::dotenv().ok();
@@ -27,7 +31,7 @@ pub fn load_dotenv() {
 /// Get the command line arguments, excluding the program name
 pub fn args() -> Vec<String> {
 	cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			// the wasm arg decision (deno argv, else browser location, else empty)
 			// lives in `js_runtime`, so this stays a thin platform switch.
 			return js_runtime::args();
@@ -47,7 +51,7 @@ pub fn args() -> Vec<String> {
 #[allow(unused)]
 pub unsafe fn set_var(key: &str, value: &str) {
 	cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			// presence-checked + safe (no-op where the host has no env global).
 			js_runtime::set_env(key, value);
 		} else if #[cfg(feature = "std")] {
@@ -67,7 +71,7 @@ pub unsafe fn set_var(key: &str, value: &str) {
 #[allow(unused)]
 pub unsafe fn remove_var(key: &str) {
 	cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			// presence-checked + safe (no-op where the host has no env global).
 			js_runtime::remove_env(key);
 		} else if #[cfg(feature = "std")] {
@@ -83,7 +87,7 @@ pub unsafe fn remove_var(key: &str) {
 /// an error containing the key name if not found.
 pub fn var(key: &str) -> Result<String, EnvError> {
 	cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			return js_runtime::env_var(key)
 				.ok_or_else(|| EnvError::NotFound(key.to_string()));
 		} else if #[cfg(feature = "std")] {
@@ -158,7 +162,7 @@ fn unix_display_reachable() -> bool {
 /// Get all environment variables.
 pub fn vars() -> Vec<(String, String)> {
 	cfg_if! {
-		if #[cfg(target_arch = "wasm32")] {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			// `env_all` already marshals `Object.entries(Deno.env.toObject())`
 			// into native pairs, so just widen `SmolStr` -> `String`.
 			return js_runtime::env_all()

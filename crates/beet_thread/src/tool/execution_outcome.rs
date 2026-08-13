@@ -13,6 +13,9 @@ pub struct ExecutionOutcomeParams {
 
 /// A tool giving a model the opportunity to confirm success
 /// or produce an error when a process behaved incorrectly.
+///
+/// The params above are plain data; only the tool itself is an action.
+#[cfg(feature = "action")]
 #[action]
 #[derive(Component, Reflect)]
 pub async fn ExecutionOutcome(

@@ -1,9 +1,15 @@
+// only the two `ActionMeta` readers below are action-aware; the definitions
+// themselves are plain wire types.
+#[cfg(feature = "action")]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
+// `PathPattern`, read by the two action-gated readers below.
+#[cfg(feature = "action")]
 use beet_net::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
+#[cfg(feature = "action")]
 pub(crate) fn insert_tool_definition(
 	// path pattern is inserted by ActionMeta
 	ev: On<Insert, PathPattern>,
@@ -104,6 +110,7 @@ impl FunctionToolDefinition {
 	/// cannot be a tool, and a route with no description or input schema is a plain
 	/// route rather than an agent tool. The observer fires on every route, so this
 	/// skips the non-tools instead of erroring.
+	#[cfg(feature = "action")]
 	pub fn from_meta(
 		(meta, path): (&ActionMeta, &PathPattern),
 	) -> Result<Option<Self>> {

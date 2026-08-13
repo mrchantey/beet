@@ -179,11 +179,11 @@ _core-pkgs-wasm := "beet_core beet_net beet_ui beet_router beet_thread beet_acti
 # in `test-all` (see comment there). Excluded from `test-core`.
 _extra-pkgs := "beet_spatial beet_ml beet_extra"
 
-# Subset of `_extra-pkgs` that builds for wasm. beet_ml doesn't (`getrandom`
-# needs the `wasm_js` feature); beet_extra doesn't under the full feature set,
-# since its `infra` feature pulls `beet_infra`, which is native-only (note it is
-# absent from `_core-pkgs-wasm` for the same reason).
-_extra-pkgs-wasm := "beet_spatial"
+# Subset of `_extra-pkgs` whose wasm tests pass. beet_ml is absent by *test*, not
+# by build: it compiles for wasm (its `infra`-free graph needs only getrandom's
+# `wasm_js` backend, wired in beet_ml's wasm dependency table), but its bert
+# forward pass wants a real wgpu device the deno runner has none of.
+_extra-pkgs-wasm := "beet_spatial beet_extra"
 
 # Computes the cargo feature flag for the in-scope crates by enumerating each
 # crate's `[features]` and excluding the ones that must not be co-enabled.
@@ -195,8 +195,7 @@ _extra-pkgs-wasm := "beet_spatial"
 # On stable additionally excludes `nightly` / `custom_test_frameworks`, the
 # nightly-only test-runner features that stable cannot compile.
 # `extra` is a `|`-joined list of additional feature names to exclude; the wasm
-# runner passes `testing_embedded`, whose `linkme` distributed slice does not
-# compile off bare metal (native keeps it, exercising the linkme declaration).
+# runner passes `cloudflare` (see `_test-pkgs-wasm`).
 _core-features pkgs extra="":
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -224,14 +223,14 @@ _test-pkgs pkgs *args:
 	cargo test $crates $feats {{ args }} -- {{ test-threads }}
 
 # Shared wasm cargo test runner over a space-separated list of crates.
-# Excludes `testing_embedded`: its `linkme` distributed slice is unsupported on
-# wasm32 (the embedded runner is bare-metal only).
 # Excludes `cloudflare`: it pulls the `worker` SDK, whose module init expects the
-# Cloudflare Workers runtime and hangs under the Deno wasm test runner.
+# Cloudflare Workers runtime and hangs under the Deno wasm test runner. Every
+# other feature is enabled, `testing_embedded` included — its `linkme` slice is
+# cfg'd out on wasm, so the feature is inert there rather than unbuildable.
 _test-pkgs-wasm pkgs *args:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	feats=$(just _core-features "{{ pkgs }}" "testing_embedded|cloudflare")
+	feats=$(just _core-features "{{ pkgs }}" "cloudflare")
 	crates=$(printf -- "-p %s " {{ pkgs }})
 	cargo test $crates --lib --target wasm32-unknown-unknown $feats {{ args }} -- {{ test-threads }}
 

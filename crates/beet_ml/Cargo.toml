@@ -45,6 +45,9 @@ thiserror.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook.workspace = true
+# `bevy_default` pulls bevy_math's rand 0.10, hence getrandom 0.4; enable its
+# WebCrypto backend so a wasm build links (see the workspace `getrandom_04` key).
+getrandom_04 = { workspace = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

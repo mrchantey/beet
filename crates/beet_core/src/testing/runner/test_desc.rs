@@ -222,13 +222,17 @@ pub(crate) fn inventory_tests() -> Vec<TestDescAndFn> {
 /// (xtensa-lx-rt does not walk `.init_array`), so the embedded build collects
 /// cases from a dedicated linker section instead. Declared here, populated by
 /// the `submit!` the `#[beet_core::test]` macro emits under `testing_embedded`.
-#[cfg(feature = "testing_embedded")]
+///
+/// wasm32 has no working link sections for linkme, so this compiles out there
+/// even when the feature is on (as it is under `--all-features`); wasm always
+/// registers through `inventory`.
+#[cfg(all(feature = "testing_embedded", not(target_arch = "wasm32")))]
 #[linkme::distributed_slice]
 pub static BEET_TESTS: [BeetTestCase];
 
 /// Collects all [`BeetTestCase`]s registered via the [`BEET_TESTS`] `linkme`
 /// slice. The embedded mirror of [`inventory_tests`].
-#[cfg(feature = "testing_embedded")]
+#[cfg(all(feature = "testing_embedded", not(target_arch = "wasm32")))]
 pub(crate) fn embedded_tests() -> Vec<TestDescAndFn> {
 	BEET_TESTS
 		.iter()

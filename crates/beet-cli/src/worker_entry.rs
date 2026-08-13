@@ -6,7 +6,7 @@
 //! [`WorkerWorld`] is built (or reused) and the request is routed through it.
 //! Building is the shared core end to end: the same [`build_app`]
 //! ([`BeetPlugins`] + [`WorkersPlugin`]), the same [`entry_build::probe_entry_names`]
-//! discovery, and the same [`build_entry_owned`] build+settle every world-owning
+//! discovery, and the same [`entry_build::build_entry_owned`] build+settle every world-owning
 //! driver uses. The glue that remains here is genuinely platform-specific: the
 //! env binding to store, the worker request/response conversion, and the
 //! per-isolate world cache with version invalidation.
@@ -67,7 +67,10 @@ async fn handle(
 	let blob_store = BlobStore::new(store.clone());
 	let entry_name =
 		entry_build::probe_entry_names(&blob_store).await?.ok_or_else(|| {
-			bevyhow!("no entry document {entry_build::ENTRY_NAMES:?} in the site bucket")
+			bevyhow!(
+				"no entry document {:?} in the site bucket",
+				entry_build::ENTRY_NAMES
+			)
 		})?;
 
 	// take the per-isolate world out so the exchange can borrow it mutably across
@@ -124,7 +127,13 @@ async fn build_worker_world(
 	let mut app = build_app();
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
-	build_entry_owned(&mut world, store, entry_name, DisableCallOnLoad).await?;
+	entry_build::build_entry_owned(
+		&mut world,
+		store,
+		entry_name,
+		DisableCallOnLoad,
+	)
+	.await?;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world

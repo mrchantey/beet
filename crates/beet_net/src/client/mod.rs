@@ -29,7 +29,9 @@ mod impl_file;
 mod impl_reqwest;
 #[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
 mod impl_ureq;
-#[cfg(target_arch = "wasm32")]
+// the fetch transport rides `std`: its response stream goes through the
+// std-gated `futures` channel and `send_wrapper`.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 mod impl_web_sys;
 mod send;
 #[cfg(feature = "http")]

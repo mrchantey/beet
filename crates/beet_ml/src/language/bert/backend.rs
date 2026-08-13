@@ -17,7 +17,7 @@ cfg_if! {
 		pub type DefaultBackend = burn::backend::NdArray;
 		/// Returns the default device for [`DefaultBackend`].
 		pub fn default_device() -> DefaultDevice { DefaultDevice::default() }
-	} else {
+	} else if #[cfg(feature = "wgpu")] {
 		// wgpu — also the path used in wasm
 		/// The active burn backend.
 		pub type DefaultBackend = burn::backend::Wgpu;
@@ -28,6 +28,12 @@ cfg_if! {
 		pub fn default_device() -> DefaultDevice {
 			crate::prelude::shared_burn_wgpu_device().unwrap_or_default()
 		}
+	} else {
+		compile_error!(
+			"beet_ml needs exactly one burn backend feature: `wgpu` (the default), \
+`ndarray` or `cuda`. There is no backend-free build — every model runs on a burn \
+device."
+		);
 	}
 }
 

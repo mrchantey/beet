@@ -70,17 +70,19 @@ mod fs_blob_watchers;
 mod fs_store;
 #[cfg(feature = "std")]
 pub use fs_blob_watchers::*;
-#[cfg(target_arch = "wasm32")]
+// the browser stores ride the `std` store surface (`BlobEventBus`, the
+// send_wrapper/futures bridge, and the base64 blob encoding).
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 mod indexed_db_store;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 mod local_storage_store;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod r2_workers_store;
 #[cfg(feature = "std")]
 pub use fs_store::*;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub use indexed_db_store::*;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub use local_storage_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use r2_workers_store::*;

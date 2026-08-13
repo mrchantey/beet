@@ -94,7 +94,7 @@ impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
 		// on wasm the bridge drives our tickable executor instead of bevy's
 		// JS-event-loop `spawn_local`.
-		#[cfg(target_arch = "wasm32")]
+		#[cfg(all(target_arch = "wasm32", feature = "std"))]
 		beet_async::WasmTickHook::set(tick_bridge_executor);
 
 		app.init_plugin_with(MainSchedulePlugin)
@@ -141,8 +141,10 @@ impl Default for AsyncSpawner {
 		cfg_if! {
 			// wasm: bevy `spawn_local` uses the JS event loop, which the
 			// synchronous bridge driver cannot tick. Use our own tickable
-			// executor instead (see `tick_bridge_executor`).
-			if #[cfg(target_arch = "wasm32")] {
+			// executor instead (see `tick_bridge_executor`). `std`-gated with
+			// the executor itself, so a no_std wasm build falls through to the
+			// manual-spawner branch.
+			if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 				spawn = Box::new(|fut| {
 					BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
 				});
@@ -183,7 +185,9 @@ impl Default for AsyncSpawner {
 	}
 }
 
-#[cfg(target_arch = "wasm32")]
+// `thread_local!` and `async_executor` are both `std`, so a no_std wasm build
+// has no bridge executor and supplies its own spawner.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 thread_local! {
 	/// Tickable executor for bridged async tasks on wasm.
 	static BRIDGE_EXECUTOR: async_executor::LocalExecutor<'static> =
@@ -193,7 +197,7 @@ thread_local! {
 /// Ticks the wasm bridge executor so woken futures can poll while the sync-point
 /// driver has `&mut World` published. Registered with [`beet_async`] as its
 /// wasm tick hook.
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub(crate) fn tick_bridge_executor() {
 	BRIDGE_EXECUTOR.with(|exec| {
 		for _ in 0..100 {

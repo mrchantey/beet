@@ -31,7 +31,19 @@ impl Plugin for ThreadPlugin {
 			.register_type::<MountThreadStore>()
 			// markup window bounding: stub older images so an endless loop's
 			// request stays bounded without dropping a post
-			.register_type::<StubOldImages>();
+			.register_type::<StubOldImages>()
+			// the OpenResponses streamer is an action
+			.register_type::<O11sStreamer>()
+			.add_observer(insert_tool_definition);
+
+		// the async-openai-backed completions streamer, plus the model selection
+		// driven by the provider constructors beside it
+		#[cfg(feature = "agent")]
+		app.register_type::<CompletionsStreamer>()
+			.register_type::<Provider>()
+			.register_type::<ModelApi>()
+			.register_type::<ModelSize>()
+			.register_template::<ModelStreamer>();
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────
@@ -51,11 +63,6 @@ impl Plugin for ThreadPlugin {
 			// ── Streaming types ───────────────────────────────────────────
 			.register_type::<EnvVar>()
 			.register_type::<ModelDef>()
-			.register_type::<O11sStreamer>()
-			.register_type::<CompletionsStreamer>()
-			.register_type::<Provider>()
-			.register_type::<ModelApi>()
-			.register_type::<ModelSize>()
 			// ── Reasoning sub-types ───────────────────────────────────────
 			.register_type::<ReasoningEffort>()
 			.register_type::<ReasoningSummary>()
@@ -68,9 +75,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<StringEnumOptions>()
 			// ── Markup templates ──────────────────────────────────────────
 			.register_template::<CreatePost>()
-			.register_template::<ModelStreamer>()
 			.register_template::<CreateActor>()
-			.add_observer(insert_tool_definition)
 			.add_observer(reapply_string_enum_options)
 			// _
 			;

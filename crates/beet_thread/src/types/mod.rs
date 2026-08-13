@@ -1,4 +1,6 @@
+#[cfg(feature = "action")]
 mod repeat_while_function_call_output;
+#[cfg(feature = "action")]
 pub use repeat_while_function_call_output::*;
 #[cfg(feature = "action")]
 mod run_thread;

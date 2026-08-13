@@ -102,7 +102,11 @@ pub use inventory::submit as _inventory_submit;
 
 /// linkme's distributed-slice attribute, re-exported so the `submit!` macro can
 /// reference it by `$crate` path without the test author depending on linkme.
-#[cfg(feature = "testing_embedded")]
+///
+/// linkme's link sections do not resolve on wasm32, so the embedded registration
+/// path compiles out there and `testing` (inventory) is the only runner. See
+/// [`BEET_TESTS`](crate::testing::BEET_TESTS).
+#[cfg(all(feature = "testing_embedded", not(target_arch = "wasm32")))]
 #[doc(hidden)]
 pub use linkme::distributed_slice;
 
@@ -119,7 +123,11 @@ macro_rules! __beet_testing_submit {
 }
 
 /// Registers a [`BeetTestCase`] into the [`BEET_TESTS`] `linkme` slice (embedded).
-#[cfg(all(feature = "testing_embedded", not(feature = "testing")))]
+#[cfg(all(
+	feature = "testing_embedded",
+	not(feature = "testing"),
+	not(target_arch = "wasm32")
+))]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __beet_testing_submit {
