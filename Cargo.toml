@@ -445,8 +445,10 @@ action = ["dep:beet_action","beet_ui?/action","beet_net?/action"]
 # actually run. Pair with `quickjs` for the embedded engine.
 scripting = ["action","serde","std","beet_action/scripting","beet_router?/scripting"]
 # The embedded QuickJS backend, re-exported via `beet::exports::rquickjs`, plus
-# the scripting registrations above.
-quickjs = ["scripting","beet_action/quickjs","beet_router?/quickjs"]
+# the scripting registrations above. Also forwards the scripting *example* wiring
+# (`<NumberScript>`/`<TextScript>`) when `beet_extra` is a dep, the same shape
+# `thread` uses, so a binary with the engine can run `examples/action/scripting.bsx`.
+quickjs = ["scripting","beet_action/quickjs","beet_router?/quickjs","beet_extra?/scripting"]
 # turning on `ui` also lights up beet_thread's chat UI (`ThreadView`,
 # `CreatePostForm`, `ThreadUiPlugin`) when `thread` is present.
 ui = ["dep:beet_ui", "beet_thread?/ui"]

@@ -126,6 +126,17 @@ web_examples = ["web", "extra"]
 # the separate native binary serving this head over a socket). Build with:
 # `beet build-wasm --package=beet-cli --bin=beet --features=web_head --out=<path>.wasm`.
 web_head = ["web", "beet/perceive_act_web"]
+# `beet-min.wasm`: the browser binary a page mounts by default, ie every example
+# surface (`web_examples`) plus the perceive-act head (`web_head`) and no embedded
+# JavaScript engine. A script run from this build reaches the host realm instead,
+# through the sandboxed-iframe backend, which is why the fallbacks exist. Build with:
+# `just build-wasm-min`.
+web_min = ["web_examples", "web_head"]
+# `beet-full.wasm`: `web_min` plus the embedded QuickJS engine, so a script runs
+# in-process with zero ambient authority rather than in a host-realm sandbox. Costs
+# the engine's bytes and a C toolchain (its wasi sysroot is downloaded once), so it is
+# the opt-in artifact rather than the default. Build with: `just build-wasm-full`.
+web_full = ["web_min", "beet/quickjs"]
 
 # the portable cross-platform base: the render router stack, media negotiation and
 # the runtime BSX parser the no-code site needs, on both native and wasm. beet's

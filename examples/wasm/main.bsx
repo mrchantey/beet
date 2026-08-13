@@ -5,20 +5,22 @@ Serves a page that boots the wasm `beet` binary, which reads its program from a
 `<script type="application/x-bsx" data-src=..>`, fetches and runs it headless, and
 renders its console output via `<RenderConsole>`. Honors `?color-scheme=dark`.
 
-Install the wasm binary once (the same single binary every wasm example mounts,
-at `assets/wasm/beet.wasm`), then serve:
+Install a wasm binary once, then serve:
 
-    beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
+    just build-wasm-min                  # assets/wasm/beet-min.wasm, what `/` mounts
     beet --main=examples/wasm --watch    # then open http://127.0.0.1:8337
 
-The standard build carries the full browser surface (`web_examples,web_head`), so
-any `examples/action/*.bsx` runs: point `routes/index.bsx`'s `<MainBsx src>` at eg
-`/examples/action/malenia.bsx`. The entry roots at the workspace (`<StoreRoot>`),
-so `<AssetsDir>` serves the examples the browser fetches and `--watch` live-reloads
-the browser on any edit under them.
+The two pages mount the two artifacts, which is the whole point of the split: `/`
+boots `beet-min.wasm` (`web_min`) and `/scripting` boots `beet-full.wasm`
+(`web_full`, the embedded JS engine), so `just build-wasm-full` is needed before
+that page runs. Both carry the example surface, so any `examples/action/*.bsx`
+runs: point a page's `<MainBsx src>` at eg `/examples/action/malenia.bsx`
+(`scripting.bsx` is the exception, needing the engine only `beet-full` has). The
+entry roots at the workspace (`<StoreRoot>`), so `<AssetsDir>` serves the examples
+the browser fetches and `--watch` live-reloads the browser on any edit under them.
 
-`<RoutesDir>` serves examples/wasm/routes (the page); `<AssetsDir>` mounts the
-workspace assets (the wasm binary) at /assets and the examples tree at /examples.
+`<RoutesDir>` serves examples/wasm/routes (the pages); `<AssetsDir>` mounts the
+workspace assets (the wasm binaries) at /assets and the examples tree at /examples.
 -->
 <HttpServer>
 <Router>

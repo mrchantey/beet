@@ -41,10 +41,10 @@ beet --main=examples/perceive_act/main-v2.bsx
 
 ## v3: browser head
 
-No in-process clients. A second HTTP server serves a wasm browser head that connects back over the socket, serving the real webcam, Web Speech, and a rendered face. Install the wasm binary once (the same single `assets/wasm/beet.wasm` every wasm example mounts), then run both servers:
+No in-process clients. A second HTTP server serves a wasm browser head that connects back over the socket, serving the real webcam, Web Speech, and a rendered face. Install the default browser binary once (`assets/wasm/beet-min.wasm`, whose `web_head` half is this head), then run both servers:
 
 ```sh
-beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
+just build-wasm-min
 beet --main=examples/perceive_act/main-v3.bsx
 ```
 

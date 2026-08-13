@@ -27,7 +27,7 @@ use beet_core::prelude::*;
 /// wasm-bindgen pair `build-wasm` emits), so a page need only name the `.wasm`.
 #[template]
 pub fn Wasm(
-	/// The wasm artifact url, eg `/assets/wasm/beet.wasm`.
+	/// The wasm artifact url, eg `/assets/wasm/beet-min.wasm`.
 	#[prop(into)]
 	src: String,
 	/// The wasm-bindgen glue url; defaults to `src` with `.wasm` swapped for `.js`.

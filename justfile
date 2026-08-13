@@ -276,14 +276,28 @@ test-wasm-feat crate *args:
 test-wasm-e2e crate test_name *args:
 	just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
 
+# The default browser binary (assets/wasm/beet-min.wasm): every example surface plus
+# the perceive-act head, with no embedded JavaScript engine, so a script it runs
+# reaches the sandboxed-iframe backend instead. This is the artifact a page mounts
+# unless it says otherwise. Needs `just install-cli`.
+build-wasm-min:
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=assets/wasm/beet-min.wasm
+
+# The engine-bearing browser binary (assets/wasm/beet-full.wasm): beet-min plus the
+# embedded QuickJS engine, so a script runs in-process. Slower to build (the C engine
+# downloads a wasi sysroot on the first run) and a much larger artifact, so it is
+# opt-in: only a page that wants the embedded engine mounts it, eg /scripting.
+build-wasm-full:
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=assets/wasm/beet-full.wasm
+
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet program (examples/wasm/hello.bsx) in the browser; its
-# console output renders on the page via <RenderConsole>. Needs `just install-cli`.
-# `beet build-wasm` installs the standard browser binary (assets/wasm/beet.wasm);
-# the entry roots at the workspace (<StoreRoot>) so the served examples are
-# reachable and --watch live-reloads on edit.
+# console output renders on the page via <RenderConsole>. The entry roots at the
+# workspace (<StoreRoot>) so the served examples are reachable and --watch
+# live-reloads on edit. Its /scripting page mounts beet-full.wasm, so run
+# `just build-wasm-full` once to serve that page too.
 serve-wasm *args:
-	beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm
+	just build-wasm-min
 	beet --main=examples/wasm --watch {{ args }}
 
 clear-rust-analyzer:

@@ -8,9 +8,9 @@ With no `url` the head connects to the host serving this page (`ws://<page-host>
 so the same program works from the serving machine and from a phone on the LAN. Set
 `url` explicitly to point the head at an agent on a different host.
 
-The `<CrateCheck>` verifies the wasm binary was built with `web_head` (the standard
-`beet build-wasm` binary is), failing fast with the missing feature instead of an
-unresolved `<WebHead>` tag.
+The `<CrateCheck>` verifies the wasm binary was built with `web_head` (both
+`beet-min.wasm` and `beet-full.wasm` are), failing fast with the missing feature
+instead of an unresolved `<WebHead>` tag.
 -->
 <Fragment>
 	<CrateCheck features="web_head"/>

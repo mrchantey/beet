@@ -1,0 +1,33 @@
+<!--
+The scripting page, booting `beet-full.wasm`: the same browser surface as `/` plus
+the embedded QuickJS engine, so the JavaScript in `examples/action/scripting.bsx`
+runs in-process with no host realm to reach. The engine is also what registers
+`<NumberScript>`/`<TextScript>` (beet_extra's `scripting` feature), so this program
+only resolves on the full build. Build it with `just build-wasm-full`; until then
+the page loads and the module fetch 404s.
+
+Structurally identical to `/` (a full `<HtmlDocument>`, `<RenderConsole>` before
+`<Wasm>` so the console wrap installs first), differing only in which artifact and
+which program it names.
+-->
+<HtmlDocument>
+	<Fragment slot="head">
+		<Stylesheet/>
+		<ColorSchemeScript/>
+		<LiveReloadScript/>
+	</Fragment>
+	<h1>Scripting in the browser</h1>
+	<p>
+		A behavior tree whose leaves are JavaScript, running in your browser. The
+		engine is compiled into the wasm binary, so a script has no ambient authority:
+		no fetch, no host globals, no page. Its console output renders below.
+	</p>
+	<p>
+		The <a href="/">home page</a> boots <code>beet-min.wasm</code>, which omits the
+		engine (and with it these script tags), so a script there would run in a
+		sandboxed iframe instead.
+	</p>
+	<RenderConsole/>
+	<MainBsx src="/examples/action/scripting.bsx"/>
+	<Wasm src="/assets/wasm/beet-full.wasm"/>
+</HtmlDocument>

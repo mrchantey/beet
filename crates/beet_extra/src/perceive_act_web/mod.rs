@@ -24,4 +24,5 @@ pub use take_photo::*;
 mod speak_text;
 pub use speak_text::*;
 mod render_face;
-pub use render_face::*;
+// the face observer is crate-internal, registered by the plugin above.
+pub(crate) use render_face::*;
