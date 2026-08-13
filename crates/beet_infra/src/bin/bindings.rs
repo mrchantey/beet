@@ -5,12 +5,23 @@
 //!
 //! Run with:
 //!     cargo run -p beet_infra --bin bindings --features bindings_generator
+//!
+//! Native-only, like the generator it drives. A wasm build of beet_infra still
+//! compiles this bin target, so there it is a stub.
 
+#[cfg(target_arch = "wasm32")]
+fn main() {}
+
+#[cfg(not(target_arch = "wasm32"))]
 use beet_core::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use beet_infra::bindings_generator::BindingFile;
+#[cfg(not(target_arch = "wasm32"))]
 use beet_infra::bindings_generator::SchemaBindingGenerator;
+#[cfg(not(target_arch = "wasm32"))]
 use beet_infra::prelude::*;
 
+#[cfg(not(target_arch = "wasm32"))]
 #[beet_core::main]
 async fn main() -> Result {
 	// Use the existing schema.json instead of running the full tofu init cycle.

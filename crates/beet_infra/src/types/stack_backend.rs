@@ -17,7 +17,9 @@ pub enum StackBackend {
 impl Default for StackBackend {
 	fn default() -> Self {
 		cfg_if! {
-			if #[cfg(feature = "aws_sdk")] {
+			// the S3 backend needs the native SDK (`S3Store` is native-only), so a
+			// wasm build defaults to local state exactly as an sdk-free one does.
+			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
 				StackBackend::S3(S3Backend::default())
 			} else {
 				StackBackend::Local(LocalBackend::default())
@@ -46,7 +48,7 @@ impl StackBackend {
 			#[allow(unused)]
 			Self::S3(s3) => {
 				cfg_if! {
-					if #[cfg(feature = "aws_sdk")] {
+					if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
 						s3.provider().box_clone()
 					} else {
 						panic!("aws feature is required for S3 backend provider usage")
@@ -138,7 +140,7 @@ pub struct S3Backend {
 }
 
 impl S3Backend {
-	#[cfg(feature = "aws_sdk")]
+	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	pub fn provider(&self) -> beet_net::prelude::S3Store {
 		beet_net::prelude::S3Store::new(
 			self.bucket.clone(),

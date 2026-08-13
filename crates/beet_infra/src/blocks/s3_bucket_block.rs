@@ -53,7 +53,7 @@ impl S3BucketBlock {
 
 	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket, resolved
 	/// against `stack` (bucket name, region, and deploy-versioned subdir).
-	#[cfg(feature = "aws_sdk")]
+	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	pub fn store(&self, stack: &Stack) -> beet_net::prelude::S3Store {
 		let region = self.region.as_ref().unwrap_or(stack.aws_region());
 		let bucket_name = stack.resource_ident(self.label.clone());
@@ -75,8 +75,8 @@ fn on_add_s3_bucket_block(mut world: DeferredWorld, cx: HookContext) {
 	// always insert ErasedBlock
 	ErasedBlock::on_add::<S3BucketBlock>(world.reborrow(), cx);
 
-	// when aws_sdk is available, insert S3Store
-	#[cfg(feature = "aws_sdk")]
+	// when the native aws_sdk is available, insert S3Store
+	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	{
 		world.commands().entity(cx.entity).queue(
 			move |mut entity: EntityWorldMut| -> Result {

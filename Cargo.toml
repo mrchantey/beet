@@ -157,14 +157,16 @@ chrono = "0.4"
 # compile on no_std; std consumers re-add the relevant features.
 rand = { version = "0.9", default-features = false }
 rand_chacha = { version = "0.9", default-features = false }
-# wasm_js ignored in native. Backs ahash (via material-colors) and rand 0.9 on
-# wasm. uuid uses its own `js` backend, so getrandom 0.4 stays out of the graph.
-getrandom = { version = "0.3", features = ["wasm_js"] }
-# getrandom 0.4, a separate crate version reached only through `rand` 0.10 (which
-# `bevy_math` pulls under `bevy/default`). Same story as 0.3: no wasm backend
-# unless `wasm_js` is enabled. Kept as its own key so a crate opts in where the
-# 0.10 rand actually appears, rather than forcing 0.4 into every wasm build.
-getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+# Two getrandom majors are in the graph at once, reached by different crates, and
+# neither has a wasm backend unless `wasm_js` is on (the wasm rustflags select that
+# backend unconditionally, see `.cargo/config.toml`). `wasm_js` is ignored natively.
+# The current major is the plain key; the older one is aliased, so a crate opts in
+# to whichever its own dependencies actually pull.
+# 0.4: reached through `rand` 0.10, which `bevy_math` pulls under `bevy/default`.
+getrandom = { version = "0.4", features = ["wasm_js"] }
+# 0.3: reached through ahash, async-openai, tokenizers and `rand` 0.9 (beet_core's
+# `rand` feature). uuid stays on its own `js` backend rather than either of these.
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
 webbrowser = "1"
 
@@ -521,7 +523,7 @@ beet_extra = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # pins uuid's wasm RNG to its `js` (WebCrypto) backend; `rng-getrandom` would
-# drag in getrandom 0.4, whose wasm marshalling traps the test runner.
+# route it through getrandom 0.4, whose wasm marshalling traps the test runner.
 uuid = { workspace = true, features = ["std", "js"] }
 
 [dev-dependencies]

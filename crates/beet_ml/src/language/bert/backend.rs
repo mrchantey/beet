@@ -1,8 +1,9 @@
 //! Backend selection for [`Bert`].
 //!
-//! Exactly one of `wgpu` / `ndarray` / `cuda` should be enabled — the
-//! workspace defaults to `wgpu` since it gives a single code-path that
-//! runs both natively and in the browser.
+//! Exactly one of `wgpu` / `ndarray` / `cuda` should be enabled. The workspace
+//! defaults to `wgpu` since it gives a single code-path that runs both natively
+//! and in the browser; `ndarray` is the CPU-only path, for a host with no usable
+//! GPU; `cuda` needs a system CUDA install.
 use beet_core::prelude::cfg_if;
 
 cfg_if! {
@@ -30,9 +31,9 @@ cfg_if! {
 		}
 	} else {
 		compile_error!(
-			"beet_ml needs exactly one burn backend feature: `wgpu` (the default), \
-`ndarray` or `cuda`. There is no backend-free build — every model runs on a burn \
-device."
+			"beet_ml needs exactly one burn backend feature: `wgpu` (the default, \
+GPU, and the only wasm path), `ndarray` (CPU-only) or `cuda` (needs a system CUDA \
+install). There is no backend-free build — every model runs on a burn device."
 		);
 	}
 }

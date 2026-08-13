@@ -57,7 +57,9 @@ impl Block for LambdaBlock {
 		let artifact_bucket = stack.artifact_bucket_name();
 		let artifact_key = stack.artifact_key(&self.label);
 		cfg_if! {
-			if #[cfg(feature = "deploy")] {
+			// `BuildArtifact` holds a `ChildProcess`, so the hash of a
+			// locally-built artifact only exists where the build can run.
+			if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
 				let source_hash = entity
 					.get::<BuildArtifact>()
 					.and_then(|artifact| artifact.compute_source_hash().ok());

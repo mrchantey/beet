@@ -188,10 +188,6 @@ console_error_panic_hook = { workspace = true }
 # into the returned JS promise.
 wasm-bindgen = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
-# force getrandom's `wasm_js` (WebCrypto) backend into the graph: fastrand/ahash
-# pull getrandom 0.3, which has no default wasm backend (see the `getrandom_backend`
-# cfg in `.cargo/config.toml`).
-getrandom = { workspace = true }
 
 [dev-dependencies]
 beet = { workspace = true, features = ["testing"] }

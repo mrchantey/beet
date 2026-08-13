@@ -122,7 +122,7 @@ impl PluginGroup for BeetPlugins {
 		// the infra deploy block/action type registrations, so a deployer entry
 		// resolves every compiled deploy type by tag independent of the example
 		// templates (`extra`).
-		#[cfg(all(feature = "infra", not(target_arch = "wasm32")))]
+		#[cfg(feature = "infra")]
 		{
 			builder = builder.add(beet_infra::prelude::InfraPlugin);
 		}

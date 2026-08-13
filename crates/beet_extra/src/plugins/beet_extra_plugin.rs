@@ -44,7 +44,7 @@ impl Plugin for BeetExtraPlugin {
 		app.add_plugins(crate::prelude::PerceiveActWebPlugin);
 		// the cloudflare/aws deploy example types + templates, so an
 		// `examples/infra/*.bsx` deployer runs through the one binary (headless).
-		#[cfg(feature = "infra")]
+		#[cfg(all(feature = "infra", not(target_arch = "wasm32")))]
 		app.add_plugins(crate::prelude::InfraExamplesPlugin);
 	}
 }

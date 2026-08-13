@@ -1,4 +1,5 @@
 use crate::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::terra::Project;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -138,7 +139,7 @@ impl Stack {
 	/// Create an artifacts client for this stack's artifact bucket.
 	pub fn artifacts_client(&self) -> ArtifactsClient {
 		cfg_if! {
-			if #[cfg(feature = "aws_sdk")] {
+			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
 				// TODO provider agnostic, perhaps something similar to the state_backend.rs pattern
 				let provider = beet_net::prelude::S3Store::new(
 					self.artifact_bucket_name(),
@@ -178,7 +179,12 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// builds a config of all block descendents.
 	/// Sets the AWS provider region from the nearest [`AwsStack`] ancestor,
 	/// ensuring the tofu config and Rust SDK use the same region.
-	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
+	///
+	/// This is the whole definition step, and it is target-agnostic: a wasm
+	/// consumer authors blocks and builds the config here, then serializes it for
+	/// a host that can apply it (see [`build_project`](Self::build_project),
+	/// which is the same config wrapped in the native tofu driver).
+	pub fn build_config(&self, entity: Entity) -> Result<(&Stack, terra::Config)> {
 		let (root, stack) = self.stacks.get(entity)?;
 		let mut config = stack.create_config();
 		let region = stack.aws_region();
@@ -193,7 +199,15 @@ impl<'w, 's> StackQuery<'w, 's> {
 		{
 			block.apply_to_config(&child, stack, &mut config)?;
 		}
-		Ok(Project::new(&stack, config))
+		Ok((stack, config))
+	}
+
+	/// [`build_config`](Self::build_config) wrapped in the tofu driver that
+	/// applies it, hence native-only.
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
+		let (stack, config) = self.build_config(entity)?;
+		Ok(Project::new(stack, config))
 	}
 
 	/// Create an artifacts client for the stack at the given entity.
@@ -205,7 +219,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Collect artifact entries from block descendants.
 	/// Returns `(BuildArtifact, artifact_label)` for each block
 	/// that has both a [`BuildArtifact`] and an artifact label.
-	#[cfg(feature = "deploy")]
+	#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 	pub fn collect_artifacts(
 		&self,
 		entity: Entity,

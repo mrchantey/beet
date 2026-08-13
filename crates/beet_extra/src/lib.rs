@@ -5,8 +5,11 @@ beet_core::test_main!();
 #[cfg(feature = "bevy_default")]
 pub mod components;
 // the cloudflare/aws deploy example wiring, so an `examples/infra/hello_*.bsx`
-// runs through the one `beet` binary (headless, no render).
-#[cfg(feature = "infra")]
+// runs through the one `beet` binary (headless, no render). Native-only: unlike
+// beet_infra's block *definitions*, which build anywhere, these templates wire the
+// deploy host itself — the `apply`/`destroy`/`plan` verbs and the cargo/zigbuild
+// artifacts, all of which shell out.
+#[cfg(all(feature = "infra", not(target_arch = "wasm32")))]
 pub mod infra;
 // the perceive-act types the agent and every head/body client share (the wire
 // types + the socket-client primitives), split out so the wasm head reuses them
@@ -35,7 +38,7 @@ pub mod scenes;
 pub mod prelude {
 	#[cfg(feature = "bevy_default")]
 	pub use crate::components::*;
-	#[cfg(feature = "infra")]
+	#[cfg(all(feature = "infra", not(target_arch = "wasm32")))]
 	pub use crate::infra::*;
 	// redundant when `perceive_act`/`perceive_act_web` re-export it, but the
 	// direct path covers a native build where the web module is compiled out
