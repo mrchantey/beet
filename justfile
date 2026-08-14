@@ -20,10 +20,6 @@ export RUST_MIN_STACK := '1073741824'
 
 test-threads := '--test-threads=8'
 
-# The upstream bucket holding shared assets (models, fonts, fixtures): the
-# `shared` stage's bucket, a source of record owned by no deploy stage.
-assets-bucket := 's3://beet-site--shared--assets'
-
 default:
 	just --list --unsorted
 
@@ -37,20 +33,8 @@ init-cli:
 # Set up a fresh checkout: cli, assets, and the ml default model.
 init-repo:
 	just init-cli
-	just pull-assets
+	just beet-shared pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
-
-# Pull shared assets from the upstream bucket into ./assets.
-pull-assets:
-	beet s3-sync --src={{ assets-bucket }} --dst=./assets
-pull-assets-delete:
-	beet s3-sync --src={{ assets-bucket }} --dst=./assets --delete
-
-# Push local ./assets up to the upstream bucket.
-push-assets:
-	beet s3-sync --src=./assets --dst={{ assets-bucket }} --delete
-push-assets-delete:
-	beet s3-sync --src=./assets --dst={{ assets-bucket }}
 
 #💡 CLI
 
@@ -86,7 +70,7 @@ beet-validate *args:
 # Show the tofu plan without applying (eyeball before deploy).
 beet-plan *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- plan {{ args }}
-# The shared-stage verbs (the assets bucket): `just beet-shared plan|apply|push|..`.
+# The shared-stage verbs (the assets bucket): `just beet-shared plan|apply|pull|push|..`.
 beet-shared *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- shared {{ args }}
 
@@ -115,7 +99,7 @@ fmt *args:
 
 test-all *args:
 	@if [ ! -d assets ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then \
-		echo "please download assets directory: just pull-assets"; \
+		echo "please download assets directory: just beet-shared pull"; \
 		exit 1; \
 	fi
 	just test-core {{ args }}

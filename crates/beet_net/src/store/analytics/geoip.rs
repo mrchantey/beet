@@ -6,29 +6,30 @@
 //! an unresolvable ip, [`GeoIp::country`] returns `None` and callers omit the
 //! country.
 //!
-//! The database is a static asset at `databases/country.mmdb` under the assets
-//! store (the local `assets/` dir, or the deployed assets bucket). Use a
+//! The database is a static asset at `assets/databases/country.mmdb` under the
+//! app's [`BlobStore`] (the checkout in dev, the app bucket when deployed). Use a
 //! redistributable database (db-ip Lite or IP2Location LITE, both CC-licensed)
 //! rather than MaxMind GeoLite2, whose license restricts committing the file.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::net::IpAddr;
 
-/// The relative path of the country database under the assets directory.
+/// The path of the country database under the app store.
 #[cfg(feature = "geoip")]
-const COUNTRY_DB_PATH: &str = "databases/country.mmdb";
+const COUNTRY_DB_PATH: &str = "assets/databases/country.mmdb";
 
-/// Resource wrapping the loaded country database, or empty when unavailable.
-#[derive(Default, Clone, Resource)]
+/// Component wrapping the loaded country database, or empty when unavailable.
+/// Rides the [`AnalyticsConfig`] entity, so consumers resolve it by ancestry.
+#[derive(Default, Clone, Component)]
 pub struct GeoIp {
 	#[cfg(feature = "geoip")]
 	db: Option<std::sync::Arc<GeoIpDb>>,
 }
 
 impl GeoIp {
-	/// Loads the country database from `databases/country.mmdb` in the assets
-	/// store, so a deployed site reads the same bucket-backed store it serves
-	/// assets from (a local fs path would be empty in a container).
+	/// Loads the country database from [`COUNTRY_DB_PATH`] in the app's store, the
+	/// same store the site serves its assets from (the checkout in dev, the app
+	/// bucket when deployed, where a local fs path would be empty).
 	///
 	/// Best-effort: a missing blob, an unreadable blob, or a parse failure logs
 	/// and yields an empty [`GeoIp`] whose lookups return `None`, rather than
@@ -117,12 +118,13 @@ mod test {
 	}
 
 	/// The committed country database resolves a known ip to its country, proving
-	/// the real mmdb loads and the lookup path works end to end.
+	/// the real mmdb loads and the lookup path works end to end. The store roots
+	/// at the workspace, the same shape as an app store containing `assets/`.
 	#[cfg(feature = "geoip")]
 	#[beet_core::test]
 	async fn resolves_known_ip_from_committed_db() {
 		let assets = BlobStore::new(FsStore::new(
-			AbsPathBuf::new_workspace_rel("assets").unwrap(),
+			AbsPathBuf::new_workspace_rel(".").unwrap(),
 		));
 		let geoip = GeoIp::load(&assets).await;
 		// google public dns is a stable US address in the db-ip country database.

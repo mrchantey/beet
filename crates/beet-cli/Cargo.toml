@@ -45,7 +45,7 @@ thread = ["beet/thread", "beet/ui"]
 # The cloudflare/aws deploy blocks + route actions, so one `beet` binary runs an
 # infra deployer `.bsx` (eg `examples/infra/cloudflare_workers.bsx deploy`).
 # Opt-in (like `winit`), so a plain `beet serve` never links the deploy
-# machinery. The example deploy templates (`<StackHost>`, `<SiteBucket>`, ...)
+# machinery. The example deploy templates (`<StackHost>`, `<AppBucket>`, ...)
 # ride the separate `extra` feature. Run with:
 # `cargo run -p beet-cli --features infra,extra -- --main=examples/infra/cloudflare_workers.bsx deploy`.
 infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk"]

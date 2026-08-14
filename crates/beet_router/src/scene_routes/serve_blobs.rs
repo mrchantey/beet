@@ -11,11 +11,12 @@ pub(crate) const STORE_PATH_PARAM: &str = "store_path";
 /// Mounts a static-file route under `prefix`, serving the captured path from the
 /// nearest self-or-ancestor [`BlobStore`].
 ///
-/// `prefix` is the only knob: `<ServeBlobs prefix="assets"/>` serves every file
-/// beneath `assets/`. The greedy trailing capture and the request/response adapter
-/// are private details ServeBlobs inserts for itself. Resolve the store by
-/// composition: pair with a co-located store-scoping component (eg [`DirPath`] or
-/// [`AssetsStore`]) on the same entity, or let it inherit an ancestor store.
+/// `prefix` is the mount path, and the *only* thing it scopes: the greedy capture
+/// excludes it, so an unpaired `<ServeBlobs prefix="assets"/>` serves the store
+/// *root* under `/assets`. Serving a subdir is composition: pair with a co-located
+/// [`DirPath`] scoping the inherited store (which is exactly [`AssetsDir`]), or
+/// co-locate a store of its own. The greedy trailing capture and the
+/// request/response adapter are private details ServeBlobs inserts for itself.
 #[template]
 pub fn ServeBlobs(
 	/// The mount path the static files are served under, eg `assets`.
@@ -67,70 +68,53 @@ pub(crate) async fn ServeBlobsHandler(
 		.get_params(STORE_PATH_PARAM)
 		.map(|segments| SmolPath::from_segments(segments))
 		.unwrap_or_else(|| SmolPath::from(cx.input.path()));
-	serve_blob(&store, &path).await
+	serve_blob(&store, &path)
+		.await
+		.map_err(|err| unhydrated_hint(&cx.input, err))
 }
 
-/// Composes the asset-serving backing onto its route at build time: a dedicated
-/// `BEET_ASSETS_BUCKET` [`S3Store`] when set (the deployed container's separate,
-/// public-read assets bucket), else a [`DirPath`] scoping the nearest ancestor
-/// site [`BlobStore`] to its `assets/` subdir (local dev). Spread alongside
-/// [`ServeBlobs`], which owns the mount path:
-/// `<ServeBlobs prefix="assets" {AssetsStore}/>`.
+/// The request path segment whose misses earn the unhydrated-store hint.
+const HINT_DIR: &str = "assets";
+
+/// Appends a pull hint to a miss under a top-level `assets/` request path.
 ///
-/// The assets glue, resolving where the served files come from. A WIP shim, and
-/// the one sanctioned direct `BEET_*` read left outside [`BootstrapConfig`]:
-/// `BEET_ASSETS_BUCKET` / `BEET_S3_ENDPOINT` are deliberately *not* config fields
-/// because the store-topology phase deletes this template outright rather than
-/// migrating it (`.agents/plans/bootstrap-config.md` section 8). At that point
-/// the deployed runtime reads one app bucket that physically contains `assets/`,
-/// serving becomes pure store inheritance (`<ServeBlobs prefix="assets"/>`), and
-/// there is no assets uri on any transport to name.
-#[template]
-pub fn AssetsStore() -> impl Bundle {
-	OnSpawn::new(|entity: &mut EntityWorldMut| {
-		// the deployed assets bucket, mirroring the `--store=s3://..` endpoint /
-		// region selection (R2 vs AWS S3). Only the native `aws_sdk` build can
-		// build an `S3Store`; every other build scopes the ancestor entry store.
-		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-		if let Ok(bucket) = env_ext::var("BEET_ASSETS_BUCKET") {
-			let store = match env_ext::var("BEET_S3_ENDPOINT") {
-				Ok(endpoint) => {
-					S3Store::new(bucket, "auto").with_endpoint(endpoint)
-				}
-				Err(_) => S3Store::new(
-					bucket,
-					env_ext::var("AWS_REGION")
-						.unwrap_or_else(|_| "us-west-2".to_string()),
-				),
-			};
-			entity.insert(store);
-			return;
-		}
-		// local dev (native): serve the workspace `assets/` directory the site
-		// mirrors from the bucket (`just pull-assets`). It lives at the workspace
-		// root, not under the site store (which roots at the entry's dir, eg
-		// `site/`), so a concrete store reaches it — the local mirror of the S3
-		// branch above. Falls back to the inherited store's `assets/` subdir when
-		// absent (a standalone site that co-locates its assets).
-		#[cfg(not(target_arch = "wasm32"))]
-		if let Ok(assets) = AbsPathBuf::new_workspace_rel("assets") {
-			if assets.exists() {
-				entity.insert(FsStore::new(assets));
-				return;
-			}
-		}
-		// scope the inherited site store to its `assets/` subdir.
-		entity.insert(DirPath("assets".into()));
-	})
+/// A store-agnostic nudge rather than repo-specific knowledge: `assets`
+/// directories are commonly synced from a blob bucket instead of committed, so a
+/// miss there is usually an unhydrated checkout rather than a wrong url. Any
+/// other status or path passes through untouched.
+fn unhydrated_hint(request: &RequestParts, err: BevyError) -> BevyError {
+	let miss = err
+		.downcast_ref::<HttpError>()
+		.filter(|err| err.status_code == StatusCode::NOT_FOUND)
+		.filter(|_| request.path().first().map(SmolStr::as_str) == Some(HINT_DIR))
+		.cloned();
+	let note = format!(
+		"note: '{HINT_DIR}' directories are commonly synced from a blob store; this checkout may need a pull"
+	);
+	match miss {
+		Some(miss) => HttpError::new(
+			miss.status_code,
+			[miss.message.as_str(), note.as_str()]
+				.into_iter()
+				.filter(|part| !part.is_empty())
+				.collect::<Vec<_>>()
+				.join("\n"),
+		)
+		.into(),
+		None => err,
+	}
 }
 
 /// Mounts a named directory as static-file routes: serves the files under `src`
 /// (resolved against the nearest ancestor [`BlobStore`]) at the url `prefix`.
 ///
-/// The declarative, env-free counterpart to [`AssetsStore`]: it pairs [`ServeBlobs`]
-/// (the mount path) with a [`DirPath`] (scoping the inherited store to `src`), so
-/// `<AssetsDir src="examples/wasm/assets" prefix="assets"/>` serves
-/// `examples/wasm/assets/…` at `/assets/…`. `prefix` defaults to `src`.
+/// Pairs [`ServeBlobs`] (the mount path) with a [`DirPath`] (scoping the inherited
+/// store to `src`), so `<AssetsDir src="examples/wasm/assets" prefix="assets"/>`
+/// serves `examples/wasm/assets/…` at `/assets/…`. `prefix` defaults to `src`.
+///
+/// One store, no env: the deployed app bucket is a replica of the checkout, so
+/// `<AssetsDir src="assets"/>` resolves the same relative path either side of a
+/// deploy.
 #[template]
 pub fn AssetsDir(
 	/// The directory to mount, relative to the nearest ancestor store root.
@@ -139,13 +123,24 @@ pub fn AssetsDir(
 	/// The url prefix to serve under; defaults to `src`.
 	#[prop(into, default)]
 	prefix: String,
+	/// Browser cache TTL for the served files, forwarded to [`ServeBlobs`].
+	cache: Option<Duration>,
 ) -> impl Bundle {
 	let prefix = if prefix.is_empty() {
 		src.clone()
 	} else {
 		prefix
 	};
-	rsx! { <ServeBlobs prefix={prefix} {DirPath(SmolPath::from(src.as_str()))}/> }
+	// the props struct directly rather than `rsx!`: an already-`Option` prop has no
+	// call-site conversion, only the bare inner value does.
+	(
+		ServeBlobs {
+			prefix,
+			cache: PropOpt(cache),
+		}
+		.into_snippet_bundle(),
+		DirPath(SmolPath::from(src.as_str())),
+	)
 }
 
 // the tests assemble a router with a temp store, both adjacent (on an ancestor) and
@@ -210,29 +205,67 @@ mod test {
 			.xpect_contains("color: red");
 	}
 
-	/// The local-dev backing [`AssetsStore`] installs — an [`FsStore`] rooted at the
-	/// workspace `assets/` mirror — serves a `/assets/…` blog image through
-	/// [`ServeBlobs`]. This is the path the `site/` entry relies on: its site store
-	/// roots at the entry's dir (`site/`, where `assets/` is empty), so the workspace
-	/// mirror, not the inherited store's subdir, is what resolves. Skipped on a
-	/// checkout without the workspace assets (a fresh clone before `just pull-assets`).
+	/// The real `site/` layout: a store rooted at the entry's dir plus
+	/// `<AssetsDir src="assets"/>` serves a blog image through the committed
+	/// `site/assets -> ../assets` symlink, the one resolution dev and the deployed
+	/// app bucket share. Skipped on a checkout without hydrated assets (a fresh
+	/// clone before `beet shared pull`).
 	#[beet_core::test]
-	async fn workspace_assets_backing_serves_blog_image() {
-		let Ok(assets) = AbsPathBuf::new_workspace_rel("assets") else {
+	async fn site_assets_dir_serves_blog_image() {
+		let Ok(site) = AbsPathBuf::new_workspace_rel("site") else {
 			return;
 		};
-		if !assets.join("blog/kiama-sea-shanty-club.jpg").exists() {
+		if !site.join("assets/blog/kiama-sea-shanty-club.jpg").exists() {
 			return;
 		}
 		router_world()
-			.spawn((Router::with_defaults(), children![(
-				serve_route("assets"),
-				FsStore::new(assets)
-			)]))
+			.spawn((
+				Router::with_defaults(),
+				FsStore::new(site),
+				children![
+					AssetsDir {
+						src: "assets".into(),
+						prefix: default(),
+						cache: default(),
+					}
+					.into_snippet_bundle()
+				],
+			))
 			.exchange(Request::get("assets/blog/kiama-sea-shanty-club.jpg"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
+	}
+
+	/// A miss under `assets/` carries the unhydrated-checkout hint, and a miss
+	/// anywhere else does not.
+	#[beet_core::test]
+	async fn miss_hints_at_an_unhydrated_assets_dir() {
+		let mut world = router_world();
+		let root = world
+			.spawn((
+				Router::with_defaults(),
+				BlobStore::temp(),
+				children![serve_route("assets"), serve_route("other")],
+			))
+			.flush();
+		world
+			.entity_mut(root)
+			.exchange(Request::get("assets/missing.png"))
+			.await
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("may need a pull");
+		world
+			.entity_mut(root)
+			.exchange(Request::get("other/missing.png"))
+			.await
+			.text()
+			.await
+			.unwrap()
+			.xnot()
+			.xpect_contains("may need a pull");
 	}
 
 	/// An extensionless path serves `<path>/index.html`, the static-host fallback.

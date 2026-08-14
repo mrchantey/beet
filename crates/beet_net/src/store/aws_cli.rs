@@ -138,6 +138,20 @@ impl S3Filter {
 	}
 }
 
+/// Which way a sync runs between a local directory and a bucket.
+///
+/// The direction flips which end is the source, so the two ends are named by
+/// *where* they are (local, bucket) rather than by their role in one direction.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
+pub enum SyncDirection {
+	/// Local directory to bucket, the publishing direction.
+	#[default]
+	Push,
+	/// Bucket to local directory, the hydrating direction.
+	Pull,
+}
+
 /// Builder for `aws s3 sync`, including CLI configuration, endpoints, and flags.
 ///
 /// This struct preserves the order of include/exclude rules, as the AWS CLI
@@ -302,6 +316,12 @@ impl S3Sync {
 	/// Sets whether to follow symbolic links.
 	pub fn follow_symlinks(mut self, value: bool) -> Self {
 		self.follow_symlinks = value;
+		self
+	}
+	/// Sets whether to pass `--no-sign-request`, for a public bucket reachable
+	/// without credentials.
+	pub fn no_sign_request(mut self, value: bool) -> Self {
+		self.cli = self.cli.with_no_sign_request(value);
 		self
 	}
 	/// Shorthand to set `--acl public-read`.

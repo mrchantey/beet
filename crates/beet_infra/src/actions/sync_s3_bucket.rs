@@ -2,15 +2,73 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Mirror the local dir to the nearest ancestor [`S3FsStore`]'s bucket.
+/// Syncs the nearest ancestor [`S3FsStore`]'s two ends, in either direction.
+/// Read by [`SyncS3BucketAction`], which does the work.
 ///
-/// A *mirror*, not an append: bucket objects no longer present locally are pruned
-/// (`aws s3 sync --delete`), so the bucket exactly reflects the source dir. Without
-/// this a renamed or removed source file lingers across deploys -- eg a home route
-/// converted `index.bsx` -> `index.md` leaves the stale `index.bsx`, so the served
-/// binary sees two routes for `/` and panics on boot (`Duplicate route`). Mirroring
-/// stops stale files from accumulating. The synced dirs (`site/`, `assets/`) are
-/// read-only at runtime, so nothing in the bucket is authored anywhere but locally.
+/// The defaults are the conservative ones: push, additive. `delete` opts into a
+/// *mirror*, where objects absent from the source are pruned so the destination
+/// exactly reflects it. A deploy wants that (a renamed or removed source file
+/// otherwise lingers across deploys, eg a home route converted `index.bsx` ->
+/// `index.md` leaves the stale `index.bsx`, so the served binary sees two routes
+/// for `/` and panics on boot), a source of record does not.
+#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
+#[require(SyncS3BucketAction)]
+pub struct SyncS3Bucket {
+	/// Which end is the source.
+	direction: SyncDirection,
+	/// Prune destination entries absent from the source (a mirror rather than an
+	/// additive sync). Guarded on push by [`SyncS3Bucket::assert_mirrorable`].
+	delete: bool,
+	/// Upload the targets of symbolic links rather than skipping them, so a
+	/// symlinked subdir is materialized into the bucket.
+	follow_symlinks: bool,
+	/// Sync without credentials, for a public-read bucket.
+	no_sign_request: bool,
+	/// Optional subdir of the bucket to sync against; the bucket root by default.
+	#[set_with(unwrap_option)]
+	bucket_dir: Option<SmolPath>,
+}
+
+impl SyncS3Bucket {
+	/// Refuse to mirror a local dir that would empty the bucket: a missing or
+	/// empty source, or (when following symlinks) a symlinked child dir whose
+	/// target is missing or empty — the signature of an unhydrated checkout.
+	///
+	/// Only the push direction destroys remote state, so only push is guarded; a
+	/// pull with `delete` overwrites a local dir the caller asked for.
+	fn assert_mirrorable(&self, local_dir: &AbsPathBuf) -> Result {
+		if !self.delete || self.direction != SyncDirection::Push {
+			return Ok(());
+		}
+		if fs_ext::is_dir_empty(local_dir)? {
+			bevybail!(
+				"refusing to mirror an empty local dir into a bucket: {}\nhydrate it first, eg `just beet-shared pull`",
+				local_dir.display()
+			);
+		}
+		if !self.follow_symlinks {
+			return Ok(());
+		}
+		// a linked child dir is materialized into the bucket by this push, so an
+		// unhydrated link is the same emptying hazard one level down.
+		for child in ReadDir::all(local_dir)?
+			.into_iter()
+			.filter(|child| fs_ext::is_symlink(child))
+		{
+			if fs_ext::is_dir_empty(&child)? {
+				bevybail!(
+					"refusing to mirror an empty symlinked dir into a bucket: {}\nhydrate it first, eg `just beet-shared pull`",
+					child.display()
+				);
+			}
+		}
+		Ok(())
+	}
+}
+
+/// Sync the nearest ancestor [`S3FsStore`]'s local dir and bucket, per the
+/// [`SyncS3Bucket`] settings on this entity (its defaults when absent).
 #[action]
 #[derive(Default, Component)]
 pub async fn SyncS3BucketAction(
@@ -23,19 +81,78 @@ pub async fn SyncS3BucketAction(
 			query.get(entity).cloned()
 		})
 		.await??;
-	let s3_uri = s3_fs_store.s3_store().s3_uri();
+	let opts = cx
+		.caller
+		.get_cloned::<SyncS3Bucket>()
+		.await
+		.unwrap_or_default();
+	let s3_uri = match opts.bucket_dir() {
+		Some(dir) => format!("{}/{dir}", s3_fs_store.s3_store().s3_uri()),
+		None => s3_fs_store.s3_store().s3_uri(),
+	};
 	let local_dir = s3_fs_store.fs_store().effective_root();
+	opts.assert_mirrorable(&local_dir)?;
+	let sync = match opts.direction() {
+		SyncDirection::Push => S3Sync::push(local_dir.clone(), &s3_uri),
+		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
+	};
 	trace!(
-		"SyncS3BucketAction: syncing {} to {}",
+		"SyncS3BucketAction: syncing {} {} {s3_uri}",
 		local_dir.display(),
-		s3_uri
+		match opts.direction() {
+			SyncDirection::Push => "->",
+			SyncDirection::Pull => "<-",
+		}
 	);
-	// `.delete(true)`: mirror, pruning bucket objects no longer in the local dir.
-	S3Sync::push(local_dir, &s3_uri).delete(true).send().await?;
+	sync.delete(opts.delete())
+		.follow_symlinks(opts.follow_symlinks())
+		.no_sign_request(opts.no_sign_request())
+		.send()
+		.await?;
 	trace!(
-		"synced to {s3_uri} (region: {})",
+		"synced {s3_uri} (region: {})",
 		s3_fs_store.s3_store().region()
 	);
 	trace!("SyncS3BucketAction: complete");
 	Pass(cx.input).xok()
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// A mirroring push refuses an empty source dir, the shape that would empty
+	/// the bucket; an additive push (the default) makes no such demand, since it
+	/// can only add.
+	#[beet_core::test]
+	fn mirror_guard_rejects_an_empty_dir() {
+		let dir = TempDir::new().unwrap();
+		let root = (*dir).clone();
+		SyncS3Bucket::default().assert_mirrorable(&root).unwrap();
+		let mirror = SyncS3Bucket::default().with_delete(true);
+		mirror.assert_mirrorable(&root).unwrap_err();
+		fs_ext::write(root.join("index.html"), "<div/>").unwrap();
+		mirror.assert_mirrorable(&root).unwrap();
+	}
+
+	/// A symlinked child dir is materialized into the bucket by a
+	/// `follow_symlinks` mirror, so an unhydrated link is the same hazard one
+	/// level down — and only when links are followed.
+	#[cfg(unix)]
+	#[beet_core::test]
+	fn mirror_guard_rejects_an_unhydrated_symlink() {
+		let dir = TempDir::new().unwrap();
+		let root = (*dir).clone();
+		fs_ext::write(root.join("index.html"), "<div/>").unwrap();
+		let target = root.join("target");
+		fs_ext::create_dir_all(&target).unwrap();
+		std::os::unix::fs::symlink(&target, root.join("assets")).unwrap();
+
+		let mirror = SyncS3Bucket::default().with_delete(true);
+		mirror.assert_mirrorable(&root).unwrap();
+		let mirror = mirror.with_follow_symlinks(true);
+		mirror.assert_mirrorable(&root).unwrap_err();
+		fs_ext::write(target.join("logo.png"), "png").unwrap();
+		mirror.assert_mirrorable(&root).unwrap();
+	}
 }

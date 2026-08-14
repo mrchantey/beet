@@ -13,11 +13,11 @@ entry on every request, so a `sync` updates the entire site with no redeploy, li
 the very next fetch. `build` compiles the wasm once; `deploy` uploads that prebuilt
 artifact (no recompile) and seeds the bucket.
 
-Two directories are synced: `site/` to the bucket root (its `main.bsx`, `routes/`,
-`templates/`), and the workspace `assets/` under the `assets/` key prefix. The site's
-own `site/assets/` is empty and a Worker has no filesystem fallback, so its
-`ServeBlobs`/`AssetsStore` resolves `/assets/*` from bucket key `assets/*`; the prefixed
-sync is what lands the real assets there.
+One directory is synced: `site/` to the bucket root (its `main.bsx`, `routes/`,
+`templates/`, and `assets/`). The sync walk follows the committed `site/assets ->
+../assets` symlink, so the workspace assets land under the bucket's `assets/` key and
+the Worker's `<AssetsDir src="assets"/>` reads them from the one store it has — the
+same resolution as a checkout, which is the point of the symlink.
 
 ## The edit → sync → live loop (no redeploy)
 
@@ -59,13 +59,11 @@ neither (a local compile).
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareWorkerBlock name="beet-hello-site-worker" bucket="beet-hello-site"/>
 		<CloudflareWorkerDeployAction/>
-		<!-- the site to the bucket root; the workspace assets under the `assets/` prefix -->
+		<!-- the site to the bucket root, assets included via the `site/assets` symlink -->
 		<CloudflareR2Sync local_dir="site" bucket="beet-hello-site"/>
-		<CloudflareR2Sync local_dir="assets" prefix="assets" bucket="beet-hello-site"/>
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
 		<CloudflareR2Sync local_dir="site" bucket="beet-hello-site"/>
-		<CloudflareR2Sync local_dir="assets" prefix="assets" bucket="beet-hello-site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
 		<!-- empties the whole bucket (site/ + assets/) before deleting it -->

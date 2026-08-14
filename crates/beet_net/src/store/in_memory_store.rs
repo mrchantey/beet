@@ -268,9 +268,15 @@ impl BlobStoreProvider for InMemoryStore {
 			let map = guard
 				.as_ref()
 				.ok_or_else(|| bevyhow!("store not created"))?;
-			map.get(&key)
-				.cloned()
-				.ok_or_else(|| bevyhow!("object not found: {key}"))
+			// a miss is a 404, matching every other backend, so a served route
+			// distinguishes an absent file from a broken store.
+			map.get(&key).cloned().ok_or_else(|| {
+				HttpError::new(
+					StatusCode::NOT_FOUND,
+					format!("object not found: {key}"),
+				)
+				.into()
+			})
 		})
 	}
 

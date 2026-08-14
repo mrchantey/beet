@@ -29,7 +29,7 @@ impl Plugin for InfraExamplesPlugin {
 			// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
 			// `.bsx` lambda deployer composes them (see `templates.rs`).
 			.register_template::<StackHost>()
-			.register_template::<SiteBucket>()
+			.register_template::<AppBucket>()
 			// the bucket-lifecycle example's stack host + named bucket.
 			.register_template::<BucketStack>()
 			.register_template::<NamedBucket>()

@@ -128,20 +128,17 @@ impl Plugin for RouterPlugin {
 			// entry resolution before the store builds; inert in the built tree.
 			app.register_type::<StoreRoot>();
 			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
-			// inserts its own greedy capture + handler, eg
-			// `<ServeBlobs prefix="assets" {AssetsStore}/>`.
+			// inserts its own greedy capture + handler, serving from the nearest
+			// self-or-ancestor store, eg `<AssetsDir src="assets"/>`.
 			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
-			// `AssetsStore` picks the backing (a `BEET_ASSETS_BUCKET` bucket, or the
-			// local `assets/` subdir) at build time.
 			app.register_template::<Route>()
 				// the persistent page route (`<Route path="/" {FixedPage}>`): its
 				// declared children are one live tree served by every request.
 				.register_type::<FixedPage>()
 				.register_template::<ServeBlobs>()
 				.register_type::<ServeBlobsHandler>()
-				.register_template::<AssetsStore>()
-				// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`),
-				// the env-free counterpart to `AssetsStore`.
+				// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`):
+				// `ServeBlobs` scoped to a subdir of the inherited store.
 				.register_template::<AssetsDir>()
 				// the browser-wasm page templates: the module loader and the program
 				// reference a served page boots a wasm `beet` binary with.

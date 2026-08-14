@@ -35,7 +35,8 @@ pub use store::*;
 /// and the geoip country database.
 ///
 /// Inert until an [`AnalyticsConfig`] is spawned (the on-switch): its insertion
-/// creates the store, so a plain beet app with this plugin still does nothing.
+/// creates the store and the country database on that same entity, so a plain
+/// beet app with this plugin still does nothing.
 /// Once a config is present, terminal page views and web beacons persist
 /// automatically; the per-request [`AnalyticsEventKind::Request`] log
 /// additionally honors the config (recording on by default, raw ip off by

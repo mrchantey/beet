@@ -509,9 +509,8 @@ pub struct CloudflareR2Sync {
 	/// Target R2 bucket.
 	bucket: SmolStr,
 	/// Optional R2 key prefix: each uploaded key becomes `<prefix>/<relpath>`
-	/// instead of `<relpath>`. Mounts a local directory under a sub-path of the
-	/// bucket, eg the workspace `assets/` under the served site's `assets/` prefix
-	/// (where a Worker's `AssetsStore` reads them). `None` uploads to the bucket root.
+	/// instead of `<relpath>`, mounting a local directory under a sub-path of the
+	/// bucket. `None` uploads to the bucket root.
 	#[set_with(unwrap_option)]
 	prefix: Option<SmolPath>,
 }

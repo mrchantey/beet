@@ -6,15 +6,16 @@ use beet_core::prelude::*;
 // TODO this should be from beet_infra
 const DEFAULT_REGION: &str = "us-west-2";
 
-/// Resource holding the analytics storage table.
-#[derive(Clone, Deref, DerefMut, Resource)]
+/// Component holding the analytics storage table, spawned on the
+/// [`AnalyticsConfig`] entity.
+#[derive(Clone, Deref, DerefMut, Component)]
 pub struct AnalyticsStore {
 	/// The underlying table store for analytics events.
 	pub store: TableStore<AnalyticsEvent>,
 }
 
-/// Observer: on the first [`AnalyticsConfig`] insertion, create the
-/// [`AnalyticsStore`] and (under `geoip`) load the country database.
+/// Observer: on an [`AnalyticsConfig`] insertion, create the [`AnalyticsStore`]
+/// and (under `geoip`) the country database, both on the config's own entity.
 ///
 /// Config-triggered rather than a startup system so it is inert until analytics
 /// is switched on, and so it works whenever the config lands (markup scenes
@@ -22,26 +23,23 @@ pub struct AnalyticsStore {
 /// [`PackageConfig`] spawned alongside the [`AnalyticsConfig`] is already
 /// present; idempotent, so a scene reload does not rebuild the store.
 pub(super) fn spawn_store_on_config(
-	_ev: On<Add, AnalyticsConfig>,
-	existing: Option<Res<AnalyticsStore>>,
+	ev: On<Add, AnalyticsConfig>,
+	stores: Query<&AnalyticsStore>,
 	commands: AsyncCommands,
 ) {
-	if existing.is_some() {
+	if stores.contains(ev.entity) {
 		return;
 	}
+	let entity = ev.entity;
 	commands.run(async move |world| {
-		// guard against a racing second config insertion creating it first.
-		if world
-			.with(|world: &mut World| {
-				world.get_resource::<AnalyticsStore>().is_some()
-			})
-			.await
-		{
+		let entity = world.entity(entity);
+		// guard against a racing second insertion creating it first.
+		if entity.get::<AnalyticsStore, _>(|_| ()).await.is_ok() {
 			return Ok(());
 		}
 		// read the backend config now (the scene has settled), defaulting when a
 		// PackageConfig/WorkspaceConfig was not inserted.
-		let (fs_dir, assets_dir, bucket_name) = world
+		let (fs_dir, table_name) = world
 			.with(|world: &mut World| {
 				let ws = world
 					.get_resource::<WorkspaceConfig>()
@@ -59,67 +57,50 @@ pub(super) fn spawn_store_on_config(
 					.as_deref()
 					.map(str::to_string)
 					.unwrap_or_else(|| pkg.analytics_bucket_name());
-				(
-					ws.analytics_dir.into_abs(),
-					ws.assets_dir.into_abs(),
-					table_name,
-				)
+				(ws.analytics_dir.into_abs(), table_name)
 			})
 			.await;
 		let access = BootstrapConfig::get().service_access;
 		let store =
-			TableStore::dynamo_fs_selector(&fs_dir, &bucket_name, DEFAULT_REGION, access)
+			TableStore::dynamo_fs_selector(&fs_dir, &table_name, DEFAULT_REGION, access)
 				.await;
-		world.insert_resource(AnalyticsStore { store }).await;
-		// the offline country database is a best-effort static asset: a missing
-		// or unreadable db just leaves country lookups returning `None`.
-		let geoip = GeoIp::load(&assets_store(&assets_dir, access)).await;
-		world.insert_resource(geoip).await;
+		// the offline country database rides the app's own store (the checkout in
+		// dev, the app bucket when deployed), resolved like any other tree
+		// consumer. Best-effort: no store, or no blob, just disables lookups.
+		let blobs = entity
+			.with_state::<AncestorQuery<&BlobStore>, _>(|entity, stores| {
+				stores.get(entity).cloned().ok()
+			})
+			.await?;
+		let geoip = match blobs {
+			Some(blobs) => GeoIp::load(&blobs).await,
+			None => GeoIp::default(),
+		};
+		entity.insert((AnalyticsStore { store }, geoip)).await?;
 		Ok(())
 	});
 }
 
-/// The assets [`BlobStore`]: the deploy-provided `BEET_ASSETS_BUCKET` when
-/// running remote (the container has no local assets, see `AssetsStore` in
-/// beet_router), else the local assets dir.
-///
-/// The one sanctioned direct `BEET_*` read left outside [`BootstrapConfig`]:
-/// `BEET_ASSETS_BUCKET` / `BEET_S3_ENDPOINT` are not config fields because the
-/// store-topology phase deletes `AssetsStore` outright, at which point the
-/// deployed runtime reads one app bucket that physically contains `assets/` and
-/// there is no assets uri on any transport.
-#[allow(unused_variables)]
-fn assets_store(assets_dir: &AbsPathBuf, access: ServiceAccess) -> BlobStore {
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	if access == ServiceAccess::Remote {
-		if let Ok(bucket) = env_ext::var("BEET_ASSETS_BUCKET") {
-			let region = env_ext::var("AWS_REGION")
-				.unwrap_or_else(|_| DEFAULT_REGION.to_string());
-			return BlobStore::new(S3Store::new(bucket, region));
-		}
-	}
-	BlobStore::new(FsStore::new(assets_dir.clone()))
-}
-
-/// Observer: persist a triggered [`AnalyticsEvent`] to the [`AnalyticsStore`].
+/// Observer: persist a triggered [`AnalyticsEvent`] to every [`AnalyticsStore`].
 ///
 /// The single sink for every emitter (request middleware, navigator, web
-/// beacon). A missing store (analytics not switched on) drops the event rather
-/// than panicking, since emitters trigger unconditionally. Fire-and-forget: the
-/// push runs on the async queue so recording never blocks a request or a
-/// navigation.
+/// beacon). No store (analytics not switched on) drops the event rather than
+/// panicking, since emitters trigger unconditionally. Fire-and-forget: the push
+/// runs on the async queue so recording never blocks a request or a navigation.
 pub(super) fn handle_analytics_event(
 	ev: On<AnalyticsEvent>,
-	store: Option<Res<AnalyticsStore>>,
+	stores: Query<&AnalyticsStore>,
 	commands: AsyncCommands,
 ) {
-	let Some(store) = store else {
+	let stores = stores.iter().cloned().collect::<Vec<_>>();
+	if stores.is_empty() {
 		return;
-	};
-	let store = store.clone();
+	}
 	let event = ev.event().clone();
 	commands.run(async move |_| {
-		store.push(event).await?;
+		for store in stores {
+			store.push(event.clone()).await?;
+		}
 		Ok(())
 	});
 }
@@ -143,5 +124,16 @@ mod test {
 		let loaded = store.get(id).await.unwrap();
 		loaded.path.as_str().xpect_eq("/about");
 		loaded.event_kind.xpect_eq(AnalyticsEventKind::Request);
+	}
+
+	/// The config's own entity carries the store and the geoip component, so
+	/// consumers resolve them by ancestry rather than as globals.
+	#[beet_core::test]
+	async fn config_entity_carries_the_store() {
+		let mut world = (AsyncPlugin, analytics_plugin).into_world();
+		let entity = world.spawn(AnalyticsConfig::default()).flush();
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		world.entity(entity).contains::<AnalyticsStore>().xpect_true();
+		world.entity(entity).contains::<GeoIp>().xpect_true();
 	}
 }

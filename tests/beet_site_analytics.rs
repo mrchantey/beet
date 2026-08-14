@@ -26,18 +26,18 @@ async fn seeded_store() -> (AnalyticsStore, Uuid) {
 	(AnalyticsStore { store }, prior_id)
 }
 
-/// A router with analytics enabled over `store`, plus one content route. Inserting
-/// the store before the `AnalyticsConfig` lands makes the config's bootstrap a
-/// no-op, so the test controls (and can read back) the exact store.
+/// A router with analytics enabled over `store`, plus one content route.
+/// Co-locating the store with the `AnalyticsConfig` makes the config's bootstrap
+/// a no-op, so the test controls (and can read back) the exact store.
 async fn analytics_world(store: AnalyticsStore) -> (World, Entity) {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	world.insert_resource(pkg_config!());
-	world.insert_resource(store);
 	let root = world
 		.spawn((
 			Router::with_defaults(),
 			AnalyticsConfig::default(),
 			AnalyticsMiddleware::default(),
+			store,
 			children![render_action::fixed_func_route("about", || rsx! {
 				<p>"About"</p>
 			})],

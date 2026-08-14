@@ -72,11 +72,13 @@ pub async fn AnalyticsMiddleware(
 
 	// a geoip country from the address, always derived; the raw ip is stored only
 	// when explicitly opted in, keeping the default posture free of personal data.
+	// The database rides the `AnalyticsConfig` entity, resolved by the same
+	// ancestry walk as the config itself.
 	let country = ip
 		.zip(
 			world
-				.with(|world: &mut World| {
-					world.get_resource::<GeoIp>().cloned()
+				.with_state::<AncestorQuery<&GeoIp>, Option<GeoIp>>(move |query| {
+					query.get(caller_id).ok().cloned()
 				})
 				.await,
 		)

@@ -15,18 +15,20 @@ pub fn stack(app_name: impl Into<SmolStr>) -> Stack {
 	Stack::new(app_name).with_aws_region("us-west-2")
 }
 
-/// The single bucket the site is served from. Non-versioned so `sync` overwrites in
-/// place and the running binary reads a stable root.
-pub fn site_bucket() -> S3BucketBlock {
-	S3BucketBlock::new("site").with_deploy_versioned(false)
+/// The one bucket an app is served from: a per-stage replica of the checkout, so
+/// everything the binary reads (the entry, the routes, the assets) is one store.
+/// Non-versioned so `sync` overwrites in place and the running binary reads a
+/// stable root.
+pub fn app_bucket() -> S3BucketBlock {
+	S3BucketBlock::new("app").with_deploy_versioned(false)
 }
 
-/// The resolved name of the site bucket for this stack, ready to inject so the
+/// The resolved name of the app bucket for this stack, ready to inject so the
 /// deployed binary reconstructs the same store. Deterministic for a given stack
 /// (the `resource_ident`, independent of the per-deploy id), so a throwaway stack
 /// rebuilt from the same `app_name` resolves the same bucket.
-pub fn site_bucket_name(stack: &Stack) -> String {
-	site_bucket().store(stack).bucket_name().to_string()
+pub fn app_bucket_name(stack: &Stack) -> String {
+	app_bucket().store(stack).bucket_name().to_string()
 }
 
 /// The deployed generic `beet` binary's [`BootstrapConfig`] for serving the site
@@ -62,13 +64,14 @@ pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 }
 
 /// Sync `examples/bsx_site` (the no-code site) to the bucket root, the content every
-/// infra example serves.
+/// infra example serves. A mirror, so a renamed or removed source file does not
+/// linger in the bucket across deploys.
 pub fn sync_site(stack: &Stack) -> impl Bundle + use<> {
 	(
 		S3FsStore::new(
 			FsStore::new(WsPathBuf::new("examples/bsx_site")),
-			site_bucket().store(stack),
+			app_bucket().store(stack),
 		),
-		SyncS3BucketAction,
+		SyncS3Bucket::default().with_delete(true),
 	)
 }

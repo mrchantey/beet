@@ -31,11 +31,13 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 	// session + address from the beacon request headers (before consuming the body).
 	let session = analytics_ext::session_from_cookies(request.headers());
 	let ip = analytics_ext::client_ip(request.headers());
+	// the database rides the `AnalyticsConfig` entity, so it resolves by the same
+	// ancestry walk as the config below.
 	let country = ip
 		.zip(
 			world
-				.with(|world: &mut World| {
-					world.get_resource::<GeoIp>().cloned()
+				.with_state::<AncestorQuery<&GeoIp>, Option<GeoIp>>(move |query| {
+					query.get(caller_id).ok().cloned()
 				})
 				.await,
 		)

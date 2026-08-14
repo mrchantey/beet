@@ -75,14 +75,6 @@ pub struct FargateBlock {
 	#[serde(default)]
 	#[set_with(skip)]
 	secret_env: Vec<(SmolStr, SmolStr)>,
-	/// The public-read assets bucket the deployed container serves `/assets` from.
-	///
-	/// Deliberately not a [`BootstrapConfig`] field: the store-topology phase
-	/// deletes the `AssetsStore` that reads it, at which point the app bucket
-	/// physically contains `assets/` and there is no assets name on any transport.
-	#[serde(default)]
-	#[set_with(unwrap_option, into)]
-	assets_bucket: Option<SmolStr>,
 	/// DNS + HTTPS configuration, one entry per hostname the NLB answers. When
 	/// non-empty, a single ACM certificate is provisioned covering every
 	/// authority (the first is the cert's primary domain, the rest are subject
@@ -139,7 +131,6 @@ impl Default for FargateBlock {
 			env_vars: Vec::new(),
 			bootstrap: default(),
 			secret_env: Vec::new(),
-			assets_bucket: None,
 		}
 	}
 }
@@ -514,7 +505,7 @@ impl Block for FargateBlock {
 			},
 		);
 
-		// IAM task role (runtime S3 + DynamoDB access, ie the site bucket and the
+		// IAM task role (runtime S3 + DynamoDB access, ie the app bucket and the
 		// analytics table), stack-prefixed for the same reason.
 		let task_role = terra::ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("task-role")),
@@ -569,10 +560,6 @@ impl Block for FargateBlock {
 		// third-party conventions the block emits directly; not beet config.
 		env_vars.insert("RUST_LOG".into(), "info".into());
 		env_vars.insert("AWS_REGION".into(), region.to_string());
-		// interim, dies with the store-topology phase: see `assets_bucket`.
-		if let Some(bucket) = &self.assets_bucket {
-			env_vars.insert("BEET_ASSETS_BUCKET".into(), bucket.to_string());
-		}
 		// env_vars as terraform variable references
 		for variable in &self.env_vars {
 			env_vars
@@ -1127,9 +1114,13 @@ mod tests {
 			.xpect_contains(
 				r#"\"name\":\"BEET_ANALYTICS_TABLE\",\"value\":\"beet--dev--analytics\""#,
 			)
-			// entry-store selection rides argv (the image CMD), never env
+			// entry-store selection rides argv (the image CMD), never env, and the
+			// one app bucket is the only store there is: no second bucket name
+			// reaches the container.
 			.xnot()
-			.xpect_contains("BEET_STORE");
+			.xpect_contains("BEET_STORE")
+			.xnot()
+			.xpect_contains("BEET_ASSETS_BUCKET");
 	}
 
 	/// Boot selection rides the container `CMD` as a real JSON array, and the

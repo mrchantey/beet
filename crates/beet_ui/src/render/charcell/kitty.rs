@@ -929,7 +929,7 @@ mod test {
 	// ── item 9: the folk-technology blog post image ────────────────────────────
 	// The real committed asset `<img src="/assets/blog/kiama-sea-shanty-club.jpg">`
 	// references. Outside the crate, under the workspace `assets/`; absent on a
-	// fresh checkout until `just pull-assets`, so the asset tests skip when missing.
+	// fresh checkout until `just beet-shared pull`, so the asset tests skip when missing.
 
 	/// The site-rooted src of the folk-technology post image.
 	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]

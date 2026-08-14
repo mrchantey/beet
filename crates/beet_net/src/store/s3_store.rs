@@ -2,6 +2,7 @@ use crate::prelude::*;
 use aws_config::Region;
 use aws_sdk_s3::Client;
 use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_bucket::HeadBucketError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::prelude::*;
@@ -307,12 +308,27 @@ impl BlobStoreProvider for S3Store {
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
-			let get_result = client
+			// a missing key is a miss, not a failure: the served 404 is the whole
+			// difference between a static host and a broken one.
+			let get_result = match client
 				.get_object()
 				.bucket(this.bucket_name.as_str())
 				.key(&key)
 				.send()
-				.await?;
+				.await
+			{
+				Ok(get_result) => get_result,
+				Err(SdkError::ServiceError(service_err))
+					if let GetObjectError::NoSuchKey(_) = service_err.err() =>
+				{
+					return Err(HttpError::new(
+						StatusCode::NOT_FOUND,
+						format!("object not found: {key}"),
+					)
+					.into());
+				}
+				Err(err) => return Err(err.into()),
+			};
 			get_result.body.collect().await?.into_bytes().xok()
 		})
 	}

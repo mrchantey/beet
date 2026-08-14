@@ -57,7 +57,7 @@ impl Plugin for CliCommandsPlugin {
 			"FargateBeetSiteBlock",
 			"CloudflareZoneSetup",
 			"CloudflarePurgeCache",
-			"SiteBucket",
+			"AppBucket",
 			"AssetsBucket",
 			"BeetBinaryBuild",
 			"TofuApplyAction",

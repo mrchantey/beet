@@ -20,9 +20,12 @@ logging, `--help`, terminal link navigation, the layout, and the cache policy:
 `CacheHeadersMiddleware` + `CacheHeaders` mark html pages edge-cacheable, which
 the Cloudflare proxy honors and the deploy/sync purge refreshes).
 `<DefaultAppRoutes/>` adds the default app routes (`/app-info`, the reactivity
-runtime, …), `<RoutesDir/>` discovers the `routes/` pages, and `<ServeBlobs
-prefix="assets" cache="1h"/>` mounts the workspace assets the site and blog
-reference (the favicon, images), browser-cacheable for an hour. `<Theme
+runtime, …), `<RoutesDir/>` discovers the `routes/` pages, and `<AssetsDir
+src="assets" cache="1h"/>` mounts the assets the site and blog reference (the
+favicon, images), browser-cacheable for an hour. It is one plain subdir of the
+site store: in dev `site/assets` is a committed symlink to the workspace
+`assets/` (hydrated by `just beet-shared pull`), and the deploy replicates it
+into the app bucket, so the store path is the same either side. `<Theme
 color=.../>` seeds the brand colour the whole Material palette derives from, and
 `<Styles/>` registers the named style rules in `templates/Styles.bsx`.
 
@@ -39,6 +42,6 @@ while the serve definition is shared from here.
 	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
-	<ServeBlobs prefix="assets" cache="1h" {AssetsStore}/>
+	<AssetsDir src="assets" cache="1h"/>
 </Router>
 </StartOnLoad>

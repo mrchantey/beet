@@ -25,7 +25,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 	<Route path="deploy" {ExchangeSequence}>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailSiteBlock app_name="lightsail" features="aws_sdk"/>
-		<SiteBucket/>
+		<AppBucket/>
 		<TofuApplyAction/>
 		<SiteSync app_name="lightsail"/>
 		<LightsailWatch app_name="lightsail" timeout="30s"/>

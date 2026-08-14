@@ -47,6 +47,16 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::CloudflareZoneSetup>()
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
+		// the bucket sync settings (`<DirSync direction="pull" delete=true/>`), and
+		// the direction enum a markup attribute names by variant.
+		#[cfg(all(
+			feature = "deploy",
+			feature = "aws_sdk",
+			not(target_arch = "wasm32")
+		))]
+		app.register_type::<crate::prelude::SyncS3Bucket>()
+			.register_type::<beet_net::prelude::SyncDirection>();
+
 		// the full-lifecycle smoke-test action: reads a bucket's `BlobStore` (so
 		// `aws_sdk`-gated like the store) and lives in the `actions` module (so
 		// `deploy`-gated and native-only). Register it only when all three compile it.

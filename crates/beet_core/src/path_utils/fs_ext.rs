@@ -94,6 +94,31 @@ pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	}
 }
 
+/// Whether `path` holds no entries. A missing path reads as empty, so a caller
+/// guarding against mirroring nothing treats "absent" and "present but bare" the
+/// same.
+pub fn is_dir_empty(path: impl AsRef<Path>) -> FsResult<bool> {
+	match exists(&path)? {
+		true => ReadDir::all(&path).map(|entries| entries.is_empty()),
+		false => Ok(true),
+	}
+}
+
+/// Whether `path` is a symbolic link, without following it. Always false on
+/// wasm, which has no link metadata.
+pub fn is_symlink(path: impl AsRef<Path>) -> bool {
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			let _ = path;
+			false
+		} else {
+			fs::symlink_metadata(path)
+				.map(|meta| meta.file_type().is_symlink())
+				.unwrap_or(false)
+		}
+	}
+}
+
 /// Async version of [`exists`].
 pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]

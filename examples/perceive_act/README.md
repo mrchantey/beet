@@ -20,7 +20,7 @@ cycle 3: acted in 0.10s (show-image 0.07s | speak-text 0.10s | drive 0.07s)
 
 - The beet cli with the listed features, ie `cargo install --path crates/beet-cli --all-features` (each entry declares its requirements with `<CrateCheck>` and the command's `--features` verifies them, so a leaner install fails fast with the missing list).
 - `OPENAI_API_KEY` in `.env` (loaded automatically), used by the agent.
-- Assets: `just pull-assets`, for the floor-photo fixtures, the fox model, and the perceive-act scene face images.
+- Assets: `just beet-shared pull`, for the floor-photo fixtures, the fox model, and the perceive-act scene face images.
 - Optional: the kokoro `tts` command on `PATH` for spoken audio. Without it, speech is logged and skipped.
 
 ## v1: mock head and body
