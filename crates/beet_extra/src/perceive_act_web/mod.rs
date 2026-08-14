@@ -2,15 +2,19 @@
 //!
 //! A `web`-feature wasm binary serves this to a browser tab, where it connects back to
 //! the perceive-act agent's socket server as the `head` client (mirroring the desktop
-//! `<MockHead>`) and serves the head capabilities from the browser: [`TakePhoto`] from
-//! the real webcam, [`SpeakText`] via the Web Speech API, and [`ShowImage`] as a
+//! `<MockHead>`) and serves the head capabilities from the browser: [`WebTakePhoto`] from
+//! the real webcam, [`WebSpeakText`] via the Web Speech API, and [`ShowImage`] as a
 //! rendered `<img>` face. The agent forwards each capability over the socket, so the
 //! In/Out wire types match its `perceive_act` definitions.
 //!
 //! This module is deliberately independent of the `thread`-gated `perceive_act` module
-//! (which pulls the native LLM `beet_thread`, absent from a wasm build): it needs only
-//! the `web` base (`Socket`/`ExchangeSocket`/`Router`/`#[action]`) plus the browser
-//! web-sys APIs. The shared wire types + client primitives come from `perceive_act_core`.
+//! (which pulls the LLM agent `beet_thread`): it needs only the `web` base
+//! (`Socket`/`ExchangeSocket`/`Router`/`#[action]`) plus the browser web-sys APIs. The
+//! shared wire types + client primitives come from `perceive_act_core`.
+//!
+//! The `Web` prefix is load-bearing: a kitchen-sink wasm build (`web_full`) compiles
+//! both modules, so the browser capabilities and the desktop ones must not share a
+//! type name — one prelude, and markup resolves a tag by short type path.
 // the wire types (`DisplayedImage`, the tool inputs) + client primitives (`WhoAmI`,
 // `ClientRole`, `PersistentSocket`), mirrored once in `perceive_act_core` and shared
 // with the native agent, so the head does not redefine them.

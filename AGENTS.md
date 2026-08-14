@@ -164,7 +164,7 @@ async_ext::do_async_thing().await;
 - Install the beet cli via `cargo install --path crates/beet-cli --all-features`.
 - `--main` accepts an entry file (`--main=examples/hello/main.bsx`) or a directory probed for `main.bsx` (`--main=examples/hello`); with no `--main` discovery walks the cwd and its ancestors.
 - An entry that mounts paths outside its own directory declares `<StoreRoot src="../.."/>` (there is no `--root` flag), and declares its required features with `<CrateCheck features="thread,sockets"/>`.
-- There are two browser binaries, built by `just build-wasm-min` (`assets/wasm/beet-min.wasm`, the default a page mounts) and `just build-wasm-full` (`assets/wasm/beet-full.wasm`, min plus the embedded QuickJS engine). Their feature sets are the `web_min`/`web_full` features in `crates/beet-cli/Cargo.toml`; `build-wasm` itself is target-agnostic, so package/features/out are always explicit, never defaulted to a beet binary.
+- Two browser binaries bracket the range: `just build-wasm-min` (`assets/wasm/beet-min.wasm`, the smallest binary that is still a beet runtime in the browser) and `just build-wasm-full` (`assets/wasm/beet-full.wasm`, the kitchen sink: every feature a browser binary can boot with, the render stack excepted). Their feature sets are `web_min`/`web_full` in `crates/beet-cli/Cargo.toml`, whose comments carry the exclusions and why; narrower sets in between get their own artifact rather than widening `min`. `build-wasm` itself is target-agnostic, so package/features/out are always explicit, never defaulted to a beet binary.
 
 ## Bevy Cheatsheet
 

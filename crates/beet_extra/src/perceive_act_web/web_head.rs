@@ -37,7 +37,7 @@ pub fn WebHead(
 		ExchangeSocket::json(),
 		Router,
 		ClientRole(SmolStr::new("head")),
-		children![WhoAmI, TakePhoto, SpeakText, ShowImage],
+		children![WhoAmI, WebTakePhoto, WebSpeakText, ShowImage],
 	));
 }
 

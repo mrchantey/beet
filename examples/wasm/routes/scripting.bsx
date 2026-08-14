@@ -1,10 +1,11 @@
 <!--
-The scripting page, booting `beet-full.wasm`: the same browser surface as `/` plus
-the embedded QuickJS engine, so the JavaScript in `examples/action/scripting.bsx`
-runs in-process with no host realm to reach. The engine is also what registers
-`<NumberScript>`/`<TextScript>` (beet_extra's `scripting` feature), so this program
-only resolves on the full build. Build it with `just build-wasm-full`; until then
-the page loads and the module fetch 404s.
+The scripting page, booting `beet-full.wasm`: the ceiling of the browser feature
+range, ie every feature a browser binary can boot with, from the example surface and
+the perceive-act head through the agent thread runtime to the embedded JavaScript
+engine. This page runs a program the floor cannot: `examples/action/scripting.bsx`,
+whose leaves are JavaScript, needs both the engine and the `<NumberScript>` /
+`<TextScript>` templates that ride it. Build it with `just build-wasm-full`; until
+then the page loads and the module fetch 404s.
 
 Structurally identical to `/` (a full `<HtmlDocument>`, `<RenderConsole>` before
 `<Wasm>` so the console wrap installs first), differing only in which artifact and
@@ -23,9 +24,10 @@ which program it names.
 		no fetch, no host globals, no page. Its console output renders below.
 	</p>
 	<p>
-		The <a href="/">home page</a> boots <code>beet-min.wasm</code>, which omits the
-		engine (and with it these script tags), so a script there would run in a
-		sandboxed iframe instead.
+		This binary is the kitchen sink, so it also carries everything else that
+		compiles for the browser. The <a href="/">home page</a> boots the other end of
+		the range, <code>beet-min.wasm</code>, which carries the runtime and nothing
+		more.
 	</p>
 	<RenderConsole/>
 	<MainBsx src="/examples/action/scripting.bsx"/>

@@ -55,7 +55,7 @@ The head is a web page opened on the phone. The tab connects to the agent and se
 	<h2>Head log</h2>
 	<RenderConsole/>
 	<MainBsx src="/examples/perceive_act/head/head.bsx"/>
-	<Wasm src="/assets/wasm/beet-min.wasm"/>
+	<Wasm src="/assets/wasm/beet-full.wasm"/>
 </HtmlDocument>
 ```
 

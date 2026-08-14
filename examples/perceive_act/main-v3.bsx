@@ -9,11 +9,12 @@ face). A device body (eg the esp Alvik) can connect for `drive`; none runs here.
 Two servers in one process, each a child of its own root, both bound to
 all interfaces so a phone on the LAN can load the head page and connect back: the agent's
 `SocketServer` (all interfaces by default) on `:8338`, and the head `HttpServer` (all
-interfaces via its `host` field) on `:8337`. Install the default browser binary once
-(`assets/wasm/beet-min.wasm`, whose `web_head` half is this head), then run both
-servers (the socket and http servers both default-boot, so no --server flag is needed):
+interfaces via its `host` field) on `:8337`. The head capabilities ride the `web_head`
+feature, which today lives only in the kitchen-sink browser binary, so install that
+once, then run both servers (the socket and http servers both default-boot, so no
+--server flag is needed):
 
-    just build-wasm-min
+    just build-wasm-full
     beet --main=examples/perceive_act/main-v3.bsx
     # for running on esp32, cd ../beet_esp and load
     beet load templates/alvik/perceive-act-body.bsx
@@ -43,7 +44,7 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 		<DefaultAppRoutes/>
 		<RoutesDir src="examples/perceive_act/head/routes"/>
 		<!-- the workspace assets tree at /assets: the wasm binary the pages boot
-		     (/assets/wasm/beet-min.wasm) and the scene face images the head renders
+		     (/assets/wasm/beet-full.wasm) and the scene face images the head renders
 		     (/assets/extra/perceive-act/explorer/images/joy.png). The examples tree at
 		     /examples serves the head program the browser fetches. -->
 		<AssetsDir src="assets" prefix="assets"/>

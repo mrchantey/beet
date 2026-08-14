@@ -1,4 +1,4 @@
-//! `TakePhoto`: the browser head's webcam capture, `In = ()`, `Out = MediaBytes`.
+//! `WebTakePhoto`: the browser head's webcam capture, `In = ()`, `Out = MediaBytes`.
 //!
 //! Serves the same `take-photo` route the desktop head does, but from the real
 //! webcam. The `<video id="webcam">` element is declared in the page markup (visible on
@@ -19,7 +19,7 @@ use web_sys::MediaStreamConstraints;
 #[action(route = "take-photo")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn TakePhoto(_cx: ActionContext<()>) -> Result<MediaBytes> {
+pub async fn WebTakePhoto(_cx: ActionContext<()>) -> Result<MediaBytes> {
 	capture_webcam().await
 }
 

@@ -1,4 +1,4 @@
-//! `SpeakText`: the browser head's spoken voice, `In = SpeakTextInput`, `Out = ()`.
+//! `WebSpeakText`: the browser head's spoken voice, `In = SpeakTextInput`, `Out = ()`.
 //!
 //! Serves the same `speak-text` route the desktop head does, but through the Web
 //! Speech API instead of a `tts` subprocess: `speechSynthesis.speak(new
@@ -13,9 +13,9 @@ use web_sys::SpeechSynthesisUtterance;
 #[action(route = "speak-text")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn SpeakText(cx: ActionContext<SpeakTextInput>) -> Result<()> {
+pub async fn WebSpeakText(cx: ActionContext<SpeakTextInput>) -> Result<()> {
 	let line = cx.input.text;
-	info!("SpeakText: {line}");
+	info!("WebSpeakText: {line}");
 	if let Err(err) = speak(&line) {
 		warn!("could not speak: {err:?}");
 	}

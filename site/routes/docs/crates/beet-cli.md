@@ -10,7 +10,7 @@ title = "beet-cli"
 |---|---|
 | `serve` | Serve a no-code site over http/tui/ssh |
 | `run-wasm` | Cargo runner for `wasm32-unknown-unknown` targets |
-| `build-wasm` | Build a package for the browser (eg the `beet-min`/`beet-full` binaries) |
+| `build-wasm` | Build a package for the browser (eg the `beet-min`/`beet-full` browser binaries) |
 | `export-static` | Write a site's static `dist/` |
 | `export-pdf` | Render a route to PDF |
 | `qrcode` | Generate a QR code (`qrcode` feature) |

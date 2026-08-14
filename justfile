@@ -276,17 +276,19 @@ test-wasm-feat crate *args:
 test-wasm-e2e crate test_name *args:
 	just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
 
-# The default browser binary (assets/wasm/beet-min.wasm): every example surface plus
-# the perceive-act head, with no embedded JavaScript engine, so a script it runs
-# reaches the sandboxed-iframe backend instead. This is the artifact a page mounts
-# unless it says otherwise. Needs `just install-cli`.
+# The floor (assets/wasm/beet-min.wasm): the smallest binary that is still a beet
+# runtime in the browser, the `web` base and nothing else. A page whose program uses
+# only the core vocabulary mounts this. Needs `just install-cli`.
 build-wasm-min:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=assets/wasm/beet-min.wasm
 
-# The engine-bearing browser binary (assets/wasm/beet-full.wasm): beet-min plus the
-# embedded QuickJS engine, so a script runs in-process. Slower to build (the C engine
-# downloads a wasi sysroot on the first run) and a much larger artifact, so it is
-# opt-in: only a page that wants the embedded engine mounts it, eg /scripting.
+# The ceiling (assets/wasm/beet-full.wasm): every feature a browser binary can boot
+# with, ie the example surface, the perceive-act head, the thread runtime, the tui
+# host, infra definitions and the embedded JavaScript engine. The render stack
+# (winit/bevy_default/ml) is the one exclusion, since it does not boot in a tab yet;
+# see the `web_full` comment in crates/beet-cli/Cargo.toml. Slower to build (the JS
+# engine's wasi sysroot downloads once) and twice the artifact, so a page mounts it
+# only when its program needs more than the floor.
 build-wasm-full:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=assets/wasm/beet-full.wasm
 
@@ -294,7 +296,7 @@ build-wasm-full:
 # to run a headless beet program (examples/wasm/hello.bsx) in the browser; its
 # console output renders on the page via <RenderConsole>. The entry roots at the
 # workspace (<StoreRoot>) so the served examples are reachable and --watch
-# live-reloads on edit. Its /scripting page mounts beet-full.wasm, so run
+# live-reloads on edit. Its /scripting page mounts the full binary, so run
 # `just build-wasm-full` once to serve that page too.
 serve-wasm *args:
 	just build-wasm-min

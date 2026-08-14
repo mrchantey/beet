@@ -41,12 +41,14 @@ beet --main=examples/perceive_act/main-v2.bsx
 
 ## v3: browser head
 
-No in-process clients. A second HTTP server serves a wasm browser head that connects back over the socket, serving the real webcam, Web Speech, and a rendered face. Install the default browser binary once (`assets/wasm/beet-min.wasm`, whose `web_head` half is this head), then run both servers:
+No in-process clients. A second HTTP server serves a wasm browser head that connects back over the socket, serving the real webcam, Web Speech, and a rendered face. The head capabilities ride the `web_head` feature, which today ships only in the kitchen-sink browser binary (`assets/wasm/beet-full.wasm`), so install that once, then run both servers:
 
 ```sh
-just build-wasm-min
+just build-wasm-full
 beet --main=examples/perceive_act/main-v3.bsx
 ```
+
+That build is the ceiling of the browser feature range (the whole example surface, the agent runtime, the JavaScript engine), so it is far larger and slower to build than this head needs. A head-sized artifact is the obvious next narrowing: `beet build-wasm --release --package=beet-cli --bin=beet --features=web_head --out=assets/wasm/beet-head.wasm`, with the two head pages' `<Wasm src>` pointed at it.
 
 Both servers bind all interfaces, so any device on the LAN works: open `https://<this-host>:8337` (or plain `http://127.0.0.1:8337` locally) and grant camera access; the head derives the agent's socket url from the page location. The `/debug` route shows the webcam, face, and log on one page. All socket clients reconnect with exponential backoff, so the page survives an agent restart.
 

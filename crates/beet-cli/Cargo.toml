@@ -126,17 +126,43 @@ web_examples = ["web", "extra"]
 # the separate native binary serving this head over a socket). Build with:
 # `beet build-wasm --package=beet-cli --bin=beet --features=web_head --out=<path>.wasm`.
 web_head = ["web", "beet/perceive_act_web"]
-# `beet-min.wasm`: the browser binary a page mounts by default, ie every example
-# surface (`web_examples`) plus the perceive-act head (`web_head`) and no embedded
-# JavaScript engine. A script run from this build reaches the host realm instead,
-# through the sandboxed-iframe backend, which is why the fallbacks exist. Build with:
-# `just build-wasm-min`.
-web_min = ["web_examples", "web_head"]
-# `beet-full.wasm`: `web_min` plus the embedded QuickJS engine, so a script runs
-# in-process with zero ambient authority rather than in a host-realm sandbox. Costs
-# the engine's bytes and a C toolchain (its wasi sysroot is downloaded once), so it is
-# the opt-in artifact rather than the default. Build with: `just build-wasm-full`.
-web_full = ["web_min", "beet/quickjs"]
+# `beet-min.wasm`, the floor: the smallest binary that is still a beet runtime in
+# the browser, ie the `web` base and nothing else. It boots, reads its program from
+# the DOM and runs it, so a page whose program sticks to the core vocabulary
+# (`<Sequence>`, `<Log>`, `CallOnLoad`) mounts this. Anything a program names beyond
+# that needs a larger set. Build with: `just build-wasm-min`.
+web_min = ["web"]
+# `beet-full.wasm`, the ceiling: every feature a browser binary can actually boot
+# with, so any `.bsx` whose types are wasm-safe runs from it — the example surface,
+# the perceive-act head, the agent thread runtime, the charcell tui host, the infra
+# block definitions, and the embedded JavaScript engine.
+# Three exclusion groups, each for its own reason:
+# - `winit`/`ml`/`bevy_default`: the render stack does not boot in a browser tab yet,
+#   verified both ways. With `winit`, `BeetPlugins` picks the winit runner (wasm has
+#   no `DISPLAY` concept, so `has_display()` is `true`), which owns the event loop and
+#   never returns to the awaited `start()`, hanging the tab. Without it, the headless
+#   runner is `MinimalPlugins`, so the asset-dependent plugins `bevy_default` switches
+#   on panic at boot on a missing `AssetServer`. Both need a wasm windowed-boot path,
+#   not a feature list.
+# - `cloudflare`: a different artifact entirely (the Worker `cdylib`), not a browser
+#   binary.
+# - `net`/`sockets`/`secure`/`ssh`/`aws_sdk`/`lambda` (the native transports, gated
+#   away in beet_net on wasm) and `qrcode`/`pdf` (whose deps sit in this manifest's
+#   own `not(wasm32)` table): all compile, and all add exactly zero packages to the
+#   wasm graph, so naming them would claim a capability the artifact does not have.
+# Between the two ends is where narrower sets belong (a head-only build, a render
+# build once one boots); add them as artifacts of their own rather than widening
+# `min`.
+web_full = [
+	"web_min",
+	"web_examples",
+	"web_head",
+	"tui",
+	"thread",
+	"infra",
+	"geoip",
+	"beet/quickjs",
+]
 
 # the portable cross-platform base: the render router stack, media negotiation and
 # the runtime BSX parser the no-code site needs, on both native and wasm. beet's
