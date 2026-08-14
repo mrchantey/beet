@@ -39,7 +39,9 @@ hostnames are proxied and edge-cached, ssh (and future live apps) ride the
 DNS-only `app.beet.org` / `app.dev.beet.org` hostnames straight to the NLB,
 `<CloudflareZoneSetup/>` converges the zone-level edge config (cache ruleset,
 strict TLS), and every deploy or sync ends with a `<CloudflarePurgeCache/>` so
-content changes are live at the edge immediately. The deploy routes hang off a stack-bearing
+content changes are live at the edge immediately. On the deploy route the purge
+comes *after* `<FargateWatch/>`, since purging while the old tasks still serve
+just re-caches the old responses for the full edge TTL. The deploy routes hang off a stack-bearing
 `<BeetSiteDeployHost>` so they resolve a `Stack` by ancestry without a second
 server. `--stage=prod` targets production (apex `beet.org` + `www`); the default
 `dev` stage publishes only `dev.beet.org`.
@@ -84,8 +86,8 @@ plus `tofu`, `cargo-zigbuild` and a container engine.
 			<BuildDockerImage/>
 			<DirSync app_name="beet-site" bucket="app" local_dir="site" follow_symlinks=true delete=true/>
 			<CloudflareZoneSetup/>
-			<CloudflarePurgeCache/>
 			<FargateWatch app_name="beet-site" timeout="300s"/>
+			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="sync" {ExchangeSequence}>
 			<DirSync app_name="beet-site" bucket="app" local_dir="site" follow_symlinks=true delete=true/>

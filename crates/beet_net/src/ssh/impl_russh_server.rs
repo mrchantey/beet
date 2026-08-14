@@ -225,8 +225,11 @@ impl RusshServer for BeetSshApp {
 		&mut self,
 		error: <Self::Handler as russh::server::Handler>::Error,
 	) {
-		// UnexpectedEof is normal when a client disconnects abruptly.
+		// a client going away is normal, whether it says goodbye (`Disconnect`)
+		// or just drops the socket (`UnexpectedEof`); neither is an error, and
+		// logging them as one buries real faults in a deployed service's logs.
 		match &error {
+			russh::Error::Disconnect => debug!("SSH client disconnected"),
 			russh::Error::IO(e)
 				if e.kind() == std::io::ErrorKind::UnexpectedEof =>
 			{

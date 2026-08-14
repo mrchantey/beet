@@ -17,7 +17,7 @@ The deploy block is stage-aware (`FargateBeetSiteBlock`, `crates/beet_extra/src/
 - `dev` stage publishes ONLY `dev.beet.org`.
 - `prod` stage publishes the apex `beet.org` + `www.beet.org`.
 
-Both serve html over http AND a multi-tenant live terminal over ssh; the whole site (`site/main.bsx`, `routes/`, `templates/`, plus the `assets/` bucket) is read from S3 by the generic `beet` binary at runtime. The deployed binary is built with `--features aws_sdk,ssh` (see `<BeetBinaryBuild features="aws_sdk,ssh"/>` in `main.bsx`), so the served site includes the ssh terminal. `aws_sdk` alone would serve http only.
+Both serve html over http AND a multi-tenant live terminal over ssh. The generic `beet` binary reads the whole site from ONE bucket at runtime, the per-stage app bucket `beet-site--<stage>--app`: `main.bsx`, `routes/`, `templates/` and `assets/` all live in it, the last arriving through the committed `site/assets -> ../assets` symlink the deploy sync follows. No deployed binary reads `beet-site--shared--assets`; that bucket is the developers' source of record, owned by `just beet-shared pull|push` and untouched by any stage deploy. The deployed binary is built with `--features aws_sdk,ssh,geoip` (see `<BeetBinaryBuild features="aws_sdk,ssh,geoip"/>` in `main.bsx`), so the served site includes the ssh terminal and country lookups. `aws_sdk` alone would serve http only.
 
 ## Commands
 
@@ -59,10 +59,13 @@ The counter (`site/routes/docs/design/counter.bsx`) is a reactive page: a "More"
 
 A reusable script lives at `.agents/tmp/deploy-verify/verify_client.js <BASE_URL>` (built and shaken out during the Local step); it runs everything below and exits non-zero on any client error or overflow. The checks:
 
-**Client errors (fail on any).** Before navigating, attach two collectors and fail the step if either fires, so a broken client script cannot ship silently -- exactly the miss that let `crypto.randomUUID is not a function` reach the analytics beacon in production:
+**Client errors (fail on any).** Before navigating, attach three collectors and fail the step if any fires, so a broken client script cannot ship silently -- exactly the miss that let `crypto.randomUUID is not a function` reach the analytics beacon in production:
 
 - `page.on('pageerror', ...)` -- uncaught exceptions.
 - `page.on('console', msg => msg.type() === 'error')` -- `console.error` plus failed-request console messages.
+- `page.on('response', res => res.status() >= 400)` -- any failed subresource. A favicon that fails to load raises no console error, so without this a site whose every asset 403s still reports `client OK`.
+
+**Asset sweep.** Load a page that actually carries an image (`/blog/post-6`), collect every `/assets/` reference on it (`img[src]`, `link[href]`, `script[src]`, `source[src]`), fetch each following redirects, and assert 200. This is the store-topology check: the app serves assets from its own bucket, and a private bucket handing out a public url turns every asset into a redirect to a 403. Both this and the response collector were added after exactly that shipped past a green run (`S3Store::public_url` claimed a virtual-hosted url for a private bucket; it now returns `None` unless the store is explicitly `with_public(true)`).
 
 Ignore nothing by default; if a message is genuinely benign, match it exactly and log that it was skipped. CAVEAT: some faults only surface in an insecure context -- `crypto.randomUUID`/`crypto.subtle` are gated to secure contexts, and localhost + `https://` are both secure, so this check does NOT reproduce that specific bug. The durable fix is keeping secure-context-only APIs out of the client (the beacon now derives its id from `crypto.getRandomValues`, available on plain http); the collectors still catch the broad class of client JS errors on every env.
 
@@ -122,7 +125,7 @@ Recipe (run around the b-d checks so the delta is attributable):
    - the total went UP (new events recorded) and is `>=` the baseline (prior events retained, since the store is append/upsert, never truncated).
    - `PageView` events for the visited paths appear under `pages` (eg `/docs/design/counter`).
    - both client kinds are present under `client kinds`: `Web` (the http/playwright visits) and `Terminal` (the ssh session).
-   - for dev/prod (geoip enabled in the deploy build), a country appears under `countries` for the web visits. CAVEAT: the geoip database (`assets/databases/country.mmdb`, ~8MB) is gitignored, so it only reaches a bucket via the asset sync's filesystem walk. A long-lived prod bucket retains it across deploys and populates countries; a BRAND-NEW bucket (a fresh dev stack) may report empty `countries` on its first run even though everything else works. Treat empty countries on a fresh dev stack as a non-blocking known gap (confirm the site + multi-tenancy are otherwise green); on prod, expect countries to populate, and if they do not, verify `country.mmdb` is present under `s3://beet-site--shared--assets/databases/` (the `shared`-stage assets bucket both stages read).
+   - for dev/prod (geoip enabled in the deploy build), a country appears under `countries` for the web visits. The geoip database (`assets/databases/country.mmdb`, ~8MB) is gitignored, so it reaches the app bucket only through the deploy's `site/assets` symlink walk from a hydrated checkout: run `just beet-shared pull` before deploying, and if `countries` is empty verify `country.mmdb` is present under `s3://beet-site--<stage>--app/assets/databases/`. Since the app bucket carries the assets, a brand-new dev stack now populates countries on its first run like prod does.
 
 An automated in-process version of the web half of this flow (http request -> request event, beacon -> page view, prior events retained, the beacon endpoint skipped) lives in `tests/beet_site_analytics.rs`; run it with `cargo test --test beet_site_analytics --features "router,json,fs,testing"` for a fast pre-deploy check of the wiring. The terminal page-view path is unit-tested in `beet_router/src/navigate/navigator.rs`.
 
@@ -160,6 +163,8 @@ just beet-deploy --stage=prod
 
 Run the full verification (a-e) against `https://beet.org` (and confirm `https://www.beet.org` serves too; ssh on `app.beet.org` port 22). LEAVE PROD UP. Teardown, if ever needed, is `just beet-destroy --stage=prod`.
 
-## First-run / migration note
+## Before any deploy
 
-Historically the dev stack published all three hostnames, so `beet.org`, `www`, and `dev.beet.org` currently resolve to the DEV NLB. The first run of this process migrates the apex to prod: Step 2's dev deploy drops the apex from the dev stack (a brief `beet.org` outage), Step 2's destroy removes the dev stack, and Step 3 recreates `beet.org` + `www` on the prod stack. Expect `beet.org` to be down between the dev deploy and the prod deploy completing. If the prod plan reports the apex records already exist (stale), delete or import them before applying. Never run with `--stage=prod` except in Step 3.
+1. **Hydrate the assets** (`just beet-shared pull`). The site sync mirrors `site/` with `delete=true` and follows the `site/assets` symlink, so it publishes whatever the checkout holds. `SyncS3Bucket::assert_mirrorable` refuses a missing or empty symlinked child rather than emptying the bucket, but a *stale* tree syncs happily and silently ships old assets.
+2. **Accepted rollout window.** `TofuApplyAction` rolls the new task definition before `DirSync` fills the bucket, so the first tasks may briefly serve misses. `FargateWatch` covers rollout health; re-check the site after the deploy returns, not during.
+3. Never run with `--stage=prod` except in Step 3.

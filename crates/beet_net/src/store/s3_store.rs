@@ -24,6 +24,12 @@ pub struct S3Store {
 	/// set (with path-style addressing) targets an S3-compatible service such as
 	/// Cloudflare R2. See [`S3Store::r2`].
 	endpoint: Option<SmolStr>,
+	/// Whether the bucket's objects are anonymously readable at their url, so a
+	/// static-file route may redirect a visitor straight to the bucket instead of
+	/// streaming the bytes. Buckets are private unless a policy says otherwise,
+	/// so this is `false` by default: claiming a url the bucket will not serve
+	/// turns every static file into a redirect to a 403.
+	public: bool,
 }
 
 #[cfg(feature = "json")]
@@ -44,6 +50,7 @@ impl S3Store {
 			region: region.into(),
 			subdir: None,
 			endpoint: None,
+			public: false,
 		}
 	}
 
@@ -71,6 +78,15 @@ impl S3Store {
 	/// an S3-compatible service (eg Cloudflare R2, MinIO).
 	pub fn with_endpoint(mut self, endpoint: impl Into<SmolStr>) -> Self {
 		self.endpoint = Some(endpoint.into());
+		self
+	}
+
+	/// Declare the bucket's objects anonymously readable, so
+	/// [`BlobStoreProvider::public_url`] hands out its url and a static-file route
+	/// redirects to the bucket rather than streaming through the app. Only true
+	/// when a bucket policy (or an R2 custom domain) actually grants public read.
+	pub fn with_public(mut self, public: bool) -> Self {
+		self.public = public;
 		self
 	}
 
@@ -137,6 +153,7 @@ impl BlobStoreProvider for S3Store {
 				None => path,
 			}),
 			endpoint: self.endpoint.clone(),
+			public: self.public,
 		})
 	}
 
@@ -383,6 +400,11 @@ impl BlobStoreProvider for S3Store {
 		&self,
 		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
+		if !self.public {
+			// a private bucket has no anonymous url, so the caller streams the
+			// bytes rather than redirecting a visitor into a 403.
+			return Box::pin(async move { None.xok() });
+		}
 		let key = self.resolve_key(path);
 		let public_url = match &self.endpoint {
 			// path-style URL against the override endpoint (eg the R2 S3 API). A
@@ -392,7 +414,7 @@ impl BlobStoreProvider for S3Store {
 				endpoint.trim_end_matches('/'),
 				self.bucket_name
 			),
-			// virtual-hosted AWS S3 URL (unchanged).
+			// virtual-hosted AWS S3 URL.
 			None => format!(
 				"https://{}.s3.{}.amazonaws.com/{key}",
 				self.bucket_name, self.region
@@ -440,7 +462,7 @@ mod test {
 			.unwrap()
 			.as_str()
 			.xpect_eq("https://abc123.r2.cloudflarestorage.com");
-		BlobStore::new(store)
+		BlobStore::new(store.with_public(true))
 			.public_url(&SmolPath::from("index.html"))
 			.await
 			.unwrap()
@@ -450,10 +472,21 @@ mod test {
 			);
 	}
 
+	/// A private bucket must not hand out a url it will answer with a 403, which
+	/// a static-file route would redirect every visitor into.
+	#[beet_core::test]
+	async fn private_bucket_has_no_public_url() {
+		BlobStore::new(S3Store::new("beet-test", "us-west-2"))
+			.public_url(&SmolPath::from("test-file.txt"))
+			.await
+			.unwrap()
+			.xpect_none();
+	}
+
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
-		let provider = S3Store::new("beet-test", "us-west-2");
+		let provider = S3Store::new("beet-test", "us-west-2").with_public(true);
 		let test_key = SmolPath::from("test-file.txt");
 		BlobStore::new(provider)
 			.public_url(&test_key)
