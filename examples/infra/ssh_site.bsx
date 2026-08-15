@@ -26,8 +26,11 @@ engine.
 	<Route path="deploy" {ExchangeSequence}>
 		<FargateSshBlock/>
 		<ExampleBinaryBuild example="ssh_tui_site" features="ssh_tui,http_server,markdown"/>
-		<TofuApplyAction/>
+		<!-- the image registry first, so the push has somewhere to go -->
+		<TofuApply layer="storage"/>
 		<BuildDockerImage/>
+		<!-- then the full apply rolls the service, onto an image that is already pushed -->
+		<TofuApply/>
 		<FargateWatch app_name="ssh-site" timeout="60s"/>
 	</Route>
 	<Route path="watch" {ExchangeSequence}>

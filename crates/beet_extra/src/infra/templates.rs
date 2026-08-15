@@ -503,6 +503,26 @@ mod test {
 			.xpect_eq("beet-site--shared--assets");
 	}
 
+	/// The apply layer coerces from markup, so a deploy route can author its
+	/// layered applies (`layer="storage"` before the content sync, a bare full
+	/// apply after it) as the same tag.
+	#[beet_core::test]
+	fn tofu_apply_layer_prop() {
+		let mut world = test_world();
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Fragment><TofuApply layer="storage"/><TofuApply/></Fragment>"#,
+		);
+		world
+			.query::<&TofuApply>()
+			.iter(&world)
+			.map(|apply| apply.layer().clone())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![Some(SmolStr::new("storage")), None]);
+	}
+
 	/// The sync verbs coerce from markup: an enum by variant name, the flags by
 	/// bool, and the defaults are the conservative push/additive pair.
 	#[beet_core::test]

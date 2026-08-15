@@ -60,7 +60,7 @@ impl Plugin for CliCommandsPlugin {
 			"AppBucket",
 			"AssetsBucket",
 			"BeetBinaryBuild",
-			"TofuApplyAction",
+			"TofuApply",
 			"BuildDockerImage",
 			"DirSync",
 			"FargateWatch",

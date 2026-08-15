@@ -40,10 +40,12 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::CloudflareWorkerDeployAction>()
 			.register_type::<crate::prelude::CloudflareContainerDeployAction>();
 
-		// the tofu apply action + the zone edge setup/purge (the whole `actions`
-		// module is gated on `deploy`, and is native-only).
+		// the tofu apply action + its layer settings (`<TofuApply layer="storage"/>`),
+		// and the zone edge setup/purge (the whole `actions` module is gated on
+		// `deploy`, and is native-only).
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::TofuApplyAction>()
+			.register_type::<crate::prelude::TofuApply>()
 			.register_type::<crate::prelude::CloudflareZoneSetup>()
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 

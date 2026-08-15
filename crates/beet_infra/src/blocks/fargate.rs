@@ -110,12 +110,18 @@ pub struct FargateBlock {
 	health_check_path: SmolStr,
 	/// Container image base.
 	container_image: ContainerImage,
+	/// The deploy layer for the image registry
+	/// ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER) by default): the
+	/// deploy pushes the image into the registry before the task definition
+	/// names that image, so it converges ahead of the push.
+	registry_layer: SmolStr,
 }
 
 impl Default for FargateBlock {
 	fn default() -> Self {
 		Self {
 			label: "main-fargate".into(),
+			registry_layer: terra::Config::STORAGE_LAYER.into(),
 			dns: Vec::new(),
 			container_port: beet_net::prelude::DEFAULT_HTTP_PORT,
 			ssh_container_port: 22,
@@ -642,6 +648,19 @@ impl Block for FargateBlock {
 				task_definition: Some(task_def.field_ref("arn").into()),
 				desired_count: Some(desired_count.into()),
 				launch_type: Some("FARGATE".into()),
+				// a task that cannot boot (a bad binary, a missing image) fails
+				// the deployment and restores the last good task definition,
+				// rather than crash-looping the new one forever. Safe only
+				// because the deploy fills the stores before rolling the
+				// service, see `TofuApply`: under the old ordering the first
+				// tasks always failed, so this would have rolled back every
+				// deploy.
+				deployment_circuit_breaker: Some(vec![
+					AwsEcsServiceResourceBlockTypeDeploymentCircuitBreaker {
+						enable: true,
+						rollback: true,
+					},
+				]),
 				network_configuration: Some(vec![
 					AwsEcsServiceResourceBlockTypeNetworkConfiguration {
 						subnets: vec![
@@ -704,10 +723,12 @@ impl Block for FargateBlock {
 			},
 		);
 
-		// Add all resources
+		// Add all resources. The registry converges in its layer like a bucket:
+		// the deploy pushes the image into it before the task definition names
+		// that image.
 		config
 			.add_resource(&log_group)?
-			.add_resource(&ecr_repo)?
+			.add_layer_resource(self.registry_layer.clone(), &ecr_repo)?
 			.add_resource(&vpc)?
 			.add_resource(&igw)?
 			.add_resource(&subnet_a)?
@@ -975,6 +996,30 @@ mod tests {
 			.with_min_count(2)
 			.with_max_count(7)
 			.with_cpu_target_percent(65.0)
+	}
+
+	/// The registry the deploy pushes its image into is the block's one storage
+	/// layer entry; the service that pulls the image is not, since rolling the
+	/// service onto already-published content is what the full apply *after* the
+	/// push is for. The circuit breaker rides on that ordering: a task that still
+	/// fails to boot now fails the deployment rather than crash-looping.
+	#[beet_core::test]
+	fn ecr_is_the_only_storage_target() {
+		let block = FargateBlock::default();
+		let (config, stack, _dir) = build_config(&block);
+		config
+			.layer_targets("storage")
+			.unwrap()
+			.to_vec()
+			.xpect_eq(vec![format!(
+				"aws_ecr_repository.{}",
+				stack.resource_ident(block.build_label("ecr")).label()
+			)]);
+		config
+			.to_json()
+			.to_string()
+			.as_str()
+			.xpect_contains("\"deployment_circuit_breaker\":[{\"enable\":true,\"rollback\":true}]");
 	}
 
 	#[beet_core::test]

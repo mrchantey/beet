@@ -41,10 +41,24 @@ DNS-only `app.beet.org` / `app.dev.beet.org` hostnames straight to the NLB,
 strict TLS), and every deploy or sync ends with a `<CloudflarePurgeCache/>` so
 content changes are live at the edge immediately. On the deploy route the purge
 comes *after* `<FargateWatch/>`, since purging while the old tasks still serve
-just re-caches the old responses for the full edge TTL. The deploy routes hang off a stack-bearing
-`<BeetSiteDeployHost>` so they resolve a `Stack` by ancestry without a second
-server. `--stage=prod` targets production (apex `beet.org` + `www`); the default
-`dev` stage publishes only `dev.beet.org`.
+just re-caches the old responses for the full edge TTL.
+
+The deploy route applies once per layer, and the order is the point: `<TofuApply
+layer="storage"/>` brings up the stores (the app bucket, the image registry, the
+analytics table: the addresses their blocks declare under the `storage` layer,
+an overridable per-block field), `<BuildDockerImage/>` and `<DirSync/>` fill
+them, and a bare `<TofuApply/>` converges the whole stack, rolling a task
+definition onto an image that is pushed and a bucket that already holds the
+site. One apply rolls the new task first, so it boots against an empty bucket,
+finds no entry document and exits. Naming a layer no block declares is a loud
+error, never a silent skip. The ECS deployment circuit breaker rides on that
+ordering: with the sync ahead of the roll, a task that still fails to boot is a
+genuinely broken image, so the deployment fails and restores the previous task
+definition.
+
+The deploy routes hang off a stack-bearing `<BeetSiteDeployHost>` so they resolve
+a `Stack` by ancestry without a second server. `--stage=prod` targets production
+(apex `beet.org` + `www`); the default `dev` stage publishes only `dev.beet.org`.
 
 The assets bucket (`beet-site--shared--assets`, the source of record for files
 too large for git) lives on its own `shared` stage: a second `<BeetSiteDeployHost
@@ -55,12 +69,12 @@ deploy replicates the checkout (`site/assets` is a committed symlink to
 `./assets`, and the sync follows it), so the assets reach an app bucket the same
 way every other file does.
 
-    just beet deploy [--stage=prod]        # build -> tofu -> image -> sync -> purge -> watch
-    just beet sync                         # re-publish the site (no image rebuild)
-    just beet watch                        # poll the rollout
-    just beet shared apply                 # provision the shared assets bucket
-    just beet shared pull                  # hydrate ./assets from it (no credentials)
-    just beet shared push                  # publish ./assets to it
+    just beet-deploy [--stage=prod]        # build -> stores -> image -> sync -> roll -> watch -> purge
+    just beet-sync                         # re-publish the site (no image rebuild)
+    just beet-watch                        # poll the rollout
+    just beet-shared apply                 # provision the shared assets bucket
+    just beet-shared pull                  # hydrate ./assets from it (no credentials)
+    just beet-shared push                  # publish ./assets to it
 
 Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 `CLOUDFLARE_API_TOKEN` in `.env` (see `.env.example` for the token permissions),
@@ -82,9 +96,10 @@ plus `tofu`, `cargo-zigbuild` and a container engine.
 			<AppBucket/>
 			<AnalyticsTable/>
 			<BeetBinaryBuild features="aws_sdk,ssh,geoip"/>
-			<TofuApplyAction/>
+			<TofuApply layer="storage"/>
 			<BuildDockerImage/>
 			<DirSync app_name="beet-site" bucket="app" local_dir="site" follow_symlinks=true delete=true/>
+			<TofuApply/>
 			<CloudflareZoneSetup/>
 			<FargateWatch app_name="beet-site" timeout="300s"/>
 			<CloudflarePurgeCache/>

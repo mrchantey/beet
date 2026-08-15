@@ -162,13 +162,16 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 				block,
 				// build binary for containerization
 				build_fargate_binary(),
-				// deploy infrastructure first (creates ECR repo)
-				TofuApplyAction,
+				// the stores first: the ECR repo the push targets and the bucket
+				// the sync fills
+				TofuApply::default().with_layer("storage"),
 				// build and push Docker image (ECR repo now exists); the config
 				// component requires the action.
 				BuildDockerImage::default(),
 				// sync assets to S3
 				SyncS3BucketAction,
+				// roll the service, onto a pushed image and a filled bucket
+				TofuApply::default(),
 			],
 		))
 		.exchange(Request::get(""))

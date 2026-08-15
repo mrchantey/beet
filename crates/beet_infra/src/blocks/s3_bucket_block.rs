@@ -32,6 +32,11 @@ pub struct S3BucketBlock {
 	/// that lifts the default block, plus a bucket policy). Needed when objects
 	/// are served by a 301 to the public S3 url, eg the assets bucket.
 	public_read: bool,
+	/// The deploy layer for the bucket and its public-read pair
+	/// ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER) by default):
+	/// the deploy syncs content into the bucket, so it converges before anything
+	/// that reads it rolls.
+	layer: SmolStr,
 }
 
 impl S3BucketBlock {
@@ -46,6 +51,7 @@ impl S3BucketBlock {
 			output: true,
 			deploy_versioned: true,
 			public_read: false,
+			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
 
@@ -109,7 +115,9 @@ impl Block for S3BucketBlock {
 			stack.resource_ident(self.label.clone()),
 			details,
 		);
-		config.add_resource(&bucket)?;
+		// the destination of a deploy's content sync, so it converges in the
+		// layer applied ahead of the sync
+		config.add_layer_resource(self.layer.clone(), &bucket)?;
 		if self.output {
 			config.add_output(self.output_label(), terra::Output {
 				value: json!(bucket.field_ref("bucket")),
@@ -174,7 +182,11 @@ impl S3BucketBlock {
 				..default()
 			},
 		);
-		config.add_resource(&public_access)?.add_resource(&policy)?;
+		// the bucket's own layer: a reader that finds the bucket but not yet its
+		// public policy is the same failure as finding no bucket
+		config
+			.add_layer_resource(self.layer.clone(), &public_access)?
+			.add_layer_resource(self.layer.clone(), &policy)?;
 		Ok(())
 	}
 }
@@ -182,8 +194,8 @@ impl S3BucketBlock {
 mod tests {
 	use super::*;
 
-	/// The terraform json emitted by `block`.
-	fn build_json(block: S3BucketBlock) -> String {
+	/// The config `block` emits, and the throwaway stack it was resolved against.
+	fn build_config(block: S3BucketBlock) -> (Stack, terra::Config) {
 		let (stack, _dir) = Stack::default_local();
 		let mut config = stack.create_config();
 		let mut world = World::new();
@@ -194,7 +206,12 @@ mod tests {
 				&mut config,
 			)
 			.unwrap();
-		config.to_json().to_string()
+		(stack, config)
+	}
+
+	/// The terraform json emitted by `block`.
+	fn build_json(block: S3BucketBlock) -> String {
+		build_config(block).1.to_json().to_string()
 	}
 
 	#[beet_core::test]
@@ -214,5 +231,44 @@ mod tests {
 			.as_str()
 			.xnot()
 			.xpect_contains("aws_s3_bucket_policy");
+	}
+
+	/// A bucket and the resources that make it readable default to the `storage`
+	/// layer (the deploy syncs content into it, so it converges before anything
+	/// that reads it rolls). The address is the `type.label` form `-target` takes.
+	#[beet_core::test]
+	fn declares_storage_layer() {
+		let (stack, config) = build_config(S3BucketBlock::new("app"));
+		config
+			.layer_targets("storage")
+			.unwrap()
+			.to_vec()
+			.xpect_eq(vec![format!(
+				"aws_s3_bucket.{}",
+				stack.resource_ident("app").label()
+			)]);
+		// the bucket, plus its public-access block and policy
+		build_config(S3BucketBlock::new("assets").with_public_read(true))
+			.1
+			.layer_targets("storage")
+			.unwrap()
+			.len()
+			.xpect_eq(3);
+	}
+
+	/// The layer assignment is a field, so a route can re-cut its layers, and an
+	/// undeclared layer is a loud error naming the declared ones: a typo that
+	/// silently converged nothing would race exactly as an unordered deploy does.
+	#[beet_core::test]
+	fn layer_is_overridable_and_typos_are_loud() {
+		let (_stack, config) =
+			build_config(S3BucketBlock::new("app").with_layer("data"));
+		config.layer_targets("data").unwrap().len().xpect_eq(1);
+		config
+			.layer_targets("storage")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no resources declare layer 'storage'")
+			.xpect_contains("data");
 	}
 }

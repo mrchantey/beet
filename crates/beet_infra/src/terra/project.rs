@@ -67,13 +67,16 @@ impl Project {
 		tofu::apply(&self.dir()).await
 	}
 
-	/// Apply the execution plan with Terraform variables.
+	/// Apply the execution plan with Terraform variables, narrowed to `targets`
+	/// (resource addresses, ie a layer's [`Config::layer_targets`]) when
+	/// non-empty.
 	pub async fn apply_with_vars(
 		&self,
 		vars: &[(SmolStr, SmolStr)],
+		targets: &[String],
 	) -> Result<String> {
 		self.init().await?;
-		tofu::apply_with_vars(&self.dir(), vars).await
+		tofu::apply_with_vars(&self.dir(), vars, targets).await
 	}
 
 	/// Show the current state.

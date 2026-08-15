@@ -93,9 +93,20 @@ pub struct Config {
 	variables: Map<String, Value>,
 	outputs: Map<String, Value>,
 	locals: Map<String, Value>,
+	/// Resource addresses grouped by deploy layer, collected by
+	/// [`add_layer_resource`](Self::add_layer_resource). Config-only, never
+	/// serialized.
+	layers: HashMap<SmolStr, Vec<String>>,
 }
 
 impl Config {
+	/// The conventional layer for resources a deploy publishes *into*: a bucket
+	/// it syncs, an image registry it pushes to, a table the runtime writes.
+	/// Blocks default such resources here so `<TofuApply layer="storage"/>`
+	/// converges them before the content upload and the service roll, and expose
+	/// the assignment as a field so a route can re-cut its layers.
+	pub const STORAGE_LAYER: &str = "storage";
+
 	/// Create a new empty configuration.
 	pub fn new() -> Self { Self::default() }
 
@@ -161,6 +172,47 @@ impl Config {
 		resource: &terra::ResourceDef<T>,
 	) -> Result<&mut Self> {
 		self.add_labeled_resource(resource.ident().label(), resource.resource())
+	}
+
+	/// Add a typed resource assigned to a named deploy layer, a set of `-target`
+	/// addresses a route converges ahead of the full apply via
+	/// `<TofuApply layer="..."/>`.
+	///
+	/// Layers are milestones through the one stack graph rather than partitions
+	/// of it: a targeted apply pulls in each target's dependencies, so a layer
+	/// need not be dependency-closed. Blocks default their publish-into resources
+	/// to [`STORAGE_LAYER`](Self::STORAGE_LAYER).
+	pub fn add_layer_resource<T: Resource>(
+		&mut self,
+		layer: impl Into<SmolStr>,
+		resource: &terra::ResourceDef<T>,
+	) -> Result<&mut Self> {
+		self.add_resource(resource)?;
+		self.layers
+			.entry(layer.into())
+			.or_default()
+			.push(resource.address());
+		Ok(self)
+	}
+
+	/// The addresses declared under `layer`, as `tofu apply -target` takes them.
+	/// Non-empty by construction, since only
+	/// [`add_layer_resource`](Self::add_layer_resource) creates an entry.
+	///
+	/// An unknown layer is a loud error naming the declared layers: a typo that
+	/// silently converged nothing would race exactly as an unordered deploy does.
+	pub fn layer_targets(&self, layer: &str) -> Result<&[String]> {
+		self.layers
+			.get(layer)
+			.map(|targets| targets.as_slice())
+			.ok_or_else(|| {
+				let mut declared =
+					self.layers.keys().cloned().collect::<Vec<_>>();
+				declared.sort();
+				bevyhow!(
+					"no resources declare layer '{layer}', declared layers: {declared:?}"
+				)
+			})
 	}
 
 	/// Add a typed resource (chaining). The required provider is registered

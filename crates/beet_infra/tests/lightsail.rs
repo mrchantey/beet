@@ -146,7 +146,14 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 			assets_s3_fs_store(stack, assets_dir),
 			assets_bucket_block(),
 			ExchangeSequence,
-			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],
+			// the bucket first, so the assets are in place before the instance
+			// that serves them boots
+			children![
+				(block, cargo),
+				TofuApply::default().with_layer("storage"),
+				SyncS3BucketAction,
+				TofuApply::default(),
+			],
 		))
 		.exchange(Request::get(""))
 		.await

@@ -92,15 +92,23 @@ pub async fn apply(dir: &AbsPathBuf) -> Result<String> {
 		.await
 }
 
-/// Apply the execution plan with Terraform variables.
+/// Apply the execution plan with Terraform variables, narrowed to `targets`
+/// (resource addresses) and their dependencies when non-empty.
 pub async fn apply_with_vars(
 	dir: &AbsPathBuf,
 	vars: &[(SmolStr, SmolStr)],
+	targets: &[String],
 ) -> Result<String> {
 	let mut args: Vec<SmolStr> = vec!["apply".into(), "-auto-approve".into()];
 	for (key, value) in vars {
 		args.push("-var".into());
 		args.push(format!("{key}={value}").into());
+	}
+	// tofu pulls in each target's dependencies but never its dependents, so a
+	// targeted apply converges exactly these resources and leaves the rest of the
+	// stack (notably the service roll) for the apply that follows.
+	for target in targets {
+		args.push(format!("-target={target}").into());
 	}
 	tofu_process()
 		.with_cwd(dir.clone())

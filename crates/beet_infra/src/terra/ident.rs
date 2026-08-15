@@ -28,13 +28,18 @@ where
 		Self { ident, resource }
 	}
 
+	/// The terraform address of this resource, in the format
+	/// `resource_type.label_name` ie `aws_s3_bucket.my_app__dev__app`. The form
+	/// `tofu apply -target` takes, see [`Config::add_layer_resource`].
+	pub fn address(&self) -> String {
+		format!("{}.{}", self.resource.resource_type(), self.ident.label)
+	}
+
 	/// The terraform syntax for referencing a resource field,
 	/// in the format `resource_type.label_name.field_name`
 	/// ie `aws_iam_role.lambda_role.name`
 	pub fn field(&self, field_name: &str) -> String {
-		let label = &self.ident.label;
-		let resource_type = self.resource.resource_type();
-		format!("{}.{}.{}", resource_type, label, field_name)
+		format!("{}.{field_name}", self.address())
 	}
 
 	/// The terraform syntax for referencing a resource field in an interpolated string

@@ -21,15 +21,15 @@ Both serve html over http AND a multi-tenant live terminal over ssh. The generic
 
 ## Commands
 
-Creds load from `.env` (AWS, `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ZONE_ID`, `BEET_SSH_HOST_KEY`). The lean `beet-*` recipes use a headless build (no winit/ml) and clear `AWS_PROFILE`; prefer them over `just beet <verb>` (which forces the heavy winit/ml build and can hit a wgpu teardown SIGSEGV).
+Creds load from `.env` (AWS, `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ZONE_ID`, `BEET_SSH_HOST_KEY`). Always use the `beet-*` recipes: they build with `--features infra,extra` (without which the deploy routes load as inert tags and the verb does nothing) and clear `AWS_PROFILE`.
 
 | intent | command |
 | --- | --- |
 | local serve (http+ssh) | `cargo run -p beet-cli -- serve site --server=http,ssh` |
 | pre-apply safety check | `just beet-validate` then `just beet-plan` (eyeball the plan) |
-| dev deploy | `just beet-deploy` (alias: `just beet deploy`) |
-| dev destroy | `just beet-destroy` (alias: `just beet destroy --force`) |
-| prod deploy | `just beet-deploy --stage=prod` (alias: `just beet deploy --stage=prod`) |
+| dev deploy | `just beet-deploy` |
+| dev destroy | `just beet-destroy` |
+| prod deploy | `just beet-deploy --stage=prod` |
 
 `just beet-plan --stage=prod` shows the prod plan without applying.
 
@@ -142,7 +142,7 @@ Read the bound http + ssh ports from the serve output. Run the full verification
 ```sh
 just beet-validate            # resolves, no cloud
 just beet-plan                # EYEBALL: dev must touch only beet-site--dev--* and dev.beet.org
-just beet-deploy              # build -> tofu -> image -> sync site/ + assets/ -> watch rollout
+just beet-deploy              # build -> stores -> image -> sync site/ + assets/ -> roll -> watch -> purge
 ```
 
 Run the full verification (a-e) against `https://dev.beet.org` (ssh on `app.dev.beet.org` port 22), allowing a few minutes for rollout + DNS/ACM to settle (retry with a sane budget). Then ALWAYS tear down:
@@ -166,5 +166,5 @@ Run the full verification (a-e) against `https://beet.org` (and confirm `https:/
 ## Before any deploy
 
 1. **Hydrate the assets** (`just beet-shared pull`). The site sync mirrors `site/` with `delete=true` and follows the `site/assets` symlink, so it publishes whatever the checkout holds. `SyncS3Bucket::assert_mirrorable` refuses a missing or empty symlinked child rather than emptying the bucket, but a *stale* tree syncs happily and silently ships old assets.
-2. **Accepted rollout window.** `TofuApplyAction` rolls the new task definition before `DirSync` fills the bucket, so the first tasks may briefly serve misses. `FargateWatch` covers rollout health; re-check the site after the deploy returns, not during.
+2. **The apply runs once per layer, and the order matters.** `<TofuApply layer="storage"/>` brings up the stores (the addresses blocks declare under the `storage` layer, an overridable per-block field), the image push and `<DirSync/>` fill them, then a bare `<TofuApply/>` converges the whole stack and rolls the service onto content that is already published. A single apply rolled the task definition first, and the task exited 1 with `no entry document found in the --store backend`. Naming a layer no block declares is a loud error, never a silent skip. The ECS deployment circuit breaker (enable + rollback) rides on that ordering, so a task that still fails to boot now fails the deployment and restores the previous task definition rather than crash-looping: if `just beet-deploy` reports a rolled-back deployment, the new image is genuinely broken, not racing the sync. `FargateWatch` is a log tail, not a health gate; re-check the site after the deploy returns, not during.
 3. Never run with `--stage=prod` except in Step 3.

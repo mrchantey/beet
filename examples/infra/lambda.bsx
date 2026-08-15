@@ -32,8 +32,11 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>
 		<AppBucket/>
-		<TofuApplyAction/>
+		<!-- the bucket first, so the site is in place before the function that
+		     serves it exists -->
+		<TofuApply layer="storage"/>
 		<SiteSync app_name="lambda"/>
+		<TofuApply/>
 		<!-- the rollout is quick, so tail briefly then exit -->
 		<LambdaWatch app_name="lambda" timeout="30s"/>
 	</Route>

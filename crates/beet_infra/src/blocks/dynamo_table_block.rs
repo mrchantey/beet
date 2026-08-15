@@ -12,13 +12,19 @@ use beet_core::prelude::*;
 /// the stage-prefixed table name (`stack.resource_ident(label)`), and the deploy
 /// hands that name to the running binary via an env var, so the two agree on the
 /// name without deriving it independently.
-#[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, SetWith, Serialize, Deserialize, Component)]
 #[component(immutable, on_add = on_add_dynamo_table_block)]
 pub struct DynamoTableBlock {
 	/// The unprefixed table label (eg `analytics`).
 	label: SmolStr,
 	/// The hash (partition) key attribute name.
 	hash_key: SmolStr,
+	/// The deploy layer ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER)
+	/// by default): the runtime writes to this table from its first request, and
+	/// nothing in the tofu graph orders the table before the service (the name
+	/// crosses to the task env as a literal, not a field ref), so the layer is
+	/// what makes it exist before the service that names it rolls.
+	layer: SmolStr,
 }
 
 impl DynamoTableBlock {
@@ -28,6 +34,7 @@ impl DynamoTableBlock {
 		Self {
 			label: label.into(),
 			hash_key: "id".into(),
+			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
 
@@ -67,7 +74,8 @@ impl Block for DynamoTableBlock {
 				..default()
 			},
 		);
-		config.add_resource(&table)?;
+		// see the `layer` field: nothing else orders the table before the service
+		config.add_layer_resource(self.layer.clone(), &table)?;
 		Ok(())
 	}
 }
