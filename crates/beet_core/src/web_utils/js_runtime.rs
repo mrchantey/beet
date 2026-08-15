@@ -14,6 +14,7 @@
 //! full surface.
 
 use crate::prelude::*;
+use bevy::platform::sync::OnceLock;
 use wasm_bindgen::prelude::*;
 
 // The raw host globals. Names are load-bearing: `beet_core` dev-depends on itself
@@ -190,18 +191,70 @@ fn has_node_marker() -> bool {
 		.unwrap_or(false)
 }
 
-/// Whether `navigator.userAgent` is Cloudflare's, ie the host is a Worker. The
-/// runtime advertises itself there and nowhere else, so it is the only marker
-/// available.
-fn has_cloudflare_marker() -> bool {
+/// A property of the host `navigator`, `None` when the property (or the
+/// `navigator` itself) is absent.
+fn navigator_value(key: &str) -> Option<JsValue> {
 	js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str("navigator"))
 		.ok()
 		.filter(|navigator| !navigator.is_undefined() && !navigator.is_null())
 		.and_then(|navigator| {
-			js_sys::Reflect::get(&navigator, &JsValue::from_str("userAgent")).ok()
+			js_sys::Reflect::get(&navigator, &JsValue::from_str(key)).ok()
 		})
+		.filter(|value| !value.is_undefined() && !value.is_null())
+}
+
+/// Whether `navigator.userAgent` is Cloudflare's, ie the host is a Worker. The
+/// runtime advertises itself there and nowhere else, so it is the only marker
+/// available.
+fn has_cloudflare_marker() -> bool {
+	navigator_value("userAgent")
 		.and_then(|agent| agent.as_string())
 		.map(|agent| agent == "Cloudflare-Workers")
+		.unwrap_or(false)
+}
+
+/// The cached [`probe_webgpu`] outcome; unset until the probe has run.
+static WEBGPU: OnceLock<bool> = OnceLock::new();
+
+/// Probe whether the host grants a WebGPU adapter, caching the outcome for
+/// [`has_webgpu`]. WebGPU is the one wgpu backend that can produce an adapter
+/// without a canvas-backed surface, so a windowless render boot hinges on it;
+/// probing `navigator.gpu`'s *presence* is not enough, since a browser may
+/// define the API yet resolve `requestAdapter()` to `null` (eg Chrome on a
+/// host without WebGPU support). A wasm render entry awaits this once before
+/// building its app, which then reads the cached answer synchronously.
+pub async fn probe_webgpu() -> bool {
+	let granted = request_webgpu_adapter().await;
+	*WEBGPU.get_or_init(|| granted)
+}
+
+/// The cached [`probe_webgpu`] outcome, `false` when the probe has not run.
+/// Synchronous, so plugin construction can branch on it.
+pub fn has_webgpu() -> bool { WEBGPU.get().copied().unwrap_or(false) }
+
+/// Await `navigator.gpu.requestAdapter()`: `true` only when it resolves to an
+/// adapter, `false` on absence, rejection or a `null` resolution.
+async fn request_webgpu_adapter() -> bool {
+	let Some(gpu) = navigator_value("gpu") else {
+		return false;
+	};
+	let Some(request) =
+		js_sys::Reflect::get(&gpu, &JsValue::from_str("requestAdapter"))
+			.ok()
+			.and_then(|func| func.dyn_into::<js_sys::Function>().ok())
+	else {
+		return false;
+	};
+	let Some(promise) = request
+		.call0(&gpu)
+		.ok()
+		.and_then(|value| value.dyn_into::<js_sys::Promise>().ok())
+	else {
+		return false;
+	};
+	wasm_bindgen_futures::JsFuture::from(promise)
+		.await
+		.map(|adapter| !adapter.is_undefined() && !adapter.is_null())
 		.unwrap_or(false)
 }
 

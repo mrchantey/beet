@@ -3,9 +3,10 @@ use bevy::app::PluginGroupBuilder;
 
 /// The default plugin set for a *Beet* application, the trusted way to get sensible
 /// defaults. It selects the runner (a real winit window with the `winit` feature,
-/// else the headless 30Hz schedule loop), installs beet's tracing [`LogPlugin`] and
-/// the async/exit runtime, and links the router/scene/server capabilities a served
-/// or presented site needs, each gated on the relevant feature.
+/// the winit-less browser render runner on wasm, else the headless 30Hz schedule
+/// loop), installs beet's tracing [`LogPlugin`] and the async/exit runtime, and
+/// links the router/scene/server capabilities a served or presented site needs,
+/// each gated on the relevant feature.
 ///
 /// It is a [`PluginGroup`], so any inner plugin can be reconfigured, eg
 /// `BeetPlugins.set(LogPlugin::new(Level::TRACE))`. With the `extra` feature it
@@ -34,8 +35,12 @@ impl PluginGroup for BeetPlugins {
 		// rather than panicking: a server/tool `.bsx` runs anywhere, target-agnostic.
 		// With `winit` compiled, that fallback keeps the render capabilities linked but
 		// GPU-less (see [`headless_render_runner`]) so scene systems never panic.
+		// A browser tab is neither native branch (winit assumes it owns the loop, and
+		// a tab always "has a display"), so wasm takes its own render runner.
 		cfg_if! {
-			if #[cfg(feature = "winit")] {
+			if #[cfg(all(target_arch = "wasm32", feature = "winit"))] {
+				builder = builder.add_group(wasm_render_runner());
+			} else if #[cfg(feature = "winit")] {
 				if env_ext::has_display() {
 					builder = builder.add_group(winit_default_plugins());
 				} else {
@@ -162,7 +167,7 @@ fn headless_runner() -> PluginGroupBuilder {
 ///
 /// So a CLI/server/TUI `.bsx` runs headless anywhere; a `<Window/>`/3d scene simply
 /// cannot render, rather than crashing the whole binary.
-#[cfg(feature = "winit")]
+#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
 fn headless_render_runner() -> PluginGroupBuilder {
 	use bevy::render::RenderPlugin;
 	use bevy::render::settings::RenderCreation;
@@ -181,19 +186,62 @@ fn headless_render_runner() -> PluginGroupBuilder {
 		})
 }
 
-/// The workspace-rooted [`AssetPlugin`], shared by the windowed and headless
-/// render-capable runners. Resolves the assets dir from the workspace root (the
-/// nearest ancestor with a `Cargo.lock`) so a scene loads its assets regardless of
-/// the process cwd, and skips `.meta` lookups (beet sites ship no sidecars).
+/// The browser runner: a tab is neither native branch of the display dichotomy.
+/// winit's web event loop assumes it owns the thread (never returning to the
+/// awaited wasm `start`), while the schedule loop alone would strip the render
+/// stack the compiled features expect. So: the full render/asset
+/// `DefaultPlugins` minus `WinitPlugin`, driven by the awaited `run_async` loop
+/// like every wasm beet app.
+///
+/// GPU through WebGPU when the host granted an adapter — the wasm entry awaits
+/// [`js_runtime::probe_webgpu`] once before building the app, and this reads
+/// the cached answer. Otherwise GPU-less like [`headless_render_runner`]:
+/// WebGL2 can never back this boot, since its adapter only exists on a
+/// canvas-backed surface and beet boots windowless. With no winit backend a
+/// scene-spawned `<Window/>` gets no surface yet, so cameras only draw to
+/// texture targets; putting pixels in the tab (a page-supplied or created
+/// canvas) is a design still open.
+#[cfg(all(target_arch = "wasm32", feature = "winit"))]
+fn wasm_render_runner() -> PluginGroupBuilder {
+	use bevy::render::RenderPlugin;
+	use bevy::render::settings::Backends;
+	use bevy::render::settings::RenderCreation;
+	use bevy::render::settings::WgpuSettings;
+	winit_default_plugins()
+		.disable::<bevy::winit::WinitPlugin>()
+		.set(RenderPlugin {
+			render_creation: RenderCreation::Automatic(Box::new(WgpuSettings {
+				backends: js_runtime::has_webgpu()
+					.then_some(Backends::BROWSER_WEBGPU),
+				..default()
+			})),
+			..default()
+		})
+}
+
+/// The [`AssetPlugin`] shared by every render-capable runner: skips `.meta`
+/// lookups (beet sites ship no sidecars) and roots the assets dir per target.
+/// Native resolves from the workspace root (the nearest ancestor with a
+/// `Cargo.lock`) so a scene loads its assets regardless of the process cwd; a
+/// browser has no filesystem, so bevy's http reader fetches the origin-rooted
+/// `/assets` url the serving site mounts (eg `<AssetsDir src="assets"
+/// prefix="assets"/>`).
 #[cfg(feature = "winit")]
 fn asset_plugin() -> AssetPlugin {
 	use bevy::asset::AssetMetaCheck;
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			let file_path = "/assets".to_string();
+		} else {
+			let file_path = fs_ext::workspace_root()
+				.join("assets")
+				.to_string_lossy()
+				.into_owned();
+		}
+	}
 	AssetPlugin {
 		meta_check: AssetMetaCheck::Never,
-		file_path: fs_ext::workspace_root()
-			.join("assets")
-			.to_string_lossy()
-			.into_owned(),
+		file_path,
 		..default()
 	}
 }

@@ -132,29 +132,32 @@ web_head = ["web", "beet/perceive_act_web"]
 # (`<Sequence>`, `<Log>`, `CallOnLoad`) mounts this. Anything a program names beyond
 # that needs a larger set. Build with: `just build-wasm-min`.
 web_min = ["web"]
+# `beet-render.wasm`, the render middle: the browser binary plus the windowed
+# render stack (`winit` pulls `beet/examples`: bevy_default + spatial + extra), so
+# a wgpu scene `.bsx` boots in a tab without hauling the full binary's thread/tui/
+# infra/scripting weight. `BeetPlugins` swaps winit's event loop for the awaited
+# wasm runner; `beet/webgpu` compiles the one backend that can grant a windowless
+# adapter (the entry probes `navigator.gpu`, booting GPU-less on refusal). Build
+# with: `just build-wasm-render`.
+web_render = ["web", "winit", "beet/webgpu"]
 # `beet-full.wasm`, the ceiling: every feature a browser binary can actually boot
 # with, so any `.bsx` whose types are wasm-safe runs from it — the example surface,
-# the perceive-act head, the agent thread runtime, the charcell tui host, the infra
-# block definitions, and the embedded JavaScript engine.
-# Three exclusion groups, each for its own reason:
-# - `winit`/`ml`/`bevy_default`: the render stack does not boot in a browser tab yet,
-#   verified both ways. With `winit`, `BeetPlugins` picks the winit runner (wasm has
-#   no `DISPLAY` concept, so `has_display()` is `true`), which owns the event loop and
-#   never returns to the awaited `start()`, hanging the tab. Without it, the headless
-#   runner is `MinimalPlugins`, so the asset-dependent plugins `bevy_default` switches
-#   on panic at boot on a missing `AssetServer`. Both need a wasm windowed-boot path,
-#   not a feature list.
+# the render stack and the burn ml backend, the perceive-act head, the agent thread
+# runtime, the charcell tui host, the infra block definitions, and the embedded
+# JavaScript engine.
+# Two exclusion groups, each for its own reason:
 # - `cloudflare`: a different artifact entirely (the Worker `cdylib`), not a browser
 #   binary.
 # - `net`/`sockets`/`secure`/`ssh`/`aws_sdk`/`lambda` (the native transports, gated
 #   away in beet_net on wasm) and `qrcode`/`pdf` (whose deps sit in this manifest's
 #   own `not(wasm32)` table): all compile, and all add exactly zero packages to the
 #   wasm graph, so naming them would claim a capability the artifact does not have.
-# Between the two ends is where narrower sets belong (a head-only build, a render
-# build once one boots); add them as artifacts of their own rather than widening
-# `min`.
+# Between the ends is where narrower sets belong (`web_render`, a head-only build);
+# add them as artifacts of their own rather than widening `min`.
 web_full = [
 	"web_min",
+	"web_render",
+	"ml",
 	"web_examples",
 	"web_head",
 	"tui",

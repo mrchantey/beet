@@ -49,21 +49,41 @@ async fn yield_to_executor() {
 
 impl AsyncRunner {
 	/// Runs an app asynchronously until an [`AppExit`] is triggered.
+	///
+	/// Drives the whole [`App`] per frame — sub-apps included, eg the render
+	/// extract — unlike the world-level loops below, which run only the main
+	/// schedule for world-owning async contexts.
 	pub(crate) async fn run(mut app: App) -> AppExit {
 		app.init_plugin::<AsyncPlugin>();
-		app.init();
-
-		// outer loop runs when there are no in-flight async tasks
+		Self::init_async(&mut app).await;
+		// yield required for wasm to spawn tasks
+		async_ext::yield_now().await;
 		loop {
-			// 1. flush async tasks (also runs update)
-			Self::flush_async_tasks(app.world_mut()).await;
-			// 2. exit if instructed
+			// 1. update first to process the sync point + spawned commands
+			app.update();
+			// 2. tick local tasks so spawned futures progress between updates
+			tick_task_pools();
+			// 3. exit if AppExit
 			if let Some(exit) = app.should_exit() {
 				return exit;
 			}
-			// 3. yield before the next update
+			// 4. yield to the executor before the next update
 			yield_to_executor().await;
 		}
+	}
+
+	/// Initialize the app, yielding to the executor while plugins finish rather
+	/// than busy-waiting like `App::init`. Load-bearing on wasm: a plugin may
+	/// finish through a detached task on the JS event loop (eg the render
+	/// plugin's async wgpu setup), which only progresses when the main thread
+	/// yields, so a synchronous spin would wedge the tab forever.
+	async fn init_async(app: &mut App) {
+		while app.plugins_state() == bevy::app::PluginsState::Adding {
+			tick_task_pools();
+			yield_to_executor().await;
+		}
+		app.finish();
+		app.cleanup();
 	}
 
 	/// Runs an update loop until all tasks have completed or an AppExit is triggered.

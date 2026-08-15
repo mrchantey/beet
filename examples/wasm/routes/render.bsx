@@ -1,0 +1,41 @@
+<!--
+The render page, booting `beet-render.wasm`: the browser binary plus the windowed
+render stack, running a wgpu scene (`examples/spatial/scene_3d.bsx`) in the tab.
+Build it with `just build-wasm-render`; until then the page loads and the module
+fetch 404s.
+
+The runtime boots windowless like every beet binary, so the GPU rides WebGPU: the
+entry probes `navigator.gpu` and requests an adapter, booting GPU-less when the
+browser refuses one (WebGL2 cannot back a windowless boot, its adapters only
+exist on a canvas-backed surface). Either way the whole render stack is live —
+assets, cameras, scene systems — which the console output below proves; pixels in
+the tab await the canvas design (a scene `<Window/>` has no winit backend here to
+give it a surface).
+
+Structurally identical to `/` (a full `<HtmlDocument>`, `<RenderConsole>` before
+`<Wasm>` so the console wrap installs first), differing only in which artifact and
+which program it names.
+-->
+<HtmlDocument>
+	<Fragment slot="head">
+		<Stylesheet/>
+		<ColorSchemeScript/>
+		<LiveReloadScript/>
+	</Fragment>
+	<h1>Rendering in the browser</h1>
+	<p>
+		A wgpu scene booting in your browser: the same render stack a native window
+		runs, minus winit, driven by the awaited wasm runner. With WebGPU granted the
+		scene runs on a real adapter; without it the render capabilities stay linked
+		but GPU-less. Its console output renders below.
+	</p>
+	<p>
+		The <a href="/">home page</a> boots the floor of the range,
+		<code>beet-min.wasm</code>, and the <a href="/scripting">scripting page</a>
+		boots the ceiling, <code>beet-full.wasm</code>, which carries this render
+		stack and everything else that compiles for the browser.
+	</p>
+	<RenderConsole/>
+	<MainBsx src="/examples/spatial/scene_3d.bsx"/>
+	<Wasm src="/assets/wasm/beet-render.wasm"/>
+</HtmlDocument>

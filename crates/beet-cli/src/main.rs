@@ -59,6 +59,11 @@ fn main() { console_error_panic_hook::set_once(); }
 pub async fn start() -> i32 {
 	// idempotent: `main` already set it during `init()`.
 	console_error_panic_hook::set_once();
+	// the wasm render runner branches on the WebGPU grant, which only an awaited
+	// probe can answer (`navigator.gpu` may exist yet grant no adapter), so
+	// resolve it before the app and its plugins are built.
+	#[cfg(feature = "winit")]
+	js_runtime::probe_webgpu().await;
 	build_app().run_async().await.exit_code()
 }
 

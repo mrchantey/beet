@@ -338,6 +338,12 @@ bevy_default = [
 # schedule loop, opening a default window. (Override the `WindowPlugin` to boot
 # windowless and open the window from data.) Off by default, so the CLI stays headless.
 winit = ["bevy_default"]
+# The browser's surfaceless render backend (`wgpu/webgpu`), so the wasm render
+# runner can request an adapter off `navigator.gpu`: WebGL2 only yields adapters
+# on a canvas-backed surface, which a windowless boot never has. Enabled by the
+# wasm render artifacts (beet-cli `web_render`/`web_full`); inert natively (bevy
+# guards every `webgpu` cfg behind `target_arch = "wasm32"`).
+webgpu = ["bevy/webgpu"]
 template_serde = ["beet_core/template_serde", "beet_net?/template_serde", "beet_router?/template_serde", "beet_thread?/template_serde"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]

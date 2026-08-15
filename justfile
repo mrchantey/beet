@@ -266,13 +266,19 @@ test-wasm-e2e crate test_name *args:
 build-wasm-min:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=assets/wasm/beet-min.wasm
 
+# The render middle (assets/wasm/beet-render.wasm): the browser binary plus the
+# windowed render stack (wgpu via WebGPU, the spatial + example scenes), so a
+# render scene `.bsx` boots in a tab without the full binary's weight; see the
+# `web_render` comment in crates/beet-cli/Cargo.toml. Needs `just install-cli`.
+build-wasm-render:
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_render --out=assets/wasm/beet-render.wasm
+
 # The ceiling (assets/wasm/beet-full.wasm): every feature a browser binary can boot
-# with, ie the example surface, the perceive-act head, the thread runtime, the tui
-# host, infra definitions and the embedded JavaScript engine. The render stack
-# (winit/bevy_default/ml) is the one exclusion, since it does not boot in a tab yet;
-# see the `web_full` comment in crates/beet-cli/Cargo.toml. Slower to build (the JS
-# engine's wasi sysroot downloads once) and twice the artifact, so a page mounts it
-# only when its program needs more than the floor.
+# with, ie the example surface, the render stack and ml backend, the perceive-act
+# head, the thread runtime, the tui host, infra definitions and the embedded
+# JavaScript engine; see the `web_full` comment in crates/beet-cli/Cargo.toml.
+# Slower to build (the JS engine's wasi sysroot downloads once) and several times
+# the artifact, so a page mounts it only when its program needs more than the floor.
 build-wasm-full:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=assets/wasm/beet-full.wasm
 

@@ -291,6 +291,7 @@ pub fn build_root(
 /// land before the caller serves. The world-owning driver path (the wasm Worker,
 /// a one-shot build); an in-app caller settles via [`TemplatePending::settle`]
 /// instead. Returns the entry root.
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub(crate) async fn build_entry_owned(
 	world: &mut World,
 	store: BlobStore,

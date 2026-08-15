@@ -10,14 +10,16 @@ Install a wasm binary once, then serve:
     just build-wasm-min                  # assets/wasm/beet-min.wasm, what `/` mounts
     beet --main=examples/wasm --watch    # then open http://127.0.0.1:8337
 
-The two pages mount the two ends of the range, which is the whole point of the
-split: `/` boots `beet-min.wasm` (`web_min`, the smallest binary that is still a
-beet runtime, so its program sticks to the core vocabulary), and `/scripting` boots
-`beet-full.wasm` (`web_full`, the kitchen sink), so `just build-wasm-full` is needed
-before that page runs. Any `examples/action/*.bsx` runs off the full binary: point a
-page's `<MainBsx src>` at eg `/examples/action/malenia.bsx`. The entry roots at the
-workspace (`<StoreRoot>`), so `<AssetsDir>` serves the examples the browser fetches
-and `--watch` live-reloads the browser on any edit under them.
+The pages walk the artifact range, which is the whole point of the split: `/`
+boots `beet-min.wasm` (`web_min`, the smallest binary that is still a beet
+runtime, so its program sticks to the core vocabulary), `/render` boots
+`beet-render.wasm` (`web_render`, the render middle: a wgpu scene in the tab, so
+`just build-wasm-render` first), and `/scripting` boots `beet-full.wasm`
+(`web_full`, the kitchen sink, so `just build-wasm-full` first). Any
+`examples/action/*.bsx` runs off the full binary: point a page's `<MainBsx src>`
+at eg `/examples/action/malenia.bsx`. The entry roots at the workspace
+(`<StoreRoot>`), so `<AssetsDir>` serves the examples the browser fetches and
+`--watch` live-reloads the browser on any edit under them.
 
 `<RoutesDir>` serves examples/wasm/routes (the pages); `<AssetsDir>` mounts the
 workspace assets (the wasm binaries) at /assets and the examples tree at /examples.
