@@ -349,13 +349,13 @@ pub fn FargateBeetSiteBlock(
 		// one declaration for both channels: the block splits boot selection (the
 		// entry store, the transports) onto the container `CMD` and the service
 		// config the runtime `PackageConfig`/analytics store read onto task env.
-		.with_bootstrap(
-			BootstrapConfig::launch()
-				.with_store(StoreUri::parse(&format!("s3://{app_bucket}"))?)
-				.with_server(ServerFilter::new("http,ssh"))
-				.with_service_access(ServiceAccess::Remote)
-				.with_analytics_table(SmolStr::from(analytics_table)),
-		)
+		.with_bootstrap(BootstrapConfig {
+			store: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
+			server: Some(ServerFilter::new("http,ssh")),
+			service_access: ServiceAccess::Remote,
+			analytics_table: Some(analytics_table.into()),
+			..default()
+		})
 		// private key material: its own channel, so no renderer can ever put it
 		// on an argv line or in a `CMD` array.
 		.with_secret_env("BEET_SSH_HOST_KEY", ssh_host_key);

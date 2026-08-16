@@ -76,21 +76,25 @@ impl CloudflareContainerBlock {
 	/// store uri (bucket + account `endpoint`, both known only at deploy time)
 	/// constrained to the http transport.
 	pub fn cmd_bootstrap(&self, endpoint: &str) -> Result<BootstrapConfig> {
-		BootstrapConfig::launch()
-			.with_store(StoreUri::parse(&format!(
+		BootstrapConfig {
+			store: Some(StoreUri::parse(&format!(
 				"s3://{}?endpoint={endpoint}",
 				self.bucket
-			))?)
-			.with_server(ServerFilter::new("http"))
-			.xok()
+			))?),
+			server: Some(ServerFilter::new("http")),
+			..default()
+		}
+		.xok()
 	}
 
 	/// The deployed binary's env config, rendered into the fronting Worker's
 	/// `envVars`. `0.0.0.0` binds all interfaces: the Worker proxies to the
 	/// container's own IP, so a localhost bind would be unreachable.
 	pub fn runtime_bootstrap(&self) -> BootstrapConfig {
-		BootstrapConfig::launch()
-			.with_host(core::net::Ipv4Addr::UNSPECIFIED.into())
+		BootstrapConfig {
+			host: Some(core::net::Ipv4Addr::UNSPECIFIED.into()),
+			..default()
+		}
 	}
 }
 

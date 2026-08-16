@@ -550,19 +550,17 @@ impl Block for FargateBlock {
 		// Container environment variables. The `BEET_*` set is rendered from the
 		// block's `BootstrapConfig` with the platform bindings merged in, so the
 		// names the deploy writes are by construction the names the runtime reads.
-		let mut runtime = self
-			.bootstrap
-			.clone()
-			.with_host(core::net::Ipv4Addr::UNSPECIFIED.into())
-			.with_http_port(self.container_port)
+		let runtime = BootstrapConfig {
+			host: Some(core::net::Ipv4Addr::UNSPECIFIED.into()),
+			http_port: Some(self.container_port),
+			ssh_port: self.allow_ssh.then_some(self.ssh_container_port),
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
-			.with_stage(stage.clone())
-			.with_deploy_id(deploy_id.to_string())
-			.with_deploy_timestamp(deploy_timestamp);
-		if self.allow_ssh {
-			runtime = runtime.with_ssh_port(self.ssh_container_port);
-		}
+			stage: stage.clone(),
+			deploy_id: Some(deploy_id.to_string().into()),
+			deploy_timestamp: Some(deploy_timestamp.into()),
+			..self.bootstrap.clone()
+		};
 		let mut env_vars = std::collections::BTreeMap::new();
 		for (key, value) in runtime.split_channels().1.to_env() {
 			env_vars.insert(key, value.to_string());
@@ -1143,12 +1141,12 @@ mod tests {
 			&FargateBlock::default()
 				.with_allow_ssh(true)
 				.with_container_port(9001)
-				.with_bootstrap(
-					BootstrapConfig::launch()
-						.with_service_access(ServiceAccess::Remote)
-						.with_analytics_table("beet--dev--analytics")
-						.with_store(StoreUri::parse("s3://beet--dev--app").unwrap()),
-				),
+				.with_bootstrap(BootstrapConfig {
+					service_access: ServiceAccess::Remote,
+					analytics_table: Some("beet--dev--analytics".into()),
+					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+					..default()
+				}),
 		);
 		let json = json.as_str();
 		json
@@ -1176,12 +1174,12 @@ mod tests {
 	/// secret channel is visible in the type: a secret can only reach env.
 	#[beet_core::test]
 	fn splits_cmd_and_secret_channels() {
-		let block = FargateBlock::default().with_bootstrap(
-			BootstrapConfig::launch()
-				.with_store(StoreUri::parse("s3://beet--dev--app").unwrap())
-				.with_server(ServerFilter::new("http,ssh"))
-				.with_stage("staging"),
-		);
+		let block = FargateBlock::default().with_bootstrap(BootstrapConfig {
+			store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+			server: Some(ServerFilter::new("http,ssh")),
+			stage: "staging".into(),
+			..default()
+		});
 		block
 			.cmd_bootstrap()
 			.to_cmd_json("/app")

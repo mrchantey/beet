@@ -37,7 +37,7 @@ impl Request {
 	) -> Result<bool> {
 		ServerFilter::from_params(request.params())
 			.as_ref()
-			.or(BootstrapConfig::get().server().as_ref())
+			.or(BootstrapConfig::get().server.as_ref())
 			.map(|filter| filter.passes(name))
 			.unwrap_or(default_boot)
 			.xok()
@@ -51,12 +51,12 @@ impl Request {
 /// [`Default`] through [`BootstrapConfig::get`], and a markup-declared field
 /// out-ranks env, so consulting it again here would invert that precedence. A
 /// boot request is not a process launch, so this is a plain params type rather
-/// than a second [`BootstrapConfig`]; `boot_params_match_launch_knobs` pins its
-/// names to the flags a deploy renders, which is the drift the process config
+/// than a second [`BootstrapConfig`]; `server_params_match_bootstrap_knobs` pins
+/// its names to the flags a deploy renders, which is the drift the process config
 /// exists to prevent.
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 #[reflect(Default)]
-pub struct BootParams {
+pub struct ServerParams {
 	/// The address to bind, overriding the declared host.
 	pub host: Option<String>,
 	/// The http listener port, overriding the declared port.
@@ -68,7 +68,7 @@ pub struct BootParams {
 	pub path: Option<String>,
 }
 
-impl BootParams {
+impl ServerParams {
 	/// The boot knobs `request` carries.
 	pub fn from_request(request: &Request) -> Result<Self> {
 		request.params().parse_reflect()
@@ -89,6 +89,7 @@ impl BootParams {
 			.xok()
 	}
 }
+
 /// A bootable, parking server: supplies the `--server` selector and the serve-loop
 /// launcher the shared [`ServerShutdown<Self>`] machinery drives.
 ///
@@ -208,23 +209,25 @@ mod test {
 
 	/// The invariant that lets a boot read plain params instead of a second
 	/// [`BootstrapConfig`]: every flag the deploy renders for a bind knob is a
-	/// flag [`BootParams`] reads back. A renamed knob fails here rather than
+	/// flag [`ServerParams`] reads back. A renamed knob fails here rather than
 	/// silently leaving a deployed server on the wrong port.
 	#[beet_core::test]
-	fn boot_params_match_launch_knobs() {
-		let argv = BootstrapConfig::launch()
-			.with_host("0.0.0.0".parse().unwrap())
-			.with_http_port(9090)
-			.with_ssh_port(2222)
-			.with_path("docs/form")
-			.to_argv()
-			.unwrap();
+	fn server_params_match_bootstrap_knobs() {
+		let argv = BootstrapConfig {
+			host: Some("0.0.0.0".parse().unwrap()),
+			http_port: Some(9090),
+			ssh_port: Some(2222),
+			path: Some("docs/form".into()),
+			..default()
+		}
+		.to_argv()
+		.unwrap();
 		let request = Request::from_cli_args(CliArgs::parse_tokens(
 			argv.iter().map(ToString::to_string).collect(),
 		));
-		BootParams::from_request(&request)
+		ServerParams::from_request(&request)
 			.unwrap()
-			.xpect_eq(BootParams {
+			.xpect_eq(ServerParams {
 				host: Some("0.0.0.0".into()),
 				port: Some(9090),
 				ssh_port: Some(2222),
@@ -232,7 +235,7 @@ mod test {
 			});
 	}
 
-	/// `--server` selects through the same [`ServerFilter`] grammar the launch
+	/// `--server` selects through the same [`ServerFilter`] grammar the process
 	/// config renders, and an unselected boot falls back to the server's own
 	/// `default_boot`.
 	#[beet_core::test]

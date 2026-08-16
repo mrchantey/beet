@@ -155,10 +155,10 @@ impl HttpServer {
 	}
 
 	/// Overlays `--port` / `--host` from the boot request onto these fields, the
-	/// resolved bind config the backend then reads. See [`BootParams`] for why
+	/// resolved bind config the backend then reads. See [`ServerParams`] for why
 	/// the request alone decides.
 	fn apply_request(&mut self, request: &Request) -> Result {
-		let boot = BootParams::from_request(request)?;
+		let boot = ServerParams::from_request(request)?;
 		if let Some(port) = boot.port {
 			self.port = Some(port);
 		}

@@ -26,7 +26,7 @@ impl DevCert {
 	/// `target/tls` under the workspace root.
 	pub fn dir() -> PathBuf {
 		BootstrapConfig::get()
-			.tls_dir()
+			.tls_dir
 			.as_ref()
 			.map(|dir| PathBuf::from(dir.as_str()))
 			.unwrap_or_else(|| fs_ext::workspace_root().join("target/tls"))

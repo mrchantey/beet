@@ -12,22 +12,19 @@ use core::str::FromStr;
 ///
 /// A `BootstrapConfig` describes **one process launch**. There are exactly two
 /// things to do with one: read the launch *this* process booted from
-/// ([`get`](Self::get) / [`from_env`](Self::from_env)), or describe the launch of
-/// a process you are about to start ([`launch`](Self::launch), rendered through
+/// ([`get`](Self::get) / [`from_env`](Self::from_env)), or construct one to
+/// describe the launch of a process you are about to start, rendered through
 /// [`to_argv`](Self::to_argv) / [`to_env`](Self::to_env) /
 /// [`to_cmd_json`](Self::to_cmd_json) by `ChildProcess::with_bootstrap` and the
-/// deploy blocks).
+/// deploy blocks.
 ///
 /// It is **not** a params parser. A route reading one flag off its request reads
 /// that flag (a `ParamsPartial` params type, so `--help` documents it), because a
 /// request is not a process launch: pulling a whole 19-knob config out of one to
 /// reach a single field silently drags the `BEET_*` environment in behind it and
 /// hides the flag from the route's own help. The single request-shaped
-/// constructor, [`take_launch`](Self::take_launch), exists only for beet spawning
+/// constructor, [`take_params`](Self::take_params), exists only for beet spawning
 /// beet, and consumes the knobs it reads so they cannot also be forwarded.
-///
-/// Fields are private and set through the generated `with_*` builders, so a
-/// construction site reads as the launch description it is.
 ///
 /// ## The transport rule
 ///
@@ -67,73 +64,66 @@ use core::str::FromStr;
 /// Secrets are deliberately absent: the type has no secret field, so no renderer
 /// can put one on an argv line, a `CMD` array or a systemd `ExecStart`. Secrets
 /// stay env on their existing channels.
-#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith)]
-#[set_with(unwrap_option)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
 	/// The entry document: a path for a dir-rooted store, a name within a
 	/// self-rooted one. `--main` / `BEET_MAIN`.
-	main: Option<SmolStr>,
+	pub main: Option<SmolStr>,
 	/// The store the entry loads through. `--store` / `BEET_STORE`.
-	store: Option<StoreUri>,
+	pub store: Option<StoreUri>,
 	/// Watch the entry's sources and live-reload. `--watch` / `BEET_WATCH`.
-	watch: bool,
+	pub watch: bool,
 	/// Cargo features this binary is asserted to have been built with.
 	/// `--features` / `BEET_FEATURES`.
-	features: Vec<SmolStr>,
+	pub features: Vec<SmolStr>,
 	/// Which declared servers boot. `--server` / `BEET_SERVER`.
-	server: Option<ServerFilter>,
+	pub server: Option<ServerFilter>,
 	/// The opening route a freshly-opened tui/ssh surface navigates to.
 	/// `--path` / `BEET_PATH`.
-	path: Option<SmolStr>,
-	/// The address servers bind to, read through
+	pub path: Option<SmolStr>,
+	/// The address servers bind to, usually read through
 	/// [`host_octets`](Self::host_octets). `--host` / `BEET_HOST`.
-	#[get(skip)]
-	host: Option<IpAddr>,
+	pub host: Option<IpAddr>,
 	/// The http listener port. `--port` / `BEET_HTTP_PORT`.
-	#[get(copy)]
-	http_port: Option<u16>,
+	pub http_port: Option<u16>,
 	/// The ssh listener port. `--ssh-port` / `BEET_SSH_PORT`.
-	#[get(copy)]
-	ssh_port: Option<u16>,
+	pub ssh_port: Option<u16>,
 	/// The infrastructure stage this process runs in, defaulting to
 	/// [`DEFAULT_STAGE`](Self::DEFAULT_STAGE). `--stage` / `BEET_STAGE`.
-	stage: SmolStr,
+	pub stage: SmolStr,
 	/// Whether services resolve locally or against the cloud, defaulting to
 	/// [`ServiceAccess::Local`]. `--service-access` / `BEET_SERVICE_ACCESS`.
-	#[get(copy)]
-	service_access: ServiceAccess,
+	pub service_access: ServiceAccess,
 	/// The deploy-provided analytics table name. `--analytics-table` /
 	/// `BEET_ANALYTICS_TABLE`.
-	analytics_table: Option<SmolStr>,
+	pub analytics_table: Option<SmolStr>,
 	/// This deployment's unique id. `--deploy-id` / `BEET_DEPLOY_ID`.
-	deploy_id: Option<SmolStr>,
+	pub deploy_id: Option<SmolStr>,
 	/// This deployment's timestamp. `--deploy-timestamp` /
 	/// `BEET_DEPLOY_TIMESTAMP`.
-	deploy_timestamp: Option<SmolStr>,
+	pub deploy_timestamp: Option<SmolStr>,
 	/// Force TLS on or off, overriding the managed-platform detection.
 	/// `--tls` / `BEET_TLS`.
-	#[get(copy)]
-	tls: Option<bool>,
+	pub tls: Option<bool>,
 	/// Where the cached dev certificate lives. `--tls-dir` / `BEET_TLS_DIR`.
-	tls_dir: Option<SmolStr>,
+	pub tls_dir: Option<SmolStr>,
 	/// Run terminal surfaces buffered, never touching the real tty.
 	/// `--headless` / `BEET_HEADLESS`.
-	headless: bool,
+	pub headless: bool,
 	/// Capture the first window to this PNG and exit. `--screenshot` /
 	/// `BEET_SCREENSHOT`.
-	screenshot: Option<SmolStr>,
+	pub screenshot: Option<SmolStr>,
 	/// The frame the screenshot harness captures on. `--screenshot-frame` /
 	/// `BEET_SCREENSHOT_FRAME`.
-	#[get(copy)]
-	screenshot_frame: Option<u32>,
+	pub screenshot_frame: Option<u32>,
 }
 
 /// Every field's static default, ie what an unset knob resolves to. Also the
 /// baseline the renderers diff against, so a field left at its default never
-/// reaches an argv line or an env pair. Spelled [`launch`](Self::launch) at a
-/// construction site, which names what constructing one is for.
+/// reaches an argv line or an env pair, and the base a launch description is
+/// built over: `BootstrapConfig { store, ..default() }`.
 impl Default for BootstrapConfig {
 	fn default() -> Self {
 		Self {
@@ -255,16 +245,6 @@ impl BootstrapConfig {
 		env: "BEET_SCREENSHOT_FRAME",
 	};
 
-	/// A launch to describe: every knob at its static default, named explicitly
-	/// from here with the `with_*` builders.
-	///
-	/// The one constructor, and only for a process *this* one is about to start:
-	/// a beet child (`ChildProcess::with_bootstrap`) or a deployed binary (an
-	/// infra block's rendered `CMD` / `ExecStart` / task env). Nothing is
-	/// inherited by accident, because nothing is inherited at all. To read the
-	/// launch this process itself booted from, use [`get`](Self::get).
-	pub fn launch() -> Self { Self::default() }
-
 	/// Parse this process's argv, with the `BEET_*` environment as the fallback for
 	/// every field argv did not set. Strict: a malformed value errors.
 	///
@@ -295,6 +275,7 @@ impl BootstrapConfig {
 	/// this process's `BEET_*` environment as the fallback for every knob the
 	/// params did not set).
 	///
+	///
 	/// The one request-shaped constructor, and only for beet spawning beet: the
 	/// wasm runner is handed the module's argv and must split it, delivering the
 	/// module's own knobs through [`to_argv`](Self::to_argv) and forwarding the
@@ -307,7 +288,7 @@ impl BootstrapConfig {
 	/// (`BEET_STORE=.. cargo test ..` reaches the runner only through the
 	/// environment), and the child's environment is scrubbed of `BEET_*` on the
 	/// way out, so the argv is the whole delivery.
-	pub fn take_launch(
+	pub fn take_params(
 		params: &mut MultiMap<SmolStr, SmolStr>,
 	) -> Result<Self> {
 		let config = Self::parse(params, &Self::env_var)?;
@@ -806,26 +787,27 @@ mod test {
 
 	/// A config with every field set, so a round trip exercises each one.
 	fn full() -> BootstrapConfig {
-		BootstrapConfig::launch()
-			.with_main("main.bsx")
-			.with_store(StoreUri::parse("s3://site?region=us-west-2").unwrap())
-			.with_watch(true)
-			.with_features(vec!["thread".into(), "sockets".into()])
-			.with_server(ServerFilter::new("http,ssh"))
-			.with_path("/docs")
-			.with_host("0.0.0.0".parse().unwrap())
-			.with_http_port(8337)
-			.with_ssh_port(2222)
-			.with_stage("prod")
-			.with_service_access(ServiceAccess::Remote)
-			.with_analytics_table("beet--prod--analytics")
-			.with_deploy_id("019823ff-0000-7000-8000-000000000000")
-			.with_deploy_timestamp("2026-08-09T00:00:00Z")
-			.with_tls(true)
-			.with_tls_dir("/tmp/tls")
-			.with_headless(true)
-			.with_screenshot("/tmp/shot.png")
-			.with_screenshot_frame(30)
+		BootstrapConfig {
+			main: Some("main.bsx".into()),
+			store: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
+			watch: true,
+			features: vec!["thread".into(), "sockets".into()],
+			server: Some(ServerFilter::new("http,ssh")),
+			path: Some("/docs".into()),
+			host: Some("0.0.0.0".parse().unwrap()),
+			http_port: Some(8337),
+			ssh_port: Some(2222),
+			stage: "prod".into(),
+			service_access: ServiceAccess::Remote,
+			analytics_table: Some("beet--prod--analytics".into()),
+			deploy_id: Some("019823ff-0000-7000-8000-000000000000".into()),
+			deploy_timestamp: Some("2026-08-09T00:00:00Z".into()),
+			tls: Some(true),
+			tls_dir: Some("/tmp/tls".into()),
+			headless: true,
+			screenshot: Some("/tmp/shot.png".into()),
+			screenshot_frame: Some(30),
+		}
 	}
 
 	/// The renderer invariant: argv round-trips through the argv parse, and env
@@ -856,11 +838,11 @@ mod test {
 			.xpect_eq(config);
 	}
 
-	/// A bare launch renders to nothing on either channel.
+	/// A default config renders to nothing on either channel.
 	#[crate::test]
 	fn default_renders_empty() {
-		BootstrapConfig::launch().to_argv().unwrap().len().xpect_eq(0);
-		BootstrapConfig::launch().to_env().len().xpect_eq(0);
+		BootstrapConfig::default().to_argv().unwrap().len().xpect_eq(0);
+		BootstrapConfig::default().to_env().len().xpect_eq(0);
 	}
 
 	/// A field with a static default renders only when it differs from it: the
@@ -868,16 +850,18 @@ mod test {
 	/// anyway, while a named stage always reaches both channels.
 	#[crate::test]
 	fn defaulted_fields_render_only_when_named() {
-		BootstrapConfig::launch()
-			.with_stage("staging")
-			.with_service_access(ServiceAccess::Remote)
-			.to_argv()
-			.unwrap()
-			.join(" ")
-			.xpect_eq("--stage=staging --service-access=remote");
+		BootstrapConfig {
+			stage: "staging".into(),
+			service_access: ServiceAccess::Remote,
+			..default()
+		}
+		.to_argv()
+		.unwrap()
+		.join(" ")
+		.xpect_eq("--stage=staging --service-access=remote");
 		// the defaults are what an unset knob parses back to, so dropping them is
 		// lossless
-		parse_argv("").unwrap().xpect_eq(BootstrapConfig::launch());
+		parse_argv("").unwrap().xpect_eq(BootstrapConfig::default());
 	}
 
 	/// Argv beats env, per field, with no exceptions.
@@ -890,9 +874,9 @@ mod test {
 			_ => None,
 		};
 		let config = BootstrapConfig::parse(&params, &env).unwrap();
-		config.http_port().xpect_eq(Some(9000));
+		config.http_port.xpect_eq(Some(9000));
 		// a field argv did not set still falls back to env
-		config.stage().as_str().xpect_eq("prod");
+		config.stage.as_str().xpect_eq("prod");
 	}
 
 	/// A token the renderers cannot encode is a loud error, not a corrupted
@@ -900,28 +884,34 @@ mod test {
 	/// error.
 	#[crate::test]
 	fn rejects_unencodable_tokens() {
-		BootstrapConfig::launch()
-			.with_main("my entry.bsx")
-			.to_argv()
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("cannot be rendered");
-		BootstrapConfig::launch()
-			.with_main("say\"hi\"")
-			.to_cmd_json("/app")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("cannot be rendered");
+		BootstrapConfig {
+			main: Some("my entry.bsx".into()),
+			..default()
+		}
+		.to_argv()
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("cannot be rendered");
+		BootstrapConfig {
+			main: Some("say\"hi\"".into()),
+			..default()
+		}
+		.to_cmd_json("/app")
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("cannot be rendered");
 	}
 
 	#[crate::test]
 	fn renders_cmd_json() {
-		BootstrapConfig::launch()
-			.with_store(StoreUri::parse("s3://site").unwrap())
-			.with_server(ServerFilter::new("http,ssh"))
-			.to_cmd_json("/app")
-			.unwrap()
-			.xpect_eq(r#"["/app", "--store=s3://site", "--server=http,ssh"]"#);
+		BootstrapConfig {
+			store: Some(StoreUri::parse("s3://site").unwrap()),
+			server: Some(ServerFilter::new("http,ssh")),
+			..default()
+		}
+		.to_cmd_json("/app")
+		.unwrap()
+		.xpect_eq(r#"["/app", "--store=s3://site", "--server=http,ssh"]"#);
 	}
 
 	/// Boot selection rides argv, ambient service config rides env, and the
@@ -971,8 +961,8 @@ mod test {
 			&CliArgs::parse("--port=nope --stage=prod").params,
 			&|_| None,
 		);
-		config.http_port().xpect_none();
-		config.stage().as_str().xpect_eq("prod");
+		config.http_port.xpect_none();
+		config.stage.as_str().xpect_eq("prod");
 	}
 
 	/// `--server` present but empty is a selection with no constraint, distinct
@@ -982,23 +972,22 @@ mod test {
 	fn empty_server_selection_is_present() {
 		parse_argv("--server")
 			.unwrap()
-			.server()
-			.clone()
+			.server
 			.unwrap()
 			.passes("http")
 			.xpect_true();
-		parse_argv("").unwrap().server().xpect_none();
+		parse_argv("").unwrap().server.xpect_none();
 	}
 
 	/// Beet spawning beet: the launch knobs leave the params (delivered on the
 	/// child's argv instead) and everything else is untouched, so a flag can
 	/// never be forwarded twice.
 	#[crate::test]
-	fn take_launch_consumes_only_the_knobs() {
+	fn take_params_consumes_only_the_knobs() {
 		let mut params = CliArgs::parse("--port=9090 --nocapture").params;
-		BootstrapConfig::take_launch(&mut params)
+		BootstrapConfig::take_params(&mut params)
 			.unwrap()
-			.http_port()
+			.http_port
 			.xpect_eq(Some(9090));
 		params.contains_key("port").xpect_false();
 		params.contains_key("nocapture").xpect_true();

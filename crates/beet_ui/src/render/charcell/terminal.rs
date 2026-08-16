@@ -48,7 +48,7 @@ impl Default for StdioTerminal {
 			restore_hook: true,
 			ctrl_c_exit: true,
 			log_file: Some(PathBuf::from("target/beet-log.txt")),
-			headless: BootstrapConfig::get().headless(),
+			headless: BootstrapConfig::get().headless,
 			config: TerminalConfig::default().with_raw_mode(true),
 		}
 	}

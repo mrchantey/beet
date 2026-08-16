@@ -191,7 +191,7 @@ async fn build_entry(
 	// Opt-in, so a running presentation never reloads underfoot; a deployed (remote)
 	// entry has no local dir to watch, and the wasm runner has no fs watcher.
 	#[cfg(not(target_arch = "wasm32"))]
-	if watch_dir.is_some() && config.watch() {
+	if watch_dir.is_some() && config.watch {
 		return build_watched_entry(world, store, entry_name, formats).await;
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it spawns
@@ -285,8 +285,8 @@ async fn resolve_entry(
 	// module's own config on via `ChildProcess::with_bootstrap`.
 	let is_wasm_runner =
 		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
-	let store_uri = (!is_wasm_runner).then(|| config.store().as_ref()).flatten();
-	let main = (!is_wasm_runner).then(|| config.main().as_ref()).flatten();
+	let store_uri = (!is_wasm_runner).then(|| config.store.as_ref()).flatten();
+	let main = (!is_wasm_runner).then(|| config.main.as_ref()).flatten();
 
 	// a self-rooted store: no local dir, no ancestor walk, no watch dir.
 	if store_uri.is_some_and(StoreUri::is_self_rooted) {
@@ -339,11 +339,11 @@ fn features_self_check(
 ) -> Option<CrateCheck> {
 	let is_wasm_runner =
 		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
-	let runs_entry = config.main().is_some() || args.path.is_empty();
-	if is_wasm_runner || !runs_entry || config.features().is_empty() {
+	let runs_entry = config.main.is_some() || args.path.is_empty();
+	if is_wasm_runner || !runs_entry || config.features.is_empty() {
 		return None;
 	}
-	Some(CrateCheck::features(config.features().join(",")))
+	Some(CrateCheck::features(config.features.join(",")))
 }
 
 /// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving

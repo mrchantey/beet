@@ -40,10 +40,12 @@ pub fn app_bucket_name(stack: &Stack) -> String {
 /// onto argv (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
 /// `bootstrap` script) and service config onto env.
 pub fn remote_bootstrap(bucket_name: impl AsRef<str>) -> Result<BootstrapConfig> {
-	BootstrapConfig::launch()
-		.with_store(StoreUri::parse(&format!("s3://{}", bucket_name.as_ref()))?)
-		.with_server(ServerFilter::new("http"))
-		.xok()
+	BootstrapConfig {
+		store: Some(StoreUri::parse(&format!("s3://{}", bucket_name.as_ref()))?),
+		server: Some(ServerFilter::new("http")),
+		..default()
+	}
+	.xok()
 }
 
 /// Shared `CargoBuild` for the generic `beet` binary; callers pick the terminal

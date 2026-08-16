@@ -60,18 +60,18 @@ impl Stack {
 		let config = BootstrapConfig::get();
 
 		let deploy_id = config
-			.deploy_id()
+			.deploy_id
 			.as_deref()
 			.and_then(|id| Uuid::parse_str(id).ok())
 			.unwrap_or_else(Uuid::now_v7);
 
 		let deploy_timestamp = config
-			.deploy_timestamp()
+			.deploy_timestamp
 			.as_ref()
 			.map(|stamp| stamp.to_string())
 			.unwrap_or_else(crate::types::artifacts::now_timestamp);
 
-		let stage = config.stage().clone();
+		let stage = config.stage.clone();
 
 		Self {
 			app_name,

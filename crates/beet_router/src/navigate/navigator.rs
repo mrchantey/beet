@@ -443,7 +443,7 @@ impl OpeningRoute {
 	/// compiled binary's own args, eg a deployed site opening at its home route,
 	/// which for an argument-less boot is `/`).
 	pub fn from_request(request: &Request) -> Result<Self> {
-		let url = match BootParams::from_request(request)?.path {
+		let url = match ServerParams::from_request(request)?.path {
 			Some(path) => Url::parse(path),
 			None => Url::parse(request.path_string()),
 		};

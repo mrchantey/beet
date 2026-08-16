@@ -85,7 +85,7 @@ pub mod prelude {
 	/// port, an env override and the static default all resolve the same way.
 	pub fn resolve_server_port(explicit: Option<u16>) -> u16 {
 		explicit
-			.or(beet_core::prelude::BootstrapConfig::get().http_port())
+			.or(beet_core::prelude::BootstrapConfig::get().http_port)
 			.unwrap_or(DEFAULT_HTTP_PORT)
 	}
 

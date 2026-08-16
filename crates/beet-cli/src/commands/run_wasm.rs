@@ -145,7 +145,7 @@ pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
 	let chrome_args = params.chrome_args();
 	cli.params.remove("wasm-host");
 	cli.params.remove("chrome-args");
-	let bootstrap = BootstrapConfig::take_launch(&mut cli.params)?;
+	let bootstrap = BootstrapConfig::take_params(&mut cli.params)?;
 	let mut forwarded = cli.into_args();
 	forwarded.extend(trailing.into_iter().map(Into::into));
 

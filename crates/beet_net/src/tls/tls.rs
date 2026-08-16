@@ -54,7 +54,7 @@ impl Tls {
 	/// while deployment is an environment.
 	pub fn active(&self) -> bool {
 		BootstrapConfig::get()
-			.tls()
+			.tls
 			.unwrap_or_else(|| !Self::platform_tls_layer())
 	}
 

@@ -59,7 +59,7 @@ fn on_action_in(
 	let (selected, boot, opening) = ev.with(|request| -> Result<_> {
 		(
 			Request::selects_server(request, "ssh", default_boot)?,
-			BootParams::from_request(request)?,
+			ServerParams::from_request(request)?,
 			OpeningRoute::from_request(request)?,
 		)
 			.xok()
