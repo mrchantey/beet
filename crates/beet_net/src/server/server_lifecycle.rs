@@ -16,27 +16,77 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::component::Mutable;
 use core::marker::PhantomData;
+use core::net::IpAddr;
 
 impl Request {
-	/// Whether a server named `name` should boot for `request`, read from its
-	/// [`BootstrapConfig`] [`ServerFilter`] (`--server`, else `BEET_SERVER`).
+	/// Whether a server named `name` should boot for `request`, from the boot
+	/// request's [`ServerFilter`] (`--server`), else the process
+	/// [`BootstrapConfig`]'s (`--server`, else `BEET_SERVER`).
 	///
-	/// The env fallback is why a deployed binary launched with no args (a lambda
-	/// bootstrap, a lightsail systemd unit) still selects its transport. Absent
-	/// both, the server's own `default_boot` decides: it defaults to `true`, so a
-	/// bare `beet` brings up every declared server, and an entry clears it on one
-	/// (eg a secondary [`HttpServer`]) that should boot only when `--server`
-	/// names it.
+	/// The process-config fallback is why a deployed binary launched with no args
+	/// (a lambda bootstrap, a lightsail systemd unit) still selects its
+	/// transport: its `BEET_SERVER` reaches the boot even though the synthesized
+	/// request carries no flag. Absent both, the server's own `default_boot`
+	/// decides: it defaults to `true`, so a bare `beet` brings up every declared
+	/// server, and an entry clears it on one (eg a secondary [`HttpServer`]) that
+	/// should boot only when `--server` names it.
 	pub fn selects_server(
 		request: &Request,
 		name: &str,
 		default_boot: bool,
 	) -> Result<bool> {
-		match BootstrapConfig::from_params(request.params())?.server {
-			Some(filter) => filter.passes(name),
-			None => default_boot,
-		}
-		.xok()
+		ServerFilter::from_params(request.params())
+			.as_ref()
+			.or(BootstrapConfig::get().server().as_ref())
+			.map(|filter| filter.passes(name))
+			.unwrap_or(default_boot)
+			.xok()
+	}
+}
+
+/// The bind knobs a booting server overlays onto its own declared config, read
+/// from the boot request.
+///
+/// The request alone, never the environment: env already fed each server's
+/// [`Default`] through [`BootstrapConfig::get`], and a markup-declared field
+/// out-ranks env, so consulting it again here would invert that precedence. A
+/// boot request is not a process launch, so this is a plain params type rather
+/// than a second [`BootstrapConfig`]; `boot_params_match_launch_knobs` pins its
+/// names to the flags a deploy renders, which is the drift the process config
+/// exists to prevent.
+#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+#[reflect(Default)]
+pub struct BootParams {
+	/// The address to bind, overriding the declared host.
+	pub host: Option<String>,
+	/// The http listener port, overriding the declared port.
+	pub port: Option<u16>,
+	/// The ssh listener port, overriding the declared port.
+	pub ssh_port: Option<u16>,
+	/// The route a freshly-opened tui/ssh surface navigates to, overriding the
+	/// request path.
+	pub path: Option<String>,
+}
+
+impl BootParams {
+	/// The boot knobs `request` carries.
+	pub fn from_request(request: &Request) -> Result<Self> {
+		request.params().parse_reflect()
+	}
+
+	/// The `--host` override as IPv4 octets, the form the server components hold.
+	/// A malformed address errors; an IPv6 one warns and yields `None`, per
+	/// [`BootstrapConfig::ipv4_octets`].
+	pub fn host_octets(&self) -> Result<Option<[u8; 4]>> {
+		self.host
+			.as_deref()
+			.map(|host| {
+				host.parse::<IpAddr>()
+					.map_err(|err| bevyhow!("invalid --host `{host}`: {err}"))
+			})
+			.transpose()?
+			.and_then(BootstrapConfig::ipv4_octets)
+			.xok()
 	}
 }
 /// A bootable, parking server: supplies the `--server` selector and the serve-loop
@@ -148,5 +198,59 @@ fn teardown_server<S: BootServer>(
 		&& let Some(signal) = shutdown.signal.take()
 	{
 		signal.signal(());
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// The invariant that lets a boot read plain params instead of a second
+	/// [`BootstrapConfig`]: every flag the deploy renders for a bind knob is a
+	/// flag [`BootParams`] reads back. A renamed knob fails here rather than
+	/// silently leaving a deployed server on the wrong port.
+	#[beet_core::test]
+	fn boot_params_match_launch_knobs() {
+		let argv = BootstrapConfig::launch()
+			.with_host("0.0.0.0".parse().unwrap())
+			.with_http_port(9090)
+			.with_ssh_port(2222)
+			.with_path("docs/form")
+			.to_argv()
+			.unwrap();
+		let request = Request::from_cli_args(CliArgs::parse_tokens(
+			argv.iter().map(ToString::to_string).collect(),
+		));
+		BootParams::from_request(&request)
+			.unwrap()
+			.xpect_eq(BootParams {
+				host: Some("0.0.0.0".into()),
+				port: Some(9090),
+				ssh_port: Some(2222),
+				path: Some("docs/form".into()),
+			});
+	}
+
+	/// `--server` selects through the same [`ServerFilter`] grammar the launch
+	/// config renders, and an unselected boot falls back to the server's own
+	/// `default_boot`.
+	#[beet_core::test]
+	fn selects_server_reads_the_filter() {
+		let selects = |args: &str, name: &str, default_boot: bool| {
+			Request::selects_server(
+				&Request::from_cli_str(args),
+				name,
+				default_boot,
+			)
+			.unwrap()
+		};
+		selects("--server=http,ssh", "http", false).xpect_true();
+		selects("--server=http", "cli", true).xpect_false();
+		// a bare `--server` is present but unconstrained
+		selects("--server", "cli", false).xpect_true();
+		// absent, the server's own `default_boot` decides
+		selects("", "http", true).xpect_true();
+		selects("", "http", false).xpect_false();
 	}
 }

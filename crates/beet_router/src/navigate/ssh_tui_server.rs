@@ -59,10 +59,7 @@ fn on_action_in(
 	let (selected, boot, opening) = ev.with(|request| -> Result<_> {
 		(
 			Request::selects_server(request, "ssh", default_boot)?,
-			// the request alone, with no env fallback: env already fed
-			// `SshServer::default` below, so consulting it again here would let it
-			// out-rank a markup-declared field.
-			BootstrapConfig::parse_params(request.params())?,
+			BootParams::from_request(request)?,
 			OpeningRoute::from_request(request)?,
 		)
 			.xok()
@@ -70,12 +67,12 @@ fn on_action_in(
 	if !selected {
 		return Ok(());
 	}
-	// the bind config from the request, defaulting from env.
+	// the bind config from the request, over the env-fed `SshServer::default`.
 	let mut server = SshServer::default();
 	if let Some(port) = boot.ssh_port {
 		server.port = Some(port);
 	}
-	if let Some(host) = boot.host_octets() {
+	if let Some(host) = boot.host_octets()? {
 		server.host = host;
 	}
 	// the opening route each session navigates to, recorded on the server (the

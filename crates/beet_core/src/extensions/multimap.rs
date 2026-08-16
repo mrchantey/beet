@@ -8,11 +8,13 @@
 //!
 //! The target type must derive `Reflect`, `FromReflect`, and `Default`, plus include
 //! the `#[reflect(Default)]` attribute. Field types can be:
-//! - `bool` - parsed from "true"/"false" strings
+//! - `bool` - parsed from "true"/"false" strings, or bare presence as a flag
 //! - `String` - direct string value
-//! - `Option<String>` - `None` if key is missing
 //! - `Vec<String>` - all values for a key
 //! - Numeric types (`i8`, `i16`, `i32`, `i64`, `i128`, `isize`, `u8`, `u16`, `u32`, `u64`, `u128`, `usize`, `f32`, `f64`)
+//! - `Option<T>` of any of the above - `None` if key is missing, so an unset
+//!   knob is distinguishable from one explicitly set to the type's default
+//!   (`--port=0` is `Some(0)`, no `--port` at all is `None`)
 //! - Newtype wrappers (single-field structs/tuple structs) - transparent, use parent field name
 //! - Nested multi-field structs/tuple structs - fields are flattened
 //! - `Vec<NewType>` - vectors of newtype wrappers
@@ -77,6 +79,9 @@ use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::attributes::CustomAttributes;
+use bevy::reflect::enums::DynamicEnum;
+use bevy::reflect::enums::DynamicVariant;
+use bevy::reflect::enums::VariantInfo;
 use bevy::reflect::structs::DynamicStruct;
 use bevy::reflect::structs::StructInfo;
 use bevy::reflect::tuple::DynamicTuple;
@@ -565,6 +570,12 @@ fn build_field_value(
 	if field_type_id == TypeId::of::<bool>() {
 		return parse_bool_field(map, field_name);
 	};
+	// `Option<bool>` keeps the flag shape, so a bare `--watch` is `Some(true)` and
+	// an absent key stays `None`.
+	let option_inner = option_some_field(field_type_info);
+	if option_inner.is_some_and(|inner| inner == TypeId::of::<bool>()) {
+		return Ok(parse_bool_field(map, field_name)?.map(wrap_some));
+	}
 
 	// Check for complex/nested types first (structs, tuples, lists)
 	// These are flattened and don't have a direct entry in the map
@@ -638,12 +649,44 @@ fn build_field_value(
 		return Ok(None);
 	};
 
-	// Handle primitive/leaf types
-	match field_type_id {
+	// an `Option<T>` leaf present in the map is `Some(T)`; an absent one already
+	// returned above, leaving the field at its default `None`.
+	if let Some(inner) = option_inner {
+		return Ok(parse_leaf_field(map_item, field_name, inner)?.map(wrap_some));
+	}
+	parse_leaf_field(map_item, field_name, field_type_id)
+}
+
+/// The `Some` variant's inner [`TypeId`] when `type_info` is an `Option<T>`,
+/// else `None`.
+fn option_some_field(type_info: Option<&TypeInfo>) -> Option<TypeId> {
+	let TypeInfo::Enum(info) = type_info? else {
+		return None;
+	};
+	if !info.type_path().starts_with("core::option::Option<") {
+		return None;
+	}
+	match info.variant("Some")? {
+		VariantInfo::Tuple(tuple) => Some(tuple.field_at(0)?.type_id()),
+		_ => None,
+	}
+}
+
+/// Wrap a parsed leaf in an `Option`'s `Some` variant.
+fn wrap_some(value: Box<dyn PartialReflect>) -> Box<dyn PartialReflect> {
+	let mut tuple = DynamicTuple::default();
+	tuple.insert_boxed(value);
+	Box::new(DynamicEnum::new("Some", DynamicVariant::Tuple(tuple)))
+}
+
+/// Parse the map's values for a primitive/leaf field of type `type_id`.
+fn parse_leaf_field(
+	map_item: &Vec<String>,
+	field_name: &str,
+	type_id: TypeId,
+) -> Result<Option<Box<dyn PartialReflect>>> {
+	match type_id {
 		id if id == TypeId::of::<String>() => parse_string_field(map_item),
-		id if id == TypeId::of::<Option<String>>() => {
-			Ok(Some(Box::new(parse_option_string_field(map_item))))
-		}
 		id if id == TypeId::of::<Vec<String>>() => {
 			Ok(Some(Box::new(parse_vec_string_field(map_item))))
 		}
@@ -691,7 +734,7 @@ fn build_field_value(
 		}
 		_ => {
 			bevybail!(
-				"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
+				"unsupported field type for '{}', expected bool, String, Vec<String>, a numeric type, an `Option` of any of those, or a nested struct",
 				field_name
 			)
 		}
@@ -762,11 +805,6 @@ fn parse_string_field(
 		Some(value) => Ok(Some(Box::new(value.clone()))),
 		None => Ok(None),
 	}
-}
-
-/// Parse an optional String field from the multimap.
-fn parse_option_string_field(values: &Vec<String>) -> Option<String> {
-	values.first().cloned()
 }
 
 /// Parse a Vec<String> field from the multimap (all values for the key).
@@ -875,6 +913,48 @@ mod test {
 		let result: WithOptional = map.parse_reflect().unwrap();
 		result.required.xpect_eq("req".to_string());
 		result.optional.xpect_eq(None);
+	}
+
+	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
+	struct WithOptionalLeaves {
+		port: Option<u16>,
+		zoom: Option<f64>,
+		tls: Option<bool>,
+	}
+
+	/// An `Option<T>` leaf separates "unset" from "set to the type's default", the
+	/// distinction a bare `u16` cannot express: `--port=0` (an OS-assigned port) is
+	/// a real selection, no `--port` at all is not.
+	#[crate::test]
+	fn parses_optional_leaves() {
+		let mut map = MultiMap::new();
+		map.insert("port".to_string(), "0".to_string());
+		map.insert("zoom".to_string(), "1.5".to_string());
+		// a bare key keeps the flag shape through the `Option`
+		map.insert_key("tls".to_string());
+
+		let result: WithOptionalLeaves = map.parse_reflect().unwrap();
+		result.port.xpect_eq(Some(0));
+		result.zoom.xpect_eq(Some(1.5));
+		result.tls.xpect_eq(Some(true));
+
+		// every leaf absent stays `None` rather than taking the type's default
+		MultiMap::<String, String>::new()
+			.parse_reflect::<WithOptionalLeaves>()
+			.unwrap()
+			.xpect_eq(WithOptionalLeaves::default());
+	}
+
+	/// A malformed `Option<T>` value errors, exactly as the unwrapped leaf does.
+	#[crate::test]
+	fn optional_leaf_reports_malformed() {
+		let mut map = MultiMap::new();
+		map.insert("port".to_string(), "nope".to_string());
+		map.parse_reflect::<WithOptionalLeaves>()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("invalid numeric value for field 'port'");
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]

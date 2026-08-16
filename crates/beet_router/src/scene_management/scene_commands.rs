@@ -35,13 +35,25 @@ impl Plugin for SceneCommandsPlugin {
 	}
 }
 
-/// The device URL a command targets, from the request's [`BootstrapConfig`]:
-/// `--url`, else `BEET_REMOTE_URL`. Errors when neither is set, since these
-/// commands only drive a remote device.
+/// The params every scene-push command shares, surfaced in `--help`.
+#[derive(Reflect, Default)]
+#[reflect(Default)]
+struct SceneTargetParams {
+	/// The device to drive, eg `--url=http://device`. Falls back to the
+	/// `BEET_REMOTE_URL` environment variable.
+	url: Option<String>,
+}
+
+/// The device URL a command targets: its `--url` param, else the
+/// `BEET_REMOTE_URL` environment variable (usually from a local `.env`, so a
+/// workshop device need not be re-typed per command). Errors when neither is
+/// set, since these commands only drive a remote device.
 fn device_url(parts: &RequestParts) -> Result<String> {
-	BootstrapConfig::from_params(parts.params())?
-		.remote_url
-		.map(|url| url.to_string())
+	parts
+		.params()
+		.parse_reflect::<SceneTargetParams>()?
+		.url
+		.or_else(|| env_ext::var("BEET_REMOTE_URL").ok())
 		.ok_or_else(|| {
 			bevyhow!("a device `--url` (or `BEET_REMOTE_URL`) is required")
 		})
@@ -54,6 +66,7 @@ fn device_url(parts: &RequestParts) -> Result<String> {
 #[action(route = "load/*scene", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
 pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let path = cx
 		.input
@@ -92,6 +105,7 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 #[action(route = "clear", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
 pub async fn SceneClear(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let url = device_url(&cx.input)?;
 	Request::get(format!("{url}/clear")).send().await
@@ -101,6 +115,7 @@ pub async fn SceneClear(cx: ActionContext<RequestParts>) -> Result<Response> {
 #[action(route = "reset", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
 pub async fn SceneReset(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let url = device_url(&cx.input)?;
 	Request::get(format!("{url}/reset")).send().await
@@ -110,6 +125,7 @@ pub async fn SceneReset(cx: ActionContext<RequestParts>) -> Result<Response> {
 #[action(route = "dump", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
 pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let url = device_url(&cx.input)?;
 	Request::get(format!("{url}/dump")).send().await
@@ -122,6 +138,7 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 #[action(route = "run/:route", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
 pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
 	let route = SmolStr::from(cx.input.get_param("route").unwrap_or(""));
 	let url = device_url(cx.input.request_parts())?;

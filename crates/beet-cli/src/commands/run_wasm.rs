@@ -1,10 +1,94 @@
 use beet::prelude::*;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 /// The bundled Deno wasm runner script, written alongside the `wasm-bindgen`
 /// output so its relative `./bindgen.js` import resolves.
 const DENO_TS: &str = include_str!("deno.ts");
+
+/// The runner's own params, distinct from the [`BootstrapConfig`] it hands the
+/// module: these configure *this* process's hosting of the module, so the module
+/// never sees them.
+#[derive(Reflect, Default)]
+#[reflect(Default)]
+struct RunWasmParams {
+	/// The host to execute the module in: `deno` (default) or `browser`. Also
+	/// read from `BEET_WASM_HOST`, the only channel cargo leaves open to a
+	/// configured `runner` (see the justfile's browser test recipe).
+	wasm_host: Option<String>,
+	/// Extra flags for the browser host's chromium session, eg
+	/// `--chrome-args='--enable-unsafe-webgpu --use-angle=gl'`. Repeatable, and
+	/// ignored by the deno host.
+	chrome_args: Vec<String>,
+}
+
+impl RunWasmParams {
+	/// The selected host, `deno` unless `--wasm-host` or `BEET_WASM_HOST` names
+	/// otherwise.
+	fn host(&self) -> Result<WasmHost> {
+		self.wasm_host
+			.clone()
+			.or_else(|| env_ext::var("BEET_WASM_HOST").ok())
+			.map(|host| host.parse::<WasmHost>())
+			.transpose()?
+			.unwrap_or_default()
+			.xok()
+	}
+
+	/// The browser host's extra chromium flags, split on whitespace so one flag
+	/// can carry several.
+	fn chrome_args(&self) -> Vec<String> {
+		self.chrome_args
+			.iter()
+			.flat_map(|value| value.split_whitespace())
+			.map(str::to_string)
+			.collect()
+	}
+}
+
+/// The host `beet run-wasm` executes a wasm module in.
+///
+/// ## Example
+///
+/// ```
+/// # use beet::prelude::*;
+/// # use beet_cli::prelude::*;
+/// let host: WasmHost = "browser".parse().unwrap();
+/// host.xpect_eq(WasmHost::Browser);
+/// ```
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+pub enum WasmHost {
+	/// The bundled deno runner: a js runtime with fs access and no dom.
+	#[default]
+	Deno,
+	/// A headless browser driven through the webdriver: the host for
+	/// `#[beet_core::test(browser)]` dom suites.
+	Browser,
+}
+
+impl FromStr for WasmHost {
+	type Err = BevyError;
+	fn from_str(value: &str) -> Result<Self> {
+		match value.to_lowercase().as_str() {
+			"deno" => Ok(WasmHost::Deno),
+			"browser" => Ok(WasmHost::Browser),
+			other => bevybail!(
+				"invalid --wasm-host `{other}`, expected `deno` or `browser`"
+			),
+		}
+	}
+}
+
+impl fmt::Display for WasmHost {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			WasmHost::Deno => write!(f, "deno"),
+			WasmHost::Browser => write!(f, "browser"),
+		}
+	}
+}
 
 /// Runs a `wasm32-unknown-unknown` binary via `wasm-bindgen` + the bundled Deno
 /// runner, or with `BEET_WASM_HOST=browser` via a headless chromium (see
@@ -27,6 +111,7 @@ const DENO_TS: &str = include_str!("deno.ts");
 #[action(route = "run-wasm/*run-wasm-args", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<RunWasmParams>())]
 pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let mut cli = parts.to_cli_args();
@@ -49,23 +134,18 @@ pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
 	let trailing = segments.split_off(wasm_idx + 1);
 	let exe_path = segments.join("/");
 	// `cli` now holds only the forwarded params; drop the route's own `run-wasm-args`
-	// capture so it never leaks into the module's `Deno.args`. The module's
-	// bootstrap knobs are taken out and delivered explicitly (see [`run_wasm`]);
-	// what remains (the test-runner flags) flattens to `--key[=value]` flags plus
-	// the trailing positionals (eg the filter) the module reads via `Deno.args`.
+	// capture so it never leaks into the module's `Deno.args`. The runner's own
+	// params and the module's launch knobs are both taken out (the latter
+	// delivered explicitly, see [`run_deno`]); what remains (the test-runner
+	// flags) flattens to `--key[=value]` flags plus the trailing positionals (eg
+	// the filter) the module reads via `Deno.args`.
 	cli.params.remove("run-wasm-args");
-	let bootstrap = BootstrapConfig::take_params(&mut cli.params)?;
-	// the browser host's extra chrome flags ride the request
-	// (`--chrome-args='--enable-unsafe-webgpu --use-angle=gl'`), taken out here
-	// so they never leak into the module's args; the deno host ignores them.
-	let chrome_args = cli
-		.params
-		.remove("chrome-args")
-		.unwrap_or_default()
-		.iter()
-		.flat_map(|value| value.split_whitespace())
-		.map(|arg| arg.to_string())
-		.collect::<Vec<_>>();
+	let params = cli.params.parse_reflect::<RunWasmParams>()?;
+	let host = params.host()?;
+	let chrome_args = params.chrome_args();
+	cli.params.remove("wasm-host");
+	cli.params.remove("chrome-args");
+	let bootstrap = BootstrapConfig::take_launch(&mut cli.params)?;
 	let mut forwarded = cli.into_args();
 	forwarded.extend(trailing.into_iter().map(Into::into));
 
@@ -74,7 +154,7 @@ pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
 	// output and run the module in a headless browser instead of deno, the
 	// host for `#[beet_core::test(browser)]` dom suites
 	#[cfg(not(target_arch = "wasm32"))]
-	if bootstrap.wasm_host.unwrap_or_default() == WasmHost::Browser {
+	if host == WasmHost::Browser {
 		super::run_wasm_browser::run(
 			&cx,
 			&runner_dir,
@@ -87,7 +167,7 @@ pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
 	}
 	// the browser host (and so the flags' consumer) is native-only
 	#[cfg(target_arch = "wasm32")]
-	let _ = chrome_args;
+	let _ = (host, chrome_args);
 	run_deno(&runner_dir, &bootstrap, forwarded).await?;
 	// the module's output already streamed via inherited stdio, so the runner's own
 	// response carries no body, only a success status.

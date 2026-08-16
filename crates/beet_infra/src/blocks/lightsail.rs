@@ -133,12 +133,14 @@ impl LightsailBlock {
 		let app_port = self.app_port();
 		// the deployed binary's config, with the platform bindings this block owns
 		// merged in, then split onto its two channels.
-		let mut runtime = self.bootstrap.clone();
-		runtime.host = Some(core::net::Ipv4Addr::UNSPECIFIED.into());
-		runtime.http_port = Some(app_port);
-		runtime.deploy_id = Some(deploy_id.to_string().into());
-		runtime.deploy_timestamp = Some(deploy_timestamp.to_string().into());
-		let (argv, env) = runtime.split_channels();
+		let (argv, env) = self
+			.bootstrap
+			.clone()
+			.with_host(core::net::Ipv4Addr::UNSPECIFIED.into())
+			.with_http_port(app_port)
+			.with_deploy_id(deploy_id.to_string())
+			.with_deploy_timestamp(deploy_timestamp.to_string())
+			.split_channels();
 		// boot selection rides the `ExecStart` invocation. `to_argv` validates every
 		// token against a shell-safe charset, so an arg that would corrupt the unit
 		// file is a render error rather than a silently broken deploy.
@@ -582,12 +584,10 @@ mod tests {
 	fn splits_exec_and_env_channels() {
 		let (script, _dir) =
 			build_user_data(&LightsailBlock::default().with_bootstrap(
-				BootstrapConfig {
-					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
-					server: Some(ServerFilter::new("http")),
-					stage: "staging".into(),
-					..default()
-				},
+				BootstrapConfig::launch()
+					.with_store(StoreUri::parse("s3://beet--dev--app").unwrap())
+					.with_server(ServerFilter::new("http"))
+					.with_stage("staging"),
 			));
 		script
 			.as_str()
@@ -607,10 +607,7 @@ mod tests {
 	fn rejects_unencodable_exec_args() {
 		let (stack, _dir) = Stack::default_local();
 		LightsailBlock::default()
-			.with_bootstrap(BootstrapConfig {
-				path: Some("/my page".into()),
-				..default()
-			})
+			.with_bootstrap(BootstrapConfig::launch().with_path("/my page"))
 			.build_user_data(&stack, "id", "secret")
 			.unwrap_err()
 			.to_string()

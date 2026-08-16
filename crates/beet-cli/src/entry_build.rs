@@ -72,11 +72,11 @@ pub async fn read_prescan(
 /// load (the binary, `serve`/`check`/`export-static`) resolves through this so
 /// an entry's declared root applies everywhere.
 async fn widen_store_root(
-	config: &BootstrapConfig,
+	store_uri: Option<&StoreUri>,
 	dir: AbsPathBuf,
 	entry_name: String,
 ) -> Result<(BlobStore, String, AbsPathBuf, EntryPrescan)> {
-	let store = resolve_store(config, dir.clone())?;
+	let store = resolve_store(store_uri, dir.clone())?;
 	let prescan = read_prescan(&store, &entry_name).await?;
 	let Some(src) = prescan.store_root.clone() else {
 		return Ok((store, entry_name, dir, prescan));
@@ -96,7 +96,7 @@ async fn widen_store_root(
 		})?;
 	// the widened store holds the same entry document, so its pre-scan is the one
 	// already read: entry resolution parses the entry exactly once.
-	Ok((resolve_store(config, root.clone())?, entry_name, root, prescan))
+	Ok((resolve_store(store_uri, root.clone())?, entry_name, root, prescan))
 }
 
 /// A resolved entry: its store, the entry document name within it, and the local
@@ -118,7 +118,7 @@ pub struct ResolvedEntry {
 /// the entry may widen its own store root with a `<StoreRoot src>` declaration
 /// (see [`widen_store_root`]), and the `--store` param picks the backend.
 pub async fn resolve_main(
-	config: &BootstrapConfig,
+	store_uri: Option<&StoreUri>,
 	main: &str,
 ) -> Result<ResolvedEntry> {
 	let path = AbsPathBuf::new(main)?;
@@ -135,7 +135,7 @@ pub async fn resolve_main(
 		(dir, entry_name)
 	} else {
 		// a directory: probe it for an entry document
-		let store = resolve_store(config, path.clone())?;
+		let store = resolve_store(store_uri, path.clone())?;
 		let entry_name = probe_entry_names(&store).await?.ok_or_else(|| {
 			bevyhow!(
 				"no entry document found in `{path}`: looked for {ENTRY_NAMES:?}. \
@@ -144,18 +144,18 @@ pub async fn resolve_main(
 		})?;
 		(path, entry_name)
 	};
-	resolve_widened(config, dir, entry_name).await
+	resolve_widened(store_uri, dir, entry_name).await
 }
 
 /// [`widen_store_root`] into a [`ResolvedEntry`], live reload watching the
 /// resolved root.
 pub async fn resolve_widened(
-	config: &BootstrapConfig,
+	store_uri: Option<&StoreUri>,
 	dir: AbsPathBuf,
 	entry_name: String,
 ) -> Result<ResolvedEntry> {
 	let (store, entry_name, _root, prescan) =
-		widen_store_root(config, dir, entry_name).await?;
+		widen_store_root(store_uri, dir, entry_name).await?;
 	Ok(ResolvedEntry {
 		store,
 		entry_name,
@@ -175,15 +175,16 @@ pub async fn probe_entry_names(store: &BlobStore) -> Result<Option<String>> {
 	Ok(None)
 }
 
-/// Build the [`BlobStore`] the config's `--store` [`StoreUri`] names, defaulting
-/// to a filesystem store rooted at `dir` (the resolved entry directory). Shared
-/// by the binary's entry resolution and the `check`/`serve`/`export-static`
-/// commands so every entry load is store-driven rather than filesystem-bound.
+/// Build the [`BlobStore`] a `--store` [`StoreUri`] names, defaulting to a
+/// filesystem store rooted at `dir` (the resolved entry directory). Shared by
+/// the binary's entry resolution (the launch config's `--store`) and the
+/// `check`/`serve`/`export-static` commands (each command's own `--store`
+/// param) so every entry load is store-driven rather than filesystem-bound.
 pub fn resolve_store(
-	config: &BootstrapConfig,
+	store_uri: Option<&StoreUri>,
 	dir: AbsPathBuf,
 ) -> Result<BlobStore> {
-	BlobStore::from_uri(config.store.as_ref().unwrap_or(&StoreUri::default()), dir)
+	BlobStore::from_uri(store_uri.unwrap_or(&StoreUri::default()), dir)
 }
 
 /// The entry sources read from a store: the entry document bytes + name, its

@@ -26,14 +26,14 @@ struct ExportStaticParams {
 #[action(route = "export-static/*entry", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<ExportStaticParams>())]
+#[require(ParamsPartial = ParamsPartial::new::<(ExportStaticParams, EntryParams)>())]
 pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<ExportStaticParams>()?;
 	let entry_path = entry_arg(parts)?;
 	let root = build_entry(
 		&cx.caller,
-		&BootstrapConfig::from_params(parts.params())?,
+		EntryParams::store(parts)?.as_ref(),
 		&entry_path,
 		Some(ONE_SHOT_SETTLE_DEADLINE),
 	)

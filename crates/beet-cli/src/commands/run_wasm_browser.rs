@@ -1,5 +1,5 @@
 //! The browser host for the wasm runner, selected by `--wasm-host=browser` /
-//! `BEET_WASM_HOST=browser` ([`BootstrapConfig::wasm_host`]): where the deno
+//! `BEET_WASM_HOST=browser` ([`WasmHost::Browser`]): where the deno
 //! host gives a wasm module a js runtime with fs access and no dom, this
 //! serves the `wasm-bindgen` output through the standard beet server stack,
 //! boots a headless chromium through the in-house webdriver, streams the page

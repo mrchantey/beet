@@ -159,10 +159,8 @@ impl ChildProcess {
 	/// is code you can read.
 	///
 	/// ```ignore
-	/// let child = BootstrapConfig {
-	///     store: config.store.clone(), // deliberate inheritance
-	///     ..default()                  // everything else: not inherited
-	/// };
+	/// // named field by field: what is not named is not inherited
+	/// let child = BootstrapConfig::launch().with_store(store);
 	/// ChildProcess::new("beet").with_bootstrap(&child)?
 	/// ```
 	///

@@ -11,7 +11,7 @@ use beet::prelude::*;
 
 /// Load the entry onto the caller's world through its [`BlobStore`], returning its
 /// root entity. Resolution is the binary's own [`entry_build::resolve_main`] (the
-/// request's [`BootstrapConfig`] `--store` picks the backend, the entry's
+/// command's [`EntryParams`] `--store` picks the backend, the entry's
 /// `<StoreRoot src>` widens the root), so the same resolution serves
 /// `beet --main=..` and these commands.
 ///
@@ -28,7 +28,7 @@ use beet::prelude::*;
 /// stall to wait out, not a failed run.
 pub(crate) async fn build_entry(
 	caller: &AsyncEntity,
-	config: &BootstrapConfig,
+	store_uri: Option<&StoreUri>,
 	entry_path: &str,
 	settle_deadline: Option<Duration>,
 ) -> Result<Entity> {
@@ -37,7 +37,7 @@ pub(crate) async fn build_entry(
 		entry_name,
 		prescan,
 		..
-	} = entry_build::resolve_main(config, entry_path).await?;
+	} = entry_build::resolve_main(store_uri, entry_path).await?;
 	let formats = caller
 		.with_world(|world, _| {
 			world.get_resource_or_init::<TemplateFormats>().clone()
@@ -80,6 +80,33 @@ pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPathBuf> {
 			.ok_or_else(|| bevyhow!("entry `{path}` has no parent directory"))
 	} else {
 		path.xok()
+	}
+}
+
+/// The store selector every entry-loading command shares (`serve`, `check`,
+/// `export-static`, `export-pdf`), naming the backend the entry loads through.
+///
+/// A command loads an entry into *this* process rather than launching one, so
+/// it reads its own `--store` param (documented in its `--help`) rather than
+/// parsing a whole [`BootstrapConfig`] out of the request to reach one field.
+#[derive(Reflect, Default)]
+#[reflect(Default)]
+pub(crate) struct EntryParams {
+	/// The store the entry loads through, eg `--store=s3://my-bucket`. Defaults
+	/// to the filesystem, rooted at the entry directory.
+	store: Option<String>,
+}
+
+impl EntryParams {
+	/// The entry store `parts` select, `None` for the default filesystem store
+	/// rooted at the entry dir.
+	pub fn store(parts: &RequestParts) -> Result<Option<StoreUri>> {
+		parts
+			.params()
+			.parse_reflect::<Self>()?
+			.store
+			.map(|uri| StoreUri::parse(&uri))
+			.transpose()
 	}
 }
 
@@ -131,7 +158,7 @@ mod test {
 	async fn resolves_dir_and_entry_file() {
 		// a dir resolves to its highest-priority `entry_build::ENTRY_NAMES` entry (`main.bsx` here)
 		let dir = entry_build::resolve_main(
-			&default(),
+			None,
 			entry_path().to_string_lossy().as_ref(),
 		)
 		.await
@@ -139,7 +166,7 @@ mod test {
 		dir.entry_name.xpect_eq("main.bsx");
 		// passing the entry file itself roots the store at its parent
 		let file = entry_build::resolve_main(
-			&default(),
+			None,
 			entry_path().join("main.bsx").to_string_lossy().as_ref(),
 		)
 		.await
@@ -149,14 +176,14 @@ mod test {
 		// a non-`main.bsx` entry name is still discovered (the search spans entry_build::ENTRY_NAMES)
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(tmp.path().join("main.json"), "{}").unwrap();
-		entry_build::resolve_main(&default(), tmp.path().to_string_lossy().as_ref())
+		entry_build::resolve_main(None, tmp.path().to_string_lossy().as_ref())
 			.await
 			.unwrap()
 			.entry_name
 			.xpect_eq("main.json");
 		// a dir with no entry document errors with guidance
 		let empty = TempDir::new().unwrap();
-		entry_build::resolve_main(&default(), empty.path().to_string_lossy().as_ref())
+		entry_build::resolve_main(None, empty.path().to_string_lossy().as_ref())
 			.await
 			.err()
 			.unwrap()
@@ -177,7 +204,7 @@ mod test {
 			prescan,
 			..
 		} = entry_build::resolve_main(
-			&default(),
+			None,
 			entry_path().to_string_lossy().as_ref(),
 		)
 		.await

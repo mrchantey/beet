@@ -167,7 +167,7 @@ impl Default for SshServer {
 	fn default() -> Self {
 		let config = BootstrapConfig::get();
 		Self {
-			port: Some(config.ssh_port.unwrap_or(DEFAULT_SSH_PORT)),
+			port: Some(config.ssh_port().unwrap_or(DEFAULT_SSH_PORT)),
 			host: config.host_octets().unwrap_or([127, 0, 0, 1]),
 			credentials: None,
 		}

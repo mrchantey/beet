@@ -92,7 +92,7 @@ impl PackageConfig {
 			.as_deref()
 			.unwrap_or(&self.title)
 			.to_kebab_case();
-		let stage = &BootstrapConfig::get().stage;
+		let stage = BootstrapConfig::get().stage();
 		format! {"{binary_name}--{stage}--{descriptor}"}
 	}
 }

@@ -36,7 +36,7 @@ fn AppInfoContent(
 		version,
 		..
 	} = config.clone();
-	let stage = BootstrapConfig::get().stage.clone();
+	let stage = BootstrapConfig::get().stage().clone();
 	// uptime since app start; "unknown" without a `Time` resource (no `TimePlugin`,
 	// eg a bare router test world).
 	let uptime = time

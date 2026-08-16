@@ -331,11 +331,11 @@ mod test {
 			.unwrap()
 			.xpect_eq("cd /tmp/lam && zip -j bootstrap.zip bootstrap");
 		CargoBuild::default()
-			.with_bootstrap(BootstrapConfig {
-				store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
-				server: Some(ServerFilter::new("http")),
-				..default()
-			})
+			.with_bootstrap(
+				BootstrapConfig::launch()
+					.with_store(StoreUri::parse("s3://beet--dev--app").unwrap())
+					.with_server(ServerFilter::new("http")),
+			)
 			.lambda_zip_cmd(dir)
 			.unwrap()
 			.xpect_contains(
@@ -349,10 +349,7 @@ mod test {
 	#[beet_core::test]
 	fn lambda_zip_cmd_rejects_unencodable_args() {
 		CargoBuild::default()
-			.with_bootstrap(BootstrapConfig {
-				path: Some("/my page".into()),
-				..default()
-			})
+			.with_bootstrap(BootstrapConfig::launch().with_path("/my page"))
 			.lambda_zip_cmd(std::path::Path::new("/tmp/lam"))
 			.unwrap_err()
 			.to_string()

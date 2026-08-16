@@ -8,6 +8,27 @@ use core::str::FromStr;
 
 /// Every pre-scene knob a beet process boots from, in one type.
 ///
+/// ## What it is, and is not
+///
+/// A `BootstrapConfig` describes **one process launch**. There are exactly two
+/// things to do with one: read the launch *this* process booted from
+/// ([`get`](Self::get) / [`from_env`](Self::from_env)), or describe the launch of
+/// a process you are about to start ([`launch`](Self::launch), rendered through
+/// [`to_argv`](Self::to_argv) / [`to_env`](Self::to_env) /
+/// [`to_cmd_json`](Self::to_cmd_json) by `ChildProcess::with_bootstrap` and the
+/// deploy blocks).
+///
+/// It is **not** a params parser. A route reading one flag off its request reads
+/// that flag (a `ParamsPartial` params type, so `--help` documents it), because a
+/// request is not a process launch: pulling a whole 19-knob config out of one to
+/// reach a single field silently drags the `BEET_*` environment in behind it and
+/// hides the flag from the route's own help. The single request-shaped
+/// constructor, [`take_launch`](Self::take_launch), exists only for beet spawning
+/// beet, and consumes the knobs it reads so they cannot also be forwarded.
+///
+/// Fields are private and set through the generated `with_*` builders, so a
+/// construction site reads as the launch description it is.
+///
 /// ## The transport rule
 ///
 /// One rule, no per-field exceptions: **every field parses from both transports,
@@ -35,13 +56,6 @@ use core::str::FromStr;
 ///   runs it so a malformed `--port=nope` fails the app loudly instead of only
 ///   warning.
 ///
-/// A *request* is a different scope and keeps its own constructors:
-/// [`from_params`](Self::from_params) (a routed request's params, env as
-/// fallback) for the `serve` / `check` / `export-static` / `export-pdf` commands,
-/// and [`parse_params`](Self::parse_params) for an overlay that must not consult
-/// env at all, ie a server's boot request applied over its markup-declared
-/// fields.
-///
 /// ## Rendering it
 ///
 /// [`to_argv`](Self::to_argv), [`to_env`](Self::to_env) and
@@ -53,69 +67,73 @@ use core::str::FromStr;
 /// Secrets are deliberately absent: the type has no secret field, so no renderer
 /// can put one on an argv line, a `CMD` array or a systemd `ExecStart`. Secrets
 /// stay env on their existing channels.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith)]
+#[set_with(unwrap_option)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
 	/// The entry document: a path for a dir-rooted store, a name within a
 	/// self-rooted one. `--main` / `BEET_MAIN`.
-	pub main: Option<SmolStr>,
+	main: Option<SmolStr>,
 	/// The store the entry loads through. `--store` / `BEET_STORE`.
-	pub store: Option<StoreUri>,
+	store: Option<StoreUri>,
 	/// Watch the entry's sources and live-reload. `--watch` / `BEET_WATCH`.
-	pub watch: bool,
+	watch: bool,
 	/// Cargo features this binary is asserted to have been built with.
 	/// `--features` / `BEET_FEATURES`.
-	pub features: Vec<SmolStr>,
+	features: Vec<SmolStr>,
 	/// Which declared servers boot. `--server` / `BEET_SERVER`.
-	pub server: Option<ServerFilter>,
+	server: Option<ServerFilter>,
 	/// The opening route a freshly-opened tui/ssh surface navigates to.
 	/// `--path` / `BEET_PATH`.
-	pub path: Option<SmolStr>,
-	/// The address servers bind to. `--host` / `BEET_HOST`.
-	pub host: Option<IpAddr>,
+	path: Option<SmolStr>,
+	/// The address servers bind to, read through
+	/// [`host_octets`](Self::host_octets). `--host` / `BEET_HOST`.
+	#[get(skip)]
+	host: Option<IpAddr>,
 	/// The http listener port. `--port` / `BEET_HTTP_PORT`.
-	pub http_port: Option<u16>,
+	#[get(copy)]
+	http_port: Option<u16>,
 	/// The ssh listener port. `--ssh-port` / `BEET_SSH_PORT`.
-	pub ssh_port: Option<u16>,
+	#[get(copy)]
+	ssh_port: Option<u16>,
 	/// The infrastructure stage this process runs in, defaulting to
 	/// [`DEFAULT_STAGE`](Self::DEFAULT_STAGE). `--stage` / `BEET_STAGE`.
-	pub stage: SmolStr,
+	stage: SmolStr,
 	/// Whether services resolve locally or against the cloud, defaulting to
 	/// [`ServiceAccess::Local`]. `--service-access` / `BEET_SERVICE_ACCESS`.
-	pub service_access: ServiceAccess,
+	#[get(copy)]
+	service_access: ServiceAccess,
 	/// The deploy-provided analytics table name. `--analytics-table` /
 	/// `BEET_ANALYTICS_TABLE`.
-	pub analytics_table: Option<SmolStr>,
+	analytics_table: Option<SmolStr>,
 	/// This deployment's unique id. `--deploy-id` / `BEET_DEPLOY_ID`.
-	pub deploy_id: Option<SmolStr>,
+	deploy_id: Option<SmolStr>,
 	/// This deployment's timestamp. `--deploy-timestamp` /
 	/// `BEET_DEPLOY_TIMESTAMP`.
-	pub deploy_timestamp: Option<SmolStr>,
-	/// The device a scene-push command targets. `--url` / `BEET_REMOTE_URL`.
-	pub remote_url: Option<SmolStr>,
+	deploy_timestamp: Option<SmolStr>,
 	/// Force TLS on or off, overriding the managed-platform detection.
 	/// `--tls` / `BEET_TLS`.
-	pub tls: Option<bool>,
+	#[get(copy)]
+	tls: Option<bool>,
 	/// Where the cached dev certificate lives. `--tls-dir` / `BEET_TLS_DIR`.
-	pub tls_dir: Option<SmolStr>,
+	tls_dir: Option<SmolStr>,
 	/// Run terminal surfaces buffered, never touching the real tty.
 	/// `--headless` / `BEET_HEADLESS`.
-	pub headless: bool,
+	headless: bool,
 	/// Capture the first window to this PNG and exit. `--screenshot` /
 	/// `BEET_SCREENSHOT`.
-	pub screenshot: Option<SmolStr>,
+	screenshot: Option<SmolStr>,
 	/// The frame the screenshot harness captures on. `--screenshot-frame` /
 	/// `BEET_SCREENSHOT_FRAME`.
-	pub screenshot_frame: Option<u32>,
-	/// The host `beet run-wasm` executes a wasm module in.
-	/// `--wasm-host` / `BEET_WASM_HOST`.
-	pub wasm_host: Option<WasmHost>,
+	#[get(copy)]
+	screenshot_frame: Option<u32>,
 }
 
 /// Every field's static default, ie what an unset knob resolves to. Also the
 /// baseline the renderers diff against, so a field left at its default never
-/// reaches an argv line or an env pair.
+/// reaches an argv line or an env pair. Spelled [`launch`](Self::launch) at a
+/// construction site, which names what constructing one is for.
 impl Default for BootstrapConfig {
 	fn default() -> Self {
 		Self {
@@ -133,13 +151,11 @@ impl Default for BootstrapConfig {
 			analytics_table: None,
 			deploy_id: None,
 			deploy_timestamp: None,
-			remote_url: None,
 			tls: None,
 			tls_dir: None,
 			headless: false,
 			screenshot: None,
 			screenshot_frame: None,
-			wasm_host: None,
 		}
 	}
 }
@@ -179,7 +195,7 @@ impl BootstrapConfig {
 		env: "BEET_FEATURES",
 	};
 	const SERVER: Knob = Knob {
-		arg: "server",
+		arg: ServerFilter::PARAM,
 		env: "BEET_SERVER",
 	};
 	const PATH: Knob = Knob {
@@ -218,10 +234,6 @@ impl BootstrapConfig {
 		arg: "deploy-timestamp",
 		env: "BEET_DEPLOY_TIMESTAMP",
 	};
-	const REMOTE_URL: Knob = Knob {
-		arg: "url",
-		env: "BEET_REMOTE_URL",
-	};
 	const TLS: Knob = Knob {
 		arg: "tls",
 		env: "BEET_TLS",
@@ -242,10 +254,16 @@ impl BootstrapConfig {
 		arg: "screenshot-frame",
 		env: "BEET_SCREENSHOT_FRAME",
 	};
-	const WASM_HOST: Knob = Knob {
-		arg: "wasm-host",
-		env: "BEET_WASM_HOST",
-	};
+
+	/// A launch to describe: every knob at its static default, named explicitly
+	/// from here with the `with_*` builders.
+	///
+	/// The one constructor, and only for a process *this* one is about to start:
+	/// a beet child (`ChildProcess::with_bootstrap`) or a deployed binary (an
+	/// infra block's rendered `CMD` / `ExecStart` / task env). Nothing is
+	/// inherited by accident, because nothing is inherited at all. To read the
+	/// launch this process itself booted from, use [`get`](Self::get).
+	pub fn launch() -> Self { Self::default() }
 
 	/// Parse this process's argv, with the `BEET_*` environment as the fallback for
 	/// every field argv did not set. Strict: a malformed value errors.
@@ -259,7 +277,7 @@ impl BootstrapConfig {
 	/// resolves to `None`, which is correct (the Worker resolves its store from
 	/// bindings).
 	pub fn from_env() -> Result<Self> {
-		Self::from_params(&CliArgs::parse_env().params)
+		Self::parse(&CliArgs::parse_env().params, &Self::env_var)
 	}
 
 	/// The process config, parsed from argv + env on first read and memoized
@@ -273,43 +291,41 @@ impl BootstrapConfig {
 	/// error.
 	pub fn get() -> &'static Self { &BOOTSTRAP }
 
-	/// The config a routed request carries, with the `BEET_*` environment as the
-	/// fallback for every field the params did not set. What the `serve` /
-	/// `check` / `export-static` / `export-pdf` commands build from their
-	/// request.
-	pub fn from_params(params: &MultiMap<SmolStr, SmolStr>) -> Result<Self> {
-		Self::parse(params, &|key| env_ext::var(key).ok().map(SmolStr::from))
-	}
-
-	/// The config these params alone carry, with no environment fallback. The
-	/// overlay form: a server applies its boot request over its markup-declared
-	/// fields, and env must not out-rank markup there.
-	pub fn parse_params(params: &MultiMap<SmolStr, SmolStr>) -> Result<Self> {
-		Self::parse(params, &|_| None)
-	}
-
-	/// [`from_params`](Self::from_params) (params with the `BEET_*` env as
-	/// fallback), removing every knob it consumed from `params`.
+	/// The launch config for a beet child process, *taken out of* `params` (with
+	/// this process's `BEET_*` environment as the fallback for every knob the
+	/// params did not set).
 	///
-	/// For a caller that forwards the *rest* of an argv on (the wasm runner hands
-	/// the module its test-runner flags): the config's own knobs leave through
-	/// [`to_argv`](Self::to_argv) instead, so a knob can never be forwarded twice
-	/// and the two copies disagree. Env participates because such a caller is
-	/// itself configured like a process (`BEET_WASM_HOST=browser cargo test ..`
-	/// reaches the runner only through the environment).
-	pub fn take_params(
+	/// The one request-shaped constructor, and only for beet spawning beet: the
+	/// wasm runner is handed the module's argv and must split it, delivering the
+	/// module's own knobs through [`to_argv`](Self::to_argv) and forwarding the
+	/// rest (the test-runner flags) untouched. It removes what it reads precisely
+	/// so a knob cannot be forwarded twice and the two copies disagree, which is
+	/// also what stops it being repurposed to peek at a field: a route that wants
+	/// one flag reads that flag from its own params type.
+	///
+	/// Env participates because such a caller is itself configured like a process
+	/// (`BEET_STORE=.. cargo test ..` reaches the runner only through the
+	/// environment), and the child's environment is scrubbed of `BEET_*` on the
+	/// way out, so the argv is the whole delivery.
+	pub fn take_launch(
 		params: &mut MultiMap<SmolStr, SmolStr>,
 	) -> Result<Self> {
-		let config = Self::from_params(params)?;
+		let config = Self::parse(params, &Self::env_var)?;
 		for knob in Self::KNOBS {
 			params.remove(knob.arg);
 		}
 		Ok(config)
 	}
 
+	/// A `BEET_*` name resolved from the real process environment, the fallback
+	/// channel of [the transport rule](Self#the-transport-rule).
+	fn env_var(key: &str) -> Option<SmolStr> {
+		env_ext::var(key).ok().map(SmolStr::from)
+	}
+
 	/// Every knob, in field order. The one enumeration of the table, so a new
 	/// field is either listed here or is not a knob at all.
-	const KNOBS: [Knob; 21] = [
+	const KNOBS: [Knob; 19] = [
 		Self::MAIN,
 		Self::STORE,
 		Self::WATCH,
@@ -324,13 +340,11 @@ impl BootstrapConfig {
 		Self::ANALYTICS_TABLE,
 		Self::DEPLOY_ID,
 		Self::DEPLOY_TIMESTAMP,
-		Self::REMOTE_URL,
 		Self::TLS,
 		Self::TLS_DIR,
 		Self::HEADLESS,
 		Self::SCREENSHOT,
 		Self::SCREENSHOT_FRAME,
-		Self::WASM_HOST,
 	];
 
 	/// The one parse. `env` resolves a `BEET_*` name, and is consulted only for a
@@ -382,13 +396,11 @@ impl BootstrapConfig {
 			analytics_table: reader.value(Self::ANALYTICS_TABLE),
 			deploy_id: reader.value(Self::DEPLOY_ID),
 			deploy_timestamp: reader.value(Self::DEPLOY_TIMESTAMP),
-			remote_url: reader.value(Self::REMOTE_URL),
 			tls: reader.bool_value(Self::TLS)?,
 			tls_dir: reader.value(Self::TLS_DIR),
 			headless: reader.flag(Self::HEADLESS),
 			screenshot: reader.value(Self::SCREENSHOT),
 			screenshot_frame: reader.parsed(Self::SCREENSHOT_FRAME)?,
-			wasm_host: reader.parsed(Self::WASM_HOST)?,
 		}
 		.xok()
 	}
@@ -446,10 +458,6 @@ impl BootstrapConfig {
 			Self::DEPLOY_TIMESTAMP,
 			self.deploy_timestamp.as_ref().map(ToString::to_string),
 		);
-		push(
-			Self::REMOTE_URL,
-			self.remote_url.as_ref().map(ToString::to_string),
-		);
 		push(Self::TLS, self.tls.map(|tls| tls.to_string()));
 		push(Self::TLS_DIR, self.tls_dir.as_ref().map(ToString::to_string));
 		push(
@@ -459,10 +467,6 @@ impl BootstrapConfig {
 		push(
 			Self::SCREENSHOT_FRAME,
 			self.screenshot_frame.map(|frame| frame.to_string()),
-		);
-		push(
-			Self::WASM_HOST,
-			self.wasm_host.map(|host| host.to_string()),
 		);
 		push(
 			Self::FEATURES,
@@ -512,10 +516,6 @@ impl BootstrapConfig {
 			Self::DEPLOY_TIMESTAMP,
 			self.deploy_timestamp.as_ref().map(ToString::to_string),
 		);
-		push(
-			Self::REMOTE_URL,
-			self.remote_url.as_ref().map(ToString::to_string),
-		);
 		push(Self::TLS, self.tls.map(|tls| tls.to_string()));
 		push(Self::TLS_DIR, self.tls_dir.as_ref().map(ToString::to_string));
 		push(
@@ -525,14 +525,6 @@ impl BootstrapConfig {
 		push(
 			Self::SCREENSHOT_FRAME,
 			self.screenshot_frame.map(|frame| frame.to_string()),
-		);
-		push(
-			Self::WASM_HOST,
-			self.wasm_host.map(|host| host.to_string()),
-		);
-		push(
-			Self::WASM_HOST,
-			self.wasm_host.map(|host| host.to_string()),
 		);
 		push(
 			Self::FEATURES,
@@ -591,15 +583,24 @@ impl BootstrapConfig {
 		(argv, env)
 	}
 
-	/// The bind address as IPv4 octets, the form the server components hold.
+	/// This launch's bind address as IPv4 octets, see
+	/// [`ipv4_octets`](Self::ipv4_octets).
+	pub fn host_octets(&self) -> Option<[u8; 4]> {
+		self.host.and_then(Self::ipv4_octets)
+	}
+
+	/// A `--host` address as IPv4 octets, the form the server components hold.
 	///
 	/// `bevy_reflect` has no [`IpAddr`] impl, so a markup-declarable server field
 	/// stays `[u8; 4]`; the typed parse still lives here, which is what fixes the
 	/// old literal `"0.0.0.0"` check (every other value, including a real
 	/// address, silently became localhost). An IPv6 address warns and yields
 	/// `None`: the listeners bind a v4 socket.
-	pub fn host_octets(&self) -> Option<[u8; 4]> {
-		match self.host? {
+	///
+	/// The one place that rule lives, shared with the boot-request overlay a
+	/// server applies over its declared host.
+	pub fn ipv4_octets(host: IpAddr) -> Option<[u8; 4]> {
+		match host {
 			IpAddr::V4(addr) => Some(addr.octets()),
 			IpAddr::V6(addr) => {
 				warn!("ignoring --host / BEET_HOST `{addr}`: beet servers bind IPv4");
@@ -641,9 +642,10 @@ impl BootstrapConfig {
 /// initializer poisons the cell, and this is reached from `Default` impls that
 /// cannot fail.
 static BOOTSTRAP: LazyLock<BootstrapConfig> = LazyLock::new(|| {
-	BootstrapConfig::parse_lenient(&CliArgs::parse_env().params, &|key| {
-		env_ext::var(key).ok().map(SmolStr::from)
-	})
+	BootstrapConfig::parse_lenient(
+		&CliArgs::parse_env().params,
+		&BootstrapConfig::env_var,
+	)
 });
 
 /// Validates the process [`BootstrapConfig`] at [`PreStartup`], and under `std`
@@ -778,51 +780,52 @@ impl ConfigReader<'_> {
 			.collect()
 	}
 
-	/// A [`ServerFilter`], accumulated across repeated flags. `None` when the
-	/// knob is absent from both transports, which is what lets a server fall back
-	/// to its own `default_boot`.
+	/// A [`ServerFilter`], through the filter's own param grammar so the boot-time
+	/// read and this one cannot diverge, falling back to the env transport.
+	/// `None` when the knob is absent from both, which is what lets a server fall
+	/// back to its own `default_boot`.
 	fn filter(&self, knob: Knob) -> Option<ServerFilter> {
-		let values = self.values(knob);
-		if values.is_empty() && !self.params.contains_key(knob.arg) {
-			return None;
-		}
-		let mut filter = ServerFilter::default();
-		for value in &values {
-			filter.extend(value);
-		}
-		Some(filter)
+		ServerFilter::from_params(self.params).or_else(|| {
+			(self.env)(knob.env)
+				.map(|value| ServerFilter::new(value.as_str()))
+		})
 	}
 }
 
 #[cfg(test)]
 mod test {
+	use super::BootstrapConfig;
 	use crate::prelude::*;
+
+	/// Parse an argv line alone, with no environment. The real parse is reached
+	/// through [`BootstrapConfig::from_env`], which is not test-drivable (it reads
+	/// the harness's own argv), so the cases exercise the shared inner parse.
+	fn parse_argv(args: &str) -> Result<BootstrapConfig> {
+		BootstrapConfig::parse(&CliArgs::parse(args).params, &|_| None)
+	}
 
 	/// A config with every field set, so a round trip exercises each one.
 	fn full() -> BootstrapConfig {
-		BootstrapConfig {
-			main: Some("main.bsx".into()),
-			store: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
-			watch: true,
-			features: vec!["thread".into(), "sockets".into()],
-			server: Some(ServerFilter::new("http,ssh")),
-			path: Some("/docs".into()),
-			host: Some("0.0.0.0".parse().unwrap()),
-			http_port: Some(8337),
-			ssh_port: Some(2222),
-			stage: "prod".into(),
-			service_access: ServiceAccess::Remote,
-			analytics_table: Some("beet--prod--analytics".into()),
-			deploy_id: Some("019823ff-0000-7000-8000-000000000000".into()),
-			deploy_timestamp: Some("2026-08-09T00:00:00Z".into()),
-			remote_url: Some("http://192.168.0.4:8337".into()),
-			tls: Some(true),
-			tls_dir: Some("/tmp/tls".into()),
-			headless: true,
-			screenshot: Some("/tmp/shot.png".into()),
-			screenshot_frame: Some(30),
-			wasm_host: Some(WasmHost::Browser),
-		}
+		BootstrapConfig::launch()
+			.with_main("main.bsx")
+			.with_store(StoreUri::parse("s3://site?region=us-west-2").unwrap())
+			.with_watch(true)
+			.with_features(vec!["thread".into(), "sockets".into()])
+			.with_server(ServerFilter::new("http,ssh"))
+			.with_path("/docs")
+			.with_host("0.0.0.0".parse().unwrap())
+			.with_http_port(8337)
+			.with_ssh_port(2222)
+			.with_stage("prod")
+			.with_service_access(ServiceAccess::Remote)
+			.with_analytics_table("beet--prod--analytics")
+			.with_deploy_id("019823ff-0000-7000-8000-000000000000")
+			.with_deploy_timestamp("2026-08-09T00:00:00Z")
+			.with_tls(true)
+			.with_tls_dir("/tmp/tls")
+			.with_headless(true)
+			.with_screenshot("/tmp/shot.png")
+			.with_screenshot_frame(30)
 	}
 
 	/// The renderer invariant: argv round-trips through the argv parse, and env
@@ -837,7 +840,7 @@ mod test {
 			argv.iter().map(ToString::to_string).collect(),
 		)
 		.params;
-		BootstrapConfig::parse_params(&params)
+		BootstrapConfig::parse(&params, &|_| None)
 			.unwrap()
 			.xpect_eq(config.clone());
 		// env: render, look the pairs back up by name
@@ -853,11 +856,11 @@ mod test {
 			.xpect_eq(config);
 	}
 
-	/// A default config renders to nothing on either channel.
+	/// A bare launch renders to nothing on either channel.
 	#[crate::test]
 	fn default_renders_empty() {
-		BootstrapConfig::default().to_argv().unwrap().len().xpect_eq(0);
-		BootstrapConfig::default().to_env().len().xpect_eq(0);
+		BootstrapConfig::launch().to_argv().unwrap().len().xpect_eq(0);
+		BootstrapConfig::launch().to_env().len().xpect_eq(0);
 	}
 
 	/// A field with a static default renders only when it differs from it: the
@@ -865,21 +868,16 @@ mod test {
 	/// anyway, while a named stage always reaches both channels.
 	#[crate::test]
 	fn defaulted_fields_render_only_when_named() {
-		let named = BootstrapConfig {
-			stage: "staging".into(),
-			service_access: ServiceAccess::Remote,
-			..default()
-		};
-		named
+		BootstrapConfig::launch()
+			.with_stage("staging")
+			.with_service_access(ServiceAccess::Remote)
 			.to_argv()
 			.unwrap()
 			.join(" ")
 			.xpect_eq("--stage=staging --service-access=remote");
 		// the defaults are what an unset knob parses back to, so dropping them is
 		// lossless
-		BootstrapConfig::parse_params(&default())
-			.unwrap()
-			.xpect_eq(BootstrapConfig::default());
+		parse_argv("").unwrap().xpect_eq(BootstrapConfig::launch());
 	}
 
 	/// Argv beats env, per field, with no exceptions.
@@ -892,9 +890,9 @@ mod test {
 			_ => None,
 		};
 		let config = BootstrapConfig::parse(&params, &env).unwrap();
-		config.http_port.xpect_eq(Some(9000));
+		config.http_port().xpect_eq(Some(9000));
 		// a field argv did not set still falls back to env
-		config.stage.as_str().xpect_eq("prod");
+		config.stage().as_str().xpect_eq("prod");
 	}
 
 	/// A token the renderers cannot encode is a loud error, not a corrupted
@@ -902,35 +900,28 @@ mod test {
 	/// error.
 	#[crate::test]
 	fn rejects_unencodable_tokens() {
-		let config = BootstrapConfig {
-			main: Some("my entry.bsx".into()),
-			..default()
-		};
-		config
+		BootstrapConfig::launch()
+			.with_main("my entry.bsx")
 			.to_argv()
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("cannot be rendered");
-		BootstrapConfig {
-			main: Some("say\"hi\"".into()),
-			..default()
-		}
-		.to_cmd_json("/app")
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("cannot be rendered");
+		BootstrapConfig::launch()
+			.with_main("say\"hi\"")
+			.to_cmd_json("/app")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cannot be rendered");
 	}
 
 	#[crate::test]
 	fn renders_cmd_json() {
-		BootstrapConfig {
-			store: Some(StoreUri::parse("s3://site").unwrap()),
-			server: Some(ServerFilter::new("http,ssh")),
-			..default()
-		}
-		.to_cmd_json("/app")
-		.unwrap()
-		.xpect_eq(r#"["/app", "--store=s3://site", "--server=http,ssh"]"#);
+		BootstrapConfig::launch()
+			.with_store(StoreUri::parse("s3://site").unwrap())
+			.with_server(ServerFilter::new("http,ssh"))
+			.to_cmd_json("/app")
+			.unwrap()
+			.xpect_eq(r#"["/app", "--store=s3://site", "--server=http,ssh"]"#);
 	}
 
 	/// Boot selection rides argv, ambient service config rides env, and the
@@ -962,11 +953,11 @@ mod test {
 	/// A malformed value errors at parse rather than silently taking a default.
 	#[crate::test]
 	fn malformed_errors() {
-		BootstrapConfig::parse_params(&CliArgs::parse("--port=nope").params)
+		parse_argv("--port=nope")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("invalid --port / BEET_HTTP_PORT");
-		BootstrapConfig::parse_params(&CliArgs::parse("--host=nope").params)
+		parse_argv("--host=nope")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("invalid --host / BEET_HOST");
@@ -980,8 +971,8 @@ mod test {
 			&CliArgs::parse("--port=nope --stage=prod").params,
 			&|_| None,
 		);
-		config.http_port.xpect_none();
-		config.stage.as_str().xpect_eq("prod");
+		config.http_port().xpect_none();
+		config.stage().as_str().xpect_eq("prod");
 	}
 
 	/// `--server` present but empty is a selection with no constraint, distinct
@@ -989,15 +980,27 @@ mod test {
 	/// decide).
 	#[crate::test]
 	fn empty_server_selection_is_present() {
-		BootstrapConfig::parse_params(&CliArgs::parse("--server").params)
+		parse_argv("--server")
 			.unwrap()
-			.server
+			.server()
+			.clone()
 			.unwrap()
 			.passes("http")
 			.xpect_true();
-		BootstrapConfig::parse_params(&default())
+		parse_argv("").unwrap().server().xpect_none();
+	}
+
+	/// Beet spawning beet: the launch knobs leave the params (delivered on the
+	/// child's argv instead) and everything else is untouched, so a flag can
+	/// never be forwarded twice.
+	#[crate::test]
+	fn take_launch_consumes_only_the_knobs() {
+		let mut params = CliArgs::parse("--port=9090 --nocapture").params;
+		BootstrapConfig::take_launch(&mut params)
 			.unwrap()
-			.server
-			.xpect_none();
+			.http_port()
+			.xpect_eq(Some(9090));
+		params.contains_key("port").xpect_false();
+		params.contains_key("nocapture").xpect_true();
 	}
 }

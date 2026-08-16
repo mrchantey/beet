@@ -25,6 +25,27 @@ use core::str::FromStr;
 pub struct ServerFilter(Vec<SmolStr>);
 
 impl ServerFilter {
+	/// The one name this selection travels under: the `--server` flag on a boot
+	/// request and, as `BEET_SERVER`, the [`BootstrapConfig`] knob a deploy
+	/// renders. Declared once so the deploy's rendered argv and a booting
+	/// server's read cannot drift apart.
+	pub const PARAM: &'static str = "server";
+
+	/// The selection `params` carry on [`PARAM`](Self::PARAM), accumulated across
+	/// repeated flags.
+	///
+	/// `None` when the flag is absent entirely, which is what leaves each
+	/// server's own `default_boot` to decide. A bare `--server` is present but
+	/// unconstrained, so it selects every server.
+	pub fn from_params(params: &MultiMap<SmolStr, SmolStr>) -> Option<Self> {
+		params.get_vec(Self::PARAM).map(|values| {
+			values.iter().fold(Self::default(), |mut filter, value| {
+				filter.extend(value);
+				filter
+			})
+		})
+	}
+
 	/// Parse a comma-separated glob list, trimming each name and dropping empty
 	/// ones.
 	pub fn new(value: &str) -> Self {
@@ -101,5 +122,21 @@ mod test {
 		ServerFilter::new("http,ssh").passes("http").xpect_true();
 		ServerFilter::new("http,ssh").passes("cli").xpect_false();
 		ServerFilter::new("*-tui").passes("ssh-tui").xpect_true();
+	}
+
+	/// An absent `--server` is no selection at all (each server's `default_boot`
+	/// decides), a bare one is an unconstrained selection, and repeated flags
+	/// accumulate.
+	#[crate::test]
+	fn reads_params() {
+		let from = |args: &str| {
+			ServerFilter::from_params(&CliArgs::parse(args).params)
+		};
+		from("").xpect_none();
+		from("--server").unwrap().passes("http").xpect_true();
+		from("--server=http --server=ssh")
+			.unwrap()
+			.to_string()
+			.xpect_eq("http,ssh");
 	}
 }

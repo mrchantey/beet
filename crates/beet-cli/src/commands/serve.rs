@@ -32,6 +32,7 @@ use beet::prelude::*;
 #[action(route = "serve/*entry", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<EntryParams>())]
 pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let request = cx.take();
@@ -43,7 +44,7 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 	// failing the run, see `build_entry`.
 	let root = build_entry(
 		&caller,
-		&BootstrapConfig::from_params(parts.params())?,
+		EntryParams::store(parts)?.as_ref(),
 		&entry_arg(parts)?,
 		None,
 	)

@@ -100,11 +100,11 @@ fn screenshot_verify_plugin(app: &mut App) {
 /// leaving the harness inert otherwise.
 fn arm_screenshot_verify(mut commands: Commands) {
 	let config = BootstrapConfig::get();
-	let Some(path) = config.screenshot.as_ref() else {
+	let Some(path) = config.screenshot().as_ref() else {
 		return;
 	};
 	let path = path.to_string();
-	let frame = config.screenshot_frame.unwrap_or(30);
+	let frame = config.screenshot_frame().unwrap_or(30);
 	info!("screenshot harness armed: path={path}, capture frame={frame}");
 	commands.insert_resource(ScreenshotVerify { path, frame });
 }

@@ -438,13 +438,13 @@ impl Navigator {
 pub struct OpeningRoute(pub Url);
 
 impl OpeningRoute {
-	/// The opening route from the boot request: an explicit `--path` / `BEET_PATH`
-	/// (eg `beet serve <dir> --server=tui --path=docs/form`), else the request path
-	/// (a compiled binary's own args, eg a deployed site opening at its home
-	/// route, which for an argument-less boot is `/`).
+	/// The opening route from the boot request: an explicit `--path` (eg `beet
+	/// serve <dir> --server=tui --path=docs/form`), else the request path (a
+	/// compiled binary's own args, eg a deployed site opening at its home route,
+	/// which for an argument-less boot is `/`).
 	pub fn from_request(request: &Request) -> Result<Self> {
-		let url = match BootstrapConfig::from_params(request.params())?.path {
-			Some(path) => Url::parse(path.as_str()),
+		let url = match BootParams::from_request(request)?.path {
+			Some(path) => Url::parse(path),
 			None => Url::parse(request.path_string()),
 		};
 		Self(url).xok()

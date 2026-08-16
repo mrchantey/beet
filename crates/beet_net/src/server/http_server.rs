@@ -155,17 +155,14 @@ impl HttpServer {
 	}
 
 	/// Overlays `--port` / `--host` from the boot request onto these fields, the
-	/// resolved bind config the backend then reads.
-	///
-	/// Parsed with [`BootstrapConfig::parse_params`], ie the request alone with no
-	/// env fallback: env already fed [`Default`], and a markup-declared field
-	/// out-ranks it, so consulting env again here would invert that precedence.
+	/// resolved bind config the backend then reads. See [`BootParams`] for why
+	/// the request alone decides.
 	fn apply_request(&mut self, request: &Request) -> Result {
-		let config = BootstrapConfig::parse_params(request.params())?;
-		if let Some(port) = config.http_port {
+		let boot = BootParams::from_request(request)?;
+		if let Some(port) = boot.port {
 			self.port = Some(port);
 		}
-		if let Some(host) = config.host_octets() {
+		if let Some(host) = boot.host_octets()? {
 			self.host = host;
 		}
 		Ok(())

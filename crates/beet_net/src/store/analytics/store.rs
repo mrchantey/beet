@@ -53,14 +53,14 @@ pub(super) fn spawn_store_on_config(
 				// / `BEET_ANALYTICS_TABLE`, so the deploy owns the name; the
 				// package-derived name is the fallback for a self-named build.
 				let table_name = BootstrapConfig::get()
-					.analytics_table
+					.analytics_table()
 					.as_deref()
 					.map(str::to_string)
 					.unwrap_or_else(|| pkg.analytics_bucket_name());
 				(ws.analytics_dir.into_abs(), table_name)
 			})
 			.await;
-		let access = BootstrapConfig::get().service_access;
+		let access = BootstrapConfig::get().service_access();
 		let store =
 			TableStore::dynamo_fs_selector(&fs_dir, &table_name, DEFAULT_REGION, access)
 				.await;

@@ -29,18 +29,17 @@ struct CheckParams {
 #[action(route = "check/*entry", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<CheckParams>())]
+#[require(ParamsPartial = ParamsPartial::new::<(CheckParams, EntryParams)>())]
 pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 	let params = parts.params().parse_reflect::<CheckParams>()?;
-	let root =
-		build_entry(
-			&cx.caller,
-			&BootstrapConfig::from_params(parts.params())?,
-			&entry_arg(parts)?,
-			Some(ONE_SHOT_SETTLE_DEADLINE),
-		)
-		.await?;
+	let root = build_entry(
+		&cx.caller,
+		EntryParams::store(parts)?.as_ref(),
+		&entry_arg(parts)?,
+		Some(ONE_SHOT_SETTLE_DEADLINE),
+	)
+	.await?;
 	let report = CheckReport::check_routes(&cx.world(), root).await?;
 
 	// surface every diagnostic loudly through the log facade, then summarize.

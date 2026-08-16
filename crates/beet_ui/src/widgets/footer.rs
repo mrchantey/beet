@@ -16,7 +16,7 @@ pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Bundle {
 	#[cfg(debug_assertions)]
 	build_text.push_str(" | build=debug");
 	if !bootstrap.is_prod() {
-		build_text.push_str(&format!(" | stage={}", bootstrap.stage));
+		build_text.push_str(&format!(" | stage={}", bootstrap.stage()));
 	}
 
 	rsx! {

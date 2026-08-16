@@ -6,6 +6,13 @@ use heck::ToKebabCase;
 /// The param equivelent of a [`PathPartial`], denoting
 /// all params used at this point in the graph. For the full
 /// list see [`Endpoint::params`]
+///
+/// ```
+/// #[action(route = "my-action")]
+/// #[derive(Default, Clone, Component, Reflect)]
+/// #[require(ParamsPartial = ParamsPartial::new::<MyParams>())]
+/// pub async fn MyAction() {}
+/// ```
 #[derive(
 	Debug,
 	Clone,

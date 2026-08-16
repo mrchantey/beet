@@ -154,13 +154,11 @@ impl Block for LambdaBlock {
 							let mut vars = std::collections::BTreeMap::new();
 							// the deploy identity, named by the same table the
 							// runtime parses.
-							let runtime = BootstrapConfig {
-								deploy_id: Some(stack.deploy_id().to_string().into()),
-								deploy_timestamp: Some(
-									stack.deploy_timestamp().to_string().into(),
-								),
-								..default()
-							};
+							let runtime = BootstrapConfig::launch()
+								.with_deploy_id(stack.deploy_id().to_string())
+								.with_deploy_timestamp(
+									stack.deploy_timestamp().to_string(),
+								);
 							for (key, value) in runtime.to_env() {
 								vars.insert(key, value.to_string().into());
 							}
