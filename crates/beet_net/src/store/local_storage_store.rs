@@ -290,8 +290,7 @@ mod test {
 
 	// localStorage requires a browser environment; the beet wasm test runner
 	// uses Deno which has no `window.localStorage`.
-	#[beet_core::test]
-	#[ignore = "requires browser environment"]
+	#[beet_core::test(browser)]
 	async fn works() {
 		let provider = LocalStorageStore::new("test-store");
 		store_test::run(provider).await;

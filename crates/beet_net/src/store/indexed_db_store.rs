@@ -93,6 +93,70 @@ async fn open_db(db_name: &str) -> Result<IdbDatabase> {
 		.map_err(|e| bevyhow!("idb db cast: {e:?}"))
 }
 
+/// Probe whether `db_name` exists without creating it: `open` implicitly
+/// creates a missing database, but aborting the `versionchange` transaction
+/// inside `onupgradeneeded` cancels that creation, so a fresh-created probe
+/// resolves through `onerror` (AbortError) and reports absence.
+async fn db_exists(db_name: &str) -> Result<bool> {
+	let factory = web_sys::window()
+		.ok_or_else(|| bevyhow!("idb: no window"))?
+		.indexed_db()
+		.map_jserr()?
+		.ok_or_else(|| bevyhow!("idb: not supported"))?;
+	let req = factory.open(db_name).map_jserr()?;
+
+	let fresh = std::rc::Rc::new(std::cell::Cell::new(false));
+	let onupgrade = Closure::<dyn FnMut(web_sys::Event)>::new({
+		let req = req.clone();
+		let fresh = fresh.clone();
+		move |_| {
+			fresh.set(true);
+			if let Some(txn) = req.transaction() {
+				let _ = txn.abort();
+			}
+		}
+	});
+	req.set_onupgradeneeded(Some(onupgrade.as_ref().unchecked_ref()));
+	onupgrade.forget();
+
+	let (sender, receiver) = futures::channel::oneshot::channel();
+	let sender = std::rc::Rc::new(std::cell::RefCell::new(Some(sender)));
+	let onsuccess = Closure::<dyn FnMut(web_sys::Event)>::new({
+		let req = req.clone();
+		let sender = sender.clone();
+		move |_| {
+			// existing db: close the probe connection immediately
+			if let Ok(db) = req.result() {
+				db.unchecked_into::<IdbDatabase>().close();
+			}
+			if let Some(tx) = sender.borrow_mut().take() {
+				let _ = tx.send(true);
+			}
+		}
+	});
+	req.set_onsuccess(Some(onsuccess.as_ref().unchecked_ref()));
+	onsuccess.forget();
+	let onerror = Closure::<dyn FnMut(web_sys::Event)>::new({
+		let sender = sender.clone();
+		move |ev: web_sys::Event| {
+			// the abort surfaces here; swallow it so it does not reach the
+			// global error handler
+			ev.prevent_default();
+			if let Some(tx) = sender.borrow_mut().take() {
+				let _ = tx.send(false);
+			}
+		}
+	});
+	req.set_onerror(Some(onerror.as_ref().unchecked_ref()));
+	onerror.forget();
+
+	let opened = receiver
+		.await
+		.map_err(|e| bevyhow!("idb probe cancelled: {e}"))?;
+	// opened but only by creating it fresh: the abort cancelled the creation
+	Ok(opened && !fresh.get())
+}
+
 async fn await_idb_request(req: web_sys::IdbRequest) -> Result<JsValue> {
 	let (sender, receiver) = futures::channel::oneshot::channel();
 	let sender = std::cell::RefCell::new(Some(sender));
@@ -135,15 +199,15 @@ impl BlobStoreProvider for IndexedDbStore {
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let db_name = self.db_name.clone();
-		Box::pin(SendWrapper::new(async move {
-			open_db(&db_name).await.map(|_| true)
-		}))
+		Box::pin(SendWrapper::new(
+			async move { db_exists(&db_name).await },
+		))
 	}
 
 	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
 		Box::pin(SendWrapper::new(async move {
-			open_db(&db_name).await?;
+			open_db(&db_name).await?.close();
 			Ok(())
 		}))
 	}
@@ -192,6 +256,8 @@ impl BlobStoreProvider for IndexedDbStore {
 				.put_with_key(&arr, &JsValue::from_str(&key))
 				.map_jserr()?;
 			await_idb_request(req).await?;
+			// close so a later deleteDatabase is not blocked by this handle
+			db.close();
 			Ok(())
 		}))
 	}
@@ -210,6 +276,7 @@ impl BlobStoreProvider for IndexedDbStore {
 			let store = tx.object_store(STORE_NAME).map_jserr()?;
 			let req = store.get(&JsValue::from_str(&key)).map_jserr()?;
 			let value = await_idb_request(req).await?;
+			db.close();
 			(!value.is_undefined() && !value.is_null()).xok()
 		}))
 	}
@@ -228,6 +295,7 @@ impl BlobStoreProvider for IndexedDbStore {
 			let store = tx.object_store(STORE_NAME).map_jserr()?;
 			let req = store.get_all_keys().map_jserr()?;
 			let keys_val = await_idb_request(req).await?;
+			db.close();
 			let keys: js_sys::Array = keys_val.unchecked_into();
 			let paths = (0..keys.length())
 				.filter_map(|i| keys.get(i).as_string())
@@ -257,22 +325,20 @@ impl BlobStoreProvider for IndexedDbStore {
 			let req = store.get(&JsValue::from_str(&key)).map_jserr()?;
 			let value = await_idb_request(req).await?;
 			if value.is_undefined() || value.is_null() {
+				db.close();
 				bevybail!("Object not found: {}", key);
 			}
-			Bytes::from(Uint8Array::new(&value).to_vec()).xok()
+			let bytes = Bytes::from(Uint8Array::new(&value).to_vec());
+			db.close();
+			bytes.xok()
 		}))
 	}
 
 	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
-		let this = self.clone();
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		let path = path.clone();
 		Box::pin(SendWrapper::new(async move {
-			// Resolve exists synchronously by re-opening; the trait's
-			// `exists` future can't be awaited inside a SendWrapper from
-			// here without giving up Send-ness on the wrapper.
-			let _ = this;
 			let db = open_db(&db_name).await?;
 			let tx = db
 				.transaction_with_str_and_mode(
@@ -284,6 +350,7 @@ impl BlobStoreProvider for IndexedDbStore {
 			let req = store.get(&JsValue::from_str(&key)).map_jserr()?;
 			let value = await_idb_request(req).await?;
 			if value.is_undefined() || value.is_null() {
+				db.close();
 				bevybail!("Object not found: {}", path);
 			}
 			let tx = db
@@ -295,6 +362,7 @@ impl BlobStoreProvider for IndexedDbStore {
 			let store = tx.object_store(STORE_NAME).map_jserr()?;
 			let req = store.delete(&JsValue::from_str(&key)).map_jserr()?;
 			await_idb_request(req).await?;
+			db.close();
 			Ok(())
 		}))
 	}
@@ -313,8 +381,7 @@ mod test {
 
 	// IndexedDB requires a browser environment; the beet wasm test runner
 	// uses Deno which has no `window.indexedDB`.
-	#[beet_core::test]
-	#[ignore = "requires browser environment"]
+	#[beet_core::test(browser)]
 	async fn works() {
 		let provider = IndexedDbStore::new("test-store");
 		store_test::run(provider).await;

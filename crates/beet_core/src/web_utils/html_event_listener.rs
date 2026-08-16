@@ -43,7 +43,6 @@
 
 use async_channel::Receiver;
 use async_channel::Sender;
-use async_channel::TryRecvError;
 use async_channel::unbounded;
 use futures_lite::Stream;
 use js_sys::Function;
@@ -80,7 +79,7 @@ impl<T> Drop for HtmlEventListenerInner<T> {
 ///
 /// Use `.next().await` to wait for a single event or iterate to process multiple.
 pub struct HtmlEventListener<T = web_sys::Event> {
-	receiver: Receiver<T>,
+	receiver: super::RecvStream<T>,
 	// Keep the listener alive and ensure cleanup on drop.
 	_inner: Rc<HtmlEventListenerInner<T>>,
 }
@@ -123,7 +122,7 @@ where
 		});
 
 		Self {
-			receiver,
+			receiver: super::RecvStream::new(receiver),
 			_inner: inner,
 		}
 	}
@@ -134,35 +133,20 @@ where
 	/// Await the next event from this listener.
 	/// Convenience when you don't want to depend on StreamExt::next.
 	pub async fn next_event(&mut self) -> Option<T> {
-		self.receiver.recv().await.ok()
+		self.receiver.recv().await
 	}
 }
 
-impl<T> Stream for HtmlEventListener<T> {
+impl<T: 'static> Stream for HtmlEventListener<T> {
 	type Item = T;
 
 	fn poll_next(
 		self: Pin<&mut Self>,
 		cx: &mut Context<'_>,
 	) -> Poll<Option<Self::Item>> {
-		let this = self.get_mut();
-
-		// Try fast-path without registering the waker.
-		match this.receiver.try_recv() {
-			Ok(item) => return Poll::Ready(Some(item)),
-			Err(TryRecvError::Closed) => return Poll::Ready(None),
-			Err(TryRecvError::Empty) => {}
-		}
-
-		// No item immediately available; poll using a cloned receiver to avoid borrowing self across await.
-		let recv = this.receiver.clone();
-		let fut = recv.recv();
-		futures_lite::pin!(fut);
-		match fut.poll(cx) {
-			Poll::Ready(Ok(item)) => Poll::Ready(Some(item)),
-			Poll::Ready(Err(_closed)) => Poll::Ready(None),
-			Poll::Pending => Poll::Pending,
-		}
+		// `RecvStream` holds its recv future across polls, keeping the waker
+		// registered for the event that does arrive
+		Pin::new(&mut self.get_mut().receiver).poll_next(cx)
 	}
 }
 
@@ -176,8 +160,7 @@ mod tests {
 	use web_sys::HtmlButtonElement;
 	use web_sys::MouseEvent;
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	fn works() {
 		// Ensure minimal DOM access available
 		let _ = doc::document();
@@ -185,10 +168,8 @@ mod tests {
 		let _ = doc::body();
 	}
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	async fn works_async() {
-		doc::clear_body();
 
 		let button: HtmlButtonElement = doc::create_button();
 		button.set_id("clicker");

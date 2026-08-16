@@ -20,7 +20,7 @@
 //! iframe::reload_async(&iframe).await;
 //! ```
 //!
-//! Set source and await load:
+//! Set a same-origin srcdoc and await load:
 //! ```ignore
 //! use beet_core::web_utils::{iframe, document_ext as doc};
 //! use web_sys::HtmlIFrameElement;
@@ -30,8 +30,8 @@
 //!     .dyn_into().unwrap();
 //!
 //! doc::append_child(&iframe);
-//! iframe::set_source(&iframe, "data:text/html,<html><body>ok</body></html>").await;
-//! // asserts same-origin document is present
+//! iframe::set_srcdoc(&iframe, "<html><body>ok</body></html>").await;
+//! // srcdoc inherits the parent origin, so the document is reachable
 //! assert!(iframe.content_document().is_some());
 //! ```
 use crate::web_utils::HtmlEventListener;
@@ -58,15 +58,52 @@ pub async fn reload_async(iframe: &HtmlIFrameElement) {
 
 /// Set the iframe `src` and await the next `load` event.
 ///
-/// Panics if the iframe finishes loading but `content_document()` is `None`,
-/// which commonly indicates a cross-origin restriction.
+/// A loaded frame does not imply a reachable document:
+/// `content_document()` is `None` for any cross-origin frame, including every
+/// `data:` url (opaque origin). For a same-origin scripted frame use
+/// [`set_srcdoc`], which inherits the parent origin and verifies arrival.
+///
+/// A freshly-inserted frame may still deliver its initial `about:blank` load
+/// after this attaches, in which case that is the event awaited here; a frame
+/// that has settled awaits the real one.
 pub async fn set_source(iframe: &HtmlIFrameElement, url: &str) {
+	let target = iframe.clone().unchecked_into::<web_sys::EventTarget>();
+	let mut loads =
+		HtmlEventListener::<web_sys::Event>::new_with_target("load", target);
+	// a present srcdoc takes precedence over src, making the assignment a
+	// silent no-op that never fires load. Assign src first, then remove:
+	// removing srcdoc navigates to the src attribute, so this order yields
+	// exactly one navigation (remove-first bounces through about:blank, and a
+	// single load await would resolve on the wrong document)
 	iframe.set_src(url);
-	wait_for_load(iframe).await;
-	if iframe.content_document().is_none() {
-		panic!(
-			"iframe loaded src: {url}\nbut content_document is None (likely a CORS issue)"
-		);
+	iframe.remove_attribute("srcdoc").ok();
+	let _ = loads.next_event().await;
+}
+
+/// Set the iframe `srcdoc` and await the srcdoc document being current and
+/// complete. Unlike a `data:` [`set_source`], a srcdoc frame inherits the
+/// parent origin, so `content_document()` is reachable afterwards.
+///
+/// Consumes load events until the srcdoc document has actually arrived: a
+/// freshly-inserted frame's initial `about:blank` load can land after the
+/// srcdoc assignment, so a single awaited event proves nothing.
+pub async fn set_srcdoc(iframe: &HtmlIFrameElement, html: &str) {
+	let target = iframe.clone().unchecked_into::<web_sys::EventTarget>();
+	let mut loads =
+		HtmlEventListener::<web_sys::Event>::new_with_target("load", target);
+	iframe.set_srcdoc(html);
+	loop {
+		let arrived = iframe
+			.content_document()
+			.map(|doc| {
+				doc.url().unwrap_or_default() == "about:srcdoc"
+					&& doc.ready_state() == "complete"
+			})
+			.unwrap_or(false);
+		if arrived {
+			return;
+		}
+		let _ = loads.next_event().await;
 	}
 }
 
@@ -86,8 +123,7 @@ mod tests {
 	use crate::prelude::*;
 	use crate::web_utils::document_ext as doc;
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	fn works() {
 		// DOM access smoke-check
 		let _ = doc::document();
@@ -95,29 +131,34 @@ mod tests {
 		let _ = doc::body();
 	}
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	async fn works_async() {
-		doc::clear_body();
-
-		// Create and attach an iframe, then set a same-origin data URL and await load
 		let iframe: HtmlIFrameElement = doc::document()
 			.create_element("iframe")
 			.unwrap()
 			.dyn_into()
 			.unwrap();
-
-		// Make it visible to avoid some headless environment quirks
-
 		doc::append_child(&iframe);
 
-		let data_url = "data:text/html,<html><body>ok</body></html>";
-		set_source(&iframe, data_url).await;
+		// a srcdoc frame inherits the parent origin, so the document is
+		// reachable and carries the content
+		set_srcdoc(&iframe, "<html><body>ok</body></html>").await;
+		iframe
+			.content_document()
+			.unwrap()
+			.body()
+			.unwrap()
+			.text_content()
+			.unwrap()
+			.xpect_eq("ok");
 
-		iframe.content_document().is_some().xpect_true();
-
-		// Exercise reload path too
+		// the reload path resolves and keeps the document reachable
 		reload_async(&iframe).await;
 		iframe.content_document().is_some().xpect_true();
+
+		// a `data:` src loads fine but is an opaque origin: no document access
+		set_source(&iframe, "data:text/html,<html><body>ok</body></html>")
+			.await;
+		iframe.content_document().is_none().xpect_true();
 	}
 }

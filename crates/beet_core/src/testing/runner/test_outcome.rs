@@ -51,6 +51,12 @@ pub(crate) enum TestSkip {
 	Ignore(Option<&'static str>),
 	/// The test was filtered out by user-specified filters.
 	FailedFilter,
+	/// The test needs a real browser dom (`#[beet_core::test(browser)]`) and
+	/// this host is not one.
+	RequiresBrowser,
+	/// A browser host runs only browser-marked tests; everything else is
+	/// covered by the native and deno suites.
+	NonBrowser,
 }
 
 /// Reasons why a test failed.

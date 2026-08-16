@@ -87,6 +87,11 @@ pub struct TestDesc {
 	pub should_panic: ShouldPanic,
 	/// The kind of test.
 	pub test_type: TestType,
+	/// Whether the test needs a real browser dom
+	/// (`#[beet_core::test(browser)]`). A beet extension beyond the libtest
+	/// mirror: browser hosts run only marked tests, every other host skips
+	/// them.
+	pub browser: bool,
 }
 
 /// Mirror of the subset of `test::TestFn` beet uses.
@@ -154,6 +159,9 @@ pub struct BeetTestCase {
 	pub ignore: bool,
 	/// Optional `#[ignore = "message"]` message.
 	pub ignore_message: Option<&'static str>,
+	/// Whether the test needs a real browser dom
+	/// (`#[beet_core::test(browser)]`).
+	pub browser: bool,
 	/// The test runner function. For async tests this registers the
 	/// future via `register_test` then returns `Ok(())`.
 	pub run: fn() -> Result<(), String>,
@@ -169,6 +177,7 @@ impl BeetTestCase {
 		should_panic: ShouldPanic,
 		ignore: bool,
 		ignore_message: Option<&'static str>,
+		browser: bool,
 		run: fn() -> Result<(), String>,
 	) -> Self {
 		Self {
@@ -179,6 +188,7 @@ impl BeetTestCase {
 			should_panic,
 			ignore,
 			ignore_message,
+			browser,
 			run,
 		}
 	}
@@ -199,6 +209,7 @@ impl BeetTestCase {
 				no_run: false,
 				should_panic: self.should_panic,
 				test_type: TestType::UnitTest,
+				browser: self.browser,
 			},
 			testfn: TestFn::StaticTestFn(self.run),
 		}
@@ -291,6 +302,8 @@ mod libtest_conv {
 				no_run: d.no_run,
 				should_panic: d.should_panic.into(),
 				test_type: d.test_type.into(),
+				// libtest descriptors cannot carry the beet-only marker
+				browser: false,
 			}
 		}
 	}

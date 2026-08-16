@@ -1,9 +1,10 @@
 //! WebDriver example
 //!
-//! This example spawns a chromedriver process, opens `example.com`,
-//! reads the heading text and clicks the anchor to follow a link.
+//! This example spawns a chromedriver process, opens `example.com`, reads the
+//! heading text with an auto-waiting find, follows a link with a trusted
+//! click, then saves a screenshot of the landing page.
 //!
-//! Prerequisites: `chromedriver` and `chromium` must be available on `PATH`.
+//! Prerequisites: `chromedriver` and a chromium/chrome must be on `PATH`.
 //!
 //! Run with:
 //! ```sh
@@ -32,46 +33,31 @@ fn run_webdriver(async_commands: AsyncCommands) {
 	async_commands.run_local(|world| async move {
 		ClientProcess::check_installed(Provider::Chromedriver).await?;
 
-		let (process, page) = Page::visit("https://example.com")
-			.await
-			.expect("failed to visit example.com");
+		let (process, page) = Page::visit("https://example.com").await?;
 
-		assert_eq!(
-			page.current_url().await.expect("current_url failed"),
-			"https://example.com/"
-		);
+		// find auto-waits for the selector, so no readiness dance
+		let heading = page.find("h1").await?.inner_text().await?;
+		info!("heading: {heading}");
 
-		let heading = page
-			.query_selector("h1")
-			.await
-			.expect("query failed")
-			.expect("missing h1");
-		assert_eq!(
-			heading.inner_text().await.expect("inner_text failed"),
-			"Example Domain"
-		);
+		// the innerText locator + a trusted click follows the link
+		page.find_text("More information...").await?.click().await?;
+		poll_ext::poll_async(async || {
+			let url = page.current_url().await?;
+			url.contains("iana.org")
+				.then_some(())
+				.ok_or_else(|| bevyhow!("still at {url}"))
+		})
+		.await?;
+		info!("landed on {}", page.current_url().await?);
 
-		let anchor = page
-			.query_selector("a")
-			.await
-			.expect("query failed")
-			.expect("missing anchor");
-		anchor.click().await.expect("click failed");
+		// capture the landing page
+		let png = page.screenshot().await?;
+		let out = fs_ext::workspace_root().join("target/webdriver-example.png");
+		fs_ext::write(&out, &png)?;
+		info!("saved screenshot to {}", out.display());
 
-		// wait for the navigation to land
-		Backoff::default()
-			.with_max_attempts(10)
-			.retry_async(|_| async {
-				match page.current_url().await.unwrap().as_str() {
-					"https://www.iana.org/help/example-domains" => Ok(()),
-					_ => Err(()),
-				}
-			})
-			.await
-			.expect("did not navigate to iana.org");
-
-		page.kill().await.expect("session kill failed");
-		process.kill().expect("driver kill failed");
+		page.kill().await?;
+		process.kill()?;
 
 		world.write_message(AppExit::Success).await;
 		Ok(())

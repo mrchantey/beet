@@ -7,7 +7,9 @@ use std::path::PathBuf;
 const DENO_TS: &str = include_str!("deno.ts");
 
 /// Runs a `wasm32-unknown-unknown` binary via `wasm-bindgen` + the bundled Deno
-/// runner. Wire it up as the cargo runner:
+/// runner, or with `BEET_WASM_HOST=browser` via a headless chromium (see
+/// `run_wasm_browser.rs`, the host for `#[beet_core::test(browser)]` dom
+/// tests). Wire it up as the cargo runner:
 ///
 /// ```toml
 /// # .cargo/config.toml
@@ -97,12 +99,23 @@ async fn run_wasm(
 		.run_async()
 		.await?;
 
-	// 2. write the bundled Deno runner next to the bindgen output
+	// 2. BEET_WASM_HOST=browser: serve the bindgen output and run the suite in
+	// a headless browser instead of deno, the host for
+	// `#[beet_core::test(browser)]` dom tests
+	#[cfg(not(target_arch = "wasm32"))]
+	if env_ext::var("BEET_WASM_HOST")
+		.map(|host| host == "browser")
+		.unwrap_or(false)
+	{
+		return super::run_wasm_browser::run(&runner_dir, args).await;
+	}
+
+	// 3. write the bundled Deno runner next to the bindgen output
 	assert_deno_installed().await?;
 	fs_ext::create_dir_all_async(&runner_dir).await?;
 	fs_ext::write_async(runner_dir.join("deno.ts"), DENO_TS).await?;
 
-	// 3. deno run <runner> <args>, inheriting stdio so the module's output
+	// 4. deno run <runner> <args>, inheriting stdio so the module's output
 	// (test results, panics, logs) streams to the terminal live and its exit
 	// code propagates — essential for a cargo runner.
 	let mut deno_args = vec![

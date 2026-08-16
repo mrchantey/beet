@@ -29,9 +29,10 @@ struct SessionInner {
 	/// channel (see [`Session::kill`]) ends the pump, which closes the socket.
 	cmd_tx: async_channel::Sender<String>,
 
-	/// Event stream (BiDi messages without an id but with a method)
-	events_tx: async_channel::Sender<Value>,
-	events_rx: async_channel::Receiver<Value>,
+	/// Event subscribers as `(method prefix, sender)` pairs, matched against
+	/// each inbound method-bearing frame. A subscriber whose receiver has been
+	/// dropped is pruned on the next event.
+	subscribers: Mutex<Vec<(String, async_channel::Sender<Value>)>>,
 }
 
 /// A BiDi WebDriver session (cross platform, wasm friendly).
@@ -56,9 +57,9 @@ struct SessionInner {
 ///      - If a message parses and contains an `id`, it is a response.
 ///        The matching one‑shot sender (if still present) is removed
 ///        from `pending` and fulfilled with the full JSON object.
-///      - If it lacks an `id` but contains `method`, it is treated as
-///        an unsolicited event and pushed (non‑blocking try_send) onto
-///        the `events_tx` channel for opportunistic consumption.
+///      - If it lacks an `id` but contains `method`, it is an unsolicited
+///        event, delivered to every subscriber (see [`Session::events`])
+///        whose method prefix matches.
 ///    The socket's reader/writer halves are thread-bound (`SendWrapper`),
 ///    so the pump is a single `spawn_local` task: the socket is created and
 ///    polled on one thread, never sent across the pool (a plain `spawn`
@@ -69,7 +70,8 @@ struct SessionInner {
 /// * Each in‑flight command has exactly one awaiting receiver.
 /// * Dropping a receiver before fulfillment simply discards the response,
 ///   because the pending entry is removed only on match.
-/// * Event delivery is best‑effort (a full events channel drops silently).
+/// * Event channels are unbounded; dropping a receiver unsubscribes it (the
+///   pump prunes closed senders on the next event).
 ///
 /// Concurrency & Safety
 /// --------------------
@@ -124,13 +126,38 @@ impl Session {
 	/// Access session id.
 	pub fn id(&self) -> &str { &self.inner.session_id }
 
-	/// Try to receive the next event (non-blocking).
-	pub fn try_event(&self) -> Option<Value> {
-		self.inner.events_rx.try_recv().ok()
+	/// Register a listener for BiDi events whose `method` starts with
+	/// `prefix`, eg `"log.entryAdded"` for one event or `"network."` for a
+	/// whole module. Registration alone delivers nothing: pair it with
+	/// [`Self::subscribe`] so the browser actually emits the events. Dropping
+	/// the receiver unsubscribes the listener.
+	pub fn events(
+		&self,
+		prefix: impl Into<String>,
+	) -> async_channel::Receiver<Value> {
+		let (tx, rx) = async_channel::unbounded();
+		self.inner
+			.subscribers
+			.lock()
+			.unwrap()
+			.push((prefix.into(), tx));
+		rx
 	}
-	/// Asynchronously receive the next event (non-blocking).
-	pub async fn next_event(&self) -> Result<Value, async_channel::RecvError> {
-		self.inner.events_rx.recv().await
+
+	/// Issue `session.subscribe` for the given BiDi event names, optionally
+	/// scoped to specific browsing contexts. Listen via [`Self::events`],
+	/// registered *before* subscribing so no event slips between the two.
+	pub async fn subscribe(
+		&self,
+		events: &[&str],
+		contexts: Option<&[&str]>,
+	) -> Result<()> {
+		let mut params = json!({ "events": events });
+		if let Some(contexts) = contexts {
+			params.set_field("contexts", json!(contexts))?;
+		}
+		self.command("session.subscribe", params).await?;
+		Ok(())
 	}
 
 	/// Send a BiDi command and await the full JSON response (the full object
@@ -196,7 +223,6 @@ impl Session {
 		socket_url: &str,
 	) -> Result<Self> {
 		let (cmd_tx, cmd_rx) = async_channel::unbounded::<String>();
-		let (events_tx, events_rx) = async_channel::unbounded::<Value>();
 
 		let inner = Arc::new(SessionInner {
 			driver_url: driver_url.to_string(),
@@ -205,8 +231,7 @@ impl Session {
 			next_id: AtomicUsize::new(1),
 			pending: Mutex::new(HashMap::new()),
 			cmd_tx,
-			events_tx,
-			events_rx,
+			subscribers: Mutex::new(Vec::new()),
 		});
 
 		let ready = Self::spawn_pump(inner.clone(), cmd_rx);
@@ -279,9 +304,21 @@ impl Session {
 							continue;
 						}
 
-						// Event (has method, no id)
-						if val.get("method").is_some() {
-							let _ = inner.events_tx.try_send(val);
+						// Event (has method, no id): deliver to matching
+						// subscribers, pruning any whose receiver has closed.
+						if let Some(method) =
+							val.get("method").and_then(|m| m.as_str())
+						{
+							let method = method.to_string();
+							let mut subscribers =
+								inner.subscribers.lock().unwrap();
+							subscribers.retain(|(prefix, tx)| {
+								if !method.starts_with(prefix.as_str()) {
+									return !tx.is_closed();
+								}
+								// unbounded, so try_send only fails when closed
+								tx.try_send(val.clone()).is_ok()
+							});
 						}
 					}
 				};
@@ -301,12 +338,14 @@ mod test {
 	use crate::webdriver::*;
 	use beet_core::prelude::*;
 
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn works() {
 		App::default()
 			.run_io_task_local(async move {
-				let client = ClientProcess::new().unwrap();
+				let client =
+					ClientProcess::new_with_opts(test_fixtures::client())
+						.unwrap();
 				let session = client.new_session().await.unwrap();
 				// Simple BiDi round‑trip health check.
 				session.ping().await.unwrap();

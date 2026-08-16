@@ -7,17 +7,12 @@ use super::Element;
 use super::*;
 use beet_core::prelude::*;
 use bevy::prelude::Result;
+use core::time::Duration;
 use serde_json::Value;
 use serde_json::json;
 
 /// High level ergonomic wrapper over a BiDi `Session` bound to a single
 /// top-level browsing context (page / tab).
-///
-/// Responsibilities:
-/// * Discover an initial browsing context (via `browsingContext.getTree`)
-/// * Provide convenience helpers (`navigate`, `evaluate`, `get_current_url`)
-/// * Future: element querying returning typed `Element` handles that track
-///   BiDi object ids (currently a stub until `Element` is expanded)
 ///
 /// Construction Patterns:
 /// * `Page::from_session(session)` – bind an already-created session
@@ -25,10 +20,16 @@ use serde_json::json;
 ///    navigate, return `(ClientProcess, Page)` so the caller can clean up
 /// * `Page::visit_with_client(client, url)` – same but with a custom client
 ///
+/// Element querying comes in two speeds: [`Page::find`] (and friends, see
+/// `locate.rs`) auto-waits for a match bounded by [`Page::timeout`], while
+/// [`Page::query_selector`] probes exactly once.
 #[derive(Debug, Clone)]
 pub struct Page {
 	pub(super) session: Session,
 	pub(super) context_id: String,
+	/// The auto-wait deadline for [`Page::find`] and the async matchers,
+	/// default 4s (sits under the 5s default test timeout).
+	timeout: Duration,
 }
 
 impl Page {
@@ -49,7 +50,17 @@ impl Page {
 		Ok(Self {
 			session,
 			context_id: first.to_string(),
+			timeout: poll_ext::DEFAULT_TIMEOUT,
 		})
+	}
+
+	/// The auto-wait deadline for [`Page::find`] and the async matchers.
+	pub fn timeout(&self) -> Duration { self.timeout }
+
+	/// Set the auto-wait deadline for [`Page::find`] and the async matchers.
+	pub fn with_timeout(mut self, timeout: Duration) -> Self {
+		self.timeout = timeout;
+		self
 	}
 
 	/// Spawn a default (chromium) driver process, create a session,
@@ -107,9 +118,11 @@ impl Page {
 	}
 
 	/// Evaluate a JavaScript expression in the page's browsing context.
-	/// Returns the full BiDi response JSON (caller can drill down).
+	/// Returns the full BiDi response JSON (caller can drill down); a script
+	/// exception becomes an `Err` carrying the exception text.
 	pub async fn evaluate(&self, expression: &str) -> Result<Value> {
-		self.session
+		let resp = self
+			.session
 			.command(
 				"script.evaluate",
 				json!({
@@ -119,7 +132,58 @@ impl Page {
 					"resultOwnership": "root"
 				}),
 			)
-			.await
+			.await?;
+		Self::check_exception(&resp)?;
+		Ok(resp)
+	}
+
+	/// Evaluate a JavaScript expression and return its completion as plain
+	/// JSON, with objects and arrays deep-serialized and flattened (see
+	/// `bidi_value.rs`), so results compare directly against `json!` values.
+	pub async fn evaluate_value(&self, expression: &str) -> Result<Value> {
+		let resp = self
+			.session
+			.command(
+				"script.evaluate",
+				json!({
+					"expression": expression,
+					"target": { "context": self.context_id },
+					"awaitPromise": true,
+					"resultOwnership": "none",
+					"serializationOptions": { "maxObjectDepth": 64 }
+				}),
+			)
+			.await?;
+		Self::check_exception(&resp)?;
+		resp.pointer("/result/result")
+			.ok_or_else(|| bevyhow!("script result missing"))?
+			.xmap(bidi_value::to_json)
+			.xok()
+	}
+
+	/// Surface an in-page exception (`result.type == "exception"`) as an
+	/// error; protocol-level errors are already handled by
+	/// [`Session::command`].
+	fn check_exception(resp: &Value) -> Result<()> {
+		if resp.pointer("/result/type").and_then(|ty| ty.as_str())
+			== Some("exception")
+		{
+			let text = resp
+				.pointer("/result/exceptionDetails/text")
+				.and_then(|text| text.as_str())
+				.unwrap_or("unknown script exception");
+			bevybail!("script threw: {text}");
+		}
+		Ok(())
+	}
+
+	/// The document title.
+	pub async fn title(&self) -> Result<String> {
+		self.evaluate_value("document.title")
+			.await?
+			.as_str()
+			.map(|title| title.to_string())
+			.ok_or_else(|| bevyhow!("missing document title"))
 	}
 
 	/// Get current page URL (string convenience wrapper).
@@ -168,27 +232,40 @@ impl Page {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::webdriver::test_fixtures;
 
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
-	async fn visit_and_read_title() {
+	async fn visits_and_evaluates() {
 		App::default()
 			.run_io_task_local(async move {
-				let (proc, page) =
-					Page::visit("https://example.com").await.unwrap();
-				page.current_url()
-					.await
-					.unwrap()
-					.xpect_eq("https://example.com/");
+				let url = test_fixtures::page_url(
+					"page",
+					"<html><body><h1>Example Domain</h1></body></html>",
+				);
+				let (proc, page) = test_fixtures::visit(&url).await;
+				page.current_url().await.unwrap().xpect_eq(url);
 
-				page.evaluate("document.querySelector('h1')?.textContent")
+				page.evaluate_value(
+					"document.querySelector('h1')?.textContent",
+				)
+				.await
+				.unwrap()
+				.xpect_eq(json!("Example Domain"));
+
+				// objects deep-serialize into plain json
+				page.evaluate_value("({count: 1, items: [1, 2], nested: {flag: true}})")
 					.await
 					.unwrap()
-					.pointer("/result/result/value")
-					.and_then(|v| v.as_str())
-					.unwrap()
+					.xpect_eq(json!({"count": 1, "items": [1, 2], "nested": {"flag": true}}));
+
+				// in-page exceptions surface as errors
+				page.evaluate("(() => { throw new Error('boom') })()")
+					.await
+					.unwrap_err()
 					.to_string()
-					.xpect_eq("Example Domain");
+					.xpect_contains("boom");
+
 				page.kill().await.unwrap();
 				proc.kill().unwrap();
 			})

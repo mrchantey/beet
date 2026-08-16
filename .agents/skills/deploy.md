@@ -50,34 +50,35 @@ GET each key page; assert HTTP 200 and the expected marker:
 
 Also fetch `/docs/design/counter?color-scheme=light` and `?color-scheme=dark` and confirm 200 (the scheme is applied server-side for the screenshot check below).
 
-### b. playwright interactive (navigability, the counter, client errors, mobile layout)
+### b. browser verification (navigability, the counter, client errors, mobile layout)
 
-The counter (`site/routes/docs/design/counter.bsx`) is a reactive page: a "More" button increments and a "Less" button decrements a document field rendered as "You have clicked N times." Drive it with playwright (no MCP; use the CLI/library):
+The counter (`site/routes/docs/design/counter.bsx`) is a reactive page: a "More" button increments and a "Less" button decrements a document field rendered as "You have clicked N times." The whole check is one committed test driving the in-house webdriver (`chromedriver` + a chromium on PATH are the only deps):
 
-- module: `NODE_PATH=/home/pete/.local/lib/node_modules` then `require('playwright')`
-- browsers: `PLAYWRIGHT_BROWSERS_PATH=/home/pete/.cache/ms-playwright` (chromium cached)
+```sh
+BEET_BASE_URL=<BASE_URL> cargo test --test site_browser \
+  --features router,json,testing,webdriver -- --include-ignored
+```
 
-A reusable script lives at `.agents/tmp/deploy-verify/verify_client.js <BASE_URL>` (built and shaken out during the Local step); it runs everything below and exits non-zero on any client error or overflow. The checks:
+`tests/site_browser.rs` runs everything below and exits non-zero on any client error or overflow. The checks:
 
-**Client errors (fail on any).** Before navigating, attach three collectors and fail the step if any fires, so a broken client script cannot ship silently -- exactly the miss that let `crypto.randomUUID is not a function` reach the analytics beacon in production:
+**Client errors (fail on any).** Before navigating, two collectors attach and the run fails if either fires, so a broken client script cannot ship silently -- exactly the miss that let `crypto.randomUUID is not a function` reach the analytics beacon in production:
 
-- `page.on('pageerror', ...)` -- uncaught exceptions.
-- `page.on('console', msg => msg.type() === 'error')` -- `console.error` plus failed-request console messages.
-- `page.on('response', res => res.status() >= 400)` -- any failed subresource. A favicon that fails to load raises no console error, so without this a site whose every asset 403s still reports `client OK`.
+- `page.console()` -- `console.error` plus uncaught exceptions and failed-request console messages (BiDi `log.entryAdded`).
+- `page.responses()` -- any 4xx/5xx subresource. A favicon that fails to load raises no console error, so without this a site whose every asset 403s still reports green.
 
 **Asset sweep.** Load a page that actually carries an image (`/blog/post-6`), collect every `/assets/` reference on it (`img[src]`, `link[href]`, `script[src]`, `source[src]`), fetch each following redirects, and assert 200. This is the store-topology check: the app serves assets from its own bucket, and a private bucket handing out a public url turns every asset into a redirect to a 403. Both this and the response collector were added after exactly that shipped past a green run (`S3Store::public_url` claimed a virtual-hosted url for a private bucket; it now returns `None` unless the store is explicitly `with_public(true)`).
 
 Ignore nothing by default; if a message is genuinely benign, match it exactly and log that it was skipped. CAVEAT: some faults only surface in an insecure context -- `crypto.randomUUID`/`crypto.subtle` are gated to secure contexts, and localhost + `https://` are both secure, so this check does NOT reproduce that specific bug. The durable fix is keeping secure-context-only APIs out of the client (the beacon now derives its id from `crypto.getRandomValues`, available on plain http); the collectors still catch the broad class of client JS errors on every env.
 
-**Counter + navigability.** Headless chromium: goto `BASE_URL/docs/design/counter`, wait for `Counter`, read the count, click "More" twice and assert "You have clicked 2 times", click "Less" and assert "1 times". Then navigate `/` -> a docs page -> the counter via in-page links (proves the site is navigable, not just direct loads), and load `/blog` + a post (`/blog/post-3`) so the beacon runs on a content page -- the pages the client error was reported on.
+**Counter + navigability.** Headless chromium: goto `BASE_URL/docs/design/counter`, click "More" twice and assert "You have clicked 2 times", click "Less" and assert "1 times" (trusted `performActions` clicks, so hit-testing is real). Then navigate `/` -> `/docs` -> `/docs/design` -> the counter via in-page links at a desktop viewport (the collapsed-nav links are zero-size and unclickable, exactly like a real user; proves the site is navigable, not just direct loads), and load `/blog` + a post (`/blog/post-3`) so the beacon runs on a content page -- the pages the client error was reported on.
 
-**Mobile layout (no horizontal overflow).** Set a narrow viewport (`page.setViewportSize({width: 375, height: 812})`, then repeat at `320`) and for `/`, `/blog`, and `/blog/post-3` assert `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`. On failure print the offending elements (those whose `getBoundingClientRect().right` exceeds the viewport) so the culprit is obvious. Regression guard: a `<pre>` code block or a wide embed used to blow `<main>` past the viewport (`<main>` is a flex item, fixed with `min-width: 0`), and the header nav overflowed at 320px (fixed with an `@media screen` app-bar `flex-wrap`).
+**Mobile layout (no horizontal overflow).** At viewports 375x812 and 320x812, for `/`, `/blog`, and `/blog/post-3` assert `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`, printing the offending elements on failure so the culprit is obvious. Regression guard: a `<pre>` code block or a wide embed used to blow `<main>` past the viewport (`<main>` is a flex item, fixed with `min-width: 0`), and the header nav overflowed at 320px (fixed with an `@media screen` app-bar `flex-wrap`).
 
-Assert ZERO collected client errors across every navigation above. Print `client OK` on success and exit non-zero on any failed assertion or collected error.
+The test asserts ZERO collected client errors across every navigation above; extend `tests/site_browser.rs` if a deploy needs a check it does not cover, rather than scripting around it.
 
-### c. playwright screenshot (styles + color schemes)
+### c. screenshot (styles + color schemes)
 
-Screenshot the home page, the counter page, and `/docs/design/color_schemes`, each in default, `?color-scheme=light`, and `?color-scheme=dark`. The CLI is enough (the URL is a positional arg, not `--url`): `PLAYWRIGHT_BROWSERS_PATH=/home/pete/.cache/ms-playwright node /home/pete/.local/lib/node_modules/playwright/cli.js screenshot '<BASE_URL>/docs/design/counter?color-scheme=light' .agents/tmp/<step>-counter-light.png`. Save to `.agents/tmp/`, then `Read` the PNGs and confirm they render styled (typography, buttons, layout present; light vs dark visibly differ), not an unstyled or broken page.
+Screenshot the home page, the counter page, and `/docs/design/color_schemes`, each in default, `?color-scheme=light`, and `?color-scheme=dark`, via the cli: `cargo run -p beet-cli -- screenshot '<BASE_URL>/docs/design/counter?color-scheme=light' --output=.agents/tmp/<step>-counter-light.png` (an installed `beet` works too). Save to `.agents/tmp/`, then `Read` the PNGs and confirm they render styled (typography, buttons, layout present; light vs dark visibly differ), not an unstyled or broken page.
 
 ### d. ssh (the live terminal + multi-tenancy)
 
@@ -120,11 +121,11 @@ The site records analytics for every transport: a server `Request` event per rou
 Recipe (run around the b-d checks so the delta is attributable):
 
 1. BASELINE: query once before the b-d checks and record the total (`N events: ...`). A brand-new environment reports `0 events`; an existing one is non-zero.
-2. Drive the visits: checks b (playwright: home -> docs -> counter, click "More") and d (ssh: navigate to the counter). These generate page views, a `Click`, and request events.
+2. Drive the visits: checks b (the browser test: home -> docs -> counter, click "More") and d (ssh: navigate to the counter). These generate page views, a `Click`, and request events.
 3. DELTA: query again and assert, from the summary:
    - the total went UP (new events recorded) and is `>=` the baseline (prior events retained, since the store is append/upsert, never truncated).
    - `PageView` events for the visited paths appear under `pages` (eg `/docs/design/counter`).
-   - both client kinds are present under `client kinds`: `Web` (the http/playwright visits) and `Terminal` (the ssh session).
+   - both client kinds are present under `client kinds`: `Web` (the http/browser visits) and `Terminal` (the ssh session).
    - for dev/prod (geoip enabled in the deploy build), a country appears under `countries` for the web visits. The geoip database (`assets/databases/country.mmdb`, ~8MB) is gitignored, so it reaches the app bucket only through the deploy's `site/assets` symlink walk from a hydrated checkout: run `just beet-shared pull` before deploying, and if `countries` is empty verify `country.mmdb` is present under `s3://beet-site--<stage>--app/assets/databases/`. Since the app bucket carries the assets, a brand-new dev stack now populates countries on its first run like prod does.
 
 An automated in-process version of the web half of this flow (http request -> request event, beacon -> page view, prior events retained, the beacon endpoint skipped) lives in `tests/beet_site_analytics.rs`; run it with `cargo test --test beet_site_analytics --features "router,json,fs,testing"` for a fast pre-deploy check of the wiring. The terminal page-view path is unit-tested in `beet_router/src/navigate/navigator.rs`.
@@ -135,7 +136,7 @@ An automated in-process version of the web half of this flow (http request -> re
 cargo run -p beet-cli -- serve site --server=http,ssh    # run in background
 ```
 
-Read the bound http + ssh ports from the serve output. Run the full verification (a-e) against `http://localhost:<http_port>` and `127.0.0.1:<ssh_port>`. This step is also the shakedown: settle the exact playwright script and ssh driver here and record them above. Kill the server when done. No cloud or DNS impact.
+Read the bound http + ssh ports from the serve output. Run the full verification (a-e) against `http://localhost:<http_port>` and `127.0.0.1:<ssh_port>`. This step is also the shakedown: run the browser test and settle the ssh driver here, recording any changes above. Kill the server when done. No cloud or DNS impact.
 
 ## Step 2: Dev
 

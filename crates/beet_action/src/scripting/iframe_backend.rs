@@ -222,18 +222,17 @@ impl Drop for FrameGuard {
 	fn drop(&mut self) { self.frame.remove(); }
 }
 
-/// Browser-only, so these need a real DOM.
+/// Browser-only, so these need a real DOM: `#[beet_core::test(browser)]`
+/// skips them everywhere except a browser-hosted suite (the deno wasm runner
+/// has no `document`).
 ///
-/// Ignored until the in-house webdriver harness lands (master-plan phase 10);
-/// until then they are the manual checklist for this backend. The deno wasm
-/// runner has no `document`, so nothing here can run under it.
+/// Run: `just test-wasm-browser beet_action`.
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[ignore = "requires a browser dom"]
-	#[beet_core::test]
+	#[beet_core::test(browser)]
 	async fn transforms_its_input() {
 		Script::<i64, i64>::new("input + 1")
 			.run(41)
@@ -242,8 +241,7 @@ mod test {
 			.xpect_eq(42);
 	}
 
-	#[ignore = "requires a browser dom"]
-	#[beet_core::test]
+	#[beet_core::test(browser)]
 	async fn splits_the_console_streams() {
 		Script::<(), ()>::new(r#"console.log("out"); console.error("err")"#)
 			.run_captured(())
@@ -254,8 +252,7 @@ mod test {
 
 	/// The opaque origin is the guarantee this backend does provide: the parent
 	/// document and same-origin storage are both unreachable.
-	#[ignore = "requires a browser dom"]
-	#[beet_core::test]
+	#[beet_core::test(browser)]
 	async fn cannot_reach_the_parent_realm() {
 		for source in [
 			"parent.document.title",

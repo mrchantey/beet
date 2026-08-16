@@ -116,6 +116,22 @@ where
 		.map(|el| el.dyn_into::<T>().unwrap())
 }
 
+/// [`query_selector`] with a poll: wait until `selector` matches, the in-page
+/// counterpart of the webdriver's auto-waiting `find`. Requires a runner that
+/// yields to the js event loop between attempts.
+#[cfg(feature = "std")]
+pub async fn get<T>(selector: &str) -> crate::prelude::Result<T>
+where
+	T: JsCast,
+{
+	use crate::prelude::*;
+	poll_ext::poll(|| {
+		query_selector::<T>(selector)
+			.ok_or_else(|| bevyhow!("no element matching {selector:?}"))
+	})
+	.await
+}
+
 /// Create an `HtmlElement` with the provided tag name.
 pub fn create_element(local_name: &str) -> HtmlElement {
 	document()
@@ -241,8 +257,7 @@ mod tests {
 	use web_sys::HtmlLinkElement;
 	use web_sys::HtmlScriptElement;
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	fn runs_in_wasm() {
 		// This ensures the test harness can reach the DOM.
 		let _ = document_ext::document();
@@ -250,10 +265,8 @@ mod tests {
 		let _ = document_ext::body();
 	}
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	fn creates_and_appends_div() {
-		document_ext::clear_body();
 
 		let div = document_ext::create_div();
 		div.set_id("greeting");
@@ -265,10 +278,8 @@ mod tests {
 		found.inner_html().xpect_eq("hello");
 	}
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	async fn adds_script_and_style() {
-		document_ext::clear_body();
 		let _script =
 			document_ext::add_script_content_to_body("window.__beet_flag = 1;")
 				.unwrap();

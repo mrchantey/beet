@@ -179,14 +179,21 @@ impl Page {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::webdriver::test_fixtures;
 
-	#[beet_core::test]
+	fn fixture_url() -> String {
+		test_fixtures::page_url(
+			"export_pdf",
+			"<html><body><h1>Printable</h1><p>content</p></body></html>",
+		)
+	}
+
+	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn export_pdf_generates_valid_pdf() {
 		App::default()
 			.run_io_task_local(async move {
-				let (proc, page) =
-					Page::visit("https://example.com").await.unwrap();
+				let (proc, page) = test_fixtures::visit(&fixture_url()).await;
 
 				let pdf_bytes = page.export_pdf().await.unwrap();
 
@@ -203,13 +210,12 @@ mod test {
 			.await;
 	}
 
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn export_pdf_with_custom_options() {
 		App::default()
 			.run_io_task_local(async move {
-				let (proc, page) =
-					Page::visit("https://example.com").await.unwrap();
+				let (proc, page) = test_fixtures::visit(&fixture_url()).await;
 
 				let options = PdfOptions {
 					background: false,

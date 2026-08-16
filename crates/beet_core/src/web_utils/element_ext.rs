@@ -104,8 +104,7 @@ mod tests {
 	use web_sys::HtmlDivElement;
 	use web_sys::HtmlParagraphElement;
 
-	#[crate::test]
-	#[ignore = "requires dom"]
+	#[crate::test(browser)]
 	fn works() {
 		// Existence checks to confirm DOM access
 		let _ = doc::document();
@@ -113,10 +112,8 @@ mod tests {
 		let _ = doc::head();
 	}
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	async fn works_async() {
-		doc::clear_body();
 
 		// Build a parent and two children
 		let parent: HtmlDivElement = doc::create_div();

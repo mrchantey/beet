@@ -246,7 +246,8 @@ async fn page_renders_in_layout() {
 /// thin-client wire format: the bound run wrapped in anchors (no flash), the
 /// document blob, the event verb with its `@doc` arg resolved absolute, the
 /// default verb twins, and the runtime `<script defer>` loaded from the shared
-/// `/js/reactivity.js`. The in-browser proof is the Playwright check (Stream 4).
+/// `/js/reactivity.js`. The in-browser proof is `reactivity_in_browser` in
+/// `beet_ui`, driven through the in-house webdriver.
 #[beet_core::test]
 async fn counter_page_renders_reactively() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();

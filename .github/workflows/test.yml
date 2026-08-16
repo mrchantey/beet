@@ -1,0 +1,132 @@
+name: 🔎 Test
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'examples/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'justfile'
+      - '.cargo/**'
+      - '.github/workflows/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'crates/**'
+      - 'examples/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'justfile'
+      - '.cargo/**'
+      - '.github/workflows/**'
+env:
+  CARGO_TERM_COLOR: always
+  # wasm binaries run through the freshly-built workspace cli instead of a
+  # stale published binstall (the runner in .cargo/config.toml is the
+  # installed `beet`, absent here)
+  CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: cargo run -q -p beet-cli -- run-wasm
+jobs:
+  core:
+    name: 🧪 Core
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout
+        uses: actions/checkout@v4
+      - name: 📂 Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ github.job }}-${{ hashFiles('**/Cargo.lock') }}-v0
+      - name: 🔨 Install Just
+        uses: extractions/setup-just@v1
+      - name: 🔨 Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: 🔨 Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+      - name: 🔨 Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: 🔨 Install cargo binstall
+        uses: cargo-bins/cargo-binstall@main
+      # must exactly match the workspace `wasm-bindgen` version in Cargo.lock
+      - name: 🔨 Install wasm bindgen cli
+        run: cargo binstall --no-confirm wasm-bindgen-cli --version 0.2.125
+      - name: 🔎 Test
+        run: just test-core
+  rsx:
+    name: 🧪 Rsx
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout
+        uses: actions/checkout@v4
+      - name: 📂 Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ github.job }}-${{ hashFiles('**/Cargo.lock') }}-v0
+      - name: 🔨 Install Just
+        uses: extractions/setup-just@v1
+      - name: 🔨 Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+      - name: 🔎 Test
+        run: just test-rsx
+  browser:
+    name: 🧪 Browser
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout
+        uses: actions/checkout@v4
+      - name: 📂 Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ github.job }}-${{ hashFiles('**/Cargo.lock') }}-v0
+      - name: 🔨 Install Just
+        uses: extractions/setup-just@v1
+      - name: 🔨 Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: 🔨 Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+      - name: 🔨 Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: 🔨 Install cargo binstall
+        uses: cargo-bins/cargo-binstall@main
+      - name: 🔨 Install wasm bindgen cli
+        run: cargo binstall --no-confirm wasm-bindgen-cli --version 0.2.125
+      # ubuntu runners ship chrome + chromedriver and firefox + geckodriver;
+      # this step is the fast failure if an image drops them (the firefox
+      # smoketest skips gracefully when geckodriver is absent, so its presence
+      # is pinned here instead)
+      - name: 🔎 Verify browsers
+        run: |
+          chromedriver --version
+          chromium --version || google-chrome --version
+          geckodriver --version
+          firefox --version
+      - name: 🔎 Native browser tests
+        run: just test-browser
+      - name: 🔎 Wasm browser suites
+        run: |
+          just test-wasm-browser beet_core
+          just test-wasm-browser beet_net
+          just test-wasm-browser beet_action

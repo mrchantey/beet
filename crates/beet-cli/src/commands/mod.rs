@@ -10,7 +10,11 @@ pub mod pdf_ext;
 #[cfg(feature = "qrcode")]
 mod qrcode;
 mod run_wasm;
+#[cfg(not(target_arch = "wasm32"))]
+mod run_wasm_browser;
 mod s3_sync;
+#[cfg(not(target_arch = "wasm32"))]
+mod screenshot;
 mod serve;
 
 pub use analytics::*;
@@ -22,6 +26,8 @@ pub use export_static::*;
 pub use qrcode::*;
 pub use run_wasm::*;
 pub use s3_sync::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use screenshot::*;
 pub use serve::*;
 
 use beet::prelude::*;
@@ -43,6 +49,8 @@ impl Plugin for CliCommandsPlugin {
 			.register_type::<BuildWasm>()
 			.register_type::<ExportPdf>()
 			.register_type::<SyncS3>();
+		#[cfg(not(target_arch = "wasm32"))]
+		app.register_type::<CaptureScreenshot>();
 		#[cfg(feature = "qrcode")]
 		app.register_type::<QrCode>();
 		// the root `main.bsx` names the infra deploy blocks and templates, which

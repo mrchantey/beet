@@ -245,15 +245,13 @@ mod tests {
 			.unwrap();
 	}
 
-	#[crate::test]
-	#[ignore = "requires dom"]
+	#[crate::test(browser)]
 	fn works() {
 		// Smoke check: ensure we can reach basic DOM APIs.
 		let _ = window().unwrap();
 	}
 
-	#[crate::test]
-	#[ignore = "requires dom"]
+	#[crate::test(browser)]
 	async fn read_write_params() {
 		// Start from a known baseline
 		set_url_query("");

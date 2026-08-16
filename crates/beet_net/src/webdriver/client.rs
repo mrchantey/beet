@@ -15,15 +15,20 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 /// WebDriver client configuration for browser automation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Get, SetWith)]
 pub struct Client {
+	/// The driver host, default `http://127.0.0.1`.
 	host: Cow<'static, str>,
+	/// The browser driver process to speak to.
 	provider: Provider,
+	/// Port the driver process listens on. Concurrent drivers (eg parallel
+	/// tests) each need their own.
 	driver_port: u16,
 	/// Port to serve bidi websockets on.
 	/// this is for geckodriver only, chromedriver uses
 	/// the same `driver_port`.
 	websocket_port: u16,
+	/// Log verbosity for the driver process.
 	log_level: LogLevel,
 }
 
@@ -66,10 +71,12 @@ pub enum Provider {
 }
 
 /// Options for creating a new WebDriver session.
+#[derive(Debug, Clone, Get, SetWith)]
 pub struct NewSessionOptions {
-	/// Whether to run the browser in headless mode.
+	/// Whether to run the browser in headless mode, default `true`. Turn off
+	/// to watch a test drive the browser locally.
 	headless: bool,
-	/// Whether to disable GPU acceleration.
+	/// Whether to disable GPU acceleration, default `true`.
 	disable_gpu: bool,
 }
 
@@ -221,19 +228,37 @@ impl ClientProcess {
 		.xok()
 	}
 
-	/// Verify that the driver and browser binaries for `provider` are
-	/// discoverable on `PATH`. Returns an error containing platform-specific
-	/// install instructions if either binary is missing.
+	/// Verify that the driver and a browser binary for `provider` are
+	/// discoverable on `PATH`. The browser ships under different names per
+	/// distro (github runners have `google-chrome`, arch has `chromium`), so
+	/// any candidate satisfies the check. Returns an error containing
+	/// platform-specific install instructions on a miss.
 	pub async fn check_installed(provider: Provider) -> Result<()> {
-		let (driver, browser) = match provider {
-			Provider::Chromedriver => ("chromedriver", "chromium"),
-			Provider::Geckodriver => ("geckodriver", "firefox"),
+		let (driver, browsers): (_, &[_]) = match provider {
+			Provider::Chromedriver => ("chromedriver", &[
+				"chromium",
+				"chromium-browser",
+				"google-chrome",
+				"google-chrome-stable",
+				"chrome",
+			]),
+			Provider::Geckodriver => {
+				("geckodriver", &["firefox", "firefox-esr"])
+			}
 		};
 		let mut missing = Vec::new();
-		for binary in [driver, browser] {
-			if !Self::binary_available(binary).await {
-				missing.push(binary);
+		if !Self::binary_available(driver).await {
+			missing.push(driver.to_string());
+		}
+		let mut browser_found = false;
+		for browser in browsers {
+			if Self::binary_available(browser).await {
+				browser_found = true;
+				break;
 			}
+		}
+		if !browser_found {
+			missing.push(browsers.join("|"));
 		}
 		if missing.is_empty() {
 			return Ok(());
@@ -323,24 +348,33 @@ impl ClientProcess {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::webdriver::test_fixtures;
 
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn firefox() {
-		let client = Client::firefox();
-		let client = ClientProcess::new_with_opts(client.clone()).unwrap();
+		// dev machines often lack geckodriver; ci pins its presence with an
+		// explicit verify step, so a graceful skip here masks nothing there
+		if ClientProcess::check_installed(Provider::Geckodriver)
+			.await
+			.is_err()
+		{
+			warn!("geckodriver/firefox not on PATH, skipping");
+			return;
+		}
+		let client = ClientProcess::new_with_opts(
+			test_fixtures::client().with_provider(Provider::Geckodriver),
+		)
+		.unwrap();
 		let session = client.new_session().await.unwrap();
 		session.kill().await.unwrap();
 		client.kill().unwrap();
 	}
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn chromium() {
-		let client = ClientProcess::new_with_opts(Client {
-			provider: Provider::Chromedriver,
-			..default()
-		})
-		.unwrap();
+		let client =
+			ClientProcess::new_with_opts(test_fixtures::client()).unwrap();
 		let session = client.new_session().await.unwrap();
 		session.kill().await.unwrap();
 		client.kill().unwrap();

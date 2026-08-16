@@ -88,6 +88,26 @@ fn try_skip(entity: &mut EntityWorldMut, desc: &TestDesc) {
 	if desc.ignore {
 		entity.insert(TestOutcome::Skip(TestSkip::Ignore(desc.ignore_message)));
 	}
+	// browser-marked tests and the host must agree: a browser page runs only
+	// marked tests, every other host (native, deno) skips them
+	if desc.browser != host_is_browser() {
+		entity.insert(TestOutcome::Skip(match desc.browser {
+			true => TestSkip::RequiresBrowser,
+			false => TestSkip::NonBrowser,
+		}));
+	}
+}
+
+/// Whether this suite is executing inside a real browser page.
+fn host_is_browser() -> bool {
+	cfg_if! {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
+			crate::web_utils::js_runtime::environment()
+				== crate::web_utils::js_runtime::JsEnvironment::Browser
+		} else {
+			false
+		}
+	}
 }
 
 /// Per-test parameters that can be configured via attributes.

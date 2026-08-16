@@ -124,10 +124,6 @@ test-all-lib *args:
 test-all-doc *args:
 	cargo test --workspace 			--doc 	--all-features																	{{ args }} -- {{ test-threads }}
 
-test-ci *args:
-	just test-fmt
-	just test-rsx
-
 # rsx_site (the typed-authoring example) is excluded from the `test-core` /
 # `test-all` package lists (its `src/codegen` route modules are generated, not
 # committed). Regenerate them, then run its render + tui tests (`--features tui`
@@ -228,6 +224,18 @@ test-core *args:
 test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 
+# Run a crate's wasm suite inside a headless browser instead of deno: only the
+# `#[beet_core::test(browser)]` dom tests run there (everything else skips, and
+# vice versa under deno). Needs chromedriver + a chromium on PATH.
+test-wasm-browser crate *args:
+	BEET_WASM_HOST=browser cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown {{ args }}
+
+# The native browser-driving smoketests: the beet_net webdriver suite against
+# local fixtures, and beet_ui's reactivity-runtime proof. Same PATH deps.
+test-browser *args:
+	cargo test -p beet_net --features webdriver,testing --lib {{ args }} -- --include-ignored --include '*webdriver*'
+	cargo test -p beet_ui --lib {{ args }} -- --include-ignored --include '*reactivity_in_browser*'
+
 # The `Script` backends are mutually exclusive at compile time, so the host-realm
 # fallbacks need their own invocations: `test-core`/`test-core-wasm` enumerate
 # every feature, which always selects the embedded `quickjs` engine and compiles
@@ -238,27 +246,6 @@ test-scripting-fallback *args:
 	cargo test -p beet_action --lib {{ args }} -- {{ test-threads }}
 	cargo test -p beet_action --lib --target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
 
-
-test crate *args:
-	just watch cargo test -p {{ crate }} --lib -- --watch=true {{ args }}
-
-test-int crate test *args:
-	just watch cargo test -p {{ crate }} --test {{ test }} {{ args }}
-
-test-e2e crate *args:
-	just watch cargo test -p {{ crate }} --lib --features=e2e -- 														--e2e	--watch {{ args }}
-
-test-doc crate *args:
-	just watch cargo test -p {{ crate }} --doc 																														{{ args }}
-
-test-wasm crate *args:
-	just watch cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown -- 								--watch {{ args }}
-
-test-wasm-feat crate *args:
-	just watch cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown --all-features -- 					{{ args }}
-
-test-wasm-e2e crate test_name *args:
-	just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
 
 # The floor (assets/wasm/beet-min.wasm): the smallest binary that is still a beet
 # runtime in the browser, the `web` base and nothing else. A page whose program uses

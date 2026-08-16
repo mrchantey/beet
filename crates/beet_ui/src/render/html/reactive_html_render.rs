@@ -724,9 +724,9 @@ mod test {
 	}
 
 	/// A flat counter exercising every default verb plus a custom one, the fixture
-	/// the Playwright check drives.
+	/// the in-browser check drives.
 	#[cfg(not(target_arch = "wasm32"))]
-	const PLAYWRIGHT_COUNTER: &str = r#"<html><head><title>counter</title></head><body><article>
+	const BROWSER_COUNTER: &str = r#"<html><head><title>counter</title></head><body><article>
 <p id="count">count is {@doc:count=0}</p>
 <p id="flag">flag is {@doc:flag=false}</p>
 <p id="status">status is {@doc:status="pending"}</p>
@@ -737,15 +737,24 @@ mod test {
 <button id="dbl" bx:click=double{ field: @doc:count }>double</button>
 </article></body></html>"#;
 
-	/// Render the [`PLAYWRIGHT_COUNTER`] reactively (inline runtime, so the file is
-	/// self-contained for `file://`) with a custom `double` verb, and write it to
-	/// `target/playwright/counter.html`, the input the Playwright check drives.
+	/// The in-browser end-to-end proof for the thin-client reactivity runtime
+	/// (`reactivity.js`), which the Rust/deno unit tests cannot give: a real
+	/// chromium hydrates the page and each verb mutates the client document and
+	/// patches the DOM, with no network round-trip and no re-render flash.
 	///
-	/// Run: `cargo test -p beet_ui --lib writes_playwright_fixture`, then
-	/// `node crates/beet_ui/src/render/html/reactivity.playwright.cjs`.
+	/// The page is byte-for-byte what the renderer emits: [`BROWSER_COUNTER`]
+	/// rendered reactively with the runtime inlined (so `file://` needs no
+	/// server) plus a custom `double` verb, proving the `data-bx-verbs` seam
+	/// end to end.
+	///
+	/// Run: `cargo test -p beet_ui --lib -- --include-ignored --include '*reactivity*'`.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet_core::test]
-	fn writes_playwright_fixture() {
+	#[beet_core::test(timeout_ms = 30_000)]
+	#[ignore = "smoketest"]
+	async fn reactivity_in_browser() {
+		use beet_net::prelude::webdriver::*;
+		use serde_json::json;
+
 		let mut world = world_ext::ui_world();
 		// a custom app verb with its JS twin: proves the `data-bx-verbs` seam end to
 		// end in a real browser.
@@ -755,7 +764,7 @@ mod test {
 			Some("entity.set_field(args.field, (Number(entity.get_field(args.field)) || 0) * 2);"),
 			|_, _| {},
 		);
-		let root = build(&mut world, PLAYWRIGHT_COUNTER);
+		let root = build(&mut world, BROWSER_COUNTER);
 		// several `@doc` fields initialize the same not-yet-created document in one
 		// pass, racing its deferred creation so only the last survives; seed the
 		// full initial state so the blob ships every value (the SSR text is already
@@ -771,15 +780,80 @@ mod test {
 			.unwrap();
 		let html =
 			reactive_html_with(&mut world, root, InsertReactive::Auto, true);
-		// the fixture carries the wire format, the custom verb twin, and the runtime
+		// preflight: the wire format, the custom verb twin, and the runtime
 		html.clone()
 			.xpect_contains("data-bx-doc=")
 			.xpect_contains("data-bx-blob")
 			.xpect_contains("class EntityMut")
 			.xpect_contains("Number(entity.get_field(args.field))");
-		let path =
-			fs_ext::workspace_root().join("target/playwright/counter.html");
+		let path = fs_ext::workspace_root()
+			.join("target/webdriver-fixtures/reactivity_counter.html");
 		fs_ext::write(&path, &html).unwrap();
+		let url = format!("file://{}", path.display());
+
+		App::default()
+			.run_io_task_local(async move {
+				// ports offset above beet_net's own per-test allocation range
+				let process = ClientProcess::new_with_opts(
+					Client::default()
+						.with_driver_port(8390)
+						.with_websocket_port(8391),
+				)
+				.unwrap();
+				let session = process.client().new_session().await.unwrap();
+				let mut page = Page::from_session(session).await.unwrap();
+				// console attaches before navigation so a hydration error
+				// cannot slip past; network attaches after, counting only
+				// post-load requests (the navigation itself reports one)
+				let console = page.console().await.unwrap();
+				page.navigate(&url).await.unwrap();
+				let network = page.network().await.unwrap();
+
+				// hydration: the runtime trusts the blob, leaving the correct
+				// SSR text in place (no flash), and the client document
+				// matches the blob
+				page.get("#count").await.xpect_text("count is 0").await;
+				page.get("#flag").await.xpect_text("flag is false").await;
+				page.evaluate_value("globalThis.beet.store.docs.d0")
+					.await
+					.unwrap()
+					.xpect_eq(json!({ "count": 0, "flag": false, "status": "pending" }));
+
+				// every default verb, installed from the `data-bx-verbs` blob
+				page.get("#inc").await.click().await.unwrap();
+				page.get("#count").await.xpect_text("count is 2").await;
+				page.get("#dec").await.click().await.unwrap();
+				page.get("#count").await.xpect_text("count is 1").await;
+				page.get("#tog").await.click().await.unwrap();
+				page.get("#flag").await.xpect_text("flag is true").await;
+				page.get("#set").await.click().await.unwrap();
+				page.get("#status").await.xpect_text("status is done").await;
+
+				// the custom app verb (its js twin shipped in `data-bx-verbs`)
+				page.get("#dbl").await.click().await.unwrap();
+				page.get("#count").await.xpect_text("count is 2").await;
+
+				// the client document reflects every mutation
+				page.evaluate_value("globalThis.beet.store.docs.d0")
+					.await
+					.unwrap()
+					.xpect_eq(
+						json!({ "count": 2, "flag": true, "status": "done" }),
+					);
+
+				// the whole exchange was local: no requests, no console errors
+				network.drain().xpect_empty();
+				console
+					.drain()
+					.into_iter()
+					.filter(|entry| entry.is_error())
+					.collect::<Vec<_>>()
+					.xpect_empty();
+
+				page.kill().await.unwrap();
+				process.kill().unwrap();
+			})
+			.await;
 	}
 
 	/// The JSON payload of a `<script ..MARKER>..</script>` emitted by the render.

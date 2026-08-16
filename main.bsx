@@ -89,6 +89,7 @@ plus `tofu`, `cargo-zigbuild` and a container engine.
 	<AnalyticsReport/>
 	<ExportStatic/>
 	<ExportPdf/>
+	<CaptureScreenshot/>
 	<SyncS3/>
 	<BeetSiteDeployHost>
 		<Route path="deploy" {ExchangeSequence}>

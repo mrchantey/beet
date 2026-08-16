@@ -93,9 +93,12 @@ pub(crate) fn impl_test_attr(
 		AttributeGroup::parse(&[synthetic_attr], "beet")?
 	};
 
-	attrs.validate_allowed_keys(&["timeout_ms"])?;
+	attrs.validate_allowed_keys(&["timeout_ms", "browser"])?;
 
 	let timeout_ms = attrs.get_value_parsed::<syn::LitInt>("timeout_ms")?;
+	// `#[beet_core::test(browser)]`: needs a real browser dom; browser hosts
+	// run only marked tests, every other host skips them
+	let browser = attrs.contains("browser");
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 
 	let params_expr = if let Some(timeout_lit) = timeout_ms {
@@ -182,6 +185,7 @@ pub(crate) fn impl_test_attr(
 				#should_panic,
 				#ignore,
 				#ignore_message,
+				#browser,
 				#run_ident,
 			)
 		}

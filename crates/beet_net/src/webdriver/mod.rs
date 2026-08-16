@@ -5,19 +5,32 @@
 //!
 //! # Features
 //!
-//! - Session management for browser automation
-//! - Page navigation and interaction
-//! - Element querying and manipulation
-//! - PDF export functionality
+//! - Session management with typed event subscriptions
+//! - Page navigation, script evaluation and auto-waiting element location
+//! - Trusted pointer/key input and console/network collectors
+//! - Screenshot and PDF export
 
+mod bidi_value;
 mod client;
+mod collector;
 mod element;
 mod export_pdf;
+mod input;
+mod locate;
+#[cfg(any(test, feature = "testing"))]
+mod matchers;
 mod page;
+mod screenshot;
 mod session;
+#[cfg(test)]
+mod test_fixtures;
 
 pub use client::*;
+pub use collector::*;
 pub use element::*;
 pub use export_pdf::*;
+#[cfg(any(test, feature = "testing"))]
+pub use matchers::*;
 pub use page::*;
+pub use screenshot::*;
 pub use session::*;

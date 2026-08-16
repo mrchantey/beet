@@ -2,6 +2,8 @@ mod close_to;
 mod matcher_bool;
 mod matcher_close;
 mod matcher_control_flow;
+#[cfg(all(feature = "std", target_arch = "wasm32"))]
+mod matcher_el;
 mod matcher_eq;
 mod matcher_not;
 mod matcher_option;
@@ -13,6 +15,8 @@ pub use close_to::*;
 pub use matcher_bool::*;
 pub use matcher_close::*;
 pub use matcher_control_flow::*;
+#[cfg(all(feature = "std", target_arch = "wasm32"))]
+pub use matcher_el::*;
 pub use matcher_eq::*;
 pub use matcher_not::*;
 pub use matcher_option::*;

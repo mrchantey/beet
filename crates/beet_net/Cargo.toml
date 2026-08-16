@@ -130,6 +130,9 @@ ureq = ["std", "http", "dep:ureq", "dep:blocking"]
 # and the `Socket` client ride the same feature.
 tungstenite = ["std", "server", "dep:async-tungstenite","dep:async-io","dep:blocking", "dep:sha1", "dep:base64"]
 webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
+# the async webdriver matchers (`page.get(..)`, `xpect_text` etc), for consumer
+# test builds: pulls the beet_core matcher/panic machinery
+testing = ["beet_core/testing"]
 native-tls = [
 	"reqwest?/default",
 	"ureq?/native-tls",

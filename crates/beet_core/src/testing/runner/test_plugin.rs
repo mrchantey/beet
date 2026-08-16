@@ -15,8 +15,30 @@ use bevy::time::TimePlugin;
 fn run_tests_app(tests: Vec<TestDescAndFn>) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn((TestRunnerConfig::from_env(), tests_bundle(tests)))
-		.run();
+		.spawn((TestRunnerConfig::from_env(), tests_bundle(tests)));
+	run_app(app);
+}
+
+/// Native blocks on [`App::run`]; wasm spawns [`App::run_async`] so the suite
+/// yields to the js event loop between frames, letting tests await real
+/// timers, fetches and `postMessage` (a blocking loop can never resolve them).
+/// The verdict reaches the host through [`AppExitPlugin`]'s `exit` global
+/// rather than a return value, with the host (the deno runner's keep-alive
+/// loop, a browser page) holding the process open until it fires.
+#[cfg(feature = "testing")]
+fn run_app(mut app: App) {
+	cfg_if! {
+		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
+			// detach: a bevy `Task` cancels on drop, and this fn returns while
+			// the suite is still running
+			async_ext::spawn_local(async move {
+				app.run_async().await;
+			})
+			.detach();
+		} else {
+			app.run();
+		}
+	}
 }
 
 // On wasm the linker only calls `__wasm_call_ctors` from exported functions
@@ -54,8 +76,8 @@ pub fn test_runner(tests: &[&TestDescAndFn]) {
 pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn((TestRunnerConfig::from_env(), tests_bundle_borrowed(tests)))
-		.run();
+		.spawn((TestRunnerConfig::from_env(), tests_bundle_borrowed(tests)));
+	run_app(app);
 }
 
 /// Bevy plugin that sets up the test runner infrastructure.

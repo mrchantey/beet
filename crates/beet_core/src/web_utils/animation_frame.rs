@@ -22,8 +22,6 @@
 //! assert!(second > first);
 //! ```
 
-use async_channel::Receiver;
-use async_channel::TryRecvError;
 use async_channel::unbounded;
 use futures_lite::Stream;
 
@@ -59,7 +57,7 @@ impl Drop for AnimationFrameInner {
 /// Use `.next().await` to wait for a single frame or iterate to process many, or
 /// call the convenience `next_frame()` method if you don't want to pull in `StreamExt`.
 pub(crate) struct AnimationFrame {
-	receiver: Receiver<f64>,
+	receiver: super::RecvStream<f64>,
 	// Keep scheduling alive and ensure cleanup on drop.
 	_inner: Rc<AnimationFrameInner>,
 }
@@ -107,7 +105,7 @@ impl AnimationFrame {
 		});
 
 		Self {
-			receiver,
+			receiver: super::RecvStream::new(receiver),
 			_inner: inner,
 		}
 	}
@@ -123,24 +121,9 @@ impl Stream for AnimationFrame {
 		self: Pin<&mut Self>,
 		cx: &mut Context<'_>,
 	) -> Poll<Option<Self::Item>> {
-		let this = self.get_mut();
-
-		// Fast path: try to grab without parking.
-		match this.receiver.try_recv() {
-			Ok(ts) => return Poll::Ready(Some(ts)),
-			Err(TryRecvError::Closed) => return Poll::Ready(None),
-			Err(TryRecvError::Empty) => {}
-		}
-
-		// Fallback: poll the async receive future.
-		let recv = this.receiver.clone();
-		let fut = recv.recv();
-		futures_lite::pin!(fut);
-		match fut.poll(cx) {
-			Poll::Ready(Ok(ts)) => Poll::Ready(Some(ts)),
-			Poll::Ready(Err(_closed)) => Poll::Ready(None),
-			Poll::Pending => Poll::Pending,
-		}
+		// `RecvStream` holds its recv future across polls, keeping the waker
+		// registered for the frame that does arrive
+		Pin::new(&mut self.get_mut().receiver).poll_next(cx)
 	}
 }
 
@@ -157,8 +140,7 @@ mod tests {
 	use super::AnimationFrame;
 	use crate::prelude::*;
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	fn works() {
 		// Ensure minimal DOM access available
 		let _ = document_ext::document();
@@ -166,11 +148,9 @@ mod tests {
 		let _ = document_ext::body();
 	}
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	async fn yields_timestamps() {
 		// Ensure clean DOM (not strictly required for RAF, but keeps parity with other tests)
-		document_ext::clear_body();
 
 		let mut raf = AnimationFrame::new();
 

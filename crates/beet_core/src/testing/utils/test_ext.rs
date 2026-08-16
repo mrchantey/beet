@@ -49,6 +49,7 @@ pub fn new_auto_desc() -> TestDesc {
 		no_run: false,
 		should_panic: ShouldPanic::No,
 		test_type: TestType::UnitTest,
+		browser: false,
 	}
 }
 
@@ -108,5 +109,6 @@ pub fn new_desc(name: &str, file: &'static str) -> TestDesc {
 		no_run: false,
 		should_panic: ShouldPanic::No,
 		test_type: TestType::UnitTest,
+		browser: false,
 	}
 }

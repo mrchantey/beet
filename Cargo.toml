@@ -319,7 +319,7 @@ postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
-testing = ["beet_core/testing"]
+testing = ["beet_core/testing", "beet_net?/testing"]
 # no_std test runner for bare-metal consumers (eg the esp32 firmware): the beet
 # harness registering via `linkme` instead of `inventory`. See `beet_core`.
 testing_embedded = ["beet_core/testing_embedded"]
@@ -754,6 +754,15 @@ name = "beet_site_analytics"
 path = "tests/beet_site_analytics.rs"
 harness = false
 required-features = ["router", "json", "fs", "testing"]
+
+# the deploy skill's check `b`: drive the live site (`BEET_BASE_URL`) through the
+# in-house webdriver, failing on any console error or 4xx/5xx response, and
+# proving the counter's reactive round trip.
+[[test]]
+name = "site_browser"
+path = "tests/site_browser.rs"
+harness = false
+required-features = ["router", "json", "testing", "webdriver"]
 
 [[bench]]
 name = "bevy_coldstart"

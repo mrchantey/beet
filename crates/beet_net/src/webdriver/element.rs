@@ -4,46 +4,41 @@ use serde_json::json;
 
 use super::Session;
 
-/// A DOM `Element` handle backed by a WebDriver BiDi remote object id
-/// (aka handle / sharedId – we probe both field names to remain tolerant
-/// across browser implementations while the spec & drivers converge).
+/// A DOM `Element` backed by a WebDriver BiDi remote reference.
 ///
-/// Responsibilities:
-/// * Store the BiDi handle so subsequent `script.callFunction` commands
-///   can target the same remote element without re-querying.
-/// * Provide ergonomic helpers for common DOM interactions (click,
-///   get/set attribute, get/set property).
+/// A node value can carry two reference kinds and we retain both:
+/// * `shared_id`, the navigable-scoped stable node id. Required wherever the
+///   protocol wants a `SharedReference`: `startNodes` scoping, `input`
+///   element origins and screenshot clips. Present on every node produced by
+///   `browsingContext.locateNodes` (so [`Page::find`] and friends), and on
+///   script results in current Chrome and Firefox.
+/// * `handle`, the realm-scoped remote object handle, present when the
+///   element came from a script result with `"resultOwnership": "root"`.
 ///
-/// Lifetimes & Ownership:
-/// * The underlying remote handle is kept alive by using
-///   `"resultOwnership": "root"` when the element is first produced
-///   (expected in the caller – e.g. `Page::query_selector`).
-/// * If the node is removed from the DOM the handle may become stale;
-///   current helpers will surface driver errors in that case.
-///
-/// NOTE:
-/// The exact BiDi field for referencing a previously returned remote
-/// object can be `handle` (Chrome) or `sharedId` (Firefox in some
-/// channels). We store whichever we locate first and always send it as
-/// `"handle"` in `script.callFunction` params (Chrome & current spec).
+/// If the node is removed from the DOM the reference goes stale and helpers
+/// surface the driver error.
 #[derive(Debug, Clone)]
 pub struct Element {
 	session: Session,
 	context_id: String,
-	handle: String,
+	handle: Option<String>,
+	shared_id: Option<String>,
 }
 
 impl Element {
-	/// Create directly (used internally / by `Page`).
-	pub(crate) fn new(
+	/// Create directly; at least one of `handle` / `shared_id` must be set.
+	fn new(
 		session: &Session,
 		context_id: &str,
-		handle: &str,
+		handle: Option<String>,
+		shared_id: Option<String>,
 	) -> Self {
+		debug_assert!(handle.is_some() || shared_id.is_some());
 		Self {
 			session: session.clone(),
 			context_id: context_id.to_string(),
-			handle: handle.to_string(),
+			handle,
+			shared_id,
 		}
 	}
 
@@ -55,21 +50,72 @@ impl Element {
 		context_id: &str,
 		resp: &Value,
 	) -> Option<Self> {
-		let handle = resp
-			.pointer("/result/result/handle")
-			.and_then(|v| v.as_str())
-			.or_else(|| {
-				resp.pointer("/result/result/sharedId")
-					.and_then(|v| v.as_str())
-			})?;
-		Some(Self::new(session, context_id, handle))
+		let field = |name: &str| {
+			resp.pointer(&format!("/result/result/{name}"))
+				.and_then(|v| v.as_str())
+				.map(|v| v.to_string())
+		};
+		let handle = field("handle");
+		let shared_id = field("sharedId");
+		(handle.is_some() || shared_id.is_some())
+			.then(|| Self::new(session, context_id, handle, shared_id))
 	}
 
-	/// Access the raw BiDi handle (debug / advanced use).
-	pub fn handle(&self) -> &str { &self.handle }
+	/// Construct from a top-level node remote value, eg an entry of
+	/// `browsingContext.locateNodes`' `nodes` array.
+	pub(crate) fn from_node_value(
+		session: &Session,
+		context_id: &str,
+		node: &Value,
+	) -> Result<Self> {
+		let field = |name: &str| {
+			node.get(name)
+				.and_then(|v| v.as_str())
+				.map(|v| v.to_string())
+		};
+		let handle = field("handle");
+		let shared_id = field("sharedId");
+		if handle.is_none() && shared_id.is_none() {
+			bevybail!("node value carries neither sharedId nor handle: {node}");
+		}
+		Self::new(session, context_id, handle, shared_id).xok()
+	}
+
+	/// The `RemoteReference` for `script.callFunction`'s `this`, carrying
+	/// whichever reference kinds are present.
+	fn remote_ref(&self) -> Value {
+		let mut reference = serde_json::Map::new();
+		if let Some(shared_id) = &self.shared_id {
+			reference.insert("sharedId".into(), json!(shared_id));
+		}
+		if let Some(handle) = &self.handle {
+			reference.insert("handle".into(), json!(handle));
+		}
+		Value::Object(reference)
+	}
+
+	/// The `SharedReference` required by `startNodes`, `input` element
+	/// origins and screenshot clips, erroring when only a realm handle is
+	/// held (elements from [`Page::find`] and [`Page::query_selector`]
+	/// always carry a `sharedId`).
+	pub(crate) fn shared_ref(&self) -> Result<Value> {
+		let shared_id = self.shared_id.as_ref().ok_or_else(|| {
+			bevyhow!("this operation needs a BiDi sharedId, ie an element produced by `find` or `query_selector`")
+		})?;
+		match &self.handle {
+			Some(handle) => json!({"sharedId": shared_id, "handle": handle}),
+			None => json!({"sharedId": shared_id}),
+		}
+		.xok()
+	}
+
+	/// The session this element's browsing context belongs to.
+	pub(crate) fn session(&self) -> &Session { &self.session }
+	/// The browsing context id this element lives in.
+	pub(crate) fn context_id(&self) -> &str { &self.context_id }
 
 	/// Low-level helper: invoke a function with `this` bound to element.
-	async fn call_function(
+	pub(crate) async fn call_function(
 		&self,
 		function_declaration: &str,
 		arguments: &[Value],
@@ -85,7 +131,7 @@ impl Element {
 				"script.callFunction",
 				json!({
 					"functionDeclaration": function_declaration,
-					"this": { "handle": self.handle },
+					"this": self.remote_ref(),
 					"arguments": arguments,
 					"target": { "context": self.context_id },
 					"awaitPromise": true,
@@ -93,17 +139,6 @@ impl Element {
 				}),
 			)
 			.await
-	}
-
-	/// Click the element (dispatches the default `.click()`).
-	pub async fn click(&self) -> Result<()> {
-		self.call_function(
-			"function(){ this.click(); return true; }",
-			&[],
-			false,
-		)
-		.await?;
-		Ok(())
 	}
 
 	/// Get an attribute value (None if absent).
@@ -255,49 +290,56 @@ impl Element {
 
 #[cfg(test)]
 mod test {
-	use crate::webdriver::*;
+	use crate::webdriver::test_fixtures;
 	use beet_core::prelude::*;
 
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
-	async fn visit_and_read_title() {
+	async fn finds_reads_and_navigates() {
 		App::default()
 			.run_io_task_local(async move {
-				let (proc, page) =
-					Page::visit("https://example.com").await.unwrap();
-				page.current_url()
-					.await
-					.unwrap()
-					.xpect_eq("https://example.com/");
+				let page_b = test_fixtures::page_url(
+					"element_b",
+					"<html><body><h1>Page B</h1></body></html>",
+				);
+				let page_a = test_fixtures::page_url(
+					"element_a",
+					&format!(
+						r#"<html><body>
+						<h1>Example Domain</h1>
+						<p><a href="{page_b}">More information...</a></p>
+						</body></html>"#
+					),
+				);
+				let (proc, page) = test_fixtures::visit(&page_a).await;
 
-				page.query_selector("h1")
+				// auto-waiting css find + matcher chain
+				page.get("h1")
 					.await
-					.unwrap()
-					.unwrap()
-					.inner_text()
+					.xpect_text("Example Domain")
 					.await
-					.unwrap()
-					.xpect_eq("Example Domain");
+					.xpect_not_text("foobar")
+					.await;
+				page.find_all("a").await.unwrap().len().xpect_eq(1);
 
-				let anchor = page.query_selector("a").await.unwrap().unwrap();
-				anchor
-					.inner_text()
+				// element-scoped find reads the real attribute
+				page.get("p")
+					.await
+					.get("a")
+					.await
+					.xpect_attr("href", &page_b)
+					.await;
+				page.xpect_no_selector("#missing").await;
+
+				// text locator + trusted click navigates; xpect_url waits
+				page.find_text("More information...")
 					.await
 					.unwrap()
-					.xpect_eq("More information...");
-				anchor.click().await.unwrap();
-				Backoff::default()
-					.with_max_attempts(10)
-					.retry_async(|_| async {
-						match page.current_url().await.unwrap().as_str() {
-							"https://www.iana.org/help/example-domains" => {
-								Ok(())
-							}
-							_ => Err(()),
-						}
-					})
+					.click()
 					.await
 					.unwrap();
+				page.xpect_url(&page_b).await;
+				page.get("h1").await.xpect_text("Page B").await;
 
 				page.kill().await.unwrap();
 				proc.kill().unwrap();

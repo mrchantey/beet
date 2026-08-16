@@ -23,8 +23,6 @@
 //! ```
 //!
 //! If you want frame-aligned updates, see `animation_frame::AnimationFrame`.
-use async_channel::Receiver;
-use async_channel::TryRecvError;
 use async_channel::unbounded;
 use futures_lite::Stream;
 
@@ -58,7 +56,7 @@ impl Drop for IntervalInner {
 /// Use `.next().await` to wait for ticks, or `next_tick()` if you don't want to
 /// bring in `StreamExt`.
 pub(crate) struct IntervalStream {
-	receiver: Receiver<f64>,
+	receiver: super::RecvStream<f64>,
 	// Keep the callback alive and ensure cleanup on drop.
 	_inner: Rc<IntervalInner>,
 }
@@ -101,7 +99,7 @@ impl IntervalStream {
 		});
 
 		Self {
-			receiver,
+			receiver: super::RecvStream::new(receiver),
 			_inner: inner,
 		}
 	}
@@ -112,7 +110,7 @@ impl IntervalStream {
 	/// Await the next interval timestamp.
 	/// Convenience when you don't want to depend on StreamExt::next.
 	pub async fn next_tick(&mut self) -> Option<f64> {
-		self.receiver.recv().await.ok()
+		self.receiver.recv().await
 	}
 }
 
@@ -123,24 +121,9 @@ impl Stream for IntervalStream {
 		self: Pin<&mut Self>,
 		cx: &mut Context<'_>,
 	) -> Poll<Option<Self::Item>> {
-		let this = self.get_mut();
-
-		// Try fast-path without registering the waker.
-		match this.receiver.try_recv() {
-			Ok(item) => return Poll::Ready(Some(item)),
-			Err(TryRecvError::Closed) => return Poll::Ready(None),
-			Err(TryRecvError::Empty) => {}
-		}
-
-		// No item immediately available; poll using a cloned receiver.
-		let recv = this.receiver.clone();
-		let fut = recv.recv();
-		futures_lite::pin!(fut);
-		match fut.poll(cx) {
-			Poll::Ready(Ok(item)) => Poll::Ready(Some(item)),
-			Poll::Ready(Err(_closed)) => Poll::Ready(None),
-			Poll::Pending => Poll::Pending,
-		}
+		// `RecvStream` holds its recv future across polls, keeping the waker
+		// registered for the tick that does arrive
+		Pin::new(&mut self.get_mut().receiver).poll_next(cx)
 	}
 }
 
@@ -151,8 +134,7 @@ mod tests {
 	use crate::prelude::*;
 	use crate::web_utils::document_ext as doc;
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	fn works() {
 		// Ensure minimal DOM access available
 		let _ = doc::document();
@@ -160,10 +142,8 @@ mod tests {
 		let _ = doc::body();
 	}
 
-	#[ignore = "requires dom"]
-	#[crate::test]
+	#[crate::test(browser)]
 	async fn yields_timestamps() {
-		doc::clear_body();
 
 		let mut interval = IntervalStream::new(10);
 
