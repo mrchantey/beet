@@ -462,6 +462,33 @@ impl Selector {
 		}
 	}
 
+	/// Whether an [`Entity`](Self::Entity) match appears anywhere in this
+	/// selector. Entity rules are resolved at runtime against the entity itself,
+	/// so they have no CSS text form and are excluded from serialized
+	/// stylesheets, see [`CssRule::selector_to_css`](crate::style::CssRule::selector_to_css).
+	pub fn has_entity(&self) -> bool {
+		match self {
+			Selector::Entity(_) => true,
+			Selector::Root
+			| Selector::Any
+			| Selector::Tag(_)
+			| Selector::Class(_)
+			| Selector::State(_)
+			| Selector::Attribute { .. } => false,
+			Selector::Not(inner) => inner.has_entity(),
+			Selector::AnyOf(parts) | Selector::AllOf(parts) => {
+				parts.iter().any(Selector::has_entity)
+			}
+			Selector::Descendant {
+				ancestor,
+				descendant,
+			} => ancestor.has_entity() || descendant.has_entity(),
+			Selector::Child { parent, child } => {
+				parent.has_entity() || child.has_entity()
+			}
+		}
+	}
+
 	/// Whether `el` matches this selector. `ancestors` is `el`'s ancestor
 	/// element views, nearest-first (`ancestors[0]` is the immediate parent),
 	/// used to evaluate the [`Child`](Self::Child)/[`Descendant`](Self::Descendant)

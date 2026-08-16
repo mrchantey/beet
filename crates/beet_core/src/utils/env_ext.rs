@@ -16,10 +16,13 @@ pub enum EnvError {
 }
 
 /// Load environment variables from a `.env` file in the current directory.
+///
+/// A no-op on wasm, which has no `.env` file to read: a browser build takes its
+/// configuration from the host page and a deno build from the real environment.
 pub fn load_dotenv() {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			todo!("probs load from query params or something?")
+			// wasm: no `.env` on disk to load.
 		} else if #[cfg(feature = "std")] {
 			dotenv::dotenv().ok();
 		} else {

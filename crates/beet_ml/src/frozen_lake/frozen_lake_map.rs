@@ -186,31 +186,3 @@ impl FrozenLakeMap {
 	}
 }
 
-impl FrozenLakeMap {
-	#[rustfmt::skip]
-	pub fn default_eight_by_eight() -> Self {
-		todo!();
-		// Self {
-		// 	size: UVec2::new(8, 8),
-		// 	//https://github.com/openai/gym/blob/dcd185843a62953e27c2d54dc8c2d647d604b635/gym/envs/toy_text/frozen_lake.py#L17
-		// 	cells: vec![
-		// 		//row 1
-		// 		FrozenLakeCell::Agent,	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-		// 		//row 2
-		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-		// 		//row 3
-		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-		// 		//row 4
-		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-		// 		//row 5
-		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-		// 		//row 6
-		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Hole, FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice,
-		// 		//row 7
-		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice,
-		// 		//row 8
-		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Goal,
-		// 	],
-		// }
-	}
-}

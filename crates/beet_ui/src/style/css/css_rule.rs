@@ -115,6 +115,13 @@ impl CssRule {
 			.xok()
 	}
 
+	/// Serialize this rule's selector to CSS.
+	///
+	/// ## Panics
+	///
+	/// Panics on a selector containing [`Selector::Entity`], which is resolved
+	/// at runtime against the entity and has no CSS text form. Callers filter
+	/// those out with [`Selector::has_entity`] before serializing.
 	pub fn selector_to_css(&self) -> String {
 		Self::selector_to_css_inner(&self.selector)
 	}
@@ -123,8 +130,8 @@ impl CssRule {
 		match rule {
 			Selector::Any => "*".to_string(),
 			Selector::Root => ":root".to_string(),
-			Selector::Entity(_) => todo!(
-				"entities that use this should be assigned a special class, ie entity.to_bits"
+			Selector::Entity(_) => unimplemented!(
+				"`Selector::Entity` has no CSS form, it is applied at runtime to the entity. Filter with `Selector::has_entity` before serializing"
 			),
 			Selector::AnyOf(rules) => rules
 				.iter()

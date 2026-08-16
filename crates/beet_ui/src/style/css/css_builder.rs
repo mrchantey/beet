@@ -54,9 +54,12 @@ impl CssBuilder {
 		let css_rules = rule_set
 			.iter()
 			// rules gated on a query with no CSS condition (`Terminal`) never reach
-			// the serialized stylesheet (the charcell cascade applies them instead).
+			// the serialized stylesheet (the charcell cascade applies them instead),
+			// nor do entity rules, which have no CSS form and are resolved at
+			// runtime against the entity itself.
 			.filter(|rule| {
 				rule.media().is_none_or(|media| media.as_css().is_some())
+					&& !rule.selector().has_entity()
 			})
 			.xtry_map(|rule| CssRule::from_rule(css_map, rule))?;
 
