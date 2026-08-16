@@ -225,9 +225,17 @@ test-core-wasm *args:
 
 # Run a crate's wasm suite inside a headless browser instead of deno: only the
 # `#[beet_core::test(browser)]` dom tests run there (everything else skips, and
-# vice versa under deno). Needs chromedriver + a chromium on PATH.
+# vice versa under deno). Needs chromedriver + a chromium on PATH. For a
+# WebGPU-granting session append `-- --chrome-args='--enable-unsafe-webgpu --use-angle=gl'`.
 test-wasm-browser crate *args:
 	BEET_WASM_HOST=browser cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown {{ args }}
+
+# Headless-chrome verification of the browser render boot: serves the built
+# beet-render.wasm at a generated page and asserts the WebGPU boot claims a
+# canvas and draws pixels while the GPU-less boot stays surfaceless. Needs
+# `just build-wasm-render` first, plus the test-browser PATH deps.
+check-wasm-render *args:
+	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*browser_render_boot*'
 
 # The native browser-driving smoketests: the beet_net webdriver suite against
 # local fixtures, and beet_ui's reactivity-runtime proof. Same PATH deps.

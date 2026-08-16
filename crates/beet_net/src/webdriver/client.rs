@@ -78,6 +78,10 @@ pub struct NewSessionOptions {
 	headless: bool,
 	/// Whether to disable GPU acceleration, default `true`.
 	disable_gpu: bool,
+	/// Extra flags appended to the browser launch args verbatim, eg
+	/// `--enable-unsafe-webgpu` (pair with `disable_gpu: false`) for a
+	/// WebGPU-granting headless chrome.
+	extra_args: Vec<String>,
 }
 
 impl Default for NewSessionOptions {
@@ -85,6 +89,7 @@ impl Default for NewSessionOptions {
 		Self {
 			headless: true,
 			disable_gpu: true,
+			extra_args: Vec::new(),
 		}
 	}
 }
@@ -153,6 +158,7 @@ impl Client {
 				if opts.disable_gpu {
 					args.push("--disable-gpu".to_string());
 				}
+				args.extend(opts.extra_args.iter().cloned());
 				body["capabilities"]["alwaysMatch"]
 					.set_field("goog:chromeOptions", json!({ "args": args }))?;
 			}
@@ -162,7 +168,7 @@ impl Client {
 					// geckodriver expects "-headless"
 					args.push("-headless".to_string());
 				}
-
+				args.extend(opts.extra_args.iter().cloned());
 				body["capabilities"]["alwaysMatch"]
 					.set_field("moz:firefoxOptions", json!({ "args": args }))?;
 			}

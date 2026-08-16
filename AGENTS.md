@@ -57,6 +57,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - Never consider backward-compatibility. when asked to change something, remove the old implementation
 - all shared dependencies should be declared in the workspace Cargo.toml. if one needs no-default-features, disable that at the workspace level, and reenable as required
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
+- Never scatter new env vars: configuration flows through request params (ie a route reads `--chrome-args` from its request, `BootstrapConfig` owns the process knobs). Beet spawning beet delivers config explicitly (`ChildProcess::with_bootstrap`), never ambiently.
 - We prefer `use crate::prelude::*` and `use other_crate::prelude::*;`, instead of individual imports.
 - Never run `cargo fmt`
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible

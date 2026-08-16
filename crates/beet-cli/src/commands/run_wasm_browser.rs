@@ -35,6 +35,7 @@ pub(crate) async fn run(
 	runner_dir: &Path,
 	bootstrap: &BootstrapConfig,
 	args: Vec<String>,
+	chrome_args: Vec<String>,
 ) -> Result {
 	// the host page + the runner-provided env
 	fs_ext::write_async(runner_dir.join("index.html"), INDEX_HTML).await?;
@@ -98,11 +99,19 @@ pub(crate) async fn run(
 	let url =
 		format!("http://127.0.0.1:{port}/{}", args_to_query(&query_args));
 
-	// drive: the console streams live, the verdict lands on `__beet_exit`
-	let mut browser = Browser::new_with(
+	// drive: the console streams live, the verdict lands on `__beet_exit`.
+	// `--chrome-args` rides the request (see `RunWasm`), passing extra browser
+	// flags through to the session, eg `--enable-unsafe-webgpu --use-angle=gl`
+	// (which also lifts the default `--disable-gpu`) so a dom test can exercise
+	// a WebGPU-granting chrome.
+	let session_opts = NewSessionOptions::default()
+		.with_disable_gpu(chrome_args.is_empty())
+		.with_extra_args(chrome_args);
+	let mut browser = Browser::new_with_opts(
 		Client::default()
 			.with_driver_port(free_port()?)
 			.with_websocket_port(free_port()?),
+		session_opts,
 	)
 	.await?;
 	let console = browser.console().await?;
@@ -175,8 +184,9 @@ fn args_to_query(args: &[String]) -> String {
 }
 
 /// An OS-assigned free port for the driver process (bind, read, drop). Racy
-/// in principle, fine for a runner that owns the machine's test run.
-fn free_port() -> Result<u16> {
+/// in principle, fine for a runner that owns the machine's test run. Shared
+/// with the `wasm_render_check` smoketest's driver.
+pub(crate) fn free_port() -> Result<u16> {
 	TcpListener::bind("127.0.0.1:0")?
 		.local_addr()?
 		.port()

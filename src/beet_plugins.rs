@@ -197,10 +197,14 @@ fn headless_render_runner() -> PluginGroupBuilder {
 /// [`js_runtime::probe_webgpu`] once before building the app, and this reads
 /// the cached answer. Otherwise GPU-less like [`headless_render_runner`]:
 /// WebGL2 can never back this boot, since its adapter only exists on a
-/// canvas-backed surface and beet boots windowless. With no winit backend a
-/// scene-spawned `<Window/>` gets no surface yet, so cameras only draw to
-/// texture targets; putting pixels in the tab (a page-supplied or created
-/// canvas) is a design still open.
+/// canvas-backed surface and beet boots windowless. On the WebGPU boot a
+/// scene-spawned `<Window/>` presents into the page: [`WasmCanvasPlugin`]
+/// (`beet_core::web_utils::wasm_canvas`) resolves or creates a `#beet-canvas`
+/// and inserts the `RawHandleWrapper` the render stack surfaces from, standing
+/// in for winit as the window backend. The GPU-less boot stays surfaceless, cameras drawing
+/// only to texture targets. The window *lifecycle* (continuous updates,
+/// close-to-exit, the screenshot harness) remains the binary's concern, as on
+/// native — a tab needs none of it, since the browser owns pacing and teardown.
 #[cfg(all(target_arch = "wasm32", feature = "winit"))]
 fn wasm_render_runner() -> PluginGroupBuilder {
 	use bevy::render::RenderPlugin;
@@ -217,6 +221,7 @@ fn wasm_render_runner() -> PluginGroupBuilder {
 			})),
 			..default()
 		})
+		.add(WasmCanvasPlugin)
 }
 
 /// The [`AssetPlugin`] shared by every render-capable runner: skips `.meta`

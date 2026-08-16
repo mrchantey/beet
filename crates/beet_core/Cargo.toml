@@ -151,8 +151,10 @@ template_serde = ["serde", "bevy/serialize"]
 bevy_keyboard = ["bevy/keyboard"]
 bevy_mouse = ["bevy/mouse"]
 # the window-types layer (CursorMoved etc); does not pull winit, so a terminal
-# host can synthesize the same cursor events winit would.
-bevy_window = ["bevy/bevy_window"]
+# host can synthesize the same cursor events winit would. On wasm it also links
+# the browser canvas surface (`web_utils::wasm_canvas`) via the id-only
+# raw-window-handle web handles.
+bevy_window = ["bevy/bevy_window", "dep:raw-window-handle"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 bevy_multithreaded = ["bevy/multi_threaded"]
 bevy_color = ["bevy/bevy_color"]
@@ -317,6 +319,9 @@ wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 js-sys.workspace = true
 console_error_panic_hook.workspace = true
+# the id-only `WebWindowHandle` the browser canvas surface stamps
+# (`web_utils/wasm_canvas.rs`); activated by `bevy_window`.
+raw-window-handle = { workspace = true, optional = true }
 # tickable local executor for the bevy_async bridge: wasm's bevy `spawn_local`
 # uses the JS event loop, which the synchronous sync-point driver cannot tick.
 async-executor = { workspace = true, optional = true }

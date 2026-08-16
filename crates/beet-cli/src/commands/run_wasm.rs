@@ -55,6 +55,17 @@ pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
 	// the trailing positionals (eg the filter) the module reads via `Deno.args`.
 	cli.params.remove("run-wasm-args");
 	let bootstrap = BootstrapConfig::take_params(&mut cli.params)?;
+	// the browser host's extra chrome flags ride the request
+	// (`--chrome-args='--enable-unsafe-webgpu --use-angle=gl'`), taken out here
+	// so they never leak into the module's args; the deno host ignores them.
+	let chrome_args = cli
+		.params
+		.remove("chrome-args")
+		.unwrap_or_default()
+		.iter()
+		.flat_map(|value| value.split_whitespace())
+		.map(|arg| arg.to_string())
+		.collect::<Vec<_>>();
 	let mut forwarded = cli.into_args();
 	forwarded.extend(trailing.into_iter().map(Into::into));
 
@@ -64,10 +75,19 @@ pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
 	// host for `#[beet_core::test(browser)]` dom suites
 	#[cfg(not(target_arch = "wasm32"))]
 	if bootstrap.wasm_host.unwrap_or_default() == WasmHost::Browser {
-		super::run_wasm_browser::run(&cx, &runner_dir, &bootstrap, forwarded)
-			.await?;
+		super::run_wasm_browser::run(
+			&cx,
+			&runner_dir,
+			&bootstrap,
+			forwarded,
+			chrome_args,
+		)
+		.await?;
 		return Response::ok().xok();
 	}
+	// the browser host (and so the flags' consumer) is native-only
+	#[cfg(target_arch = "wasm32")]
+	let _ = chrome_args;
 	run_deno(&runner_dir, &bootstrap, forwarded).await?;
 	// the module's output already streamed via inherited stdio, so the runner's own
 	// response carries no body, only a success status.

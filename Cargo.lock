@@ -1417,6 +1417,7 @@ dependencies = [
  "quote",
  "rand 0.9.4",
  "rand_chacha 0.9.0",
+ "raw-window-handle",
  "ron 0.8.1",
  "send_wrapper",
  "serde",

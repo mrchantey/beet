@@ -26,8 +26,18 @@ impl Browser {
 
 	/// [`Self::new`] with a custom `client` (ports, provider, log level).
 	pub async fn new_with(client: Client) -> Result<Self> {
+		Self::new_with_opts(client, default()).await
+	}
+
+	/// [`Self::new_with`] with custom session options (headless, gpu, extra
+	/// browser flags), eg a WebGPU-granting chrome via
+	/// `NewSessionOptions::default().with_disable_gpu(false).with_extra_args(..)`.
+	pub async fn new_with_opts(
+		client: Client,
+		opts: NewSessionOptions,
+	) -> Result<Self> {
 		let process = ClientProcess::new_with_opts(client)?;
-		let session = process.client().new_session().await?;
+		let session = process.client().new_session_with_opts(opts).await?;
 		let page = Page::from_session(session).await?;
 		Ok(Self { process, page })
 	}

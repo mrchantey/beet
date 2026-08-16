@@ -33,6 +33,12 @@ mod recv_stream;
 pub(crate) use recv_stream::RecvStream;
 mod resize_listener;
 pub use self::resize_listener::*;
+// the canvas surface a winit-less browser render boot draws into; needs the
+// bevy window-types layer (`RawHandleWrapper`) and the id-only web handles.
+#[cfg(feature = "bevy_window")]
+mod wasm_canvas;
+#[cfg(feature = "bevy_window")]
+pub use self::wasm_canvas::*;
 /// URL query string reading and writing utilities.
 pub mod search_params_ext;
 mod time_ext;

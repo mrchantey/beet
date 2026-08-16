@@ -16,6 +16,10 @@ mod s3_sync;
 #[cfg(not(target_arch = "wasm32"))]
 mod screenshot;
 mod serve;
+// the committed page-driving check for the browser render boot, run via
+// `just check-wasm-render`.
+#[cfg(test)]
+mod wasm_render_check;
 
 pub use analytics::*;
 pub use check::*;

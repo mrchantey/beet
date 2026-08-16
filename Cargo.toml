@@ -251,6 +251,8 @@ wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 # https://github.com/wasm-bindgen/wasm-bindgen/blob/215b914c739c598e5c076f8ed22df20d2c77a3dd/crates/web-sys/Cargo.toml#L45
 web-sys = "0.3"
+# bevy's pin: the id-only `WebWindowHandle` the browser canvas surface rides.
+raw-window-handle = "0.6"
 # Cloudflare Workers SDK (workers-rs): the `R2WorkersStore` backend and the
 # `#[event(fetch)]` Worker entry. wasm32-only, referenced under each crate's
 # wasm target table behind the `cloudflare` feature.
@@ -337,7 +339,7 @@ bevy_default = [
 # `BeetPlugins` select the winit event-loop runner instead of the headless 30Hz
 # schedule loop, opening a default window. (Override the `WindowPlugin` to boot
 # windowless and open the window from data.) Off by default, so the CLI stays headless.
-winit = ["bevy_default"]
+winit = ["bevy_default", "beet_core/bevy_window"]
 # The browser's surfaceless render backend (`wgpu/webgpu`), so the wasm render
 # runner can request an adapter off `navigator.gpu`: WebGL2 only yields adapters
 # on a canvas-backed surface, which a windowless boot never has. Enabled by the

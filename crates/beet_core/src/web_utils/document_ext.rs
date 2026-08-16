@@ -57,7 +57,8 @@ use web_sys::MouseEvent;
 use web_sys::Node;
 use web_sys::Window;
 
-fn window() -> Window { web_sys::window().unwrap() }
+/// Return the browser `Window` global.
+pub fn window() -> Window { web_sys::window().unwrap() }
 
 /// Return the current document.
 pub fn document() -> Document { window().document().unwrap() }

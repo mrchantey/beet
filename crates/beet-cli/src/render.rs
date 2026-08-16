@@ -1,6 +1,11 @@
 //! The winit render-path runtime: window lifecycle plus an env-var screenshot
 //! hook for headless verification. The binary adds [`render_window_plugin`] on top
 //! of `BeetPlugins` when the `winit` feature links the windowed render stack.
+//!
+//! Deliberately native-only, none of it target-agnostic: a browser tab owns its
+//! own pacing, close affordance and teardown, so the wasm runner's window concern
+//! is only the surface (the facade's `wasm_canvas` module), and headless browser
+//! verification captures through the webdriver rather than this harness.
 use beet::exports::bevy;
 use beet::prelude::*;
 use bevy::render::view::screenshot::Screenshot;
