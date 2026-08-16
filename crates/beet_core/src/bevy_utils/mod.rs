@@ -44,7 +44,6 @@ mod bevyhow;
 mod common_systems;
 mod despawn_after;
 mod entity_target_event;
-mod non_send_marker;
 mod non_send_plugin;
 pub mod hook_ext;
 
@@ -67,7 +66,6 @@ pub use async_runner::*;
 pub use common_systems::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
-pub use non_send_marker::*;
 pub use non_send_plugin::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]

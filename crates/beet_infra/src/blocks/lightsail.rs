@@ -552,7 +552,7 @@ mod tests {
 
 	/// The rendered cloud-init user-data script for a block, ie the systemd unit
 	/// the instance provisions itself with.
-	fn build_user_data(block: &LightsailBlock) -> (String, TempDir) {
+	fn build_user_data(block: &LightsailBlock) -> (String, TestWorkDir) {
 		let (stack, dir) = Stack::default_local();
 		let script = block
 			.build_user_data(&stack, "${key_id}", "${key_secret}")
@@ -617,6 +617,8 @@ mod tests {
 			.xpect_contains("cannot be rendered");
 	}
 
+	// drives the native tofu Project, so it cannot compile for wasm
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {

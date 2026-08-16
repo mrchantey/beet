@@ -152,21 +152,20 @@ snap:
 # Native test crate sets.
 _core-pkgs := "beet_core_shared beet_core_macros beet_async beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action"
 
-# Wasm test crate sets. beet_infra is absent by *test*, not by build: its lib
-# compiles for wasm (the definitions build anywhere, only the tofu/cargo/S3
-# execution is `not(wasm32)`), but its unit tests drive `TempDir` work directories
-# and the native tofu `Project`, so there is nothing for the deno runner to run.
-_core-pkgs-wasm := "beet_core beet_net beet_ui beet_router beet_thread beet_action"
+# Wasm test crate sets. beet_infra runs its config/definition tests under deno
+# like everywhere else: its work-dir test helper has a wasm arm, and only the two
+# `Project::validate` tests (the native tofu cli) are native-gated.
+_core-pkgs-wasm := "beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action"
 
 # Crates that enable `bevy_default` — each runs in its own cargo invocation
 # in `test-all` (see comment there). Excluded from `test-core`.
 _extra-pkgs := "beet_spatial beet_ml beet_extra"
 
-# Subset of `_extra-pkgs` whose wasm tests pass. beet_ml is absent by *test*, not
-# by build: it compiles for wasm (it needs getrandom 0.4's `wasm_js` backend,
-# wired in beet_ml's wasm dependency table), but its bert forward pass wants a
-# real wgpu device the deno runner has none of.
-_extra-pkgs-wasm := "beet_spatial beet_extra"
+# Subset of `_extra-pkgs` whose wasm tests pass. beet_ml runs under deno, whose
+# WebGPU grants a real wgpu device: the bert forward pass initializes it through
+# burn's async setup (`default_device_async`) and probes first, skipping with a
+# warning on a host that grants no adapter (gpu-less CI).
+_extra-pkgs-wasm := "beet_spatial beet_ml beet_extra"
 
 # Computes the cargo feature flag for the in-scope crates by enumerating each
 # crate's `[features]` and excluding the ones that must not be co-enabled.

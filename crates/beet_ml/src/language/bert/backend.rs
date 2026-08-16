@@ -13,11 +13,15 @@ cfg_if! {
 		pub type DefaultBackend = burn::backend::Cuda;
 		/// Returns the default device for [`DefaultBackend`].
 		pub fn default_device() -> DefaultDevice { DefaultDevice::default() }
+		/// [`default_device`]; only the wasm wgpu path needs async setup.
+		pub async fn default_device_async() -> DefaultDevice { default_device() }
 	} else if #[cfg(feature = "ndarray")] {
 		/// The active burn backend.
 		pub type DefaultBackend = burn::backend::NdArray;
 		/// Returns the default device for [`DefaultBackend`].
 		pub fn default_device() -> DefaultDevice { DefaultDevice::default() }
+		/// [`default_device`]; only the wasm wgpu path needs async setup.
+		pub async fn default_device_async() -> DefaultDevice { default_device() }
 	} else if #[cfg(feature = "wgpu")] {
 		// wgpu — also the path used in wasm
 		/// The active burn backend.
@@ -28,6 +32,22 @@ cfg_if! {
 		/// (the headless path, where Burn initialises its own device).
 		pub fn default_device() -> DefaultDevice {
 			crate::prelude::shared_burn_wgpu_device().unwrap_or_default()
+		}
+		/// Like [`default_device`], first completing the runtime setup wasm
+		/// requires: cubecl cannot lazily block on adapter selection there, so
+		/// the device must be initialized through the async path before first
+		/// use. Native setup is lazy and this is just [`default_device`]. A
+		/// bevy-shared device is already initialized and is returned as is.
+		pub async fn default_device_async() -> DefaultDevice {
+			let device = default_device();
+			#[cfg(target_arch = "wasm32")]
+			if !matches!(device, burn::backend::wgpu::WgpuDevice::Existing(_)) {
+				burn::backend::wgpu::init_setup_async::<
+					burn::backend::wgpu::graphics::AutoGraphicsApi,
+				>(&device, Default::default())
+				.await;
+			}
+			device
 		}
 	} else {
 		compile_error!(

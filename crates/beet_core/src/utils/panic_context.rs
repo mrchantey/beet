@@ -71,8 +71,8 @@ impl PanicContext {
 	///
 	/// ## Note
 	/// This method uses [`panic::set_hook`], calling the prev hook if
-	/// a panic occurs outside of this scope. Overriding set_hook will break
-	/// this method.
+	/// a panic occurs outside of this scope. If another hook has overridden
+	/// ours the report degrades to the unwind payload with no location.
 	pub fn catch(func: impl FnOnce() -> Result<(), String>) -> PanicResult {
 		match Self::catch_poll(|| Poll::Ready(func())) {
 			Poll::Ready(result) => result,
@@ -86,8 +86,8 @@ impl PanicContext {
 	///
 	/// ## Note
 	/// This method uses [`panic::set_hook`], calling the prev hook if
-	/// a panic occurs outside of this scope. Overriding set_hook will break
-	/// this method.
+	/// a panic occurs outside of this scope. If another hook has overridden
+	/// ours the report degrades to the unwind payload with no location.
 	pub fn catch_async<Fut>(fut: Fut) -> impl Future<Output = PanicResult>
 	where
 		Fut: Future<Output = Result<(), String>>,
@@ -107,7 +107,8 @@ impl PanicContext {
 		let prev_cx = CONTEXT.with(|cx| cx.take());
 		let prev_scope = IN_SCOPE.with(|in_scope| in_scope.get());
 		IN_SCOPE.with(|in_scope| in_scope.set(true));
-		// 2. run function
+		// 2. run function, normalizing the error to a fallback payload: the js
+		// catch yields none, the native unwind carries the panic payload itself
 		#[cfg(target_arch = "wasm32")]
 		let result = {
 			let mut poll_result = None;
@@ -117,24 +118,28 @@ impl PanicContext {
 			});
 			match catch_result {
 				Ok(_) => Ok(poll_result.expect("func not called")),
-				Err(()) => Err(()),
+				Err(()) => Err(None),
 			}
 		};
 		#[cfg(not(target_arch = "wasm32"))]
-		let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(func));
+		let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(func))
+			.map_err(|payload| display_ext::try_downcast_str(payload.as_ref()));
 
 		// 3. map the result
 		let result = match result {
 			Ok(Poll::Ready(Ok(()))) => Poll::Ready(PanicResult::Ok),
 			Ok(Poll::Ready(Err(err))) => Poll::Ready(PanicResult::Err(err)),
 			Ok(Poll::Pending) => Poll::Pending,
-			Err(_) => {
-				// panicked
-				let context = CONTEXT.with(|cx| {
-					cx.take().expect(
-						"panic without context, has the panic hook been overridden?",
-					)
-				});
+			Err(fallback_payload) => {
+				// prefer the hook-captured context for its location; a bypassed
+				// hook (eg a dependency overrode it) degrades to the unwind
+				// payload rather than panicking the runner into a second,
+				// uncatchable panic that reports as the test's timeout
+				let context =
+					CONTEXT.with(|cx| cx.take()).unwrap_or(PanicContext {
+						payload: fallback_payload,
+						location: None,
+					});
 				Poll::Ready(PanicResult::Panic {
 					payload: context.payload,
 					location: context.location,
@@ -233,6 +238,22 @@ mod tests {
 		PanicContext::catch(|| panic!("foobar")).xpect_eq(PanicResult::Panic {
 			payload: Some("foobar".into()),
 			location: Some(FileSpan::new_with_start(file!(), line!() - 2, 31)),
+		});
+	}
+
+	/// REGRESSION: a bypassed hook (a dependency overrode it) must degrade to
+	/// the unwind payload, not re-panic the runner into a timeout report.
+	#[crate::test]
+	fn survives_bypassed_hook() {
+		// ensure our hook is installed before swapping it out
+		PanicContext::catch(|| Ok(())).xpect_eq(PanicResult::Ok);
+		let beet_hook = std::panic::take_hook();
+		std::panic::set_hook(Box::new(|_| {}));
+		let result = PanicContext::catch(|| panic!("foobar"));
+		std::panic::set_hook(beet_hook);
+		result.xpect_eq(PanicResult::Panic {
+			payload: Some("foobar".into()),
+			location: None,
 		});
 	}
 

@@ -301,6 +301,8 @@ impl Block for LambdaBlock {
 mod tests {
 	use super::*;
 
+	// drives the native tofu Project, so it cannot compile for wasm
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {

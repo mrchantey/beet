@@ -949,8 +949,8 @@ mod tests {
 	use super::*;
 
 	/// Build a config from the given block, returning the config, stack, and the
-	/// temp directory guard that keeps the local stack alive.
-	fn build_config(block: &FargateBlock) -> (terra::Config, Stack, TempDir) {
+	/// work dir guard that keeps the local stack alive.
+	fn build_config(block: &FargateBlock) -> (terra::Config, Stack, TestWorkDir) {
 		build_config_at(block, BootstrapConfig::DEFAULT_STAGE)
 	}
 
@@ -958,7 +958,7 @@ mod tests {
 	fn build_config_at(
 		block: &FargateBlock,
 		stage: &str,
-	) -> (terra::Config, Stack, TempDir) {
+	) -> (terra::Config, Stack, TestWorkDir) {
 		let (stack, dir) = Stack::default_local();
 		let stack = stack.with_stage(stage);
 		let mut config = stack.create_config();

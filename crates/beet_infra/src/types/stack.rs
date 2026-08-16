@@ -4,6 +4,13 @@ use crate::terra::Project;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
+/// The work-dir guard [`Stack::default_local`] returns: a real [`TempDir`] on
+/// native, nothing on wasm where the config-only tests never write to it.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+pub(crate) type TestWorkDir = TempDir;
+#[cfg(all(test, target_arch = "wasm32"))]
+pub(crate) struct TestWorkDir;
+
 #[derive(Debug, Clone, Get, SetWith, Component)]
 pub struct Stack {
 	/// The app name, defaults to `CARGO_PKG_NAME`
@@ -38,7 +45,7 @@ pub struct Stack {
 
 impl Default for Stack {
 	fn default() -> Self {
-		let app_name = std::env::var("CARGO_PKG_NAME").unwrap();
+		let app_name = env_ext::var("CARGO_PKG_NAME").unwrap();
 		Self::new(app_name)
 	}
 }
@@ -86,11 +93,19 @@ impl Stack {
 	}
 
 	/// Create a stack with a local backend and a temporary directory for testing.
-	/// The directory will be removed on drop.
+	/// The directory will be removed on drop. On wasm the directory is a fixed
+	/// pseudo path: the config-only tests never touch the fs, and the two
+	/// `Project::validate` tests that do are native-gated.
 	#[cfg(test)]
-	pub fn default_local() -> (Self, TempDir) {
-		let dir = TempDir::new_ws().unwrap();
-		let path = dir.path().into_ws_path().unwrap();
+	pub fn default_local() -> (Self, TestWorkDir) {
+		#[cfg(not(target_arch = "wasm32"))]
+		let (dir, path) = {
+			let dir = TempDir::new_ws().unwrap();
+			let path = dir.path().into_ws_path().unwrap();
+			(dir, path)
+		};
+		#[cfg(target_arch = "wasm32")]
+		let (dir, path) = (TestWorkDir, WsPathBuf::new("target/infra/test"));
 
 		(
 			Self {

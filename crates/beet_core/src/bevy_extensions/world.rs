@@ -395,7 +395,7 @@ pub impl World {
 	}
 }
 
-/// Extension trait adding observer and trigger helpers to [`World`].
+/// Extension trait adding observer helpers to [`World`].
 #[ext(name=CoreWorldExt)]
 pub impl World {
 	/// Returns self with an observer spawned.
@@ -415,37 +415,11 @@ pub impl World {
 		self.spawn(Observer::new(system));
 		self
 	}
-
-	/// Flushes, triggers the event, then flushes again.
-	// TODO deprecated, bevy 0.16 fixes this?
-	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
-		&mut self,
-		event: E,
-	) -> &mut Self {
-		self.flush();
-		self.trigger(event);
-		self.flush();
-		self
-	}
 }
 
-/// Extension trait adding trigger helpers to [`EntityWorldMut`].
+/// Extension trait adding hierarchy helpers to [`EntityWorldMut`].
 #[extend::ext]
 pub impl<'w> EntityWorldMut<'w> {
-	/// Flushes, triggers the event, then flushes again.
-	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
-		&mut self,
-		event: E,
-	) -> &mut Self {
-		unsafe {
-			let world = self.world_mut();
-			world.flush();
-			world.trigger(event);
-			world.flush();
-		}
-		self
-	}
-
 	/// Removes the component of the given type from the entity and all its descendants
 	/// and returns their values, in depth-first pre-order.
 	fn take_recursive<C: Component>(&mut self) -> Vec<C> {

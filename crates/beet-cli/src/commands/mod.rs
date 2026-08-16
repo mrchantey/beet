@@ -47,6 +47,7 @@ impl Plugin for CliCommandsPlugin {
 			.register_type::<Serve>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()
+			.register_type::<BuildWasmAction>()
 			.register_type::<ExportPdf>()
 			.register_type::<SyncS3>();
 		#[cfg(not(target_arch = "wasm32"))]

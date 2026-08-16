@@ -366,21 +366,7 @@ pub impl<K: AsRef<str> + Eq + Hash, V: AsRef<str>> MultiMap<K, V> {
 	where
 		T: 'static + Send + Sync + FromReflect + Typed,
 	{
-		// normalize kebab-case keys to snake_case for reflection
-		let mut normalized = MultiMap::<String, String>::new();
-		for (key, values) in self.iter_all() {
-			let snake_key = key.as_ref().to_snake_case();
-			if values.is_empty() {
-				// preserve empty value lists (flags with no value)
-				normalized.insert_key(snake_key);
-			} else {
-				for value in values {
-					normalized
-						.insert(snake_key.clone(), value.as_ref().to_string());
-				}
-			}
-		}
-
+		let normalized = normalize_snake_case(self);
 		let type_info = T::type_info();
 		let dynamic =
 			build_dynamic_from_type_info(&normalized, type_info, None)?;
@@ -391,6 +377,41 @@ pub impl<K: AsRef<str> + Eq + Hash, V: AsRef<str>> MultiMap<K, V> {
 			)
 		})
 	}
+
+	/// Apply only the fields present in the map over `base`, leaving absent
+	/// fields untouched: the presence-aware sibling of
+	/// [`parse_reflect`](Self::parse_reflect), for a value with its own
+	/// declared defaults, ie a markup-authored component that request params
+	/// override field-by-field. Keys normalize identically.
+	fn apply_reflect<T>(&self, base: &mut T) -> Result<()>
+	where
+		T: 'static + Send + Sync + Reflect + Typed,
+	{
+		let normalized = normalize_snake_case(self);
+		let dynamic =
+			build_dynamic_from_type_info(&normalized, T::type_info(), None)?;
+		base.try_apply(dynamic.as_partial_reflect())?;
+		Ok(())
+	}
+}
+
+/// Normalize kebab-case keys to snake_case for reflection lookup, preserving
+/// empty value lists (flags with no value).
+fn normalize_snake_case<K: AsRef<str> + Eq + Hash, V: AsRef<str>>(
+	map: &MultiMap<K, V>,
+) -> MultiMap<String, String> {
+	let mut normalized = MultiMap::<String, String>::new();
+	for (key, values) in map.iter_all() {
+		let snake_key = key.as_ref().to_snake_case();
+		if values.is_empty() {
+			normalized.insert_key(snake_key);
+		} else {
+			for value in values {
+				normalized.insert(snake_key.clone(), value.as_ref().to_string());
+			}
+		}
+	}
+	normalized
 }
 
 /// Build a dynamic reflected value from type info and a multimap.
@@ -1337,6 +1358,30 @@ mod test {
 		result.port.xpect_eq(0); // default u16
 		result.enabled.xpect_false(); // default bool
 		result.tags.xpect_eq(Vec::<String>::new()); // default vec
+	}
+
+	#[crate::test]
+	fn apply_reflect_leaves_absent_fields() {
+		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
+		struct Config {
+			host: String,
+			port: u16,
+			enabled: bool,
+		}
+
+		// a base with its own declared values, the map overriding a subset
+		let mut base = Config {
+			host: "preset".to_string(),
+			port: 8080,
+			enabled: true,
+		};
+		let mut map = MultiMap::new();
+		map.insert("host".to_string(), "localhost".to_string());
+		map.apply_reflect(&mut base).unwrap();
+		base.host.xpect_eq("localhost".to_string());
+		base.port.xpect_eq(8080); // absent in the map, the preset survives
+		base.enabled.xpect_true();
 	}
 
 	#[crate::test]

@@ -49,7 +49,7 @@ impl PathPatternModifier {
 /// at this point in the tree.
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.
-#[derive(Debug, Clone, Deref, DerefMut, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[reflect(Component)]
 pub struct PathPartial {

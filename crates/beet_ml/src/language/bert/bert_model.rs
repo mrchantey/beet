@@ -110,7 +110,7 @@ impl<B: Backend> BertModel<B> {
 mod test {
 	use super::*;
 	use crate::language::bert::DefaultBackend;
-	use crate::language::bert::default_device;
+	use crate::language::bert::default_device_async;
 	use crate::language::bert::mean_pool;
 	use crate::language::bert::normalize_l2;
 	use beet_core::prelude::*;
@@ -121,10 +121,16 @@ mod test {
 	/// against pretrained weights is exercised by the `works` test in
 	/// [`bert_asset`](super::bert_asset).
 	#[beet_core::test]
-	fn forward_smoke() {
+	async fn forward_smoke() {
 		use burn::tensor::Tensor;
 
-		let device = default_device();
+		// a wasm host may grant no adapter (gpu-less CI); skip rather than fail
+		#[cfg(target_arch = "wasm32")]
+		if !js_runtime::probe_webgpu().await {
+			warn!("no WebGPU adapter granted, skipping forward_smoke");
+			return;
+		}
+		let device = default_device_async().await;
 		let config = BertModelConfig::new(
 			16,    // hidden_size
 			2,     // num_attention_heads

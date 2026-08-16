@@ -2,20 +2,29 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Request params for the [`BuildWasm`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
-struct BuildWasmParams {
+/// Settings for the [`BuildWasmAction`] on this entity (its defaults when
+/// absent), surfaced in `--help`. Request params apply over these
+/// field-by-field, so a markup preset like `<BuildWasm package="beet-cli"
+/// features="web" out="app.wasm"/>` still yields to an explicit `--features`
+/// per call.
+#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
+#[require(BuildWasmAction)]
+pub struct BuildWasm {
 	/// Build in release mode and optimize the artifact with `wasm-opt -Oz`.
 	release: bool,
 	/// The cargo package to build (`--package`). Omit to build the current
 	/// directory's crate, a non-workspace `main.bsx` wasm build.
+	#[set_with(unwrap_option)]
 	package: Option<String>,
 	/// The binary target to build (`--bin`).
+	#[set_with(unwrap_option)]
 	bin: Option<String>,
 	/// The example target to build, ie `--example my_scene`, overriding `bin`.
+	#[set_with(unwrap_option)]
 	example: Option<String>,
 	/// Comma-separated features to activate (`--features`).
+	#[set_with(unwrap_option)]
 	features: Option<String>,
 	/// Activate all features (`--all-features`), overriding `features`.
 	all_features: bool,
@@ -25,14 +34,16 @@ struct BuildWasmParams {
 	/// The output `.wasm` path (required); the sibling `.js` is written alongside
 	/// it. The `wasm-bindgen` `<name>_bg.wasm`/`<name>.js` pair is renamed to these
 	/// exact names, eg `--out=dist/wasm/min.wasm` yields `min.wasm` + `min.js`.
+	#[set_with(unwrap_option)]
 	out: Option<String>,
 }
 
 /// Compiles a package to wasm and prepares it for the browser.
 ///
-/// Target-agnostic: the invoking entry (a `main.bsx`, a justfile recipe) supplies
-/// the package, features and `--out` path, so nothing here defaults to a beet
-/// binary. With no `--package` it builds the current directory's crate (a
+/// Target-agnostic: the invoking entry (a `main.bsx`, a justfile recipe)
+/// supplies the package, features and `--out` path through [`BuildWasm`]
+/// presets and/or request params, so nothing here defaults to a beet binary.
+/// With no `--package` it builds the current directory's crate (a
 /// non-workspace `main.bsx` build).
 ///
 /// Runs `cargo build --target wasm32-unknown-unknown` (`--no-default-features`
@@ -43,22 +54,28 @@ struct BuildWasmParams {
 #[action(route = "build-wasm", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<BuildWasmParams>())]
-pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
-	let params = parts.params().parse_reflect::<BuildWasmParams>()?;
+#[require(ParamsPartial = ParamsPartial::new::<BuildWasm>())]
+pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
+	// markup-declared defaults on this entity, request params applying over them
+	let mut params = cx
+		.caller
+		.get_cloned::<BuildWasm>()
+		.await
+		.unwrap_or_default();
+	cx.input.params().apply_reflect(&mut params)?;
 
-	// the cargo build, fully driven by the invoking entry's args.
+	// the cargo build, fully driven by the resolved params.
 	let mut cargo = CargoBuild::default()
-		.with_release(params.release)
+		.with_release(params.release())
 		.with_target(BuildTarget::Wasm)
-		.with_no_default_features(!params.default_features)
-		.with_all_features(params.all_features);
+		.with_no_default_features(!params.default_features())
+		.with_all_features(params.all_features());
 	// no `--package` builds the current directory's crate (a non-workspace build).
-	if let Some(package) = &params.package {
+	if let Some(package) = params.package() {
 		cargo = cargo.with_package(package.as_str());
 	}
-	if !params.all_features
-		&& let Some(features) = &params.features
+	if !params.all_features()
+		&& let Some(features) = params.features()
 	{
 		cargo = cargo.with_features(
 			features
@@ -69,15 +86,15 @@ pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
 		);
 	}
 	// an `--example` target overrides `--bin`
-	if let Some(example) = &params.example {
+	if let Some(example) = params.example() {
 		cargo = cargo.with_example(example.as_str());
-	} else if let Some(bin) = &params.bin {
+	} else if let Some(bin) = params.bin() {
 		cargo = cargo.with_binary(bin.as_str());
 	}
 
 	// the requested artifact names, parsed from the required `--out`: the `.wasm`
 	// file, its `.js` sibling, and the interim `wasm-bindgen` `<stem>_bg.wasm`.
-	let out_raw = params.out.as_deref().ok_or_else(|| {
+	let out_raw = params.out().as_deref().ok_or_else(|| {
 		bevyhow!("--out is required, eg --out=assets/wasm/beet-min.wasm")
 	})?;
 	let out_path = std::path::Path::new(out_raw);
@@ -147,10 +164,35 @@ pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
 		fs_ext::write(&out_js, glue)?;
 	}
 
-	let size_kb = std::fs::metadata(&out_wasm)
-		.map(|meta| meta.len() as usize / 1024)
+	let size_kb = fs_ext::file_size(&out_wasm)
+		.map(|len| len as usize / 1024)
 		.unwrap_or(0);
 	let report = format!("🌱 wasm size: {size_kb} KB ({wasm_name})");
 	info!("{report}");
 	Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use beet_core::prelude::*;
+
+	/// REGRESSION: required components yield to explicit ones and nothing
+	/// asserts a provider on [`PathPartial`], so an explicit spread overrides
+	/// the macro default and two presets can mount distinct routes, ie
+	/// `<BuildWasm {PathPartial::new("build-wasm-min")}/>`.
+	#[beet_core::test]
+	fn explicit_path_partial_overrides() {
+		let mut world = World::new();
+		world
+			.spawn(BuildWasm::default())
+			.get::<PathPartial>()
+			.unwrap()
+			.xpect_eq(PathPartial::new("build-wasm"));
+		world
+			.spawn((BuildWasm::default(), PathPartial::new("build-wasm-min")))
+			.get::<PathPartial>()
+			.unwrap()
+			.xpect_eq(PathPartial::new("build-wasm-min"));
+	}
 }
