@@ -1559,6 +1559,7 @@ dependencies = [
  "hyper 1.9.0",
  "js-sys",
  "lambda_http",
+ "log",
  "maxminddb",
  "pin-project",
  "postcard",
