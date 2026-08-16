@@ -16,10 +16,24 @@ thread_local! {
 	static IN_SCOPE: Cell<bool> = Cell::new(false);
 	/// Captures the panic context
 	static CONTEXT: Cell<Option<PanicContext>> = Cell::new(None);
+	/// Whether the most recent panic hook invocation on this thread buffered
+	/// the panic as escaped (fired outside any catch scope). Lets swallow
+	/// sites like [`PanicContext::record_swallowed`] avoid double-recording.
+	static ESCAPE_RECORDED: Cell<bool> = Cell::new(false);
 }
 
 #[cfg(feature = "std")]
 static INITIALIZED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Panics that escaped every catch scope (or were swallowed by a task runner
+/// before reaching one), stamped with the instant they fired. Attribution under
+/// concurrent tests is genuinely ambiguous, so timeout reports include the
+/// entries from their window unattributed rather than guessing an owner. The
+/// buffer is never drained: concurrent suites each read the window they
+/// observed via [`PanicContext::escaped_since`].
+#[cfg(feature = "std")]
+static ESCAPED: std::sync::Mutex<Vec<(Instant, String)>> =
+	std::sync::Mutex::new(Vec::new());
 
 /// Cross-platform method for capturing panic info, including in
 /// non-unwind contexts like wasm. See [`Self::catch`]
@@ -62,6 +76,9 @@ impl PanicContext {
 			}
 		}
 	}
+
+	/// No escape buffer under `panic = abort`: the first panic ends the run.
+	pub fn escaped_since(_start: Instant) -> Vec<String> { Vec::new() }
 }
 
 #[cfg(feature = "std")]
@@ -157,20 +174,75 @@ impl PanicContext {
 		let default_hook = std::panic::take_hook();
 
 		std::panic::set_hook(Box::new(move |info| {
+			let payload = display_ext::try_downcast_str(info.payload());
+			let location = info.location().map(FileSpan::new_from_location);
 			if IN_SCOPE.with(|in_scope| in_scope.get()) {
 				// in a catch scope, capture context
+				ESCAPE_RECORDED.with(|cell| cell.set(false));
 				CONTEXT.with(|cx| {
-					let payload = display_ext::try_downcast_str(info.payload());
-					let location =
-						info.location().map(FileSpan::new_from_location);
 					cx.set(Some(PanicContext { payload, location }));
 				});
 			} else {
-				// not in a catch scope, use default hook
+				// not in a catch scope: report via the default hook and buffer
+				// the escape so a timeout report can carry it
 				default_hook(info);
-				return;
+				Self::buffer_escaped(payload, location);
+				ESCAPE_RECORDED.with(|cell| cell.set(true));
 			}
 		}));
+	}
+
+	/// Formats and appends an escaped panic to the suite-wide buffer.
+	///
+	/// No-op until [`Self::init`] has installed the test hook, so a production
+	/// app with panicking tasks never grows the buffer.
+	fn buffer_escaped(payload: Option<String>, location: Option<FileSpan>) {
+		if INITIALIZED.get().is_none() {
+			return;
+		}
+		let payload =
+			payload.unwrap_or_else(|| "opaque panic payload".to_string());
+		let text = match location {
+			Some(location) => format!("{payload} at {location}"),
+			None => payload,
+		};
+		ESCAPED
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner)
+			.push((Instant::now(), text));
+	}
+
+	/// Records a panic a task runner caught after it escaped every test catch
+	/// scope (see `run_async_task_inner` / `tick_bridge_executor`).
+	///
+	/// Prefers the hook-captured context for its location, consuming it so the
+	/// stale context cannot be misread later; skips entirely when the hook
+	/// already buffered this panic as escaped. `fallback_payload` covers a
+	/// bypassed hook (a dependency overrode it), where only the unwind payload
+	/// survives.
+	pub fn record_swallowed(fallback_payload: Option<String>) {
+		if ESCAPE_RECORDED.with(|cell| cell.replace(false)) {
+			return;
+		}
+		match CONTEXT.with(|cx| cx.take()) {
+			Some(context) => {
+				Self::buffer_escaped(context.payload, context.location)
+			}
+			None => Self::buffer_escaped(fallback_payload, None),
+		}
+	}
+
+	/// Escaped panics recorded at or after `start`, ie a timeout report's
+	/// window. Cloned rather than drained: attribution is ambiguous, so
+	/// concurrent suites each report the window they observed.
+	pub fn escaped_since(start: Instant) -> Vec<String> {
+		ESCAPED
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner)
+			.iter()
+			.filter(|(at, _)| *at >= start)
+			.map(|(_, text)| text.clone())
+			.collect()
 	}
 }
 
@@ -255,6 +327,47 @@ mod tests {
 			payload: Some("foobar".into()),
 			location: None,
 		});
+	}
+
+	/// A panic swallowed by a nested catch (eg a task runner's `catch_unwind`)
+	/// inside a catch scope must land in the escape buffer with its location,
+	/// not vanish or attribute to the enclosing test.
+	#[crate::test]
+	fn buffers_swallowed_panics() {
+		let start = Instant::now();
+		let line = line!() + 2;
+		PanicContext::catch(|| {
+			std::panic::catch_unwind(|| panic!("swallowed pizza")).ok();
+			PanicContext::record_swallowed(None);
+			Ok(())
+		})
+		.xpect_eq(PanicResult::Ok);
+		PanicContext::escaped_since(start)
+			.iter()
+			.any(|text| {
+				text.contains("swallowed pizza")
+					&& text.contains(&format!("{}:{line}", file!()))
+			})
+			.xpect_true();
+	}
+
+	/// A panic outside any catch scope (here a spawned thread) must be buffered
+	/// by the hook itself, exactly once.
+	#[crate::test]
+	fn buffers_out_of_scope_panics() {
+		// ensure the hook is installed
+		PanicContext::catch(|| Ok(())).xpect_eq(PanicResult::Ok);
+		let start = Instant::now();
+		std::thread::spawn(|| panic!("thread pizza"))
+			.join()
+			.unwrap_err()
+			.xmap(|payload| display_ext::try_downcast_str(payload.as_ref()))
+			.xpect_eq(Some("thread pizza".to_string()));
+		PanicContext::escaped_since(start)
+			.iter()
+			.filter(|text| text.contains("thread pizza"))
+			.count()
+			.xpect_eq(1);
 	}
 
 	#[crate::test]

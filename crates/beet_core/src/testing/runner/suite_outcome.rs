@@ -112,9 +112,17 @@ pub(crate) fn trigger_timeouts(
 		test.tick(time.delta());
 		let elapsed = test.elapsed();
 		if elapsed >= timeout {
-			commands
-				.entity(entity)
-				.insert(TestOutcome::Fail(TestFail::Timeout { elapsed }));
+			// a hang is the usual symptom of a panic that escaped every catch
+			// scope (a spawned task, a Drop, a JS callback); attach any escapes
+			// from this suite's window so the report carries the payload
+			let unattributed_panics =
+				PanicContext::escaped_since(config.started());
+			commands.entity(entity).insert(TestOutcome::Fail(
+				TestFail::Timeout {
+					elapsed,
+					unattributed_panics,
+				},
+			));
 		}
 	}
 	Ok(())
@@ -170,6 +178,44 @@ mod tests {
 		}))
 		.await
 		.xpect_true();
+	}
+
+	/// A panic raised while the test is suspended (here a task the test
+	/// spawned) escapes every catch scope and cannot be attributed under
+	/// concurrency; the test hangs, and its timeout report must carry the
+	/// escaped panic text rather than reporting a bare timeout.
+	#[crate::test]
+	async fn timeout_reports_escaped_panics() {
+		let test = test_ext::new_auto(|| {
+			register_test(TestCaseParams::new(), async {
+				let mut app = App::new();
+				app.add_plugins(AsyncPlugin);
+				app.world_mut().run_async_local(async |_world| {
+					panic!("spawned task pizza");
+					#[allow(unreachable_code)]
+					Ok::<(), BevyError>(())
+				});
+				// the spawned task panics while this test is suspended; hang
+				// until the runner times the test out
+				core::future::pending::<()>().await;
+				#[allow(unreachable_code)]
+				Ok::<(), String>(())
+			});
+			Ok(())
+		});
+
+		let outcome = test_runner_ext::run(Some("--timeout-ms=200"), test).await;
+		let TestOutcome::Fail(TestFail::Timeout {
+			unattributed_panics,
+			..
+		}) = &outcome
+		else {
+			panic!("expected timeout, got {outcome:?}");
+		};
+		unattributed_panics
+			.iter()
+			.any(|text| text.contains("spawned task pizza"))
+			.xpect_true();
 	}
 
 	#[crate::test]

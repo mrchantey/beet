@@ -197,14 +197,28 @@ thread_local! {
 /// Ticks the wasm bridge executor so woken futures can poll while the sync-point
 /// driver has `&mut World` published. Registered with [`beet_async`] as its
 /// wasm tick hook.
+///
+/// The tick loop is wrapped in [`js_runtime::catch_no_abort`]: wasm has no
+/// unwinding, so a task panic is a JS trap that would otherwise propagate into
+/// whichever caller ticked (misattributing to an unrelated test's catch scope,
+/// or killing the frame). Catching drops the panicking task and defers the
+/// rest of the queue to the next tick, mirroring the native `catch_unwind` in
+/// `run_async_task_inner`, and buffers the escape for timeout reports. Hosts
+/// without a JS catch frame (a production browser app) run the loop directly
+/// and keep the trap.
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub(crate) fn tick_bridge_executor() {
 	BRIDGE_EXECUTOR.with(|exec| {
-		for _ in 0..100 {
-			if !exec.try_tick() {
-				break;
+		js_runtime::catch_no_abort(|| {
+			for _ in 0..100 {
+				if !exec.try_tick() {
+					break;
+				}
 			}
-		}
+			Ok(())
+		})
+		.map_err(|()| PanicContext::record_swallowed(None))
+		.ok();
 	});
 }
 
@@ -297,6 +311,9 @@ async fn run_async_task_inner<Func, Fut, Out>(
 				let msg = display_ext::try_downcast_str(&panic)
 					.unwrap_or_else(|| "unknown panic".to_string());
 				error!("Async task panicked: {}", msg);
+				// the unwind ends here, escaping every test catch scope; buffer
+				// it so a hanging test's timeout report can carry the payload
+				PanicContext::record_swallowed(Some(msg));
 				return;
 			}
 		}

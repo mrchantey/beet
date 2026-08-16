@@ -84,6 +84,12 @@ pub(crate) enum TestFail {
 	Timeout {
 		/// How long the test ran before timing out.
 		elapsed: Duration,
+		/// Panics that fired outside any catch scope during this suite's run,
+		/// eg from a task the test spawned, a `Drop`, or a JS callback. A
+		/// timeout is the usual symptom of such an escape (the test hangs
+		/// awaiting work that died), but attribution under concurrent tests is
+		/// ambiguous, so they are reported unattributed rather than guessed.
+		unattributed_panics: Vec<String>,
 	},
 }
 
