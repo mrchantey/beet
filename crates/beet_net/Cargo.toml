@@ -129,7 +129,7 @@ ureq = ["std", "http", "dep:ureq", "dep:blocking"]
 # is a server concern, so `tungstenite` pulls `server`; the side-port `SocketServer`
 # and the `Socket` client ride the same feature.
 tungstenite = ["std", "server", "dep:async-tungstenite","dep:async-io","dep:blocking", "dep:sha1", "dep:base64"]
-webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
+webdriver = ["tungstenite", "ureq", "json", "dep:async-process", "bevy/keyboard"]
 # the async webdriver matchers (`page.get(..)`, `xpect_text` etc), for consumer
 # test builds: pulls the beet_core matcher/panic machinery
 testing = ["beet_core/testing"]
@@ -189,6 +189,7 @@ bevy.workspace = true
 
 # utils
 extend.workspace = true
+log.workspace = true
 heck.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

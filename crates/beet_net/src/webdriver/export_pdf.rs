@@ -191,60 +191,50 @@ mod test {
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn export_pdf_generates_valid_pdf() {
-		App::default()
-			.run_io_task_local(async move {
-				let (proc, page) = test_fixtures::visit(&fixture_url()).await;
+		let page = test_fixtures::visit(&fixture_url()).await;
 
-				let pdf_bytes = page.export_pdf().await.unwrap();
+		let pdf_bytes = page.export_pdf().await.unwrap();
 
-				// Basic validation that we got PDF bytes
-				pdf_bytes.len().xpect_greater_than(0);
+		// Basic validation that we got PDF bytes
+		pdf_bytes.len().xpect_greater_than(0);
 
-				// Check PDF header (PDF files start with "%PDF-")
-				let header = std::str::from_utf8(&pdf_bytes[..4]).unwrap();
-				header.xpect_eq("%PDF");
+		// Check PDF header (PDF files start with "%PDF-")
+		let header = std::str::from_utf8(&pdf_bytes[..4]).unwrap();
+		header.xpect_eq("%PDF");
 
-				page.kill().await.unwrap();
-				proc.kill().unwrap();
-			})
-			.await;
+		page.kill().await.unwrap();
 	}
 
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn export_pdf_with_custom_options() {
-		App::default()
-			.run_io_task_local(async move {
-				let (proc, page) = test_fixtures::visit(&fixture_url()).await;
+		let page = test_fixtures::visit(&fixture_url()).await;
 
-				let options = PdfOptions {
-					background: false,
-					margin: PdfMargin {
-						top: 2.0,
-						bottom: 2.0,
-						left: 1.5,
-						right: 1.5,
-					},
-					orientation: PdfOrientation::Landscape,
-					page_size: PdfPageSize::letter(),
-					scale: 0.8,
-					shrink_to_fit: false,
-					page_ranges: vec!["1".to_string()],
-				};
+		let options = PdfOptions {
+			background: false,
+			margin: PdfMargin {
+				top: 2.0,
+				bottom: 2.0,
+				left: 1.5,
+				right: 1.5,
+			},
+			orientation: PdfOrientation::Landscape,
+			page_size: PdfPageSize::letter(),
+			scale: 0.8,
+			shrink_to_fit: false,
+			page_ranges: vec!["1".to_string()],
+		};
 
-				let pdf_bytes =
-					page.export_pdf_with_options(&options).await.unwrap();
+		let pdf_bytes =
+			page.export_pdf_with_options(&options).await.unwrap();
 
-				// Basic validation that we got PDF bytes
-				pdf_bytes.len().xpect_greater_than(0);
+		// Basic validation that we got PDF bytes
+		pdf_bytes.len().xpect_greater_than(0);
 
-				// Check PDF header (PDF files start with "%PDF-")
-				let header = std::str::from_utf8(&pdf_bytes[..4]).unwrap();
-				header.xpect_eq("%PDF");
+		// Check PDF header (PDF files start with "%PDF-")
+		let header = std::str::from_utf8(&pdf_bytes[..4]).unwrap();
+		header.xpect_eq("%PDF");
 
-				page.kill().await.unwrap();
-				proc.kill().unwrap();
-			})
-			.await;
+		page.kill().await.unwrap();
 	}
 }

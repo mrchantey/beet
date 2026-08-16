@@ -83,7 +83,7 @@ async fn capture(
 	page.set_viewport(width, height).await?;
 	let png = match selector {
 		Some(selector) => {
-			let element = page.find(&selector).await?;
+			let element = page.try_find(&selector).await?;
 			element.screenshot().await?
 		}
 		None if full_page => {

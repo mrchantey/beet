@@ -296,54 +296,48 @@ mod test {
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn finds_reads_and_navigates() {
-		App::default()
-			.run_io_task_local(async move {
-				let page_b = test_fixtures::page_url(
-					"element_b",
-					"<html><body><h1>Page B</h1></body></html>",
-				);
-				let page_a = test_fixtures::page_url(
-					"element_a",
-					&format!(
-						r#"<html><body>
-						<h1>Example Domain</h1>
-						<p><a href="{page_b}">More information...</a></p>
-						</body></html>"#
-					),
-				);
-				let (proc, page) = test_fixtures::visit(&page_a).await;
+		let page_b = test_fixtures::page_url(
+			"element_b",
+			"<html><body><h1>Page B</h1></body></html>",
+		);
+		let page_a = test_fixtures::page_url(
+			"element_a",
+			&format!(
+				r#"<html><body>
+				<h1>Example Domain</h1>
+				<p><a href="{page_b}">More information...</a></p>
+				</body></html>"#
+			),
+		);
+		let page = test_fixtures::visit(&page_a).await;
 
-				// auto-waiting css find + matcher chain
-				page.get("h1")
-					.await
-					.xpect_text("Example Domain")
-					.await
-					.xpect_not_text("foobar")
-					.await;
-				page.find_all("a").await.unwrap().len().xpect_eq(1);
-
-				// element-scoped find reads the real attribute
-				page.get("p")
-					.await
-					.get("a")
-					.await
-					.xpect_attr("href", &page_b)
-					.await;
-				page.xpect_no_selector("#missing").await;
-
-				// text locator + trusted click navigates; xpect_url waits
-				page.find_text("More information...")
-					.await
-					.unwrap()
-					.click()
-					.await
-					.unwrap();
-				page.xpect_url(&page_b).await;
-				page.get("h1").await.xpect_text("Page B").await;
-
-				page.kill().await.unwrap();
-				proc.kill().unwrap();
-			})
+		// auto-waiting css find + matcher chain
+		page.find("h1")
+			.await
+			.xpect_text("Example Domain")
+			.await
+			.xpect_not_text("foobar")
 			.await;
+		page.find_all("a").await.len().xpect_eq(1);
+
+		// element-scoped find reads the real attribute
+		page.find("p")
+			.await
+			.find("a")
+			.await
+			.xpect_attr("href", &page_b)
+			.await;
+		page.xpect_no_selector("#missing").await;
+
+		// text locator + trusted click navigates; xpect_url waits
+		page.find_text("More information...")
+			.await
+			.click()
+			.await
+			.unwrap();
+		page.xpect_url(&page_b).await;
+		page.find("h1").await.xpect_text("Page B").await;
+
+		page.kill().await.unwrap();
 	}
 }

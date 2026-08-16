@@ -5,40 +5,18 @@ use crate::prelude::*;
 use bevy::ecs::schedule::SingleThreadedExecutor;
 use bevy::time::TimePlugin;
 
-/// Builds and runs the test app for the given owned tests.
+/// Builds the test app for the given owned tests.
 ///
 /// std-shaped: `MinimalPlugins`' run-once-and-exit plus [`AppExitPlugin`]'s
 /// `process::exit`. The bare-metal build assembles its own app + runner +
 /// `AppExit`-to-semihosting consumer instead, reusing [`TestPlugin`] and
 /// [`tests_bundle`].
 #[cfg(feature = "testing")]
-fn run_tests_app(tests: Vec<TestDescAndFn>) {
+fn tests_app(tests: Vec<TestDescAndFn>) -> App {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
 		.spawn((TestRunnerConfig::from_env(), tests_bundle(tests)));
-	run_app(app);
-}
-
-/// Native blocks on [`App::run`]; wasm spawns [`App::run_async`] so the suite
-/// yields to the js event loop between frames, letting tests await real
-/// timers, fetches and `postMessage` (a blocking loop can never resolve them).
-/// The verdict reaches the host through [`AppExitPlugin`]'s `exit` global
-/// rather than a return value, with the host (the deno runner's keep-alive
-/// loop, a browser page) holding the process open until it fires.
-#[cfg(feature = "testing")]
-fn run_app(mut app: App) {
-	cfg_if! {
-		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			// detach: a bevy `Task` cancels on drop, and this fn returns while
-			// the suite is still running
-			async_ext::spawn_local(async move {
-				app.run_async().await;
-			})
-			.detach();
-		} else {
-			app.run();
-		}
-	}
+	app
 }
 
 // On wasm the linker only calls `__wasm_call_ctors` from exported functions
@@ -52,13 +30,28 @@ unsafe extern "C" {
 
 /// Stable-Rust entry point: runs every [`BeetTestCase`] registered via
 /// [`inventory`]. Invoked by the `beet_core::test_main!()` macro.
+///
+/// On wasm this is a no-op: `main` runs during module `init()`, and a wasm
+/// suite instead boots through the exported [`test_start`], the same
+/// awaited-async-start contract an app binary uses, so tests can await real
+/// timers, fetches and `postMessage` while the host holds the page open.
 #[cfg(feature = "testing")]
 pub fn test_main() {
-	#[cfg(target_family = "wasm")]
+	#[cfg(not(target_arch = "wasm32"))]
+	tests_app(inventory_tests()).run();
+}
+
+/// The wasm suite entry, emitted as an exported async `test_start` by the
+/// `test_main!` macro and awaited by the host (deno.ts, browser.js) exactly
+/// like an app binary's `start`: run the suite via [`App::run_async`], return
+/// the exit code. The `test_` prefix avoids colliding with a `start` the lib
+/// under test may itself export.
+#[cfg(all(feature = "testing", target_arch = "wasm32"))]
+pub async fn test_start() -> i32 {
 	unsafe {
 		__wasm_call_ctors();
 	}
-	run_tests_app(inventory_tests());
+	tests_app(inventory_tests()).run_async().await.exit_code()
 }
 
 /// Runs an explicit set of beet tests, cloning static descriptors.
@@ -67,17 +60,20 @@ pub fn test_main() {
 /// `custom_test_frameworks` harness uses [`libtest_runner`] instead.
 #[cfg(feature = "testing")]
 pub fn test_runner(tests: &[&TestDescAndFn]) {
-	run_tests_app(tests.iter().map(|t| test_ext::clone_static(t)).collect());
+	tests_app(tests.iter().map(|t| test_ext::clone_static(t)).collect())
+		.run();
 }
 
 /// Entry point for the nightly `custom_test_frameworks` test harness,
-/// invoked via `#![test_runner(beet_core::libtest_runner)]`.
+/// invoked via `#![test_runner(beet_core::libtest_runner)]`. Native only in
+/// practice: wasm targets are `harness = false` everywhere, booting through
+/// [`test_start`] instead.
 #[cfg(feature = "custom_test_frameworks")]
 pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
 		.spawn((TestRunnerConfig::from_env(), tests_bundle_borrowed(tests)));
-	run_app(app);
+	app.run();
 }
 
 /// Bevy plugin that sets up the test runner infrastructure.

@@ -77,8 +77,10 @@ struct SessionInner {
 /// --------------------
 /// * `pending` is guarded by a `Mutex` because operations are short and
 ///   low contention (only command send / response match).
-/// * The socket pump runs on the `IoTaskPool` so it does not block user
-///   systems or async tests.
+/// * The socket pump runs on the `IoTaskPool`'s thread-local executor, so an
+///   app loop must be ticking it: any running beet app qualifies, including
+///   the test runner's own (async `#[beet_core::test]` bodies need no extra
+///   `run_io_task_local` wrapper).
 ///
 /// High‑Level Extensions
 /// ---------------------
@@ -341,17 +343,13 @@ mod test {
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn works() {
-		App::default()
-			.run_io_task_local(async move {
-				let client =
-					ClientProcess::new_with_opts(test_fixtures::client())
-						.unwrap();
-				let session = client.new_session().await.unwrap();
-				// Simple BiDi round‑trip health check.
-				session.ping().await.unwrap();
-				session.kill().await.unwrap();
-				client.kill().unwrap();
-			})
-			.await;
+		let client =
+			ClientProcess::new_with_opts(test_fixtures::client())
+				.unwrap();
+		let session = client.new_session().await.unwrap();
+		// Simple BiDi round‑trip health check.
+		session.ping().await.unwrap();
+		session.kill().await.unwrap();
+		client.kill().unwrap();
 	}
 }

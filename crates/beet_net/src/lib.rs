@@ -1,6 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
+// `#[track_caller]` on the async webdriver matchers, so their panics print
+// the callsite rather than the matcher body
+#![cfg_attr(feature = "nightly", feature(async_fn_track_caller))]
 extern crate alloc;
 
 beet_core::test_main!();

@@ -116,6 +116,23 @@ macro_rules! test_main {
 	() => {
 		#[cfg(test)]
 		fn main() { $crate::testing::test_main(); }
+		// the `wasm_bindgen` attr expansion references both crate names in the
+		// caller's scope; alias them so callers need no direct dependency
+		#[cfg(all(test, target_arch = "wasm32"))]
+		#[allow(unused_imports)]
+		use $crate::exports::wasm_bindgen;
+		#[cfg(all(test, target_arch = "wasm32"))]
+		#[allow(unused_imports)]
+		use $crate::exports::wasm_bindgen_futures;
+		/// The wasm host contract: the same exported-async-start shape an app
+		/// binary boots through, under the `test_` prefix since the lib under
+		/// test may export a `start` of its own. Hosts (deno.ts, browser.js)
+		/// probe this before `start`; `main` above is a no-op on wasm.
+		#[cfg(all(test, target_arch = "wasm32"))]
+		#[$crate::exports::wasm_bindgen::prelude::wasm_bindgen]
+		pub async fn test_start() -> i32 {
+			$crate::testing::test_start().await
+		}
 	};
 }
 
@@ -124,6 +141,10 @@ macro_rules! test_main {
 // `tests/test_test.rs`.
 #[cfg(all(test, feature = "testing"))]
 fn main() { crate::testing::test_main(); }
+/// beet_core's own wasm host contract export, see the `test_main!` macro.
+#[cfg(all(test, feature = "testing", target_arch = "wasm32"))]
+#[crate::exports::wasm_bindgen::prelude::wasm_bindgen]
+pub async fn test_start() -> i32 { crate::testing::test_start().await }
 
 /// Re-exports of commonly used types and traits.
 ///

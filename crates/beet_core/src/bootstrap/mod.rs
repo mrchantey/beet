@@ -12,10 +12,12 @@
 mod bootstrap_config;
 mod server_filter;
 mod service_access;
+mod wasm_host;
 mod store_uri;
 pub use bootstrap_config::*;
 pub use server_filter::*;
 pub use service_access::*;
+pub use wasm_host::*;
 pub use store_uri::*;
 
 // `heck` casing and the workspace path helpers are std-only.

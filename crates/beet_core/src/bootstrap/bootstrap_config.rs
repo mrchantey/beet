@@ -108,6 +108,9 @@ pub struct BootstrapConfig {
 	/// The frame the screenshot harness captures on. `--screenshot-frame` /
 	/// `BEET_SCREENSHOT_FRAME`.
 	pub screenshot_frame: Option<u32>,
+	/// The host `beet run-wasm` executes a wasm module in.
+	/// `--wasm-host` / `BEET_WASM_HOST`.
+	pub wasm_host: Option<WasmHost>,
 }
 
 /// Every field's static default, ie what an unset knob resolves to. Also the
@@ -136,6 +139,7 @@ impl Default for BootstrapConfig {
 			headless: false,
 			screenshot: None,
 			screenshot_frame: None,
+			wasm_host: None,
 		}
 	}
 }
@@ -238,6 +242,10 @@ impl BootstrapConfig {
 		arg: "screenshot-frame",
 		env: "BEET_SCREENSHOT_FRAME",
 	};
+	const WASM_HOST: Knob = Knob {
+		arg: "wasm-host",
+		env: "BEET_WASM_HOST",
+	};
 
 	/// Parse this process's argv, with the `BEET_*` environment as the fallback for
 	/// every field argv did not set. Strict: a malformed value errors.
@@ -280,17 +288,19 @@ impl BootstrapConfig {
 		Self::parse(params, &|_| None)
 	}
 
-	/// [`parse_params`](Self::parse_params), removing every knob it consumed from
-	/// `params`.
+	/// [`from_params`](Self::from_params) (params with the `BEET_*` env as
+	/// fallback), removing every knob it consumed from `params`.
 	///
 	/// For a caller that forwards the *rest* of an argv on (the wasm runner hands
 	/// the module its test-runner flags): the config's own knobs leave through
 	/// [`to_argv`](Self::to_argv) instead, so a knob can never be forwarded twice
-	/// and the two copies disagree.
+	/// and the two copies disagree. Env participates because such a caller is
+	/// itself configured like a process (`BEET_WASM_HOST=browser cargo test ..`
+	/// reaches the runner only through the environment).
 	pub fn take_params(
 		params: &mut MultiMap<SmolStr, SmolStr>,
 	) -> Result<Self> {
-		let config = Self::parse_params(params)?;
+		let config = Self::from_params(params)?;
 		for knob in Self::KNOBS {
 			params.remove(knob.arg);
 		}
@@ -299,7 +309,7 @@ impl BootstrapConfig {
 
 	/// Every knob, in field order. The one enumeration of the table, so a new
 	/// field is either listed here or is not a knob at all.
-	const KNOBS: [Knob; 20] = [
+	const KNOBS: [Knob; 21] = [
 		Self::MAIN,
 		Self::STORE,
 		Self::WATCH,
@@ -320,6 +330,7 @@ impl BootstrapConfig {
 		Self::HEADLESS,
 		Self::SCREENSHOT,
 		Self::SCREENSHOT_FRAME,
+		Self::WASM_HOST,
 	];
 
 	/// The one parse. `env` resolves a `BEET_*` name, and is consulted only for a
@@ -377,6 +388,7 @@ impl BootstrapConfig {
 			headless: reader.flag(Self::HEADLESS),
 			screenshot: reader.value(Self::SCREENSHOT),
 			screenshot_frame: reader.parsed(Self::SCREENSHOT_FRAME)?,
+			wasm_host: reader.parsed(Self::WASM_HOST)?,
 		}
 		.xok()
 	}
@@ -449,6 +461,10 @@ impl BootstrapConfig {
 			self.screenshot_frame.map(|frame| frame.to_string()),
 		);
 		push(
+			Self::WASM_HOST,
+			self.wasm_host.map(|host| host.to_string()),
+		);
+		push(
 			Self::FEATURES,
 			(!self.features.is_empty()).then(|| self.features.join(",")),
 		);
@@ -509,6 +525,14 @@ impl BootstrapConfig {
 		push(
 			Self::SCREENSHOT_FRAME,
 			self.screenshot_frame.map(|frame| frame.to_string()),
+		);
+		push(
+			Self::WASM_HOST,
+			self.wasm_host.map(|host| host.to_string()),
+		);
+		push(
+			Self::WASM_HOST,
+			self.wasm_host.map(|host| host.to_string()),
 		);
 		push(
 			Self::FEATURES,
@@ -797,6 +821,7 @@ mod test {
 			headless: true,
 			screenshot: Some("/tmp/shot.png".into()),
 			screenshot_frame: Some(30),
+			wasm_host: Some(WasmHost::Browser),
 		}
 	}
 

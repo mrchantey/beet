@@ -6,6 +6,7 @@
 //! [`Page::network`], which also issue the `session.subscribe`.
 
 use super::Page;
+use crate::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 use serde_json::Value;
@@ -53,20 +54,27 @@ impl<T> Collector<T> {
 /// One console line (or uncaught error) from `log.entryAdded`.
 #[derive(Debug, Clone)]
 pub struct ConsoleEntry {
-	/// `debug` | `info` | `warn` | `error`.
-	pub level: SmolStr,
+	/// The severity, mapped onto [`log::Level`] (bidi has no `trace`).
+	pub level: log::Level,
 	/// The rendered message text.
 	pub text: String,
 }
 
 impl ConsoleEntry {
 	/// Whether this entry is an error, including uncaught exceptions.
-	pub fn is_error(&self) -> bool { self.level == "error" }
+	pub fn is_error(&self) -> bool { self.level == log::Level::Error }
 
 	fn parse(event: &Value) -> Option<Self> {
 		let params = event.get("params")?;
+		let level = match params.get("level")?.as_str()? {
+			"debug" => log::Level::Debug,
+			"info" => log::Level::Info,
+			"warn" => log::Level::Warn,
+			"error" => log::Level::Error,
+			_ => log::Level::Info,
+		};
 		Some(Self {
-			level: params.get("level")?.as_str()?.into(),
+			level,
 			text: params
 				.get("text")
 				.and_then(|text| text.as_str())
@@ -79,18 +87,18 @@ impl ConsoleEntry {
 /// One outgoing request from `network.beforeRequestSent`.
 #[derive(Debug, Clone)]
 pub struct RequestEvent {
-	/// The request method, eg `GET`.
-	pub method: SmolStr,
+	/// The request method.
+	pub method: HttpMethod,
 	/// The full request url.
-	pub url: String,
+	pub url: Url,
 }
 
 impl RequestEvent {
 	fn parse(event: &Value) -> Option<Self> {
 		let request = event.pointer("/params/request")?;
 		Some(Self {
-			method: request.get("method")?.as_str()?.into(),
-			url: request.get("url")?.as_str()?.to_string(),
+			method: request.get("method")?.as_str()?.parse().ok()?,
+			url: Url::parse(request.get("url")?.as_str()?),
 		})
 	}
 }
@@ -99,21 +107,21 @@ impl RequestEvent {
 #[derive(Debug, Clone)]
 pub struct ResponseEvent {
 	/// The http status code.
-	pub status: u16,
+	pub status: StatusCode,
 	/// The full request url.
-	pub url: String,
+	pub url: Url,
 }
 
 impl ResponseEvent {
 	/// Whether this response failed (4xx/5xx). A failed subresource (eg a
 	/// 403 favicon) raises no console error, so a client check needs both.
-	pub fn is_error(&self) -> bool { self.status >= 400 }
+	pub fn is_error(&self) -> bool { self.status.as_u16() >= 400 }
 
 	fn parse(event: &Value) -> Option<Self> {
 		let response = event.pointer("/params/response")?;
 		Some(Self {
-			status: response.get("status")?.as_u64()? as u16,
-			url: response.get("url")?.as_str()?.to_string(),
+			status: StatusCode::new(response.get("status")?.as_u64()? as u16),
+			url: Url::parse(response.get("url")?.as_str()?),
 		})
 	}
 }
@@ -163,52 +171,47 @@ mod test {
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn collects_console_and_network() {
-		App::default()
-			.run_io_task_local(async move {
-				let url = test_fixtures::page_url(
-					"collector",
-					r#"<html><body>
-					<button id="log">log</button>
-					<script>
-					document.querySelector('#log').addEventListener('click', () => {
-						console.log('clicked!');
-						console.error('oh no');
-					});
-					</script>
-					</body></html>"#,
-				);
-				let (proc, page) = test_fixtures::visit(&url).await;
-				let console = page.console().await.unwrap();
-				let network = page.network().await.unwrap();
+		let url = test_fixtures::page_url(
+			"collector",
+			r#"<html><body>
+			<button id="log">log</button>
+			<script>
+			document.querySelector('#log').addEventListener('click', () => {
+				console.log('clicked!');
+				console.error('oh no');
+			});
+			</script>
+			</body></html>"#,
+		);
+		let page = test_fixtures::visit(&url).await;
+		let console = page.console().await.unwrap();
+		let network = page.network().await.unwrap();
 
-				page.find("#log").await.unwrap().click().await.unwrap();
+		page.find("#log").await.click().await.unwrap();
 
-				let mut entries = Vec::new();
-				poll_ext::poll_async(async || {
-					entries.extend(console.drain());
-					(entries.len() >= 2).then_some(()).ok_or_else(|| {
-						bevyhow!("only {} entries", entries.len())
-					})
-				})
-				.await
-				.unwrap();
-				entries
-					.iter()
-					.any(|entry| {
-						entry.text.contains("clicked!") && !entry.is_error()
-					})
-					.xpect_true();
-				entries
-					.iter()
-					.any(|entry| entry.text.contains("oh no") && entry.is_error())
-					.xpect_true();
-
-				// a local click round-trip sends nothing over the network
-				network.drain().xpect_empty();
-
-				page.kill().await.unwrap();
-				proc.kill().unwrap();
+		let mut entries = Vec::new();
+		poll_ext::poll_async(async || {
+			entries.extend(console.drain());
+			(entries.len() >= 2).then_some(()).ok_or_else(|| {
+				bevyhow!("only {} entries", entries.len())
 			})
-			.await;
+		})
+		.await
+		.unwrap();
+		entries
+			.iter()
+			.any(|entry| {
+				entry.text.contains("clicked!") && !entry.is_error()
+			})
+			.xpect_true();
+		entries
+			.iter()
+			.any(|entry| entry.text.contains("oh no") && entry.is_error())
+			.xpect_true();
+
+		// a local click round-trip sends nothing over the network
+		network.drain().xpect_empty();
+
+		page.kill().await.unwrap();
 	}
 }

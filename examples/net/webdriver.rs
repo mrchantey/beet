@@ -33,14 +33,14 @@ fn run_webdriver(async_commands: AsyncCommands) {
 	async_commands.run_local(|world| async move {
 		ClientProcess::check_installed(Provider::Chromedriver).await?;
 
-		let (process, page) = Page::visit("https://example.com").await?;
+		let page = Browser::visit("https://example.com").await?;
 
-		// find auto-waits for the selector, so no readiness dance
-		let heading = page.find("h1").await?.inner_text().await?;
+		// try_find auto-waits for the selector, so no readiness dance
+		let heading = page.try_find("h1").await?.inner_text().await?;
 		info!("heading: {heading}");
 
 		// the innerText locator + a trusted click follows the link
-		page.find_text("More information...").await?.click().await?;
+		page.try_find_text("More information...").await?.click().await?;
 		poll_ext::poll_async(async || {
 			let url = page.current_url().await?;
 			url.contains("iana.org")
@@ -57,7 +57,6 @@ fn run_webdriver(async_commands: AsyncCommands) {
 		info!("saved screenshot to {}", out.display());
 
 		page.kill().await?;
-		process.kill()?;
 
 		world.write_message(AppExit::Success).await;
 		Ok(())

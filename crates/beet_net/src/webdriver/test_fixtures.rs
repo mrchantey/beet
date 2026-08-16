@@ -29,9 +29,7 @@ pub(crate) fn client() -> Client {
 }
 
 /// Spawn a uniquely-ported chromedriver and visit `url`.
-pub(crate) async fn visit(url: &str) -> (ClientProcess, Page) {
-	let process = ClientProcess::new_with_opts(client()).unwrap();
-	let page = Page::visit_with_client(&process.client(), url).await.unwrap();
-	(process, page)
+pub(crate) async fn visit(url: &str) -> Browser {
+	Browser::visit_with(client(), url).await.unwrap()
 }
 

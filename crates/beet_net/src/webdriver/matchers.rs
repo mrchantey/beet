@@ -1,7 +1,8 @@
 //! Async auto-retrying matchers on [`Page`] and [`Element`].
 //!
 //! The same `xpect_*` vocabulary and panic semantics as the sync matchers in
-//! `beet_core::testing`, but async and auto-waiting: each assertion polls
+//! `beet_core::testing`, but async and auto-waiting (and, under the `nightly`
+//! feature, `#[track_caller]` so panics print the callsite): each assertion polls
 //! until it passes or the deadline expires ([`Page::timeout`] on pages, the
 //! default poll timeout on elements), so tests read like their cypress and
 //! playwright counterparts with no explicit waits:
@@ -10,9 +11,9 @@
 //! # use beet_core::prelude::*;
 //! # use beet_net::prelude::*;
 //! # async fn demo(page: webdriver::Page) {
-//! page.get("#count").await.xpect_text("count is 0").await;
-//! page.get("#inc").await.click().await.unwrap();
-//! page.get("#count").await.xpect_text("count is 2").await;
+//! page.find("#count").await.xpect_text("count is 0").await;
+//! page.find("#inc").await.click().await.unwrap();
+//! page.find("#count").await.xpect_text("count is 2").await;
 //! page.xpect_no_selector("#modal").await;
 //! # }
 //! ```
@@ -80,19 +81,9 @@ fn display_option(value: &Option<String>) -> String {
 }
 
 impl Page {
-	/// [`Page::find`] for tests: auto-waits, panics pretty on timeout.
-	pub async fn get(&self, selector: &str) -> Element {
-		match self.find(selector).await {
-			Ok(element) => element,
-			Err(_) => panic_ext::panic_expected_received_display(
-				format!("element matching {selector:?}"),
-				format!("no match within {:?}", self.timeout()),
-			),
-		}
-	}
-
 	/// Assert the page url equals `expected`, auto-waiting, so a click that
 	/// navigates needs no explicit wait before this.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_url(&self, expected: &str) -> &Self {
 		assert_eventually(
 			self.timeout(),
@@ -106,6 +97,7 @@ impl Page {
 	}
 
 	/// Assert the document title equals `expected`, auto-waiting.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_title(&self, expected: &str) -> &Self {
 		assert_eventually(
 			self.timeout(),
@@ -122,10 +114,11 @@ impl Page {
 impl Page {
 	/// Assert no element matches `selector`, waiting for removal, the
 	/// `should('not.exist')` shape.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_no_selector(&self, selector: &str) -> &Self {
 		assert_eventually(
 			self.timeout(),
-			async || self.find_all(selector).await.map(|all| all.len()),
+			async || self.try_find_all(selector).await.map(|all| all.len()),
 			|count| *count > 0,
 			format!("elements matching {selector:?}"),
 			true,
@@ -135,6 +128,7 @@ impl Page {
 	}
 
 	/// Assert the page url does not equal `expected`, waiting to leave it.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_not_url(&self, expected: &str) -> &Self {
 		assert_eventually(
 			self.timeout(),
@@ -160,6 +154,7 @@ impl Element {
 	}
 
 	/// Assert the trimmed `textContent` equals `expected`, auto-waiting.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_text(&self, expected: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
@@ -173,6 +168,7 @@ impl Element {
 	}
 
 	/// Assert the trimmed `textContent` contains `expected`, auto-waiting.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_contains_text(&self, expected: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
@@ -186,6 +182,7 @@ impl Element {
 	}
 
 	/// Assert the `innerHTML` equals `expected`, auto-waiting.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_html(&self, expected: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
@@ -199,6 +196,7 @@ impl Element {
 	}
 
 	/// Assert the attribute `name` equals `expected`, auto-waiting.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_attr(&self, name: &str, expected: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
@@ -213,6 +211,7 @@ impl Element {
 
 	/// Assert the `value` property equals `expected`, auto-waiting, eg an
 	/// `<input>`'s current text.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_value(&self, expected: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
@@ -233,21 +232,12 @@ impl Element {
 		self
 	}
 
-	/// Assert a descendant matches `selector`, auto-waiting, returning it.
-	pub async fn get(&self, selector: &str) -> Element {
-		match self.find(selector).await {
-			Ok(element) => element,
-			Err(_) => panic_ext::panic_expected_received_display(
-				format!("descendant matching {selector:?}"),
-				format!("no match within {:?}", poll_ext::DEFAULT_TIMEOUT),
-			),
-		}
-	}
 }
 
 impl Element {
 	/// Assert the trimmed `textContent` does not equal `expected`, waiting
 	/// for it to change.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_not_text(&self, expected: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
@@ -261,6 +251,7 @@ impl Element {
 	}
 
 	/// Assert the trimmed `textContent` does not contain `expected`.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_not_contains_text(&self, expected: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
@@ -274,6 +265,7 @@ impl Element {
 	}
 
 	/// Assert no descendant matches `selector`, waiting for removal.
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_no_selector(&self, selector: &str) -> &Self {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,

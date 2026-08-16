@@ -11,6 +11,7 @@
 //! - Screenshot and PDF export
 
 mod bidi_value;
+mod browser;
 mod client;
 mod collector;
 mod element;
@@ -25,12 +26,11 @@ mod session;
 #[cfg(test)]
 mod test_fixtures;
 
+pub use browser::*;
 pub use client::*;
 pub use collector::*;
 pub use element::*;
 pub use export_pdf::*;
-#[cfg(any(test, feature = "testing"))]
-pub use matchers::*;
 pub use page::*;
 pub use screenshot::*;
 pub use session::*;

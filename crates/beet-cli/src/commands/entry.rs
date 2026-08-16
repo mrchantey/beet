@@ -201,3 +201,17 @@ mod test {
 			.xpect_some();
 	}
 }
+
+/// Wait for the process [`CanonicalPort`] to register, ie the freshly booted
+/// canonical http server's bound port. Shared by the commands that boot a
+/// server on an ephemeral port and then drive it (`export-pdf`, the
+/// browser-hosted `run-wasm`).
+pub(crate) async fn wait_for_port() -> Result<u16> {
+	for _ in 0..200 {
+		if let Ok(port) = CanonicalPort::get() {
+			return Ok(port);
+		}
+		time_ext::sleep_millis(25).await;
+	}
+	bevybail!("http server did not bind within 5s")
+}

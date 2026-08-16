@@ -19,7 +19,7 @@ pub struct ScreenshotOptions {
 	/// The capture origin.
 	pub origin: ScreenshotOrigin,
 	/// An optional clip rectangle, in css px relative to [`Self::origin`].
-	pub clip: Option<ScreenshotClip>,
+	pub clip: Option<Rect>,
 }
 
 impl ScreenshotOptions {
@@ -42,19 +42,6 @@ pub enum ScreenshotOrigin {
 	Document,
 }
 
-/// A clip rectangle in css px.
-#[derive(Debug, Clone, Copy)]
-pub struct ScreenshotClip {
-	/// Left edge.
-	pub x: f64,
-	/// Top edge.
-	pub y: f64,
-	/// Clip width.
-	pub width: f64,
-	/// Clip height.
-	pub height: f64,
-}
-
 impl Page {
 	/// Capture the viewport as png bytes.
 	pub async fn screenshot(&self) -> Result<Vec<u8>> {
@@ -69,10 +56,10 @@ impl Page {
 		let clip = options.clip.map(|clip| {
 			json!({
 				"type": "box",
-				"x": clip.x,
-				"y": clip.y,
-				"width": clip.width,
-				"height": clip.height,
+				"x": clip.min.x,
+				"y": clip.min.y,
+				"width": clip.width(),
+				"height": clip.height(),
 			})
 		});
 		capture(&self.session, &self.context_id, options.origin, clip).await
@@ -134,39 +121,29 @@ mod test {
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn captures_page_and_element() {
-		App::default()
-			.run_io_task_local(async move {
-				let url = test_fixtures::page_url(
-					"screenshot",
-					r#"<html><body style="background: rgb(200, 50, 50)">
-					<h1 id="title">Shot</h1>
-					</body></html>"#,
-				);
-				let (proc, page) = test_fixtures::visit(&url).await;
+		let url = test_fixtures::page_url(
+			"screenshot",
+			r#"<html><body style="background: rgb(200, 50, 50)">
+			<h1 id="title">Shot</h1>
+			</body></html>"#,
+		);
+		let page = test_fixtures::visit(&url).await;
 
-				let viewport = page.screenshot().await.unwrap();
-				viewport.starts_with(PNG_MAGIC).xpect_true();
+		let viewport = page.screenshot().await.unwrap();
+		viewport.starts_with(PNG_MAGIC).xpect_true();
 
-				let full = page
-					.screenshot_with_options(&ScreenshotOptions::full_page())
-					.await
-					.unwrap();
-				full.starts_with(PNG_MAGIC).xpect_true();
+		let full = page
+			.screenshot_with_options(&ScreenshotOptions::full_page())
+			.await
+			.unwrap();
+		full.starts_with(PNG_MAGIC).xpect_true();
 
-				let element = page
-					.find("#title")
-					.await
-					.unwrap()
-					.screenshot()
-					.await
-					.unwrap();
-				element.starts_with(PNG_MAGIC).xpect_true();
-				// the heading crops far smaller than the whole viewport
-				(element.len() < viewport.len()).xpect_true();
+		let element =
+			page.find("#title").await.screenshot().await.unwrap();
+		element.starts_with(PNG_MAGIC).xpect_true();
+		// the heading crops far smaller than the whole viewport
+		(element.len() < viewport.len()).xpect_true();
 
-				page.kill().await.unwrap();
-				proc.kill().unwrap();
-			})
-			.await;
+		page.kill().await.unwrap();
 	}
 }

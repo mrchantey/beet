@@ -237,38 +237,33 @@ mod tests {
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn visits_and_evaluates() {
-		App::default()
-			.run_io_task_local(async move {
-				let url = test_fixtures::page_url(
-					"page",
-					"<html><body><h1>Example Domain</h1></body></html>",
-				);
-				let (proc, page) = test_fixtures::visit(&url).await;
-				page.current_url().await.unwrap().xpect_eq(url);
+		let url = test_fixtures::page_url(
+			"page",
+			"<html><body><h1>Example Domain</h1></body></html>",
+		);
+		let page = test_fixtures::visit(&url).await;
+		page.current_url().await.unwrap().xpect_eq(url);
 
-				page.evaluate_value(
-					"document.querySelector('h1')?.textContent",
-				)
-				.await
-				.unwrap()
-				.xpect_eq(json!("Example Domain"));
+		page.evaluate_value(
+			"document.querySelector('h1')?.textContent",
+		)
+		.await
+		.unwrap()
+		.xpect_eq(json!("Example Domain"));
 
-				// objects deep-serialize into plain json
-				page.evaluate_value("({count: 1, items: [1, 2], nested: {flag: true}})")
-					.await
-					.unwrap()
-					.xpect_eq(json!({"count": 1, "items": [1, 2], "nested": {"flag": true}}));
+		// objects deep-serialize into plain json
+		page.evaluate_value("({count: 1, items: [1, 2], nested: {flag: true}})")
+			.await
+			.unwrap()
+			.xpect_eq(json!({"count": 1, "items": [1, 2], "nested": {"flag": true}}));
 
-				// in-page exceptions surface as errors
-				page.evaluate("(() => { throw new Error('boom') })()")
-					.await
-					.unwrap_err()
-					.to_string()
-					.xpect_contains("boom");
+		// in-page exceptions surface as errors
+		page.evaluate("(() => { throw new Error('boom') })()")
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("boom");
 
-				page.kill().await.unwrap();
-				proc.kill().unwrap();
-			})
-			.await;
+		page.kill().await.unwrap();
 	}
 }

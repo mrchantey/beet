@@ -139,7 +139,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 			Ok(())
 		})
 		.await;
-	let port = wait_for_port().await?;
+	let port = super::wait_for_port().await?;
 
 	// the query rides every request verbatim, eg `?color-scheme=dark`.
 	let query = params
@@ -187,9 +187,7 @@ async fn export_pages(
 	viewport: (u32, u32),
 	options: &PdfOptions,
 ) -> Result<Vec<(SmolPath, Vec<u8>)>> {
-	let process = ClientProcess::new()?;
-	let session = process.client().new_session().await?;
-	let mut page = Page::from_session(session).await?;
+	let mut page = Browser::new().await?;
 	page.set_viewport(viewport.0, viewport.1).await?;
 
 	let mut pdfs = Vec::with_capacity(paths.len());
@@ -199,7 +197,6 @@ async fn export_pages(
 		pdfs.push((path.clone(), page.export_pdf_with_options(options).await?));
 	}
 	page.kill().await?;
-	process.kill()?;
 	Ok(pdfs)
 }
 
@@ -248,16 +245,6 @@ async fn write_concat(
 
 /// Polls the process-global server port until the booted http server binds,
 /// erroring after ~5s rather than hanging.
-async fn wait_for_port() -> Result<u16> {
-	for _ in 0..200 {
-		if let Ok(port) = CanonicalPort::get() {
-			return Ok(port);
-		}
-		time_ext::sleep_millis(25).await;
-	}
-	bevybail!("http server did not bind within 5s")
-}
-
 /// Resolves the `(page_size_cm, viewport_px)` pair from the `--width`/`--height`
 /// params (`0` = unset), defaulting each dimension to A4.
 fn resolve_size(

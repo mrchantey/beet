@@ -130,6 +130,13 @@ const _wasm = await init().catch((err: any) => {
 	Deno.exit(1);
 });
 
+// A test module exports `test_start` (the `test_main!` macro), the same
+// awaited-async-start contract as an app's `start` under a collision-proof
+// name: await the suite, exit with its verdict.
+if (typeof bindgen.test_start === "function") {
+	Deno.exit((await bindgen.test_start()) ?? 0);
+}
+
 // A module exporting an async `start` (the beet binary) resolves to its exit
 // code: await it and exit with the code, the one-shot shape where the code is a
 // return value rather than a side channel.

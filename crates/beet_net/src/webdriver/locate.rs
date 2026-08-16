@@ -96,7 +96,7 @@ pub(crate) async fn find_polling(
 impl Page {
 	/// Find the first element matching the css `selector`, polling until one
 	/// appears, bounded by [`Page::timeout`].
-	pub async fn find(&self, selector: &str) -> Result<Element> {
+	pub async fn try_find(&self, selector: &str) -> Result<Element> {
 		find_polling(
 			&self.session,
 			&self.context_id,
@@ -109,7 +109,7 @@ impl Page {
 
 	/// Find the first element whose rendered text is exactly `text`, polling
 	/// until one appears, bounded by [`Page::timeout`].
-	pub async fn find_text(&self, text: &str) -> Result<Element> {
+	pub async fn try_find_text(&self, text: &str) -> Result<Element> {
 		find_polling(
 			&self.session,
 			&self.context_id,
@@ -121,7 +121,7 @@ impl Page {
 	}
 
 	/// All elements currently matching the css `selector`, without waiting.
-	pub async fn find_all(&self, selector: &str) -> Result<Vec<Element>> {
+	pub async fn try_find_all(&self, selector: &str) -> Result<Vec<Element>> {
 		locate_nodes(
 			&self.session,
 			&self.context_id,
@@ -136,7 +136,7 @@ impl Page {
 impl Element {
 	/// Find the first descendant matching the css `selector`, polling until
 	/// one appears (the page-default timeout).
-	pub async fn find(&self, selector: &str) -> Result<Element> {
+	pub async fn try_find(&self, selector: &str) -> Result<Element> {
 		find_polling(
 			self.session(),
 			self.context_id(),
@@ -149,7 +149,7 @@ impl Element {
 
 	/// All descendants currently matching the css `selector`, without
 	/// waiting.
-	pub async fn find_all(&self, selector: &str) -> Result<Vec<Element>> {
+	pub async fn try_find_all(&self, selector: &str) -> Result<Vec<Element>> {
 		locate_nodes(
 			self.session(),
 			self.context_id(),
@@ -158,5 +158,51 @@ impl Element {
 			None,
 		)
 		.await
+	}
+}
+
+impl Page {
+	/// [`Self::try_find`], panicking on timeout: the test-and-script shape,
+	/// so chains read without unwraps.
+	#[cfg_attr(feature = "nightly", track_caller)]
+	pub async fn find(&self, selector: &str) -> Element {
+		self.try_find(selector)
+			.await
+			.unwrap_or_else(|err| panic!("{err}"))
+	}
+
+	/// [`Self::try_find_text`], panicking on timeout.
+	#[cfg_attr(feature = "nightly", track_caller)]
+	pub async fn find_text(&self, text: &str) -> Element {
+		self.try_find_text(text)
+			.await
+			.unwrap_or_else(|err| panic!("{err}"))
+	}
+
+	/// [`Self::try_find_all`], panicking on error (an empty match is `[]`,
+	/// not a panic).
+	#[cfg_attr(feature = "nightly", track_caller)]
+	pub async fn find_all(&self, selector: &str) -> Vec<Element> {
+		self.try_find_all(selector)
+			.await
+			.unwrap_or_else(|err| panic!("{err}"))
+	}
+}
+
+impl Element {
+	/// [`Self::try_find`], panicking on timeout.
+	#[cfg_attr(feature = "nightly", track_caller)]
+	pub async fn find(&self, selector: &str) -> Element {
+		self.try_find(selector)
+			.await
+			.unwrap_or_else(|err| panic!("{err}"))
+	}
+
+	/// [`Self::try_find_all`], panicking on error.
+	#[cfg_attr(feature = "nightly", track_caller)]
+	pub async fn find_all(&self, selector: &str) -> Vec<Element> {
+		self.try_find_all(selector)
+			.await
+			.unwrap_or_else(|err| panic!("{err}"))
 	}
 }

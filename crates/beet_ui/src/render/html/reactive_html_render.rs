@@ -791,69 +791,63 @@ mod test {
 		fs_ext::write(&path, &html).unwrap();
 		let url = format!("file://{}", path.display());
 
-		App::default()
-			.run_io_task_local(async move {
-				// ports offset above beet_net's own per-test allocation range
-				let process = ClientProcess::new_with_opts(
-					Client::default()
-						.with_driver_port(8390)
-						.with_websocket_port(8391),
-				)
-				.unwrap();
-				let session = process.client().new_session().await.unwrap();
-				let mut page = Page::from_session(session).await.unwrap();
-				// console attaches before navigation so a hydration error
-				// cannot slip past; network attaches after, counting only
-				// post-load requests (the navigation itself reports one)
-				let console = page.console().await.unwrap();
-				page.navigate(&url).await.unwrap();
-				let network = page.network().await.unwrap();
+		// ports offset above beet_net's own per-test allocation range
+		let mut page = Browser::new_with(
+			Client::default()
+				.with_driver_port(8390)
+				.with_websocket_port(8391),
+		)
+		.await
+		.unwrap();
+		// console attaches before navigation so a hydration error cannot slip
+		// past; network attaches after, counting only post-load requests (the
+		// navigation itself reports one)
+		let console = page.console().await.unwrap();
+		page.navigate(&url).await.unwrap();
+		let network = page.network().await.unwrap();
 
-				// hydration: the runtime trusts the blob, leaving the correct
-				// SSR text in place (no flash), and the client document
-				// matches the blob
-				page.get("#count").await.xpect_text("count is 0").await;
-				page.get("#flag").await.xpect_text("flag is false").await;
-				page.evaluate_value("globalThis.beet.store.docs.d0")
-					.await
-					.unwrap()
-					.xpect_eq(json!({ "count": 0, "flag": false, "status": "pending" }));
+		// hydration: the runtime trusts the blob, leaving the correct
+		// SSR text in place (no flash), and the client document
+		// matches the blob
+		page.find("#count").await.xpect_text("count is 0").await;
+		page.find("#flag").await.xpect_text("flag is false").await;
+		page.evaluate_value("globalThis.beet.store.docs.d0")
+			.await
+			.unwrap()
+			.xpect_eq(json!({ "count": 0, "flag": false, "status": "pending" }));
 
-				// every default verb, installed from the `data-bx-verbs` blob
-				page.get("#inc").await.click().await.unwrap();
-				page.get("#count").await.xpect_text("count is 2").await;
-				page.get("#dec").await.click().await.unwrap();
-				page.get("#count").await.xpect_text("count is 1").await;
-				page.get("#tog").await.click().await.unwrap();
-				page.get("#flag").await.xpect_text("flag is true").await;
-				page.get("#set").await.click().await.unwrap();
-				page.get("#status").await.xpect_text("status is done").await;
+		// every default verb, installed from the `data-bx-verbs` blob
+		page.find("#inc").await.click().await.unwrap();
+		page.find("#count").await.xpect_text("count is 2").await;
+		page.find("#dec").await.click().await.unwrap();
+		page.find("#count").await.xpect_text("count is 1").await;
+		page.find("#tog").await.click().await.unwrap();
+		page.find("#flag").await.xpect_text("flag is true").await;
+		page.find("#set").await.click().await.unwrap();
+		page.find("#status").await.xpect_text("status is done").await;
 
-				// the custom app verb (its js twin shipped in `data-bx-verbs`)
-				page.get("#dbl").await.click().await.unwrap();
-				page.get("#count").await.xpect_text("count is 2").await;
+		// the custom app verb (its js twin shipped in `data-bx-verbs`)
+		page.find("#dbl").await.click().await.unwrap();
+		page.find("#count").await.xpect_text("count is 2").await;
 
-				// the client document reflects every mutation
-				page.evaluate_value("globalThis.beet.store.docs.d0")
-					.await
-					.unwrap()
-					.xpect_eq(
-						json!({ "count": 2, "flag": true, "status": "done" }),
-					);
+		// the client document reflects every mutation
+		page.evaluate_value("globalThis.beet.store.docs.d0")
+			.await
+			.unwrap()
+			.xpect_eq(
+				json!({ "count": 2, "flag": true, "status": "done" }),
+			);
 
-				// the whole exchange was local: no requests, no console errors
-				network.drain().xpect_empty();
-				console
-					.drain()
-					.into_iter()
-					.filter(|entry| entry.is_error())
-					.collect::<Vec<_>>()
-					.xpect_empty();
+		// the whole exchange was local: no requests, no console errors
+		network.drain().xpect_empty();
+		console
+			.drain()
+			.into_iter()
+			.filter(|entry| entry.is_error())
+			.collect::<Vec<_>>()
+			.xpect_empty();
 
-				page.kill().await.unwrap();
-				process.kill().unwrap();
-			})
-			.await;
+		page.kill().await.unwrap();
 	}
 
 	/// The JSON payload of a `<script ..MARKER>..</script>` emitted by the render.

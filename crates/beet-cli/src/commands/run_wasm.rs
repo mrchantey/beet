@@ -27,7 +27,8 @@ const DENO_TS: &str = include_str!("deno.ts");
 #[action(route = "run-wasm/*run-wasm-args", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub async fn RunWasm(parts: RequestParts) -> Result<Response> {
+pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
+	let parts = cx.input.request_parts();
 	let mut cli = parts.to_cli_args();
 	// route `run-wasm/*run-wasm-args`: the first segment is the command, the rest
 	// are the absolute binary path (split on `/`) followed by any positional module
@@ -56,7 +57,18 @@ pub async fn RunWasm(parts: RequestParts) -> Result<Response> {
 	let bootstrap = BootstrapConfig::take_params(&mut cli.params)?;
 	let mut forwarded = cli.into_args();
 	forwarded.extend(trailing.into_iter().map(Into::into));
-	run_wasm(Path::new(&exe_path), &bootstrap, forwarded).await?;
+
+	let runner_dir = bindgen_wasm(Path::new(&exe_path)).await?;
+	// `--wasm-host=browser` / `BEET_WASM_HOST=browser`: serve the bindgen
+	// output and run the module in a headless browser instead of deno, the
+	// host for `#[beet_core::test(browser)]` dom suites
+	#[cfg(not(target_arch = "wasm32"))]
+	if bootstrap.wasm_host.unwrap_or_default() == WasmHost::Browser {
+		super::run_wasm_browser::run(&cx, &runner_dir, &bootstrap, forwarded)
+			.await?;
+		return Response::ok().xok();
+	}
+	run_deno(&runner_dir, &bootstrap, forwarded).await?;
 	// the module's output already streamed via inherited stdio, so the runner's own
 	// response carries no body, only a success status.
 	Response::ok().xok()
@@ -67,24 +79,13 @@ fn runner_dir() -> PathBuf {
 	fs_ext::workspace_root().join("target/wasm-runner")
 }
 
-/// Runs `wasm-bindgen`, writes the Deno runner, then executes the module,
-/// forwarding `args` and inheriting stdio so the module's output streams live.
-///
-/// The module's own [`BootstrapConfig`] is delivered explicitly through
-/// [`ChildProcess::with_bootstrap`], which also scrubs the runner's inherited
-/// `BEET_*` env: beet spawning beet never passes config ambiently, so a wasm test
-/// isolate cannot pick up the host's stage, store or ports by accident.
-async fn run_wasm(
-	exe_path: &Path,
-	bootstrap: &BootstrapConfig,
-	args: Vec<String>,
-) -> Result {
+/// Runs `wasm-bindgen`, returning the runner dir holding `bindgen*.js` +
+/// `*_bg.wasm`, the input both hosts serve or import.
+async fn bindgen_wasm(exe_path: &Path) -> Result<PathBuf> {
 	if !fs_ext::exists(exe_path)? {
 		bevybail!("wasm binary does not exist: {}", exe_path.display());
 	}
 	let runner_dir = runner_dir();
-
-	// 1. wasm-bindgen → target/wasm-runner/bindgen*.js + *_bg.wasm
 	ChildProcess::new("wasm-bindgen")
 		.with_args([
 			"--out-dir".to_string(),
@@ -98,19 +99,23 @@ async fn run_wasm(
 		])
 		.run_async()
 		.await?;
+	Ok(runner_dir)
+}
 
-	// 2. BEET_WASM_HOST=browser: serve the bindgen output and run the suite in
-	// a headless browser instead of deno, the host for
-	// `#[beet_core::test(browser)]` dom tests
-	#[cfg(not(target_arch = "wasm32"))]
-	if env_ext::var("BEET_WASM_HOST")
-		.map(|host| host == "browser")
-		.unwrap_or(false)
-	{
-		return super::run_wasm_browser::run(&runner_dir, args).await;
-	}
-
-	// 3. write the bundled Deno runner next to the bindgen output
+/// Writes the bundled Deno runner beside the bindgen output and executes the
+/// module, forwarding `args` and inheriting stdio so the module's output
+/// streams live.
+///
+/// The module's own [`BootstrapConfig`] is delivered explicitly through
+/// [`ChildProcess::with_bootstrap`], which also scrubs the runner's inherited
+/// `BEET_*` env: beet spawning beet never passes config ambiently, so a wasm test
+/// isolate cannot pick up the host's stage, store or ports by accident.
+async fn run_deno(
+	runner_dir: &Path,
+	bootstrap: &BootstrapConfig,
+	args: Vec<String>,
+) -> Result {
+	// write the bundled Deno runner next to the bindgen output
 	assert_deno_installed().await?;
 	fs_ext::create_dir_all_async(&runner_dir).await?;
 	fs_ext::write_async(runner_dir.join("deno.ts"), DENO_TS).await?;
