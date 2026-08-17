@@ -28,7 +28,7 @@ impl CliArgs {
 	/// Parses pre-tokenized CLI arguments into path and query parameters.
 	///
 	/// Tokens are taken verbatim, so any quoting must already be resolved.
-	pub fn parse_tokens(tokens: Vec<String>) -> Self {
+	pub fn parse_tokens(tokens: Vec<SmolStr>) -> Self {
 		let mut path = Vec::new();
 		let mut params = MultiMap::new();
 		let mut collecting_nested = false;
@@ -101,7 +101,7 @@ impl CliArgs {
 	/// - Single quotes preserve everything literally (no escape sequences)
 	/// - Double quotes allow backslash escaping (\", \\, etc.)
 	/// - Outside quotes, backslash escapes the next character
-	fn group_quotations(args: &str) -> Vec<String> {
+	fn group_quotations(args: &str) -> Vec<SmolStr> {
 		let mut result = Vec::new();
 		let mut current = String::new();
 		let mut chars = args.chars().peekable();
@@ -143,7 +143,7 @@ impl CliArgs {
 				{
 					// Whitespace outside quotes is a separator
 					if !current.is_empty() {
-						result.push(current.clone());
+						result.push(current.as_str().into());
 						current.clear();
 					}
 				}
@@ -155,7 +155,7 @@ impl CliArgs {
 
 		// Push the final token if any
 		if !current.is_empty() {
-			result.push(current);
+			result.push(current.into());
 		}
 
 		result
@@ -306,9 +306,10 @@ mod tests {
 		// shell-resolved argv: quotes are already stripped from the wrapper,
 		// but inner json quotes must survive verbatim
 		let cli = CliArgs::parse_tokens(vec![
-			"create".to_string(),
-			r#"--body={"description":"take out garbage","done":false}"#
-				.to_string(),
+			SmolStr::new("create"),
+			SmolStr::new(
+				r#"--body={"description":"take out garbage","done":false}"#,
+			),
 		]);
 
 		cli.path.xpect_eq(vec!["create".to_string()]);

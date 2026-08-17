@@ -879,14 +879,14 @@ mod test {
 	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	fn dump_svg_raster() {
-		let Ok(out) = std::env::var("BEET_SVG_DUMP_OUT") else {
+		let Ok(out) = env_ext::var("BEET_SVG_DUMP_OUT") else {
 			return;
 		};
-		let svg = match std::env::var("BEET_SVG_DUMP_IN") {
-			Ok(path) => fs_ext::read(path).unwrap(),
+		let svg = match env_ext::var("BEET_SVG_DUMP_IN") {
+			Ok(path) => fs_ext::read(path.as_str()).unwrap(),
 			Err(_) => SAMPLE_SVG.as_bytes().to_vec(),
 		};
-		fs_ext::write(out, to_png_bytes(svg).unwrap()).unwrap();
+		fs_ext::write(out.as_str(), to_png_bytes(svg).unwrap()).unwrap();
 	}
 
 	/// SSH detection: a flattened `TERM` plus a non-zero pixel window (eg ghostty

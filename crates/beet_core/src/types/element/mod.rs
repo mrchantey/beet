@@ -10,4 +10,4 @@ mod element_text;
 mod element_traverse;
 pub use element::*;
 pub use element_text::*;
-pub use element_traverse::*;
+pub(crate) use element_traverse::*;

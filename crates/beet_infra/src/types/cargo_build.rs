@@ -89,8 +89,8 @@ impl CargoBuild {
 	/// Resolve the expected executable path after a standard cargo build.
 	pub fn exe_path(&self) -> PathBuf {
 		let target_dir = env_ext::var("CARGO_TARGET_DIR")
-			.unwrap_or_else(|_| "target".to_string());
-		let mut path = PathBuf::from(target_dir);
+			.unwrap_or_else(|_| "target".into());
+		let mut path = PathBuf::from(target_dir.as_str());
 		// cross-compilation targets put output in a subdirectory
 		if let Some(triple) = self.target.target_triple() {
 			path.push(triple);
@@ -113,8 +113,8 @@ impl CargoBuild {
 	/// Resolve the lambda build output directory.
 	fn lambda_dir(&self) -> PathBuf {
 		let target_dir = env_ext::var("CARGO_TARGET_DIR")
-			.unwrap_or_else(|_| "target".to_string());
-		let mut path = PathBuf::from(target_dir);
+			.unwrap_or_else(|_| "target".into());
+		let mut path = PathBuf::from(target_dir.as_str());
 		path.push("lambda");
 		path.push(self.binary_name().as_str());
 		path

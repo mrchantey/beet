@@ -355,12 +355,9 @@ pub fn remove(path: &str) -> FsResult {
 ///
 /// This is the single wasm arg decision; [`env_ext::args`](crate::prelude::env_ext)
 /// delegates here rather than branching itself.
-pub fn args() -> Vec<String> {
+pub fn args() -> Vec<SmolStr> {
 	if has_global("env_args") {
-		return js_strings(&raw::env_args())
-			.into_iter()
-			.map(Into::into)
-			.collect();
+		return js_strings(&raw::env_args());
 	}
 	if environment() == JsEnvironment::Browser {
 		return search_params_ext::location_args();
@@ -371,28 +368,88 @@ pub fn args() -> Vec<String> {
 /// A single environment variable, ie `Deno.env.get(key)`. `None` where the env
 /// global is absent (a Worker's config is its `worker::Env` bindings, not a
 /// process environment).
-pub fn env_var(key: &str) -> Option<String> {
+pub fn env_var(key: &str) -> Option<SmolStr> {
 	if has_global("env_var") {
-		raw::env_var(key)
+		raw::env_var(key).map(SmolStr::from)
 	} else {
 		None
 	}
 }
 
-/// Set an environment variable, ie `Deno.env.set(key, value)`. A no-op where
-/// unavailable.
-pub fn set_env(key: &str, value: &str) {
-	if has_global("set_env") {
-		raw::set_env(key, value);
-	}
+/// Set an environment variable, ie `Deno.env.set(key, value)`, returning whether
+/// the host has an environment to mutate.
+pub fn set_env(key: &str, value: &str) -> bool {
+	has_global("set_env")
+		.then(|| raw::set_env(key, value))
+		.is_some()
 }
 
-/// Remove an environment variable, ie `Deno.env.delete(key)`. A no-op where
-/// unavailable.
-pub fn remove_env(key: &str) {
-	if has_global("remove_env") {
-		raw::remove_env(key);
+/// Remove an environment variable, ie `Deno.env.delete(key)`, returning whether
+/// the host has an environment to mutate.
+pub fn remove_env(key: &str) -> bool {
+	has_global("remove_env")
+		.then(|| raw::remove_env(key))
+		.is_some()
+}
+
+/// Load the nearest `.env` into the host environment, the wasm twin of
+/// `dotenv::dotenv()`: walk [`cwd`] and its ancestors for the first `.env`, then
+/// set every key it declares that is not already present, so an existing value
+/// always wins.
+///
+/// Returns whether the host has an environment to load into, ie both an fs and an
+/// env global; a browser and a Worker have neither. A missing `.env` is not a
+/// failure, matching the native crate.
+pub fn load_dotenv() -> bool {
+	if !has_global("read_file") || !has_global("set_env") {
+		return false;
 	}
+	let Some(contents) = find_dotenv() else {
+		return true;
+	};
+	parse_dotenv(&contents)
+		.into_iter()
+		.filter(|(key, _)| env_var(key).is_none())
+		.for_each(|(key, value)| {
+			set_env(&key, &value);
+		});
+	true
+}
+
+/// The contents of the first `.env` found walking up from [`cwd`], `None` when no
+/// ancestor has one.
+fn find_dotenv() -> Option<SmolStr> {
+	std::path::PathBuf::from(cwd())
+		.ancestors()
+		.map(|dir| dir.join(".env"))
+		.find_map(|path| read_file(&path.to_string_lossy()))
+		.and_then(|bytes| String::from_utf8(bytes).ok())
+		.map(SmolStr::from)
+}
+
+/// Parse `.env` contents into `(key, value)` pairs: blank lines and `#` comments
+/// are skipped, a leading `export ` is dropped, and a value wrapped in matching
+/// single or double quotes is unwrapped. A line without a `=` is skipped.
+fn parse_dotenv(contents: &str) -> Vec<(SmolStr, SmolStr)> {
+	contents
+		.lines()
+		.map(str::trim)
+		.filter(|line| !line.is_empty() && !line.starts_with('#'))
+		.filter_map(|line| line.strip_prefix("export ").unwrap_or(line).split_once('='))
+		.map(|(key, value)| {
+			let value = value.trim();
+			let unquoted = ['"', '\'']
+				.into_iter()
+				.find(|quote| {
+					value.len() >= 2
+						&& value.starts_with(*quote)
+						&& value.ends_with(*quote)
+				})
+				.map(|_| &value[1..value.len() - 1])
+				.unwrap_or(value);
+			(SmolStr::from(key.trim()), SmolStr::from(unquoted))
+		})
+		.collect()
 }
 
 /// All environment variables as native `(key, value)` pairs, ie
@@ -433,13 +490,24 @@ fn js_strings(array: &js_sys::Array) -> Vec<SmolStr> {
 /// panic then traps, as there is no JS frame to catch it).
 ///
 /// ## Sunset
-/// This is an interim shim for wasm's lack of unwinding. Once Rust ships
-/// `catch_unwind` on wasm32 (`panic=unwind` via the Wasm exception-handling
-/// proposal, already shipped in browsers), delete this whole mechanism: this
-/// fn, the `catch_no_abort_inner` host globals (deno.ts / browser.js), the
-/// wasm branch of `PanicContext::catch_poll`, and the catch wrapper in
+/// This is an interim shim for wasm's default `panic = abort` builds, where a
+/// panic is an uncatchable trap. Real `catch_unwind` on wasm32 works today,
+/// but only on nightly with a rebuilt std: `-Cpanic=unwind` plus
+/// `-Zbuild-std=std,panic_unwind` (wasm-bindgen then also surfaces panics
+/// escaping exported fns as JS `PanicError`; needs a Wasm-EH runtime, ie
+/// Node 22.22.3+/24.15+ or a recent browser). No stabilization timeline as of
+/// 2026-08; see
+/// <https://wasm-bindgen.github.io/wasm-bindgen/reference/catch-unwind.html>.
+///
+/// Delete this mechanism when either `build-std`/`panic=unwind` reach stable
+/// or beet declares wasm testing nightly-only: this fn, the
+/// `catch_no_abort_inner` host globals (deno.ts / browser.js), the wasm branch
+/// of `PanicContext::catch_poll`, and the catch wrapper in
 /// `tick_bridge_executor` — the native `catch_unwind` paths then cover wasm.
-/// The escape-buffer attribution design is platform-independent and stays.
+/// Production browser artifacts may stay `panic = abort` for size
+/// (`beet-min`); `catch_unwind` under abort catches nothing and degrades to
+/// today's trap behavior, so the unified path still holds. The escape-buffer
+/// attribution design is platform-independent and stays.
 ///
 /// Returns `Ok(Ok(()))` on success, `Ok(Err(msg))` if the function returned
 /// an error string, or `Err(())` if a panic occurred.
@@ -503,5 +571,26 @@ mod test {
 	#[crate::test]
 	fn detects_the_deno_runner() {
 		environment().xpect_eq(JsEnvironment::Deno);
+	}
+
+	// comments, blanks, `export`, quoting and `=` inside a value.
+	#[crate::test]
+	fn parses_dotenv() {
+		parse_dotenv(
+			"# a comment\n\nFOO=bar\nexport BAZZ='boo'\nBOOM=\"a b\"\nURL=http://x?a=b\nnot a pair\n",
+		)
+		.xpect_eq(vec![
+			(SmolStr::new("FOO"), SmolStr::new("bar")),
+			(SmolStr::new("BAZZ"), SmolStr::new("boo")),
+			(SmolStr::new("BOOM"), SmolStr::new("a b")),
+			(SmolStr::new("URL"), SmolStr::new("http://x?a=b")),
+		]);
+	}
+
+	// the runner is spawned inside the workspace, so the ancestor walk finds the
+	// same `.env` the deno host used to hand-load.
+	#[crate::test]
+	fn loads_dotenv() {
+		load_dotenv().xpect_true();
 	}
 }

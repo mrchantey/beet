@@ -122,7 +122,7 @@ impl AbsPathBuf {
 	pub fn new_manifest_rel(path: impl AsRef<Path>) -> FsResult<Self> {
 		env_ext::var("CARGO_MANIFEST_DIR")
 			.unwrap()
-			.xref()
+			.as_str()
 			.xmap(Path::new)
 			.join(path)
 			.xmap(Self::new)

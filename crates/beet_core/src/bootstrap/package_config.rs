@@ -64,15 +64,6 @@ impl PackageConfig {
 	/// Returns the repository URL if set.
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
 
-	/// The cloud resource name for the server lambda function.
-	pub fn router_lambda_name(&self) -> String { self.resource_name("router") }
-
-	/// The cloud resource name for the static html bucket.
-	pub fn html_bucket_name(&self) -> String { self.resource_name("html") }
-
-	/// The cloud resource name for the assets bucket.
-	pub fn assets_bucket_name(&self) -> String { self.resource_name("assets") }
-
 	/// The cloud resource name for the analytics store.
 	pub fn analytics_bucket_name(&self) -> String {
 		self.resource_name("analytics")

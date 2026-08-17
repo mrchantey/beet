@@ -175,7 +175,7 @@ fn host_key() -> PrivateKey {
 		// base64's no_std DecodeError lacks a std::error::Error impl, so render it
 		// into a message rather than relying on the `?`/`From<Error>` path.
 		match BASE64_STANDARD
-			.decode(&encoded)
+			.decode(encoded.as_str())
 			.map_err(|err| bevyhow!("{err}"))
 			.and_then(|bytes| {
 				PrivateKey::from_bytes(&bytes).map_err(Into::into)
@@ -501,7 +501,7 @@ mod tests {
 	fn stable_host_key_from_env() {
 		let encoded = BASE64_STANDARD.encode(DEBUG_HOST_KEY_BYTES);
 		// safety: single-threaded test, restored before returning.
-		unsafe { env_ext::set_var("BEET_SSH_HOST_KEY", &encoded) };
+		unsafe { env_ext::set_var("BEET_SSH_HOST_KEY", &encoded) }.unwrap();
 
 		let fingerprint =
 			|key: PrivateKey| key.public_key().fingerprint(Default::default());
@@ -512,6 +512,6 @@ mod tests {
 		fingerprint(host_key()).xpect_eq(expected);
 
 		// safety: see above.
-		unsafe { std::env::remove_var("BEET_SSH_HOST_KEY") };
+		unsafe { env_ext::remove_var("BEET_SSH_HOST_KEY") }.unwrap();
 	}
 }

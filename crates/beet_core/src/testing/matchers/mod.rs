@@ -11,7 +11,7 @@ mod matcher_ord;
 mod matcher_result;
 mod matcher_str;
 mod matcher_vec;
-pub use close_to::*;
+pub(crate) use close_to::*;
 pub use matcher_bool::*;
 pub use matcher_close::*;
 pub use matcher_control_flow::*;

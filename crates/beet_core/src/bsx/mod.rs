@@ -153,9 +153,9 @@ pub use events::*;
 pub use parse::*;
 pub use registry::*;
 #[cfg(feature = "bevy_async")]
-pub use remote::*;
+pub(crate) use remote::*;
 pub use resolve::*;
-pub use schema::*;
+pub(crate) use schema::*;
 pub use style_resolver::*;
 pub use tag_resolver::*;
 pub use template_format::*;

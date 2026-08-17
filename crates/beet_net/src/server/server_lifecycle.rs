@@ -222,9 +222,7 @@ mod test {
 		}
 		.to_argv()
 		.unwrap();
-		let request = Request::from_cli_args(CliArgs::parse_tokens(
-			argv.iter().map(ToString::to_string).collect(),
-		));
+		let request = Request::from_cli_args(CliArgs::parse_tokens(argv));
 		ServerParams::from_request(&request)
 			.unwrap()
 			.xpect_eq(ServerParams {

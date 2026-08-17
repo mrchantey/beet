@@ -24,7 +24,6 @@ Do NOT delete any files.
 #[ignore = "requires OpenAI API key"]
 #[beet_core::test(timeout_ms = 60_000)]
 fn main() {
-	env_ext::load_dotenv();
 	let dir = TempDir::new_ws().unwrap();
 	let store_path = dir.path().clone();
 	let verify_path = store_path.join("result.txt");

@@ -106,23 +106,43 @@ test-all *args:
 	just test-scripting-fallback {{ args }}
 	# `bevy_default`-enabling crates each run in their own cargo invocation —
 	# unifying `bevy/default` across the whole graph has tripped a mold linker bug.
-	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" {{ args }}; done
-	for pkg in {{ _extra-pkgs-wasm }}; do just _test-pkgs-wasm "$pkg" {{ args }}; done
+	# `|| exit 1` on every loop: a `for` loop exits with the status of its *last*
+	# iteration, so without it a failing package in the middle is silently passed over.
+	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" {{ args }} || exit 1; done
+	for pkg in {{ _extra-pkgs-wasm }}; do just _test-pkgs-wasm "$pkg" {{ args }} || exit 1; done
 	just test-rsx {{ args }}
 	# beet-cli is not in `_core-pkgs`: it is the binary crate, so `_core-features`'
 	# enumerate-everything approach would co-enable mutually exclusive target
 	# features (`web`/`cloudflare` alongside the native stack). `--all-features` is
 	# safe here because its wasm-only deps are already target-gated.
 	cargo test -p beet-cli --all-features {{ args }} -- {{ test-threads }}
+	just test-facade-doc {{ args }}
 
-# cargo test --workspace -- {{args}}
-# cargo test --workspace --all-features -- {{args}}
+# `--all-features` is never safe workspace-wide: it enables `cuda`, whose
+# `cudarc` build script cannot build on every host. Both recipes below therefore
+# run the same crate sets `test-all` does, through `_core-features`.
 
 test-all-lib *args:
-	cargo test --workspace 			--lib 	--all-features																	{{ args }} -- {{ test-threads }}
+	just _test-pkgs "{{ _core-pkgs }}" --lib {{ args }}
+	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" --lib {{ args }} || exit 1; done
 
+# The doc-only pass. `_test-pkgs` already runs each crate's doctests as part of
+# `cargo test`, so `test-all` covers these; this is the quick pass when only a
+# doc comment changed.
 test-all-doc *args:
-	cargo test --workspace 			--doc 	--all-features																	{{ args }} -- {{ test-threads }}
+	just _test-pkgs "{{ _core-pkgs }}" --doc {{ args }}
+	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" --doc {{ args }} || exit 1; done
+	just test-facade-doc {{ args }}
+
+# The `beet` facade's doctests, ie its README (`#![doc = include_str!]`). Like
+# beet-cli it is an aggregate crate, so `_core-features`' enumerate-everything
+# would co-enable mutually exclusive targets (`web`/`cloudflare`/`embedded`);
+# instead run the default surface, then the behaviour surface the README's
+# example needs (it is `#[cfg(feature = "action")]`-gated, so the default pass
+# only compiles it away).
+test-facade-doc *args:
+	cargo test -p beet --doc {{ args }} -- {{ test-threads }}
+	cargo test -p beet --doc --features action {{ args }} -- {{ test-threads }}
 
 # rsx_site (the typed-authoring example) is excluded from the `test-core` /
 # `test-all` package lists (its `src/codegen` route modules are generated, not

@@ -10,6 +10,6 @@
 mod inline_style;
 mod prop_name;
 mod rule_markup;
-pub use inline_style::*;
+pub(crate) use inline_style::*;
 pub use prop_name::*;
-pub use rule_markup::*;
+pub(crate) use rule_markup::*;

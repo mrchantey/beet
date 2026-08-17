@@ -12,94 +12,116 @@ use thiserror::Error;
 pub enum EnvError {
 	/// The requested environment variable was not found.
 	#[error("Environment variable not found: {0}")]
-	NotFound(String),
+	NotFound(SmolStr),
+	/// The platform has no process environment to mutate: a no_std target, or a
+	/// js host that defines no env global (a browser, a Cloudflare Worker).
+	/// Returned instead of silently succeeding, so a caller that depends on the
+	/// mutation landing can say so.
+	#[error("This platform has no process environment to mutate")]
+	Unsupported,
 }
 
-/// Load environment variables from a `.env` file in the current directory.
+/// Load environment variables from the nearest `.env` file, searching the current
+/// directory and its ancestors. An existing variable always wins, and a missing
+/// `.env` is not an error.
 ///
-/// A no-op on wasm, which has no `.env` file to read: a browser build takes its
-/// configuration from the host page and a deno build from the real environment.
-pub fn load_dotenv() {
+/// Errors with [`EnvError::Unsupported`] where there is no environment to load
+/// into: a no_std target, or a js host without env globals (a browser takes its
+/// configuration from the host page, a Worker from its bindings).
+pub fn load_dotenv() -> Result<(), EnvError> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			// wasm: no `.env` on disk to load.
+			return js_runtime::load_dotenv()
+				.then_some(())
+				.ok_or(EnvError::Unsupported);
 		} else if #[cfg(feature = "std")] {
+			// a missing `.env` is the common case, not a failure.
 			dotenv::dotenv().ok();
+			return Ok(());
 		} else {
-			// no_std: no `.env` file to load.
+			return Err(EnvError::Unsupported);
 		}
 	}
 }
 
 /// Get the command line arguments, excluding the program name
-pub fn args() -> Vec<String> {
+pub fn args() -> Vec<SmolStr> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			// the wasm arg decision (deno argv, else browser location, else empty)
 			// lives in `js_runtime`, so this stays a thin platform switch.
 			return js_runtime::args();
 		} else if #[cfg(feature = "std")] {
-			return std::env::args().skip(1).collect();
+			return std::env::args().skip(1).map(SmolStr::from).collect();
 		} else {
 			return Vec::new();
 		}
 	}
 }
 
-/// Set an environment variable.
+/// Set an environment variable, erroring with [`EnvError::Unsupported`] where the
+/// platform has no environment to mutate.
 ///
 /// # Safety
 /// Modifies global process state. Calling concurrently from multiple
 /// threads or while other threads read environment variables is undefined behavior.
-#[allow(unused)]
-pub unsafe fn set_var(key: &str, value: &str) {
+pub unsafe fn set_var(key: &str, value: &str) -> Result<(), EnvError> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			// presence-checked + safe (no-op where the host has no env global).
-			js_runtime::set_env(key, value);
+			// presence-checked + safe, so the absent-global case is an error
+			// rather than a trap.
+			return js_runtime::set_env(key, value)
+				.then_some(())
+				.ok_or(EnvError::Unsupported);
 		} else if #[cfg(feature = "std")] {
 			unsafe { std::env::set_var(key, value); }
+			return Ok(());
 		} else {
-			// no_std: no process environment to mutate.
 			let _ = (key, value);
+			return Err(EnvError::Unsupported);
 		}
 	}
 }
 
-/// Remove an environment variable.
+/// Remove an environment variable, erroring with [`EnvError::Unsupported`] where
+/// the platform has no environment to mutate.
 ///
 /// # Safety
 /// Modifies global process state. Calling concurrently from multiple
 /// threads or while other threads read environment variables is undefined behavior.
-#[allow(unused)]
-pub unsafe fn remove_var(key: &str) {
+pub unsafe fn remove_var(key: &str) -> Result<(), EnvError> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			// presence-checked + safe (no-op where the host has no env global).
-			js_runtime::remove_env(key);
+			// presence-checked + safe, so the absent-global case is an error
+			// rather than a trap.
+			return js_runtime::remove_env(key)
+				.then_some(())
+				.ok_or(EnvError::Unsupported);
 		} else if #[cfg(feature = "std")] {
 			unsafe { std::env::remove_var(key); }
+			return Ok(());
 		} else {
-			// no_std: no process environment to mutate.
 			let _ = key;
+			return Err(EnvError::Unsupported);
 		}
 	}
 }
 
 /// Try get the environment variable with the given key, returning
 /// an error containing the key name if not found.
-pub fn var(key: &str) -> Result<String, EnvError> {
+pub fn var(key: &str) -> Result<SmolStr, EnvError> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			return js_runtime::env_var(key)
-				.ok_or_else(|| EnvError::NotFound(key.to_string()));
+				.ok_or_else(|| EnvError::NotFound(key.into()));
 		} else if #[cfg(feature = "std")] {
 			return std::env::var(key)
-				.map_err(|_| EnvError::NotFound(key.to_string()));
+				.map(SmolStr::from)
+				.map_err(|_| EnvError::NotFound(key.into()));
 		} else {
 			// no_std: no process environment, so always "not found" and callers
 			// fall back to their defaults.
-			return Err(EnvError::NotFound(key.to_string()));
+			return Err(EnvError::NotFound(key.into()));
 		}
 	}
 }
@@ -139,10 +161,10 @@ fn unix_display_reachable() -> bool {
 		var("WAYLAND_DISPLAY").ok().filter(|value| !value.is_empty())
 	{
 		let socket = if wayland.starts_with('/') {
-			PathBuf::from(wayland)
+			PathBuf::from(wayland.as_str())
 		} else {
 			match var("XDG_RUNTIME_DIR") {
-				Ok(dir) => Path::new(&dir).join(wayland),
+				Ok(dir) => Path::new(dir.as_str()).join(wayland.as_str()),
 				Err(_) => return false,
 			}
 		};
@@ -163,17 +185,16 @@ fn unix_display_reachable() -> bool {
 }
 
 /// Get all environment variables.
-pub fn vars() -> Vec<(String, String)> {
+pub fn vars() -> Vec<(SmolStr, SmolStr)> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			// `env_all` already marshals `Object.entries(Deno.env.toObject())`
-			// into native pairs, so just widen `SmolStr` -> `String`.
-			return js_runtime::env_all()
-				.into_iter()
-				.map(|(key, value)| (key.into(), value.into()))
-				.collect();
+			// into native pairs.
+			return js_runtime::env_all();
 		} else if #[cfg(feature = "std")] {
-			return std::env::vars().collect();
+			return std::env::vars()
+				.map(|(key, value)| (SmolStr::from(key), SmolStr::from(value)))
+				.collect();
 		} else {
 			return Vec::new();
 		}
@@ -181,7 +202,7 @@ pub fn vars() -> Vec<(String, String)> {
 }
 
 /// Get all environment variables that match the given filter.
-pub fn vars_filtered(filter: GlobFilter) -> Vec<(String, String)> {
+pub fn vars_filtered(filter: GlobFilter) -> Vec<(SmolStr, SmolStr)> {
 	vars()
 		.into_iter()
 		.filter(|(key, _)| filter.passes(key))

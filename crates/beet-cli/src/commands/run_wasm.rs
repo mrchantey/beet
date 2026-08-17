@@ -17,7 +17,7 @@ struct RunWasmParams {
 	/// The host to execute the module in: `deno` (default) or `browser`. Also
 	/// read from `BEET_WASM_HOST`, the only channel cargo leaves open to a
 	/// configured `runner` (see the justfile's browser test recipe).
-	wasm_host: Option<String>,
+	wasm_host: Option<SmolStr>,
 	/// Extra flags for the browser host's chromium session, eg
 	/// `--chrome-args='--enable-unsafe-webgpu --use-angle=gl'`. Repeatable, and
 	/// ignored by the deno host.

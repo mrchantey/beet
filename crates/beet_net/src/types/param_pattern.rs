@@ -8,7 +8,16 @@ use heck::ToKebabCase;
 /// list see [`Endpoint::params`]
 ///
 /// ```
-/// #[action(route = "my-action")]
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// # use beet_action::prelude::*;
+/// #[derive(Reflect)]
+/// struct MyParams {
+///     /// Print the whole story.
+///     verbose: bool,
+/// }
+///
+/// #[action]
 /// #[derive(Default, Clone, Component, Reflect)]
 /// #[require(ParamsPartial = ParamsPartial::new::<MyParams>())]
 /// pub async fn MyAction() {}

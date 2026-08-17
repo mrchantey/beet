@@ -18,4 +18,4 @@ pub use reactive_html_render::InsertReactive;
 #[cfg(all(feature = "bsx", feature = "json"))]
 pub use reactive_html_render::Reactivity;
 mod html_utils;
-pub use html_utils::*;
+pub(crate) use html_utils::*;

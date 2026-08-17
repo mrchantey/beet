@@ -5,7 +5,7 @@ pub use self::force_bundle::*;
 mod hover;
 pub use self::hover::*;
 mod integrate_force;
-pub use self::integrate_force::*;
+pub(crate) use self::integrate_force::*;
 mod rotate_to_velocity;
 pub use self::rotate_to_velocity::*;
 mod translate;

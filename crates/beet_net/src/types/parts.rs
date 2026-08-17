@@ -435,7 +435,9 @@ impl From<CliArgs> for RequestParts {
 			headers: HeaderMap::default(),
 			version: Cow::Owned(
 				env_ext::var("CARGO_PKG_VERSION")
-					.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
+					.as_deref()
+					.unwrap_or(DEFAULT_CLI_VERSION)
+					.to_string(),
 			),
 		}
 	}

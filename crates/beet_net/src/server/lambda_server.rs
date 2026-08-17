@@ -18,8 +18,8 @@ impl HttpServer {
 		// - default: `GET /test-stage/todo/id/123`
 		// - ignored: `GET /todo/id/123`
 		unsafe {
-			std::env::set_var("AWS_LAMBDA_HTTP_IGNORE_STAGE_IN_PATH", "true");
-		};
+			env_ext::set_var("AWS_LAMBDA_HTTP_IGNORE_STAGE_IN_PATH", "true")
+		}?;
 		// required to enable CloudWatch error logging by the runtime
 		// tracing::init_default_subscriber(); //we use PrettyTracing instead
 

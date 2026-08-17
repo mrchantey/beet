@@ -1,18 +1,15 @@
 beet_core::test_main!();
 
-use beet_core::prelude::*;
 use beet_thread::prelude::*;
 
 #[path = "utils/post_streamer.rs"]
 mod post_streamer;
 
 fn completions_streamer() -> CompletionsStreamer {
-	env_ext::load_dotenv();
 	GeminiProvider::gemini_2_5_flash().unwrap()
 }
 
 fn completions_streamer_non_streaming() -> CompletionsStreamer {
-	env_ext::load_dotenv();
 	GeminiProvider::gemini_2_5_flash()
 		.unwrap()
 		.without_streaming()

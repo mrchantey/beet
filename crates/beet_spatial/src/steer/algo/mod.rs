@@ -1,10 +1,10 @@
 mod align_impulse;
-pub use self::align_impulse::*;
+pub(crate) use self::align_impulse::*;
 mod cohere_impulse;
-pub use self::cohere_impulse::*;
+pub(crate) use self::cohere_impulse::*;
 mod seek_impulse;
-pub use self::seek_impulse::*;
+pub(crate) use self::seek_impulse::*;
 mod separate_impulse;
-pub use self::separate_impulse::*;
+pub(crate) use self::separate_impulse::*;
 mod wander_impulse;
-pub use self::wander_impulse::*;
+pub(crate) use self::wander_impulse::*;

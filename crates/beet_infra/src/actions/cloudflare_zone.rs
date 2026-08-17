@@ -14,7 +14,7 @@ use beet_net::prelude::*;
 const API_BASE: &str = "https://api.cloudflare.com/client/v4";
 
 /// The zone id + api token from the environment, the auth every zone call needs.
-fn zone_env() -> Result<(String, String)> {
+fn zone_env() -> Result<(SmolStr, SmolStr)> {
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID")
 		.map_err(|_| bevyhow!("CLOUDFLARE_ZONE_ID is unset"))?;
 	let token = env_ext::var("CLOUDFLARE_API_TOKEN")

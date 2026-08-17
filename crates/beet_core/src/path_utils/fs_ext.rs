@@ -227,7 +227,7 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 /// - Insufficient permissions to access the current directory
 pub fn workspace_root() -> PathBuf {
 	if let Ok(root_str) = env_ext::var("WORKSPACE_ROOT") {
-		return root_str.into();
+		return PathBuf::from(root_str.as_str());
 	}
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {

@@ -49,6 +49,7 @@ pub(crate) const BLOCK_ELEMENTS: &[&str] = &[
 
 /// Whether `name` is an HTML block-level element (case-insensitive), per
 /// [`BLOCK_ELEMENTS`].
+#[cfg(feature = "markdown_parser")]
 pub(crate) fn is_block_element(name: &str) -> bool {
 	BLOCK_ELEMENTS
 		.iter()
@@ -119,6 +120,7 @@ const HTML_ENTITY_PAIRS: &[(&str, &str)] = &[
 ];
 
 /// Look up the character replacement for an HTML entity.
+#[cfg(feature = "markdown_parser")]
 fn unescape_entity(entity: &str) -> Option<&'static str> {
 	HTML_ENTITY_PAIRS
 		.iter()
@@ -135,6 +137,7 @@ fn escape_char(ch: &str) -> Option<&'static str> {
 }
 
 /// Replace HTML entities with their corresponding characters.
+#[cfg(feature = "markdown_parser")]
 pub(crate) fn unescape_html_text(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 	let mut remaining = input;
@@ -211,6 +214,7 @@ pub(crate) fn escape_html_attribute(input: &str) -> String {
 /// This is functionally identical to [`unescape_html_text`] since
 /// both contexts use the same entity encoding, but is provided as a
 /// distinct function for clarity at call sites.
+#[cfg(feature = "markdown_parser")]
 pub(crate) fn unescape_html_attribute(input: &str) -> String {
 	unescape_html_text(input)
 }

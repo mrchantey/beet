@@ -187,6 +187,23 @@ mod test {
 		);
 	}
 
+	/// Navigate `surface` to `url` and settle the spawned task, so the next frame
+	/// renders the new page.
+	///
+	/// [`Navigator::navigate_to`] is async, and [`drive_until`] cannot be the wait:
+	/// a re-navigation usually carries the same text, so its needle is already on
+	/// screen and the drive returns before the navigation has landed. On the
+	/// single-threaded task pool it happened to land inside the first frame; under
+	/// `beet_core/bevy_multithreaded` the task is dispatched to a worker and lands
+	/// several frames later, so the settle is what makes this deterministic.
+	async fn navigate(app: &mut App, surface: Entity, url: &str) {
+		let url = beet_net::prelude::Url::parse(url);
+		app.world_mut()
+			.entity_mut(surface)
+			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
+		AsyncRunner::settle_async_tasks(app.world_mut()).await;
+	}
+
 	/// The first rendered element with `tag`, eg the composer's `<form>` or
 	/// `<input>`.
 	fn element_by_tag(app: &mut App, tag: &str) -> Option<Entity> {
@@ -263,12 +280,13 @@ mod test {
 
 		// ... and a seeded light theme themes the next navigation
 		app.world_mut().resource_mut::<Theme>().scheme = ColorScheme::Light;
-		let url = beet_net::prelude::Url::parse("");
-		app.world_mut()
-			.entity_mut(surface)
-			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
+		navigate(&mut app, surface, "").await;
 		drive_until(&mut app, surface, "hi");
 		scheme_class(&mut app, &classes::LIGHT_SCHEME).xpect_true();
+		// the re-navigation replaced the page rather than adding to it, so the
+		// previous scheme is gone. This is what the settle in `navigate` buys:
+		// without it the assertion reads the *first* render's dark page.
+		scheme_class(&mut app, &classes::DARK_SCHEME).xpect_false();
 	}
 
 	/// Push an error post (5xx intent) authored by the thread's agent into its

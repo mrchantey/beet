@@ -60,7 +60,7 @@
 //! use beet_net::prelude::*;
 //!
 //! # async fn example() -> Result<()> {
-//! env_ext::load_dotenv();
+//! env_ext::load_dotenv()?;
 //!
 //! let body = o11s::RequestBody::new("gpt-4o-mini")
 //!     .with_simple_input("Say hello in exactly 3 words.");

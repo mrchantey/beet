@@ -85,6 +85,10 @@ impl Plugin for TestPlugin {
 		#[cfg(target_arch = "wasm32")]
 		console_error_panic_hook::set_once();
 
+		// tests read credentials and paths from `.env`, so load it here rather
+		// than relying on the caller (`just`, a js host) to have done it.
+		env_ext::load_dotenv().ok();
+
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<TimePlugin>()
 			.insert_schedule_before(Update, RunTests)

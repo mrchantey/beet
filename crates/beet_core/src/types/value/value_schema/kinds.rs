@@ -25,7 +25,7 @@ macro_rules! number_schema {
 			feature = "serde",
 			derive(serde::Serialize, serde::Deserialize)
 		)]
-		pub enum $constraint {
+		pub(crate) enum $constraint {
 			/// The value must be at least this number.
 			Min($min),
 			/// The value must be at most this number.
@@ -42,7 +42,7 @@ macro_rules! number_schema {
 			feature = "serde",
 			derive(serde::Serialize, serde::Deserialize)
 		)]
-		pub struct $min {
+		pub(crate) struct $min {
 			/// The minimum allowed value.
 			pub value: $t,
 			/// What to do if `value` falls below the minimum.
@@ -57,7 +57,7 @@ macro_rules! number_schema {
 			feature = "serde",
 			derive(serde::Serialize, serde::Deserialize)
 		)]
-		pub struct $max {
+		pub(crate) struct $max {
 			/// The maximum allowed value.
 			pub value: $t,
 			/// What to do if `value` exceeds the maximum.
@@ -72,7 +72,7 @@ macro_rules! number_schema {
 			feature = "serde",
 			derive(serde::Serialize, serde::Deserialize)
 		)]
-		pub struct $step {
+		pub(crate) struct $step {
 			/// The step value.
 			pub value: $t,
 			/// What to do if `value` is not aligned to the step.
@@ -95,7 +95,7 @@ macro_rules! number_schema {
 			feature = "serde",
 			derive(serde::Serialize, serde::Deserialize)
 		)]
-		pub struct $schema {
+		pub(crate) struct $schema {
 			/// Constraints applied to this number.
 			pub constraints: Vec<$constraint>,
 		}

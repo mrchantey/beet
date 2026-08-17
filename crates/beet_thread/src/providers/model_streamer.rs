@@ -238,7 +238,7 @@ mod test {
 
 		// Gemini falls back to completions even when OpenResponses is requested.
 		// Requires GEMINI_API_KEY, so only assert when it is present.
-		if std::env::var(GeminiProvider::AUTH_ENV).is_ok() {
+		if env_ext::var(GeminiProvider::AUTH_ENV).is_ok() {
 			let (app, gemini) = equip(
 				Provider::Gemini,
 				ModelApi::OpenResponses,

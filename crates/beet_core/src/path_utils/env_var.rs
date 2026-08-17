@@ -17,7 +17,7 @@ use crate::prelude::*;
 /// ```rust
 /// # use beet_core::prelude::*;
 /// // SAFETY: single-threaded example
-/// unsafe { env_ext::set_var("MY_VAR", "hello") };
+/// unsafe { env_ext::set_var("MY_VAR", "hello") }.unwrap();
 /// let var = EnvVar::new("MY_VAR").unwrap();
 /// assert_eq!(var.key(), "MY_VAR");
 /// assert_eq!(var.value(), "hello");
@@ -42,7 +42,7 @@ impl EnvVar {
 		let value = env_ext::var(key)?;
 		Ok(Self {
 			key: key.to_string(),
-			value,
+			value: value.into(),
 		})
 	}
 }
@@ -92,7 +92,10 @@ impl<'de> serde::Deserialize<'de> for EnvVar {
 	) -> std::result::Result<Self, D::Error> {
 		let key = String::deserialize(deserializer)?;
 		let value = env_ext::var(&key).map_err(serde::de::Error::custom)?;
-		Ok(EnvVar { key, value })
+		Ok(EnvVar {
+			key,
+			value: value.into(),
+		})
 	}
 }
 
@@ -105,7 +108,7 @@ mod test {
 	#[crate::test]
 	fn roundtrip_serde() {
 		// SAFETY: single-threaded test
-		unsafe { env_ext::set_var("BEET_TEST_ENV_VAR", "test_value") };
+		unsafe { env_ext::set_var("BEET_TEST_ENV_VAR", "test_value") }.unwrap();
 		let var = EnvVar::new("BEET_TEST_ENV_VAR").unwrap();
 		var.key().xpect_eq("BEET_TEST_ENV_VAR");
 		var.value().xpect_eq("test_value");
@@ -149,7 +152,8 @@ mod reflect_test {
 	#[crate::test]
 	fn roundtrip_reflect_serde() {
 		// SAFETY: single-threaded test
-		unsafe { env_ext::set_var("BEET_TEST_REFLECT_VAR", "reflect_value") };
+		unsafe { env_ext::set_var("BEET_TEST_REFLECT_VAR", "reflect_value") }
+				.unwrap();
 		let var = EnvVar::new("BEET_TEST_REFLECT_VAR").unwrap();
 
 		// Registering EnvVar also registers ReflectSerialize + ReflectDeserialize

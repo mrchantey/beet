@@ -25,6 +25,7 @@
 //! search_params_ext::remove("color");
 //! ```
 
+use crate::prelude::*;
 use wasm_bindgen::JsValue;
 use web_sys::Url;
 use web_sys::UrlSearchParams;
@@ -49,7 +50,7 @@ fn replace_url(url: &Url) {
 /// positionals and query params become `--key=value` flags, ie
 /// `example.com/foo/bar.png?bazz=boo&boom=boo` yields
 /// `["foo", "bar.png", "--bazz=boo", "--boom=boo"]`.
-pub fn location_args() -> Vec<String> {
+pub fn location_args() -> Vec<SmolStr> {
 	let location = current_window().location();
 	args_from_location(
 		&location.pathname().unwrap_or_default(),
@@ -60,20 +61,20 @@ pub fn location_args() -> Vec<String> {
 /// The pure core of [`location_args`]: convert a URL `pathname` and `search` into
 /// CLI-style args, so the conversion is testable off a browser. Path segments become
 /// positionals and query params become `--key=value` flags.
-fn args_from_location(pathname: &str, search: &str) -> Vec<String> {
+fn args_from_location(pathname: &str, search: &str) -> Vec<SmolStr> {
 	let mut args = Vec::new();
 	args.extend(
 		pathname
 			.split('/')
 			.filter(|seg| !seg.is_empty())
-			.map(String::from),
+			.map(SmolStr::from),
 	);
 	for pair in search
 		.trim_start_matches('?')
 		.split('&')
 		.filter(|pair| !pair.is_empty())
 	{
-		args.push(format!("--{pair}"));
+		args.push(format!("--{pair}").into());
 	}
 	args
 }
@@ -87,18 +88,16 @@ mod test {
 	/// flags, the browser equivalent of process argv.
 	#[beet_core::test]
 	fn converts_location_to_args() {
-		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(
-			vec![
-				"foo".to_string(),
-				"bar.png".to_string(),
-				"--bazz=boo".to_string(),
-				"--boom=boo".to_string(),
-			],
-		);
+		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(vec![
+			SmolStr::new("foo"),
+			SmolStr::new("bar.png"),
+			SmolStr::new("--bazz=boo"),
+			SmolStr::new("--boom=boo"),
+		]);
 		// a bare flag and an empty path/query degrade cleanly.
 		args_from_location("/", "?verbose")
-			.xpect_eq(vec!["--verbose".to_string()]);
-		args_from_location("", "").xpect_eq(Vec::<String>::new());
+			.xpect_eq(vec![SmolStr::new("--verbose")]);
+		args_from_location("", "").xpect_eq(Vec::<SmolStr>::new());
 	}
 }
 

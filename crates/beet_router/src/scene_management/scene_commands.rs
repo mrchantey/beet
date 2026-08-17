@@ -18,9 +18,6 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-extern crate alloc;
-use alloc::string::String;
-
 /// Registers the scene-command reflect types so a scene carrying them round-trips:
 /// the loader reconstructs each command's path/behaviour from its require hooks.
 pub struct SceneCommandsPlugin;
@@ -41,14 +38,14 @@ impl Plugin for SceneCommandsPlugin {
 struct SceneTargetParams {
 	/// The device to drive, eg `--url=http://device`. Falls back to the
 	/// `BEET_REMOTE_URL` environment variable.
-	url: Option<String>,
+	url: Option<SmolStr>,
 }
 
 /// The device URL a command targets: its `--url` param, else the
 /// `BEET_REMOTE_URL` environment variable (usually from a local `.env`, so a
 /// workshop device need not be re-typed per command). Errors when neither is
 /// set, since these commands only drive a remote device.
-fn device_url(parts: &RequestParts) -> Result<String> {
+fn device_url(parts: &RequestParts) -> Result<SmolStr> {
 	parts
 		.params()
 		.parse_reflect::<SceneTargetParams>()?

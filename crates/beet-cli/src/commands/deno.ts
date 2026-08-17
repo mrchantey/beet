@@ -11,23 +11,12 @@
 // For more info see [js_runtime.rs](crates/beet_core/src/web_utils/js_runtime.rs)
 // for context see how the wasm-bindgen deno runner works
 // https://github.com/wasm-bindgen/wasm-bindgen/blob/main/crates/cli/src/wasm_bindgen_test_runner/deno.rs
+//
+// `.env` is not loaded here: the module does it itself through
+// `js_runtime::load_dotenv`, over the `read_file` / `set_env` globals below.
 import init, * as bindgen from "./bindgen.js";
 import { dirname } from "https://deno.land/std/path/mod.ts";
 import { ensureDirSync, existsSync } from "https://deno.land/std/fs/mod.ts";
-import { load } from "jsr:@std/dotenv";
-
-// Load .env file from workspace root and export vars to process environment
-const workspaceRoot = Deno.env.get("WORKSPACE_ROOT");
-if (workspaceRoot) {
-	try {
-		await load({
-			envPath: `${workspaceRoot}/.env`,
-			export: true,
-		});
-	} catch (_) {
-		// .env file may not exist, that's ok
-	}
-}
 
 globalThis.cwd = () => {
 	return do_try(() => Deno.cwd());

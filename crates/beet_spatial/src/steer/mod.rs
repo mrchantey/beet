@@ -12,7 +12,7 @@ mod steer_bundle;
 pub use steer_bundle::*;
 mod steer_target;
 use crate::prelude::*;
-pub use algo::*;
+pub(crate) use algo::*;
 use beet_core::prelude::*;
 pub use steer_target::*;
 

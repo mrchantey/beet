@@ -112,9 +112,9 @@ impl BlobStore {
 			}
 			None => {
 				let region = region
-					.map(str::to_string)
+					.map(SmolStr::from)
 					.or_else(|| env_ext::var("AWS_REGION").ok())
-					.unwrap_or_else(|| "us-west-2".to_string());
+					.unwrap_or_else(|| "us-west-2".into());
 				info!("entry store: s3 bucket `{bucket}` ({region})");
 				S3Store::new(bucket, region)
 			}

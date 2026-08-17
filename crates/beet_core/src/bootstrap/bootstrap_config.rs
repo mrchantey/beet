@@ -818,10 +818,7 @@ mod test {
 		let config = full();
 		// argv: render, re-tokenize as a shell would, parse back
 		let argv = config.to_argv().unwrap();
-		let params = CliArgs::parse_tokens(
-			argv.iter().map(ToString::to_string).collect(),
-		)
-		.params;
+		let params = CliArgs::parse_tokens(argv).params;
 		BootstrapConfig::parse(&params, &|_| None)
 			.unwrap()
 			.xpect_eq(config.clone());

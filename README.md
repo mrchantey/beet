@@ -86,9 +86,10 @@ Cross-platform primitives shared by every other crate.
 Behaviors built on `beet_action`, for paradigms like behavior trees, utility AI and agentic systems.
 
 ```rust
+# #[cfg(feature = "action")]
+# async fn run() -> beet::prelude::Result {
 use beet::prelude::*;
 
-# async fn run() -> Result {
 let outcome = AsyncPlugin::world()
   .spawn((Sequence::new(), children![
     Log::new("hello"),

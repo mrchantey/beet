@@ -14,7 +14,7 @@ use std::sync::Once;
 fn ensure_auth_env() {
 	static INIT: Once = Once::new();
 	INIT.call_once(|| unsafe {
-		env_ext::set_var("OPENAI_API_KEY", "test-dummy-key");
+		env_ext::set_var("OPENAI_API_KEY", "test-dummy-key").unwrap();
 	});
 }
 
