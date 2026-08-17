@@ -16,7 +16,7 @@
 //! - [`iframe_ext`] - IFrame manipulation and loading utilities
 
 mod animation_frame;
-pub(crate) use self::animation_frame::*;
+pub use self::animation_frame::*;
 /// File upload and download utilities for the browser.
 pub mod file_ext;
 /// Browser History API helpers for SPA navigation.
@@ -24,7 +24,7 @@ pub mod history_ext;
 mod html_event_listener;
 pub use self::html_event_listener::*;
 mod interval;
-pub(crate) use self::interval::*;
+pub use self::interval::*;
 /// Runtime bindings for Deno/browser environments.
 pub mod js_runtime;
 /// Async timeout and lifecycle utilities.
@@ -32,7 +32,7 @@ pub mod lifecycle_ext;
 mod recv_stream;
 pub(crate) use recv_stream::RecvStream;
 mod resize_listener;
-pub(crate) use self::resize_listener::*;
+pub use self::resize_listener::*;
 // the canvas surface a winit-less browser render boot draws into; needs the
 // bevy window-types layer (`RawHandleWrapper`) and the id-only web handles.
 #[cfg(feature = "bevy_window")]

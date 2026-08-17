@@ -136,7 +136,6 @@ bevy_reflect = { version = "0.19", default-features = false, features = ["smol_s
 bitflags = "2"
 thiserror = { version = "2", default-features = false }
 heck = "0.5"
-dotenv = "0.15"
 send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
 # Link-section test registration for bare-metal targets, where `inventory`'s

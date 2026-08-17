@@ -97,7 +97,6 @@ std = [
 	"bevy_async",
 	"beet_async?/std",
 	"dep:send_wrapper",
-	"dep:dotenv",
 	"dep:async-lock",
 	"dep:pathdiff",
 	"dep:futures",
@@ -231,7 +230,6 @@ bevy_reflect.workspace = true
 tracing.workspace = true
 itertools = { workspace = true, features = ["use_alloc"] }
 send_wrapper = { workspace = true, optional = true }
-dotenv = { workspace = true, optional = true }
 smol_str = { workspace = true }
 heck.workspace = true
 bitflags = { workspace = true }

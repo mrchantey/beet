@@ -103,6 +103,7 @@ async_ext::do_async_thing().await;
 	- `.agents/skills`
 	- `.agents/tmp`: scratchpads, output logs and dumps, wip scripts, etc
 - Unless explcitly told to, never create extension methods on World, EntityRef, Commands or any of their async/mut counterparts. 
+- Web APIs: reach for the ergonomic rust wrapper in `beet_core::web_utils`, don't hand-roll raw `wasm-bindgen`. A raw `Closure` handed to a browser API has to be kept alive for exactly as long as the API holds it and torn down after, which is where leaks and use-after-free come from; the wrappers own that lifetime in `Drop` and hand you a rust shape instead, ie `AnimationFrame` and `IntervalStream` are `Stream`s you `.next().await`, `HtmlEventListener` is a `Stream` of events, `ResizeListener` disconnects its observer on drop. Missing a wrapper is a reason to add one to `web_utils`, not to inline a `Closure::wrap` at the call site.
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.
 - comments must be concise

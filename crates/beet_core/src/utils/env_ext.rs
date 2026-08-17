@@ -25,23 +25,72 @@ pub enum EnvError {
 /// directory and its ancestors. An existing variable always wins, and a missing
 /// `.env` is not an error.
 ///
+/// One implementation on every platform: the file is found and read through
+/// [`fs_ext`] (whose wasm arm is the js host's fs globals), parsed by
+/// [`parse_dotenv`] and written through [`set_var`], so a deno runner and a native
+/// process resolve the same file the same way.
+///
 /// Errors with [`EnvError::Unsupported`] where there is no environment to load
 /// into: a no_std target, or a js host without env globals (a browser takes its
 /// configuration from the host page, a Worker from its bindings).
 pub fn load_dotenv() -> Result<(), EnvError> {
 	cfg_if! {
-		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			return js_runtime::load_dotenv()
-				.then_some(())
-				.ok_or(EnvError::Unsupported);
-		} else if #[cfg(feature = "std")] {
+		if #[cfg(feature = "std")] {
 			// a missing `.env` is the common case, not a failure.
-			dotenv::dotenv().ok();
-			return Ok(());
+			let Some(contents) = find_dotenv() else {
+				return Ok(());
+			};
+			return parse_dotenv(&contents)
+				.into_iter()
+				.filter(|(key, _)| var(key).is_err())
+				// SAFETY: process-wide mutation, so this is a startup call made
+				// before any other thread reads the environment.
+				.try_for_each(|(key, value)| unsafe { set_var(&key, &value) });
 		} else {
 			return Err(EnvError::Unsupported);
 		}
 	}
+}
+
+/// The contents of the first `.env` found walking up from the current directory,
+/// `None` when no ancestor has one (or the host has no filesystem).
+#[cfg(feature = "std")]
+fn find_dotenv() -> Option<String> {
+	let cwd = fs_ext::current_dir().ok()?;
+	cwd.ancestors()
+		.map(|dir| dir.join(".env"))
+		.find_map(|path| fs_ext::read_to_string(path).ok())
+}
+
+/// Parse `.env` contents into `(key, value)` pairs: blank lines and `#` comments
+/// are skipped, a leading `export ` is dropped, and a value wrapped in matching
+/// single or double quotes is unwrapped. A line without a `=` is skipped.
+///
+/// The single dotenv grammar in beet, so a caller loading a `.env` from somewhere
+/// other than the filesystem (a blob store entry, a host page) parses it
+/// identically to [`load_dotenv`].
+pub fn parse_dotenv(contents: &str) -> Vec<(SmolStr, SmolStr)> {
+	contents
+		.lines()
+		.map(str::trim)
+		.filter(|line| !line.is_empty() && !line.starts_with('#'))
+		.filter_map(|line| {
+			line.strip_prefix("export ").unwrap_or(line).split_once('=')
+		})
+		.map(|(key, value)| {
+			let value = value.trim();
+			let unquoted = ['"', '\'']
+				.into_iter()
+				.find(|quote| {
+					value.len() >= 2
+						&& value.starts_with(*quote)
+						&& value.ends_with(*quote)
+				})
+				.map(|_| &value[1..value.len() - 1])
+				.unwrap_or(value);
+			(SmolStr::from(key.trim()), SmolStr::from(unquoted))
+		})
+		.collect()
 }
 
 /// Get the command line arguments, excluding the program name
@@ -207,4 +256,28 @@ pub fn vars_filtered(filter: GlobFilter) -> Vec<(SmolStr, SmolStr)> {
 		.into_iter()
 		.filter(|(key, _)| filter.passes(key))
 		.collect()
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	// comments, blanks, `export`, quoting and an `=` inside a value.
+	#[crate::test]
+	fn parses_dotenv() {
+		env_ext::parse_dotenv(
+			"# a comment\n\nFOO=bar\nexport BAZZ='boo'\nBOOM=\"a b\"\nURL=http://x?a=b\nnot a pair\n",
+		)
+		.xpect_eq(vec![
+			(SmolStr::new("FOO"), SmolStr::new("bar")),
+			(SmolStr::new("BAZZ"), SmolStr::new("boo")),
+			(SmolStr::new("BOOM"), SmolStr::new("a b")),
+			(SmolStr::new("URL"), SmolStr::new("http://x?a=b")),
+		]);
+	}
+
+	// every test host (native, and the deno runner over the js fs globals) runs
+	// inside the workspace, so the ancestor walk reaches its `.env`.
+	#[crate::test]
+	fn loads_dotenv() { env_ext::load_dotenv().unwrap(); }
 }

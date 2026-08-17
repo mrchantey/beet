@@ -11,6 +11,11 @@ use beet_net::prelude::*;
 /// it is a child of (a [`CliServer`] resolves its boot by routing down into this
 /// dispatch, an [`HttpServer`] parks and routes each socket request into it).
 ///
+/// Middleware is opt-in, [`HelpHandler`] included: a router that should answer
+/// `--help` / `?help` declares it, as a spread in markup (`<Router {HelpHandler}>`)
+/// or through [`Router::with_defaults`] in Rust. An api-only router is entitled to
+/// serve no help at all.
+///
 /// `Reflect` is derived unconditionally: reflection works on no_std and is wanted
 /// there for scene loading.
 #[derive(Debug, Default, Clone, Component, Reflect)]

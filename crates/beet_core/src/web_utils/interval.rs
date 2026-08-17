@@ -55,7 +55,7 @@ impl Drop for IntervalInner {
 ///
 /// Use `.next().await` to wait for ticks, or `next_tick()` if you don't want to
 /// bring in `StreamExt`.
-pub(crate) struct IntervalStream {
+pub struct IntervalStream {
 	receiver: super::RecvStream<f64>,
 	// Keep the callback alive and ensure cleanup on drop.
 	_inner: Rc<IntervalInner>,

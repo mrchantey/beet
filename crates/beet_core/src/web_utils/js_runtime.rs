@@ -392,65 +392,9 @@ pub fn remove_env(key: &str) -> bool {
 		.is_some()
 }
 
-/// Load the nearest `.env` into the host environment, the wasm twin of
-/// `dotenv::dotenv()`: walk [`cwd`] and its ancestors for the first `.env`, then
-/// set every key it declares that is not already present, so an existing value
-/// always wins.
-///
-/// Returns whether the host has an environment to load into, ie both an fs and an
-/// env global; a browser and a Worker have neither. A missing `.env` is not a
-/// failure, matching the native crate.
-pub fn load_dotenv() -> bool {
-	if !has_global("read_file") || !has_global("set_env") {
-		return false;
-	}
-	let Some(contents) = find_dotenv() else {
-		return true;
-	};
-	parse_dotenv(&contents)
-		.into_iter()
-		.filter(|(key, _)| env_var(key).is_none())
-		.for_each(|(key, value)| {
-			set_env(&key, &value);
-		});
-	true
-}
-
-/// The contents of the first `.env` found walking up from [`cwd`], `None` when no
-/// ancestor has one.
-fn find_dotenv() -> Option<SmolStr> {
-	std::path::PathBuf::from(cwd())
-		.ancestors()
-		.map(|dir| dir.join(".env"))
-		.find_map(|path| read_file(&path.to_string_lossy()))
-		.and_then(|bytes| String::from_utf8(bytes).ok())
-		.map(SmolStr::from)
-}
-
-/// Parse `.env` contents into `(key, value)` pairs: blank lines and `#` comments
-/// are skipped, a leading `export ` is dropped, and a value wrapped in matching
-/// single or double quotes is unwrapped. A line without a `=` is skipped.
-fn parse_dotenv(contents: &str) -> Vec<(SmolStr, SmolStr)> {
-	contents
-		.lines()
-		.map(str::trim)
-		.filter(|line| !line.is_empty() && !line.starts_with('#'))
-		.filter_map(|line| line.strip_prefix("export ").unwrap_or(line).split_once('='))
-		.map(|(key, value)| {
-			let value = value.trim();
-			let unquoted = ['"', '\'']
-				.into_iter()
-				.find(|quote| {
-					value.len() >= 2
-						&& value.starts_with(*quote)
-						&& value.ends_with(*quote)
-				})
-				.map(|_| &value[1..value.len() - 1])
-				.unwrap_or(value);
-			(SmolStr::from(key.trim()), SmolStr::from(unquoted))
-		})
-		.collect()
-}
+// There is deliberately no `load_dotenv` twin here: `env_ext::load_dotenv` reads
+// through `fs_ext` (ie the fs globals above) and writes through `set_env`, so one
+// implementation and one parser serve every platform.
 
 /// All environment variables as native `(key, value)` pairs, ie
 /// `Object.entries(Deno.env.toObject())`. Empty where unavailable.
@@ -573,24 +517,4 @@ mod test {
 		environment().xpect_eq(JsEnvironment::Deno);
 	}
 
-	// comments, blanks, `export`, quoting and `=` inside a value.
-	#[crate::test]
-	fn parses_dotenv() {
-		parse_dotenv(
-			"# a comment\n\nFOO=bar\nexport BAZZ='boo'\nBOOM=\"a b\"\nURL=http://x?a=b\nnot a pair\n",
-		)
-		.xpect_eq(vec![
-			(SmolStr::new("FOO"), SmolStr::new("bar")),
-			(SmolStr::new("BAZZ"), SmolStr::new("boo")),
-			(SmolStr::new("BOOM"), SmolStr::new("a b")),
-			(SmolStr::new("URL"), SmolStr::new("http://x?a=b")),
-		]);
-	}
-
-	// the runner is spawned inside the workspace, so the ancestor walk finds the
-	// same `.env` the deno host used to hand-load.
-	#[crate::test]
-	fn loads_dotenv() {
-		load_dotenv().xpect_true();
-	}
 }

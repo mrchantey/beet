@@ -81,7 +81,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 plus `tofu`, `cargo-zigbuild` and a container engine.
 -->
 <StartOnLoad {CliServer{always:true}}>
-<Router>
+<Router {HelpHandler}>
 	<Serve/>
 	<RunWasm/>
 	<BuildWasm/>

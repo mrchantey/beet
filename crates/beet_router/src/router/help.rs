@@ -515,50 +515,6 @@ mod test {
 			.xpect_contains("kind:single");
 	}
 
-	/// REGRESSION: a bare `Router` — the markup form, eg the beet cli's own
-	/// `main.bsx` — answers `--help` too, and a command's own `--help` lists that
-	/// command's params rather than running its action. [`HelpHandler`] used to be
-	/// spelled out by `Router::with_defaults` alone, so `beet build-wasm --help`
-	/// dispatched straight into the action's "--out is required" error.
-	#[beet_core::test]
-	async fn bare_router_scopes_help_to_a_command() {
-		#[derive(Reflect)]
-		#[allow(dead_code)]
-		struct BuildParams {
-			out: Option<String>,
-		}
-		/// Stands in for a command that errors without its required param.
-		#[action(handler_only)]
-		#[derive(Default, Clone, Component, Reflect)]
-		#[reflect(Component)]
-		async fn RequiresOut(_cx: ActionContext<RequestParts>) -> Result<String> {
-			bevybail!("--out is required")
-		}
-
-		let mut world = router_world();
-		let root = world
-			.spawn((Router, children![
-				(route::exchange("build", RequiresOut), ParamsPartial::new::<
-					BuildParams,
-				>()),
-				render_action::fixed_func_route(
-					"about",
-					|| rsx! { <p>"about"</p> }
-				),
-			]))
-			.flush();
-
-		// `unwrap_str` panics on a non-ok status, so reaching the body at all
-		// proves the help intercepted before the action ran.
-		help_body(&mut world, root, "build --help")
-			.await
-			.xpect_contains("/build")
-			.xpect_contains("out")
-			// scoped to the command: the sibling route is not listed
-			.xnot()
-			.xpect_contains("about");
-	}
-
 	#[beet_core::test]
 	async fn help_shows_input_output_types() {
 		let mut world = router_world();

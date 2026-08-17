@@ -14,7 +14,7 @@ use web_sys::ResizeObserverSize;
 
 /// Wrapper around [`ResizeObserver`] that monitors element size changes,
 /// removed on drop.
-pub(crate) struct ResizeListener {
+pub struct ResizeListener {
 	/// The underlying resize observer.
 	pub observer: ResizeObserver,
 	/// The callback closure invoked on resize events.
@@ -56,6 +56,12 @@ impl ResizeListener {
 		(width as u32, height as u32)
 	}
 	/// Creates a listener that automatically resizes a canvas to match its container.
+	///
+	/// This writes the canvas *backing store* (its `width`/`height` attributes), so
+	/// it must not be used on a canvas a graphics backend owns: wgpu re-writes both
+	/// on every surface configure and the two would fight. Reach for it only where
+	/// the drawing code reads the backing store rather than setting it (a 2d
+	/// context); see `wasm_canvas`, which syncs only the css display size.
 	pub fn resize_canvas(canvas: HtmlCanvasElement) -> Self {
 		let canvas2 = canvas.clone();
 		Self::new(canvas.unchecked_ref(), move |entry| {

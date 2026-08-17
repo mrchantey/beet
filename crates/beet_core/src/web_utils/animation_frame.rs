@@ -56,7 +56,7 @@ impl Drop for AnimationFrameInner {
 ///
 /// Use `.next().await` to wait for a single frame or iterate to process many, or
 /// call the convenience `next_frame()` method if you don't want to pull in `StreamExt`.
-pub(crate) struct AnimationFrame {
+pub struct AnimationFrame {
 	receiver: super::RecvStream<f64>,
 	// Keep scheduling alive and ensure cleanup on drop.
 	_inner: Rc<AnimationFrameInner>,
