@@ -146,12 +146,11 @@ impl DynamoStore {
 }
 
 /// Insert both erased store currencies: the [`BlobStore`] every provider gets,
-/// then (under `json`) the [`TableStore`] wrapping this provider directly, so
-/// its native document form wins over the json-over-blobs table the blob hook
-/// materializes.
+/// then the [`TableStore`] wrapping this provider directly, so its native
+/// document form wins over the json-over-blobs table the blob hook
+/// materializes under `json`.
 fn on_add_dynamo(mut world: DeferredWorld, cx: HookContext) {
 	BlobStore::on_add::<DynamoStore>(world.reborrow(), cx);
-	#[cfg(feature = "json")]
 	TableStore::on_add::<DynamoStore>(world, cx);
 }
 
@@ -378,10 +377,10 @@ impl BlobStoreProvider for DynamoStore {
 }
 
 /// Native document form: rows land as structured DynamoDB items (queryable
-/// attributes), not json blobs. The row document carries its own `id` attribute
-/// (the [`TableStoreRow`] contract), which is the primary key retrieval uses,
-/// so the `id` parameter is redundant on insert.
-#[cfg(feature = "json")]
+/// attributes), never json bytes, so this backend needs no `json` codec at
+/// all. The row document carries its own `id` attribute (the [`TableStoreRow`]
+/// contract), which is the primary key retrieval uses, so the `id` parameter
+/// is redundant on insert.
 impl TableProvider for DynamoStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
@@ -437,7 +436,6 @@ mod test {
 		let provider = DynamoStore::new("beet-test-table", "us-west-2");
 		store_test::run(provider).await;
 	}
-	#[cfg(feature = "json")]
 	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn table() {

@@ -58,13 +58,6 @@ impl LocalStorageStore {
 	}
 }
 
-#[cfg(feature = "json")]
-impl TableProvider for LocalStorageStore {
-	fn box_clone_table(&self) -> Box<dyn TableProvider> {
-		Box::new(self.clone())
-	}
-}
-
 impl BlobStoreProvider for LocalStorageStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 

@@ -12,20 +12,26 @@ pub struct AnalyticsStore {
 }
 
 impl AnalyticsStore {
-	/// The local analytics table at `dir`, the same store a dev server derives.
+	/// Create from a resolved typed table.
+	pub fn new(store: Table<AnalyticsEvent>) -> Self { Self { store } }
+
+	/// The local analytics store at `dir`, the same store a dev server derives.
 	/// Used by `beet analytics` to query without a scene.
-	pub fn local(dir: AbsPathBuf) -> Table<AnalyticsEvent> {
-		Table::new(FsStore::new(dir))
+	pub fn local(dir: AbsPathBuf) -> Self {
+		Self::new(Table::new(BlobStore::new(FsStore::new(dir))))
 	}
 
-	/// The remote (DynamoDB) analytics table at `table_name`, in `AWS_REGION`
+	/// The remote (DynamoDB) analytics store at `table_name`, in `AWS_REGION`
 	/// else `us-west-2`. Used by `beet analytics --remote` to query without a
 	/// scene; errors without the `aws_sdk` backend.
-	pub fn remote(table_name: &str) -> Result<Table<AnalyticsEvent>> {
+	pub fn remote(table_name: &str) -> Result<Self> {
 		cfg_if! {
 			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				Table::new(DynamoStore::new(table_name, DynamoStore::env_region()))
-					.xok()
+				Self::new(Table::new(DynamoStore::new(
+					table_name,
+					DynamoStore::env_region(),
+				)))
+				.xok()
 			} else {
 				let _ = table_name;
 				bevybail!("a remote analytics store requires the `aws_sdk` feature")
@@ -109,12 +115,7 @@ pub(super) fn spawn_store_on_config(
 			None => GeoIp::default(),
 		};
 		config_entity
-			.insert((
-				AnalyticsStore {
-					store: table_store.table(),
-				},
-				geoip,
-			))
+			.insert((AnalyticsStore::new(table_store.table()), geoip))
 			.await?;
 		Ok(())
 	});

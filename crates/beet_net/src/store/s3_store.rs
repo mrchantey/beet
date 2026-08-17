@@ -32,13 +32,6 @@ pub struct S3Store {
 	public: bool,
 }
 
-#[cfg(feature = "json")]
-impl TableProvider for S3Store {
-	fn box_clone_table(&self) -> Box<dyn TableProvider> {
-		Box::new(self.clone())
-	}
-}
-
 impl S3Store {
 	/// Create a new S3 store for the given bucket name and region.
 	pub fn new(

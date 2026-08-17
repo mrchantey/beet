@@ -12,9 +12,10 @@
 //!
 //! Use [`StorePlugin`] to register store types for world serialization.
 //! Concrete store types (like [`FsStore`], [`S3Store`]) are Components whose
-//! on_add hooks auto-insert the type-erased currencies: a [`BlobStore`], and
-//! (under `json`) a `TableStore`, so a consumer resolves either from the
-//! entity without naming a backend.
+//! on_add hooks auto-insert the type-erased currencies: a [`BlobStore`], and a
+//! `TableStore` (through the `json` blob adapter, or natively for a table
+//! backend like DynamoDB), so a consumer resolves either from the entity
+//! without naming a backend.
 //!
 //! # Example
 //!
@@ -49,7 +50,7 @@ pub use store_path::*;
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
-#[cfg(all(feature = "json", feature = "std"))]
+#[cfg(feature = "std")]
 mod table;
 #[cfg(feature = "template_serde")]
 mod template_store;
@@ -57,7 +58,7 @@ mod template_store;
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
-#[cfg(all(feature = "json", feature = "std"))]
+#[cfg(feature = "std")]
 pub use table::*;
 #[cfg(feature = "template_serde")]
 pub use template_store::*;

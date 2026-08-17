@@ -59,13 +59,6 @@ impl FsStore {
 	}
 }
 
-#[cfg(feature = "json")]
-impl TableProvider for FsStore {
-	fn box_clone_table(&self) -> Box<dyn TableProvider> {
-		Box::new(self.clone())
-	}
-}
-
 impl BlobStoreProvider for FsStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
