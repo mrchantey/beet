@@ -1,18 +1,18 @@
 use crate::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 use rand::SeedableRng;
 use rand::distr::Distribution;
 use rand::distr::StandardUniform;
 use rand::distr::uniform::SampleRange;
 use rand::distr::uniform::SampleUniform;
-use rand_chacha::ChaCha8Rng;
+use rand::rngs::ChaCha8Rng;
 
 /// A simple random source, by default retrieved from entropy.
 ///
 /// Enable the `bevy` feature to derive [Resource](bevy::prelude::Resource)
 /// ```rust
 /// # use beet_core::prelude::*;
-/// # use rand::Rng;
+/// # use rand::RngExt;
 ///
 /// // defaults to from entropy
 /// let mut source = RandomSource::default();
@@ -41,24 +41,17 @@ impl RandomSource {
 
 impl Default for RandomSource {
 	fn default() -> Self {
-		cfg_if! {
-			if #[cfg(feature = "std")] {
-				// std: seed from the thread-local entropy generator.
-				Self(ChaCha8Rng::from_rng(&mut rand::rng()))
-			} else {
-				// no_std (eg bare embedded): seed from the platform entropy
-				// source via getrandom's `os_rng`. On targets without a built-in
-				// getrandom backend the downstream adapter must supply one (eg
-				// the esp32 custom backend over the hardware RNG).
-				Self(ChaCha8Rng::from_os_rng())
-			}
-		}
+		// std seeds from the thread-local entropy generator, no_std (eg bare
+		// embedded) from the platform entropy source via getrandom's `sys_rng`.
+		// On targets without a built-in getrandom backend the downstream adapter
+		// must supply one (eg the esp32 custom backend over the hardware RNG).
+		Self(rand::make_rng())
 	}
 }
 
-/// save the `use rand::Rng` shenannigans
+/// save the `use rand::RngExt` shenanigans
 impl RandomSource {
-	/// see [Rng::random]
+	/// see [RngExt::random]
 	pub fn random<T>(&mut self) -> T
 	where
 		StandardUniform: Distribution<T>,
@@ -66,7 +59,7 @@ impl RandomSource {
 		self.0.random()
 	}
 
-	/// see [Rng::random_iter]
+	/// see [RngExt::random_iter]
 	pub fn random_iter<T>(
 		self,
 	) -> rand::distr::Iter<StandardUniform, ChaCha8Rng, T>
@@ -77,7 +70,7 @@ impl RandomSource {
 		self.0.random_iter()
 	}
 
-	/// see [Rng::random_range]
+	/// see [RngExt::random_range]
 	pub fn random_range<T, R>(&mut self, range: R) -> T
 	where
 		T: SampleUniform,
@@ -86,20 +79,20 @@ impl RandomSource {
 		self.0.random_range(range)
 	}
 
-	/// see [Rng::random_bool]
+	/// see [RngExt::random_bool]
 	pub fn random_bool(&mut self, p: f64) -> bool { self.0.random_bool(p) }
 
-	/// see [Rng::random_ratio]
+	/// see [RngExt::random_ratio]
 	pub fn random_ratio(&mut self, numerator: u32, denominator: u32) -> bool {
 		self.0.random_ratio(numerator, denominator)
 	}
 
-	/// see [Rng::sample]
+	/// see [RngExt::sample]
 	pub fn sample<T, D: Distribution<T>>(&mut self, distr: D) -> T {
 		self.0.sample(distr)
 	}
 
-	/// see [Rng::sample_iter]
+	/// see [RngExt::sample_iter]
 	pub fn sample_iter<T, D>(
 		self,
 		distr: D,
@@ -111,10 +104,8 @@ impl RandomSource {
 		self.0.sample_iter(distr)
 	}
 
-	/// see [Rng::fill]
-	pub fn fill<T: rand::Fill + ?Sized>(&mut self, dest: &mut T) {
-		self.0.fill(dest)
-	}
+	/// see [RngExt::fill]
+	pub fn fill<T: rand::Fill>(&mut self, dest: &mut [T]) { self.0.fill(dest) }
 }
 
 #[cfg(test)]

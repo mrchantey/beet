@@ -99,8 +99,13 @@ impl GeoIpDb {
 	/// Looks up the country for `ip`, copying its iso code out of the borrowed
 	/// record. A missing record (ip not in the database) yields `None`.
 	fn country(&self, ip: IpAddr) -> Option<SmolStr> {
-		let country: maxminddb::geoip2::Country = self.reader.lookup(ip).ok()?;
-		country.country?.iso_code.map(SmolStr::from)
+		let country = self
+			.reader
+			.lookup(ip)
+			.ok()?
+			.decode::<maxminddb::geoip2::Country>()
+			.ok()??;
+		country.country.iso_code.map(SmolStr::from)
 	}
 }
 

@@ -10,7 +10,7 @@ pub(crate) fn wander_impulse(
 	velocity: &Velocity,
 	wander: &mut Wander,
 	max_speed: MaxSpeed,
-	rng: &mut impl Rng,
+	rng: &mut impl RngExt,
 ) -> Impulse {
 	let inner_delta = Vec3::random_in_sphere(rng) * wander.inner_radius;
 	// for the first iteration, last_local_target is Vec3::ZERO, this is

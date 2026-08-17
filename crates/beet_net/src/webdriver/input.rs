@@ -156,7 +156,6 @@ impl Page {
 #[cfg(test)]
 mod test {
 	use crate::webdriver::test_fixtures;
-	use beet_core::prelude::*;
 	use bevy::input::keyboard::Key;
 
 	#[beet_core::test(timeout_ms = 30_000)]

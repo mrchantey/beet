@@ -57,7 +57,7 @@ impl<S: RlSessionTypes> QTrainer for QTableTrainer<S>
 where
 	S::State: Clone,
 {
-	fn train(&mut self, rng: &mut impl Rng) {
+	fn train(&mut self, rng: &mut impl RngExt) {
 		let params = &self.params;
 
 		for episode in 0..params.n_training_episodes {

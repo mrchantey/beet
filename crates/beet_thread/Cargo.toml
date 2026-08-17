@@ -37,7 +37,7 @@ beet_action = { workspace = true, optional = true, features = ["std", "reflect",
 beet_ui = { workspace = true, optional = true, features = ["tui", "template", "json"] }
 bevy.workspace = true
 uuid = { workspace = true, features = ["std", "v7", "js"] }
-async-openai = { version = "0.34", optional=true, default-features=false, features=["chat-completion-types"] }
+async-openai = { version = "0.41", optional=true, default-features=false, features=["chat-completion-types"] }
 serde.workspace = true
 futures.workspace = true
 strum.workspace = true

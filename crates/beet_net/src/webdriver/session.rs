@@ -338,7 +338,6 @@ impl Session {
 #[cfg(test)]
 mod test {
 	use crate::webdriver::*;
-	use beet_core::prelude::*;
 
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]

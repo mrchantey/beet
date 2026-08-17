@@ -72,6 +72,6 @@ pub trait StateSpace: DiscreteSpace {}
 impl<T: DiscreteSpace> StateSpace for T {}
 
 pub trait ActionSpace: DiscreteSpace + Default {
-	fn sample(rng: &mut impl Rng) -> Self;
+	fn sample(rng: &mut impl RngExt) -> Self;
 }
 // impl<T: DiscreteSpace + TryFrom<usize>> ActionSpace for T {}

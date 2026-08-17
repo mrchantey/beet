@@ -151,20 +151,24 @@ itertools = { version = "0.14", default-features = false }
 # default-features off (drops `std`) so dependents can compile on no_std;
 # std consumers re-add `uuid/std`. `js`/`rng-getrandom` backends are opt-in per crate.
 uuid = { version = "1", default-features = false }
-chrono = "0.4"
-# default-features off (drops `std`, `std_rng`, `thread_rng`) so dependents can
-# compile on no_std; std consumers re-add the relevant features.
-rand = { version = "0.9", default-features = false }
-rand_chacha = { version = "0.9", default-features = false }
+# default-features off (drops `std`, `std_rng`, `sys_rng`, `thread_rng`) so
+# dependents can compile on no_std; std consumers re-add the relevant features.
+# 0.10 is the version bevy pulls (via `bevy_math`/`glam`) and russh requires, and
+# it re-exports the ChaCha rngs under its `chacha` feature, so no separate
+# `rand_chacha` rides the graph.
+rand = { version = "0.10", default-features = false }
 # Two getrandom majors are in the graph at once, reached by different crates, and
 # neither has a wasm backend unless `wasm_js` is on (the wasm rustflags select that
 # backend unconditionally, see `.cargo/config.toml`). `wasm_js` is ignored natively.
 # The current major is the plain key; the older one is aliased, so a crate opts in
 # to whichever its own dependencies actually pull.
-# 0.4: reached through `rand` 0.10, which `bevy_math` pulls under `bevy/default`.
+# 0.4: reached through `rand` 0.10 — beet's own `rand` feature, and `bevy_math`
+# under `bevy/default`.
 getrandom = { version = "0.4", features = ["wasm_js"] }
-# 0.3: reached through ahash, async-openai, tokenizers and `rand` 0.9 (beet_core's
-# `rand` feature). uuid stays on its own `js` backend rather than either of these.
+# 0.3: no beet crate asks for it directly, it is reached through ahash (which
+# `material-colors` and the ml stack pull) and tokenizers. beet_core declares it on
+# wasm purely to switch that backend on. uuid stays on its own `js` backend rather
+# than either of these.
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
 webbrowser = "1"
@@ -173,7 +177,7 @@ webbrowser = "1"
 log = "0.4"
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-pretty_env_logger = "0.4"
+pretty_env_logger = "0.5"
 
 #💡 async
 futures = "0.3"
@@ -185,12 +189,18 @@ async-channel = "2"
 async-executor = "1"
 async-fs = "2"
 async-io = "2"
-futures-io = "0.3"
 async-lock = "3"
 async-process = "2"
 async-task = "4"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
-russh = { version = "0.60", default-features = false }
+# default-features off to drop russh's `aws-lc-rs` backend: beet_net selects the
+# pure-rust `ring` one instead (aws-lc-rs needs a C/cmake toolchain, which the
+# zigbuild cross-compile has no cross system library for), keeping only the
+# compression and rsa key defaults.
+russh = { version = "0.62", default-features = false, features = [
+	"flate2",
+	"rsa",
+] }
 
 #💡 macros
 
@@ -206,8 +216,8 @@ proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
 #💡 attributes
-strum = { version = "0.26", default-features = false, features = ["derive"] }
-strum_macros = "0.26"
+strum = { version = "0.28", default-features = false, features = ["derive"] }
+strum_macros = "0.28"
 extend = "1"
 
 #💡 io
@@ -226,12 +236,13 @@ postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
-sha2 = "0.10"
+sha2 = "0.11"
 # SHA-1 for the websocket `Sec-WebSocket-Accept` handshake (RFC 6455). no_std by
 # default; the digest API works on alloc, so consumers need not re-enable `std`.
-sha1 = { version = "0.10", default-features = false }
-ron = "0.8"
-toml = "0.8"
+sha1 = { version = "0.11", default-features = false }
+# 0.12 is the version `bevy_asset` pulls. no_std by default; std consumers
+# re-enable `ron/std` (eg via `beet_core/std`).
+ron = { version = "0.12", default-features = false }
 
 #💡 http
 http = "1"
@@ -239,7 +250,6 @@ http-body-util = "0.1"
 
 #💡 tui
 vte = "0.15.0"
-termion = { version = "4" }
 crossterm = { version = "0.29" }
 
 #💡 web

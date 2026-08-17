@@ -80,7 +80,9 @@ fn lambda_to_request(lambda_req: lambda_http::Request) -> Result<Request> {
 		lambda_http::Body::Empty => Body::default(),
 		lambda_http::Body::Text(text) => Body::Bytes(Bytes::from(text)),
 		lambda_http::Body::Binary(binary) => Body::Bytes(Bytes::from(binary)),
-		// Request streaming not supported in lambda
+		// Request streaming not supported in lambda; `Body` is non_exhaustive,
+		// so an unknown future variant reads as an empty body rather than a panic.
+		_ => Body::default(),
 	};
 
 	Ok(Request::from_parts(parts.into(), body))

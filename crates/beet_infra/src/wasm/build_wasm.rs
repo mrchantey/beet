@@ -175,7 +175,6 @@ pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use beet_core::prelude::*;
 
 	/// REGRESSION: required components yield to explicit ones and nothing
 	/// asserts a provider on [`PathPartial`], so an explicit spread overrides

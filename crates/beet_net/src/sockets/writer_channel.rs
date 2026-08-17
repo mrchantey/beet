@@ -119,7 +119,6 @@ impl<T> Receiver<T> {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 	use beet_core::prelude::*;
 
 	#[beet_core::test]

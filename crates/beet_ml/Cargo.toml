@@ -30,9 +30,9 @@ beet_spatial = { workspace = true, optional = true, features = ["std"] }
 
 bevy = { workspace = true, features = ["bevy_asset"] }
 
-burn = { version = "0.21.0-pre.4", default-features = false, features = ["std"] }
-burn-store = { version = "0.21.0-pre.4", default-features = false, features = ["std", "safetensors"] }
-tokenizers = { version = "0.22", default-features = false, features = ["unstable_wasm"] }
+burn = { version = "0.21", default-features = false, features = ["std"] }
+burn-store = { version = "0.21", default-features = false, features = ["std", "safetensors"] }
+tokenizers = { version = "0.23", default-features = false, features = ["unstable_wasm"] }
 
 futures.workspace = true
 log.workspace = true

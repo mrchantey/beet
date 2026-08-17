@@ -207,7 +207,9 @@ beet = { workspace = true, features = [
 ] }
 # `export-pdf` merges the per-page PDFs a headless browser prints into one
 # document; pulled only by the `pdf` feature.
-lopdf = { version = "0.36", optional = true }
+# default-features off: the merge only needs the document model, not lopdf's
+# date/rayon surface (whose `time` path does not compile against current `time`).
+lopdf = { version = "0.44", optional = true, default-features = false }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }
 

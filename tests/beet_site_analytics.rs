@@ -13,7 +13,7 @@ use beet::prelude::*;
 /// An analytics store seeded with one prior event (to prove new events are added,
 /// not a fresh store), returned alongside its prior event's id.
 async fn seeded_store() -> (AnalyticsStore, Uuid) {
-	let store = TableStore::<AnalyticsEvent>::temp();
+	let store = TableStore::temp().table::<AnalyticsEvent>();
 	let prior = AnalyticsEvent::new("/old", AnalyticsEventData::PageView {
 		duration_ms: 500,
 		referrer: None,
@@ -23,7 +23,7 @@ async fn seeded_store() -> (AnalyticsStore, Uuid) {
 	.with_client_kind(ClientKind::Web);
 	let prior_id = prior.id;
 	store.push(prior).await.unwrap();
-	(AnalyticsStore { store }, prior_id)
+	(AnalyticsStore::new(store), prior_id)
 }
 
 /// A router with analytics enabled over `store`, plus one content route.

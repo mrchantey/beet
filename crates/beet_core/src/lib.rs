@@ -289,7 +289,7 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::dir;
 	#[cfg(feature = "rand")]
-	pub use rand::Rng;
+	pub use rand::RngExt;
 }
 
 /// Re-exports of external crates used by beet.

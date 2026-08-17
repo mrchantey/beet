@@ -6,6 +6,7 @@ use russh::Channel;
 use russh::ChannelId;
 use russh::keys::PrivateKey;
 use russh::server::Auth;
+use russh::server::ChannelOpenHandle;
 use russh::server::Msg;
 use russh::server::Server as RusshServer;
 use russh::server::Session;
@@ -257,8 +258,9 @@ impl russh::server::Handler for BeetSshHandler {
 	async fn channel_open_session(
 		&mut self,
 		channel: Channel<Msg>,
+		reply: ChannelOpenHandle,
 		session: &mut Session,
-	) -> std::result::Result<bool, Self::Error> {
+	) -> std::result::Result<(), Self::Error> {
 		let (to_client_tx, to_client_rx) =
 			async_channel::unbounded::<SshEvent>();
 		let (from_client_tx, from_client_rx) =
@@ -308,7 +310,9 @@ impl russh::server::Handler for BeetSshHandler {
 				russh::Error::Disconnect
 			})?;
 
-		Ok(true)
+		// dropping the handle instead would reject the channel.
+		reply.accept().await;
+		Ok(())
 	}
 
 	async fn auth_none(

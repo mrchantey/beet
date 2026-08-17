@@ -8,7 +8,7 @@ pub trait QPolicy: 'static + Send + Sync {
 	fn step(
 		&mut self,
 		params: &QLearnParams,
-		rng: &mut impl Rng,
+		rng: &mut impl RngExt,
 		epsilon: f32,
 		action: &Self::Action,
 		state: &Self::State,
@@ -47,7 +47,7 @@ pub trait QPolicy: 'static + Send + Sync {
 		&self,
 		state: &Self::State,
 		epsilon: f32,
-		rng: &mut impl Rng,
+		rng: &mut impl RngExt,
 	) -> (Self::Action, QValue) {
 		let random_num: f32 = rng.random(); // generates a float between 0 and 1
 		if random_num > epsilon {
