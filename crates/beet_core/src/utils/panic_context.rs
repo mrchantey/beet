@@ -125,7 +125,9 @@ impl PanicContext {
 		let prev_scope = IN_SCOPE.with(|in_scope| in_scope.get());
 		IN_SCOPE.with(|in_scope| in_scope.set(true));
 		// 2. run function, normalizing the error to a fallback payload: the js
-		// catch yields none, the native unwind carries the panic payload itself
+		// catch yields none, the native unwind carries the panic payload itself.
+		// the wasm branch is interim until wasm can unwind; see the sunset note
+		// on `js_runtime::catch_no_abort`
 		#[cfg(target_arch = "wasm32")]
 		let result = {
 			let mut poll_result = None;

@@ -432,6 +432,15 @@ fn js_strings(array: &js_sys::Array) -> Vec<SmolStr> {
 /// host has no `catch_no_abort_inner` global the function is run directly (a
 /// panic then traps, as there is no JS frame to catch it).
 ///
+/// ## Sunset
+/// This is an interim shim for wasm's lack of unwinding. Once Rust ships
+/// `catch_unwind` on wasm32 (`panic=unwind` via the Wasm exception-handling
+/// proposal, already shipped in browsers), delete this whole mechanism: this
+/// fn, the `catch_no_abort_inner` host globals (deno.ts / browser.js), the
+/// wasm branch of `PanicContext::catch_poll`, and the catch wrapper in
+/// `tick_bridge_executor` — the native `catch_unwind` paths then cover wasm.
+/// The escape-buffer attribution design is platform-independent and stays.
+///
 /// Returns `Ok(Ok(()))` on success, `Ok(Err(msg))` if the function returned
 /// an error string, or `Err(())` if a panic occurred.
 pub fn catch_no_abort(

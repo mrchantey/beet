@@ -205,7 +205,8 @@ thread_local! {
 /// rest of the queue to the next tick, mirroring the native `catch_unwind` in
 /// `run_async_task_inner`, and buffers the escape for timeout reports. Hosts
 /// without a JS catch frame (a production browser app) run the loop directly
-/// and keep the trap.
+/// and keep the trap. Interim until wasm can unwind; see the sunset note on
+/// [`js_runtime::catch_no_abort`].
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub(crate) fn tick_bridge_executor() {
 	BRIDGE_EXECUTOR.with(|exec| {
