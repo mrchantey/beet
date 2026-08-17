@@ -6,7 +6,9 @@
 mod connect_webrtc;
 mod realtime_api;
 #[cfg(target_arch = "wasm32")]
-pub(self) use connect_webrtc::*;
+pub use connect_webrtc::RealtimeConnection;
+#[cfg(target_arch = "wasm32")]
+pub(self) use connect_webrtc::connect_webrtc;
 pub use realtime_api::*;
 mod types;
 pub use types::*;

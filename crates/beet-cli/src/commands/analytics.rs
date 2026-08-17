@@ -32,24 +32,21 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
 
 	// build the store: a local FsStore directory, or the cloud store with
-	// `--remote` (the same `TableStore::dynamo_fs_selector` a running server uses).
-	let dir = match parts.get_param("dir") {
-		Some(dir) => AbsPathBuf::new(dir)?,
-		None => WorkspaceConfig::default().analytics_dir.into_abs(),
-	};
-	let access = if parts.has_param("remote") {
-		ServiceAccess::Remote
+	// `--remote` (the same backends a running server derives).
+	let store = if parts.has_param("remote") {
+		let Some(bucket) = parts.get_param("bucket") else {
+			bevybail!(
+				"`--remote` requires `--bucket <table-name>`, ie `my-app--prod--analytics`"
+			);
+		};
+		AnalyticsStore::remote(bucket)?
 	} else {
-		ServiceAccess::Local
+		let dir = match parts.get_param("dir") {
+			Some(dir) => AbsPathBuf::new(dir)?,
+			None => WorkspaceConfig::default().analytics_dir.into_abs(),
+		};
+		AnalyticsStore::local(dir)
 	};
-	let bucket = parts.get_param("bucket").unwrap_or("beet--analytics");
-	let store = TableStore::<AnalyticsEvent>::dynamo_fs_selector(
-		&dir,
-		bucket,
-		"us-west-2",
-		access,
-	)
-	.await;
 
 	// a store that was never written to (no analytics collected yet) reads as
 	// empty rather than an error, so the command works on a fresh site. The

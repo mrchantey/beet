@@ -2,9 +2,6 @@
 //! [`Document`] and rendered as a scrollable, keyed list of posts.
 
 use crate::prelude::*;
-// `Table::id()` on a `Post` (via `PostView`'s deref); the `beet_ui` glob below
-// otherwise shadows the prelude re-export of this trait.
-use crate::table::Table;
 use beet_core::prelude::*;
 // `ScrollPosition` is beet_ui's renderer-agnostic type; pin it explicitly so it wins
 // over bevy's same-named ui type (reached via `beet_core::prelude` under

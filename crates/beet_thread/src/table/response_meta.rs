@@ -20,7 +20,7 @@ pub struct ResponseMeta {
 	pub response_stored: bool,
 }
 
-impl Table for ResponseMeta {
+impl ThreadRecord for ResponseMeta {
 	type Id = PostId;
 	fn id(&self) -> Self::Id { self.post_id }
 }

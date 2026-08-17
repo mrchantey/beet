@@ -141,10 +141,11 @@ pub fn AssetsBucket() -> impl Bundle {
 }
 
 /// `<AnalyticsTable/>` — the DynamoDB table backing the analytics store's remote
-/// mode (`<app>--<stage>--analytics`, keyed by the event `id`). The deployed
-/// binary reaches it via `BEET_ANALYTICS_TABLE` (set by [`FargateBeetSiteBlock`]),
-/// so the created name and the runtime name agree. Resolves its [`Stack`] by
-/// ancestry.
+/// mode (`<app>--<stage>--analytics`, keyed by the event `id`). Nothing is
+/// delivered to the runtime: both sides derive the same name by convention
+/// (the deploy via `stack.resource_ident("analytics")`, the running binary via
+/// [`PackageConfig::resource_name`]), pinned by [`analytics_names_agree`].
+/// Resolves its [`Stack`] by ancestry.
 #[template]
 pub fn AnalyticsTable() -> impl Bundle { DynamoTableBlock::new("analytics") }
 
@@ -339,8 +340,6 @@ pub fn FargateBeetSiteBlock(
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
 	let app_bucket = infra_ext::app_bucket_name(&stack);
-	// the analytics DynamoDB table name, the same value `<AnalyticsTable/>` creates.
-	let analytics_table = DynamoTableBlock::new("analytics").table_name(&stack);
 	let block = FargateBlock::default()
 		.with_allow_ssh(true)
 		.with_max_count(5)
@@ -353,7 +352,6 @@ pub fn FargateBeetSiteBlock(
 			store: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
 			server: Some(ServerFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
-			analytics_table: Some(analytics_table.into()),
 			..default()
 		})
 		// private key material: its own channel, so no renderer can ever put it
@@ -445,6 +443,23 @@ mod test {
 			))
 			.unwrap();
 		world.flush();
+	}
+
+	/// The runtime derives the analytics table name
+	/// ([`PackageConfig::resource_name`]) that the deploy creates
+	/// (`stack.resource_ident("analytics")`): nothing is delivered between them,
+	/// so this pins the two conventions together. Both read the stage from the
+	/// same [`BootstrapConfig`], so agreement holds for any stage.
+	#[beet_core::test]
+	fn analytics_names_agree() {
+		let stack = infra_ext::stack("beet-site");
+		let pkg = PackageConfig {
+			binary_name: Some("beet-site".into()),
+			..default()
+		};
+		DynamoTableBlock::new("analytics")
+			.table_name(&stack)
+			.xpect_eq(pkg.resource_name("analytics"));
 	}
 
 	/// The `shared`-stage host, the shape `main.bsx` declares: its verb routes

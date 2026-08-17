@@ -1,6 +1,4 @@
 use crate::prelude::*;
-// `Table::id()` on the records; the `beet_net` glob otherwise shadows it.
-use crate::table::Table;
 use async_lock::Mutex;
 use beet_core::prelude::*;
 use beet_net::prelude::*;

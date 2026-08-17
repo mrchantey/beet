@@ -8,7 +8,9 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use uuid::Uuid;
 
-pub trait Table: 'static + Send + Sync + Sized {
+/// A record in a thread store ([`Thread`], [`Actor`], [`Post`], ..), keyed by
+/// its typed [`TableId`].
+pub trait ThreadRecord: 'static + Send + Sync + Sized {
 	type Id: TableId;
 	fn id(&self) -> Self::Id;
 }
@@ -140,23 +142,20 @@ impl<M> std::fmt::Display for Uuid7<M> {
 	}
 }
 
-/// In-memory collection of tables, mapped by their id.
+/// In-memory collection of records, mapped by their id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TableMap<T: Table>(HashMap<T::Id, T>);
+pub struct TableMap<T: ThreadRecord>(HashMap<T::Id, T>);
 
-impl<T: Table> Default for TableMap<T> {
+impl<T: ThreadRecord> Default for TableMap<T> {
 	fn default() -> Self { Self::new() }
 }
 
-impl<T: Table> TableMap<T> {
+impl<T: ThreadRecord> TableMap<T> {
 	pub fn new() -> Self { Self(HashMap::new()) }
 	pub fn contains_key(&self, id: T::Id) -> bool { self.0.contains_key(&id) }
-	pub fn insert(&mut self, table: T) -> T::Id
-	where
-		T: Table,
-	{
-		let id = table.id();
-		self.0.insert(id.clone(), table);
+	pub fn insert(&mut self, record: T) -> T::Id {
+		let id = record.id();
+		self.0.insert(id.clone(), record);
 		id
 	}
 	#[track_caller]

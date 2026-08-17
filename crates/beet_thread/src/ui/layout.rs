@@ -96,9 +96,6 @@ fn page_column() -> impl Bundle {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	// `Thread::id()` / `Actor::id()` / `Actor::kind()` come from this trait; the
-	// `beet_ui` glob below otherwise shadows the prelude re-export.
-	use crate::table::Table;
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_router::prelude::*;

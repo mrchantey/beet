@@ -24,7 +24,7 @@ pub struct Actor {
 	metadata: Map,
 }
 
-impl Table for Actor {
+impl ThreadRecord for Actor {
 	type Id = ActorId;
 	fn id(&self) -> Self::Id { self.id }
 }

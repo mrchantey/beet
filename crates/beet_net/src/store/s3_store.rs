@@ -33,8 +33,8 @@ pub struct S3Store {
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for S3Store {
-	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+impl TableProvider for S3Store {
+	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 }

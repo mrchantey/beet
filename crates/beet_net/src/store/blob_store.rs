@@ -178,10 +178,17 @@ impl BlobStore {
 	) {
 		match world.entity(cx.entity).get_or_else::<T>().cloned() {
 			Ok(provider) => {
+				let store = BlobStore::new(provider);
+				// any blob store backs a table (json rows keyed by id), so the
+				// erased [`TableStore`] currency lands on every store entity; a
+				// table-native provider's own [`TableStore::on_add`] runs after
+				// and overrides it.
+				#[cfg(all(feature = "json", feature = "std"))]
 				world
 					.commands()
 					.entity(cx.entity)
-					.insert(BlobStore::new(provider));
+					.insert(TableStore::new(store.clone()));
+				world.commands().entity(cx.entity).insert(store);
 			}
 			Err(err) => {
 				world.fallback_error_handler()(err, ErrorContext::Command {

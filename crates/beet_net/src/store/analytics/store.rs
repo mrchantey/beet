@@ -3,19 +3,46 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-// TODO this should be from beet_infra
-const DEFAULT_REGION: &str = "us-west-2";
-
-/// Component holding the analytics storage table, spawned on the
-/// [`AnalyticsConfig`] entity.
+/// Component holding the analytics table, spawned on the [`AnalyticsConfig`]
+/// entity.
 #[derive(Clone, Deref, DerefMut, Component)]
 pub struct AnalyticsStore {
-	/// The underlying table store for analytics events.
-	pub store: TableStore<AnalyticsEvent>,
+	/// The typed view over the resolved store entity's [`TableStore`].
+	pub store: Table<AnalyticsEvent>,
 }
 
-/// Observer: on an [`AnalyticsConfig`] insertion, create the [`AnalyticsStore`]
-/// and (under `geoip`) the country database, both on the config's own entity.
+impl AnalyticsStore {
+	/// The local analytics table at `dir`, the same store a dev server derives.
+	/// Used by `beet analytics` to query without a scene.
+	pub fn local(dir: AbsPathBuf) -> Table<AnalyticsEvent> {
+		Table::new(FsStore::new(dir))
+	}
+
+	/// The remote (DynamoDB) analytics table at `table_name`, in `AWS_REGION`
+	/// else `us-west-2`. Used by `beet analytics --remote` to query without a
+	/// scene; errors without the `aws_sdk` backend.
+	pub fn remote(table_name: &str) -> Result<Table<AnalyticsEvent>> {
+		cfg_if! {
+			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+				Table::new(DynamoStore::new(table_name, DynamoStore::env_region()))
+					.xok()
+			} else {
+				let _ = table_name;
+				bevybail!("a remote analytics store requires the `aws_sdk` feature")
+			}
+		}
+	}
+}
+
+/// Observer: on an [`AnalyticsConfig`] insertion, resolve the analytics store
+/// entity and insert the [`AnalyticsStore`] and (under `geoip`) the country
+/// database on the config's own entity.
+///
+/// Entity-first: [`AnalyticsConfig::store`] names an entity whose [`TableStore`]
+/// backs the analytics table (any store provider component materializes one),
+/// so any [`TableProvider`] backend plugs in without analytics naming it.
+/// `None` spawns a convention-derived child store entity, resolved through the
+/// same path.
 ///
 /// Config-triggered rather than a startup system so it is inert until analytics
 /// is switched on, and so it works whenever the config lands (markup scenes
@@ -32,42 +59,47 @@ pub(super) fn spawn_store_on_config(
 	}
 	let entity = ev.entity;
 	commands.run(async move |world| {
-		let entity = world.entity(entity);
+		let config_entity = world.entity(entity);
 		// guard against a racing second insertion creating it first.
-		if entity.get::<AnalyticsStore, _>(|_| ()).await.is_ok() {
+		if config_entity.get::<AnalyticsStore, _>(|_| ()).await.is_ok() {
 			return Ok(());
 		}
-		// read the backend config now (the scene has settled), defaulting when a
-		// PackageConfig/WorkspaceConfig was not inserted.
-		let (fs_dir, table_name) = world
-			.with(|world: &mut World| {
-				let ws = world
-					.get_resource::<WorkspaceConfig>()
-					.cloned()
-					.unwrap_or_default();
-				let pkg = world
-					.get_resource::<PackageConfig>()
-					.cloned()
-					.unwrap_or_default();
-				// the remote table name is the deploy-provided `--analytics-table`
-				// / `BEET_ANALYTICS_TABLE`, so the deploy owns the name; the
-				// package-derived name is the fallback for a self-named build.
-				let table_name = BootstrapConfig::get()
-					.analytics_table
-					.as_deref()
-					.map(str::to_string)
-					.unwrap_or_else(|| pkg.analytics_bucket_name());
-				(ws.analytics_dir.into_abs(), table_name)
-			})
-			.await;
-		let access = BootstrapConfig::get().service_access;
-		let store =
-			TableStore::dynamo_fs_selector(&fs_dir, &table_name, DEFAULT_REGION, access)
-				.await;
+		// resolve the store entity: the configured reference, else a child
+		// spawned with the convention-derived provider component.
+		let target = config_entity
+			.get::<AnalyticsConfig, _>(|config| config.store)
+			.await?;
+		let target = match target {
+			Some(target) => target,
+			None => {
+				world
+					.with(move |world: &mut World| {
+						derived_store_entity(world, entity)
+					})
+					.await
+			}
+		};
+		// the provider hooks insert the TableStore through the command queue,
+		// so give it a settle window before erroring.
+		let mut backoff = Backoff::default().with_max_attempts(5).stream();
+		let table_store = loop {
+			if let Ok(store) = world
+				.entity(target)
+				.get::<TableStore, _>(|store| store.clone())
+				.await
+			{
+				break store;
+			}
+			if backoff.next().await.is_none() {
+				bevybail!(
+					"analytics store entity {target} has no TableStore: insert a store provider component, ie `<FsStore/>`"
+				);
+			}
+		};
 		// the offline country database rides the app's own store (the checkout in
 		// dev, the app bucket when deployed), resolved like any other tree
 		// consumer. Best-effort: no store, or no blob, just disables lookups.
-		let blobs = entity
+		let blobs = config_entity
 			.with_state::<AncestorQuery<&BlobStore>, _>(|entity, stores| {
 				stores.get(entity).cloned().ok()
 			})
@@ -76,9 +108,55 @@ pub(super) fn spawn_store_on_config(
 			Some(blobs) => GeoIp::load(&blobs).await,
 			None => GeoIp::default(),
 		};
-		entity.insert((AnalyticsStore { store }, geoip)).await?;
+		config_entity
+			.insert((
+				AnalyticsStore {
+					store: table_store.table(),
+				},
+				geoip,
+			))
+			.await?;
 		Ok(())
 	});
+}
+
+/// Spawn the convention-derived analytics store entity as a child of the
+/// config entity: a local run writes [`WorkspaceConfig::analytics_dir`]; a
+/// deployed ([`ServiceAccess::Remote`]) process uses the
+/// `<app>--<stage>--analytics` DynamoDB table the deploy also derives
+/// ([`PackageConfig::resource_name`]), in `AWS_REGION` else `us-west-2`.
+/// Remote without the `aws_sdk` backend falls back to the local directory.
+fn derived_store_entity(world: &mut World, config_entity: Entity) -> Entity {
+	let access = BootstrapConfig::get().service_access;
+	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+	if access == ServiceAccess::Remote {
+		let table_name = world
+			.get_resource::<PackageConfig>()
+			.cloned()
+			.unwrap_or_default()
+			.analytics_bucket_name();
+		return world
+			.spawn((
+				ChildOf(config_entity),
+				DynamoStore::new(table_name, DynamoStore::env_region()),
+			))
+			.id();
+	}
+	#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
+	if access == ServiceAccess::Remote {
+		debug!(
+			"analytics: no `aws_sdk` backend, a remote store falls back to the local directory"
+		);
+	}
+	let dir = world
+		.get_resource::<WorkspaceConfig>()
+		.cloned()
+		.unwrap_or_default()
+		.analytics_dir
+		.into_abs();
+	world
+		.spawn((ChildOf(config_entity), FsStore::new(dir)))
+		.id()
 }
 
 /// Observer: persist a triggered [`AnalyticsEvent`] to every [`AnalyticsStore`].
@@ -112,7 +190,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn event_roundtrips_through_store() {
-		let store = TableStore::<AnalyticsEvent>::temp();
+		let store = Table::<AnalyticsEvent>::temp();
 		let event = AnalyticsEvent::new("/about", AnalyticsEventData::Request {
 			status: 200,
 			method: "GET".into(),
@@ -127,7 +205,8 @@ mod test {
 	}
 
 	/// The config's own entity carries the store and the geoip component, so
-	/// consumers resolve them by ancestry rather than as globals.
+	/// consumers resolve them by ancestry rather than as globals, and the
+	/// convention-derived store entity is spawned as its child.
 	#[beet_core::test]
 	async fn config_entity_carries_the_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
@@ -135,5 +214,50 @@ mod test {
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world.entity(entity).contains::<AnalyticsStore>().xpect_true();
 		world.entity(entity).contains::<GeoIp>().xpect_true();
+		world
+			.entity(entity)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.any(|child| world.entity(child).contains::<TableStore>())
+			.xpect_true();
+	}
+
+	/// An explicit [`AnalyticsConfig::store`] reference persists events into
+	/// that entity's [`TableStore`] rather than a derived one.
+	#[beet_core::test]
+	async fn explicit_store_entity() {
+		let mut world = (AsyncPlugin, analytics_plugin).into_world();
+		let store_entity = world.spawn(InMemoryStore::new()).flush();
+		let config = world
+			.spawn(AnalyticsConfig {
+				store: Some(store_entity),
+				..default()
+			})
+			.flush();
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		world.entity(config).contains::<AnalyticsStore>().xpect_true();
+
+		let event = AnalyticsEvent::new("/about", AnalyticsEventData::Request {
+			status: 200,
+			method: "GET".into(),
+			user_agent: None,
+		});
+		let id = event.id;
+		world.trigger(event);
+		AsyncRunner::settle_async_tasks(&mut world).await;
+
+		// the event landed in the referenced entity's store
+		world
+			.entity(store_entity)
+			.get::<TableStore>()
+			.unwrap()
+			.table::<AnalyticsEvent>()
+			.get(id)
+			.await
+			.unwrap()
+			.path
+			.as_str()
+			.xpect_eq("/about");
 	}
 }

@@ -11,8 +11,10 @@
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
 //!
 //! Use [`StorePlugin`] to register store types for world serialization.
-//! Concrete store types (like [`FsStore`], [`S3Store`]) are Components
-//! that auto-insert a type-erased [`BlobStore`] via on_add hooks.
+//! Concrete store types (like [`FsStore`], [`S3Store`]) are Components whose
+//! on_add hooks auto-insert the type-erased currencies: a [`BlobStore`], and
+//! (under `json`) a `TableStore`, so a consumer resolves either from the
+//! entity without naming a backend.
 //!
 //! # Example
 //!

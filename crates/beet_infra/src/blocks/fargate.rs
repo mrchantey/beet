@@ -1143,7 +1143,6 @@ mod tests {
 				.with_container_port(9001)
 				.with_bootstrap(BootstrapConfig {
 					service_access: ServiceAccess::Remote,
-					analytics_table: Some("beet--dev--analytics".into()),
 					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 					..default()
 				}),
@@ -1157,9 +1156,6 @@ mod tests {
 			// the deploy-declared service config
 			.xpect_contains(
 				r#"\"name\":\"BEET_SERVICE_ACCESS\",\"value\":\"remote\""#,
-			)
-			.xpect_contains(
-				r#"\"name\":\"BEET_ANALYTICS_TABLE\",\"value\":\"beet--dev--analytics\""#,
 			)
 			// entry-store selection rides argv (the image CMD), never env, and the
 			// one app bucket is the only store there is: no second bucket name

@@ -31,7 +31,7 @@ impl Default for Thread {
 	fn default() -> Self { Self::new("New Thread") }
 }
 
-impl Table for Thread {
+impl ThreadRecord for Thread {
 	type Id = ThreadId;
 	fn id(&self) -> Self::Id { self.id }
 }

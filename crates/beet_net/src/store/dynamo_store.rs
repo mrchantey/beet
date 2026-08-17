@@ -13,7 +13,7 @@ use bytes::Bytes;
 /// The DynamoDB client is lazily constructed and cached by region using a [`LazyPool`].
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_add = on_add_dynamo)]
 pub struct DynamoStore {
 	/// The DynamoDB table name (maps to "store name" in the storage abstraction).
 	table_name: SmolStr,
@@ -40,6 +40,12 @@ impl DynamoStore {
 	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
+	}
+
+	/// The region the convention resolves when none is configured: the sdk's
+	/// `AWS_REGION` env, else `us-west-2` (mirroring the `s3://` store uri).
+	pub fn env_region() -> SmolStr {
+		env_ext::var("AWS_REGION").unwrap_or_else(|_| "us-west-2".into())
 	}
 
 	/// Get or create a DynamoDB client for this provider's region.
@@ -137,6 +143,16 @@ impl DynamoStore {
 	pub fn blob(&self, path: SmolPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
+}
+
+/// Insert both erased store currencies: the [`BlobStore`] every provider gets,
+/// then (under `json`) the [`TableStore`] wrapping this provider directly, so
+/// its native document form wins over the json-over-blobs table the blob hook
+/// materializes.
+fn on_add_dynamo(mut world: DeferredWorld, cx: HookContext) {
+	BlobStore::on_add::<DynamoStore>(world.reborrow(), cx);
+	#[cfg(feature = "json")]
+	TableStore::on_add::<DynamoStore>(world, cx);
 }
 
 /// Convert an SDK error to a [`BevyError`] carrying the full error chain.
@@ -361,15 +377,19 @@ impl BlobStoreProvider for DynamoStore {
 	}
 }
 
+/// Native document form: rows land as structured DynamoDB items (queryable
+/// attributes), not json blobs. The row document carries its own `id` attribute
+/// (the [`TableStoreRow`] contract), which is the primary key retrieval uses,
+/// so the `id` parameter is redundant on insert.
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for DynamoStore {
-	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+impl TableProvider for DynamoStore {
+	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 
-	fn insert_row(&self, body: T) -> SendBoxedFuture<Result> {
+	fn insert_row(&self, _id: Uuid, row: Value) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let Ok(item) = serde_dynamo::to_item(body) else {
+		let Ok(item) = serde_dynamo::to_item(row) else {
 			return Box::pin(async move {
 				bevybail!("Failed to serialize item for dynamo");
 			});
@@ -387,7 +407,7 @@ impl<T: TableStoreRow> TableProvider<T> for DynamoStore {
 		})
 	}
 
-	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<T>> {
+	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<Value>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -401,8 +421,8 @@ impl<T: TableStoreRow> TableProvider<T> for DynamoStore {
 			let Some(item) = out.item else {
 				bevybail!("Item not found");
 			};
-			let item: T = serde_dynamo::from_item(item)?;
-			item.xok()
+			let row: Value = serde_dynamo::from_item(item)?;
+			row.xok()
 		})
 	}
 }

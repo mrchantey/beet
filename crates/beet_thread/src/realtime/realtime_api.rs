@@ -28,14 +28,18 @@ impl RealtimeApi {
 		.xok()
 	}
 
-	/// Connect to the realtime api client side
-	// TODO bevy integration
+	/// Connect to the realtime api client side: establish the WebRTC session
+	/// (microphone up, model audio down), open the event data channel, then
+	/// apply `request`'s session settings with a `session.update`. The returned
+	/// [`RealtimeConnection`] owns the whole browser-side lifetime: stream
+	/// server events with [`recv`](RealtimeConnection::recv), send client
+	/// events with [`send`](RealtimeConnection::send), drop it to hang up.
 	#[cfg(target_arch = "wasm32")]
-	pub async fn connect_webrtc(ephemeral_key: String) -> Result<()> {
-		// async_ext::spawn_local(async move {
-		connect_webrtc(ephemeral_key).await
-		// });
-		// Ok(())
+	pub async fn connect_webrtc(
+		ephemeral_key: String,
+		request: RealtimeSessionCreateRequest,
+	) -> Result<RealtimeConnection> {
+		connect_webrtc(ephemeral_key, request).await
 	}
 }
 

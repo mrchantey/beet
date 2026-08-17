@@ -1,19 +1,100 @@
 use crate::prelude::*;
+use beet_core::prelude::bevy_ecs::error::ErrorContext;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use uuid::Uuid;
 
-/// Type-safe storage table for serializable objects.
+/// Type-erased table store: rows stored as [`Value`] documents keyed by [`Uuid`].
+///
+/// The table twin of [`BlobStore`]: wraps an [`Arc<dyn TableProvider>`] and is
+/// materialized onto every store entity by the provider component hooks
+/// ([`BlobStore::on_add`] inserts the json-over-blobs form, a table-native
+/// provider like `DynamoStore` overrides it with its own via
+/// [`TableStore::on_add`]), so a consumer resolves `TableStore` from an entity
+/// and never names a backend. Typed access goes through [`Self::table`],
+/// mirroring [`BlobStore::blob`].
 ///
 /// # Example
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
-/// let table = TableStore::<TableItem<String>>::temp();
+/// let table = TableStore::temp().table::<TableItem<String>>();
+/// table.push(TableItem::new("Hello, world!".to_string())).await?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Component)]
+pub struct TableStore {
+	/// The provider that handles table operations (DynamoDB, filesystem, memory, etc).
+	provider: Arc<dyn TableProvider>,
+}
+
+impl core::fmt::Debug for TableStore {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_struct("TableStore").finish_non_exhaustive()
+	}
+}
+
+impl TableStore {
+	/// Creates a new store wrapping the given provider.
+	pub fn new(provider: impl TableProvider) -> Self {
+		Self {
+			provider: Arc::new(provider),
+		}
+	}
+
+	/// Create temporary in-memory table store for testing.
+	/// The returned store is pre-created and ready for immediate use.
+	pub fn temp() -> Self { Self::new(InMemoryStore::new()) }
+
+	/// A typed view over this store, rows serialized at the edge via [`Value`].
+	pub fn table<T: TableStoreRow>(&self) -> Table<T> {
+		Table {
+			provider: Arc::clone(&self.provider),
+			_marker: PhantomData,
+		}
+	}
+
+	/// Component hook that reads a concrete table provider component from the
+	/// entity and inserts a [`TableStore`] wrapping it.
+	/// Use with `#[component(on_add = TableStore::on_add::<MyStore>)]`; run
+	/// after [`BlobStore::on_add`] it overrides the json-over-blobs table that
+	/// hook materializes.
+	pub fn on_add<T: Component + Clone + TableProvider>(
+		mut world: DeferredWorld,
+		cx: HookContext,
+	) {
+		match world.entity(cx.entity).get_or_else::<T>().cloned() {
+			Ok(provider) => {
+				world
+					.commands()
+					.entity(cx.entity)
+					.insert(TableStore::new(provider));
+			}
+			Err(err) => {
+				world.fallback_error_handler()(err, ErrorContext::Command {
+					name: core::any::type_name_of_val(&TableStore::on_add::<T>)
+						.into(),
+				});
+			}
+		}
+	}
+}
+
+/// Typed view over a [`TableStore`], rows serialized to [`Value`] documents at
+/// this edge. The table twin of [`Blob`].
+///
+/// # Example
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// # async fn run() -> Result<()> {
+/// let table = Table::<TableItem<String>>::temp();
 /// table.store_try_create().await?;
 ///
 /// let item = TableItem::new("Hello, world!".to_string());
@@ -26,34 +107,29 @@ use uuid::Uuid;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Component)]
-pub struct TableStore<T: TableStoreRow> {
-	/// The provider that handles table operations (S3, filesystem, memory, etc).
-	provider: Arc<dyn TableProvider<T>>,
+pub struct Table<T: TableStoreRow> {
+	provider: Arc<dyn TableProvider>,
+	_marker: PhantomData<T>,
 }
 
-impl<T: TableStoreRow> Clone for TableStore<T> {
+impl<T: TableStoreRow> Clone for Table<T> {
 	fn clone(&self) -> Self {
 		Self {
 			provider: Arc::clone(&self.provider),
+			_marker: PhantomData,
 		}
 	}
 }
 
-impl<T: TableStoreRow> TableStore<T> {
-	/// Create a new table store with the given provider.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// let table = TableStore::<TableItem<String>>::temp();
-	/// ```
-	pub fn new(provider: impl TableProvider<T>) -> Self {
-		Self {
-			provider: Arc::new(provider),
-		}
+impl<T: TableStoreRow> Table<T> {
+	/// Create a new table with the given provider.
+	pub fn new(provider: impl TableProvider) -> Self {
+		TableStore::new(provider).table()
 	}
+
+	/// Create temporary in-memory table for testing.
+	/// The returned table is pre-created and ready for immediate use.
+	pub fn temp() -> Self { TableStore::temp().table() }
 
 	/// Create store (may take 10+ seconds for cloud providers).
 	///
@@ -88,14 +164,15 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
+	/// let table = Table::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test data".to_string());
 	/// table.push(item).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn push(&self, body: T) -> Result {
-		self.provider.insert_row(body).await
+		let id = body.id();
+		self.provider.insert_row(id, Value::from_serde(body)?).await
 	}
 
 	/// Insert typed object, failing if it already exists.
@@ -105,7 +182,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
+	/// let table = Table::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test data".to_string());
 	/// table.try_push(item).await?;
 	/// # Ok(())
@@ -130,7 +207,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
+	/// let table = Table::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test".to_string());
 	/// let id = item.id();
 	/// let exists = table.exists(id).await?;
@@ -149,7 +226,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
+	/// let table = Table::<TableItem<String>>::temp();
 	/// let paths = table.list().await?;
 	/// # Ok(())
 	/// # }
@@ -165,7 +242,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
+	/// let table = Table::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test".to_string());
 	/// let id = item.id();
 	/// let retrieved = table.get(id).await?;
@@ -176,7 +253,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # Errors
 	/// Returns error if object doesn't exist or fails to deserialize.
 	pub async fn get(&self, id: Uuid) -> Result<T> {
-		self.provider.get_row(id).await
+		self.provider.get_row(id).await?.into_serde()
 	}
 
 	/// Get all objects and their typed data.
@@ -186,7 +263,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
+	/// let table = Table::<TableItem<String>>::temp();
 	/// let items = table.get_all().await?;
 	/// for (path, item) in items {
 	///     println!("Item at {}: {}", path, item.data);
@@ -249,7 +326,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
+	/// let table = Table::<TableItem<String>>::temp();
 	/// let item = TableItem::new("test".to_string());
 	/// let id = item.id();
 	/// table.remove(id).await?;
@@ -266,20 +343,6 @@ impl<T: TableStoreRow> TableStore<T> {
 
 	/// Get public URL for object (if supported by provider).
 	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<TableItem<String>>::temp();
-	/// let path = SmolPath::from("some-uuid");
-	/// if let Some(url) = table.public_url(&path).await? {
-	///     println!("Public URL: {}", url);
-	/// }
-	/// # Ok(())
-	/// # }
-	/// ```
-	///
 	/// Returns `None` if provider doesn't support public URLs.
 	pub async fn public_url(&self, path: &SmolPath) -> Result<Option<String>> {
 		BlobStoreProvider::public_url(self.provider.as_ref(), path).await
@@ -291,13 +354,16 @@ impl<T: TableStoreRow> TableStore<T> {
 	}
 }
 
-/// Types that can be stored in a [`TableStore`].
+/// Types that can be stored in a [`Table`].
 ///
 /// This trait is automatically implemented for any type that implements the required bounds:
 /// - [`Serialize`] - For encoding objects into bytes
 /// - [`DeserializeOwned`] - For decoding objects from bytes
 /// - [`Clone`] - For copying objects
 /// - `'static` - For type safety across async boundaries
+///
+/// The serialized row must carry its [`id`](Self::id) as an `id` field, the
+/// primary key a table-native backend (eg DynamoDB) retrieves by.
 pub trait TableStoreRow: TableContent {
 	/// Unique identifier for the object, used as the primary key in the table.
 	fn id(&self) -> Uuid;
@@ -350,29 +416,27 @@ impl<T: TableContent> TableStoreRow for TableItem<T> {
 	fn id(&self) -> Uuid { self.id }
 }
 
-/// Storage provider for typed table operations.
+/// Storage provider for table operations over untyped [`Value`] rows.
 ///
-/// This trait extends [`BlobStoreProvider`] with type-safe operations for storing
-/// and retrieving serializable objects. Implementors only need to provide
-/// [`box_clone_table`](TableProvider::box_clone_table), as the default
-/// implementations use the [`BlobStoreProvider`] api to store data as JSON.
-pub trait TableProvider<T: TableStoreRow>:
-	BlobStoreProvider + 'static + Send + Sync
-{
+/// Extends [`BlobStoreProvider`] with document operations; the default
+/// implementations store each row as JSON bytes at its id, which is what lets
+/// any blob store back a table. A table-native backend (eg DynamoDB) overrides
+/// them to store structured documents.
+pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 	/// Returns a boxed clone of this provider for type erasure.
-	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
-	/// Inserts a row into the table, serializing it as JSON.
-	fn insert_row(&self, body: T) -> SendBoxedFuture<Result> {
-		let path = SmolPath::new(body.id().to_string());
-		match serde_json::to_vec(&body) {
-			Ok(vec) => BlobStoreProvider::insert(self, &path, vec.into()),
+	fn box_clone_table(&self) -> Box<dyn TableProvider>;
+	/// Insert the row document at `id`.
+	fn insert_row(&self, id: Uuid, row: Value) -> SendBoxedFuture<Result> {
+		let path = SmolPath::new(id.to_string());
+		match serde_json::to_vec(&row) {
+			Ok(bytes) => BlobStoreProvider::insert(self, &path, bytes.into()),
 			Err(e) => {
 				Box::pin(async move { bevybail!("Failed to serialize: {}", e) })
 			}
 		}
 	}
-	/// Retrieves a row by its UUID, deserializing from JSON.
-	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<T>> {
+	/// Get the row document at `id`.
+	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<Value>> {
 		let path = SmolPath::new(id.to_string());
 		let fut = BlobStoreProvider::get(self, &path);
 		Box::pin(async move {
@@ -383,50 +447,15 @@ pub trait TableProvider<T: TableStoreRow>:
 	}
 }
 
-/// The [`BlobStore`] wrapper is a [`TableProvider`] for free, serializing rows
-/// as JSON via the default trait methods. This is what lets a single
-/// [`BlobStore`] back many typed [`TableStore`]s, one per record-type subdir.
-#[cfg(all(feature = "json", feature = "std"))]
-impl<T: TableStoreRow> TableProvider<T> for BlobStore {
-	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+/// The [`BlobStore`] wrapper is a [`TableProvider`] for free, storing rows as
+/// JSON via the default trait methods. This is what lets a single [`BlobStore`]
+/// back many typed [`Table`]s, one per record-type subdir.
+impl TableProvider for BlobStore {
+	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 }
 
-impl<T: TableStoreRow> TableStore<T> {
-	/// Create temporary in-memory table for testing.
-	/// The returned table is pre-created and ready for immediate use.
-	pub fn temp() -> TableStore<T> { TableStore::new(InMemoryStore::new()) }
-}
-
-impl<T: TableStoreRow> TableStore<T> {
-	/// Select filesystem or DynamoDB [`TableProvider`] based on [`ServiceAccess`]
-	/// and feature flags.
-	#[allow(unused_variables)]
-	pub async fn dynamo_fs_selector(
-		fs_path: &AbsPathBuf,
-		table_name: &str,
-		region: &str,
-		access: ServiceAccess,
-	) -> TableStore<T> {
-		match access {
-			ServiceAccess::Local => {
-				debug!("Table Selector - FS: {fs_path}");
-				TableStore::new(FsStore::new(fs_path.clone()))
-			}
-			#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
-			ServiceAccess::Remote => {
-				debug!("Table Selector - FS (no aws_sdk feature): {fs_path}");
-				TableStore::new(FsStore::new(fs_path.clone()))
-			}
-			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-			ServiceAccess::Remote => {
-				debug!("Table Selector - Dynamo: {table_name}");
-				TableStore::new(DynamoStore::new(table_name, region))
-			}
-		}
-	}
-}
 /// Test utilities for table providers.
 #[cfg(test)]
 pub mod table_test {
@@ -443,8 +472,8 @@ pub mod table_test {
 	}
 
 	/// Runs the standard table provider test suite.
-	pub async fn run(provider: impl TableProvider<TableItem<MyObject>>) {
-		let table = TableStore::new(provider);
+	pub async fn run(provider: impl TableProvider) {
+		let table = Table::<TableItem<MyObject>>::new(provider);
 		let body = TableItem::new(MyObject {
 			some_key: "some_value".into(),
 			some_vec: vec![MyObject {
@@ -479,12 +508,23 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// Any provider component materializes the erased [`TableStore`] alongside
+	/// [`BlobStore`] via its `on_add` hooks.
+	#[beet_core::test]
+	fn provider_component_materializes_table_store() {
+		let mut world = World::new();
+		let entity = world.spawn(InMemoryStore::new()).id();
+		world.flush();
+		world.entity(entity).contains::<BlobStore>().xpect_true();
+		world.entity(entity).contains::<TableStore>().xpect_true();
+	}
+
 	/// A row that fails to deserialize (eg a legacy schema) or has a non-uuid
 	/// path is skipped by the lossy read instead of failing the whole scan.
 	#[beet_core::test]
 	async fn get_all_lossy_skips_unreadable_rows() {
 		let provider = InMemoryStore::new();
-		let table = TableStore::<TableItem<u32>>::new(provider.clone());
+		let table = Table::<TableItem<u32>>::new(provider.clone());
 		table.store_try_create().await.unwrap();
 		let valid = TableItem::new(7u32);
 		let valid_id = valid.id();

@@ -143,8 +143,8 @@ impl InMemoryStore {
 }
 
 #[cfg(all(feature = "json", feature = "std"))]
-impl<T: TableStoreRow> TableProvider<T> for InMemoryStore {
-	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+impl TableProvider for InMemoryStore {
+	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 }

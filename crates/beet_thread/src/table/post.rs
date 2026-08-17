@@ -144,7 +144,7 @@ impl Ord for Post {
 	}
 }
 
-impl Table for Post {
+impl ThreadRecord for Post {
 	type Id = PostId;
 	fn id(&self) -> Self::Id { self.id }
 }
