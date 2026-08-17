@@ -207,8 +207,37 @@ thread_local! {
 /// without a JS catch frame (a production browser app) run the loop directly
 /// and keep the trap. Interim until wasm can unwind; see the sunset note on
 /// [`js_runtime::catch_no_abort`].
+///
+/// ## Depth cap
+/// Ticking is re-entrant by design: a ticked task may drive an app whose sync
+/// point fires this hook again so its bridged requests can poll while that
+/// world is published (`beet_async::wake_requests_and_wait`). But the executor
+/// is shared, so each nested tick also polls whatever *unrelated* tasks are
+/// runnable — under a loaded suite tests chain through each other's sync
+/// points and the call stack grows with the number of in-flight tasks, not
+/// with any structural nesting, until V8 overflows (`Maximum call stack size
+/// exceeded` surfacing inside arbitrary tests as opaque panics; an overflow
+/// landing in deno's lazy-global machinery permanently wedges
+/// `globalThis.setTimeout` into a `ReferenceError`, killing every later
+/// sleep). Beyond [`MAX_TICK_DEPTH`] a tick returns without polling: the
+/// skipped sync point's requests simply re-queue and are served on a later
+/// frame at shallower depth, so deep chains degrade to an extra frame of
+/// latency instead of an overflow. Structural nesting (a test driving an app
+/// driving a nested runner) is at most a handful of levels, well inside the
+/// cap.
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub(crate) fn tick_bridge_executor() {
+	/// nested tick entries permitted before deferring to a later frame; real
+	/// structural nesting is ≤5, the cap only cuts cross-task chains
+	const MAX_TICK_DEPTH: usize = 16;
+	thread_local! {
+		static TICK_DEPTH: core::cell::Cell<usize> = core::cell::Cell::new(0);
+	}
+	let depth = TICK_DEPTH.with(|depth| depth.get());
+	if depth >= MAX_TICK_DEPTH {
+		return;
+	}
+	TICK_DEPTH.with(|cell| cell.set(depth + 1));
 	BRIDGE_EXECUTOR.with(|exec| {
 		js_runtime::catch_no_abort(|| {
 			for _ in 0..100 {
@@ -221,6 +250,7 @@ pub(crate) fn tick_bridge_executor() {
 		.map_err(|()| PanicContext::record_swallowed(None))
 		.ok();
 	});
+	TICK_DEPTH.with(|cell| cell.set(depth));
 }
 
 impl AsyncSpawner {

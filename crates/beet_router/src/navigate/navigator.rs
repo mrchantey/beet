@@ -506,9 +506,13 @@ mod test {
 			))
 			.id();
 
-		let drive_until = |app: &mut App, needle: &str| {
+		// yields between updates so async work (the navigation task, the bridge)
+		// progresses at top-level tick depth rather than starving inside this
+		// test's own poll under a loaded suite
+		async fn drive_until(app: &mut App, host: Entity, needle: &str) {
 			for _ in 0..200 {
 				app.update();
+				AsyncRunner::tick().await;
 				let frame = app
 					.world()
 					.get::<DoubleBuffer>(host)
@@ -519,10 +523,10 @@ mod test {
 				}
 			}
 			panic!("frame never contained '{needle}'");
-		};
+		}
 
 		// the home page renders; still on the first page, so nothing recorded yet.
-		drive_until(&mut app, "Alpha page");
+		drive_until(&mut app, host, "Alpha page").await;
 		events.lock().unwrap().is_empty().xpect_true();
 
 		// navigating to beta emits the page view for the alpha page it leaves.
@@ -530,7 +534,7 @@ mod test {
 		app.world_mut()
 			.entity_mut(host)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
-		drive_until(&mut app, "Beta page");
+		drive_until(&mut app, host, "Beta page").await;
 
 		let leaving = events.lock().unwrap().clone();
 		leaving.len().xpect_eq(1);
