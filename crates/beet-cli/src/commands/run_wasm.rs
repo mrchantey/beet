@@ -81,6 +81,16 @@ impl FromStr for WasmHost {
 	}
 }
 
+impl RunWasm {
+	/// Whether this process was invoked as cargo's wasm runner, ie the first
+	/// positional is `run-wasm`. The runner hosts the module in a child runtime,
+	/// so the `--main`/`--store` on its argv belong to the module and are
+	/// forwarded untouched rather than read as this process's own.
+	pub fn is_runner(args: &CliArgs) -> bool {
+		args.path.first().map(SmolStr::as_str) == Some("run-wasm")
+	}
+}
+
 impl fmt::Display for WasmHost {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {

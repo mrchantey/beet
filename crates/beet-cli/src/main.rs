@@ -283,8 +283,7 @@ async fn resolve_entry(
 	// runner. When acting as the runner (first positional `run-wasm`), drop them
 	// and discover the workspace command entry; the `<RunWasm/>` route forwards the
 	// module's own config on via `ChildProcess::with_bootstrap`.
-	let is_wasm_runner =
-		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
+	let is_wasm_runner = RunWasm::is_runner(args);
 	let store_uri = (!is_wasm_runner).then(|| config.store.as_ref()).flatten();
 	let main = (!is_wasm_runner).then(|| config.main.as_ref()).flatten();
 
@@ -337,10 +336,8 @@ fn features_self_check(
 	args: &CliArgs,
 	config: &BootstrapConfig,
 ) -> Option<CrateCheck> {
-	let is_wasm_runner =
-		args.path.first().map(SmolStr::as_str) == Some("run-wasm");
 	let runs_entry = config.main.is_some() || args.path.is_empty();
-	if is_wasm_runner || !runs_entry || config.features.is_empty() {
+	if RunWasm::is_runner(args) || !runs_entry || config.features.is_empty() {
 		return None;
 	}
 	Some(CrateCheck::features(config.features.join(",")))

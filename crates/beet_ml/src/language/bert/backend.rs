@@ -15,6 +15,10 @@ cfg_if! {
 		pub fn default_device() -> DefaultDevice { DefaultDevice::default() }
 		/// [`default_device`]; only the wasm wgpu path needs async setup.
 		pub async fn default_device_async() -> DefaultDevice { default_device() }
+		/// Whether this host grants a device for [`DefaultBackend`]. cuda is
+		/// selected explicitly, so a host without it is a build error rather than
+		/// something to probe around.
+		pub async fn has_device() -> bool { true }
 	} else if #[cfg(feature = "ndarray")] {
 		/// The active burn backend.
 		pub type DefaultBackend = burn::backend::NdArray;
@@ -22,6 +26,9 @@ cfg_if! {
 		pub fn default_device() -> DefaultDevice { DefaultDevice::default() }
 		/// [`default_device`]; only the wasm wgpu path needs async setup.
 		pub async fn default_device_async() -> DefaultDevice { default_device() }
+		/// Whether this host grants a device for [`DefaultBackend`]; the CPU
+		/// backend always has one.
+		pub async fn has_device() -> bool { true }
 	} else if #[cfg(feature = "wgpu")] {
 		// wgpu — also the path used in wasm
 		/// The active burn backend.
@@ -48,6 +55,40 @@ cfg_if! {
 				.await;
 			}
 			device
+		}
+		/// Whether this host grants a device for [`DefaultBackend`].
+		///
+		/// cubecl selects its adapter lazily and *panics* when none is available
+		/// ("No possible adapter available for backend"), so there is no fallible
+		/// device call to recover from — anything that merely needs *a* GPU, rather
+		/// than asserting one exists, has to ask first and skip when the answer is
+		/// no (GPU-less CI, a host whose driver is broken).
+		///
+		/// A bevy-shared device is already live, so it answers without a probe.
+		/// Otherwise wasm asks the host through `js_runtime::probe_webgpu`, and
+		/// native runs cubecl's own eager setup and catches the panic. cubecl
+		/// exposes no fallible adapter query, so provoking the panic *here* is
+		/// what makes it recoverable: called on this thread it unwinds into the
+		/// catch, whereas the lazy init happens on a cubecl worker thread, where
+		/// the panic is unreachable and surfaces only as a `RecvError` from a
+		/// dead channel. Requires unwinding, so under `panic = "abort"` a
+		/// gpu-less host aborts rather than reporting `false`.
+		pub async fn has_device() -> bool {
+			if crate::prelude::shared_burn_wgpu_device().is_some() {
+				return true;
+			}
+			#[cfg(target_arch = "wasm32")]
+			{ beet_core::prelude::js_runtime::probe_webgpu().await }
+			#[cfg(not(target_arch = "wasm32"))]
+			{
+				let device = default_device();
+				std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+					burn::backend::wgpu::init_setup::<
+						burn::backend::wgpu::graphics::AutoGraphicsApi,
+					>(&device, Default::default())
+				}))
+				.is_ok()
+			}
 		}
 	} else {
 		compile_error!(

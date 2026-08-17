@@ -9,7 +9,11 @@
 //! state1 ──> transition ──> state2
 //! ```
 //!
-//! Each node is wrapped with [`trace_action`] so the traversal is logged.
+//! The terminal state is wrapped with [`trace_action`] so its call is logged.
+//! The jump nodes are not, and cannot be: an entity holds at most one action,
+//! and [`RunNext`] already fills that slot with the [`RunNextAction`] it
+//! requires. A colocated wrapper would be an explicit `Action` taking the same
+//! slot, which the provider rejects rather than silently losing the jump.
 //!
 //! Run with:
 //! ```sh
@@ -41,19 +45,11 @@ fn setup(async_commands: AsyncCommands) {
 					.id();
 				// transition forwards to state2.
 				let transition = world
-					.spawn((
-						Name::new("transition"),
-						RunNext::new(state2),
-						trace_action.wrap(RunNextAction::<Outcome>::default()),
-					))
+					.spawn((Name::new("transition"), RunNext::new(state2)))
 					.id();
 				// state1 begins the machine and jumps to the transition.
 				world
-					.spawn((
-						Name::new("state1"),
-						RunNext::new(transition),
-						trace_action.wrap(RunNextAction::<Outcome>::default()),
-					))
+					.spawn((Name::new("state1"), RunNext::new(transition)))
 					.id()
 			})
 			.await;

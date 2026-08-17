@@ -111,6 +111,7 @@ mod test {
 	use super::*;
 	use crate::language::bert::DefaultBackend;
 	use crate::language::bert::default_device_async;
+	use crate::language::bert::has_device;
 	use crate::language::bert::mean_pool;
 	use crate::language::bert::normalize_l2;
 	use beet_core::prelude::*;
@@ -124,10 +125,10 @@ mod test {
 	async fn forward_smoke() {
 		use burn::tensor::Tensor;
 
-		// a wasm host may grant no adapter (gpu-less CI); skip rather than fail
-		#[cfg(target_arch = "wasm32")]
-		if !js_runtime::probe_webgpu().await {
-			warn!("no WebGPU adapter granted, skipping forward_smoke");
+		// this asserts the modules wire together, not that a GPU exists, so a host
+		// granting no adapter (gpu-less CI, a broken driver) skips rather than fails
+		if !has_device().await {
+			warn!("no gpu adapter granted, skipping forward_smoke");
 			return;
 		}
 		let device = default_device_async().await;
