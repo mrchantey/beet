@@ -31,12 +31,15 @@ use std::time::Duration;
 /// All matches against `include` and `exclude` patterns will be normalized
 /// to forward slashes.
 ///
+/// Removing the component (or despawning the entity) stops the watcher,
+/// dropping its debouncer and releasing the os watches.
+///
 /// # Common Pitfalls
 ///
 /// - If the directory does not exist when the watcher starts, it will error
 /// - If the [`Self::path`] is removed while watching, the watcher will silently stop listening
 #[derive(Debug, Clone, Component)]
-#[component(on_add=start_fs_watcher)]
+#[component(on_add = start_fs_watcher, on_remove = stop_fs_watcher)]
 pub struct FsWatcher {
 	/// The path to watch.
 	pub path: AbsPathBuf,
@@ -115,53 +118,84 @@ impl FsWatcher {
 		}
 	}
 }
-// TODO kill watcher on remove component
+/// Handle to the watcher task, inserted alongside [`FsWatcher`] by its `on_add`
+/// hook. Closing the kill channel ([`FsWatcher`] removal) or dropping it
+/// (despawn) ends the watcher task, which drops the debouncer and releases the
+/// os watches.
+#[derive(Component)]
+struct FsWatcherTask {
+	kill_tx: Sender<()>,
+}
+
 fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	let watcher = world.entity(entity).get::<FsWatcher>().unwrap().clone();
+	let (kill_tx, kill_rx) = async_channel::bounded::<()>(1);
+	// try: on a spawn-then-despawn in the same flush the insert is dropped,
+	// closing the channel and ending the task before it starts watching.
+	world
+		.commands()
+		.entity(entity)
+		.try_insert(FsWatcherTask { kill_tx });
 	world.commands().queue_async(async move |world| {
 		watcher.assert_path_exists()?;
 		let (tx, rx) = async_channel::unbounded();
 		let mut debouncer = new_debouncer(watcher.debounce, None, move |ev| {
-			// println!("EV! {:#?}", ev);
 			tx.try_send(ev).ok(/* ignore dropped rx, thats allowed */);
 		})?;
 		debouncer.watch(&watcher.path, RecursiveMode::Recursive)?;
 
-		while let Ok(ev) = rx.recv().await {
-			let ev = match ev {
-				Ok(ev) => ev,
-				Err(errs) => {
-					bevybail!("Watch event contains errors: {:?}", errs);
-				}
-			};
-			let Some(ev) = DirEvent::new(ev)?
-				.apply_filter(|ev| watcher.filter.passes(ev.path.to_string()))
-			else {
-				// empty after filter
-				continue;
-			};
-
-			let ev = match (watcher.mutated_only, ev.has_mutate()) {
-				(true, false) => {
-					// mutated only but contains no mutated
+		// never sent to: resolves when the `FsWatcherTask` closes or drops the
+		// channel, winning the race below and dropping the debouncer.
+		let kill = async {
+			kill_rx.recv().await.ok();
+			Ok(())
+		};
+		let watch = async {
+			while let Ok(ev) = rx.recv().await {
+				let ev = match ev {
+					Ok(ev) => ev,
+					Err(errs) => {
+						bevybail!("Watch event contains errors: {:?}", errs);
+					}
+				};
+				let Some(ev) = DirEvent::new(ev)?.apply_filter(|ev| {
+					watcher.filter.passes(ev.path.to_string())
+				}) else {
+					// empty after filter
 					continue;
+				};
+
+				let ev = match (watcher.mutated_only, ev.has_mutate()) {
+					(true, false) => {
+						// mutated only but contains no mutated
+						continue;
+					}
+					(true, true) => {
+						// only send mutated events
+						ev.mutated()
+					}
+					(false, _) => ev,
+				};
+				// the watcher entity may be despawned while this task runs (a live-reload
+				// teardown drops its `WatchDir`): stop watching cleanly rather than
+				// erroring, so the drop is not reported as a fault.
+				if world.entity(entity).trigger_target(ev).await.is_err() {
+					break;
 				}
-				(true, true) => {
-					// only send mutated events
-					ev.mutated()
-				}
-				(false, _) => ev,
-			};
-			// the watcher entity may be despawned while this task runs (a live-reload
-			// teardown drops its `WatchDir`): stop watching cleanly rather than
-			// erroring, so the drop is not reported as a fault.
-			if world.entity(entity).trigger_target(ev).await.is_err() {
-				break;
 			}
-		}
-		Ok(())
+			Ok(())
+		};
+		futures_lite::future::or(kill, watch).await
 	})
+}
+
+/// Close the kill channel, ending the watcher task. The dead [`FsWatcherTask`]
+/// is left in place: harmless, and replaced if [`FsWatcher`] is re-added.
+fn stop_fs_watcher(world: DeferredWorld, cx: HookContext) {
+	if let Some(task) = world.entity(cx.entity).get::<FsWatcherTask>() {
+		task.kill_tx.close();
+	}
 }
 
 /// An file system event that occurred for a given file or directory.
@@ -401,5 +435,29 @@ mod test {
 		done.store(true, Ordering::Relaxed);
 		// tempdir kept alive until here to prevent cleanup race
 		drop(tempdir);
+	}
+
+	/// Removing [`FsWatcher`] closes the kill channel, ending the watcher task
+	/// rather than leaking the debouncer (a despawn drops the handle outright).
+	#[crate::test]
+	fn removal_stops_watcher() {
+		let mut app = App::new();
+		let tempdir = TempDir::new().unwrap();
+		app.add_plugins(AsyncPlugin);
+		let entity = app
+			.world_mut()
+			.spawn(FsWatcher::default().with_path(tempdir.path().clone()))
+			.id();
+		app.update();
+		let kill_tx = app
+			.world()
+			.entity(entity)
+			.get::<super::FsWatcherTask>()
+			.unwrap()
+			.kill_tx
+			.clone();
+		kill_tx.is_closed().xpect_false();
+		app.world_mut().entity_mut(entity).remove::<FsWatcher>();
+		kill_tx.is_closed().xpect_true();
 	}
 }

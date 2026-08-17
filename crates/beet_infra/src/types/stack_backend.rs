@@ -59,6 +59,28 @@ impl StackBackend {
 		}
 	}
 
+	/// A provider for a named bucket in this backend's provider family: a
+	/// sibling directory of the local state for [`Self::Local`], an S3 bucket
+	/// in `region` for [`Self::S3`].
+	pub fn bucket_provider(
+		&self,
+		bucket: &str,
+		#[allow(unused)] region: &SmolStr,
+	) -> Box<dyn BlobStoreProvider> {
+		match self {
+			Self::S3(_) => {
+				cfg_if! {
+					if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+						Box::new(beet_net::prelude::S3Store::new(bucket, region.clone()))
+					} else {
+						panic!("the `aws_sdk` feature is required for an S3 bucket provider")
+					}
+				}
+			}
+			Self::Local(local) => Box::new(FsStore::new(local.path.join(bucket))),
+		}
+	}
+
 	/// Ensure the backend exists, creating the directory or s3 bucket if it doesn't exist.
 	pub async fn ensure_exists(&self) -> Result {
 		self.provider().store_try_create().await

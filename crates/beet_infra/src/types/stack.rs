@@ -151,23 +151,17 @@ impl Stack {
 		format!("versions/{}/{label}", self.deploy_id)
 	}
 
-	/// Create an artifacts client for this stack's artifact bucket.
+	/// Create an artifacts client for this stack's artifact bucket, in the same
+	/// provider family as the state backend: local state stores artifacts in a
+	/// sibling directory, S3 state in an S3 bucket in [`Self::aws_region`].
 	pub fn artifacts_client(&self) -> ArtifactsClient {
-		cfg_if! {
-			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				// TODO provider agnostic, perhaps something similar to the state_backend.rs pattern
-				let provider = beet_net::prelude::S3Store::new(
-					self.artifact_bucket_name(),
-					self.aws_region().clone(),
-				);
-				ArtifactsClient::new(
-					BlobStore::new(provider),
-					ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone())
-				)
-			} else {
-				panic!("the `aws_sdk` feature is required for artifact operations")
-			}
-		}
+		let provider = self
+			.backend
+			.bucket_provider(&self.artifact_bucket_name(), &self.aws_region);
+		ArtifactsClient::new(
+			BlobStore::new(provider),
+			ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone()),
+		)
 	}
 
 	/// Initialize a config with the corresponding backend.

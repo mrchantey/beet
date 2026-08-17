@@ -40,8 +40,6 @@ pub(crate) fn resolve_styles(
 	)>,
 	mut transitions: Query<Option<&mut TransitionStyle>>,
 ) -> Result {
-	// TODO fine-grained listeners
-	// reparenting etc. only update whats needed
 	let mut roots = query
 		.iter()
 		.map(|entity| ancestors.root_ancestor(entity))

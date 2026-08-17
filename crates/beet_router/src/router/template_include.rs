@@ -31,8 +31,10 @@ pub(crate) fn register_template_include(world: &mut World) {
 				// `<Template>` with no `src` is a directives-only no-op.
 				return Ok(());
 			};
-			// remote (`http(s)://`, `s3://`) includes resolve through the async
-			// pending path too, but the transport is not yet wired (TODO).
+			// remote (`http(s)://`, `s3://`) includes would resolve through the
+			// same async pending path, but the transport is deferred to the BSN
+			// transition (see `beet_core`'s `remote.rs`), so they bail rather
+			// than silently no-op.
 			if is_remote(&src) {
 				bevybail!(
 					"remote `<Template src=\"{src}\">` includes are not yet \

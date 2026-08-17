@@ -103,7 +103,7 @@ impl<'de> serde::Deserialize<'de> for EnvVar {
 mod test {
 	use super::*;
 
-	// todo js runtime set env var
+	// native-only: a browser host has no mutable env, `set_var` errors `Unsupported`
 	#[cfg(not(target_arch = "wasm32"))]
 	#[crate::test]
 	fn roundtrip_serde() {

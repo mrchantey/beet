@@ -94,8 +94,7 @@ impl O11sStreamer {
 		&self,
 		caller: AsyncEntity,
 	) -> Result<(o11s::RequestBody, ActorId, ThreadId)> {
-		// TODO perhaps with new bevy async we wont need 'static FnOnce,
-		// so wont need to clone
+		// with_state takes a 'static FnOnce, so move a clone in
 		let this = self.clone();
 
 		caller

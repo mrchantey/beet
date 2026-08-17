@@ -7,9 +7,10 @@
 //! set, spawn a task that resolves the dependency, then resolve the guard,
 //! firing `LoadTemplate` once everything settles.
 //!
-//! The fetch itself is STUBBED: trust, caching, versioning, and the actual
-//! transport are deliberate later decisions (see the TODOs). What is real is the
-//! pending-set wiring, so the transport slots in later without rework.
+//! The fetch itself is intentionally unimplemented: remote transport (trust,
+//! caching, versioning) is deferred to the BSX to BSN transition, which
+//! replaces this front-end. What is real is the pending-set wiring, which local
+//! includes (`beet_router`'s `<Template src>`) already run on.
 //!
 //! Gated behind `bevy_async`: the no_std core never references this.
 
@@ -81,8 +82,8 @@ async fn resolve_remote_schema(
 	url: SmolStr,
 	guard: PendingGuard,
 ) {
-	// TODO: actually fetch `url` over the network with trust + caching + versioning.
-	// For now the stub resolves to an unconstrained schema so the wiring is live.
+	// no transport (see the module doc): resolves to an unconstrained schema so
+	// the wiring is live.
 	let schema = fetch_remote_schema(&url).await;
 
 	async_world
@@ -95,10 +96,9 @@ async fn resolve_remote_schema(
 		.await;
 }
 
-/// Stubbed remote-schema fetch: resolves to [`ValueSchema::Any`] (a wildcard).
-///
-/// TODO: fetch and deserialize the JSON schema at `url`, with trust, caching, and
-/// versioning. The signature is the seam the real transport drops into.
+/// Stubbed remote-schema fetch: resolves to [`ValueSchema::Any`] (a wildcard),
+/// so a remote schema validates everything. A real transport is deferred to the
+/// BSN transition; this signature is the seam it would drop into.
 async fn fetch_remote_schema(_url: &str) -> ValueSchema { ValueSchema::Any }
 
 /// Register a pending remote-template fetch on the build root for a
@@ -135,9 +135,8 @@ async fn resolve_remote_template(
 	target: Entity,
 	guard: PendingGuard,
 ) {
-	// TODO: fetch the `.bsx` (or serialized `DynamicTemplate`) at `src`, parse it
-	// to a `DynamicTemplate`, then `build_template` it into `target` through the
-	// same registry as `<path::to::X>`. Trust, caching, and versioning are later.
+	// no transport (see the module doc): the include site stays empty. Fetching
+	// and building the remote `.bsx` is deferred to the BSN transition.
 	let _ = (&src, target);
 
 	async_world

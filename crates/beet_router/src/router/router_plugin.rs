@@ -271,8 +271,10 @@ fn insert_path_pattern_for_late_path_partial(
 /// [`ParamsPattern`]) from the root's descendants and constructs a validated
 /// tree. Scene routes are distinguished from regular actions by their output
 /// type being [`PageRequest`], detected via [`ActionMeta::output_is`].
-// TODO this is a bit wasteful, if we used change detection could deduplicate added,
-// and only generate once, but we'd still want a guanratee the system runs immediately
+///
+/// Rebuilds the whole tree on every insert rather than batching with change
+/// detection, keeping the guarantee that the tree exists as soon as the insert
+/// settles.
 fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,

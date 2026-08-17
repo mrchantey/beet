@@ -70,7 +70,6 @@ impl IkArm4DofTransforms {
 		let delta_pos =
 			delta_pos_including_segment3 - target_pos_with_segment_3;
 
-		// TODO delta pos without segment3
 		let angles = self.ik.solve4d(delta_pos);
 
 		if angles.0.is_nan()

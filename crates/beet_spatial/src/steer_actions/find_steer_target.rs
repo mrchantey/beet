@@ -36,8 +36,6 @@ impl FindSteerTarget {
 	}
 }
 
-// TODO this shouldnt run every frame?
-
 pub(crate) fn find_steer_target(
 	mut commands: Commands,
 	agents: AgentQuery<&Transform>,

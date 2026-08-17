@@ -8,12 +8,16 @@ pub struct Project {
 	config: Config,
 	#[deref]
 	stack: Stack,
+	/// The stack's artifacts client, built once at construction so teardown
+	/// does not rebuild it from the stack.
+	artifacts: ArtifactsClient,
 }
 impl Project {
 	pub fn new(stack: &Stack, config: Config) -> Self {
 		Self {
 			config,
 			stack: stack.clone(),
+			artifacts: stack.artifacts_client(),
 		}
 	}
 
@@ -138,13 +142,7 @@ impl Project {
 		let lock_path =
 			SmolPath::new(format!("{}.tflock", self.backend_path()));
 		self.backend().provider().remove(&lock_path).await.ok();
-		// TODO should be possible to just include artifacts client in the project
-		self.stack
-			.artifacts_client()
-			.store()
-			.store_remove()
-			.await
-			.ok();
+		self.artifacts.store().store_remove().await.ok();
 		fs_ext::remove_async(&self.dir()).await.ok();
 	}
 }

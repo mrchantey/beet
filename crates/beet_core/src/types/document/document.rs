@@ -306,7 +306,6 @@ pub enum DocumentPath {
 	Props,
 	/// A specific document by entity id.
 	Entity(Entity),
-	// TODO url, perhaps with some automerge style synchronous system
 }
 
 impl core::fmt::Display for DocumentPath {

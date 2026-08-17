@@ -62,7 +62,6 @@ impl WsPathBuf {
 	/// Panics if [`fs_ext::workspace_root`] fails.
 	pub fn new_cwd_rel(path: impl AsRef<Path>) -> FsResult<Self> {
 		let path = path_ext::absolute(path)?;
-		// TODO use pathdiff instead?
 		let path = path_ext::strip_prefix(&path, &fs_ext::workspace_root())?;
 		Ok(Self::new(path))
 	}
