@@ -33,28 +33,31 @@ holding an entry document, or the entry file itself):
     beet serve site --server=tui           # ..as a live terminal (like `beet present`)
     beet serve site --server=http,ssh      # ..http plus a multi-tenant ssh terminal
 
-It also deploys the beet website to AWS Fargate (the site served from S3, html
-over http + a live ssh terminal), fronted by Cloudflare's edge cache: http
-hostnames are proxied and edge-cached, ssh (and future live apps) ride the
-DNS-only `app.beet.org` / `app.dev.beet.org` hostnames straight to the NLB,
+It also deploys the beet website to a single AWS Lightsail box (the site served
+from S3, html over http + a live ssh terminal on port 22), fronted by
+Cloudflare's edge cache: http hostnames are proxied and edge-cached `A` records
+at the box's static IP, ssh (and future live apps) ride the DNS-only
+`app.beet.org` / `app.dev.beet.org` hostnames straight to it,
 `<CloudflareZoneSetup/>` converges the zone-level edge config (cache ruleset,
 strict TLS), and every deploy or sync ends with a `<CloudflarePurgeCache/>` so
 content changes are live at the edge immediately. On the deploy route the purge
-comes *after* `<FargateWatch/>`, since purging while the old tasks still serve
-just re-caches the old responses for the full edge TTL.
+comes *after* `<LightsailWatch/>`, since purging while the old instance still
+serves just re-caches the old responses for the full edge TTL. The box's own
+sshd moves to port 2222 (the TUI owns 22), so management is your own client
+plus the stack's key pair, not the Lightsail browser console.
 
 The deploy route applies once per layer, and the order is the point: `<TofuApply
-layer="storage"/>` brings up the stores (the app bucket, the image registry, the
-analytics table: the addresses their blocks declare under the `storage` layer,
-an overridable per-block field), `<BuildDockerImage/>` and `<DirSync/>` fill
-them, and a bare `<TofuApply/>` converges the whole stack, rolling a task
-definition onto an image that is pushed and a bucket that already holds the
-site. One apply rolls the new task first, so it boots against an empty bucket,
-finds no entry document and exits. Naming a layer no block declares is a loud
-error, never a silent skip. The ECS deployment circuit breaker rides on that
-ordering: with the sync ahead of the roll, a task that still fails to boot is a
-genuinely broken image, so the deployment fails and restores the previous task
-definition.
+layer="storage"/>` brings up the stores (the app bucket, the analytics table:
+the addresses their blocks declare under the `storage` layer, an overridable
+per-block field), `<DirSync/>` fills them, and a bare `<TofuApply/>` converges
+the whole stack: it uploads the built binary under the deploy id and replaces
+the instance, whose cloud-init fetches that binary and serves a bucket that
+already holds the site. One apply boots the new instance first, so it finds an
+empty bucket and no entry document. Naming a layer no block declares is a loud
+error, never a silent skip. A deploy replaces the box (cloud-init bakes the
+deploy id), costing a minute or two of downtime; the static IP re-attaches so
+DNS never moves, and the ssh host key rides the env channel so the fingerprint
+never changes.
 
 The deploy routes hang off a stack-bearing `<BeetSiteDeployHost>` so they resolve
 a `Stack` by ancestry without a second server. `--stage=prod` targets production
@@ -69,16 +72,16 @@ deploy replicates the checkout (`site/assets` is a committed symlink to
 `./assets`, and the sync follows it), so the assets reach an app bucket the same
 way every other file does.
 
-    just beet-deploy [--stage=prod]        # build -> stores -> image -> sync -> roll -> watch -> purge
-    just beet-sync                         # re-publish the site (no image rebuild)
-    just beet-watch                        # poll the rollout
+    just beet-deploy [--stage=prod]        # build -> stores -> sync -> replace box -> watch -> purge
+    just beet-sync                         # re-publish the site (no redeploy)
+    just beet-watch                        # tail the instance logs
     just beet-shared apply                 # provision the shared assets bucket
     just beet-shared pull                  # hydrate ./assets from it (no credentials)
     just beet-shared push                  # publish ./assets to it
 
 Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 `CLOUDFLARE_API_TOKEN` in `.env` (see `.env.example` for the token permissions),
-plus `tofu`, `cargo-zigbuild` and a container engine.
+plus `tofu` and `cargo-zigbuild`.
 -->
 <StartOnLoad {CliServer{always:true}}>
 <Router {HelpHandler}>
@@ -93,16 +96,15 @@ plus `tofu`, `cargo-zigbuild` and a container engine.
 	<SyncS3/>
 	<BeetSiteDeployHost>
 		<Route path="deploy" {ExchangeSequence}>
-			<FargateBeetSiteBlock app_name="beet-site"/>
+			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+			<LightsailBeetSiteBlock app_name="beet-site" features="aws_sdk,ssh,geoip"/>
 			<AppBucket/>
 			<AnalyticsTable/>
-			<BeetBinaryBuild features="aws_sdk,ssh,geoip"/>
 			<TofuApply layer="storage"/>
-			<BuildDockerImage/>
 			<DirSync app_name="beet-site" bucket="app" local_dir="site" follow_symlinks=true delete=true/>
 			<TofuApply/>
 			<CloudflareZoneSetup/>
-			<FargateWatch app_name="beet-site" timeout="300s"/>
+			<LightsailWatch app_name="beet-site" timeout="300s"/>
 			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="sync" {ExchangeSequence}>
@@ -110,7 +112,7 @@ plus `tofu`, `cargo-zigbuild` and a container engine.
 			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
-			<FargateWatch app_name="beet-site" timeout="300s"/>
+			<LightsailWatch app_name="beet-site" timeout="300s"/>
 		</Route>
 	</BeetSiteDeployHost>
 	<Route path="shared">

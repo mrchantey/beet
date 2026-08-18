@@ -18,17 +18,7 @@ use beet_router::prelude::*;
 /// container image, a Lambda zip) reads the produced artifact from its sibling.
 #[template]
 pub fn BeetBinaryBuild(#[prop(into)] features: String) -> impl Bundle {
-	CargoBuild::default()
-		.with_target(BuildTarget::Zigbuild)
-		.with_package("beet-cli")
-		.with_binary("beet")
-		.with_additional_args(vec![
-			"--no-default-features".into(),
-			"--features".into(),
-			features.into(),
-		])
-		.with_release(true)
-		.into_build_artifact()
+	infra_ext::beet_cargo_build(features).into_build_artifact()
 }
 
 /// `<ExampleBinaryBuild example="ssh_tui_site" features="ssh_tui,http_server,markdown"/>`
@@ -316,38 +306,43 @@ pub fn FargateWatch(
 	}
 }
 
-/// `<FargateBeetSiteBlock app_name="beet-site"/>` — the beet website's Fargate block:
-/// ssh + STAGE-AWARE Cloudflare DNS + ACM, autoscaled 1..5 at 1 vCPU / 2 GB, runtime
-/// env wired so the container reads its one app bucket (site and assets alike) and
-/// presents one stable ssh fingerprint. Bucket names derived from the stack
-/// (declared once). Markup form of deploy_beet_site's `block`.
+/// `<LightsailBeetSiteBlock app_name="beet-site" features="aws_sdk,ssh,geoip"/>` —
+/// the beet website's Lightsail block plus its build artifact, on one entity
+/// (paired by `TofuApplyAction`, see [`LambdaSiteBlock`]): one `small_3_0` box
+/// (2 GB, known monthly price, no NLB) serving http behind Caddy and the beet
+/// ssh TUI on port 22, with STAGE-AWARE Cloudflare DNS at the static IP.
+/// Runtime env wired so the binary reads its one app bucket (site and assets
+/// alike) and presents one stable ssh fingerprint. Bucket names derived from
+/// the stack (declared once).
 ///
-/// Every http hostname is PROXIED and edge-cached: Cloudflare's edge caches per
-/// the origin's `CacheHeaders` and the zone rules `<CloudflareZoneSetup/>`
-/// publishes. ssh lives on the DNS-only `app` hostname (`ssh app.beet.org` /
-/// `ssh app.dev.beet.org`). TLS stays terminated at the origin's ACM cert,
-/// which the edge verifies (the zone runs Full strict).
+/// Every http hostname is PROXIED and edge-cached (an `A` record at the static
+/// IP): Cloudflare's edge caches per the origin's `CacheHeaders` and the zone
+/// rules `<CloudflareZoneSetup/>` publishes. ssh lives on the DNS-only `app`
+/// hostname (`ssh app.beet.org` / `ssh app.dev.beet.org`), since Cloudflare
+/// does not proxy raw TCP. Caddy terminates TLS at the origin with a Let's
+/// Encrypt cert covering every hostname, which the edge verifies (the zone
+/// runs Full strict). The box's own sshd moves to port 2222, reachable with
+/// the stack's key pair.
 ///
-/// SAFETY / stage-aware DNS (a deliberate change from the original, which always
-/// published all three hostnames): `dev` publishes ONLY `dev.beet.org`; `prod`
+/// SAFETY / stage-aware DNS: `dev` publishes ONLY `dev.beet.org`; `prod`
 /// publishes the production apex `beet.org` + `www.beet.org`. This is REQUIRED so a
 /// `dev` deploy never touches production apex DNS, and it makes `--stage` meaningful.
 #[template]
-pub fn FargateBeetSiteBlock(
+pub fn LightsailBeetSiteBlock(
 	#[prop(into)] app_name: String,
+	#[prop(into)] features: String,
 ) -> Result<impl Bundle> {
 	let stack = infra_ext::stack(&app_name);
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
 	let app_bucket = infra_ext::app_bucket_name(&stack);
-	let block = FargateBlock::default()
+	let block = LightsailBlock::default()
+		.with_bundle_id("small_3_0")
 		.with_allow_ssh(true)
-		.with_max_count(5)
-		.with_cpu(1024)
-		.with_memory(2048)
 		// one declaration for both channels: the block splits boot selection (the
-		// entry store, the transports) onto the container `CMD` and the service
-		// config the runtime `PackageConfig`/analytics store read onto task env.
+		// entry store, the transports) onto the unit's `ExecStart` and the service
+		// config the runtime `PackageConfig`/analytics store read onto its
+		// `Environment=` lines.
 		.with_bootstrap(BootstrapConfig {
 			store: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
 			server: Some(ServerFilter::new("http,ssh")),
@@ -355,12 +350,12 @@ pub fn FargateBeetSiteBlock(
 			..default()
 		})
 		// private key material: its own channel, so no renderer can ever put it
-		// on an argv line or in a `CMD` array.
+		// on an argv line.
 		.with_secret_env("BEET_SSH_HOST_KEY", ssh_host_key);
 	// prod claims the apex + www (proxied, edge-cached) plus the DNS-only `app`
 	// hostname carrying ssh + future live apps; other stages get their
 	// subdomain (proxied) + `app.dev` (DNS-only ssh).
-	if stack.is_production() {
+	let block = if stack.is_production() {
 		block
 			.with_dns(
 				DnsProvider::cloudflare("beet.org", zone_id.clone())
@@ -370,19 +365,20 @@ pub fn FargateBeetSiteBlock(
 				DnsProvider::cloudflare("www.beet.org", zone_id.clone())
 					.with_proxied(true),
 			)
-			.with_dns(DnsProvider::cloudflare("app.beet.org", zone_id.clone()))
+			.with_dns(DnsProvider::cloudflare("app.beet.org", zone_id))
 	} else {
 		block
 			.with_dns(
 				DnsProvider::cloudflare("dev.beet.org", zone_id.clone())
 					.with_proxied(true),
 			)
-			.with_dns(DnsProvider::cloudflare(
-				"app.dev.beet.org",
-				zone_id.clone(),
-			))
-	}
-	.xok()
+			.with_dns(DnsProvider::cloudflare("app.dev.beet.org", zone_id))
+	};
+	(
+		block,
+		infra_ext::beet_cargo_build(features).into_build_artifact(),
+	)
+		.xok()
 }
 
 /// `<BeetSiteDeployHost>` — the [`Stack`]-bearing parent for the beet-site deploy

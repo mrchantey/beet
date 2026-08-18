@@ -5,9 +5,14 @@ use beet_core::prelude::*;
 use serde_json::json;
 
 /// A DNS record provider, embedded in a block that needs to publish a hostname
-/// (a [`LambdaBlock`] gateway, a [`FargateBlock`] load balancer). It emits a
-/// single `CNAME` pointing its `authority` at an alias target, plus any
-/// auxiliary records (eg ACM DNS-validation) via [`emit_validation_record`].
+/// (a [`LambdaBlock`] gateway, a [`FargateBlock`] load balancer, a
+/// [`LightsailBlock`] static IP). It emits a single record pointing its
+/// `authority` at a target: a `CNAME` via [`emit`] for hostname targets, an
+/// `A`/`AAAA` via [`emit_address`] for IP targets, plus any auxiliary records
+/// (eg ACM DNS-validation) via [`emit_validation_record`].
+///
+/// [`emit`]: Self::emit
+/// [`emit_address`]: Self::emit_address
 ///
 /// [`emit_validation_record`]: Self::emit_validation_record
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,19 +101,47 @@ impl DnsProvider {
 		label: &str,
 		alias_target: &str,
 	) -> Result {
-		#[cfg(feature = "cloudflare_dns")]
-		let proxied = matches!(self, Self::Cloudflare { proxied: true, .. });
-		#[cfg(not(feature = "cloudflare_dns"))]
-		let proxied = false;
 		self.emit_record(
 			stack,
 			config,
 			label,
 			self.authority(),
 			alias_target,
-			proxied,
+			self.proxied(),
+			"CNAME",
 		)?;
 		Ok(())
+	}
+
+	/// Emit an address record pointing [`authority`](Self::authority) at
+	/// `address` (a terra field-ref resolving to an IP, eg a Lightsail static
+	/// IP's `ip_address`): an `AAAA` when `ipv6`, else an `A`.
+	pub fn emit_address(
+		&self,
+		stack: &Stack,
+		config: &mut terra::Config,
+		label: &str,
+		address: &str,
+		ipv6: bool,
+	) -> Result {
+		self.emit_record(
+			stack,
+			config,
+			label,
+			self.authority(),
+			address,
+			self.proxied(),
+			if ipv6 { "AAAA" } else { "A" },
+		)?;
+		Ok(())
+	}
+
+	/// Whether records emit proxied through Cloudflare's edge.
+	fn proxied(&self) -> bool {
+		#[cfg(feature = "cloudflare_dns")]
+		return matches!(self, Self::Cloudflare { proxied: true, .. });
+		#[cfg(not(feature = "cloudflare_dns"))]
+		false
 	}
 
 	/// Emit an ACM DNS-validation `CNAME` (always unproxied) into this
@@ -123,11 +156,11 @@ impl DnsProvider {
 		name: &str,
 		content: &str,
 	) -> Result<String> {
-		self.emit_record(stack, config, label, name, content, false)
+		self.emit_record(stack, config, label, name, content, false, "CNAME")
 	}
 
-	/// Emit one `CNAME` into this provider's zone, returning its terraform
-	/// resource address (eg `cloudflare_dns_record.<label>`).
+	/// Emit one record of `record_type` into this provider's zone, returning its
+	/// terraform resource address (eg `cloudflare_dns_record.<label>`).
 	fn emit_record(
 		&self,
 		stack: &Stack,
@@ -136,6 +169,7 @@ impl DnsProvider {
 		name: &str,
 		content: &str,
 		proxied: bool,
+		record_type: &str,
 	) -> Result<String> {
 		let ident = stack.resource_ident(label);
 		let address = match self {
@@ -147,7 +181,7 @@ impl DnsProvider {
 					CloudflareDnsRecordDetails {
 						name: name.into(),
 						ttl: 1,
-						r#type: "CNAME".into(),
+						r#type: record_type.into(),
 						zone_id: zone_id.clone(),
 						content: Some(content.into()),
 						proxied: Some(proxied),
@@ -164,7 +198,7 @@ impl DnsProvider {
 					ident,
 					AwsRoute53RecordDetails {
 						name: name.into(),
-						r#type: "CNAME".into(),
+						r#type: record_type.into(),
 						zone_id: zone_id.clone(),
 						ttl: Some(60),
 						records: Some(vec![content.into()]),

@@ -48,9 +48,10 @@ pub fn remote_bootstrap(bucket_name: impl AsRef<str>) -> Result<BootstrapConfig>
 	.xok()
 }
 
-/// Shared `CargoBuild` for the generic `beet` binary; callers pick the terminal
-/// (`into_build_artifact` vs `into_lambda_build_artifact`). `--no-default-features`
-/// keeps the http-only deploy lean; the mini http backend is always present.
+/// Shared `CargoBuild` for the generic `beet` binary (release, zigbuild);
+/// callers pick the terminal (`into_build_artifact` vs
+/// `into_lambda_build_artifact`). `--no-default-features` keeps the http-only
+/// deploy lean; the mini http backend is always present.
 pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 	CargoBuild::default()
 		.with_target(BuildTarget::Zigbuild)
@@ -61,6 +62,7 @@ pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 			"--features".into(),
 			features.into(),
 		])
+		.with_release(true)
 }
 
 /// Sync `examples/bsx_site` (the no-code site) to the bucket root, the content every

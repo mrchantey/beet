@@ -67,16 +67,14 @@ impl Plugin for CliCommandsPlugin {
 		#[cfg(not(all(feature = "infra", feature = "extra")))]
 		for tag in [
 			"BeetSiteDeployHost",
-			"FargateBeetSiteBlock",
+			"LightsailBeetSiteBlock",
 			"CloudflareZoneSetup",
 			"CloudflarePurgeCache",
 			"AppBucket",
 			"AssetsBucket",
-			"BeetBinaryBuild",
 			"TofuApply",
-			"BuildDockerImage",
 			"DirSync",
-			"FargateWatch",
+			"LightsailWatch",
 		] {
 			app.allow_unregistered(tag);
 		}

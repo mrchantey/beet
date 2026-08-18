@@ -13,17 +13,20 @@ mod fargate;
 pub use fargate::*;
 mod block;
 pub use block::*;
-// The DNS module is reused by the lambda and fargate blocks, and by the cloudflare
-// failover (which calls its `ensure_cloudflare_provider`); gate it on any of them.
+// The DNS module is reused by the lambda, fargate and lightsail blocks, and by
+// the cloudflare failover (which calls its `ensure_cloudflare_provider`); gate
+// it on any of them.
 #[cfg(any(
 	feature = "lambda_block",
 	feature = "fargate_block",
+	feature = "lightsail_block",
 	feature = "cloudflare_dns"
 ))]
 mod dns;
 #[cfg(any(
 	feature = "lambda_block",
 	feature = "fargate_block",
+	feature = "lightsail_block",
 	feature = "cloudflare_dns"
 ))]
 pub use dns::*;

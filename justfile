@@ -48,16 +48,17 @@ init-repo:
 beet *args:
   cargo run -p beet-cli -- {{ args }}
 
-# Deploy the beet website to AWS Fargate; --stage=prod targets prod (default dev).
-# Lean headless build (no winit/ml) and AWS_PROFILE cleared so tofu/aws/s3 use the
-# explicit `.env` keys rather than a global profile. `infra,extra` links the
-# beet-site deploy host (`<BeetSiteDeployHost>` + the IaC verb routes).
+# Deploy the beet website to its AWS Lightsail box; --stage=prod targets prod
+# (default dev). Lean headless build (no winit/ml) and AWS_PROFILE cleared so
+# tofu/aws/s3 use the explicit `.env` keys rather than a global profile.
+# `infra,extra` links the beet-site deploy host (`<BeetSiteDeployHost>` + the
+# IaC verb routes).
 beet-deploy *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- deploy {{ args }}
-# Re-publish the site to S3 without an image rebuild (assets: `beet-shared push`).
+# Re-publish the site to S3 without a redeploy (assets: `beet-shared push`).
 beet-sync *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- sync {{ args }}
-# Poll the deployed service's rollout.
+# Tail the deployed instance's logs.
 beet-watch *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- watch {{ args }}
 # Tear the deployed stack down (pass --stage=prod for the prod stack). Stage only:

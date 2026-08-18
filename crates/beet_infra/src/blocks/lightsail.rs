@@ -15,10 +15,12 @@ pub enum LightsailNetworking {
 
 /// Opinionated terraform configuration for a Lightsail instance:
 /// - Key pair for SSH access
-/// - IAM user with S3 full access for runtime asset retrieval and persistence via aws_sdk
+/// - IAM user with S3 + DynamoDB full access for runtime persistence via aws_sdk
 /// - Static IP with attachment (configurable via networking mode)
 /// - Systemd service that fetches its binary from S3 on startup
 /// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt
+/// - Optional DNS records pointing each authority at the public address
+/// - Optional beet ssh on 22, relocating the management sshd
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
 #[component(immutable, on_add = ErasedBlock::on_add::<LightsailBlock>)]
 pub struct LightsailBlock {
@@ -29,6 +31,33 @@ pub struct LightsailBlock {
 	/// in the lightsail instance.
 	#[serde(default)]
 	env_vars: Vec<Variable>,
+	/// Env vars written directly into the unit's `Environment=` lines, last so
+	/// a deploy can override any default, and kept off the `ExecStart` argv.
+	/// Not a stronger channel than [`env_vars`](Self::env_vars): the rendered
+	/// user data still lands in terraform state either way.
+	#[serde(default)]
+	#[set_with(skip)]
+	secret_env: Vec<(SmolStr, SmolStr)>,
+	/// DNS records published at the instance's public address: an `A` record
+	/// per provider (`AAAA` under [`Ipv6`](LightsailNetworking::Ipv6)
+	/// networking). Each authority also lands in the Caddyfile, so declaring
+	/// any records turns on HTTPS for them (see [`domain`](Self::with_domain)).
+	#[get(skip)]
+	#[serde(default)]
+	#[set_with(skip)]
+	dns: Vec<DnsProvider>,
+	/// Serve the beet ssh TUI on port 22: the runtime config gets
+	/// `ssh_port=22`, cloud-init moves the box's own sshd to
+	/// [`management_ssh_port`](Self::management_ssh_port) before the unit
+	/// starts, and the firewall opens both. The unit runs as root (no `User=`
+	/// line), so binding 22 needs no extra capability. Note the Lightsail
+	/// browser console only dials 22, so management becomes your own client
+	/// plus the key pair on the new port.
+	#[serde(default)]
+	allow_ssh: bool,
+	/// Where the management sshd listens once [`allow_ssh`](Self::allow_ssh)
+	/// frees port 22 for the TUI.
+	management_ssh_port: u16,
 	/// The deployed binary's [`BootstrapConfig`], split at render time by
 	/// [`BootstrapConfig::split_channels`]: boot selection (the store, the
 	/// `--server` set) rides the systemd `ExecStart` invocation, ambient service
@@ -37,9 +66,11 @@ pub struct LightsailBlock {
 	/// at render time.
 	#[serde(default)]
 	bootstrap: BootstrapConfig,
-	/// Optional domain for HTTPS via Caddy reverse proxy with automatic
-	/// Let's Encrypt certificates. When `None`, serves plain HTTP on port 80.
-	/// DNS must be configured to point this domain to the instance's public IP.
+	/// Optional manually-routed domain for HTTPS via Caddy reverse proxy with
+	/// automatic Let's Encrypt certificates: external DNS must point it at the
+	/// instance's public IP. For records this block manages, declare
+	/// [`dns`](Self::with_dns) providers instead; Caddy serves the union. With
+	/// neither, the app's own port is opened for plain HTTP.
 	#[set_with(unwrap_option, into)]
 	domain: Option<SmolStr>,
 	/// AWS availability zone. Defaults to the stack's region with suffix 'a', ie `us-west-2a`.
@@ -48,6 +79,7 @@ pub struct LightsailBlock {
 	/// Lightsail blueprint ID, defaults to `amazon_linux_2023`.
 	blueprint_id: SmolStr,
 	/// Lightsail bundle ID (instance size), defaults to `nano_3_0`.
+	#[set_with(into)]
 	bundle_id: SmolStr,
 	/// Networking mode, defaults to static IPv4.
 	networking: LightsailNetworking,
@@ -71,6 +103,10 @@ impl Default for LightsailBlock {
 			bundle_id: "nano_3_0".into(),
 			networking: LightsailNetworking::default(),
 			env_vars: Vec::new(),
+			secret_env: Vec::new(),
+			dns: Vec::new(),
+			allow_ssh: false,
+			management_ssh_port: 2222,
 			bootstrap: default(),
 			app_port: None,
 		}
@@ -91,6 +127,56 @@ impl LightsailBlock {
 		} else {
 			"ec2-user"
 		}
+	}
+
+	/// Add a DNS record published at the instance's public address
+	/// (repeatable, see [`dns`](Self::dns)).
+	pub fn with_dns(mut self, dns: DnsProvider) -> Self {
+		self.dns.push(dns);
+		self
+	}
+
+	/// Add an env var delivered off-argv (repeatable, see
+	/// [`secret_env`](Self::secret_env)).
+	pub fn with_secret_env(
+		mut self,
+		key: impl Into<SmolStr>,
+		value: impl Into<SmolStr>,
+	) -> Self {
+		self.secret_env.push((key.into(), value.into()));
+		self
+	}
+
+	/// Every hostname Caddy serves: the manual [`domain`](Self::with_domain)
+	/// plus each [`dns`](Self::with_dns) authority. Non-empty means Caddy
+	/// terminates TLS on 80/443 and the app port stays private.
+	fn caddy_hostnames(&self) -> Vec<&SmolStr> {
+		self.domain
+			.iter()
+			.chain(self.dns.iter().map(|dns| dns.authority()))
+			.collect()
+	}
+
+	/// Publish each [`dns`](Self::with_dns) record at `address_ref`, a terra
+	/// field-ref resolving to the instance's public IP.
+	fn emit_dns(
+		&self,
+		stack: &Stack,
+		config: &mut terra::Config,
+		address_ref: &str,
+		ipv6: bool,
+	) -> Result {
+		for dns in &self.dns {
+			let suffix = dns.authority().replace('.', "-");
+			dns.emit_address(
+				stack,
+				config,
+				&self.build_label(&format!("dns-{suffix}")),
+				address_ref,
+				ipv6,
+			)?;
+		}
+		Ok(())
 	}
 
 	/// The port the application server listens on: the block's explicit
@@ -136,6 +222,10 @@ impl LightsailBlock {
 		let runtime = BootstrapConfig {
 			host: Some(core::net::Ipv4Addr::UNSPECIFIED.into()),
 			http_port: Some(app_port),
+			ssh_port: self.allow_ssh.then_some(22),
+			// the deployed stage, so the running process reports (and names cloud
+			// resources for) the stage it is actually deployed to.
+			stage: stack.stage().clone(),
 			deploy_id: Some(deploy_id.to_string().into()),
 			deploy_timestamp: Some(deploy_timestamp.to_string().into()),
 			..self.bootstrap.clone()
@@ -156,11 +246,44 @@ impl LightsailBlock {
 			.iter()
 			.map(|(key, value)| format!("Environment={key}={value}\n"))
 			.collect::<String>();
+		// secrets last, so a deploy can override any default above.
+		let secret_env_lines = self
+			.secret_env
+			.iter()
+			.map(|(key, value)| format!("Environment={key}={value}\n"))
+			.collect::<String>();
 
-		// build optional HTTPS setup via Caddy
-		let https_setup = if let Some(domain) = &self.domain {
+		// free port 22 for the TUI: comment out any explicit `Port` in the main
+		// sshd config and declare the management port in a drop-in, ordered
+		// before the unit starts so 22 is unbound when the app claims it
+		let ssh_setup = if self.allow_ssh {
+			let management_ssh_port = self.management_ssh_port;
+			format!(
+				r#"
+# move the management sshd off 22 so the app can serve ssh there
+sed -i 's/^Port /#Port /' /etc/ssh/sshd_config
+mkdir -p /etc/ssh/sshd_config.d
+echo 'Port {management_ssh_port}' > /etc/ssh/sshd_config.d/90-beet-management.conf
+systemctl restart sshd
+"#
+			)
+		} else {
+			String::new()
+		};
+
+		// build optional HTTPS setup via Caddy, one site block serving every
+		// hostname (the manual domain + the dns authorities)
+		let caddy_hostnames = self.caddy_hostnames();
+		let https_setup = if caddy_hostnames.is_empty() {
+			String::new()
+		} else {
+			let hostnames = caddy_hostnames
+				.iter()
+				.map(|hostname| hostname.as_str())
+				.collect::<Vec<_>>()
+				.join(", ");
 			let caddyfile = format!(
-				"{domain} {{\n    reverse_proxy localhost:{app_port}\n}}"
+				"{hostnames} {{\n    reverse_proxy localhost:{app_port}\n}}"
 			);
 			format!(
 				r#"
@@ -175,8 +298,6 @@ CADDY_EOF
 systemctl enable --now caddy
 "#
 			)
-		} else {
-			String::new()
 		};
 
 		// build CloudWatch agent setup for log forwarding; the log group matches
@@ -239,7 +360,7 @@ CONF
 mkdir -p /opt/{app_name}
 aws s3 cp "s3://{bucket}/versions/{deploy_id}/{label}" /opt/{app_name}/app
 chmod +x /opt/{app_name}/app
-
+{ssh_setup}
 # create systemd service with AWS credentials for runtime S3 access
 cat > /etc/systemd/system/{app_name}.service <<'EOF'
 [Unit]
@@ -257,8 +378,7 @@ Environment=RUST_LOG=info
 Environment=AWS_REGION={region}
 Environment=AWS_ACCESS_KEY_ID=__ACCESS_KEY_ID__
 Environment=AWS_SECRET_ACCESS_KEY=__ACCESS_KEY_SECRET__
-{bootstrap_env}__ENV_VARS__
-[Install]
+{bootstrap_env}__ENV_VARS__{secret_env_lines}[Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
@@ -272,13 +392,12 @@ systemctl enable --now {app_name}.service
 			.iter()
 			.map(|variable| {
 				format!(
-					"Environment={}=__VAR_{}__",
+					"Environment={}=__VAR_{}__\n",
 					variable.key(),
 					variable.key()
 				)
 			})
-			.collect::<Vec<_>>()
-			.join("\n");
+			.collect();
 
 		// replace placeholder tokens with terraform interpolation expressions
 		let mut script = script
@@ -340,6 +459,19 @@ impl Block for LightsailBlock {
 				user: user_name_ref.clone().into(),
 				policy_arn:
 					"arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy".into(),
+				..default()
+			},
+		);
+
+		// grant the user DynamoDB access for runtime table stores, eg analytics
+		let dynamo_policy_ident =
+			stack.resource_ident(self.build_label("deploy-dynamo-policy"));
+		let dynamo_policy = terra::ResourceDef::new_secondary(
+			dynamo_policy_ident,
+			AwsIamUserPolicyAttachmentDetails {
+				user: user_name_ref.clone().into(),
+				policy_arn: "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+					.into(),
 				..default()
 			},
 		);
@@ -423,41 +555,27 @@ impl Block for LightsailBlock {
 		let instance =
 			terra::ResourceDef::new_secondary(instance_ident, instance_details);
 
-		// SSH (22) is always open. With a domain Caddy terminates TLS on 80/443
-		// and proxies to the app's internal port; without one the app's own port
-		// (`app_port`) is opened directly so the binary is publicly reachable.
-		let mut port_info =
-			vec![AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-				from_port: 22,
+		// tcp port helper for the firewall entries below
+		let tcp_port =
+			|port: u16| AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+				from_port: port.into(),
 				protocol: "tcp".into(),
-				to_port: 22,
+				to_port: port.into(),
 				..default()
-			}];
-		if self.domain.is_some() {
-			port_info.extend([
-				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-					from_port: 80,
-					protocol: "tcp".into(),
-					to_port: 80,
-					..default()
-				},
-				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-					from_port: 443,
-					protocol: "tcp".into(),
-					to_port: 443,
-					..default()
-				},
-			]);
+			};
+		// Port 22 is always open: the management sshd by default, the beet ssh
+		// TUI under `allow_ssh` (management moves to `management_ssh_port`).
+		// With Caddy hostnames TLS terminates on 80/443 and proxies to the app's
+		// internal port; without any the app's own port (`app_port`) is opened
+		// directly so the binary is publicly reachable.
+		let mut port_info = vec![tcp_port(22)];
+		if self.allow_ssh {
+			port_info.push(tcp_port(self.management_ssh_port));
+		}
+		if self.caddy_hostnames().is_empty() {
+			port_info.push(tcp_port(self.app_port()));
 		} else {
-			let app_port = self.app_port();
-			port_info.push(
-				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-					from_port: app_port.into(),
-					protocol: "tcp".into(),
-					to_port: app_port.into(),
-					..default()
-				},
-			);
+			port_info.extend([tcp_port(80), tcp_port(443)]);
 		}
 		let ports = terra::ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("ports")),
@@ -473,6 +591,7 @@ impl Block for LightsailBlock {
 			.add_resource(&user)?
 			.add_resource(&policy)?
 			.add_resource(&cw_policy)?
+			.add_resource(&dynamo_policy)?
 			.add_resource(&access_key)?
 			.add_resource(&keypair)?
 			.add_resource(&log_group)?
@@ -508,11 +627,13 @@ impl Block for LightsailBlock {
 						"replace_triggered_by": [instance.field("id")]
 					}),
 				)?;
+				self.emit_dns(stack, config, &static_ip.field_ref("ip_address"), false)?;
 				(addr, "static_ipv4")
 			}
 			LightsailNetworking::Ipv6 => {
-				let addr = json!(instance.field_ref("ipv6_addresses[0]"));
-				(addr, "ipv6")
+				let addr_ref = instance.field_ref("ipv6_addresses[0]");
+				self.emit_dns(stack, config, &addr_ref, true)?;
+				(json!(addr_ref), "ipv6")
 			}
 		};
 
@@ -562,6 +683,89 @@ mod tests {
 		(script.to_string(), dir)
 	}
 
+	/// The rendered terraform config json for a block.
+	fn build_json(block: &LightsailBlock) -> String {
+		let (stack, _dir) = Stack::default_local();
+		let mut config = stack.create_config();
+		let mut world = World::new();
+		block
+			.apply_to_config(&world.spawn(()).as_readonly(), &stack, &mut config)
+			.unwrap();
+		config.to_json().to_string()
+	}
+
+	/// `allow_ssh`: the TUI takes 22 (`BEET_SSH_PORT=22`), cloud-init relocates
+	/// the management sshd before the unit starts, and the firewall opens the
+	/// management port. Without it the sshd keeps 22 untouched.
+	#[beet_core::test]
+	fn allow_ssh_takes_22_and_relocates_management() {
+		let block = LightsailBlock::default().with_allow_ssh(true);
+		let (script, _dir) = build_user_data(&block);
+		script
+			.as_str()
+			.xpect_contains("Environment=BEET_SSH_PORT=22")
+			.xpect_contains("Port 2222")
+			.xpect_contains("systemctl restart sshd");
+		// the relocation runs before the unit claims 22
+		let sshd_move = script.find("systemctl restart sshd").unwrap();
+		let unit_start = script.find("systemctl enable --now").unwrap();
+		(sshd_move < unit_start).xpect_true();
+		build_json(&block).xpect_contains("2222");
+		let (script, _dir) = build_user_data(&LightsailBlock::default());
+		script.as_str().xnot().xpect_contains("sshd");
+	}
+
+	/// Secret env rides the unit's `Environment=` lines, never `ExecStart`.
+	#[beet_core::test]
+	fn secret_env_rides_environment_lines() {
+		let (script, _dir) =
+			build_user_data(&LightsailBlock::default().with_secret_env(
+				"BEET_SSH_HOST_KEY",
+				"abc123",
+			));
+		script
+			.as_str()
+			.xpect_contains("Environment=BEET_SSH_HOST_KEY=abc123")
+			.xnot()
+			.xpect_contains("app abc123");
+	}
+
+	/// The IAM user carries the runtime store policies: S3 (site), CloudWatch
+	/// (log forwarding) and DynamoDB (analytics).
+	#[beet_core::test]
+	fn grants_runtime_policies() {
+		build_json(&LightsailBlock::default())
+			.xpect_contains("AmazonS3FullAccess")
+			.xpect_contains("CloudWatchAgentServerPolicy")
+			.xpect_contains("AmazonDynamoDBFullAccess");
+	}
+
+	/// Declared dns providers emit `A` records at the static IP (proxied flag
+	/// preserved), land in the Caddyfile as one site block, and switch the
+	/// firewall to 80/443 in place of the app port.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn dns_emits_a_records_and_caddy_hostnames() {
+		let block = LightsailBlock::default()
+			.with_dns(
+				DnsProvider::cloudflare("example.org", "zone123")
+					.with_proxied(true),
+			)
+			.with_dns(DnsProvider::cloudflare("app.example.org", "zone123"));
+		build_json(&block)
+			.xpect_contains("cloudflare_dns_record")
+			.xpect_contains("\"type\":\"A\"")
+			.xpect_contains("\"proxied\":true")
+			.xpect_contains("\"proxied\":false")
+			.xpect_contains("\"from_port\":443")
+			.xnot()
+			.xpect_contains("\"from_port\":8337");
+		let (script, _dir) = build_user_data(&block);
+		script
+			.as_str()
+			.xpect_contains("example.org, app.example.org {");
+	}
+
 	/// REGRESSION: the unit must write `BEET_HTTP_PORT`, the name the runtime
 	/// actually reads. It used to write `BEET_PORT`, which nothing read, so a
 	/// deploy on a non-default port silently bound 8337 anyway. Rendering through
@@ -579,18 +783,20 @@ mod tests {
 	}
 
 	/// Boot selection rides `ExecStart` as validated argv; ambient service config
-	/// rides `Environment=` lines.
+	/// rides `Environment=` lines. The deployed stage is a platform binding: it
+	/// flows from the stack, not the authored bootstrap.
 	#[beet_core::test]
 	fn splits_exec_and_env_channels() {
-		let (script, _dir) =
-			build_user_data(&LightsailBlock::default().with_bootstrap(
-				BootstrapConfig {
-					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
-					server: Some(ServerFilter::new("http")),
-					stage: "staging".into(),
-					..default()
-				},
-			));
+		let (stack, _dir) = Stack::default_local();
+		let stack = stack.with_stage("staging");
+		let script = LightsailBlock::default()
+			.with_bootstrap(BootstrapConfig {
+				store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+				server: Some(ServerFilter::new("http")),
+				..default()
+			})
+			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.unwrap();
 		script
 			.as_str()
 			.xpect_contains(

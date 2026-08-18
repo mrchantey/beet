@@ -35,11 +35,11 @@ impl Plugin for InfraExamplesPlugin {
 			.register_template::<NamedBucket>()
 			.register_template::<SiteSync>()
 			// the beet-site deployer (root main.bsx): assets bucket, generic dir
-			// sync, the stage-aware fargate block, and its stack-bearing host.
+			// sync, the stage-aware lightsail block, and its stack-bearing host.
 			.register_template::<AssetsBucket>()
 			.register_template::<AnalyticsTable>()
 			.register_template::<DirSync>()
-			.register_template::<FargateBeetSiteBlock>()
+			.register_template::<LightsailBeetSiteBlock>()
 			.register_template::<BeetSiteDeployHost>()
 			.register_template::<LambdaSiteBlock>()
 			.register_template::<LambdaWatch>()
