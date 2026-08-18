@@ -7,6 +7,11 @@ expanded = true
 
 # The Full Moon Harvest
 
+#### [#14 — ATProto isn't malleable yet](/blog/post-14)
+*Pete Hayman — 14th August, 2026*
+
+The locked open stack is missing a layer.
+
 #### [#13 — Engines, not frameworks](/blog/post-13)
 *Pete Hayman — 29th June, 2026*
 
