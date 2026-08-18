@@ -43,6 +43,10 @@ impl SshCredentials {
 /// - [`SshEvent::Connect`] — a client opened a session
 /// - [`SshEvent::Close`] — the client disconnected
 ///
+/// The server owns the connection entity end to end: it is spawned on connect and
+/// despawned once observers have seen the close, so per-connection state belongs
+/// on it (and dies with it) rather than in a map a disconnect has to prune.
+///
 /// Register handlers as global observers, not per-server observers:
 /// ```rust,ignore
 /// app.add_observer(my_listener).world_mut().spawn(SshServer::default());
@@ -183,6 +187,69 @@ impl Default for SshServer {
 mod tests {
 	use super::*;
 	use crate::ssh::*;
+
+	/// Poll `check` every 10ms until it holds, failing with `message` after ~2s.
+	/// The server runs in its own thread, so its progress is only observable
+	/// through the shared stores.
+	async fn poll_until(mut check: impl FnMut() -> bool, message: &str) {
+		for _ in 0..200 {
+			if check() {
+				return;
+			}
+			time_ext::sleep_millis(10).await;
+		}
+		panic!("{message}");
+	}
+
+	/// Connect anonymously and drop the session straight away, so the client is
+	/// gone by the time this returns. Retries while the server thread boots, which
+	/// a fixed sleep cannot promise on a loaded machine.
+	async fn connect_then_disconnect(addr: &str) {
+		for _ in 0..100 {
+			if SshSession::connect_raw(addr, None, None).await.is_ok() {
+				return;
+			}
+			time_ext::sleep_millis(20).await;
+		}
+		panic!("client never connected to the test server");
+	}
+
+	/// Regression: a gone client's connection entity goes with it, and it is
+	/// announced before it is reclaimed. The accept loop spawns one entity per
+	/// connection, so a server that never reclaims them keeps an entity — and the
+	/// tokio task forwarding to that client — for every client that ever
+	/// connected, which is a long-running server filling up.
+	#[beet_core::test]
+	async fn despawns_connection_on_disconnect() {
+		let (server, on_spawn) = SshServer::new_test();
+		let addr = server.local_address();
+		let events = Store::<Vec<&'static str>>::default();
+		let live = Store::<usize>::default();
+		let (log, count) = (events.clone(), live.clone());
+
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, SshServerPlugin))
+				.add_observer(move |ev: On<SshRecv>| match **ev {
+					SshEvent::Connect => log.push("connect"),
+					SshEvent::Close(_) => log.push("close"),
+					_ => {}
+				})
+				.add_systems(Update, move |peers: Query<(), With<SshPeerInfo>>| {
+					count.set(peers.iter().count())
+				});
+			app.world_mut().spawn((server, on_spawn));
+			app.run();
+		});
+
+		connect_then_disconnect(&addr).await;
+
+		// the whole lifecycle, in order: even a client gone this fast is announced
+		// before it closes, and its entity is reclaimed after.
+		poll_until(|| events.len() == 2, "server never saw the client go").await;
+		events.get().xpect_eq(vec!["connect", "close"]);
+		poll_until(|| live.get() == 0, "connection outlived its client").await;
+	}
 
 	/// Verifies that a client can connect and data flows bidirectionally.
 	#[beet_core::test]

@@ -107,6 +107,11 @@ pub(crate) fn sync_reflect_field_bindings(world: &mut World) {
 	world.resource_scope(|world, mut cache: Mut<ComponentBindingCache>| {
 		let last_run = cache.ticks.last_run;
 		cache.ticks.last_run = this_run;
+		// bindings live in page trees that come and go (one per terminal session),
+		// so entries keyed by a despawned binding outlive it unless dropped here.
+		cache
+			.reserved_targets
+			.retain(|entity, _| world.get_entity(*entity).is_ok());
 		for (entity, value_changed, value_added, binding) in bindings {
 			let Some((reflect_component, component_id)) = resolve_component(
 				world,
@@ -405,6 +410,37 @@ mod test {
 			.unwrap()
 			.value
 			.xpect_eq(11);
+	}
+
+	/// Regression: a despawned binding's cached target goes with it. Bindings live
+	/// in page trees that come and go (one per terminal session), so a cache keyed
+	/// by binding entity grows an entry for every page ever built.
+	#[beet_core::test]
+	fn despawned_binding_drops_its_cached_target() {
+		let mut world = world();
+		let marked = world.spawn((Marker, Slider { value: 3 })).id();
+		let binding = |marked| {
+			(
+				ChildOf(marked),
+				Value::default(),
+				ReflectFieldRef::new("Slider", "value")
+					.with_target(BindingTarget::Reserved("Marker".into())),
+			)
+		};
+		let entity = world.spawn(binding(marked)).id();
+		// a second binding outlives the first: the sync skips a world with no
+		// bindings at all, so something must keep it running (as a live app does).
+		world.spawn(binding(marked));
+		world.update_local();
+		let cached = |world: &World| {
+			world.resource::<ComponentBindingCache>().reserved_targets.len()
+		};
+		cached(&world).xpect_eq(2);
+
+		world.entity_mut(entity).despawn();
+		world.update_local();
+
+		cached(&world).xpect_eq(1);
 	}
 
 	#[beet_core::test]

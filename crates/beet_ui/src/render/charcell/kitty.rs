@@ -488,6 +488,21 @@ impl KittyPlacements {
 	}
 }
 
+/// Observer: drop a gone terminal's placement state.
+///
+/// The map is keyed by surface, and a multi-tenant server's surfaces come and go
+/// with its clients (one per SSH session), so without this it grows an entry —
+/// with every id it ever transmitted — for every client that ever connected.
+/// Registered by [`CharcellPlugin`](crate::prelude::CharcellPlugin) beside the
+/// resource.
+#[cfg(feature = "tui")]
+pub(crate) fn clear_kitty_placements(
+	ev: On<Remove, Terminal>,
+	mut placements: ResMut<KittyPlacements>,
+) {
+	placements.terminals.remove(&ev.entity);
+}
+
 /// ECS system: transmit and (re)place each visible [`KittyImage`] after the
 /// cell renderer has drawn, diffing against [`KittyPlacements`] so escapes are
 /// only emitted when an image appears, moves, resizes, or disappears.
@@ -838,6 +853,25 @@ mod test {
 		String::from_utf8_lossy(&host.frame_ansi())
 			.into_owned()
 			.xpect_contains("a=d,d=i,i=1,q=2");
+	}
+
+	/// Regression: a gone terminal's placements go with it. The state is keyed by
+	/// surface in a resource, and a multi-tenant server's surfaces close with their
+	/// clients (one per SSH session), so a stale entry per client — each holding
+	/// every image id it was sent — outlives every session that ever connected.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn despawned_terminal_drops_its_placements() {
+		let mut host = image_host(100, 40);
+		host.frame_ansi();
+		let tracked = |host: &TestHost| {
+			host.app.world().resource::<KittyPlacements>().terminals.len()
+		};
+		tracked(&host).xpect_eq(1);
+
+		host.app.world_mut().entity_mut(host.host).despawn();
+
+		tracked(&host).xpect_eq(0);
 	}
 
 	/// A small SVG exercising every feature the deck figures use — an internal

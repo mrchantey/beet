@@ -146,6 +146,9 @@ impl Plugin for CharcellPlugin {
 		// insert it (a `StdioTerminal` from the env, an SSH session from its pty).
 		#[cfg(feature = "tui")]
 		app.init_resource::<KittyPlacements>()
+			// a surface's placements are per-terminal state in a resource, so they
+			// leave with their terminal rather than with its entity.
+			.add_observer(clear_kitty_placements)
 			// before the cascade so the `graphics` state (and the block box it
 			// selects) resolves the same frame the raster attaches — no
 			// one-frame alt-text flash.

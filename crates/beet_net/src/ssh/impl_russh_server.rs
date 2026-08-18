@@ -71,11 +71,9 @@ pub(crate) async fn start_russh_server_with_tcp(
 	Ok(())
 }
 
-/// Spawns child entity with [`SshPeerInfo`] and wires up bidirectional data flow.
-async fn handle_connection(
-	server: AsyncEntity,
-	info: NewConnectionInfo,
-) -> Result {
+/// Spawns the connection entity with [`SshPeerInfo`] and wires up bidirectional
+/// data flow, for the whole life of the connection.
+async fn handle_connection(server: AsyncEntity, info: NewConnectionInfo) {
 	let server_id = server.id();
 	let to_client = info.to_client;
 	let from_client = info.from_client;
@@ -85,19 +83,21 @@ async fn handle_connection(
 	// Clone for the send observer (the recv loop takes the original).
 	let to_client_obs = to_client.clone();
 
-	// Spawn child entity and return its ID so we can trigger SshRecv(Connect) on it.
-	let child_id = server
+	// Spawn the connection entity, announce it, and start its recv loop, all in
+	// one world scope: the loop cannot deliver a close (or despawn the entity)
+	// before the connect it holds the world against, so a client that vanishes
+	// immediately is still seen to connect before it is seen to go.
+	server
 		.world()
-		.with(move |world: &mut World| -> Entity {
-			let mut entity_mut = world.spawn((
-				SshPeerInfo {
-					username,
-					peer_addr,
-				},
-				ChildOf(server_id),
-			));
-			let child_id = entity_mut.id();
-			entity_mut
+		.with(move |world: &mut World| {
+			world
+				.spawn((
+					SshPeerInfo {
+						username,
+						peer_addr,
+					},
+					ChildOf(server_id),
+				))
 				.observe_any(
 					move |ev: On<SshSend>, commands: AsyncCommands| -> Result {
 						let to_client = to_client_obs.clone();
@@ -111,28 +111,26 @@ async fn handle_connection(
 						Ok(())
 					},
 				)
+				// auto_propagate carries this up to the server entity, so server
+				// observers get original_target() == the connection.
+				.trigger_target(SshRecv(SshEvent::Connect))
 				.run_async_local(async move |child_entity| {
 					while let Ok(event) = from_client.recv().await {
 						child_entity.trigger_target(SshRecv(event)).await.ok();
 					}
-					// Channel closed — fire a Close event so observers can clean up.
+					// Channel closed — fire a Close event so observers can clean up,
+					// then reclaim the connection: the accept loop spawned this
+					// entity, so it owns the whole lifecycle. Despawning it drops the
+					// send observer with it, ending the client's forwarding task, so a
+					// disconnect leaves nothing behind for a long-running server.
 					child_entity
 						.trigger_target(SshRecv(SshEvent::Close(None)))
 						.await
 						.ok();
+					child_entity.despawn().await.ok();
 				});
-			child_id
 		})
 		.await;
-
-	// Trigger SshRecv(Connect) on the child entity — auto_propagate carries it
-	// up to the server entity, so server observers get original_target() == child.
-	server
-		.world()
-		.entity(child_id)
-		.trigger_target(SshRecv(SshEvent::Connect))
-		.await?;
-	Ok(())
 }
 
 /// Runs the russh server loop inside the shared tokio runtime.

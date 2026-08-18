@@ -359,7 +359,7 @@ impl Navigator {
 	}
 
 	/// Bind `page` to this navigator's surface (its [`PageHost`], resolved
-	/// structurally from the navigator entity), logging if it has none.
+	/// structurally from the navigator entity), reclaiming the page if it has none.
 	async fn bind_page(entity: &AsyncEntity, page: Entity) {
 		let navigator = entity.id();
 		entity
@@ -367,9 +367,15 @@ impl Navigator {
 			.with(move |world| match PageHost::of(world, navigator) {
 				Some(host) => bind_surface_page(world, host, page),
 				None => {
-					error!(
-						"navigator {navigator} has no page host to render into"
-					)
+					// a *despawned* navigator is an ssh client that disconnected
+					// while its page was building, not a misconfiguration; either
+					// way the finished page has nowhere to paint, so reclaim it.
+					if world.get_entity(navigator).is_ok() {
+						error!(
+							"navigator {navigator} has no page host to render into"
+						);
+					}
+					despawn_page_ephemerals(world, page, None);
 				}
 			})
 			.await;

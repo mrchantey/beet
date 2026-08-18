@@ -203,9 +203,8 @@ fn ssh_read(
 				term.send_input(bytes)?;
 			}
 		}
-		SshEvent::Close(_) => {
-			commands.entity(entity).despawn();
-		}
+		// the accept loop despawns the connection after this event, taking the
+		// terminal and buffer inserted above with it.
 		_ => {}
 	}
 	Ok(())

@@ -71,15 +71,38 @@ fn page_viewport_style() -> impl Bundle {
 /// Marks an app that paints live navigator pages into [`PageHost::bundle`] surfaces.
 ///
 /// Pairs with [`CharcellPlugin`] + [`RealtimeParsePlugin`] (the repaint loop) and
-/// [`NavigatorPlugin`] (which navigates). The page-to-surface binding is now
-/// direct (a [`Navigator`] calls [`bind_surface_page`] on its co-located host),
-/// so there is no per-frame sync system; this plugin remains the documented home
-/// for the live-render composition.
+/// [`NavigatorPlugin`] (which navigates). The page-to-surface binding is direct (a
+/// [`Navigator`] calls [`bind_surface_page`] on its co-located host), so there is
+/// no per-frame sync system; what this plugin owns is the other end of that
+/// binding, the page lifecycle: a page outlives each render but never its surface.
 #[derive(Default)]
 pub struct LivePagePlugin;
 
 impl Plugin for LivePagePlugin {
-	fn build(&self, _app: &mut App) {}
+	fn build(&self, app: &mut App) {
+		app.add_observer(despawn_page_with_surface);
+	}
+}
+
+/// Observer: a despawned surface takes its bound page with it.
+///
+/// A page is a *root* entity linked to its surface by [`RenderSurface`], not a
+/// child of it, so no structural cleanup reclaims it: a closing SSH session
+/// despawns its connection (the surface) and would otherwise leave the whole page
+/// tree, layout chrome and all, alive for the life of the process — one per client
+/// that ever connected. Reclaims exactly what a navigation swap does, so a shared
+/// [`FixedPage`] route (no ephemerals) outlives the surfaces viewing it.
+fn despawn_page_with_surface(
+	ev: On<Despawn, RenderSurfaceOf>,
+	surfaces: Query<&RenderSurfaceOf>,
+	mut commands: Commands,
+) {
+	let Ok(page) = surfaces.get(ev.entity).map(RenderSurfaceOf::page) else {
+		return;
+	};
+	commands.queue(move |world: &mut World| {
+		despawn_page_ephemerals(world, page, None);
+	});
 }
 
 /// Resolve `request` against the router's [`RouteTree`] and build the matched
@@ -166,7 +189,13 @@ pub(crate) fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity>
 /// another session's page.
 pub(crate) fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
 	let Some(slot) = page_slot_of(world, host) else {
-		error!("page host {host} has no PageSlot child");
+		// a host that went away while its page was building (a client
+		// disconnecting mid-navigation) is not a misconfiguration; either way the
+		// page has no surface to paint into, so reclaim it rather than leak it.
+		if world.get_entity(host).is_ok() {
+			error!("page host {host} has no PageSlot child");
+		}
+		despawn_page_ephemerals(world, page, None);
 		return;
 	};
 	// the page currently bound to this surface, to clean up after the swap.
@@ -180,17 +209,35 @@ pub(crate) fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
 	world.entity_mut(page).insert(RenderSurface(host));
 	world.entity_mut(slot).insert(Portal::new(page));
 
-	// despawn the outgoing page's ephemerals now that nothing references them.
+	// despawn the outgoing page's ephemerals now that nothing references them,
+	// keeping the incoming page (a fixed route rebinding to itself).
 	if let Some(outgoing) = outgoing.filter(|outgoing| *outgoing != page) {
-		let stale = world
-			.entity(outgoing)
-			.get::<DespawnAfterRender>()
-			.map(|despawn| despawn.0.clone())
-			.unwrap_or_default();
-		for entity in stale.into_iter().filter(|entity| *entity != page) {
-			if let Ok(entity) = world.get_entity_mut(entity) {
-				entity.despawn();
-			}
+		despawn_page_ephemerals(world, outgoing, Some(page));
+	}
+}
+
+/// Despawn `page`'s [`DespawnAfterRender`] entities — its per-request tree and the
+/// layout chrome wrapping it — skipping `keep`.
+///
+/// The one rule for reclaiming a page that will not be shown, whether replaced by
+/// a navigation, torn down with its surface, or built for a surface that has
+/// already gone: ownership is what the page recorded to clean up, never tree
+/// membership, so a shared fixed route (an empty set) and any fragment slotted
+/// into the page survive.
+pub(crate) fn despawn_page_ephemerals(
+	world: &mut World,
+	page: Entity,
+	keep: Option<Entity>,
+) {
+	let stale = world
+		.get_entity(page)
+		.ok()
+		.and_then(|entity| entity.get::<DespawnAfterRender>())
+		.map(|despawn| despawn.0.clone())
+		.unwrap_or_default();
+	for entity in stale.into_iter().filter(|entity| Some(*entity) != keep) {
+		if let Ok(entity) = world.get_entity_mut(entity) {
+			entity.despawn();
 		}
 	}
 }
@@ -217,14 +264,18 @@ impl PageHost {
 	}
 }
 
-/// The [`PageSlot`] descendant of `host` (a grandchild as [`PageHost::bundle`] spawns it).
+/// The [`PageSlot`] descendant of `host` (a grandchild as [`PageHost::bundle`]
+/// spawns it), or `None` for a host with no slot — a despawned one included.
 fn page_slot_of(world: &World, host: Entity) -> Option<Entity> {
 	let mut stack = vec![host];
 	while let Some(entity) = stack.pop() {
-		if world.entity(entity).contains::<PageSlot>() {
-			return Some(entity);
+		let Ok(entity) = world.get_entity(entity) else {
+			continue;
+		};
+		if entity.contains::<PageSlot>() {
+			return Some(entity.id());
 		}
-		if let Some(children) = world.entity(entity).get::<Children>() {
+		if let Some(children) = entity.get::<Children>() {
 			stack.extend(children.iter());
 		}
 	}

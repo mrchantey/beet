@@ -214,11 +214,16 @@ pub(crate) fn scrollbar_mouse(
 		ScrollbarHitTest,
 		Query<&'static mut ScrollPosition>,
 	)>,
+	surfaces: Query<Entity>,
 	// drag + last cursor are kept per surface (window), so a drag on one SSH
 	// session never moves another's scrollbar.
 	mut drag: Local<HashMap<Entity, ScrollbarDrag>>,
 	mut last_cursor: Local<HashMap<Entity, IVec2>>,
 ) {
+	// per-surface state outside the world outlives the surface it belongs to, so
+	// a closed session (an ssh client disconnecting) is pruned by hand.
+	drag.retain(|surface, _| surfaces.contains(*surface));
+	last_cursor.retain(|surface, _| surfaces.contains(*surface));
 	// phase 1 (read-only hit-test): collect the offset writes this frame implies.
 	let mut writes = Vec::<ScrollWrite>::new();
 	{

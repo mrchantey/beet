@@ -97,7 +97,10 @@ pub struct SshTuiPlugin;
 
 impl Plugin for SshTuiPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<SshTuiServer>()
+		// every connection gets a page-bound surface, so the page lifecycle is not
+		// optional here: without it a closed session leaves its page behind.
+		app.init_plugin::<LivePagePlugin>()
+			.register_type::<SshTuiServer>()
 			.add_observer(on_ssh_recv)
 			// drain each surface's painted frame to its client after the render
 			// pipeline (PostParseTree, which RealtimeParsePlugin runs after Update).
@@ -193,11 +196,9 @@ fn on_ssh_recv(
 				}
 			}
 		}
-		SshEvent::Close(_) => {
-			// the navigator is co-located on the connection surface, so despawning
-			// the connection tears down the whole session.
-			commands.entity(connection).despawn();
-		}
+		// a close needs no handling here: the accept loop despawns the connection
+		// once observers have seen it, and the whole surface (terminal, buffer,
+		// navigator and its page) is co-located on that entity.
 		_ => {}
 	}
 	Ok(())
@@ -222,7 +223,7 @@ fn ssh_write(
 /// System: ctrl+c closes only the originating session, never the process. It
 /// restores the client terminal (the leave sequences) *before* sending
 /// [`SshEvent::Close`], so the client is not left in raw mouse-tracking mode; the
-/// resulting [`SshRecv`] close despawns its surface.
+/// client then goes away and the accept loop despawns its surface.
 fn close_session_on_ctrl_c(
 	mut keys: MessageReader<KeyboardInput>,
 	connections: Query<(), With<SshPeerInfo>>,
@@ -408,6 +409,124 @@ mod test {
 			}
 		}
 		panic!("ssh surface frame never contained '{needle}'");
+	}
+
+	/// Close a session exactly as the accept loop does when a client disconnects:
+	/// fire [`SshEvent::Close`] for observers, then despawn the connection entity
+	/// it spawned.
+	fn close_connection(app: &mut App, connection: Entity) {
+		app.world_mut()
+			.entity_mut(connection)
+			.trigger_target(SshRecv(SshEvent::Close(None)));
+		app.world_mut().entity_mut(connection).despawn();
+		app.update();
+	}
+
+	/// The page currently bound to a connection's surface.
+	fn bound_page(app: &App, connection: Entity) -> Entity {
+		app.world()
+			.entity(connection)
+			.get::<RenderSurfaceOf>()
+			.expect("connection has no bound page")
+			.page()
+	}
+
+	/// Open a session, wait for `needle` to paint, then close it.
+	fn open_and_close(app: &mut App, server: Entity, needle: &str) {
+		let connection = open_connection(app, server, UVec2::new(40, 8));
+		drive_until(app, connection, needle);
+		close_connection(app, connection);
+	}
+
+	/// Cycle sessions against `server`, asserting the world does not grow. The
+	/// first cycle is the warmup that spawns any one-off entities; the rest must
+	/// leave the count exactly where they found it.
+	fn expect_no_growth(app: &mut App, server: Entity, needle: &str) {
+		open_and_close(app, server, needle);
+		let baseline = app.world().iter_entities().count();
+		for _ in 0..3 {
+			open_and_close(app, server, needle);
+		}
+		app.world().iter_entities().count().xpect_eq(baseline);
+	}
+
+	/// Regression (the deployed ssh site's memory leak): a disconnected client
+	/// leaves nothing behind. A session's live page is a *root* entity bound to its
+	/// surface by [`RenderSurface`], not a child of the connection, so despawning
+	/// the connection alone left the whole page tree — layout chrome and all —
+	/// alive forever, one per client that ever connected.
+	#[beet_core::test]
+	async fn closing_a_session_despawns_its_page() {
+		let mut app = ssh_tui_app();
+		let server = spawn_server(&mut app);
+		let connection = open_connection(&mut app, server, UVec2::new(40, 8));
+		drive_until(&mut app, connection, "Alpha page");
+		let page = bound_page(&app, connection);
+
+		close_connection(&mut app, connection);
+
+		app.world().get_entity(page).is_err().xpect_true();
+	}
+
+	/// Regression: connect/disconnect cycles do not grow the world. The page
+	/// despawn above is the bulk of it, but the count catches anything else a
+	/// session leaves behind, which is what filled the long-running server.
+	#[beet_core::test]
+	async fn session_cycles_do_not_grow_the_world() {
+		let mut app = ssh_tui_app();
+		let server = spawn_server(&mut app);
+		expect_no_growth(&mut app, server, "Alpha page");
+	}
+
+	/// Regression: a client that disconnects *while its opening page is still
+	/// building* leaves nothing behind either. The build finishes against a surface
+	/// that is already gone, so nothing ever binds it and no teardown can find it —
+	/// the bind step has to reclaim it. Common in the wild: a port scanner, or
+	/// anyone who ctrl-c's a slow first paint.
+	///
+	/// The route is gated on a channel the test holds, so the disconnect lands
+	/// while the page build is genuinely parked mid-flight.
+	#[beet_core::test]
+	async fn closing_a_session_mid_load_leaves_nothing() {
+		use beet_core::exports::async_channel;
+		let (release, gate) = async_channel::unbounded::<()>();
+		let mut app = ssh_tui_app();
+		let server = app
+			.world_mut()
+			.spawn((
+				SshTuiServer::default(),
+				OpeningRoute(Url::parse("alpha")),
+				children![(Router, children![render_action::async_route(
+					"alpha",
+					move |_cx: ActionContext<Request>| {
+						let gate = gate.clone();
+						async move {
+							gate.recv().await.ok();
+							rsx! { <p>"Alpha page"</p> }
+						}
+					}
+				)])],
+			))
+			.flush();
+
+		// a warmup cycle (released immediately), so one-off entities are spawned
+		release.send(()).await.unwrap();
+		open_and_close(&mut app, server, "Alpha page");
+		let baseline = app.world().iter_entities().count();
+
+		// open a session and let its build park in the gated handler
+		let connection = open_connection(&mut app, server, UVec2::new(40, 8));
+		for _ in 0..10 {
+			app.update();
+		}
+		// the client disconnects, *then* the page it asked for finishes building
+		close_connection(&mut app, connection);
+		release.send(()).await.unwrap();
+		for _ in 0..20 {
+			app.update();
+		}
+
+		app.world().iter_entities().count().xpect_eq(baseline);
 	}
 
 	/// A pty request builds the surface (channel terminal + buffer) and an in-world
@@ -657,6 +776,18 @@ mod test {
 				)],
 			))
 			.flush()
+	}
+
+	/// Regression: the teardown holds for the deployed page shape, a
+	/// [`BaseLayout`]-wrapped route. The layout chrome is a second ephemeral tree
+	/// built per session on top of the route's own, both recorded on the page's
+	/// [`DespawnAfterRender`], so a closed session must reclaim the pair. Runs on
+	/// the plain harness: no input is driven, only the page lifecycle.
+	#[beet_core::test]
+	async fn layout_session_cycles_do_not_grow_the_world() {
+		let mut app = ssh_tui_app();
+		let server = spawn_drawer_router(&mut app);
+		expect_no_growth(&mut app, server, "Home page");
 	}
 
 	/// The string value of attribute `key` on element `entity`, if present.

@@ -175,9 +175,13 @@ pub(crate) fn pointer_input(
 	mut buttons: MessageReader<MouseButtonInput>,
 	hit_test: HitTest,
 	mut commands: Commands,
+	surfaces: Query<Entity>,
 	mut pointers: Query<&mut Pointer>,
 	mut last_cursor: Local<HashMap<Entity, IVec2>>,
 ) -> Result {
+	// per-surface state outside the world outlives the surface it belongs to, so
+	// a closed session (an ssh client disconnecting) is pruned by hand.
+	last_cursor.retain(|surface, _| surfaces.contains(*surface));
 	// the pointer lives on the surface (window) entity, so cursor/button events
 	// route to their own surface's pointer and hit-test only that surface's buffer.
 	for moved in cursor.read() {
