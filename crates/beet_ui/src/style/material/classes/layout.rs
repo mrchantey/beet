@@ -59,17 +59,27 @@ pub fn app_bar_terminal() -> Rule {
 		})
 }
 
-/// Web app bar - wraps its leading cluster and nav onto separate rows once they
-/// no longer fit on one line, so a very narrow screen (eg a 320px phone) drops
-/// the Docs/Blog/GitHub nav below the wordmark rather than overflowing the page
-/// width. Inert while the bar fits (a single-row `space-between` as before).
-/// Screen-gated: the terminal keeps its deliberately single-row app bar (see
-/// [`app_bar_terminal`]).
+/// Web app bar - wraps onto extra rows if its content genuinely no longer fits
+/// on one line. Above the nav-collapse breakpoint (below it the nav links hide,
+/// see [`app_bar_nav_hidden`]) this only fires for a bar whose content outgrows
+/// a wide viewport, rather than overflowing the page width. Screen-gated: the
+/// terminal keeps its deliberately single-row app bar (see [`app_bar_terminal`]).
 pub fn app_bar_web() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::class(APP_BAR))
 		.with_value(common_props::FlexWrapProp, FlexWrap::Wrap)
+}
+
+/// App bar nav on narrow viewports - hidden at or below the sidebar collapse
+/// breakpoint on both targets, where navigation lives in the drawer behind the
+/// [`MenuButton`](super::MENU_BUTTON) instead: a wrapped second row of header
+/// links would spend an already-small screen's height duplicating it.
+pub fn app_bar_nav_hidden() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::MaxWidth(super::SIDEBAR_BREAKPOINT_PX))
+		.with_selector(Selector::class(APP_BAR_NAV))
+		.with_value(common_props::DisplayProp, Display::None)
 }
 
 /// App bar navigation - a flex row so its links are spaced rather than running

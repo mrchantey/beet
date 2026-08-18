@@ -381,6 +381,8 @@ mod test {
 			crate::style::material::MaterialStylePlugin::default(),
 		)
 			.into_world();
+		// the site identity `Header` reads; the live pipeline seeds it
+		world.init_resource::<PackageConfig>();
 		let root = world.spawn_template(template).unwrap().id();
 		world.entity_mut(root).insert(FlexBuffer::new(width));
 		world.run_schedule(crate::parse::PostParseTree);
@@ -545,6 +547,27 @@ mod test {
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 	}
 
+	/// The header's nav-links cluster is responsive on the terminal exactly
+	/// like the web: shown above the collapse breakpoint, hidden below it —
+	/// where the drawer behind the [`MenuButton`] owns navigation, rather than
+	/// a wrapped second header row spending the small screen's height.
+	#[beet_core::test]
+	fn app_bar_nav_follows_breakpoint() {
+		let template = || {
+			rsx! {
+				<Header>
+					<Link slot="nav" href="/docs" variant=ButtonVariant::Text>"NavDocs"</Link>
+				</Header>
+			}
+		};
+		// wide: the nav links render in the bar
+		render_plain_sized(100, template()).xpect_contains("NavDocs");
+		// narrow: hidden, navigation lives in the drawer
+		render_plain_sized(40, template())
+			.xnot()
+			.xpect_contains("NavDocs");
+	}
+
 	/// Below the breakpoint an open rail overlays the container's content
 	/// instead of joining its flex row: `<main>` keeps the full surface width
 	/// with the drawer absolutely positioned over its left edge — the terminal
@@ -595,6 +618,41 @@ mod test {
 		nav.min.x.xpect_eq(0);
 		(nav.max.x > 5).xpect_true();
 		(nav.max.x < width as i32).xpect_true();
+	}
+
+	/// The open drawer clips a nav list taller than itself to its own box
+	/// (scrolling it within), rather than spilling the overflow over whatever
+	/// sits below the container — the terminal half of the drawer's
+	/// `overflow-y: auto`, guarding the footer-occlusion regression.
+	#[beet_core::test]
+	fn narrow_open_rail_clips_to_container() {
+		let links: Vec<_> = (0..20)
+			.map(|i| {
+				rsx! { <a {Classes::new([classes::SIDEBAR_LINK])} href="/x">{format!("link-{i}")}</a> }
+			})
+			.collect();
+		let out = render_plain_sized(40, rsx! {
+			<div>
+				<div {Classes::new([classes::CONTAINER])}>
+					<nav id="sidebar" aria-hidden="false" {Classes::new([classes::SIDEBAR])}>
+						{links}
+					</nav>
+					<main>
+						<p>"content"</p>
+						<p>"content"</p>
+						<p>"content"</p>
+					</main>
+				</div>
+				<footer>"FOOTLINE"</footer>
+			</div>
+		});
+		// the list's head paints inside the drawer ...
+		out.xpect_contains("link-0")
+			// ... its overflowing tail is clipped to the drawer's box ...
+			.xnot()
+			.xpect_contains("link-19")
+			// ... so the footer below the container keeps its row
+			.xpect_contains("FOOTLINE");
 	}
 
 	/// The leading-space indent of the row whose text starts with `label`.

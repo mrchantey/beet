@@ -107,6 +107,16 @@ impl CharcellNodeData<'_> {
 		self.value().is_some() || self.layout_style().display == Display::Inline
 	}
 
+	/// Whether this node is a bare text leaf: a tag-less [`Value`] carrier. Its
+	/// resolved `display` is inherited from the nearest ancestor element (a
+	/// tag-less node has no display of its own), so a sizing dispatch must
+	/// check this first — eg text directly inside a flex footer inherits
+	/// `flex`, and dispatching it as a (childless) flex container would
+	/// measure it to nothing.
+	pub fn is_text_leaf(&self) -> bool {
+		self.element.is_none() && self.value.is_some()
+	}
+
 	pub(super) fn child_nodes<'a>(
 		&'a self,
 		query: &'a CharcellQuery,

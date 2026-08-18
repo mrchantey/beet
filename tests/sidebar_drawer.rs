@@ -19,20 +19,33 @@ use beet::net::prelude::webdriver::*;
 use beet::prelude::*;
 
 /// The served site: the real [`SiteLayout`] chrome (app bar + [`MenuButton`],
-/// [`RouteSidebar`], `<main>`) wrapping a home page carrying the card, plus a
-/// couple of routes so the rail has links to show.
+/// [`RouteSidebar`], `<main>`, `Footer`) wrapping a home page carrying the
+/// card, plus enough routes that the rail's nav list outgrows a phone viewport
+/// (the shape that spilled over the footer).
 fn site() -> impl Bundle {
-	(Router, BaseLayout::<SiteLayout>::default(), children![
-		(render_action::fixed_func_route("", home), PageRoute),
-		(
-			render_action::fixed_func_route("docs", || rsx! { <p>"docs"</p> }),
-			PageRoute
-		),
-		(
-			render_action::fixed_func_route("blog", || rsx! { <p>"blog"</p> }),
-			PageRoute
-		),
-	])
+	(
+		Router,
+		BaseLayout::<SiteLayout>::default(),
+		Children::spawn(bevy::ecs::spawn::SpawnIter(page_routes())),
+	)
+}
+
+/// The route bundles: the home card page plus a flat run of stub pages, as
+/// `fn` pointers so every route bundle is one type the spawn iterator unifies.
+fn page_routes() -> impl Iterator<Item = impl Bundle> {
+	fn home_body() -> Snippet { Snippet::from_bundle(home()) }
+	fn stub_body() -> Snippet {
+		Snippet::from_bundle(rsx! { <p>"page"</p> })
+	}
+	std::iter::once(("".to_string(), home_body as fn() -> Snippet))
+		.chain(
+			std::iter::once("docs".to_string())
+				.chain((0..24).map(|i| format!("post-{i}")))
+				.map(|path| (path, stub_body as fn() -> Snippet)),
+		)
+		.map(|(path, page)| {
+			(render_action::fixed_func_route(&path, page), PageRoute)
+		})
 }
 
 /// The home body, mirroring `site/routes/index.md`: a filled card whose
@@ -77,6 +90,18 @@ async fn main_rect(page: &Page) -> Rect {
 	page.find("main").await.bounding_rect().await.unwrap()
 }
 
+/// The computed `display` of the header's nav-links cluster.
+async fn nav_display(page: &Page) -> String {
+	page.evaluate_value(
+		"getComputedStyle(document.querySelector('.app-bar-nav')).display",
+	)
+	.await
+	.unwrap()
+	.as_str()
+	.unwrap()
+	.to_string()
+}
+
 #[beet_core::test(timeout_ms = 60_000)]
 #[ignore = "smoketest"]
 async fn drawer_overlays_content_on_mobile() {
@@ -102,6 +127,9 @@ async fn drawer_overlays_content_on_mobile() {
 	let viewport = client_width(&page).await;
 	page.xpect_no_horizontal_overflow().await;
 	(main_rect(&page).await.width() >= viewport - 1.).xpect_true();
+	// the header's nav links hide rather than wrapping onto a second row:
+	// below the breakpoint the drawer owns navigation
+	nav_display(&page).await.xpect_eq("none");
 
 	// open the drawer
 	page.find("#menu-button").await.click().await.unwrap();
@@ -110,7 +138,10 @@ async fn drawer_overlays_content_on_mobile() {
 		.xpect_attr("aria-hidden", "false")
 		.await;
 
-	// the open rail overlays the content: `<main>` keeps the full viewport ...
+	// the open rail overlays the content: `<main>` keeps the full viewport
+	// (re-read, since a buggy drawer inflating the page also costs a scrollbar
+	// width) ...
+	let viewport = client_width(&page).await;
 	let main = main_rect(&page).await;
 	(main.min.x <= 1.).xpect_true();
 	(main.width() >= viewport - 1.).xpect_true();
@@ -129,6 +160,41 @@ async fn drawer_overlays_content_on_mobile() {
 	(card.min.x >= -1.).xpect_true();
 	(card.max.x <= viewport + 1.).xpect_true();
 
+	// the drawer's long nav list scrolls within its own box ...
+	page.evaluate_value(
+		"(() => { const sb = document.getElementById('sidebar'); \
+		 sb.scrollTop = 9999; return sb.scrollTop > 0; })()",
+	)
+	.await
+	.unwrap()
+	.as_bool()
+	.unwrap()
+	.xpect_true();
+	// ... instead of spilling over the footer: the paint at the footer's left
+	// half belongs to the footer, not an overflowing nav link ...
+	page.evaluate_value(
+		"(() => { const footer = document.querySelector('footer'); \
+		 const rect = footer.getBoundingClientRect(); \
+		 const hit = document.elementFromPoint(8, rect.top + rect.height / 2); \
+		 return footer.contains(hit); })()",
+	)
+	.await
+	.unwrap()
+	.as_bool()
+	.unwrap()
+	.xpect_true();
+	// ... and without inflating the page: opening the drawer on a short page
+	// summons no vertical scrollbar
+	page.evaluate_value(
+		"document.documentElement.scrollHeight \
+		 <= document.documentElement.clientHeight + 1",
+	)
+	.await
+	.unwrap()
+	.as_bool()
+	.unwrap()
+	.xpect_true();
+
 	// the app bar sits above the drawer, so the toggle stays reachable to close
 	page.find("#menu-button").await.click().await.unwrap();
 	page.find("#sidebar")
@@ -137,13 +203,14 @@ async fn drawer_overlays_content_on_mobile() {
 		.await;
 
 	// crossing back above the breakpoint restores the flowed rail beside the
-	// content: the drawer is a narrow-viewport behavior only
+	// content and the header nav links: the drawer is narrow-viewport only
 	page.set_viewport(1280, 800).await.unwrap();
 	page.find("#sidebar")
 		.await
 		.xpect_attr("aria-hidden", "false")
 		.await;
 	(main_rect(&page).await.min.x >= 200.).xpect_true();
+	nav_display(&page).await.xpect_eq("flex");
 
 	page.kill().await.unwrap();
 }

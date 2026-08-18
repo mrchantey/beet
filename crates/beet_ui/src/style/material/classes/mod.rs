@@ -196,6 +196,8 @@ pub fn all_rules() -> Vec<Rule> {
 		disabled_state(),
 		// the `@media screen` app-bar override, ignored by charcell
 		app_bar_nav_web(),
+		// after the nav's display rules so the narrow-viewport hide wins ties
+		app_bar_nav_hidden(),
 		// viewport-fill: both targets fill the window so the footer pins to the
 		// bottom (charcell resolves `100vh` against the cell viewport)
 		page_fill_viewport(),

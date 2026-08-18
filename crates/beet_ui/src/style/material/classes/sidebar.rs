@@ -154,11 +154,13 @@ pub fn sidebar_terminal() -> Rule {
 ///
 /// Anchored to the container — just below the app bar — rather than fixed over
 /// the whole viewport, so the [`MENU_BUTTON`] stays reachable to close the
-/// drawer and the bar keeps its freedom to wrap on tiny screens. `max-width:
-/// 100%` caps the rail on viewports narrower than its widths ([`sidebar_web`] /
-/// [`sidebar_terminal`], which this rule follows in the cascade). Applies
-/// whether or not the rail is shown ([`sidebar_hidden`] still collapses it), so
-/// it stays one width-gated rule both targets evaluate, like the collapse.
+/// drawer. `max-width: 100%` caps the rail on viewports narrower than its
+/// widths ([`sidebar_web`] / [`sidebar_terminal`], which this rule follows in
+/// the cascade), and `overflow-y: auto` scrolls a nav list taller than the
+/// drawer within it — an overflowing list would otherwise spill past the box,
+/// painting over the footer and inflating the page height. Applies whether or
+/// not the rail is shown ([`sidebar_hidden`] still collapses it), so it stays
+/// one width-gated rule both targets evaluate, like the collapse.
 pub fn sidebar_overlay() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::MaxWidth(SIDEBAR_BREAKPOINT_PX))
@@ -169,6 +171,7 @@ pub fn sidebar_overlay() -> Rule {
 		.with_value(common_props::InsetBottom, Length::Px(0.))
 		.with_value(common_props::InsetLeft, Length::Px(0.))
 		.with_value(common_props::MaxWidth, Length::Percent(100.))
+		.with_value(common_props::OverflowYProp, Overflow::Auto)
 		.with_value(common_props::ZIndexProp, 100)
 }
 

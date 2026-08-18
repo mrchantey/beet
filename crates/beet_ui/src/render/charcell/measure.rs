@@ -62,6 +62,9 @@ pub(super) fn measure_node(
 		viewport.y.saturating_sub(overhead.y),
 	);
 	let content_size = match node.layout_style().display {
+		// a bare text leaf inherits its ancestor's display (eg `flex` inside a
+		// flex footer): measure it as the text run it is, never as a container
+		_ if node.is_text_leaf() => measure_text(node, content_available.x),
 		Display::Flex => {
 			measure_flex(node, query, sizes, content_available, viewport)?
 		}
@@ -111,6 +114,9 @@ pub(super) fn measure_node(
 ///
 /// Height is the sum of child heights (each at least one row, mirroring
 /// [`block_layout_rects`]), width the widest child clamped to the content box.
+/// In-flow children only: an absolute/fixed child sizes against its containing
+/// block, never its parent (eg the sidebar drawer must not inflate the
+/// container it overlays).
 ///
 /// Children must already be measured (post-order traversal ensures this).
 fn measure_block(
@@ -124,7 +130,7 @@ fn measure_block(
 	let gutter = marker_gutter(node, query);
 	let mut max_w = 0u32;
 	let mut total_h = 0u32;
-	let children: Vec<_> = node.child_nodes(query).collect();
+	let children: Vec<_> = node.flow_child_nodes(query).collect();
 	let last = children.len().saturating_sub(1);
 	for (i, child) in children.iter().enumerate() {
 		let size = sizes

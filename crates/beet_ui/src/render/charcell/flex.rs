@@ -83,9 +83,10 @@ pub(crate) fn measure_flex(
 	viewport: UVec2,
 ) -> Result<UVec2> {
 	let flexbox = node.flexbox();
-	// Build (entity, size) pairs from child_nodes, using fresh sizes from HashMap
+	// (entity, size) pairs for the in-flow children (an absolute child is no
+	// flex item and adds nothing to the measure), sized fresh from the map
 	let mut child_sizes = node
-		.child_nodes(query)
+		.flow_child_nodes(query)
 		.map(|child| {
 			let size = sizes
 				.get(&child.entity)
@@ -182,6 +183,9 @@ pub(super) fn resolve_height(
 	let content_width = width.saturating_sub(overhead.x);
 	let content_height = match node.layout_style().display {
 		Display::None => 0,
+		// a bare text leaf inherits its ancestor's display (eg `flex` inside a
+		// flex footer): resolve it as the text run it is, never as a container
+		_ if node.is_text_leaf() => measure_text(node, content_width).y,
 		Display::Flex => {
 			resolve_flex_height(node, query, content_width, viewport)
 		}
@@ -244,7 +248,7 @@ fn resolve_block_height(
 	viewport: UVec2,
 ) -> u32 {
 	let child_width = content_width.saturating_sub(marker_gutter(node, query));
-	let children: Vec<_> = node.child_nodes(query).collect();
+	let children: Vec<_> = node.flow_child_nodes(query).collect();
 	let last = children.len().saturating_sub(1);
 	children
 		.iter()
@@ -274,7 +278,7 @@ fn resolve_flex_height(
 ) -> u32 {
 	let flexbox = node.flexbox();
 	let mut child_sizes = node
-		.child_nodes(query)
+		.flow_child_nodes(query)
 		.map(|child| (child.entity, child.intrinsic_size()))
 		.collect::<Vec<_>>();
 	child_sizes.sort_by_key(|(entity, _)| flex_order(*entity, query));

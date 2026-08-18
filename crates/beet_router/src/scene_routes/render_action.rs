@@ -34,7 +34,10 @@ use bevy::ecs::system::SystemParamFunction;
 
 /// A per-request scene route from a sync handler
 /// `fn(cx: ActionContext<In>) -> impl Bundle`.
-pub fn pure_route<Func, Input, B, M1>(path: &str, handler: Func) -> impl Bundle
+pub fn pure_route<Func, Input, B, M1>(
+	path: &str,
+	handler: Func,
+) -> impl Bundle + use<Func, Input, B, M1>
 where
 	Func: 'static + Send + Sync + Clone + Fn(ActionContext<Input>) -> B,
 	Input: 'static + Send + Sync + FromRequest<M1>,
@@ -51,7 +54,7 @@ where
 pub fn async_route<Func, Input, Fut, B, M1>(
 	path: &str,
 	handler: Func,
-) -> impl Bundle
+) -> impl Bundle + use<Func, Input, Fut, B, M1>
 where
 	Func: 'static + Send + Sync + Clone + Fn(ActionContext<Input>) -> Fut,
 	Fut: 'static + MaybeSend + Future<Output = B>,
@@ -69,7 +72,7 @@ where
 pub fn system_route<Func, Input, B, FnMarker, M1>(
 	path: &str,
 	handler: Func,
-) -> impl Bundle
+) -> impl Bundle + use<Func, Input, B, FnMarker, M1>
 where
 	Func: 'static + Send + Sync + Clone,
 	FnMarker: 'static,
@@ -121,7 +124,10 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 /// fn home() -> impl Bundle { Element::new("p").with_inner_text("Home") }
 /// render_action::func_route("home", |_: ()| home());
 /// ```
-pub fn func_route<Func, Props, B>(path: &str, ctor: Func) -> impl Bundle
+pub fn func_route<Func, Props, B>(
+	path: &str,
+	ctor: Func,
+) -> impl Bundle + use<Func, Props, B>
 where
 	Func: 'static + Send + Sync + Clone + Fn(Props) -> B,
 	Props: 'static + Send + Sync + Default,
@@ -136,7 +142,10 @@ where
 /// page-codegen default for a `.rs` page. The handler runs fresh each request
 /// (nothing is cached at serve time); static export is governed separately by
 /// [`ExportStrategy`].
-pub fn fixed_func_route<Func, B>(path: &str, handler: Func) -> impl Bundle
+pub fn fixed_func_route<Func, B>(
+	path: &str,
+	handler: Func,
+) -> impl Bundle + use<Func, B>
 where
 	Func: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
