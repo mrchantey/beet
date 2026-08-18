@@ -441,21 +441,60 @@ mod test {
 		world.flush();
 	}
 
+	/// Every `<PackageConfig/>` element in a parsed document, in source order.
+	fn find_package_configs(nodes: &[BsxNode]) -> Vec<BsxNode> {
+		nodes
+			.iter()
+			.flat_map(|node| match node {
+				BsxNode::Element(element) if element.tag == "PackageConfig" => {
+					vec![node.clone()]
+				}
+				BsxNode::Element(element) => find_package_configs(&element.children),
+				_ => Vec::new(),
+			})
+			.collect()
+	}
+
+	/// The [`PackageConfig`] the beet website's committed entry declares, read
+	/// from the real `site/main.bsx` (its `<PackageConfig/>` alone, so the routes
+	/// and assets the rest of the entry mounts are not needed).
+	fn site_package_config() -> PackageConfig {
+		let markup =
+			fs_ext::read_to_string(WsPathBuf::new("site/main.bsx").into_abs())
+				.unwrap();
+		let nodes =
+			BsxNode::parse_document(&markup, &BsxParseConfig::bsx()).unwrap();
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		world
+			.resource_mut::<AppTypeRegistry>()
+			.write()
+			.register::<PackageConfig>();
+		world
+			.spawn_template(BsxTemplate::container(
+				find_package_configs(&nodes),
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap();
+		world.resource::<PackageConfig>().clone()
+	}
+
 	/// The runtime derives the analytics table name
 	/// ([`PackageConfig::resource_name`]) that the deploy creates
 	/// (`stack.resource_ident("analytics")`): nothing is delivered between them,
-	/// so this pins the two conventions together. Both read the stage from the
-	/// same [`BootstrapConfig`], so agreement holds for any stage.
+	/// so this pins the two conventions together against the entry the deploy
+	/// actually publishes. Both read the stage from the same [`BootstrapConfig`],
+	/// so agreement holds for any stage.
+	///
+	/// REGRESSION: `site/main.bsx` declared no `binary_name`, so the runtime fell
+	/// back to the kebab-cased title and wrote to `beet--<stage>--analytics`,
+	/// a table the deploy never creates. Every event on the live site failed with
+	/// a DynamoDB `ResourceNotFoundException` while the site otherwise served
+	/// perfectly, so the summary reported `0 events` on a green deploy.
 	#[beet_core::test]
 	fn analytics_names_agree() {
-		let stack = infra_ext::stack("beet-site");
-		let pkg = PackageConfig {
-			binary_name: Some("beet-site".into()),
-			..default()
-		};
 		DynamoTableBlock::new("analytics")
-			.table_name(&stack)
-			.xpect_eq(pkg.resource_name("analytics"));
+			.table_name(&infra_ext::stack("beet-site"))
+			.xpect_eq(site_package_config().resource_name("analytics"));
 	}
 
 	/// The `shared`-stage host, the shape `main.bsx` declares: its verb routes

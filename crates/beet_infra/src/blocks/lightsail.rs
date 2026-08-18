@@ -114,6 +114,10 @@ impl Default for LightsailBlock {
 }
 
 impl LightsailBlock {
+	/// The Caddy release installed as the TLS terminator, pinned so a box built
+	/// today and a box built next month are the same box. Bump deliberately.
+	pub const CADDY_VERSION: &'static str = "2.11.4";
+
 	/// Build a prefixed label for terraform resources.
 	pub fn build_label(&self, suffix: &str) -> String {
 		format!("{}--{}", self.label, suffix)
@@ -285,16 +289,51 @@ systemctl restart sshd
 			let caddyfile = format!(
 				"{hostnames} {{\n    reverse_proxy localhost:{app_port}\n}}"
 			);
+			let caddy_version = Self::CADDY_VERSION;
+			// the upstream static binary, not a distro package: Caddy publishes no
+			// `amzn` rpms, and its repo-setup script still writes an `amzn/2023`
+			// baseurl with `skip_if_unavailable=1`, so `dnf install -y caddy`
+			// no-opped and the box booted with no TLS terminator at all.
 			format!(
 				r#"
 # install Caddy for HTTPS reverse proxy with automatic Let's Encrypt
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/setup.rpm.sh' | bash
-dnf install -y caddy
+curl -sSLf 'https://github.com/caddyserver/caddy/releases/download/v{caddy_version}/caddy_{caddy_version}_linux_amd64.tar.gz' \
+  | tar -xz -C /usr/local/bin caddy
+chmod +x /usr/local/bin/caddy
+# fail the boot loudly rather than serve nothing on 443
+/usr/local/bin/caddy version || exit 1
+
+id caddy >/dev/null 2>&1 || useradd --system --home /var/lib/caddy --create-home --shell /usr/sbin/nologin caddy
+mkdir -p /etc/caddy /var/lib/caddy
+chown -R caddy:caddy /var/lib/caddy
 
 cat > /etc/caddy/Caddyfile <<'CADDY_EOF'
 {caddyfile}
 CADDY_EOF
 
+cat > /etc/systemd/system/caddy.service <<'CADDY_UNIT_EOF'
+[Unit]
+Description=Caddy
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+Type=notify
+User=caddy
+Group=caddy
+ExecStart=/usr/local/bin/caddy run --environ --config /etc/caddy/Caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+PrivateTmp=true
+ProtectSystem=full
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
+CADDY_UNIT_EOF
+
+systemctl daemon-reload
 systemctl enable --now caddy
 "#
 			)
@@ -764,6 +803,34 @@ mod tests {
 		script
 			.as_str()
 			.xpect_contains("example.org, app.example.org {");
+	}
+
+	/// REGRESSION: Caddy is installed from the upstream static binary, never the
+	/// cloudsmith rpm repo. Caddy publishes no `amzn` packages, but its repo
+	/// script writes an `amzn/2023` baseurl with `skip_if_unavailable=1`, so
+	/// `dnf install -y caddy` exited "No match for argument: caddy" and cloud-init
+	/// carried on: the box booted serving the app on its own port with NOTHING on
+	/// 80/443, and the deploy reported success while every hostname returned a
+	/// Cloudflare 521. The install now writes its own unit and verifies the binary.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn installs_caddy_from_static_release_not_rpm() {
+		let (script, _dir) = build_user_data(
+			&LightsailBlock::default()
+				.with_dns(DnsProvider::cloudflare("example.org", "zone123")),
+		);
+		script
+			.as_str()
+			.xpect_contains(&format!(
+				"caddy_{}_linux_amd64.tar.gz",
+				LightsailBlock::CADDY_VERSION
+			))
+			.xpect_contains("/usr/local/bin/caddy version || exit 1")
+			.xpect_contains("/etc/systemd/system/caddy.service")
+			.xnot()
+			.xpect_contains("cloudsmith")
+			.xnot()
+			.xpect_contains("dnf install -y caddy");
 	}
 
 	/// REGRESSION: the unit must write `BEET_HTTP_PORT`, the name the runtime

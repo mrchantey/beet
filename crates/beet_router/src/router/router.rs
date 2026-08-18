@@ -94,6 +94,23 @@ impl Router {
 				// resolve the inner action and dispatch entity from the matched route
 				let (inner_action, dispatch_entity) = match &node {
 					Ok(Some(node)) => {
+						// a route declaring a method answers 405 to any other,
+						// rather than running the handler against a request shape
+						// it never expected: a `GET` on the POST-only analytics
+						// beacon reached the body parser and logged an internal
+						// error for every bot probe.
+						match node.method {
+							Some(allowed)
+								if !allowed.allows(request.method()) =>
+							{
+								return HttpError::from_status(
+									StatusCode::METHOD_NOT_ALLOWED,
+								)
+								.xmap(Response::from)
+								.xok();
+							}
+							_ => {}
+						}
 						// surface matched dynamic segments (`:id`) to the handler
 						node.merge_path_params(&mut request);
 						let entity = world.entity(node.entity);
@@ -214,6 +231,35 @@ mod test {
 			.collect::<Vec<_>>();
 		pairs.sort();
 		MediaBytes::new_text(pairs.join("&"))
+	}
+
+	/// A route declaring an [`HttpMethod`] only dispatches to that method, and a
+	/// `Get` route also answers `Head`.
+	///
+	/// Regression guard: the declared method was display-only, so a `GET` on the
+	/// POST-only analytics beacon reached the body parser and answered `500` with
+	/// an `Internal Error` logged for every bot probe.
+	#[beet_core::test]
+	async fn declared_method_gates_dispatch() {
+		async fn status(method: HttpMethod, declared: HttpMethod) -> StatusCode {
+			router_world()
+				.spawn((Router::with_defaults(), children![(
+					route::exchange("beacon", EchoParams),
+					declared
+				)]))
+				.exchange(Request::new(method, "beacon"))
+				.await
+				.status()
+		}
+		status(HttpMethod::Post, HttpMethod::Post).await.xpect_eq(StatusCode::OK);
+		status(HttpMethod::Get, HttpMethod::Post)
+			.await
+			.xpect_eq(StatusCode::METHOD_NOT_ALLOWED);
+		status(HttpMethod::Get, HttpMethod::Get).await.xpect_eq(StatusCode::OK);
+		// a HEAD is a GET with the body dropped, so a Get route serves it
+		status(HttpMethod::Head, HttpMethod::Get)
+			.await
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]

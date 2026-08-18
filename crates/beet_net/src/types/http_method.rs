@@ -105,6 +105,16 @@ impl HttpMethod {
 		HttpMethod::Patch,
 	];
 
+	/// Whether a request made with `method` may dispatch to a route declaring
+	/// `self`.
+	///
+	/// An exact match, except that a `Get` route also answers a `Head`: a HEAD is
+	/// a GET whose body is dropped, and edges and crawlers issue them routinely.
+	pub fn allows(&self, method: &HttpMethod) -> bool {
+		self == method
+			|| (*self == HttpMethod::Get && *method == HttpMethod::Head)
+	}
+
 	/// Returns whether this method typically has a request body.
 	///
 	/// Returns `true` for `POST`, `PUT`, and `PATCH`.

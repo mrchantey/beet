@@ -28,9 +28,12 @@ pub struct S3BucketBlock {
 	/// All objects will be nested under the deploy uuid,
 	/// ensuring unique files per deploy
 	deploy_versioned: bool,
-	/// Grant anonymous `s3:GetObject` on every object (via a public-access-block
-	/// that lifts the default block, plus a bucket policy). Needed when objects
-	/// are served by a 301 to the public S3 url, eg the assets bucket.
+	/// Grant anonymous `s3:GetObject` on every object and `s3:ListBucket` on the
+	/// bucket (via a public-access-block that lifts the default block, plus a
+	/// bucket policy). Needed when objects are served by a 301 to the public S3
+	/// url, and when a credential-free `sync` hydrates a checkout from the
+	/// bucket: `aws s3 sync --no-sign-request` lists before it gets, so
+	/// `GetObject` alone fails at the first `ListObjectsV2`.
 	public_read: bool,
 	/// The deploy layer for the bucket and its public-read pair
 	/// ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER) by default):
@@ -136,7 +139,7 @@ impl Block for S3BucketBlock {
 
 impl S3BucketBlock {
 	/// Emit the public-access-block (lifting the default block on public policies)
-	/// and the anonymous `s3:GetObject` bucket policy that depends on it.
+	/// and the anonymous read bucket policy that depends on it.
 	fn emit_public_read(
 		&self,
 		stack: &Stack,
@@ -166,6 +169,13 @@ impl S3BucketBlock {
 						"Principal": "*",
 						"Action": "s3:GetObject",
 						"Resource": format!("{}/*", bucket.field_ref("arn"))
+					}, {
+						// a credential-free `sync` lists before it gets
+						"Sid": "PublicListBucket",
+						"Effect": "Allow",
+						"Principal": "*",
+						"Action": "s3:ListBucket",
+						"Resource": bucket.field_ref("arn").to_string()
 					}]
 				})
 				.to_string()
@@ -214,6 +224,8 @@ mod tests {
 		build_config(block).1.to_json().to_string()
 	}
 
+	/// Both grants matter: `GetObject` serves the objects, `ListBucket` lets a
+	/// credential-free `sync` enumerate them (it lists before it gets).
 	#[beet_core::test]
 	fn public_read_emits_access_block_and_policy() {
 		let json =
@@ -222,7 +234,9 @@ mod tests {
 			.xpect_contains("aws_s3_bucket_public_access_block")
 			.xpect_contains("aws_s3_bucket_policy")
 			.xpect_contains("s3:GetObject")
-			.xpect_contains("PublicReadGetObject");
+			.xpect_contains("PublicReadGetObject")
+			.xpect_contains("s3:ListBucket")
+			.xpect_contains("PublicListBucket");
 	}
 
 	#[beet_core::test]

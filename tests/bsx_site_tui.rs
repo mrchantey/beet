@@ -213,6 +213,41 @@ async fn nav_link_click_navigates() {
 	host.frame().xnot().xpect_contains("Read the docs");
 }
 
+/// The page is interactive at a narrow (80x24, the default ssh window) viewport,
+/// where the sidebar rail collapses into the [`MenuButton`] drawer. Regression
+/// for the live-ssh bug: the collapsed drawer is `position: absolute` and
+/// `display: none`, and the layout pass positioned out-of-flow nodes without
+/// consulting display, so the hidden rail kept a full-height 20-cell rect. It
+/// painted nothing yet won every hit-test in that column — an invisible click
+/// shield that swallowed "More" (and every link in the left of the content) on
+/// every narrow terminal, while the wide layout worked.
+#[beet::test]
+async fn narrow_viewport_stays_interactive() {
+	let mut host = SiteHost::new(UVec2::new(80, 24), "/counter").await;
+	host.step_until("You have clicked 0 times.");
+
+	let (col, row) = host.cell_of("More");
+	host.click(col, row);
+	host.step_until("You have clicked 1 times.");
+}
+
+/// A button on a page reached BY NAVIGATION is clickable, not just on a page the
+/// host booted into: navigating swaps the route content under the page host, so
+/// the new content's interactive surfaces must be registered exactly as a booted
+/// page's are.
+#[beet::test]
+async fn button_click_after_navigate() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
+	host.step_until("Read the docs");
+	let (col, row) = host.cell_of("counter");
+	host.click(col, row);
+	host.step_until("You have clicked 0 times.");
+
+	let (col, row) = host.cell_of("More");
+	host.click(col, row);
+	host.step_until("You have clicked 1 times.");
+}
+
 /// Clicking an in-content link (not the sidebar chrome) navigates the TUI. The
 /// route content is layouted into the page by reference (a [`Portal`]), so the
 /// link has no `ChildOf` path to the page root's `RenderSurface`; resolving the

@@ -22,6 +22,15 @@ impl core::fmt::Debug for BlobStore {
 }
 
 impl BlobStore {
+	/// How many reads a whole-store fan-out keeps in flight at once.
+	///
+	/// The single ceiling for every `get_all`-shaped read, blob or table. A
+	/// remote store answers a listing with thousands of keys, and issuing that
+	/// many concurrent requests exhausts the connection pool: every request past
+	/// the pool's capacity fails its connect timeout, which a lossy read then
+	/// reports as an unreadable row.
+	pub const GET_ALL_CONCURRENCY: usize = 32;
+
 	/// Creates a new store wrapping the given provider.
 	pub fn new(provider: impl BlobStoreProvider) -> Self {
 		Self {
@@ -268,7 +277,9 @@ impl BlobStore {
 				let data = self.get(&path).await?;
 				Ok::<_, BevyError>((path, data))
 			})
-			.xmap(async_ext::try_join_all)
+			.xmap(|futures| {
+				async_ext::try_join_all_bounded(Self::GET_ALL_CONCURRENCY, futures)
+			})
 			.await
 	}
 }

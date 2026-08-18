@@ -98,6 +98,79 @@ where
 	.await
 }
 
+/// Like [`join_all`], but with at most `limit` futures in flight at once.
+///
+/// A future does no work until it is first polled, so this admits a new future
+/// only as an earlier one completes. Prefer it for any fan-out over a remote
+/// store: an unbounded [`join_all`] over thousands of keys opens thousands of
+/// concurrent connections at once, and every one of them times out.
+///
+/// A `limit` of `0` is treated as `1`. no_std.
+pub async fn join_all_bounded<Fut, T>(
+	limit: usize,
+	futures: impl IntoIterator<Item = Fut>,
+) -> Vec<T>
+where
+	Fut: Future<Output = T>,
+{
+	let limit = limit.max(1);
+	let mut futures: Vec<Option<Pin<Box<Fut>>>> =
+		futures.into_iter().map(|fut| Some(Box::pin(fut))).collect();
+	let mut results: Vec<Option<T>> = core::iter::repeat_with(|| None)
+		.take(futures.len())
+		.collect();
+	// exclusive high-water mark of futures admitted, and how many of those are
+	// still pending
+	let mut admitted = 0;
+	let mut in_flight = 0;
+
+	core::future::poll_fn(move |cx| {
+		loop {
+			// fill the free slots from the tail of the queue
+			while in_flight < limit && admitted < futures.len() {
+				admitted += 1;
+				in_flight += 1;
+			}
+			let mut completed = false;
+			for idx in 0..admitted {
+				let Some(fut) = futures[idx].as_mut() else {
+					continue;
+				};
+				if let Poll::Ready(value) = fut.as_mut().poll(cx) {
+					results[idx] = Some(value);
+					futures[idx] = None;
+					in_flight -= 1;
+					completed = true;
+				}
+			}
+			if in_flight == 0 && admitted == futures.len() {
+				return Poll::Ready(
+					results.iter_mut().map(|slot| slot.take().unwrap()).collect(),
+				);
+			}
+			// a completion freed a slot, so loop round to admit its replacement
+			if !completed {
+				return Poll::Pending;
+			}
+		}
+	})
+	.await
+}
+
+/// Like [`try_join_all`], but with at most `limit` futures in flight at once.
+///
+/// Unlike [`try_join_all`] this does NOT short-circuit: every admitted future
+/// runs to completion and the first [`Err`] in iteration order is returned. no_std.
+pub async fn try_join_all_bounded<Fut, T, E>(
+	limit: usize,
+	futures: impl IntoIterator<Item = Fut>,
+) -> Result<Vec<T>, E>
+where
+	Fut: Future<Output = Result<T, E>>,
+{
+	join_all_bounded(limit, futures).await.into_iter().collect()
+}
+
 /// A 'static + Send, making it suitable for spawning on async runtimes
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
 /// A 'static + Send + Sync boxed [`Future`], required where the future is held
@@ -296,6 +369,39 @@ mod test {
 		.await
 		.unwrap()
 		.xpect_eq(42);
+	}
+
+	/// The bounded join runs every future and keeps iteration order, while never
+	/// exceeding `limit` in flight. Regression guard: an unbounded fan-out over a
+	/// remote store starts thousands of requests at once, and every one past the
+	/// connection pool fails its connect timeout.
+	#[crate::test]
+	async fn join_all_bounded_caps_in_flight() {
+		use std::sync::Arc;
+		use std::sync::atomic::AtomicUsize;
+		use std::sync::atomic::Ordering;
+
+		let in_flight = Arc::new(AtomicUsize::new(0));
+		let peak = Arc::new(AtomicUsize::new(0));
+		let total = 20;
+		let futures = (0..total).map(|idx| {
+			let in_flight = in_flight.clone();
+			let peak = peak.clone();
+			async move {
+				let now = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+				peak.fetch_max(now, Ordering::SeqCst);
+				// yield long enough that an unbounded join would overlap all of them
+				for _ in 0..4 {
+					async_ext::yield_now().await;
+				}
+				in_flight.fetch_sub(1, Ordering::SeqCst);
+				idx
+			}
+		});
+		async_ext::join_all_bounded(4, futures)
+			.await
+			.xpect_eq((0..total).collect::<Vec<_>>());
+		peak.load(Ordering::SeqCst).xpect_eq(4);
 	}
 
 	#[crate::test]

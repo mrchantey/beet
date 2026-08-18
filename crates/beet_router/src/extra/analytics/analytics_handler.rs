@@ -59,13 +59,24 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 	// the beacon posts a json body; `into_value` parses it into a `Value` map.
 	// A `sendBeacon` implementation may still declare `text/plain`, so a string
 	// body is re-parsed as json rather than trusting the declared type.
-	let body = match request.into_value().await? {
+	//
+	// Every failure below is malformed client input, so it answers 400. This is a
+	// public endpoint that bots probe constantly: a 500 would file their junk as a
+	// fault of ours, logging an `Internal Error` per probe.
+	let body = request
+		.into_value()
+		.await
+		.map_err(|err| HttpError::bad_request(format!("beacon body: {err}")))?;
+	let body = match body {
 		Value::Str(text) => serde_json::from_str::<serde_json::Value>(&text)
 			.map(Value::from_json)
-			.map_err(|err| bevyhow!("failed to parse beacon body: {err}"))?,
+			.map_err(|err| {
+				HttpError::bad_request(format!("beacon body: {err}"))
+			})?,
 		body => body,
 	};
-	let event = AnalyticsEvent::from_beacon(body, session, ip, country)?;
+	let event = AnalyticsEvent::from_beacon(body, session, ip, country)
+		.map_err(|err| HttpError::bad_request(format!("beacon event: {err}")))?;
 	world
 		.with(move |world: &mut World| world.trigger(event))
 		.await;
@@ -126,5 +137,24 @@ mod test {
 		))
 		.await
 		.xpect_eq(1);
+	}
+
+	/// A junk beacon body is the client's fault, so it answers 400.
+	///
+	/// Regression guard: an unparseable body raised an opaque error, so the
+	/// public beacon endpoint answered `500` and logged an `Internal Error` for
+	/// every bot that probed it.
+	#[beet_core::test]
+	async fn malformed_body_is_a_bad_request() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let root = world.spawn(Router::with_defaults()).flush();
+		for body in ["", "not-json", "[1,2,3]"] {
+			world
+				.entity_mut(root)
+				.exchange(Request::with_json_str("analytics", body))
+				.await
+				.status()
+				.xpect_eq(StatusCode::BAD_REQUEST);
+		}
 	}
 }

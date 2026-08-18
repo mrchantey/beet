@@ -3,7 +3,7 @@ The single canonical entry for the beet website: the content Router serving the
 `routes/` directory, every page wrapped in `templates/Layout.bsx`. Discovery loads
 it locally when the `beet` binary runs from the `site/` directory (`cd site && beet
 serve`, and `beet present`, `beet check`, `beet export-static`), and the deployed
-Fargate container loads the same entry directly from the bucket root. Either way
+Lightsail box loads the same entry directly from the app bucket root. Either way
 this entry's `StartOnLoad` root carries the servers, and its `CallOnLoad` fires
 once the build loads, fanning the request out to them.
 
@@ -30,13 +30,15 @@ color=.../>` seeds the brand colour the whole Material palette derives from, and
 `<Styles/>` registers the named style rules in `templates/Styles.bsx`.
 
 The infra commands (`deploy`, `sync`, the validate/plan/apply/destroy IaC verbs)
-live in the Rust deploy host (`examples/infra/deploy_beet_site.rs`): the terraform
-and docker blocks are not registered for markup, so the deploy stays Rust-expressed
-while the serve definition is shared from here.
+live on the workspace root entry's `<BeetSiteDeployHost>`, so this entry stays
+purely the served site.
 -->
 <StartOnLoad {(HttpServer, TuiServer, SshTuiServer)}>
 <Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
-	<PackageConfig title="Beet" description="The beet website, built with beet" version="0.0.9-dev.16"/>
+	<!-- `binary_name` is the cloud resource prefix, so it must be the deploy's
+	     stack app name (`beet-site`), NOT the generic `beet` binary this site
+	     runs on: it is what names the analytics table at runtime. -->
+	<PackageConfig title="Beet" binary_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 	<TemplateDir src="templates"/>
 	<Styles/>

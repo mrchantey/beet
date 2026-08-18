@@ -266,20 +266,31 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
+	/// List every key in the table.
+	///
+	/// A DynamoDB `Scan` returns at most 1MB per call, so this follows
+	/// `last_evaluated_key` to exhaustion; a single call silently truncates a
+	/// table of any real size (prod analytics returned 4k of 200k rows) and the
+	/// caller cannot tell a truncated page from a small table. Projects to the
+	/// `id` attribute so pages carry keys rather than row bodies, which is both
+	/// cheaper and far more keys per page.
 	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
 			let prefix = this.subdir.as_ref().map(|s| format!("{}/", s));
-			let out = client
-				.scan()
-				.table_name(this.table_name.as_str())
-				.send()
-				.await
-				.map_err(sdk_err)?;
 			let mut paths = Vec::new();
-			if let Some(items) = out.items {
-				for item in items {
+			let mut start_key = None;
+			loop {
+				let out = client
+					.scan()
+					.table_name(this.table_name.as_str())
+					.projection_expression("id")
+					.set_exclusive_start_key(start_key)
+					.send()
+					.await
+					.map_err(sdk_err)?;
+				for item in out.items.unwrap_or_default() {
 					if let Some(AttributeValue::S(id)) = item.get("id") {
 						let rel = match &prefix {
 							Some(p) => match id.strip_prefix(p.as_str()) {
@@ -290,6 +301,11 @@ impl BlobStoreProvider for DynamoStore {
 						};
 						paths.push(SmolPath::new(rel));
 					}
+				}
+				// an absent (or empty) last evaluated key ends the scan
+				start_key = out.last_evaluated_key.filter(|key| !key.is_empty());
+				if start_key.is_none() {
+					break;
 				}
 			}
 			paths.xok()
@@ -422,6 +438,56 @@ impl TableProvider for DynamoStore {
 			};
 			let row: Value = serde_dynamo::from_item(item)?;
 			row.xok()
+		})
+	}
+
+	/// Read every row with a paginated `Scan`, deserializing the items the scan
+	/// already returned.
+	///
+	/// The [`TableProvider::get_all_rows`] default would list the ids and then
+	/// issue one `GetItem` per row, an N+1 that a scan makes unnecessary: the
+	/// scan carries the bodies.
+	fn get_all_rows(
+		&self,
+	) -> SendBoxedFuture<Result<Vec<(SmolPath, Result<Value>)>>> {
+		let this = self.clone();
+		async_ext::pin_tokio(async move {
+			let client = this.client().await;
+			let prefix = this.subdir.as_ref().map(|sub| format!("{}/", sub));
+			let mut rows = Vec::new();
+			let mut start_key = None;
+			loop {
+				let out = client
+					.scan()
+					.table_name(this.table_name.as_str())
+					.set_exclusive_start_key(start_key)
+					.send()
+					.await
+					.map_err(sdk_err)?;
+				for item in out.items.unwrap_or_default() {
+					let Some(AttributeValue::S(id)) = item.get("id") else {
+						continue;
+					};
+					let path = match &prefix {
+						Some(prefix) => match id.strip_prefix(prefix.as_str()) {
+							Some(stripped) => SmolPath::new(stripped),
+							None => continue,
+						},
+						None => SmolPath::new(id.as_str()),
+					};
+					rows.push((
+						path,
+						serde_dynamo::from_item::<_, Value>(item)
+							.map_err(Into::into),
+					));
+				}
+				// an absent (or empty) last evaluated key ends the scan
+				start_key = out.last_evaluated_key.filter(|key| !key.is_empty());
+				if start_key.is_none() {
+					break;
+				}
+			}
+			rows.xok()
 		})
 	}
 }

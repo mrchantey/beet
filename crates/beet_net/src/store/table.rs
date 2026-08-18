@@ -203,48 +203,40 @@ impl<T: TableStoreRow> Table<T> {
 	/// # Caution
 	/// Expensive operation - prefer [`Self::list`] + [`Self::get`] for large tables.
 	pub async fn get_all(&self) -> Result<Vec<(SmolPath, T)>> {
-		self.list()
+		self.provider
+			.get_all_rows()
 			.await?
 			.into_iter()
-			.map(async |path| {
-				let id = path.to_string().parse::<Uuid>().map_err(|e| {
-					bevyhow!("Invalid UUID in path {}: {}", path, e)
-				})?;
-				let data = self.get(id).await?;
-				Ok::<_, BevyError>((path, data))
-			})
-			.xmap(async_ext::try_join_all)
-			.await
+			.map(|(path, row)| Ok((path, row?.into_serde()?)))
+			.collect()
 	}
 
-	/// Like [`Self::get_all`], but a row that fails to parse or deserialize is
-	/// skipped with a warning instead of failing the whole read.
+	/// Like [`Self::get_all`], but a row that fails to read, parse or
+	/// deserialize is skipped with a warning instead of failing the whole read.
 	///
 	/// Prefer for telemetry-style tables (eg analytics) where a legacy-schema or
 	/// corrupt row must not brick every aggregate query over the table.
+	///
+	/// # Caution
+	/// A skipped row is silently missing from the result, so a caller reporting
+	/// aggregates over this should not present the count as the table's true
+	/// total.
 	pub async fn get_all_lossy(&self) -> Result<Vec<(SmolPath, T)>> {
-		self.list()
+		self.provider
+			.get_all_rows()
 			.await?
 			.into_iter()
-			.map(async |path| {
-				let row = match path.to_string().parse::<Uuid>() {
-					Ok(id) => match self.get(id).await {
-						Ok(row) => Some((path, row)),
-						Err(err) => {
-							warn!("skipping unreadable row {path}: {err}");
-							None
-						}
-					},
+			.filter_map(|(path, row)| {
+				match row.and_then(|row| row.into_serde::<T>()) {
+					Ok(row) => Some((path, row)),
 					Err(err) => {
-						warn!("skipping non-uuid row {path}: {err}");
+						warn!("skipping unreadable row {path}: {err}");
 						None
 					}
-				};
-				Ok::<_, BevyError>(row)
+				}
 			})
-			.xmap(async_ext::try_join_all)
-			.await
-			.map(|rows| rows.into_iter().flatten().collect())
+			.collect::<Vec<_>>()
+			.xok()
 	}
 
 	/// Remove object from table by id.
@@ -344,6 +336,45 @@ pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 	fn insert_row(&self, id: Uuid, row: Value) -> SendBoxedFuture<Result>;
 	/// Get the row document at `id`.
 	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<Value>>;
+
+	/// Every row in the table, each paired with the document it read or the
+	/// error that row failed with.
+	///
+	/// Row-level errors are carried rather than raised so the caller picks the
+	/// policy: [`Table::get_all`] fails on the first, [`Table::get_all_lossy`]
+	/// skips it.
+	///
+	/// The default lists ids and fetches each row, bounded by
+	/// [`BlobStore::GET_ALL_CONCURRENCY`]. A provider whose listing already
+	/// carries the row bodies (ie a DynamoDB `Scan`) should override this to
+	/// read them in one pass, since the default is an N+1 over the network.
+	fn get_all_rows(
+		&self,
+	) -> SendBoxedFuture<Result<Vec<(SmolPath, Result<Value>)>>> {
+		let this = self.box_clone_table();
+		Box::pin(async move {
+			this.list()
+				.await?
+				.into_iter()
+				.map(async |path| {
+					let row = match path.to_string().parse::<Uuid>() {
+						Ok(id) => this.get_row(id).await,
+						Err(err) => {
+							Err(bevyhow!("invalid uuid in path {path}: {err}"))
+						}
+					};
+					(path, row)
+				})
+				.xmap(|rows| {
+					async_ext::join_all_bounded(
+						BlobStore::GET_ALL_CONCURRENCY,
+						rows,
+					)
+				})
+				.await
+				.xok()
+		})
+	}
 }
 
 /// The [`BlobStore`] wrapper is a [`TableProvider`] for free, encoding rows as
@@ -470,5 +501,18 @@ mod test {
 		let rows = table.get_all_lossy().await.unwrap();
 		rows.len().xpect_eq(1);
 		rows[0].1.id.xpect_eq(valid_id);
+	}
+
+	/// A whole-table read spanning more rows than [`BlobStore::GET_ALL_CONCURRENCY`]
+	/// returns every one of them: the fan-out is bounded, never truncated.
+	#[beet_core::test]
+	async fn get_all_reads_past_the_concurrency_limit() {
+		let table = Table::<TableItem<u32>>::temp();
+		let total = BlobStore::GET_ALL_CONCURRENCY * 3 + 1;
+		for idx in 0..total {
+			table.push(TableItem::new(idx as u32)).await.unwrap();
+		}
+		table.get_all().await.unwrap().len().xpect_eq(total);
+		table.get_all_lossy().await.unwrap().len().xpect_eq(total);
 	}
 }

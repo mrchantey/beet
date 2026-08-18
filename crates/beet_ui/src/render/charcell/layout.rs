@@ -50,13 +50,29 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 			// child -> parent, for resolving an absolute element's containing block.
 			let parents = parent_map(root, &charcell, &tree);
 			let mut managed = HashSet::<Entity>::default();
+			// `display: none` subtrees, grown top-down (pre-order visits a parent
+			// before its children). An in-flow hidden node is already dropped by its
+			// parent's child iteration, but an out-of-flow one is placed against its
+			// containing block by `position_node`, which never consults display — so
+			// without this the hidden node still earns a rect.
+			let mut hidden = HashSet::<Entity>::default();
 			for &entity in &ordered {
-				if managed.contains(&entity) {
-					continue;
-				}
 				let Ok(node) = charcell.unresolved_node(entity) else {
 					continue;
 				};
+				// removed from layout, along with everything beneath it: no rect, so
+				// nothing paints and nothing is hit-testable. Tested before `managed`
+				// so a table nested in a hidden subtree still propagates hidden to its
+				// own descendants.
+				if parents.get(&entity).is_some_and(|parent| hidden.contains(parent))
+					|| node.layout_style().display == Display::None
+				{
+					hidden.insert(entity);
+					continue;
+				}
+				if managed.contains(&entity) {
+					continue;
+				}
 
 				// position the node before laying out its children: a relative box
 				// shifts (carrying its content), an absolute/fixed box is placed
@@ -117,15 +133,18 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 						viewport_size,
 						&mut layout_rects,
 					)?,
-					// removed from layout: skip the subtree so children get no
-					// rects and are not drawn
+					// removed from layout, already skipped with its subtree above
 					Display::None => {}
 				}
 			}
 		}
 
-		// Write phase: flush computed rects to ECS components
-		for (entity, rect) in layout_rects {
+		// Write phase: flush computed rects to ECS components. A node that earned
+		// no rect this pass is zeroed rather than left holding its last one: a
+		// stale rect never paints (paint skips `display: none`) but still hits, an
+		// invisible click shield over whatever is beneath it.
+		for &entity in &ordered {
+			let rect = layout_rects.get(&entity).copied().unwrap_or_default();
 			if let Ok(mut layout_rect) = params.p1().get_mut(entity) {
 				layout_rect.set_if_neq(LayoutRect(rect));
 			}
@@ -803,6 +822,22 @@ mod tests {
 		world.run_schedule(crate::parse::PostParseTree);
 		display(&mut world, "nav").xpect_eq(Display::None);
 		display(&mut world, "button").xpect_eq(Display::Flex);
+		// and the collapsed rail holds NO rect. Below the breakpoint the drawer is
+		// `position: absolute`, and the positioning pass placed out-of-flow nodes
+		// without consulting display, so the hidden rail kept its full-height rect
+		// from the wide pass: invisible (paint skips it) yet winning every
+		// hit-test in its column, an unclickable stripe down the left of the page.
+		world
+			.run_system_once(|query: Query<(&Element, &LayoutRect)>| {
+				query
+					.iter()
+					.find(|(el, _)| el.tag() == "nav")
+					.map(|(_, rect)| rect.0)
+					.unwrap()
+			})
+			.unwrap()
+			.is_empty()
+			.xpect_true();
 		// well below: the rail stays collapsed behind the toggle
 		world
 			.entity_mut(root)
