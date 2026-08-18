@@ -37,10 +37,23 @@ pub struct SshTuiServer {
 	/// so an entry declaring a single [`SshTuiServer`] needs no flag; clear it on a
 	/// server that should boot only when `--server=ssh` names it explicitly.
 	pub default_boot: bool,
+	/// How long a connection has to request a pty before it is closed, `10s` by
+	/// default and `None` to allow connections that never ask for a terminal.
+	///
+	/// Every session here *is* a terminal (the surface is built from the pty's
+	/// size), so a connection that never requests one can only be a scanner, of
+	/// which a public port 22 attracts a steady stream. Authored as a duration
+	/// string, eg `<SshTuiServer pty_timeout="30s"/>`.
+	pub pty_timeout: Option<Duration>,
 }
 
 impl Default for SshTuiServer {
-	fn default() -> Self { Self { default_boot: true } }
+	fn default() -> Self {
+		Self {
+			default_boot: true,
+			pty_timeout: Some(Duration::from_secs(10)),
+		}
+	}
 }
 
 /// Boots the SSH listener on the boot fan-out, if `--server` selects `"ssh"`:
@@ -52,7 +65,9 @@ fn on_action_in(
 	servers: Query<&SshTuiServer>,
 	mut commands: Commands,
 ) -> Result {
-	let Ok(default_boot) = servers.get(ev.entity).map(|server| server.default_boot)
+	let Ok((default_boot, pty_timeout)) = servers
+		.get(ev.entity)
+		.map(|server| (server.default_boot, server.pty_timeout))
 	else {
 		return Ok(());
 	};
@@ -75,6 +90,9 @@ fn on_action_in(
 	if let Some(host) = boot.host_octets()? {
 		server.host = host;
 	}
+	// a session here is a terminal, so a connection that never asks for one is
+	// dropped rather than held to the transport's idle timeout.
+	server.pty_timeout = pty_timeout;
 	// the opening route each session navigates to, recorded on the server (the
 	// shared mechanism the local TUI server also reads).
 	// `ServerBooted` flags the boot as served, so `exit_if_no_server` lets it park
@@ -98,8 +116,11 @@ pub struct SshTuiPlugin;
 impl Plugin for SshTuiPlugin {
 	fn build(&self, app: &mut App) {
 		// every connection gets a page-bound surface, so the page lifecycle is not
-		// optional here: without it a closed session leaves its page behind.
+		// optional here: without it a closed session leaves its page behind. The
+		// transport plugin is likewise not optional: it enforces the pty timeout
+		// this server sets on every connection.
 		app.init_plugin::<LivePagePlugin>()
+			.init_plugin::<SshServerPlugin>()
 			.register_type::<SshTuiServer>()
 			.add_observer(on_ssh_recv)
 			// drain each surface's painted frame to its client after the render
@@ -448,6 +469,40 @@ mod test {
 			open_and_close(app, server, needle);
 		}
 		app.world().iter_entities().count().xpect_eq(baseline);
+	}
+
+	/// The boot hands the transport its policy: a session here is a terminal, so
+	/// the [`SshServer`] it installs carries the pty timeout that reaps the
+	/// connections which never ask for one.
+	#[beet_core::test]
+	async fn boot_installs_the_pty_timeout() {
+		let mut app = ssh_tui_app();
+		let server = app
+			.world_mut()
+			.spawn((StartOnLoad, SshTuiServer::default()))
+			.flush();
+		app.world_mut()
+			.entity_mut(server)
+			.run_async_local(|entity| async move {
+				entity
+					.call::<Request, Response>(Request::from_cli_str(
+						"--server=ssh",
+					))
+					.await?;
+				Ok(())
+			});
+		// the boot never resolves (a long-running server parks it), so drive the
+		// app rather than awaiting the call.
+		for _ in 0..20 {
+			app.update();
+		}
+
+		app.world()
+			.entity(server)
+			.get::<SshServer>()
+			.expect("boot did not install an SshServer")
+			.pty_timeout
+			.xpect_eq(Some(Duration::from_secs(10)));
 	}
 
 	/// Regression (the deployed ssh site's memory leak): a disconnected client

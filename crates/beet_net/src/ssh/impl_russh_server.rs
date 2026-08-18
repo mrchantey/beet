@@ -40,8 +40,14 @@ pub(crate) async fn start_russh_server_with_tcp(
 		.local_addr()
 		.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
 
-	let credentials = entity
-		.get::<SshServer, _>(|s| s.credentials.clone())
+	let (credentials, idle_timeout, pty_timeout) = entity
+		.get::<SshServer, _>(|server| {
+			(
+				server.credentials.clone(),
+				server.idle_timeout,
+				server.pty_timeout,
+			)
+		})
 		.await?;
 
 	let (new_conn_tx, new_conn_rx) =
@@ -52,6 +58,7 @@ pub(crate) async fn start_russh_server_with_tcp(
 		listener,
 		new_conn_tx,
 		credentials,
+		idle_timeout,
 	));
 
 	info!("SSH server listening on {}", addr);
@@ -61,7 +68,9 @@ pub(crate) async fn start_russh_server_with_tcp(
 		match new_conn_rx.recv().await {
 			Ok(info) => {
 				entity
-					.run_async_local(|server| handle_connection(server, info))
+					.run_async_local(move |server| {
+						handle_connection(server, info, pty_timeout)
+					})
 					.await
 					.ok();
 			}
@@ -73,7 +82,11 @@ pub(crate) async fn start_russh_server_with_tcp(
 
 /// Spawns the connection entity with [`SshPeerInfo`] and wires up bidirectional
 /// data flow, for the whole life of the connection.
-async fn handle_connection(server: AsyncEntity, info: NewConnectionInfo) {
+async fn handle_connection(
+	server: AsyncEntity,
+	info: NewConnectionInfo,
+	pty_timeout: Option<Duration>,
+) {
 	let server_id = server.id();
 	let to_client = info.to_client;
 	let from_client = info.from_client;
@@ -97,6 +110,13 @@ async fn handle_connection(server: AsyncEntity, info: NewConnectionInfo) {
 						peer_addr,
 					},
 					ChildOf(server_id),
+					// the pty requirement, if this server sets one, starts ticking
+					// from the moment the channel opens.
+					OnSpawn::new(move |entity: &mut EntityWorldMut| {
+						if let Some(timeout) = pty_timeout {
+							entity.insert(RequirePty::new(timeout));
+						}
+					}),
 				))
 				.observe_any(
 					move |ev: On<SshSend>, commands: AsyncCommands| -> Result {
@@ -138,9 +158,10 @@ async fn run_russh_server_inner(
 	listener: std::net::TcpListener,
 	new_conn_tx: async_channel::Sender<NewConnectionInfo>,
 	credentials: Option<SshCredentials>,
+	idle_timeout: Duration,
 ) {
 	let config = Arc::new(russh::server::Config {
-		inactivity_timeout: Some(Duration::from_secs(3600)),
+		inactivity_timeout: Some(idle_timeout),
 		auth_rejection_time: Duration::from_secs(3),
 		auth_rejection_time_initial: Some(Duration::from_secs(0)),
 		keys: vec![host_key()],
@@ -290,6 +311,13 @@ impl russh::server::Handler for BeetSshHandler {
 			// Send exit status before closing so the SSH client exits cleanly.
 			handle.exit_status_request(channel_id, exit_code).await.ok();
 			handle.close(channel_id).await.ok();
+			// One channel per connection, so the session has nothing left to serve:
+			// disconnect rather than wait out the inactivity timeout, which is what
+			// makes a reap decisive against a peer that ignores the channel close.
+			handle
+				.disconnect(russh::Disconnect::ByApplication, String::new(), String::new())
+				.await
+				.ok();
 		});
 
 		self.new_conn_tx

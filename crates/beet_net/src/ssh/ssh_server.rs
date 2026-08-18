@@ -1,12 +1,64 @@
-use crate::prelude::DEFAULT_SSH_PORT;
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Plugin for running bevy SSH servers.
+///
+/// Beyond the async runtime the listener needs, this drives
+/// [`SshServer::pty_timeout`]: without it a server still accepts connections, but
+/// nothing enforces the terminal request.
 #[derive(Default)]
 pub struct SshServerPlugin;
 
 impl Plugin for SshServerPlugin {
-	fn build(&self, app: &mut App) { app.init_plugin::<AsyncPlugin>(); }
+	fn build(&self, app: &mut App) {
+		app.init_plugin::<AsyncPlugin>()
+			.add_observer(RequirePty::clear_on_pty)
+			.add_systems(Update, RequirePty::close_expired);
+	}
+}
+
+/// Closes its connection unless the client requests a pty before the timer
+/// elapses.
+///
+/// Inserted on each connection when the server sets a
+/// [`pty_timeout`](SshServer::pty_timeout), and removed the moment the pty
+/// request arrives, so it only ever fires on a client that opened a channel and
+/// then asked for nothing: the shape of the credential scanners that find any
+/// public port 22 within hours. A real client requests its terminal immediately.
+#[derive(Debug, Clone, Component)]
+pub struct RequirePty(Timer);
+
+impl RequirePty {
+	/// Require a pty request within `timeout` of the connection opening.
+	pub fn new(timeout: Duration) -> Self {
+		Self(Timer::new(timeout, TimerMode::Once))
+	}
+
+	/// Observer: the client asked for its terminal, so the requirement is met.
+	fn clear_on_pty(ev: On<SshRecv>, mut commands: Commands) {
+		if matches!(**ev, SshEvent::RequestPty(_)) {
+			commands.entity(ev.target()).try_remove::<Self>();
+		}
+	}
+
+	/// System: close every connection whose pty deadline passed. The close is
+	/// announced to the client and disconnects the session, so a peer that ignores
+	/// it still loses the socket.
+	fn close_expired(
+		time: Res<Time>,
+		mut commands: Commands,
+		mut connections: Populated<(Entity, &mut Self)>,
+	) {
+		for (entity, mut require) in connections.iter_mut() {
+			if require.0.tick(time.delta()).is_finished() {
+				debug!("closing ssh connection {entity}: no pty requested");
+				commands
+					.entity(entity)
+					.remove::<Self>()
+					.trigger_target(SshSend(SshEvent::Close(None)));
+			}
+		}
+	}
 }
 
 /// Optional username/password credentials for an SSH server.
@@ -61,7 +113,31 @@ pub struct SshServer {
 	pub host: [u8; 4],
 	/// Optional credentials. If `None`, all connections are accepted.
 	pub credentials: Option<SshCredentials>,
+	/// How long a connection may go without traffic before the transport drops
+	/// it, [`DEFAULT_IDLE_TIMEOUT`] by default.
+	///
+	/// The only reaper for a peer that authenticates and then just holds the
+	/// socket, so an hour-long value means an hour-long slot per stalled scan.
+	/// Its floor is how long a *real* session may sit unread: a terminal reading
+	/// a page sends nothing, so this is the price of not dropping them.
+	pub idle_timeout: Duration,
+	/// How long a connection has to request a pty before it is closed, `None`
+	/// (the default) to let a connection live without one.
+	///
+	/// Set it on a server whose sessions are terminals: it costs a real client
+	/// nothing (its pty request follows auth immediately) and takes the scanners
+	/// out in seconds rather than at [`idle_timeout`](Self::idle_timeout). Leave
+	/// it unset for a server serving non-terminal clients, eg beet's own
+	/// [`SshSession`](crate::prelude::SshSession) data channels.
+	///
+	/// Enforced by [`SshServerPlugin`] (via [`RequirePty`]), not by the transport.
+	pub pty_timeout: Option<Duration>,
 }
+
+/// The default [`SshServer::idle_timeout`]: long enough to read a page without
+/// being dropped mid-session, short enough that a stalled scan is not a slot held
+/// for an hour.
+pub const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
 impl std::fmt::Debug for SshServer {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -76,6 +152,8 @@ impl std::fmt::Debug for SshServer {
 					&"None"
 				},
 			)
+			.field("idle_timeout", &self.idle_timeout)
+			.field("pty_timeout", &self.pty_timeout)
 			.finish()
 	}
 }
@@ -99,11 +177,17 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 impl SshServer {
 	/// Creates a new SSH server bound to the specified port on localhost.
-	pub fn new(port: u16) -> Self {
+	pub fn new(port: u16) -> Self { Self::bound([127, 0, 0, 1], Some(port)) }
+
+	/// An open server on `host:port`: no credentials, default timeouts. The one
+	/// place the field defaults live, so a constructor cannot drift from them.
+	fn bound(host: [u8; 4], port: Option<u16>) -> Self {
 		Self {
-			port: Some(port),
-			host: [127, 0, 0, 1],
+			port,
+			host,
 			credentials: None,
+			idle_timeout: DEFAULT_IDLE_TIMEOUT,
+			pty_timeout: None,
 		}
 	}
 
@@ -123,6 +207,20 @@ impl SshServer {
 		self
 	}
 
+	/// Sets how long a connection may go without traffic, see
+	/// [`idle_timeout`](Self::idle_timeout).
+	pub fn with_idle_timeout(mut self, timeout: Duration) -> Self {
+		self.idle_timeout = timeout;
+		self
+	}
+
+	/// Requires each connection to request a pty within `timeout`, see
+	/// [`pty_timeout`](Self::pty_timeout).
+	pub fn with_pty_timeout(mut self, timeout: Duration) -> Self {
+		self.pty_timeout = Some(timeout);
+		self
+	}
+
 	/// Creates a new server with an OS-assigned port for testing.
 	///
 	/// Binds to port 0 so the OS picks an available port,
@@ -137,11 +235,7 @@ impl SshServer {
 			.expect("failed to bind test SSH server");
 		let port = listener.local_addr().unwrap().port();
 		(
-			Self {
-				port: Some(port),
-				host: [127, 0, 0, 1],
-				credentials: None,
-			},
+			Self::bound([127, 0, 0, 1], Some(port)),
 			OnSpawn::new_async(move |entity| {
 				super::impl_russh_server::start_russh_server_with_tcp(
 					entity, listener,
@@ -170,11 +264,10 @@ impl Default for SshServer {
 	/// falling back to localhost on [`DEFAULT_SSH_PORT`].
 	fn default() -> Self {
 		let config = BootstrapConfig::get();
-		Self {
-			port: Some(config.ssh_port.unwrap_or(DEFAULT_SSH_PORT)),
-			host: config.host_octets().unwrap_or([127, 0, 0, 1]),
-			credentials: None,
-		}
+		Self::bound(
+			config.host_octets().unwrap_or([127, 0, 0, 1]),
+			Some(config.ssh_port.unwrap_or(DEFAULT_SSH_PORT)),
+		)
 	}
 }
 
@@ -212,6 +305,71 @@ mod tests {
 			time_ext::sleep_millis(20).await;
 		}
 		panic!("client never connected to the test server");
+	}
+
+	/// A client that opens a channel and then asks for nothing, the port-scanner
+	/// shape, is closed by the server once its pty timeout passes.
+	///
+	/// Asserted on the *server*: the client here sits on its session and would
+	/// otherwise be dropped only by a timeout an order of magnitude further out,
+	/// so a connection reclaimed within the poll budget can only be the reap.
+	#[beet_core::test]
+	async fn reaps_a_connection_that_never_requests_a_pty() {
+		let (server, on_spawn) = SshServer::new_test();
+		let server = server.with_pty_timeout(Duration::from_millis(200));
+		let addr = server.local_address();
+		let live = Store::<usize>::default();
+		let count = live.clone();
+
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, SshServerPlugin)).add_systems(
+				Update,
+				move |peers: Query<(), With<SshPeerInfo>>| {
+					count.set(peers.iter().count())
+				},
+			);
+			app.world_mut().spawn((server, on_spawn));
+			app.run();
+		});
+		time_ext::sleep_millis(300).await;
+
+		// a client that connects and sits there: no pty, no shell, no data
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
+			app.world_mut().spawn(SshSession::insert_anon(&addr));
+			app.run();
+		});
+
+		poll_until(|| live.get() == 1, "server never saw the connection").await;
+		poll_until(|| live.get() == 0, "connection with no pty was not reaped")
+			.await;
+	}
+
+	/// A session that does request a pty is left alone: the requirement is met,
+	/// so the timer that would have closed it is gone.
+	#[beet_core::test]
+	async fn a_pty_request_clears_the_requirement() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, SshServerPlugin));
+		let connection = app
+			.world_mut()
+			.spawn(RequirePty::new(Duration::from_millis(50)))
+			.flush();
+
+		app.world_mut()
+			.entity_mut(connection)
+			.trigger_target(SshRecv(SshEvent::RequestPty(RequestPty {
+				terminal: "xterm".into(),
+				..default()
+			})));
+		app.update();
+
+		app.world()
+			.entity(connection)
+			.contains::<RequirePty>()
+			.xpect_false();
 	}
 
 	/// Regression: a gone client's connection entity goes with it, and it is

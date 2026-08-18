@@ -110,7 +110,7 @@ impl From<SshCloseFrame> for Result {
 }
 
 /// Pseudo-terminal request parameters, sent by the client to the server.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct RequestPty {
 	/// Terminal type string, e.g. `"xterm-256color"`.
 	pub terminal: SmolStr,
@@ -121,7 +121,7 @@ pub struct RequestPty {
 }
 
 /// Terminal window dimensions.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct SshWindowSize {
 	/// Width and height in character cells (columns × rows).
 	pub cells: UVec2,
