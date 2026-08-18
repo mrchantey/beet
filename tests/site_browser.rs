@@ -107,39 +107,23 @@ async fn verifies_client() {
 		.collect::<Vec<_>>()
 		.xpect_empty();
 
-	// mobile layout: no horizontal overflow at phone widths, with the
-	// offending elements printed on failure
+	// mobile layout: no horizontal overflow at phone widths (the matcher
+	// prints the offending elements on failure), and the opened sidebar
+	// drawer overlays the content rather than squeezing it into overflow
 	cross_log!("stage: asset sweep done");
 	for width in [375, 320] {
 		page.set_viewport(width, 812).await.unwrap();
 		for path in ["/", "/blog", "/blog/post-3"] {
 			page.navigate(&format!("{base}{path}")).await.unwrap();
 			page.find("body").await;
-			let offenders = page
-				.evaluate_value(
-					r#"document.documentElement.scrollWidth
-						<= document.documentElement.clientWidth + 1
-					? []
-					: [...document.querySelectorAll('*')]
-						.filter(el => el.getBoundingClientRect().right
-							> document.documentElement.clientWidth + 1)
-						.slice(0, 10)
-						.map(el => `${el.tagName}.${el.className}`)"#,
-				)
+			page.xpect_no_horizontal_overflow().await;
+			// open the drawer: still no overflow with the rail overlaid
+			page.find("#menu-button").await.click().await.unwrap();
+			page.find("#sidebar")
 				.await
-				.unwrap();
-			offenders
-				.as_array()
-				.cloned()
-				.unwrap_or_default()
-				.xmap(|offenders| {
-					offenders.is_empty().then_some(()).ok_or(offenders)
-				})
-				.unwrap_or_else(|offenders| {
-					panic!(
-						"horizontal overflow at {width}px on {path}: {offenders:?}"
-					)
-				});
+				.xpect_attr("aria-hidden", "false")
+				.await;
+			page.xpect_no_horizontal_overflow().await;
 		}
 	}
 

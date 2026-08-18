@@ -145,6 +145,33 @@ pub fn sidebar_terminal() -> Rule {
 		.with_value(common_props::Width, Length::Rem(20.))
 }
 
+/// Narrow-viewport drawer - at or below [`SIDEBAR_BREAKPOINT_PX`] the rail
+/// leaves the container's flex row and overlays the content as a modal drawer:
+/// absolute against the (relative) container, stretched to its full height and
+/// lifted above the page. Without this, an opened rail re-entered the row and
+/// squeezed `<main>` to a sliver, spilling any unshrinkable content under the
+/// rail and past the viewport edge (the "Mind your step" card regression).
+///
+/// Anchored to the container — just below the app bar — rather than fixed over
+/// the whole viewport, so the [`MENU_BUTTON`] stays reachable to close the
+/// drawer and the bar keeps its freedom to wrap on tiny screens. `max-width:
+/// 100%` caps the rail on viewports narrower than its widths ([`sidebar_web`] /
+/// [`sidebar_terminal`], which this rule follows in the cascade). Applies
+/// whether or not the rail is shown ([`sidebar_hidden`] still collapses it), so
+/// it stays one width-gated rule both targets evaluate, like the collapse.
+pub fn sidebar_overlay() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::MaxWidth(SIDEBAR_BREAKPOINT_PX))
+		.with_selector(Selector::class(SIDEBAR))
+		.with_token(common_props::ElevationProp, geometry::Elevation1).unwrap()
+		.with_value(common_props::PositionProp, Position::Absolute)
+		.with_value(common_props::InsetTop, Length::Px(0.))
+		.with_value(common_props::InsetBottom, Length::Px(0.))
+		.with_value(common_props::InsetLeft, Length::Px(0.))
+		.with_value(common_props::MaxWidth, Length::Percent(100.))
+		.with_value(common_props::ZIndexProp, 100)
+}
+
 /// Responsive sidebar collapse - at or below [`SIDEBAR_BREAKPOINT_PX`] the
 /// rail is taken out of flow unless something has marked it
 /// `aria-hidden="false"` (the [`MENU_BUTTON`] toggle): `sidebar.js` on the

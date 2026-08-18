@@ -397,9 +397,9 @@ mod test {
 	}
 
 	/// Render the sidebar into a styled [`FlexBuffer`] of fixed `width`, for cell
-	/// inspection (entity ownership, background). Narrow widths sit below the
-	/// responsive breakpoint, so the rail is marked `aria-hidden="false"` — the
-	/// open state the seed/toggle runtimes produce live — to keep it rendered.
+	/// inspection (entity ownership, background). Marked `aria-hidden="false"` —
+	/// the open state the seed/toggle runtimes produce live — so the rail
+	/// renders at any width (below the breakpoint it would otherwise collapse).
 	fn render_sidebar_cells(width: u32, nodes: Vec<SidebarNode>) -> FlexBuffer {
 		let mut world = (
 			TemplatePlugin,
@@ -545,6 +545,58 @@ mod test {
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 	}
 
+	/// Below the breakpoint an open rail overlays the container's content
+	/// instead of joining its flex row: `<main>` keeps the full surface width
+	/// with the drawer absolutely positioned over its left edge — the terminal
+	/// half of the one width-gated `sidebar_overlay` rule both targets
+	/// evaluate. Guards the "Mind your step" regression, where the flowed rail
+	/// squeezed the main column to a sliver and its unshrinkable content
+	/// spilled under the rail and past the viewport.
+	#[beet_core::test]
+	fn narrow_open_rail_overlays_content() {
+		let width = 40u32;
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		// the site-chrome shape: the container row holding the rail (opened by
+		// the toggle, like the seed/toggle runtimes produce live) + the content
+		let root = world
+			.spawn_template(rsx! {
+				<div {Classes::new([classes::CONTAINER])}>
+					<nav id="sidebar" aria-hidden="false" {Classes::new([classes::SIDEBAR])}>"nav"</nav>
+					<main>"content"</main>
+				</div>
+			})
+			.unwrap()
+			.id();
+		world.entity_mut(root).insert(FlexBuffer::new(width));
+		world.run_schedule(crate::parse::PostParseTree);
+
+		let rect_of = |world: &mut World, tag: &str| {
+			world
+				.query::<(&Element, &LayoutRect)>()
+				.iter(world)
+				.find(|(element, _)| element.tag() == tag)
+				.map(|(_, rect)| rect.0)
+				.unwrap()
+		};
+		// the content column spans the full surface, not the sliver beside a
+		// flowed rail
+		let main = rect_of(&mut world, "main");
+		main.min.x.xpect_eq(0);
+		main.width().xpect_eq(width as i32);
+		// the drawer overlays it: anchored to the container's left edge, wide
+		// enough to cover content that would previously have been beside it
+		let nav = rect_of(&mut world, "nav");
+		nav.min.x.xpect_eq(0);
+		(nav.max.x > 5).xpect_true();
+		(nav.max.x < width as i32).xpect_true();
+	}
+
 	/// The leading-space indent of the row whose text starts with `label`.
 	fn indent_of(out: &str, label: &str) -> usize {
 		let row = out
@@ -602,10 +654,11 @@ mod test {
 	/// text. The cells past the label form one contiguous painted box carrying a
 	/// background, distinct from the bare rail behind it; the label glyph sits
 	/// inside that box. Guards the sidebar-anchor bug where the row beyond the text
-	/// belonged to the rail, so only the text was interactive.
+	/// belonged to the rail, so only the text was interactive. Rendered above the
+	/// responsive breakpoint (a wide surface), the flowed rail's natural mode.
 	#[beet_core::test]
 	fn leaf_link_fills_row_width() {
-		let width = 20u32;
+		let width = 100u32;
 		let buffer = render_sidebar_cells(width, nodes());
 		let cells = buffer.cells();
 		let row_of =
@@ -630,7 +683,7 @@ mod test {
 		row[10].style.background.is_some().xpect_true();
 		// the label text sits inside that box (a distinct child glyph entity)
 		(row[0].entity.expect("label glyph") != link).xpect_true();
-		// and the box is the link, not the bare rail divider trailing the row
+		// and the box ends with the rail, not running the full surface width
 		(row[(width - 1) as usize].entity != Some(link)).xpect_true();
 	}
 

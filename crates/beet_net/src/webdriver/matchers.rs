@@ -127,6 +127,42 @@ impl Page {
 		self
 	}
 
+	/// Assert the document has no horizontal overflow (`scrollWidth` within
+	/// `clientWidth`), auto-waiting, panicking with the offending elements —
+	/// the responsive-layout regression matcher (a squeezed column spilling
+	/// unshrinkable content past the viewport).
+	#[cfg_attr(feature = "nightly", track_caller)]
+	pub async fn xpect_no_horizontal_overflow(&self) -> &Self {
+		assert_eventually(
+			self.timeout(),
+			async || {
+				self.evaluate_value(
+					r#"document.documentElement.scrollWidth
+						<= document.documentElement.clientWidth + 1
+					? []
+					: [...document.querySelectorAll('*')]
+						.filter(el => el.getBoundingClientRect().right
+							> document.documentElement.clientWidth + 1)
+						.slice(0, 10)
+						.map(el => `${el.tagName}.${el.className}`)"#,
+				)
+				.await?
+				.as_array()
+				.into_iter()
+				.flatten()
+				.map(|el| el.as_str().unwrap_or_default().to_string())
+				.collect::<Vec<_>>()
+				.join(", ")
+				.xok()
+			},
+			|offenders| offenders.is_empty(),
+			"no elements overflowing the viewport",
+			false,
+		)
+		.await;
+		self
+	}
+
 	/// Assert the page url does not equal `expected`, waiting to leave it.
 	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn xpect_not_url(&self, expected: &str) -> &Self {

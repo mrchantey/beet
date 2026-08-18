@@ -275,6 +275,33 @@ impl Element {
 		Ok(())
 	}
 
+	/// The viewport-relative bounding rect (`getBoundingClientRect`), in CSS px.
+	/// The layout-assertion primitive: an overlay proves itself by overlapping
+	/// the box it covers, a squeezed column by its width.
+	pub async fn bounding_rect(&self) -> Result<bevy::math::Rect> {
+		let resp = self
+			.call_function(
+				"function(){ const b = this.getBoundingClientRect(); \
+				 return [b.left, b.top, b.right, b.bottom]; }",
+				&[],
+				false,
+			)
+			.await?;
+		let corners = resp
+			.pointer("/result/result")
+			.map(super::bidi_value::to_json)
+			.and_then(|value| {
+				value
+					.as_array()?
+					.iter()
+					.map(|corner| corner.as_f64().map(|corner| corner as f32))
+					.collect::<Option<Vec<f32>>>()
+			})
+			.ok_or_else(|| bevyhow!("bounding rect missing in response"))?;
+		bevy::math::Rect::new(corners[0], corners[1], corners[2], corners[3])
+			.xok()
+	}
+
 	/// Text content convenience getter.
 	pub async fn text_content(&self) -> Result<Option<String>> {
 		let resp = self

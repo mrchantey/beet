@@ -231,32 +231,6 @@ mod test {
 	use super::*;
 
 	#[beet_core::test]
-	fn unescape_structural_entities() {
-		unescape_html_text("&lt;div class=&quot;foo&quot;&gt;")
-			.xpect_eq("<div class=\"foo\">".to_string());
-	}
-
-	#[beet_core::test]
-	fn unescape_typographic_entities() {
-		unescape_html_text("&ldquo;hello&rdquo; &mdash; world")
-			.xpect_eq("\u{201C}hello\u{201D} \u{2014} world".to_string());
-	}
-
-	#[beet_core::test]
-	fn unescape_preserves_unknown_entities() {
-		unescape_html_text("&unknownentity; text")
-			.xpect_eq("&unknownentity; text".to_string());
-	}
-
-	#[beet_core::test]
-	fn unescape_bare_ampersand() {
-		unescape_html_text("AT&T").xpect_eq("AT&T".to_string());
-	}
-
-	#[beet_core::test]
-	fn unescape_empty() { unescape_html_text("").xpect_eq("".to_string()); }
-
-	#[beet_core::test]
 	fn escape_structural_chars() {
 		escape_html_text("<div class=\"foo\">")
 			.xpect_eq("&lt;div class=&quot;foo&quot;&gt;".to_string());
@@ -279,20 +253,6 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn roundtrip_escape_unescape() {
-		let original = "<p>\"Hello\" & 'goodbye' \u{2014} world</p>";
-		let escaped = escape_html_text(original);
-		unescape_html_text(&escaped).xpect_eq(original.to_string());
-	}
-
-	#[beet_core::test]
-	fn roundtrip_unescape_escape() {
-		let original = "&lt;p&gt;&quot;Hello&quot; &amp; &apos;goodbye&apos; &mdash; world&lt;/p&gt;";
-		let unescaped = unescape_html_text(original);
-		escape_html_text(&unescaped).xpect_eq(original.to_string());
-	}
-
-	#[beet_core::test]
 	fn escape_attribute_quotes_and_ampersand() {
 		escape_html_attribute(r#"say "hello" & 'goodbye'"#).xpect_eq(
 			"say &quot;hello&quot; &amp; &apos;goodbye&apos;".to_string(),
@@ -305,24 +265,6 @@ mod test {
 			.xpect_eq("<b>bold</b>".to_string());
 	}
 
-	#[beet_core::test]
-	fn unescape_attribute_structural() {
-		unescape_html_attribute("&quot;hello&quot; &amp; &apos;world&apos;")
-			.xpect_eq("\"hello\" & 'world'".to_string());
-	}
-
-	#[beet_core::test]
-	fn roundtrip_attribute_escape_unescape() {
-		let original = r#"font-family: "Helvetica" & 'Arial'"#;
-		let escaped = escape_html_attribute(original);
-		unescape_html_attribute(&escaped).xpect_eq(original.to_string());
-	}
-
-	#[beet_core::test]
-	fn unescape_double_escaped_ampersand() {
-		unescape_html_text("&amp;amp;").xpect_eq("&amp;".to_string());
-	}
-
 	/// no `<` survives, so the value cannot close the host `<script>`
 	#[beet_core::test]
 	fn escape_script_json_neutralizes_angle_brackets() {
@@ -330,5 +272,70 @@ mod test {
 			.xnot()
 			.xpect_contains("<")
 			.xpect_contains("/script>");
+	}
+
+	/// The unescape half rides the markdown parser's feature, like the
+	/// functions it exercises.
+	#[cfg(feature = "markdown_parser")]
+	mod unescape {
+		use super::super::*;
+
+		#[beet_core::test]
+		fn structural_entities() {
+			unescape_html_text("&lt;div class=&quot;foo&quot;&gt;")
+				.xpect_eq("<div class=\"foo\">".to_string());
+		}
+
+		#[beet_core::test]
+		fn typographic_entities() {
+			unescape_html_text("&ldquo;hello&rdquo; &mdash; world")
+				.xpect_eq("\u{201C}hello\u{201D} \u{2014} world".to_string());
+		}
+
+		#[beet_core::test]
+		fn preserves_unknown_entities() {
+			unescape_html_text("&unknownentity; text")
+				.xpect_eq("&unknownentity; text".to_string());
+		}
+
+		#[beet_core::test]
+		fn bare_ampersand() {
+			unescape_html_text("AT&T").xpect_eq("AT&T".to_string());
+		}
+
+		#[beet_core::test]
+		fn empty() { unescape_html_text("").xpect_eq("".to_string()); }
+
+		#[beet_core::test]
+		fn roundtrip_escape_unescape() {
+			let original = "<p>\"Hello\" & 'goodbye' \u{2014} world</p>";
+			let escaped = escape_html_text(original);
+			unescape_html_text(&escaped).xpect_eq(original.to_string());
+		}
+
+		#[beet_core::test]
+		fn roundtrip_unescape_escape() {
+			let original = "&lt;p&gt;&quot;Hello&quot; &amp; &apos;goodbye&apos; &mdash; world&lt;/p&gt;";
+			let unescaped = unescape_html_text(original);
+			escape_html_text(&unescaped).xpect_eq(original.to_string());
+		}
+
+		#[beet_core::test]
+		fn attribute_structural() {
+			unescape_html_attribute("&quot;hello&quot; &amp; &apos;world&apos;")
+				.xpect_eq("\"hello\" & 'world'".to_string());
+		}
+
+		#[beet_core::test]
+		fn roundtrip_attribute_escape_unescape() {
+			let original = r#"font-family: "Helvetica" & 'Arial'"#;
+			let escaped = escape_html_attribute(original);
+			unescape_html_attribute(&escaped).xpect_eq(original.to_string());
+		}
+
+		#[beet_core::test]
+		fn double_escaped_ampersand() {
+			unescape_html_text("&amp;amp;").xpect_eq("&amp;".to_string());
+		}
 	}
 }

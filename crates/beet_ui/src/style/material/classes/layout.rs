@@ -180,7 +180,10 @@ pub fn app_bar_scrolled() -> Rule {
 /// Container - the body's sidebar + main row.
 ///
 /// A flex row (default [`Direction::Horizontal`]) so the `nav` sidebar and
-/// `<main>` content sit side by side rather than stacking.
+/// `<main>` content sit side by side rather than stacking. Positioned so it is
+/// the containing block of the narrow-viewport sidebar drawer (see
+/// [`sidebar_overlay`](super::sidebar_overlay)), anchoring the drawer just
+/// below the app bar on both targets.
 pub fn container() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CONTAINER))
@@ -189,6 +192,7 @@ pub fn container() -> Rule {
 		// stretch the sidebar to the row height so its right divider runs the
 		// full height of the content, not just its own entries.
 		.with_value(common_props::AlignItemsProp, AlignItems::Stretch)
+		.with_value(common_props::PositionProp, Position::Relative)
 }
 
 /// Grid container - the default 12 columns of square tracks with a one-cell

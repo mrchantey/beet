@@ -16,6 +16,10 @@ mod client;
 mod collector;
 mod element;
 mod export_pdf;
+// the serve-a-bundle harness runs a real listener, so it needs the server half
+// beside the webdriver half
+#[cfg(all(any(test, feature = "testing"), feature = "server"))]
+mod harness;
 mod input;
 mod locate;
 #[cfg(any(test, feature = "testing"))]
@@ -31,6 +35,8 @@ pub use client::*;
 pub use collector::*;
 pub use element::*;
 pub use export_pdf::*;
+#[cfg(all(any(test, feature = "testing"), feature = "server"))]
+pub use harness::*;
 pub use page::*;
 pub use screenshot::*;
 pub use session::*;

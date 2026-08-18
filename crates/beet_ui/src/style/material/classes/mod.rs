@@ -144,7 +144,10 @@ pub fn all_rules() -> Vec<Rule> {
 		sidebar(),
 		sidebar_web(),
 		sidebar_terminal(),
-		// responsive: narrow-screen collapse + the header toggle that drives it
+		// responsive: the narrow-screen drawer overlay (after the width rules so
+		// its `max-width` cap wins the tie), the collapse, and the header toggle
+		// that drives them
+		sidebar_overlay(),
 		sidebar_hidden(),
 		menu_button(),
 		menu_button_visible(),

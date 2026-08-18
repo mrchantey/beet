@@ -386,16 +386,21 @@ fn containing_block(
 /// Each axis: with both insets set (and no explicit size) the box stretches
 /// between them; with one inset it anchors to that edge at its content/explicit
 /// size; with neither it stays at the block's start edge (static-ish fallback).
+/// Sizes resolve against the block (so a percent width/max-width means "of the
+/// containing block", as in flow layout) and route through the
+/// `min-width`/`max-width` bounds like every other sized box (eg the narrow
+/// sidebar drawer's `max-width: 100%` capping its rail width to the surface).
 fn absolute_rect(
 	node: &CharcellNodeData,
 	style: &PositionStyle,
 	block: IRect,
 	viewport: UVec2,
 ) -> IRect {
-	let box_model = BoxModel::from_node(node, viewport);
-	let intrinsic = node.intrinsic_size();
 	let block_w = (block.width().max(0)) as u32;
 	let block_h = (block.height().max(0)) as u32;
+	let box_model =
+		BoxModel::from_node_in(node, viewport, UVec2::new(block_w, block_h));
+	let intrinsic = node.intrinsic_size();
 
 	let (left, right) = (
 		style
@@ -413,8 +418,9 @@ fn absolute_rect(
 			.bottom()
 			.map(|l| inset_cells(l, viewport, block_h, false)),
 	);
-	let explicit_w = box_model.width.map(|w| w + box_model.overhead().x);
-	let explicit_h = box_model.height.map(|h| h + box_model.overhead().y);
+	let overhead = box_model.overhead();
+	let explicit_w = box_model.width.map(|w| w + overhead.x);
+	let explicit_h = box_model.height.map(|h| h + overhead.y);
 
 	let (x0, x1) = axis_extent(
 		block.min.x,
@@ -423,6 +429,7 @@ fn absolute_rect(
 		right,
 		explicit_w,
 		intrinsic.x,
+		|len| clamp_outer(len, box_model.min_width, box_model.max_width, overhead.x),
 	);
 	let (y0, y1) = axis_extent(
 		block.min.y,
@@ -431,13 +438,31 @@ fn absolute_rect(
 		bottom,
 		explicit_h,
 		intrinsic.y,
+		|len| {
+			clamp_outer(len, box_model.min_height, box_model.max_height, overhead.y)
+		},
 	);
 	IRect::new(x0, y0, x1, y1)
 }
 
+/// Clamp an outer (border-box) `len` into content-box `min`/`max` bounds
+/// widened by the box's `overhead`, cap first then floor like
+/// [`BoxModel::clamp_width`].
+fn clamp_outer(
+	len: i32,
+	min: Option<u32>,
+	max: Option<u32>,
+	overhead: u32,
+) -> i32 {
+	let capped = max.map_or(len, |max| len.min((max + overhead) as i32));
+	min.map_or(capped, |min| capped.max((min + overhead) as i32))
+}
+
 /// Resolve one axis of an absolute box to `(start, end)` within `[block_min,
-/// block_max]`, given the leading/trailing insets, an explicit size, and the
-/// content size fallback.
+/// block_max]`, given the leading/trailing insets, an explicit size, the
+/// content size fallback, and the box's min/max `clamp` (applied to every
+/// resolved length, the stretch included; an over-constrained stretch keeps its
+/// leading anchor, like CSS resolving the conflict against the trailing inset).
 fn axis_extent(
 	block_min: i32,
 	block_max: i32,
@@ -445,20 +470,24 @@ fn axis_extent(
 	trail: Option<i32>,
 	explicit: Option<u32>,
 	content: u32,
+	clamp: impl Fn(i32) -> i32,
 ) -> (i32, i32) {
 	match (lead, trail, explicit) {
 		// both insets, no explicit size: stretch between them
-		(Some(a), Some(b), None) => (block_min + a, block_max - b),
+		(Some(a), Some(b), None) => {
+			let start = block_min + a;
+			(start, start + clamp(block_max - b - start))
+		}
 		// trailing inset wins the anchor when there's a size
 		(_, Some(b), size) => {
-			let len = size.unwrap_or(content) as i32;
+			let len = clamp(size.unwrap_or(content) as i32);
 			let end = block_max - b;
 			(end - len, end)
 		}
 		// leading inset (or neither): anchor to the start edge
 		(lead, None, size) => {
 			let start = block_min + lead.unwrap_or(0);
-			(start, start + size.unwrap_or(content) as i32)
+			(start, start + clamp(size.unwrap_or(content) as i32))
 		}
 	}
 }

@@ -775,6 +775,15 @@ path = "tests/site_browser.rs"
 harness = false
 required-features = ["router", "json", "testing", "webdriver"]
 
+# the responsive sidebar drawer over a `PageHarness`-served `SiteLayout`
+# fixture: below the breakpoint the opened rail overlays the content instead of
+# squeezing it (the "Mind your step" card overflow regression).
+[[test]]
+name = "sidebar_drawer"
+path = "tests/sidebar_drawer.rs"
+harness = false
+required-features = ["router", "style", "http_server", "testing", "webdriver"]
+
 [[bench]]
 name = "bevy_coldstart"
 path = "tests/benches/bevy_coldstart.rs"

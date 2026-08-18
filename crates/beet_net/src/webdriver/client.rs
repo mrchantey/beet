@@ -95,6 +95,24 @@ impl Default for NewSessionOptions {
 }
 
 impl Client {
+	/// A client with a process-unique driver/websocket port pair, so
+	/// concurrently running tests and harnesses never fight over one driver
+	/// process. Pairs advance from a per-process base above
+	/// [`DEFAULT_WEBDRIVER_PORT`], spread by process id so concurrently running
+	/// test *binaries* rarely collide either.
+	pub fn unique() -> Self {
+		use std::sync::atomic::AtomicU16;
+		use std::sync::atomic::Ordering;
+		static NEXT_PAIR: AtomicU16 = AtomicU16::new(0);
+		let pair = NEXT_PAIR.fetch_add(1, Ordering::SeqCst);
+		let base = DEFAULT_WEBDRIVER_PORT
+			+ 10 + (std::process::id() as u16 % 512) * 32
+			+ pair * 2;
+		Self::default()
+			.with_driver_port(base)
+			.with_websocket_port(base + 1)
+	}
+
 	/// Creates a client configured for Chromium.
 	pub fn chromium() -> Self {
 		Self {
