@@ -42,6 +42,13 @@ pub enum AnalyticsEventData {
 		method: SmolStr,
 		/// The `User-Agent` header, if any.
 		user_agent: Option<SmolStr>,
+		/// The `Referer` header, ie the page this request was linked from.
+		///
+		/// What separates a broken link from a probe on a 404: someone followed a
+		/// link to reach a referred path, where a scanner walking a vulnerability
+		/// list arrives cold. See [`AnalyticsSummary`](super::AnalyticsSummary).
+		#[serde(default)]
+		referrer: Option<SmolStr>,
 	},
 	/// A viewed page and its dwell duration.
 	PageView {

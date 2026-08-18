@@ -196,6 +196,7 @@ mod test {
 			status: 200,
 			method: "GET".into(),
 			user_agent: None,
+			referrer: None,
 		})
 		.with_client_kind(ClientKind::Web);
 		let id = event.id;
@@ -243,6 +244,7 @@ mod test {
 			status: 200,
 			method: "GET".into(),
 			user_agent: None,
+			referrer: None,
 		});
 		let id = event.id;
 		world.trigger(event);

@@ -66,6 +66,12 @@ pub async fn AnalyticsMiddleware(
 		.headers()
 		.get::<header::UserAgent>()
 		.and_then(|res| res.ok());
+	// the page this request was linked from, which is what tells a broken link
+	// (someone followed a link here) from a probe (a scanner arriving cold).
+	let referrer = request
+		.headers()
+		.get::<header::Referer>()
+		.and_then(|res| res.ok());
 
 	let response = next.call(request).await?;
 	let status = response.status().as_u16();
@@ -88,6 +94,7 @@ pub async fn AnalyticsMiddleware(
 		status,
 		method: method.into(),
 		user_agent: user_agent.as_deref().map(SmolStr::from),
+		referrer: referrer.as_deref().map(SmolStr::from),
 	})
 	.with_client_kind(router_analytics_ext::request_client_kind(
 		user_agent.is_some(),
@@ -162,6 +169,29 @@ mod test {
 			} => {
 				(*status).xpect_eq(200);
 				user_agent.as_deref().xpect_eq(Some("Mozilla/5.0 Test"));
+			}
+			_ => panic!("expected a request event"),
+		}
+	}
+
+	/// The referrer rides the request event: it is what tells a broken link from a
+	/// probe when the response is a 404 (see `AnalyticsSummary::broken_links`).
+	#[beet_core::test]
+	async fn records_the_referrer() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let root = analytics_router(&mut world);
+		world
+			.entity_mut(root)
+			.exchange(
+				Request::get("about")
+					.with_header::<header::Referer>("https://beet.org/docs"),
+			)
+			.await;
+
+		let events = world.resource::<Captured>().lock().unwrap().clone();
+		match &events[0].data {
+			AnalyticsEventData::Request { referrer, .. } => {
+				referrer.as_deref().xpect_eq(Some("https://beet.org/docs"));
 			}
 			_ => panic!("expected a request event"),
 		}

@@ -55,7 +55,10 @@ impl PluginGroup for BeetPlugins {
 		// branch disables), then the error handler + async/exit runtime.
 		builder = builder
 			.add(LogPlugin::new(Level::DEBUG))
-			.add(beet_runtime_plugin);
+			.add(beet_runtime_plugin)
+			// the tick/entity-count diagnostics, so any entry can ask for a periodic
+			// performance report with a `<PerfLog/>`. Inert without one.
+			.add(PerfLogPlugin);
 
 		// the beet_ui widget library, registered as an inert capability: it registers
 		// the `<Button>`/`<Form>`/`<Header>`/`<Sidebar>`/… widget templates by name and

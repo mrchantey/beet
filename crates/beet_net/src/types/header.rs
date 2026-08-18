@@ -618,6 +618,39 @@ impl Header for UserAgent {
 	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
+// ============================================================================
+// Referer
+// ============================================================================
+
+/// Typed `Referer` header: the page a request was linked from.
+///
+/// Misspelled in the protocol since RFC 1945 and kept that way on the wire; the
+/// type name follows suit so the constant and the header read alike.
+///
+/// ```
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
+/// let mut headers = HeaderMap::new();
+/// headers.set::<headers::Referer>("https://beet.org/docs".to_string());
+/// let from: String = headers.get::<headers::Referer>().unwrap().unwrap();
+/// assert_eq!(from, "https://beet.org/docs");
+/// ```
+pub struct Referer;
+
+impl Header for Referer {
+	type Value = String;
+	const KEY: &'static str = "referer";
+
+	fn parse(values: &Vec<String>) -> Result<Self::Value> {
+		values
+			.first()
+			.cloned()
+			.ok_or_else(|| bevyhow!("referer header has no value"))
+	}
+
+	fn serialize(value: String) -> Vec<String> { vec![value] }
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;

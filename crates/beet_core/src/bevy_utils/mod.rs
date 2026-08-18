@@ -51,6 +51,9 @@ pub use bevyhow::*;
 #[cfg(feature = "std")]
 pub mod observer_ext;
 mod on_spawn;
+// the periodic performance report; std-only for the log output it writes to.
+#[cfg(feature = "std")]
+mod perf_log;
 #[cfg(feature = "std")]
 mod pretty_tracing;
 pub mod reflect_ext;
@@ -68,6 +71,8 @@ pub use despawn_after::*;
 pub use entity_target_event::*;
 pub use non_send_plugin::*;
 pub use on_spawn::*;
+#[cfg(feature = "std")]
+pub use perf_log::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
 pub use when::*;
