@@ -68,7 +68,7 @@ template = ["std", "rsx", "style"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "dep:image", "dep:resvg", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
+tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "dep:image", "dep:resvg", "dep:blocking", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -120,6 +120,9 @@ image = { version = "0.25", optional = true, default-features = false, features 
 # keep it current: an older resvg pins an older codec line (zune-jpeg, gif, png)
 # and duplicates the one `image` already pulls.
 resvg = { version = "0.48", optional = true }
+# decode/rasterise off the world thread: beet runs bevy single-threaded, so an
+# inline `image::load_from_memory` + `resvg::render` freezes every connection
+blocking = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 serde_json = { workspace = true, optional = true }

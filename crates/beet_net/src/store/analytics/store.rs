@@ -121,32 +121,42 @@ pub(super) fn spawn_store_on_config(
 	});
 }
 
-/// Spawn the convention-derived analytics store entity as a child of the
-/// config entity: a local run writes [`WorkspaceConfig::analytics_dir`]; a
-/// deployed ([`ServiceAccess::Remote`]) process uses the
-/// `<app>--<stage>--analytics` DynamoDB table the deploy also derives
-/// ([`PackageConfig::resource_name`]), in `AWS_REGION` else `us-west-2`.
-/// Remote without the `aws_sdk` backend falls back to the local directory.
+/// Spawn the analytics store entity as a child of the config entity: a process
+/// handed an analytics table ([`BootstrapConfig::analytics_table`]) records to
+/// that DynamoDB table, in `AWS_REGION` else `us-west-2`; every other run writes
+/// [`WorkspaceConfig::analytics_dir`].
+///
+/// The name is **delivered, never derived**. The deploy creates the table, so
+/// the deploy names it on the unit it renders. Deriving it here from a naming
+/// convention meant the runtime and the deploy each computed a name from
+/// different inputs and nothing checked they matched: the live site spent a
+/// deploy writing to `beet--prod--analytics`, a table that does not exist,
+/// logging a `ResourceNotFoundException` per event while serving perfectly and
+/// reporting zero events. Delivery makes that disagreement unrepresentable.
 fn derived_store_entity(world: &mut World, config_entity: Entity) -> Entity {
-	let access = BootstrapConfig::get().service_access;
+	let bootstrap = BootstrapConfig::get();
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	if access == ServiceAccess::Remote {
-		let table_name = world
-			.get_resource::<PackageConfig>()
-			.cloned()
-			.unwrap_or_default()
-			.analytics_bucket_name();
+	if let Some(table) = &bootstrap.analytics_table {
 		return world
 			.spawn((
 				ChildOf(config_entity),
-				DynamoStore::new(table_name, DynamoStore::env_region()),
+				DynamoStore::new(table.to_string(), DynamoStore::env_region()),
 			))
 			.id();
 	}
 	#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
-	if access == ServiceAccess::Remote {
+	if bootstrap.analytics_table.is_some() {
 		debug!(
-			"analytics: no `aws_sdk` backend, a remote store falls back to the local directory"
+			"analytics: no `aws_sdk` backend, the delivered table falls back to the local directory"
+		);
+	}
+	// a deployed process with no table named it: say so rather than silently
+	// recording to a directory on a box that is replaced every deploy.
+	if bootstrap.analytics_table.is_none()
+		&& bootstrap.service_access == ServiceAccess::Remote
+	{
+		warn!(
+			"analytics: --service-access=remote with no --analytics-table, recording to the local directory"
 		);
 	}
 	let dir = world

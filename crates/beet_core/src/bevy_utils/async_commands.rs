@@ -125,6 +125,23 @@ type SpawnLocalFut = Pin<Box<dyn 'static + Future<Output = ()>>>;
 /// Spawning is pluggable so a future `tokio` / `embassy` backend can be selected;
 /// the default uses [`IoTaskPool`](bevy::tasks::IoTaskPool). The in-flight
 /// counter is the idle signal used by [`AsyncRunner`].
+///
+/// ## Every task shares the world thread unless `bevy_multithreaded` is on
+///
+/// Without that feature (the default, including every deployed `beet-cli`
+/// binary) [`spawn`](Self::spawn) is [`spawn_local`](Self::spawn_local): the
+/// future joins the *calling* thread's local executor, which for anything
+/// spawned from a system or observer is the world-owning thread, ticked by
+/// `tick_global_task_pools_on_main_thread`. One server thread then runs the bevy
+/// schedule, the async bridge driver, every connection, and every store call.
+///
+/// So a future that blocks that thread inside `poll` — a `block_on`, blocking
+/// file or socket IO, a `std::thread::sleep`, a long synchronous compute — does
+/// not merely delay itself, it freezes the world and every in-flight request
+/// until it returns, releasing the whole queue at one instant. Awaiting is not
+/// optional politeness here, it is what keeps a server responsive. Genuinely
+/// blocking work belongs on another thread (`async_ext::on_tokio`, the
+/// `blocking` pool), never inline in a spawned task.
 #[derive(Resource, Clone)]
 pub struct AsyncSpawner(Arc<AsyncSpawnerInner>);
 

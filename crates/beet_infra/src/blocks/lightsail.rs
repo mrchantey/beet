@@ -15,7 +15,7 @@ pub enum LightsailNetworking {
 
 /// Opinionated terraform configuration for a Lightsail instance:
 /// - Key pair for SSH access
-/// - IAM user with S3 + DynamoDB full access for runtime persistence via aws_sdk
+/// - IAM user with a least-privilege inline policy for runtime persistence
 /// - Static IP with attachment (configurable via networking mode)
 /// - Systemd service that fetches its binary from S3 on startup
 /// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt
@@ -183,6 +183,81 @@ impl LightsailBlock {
 		Ok(())
 	}
 
+	/// The inline IAM policy document for the box's runtime identity: read the
+	/// app bucket it serves the site from, read the artifacts bucket it pulls its
+	/// binary from at boot, read/write the one analytics table, and write its own
+	/// log group. Every ARN is derived from the stack and this block's own
+	/// [`bootstrap`](Self::bootstrap), so nothing is hardcoded and a stage can
+	/// never reach another stage's data.
+	///
+	/// The account segment is a wildcard because the account id is not known at
+	/// render time; the resource names are already stage-scoped, and a policy
+	/// cannot grant cross-account access anyway (that needs a resource policy on
+	/// the far side).
+	fn runtime_policy(&self, stack: &Stack) -> Result<String> {
+		let region = stack.aws_region();
+		let mut statements = Vec::new();
+
+		// the site store, read-only: the deploy publishes it, the box serves it
+		let mut read_buckets = vec![stack.artifact_bucket_name()];
+		if let Some(StoreUri::S3 { bucket, .. }) = &self.bootstrap.store {
+			read_buckets.push(bucket.to_string());
+		}
+		statements.push(json!({
+			"Sid": "ReadStores",
+			"Effect": "Allow",
+			"Action": ["s3:GetObject", "s3:ListBucket"],
+			"Resource": read_buckets
+				.iter()
+				.flat_map(|bucket| [
+					format!("arn:aws:s3:::{bucket}"),
+					format!("arn:aws:s3:::{bucket}/*"),
+				])
+				.collect::<Vec<_>>()
+		}));
+
+		// the analytics table, read/write, only when one was named
+		if let Some(table) = &self.bootstrap.analytics_table {
+			statements.push(json!({
+				"Sid": "AnalyticsTable",
+				"Effect": "Allow",
+				"Action": [
+					"dynamodb:DescribeTable",
+					"dynamodb:GetItem",
+					"dynamodb:PutItem",
+					"dynamodb:UpdateItem",
+					"dynamodb:DeleteItem",
+					"dynamodb:Query",
+					"dynamodb:Scan",
+					"dynamodb:BatchGetItem",
+					"dynamodb:BatchWriteItem"
+				],
+				"Resource": format!("arn:aws:dynamodb:{region}:*:table/{table}")
+			}));
+		}
+
+		// the block's own log group, for the CloudWatch agent
+		let log_group = self.log_group(stack);
+		statements.push(json!({
+			"Sid": "OwnLogGroup",
+			"Effect": "Allow",
+			"Action": [
+				"logs:CreateLogGroup",
+				"logs:CreateLogStream",
+				"logs:PutLogEvents",
+				"logs:DescribeLogStreams"
+			],
+			"Resource": [
+				format!("arn:aws:logs:{region}:*:log-group:{log_group}"),
+				format!("arn:aws:logs:{region}:*:log-group:{log_group}:*")
+			]
+		}));
+
+		json!({ "Version": "2012-10-17", "Statement": statements })
+			.to_string()
+			.xok()
+	}
+
 	/// The port the application server listens on: the block's explicit
 	/// [`app_port`](Self::with_app_port) if set, else `--port` /
 	/// `BEET_HTTP_PORT`, else
@@ -340,7 +415,14 @@ systemctl enable --now caddy
 		};
 
 		// build CloudWatch agent setup for log forwarding; the log group matches
-		// `AwsWatch::for_lightsail` so `watch` tails the same group
+		// `AwsWatch::for_lightsail` so `watch` tails the same group.
+		//
+		// `timestamp_format` is what makes the forwarded event carry the time the
+		// line was WRITTEN rather than the time the agent happened to ingest it,
+		// so a stall is correlatable against CloudWatch metrics. `timezone` is
+		// required alongside it: the agent interprets a parsed stamp as LOCAL by
+		// default and beet emits `Z`. `multi_line_start_pattern` reuses that same
+		// regex so a panic backtrace stays one event instead of N.
 		let log_group = self.log_group(stack);
 		let cloudwatch_setup = format!(
 			r#"
@@ -365,7 +447,10 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF
             "file_path": "/var/log/{app_name}.log",
             "log_group_name": "{log_group}",
             "log_stream_name": "{app_name}",
-            "retention_in_days": 30
+            "retention_in_days": 30,
+            "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
+            "timezone": "UTC",
+            "multi_line_start_pattern": "{{timestamp_format}}"
           }}
         ]
       }}
@@ -477,40 +562,26 @@ impl Block for LightsailBlock {
 		);
 		let user_name_ref = user.field_ref("name");
 
-		// grant the user S3 full access for artifacts, assets, and runtime persistence
+		// One inline least-privilege policy naming exactly the resources this box
+		// uses. Lightsail cannot carry an IAM role (a hard service limit, which is
+		// why this block issues a static key at all), so the key is the whole
+		// security boundary and its scope is the only thing that bounds a
+		// compromise. It previously carried `AmazonS3FullAccess` +
+		// `AmazonDynamoDBFullAccess`, ie every bucket and every table in the
+		// account, readable from the metadata service and from the unit file.
+		//
+		// IAM Roles Anywhere would retire the static key entirely, but it needs a
+		// CA, cert issuance and renewal, and a credential helper on a box that is
+		// rebuilt every deploy. Judged disproportionate for two resources; scope
+		// and rotation carry the weight instead.
 		let policy_ident =
-			stack.resource_ident(self.build_label("deploy-s3-policy"));
+			stack.resource_ident(self.build_label("deploy-policy"));
 		let policy = terra::ResourceDef::new_secondary(
-			policy_ident,
-			AwsIamUserPolicyAttachmentDetails {
+			policy_ident.clone(),
+			AwsIamUserPolicyDetails {
+				name: Some(policy_ident.primary_identifier().clone()),
 				user: user_name_ref.clone().into(),
-				policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess".into(),
-				..default()
-			},
-		);
-
-		// grant the user CloudWatch Logs write access for the CloudWatch agent
-		let cw_policy_ident =
-			stack.resource_ident(self.build_label("deploy-cw-policy"));
-		let cw_policy = terra::ResourceDef::new_secondary(
-			cw_policy_ident,
-			AwsIamUserPolicyAttachmentDetails {
-				user: user_name_ref.clone().into(),
-				policy_arn:
-					"arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy".into(),
-				..default()
-			},
-		);
-
-		// grant the user DynamoDB access for runtime table stores, eg analytics
-		let dynamo_policy_ident =
-			stack.resource_ident(self.build_label("deploy-dynamo-policy"));
-		let dynamo_policy = terra::ResourceDef::new_secondary(
-			dynamo_policy_ident,
-			AwsIamUserPolicyAttachmentDetails {
-				user: user_name_ref.clone().into(),
-				policy_arn: "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
-					.into(),
+				policy: self.runtime_policy(stack)?.into(),
 				..default()
 			},
 		);
@@ -526,6 +597,21 @@ impl Block for LightsailBlock {
 		);
 		let access_key_id_ref = access_key.field_ref("id");
 		let access_key_secret_ref = access_key.field_ref("secret");
+
+		// Rotate the access key every deploy. The box is destroyed and recreated
+		// on every deploy anyway, so tying the key's lifetime to the same cycle
+		// bounds a leaked credential to one deploy instead of forever.
+		//
+		// The trigger cannot be the instance itself: the instance's user data
+		// interpolates the key, so the instance already depends on the key and
+		// pointing back at it would be a cycle. A `terraform_data` carrying this
+		// deploy's id changes exactly once per deploy, giving the ordering
+		// rotation -> key -> instance.
+		let rotation_ident = stack.resource_ident(self.build_label("key-rotation"));
+		let rotation_label = rotation_ident.label().to_string();
+		config.add_untyped_resource("terraform_data", &rotation_label, &json!({
+			"input": stack.deploy_id().to_string()
+		}))?;
 
 		// key pair for SSH access
 		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
@@ -629,9 +715,17 @@ impl Block for LightsailBlock {
 		config
 			.add_resource(&user)?
 			.add_resource(&policy)?
-			.add_resource(&cw_policy)?
-			.add_resource(&dynamo_policy)?
 			.add_resource(&access_key)?
+			.xmap(|config| {
+				// rotate on the deploy-scoped trigger declared above
+				config.set_lifecycle(
+					"aws_iam_access_key",
+					access_key.ident().label(),
+					json!({
+						"replace_triggered_by": [format!("terraform_data.{rotation_label}")]
+					}),
+				)
+			})?
 			.add_resource(&keypair)?
 			.add_resource(&log_group)?
 			.add_resource(&instance)?
@@ -769,14 +863,48 @@ mod tests {
 			.xpect_contains("app abc123");
 	}
 
-	/// The IAM user carries the runtime store policies: S3 (site), CloudWatch
-	/// (log forwarding) and DynamoDB (analytics).
+	/// The IAM user carries ONE inline policy naming exactly the resources the
+	/// box uses, and none of the account-wide managed policies.
+	///
+	/// Lightsail cannot carry an IAM role, so this key is the whole security
+	/// boundary: it used to grant `AmazonS3FullAccess` + `AmazonDynamoDBFullAccess`,
+	/// ie every bucket and table in the account, from a key readable via the
+	/// instance metadata service and the unit file.
 	#[beet_core::test]
-	fn grants_runtime_policies() {
-		build_json(&LightsailBlock::default())
+	fn grants_only_least_privilege_policies() {
+		let stack = Stack::default_local().0;
+		let block = LightsailBlock::default().with_bootstrap(BootstrapConfig {
+			store: Some(StoreUri::parse("s3://my-app-bucket").unwrap()),
+			analytics_table: Some("my-analytics".into()),
+			..default()
+		});
+		let json = build_json(&block);
+		json.as_str()
+			// scoped to the named resources
+			.xpect_contains("arn:aws:s3:::my-app-bucket/*")
+			.xpect_contains(&format!(
+				"arn:aws:s3:::{}/*",
+				stack.artifact_bucket_name()
+			))
+			.xpect_contains("table/my-analytics")
+			.xpect_contains(&block.log_group(&stack))
+			// and never account-wide
+			.xnot()
 			.xpect_contains("AmazonS3FullAccess")
-			.xpect_contains("CloudWatchAgentServerPolicy")
-			.xpect_contains("AmazonDynamoDBFullAccess");
+			.xnot()
+			.xpect_contains("AmazonDynamoDBFullAccess")
+			.xnot()
+			.xpect_contains("CloudWatchAgentServerPolicy");
+	}
+
+	/// A block naming no analytics table grants no DynamoDB access at all,
+	/// rather than a wildcard table arn.
+	#[beet_core::test]
+	fn no_analytics_table_grants_no_dynamo() {
+		build_json(&LightsailBlock::default())
+			.as_str()
+			.xnot()
+			.xpect_contains("dynamodb:");
 	}
 
 	/// Declared dns providers emit `A` records at the static IP (proxied flag

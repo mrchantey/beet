@@ -233,7 +233,7 @@ async-tungstenite = { version = "0.35", optional = true, default-features = fals
 "handshake",
 "futures-03-sink"
 ] }
-blocking = { version = "1.6", optional = true }
+blocking = { workspace = true, optional = true }
 async-native-tls = { version = "0.6", optional = true }
 # ureq uses ring instead of aws-lc-rs so we must too
 futures-rustls = { version = "0.26", optional = true, default-features = false, features = ["ring", "logging", "tls12"] }

@@ -131,11 +131,12 @@ pub fn AssetsBucket() -> impl Bundle {
 }
 
 /// `<AnalyticsTable/>` — the DynamoDB table backing the analytics store's remote
-/// mode (`<app>--<stage>--analytics`, keyed by the event `id`). Nothing is
-/// delivered to the runtime: both sides derive the same name by convention
-/// (the deploy via `stack.resource_ident("analytics")`, the running binary via
-/// [`PackageConfig::resource_name`]), pinned by [`analytics_names_agree`].
-/// Resolves its [`Stack`] by ancestry.
+/// mode (`<app>--<stage>--analytics`, keyed by the event `id`). The deploy
+/// creates it and names it on the unit it renders
+/// ([`BootstrapConfig::analytics_table`]), so the runtime is told which table to
+/// record to rather than deriving a matching convention, pinned by
+/// [`deploy_delivers_the_analytics_table_name`]. Resolves its [`Stack`] by
+/// ancestry.
 #[template]
 pub fn AnalyticsTable() -> impl Bundle { DynamoTableBlock::new("analytics") }
 
@@ -341,12 +342,16 @@ pub fn LightsailBeetSiteBlock(
 		.with_allow_ssh(true)
 		// one declaration for both channels: the block splits boot selection (the
 		// entry store, the transports) onto the unit's `ExecStart` and the service
-		// config the runtime `PackageConfig`/analytics store read onto its
-		// `Environment=` lines.
+		// config the runtime analytics store reads onto its `Environment=` lines.
 		.with_bootstrap(BootstrapConfig {
 			store: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
 			server: Some(ServerFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
+			// the deploy creates the table, so the deploy names it: the runtime
+			// is told rather than deriving a convention that has to agree.
+			analytics_table: Some(
+				DynamoTableBlock::new("analytics").table_name(&stack).into(),
+			),
 			..default()
 		})
 		// private key material: its own channel, so no renderer can ever put it
@@ -441,60 +446,40 @@ mod test {
 		world.flush();
 	}
 
-	/// Every `<PackageConfig/>` element in a parsed document, in source order.
-	fn find_package_configs(nodes: &[BsxNode]) -> Vec<BsxNode> {
-		nodes
-			.iter()
-			.flat_map(|node| match node {
-				BsxNode::Element(element) if element.tag == "PackageConfig" => {
-					vec![node.clone()]
-				}
-				BsxNode::Element(element) => find_package_configs(&element.children),
-				_ => Vec::new(),
-			})
-			.collect()
-	}
-
-	/// The [`PackageConfig`] the beet website's committed entry declares, read
-	/// from the real `site/main.bsx` (its `<PackageConfig/>` alone, so the routes
-	/// and assets the rest of the entry mounts are not needed).
-	fn site_package_config() -> PackageConfig {
-		let markup =
-			fs_ext::read_to_string(WsPathBuf::new("site/main.bsx").into_abs())
-				.unwrap();
-		let nodes =
-			BsxNode::parse_document(&markup, &BsxParseConfig::bsx()).unwrap();
-		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
-		world
-			.resource_mut::<AppTypeRegistry>()
-			.write()
-			.register::<PackageConfig>();
-		world
-			.spawn_template(BsxTemplate::container(
-				find_package_configs(&nodes),
-				BsxTemplateRegistry::default(),
-			))
-			.unwrap();
-		world.resource::<PackageConfig>().clone()
-	}
-
-	/// The runtime derives the analytics table name
-	/// ([`PackageConfig::resource_name`]) that the deploy creates
-	/// (`stack.resource_ident("analytics")`): nothing is delivered between them,
-	/// so this pins the two conventions together against the entry the deploy
-	/// actually publishes. Both read the stage from the same [`BootstrapConfig`],
-	/// so agreement holds for any stage.
+	/// The deploy names the analytics table it creates on the unit it renders
+	/// ([`BootstrapConfig::analytics_table`]), so the runtime is told rather
+	/// than deriving a convention that has to agree. This pins the delivery
+	/// itself: the block's bootstrap must carry the same name the
+	/// [`AnalyticsTable`] block creates, for any stage.
 	///
-	/// REGRESSION: `site/main.bsx` declared no `binary_name`, so the runtime fell
-	/// back to the kebab-cased title and wrote to `beet--<stage>--analytics`,
-	/// a table the deploy never creates. Every event on the live site failed with
-	/// a DynamoDB `ResourceNotFoundException` while the site otherwise served
-	/// perfectly, so the summary reported `0 events` on a green deploy.
+	/// REGRESSION: the two sides used to derive the name independently, and
+	/// `site/main.bsx` declared no `binary_name`, so the runtime fell back to the
+	/// kebab-cased title and wrote to `beet--<stage>--analytics`, a table the
+	/// deploy never creates. Every event on the live site failed with a DynamoDB
+	/// `ResourceNotFoundException` while the site served perfectly and the
+	/// summary reported `0 events` on a green deploy.
 	#[beet_core::test]
-	fn analytics_names_agree() {
-		DynamoTableBlock::new("analytics")
-			.table_name(&infra_ext::stack("beet-site"))
-			.xpect_eq(site_package_config().resource_name("analytics"));
+	fn deploy_delivers_the_analytics_table_name() {
+		let mut world = test_world();
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<LightsailBeetSiteBlock app_name="beet-site" features="aws_sdk"/>"#,
+		);
+		// both sides read the one stack, so agreement holds for any stage
+		world
+			.query::<&LightsailBlock>()
+			.single(&world)
+			.unwrap()
+			.bootstrap()
+			.analytics_table
+			.clone()
+			.unwrap()
+			.xpect_eq(
+				DynamoTableBlock::new("analytics")
+					.table_name(&infra_ext::stack("beet-site")),
+			);
 	}
 
 	/// The `shared`-stage host, the shape `main.bsx` declares: its verb routes

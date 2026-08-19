@@ -36,6 +36,7 @@ async fn main() -> Result {
 					"aws_iam_role",
 					"aws_iam_role_policy_attachment",
 					"aws_iam_user",
+					"aws_iam_user_policy",
 					"aws_iam_user_policy_attachment",
 					"aws_s3_bucket",
 					"aws_s3_bucket_policy",

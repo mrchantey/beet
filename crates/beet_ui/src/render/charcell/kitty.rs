@@ -106,6 +106,7 @@ pub(crate) fn graphics_state() -> ElementState {
 
 /// Pixel dimensions from a PNG header (`IHDR` width/height), or `None` when
 /// the bytes are not a PNG.
+#[cfg(all(feature = "tui", any(feature = "net", test)))]
 pub(crate) fn png_dimensions(bytes: &[u8]) -> Option<UVec2> {
 	(bytes.len() >= 24
 		&& bytes.starts_with(b"\x89PNG\r\n\x1a\n")
@@ -394,11 +395,21 @@ fn svg_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
 /// shows the alt marker plus the styled error.
 #[cfg(all(feature = "tui", feature = "net"))]
 async fn fetch_remote(entity: AsyncEntity, src: String, id: u32) -> Result {
-	let loaded = fetch_image_bytes(&src).await.and_then(|bytes| {
-		to_png_bytes(bytes)
-			.and_then(encode_png)
-			.ok_or_else(|| bevyhow!("response is not a decodable image"))
-	});
+	// decode + rasterise + encode on the blocking pool, never inline. Beet runs
+	// bevy single-threaded, so every detached task shares the one world thread:
+	// an inline `image::load_from_memory`, a `resvg::render` of up to 4096², or
+	// the one-time `fontdb::load_system_fonts()` directory walk freezes every
+	// other connection for as long as it runs. On a throttled 2-vCPU box that is
+	// a multi-second stall of the whole server per `<img>`.
+	let loaded = match fetch_image_bytes(&src).await {
+		Ok(bytes) => blocking::unblock(move || {
+			to_png_bytes(bytes)
+				.and_then(encode_png)
+				.ok_or_else(|| bevyhow!("response is not a decodable image"))
+		})
+		.await,
+		Err(err) => Err(err),
+	};
 	// each failure mode warns the src so a no-port error reads differently from a
 	// refused connection, a non-2xx, or a decode error, instead of a silent blank.
 	if let Err(err) = &loaded {

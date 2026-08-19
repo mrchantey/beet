@@ -3,6 +3,11 @@ use bevy::log::tracing;
 use bevy::log::tracing_subscriber;
 use std::str::FromStr;
 use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::MakeWriter;
+use tracing_subscriber::fmt::format::Writer;
+use tracing_subscriber::fmt::time::FormatTime;
+use tracing_subscriber::util::SubscriberInitExt;
 
 /// Drop-in replacement for bevy's [`bevy::log::LogPlugin`] that installs beet's
 /// [`PrettyTracing`] subscriber. Prefer this over bevy's `LogPlugin` so every
@@ -15,6 +20,8 @@ pub struct LogPlugin {
 	/// Extra comma-separated `EnvFilter` directives appended to the defaults,
 	/// eg `"ureq=off,ureq_proto=off"`.
 	pub filter: String,
+	/// See [`PrettyTracing::interactive`].
+	pub interactive: bool,
 }
 
 impl LogPlugin {
@@ -27,10 +34,12 @@ impl Default for LogPlugin {
 		let PrettyTracing {
 			default_level,
 			filter,
+			interactive,
 		} = PrettyTracing::default();
 		Self {
 			level: default_level,
 			filter,
+			interactive,
 		}
 	}
 }
@@ -40,6 +49,7 @@ impl Plugin for LogPlugin {
 		PrettyTracing {
 			default_level: self.level,
 			filter: self.filter.clone(),
+			interactive: self.interactive,
 		}
 		.init();
 	}
@@ -52,6 +62,11 @@ pub struct PrettyTracing {
 	pub default_level: tracing::Level,
 	/// Extra comma-separated `EnvFilter` directives appended to the defaults.
 	pub filter: String,
+	/// Whether output is going to a human at a terminal, defaulting to
+	/// [`PrettyTracing::is_interactive`]. Interactive output is colored,
+	/// multi-line and timestamp-free; everything else is one plain
+	/// [`Iso8601Timer`]-stamped line per event. See [`PrettyTracing::init`].
+	pub interactive: bool,
 }
 
 impl Default for PrettyTracing {
@@ -63,6 +78,7 @@ impl Default for PrettyTracing {
 		Self {
 			default_level,
 			filter: String::new(),
+			interactive: Self::is_interactive(),
 		}
 	}
 }
@@ -132,7 +148,74 @@ impl PrettyTracing {
 	/// This also considers the AWS Lambda tracing environment variables,
 	/// as defined in [`lambda_http::tracing::init_default_subscriber_with_writer`]
 	///
+	/// ## Format
+	/// See [`PrettyTracing::interactive`]: a terminal gets the colored
+	/// multi-line format, a log file or log shipper gets one plain
+	/// timestamped line per event.
 	pub fn init(&self) {
+		// wasm has no useful stdout (a Cloudflare Worker discards it), so route
+		// formatted events to the JS console instead: `error!`/`info!` then surface
+		// in browser devtools and `wrangler tail`, wiring diagnostics for every
+		// upstream system rather than just the Worker entry. native keeps the
+		// pretty stdout format.
+		#[cfg(target_arch = "wasm32")]
+		let dispatch = self.dispatch(console_writer::MakeConsoleWriter);
+		#[cfg(not(target_arch = "wasm32"))]
+		let dispatch = self.dispatch(std::io::stdout);
+		// also installs the `log` -> `tracing` bridge; a no-op if a subscriber
+		// has already been installed
+		dispatch.try_init().ok();
+	}
+
+	/// `true` when stdout is an interactive terminal, ie a developer watching a
+	/// tty rather than a log file, a pipe or a deployed service.
+	///
+	/// Always `false` on wasm, which has no tty: the JS console host stamps
+	/// entries at *ingest*, so beet emits its own *emit* timestamp there too.
+	pub fn is_interactive() -> bool {
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				false
+			} else {
+				std::io::IsTerminal::is_terminal(&std::io::stdout())
+			}
+		}
+	}
+
+	/// Builds the subscriber, writing formatted events to `writer`.
+	fn dispatch<W>(&self, writer: W) -> tracing::Dispatch
+	where
+		W: 'static + Send + Sync + for<'a> MakeWriter<'a>,
+	{
+		let builder = tracing_subscriber::fmt()
+			.compact()
+			.with_level(true)
+			.with_target(false)
+			.with_thread_ids(false)
+			.with_thread_names(false)
+			.with_file(true)
+			.with_line_number(true)
+			.with_writer(writer)
+			.with_env_filter(self.env_filter());
+		match self.interactive {
+			// a human at a terminal: colored and roomy, and the wall clock is a
+			// glance away so the timestamp is just noise.
+			true => builder.pretty().without_time().finish().into(),
+			// a log file, a pipe or a log shipper: one grep-able line per event,
+			// stamped so it can be correlated with other systems, and free of ansi
+			// escapes that a log viewer would render as garbage.
+			false => builder
+				.with_ansi(false)
+				.with_timer(Iso8601Timer)
+				.finish()
+				.into(),
+		}
+	}
+
+	/// The resolved [`EnvFilter`]: the environment or [`Self::default_level`],
+	/// with [`QUIET_TARGETS`] pinned to `warn` and [`Self::filter`] folded in
+	/// last so caller directives win.
+	fn env_filter(&self) -> EnvFilter {
 		// The env may carry a plain level (`info`), a directive list
 		// (`info,beet_net=warn`), or nothing. A plain level (or the built-in
 		// default when the env is absent) becomes the catch-all directive; a
@@ -159,43 +242,32 @@ impl PrettyTracing {
 		let base = QUIET_TARGETS.iter().fold(base, |filter, target| {
 			filter.add_directive(format!("{target}=warn").parse().unwrap())
 		});
-		let env_filter = self
-			.filter
+		self.filter
 			.split(',')
 			.map(str::trim)
 			.filter(|directive| !directive.is_empty())
 			.fold(base, |filter, directive| {
 				filter.add_directive(directive.parse().unwrap())
-			});
+			})
+	}
+}
 
-		let builder = tracing_subscriber::fmt()
-			.compact()
-			.with_level(true)
-			.with_target(false)
-			.with_thread_ids(false)
-			.with_thread_names(false)
-			.with_file(true)
-			.without_time()
-			.with_line_number(true)
-			.with_env_filter(env_filter);
+/// The [`FormatTime`] used by non-interactive [`PrettyTracing`] output,
+/// emitting an ISO 8601 UTC timestamp with millisecond precision, eg
+/// `2024-09-09T19:46:02.102Z`.
+///
+/// Backed by the cross-platform [`time_ext::try_now`] clock, so it also works
+/// on wasm and on a bare target once a clock is installed; until then the fmt
+/// layer substitutes `<unknown time>` rather than dropping the event.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Iso8601Timer;
 
-		// wasm has no useful stdout (a Cloudflare Worker discards it), so route
-		// formatted events to the JS console instead: `error!`/`info!` then surface
-		// in browser devtools and `wrangler tail`, wiring diagnostics for every
-		// upstream system rather than just the Worker entry. native keeps the
-		// pretty stdout format.
-		#[cfg(target_arch = "wasm32")]
-		builder
-			.with_ansi(false)
-			.with_writer(console_writer::MakeConsoleWriter)
-			.try_init()
-			.ok();
-		#[cfg(not(target_arch = "wasm32"))]
-		builder
-			.with_writer(std::io::stdout)
-			.pretty()
-			.try_init()
-			.ok();
+impl FormatTime for Iso8601Timer {
+	fn format_time(&self, writer: &mut Writer<'_>) -> core::fmt::Result {
+		let Ok(now) = time_ext::try_now() else {
+			return Err(core::fmt::Error);
+		};
+		writer.write_str(&time_ext::format_iso8601(now))
 	}
 }
 
@@ -263,5 +335,77 @@ mod console_writer {
 				_ => console::log_1(&value),
 			}
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::log::tracing;
+	use bevy::log::tracing_subscriber::fmt::MakeWriter;
+	use std::io;
+	use std::sync::Arc;
+	use std::sync::Mutex;
+
+	/// A [`MakeWriter`] collecting formatted events into a shared buffer.
+	#[derive(Default, Clone)]
+	struct CaptureWriter(Arc<Mutex<Vec<u8>>>);
+
+	impl CaptureWriter {
+		fn into_string(self) -> String {
+			String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+		}
+	}
+
+	impl io::Write for CaptureWriter {
+		fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+			self.0.lock().unwrap().extend_from_slice(data);
+			Ok(data.len())
+		}
+		fn flush(&mut self) -> io::Result<()> { Ok(()) }
+	}
+
+	impl<'a> MakeWriter<'a> for CaptureWriter {
+		type Writer = Self;
+		fn make_writer(&'a self) -> Self::Writer { self.clone() }
+	}
+
+	/// Formats a single event with the subscriber built for the given mode.
+	fn render(interactive: bool) -> String {
+		let writer = CaptureWriter::default();
+		let dispatch = PrettyTracing {
+			interactive,
+			// pin this module's level so the ambient `RUST_LOG` cannot mute it
+			filter: format!("{}=error", module_path!()),
+			..default()
+		}
+		.dispatch(writer.clone());
+		tracing::dispatcher::with_default(&dispatch, || {
+			tracing::error!("hello");
+		});
+		writer.into_string()
+	}
+
+	/// Today's date, the prefix of every timestamp [`Iso8601Timer`] emits.
+	fn today() -> String { time_ext::format_iso8601(time_ext::now())[..10].into() }
+
+	#[crate::test]
+	fn non_interactive_stamps_lines() {
+		let output = render(false);
+		// a full `YYYY-MM-DDTHH:MM:SS.mmmZ` leads the line
+		let timestamp = output.split_whitespace().next().unwrap();
+		timestamp.len().xpect_eq(24);
+		timestamp.xpect_starts_with(today()).xpect_ends_with("Z");
+		// and the line is plain single-line text a log shipper can parse
+		output.trim_end().lines().count().xpect_eq(1);
+		output
+			.xpect_contains("hello")
+			.xnot()
+			.xpect_contains("\u{1b}[");
+	}
+
+	#[crate::test]
+	fn interactive_omits_timestamps() {
+		render(true).xpect_contains("hello").xnot().xpect_contains(today());
 	}
 }

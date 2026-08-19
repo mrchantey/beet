@@ -14,6 +14,12 @@
 #      asserting "You have clicked 2 times."
 #   2. multi-tenancy: two concurrent sessions driven to DIFFERENT counts (A once,
 #      B twice), asserting each keeps its own state.
+#   3. images: a graphics-capable session loads a page carrying a raster and the
+#      raw pty stream must contain a kitty transmit. This needs BOTH a kitty term
+#      name and a taller window: the TUI only transmits to a terminal that
+#      advertises support, and only places a raster whose whole cell box fits, so
+#      at the default `xterm-256color` 80x24 a completely broken image path still
+#      renders a clean frame and checks 1-2 pass.
 #
 # Waits scale up for a non-localhost host (network latency + a cold page render).
 set -uo pipefail
@@ -77,6 +83,25 @@ wait $PID_A $PID_B
 # independent counts prove per-session state, not one shared world
 expect "client A" "$OUT/a.txt" "You have clicked 1 times."
 expect "client B" "$OUT/b.txt" "You have clicked 2 times."
+
+echo "-- images (kitty graphics) --"
+# At 60x40 the sidebar overlay lists every post, and "Folk Technology" (post-6,
+# the one carrying a raster) sits at row 15. The image is well below the fold, so
+# scroll it into view: a raster is transmitted only once its box is on screen.
+DOWNS="$(printf 'k:down;%.0s' {1..32})"
+PTY_TERM=xterm-kitty PTY_COLS=60 PTY_ROWS=40 PTY_RAW="$OUT/img.raw" \
+	python3 "$PTY" "$HOST" "$PORT" \
+	"w:$BOOT;m:3,1;w:$TICK;m:6,15;w:$((NAV * 2));${DOWNS}w:$((NAV * 2))" \
+	>"$OUT/img.txt" 2>&1
+# `a=t` is the transmit; the emulator drops APC, so grep the raw stream
+if grep -qa $'\x1b_Ga=t' "$OUT/img.raw"; then
+	echo "PASS  images: kitty transmit present ($(stat -c%s "$OUT/img.raw") raw bytes)"
+else
+	echo "FAIL  images: no kitty transmit in the raw pty stream"
+	echo "      the <img> fetch/decode path is broken, or the page never loaded:"
+	sed 's/^/      | /' "$OUT/img.txt"
+	FAILED=1
+fi
 
 if [[ $FAILED -eq 0 ]]; then
 	echo "== ssh OK =="

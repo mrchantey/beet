@@ -189,6 +189,9 @@ async-channel = "2"
 async-executor = "1"
 async-fs = "2"
 async-io = "2"
+# offload a blocking/CPU-bound call off the async executor; beet runs bevy
+# single-threaded, so an inline blocking poll freezes the whole world
+blocking = "1.6"
 async-lock = "3"
 async-process = "2"
 async-task = "4"

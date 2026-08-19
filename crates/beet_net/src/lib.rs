@@ -124,6 +124,9 @@ pub mod prelude {
 /// Re-exports of dependency crates for downstream use.
 pub mod exports {
 	pub use bevy::tasks::futures_lite;
+	/// `BlobStoreProvider::insert` takes a [`bytes::Bytes`], so implementing a
+	/// store backend outside this crate needs the same `bytes` version.
+	pub use bytes;
 	#[cfg(feature = "http")]
 	pub use eventsource_stream;
 	#[cfg(feature = "http")]

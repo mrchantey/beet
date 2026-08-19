@@ -18,6 +18,19 @@ Env:
   PTY_RULER=1   print 1-indexed col/row guides around the frame, for
                 rediscovering cell coordinates when the layout shifts
   PTY_USER      ssh user (default `root`; the server accepts any)
+  PTY_TERM      terminal name to advertise (default `xterm-256color`). Set
+                `xterm-kitty` to exercise the kitty graphics path: the TUI only
+                transmits rasters to a terminal that advertises support, so with
+                the default a totally broken image path still renders a clean
+                frame and check `d` passes.
+  PTY_COLS      pty width  (default 80)
+  PTY_ROWS      pty height (default 24). A raster is only placed when its whole
+                cell box fits the screen, so an image page needs a taller window
+                than the 24-row default.
+  PTY_RAW       write the undecoded pty stream to this path. The VT emulator
+                discards APC (`ESC _ ... ESC \\`) sequences, which is exactly
+                where the kitty image payload lives, so asserting on images
+                means grepping the raw stream, not the frame.
 """
 
 import fcntl
@@ -33,8 +46,9 @@ import termios
 import time
 import unicodedata
 
-COLS = 80
-ROWS = 24
+COLS = int(os.environ.get("PTY_COLS", 80))
+ROWS = int(os.environ.get("PTY_ROWS", 24))
+TERM = os.environ.get("PTY_TERM", "xterm-256color")
 
 
 class Screen:
@@ -255,6 +269,9 @@ class Session:
 
 	def __init__(self, host: str, port: str, user: str):
 		self.screen = Screen()
+		# the emulator drops APC, so keep the undecoded stream for image asserts
+		raw_path = os.environ.get("PTY_RAW")
+		self.raw = open(raw_path, "wb") if raw_path else None
 		self.master, slave = pty.openpty()
 		fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
 		self.proc = subprocess.Popen(
@@ -263,7 +280,7 @@ class Session:
 			stdout=slave,
 			stderr=slave,
 			start_new_session=True,
-			env={**os.environ, "TERM": "xterm-256color"},
+			env={**os.environ, "TERM": TERM},
 		)
 		os.close(slave)
 
@@ -284,6 +301,9 @@ class Session:
 			if not data:
 				return
 			self.screen.feed(data)
+			if self.raw:
+				self.raw.write(data)
+				self.raw.flush()
 
 	def send(self, data: bytes):
 		os.write(self.master, data)
@@ -321,6 +341,8 @@ class Session:
 			pass
 		self.proc.wait(timeout=5)
 		os.close(self.master)
+		if self.raw:
+			self.raw.close()
 
 
 def main():

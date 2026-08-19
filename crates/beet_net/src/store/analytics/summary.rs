@@ -34,6 +34,9 @@ pub struct AnalyticsSummary {
 	/// Count of 404s nobody linked to, ie vulnerability probes walking a list
 	/// (`/wp-login.php`, `/.env`). Counted rather than listed: on a public site
 	/// they outnumber every other event and their paths are noise.
+	///
+	/// Only ever nonzero for events recorded elsewhere or before the router
+	/// middleware started dropping them at the source, which it now does.
 	pub probes: usize,
 }
 
