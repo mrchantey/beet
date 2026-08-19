@@ -21,8 +21,11 @@ pub struct SshConnection {
 
 impl SshConnection {
 	/// Standard SSH options for connecting to instances.
-	/// Disables host key checking and uses a 30-second connection timeout.
-	pub const OPTS: [&str; 8] = [
+	/// Disables host key checking, uses a 30-second connection timeout, and
+	/// keeps the session alive: a release can legitimately sit near-silent for
+	/// minutes while a fresh box crawls through cloud-init, and the keepalive
+	/// makes a dropped session fail fast instead of hanging the deploy.
+	pub const OPTS: [&str; 10] = [
 		"-o",
 		"StrictHostKeyChecking=no",
 		"-o",
@@ -31,6 +34,8 @@ impl SshConnection {
 		"ConnectTimeout=30",
 		"-o",
 		"BatchMode=yes",
+		"-o",
+		"ServerAliveInterval=15",
 	];
 
 	/// The `user@host` string for SSH commands.
@@ -74,8 +79,15 @@ impl SshConnection {
 		Ok(())
 	}
 
-	/// Wait for SSH to become available, retrying up to `max_attempts` times.
-	pub async fn wait_for_ready(&self, max_attempts: u32) -> Result {
+	/// Wait for SSH to become available, retrying every `poll` until `timeout`
+	/// elapses. At least one attempt is always made.
+	pub async fn wait_for_ready(
+		&self,
+		timeout: Duration,
+		poll: Duration,
+	) -> Result {
+		let max_attempts =
+			(timeout.as_secs() / poll.as_secs().max(1)).max(1);
 		for attempt in 1..=max_attempts {
 			info!(
 				"waiting for ssh on {}:{} (attempt {attempt}/{max_attempts})...",
@@ -84,7 +96,7 @@ impl SshConnection {
 			if self.run_command("echo ready").await.is_ok() {
 				return Ok(());
 			}
-			time_ext::sleep_millis(10_000).await;
+			time_ext::sleep(poll).await;
 		}
 		bevybail!(
 			"failed to connect to {}:{} after {max_attempts} attempts",

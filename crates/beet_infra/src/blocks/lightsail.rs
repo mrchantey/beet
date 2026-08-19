@@ -592,6 +592,10 @@ if ! aws s3 cp "s3://__BUCKET__/__POINTER__" "$tmp/deploy.env" >&2; then
 	echo "beet: no release pointer at __POINTER__, keeping the installed binary" >&2
 elif ! . "$tmp/deploy.env"; then
 	echo "beet: release pointer is unreadable, keeping the installed binary" >&2
+elif [ -z "${__ARTIFACT_KEY_VAR__:-}" ]; then
+	# guarded: under `set -u` a bare expansion of a missing var would abort the
+	# whole script instead of landing here
+	echo "beet: release pointer names no __ARTIFACT_KEY_VAR__, keeping the installed binary" >&2
 elif ! aws s3 cp "s3://__BUCKET__/$__ARTIFACT_KEY_VAR__" "$tmp/app" >&2; then
 	echo "beet: cannot download $__ARTIFACT_KEY_VAR__, keeping the installed binary" >&2
 else
@@ -601,7 +605,7 @@ else
 	install -m 644 "$tmp/deploy.env" /etc/__APP__/deploy.env.next
 	mv -f /opt/__APP__/app.next /opt/__APP__/app
 	mv -f /etc/__APP__/deploy.env.next /etc/__APP__/deploy.env
-	echo "beet: installed release $BEET_DEPLOY_ID" >&2
+	echo "beet: installed release ${BEET_DEPLOY_ID:-unknown}" >&2
 fi
 
 if [ ! -x /opt/__APP__/app ]; then
@@ -744,10 +748,11 @@ exit 1
 	/// on.
 	///
 	/// This is what the access key's rotation trigger keys on, so the key
-	/// rotates on precisely the deploys that build a new box. Keying it on the
-	/// deploy id instead (as it once was) replaced the key every deploy, and
-	/// since the instance interpolates the key into its `user_data` that alone
-	/// forced a rebuild every deploy no matter what else was constant.
+	/// rotates with every machine-config change (a rebuild from a non-script
+	/// change, ie a bundle resize, keeps its key). Keying it on the deploy id
+	/// instead (as it once was) replaced the key every deploy, and since the
+	/// instance interpolates the key into its `user_data` that alone forced a
+	/// rebuild every deploy no matter what else was constant.
 	///
 	/// Not circular: the terraform *references* to the key are stable literals
 	/// in this string, so hashing it says nothing about the key's value.
@@ -825,10 +830,9 @@ impl Block for LightsailBlock {
 			&access_key_secret_ref,
 		)?;
 
-		// Rotate the access key every time the box is rebuilt, bounding a leaked
-		// credential to the life of one instance rather than forever. The box is
-		// rebuilt exactly when its machine config changes, so that is what the
-		// trigger keys on (see `machine_config_hash`).
+		// Rotate the access key with every machine-config change, bounding a
+		// leaked credential to the next rebuild rather than forever (see
+		// `machine_config_hash`).
 		//
 		// The trigger cannot be the instance itself: the instance's user data
 		// interpolates the key, so the instance already depends on the key and
@@ -1134,8 +1138,8 @@ mod tests {
 	}
 
 	/// A machine-config change DOES rebuild the box, and rotates the access key
-	/// with it: the key's whole lifetime is one instance, so a leaked credential
-	/// is bounded by the next rebuild rather than living forever.
+	/// with it, so a leaked credential is bounded by the next machine-config
+	/// change rather than living forever.
 	///
 	/// Keying rotation on the deploy id instead (as it once was) replaced the
 	/// key every deploy, and since the instance interpolates the key into its
@@ -1174,6 +1178,12 @@ mod tests {
 			.xpect_contains(&format!(
 				"aws s3 cp \"s3://{}/${}\"",
 				Stack::default_local().0.artifact_bucket_name(),
+				ArtifactLedger::ARTIFACT_KEY_VAR
+			))
+			// a pointer missing the key lands in the narrated keep-serving
+			// path rather than aborting the fetch under `set -u`
+			.xpect_contains(&format!(
+				"[ -z \"${{{}:-}}\" ]",
 				ArtifactLedger::ARTIFACT_KEY_VAR
 			))
 			// the launcher exports the pointer's identity into the process

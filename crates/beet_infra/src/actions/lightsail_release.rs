@@ -22,11 +22,12 @@ use beet_net::prelude::*;
 #[reflect(Component, Default)]
 #[require(LightsailReleaseAction)]
 pub struct LightsailRelease {
-	/// How long to wait for the unit to appear, and then again for it to come
-	/// up serving this deploy. Generous by default: a freshly replaced box is
-	/// still installing Caddy and the CloudWatch agent when the deploy arrives.
+	/// How long to wait at each gate: for ssh to answer, for the unit to
+	/// appear, and for it to come up serving this deploy. Generous by default:
+	/// a freshly replaced box is still installing Caddy and the CloudWatch
+	/// agent when the deploy arrives.
 	timeout: Duration,
-	/// The gap between attempts, both here and in the script run on the box.
+	/// The gap between attempts, at every gate `timeout` bounds.
 	poll: Duration,
 }
 
@@ -64,7 +65,7 @@ pub async fn LightsailReleaseAction(
 	let connection =
 		SshConnection::from_project(&project, block.management_ssh_port()).await?;
 	connection
-		.wait_for_ready(attempts(release.timeout(), &Duration::from_secs(10)))
+		.wait_for_ready(*release.timeout(), *release.poll())
 		.await?;
 
 	// the script is a file rather than an argv token: it carries quotes, globs
@@ -81,14 +82,16 @@ pub async fn LightsailReleaseAction(
 		.into_abs()
 		.join("release.sh");
 	fs_ext::write_async(&local_path, script.as_bytes()).await?;
-	let remote_path = "/tmp/beet-release.sh";
+	// the ssh user's home dir, not /tmp: a predictable world-writable path is
+	// a symlink-planting target, and root runs this script
+	let remote_path = "beet-release.sh";
 	connection.scp_to(local_path.as_path(), remote_path).await?;
 
 	info!("releasing {deploy_id} on {}", connection.host);
 	// `-n`: the ssh side is `BatchMode`, so a sudo that wanted a password would
 	// hang the deploy on a prompt nobody can answer
 	let output = connection
-		.run_command(&format!("sudo -n bash {remote_path}"))
+		.run_command(&format!("sudo -n bash ./{remote_path}"))
 		.await?;
 	// the script narrates on stderr and prints the release it converged on
 	for line in String::from_utf8_lossy(&output.stderr).lines() {
@@ -139,9 +142,4 @@ impl ReleaseQuery<'_, '_> {
 		}
 		(project, block).xok()
 	}
-}
-
-/// How many `poll`-spaced attempts fit in `timeout`, at least one.
-fn attempts(timeout: &Duration, poll: &Duration) -> u32 {
-	(timeout.as_secs() / poll.as_secs().max(1)).max(1) as u32
 }
