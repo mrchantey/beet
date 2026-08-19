@@ -50,14 +50,20 @@ The deploy route applies once per layer, and the order is the point: `<TofuApply
 layer="storage"/>` brings up the stores (the app bucket, the analytics table:
 the addresses their blocks declare under the `storage` layer, an overridable
 per-block field), `<DirSync/>` fills them, and a bare `<TofuApply/>` converges
-the whole stack: it uploads the built binary under the deploy id and replaces
-the instance, whose cloud-init fetches that binary and serves a bucket that
+the whole stack: it uploads the built binary under the deploy id, publishes the
+release pointer naming it, and converges the instance against a bucket that
 already holds the site. One apply boots the new instance first, so it finds an
 empty bucket and no entry document. Naming a layer no block declares is a loud
-error, never a silent skip. A deploy replaces the box (cloud-init bakes the
-deploy id), costing a minute or two of downtime; the static IP re-attaches so
-DNS never moves, and the ssh host key rides the env channel so the fingerprint
-never changes.
+error, never a silent skip.
+
+Most deploys do NOT replace the box. The instance's cloud-init renders machine
+config only (Caddy, the sshd relocation, the CloudWatch agent, the unit), never
+a version, so a code-only deploy plans no change to it; `<LightsailRelease/>`
+then reaches the box over the management sshd on 2222 and rolls the unit onto
+the new binary, verifying the RUNNING process reports this deploy's id. A
+machine-config change still replaces the box, and rotates its access key with
+it. Either way the static IP re-attaches so DNS never moves, and the ssh host
+key rides the env channel so the fingerprint never changes.
 
 The deploy routes hang off a stack-bearing `<BeetSiteDeployHost>` so they resolve
 a `Stack` by ancestry without a second server. `--stage=prod` targets production
@@ -103,6 +109,7 @@ plus `tofu` and `cargo-zigbuild`.
 			<TofuApply layer="storage"/>
 			<DirSync app_name="beet-site" bucket="app" local_dir="site" follow_symlinks=true delete=true/>
 			<TofuApply/>
+			<LightsailRelease/>
 			<CloudflareZoneSetup/>
 			<LightsailWatch app_name="beet-site" timeout="300s"/>
 			<CloudflarePurgeCache/>

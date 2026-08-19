@@ -276,9 +276,34 @@ impl LightsailBlock {
 		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
 	}
 
-	/// Build the user data script that provisions the instance.
-	/// Downloads the binary from S3 and creates a systemd service with
-	/// AWS credentials so the binary can access S3 at runtime via aws_sdk.
+	/// The systemd unit, and the name every path on the box is built from.
+	fn service_name(stack: &Stack) -> &SmolStr { stack.app_name() }
+
+	/// Build the user data script that provisions the instance: the Caddy
+	/// install, the sshd relocation, the CloudWatch agent and the systemd unit
+	/// that runs the app.
+	///
+	/// ## The rebuild rule
+	///
+	/// **Everything rendered here is MACHINE config, and any change to it
+	/// replaces the instance.** Terraform has no way to update `user_data` in
+	/// place, so an edit to this script is a new box: a cold page cache, a
+	/// burst-credit balance reset to zero, an outage window and a fresh Let's
+	/// Encrypt issuance. That is the right answer for a change to what the box
+	/// *is* (a new Caddy, a new blueprint, a new unit definition) and the wrong
+	/// answer for a change to what it *runs*.
+	///
+	/// So APP config is deliberately absent. The versioned artifact key and the
+	/// deploy identity live in the artifacts bucket behind
+	/// [`ArtifactLedger::release_pointer_key`], and the unit resolves them at
+	/// every start through the fetch/run script pair below. A code-only deploy
+	/// therefore renders a byte-identical script, terraform plans no change to
+	/// the instance, and [`LightsailRelease`] rolls the running unit onto the
+	/// new binary instead. Pinned by `code_only_deploy_renders_one_box`.
+	///
+	/// Adding a value here is a decision to rebuild the box whenever that value
+	/// changes. If it changes per deploy it belongs on the release pointer, not
+	/// in this script.
 	///
 	/// The `access_key_id_ref` and `access_key_secret_ref` are terraform
 	/// interpolation expressions (ie `${aws_iam_access_key.xxx.id}`) that
@@ -289,15 +314,12 @@ impl LightsailBlock {
 		access_key_id_ref: &str,
 		access_key_secret_ref: &str,
 	) -> Result<SmolStr> {
-		let app_name = stack.app_name();
+		let app_name = Self::service_name(stack);
 		let region = stack.aws_region();
-		let bucket = stack.artifact_bucket_name();
-		let deploy_id = stack.deploy_id();
-		let deploy_timestamp = stack.deploy_timestamp();
-		let label = &self.label;
 		let app_port = self.app_port();
 		// the deployed binary's config, with the platform bindings this block owns
-		// merged in, then split onto its two channels.
+		// merged in, then split onto its two channels. The deploy identity is
+		// absent by design: it is per-deploy, so it rides the release pointer.
 		let runtime = BootstrapConfig {
 			host: Some(core::net::Ipv4Addr::UNSPECIFIED.into()),
 			http_port: Some(app_port),
@@ -305,8 +327,6 @@ impl LightsailBlock {
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
 			stage: stack.stage().clone(),
-			deploy_id: Some(deploy_id.to_string().into()),
-			deploy_timestamp: Some(deploy_timestamp.to_string().into()),
 			..self.bootstrap.clone()
 		};
 		let (argv, env) = runtime.split_channels();
@@ -462,6 +482,11 @@ CWEOF
 "#
 		);
 
+		// the two release scripts, the whole of the machine's knowledge about
+		// finding its binary. Neither names a version.
+		let fetch_script = self.fetch_script(stack);
+		let run_script = self.run_script(stack, &exec_args);
+
 		// uses __PLACEHOLDER__ tokens for terraform refs that contain ${}
 		// which would conflict with Rust's format! macro
 		let script = format!(
@@ -480,10 +505,17 @@ cat > /root/.aws/config <<CONF
 region = {region}
 CONF
 
-# download application binary from S3
-mkdir -p /opt/{app_name}
-aws s3 cp "s3://{bucket}/versions/{deploy_id}/{label}" /opt/{app_name}/app
-chmod +x /opt/{app_name}/app
+mkdir -p /opt/{app_name} /etc/{app_name}
+
+# install the release scripts: the unit resolves the current binary at every
+# start, so this box is described without naming a deploy
+cat > /usr/local/bin/{app_name}-fetch <<'FETCH_EOF'
+{fetch_script}
+FETCH_EOF
+cat > /usr/local/bin/{app_name}-run <<'RUN_EOF'
+{run_script}
+RUN_EOF
+chmod +x /usr/local/bin/{app_name}-fetch /usr/local/bin/{app_name}-run
 {ssh_setup}
 # create systemd service with AWS credentials for runtime S3 access
 cat > /etc/systemd/system/{app_name}.service <<'EOF'
@@ -492,7 +524,7 @@ Description={app_name}
 After=network.target
 [Service]
 Type=simple
-ExecStart=/opt/{app_name}/app{exec_args}
+ExecStart=/usr/local/bin/{app_name}-run
 WorkingDirectory=/opt/{app_name}
 Restart=always
 RestartSec=3
@@ -538,6 +570,193 @@ systemctl enable --now {app_name}.service
 		}
 
 		SmolStr::from(script).xok()
+	}
+
+	/// The release fetcher installed at `/usr/local/bin/<app>-fetch`: read the
+	/// artifacts bucket's release pointer, install the binary it names and the
+	/// deploy identity it carries.
+	///
+	/// A fetch failure is not fatal while a binary is already installed. A
+	/// restart after a crash must not be blocked by a transient S3 error, and
+	/// the box keeps serving what it has rather than serving nothing.
+	fn fetch_script(&self, stack: &Stack) -> String {
+		Self::render_script(
+			r#"#!/bin/bash
+# Install the release the artifacts bucket currently points at.
+set -uo pipefail
+mkdir -p /opt/__APP__ /etc/__APP__
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+if ! aws s3 cp "s3://__BUCKET__/__POINTER__" "$tmp/deploy.env" >&2; then
+	echo "beet: no release pointer at __POINTER__, keeping the installed binary" >&2
+elif ! . "$tmp/deploy.env"; then
+	echo "beet: release pointer is unreadable, keeping the installed binary" >&2
+elif ! aws s3 cp "s3://__BUCKET__/$__ARTIFACT_KEY_VAR__" "$tmp/app" >&2; then
+	echo "beet: cannot download $__ARTIFACT_KEY_VAR__, keeping the installed binary" >&2
+else
+	# staged in the destination directory then renamed, so the swap is atomic
+	# and never truncates an inode something is still executing
+	install -m 755 "$tmp/app" /opt/__APP__/app.next
+	install -m 644 "$tmp/deploy.env" /etc/__APP__/deploy.env.next
+	mv -f /opt/__APP__/app.next /opt/__APP__/app
+	mv -f /etc/__APP__/deploy.env.next /etc/__APP__/deploy.env
+	echo "beet: installed release $BEET_DEPLOY_ID" >&2
+fi
+
+if [ ! -x /opt/__APP__/app ]; then
+	echo "beet: no binary installed and none could be fetched" >&2
+	exit 1
+fi
+touch /etc/__APP__/deploy.env
+"#,
+			stack,
+			&[
+				("__BUCKET__", &stack.artifact_bucket_name()),
+				(
+					"__POINTER__",
+					&ArtifactLedger::release_pointer_key(&self.label).to_string(),
+				),
+				("__ARTIFACT_KEY_VAR__", ArtifactLedger::ARTIFACT_KEY_VAR),
+			],
+		)
+	}
+
+	/// The unit's `ExecStart`, at `/usr/local/bin/<app>-run`: install the
+	/// current release, load the deploy identity it published, exec it.
+	///
+	/// Resolving the release per start (rather than at provision time) is the
+	/// whole trick: `systemctl restart` is a deploy, and the machine config
+	/// stays constant across every one of them. The `exec` keeps the unit's
+	/// `MainPID` on the app itself, so a caller can read the running process's
+	/// own environment to prove which release is serving.
+	fn run_script(&self, stack: &Stack, exec_args: &str) -> String {
+		Self::render_script(
+			r#"#!/bin/bash
+# Launch the current release.
+set -euo pipefail
+/usr/local/bin/__APP__-fetch
+set -a
+. /etc/__APP__/deploy.env
+set +a
+exec /opt/__APP__/app__EXEC_ARGS__
+"#,
+			stack,
+			&[("__EXEC_ARGS__", exec_args)],
+		)
+	}
+
+	/// The script [`LightsailRelease`] runs on the box: roll the unit onto the
+	/// release the artifacts bucket currently points at, and prove it took.
+	///
+	/// The proof is deliberately the RUNNING process's own environment, read
+	/// out of `/proc/<MainPID>/environ`, not the presence of a file or a
+	/// successful `systemctl restart`. A binary that downloaded but never
+	/// launched, or a unit that restarted into a crash loop, both look like
+	/// success from anywhere else.
+	///
+	/// Idempotent: a box that already serves this release (a freshly rebuilt
+	/// one, which pulled it at boot) is left alone rather than bounced.
+	///
+	/// `poll` is the gap between attempts, and the script gives the unit
+	/// `timeout` to appear and `timeout` again to converge, since a replaced
+	/// box is still running cloud-init when the deploy arrives.
+	pub fn release_script(
+		&self,
+		stack: &Stack,
+		deploy_id: &str,
+		timeout: Duration,
+		poll: Duration,
+	) -> String {
+		let poll_secs = poll.as_secs().max(1);
+		let attempts = (timeout.as_secs() / poll_secs).max(1);
+		Self::render_script(
+			r#"#!/bin/bash
+# Roll the unit onto a release, and prove the process now running IS it.
+set -uo pipefail
+unit=__APP__.service
+expect=__DEPLOY_ID__
+
+running_release() {
+	local pid
+	pid=$(systemctl show -p MainPID --value "$unit" 2>/dev/null)
+	if [ -z "$pid" ] || [ "$pid" = 0 ]; then return 1; fi
+	tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^BEET_DEPLOY_ID=//p'
+}
+
+# a replaced box is still running cloud-init, so wait for the unit to exist
+for _ in $(seq 1 __ATTEMPTS__); do
+	systemctl cat "$unit" >/dev/null 2>&1 && break
+	sleep __POLL__
+done
+
+if [ "$(running_release)" = "$expect" ]; then
+	echo "beet: already serving $expect" >&2
+else
+	echo "beet: restarting $unit onto $expect" >&2
+	systemctl restart "$unit" >&2 || true
+fi
+
+for _ in $(seq 1 __ATTEMPTS__); do
+	if [ "$(systemctl is-active "$unit")" = active ] && [ "$(running_release)" = "$expect" ]; then
+		echo "$expect"
+		exit 0
+	fi
+	sleep __POLL__
+done
+
+echo "beet: $unit never came up serving release $expect" >&2
+systemctl status "$unit" --no-pager --lines=40 >&2 || true
+exit 1
+"#,
+			stack,
+			&[
+				("__DEPLOY_ID__", deploy_id),
+				("__ATTEMPTS__", &attempts.to_string()),
+				("__POLL__", &poll_secs.to_string()),
+			],
+		)
+	}
+
+	/// Render a shell script template, substituting `__TOKEN__` placeholders.
+	///
+	/// Placeholders rather than `format!` because these scripts are dense with
+	/// `${..}` and `{ .. }`, which `format!` would need escaped into
+	/// illegibility. `__APP__` is shared by every script, so it is substituted
+	/// here rather than passed by each caller.
+	fn render_script(
+		template: &str,
+		stack: &Stack,
+		tokens: &[(&str, &str)],
+	) -> String {
+		tokens
+			.iter()
+			.fold(
+				template.replace("__APP__", Self::service_name(stack)),
+				|script, (token, value)| script.replace(token, value),
+			)
+			.trim_end()
+			.to_string()
+	}
+
+	/// The identity of the box's machine config: a digest of the rendered
+	/// cloud-init script, which is exactly what terraform replaces the instance
+	/// on.
+	///
+	/// This is what the access key's rotation trigger keys on, so the key
+	/// rotates on precisely the deploys that build a new box. Keying it on the
+	/// deploy id instead (as it once was) replaced the key every deploy, and
+	/// since the instance interpolates the key into its `user_data` that alone
+	/// forced a rebuild every deploy no matter what else was constant.
+	///
+	/// Not circular: the terraform *references* to the key are stable literals
+	/// in this string, so hashing it says nothing about the key's value.
+	fn machine_config_hash(user_data: &str) -> String {
+		use sha2::Digest;
+		sha2::Sha256::digest(user_data.as_bytes())
+			.iter()
+			.map(|byte| format!("{byte:02x}"))
+			.collect()
 	}
 }
 
@@ -598,19 +817,30 @@ impl Block for LightsailBlock {
 		let access_key_id_ref = access_key.field_ref("id");
 		let access_key_secret_ref = access_key.field_ref("secret");
 
-		// Rotate the access key every deploy. The box is destroyed and recreated
-		// on every deploy anyway, so tying the key's lifetime to the same cycle
-		// bounds a leaked credential to one deploy instead of forever.
+		// the machine config, rendered once and used twice: as the instance's
+		// user data, and as the identity the key rotation keys on.
+		let user_data = self.build_user_data(
+			stack,
+			&access_key_id_ref,
+			&access_key_secret_ref,
+		)?;
+
+		// Rotate the access key every time the box is rebuilt, bounding a leaked
+		// credential to the life of one instance rather than forever. The box is
+		// rebuilt exactly when its machine config changes, so that is what the
+		// trigger keys on (see `machine_config_hash`).
 		//
 		// The trigger cannot be the instance itself: the instance's user data
 		// interpolates the key, so the instance already depends on the key and
-		// pointing back at it would be a cycle. A `terraform_data` carrying this
-		// deploy's id changes exactly once per deploy, giving the ordering
-		// rotation -> key -> instance.
+		// pointing back at it would be a cycle. A `terraform_data` carrying the
+		// machine config's digest gives the ordering rotation -> key -> instance,
+		// and the coupling runs both ways: a machine change rotates the key, and
+		// a rotated key changes the user data terraform renders, which replaces
+		// the instance.
 		let rotation_ident = stack.resource_ident(self.build_label("key-rotation"));
 		let rotation_label = rotation_ident.label().to_string();
 		config.add_untyped_resource("terraform_data", &rotation_label, &json!({
-			"input": stack.deploy_id().to_string()
+			"input": Self::machine_config_hash(&user_data)
 		}))?;
 
 		// key pair for SSH access
@@ -646,11 +876,6 @@ impl Block for LightsailBlock {
 
 		// instance with self-provisioning user data
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
-		let user_data = self.build_user_data(
-			stack,
-			&access_key_id_ref,
-			&access_key_secret_ref,
-		)?;
 		let mut instance_details = AwsLightsailInstanceDetails {
 			availability_zone: self
 				.availability_zone
@@ -818,13 +1043,43 @@ mod tests {
 
 	/// The rendered terraform config json for a block.
 	fn build_json(block: &LightsailBlock) -> String {
-		let (stack, _dir) = Stack::default_local();
+		build_json_for(block, &Stack::default_local().0)
+	}
+
+	/// The rendered terraform config json for a block on a specific stack, ie
+	/// a specific deploy.
+	fn build_json_for(block: &LightsailBlock, stack: &Stack) -> String {
 		let mut config = stack.create_config();
 		let mut world = World::new();
 		block
-			.apply_to_config(&world.spawn(()).as_readonly(), &stack, &mut config)
+			.apply_to_config(&world.spawn(()).as_readonly(), stack, &mut config)
 			.unwrap();
 		config.to_json().to_string()
+	}
+
+	/// The `terraform_data` input the access key's replacement is triggered by,
+	/// ie the identity of the box's machine config.
+	fn rotation_input(block: &LightsailBlock, stack: &Stack) -> String {
+		let label = stack
+			.resource_ident(block.build_label("key-rotation"))
+			.label()
+			.to_string();
+		serde_json::from_str::<serde_json::Value>(&build_json_for(block, stack))
+			.unwrap()["resource"]["terraform_data"][label]["input"]
+			.as_str()
+			.unwrap()
+			.to_string()
+	}
+
+	/// Two deploys of the same machine config, ie the same box built twice with
+	/// different code.
+	fn two_deploys() -> (Stack, Stack, TestWorkDir) {
+		let (first, dir) = Stack::default_local();
+		let second = first
+			.clone()
+			.with_deploy_id(uuid_ext::now_v7())
+			.with_deploy_timestamp("2026-08-19T00:00:00Z".to_string());
+		(first, second, dir)
 	}
 
 	/// `allow_ssh`: the TUI takes 22 (`BEET_SSH_PORT=22`), cloud-init relocates
@@ -846,6 +1101,112 @@ mod tests {
 		build_json(&block).xpect_contains("2222");
 		let (script, _dir) = build_user_data(&LightsailBlock::default());
 		script.as_str().xnot().xpect_contains("sshd");
+	}
+
+	/// A code-only deploy renders the SAME box, so terraform plans no change to
+	/// the instance and the running unit is rolled onto the new binary instead
+	/// (`<LightsailRelease/>`).
+	///
+	/// The whole terraform config is compared, not just the user data: anything
+	/// deploy-varying anywhere in it would replace or update a resource, and the
+	/// instance in particular cannot be updated in place at all. The box is
+	/// burstable and starts every life with ZERO burst credit, so a rebuild does
+	/// the heaviest work of the instance's life (a `dnf install`, an ~80MB pull,
+	/// a Let's Encrypt issuance) clamped to the 20% baseline.
+	#[beet_core::test]
+	fn code_only_deploy_renders_one_box() {
+		let (first, second, _dir) = two_deploys();
+		let block = LightsailBlock::default().with_allow_ssh(true);
+		first.deploy_id().xpect_not_eq(*second.deploy_id());
+		build_json_for(&block, &first)
+			.xpect_eq(build_json_for(&block, &second));
+		// the version it serves is resolved per start from the artifacts
+		// bucket's stable pointer, and named nowhere in the machine config
+		block
+			.build_user_data(&first, "${key_id}", "${key_secret}")
+			.unwrap()
+			.as_str()
+			.xpect_contains("current/main-lightsail.env")
+			.xnot()
+			.xpect_contains(&first.deploy_id().to_string())
+			.xnot()
+			.xpect_contains("Environment=BEET_DEPLOY_ID");
+	}
+
+	/// A machine-config change DOES rebuild the box, and rotates the access key
+	/// with it: the key's whole lifetime is one instance, so a leaked credential
+	/// is bounded by the next rebuild rather than living forever.
+	///
+	/// Keying rotation on the deploy id instead (as it once was) replaced the
+	/// key every deploy, and since the instance interpolates the key into its
+	/// user data, that alone forced a rebuild every deploy no matter what else
+	/// was constant.
+	#[beet_core::test]
+	fn machine_config_change_rebuilds_and_rotates() {
+		let (first, second, _dir) = two_deploys();
+		let block = LightsailBlock::default();
+		// same machine, two deploys: no rotation, so no new user data, so no
+		// replacement
+		rotation_input(&block, &first)
+			.xpect_eq(rotation_input(&block, &second));
+		// a different machine: a new key, and the user data that carries it
+		rotation_input(&block.clone().with_allow_ssh(true), &first)
+			.xpect_not_eq(rotation_input(&block, &first));
+		rotation_input(&block.clone().with_app_port(9001), &first)
+			.xpect_not_eq(rotation_input(&block, &first));
+	}
+
+	/// The box's fetch script and the artifacts client name the SAME pointer,
+	/// and the launcher loads the identity that pointer publishes.
+	///
+	/// This is the one join between the two processes: the deploy writes the
+	/// pointer, the machine reads it, and they never speak otherwise. A drift
+	/// here is a box that boots the version it was built with forever.
+	#[beet_core::test]
+	fn machine_reads_the_pointer_the_deploy_writes() {
+		let (script, _dir) = build_user_data(&LightsailBlock::default());
+		script
+			.as_str()
+			.xpect_contains(
+				&ArtifactLedger::release_pointer_key("main-lightsail")
+					.to_string(),
+			)
+			.xpect_contains(&format!(
+				"aws s3 cp \"s3://{}/${}\"",
+				Stack::default_local().0.artifact_bucket_name(),
+				ArtifactLedger::ARTIFACT_KEY_VAR
+			))
+			// the launcher exports the pointer's identity into the process
+			.xpect_contains(". /etc/beet_infra/deploy.env");
+	}
+
+	/// The release step proves the RUNNING process carries the deploy's id,
+	/// read out of its own environment.
+	///
+	/// A downloaded file, a zero-exit `systemctl restart` and an `active` unit
+	/// all look like success while the box serves the previous binary or crash
+	/// loops; only the live process settles it. It is also idempotent, so a
+	/// freshly rebuilt box (which pulled this release at boot) is confirmed
+	/// rather than bounced.
+	#[beet_core::test]
+	fn release_proves_the_running_process() {
+		let (stack, _dir) = Stack::default_local();
+		LightsailBlock::default()
+			.release_script(
+				&stack,
+				"my-deploy-id",
+				Duration::from_secs(60),
+				Duration::from_secs(5),
+			)
+			.as_str()
+			.xpect_contains("expect=my-deploy-id")
+			.xpect_contains("/proc/$pid/environ")
+			.xpect_contains("s/^BEET_DEPLOY_ID=//p")
+			.xpect_contains("unit=beet_infra.service")
+			// idempotent: an already-current box is left alone
+			.xpect_contains("beet: already serving $expect")
+			// 60s of 5s attempts
+			.xpect_contains("seq 1 12");
 	}
 
 	/// Secret env rides the unit's `Environment=` lines, never `ExecStart`.
@@ -977,9 +1338,9 @@ mod tests {
 			.xpect_contains("BEET_PORT=");
 	}
 
-	/// Boot selection rides `ExecStart` as validated argv; ambient service config
-	/// rides `Environment=` lines. The deployed stage is a platform binding: it
-	/// flows from the stack, not the authored bootstrap.
+	/// Boot selection rides the launch `exec` as validated argv; ambient service
+	/// config rides the unit's `Environment=` lines. The deployed stage is a
+	/// platform binding: it flows from the stack, not the authored bootstrap.
 	#[beet_core::test]
 	fn splits_exec_and_env_channels() {
 		let (stack, _dir) = Stack::default_local();
@@ -995,9 +1356,11 @@ mod tests {
 		script
 			.as_str()
 			.xpect_contains(
-				"ExecStart=/opt/beet_infra/app --store=s3://beet--dev--app \
+				"exec /opt/beet_infra/app --store=s3://beet--dev--app \
 				--server=http",
 			)
+			// the unit runs the launcher, which resolves the release per start
+			.xpect_contains("ExecStart=/usr/local/bin/beet_infra-run")
 			.xpect_contains("Environment=BEET_STAGE=staging")
 			// the store never leaks onto the env channel
 			.xnot()

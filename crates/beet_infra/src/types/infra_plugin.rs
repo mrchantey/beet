@@ -69,6 +69,16 @@ impl Plugin for InfraPlugin {
 		))]
 		app.register_type::<crate::prelude::LifecycleProbe>();
 
+		// the post-apply release step: rolls a running Lightsail box onto the
+		// deploy's binary, the counterpart to its machine-config-only user data.
+		#[cfg(all(
+			feature = "deploy",
+			feature = "lightsail_block",
+			not(target_arch = "wasm32")
+		))]
+		app.register_type::<crate::prelude::LightsailRelease>()
+			.register_type::<crate::prelude::LightsailReleaseAction>();
+
 		// the docker/podman image build action + its engine selector (the
 		// `build_docker_image` module is gated on `fargate_block`).
 		#[cfg(all(feature = "fargate_block", not(target_arch = "wasm32")))]

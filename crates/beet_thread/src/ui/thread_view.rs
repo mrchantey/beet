@@ -131,6 +131,7 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 			.to_string()
 	};
 	let author = field("author");
+	let text = field("text");
 	let kind = item
 		.get("kind")
 		.and_then(|kind| kind.as_str().ok())
@@ -139,7 +140,9 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 	OnSpawn::insert(rsx! {
 		<div {message_block(&kind)}>
 			<div {author_label(&kind)}>{author}</div>
-			<div {body_text()}>{(Value::default(), FieldRef::new("text"))}</div>
+			// seeded with the body at build time so a new row paints its text on
+			// the first frame, bound so streamed growth re-syncs in place
+			<div {body_text()}>{(Value::new(text), FieldRef::new("text"))}</div>
 		</div>
 	})
 }

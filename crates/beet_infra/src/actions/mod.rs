@@ -7,7 +7,9 @@ mod cloudflare;
 mod cloudflare_zone;
 #[cfg(feature = "aws_sdk")]
 mod lifecycle_probe;
-pub mod ssh_utils;
+#[cfg(feature = "lightsail_block")]
+mod lightsail_release;
+mod ssh_connection;
 #[cfg(feature = "aws_sdk")]
 mod sync_s3_bucket;
 mod tofu_apply_action;
@@ -20,6 +22,9 @@ pub use cloudflare::*;
 pub use cloudflare_zone::*;
 #[cfg(feature = "aws_sdk")]
 pub use lifecycle_probe::*;
+#[cfg(feature = "lightsail_block")]
+pub use lightsail_release::*;
+pub use ssh_connection::*;
 #[cfg(feature = "aws_sdk")]
 pub use sync_s3_bucket::*;
 pub use tofu_apply_action::*;

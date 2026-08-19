@@ -184,6 +184,22 @@ pub struct StackQuery<'w, 's> {
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
+	/// The nearest ancestor carrying a [`Stack`], and the stack itself: the
+	/// root every block, artifact and verb under one deploy resolves against.
+	pub fn root(&self, entity: Entity) -> Result<(Entity, &Stack)> {
+		self.stacks.get(entity)
+	}
+
+	/// Every descendant of `entity`'s stack root, inclusive. The one traversal
+	/// a deploy step uses to find what was declared alongside it.
+	pub fn declared(
+		&self,
+		entity: Entity,
+	) -> Result<impl Iterator<Item = Entity> + use<'_>> {
+		let (root, _) = self.root(entity)?;
+		self.children.iter_descendants_inclusive(root).xok()
+	}
+
 	/// Finds the stack in ancestors and
 	/// builds a config of all block descendents.
 	/// Sets the AWS provider region from the nearest [`AwsStack`] ancestor,
@@ -194,7 +210,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// a host that can apply it (see [`build_project`](Self::build_project),
 	/// which is the same config wrapped in the native tofu driver).
 	pub fn build_config(&self, entity: Entity) -> Result<(&Stack, terra::Config)> {
-		let (root, stack) = self.stacks.get(entity)?;
+		let (root, stack) = self.root(entity)?;
 		let mut config = stack.create_config();
 		let region = stack.aws_region();
 		config.add_provider_config(
@@ -221,7 +237,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 
 	/// Create an artifacts client for the stack at the given entity.
 	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
-		let (_, stack) = self.stacks.get(entity)?;
+		let (_, stack) = self.root(entity)?;
 		stack.artifacts_client().xok()
 	}
 
@@ -233,9 +249,8 @@ impl<'w, 's> StackQuery<'w, 's> {
 		&self,
 		entity: Entity,
 	) -> Result<Vec<(BuildArtifact, SmolStr)>> {
-		let (root, _) = self.stacks.get(entity)?;
 		let mut pairs = Vec::new();
-		for child in self.children.iter_descendants_inclusive(root) {
+		for child in self.declared(entity)? {
 			if let Ok((entity_ref, block)) = self.blocks.get(child) {
 				if let Some(label) = block.artifact_label() {
 					if let Some(artifact) = entity_ref.get::<BuildArtifact>() {
@@ -250,9 +265,8 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Collect all [`Variable`] declarations from block descendants.
 	#[cfg(feature = "deploy")]
 	pub fn collect_variables(&self, entity: Entity) -> Result<Vec<Variable>> {
-		let (root, _) = self.stacks.get(entity)?;
 		let mut variables = Vec::new();
-		for child in self.children.iter_descendants_inclusive(root) {
+		for child in self.declared(entity)? {
 			if let Ok((_, block)) = self.blocks.get(child) {
 				variables.extend_from_slice(block.variables());
 			}

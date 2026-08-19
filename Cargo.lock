@@ -1578,6 +1578,7 @@ dependencies = [
  "beet_net",
  "bevy",
  "bitflags 2.13.1",
+ "blocking",
  "bytes",
  "extend",
  "heck",

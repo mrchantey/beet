@@ -117,8 +117,8 @@ pub mod prelude {
 			pub use beet_core::prelude::Transform;
 			pub use crate::ui::prelude::Reset;
 			// ui's `Header`/`Table` types overlap with `beet_net`'s `Header` trait
-			// and `beet_thread`'s `Table` trait (same namespace, glob-imported); an
-			// explicit re-export resolves the overlap in favour of the ui types.
+			// and `Table` store (same namespace, glob-imported); an explicit
+			// re-export resolves the overlap in favour of the ui types.
 			pub use crate::ui::prelude::Header;
 			pub use crate::ui::prelude::Table;
 			pub use crate::ui::prelude::style::*;

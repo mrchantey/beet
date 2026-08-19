@@ -13,6 +13,10 @@ pub struct ArtifactLedger {
 }
 
 impl ArtifactLedger {
+	/// The env name a release pointer publishes the versioned artifact key
+	/// under, read by the machine's fetch script.
+	pub const ARTIFACT_KEY_VAR: &'static str = "BEET_ARTIFACT_KEY";
+
 	/// Create a new ledger with the given deploy id and timestamp.
 	pub fn new(deploy_id: Uuid, timestamp: String) -> Self {
 		Self {
@@ -54,6 +58,49 @@ impl ArtifactLedger {
 	}
 	fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> SmolPath {
 		SmolPath::new(format!("versions/{uuid}/{artifact_name}"))
+	}
+
+	/// The stable key naming the current release of one artifact, ie
+	/// `current/my-app.env`.
+	///
+	/// The indirection that lets a deployed machine be described without naming
+	/// a deploy: a boot script pointed at this key resolves the current binary
+	/// at every start, so the machine's own config never mentions a version and
+	/// never changes when only the code does. [`publish_ledger`] and
+	/// [`set_current`] are the only writers, so rolling back re-points it too.
+	///
+	/// [`publish_ledger`]: ArtifactsClient::publish_ledger
+	/// [`set_current`]: ArtifactsClient::set_current
+	pub fn release_pointer_key(artifact_name: &str) -> SmolPath {
+		SmolPath::new(format!("current/{artifact_name}.env"))
+	}
+
+	/// The pointer body: an env file, so one file serves both readers a
+	/// deployed box needs, a shell `.` and a systemd `EnvironmentFile=`.
+	///
+	/// The deploy identity renders through [`BootstrapConfig::to_env`], the same
+	/// table the runtime parses, so the names cannot drift. The artifact key is
+	/// the pointer's own knob, not a bootstrap one: it tells the machine what to
+	/// download, not the process how to boot.
+	fn release_pointer(&self, artifact_name: &str) -> Result<String> {
+		let entry = self.artifacts.get(artifact_name).ok_or_else(|| {
+			bevyhow!("no artifact '{artifact_name}' in ledger {}", self.deploy_id)
+		})?;
+		let mut body = BootstrapConfig {
+			deploy_id: Some(self.deploy_id.to_string().into()),
+			deploy_timestamp: Some(self.timestamp.clone().into()),
+			..default()
+		}
+		.to_env()
+		.iter()
+		.map(|(key, value)| format!("{key}={value}\n"))
+		.collect::<String>();
+		body.push_str(&format!(
+			"{}={}\n",
+			Self::ARTIFACT_KEY_VAR,
+			entry.bucket_key
+		));
+		body.xok()
 	}
 }
 
@@ -114,7 +161,27 @@ impl ArtifactsClient {
 		// store version ledger
 		self.store.insert(&ledger_key, bytes.clone()).await?;
 		// set as current
-		self.store.insert(&current_ledger_key(), bytes).await
+		self.store.insert(&current_ledger_key(), bytes).await?;
+		self.publish_release_pointers(&self.ledger).await
+	}
+
+	/// Re-point every artifact's stable release pointer at `ledger`, see
+	/// [`ArtifactLedger::release_pointer_key`]. Runs on every write of the
+	/// current pointer, so a rollback moves the machines' view of "current" with
+	/// the ledger rather than leaving them on the version they last booted.
+	async fn publish_release_pointers(
+		&self,
+		ledger: &ArtifactLedger,
+	) -> Result {
+		for artifact_name in ledger.artifacts.keys() {
+			self.store
+				.insert(
+					&ArtifactLedger::release_pointer_key(artifact_name),
+					ledger.release_pointer(artifact_name)?.into_bytes(),
+				)
+				.await?;
+		}
+		Ok(())
 	}
 
 	/// Read the current ledger.
@@ -141,7 +208,11 @@ impl ArtifactsClient {
 	pub async fn set_current(&self, version: &Uuid) -> Result {
 		let key = ArtifactLedger::version_ledger_key(version);
 		let ledger_bytes = self.store.get(&key).await?;
-		self.store.insert(&current_ledger_key(), ledger_bytes).await
+		let ledger: ArtifactLedger = serde_json::from_slice(&ledger_bytes)?;
+		self.store
+			.insert(&current_ledger_key(), ledger_bytes)
+			.await?;
+		self.publish_release_pointers(&ledger).await
 	}
 
 	/// List all deployed versions, sorted chronologically.
@@ -254,6 +325,48 @@ mod tests {
 		let current = client.current_ledger().await.unwrap().unwrap();
 		current.deploy_id.xpect_eq(ledger.deploy_id);
 		current.artifacts.len().xpect_eq(1);
+	}
+
+	/// Publishing a ledger also re-points each artifact's stable release
+	/// pointer, and a rollback moves it back: this is the only channel a
+	/// deployed machine learns which binary is current through, so it has to
+	/// track the ledger rather than the boot it happened to start from.
+	#[beet_core::test]
+	async fn release_pointer_tracks_the_current_ledger() {
+		let store = BlobStore::temp();
+		let first =
+			test_ledger(vec![("app", "versions/v1/app", "h1")]);
+		let second =
+			test_ledger(vec![("app", "versions/v2/app", "h2")]);
+		let client = ArtifactsClient::new(store.clone(), first.clone());
+		client.publish_ledger().await.unwrap();
+		ArtifactsClient::new(store.clone(), second.clone())
+			.publish_ledger()
+			.await
+			.unwrap();
+
+		let pointer = async || {
+			String::from_utf8(
+				store
+					.get(&ArtifactLedger::release_pointer_key("app"))
+					.await
+					.unwrap()
+					.to_vec(),
+			)
+			.unwrap()
+		};
+		pointer()
+			.await
+			.as_str()
+			.xpect_contains("BEET_ARTIFACT_KEY=versions/v2/app")
+			.xpect_contains(&format!("BEET_DEPLOY_ID={}", second.deploy_id));
+		// a rollback re-points it, so the next unit start pulls the older binary
+		client.set_current(&first.deploy_id).await.unwrap();
+		pointer()
+			.await
+			.as_str()
+			.xpect_contains("BEET_ARTIFACT_KEY=versions/v1/app")
+			.xpect_contains(&format!("BEET_DEPLOY_ID={}", first.deploy_id));
 	}
 
 	#[beet_core::test]
