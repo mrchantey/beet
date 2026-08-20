@@ -44,22 +44,10 @@ impl PathPatternModifier {
 	pub fn is_static(&self) -> bool { matches!(self, Self::Static) }
 }
 
-/// The entity a url space is rooted at: ancestor [`PathPartial`] segments above
-/// it do NOT prepend, and its subtree is a route tree of its own.
-///
-/// A structural marker rather than a flag on [`PathPartial`], so a root is a
-/// *kind of entity* and not a value any partial could carry. A `Router` requires
-/// one, which is what lets an entry mount a whole site under a command route
-/// (`<Route path="serve"><StartOnLoad><Router>..`) while the site's own urls stay
-/// rooted at `/`, and keeps a dispatching surface from reaching routes outside
-/// the namespace it serves.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct PathRoot;
-
 /// Represents the next part of the route pattern.
 /// All ancestor [`PathPartial`] will be prepended when determining the route pattern
-/// at this point in the tree, up to the nearest [`PathRoot`].
+/// at this point in the tree, up to and including the nearest
+/// [url space root](Self::root).
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
@@ -68,7 +56,16 @@ pub struct PathRoot;
 pub struct PathPartial {
 	/// Segements that must match in order for the route to be valid,
 	/// an empty vector means only the root path `/` is valid.
+	#[deref]
 	pub segments: Vec<PathPatternSegment>,
+	/// Whether this entity roots a url space: ancestor segments above it do NOT
+	/// prepend, and its subtree is a route tree of its own.
+	///
+	/// A `Router` is one, which is what lets an entry mount a whole site under a
+	/// command route (`<Route path="serve"><StartOnLoad><Router>..`) while the
+	/// site's own urls stay rooted at `/`, and keeps a dispatching surface from
+	/// reaching routes outside the url space it serves.
+	pub is_root: bool,
 }
 
 impl PathPartial {
@@ -78,13 +75,26 @@ impl PathPartial {
 	pub fn parse(path: impl AsRef<str>) -> Result<Self> {
 		Self {
 			segments: PathPattern::new(path)?.segments,
+			is_root: false,
 		}
 		.xok()
 	}
 
+	/// A url space root: contributes no segments and stops ancestor segments
+	/// from prepending, so its subtree is a url space of its own.
+	pub fn root() -> Self {
+		Self {
+			segments: Vec::new(),
+			is_root: true,
+		}
+	}
+
 	/// Creates a [`PathPartial`] from pre-parsed segments.
 	pub fn from_segments(segments: Vec<PathPatternSegment>) -> Self {
-		Self { segments }
+		Self {
+			segments,
+			is_root: false,
+		}
 	}
 }
 
@@ -148,9 +158,8 @@ impl PathPattern {
 		entity: In<Entity>,
 		parents: Query<&ChildOf>,
 		path_partials: Query<&PathPartial>,
-		path_roots: Query<(), With<PathRoot>>,
 	) -> Result<PathPattern> {
-		Self::collect(*entity, &parents, &path_partials, &path_roots)
+		Self::collect(*entity, &parents, &path_partials)
 	}
 
 	/// Collects a [`PathPattern`] by traversing ancestor [`PathPartial`] components.
@@ -159,15 +168,15 @@ impl PathPattern {
 		entity: Entity,
 		parents: &Query<&ChildOf>,
 		path_partials: &Query<&PathPartial>,
-		path_roots: &Query<(), With<PathRoot>>,
 	) -> Result<PathPattern> {
 		let mut partials = Vec::new();
-		for entity in parents.iter_ancestors_inclusive(entity) {
-			if let Ok(partial) = path_partials.get(entity) {
-				partials.push(partial.clone());
-			}
+		for partial in parents
+			.iter_ancestors_inclusive(entity)
+			.filter_map(|entity| path_partials.get(entity).ok())
+		{
+			partials.push(partial.clone());
 			// a url space root ends the walk: nothing above it prepends.
-			if path_roots.contains(entity) {
+			if partial.is_root {
 				break;
 			}
 		}
@@ -182,15 +191,20 @@ impl PathPattern {
 	}
 
 	/// The entity starting `entity`'s url space: the nearest ancestor
-	/// (inclusive) carrying a [`PathRoot`], else the document root.
+	/// (inclusive) whose [`PathPartial`] is a [root](PathPartial::root), else the
+	/// document root.
 	pub fn namespace_root(
 		entity: Entity,
 		parents: &Query<&ChildOf>,
-		path_roots: &Query<(), With<PathRoot>>,
+		path_partials: &Query<&PathPartial>,
 	) -> Entity {
 		parents
 			.iter_ancestors_inclusive(entity)
-			.find(|entity| path_roots.contains(*entity))
+			.find(|entity| {
+				path_partials
+					.get(*entity)
+					.is_ok_and(|partial| partial.is_root)
+			})
 			.unwrap_or_else(|| parents.root_ancestor(entity))
 	}
 
