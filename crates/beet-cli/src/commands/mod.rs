@@ -58,25 +58,10 @@ impl Plugin for CliCommandsPlugin {
 		app.register_type::<CaptureScreenshot>();
 		#[cfg(feature = "qrcode")]
 		app.register_type::<QrCode>();
-		// the root `main.bsx` names the infra deploy blocks and templates, which
-		// only register under `infra` + `extra`. Without both (the default `beet`,
-		// `beet run-wasm`, `beet build-wasm`, `beet serve`), allow them as
-		// known-but-inert tags so the entry still loads and the
-		// `deploy`/`sync`/`watch` routes render nothing, mirroring how
-		// `<LiveReloadScript>` degrades without `client_io`.
-		#[cfg(not(all(feature = "infra", feature = "extra")))]
-		for tag in [
-			"BeetSiteDeployHost",
-			"LightsailBeetSiteBlock",
-			"CloudflareZoneSetup",
-			"CloudflarePurgeCache",
-			"AppBucket",
-			"AssetsBucket",
-			"TofuApply",
-			"DirSync",
-			"LightsailWatch",
-		] {
-			app.allow_unregistered(tag);
-		}
+		// NOTE: deploy tags are NOT allowlisted here. An entry declaring deploy
+		// verbs gates them with `bx:features="infra,extra"`, so a build without
+		// those features skips the subtree at resolve time instead of relying on
+		// a hand-maintained list of tags to treat as inert — a list that silently
+		// went stale every time an entry named a new one.
 	}
 }

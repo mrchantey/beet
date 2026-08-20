@@ -49,27 +49,34 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 		None,
 	)
 	.await?;
-	// boot the entry at its own home with the serve flags (see
-	// `entry_boot_request`), not the `serve/<entry>` command request the dev
-	// router routed here.
-	CallOnLoad::call_recursive(caller.world().entity(root), || {
-		entry_boot_request(parts)
-	})
-	.await?;
+	// an entry whose root dispatches commands names its site with a positional
+	// route, so forward `serve` into it; an entry that IS the server boots at
+	// its own home. Same shape the deployed unit uses (`app --store=.. serve`),
+	// so `beet serve site` and the box run the identical path.
+	let root = caller.world().entity(root);
+	let dispatches = root.get::<CliServer, _>(|_| ()).await.is_ok();
+	CallOnLoad::call_recursive(root, || entry_boot_request(parts, dispatches))
+		.await?;
 	Response::ok().xok()
 }
 
-/// The boot request handed to the loaded entry: a fresh request at the entry's
-/// home (`/`) carrying the serve invocation's flags (`--server`,
-/// `--color-scheme`, `--port`, ...), with the `serve/<entry>` command path and
-/// its `*entry` capture dropped so the entry's servers open their own home
-/// rather than treating the command path as a route.
+/// The boot request handed to the loaded entry: a fresh request carrying the
+/// serve invocation's flags (`--server`, `--color-scheme`, `--port`, ...), with
+/// the `serve/<entry>` command path and its `*entry` capture dropped so the
+/// entry never treats the command path as a route.
+///
+/// The path is the entry's home (`/`) when the entry root IS the server, and the
+/// positional `serve` route when it is a `CliServer` dispatcher whose site is one
+/// route among its commands.
 ///
 /// `--server` defaults to `http`, so a bare `beet serve <entry>` brings up a web
-/// server rather than every declared server: a one-shot `CliServer` would resolve
-/// the boot and exit the process, and the `TuiServer` would seize the terminal.
-fn entry_boot_request(parts: &RequestParts) -> Request {
-	let mut boot = RequestParts::get(Url::NONE);
+/// server rather than every declared server: the `TuiServer` would seize the
+/// terminal.
+fn entry_boot_request(parts: &RequestParts, dispatches: bool) -> Request {
+	let mut boot = match dispatches {
+		true => RequestParts::get("serve"),
+		false => RequestParts::get(Url::NONE),
+	};
 	for (key, values) in parts.params().iter_all() {
 		// the greedy `*entry` capture is a serve-command concern, not an entry flag.
 		if key.as_str() == "entry" {
@@ -102,7 +109,7 @@ mod test {
 		// mirror the routed request: the `*entry` capture plus no `--server`
 		let mut parts = RequestParts::get("/serve/examples/bsx_site");
 		parts.insert_param("entry", "examples/bsx_site");
-		let boot = entry_boot_request(&parts);
+		let boot = entry_boot_request(&parts, false);
 		let parts = boot.request_parts();
 		parts.get_param("server").xpect_eq(Some("http"));
 		// the command path and its capture never reach the entry
@@ -118,10 +125,25 @@ mod test {
 		parts.insert_param("entry", "site");
 		parts.insert_param("server", "tui");
 		parts.insert_param("color-scheme", "light");
-		let boot = entry_boot_request(&parts);
+		let boot = entry_boot_request(&parts, false);
 		let parts = boot.request_parts();
 		parts.get_param("server").xpect_eq(Some("tui"));
 		parts.get_param("color-scheme").xpect_eq(Some("light"));
+		parts.get_param("entry").xpect_none();
+	}
+
+	/// An entry whose root is a `CliServer` dispatcher (the beet site) is booted
+	/// by forwarding the positional `serve` route into it, the identical path
+	/// the deployed unit takes (`app --store=.. --server=http,ssh serve`).
+	#[beet::test]
+	fn boot_request_forwards_serve_into_a_dispatcher() {
+		let mut parts = RequestParts::get("/serve/site");
+		parts.insert_param("entry", "site");
+		parts.insert_param("server", "http,ssh");
+		let boot = entry_boot_request(&parts, true);
+		let parts = boot.request_parts();
+		parts.path_string().xpect_eq("/serve");
+		parts.get_param("server").xpect_eq(Some("http,ssh"));
 		parts.get_param("entry").xpect_none();
 	}
 }

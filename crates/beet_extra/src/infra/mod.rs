@@ -29,18 +29,15 @@ impl Plugin for InfraExamplesPlugin {
 			// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
 			// `.bsx` lambda deployer composes them (see `templates.rs`).
 			.register_template::<StackHost>()
-			.register_template::<AppBucket>()
-			// the bucket-lifecycle example's stack host + named bucket.
+			// the bucket-lifecycle example's stack host.
 			.register_template::<BucketStack>()
-			.register_template::<NamedBucket>()
 			.register_template::<SiteSync>()
-			// the beet-site deployer (root main.bsx): assets bucket, generic dir
-			// sync, the stage-aware lightsail block, and its stack-bearing host.
-			.register_template::<AssetsBucket>()
-			.register_template::<AnalyticsTable>()
-			.register_template::<DirSync>()
+			// the beet-site deployer: the stage-aware lightsail block and the
+			// stack-bearing host every deploy verb resolves by ancestry. The
+			// resource declarations themselves are authored as their blocks
+			// (`<S3BucketBlock/>`, `<DynamoTableBlock/>`), registered upstream.
 			.register_template::<LightsailBeetSiteBlock>()
-			.register_template::<BeetSiteDeployHost>()
+			.register_template::<DeployHost>()
 			.register_template::<LambdaSiteBlock>()
 			.register_template::<LambdaWatch>()
 			.register_template::<LightsailSiteBlock>()

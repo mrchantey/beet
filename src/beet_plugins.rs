@@ -279,14 +279,33 @@ fn winit_default_plugins() -> PluginGroupBuilder {
 }
 
 /// The async command runtime, app-exit handling, the process config assignment,
-/// the crate feature check, and the panic error handler. Uses `init_plugin` so it
-/// composes with plugins that pull these in themselves.
+/// the crate feature check, and the fallback error handler. Uses `init_plugin` so
+/// it composes with plugins that pull these in themselves.
+///
+/// ## The fallback handler splits by build
+///
+/// Only errors raised where a `Result` cannot be returned reach it: a component
+/// hook, a command, a detached async task. A route failure flows back as a
+/// response and sets the exit status on that path instead.
+///
+/// A **debug** build panics, so a misconfiguration surfaces the instant it is
+/// introduced and a dev run cannot quietly carry on wrong. A **release** build
+/// logs and keeps running, because the release build is the deployed server: a
+/// detached analytics write that cannot reach its table must not take the site
+/// down with it. The loud-once latch on `AnalyticsStore::record` is what keeps
+/// that from becoming a log per event.
 fn beet_runtime_plugin(app: &mut App) {
 	app.init_plugin::<AsyncPlugin>()
 		.init_plugin::<AppExitPlugin>()
 		.init_plugin::<BootstrapPlugin>()
-		.init_plugin::<CrateCheckPlugin>()
-		.try_set_error_handler(bevy::ecs::error::panic);
+		.init_plugin::<CrateCheckPlugin>();
+	cfg_if! {
+		if #[cfg(debug_assertions)] {
+			app.try_set_error_handler(bevy::ecs::error::panic);
+		} else {
+			app.try_set_error_handler(bevy::ecs::error::error);
+		}
+	}
 }
 
 /// The route tree, document sync, server exchange and navigation observers (the

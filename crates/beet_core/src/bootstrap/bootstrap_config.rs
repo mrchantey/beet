@@ -96,14 +96,6 @@ pub struct BootstrapConfig {
 	/// Whether services resolve locally or against the cloud, defaulting to
 	/// [`ServiceAccess::Local`]. `--service-access` / `BEET_SERVICE_ACCESS`.
 	pub service_access: ServiceAccess,
-	/// The analytics table a deployed process records to, delivered by the
-	/// deploy that created it. Absent, analytics writes the local directory.
-	/// `--analytics-table` / `BEET_ANALYTICS_TABLE`.
-	///
-	/// A bare name rather than a [`StoreUri`]: the entry store picks a *backend*
-	/// from a grammar, this names the one table the deploy already made, and
-	/// `dynamodb://..` is not a thing an entry could ever load through.
-	pub analytics_table: Option<SmolStr>,
 	/// This deployment's unique id. `--deploy-id` / `BEET_DEPLOY_ID`.
 	pub deploy_id: Option<SmolStr>,
 	/// This deployment's timestamp. `--deploy-timestamp` /
@@ -143,7 +135,6 @@ impl Default for BootstrapConfig {
 			ssh_port: None,
 			stage: Self::DEFAULT_STAGE.into(),
 			service_access: default(),
-			analytics_table: None,
 			deploy_id: None,
 			deploy_timestamp: None,
 			tls: None,
@@ -216,10 +207,6 @@ impl BootstrapConfig {
 	const SERVICE_ACCESS: Knob = Knob {
 		arg: "service-access",
 		env: "BEET_SERVICE_ACCESS",
-	};
-	const ANALYTICS_TABLE: Knob = Knob {
-		arg: "analytics-table",
-		env: "BEET_ANALYTICS_TABLE",
 	};
 	const DEPLOY_ID: Knob = Knob {
 		arg: "deploy-id",
@@ -311,7 +298,7 @@ impl BootstrapConfig {
 
 	/// Every knob, in field order. The one enumeration of the table, so a new
 	/// field is either listed here or is not a knob at all.
-	const KNOBS: [Knob; 19] = [
+	const KNOBS: [Knob; 18] = [
 		Self::MAIN,
 		Self::STORE,
 		Self::WATCH,
@@ -323,7 +310,6 @@ impl BootstrapConfig {
 		Self::SSH_PORT,
 		Self::STAGE,
 		Self::SERVICE_ACCESS,
-		Self::ANALYTICS_TABLE,
 		Self::DEPLOY_ID,
 		Self::DEPLOY_TIMESTAMP,
 		Self::TLS,
@@ -379,7 +365,6 @@ impl BootstrapConfig {
 			service_access: reader
 				.parsed(Self::SERVICE_ACCESS)?
 				.unwrap_or_default(),
-			analytics_table: reader.value(Self::ANALYTICS_TABLE),
 			deploy_id: reader.value(Self::DEPLOY_ID),
 			deploy_timestamp: reader.value(Self::DEPLOY_TIMESTAMP),
 			tls: reader.bool_value(Self::TLS)?,
@@ -432,7 +417,6 @@ impl BootstrapConfig {
 		push(Self::SSH_PORT, self.ssh_port.map(|port| port.to_string()));
 		push(Self::STAGE, self.rendered_stage());
 		push(Self::SERVICE_ACCESS, self.rendered_service_access());
-		push(Self::ANALYTICS_TABLE, self.analytics_table.as_ref().map(ToString::to_string));
 		push(
 			Self::DEPLOY_ID,
 			self.deploy_id.as_ref().map(ToString::to_string),
@@ -487,7 +471,6 @@ impl BootstrapConfig {
 		push(Self::SSH_PORT, self.ssh_port.map(|port| port.to_string()));
 		push(Self::STAGE, self.rendered_stage());
 		push(Self::SERVICE_ACCESS, self.rendered_service_access());
-		push(Self::ANALYTICS_TABLE, self.analytics_table.as_ref().map(ToString::to_string));
 		push(
 			Self::DEPLOY_ID,
 			self.deploy_id.as_ref().map(ToString::to_string),
@@ -554,7 +537,6 @@ impl BootstrapConfig {
 			ssh_port: self.ssh_port,
 			stage: self.stage,
 			service_access: self.service_access,
-			analytics_table: self.analytics_table,
 			deploy_id: self.deploy_id,
 			deploy_timestamp: self.deploy_timestamp,
 			tls: self.tls,
@@ -798,7 +780,6 @@ mod test {
 			ssh_port: Some(2222),
 			stage: "prod".into(),
 			service_access: ServiceAccess::Remote,
-			analytics_table: Some("my-app--prod--analytics".into()),
 			deploy_id: Some("019823ff-0000-7000-8000-000000000000".into()),
 			deploy_timestamp: Some("2026-08-09T00:00:00Z".into()),
 			tls: Some(true),
@@ -929,7 +910,6 @@ mod test {
 				"BEET_SSH_PORT",
 				"BEET_STAGE",
 				"BEET_SERVICE_ACCESS",
-				"BEET_ANALYTICS_TABLE",
 				"BEET_DEPLOY_ID",
 				"BEET_DEPLOY_TIMESTAMP",
 				"BEET_TLS",

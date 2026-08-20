@@ -5,6 +5,9 @@ mod build_docker_image;
 #[cfg(feature = "cloudflare_block")]
 mod cloudflare;
 mod cloudflare_zone;
+mod dir_copy;
+#[cfg(feature = "aws_sdk")]
+mod dir_sync;
 #[cfg(feature = "aws_sdk")]
 mod lifecycle_probe;
 #[cfg(feature = "lightsail_block")]
@@ -20,6 +23,9 @@ pub use build_docker_image::*;
 #[cfg(feature = "cloudflare_block")]
 pub use cloudflare::*;
 pub use cloudflare_zone::*;
+pub use dir_copy::*;
+#[cfg(feature = "aws_sdk")]
+pub use dir_sync::*;
 #[cfg(feature = "aws_sdk")]
 pub use lifecycle_probe::*;
 #[cfg(feature = "lightsail_block")]

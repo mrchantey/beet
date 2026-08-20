@@ -259,6 +259,18 @@ impl<T: TableStoreRow> Table<T> {
 	pub fn region(&self) -> Option<String> {
 		BlobStoreProvider::region(self.provider.as_ref())
 	}
+
+	/// Where this table actually lives, ie `dynamo:beet-site--prod--analytics
+	/// (us-west-2)`. The one thing an operator needs from a store that will not
+	/// answer, so it belongs in any error naming this table.
+	pub fn describe(&self) -> String {
+		let id = BlobStoreProvider::id(self.provider.as_ref());
+		let root = BlobStoreProvider::root_key(self.provider.as_ref());
+		match self.region() {
+			Some(region) => format!("{id}:{root} ({region})"),
+			None => format!("{id}:{root}"),
+		}
+	}
 }
 
 /// Types that can be stored in a [`Table`].

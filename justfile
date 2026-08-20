@@ -30,10 +30,15 @@ default:
 init-cli:
 	just install-cli
 
-# Set up a fresh checkout: cli, assets, and the ml default model.
+# Set up a fresh checkout: cli, both asset trees, and the ml default model.
+# The two trees are separate sources of record: the workspace's own
+# (`beet--shared--assets`, what the examples/tests/wasm builds read) and the
+# site's (`beet-site--shared--assets`, what the website serves). Neither derives
+# from the other, so a fresh checkout pulls both.
 init-repo:
 	just init-cli
 	just beet-shared pull
+	just site-shared pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 
 #💡 CLI
@@ -51,29 +56,41 @@ beet *args:
 # Deploy the beet website to its AWS Lightsail box; --stage=prod targets prod
 # (default dev). Lean headless build (no winit/ml) and AWS_PROFILE cleared so
 # tofu/aws/s3 use the explicit `.env` keys rather than a global profile.
-# `infra,extra` links the beet-site deploy host (`<BeetSiteDeployHost>` + the
-# IaC verb routes).
+# `--main=site`: the SITE entry declares its own resources and deploy verbs, so
+# the application that runs on them is the thing that provisions them.
+# `infra,extra` links the deploy host and the IaC verb routes; without them the
+# site entry's `bx:features` gate skips the whole subtree and the verb is absent.
 beet-deploy *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- deploy {{ args }}
-# Re-publish the site to S3 without a redeploy (assets: `beet-shared push`).
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site deploy {{ args }}
+# Re-publish the site to S3 without a redeploy (site assets: `site-shared push`).
 beet-sync *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- sync {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site sync {{ args }}
 # Tail the deployed instance's logs.
 beet-watch *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- watch {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site watch {{ args }}
+# Refresh the files site/assets borrows from the workspace tree (the wasm binary,
+# the geoip database, the robot faces). Runs ahead of every publish anyway.
+beet-assets *args:
+  cargo run -p beet-cli --features infra,extra -- --main=site assets {{ args }}
 # Tear the deployed stack down (pass --stage=prod for the prod stack). Stage only:
-# the `shared` stage (the assets bucket) has its own verbs under `beet-shared`.
+# the `shared` stage (the assets bucket) has its own verbs under `site-shared`.
 beet-destroy *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- destroy --force {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site destroy --force {{ args }}
 # Resolve the deploy config without touching cloud (safe pre-apply check).
 beet-validate *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- validate {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site validate {{ args }}
 # Show the tofu plan without applying (eyeball before deploy).
 beet-plan *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- plan {{ args }}
-# The shared-stage verbs (the assets bucket): `just beet-shared plan|apply|pull|push|..`.
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site plan {{ args }}
+# The WORKSPACE assets bucket (`beet--shared--assets`), the source of record for
+# ./assets: `just beet-shared plan|apply|pull|push|..`. Rooted at the workspace
+# entry, since these assets belong to the repo rather than to the website.
 beet-shared *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- shared {{ args }}
+# The SITE assets bucket (`beet-site--shared--assets`), the source of record for
+# ./site/assets: `just site-shared plan|apply|pull|push|..`.
+site-shared *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site shared {{ args }}
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,
@@ -100,7 +117,11 @@ fmt *args:
 
 test-all *args:
 	@if [ ! -d assets ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then \
-		echo "please download assets directory: just beet-shared pull"; \
+		echo "please download the workspace assets: just beet-shared pull"; \
+		exit 1; \
+	fi
+	@if [ ! -d site/assets ] || [ -z "$(ls -A site/assets 2>/dev/null)" ]; then \
+		echo "please download the site assets: just site-shared pull"; \
 		exit 1; \
 	fi
 	just test-core {{ args }}
@@ -294,8 +315,11 @@ build-wasm-render:
 # JavaScript engine; see the `web_full` comment in crates/beet-cli/Cargo.toml.
 # Slower to build (the JS engine's wasi sysroot downloads once) and several times
 # the artifact, so a page mounts it only when its program needs more than the floor.
+# Ends by refreshing the site's borrowed copy, so a rebuilt binary cannot go
+# stale in site/assets (the tutorial page serves it from there).
 build-wasm-full:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=assets/wasm/beet-full.wasm
+	beet --main=site assets
 
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet program (examples/wasm/hello.bsx) in the browser; its

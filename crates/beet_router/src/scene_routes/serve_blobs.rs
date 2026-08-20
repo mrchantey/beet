@@ -206,10 +206,10 @@ mod test {
 	}
 
 	/// The real `site/` layout: a store rooted at the entry's dir plus
-	/// `<AssetsDir src="assets"/>` serves a blog image through the committed
-	/// `site/assets -> ../assets` symlink, the one resolution dev and the deployed
-	/// app bucket share. Skipped on a checkout without hydrated assets (a fresh
-	/// clone before `beet shared pull`).
+	/// `<AssetsDir src="assets"/>` serves a blog image out of `site/assets`, the
+	/// one resolution dev and the deployed app bucket share. Skipped on a
+	/// checkout without hydrated site assets (a fresh clone before
+	/// `just site-shared pull`).
 	#[beet_core::test]
 	async fn site_assets_dir_serves_blog_image() {
 		let Ok(site) = AbsPathBuf::new_workspace_rel("site") else {

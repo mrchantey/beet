@@ -1,49 +1,163 @@
 <!--
-The single canonical entry for the beet website: the content Router serving the
-`routes/` directory, every page wrapped in `templates/Layout.bsx`. Discovery loads
-it locally when the `beet` binary runs from the `site/` directory (`cd site && beet
-serve`, and `beet present`, `beet check`, `beet export-static`), and the deployed
-Lightsail box loads the same entry directly from the app bucket root. Either way
-this entry's `StartOnLoad` root carries the servers, and its `CallOnLoad` fires
-once the build loads, fanning the request out to them.
+The single canonical entry for the beet website, and the one place its cloud
+resources are declared. Discovery loads it locally when the `beet` binary runs
+from the `site/` directory (`cd site && beet serve`, and `beet present`, `beet
+check`, `beet export-static`), and the deployed Lightsail box loads the same
+entry directly from the app bucket root.
 
-It declares the three long-running servers (`HttpServer`, the local live
-`TuiServer`, and the multi-tenant `SshTuiServer`), so `--server` picks them once
-booted: the default boots them all, `--server=http,ssh` serves html over http and
-a live terminal over ssh, `--server=tui` runs the local `beet present` terminal. It
-carries no `CliServer` (a one-shot would resolve the boot and exit), so the boot
-parks on the servers' keep-alive and the serve-feature binary stays up. Each server
-dispatches down into the `Router` child.
+The root is a one-shot `<CliServer{always:true}>` dispatcher whose `Router` is
+its child, so the entry is a set of commands and the served site is ONE of them:
+`serve`. `always=true` makes the dispatcher run on every boot regardless of
+`--server`, since `--server` selects the *served site's* transports, not this
+entry's. The box therefore launches `app --store=s3://.. --server=http,ssh
+serve`, and `beet serve site` forwards the identical `serve` route in, so local
+and deployed take the same path.
 
-The router's middleware and the layout attach as component spreads (request
-logging, `--help`, terminal link navigation, the layout, and the cache policy:
-`CacheHeadersMiddleware` + `CacheHeaders` mark html pages edge-cacheable, which
-the Cloudflare proxy honors and the deploy/sync purge refreshes).
+    beet serve site                        # http (the default)
+    beet serve site --server=tui           # ..as a live terminal (like `beet present`)
+    beet serve site --server=http,ssh      # ..http plus a multi-tenant ssh terminal
+
+A `Router` is a url space, so the site's own routes stay rooted at `/` despite
+hanging off the `serve` command, and no http/ssh request can reach a sibling
+command route.
+
+## One declaration, two meanings
+
+`<DynamoTableBlock label="analytics"/>` is declared once, here, at router level.
+The DEPLOY provisions it into the stage stack (a block outside any deploy host
+is adopted by the host carrying this process's stage), and the RUNTIME attaches
+a store for it, which the content router names with `TableStoreRef($analytics)`.
+Both sides compose `<app>--<stage>--analytics` through the one `ResourceScope`,
+from the `app_name` on this entry's `<PackageConfig/>`, so they cannot disagree.
+The live site once spent a whole deploy writing to a table that did not exist
+because the two sides derived that name independently.
+
+## The served site
+
+`<Route path="serve" {BootHost}>` starts the host declared beneath it and parks.
+The host declares the three long-running servers (`HttpServer`, the local live
+`TuiServer`, and the multi-tenant `SshTuiServer`) and dispatches into the content
+`Router`, whose middleware and layout attach as component spreads: request
+logging, analytics, `--help`, terminal link navigation, the layout, and the cache
+policy (`CacheHeadersMiddleware` + `CacheHeaders` mark html pages edge-cacheable,
+which the Cloudflare proxy honors and the deploy/sync purge refreshes).
 `<DefaultAppRoutes/>` adds the default app routes (`/app-info`, the reactivity
 runtime, …), `<RoutesDir/>` discovers the `routes/` pages, and `<AssetsDir
-src="assets" cache="1h"/>` mounts the assets the site and blog reference (the
-favicon, images), browser-cacheable for an hour. It is one plain subdir of the
-site store: in dev `site/assets` is a committed symlink to the workspace
-`assets/` (hydrated by `just beet-shared pull`), and the deploy replicates it
-into the app bucket, so the store path is the same either side. `<Theme
-color=.../>` seeds the brand colour the whole Material palette derives from, and
-`<Styles/>` registers the named style rules in `templates/Styles.bsx`.
+src="assets" cache="1h"/>` mounts the assets the site and blog reference,
+browser-cacheable for an hour.
 
-The infra commands (`deploy`, `sync`, the validate/plan/apply/destroy IaC verbs)
-live on the workspace root entry's `<BeetSiteDeployHost>`, so this entry stays
-purely the served site.
+`site/assets` is a real directory whose source of record is the site's own shared
+bucket (`beet-site--shared--assets`), hydrated with `just site-shared pull`. A
+few files it serves are BUILT in the workspace tree (the wasm binary the tutorial
+embeds, the geoip database, the perceive-act robot faces); `<DirCopy/>` is the
+one declaration of what is borrowed, and runs ahead of every publish.
+
+## The deploy
+
+`bx:features="infra,extra"` gates the deploy verbs on the compiled feature set,
+so this same file loads in the deployed binary (built `--no-default-features
+--features aws_sdk,ssh,geoip`) with the whole subtree skipped before its tags
+resolve. That is what lets the application declare its own infrastructure without
+shipping the deployer.
+
+The deploy route applies once per layer, and the order is the point: `<TofuApply
+layer="storage"/>` brings up the stores (the app bucket, the analytics table),
+`<DirSync/>` fills them, and a bare `<TofuApply/>` converges the whole stack:
+it uploads the built binary under the deploy id, publishes the release pointer
+naming it, and converges the instance against a bucket that already holds the
+site. One apply boots the new instance first, so it finds an empty bucket and no
+entry document. Naming a layer no block declares is a loud error, never a silent
+skip.
+
+Most deploys do NOT replace the box. The instance's cloud-init renders machine
+config only (Caddy, the sshd relocation, the CloudWatch agent, the unit), never a
+version, so a code-only deploy plans no change to it; `<LightsailRelease/>` then
+reaches the box over the management sshd on 2222 and rolls the unit onto the new
+binary, verifying the RUNNING process reports this deploy's id. A machine-config
+change still replaces the box, and rotates its access key with it. Either way the
+static IP re-attaches so DNS never moves, and the ssh host key rides the env
+channel so the fingerprint never changes.
+
+Cloudflare fronts the box: http hostnames are proxied and edge-cached `A` records
+at the static IP, ssh (and future live apps) ride the DNS-only `app.beet.org` /
+`app.dev.beet.org` hostnames straight to it, `<CloudflareZoneSetup/>` converges
+the zone-level edge config, and every deploy or sync ends with a
+`<CloudflarePurgeCache/>`. On the deploy route the purge comes *after*
+`<LightsailWatch/>`, since purging while the old instance still serves just
+re-caches the old responses for the full edge TTL.
+
+The assets bucket lives on its own `shared` stage under the `shared/` route
+prefix, provisioned as its own step since a source shared by developers is a
+different process from a stage deploy. No stage deploy or destroy touches it.
+
+    just beet-deploy [--stage=prod]        # build -> stores -> sync -> release -> watch -> purge
+    just beet-sync                         # re-publish the site (no redeploy)
+    just beet-watch                        # tail the instance logs
+    just site-shared apply                 # provision the site assets bucket
+    just site-shared pull                  # hydrate site/assets from it (no credentials)
+    just site-shared push                  # publish site/assets to it
+
+Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
+`CLOUDFLARE_API_TOKEN` in `.env`, plus `tofu` and `cargo-zigbuild`.
 -->
-<StartOnLoad {(HttpServer, TuiServer, SshTuiServer)}>
-<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
-	<!-- `binary_name` is the cloud resource prefix, so it must be the deploy's
-	     stack app name (`beet-site`), NOT the generic `beet` binary this site
-	     runs on: it is what names the analytics table at runtime. -->
-	<PackageConfig title="Beet" binary_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
-	<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
-	<TemplateDir src="templates"/>
-	<Styles/>
-	<DefaultAppRoutes/>
-	<RoutesDir src="routes"/>
-	<AssetsDir src="assets" cache="1h"/>
+<StartOnLoad {CliServer{always:true}}>
+<Router {HelpHandler}>
+	<!-- the ONE location app identity lives: the deploy names its resources from
+	     this, and so does the running binary. -->
+	<PackageConfig title="Beet" app_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
+	<!-- declared once: the deploy creates it, the runtime records to it -->
+	<DynamoTableBlock bx:ref="analytics" label="analytics"/>
+	<Route path="serve" {BootHost}>
+		<StartOnLoad {(HttpServer, TuiServer, SshTuiServer)}>
+			<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, TableStoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+				<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
+				<TemplateDir src="templates"/>
+				<Styles/>
+				<DefaultAppRoutes/>
+				<RoutesDir src="routes"/>
+				<AssetsDir src="assets" cache="1h"/>
+			</Router>
+		</StartOnLoad>
+	</Route>
+	<Fragment bx:features="infra,extra">
+		<DeployHost>
+			<Route path="deploy" {ExchangeSequence}>
+				<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+				<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
+				<S3BucketBlock label="app" deploy_versioned=false/>
+				<TofuApply layer="storage"/>
+				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+				<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
+				<TofuApply/>
+				<LightsailRelease/>
+				<CloudflareZoneSetup/>
+				<LightsailWatch timeout="300s"/>
+				<CloudflarePurgeCache/>
+			</Route>
+			<Route path="sync" {ExchangeSequence}>
+				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+				<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
+				<CloudflarePurgeCache/>
+			</Route>
+			<Route path="watch" {ExchangeSequence}>
+				<LightsailWatch timeout="300s"/>
+			</Route>
+			<Route path="assets" {ExchangeSequence}>
+				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+			</Route>
+		</DeployHost>
+		<Route path="shared">
+			<DeployHost stage="shared">
+				<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+				<Route path="push" {ExchangeSequence}>
+					<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+					<DirSync bucket="assets" local_dir="site/assets"/>
+				</Route>
+				<Route path="pull" {ExchangeSequence}>
+					<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
+				</Route>
+			</DeployHost>
+		</Route>
+	</Fragment>
 </Router>
 </StartOnLoad>

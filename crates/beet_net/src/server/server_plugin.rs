@@ -22,6 +22,8 @@ impl Plugin for ServerPlugin {
 			.register_type::<StartOnLoad>()
 			.register_type::<CallOnLoad>()
 			.register_type::<DisableCallOnLoad>()
+			// the dispatched boot: `<Route path="serve" {BootHost}>`
+			.register_type::<BootHost>()
 			// a boot whose `--server` selects nothing exits rather than parking
 			.add_systems(Update, exit_if_no_server);
 

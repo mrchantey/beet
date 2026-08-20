@@ -104,6 +104,19 @@ pub fn is_dir_empty(path: impl AsRef<Path>) -> FsResult<bool> {
 	}
 }
 
+/// Whether `path` is a directory. A missing path reads as `false`.
+pub fn is_dir(path: impl AsRef<Path>) -> bool {
+	let path = path.as_ref();
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			// the runner has no stat, so a successful listing is the probe.
+			ReadDir::all(path).is_ok()
+		} else {
+			fs::metadata(path).map(|meta| meta.is_dir()).unwrap_or(false)
+		}
+	}
+}
+
 /// Whether `path` is a symbolic link, without following it. Always false on
 /// wasm, which has no link metadata.
 pub fn is_symlink(path: impl AsRef<Path>) -> bool {

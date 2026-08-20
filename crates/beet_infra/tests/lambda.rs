@@ -123,8 +123,16 @@ fn build_project(stack: &Stack) -> Result<terra::Project> {
 	let mut world = World::new();
 	let entity_mut = world.spawn(());
 	let entity = entity_mut.as_readonly();
-	block.apply_to_config(&entity, stack, &mut config)?;
-	bucket_block.apply_to_config(&entity, stack, &mut config)?;
+	// the grants the declared blocks state, lowered by the compute block, as
+	// `StackQuery::build_config` collects them.
+	let access = AccessGrants::new(
+		[&block as &dyn Block, &bucket_block]
+			.iter()
+			.flat_map(|block| block.runtime_access(&stack.scope()))
+			.collect(),
+	);
+	block.apply_to_config(&entity, stack, &access, &mut config)?;
+	bucket_block.apply_to_config(&entity, stack, &access, &mut config)?;
 	terra::Project::new(stack, config).xok()
 }
 

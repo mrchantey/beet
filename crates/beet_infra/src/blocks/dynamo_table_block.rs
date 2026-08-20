@@ -5,26 +5,40 @@ use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// A DynamoDB table with a single string hash key, provisioned pay-per-request.
 ///
-/// Mirrors [`S3BucketBlock`](crate::prelude::S3BucketBlock): its `label` becomes
-/// the stage-prefixed table name (`stack.resource_ident(label)`), and the deploy
-/// hands that name to the running binary via an env var, so the two agree on the
-/// name without deriving it independently.
-#[derive(Debug, Clone, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_add = on_add_dynamo_table_block)]
+/// Mirrors [`S3BucketBlock`](crate::prelude::S3BucketBlock): the declaration
+/// carries only its `label`, and the `<app>--<stage>--<label>` name composes at
+/// resolution through [`ResourceScope`]. The deploy creates the table from that
+/// name and the runtime attaches a store for the same name off the same entity,
+/// so there is one declaration and nothing to keep in agreement.
+///
+/// Authored directly from markup, ie
+/// `<DynamoTableBlock bx:ref="analytics" label="analytics"/>`.
+#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect)]
+#[reflect(Component, Default)]
+#[component(immutable, on_add = ErasedBlock::on_add::<DynamoTableBlock>)]
 pub struct DynamoTableBlock {
 	/// The unprefixed table label (eg `analytics`).
 	label: SmolStr,
 	/// The hash (partition) key attribute name.
 	hash_key: SmolStr,
+	/// The aws region the table lives in. The block's own field, so the runtime
+	/// store and the tofu resource read one value rather than the runtime
+	/// falling back to an environment the deploy never saw.
+	region: SmolStr,
 	/// The deploy layer ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER)
 	/// by default): the runtime writes to this table from its first request, and
 	/// nothing in the tofu graph orders the table before the service (the name
 	/// crosses to the task env as a literal, not a field ref), so the layer is
 	/// what makes it exist before the service that names it rolls.
 	layer: SmolStr,
+}
+
+impl Default for DynamoTableBlock {
+	fn default() -> Self { Self::new("") }
 }
 
 impl DynamoTableBlock {
@@ -34,22 +48,72 @@ impl DynamoTableBlock {
 		Self {
 			label: label.into(),
 			hash_key: "id".into(),
+			region: crate::bindings::aws::region::DEFAULT.into(),
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
 
-	/// The stage-prefixed table name this block creates, resolved against `stack`.
-	pub fn table_name(&self, stack: &Stack) -> String {
-		stack
-			.resource_ident(self.label.clone())
-			.primary_identifier()
-			.to_string()
+	/// The composed table name this block declares, ie `beet-site--prod--analytics`.
+	pub fn table_name(&self, scope: &ResourceScope) -> String {
+		scope.resource_name(self.label.clone())
 	}
 }
 
-/// Inserts the [`ErasedBlock`] so the deploy config collects this table.
-fn on_add_dynamo_table_block(mut world: DeferredWorld, cx: HookContext) {
-	ErasedBlock::on_add::<DynamoTableBlock>(world.reborrow(), cx);
+/// Observer: attach the runtime meaning of a declared table, a store provider
+/// materializing the [`TableStore`] a consumer reaches through
+/// [`TableStoreRef`]. Registered by [`InfraPlugin`] rather than hooked on the
+/// component, so a build without a backend carries the declaration and nothing
+/// else.
+///
+/// [`ServiceAccess::Remote`] (a deployed process) resolves the DynamoDB table
+/// the deploy created; [`ServiceAccess::Local`] backs the same declaration with
+/// a workspace directory, so one markup declaration runs both ways.
+///
+/// Deferred through the command queue because the ancestry a scope resolves
+/// against lands with the rest of the scene, after this insertion.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn attach_table_store(
+	ev: On<Add, DynamoTableBlock>,
+	mut commands: Commands,
+) {
+	commands.entity(ev.entity).queue(
+		|mut entity: EntityWorldMut| -> Result {
+			let block = entity.get_or_else::<DynamoTableBlock>()?.clone();
+			let (scope, workspace) = entity
+				.with_state::<(ResourceScopeQuery, Option<Res<WorkspaceConfig>>), _>(
+					|entity, (scopes, workspace)| -> Result<_> {
+						(scopes.get(entity)?, workspace.map(|it| it.clone()))
+							.xok()
+					},
+				)?;
+			match BootstrapConfig::get().service_access {
+				ServiceAccess::Remote => {
+					cfg_if! {
+						if #[cfg(feature = "aws_sdk")] {
+							entity.insert(beet_net::prelude::DynamoStore::new(
+								block.table_name(&scope),
+								block.region().clone(),
+							));
+						} else {
+							bevybail!(
+								"the table declared as `{}` resolves to the remote `{}`, but this binary has no `aws_sdk` backend to reach it",
+								block.label(),
+								block.table_name(&scope)
+							);
+						}
+					}
+				}
+				ServiceAccess::Local => {
+					let dir = workspace
+						.unwrap_or_default()
+						.store_dir(block.label().as_str())
+						.into_abs();
+					entity.insert(FsStore::new(dir));
+				}
+			}
+			Ok(())
+		},
+	);
 }
 
 impl Block for DynamoTableBlock {
@@ -57,6 +121,7 @@ impl Block for DynamoTableBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		let table = ResourceDef::new_primary(
@@ -70,13 +135,22 @@ impl Block for DynamoTableBlock {
 						r#type: "S".into(),
 					},
 				]),
-				region: Some(stack.aws_region().clone()),
+				region: Some(self.region.clone()),
 				..default()
 			},
 		);
 		// see the `layer` field: nothing else orders the table before the service
 		config.add_layer_resource(self.layer.clone(), &table)?;
 		Ok(())
+	}
+
+	/// A table is declared to be recorded to, so the process that declared it
+	/// reads and writes it.
+	fn runtime_access(&self, scope: &ResourceScope) -> Vec<AccessGrant> {
+		vec![AccessGrant::read_write(AccessResource::DynamoTable {
+			name: self.table_name(scope),
+			region: self.region.clone(),
+		})]
 	}
 }
 
@@ -95,6 +169,7 @@ mod test {
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&default(),
 				&mut config,
 			)
 			.unwrap();

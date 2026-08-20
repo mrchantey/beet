@@ -223,7 +223,9 @@ pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// registered template type `Name` building the body's subtree. There is no
 /// `NameProps` struct and no compile-time call-site prop checking; props are
 /// runtime-verified input values. `#[template(system)]` reads world/ancestor
-/// state at build time (non-`#[prop]` params are Bevy `SystemParam`s).
+/// state at build time (non-`#[prop]` params are Bevy `SystemParam`s, plus an
+/// optional bare `Entity` param bound to the entity being built, so a body can
+/// resolve its own ancestry).
 ///
 /// Prop grammar: a bare field or `#[prop(default)]` is optional (type default);
 /// `#[prop(default = expr)]` defaults to `expr`; `#[prop(required)]` is required

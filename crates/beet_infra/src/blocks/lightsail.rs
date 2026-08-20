@@ -91,6 +91,15 @@ pub struct LightsailBlock {
 	#[get(skip)]
 	#[set_with(unwrap_option)]
 	app_port: Option<u16>,
+	/// The positional route the unit dispatches on boot, appended after the
+	/// argv channel: `exec /opt/<app>/app --store=.. --server=.. serve`.
+	///
+	/// An entry whose root is a `CliServer` dispatcher selects its command with
+	/// a positional arg, so a deployed site says which of its routes *is* the
+	/// site. Distinct from [`BootstrapConfig::path`], which is the opening page
+	/// of a tui/ssh surface once booted, not a boot selector.
+	#[set_with(unwrap_option, into)]
+	exec_route: Option<SmolStr>,
 }
 
 impl Default for LightsailBlock {
@@ -109,6 +118,7 @@ impl Default for LightsailBlock {
 			management_ssh_port: 2222,
 			bootstrap: default(),
 			app_port: None,
+			exec_route: None,
 		}
 	}
 }
@@ -183,26 +193,35 @@ impl LightsailBlock {
 		Ok(())
 	}
 
-	/// The inline IAM policy document for the box's runtime identity: read the
-	/// app bucket it serves the site from, read the artifacts bucket it pulls its
-	/// binary from at boot, read/write the one analytics table, and write its own
-	/// log group. Every ARN is derived from the stack and this block's own
-	/// [`bootstrap`](Self::bootstrap), so nothing is hardcoded and a stage can
-	/// never reach another stage's data.
+	/// The inline IAM policy document for the box's runtime identity, LOWERED
+	/// from the [`AccessGrants`] the stack's blocks declared: a declared bucket
+	/// becomes an s3 read, a declared table a dynamodb read/write. The two grants
+	/// this block owns internally are added here because nothing declares them:
+	/// the artifacts bucket it pulls its binary from at boot, and its own log
+	/// group.
+	///
+	/// Provider-agnostic on the declaring side, provider-specific here: a block
+	/// says "this process reads that bucket" and the compute renders whatever its
+	/// platform's permission mechanism is (IAM statements here, wrangler bindings
+	/// for a Cloudflare compute).
 	///
 	/// The account segment is a wildcard because the account id is not known at
 	/// render time; the resource names are already stage-scoped, and a policy
 	/// cannot grant cross-account access anyway (that needs a resource policy on
 	/// the far side).
-	fn runtime_policy(&self, stack: &Stack) -> Result<String> {
+	fn runtime_policy(
+		&self,
+		stack: &Stack,
+		access: &AccessGrants,
+	) -> Result<String> {
 		let region = stack.aws_region();
 		let mut statements = Vec::new();
 
-		// the site store, read-only: the deploy publishes it, the box serves it
+		// every declared bucket, read-only: the deploy publishes them, the box
+		// serves them. Its own artifacts bucket is declared by nothing, so it is
+		// added here.
 		let mut read_buckets = vec![stack.artifact_bucket_name()];
-		if let Some(StoreUri::S3 { bucket, .. }) = &self.bootstrap.store {
-			read_buckets.push(bucket.to_string());
-		}
+		read_buckets.extend(access.s3_buckets().iter().map(ToString::to_string));
 		statements.push(json!({
 			"Sid": "ReadStores",
 			"Effect": "Allow",
@@ -216,10 +235,10 @@ impl LightsailBlock {
 				.collect::<Vec<_>>()
 		}));
 
-		// the analytics table, read/write, only when one was named
-		if let Some(table) = &self.bootstrap.analytics_table {
+		// every declared table, read/write
+		for (table, table_region) in access.dynamo_tables() {
 			statements.push(json!({
-				"Sid": "AnalyticsTable",
+				"Sid": "DeclaredTables",
 				"Effect": "Allow",
 				"Action": [
 					"dynamodb:DescribeTable",
@@ -232,7 +251,7 @@ impl LightsailBlock {
 					"dynamodb:BatchGetItem",
 					"dynamodb:BatchWriteItem"
 				],
-				"Resource": format!("arn:aws:dynamodb:{region}:*:table/{table}")
+				"Resource": format!("arn:aws:dynamodb:{table_region}:*:table/{table}")
 			}));
 		}
 
@@ -337,7 +356,12 @@ impl LightsailBlock {
 			.to_argv()?
 			.iter()
 			.map(|arg| format!(" {arg}"))
-			.collect::<String>();
+			.collect::<String>()
+			// the boot route is positional, so it trails every flag.
+			.xmap(|args| match &self.exec_route {
+				Some(route) => format!("{args} {route}"),
+				None => args,
+			});
 		// ambient service config rides `Environment=` lines, named by the same
 		// table the runtime parses.
 		let bootstrap_env = env
@@ -554,6 +578,16 @@ systemctl enable --now {app_name}.service
 				)
 			})
 			.collect();
+
+		// The rendered script is a terraform string, so terraform reads every
+		// `${..}` in it as an interpolation. The shell's own parameter
+		// expansions (`${BEET_ARTIFACT_KEY:-}`) are not terraform expressions,
+		// and one of them is a parse error rather than a mis-render: the colon
+		// in `:-` is not valid in an interpolation, so `tofu validate` rejects
+		// the whole config. Escape every literal one to `$${..}` BEFORE the
+		// placeholders below become real terraform refs, which is exactly why
+		// those are placeholders.
+		let script = script.replace("${", "$${");
 
 		// replace placeholder tokens with terraform interpolation expressions
 		let mut script = script
@@ -773,6 +807,7 @@ impl Block for LightsailBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		// IAM user for S3 access (binary download + runtime asset retrieval)
@@ -805,7 +840,7 @@ impl Block for LightsailBlock {
 			AwsIamUserPolicyDetails {
 				name: Some(policy_ident.primary_identifier().clone()),
 				user: user_name_ref.clone().into(),
-				policy: self.runtime_policy(stack)?.into(),
+				policy: self.runtime_policy(stack, access)?.into(),
 				..default()
 			},
 		);
@@ -1051,12 +1086,33 @@ mod tests {
 	}
 
 	/// The rendered terraform config json for a block on a specific stack, ie
-	/// a specific deploy.
+	/// a specific deploy, granting nothing (no resource blocks declared beside it).
 	fn build_json_for(block: &LightsailBlock, stack: &Stack) -> String {
+		build_json_granting(block, stack, &[])
+	}
+
+	/// The rendered terraform config json for a block deployed alongside
+	/// `declared`, whose grants it lowers into its runtime policy.
+	fn build_json_granting(
+		block: &LightsailBlock,
+		stack: &Stack,
+		declared: &[&dyn Block],
+	) -> String {
+		let access = AccessGrants::new(
+			declared
+				.iter()
+				.flat_map(|block| block.runtime_access(&stack.scope()))
+				.collect(),
+		);
 		let mut config = stack.create_config();
 		let mut world = World::new();
 		block
-			.apply_to_config(&world.spawn(()).as_readonly(), stack, &mut config)
+			.apply_to_config(
+				&world.spawn(()).as_readonly(),
+				stack,
+				&access,
+				&mut config,
+			)
 			.unwrap();
 		config.to_json().to_string()
 	}
@@ -1181,13 +1237,46 @@ mod tests {
 				ArtifactLedger::ARTIFACT_KEY_VAR
 			))
 			// a pointer missing the key lands in the narrated keep-serving
-			// path rather than aborting the fetch under `set -u`
+			// path rather than aborting the fetch under `set -u`. Escaped
+			// `$${..}`, since terraform reads the rendered script as a string
+			// and a `:-` inside a real interpolation is a parse error, not a
+			// mis-render: unescaped, `tofu validate` rejects the whole config.
 			.xpect_contains(&format!(
-				"[ -z \"${{{}:-}}\" ]",
+				"[ -z \"$${{{}:-}}\" ]",
 				ArtifactLedger::ARTIFACT_KEY_VAR
 			))
 			// the launcher exports the pointer's identity into the process
 			.xpect_contains(". /etc/beet_infra/deploy.env");
+	}
+
+	/// Terraform reads `user_data` as a string, so every `${..}` in it is an
+	/// interpolation. The only ones that may survive unescaped are the terraform
+	/// refs this block deliberately injects (the access key pair and any declared
+	/// variables); every shell expansion is escaped.
+	///
+	/// REGRESSION: an unescaped `${BEET_ARTIFACT_KEY:-}` in the release fetcher
+	/// made `tofu validate` fail the whole config with "Extra characters after
+	/// interpolation expression", ie no deploy at all.
+	#[beet_core::test]
+	fn escapes_shell_expansions_from_terraform() {
+		let (stack, _dir) = Stack::default_local();
+		let script = LightsailBlock::default()
+			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.unwrap();
+		// every unescaped `${` is one of the injected terraform refs
+		script
+			.match_indices("${")
+			.filter(|(index, _)| !script[..*index].ends_with('$'))
+			.map(|(index, _)| {
+				script[index..].split('}').next().unwrap_or_default()
+			})
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"${key_id",
+				"${key_secret",
+				"${key_id",
+				"${key_secret",
+			]);
 	}
 
 	/// The release step proves the RUNNING process carries the deploy's id,
@@ -1244,20 +1333,26 @@ mod tests {
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
 		let stack = Stack::default_local().0;
-		let block = LightsailBlock::default().with_bootstrap(BootstrapConfig {
-			store: Some(StoreUri::parse("s3://my-app-bucket").unwrap()),
-			analytics_table: Some("my-analytics".into()),
-			..default()
-		});
-		let json = build_json(&block);
+		let block = LightsailBlock::default();
+		let json = build_json_granting(&block, &stack, &[
+			&S3BucketBlock::new("app").with_deploy_versioned(false),
+			&DynamoTableBlock::new("analytics"),
+		]);
 		json.as_str()
-			// scoped to the named resources
-			.xpect_contains("arn:aws:s3:::my-app-bucket/*")
+			// scoped to the resources the stack DECLARED, resolved through the
+			// one naming composition rather than restated on the block.
+			.xpect_contains(&format!(
+				"arn:aws:s3:::{}/*",
+				stack.scope().resource_name("app")
+			))
 			.xpect_contains(&format!(
 				"arn:aws:s3:::{}/*",
 				stack.artifact_bucket_name()
 			))
-			.xpect_contains("table/my-analytics")
+			.xpect_contains(&format!(
+				"table/{}",
+				stack.scope().resource_name("analytics")
+			))
 			.xpect_contains(&block.log_group(&stack))
 			// and never account-wide
 			.xnot()
@@ -1268,10 +1363,10 @@ mod tests {
 			.xpect_contains("CloudWatchAgentServerPolicy");
 	}
 
-	/// A block naming no analytics table grants no DynamoDB access at all,
-	/// rather than a wildcard table arn.
+	/// A stack declaring no table grants no DynamoDB access at all, rather than
+	/// a wildcard table arn.
 	#[beet_core::test]
-	fn no_analytics_table_grants_no_dynamo() {
+	fn no_declared_table_grants_no_dynamo() {
 		build_json(&LightsailBlock::default())
 			.as_str()
 			.xnot()
@@ -1348,9 +1443,10 @@ mod tests {
 			.xpect_contains("BEET_PORT=");
 	}
 
-	/// Boot selection rides the launch `exec` as validated argv; ambient service
-	/// config rides the unit's `Environment=` lines. The deployed stage is a
-	/// platform binding: it flows from the stack, not the authored bootstrap.
+	/// Boot selection rides the launch `exec` as validated argv, with the boot
+	/// route trailing every flag; ambient service config rides the unit's
+	/// `Environment=` lines. The deployed stage is a platform binding: it flows
+	/// from the stack, not the authored bootstrap.
 	#[beet_core::test]
 	fn splits_exec_and_env_channels() {
 		let (stack, _dir) = Stack::default_local();
@@ -1361,13 +1457,14 @@ mod tests {
 				server: Some(ServerFilter::new("http")),
 				..default()
 			})
+			.with_exec_route("serve")
 			.build_user_data(&stack, "${key_id}", "${key_secret}")
 			.unwrap();
 		script
 			.as_str()
 			.xpect_contains(
 				"exec /opt/beet_infra/app --store=s3://beet--dev--app \
-				--server=http",
+				--server=http serve",
 			)
 			// the unit runs the launcher, which resolves the release per start
 			.xpect_contains("ExecStart=/usr/local/bin/beet_infra-run")
@@ -1375,6 +1472,22 @@ mod tests {
 			// the store never leaks onto the env channel
 			.xnot()
 			.xpect_contains("BEET_STORE");
+	}
+
+	/// No boot route renders the bare invocation, ie an entry whose root boots
+	/// its servers directly.
+	#[beet_core::test]
+	fn no_exec_route_renders_the_bare_invocation() {
+		let (stack, _dir) = Stack::default_local();
+		LightsailBlock::default()
+			.with_bootstrap(BootstrapConfig {
+				server: Some(ServerFilter::new("http")),
+				..default()
+			})
+			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.unwrap()
+			.as_str()
+			.xpect_contains("exec /opt/beet_infra/app --server=http\n");
 	}
 
 	/// A token that cannot be rendered into a systemd `ExecStart` is a loud error
@@ -1406,6 +1519,7 @@ mod tests {
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&default(),
 				&mut config,
 			)
 			.unwrap();

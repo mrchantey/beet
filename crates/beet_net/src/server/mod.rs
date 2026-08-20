@@ -80,6 +80,13 @@ mod start_on_load;
 #[cfg(feature = "action")]
 pub use start_on_load::*;
 
+// The dispatched boot verb: a route that starts the server host declared as its
+// child, for an entry whose root dispatches commands rather than serving.
+#[cfg(feature = "action")]
+mod boot_host;
+#[cfg(feature = "action")]
+pub use boot_host::*;
+
 #[cfg(feature = "action")]
 mod cli_server;
 #[cfg(feature = "action")]

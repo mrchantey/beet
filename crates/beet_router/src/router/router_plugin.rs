@@ -232,9 +232,10 @@ fn insert_action_path_and_params(
 	params: Query<&ParamsPartial>,
 	mut commands: Commands,
 ) -> Result {
-	// only entities that have their own PathPartial become routes;
-	// children of a route (eg sequence steps) have no PathPartial themselves
-	if !paths.contains(ev.entity) {
+	// only entities that have their own PathPartial become routes; children of a
+	// route (eg sequence steps) have no PathPartial themselves, and a namespace
+	// root (a `Router`) carries one to bound its url space, not to be a route.
+	if !paths.get(ev.entity).is_ok_and(|path| !path.is_root) {
 		return Ok(());
 	}
 	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
@@ -254,8 +255,11 @@ fn insert_path_pattern_for_late_path_partial(
 	actions: Query<(), (With<ActionMeta>, Without<PathPattern>)>,
 	mut commands: Commands,
 ) -> Result {
-	// ActionMeta must already be present and PathPattern not yet computed
-	if !actions.contains(ev.entity) {
+	// ActionMeta must already be present, PathPattern not yet computed, and a
+	// namespace root is not itself a route (see `insert_action_path_and_params`).
+	if !actions.contains(ev.entity)
+		|| paths.get(ev.entity).is_ok_and(|path| path.is_root)
+	{
 		return Ok(());
 	}
 	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
@@ -264,11 +268,17 @@ fn insert_path_pattern_for_late_path_partial(
 	Ok(())
 }
 
-/// Observer that rebuilds the [`RouteTree`] on the root ancestor
-/// whenever a [`PathPattern`] is inserted on any entity in the hierarchy.
+/// Observer that rebuilds the [`RouteTree`] of a route's url space whenever a
+/// [`PathPattern`] is inserted on any entity in the hierarchy.
+///
+/// The tree lands on the [namespace root](PathPattern::namespace_root), ie the
+/// nearest `Router` above the route, else the document root. A nested namespace
+/// is a url space of its own, so its routes are excluded here and get their own
+/// tree: that is what lets one entry carry a dispatching command router AND the
+/// site it serves without either reaching the other's routes.
 ///
 /// Collects all entities with action components ([`ActionMeta`], [`PathPattern`],
-/// [`ParamsPattern`]) from the root's descendants and constructs a validated
+/// [`ParamsPattern`]) from that root's descendants and constructs a validated
 /// tree. Scene routes are distinguished from regular actions by their output
 /// type being [`PageRequest`], detected via [`ActionMeta::output_is`].
 ///
@@ -278,11 +288,12 @@ fn insert_path_pattern_for_late_path_partial(
 fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
+	paths: Query<&PathPartial>,
 	children_query: Query<&Children>,
 	actions: Query<ActionQueryItem, Without<RouteHidden>>,
 	mut commands: Commands,
 ) -> Result {
-	let root = ancestors.root_ancestor(ev.entity);
+	let root = PathPattern::namespace_root(ev.entity, &ancestors, &paths);
 	let mut nodes: Vec<ActionNode> = Vec::new();
 	// when added via ChildOf, it will not have been added to the Children,
 	// so we check this one manually
@@ -294,6 +305,10 @@ fn insert_route_tree(
 		.iter_descendants_inclusive(root)
 		// we've already checked this one
 		.filter(|entity| *entity != ev.entity)
+		// ..and a nested namespace owns its own tree
+		.filter(|entity| {
+			PathPattern::namespace_root(*entity, &ancestors, &paths) == root
+		})
 	{
 		if let Ok(item) = actions.get(entity) {
 			nodes.push(ActionNode::from_query(item));
@@ -321,14 +336,17 @@ fn rebuild_route_trees_on_load(
 	ev: On<LoadTemplateSerde>,
 	mut commands: Commands,
 	ancestors: Query<&ChildOf>,
+	paths: Query<&PathPartial>,
 	children_query: Query<&Children>,
 	actions: Query<ActionQueryItem, Without<RouteHidden>>,
 ) -> Result {
-	// collect unique roots so we rebuild each tree at most once
+	// collect unique namespace roots so we rebuild each tree at most once. A
+	// nested `Router` is its own url space (see `insert_route_tree`), so the
+	// rebuild must land per namespace, not once on the document root.
 	let mut roots: Vec<Entity> = ev
 		.entities
 		.iter()
-		.map(|entity| ancestors.root_ancestor(*entity))
+		.map(|entity| PathPattern::namespace_root(*entity, &ancestors, &paths))
 		.collect();
 	roots.sort();
 	roots.dedup();
@@ -336,6 +354,9 @@ fn rebuild_route_trees_on_load(
 	for root in roots {
 		let nodes: Vec<ActionNode> = children_query
 			.iter_descendants_inclusive(root)
+			.filter(|entity| {
+				PathPattern::namespace_root(*entity, &ancestors, &paths) == root
+			})
 			.filter_map(|entity| actions.get(entity).ok())
 			.map(ActionNode::from_query)
 			.collect();

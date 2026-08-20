@@ -21,6 +21,10 @@ use beet_net::prelude::*;
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(Action<Request, Response> = Router::action().with_meta(ActionMeta::of::<Self, Request, Response>()))]
+// a router is a url space: its subtree's routes are rooted at it and no ancestor
+// segment prepends, so a site mounted under a command route keeps its own urls
+// and a dispatching surface cannot reach routes outside the namespace it serves.
+#[require(PathPartial = PathPartial::root())]
 #[component(on_add = Action::<Request, Response>::assert_provider::<Self>)]
 pub struct Router;
 
@@ -30,16 +34,30 @@ pub struct Router;
 /// dispatching, so a caller holding that root (static export, pdf export) addresses
 /// the router beneath it. A bare router root resolves to itself.
 ///
+/// Each `Router` is a url space of its own, and an entry can hold several (a
+/// command dispatcher whose site is one of its routes), so the one that serves
+/// PAGES wins: that is the site a caller holding the entry root means. Absent
+/// any, the first router found.
+///
 /// # Errors
 /// Errors when no [`Router`] is at or under `root`.
 pub fn find_router(
 	In(root): In<Entity>,
 	children: Query<&Children>,
 	routers: Query<(), With<Router>>,
+	trees: Query<&RouteTree>,
 ) -> Result<Entity> {
-	children
+	let candidates = children
 		.iter_descendants_inclusive(root)
-		.find(|entity| routers.contains(*entity))
+		.filter(|entity| routers.contains(*entity))
+		.collect::<Vec<_>>();
+	candidates
+		.iter()
+		.find(|entity| {
+			trees.get(**entity).is_ok_and(|tree| tree.serves_pages())
+		})
+		.or(candidates.first())
+		.copied()
 		.ok_or_else(|| bevyhow!("no Router at or under {root}"))
 }
 

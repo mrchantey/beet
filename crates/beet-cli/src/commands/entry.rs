@@ -220,9 +220,8 @@ mod test {
 		// the markup `<HttpServer>` owns the boot, with the router as its child
 		world.entity(root).contains::<HttpServer>().xpect_true();
 		// and `<DefaultAppRoutes/>` wired the reactivity-runtime route
-		world
-			.entity(root)
-			.get::<RouteTree>()
+		// the tree lives on the router's own url space, a child of the server
+		RouteTree::of(&world, root)
 			.unwrap()
 			.find(&["js", "reactivity.js"])
 			.xpect_some();

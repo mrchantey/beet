@@ -97,6 +97,7 @@ impl Block for CloudflareFailoverBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		ensure_cloudflare_provider(config)?;
@@ -169,7 +170,12 @@ mod tests {
 		// explicit ids: the env-derived defaults are absent in a test run
 		.with_zone_id("test-zone")
 		.with_account_id("test-account")
-		.apply_to_config(&world.spawn(()).as_readonly(), &stack, &mut config)
+		.apply_to_config(
+			&world.spawn(()).as_readonly(),
+			&stack,
+			&default(),
+			&mut config,
+		)
 		.unwrap();
 		config
 			.to_json()

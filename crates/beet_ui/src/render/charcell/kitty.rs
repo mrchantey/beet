@@ -972,9 +972,9 @@ mod test {
 	}
 
 	// ── item 9: the folk-technology blog post image ────────────────────────────
-	// The real committed asset `<img src="/assets/blog/kiama-sea-shanty-club.jpg">`
-	// references. Outside the crate, under the workspace `assets/`; absent on a
-	// fresh checkout until `just beet-shared pull`, so the asset tests skip when missing.
+	// The real asset `<img src="/assets/blog/kiama-sea-shanty-club.jpg">`
+	// references. Site-owned, so it lives under `site/assets/`; absent on a fresh
+	// checkout until `just site-shared pull`, so the asset tests skip when missing.
 
 	/// The site-rooted src of the folk-technology post image.
 	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]
@@ -985,7 +985,7 @@ mod test {
 	fn shanty_jpeg() -> Option<Vec<u8>> {
 		fs_ext::read(
 			AbsPathBuf::new_workspace_rel(
-				"assets/blog/kiama-sea-shanty-club.jpg",
+				"site/assets/blog/kiama-sea-shanty-club.jpg",
 			)
 			.unwrap(),
 		)

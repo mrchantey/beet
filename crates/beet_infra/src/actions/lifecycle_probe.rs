@@ -8,7 +8,7 @@ use beet_net::prelude::*;
 /// plan, apply, write a probe file to the bucket's [`BlobStore`] and read it back,
 /// then destroy — logging each step. Resolves the [`Stack`] via [`StackQuery`]; reads
 /// the [`BlobStore`] from its own entity, so spawn it on the bucket block entity (eg
-/// `<NamedBucket label="my-bucket" {LifecycleProbe}/>`).
+/// `<S3BucketBlock label="my-bucket" {LifecycleProbe}/>`).
 #[action(handler_only)]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]

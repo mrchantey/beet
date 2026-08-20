@@ -220,6 +220,7 @@ impl Block for FargateBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		let region = stack.aws_region();
@@ -969,6 +970,7 @@ mod tests {
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&default(),
 				&mut config,
 			)
 			.unwrap();

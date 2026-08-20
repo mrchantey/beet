@@ -523,6 +523,12 @@ fn build_element(
 	refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
+	// `bx:features` gates the whole node on this binary's compiled feature set,
+	// skipped BEFORE the tag resolves so a subtree naming types a lean build
+	// never linked is silently absent rather than a hard unregistered-tag error.
+	if !feature_gate_passes(el, cx) {
+		return Ok(());
+	}
 	if el.tag == "Slot" {
 		return build_slot(el, cx.entity);
 	}
@@ -536,6 +542,34 @@ fn build_element(
 		return build_uppercase(el, registry, refs, cx);
 	}
 	build_html_element(el, registry, refs, cx)
+}
+
+/// Whether `el`'s `bx:features` gate is satisfied by the [`CrateRegistration`]s
+/// this binary spawned, ie whether its subtree is built at all.
+///
+/// The terms are the same `feature` / `crate/feature` items
+/// [`CrateCheck`](crate::prelude::CrateCheck) verifies, but the outcome is the
+/// opposite: `<CrateCheck>` says "this entry NEEDS these, fail loudly without
+/// them", `bx:features` says "this part of the entry is FOR builds that have
+/// them, skip it otherwise". A site declares its deploy verbs behind the gate,
+/// and the lean deployed binary loads the same entry without them.
+///
+/// A gated subtree is skipped before its tags resolve, so unregistered tags
+/// inside never error. Note [`EntryPrescan`] walks the document registry-free
+/// and BEFORE this runs, so `<StoreRoot>`, `<TemplateDir>` and `<CrateCheck>`
+/// must not sit inside a gated subtree.
+fn feature_gate_passes(el: &BsxElement, cx: &mut TemplateContext) -> bool {
+	let Some(features) = string_attr(el, "bx:features") else {
+		return true;
+	};
+	cx.entity.world_scope(|world| {
+		let mut registrations = world.query::<&CrateRegistration>();
+		let registrations =
+			registrations.iter(world).cloned().collect::<Vec<_>>();
+		CrateCheck::features(features)
+			.failures(&registrations)
+			.is_empty()
+	})
 }
 
 /// Whether a tag resolves by name (a component or template) rather than as an
@@ -1862,6 +1896,7 @@ const STRUCTURAL_DIRECTIVES: &[&str] = &[
 	"bx:ref",
 	"bx:schema",
 	"bx:style",
+	"bx:features",
 ];
 
 /// Whether a key is a `bx:<event>` verb-trigger directive (eg `bx:click`), ie a

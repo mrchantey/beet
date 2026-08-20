@@ -181,30 +181,85 @@ impl RouteTree {
 		.xok()
 	}
 
-	/// Rebuild the [`RouteTree`] on `server` from all of its descendant actions.
+	/// Rebuild the [`RouteTree`] of every url space at or under `server`.
 	///
 	/// A system meant to be run on demand via
 	/// [`run_system_cached_with`](bevy::ecs::world::World::run_system_cached_with),
 	/// mirroring the router's [`insert_route_tree`](crate::prelude::insert_route_tree)
 	/// observer for cases where the tree must be recomputed without a
 	/// [`PathPattern`] insert — eg after reparenting a loaded scene under a server.
+	///
+	/// Every namespace, not just `server`'s: a mounted scene rooted in its own
+	/// `Router` is a url space of its own, and reparenting is exactly when its
+	/// ancestry (and so its namespace) settles.
 	pub fn rebuild(
 		server: In<Entity>,
+		ancestors: Query<&ChildOf>,
+		paths: Query<&PathPartial>,
 		children_query: Query<&Children>,
 		actions: Query<ActionQueryItem, Without<RouteHidden>>,
 		mut commands: Commands,
 	) -> Result {
-		let nodes = children_query
-			.iter_descendants_inclusive(*server)
-			.filter_map(|entity| actions.get(entity).ok())
-			.map(ActionNode::from_query)
-			.collect::<Vec<_>>();
-		if nodes.is_empty() {
-			return Ok(());
+		// group every route below `server` by the url space it belongs to
+		let mut spaces: Vec<(Entity, Vec<ActionNode>)> = Vec::new();
+		for entity in children_query.iter_descendants_inclusive(*server) {
+			let Ok(item) = actions.get(entity) else {
+				continue;
+			};
+			let root = PathPattern::namespace_root(entity, &ancestors, &paths);
+			let node = ActionNode::from_query(item);
+			match spaces.iter_mut().find(|(space, _)| *space == root) {
+				Some((_, nodes)) => nodes.push(node),
+				None => spaces.push((root, vec![node])),
+			}
 		}
-		let tree = Self::from_nodes(nodes)?;
-		commands.entity(*server).insert(tree);
+		for (root, nodes) in spaces {
+			commands.entity(root).insert(Self::from_nodes(nodes)?);
+		}
 		Ok(())
+	}
+
+	/// The [`RouteTree`] at or under `entity`.
+	///
+	/// A tree lives on its url space's root, ie the `Router` that dispatches it,
+	/// and a built entry root is usually its *server* with the router as a child.
+	/// A caller holding the root resolves the tree here rather than assuming
+	/// which entity carries it.
+	///
+	/// An entry can hold several url spaces (a command dispatcher whose site is
+	/// one of its routes), so the one that serves PAGES wins: that is the site a
+	/// caller holding the entry root means (rendering, checking, exporting).
+	/// Absent any, the first tree found.
+	///
+	/// # Errors
+	/// Errors when nothing at or under `entity` carries a tree.
+	pub fn of(world: &World, entity: Entity) -> Result<&RouteTree> {
+		let mut trees = Vec::new();
+		let mut queue = vec![entity];
+		while let Some(entity) = queue.pop() {
+			let entity = world.entity(entity);
+			if let Some(tree) = entity.get::<RouteTree>() {
+				trees.push(tree);
+			}
+			if let Some(children) = entity.get::<Children>() {
+				queue.extend(children.iter());
+			}
+		}
+		trees
+			.iter()
+			.find(|tree| tree.serves_pages())
+			.or(trees.first())
+			.copied()
+			.ok_or_else(|| bevyhow!("no RouteTree at or under {entity}"))
+	}
+
+	/// Whether any node in this tree renders a page, ie whether this url space
+	/// is a *site* rather than a set of commands or an api.
+	pub fn serves_pages(&self) -> bool {
+		self.iter_dfs()
+			.iter()
+			.filter_map(|tree| tree.node.as_ref())
+			.any(|node| node.is_page_route)
 	}
 
 	/// All nodes of the tree in depth-first pre-order (reading order): each node

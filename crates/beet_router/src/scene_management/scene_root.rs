@@ -180,8 +180,12 @@ mod test {
 		roots.len().xpect_eq(1);
 		world.flush();
 
-		let tree = world.entity(server).get::<RouteTree>().unwrap();
-		tree.find(&["ping"]).xpect_some();
+		// the scene is rooted in its own `Router`, so it mounts under the host
+		// as a url space of its own and owns the tree its routes land in.
+		RouteTree::of(&world, roots[0])
+			.unwrap()
+			.find(&["ping"])
+			.xpect_some();
 	}
 
 	/// A markup-declared resource is scene-owned: `despawn_scene` removes it
@@ -290,11 +294,9 @@ mod test {
 		for _ in 0..3 {
 			let mut world = test_world();
 			let host = world.spawn(Router::with_defaults()).flush();
-			set_scene(&mut world, &bytes, Some(host)).unwrap();
+			let roots = set_scene(&mut world, &bytes, Some(host)).unwrap();
 			world.flush();
-			world
-				.entity(host)
-				.get::<RouteTree>()
+			RouteTree::of(&world, roots[0])
 				.unwrap()
 				.find(&["ping"])
 				.xpect_some();

@@ -196,7 +196,7 @@ mod tests {
 				Stack::cli(),
 			))
 			.flush();
-		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		let tree = RouteTree::of(&world, root).unwrap();
 		// standard IaC routes
 		tree.find(&["validate"]).xpect_some();
 		tree.find(&["plan"]).xpect_some();
@@ -218,7 +218,7 @@ mod tests {
 				Stack::cli(),
 			))
 			.flush();
-		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		let tree = RouteTree::of(&world, root).unwrap();
 		let destroy_node = tree.find(&["destroy"]).unwrap();
 		world
 			.entity(destroy_node.entity)

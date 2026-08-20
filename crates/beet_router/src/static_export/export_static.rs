@@ -39,10 +39,7 @@ impl StaticExport {
 		router: Entity,
 		is_prod: bool,
 	) -> Result<Vec<SmolPath>> {
-		world
-			.entity(router)
-			.get::<RouteTree>()
-			.ok_or_else(|| bevyhow!("router entity {router} has no RouteTree"))?
+		RouteTree::of(world, router)?
 			.clone()
 			.flatten_nodes()
 			.into_iter()

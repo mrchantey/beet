@@ -23,6 +23,28 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::types::Variable>()
 			.register_type::<crate::types::VariableValue>();
 
+		// the two blocks a beet *application* declares (the bucket it is served
+		// from, the table it records to), so `<S3BucketBlock label="app"/>` and
+		// `<DynamoTableBlock label="analytics"/>` spawn by tag in any build
+		// carrying their default-on binding features.
+		#[cfg(feature = "bindings_aws_common")]
+		app.register_type::<crate::prelude::S3BucketBlock>();
+		#[cfg(feature = "bindings_aws_dynamo")]
+		app.register_type::<crate::prelude::DynamoTableBlock>();
+
+		// ..and the runtime half of those declarations: one observer per block
+		// type attaching the live store, so the deploy meaning (the always
+		// compiled `ErasedBlock` hook) and the runtime meaning hang off the one
+		// entity the markup declared.
+		#[cfg(all(
+			feature = "bindings_aws_common",
+			feature = "aws_sdk",
+			not(target_arch = "wasm32")
+		))]
+		app.add_observer(crate::blocks::attach_s3_store);
+		#[cfg(all(feature = "bindings_aws_dynamo", not(target_arch = "wasm32")))]
+		app.add_observer(crate::blocks::attach_table_store);
+
 		// the cloudflare deploy blocks, spawned by tag. Definitions, so every target.
 		#[cfg(feature = "cloudflare_block")]
 		app.register_type::<crate::prelude::CloudflareWorkerBlock>()
@@ -49,15 +71,28 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::CloudflareZoneSetup>()
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
-		// the bucket sync settings (`<DirSync direction="pull" delete=true/>`), and
-		// the direction enum a markup attribute names by variant.
+		// the bucket sync settings (`{SyncS3Bucket{delete:true}}`), the direction
+		// enum a markup attribute names by variant, and the `<DirSync>` front-end
+		// that binds a local dir to a bucket by label.
 		#[cfg(all(
 			feature = "deploy",
 			feature = "aws_sdk",
 			not(target_arch = "wasm32")
 		))]
 		app.register_type::<crate::prelude::SyncS3Bucket>()
-			.register_type::<beet_net::prelude::SyncDirection>();
+			.register_type::<beet_net::prelude::SyncDirection>()
+			.register_type::<crate::prelude::DirSync>()
+			.add_observer(crate::actions::attach_dir_sync_store);
+
+		// the borrowed-paths copy (`<DirCopy src=".." dest=".." paths=".."/>`),
+		// plain fs work so it needs no cloud backend.
+		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+		app.register_type::<crate::prelude::DirCopy>();
+
+		// the CloudWatch tail and the target it composes its log group from.
+		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+		app.register_type::<crate::prelude::AwsWatch>()
+			.register_type::<crate::prelude::WatchTarget>();
 
 		// the full-lifecycle smoke-test action: reads a bucket's `BlobStore` (so
 		// `aws_sdk`-gated like the store) and lives in the `actions` module (so

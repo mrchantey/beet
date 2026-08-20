@@ -27,7 +27,7 @@ and a container engine.
 	<CrateCheck features="infra,extra"/>
 	<Route path="deploy" {ExchangeSequence}>
 		<FargateSiteBlock app_name="fargate"/>
-		<AppBucket/>
+		<S3BucketBlock label="app" deploy_versioned=false/>
 		<BeetBinaryBuild features="aws_sdk"/>
 		<!-- the stores the deploy publishes into: the image registry and the
 		     bucket the site is served from -->

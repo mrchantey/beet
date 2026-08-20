@@ -2,18 +2,37 @@
 //! persistence observers.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
 /// Component holding the analytics table, spawned on the [`AnalyticsConfig`]
 /// entity.
-#[derive(Clone, Deref, DerefMut, Component)]
+///
+/// Writes are fire-and-forget off the request path, so a table that will not
+/// answer would otherwise report one error per event forever: a wrong table name
+/// once survived a whole deploy that way, logging a `ResourceNotFoundException`
+/// per request while the site served perfectly. The first failure therefore
+/// raises with the resolved target and the full error, then poisons the store so
+/// every later write is a `debug!` line rather than another raise.
+#[derive(Clone, Deref, Component)]
 pub struct AnalyticsStore {
 	/// The typed view over the resolved store entity's [`TableStore`].
+	#[deref]
 	pub store: Table<AnalyticsEvent>,
+	/// Set by the first failed write. Shared, so a cloned handle in a detached
+	/// task poisons the component the world still holds.
+	poisoned: Arc<AtomicBool>,
 }
 
 impl AnalyticsStore {
 	/// Create from a resolved typed table.
-	pub fn new(store: Table<AnalyticsEvent>) -> Self { Self { store } }
+	pub fn new(store: Table<AnalyticsEvent>) -> Self {
+		Self {
+			store,
+			poisoned: Arc::new(AtomicBool::new(false)),
+		}
+	}
 
 	/// The local analytics store at `dir`, the same store a dev server derives.
 	/// Used by `beet analytics` to query without a scene.
@@ -22,8 +41,8 @@ impl AnalyticsStore {
 	}
 
 	/// The remote (DynamoDB) analytics store at `table_name`, in `AWS_REGION`
-	/// else `us-west-2`. Used by `beet analytics --remote` to query without a
-	/// scene; errors without the `aws_sdk` backend.
+	/// else the default region. Used by `beet analytics --remote` to query
+	/// without a scene; errors without the `aws_sdk` backend.
 	pub fn remote(table_name: &str) -> Result<Self> {
 		cfg_if! {
 			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
@@ -38,23 +57,49 @@ impl AnalyticsStore {
 			}
 		}
 	}
+
+	/// Record `event`, raising exactly once for a store that will not answer.
+	///
+	/// The first failure carries the resolved table, its region and the whole
+	/// error chain through the app's configured handler (which panics on a debug
+	/// build so a misconfiguration surfaces immediately, and logs on release so
+	/// the site keeps serving). Every later event is dropped at `debug!`.
+	pub async fn record(&self, event: AnalyticsEvent) -> Result {
+		if self.poisoned.load(Ordering::Relaxed) {
+			debug!(
+				"analytics: dropping {:?} event for {}, {} is not answering",
+				event.event_kind,
+				event.path,
+				self.store.describe()
+			);
+			return Ok(());
+		}
+		match self.store.push(event).await {
+			Ok(()) => Ok(()),
+			Err(err) => {
+				self.poisoned.store(true, Ordering::Relaxed);
+				bevybail!(
+					"analytics: could not record to {}, every later event is dropped.\n{err}",
+					self.store.describe()
+				)
+			}
+		}
+	}
 }
 
-/// Observer: on an [`AnalyticsConfig`] insertion, resolve the analytics store
-/// entity and insert the [`AnalyticsStore`] and (under `geoip`) the country
-/// database on the config's own entity.
+/// Observer: on an [`AnalyticsConfig`] insertion, resolve the declared store and
+/// insert the [`AnalyticsStore`] and (under `geoip`) the country database on the
+/// config's own entity.
 ///
-/// Entity-first: [`AnalyticsConfig::store`] names an entity whose [`TableStore`]
-/// backs the analytics table (any store provider component materializes one),
-/// so any [`TableProvider`] backend plugs in without analytics naming it.
-/// `None` spawns a convention-derived child store entity, resolved through the
-/// same path.
+/// Declaration-first: a [`TableStoreRef`] on the config entity names the entity
+/// that *declares* the store (a `<DynamoTableBlock/>`, an `<FsStore/>`, any
+/// store provider), so the deploy that creates a table and the runtime that
+/// writes to it read one declaration and can never resolve different names.
 ///
 /// Config-triggered rather than a startup system so it is inert until analytics
 /// is switched on, and so it works whenever the config lands (markup scenes
-/// resolve asynchronously). Reads the backend config inside the async task, so a
-/// [`PackageConfig`] spawned alongside the [`AnalyticsConfig`] is already
-/// present; idempotent, so a scene reload does not rebuild the store.
+/// resolve asynchronously). Idempotent, so a scene reload does not rebuild the
+/// store.
 pub(super) fn spawn_store_on_config(
 	ev: On<Add, AnalyticsConfig>,
 	stores: Query<&AnalyticsStore>,
@@ -70,20 +115,14 @@ pub(super) fn spawn_store_on_config(
 		if config_entity.get::<AnalyticsStore, _>(|_| ()).await.is_ok() {
 			return Ok(());
 		}
-		// resolve the store entity: the configured reference, else a child
-		// spawned with the convention-derived provider component.
-		let target = config_entity
-			.get::<AnalyticsConfig, _>(|config| config.store)
-			.await?;
-		let target = match target {
-			Some(target) => target,
-			None => {
-				world
-					.with(move |world: &mut World| {
-						derived_store_entity(world, entity)
-					})
-					.await
-			}
+		// the store this config records to, declared once and named here.
+		let Ok(target) = config_entity
+			.get::<TableStoreRef, _>(|store_ref| store_ref.store())
+			.await
+		else {
+			bevybail!(
+				"an `AnalyticsConfig` records to the store it names: add a `TableStoreRef` beside it pointing at a store declaration, ie `<DynamoTableBlock bx:ref=\"analytics\" label=\"analytics\"/>` and `{{(AnalyticsConfig, TableStoreRef($analytics))}}`"
+			);
 		};
 		// the provider hooks insert the TableStore through the command queue,
 		// so give it a settle window before erroring.
@@ -121,74 +160,32 @@ pub(super) fn spawn_store_on_config(
 	});
 }
 
-/// Spawn the analytics store entity as a child of the config entity: a process
-/// handed an analytics table ([`BootstrapConfig::analytics_table`]) records to
-/// that DynamoDB table, in `AWS_REGION` else `us-west-2`; every other run writes
-/// [`WorkspaceConfig::analytics_dir`].
-///
-/// The name is **delivered, never derived**. The deploy creates the table, so
-/// the deploy names it on the unit it renders. Deriving it here from a naming
-/// convention meant the runtime and the deploy each computed a name from
-/// different inputs and nothing checked they matched: the live site spent a
-/// deploy writing to `beet--prod--analytics`, a table that does not exist,
-/// logging a `ResourceNotFoundException` per event while serving perfectly and
-/// reporting zero events. Delivery makes that disagreement unrepresentable.
-fn derived_store_entity(world: &mut World, config_entity: Entity) -> Entity {
-	let bootstrap = BootstrapConfig::get();
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	if let Some(table) = &bootstrap.analytics_table {
-		return world
-			.spawn((
-				ChildOf(config_entity),
-				DynamoStore::new(table.to_string(), DynamoStore::env_region()),
-			))
-			.id();
-	}
-	#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
-	if bootstrap.analytics_table.is_some() {
-		debug!(
-			"analytics: no `aws_sdk` backend, the delivered table falls back to the local directory"
-		);
-	}
-	// a deployed process with no table named it: say so rather than silently
-	// recording to a directory on a box that is replaced every deploy.
-	if bootstrap.analytics_table.is_none()
-		&& bootstrap.service_access == ServiceAccess::Remote
-	{
-		warn!(
-			"analytics: --service-access=remote with no --analytics-table, recording to the local directory"
-		);
-	}
-	let dir = world
-		.get_resource::<WorkspaceConfig>()
-		.cloned()
-		.unwrap_or_default()
-		.analytics_dir
-		.into_abs();
-	world
-		.spawn((ChildOf(config_entity), FsStore::new(dir)))
-		.id()
-}
-
-/// Observer: persist a triggered [`AnalyticsEvent`] to every [`AnalyticsStore`].
+/// Observer: persist a triggered [`AnalyticsEvent`] to the store each
+/// [`AnalyticsConfig`] declared.
 ///
 /// The single sink for every emitter (request middleware, navigator, web
-/// beacon). No store (analytics not switched on) drops the event rather than
+/// beacon). No config (analytics not switched on) drops the event rather than
 /// panicking, since emitters trigger unconditionally. Fire-and-forget: the push
 /// runs on the async queue so recording never blocks a request or a navigation.
+///
+/// Scoped to [`AnalyticsConfig`] entities rather than to every
+/// [`AnalyticsStore`] in the world, so a world holding two routers records each
+/// one's traffic to the store that router declared (through its
+/// [`TableStoreRef`], resolved once by [`spawn_store_on_config`]) and to no
+/// other.
 pub(super) fn handle_analytics_event(
 	ev: On<AnalyticsEvent>,
-	stores: Query<&AnalyticsStore>,
+	configs: Query<&AnalyticsStore, With<AnalyticsConfig>>,
 	commands: AsyncCommands,
 ) {
-	let stores = stores.iter().cloned().collect::<Vec<_>>();
+	let stores = configs.iter().cloned().collect::<Vec<_>>();
 	if stores.is_empty() {
 		return;
 	}
 	let event = ev.event().clone();
 	commands.run(async move |_| {
 		for store in stores {
-			store.push(event.clone()).await?;
+			store.record(event.clone()).await?;
 		}
 		Ok(())
 	});
@@ -198,6 +195,22 @@ pub(super) fn handle_analytics_event(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use crate::exports::bytes::Bytes;
+	use std::sync::Arc;
+	use std::sync::atomic::AtomicUsize;
+	use std::sync::atomic::Ordering;
+
+	/// A router-shaped world: an analytics config bound to a declared store.
+	fn config_with_store(
+		world: &mut World,
+		store: impl Bundle,
+	) -> (Entity, Entity) {
+		let store = world.spawn(store).flush();
+		let config = world
+			.spawn((AnalyticsConfig::default(), TableStoreRef(store)))
+			.flush();
+		(config, store)
+	}
 
 	#[beet_core::test]
 	async fn event_roundtrips_through_store() {
@@ -217,38 +230,24 @@ mod test {
 	}
 
 	/// The config's own entity carries the store and the geoip component, so
-	/// consumers resolve them by ancestry rather than as globals, and the
-	/// convention-derived store entity is spawned as its child.
+	/// consumers resolve them by ancestry rather than as globals, and the table
+	/// itself lives on the declaration the config names.
 	#[beet_core::test]
 	async fn config_entity_carries_the_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let entity = world.spawn(AnalyticsConfig::default()).flush();
-		AsyncRunner::settle_async_tasks(&mut world).await;
-		world.entity(entity).contains::<AnalyticsStore>().xpect_true();
-		world.entity(entity).contains::<GeoIp>().xpect_true();
-		world
-			.entity(entity)
-			.get::<Children>()
-			.unwrap()
-			.iter()
-			.any(|child| world.entity(child).contains::<TableStore>())
-			.xpect_true();
-	}
-
-	/// An explicit [`AnalyticsConfig::store`] reference persists events into
-	/// that entity's [`TableStore`] rather than a derived one.
-	#[beet_core::test]
-	async fn explicit_store_entity() {
-		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let store_entity = world.spawn(InMemoryStore::new()).flush();
-		let config = world
-			.spawn(AnalyticsConfig {
-				store: Some(store_entity),
-				..default()
-			})
-			.flush();
+		let (config, _) = config_with_store(&mut world, InMemoryStore::new());
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world.entity(config).contains::<AnalyticsStore>().xpect_true();
+		world.entity(config).contains::<GeoIp>().xpect_true();
+	}
+
+	/// The declared store is where the events land, resolved through the
+	/// relation rather than derived from a naming convention.
+	#[beet_core::test]
+	async fn records_to_the_declared_store() {
+		let mut world = (AsyncPlugin, analytics_plugin).into_world();
+		let (_, store_entity) = config_with_store(&mut world, InMemoryStore::new());
+		AsyncRunner::settle_async_tasks(&mut world).await;
 
 		let event = AnalyticsEvent::new("/about", AnalyticsEventData::Request {
 			status: 200,
@@ -260,7 +259,6 @@ mod test {
 		world.trigger(event);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
-		// the event landed in the referenced entity's store
 		world
 			.entity(store_entity)
 			.get::<TableStore>()
@@ -272,5 +270,121 @@ mod test {
 			.path
 			.as_str()
 			.xpect_eq("/about");
+	}
+
+	/// Everything raised through the collecting handler below. A `static`
+	/// because bevy's error handler is a bare fn pointer with nowhere to capture
+	/// state; only [`analytics_failures_are_loud`] routes a world into it, so
+	/// there is one writer.
+	static RAISED: std::sync::Mutex<Vec<String>> =
+		std::sync::Mutex::new(Vec::new());
+
+	fn collect_error(err: BevyError, _cx: bevy::ecs::error::ErrorContext) {
+		RAISED.lock().unwrap().push(err.to_string());
+	}
+
+	/// A world whose raised errors land in [`RAISED`], which starts empty.
+	fn collecting_world() -> World {
+		RAISED.lock().unwrap().clear();
+		let mut world = (AsyncPlugin, analytics_plugin).into_world();
+		world.insert_resource(
+			bevy::ecs::error::FallbackErrorHandler(collect_error),
+		);
+		world
+	}
+
+	fn raised() -> Vec<String> { RAISED.lock().unwrap().clone() }
+
+	/// Both loud paths, in one test because they share the one static collector.
+	///
+	/// 1. A config that names no store raises at spawn time rather than falling
+	///    back to a directory nobody reads.
+	/// 2. A store that will not answer raises ONCE and is then poisoned. The
+	///    original incident survived a whole deploy precisely because it
+	///    produced a silent error per event while the site served perfectly.
+	#[beet_core::test]
+	async fn analytics_failures_are_loud() {
+		let mut world = collecting_world();
+		world.spawn(AnalyticsConfig::default()).flush();
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		raised().join("\n").xpect_contains("TableStoreRef");
+
+		let mut world = collecting_world();
+		let attempts = Arc::new(AtomicUsize::new(0));
+		config_with_store(&mut world, FailingStore {
+			attempts: attempts.clone(),
+		});
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		for index in 0..8 {
+			world.trigger(AnalyticsEvent::new(
+				format!("/page-{index}"),
+				AnalyticsEventData::Request {
+					status: 200,
+					method: "GET".into(),
+					user_agent: None,
+					referrer: None,
+				},
+			));
+			AsyncRunner::settle_async_tasks(&mut world).await;
+		}
+		// one raise, naming the table that would not answer..
+		let raised = raised();
+		raised.len().xpect_eq(1);
+		raised[0]
+			.as_str()
+			.xpect_contains("could not record to")
+			.xpect_contains("no-such-table");
+		// ..and the store is not hammered once poisoned.
+		attempts.load(Ordering::SeqCst).xpect_eq(1);
+	}
+
+	/// A store whose every write fails, standing in for a table that does not
+	/// exist.
+	#[derive(Clone, Component)]
+	#[component(on_add = BlobStore::on_add::<Self>)]
+	struct FailingStore {
+		attempts: Arc<AtomicUsize>,
+	}
+
+	impl BlobStoreProvider for FailingStore {
+		fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+		fn with_subdir(&self, _path: SmolPath) -> Box<dyn BlobStoreProvider> {
+			Box::new(self.clone())
+		}
+		fn id(&self) -> &'static str { "failing" }
+		fn root_key(&self) -> SmolStr { "no-such-table".into() }
+		fn region(&self) -> Option<String> { None }
+		fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+			Box::pin(async { true.xok() })
+		}
+		fn store_create(&self) -> SendBoxedFuture<Result> {
+			Box::pin(async { Ok(()) })
+		}
+		fn store_remove(&self) -> SendBoxedFuture<Result> {
+			Box::pin(async { Ok(()) })
+		}
+		fn insert(&self, _path: &SmolPath, _body: Bytes) -> SendBoxedFuture<Result> {
+			self.attempts.fetch_add(1, Ordering::SeqCst);
+			Box::pin(async { bevybail!("ResourceNotFoundException") })
+		}
+		fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+			Box::pin(async { Vec::new().xok() })
+		}
+		fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+			let path = path.clone();
+			Box::pin(async move { bevybail!("no row at {path}") })
+		}
+		fn exists(&self, _path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+			Box::pin(async { false.xok() })
+		}
+		fn remove(&self, _path: &SmolPath) -> SendBoxedFuture<Result> {
+			Box::pin(async { Ok(()) })
+		}
+		fn public_url(
+			&self,
+			_path: &SmolPath,
+		) -> SendBoxedFuture<Result<Option<String>>> {
+			Box::pin(async { None.xok() })
+		}
 	}
 }

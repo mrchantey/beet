@@ -273,10 +273,8 @@ mod stalled_store_test {
 			// the server owns the boot, the analytics router is its dispatch child
 			app.world_mut().spawn((server, on_spawn, children![(
 				Router,
-				AnalyticsConfig {
-					store: Some(store),
-					..default()
-				},
+				AnalyticsConfig::default(),
+				TableStoreRef(store),
 				AnalyticsMiddleware::default(),
 				children![render_action::fixed_func_route("about", || rsx! {
 					<p>"About"</p>
@@ -338,10 +336,12 @@ mod test {
 		world.add_observer(move |ev: On<AnalyticsEvent>| {
 			captured.lock().unwrap().push(ev.event().clone());
 		});
+		let store = world.spawn(InMemoryStore::new()).flush();
 		world
 			.spawn((
 				Router,
 				AnalyticsConfig::default(),
+				TableStoreRef(store),
 				AnalyticsMiddleware::default(),
 				children![render_action::fixed_func_route("about", || rsx! {
 					<p>"About"</p>

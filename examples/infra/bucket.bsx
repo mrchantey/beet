@@ -16,6 +16,6 @@ Live run needs AWS credentials and `tofu`.
 <BucketStack app_name="bucket-example">
 	<CrateCheck features="infra,extra"/>
 	<Route path="run" {ExchangeSequence}>
-		<NamedBucket label="my-bucket" {LifecycleProbe}/>
+		<S3BucketBlock label="my-bucket" deploy_versioned=false {LifecycleProbe}/>
 	</Route>
 </BucketStack>

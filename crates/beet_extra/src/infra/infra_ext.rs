@@ -9,10 +9,10 @@ use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
 
-/// Namespaces every cloud resource for an example; `us-west-2` matches the other AWS
-/// examples.
+/// Namespaces every cloud resource for an example, in the one region every beet
+/// stack and block defaults to.
 pub fn stack(app_name: impl Into<SmolStr>) -> Stack {
-	Stack::new(app_name).with_aws_region("us-west-2")
+	Stack::new(app_name).with_aws_region(bindings::aws::region::DEFAULT)
 }
 
 /// The one bucket an app is served from: a per-stage replica of the checkout, so
@@ -28,7 +28,18 @@ pub fn app_bucket() -> S3BucketBlock {
 /// (the `resource_ident`, independent of the per-deploy id), so a throwaway stack
 /// rebuilt from the same `app_name` resolves the same bucket.
 pub fn app_bucket_name(stack: &Stack) -> String {
-	app_bucket().store(stack).bucket_name().to_string()
+	stack.scope().resource_name("app")
+}
+
+/// A CloudWatch tail of `target`, with an optional timeout after which the
+/// follow is killed. The log group composes from the ancestor [`Stack`] when the
+/// tail runs, so a watch verb never restates the app identity.
+pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
+	let watch = AwsWatch::for_target(target);
+	match timeout {
+		Some(timeout) => watch.with_timeout(timeout),
+		None => watch,
+	}
 }
 
 /// The deployed generic `beet` binary's [`BootstrapConfig`] for serving the site
@@ -72,7 +83,7 @@ pub fn sync_site(stack: &Stack) -> impl Bundle + use<> {
 	(
 		S3FsStore::new(
 			FsStore::new(WsPathBuf::new("examples/bsx_site")),
-			app_bucket().store(stack),
+			app_bucket().stack_store(stack),
 		),
 		SyncS3Bucket::default().with_delete(true),
 	)

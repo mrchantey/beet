@@ -46,7 +46,8 @@ impl PathPatternModifier {
 
 /// Represents the next part of the route pattern.
 /// All ancestor [`PathPartial`] will be prepended when determining the route pattern
-/// at this point in the tree.
+/// at this point in the tree, up to and including the nearest
+/// [namespace root](Self::root).
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
@@ -55,7 +56,16 @@ impl PathPatternModifier {
 pub struct PathPartial {
 	/// Segements that must match in order for the route to be valid,
 	/// an empty vector means only the root path `/` is valid.
+	#[deref]
 	pub segments: Vec<PathPatternSegment>,
+	/// Whether this entity starts a fresh url space: ancestor segments above it
+	/// do NOT prepend, and its subtree is a route tree of its own.
+	///
+	/// A `Router` is one, which is what lets an entry mount a whole site under a
+	/// command route (`<Route path="serve"><StartOnLoad><Router>..`) while the
+	/// site's own urls stay rooted at `/`, and keeps a dispatching surface from
+	/// reaching routes outside the namespace it serves.
+	pub is_root: bool,
 }
 
 impl PathPartial {
@@ -65,13 +75,26 @@ impl PathPartial {
 	pub fn parse(path: impl AsRef<str>) -> Result<Self> {
 		Self {
 			segments: PathPattern::new(path)?.segments,
+			is_root: false,
 		}
 		.xok()
 	}
 
+	/// A namespace root: contributes no segments and stops ancestor segments
+	/// from prepending, so its subtree is a url space of its own.
+	pub fn root() -> Self {
+		Self {
+			segments: Vec::new(),
+			is_root: true,
+		}
+	}
+
 	/// Creates a [`PathPartial`] from pre-parsed segments.
 	pub fn from_segments(segments: Vec<PathPatternSegment>) -> Self {
-		Self { segments }
+		Self {
+			segments,
+			is_root: false,
+		}
 	}
 }
 
@@ -146,19 +169,43 @@ impl PathPattern {
 		parents: &Query<&ChildOf>,
 		path_partials: &Query<&PathPartial>,
 	) -> Result<PathPattern> {
-		parents
-			// get every PathFilter in ancestors
+		let mut partials = Vec::new();
+		for partial in parents
 			.iter_ancestors_inclusive(entity)
 			.filter_map(|entity| path_partials.get(entity).ok())
-			.collect::<Vec<_>>()
+		{
+			partials.push(partial.clone());
+			// a namespace root ends the walk: nothing above it prepends.
+			if partial.is_root {
+				break;
+			}
+		}
+		partials
 			.into_iter()
-			.cloned()
-			// reverse to start from the root
+			// reverse to start from the namespace root
 			.rev()
 			// extract the segments
 			.flat_map(|partial| partial.segments)
 			.collect::<Vec<_>>()
 			.xmap(Self::from_segments)
+	}
+
+	/// The entity starting `entity`'s url space: the nearest ancestor
+	/// (inclusive) carrying a [namespace-root](PathPartial::root)
+	/// [`PathPartial`], else the document root.
+	pub fn namespace_root(
+		entity: Entity,
+		parents: &Query<&ChildOf>,
+		path_partials: &Query<&PathPartial>,
+	) -> Entity {
+		parents
+			.iter_ancestors_inclusive(entity)
+			.find(|entity| {
+				path_partials
+					.get(*entity)
+					.is_ok_and(|partial| partial.is_root)
+			})
+			.unwrap_or_else(|| parents.root_ancestor(entity))
 	}
 
 	/// Called by to_tokens, this should never be used directly

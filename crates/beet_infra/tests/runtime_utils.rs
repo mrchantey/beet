@@ -102,13 +102,13 @@ pub fn assets_bucket_block() -> S3BucketBlock {
 pub fn assets_s3_fs_store(stack: &Stack, assets_dir: &AbsPathBuf) -> S3FsStore {
 	S3FsStore::new(
 		FsStore::new(assets_dir.clone()),
-		assets_bucket_block().store(stack),
+		assets_bucket_block().stack_store(stack),
 	)
 }
 
 /// Get the deploy-versioned assets store for verification.
 pub fn assets_store(stack: &Stack) -> BlobStore {
-	BlobStore::new(assets_bucket_block().store(stack))
+	BlobStore::new(assets_bucket_block().stack_store(stack))
 }
 
 /// Re-apply terraform with the current ledger deploy_id.

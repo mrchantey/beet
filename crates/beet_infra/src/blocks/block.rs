@@ -5,12 +5,23 @@ use std::sync::Arc;
 
 /// Trait for infrastructure blocks that generate terraform config.
 pub trait Block: 'static + Send + Sync {
+	/// Emit this block's resources. `access` carries every [`AccessGrant`] the
+	/// stack's blocks declared, so a compute block lowers them to its provider's
+	/// permission mechanism; a resource block ignores it.
 	fn apply_to_config(
 		&self,
 		entity: &EntityRef,
 		stack: &Stack,
+		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result;
+
+	/// What a process running in this stack needs to do with this resource,
+	/// stated without naming any provider's permission model. Empty for a block
+	/// nothing reads at runtime.
+	fn runtime_access(&self, _scope: &ResourceScope) -> Vec<AccessGrant> {
+		Vec::new()
+	}
 
 	/// If this block creates a deployable artifact, return its label.
 	fn artifact_label(&self) -> Option<&str> { None }

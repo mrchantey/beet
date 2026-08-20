@@ -96,9 +96,16 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 	if !entity.is_alive().await {
 		return Ok(());
 	}
-	// navigation targets the server entity; route lookups resolve the nearest
-	// `RouteTree` by ancestry, so the server browses its router's routes.
-	let router = entity.id();
+	// navigation resolves routes against a `RouteTree`, which lives on the url
+	// space's own `Router` rather than on the server that hosts it, so address
+	// the router itself (the same hop `exchange_child` makes).
+	let router = entity
+		.world()
+		.run_system_cached_with::<_, Result<Entity>, _, _>(
+			find_router,
+			entity.id(),
+		)
+		.await??;
 	// the opening route is recorded on the server (the shared mechanism); read it
 	// back here. The server is route-agnostic; a downstream plugin (eg
 	// `CardStackPlugin`) may patch a more specific opening route after boot.

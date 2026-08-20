@@ -43,7 +43,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	} else {
 		let dir = match parts.get_param("dir") {
 			Some(dir) => AbsPathBuf::new(dir)?,
-			None => WorkspaceConfig::default().analytics_dir.into_abs(),
+			None => WorkspaceConfig::default().store_dir("analytics").into_abs(),
 		};
 		AnalyticsStore::local(dir)
 	};

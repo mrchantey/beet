@@ -206,10 +206,7 @@ fn manifest_classes(world: &World) -> Vec<SmolStr> {
 /// Every route path under `router`, rooted with a leading slash and sorted.
 /// Reuses the [`RouteTree`] the broken-href check validates against.
 fn manifest_routes(world: &World, router: Entity) -> Result<Vec<SmolStr>> {
-	let route_tree = world
-		.entity(router)
-		.get::<RouteTree>()
-		.ok_or_else(|| bevyhow!("router entity {router} has no RouteTree"))?;
+	let route_tree = RouteTree::of(world, router)?;
 	let mut routes = route_tree
 		.flatten()
 		.iter()

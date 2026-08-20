@@ -145,19 +145,28 @@ fn on_ssh_recv(
 	ev: On<SshRecv>,
 	peers: Query<&ChildOf, With<SshPeerInfo>>,
 	tui_servers: Query<&OpeningRoute, With<SshTuiServer>>,
+	children: Query<&Children>,
+	routers: Query<(), With<Router>>,
 	mut terminals: Query<&mut ChannelTerminal>,
 	mut buffers: Query<&mut DoubleBuffer>,
 	mut commands: Commands,
 ) -> Result {
 	let connection = ev.target();
-	// only handle connections (carry SshPeerInfo) whose router is an SshTuiServer.
-	let Ok(router) = peers.get(connection).map(|child_of| child_of.parent())
+	// only handle connections (carry SshPeerInfo) whose host is an SshTuiServer.
+	let Ok(host) = peers.get(connection).map(|child_of| child_of.parent())
 	else {
 		return Ok(());
 	};
-	let Ok(opening) = tui_servers.get(router) else {
+	let Ok(opening) = tui_servers.get(host) else {
 		return Ok(());
 	};
+	// the navigator resolves routes against a `RouteTree`, which lives on the
+	// url space's own `Router` rather than on the server that hosts it, so
+	// address the router itself (the same hop `exchange_child` makes).
+	let router = children
+		.iter_descendants_inclusive(host)
+		.find(|entity| routers.contains(*entity))
+		.unwrap_or(host);
 	match ev.event().inner() {
 		// wait for the pty before building the surface; its size sizes the buffer.
 		SshEvent::Connect => {}

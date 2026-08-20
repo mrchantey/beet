@@ -1,15 +1,13 @@
 //! The package's identity, usually declared via [`pkg_config!`].
 
 use crate::prelude::*;
-use heck::ToKebabCase;
 
 /// The identity of the package this binary was built from, usually set via
 /// [`pkg_config!`].
 ///
 /// Build-time facts only: what the package *is*, not how this process was
 /// launched. Anything a launch decides (the stage, service access, ports) lives
-/// on [`BootstrapConfig`], so the two cannot disagree; the cloud resource names
-/// below combine the two, reading the stage from the process config.
+/// on [`BootstrapConfig`], so the two cannot disagree.
 ///
 /// This resource is required for all beet applications and should be consistent
 /// across launch, server and client binaries.
@@ -20,8 +18,11 @@ pub struct PackageConfig {
 	pub title: SmolStr,
 	/// A short description of the package, used for meta tags.
 	pub description: SmolStr,
-	/// The binary name, usually set via `CARGO_PKG_NAME` in [`pkg_config!`].
-	pub binary_name: Option<SmolStr>,
+	/// The application's identity, usually set via `CARGO_PKG_NAME` in
+	/// [`pkg_config!`]. The ONE location app identity lives: a deploy names its
+	/// cloud resources `<app_name>--<stage>--<label>`, and the running binary
+	/// resolves the same names from the same field, so the two cannot drift.
+	pub app_name: Option<SmolStr>,
 	/// The package version, defaulting to `0.0.1` and usually overridden via
 	/// `CARGO_PKG_VERSION` in [`pkg_config!`].
 	pub version: SmolStr,
@@ -40,7 +41,7 @@ impl Default for PackageConfig {
 		Self {
 			title: "My Beet App".into(),
 			description: "An app built with beet".into(),
-			binary_name: None,
+			app_name: None,
 			version: "0.0.1".into(),
 			homepage: None,
 			repository: None,
@@ -49,8 +50,8 @@ impl Default for PackageConfig {
 }
 
 impl PackageConfig {
-	/// Returns the binary name if set.
-	pub fn binary_name(&self) -> Option<&str> { self.binary_name.as_deref() }
+	/// Returns the app name if set.
+	pub fn app_name(&self) -> Option<&str> { self.app_name.as_deref() }
 
 	/// Returns the version string.
 	pub fn version(&self) -> &str { &self.version }
@@ -63,29 +64,6 @@ impl PackageConfig {
 
 	/// Returns the repository URL if set.
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
-
-	/// The cloud resource name for the analytics store.
-	pub fn analytics_bucket_name(&self) -> String {
-		self.resource_name("analytics")
-	}
-
-	/// Prefixes the binary name and suffixes the process
-	/// [`stage`](BootstrapConfig::stage) to the provided name.
-	///
-	/// For example `lambda` becomes `my-site-lambda-dev`.
-	/// This binary-resource-stage convention must match sst config:
-	/// `sst.config.ts -> new sst.aws.Function(.., {name: THIS_FIELD })`.
-	pub fn resource_name(&self, descriptor: &str) -> String {
-		// the cloud naming convention needs a stable prefix; fall back to the
-		// title when no binary name was set.
-		let binary_name = self
-			.binary_name
-			.as_deref()
-			.unwrap_or(&self.title)
-			.to_kebab_case();
-		let stage = &BootstrapConfig::get().stage;
-		format! {"{binary_name}--{stage}--{descriptor}"}
-	}
 }
 
 impl core::fmt::Display for PackageConfig {
@@ -95,7 +73,7 @@ impl core::fmt::Display for PackageConfig {
 		writeln!(f, "description: {}", self.description)?;
 		writeln!(f, "version: {}", self.version)?;
 		for (key, value) in [
-			("binary_name", &self.binary_name),
+			("app_name", &self.app_name),
 			("homepage", &self.homepage),
 			("repository", &self.repository),
 		] {
@@ -127,7 +105,7 @@ macro_rules! pkg_config {
 		$crate::prelude::PackageConfig {
 			title: env!("CARGO_PKG_NAME").into(),
 			description: env!("CARGO_PKG_DESCRIPTION").into(),
-			binary_name: Some(env!("CARGO_PKG_NAME").into()),
+			app_name: Some(env!("CARGO_PKG_NAME").into()),
 			version: env!("CARGO_PKG_VERSION").into(),
 			homepage: Some(env!("CARGO_PKG_HOMEPAGE").into()),
 			repository: option_env!("CARGO_PKG_REPOSITORY").map(|s| s.into()),
@@ -139,13 +117,11 @@ macro_rules! pkg_config {
 mod test {
 	use crate::prelude::*;
 
-	/// The cloud name combines the package's binary name with the process stage,
-	/// which defaults to `dev`.
+	/// The app identity comes from the package name, the one place a deploy and
+	/// the running binary both read it from.
 	#[crate::test]
-	fn resource_name_carries_the_stage() {
-		pkg_config!()
-			.resource_name("lambda")
-			.xpect_eq("beet-core--dev--lambda");
+	fn app_name_from_the_package() {
+		pkg_config!().app_name().unwrap().xpect_eq("beet_core");
 	}
 
 	#[crate::test]
@@ -156,7 +132,7 @@ mod test {
 			.description
 			.as_str()
 			.xpect_eq("An app built with beet");
-		config.binary_name.xpect_none();
+		config.app_name.xpect_none();
 		config.version.as_str().xpect_eq("0.0.1");
 		config.homepage.xpect_none();
 		config.repository.xpect_none();
@@ -192,7 +168,7 @@ mod test {
 			.description
 			.as_str()
 			.xpect_eq("An app built with beet");
-		config.binary_name.xpect_none();
+		config.app_name.xpect_none();
 		// version keeps the default since the markup did not set it
 		config.version.as_str().xpect_eq("0.0.1");
 	}

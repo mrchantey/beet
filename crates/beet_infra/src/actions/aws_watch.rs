@@ -3,50 +3,76 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Tails CloudWatch logs for a given log group.
-/// Use [`AwsWatch::for_lambda`], [`AwsWatch::for_lightsail`], or [`AwsWatch::for_fargate`]
-/// for convenient construction from a [`Stack`].
-#[derive(Debug, Clone, Get, SetWith, Component)]
+/// Tails the CloudWatch logs of a [`WatchTarget`], resolved against the nearest
+/// ancestor [`Stack`] when the tail runs, so a watch verb declares WHAT it
+/// follows and never restates the app identity.
+#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
 #[require(AwsWatchAction)]
 pub struct AwsWatch {
-	/// The CloudWatch log group to tail.
-	log_group: SmolStr,
+	/// Which deployed thing's logs to follow.
+	target: WatchTarget,
 	/// Optional timeout after which the tail process is killed.
 	/// When `None`, follows indefinitely until interrupted.
 	#[set_with(unwrap_option)]
 	timeout: Option<Duration>,
 }
 
+/// The log group a watch follows, named by the deploy target rather than by the
+/// provider's string, so the group is composed from the resolved [`Stack`] at
+/// tail time.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+pub enum WatchTarget {
+	/// A literal CloudWatch log group, for a group beet does not name.
+	LogGroup(SmolStr),
+	/// A lambda function's `/aws/lambda/<function>` group, by block label.
+	Lambda(SmolStr),
+	/// A lightsail instance's `/<app>/<label>/<stage>` group, by block label,
+	/// the same group its cloud-init agent forwards to
+	/// ([`LightsailBlock::log_group`]).
+	Lightsail(SmolStr),
+	/// A fargate service's `/ecs/<app>/<stage>` group.
+	Fargate,
+}
+
+impl Default for WatchTarget {
+	fn default() -> Self { Self::LogGroup(default()) }
+}
+
+impl WatchTarget {
+	/// The CloudWatch group this target resolves to in `stack`.
+	pub fn log_group(&self, stack: &Stack) -> String {
+		match self {
+			Self::LogGroup(group) => group.to_string(),
+			Self::Lambda(label) => format!(
+				"/aws/lambda/{}",
+				stack
+					.resource_ident(format!("{label}--function"))
+					.primary_identifier()
+			),
+			Self::Lightsail(label) => {
+				format!("/{}/{label}/{}", stack.app_name(), stack.stage())
+			}
+			Self::Fargate => {
+				format!("/ecs/{}/{}", stack.app_name(), stack.stage())
+			}
+		}
+	}
+}
+
 impl AwsWatch {
 	pub fn new(log_group: impl Into<SmolStr>) -> Self {
 		Self {
-			log_group: log_group.into(),
+			target: WatchTarget::LogGroup(log_group.into()),
 			timeout: None,
 		}
 	}
 
-	/// Create an [`AwsWatch`] for a Lambda function's CloudWatch log group.
-	/// The log group follows the AWS convention `/aws/lambda/{function-name}`.
-	#[cfg(feature = "lambda_block")]
-	pub fn for_lambda(stack: &Stack, block: &LambdaBlock) -> Self {
-		let func_ident =
-			stack.resource_ident(format!("{}--function", block.label()));
-		Self::new(format!("/aws/lambda/{}", func_ident.primary_identifier()))
-	}
-
-	/// Create an [`AwsWatch`] for a Lightsail instance's CloudWatch log group,
-	/// the same group the instance's cloud-init agent forwards to
-	/// ([`LightsailBlock::log_group`]).
-	#[cfg(feature = "lightsail_block")]
-	pub fn for_lightsail(stack: &Stack, block: &LightsailBlock) -> Self {
-		Self::new(block.log_group(stack))
-	}
-
-	/// Create an [`AwsWatch`] for a Fargate service's CloudWatch log group.
-	/// Uses the ECS convention `/ecs/{app-name}/{stage}`.
-	#[cfg(feature = "fargate_block")]
-	pub fn for_fargate(stack: &Stack, _block: &FargateBlock) -> Self {
-		Self::new(format!("/ecs/{}/{}", stack.app_name(), stack.stage()))
+	pub fn for_target(target: WatchTarget) -> Self {
+		Self {
+			target,
+			timeout: None,
+		}
 	}
 }
 
@@ -59,17 +85,17 @@ pub async fn AwsWatchAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let watch = cx.caller.get_cloned::<AwsWatch>().await?;
-	let region = cx
+	let timeout = *watch.timeout();
+	let (region, log_group) = cx
 		.caller
-		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
-			query.get(entity).map(|stack| stack.aws_region().clone())
+		.with_state::<AncestorQuery<&Stack>, _>(move |entity, query| {
+			query.get(entity).map(|stack| {
+				(stack.aws_region().clone(), watch.target().log_group(stack))
+			})
 		})
 		.await??;
 
-	info!(
-		"tailing CloudWatch log group: {} (region: {region})",
-		watch.log_group()
-	);
+	info!("tailing CloudWatch log group: {log_group} (region: {region})");
 
 	// spawn aws logs tail with inherited stdout/stderr for streaming output.
 	// drop a possibly-empty inherited `AWS_PROFILE` (see `build_docker_image`).
@@ -78,7 +104,7 @@ pub async fn AwsWatchAction(
 		.with_args([
 			"logs",
 			"tail",
-			watch.log_group().as_str(),
+			log_group.as_str(),
 			"--follow",
 			"--region",
 			region.as_str(),
@@ -88,8 +114,8 @@ pub async fn AwsWatchAction(
 		.spawn()?;
 
 	// if timeout is set, wait then kill; otherwise follow indefinitely
-	if let Some(timeout) = watch.timeout() {
-		time_ext::sleep(*timeout).await;
+	if let Some(timeout) = timeout {
+		time_ext::sleep(timeout).await;
 		child.kill().ok();
 		info!("watch timed out after {timeout:?}");
 	} else {

@@ -100,13 +100,7 @@ impl CheckReport {
 		// every per-route scan validates against.
 		let (route_entities, route_tree, config) = world
 			.with(move |world: &mut World| -> Result<_> {
-				let route_tree = world
-					.entity(router)
-					.get::<RouteTree>()
-					.ok_or_else(|| {
-						bevyhow!("router entity {router} has no RouteTree")
-					})?
-					.clone();
+				let route_tree = RouteTree::of(world, router)?.clone();
 				let config = world
 					.get_resource::<RenderDiagnostics>()
 					.cloned()

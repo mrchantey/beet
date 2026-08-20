@@ -1,7 +1,8 @@
-# the bucket-synced workspace assets (`beet shared pull`), except the committed
-# `site/assets -> ../assets` symlink putting them under the site store root
+# the bucket-synced asset trees, each hydrated from its own shared bucket:
+# `./assets` from `beet--shared--assets` (`just beet-shared pull`) and
+# `./site/assets` from `beet-site--shared--assets` (`just site-shared pull`).
+# The pattern is unanchored, so it covers both.
 assets
-!site/assets
 .agents/*
 !.agents/skills
 .claude

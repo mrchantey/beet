@@ -211,6 +211,18 @@ fn is_prop_param(pt: &syn::PatType) -> bool {
 	pt.attrs.iter().any(|attr| attr.path().is_ident("prop"))
 }
 
+/// Whether a system-template param is the building [`Entity`] rather than a
+/// [`SystemParam`], ie a bare `entity: Entity`.
+fn is_entity_param(pt: &syn::PatType) -> bool {
+	let syn::Type::Path(path) = pt.ty.as_ref() else {
+		return false;
+	};
+	path.path
+		.segments
+		.last()
+		.is_some_and(|segment| segment.ident == "Entity")
+}
+
 /// Extract the identifier from a simple parameter pattern.
 fn param_ident(pt: &syn::PatType) -> syn::Result<syn::Ident> {
 	Ok(param_pat_ident(pt)?.ident)
@@ -256,10 +268,15 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut props: Vec<Prop> = Vec::new();
 	let mut sys_types: Vec<TokenStream> = Vec::new();
 	let mut sys_pats: Vec<syn::PatIdent> = Vec::new();
+	let mut entity_pat: Option<syn::PatIdent> = None;
 	for arg in &item.sig.inputs {
 		let pt = typed_arg(arg)?;
 		if is_prop_param(pt) {
 			props.push(parse_prop(pt)?);
+		} else if is_entity_param(pt) {
+			// the entity being built, so the body can read self/ancestor context
+			// (`<LightsailBeetSiteBlock/>` resolving its deploy scope by ancestry).
+			entity_pat = Some(param_pat_ident(pt)?);
 		} else {
 			let ty = &pt.ty;
 			sys_types.push(quote! { #ty });
@@ -274,6 +291,7 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 		Some(System {
 			sys_types,
 			sys_pats,
+			entity_pat,
 		}),
 	)
 }
@@ -301,6 +319,9 @@ fn is_fallible(item: &ItemFn) -> bool {
 struct System {
 	sys_types: Vec<TokenStream>,
 	sys_pats: Vec<syn::PatIdent>,
+	/// The binding for the entity being built, when the body declared an
+	/// `Entity` param.
+	entity_pat: Option<syn::PatIdent>,
 }
 
 /// Emit the data struct, `Template` impl, `subtree_template!`, and registration
@@ -389,10 +410,16 @@ fn emit(
 		Some(System {
 			sys_types,
 			sys_pats,
-		}) => quote! {
+			entity_pat,
+		}) => {
+			let entity_binding = entity_pat
+				.clone()
+				.map(|pat| quote! { #pat })
+				.unwrap_or_else(|| quote! { _entity });
+			quote! {
 			let inner = #beet_core::prelude::SystemTemplate::<
 				(#(#sys_types,)*), _, _
-			>::new(move |_entity, (#(#sys_pats,)*)| {
+			>::new(move |#entity_binding, (#(#sys_pats,)*)| {
 				let Self { #(#field_idents),* } = props.clone();
 				#(#required_unwraps)*
 				#(#body_bindings)*
@@ -402,7 +429,7 @@ fn emit(
 				)
 			});
 			cx.entity.build_template(&inner)
-		},
+		}},
 		None => quote! {
 			let Self { #(#field_idents),* } = self.clone();
 			#(#required_unwraps)*

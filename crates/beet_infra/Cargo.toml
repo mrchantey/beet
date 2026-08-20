@@ -11,7 +11,11 @@ repository.workspace = true
 
 
 [features]
-default = []
+# The two blocks that carry a runtime meaning as well as a deploy one (an app
+# bucket the binary reads, an analytics table it writes) are declared in the
+# *application's* markup, so they must resolve in an ordinary build rather than
+# only in a deployer build. `--no-default-features` still strips them.
+default = ["bindings_aws_common", "bindings_aws_dynamo"]
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
 aws_sdk = ["beet_net/aws_sdk"]

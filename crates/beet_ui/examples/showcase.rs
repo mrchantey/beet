@@ -42,7 +42,7 @@ fn main() {
 		.insert_resource(PackageConfig {
 			title: "Beet UI Showcase".into(),
 			description: "A gallery of beet_ui rules and widgets".into(),
-			binary_name: Some("showcase".into()),
+			app_name: Some("showcase".into()),
 			version: "0.0.0".into(),
 			homepage: Some("https://beet.org".into()),
 			repository: None,

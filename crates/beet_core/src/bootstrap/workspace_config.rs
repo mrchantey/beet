@@ -25,8 +25,12 @@ pub struct WorkspaceConfig {
 	pub snippets_dir: WsPathBuf,
 	/// Location of the html directory, defaults to 'target/client'.
 	pub html_dir: WsPathBuf,
-	/// Location of the analytics test directory, defaults to 'target/analytics'.
-	pub analytics_dir: WsPathBuf,
+	/// Root for the local stand-ins of declared cloud stores, defaults to
+	/// 'target/stores'. A declaration resolved with
+	/// [`ServiceAccess::Local`](crate::prelude::ServiceAccess) is backed by
+	/// [`Self::store_dir`] keyed on its label, so the same markup runs locally
+	/// and deployed.
+	pub stores_dir: WsPathBuf,
 	/// Directory for temp static files like client islands.
 	pub client_islands_path: WsPathBuf,
 }
@@ -45,7 +49,7 @@ impl Default for WorkspaceConfig {
 			root_dir: WsPathBuf::default(),
 			snippets_dir: WsPathBuf::new("target/snippets"),
 			html_dir: WsPathBuf::new("target/client"),
-			analytics_dir: WsPathBuf::new("target/analytics"),
+			stores_dir: WsPathBuf::new("target/stores"),
 			client_islands_path: WsPathBuf::new("target/client_islands.ron"),
 		}
 	}
@@ -54,6 +58,12 @@ impl Default for WorkspaceConfig {
 impl WorkspaceConfig {
 	/// Returns the snippets directory.
 	pub fn snippets_dir(&self) -> &WsPathBuf { &self.snippets_dir }
+
+	/// The local directory backing the store declared under `label`, ie
+	/// `target/stores/analytics`.
+	pub fn store_dir(&self, label: impl AsRef<Path>) -> WsPathBuf {
+		self.stores_dir.join(label)
+	}
 
 	/// Creates a file path in the format of `path/to/file:line:col.rs`.
 	///

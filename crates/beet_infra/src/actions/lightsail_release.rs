@@ -124,6 +124,7 @@ impl ReleaseQuery<'_, '_> {
 		let mut blocks = self
 			.stacks
 			.declared(entity)?
+			.into_iter()
 			.filter_map(|child| self.blocks.get(child).ok());
 		let block = blocks
 			.next()

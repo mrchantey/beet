@@ -5,26 +5,35 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::json;
 
+/// An S3 bucket, declared once and read by both meanings of the declaration:
+/// the deploy creates it, and (with the `aws_sdk` backend) the runtime attaches
+/// an [`S3Store`](beet_net::prelude::S3Store) for it on the same entity.
+///
+/// Authored directly from markup, ie `<S3BucketBlock label="app"
+/// deploy_versioned=false/>`. The label alone is declared; the
+/// `<app>--<stage>--<label>` name composes at resolution through
+/// [`ResourceScope`], so both sides read the same string.
 #[derive(
 	Debug,
 	Clone,
 	Get,
-	Deref,
-	DerefMut,
 	SetWith,
 	Serialize,
 	Deserialize,
 	Component,
+	Reflect,
 )]
-#[component(immutable, on_add = on_add_s3_bucket_block)]
+#[reflect(Component, Default)]
+#[component(immutable, on_add = ErasedBlock::on_add::<S3BucketBlock>)]
 pub struct S3BucketBlock {
 	label: SmolStr,
-	#[deref]
-	details: AwsS3BucketDetails,
+	/// The aws region the bucket lives in.
+	region: SmolStr,
 	/// add a tofu output for the bucket name
 	output: bool,
-	/// apply the stack default region if none set
-	apply_region: bool,
+	/// Allow the deploy to delete a non-empty bucket. `false` for a source of
+	/// record, whose accidental teardown is unrecoverable.
+	force_destroy: bool,
 	/// All objects will be nested under the deploy uuid,
 	/// ensuring unique files per deploy
 	deploy_versioned: bool,
@@ -42,16 +51,17 @@ pub struct S3BucketBlock {
 	layer: SmolStr,
 }
 
+impl Default for S3BucketBlock {
+	fn default() -> Self { Self::new("") }
+}
+
 impl S3BucketBlock {
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
-			details: AwsS3BucketDetails {
-				force_destroy: Some(true),
-				..default()
-			},
-			apply_region: true,
+			region: crate::bindings::aws::region::DEFAULT.into(),
 			output: true,
+			force_destroy: true,
 			deploy_versioned: true,
 			public_read: false,
 			layer: terra::Config::STORAGE_LAYER.into(),
@@ -61,46 +71,61 @@ impl S3BucketBlock {
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
 	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket, resolved
-	/// against `stack` (bucket name, region, and deploy-versioned subdir).
+	/// against `scope` (the composed bucket name) and this block's own region.
+	/// A deploy-versioned bucket needs the deploy id, which only a [`Stack`]
+	/// carries, so pass it through when there is one.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	pub fn store(&self, stack: &Stack) -> beet_net::prelude::S3Store {
-		let region = self.region.as_ref().unwrap_or(stack.aws_region());
-		let bucket_name = stack.resource_ident(self.label.clone());
-		let mut store = beet_net::prelude::S3Store::new(
-			bucket_name.primary_identifier().clone(),
-			region.clone(),
+	pub fn store(
+		&self,
+		scope: &ResourceScope,
+		deploy_id: Option<&Uuid>,
+	) -> beet_net::prelude::S3Store {
+		let store = beet_net::prelude::S3Store::new(
+			scope.resource_name(self.label.clone()),
+			self.region.clone(),
 		);
-		if self.deploy_versioned {
-			store =
-				store.with_subdir(SmolPath::new(stack.deploy_id().to_string()));
+		match (self.deploy_versioned, deploy_id) {
+			(true, Some(deploy_id)) => {
+				store.with_subdir(SmolPath::new(deploy_id.to_string()))
+			}
+			_ => store,
 		}
-		store
+	}
+
+	/// The store for this bucket as a deploy declares it, ie including the
+	/// per-deploy subdir a versioned bucket nests under.
+	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+	pub fn stack_store(&self, stack: &Stack) -> beet_net::prelude::S3Store {
+		self.store(&stack.scope(), Some(stack.deploy_id()))
 	}
 }
 
-/// Inserts an [`ErasedBlock`] and, when the `aws_sdk` feature is enabled,
-/// also inserts an [`S3Store`] (which in turn inserts a [`BlobStore`]).
-fn on_add_s3_bucket_block(mut world: DeferredWorld, cx: HookContext) {
-	// always insert ErasedBlock
-	ErasedBlock::on_add::<S3BucketBlock>(world.reborrow(), cx);
-
-	// when the native aws_sdk is available, insert S3Store
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	{
-		world.commands().entity(cx.entity).queue(
-			move |mut entity: EntityWorldMut| -> Result {
-				if let Ok(stack) = entity
-					.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
-						query.get(entity).cloned()
-					}) {
-					let block = entity.get_or_else::<S3BucketBlock>()?;
-					let s3_store = block.store(&stack);
-					entity.insert(s3_store);
-				}
-				Ok(())
-			},
-		);
-	}
+/// Observer: attach the runtime meaning of a declared bucket, the
+/// [`S3Store`](beet_net::prelude::S3Store) (which in turn inserts a
+/// [`BlobStore`]) for the name the deploy creates. Registered by [`InfraPlugin`]
+/// rather than hooked on the component, so a build without the SDK carries the
+/// declaration and nothing else.
+///
+/// Deferred through the command queue because the ancestry a scope resolves
+/// against lands with the rest of the scene, after this insertion.
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+pub(crate) fn attach_s3_store(ev: On<Add, S3BucketBlock>, mut commands: Commands) {
+	commands.entity(ev.entity).queue(
+		|mut entity: EntityWorldMut| -> Result {
+			let block = entity.get_or_else::<S3BucketBlock>()?.clone();
+			let store = entity.with_state::<ResourceScopeQuery, _>(
+				|entity, scopes| -> Result<_> {
+					let deploy_id =
+						scopes.stack(entity).map(|stack| *stack.deploy_id());
+					block
+						.store(&scopes.get(entity)?, deploy_id.as_ref())
+						.xok()
+				},
+			)?;
+			entity.insert(store);
+			Ok(())
+		},
+	);
 }
 
 impl Block for S3BucketBlock {
@@ -108,15 +133,16 @@ impl Block for S3BucketBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		let mut details = self.details.clone();
-		if self.apply_region && details.region.is_none() {
-			details.region = Some(stack.aws_region().clone());
-		}
 		let bucket = ResourceDef::new_primary(
 			stack.resource_ident(self.label.clone()),
-			details,
+			AwsS3BucketDetails {
+				force_destroy: Some(self.force_destroy),
+				region: Some(self.region.clone()),
+				..default()
+			},
 		);
 		// the destination of a deploy's content sync, so it converges in the
 		// layer applied ahead of the sync
@@ -134,6 +160,14 @@ impl Block for S3BucketBlock {
 			self.emit_public_read(stack, config, &bucket)?;
 		}
 		Ok(())
+	}
+
+	/// A deployed process reads the buckets declared alongside it (its site
+	/// store, its assets); the deploy itself is what writes them.
+	fn runtime_access(&self, scope: &ResourceScope) -> Vec<AccessGrant> {
+		vec![AccessGrant::read(AccessResource::S3Bucket {
+			name: scope.resource_name(self.label.clone()),
+		})]
 	}
 }
 
@@ -213,6 +247,7 @@ mod tests {
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&default(),
 				&mut config,
 			)
 			.unwrap();

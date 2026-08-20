@@ -13,7 +13,10 @@ pub(crate) struct TestWorkDir;
 
 #[derive(Debug, Clone, Get, SetWith, Component)]
 pub struct Stack {
-	/// The app name, defaults to `CARGO_PKG_NAME`
+	/// The app name, the deploy half of the one app identity. A host derives it
+	/// from the application's [`PackageConfig`] rather than defaulting it, since
+	/// an app identity derivable from two sources is exactly the drift the
+	/// [`ResourceScope`] composition exists to prevent.
 	app_name: SmolStr,
 	/// The deployment stage, namespacing every resource. Resolved by [`Stack::new`]
 	/// from the `--stage=<x>` cli arg, else the `BEET_STAGE` env var, else `dev`.
@@ -43,12 +46,6 @@ pub struct Stack {
 	deploy_timestamp: String,
 }
 
-impl Default for Stack {
-	fn default() -> Self {
-		let app_name = env_ext::var("CARGO_PKG_NAME").unwrap();
-		Self::new(app_name)
-	}
-}
 impl Stack {
 	pub fn new(app_name: impl Into<SmolStr>) -> Self {
 		let app_name = app_name.into();
@@ -111,7 +108,7 @@ impl Stack {
 			Self {
 				backend: LocalBackend::default().into(),
 				work_directory: path,
-				..default()
+				..Self::new("beet_infra")
 			},
 			dir,
 		)
@@ -126,8 +123,14 @@ impl Stack {
 	// 	self.resource_ident("iam-roles", label)
 	// }
 
+	/// The app identity + stage this stack names resources in, the half of a
+	/// stack a runtime declaration also resolves against.
+	pub fn scope(&self) -> ResourceScope {
+		ResourceScope::new(self.app_name.clone(), self.stage.clone())
+	}
+
 	pub fn resource_ident(&self, label: impl Into<SmolStr>) -> terra::Ident {
-		terra::Ident::new(self.app_name.clone(), self.stage.clone(), label)
+		self.scope().resource_ident(label)
 	}
 
 	/// The state backend path, ie `my-app--prod--tofu.tfstate`.
@@ -178,6 +181,7 @@ impl Stack {
 #[derive(SystemParam)]
 pub struct StackQuery<'w, 's> {
 	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
+	all_stacks: Query<'w, 's, (Entity, &'static Stack)>,
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
 	stores: Query<'w, 's, &'static BlobStore>,
@@ -190,14 +194,62 @@ impl<'w, 's> StackQuery<'w, 's> {
 		self.stacks.get(entity)
 	}
 
-	/// Every descendant of `entity`'s stack root, inclusive. The one traversal
-	/// a deploy step uses to find what was declared alongside it.
-	pub fn declared(
-		&self,
-		entity: Entity,
-	) -> Result<impl Iterator<Item = Entity> + use<'_>> {
+	/// Every entity declared under `entity`'s stack: its root's descendants
+	/// (inclusive), plus any UNSCOPED block (see [`Self::unscoped_blocks`]) when
+	/// this stack is the one that adopts them. The one traversal a deploy step
+	/// uses to find what was declared alongside it.
+	pub fn declared(&self, entity: Entity) -> Result<Vec<Entity>> {
 		let (root, _) = self.root(entity)?;
-		self.children.iter_descendants_inclusive(root).xok()
+		let mut declared = self
+			.children
+			.iter_descendants_inclusive(root)
+			.collect::<Vec<_>>();
+		declared.extend(self.adopted_blocks(root)?);
+		declared.xok()
+	}
+
+	/// Blocks declared outside any [`Stack`], ie an application-level resource
+	/// declaration whose reason to exist is its runtime meaning (the analytics
+	/// table a router records to). They are real resources and something must
+	/// provision them, so a deploy adopts them.
+	fn unscoped_blocks(&self) -> Vec<Entity> {
+		self.blocks
+			.iter()
+			.map(|(entity_ref, _)| entity_ref.id())
+			.filter(|entity| self.stacks.get(*entity).is_err())
+			.collect()
+	}
+
+	/// The unscoped blocks this stack adopts: none unless it is THE host for
+	/// this process's stage, so a stage override (the shared assets host, which
+	/// deploys nothing the app runs on) never quietly provisions the app's
+	/// resources into the wrong stack.
+	fn adopted_blocks(&self, root: Entity) -> Result<Vec<Entity>> {
+		let unscoped = self.unscoped_blocks();
+		if unscoped.is_empty() {
+			return Ok(Vec::new());
+		}
+		let process_stage = &BootstrapConfig::get().stage;
+		let hosts = self
+			.all_stacks
+			.iter()
+			.filter(|(_, stack)| stack.stage() == process_stage)
+			.map(|(entity, _)| entity)
+			.collect::<Vec<_>>();
+		// naming the blocks, since the fix is either to scope them under a host
+		// or to declare the host they belong to.
+		if hosts.len() != 1 {
+			bevybail!(
+				"{} block(s) are declared outside any deploy host, and {} hosts carry the process stage '{process_stage}' (exactly one must): {unscoped:?}",
+				unscoped.len(),
+				hosts.len()
+			);
+		}
+		match hosts[0] == root {
+			true => unscoped,
+			false => Vec::new(),
+		}
+		.xok()
 	}
 
 	/// Finds the stack in ancestors and
@@ -210,19 +262,27 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// a host that can apply it (see [`build_project`](Self::build_project),
 	/// which is the same config wrapped in the native tofu driver).
 	pub fn build_config(&self, entity: Entity) -> Result<(&Stack, terra::Config)> {
-		let (root, stack) = self.root(entity)?;
+		let (_, stack) = self.root(entity)?;
 		let mut config = stack.create_config();
 		let region = stack.aws_region();
 		config.add_provider_config(
 			&terra::Provider::AWS,
 			&serde_json::json!({ "region": region }),
 		)?;
-		for (child, block) in self
-			.children
-			.iter_descendants_inclusive(root)
+		let blocks = self
+			.declared(entity)?
+			.into_iter()
 			.filter_map(|child| self.blocks.get(child).ok())
-		{
-			block.apply_to_config(&child, stack, &mut config)?;
+			.collect::<Vec<_>>();
+		// a pre-pass, since a compute block lowers the grants its *siblings*
+		// declared and the emit order is otherwise arbitrary.
+		let access = blocks
+			.iter()
+			.flat_map(|(_, block)| block.runtime_access(&stack.scope()))
+			.collect::<Vec<_>>()
+			.xmap(AccessGrants::new);
+		for (child, block) in blocks {
+			block.apply_to_config(&child, stack, &access, &mut config)?;
 		}
 		Ok((stack, config))
 	}
