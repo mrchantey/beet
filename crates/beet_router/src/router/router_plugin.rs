@@ -33,6 +33,7 @@ impl Plugin for RouterPlugin {
 		app.register_type::<InterruptOnRun>()
 			.register_type::<InterruptOnEnd>()
 			.register_type::<PathPartial>()
+			.register_type::<PathRoot>()
 			.register_type::<ParamsPartial>()
 			.register_type::<PathPattern>()
 			.register_type::<ParamsPattern>()
@@ -229,16 +230,17 @@ fn insert_action_path_and_params(
 	ev: On<Insert, ActionMeta>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
+	path_roots: Query<(), With<PathRoot>>,
 	params: Query<&ParamsPartial>,
 	mut commands: Commands,
 ) -> Result {
 	// only entities that have their own PathPartial become routes; children of a
-	// route (eg sequence steps) have no PathPartial themselves, and a namespace
-	// root (a `Router`) carries one to bound its url space, not to be a route.
-	if !paths.get(ev.entity).is_ok_and(|path| !path.is_root) {
+	// route (eg sequence steps) have no PathPartial themselves, and a url space
+	// root (a `Router`) bounds its subtree rather than being a route itself.
+	if !paths.contains(ev.entity) || path_roots.contains(ev.entity) {
 		return Ok(());
 	}
-	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
+	let path = PathPattern::collect(ev.entity, &ancestors, &paths, &path_roots)?;
 	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
 	commands.entity(ev.entity).insert((path, params));
 	Ok(())
@@ -251,18 +253,17 @@ fn insert_path_pattern_for_late_path_partial(
 	ev: On<Insert, PathPartial>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
+	path_roots: Query<(), With<PathRoot>>,
 	params: Query<&ParamsPartial>,
 	actions: Query<(), (With<ActionMeta>, Without<PathPattern>)>,
 	mut commands: Commands,
 ) -> Result {
-	// ActionMeta must already be present, PathPattern not yet computed, and a
-	// namespace root is not itself a route (see `insert_action_path_and_params`).
-	if !actions.contains(ev.entity)
-		|| paths.get(ev.entity).is_ok_and(|path| path.is_root)
-	{
+	// ActionMeta must already be present, PathPattern not yet computed, and a url
+	// space root is not itself a route (see `insert_action_path_and_params`).
+	if !actions.contains(ev.entity) || path_roots.contains(ev.entity) {
 		return Ok(());
 	}
-	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
+	let path = PathPattern::collect(ev.entity, &ancestors, &paths, &path_roots)?;
 	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
 	commands.entity(ev.entity).insert((path, params));
 	Ok(())
@@ -288,12 +289,12 @@ fn insert_path_pattern_for_late_path_partial(
 fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
-	paths: Query<&PathPartial>,
+	path_roots: Query<(), With<PathRoot>>,
 	children_query: Query<&Children>,
 	actions: Query<ActionQueryItem, Without<RouteHidden>>,
 	mut commands: Commands,
 ) -> Result {
-	let root = PathPattern::namespace_root(ev.entity, &ancestors, &paths);
+	let root = PathPattern::namespace_root(ev.entity, &ancestors, &path_roots);
 	let mut nodes: Vec<ActionNode> = Vec::new();
 	// when added via ChildOf, it will not have been added to the Children,
 	// so we check this one manually
@@ -307,7 +308,7 @@ fn insert_route_tree(
 		.filter(|entity| *entity != ev.entity)
 		// ..and a nested namespace owns its own tree
 		.filter(|entity| {
-			PathPattern::namespace_root(*entity, &ancestors, &paths) == root
+			PathPattern::namespace_root(*entity, &ancestors, &path_roots) == root
 		})
 	{
 		if let Ok(item) = actions.get(entity) {
@@ -336,7 +337,7 @@ fn rebuild_route_trees_on_load(
 	ev: On<LoadTemplateSerde>,
 	mut commands: Commands,
 	ancestors: Query<&ChildOf>,
-	paths: Query<&PathPartial>,
+	path_roots: Query<(), With<PathRoot>>,
 	children_query: Query<&Children>,
 	actions: Query<ActionQueryItem, Without<RouteHidden>>,
 ) -> Result {
@@ -346,7 +347,7 @@ fn rebuild_route_trees_on_load(
 	let mut roots: Vec<Entity> = ev
 		.entities
 		.iter()
-		.map(|entity| PathPattern::namespace_root(*entity, &ancestors, &paths))
+		.map(|entity| PathPattern::namespace_root(*entity, &ancestors, &path_roots))
 		.collect();
 	roots.sort();
 	roots.dedup();
@@ -355,7 +356,7 @@ fn rebuild_route_trees_on_load(
 		let nodes: Vec<ActionNode> = children_query
 			.iter_descendants_inclusive(root)
 			.filter(|entity| {
-				PathPattern::namespace_root(*entity, &ancestors, &paths) == root
+				PathPattern::namespace_root(*entity, &ancestors, &path_roots) == root
 			})
 			.filter_map(|entity| actions.get(entity).ok())
 			.map(ActionNode::from_query)

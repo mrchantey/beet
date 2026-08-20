@@ -5,9 +5,10 @@ use crate::bindings::*;
 use crate::prelude::*;
 
 pub mod region {
-	/// The region every beet stack and block defaults to, so a block resolved
-	/// without a stack lands in the same place as one resolved with it.
-	pub const DEFAULT: &str = US_WEST_2;
+	/// The [`Stack`](crate::prelude::Stack)'s region fallback, and nothing
+	/// else's. A block must not reach for this: region is a property of the
+	/// scope a resource is declared in, so a block resolves it from its stack.
+	pub(crate) const DEFAULT: &str = US_WEST_2;
 	pub const US_EAST_1: &str = "us-east-1";
 	pub const US_WEST_2: &str = "us-west-2";
 }

@@ -10,12 +10,12 @@ use beet_core::prelude::*;
 /// stream the router middleware records.
 ///
 /// The store it records to is named by a
-/// [`TableStoreRef`](crate::prelude::TableStoreRef) on the same entity, pointing
+/// [`StoreRef`](crate::prelude::StoreRef) on the same entity, pointing
 /// at the entity that *declares* the store, ie
 ///
 /// ```html
 /// <DynamoTableBlock bx:ref="analytics" label="analytics"/>
-/// <Router {(AnalyticsConfig, TableStoreRef($analytics))}>..</Router>
+/// <Router {(AnalyticsConfig, StoreRef($analytics))}>..</Router>
 /// ```
 ///
 /// The reference is required: a config with nowhere to record is the failure

@@ -26,7 +26,7 @@ command route.
 `<DynamoTableBlock label="analytics"/>` is declared once, here, at router level.
 The DEPLOY provisions it into the stage stack (a block outside any deploy host
 is adopted by the host carrying this process's stage), and the RUNTIME attaches
-a store for it, which the content router names with `TableStoreRef($analytics)`.
+a store for it, which the content router names with `StoreRef($analytics)`.
 Both sides compose `<app>--<stage>--analytics` through the one `ResourceScope`,
 from the `app_name` on this entry's `<PackageConfig/>`, so they cannot disagree.
 The live site once spent a whole deploy writing to a table that did not exist
@@ -109,7 +109,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 	<DynamoTableBlock bx:ref="analytics" label="analytics"/>
 	<Route path="serve" {BootHost}>
 		<StartOnLoad {(HttpServer, TuiServer, SshTuiServer)}>
-			<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, TableStoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+			<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
 				<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 				<TemplateDir src="templates"/>
 				<Styles/>

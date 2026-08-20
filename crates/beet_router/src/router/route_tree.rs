@@ -195,7 +195,7 @@ impl RouteTree {
 	pub fn rebuild(
 		server: In<Entity>,
 		ancestors: Query<&ChildOf>,
-		paths: Query<&PathPartial>,
+		path_roots: Query<(), With<PathRoot>>,
 		children_query: Query<&Children>,
 		actions: Query<ActionQueryItem, Without<RouteHidden>>,
 		mut commands: Commands,
@@ -206,7 +206,7 @@ impl RouteTree {
 			let Ok(item) = actions.get(entity) else {
 				continue;
 			};
-			let root = PathPattern::namespace_root(entity, &ancestors, &paths);
+			let root = PathPattern::namespace_root(entity, &ancestors, &path_roots);
 			let node = ActionNode::from_query(item);
 			match spaces.iter_mut().find(|(space, _)| *space == root) {
 				Some((_, nodes)) => nodes.push(node),

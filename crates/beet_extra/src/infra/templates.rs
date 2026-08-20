@@ -47,7 +47,7 @@ pub fn ExampleBinaryBuild(
 #[template]
 pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
 	(CliServer::default(), children![(
-		infra_ext::stack(app_name),
+		Stack::new(app_name),
 		Router::with_defaults(),
 		children![
 			Validate,
@@ -75,7 +75,7 @@ pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
 			LocalBackend::default().into()
 		};
 	(
-		infra_ext::stack(app_name).with_backend(backend),
+		Stack::new(app_name).with_backend(backend),
 		Router::with_defaults(),
 		children![
 			CliServer::default(),
@@ -94,7 +94,7 @@ pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
 /// app bucket. The markup form of `sync_site(stack)`.
 #[template]
 pub fn SiteSync(#[prop(into)] app_name: String) -> impl Bundle {
-	infra_ext::sync_site(&infra_ext::stack(app_name))
+	infra_ext::sync_site(&Stack::new(app_name))
 }
 
 /// `<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>` — the lambda
@@ -110,7 +110,7 @@ pub fn LambdaSiteBlock(
 	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
 ) -> Result<impl Bundle> {
-	let stack = infra_ext::stack(&app_name);
+	let stack = Stack::new(&app_name);
 	(
 		LambdaBlock::default(),
 		infra_ext::beet_cargo_build(features)
@@ -143,7 +143,7 @@ pub fn LightsailSiteBlock(
 	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
 ) -> Result<impl Bundle> {
-	let stack = infra_ext::stack(&app_name);
+	let stack = Stack::new(&app_name);
 	(
 		LightsailBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::app_bucket_name(&stack),
@@ -172,7 +172,7 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 pub fn FargateSiteBlock(
 	#[prop(into)] app_name: String,
 ) -> Result<impl Bundle> {
-	let stack = infra_ext::stack(&app_name);
+	let stack = Stack::new(&app_name);
 	FargateBlock::default()
 		.with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::app_bucket_name(&stack),
@@ -311,8 +311,8 @@ pub fn DeployHost(
 			.clone(),
 	};
 	let stack = match stage {
-		Some(stage) => infra_ext::stack(app_name).with_stage(stage),
-		None => infra_ext::stack(app_name),
+		Some(stage) => Stack::new(app_name).with_stage(stage),
+		None => Stack::new(app_name),
 	};
 	(stack, children![
 		Validate,

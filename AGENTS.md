@@ -68,6 +68,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - prefer method chaining over if statements, but dont use `for_each`. ie  this is correct`for child in children.iter().filter(query.contains}`
 - Fix any spelling mistakes you come across in code or docs.
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
+- Never mention agent plans or temporary tasks in code docs.
 - Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`
 - Many types like `HashMap`, `HashSet`, `Instant`, `Result` are already re-exported from `beet_core::prelude::*`. These types are optimized for beet applications, ie cross-platform, faster non-crypto etc, so only use others if theres a good reason for it.
 - Always use `bevyhow!{}`, `bevybail!{}` unless a result consumer needs to access the error type, in which case use `thiserror` which is now no_std. 

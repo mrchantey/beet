@@ -9,12 +9,6 @@ use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
 
-/// Namespaces every cloud resource for an example, in the one region every beet
-/// stack and block defaults to.
-pub fn stack(app_name: impl Into<SmolStr>) -> Stack {
-	Stack::new(app_name).with_aws_region(bindings::aws::region::DEFAULT)
-}
-
 /// The one bucket an app is served from: a per-stage replica of the checkout, so
 /// everything the binary reads (the entry, the routes, the assets) is one store.
 /// Non-versioned so `sync` overwrites in place and the running binary reads a

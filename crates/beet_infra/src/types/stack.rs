@@ -176,6 +176,38 @@ impl Stack {
 	pub fn state_file(&self) -> Blob {
 		self.backend.provider().erased_blob(self.backend_path())
 	}
+
+	/// The tofu config `blocks` build in this stack: the provider region, then
+	/// every block's resources emitted with the [`AccessGrants`] the whole set
+	/// declared.
+	///
+	/// The one definition of what a stack's config *is*, so the ECS traversal
+	/// ([`StackQuery::build_config`]) and a caller holding blocks directly (a
+	/// test, a wasm consumer authoring a stack in Rust) cannot drift on the
+	/// grant pre-pass, which is easy to omit and silently under-grants the
+	/// deployed identity.
+	pub fn build_config<'a>(
+		&self,
+		blocks: impl IntoIterator<Item = (EntityRef<'a>, &'a dyn Block)> + Clone,
+	) -> Result<terra::Config> {
+		let mut config = self.create_config();
+		config.add_provider_config(
+			&terra::Provider::AWS,
+			&serde_json::json!({ "region": self.aws_region() }),
+		)?;
+		// a pre-pass, since a compute block lowers the grants its *siblings*
+		// declared and the emit order is otherwise arbitrary.
+		let access = blocks
+			.clone()
+			.into_iter()
+			.flat_map(|(_, block)| block.runtime_access(&self.scope()))
+			.collect::<Vec<_>>()
+			.xmap(AccessGrants::new);
+		for (entity, block) in blocks {
+			block.apply_to_config(&entity, self, &access, &mut config)?;
+		}
+		config.xok()
+	}
 }
 
 #[derive(SystemParam)]
@@ -263,27 +295,13 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// which is the same config wrapped in the native tofu driver).
 	pub fn build_config(&self, entity: Entity) -> Result<(&Stack, terra::Config)> {
 		let (_, stack) = self.root(entity)?;
-		let mut config = stack.create_config();
-		let region = stack.aws_region();
-		config.add_provider_config(
-			&terra::Provider::AWS,
-			&serde_json::json!({ "region": region }),
-		)?;
 		let blocks = self
 			.declared(entity)?
 			.into_iter()
 			.filter_map(|child| self.blocks.get(child).ok())
+			.map(|(entity, block)| (entity, &**block))
 			.collect::<Vec<_>>();
-		// a pre-pass, since a compute block lowers the grants its *siblings*
-		// declared and the emit order is otherwise arbitrary.
-		let access = blocks
-			.iter()
-			.flat_map(|(_, block)| block.runtime_access(&stack.scope()))
-			.collect::<Vec<_>>()
-			.xmap(AccessGrants::new);
-		for (child, block) in blocks {
-			block.apply_to_config(&child, stack, &access, &mut config)?;
-		}
+		let config = stack.build_config(blocks)?;
 		Ok((stack, config))
 	}
 

@@ -24,7 +24,7 @@ use beet_net::prelude::*;
 // a router is a url space: its subtree's routes are rooted at it and no ancestor
 // segment prepends, so a site mounted under a command route keeps its own urls
 // and a dispatching surface cannot reach routes outside the namespace it serves.
-#[require(PathPartial = PathPartial::root())]
+#[require(PathRoot)]
 #[component(on_add = Action::<Request, Response>::assert_provider::<Self>)]
 pub struct Router;
 

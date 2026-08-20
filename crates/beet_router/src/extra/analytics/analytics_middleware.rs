@@ -274,7 +274,7 @@ mod stalled_store_test {
 			app.world_mut().spawn((server, on_spawn, children![(
 				Router,
 				AnalyticsConfig::default(),
-				TableStoreRef(store),
+				StoreRef(store),
 				AnalyticsMiddleware::default(),
 				children![render_action::fixed_func_route("about", || rsx! {
 					<p>"About"</p>
@@ -341,7 +341,7 @@ mod test {
 			.spawn((
 				Router,
 				AnalyticsConfig::default(),
-				TableStoreRef(store),
+				StoreRef(store),
 				AnalyticsMiddleware::default(),
 				children![render_action::fixed_func_route("about", || rsx! {
 					<p>"About"</p>

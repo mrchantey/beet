@@ -133,24 +133,13 @@ async fn fargate_force_destroy() {
 fn build_project(stack: &Stack) -> Result<terra::Project> {
 	let block = FargateBlock::default();
 	let bucket_block = assets_bucket_block();
-	let mut config = stack.create_config();
-	config.add_provider_config(
-		&terra::Provider::AWS,
-		&serde_json::json!({ "region": stack.aws_region() }),
-	)?;
 	let mut world = World::new();
 	let entity_mut = world.spawn(());
 	let entity = entity_mut.as_readonly();
-	// the grants the declared blocks state, lowered by the compute block, as
-	// `StackQuery::build_config` collects them.
-	let access = AccessGrants::new(
-		[&block as &dyn Block, &bucket_block]
-			.iter()
-			.flat_map(|block| block.runtime_access(&stack.scope()))
-			.collect(),
-	);
-	block.apply_to_config(&entity, stack, &access, &mut config)?;
-	bucket_block.apply_to_config(&entity, stack, &access, &mut config)?;
+	let config = stack.build_config([
+		(entity.clone(), &block as &dyn Block),
+		(entity, &bucket_block),
+	])?;
 	terra::Project::new(stack, config).xok()
 }
 

@@ -91,7 +91,7 @@ impl AnalyticsStore {
 /// insert the [`AnalyticsStore`] and (under `geoip`) the country database on the
 /// config's own entity.
 ///
-/// Declaration-first: a [`TableStoreRef`] on the config entity names the entity
+/// Declaration-first: a [`StoreRef`] on the config entity names the entity
 /// that *declares* the store (a `<DynamoTableBlock/>`, an `<FsStore/>`, any
 /// store provider), so the deploy that creates a table and the runtime that
 /// writes to it read one declaration and can never resolve different names.
@@ -117,11 +117,11 @@ pub(super) fn spawn_store_on_config(
 		}
 		// the store this config records to, declared once and named here.
 		let Ok(target) = config_entity
-			.get::<TableStoreRef, _>(|store_ref| store_ref.store())
+			.get::<StoreRef, _>(|store_ref| store_ref.store())
 			.await
 		else {
 			bevybail!(
-				"an `AnalyticsConfig` records to the store it names: add a `TableStoreRef` beside it pointing at a store declaration, ie `<DynamoTableBlock bx:ref=\"analytics\" label=\"analytics\"/>` and `{{(AnalyticsConfig, TableStoreRef($analytics))}}`"
+				"an `AnalyticsConfig` records to the store it names: add a `StoreRef` beside it pointing at a store declaration, ie `<DynamoTableBlock bx:ref=\"analytics\" label=\"analytics\"/>` and `{{(AnalyticsConfig, StoreRef($analytics))}}`"
 			);
 		};
 		// the provider hooks insert the TableStore through the command queue,
@@ -171,7 +171,7 @@ pub(super) fn spawn_store_on_config(
 /// Scoped to [`AnalyticsConfig`] entities rather than to every
 /// [`AnalyticsStore`] in the world, so a world holding two routers records each
 /// one's traffic to the store that router declared (through its
-/// [`TableStoreRef`], resolved once by [`spawn_store_on_config`]) and to no
+/// [`StoreRef`], resolved once by [`spawn_store_on_config`]) and to no
 /// other.
 pub(super) fn handle_analytics_event(
 	ev: On<AnalyticsEvent>,
@@ -207,7 +207,7 @@ mod test {
 	) -> (Entity, Entity) {
 		let store = world.spawn(store).flush();
 		let config = world
-			.spawn((AnalyticsConfig::default(), TableStoreRef(store)))
+			.spawn((AnalyticsConfig::default(), StoreRef(store)))
 			.flush();
 		(config, store)
 	}
@@ -307,7 +307,7 @@ mod test {
 		let mut world = collecting_world();
 		world.spawn(AnalyticsConfig::default()).flush();
 		AsyncRunner::settle_async_tasks(&mut world).await;
-		raised().join("\n").xpect_contains("TableStoreRef");
+		raised().join("\n").xpect_contains("StoreRef");
 
 		let mut world = collecting_world();
 		let attempts = Arc::new(AtomicUsize::new(0));

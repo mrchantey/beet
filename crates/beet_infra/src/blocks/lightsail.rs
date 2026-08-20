@@ -1098,23 +1098,18 @@ mod tests {
 		stack: &Stack,
 		declared: &[&dyn Block],
 	) -> String {
-		let access = AccessGrants::new(
-			declared
-				.iter()
-				.flat_map(|block| block.runtime_access(&stack.scope()))
-				.collect(),
-		);
-		let mut config = stack.create_config();
 		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				stack,
-				&access,
-				&mut config,
+		let entity_mut = world.spawn(());
+		let entity = entity_mut.as_readonly();
+		stack
+			.build_config(
+				core::iter::once((entity.clone(), block as &dyn Block))
+					.chain(declared.iter().map(|block| (entity.clone(), *block)))
+					.collect::<Vec<_>>(),
 			)
-			.unwrap();
-		config.to_json().to_string()
+			.unwrap()
+			.to_json()
+			.to_string()
 	}
 
 	/// The `terraform_data` input the access key's replacement is triggered by,

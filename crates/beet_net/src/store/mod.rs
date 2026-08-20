@@ -53,7 +53,7 @@ mod aws_cli;
 #[cfg(feature = "std")]
 mod table;
 #[cfg(feature = "std")]
-mod table_store_ref;
+mod store_ref;
 #[cfg(feature = "template_serde")]
 mod template_store;
 #[cfg(feature = "std")]
@@ -63,7 +63,7 @@ pub use aws_cli::*;
 #[cfg(feature = "std")]
 pub use table::*;
 #[cfg(feature = "std")]
-pub use table_store_ref::*;
+pub use store_ref::*;
 #[cfg(feature = "template_serde")]
 pub use template_store::*;
 // the `WatchDir` registration component (any `std` target) and the notify-based
@@ -126,9 +126,9 @@ impl Plugin for StorePlugin {
 			.register_type::<DirPath>()
 			.register_type::<BlobPath>()
 			// the consumer -> declared-store relationship, so markup binds a
-			// consumer to a declaration (`{TableStoreRef($analytics)}`).
-			.register_type::<TableStoreRef>()
-			.register_type::<TableStoreConsumers>()
+			// consumer to a declaration (`{StoreRef($analytics)}`).
+			.register_type::<StoreRef>()
+			.register_type::<StoreConsumers>()
 			.add_observer(on_insert_dir_path)
 			.add_observer(on_insert_blob_path)
 			.add_observer(on_insert_store)

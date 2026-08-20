@@ -61,7 +61,7 @@ impl DynamoTableBlock {
 
 /// Observer: attach the runtime meaning of a declared table, a store provider
 /// materializing the [`TableStore`] a consumer reaches through
-/// [`TableStoreRef`]. Registered by [`InfraPlugin`] rather than hooked on the
+/// [`StoreRef`]. Registered by [`InfraPlugin`] rather than hooked on the
 /// component, so a build without a backend carries the declaration and nothing
 /// else.
 ///
