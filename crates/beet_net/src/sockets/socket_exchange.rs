@@ -70,9 +70,9 @@ impl ExchangeSocket {
 			let (reply, id, codec) = connection
 				.with(move |mut entity: EntityWorldMut| -> Result<_> {
 					let mut socket =
-						entity.get_mut::<ExchangeSocket>().ok_or_else(|| {
-							bevyhow!("connection has no `ExchangeSocket`")
-						})?;
+						entity.get_mut::<ExchangeSocket>().ok_or_else(
+							|| bevyhow!("connection has no `ExchangeSocket`"),
+						)?;
 					let id = socket.next_id;
 					socket.next_id += 1;
 					let (sender, reply) = OnceValue::oneshot();

@@ -10,8 +10,8 @@
 //! Calling a [`ContinueRun`] also fires an [`StartRunning`] event carrying the
 //! input, so any number of observers can react to the parked call. One of them
 //! resolves it by queuing an [`EndRun`]; with no observer the call simply parks
-//! on its [`Running`]. This is how a server host fans a boot exchange out to
-//! every server that observes [`StartRunning<Request>`].
+//! on its [`Running`]. This is how a boot notification reaches a bystander that
+//! wants the request but holds nothing open, ie a thread kicking itself off.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
@@ -143,9 +143,9 @@ impl<In: 'static + Send + Sync> StartRunning<In> {
 /// When called, the [`ContinueRun::start_running`] handler stores the [`OutHandler`] on a
 /// [`Running`] component (so the call stays pending until an [`EndRun`] is
 /// queued) and fires an [`StartRunning`] carrying the input to any observers. A
-/// behaviour-tree action parks with no observer; a server entity carries
-/// `ContinueRun<Request, Response>` so a boot exchange reaches every server that
-/// observes [`StartRunning<Request>`].
+/// behaviour-tree action parks with no observer; an entity whose long-running
+/// work is a set of facets uses [`RunningSet`] instead, which parks the same way
+/// and additionally drives them.
 ///
 /// Never colocate an explicit `Action<In, Out>` (eg a handler, or a `Router`)
 /// with a `ContinueRun<In, Out>`: explicit-beats-required would silently replace
@@ -250,8 +250,8 @@ where
 }
 
 /// Fails a [`Running`] action, resolving its deferred [`OutHandler`] with an
-/// error: the [`EndRun`] counterpart for a run that could not start, or one an
-/// entry aborted.
+/// error: the [`EndRun`] counterpart for a run that could not start, or one a
+/// facet aborted.
 ///
 /// Queue on an entity to remove its [`Running<T>`] and fail the original call.
 /// With no `Running` (the call already resolved) the error is returned instead,

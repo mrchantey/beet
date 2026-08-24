@@ -58,14 +58,46 @@ where
 	.await
 }
 
+/// Polls every unfinished future concurrently, resolving when one fails or all
+/// have completed.
+///
+/// Unlike [`try_join_all`] nothing is dropped mid-flight: a completed future's
+/// slot is emptied and the unfinished ones are left in place, so on a failure
+/// the caller can react (signal a shutdown, record the error) and call this
+/// again to drive the remainder to completion. Repeat until it yields [`None`]
+/// to collect every error. no_std.
+pub async fn join_all_until_err<Fut, T, E>(
+	futures: &mut [Option<Fut>],
+) -> Option<E>
+where
+	Fut: Future<Output = Result<T, E>> + Unpin,
+{
+	core::future::poll_fn(move |cx| {
+		for slot in futures.iter_mut() {
+			let Some(fut) = slot else { continue };
+			match Pin::new(fut).poll(cx) {
+				Poll::Ready(Ok(_)) => *slot = None,
+				Poll::Ready(Err(err)) => {
+					*slot = None;
+					return Poll::Ready(Some(err));
+				}
+				Poll::Pending => {}
+			}
+		}
+		match futures.iter().all(Option::is_none) {
+			true => Poll::Ready(None),
+			false => Poll::Pending,
+		}
+	})
+	.await
+}
+
 /// Polls a collection of futures concurrently, resolving to their outputs in
 /// iteration order once all complete.
 ///
 /// A no_std drop-in for `futures::future::join_all`, backed only by
 /// `alloc` + `core`.
-pub async fn join_all<Fut, T>(
-	futures: impl IntoIterator<Item = Fut>,
-) -> Vec<T>
+pub async fn join_all<Fut, T>(futures: impl IntoIterator<Item = Fut>) -> Vec<T>
 where
 	Fut: Future<Output = T>,
 {
@@ -88,9 +120,7 @@ where
 			}
 		}
 		if all_done {
-			Poll::Ready(
-				results.iter_mut().map(|r| r.take().unwrap()).collect(),
-			)
+			Poll::Ready(results.iter_mut().map(|r| r.take().unwrap()).collect())
 		} else {
 			Poll::Pending
 		}
@@ -145,7 +175,10 @@ where
 			}
 			if in_flight == 0 && admitted == futures.len() {
 				return Poll::Ready(
-					results.iter_mut().map(|slot| slot.take().unwrap()).collect(),
+					results
+						.iter_mut()
+						.map(|slot| slot.take().unwrap())
+						.collect(),
 				);
 			}
 			// a completion freed a slot, so loop round to admit its replacement
@@ -402,6 +435,39 @@ mod test {
 			.await
 			.xpect_eq((0..total).collect::<Vec<_>>());
 		peak.load(Ordering::SeqCst).xpect_eq(4);
+	}
+
+	/// The graceful join: the first failure surfaces without dropping the
+	/// unfinished futures, so a second call drives them to completion and
+	/// collects what they broke on too.
+	#[crate::test]
+	async fn join_all_until_err_resumes_the_survivors() {
+		let (sender, receiver) = OnceValue::<()>::oneshot();
+		let mut futures = [
+			Some(Box::pin(async { bevybail!("first failed") })
+				as LocalBoxedFuture<Result>),
+			Some(Box::pin(async move {
+				receiver.wait().await;
+				bevybail!("second failed")
+			})),
+			Some(Box::pin(async { Ok(()) })),
+		];
+		async_ext::join_all_until_err(&mut futures)
+			.await
+			.unwrap()
+			.to_string()
+			.xpect_starts_with("first failed");
+		// the survivor was left in place, so signalling it resumes rather than
+		// resolving a dropped future
+		sender.signal(());
+		async_ext::join_all_until_err(&mut futures)
+			.await
+			.unwrap()
+			.to_string()
+			.xpect_starts_with("second failed");
+		async_ext::join_all_until_err(&mut futures)
+			.await
+			.xpect_none();
 	}
 
 	#[crate::test]

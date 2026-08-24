@@ -381,7 +381,11 @@ async fn run_async_task_inner<Func, Fut, Out>(
 			Some(entity) => {
 				debug!("async task for despawned entity {entity} ended: {err}")
 			}
-			None => world.handle_command_error_with_location::<Func>(err, location).await,
+			None => {
+				world
+					.handle_command_error_with_location::<Func>(err, location)
+					.await
+			}
 		}
 	}
 }

@@ -82,8 +82,9 @@ impl ServerFacet {
 			      }| {
 				let shutdown = shutdown.clone();
 				commands.commands.queue(move |world: &mut World| -> Result {
-					let outcome =
-						Self::start_now(world, caller, input, &shutdown, boot, serve);
+					let outcome = Self::start_now(
+						world, caller, input, &shutdown, boot, serve,
+					);
 					out_handler.call_world(world, outcome)
 				});
 				Ok(())
@@ -123,7 +124,9 @@ impl ServerFacet {
 			move |entity: AsyncEntity| async move {
 				match serve(entity.clone(), receiver).await {
 					Ok(()) => Ok(()),
-					Err(err) => entity.queue(FailRun::<Response>::new(err)).await?,
+					Err(err) => {
+						entity.queue(FailRun::<Response>::new(err)).await?
+					}
 				}
 			},
 		);
@@ -262,11 +265,11 @@ mod test {
 			.id();
 		let served = Store::new(false);
 		let recorder = served;
-		app.world_mut()
-			.entity_mut(entity)
-			.observe_any(move |ev: On<RunningSetStarted>| {
+		app.world_mut().entity_mut(entity).observe_any(
+			move |ev: On<RunningSetStarted>| {
 				recorder.set(ev.started == 2 && ev.declined == 0)
-			});
+			},
+		);
 		app.world_mut().entity_mut(entity).run_async_local(
 			|server| async move {
 				server.call::<Request, Response>(Request::get("/")).await?;

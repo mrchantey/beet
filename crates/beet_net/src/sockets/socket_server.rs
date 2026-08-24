@@ -115,15 +115,18 @@ impl SocketServer {
 	/// contribution, mirroring [`HttpServer`]: accept on start when `--server`
 	/// selects `"socket"`, close the listener on stop.
 	fn contribute(entity: &mut EntityCommands) {
-		ServerFacet::contribute(entity, SocketServer::boot, |entity, shutdown| {
-			Box::pin(start_socket_server(entity, shutdown))
-		});
+		ServerFacet::contribute(
+			entity,
+			SocketServer::boot,
+			|entity, shutdown| Box::pin(start_socket_server(entity, shutdown)),
+		);
 	}
 
 	/// Whether this boot selects the server. The socket listener takes its bind
 	/// config from the component alone, so there is nothing to overlay.
 	fn boot(&mut self, request: &Request) -> Result<bool> {
-		ServerFilter::selects(request.params(), "socket", self.default_boot).xok()
+		ServerFilter::selects(request.params(), "socket", self.default_boot)
+			.xok()
 	}
 
 	/// Creates a new socket server on `port`, bound to all interfaces (`0.0.0.0`) so a

@@ -19,6 +19,8 @@ impl Plugin for ActionPlugin {
 			.register_type::<CallOnSpawn<(), Outcome>>()
 			.add_systems(Update, call_on_spawn::<(), Outcome>)
 			.register_type::<ExcludeErrors>()
+			.register_type::<RunningError>()
+			.register_type::<ExcludeRunningErrors>()
 			.register_type::<Sequence<(), ()>>()
 			.register_type::<InfallibleSequence<(), ()>>()
 			.register_type::<Fallback<(), ()>>()

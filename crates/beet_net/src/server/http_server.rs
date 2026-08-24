@@ -155,9 +155,11 @@ impl HttpServer {
 	/// contribution: bind on start when `--server` selects `"http"`, close the
 	/// listener on stop.
 	fn contribute(entity: &mut EntityCommands) {
-		ServerFacet::contribute(entity, HttpServer::boot, |entity, shutdown| {
-			Box::pin(start_http_server(entity, shutdown))
-		});
+		ServerFacet::contribute(
+			entity,
+			HttpServer::boot,
+			|entity, shutdown| Box::pin(start_http_server(entity, shutdown)),
+		);
 	}
 
 	/// Whether this boot selects the server, overlaying its `--port` / `--host`
@@ -363,21 +365,24 @@ mod tests {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
-		app.world_mut()
-			.entity_mut(entity)
-			.run_async_local(move |server| async move {
+		app.world_mut().entity_mut(entity).run_async_local(
+			move |server| async move {
 				if let Err(err) =
 					server.call::<Request, Response>(Request::get("/")).await
 				{
 					recorder.set(Some(err.to_string()));
 				}
 				Ok(())
-			});
-		let settled = app_ext::update_until(&mut app, |_| caught.get().is_some())
-			.await;
+			},
+		);
+		let settled =
+			app_ext::update_until(&mut app, |_| caught.get().is_some()).await;
 		STUB_FAILS.store(false, Ordering::Relaxed);
 		settled.xpect_true();
-		caught.get().unwrap().xpect_contains("Address already in use");
+		caught
+			.get()
+			.unwrap()
+			.xpect_contains("Address already in use");
 	}
 
 	/// Closing the shutdown channel ends the accept loop and drops the listener,
@@ -553,9 +558,10 @@ pub(crate) mod test {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			// the server owns the boot, its dispatch host is the child
-			app.world_mut().spawn((server, children![exchange_ext::handler(
-				move |req| Response::ok().with_body(req.take().body)
-			)]));
+			app.world_mut()
+				.spawn((server, children![exchange_ext::handler(
+					move |req| Response::ok().with_body(req.take().body)
+				)]));
 			app.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -611,7 +617,9 @@ pub(crate) mod test {
 					HttpServer::start_mini_with_tcp(entity, listener, shutdown)
 				}),
 				// the server's dispatch host, a child
-				children![exchange_ext::handler(|_| Response::ok().with_body("up"))],
+				children![exchange_ext::handler(
+					|_| Response::ok().with_body("up")
+				)],
 			));
 			app.run();
 		});

@@ -45,6 +45,28 @@ impl From<BevyError> for CloneError {
 	fn from(error: BevyError) -> Self { Self::new(error) }
 }
 
+/// Collapse several errors into one.
+///
+/// A fan-out that can fail in more than one place (a set of concurrently driven
+/// tasks, a validation pass) owes its caller every failure, not just the first.
+#[extend::ext(name = CollapseErrors)]
+pub impl Vec<BevyError> {
+	/// One error passes through unchanged; several join their messages into a
+	/// single bulleted error.
+	fn collapse(mut self) -> BevyError {
+		match self.len() {
+			0 => bevyhow!("no errors to collapse"),
+			1 => self.remove(0),
+			count => self
+				.iter()
+				.map(|err| alloc::format!("- {err}"))
+				.collect::<Vec<_>>()
+				.join("\n")
+				.xmap(|list| bevyhow!("{count} errors:\n{list}")),
+		}
+	}
+}
+
 /// Trait for converting a value or Result into a `Result`.
 pub trait IntoResult<T = (), E = BevyError> {
 	/// Converts this value into a `Result`.
@@ -171,5 +193,19 @@ mod test {
 		c().unwrap_err()
 			.to_string()
 			.xpect_starts_with("fmt literal 12\n");
+	}
+
+	#[crate::test]
+	fn collapse_keeps_every_message() {
+		vec![bevyhow!("alone")]
+			.collapse()
+			.to_string()
+			.xpect_starts_with("alone\n");
+		vec![bevyhow!("first"), bevyhow!("second")]
+			.collapse()
+			.to_string()
+			.xpect_contains("2 errors:")
+			.xpect_contains("first")
+			.xpect_contains("second");
 	}
 }
