@@ -1,50 +1,92 @@
-//! Turning the process request into a run: the [`CallOnLoad`] verb calls an
-//! entity's action with the process request once its template loads, streaming
-//! the response and writing the matching [`AppExit`].
+//! Turning a load into a run: the [`CallOnLoad`] verb calls an entity's action
+//! when its template loads, with the request the load was given, streaming the
+//! response and writing the matching [`AppExit`].
 //!
 //! The canonical load signature is `Request -> Response`: argv/env is the
 //! request ([`Request::from_cli_args`]), stdout and the exit code are the
 //! response. Two fallbacks let a behavior scene load with no adapter, see
 //! [`CallOnLoad::call`].
 //!
-//! A [`StartOnLoad`] entity parks the call and fans it out to its servers,
-//! holding the process open; a one-shot (a [`CliServer`], a finite behavior)
-//! resolves it and the process exits with the response status. This is the one
-//! path that reads `CliArgs::parse_env()` and writes [`AppExit`]; servers are
-//! handed the request, never re-parsing argv.
+//! Loading a template never implies running it. The request is part of the load
+//! context, declared by whoever builds the tree ([`LoadRequest`]) rather than
+//! read from argv at fire time, so a command building a document inside another
+//! process builds it dormant by simply providing none.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Load verb: on this entity's `LoadTemplate`, call its action with the
-/// process request and stream the one-shot response (see [`CallOnLoad::call`]).
+/// Load verb: on this entity's `LoadTemplate`, call its action with the load's
+/// request and stream the one-shot response (see [`CallOnLoad::call`]).
 ///
-/// Sits directly on the action it drives. `LoadTemplate` fires on every
-/// descendant of a built entry, so a server root, a behavior root, or a
-/// script element all hear their own:
+/// Sits directly on the action it drives, so an entry root, a behavior root or a
+/// script element each declares its own:
 ///
 /// ```bsx
-/// <HttpServer>                            // requires StartOnLoad, parking on load
+/// <CliServer always=true {CallOnLoad}>    // a dispatcher root, exiting on resolve
 ///     <Router>..</Router>                 // the dispatch host, a child
-/// </HttpServer>
+/// </CliServer>
 /// <Sequence {CallOnLoad}> .. </Sequence>  // a behavior, exiting on resolve
 /// ```
 ///
-/// A failed build exits with an error and never runs; a [`DisableCallOnLoad`]
-/// on the entity or an ancestor opts the subtree out (eg a render/inspect
-/// build).
+/// It fires only when the load carried a [`LoadRequest`] (on this entity or an
+/// ancestor), which is what makes a render-only build (`check`, `export-static`)
+/// dormant without an opt-out component. A failed build exits with an error and
+/// never runs.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::observe(on_load_call))]
 pub struct CallOnLoad;
 
-/// Opts an entity (and its subtree) out of [`CallOnLoad`]: the tree is built
-/// to render or inspect (eg `export-static`, `check`), not to run. A
-/// component, not a resource, so a single world can build some entries
-/// dormant and run others.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct DisableCallOnLoad;
+/// The request a load fires with: the load context a [`CallOnLoad`] under it
+/// calls with.
+///
+/// Provided by whoever builds the tree, never read ambiently at fire time. The
+/// binary supplies its argv request when loading the process entry (the one
+/// sanctioned ambient read, made once at the process boundary); a command
+/// building a document to render or inspect supplies none, and nothing fires.
+///
+/// Held as [`RequestParts`] rather than a [`Request`] so one load context serves
+/// every `CallOnLoad` beneath it: a boot request is argv-shaped and carries no
+/// body.
+#[derive(Debug, Clone, Component)]
+pub struct LoadRequest(RequestParts);
+
+impl LoadRequest {
+	/// The load context for `request`.
+	pub fn new(request: &Request) -> Self {
+		Self(request.request_parts().clone())
+	}
+
+	/// The process request as a load context: the binary's own argv, read once
+	/// at the process boundary.
+	pub fn from_cli() -> Self {
+		Self::new(&Request::from_cli_args(CliArgs::parse_env()))
+	}
+
+	/// A fresh [`Request`] for one call.
+	pub fn request(&self) -> Request {
+		Request::from_parts(self.0.clone(), default())
+	}
+
+	/// Deliver this load context to the entity on spawn, calling its action as a
+	/// document load would.
+	///
+	/// The code counterpart of the markup load path, for an app that spawns its
+	/// server directly instead of loading a document:
+	///
+	/// ```ignore
+	/// world.spawn((
+	///     HttpServer::default(),
+	///     LoadRequest::from_cli().on_spawn(),
+	///     children![exchange_ext::handler(|req| req.mirror())],
+	/// ));
+	/// ```
+	pub fn on_spawn(self) -> OnSpawn {
+		OnSpawn::new_async_local(move |entity| {
+			CallOnLoad::call(entity, self.request())
+		})
+	}
+}
 
 impl CallOnLoad {
 	/// Call the entity's action with `request` and, once the call resolves,
@@ -58,16 +100,35 @@ impl CallOnLoad {
 	/// - `() -> Outcome`, a behavior: `Pass` exits zero, `Fail` nonzero
 	/// - `() -> ()`, a plain action, always zero
 	///
-	/// A long-running action (a parked [`StartOnLoad`], an endless `Repeat`)
+	/// A long-running action (a parked [`RunningSet`], an endless `Repeat`)
 	/// never resolves, so the await parks here and the process stays up; a
 	/// one-shot resolves, streams, and exits.
+	///
+	/// A failed call is the process's result too: it logs and exits nonzero
+	/// rather than raising into the app's error handler, since there is no caller
+	/// above a load to hear it.
 	pub async fn call(entity: AsyncEntity, request: Request) -> Result {
-		let response = if entity
+		let response = match Self::response(&entity, request).await {
+			Ok(response) => response,
+			Err(err) => {
+				error!("{err}");
+				entity.world().write_message(AppExit::error()).await;
+				return Ok(());
+			}
+		};
+		// reached only for a one-shot; a long-running action parks the await.
+		stream_and_exit(&entity, response).await
+	}
+
+	/// The load call itself, resolving whichever of the three shapes the entity
+	/// serves.
+	async fn response(entity: &AsyncEntity, request: Request) -> Result<Response> {
+		if entity
 			.get(|meta: &ActionMeta| meta.matches::<Request, Response>())
 			.await
 			.unwrap_or(false)
 		{
-			entity.call::<Request, Response>(request).await?
+			entity.call::<Request, Response>(request).await
 		} else if entity
 			.get(|meta: &ActionMeta| meta.matches::<(), Outcome>())
 			.await
@@ -77,18 +138,15 @@ impl CallOnLoad {
 				Pass(()) => Response::ok(),
 				Fail(()) => Response::internal_error(),
 			}
+			.xok()
 		} else {
 			entity.call::<(), ()>(()).await?;
-			Response::ok()
-		};
-		// reached only for a one-shot; a long-running action parks the await.
-		stream_and_exit(&entity, response).await
+			Response::ok().xok()
+		}
 	}
 
 	/// Explicitly call every [`CallOnLoad`] action at or under `host`,
-	/// each with its own request from `make_request`, ignoring
-	/// [`DisableCallOnLoad`] (an explicit boot is deliberate, eg `beet serve`
-	/// booting a dormant-built site).
+	/// each with its own request from `make_request`.
 	///
 	/// Resolves once every call resolves, so a parked server holds the await.
 	///
@@ -127,51 +185,36 @@ fn collect_call_on_load(
 		.collect()
 }
 
-/// On the entity's `LoadTemplate`, queue [`CallOnLoad::call`] with the process
-/// request.
+/// On the entity's `LoadTemplate`, queue [`CallOnLoad::call`] with the load's
+/// request, resolved from the nearest [`LoadRequest`] at or above it. A load
+/// given no request builds the tree and stops there.
 fn on_load_call(
 	ev: On<LoadTemplate>,
-	ancestors: Query<&ChildOf>,
-	disabled: Query<(), With<DisableCallOnLoad>>,
+	load_requests: AncestorQuery<&LoadRequest>,
 	mut exit: MessageWriter<AppExit>,
 	mut commands: Commands,
 ) {
 	let target = ev.event_target();
-	if !should_load(target, ev.is_error, &ancestors, &disabled, &mut exit) {
+	// a failed build never runs: exit with an error code.
+	if ev.is_error {
+		exit.write(AppExit::error());
 		return;
 	}
-	commands.entity(target).queue_async_local(|entity| {
-		CallOnLoad::call(entity, Request::from_cli_args(CliArgs::parse_env()))
-	});
+	let Ok(load) = load_requests.get(target) else {
+		return;
+	};
+	let request = load.request();
+	commands
+		.entity(target)
+		.queue_async_local(|entity| CallOnLoad::call(entity, request));
 }
 
-/// Whether a `LoadTemplate` on `target` should drive a load: the build succeeded
-/// and neither the target nor an ancestor opts out via [`DisableCallOnLoad`]. A
-/// failed build writes `AppExit::error()` so the process exits instead of running.
-fn should_load(
-	target: Entity,
-	is_error: bool,
-	ancestors: &Query<&ChildOf>,
-	disabled: &Query<(), With<DisableCallOnLoad>>,
-	exit: &mut MessageWriter<AppExit>,
-) -> bool {
-	// a failed build never runs: exit with an error code.
-	if is_error {
-		exit.write(AppExit::error());
-		return false;
-	}
-	// skip if this entity or any ancestor disables auto-run.
-	!(disabled.contains(target)
-		|| ancestors
-			.iter_ancestors(target)
-			.any(|ancestor| disabled.contains(ancestor)))
-}
-
-/// The process request as a boot event: fire it on a server entity to boot it
-/// directly, skipping the load path.
+/// The process request as a start notification: fire it on an entity to reach
+/// the [`StartRunning<Request>`] observers a real start would, without a
+/// [`RunningSet`] to walk. Booting a server is [`LoadRequest::on_spawn`].
 #[extend::ext(name = StartRunningRequestExt)]
 pub impl StartRunning<Request> {
-	/// The process request as a boot event.
+	/// The process request as a start notification.
 	fn from_cli(entity: Entity) -> Self {
 		Self::new(entity, Request::from_cli_args(CliArgs::parse_env()))
 	}
@@ -179,10 +222,10 @@ pub impl StartRunning<Request> {
 
 /// Stream a one-shot's [`Response`] to stdout and write the matching [`AppExit`].
 ///
-/// The shared tail of the load path: [`CallOnLoad::call`] after its awaited
-/// call resolves, and [`CliServer`] when it boots via a direct `StartRunning`
-/// with no `Running` to resolve.
-pub(crate) async fn stream_and_exit(
+/// The tail of the load path, reached once [`CallOnLoad::call`]'s awaited call
+/// resolves. A long-running action never gets here: its parked call is the
+/// process.
+async fn stream_and_exit(
 	host: &AsyncEntity,
 	response: Response,
 ) -> Result {
@@ -210,10 +253,21 @@ pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 mod test {
 	use super::*;
 
-	/// End to end through the load path: `CallOnLoad` (required via `StartOnLoad`)
-	/// calls the server's parking action, which fans out a `StartRunning<Request>`;
-	/// `CliServer` routes it through its dispatch child and resolves the parked
-	/// call, and `CallOnLoad::call` exits with the status's code.
+	/// Fire a load on `entity`, with the load context a running binary provides.
+	fn load(world: &mut World, entity: Entity) {
+		world
+			.entity_mut(entity)
+			.insert(LoadRequest::new(&Request::get("/")))
+			.trigger(|entity| LoadTemplate {
+				entity,
+				is_error: false,
+			});
+	}
+
+	/// End to end through the load path: `CallOnLoad` calls the entity's parked
+	/// action, whose `RunningSet` walk reaches `CliServer`; it routes the request
+	/// through its dispatch child and resolves the parked call, and
+	/// `CallOnLoad::call` exits with the status's code.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn one_shot_resolves_and_exits() {
@@ -221,35 +275,68 @@ mod test {
 		app.add_plugins((MinimalPlugins, ServerPlugin)).add_systems(
 			Startup,
 			|mut commands: Commands| {
-				commands
-					.spawn((CliServer::default(), children![exchange_ext::handler(
-						|_| { Response::ok().with_body("hi") }
-					)]))
-					.trigger(|entity| LoadTemplate {
-						entity,
-						is_error: false,
-					});
+				let entity = commands
+					.spawn((
+						CliServer::default(),
+						CallOnLoad,
+						children![exchange_ext::handler(|_| {
+							Response::ok().with_body("hi")
+						})],
+					))
+					.id();
+				commands.queue(move |world: &mut World| load(world, entity));
 			},
 		);
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
 
-	/// The lightweight boot: `trigger(StartRunning::from_cli)` fires a
-	/// `StartRunning<Request>` straight at `CliServer` with no `Running`
-	/// keep-alive, so the server streams the response and writes the `AppExit`
-	/// itself.
+	/// A load with no `LoadRequest` in scope builds the tree and stops: the
+	/// dormant build every render-only command relies on.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
-	async fn boot_event_resolves_and_exits() {
+	async fn no_load_request_never_runs() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app
+			.world_mut()
+			.spawn((
+				CliServer::default(),
+				CallOnLoad,
+				children![exchange_ext::handler(|_| {
+					Response::ok().with_body("hi")
+				})],
+			))
+			.trigger(|entity| LoadTemplate {
+				entity,
+				is_error: false,
+			})
+			.id();
+		for _ in 0..16 {
+			app.update();
+			AsyncRunner::tick().await;
+		}
+		app.world()
+			.entity(entity)
+			.contains::<Running<Response>>()
+			.xpect_false();
+	}
+
+	/// The code boot: `LoadRequest::on_spawn` calls a hand-spawned server exactly
+	/// as a document load would, so a `main.rs` app needs no template.
+	#[beet_core::test]
+	#[cfg(feature = "http")]
+	async fn spawned_load_request_resolves_and_exits() {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin)).add_systems(
 			Startup,
 			|mut commands: Commands| {
-				commands
-					.spawn((CliServer::default(), children![exchange_ext::handler(
-						|_| { Response::ok().with_body("hi") }
-					)]))
-					.trigger(StartRunning::from_cli);
+				commands.spawn((
+					CliServer::default(),
+					LoadRequest::from_cli().on_spawn(),
+					children![exchange_ext::handler(|_| {
+						Response::ok().with_body("hi")
+					})],
+				));
 			},
 		);
 		app.run_async().await.xpect_eq(AppExit::Success);
@@ -257,9 +344,10 @@ mod test {
 
 	/// A long-running server parks the load call: its `Running<Response>`
 	/// keep-alive stays and no `AppExit` is written, so the process persists.
-	/// The `Running` is inserted by the server's `ContinueRun<Request, Response>`
-	/// before the backend runs, so the park holds regardless of what the backend
-	/// does.
+	/// The `Running` is inserted by the entity's `RunningSet` before any entry
+	/// runs, so the park holds regardless of what the backend does.
+	// see the NATIVE_ONLY note in `http_server`
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn server_parks_and_stays_up() {
 		// the global backend hook is first-install-wins for the whole test
@@ -269,14 +357,11 @@ mod test {
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app
 			.world_mut()
-			.spawn(HttpServer::new(0))
-			.trigger(|entity| LoadTemplate {
-				entity,
-				is_error: false,
-			})
+			.spawn((HttpServer::new(0), CallOnLoad))
 			.id();
-		// drive until the boot fan-out lands the parking `Running` (a bounded
-		// condition, unlike settling a parked server to the frame cap).
+		load(app.world_mut(), entity);
+		// drive until the walk lands the parking `Running` (a bounded condition,
+		// unlike settling a parked server to the frame cap).
 		app_ext::update_until(&mut app, |world| {
 			world.entity(entity).contains::<Running<Response>>()
 		})
@@ -306,11 +391,39 @@ mod test {
 				Outcome::PASS.xok()
 			});
 		app.world_mut()
-			.spawn_template(Snippet::from_bundle((CallOnLoad, action)))
+			.spawn_template(Snippet::from_bundle((
+				CallOnLoad,
+				LoadRequest::from_cli(),
+				action,
+			)))
 			.unwrap();
 		// the `LoadTemplate` observer queues `CallOnLoad::call` onto the
 		// AsyncWorld; `update_until` ticks the runtime between frames so the
 		// queued call runs.
+		app_ext::update_until(&mut app, |_world| ran.get())
+			.await
+			.xpect_true();
+	}
+
+	/// The load context resolves by ancestry, so a behavior nested in a scene
+	/// runs on the entry's load exactly as a root one does.
+	#[beet_core::test]
+	async fn runs_a_nested_behavior() {
+		let ran = Store::new(false);
+		let recorder = ran.clone();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
+		let action: Action<(), Outcome> =
+			Action::new_pure(move |_: ActionContext| -> Result<Outcome> {
+				recorder.set(true);
+				Outcome::PASS.xok()
+			});
+		app.world_mut()
+			.spawn_template(Snippet::from_bundle((
+				LoadRequest::from_cli(),
+				children![(CallOnLoad, action)],
+			)))
+			.unwrap();
 		app_ext::update_until(&mut app, |_world| ran.get())
 			.await
 			.xpect_true();

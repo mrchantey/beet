@@ -28,11 +28,13 @@ fn main() {
 	app.add_plugins((CharcellTuiPlugin, NavigatorPlugin, LivePagePlugin));
 	app.add_systems(Startup, |mut commands: Commands| {
 		// spawn the feature-selected server with the site router as its dispatch
-		// child, then boot it directly: a one-shot `CliServer` streams and exits
-		// itself, a long-running server parks.
-		commands
-			.spawn((site_server(), children![rsx_site_router()]))
-			.trigger(StartRunning::from_cli);
+		// child, plus the load context that calls it: a one-shot `CliServer`
+		// streams and exits, a long-running server parks.
+		commands.spawn((
+			site_server(),
+			children![rsx_site_router()],
+			LoadRequest::from_cli().on_spawn(),
+		));
 	});
 	app.run();
 }

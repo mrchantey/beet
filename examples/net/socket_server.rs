@@ -25,18 +25,16 @@ fn main() -> Result {
 			SocketServerPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands
-				.spawn((
-					SocketServer::new(9000),
-					OnSpawn::observe(my_handler),
-					// just echo back the close if you dont need to
-					// modify the CloseFrame
-					OnSpawn::observe(common_handlers::echo_close),
-					OnSpawn::observe(common_handlers::log_send),
-					OnSpawn::observe(common_handlers::log_recv),
-				))
-				// boot through the fan-out, exactly like `HttpServer`
-				.trigger(StartRunning::from_cli);
+			commands.spawn((
+				SocketServer::new(9000),
+				OnSpawn::observe(my_handler),
+				// just echo back the close if you dont need to
+				// modify the CloseFrame
+				OnSpawn::observe(common_handlers::echo_close),
+				OnSpawn::observe(common_handlers::log_send),
+				OnSpawn::observe(common_handlers::log_recv),
+				LoadRequest::from_cli().on_spawn(),
+			));
 		})
 		.run();
 

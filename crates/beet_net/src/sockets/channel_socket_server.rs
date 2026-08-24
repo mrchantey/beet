@@ -18,16 +18,16 @@ use futures::future::BoxFuture;
 ///
 /// The socket analogue of [`ChannelHttpServer`]: a per-instance component (no
 /// global backend), so multiple can coexist, with the same wasm-first / mock /
-/// deterministic-test use. Boots through the fan-out like [`SocketServer`] - a
-/// [`StartRunning<Request>`] whose `--server` selects `"channel"` starts the accept
-/// loop, which parks on the host's [`Running<Response>`] keep-alive and tears down
-/// on its removal.
+/// deterministic-test use. Boots like [`SocketServer`]: it contributes a
+/// start/stop pair to its entity's
+/// [`RunningSet`](beet_action::prelude::RunningSet), and a call whose `--server`
+/// selects `"channel"` starts the accept loop, which parks on the entity's
+/// [`Running<Response>`] keep-alive and tears down on its removal.
 ///
 /// Runtime-only: it holds an [`async_channel`] end, which is not [`Reflect`], so it
 /// is not markup-spawnable. Construct it with [`ChannelSocketServer::new`].
 #[derive(Component)]
-#[component(on_add = hook_ext::entity_hook(ServerShutdown::<ChannelSocketServer>::add_observers))]
-#[require(StartOnLoad)]
+#[component(on_add = hook_ext::entity_hook(ChannelSocketServer::contribute))]
 pub struct ChannelSocketServer {
 	/// Incoming connections; each yields a fresh server-side [`Socket`].
 	connections: Receiver<ChannelSocketConn>,
@@ -51,6 +51,25 @@ struct ChannelSocketConn {
 }
 
 impl ChannelSocketServer {
+	/// This server's [`RunningSet`](beet_action::prelude::RunningSet)
+	/// contribution, mirroring [`SocketServer`]: accept on start when `--server`
+	/// selects `"channel"`, close the loop on stop.
+	fn contribute(entity: &mut EntityCommands) {
+		ServerFacet::contribute(
+			entity,
+			ChannelSocketServer::boot,
+			|entity, shutdown| {
+				Box::pin(start_channel_socket_server(entity, shutdown))
+			},
+		);
+	}
+
+	/// Whether this boot selects the server. There are no bind knobs to overlay:
+	/// whoever constructed the pair holds the connections channel.
+	fn boot(&mut self, request: &Request) -> Result<bool> {
+		ServerFilter::selects(request.params(), "channel", true).xok()
+	}
+
 	/// Creates a paired server and client over a fresh connections channel.
 	pub fn new() -> (ChannelSocketServer, ChannelSocketClient) {
 		let (conn_tx, conn_rx) =
@@ -130,19 +149,6 @@ impl SocketWriter for ChannelSocketWriter {
 	}
 }
 
-/// Registers the shared boot + teardown observers, mirroring [`SocketServer`] (see
-/// [`ServerShutdown`]).
-impl BootServer for ChannelSocketServer {
-	const SELECTOR: &'static str = "channel";
-
-	fn serve(
-		entity: AsyncEntity,
-		shutdown: OnceValueRx<()>,
-	) -> LocalBoxedFuture<'static, Result> {
-		Box::pin(start_channel_socket_server(entity, shutdown))
-	}
-}
-
 /// The accept loop: adopt each connection delivered over the channel as a child
 /// [`Socket`], exactly as the tungstenite accept path adopts an accepted WSS
 /// connection. Parks like [`SocketServer`]; ends when the shutdown signal resolves
@@ -195,7 +201,7 @@ mod test {
 		// the server echoes Text/Binary back on each accepted child socket
 		let entity =
 			app.world_mut().spawn(server).observe_any(echo_message).id();
-		// boot through the fan-out (fire-and-forget: the call fans out and parks)
+		// boot through the entity's `RunningSet` (fire-and-forget: it parks)
 		app.world_mut()
 			.entity_mut(entity)
 			.run_async_local(|host| async move {

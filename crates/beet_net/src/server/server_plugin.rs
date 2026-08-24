@@ -1,5 +1,6 @@
 //! Plugin and utilities for running Bevy-based HTTP servers.
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// Plugin for running Bevy HTTP servers.
@@ -16,16 +17,11 @@ impl Plugin for ServerPlugin {
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
 			.register_type::<Tls>()
-			// the markup boot and load verbs (and the load opt-out), so an
-			// `<HttpServer>` entry, a `{CallOnLoad}` script or behaviour scene
-			// resolves them.
-			.register_type::<StartOnLoad>()
+			// the markup load verb, so an `<HttpServer>` entry, a `{CallOnLoad}`
+			// script or behaviour scene resolves it.
 			.register_type::<CallOnLoad>()
-			.register_type::<DisableCallOnLoad>()
-			// the dispatched boot: `<Route path="serve" {BootHost}>`
-			.register_type::<BootHost>()
-			// a boot whose `--server` selects nothing exits rather than parking
-			.add_systems(Update, exit_if_no_server);
+			// a boot whose `--server` selected nothing fails rather than parking
+			.add_observer(assert_server_started);
 
 		// the process exits when `CallOnLoad` writes `AppExit` for the one-shot
 		// it resolves; a long-running server never resolves its boot call, so its
@@ -69,6 +65,56 @@ impl Plugin for ServerPlugin {
 		// observer increments) backs the std [`HttpServer`] requirement.
 		#[cfg(feature = "std")]
 		app.add_observer(exchange_stats);
+	}
+}
+
+/// A boot that declared servers but started none has nothing to hold the process
+/// open, so fail the parked call rather than park forever: `beet serve site
+/// --server=nonexistent` exits with the error instead of hanging.
+///
+/// The thin server-layer reading of a [`RunningSet`]'s tally. It resolves the
+/// call in the same breath as the walk, so no marker component and no
+/// frame-later sweep are needed.
+fn assert_server_started(
+	ev: On<RunningSetStarted>,
+	sets: Query<(), With<RunningSet<Request, Response>>>,
+	mut commands: Commands,
+) {
+	if ev.started > 0 || !sets.contains(ev.entity) {
+		return;
+	}
+	commands.entity(ev.entity).queue(FailRun::<Response>::new(
+		bevyhow!(
+			"No server started for {}, does --server (or BEET_SERVER) name a \
+			 server this entry declares?",
+			ev.entity
+		),
+	));
+}
+
+#[cfg(test)]
+mod boot_check_test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A `--server` naming nothing this entry declares must exit, not park the
+	/// process on a `Running` no server will ever resolve.
+	#[beet_core::test]
+	async fn unselected_boot_exits() {
+		crate::server::http_server::stub_backend();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
+		app.world_mut()
+			.entity_mut(entity)
+			.run_async_local(|server| async move {
+				CallOnLoad::call(
+					server,
+					Request::from_cli_str("--server=nonexistent"),
+				)
+				.await
+			});
+		app.run_async().await.xpect_eq(AppExit::error());
 	}
 }
 

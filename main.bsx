@@ -8,13 +8,14 @@ The wasm test runner depends on it: `.cargo/config.toml` sets
 `<RunWasm/>` route. The rest are convenience: serve, build, check, static export,
 pdf, s3 sync.
 
-It is a one-shot `<CliServer{always:true}>` root with the `Router` as its child: the
-binary injects nothing, the server's `CallOnLoad` fires the process request on load,
-it hops down to the router, the positional route arg selects the command, and the
-command resolves and the process exits. `always=true` makes this dispatcher run on every boot
-regardless of `--server`, since `--server` selects the *served site's* servers, not
-this entry's. The one exception to exiting is `<Serve/>`, which loads a site and
-boots *its* servers, parking so the process serves.
+It is a one-shot `<CliServer always=true {CallOnLoad}>` root with the `Router` as its
+child: the binary supplies only the load context (the process request), the root's
+`CallOnLoad` calls with it on load, it hops down to the router, the positional route
+arg selects the command, and the command resolves and the process exits.
+`always=true` makes this dispatcher run on every boot regardless of `--server`, since
+`--server` selects the *served site's* servers, not this entry's. The one exception
+to exiting is `<Serve/>`, which loads a site and boots *its* servers, parking so the
+process serves.
 
     cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
@@ -52,7 +53,7 @@ its tags resolve rather than failing on an unregistered tag.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
 -->
-<StartOnLoad {CliServer{always:true}}>
+<CliServer always=true {CallOnLoad}>
 <Router {HelpHandler}>
 	<PackageConfig title="Beet" app_name="beet" description="A creative tool engine built on bevy" version="0.0.9-dev.16"/>
 	<Serve/>
@@ -78,4 +79,4 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 		</Route>
 	</Fragment>
 </Router>
-</StartOnLoad>
+</CliServer>

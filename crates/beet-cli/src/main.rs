@@ -10,9 +10,10 @@
 //! The entry may widen its own store root with a `<StoreRoot src="../.."/>`
 //! declaration (see [`StoreRoot`]), so callers never re-supply it. The entry
 //! builds on the async runtime through its [`BlobStore`] (so every store read is
-//! awaited, never blocked), then the `CallOnLoad` verb fans the process request
-//! out on the build's `LoadTemplate`. A one-shot streams its response and exits;
-//! a long-running server parks its boot call to persist the process.
+//! awaited, never blocked) with the process request as the build's [`LoadRequest`],
+//! which the entry's `CallOnLoad` verb calls with on `LoadTemplate`. A one-shot
+//! streams its response and exits; a long-running server parks its call to
+//! persist the process.
 //!
 //! `--features=a,b` verifies the running binary was compiled with those cargo
 //! features (see [`CrateCheck`]), failing fast with the full missing list.
@@ -154,14 +155,21 @@ fn load_entry(world: &mut World) {
 
 /// Build the browser entry: read the program from the DOM via
 /// [`MainBsx::read_dom_program`] and build it onto a storeless root (see
-/// [`entry_build::build_from_bsx`]). The wasm `Browser` branch of [`load_entry`]; the
-/// program's own `CallOnLoad` verb then drives it.
+/// [`entry_build::build_from_bsx`]), with the process request as its load context.
+/// The wasm `Browser` branch of [`load_entry`]; the program's own `CallOnLoad`
+/// verb then drives it.
 #[cfg(target_arch = "wasm32")]
 async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 	let bsx = MainBsx::read_dom_program().await?;
 	world
 		.with(move |world: &mut World| {
-			entry_build::build_from_bsx(world, formats, "main.bsx", bsx, ())
+			entry_build::build_from_bsx(
+				world,
+				formats,
+				"main.bsx",
+				bsx,
+				LoadRequest::from_cli(),
+			)
 		})
 		.await?;
 	Ok(())
@@ -170,8 +178,9 @@ async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 /// Build the resolved entry on the async runtime: register the entry's `templates/`
 /// and read the entry document through the store (awaited, not blocked), then build
 /// it into a root carrying the store so `<RoutesDir>` and `<Template src>` resolve
-/// the store by ancestry. The build fires `LoadTemplate`, where `CallOnLoad` boots
-/// the servers. Target-agnostic; the `--watch` live-reload path is native-only.
+/// the store by ancestry, plus the process [`LoadRequest`] the load calls with.
+/// The build fires `LoadTemplate`, where `CallOnLoad` boots the servers.
+/// Target-agnostic; the `--watch` live-reload path is native-only.
 async fn build_entry(
 	world: &AsyncWorld,
 	config: &BootstrapConfig,
@@ -194,10 +203,10 @@ async fn build_entry(
 	if watch_dir.is_some() && config.watch {
 		return build_watched_entry(world, store, entry_name, formats).await;
 	}
-	// otherwise the plain one-shot build. The binary stays unopinionated: it spawns
-	// the entry root with no load verb of its own, so the entry's own markup declares
-	// how it loads (servers, scripts and render scenes all carry `CallOnLoad`,
-	// a self-booting verb `#[require]`s it).
+	// otherwise the plain one-shot build. The binary stays unopinionated: it
+	// declares no load verb of its own, only the load *context* (the process
+	// request), so the entry's own markup decides how it loads by carrying a
+	// `CallOnLoad` or not.
 	#[cfg(target_arch = "wasm32")]
 	let _ = config;
 	let sources =
@@ -205,7 +214,7 @@ async fn build_entry(
 			.await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			entry_build::build_root(world, store, sources, ())?;
+			entry_build::build_root(world, store, sources, LoadRequest::from_cli())?;
 			Ok(())
 		})
 		.await

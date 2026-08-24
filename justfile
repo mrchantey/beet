@@ -20,6 +20,11 @@ export RUST_MIN_STACK := '1073741824'
 
 test-threads := '--test-threads=8'
 
+# `rustfmt.toml` uses nightly-only options, so formatting needs a nightly
+# toolchain. Pinned so `just fmt` produces the same output on every machine;
+# bumping it is a deliberate act that reformats the workspace.
+fmt-toolchain := 'nightly-2026-07-02'
+
 default:
 	just --list --unsorted
 
@@ -108,10 +113,24 @@ install-cli *args:
 
 #💡 Aliases
 
+# Format every workspace member with the pinned nightly. Never `cargo fmt`.
 fmt *args:
-	rustup default nightly
-	cargo fmt {{ args }}
-	rustup default stable
+  #!/usr/bin/env bash
+  set -euo pipefail
+  # bare `cargo fmt` formats only the root `beet` package, and on the stable
+  # toolchain silently drops every nightly-only option in `rustfmt.toml`
+  # (`fn_single_line`, `imports_granularity`, ...), reformatting the whole
+  # tree into a huge bogus diff.
+  rustup toolchain list | grep -q '^{{ fmt-toolchain }}' \
+    || rustup toolchain install {{ fmt-toolchain }} --profile minimal --component rustfmt
+  # rustfmt resolves `mod` before `cfg`, so the generated (gitignored) modules
+  # `examples/rsx_site` declares must exist; stub any a fresh clone lacks.
+  mkdir -p examples/rsx_site/src/codegen
+  sed -n 's/.*#\[path = "\(codegen\/[^"]*\)".*/\1/p' examples/rsx_site/src/lib.rs |
+    while read -r rel; do
+      [ -f "examples/rsx_site/src/$rel" ] || touch "examples/rsx_site/src/$rel"
+    done
+  cargo +{{ fmt-toolchain }} fmt --all {{ args }}
 
 #💡 Test
 

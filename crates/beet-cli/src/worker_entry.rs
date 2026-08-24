@@ -11,8 +11,8 @@
 //! env binding to store, the worker request/response conversion, and the
 //! per-isolate world cache with version invalidation.
 //!
-//! The entry builds into a root carrying the site store plus
-//! [`DisableCallOnLoad`] (so its declared servers stay dormant; the Worker itself
+//! The entry builds into a root carrying the site store and no
+//! [`LoadRequest`] (so its declared servers stay dormant; the Worker itself
 //! serves each request). The universal seam is the same
 //! `entity.exchange(request) -> Response` the native servers use.
 
@@ -109,11 +109,11 @@ async fn handle(
 /// [`build_app`] ([`BeetPlugins`] + [`WorkersPlugin`]) and run the shared
 /// [`build_entry_owned`] build+settle, then resolve the host entity.
 ///
-/// The root carries [`DisableCallOnLoad`]: the Worker itself routes each request
+/// The build supplies no [`LoadRequest`]: the Worker itself routes each request
 /// through the host's `Router` action via `exchange`, so the servers the entry
-/// declares (`HttpServer`, `TuiServer`, ...) must stay dormant. Without it the
-/// entry's `CallOnLoad` verb boots them on `LoadTemplate`, and `HttpServer`'s
-/// start hits the (wasm-absent) backend and panics. Same suppression
+/// declares (`HttpServer`, `TuiServer`, ...) must stay dormant. With one the
+/// entry's `CallOnLoad` verb would boot them on `LoadTemplate`, and `HttpServer`'s
+/// start would hit the (wasm-absent) backend and panic. Same dormant build
 /// `export-static`/`check` use.
 async fn build_worker_world(
 	store: BlobStore,
@@ -127,13 +127,7 @@ async fn build_worker_world(
 	let mut app = build_app();
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
-	entry_build::build_entry_owned(
-		&mut world,
-		store,
-		entry_name,
-		DisableCallOnLoad,
-	)
-	.await?;
+	entry_build::build_entry_owned(&mut world, store, entry_name, ()).await?;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world

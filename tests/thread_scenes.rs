@@ -9,8 +9,8 @@ use std::sync::Once;
 
 /// Set a dummy auth env once so `{ModelStreamer{provider:OpenAi}}` builds during
 /// reduction without a real key (no request is ever made). Nothing here boots, so
-/// the scenes' servers stay inert: a `TuiServer` only takes the terminal on the
-/// boot fan-out, which reduction never fires.
+/// the scenes' servers stay inert: a `TuiServer` only takes the terminal on its
+/// start walk, which reduction never fires.
 fn ensure_auth_env() {
 	static INIT: Once = Once::new();
 	INIT.call_once(|| unsafe {
@@ -87,8 +87,8 @@ fn assert_crate_check_passed(app: &mut App) {
 		.xpect_eq(0);
 }
 
-/// Every scene declares the same served shape: a `StartOnLoad` root carrying the
-/// local TUI server (default-booting) plus the two opt-in ones, a `ThreadLayout`
+/// Every scene declares the same served shape: a root carrying the local TUI
+/// server (default-booting) plus the two opt-in ones, a `ThreadLayout`
 /// router, one `FixedPage` route, and a `ThreadView` whose `$thread` reference
 /// resolved to the scene's own thread. Asserted per scene, since an unresolved
 /// tag would otherwise reduce to a thread that renders nowhere.

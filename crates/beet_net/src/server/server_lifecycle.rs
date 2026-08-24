@@ -1,46 +1,170 @@
-//! The shared boot, park and shutdown lifecycle every bootable server uses.
+//! What a listener-backed server contributes to its entity's [`RunningSet`].
 //!
-//! A server is an entity carrying its marker component plus the
-//! [`ContinueRun<Request, Response>`] boot action and [`CallOnLoad`], usually a
-//! child of its dispatch host. A long-running server (http, socket, and their
-//! channel variants) boots on the [`StartRunning<Request>`] fan-out, parks on
-//! its own [`Running<Response>`] keep-alive, and tears down when that `Running`
-//! is removed. The only per-server differences are the `--server` selector and
-//! the serve-loop launcher, so this captures the rest once: [`BootServer`]
-//! supplies those two seams (plus an optional boot-request hook) and
-//! [`ServerShutdown<S>`] holds the teardown signal, keyed by the server marker
-//! so co-resident servers never clobber a shared one.
+//! A server is config plus a contribution: [`ServerFacet::contribute`] appends
+//! the start that opens its listener and the stop that closes it, so several
+//! servers spread on one entity share that entity's single parked action. The
+//! only per-server differences are the `--server` selection (with any bind knobs
+//! it overlays) and the serve-loop launcher, so this captures the rest once,
+//! including the [`ShutdownSignal`] the two halves share.
+//!
+//! A server with no listener to open (the one-shot [`CliServer`], the terminal
+//! servers) contributes its own pair through [`RunningSet::contribute`] directly.
 
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::component::Mutable;
-use core::marker::PhantomData;
+use bevy::platform::sync::Arc;
+use bevy::platform::sync::Mutex;
 use core::net::IpAddr;
 
-impl Request {
-	/// Whether a server named `name` should boot for `request`, from the boot
-	/// request's [`ServerFilter`] (`--server`), else the process
-	/// [`BootstrapConfig`]'s (`--server`, else `BEET_SERVER`).
+/// One listener-backed server's contribution to its entity's [`RunningSet`].
+///
+/// The four built-in servers ([`HttpServer`], [`SocketServer`] and their channel
+/// variants) join through this rather than re-deriving the selection, the
+/// shutdown handoff and the outcome shape; a downstream server does too.
+pub struct ServerFacet;
+
+/// Launches a server's serve loop on a started host, handed the shutdown
+/// receiver it owns its teardown on: it stops accepting and drops its listener
+/// when the signal resolves.
+///
+/// Local (never `Send`): the loop is thread-bound, so the start always drives it
+/// with a local task.
+pub type ServeFn =
+	fn(AsyncEntity, OnceValueRx<()>) -> LocalBoxedFuture<'static, Result>;
+
+impl ServerFacet {
+	/// Append `S`'s start/stop pair to its entity's [`RunningSet`].
 	///
-	/// The process-config fallback is why a deployed binary launched with no args
-	/// (a lambda bootstrap, a lightsail systemd unit) still selects its
-	/// transport: its `BEET_SERVER` reaches the boot even though the synthesized
-	/// request carries no flag. Absent both, the server's own `default_boot`
-	/// decides: it defaults to `true`, so a bare `beet` brings up every declared
-	/// server, and an entry clears it on one (eg a secondary [`HttpServer`]) that
-	/// should boot only when `--server` names it.
-	pub fn selects_server(
-		request: &Request,
-		name: &str,
-		default_boot: bool,
-	) -> Result<bool> {
-		ServerFilter::from_params(request.params())
-			.as_ref()
-			.or(BootstrapConfig::get().server.as_ref())
-			.map(|filter| filter.passes(name))
-			.unwrap_or(default_boot)
-			.xok()
+	/// `boot` answers whether this boot selects the server, overlaying any bind
+	/// knobs the request carries onto its config as it does, and `serve` launches
+	/// its loop. Those two are the whole per-server difference.
+	pub fn contribute<S>(
+		entity: &mut EntityCommands,
+		boot: fn(&mut S, &Request) -> Result<bool>,
+		serve: ServeFn,
+	) where
+		S: Component<Mutability = Mutable>,
+	{
+		let shutdown = ShutdownSignal::default();
+		RunningSet::<Request, Response>::contribute(
+			entity,
+			Self::start::<S>(shutdown.clone(), boot, serve),
+			Some(Self::stop(shutdown)),
+		);
+	}
+
+	/// The start half: decide selection against the server's own config, then
+	/// hand the serve loop a fresh shutdown receiver. Never resolves the parked
+	/// call, so the host's `Running<Response>` keeps the process up.
+	///
+	/// Synchronous rather than async: selection reads the server's own component
+	/// and the launch is a queued task, neither of which needs to await, and an
+	/// entry that never awaits keeps the walk off the world bridge. Built by hand
+	/// because [`Action::new_system`] caches its system, which rules out the
+	/// per-server data these entries carry.
+	fn start<S>(
+		shutdown: ShutdownSignal,
+		boot: fn(&mut S, &Request) -> Result<bool>,
+		serve: ServeFn,
+	) -> Action<Request, StartOutcome<Request>>
+	where
+		S: Component<Mutability = Mutable>,
+	{
+		Action::new(
+			ActionMeta::of::<ServerFacet, Request, StartOutcome<Request>>(),
+			move |ActionCall {
+			          mut commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let shutdown = shutdown.clone();
+				commands.commands.queue(move |world: &mut World| -> Result {
+					let outcome =
+						Self::start_now(world, caller, input, &shutdown, boot, serve);
+					out_handler.call_world(world, outcome)
+				});
+				Ok(())
+			},
+		)
+	}
+
+	/// Ask the server whether this boot selects it, then launch its serve loop.
+	/// Never resolves the parked call, so the host's `Running<Response>` keeps the
+	/// process up.
+	fn start_now<S>(
+		world: &mut World,
+		caller: Entity,
+		request: Request,
+		shutdown: &ShutdownSignal,
+		boot: fn(&mut S, &Request) -> Result<bool>,
+		serve: ServeFn,
+	) -> Result<StartOutcome<Request>>
+	where
+		S: Component<Mutability = Mutable>,
+	{
+		// the request threads on to the next entry either way, so the config
+		// overlay borrows it rather than consuming it.
+		let selected = match world.get_mut::<S>(caller) {
+			Some(mut server) => boot(&mut server, &request)?,
+			None => false,
+		};
+		if !selected {
+			return StartOutcome::Declined(request).xok();
+		}
+		let receiver = shutdown.open();
+		// the loop outlives this entry, so its failure (a port already bound)
+		// comes back through the run it was started for: the parked call resolves
+		// with the error rather than the detached task raising into the app's
+		// error handler.
+		world.commands().entity(caller).queue_async_local(
+			move |entity: AsyncEntity| async move {
+				match serve(entity.clone(), receiver).await {
+					Ok(()) => Ok(()),
+					Err(err) => entity.queue(FailRun::<Response>::new(err)).await?,
+				}
+			},
+		);
+		StartOutcome::Started(request).xok()
+	}
+
+	/// The stop half: signal the shutdown its start opened, so the backend stops
+	/// accepting and drops its listener. Cause-agnostic, so a reload, an
+	/// interrupt and a despawn all close the socket.
+	fn stop(shutdown: ShutdownSignal) -> Action<(), ()> {
+		Action::new_pure(move |_: ActionContext| shutdown.close())
+	}
+}
+
+/// The teardown signal a server's start opens and its stop closes.
+///
+/// Shared by both halves of one server's contribution rather than stored on the
+/// entity, so a co-resident server never clobbers it and a reboot can never
+/// orphan the live listener's teardown: opening closes the previous signal
+/// first. A no_std one-shot, so an embedded backend tears down the same way.
+#[derive(Clone, Default)]
+struct ShutdownSignal(Arc<Mutex<Option<OnceValue<()>>>>);
+
+impl ShutdownSignal {
+	/// Open a fresh signal, closing any live one first, and return the receiver
+	/// the serve loop races its accept loop against.
+	fn open(&self) -> OnceValueRx<()> {
+		self.close();
+		let (signal, receiver) = OnceValue::<()>::oneshot();
+		*self.0.lock().unwrap() = Some(signal);
+		receiver
+	}
+
+	/// Signal and clear the live signal. Idempotent: a missing one is a no-op.
+	fn close(&self) {
+		// take and drop the guard before signalling: a single-threaded executor
+		// polls the woken serve loop inline, and it may reach this slot again.
+		let signal = self.0.lock().unwrap().take();
+		if let Some(signal) = signal {
+			signal.signal(());
+		}
 	}
 }
 
@@ -90,121 +214,10 @@ impl ServerParams {
 	}
 }
 
-/// A bootable, parking server: supplies the `--server` selector and the serve-loop
-/// launcher the shared [`ServerShutdown<Self>`] machinery drives.
-///
-/// The four built-in servers ([`HttpServer`], [`SocketServer`] and their channel
-/// variants) implement it; a downstream server does too rather than re-deriving the
-/// boot/teardown observer pair.
-pub trait BootServer: Component<Mutability = Mutable> {
-	/// The `--server` selector value that boots this server (eg `"http"`).
-	const SELECTOR: &'static str;
-
-	/// Launch the serve loop on a started host, handed the `shutdown` receiver it
-	/// owns its teardown on (it stops accepting and drops its listener when the
-	/// signal resolves). Local (never `Send`): the loop is thread-bound.
-	fn serve(
-		entity: AsyncEntity,
-		shutdown: OnceValueRx<()>,
-	) -> LocalBoxedFuture<'static, Result>;
-
-	/// Overlay the boot request onto the server config before the backend reads it.
-	/// Default: a no-op; [`HttpServer`] overrides it to apply `--port` / `--host`.
-	fn apply_boot(&mut self, _request: &Request) -> Result { Ok(()) }
-
-	/// Whether this server boots when neither `--server` nor `BEET_SERVER` is
-	/// given. Defaults to `true` — a bare `beet` brings up the declared server;
-	/// override to `false` for one that must be named explicitly.
-	fn default_boot(&self) -> bool { true }
-}
-
-/// Shutdown signal for a running server of marker `S`: [`boot_server`] stores the
-/// sender on the host and hands the receiver to the serve loop, and
-/// [`teardown_server`] signals it when the host's [`Running<Response>`] is removed so
-/// the backend stops accepting and drops its listener. A no_std one-shot channel, so
-/// an embedded backend tears down the same way.
-///
-/// Keyed by the marker `S` so co-resident servers (eg `HttpServer` + `SocketServer`
-/// on one Router) each hold their own, never clobbering a shared signal. Replaced on
-/// each boot, so a reboot installs a fresh one.
-#[derive(Component)]
-pub struct ServerShutdown<S: BootServer> {
-	signal: Option<OnceValue<()>>,
-	_marker: PhantomData<fn() -> S>,
-}
-
-impl<S: BootServer> ServerShutdown<S> {
-	/// Register the shared boot + teardown observers on the server entity: the one
-	/// place the observer pair is wired. Each server's `on_add` hook is
-	/// `hook_ext::entity_hook(ServerShutdown::<Marker>::add_observers)`.
-	pub fn add_observers(entity: &mut EntityCommands) {
-		entity
-			.observe_any(boot_server::<S>)
-			.observe_any(teardown_server::<S>);
-	}
-
-	/// Whether the teardown signal is still live (booted, not yet torn down). The
-	/// bounded booted condition the server tests drive to.
-	pub fn is_live(&self) -> bool { self.signal.is_some() }
-}
-
-/// Boots `S` on the boot fan-out, if `--server` selects [`BootServer::SELECTOR`].
-/// Overlays the boot request onto the server config, stores the shutdown sender on
-/// the server entity, then queues the serve loop, handing it the receiver. Reads the
-/// boot without consuming it (never the taker), and never resolves the boot call, so
-/// the server's [`Running<Response>`] parks the process.
-fn boot_server<S: BootServer>(
-	ev: On<StartRunning<Request>>,
-	mut servers: Query<&mut S>,
-	mut commands: Commands,
-) -> Result {
-	let entity = ev.entity;
-	let selected = ev.with(|request| -> Result<bool> {
-		let Ok(mut server) = servers.get_mut(entity) else {
-			return Ok(false);
-		};
-		let selected =
-			Request::selects_server(request, S::SELECTOR, server.default_boot())?;
-		if selected {
-			server.apply_boot(request)?;
-		}
-		selected.xok()
-	})??;
-	if !selected {
-		return Ok(());
-	}
-	// store the shutdown sender on the server entity; hand the receiver to the serve loop.
-	let (signal, shutdown) = OnceValue::<()>::oneshot();
-	commands
-		.entity(entity)
-		// flags the boot as served, so `exit_if_no_server` lets it park
-		.insert((ServerBooted, ServerShutdown::<S> {
-			signal: Some(signal),
-			_marker: PhantomData,
-		}))
-		.queue_async_local(move |entity| S::serve(entity, shutdown));
-	Ok(())
-}
-
-/// Tears down `S` when the server's [`Running<Response>`] is removed (a reload, an
-/// interrupt, or a despawn, since Bevy runs remove hooks on despawn): signals the
-/// shutdown channel so the backend stops accepting and drops its listener.
-/// Cause-agnostic, so any teardown closes the socket. Idempotent: a missing handle
-/// is a no-op.
-fn teardown_server<S: BootServer>(
-	ev: On<Remove, Running<Response>>,
-	mut shutdowns: Query<&mut ServerShutdown<S>>,
-) {
-	if let Ok(mut shutdown) = shutdowns.get_mut(ev.event().event_target())
-		&& let Some(signal) = shutdown.signal.take()
-	{
-		signal.signal(());
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 
 	/// The invariant that lets a boot read plain params instead of a second
@@ -233,18 +246,49 @@ mod test {
 			});
 	}
 
+	/// Two servers spread on one entity contribute to the one [`RunningSet`], so
+	/// a single call starts both rather than either clobbering the other's slot.
+	// see the NATIVE_ONLY note in `http_server`
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test]
+	async fn starts_every_declared_server() {
+		crate::server::http_server::stub_backend();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let (channel_server, _client) = ChannelHttpServer::new();
+		let entity = app
+			.world_mut()
+			.spawn((HttpServer::new(0), channel_server))
+			.id();
+		let served = Store::new(false);
+		let recorder = served;
+		app.world_mut()
+			.entity_mut(entity)
+			.observe_any(move |ev: On<RunningSetStarted>| {
+				recorder.set(ev.started == 2 && ev.declined == 0)
+			});
+		app.world_mut().entity_mut(entity).run_async_local(
+			|server| async move {
+				server.call::<Request, Response>(Request::get("/")).await?;
+				Ok(())
+			},
+		);
+		app_ext::update_until(&mut app, |_| served.get())
+			.await
+			.xpect_true();
+	}
+
 	/// `--server` selects through the same [`ServerFilter`] grammar the process
 	/// config renders, and an unselected boot falls back to the server's own
 	/// `default_boot`.
 	#[beet_core::test]
-	fn selects_server_reads_the_filter() {
+	fn selects_reads_the_filter() {
 		let selects = |args: &str, name: &str, default_boot: bool| {
-			Request::selects_server(
-				&Request::from_cli_str(args),
+			ServerFilter::selects(
+				Request::from_cli_str(args).params(),
 				name,
 				default_boot,
 			)
-			.unwrap()
 		};
 		selects("--server=http,ssh", "http", false).xpect_true();
 		selects("--server=http", "cli", true).xpect_false();

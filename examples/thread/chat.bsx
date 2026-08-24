@@ -6,7 +6,7 @@ one binary:
 
 The behavior is `Repeat[Sequence[agent, user]]`: the agent greets from the system
 prompt, the user's turn (`{UserInput}`) waits for the composer, looped forever.
-`{RunThread}` runs it on the servers' boot fan-out.
+`{RunThread}` runs it on the servers' start notification.
 
 The entry is a server root with a router child, like every other beet entry: a
 bare run boots the local `TuiServer` only, `--server=http` serves the same page
@@ -17,9 +17,9 @@ pins per request.
 The page is a `{FixedPage}` route: its children are one live tree served by every
 request, so the view and composer stay bound to the thread the loop drives (the
 `bx:ref="thread"` / `$thread` reference) and repaint reactively. The behavior tree
-is a sibling of the page, kicked by the same boot.
+is a sibling of the page, kicked by the same start.
 -->
-<StartOnLoad {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+<Fragment {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, CallOnLoad)}>
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
@@ -36,4 +36,4 @@ is a sibling of the page, kicked by the same boot.
 			</Thread>
 		</Repeat>
 	</Router>
-</StartOnLoad>
+</Fragment>

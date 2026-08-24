@@ -10,20 +10,21 @@ use beet_net::prelude::*;
 /// Spread it onto a thread's outer root, anywhere under the servers:
 ///
 /// ```rsx
-/// <StartOnLoad {TuiServer}>
+/// <TuiServer {CallOnLoad}>
 ///     <Router>
 ///         <Repeat {RunThread}>
 ///             <Thread {Sequence}> ..actors.. </Thread>
 ///         </Repeat>
 ///     </Router>
-/// </StartOnLoad>
+/// </TuiServer>
 /// ```
 ///
 /// It owns no action slot and never writes [`AppExit`]: process lifetime belongs
-/// to the servers. The kick rides their boot fan-out ([`StartRunning<Request>`],
-/// see [`RunThread::kick_on_boot`]), which is what makes it both markup-friendly
-/// and boot-free — it gets the boot request (for `--new`) without owning argv,
-/// and works identically under `beet serve`, which fans the same request shape.
+/// to the servers. The kick rides the start notification a [`RunningSet`] fires
+/// ([`StartRunning<Request>`], see [`RunThread::kick_on_boot`]), which is what
+/// makes it both markup-friendly and boot-free: it gets the boot request (for
+/// `--new`) without owning argv, and works identically under `beet serve`, which
+/// fires the same request shape.
 ///
 /// The call is detached, so a finite loop ([`RepeatTimes`],
 /// [`RepeatWhileFunctionCallOutput`]) completes and leaves the servers serving
@@ -45,7 +46,7 @@ impl RunThread {
 	/// completion.
 	///
 	/// The seam a test or a serverless scene kicks through directly, with no boot
-	/// event; the boot fan-out is just the caller that supplies the request.
+	/// event; the start notification is just the caller that supplies the request.
 	pub async fn kick(
 		world: AsyncWorld,
 		entity: Entity,
@@ -174,14 +175,14 @@ mod test {
 		)
 	}
 
-	/// Run a persistent thread to completion through the boot fan-out: a
-	/// `StartOnLoad` root whose child is the thread, booted as a load does.
+	/// Run a persistent thread to completion through the start notification: a
+	/// root whose child is the thread, notified as a real start does.
 	fn run_once(path: &str, system: ActorId, agent: ActorId) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.init_plugin::<ThreadPlugin>();
 		app.world_mut()
-			.spawn((StartOnLoad, children![scene(path, system, agent)]))
+			.spawn(children![scene(path, system, agent)])
 			.trigger(StartRunning::from_cli);
 		// pump long enough for the async kick -> adopt -> mount -> run -> sync
 		for _ in 0..120 {
@@ -239,9 +240,12 @@ mod test {
 		};
 		let booted = app
 			.world_mut()
-			.spawn((StartOnLoad, children![ephemeral()]))
+			.spawn(children![ephemeral()])
 			.flush();
-		let idle = app.world_mut().spawn((StartOnLoad, children![ephemeral()])).flush();
+		let idle = app
+			.world_mut()
+			.spawn(children![ephemeral()])
+			.flush();
 		app.world_mut()
 			.entity_mut(booted)
 			.trigger(StartRunning::from_cli);

@@ -9,14 +9,15 @@ declares four servers, so `--server` picks one on load: the default `HttpServer`
     beet --main=examples/bsx_site/main.bsx --server=http
     cd examples/bsx_site && beet --server=tui   # or rely on discovery
 
-There is no `main.rs`: the binary discovers this entry, and `CallOnLoad` boots
-the servers the site declares the moment the entry loads. `<DefaultAppRoutes/>`
+There is no `main.rs`: the binary discovers this entry and hands it the process
+request, which the root's `{CallOnLoad}` calls with, starting the servers the site
+declares the moment the entry loads. `<DefaultAppRoutes/>`
 adds the default app routes (eg the `/js/reactivity.js` runtime a reactive page
 loads) as child routes. The `<PackageConfig/>` declaration patches the named
 fields of the resource, creating it from defaults if absent, so the title and
 description are set in markup with no compile-time host config.
 -->
-<StartOnLoad {(HttpServer{port:8337}, TuiServer, SshTuiServer, CliServer)}>
+<Fragment {(HttpServer{port:8337}, TuiServer, SshTuiServer, CliServer, CallOnLoad)}>
 <Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<Theme color={Srgba(Srgba{red:0.5, green:0.2, blue:0.9, alpha:1.0})}/>
@@ -25,4 +26,4 @@ description are set in markup with no compile-time host config.
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
 </Router>
-</StartOnLoad>
+</Fragment>

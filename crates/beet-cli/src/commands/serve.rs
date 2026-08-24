@@ -23,12 +23,11 @@ use beet::prelude::*;
 /// beet serve site --server=http,ssh     # http plus a multi-tenant ssh terminal
 /// ```
 ///
-/// The entry is built with boot suppressed ([`build_entry`] adds
-/// [`DisableCallOnLoad`]), then booted explicitly: [`CallOnLoad::call_recursive`]
-/// calls every declared server under the loaded root, so the workspace entry
-/// serves only when `serve` is invoked, never on its own load. A parked server
-/// holds the await, so this handler never returns and the process serves until
-/// interrupted.
+/// The entry is built dormant ([`build_entry`] supplies no [`LoadRequest`]), then
+/// booted explicitly: [`CallOnLoad::call_recursive`] calls every declared server
+/// under the loaded root, so the workspace entry serves only when `serve` is
+/// invoked, never on its own load. A parked server holds the await, so this
+/// handler never returns and the process serves until interrupted.
 #[action(route = "serve/*entry", handler_only)]
 #[derive(Component, Reflect)]
 #[reflect(Component)]

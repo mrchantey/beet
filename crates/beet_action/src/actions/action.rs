@@ -217,9 +217,28 @@ where
 	) -> Result {
 		let id = entity.id();
 		let world = entity.into_world_mut();
+		self.call_world_for(world, id, input, out_handler)
+	}
+
+	/// Invoke this action handler from a [`World`] against a caller named only by
+	/// id, so the entity need not still exist.
+	///
+	/// The teardown seam: a [`RunningSet`]'s stop walk runs while its entity is
+	/// being despawned, where no [`EntityWorldMut`] can be taken but the stop must
+	/// still close what the start opened.
+	///
+	/// # Errors
+	/// Propagates any error from the handler or [`OutHandler`].
+	pub fn call_world_for(
+		&self,
+		world: &mut World,
+		caller: Entity,
+		input: In,
+		out_handler: OutHandler<Out>,
+	) -> Result {
 		let mut state = SystemState::<AsyncCommands>::new(world);
 		let commands = state.get_mut(world)?;
-		let result = self.call_with(id, input, commands, out_handler);
+		let result = self.call_with(caller, input, commands, out_handler);
 		state.apply(world);
 		world.flush();
 		result

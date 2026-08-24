@@ -62,7 +62,7 @@ pub struct PathPartial {
 	/// prepend, and its subtree is a route tree of its own.
 	///
 	/// A `Router` is one, which is what lets an entry mount a whole site under a
-	/// command route (`<Route path="serve"><StartOnLoad><Router>..`) while the
+	/// command route (`<Route path="serve" {HttpServer}><Router>..`) while the
 	/// site's own urls stay rooted at `/`, and keeps a dispatching surface from
 	/// reaching routes outside the url space it serves.
 	pub is_root: bool,

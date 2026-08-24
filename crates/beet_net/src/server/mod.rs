@@ -3,18 +3,19 @@
 //! This module provides server infrastructure that listens for HTTP requests
 //! and routes them to Bevy entities for processing via `Action<Request, Response>`.
 //!
-//! ## One load path, servers own the boot
+//! ## One load path, one parked action
 //!
-//! [`CallOnLoad`] calls its entity's action with the process request. On a
-//! server that action is [`StartOnLoad`]'s: it inserts a `Running<Response>`
-//! keep-alive claim and fires an `StartRunning<Request>` every server on the
-//! entity observes. A one-shot [`CliServer`] resolves the call (its response
-//! streams to stdout and the process exits); a long-running [`HttpServer`] /
-//! `TuiServer` parks the call, persisting the process until its `Running` is
-//! removed, which fires its teardown observer. `--server` selects which servers
-//! act, and a selection matching none exits rather than parking. The dispatch
-//! host (a `Router`) is a child, reached with `exchange_child`. See
-//! [`call_on_load`] and [`start_on_load`] for the model.
+//! [`CallOnLoad`] calls its entity's action with the load's request. On a server
+//! entity that action belongs to the [`RunningSet`] its servers contributed to:
+//! it inserts a `Running<Response>` keep-alive claim, fires a
+//! `StartRunning<Request>` for observers, then walks each server's start entry.
+//! A one-shot [`CliServer`] resolves the call (its response streams to stdout
+//! and the process exits); a long-running [`HttpServer`] / `TuiServer` parks the
+//! call, persisting the process until its `Running` is removed, which walks the
+//! stop entries. `--server` selects which servers act, and a selection matching
+//! none fails the call rather than parking. The dispatch host (a `Router`) is a
+//! child, reached with `exchange_child`. See [`call_on_load`] and
+//! [`server_lifecycle`] for the model.
 //!
 //! ## Implementations
 //!
@@ -35,9 +36,9 @@ mod canonical_port;
 pub use canonical_port::*;
 
 // The `HttpServer` component and its `HttpServer::set_backend` install hook; the concrete
-// backends below stay std/feature-gated on top. A server is an
-// `StartRunning<Request>` observer torn down by observing the removal of
-// `StartOnLoad`'s parked `Running<Response>`.
+// backends below stay std/feature-gated on top. A server contributes a
+// start/stop pair to its entity's `RunningSet`, torn down when that set's parked
+// `Running<Response>` is removed.
 //
 // Gated on `action`, not `std`: a server dispatches through an
 // `Action<Request, Response>` by construction, so there is no server without the
@@ -48,8 +49,8 @@ mod http_server;
 #[cfg(feature = "action")]
 pub use http_server::*;
 
-// The shared boot, park and shutdown lifecycle every bootable server uses, keyed
-// by the server marker. Same `action` gate as `HttpServer`, which depends on it.
+// What a listener-backed server contributes to its entity's `RunningSet`. Same
+// `action` gate as `HttpServer`, which depends on it.
 #[cfg(feature = "action")]
 mod server_lifecycle;
 #[cfg(feature = "action")]
@@ -72,20 +73,6 @@ pub use channel_http_server::*;
 mod call_on_load;
 #[cfg(feature = "action")]
 pub use call_on_load::*;
-
-// The boot verb: parks the process and fans the request out to the servers on
-// its entity. Same `action` gate as the load verb it requires.
-#[cfg(feature = "action")]
-mod start_on_load;
-#[cfg(feature = "action")]
-pub use start_on_load::*;
-
-// The dispatched boot verb: a route that starts the server host declared as its
-// child, for an entry whose root dispatches commands rather than serving.
-#[cfg(feature = "action")]
-mod boot_host;
-#[cfg(feature = "action")]
-pub use boot_host::*;
 
 #[cfg(feature = "action")]
 mod cli_server;

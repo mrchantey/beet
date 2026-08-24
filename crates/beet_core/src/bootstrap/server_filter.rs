@@ -46,6 +46,28 @@ impl ServerFilter {
 		})
 	}
 
+	/// Whether a server named `name` should boot for a request carrying `params`,
+	/// from that request's own filter (`--server`), else the process
+	/// [`BootstrapConfig`]'s (`--server`, else `BEET_SERVER`).
+	///
+	/// The process-config fallback is why a deployed binary launched with no args
+	/// (a lambda bootstrap, a lightsail systemd unit) still selects its transport:
+	/// its `BEET_SERVER` reaches the boot even though the synthesized request
+	/// carries no flag. Absent both, `default_boot` decides: it is `true` for
+	/// every built-in server, so a bare `beet` brings up every declared one, and
+	/// an entry clears it on a server that should boot only when named.
+	pub fn selects(
+		params: &MultiMap<SmolStr, SmolStr>,
+		name: &str,
+		default_boot: bool,
+	) -> bool {
+		Self::from_params(params)
+			.as_ref()
+			.or(BootstrapConfig::get().server.as_ref())
+			.map(|filter| filter.passes(name))
+			.unwrap_or(default_boot)
+	}
+
 	/// Parse a comma-separated glob list, trimming each name and dropping empty
 	/// ones.
 	pub fn new(value: &str) -> Self {

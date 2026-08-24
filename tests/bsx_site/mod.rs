@@ -13,7 +13,7 @@ use beet::prelude::*;
 /// `<Template src>` resolve it by ancestry), then settle the async `<RoutesDir>` /
 /// `<TemplateDir>` scans so every route/template exists before the first request.
 ///
-/// The root carries [`DisableCallOnLoad`], so the entry's declared servers stay
+/// The root carries no [`LoadRequest`], so the entry's declared servers stay
 /// dormant: callers render or navigate the site rather than boot it.
 /// `RouterPlugin` registers the spread server/middleware types (`CliServer`,
 /// `TuiServer`, `BsxLayout`, ...); `SshTuiServer` needs the ssh transport and is
@@ -43,7 +43,7 @@ pub async fn build_site(world: &mut World) -> Entity {
 	let template = BsxTemplate::parse_entry(world, source).unwrap();
 	world
 		.entity_mut(root)
-		.insert((DisableCallOnLoad, store))
+		.insert(store)
 		.insert_template(template)
 		.unwrap();
 	AsyncRunner::settle_async_tasks(world).await;

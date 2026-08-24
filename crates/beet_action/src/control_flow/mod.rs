@@ -14,6 +14,8 @@ mod repeat;
 pub use repeat::*;
 mod running;
 pub use running::*;
+mod running_set;
+pub use running_set::*;
 mod sequence;
 pub use sequence::*;
 

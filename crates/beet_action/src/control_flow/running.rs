@@ -49,14 +49,21 @@ where
 		self.0.call_world(world, Ok(value))
 	}
 
+	/// Resolve the deferred handler with `error`, completing the call as failed.
+	///
+	/// # Errors
+	/// Propagates any error from the [`OutHandler`].
+	pub fn fail(self, world: &mut World, error: BevyError) -> Result {
+		self.0.call_world(world, Err(error))
+	}
+
 	/// Resolve the deferred handler with [`ControlFlowError::Interrupted`],
 	/// completing the call as interrupted.
 	///
 	/// # Errors
 	/// Propagates any error from the [`OutHandler`].
 	pub fn interrupt(self, world: &mut World) -> Result {
-		self.0
-			.call_world(world, Err(ControlFlowError::Interrupted.into()))
+		self.fail(world, ControlFlowError::Interrupted.into())
 	}
 }
 
@@ -239,6 +246,45 @@ where
 			)
 		})?;
 		running.end(entity.into_world_mut(), self.0)
+	}
+}
+
+/// Fails a [`Running`] action, resolving its deferred [`OutHandler`] with an
+/// error: the [`EndRun`] counterpart for a run that could not start, or one an
+/// entry aborted.
+///
+/// Queue on an entity to remove its [`Running<T>`] and fail the original call.
+/// With no `Running` (the call already resolved) the error is returned instead,
+/// so it surfaces through the caller's own error path rather than vanishing.
+pub struct FailRun<T = Outcome> {
+	error: BevyError,
+	_marker: PhantomData<fn() -> T>,
+}
+
+impl<T> FailRun<T>
+where
+	T: 'static + Send + Sync,
+{
+	/// Fail the entity's `Running<T>` with `error`.
+	pub fn new(error: impl Into<BevyError>) -> Self {
+		Self {
+			error: error.into(),
+			_marker: PhantomData,
+		}
+	}
+}
+
+impl<T> EntityCommand for FailRun<T>
+where
+	T: 'static + Send + Sync,
+{
+	type Out = Result;
+
+	fn apply(self, mut entity: EntityWorldMut) -> Result {
+		match entity.take::<Running<T>>() {
+			Some(running) => running.fail(entity.into_world_mut(), self.error),
+			None => Err(self.error),
+		}
 	}
 }
 

@@ -61,7 +61,7 @@ impl Plugin for RouterPlugin {
 				// `ServeBlobs` resolve by ancestry.
 				.init_plugin::<StorePlugin>()
 				// the server model: routers and servers go together, so a server
-				// spread on a router boots when the boot fan-out reaches it.
+				// spread on a router starts when its entity's start walk reaches it.
 				// `ServerPlugin` installs the `HttpServer` backend and registers the
 				// server types.
 				.init_plugin::<ServerPlugin>()
@@ -177,7 +177,7 @@ impl Plugin for RouterPlugin {
 			register_template_include(app.world_mut());
 			// the live-TUI server, declarable in a router markup spread
 			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
-			// terminal app when the boot fan-out selects `tui`.
+			// terminal app when the start walk selects `tui`.
 			#[cfg(feature = "tui")]
 			app.register_type::<TuiServer>();
 			// the multi-tenant SSH-TUI server, likewise declarable in a markup

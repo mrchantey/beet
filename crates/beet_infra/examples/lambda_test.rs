@@ -13,12 +13,12 @@ const TEST_VERSION: &str = "test-v1";
 fn main() -> AppExit {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, ServerPlugin));
-	// the server owns the boot, its dispatch host is the child
-	app.world_mut()
-		.spawn((HttpServer::default(), children![exchange_ext::handler(
-			handle_request
-		)]))
-		.trigger(StartRunning::from_cli);
+	// the server owns the run, its dispatch host is the child
+	app.world_mut().spawn((
+		HttpServer::default(),
+		children![exchange_ext::handler(handle_request)],
+		LoadRequest::from_cli().on_spawn(),
+	));
 	app.run()
 }
 

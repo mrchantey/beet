@@ -143,6 +143,24 @@ impl<T: 'static + Debug> Debug for Store<T> {
 	}
 }
 
+impl<T: 'static + Send> Store<Option<T>> {
+	/// Takes the inner value out, leaving `None` behind.
+	///
+	/// The shared-slot handoff for a value that cannot be cloned, ie a lifecycle
+	/// handle one closure opens and another closes.
+	///
+	/// ## Examples
+	/// ```rust
+	/// # use beet_core::prelude::*;
+	/// let slot = Store::new(Some(7));
+	/// assert_eq!(slot.take(), Some(7));
+	/// assert_eq!(slot.take(), None);
+	/// ```
+	pub fn take(&self) -> Option<T> {
+		self.0.with_mut(Option::take)
+	}
+}
+
 impl<T: 'static + Send> Store<Vec<T>> {
 	/// helper
 	pub fn new_vec() -> Self { Self::default() }

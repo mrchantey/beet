@@ -20,9 +20,9 @@ use bsx_site::build_site;
 /// server/middleware types (+ `AsyncPlugin`), `MaterialStylePlugin` the style rules
 /// the `<Theme>`/`<Rule>` declarations resolve against.
 ///
-/// The entry root is the *server* (`main.bsx` declares its servers on a
-/// `<StartOnLoad>`), which parks on its boot action rather than dispatching, so a
-/// render addresses the [`Router`] beneath it.
+/// The entry root is the *server* (`main.bsx` spreads its servers on the root),
+/// which parks on its `RunningSet` action rather than dispatching, so a render
+/// addresses the [`Router`] beneath it.
 async fn site_world() -> (World, Entity, Entity) {
 	let mut world =
 		(AsyncPlugin, RouterPlugin, material::MaterialStylePlugin).into_world();
@@ -48,7 +48,7 @@ async fn render(world: &mut World, router: Entity, path: &str) -> String {
 async fn entry_lands_on_root() {
 	let (world, root, router) = site_world().await;
 	// the servers `main.bsx` declares own the entry root, the router is their child
-	world.entity(root).contains::<StartOnLoad>().xpect_true();
+	world.entity(root).contains::<CallOnLoad>().xpect_true();
 	world.entity(root).contains::<HttpServer>().xpect_true();
 	// the spread middleware stacks on the router beside its dispatch
 	world.entity(router).contains::<Router>().xpect_true();
@@ -60,8 +60,9 @@ async fn entry_lands_on_root() {
 		.title
 		.as_str()
 		.xpect_eq("BSX Site");
-	// the on-disk routes assembled into the entry root's tree
-	let tree = world.entity(root).get::<RouteTree>().unwrap();
+	// the on-disk routes assembled into the router's own url space, resolved from
+	// the held root rather than read off it: the tree lives on the `Router` child.
+	let tree = RouteTree::of(&world, root).unwrap();
 	tree.find(&["docs", "getting-started"]).xpect_some();
 	tree.find(&["blog", "hello-world"]).xpect_some();
 	tree.find(&["counter"]).xpect_some();

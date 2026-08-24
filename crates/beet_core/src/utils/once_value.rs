@@ -40,7 +40,11 @@ impl<T> OnceValue<T> {
 	pub fn signal(self, value: T) {
 		*self.0.value.lock().unwrap() = Some(value);
 		self.0.set.store(true, Ordering::SeqCst);
-		if let Some(waker) = self.0.waker.lock().unwrap().take() {
+		// take the waker out and drop the guard *before* waking: a single-threaded
+		// executor (wasm) polls the woken task inline, and that poll re-enters
+		// `wait`, which locks this same mutex.
+		let waker = self.0.waker.lock().unwrap().take();
+		if let Some(waker) = waker {
 			waker.wake();
 		}
 	}

@@ -49,9 +49,15 @@ impl SiteHost {
 		))
 		.insert_resource(pkg_config!());
 
-		// the on-disk markup router, built into its own entity; the in-world
-		// navigator dispatches to it.
-		let router = build_site(app.world_mut()).await;
+		// the on-disk markup entry, built into its own root; the navigator resolves
+		// routes against the `RouteTree` on the entry's own `Router`, so hop down to
+		// it exactly as the `--server=tui` boot does before pointing the navigator.
+		let root = build_site(app.world_mut()).await;
+		let router = app
+			.world_mut()
+			.run_system_cached_with::<_, Result<Entity>, _, _>(find_router, root)
+			.unwrap()
+			.unwrap();
 		// the host pairs a channel terminal with the page-host buffer, the in-world
 		// navigator co-located on it (one surface), as the TUI boot composes them.
 		let (channel, terminal) =

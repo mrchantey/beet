@@ -5,9 +5,9 @@ from the `site/` directory (`cd site && beet serve`, and `beet present`, `beet
 check`, `beet export-static`), and the deployed Lightsail box loads the same
 entry directly from the app bucket root.
 
-The root is a one-shot `<CliServer{always:true}>` dispatcher whose `Router` is
-its child, so the entry is a set of commands and the served site is ONE of them:
-`serve`. `always=true` makes the dispatcher run on every boot regardless of
+The root is a one-shot `<CliServer always=true {CallOnLoad}>` dispatcher whose
+`Router` is its child, so the entry is a set of commands and the served site is ONE
+of them: `serve`. `always=true` makes the dispatcher run on every boot regardless of
 `--server`, since `--server` selects the *served site's* transports, not this
 entry's. The box therefore launches `app --store=s3://.. --server=http,ssh
 serve`, and `beet serve site` forwards the identical `serve` route in, so local
@@ -34,10 +34,11 @@ because the two sides derived that name independently.
 
 ## The served site
 
-`<Route path="serve" {BootHost}>` starts the host declared beneath it and parks.
-The host declares the three long-running servers (`HttpServer`, the local live
-`TuiServer`, and the multi-tenant `SshTuiServer`) and dispatches into the content
-`Router`, whose middleware and layout attach as component spreads: request
+`<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>` is the serve route
+and the server host in one: dispatching it calls the route's `RunningSet`, which
+parks and starts the three long-running servers (`HttpServer`, the local live
+`TuiServer`, and the multi-tenant `SshTuiServer`). They dispatch into the content
+`Router` child, whose middleware and layout attach as component spreads: request
 logging, analytics, `--help`, terminal link navigation, the layout, and the cache
 policy (`CacheHeadersMiddleware` + `CacheHeaders` mark html pages edge-cacheable,
 which the Cloudflare proxy honors and the deploy/sync purge refreshes).
@@ -100,24 +101,22 @@ different process from a stage deploy. No stage deploy or destroy touches it.
 Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 `CLOUDFLARE_API_TOKEN` in `.env`, plus `tofu` and `cargo-zigbuild`.
 -->
-<StartOnLoad {CliServer{always:true}}>
+<CliServer always=true {CallOnLoad}>
 <Router {HelpHandler}>
 	<!-- the ONE location app identity lives: the deploy names its resources from
 	     this, and so does the running binary. -->
 	<PackageConfig title="Beet" app_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<!-- declared once: the deploy creates it, the runtime records to it -->
 	<DynamoTableBlock bx:ref="analytics" label="analytics"/>
-	<Route path="serve" {BootHost}>
-		<StartOnLoad {(HttpServer, TuiServer, SshTuiServer)}>
-			<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
-				<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
-				<TemplateDir src="templates"/>
-				<Styles/>
-				<DefaultAppRoutes/>
-				<RoutesDir src="routes"/>
-				<AssetsDir src="assets" cache="1h"/>
-			</Router>
-		</StartOnLoad>
+	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>
+		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+			<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
+			<TemplateDir src="templates"/>
+			<Styles/>
+			<DefaultAppRoutes/>
+			<RoutesDir src="routes"/>
+			<AssetsDir src="assets" cache="1h"/>
+		</Router>
 	</Route>
 	<Fragment bx:features="infra,extra">
 		<DeployHost>
@@ -160,4 +159,4 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		</Route>
 	</Fragment>
 </Router>
-</StartOnLoad>
+</CliServer>

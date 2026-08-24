@@ -234,7 +234,7 @@ pub async fn read_sources(
 
 /// Build read [`EntrySources`] into a root carrying `store` (resolved by ancestry for
 /// `<TemplateDir>`, `<RoutesDir>` and `<Template src>`), with `extra` riding onto the
-/// root (eg `DisableCallOnLoad` for a render-only build). Registers the entry's
+/// root (eg a [`LoadRequest`] for a build that should run itself). Registers the entry's
 /// declared template sources *before* parsing the entry (so its own tags resolve),
 /// then marks the root [`TemplatesLoaded`]. The synchronous world-mutating tail of an
 /// entry load; returns the root entity.
@@ -347,7 +347,7 @@ pub async fn rebuild_watched(
 				world,
 				store,
 				sources,
-				(BeetSceneRoot, LiveReload::new()),
+				(BeetSceneRoot, LiveReload::new(), LoadRequest::from_cli()),
 			)?;
 			if let Some(entry_watch) = entry_watch {
 				world.entity_mut(root).insert(entry_watch);
@@ -437,8 +437,7 @@ mod test {
 			.await
 			.unwrap();
 		let root =
-			build_root(&mut world, store, sources, DisableCallOnLoad)
-				.unwrap();
+			build_root(&mut world, store, sources, ()).unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world
@@ -466,8 +465,7 @@ mod test {
 			.await
 			.unwrap();
 		let root =
-			build_root(&mut world, store, sources, DisableCallOnLoad)
-				.unwrap();
+			build_root(&mut world, store, sources, ()).unwrap();
 		world
 			.entity(root)
 			.contains::<TemplatesLoaded>()

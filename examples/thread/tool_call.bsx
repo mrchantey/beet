@@ -8,7 +8,7 @@ tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
 `{RunThread}`. The run is finite, so the transcript settles once the two turns
 complete and the terminal holds it until Ctrl+C.
 -->
-<StartOnLoad {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+<Fragment {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, CallOnLoad)}>
 	<CrateCheck features="thread,tui,ssh,extra"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
@@ -40,4 +40,4 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 			</Thread>
 		</RepeatTimes>
 	</Router>
-</StartOnLoad>
+</Fragment>

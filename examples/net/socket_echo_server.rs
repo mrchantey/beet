@@ -22,15 +22,14 @@ fn main() -> Result {
 			SocketServerPlugin::default(),
 		))
 		.add_systems(Startup, move |mut commands: Commands| {
-			commands
-				.spawn((
-					SocketServer::new(port).bind_all(),
-					OnSpawn::observe(common_handlers::echo_message),
-					OnSpawn::observe(common_handlers::echo_close),
-					OnSpawn::observe(common_handlers::log_send),
-					OnSpawn::observe(common_handlers::log_recv),
-				))
-				.trigger(StartRunning::from_cli);
+			commands.spawn((
+				SocketServer::new(port).bind_all(),
+				OnSpawn::observe(common_handlers::echo_message),
+				OnSpawn::observe(common_handlers::echo_close),
+				OnSpawn::observe(common_handlers::log_send),
+				OnSpawn::observe(common_handlers::log_recv),
+				LoadRequest::from_cli().on_spawn(),
+			));
 		})
 		.run();
 

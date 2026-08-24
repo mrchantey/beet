@@ -6,13 +6,13 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// A live-TUI server owning the boot with its router as a child: the fan-out whose
-/// `--server` selects `"tui"` boots the navigable terminal app. The interactive
-/// sibling of the one-shot [`CliServer`].
+/// A live-TUI server contributing to its entity's [`RunningSet`] with its router
+/// as a child: the start whose `--server` selects `"tui"` boots the navigable
+/// terminal app. The interactive sibling of the one-shot [`CliServer`].
 ///
-/// A long-running server: it never resolves the boot call, so its
+/// A long-running server: it never resolves the parked call, so the entity's
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up. The
-/// boot wires the live host: a [`StdioTerminal`] paired with a [`PageHost::bundle`]
+/// start wires the live host: a [`StdioTerminal`] paired with a [`PageHost::bundle`]
 /// buffer, plus an in-world [`Navigator`] pointed at this router, started at the
 /// request path (`-- docs/design/form`, default home `/`). A
 /// `--color-scheme=light|dark` argument seeds the app-wide [`Theme::scheme`], the
@@ -25,8 +25,7 @@ use beet_ui::prelude::*;
 /// this on its server root, then booting it.
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(StartOnLoad)]
-#[component(on_add = hook_ext::observe((on_action_in, on_running_removed)))]
+#[component(on_add = hook_ext::entity_hook(TuiServer::contribute))]
 pub struct TuiServer {
 	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
 	/// so an entry declaring a single [`TuiServer`] needs no flag; clear it on a
@@ -38,60 +37,70 @@ impl Default for TuiServer {
 	fn default() -> Self { Self { default_boot: true } }
 }
 
-/// The live host entity (terminal + navigator) the boot spawned, despawned on
-/// teardown so a reload does not leak it.
-#[derive(Component)]
-struct TuiHost(Entity);
+impl TuiServer {
+	/// This server's [`RunningSet`] contribution: spawn the live host on start,
+	/// despawn it on stop.
+	///
+	/// The host id rides a shared slot rather than a component on the server, so a
+	/// stop driven by the server's own despawn still takes the terminal with it.
+	fn contribute(entity: &mut EntityCommands) {
+		let host = Store::<Option<Entity>>::default();
+		RunningSet::<Request, Response>::contribute(
+			entity,
+			Self::start(host),
+			Some(Self::stop(host)),
+		);
+	}
 
-/// Boots the live terminal app on the boot fan-out, if `--server` selects `"tui"`.
-/// Records the opening route on the router (the shared mechanism the SSH server
-/// also reads) and never resolves the boot call, so its `Running` parks the
-/// process up.
-fn on_action_in(
-	ev: On<StartRunning<Request>>,
-	servers: Query<&TuiServer>,
-	mut commands: Commands,
-) -> Result {
-	let Ok(default_boot) = servers.get(ev.entity).map(|server| server.default_boot)
-	else {
-		return Ok(());
-	};
-	let (selected, opening, scheme) = ev.with(|request| -> Result<_> {
-		(
-			// this server's own default unless `--server` names a set.
-			Request::selects_server(request, "tui", default_boot)?,
-			OpeningRoute::from_request(request)?,
-			request
+	/// The start entry: boot the live terminal app if `--server` selects `"tui"`,
+	/// recording the opening route on the server (the shared mechanism the SSH
+	/// server also reads). Never resolves the parked call, so it parks the process
+	/// up.
+	fn start(host: Store<Option<Entity>>) -> Action<Request, StartOutcome<Request>> {
+		Action::new_async_local(move |cx: ActionContext<Request>| async move {
+			let entity = cx.caller;
+			let request = cx.input;
+			let default_boot =
+				entity.get(|server: &TuiServer| server.default_boot).await?;
+			if !ServerFilter::selects(request.params(), "tui", default_boot) {
+				return StartOutcome::Declined(request).xok();
+			}
+			let opening = OpeningRoute::from_request(&request)?;
+			let scheme = request
 				.get_param("color-scheme")
-				.and_then(ColorScheme::parse),
-		)
-			.xok()
-	})??;
-	if !selected {
-		return Ok(());
+				.and_then(ColorScheme::parse);
+			entity.insert(opening).await?;
+			entity
+				.run_async_local(move |entity| start_tui(entity, host, scheme))
+				.await?;
+			StartOutcome::Started(request).xok()
+		})
 	}
-	commands
-		.entity(ev.entity)
-		// `ServerBooted` flags the boot as served, so `exit_if_no_server` lets it park
-		.insert((ServerBooted, opening))
-		.queue_async_local(move |entity| start_tui(entity, scheme));
-	Ok(())
+
+	/// The stop entry: despawn the spawned host so its terminal and navigator do
+	/// not leak past a reload, an interrupt or a despawn.
+	fn stop(host: Store<Option<Entity>>) -> Action<(), ()> {
+		Action::new_async_local(move |cx: ActionContext| async move {
+			let Some(host) = host.take() else {
+				return Ok(());
+			};
+			cx.world()
+				.with(move |world: &mut World| {
+					// already gone when the whole scene tore down, which is a stop
+					// just the same
+					world.try_despawn(host).ok();
+				})
+				.await
+				.xok()
+		})
+	}
 }
 
-/// Tears down the live terminal app when the host's `Running<Response>` is removed
-/// (a reload, interrupt, or despawn): despawns the spawned host so its terminal
-/// and navigator do not leak.
-fn on_running_removed(
-	ev: On<Remove, Running<Response>>,
-	hosts: Query<&TuiHost>,
-	mut commands: Commands,
-) {
-	if let Ok(host) = hosts.get(ev.event().event_target()) {
-		commands.entity(host.0).try_despawn();
-	}
-}
-
-async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
+async fn start_tui(
+	entity: AsyncEntity,
+	host_slot: Store<Option<Entity>>,
+	scheme: Option<ColorScheme>,
+) -> Result {
 	// a briefly-spawned server (eg during serialization) has no business booting
 	if !entity.is_alive().await {
 		return Ok(());
@@ -145,12 +154,7 @@ async fn start_tui(entity: AsyncEntity, scheme: Option<ColorScheme>) -> Result {
 				.insert(Navigator::in_world(router, home));
 		})
 		.await;
-	// record the host so teardown can despawn it
-	entity
-		.with(move |mut entity| {
-			entity.insert(TuiHost(host));
-		})
-		.await
-		.ok();
+	// record the host so the stop entry can despawn it
+	host_slot.set(Some(host));
 	Ok(())
 }
