@@ -146,7 +146,8 @@ fn load_entry(world: &mut World) {
 				return;
 			}
 		};
-		if let Err(err) = build_entry(&world, &config, resolved, formats).await {
+		if let Err(err) = build_entry(&world, &config, resolved, formats).await
+		{
 			error!("{err}");
 			world.write_message(AppExit::error()).await;
 		}
@@ -214,7 +215,12 @@ async fn build_entry(
 			.await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			entry_build::build_root(world, store, sources, LoadRequest::from_cli())?;
+			entry_build::build_root(
+				world,
+				store,
+				sources,
+				LoadRequest::from_cli(),
+			)?;
 			Ok(())
 		})
 		.await
@@ -247,7 +253,8 @@ async fn build_watched_entry(
 			let (store, entry_name, formats) =
 				(store.clone(), entry_name.clone(), formats.clone());
 			Box::pin(async move {
-				entry_build::rebuild_watched(&world, store, entry_name, formats).await
+				entry_build::rebuild_watched(&world, store, entry_name, formats)
+					.await
 			})
 		}
 	};
@@ -298,16 +305,19 @@ async fn resolve_entry(
 
 	// a self-rooted store: no local dir, no ancestor walk, no watch dir.
 	if store_uri.is_some_and(StoreUri::is_self_rooted) {
-		let store = entry_build::resolve_store(store_uri, AbsPathBuf::new(".")?)?;
+		let store =
+			entry_build::resolve_store(store_uri, AbsPathBuf::new(".")?)?;
 		let entry_name = match main {
 			Some(main) => main.to_string(),
-			None => entry_build::probe_entry_names(&store).await?.ok_or_else(|| {
-				bevyhow!(
-					"no entry document found in the `--store` backend: looked \
+			None => entry_build::probe_entry_names(&store).await?.ok_or_else(
+				|| {
+					bevyhow!(
+						"no entry document found in the `--store` backend: looked \
 					for {:?}. Seed one, or pass `--main=<name>`.",
-					entry_build::ENTRY_NAMES
-				)
-			})?,
+						entry_build::ENTRY_NAMES
+					)
+				},
+			)?,
 		};
 		let prescan = entry_build::read_prescan(&store, &entry_name).await?;
 		return Ok(ResolvedEntry {
@@ -357,16 +367,17 @@ fn features_self_check(
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
 /// a filesystem walk makes sense; the matched entry may still widen its own
 /// root ([`widen_store_root`]), and no match errors with guidance.
-async fn discover_entry(
-	store_uri: Option<&StoreUri>,
-) -> Result<ResolvedEntry> {
+async fn discover_entry(store_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
 	let start = AbsPathBuf::new(".")?;
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
 		let store = BlobStore::new(FsStore::new(current.clone()));
-		if let Some(entry_name) = entry_build::probe_entry_names(&store).await? {
-			return entry_build::resolve_widened(store_uri, current, entry_name)
-				.await;
+		if let Some(entry_name) = entry_build::probe_entry_names(&store).await?
+		{
+			return entry_build::resolve_widened(
+				store_uri, current, entry_name,
+			)
+			.await;
 		}
 		dir = current.parent();
 	}

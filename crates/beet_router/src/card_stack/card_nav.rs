@@ -337,7 +337,10 @@ mod test {
 	fn home_card_is_first() {
 		let tree = card_stack_with_home();
 		// the home card (empty path) is card 1, the children follow.
-		CardNav::resolve_nth(&tree, 1).unwrap().join("/").xpect_eq("");
+		CardNav::resolve_nth(&tree, 1)
+			.unwrap()
+			.join("/")
+			.xpect_eq("");
 		CardNav::resolve_nth(&tree, 2)
 			.unwrap()
 			.join("/")

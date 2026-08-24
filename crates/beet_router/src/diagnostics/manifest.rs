@@ -222,7 +222,9 @@ fn manifest_routes(world: &World, router: Entity) -> Result<Vec<SmolStr>> {
 /// The kebab property names a `<Rule>`/`bx:style` declaration accepts, from A3's
 /// [`PropResolver::name_map`](beet_ui::prelude::style::PropResolver::name_map), sorted.
 fn manifest_style_props() -> Vec<SmolStr> {
-	let mut props = style::PropResolver::name_map().into_keys().collect::<Vec<_>>();
+	let mut props = style::PropResolver::name_map()
+		.into_keys()
+		.collect::<Vec<_>>();
 	props.sort();
 	props
 }

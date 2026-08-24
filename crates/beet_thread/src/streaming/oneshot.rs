@@ -35,12 +35,13 @@ impl Post {
 		ThreadWindow::reduce_now(world);
 
 		// a cursor past the seed window, so only the turn's posts come back
-		let cursor = world.with_state::<Query<&ThreadWindow>, _>(move |windows| {
-			windows
-				.get(thread)
-				.ok()
-				.and_then(|window| window.last_post().map(|post| post.id()))
-		});
+		let cursor =
+			world.with_state::<Query<&ThreadWindow>, _>(move |windows| {
+				windows
+					.get(thread)
+					.ok()
+					.and_then(|window| window.last_post().map(|post| post.id()))
+			});
 
 		world.entity_mut(thread).call::<(), Outcome>(()).await?;
 

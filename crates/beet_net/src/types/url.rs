@@ -195,7 +195,8 @@ impl Url {
 		// bracketed ipv6: the port is whatever follows the closing bracket
 		if let Some(end) = authority.find(']') {
 			let (host, rest) = authority.split_at(end + 1);
-			let port = rest.strip_prefix(':').and_then(|port| port.parse().ok());
+			let port =
+				rest.strip_prefix(':').and_then(|port| port.parse().ok());
 			return Some((host, port));
 		}
 		match authority.rsplit_once(':') {
@@ -692,9 +693,15 @@ mod test {
 	#[beet_core::test]
 	fn file_extension_classification() {
 		// served files carry a real extension
-		Url::parse("/assets/blog/x.jpg").file_extension().xpect_eq(Some("jpg"));
-		Url::parse("/style.css").file_extension().xpect_eq(Some("css"));
-		Url::parse("/index.html").file_extension().xpect_eq(Some("html"));
+		Url::parse("/assets/blog/x.jpg")
+			.file_extension()
+			.xpect_eq(Some("jpg"));
+		Url::parse("/style.css")
+			.file_extension()
+			.xpect_eq(Some("css"));
+		Url::parse("/index.html")
+			.file_extension()
+			.xpect_eq(Some("html"));
 		// page routes do not
 		Url::parse("/about").file_extension().xpect_eq(None);
 		Url::parse("/blog/post-6").file_extension().xpect_eq(None);

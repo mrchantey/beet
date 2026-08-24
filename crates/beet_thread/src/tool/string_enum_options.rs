@@ -94,10 +94,8 @@ mod test {
 			))
 			.id();
 		app.update();
-		field_enum(&app, tool).xpect_eq(Some(vec![
-			SmolStr::new("happy"),
-			SmolStr::new("sad"),
-		]));
+		field_enum(&app, tool)
+			.xpect_eq(Some(vec![SmolStr::new("happy"), SmolStr::new("sad")]));
 
 		// changing the options re-patches the schema.
 		app.world_mut()

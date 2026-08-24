@@ -208,7 +208,10 @@ pub impl App {
 /// Whether `tag` was marked [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered),
 /// ie a known featured-out name the loader resolves to nothing rather than error.
 /// Consulted by both lookup paths on a missing registration.
-pub(crate) fn is_allowed_unregistered(cx: &mut TemplateContext, tag: &str) -> bool {
+pub(crate) fn is_allowed_unregistered(
+	cx: &mut TemplateContext,
+	tag: &str,
+) -> bool {
 	cx.entity.world_scope(|world| {
 		world
 			.get_resource::<AllowedUnregistered>()
@@ -226,7 +229,9 @@ impl ValueSchema {
 		let registry = registry.read();
 		registry
 			.get_with_short_type_path(tag)
-			.and_then(|registration| registration.data::<ReflectTemplateSchema>())
+			.and_then(|registration| {
+				registration.data::<ReflectTemplateSchema>()
+			})
 			.map(|data| data.schema.clone())
 	}
 }

@@ -52,7 +52,11 @@ pub struct TofuApply {
 pub async fn TofuApplyAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let apply = cx.caller.get_cloned::<TofuApply>().await.unwrap_or_default();
+	let apply = cx
+		.caller
+		.get_cloned::<TofuApply>()
+		.await
+		.unwrap_or_default();
 	trace!("TofuApplyAction: starting, layer {:?}", apply.layer());
 	// step 1: build the project and collect variables and artifact pairs
 	trace!(
@@ -109,10 +113,9 @@ pub async fn TofuApplyAction(
 
 		// step 3: publish ledger
 		trace!("TofuApplyAction: step 3 - publishing artifact ledger");
-		client
-			.publish_ledger()
-			.await
-			.map_err(|err| bevyhow!("failed to publish artifact ledger: {err}"))?;
+		client.publish_ledger().await.map_err(|err| {
+			bevyhow!("failed to publish artifact ledger: {err}")
+		})?;
 		trace!(
 			"TofuApplyAction: published artifact ledger: {}",
 			client.ledger().deploy_id

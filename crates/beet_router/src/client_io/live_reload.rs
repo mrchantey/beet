@@ -190,7 +190,9 @@ pub(crate) fn reload_site(world: &mut World, root: Entity) {
 		// shared node (else the diagnostics' ephemeral cleanup races the repaint and
 		// blanks the live TUI).
 		TemplatePending::settle(&world).await;
-		world.with(|world: &mut World| broadcast_reload(world)).await;
+		world
+			.with(|world: &mut World| broadcast_reload(world))
+			.await;
 		log_all_render_diagnostics(&world).await;
 		for navigator in navigators {
 			if let Err(err) = Navigator::reload(world.entity(navigator)).await {
@@ -312,10 +314,15 @@ mod test {
 	/// [`ClientIo`] child. Returns the root entity, which carries the store.
 	fn spawn_site(world: &mut World, store: impl Bundle) -> Entity {
 		world
-			.spawn((store, Router::with_defaults(), LiveReload::new(), children![
-				TemplateDir::new("templates"),
-				RoutesDir::new("routes")
-			]))
+			.spawn((
+				store,
+				Router::with_defaults(),
+				LiveReload::new(),
+				children![
+					TemplateDir::new("templates"),
+					RoutesDir::new("routes")
+				],
+			))
 			.flush()
 	}
 
@@ -469,7 +476,11 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		// no pre-set ClientIo: `start_live_reload` spawns one as the root's child
 		let root = world
-			.spawn((InMemoryStore::new(), Router::with_defaults(), LiveReload::new()))
+			.spawn((
+				InMemoryStore::new(),
+				Router::with_defaults(),
+				LiveReload::new(),
+			))
 			.flush();
 		let channel = world
 			.with_state::<Query<Entity, With<ClientIo>>, _>(|query| {

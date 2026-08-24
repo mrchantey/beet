@@ -83,10 +83,9 @@ mod test {
 		let store = BlobStore::temp();
 		for index in 0..count {
 			store
-				.insert(
-					&SmolPath::from(format!("{dir}/{index}.jpg")),
-					vec![index as u8],
-				)
+				.insert(&SmolPath::from(format!("{dir}/{index}.jpg")), vec![
+					index as u8,
+				])
 				.await
 				.unwrap();
 		}
@@ -127,10 +126,9 @@ mod test {
 		let store = BlobStore::temp();
 		for index in 0..3usize {
 			store
-				.insert(
-					&SmolPath::from(format!("photos/{index}.jpg")),
-					vec![index as u8],
-				)
+				.insert(&SmolPath::from(format!("photos/{index}.jpg")), vec![
+					index as u8,
+				])
 				.await
 				.unwrap();
 		}
@@ -139,13 +137,14 @@ mod test {
 		world.flush();
 		// resolve the store + advance the cursor exactly as `capture` does.
 		let resolve = |world: &mut World| {
-			world.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
-				|(stores, mut photos)| -> Result<(BlobStore, usize)> {
-					let dir_store =
-						stores.get(camera)?.with_subdir(photos.dir.clone());
-					Ok((dir_store, photos.advance()))
-				},
-			)
+			world
+				.with_state::<(AncestorQuery<&BlobStore>, ResMut<PhotoStream>), _>(
+					|(stores, mut photos)| -> Result<(BlobStore, usize)> {
+						let dir_store =
+							stores.get(camera)?.with_subdir(photos.dir.clone());
+						Ok((dir_store, photos.advance()))
+					},
+				)
 		};
 		let (store, cursor) = resolve(&mut world).unwrap();
 		let first = read_next_photo(&store, cursor).await.unwrap();

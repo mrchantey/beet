@@ -1146,7 +1146,8 @@ fn resource_tag_inserts_when_absent() {
 
 /// Build `source` and return the template error.
 fn build_error(world: &mut World, source: &str) -> String {
-	let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
+	let nodes =
+		BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
 	world
 		.spawn_template(BsxTemplate::container(
 			nodes,
@@ -1354,9 +1355,11 @@ fn binding_comp_router_lazy() {
 #[beet_core::test]
 fn reserved_ref_shadow_errors() {
 	let mut world = world();
-	let nodes =
-		BsxNode::parse_document("<div bx:ref=\"Router\"/>", &BsxParseConfig::bsx())
-			.unwrap();
+	let nodes = BsxNode::parse_document(
+		"<div bx:ref=\"Router\"/>",
+		&BsxParseConfig::bsx(),
+	)
+	.unwrap();
 	world
 		.spawn_template(BsxTemplate::container(
 			nodes,

@@ -64,9 +64,14 @@ pub async fn CaptureScreenshot(cx: ActionContext<Request>) -> Result<Response> {
 	// owned args + a helper fn: inline borrows across the awaits here trip
 	// the action macro's `Send` bound ("implementation of `Send` is not
 	// general enough"), the same shape `export_pdf` uses
-	let png =
-		capture(url, width, height, params.full_page, params.selector.clone())
-			.await?;
+	let png = capture(
+		url,
+		width,
+		height,
+		params.full_page,
+		params.selector.clone(),
+	)
+	.await?;
 	fs_ext::write(&output, &png)?;
 	Response::ok_text(format!("wrote {output} ({} bytes)\n", png.len())).xok()
 }

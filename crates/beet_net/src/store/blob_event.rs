@@ -86,7 +86,10 @@ impl BlobEventBus {
 
 /// Drains the [`BlobEventBus`] channel, triggering each [`BlobEvent`] globally.
 #[cfg(feature = "std")]
-pub(crate) fn drain_blob_events(bus: Res<BlobEventBus>, mut commands: Commands) {
+pub(crate) fn drain_blob_events(
+	bus: Res<BlobEventBus>,
+	mut commands: Commands,
+) {
 	while let Ok(event) = bus.receiver.try_recv() {
 		commands.trigger(event);
 	}
@@ -123,7 +126,10 @@ pub(crate) fn propagate_blob_store_changes(
 /// components an app hung beside the handle) on a deletion the object may recover
 /// from moments later, eg an editor that writes by remove-then-create, whose
 /// re-creation then resurrects through the same untouched handle.
-pub(crate) fn propagate_blob_changes(ev: On<BlobEvent>, mut blobs: Query<&mut Blob>) {
+pub(crate) fn propagate_blob_changes(
+	ev: On<BlobEvent>,
+	mut blobs: Query<&mut Blob>,
+) {
 	blobs
 		.iter_mut()
 		.filter(|blob| blob.matches_event(&ev))

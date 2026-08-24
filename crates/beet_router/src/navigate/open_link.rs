@@ -111,7 +111,10 @@ fn on_link_click(
 		.map(|link| link.href.to_string())
 		.ok()
 		.or_else(|| {
-			hyperlinks.get(link_entity).ok().map(|link| link.0.to_string())
+			hyperlinks
+				.get(link_entity)
+				.ok()
+				.map(|link| link.0.to_string())
 		})
 	else {
 		return Ok(());
@@ -135,19 +138,21 @@ fn on_link_click(
 	// internal, or external rendered in-app, both navigate the Navigator; a
 	// static file is never navigated in-app.
 	if !is_file && (!url.is_external() || on_open == OnOpenLink::Internal) {
-		commands.entity(navigator).queue_async(move |entity| async move {
-			// a session can close (despawning its co-located navigator) between the
-			// click and this task, eg a multi-tenant SSH client that disconnects
-			// mid-navigation. A despawned navigator is a clean no-op; a genuine load
-			// failure is logged rather than escalated to the command error handler,
-			// as the boot navigation in `Navigator::on_add` also does.
-			if !entity.is_alive().await {
-				return;
-			}
-			if let Err(err) = Navigator::navigate_to(entity, url).await {
-				error!("navigation failed: {err}");
-			}
-		});
+		commands
+			.entity(navigator)
+			.queue_async(move |entity| async move {
+				// a session can close (despawning its co-located navigator) between the
+				// click and this task, eg a multi-tenant SSH client that disconnects
+				// mid-navigation. A despawned navigator is a clean no-op; a genuine load
+				// failure is logged rather than escalated to the command error handler,
+				// as the boot navigation in `Navigator::on_add` also does.
+				if !entity.is_alive().await {
+					return;
+				}
+				if let Err(err) = Navigator::navigate_to(entity, url).await {
+					error!("navigation failed: {err}");
+				}
+			});
 		return Ok(());
 	}
 
@@ -479,7 +484,8 @@ mod test {
 	#[ignore = "the open_external_link system launches the real system browser; behavior verified, but with no running server the file link opens x.jpg on every run"]
 	fn img_file_link_hands_off_not_navigated() {
 		let mut app = link_app();
-		let img = spawn_media_link(&mut app, "img", false, "/assets/blog/x.jpg");
+		let img =
+			spawn_media_link(&mut app, "img", false, "/assets/blog/x.jpg");
 		click(&mut app, img);
 		let opens = &app.world().resource::<ExternalOpens>().0;
 		opens.len().xpect_eq(1);
@@ -492,8 +498,12 @@ mod test {
 	#[beet_core::test]
 	fn iframe_external_link_follows_hyperlink() {
 		let mut app = link_app();
-		let iframe =
-			spawn_media_link(&mut app, "iframe", true, "https://youtu.be/abc123");
+		let iframe = spawn_media_link(
+			&mut app,
+			"iframe",
+			true,
+			"https://youtu.be/abc123",
+		);
 		click(&mut app, iframe);
 		let copies = &app.world().resource::<ClipboardCopies>().0;
 		copies.len().xpect_eq(1);
@@ -505,7 +515,8 @@ mod test {
 	#[beet_core::test]
 	fn kitty_rendered_image_is_not_clickable() {
 		let mut app = link_app();
-		let img = spawn_media_link(&mut app, "img", false, "/assets/blog/x.jpg");
+		let img =
+			spawn_media_link(&mut app, "img", false, "/assets/blog/x.jpg");
 		app.world_mut().entity_mut(img).insert(KittyImage {
 			id: 1,
 			data: String::new(),

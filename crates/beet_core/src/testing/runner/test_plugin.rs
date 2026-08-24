@@ -60,8 +60,7 @@ pub async fn test_start() -> i32 {
 /// `custom_test_frameworks` harness uses [`libtest_runner`] instead.
 #[cfg(feature = "testing")]
 pub fn test_runner(tests: &[&TestDescAndFn]) {
-	tests_app(tests.iter().map(|t| test_ext::clone_static(t)).collect())
-		.run();
+	tests_app(tests.iter().map(|t| test_ext::clone_static(t)).collect()).run();
 }
 
 /// Entry point for the nightly `custom_test_frameworks` test harness,

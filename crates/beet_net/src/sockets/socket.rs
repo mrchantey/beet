@@ -230,10 +230,7 @@ impl Socket {
 	/// The seam a downstream transport uses to build a `Socket` from its own
 	/// channel ends after installing [`Socket::set_client`] (the esp WiFi backend
 	/// does exactly this); the built-in tungstenite/web-sys backends use it too.
-	pub fn new(
-		reader: impl SocketReader,
-		writer: impl SocketWriter,
-	) -> Self {
+	pub fn new(reader: impl SocketReader, writer: impl SocketWriter) -> Self {
 		Self {
 			reader: SocketCell::new(Box::pin(reader)),
 			writer: SocketCell::new(Box::new(writer)),
@@ -336,10 +333,7 @@ impl Stream for SocketRead {
 /// boxed into `Socket`.
 pub trait SocketWriter: 'static + MaybeSend {
 	/// Send a message to the socket peer.
-	fn send_boxed(
-		&mut self,
-		msg: Message,
-	) -> SendBoxedFuture<Result<()>>;
+	fn send_boxed(&mut self, msg: Message) -> SendBoxedFuture<Result<()>>;
 	/// Close the socket with an optional close frame.
 	fn close_boxed(
 		&mut self,
@@ -464,10 +458,7 @@ mod tests {
 	}
 
 	impl SocketWriter for DummyWriter {
-		fn send_boxed(
-			&mut self,
-			msg: Message,
-		) -> SendBoxedFuture<Result<()>> {
+		fn send_boxed(&mut self, msg: Message) -> SendBoxedFuture<Result<()>> {
 			self.sent.push(msg);
 			Box::pin(async { Ok(()) })
 		}

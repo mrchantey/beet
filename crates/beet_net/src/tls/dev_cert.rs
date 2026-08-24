@@ -105,8 +105,8 @@ impl DevCert {
 			Some(existing) => existing,
 			None => rcgen::KeyPair::generate()?,
 		};
-		let cert =
-			rcgen::CertificateParams::new(sans.clone())?.self_signed(&signing_key)?;
+		let cert = rcgen::CertificateParams::new(sans.clone())?
+			.self_signed(&signing_key)?;
 		fs_ext::write(&cert_path, cert.pem())?;
 		fs_ext::write(&key_path, signing_key.serialize_pem())?;
 		fs_ext::write(Self::sans_path(dir), &sans_file)?;
@@ -194,7 +194,9 @@ mod tests {
 		fs_ext::write(dir.join("sans.txt"), "stale.example").unwrap();
 		DevCert::load_or_generate_in(&dir).unwrap();
 
-		fs_ext::read_to_string(dir.join("key.pem")).unwrap().xpect_eq(key);
+		fs_ext::read_to_string(dir.join("key.pem"))
+			.unwrap()
+			.xpect_eq(key);
 		fs_ext::read_to_string(dir.join("cert.pem"))
 			.unwrap()
 			.xpect_not_eq(cert);

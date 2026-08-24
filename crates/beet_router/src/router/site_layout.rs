@@ -133,12 +133,14 @@ impl PageClasses {
 	/// help, with no layout) is themed the same.
 	pub fn resolve(parts: &RequestParts, theme: &Theme) -> Classes {
 		let mut classes = Classes::new([classes::PAGE]);
-		let scheme =
-			match parts.get_param("color-scheme").and_then(ColorScheme::parse) {
-				Some(scheme) => Some(scheme),
-				None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
-				None => None,
-			};
+		let scheme = match parts
+			.get_param("color-scheme")
+			.and_then(ColorScheme::parse)
+		{
+			Some(scheme) => Some(scheme),
+			None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
+			None => None,
+		};
 		if let Some(scheme) = scheme {
 			classes.insert_class(scheme.class());
 		}
@@ -159,9 +161,12 @@ mod test {
 	/// context's content/route/router anchor. Includes the Material rule set so
 	/// `<Stylesheet/>` bakes the same rules a deployed site serves.
 	fn layout_world(parts: RequestParts) -> World {
-		let mut world =
-			(AsyncPlugin, RouterPlugin, material::MaterialStylePlugin::default())
-				.into_world();
+		let mut world = (
+			AsyncPlugin,
+			RouterPlugin,
+			material::MaterialStylePlugin::default(),
+		)
+			.into_world();
 		// the `Header`/`RouteHead` chrome reads the site name off `PackageConfig`;
 		// the live middleware seeds it, so a bare render world must too.
 		world.init_resource::<PackageConfig>();

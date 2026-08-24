@@ -45,11 +45,16 @@ impl DataLiteral {
 		if let Some(some_info) = option_some_inner(field_info)
 			&& !is_option_literal(literal)
 		{
-			let inner =
-				DataLiteral::to_reflect(literal, Some(some_info), registry, resolver)?;
+			let inner = DataLiteral::to_reflect(
+				literal,
+				Some(some_info),
+				registry,
+				resolver,
+			)?;
 			let mut tuple = DynamicTuple::default();
 			tuple.insert_boxed(inner);
-			let mut option = DynamicEnum::new("Some", DynamicVariant::Tuple(tuple));
+			let mut option =
+				DynamicEnum::new("Some", DynamicVariant::Tuple(tuple));
 			option.set_represented_type(field_info);
 			return Ok(Box::new(option));
 		}
@@ -412,7 +417,9 @@ fn list_to_reflect(
 	};
 	let values = items
 		.iter()
-		.map(|item| DataLiteral::to_reflect(item, item_info, registry, resolver))
+		.map(|item| {
+			DataLiteral::to_reflect(item, item_info, registry, resolver)
+		})
 		.collect::<Result<Vec<_>>>()?;
 	if let Some(info @ TypeInfo::Array(_)) = field_info {
 		let mut array = DynamicArray::new(values.into_boxed_slice());
@@ -514,7 +521,9 @@ fn enum_to_reflect(
 				};
 				dynamic.insert_boxed(
 					name.as_str(),
-					DataLiteral::to_reflect(literal, nested, registry, resolver)?,
+					DataLiteral::to_reflect(
+						literal, nested, registry, resolver,
+					)?,
 				);
 			}
 			DynamicVariant::Struct(dynamic)

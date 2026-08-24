@@ -44,8 +44,8 @@ mod bevyhow;
 mod common_systems;
 mod despawn_after;
 mod entity_target_event;
-mod non_send_plugin;
 pub mod hook_ext;
+mod non_send_plugin;
 
 pub use bevyhow::*;
 #[cfg(feature = "std")]

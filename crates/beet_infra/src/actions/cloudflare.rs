@@ -572,7 +572,9 @@ async fn sync_dir_to_r2(
 		"syncing {} files from {} to r2://{bucket}{}",
 		files.len(),
 		root.display(),
-		prefix.map(|prefix| format!("/{prefix}")).unwrap_or_default(),
+		prefix
+			.map(|prefix| format!("/{prefix}"))
+			.unwrap_or_default(),
 	);
 	// precompute owned `(bucket/key, file)` args so the uploads own their data.
 	let puts = files
@@ -585,7 +587,10 @@ async fn sync_dir_to_r2(
 				Some(prefix) => format!("{prefix}/{rel_key}"),
 				None => rel_key,
 			};
-			(format!("{bucket}/{key}"), file.to_string_lossy().to_string())
+			(
+				format!("{bucket}/{key}"),
+				file.to_string_lossy().to_string(),
+			)
 		})
 		.collect::<Vec<_>>();
 	// each `wrangler r2 object put` is its own node process, so the per-file startup

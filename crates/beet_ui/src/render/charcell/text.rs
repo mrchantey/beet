@@ -44,7 +44,11 @@ pub(super) fn measure_str(text: &str, max_width: u32) -> UVec2 {
 fn measure_str_spaced(text: &str, max_width: u32, space: char) -> UVec2 {
 	let lines = word_wrap(text, max_width, space);
 	UVec2::new(
-		lines.iter().map(|l| text_ext::display_width(l)).max().unwrap_or(0) as u32,
+		lines
+			.iter()
+			.map(|l| text_ext::display_width(l))
+			.max()
+			.unwrap_or(0) as u32,
 		lines.len() as u32,
 	)
 }
@@ -218,7 +222,8 @@ pub(super) fn word_wrap(text: &str, max_w: u32, space: char) -> Vec<String> {
 					w = tail;
 				}
 				current = w.to_string();
-			} else if text_ext::display_width(&current) + space_w + text_ext::display_width(word)
+			} else if text_ext::display_width(&current)
+				+ space_w + text_ext::display_width(word)
 				<= max_w
 			{
 				current.push(space);

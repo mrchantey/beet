@@ -364,7 +364,10 @@ mod tests {
 	#[beet_core::test]
 	fn combinator_selectors() {
 		CssRule::default()
-			.with_selector(Selector::child(Selector::tag("main"), Selector::Any))
+			.with_selector(Selector::child(
+				Selector::tag("main"),
+				Selector::Any,
+			))
 			.selector_to_css()
 			.xpect_eq("main > *");
 		CssRule::default()

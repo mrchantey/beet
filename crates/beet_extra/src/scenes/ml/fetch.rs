@@ -177,11 +177,7 @@ fn spawn_fetch_tree(world: &mut World, fox: Entity, bert: Handle<Bert>) {
 				Name::new("Play Walk"),
 				PlayAnimation::new("misc/fox.glb#Animation1").repeat_forever(),
 			),
-			(
-				Name::new("Seek to Arrive"),
-				Seek,
-				EndOnArrive::new(1.),
-			),
+			(Name::new("Seek to Arrive"), Seek, EndOnArrive::new(1.),),
 		]));
 		seq.spawn((Name::new("Return to Idle"), Sequence::new(), children![
 			(

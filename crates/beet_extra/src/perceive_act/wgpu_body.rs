@@ -112,14 +112,16 @@ mod test {
 		app.world_mut().flush();
 
 		// fire the `drive` call the socket would deliver, then tick the app.
-		app.world_mut().entity_mut(body).run_async_local(|body| async move {
-			body.call::<DriveForDuration, ()>(DriveForDuration {
-				drive: DifferentialDrive::new(40., 0.),
-				duration: Duration::from_secs(1),
-			})
-			.await?;
-			Ok(())
-		});
+		app.world_mut()
+			.entity_mut(body)
+			.run_async_local(|body| async move {
+				body.call::<DriveForDuration, ()>(DriveForDuration {
+					drive: DifferentialDrive::new(40., 0.),
+					duration: Duration::from_secs(1),
+				})
+				.await?;
+				Ok(())
+			});
 
 		// drive until the fox has stepped off the origin along its forward axis.
 		app_ext::update_until(&mut app, |world| {

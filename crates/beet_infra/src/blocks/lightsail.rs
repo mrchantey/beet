@@ -221,7 +221,8 @@ impl LightsailBlock {
 		// serves them. Its own artifacts bucket is declared by nothing, so it is
 		// added here.
 		let mut read_buckets = vec![stack.artifact_bucket_name()];
-		read_buckets.extend(access.s3_buckets().iter().map(ToString::to_string));
+		read_buckets
+			.extend(access.s3_buckets().iter().map(ToString::to_string));
 		statements.push(json!({
 			"Sid": "ReadStores",
 			"Effect": "Allow",
@@ -653,7 +654,8 @@ touch /etc/__APP__/deploy.env
 				("__BUCKET__", &stack.artifact_bucket_name()),
 				(
 					"__POINTER__",
-					&ArtifactLedger::release_pointer_key(&self.label).to_string(),
+					&ArtifactLedger::release_pointer_key(&self.label)
+						.to_string(),
 				),
 				("__ARTIFACT_KEY_VAR__", ArtifactLedger::ARTIFACT_KEY_VAR),
 			],
@@ -876,11 +878,16 @@ impl Block for LightsailBlock {
 		// and the coupling runs both ways: a machine change rotates the key, and
 		// a rotated key changes the user data terraform renders, which replaces
 		// the instance.
-		let rotation_ident = stack.resource_ident(self.build_label("key-rotation"));
+		let rotation_ident =
+			stack.resource_ident(self.build_label("key-rotation"));
 		let rotation_label = rotation_ident.label().to_string();
-		config.add_untyped_resource("terraform_data", &rotation_label, &json!({
-			"input": Self::machine_config_hash(&user_data)
-		}))?;
+		config.add_untyped_resource(
+			"terraform_data",
+			&rotation_label,
+			&json!({
+				"input": Self::machine_config_hash(&user_data)
+			}),
+		)?;
 
 		// key pair for SSH access
 		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
@@ -945,13 +952,14 @@ impl Block for LightsailBlock {
 			terra::ResourceDef::new_secondary(instance_ident, instance_details);
 
 		// tcp port helper for the firewall entries below
-		let tcp_port =
-			|port: u16| AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+		let tcp_port = |port: u16| {
+			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
 				from_port: port.into(),
 				protocol: "tcp".into(),
 				to_port: port.into(),
 				..default()
-			};
+			}
+		};
 		// Port 22 is always open: the management sshd by default, the beet ssh
 		// TUI under `allow_ssh` (management moves to `management_ssh_port`).
 		// With Caddy hostnames TLS terminates on 80/443 and proxies to the app's
@@ -1024,7 +1032,12 @@ impl Block for LightsailBlock {
 						"replace_triggered_by": [instance.field("id")]
 					}),
 				)?;
-				self.emit_dns(stack, config, &static_ip.field_ref("ip_address"), false)?;
+				self.emit_dns(
+					stack,
+					config,
+					&static_ip.field_ref("ip_address"),
+					false,
+				)?;
 				(addr, "static_ipv4")
 			}
 			LightsailNetworking::Ipv6 => {
@@ -1104,7 +1117,9 @@ mod tests {
 		stack
 			.build_config(
 				core::iter::once((entity.clone(), block as &dyn Block))
-					.chain(declared.iter().map(|block| (entity.clone(), *block)))
+					.chain(
+						declared.iter().map(|block| (entity.clone(), *block)),
+					)
 					.collect::<Vec<_>>(),
 			)
 			.unwrap()
@@ -1306,11 +1321,10 @@ mod tests {
 	/// Secret env rides the unit's `Environment=` lines, never `ExecStart`.
 	#[beet_core::test]
 	fn secret_env_rides_environment_lines() {
-		let (script, _dir) =
-			build_user_data(&LightsailBlock::default().with_secret_env(
-				"BEET_SSH_HOST_KEY",
-				"abc123",
-			));
+		let (script, _dir) = build_user_data(
+			&LightsailBlock::default()
+				.with_secret_env("BEET_SSH_HOST_KEY", "abc123"),
+		);
 		script
 			.as_str()
 			.xpect_contains("Environment=BEET_SSH_HOST_KEY=abc123")

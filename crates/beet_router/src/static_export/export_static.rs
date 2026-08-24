@@ -26,7 +26,8 @@ impl StaticExport {
 		// drafts are excluded only in production; the process stage defaults to
 		// dev (keep drafts) when neither transport named one.
 		let is_prod = BootstrapConfig::get().is_prod();
-		world.with(move |world: &mut World| Self::paths(world, router, is_prod))
+		world
+			.with(move |world: &mut World| Self::paths(world, router, is_prod))
 			.await
 	}
 
@@ -64,8 +65,7 @@ impl StaticExport {
 			return false;
 		}
 		let entity = world.entity(node.entity);
-		if is_prod
-			&& entity.get::<ArticleMeta>().is_some_and(|meta| meta.draft)
+		if is_prod && entity.get::<ArticleMeta>().is_some_and(|meta| meta.draft)
 		{
 			return false;
 		}

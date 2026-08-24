@@ -290,14 +290,17 @@ impl Session {
 						let Ok(Message::Text(text)) = item else {
 							continue;
 						};
-						let Ok(val) = serde_json::from_str::<Value>(&text) else {
+						let Ok(val) = serde_json::from_str::<Value>(&text)
+						else {
 							continue;
 						};
 
 						// Response (has id)
-						if let Some(id) = val.get("id").and_then(|v| v.as_u64()) {
+						if let Some(id) = val.get("id").and_then(|v| v.as_u64())
+						{
 							let pending = {
-								let mut pending_map = inner.pending.lock().unwrap();
+								let mut pending_map =
+									inner.pending.lock().unwrap();
 								pending_map.remove(&id)
 							};
 							if let Some(tx) = pending {
@@ -343,8 +346,7 @@ mod test {
 	#[ignore = "smoketest"]
 	async fn works() {
 		let client =
-			ClientProcess::new_with_opts(test_fixtures::client())
-				.unwrap();
+			ClientProcess::new_with_opts(test_fixtures::client()).unwrap();
 		let session = client.new_session().await.unwrap();
 		// Simple BiDi round‑trip health check.
 		session.ping().await.unwrap();

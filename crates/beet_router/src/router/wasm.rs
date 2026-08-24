@@ -79,10 +79,9 @@ impl MainBsx {
 		use beet_core::exports::js_sys;
 		use beet_core::exports::web_sys::HtmlScriptElement;
 		use beet_net::prelude::*;
-		let script = document_ext::query_selector::<HtmlScriptElement>(&format!(
-			"script[type={:?}]",
-			MediaType::Bsx.as_str()
-		))
+		let script = document_ext::query_selector::<HtmlScriptElement>(
+			&format!("script[type={:?}]", MediaType::Bsx.as_str()),
+		)
 		.ok_or_else(|| {
 			bevyhow!(
 				"no `<script type=\"{}\">` found in the document",

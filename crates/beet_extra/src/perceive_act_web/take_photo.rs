@@ -37,7 +37,9 @@ async fn capture_webcam() -> Result<MediaBytes> {
 		let stream = open_camera().await?;
 		video.set_muted(true);
 		video.set_src_object(Some(&stream));
-		JsFuture::from(video.play().map_jserr()?).await.map_jserr()?;
+		JsFuture::from(video.play().map_jserr()?)
+			.await
+			.map_jserr()?;
 	}
 	await_first_frame(&video).await;
 

@@ -136,7 +136,9 @@ pub(crate) const NON_VISUAL_TAGS: &[&str] = &[
 ];
 
 /// Whether a tag carries no visual content, ie [`NON_VISUAL_TAGS`].
-pub(crate) fn is_non_visual(tag: &str) -> bool { NON_VISUAL_TAGS.contains(&tag) }
+pub(crate) fn is_non_visual(tag: &str) -> bool {
+	NON_VISUAL_TAGS.contains(&tag)
+}
 
 /// Form-control tags whose own [`Value`] is their displayed content (eg the
 /// charcell editable textbox). Every other element treats a co-located
@@ -144,7 +146,9 @@ pub(crate) fn is_non_visual(tag: &str) -> bool { NON_VISUAL_TAGS.contains(&tag) 
 pub(crate) const VALUE_ELEMENT_TAGS: &[&str] = &["input", "textarea", "select"];
 
 /// Whether a tag displays its own [`Value`], ie [`VALUE_ELEMENT_TAGS`].
-pub(crate) fn is_value_element(tag: &str) -> bool { VALUE_ELEMENT_TAGS.contains(&tag) }
+pub(crate) fn is_value_element(tag: &str) -> bool {
+	VALUE_ELEMENT_TAGS.contains(&tag)
+}
 
 pub trait NodeVisitor {
 	/// Return `true` to skip visiting this node and all its children.

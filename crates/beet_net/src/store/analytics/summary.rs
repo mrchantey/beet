@@ -140,7 +140,9 @@ mod test {
 			request("/docs", 200, None),
 		]);
 
-		summary.broken_links.xpect_eq(vec![("/docs/typo".into(), 2)]);
+		summary
+			.broken_links
+			.xpect_eq(vec![("/docs/typo".into(), 2)]);
 		summary.probes.xpect_eq(2);
 		summary.requests.xpect_eq(5);
 	}
@@ -184,7 +186,11 @@ impl core::fmt::Display for AnalyticsSummary {
 		// the 404s worth acting on, kept clear of the probe flood they would
 		// otherwise be buried in.
 		if !self.broken_links.is_empty() {
-			section(f, "broken links (404 with a referrer)", &self.broken_links)?;
+			section(
+				f,
+				"broken links (404 with a referrer)",
+				&self.broken_links,
+			)?;
 		}
 		if self.probes > 0 {
 			writeln!(f, "\nunreferred 404s (probes): {}", self.probes)?;

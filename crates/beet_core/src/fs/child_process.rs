@@ -271,7 +271,10 @@ impl ChildProcess {
 
 	/// Spawn a prepared command, mapping a missing executable onto the
 	/// configured [`not_found`](Self::with_not_found) message.
-	fn spawn_with(&self, mut cmd: async_process::Command) -> Result<ChildHandle> {
+	fn spawn_with(
+		&self,
+		mut cmd: async_process::Command,
+	) -> Result<ChildHandle> {
 		let child = cmd.spawn().map_err(|err| {
 			if err.kind() == ErrorKind::NotFound
 				&& let Some(msg) = &self.not_found

@@ -32,7 +32,8 @@ mod test {
 		world
 			.entity_mut(entity)
 			.call::<ShowImageInput, ()>(ShowImageInput {
-				src: "/assets/extra/perceive-act/explorer/images/joy.png".into(),
+				src: "/assets/extra/perceive-act/explorer/images/joy.png"
+					.into(),
 			})
 			.await
 			.unwrap();

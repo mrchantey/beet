@@ -35,7 +35,9 @@ impl<T> SendWrapper<T> {
 ///
 /// Panics if dynamic tests or benches are passed in (they cannot be cloned).
 #[cfg(feature = "custom_test_frameworks")]
-pub(crate) fn tests_bundle_borrowed(tests: &[&test::TestDescAndFn]) -> impl Bundle {
+pub(crate) fn tests_bundle_borrowed(
+	tests: &[&test::TestDescAndFn],
+) -> impl Bundle {
 	let tests = tests
 		.iter()
 		.map(|test| TestDescAndFn::from(*test))

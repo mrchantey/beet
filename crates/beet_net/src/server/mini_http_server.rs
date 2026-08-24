@@ -345,9 +345,11 @@ mod secure_test {
 		std::thread::spawn(move || {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn((server, Tls::default(), children![exchange_ext::handler(
-					|_| { Response::ok().with_body("secure hello") }
-				)]))
+				.spawn((server, Tls::default(), children![
+					exchange_ext::handler(|_| {
+						Response::ok().with_body("secure hello")
+					})
+				]))
 				.run();
 		});
 		time_ext::sleep_millis(300).await;
@@ -411,9 +413,10 @@ mod test {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			// a route that upgrades any request to a websocket
-			app.world_mut().spawn((server, children![exchange_ext::handler(
-				|cx| { WebSocketUpgrade::from_request(&cx).into() }
-			)]));
+			app.world_mut()
+				.spawn((server, children![exchange_ext::handler(|cx| {
+					WebSocketUpgrade::from_request(&cx).into()
+				})]));
 			// record landed sockets
 			app.world_mut()
 				.add_observer(move |ev: On<OnWebSocketUpgrade>| {

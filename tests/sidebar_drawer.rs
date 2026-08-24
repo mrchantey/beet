@@ -34,9 +34,7 @@ fn site() -> impl Bundle {
 /// `fn` pointers so every route bundle is one type the spawn iterator unifies.
 fn page_routes() -> impl Iterator<Item = impl Bundle> {
 	fn home_body() -> Snippet { Snippet::from_bundle(home()) }
-	fn stub_body() -> Snippet {
-		Snippet::from_bundle(rsx! { <p>"page"</p> })
-	}
+	fn stub_body() -> Snippet { Snippet::from_bundle(rsx! { <p>"page"</p> }) }
 	std::iter::once(("".to_string(), home_body as fn() -> Snippet))
 		.chain(
 			std::iter::once("docs".to_string())

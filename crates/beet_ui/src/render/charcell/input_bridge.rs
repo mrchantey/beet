@@ -325,7 +325,8 @@ pub(crate) fn exit_on_ctrl_c(
 	for (window, (ctrl, c)) in per_window {
 		// a remote (channel) surface lacks a StdioTerminal and closes its session
 		// elsewhere; a local stdio surface exits unless it opts out.
-		if ctrl && c && stdio.get(window).is_ok_and(|stdio| stdio.ctrl_c_exit()) {
+		if ctrl && c && stdio.get(window).is_ok_and(|stdio| stdio.ctrl_c_exit())
+		{
 			exit.write(AppExit::Success);
 		}
 	}
@@ -529,7 +530,9 @@ mod test {
 		// headless, so `on_add` skips the tty/raw-mode setup, see the ctrl+c byte
 		// case above.
 		let app = ctrl_c_from(|world| {
-			world.spawn(StdioTerminal::default().with_headless(true)).id()
+			world
+				.spawn(StdioTerminal::default().with_headless(true))
+				.id()
 		});
 		exited(&app).xpect_true();
 	}

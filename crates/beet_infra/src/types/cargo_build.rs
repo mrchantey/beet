@@ -282,8 +282,11 @@ impl CargoBuild {
 			.map(|arg| format!(" {arg}"))
 			.collect::<String>();
 		if args.is_empty() {
-			return format!("cd {} && zip -j bootstrap.zip bootstrap", dir.display())
-				.xok();
+			return format!(
+				"cd {} && zip -j bootstrap.zip bootstrap",
+				dir.display()
+			)
+			.xok();
 		}
 		format!(
 			"cd {dir} && mv bootstrap beet && printf '#!/bin/sh\\nexec /var/task/beet{args}\\n' > bootstrap && chmod +x bootstrap && zip -j bootstrap.zip bootstrap beet",

@@ -192,17 +192,15 @@ mod test {
 		let mut entries = Vec::new();
 		poll_ext::poll_async(async || {
 			entries.extend(console.drain());
-			(entries.len() >= 2).then_some(()).ok_or_else(|| {
-				bevyhow!("only {} entries", entries.len())
-			})
+			(entries.len() >= 2)
+				.then_some(())
+				.ok_or_else(|| bevyhow!("only {} entries", entries.len()))
 		})
 		.await
 		.unwrap();
 		entries
 			.iter()
-			.any(|entry| {
-				entry.text.contains("clicked!") && !entry.is_error()
-			})
+			.any(|entry| entry.text.contains("clicked!") && !entry.is_error())
 			.xpect_true();
 		entries
 			.iter()

@@ -1564,7 +1564,8 @@ fn prop_opt_value(
 			.and_then(|field| field.type_info()),
 		_ => None,
 	};
-	let inner = DataLiteral::to_reflect(literal, inner_info, registry, resolver)?;
+	let inner =
+		DataLiteral::to_reflect(literal, inner_info, registry, resolver)?;
 	// `Some(inner)`
 	let mut some = DynamicTuple::default();
 	some.insert_boxed(inner);
@@ -1696,9 +1697,8 @@ fn write_resource_patch(
 			// created by the markup: tie the backing entity to the build root (when
 			// inside a template build) so that scene's teardown, and only that
 			// scene's, removes the resource with it.
-			let scene_root = world
-				.get_resource::<TemplateBuildRoot>()
-				.map(|root| **root);
+			let scene_root =
+				world.get_resource::<TemplateBuildRoot>().map(|root| **root);
 			let resource_entity = world.spawn_empty().id();
 			reflect_component.insert(
 				&mut world.entity_mut(resource_entity),

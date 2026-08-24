@@ -53,8 +53,12 @@ impl RunThread {
 		parts: RequestParts,
 	) -> Result {
 		// `--new` rides the boot request, never a global env read mid-load.
-		Self::adopt_store(world.clone(), entity, parts.get_param("new").is_some())
-			.await?;
+		Self::adopt_store(
+			world.clone(),
+			entity,
+			parts.get_param("new").is_some(),
+		)
+		.await?;
 		// Reduce the authored scene into its `ThreadWindow` + behavior scene before
 		// running it. The kick drives the behavior directly, ahead of the scheduled
 		// `First` reduce, so without this the `Sequence` would receive raw, action-less
@@ -74,11 +78,7 @@ impl RunThread {
 	/// *after* adoption so the persistence sync never flushes a fresh, un-adopted
 	/// thread (which would fork a duplicate on every reload). `new` discards the
 	/// stored conversation first. Ephemeral threads declare no store and skip this.
-	async fn adopt_store(
-		world: AsyncWorld,
-		root: Entity,
-		new: bool,
-	) -> Result {
+	async fn adopt_store(world: AsyncWorld, root: Entity, new: bool) -> Result {
 		let Some((thread, mount)) = world
 			.with(move |world: &mut World| Self::pending_store(world, root))
 			.await
@@ -110,9 +110,14 @@ impl RunThread {
 	) -> Option<(Entity, MountThreadStore)> {
 		world.with_state::<(Query<&Children>, Query<&MountThreadStore>), _>(
 			|(children, mounts)| {
-				children.iter_descendants_inclusive(root).find_map(|entity| {
-					mounts.get(entity).ok().map(|mount| (entity, mount.clone()))
-				})
+				children
+					.iter_descendants_inclusive(root)
+					.find_map(|entity| {
+						mounts
+							.get(entity)
+							.ok()
+							.map(|mount| (entity, mount.clone()))
+					})
 			},
 		)
 	}
@@ -212,10 +217,12 @@ mod test {
 		// stable ids so the seed hash matches across runs
 		let system = ActorId::from_u128(1);
 		let agent = ActorId::from_u128(2);
-		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPathBuf::new(path))))
-			.store_remove()
-			.await
-			.ok();
+		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPathBuf::new(
+			path,
+		))))
+		.store_remove()
+		.await
+		.ok();
 
 		run_once(path, system, agent);
 		stored_threads(path).await.xpect_eq(1);
@@ -238,14 +245,8 @@ mod test {
 				(Actor::agent(), MockPostStreamer::default()),
 			])
 		};
-		let booted = app
-			.world_mut()
-			.spawn(children![ephemeral()])
-			.flush();
-		let idle = app
-			.world_mut()
-			.spawn(children![ephemeral()])
-			.flush();
+		let booted = app.world_mut().spawn(children![ephemeral()]).flush();
+		let idle = app.world_mut().spawn(children![ephemeral()]).flush();
 		app.world_mut()
 			.entity_mut(booted)
 			.trigger(StartRunning::from_cli);

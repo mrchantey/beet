@@ -130,6 +130,8 @@ mod test {
 			.xpect_eq(Duration::from_millis(250));
 		// a bare number is rejected, whether a JSON number or a unit-less string
 		serde_json::from_str::<Wrap>("1.5").is_err().xpect_true();
-		serde_json::from_str::<Wrap>(r#""1.5""#).is_err().xpect_true();
+		serde_json::from_str::<Wrap>(r#""1.5""#)
+			.is_err()
+			.xpect_true();
 	}
 }

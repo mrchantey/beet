@@ -14,14 +14,7 @@ use serde_json::json;
 /// `<app>--<stage>--<label>` name composes at resolution through
 /// [`ResourceScope`], so both sides read the same string.
 #[derive(
-	Debug,
-	Clone,
-	Get,
-	SetWith,
-	Serialize,
-	Deserialize,
-	Component,
-	Reflect,
+	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
 #[component(immutable, on_add = ErasedBlock::on_add::<S3BucketBlock>)]
@@ -109,23 +102,24 @@ impl S3BucketBlock {
 /// Deferred through the command queue because the ancestry a scope resolves
 /// against lands with the rest of the scene, after this insertion.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-pub(crate) fn attach_s3_store(ev: On<Add, S3BucketBlock>, mut commands: Commands) {
-	commands.entity(ev.entity).queue(
-		|mut entity: EntityWorldMut| -> Result {
+pub(crate) fn attach_s3_store(
+	ev: On<Add, S3BucketBlock>,
+	mut commands: Commands,
+) {
+	commands
+		.entity(ev.entity)
+		.queue(|mut entity: EntityWorldMut| -> Result {
 			let block = entity.get_or_else::<S3BucketBlock>()?.clone();
 			let store = entity.with_state::<ResourceScopeQuery, _>(
 				|entity, scopes| -> Result<_> {
 					let deploy_id =
 						scopes.stack(entity).map(|stack| *stack.deploy_id());
-					block
-						.store(&scopes.get(entity)?, deploy_id.as_ref())
-						.xok()
+					block.store(&scopes.get(entity)?, deploy_id.as_ref()).xok()
 				},
 			)?;
 			entity.insert(store);
 			Ok(())
-		},
-	);
+		});
 }
 
 impl Block for S3BucketBlock {

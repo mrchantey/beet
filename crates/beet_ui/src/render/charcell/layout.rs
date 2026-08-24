@@ -64,7 +64,9 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 				// nothing paints and nothing is hit-testable. Tested before `managed`
 				// so a table nested in a hidden subtree still propagates hidden to its
 				// own descendants.
-				if parents.get(&entity).is_some_and(|parent| hidden.contains(parent))
+				if parents
+					.get(&entity)
+					.is_some_and(|parent| hidden.contains(parent))
 					|| node.layout_style().display == Display::None
 				{
 					hidden.insert(entity);
@@ -448,7 +450,14 @@ fn absolute_rect(
 		right,
 		explicit_w,
 		intrinsic.x,
-		|len| clamp_outer(len, box_model.min_width, box_model.max_width, overhead.x),
+		|len| {
+			clamp_outer(
+				len,
+				box_model.min_width,
+				box_model.max_width,
+				overhead.x,
+			)
+		},
 	);
 	let (y0, y1) = axis_extent(
 		block.min.y,
@@ -458,7 +467,12 @@ fn absolute_rect(
 		explicit_h,
 		intrinsic.y,
 		|len| {
-			clamp_outer(len, box_model.min_height, box_model.max_height, overhead.y)
+			clamp_outer(
+				len,
+				box_model.min_height,
+				box_model.max_height,
+				overhead.y,
+			)
 		},
 	);
 	IRect::new(x0, y0, x1, y1)
@@ -748,7 +762,8 @@ mod tests {
 		section.width().xpect_eq(70);
 		// centred: inset from the left, with equal gaps either side (±1 for an
 		// odd remainder).
-		let (left, right) = (section.min.x - main.min.x, main.max.x - section.max.x);
+		let (left, right) =
+			(section.min.x - main.min.x, main.max.x - section.max.x);
 		(left > 1).xpect_true();
 		((left - right).abs() <= 1).xpect_true();
 	}
@@ -788,13 +803,15 @@ mod tests {
 			.id();
 		let display = |world: &mut World, tag: &'static str| {
 			world
-				.run_system_once(move |query: Query<(&Element, &LayoutStyle)>| {
-					query
-						.iter()
-						.find(|(el, _)| el.tag() == tag)
-						.map(|(_, layout)| layout.display)
-						.unwrap()
-				})
+				.run_system_once(
+					move |query: Query<(&Element, &LayoutStyle)>| {
+						query
+							.iter()
+							.find(|(el, _)| el.tag() == tag)
+							.map(|(_, layout)| layout.display)
+							.unwrap()
+					},
+				)
 				.unwrap()
 		};
 		// wide: the rail shows, the toggle stays hidden

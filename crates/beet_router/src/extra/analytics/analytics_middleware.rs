@@ -95,9 +95,9 @@ pub async fn AnalyticsMiddleware(
 	let country = ip
 		.zip(
 			world
-				.with_state::<AncestorQuery<&GeoIp>, Option<GeoIp>>(move |query| {
-					query.get(caller_id).ok().cloned()
-				})
+				.with_state::<AncestorQuery<&GeoIp>, Option<GeoIp>>(
+					move |query| query.get(caller_id).ok().cloned(),
+				)
 				.await,
 		)
 		.and_then(|(ip, geoip)| geoip.country(ip));
@@ -183,7 +183,9 @@ mod stalled_store_test {
 	}
 
 	impl BlobStoreProvider for StalledStore {
-		fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+		fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
+			Box::new(self.clone())
+		}
 		/// Every path stalls, so a subdir view is the same store.
 		fn with_subdir(&self, _path: SmolPath) -> Box<dyn BlobStoreProvider> {
 			Box::new(self.clone())
@@ -200,7 +202,11 @@ mod stalled_store_test {
 		fn store_remove(&self) -> SendBoxedFuture<Result> {
 			Box::pin(async { Ok(()) })
 		}
-		fn insert(&self, _path: &SmolPath, _body: Bytes) -> SendBoxedFuture<Result> {
+		fn insert(
+			&self,
+			_path: &SmolPath,
+			_body: Bytes,
+		) -> SendBoxedFuture<Result> {
 			self.started.fetch_add(1, Ordering::SeqCst);
 			Box::pin(async {
 				time_ext::sleep(STALL).await;

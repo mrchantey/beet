@@ -61,7 +61,11 @@ impl SshTuiServer {
 	/// [`SshServer`] it inserts owns its own teardown, so there is nothing to undo
 	/// on stop.
 	fn contribute(entity: &mut EntityCommands) {
-		RunningSet::<Request, Response>::contribute(entity, Self::start(), None);
+		RunningSet::<Request, Response>::contribute(
+			entity,
+			Self::start(),
+			None,
+		);
 	}
 
 	/// The start entry: build an [`SshServer`] from the request and insert it on
@@ -485,20 +489,17 @@ mod test {
 	#[beet_core::test]
 	async fn boot_installs_the_pty_timeout() {
 		let mut app = ssh_tui_app();
-		let server = app
-			.world_mut()
-			.spawn(SshTuiServer::default())
-			.flush();
-		app.world_mut()
-			.entity_mut(server)
-			.run_async_local(|entity| async move {
+		let server = app.world_mut().spawn(SshTuiServer::default()).flush();
+		app.world_mut().entity_mut(server).run_async_local(
+			|entity| async move {
 				entity
 					.call::<Request, Response>(Request::from_cli_str(
 						"--server=ssh",
 					))
 					.await?;
 				Ok(())
-			});
+			},
+		);
 		// the boot never resolves (a long-running server parks it), so drive the
 		// app rather than awaiting the call.
 		for _ in 0..20 {
@@ -690,12 +691,9 @@ mod test {
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::parse("")),
-				children![(
-					store,
-					Router,
-					BsxLayout::default(),
-					children![route::new("", BlobScene::new("index.html"))]
-				)],
+				children![(store, Router, BsxLayout::default(), children![
+					route::new("", BlobScene::new("index.html"))
+				])],
 			))
 			.flush();
 		let first = open_connection(&mut app, server, UVec2::new(40, 8));
@@ -1025,12 +1023,9 @@ mod test {
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::parse("counter")),
-				children![(
-					store,
-					Router,
-					BsxLayout::default(),
-					children![route::new("counter", BlobScene::new("counter.bsx"))]
-				)],
+				children![(store, Router, BsxLayout::default(), children![
+					route::new("counter", BlobScene::new("counter.bsx"))
+				])],
 			))
 			.flush();
 		let session_a = open_connection(&mut app, server, UVec2::new(40, 8));

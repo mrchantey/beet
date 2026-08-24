@@ -47,18 +47,20 @@ pub(crate) fn toggle_aria_controls_on_click(
 	mut commands: Commands,
 ) {
 	let control = ev.event_target();
-	let Some(id) = attr_string(
-		&attributes,
-		&attr_keys,
-		&values,
-		control,
-		"aria-controls",
-	) else {
+	let Some(id) =
+		attr_string(&attributes, &attr_keys, &values, control, "aria-controls")
+	else {
 		return;
 	};
 	let root = Portal::render_root(&parents, &holders, &surfaces, control);
 	let Some(target) = find_by_id(
-		&children, &portals, &attributes, &attr_keys, &values, root, &id,
+		&children,
+		&portals,
+		&attributes,
+		&attr_keys,
+		&values,
+		root,
+		&id,
 	) else {
 		return;
 	};
@@ -179,14 +181,17 @@ mod tests {
 	use super::*;
 
 	/// The string value of `key` on `entity`, via the raw attribute queries.
-	fn attr(world: &mut World, entity: Entity, key: &'static str) -> Option<SmolStr> {
-		world.with_state::<(
-			Query<&Attributes>,
-			Query<&Attribute>,
-			Query<&mut Value>,
-		), _>(move |(attributes, attr_keys, values)| {
-			attr_string(&attributes, &attr_keys, &values, entity, key)
-		})
+	fn attr(
+		world: &mut World,
+		entity: Entity,
+		key: &'static str,
+	) -> Option<SmolStr> {
+		world
+			.with_state::<(Query<&Attributes>, Query<&Attribute>, Query<&mut Value>), _>(
+				move |(attributes, attr_keys, values)| {
+					attr_string(&attributes, &attr_keys, &values, entity, key)
+				},
+			)
 	}
 
 	/// The entity of the sole element with `tag`.
@@ -220,14 +225,20 @@ mod tests {
 				</div>
 			})
 			.unwrap();
-		let (button, nav) =
-			(tag_entity(&mut world, "button"), tag_entity(&mut world, "nav"));
+		let (button, nav) = (
+			tag_entity(&mut world, "button"),
+			tag_entity(&mut world, "nav"),
+		);
 		world.entity_mut(button).trigger(PointerUp::new(button));
 		world.flush();
-		attr(&mut world, nav, "aria-hidden").unwrap().xpect_eq("true");
+		attr(&mut world, nav, "aria-hidden")
+			.unwrap()
+			.xpect_eq("true");
 		world.entity_mut(button).trigger(PointerUp::new(button));
 		world.flush();
-		attr(&mut world, nav, "aria-hidden").unwrap().xpect_eq("false");
+		attr(&mut world, nav, "aria-hidden")
+			.unwrap()
+			.xpect_eq("false");
 	}
 
 	// the id resolves within the clicked tree only, so a control in one
@@ -245,8 +256,10 @@ mod tests {
 		world
 			.spawn_template(rsx! { <nav id="sidebar">"nav"</nav> })
 			.unwrap();
-		let (button, nav) =
-			(tag_entity(&mut world, "button"), tag_entity(&mut world, "nav"));
+		let (button, nav) = (
+			tag_entity(&mut world, "button"),
+			tag_entity(&mut world, "nav"),
+		);
 		world.entity_mut(button).trigger(PointerUp::new(button));
 		attr(&mut world, nav, "aria-hidden").xpect_eq(None);
 	}

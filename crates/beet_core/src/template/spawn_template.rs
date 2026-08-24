@@ -607,11 +607,7 @@ mod test {
 			.iter(&world)
 			.count()
 			.xpect_eq(0);
-		world
-			.query::<&SlotChild>()
-			.iter(&world)
-			.count()
-			.xpect_eq(0);
+		world.query::<&SlotChild>().iter(&world).count().xpect_eq(0);
 		load_state.get().xpect_eq(Some(false));
 	}
 
@@ -625,8 +621,7 @@ mod test {
 		world.add_observer(move |_: On<LoadTemplate>| lf.set(true));
 
 		let root = world.spawn_empty().id();
-		let guard =
-			TemplatePending::park(
+		let guard = TemplatePending::park(
 			&mut world,
 			root,
 			PendingKind::Passive,
@@ -663,7 +658,8 @@ mod test {
 		world.spawn((Comment::new(" c "), ChildOf(outer)));
 		let inner = world.spawn(ChildOf(outer)).id();
 		world.spawn((Doctype::new("html"), ChildOf(inner)));
-		let deep_html = world.spawn((Element::new("html"), ChildOf(inner))).id();
+		let deep_html =
+			world.spawn((Element::new("html"), ChildOf(inner))).id();
 		content_root(&world, outer).xpect_eq(deep_html);
 
 		// a wrapper with no element anywhere below falls back to the root itself.

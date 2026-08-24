@@ -130,9 +130,7 @@ macro_rules! test_main {
 		/// probe this before `start`; `main` above is a no-op on wasm.
 		#[cfg(all(test, target_arch = "wasm32"))]
 		#[$crate::exports::wasm_bindgen::prelude::wasm_bindgen]
-		pub async fn test_start() -> i32 {
-			$crate::testing::test_start().await
-		}
+		pub async fn test_start() -> i32 { $crate::testing::test_start().await }
 	};
 }
 
@@ -175,9 +173,9 @@ pub mod prelude {
 	pub use crate::arena::*;
 	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
-	pub use crate::bootstrap::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
+	pub use crate::bootstrap::*;
 	#[cfg(feature = "bsx")]
 	pub use crate::bsx::*;
 	pub use crate::cfg_if;

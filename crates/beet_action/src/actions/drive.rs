@@ -57,7 +57,10 @@ pub struct DriveForDuration {
 	pub drive: DifferentialDrive,
 	/// How long to hold the velocity before stopping, as a unit-suffixed duration
 	/// string like `"1.5s"` or `"800ms"`.
-	#[cfg_attr(feature = "serde", serde(with = "beet_core::prelude::duration_str"))]
+	#[cfg_attr(
+		feature = "serde",
+		serde(with = "beet_core::prelude::duration_str")
+	)]
 	pub duration: Duration,
 }
 

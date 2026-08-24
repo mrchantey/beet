@@ -77,7 +77,9 @@ impl BlobStore {
 	#[cfg(feature = "std")]
 	pub fn from_uri(uri: &StoreUri, dir: AbsPathBuf) -> Result<BlobStore> {
 		match uri {
-			StoreUri::Fs { path: None } => BlobStore::new(FsStore::new(dir)).xok(),
+			StoreUri::Fs { path: None } => {
+				BlobStore::new(FsStore::new(dir)).xok()
+			}
 			StoreUri::Fs { path: Some(path) } => {
 				BlobStore::new(FsStore::new(dir.join(path.as_str()))).xok()
 			}
@@ -86,15 +88,17 @@ impl BlobStore {
 				bucket,
 				endpoint,
 				region,
-			} => Self::s3_from_uri(bucket, endpoint.as_deref(), region.as_deref()),
+			} => Self::s3_from_uri(
+				bucket,
+				endpoint.as_deref(),
+				region.as_deref(),
+			),
 			#[cfg(target_arch = "wasm32")]
 			StoreUri::LocalStorage => {
 				BlobStore::new(LocalStorageStore::new("beet")).xok()
 			}
 			#[cfg(target_arch = "wasm32")]
-			StoreUri::IndexedDb => {
-				BlobStore::new(IndexedDbStore::new("beet")).xok()
-			}
+			StoreUri::IndexedDb => BlobStore::new(IndexedDbStore::new("beet")).xok(),
 			#[cfg(not(target_arch = "wasm32"))]
 			StoreUri::LocalStorage | StoreUri::IndexedDb => bevybail!(
 				"store `{uri}` is browser storage, only available on wasm"
@@ -278,7 +282,10 @@ impl BlobStore {
 				Ok::<_, BevyError>((path, data))
 			})
 			.xmap(|futures| {
-				async_ext::try_join_all_bounded(Self::GET_ALL_CONCURRENCY, futures)
+				async_ext::try_join_all_bounded(
+					Self::GET_ALL_CONCURRENCY,
+					futures,
+				)
 			})
 			.await
 	}

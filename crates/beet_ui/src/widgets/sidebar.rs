@@ -169,7 +169,12 @@ pub(crate) fn sync_sidebar_breakpoint(
 			continue;
 		}
 		let Some(sidebar) = find_by_id(
-			&children, &portals, &attributes, &attr_keys, &values, surface,
+			&children,
+			&portals,
+			&attributes,
+			&attr_keys,
+			&values,
+			surface,
 			"sidebar",
 		) else {
 			continue;
@@ -467,13 +472,18 @@ mod test {
 	#[cfg(feature = "tui")]
 	fn nav_hidden(world: &mut World) -> Option<SmolStr> {
 		let nav = nav_entity(world);
-		world.with_state::<(
-			Query<&Attributes>,
-			Query<&Attribute>,
-			Query<&mut Value>,
-		), _>(move |(attributes, attr_keys, values)| {
-			attr_string(&attributes, &attr_keys, &values, nav, "aria-hidden")
-		})
+		world
+			.with_state::<(Query<&Attributes>, Query<&Attribute>, Query<&mut Value>), _>(
+				move |(attributes, attr_keys, values)| {
+					attr_string(
+						&attributes,
+						&attr_keys,
+						&values,
+						nav,
+						"aria-hidden",
+					)
+				},
+			)
 	}
 
 	/// Overwrite the seeded `aria-hidden` on the sole `<nav>`, simulating the
@@ -481,15 +491,19 @@ mod test {
 	#[cfg(feature = "tui")]
 	fn set_nav_hidden(world: &mut World, value: &'static str) {
 		let nav = nav_entity(world);
-		world.with_state::<(
-			Query<&Attributes>,
-			Query<&Attribute>,
-			Query<&mut Value>,
-		), _>(move |(attributes, attr_keys, mut values)| {
-			let attr = attr_entity(&attributes, &attr_keys, nav, "aria-hidden")
-				.unwrap();
-			*values.get_mut(attr).unwrap() = Value::str(value);
-		});
+		world
+			.with_state::<(Query<&Attributes>, Query<&Attribute>, Query<&mut Value>), _>(
+				move |(attributes, attr_keys, mut values)| {
+					let attr = attr_entity(
+						&attributes,
+						&attr_keys,
+						nav,
+						"aria-hidden",
+					)
+					.unwrap();
+					*values.get_mut(attr).unwrap() = Value::str(value);
+				},
+			);
 	}
 
 	/// [`sync_sidebar_breakpoint`] mirrors `sidebar.js`: seed on first sight,
@@ -524,19 +538,25 @@ mod test {
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 		// crossing up re-seeds shown
-		world.entity_mut(surface).insert(MediaViewport::new(1600., 768.));
+		world
+			.entity_mut(surface)
+			.insert(MediaViewport::new(1600., 768.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("false");
 		// crossing down to *exactly* the breakpoint re-seeds hidden: the seed is
 		// inclusive like the `max-width` rule, so no width shows the menu button
 		// over a still-open rail
-		world.entity_mut(surface).insert(MediaViewport::new(1024., 768.));
+		world
+			.entity_mut(surface)
+			.insert(MediaViewport::new(1024., 768.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("true");
 		// a manual toggle (the menu button opening the rail) survives a
 		// same-side resize, exactly like the script's `wasNarrow` guard
 		set_nav_hidden(&mut world, "false");
-		world.entity_mut(surface).insert(MediaViewport::new(800., 768.));
+		world
+			.entity_mut(surface)
+			.insert(MediaViewport::new(800., 768.));
 		world.run_system(system).unwrap();
 		nav_hidden(&mut world).unwrap().xpect_eq("false");
 		// a freshly built rail (a new page, no attribute yet) re-seeds

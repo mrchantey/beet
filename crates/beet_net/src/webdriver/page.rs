@@ -244,18 +244,20 @@ mod tests {
 		let page = test_fixtures::visit(&url).await;
 		page.current_url().await.unwrap().xpect_eq(url);
 
+		page.evaluate_value("document.querySelector('h1')?.textContent")
+			.await
+			.unwrap()
+			.xpect_eq(json!("Example Domain"));
+
+		// objects deep-serialize into plain json
 		page.evaluate_value(
-			"document.querySelector('h1')?.textContent",
+			"({count: 1, items: [1, 2], nested: {flag: true}})",
 		)
 		.await
 		.unwrap()
-		.xpect_eq(json!("Example Domain"));
-
-		// objects deep-serialize into plain json
-		page.evaluate_value("({count: 1, items: [1, 2], nested: {flag: true}})")
-			.await
-			.unwrap()
-			.xpect_eq(json!({"count": 1, "items": [1, 2], "nested": {"flag": true}}));
+		.xpect_eq(
+			json!({"count": 1, "items": [1, 2], "nested": {"flag": true}}),
+		);
 
 		// in-page exceptions surface as errors
 		page.evaluate("(() => { throw new Error('boom') })()")

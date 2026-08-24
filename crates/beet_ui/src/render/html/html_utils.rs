@@ -224,7 +224,9 @@ pub(crate) fn unescape_html_attribute(input: &str) -> String {
 /// Replaces every `<` with its JSON unicode escape, so an embedded value (a
 /// `</script>` substring, an HTML comment opener) can never close or break out
 /// of the host `<script>`. The result is still valid JSON.
-pub(crate) fn escape_script_json(json: &str) -> String { json.replace('<', "\\u003c") }
+pub(crate) fn escape_script_json(json: &str) -> String {
+	json.replace('<', "\\u003c")
+}
 
 #[cfg(test)]
 mod test {
@@ -322,8 +324,10 @@ mod test {
 
 		#[beet_core::test]
 		fn attribute_structural() {
-			unescape_html_attribute("&quot;hello&quot; &amp; &apos;world&apos;")
-				.xpect_eq("\"hello\" & 'world'".to_string());
+			unescape_html_attribute(
+				"&quot;hello&quot; &amp; &apos;world&apos;",
+			)
+			.xpect_eq("\"hello\" & 'world'".to_string());
 		}
 
 		#[beet_core::test]

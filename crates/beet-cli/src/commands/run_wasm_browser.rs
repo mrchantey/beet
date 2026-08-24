@@ -96,8 +96,7 @@ pub(crate) async fn run(
 			.into_iter()
 			.map(|token| token.to_string()),
 	);
-	let url =
-		format!("http://127.0.0.1:{port}/{}", args_to_query(&query_args));
+	let url = format!("http://127.0.0.1:{port}/{}", args_to_query(&query_args));
 
 	// drive: the console streams live, the verdict lands on `__beet_exit`.
 	// `--chrome-args` rides the request (see `RunWasm`), passing extra browser
@@ -187,8 +186,5 @@ fn args_to_query(args: &[String]) -> String {
 /// in principle, fine for a runner that owns the machine's test run. Shared
 /// with the `wasm_render_check` smoketest's driver.
 pub(crate) fn free_port() -> Result<u16> {
-	TcpListener::bind("127.0.0.1:0")?
-		.local_addr()?
-		.port()
-		.xok()
+	TcpListener::bind("127.0.0.1:0")?.local_addr()?.port().xok()
 }

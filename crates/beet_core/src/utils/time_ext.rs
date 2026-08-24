@@ -84,8 +84,7 @@ pub fn current_year() -> i32 {
 pub fn format_iso8601(unix: Duration) -> String {
 	let secs = unix.as_secs();
 	let millis = unix.subsec_millis();
-	let (hour, min, sec) =
-		((secs / 3600) % 24, (secs / 60) % 60, secs % 60);
+	let (hour, min, sec) = ((secs / 3600) % 24, (secs / 60) % 60, secs % 60);
 	// days-to-civil (Howard Hinnant), valid for the unsigned epoch range
 	let days = secs / 86_400 + 719_468;
 	let era = days / 146_097;

@@ -44,7 +44,9 @@ mod test {
 	async fn sets_no_cache_headers() {
 		let response = router_world()
 			.spawn((
-				(Router::with_defaults(), children![route::exchange("", Hello)]),
+				(Router::with_defaults(), children![route::exchange(
+					"", Hello
+				)]),
 				NoCacheHeaders,
 			))
 			.exchange(Request::get(""))

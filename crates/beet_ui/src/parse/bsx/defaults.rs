@@ -167,7 +167,8 @@ mod test {
 	fn click_button(world: &mut World, doc: Entity, markup: &str) -> Entity {
 		let container = world
 			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
+				BsxNode::parse_document(markup, &BsxParseConfig::bsx())
+					.unwrap(),
 				BsxTemplateRegistry::default(),
 			))
 			.unwrap()

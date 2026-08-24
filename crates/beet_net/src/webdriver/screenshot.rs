@@ -138,8 +138,7 @@ mod test {
 			.unwrap();
 		full.starts_with(PNG_MAGIC).xpect_true();
 
-		let element =
-			page.find("#title").await.screenshot().await.unwrap();
+		let element = page.find("#title").await.screenshot().await.unwrap();
 		element.starts_with(PNG_MAGIC).xpect_true();
 		// the heading crops far smaller than the whole viewport
 		(element.len() < viewport.len()).xpect_true();

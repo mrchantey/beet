@@ -122,7 +122,9 @@ where
 						 holds {existing_name}. Remove it before inserting {}.",
 						canonical.name(),
 					);
-					world.handle_command_error_with_location::<Self>(err, location);
+					world.handle_command_error_with_location::<Self>(
+						err, location,
+					);
 				}
 				Some((false, _, overloads)) => {
 					world

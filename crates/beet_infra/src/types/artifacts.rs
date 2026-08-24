@@ -84,7 +84,10 @@ impl ArtifactLedger {
 	/// download, not the process how to boot.
 	fn release_pointer(&self, artifact_name: &str) -> Result<String> {
 		let entry = self.artifacts.get(artifact_name).ok_or_else(|| {
-			bevyhow!("no artifact '{artifact_name}' in ledger {}", self.deploy_id)
+			bevyhow!(
+				"no artifact '{artifact_name}' in ledger {}",
+				self.deploy_id
+			)
 		})?;
 		let mut body = BootstrapConfig {
 			deploy_id: Some(self.deploy_id.to_string().into()),
@@ -283,7 +286,8 @@ mod tests {
 	use super::*;
 
 	fn test_ledger(artifacts: Vec<(&str, &str, &str)>) -> ArtifactLedger {
-		let mut ledger = ArtifactLedger::new(uuid_ext::now_v7(), now_timestamp());
+		let mut ledger =
+			ArtifactLedger::new(uuid_ext::now_v7(), now_timestamp());
 		for (name, artifact_key, hash) in artifacts {
 			ledger
 				.push_artifact(name, ArtifactEntry {
@@ -334,10 +338,8 @@ mod tests {
 	#[beet_core::test]
 	async fn release_pointer_tracks_the_current_ledger() {
 		let store = BlobStore::temp();
-		let first =
-			test_ledger(vec![("app", "versions/v1/app", "h1")]);
-		let second =
-			test_ledger(vec![("app", "versions/v2/app", "h2")]);
+		let first = test_ledger(vec![("app", "versions/v1/app", "h1")]);
+		let second = test_ledger(vec![("app", "versions/v2/app", "h2")]);
 		let client = ArtifactsClient::new(store.clone(), first.clone());
 		client.publish_ledger().await.unwrap();
 		ArtifactsClient::new(store.clone(), second.clone())

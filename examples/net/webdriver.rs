@@ -40,7 +40,10 @@ fn run_webdriver(async_commands: AsyncCommands) {
 		info!("heading: {heading}");
 
 		// the innerText locator + a trusted click follows the link
-		page.try_find_text("More information...").await?.click().await?;
+		page.try_find_text("More information...")
+			.await?
+			.click()
+			.await?;
 		poll_ext::poll_async(async || {
 			let url = page.current_url().await?;
 			url.contains("iana.org")

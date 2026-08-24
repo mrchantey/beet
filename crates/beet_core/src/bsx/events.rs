@@ -58,7 +58,8 @@ impl EventBinding {
 /// resource) via [`EntityWorldMut::world_scope`] or a binding argument's
 /// read-modify-write helpers, which an inline observer closure cannot express.
 /// The event installer queues this to run as an exclusive command, never inline.
-pub(crate) type VerbFn = Arc<dyn Fn(&mut EntityWorldMut, &VerbArgs) + Send + Sync>;
+pub(crate) type VerbFn =
+	Arc<dyn Fn(&mut EntityWorldMut, &VerbArgs) + Send + Sync>;
 
 /// The resolved arguments of a verb invocation: literal arguments as a plain
 /// [`Value`] map, plus the resolved binding-argument handles kept separate.

@@ -17,7 +17,9 @@ use beet_net::prelude::*;
 ///
 /// Authored directly from markup, ie
 /// `<DynamoTableBlock bx:ref="analytics" label="analytics"/>`.
-#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect)]
+#[derive(
+	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
+)]
 #[reflect(Component, Default)]
 #[component(immutable, on_add = ErasedBlock::on_add::<DynamoTableBlock>)]
 pub struct DynamoTableBlock {

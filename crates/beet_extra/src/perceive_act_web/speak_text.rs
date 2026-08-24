@@ -29,7 +29,8 @@ fn speak(text: &str) -> Result<()> {
 		.ok_or_else(|| bevyhow!("no window"))?
 		.speech_synthesis()
 		.map_jserr()?;
-	let utterance = SpeechSynthesisUtterance::new_with_text(text).map_jserr()?;
+	let utterance =
+		SpeechSynthesisUtterance::new_with_text(text).map_jserr()?;
 	synthesis.speak(&utterance);
 	Ok(())
 }

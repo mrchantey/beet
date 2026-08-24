@@ -156,7 +156,9 @@ impl Block for LambdaBlock {
 							// the deploy identity, named by the same table the
 							// runtime parses.
 							let runtime = BootstrapConfig {
-								deploy_id: Some(stack.deploy_id().to_string().into()),
+								deploy_id: Some(
+									stack.deploy_id().to_string().into(),
+								),
 								deploy_timestamp: Some(
 									stack.deploy_timestamp().to_string().into(),
 								),

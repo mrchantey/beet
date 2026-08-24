@@ -417,19 +417,20 @@ fn emit(
 				.map(|pat| quote! { #pat })
 				.unwrap_or_else(|| quote! { _entity });
 			quote! {
-			let inner = #beet_core::prelude::SystemTemplate::<
-				(#(#sys_types,)*), _, _
-			>::new(move |#entity_binding, (#(#sys_pats,)*)| {
-				let Self { #(#field_idents),* } = props.clone();
-				#(#required_unwraps)*
-				#(#body_bindings)*
-				#bundle
-				::core::result::Result::Ok(
-					#beet_core::prelude::Snippet::from_bundle(bundle)
-				)
-			});
-			cx.entity.build_template(&inner)
-		}},
+				let inner = #beet_core::prelude::SystemTemplate::<
+					(#(#sys_types,)*), _, _
+				>::new(move |#entity_binding, (#(#sys_pats,)*)| {
+					let Self { #(#field_idents),* } = props.clone();
+					#(#required_unwraps)*
+					#(#body_bindings)*
+					#bundle
+					::core::result::Result::Ok(
+						#beet_core::prelude::Snippet::from_bundle(bundle)
+					)
+				});
+				cx.entity.build_template(&inner)
+			}
+		}
 		None => quote! {
 			let Self { #(#field_idents),* } = self.clone();
 			#(#required_unwraps)*

@@ -74,7 +74,9 @@ impl AngularVelocity {
 	/// A rate of `rpm` revolutions per minute (`1 rpm = 6 deg/s`).
 	pub fn from_rpm(rpm: f32) -> Self { Self(rpm * 6.0) }
 	/// A rate of `rev_per_sec` revolutions per second.
-	pub fn from_rev_per_sec(rev_per_sec: f32) -> Self { Self(rev_per_sec * 360.0) }
+	pub fn from_rev_per_sec(rev_per_sec: f32) -> Self {
+		Self(rev_per_sec * 360.0)
+	}
 
 	/// This rate in degrees per second.
 	pub fn as_deg_per_sec(self) -> f32 { self.0 }
@@ -205,14 +207,22 @@ mod test {
 
 	#[crate::test]
 	fn distance_round_trips() {
-		Distance::from_meters(1.0).as_millimeters().xpect_close(1000.0);
-		Distance::from_inches(1.0).as_millimeters().xpect_close(25.4);
-		Distance::from_centimeters(50.0).as_meters().xpect_close(0.5);
+		Distance::from_meters(1.0)
+			.as_millimeters()
+			.xpect_close(1000.0);
+		Distance::from_inches(1.0)
+			.as_millimeters()
+			.xpect_close(25.4);
+		Distance::from_centimeters(50.0)
+			.as_meters()
+			.xpect_close(0.5);
 	}
 
 	#[crate::test]
 	fn velocity_and_arithmetic() {
-		AngularVelocity::from_rpm(60.0).as_rev_per_sec().xpect_close(1.0);
+		AngularVelocity::from_rpm(60.0)
+			.as_rev_per_sec()
+			.xpect_close(1.0);
 		LinearVelocity::from_m_per_sec(1.0)
 			.as_mm_per_sec()
 			.xpect_close(1000.0);

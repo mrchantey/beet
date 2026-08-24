@@ -10,9 +10,7 @@ use serde::Serialize;
 ///
 /// Stored as its own field so it is a cheap filter column (and, in a future SQL
 /// table, a real column) rather than something a query digs out of the JSON data.
-#[derive(
-	Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AnalyticsEventKind {
 	/// A routed server request: the raw traffic log, one per request.
 	Request,
@@ -104,9 +102,7 @@ impl AnalyticsEventData {
 /// The browser client descriptor a web page view carries: what kind of client is
 /// viewing, no identifiers. Every field is optional (a partial beacon, or a
 /// non-browser client, may omit any).
-#[derive(
-	Debug, Default, Clone, PartialEq, Serialize, Deserialize,
-)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClientDescriptor {
 	/// The `navigator.userAgent`.
 	pub user_agent: Option<SmolStr>,
@@ -129,9 +125,7 @@ pub struct ClientDescriptor {
 }
 
 /// The element a click event recorded, for locating what was clicked.
-#[derive(
-	Debug, Default, Clone, PartialEq, Serialize, Deserialize,
-)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClickElement {
 	/// The element tag name, eg `A` / `BUTTON`.
 	pub tag: Option<SmolStr>,
@@ -240,9 +234,12 @@ impl AnalyticsEvent {
 			bevybail!("beacon body must be a json object, got: {body:?}");
 		}
 		let str = |key: &str| {
-			body.get(key).and_then(|value| value.as_str().ok()).map(SmolStr::from)
+			body.get(key)
+				.and_then(|value| value.as_str().ok())
+				.map(SmolStr::from)
 		};
-		let u64 = |key: &str| body.get(key).and_then(|value| value.as_u64().ok());
+		let u64 =
+			|key: &str| body.get(key).and_then(|value| value.as_u64().ok());
 		let uuid = |key: &str| {
 			body.get(key)
 				.and_then(|value| value.as_str().ok())
@@ -252,7 +249,8 @@ impl AnalyticsEvent {
 		// the kind selects the typed payload; the client never sends `request`, so
 		// an unknown/absent kind falls back to a page view. A nested object (client /
 		// element) deserializes into its typed struct, defaulting when malformed.
-		let data = match body.get("kind").and_then(|value| value.as_str().ok()) {
+		let data = match body.get("kind").and_then(|value| value.as_str().ok())
+		{
 			Some("click") => AnalyticsEventData::Click {
 				reason: str("reason").unwrap_or_default(),
 				element: body
@@ -363,11 +361,7 @@ mod test {
 		)
 		.unwrap();
 		click.event_kind.xpect_eq(AnalyticsEventKind::Click);
-		matches!(
-			click.data,
-			AnalyticsEventData::Click { .. }
-		)
-		.xpect_true();
+		matches!(click.data, AnalyticsEventData::Click { .. }).xpect_true();
 
 		AnalyticsEvent::from_beacon(
 			val!({ "kind": "scroll", "path": "/", "max_percent": 80u64 }),
@@ -406,9 +400,13 @@ mod test {
 	#[beet_core::test]
 	fn body_session_wins_over_cookie() {
 		let cookie = uuid_ext::now_v7();
-		let event =
-			AnalyticsEvent::from_beacon(page_view_body(), Some(cookie), None, None)
-				.unwrap();
+		let event = AnalyticsEvent::from_beacon(
+			page_view_body(),
+			Some(cookie),
+			None,
+			None,
+		)
+		.unwrap();
 		event
 			.session
 			.unwrap()
@@ -420,8 +418,8 @@ mod test {
 	fn cookie_session_fills_when_body_absent() {
 		let cookie = uuid_ext::now_v7();
 		let body = val!({ "path": "/", "page_view_id": "not-a-uuid" });
-		let event =
-			AnalyticsEvent::from_beacon(body, Some(cookie), None, None).unwrap();
+		let event = AnalyticsEvent::from_beacon(body, Some(cookie), None, None)
+			.unwrap();
 		event.session.xpect_eq(Some(cookie));
 		event.id.xpect_not_eq(Uuid::nil());
 	}

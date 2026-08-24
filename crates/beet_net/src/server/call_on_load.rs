@@ -122,7 +122,10 @@ impl CallOnLoad {
 
 	/// The load call itself, resolving whichever of the three shapes the entity
 	/// serves.
-	async fn response(entity: &AsyncEntity, request: Request) -> Result<Response> {
+	async fn response(
+		entity: &AsyncEntity,
+		request: Request,
+	) -> Result<Response> {
 		if entity
 			.get(|meta: &ActionMeta| meta.matches::<Request, Response>())
 			.await
@@ -225,10 +228,7 @@ pub impl StartRunning<Request> {
 /// The tail of the load path, reached once [`CallOnLoad::call`]'s awaited call
 /// resolves. A long-running action never gets here: its parked call is the
 /// process.
-async fn stream_and_exit(
-	host: &AsyncEntity,
-	response: Response,
-) -> Result {
+async fn stream_and_exit(host: &AsyncEntity, response: Response) -> Result {
 	let (parts, body) = response.into_parts();
 	stream_body_to_stdout(body).await?;
 	match parts.status_to_exit_code() {
@@ -276,13 +276,11 @@ mod test {
 			Startup,
 			|mut commands: Commands| {
 				let entity = commands
-					.spawn((
-						CliServer::default(),
-						CallOnLoad,
-						children![exchange_ext::handler(|_| {
+					.spawn((CliServer::default(), CallOnLoad, children![
+						exchange_ext::handler(|_| {
 							Response::ok().with_body("hi")
-						})],
-					))
+						})
+					]))
 					.id();
 				commands.queue(move |world: &mut World| load(world, entity));
 			},
@@ -299,13 +297,9 @@ mod test {
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app
 			.world_mut()
-			.spawn((
-				CliServer::default(),
-				CallOnLoad,
-				children![exchange_ext::handler(|_| {
-					Response::ok().with_body("hi")
-				})],
-			))
+			.spawn((CliServer::default(), CallOnLoad, children![
+				exchange_ext::handler(|_| { Response::ok().with_body("hi") })
+			]))
 			.trigger(|entity| LoadTemplate {
 				entity,
 				is_error: false,
@@ -355,10 +349,8 @@ mod test {
 		crate::server::http_server::stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = app
-			.world_mut()
-			.spawn((HttpServer::new(0), CallOnLoad))
-			.id();
+		let entity =
+			app.world_mut().spawn((HttpServer::new(0), CallOnLoad)).id();
 		load(app.world_mut(), entity);
 		// drive until the walk lands the parking `Running` (a bounded condition,
 		// unlike settling a parked server to the frame cap).

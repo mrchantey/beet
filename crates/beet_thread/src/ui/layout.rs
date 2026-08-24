@@ -80,16 +80,28 @@ pub(crate) fn ThreadShell(
 fn page_column() -> impl Bundle {
 	inline_class![
 		(style::common_props::DisplayProp, style::Display::Flex),
-		(style::common_props::FlexDirectionProp, style::Direction::Vertical),
+		(
+			style::common_props::FlexDirectionProp,
+			style::Direction::Vertical
+		),
 		// stretch children across the full width, so the transcript and the
 		// composer (and its top-border separator) span the terminal
-		(style::common_props::AlignItemsProp, style::AlignItems::Stretch),
+		(
+			style::common_props::AlignItemsProp,
+			style::AlignItems::Stretch
+		),
 		(
 			style::common_props::Height,
 			style::Length::ViewportHeight(100.)
 		),
-		Declaration::token(style::common_props::BackgroundColor, colors::Surface),
-		Declaration::token(style::common_props::ForegroundColor, colors::OnSurface),
+		Declaration::token(
+			style::common_props::BackgroundColor,
+			colors::Surface
+		),
+		Declaration::token(
+			style::common_props::ForegroundColor,
+			colors::OnSurface
+		),
 	]
 }
 
@@ -137,7 +149,8 @@ mod test {
 	/// buffer and an in-world navigator opening on `/`, exactly what `TuiServer`
 	/// spawns for the local terminal and `SshTuiServer` per connection.
 	fn open_surface(app: &mut App, router: Entity, size: UVec2) -> Entity {
-		let (channel, terminal) = ChannelTerminal::new(TerminalConfig::default());
+		let (channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
 		app.world_mut()
 			.spawn((
 				channel,
@@ -221,13 +234,10 @@ mod test {
 		let mut app = thread_app();
 		AsyncRunner::settle_async_tasks(app.world_mut()).await;
 		let thread = app.world_mut().spawn(thread).flush();
-		let router = spawn_router(
-			&mut app,
-			children![
-				ThreadView::new(thread),
-				CreatePostForm::new(thread),
-			],
-		);
+		let router = spawn_router(&mut app, children![
+			ThreadView::new(thread),
+			CreatePostForm::new(thread),
+		]);
 		let surface = open_surface(&mut app, router, size);
 		(app, surface, thread)
 	}
@@ -345,18 +355,15 @@ mod test {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(56, 24),
 			(Thread::default(), Sequence::new(), children![
-				(
-					Actor::new("System", ActorKind::System),
-					children![Post::spawn("you are a friendly robot")],
-				),
-				(
-					Actor::new("Billy", ActorKind::User),
-					children![Post::spawn("hello there robot")],
-				),
-				(
-					Actor::new("BeepBot", ActorKind::Agent),
-					children![Post::spawn("Beep boop! Greetings, human.")],
-				),
+				(Actor::new("System", ActorKind::System), children![
+					Post::spawn("you are a friendly robot")
+				],),
+				(Actor::new("Billy", ActorKind::User), children![
+					Post::spawn("hello there robot")
+				],),
+				(Actor::new("BeepBot", ActorKind::Agent), children![
+					Post::spawn("Beep boop! Greetings, human.")
+				],),
 			]),
 		)
 		.await;
@@ -377,10 +384,9 @@ mod test {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(48, 16),
 			(Thread::default(), Sequence::new(), children![
-				(
-					Actor::new("System", ActorKind::System),
-					children![Post::spawn("be brief")],
-				),
+				(Actor::new("System", ActorKind::System), children![
+					Post::spawn("be brief")
+				],),
 				(Actor::new("Agent", ActorKind::Agent),),
 			]),
 		)
@@ -407,10 +413,9 @@ mod test {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(48, 16),
 			(Thread::default(), Sequence::new(), children![
-				(
-					Actor::new("System", ActorKind::System),
-					children![Post::spawn("be brief")],
-				),
+				(Actor::new("System", ActorKind::System), children![
+					Post::spawn("be brief")
+				],),
 				(Actor::new("Agent", ActorKind::Agent),),
 			]),
 		)
@@ -481,7 +486,9 @@ mod test {
 		let input = element_by_tag(&mut app, "input").unwrap();
 		app.world().entity(input).contains::<Focus>().xpect_true();
 		app.world_mut()
-			.with_state::<SurfaceQuery, _>(|surfaces| surfaces.surface_of(input))
+			.with_state::<SurfaceQuery, _>(|surfaces| {
+				surfaces.surface_of(input)
+			})
 			.xpect_eq(Some(surface));
 	}
 

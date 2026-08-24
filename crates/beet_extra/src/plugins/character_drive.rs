@@ -56,7 +56,10 @@ impl Default for CharacterDrive {
 /// patrol is the two alternating.
 pub(crate) fn drive_character(
 	time: When<Res<Time>>,
-	mut query: Query<(&DifferentialDrive, &mut Transform), With<CharacterDrive>>,
+	mut query: Query<
+		(&DifferentialDrive, &mut Transform),
+		With<CharacterDrive>,
+	>,
 ) {
 	let dt = time.delta_secs();
 	for (command, mut transform) in query.iter_mut() {
@@ -91,7 +94,11 @@ pub(crate) fn drive_character_animation(
 	for (entity, command, character) in query.iter() {
 		let moving = command.linear.as_mm_per_sec().abs() > f32::EPSILON
 			|| command.angular.as_deg_per_sec().abs() > f32::EPSILON;
-		let clip = if moving { &character.walk } else { &character.idle };
+		let clip = if moving {
+			&character.walk
+		} else {
+			&character.idle
+		};
 		let Ok(clips) = graph_clips.get(entity) else {
 			continue;
 		};
@@ -101,7 +108,8 @@ pub(crate) fn drive_character_animation(
 		// the player is a descendant of the glb scene root, spawned async; once it
 		// exists, crossfade to the gait clip and loop it.
 		for descendant in children.iter_descendants_inclusive(entity) {
-			if let Ok((mut player, mut transitions)) = players.get_mut(descendant)
+			if let Ok((mut player, mut transitions)) =
+				players.get_mut(descendant)
 			{
 				transitions
 					.play(&mut player, index, TRANSITION)

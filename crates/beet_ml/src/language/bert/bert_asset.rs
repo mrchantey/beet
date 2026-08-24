@@ -40,8 +40,7 @@ impl Bert {
 		let weights_bytes =
 			fetch_ext::fetch_bytes(&config.model.model_url()).await?;
 		let tokenizer_bytes =
-			fetch_ext::fetch_bytes(&config.model.tokenizer_url())
-				.await?;
+			fetch_ext::fetch_bytes(&config.model.tokenizer_url()).await?;
 		Self::from_bytes(
 			config,
 			&model_config_bytes,

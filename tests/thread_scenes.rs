@@ -82,7 +82,9 @@ fn cli_registration() -> CrateRegistration {
 /// requirement would otherwise pass silently.
 fn assert_crate_check_passed(app: &mut App) {
 	app.world_mut()
-		.run_system_once(|mut exits: MessageReader<AppExit>| exits.read().count())
+		.run_system_once(|mut exits: MessageReader<AppExit>| {
+			exits.read().count()
+		})
 		.unwrap()
 		.xpect_eq(0);
 }

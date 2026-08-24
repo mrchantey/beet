@@ -164,7 +164,10 @@ pub(crate) async fn build_live_page(
 /// bytes that must become a tree, so they parse through the same template
 /// substrate the route build uses (via [`MediaParser`]). The tree is marked for
 /// cleanup on the next page swap.
-pub(crate) fn parse_page(world: &mut World, bytes: MediaBytes) -> Result<Entity> {
+pub(crate) fn parse_page(
+	world: &mut World,
+	bytes: MediaBytes,
+) -> Result<Entity> {
 	let mut entity = world.spawn_empty();
 	MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
 	let page = entity.id();
@@ -334,7 +337,10 @@ mod test {
 	#[beet_core::test]
 	fn renders_and_re_renders_active_page() {
 		let mut app = live_app();
-		let host = app.world_mut().spawn(PageHost::bundle(UVec2::new(40, 8))).id();
+		let host = app
+			.world_mut()
+			.spawn(PageHost::bundle(UVec2::new(40, 8)))
+			.id();
 
 		// initial page: Alpha
 		spawn_page(&mut app, host, rsx! { <p>"Alpha page"</p> });
@@ -642,7 +648,10 @@ mod test {
 	#[beet_core::test]
 	fn parse_primitive_paints() {
 		let mut app = live_app();
-		let host = app.world_mut().spawn(PageHost::bundle(UVec2::new(40, 8))).id();
+		let host = app
+			.world_mut()
+			.spawn(PageHost::bundle(UVec2::new(40, 8)))
+			.id();
 		let bytes = MediaBytes::new_markdown("# Hello");
 		let page = parse_page(app.world_mut(), bytes).unwrap();
 		bind_surface_page(app.world_mut(), host, page);

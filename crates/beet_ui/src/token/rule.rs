@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use alloc::sync::Arc;
 use beet_core::prelude::*;
 use bevy::math::Vec2;
 use bevy::reflect::Typed;
-use alloc::sync::Arc;
 
 /// A set of declarations applied to elements matching the given selector.
 ///

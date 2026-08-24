@@ -48,14 +48,14 @@ pub(crate) fn register_template_include(world: &mut World) {
 			// resolved inside the task, where the whole tree is built, so it is
 			// reachable by ancestry.
 			entity.world_scope(|world| -> Result {
-				let (async_world, spawner, guard) = TemplatePending::register_fetch(
-					world,
-					target,
-					PendingKind::Structural,
-					format!("<Template src=\"{src}\">"),
-				)?;
-				spawner
-					.spawn(resolve_include(async_world, src, target, guard));
+				let (async_world, spawner, guard) =
+					TemplatePending::register_fetch(
+						world,
+						target,
+						PendingKind::Structural,
+						format!("<Template src=\"{src}\">"),
+					)?;
+				spawner.spawn(resolve_include(async_world, src, target, guard));
 				Ok(())
 			})
 		},
@@ -238,11 +238,7 @@ mod test {
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
 		// the include's slot content resolved: no routing markers survive anywhere.
-		world
-			.query::<&SlotChild>()
-			.iter(&world)
-			.count()
-			.xpect_eq(0);
+		world.query::<&SlotChild>().iter(&world).count().xpect_eq(0);
 		world
 			.query::<&SlotTarget>()
 			.iter(&world)

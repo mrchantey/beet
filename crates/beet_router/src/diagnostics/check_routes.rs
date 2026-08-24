@@ -117,8 +117,15 @@ impl CheckReport {
 
 		let mut report = CheckReport::default();
 		for (entity, path) in route_entities {
-			check_route(world, entity, &path, &route_tree, &config, &mut report)
-				.await?;
+			check_route(
+				world,
+				entity,
+				&path,
+				&route_tree,
+				&config,
+				&mut report,
+			)
+			.await?;
 			report.checked.push(path);
 		}
 		Ok(report)

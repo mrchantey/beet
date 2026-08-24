@@ -101,48 +101,45 @@ async fn serve(page: String) -> Result<u16> {
 					..default()
 				},
 				workspace,
-				children![(
-					Router::default(),
-					children![
-						// the page rides its own static mount (a root greedy mount
-						// cannot mix with the static `assets`/`examples` prefixes);
-						// the extensionless rule resolves `/page` to `index.html`
-						(
-							ServeBlobs {
-								prefix: "page".into(),
-								cache: default(),
-							}
-							.into_snippet_bundle(),
-							page_store
-						),
-						// the artifact and the scene program, from the ancestor
-						// workspace store
-						AssetsDir {
-							src: "assets".into(),
-							prefix: default(),
+				children![(Router::default(), children![
+					// the page rides its own static mount (a root greedy mount
+					// cannot mix with the static `assets`/`examples` prefixes);
+					// the extensionless rule resolves `/page` to `index.html`
+					(
+						ServeBlobs {
+							prefix: "page".into(),
 							cache: default(),
 						}
 						.into_snippet_bundle(),
-						AssetsDir {
-							src: "examples".into(),
-							prefix: default(),
-							cache: default(),
-						}
-						.into_snippet_bundle(),
-					],
-				)],
+						page_store
+					),
+					// the artifact and the scene program, from the ancestor
+					// workspace store
+					AssetsDir {
+						src: "assets".into(),
+						prefix: default(),
+						cache: default(),
+					}
+					.into_snippet_bundle(),
+					AssetsDir {
+						src: "examples".into(),
+						prefix: default(),
+						cache: default(),
+					}
+					.into_snippet_bundle(),
+				],)],
 			))
 			.id();
-		app.world_mut()
-			.entity_mut(root)
-			.run_async_local(move |server| async move {
+		app.world_mut().entity_mut(root).run_async_local(
+			move |server| async move {
 				server
 					.call::<Request, Response>(Request::from_cli_str(
 						"--server=http",
 					))
 					.await?;
 				Ok(())
-			});
+			},
+		);
 		app.run();
 	});
 	super::wait_for_port().await

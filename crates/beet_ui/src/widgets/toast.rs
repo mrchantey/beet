@@ -56,8 +56,14 @@ fn toast_style() -> impl Bundle {
 		(common_props::InsetBottom, Length::Rem(1.)),
 		(common_props::InsetRight, Length::Rem(1.)),
 		(common_props::ZIndexProp, 1100),
-		Declaration::token(common_props::BackgroundColor, colors::InverseSurface),
-		Declaration::token(common_props::ForegroundColor, colors::InverseOnSurface),
+		Declaration::token(
+			common_props::BackgroundColor,
+			colors::InverseSurface
+		),
+		Declaration::token(
+			common_props::ForegroundColor,
+			colors::InverseOnSurface
+		),
 		Declaration::token(ShapeProps, geometry::ShapeExtraSmall),
 		Declaration::token(TypographyProps, typography::BodyMedium),
 		(common_props::Padding, Spacing {

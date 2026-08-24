@@ -63,7 +63,8 @@ pub async fn LightsailReleaseAction(
 
 	let deploy_id = project.stack().deploy_id().to_string();
 	let connection =
-		SshConnection::from_project(&project, block.management_ssh_port()).await?;
+		SshConnection::from_project(&project, block.management_ssh_port())
+			.await?;
 	connection
 		.wait_for_ready(*release.timeout(), *release.poll())
 		.await?;
@@ -119,7 +120,10 @@ impl ReleaseQuery<'_, '_> {
 	/// The project to read outputs from, and the box to release onto. Several
 	/// blocks under one stack is an error rather than a guess: they would have
 	/// different management ports and different units.
-	fn resolve(&self, entity: Entity) -> Result<(terra::Project, LightsailBlock)> {
+	fn resolve(
+		&self,
+		entity: Entity,
+	) -> Result<(terra::Project, LightsailBlock)> {
 		let project = self.stacks.build_project(entity)?;
 		let mut blocks = self
 			.stacks

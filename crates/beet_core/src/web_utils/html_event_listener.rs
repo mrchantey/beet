@@ -170,7 +170,6 @@ mod tests {
 
 	#[crate::test(browser)]
 	async fn works_async() {
-
 		let button: HtmlButtonElement = doc::create_button();
 		button.set_id("clicker");
 		button.set_inner_html("Click me");

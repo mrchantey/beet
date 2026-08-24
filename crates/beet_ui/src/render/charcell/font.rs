@@ -178,8 +178,11 @@ fn parse_block_font(src: &str) -> BlockFont {
 		// the next `height` lines are this glyph's rows, taken verbatim
 		let rows: Vec<&str> =
 			(0..height).map(|_| lines.next().unwrap_or("")).collect();
-		let width =
-			rows.iter().map(|row| text_ext::display_width(row)).max().unwrap_or(0);
+		let width = rows
+			.iter()
+			.map(|row| text_ext::display_width(row))
+			.max()
+			.unwrap_or(0);
 		let rows = rows.iter().map(|row| pad_to_width(row, width)).collect();
 		glyphs.insert(ch, Glyph {
 			width: width as u32,
@@ -437,7 +440,8 @@ glyph I
 		// each fullwidth glyph measures two columns
 		text_ext::display_width(&to_fullwidth("AB")).xpect_eq(4);
 		// `FontScale::from_fullwidth` is the inverse round-trip
-		FontScale::from_fullwidth(&to_fullwidth("A B!")).xpect_eq("A B!".to_string());
+		FontScale::from_fullwidth(&to_fullwidth("A B!"))
+			.xpect_eq("A B!".to_string());
 	}
 
 	#[beet_core::test]

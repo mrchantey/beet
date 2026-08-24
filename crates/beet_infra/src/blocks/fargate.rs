@@ -953,7 +953,9 @@ mod tests {
 
 	/// Build a config from the given block, returning the config, stack, and the
 	/// work dir guard that keeps the local stack alive.
-	fn build_config(block: &FargateBlock) -> (terra::Config, Stack, TestWorkDir) {
+	fn build_config(
+		block: &FargateBlock,
+	) -> (terra::Config, Stack, TestWorkDir) {
 		build_config_at(block, BootstrapConfig::DEFAULT_STAGE)
 	}
 
@@ -1019,11 +1021,9 @@ mod tests {
 				"aws_ecr_repository.{}",
 				stack.resource_ident(block.build_label("ecr")).label()
 			)]);
-		config
-			.to_json()
-			.to_string()
-			.as_str()
-			.xpect_contains("\"deployment_circuit_breaker\":[{\"enable\":true,\"rollback\":true}]");
+		config.to_json().to_string().as_str().xpect_contains(
+			"\"deployment_circuit_breaker\":[{\"enable\":true,\"rollback\":true}]",
+		);
 	}
 
 	#[beet_core::test]
@@ -1092,9 +1092,12 @@ mod tests {
 
 	#[beet_core::test]
 	fn proxied_dns_emits_proxied_record() {
-		let json = build_json(&autoscaling_block().with_dns(
-			DnsProvider::cloudflare("example.org", "zone123").with_proxied(true),
-		));
+		let json = build_json(
+			&autoscaling_block().with_dns(
+				DnsProvider::cloudflare("example.org", "zone123")
+					.with_proxied(true),
+			),
+		);
 		// the record rides the edge
 		json.as_str().xpect_contains("\"proxied\":true");
 		// ACM validation records stay unproxied even on a proxied deploy
@@ -1125,7 +1128,8 @@ mod tests {
 		// the container must carry BEET_STAGE (set to the stack's stage) so the
 		// deployed runtime reports the stage it is actually running in. Asserted
 		// against a named stage, since the `dev` default renders to nothing.
-		let (config, stack, _dir) = build_config_at(&autoscaling_block(), "prod");
+		let (config, stack, _dir) =
+			build_config_at(&autoscaling_block(), "prod");
 		// container_definitions is a JSON string nested in the config, so the env
 		// entry renders with escaped quotes (matching the BEET_SSH_PORT tests).
 		config.to_json().to_string().xpect_contains(&format!(
@@ -1145,7 +1149,9 @@ mod tests {
 				.with_container_port(9001)
 				.with_bootstrap(BootstrapConfig {
 					service_access: ServiceAccess::Remote,
-					store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+					store: Some(
+						StoreUri::parse("s3://beet--dev--app").unwrap(),
+					),
 					..default()
 				}),
 		);
@@ -1178,13 +1184,9 @@ mod tests {
 			stage: "staging".into(),
 			..default()
 		});
-		block
-			.cmd_bootstrap()
-			.to_cmd_json("/app")
-			.unwrap()
-			.xpect_eq(
-				r#"["/app", "--store=s3://beet--dev--app", "--server=http,ssh"]"#,
-			);
+		block.cmd_bootstrap().to_cmd_json("/app").unwrap().xpect_eq(
+			r#"["/app", "--store=s3://beet--dev--app", "--server=http,ssh"]"#,
+		);
 		build_json(&block.with_secret_env("BEET_SSH_HOST_KEY", "abc123"))
 			.as_str()
 			.xpect_contains(

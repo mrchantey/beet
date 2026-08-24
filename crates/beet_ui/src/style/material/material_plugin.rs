@@ -99,7 +99,10 @@ impl Plugin for MaterialStylePlugin {
 /// default; this writes its ~85 tone declarations into the default rule, keyed
 /// by token so it overwrites in place (idempotent — the scheme/opacity/
 /// typography keys are untouched). Runs whenever [`Theme`] changes.
-pub(crate) fn rebuild_theme_tones(theme: Res<Theme>, mut rules: ResMut<RuleSet>) {
+pub(crate) fn rebuild_theme_tones(
+	theme: Res<Theme>,
+	mut rules: ResMut<RuleSet>,
+) {
 	rules.default_rule_mut().push_declarations(
 		Rule::new().with_extend(themes::from_color(theme.color)),
 	);
@@ -220,8 +223,8 @@ mod tests {
 	/// conservative `Background` role, the card on a distinct surface tone.
 	#[beet_core::test]
 	fn surface_fills_paint_on_both_targets() {
-		let builder =
-			CssBuilder::default().with_format_variables(FormatVariables::short());
+		let builder = CssBuilder::default()
+			.with_format_variables(FormatVariables::short());
 		MaterialStylePlugin::world()
 			.with_state::<StyleQuery, _>(|query| query.build_css(&builder))
 			.xunwrap()

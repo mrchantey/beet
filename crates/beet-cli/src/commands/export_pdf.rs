@@ -166,8 +166,11 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	// dir (not a `<StoreRoot>`-widened root).
 	let output = match params.output {
 		Some(output) => AbsPathBuf::new(output)?,
-		None => entry_dir(&entry_path)?
-			.join(if params.separate { "pdf" } else { "site.pdf" }),
+		None => entry_dir(&entry_path)?.join(if params.separate {
+			"pdf"
+		} else {
+			"site.pdf"
+		}),
 	};
 	let count = if params.separate {
 		write_separate(pages, &output).await?

@@ -83,13 +83,13 @@ fn assert_server_started(
 	if ev.started > 0 || !sets.contains(ev.entity) {
 		return;
 	}
-	commands.entity(ev.entity).queue(FailRun::<Response>::new(
-		bevyhow!(
+	commands
+		.entity(ev.entity)
+		.queue(FailRun::<Response>::new(bevyhow!(
 			"No server started for {}, does --server (or BEET_SERVER) name a \
 			 server this entry declares?",
 			ev.entity
-		),
-	));
+		)));
 }
 
 #[cfg(test)]
@@ -105,15 +105,15 @@ mod boot_check_test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
-		app.world_mut()
-			.entity_mut(entity)
-			.run_async_local(|server| async move {
+		app.world_mut().entity_mut(entity).run_async_local(
+			|server| async move {
 				CallOnLoad::call(
 					server,
 					Request::from_cli_str("--server=nonexistent"),
 				)
 				.await
-			});
+			},
+		);
 		app.run_async().await.xpect_eq(AppExit::error());
 	}
 }
@@ -138,9 +138,10 @@ mod test {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
 			// the server owns the boot, its dispatch host is the child
-			app.world_mut().spawn((server, children![exchange_ext::handler(
-				|_| { Response::ok().with_body("hello") }
-			)]));
+			app.world_mut()
+				.spawn((server, children![exchange_ext::handler(|_| {
+					Response::ok().with_body("hello")
+				})]));
 			app.run();
 		});
 		time_ext::sleep_millis(200).await;

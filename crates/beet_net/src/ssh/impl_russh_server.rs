@@ -315,7 +315,11 @@ impl russh::server::Handler for BeetSshHandler {
 			// disconnect rather than wait out the inactivity timeout, which is what
 			// makes a reap decisive against a peer that ignores the channel close.
 			handle
-				.disconnect(russh::Disconnect::ByApplication, String::new(), String::new())
+				.disconnect(
+					russh::Disconnect::ByApplication,
+					String::new(),
+					String::new(),
+				)
 				.await
 				.ok();
 		});

@@ -426,7 +426,10 @@ impl BootstrapConfig {
 			self.deploy_timestamp.as_ref().map(ToString::to_string),
 		);
 		push(Self::TLS, self.tls.map(|tls| tls.to_string()));
-		push(Self::TLS_DIR, self.tls_dir.as_ref().map(ToString::to_string));
+		push(
+			Self::TLS_DIR,
+			self.tls_dir.as_ref().map(ToString::to_string),
+		);
 		push(
 			Self::SCREENSHOT,
 			self.screenshot.as_ref().map(ToString::to_string),
@@ -480,7 +483,10 @@ impl BootstrapConfig {
 			self.deploy_timestamp.as_ref().map(ToString::to_string),
 		);
 		push(Self::TLS, self.tls.map(|tls| tls.to_string()));
-		push(Self::TLS_DIR, self.tls_dir.as_ref().map(ToString::to_string));
+		push(
+			Self::TLS_DIR,
+			self.tls_dir.as_ref().map(ToString::to_string),
+		);
 		push(
 			Self::SCREENSHOT,
 			self.screenshot.as_ref().map(ToString::to_string),
@@ -565,7 +571,9 @@ impl BootstrapConfig {
 		match host {
 			IpAddr::V4(addr) => Some(addr.octets()),
 			IpAddr::V6(addr) => {
-				warn!("ignoring --host / BEET_HOST `{addr}`: beet servers bind IPv4");
+				warn!(
+					"ignoring --host / BEET_HOST `{addr}`: beet servers bind IPv4"
+				);
 				None
 			}
 		}
@@ -695,13 +703,8 @@ impl ConfigReader<'_> {
 
 	/// A malformed field: an error naming both transports, or in lenient mode a
 	/// warning and `None`.
-	fn malformed<T>(
-		&self,
-		knob: Knob,
-		err: impl Display,
-	) -> Result<Option<T>> {
-		let message =
-			format!("invalid --{} / {}: {err}", knob.arg, knob.env);
+	fn malformed<T>(&self, knob: Knob, err: impl Display) -> Result<Option<T>> {
+		let message = format!("invalid --{} / {}: {err}", knob.arg, knob.env);
 		match self.lenient {
 			true => {
 				warn!("{message}");
@@ -722,9 +725,8 @@ impl ConfigReader<'_> {
 			Some(value) => match value.trim() {
 				"1" | "true" | "on" | "yes" => Ok(Some(true)),
 				"0" | "false" | "off" | "no" => Ok(Some(false)),
-				other => {
-					self.malformed(knob, format!("`{other}`, expected on or off"))
-				}
+				other => self
+					.malformed(knob, format!("`{other}`, expected on or off")),
 			},
 			None if self.params.contains_key(knob.arg) => Ok(Some(true)),
 			None => Ok(None),
@@ -748,8 +750,7 @@ impl ConfigReader<'_> {
 	/// back to its own `default_boot`.
 	fn filter(&self, knob: Knob) -> Option<ServerFilter> {
 		ServerFilter::from_params(self.params).or_else(|| {
-			(self.env)(knob.env)
-				.map(|value| ServerFilter::new(value.as_str()))
+			(self.env)(knob.env).map(|value| ServerFilter::new(value.as_str()))
 		})
 	}
 }
@@ -818,7 +819,11 @@ mod test {
 	/// A default config renders to nothing on either channel.
 	#[crate::test]
 	fn default_renders_empty() {
-		BootstrapConfig::default().to_argv().unwrap().len().xpect_eq(0);
+		BootstrapConfig::default()
+			.to_argv()
+			.unwrap()
+			.len()
+			.xpect_eq(0);
 		BootstrapConfig::default().to_env().len().xpect_eq(0);
 	}
 
@@ -896,10 +901,9 @@ mod test {
 	#[crate::test]
 	fn splits_channels() {
 		let (argv, env) = full().split_channels();
-		argv.to_argv()
-			.unwrap()
-			.join(" ")
-			.xpect_eq("--store=s3://site?region=us-west-2 --server=http,ssh --path=/docs");
+		argv.to_argv().unwrap().join(" ").xpect_eq(
+			"--store=s3://site?region=us-west-2 --server=http,ssh --path=/docs",
+		);
 		env.to_env()
 			.iter()
 			.map(|(key, _)| key.as_str())

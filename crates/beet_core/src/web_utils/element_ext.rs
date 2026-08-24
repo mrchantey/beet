@@ -114,7 +114,6 @@ mod tests {
 
 	#[crate::test(browser)]
 	async fn works_async() {
-
 		// Build a parent and two children
 		let parent: HtmlDivElement = doc::create_div();
 		parent.set_id("root");

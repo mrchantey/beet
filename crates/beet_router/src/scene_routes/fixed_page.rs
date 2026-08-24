@@ -84,10 +84,9 @@ mod test {
 	/// router root.
 	fn spawn_router(world: &mut World) -> Entity {
 		world
-			.spawn((Router, children![(
-				route::new("", FixedPage),
-				children![rsx! { <p>"page body"</p> }]
-			)]))
+			.spawn((Router, children![(route::new("", FixedPage), children![
+				rsx! { <p>"page body"</p> }
+			])]))
 			.flush()
 	}
 
@@ -148,15 +147,12 @@ mod test {
 		// the route builds through the template substrate (so `<Route>`'s slot
 		// resolves) directly into its place under the router
 		world
-			.spawn_template(Snippet::from_bundle((
-				ChildOf(root),
-				rsx! {
-					<Route path="" {FixedPage}>
-						<p>"first"</p>
-						<p>"second"</p>
-					</Route>
-				},
-			)))
+			.spawn_template(Snippet::from_bundle((ChildOf(root), rsx! {
+				<Route path="" {FixedPage}>
+					<p>"first"</p>
+					<p>"second"</p>
+				</Route>
+			})))
 			.unwrap();
 
 		get(&mut world, root, "")

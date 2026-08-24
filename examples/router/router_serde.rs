@@ -43,7 +43,8 @@ fn main() -> AppExit {
 		// registering, BeetPlugins' RouterPlugin / ActionPlugin
 		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>()
+		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
+		)
 		.add_systems(Startup, setup)
 		.run()
 }

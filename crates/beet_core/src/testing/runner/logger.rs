@@ -375,15 +375,14 @@ fn fail_reason(outcome: &TestFail, color: bool) -> String {
 		} => {
 			let time = time_ext::pretty_print_duration(*elapsed);
 			let time = TermStyle::blue().or_plain(color).paint(time);
-			let heading = format!("{} {}", bold.paint("Timed out after:"), time);
+			let heading =
+				format!("{} {}", bold.paint("Timed out after:"), time);
 			if unattributed_panics.is_empty() {
 				heading
 			} else {
 				let mut lines = vec![
 					heading,
-					bold.paint(
-						"Unattributed panics fired during the window:",
-					),
+					bold.paint("Unattributed panics fired during the window:"),
 				];
 				lines.extend(
 					unattributed_panics.iter().map(|text| format!("- {text}")),

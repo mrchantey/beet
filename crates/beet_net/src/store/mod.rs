@@ -51,9 +51,9 @@ mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
 #[cfg(feature = "std")]
-mod table;
-#[cfg(feature = "std")]
 mod store_ref;
+#[cfg(feature = "std")]
+mod table;
 #[cfg(feature = "template_serde")]
 mod template_store;
 #[cfg(feature = "std")]
@@ -61,9 +61,9 @@ pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
 #[cfg(feature = "std")]
-pub use table::*;
-#[cfg(feature = "std")]
 pub use store_ref::*;
+#[cfg(feature = "std")]
+pub use table::*;
 #[cfg(feature = "template_serde")]
 pub use template_store::*;
 // the `WatchDir` registration component (any `std` target) and the notify-based

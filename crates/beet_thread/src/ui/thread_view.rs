@@ -10,10 +10,10 @@ use beet_ui::prelude::PortalOf;
 use beet_ui::prelude::ScrollPosition;
 // styling for the transcript: an `inline_class!` per role keeps the rule colocated
 // with the widget (a callsite-keyed class, so each role's literal is its own rule).
+use beet_ui::prelude::Declaration;
 use beet_ui::prelude::inline_class;
 use beet_ui::prelude::material::colors;
 use beet_ui::prelude::style;
-use beet_ui::prelude::Declaration;
 
 // ═══════════════════════════════════════════════════════════════════════
 // ThreadView: the reactive chat widget
@@ -72,7 +72,10 @@ fn thread_view_on_add(mut world: DeferredWorld, cx: HookContext) {
 fn transcript_style() -> OnSpawn {
 	inline_class![
 		(style::common_props::DisplayProp, style::Display::Flex),
-		(style::common_props::FlexDirectionProp, style::Direction::Vertical),
+		(
+			style::common_props::FlexDirectionProp,
+			style::Direction::Vertical
+		),
 		(style::common_props::FlexGrowProp, 1u32),
 		(style::common_props::OverflowYProp, style::Overflow::Auto),
 		(style::common_props::RowGapProp, style::Length::Rem(1.)),
@@ -155,23 +158,35 @@ fn message_block(kind: &str) -> OnSpawn {
 	match kind {
 		"user" => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			Declaration::token(style::common_props::BorderColorProp, colors::Primary),
+			Declaration::token(
+				style::common_props::BorderColorProp,
+				colors::Primary
+			),
 			(style::common_props::Padding, block_padding()),
 		],
 		"error" => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			Declaration::token(style::common_props::BorderColorProp, colors::Error),
+			Declaration::token(
+				style::common_props::BorderColorProp,
+				colors::Error
+			),
 			(style::common_props::Padding, block_padding()),
 		],
 		"system" | "developer" => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			Declaration::token(style::common_props::BorderColorProp, colors::Outline),
+			Declaration::token(
+				style::common_props::BorderColorProp,
+				colors::Outline
+			),
 			(style::common_props::Padding, block_padding()),
 		],
 		// agent and any unknown role
 		_ => inline_class![
 			(style::common_props::BorderLeftWidth, style::Length::Rem(1.)),
-			Declaration::token(style::common_props::BorderColorProp, colors::Tertiary),
+			Declaration::token(
+				style::common_props::BorderColorProp,
+				colors::Tertiary
+			),
 			(style::common_props::Padding, block_padding()),
 		],
 	}
@@ -192,19 +207,31 @@ fn author_label(kind: &str) -> OnSpawn {
 	match kind {
 		"user" => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			Declaration::token(style::common_props::ForegroundColor, colors::Primary),
+			Declaration::token(
+				style::common_props::ForegroundColor,
+				colors::Primary
+			),
 		],
 		"error" => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			Declaration::token(style::common_props::ForegroundColor, colors::Error),
+			Declaration::token(
+				style::common_props::ForegroundColor,
+				colors::Error
+			),
 		],
 		"system" | "developer" => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			Declaration::token(style::common_props::ForegroundColor, colors::Outline),
+			Declaration::token(
+				style::common_props::ForegroundColor,
+				colors::Outline
+			),
 		],
 		_ => inline_class![
 			(style::common_props::FontWeightProp, style::FontWeight::Bold),
-			Declaration::token(style::common_props::ForegroundColor, colors::Tertiary),
+			Declaration::token(
+				style::common_props::ForegroundColor,
+				colors::Tertiary
+			),
 		],
 	}
 }
@@ -212,9 +239,18 @@ fn author_label(kind: &str) -> OnSpawn {
 /// The message body: wraps long lines and preserves authored newlines.
 fn body_text() -> impl Bundle {
 	inline_class![
-		(style::common_props::WhiteSpaceProp, style::WhiteSpace::PreWrap),
-		(style::common_props::WordBreakProp, style::WordBreak::BreakWord),
-		Declaration::token(style::common_props::ForegroundColor, colors::OnSurface),
+		(
+			style::common_props::WhiteSpaceProp,
+			style::WhiteSpace::PreWrap
+		),
+		(
+			style::common_props::WordBreakProp,
+			style::WordBreak::BreakWord
+		),
+		Declaration::token(
+			style::common_props::ForegroundColor,
+			colors::OnSurface
+		),
 	]
 }
 
@@ -287,7 +323,10 @@ pub(crate) fn project_window_to_document(
 /// instead read a transcript that has simply outgrown the viewport as a reader
 /// who scrolled away, and stop following on the first burst.
 pub(crate) fn follow_thread_scroll(
-	views: Query<(Entity, Ref<Document>, Option<Ref<Children>>), With<ThreadView>>,
+	views: Query<
+		(Entity, Ref<Document>, Option<Ref<Children>>),
+		With<ThreadView>,
+	>,
 	children: Query<&Children>,
 	parents: Query<&ChildOf>,
 	portals: Query<&PortalOf>,
@@ -366,7 +405,9 @@ fn scroll_path(
 			.get(entity)
 			.ok()
 			.and_then(|portal| portal.holders().first().copied())
-			.or_else(|| parents.get(entity).ok().map(|child_of| child_of.parent()));
+			.or_else(|| {
+				parents.get(entity).ok().map(|child_of| child_of.parent())
+			});
 		path.extend(current);
 	}
 	path
@@ -490,7 +531,12 @@ mod test {
 			.query_filtered::<Entity, With<ThreadView>>()
 			.single(app.world())
 			.unwrap();
-		app.world().entity(view).get::<OfThread>().unwrap().thread().xpect_eq(thread);
+		app.world()
+			.entity(view)
+			.get::<OfThread>()
+			.unwrap()
+			.thread()
+			.xpect_eq(thread);
 		let _ = page;
 
 		push_post(&mut app, thread, "first");
@@ -556,7 +602,10 @@ mod test {
 			.world_mut()
 			.spawn((Thread::default(), ThreadWindow::default()))
 			.id();
-		let host = app.world_mut().spawn(PageHost::bundle(UVec2::new(40, 12))).id();
+		let host = app
+			.world_mut()
+			.spawn(PageHost::bundle(UVec2::new(40, 12)))
+			.id();
 		let page = app
 			.world_mut()
 			.spawn_template(Snippet::from_bundle(rsx! {
@@ -600,7 +649,8 @@ mod test {
 	/// Append one completed text post to the thread's window.
 	fn push_post(app: &mut App, thread: Entity, text: &str) {
 		let thread_id = app.world().get::<Thread>(thread).unwrap().id();
-		let mut window = app.world_mut().get_mut::<ThreadWindow>(thread).unwrap();
+		let mut window =
+			app.world_mut().get_mut::<ThreadWindow>(thread).unwrap();
 		let actor = window.insert_actor(Actor::agent());
 		window.upsert_post(AgentPost::new_text(
 			actor,

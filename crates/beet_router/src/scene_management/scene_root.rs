@@ -166,7 +166,9 @@ mod test {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![route::exchange("ping", Ping)]))
+			.spawn((Router::with_defaults(), children![route::exchange(
+				"ping", Ping
+			)]))
 			.flush();
 		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)
@@ -257,7 +259,11 @@ mod test {
 			))
 			.unwrap()
 			.id();
-		world.resource::<PackageConfig>().title.as_str().xpect_eq("Host");
+		world
+			.resource::<PackageConfig>()
+			.title
+			.as_str()
+			.xpect_eq("Host");
 
 		// a scene loads and is torn down beside it
 		let scene = world.spawn_template(()).unwrap().id();
@@ -267,7 +273,11 @@ mod test {
 		// the scene is gone, the entry and its resource are untouched
 		world.get_entity(scene).is_err().xpect_true();
 		world.get_entity(entry).is_ok().xpect_true();
-		world.resource::<PackageConfig>().title.as_str().xpect_eq("Host");
+		world
+			.resource::<PackageConfig>()
+			.title
+			.as_str()
+			.xpect_eq("Host");
 	}
 
 	/// A pushed scene round-trips: load a scene under a host, mark it
@@ -279,7 +289,9 @@ mod test {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![route::exchange("ping", Ping)]))
+			.spawn((Router::with_defaults(), children![route::exchange(
+				"ping", Ping
+			)]))
 			.flush();
 		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)

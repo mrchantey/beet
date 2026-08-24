@@ -268,7 +268,6 @@ mod tests {
 
 	#[crate::test(browser)]
 	fn creates_and_appends_div() {
-
 		let div = document_ext::create_div();
 		div.set_id("greeting");
 		div.set_inner_html("hello");

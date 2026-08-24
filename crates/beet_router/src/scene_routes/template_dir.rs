@@ -126,7 +126,9 @@ impl TemplateDir {
 						Self::read_sources(&store, &src, &formats).await?;
 					dir.world()
 						.with(move |world| -> Result {
-							Self::register_sources(world, entity, &formats, sources)?;
+							Self::register_sources(
+								world, entity, &formats, sources,
+							)?;
 							// watch the templates dir for live reload (keyed to its base
 							// store); inert on a non-fs store / on wasm.
 							let scoped =
@@ -134,7 +136,8 @@ impl TemplateDir {
 							{
 								let mut entity_mut = world.entity_mut(entity);
 								entity_mut.insert(TemplatesLoaded);
-								if let Some(watch) = WatchDir::from_store(&scoped)
+								if let Some(watch) =
+									WatchDir::from_store(&scoped)
 								{
 									entity_mut.insert(watch);
 								}
@@ -203,11 +206,9 @@ impl TemplateDir {
 			.unwrap_or_default();
 		let mut names = Vec::new();
 		for (path, source) in sources {
-			names.extend(registry.insert_source_from_path(
-				formats,
-				&path,
-				&source,
-			)?);
+			names.extend(
+				registry.insert_source_from_path(formats, &path, &source)?,
+			);
 		}
 		// unregister sources this owner previously registered but no longer ships.
 		if let Some(previous) = world.get::<RegisteredTemplates>(owner) {

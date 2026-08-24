@@ -616,7 +616,10 @@ impl<'a> MdTreeBuilder<'a> {
 	/// and lets a paired inline tag (`<strong>…</strong>`) wrap the markdown
 	/// text events that arrive between its open and close.
 	fn apply_html_fragment(&mut self, source: &'a str) {
-		let tokens = match BsxFragmentToken::parse_fragment(source, &self.html_parse_config) {
+		let tokens = match BsxFragmentToken::parse_fragment(
+			source,
+			&self.html_parse_config,
+		) {
 			Ok(tokens) => tokens,
 			// an unparseable fragment falls back to verbatim text
 			Err(_) => {

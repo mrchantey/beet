@@ -25,4 +25,3 @@ pub async fn WhoAmI(cx: ActionContext<()>) -> Result<String> {
 		})
 		.await?
 }
-

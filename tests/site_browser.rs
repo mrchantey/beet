@@ -101,9 +101,7 @@ async fn verifies_client() {
 		.as_array()
 		.unwrap()
 		.iter()
-		.filter(|entry| {
-			!entry.as_str().unwrap_or_default().starts_with("200 ")
-		})
+		.filter(|entry| !entry.as_str().unwrap_or_default().starts_with("200 "))
 		.collect::<Vec<_>>()
 		.xpect_empty();
 

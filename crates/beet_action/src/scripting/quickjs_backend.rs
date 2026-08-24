@@ -17,8 +17,8 @@ use crate::prelude::ConsoleStream;
 use crate::prelude::ScriptLimits;
 use beet_core::prelude::*;
 use rquickjs::CatchResultExt;
-use rquickjs::Ctx;
 use rquickjs::Context;
+use rquickjs::Ctx;
 use rquickjs::Function;
 use rquickjs::Runtime;
 use rquickjs::Value;
@@ -59,10 +59,12 @@ struct BoundedRuntime {
 impl BoundedRuntime {
 	/// Build a runtime and its context under `limits`.
 	fn new(limits: &ScriptLimits) -> Result<Self> {
-		let runtime = Runtime::new().map_err(|err| bevyhow!("quickjs: {err}"))?;
+		let runtime =
+			Runtime::new().map_err(|err| bevyhow!("quickjs: {err}"))?;
 		// saturating rather than truncating: a `u64` ceiling above `usize::MAX`
 		// means "no practical cap", not a wrapped-around tiny one.
-		runtime.set_memory_limit(limits.memory.try_into().unwrap_or(usize::MAX));
+		runtime
+			.set_memory_limit(limits.memory.try_into().unwrap_or(usize::MAX));
 		// always set explicitly, never left to the engine default: see
 		// `ScriptLimits::stack`.
 		runtime.set_max_stack_size(limits.stack as usize);
@@ -70,8 +72,8 @@ impl BoundedRuntime {
 		runtime.set_interrupt_handler(Some(Box::new(move || {
 			Instant::now() >= deadline
 		})));
-		let context =
-			Context::full(&runtime).map_err(|err| bevyhow!("quickjs: {err}"))?;
+		let context = Context::full(&runtime)
+			.map_err(|err| bevyhow!("quickjs: {err}"))?;
 		Self {
 			_runtime: runtime,
 			context,

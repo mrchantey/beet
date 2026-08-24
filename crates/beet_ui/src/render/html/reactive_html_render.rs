@@ -453,7 +453,8 @@ fn render_verb_arg(
 			);
 			format!("{prefix}{}", dotted_path(&resolved))
 		}
-		VerbArg::Literal(literal) => literal.value()
+		VerbArg::Literal(literal) => literal
+			.value()
 			.map(|value| {
 				serde_json::to_string(&serde_json::Value::from(value))
 					.unwrap_or_else(|_| "null".into())
@@ -497,7 +498,8 @@ mod test {
 	fn build(world: &mut World, markup: &str) -> Entity {
 		let container = world
 			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
+				BsxNode::parse_document(markup, &BsxParseConfig::bsx())
+					.unwrap(),
 				BsxTemplateRegistry::default(),
 			))
 			.unwrap()
@@ -814,7 +816,9 @@ mod test {
 		page.evaluate_value("globalThis.beet.store.docs.d0")
 			.await
 			.unwrap()
-			.xpect_eq(json!({ "count": 0, "flag": false, "status": "pending" }));
+			.xpect_eq(
+				json!({ "count": 0, "flag": false, "status": "pending" }),
+			);
 
 		// every default verb, installed from the `data-bx-verbs` blob
 		page.find("#inc").await.click().await.unwrap();
@@ -824,7 +828,10 @@ mod test {
 		page.find("#tog").await.click().await.unwrap();
 		page.find("#flag").await.xpect_text("flag is true").await;
 		page.find("#set").await.click().await.unwrap();
-		page.find("#status").await.xpect_text("status is done").await;
+		page.find("#status")
+			.await
+			.xpect_text("status is done")
+			.await;
 
 		// the custom app verb (its js twin shipped in `data-bx-verbs`)
 		page.find("#dbl").await.click().await.unwrap();
@@ -834,9 +841,7 @@ mod test {
 		page.evaluate_value("globalThis.beet.store.docs.d0")
 			.await
 			.unwrap()
-			.xpect_eq(
-				json!({ "count": 2, "flag": true, "status": "done" }),
-			);
+			.xpect_eq(json!({ "count": 2, "flag": true, "status": "done" }));
 
 		// the whole exchange was local: no requests, no console errors
 		network.drain().xpect_empty();

@@ -126,9 +126,7 @@ where
 ///
 /// The backend-agnostic console channel: `console.log`/`info`/`debug` is
 /// [`Stdout`](Self::Stdout), `console.warn`/`error` is [`Stderr`](Self::Stderr).
-#[derive(
-	Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConsoleStream {
 	/// `console.log`/`info`/`debug`.
@@ -211,7 +209,11 @@ where
 	/// # Errors
 	/// Propagates parse, evaluation, or input-serialization errors, or names the
 	/// missing backend when the build has none.
-	pub async fn run_console<Sink>(&self, input: Input, sink: Sink) -> Result<()>
+	pub async fn run_console<Sink>(
+		&self,
+		input: Input,
+		sink: Sink,
+	) -> Result<()>
 	where
 		Sink: 'static + MaybeSend + FnMut(ConsoleStream, &str),
 	{
@@ -325,10 +327,10 @@ where
 					let _ = (request, sink);
 					bevybail!(
 						"`Script` has no backend on this host ({host:?}). It offers no \
-way to run a script with less authority than the program itself holds — Node in \
-particular cannot attenuate filesystem or environment access per worker — and a \
-backend that cannot isolate is an error rather than a silent downgrade. Enable \
-the `quickjs` feature for the embedded engine, which needs nothing from the host."
+	way to run a script with less authority than the program itself holds — Node in \
+	particular cannot attenuate filesystem or environment access per worker — and a \
+	backend that cannot isolate is an error rather than a silent downgrade. Enable \
+	the `quickjs` feature for the embedded engine, which needs nothing from the host."
 					)
 				}
 			}

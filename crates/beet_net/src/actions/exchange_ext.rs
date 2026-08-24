@@ -89,9 +89,9 @@ mod test {
 	#[beet_core::test]
 	async fn handler_async_works() {
 		AsyncPlugin::world()
-			.spawn(exchange_ext::handler_async(
-				|req| async move { req.mirror_parts() },
-			))
+			.spawn(exchange_ext::handler_async(|req| async move {
+				req.mirror_parts()
+			}))
 			.exchange(Request::get("/bar"))
 			.await
 			.status()

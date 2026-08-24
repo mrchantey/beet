@@ -484,7 +484,8 @@ mod test {
 		app.init();
 		app.update();
 
-		let entity = app.world_mut().spawn(Increment::bundle(count_field())).id();
+		let entity =
+			app.world_mut().spawn(Increment::bundle(count_field())).id();
 
 		// Serialize
 		let template_bytes = TemplateSaver::new()

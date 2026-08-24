@@ -82,14 +82,16 @@ mod test {
 				(ResMut<Assets<AnimationGraph>>, BuildAssets),
 				_,
 				_,
-			>::new(move |_entity, (mut graphs, mut assets)| {
-				Snippet::from_bundle(AnimationGraphClips::build(
-					&clips,
-					&mut graphs,
-					&mut assets,
-				))
-				.xok()
-			}))
+			>::new(
+				move |_entity, (mut graphs, mut assets)| {
+					Snippet::from_bundle(AnimationGraphClips::build(
+						&clips,
+						&mut graphs,
+						&mut assets,
+					))
+					.xok()
+				},
+			))
 			.unwrap()
 			.id();
 

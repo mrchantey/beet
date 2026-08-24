@@ -64,8 +64,7 @@ impl ServerActionClient {
 		T: serde::de::DeserializeOwned,
 		E: serde::de::DeserializeOwned,
 	{
-		Self::parse_fallible_response(request.send().await?, err_status)
-			.await
+		Self::parse_fallible_response(request.send().await?, err_status).await
 	}
 
 	/// Splits a [`JsonResult`]-encoded response into `Ok(T)`/`Err(E)` by status.

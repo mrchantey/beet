@@ -88,7 +88,9 @@ impl EntryPrescan {
 	fn str_attr(element: &BsxElement, key: &str) -> Option<SmolStr> {
 		element.attributes.iter().find_map(|attr| {
 			match (attr.key == key, &attr.value) {
-				(true, AttrValue::Str(value)) => Some(SmolStr::from(value.as_str())),
+				(true, AttrValue::Str(value)) => {
+					Some(SmolStr::from(value.as_str()))
+				}
 				_ => None,
 			}
 		})
@@ -125,18 +127,18 @@ mod test {
 		))
 		.unwrap();
 		prescan.store_root.xpect_eq(Some(SmolStr::from("../..")));
-		prescan.template_dirs.xpect_eq(vec![
-			SmolStr::from("templates"),
-			SmolStr::from("more"),
-		]);
+		prescan
+			.template_dirs
+			.xpect_eq(vec![SmolStr::from("templates"), SmolStr::from("more")]);
 		prescan.checks.len().xpect_eq(2);
 		prescan.checks[0].features.xpect_eq("sockets");
 		prescan.checks[0].versions.xpect_eq("0.1.0");
 		prescan.checks[1].features.xpect_eq("ssh");
 		// the remote include is skipped: it is not a local file a watcher sees
-		prescan
-			.includes
-			.xpect_eq(vec![SmolStr::from("header.bsx"), SmolStr::from("footer.bsx")]);
+		prescan.includes.xpect_eq(vec![
+			SmolStr::from("header.bsx"),
+			SmolStr::from("footer.bsx"),
+		]);
 	}
 
 	/// The first `<StoreRoot>` wins, and a document declaring nothing yields the

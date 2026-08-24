@@ -212,7 +212,10 @@ async fn http_server_declarable_in_markup() {
 	// itself never resolves (the server parks on `Running<Response>`), so settle
 	// to its safety cap rather than `flush_async_tasks`, which would wait forever.
 	AsyncRunner::settle_async_tasks(&mut world).await;
-	world.entity(server).contains::<ServerStarted>().xpect_true();
+	world
+		.entity(server)
+		.contains::<ServerStarted>()
+		.xpect_true();
 }
 
 /// Flag the test runtime hook inserts, proving the start walk reached the

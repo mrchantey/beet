@@ -125,6 +125,9 @@ mod test {
 		CloudflareContainerBlock::default()
 			.runtime_bootstrap()
 			.to_env()
-			.xpect_eq(vec![(SmolStr::from("BEET_HOST"), SmolStr::from("0.0.0.0"))]);
+			.xpect_eq(vec![(
+				SmolStr::from("BEET_HOST"),
+				SmolStr::from("0.0.0.0"),
+			)]);
 	}
 }

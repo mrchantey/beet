@@ -69,8 +69,9 @@ pub(crate) fn attach_dir_sync_store(
 	ev: On<Add, DirSync>,
 	mut commands: Commands,
 ) {
-	commands.entity(ev.entity).queue(
-		|mut entity: EntityWorldMut| -> Result {
+	commands
+		.entity(ev.entity)
+		.queue(|mut entity: EntityWorldMut| -> Result {
 			let sync = entity.get_or_else::<DirSync>()?.clone();
 			let scope = entity
 				.with_state::<ResourceScopeQuery, _>(|entity, scopes| {
@@ -85,6 +86,5 @@ pub(crate) fn attach_dir_sync_store(
 				),
 			));
 			Ok(())
-		},
-	);
+		});
 }

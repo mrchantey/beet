@@ -13,7 +13,9 @@ use quote::quote;
 
 /// The `rsx!` proc-macro entry: lowers markup to an `impl Template<Output = ()>`
 /// by wrapping the lowered bundle in `Snippet::from_bundle(..)`.
-pub(crate) fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub(crate) fn impl_rsx(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let (nodes, errors) = parse_rsx(input.into());
 	let error_tokens: Vec<TokenStream> = errors

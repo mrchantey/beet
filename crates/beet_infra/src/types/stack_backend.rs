@@ -77,7 +77,9 @@ impl StackBackend {
 					}
 				}
 			}
-			Self::Local(local) => Box::new(FsStore::new(local.path.join(bucket))),
+			Self::Local(local) => {
+				Box::new(FsStore::new(local.path.join(bucket)))
+			}
 		}
 	}
 

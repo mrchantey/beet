@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use alloc::collections::VecDeque;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
-use alloc::collections::VecDeque;
 
 /// Global store of style [`Rule`]s.
 ///

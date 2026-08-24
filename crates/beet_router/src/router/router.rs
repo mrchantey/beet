@@ -259,7 +259,10 @@ mod test {
 	/// an `Internal Error` logged for every bot probe.
 	#[beet_core::test]
 	async fn declared_method_gates_dispatch() {
-		async fn status(method: HttpMethod, declared: HttpMethod) -> StatusCode {
+		async fn status(
+			method: HttpMethod,
+			declared: HttpMethod,
+		) -> StatusCode {
 			router_world()
 				.spawn((Router::with_defaults(), children![(
 					route::exchange("beacon", EchoParams),
@@ -269,11 +272,15 @@ mod test {
 				.await
 				.status()
 		}
-		status(HttpMethod::Post, HttpMethod::Post).await.xpect_eq(StatusCode::OK);
+		status(HttpMethod::Post, HttpMethod::Post)
+			.await
+			.xpect_eq(StatusCode::OK);
 		status(HttpMethod::Get, HttpMethod::Post)
 			.await
 			.xpect_eq(StatusCode::METHOD_NOT_ALLOWED);
-		status(HttpMethod::Get, HttpMethod::Get).await.xpect_eq(StatusCode::OK);
+		status(HttpMethod::Get, HttpMethod::Get)
+			.await
+			.xpect_eq(StatusCode::OK);
 		// a HEAD is a GET with the body dropped, so a Get route serves it
 		status(HttpMethod::Head, HttpMethod::Get)
 			.await
@@ -414,9 +421,9 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		router_world()
-			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
-				"count"
-			)),]))
+			.spawn((Router::with_defaults(), children![Increment::bundle(
+				FieldRef::new("count")
+			),]))
 			.exchange(Request::from_cli_str("nonexistent"))
 			.await
 			.status()
@@ -476,9 +483,9 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		router_world()
-			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
-				"count"
-			)),]))
+			.spawn((Router::with_defaults(), children![Increment::bundle(
+				FieldRef::new("count")
+			),]))
 			.exchange(Request::from_cli_str("nonexistent"))
 			.await
 			.text()

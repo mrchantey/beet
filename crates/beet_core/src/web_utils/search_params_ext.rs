@@ -88,12 +88,14 @@ mod test {
 	/// flags, the browser equivalent of process argv.
 	#[beet_core::test]
 	fn converts_location_to_args() {
-		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(vec![
-			SmolStr::new("foo"),
-			SmolStr::new("bar.png"),
-			SmolStr::new("--bazz=boo"),
-			SmolStr::new("--boom=boo"),
-		]);
+		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(
+			vec![
+				SmolStr::new("foo"),
+				SmolStr::new("bar.png"),
+				SmolStr::new("--bazz=boo"),
+				SmolStr::new("--boom=boo"),
+			],
+		);
 		// a bare flag and an empty path/query degrade cleanly.
 		args_from_location("/", "?verbose")
 			.xpect_eq(vec![SmolStr::new("--verbose")]);

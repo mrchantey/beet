@@ -53,13 +53,10 @@ fn main() -> Result {
 		SshTuiServer::default(),
 		HttpServer::default(),
 		LoadRequest::from_cli().on_spawn(),
-		children![(
-			Router::with_defaults(),
-			children![
-				render_action::func_route("", |_: ()| home()),
-				render_action::func_route("about", |_: ()| about()),
-			]
-		)],
+		children![(Router::with_defaults(), children![
+			render_action::func_route("", |_: ()| home()),
+			render_action::func_route("about", |_: ()| about()),
+		])],
 	));
 
 	app.run();

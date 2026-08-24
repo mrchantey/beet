@@ -516,7 +516,9 @@ mod test {
 			.xpect_eq(1);
 		// the surviving image is the newest, the stubbed ones carry the stub text
 		window.posts()[2].media_type().is_image().xpect_true();
-		window.posts()[0].to_string().xpect_eq(STUBBED_IMAGE.to_string());
+		window.posts()[0]
+			.to_string()
+			.xpect_eq(STUBBED_IMAGE.to_string());
 
 		// stubbing again is idempotent: a given image is only ever stubbed once
 		window.stub_old_images(1);

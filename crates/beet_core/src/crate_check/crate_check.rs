@@ -244,8 +244,8 @@ mod test {
 				.resource_mut::<AppTypeRegistry>()
 				.write()
 				.register::<PackageConfig>();
-			let nodes =
-				BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
+			let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())
+				.unwrap();
 			let root = world
 				.spawn_template(BsxTemplate::container(
 					nodes,

@@ -86,7 +86,9 @@ fn unhydrated_hint(request: &RequestParts, err: BevyError) -> BevyError {
 	let miss = err
 		.downcast_ref::<HttpError>()
 		.filter(|err| err.status_code == StatusCode::NOT_FOUND)
-		.filter(|_| request.path().first().map(SmolStr::as_str) == Some(HINT_DIR))
+		.filter(|_| {
+			request.path().first().map(SmolStr::as_str) == Some(HINT_DIR)
+		})
 		.cloned();
 	let note = format!(
 		"note: '{HINT_DIR}' directories are commonly synced from a blob store; this checkout may need a pull"
@@ -219,18 +221,14 @@ mod test {
 			return;
 		}
 		router_world()
-			.spawn((
-				Router::with_defaults(),
-				FsStore::new(site),
-				children![
-					AssetsDir {
-						src: "assets".into(),
-						prefix: default(),
-						cache: default(),
-					}
-					.into_snippet_bundle()
-				],
-			))
+			.spawn((Router::with_defaults(), FsStore::new(site), children![
+				AssetsDir {
+					src: "assets".into(),
+					prefix: default(),
+					cache: default(),
+				}
+				.into_snippet_bundle()
+			]))
 			.exchange(Request::get("assets/blog/kiama-sea-shanty-club.jpg"))
 			.await
 			.status()
@@ -243,11 +241,10 @@ mod test {
 	async fn miss_hints_at_an_unhydrated_assets_dir() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				Router::with_defaults(),
-				BlobStore::temp(),
-				children![serve_route("assets"), serve_route("other")],
-			))
+			.spawn((Router::with_defaults(), BlobStore::temp(), children![
+				serve_route("assets"),
+				serve_route("other")
+			]))
 			.flush();
 		world
 			.entity_mut(root)
@@ -277,7 +274,9 @@ mod test {
 			.await
 			.unwrap();
 		router_world()
-			.spawn((Router::with_defaults(), store, children![serve_route("foo")]))
+			.spawn((Router::with_defaults(), store, children![serve_route(
+				"foo"
+			)]))
 			.exchange(Request::get("foo/bar"))
 			.await
 			.unwrap_str()

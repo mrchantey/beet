@@ -307,7 +307,9 @@ pub(crate) fn option_inner_type(ty: &Type) -> Option<&Type> {
 
 /// Detect `Box<dyn Trait>` or `Arc<dyn Trait>`, returning the wrapper kind
 /// and the `dyn Trait` type.
-pub(crate) fn trait_wrapper_info(ty: &Type) -> Option<(TraitWrapperKind, &Type)> {
+pub(crate) fn trait_wrapper_info(
+	ty: &Type,
+) -> Option<(TraitWrapperKind, &Type)> {
 	let Type::Path(path) = ty else { return None };
 	let segment = path.path.segments.last()?;
 	let kind = match segment.ident.to_string().as_str() {
@@ -392,7 +394,9 @@ pub(crate) fn is_primitive_copy_type(ty: &syn::Type) -> bool {
 /// - `String`  → `(&str,              as_str())`
 /// - `PathBuf` → `(&::std::path::Path, as_path())`
 /// - `OsString`→ `(&::std::ffi::OsStr, as_os_str())`
-pub(crate) fn str_like_return(ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
+pub(crate) fn str_like_return(
+	ty: &syn::Type,
+) -> Option<(TokenStream, TokenStream)> {
 	let syn::Type::Path(path) = ty else {
 		return None;
 	};

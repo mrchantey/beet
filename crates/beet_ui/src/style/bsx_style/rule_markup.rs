@@ -270,7 +270,8 @@ mod test {
 	fn rule_from(markup: &str) -> Rule {
 		let mut world = MaterialStylePlugin::world();
 		let before = world.resource::<RuleSet>().rules().count();
-		let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
+		let nodes =
+			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
 		world
 			.spawn_template(BsxTemplate::container(
 				nodes,
@@ -309,12 +310,16 @@ mod test {
 	// the width forms all resolve to `MaxWidth`; keywords stay themselves
 	#[beet_core::test]
 	fn media_parses_max_width() {
-		rule_from(r#"<Rule class="a" media="max-width: 1024px" display=None/>"#)
-			.media()
-			.xpect_eq(Some(MediaQuery::MaxWidth(1024)));
-		rule_from(r#"<Rule class="b" media="(max-width: 800px)" display=None/>"#)
-			.media()
-			.xpect_eq(Some(MediaQuery::MaxWidth(800)));
+		rule_from(
+			r#"<Rule class="a" media="max-width: 1024px" display=None/>"#,
+		)
+		.media()
+		.xpect_eq(Some(MediaQuery::MaxWidth(1024)));
+		rule_from(
+			r#"<Rule class="b" media="(max-width: 800px)" display=None/>"#,
+		)
+		.media()
+		.xpect_eq(Some(MediaQuery::MaxWidth(800)));
 		rule_from(r#"<Rule class="c" media="max-width:640" display=None/>"#)
 			.media()
 			.xpect_eq(Some(MediaQuery::MaxWidth(640)));

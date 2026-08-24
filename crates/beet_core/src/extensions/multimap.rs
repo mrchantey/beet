@@ -412,7 +412,8 @@ fn normalize_snake_case<K: AsRef<str> + Eq + Hash, V: AsRef<str>>(
 			normalized.insert_key(snake_key);
 		} else {
 			for value in values {
-				normalized.insert(snake_key.clone(), value.as_ref().to_string());
+				normalized
+					.insert(snake_key.clone(), value.as_ref().to_string());
 			}
 		}
 	}
@@ -652,7 +653,9 @@ fn build_field_value(
 	// an `Option<T>` leaf present in the map is `Some(T)`; an absent one already
 	// returned above, leaving the field at its default `None`.
 	if let Some(inner) = option_inner {
-		return Ok(parse_leaf_field(map_item, field_name, inner)?.map(wrap_some));
+		return Ok(
+			parse_leaf_field(map_item, field_name, inner)?.map(wrap_some)
+		);
 	}
 	parse_leaf_field(map_item, field_name, field_type_id)
 }

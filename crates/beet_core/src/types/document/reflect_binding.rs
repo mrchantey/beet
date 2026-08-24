@@ -433,7 +433,10 @@ mod test {
 		world.spawn(binding(marked));
 		world.update_local();
 		let cached = |world: &World| {
-			world.resource::<ComponentBindingCache>().reserved_targets.len()
+			world
+				.resource::<ComponentBindingCache>()
+				.reserved_targets
+				.len()
 		};
 		cached(&world).xpect_eq(2);
 

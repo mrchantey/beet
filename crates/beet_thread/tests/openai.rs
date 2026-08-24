@@ -5,9 +5,7 @@ use beet_thread::prelude::*;
 #[path = "utils/post_streamer.rs"]
 mod post_streamer;
 
-fn streamer() -> O11sStreamer {
-	OpenAiProvider::gpt_5_4_mini().unwrap()
-}
+fn streamer() -> O11sStreamer { OpenAiProvider::gpt_5_4_mini().unwrap() }
 
 fn streamer_non_streaming() -> O11sStreamer {
 	OpenAiProvider::gpt_5_4_mini().unwrap().without_streaming()

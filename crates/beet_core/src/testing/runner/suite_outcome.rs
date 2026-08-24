@@ -204,7 +204,8 @@ mod tests {
 			Ok(())
 		});
 
-		let outcome = test_runner_ext::run(Some("--timeout-ms=200"), test).await;
+		let outcome =
+			test_runner_ext::run(Some("--timeout-ms=200"), test).await;
 		let TestOutcome::Fail(TestFail::Timeout {
 			unattributed_panics,
 			..

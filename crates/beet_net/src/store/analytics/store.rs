@@ -193,9 +193,9 @@ pub(super) fn handle_analytics_event(
 
 #[cfg(test)]
 mod test {
+	use crate::exports::bytes::Bytes;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use crate::exports::bytes::Bytes;
 	use std::sync::Arc;
 	use std::sync::atomic::AtomicUsize;
 	use std::sync::atomic::Ordering;
@@ -215,13 +215,14 @@ mod test {
 	#[beet_core::test]
 	async fn event_roundtrips_through_store() {
 		let store = Table::<AnalyticsEvent>::temp();
-		let event = AnalyticsEvent::new("/about", AnalyticsEventData::Request {
-			status: 200,
-			method: "GET".into(),
-			user_agent: None,
-			referrer: None,
-		})
-		.with_client_kind(ClientKind::Web);
+		let event =
+			AnalyticsEvent::new("/about", AnalyticsEventData::Request {
+				status: 200,
+				method: "GET".into(),
+				user_agent: None,
+				referrer: None,
+			})
+			.with_client_kind(ClientKind::Web);
 		let id = event.id;
 		store.push(event).await.unwrap();
 		let loaded = store.get(id).await.unwrap();
@@ -237,7 +238,10 @@ mod test {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
 		let (config, _) = config_with_store(&mut world, InMemoryStore::new());
 		AsyncRunner::settle_async_tasks(&mut world).await;
-		world.entity(config).contains::<AnalyticsStore>().xpect_true();
+		world
+			.entity(config)
+			.contains::<AnalyticsStore>()
+			.xpect_true();
 		world.entity(config).contains::<GeoIp>().xpect_true();
 	}
 
@@ -246,15 +250,17 @@ mod test {
 	#[beet_core::test]
 	async fn records_to_the_declared_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let (_, store_entity) = config_with_store(&mut world, InMemoryStore::new());
+		let (_, store_entity) =
+			config_with_store(&mut world, InMemoryStore::new());
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
-		let event = AnalyticsEvent::new("/about", AnalyticsEventData::Request {
-			status: 200,
-			method: "GET".into(),
-			user_agent: None,
-			referrer: None,
-		});
+		let event =
+			AnalyticsEvent::new("/about", AnalyticsEventData::Request {
+				status: 200,
+				method: "GET".into(),
+				user_agent: None,
+				referrer: None,
+			});
 		let id = event.id;
 		world.trigger(event);
 		AsyncRunner::settle_async_tasks(&mut world).await;
@@ -287,9 +293,9 @@ mod test {
 	fn collecting_world() -> World {
 		RAISED.lock().unwrap().clear();
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		world.insert_resource(
-			bevy::ecs::error::FallbackErrorHandler(collect_error),
-		);
+		world.insert_resource(bevy::ecs::error::FallbackErrorHandler(
+			collect_error,
+		));
 		world
 	}
 
@@ -347,7 +353,9 @@ mod test {
 	}
 
 	impl BlobStoreProvider for FailingStore {
-		fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+		fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
+			Box::new(self.clone())
+		}
 		fn with_subdir(&self, _path: SmolPath) -> Box<dyn BlobStoreProvider> {
 			Box::new(self.clone())
 		}
@@ -363,7 +371,11 @@ mod test {
 		fn store_remove(&self) -> SendBoxedFuture<Result> {
 			Box::pin(async { Ok(()) })
 		}
-		fn insert(&self, _path: &SmolPath, _body: Bytes) -> SendBoxedFuture<Result> {
+		fn insert(
+			&self,
+			_path: &SmolPath,
+			_body: Bytes,
+		) -> SendBoxedFuture<Result> {
 			self.attempts.fetch_add(1, Ordering::SeqCst);
 			Box::pin(async { bevybail!("ResourceNotFoundException") })
 		}

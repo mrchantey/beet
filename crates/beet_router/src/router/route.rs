@@ -61,7 +61,9 @@ where
 				.get(|action: &Action<In, Out>| action.clone())
 				.await?;
 			let output: Out = cx.caller.call_detached(handler, input).await?;
-			output.into_response_with_request_parts(cx.caller, parts).await
+			output
+				.into_response_with_request_parts(cx.caller, parts)
+				.await
 		},
 	))
 }

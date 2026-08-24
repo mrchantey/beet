@@ -49,7 +49,11 @@ impl CliServer {
 	/// This server's [`RunningSet`] contribution: dispatch the boot request on
 	/// start, with no listener to close on stop.
 	fn contribute(entity: &mut EntityCommands) {
-		RunningSet::<Request, Response>::contribute(entity, Self::start(), None);
+		RunningSet::<Request, Response>::contribute(
+			entity,
+			Self::start(),
+			None,
+		);
 	}
 
 	/// The start entry: dispatch when this server should act, detached so a

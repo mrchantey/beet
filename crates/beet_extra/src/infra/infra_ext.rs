@@ -44,9 +44,14 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 /// Each block renders it at its own platform boundary, splitting boot selection
 /// onto argv (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
 /// `bootstrap` script) and service config onto env.
-pub fn remote_bootstrap(bucket_name: impl AsRef<str>) -> Result<BootstrapConfig> {
+pub fn remote_bootstrap(
+	bucket_name: impl AsRef<str>,
+) -> Result<BootstrapConfig> {
 	BootstrapConfig {
-		store: Some(StoreUri::parse(&format!("s3://{}", bucket_name.as_ref()))?),
+		store: Some(StoreUri::parse(&format!(
+			"s3://{}",
+			bucket_name.as_ref()
+		))?),
 		server: Some(ServerFilter::new("http")),
 		..default()
 	}

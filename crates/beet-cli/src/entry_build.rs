@@ -96,7 +96,12 @@ async fn widen_store_root(
 		})?;
 	// the widened store holds the same entry document, so its pre-scan is the one
 	// already read: entry resolution parses the entry exactly once.
-	Ok((resolve_store(store_uri, root.clone())?, entry_name, root, prescan))
+	Ok((
+		resolve_store(store_uri, root.clone())?,
+		entry_name,
+		root,
+		prescan,
+	))
 }
 
 /// A resolved entry: its store, the entry document name within it, and the local
@@ -124,9 +129,9 @@ pub async fn resolve_main(
 	let path = AbsPathBuf::new(main)?;
 	let (dir, entry_name) = if path.extension().is_some() {
 		// an entry file: its parent is the initial root
-		let dir = path
-			.parent()
-			.ok_or_else(|| bevyhow!("entry `{path}` has no parent directory"))?;
+		let dir = path.parent().ok_or_else(|| {
+			bevyhow!("entry `{path}` has no parent directory")
+		})?;
 		let entry_name = path
 			.file_name()
 			.and_then(|name| name.to_str())
@@ -333,7 +338,8 @@ pub async fn rebuild_watched(
 	let structural = entry_source_paths(&store, &entry_name).await;
 	world
 		.with(move |world: &mut World| -> Result {
-			if let Some(mut reloader) = world.get_resource_mut::<EntryReloader>()
+			if let Some(mut reloader) =
+				world.get_resource_mut::<EntryReloader>()
 			{
 				reloader.set_sources(structural);
 			}
@@ -436,8 +442,7 @@ mod test {
 		let sources = read_sources(&store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root =
-			build_root(&mut world, store, sources, ()).unwrap();
+		let root = build_root(&mut world, store, sources, ()).unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world
@@ -464,8 +469,7 @@ mod test {
 		let sources = read_sources(&store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root =
-			build_root(&mut world, store, sources, ()).unwrap();
+		let root = build_root(&mut world, store, sources, ()).unwrap();
 		world
 			.entity(root)
 			.contains::<TemplatesLoaded>()

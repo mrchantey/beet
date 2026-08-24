@@ -303,7 +303,8 @@ impl BlobStoreProvider for DynamoStore {
 					}
 				}
 				// an absent (or empty) last evaluated key ends the scan
-				start_key = out.last_evaluated_key.filter(|key| !key.is_empty());
+				start_key =
+					out.last_evaluated_key.filter(|key| !key.is_empty());
 				if start_key.is_none() {
 					break;
 				}
@@ -469,10 +470,12 @@ impl TableProvider for DynamoStore {
 						continue;
 					};
 					let path = match &prefix {
-						Some(prefix) => match id.strip_prefix(prefix.as_str()) {
-							Some(stripped) => SmolPath::new(stripped),
-							None => continue,
-						},
+						Some(prefix) => {
+							match id.strip_prefix(prefix.as_str()) {
+								Some(stripped) => SmolPath::new(stripped),
+								None => continue,
+							}
+						}
 						None => SmolPath::new(id.as_str()),
 					};
 					rows.push((
@@ -482,7 +485,8 @@ impl TableProvider for DynamoStore {
 					));
 				}
 				// an absent (or empty) last evaluated key ends the scan
-				start_key = out.last_evaluated_key.filter(|key| !key.is_empty());
+				start_key =
+					out.last_evaluated_key.filter(|key| !key.is_empty());
 				if start_key.is_none() {
 					break;
 				}

@@ -387,7 +387,9 @@ mod test {
 	}
 
 	/// Today's date, the prefix of every timestamp [`Iso8601Timer`] emits.
-	fn today() -> String { time_ext::format_iso8601(time_ext::now())[..10].into() }
+	fn today() -> String {
+		time_ext::format_iso8601(time_ext::now())[..10].into()
+	}
 
 	#[crate::test]
 	fn non_interactive_stamps_lines() {
@@ -406,6 +408,9 @@ mod test {
 
 	#[crate::test]
 	fn interactive_omits_timestamps() {
-		render(true).xpect_contains("hello").xnot().xpect_contains(today());
+		render(true)
+			.xpect_contains("hello")
+			.xnot()
+			.xpect_contains(today());
 	}
 }

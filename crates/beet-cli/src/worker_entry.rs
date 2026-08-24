@@ -65,8 +65,9 @@ async fn handle(
 	// resolve the entry document through the shared discovery: the first
 	// `entry_build::ENTRY_NAMES` match present in the bucket.
 	let blob_store = BlobStore::new(store.clone());
-	let entry_name =
-		entry_build::probe_entry_names(&blob_store).await?.ok_or_else(|| {
+	let entry_name = entry_build::probe_entry_names(&blob_store)
+		.await?
+		.ok_or_else(|| {
 			bevyhow!(
 				"no entry document {:?} in the site bucket",
 				entry_build::ENTRY_NAMES

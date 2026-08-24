@@ -171,11 +171,7 @@ mod native {
 				EventKind::Remove(_) => BlobEventKind::Removed,
 				_ => BlobEventKind::Changed,
 			};
-			bus.send(BlobEvent::new(
-				store.clone(),
-				SmolPath::from(rel),
-				kind,
-			));
+			bus.send(BlobEvent::new(store.clone(), SmolPath::from(rel), kind));
 		});
 	}
 
@@ -235,7 +231,8 @@ mod native {
 			// the base store keys events; the watcher covers only its `sub/` subdir
 			let store = BlobStore::new(FsStore::new(base.clone()));
 			let scoped = store.with_subdir(SmolPath::from("sub"));
-			app.world_mut().spawn(WatchDir::from_store(&scoped).unwrap());
+			app.world_mut()
+				.spawn(WatchDir::from_store(&scoped).unwrap());
 
 			// capture the first matching event and exit; the run loop (not a manual
 			// `update` loop) drives the watcher's async task + drains the bus.

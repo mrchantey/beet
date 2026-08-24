@@ -14,11 +14,7 @@ pub use script_action::*;
 // wider: the embedded engine calls the engine directly and needs none of it.
 // It is also not part of beet's surface — a consumer names `Script`, never a
 // `ScriptRequest` — so the re-export is crate-internal.
-#[cfg(all(
-	feature = "scripting",
-	feature = "std",
-	not(feature = "quickjs")
-))]
+#[cfg(all(feature = "scripting", feature = "std", not(feature = "quickjs")))]
 pub(crate) mod protocol;
 #[cfg(all(
 	feature = "scripting",

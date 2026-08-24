@@ -156,9 +156,7 @@ impl<T: 'static + Send> Store<Option<T>> {
 	/// assert_eq!(slot.take(), Some(7));
 	/// assert_eq!(slot.take(), None);
 	/// ```
-	pub fn take(&self) -> Option<T> {
-		self.0.with_mut(Option::take)
-	}
+	pub fn take(&self) -> Option<T> { self.0.with_mut(Option::take) }
 }
 
 impl<T: 'static + Send> Store<Vec<T>> {

@@ -82,10 +82,7 @@ async fn web_flow_records_and_retains_prior() {
 		.collect::<Vec<_>>();
 
 	// the prior event is retained.
-	events
-		.iter()
-		.any(|event| event.id == prior_id)
-		.xpect_true();
+	events.iter().any(|event| event.id == prior_id).xpect_true();
 	// the page request recorded a Request event carrying the user agent.
 	events
 		.iter()

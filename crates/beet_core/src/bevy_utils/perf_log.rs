@@ -56,7 +56,10 @@ impl core::fmt::Display for PerfReport {
 		write!(
 			f,
 			"perf: tick {:.2}ms mean, {:.2}ms worst | entities {:.0} ({:+.0})",
-			self.mean_tick_ms, self.worst_tick_ms, self.entities, self.entity_delta
+			self.mean_tick_ms,
+			self.worst_tick_ms,
+			self.entities,
+			self.entity_delta
 		)
 	}
 }
@@ -105,7 +108,8 @@ impl PerfReport {
 	/// Read the current window from the diagnostics, taking the entity delta
 	/// against `previous` (no delta for the first report).
 	fn collect(diagnostics: &DiagnosticsStore, previous: Option<f64>) -> Self {
-		let frame_time = diagnostics.get(&FrameTimeDiagnosticsPlugin::FRAME_TIME);
+		let frame_time =
+			diagnostics.get(&FrameTimeDiagnosticsPlugin::FRAME_TIME);
 		let entities = diagnostics
 			.get(&EntityCountDiagnosticsPlugin::ENTITY_COUNT)
 			.and_then(|count| count.value())
@@ -160,7 +164,10 @@ mod test {
 		let mut app = perf_app();
 		app.update();
 		let collect = |app: &App, previous| {
-			PerfReport::collect(app.world().resource::<DiagnosticsStore>(), previous)
+			PerfReport::collect(
+				app.world().resource::<DiagnosticsStore>(),
+				previous,
+			)
 		};
 		let first = collect(&app, None);
 		// the first report has nothing to compare against
@@ -169,6 +176,8 @@ mod test {
 		app.world_mut().spawn_batch((0..10).map(|_| ()));
 		app.update();
 
-		collect(&app, Some(first.entities)).entity_delta.xpect_eq(10.);
+		collect(&app, Some(first.entities))
+			.entity_delta
+			.xpect_eq(10.);
 	}
 }

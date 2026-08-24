@@ -121,7 +121,11 @@ pub struct ExchangeScript<
 	M2 = SerdeIntoResponseMarker,
 > where
 	Input: 'static + Send + Sync + Serialize + FromRequest<M1>,
-	Output: 'static + Send + Sync + DeserializeOwned + IntoResponseWithRequestParts<M2>,
+	Output: 'static
+		+ Send
+		+ Sync
+		+ DeserializeOwned
+		+ IntoResponseWithRequestParts<M2>,
 	M1: 'static + Send + Sync,
 	M2: 'static + Send + Sync,
 {
@@ -132,7 +136,11 @@ pub struct ExchangeScript<
 impl<Input, Output, M1, M2> Default for ExchangeScript<Input, Output, M1, M2>
 where
 	Input: 'static + Send + Sync + Serialize + FromRequest<M1>,
-	Output: 'static + Send + Sync + DeserializeOwned + IntoResponseWithRequestParts<M2>,
+	Output: 'static
+		+ Send
+		+ Sync
+		+ DeserializeOwned
+		+ IntoResponseWithRequestParts<M2>,
 	M1: 'static + Send + Sync,
 	M2: 'static + Send + Sync,
 {
@@ -146,7 +154,11 @@ where
 impl<Input, Output, M1, M2> Clone for ExchangeScript<Input, Output, M1, M2>
 where
 	Input: 'static + Send + Sync + Serialize + FromRequest<M1>,
-	Output: 'static + Send + Sync + DeserializeOwned + IntoResponseWithRequestParts<M2>,
+	Output: 'static
+		+ Send
+		+ Sync
+		+ DeserializeOwned
+		+ IntoResponseWithRequestParts<M2>,
 	M1: 'static + Send + Sync,
 	M2: 'static + Send + Sync,
 {
@@ -157,7 +169,11 @@ impl<Input, Output, M1, M2> std::fmt::Debug
 	for ExchangeScript<Input, Output, M1, M2>
 where
 	Input: 'static + Send + Sync + Serialize + FromRequest<M1>,
-	Output: 'static + Send + Sync + DeserializeOwned + IntoResponseWithRequestParts<M2>,
+	Output: 'static
+		+ Send
+		+ Sync
+		+ DeserializeOwned
+		+ IntoResponseWithRequestParts<M2>,
 	M1: 'static + Send + Sync,
 	M2: 'static + Send + Sync,
 {
@@ -286,5 +302,4 @@ mod entry_test {
 			.await
 			.xpect_eq("hello body\n".to_string());
 	}
-
 }

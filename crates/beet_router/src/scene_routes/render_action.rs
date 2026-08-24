@@ -169,9 +169,9 @@ mod test {
 			rsx! { <p>"async home"</p> }
 		}
 		router_world()
-			.spawn((Router::with_defaults(), children![render_action::async_route(
-				"home", home
-			)]))
+			.spawn((Router::with_defaults(), children![
+				render_action::async_route("home", home)
+			]))
 			.exchange(Request::get("home"))
 			.await
 			.unwrap_str()
@@ -185,9 +185,9 @@ mod test {
 			rsx! { <p>"system home"</p> }
 		}
 		router_world()
-			.spawn((Router::with_defaults(), children![render_action::system_route(
-				"home", home
-			)]))
+			.spawn((Router::with_defaults(), children![
+				render_action::system_route("home", home)
+			]))
 			.exchange(Request::get("home"))
 			.await
 			.unwrap_str()
@@ -202,9 +202,9 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![render_action::async_route(
-				"home", home
-			)]))
+			.spawn((Router::with_defaults(), children![
+				render_action::async_route("home", home)
+			]))
 			.flush();
 		// two requests each succeed, proving per-request rebuild + cleanup
 		for _ in 0..2 {

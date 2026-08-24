@@ -42,7 +42,10 @@ impl Plugin for InfraPlugin {
 			not(target_arch = "wasm32")
 		))]
 		app.add_observer(crate::blocks::attach_s3_store);
-		#[cfg(all(feature = "bindings_aws_dynamo", not(target_arch = "wasm32")))]
+		#[cfg(all(
+			feature = "bindings_aws_dynamo",
+			not(target_arch = "wasm32")
+		))]
 		app.add_observer(crate::blocks::attach_table_store);
 
 		// the cloudflare deploy blocks, spawned by tag. Definitions, so every target.

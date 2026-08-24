@@ -144,7 +144,6 @@ mod tests {
 
 	#[crate::test(browser)]
 	async fn yields_timestamps() {
-
 		let mut interval = IntervalStream::new(10);
 
 		let a = interval.next_tick().await.unwrap();

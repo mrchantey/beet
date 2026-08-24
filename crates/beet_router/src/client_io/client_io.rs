@@ -31,7 +31,10 @@ pub struct ClientIo;
 /// upgrade endpoint on its own port.
 pub(crate) fn client_io_route() -> impl Bundle {
 	(
-		route::exchange("__client_io", exchange_ext::handler(client_io_upgrade)),
+		route::exchange(
+			"__client_io",
+			exchange_ext::handler(client_io_upgrade),
+		),
 		// the upgrade handshake must never be cached
 		CacheHeaders::no_store(),
 	)

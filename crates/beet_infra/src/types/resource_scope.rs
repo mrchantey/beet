@@ -16,7 +16,10 @@ pub struct ResourceScope {
 }
 
 impl ResourceScope {
-	pub fn new(app_name: impl Into<SmolStr>, stage: impl Into<SmolStr>) -> Self {
+	pub fn new(
+		app_name: impl Into<SmolStr>,
+		stage: impl Into<SmolStr>,
+	) -> Self {
 		Self {
 			app_name: app_name.into(),
 			stage: stage.into(),
@@ -28,7 +31,8 @@ impl ResourceScope {
 	/// declaration made outside any deploy [`Stack`], ie one authored at router
 	/// level purely for its runtime meaning.
 	pub fn from_package(package: Option<&PackageConfig>) -> Result<Self> {
-		let Some(app_name) = package.and_then(|package| package.app_name()) else {
+		let Some(app_name) = package.and_then(|package| package.app_name())
+		else {
 			bevybail!(
 				"a resource declaration outside a `Stack` resolves its name from the app `<PackageConfig app_name=\"..\"/>`, which is not set"
 			);
@@ -101,7 +105,10 @@ mod test {
 			.resource_ident("analytics")
 			.primary_identifier()
 			.as_str()
-			.xpect_eq(ResourceScope::new("beet-site", "prod").resource_name("analytics"));
+			.xpect_eq(
+				ResourceScope::new("beet-site", "prod")
+					.resource_name("analytics"),
+			);
 	}
 
 	/// The process fallback needs an app identity: silently composing a name

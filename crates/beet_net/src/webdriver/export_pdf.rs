@@ -225,8 +225,7 @@ mod test {
 			page_ranges: vec!["1".to_string()],
 		};
 
-		let pdf_bytes =
-			page.export_pdf_with_options(&options).await.unwrap();
+		let pdf_bytes = page.export_pdf_with_options(&options).await.unwrap();
 
 		// Basic validation that we got PDF bytes
 		pdf_bytes.len().xpect_greater_than(0);

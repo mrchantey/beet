@@ -121,7 +121,8 @@ impl PluginGroup for BeetPlugins {
 		// wiring, so a `<Thread>` entry runs without `extra`.
 		#[cfg(feature = "thread")]
 		{
-			builder = builder.add(beet_thread::prelude::ThreadPlugin::default());
+			builder =
+				builder.add(beet_thread::prelude::ThreadPlugin::default());
 		}
 		#[cfg(all(feature = "thread", feature = "ui"))]
 		{
@@ -181,10 +182,12 @@ fn headless_render_runner() -> PluginGroupBuilder {
 			1.0 / 30.0,
 		)))
 		.set(RenderPlugin {
-			render_creation: RenderCreation::Automatic(Box::new(WgpuSettings {
-				backends: None,
-				..default()
-			})),
+			render_creation: RenderCreation::Automatic(Box::new(
+				WgpuSettings {
+					backends: None,
+					..default()
+				},
+			)),
 			..default()
 		})
 }
@@ -217,11 +220,13 @@ fn wasm_render_runner() -> PluginGroupBuilder {
 	winit_default_plugins()
 		.disable::<bevy::winit::WinitPlugin>()
 		.set(RenderPlugin {
-			render_creation: RenderCreation::Automatic(Box::new(WgpuSettings {
-				backends: js_runtime::has_webgpu()
-					.then_some(Backends::BROWSER_WEBGPU),
-				..default()
-			})),
+			render_creation: RenderCreation::Automatic(Box::new(
+				WgpuSettings {
+					backends: js_runtime::has_webgpu()
+						.then_some(Backends::BROWSER_WEBGPU),
+					..default()
+				},
+			)),
 			..default()
 		})
 		.add(WasmCanvasPlugin)

@@ -278,8 +278,10 @@ async fn spawn_route_list(
 				}
 				None => rsx! { <RouteList entries=entries/> },
 			};
-			let page =
-				PageClasses::resolve(&parts, &world.resource::<Theme>().clone());
+			let page = PageClasses::resolve(
+				&parts,
+				&world.resource::<Theme>().clone(),
+			);
 			let mut entity =
 				world.spawn_template(rsx! { <div {page}>{list}</div> })?;
 			let id = entity.id();
@@ -452,16 +454,19 @@ mod test {
 		#[action(handler_only)]
 		#[derive(Default, Clone, Component, Reflect)]
 		#[reflect(Component)]
-		async fn RequiresOut(_cx: ActionContext<RequestParts>) -> Result<String> {
+		async fn RequiresOut(
+			_cx: ActionContext<RequestParts>,
+		) -> Result<String> {
 			bevybail!("--out is required")
 		}
 
 		let mut world = router_world();
 		let root = world
 			.spawn(((Router, HelpHandler::default()), children![
-				(route::exchange("build", RequiresOut), ParamsPartial::new::<
-					BuildParams,
-				>()),
+				(
+					route::exchange("build", RequiresOut),
+					ParamsPartial::new::<BuildParams>()
+				),
 				render_action::fixed_func_route(
 					"about",
 					|| rsx! { <p>"about"</p> }
@@ -486,9 +491,9 @@ mod test {
 	async fn web_help_query_renders_same_route_list() {
 		let mut world = router_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
-				"count"
-			))]))
+			.spawn((Router::with_defaults(), children![Increment::bundle(
+				FieldRef::new("count")
+			)]))
 			.flush();
 
 		world
@@ -581,7 +586,9 @@ mod test {
 	async fn help_shows_input_output_types() {
 		let mut world = router_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![AddField::bundle(FieldRef::new("value"))]))
+			.spawn((Router::with_defaults(), children![AddField::bundle(
+				FieldRef::new("value")
+			)]))
 			.flush();
 
 		// add takes i64 input and returns i64
@@ -647,9 +654,9 @@ mod test {
 	async fn not_found_shows_route_list() {
 		let mut world = router_world();
 		let root = world
-			.spawn((Router::with_defaults(), children![Increment::bundle(FieldRef::new(
-				"count"
-			))]))
+			.spawn((Router::with_defaults(), children![Increment::bundle(
+				FieldRef::new("count")
+			)]))
 			.flush();
 
 		// not-found responds 404, so take the body directly rather than via the

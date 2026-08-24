@@ -52,9 +52,10 @@ where
 		let build = &self.build;
 		// read the world synchronously and produce the child template, threading
 		// the building entity so the closure can read self/ancestor context.
-		let inner = cx
-			.entity
-			.with_state::<P, Result<T>>(|entity, params| build(entity, params))?;
+		let inner =
+			cx.entity.with_state::<P, Result<T>>(|entity, params| {
+				build(entity, params)
+			})?;
 		// build the produced subtree into this entity (synchronous, no lifecycle).
 		cx.entity.build_template(&inner)
 	}

@@ -36,9 +36,9 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 	let country = ip
 		.zip(
 			world
-				.with_state::<AncestorQuery<&GeoIp>, Option<GeoIp>>(move |query| {
-					query.get(caller_id).ok().cloned()
-				})
+				.with_state::<AncestorQuery<&GeoIp>, Option<GeoIp>>(
+					move |query| query.get(caller_id).ok().cloned(),
+				)
 				.await,
 		)
 		.and_then(|(ip, geoip)| geoip.country(ip));
@@ -76,7 +76,9 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 		body => body,
 	};
 	let event = AnalyticsEvent::from_beacon(body, session, ip, country)
-		.map_err(|err| HttpError::bad_request(format!("beacon event: {err}")))?;
+		.map_err(|err| {
+			HttpError::bad_request(format!("beacon event: {err}"))
+		})?;
 	world
 		.with(move |world: &mut World| world.trigger(event))
 		.await;

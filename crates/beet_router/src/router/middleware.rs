@@ -76,8 +76,7 @@ where
 pub(crate) fn on_add_middleware<T, In, Out>(
 	mut world: DeferredWorld,
 	cx: HookContext,
-)
-where
+) where
 	In: 'static,
 	Out: 'static,
 	T: Component + Clone + IntoAction<T, In = (In, Next<In, Out>), Out = Out>,

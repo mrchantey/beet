@@ -308,8 +308,7 @@ fn insert_route_tree(
 		// ..and a nested namespace owns its own tree
 		.filter(|entity| {
 			PathPattern::namespace_root(*entity, &ancestors, &paths) == root
-		})
-	{
+		}) {
 		if let Ok(item) = actions.get(entity) {
 			nodes.push(ActionNode::from_query(item));
 		}

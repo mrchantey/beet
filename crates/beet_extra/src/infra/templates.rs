@@ -169,9 +169,7 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 /// (`remote_bootstrap`) lands in the container `CMD` via the sibling
 /// `<BuildDockerImage/>`. Named to avoid the [`FargateBlock`] it builds.
 #[template]
-pub fn FargateSiteBlock(
-	#[prop(into)] app_name: String,
-) -> Result<impl Bundle> {
+pub fn FargateSiteBlock(#[prop(into)] app_name: String) -> Result<impl Bundle> {
 	let stack = Stack::new(&app_name);
 	FargateBlock::default()
 		.with_bootstrap(infra_ext::remote_bootstrap(
@@ -229,8 +227,9 @@ pub fn LightsailBeetSiteBlock(
 	// the app identity comes from the app's own `<PackageConfig/>`, resolved
 	// through the one composition both the deploy and the runtime read.
 	let scope = scopes.get(entity)?;
-	let is_production =
-		scopes.stack(entity).is_some_and(|stack| stack.is_production());
+	let is_production = scopes
+		.stack(entity)
+		.is_some_and(|stack| stack.is_production());
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
 	let app_bucket = scope.resource_name("app");
@@ -509,7 +508,11 @@ mod test {
 			});
 			let router = world.spawn(Router::with_defaults()).id();
 			spawn_markup(&mut world, router, markup);
-			world.query::<&SyncS3Bucket>().single(&world).unwrap().clone()
+			world
+				.query::<&SyncS3Bucket>()
+				.single(&world)
+				.unwrap()
+				.clone()
 		}
 		let pull = sync(
 			r#"<DirSync bucket="assets" local_dir="assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>"#,

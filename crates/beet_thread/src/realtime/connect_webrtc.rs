@@ -6,8 +6,8 @@
 //! via [`map_jserr`], so a bevy error (eg `document_ext::media_devices`) flows
 //! through with a plain `?` rather than being round-tripped back into a
 //! `JsValue`.
-use crate::realtime::*;
 use crate::realtime::realtime_session_create_request::Model;
+use crate::realtime::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use wasm_bindgen::JsCast;
@@ -117,8 +117,10 @@ pub(super) async fn connect_webrtc(
 	// the event channel; listeners registered before negotiation so no event
 	// can slip past unobserved.
 	let dc = pc.create_data_channel("oai-events");
-	let mut opened =
-		HtmlEventListener::<web_sys::Event>::new_with_target("open", dc.clone());
+	let mut opened = HtmlEventListener::<web_sys::Event>::new_with_target(
+		"open",
+		dc.clone(),
+	);
 	let messages = HtmlEventListener::<MessageEvent>::new_with_target(
 		"message",
 		dc.clone(),

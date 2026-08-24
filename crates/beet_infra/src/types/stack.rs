@@ -293,7 +293,10 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// consumer authors blocks and builds the config here, then serializes it for
 	/// a host that can apply it (see [`build_project`](Self::build_project),
 	/// which is the same config wrapped in the native tofu driver).
-	pub fn build_config(&self, entity: Entity) -> Result<(&Stack, terra::Config)> {
+	pub fn build_config(
+		&self,
+		entity: Entity,
+	) -> Result<(&Stack, terra::Config)> {
 		let (_, stack) = self.root(entity)?;
 		let blocks = self
 			.declared(entity)?

@@ -86,8 +86,7 @@ impl SshConnection {
 		timeout: Duration,
 		poll: Duration,
 	) -> Result {
-		let max_attempts =
-			(timeout.as_secs() / poll.as_secs().max(1)).max(1);
+		let max_attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
 		for attempt in 1..=max_attempts {
 			info!(
 				"waiting for ssh on {}:{} (attempt {attempt}/{max_attempts})...",

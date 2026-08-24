@@ -185,9 +185,7 @@ impl BlobStoreProvider for IndexedDbStore {
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let db_name = self.db_name.clone();
-		Box::pin(SendWrapper::new(
-			async move { db_exists(&db_name).await },
-		))
+		Box::pin(SendWrapper::new(async move { db_exists(&db_name).await }))
 	}
 
 	fn store_create(&self) -> SendBoxedFuture<Result> {

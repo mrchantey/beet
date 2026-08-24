@@ -116,8 +116,9 @@ fn attach_canvas(
 			raw_handle,
 			created,
 		};
-		let wrapper =
-			RawHandleWrapper::new(&WindowWrapper::new(CanvasHandle(raw_handle)))?;
+		let wrapper = RawHandleWrapper::new(&WindowWrapper::new(
+			CanvasHandle(raw_handle),
+		))?;
 		commands.entity(entity).insert((surface, wrapper));
 	}
 	Ok(())

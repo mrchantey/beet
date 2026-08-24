@@ -169,13 +169,13 @@ mod test {
 		let (host_b, _control_b) = session(&mut world);
 		// A's control resolves to A's surface, never the shared owner or B's.
 		world
-			.with_state::<(
-				Query<&ChildOf>,
-				Query<&PortalOf>,
-				Query<&RenderSurface>,
-			), _>(move |(parents, holders, surfaces)| {
-				Portal::render_root(&parents, &holders, &surfaces, control_a)
-			})
+			.with_state::<(Query<&ChildOf>, Query<&PortalOf>, Query<&RenderSurface>), _>(
+				move |(parents, holders, surfaces)| {
+					Portal::render_root(
+						&parents, &holders, &surfaces, control_a,
+					)
+				},
+			)
 			.xpect_eq(host_a);
 		(host_a != host_b).xpect_true();
 	}

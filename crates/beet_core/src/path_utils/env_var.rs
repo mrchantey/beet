@@ -153,7 +153,7 @@ mod reflect_test {
 	fn roundtrip_reflect_serde() {
 		// SAFETY: single-threaded test
 		unsafe { env_ext::set_var("BEET_TEST_REFLECT_VAR", "reflect_value") }
-				.unwrap();
+			.unwrap();
 		let var = EnvVar::new("BEET_TEST_REFLECT_VAR").unwrap();
 
 		// Registering EnvVar also registers ReflectSerialize + ReflectDeserialize

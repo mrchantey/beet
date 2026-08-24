@@ -43,7 +43,9 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	} else {
 		let dir = match parts.get_param("dir") {
 			Some(dir) => AbsPathBuf::new(dir)?,
-			None => WorkspaceConfig::default().store_dir("analytics").into_abs(),
+			None => {
+				WorkspaceConfig::default().store_dir("analytics").into_abs()
+			}
 		};
 		AnalyticsStore::local(dir)
 	};
@@ -73,8 +75,9 @@ mod test {
 	/// command works before any analytics have been collected.
 	#[beet::test]
 	async fn summarizes_empty_store() {
-		let dir = AbsPathBuf::new(std::env::temp_dir().join("beet-analytics-empty"))
-			.unwrap();
+		let dir =
+			AbsPathBuf::new(std::env::temp_dir().join("beet-analytics-empty"))
+				.unwrap();
 		let mut world = crate::commands::render_world();
 		let host = world.spawn((Router, children![AnalyticsReport])).id();
 		let response = world

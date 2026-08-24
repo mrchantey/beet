@@ -187,7 +187,9 @@ mod test {
 
 	#[crate::test]
 	fn parses_fields() {
-		StoreUri::parse("fs").unwrap().xpect_eq(StoreUri::Fs { path: None });
+		StoreUri::parse("fs")
+			.unwrap()
+			.xpect_eq(StoreUri::Fs { path: None });
 		StoreUri::parse("fs:site").unwrap().xpect_eq(StoreUri::Fs {
 			path: Some("site".into()),
 		});
@@ -204,7 +206,10 @@ mod test {
 	/// its resolution context dir.
 	#[crate::test]
 	fn self_rooted_kinds() {
-		StoreUri::parse("s3://b").unwrap().is_self_rooted().xpect_true();
+		StoreUri::parse("s3://b")
+			.unwrap()
+			.is_self_rooted()
+			.xpect_true();
 		StoreUri::parse("local-storage")
 			.unwrap()
 			.is_self_rooted()
@@ -213,8 +218,14 @@ mod test {
 			.unwrap()
 			.is_self_rooted()
 			.xpect_true();
-		StoreUri::parse("fs").unwrap().is_self_rooted().xpect_false();
-		StoreUri::parse("memory").unwrap().is_self_rooted().xpect_false();
+		StoreUri::parse("fs")
+			.unwrap()
+			.is_self_rooted()
+			.xpect_false();
+		StoreUri::parse("memory")
+			.unwrap()
+			.is_self_rooted()
+			.xpect_false();
 	}
 
 	#[crate::test]

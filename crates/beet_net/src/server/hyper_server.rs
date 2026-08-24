@@ -630,9 +630,10 @@ mod upgrade_test {
 		std::thread::spawn(move || {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin));
-			app.world_mut().spawn((server, children![exchange_ext::handler(
-				|cx| { WebSocketUpgrade::from_request(&cx).into() }
-			)]));
+			app.world_mut()
+				.spawn((server, children![exchange_ext::handler(|cx| {
+					WebSocketUpgrade::from_request(&cx).into()
+				})]));
 			app.world_mut()
 				.add_observer(move |ev: On<OnWebSocketUpgrade>| {
 					captor.push(ev.event().socket);

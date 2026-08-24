@@ -55,7 +55,10 @@ impl SiteHost {
 		let root = build_site(app.world_mut()).await;
 		let router = app
 			.world_mut()
-			.run_system_cached_with::<_, Result<Entity>, _, _>(find_router, root)
+			.run_system_cached_with::<_, Result<Entity>, _, _>(
+				find_router,
+				root,
+			)
 			.unwrap()
 			.unwrap();
 		// the host pairs a channel terminal with the page-host buffer, the in-world

@@ -89,7 +89,8 @@ mod test {
 		let mut world = MaterialStylePlugin::world();
 		let container = world
 			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap(),
+				BsxNode::parse_document(markup, &BsxParseConfig::bsx())
+					.unwrap(),
 				BsxTemplateRegistry::default(),
 			))
 			.unwrap()

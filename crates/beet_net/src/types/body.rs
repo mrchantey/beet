@@ -233,8 +233,8 @@ impl Body {
 				} else {
 					bytes.as_ref()
 				};
-				let json: serde_json::Value =
-					serde_json::from_slice(slice).map_err(|err| {
+				let json: serde_json::Value = serde_json::from_slice(slice)
+					.map_err(|err| {
 						bevyhow!("failed to parse json body: {err}")
 					})?;
 				Value::from_json(json)

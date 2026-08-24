@@ -352,7 +352,9 @@ fn rule_set_has_class(rule_set: &RuleSet, name: &str) -> bool {
 /// class catalog: both walk the same selectors, so the manifest can never list a
 /// class the check rejects (or vice versa). Names repeat across rules; the caller
 /// de-duplicates.
-pub(crate) fn rule_set_classes(rule_set: &RuleSet) -> impl Iterator<Item = &str> {
+pub(crate) fn rule_set_classes(
+	rule_set: &RuleSet,
+) -> impl Iterator<Item = &str> {
 	rule_set
 		.iter()
 		.flat_map(|rule| selector_classes(rule.selector()))

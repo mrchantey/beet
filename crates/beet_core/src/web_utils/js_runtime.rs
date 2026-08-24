@@ -516,5 +516,4 @@ mod test {
 	fn detects_the_deno_runner() {
 		environment().xpect_eq(JsEnvironment::Deno);
 	}
-
 }

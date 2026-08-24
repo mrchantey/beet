@@ -3,7 +3,9 @@ use quote::quote;
 use syn::DeriveInput;
 use syn::parse_macro_input;
 
-pub(crate) fn impl_as_any(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub(crate) fn impl_as_any(
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
 	let item = parse_macro_input!(item as DeriveInput);
 	let result = parse_as_any(item);
 	result.unwrap_or_else(|err| err.into_compile_error()).into()

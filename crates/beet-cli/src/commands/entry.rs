@@ -183,12 +183,15 @@ mod test {
 			.xpect_eq("main.json");
 		// a dir with no entry document errors with guidance
 		let empty = TempDir::new().unwrap();
-		entry_build::resolve_main(None, empty.path().to_string_lossy().as_ref())
-			.await
-			.err()
-			.unwrap()
-			.to_string()
-			.xpect_contains("no entry document");
+		entry_build::resolve_main(
+			None,
+			empty.path().to_string_lossy().as_ref(),
+		)
+		.await
+		.err()
+		.unwrap()
+		.to_string()
+		.xpect_contains("no entry document");
 	}
 
 	/// The entry declares its own servers and app routes: loading its entry document

@@ -168,12 +168,18 @@ fn resolve_navigation(
 		NavigateTo::PrevSibling => {
 			resolve_sibling(tree, current_path, SiblingDirection::Prev)
 		}
-		NavigateTo::NextCard => CardNav::resolve(tree, current_path, CardNav::Next),
-		NavigateTo::PrevCard => CardNav::resolve(tree, current_path, CardNav::Prev),
+		NavigateTo::NextCard => {
+			CardNav::resolve(tree, current_path, CardNav::Next)
+		}
+		NavigateTo::PrevCard => {
+			CardNav::resolve(tree, current_path, CardNav::Prev)
+		}
 		NavigateTo::FirstCard => {
 			CardNav::resolve(tree, current_path, CardNav::First)
 		}
-		NavigateTo::LastCard => CardNav::resolve(tree, current_path, CardNav::Last),
+		NavigateTo::LastCard => {
+			CardNav::resolve(tree, current_path, CardNav::Last)
+		}
 	}
 }
 

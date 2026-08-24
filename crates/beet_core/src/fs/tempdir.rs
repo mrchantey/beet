@@ -65,8 +65,7 @@ impl TempDir {
 	/// The `CARGO_TARGET_DIR` env var is not used.
 	pub fn new_ws() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
-		let dir_name =
-			format!("target/tmp/beet_tmp_{}", uuid_ext::now_v7());
+		let dir_name = format!("target/tmp/beet_tmp_{}", uuid_ext::now_v7());
 		let dir_path = workspace_root.join(dir_name);
 		Self::new_with_path(dir_path)
 	}
@@ -86,8 +85,7 @@ impl TempDir {
 	/// ```
 	pub fn new_workspace() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
-		let dir_name =
-			format!("target/tmp/beet_tmp_{}", uuid_ext::now_v7());
+		let dir_name = format!("target/tmp/beet_tmp_{}", uuid_ext::now_v7());
 		let dir_path = workspace_root.join(dir_name);
 		Self::new_with_path(dir_path)
 	}

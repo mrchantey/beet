@@ -73,7 +73,8 @@ impl KittyImage {
 			(None, Some(rows)) => {
 				// invert the 2:1 cell aspect: cols = rows * 2 * (px_w / px_h)
 				let rows = rows.max(1);
-				let cols = (rows * 2 * self.px.x).div_ceil(self.px.y.max(1)).max(1);
+				let cols =
+					(rows * 2 * self.px.x).div_ceil(self.px.y.max(1)).max(1);
 				// a tall raster (eg a `height: 70vh` hero on a narrow terminal)
 				// derives a width wider than the available columns. Clamping only
 				// the width there would squash the aspect and, once the laid-out
@@ -402,12 +403,14 @@ async fn fetch_remote(entity: AsyncEntity, src: String, id: u32) -> Result {
 	// other connection for as long as it runs. On a throttled 2-vCPU box that is
 	// a multi-second stall of the whole server per `<img>`.
 	let loaded = match fetch_image_bytes(&src).await {
-		Ok(bytes) => blocking::unblock(move || {
-			to_png_bytes(bytes)
-				.and_then(encode_png)
-				.ok_or_else(|| bevyhow!("response is not a decodable image"))
-		})
-		.await,
+		Ok(bytes) => {
+			blocking::unblock(move || {
+				to_png_bytes(bytes).and_then(encode_png).ok_or_else(|| {
+					bevyhow!("response is not a decodable image")
+				})
+			})
+			.await
+		}
 		Err(err) => Err(err),
 	};
 	// each failure mode warns the src so a no-port error reads differently from a
@@ -876,7 +879,11 @@ mod test {
 		let mut host = image_host(100, 40);
 		host.frame_ansi();
 		let tracked = |host: &TestHost| {
-			host.app.world().resource::<KittyPlacements>().terminals.len()
+			host.app
+				.world()
+				.resource::<KittyPlacements>()
+				.terminals
+				.len()
 		};
 		tracked(&host).xpect_eq(1);
 
@@ -940,9 +947,12 @@ mod test {
 	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn pixel_window_enables_graphics() {
-		KittyGraphicsSupport::from_pty("xterm-256color", UVec2::new(1666, 2170))
-			.enabled
-			.xpect_true();
+		KittyGraphicsSupport::from_pty(
+			"xterm-256color",
+			UVec2::new(1666, 2170),
+		)
+		.enabled
+		.xpect_true();
 		KittyGraphicsSupport::from_pty("xterm-256color", UVec2::ZERO)
 			.enabled
 			.xpect_false();

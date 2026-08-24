@@ -504,9 +504,13 @@ mod test {
 		.await
 		.unwrap();
 		// a non-uuid path.
-		BlobStoreProvider::insert(&provider, &SmolPath::new("junk"), "{}".into())
-			.await
-			.unwrap();
+		BlobStoreProvider::insert(
+			&provider,
+			&SmolPath::new("junk"),
+			"{}".into(),
+		)
+		.await
+		.unwrap();
 
 		// the strict read fails, the lossy read yields only the valid row.
 		table.get_all().await.xpect_err();

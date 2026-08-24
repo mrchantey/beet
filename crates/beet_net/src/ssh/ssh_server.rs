@@ -323,12 +323,13 @@ mod tests {
 
 		std::thread::spawn(move || {
 			let mut app = App::new();
-			app.add_plugins((MinimalPlugins, SshServerPlugin)).add_systems(
-				Update,
-				move |peers: Query<(), With<SshPeerInfo>>| {
-					count.set(peers.iter().count())
-				},
-			);
+			app.add_plugins((MinimalPlugins, SshServerPlugin))
+				.add_systems(
+					Update,
+					move |peers: Query<(), With<SshPeerInfo>>| {
+						count.set(peers.iter().count())
+					},
+				);
 			app.world_mut().spawn((server, on_spawn));
 			app.run();
 		});
@@ -393,9 +394,12 @@ mod tests {
 					SshEvent::Close(_) => log.push("close"),
 					_ => {}
 				})
-				.add_systems(Update, move |peers: Query<(), With<SshPeerInfo>>| {
-					count.set(peers.iter().count())
-				});
+				.add_systems(
+					Update,
+					move |peers: Query<(), With<SshPeerInfo>>| {
+						count.set(peers.iter().count())
+					},
+				);
 			app.world_mut().spawn((server, on_spawn));
 			app.run();
 		});
@@ -404,7 +408,8 @@ mod tests {
 
 		// the whole lifecycle, in order: even a client gone this fast is announced
 		// before it closes, and its entity is reclaimed after.
-		poll_until(|| events.len() == 2, "server never saw the client go").await;
+		poll_until(|| events.len() == 2, "server never saw the client go")
+			.await;
 		events.get().xpect_eq(vec!["connect", "close"]);
 		poll_until(|| live.get() == 0, "connection outlived its client").await;
 	}

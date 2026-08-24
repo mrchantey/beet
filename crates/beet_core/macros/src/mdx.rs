@@ -31,7 +31,9 @@ use quote::quote;
 /// Entry point for the `mdx` proc macro.
 ///
 /// Content tokens are parsed directly — no crate path prefix needed.
-pub(crate) fn impl_mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub(crate) fn impl_mdx(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
 	let input2: TokenStream = input.into();
 	let content_tokens: Vec<TokenTree> = input2.into_iter().collect();
 

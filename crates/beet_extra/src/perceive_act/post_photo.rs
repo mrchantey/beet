@@ -69,21 +69,23 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 	// append the photo as this actor's turn, then stub older photos to bound bytes
 	// without dropping posts (append-only keeps the LLM prompt-cache prefix stable).
 	cx.caller
-		.with_state::<ThreadWindowQuery, _>(move |entity, mut windows| -> Result {
-			let actor_id = windows.actor_id(entity)?;
-			let thread_id = windows.thread_id(entity)?;
-			let mut window = windows.window_mut(entity)?;
-			window.upsert_post(AgentPost::new_bytes(
-				actor_id,
-				thread_id,
-				media.media_type().clone(),
-				media.bytes().to_vec(),
-				None,
-				PostStatus::Completed,
-			));
-			window.stub_old_images(config.keep_media);
-			Ok(())
-		})
+		.with_state::<ThreadWindowQuery, _>(
+			move |entity, mut windows| -> Result {
+				let actor_id = windows.actor_id(entity)?;
+				let thread_id = windows.thread_id(entity)?;
+				let mut window = windows.window_mut(entity)?;
+				window.upsert_post(AgentPost::new_bytes(
+					actor_id,
+					thread_id,
+					media.media_type().clone(),
+					media.bytes().to_vec(),
+					None,
+					PostStatus::Completed,
+				));
+				window.stub_old_images(config.keep_media);
+				Ok(())
+			},
+		)
 		.await??;
 
 	// stamp the cycle clock so `RespondMultiModalAction` can report the model latency
@@ -168,12 +170,12 @@ mod test {
 		app.world_mut().flush();
 		ThreadWindow::reduce_now(app.world_mut());
 
-		app.world_mut()
-			.entity_mut(camera)
-			.run_async_local(|camera| async move {
+		app.world_mut().entity_mut(camera).run_async_local(
+			|camera| async move {
 				camera.call::<(), Outcome>(()).await?;
 				Ok(())
-			});
+			},
+		);
 		app_ext::update_until(&mut app, move |world| {
 			world
 				.get::<ThreadWindow>(thread)

@@ -56,7 +56,9 @@ impl TuiServer {
 	/// recording the opening route on the server (the shared mechanism the SSH
 	/// server also reads). Never resolves the parked call, so it parks the process
 	/// up.
-	fn start(host: Store<Option<Entity>>) -> Action<Request, StartOutcome<Request>> {
+	fn start(
+		host: Store<Option<Entity>>,
+	) -> Action<Request, StartOutcome<Request>> {
 		Action::new_async_local(move |cx: ActionContext<Request>| async move {
 			let entity = cx.caller;
 			let request = cx.input;

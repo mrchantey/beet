@@ -522,10 +522,14 @@ impl TemplatePending {
 		// (eg `CallOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
 		// Snapshot the subtree first, then fire: an observer may restructure the tree.
 		root.world_scope(|world| {
-			let subtree = world.entity_mut(root_id).iter_descendents_inclusive();
+			let subtree =
+				world.entity_mut(root_id).iter_descendents_inclusive();
 			for entity in subtree {
 				if let Ok(mut entity) = world.get_entity_mut(entity) {
-					entity.trigger(move |entity| LoadTemplate { entity, is_error });
+					entity.trigger(move |entity| LoadTemplate {
+						entity,
+						is_error,
+					});
 				}
 			}
 		});
@@ -596,7 +600,10 @@ impl TemplatePending {
 	///
 	/// The error names every outstanding dependency and its entity, so a wedged
 	/// build reports which dependency wedged.
-	pub async fn settle_before(world: &AsyncWorld, deadline: Duration) -> Result {
+	pub async fn settle_before(
+		world: &AsyncWorld,
+		deadline: Duration,
+	) -> Result {
 		let started = Instant::now();
 		loop {
 			let outstanding = world
@@ -678,8 +685,11 @@ mod test {
 		let err = app
 			.world_mut()
 			.run_async_local_then(|world| async move {
-				TemplatePending::settle_before(&world, Duration::from_millis(50))
-					.await
+				TemplatePending::settle_before(
+					&world,
+					Duration::from_millis(50),
+				)
+				.await
 			})
 			.await
 			.unwrap_err()

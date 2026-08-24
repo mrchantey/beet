@@ -901,7 +901,8 @@ mod test {
 	#[beet_core::test]
 	fn simple_element() {
 		let nodes =
-			BsxNode::parse_document("<div>hi</div>", &BsxParseConfig::bsx()).unwrap();
+			BsxNode::parse_document("<div>hi</div>", &BsxParseConfig::bsx())
+				.unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected element");
 		};
@@ -946,7 +947,8 @@ mod test {
 	#[beet_core::test]
 	fn void_element() {
 		let nodes =
-			BsxNode::parse_document("<br>after", &BsxParseConfig::bsx()).unwrap();
+			BsxNode::parse_document("<br>after", &BsxParseConfig::bsx())
+				.unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected br");
 		};
@@ -956,9 +958,11 @@ mod test {
 
 	#[beet_core::test]
 	fn text_block_expr() {
-		let nodes =
-			BsxNode::parse_document("<p>{@doc:count}</p>", &BsxParseConfig::bsx())
-				.unwrap();
+		let nodes = BsxNode::parse_document(
+			"<p>{@doc:count}</p>",
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
 			panic!("expected p");
 		};
@@ -970,7 +974,8 @@ mod test {
 		// a tuple/struct/enum tag-position literal parses into `tag_literal`, with
 		// `tag` reduced to the base component name (the segment before `::`).
 		let element = |source: &str| -> BsxElement {
-			let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
+			let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx())
+				.unwrap();
 			let BsxNode::Element(element) = nodes.into_iter().next().unwrap()
 			else {
 				panic!("expected an element");
@@ -1022,13 +1027,17 @@ mod test {
 
 	#[beet_core::test]
 	fn html_mode_rejects_braces() {
-		BsxNode::parse_document("<div {Foo}/>", &BsxParseConfig::html()).xpect_err();
+		BsxNode::parse_document("<div {Foo}/>", &BsxParseConfig::html())
+			.xpect_err();
 	}
 
 	#[beet_core::test]
 	fn html_mode_rejects_bx() {
-		BsxNode::parse_document("<div bx:scope=\"x\"/>", &BsxParseConfig::html())
-			.xpect_err();
+		BsxNode::parse_document(
+			"<div bx:scope=\"x\"/>",
+			&BsxParseConfig::html(),
+		)
+		.xpect_err();
 	}
 
 	#[beet_core::test]
@@ -1050,7 +1059,8 @@ mod test {
 	// -- fragment primitive --
 
 	fn fragment(source: &str) -> Vec<BsxFragmentToken<'_>> {
-		BsxFragmentToken::parse_fragment(source, &BsxFragmentConfig::default()).unwrap()
+		BsxFragmentToken::parse_fragment(source, &BsxFragmentConfig::default())
+			.unwrap()
 	}
 
 	#[beet_core::test]
@@ -1260,7 +1270,8 @@ mod test {
 
 	/// The child nodes of a single root element parsed from `source`.
 	fn children_of(source: &str) -> Vec<BsxNode> {
-		let nodes = BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
+		let nodes =
+			BsxNode::parse_document(source, &BsxParseConfig::bsx()).unwrap();
 		let BsxNode::Element(element) = nodes.into_iter().next().unwrap()
 		else {
 			panic!("expected a root element");

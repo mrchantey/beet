@@ -52,7 +52,10 @@ async fn entry_lands_on_root() {
 	world.entity(root).contains::<HttpServer>().xpect_true();
 	// the spread middleware stacks on the router beside its dispatch
 	world.entity(router).contains::<Router>().xpect_true();
-	world.entity(router).contains::<RequestLogger>().xpect_true();
+	world
+		.entity(router)
+		.contains::<RequestLogger>()
+		.xpect_true();
 	world.entity(router).contains::<BsxLayout>().xpect_true();
 	// the markup `<PackageConfig/>` patched the live resource
 	world
