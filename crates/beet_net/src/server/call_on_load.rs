@@ -338,22 +338,25 @@ mod test {
 
 	/// A long-running server parks the load call: its `Running<Response>`
 	/// keep-alive stays and no `AppExit` is written, so the process persists.
-	/// The `Running` is inserted by the entity's `RunningSet` before any entry
+	/// The `Running` is inserted by the entity's `RunningSet` before any facet
 	/// runs, so the park holds regardless of what the backend does.
 	// see the NATIVE_ONLY note in `http_server`
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn server_parks_and_stays_up() {
-		// the global backend hook is first-install-wins for the whole test
-		// binary; installing the shared stub keeps this case order-independent
-		crate::server::http_server::stub_backend();
+		let log = Store::<Vec<&'static str>>::default();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity =
-			app.world_mut().spawn((HttpServer::new(0), CallOnLoad)).id();
+		let entity = app
+			.world_mut()
+			.spawn((
+				crate::server::http_server::tests::stub_server(0, log),
+				CallOnLoad,
+			))
+			.id();
 		load(app.world_mut(), entity);
-		// drive until the walk lands the parking `Running` (a bounded condition,
-		// unlike settling a parked server to the frame cap).
+		// drive until the parking `Running` lands (a bounded condition, unlike
+		// settling a parked server to the frame cap).
 		app_ext::update_until(&mut app, |world| {
 			world.entity(entity).contains::<Running<Response>>()
 		})

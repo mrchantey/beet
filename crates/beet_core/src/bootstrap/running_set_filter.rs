@@ -4,27 +4,31 @@ use crate::prelude::*;
 use core::fmt;
 use core::str::FromStr;
 
-/// Which servers a boot brings up, parsed once from `--server` / `BEET_SERVER`
-/// instead of re-split at each consumer.
+/// Which of an entity's long-running facets a start brings up, parsed once from
+/// `--server` / `BEET_SERVER` instead of re-split at each consumer.
+///
+/// The grammar a `RunningSet` facet's `select` closure reads: a server is the
+/// reference facet, hence the flag's name, but any facet naming itself takes part
+/// in the same selection.
 ///
 /// A comma-separated glob list, eg `--server=http,ssh` or `--server=*-tui`. An
-/// empty list matches every server, which is what a bare `--server=` means: the
+/// empty list matches every facet, which is what a bare `--server=` means: the
 /// selection is present but unconstrained.
 ///
 /// ## Example
 ///
 /// ```
 /// # use beet_core::prelude::*;
-/// let filter: ServerFilter = "http,ssh".parse().unwrap();
+/// let filter: RunningSetFilter = "http,ssh".parse().unwrap();
 /// filter.passes("http").xpect_true();
 /// filter.passes("cli").xpect_false();
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ServerFilter(Vec<SmolStr>);
+pub struct RunningSetFilter(Vec<SmolStr>);
 
-impl ServerFilter {
+impl RunningSetFilter {
 	/// The one name this selection travels under: the `--server` flag on a boot
 	/// request and, as `BEET_SERVER`, the [`BootstrapConfig`] knob a deploy
 	/// renders. Declared once so the deploy's rendered argv and a booting
@@ -96,12 +100,12 @@ impl ServerFilter {
 	}
 }
 
-impl FromStr for ServerFilter {
+impl FromStr for RunningSetFilter {
 	type Err = core::convert::Infallible;
 	fn from_str(value: &str) -> Result<Self, Self::Err> { Ok(Self::new(value)) }
 }
 
-impl fmt::Display for ServerFilter {
+impl fmt::Display for RunningSetFilter {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		for (index, name) in self.0.iter().enumerate() {
 			if index > 0 {
@@ -120,7 +124,7 @@ mod test {
 	#[crate::test]
 	fn round_trips() {
 		for value in ["http", "http,ssh", "*-tui,cli", ""] {
-			ServerFilter::new(value).to_string().xpect_eq(value);
+			RunningSetFilter::new(value).to_string().xpect_eq(value);
 		}
 	}
 
@@ -128,7 +132,7 @@ mod test {
 	/// selects the same pair as `--server=http,ssh`.
 	#[crate::test]
 	fn trims_and_drops_empty() {
-		ServerFilter::new("http, ssh,")
+		RunningSetFilter::new("http, ssh,")
 			.to_string()
 			.xpect_eq("http,ssh");
 	}
@@ -136,14 +140,20 @@ mod test {
 	/// An empty selection is present but unconstrained, so it passes everything.
 	#[crate::test]
 	fn empty_passes_all() {
-		ServerFilter::default().passes("anything").xpect_true();
+		RunningSetFilter::default().passes("anything").xpect_true();
 	}
 
 	#[crate::test]
 	fn globs_match() {
-		ServerFilter::new("http,ssh").passes("http").xpect_true();
-		ServerFilter::new("http,ssh").passes("cli").xpect_false();
-		ServerFilter::new("*-tui").passes("ssh-tui").xpect_true();
+		RunningSetFilter::new("http,ssh")
+			.passes("http")
+			.xpect_true();
+		RunningSetFilter::new("http,ssh")
+			.passes("cli")
+			.xpect_false();
+		RunningSetFilter::new("*-tui")
+			.passes("ssh-tui")
+			.xpect_true();
 	}
 
 	/// An absent `--server` is no selection at all (each server's `default_boot`
@@ -152,7 +162,7 @@ mod test {
 	#[crate::test]
 	fn reads_params() {
 		let from = |args: &str| {
-			ServerFilter::from_params(&CliArgs::parse(args).params)
+			RunningSetFilter::from_params(&CliArgs::parse(args).params)
 		};
 		from("").xpect_none();
 		from("--server").unwrap().passes("http").xpect_true();
@@ -160,5 +170,26 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_eq("http,ssh");
+	}
+
+	/// The whole selection decision a facet's `select` closure makes, pinned end
+	/// to end: `--server` names the facets that take part, and absent the flag the
+	/// facet's own `default_boot` decides.
+	#[crate::test]
+	fn selects_reads_the_filter() {
+		let selects = |args: &str, name: &str, default_boot: bool| {
+			RunningSetFilter::selects(
+				&CliArgs::parse(args).params,
+				name,
+				default_boot,
+			)
+		};
+		selects("--server=http,ssh", "http", false).xpect_true();
+		selects("--server=http", "cli", true).xpect_false();
+		// a bare `--server` is present but unconstrained
+		selects("--server", "cli", false).xpect_true();
+		// absent, the facet's own `default_boot` decides
+		selects("", "http", true).xpect_true();
+		selects("", "http", false).xpect_false();
 	}
 }

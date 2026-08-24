@@ -336,7 +336,7 @@ mod test {
 		CargoBuild::default()
 			.with_bootstrap(BootstrapConfig {
 				store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
-				server: Some(ServerFilter::new("http")),
+				server: Some(RunningSetFilter::new("http")),
 				..default()
 			})
 			.lambda_zip_cmd(dir)

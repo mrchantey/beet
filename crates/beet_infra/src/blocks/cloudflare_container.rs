@@ -81,7 +81,7 @@ impl CloudflareContainerBlock {
 				"s3://{}?endpoint={endpoint}",
 				self.bucket
 			))?),
-			server: Some(ServerFilter::new("http")),
+			server: Some(RunningSetFilter::new("http")),
 			..default()
 		}
 		.xok()

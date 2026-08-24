@@ -40,6 +40,34 @@ pub fn entity_hook(
 	}
 }
 
+/// Creates a component hook from a function receiving the hooked component and
+/// returning the work to queue on its entity.
+///
+/// The read-my-own-config shape: a hook capturing a declared field at hook time
+/// (a server's `default_boot`) then queuing the work that uses it. Two steps
+/// rather than one closure because the component borrow must be released before
+/// the entity's [`EntityCommands`] can be taken.
+///
+/// The queue outlives the component borrow, so an `-> impl FnOnce(&mut
+/// EntityCommands)` provider spells `+ use<>`: it captures the read fields by
+/// value, never the `&self` it read them from.
+pub fn component_hook<C, Queue>(
+	func: impl FnOnce(&C) -> Queue,
+) -> impl FnOnce(DeferredWorld, HookContext)
+where
+	C: Component,
+	Queue: FnOnce(&mut EntityCommands),
+{
+	move |mut world: DeferredWorld, cx: HookContext| {
+		// present by definition on `on_add`/`on_insert`; absent only on a removal
+		// hook, where there is nothing left to read.
+		let Some(queue) = world.get::<C>(cx.entity).map(func) else {
+			return;
+		};
+		queue(&mut world.commands().entity(cx.entity));
+	}
+}
+
 /// Creates a component hook registering an observer, or tuple of observers,
 /// each watching the hooked entity.
 ///
@@ -108,6 +136,13 @@ mod test {
 	#[component(on_add = hook_ext::entity_hook(|entity| { entity.insert(Name::new("hooked")); }))]
 	struct Named;
 
+	#[derive(Component)]
+	#[component(on_add = hook_ext::component_hook(|config: &Configured| {
+		let label = config.0;
+		move |entity: &mut EntityCommands| { entity.insert(Name::new(label)); }
+	}))]
+	struct Configured(&'static str);
+
 	#[beet_core::test]
 	fn observe_single() {
 		let mut world = World::new();
@@ -139,5 +174,20 @@ mod test {
 			.unwrap()
 			.as_str()
 			.xpect_eq("hooked");
+	}
+
+	/// The queued work reads the declared field, so a hook captures its own
+	/// config rather than re-resolving it later.
+	#[beet_core::test]
+	fn component_hook_reads_its_config() {
+		let mut world = World::new();
+		let entity = world.spawn(Configured("declared")).id();
+		world.flush();
+		world
+			.entity(entity)
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("declared");
 	}
 }

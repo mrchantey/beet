@@ -18,9 +18,9 @@ use bevy::input::keyboard::KeyCode;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::math::UVec2;
 
-/// A multi-tenant SSH-TUI server contributing to its entity's [`RunningSet`] with
-/// its router as a child: the start whose `--server` selects `"ssh"` boots an
-/// [`SshServer`] on this entity and serves every connection its own navigable
+/// A multi-tenant SSH-TUI server adding a facet to its entity's [`RunningSet`]
+/// with its router as a child: the facet whose `--server` selects `"ssh"` boots
+/// an [`SshServer`] on this entity and serves every connection its own navigable
 /// terminal browsing that router.
 ///
 /// A long-running server: it never resolves the parked call, so the entity's
@@ -31,7 +31,7 @@ use bevy::math::UVec2;
 /// [`HttpServer`] on the same root, so one process answers http and ssh at once.
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]
-#[component(on_add = hook_ext::entity_hook(SshTuiServer::contribute))]
+#[component(on_add = hook_ext::component_hook(SshTuiServer::add_facet))]
 pub struct SshTuiServer {
 	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
 	/// so an entry declaring a single [`SshTuiServer`] needs no flag; clear it on a
@@ -57,52 +57,70 @@ impl Default for SshTuiServer {
 }
 
 impl SshTuiServer {
-	/// This server's [`RunningSet`] contribution: boot the listener on start. The
-	/// [`SshServer`] it inserts owns its own teardown, so there is nothing to undo
-	/// on stop.
-	fn contribute(entity: &mut EntityCommands) {
-		RunningSet::<Request, Response>::contribute(
-			entity,
-			Self::start(),
-			None,
-		);
+	/// This server's [`RunningSet`] facet: boot the listener, then hold the run
+	/// open until the shutdown signal. The [`SshServer`] it inserts owns its own
+	/// teardown, so there is nothing left to undo.
+	fn add_facet(&self) -> impl FnOnce(&mut EntityCommands) + use<> {
+		// selection and the pty policy are read once here, when the server is
+		// declared, so the facet decides without a world access.
+		let default_boot = self.default_boot;
+		let pty_timeout = self.pty_timeout;
+		move |entity: &mut EntityCommands| {
+			RunningSet::<Request, Response>::add(
+				entity,
+				"ssh",
+				move |request: &Request| {
+					RunningSetFilter::selects(
+						request.params(),
+						"ssh",
+						default_boot,
+					)
+				},
+				move |entity, request, shutdown| {
+					// the future owns what it needs, so nothing borrows the input
+					// past this call.
+					let params = ServerParams::from_request(request);
+					let opening = OpeningRoute::from_request(request);
+					Box::pin(serve_ssh_tui(
+						entity,
+						params,
+						opening,
+						pty_timeout,
+						shutdown,
+					))
+				},
+			);
+		}
 	}
+}
 
-	/// The start entry: build an [`SshServer`] from the request and insert it on
-	/// this entity (its `on_add` starts the listener), recording the opening route
-	/// alongside. Never resolves the parked call, so it parks the process up.
-	fn start() -> Action<Request, StartOutcome<Request>> {
-		Action::new_async_local(|cx: ActionContext<Request>| async move {
-			let entity = cx.caller;
-			let request = cx.input;
-			let (default_boot, pty_timeout) = entity
-				.get(|server: &SshTuiServer| {
-					(server.default_boot, server.pty_timeout)
-				})
-				.await?;
-			if !ServerFilter::selects(request.params(), "ssh", default_boot) {
-				return StartOutcome::Declined(request).xok();
-			}
-			// the bind config from the request, over the env-fed `SshServer::default`.
-			let boot = ServerParams::from_request(&request)?;
-			let mut server = SshServer::default();
-			if let Some(port) = boot.ssh_port {
-				server.port = Some(port);
-			}
-			if let Some(host) = boot.host_octets()? {
-				server.host = host;
-			}
-			// a session here is a terminal, so a connection that never asks for one
-			// is dropped rather than held to the transport's idle timeout.
-			server.pty_timeout = pty_timeout;
-			// the opening route each session navigates to, recorded on the server
-			// (the shared mechanism the local TUI server also reads).
-			entity
-				.insert((server, OpeningRoute::from_request(&request)?))
-				.await?;
-			StartOutcome::Started(request).xok()
-		})
+/// Build an [`SshServer`] from the start request and insert it on this entity
+/// (its `on_add` starts the listener), recording the opening route alongside,
+/// then hold the run open until the shutdown signal.
+async fn serve_ssh_tui(
+	entity: AsyncEntity,
+	params: Result<ServerParams>,
+	opening: Result<OpeningRoute>,
+	pty_timeout: Option<Duration>,
+	shutdown: OnceValueRx<()>,
+) -> Result {
+	// the bind config from the request, over the env-fed `SshServer::default`.
+	let params = params?;
+	let mut server = SshServer::default();
+	if let Some(port) = params.ssh_port {
+		server.port = Some(port);
 	}
+	if let Some(host) = params.host_octets()? {
+		server.host = host;
+	}
+	// a session here is a terminal, so a connection that never asks for one
+	// is dropped rather than held to the transport's idle timeout.
+	server.pty_timeout = pty_timeout;
+	// the opening route each session navigates to, recorded on the server
+	// (the shared mechanism the local TUI server also reads).
+	entity.insert((server, opening?)).await?;
+	shutdown.wait().await;
+	Ok(())
 }
 
 /// Per-connection behavior for the [`SshTuiServer`], added once by the app: spins

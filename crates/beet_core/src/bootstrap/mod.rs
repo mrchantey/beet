@@ -3,18 +3,19 @@
 //! [`BootstrapConfig`] is the type: every pre-scene knob, parsed from argv and
 //! the `BEET_*` environment, readable from anywhere through
 //! [`BootstrapConfig::get`]. The rest of this module is either the grammar one
-//! of its fields parses into ([`StoreUri`], [`ServerFilter`], [`ServiceAccess`]),
+//! of its fields parses into ([`StoreUri`], [`RunningSetFilter`],
+//! [`ServiceAccess`]),
 //! or a resource describing *this build* rather than *this launch*:
 //! [`PackageConfig`] (the package's identity, usually from
 //! [`pkg_config!`](crate::pkg_config)) and [`WorkspaceConfig`] (the statically
 //! extractable file layout).
 
 mod bootstrap_config;
-mod server_filter;
+mod running_set_filter;
 mod service_access;
 mod store_uri;
 pub use bootstrap_config::*;
-pub use server_filter::*;
+pub use running_set_filter::*;
 pub use service_access::*;
 pub use store_uri::*;
 

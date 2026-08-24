@@ -12,8 +12,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// The entrypoint server: contributes a one-shot start to its entity's
-/// [`RunningSet`] that routes the boot request through the host's dispatch (see
+/// The entrypoint server: adds a one-shot facet to its entity's [`RunningSet`]
+/// that routes the start request through the host's dispatch (see
 /// [`exchange`](AsyncExchangeExt::exchange)) and resolves the parked call with
 /// the response.
 ///
@@ -27,13 +27,14 @@ use beet_core::prelude::*;
 /// </CliServer>
 /// ```
 ///
-/// Being a one-shot it resolves the call rather than parking, so the process
-/// exits once [`CallOnLoad::call`] has streamed its response. The dispatch runs
-/// detached, so a co-resident long-running server still starts and a dispatched
-/// route that parks (a `serve` command) never holds the walk up.
+/// Being a one-shot it resolves the call rather than holding it, so the process
+/// exits once [`CallOnLoad::call`] has streamed its response. Resolving removes
+/// the entity's `Running<Response>`, which signals any co-resident facet: a bare
+/// start of an entity carrying both a `CliServer` and an [`HttpServer`]
+/// dispatches once and exits.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = hook_ext::entity_hook(CliServer::contribute))]
+#[component(on_add = hook_ext::component_hook(CliServer::add_facet))]
 pub struct CliServer {
 	/// Dispatch on every boot, ignoring `--server`.
 	///
@@ -46,39 +47,37 @@ pub struct CliServer {
 }
 
 impl CliServer {
-	/// This server's [`RunningSet`] contribution: dispatch the boot request on
-	/// start, with no listener to close on stop.
-	fn contribute(entity: &mut EntityCommands) {
-		RunningSet::<Request, Response>::contribute(
-			entity,
-			Self::start(),
-			None,
-		);
-	}
-
-	/// The start entry: dispatch when this server should act, detached so a
-	/// dispatched route that parks never holds the walk up.
-	///
-	/// The request threads on to the next entry, so the dispatch takes a copy of
-	/// its parts; a boot request is argv-shaped and carries no body.
-	fn start() -> Action<Request, StartOutcome<Request>> {
-		Action::new_async_local(|cx: ActionContext<Request>| async move {
-			let entity = cx.caller;
-			let request = cx.input;
-			// an `always` dispatcher (the workspace command entry) acts on every
-			// boot; otherwise `--server` decides, defaulting to acting.
-			let acts = entity.get(|server: &CliServer| server.always).await?
-				|| ServerFilter::selects(request.params(), "cli", true);
-			if !acts {
-				return StartOutcome::Declined(request).xok();
-			}
-			let dispatch =
-				Request::from_parts(request.request_parts().clone(), default());
-			entity
-				.run_async_local(move |entity| route_and_end(entity, dispatch))
-				.await?;
-			StartOutcome::Started(request).xok()
-		})
+	/// This server's [`RunningSet`] facet: dispatch the start request, resolve the
+	/// parked call with the response, and complete. There is no listener to close,
+	/// so it holds nothing open across the shutdown signal.
+	fn add_facet(&self) -> impl FnOnce(&mut EntityCommands) + use<> {
+		// an `always` dispatcher (the workspace command entry) acts on every
+		// start; otherwise `--server` decides, defaulting to acting.
+		let always = self.always;
+		move |entity: &mut EntityCommands| {
+			RunningSet::<Request, Response>::add(
+				entity,
+				"cli",
+				move |request: &Request| {
+					always
+						|| RunningSetFilter::selects(
+							request.params(),
+							"cli",
+							true,
+						)
+				},
+				|entity, request, _shutdown| {
+					// the future owns its dispatch, so nothing borrows the input
+					// past this call; a start request is argv-shaped and carries no
+					// body, so cloning the parts is the whole copy.
+					let dispatch = Request::from_parts(
+						request.request_parts().clone(),
+						default(),
+					);
+					Box::pin(route_and_end(entity, dispatch))
+				},
+			);
+		}
 	}
 }
 
@@ -94,6 +93,10 @@ fn default_accept() -> Vec<MediaType> {
 
 /// Route the request through the host's dispatch, then resolve the parked call
 /// with the response so [`CallOnLoad::call`] streams it and exits.
+///
+/// Awaited inline by the facet rather than detached: the driver polls every
+/// selected facet concurrently, so a dispatched route that parks (a `serve`
+/// command) holds nothing else up.
 async fn route_and_end(server: AsyncEntity, request: Request) -> Result {
 	// `--accept` may arrive as several params (CliArgs splits comma lists), so
 	// gather every value's media types.

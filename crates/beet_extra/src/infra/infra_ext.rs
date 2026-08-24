@@ -52,7 +52,7 @@ pub fn remote_bootstrap(
 			"s3://{}",
 			bucket_name.as_ref()
 		))?),
-		server: Some(ServerFilter::new("http")),
+		server: Some(RunningSetFilter::new("http")),
 		..default()
 	}
 	.xok()

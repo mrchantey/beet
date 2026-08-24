@@ -244,7 +244,7 @@ pub fn LightsailBeetSiteBlock(
 		// resolves the same declaration.
 		.with_bootstrap(BootstrapConfig {
 			store: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
-			server: Some(ServerFilter::new("http,ssh")),
+			server: Some(RunningSetFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
 			..default()
 		})

@@ -6,16 +6,17 @@
 //! ## One load path, one parked action
 //!
 //! [`CallOnLoad`] calls its entity's action with the load's request. On a server
-//! entity that action belongs to the [`RunningSet`] its servers contributed to:
+//! entity that action belongs to the [`RunningSet`] its servers added facets to:
 //! it inserts a `Running<Response>` keep-alive claim, fires a
-//! `StartRunning<Request>` for observers, then walks each server's start entry.
-//! A one-shot [`CliServer`] resolves the call (its response streams to stdout
-//! and the process exits); a long-running [`HttpServer`] / `TuiServer` parks the
-//! call, persisting the process until its `Running` is removed, which walks the
-//! stop entries. `--server` selects which servers act, and a selection matching
-//! none fails the call rather than parking. The dispatch host (a `Router`) is a
-//! child, reached with `exchange_child`. See [`call_on_load`] and
-//! [`server_lifecycle`] for the model.
+//! `StartRunning<Request>` for observers, then drives every facet the start
+//! selected. A one-shot [`CliServer`] resolves the call (its response streams to
+//! stdout and the process exits); a long-running [`HttpServer`] / `TuiServer`
+//! holds its facet open, persisting the process until that `Running` is removed,
+//! which signals every live facet. `--server` selects which servers act (see
+//! [`RunningSetFilter`]), and a selection matching none fails the call rather
+//! than parking. The dispatch host (a `Router`) is a child, reached with
+//! `exchange_child`. See [`call_on_load`] and
+//! [`RunningSet`](beet_action::prelude::RunningSet) for the model.
 //!
 //! ## Implementations
 //!
@@ -36,9 +37,9 @@ mod canonical_port;
 pub use canonical_port::*;
 
 // The `HttpServer` component and its `HttpServer::set_backend` install hook; the concrete
-// backends below stay std/feature-gated on top. A server contributes a
-// start/stop pair to its entity's `RunningSet`, torn down when that set's parked
-// `Running<Response>` is removed.
+// backends below stay std/feature-gated on top. A server adds one facet to its
+// entity's `RunningSet`, signalled when that set's parked `Running<Response>` is
+// removed.
 //
 // Gated on `action`, not `std`: a server dispatches through an
 // `Action<Request, Response>` by construction, so there is no server without the
@@ -49,12 +50,10 @@ mod http_server;
 #[cfg(feature = "action")]
 pub use http_server::*;
 
-// What a listener-backed server contributes to its entity's `RunningSet`. Same
-// `action` gate as `HttpServer`, which depends on it.
-#[cfg(feature = "action")]
-mod server_lifecycle;
-#[cfg(feature = "action")]
-pub use server_lifecycle::*;
+// The bind knobs a booting server reads off its start request. Action-free: it
+// is a plain params type over a `Request`.
+mod server_params;
+pub use server_params::*;
 
 // In-memory channel-backed HTTP server: shares `HttpServer`'s boot/park/dispatch
 // machinery over an `async_channel` instead of a socket. `std` for `async-channel`,

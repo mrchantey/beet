@@ -1,6 +1,5 @@
 //! Plugin and utilities for running Bevy-based HTTP servers.
 use crate::prelude::*;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// Plugin for running Bevy HTTP servers.
@@ -19,9 +18,10 @@ impl Plugin for ServerPlugin {
 			.register_type::<Tls>()
 			// the markup load verb, so an `<HttpServer>` entry, a `{CallOnLoad}`
 			// script or behaviour scene resolves it.
-			.register_type::<CallOnLoad>()
-			// a boot whose `--server` selected nothing fails rather than parking
-			.add_observer(assert_server_started);
+			.register_type::<CallOnLoad>();
+
+		// a start whose `--server` selected no facet fails the call in the
+		// `RunningSet` itself, so there is no server-layer check to register here.
 
 		// the process exits when `CallOnLoad` writes `AppExit` for the one-shot
 		// it resolves; a long-running server never resolves its boot call, so its
@@ -68,43 +68,23 @@ impl Plugin for ServerPlugin {
 	}
 }
 
-/// A boot that declared servers but started none has nothing to hold the process
-/// open, so fail the parked call rather than park forever: `beet serve site
-/// --server=nonexistent` exits with the error instead of hanging.
-///
-/// The thin server-layer reading of a [`RunningSet`]'s tally. It resolves the
-/// call in the same breath as the walk, so no marker component and no
-/// frame-later sweep are needed.
-fn assert_server_started(
-	ev: On<RunningSetStarted>,
-	sets: Query<(), With<RunningSet<Request, Response>>>,
-	mut commands: Commands,
-) {
-	if ev.started > 0 || !sets.contains(ev.entity) {
-		return;
-	}
-	commands
-		.entity(ev.entity)
-		.queue(FailRun::<Response>::new(bevyhow!(
-			"No server started for {}, does --server (or BEET_SERVER) name a \
-			 server this entry declares?",
-			ev.entity
-		)));
-}
-
 #[cfg(test)]
 mod boot_check_test {
 	use crate::prelude::*;
+	use crate::server::http_server::tests::call_and_park;
+	use crate::server::http_server::tests::stub_server;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 
 	/// A `--server` naming nothing this entry declares must exit, not park the
-	/// process on a `Running` no server will ever resolve.
+	/// process on a `Running` no server will ever resolve. The set itself fails
+	/// the call, naming every declared facet.
 	#[beet_core::test]
 	async fn unselected_boot_exits() {
-		crate::server::http_server::stub_backend();
+		let log = Store::<Vec<&'static str>>::default();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
+		let entity = app.world_mut().spawn(stub_server(0, log)).id();
 		app.world_mut().entity_mut(entity).run_async_local(
 			|server| async move {
 				CallOnLoad::call(
@@ -115,6 +95,42 @@ mod boot_check_test {
 			},
 		);
 		app.run_async().await.xpect_eq(AppExit::error());
+		log.get().xpect_eq(Vec::<&'static str>::new());
+	}
+
+	/// Two servers spread on one entity add to the one [`RunningSet`], so a single
+	/// call starts both rather than either clobbering the other's slot.
+	// see the NATIVE_ONLY note in `http_server`
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test]
+	async fn starts_every_declared_server() {
+		let log = Store::<Vec<&'static str>>::default();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let (channel_server, client) = ChannelHttpServer::new();
+		let entity = app
+			.world_mut()
+			.spawn((stub_server(0, log), channel_server, children![
+				exchange_ext::handler(|cx| {
+					Response::ok().with_body(cx.take().body)
+				})
+			]))
+			.id();
+		call_and_park(&mut app, entity, Request::get("/"));
+		// the http facet started ..
+		app_ext::update_until(&mut app, |_| log.len() >= 1)
+			.await
+			.xpect_true();
+		// .. and so did the channel facet, which now serves a round trip
+		let response = AsyncRunner::poll_and_update(
+			|| {
+				app.update();
+			},
+			client.request(Request::post("/echo").with_body("hello")),
+		)
+		.await
+		.unwrap();
+		response.text().await.unwrap().xpect_eq("hello");
 	}
 }
 

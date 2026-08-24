@@ -79,7 +79,7 @@ pub struct BootstrapConfig {
 	/// `--features` / `BEET_FEATURES`.
 	pub features: Vec<SmolStr>,
 	/// Which declared servers boot. `--server` / `BEET_SERVER`.
-	pub server: Option<ServerFilter>,
+	pub server: Option<RunningSetFilter>,
 	/// The opening route a freshly-opened tui/ssh surface navigates to.
 	/// `--path` / `BEET_PATH`.
 	pub path: Option<SmolStr>,
@@ -181,7 +181,7 @@ impl BootstrapConfig {
 		env: "BEET_FEATURES",
 	};
 	const SERVER: Knob = Knob {
-		arg: ServerFilter::PARAM,
+		arg: RunningSetFilter::PARAM,
 		env: "BEET_SERVER",
 	};
 	const PATH: Knob = Knob {
@@ -583,7 +583,7 @@ impl BootstrapConfig {
 	/// `CMD` array or a systemd `ExecStart`: no whitespace, quotes, backslashes
 	/// or control characters.
 	///
-	/// The [`StoreUri`] and [`ServerFilter`] grammars cannot produce one, so a
+	/// The [`StoreUri`] and [`RunningSetFilter`] grammars cannot produce one, so a
 	/// violation means malformed input rather than a gap in the encoding.
 	fn validate_token(token: &str) -> Result {
 		if let Some(bad) = token.chars().find(|char| {
@@ -744,13 +744,14 @@ impl ConfigReader<'_> {
 			.collect()
 	}
 
-	/// A [`ServerFilter`], through the filter's own param grammar so the boot-time
+	/// A [`RunningSetFilter`], through the filter's own param grammar so the boot-time
 	/// read and this one cannot diverge, falling back to the env transport.
 	/// `None` when the knob is absent from both, which is what lets a server fall
 	/// back to its own `default_boot`.
-	fn filter(&self, knob: Knob) -> Option<ServerFilter> {
-		ServerFilter::from_params(self.params).or_else(|| {
-			(self.env)(knob.env).map(|value| ServerFilter::new(value.as_str()))
+	fn filter(&self, knob: Knob) -> Option<RunningSetFilter> {
+		RunningSetFilter::from_params(self.params).or_else(|| {
+			(self.env)(knob.env)
+				.map(|value| RunningSetFilter::new(value.as_str()))
 		})
 	}
 }
@@ -774,7 +775,7 @@ mod test {
 			store: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
 			watch: true,
 			features: vec!["thread".into(), "sockets".into()],
-			server: Some(ServerFilter::new("http,ssh")),
+			server: Some(RunningSetFilter::new("http,ssh")),
 			path: Some("/docs".into()),
 			host: Some("0.0.0.0".parse().unwrap()),
 			http_port: Some(8337),
@@ -888,7 +889,7 @@ mod test {
 	fn renders_cmd_json() {
 		BootstrapConfig {
 			store: Some(StoreUri::parse("s3://site").unwrap()),
-			server: Some(ServerFilter::new("http,ssh")),
+			server: Some(RunningSetFilter::new("http,ssh")),
 			..default()
 		}
 		.to_cmd_json("/app")

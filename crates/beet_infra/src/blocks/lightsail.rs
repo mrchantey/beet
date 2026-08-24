@@ -1463,7 +1463,7 @@ mod tests {
 		let script = LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
 				store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
-				server: Some(ServerFilter::new("http")),
+				server: Some(RunningSetFilter::new("http")),
 				..default()
 			})
 			.with_exec_route("serve")
@@ -1490,7 +1490,7 @@ mod tests {
 		let (stack, _dir) = Stack::default_local();
 		LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
-				server: Some(ServerFilter::new("http")),
+				server: Some(RunningSetFilter::new("http")),
 				..default()
 			})
 			.build_user_data(&stack, "${key_id}", "${key_secret}")

@@ -4,6 +4,7 @@
 use crate::prelude::*;
 use async_channel::Receiver;
 use async_channel::Sender;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// A self-contained HTTP server that reads [`Request`]s from a channel and writes
@@ -16,16 +17,16 @@ use beet_core::prelude::*;
 /// browser (a teaching sandbox) with no real listener; it is also the natural
 /// deterministic test harness (no ports, no timing).
 ///
-/// Boots exactly like [`HttpServer`]: it contributes a start/stop pair to its
-/// entity's [`RunningSet`](beet_action::prelude::RunningSet), and a call whose
-/// `--server` selects `"channel"` starts the serve loop, which parks on the
-/// entity's [`Running<Response>`] keep-alive and tears down on its removal.
+/// Boots exactly like [`HttpServer`]: it adds one facet to its entity's
+/// [`RunningSet`](beet_action::prelude::RunningSet), and a call whose `--server`
+/// selects `"channel"` starts the serve loop, which holds the entity's
+/// [`Running<Response>`] keep-alive open and tears down on its removal.
 ///
 /// Runtime-only: it holds [`async_channel`] ends, which are not [`Reflect`], so
 /// (unlike [`HttpServer`]) it is not markup-spawnable. Construct it with
 /// [`ChannelHttpServer::new`].
 #[derive(Component)]
-#[component(on_add = hook_ext::entity_hook(ChannelHttpServer::contribute))]
+#[component(on_add = hook_ext::entity_hook(ChannelHttpServer::add_facet))]
 #[require(ExchangeStats)]
 pub struct ChannelHttpServer {
 	/// Inbound requests to dispatch.
@@ -45,23 +46,23 @@ pub struct ChannelHttpClient {
 }
 
 impl ChannelHttpServer {
-	/// This server's [`RunningSet`](beet_action::prelude::RunningSet)
-	/// contribution, mirroring [`HttpServer`]: serve the channel on start when
-	/// `--server` selects `"channel"`, close the loop on stop.
-	fn contribute(entity: &mut EntityCommands) {
-		ServerFacet::contribute(
+	/// This server's [`RunningSet`](beet_action::prelude::RunningSet) facet,
+	/// mirroring [`HttpServer`]: serve the channel when `--server` selects
+	/// `"channel"`, until the shutdown signal ends the loop.
+	///
+	/// There are no bind knobs to read off the start request: whoever constructed
+	/// the pair holds the channel ends.
+	fn add_facet(entity: &mut EntityCommands) {
+		RunningSet::<Request, Response>::add(
 			entity,
-			ChannelHttpServer::boot,
-			|entity, shutdown| {
-				Box::pin(start_channel_http_server(entity, shutdown))
+			"channel",
+			|request: &Request| {
+				RunningSetFilter::selects(request.params(), "channel", true)
+			},
+			|entity, _request, shutdown| {
+				Box::pin(serve_channel_http(entity, shutdown))
 			},
 		);
-	}
-
-	/// Whether this boot selects the server. There are no bind knobs to overlay:
-	/// whoever constructed the pair holds the channel ends.
-	fn boot(&mut self, request: &Request) -> Result<bool> {
-		ServerFilter::selects(request.params(), "channel", true).xok()
 	}
 
 	/// Creates a paired server and client over fresh channels.
@@ -118,9 +119,9 @@ impl ChannelHttpClient {
 
 /// The serve loop: drain requests off the channel, dispatch each through the host's
 /// `Action<Request, Response>` slot via `entity.exchange`, and write the response
-/// back. Parks like [`HttpServer`] (never resolves the parked call); ends when the
-/// shutdown signal resolves or the request channel closes.
-async fn start_channel_http_server(
+/// back. Holds the run open like [`HttpServer`] (never resolves the parked call);
+/// ends when the shutdown signal resolves or the request channel closes.
+async fn serve_channel_http(
 	entity: AsyncEntity,
 	shutdown: OnceValueRx<()>,
 ) -> Result {

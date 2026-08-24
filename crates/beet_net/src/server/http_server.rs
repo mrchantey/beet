@@ -1,6 +1,8 @@
 //! HTTP server component for handling incoming requests.
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
+use bevy::platform::sync::Arc;
 use bevy::platform::sync::OnceLock;
 
 /// Boxed server-start function: the no_std-friendly server hook, mirroring
@@ -20,26 +22,38 @@ use bevy::platform::sync::OnceLock;
 /// (and may abort tasks it spawned), since only the backend knows how it spawned its
 /// own work.
 ///
-/// The future is a [`LocalBoxedFuture`] (never `Send`): the start entry always
-/// drives it as a local task, so it stays on the thread it was created on. This lets a backend hold a thread-bound resource across an await, eg the
+/// The future is a [`LocalBoxedFuture`] (never `Send`): the facet always drives it
+/// as a local task, so it stays on the thread it was created on. This lets a backend hold a thread-bound resource across an await, eg the
 /// lambda backend's tokio runtime [`EnterGuard`](tokio::runtime::EnterGuard).
 pub type HttpServerFn =
 	fn(AsyncEntity, OnceValueRx<()>) -> LocalBoxedFuture<'static, Result>;
+
+/// One [`HttpServer`]'s own backend, outranking the process-global
+/// [`HttpServerFn`] install for that entity alone.
+///
+/// A closure rather than [`HttpServerFn`]'s fn pointer, so a caller can capture
+/// per-instance state: several servers in one process (or one test case) each
+/// serve their own way without racing over the global [`OnceLock`].
+pub type HttpServerBackend = Arc<
+	dyn Fn(AsyncEntity, OnceValueRx<()>) -> LocalBoxedFuture<'static, Result>
+		+ Send
+		+ Sync,
+>;
 
 static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 
 /// HTTP server that listens for incoming requests, dispatching each through its
 /// host's `Request -> Response` action via `entity.exchange`.
 ///
-/// A long-running server, contributing a start/stop pair to its entity's
+/// A long-running server, adding one facet to its entity's
 /// [`RunningSet`](beet_action::prelude::RunningSet) with its dispatch host as a
-/// child. Calling that entity walks
-/// the start, which boots this server when `--server` selects `"http"`, through
-/// the backend [`ServerPlugin`] installed via [`HttpServer::set_backend`],
-/// reading `--port` / `--host` from the boot request. It never resolves the
-/// parked call, so the entity's [`Running<Response>`] keep-alive claim persists
-/// the process; when that `Running` is removed (a reload or shutdown) the stop
-/// entry closes the listener. A markup-spawned `<HttpServer port=0><Router>..
+/// child. Calling that entity starts this facet when `--server` selects
+/// `"http"`, running the backend [`ServerPlugin`] installed via
+/// [`HttpServer::set_backend`] and reading `--port` / `--host` from the start
+/// request. It never resolves the parked call, so the entity's
+/// [`Running<Response>`] keep-alive claim persists the process; when that
+/// `Running` is removed (a reload or shutdown) the facet's shutdown signal fires
+/// and the listener closes. A markup-spawned `<HttpServer port=0><Router>..
 /// </Router></HttpServer>` boots exactly the same way.
 ///
 /// The concrete backend depends on compile-time features:
@@ -47,7 +61,7 @@ static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 /// - `hyper`: full-featured Hyper HTTP server
 /// - `lambda`: AWS Lambda runtime
 /// - none of the above (eg no_std embedded): a backend installed at runtime via
-///   [`HttpServer::set_backend`]
+///   [`HttpServer::set_backend`], or per-entity via [`HttpServer::backend`]
 ///
 /// # Example
 ///
@@ -63,7 +77,7 @@ static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 /// ```
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = hook_ext::entity_hook(HttpServer::contribute))]
+#[component(on_add = hook_ext::component_hook(HttpServer::add_facet))]
 #[require(ExchangeStats)]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
@@ -83,6 +97,14 @@ pub struct HttpServer {
 	/// so an entry declaring a single [`HttpServer`] needs no flag; clear it on a
 	/// server that should boot only when `--server=http` names it explicitly.
 	pub default_boot: bool,
+	/// This server's own backend, outranking the process-global
+	/// [`HttpServer::set_backend`] install. `None` (the default) falls back to it.
+	///
+	/// Not markup-declarable (it holds a closure), so it is set by whoever spawns
+	/// the entity: a second server in one process, or a test standing a listener
+	/// in without racing the first-install-wins global.
+	#[reflect(ignore)]
+	pub backend: Option<HttpServerBackend>,
 }
 
 impl Default for HttpServer {
@@ -97,6 +119,7 @@ impl Default for HttpServer {
 			host: config.host_octets().unwrap_or([127, 0, 0, 1]),
 			canonical: true,
 			default_boot: true,
+			backend: None,
 		}
 	}
 }
@@ -111,8 +134,10 @@ impl HttpServer {
 			.map_err(|_| bevyhow!("HTTP server already installed"))
 	}
 
-	/// The installed backend, if any.
-	pub fn backend() -> Option<HttpServerFn> { HTTP_SERVER.get().copied() }
+	/// The process-global installed backend, if any.
+	pub fn installed_backend() -> Option<HttpServerFn> {
+		HTTP_SERVER.get().copied()
+	}
 
 	/// Creates a new server configured to listen on the specified port.
 	pub fn new(port: u16) -> Self {
@@ -127,9 +152,23 @@ impl HttpServer {
 		Self {
 			port: Some(port),
 			host: [0, 0, 0, 0],
-			canonical: true,
-			default_boot: true,
+			..default()
 		}
+	}
+	/// Serve through `backend` rather than the process-global install, so this
+	/// one server owns how it listens.
+	pub fn with_backend<Func>(mut self, backend: Func) -> Self
+	where
+		Func: 'static
+			+ Send
+			+ Sync
+			+ Fn(
+				AsyncEntity,
+				OnceValueRx<()>,
+			) -> LocalBoxedFuture<'static, Result>,
+	{
+		self.backend = Some(Arc::new(backend));
+		self
 	}
 	/// Sets the host address to bind to.
 	pub fn with_host(mut self, host: [u8; 4]) -> Self {
@@ -144,60 +183,86 @@ impl HttpServer {
 	}
 
 	/// The socket address to bind, from the component fields (`0` = OS-assigned,
-	/// localhost the default host). The start entry applies any `--port` /
-	/// `--host` from the boot request onto these fields before the backend reads
-	/// them, so a `--port=8080` overrides a declared `port`.
+	/// localhost the default host). The facet applies any `--port` / `--host`
+	/// from the start request onto these fields before the backend reads them, so
+	/// a `--port=8080` overrides a declared `port`.
 	pub fn socket_addr(&self) -> core::net::SocketAddr {
 		(self.host, self.port.unwrap_or(0)).into()
 	}
 
-	/// This server's [`RunningSet`](beet_action::prelude::RunningSet)
-	/// contribution: bind on start when `--server` selects `"http"`, close the
-	/// listener on stop.
-	fn contribute(entity: &mut EntityCommands) {
-		ServerFacet::contribute(
-			entity,
-			HttpServer::boot,
-			|entity, shutdown| Box::pin(start_http_server(entity, shutdown)),
-		);
-	}
-
-	/// Whether this boot selects the server, overlaying its `--port` / `--host`
-	/// onto the declared bind config when it does. See [`ServerParams`] for why
-	/// the request alone decides.
-	fn boot(&mut self, request: &Request) -> Result<bool> {
-		if !ServerFilter::selects(request.params(), "http", self.default_boot) {
-			return Ok(false);
+	/// This server's [`RunningSet`](beet_action::prelude::RunningSet) facet: bind
+	/// when `--server` selects `"http"`, hold the listener open until the shutdown
+	/// signal, then drop it.
+	fn add_facet(&self) -> impl FnOnce(&mut EntityCommands) + use<> {
+		// selection and backend are read once here, when the server is declared,
+		// so the facet decides without a world access.
+		let default_boot = self.default_boot;
+		let backend = self.backend.clone();
+		move |entity: &mut EntityCommands| {
+			RunningSet::<Request, Response>::add(
+				entity,
+				"http",
+				move |request: &Request| {
+					RunningSetFilter::selects(
+						request.params(),
+						"http",
+						default_boot,
+					)
+				},
+				move |entity, request, shutdown| {
+					// the bind knobs are the request's; the future owns them, so
+					// nothing borrows the input past this call.
+					let params = ServerParams::from_request(request);
+					let backend = backend.clone();
+					Box::pin(serve_http(entity, backend, params, shutdown))
+				},
+			);
 		}
-		let boot = ServerParams::from_request(request)?;
-		if let Some(port) = boot.port {
-			self.port = Some(port);
-		}
-		if let Some(host) = boot.host_octets()? {
-			self.host = host;
-		}
-		Ok(true)
 	}
 }
 
-/// Invoke the installed backend on a started host, handing it the `shutdown`
-/// receiver so it stops accepting and releases its listener when the host's
-/// [`Running<Response>`] is removed. Skips a host already despawned (eg a
-/// serialization spawn).
-async fn start_http_server(
+/// Overlay the start request's bind knobs onto the declared config, then invoke
+/// this server's backend, handing it the `shutdown` receiver so it stops
+/// accepting and releases its listener when the host's [`Running<Response>`] is
+/// removed.
+///
+/// Skips a host already despawned (eg a serialization spawn). Errors propagate to
+/// the driver, so a listener that never opens (a port already bound) fails the
+/// parked call rather than raising into the app's error handler.
+async fn serve_http(
 	entity: AsyncEntity,
+	backend: Option<HttpServerBackend>,
+	params: Result<ServerParams>,
 	shutdown: OnceValueRx<()>,
 ) -> Result {
 	if !entity.is_alive().await {
 		return Ok(());
 	}
-	let Some(backend) = HttpServer::backend() else {
-		bevybail!(
-			"No HTTP server backend installed. Enable a server feature \
-			 (server/hyper/lambda) or install one via HttpServer::set_backend(...)."
-		)
-	};
-	backend(entity, shutdown).await
+	let params = params?;
+	let host = params.host_octets()?;
+	entity
+		.get_mut::<HttpServer, _>(move |mut server| {
+			if let Some(port) = params.port {
+				server.port = Some(port);
+			}
+			if let Some(host) = host {
+				server.host = host;
+			}
+		})
+		.await?;
+	// the entity's own backend outranks the process-global install, so a second
+	// server (or a test) serves its own way without racing that `OnceLock`.
+	match backend {
+		Some(backend) => backend(entity, shutdown).await,
+		None => match HttpServer::installed_backend() {
+			Some(backend) => backend(entity, shutdown).await,
+			None => bevybail!(
+				"No HTTP server backend installed. Enable a server feature \
+				 (server/hyper/lambda) or install one via \
+				 HttpServer::set_backend(...)."
+			),
+		},
+	}
 }
 
 /// std-only constructors and the on-hardware integration test suite.
@@ -249,52 +314,85 @@ mod std_impl {
 	}
 }
 
-// Boot-machinery tests over the stub backend (no real listener), driving to a
-// bounded flag rather than settling a parked server. The real-listener cases (eg
-// `shutdown_ends_accept_loop`) bind real TCP and stay native.
+// Facet-machinery tests over a per-entity stub backend (no real listener),
+// driving to a bounded log rather than settling a parked server. The
+// real-listener cases (eg `shutdown_ends_accept_loop`) bind real TCP and stay
+// native.
 //
 // NATIVE_ONLY: every case that actually *starts* a server is `cfg`-gated off
-// wasm. A started server's stub backend and the walk that launched it are two
+// wasm. A started server's stub backend and the driver that launched it are two
 // tasks doing world bridges, and beet's wasm harness runs every case on one
 // single-threaded executor, where resuming one task from inside another's bridge
 // re-enters it ("cannot recursively acquire mutex"). No wasm build compiles an
-// http backend at all, so what those cases pin is native machinery. See the Phase
-// 1 deviations in `.agents/plans/master-plan.md`.
+// http backend at all, so what those cases pin is native machinery. See Phase 4
+// of `.agents/plans/lifecycle-master-plan.md`, which lifts these gates.
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 	use super::*;
-	use beet_action::prelude::*;
 
-	/// Fire the boot call on the entity's `RunningSet` action (fire-and-forget:
-	/// the call parks and the walk runs). `HttpServer` contributed the only entry,
-	/// so the call reaches it exactly as a real boot does.
-	fn boot(app: &mut App, port: u16, request: Request) -> Entity {
-		let entity = app.world_mut().spawn(HttpServer::new(port)).id();
-		call_and_park(app, entity, request);
-		entity
+	/// A server whose backend records its two observable ends in `log`: `"start"`
+	/// in place of binding a port, `"stop"` in place of dropping the listener.
+	///
+	/// Per-entity rather than the process-global install, so concurrently-driven
+	/// cases never observe each other's servers.
+	pub(crate) fn stub_server(
+		port: u16,
+		log: Store<Vec<&'static str>>,
+	) -> HttpServer {
+		HttpServer::new(port).with_backend(move |_entity, shutdown| {
+			Box::pin(async move {
+				log.push("start");
+				shutdown.wait().await;
+				log.push("stop");
+				Ok(())
+			})
+		})
 	}
 
-	/// Drive until the stub backend reports it started.
-	async fn started(app: &mut App) -> bool {
-		use bevy::platform::sync::atomic::Ordering;
-		app_ext::update_until(app, |_| SERVER_STARTED.load(Ordering::Relaxed))
-			.await
+	fn app() -> App {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		app
+	}
+
+	/// Spawn a stub server and call it, returning the entity and its log.
+	fn boot(
+		app: &mut App,
+		port: u16,
+		request: Request,
+	) -> (Entity, Store<Vec<&'static str>>) {
+		let log = Store::<Vec<&'static str>>::default();
+		let entity = app.world_mut().spawn(stub_server(port, log)).id();
+		call_and_park(app, entity, request);
+		(entity, log)
+	}
+
+	/// Drive until `log` holds `len` entries, failing fast rather than hanging.
+	async fn until_logged(
+		app: &mut App,
+		log: Store<Vec<&'static str>>,
+		len: usize,
+	) -> bool {
+		app_ext::update_until(app, |_| log.len() >= len).await
 	}
 
 	/// Drive a bounded number of frames and assert the stub never started.
-	async fn never_started(app: &mut App) {
-		use bevy::platform::sync::atomic::Ordering;
+	async fn never_started(app: &mut App, log: Store<Vec<&'static str>>) {
 		for _ in 0..16 {
 			app.update();
 			AsyncRunner::tick().await;
 		}
-		SERVER_STARTED.load(Ordering::Relaxed).xpect_false();
+		log.get().xpect_eq(Vec::<&'static str>::new());
 	}
 
 	/// Call `entity`'s `RunningSet` action and let the result go: a started server
-	/// parks the call forever, and a set where every entry declined fails it, so
+	/// parks the call forever, and a start every facet declined fails it, so
 	/// neither outcome is the assertion.
-	fn call_and_park(app: &mut App, entity: Entity, request: Request) {
+	pub(crate) fn call_and_park(
+		app: &mut App,
+		entity: Entity,
+		request: Request,
+	) {
 		app.world_mut().entity_mut(entity).run_async_local(
 			move |server| async move {
 				server.call::<Request, Response>(request).await.ok();
@@ -303,16 +401,14 @@ mod tests {
 		);
 	}
 
-	/// The start walk (no `--server`) reaches the http server: the installed
-	/// backend runs and the host parks on its unresolved `Running<Response>`.
+	/// A bare start (no `--server`) selects the http facet: its backend runs and
+	/// the host parks on its unresolved `Running<Response>`.
 	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn boots_on_boot() {
-		stub_backend();
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = boot(&mut app, 8080, Request::get("/"));
-		started(&mut app).await.xpect_true();
+		let mut app = app();
+		let (entity, log) = boot(&mut app, 8080, Request::get("/"));
+		until_logged(&mut app, log, 1).await.xpect_true();
 		// a long-running server parks: the boot call's Running is unresolved.
 		app.world()
 			.entity(entity)
@@ -320,21 +416,18 @@ mod tests {
 			.xpect_true();
 	}
 
-	/// Removing the host's `Running<Response>` walks the stop entry, which signals
-	/// the shutdown the backend is holding, and a despawn is a teardown just the
-	/// same: bevy runs remove hooks on despawn, so the stop still reaches the live
-	/// listener rather than orphaning it.
+	/// Removing the host's `Running<Response>` fires the facet's shutdown signal,
+	/// and a despawn is a teardown just the same: bevy runs remove hooks on
+	/// despawn, so the signal still reaches the live listener rather than
+	/// orphaning it.
 	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn teardown_on_running_removed() {
-		use bevy::platform::sync::atomic::Ordering;
 		for despawn in [false, true] {
-			stub_backend();
-			let mut app = App::new();
-			app.add_plugins((MinimalPlugins, ServerPlugin));
-			let entity = boot(&mut app, 0, Request::get("/"));
-			started(&mut app).await.xpect_true();
-			// end the run either way: the stop entry signals the backend's shutdown.
+			let mut app = app();
+			let (entity, log) = boot(&mut app, 0, Request::get("/"));
+			until_logged(&mut app, log, 1).await.xpect_true();
+			// end the run either way: the removal signals the facet's shutdown.
 			match despawn {
 				true => app.world_mut().entity_mut(entity).despawn(),
 				false => {
@@ -343,11 +436,8 @@ mod tests {
 						.remove::<Running<Response>>();
 				}
 			}
-			app_ext::update_until(&mut app, |_| {
-				SERVER_STOPPED.load(Ordering::Relaxed)
-			})
-			.await
-			.xpect_true();
+			until_logged(&mut app, log, 2).await.xpect_true();
+			log.get().xpect_eq(vec!["start", "stop"]);
 		}
 	}
 
@@ -357,28 +447,31 @@ mod tests {
 	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn serve_failure_fails_the_call() {
-		use bevy::platform::sync::atomic::Ordering;
-		stub_backend();
-		STUB_FAILS.store(true, Ordering::Relaxed);
 		let caught = Store::<Option<String>>::default();
-		let recorder = caught;
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = app.world_mut().spawn(HttpServer::new(0)).id();
+		let mut app = app();
+		let entity = app
+			.world_mut()
+			.spawn(HttpServer::new(0).with_backend(|_entity, _shutdown| {
+				Box::pin(async move {
+					bevybail!(
+						"Failed to bind stub server: Address already in use"
+					)
+				})
+			}))
+			.id();
 		app.world_mut().entity_mut(entity).run_async_local(
 			move |server| async move {
 				if let Err(err) =
 					server.call::<Request, Response>(Request::get("/")).await
 				{
-					recorder.set(Some(err.to_string()));
+					caught.set(Some(err.to_string()));
 				}
 				Ok(())
 			},
 		);
-		let settled =
-			app_ext::update_until(&mut app, |_| caught.get().is_some()).await;
-		STUB_FAILS.store(false, Ordering::Relaxed);
-		settled.xpect_true();
+		app_ext::update_until(&mut app, |_| caught.get().is_some())
+			.await
+			.xpect_true();
 		caught
 			.get()
 			.unwrap()
@@ -425,17 +518,16 @@ mod tests {
 		std::net::TcpListener::bind(("127.0.0.1", port)).xpect_ok();
 	}
 
-	/// `--port` in the boot request overrides the declared component port before
+	/// `--port` in the start request overrides the declared component port before
 	/// the backend reads the bind address.
 	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn resolves_port_from_params() {
-		stub_backend();
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let entity = boot(&mut app, 8080, Request::from_cli_str("--port=9090"));
-		// the backend running means the start entry already applied the `--port`.
-		started(&mut app).await.xpect_true();
+		let mut app = app();
+		let (entity, log) =
+			boot(&mut app, 8080, Request::from_cli_str("--port=9090"));
+		// the backend running means the facet already applied the `--port`.
+		until_logged(&mut app, log, 1).await.xpect_true();
 		app.world()
 			.entity(entity)
 			.get::<HttpServer>()
@@ -445,87 +537,36 @@ mod tests {
 	}
 
 	/// A start whose `--server` does not select `"http"` leaves the server
-	/// untouched. The lone declining entry starts nothing, so the call itself
+	/// untouched. The lone declining facet starts nothing, so the call itself
 	/// fails (see `unselected_boot_exits`); the assertion here is only that the
 	/// backend never ran.
 	#[beet_core::test]
 	async fn skips_on_filter_miss() {
-		stub_backend();
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
-		boot(&mut app, 0, Request::from_cli_str("--server=cli"));
-		never_started(&mut app).await;
+		let mut app = app();
+		let (_entity, log) =
+			boot(&mut app, 0, Request::from_cli_str("--server=cli"));
+		never_started(&mut app, log).await;
 	}
 
-	/// A server with `default_boot: false` stays dormant on a bare boot (no
+	/// A server with `default_boot: false` stays dormant on a bare start (no
 	/// `--server`), where the default `default_boot: true` (see `boots_on_boot`)
 	/// would start it. As in `skips_on_filter_miss` the call itself fails, having
 	/// started nothing.
 	#[beet_core::test]
 	async fn default_boot_false_skips_bare_boot() {
-		stub_backend();
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let mut app = app();
+		let log = Store::<Vec<&'static str>>::default();
 		let entity = app
 			.world_mut()
 			.spawn(HttpServer {
 				default_boot: false,
-				..default()
+				..stub_server(0, log)
 			})
 			.id();
 		call_and_park(&mut app, entity, Request::get("/"));
-		// a bare boot selects `default_boot` servers only; this one opts out.
-		never_started(&mut app).await;
+		// a bare start selects `default_boot` servers only; this one opts out.
+		never_started(&mut app, log).await;
 	}
-}
-
-/// Whether the stub backend started, in place of binding a port, and whether its
-/// shutdown then resolved, in place of dropping a listener: the two observable
-/// ends of the start/stop path.
-///
-/// Process flags rather than component markers, because the stub stands in for a
-/// serve loop and a serve loop must be able to run without touching the world:
-/// its shutdown can arrive mid-command (a despawn teardown), where there is no
-/// entity left to mark and no world access to be had.
-#[cfg(test)]
-pub(crate) static SERVER_STARTED: bevy::platform::sync::atomic::AtomicBool =
-	bevy::platform::sync::atomic::AtomicBool::new(false);
-#[cfg(test)]
-pub(crate) static SERVER_STOPPED: bevy::platform::sync::atomic::AtomicBool =
-	bevy::platform::sync::atomic::AtomicBool::new(false);
-
-/// Makes the stub backend fail instead of starting, standing in for a bind
-/// failure. Global rather than per-case because [`HttpServer::set_backend`] is a
-/// process-global first-install-wins hook; a case sets it, drives, and clears it.
-#[cfg(test)]
-pub(crate) static STUB_FAILS: bevy::platform::sync::atomic::AtomicBool =
-	bevy::platform::sync::atomic::AtomicBool::new(false);
-
-/// Install the shared test backend and reset its flags: raise [`SERVER_STARTED`]
-/// in place of binding, then await the shutdown and raise [`SERVER_STOPPED`] in
-/// place of dropping the listener.
-///
-/// [`HttpServer::set_backend`] is a process-global [`OnceLock`], so the first
-/// install wins for the whole test binary (notably the single wasm module that
-/// runs every case in series). Every test that starts a server calls this same
-/// idempotent installer, so cases stay order-independent.
-#[cfg(test)]
-pub(crate) fn stub_backend() {
-	use bevy::platform::sync::atomic::Ordering;
-	SERVER_STARTED.store(false, Ordering::Relaxed);
-	SERVER_STOPPED.store(false, Ordering::Relaxed);
-	HttpServer::set_backend(|_entity, shutdown| {
-		Box::pin(async move {
-			if STUB_FAILS.load(Ordering::Relaxed) {
-				bevybail!("Failed to bind stub server: Address already in use");
-			}
-			SERVER_STARTED.store(true, Ordering::Relaxed);
-			shutdown.wait().await;
-			SERVER_STOPPED.store(true, Ordering::Relaxed);
-			Ok(())
-		})
-	})
-	.ok();
 }
 
 // needs `new_test` + `async_io` (server, native) and the ureq client.

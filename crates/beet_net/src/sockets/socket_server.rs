@@ -2,7 +2,9 @@
 //! boot model.
 use crate::prelude::*;
 use crate::sockets::PersistentSocket;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
+use bevy::platform::sync::Arc;
 use bevy::platform::sync::OnceLock;
 
 /// Boxed socket-server-start function: the no_std-friendly server hook, mirroring
@@ -11,7 +13,7 @@ use bevy::platform::sync::OnceLock;
 /// [`SocketServerPlugin`] installs the built-in tungstenite backend via
 /// [`SocketServer::set_backend`] when the feature is enabled; a downstream adapter (an
 /// embassy / esp WiFi crate, …) installs its own without living in [`beet_net`].
-/// [`SocketServer`]'s start entry invokes the installed function.
+/// [`SocketServer`]'s facet invokes the installed function.
 ///
 /// The seam matches [`HttpServerFn`] exactly so the same start/stop machinery
 /// drives both: it is handed an [`AsyncEntity`] for the spawned server and a
@@ -21,10 +23,22 @@ use bevy::platform::sync::OnceLock;
 /// as a child [`Socket`], and owns its teardown on the shutdown signal.
 ///
 /// The future is a [`LocalBoxedFuture`] (never `Send`): the accept loop and its
-/// per-connection [`Socket`] readers are thread-bound, so the start entry always
-/// drives it as a local task.
+/// per-connection [`Socket`] readers are thread-bound, so the facet always drives
+/// it as a local task.
 pub type SocketServerFn =
 	fn(AsyncEntity, OnceValueRx<()>) -> LocalBoxedFuture<'static, Result>;
+
+/// One [`SocketServer`]'s own backend, outranking the process-global
+/// [`SocketServerFn`] install for that entity alone.
+///
+/// A closure rather than [`SocketServerFn`]'s fn pointer, so a caller can capture
+/// per-instance state: several servers in one process (or one test case) each
+/// accept their own way without racing over the global [`OnceLock`].
+pub type SocketServerBackend = Arc<
+	dyn Fn(AsyncEntity, OnceValueRx<()>) -> LocalBoxedFuture<'static, Result>
+		+ Send
+		+ Sync,
+>;
 
 static SOCKET_SERVER: OnceLock<SocketServerFn> = OnceLock::new();
 
@@ -64,23 +78,23 @@ impl Plugin for SocketServerPlugin {
 /// A WebSocket server that accepts incoming connections, booting through the same
 /// fan-out as [`HttpServer`].
 ///
-/// It contributes a start/stop pair to its entity's
+/// It adds one facet to its entity's
 /// [`RunningSet`](beet_action::prelude::RunningSet): a call whose
 /// `--server` selects `"socket"` boots it through the backend installed via
 /// [`SocketServer::set_backend`]. It never resolves the parked call, so the
 /// entity's [`Running<Response>`] keep-alive parks the process; when that
-/// `Running` is removed (a reload or shutdown) the stop entry signals the backend
-/// to stop accepting and drop its listener. Each accepted connection is adopted
-/// as a child [`Socket`], dispatching via the entity's [`MessageRecv`] /
-/// [`MessageSend`] events.
+/// `Running` is removed (a reload or shutdown) the facet's shutdown signal fires
+/// and the backend stops accepting and drops its listener. Each accepted
+/// connection is adopted as a child [`Socket`], dispatching via the entity's
+/// [`MessageRecv`] / [`MessageSend`] events.
 ///
 /// The concrete backend depends on compile-time features:
 /// - `tungstenite` (native): an `async-io` TCP WebSocket listener
 /// - none of the above (eg no_std embedded): a backend installed at runtime via
-///   [`SocketServer::set_backend`]
-#[derive(Clone, Debug, Component, Reflect)]
+///   [`SocketServer::set_backend`], or per-entity via [`SocketServer::backend`]
+#[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = hook_ext::entity_hook(SocketServer::contribute))]
+#[component(on_add = hook_ext::component_hook(SocketServer::add_facet))]
 pub struct SocketServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
@@ -92,6 +106,28 @@ pub struct SocketServer {
 	/// so an entry declaring a single [`SocketServer`] needs no flag; clear it on a
 	/// server that should boot only when `--server=socket` names it explicitly.
 	pub default_boot: bool,
+	/// This server's own backend, outranking the process-global
+	/// [`SocketServer::set_backend`] install. `None` (the default) falls back to
+	/// it.
+	///
+	/// Not markup-declarable (it holds a closure), so it is set by whoever spawns
+	/// the entity: a second server in one process, or a test standing a listener
+	/// in without racing the first-install-wins global.
+	#[reflect(ignore)]
+	pub backend: Option<SocketServerBackend>,
+}
+
+/// Hand-written because the backend is a closure: it prints as whether one is
+/// declared, alongside the bind config.
+impl core::fmt::Debug for SocketServer {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_struct("SocketServer")
+			.field("port", &self.port)
+			.field("host", &self.host)
+			.field("default_boot", &self.default_boot)
+			.field("backend", &self.backend.is_some())
+			.finish()
+	}
 }
 
 impl Default for SocketServer {
@@ -108,25 +144,39 @@ impl SocketServer {
 			.map_err(|_| bevyhow!("Socket server already installed"))
 	}
 
-	/// The installed backend, if any.
-	pub fn backend() -> Option<SocketServerFn> { SOCKET_SERVER.get().copied() }
-
-	/// This server's [`RunningSet`](beet_action::prelude::RunningSet)
-	/// contribution, mirroring [`HttpServer`]: accept on start when `--server`
-	/// selects `"socket"`, close the listener on stop.
-	fn contribute(entity: &mut EntityCommands) {
-		ServerFacet::contribute(
-			entity,
-			SocketServer::boot,
-			|entity, shutdown| Box::pin(start_socket_server(entity, shutdown)),
-		);
+	/// The process-global installed backend, if any.
+	pub fn installed_backend() -> Option<SocketServerFn> {
+		SOCKET_SERVER.get().copied()
 	}
 
-	/// Whether this boot selects the server. The socket listener takes its bind
-	/// config from the component alone, so there is nothing to overlay.
-	fn boot(&mut self, request: &Request) -> Result<bool> {
-		ServerFilter::selects(request.params(), "socket", self.default_boot)
-			.xok()
+	/// This server's [`RunningSet`](beet_action::prelude::RunningSet) facet,
+	/// mirroring [`HttpServer`]: accept when `--server` selects `"socket"`, until
+	/// the shutdown signal drops the listener.
+	///
+	/// The socket listener takes its bind config from the component alone, so
+	/// there is nothing to read off the start request.
+	fn add_facet(&self) -> impl FnOnce(&mut EntityCommands) + use<> {
+		// selection and backend are read once here, when the server is declared,
+		// so the facet decides without a world access.
+		let default_boot = self.default_boot;
+		let backend = self.backend.clone();
+		move |entity: &mut EntityCommands| {
+			RunningSet::<Request, Response>::add(
+				entity,
+				"socket",
+				move |request: &Request| {
+					RunningSetFilter::selects(
+						request.params(),
+						"socket",
+						default_boot,
+					)
+				},
+				move |entity, _request, shutdown| {
+					let backend = backend.clone();
+					Box::pin(accept_sockets(entity, backend, shutdown))
+				},
+			);
+		}
 	}
 
 	/// Creates a new socket server on `port`, bound to all interfaces (`0.0.0.0`) so a
@@ -137,6 +187,7 @@ impl SocketServer {
 			port: Some(port),
 			host: [0, 0, 0, 0],
 			default_boot: true,
+			backend: None,
 		}
 	}
 
@@ -144,6 +195,22 @@ impl SocketServer {
 	/// connect. Pair with a routable address, ie `[0, 0, 0, 0]` for all interfaces.
 	pub fn with_host(mut self, host: [u8; 4]) -> Self {
 		self.host = host;
+		self
+	}
+
+	/// Accept through `backend` rather than the process-global install, so this
+	/// one server owns how it listens.
+	pub fn with_backend<Func>(mut self, backend: Func) -> Self
+	where
+		Func: 'static
+			+ Send
+			+ Sync
+			+ Fn(
+				AsyncEntity,
+				OnceValueRx<()>,
+			) -> LocalBoxedFuture<'static, Result>,
+	{
+		self.backend = Some(Arc::new(backend));
 		self
 	}
 
@@ -182,7 +249,7 @@ impl SocketServer {
 			Self {
 				port: Some(port),
 				host: [127, 0, 0, 1],
-				default_boot: true,
+				..default()
 			},
 			OnSpawn::new_async_local(move |entity| {
 				SocketServer::start_tungstenite_with_tcp(
@@ -193,97 +260,88 @@ impl SocketServer {
 	}
 }
 
-/// Invoke the installed backend on a started host, handing it the `shutdown`
+/// Invoke this server's backend on a started host, handing it the `shutdown`
 /// receiver so it stops accepting and releases its listener when the host's
 /// [`Running<Response>`] is removed. Skips a host already despawned.
-async fn start_socket_server(
+async fn accept_sockets(
 	entity: AsyncEntity,
+	backend: Option<SocketServerBackend>,
 	shutdown: OnceValueRx<()>,
 ) -> Result {
 	if !entity.is_alive().await {
 		return Ok(());
 	}
-	let Some(backend) = SocketServer::backend() else {
-		bevybail!(
-			"No socket server backend installed. Enable the tungstenite feature \
-			 or install one via SocketServer::set_backend(...)."
-		)
-	};
-	backend(entity, shutdown).await
+	// the entity's own backend outranks the process-global install, so a second
+	// server (or a test) accepts its own way without racing that `OnceLock`.
+	match backend {
+		Some(backend) => backend(entity, shutdown).await,
+		None => match SocketServer::installed_backend() {
+			Some(backend) => backend(entity, shutdown).await,
+			None => bevybail!(
+				"No socket server backend installed. Enable the tungstenite \
+				 feature or install one via SocketServer::set_backend(...)."
+			),
+		},
+	}
 }
 
-// Generic boot-machinery tests over a stub backend (no real listener), so they run
-// on native and wasm alike. The real-listener tests below bind real TCP and stay
-// native + tungstenite.
+// Generic facet-machinery tests over a per-entity stub backend (no real
+// listener), so they run on native and wasm alike. The real-listener tests below
+// bind real TCP and stay native + tungstenite.
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use beet_action::prelude::*;
 
-	/// Marker the stub backend inserts in place of binding a listener, proving the
-	/// start walk reached the installed backend.
-	#[derive(Component)]
-	struct SocketStartFlag;
-
-	/// Marker the stub backend inserts once its shutdown resolves, standing in for
-	/// a dropped listener.
-	#[derive(Component)]
-	struct SocketStopFlag;
-
-	/// Install the stub backend: flag the entity, standing in for a real server.
+	/// A server whose backend records its two observable ends in `log`: `"start"`
+	/// in place of binding a listener, `"stop"` in place of dropping it.
 	///
-	/// [`SocketServer::set_backend`] is a process-global [`OnceLock`], so the first install
-	/// wins for the whole test binary (notably the single wasm module that runs
-	/// every case in series). Every test therefore installs this same idempotent
-	/// hook: flagging is observable where a start is expected and harmless where it
-	/// is not (a filter miss never invokes the hook).
-	fn stub_backend() {
-		SocketServer::set_backend(|entity, shutdown| {
+	/// Per-entity rather than the process-global install, so concurrently-driven
+	/// cases never observe each other's servers.
+	fn stub_server(log: Store<Vec<&'static str>>) -> SocketServer {
+		SocketServer::default().with_backend(move |_entity, shutdown| {
 			Box::pin(async move {
-				entity
-					.with(|mut entity| {
-						entity.insert(SocketStartFlag);
-					})
-					.await?;
+				log.push("start");
 				shutdown.wait().await;
-				entity
-					.with(|mut entity| {
-						entity.insert(SocketStopFlag);
-					})
-					.await
-					.ok();
+				log.push("stop");
 				Ok(())
 			})
 		})
-		.ok();
 	}
 
-	/// Fire the boot exchange on the host's `RunningSet` action (fire-and-forget:
-	/// the call parks and the walk runs).
-	fn boot(app: &mut App, request: Request) -> Entity {
-		let entity = app.world_mut().spawn(SocketServer::default()).id();
+	/// Spawn a stub server and call it (fire-and-forget: the call parks while the
+	/// facet holds its listener open).
+	fn boot(
+		app: &mut App,
+		request: Request,
+	) -> (Entity, Store<Vec<&'static str>>) {
+		let log = Store::<Vec<&'static str>>::default();
+		let entity = app.world_mut().spawn(stub_server(log)).id();
 		app.world_mut().entity_mut(entity).run_async_local(
 			move |host| async move {
-				host.call::<Request, Response>(request).await?;
+				host.call::<Request, Response>(request).await.ok();
 				Ok(())
 			},
 		);
-		entity
+		(entity, log)
 	}
 
-	/// The start walk reaches the socket server: the installed backend runs and
-	/// the host parks on its unresolved `Running<Response>`.
+	/// Drive until `log` holds `len` entries, failing fast rather than hanging.
+	async fn until_logged(
+		app: &mut App,
+		log: Store<Vec<&'static str>>,
+		len: usize,
+	) -> bool {
+		app_ext::update_until(app, |_| log.len() >= len).await
+	}
+
+	/// A bare start selects the socket facet: its backend runs and the host parks
+	/// on its unresolved `Running<Response>`.
 	#[beet_core::test]
 	async fn boots_on_boot() {
-		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, SocketServerPlugin::default()));
-		let entity = boot(&mut app, Request::get("/"));
-		app_ext::update_until(&mut app, |world| {
-			world.entity(entity).contains::<SocketStartFlag>()
-		})
-		.await
-		.xpect_true();
+		let (entity, log) = boot(&mut app, Request::get("/"));
+		until_logged(&mut app, log, 1).await.xpect_true();
 		// a long-running server parks: the boot call's Running is unresolved.
 		app.world()
 			.entity(entity)
@@ -291,47 +349,35 @@ mod tests {
 			.xpect_true();
 	}
 
-	/// Removing the host's `Running<Response>` walks the stop entry, which signals
-	/// the backend's shutdown channel.
+	/// Removing the host's `Running<Response>` fires the facet's shutdown signal,
+	/// which the backend tears down on.
 	#[beet_core::test]
 	async fn teardown_on_running_removed() {
-		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, SocketServerPlugin::default()));
-		let entity = boot(&mut app, Request::get("/"));
-		app_ext::update_until(&mut app, |world| {
-			world.entity(entity).contains::<SocketStartFlag>()
-		})
-		.await
-		.xpect_true();
-		// remove the boot's Running: the stop entry signals shutdown.
+		let (entity, log) = boot(&mut app, Request::get("/"));
+		until_logged(&mut app, log, 1).await.xpect_true();
 		app.world_mut()
 			.entity_mut(entity)
 			.remove::<Running<Response>>();
-		app_ext::update_until(&mut app, |world| {
-			world.entity(entity).contains::<SocketStopFlag>()
-		})
-		.await
-		.xpect_true();
+		until_logged(&mut app, log, 2).await.xpect_true();
+		log.get().xpect_eq(vec!["start", "stop"]);
 	}
 
-	/// A boot whose `--server` does not select `"socket"` leaves the server
+	/// A start whose `--server` does not select `"socket"` leaves the server
 	/// untouched.
 	#[beet_core::test]
 	async fn skips_on_filter_miss() {
-		stub_backend();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, SocketServerPlugin::default()));
-		let entity = boot(&mut app, Request::from_cli_str("--server=cli"));
-		// drive a bounded number of frames; the filter miss never flags the entity.
+		let (_entity, log) =
+			boot(&mut app, Request::from_cli_str("--server=cli"));
+		// drive a bounded number of frames; the filter miss never starts the facet.
 		for _ in 0..16 {
 			app.update();
 			AsyncRunner::tick().await;
 		}
-		app.world()
-			.entity(entity)
-			.contains::<SocketStartFlag>()
-			.xpect_false();
+		log.get().xpect_eq(Vec::<&'static str>::new());
 	}
 }
 

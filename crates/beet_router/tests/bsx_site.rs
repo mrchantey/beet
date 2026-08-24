@@ -151,13 +151,13 @@ async fn serve_blobs_serves_assets() {
 }
 
 /// `<HttpServer port="0"><Router/></HttpServer>`: the http server is declarable
-/// from markup, contributing to the root's `RunningSet` with the router as its
+/// from markup, adding a facet to the root's `RunningSet` with the router as its
 /// dispatch child, via the reflect element path (port 0 keeps any started backend
-/// on an OS-assigned port). The reflect insert contributes through its `on_add`,
-/// so calling the entity starts it via the installed runtime hook.
+/// on an OS-assigned port). The reflect insert adds the facet through its
+/// `on_add`, so calling the entity starts it via the installed runtime hook.
 // Only without a real HTTP backend: the test installs a stand-in runtime hook to
 // prove the wiring without a live server, but with the `http`/`client_io` backend
-// present, the start walk boots a real listener (and, under `client_io`, its
+// present, the facet boots a real listener (and, under `client_io`, its
 // tungstenite channel on a fixed port) that this test cannot cleanly stop, so it
 // would leak a spinning task into the rest of the single-process suite.
 #[cfg(not(feature = "http"))]
@@ -262,10 +262,10 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 		.query_filtered_once::<Entity, With<CallOnLoad>>()
 		.len()
 		.xpect_eq(1);
-	// count every start walk, so a second boot of the serve route is visible
+	// count every start, so a second boot of the serve route is visible
 	let starts = Store::new(0usize);
 	let counter = starts;
-	world.add_observer(move |_: On<RunningSetStarted>| {
+	world.add_observer(move |_: On<StartRunning<Request>>| {
 		counter.set(counter.get() + 1)
 	});
 	// boot it the way `beet serve site` does: forward the `serve` route in
@@ -284,7 +284,7 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 		.into_iter()
 		.next()
 		.expect("the serve route's http server never started");
-	// the root's own set plus the serve route's, each walked exactly once
+	// the root's own set plus the serve route's, each started exactly once
 	starts.get().xpect_eq(2);
 	// ..and the teardown reaches that live listener rather than an orphan
 	world
