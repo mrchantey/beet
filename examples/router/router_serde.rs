@@ -7,10 +7,11 @@
 //! fresh copy.
 //!
 //! Every runtime component — the [`CliServer`] child, the [`router`] bundle, the
-//! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the
-//! components round-trip with no post-load patching. Nothing boots the loaded
-//! scene by hand: [`CallOnLoad`] rides in on `CliServer` and fires on the
-//! scene's own `LoadTemplate`, so persisting the world persists its boot too.
+//! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the whole
+//! route tree round-trips with no post-load patching. Loading it is not running
+//! it though (a [`TemplateStore`] load declares no run), so the restored scene is
+//! booted explicitly here with the process request, exactly as [`cli`](./cli.rs)
+//! boots its hand-spawned root.
 //!
 //! ## Running the Example
 //!
@@ -66,14 +67,27 @@ fn setup(async_commands: AsyncCommands) {
 			blob.remove().await.ok();
 		}
 		// the bundle stays serializable (`CliServer` root + router child, both
-		// reflect components), and the `CallOnLoad` it carries boots it: the verb
-		// observes `LoadTemplate`, which the scene load fires. Booting explicitly
-		// on top of that answers the one request twice.
-		TemplateStore::load_or_create(world.clone(), blob, async |_| {
-			route_bundle().xok()
-		})
-		.await?;
-		Ok(())
+		// reflect components), so the file *is* the app.
+		let spawned =
+			TemplateStore::load_or_create(world.clone(), blob, async |_| {
+				route_bundle().xok()
+			})
+			.await?;
+		// the restored server root, booted with the process request: the load
+		// rebuilt the tree, this runs it.
+		let root = world
+			.with(move |world: &mut World| {
+				spawned.into_iter().find(|entity| {
+					world.entity(*entity).contains::<CliServer>()
+				})
+			})
+			.await
+			.ok_or_else(|| bevyhow!("no `CliServer` in the loaded scene"))?;
+		CallOnReady::call(
+			world.entity(root),
+			Request::from_cli_args(CliArgs::parse_env()),
+		)
+		.await
 	});
 }
 

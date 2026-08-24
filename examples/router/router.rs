@@ -48,9 +48,9 @@ fn setup(mut commands: Commands) -> Result {
 			router_scene()?,
 		))
 		// boot the declared server children; `.ok()` since the repl selection
-		// self-boots and declares no `CallOnLoad` target.
+		// self-boots and declares no `CallOnReady` target.
 		.queue_async_local(|host| async move {
-			CallOnLoad::call_recursive(host, || {
+			CallOnReady::call_recursive(host, || {
 				Request::from_cli_args(CliArgs::parse_env())
 			})
 			.await

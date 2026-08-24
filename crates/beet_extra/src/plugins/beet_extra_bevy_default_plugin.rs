@@ -12,8 +12,8 @@ pub(crate) fn beet_extra_bevy_default_plugin(app: &mut App) {
 	// panic on the double-add when this group composes with a router-bearing app.
 	app.init_plugin::<ActionPlugin>()
 		.add_plugins((
-			// drains deferred asset loads (clips, Bert) so a scene's `LoadTemplate`
-			// (and its `CallOnLoad` gate) fires once every asset has settled.
+			// drains deferred asset loads (clips, Bert) so a scene's `Ready`
+			// (and its `CallOnReady` gate) fires once every asset has settled.
 			AssetTemplatePlugin,
 			BeetSpatialPlugins,
 			plugin_2d,
@@ -25,11 +25,11 @@ pub(crate) fn beet_extra_bevy_default_plugin(app: &mut App) {
 			(close_on_esc, toggle_fullscreen, ensure_spatial_roots),
 		)
 		.init_resource::<RandomSource>()
-		// `CallOnLoad` (the load verb the scenes start their trees with)
+		// `CallOnReady` (the load verb the scenes start their trees with)
 		// lives in `beet_net` with the rest of the load-verb family, registered by
 		// `ServerPlugin`. A windowed scene need not carry the router stack, so
 		// register it here too (idempotent) to keep the render set self-sufficient.
-		.register_type::<CallOnLoad>()
+		.register_type::<CallOnReady>()
 		.register_type::<Collectable>();
 }
 

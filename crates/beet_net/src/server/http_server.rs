@@ -71,7 +71,7 @@ static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 /// let mut world = World::new();
 /// world.spawn((
 ///     HttpServer::default(),
-///     LoadRequest::from_cli().on_spawn(),
+///     CallOnReady::on_spawn(),
 ///     children![exchange_ext::handler(|req| req.mirror())],
 /// ));
 /// ```

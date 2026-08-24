@@ -1,4 +1,4 @@
-//! Scene-spawn deferral: gates a template's `LoadTemplate` on a built
+//! Scene-spawn deferral: gates a template's `Ready` on a built
 //! `WorldAssetRoot`'s `WorldInstanceReady`, so spawned scene children are
 //! present before any load verb runs.
 mod scene_ready;

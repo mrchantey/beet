@@ -49,8 +49,8 @@ impl RoutesDir {
 	///
 	/// The route children appear a few async ticks after the insert, so the scan
 	/// parks a [`PendingGuard`] on the build root (or on this entity outside a
-	/// build), deferring [`LoadTemplate`] until the routes are spawned. So a load
-	/// verb (`CallOnLoad`) under the entry root only fans the request out once
+	/// build), deferring [`Ready`] until the routes are spawned. So a load
+	/// verb (`CallOnReady`) under the entry root only fans the request out once
 	/// every discovered route exists, exactly as the asset / scene deferrals gate
 	/// it, and a settle ([`TemplatePending::settle`]) waits on the same set
 	/// wherever the dir was inserted.
@@ -116,7 +116,7 @@ impl RoutesDir {
 							}
 							world.flush();
 							// routes are spawned: resolve, draining the root's set so
-							// the deferred `LoadTemplate` fires.
+							// the deferred `Ready` fires.
 							guard.resolve(world);
 						})
 						.await;

@@ -2,7 +2,7 @@ use beet_core::prelude::*;
 use bevy::world_serialization::WorldAssetRoot;
 use bevy::world_serialization::WorldInstanceReady;
 
-/// Defers a template's [`LoadTemplate`] until a [`WorldAssetRoot`] it builds has
+/// Defers a template's [`Ready`] until a [`WorldAssetRoot`] it builds has
 /// spawned its entities.
 ///
 /// A `WorldAssetRoot` (eg a glb world scene) spawns its children
@@ -25,7 +25,7 @@ impl Plugin for SceneReadyPlugin {
 
 /// On a [`WorldAssetRoot`] added during a template build, park a
 /// [`PendingDependency`] on the entity (its guard on the build root), so
-/// `LoadTemplate` waits for the scene to spawn; a despawned scene resolves it
+/// `Ready` waits for the scene to spawn; a despawned scene resolves it
 /// implicitly. A `WorldAssetRoot` added outside a build gates nothing.
 fn register_pending_scene(
 	add: On<Add, WorldAssetRoot>,
@@ -56,7 +56,7 @@ fn register_pending_scene(
 }
 
 /// On a scene's [`WorldInstanceReady`], remove the entity's
-/// [`PendingDependency`] (which resolves it), firing [`LoadTemplate`] once
+/// [`PendingDependency`] (which resolves it), firing [`Ready`] once
 /// nothing else is pending on the root.
 fn resolve_pending_scene(
 	ready: On<WorldInstanceReady>,
@@ -69,7 +69,7 @@ fn resolve_pending_scene(
 	}
 	commands.queue(move |world: &mut World| {
 		// set up the scene's freshly-spawned (bare) AnimationPlayers BEFORE firing
-		// LoadTemplate, so a `CallOnLoad`-started tree never out-races the
+		// Ready, so a `CallOnReady`-started tree never out-races the
 		// `init_animators` Update system for a player that lacks its graph handle
 		// and transitions. The remove resolves the dependency via its hook, whose
 		// queued drain runs after this command.
@@ -84,7 +84,7 @@ fn resolve_pending_scene(
 fn init_scene_animators(world: &mut World, scene_root: Entity) {
 	let graph = world.get::<AnimationGraphHandle>(scene_root).cloned();
 	// the spawned players in the scene subtree that are not yet set up.
-	let subtree = world.entity_mut(scene_root).iter_descendents_inclusive();
+	let subtree = world.entity_mut(scene_root).iter_descendants_inclusive();
 	let players = subtree
 		.into_iter()
 		.filter(|&entity| {
@@ -124,7 +124,7 @@ mod test {
 		let fired = Store::new(false);
 		let f = fired.clone();
 		app.world_mut()
-			.add_observer(move |_: On<LoadTemplate>| f.set(true));
+			.add_observer(move |_: On<Ready>| f.set(true));
 
 		// a minimal world scene asset, added directly so it is immediately available.
 		let mut asset_world = World::new();
@@ -139,7 +139,7 @@ mod test {
 			.spawn_template(Snippet::from_bundle(WorldAssetRoot(handle)))
 			.unwrap();
 
-		// LoadTemplate deferred: the scene has not spawned (WorldInstanceReady) yet.
+		// Ready deferred: the scene has not spawned (WorldInstanceReady) yet.
 		fired.get().xpect_false();
 
 		// drive the spawner until it spawns the instance and fires WorldInstanceReady.

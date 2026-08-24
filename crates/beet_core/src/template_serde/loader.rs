@@ -244,7 +244,7 @@ impl Template for EntryTemplate {
 /// entities into the world.
 ///
 /// Distinct from the per-root
-/// [`LoadTemplate`](crate::prelude::LoadTemplate) lifecycle event: this is the
+/// [`Ready`](crate::prelude::Ready) lifecycle event: this is the
 /// batch-completion signal carrying every entity the loader spawned. Reflect
 /// loads insert components one entity at a time, so per-insert observers run
 /// before relationships settle; listeners use this to react to a completed load

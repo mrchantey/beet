@@ -35,7 +35,7 @@ fn main() {
 			commands.spawn((
 				HttpServer::default(),
 				children![(Count::default(), Handler.into_action())],
-				LoadRequest::from_cli().on_spawn(),
+				CallOnReady::on_spawn(),
 			));
 		})
 		.run();

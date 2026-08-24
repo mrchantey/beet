@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 /// Spread it onto a thread's outer root, anywhere under the servers:
 ///
 /// ```rsx
-/// <TuiServer {CallOnLoad}>
+/// <TuiServer {CallOnReady}>
 ///     <Router>
 ///         <Repeat {RunThread}>
 ///             <Thread {Sequence}> ..actors.. </Thread>
@@ -188,7 +188,9 @@ mod test {
 			.init_plugin::<ThreadPlugin>();
 		app.world_mut()
 			.spawn(children![scene(path, system, agent)])
-			.trigger(StartRunning::from_cli);
+			.trigger(|entity| {
+				StartRunning::new(entity, Request::get(Url::NONE))
+			});
 		// pump long enough for the async kick -> adopt -> mount -> run -> sync
 		for _ in 0..120 {
 			app.update();
@@ -247,9 +249,9 @@ mod test {
 		};
 		let booted = app.world_mut().spawn(children![ephemeral()]).flush();
 		let idle = app.world_mut().spawn(children![ephemeral()]).flush();
-		app.world_mut()
-			.entity_mut(booted)
-			.trigger(StartRunning::from_cli);
+		app.world_mut().entity_mut(booted).trigger(|entity| {
+			StartRunning::new(entity, Request::default())
+		});
 		for _ in 0..60 {
 			app.update();
 		}

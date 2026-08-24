@@ -8,7 +8,7 @@ use bevy::animation::RepeatAnimation;
 /// The declarative, behaviour-tree-free way to "just play this animation forever":
 /// where [`PlayAnimation`] is an action a `<Sequence>` runs, this is a plain
 /// component a scene spreads onto a model (eg `<Foxie {PlayAnimationOnLoad{clip:..}}/>`)
-/// to keep it idling with no `CallOnLoad`/`Sequence` at all. Resolves the clip against
+/// to keep it idling with no `CallOnReady`/`Sequence` at all. Resolves the clip against
 /// the entity's own [`AnimationGraphClips`] and plays it on the [`AnimationPlayer`]
 /// the glb spawns as a descendant; it is a one-shot, so the model can later be driven
 /// by an action without contention.

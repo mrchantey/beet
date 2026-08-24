@@ -7,7 +7,7 @@ capabilities (registered reflect types) but ships zero behaviour, so opening it
 does nothing until you supply an entry. On startup it discovers `main.bsx` (or
 `main.json` / `main.ron`) by walking the cwd's ancestors, with `--main=<path>` as
 an override. It parses argv once into a request the loaded tree consumes, builds
-the entry through the unified loader, and lets its load verb (`CallOnLoad`) call
+the entry through the unified loader, and lets its load verb (`CallOnReady`) call
 the entry's own action with that request: a script runs and exits, or a server
 entry fans the request out to the servers it declares, each dispatching down into
 its router child. A one-shot streams its response and exits; a long-running server

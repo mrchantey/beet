@@ -33,7 +33,7 @@ fn main() -> Result {
 				OnSpawn::observe(common_handlers::echo_close),
 				OnSpawn::observe(common_handlers::log_send),
 				OnSpawn::observe(common_handlers::log_recv),
-				LoadRequest::from_cli().on_spawn(),
+				CallOnReady::on_spawn(),
 			));
 		})
 		.run();

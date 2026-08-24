@@ -1,7 +1,7 @@
 <!--
 The wasm example home page, booting `beet-min.wasm`: the smallest binary that is
 still a beet runtime in the browser, so its program (`hello.bsx`) sticks to the core
-`<Sequence>`/`<Log>`/`CallOnLoad` vocabulary. A full `<HtmlDocument>` so the route
+`<Sequence>`/`<Log>`/`CallOnReady` vocabulary. A full `<HtmlDocument>` so the route
 renders the whole document directly (no layout middleware): `<Stylesheet>` +
 `<ColorSchemeScript>` + `<LiveReloadScript>` in the head, the console panel and the
 wasm loader in the body.

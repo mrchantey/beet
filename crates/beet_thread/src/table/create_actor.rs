@@ -54,13 +54,18 @@ mod test {
 
 	/// A bespoke, non-actor loop step: a hand-written unit struct whose async `Action`
 	/// is attached via `#[require]`, the shape a custom thread `Sequence` step takes.
+	///
+	/// Named for its short type path, which is what a BSX tag resolves by: a bare
+	/// `Tick` collides with bevy's own `bevy::ecs::component::Tick` whenever a
+	/// co-compiled crate registers it, and an ambiguous short path resolves to
+	/// nothing rather than guessing.
 	async fn tick_action(_cx: ActionContext) -> Result<Outcome> {
 		Ok(Outcome::Pass(()))
 	}
 	#[derive(Component, Reflect, Default)]
 	#[reflect(Component, Default)]
 	#[require(Action<(), Outcome> = Action::new_async(tick_action))]
-	struct Tick;
+	struct TickStep;
 
 	/// A thread must behave as an extensible `Sequence`: a bespoke action authored as a
 	/// leading, non-actor child of the loop `Sequence` must survive reduce as a valid
@@ -70,13 +75,13 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.init_plugin::<ThreadPlugin>();
-		app.register_type::<Tick>();
+		app.register_type::<TickStep>();
 		app.register_type::<ProbeTool>();
 		let source = r#"
 <Thread {Sequence}>
-	<Tick/>
+	<TickStep/>
 	<CreateActor name="System" kind="System"><CreatePost text="x"/></CreateActor>
-	<CreateActor name="Camera" kind="User" {Tick}/>
+	<CreateActor name="Camera" kind="User" {TickStep}/>
 	<CreateActor name="Bot" kind="Agent" {ModelStreamer{provider:Ollama}}>
 		<ProbeTool/>
 	</CreateActor>

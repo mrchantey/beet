@@ -152,7 +152,7 @@ pub(crate) fn process_live_reloads(world: &mut World) {
 fn subtree_pending(world: &mut World, root: Entity) -> bool {
 	world
 		.entity_mut(root)
-		.iter_descendents_inclusive()
+		.iter_descendants_inclusive()
 		.into_iter()
 		.any(|entity| {
 			world

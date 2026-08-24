@@ -13,7 +13,7 @@ The fox chases a cursor-following cheese: its action tree plays the idle clip, t
 	<Ground3d/>
 	<WorldScene src="kaykit/cheese.glb#Scene0" x=20. z=40. scale=3. bx:ref="cheese" {FollowCursor3d}/>
 	<Foxie scale=0.1 bx:ref="fox" {(SteerTarget::Entity($cheese), RotateToVelocity3d, Velocity, Mass, Force, Impulse, MaxForce(0.5), MaxSpeed(10.), ArriveRadius(7.))}>
-		<Repeat {(CallOnLoad, ActionOf($fox))}>
+		<Repeat {(CallOnReady, ActionOf($fox))}>
 			<Sequence>
 				<Sequence>
 					<InsertOn target_entity="Agent"/>

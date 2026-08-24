@@ -18,7 +18,7 @@ impl AnimationGraphClips {
 
 impl AnimationGraphClips {
 	/// Build an [`AnimationGraph`] from `clips` (asset paths), loading each clip
-	/// through the deferred path ([`BuildAssets`]) so `LoadTemplate` waits for every
+	/// through the deferred path ([`BuildAssets`]) so `Ready` waits for every
 	/// clip, and returning the graph handle and the clip-path -> node-index map
 	/// ([`AnimationGraphClips`]) for actions to resolve against.
 	///
@@ -71,7 +71,7 @@ mod test {
 
 		let fired = Store::new(false);
 		let f = fired.clone();
-		world.add_observer(move |_: On<LoadTemplate>| f.set(true));
+		world.add_observer(move |_: On<Ready>| f.set(true));
 
 		let clips = vec![
 			"fox.glb#Animation0".to_string(),
@@ -95,7 +95,7 @@ mod test {
 			.unwrap()
 			.id();
 
-		// LoadTemplate deferred: both clips parked pending on the build root.
+		// Ready deferred: both clips parked pending on the build root.
 		fired.get().xpect_false();
 		world.entity(root).contains::<PendingAssets>().xpect_true();
 		// the clip-path -> node-index map is recoverable, distinct per clip.

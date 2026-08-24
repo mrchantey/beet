@@ -33,7 +33,7 @@ fn main() {
 		commands.spawn((
 			site_server(),
 			children![rsx_site_router()],
-			LoadRequest::from_cli().on_spawn(),
+			CallOnReady::on_spawn(),
 		));
 	});
 	app.run();

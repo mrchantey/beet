@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 ///
 /// Filtered on `Without<AnimationTransitions>` rather than `Added<AnimationPlayer>`:
 /// the spawned player is initialised on the first frame it lacks the transitions,
-/// so a `CallOnLoad`-started tree never out-races a one-shot `Added` setup. The
+/// so a `CallOnReady`-started tree never out-races a one-shot `Added` setup. The
 /// query is empty (and the system a no-op) once every player is initialised.
 pub(crate) fn init_animators(
 	mut commands: Commands,

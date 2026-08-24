@@ -16,14 +16,14 @@ impl Plugin for ServerPlugin {
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
 			.register_type::<Tls>()
-			// the markup load verb, so an `<HttpServer>` entry, a `{CallOnLoad}`
+			// the markup load verb, so an `<HttpServer>` entry, a `{CallOnReady}`
 			// script or behaviour scene resolves it.
-			.register_type::<CallOnLoad>();
+			.register_type::<CallOnReady>();
 
 		// a start whose `--server` selected no facet fails the call in the
 		// `RunningSet` itself, so there is no server-layer check to register here.
 
-		// the process exits when `CallOnLoad` writes `AppExit` for the one-shot
+		// the process exits when `CallOnReady` writes `AppExit` for the one-shot
 		// it resolves; a long-running server never resolves its boot call, so its
 		// parked `Running<Response>` holds the run open with no refcount.
 
@@ -87,7 +87,7 @@ mod boot_check_test {
 		let entity = app.world_mut().spawn(stub_server(0, log)).id();
 		app.world_mut().entity_mut(entity).run_async_local(
 			|server| async move {
-				CallOnLoad::call(
+				CallOnReady::call(
 					server,
 					Request::from_cli_str("--server=nonexistent"),
 				)

@@ -12,6 +12,7 @@
 //!
 //! - [`AncestorQuery`] - Query entities through ancestor relationships
 //! - [`EntityTargetEvent`] - Events targeting specific entities
+//! - [`SubtreeTrigger`] - Fire one event across a subtree, deepest first
 //!
 //! # Systems and Plugins
 //!
@@ -46,6 +47,7 @@ mod despawn_after;
 mod entity_target_event;
 pub mod hook_ext;
 mod non_send_plugin;
+mod subtree_trigger;
 
 pub use bevyhow::*;
 #[cfg(feature = "std")]
@@ -75,4 +77,5 @@ pub use on_spawn::*;
 pub use perf_log::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
+pub use subtree_trigger::*;
 pub use when::*;

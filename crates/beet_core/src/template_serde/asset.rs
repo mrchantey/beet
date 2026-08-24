@@ -4,11 +4,11 @@
 //! building it resolves the path to a [`Handle`] through the [`AssetServer`].
 //! This is the canonical example of why a [`Template`] carries world context.
 //!
-//! [`LoadTemplate`] itself is core and fires immediately when nothing is pending
+//! [`Ready`] itself is core and fires immediately when nothing is pending
 //! (see the lifecycle). What this feature adds is the deferral: an asset
 //! produced anywhere in a subtree registers a pending dependency on the template
 //! root, and [`drain_loaded_assets`] resolves it when the asset finishes loading,
-//! firing [`LoadTemplate`] only once every tracked asset has settled.
+//! firing [`Ready`] only once every tracked asset has settled.
 //!
 //! Removing the feature leaves a fully functional asset-free substrate: the
 //! no_std core representation, walker, and value-slot serde never reference an
@@ -25,7 +25,7 @@ use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
 
 /// A [`Template`] that resolves an asset path to a strong [`Handle`] and defers
-/// [`LoadTemplate`] until the asset (and its dependencies) finish loading.
+/// [`Ready`] until the asset (and its dependencies) finish loading.
 ///
 /// Build loads the handle, then registers a pending dependency on the template
 /// root, tracked by [`PendingAssets`] and drained by [`drain_loaded_assets`].
@@ -87,11 +87,11 @@ impl<A: Asset> Template for AssetLoadTemplate<A> {
 }
 
 /// A [`SystemParam`] for loading assets from inside a `#[template(system)]`, so
-/// the load defers [`LoadTemplate`] until the asset finishes loading. The
+/// the load defers [`Ready`] until the asset finishes loading. The
 /// system-side counterpart of [`AssetLoadTemplate`].
 ///
 /// A raw `asset_server.load(..)` inside a template mints a handle but lets
-/// `LoadTemplate` fire immediately; `BuildAssets::load` parks a pending
+/// `Ready` fire immediately; `BuildAssets::load` parks a pending
 /// dependency on the build root instead, so behaviours never run before their
 /// assets exist.
 #[derive(SystemParam)]
@@ -103,7 +103,7 @@ pub struct BuildAssets<'w, 's> {
 
 impl BuildAssets<'_, '_> {
 	/// Load the asset at `path`, registering it as a pending dependency on the
-	/// current template build root so `LoadTemplate` defers until it loads.
+	/// current template build root so `Ready` defers until it loads.
 	///
 	/// Outside a template build (no [`TemplateBuildRoot`]) it loads without
 	/// deferral, like a plain `asset_server.load`.
@@ -166,7 +166,7 @@ impl Plugin for AssetTemplatePlugin {
 ///
 /// Each frame, for every root with outstanding [`PendingAssets`], an asset whose
 /// recursive dependency load state is settled (loaded or failed) is resolved,
-/// firing [`LoadTemplate`] once the root's whole set drains.
+/// firing [`Ready`] once the root's whole set drains.
 fn drain_loaded_assets(world: &mut World) {
 	let roots = world
 		.query_filtered::<Entity, With<PendingAssets>>()
@@ -260,11 +260,9 @@ mod test {
 
 		let load_state = Store::new(None);
 		let ls = load_state.clone();
-		world.add_observer(move |ev: On<LoadTemplate>| {
-			ls.set(Some(ev.is_error))
-		});
+		world.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
 
-		// a template that loads the asset, deferring LoadTemplate.
+		// a template that loads the asset, deferring Ready.
 		let root = world
 			.spawn_template(bevy::ecs::template::template(
 				|cx: &mut TemplateContext| {
@@ -276,7 +274,7 @@ mod test {
 			.unwrap()
 			.id();
 
-		// LoadTemplate has not fired: the asset is still pending.
+		// Ready has not fired: the asset is still pending.
 		load_state.get().xpect_none();
 		app.world()
 			.entity(root)
@@ -288,12 +286,12 @@ mod test {
 		app_ext::update_until(&mut app, |_world| load_state.get().is_some())
 			.await
 			.xpect_true();
-		// LoadTemplate fired, no error, once the asset finished loading.
+		// Ready fired, no error, once the asset finished loading.
 		load_state.get().xpect_eq(Some(false));
 	}
 
 	/// `BuildAssets::load` (the system-side helper) parks the load as a pending
-	/// dependency on the build root, so `LoadTemplate` defers. The full
+	/// dependency on the build root, so `Ready` defers. The full
 	/// load-then-fire cycle is covered by [`defers_load_until_asset_loaded`];
 	/// both drain through the same [`drain_loaded_assets`].
 	#[beet_core::test]
@@ -303,7 +301,7 @@ mod test {
 
 		let fired = Store::new(false);
 		let f = fired.clone();
-		world.add_observer(move |_: On<LoadTemplate>| f.set(true));
+		world.add_observer(move |_: On<Ready>| f.set(true));
 
 		// a `#[template(system)]`-style build that loads through `BuildAssets`.
 		let root = world
@@ -316,7 +314,7 @@ mod test {
 			.unwrap()
 			.id();
 
-		// LoadTemplate deferred: the asset is parked pending on the build root.
+		// Ready deferred: the asset is parked pending on the build root.
 		fired.get().xpect_false();
 		app.world()
 			.entity(root)

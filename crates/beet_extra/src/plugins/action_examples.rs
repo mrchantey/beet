@@ -4,10 +4,10 @@
 //! binary, with the tree shape (names, stats, control flow) authored in BSX and
 //! only the real new actions/components living here. The control-flow nodes
 //! (`Sequence`, `Repeat`, `Fallback`, `HighestScore`, ...) and the load verb
-//! (`CallOnLoad`) come from `beet_action`/`beet_net`.
+//! (`CallOnReady`) come from `beet_action`/`beet_net`.
 //!
 //! ```bsx
-//! <Sequence {CallOnLoad}>
+//! <Sequence {CallOnReady}>
 //!   <Log::Message("running child1")/>
 //!   <Log::Message("running child2")/>
 //! </Sequence>

@@ -15,7 +15,7 @@ fn main() -> AppExit {
 	app.world_mut().spawn((
 		HttpServer::default(),
 		children![exchange_ext::handler(handle_request)],
-		LoadRequest::from_cli().on_spawn(),
+		CallOnReady::on_spawn(),
 	));
 	app.run()
 }

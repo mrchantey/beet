@@ -40,7 +40,7 @@ content. `destroy` deletes the Worker and empties + deletes the bucket.
     beet --main=examples/infra/hello_workers.bsx destroy
 
 A one-shot `CliServer` root (no long-running server) with the `Router` as its child;
-its `CallOnLoad` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
+its `CallOnReady` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
 `<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
 children of the route and the sequence runs them in order. Run from the workspace
 root: `local_dir` paths are cwd-relative.

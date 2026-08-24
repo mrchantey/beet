@@ -3,7 +3,7 @@
 //! Covers the gate: schema seed/assert, a missing required prop surfacing a
 //! graceful `TemplateError` (macro and loader paths), file-path module
 //! resolution (`<path::to::X>` from `path/to/X.bsx`), a composable schema
-//! spanning two templates, `LoadTemplate` draining on async schema resolution,
+//! spanning two templates, `Ready` draining on async schema resolution,
 //! and the remote-template stub wired into the pending set.
 beet_core::test_main!();
 
@@ -226,7 +226,7 @@ fn component_field_binds_document() {
 		.xpect_true();
 }
 
-// ---- async schema resolution drains LoadTemplate -----------------------------
+// ---- async schema resolution drains Ready -----------------------------
 
 #[beet_core::test(timeout_ms = 5000)]
 async fn async_remote_schema_defers_load() {
@@ -249,7 +249,7 @@ async fn async_remote_schema_defers_load() {
 	let load_state = Store::new(None);
 	let ls = load_state.clone();
 	app.world_mut()
-		.add_observer(move |ev: On<LoadTemplate>| ls.set(Some(ev.is_error)));
+		.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
 
 	// spawn the template; the remote schema parks a pending dependency.
 	let bytes = MediaBytes::new_bsx("<Remote/>");
@@ -262,7 +262,7 @@ async fn async_remote_schema_defers_load() {
 		entity.id()
 	};
 
-	// LoadTemplate has not fired: the remote schema is still pending.
+	// Ready has not fired: the remote schema is still pending.
 	load_state.get().xpect_none();
 	let pending = app.world().entity(root).get::<TemplatePending>();
 	pending
@@ -277,7 +277,7 @@ async fn async_remote_schema_defers_load() {
 		}
 		time_ext::sleep_millis(5).await;
 	}
-	// LoadTemplate fired once the remote schema resolved.
+	// Ready fired once the remote schema resolved.
 	load_state.get().xpect_eq(Some(false));
 }
 
@@ -294,7 +294,7 @@ async fn remote_template_stub_defers_load() {
 	let load_state = Store::new(None);
 	let ls = load_state.clone();
 	app.world_mut()
-		.add_observer(move |ev: On<LoadTemplate>| ls.set(Some(ev.is_error)));
+		.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
 
 	// `<Template src="..">` registers a pending fetch into the root's pending set.
 	let bytes =
@@ -308,7 +308,7 @@ async fn remote_template_stub_defers_load() {
 		entity.id()
 	};
 
-	// the fetch is pending, so LoadTemplate is deferred.
+	// the fetch is pending, so Ready is deferred.
 	load_state.get().xpect_none();
 	app.world()
 		.entity(root)

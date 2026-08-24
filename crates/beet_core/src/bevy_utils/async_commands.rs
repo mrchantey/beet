@@ -655,8 +655,8 @@ pub impl AsyncWorld {
 	///
 	/// `observer` is a full observer system, so beyond the [`On<E>`] trigger it
 	/// may take arbitrary [`SystemParam`]s and returns the value the future
-	/// resolves to, eg `|ev: On<LoadTemplate>| ev.is_error` to await a
-	/// [`LoadTemplate`](crate::prelude::LoadTemplate) and surface its error flag.
+	/// resolves to, eg `|ev: On<Ready>| ev.is_error` to await a
+	/// [`Ready`](crate::prelude::Ready) and surface its error flag.
 	fn await_event<E, B, M, O>(
 		&self,
 		observer: impl IntoObserverSystem<E, B, M, O>,
@@ -698,12 +698,12 @@ pub impl AsyncWorld {
 		}
 	}
 
-	/// Spawns a root and builds `template` into it, awaiting [`LoadTemplate`].
+	/// Spawns a root and builds `template` into it, awaiting [`Ready`].
 	///
 	/// Unlike the synchronous [`World::spawn_template`](crate::prelude::WorldTemplateExt),
 	/// this awaits the full lifecycle: a template with deferred dependencies
 	/// (assets, remote schemas) resolves across later sync points, and the future
-	/// completes only once [`LoadTemplate`] fires. Fallible: a failed build
+	/// completes only once [`Ready`] fires. Fallible: a failed build
 	/// returns the root's [`TemplateError`] (its [`CloneError`]).
 	fn spawn_template(
 		&self,
@@ -736,9 +736,9 @@ pub impl AsyncWorld {
 }
 
 /// Builds `template` into a root (fresh when `entity` is `None`, else the given
-/// entity), awaiting its [`LoadTemplate`].
+/// entity), awaiting its [`Ready`].
 ///
-/// Installs the [`LoadTemplate`] observer *before* building so a synchronous load
+/// Installs the [`Ready`] observer *before* building so a synchronous load
 /// is never missed, surfacing the root's [`TemplateError`] on failure.
 fn build_template_async(
 	world: AsyncWorld,
@@ -751,10 +751,10 @@ fn build_template_async(
 		let root = world
 			.with(move |world: &mut World| {
 				let root = entity.unwrap_or_else(|| world.spawn_empty().id());
-				// observe LoadTemplate on the root, signalling its error flag, then
+				// observe Ready on the root, signalling its error flag, then
 				// build (which fires it), so a synchronous load is caught.
 				world.entity_mut(root).observe(
-					move |ev: On<LoadTemplate>, mut commands: Commands| {
+					move |ev: On<Ready>, mut commands: Commands| {
 						let observer = ev.observer();
 						if let Some(send) = sender.lock().unwrap().take() {
 							send.signal(ev.is_error);
@@ -1056,7 +1056,7 @@ impl AsyncEntity {
 	/// `observer` is a full observer system, so beyond the [`On<E>`] trigger it
 	/// may take arbitrary [`SystemParam`]s and returns the value the future
 	/// resolves to. The route-handler case: `spawn_template` a root, then
-	/// `entity.await_event::<LoadTemplate, _, _, _>(|ev: On<LoadTemplate>| ev.is_error)`
+	/// `entity.await_event::<Ready, _, _, _>(|ev: On<Ready>| ev.is_error)`
 	/// to await readiness and branch on the error flag.
 	pub fn await_event<E, B, M, O>(
 		&self,
@@ -1110,7 +1110,7 @@ impl AsyncEntity {
 		}
 	}
 
-	/// Builds `template` into this entity, awaiting [`LoadTemplate`].
+	/// Builds `template` into this entity, awaiting [`Ready`].
 	///
 	/// The entity-scoped counterpart of
 	/// [`AsyncWorld::spawn_template`](AsyncWorldExt::spawn_template):

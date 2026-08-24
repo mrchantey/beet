@@ -17,7 +17,7 @@
 //! serializes it and despawns it via [`DespawnAfterRender`].
 //!
 //! Building through `spawn_template` (not a bare `world.spawn`) is what resolves
-//! the content's slots and fires its `On<SpawnTemplate>`/`On<LoadTemplate>`
+//! the content's slots and fires its `On<SpawnTemplate>`/`On<Ready>`
 //! lifecycle, so a page composed of `#[template]` widgets renders correctly.
 //!
 //! For pages whose content depends on the request, `In` is typically [`Request`]

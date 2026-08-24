@@ -112,6 +112,10 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_router::prelude::*;
 	use beet_ui::prelude::*;
+	// explicit: bevy_ui ships its own `ScrollPosition`, which reaches this module
+	// through `beet_core::prelude` whenever a co-compiled crate enables that
+	// feature. The charcell view means beet_ui's.
+	use beet_ui::prelude::ScrollPosition;
 	use bevy::math::UVec2;
 
 	/// The live-TUI stack a thread scene is served through, the in-process twin of

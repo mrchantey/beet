@@ -5,7 +5,7 @@ from the `site/` directory (`cd site && beet serve`, and `beet present`, `beet
 check`, `beet export-static`), and the deployed Lightsail box loads the same
 entry directly from the app bucket root.
 
-The root is a one-shot `<CliServer always=true {CallOnLoad}>` dispatcher whose
+The root is a one-shot `<CliServer always=true {CallOnReady}>` dispatcher whose
 `Router` is its child, so the entry is a set of commands and the served site is ONE
 of them: `serve`. `always=true` makes the dispatcher run on every boot regardless of
 `--server`, since `--server` selects the *served site's* transports, not this
@@ -101,7 +101,7 @@ different process from a stage deploy. No stage deploy or destroy touches it.
 Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 `CLOUDFLARE_API_TOKEN` in `.env`, plus `tofu` and `cargo-zigbuild`.
 -->
-<CliServer always=true {CallOnLoad}>
+<CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
 	<!-- the ONE location app identity lives: the deploy names its resources from
 	     this, and so does the running binary. -->

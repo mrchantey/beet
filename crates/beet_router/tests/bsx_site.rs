@@ -228,7 +228,7 @@ struct ServerStarted;
 /// failing with "address already in use" and orphaning the live listener's
 /// teardown): the site shape is a dispatcher root whose served site hangs off a
 /// `serve` route, and a server no longer drags a load verb in with it, so the
-/// whole document declares exactly ONE `CallOnLoad` and booting it starts each
+/// whole document declares exactly ONE `CallOnReady` and booting it starts each
 /// declared server exactly once.
 #[cfg(not(feature = "http"))]
 #[beet_core::test]
@@ -249,7 +249,7 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 	let root = spawn_bsx_under(
 		&mut world,
 		holder,
-		"<CliServer always=true {CallOnLoad}>\
+		"<CliServer always=true {CallOnReady}>\
 			<Router>\
 				<Route path=\"serve\" {HttpServer}>\
 					<Router {RequestLogger}/>\
@@ -259,7 +259,7 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 	);
 	// the load verb is the root's alone: the servers bring none of their own
 	world
-		.query_filtered_once::<Entity, With<CallOnLoad>>()
+		.query_filtered_once::<Entity, With<CallOnReady>>()
 		.len()
 		.xpect_eq(1);
 	// count every start, so a second boot of the serve route is visible
@@ -270,7 +270,7 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 	});
 	// boot it the way `beet serve site` does: forward the `serve` route in
 	world.run_async_local(move |async_world| async move {
-		CallOnLoad::call_recursive(async_world.entity(root), || {
+		CallOnReady::call_recursive(async_world.entity(root), || {
 			Request::from_cli_str("serve --server=http")
 		})
 		.await
@@ -430,13 +430,13 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 }
 
 /// An included entry carries its boot onto the root: the included `CliServer`
-/// owns the root with a `<Router/>` dispatch child and declares `{CallOnLoad}`,
+/// owns the root with a `<Router/>` dispatch child and declares `{CallOnReady}`,
 /// and a `<Template src=.../>` include builds both onto the entry root, so the
 /// load verb rides the include and the load path finds it. The binary injects no
 /// verb of its own. The regression guard for an include carrying its boot
 /// machinery onto the root.
 ///
-/// The root is built dormant (no `LoadRequest`): the assertion is that the
+/// The root is built dormant (the load declares no run): the assertion is that the
 /// machinery *arrived*, and a real boot here would dispatch the test runner's own
 /// argv as its request.
 #[beet_core::test]
@@ -445,7 +445,7 @@ async fn include_carries_boot() {
 	store
 		.insert(
 			&SmolPath::from("serve.bsx"),
-			"<CliServer {CallOnLoad}><Router/></CliServer>",
+			"<CliServer {CallOnReady}><Router/></CliServer>",
 		)
 		.await
 		.unwrap();
@@ -466,7 +466,7 @@ async fn include_carries_boot() {
 	// the included CliServer lands on the entry root carrying the load verb, so
 	// the load path can resolve, with the Router as its dispatch child.
 	world.entity(root).contains::<CliServer>().xpect_true();
-	world.entity(root).contains::<CallOnLoad>().xpect_true();
+	world.entity(root).contains::<CallOnReady>().xpect_true();
 	world
 		.with_state::<Query<(), With<Router>>, _>(|routers| {
 			routers.iter().count()

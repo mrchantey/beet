@@ -42,7 +42,7 @@ use bytes::Bytes;
 /// assert_eq!(request.method(), &HttpMethod::Get);
 /// assert_eq!(request.path(), &["api", "users"]);
 /// ```
-#[derive(Debug, Component, Get)]
+#[derive(Debug, Default, Component, Get)]
 #[component(on_add = on_add)]
 pub struct Request {
 	/// The request metadata, including method, path, headers, etc.

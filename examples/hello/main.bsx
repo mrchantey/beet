@@ -3,7 +3,7 @@ The smallest beet entry: a script that runs on load and prints, the
 `node main.js` shape. `<script>` is a raw-text element so the JavaScript body is
 verbatim; `ExchangeScriptElement` installs the entry's `Request -> Response`
 action (it runs the script and returns its `console.log` as the response), and
-`CallOnLoad` calls that action once the entry is built, streaming the output to
+`CallOnReady` calls that action once the entry is built, streaming the output to
 stdout, then exiting.
 -->
-<script {(ExchangeScriptElement, CallOnLoad)}>console.log("hello world")</script>
+<script {(ExchangeScriptElement, CallOnReady)}>console.log("hello world")</script>

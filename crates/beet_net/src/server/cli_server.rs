@@ -22,13 +22,13 @@ use beet_core::prelude::*;
 /// `--server=cli`) reaches it.
 ///
 /// ```bsx
-/// <CliServer always=true {CallOnLoad}>
+/// <CliServer always=true {CallOnReady}>
 ///     <Router>..</Router>
 /// </CliServer>
 /// ```
 ///
 /// Being a one-shot it resolves the call rather than holding it, so the process
-/// exits once [`CallOnLoad::call`] has streamed its response. Resolving removes
+/// exits once [`CallOnReady::call`] has streamed its response. Resolving removes
 /// the entity's `Running<Response>`, which signals any co-resident facet: a bare
 /// start of an entity carrying both a `CliServer` and an [`HttpServer`]
 /// dispatches once and exits.
@@ -92,7 +92,7 @@ fn default_accept() -> Vec<MediaType> {
 }
 
 /// Route the request through the host's dispatch, then resolve the parked call
-/// with the response so [`CallOnLoad::call`] streams it and exits.
+/// with the response so [`CallOnReady::call`] streams it and exits.
 ///
 /// Awaited inline by the facet rather than detached: the driver polls every
 /// selected facet concurrently, so a dispatched route that parks (a `serve`

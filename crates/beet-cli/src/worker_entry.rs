@@ -11,9 +11,9 @@
 //! env binding to store, the worker request/response conversion, and the
 //! per-isolate world cache with version invalidation.
 //!
-//! The entry builds into a root carrying the site store and no
-//! [`LoadRequest`] (so its declared servers stay dormant; the Worker itself
-//! serves each request). The universal seam is the same
+//! The entry builds into a root carrying the site store, dormant (so its
+//! declared servers stay down; the Worker itself serves each request). The
+//! universal seam is the same
 //! `entity.exchange(request) -> Response` the native servers use.
 
 use crate::prelude::*;
@@ -110,12 +110,12 @@ async fn handle(
 /// [`build_app`] ([`BeetPlugins`] + [`WorkersPlugin`]) and run the shared
 /// [`build_entry_owned`] build+settle, then resolve the host entity.
 ///
-/// The build supplies no [`LoadRequest`]: the Worker itself routes each request
-/// through the host's `Router` action via `exchange`, so the servers the entry
-/// declares (`HttpServer`, `TuiServer`, ...) must stay dormant. With one the
-/// entry's `CallOnLoad` verb would boot them on `LoadTemplate`, and `HttpServer`'s
-/// start would hit the (wasm-absent) backend and panic. Same dormant build
-/// `export-static`/`check` use.
+/// The build declares no run: the Worker itself routes each request through the
+/// host's `Router` action via `exchange`, so the servers the entry declares
+/// (`HttpServer`, `TuiServer`, ...) must stay dormant. Under a run declaration
+/// the entry's `CallOnReady` verb would boot them on its `Ready`, and
+/// `HttpServer`'s start would hit the (wasm-absent) backend and panic. Same
+/// dormant build `export-static`/`check` use.
 async fn build_worker_world(
 	store: BlobStore,
 	entry_name: String,
@@ -128,7 +128,7 @@ async fn build_worker_world(
 	let mut app = build_app();
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
-	entry_build::build_entry_owned(&mut world, store, entry_name, ()).await?;
+	entry_build::build_entry_owned(&mut world, store, entry_name).await?;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world

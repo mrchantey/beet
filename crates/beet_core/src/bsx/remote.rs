@@ -1,11 +1,11 @@
 //! Remote schemas and remote templates: async front-ends that defer
-//! [`LoadTemplate`](beet_core::prelude::LoadTemplate) until they resolve.
+//! [`Ready`](beet_core::prelude::Ready) until they resolve.
 //!
 //! Both are async because a remote dependency forms a graph that resolves over
 //! the network. They park a [`PendingGuard`](beet_core::prelude::PendingGuard)
 //! on the build root's [`TemplatePending`](beet_core::prelude::TemplatePending)
 //! set, spawn a task that resolves the dependency, then resolve the guard,
-//! firing `LoadTemplate` once everything settles.
+//! firing `Ready` once everything settles.
 //!
 //! The fetch itself is intentionally unimplemented: remote transport (trust,
 //! caching, versioning) is deferred to the BSX to BSN transition, which
@@ -17,7 +17,7 @@
 use crate::prelude::*;
 use bevy::ecs::template::TemplateContext;
 
-/// Register a pending remote-schema fetch on the build root, so `LoadTemplate`
+/// Register a pending remote-schema fetch on the build root, so `Ready`
 /// defers until the schema resolves.
 ///
 /// Parks a [`PendingGuard`] on the root's [`TemplatePending`], then spawns a
@@ -25,7 +25,7 @@ use bevy::ecs::template::TemplateContext;
 /// [`SchemaRegistry`] under `name`, and resolves the guard.
 ///
 /// The async resolution + validation is therefore registered into the
-/// `LoadTemplate` pending set, exactly as assets are.
+/// `Ready` pending set, exactly as assets are.
 pub(crate) fn register_remote_schema(
 	name: SmolStr,
 	url: SmolStr,
@@ -101,7 +101,7 @@ async fn resolve_remote_schema(
 async fn fetch_remote_schema(_url: &str) -> ValueSchema { ValueSchema::Any }
 
 /// Register a pending remote-template fetch on the build root for a
-/// `<Template src="..">` tag, deferring `LoadTemplate` until it resolves.
+/// `<Template src="..">` tag, deferring `Ready` until it resolves.
 ///
 /// A remote template is another front-end producing a
 /// [`DynamicTemplate`](beet_core::prelude::DynamicTemplate), fetched

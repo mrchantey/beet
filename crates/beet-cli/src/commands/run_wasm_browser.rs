@@ -78,7 +78,7 @@ pub(crate) async fn run(
 	// wait for the bound port, mirroring `export-pdf`
 	cx.world()
 		.run_async_local(move |world| async move {
-			CallOnLoad::call_recursive(world.entity(root), || {
+			CallOnReady::call_recursive(world.entity(root), || {
 				Request::from_cli_str("--server=http")
 			})
 			.await?;

@@ -132,7 +132,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	// and wait for the bound port.
 	cx.world()
 		.run_async_local(move |world| async move {
-			CallOnLoad::call_recursive(world.entity(root), || {
+			CallOnReady::call_recursive(world.entity(root), || {
 				Request::from_cli_str("--server=http --port=0")
 			})
 			.await?;

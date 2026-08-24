@@ -48,7 +48,7 @@ async fn render(world: &mut World, router: Entity, path: &str) -> String {
 async fn entry_lands_on_root() {
 	let (world, root, router) = site_world().await;
 	// the servers `main.bsx` declares own the entry root, the router is their child
-	world.entity(root).contains::<CallOnLoad>().xpect_true();
+	world.entity(root).contains::<CallOnReady>().xpect_true();
 	world.entity(root).contains::<HttpServer>().xpect_true();
 	// the spread middleware stacks on the router beside its dispatch
 	world.entity(router).contains::<Router>().xpect_true();

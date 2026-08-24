@@ -5,7 +5,7 @@
 //!
 //! ## One load path, one parked action
 //!
-//! [`CallOnLoad`] calls its entity's action with the load's request. On a server
+//! [`CallOnReady`] calls its entity's action with the process request. On a server
 //! entity that action belongs to the [`RunningSet`] its servers added facets to:
 //! it inserts a `Running<Response>` keep-alive claim, fires a
 //! `StartRunning<Request>` for observers, then drives every facet the start
@@ -15,7 +15,7 @@
 //! which signals every live facet. `--server` selects which servers act (see
 //! [`RunningSetFilter`]), and a selection matching none fails the call rather
 //! than parking. The dispatch host (a `Router`) is a child, reached with
-//! `exchange_child`. See [`call_on_load`] and
+//! `exchange_child`. See [`call_on_ready`] and
 //! [`RunningSet`](beet_action::prelude::RunningSet) for the model.
 //!
 //! ## Implementations
@@ -63,15 +63,15 @@ mod channel_http_server;
 #[cfg(feature = "std")]
 pub use channel_http_server::*;
 
-// The load path: the `CallOnLoad` verb calls an entity's action with the
+// The load path: the `CallOnReady` verb calls an entity's action with the
 // process request and writes `AppExit`. Gated on `action` (the call machinery),
 // not `std`: `CliArgs::parse_env` no-ops on no_std, the stdout tail goes through
 // the cross-platform `cross_log_noline!`, and the verb / `AppExit` writer are
 // all no_std-clean, so an embedded boot works too.
 #[cfg(feature = "action")]
-mod call_on_load;
+mod call_on_ready;
 #[cfg(feature = "action")]
-pub use call_on_load::*;
+pub use call_on_ready::*;
 
 #[cfg(feature = "action")]
 mod cli_server;

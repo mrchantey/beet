@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// src="ml/default-bert.ron"><SentenceOption text="heal"/><SentenceOption text="attack"/>
 /// </NearestSentenceAgent>`. The candidate sentences are children (via `<Slot/>`);
 /// `Handle<Bert>` is minted through the deferred [`BuildAssets`] path because a handle
-/// is not a markup value, so `LoadTemplate` waits for the model. [`CallOnLoad`] then
+/// is not a markup value, so `Ready` waits for the model. [`CallOnReady`] then
 /// fires [`choose_nearest`] once, which logs the winning [`Sentence`] and exits.
 #[template(system)]
 pub fn NearestSentenceAgent(
@@ -20,7 +20,7 @@ pub fn NearestSentenceAgent(
 		<span {(
 			Sentence::new(prompt),
 			NearestSentence::new(assets.load::<Bert>(src)),
-			CallOnLoad,
+			CallOnReady,
 			Action::<(), Outcome>::new_system(choose_nearest),
 		)}><Slot/></span>
 	}
@@ -97,11 +97,11 @@ fn chat_nearest_sentence(
 	Ok(Outcome::PASS)
 }
 
-/// Action: once the agent's [`Bert`] finishes loading (via [`CallOnLoad`], so the
+/// Action: once the agent's [`Bert`] finishes loading (via [`CallOnReady`], so the
 /// deferred-load path guarantees the model is ready), match the prompt against the
 /// child [`Sentence`]s, log the winner, and exit. The runtime form of `hello_ml`'s
 /// chooser, replacing the per-frame `choose_nearest_on_load` poll: a one-shot run on
-/// `LoadTemplate` rather than a loop that waited for `berts.get_mut` each frame.
+/// `Ready` rather than a loop that waited for `berts.get_mut` each frame.
 fn choose_nearest(
 	cx: In<ActionContext>,
 	mut berts: ResMut<Assets<Bert>>,
@@ -112,10 +112,10 @@ fn choose_nearest(
 ) -> Result<Outcome> {
 	let agent = cx.caller.id();
 	let (prompt, near) = query.get(agent)?;
-	// the deferred load guarantees the asset is ready by the time `CallOnLoad` fires.
+	// the deferred load guarantees the asset is ready by the time `CallOnReady` fires.
 	let mut bert = berts
 		.get_mut(&near.bert)
-		.ok_or_else(|| bevyhow!("Bert asset not loaded on CallOnLoad"))?;
+		.ok_or_else(|| bevyhow!("Bert asset not loaded on CallOnReady"))?;
 	let text = closest_descendant_sentence(
 		agent, &prompt.0, &mut bert, &children, &sentences,
 	)?;

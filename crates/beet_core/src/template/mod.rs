@@ -6,7 +6,7 @@
 //! instantiation entrypoints. Each drives a synchronous build walker that
 //! builds the template into its entity, resolves positional slot markers
 //! ([`SlotTarget`]/[`SlotChild`]), then fires the lifecycle events
-//! ([`SpawnTemplate`] then [`LoadTemplate`]). A failed root rides
+//! ([`SpawnTemplate`] then [`Ready`]). A failed root rides
 //! [`TemplateError`] rather than panicking.
 //!
 //! [`register_template`](WorldRegisterTemplateExt::register_template) installs

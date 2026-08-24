@@ -239,14 +239,17 @@ pub async fn read_sources(
 
 /// Build read [`EntrySources`] into a root carrying `store` (resolved by ancestry for
 /// `<TemplateDir>`, `<RoutesDir>` and `<Template src>`), with `extra` riding onto the
-/// root (eg a [`LoadRequest`] for a build that should run itself). Registers the entry's
-/// declared template sources *before* parsing the entry (so its own tags resolve),
-/// then marks the root [`TemplatesLoaded`]. The synchronous world-mutating tail of an
-/// entry load; returns the root entity.
+/// root. `run` is this loader's declaration that the entry should run itself (see
+/// [`Ready::run`]); a render-only command leaves it `false` and the entry's
+/// `CallOnReady` verbs stay dormant. Registers the entry's declared template sources
+/// *before* parsing the entry (so its own tags resolve), then marks the root
+/// [`TemplatesLoaded`]. The synchronous world-mutating tail of an entry load;
+/// returns the root entity.
 pub fn build_root(
 	world: &mut World,
 	store: BlobStore,
 	sources: EntrySources,
+	run: bool,
 	extra: impl Bundle,
 ) -> Result<Entity> {
 	let EntrySources {
@@ -279,35 +282,36 @@ pub fn build_root(
 	// the site store on the root: descendants resolve it by ancestry. `TemplatesLoaded`
 	// marks the entry-level templates registered (the readiness signal a wasm Worker
 	// waits on before serving).
-	world
-		.entity_mut(root)
-		.insert((extra, store, TemplatesLoaded))
-		.insert_template(template)
-		.map_err(|err| {
-			bevyhow!("failed to load entry `{entry_name}`: {err}")
-		})?;
+	let mut root_entity = world.entity_mut(root);
+	root_entity.insert((extra, store, TemplatesLoaded));
+	match run {
+		true => root_entity.insert_template_run(template),
+		false => root_entity.insert_template(template),
+	}
+	.map_err(|err| bevyhow!("failed to load entry `{entry_name}`: {err}"))?;
 	world.flush();
 	Ok(root)
 }
 
 /// Build an entry into an owned world and settle it to readiness: read the
-/// sources through `store`, build the root carrying `extra`, then drive the
-/// async runtime until every pending set drains
-/// ([`TemplatePending::settle_owned`]), so `<RoutesDir>`/`<TemplateDir>` scans
-/// land before the caller serves. The world-owning driver path (the wasm Worker,
-/// a one-shot build); an in-app caller settles via [`TemplatePending::settle`]
-/// instead. Returns the entry root.
+/// sources through `store`, build the root, then drive the async runtime until
+/// every pending set drains ([`TemplatePending::settle_owned`]), so
+/// `<RoutesDir>`/`<TemplateDir>` scans land before the caller serves. The
+/// world-owning driver path (the wasm Worker, a one-shot build); an in-app caller
+/// settles via [`TemplatePending::settle`] instead. Returns the entry root.
+///
+/// The build is dormant: this driver serves each request itself, so the entry's
+/// declared servers must not start.
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub(crate) async fn build_entry_owned(
 	world: &mut World,
 	store: BlobStore,
 	entry_name: String,
-	extra: impl Bundle,
 ) -> Result<Entity> {
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	let prescan = read_prescan(&store, &entry_name).await?;
 	let sources = read_sources(&store, formats, entry_name, prescan).await?;
-	let root = build_root(world, store, sources, extra)?;
+	let root = build_root(world, store, sources, false, ())?;
 	TemplatePending::settle_owned(world).await;
 	Ok(root)
 }
@@ -349,11 +353,14 @@ pub async fn rebuild_watched(
 			// tear down the previous entry scene so servers close and sockets drop
 			// before the fresh tree binds (a no-op on the first build).
 			BeetSceneRoot::despawn_all(world);
+			// a rebuild retains nothing from the last one: it simply declares `run`
+			// again, so the fresh tree's servers rebind.
 			let root = build_root(
 				world,
 				store,
 				sources,
-				(BeetSceneRoot, LiveReload::new(), LoadRequest::from_cli()),
+				true,
+				(BeetSceneRoot, LiveReload::new()),
 			)?;
 			if let Some(entry_watch) = entry_watch {
 				world.entity_mut(root).insert(entry_watch);
@@ -399,14 +406,14 @@ async fn entry_source_paths(
 /// path, where the program is inlined in a `<script type="application/x-bsx">`, not
 /// resolved from `--main`/a filesystem. Constructs [`EntrySources`] directly and
 /// builds onto a storeless ([`BlobStore::temp`]) root, so the same
-/// [`build_root`] core runs as the store-backed native path. `extra` rides
-/// onto the root as for [`build_root`].
+/// [`build_root`] core runs as the store-backed native path. `run` declares the
+/// build as for [`build_root`].
 pub fn build_from_bsx(
 	world: &mut World,
 	formats: TemplateFormats,
 	entry_name: impl Into<String>,
 	bsx: impl Into<String>,
-	extra: impl Bundle,
+	run: bool,
 ) -> Result<Entity> {
 	let entry = MediaBytes::new_bsx(bsx.into());
 	let sources = EntrySources {
@@ -416,7 +423,7 @@ pub fn build_from_bsx(
 		template_sources: Vec::new(),
 		formats,
 	};
-	build_root(world, BlobStore::temp(), sources, extra)
+	build_root(world, BlobStore::temp(), sources, run, ())
 }
 
 #[cfg(test)]
@@ -442,7 +449,7 @@ mod test {
 		let sources = read_sources(&store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root = build_root(&mut world, store, sources, ()).unwrap();
+		let root = build_root(&mut world, store, sources, false, ()).unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world
@@ -469,12 +476,54 @@ mod test {
 		let sources = read_sources(&store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root = build_root(&mut world, store, sources, ()).unwrap();
+		let root = build_root(&mut world, store, sources, false, ()).unwrap();
 		world
 			.entity(root)
 			.contains::<TemplatesLoaded>()
 			.xpect_true();
 		// returns rather than hanging, nothing being pending on this entry.
 		TemplatePending::settle_owned(&mut world).await;
+	}
+
+	/// The `--watch` rebuild declares `run` on every build, so a rebuilt tree
+	/// boots exactly as the first one did. Nothing is retained between builds:
+	/// the declaration is per-build and consumed by its own sweep.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet::test]
+	async fn rebuild_declares_run_every_time() {
+		let store = BlobStore::temp();
+		store
+			.insert(&SmolPath::from("main.bsx"), "<Router/>")
+			.await
+			.unwrap();
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let runs = Store::new(Vec::<bool>::new());
+		let recorder = runs.clone();
+		// the entry root is the one marked `TemplatesLoaded`.
+		world.add_observer(
+			move |ev: On<Ready>, entries: Query<(), With<TemplatesLoaded>>| {
+				if entries.contains(ev.entity) {
+					let mut all = recorder.get();
+					all.push(ev.run);
+					recorder.set(all);
+				}
+			},
+		);
+		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+		world
+			.run_async_local_then(move |world| async move {
+				for _ in 0..2 {
+					rebuild_watched(
+						&world,
+						store.clone(),
+						"main.bsx".to_string(),
+						formats.clone(),
+					)
+					.await
+					.unwrap();
+				}
+			})
+			.await;
+		runs.get().xpect_eq(vec![true, true]);
 	}
 }

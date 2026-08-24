@@ -38,7 +38,7 @@ pub struct BsxTemplateDef {
 	/// Validated against a tag's props at build time, like a Rust template's.
 	pub schema: Option<ValueSchema>,
 	/// A remote schema URL declared by `<script bx:schema src="..">`, resolved
-	/// asynchronously and awaited by `LoadTemplate`.
+	/// asynchronously and awaited by `Ready`.
 	pub remote_schema: Option<SmolStr>,
 }
 

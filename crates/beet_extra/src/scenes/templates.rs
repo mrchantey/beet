@@ -50,7 +50,7 @@ pub fn Ground3d(
 /// Loads a glb/gltf scene by path and spawns its model as children, the markup
 /// form of `WorldAssetRoot(assets.load(path))`, eg
 /// `<WorldScene src="misc/fox.glb#Scene0" scale=0.1/>`. A `#[template(system)]`
-/// loading through [`BuildAssets`] so `LoadTemplate` defers until the scene loads.
+/// loading through [`BuildAssets`] so `Ready` defers until the scene loads.
 /// Named `WorldScene` (not `Scene`) to avoid bevy's `Scene` + beet's `Scene` trait.
 ///
 /// `x`/`y`/`z`/`scale` set the model's transform in Rust because `Transform`
@@ -113,7 +113,7 @@ pub fn UiTerminal(
 
 /// The animated fox agent: loads `misc/fox.glb` and its idle (`Animation0`) + walk
 /// (`Animation1`) `AnimationGraph` through the deferred [`BuildAssets`] path, so
-/// `LoadTemplate` waits for every clip and the glb scene before the tree runs.
+/// `Ready` waits for every clip and the glb scene before the tree runs.
 /// Hosts the behaviour tree as children via `<Slot/>` and carries the
 /// [`AnimationGraphClips`] those children resolve clips against
 /// (`<PlayAnimation clip="misc/fox.glb#Animation1"/>`). A `.bsx` authors
@@ -200,7 +200,7 @@ pub fn Scene2d() -> impl Bundle {
 
 /// Loads an image by path into a [`Sprite`], the 2d counterpart of [`WorldScene`],
 /// eg `<Sprite2d src="spaceship_pack/ship_2.png" scale=0.5/>`. A `#[template(system)]`
-/// loading the image through [`BuildAssets`] so `LoadTemplate` defers until it loads;
+/// loading the image through [`BuildAssets`] so `Ready` defers until it loads;
 /// `x`/`y`/`z`/`scale` set the transform in Rust (a `Vec3` markup prop coerces as a
 /// string). Other markers (eg `FollowCursor2d`, `RotateToVelocity2d`) spread normally.
 #[template(system)]
@@ -222,7 +222,7 @@ pub fn Sprite2d(
 }
 
 /// A 2d steering agent that seeks a target forever: a sprite with the force/steer
-/// bundles, `RotateToVelocity2d`, a [`Seek`] action, and the [`CallOnLoad`] that
+/// bundles, `RotateToVelocity2d`, a [`Seek`] action, and the [`CallOnReady`] that
 /// kicks the action into `Running` once the deferred sprite image has loaded. The
 /// data form of the imperative `seek` setup, so
 /// `<SeekAgent2d src="..." {SteerTarget::Entity($planet)}/>` flies a ship at a
@@ -256,7 +256,7 @@ pub fn SeekAgent2d(
 				world.spawn((
 					ChildOf(agent_id),
 					ActionOf(agent_id),
-					CallOnLoad,
+					CallOnReady,
 					Seek,
 				));
 			});
@@ -305,7 +305,7 @@ pub fn Flock(
 
 /// A tiled starfield backdrop behind a 2d scene, the data form of the imperative
 /// `space_scene`, so `<SpaceScene/>` backs a 2d `.bsx`. A `#[template(system)]`
-/// loading the image through [`BuildAssets`] so `LoadTemplate` defers until it loads.
+/// loading the image through [`BuildAssets`] so `Ready` defers until it loads.
 #[template(system)]
 pub fn SpaceScene(mut assets: BuildAssets) -> impl Bundle {
 	(

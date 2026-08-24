@@ -17,7 +17,7 @@ the lambda runtime offers no argv), so a site change re-publishes by re-running
     beet --main=examples/infra/lambda.bsx destroy --force
 
 `<StackHost>` is the IaC deployer host: a `Stack` (resolved by the blocks + verbs by
-ancestry), a one-shot `CliServer` child (its `CallOnLoad` fires the CLI request on load
+ancestry), a one-shot `CliServer` child (its `CallOnReady` fires the CLI request on load
 and the matching verb runs), and the standard IaC verb routes
 (validate/plan/apply/...). Each verb below is a child-sequenced
 `<Route path=".." {ExchangeSequence}>`: its block and actions are direct children of

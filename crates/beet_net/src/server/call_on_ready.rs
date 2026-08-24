@@ -1,75 +1,49 @@
-//! Turning a load into a run: the [`CallOnLoad`] verb calls an entity's action
-//! when its template loads, with the request the load was given, streaming the
-//! response and writing the matching [`AppExit`].
+//! Turning a load into a run: the [`CallOnReady`] verb calls an entity's action
+//! when its template's [`Ready`] sweep reaches it, streaming the response and
+//! writing the matching [`AppExit`].
 //!
 //! The canonical load signature is `Request -> Response`: argv/env is the
 //! request ([`Request::from_cli_args`]), stdout and the exit code are the
 //! response. Two fallbacks let a behavior scene load with no adapter, see
-//! [`CallOnLoad::call`].
+//! [`CallOnReady::call`].
 //!
-//! Loading a template never implies running it. The request is part of the load
-//! context, declared by whoever builds the tree ([`LoadRequest`]) rather than
-//! read from argv at fire time, so a command building a document inside another
-//! process builds it dormant by simply providing none.
+//! Loading a template never implies running it: the verb fires only under the
+//! loader's run declaration ([`Ready::run`]), so a command building a document to
+//! render or inspect builds it dormant by simply not declaring one. A
+//! synthesized request (serve forwarding a route, `export-pdf`) never rides the
+//! sweep; it goes through the explicit [`CallOnReady::call`].
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Load verb: on this entity's `LoadTemplate`, call its action with the load's
-/// request and stream the one-shot response (see [`CallOnLoad::call`]).
+/// Load verb: on this entity's [`Ready`], call its action with the process
+/// request and stream the one-shot response (see [`CallOnReady::call`]).
 ///
 /// Sits directly on the action it drives, so an entry root, a behavior root or a
 /// script element each declares its own:
 ///
 /// ```bsx
-/// <CliServer always=true {CallOnLoad}>    // a dispatcher root, exiting on resolve
-///     <Router>..</Router>                 // the dispatch host, a child
+/// <CliServer always=true {CallOnReady}>     // a dispatcher root, exiting on resolve
+///     <Router>..</Router>                   // the dispatch host, a child
 /// </CliServer>
-/// <Sequence {CallOnLoad}> .. </Sequence>  // a behavior, exiting on resolve
+/// <Sequence {CallOnReady}> .. </Sequence>   // a behavior, exiting on resolve
+/// <CallOnReady {(CliServer, HttpServer)}>   // a multi-server host root
+///     <Router>..</Router>
+/// </CallOnReady>
 /// ```
 ///
-/// It fires only when the load carried a [`LoadRequest`] (on this entity or an
-/// ancestor), which is what makes a render-only build (`check`, `export-static`)
-/// dormant without an opt-out component. A failed build exits with an error and
-/// never runs.
+/// It fires only under the load's run declaration ([`Ready::run`]), which is what
+/// makes a render-only build (`check`, `export-static`) dormant without an
+/// opt-out component. A failed run-declared build exits with an error and never
+/// runs.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = hook_ext::observe(on_load_call))]
-pub struct CallOnLoad;
+#[component(on_add = hook_ext::observe(on_ready_call))]
+pub struct CallOnReady;
 
-/// The request a load fires with: the load context a [`CallOnLoad`] under it
-/// calls with.
-///
-/// Provided by whoever builds the tree, never read ambiently at fire time. The
-/// binary supplies its argv request when loading the process entry (the one
-/// sanctioned ambient read, made once at the process boundary); a command
-/// building a document to render or inspect supplies none, and nothing fires.
-///
-/// Held as [`RequestParts`] rather than a [`Request`] so one load context serves
-/// every `CallOnLoad` beneath it: a boot request is argv-shaped and carries no
-/// body.
-#[derive(Debug, Clone, Component)]
-pub struct LoadRequest(RequestParts);
-
-impl LoadRequest {
-	/// The load context for `request`.
-	pub fn new(request: &Request) -> Self {
-		Self(request.request_parts().clone())
-	}
-
-	/// The process request as a load context: the binary's own argv, read once
-	/// at the process boundary.
-	pub fn from_cli() -> Self {
-		Self::new(&Request::from_cli_args(CliArgs::parse_env()))
-	}
-
-	/// A fresh [`Request`] for one call.
-	pub fn request(&self) -> Request {
-		Request::from_parts(self.0.clone(), default())
-	}
-
-	/// Deliver this load context to the entity on spawn, calling its action as a
-	/// document load would.
+impl CallOnReady {
+	/// Call this entity's action with the process request on spawn, as a
+	/// run-declared load would.
 	///
 	/// The code counterpart of the markup load path, for an app that spawns its
 	/// server directly instead of loading a document:
@@ -77,18 +51,22 @@ impl LoadRequest {
 	/// ```ignore
 	/// world.spawn((
 	///     HttpServer::default(),
-	///     LoadRequest::from_cli().on_spawn(),
+	///     CallOnReady::on_spawn(),
 	///     children![exchange_ext::handler(|req| req.mirror())],
 	/// ));
 	/// ```
-	pub fn on_spawn(self) -> OnSpawn {
-		OnSpawn::new_async_local(move |entity| {
-			CallOnLoad::call(entity, self.request())
+	pub fn on_spawn() -> OnSpawn {
+		OnSpawn::new_async_local(|entity| {
+			Self::call(entity, Self::cli_request())
 		})
 	}
-}
 
-impl CallOnLoad {
+	/// The process request: argv/env as a [`Request`].
+	///
+	/// The one sanctioned ambient read, made at a process boundary (an
+	/// `on_spawn` boot) or under the loader's run declaration.
+	fn cli_request() -> Request { Request::from_cli_args(CliArgs::parse_env()) }
+
 	/// Call the entity's action with `request` and, once the call resolves,
 	/// stream the response and write the matching [`AppExit`].
 	///
@@ -148,23 +126,23 @@ impl CallOnLoad {
 		}
 	}
 
-	/// Explicitly call every [`CallOnLoad`] action at or under `host`,
+	/// Explicitly call every [`CallOnReady`] action at or under `host`,
 	/// each with its own request from `make_request`.
 	///
 	/// Resolves once every call resolves, so a parked server holds the await.
 	///
 	/// # Errors
-	/// Errors if no target carries [`CallOnLoad`], or any call fails.
+	/// Errors if no target carries [`CallOnReady`], or any call fails.
 	pub async fn call_recursive(
 		host: AsyncEntity,
 		make_request: impl Fn() -> Request,
 	) -> Result {
 		let targets = host
 			.world()
-			.run_system_cached_with(collect_call_on_load, host.id())
+			.run_system_cached_with(collect_call_on_ready, host.id())
 			.await?;
 		if targets.is_empty() {
-			bevybail!("no CallOnLoad actions at or under {:?}", host.id());
+			bevybail!("no CallOnReady actions at or under {:?}", host.id());
 		}
 		let world = host.world().clone();
 		async_ext::try_join_all(
@@ -177,55 +155,43 @@ impl CallOnLoad {
 	}
 }
 
-fn collect_call_on_load(
+fn collect_call_on_ready(
 	In(root): In<Entity>,
 	children: Query<&Children>,
-	call_on_load: Query<(), With<CallOnLoad>>,
+	call_on_ready: Query<(), With<CallOnReady>>,
 ) -> Vec<Entity> {
 	children
 		.iter_descendants_inclusive(root)
-		.filter(|entity| call_on_load.contains(*entity))
+		.filter(|entity| call_on_ready.contains(*entity))
 		.collect()
 }
 
-/// On the entity's `LoadTemplate`, queue [`CallOnLoad::call`] with the load's
-/// request, resolved from the nearest [`LoadRequest`] at or above it. A load
-/// given no request builds the tree and stops there.
-fn on_load_call(
-	ev: On<LoadTemplate>,
-	load_requests: AncestorQuery<&LoadRequest>,
+/// On the entity's [`Ready`], queue [`CallOnReady::call`] with the process
+/// request. A load that declared no run builds the tree and stops there.
+fn on_ready_call(
+	ev: On<Ready>,
 	mut exit: MessageWriter<AppExit>,
 	mut commands: Commands,
 ) {
-	let target = ev.event_target();
+	// a dormant load runs nothing, and owes nothing on failure either: whoever
+	// built it holds the result.
+	if !ev.run {
+		return;
+	}
 	// a failed build never runs: exit with an error code.
 	if ev.is_error {
 		exit.write(AppExit::error());
 		return;
 	}
-	let Ok(load) = load_requests.get(target) else {
-		return;
-	};
-	let request = load.request();
+	let request = CallOnReady::cli_request();
 	commands
-		.entity(target)
-		.queue_async_local(|entity| CallOnLoad::call(entity, request));
-}
-
-/// The process request as a start notification: fire it on an entity to reach
-/// the [`StartRunning<Request>`] observers a real start would, without a
-/// [`RunningSet`] to walk. Booting a server is [`LoadRequest::on_spawn`].
-#[extend::ext(name = StartRunningRequestExt)]
-pub impl StartRunning<Request> {
-	/// The process request as a start notification.
-	fn from_cli(entity: Entity) -> Self {
-		Self::new(entity, Request::from_cli_args(CliArgs::parse_env()))
-	}
+		.entity(ev.entity)
+		.queue_async_local(|entity| CallOnReady::call(entity, request));
 }
 
 /// Stream a one-shot's [`Response`] to stdout and write the matching [`AppExit`].
 ///
-/// The tail of the load path, reached once [`CallOnLoad::call`]'s awaited call
+/// The tail of the load path, reached once [`CallOnReady::call`]'s awaited call
 /// resolves. A long-running action never gets here: its parked call is the
 /// process.
 async fn stream_and_exit(host: &AsyncEntity, response: Response) -> Result {
@@ -253,21 +219,28 @@ pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 mod test {
 	use super::*;
 
-	/// Fire a load on `entity`, with the load context a running binary provides.
+	/// Sweep a run-declared load over `entity`'s subtree, as a booting binary's
+	/// build does.
 	fn load(world: &mut World, entity: Entity) {
-		world
-			.entity_mut(entity)
-			.insert(LoadRequest::new(&Request::get("/")))
-			.trigger(|entity| LoadTemplate {
-				entity,
-				is_error: false,
-			});
+		world.entity_mut(entity).trigger_subtree(|entity| Ready {
+			entity,
+			is_error: false,
+			run: true,
+		});
 	}
 
-	/// End to end through the load path: `CallOnLoad` calls the entity's parked
-	/// action, whose `RunningSet` walk reaches `CliServer`; it routes the request
+	/// A one-shot behavior action, recording into `ran` when it runs.
+	fn recording_action(ran: Store<bool>) -> Action<(), Outcome> {
+		Action::new_pure(move |_: ActionContext| -> Result<Outcome> {
+			ran.set(true);
+			Outcome::PASS.xok()
+		})
+	}
+
+	/// End to end through the load path: `CallOnReady` calls the entity's parked
+	/// action, whose `RunningSet` reaches `CliServer`; it routes the request
 	/// through its dispatch child and resolves the parked call, and
-	/// `CallOnLoad::call` exits with the status's code.
+	/// `CallOnReady::call` exits with the status's code.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn one_shot_resolves_and_exits() {
@@ -276,7 +249,7 @@ mod test {
 			Startup,
 			|mut commands: Commands| {
 				let entity = commands
-					.spawn((CliServer::default(), CallOnLoad, children![
+					.spawn((CliServer::default(), CallOnReady, children![
 						exchange_ext::handler(|_| {
 							Response::ok().with_body("hi")
 						})
@@ -288,22 +261,23 @@ mod test {
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
 
-	/// A load with no `LoadRequest` in scope builds the tree and stops: the
-	/// dormant build every render-only command relies on.
+	/// A build that declared no run loads the tree and stops: the dormant build
+	/// every render-only command relies on.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
-	async fn no_load_request_never_runs() {
+	async fn a_dormant_build_never_runs() {
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
+		app.add_plugins((MinimalPlugins, ServerPlugin, TemplatePlugin));
 		let entity = app
 			.world_mut()
-			.spawn((CliServer::default(), CallOnLoad, children![
-				exchange_ext::handler(|_| { Response::ok().with_body("hi") })
-			]))
-			.trigger(|entity| LoadTemplate {
-				entity,
-				is_error: false,
-			})
+			.spawn_template(Snippet::from_bundle((
+				CliServer::default(),
+				CallOnReady,
+				children![exchange_ext::handler(|_| {
+					Response::ok().with_body("hi")
+				})],
+			)))
+			.unwrap()
 			.id();
 		for _ in 0..16 {
 			app.update();
@@ -315,18 +289,18 @@ mod test {
 			.xpect_false();
 	}
 
-	/// The code boot: `LoadRequest::on_spawn` calls a hand-spawned server exactly
-	/// as a document load would, so a `main.rs` app needs no template.
+	/// The code boot: `CallOnReady::on_spawn` calls a hand-spawned server exactly
+	/// as a run-declared load would, so a `main.rs` app needs no template.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
-	async fn spawned_load_request_resolves_and_exits() {
+	async fn on_spawn_resolves_and_exits() {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin)).add_systems(
 			Startup,
 			|mut commands: Commands| {
 				commands.spawn((
 					CliServer::default(),
-					LoadRequest::from_cli().on_spawn(),
+					CallOnReady::on_spawn(),
 					children![exchange_ext::handler(|_| {
 						Response::ok().with_body("hi")
 					})],
@@ -351,7 +325,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				crate::server::http_server::tests::stub_server(0, log),
-				CallOnLoad,
+				CallOnReady,
 			))
 			.id();
 		load(app.world_mut(), entity);
@@ -370,57 +344,105 @@ mod test {
 			.xpect_eq(0);
 	}
 
-	/// `CallOnLoad` on a behavior entity converts the load call through the
+	/// `CallOnReady` on a behavior entity converts the load call through the
 	/// `() -> Outcome` conversion: a one-shot behavior resolves (recorded here)
 	/// and the process exits.
 	#[beet_core::test]
 	async fn runs_behavior() {
 		let ran = Store::new(false);
-		let recorder = ran.clone();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
-		// a behavior root that runs on `LoadTemplate`, recording when its action runs.
-		let action: Action<(), Outcome> =
-			Action::new_pure(move |_: ActionContext| -> Result<Outcome> {
-				recorder.set(true);
-				Outcome::PASS.xok()
-			});
 		app.world_mut()
-			.spawn_template(Snippet::from_bundle((
-				CallOnLoad,
-				LoadRequest::from_cli(),
-				action,
+			.spawn_template_run(Snippet::from_bundle((
+				CallOnReady,
+				recording_action(ran),
 			)))
 			.unwrap();
-		// the `LoadTemplate` observer queues `CallOnLoad::call` onto the
-		// AsyncWorld; `update_until` ticks the runtime between frames so the
-		// queued call runs.
+		// the `Ready` observer queues `CallOnReady::call` onto the AsyncWorld;
+		// `update_until` ticks the runtime between frames so the queued call runs.
 		app_ext::update_until(&mut app, |_world| ran.get())
 			.await
 			.xpect_true();
 	}
 
-	/// The load context resolves by ancestry, so a behavior nested in a scene
-	/// runs on the entry's load exactly as a root one does.
+	/// The sweep reaches every entity of the loaded tree, so a behavior nested in
+	/// a scene runs on its entry's load exactly as a root one does, with no
+	/// ancestor lookup.
 	#[beet_core::test]
 	async fn runs_a_nested_behavior() {
 		let ran = Store::new(false);
-		let recorder = ran.clone();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
-		let action: Action<(), Outcome> =
-			Action::new_pure(move |_: ActionContext| -> Result<Outcome> {
-				recorder.set(true);
-				Outcome::PASS.xok()
-			});
 		app.world_mut()
-			.spawn_template(Snippet::from_bundle((
-				LoadRequest::from_cli(),
-				children![(CallOnLoad, action)],
-			)))
+			.spawn_template_run(Snippet::from_bundle(children![(
+				CallOnReady,
+				recording_action(ran)
+			)]))
 			.unwrap();
 		app_ext::update_until(&mut app, |_world| ran.get())
 			.await
 			.xpect_true();
+	}
+
+	/// A later load inside a running tree declares its own run: the entry's
+	/// declaration was consumed by its own sweep, so a nested dormant build stays
+	/// dormant rather than inheriting it.
+	#[beet_core::test]
+	async fn a_later_dormant_load_stays_dormant() {
+		let ran = Store::new(false);
+		let nested_ran = Store::new(false);
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
+		let root = app
+			.world_mut()
+			.spawn_template_run(Snippet::from_bundle((
+				CallOnReady,
+				recording_action(ran),
+			)))
+			.unwrap()
+			.id();
+		app_ext::update_until(&mut app, |_world| ran.get())
+			.await
+			.xpect_true();
+
+		// a second, dormant build under the running root.
+		app.world_mut()
+			.spawn(ChildOf(root))
+			.insert_template(Snippet::from_bundle((
+				CallOnReady,
+				recording_action(nested_ran),
+			)))
+			.unwrap();
+		for _ in 0..16 {
+			app.update();
+			AsyncRunner::tick().await;
+		}
+		nested_ran.get().xpect_false();
+	}
+
+	/// A failed run-declared build never runs and exits nonzero, so a broken
+	/// entry fails the process rather than serving a half-built tree.
+	#[beet_core::test]
+	async fn a_failed_run_declared_build_exits_nonzero() {
+		let ran = Store::new(false);
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
+		let root = app.world_mut().spawn(CallOnReady).id();
+		app.world_mut()
+			.entity_mut(root)
+			.insert(recording_action(ran))
+			.insert(TemplateError::new(bevyhow!("boom")))
+			.trigger_subtree(|entity| Ready {
+				entity,
+				is_error: true,
+				run: true,
+			});
+		app.world_mut()
+			.run_system_once(|mut exits: MessageReader<AppExit>| {
+				exits.read().any(AppExit::is_error)
+			})
+			.unwrap()
+			.xpect_true();
+		ran.get().xpect_false();
 	}
 }

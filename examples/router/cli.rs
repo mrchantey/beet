@@ -68,6 +68,6 @@ fn setup(mut commands: Commands) {
 				PathPartial::new("greet-request"),
 			),
 		])],
-		LoadRequest::from_cli().on_spawn(),
+		CallOnReady::on_spawn(),
 	));
 }

@@ -35,7 +35,7 @@ fn main() {
 					Count::default(),
 					Action::<Request, Response>::new_system(router),
 				)],
-				LoadRequest::from_cli().on_spawn(),
+				CallOnReady::on_spawn(),
 			));
 		})
 		.run();

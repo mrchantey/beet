@@ -28,14 +28,14 @@ use std::marker::PhantomData;
 /// stderr).
 ///
 /// The "`node main.js`" entry: occupy an entry's `Action<Request, Response>` slot
-/// with it and [`CallOnLoad`](beet_net::prelude::CallOnLoad) calls that
+/// with it and [`CallOnReady`](beet_net::prelude::CallOnReady) calls that
 /// slot once the entry loads, streaming the captured output. (A script element
 /// installs a plain `Action<Request, Response>`, which the load verb calls
 /// directly.) The script source is the marked element's
 /// raw-text body, with the [`Request`] shaped into its `input`:
 ///
 /// ```bsx
-/// <script {(ExchangeScriptElement, CallOnLoad)}>console.log("hello world")</script>
+/// <script {(ExchangeScriptElement, CallOnReady)}>console.log("hello world")</script>
 /// ```
 ///
 /// Being async, it awaits the full request body and includes it in the `input` (so

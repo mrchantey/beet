@@ -1,28 +1,29 @@
 //! The template build lifecycle: events, the error component, and the
-//! generalized pending-dependency set that gates [`LoadTemplate`].
+//! generalized pending-dependency set that gates [`Ready`].
 //!
 //! The lifecycle has two observable boundaries on a template root:
 //!
 //! - [`SpawnTemplate`] fires once after the root's subtree is built. It is the
 //!   "built" signal and the attach point for future subtree passes.
-//! - [`LoadTemplate`] fires when the root's [`TemplatePending`] set drains,
-//!   immediately after [`SpawnTemplate`] when nothing is pending. It carries
-//!   [`LoadTemplate::is_error`] and fires whether the load succeeded or failed.
+//! - [`Ready`] sweeps the loaded subtree when the root's [`TemplatePending`] set
+//!   drains, immediately after [`SpawnTemplate`] when nothing is pending. It
+//!   carries [`Ready::is_error`] and fires whether the load succeeded or failed.
 //!
 //! Slot resolution rides the same boundary: a build with no outstanding
 //! [`PendingKind::Structural`] dependency resolves slots synchronously (before
 //! [`SpawnTemplate`]); a build whose content is still arriving (an async
 //! `<Template src>` include) defers resolution until the last structural
 //! dependency resolves, so slots always match over the *settled* tree. Slots are
-//! therefore guaranteed resolved by [`LoadTemplate`], but not by
-//! [`SpawnTemplate`] on a deferred build.
+//! therefore guaranteed resolved by [`Ready`], but not by [`SpawnTemplate`] on a
+//! deferred build.
 //!
 //! Build, validation, and load failures never panic and are never returned as
 //! an `Err` from `spawn_template`. They insert [`TemplateError`] on the root
-//! and drive [`LoadTemplate`] with `is_error: true`.
+//! and drive [`Ready`] with `is_error: true`.
 
 use super::spawn_template::anchor_pre_slot_children;
 use crate::prelude::*;
+use bevy::ecs::event::SetEntityEventTarget;
 use bevy::platform::sync::Arc;
 use bevy::platform::sync::Mutex;
 
@@ -32,36 +33,62 @@ use bevy::platform::sync::Mutex;
 /// pass attaches to without modifying the walker. For a single `spawn_template`
 /// call it fires exactly once, on the root. On a build with outstanding
 /// structural dependencies (an async include) slots are not yet resolved here;
-/// wait for [`LoadTemplate`] to observe the settled tree.
+/// wait for [`Ready`] to observe the settled tree.
 #[derive(Debug, Clone, EntityEvent)]
 pub struct SpawnTemplate {
 	/// The template root.
 	pub entity: Entity,
 }
 
-/// Fired on a template root when its [`TemplatePending`] dependency set drains.
+/// The load event: swept across a loaded subtree when the root's
+/// [`TemplatePending`] dependency set drains.
 ///
-/// Fires whether the load succeeded or failed; [`Self::is_error`] is `true`
-/// when the root carries a [`TemplateError`]. When nothing is pending it fires
-/// synchronously, immediately after [`SpawnTemplate`]. Slots are resolved by
-/// the time it fires.
-#[derive(Debug, Clone, EntityEvent)]
-pub struct LoadTemplate {
-	/// The template root.
+/// One instance fires on every entity at or under the loaded root, deepest
+/// first and the root last, each entity exactly once and never above the root
+/// (see [`SubtreeTrigger`]), so a node observes its own readiness only after
+/// everything it owns has observed theirs. When nothing is pending the sweep
+/// runs synchronously, immediately after [`SpawnTemplate`]; slots are resolved
+/// by the time it fires.
+///
+/// It fires for every load, succeeded or failed, dormant or live: [`Self::run`]
+/// is the loader's declaration that this build should run itself, so a load verb
+/// (`beet_net`'s `CallOnReady`) never runs without it, while a completion
+/// listener (an awaited build) still sees every load.
+// BSN alignment: bevy's BSN ships its own `On<Ready>`, so migrating is adopting
+// their trigger rather than renaming anything here.
+#[derive(Debug, Clone)]
+pub struct Ready {
+	/// The entity this instance is firing on.
 	pub entity: Entity,
-	/// `true` when the root failed; read [`TemplateError`] off the root.
+	/// `true` when the loaded root failed; read [`TemplateError`] off it.
 	pub is_error: bool,
+	/// The loader's run declaration: `true` when whoever built this tree
+	/// declared it should run itself. A dormant build (`false`) is the default,
+	/// so rendering or inspecting a document never starts it.
+	pub run: bool,
+}
+
+impl Event for Ready {
+	type Trigger<'a> = SubtreeTrigger<Self>;
+}
+
+impl EntityEvent for Ready {
+	fn event_target(&self) -> Entity { self.entity }
+}
+
+impl SetEntityEventTarget for Ready {
+	fn set_event_target(&mut self, entity: Entity) { self.entity = entity; }
 }
 
 /// Inserted on a template root whose build, validation, or load failed.
 ///
 /// Build failures ride this path rather than panicking or returning an `Err`:
-/// the walker inserts this component and fires [`LoadTemplate`] with
+/// the walker inserts this component and fires [`Ready`] with
 /// `is_error: true`.
 #[derive(Debug, Clone, Component)]
 pub struct TemplateError {
 	/// The underlying error, shared (via [`CloneError`]) with the
-	/// [`LoadTemplate`] event and the `spawn_template` return.
+	/// [`Ready`] event and the `spawn_template` return.
 	pub error: CloneError,
 }
 
@@ -99,21 +126,21 @@ pub enum PendingKind {
 	/// include, a remote template). Slot resolution waits for these.
 	Structural,
 	/// Resolution only marks readiness (an asset load, a scene spawn, a routes
-	/// scan). Gates [`LoadTemplate`], never slot resolution.
+	/// scan). Gates [`Ready`], never slot resolution.
 	#[default]
 	Passive,
 }
 
-/// The set of outstanding dependencies gating [`LoadTemplate`] on a root.
+/// The set of outstanding dependencies gating [`Ready`] on a root.
 ///
 /// Generalized so assets, includes, remote fetches, route scans and scene
 /// spawns all register into it. Each dependency is an opaque [`PendingId`] with
-/// a [`PendingKind`]. The set fires [`LoadTemplate`] when it drains to empty
+/// a [`PendingKind`]. The set fires [`Ready`] when it drains to empty
 /// (via [`TemplatePending::drain_dependencies`]); slot resolution deferred by the build
 /// walker runs when the last [`PendingKind::Structural`] entry resolves.
 ///
 /// A root that registers no dependencies drains immediately, so
-/// [`LoadTemplate`] fires synchronously within `spawn_template`.
+/// [`Ready`] fires synchronously within `spawn_template`.
 ///
 /// Prefer parking through [`TemplatePending::park`], which returns a
 /// [`PendingGuard`] that cannot leak: a guard dropped unresolved (a dead task,
@@ -129,6 +156,9 @@ pub struct TemplatePending {
 	/// The pre-build [`SlotChild`] snapshot the walker parked when it deferred
 	/// slot resolution to the drain (see [`TemplatePending::drain_dependencies`]).
 	deferred_slots: Option<Vec<Entity>>,
+	/// The loader's run declaration for this build, carried here as transient
+	/// load bookkeeping and consumed by the drain (see [`Ready::run`]).
+	run: bool,
 }
 
 /// An opaque identifier for one pending dependency on a [`TemplatePending`] set.
@@ -151,7 +181,7 @@ struct PendingEntry {
 ///
 /// A deferred dependency (an asset, an include, a remote schema) reads this to
 /// know which entity carries the [`TemplatePending`] set its [`PendingId`] must
-/// park on, so [`LoadTemplate`] defers until it resolves. Absent outside a
+/// park on, so [`Ready`] defers until it resolves. Absent outside a
 /// build, in which case a dependency registers on the entity it builds into.
 ///
 /// Public so a downstream crate can build its own deferral on the same wiring
@@ -200,7 +230,7 @@ impl TemplateBuildRoot {
 impl TemplatePending {
 	/// Registers a new dependency, returning its [`PendingId`].
 	///
-	/// While any dependency is registered, [`LoadTemplate`] is deferred until
+	/// While any dependency is registered, [`Ready`] is deferred until
 	/// every one is resolved via [`Self::resolve`]. Prefer [`Self::park`], whose
 	/// [`PendingGuard`] cannot leak the id.
 	///
@@ -225,7 +255,7 @@ impl TemplatePending {
 	///
 	/// Returns `true` if the id was present, ie this call performed the
 	/// resolution. Callers drain only on `true`, so a double resolution (a
-	/// guard resolved then swept) can never re-fire [`LoadTemplate`].
+	/// guard resolved then swept) can never re-fire [`Ready`].
 	pub fn resolve(&mut self, id: PendingId) -> bool {
 		self.ids.remove(&id).is_some()
 	}
@@ -256,6 +286,23 @@ impl TemplatePending {
 	fn take_deferred_slots(&mut self) -> Option<Vec<Entity>> {
 		self.deferred_slots.take()
 	}
+
+	/// Declares that this build should run itself, ie its [`Ready`] sweep carries
+	/// [`Ready::run`]. Set by the run-declaring build entrypoints
+	/// ([`WorldTemplateExt::spawn_template_run`] and friends) on the root before
+	/// the walker runs.
+	pub(crate) fn declare_run(world: &mut World, root: Entity) {
+		world
+			.entity_mut(root)
+			.entry::<TemplatePending>()
+			.or_default()
+			.get_mut()
+			.run = true;
+	}
+
+	/// Takes the run declaration, so one declaration drives exactly one sweep and
+	/// a later load into the same tree is dormant unless it declares its own.
+	fn take_run(&mut self) -> bool { core::mem::take(&mut self.run) }
 
 	/// Parks a dependency for `entity`'s build on the current build root (or on
 	/// `entity` itself outside a build), returning the [`PendingGuard`] that
@@ -294,7 +341,7 @@ impl TemplatePending {
 		}
 	}
 
-	/// Resolves `id` on `root` and drains the set, firing [`LoadTemplate`] (and
+	/// Resolves `id` on `root` and drains the set, firing [`Ready`] (and
 	/// any deferred slot resolution) once nothing is outstanding. The shared
 	/// tail of every resolver; a no-op if the root is gone or the id already
 	/// resolved.
@@ -396,7 +443,7 @@ impl PendingDropQueue {
 
 /// Owned handle to one parked dependency on a [`TemplatePending`] set.
 ///
-/// Resolving drains the set (firing [`LoadTemplate`] and any deferred slot
+/// Resolving drains the set (firing [`Ready`] and any deferred slot
 /// resolution once nothing is outstanding). Dropping it unresolved queues the
 /// resolution onto the [`PendingDropQueue`] sweep instead, so a dependency can
 /// never leak and hang a settle: an async task holds its guard across the
@@ -474,7 +521,7 @@ impl PendingDependency {
 }
 
 impl TemplatePending {
-	/// Fires [`LoadTemplate`] on `root` if its [`TemplatePending`] set is empty (or
+	/// Fires [`Ready`] on `root` if its [`TemplatePending`] set is empty (or
 	/// absent), reporting the error state from the presence of [`TemplateError`].
 	///
 	/// This is the drain trigger, called synchronously by the walker after
@@ -484,8 +531,8 @@ impl TemplatePending {
 	/// 1. Once no [`PendingKind::Structural`] dependency remains, a deferred slot
 	///    resolution (parked by the walker when content was still arriving) runs
 	///    exactly once over the settled tree; a failure rides [`TemplateError`].
-	/// 2. Once nothing at all remains, [`LoadTemplate`] fires on the root and every
-	///    descendant.
+	/// 2. Once nothing at all remains, the [`Ready`] sweep runs over the loaded
+	///    subtree, carrying the run declaration this build was given.
 	pub fn drain_dependencies(root: &mut EntityWorldMut) {
 		// deferred slot resolution: the content has settled once every structural
 		// dependency resolved. `take_deferred_slots` yields at most once.
@@ -517,21 +564,18 @@ impl TemplatePending {
 			return;
 		}
 		let is_error = root.contains::<TemplateError>();
-		let root_id = root.id();
-		// fire on the root *and* every descendant in the built subtree, so a load verb
-		// (eg `CallOnLoad`) sitting on any node observes its own `LoadTemplate` locally.
-		// Snapshot the subtree first, then fire: an observer may restructure the tree.
-		root.world_scope(|world| {
-			let subtree =
-				world.entity_mut(root_id).iter_descendents_inclusive();
-			for entity in subtree {
-				if let Ok(mut entity) = world.get_entity_mut(entity) {
-					entity.trigger(move |entity| LoadTemplate {
-						entity,
-						is_error,
-					});
-				}
-			}
+		// the declaration is consumed here, so it drives exactly this sweep.
+		let run = root
+			.get_mut::<TemplatePending>()
+			.map(|mut pending| pending.take_run())
+			.unwrap_or(false);
+		// the sweep reaches the root *and* every descendant in the built subtree, so
+		// a load verb (eg `CallOnReady`) sitting on any node observes its own
+		// `Ready` locally, deepest first.
+		root.trigger_subtree(move |entity| Ready {
+			entity,
+			is_error,
+			run,
 		});
 	}
 }

@@ -11,7 +11,7 @@
 //! parks a [`PendingId`] on the build root and spawns a task that resolves the
 //! nearest ancestor [`BlobStore`] (the site store on the loaded root), reads `src`
 //! through it, and builds the included entry at the include site, then resolves the
-//! dependency so `LoadTemplate` proceeds. So an include never blocks the runtime
+//! dependency so `Ready` proceeds. So an include never blocks the runtime
 //! (single-threaded on wasm) and an S3-backed site composes the same way as a local
 //! one. This reuses the same wiring [`TemplatePending::register_fetch`] gives the remote
 //! front-ends in `beet_core`'s `remote.rs`.
@@ -43,7 +43,7 @@ pub(crate) fn register_template_include(world: &mut World) {
 			}
 			let target = entity.id();
 			// park a structural dependency on the build root and spawn the async
-			// read + build, so slot resolution and `LoadTemplate` wait for the
+			// read + build, so slot resolution and `Ready` wait for the
 			// include and the runtime is never blocked. The ancestor store is
 			// resolved inside the task, where the whole tree is built, so it is
 			// reachable by ancestry.
@@ -63,7 +63,7 @@ pub(crate) fn register_template_include(world: &mut World) {
 }
 
 /// Read + build a local `<Template src>` include, then resolve its pending
-/// dependency so slot resolution and `LoadTemplate` proceed. Logs (rather than
+/// dependency so slot resolution and `Ready` proceed. Logs (rather than
 /// panics) on failure, leaving the include site empty, mirroring the
 /// remote-template resolver.
 async fn resolve_include(
@@ -200,7 +200,7 @@ mod test {
 	/// the included `<Fragment slot="x">` collapses into the included `<Slot
 	/// name="x"/>`, leaving no routing markers behind. The resolution cannot run
 	/// mid-`build_root` (the include has not built yet), so it must run when the
-	/// pending set drains, just before the deferred [`LoadTemplate`].
+	/// pending set drains, just before the deferred [`Ready`].
 	#[beet_core::test]
 	async fn resolves_slots_in_included_content() {
 		let mut world =
@@ -225,11 +225,11 @@ mod test {
 		.unwrap();
 		world.entity_mut(root).insert(store);
 
-		// record the slot state the deferred LoadTemplate observes on the root.
+		// record the slot state the deferred Ready observes on the root.
 		let loaded_with_unresolved_slots = Store::new(None);
 		let observed = loaded_with_unresolved_slots.clone();
 		world.entity_mut(root).observe(
-			move |ev: On<LoadTemplate>, slots: Query<&SlotChild>| {
+			move |ev: On<Ready>, slots: Query<&SlotChild>| {
 				if ev.entity == root {
 					observed.set(Some(slots.iter().count()));
 				}
@@ -247,12 +247,12 @@ mod test {
 		// the `<b/>` collapsed into `<main>` at the slot's position.
 		let tags = collect_tags(&mut world, root);
 		tags.contains(&"b".to_string()).xpect_true();
-		// and LoadTemplate fired with the slots already resolved.
+		// and Ready fired with the slots already resolved.
 		loaded_with_unresolved_slots.get().xpect_eq(Some(0));
 	}
 
 	/// A nested include (`first.bsx` including `second.bsx`) parks its pending
-	/// dependency on the *original* build root, so the root's [`LoadTemplate`]
+	/// dependency on the *original* build root, so the root's [`Ready`]
 	/// fires exactly once, after the whole tree (both levels) has built.
 	#[beet_core::test]
 	async fn nested_include_defers_root_load() {
@@ -282,11 +282,11 @@ mod test {
 		.unwrap();
 		world.entity_mut(root).insert(store);
 
-		// record, per root LoadTemplate fire, whether the nested content existed.
+		// record, per root Ready fire, whether the nested content existed.
 		let fires = Store::new(Vec::<bool>::new());
 		let recorded = fires.clone();
 		world.entity_mut(root).observe(
-			move |ev: On<LoadTemplate>, elements: Query<&Element>| {
+			move |ev: On<Ready>, elements: Query<&Element>| {
 				if ev.entity == root {
 					let has_span =
 						elements.iter().any(|element| element.tag() == "span");

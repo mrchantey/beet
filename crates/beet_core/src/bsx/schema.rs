@@ -191,7 +191,7 @@ pub(crate) enum SchemaDirective {
 	None,
 	/// An inline JSON schema, parsed at registration.
 	Inline(ValueSchema),
-	/// A remote schema URL, fetched asynchronously and awaited by `LoadTemplate`.
+	/// A remote schema URL, fetched asynchronously and awaited by `Ready`.
 	Remote(SmolStr),
 }
 

@@ -23,8 +23,8 @@ use beet::prelude::*;
 /// beet serve site --server=http,ssh     # http plus a multi-tenant ssh terminal
 /// ```
 ///
-/// The entry is built dormant ([`build_entry`] supplies no [`LoadRequest`]), then
-/// booted explicitly: [`CallOnLoad::call_recursive`] calls every declared server
+/// The entry is built dormant ([`build_entry`] declares no run), then
+/// booted explicitly: [`CallOnReady::call_recursive`] calls every declared server
 /// under the loaded root, so the workspace entry serves only when `serve` is
 /// invoked, never on its own load. A parked server holds the await, so this
 /// handler never returns and the process serves until interrupted.
@@ -53,7 +53,7 @@ pub async fn Serve(cx: ActionContext<Request>) -> Result<Response> {
 		.get(|server: &CliServer| dispatches_commands(Some(server)))
 		.await
 		.unwrap_or_else(|_| dispatches_commands(None));
-	CallOnLoad::call_recursive(root, || entry_boot_request(parts, dispatches))
+	CallOnReady::call_recursive(root, || entry_boot_request(parts, dispatches))
 		.await?;
 	Response::ok().xok()
 }

@@ -749,7 +749,7 @@ fn build_uppercase(
 	}
 
 	// `<Template src="..">` is the remote-template front-end: register a pending
-	// fetch into the root's pending set, awaited by `LoadTemplate`. Remote
+	// fetch into the root's pending set, awaited by `Ready`. Remote
 	// resolution needs the async runtime, so it is `bevy_async`-gated.
 	if el.tag == "Template" {
 		if let Some(_src) = string_attr(el, "src") {
@@ -762,7 +762,7 @@ fn build_uppercase(
 
 	// a `<path::to::X>` BSX template resolves from the registry first.
 	if let Some(def) = registry.get(&el.tag) {
-		// a remote schema resolves asynchronously, deferring `LoadTemplate`.
+		// a remote schema resolves asynchronously, deferring `Ready`.
 		if let Some(_url) = def.remote_schema.clone() {
 			#[cfg(feature = "bevy_async")]
 			register_remote_schema(SmolStr::from(el.tag.as_str()), _url, cx)?;

@@ -18,7 +18,7 @@ the attacks resolve their target by query. The loop runs until someone falls.
 
     beet --main=examples/action/malenia.bsx
 -->
-<Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, CallOnLoad)}>
+<Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, CallOnReady)}>
 	<Fallback>
 		<TryHealSelf/>
 		<HighestScore>

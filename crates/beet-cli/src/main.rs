@@ -1,5 +1,5 @@
-//! The `beet` binary: discover an entry, supply the process request, load it,
-//! let the loaded tree run itself, and exit unless something kept it alive.
+//! The `beet` binary: discover an entry, load it as a live build, let the loaded
+//! tree run itself, and exit unless something kept it alive.
 //!
 //! beet is unopinionated like a game engine: it links a library of capabilities
 //! (registered reflect types) but ships zero behaviour. The entry resolves from
@@ -10,8 +10,8 @@
 //! The entry may widen its own store root with a `<StoreRoot src="../.."/>`
 //! declaration (see [`StoreRoot`]), so callers never re-supply it. The entry
 //! builds on the async runtime through its [`BlobStore`] (so every store read is
-//! awaited, never blocked) with the process request as the build's [`LoadRequest`],
-//! which the entry's `CallOnLoad` verb calls with on `LoadTemplate`. A one-shot
+//! awaited, never blocked), declaring the load should run itself, which the
+//! entry's `CallOnReady` verb acts on at its own `Ready`. A one-shot
 //! streams its response and exits; a long-running server parks its call to
 //! persist the process.
 //!
@@ -97,8 +97,8 @@ fn build_app() -> App {
 /// runtime so discovery (a store walk), template registration, and every store read
 /// (`templates/`, the entry document, `<RoutesDir>`/`<Template src>`) go through the
 /// one [`BlobStore`] without ever blocking the runtime (which is single-threaded on
-/// wasm). The app loop drives the task; its build fires `LoadTemplate` on the root,
-/// where the `CallOnLoad` verb fans the process request out to the entry's servers.
+/// wasm). The app loop drives the task; its build fires `Ready` on the root,
+/// where the `CallOnReady` verb fans the process request out to the entry's servers.
 /// The app then stays alive until something writes `AppExit`, so nothing is held by
 /// hand here. A failed resolve/build logs and exits with an error rather than
 /// panicking. Target-agnostic: every runtime builds the same way, differing only
@@ -156,21 +156,15 @@ fn load_entry(world: &mut World) {
 
 /// Build the browser entry: read the program from the DOM via
 /// [`MainBsx::read_dom_program`] and build it onto a storeless root (see
-/// [`entry_build::build_from_bsx`]), with the process request as its load context.
-/// The wasm `Browser` branch of [`load_entry`]; the program's own `CallOnLoad`
-/// verb then drives it.
+/// [`entry_build::build_from_bsx`]), declaring the load should run itself. The
+/// wasm `Browser` branch of [`load_entry`]; the program's own `CallOnReady` verb
+/// then drives it.
 #[cfg(target_arch = "wasm32")]
 async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 	let bsx = MainBsx::read_dom_program().await?;
 	world
 		.with(move |world: &mut World| {
-			entry_build::build_from_bsx(
-				world,
-				formats,
-				"main.bsx",
-				bsx,
-				LoadRequest::from_cli(),
-			)
+			entry_build::build_from_bsx(world, formats, "main.bsx", bsx, true)
 		})
 		.await?;
 	Ok(())
@@ -179,8 +173,8 @@ async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
 /// Build the resolved entry on the async runtime: register the entry's `templates/`
 /// and read the entry document through the store (awaited, not blocked), then build
 /// it into a root carrying the store so `<RoutesDir>` and `<Template src>` resolve
-/// the store by ancestry, plus the process [`LoadRequest`] the load calls with.
-/// The build fires `LoadTemplate`, where `CallOnLoad` boots the servers.
+/// the store by ancestry. This is the process entry, so the build declares `run`:
+/// the `Ready` sweep carries it, and `CallOnReady` boots the servers.
 /// Target-agnostic; the `--watch` live-reload path is native-only.
 async fn build_entry(
 	world: &AsyncWorld,
@@ -205,9 +199,8 @@ async fn build_entry(
 		return build_watched_entry(world, store, entry_name, formats).await;
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it
-	// declares no load verb of its own, only the load *context* (the process
-	// request), so the entry's own markup decides how it loads by carrying a
-	// `CallOnLoad` or not.
+	// declares no load verb of its own, only that this load is live, so the
+	// entry's own markup decides how it runs by carrying a `CallOnReady` or not.
 	#[cfg(target_arch = "wasm32")]
 	let _ = config;
 	let sources =
@@ -215,12 +208,7 @@ async fn build_entry(
 			.await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			entry_build::build_root(
-				world,
-				store,
-				sources,
-				LoadRequest::from_cli(),
-			)?;
+			entry_build::build_root(world, store, sources, true, ())?;
 			Ok(())
 		})
 		.await

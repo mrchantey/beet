@@ -10,7 +10,7 @@ wire the jumps as forward references, so the graph reads top to bottom.
 
     beet --main=examples/action/state_machine.bsx
 -->
-<Name("state1") {(StateAction, GoTo($transition), CallOnLoad)}>
+<Name("state1") {(StateAction, GoTo($transition), CallOnReady)}>
 	<Name("transition") bx:ref="transition" {(StateAction, GoTo($state2))}/>
 	<Name("state2") bx:ref="state2" {StateAction}/>
 </Name>

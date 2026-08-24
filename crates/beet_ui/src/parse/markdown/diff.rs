@@ -226,7 +226,7 @@ fn build_via_bsx(world: &mut World, entity: Entity, node: &HtmlNode<'_>) {
 		.cloned()
 		.unwrap_or_default();
 	let template = BsxTemplate::new(vec![element], registry);
-	// a build failure rides `TemplateError`/`LoadTemplate` on the entity.
+	// a build failure rides `TemplateError`/`Ready` on the entity.
 	let _ = world.entity_mut(entity).insert_template(template);
 }
 

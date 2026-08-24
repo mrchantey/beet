@@ -48,7 +48,7 @@ That said, I wouldn't be surprised if this gets ripped out at some point in the 
 as you can see, the inheritence model that html/xml is built on isnt a perfect fit for ECS, we end up heavily leaning into this spread `<Comp1 {(Comp2,Comp3)}/>` syntax, but at least its somewhat familiar.
 
 ```jsx
-<Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, CallOnLoad)}>
+<Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, CallOnReady)}>
 	<Fallback>
 		<TryHealSelf/>
 		<HighestScore>

@@ -95,7 +95,7 @@ where
 		let handle =
 			asset_server.load::<AnimationClip>(on_end.clip.to_string());
 		let player = agents.get_descendent(action)?;
-		// assets are gated to be loaded before LoadTemplate, so a missing clip
+		// assets are gated to be loaded before Ready, so a missing clip
 		// asset is a real error, not a wait.
 		let clip = clips
 			.get(&handle)

@@ -16,7 +16,7 @@ use bevy::prelude::BevyError;
 ///
 /// For example the template build path carries one failure to three places at
 /// once: the [`TemplateError`](crate::prelude::TemplateError) component, the
-/// [`LoadTemplate`](crate::prelude::LoadTemplate) event, and the `spawn_template`
+/// [`Ready`](crate::prelude::Ready) event, and the `spawn_template`
 /// return. That is only possible because the error is cloneable here.
 #[derive(Debug, Clone)]
 pub struct CloneError(pub Arc<BevyError>);

@@ -3,11 +3,11 @@
 
 With async actions, "long running" is simply a future that takes a while to
 resolve. `<Patrol>` loops several times with a delay between steps, then a final
-log. `{CallOnLoad}` runs the sequence on load, then exits.
+log. `{CallOnReady}` runs the sequence on load, then exits.
 
     beet --main=examples/action/long_running.bsx
 -->
-<Sequence {CallOnLoad}>
+<Sequence {CallOnReady}>
 	<Patrol/>
 	<Log::Message("patrol complete")/>
 </Sequence>

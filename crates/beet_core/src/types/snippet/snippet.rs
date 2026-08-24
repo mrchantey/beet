@@ -318,7 +318,7 @@ impl<T: BuildTemplate> IntoSnippetBundle<SnippetBuildTemplateMarker> for T {
 		OnSpawnClone::new(move |entity| {
 			let template = self.clone();
 			// build the template's subtree into this entity; a build failure rides
-			// `TemplateError` so it surfaces through the root's `LoadTemplate`.
+			// `TemplateError` so it surfaces through the root's `Ready`.
 			if let Err(error) = entity.build_template(&template) {
 				entity.insert(TemplateError::new(error));
 			}

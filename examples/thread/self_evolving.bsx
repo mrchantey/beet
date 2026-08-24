@@ -8,7 +8,7 @@ across turns. Run it through the one binary:
 resolves) and the agent evolves `notes.md` over ten turns (`{RepeatTimes}`). The
 run is finite, so the transcript settles and the terminal holds it until Ctrl+C.
 -->
-<Fragment {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, CallOnLoad)}>
+<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
 	<CrateCheck features="thread,tui,ssh"/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
@@ -37,4 +37,4 @@ state in one sentence what you changed.
 			</Thread>
 		</RepeatTimes>
 	</Router>
-</Fragment>
+</CallOnReady>

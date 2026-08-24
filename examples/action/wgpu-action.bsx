@@ -17,7 +17,7 @@ to `SetDrive` to match the current API.
 	<Lighting3d/>
 	<Ground3d/>
 	<Foxie scale=0.1 bx:ref="fox" {CharacterDrive}>
-		<Repeat {(CallOnLoad, ActionOf($fox))}>
+		<Repeat {(CallOnReady, ActionOf($fox))}>
 			<Sequence>
 				<SetDrive linear=40. angular=0./>
 				<EndInDuration duration="1s"/>

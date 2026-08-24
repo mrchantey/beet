@@ -19,7 +19,7 @@ const FETCH_ITEM_OFFSET: f32 = 2.;
 /// they sit at world positions, so they are top-level rather than children of the
 /// inert template host. Each carries a [`Sentence`] the fox matches against, and a
 /// scaled glb model child loaded through the deferred [`BuildAssets`] path so the
-/// scene's `LoadTemplate` waits for every model. The camera + terminal live in the
+/// scene's `Ready` waits for every model. The camera + terminal live in the
 /// `.bsx`.
 #[template(system)]
 pub fn FetchItems(
@@ -86,17 +86,17 @@ pub fn FetchItems(
 ///
 /// The `<FetchFox/>` tag entity *is* the fox: the template returns the fox bundle,
 /// so the fox is hosted under the scene's build root (eg `<Scene3d>`) and receives
-/// `LoadTemplate` once its deferred assets load. The behaviour tree is spawned as
+/// `Ready` once its deferred assets load. The behaviour tree is spawned as
 /// the fox's children via an [`OnSpawn`] hook (which yields the fox entity), each
 /// tree root wired with `ActionOf(fox)` so the actions resolve their agent to the
 /// fox (its [`AnimationGraphClips`], [`SteerBundle`] and [`SteerTarget`] live here).
-/// The graph is built through the deferred [`BuildAssets`] path so `LoadTemplate`
+/// The graph is built through the deferred [`BuildAssets`] path so `Ready`
 /// waits for both fox clips and the glb scene; the `Handle<Bert>` is minted the
 /// same way because a handle is not a markup value and [`SentenceSteerTarget`] is a
 /// generic action, not a markup spread, so the whole tree is built in Rust.
 ///
 /// Behaviour tree (mirrors `fetch_npc`):
-///   Initial Idle   — play idle once the fox's assets load ([`CallOnLoad`])
+///   Initial Idle   — play idle once the fox's assets load ([`CallOnReady`])
 ///   Fetch Behavior — on each user sentence:
 ///     Sequence
 ///       Apply Sentence Steer Target — closest [`Collectable`] -> [`SteerTarget`]
@@ -143,13 +143,13 @@ pub fn FetchFox(
 /// fox via [`ActionOf`]. Split out of [`FetchFox`]'s [`OnSpawn`] hook so the tree
 /// structure reads top-down.
 fn spawn_fetch_tree(world: &mut World, fox: Entity, bert: Handle<Bert>) {
-	// plays idle once the fox's assets load (`CallOnLoad`), so the fox has a resting
+	// plays idle once the fox's assets load (`CallOnReady`), so the fox has a resting
 	// pose before the user types a command.
 	world.spawn((
 		Name::new("Initial Idle"),
 		ChildOf(fox),
 		ActionOf(fox),
-		CallOnLoad,
+		CallOnReady,
 		PlayAnimation::new("misc/fox.glb#Animation0").repeat_forever(),
 	));
 

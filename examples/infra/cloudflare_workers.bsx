@@ -23,7 +23,7 @@ full rebuild + redeploy.
     beet --main=examples/infra/cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` root (no long-running server) with the `Router` as its child;
-its `CallOnLoad` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
+its `CallOnReady` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
 `<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
 children of the route and the sequence runs them in order.
 
