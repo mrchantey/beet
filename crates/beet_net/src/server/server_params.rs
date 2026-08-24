@@ -30,7 +30,13 @@ pub struct ServerParams {
 impl ServerParams {
 	/// The bind knobs `request` carries.
 	pub fn from_request(request: &Request) -> Result<Self> {
-		request.params().parse_reflect()
+		Self::from_parts(request.request_parts())
+	}
+
+	/// The bind knobs `parts` carry, for a facet that kept the start request's
+	/// parts rather than the request itself.
+	pub fn from_parts(parts: &RequestParts) -> Result<Self> {
+		parts.params().parse_reflect()
 	}
 
 	/// The `--host` override as IPv4 octets, the form the server components hold.

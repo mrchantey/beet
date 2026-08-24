@@ -58,12 +58,10 @@ impl TuiServer {
 				},
 				|entity, request, shutdown| {
 					// the future owns what it needs, so nothing borrows the input
-					// past this call.
-					let opening = OpeningRoute::from_request(request);
-					let scheme = request
-						.get_param("color-scheme")
-						.and_then(ColorScheme::parse);
-					Box::pin(serve_tui(entity, opening, scheme, shutdown))
+					// past this call; a start request is argv-shaped and carries no
+					// body, so cloning the parts is the whole copy.
+					let parts = request.request_parts().clone();
+					Box::pin(serve_tui(entity, parts, shutdown))
 				},
 			);
 		}
@@ -79,13 +77,15 @@ impl TuiServer {
 /// the terminal with it.
 async fn serve_tui(
 	entity: AsyncEntity,
-	opening: Result<OpeningRoute>,
-	scheme: Option<ColorScheme>,
+	parts: RequestParts,
 	shutdown: OnceValueRx<()>,
 ) -> Result {
+	let scheme = parts.get_param("color-scheme").and_then(ColorScheme::parse);
 	// the opening route is recorded on the server (the shared mechanism the SSH
-	// server also reads).
-	entity.insert(opening?).await?;
+	// server also reads), resolved against this server's own url space.
+	entity
+		.insert(OpeningRoute::resolve(&entity, &parts).await?)
+		.await?;
 	let Some(host) = start_tui(entity.clone(), scheme).await? else {
 		return Ok(());
 	};

@@ -78,13 +78,12 @@ impl SshTuiServer {
 				},
 				move |entity, request, shutdown| {
 					// the future owns what it needs, so nothing borrows the input
-					// past this call.
-					let params = ServerParams::from_request(request);
-					let opening = OpeningRoute::from_request(request);
+					// past this call; a start request is argv-shaped and carries no
+					// body, so cloning the parts is the whole copy.
+					let parts = request.request_parts().clone();
 					Box::pin(serve_ssh_tui(
 						entity,
-						params,
-						opening,
+						parts,
 						pty_timeout,
 						shutdown,
 					))
@@ -99,13 +98,12 @@ impl SshTuiServer {
 /// then hold the run open until the shutdown signal.
 async fn serve_ssh_tui(
 	entity: AsyncEntity,
-	params: Result<ServerParams>,
-	opening: Result<OpeningRoute>,
+	parts: RequestParts,
 	pty_timeout: Option<Duration>,
 	shutdown: OnceValueRx<()>,
 ) -> Result {
 	// the bind config from the request, over the env-fed `SshServer::default`.
-	let params = params?;
+	let params = ServerParams::from_parts(&parts)?;
 	let mut server = SshServer::default();
 	if let Some(port) = params.ssh_port {
 		server.port = Some(port);
@@ -116,9 +114,11 @@ async fn serve_ssh_tui(
 	// a session here is a terminal, so a connection that never asks for one
 	// is dropped rather than held to the transport's idle timeout.
 	server.pty_timeout = pty_timeout;
-	// the opening route each session navigates to, recorded on the server
-	// (the shared mechanism the local TUI server also reads).
-	entity.insert((server, opening?)).await?;
+	// the opening route each session navigates to, recorded on the server (the
+	// shared mechanism the local TUI server also reads), resolved against this
+	// server's own url space.
+	let opening = OpeningRoute::resolve(&entity, &parts).await?;
+	entity.insert((server, opening)).await?;
 	shutdown.wait().await;
 	Ok(())
 }
@@ -530,6 +530,49 @@ mod test {
 			.expect("boot did not install an SshServer")
 			.pty_timeout
 			.xpect_eq(Some(Duration::from_secs(10)));
+	}
+
+	/// Regression: a server mounted under a command route opens at the url space
+	/// its own router serves, not at the command path that addressed it.
+	///
+	/// This is the deployed shape (`app --store=.. --server=ssh serve`, and `beet
+	/// serve site --server=ssh` locally): the site hangs off a `serve` route, so
+	/// every session used to open on a "no route matched //serve" error page.
+	#[beet_core::test]
+	async fn boot_opens_at_the_mounted_url_space() {
+		let mut app = ssh_tui_app();
+		let root = app
+			.world_mut()
+			.spawn((Router, children![(
+				route::new("serve", SshTuiServer::default()),
+				children![Router],
+			)]))
+			.flush();
+		let server = app.world().entity(root).get::<Children>().unwrap()[0];
+		app.world_mut().entity_mut(server).run_async_local(
+			|entity| async move {
+				entity
+					.call::<Request, Response>(Request::from_cli_str(
+						// an OS-assigned port, so this never races a sibling case
+						"serve --server=ssh --ssh-port=0",
+					))
+					.await?;
+				Ok(())
+			},
+		);
+		// the boot never resolves (a long-running server parks it), so drive the
+		// app rather than awaiting the call.
+		for _ in 0..20 {
+			app.update();
+		}
+
+		app.world()
+			.entity(server)
+			.get::<OpeningRoute>()
+			.expect("boot did not record an opening route")
+			.0
+			.path_string()
+			.xpect_eq("/");
 	}
 
 	/// Regression (the deployed ssh site's memory leak): a disconnected client

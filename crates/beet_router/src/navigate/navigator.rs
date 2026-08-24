@@ -444,14 +444,37 @@ impl Navigator {
 pub struct OpeningRoute(pub Url);
 
 impl OpeningRoute {
-	/// The opening route from the boot request: an explicit `--path` (eg `beet
-	/// serve <dir> --server=tui --path=docs/form`), else the request path (a
-	/// compiled binary's own args, eg a deployed site opening at its home route,
-	/// which for an argument-less boot is `/`).
-	pub fn from_request(request: &Request) -> Result<Self> {
-		let url = match ServerParams::from_request(request)?.path {
+	/// The opening route for the terminal server on `entity`, from its start
+	/// request's `parts`.
+	pub async fn resolve(
+		entity: &AsyncEntity,
+		parts: &RequestParts,
+	) -> Result<Self> {
+		// a server with its own `PathPattern` is mounted under a command route;
+		// a despawned server is an error, not an unmounted one.
+		let mounted = entity
+			.with(|entity| entity.contains::<PathPattern>())
+			.await?;
+		Self::from_parts(parts, mounted)
+	}
+
+	/// The opening route from the start request, relative to the server's own url
+	/// space.
+	///
+	/// An explicit `--path` wins (eg `beet serve <dir> --server=tui
+	/// --path=docs/form`). Otherwise a mounted server opens at its home: a server
+	/// under a command route (`<Route path="serve" {TuiServer}>`) is *addressed*
+	/// by that path, which is no route in the url space its `Router` child
+	/// serves, and dispatch requires an exact pattern match, so the boot path
+	/// never carries anything past the mount. An unmounted server roots its own
+	/// url space, the one place address and page coincide, so a compiled
+	/// binary's own args open the page they name (`beet --main=chat.bsx
+	/// docs/form`).
+	pub fn from_parts(parts: &RequestParts, mounted: bool) -> Result<Self> {
+		let url = match ServerParams::from_parts(parts)?.path {
 			Some(path) => Url::parse(path),
-			None => Url::parse(request.path_string()),
+			None if mounted => Url::NONE,
+			None => Url::NONE.with_path(parts.path().clone()),
 		};
 		Self(url).xok()
 	}
@@ -467,6 +490,46 @@ mod test {
 	fn defaults_to_http_transport() {
 		matches!(Navigator::default().transport(), NavigatorTransport::Http)
 			.xpect_true();
+	}
+
+	/// A mounted terminal server is *addressed* by its command path, which is no
+	/// route in the url space its router serves, so it opens at that space's
+	/// home; an unmounted server roots its own url space, so its args name the
+	/// page.
+	///
+	/// Regression: `beet serve site --server=tui` and every deployed ssh session
+	/// (`app --store=.. --server=ssh serve`) opened on a "no route matched
+	/// //serve" error page, because the whole request path became the opening
+	/// route.
+	#[beet_core::test]
+	fn a_mounted_server_opens_at_home() {
+		use beet_net::prelude::*;
+
+		let opening = |path: &str, mounted: bool| {
+			OpeningRoute::from_parts(&RequestParts::get(path), mounted)
+				.unwrap()
+				.0
+				.path_string()
+		};
+		// the command path that addressed the server is no page in its space
+		opening("/serve", true).xpect_eq("/");
+		// a compiled binary's own args open the page they name
+		opening("/docs/form", false).xpect_eq("/docs/form");
+	}
+
+	/// An explicit `--path` is the opening route mounted or not, so
+	/// `beet serve site --server=tui --path=docs/form` lands there.
+	#[beet_core::test]
+	fn opening_route_prefers_the_path_param() {
+		use beet_net::prelude::*;
+
+		let mut parts = RequestParts::get("/serve");
+		parts.insert_param("path", "docs/form");
+		OpeningRoute::from_parts(&parts, true)
+			.unwrap()
+			.0
+			.path_string()
+			.xpect_eq("/docs/form");
 	}
 
 	/// An in-world navigation records a terminal page view for the page it leaves,
