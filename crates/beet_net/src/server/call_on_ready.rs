@@ -337,8 +337,6 @@ mod test {
 	/// keep-alive stays and no `AppExit` is written, so the process persists.
 	/// The `Running` is inserted by the entity's `RunningSet` before any facet
 	/// runs, so the park holds regardless of what the backend does.
-	// see the NATIVE_ONLY note in `http_server`
-	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn server_parks_and_stays_up() {
 		let log = Store::<Vec<&'static str>>::default();

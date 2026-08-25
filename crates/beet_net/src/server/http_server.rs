@@ -317,15 +317,9 @@ mod std_impl {
 // Facet-machinery tests over a per-entity stub backend (no real listener),
 // driving to a bounded log rather than settling a parked server. The
 // real-listener cases (eg `shutdown_ends_accept_loop`) bind real TCP and stay
-// native.
-//
-// NATIVE_ONLY: every case that actually *starts* a server is `cfg`-gated off
-// wasm. A started server's stub backend and the driver that launched it are two
-// tasks doing world bridges, and beet's wasm harness runs every case on one
-// single-threaded executor, where resuming one task from inside another's bridge
-// re-enters it ("cannot recursively acquire mutex"). No wasm build compiles an
-// http backend at all, so what those cases pin is native machinery. See Phase 4
-// of `.agents/plans/lifecycle-master-plan.md`, which lifts these gates.
+// native; everything else runs on wasm too, where the stub pins the facet
+// machinery itself. See `.agents/reports/wasm-server-test-reentrancy.md` for
+// the re-entrancy class that once kept these native-only.
 #[cfg(test)]
 pub(crate) mod tests {
 	use super::*;
@@ -403,7 +397,6 @@ pub(crate) mod tests {
 
 	/// A bare start (no `--server`) selects the http facet: its backend runs and
 	/// the host parks on its unresolved `Running<Response>`.
-	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn boots_on_boot() {
 		let mut app = app();
@@ -420,7 +413,6 @@ pub(crate) mod tests {
 	/// and a despawn is a teardown just the same: bevy runs remove hooks on
 	/// despawn, so the signal still reaches the live listener rather than
 	/// orphaning it.
-	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn teardown_on_running_removed() {
 		for despawn in [false, true] {
@@ -444,7 +436,6 @@ pub(crate) mod tests {
 	/// A serve loop that never opens (a port already bound) fails the run it was
 	/// started for, so the load call resolves with the error and the process exits
 	/// rather than parking on a server that is not there.
-	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn serve_failure_fails_the_call() {
 		let caught = Store::<Option<String>>::default();
@@ -520,7 +511,6 @@ pub(crate) mod tests {
 
 	/// `--port` in the start request overrides the declared component port before
 	/// the backend reads the bind address.
-	#[cfg(not(target_arch = "wasm32"))] // see NATIVE_ONLY
 	#[beet_core::test]
 	async fn resolves_port_from_params() {
 		let mut app = app();

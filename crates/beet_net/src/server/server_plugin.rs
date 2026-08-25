@@ -101,8 +101,6 @@ mod boot_check_test {
 
 	/// Two servers spread on one entity add to the one [`RunningSet`], so a single
 	/// call starts both rather than either clobbering the other's slot.
-	// see the NATIVE_ONLY note in `http_server`
-	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn starts_every_declared_server() {
 		let log = Store::<Vec<&'static str>>::default();
