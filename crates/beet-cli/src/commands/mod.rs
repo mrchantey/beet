@@ -15,7 +15,6 @@ mod run_wasm_browser;
 mod s3_sync;
 #[cfg(not(target_arch = "wasm32"))]
 mod screenshot;
-mod serve;
 // the committed page-driving check for the browser render boot, run via
 // `just check-wasm-render`.
 #[cfg(test)]
@@ -32,7 +31,6 @@ pub use run_wasm::*;
 pub use s3_sync::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use screenshot::*;
-pub use serve::*;
 
 use beet::prelude::*;
 
@@ -46,9 +44,6 @@ impl Plugin for CliCommandsPlugin {
 		app.register_type::<AnalyticsReport>()
 			.register_type::<Check>()
 			.register_type::<ExportStatic>()
-			// `serve <entry>` loads an entry and boots its servers (the only command
-			// that boots the workspace entry's server, via a direct boot call)
-			.register_type::<Serve>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()
 			.register_type::<BuildWasmAction>()

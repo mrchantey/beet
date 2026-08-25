@@ -224,7 +224,7 @@ async fn http_server_declarable_in_markup() {
 #[derive(Component)]
 struct ServerStarted;
 
-/// Regression (`beet serve site` bound the http server twice, the second bind
+/// Regression (`beet --main=site serve` bound the http server twice, the second bind
 /// failing with "address already in use" and orphaning the live listener's
 /// teardown): the site shape is a dispatcher root whose served site hangs off a
 /// `serve` route, and a server no longer drags a load verb in with it, so the
@@ -246,7 +246,7 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 	.ok();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	// disarm the load through ancestry, as `serve` does: only the explicit
-	// `call_recursive` below may start servers, never the build's own `Ready`.
+	// `CallOnReady::call` below may start servers, never the build's own `Ready`.
 	let holder = world.spawn(DisableCallOnReady).id();
 	let root = spawn_bsx_under(
 		&mut world,
@@ -270,11 +270,12 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 	world.add_observer(move |_: On<StartRunning<Request>>| {
 		counter.set(counter.get() + 1)
 	});
-	// boot it the way `beet serve site` does: forward the `serve` route in
+	// boot it the way a launched entry does: argv names the `serve` route
 	world.run_async_local(move |async_world| async move {
-		CallOnReady::call_recursive(async_world.entity(root), || {
-			Request::from_cli_str("serve --server=http")
-		})
+		CallOnReady::call(
+			async_world.entity(root),
+			Request::from_cli_str("serve --server=http"),
+		)
 		.await
 		.ok();
 		Ok(())

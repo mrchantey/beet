@@ -461,7 +461,7 @@ impl OpeningRoute {
 	/// The opening route from the start request, relative to the server's own url
 	/// space.
 	///
-	/// An explicit `--path` wins (eg `beet serve <dir> --server=tui
+	/// An explicit `--path` wins (eg `beet --main=<dir> serve --server=tui
 	/// --path=docs/form`). Otherwise a mounted server opens at its home: a server
 	/// under a command route (`<Route path="serve" {TuiServer}>`) is *addressed*
 	/// by that path, which is no route in the url space its `Router` child
@@ -497,7 +497,7 @@ mod test {
 	/// home; an unmounted server roots its own url space, so its args name the
 	/// page.
 	///
-	/// Regression: `beet serve site --server=tui` and every deployed ssh session
+	/// Regression: `beet --main=site serve --server=tui` and every deployed ssh session
 	/// (`app --store=.. --server=ssh serve`) opened on a "no route matched
 	/// //serve" error page, because the whole request path became the opening
 	/// route.
@@ -518,7 +518,7 @@ mod test {
 	}
 
 	/// An explicit `--path` is the opening route mounted or not, so
-	/// `beet serve site --server=tui --path=docs/form` lands there.
+	/// `beet --main=site serve --server=tui --path=docs/form` lands there.
 	#[beet_core::test]
 	fn opening_route_prefers_the_path_param() {
 		use beet_net::prelude::*;

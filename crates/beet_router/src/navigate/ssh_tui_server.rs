@@ -835,7 +835,7 @@ mod test {
 	// input pipeline (no `pointer_input`, disclosure observers, or
 	// `sync_sidebar_breakpoint`) and its multi-session tests drive navigation
 	// directly. The harness below adds the full live-TUI stack the real
-	// `beet serve site --server=ssh` runs and drives real SGR mouse bytes across
+	// `beet --main=site serve --server=ssh` runs and drives real SGR mouse bytes across
 	// two concurrent sessions, so cross-session state leaks are actually
 	// exercised.
 	// ================================================================
@@ -850,7 +850,7 @@ mod test {
 		format!("\x1b[<{b};{};{}{m}", col + 1, row + 1).into_bytes()
 	}
 
-	/// The live-TUI stack the real `beet serve site --server=ssh` runs, including
+	/// The live-TUI stack the real `beet --main=site serve --server=ssh` runs, including
 	/// the input pipeline the plain [`ssh_tui_app`] omits: [`CharcellTuiPlugin`]
 	/// brings `pointer_input`/`scroll_input`, the disclosure observers, and
 	/// `sync_sidebar_breakpoint`, so concurrent SGR input is exercised.

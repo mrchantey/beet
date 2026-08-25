@@ -47,12 +47,13 @@ fn setup(mut commands: Commands) -> Result {
 			FsStore::new(WsPathBuf::new("examples/assets")),
 			router_scene()?,
 		))
-		// boot the declared server children; `.ok()` since the repl selection
-		// self-boots and declares no `CallOnReady` target.
+		// boot the spawned host; `.ok()` since the repl selection self-boots on
+		// spawn and claims no action to call.
 		.queue_async_local(|host| async move {
-			CallOnReady::call_recursive(host, || {
-				Request::from_cli_args(CliArgs::parse_env())
-			})
+			CallOnReady::call(
+				host,
+				Request::from_cli_args(CliArgs::parse_env()),
+			)
 			.await
 			.ok();
 			Ok(())

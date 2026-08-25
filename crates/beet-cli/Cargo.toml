@@ -44,7 +44,7 @@ extra = ["beet/extra"]
 thread = ["beet/thread", "beet/ui"]
 # The cloudflare/aws deploy blocks + route actions, so one `beet` binary runs an
 # infra deployer `.bsx` (eg `examples/infra/cloudflare_workers.bsx deploy`).
-# Opt-in (like `winit`), so a plain `beet serve` never links the deploy
+# Opt-in (like `winit`), so a plain `beet` never links the deploy
 # machinery. The example deploy templates (`<StackHost>`, `<AppBucket>`, ...)
 # ride the separate `extra` feature. Run with:
 # `cargo run -p beet-cli --features infra,extra -- --main=examples/infra/cloudflare_workers.bsx deploy`.
@@ -75,7 +75,7 @@ ml = ["winit", "beet/ml"]
 net = ["beet/ureq","beet/rustls-tls"]
 # The websocket socket-server + client backend (tungstenite), so a markup
 # `{SocketServer}` boots and `Socket::connect` works, eg the perceive-act agent and
-# its in-process head/body clients. Opt-in (like `winit`), so a plain `beet serve`
+# its in-process head/body clients. Opt-in (like `winit`), so a plain `beet`
 # never links tungstenite. Run with:
 # `cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket`.
 sockets = ["beet/tungstenite"]
@@ -86,7 +86,7 @@ secure = ["beet/secure"]
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.
 tui = ["beet/tui_server"]
-# The multi-tenant SSH-TUI server (`SshTuiServer`), so `beet serve <site>
+# The multi-tenant SSH-TUI server (`SshTuiServer`), so `beet --main=<site> serve
 # --server=http,ssh` serves http and an ssh terminal from one process. Registers
 # the markup-declarable `SshTuiServer` via `SshTuiPlugin`.
 ssh = ["tui", "beet/ssh_tui"]
@@ -197,7 +197,7 @@ beet = { workspace = true, features = [
 	"webdriver",
 	# the `serve` command spawns and serves a no-code BSX site
 	"http_server",
-	# `beet serve --watch`: dev-mode live reload over the client_io channel
+	# `--watch`: dev-mode live reload over the client_io channel
 	"client_io",
 	# fenced code blocks in served/presented decks render highlighted
 	"syntax_highlighting",

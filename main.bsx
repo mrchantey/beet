@@ -5,17 +5,15 @@ into the `beet` binary.
 The wasm test runner depends on it: `.cargo/config.toml` sets
 `runner = 'beet run-wasm'`, so `cargo test --target wasm32-...` invokes
 `beet run-wasm <module>`, which discovers this entry and dispatches the
-`<RunWasm/>` route. The rest are convenience: serve, build, check, static export,
-pdf, s3 sync.
+`<RunWasm/>` route. The rest are convenience: build, check, static export, pdf,
+s3 sync.
 
 It is a one-shot `<CliServer always=true {CallOnReady}>` root with the `Router` as its
 child: the binary declares only that this load should run itself, the root's
 `CallOnReady` calls it with the process request, it hops down to the router, the
 positional route arg selects the command, and the command resolves and the process exits.
 `always=true` makes this dispatcher run on every boot regardless of `--server`, since
-`--server` selects the *served site's* servers, not this entry's. The one exception
-to exiting is `<Serve/>`, which loads a site and boots *its* servers, parking so the
-process serves.
+`--server` selects a *declared server's* transports, not this dispatcher's.
 
     cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
@@ -24,18 +22,20 @@ process serves.
     just build-wasm-min                    # the smallest browser runtime (assets/wasm/beet-min.wasm)
     just build-wasm-full                   # ..and the kitchen sink (assets/wasm/beet-full.wasm)
 
-The two sites in this repo both serve through `<Serve/>` (`<site>` is a directory
-holding an entry document, or the entry file itself):
+Serving a site is NOT a command here. A site entry is its own CLI, so it is
+launched directly and names its own verb, exactly as its deploy verbs are
+(`--main` takes a directory holding an entry document, or the entry file itself):
 
-    beet serve site                        # the beet website (site/main.bsx), http
-    beet serve examples/bsx_site           # a zero-code BSX site, http
-    beet serve site/main.bsx               # ..the entry file resolves the same site
-    beet serve site --server=tui           # ..as a live terminal (like `beet present`)
-    beet serve site --server=http,ssh      # ..http plus a multi-tenant ssh terminal
+    beet --main=site serve --server=http       # the beet website (site/main.bsx)
+    beet --main=site serve --server=tui        # ..as a live terminal
+    beet --main=site serve --server=http,ssh   # ..http plus a multi-tenant ssh terminal
+    beet --main=examples/bsx_site --server=http   # a zero-code BSX site, whose root IS the server
 
-The beet website's own deploy does NOT live here: `site/main.bsx` declares the
-site's resources and its deploy verbs, so the application that runs on them is
-the thing that declares them (`just beet-deploy` runs `beet --main=site deploy`).
+That is the identical path the deployed box takes (`app --store=s3://.. serve`),
+and it is why the site's resources and deploy verbs live in `site/main.bsx`: the
+application that runs on them is the thing that declares them (`just beet-deploy`
+runs `beet --main=site deploy`).
+
 What lives here is this WORKSPACE's own shared asset bucket
 (`beet--shared--assets`), the source of record for the files too large for git
 that the examples, tests and wasm builds read out of `./assets`. It is
@@ -48,15 +48,14 @@ not owned by any deploy stage.
     just beet-shared push                  # publish ./assets to it
 
 `bx:features="infra,extra"` gates that subtree on the compiled feature set, so a
-lean `beet` (the default build, `beet run-wasm`, `beet serve`) skips it before
-its tags resolve rather than failing on an unregistered tag.
+lean `beet` (the default build, ie `beet run-wasm`) skips it before its tags
+resolve rather than failing on an unregistered tag.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
 	<PackageConfig title="Beet" app_name="beet" description="A creative tool engine built on bevy" version="0.0.9-dev.16"/>
-	<Serve/>
 	<RunWasm/>
 	<BuildWasm/>
 	<Check/>

@@ -62,7 +62,7 @@ expect() {
 		# a dead listener means the server crashed, not a layout drift
 		if grep -qiE "connection refused|connection closed|connection reset" "$file"; then
 			echo "      ^ the ssh listener is gone: the KNOWN multi-tenancy crash."
-			echo "        restart 'beet serve' and re-run."
+			echo "        restart the served entry and re-run."
 		fi
 	fi
 }

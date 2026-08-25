@@ -48,8 +48,8 @@ pub struct CallOnReady;
 /// A component, not a resource, so a single world can build some documents
 /// dormant while running others, and anything loaded *under* a disarmed root
 /// later (a rendered route page) inherits the disarm through ancestry. An
-/// explicit boot ([`CallOnReady::call_recursive`]) ignores it: an explicit
-/// call is deliberate.
+/// explicit boot ([`CallOnReady::call`]) ignores it: an explicit call is
+/// deliberate.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct DisableCallOnReady;
@@ -138,47 +138,6 @@ impl CallOnReady {
 			Response::ok().xok()
 		}
 	}
-
-	/// Explicitly call every [`CallOnReady`] action at or under `host`,
-	/// each with its own request from `make_request`, ignoring
-	/// [`DisableCallOnReady`]: an explicit boot is deliberate (eg `serve`
-	/// booting a disarmed-built site).
-	///
-	/// Resolves once every call resolves, so a parked server holds the await.
-	///
-	/// # Errors
-	/// Errors if no target carries [`CallOnReady`], or any call fails.
-	pub async fn call_recursive(
-		host: AsyncEntity,
-		make_request: impl Fn() -> Request,
-	) -> Result {
-		let targets = host
-			.world()
-			.run_system_cached_with(collect_call_on_ready, host.id())
-			.await?;
-		if targets.is_empty() {
-			bevybail!("no CallOnReady actions at or under {:?}", host.id());
-		}
-		let world = host.world().clone();
-		async_ext::try_join_all(
-			targets
-				.into_iter()
-				.map(|target| Self::call(world.entity(target), make_request())),
-		)
-		.await?;
-		Ok(())
-	}
-}
-
-fn collect_call_on_ready(
-	In(root): In<Entity>,
-	children: Query<&Children>,
-	call_on_ready: Query<(), With<CallOnReady>>,
-) -> Vec<Entity> {
-	children
-		.iter_descendants_inclusive(root)
-		.filter(|entity| call_on_ready.contains(*entity))
-		.collect()
 }
 
 /// On the entity's [`Ready`], queue [`CallOnReady::call`] with the process

@@ -23,7 +23,7 @@ use beet_net::prelude::*;
 /// to the servers. The kick rides the start notification a [`RunningSet`] fires
 /// ([`StartRunning<Request>`], see [`RunThread::kick_on_boot`]), which is what
 /// makes it both markup-friendly and boot-free: it gets the boot request (for
-/// `--new`) without owning argv, and works identically under `beet serve`, which
+/// `--new`) without owning argv, and works identically under a launched entry, which
 /// fires the same request shape.
 ///
 /// The call is detached, so a finite loop ([`RepeatTimes`],

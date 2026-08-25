@@ -1,21 +1,22 @@
 <!--
 The single canonical entry for the beet website, and the one place its cloud
 resources are declared. Discovery loads it locally when the `beet` binary runs
-from the `site/` directory (`cd site && beet serve`, and `beet present`, `beet
-check`, `beet export-static`), and the deployed Lightsail box loads the same
-entry directly from the app bucket root.
+from the `site/` directory (`cd site && beet serve --server=http`), and the
+deployed Lightsail box loads the same entry directly from the app bucket root.
+The workspace commands that take an entry as an argument (`beet check site`,
+`beet export-static site`) load it from the repo root.
 
 The root is a one-shot `<CliServer always=true {CallOnReady}>` dispatcher whose
 `Router` is its child, so the entry is a set of commands and the served site is ONE
 of them: `serve`. `always=true` makes the dispatcher run on every boot regardless of
 `--server`, since `--server` selects the *served site's* transports, not this
-entry's. The box therefore launches `app --store=s3://.. --server=http,ssh
-serve`, and `beet serve site` forwards the identical `serve` route in, so local
-and deployed take the same path.
+entry's. The box launches `app --store=s3://.. --server=http,ssh serve` and a
+developer launches `beet --main=site serve --server=http`: one process, one
+argv, the same verb, so local and deployed take the same path.
 
-    beet serve site                        # http (the default)
-    beet serve site --server=tui           # ..as a live terminal (like `beet present`)
-    beet serve site --server=http,ssh      # ..http plus a multi-tenant ssh terminal
+    beet --main=site serve --server=http      # the website over http
+    beet --main=site serve --server=tui       # ..as a live terminal (like `beet present`)
+    beet --main=site serve --server=http,ssh  # ..http plus a multi-tenant ssh terminal
 
 A `Router` is a url space, so the site's own routes stay rooted at `/` despite
 hanging off the `serve` command, and no http/ssh request can reach a sibling

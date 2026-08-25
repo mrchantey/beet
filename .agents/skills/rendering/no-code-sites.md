@@ -1,6 +1,6 @@
 # No-code sites (pure `.bsx`/`.mdx`)
 
-A site can be authored entirely in markup — no crate, no `main.rs`, no codegen — and served by the prebuilt `beet` CLI (`beet serve <dir>`). `site/` is the real example; `examples/bsx_site/` is the small teaching one. The same parser, widget library, Material rule set, and multi-target renderer back it as a compiled site.
+A site can be authored entirely in markup — no crate, no `main.rs`, no codegen — and served by the prebuilt `beet` CLI (`beet --main=<dir> serve`). `site/` is the real example; `examples/bsx_site/` is the small teaching one. The same parser, widget library, Material rule set, and multi-target renderer back it as a compiled site.
 
 ## The host (`main.bsx`)
 A `<Router>` whose middleware/server attach as component spreads, then the site config as child tags. The whole site, declared in markup:
@@ -35,11 +35,11 @@ A `<Router>` whose middleware/server attach as component spreads, then the site 
 - The fragment parser had several gaps the typed/document path didn't (now fixed): unquoted `variant=ButtonVariant::X` / `bool=true` reach typed props via the value grammar; `class={["a","b"]}` list classes; insignificant inter-tag whitespace is dropped (else it paints blank charcell rows); `bx:style`/`bx:<event>` lower like the document parser. An inline class is content-addressed (collision-free across files), not span-addressed.
 
 ## Serving a no-code site (the dev loop)
-`beet serve` is a loadable scene; after a `beet_ui`/router change the cache goes stale and serve 404s. Refresh it:
+A served entry is a loadable scene; after a `beet_ui`/router change the cache goes stale and serving 404s. Refresh it:
 ```
 cargo build -p beet-cli
 cargo run -p beet-cli --bin export_scenes && ~/.cargo_target/debug/beet load target/scenes/default-cli.json
-~/.cargo_target/debug/beet serve site/ --port=8339          # then git checkout .beet/scene.json
+~/.cargo_target/debug/beet --main=site serve --server=http --port=8339   # then git checkout .beet/scene.json
 ```
 A `.bsx`/`.mdx`/`.md` edit needs a server RESTART (RoutesDir scans at startup). `beet check <site>` validates without serving (exit 70 on an error-level diagnostic).
 
