@@ -11,9 +11,9 @@
 //! env binding to store, the worker request/response conversion, and the
 //! per-isolate world cache with version invalidation.
 //!
-//! The entry builds into a root carrying the site store, dormant (so its
-//! declared servers stay down; the Worker itself serves each request). The
-//! universal seam is the same
+//! The entry builds into a root carrying the site store, disarmed via
+//! `DisableCallOnReady` (so its declared servers stay down; the Worker itself
+//! serves each request). The universal seam is the same
 //! `entity.exchange(request) -> Response` the native servers use.
 
 use crate::prelude::*;
@@ -110,12 +110,12 @@ async fn handle(
 /// [`build_app`] ([`BeetPlugins`] + [`WorkersPlugin`]) and run the shared
 /// [`build_entry_owned`] build+settle, then resolve the host entity.
 ///
-/// The build declares no run: the Worker itself routes each request through the
-/// host's `Router` action via `exchange`, so the servers the entry declares
-/// (`HttpServer`, `TuiServer`, ...) must stay dormant. Under a run declaration
-/// the entry's `CallOnReady` verb would boot them on its `Ready`, and
-/// `HttpServer`'s start would hit the (wasm-absent) backend and panic. Same
-/// dormant build `export-static`/`check` use.
+/// The build is disarmed (`DisableCallOnReady`): the Worker itself routes each
+/// request through the host's `Router` action via `exchange`, so the servers the
+/// entry declares (`HttpServer`, `TuiServer`, ...) must stay dormant. Armed, the
+/// entry's `CallOnReady` verb would boot them on its `Ready`, and `HttpServer`'s
+/// start would hit the (wasm-absent) backend and panic. Same disarmed build
+/// `export-static`/`check` use.
 async fn build_worker_world(
 	store: BlobStore,
 	entry_name: String,

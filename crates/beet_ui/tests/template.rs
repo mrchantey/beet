@@ -147,7 +147,11 @@ fn missing_required_prop_surfaces_error() {
 	let mut world = world();
 	let error = Store::new(None);
 	let err = error.clone();
-	world.add_observer(move |ev: On<Ready>| err.set(Some(ev.is_error)));
+	world.add_observer(
+		move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+			err.set(Some(errors.contains(ev.entity)))
+		},
+	);
 
 	// `<Badge/>` leaves `variant` unset: a graceful TemplateError, never a panic.
 	let root = world.spawn_template(rsx! { <Badge/> }).unwrap().id();

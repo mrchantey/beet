@@ -9,7 +9,7 @@
 //! Every runtime component — the [`CliServer`] child, the [`router`] bundle, the
 //! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the whole
 //! route tree round-trips with no post-load patching. Loading it is not running
-//! it though (a [`TemplateStore`] load declares no run), so the restored scene is
+//! it though (the scene carries no `CallOnReady`), so the restored scene is
 //! booted explicitly here with the process request, exactly as [`cli`](./cli.rs)
 //! boots its hand-spawned root.
 //!

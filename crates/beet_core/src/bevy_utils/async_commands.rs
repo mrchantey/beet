@@ -655,8 +655,8 @@ pub impl AsyncWorld {
 	///
 	/// `observer` is a full observer system, so beyond the [`On<E>`] trigger it
 	/// may take arbitrary [`SystemParam`]s and returns the value the future
-	/// resolves to, eg `|ev: On<Ready>| ev.is_error` to await a
-	/// [`Ready`](crate::prelude::Ready) and surface its error flag.
+	/// resolves to, eg `|ev: On<Ready>| ev.entity` to await a
+	/// [`Ready`](crate::prelude::Ready) and surface the entity it fired on.
 	fn await_event<E, B, M, O>(
 		&self,
 		observer: impl IntoObserverSystem<E, B, M, O>,
@@ -751,13 +751,15 @@ fn build_template_async(
 		let root = world
 			.with(move |world: &mut World| {
 				let root = entity.unwrap_or_else(|| world.spawn_empty().id());
-				// observe Ready on the root, signalling its error flag, then
+				// observe Ready on the root, signalling whether it failed, then
 				// build (which fires it), so a synchronous load is caught.
 				world.entity_mut(root).observe(
-					move |ev: On<Ready>, mut commands: Commands| {
+					move |ev: On<Ready>,
+					      errors: Query<(), With<TemplateError>>,
+					      mut commands: Commands| {
 						let observer = ev.observer();
 						if let Some(send) = sender.lock().unwrap().take() {
-							send.signal(ev.is_error);
+							send.signal(errors.contains(ev.entity));
 						}
 						commands.entity(observer).despawn();
 					},
@@ -1056,8 +1058,8 @@ impl AsyncEntity {
 	/// `observer` is a full observer system, so beyond the [`On<E>`] trigger it
 	/// may take arbitrary [`SystemParam`]s and returns the value the future
 	/// resolves to. The route-handler case: `spawn_template` a root, then
-	/// `entity.await_event::<Ready, _, _, _>(|ev: On<Ready>| ev.is_error)`
-	/// to await readiness and branch on the error flag.
+	/// `entity.await_event::<Ready, _, _, _>(|ev: On<Ready>, errors: Query<(), With<TemplateError>>| errors.contains(ev.entity))`
+	/// to await readiness and branch on the root's error state.
 	pub fn await_event<E, B, M, O>(
 		&self,
 		observer: impl IntoObserverSystem<E, B, M, O>,

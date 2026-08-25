@@ -107,7 +107,7 @@ pub(crate) fn graphics_state() -> ElementState {
 
 /// Pixel dimensions from a PNG header (`IHDR` width/height), or `None` when
 /// the bytes are not a PNG.
-#[cfg(all(feature = "tui", any(feature = "net", test)))]
+#[cfg(any(all(feature = "tui", feature = "net"), test))]
 pub(crate) fn png_dimensions(bytes: &[u8]) -> Option<UVec2> {
 	(bytes.len() >= 24
 		&& bytes.starts_with(b"\x89PNG\r\n\x1a\n")

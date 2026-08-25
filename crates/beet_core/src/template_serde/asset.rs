@@ -260,7 +260,11 @@ mod test {
 
 		let load_state = Store::new(None);
 		let ls = load_state.clone();
-		world.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
+		world.add_observer(
+			move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+				ls.set(Some(errors.contains(ev.entity)))
+			},
+		);
 
 		// a template that loads the asset, deferring Ready.
 		let root = world

@@ -17,8 +17,9 @@ impl Plugin for ServerPlugin {
 			.register_type::<HttpServer>()
 			.register_type::<Tls>()
 			// the markup load verb, so an `<HttpServer>` entry, a `{CallOnReady}`
-			// script or behaviour scene resolves it.
-			.register_type::<CallOnReady>();
+			// script or behaviour scene resolves it, and its disarm marker.
+			.register_type::<CallOnReady>()
+			.register_type::<DisableCallOnReady>();
 
 		// a start whose `--server` selected no facet fails the call in the
 		// `RunningSet` itself, so there is no server-layer check to register here.

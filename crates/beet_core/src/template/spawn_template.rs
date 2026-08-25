@@ -7,14 +7,14 @@
 //! slots across the built subtree, then fire the lifecycle events
 //! ([`SpawnTemplate`], then the [`Ready`] sweep once dependencies drain).
 //!
-//! Every entrypoint builds dormant: the tree is built but nothing in it runs. The
-//! `_run` twin ([`WorldTemplateExt::spawn_template_run`]) is the loader's
-//! declaration that this build should run itself, which the sweep carries as
-//! [`Ready::run`] — so the one who loads is the one who declares.
+//! Building carries no run semantics: whether anything in the built tree acts
+//! on its [`Ready`] is the tree's own declaration (an on-ready component such
+//! as `beet_net`'s `CallOnReady`), suppressed per subtree by a loader building
+//! documents to render or inspect (`DisableCallOnReady`).
 //!
-//! Errors never escape as an `Err` and never panic: a failed build, slot
-//! resolution, or load rides [`TemplateError`] on the root and surfaces through
-//! [`Ready`] with `is_error: true`.
+//! Errors never escape as a panic: a failed build, slot resolution, or load
+//! rides [`TemplateError`] on the root and the [`Ready`] sweep still fires
+//! (the synchronous entrypoints also return the shared error).
 
 use crate::prelude::*;
 use bevy::ecs::template::Template;
@@ -55,30 +55,19 @@ macro_rules! subtree_template {
 /// Instantiation entrypoint on [`World`].
 #[extend::ext(name=WorldTemplateExt)]
 pub impl World {
-	/// Spawns a root entity and builds `template` into it, dormant.
+	/// Spawns a root entity and builds `template` into it.
 	///
 	/// Runs the build walker: build into the root, resolve slots, fire
 	/// [`SpawnTemplate`] then the [`Ready`] sweep. On success returns the root,
-	/// like [`World::spawn`]. On failure the error rides [`TemplateError`] and
-	/// [`Ready`] (`is_error: true`) *and* is returned here, its inner a
-	/// [`CloneError`] shared across all three.
+	/// like [`World::spawn`]. On failure the error rides [`TemplateError`] on
+	/// the root *and* is returned here, its inner a [`CloneError`] shared
+	/// across both.
 	fn spawn_template(
 		&mut self,
 		template: impl Template<Output = ()>,
 	) -> Result<EntityWorldMut<'_>> {
 		let root = self.spawn_empty().id();
-		build_root(self, root, false, template)?;
-		Ok(self.entity_mut(root))
-	}
-
-	/// [`Self::spawn_template`], declaring that the built tree should run itself:
-	/// its [`Ready`] sweep carries [`Ready::run`], so the load verbs in it fire.
-	fn spawn_template_run(
-		&mut self,
-		template: impl Template<Output = ()>,
-	) -> Result<EntityWorldMut<'_>> {
-		let root = self.spawn_empty().id();
-		build_root(self, root, true, template)?;
+		build_root(self, root, template)?;
 		Ok(self.entity_mut(root))
 	}
 }
@@ -87,8 +76,7 @@ pub impl World {
 /// entity which becomes the root for lifecycle purposes.
 #[extend::ext(name=EntityWorldMutTemplateExt)]
 pub impl EntityWorldMut<'_> {
-	/// Builds `template` into this entity, which becomes the template root,
-	/// dormant.
+	/// Builds `template` into this entity, which becomes the template root.
 	///
 	/// Same lifecycle as [`WorldTemplateExt::spawn_template`], including the
 	/// returned [`CloneError`] on failure.
@@ -97,18 +85,7 @@ pub impl EntityWorldMut<'_> {
 		template: impl Template<Output = ()>,
 	) -> Result<&mut Self> {
 		let root = self.id();
-		self.world_scope(|world| build_root(world, root, false, template))?;
-		Ok(self)
-	}
-
-	/// [`Self::insert_template`], declaring that the built tree should run
-	/// itself: its [`Ready`] sweep carries [`Ready::run`].
-	fn insert_template_run(
-		&mut self,
-		template: impl Template<Output = ()>,
-	) -> Result<&mut Self> {
-		let root = self.id();
-		self.world_scope(|world| build_root(world, root, true, template))?;
+		self.world_scope(|world| build_root(world, root, template))?;
 		Ok(self)
 	}
 }
@@ -131,7 +108,7 @@ pub impl Commands<'_, '_> {
 		entity.queue(move |mut entity: EntityWorldMut| {
 			let root = entity.id();
 			entity.world_scope(move |world| {
-				let _ = build_root(world, root, false, template);
+				let _ = build_root(world, root, template);
 			});
 		});
 		entity
@@ -151,7 +128,7 @@ pub impl EntityCommands<'_> {
 		self.queue(move |mut entity: EntityWorldMut| {
 			let root = entity.id();
 			entity.world_scope(move |world| {
-				let _ = build_root(world, root, false, template);
+				let _ = build_root(world, root, template);
 			});
 		});
 		self
@@ -167,22 +144,14 @@ pub impl EntityCommands<'_> {
 /// 3. Fire [`SpawnTemplate`] on the root (the post-build boundary).
 /// 4. Drain the pending-dependency set, sweeping [`Ready`] when empty.
 ///
-/// `run` is the loader's declaration that the built tree should run itself; it
-/// is parked on the root's [`TemplatePending`] before the build so the drain
-/// carries it however many dependencies defer the sweep.
-///
 /// Structured so nested template nodes (the `DynamicTemplate` IR) and future
 /// post-build passes attach at the slot/`SpawnTemplate` boundary without
 /// rewriting this function.
 fn build_root(
 	world: &mut World,
 	root: Entity,
-	run: bool,
 	template: impl Template<Output = ()>,
 ) -> Result<(), CloneError> {
-	if run {
-		TemplatePending::declare_run(world, root);
-	}
 	// caller content routed to the root before the build (eg the layout
 	// middleware's transcluded body, a `SlotChild` portal), to anchor onto the
 	// built layout once it exists.
@@ -413,7 +382,11 @@ mod test {
 		let sc = spawn_count;
 		world.add_observer(move |_: On<SpawnTemplate>| sc.set(sc.get() + 1));
 		let ls = load_state;
-		world.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
+		world.add_observer(
+			move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+				ls.set(Some(errors.contains(ev.entity)))
+			},
+		);
 
 		let root = world.spawn_template(Card).unwrap().id();
 
@@ -459,9 +432,11 @@ mod test {
 			sc.set(sc.get() + 1);
 		});
 		let ls = load_state.clone();
-		world.add_observer(move |ev: On<Ready>| {
-			ls.set(Some(ev.is_error));
-		});
+		world.add_observer(
+			move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+				ls.set(Some(errors.contains(ev.entity)));
+			},
+		);
 
 		world.spawn_template(Child("kid")).unwrap();
 
@@ -534,46 +509,13 @@ mod test {
 			.xpect_eq(vec![inner_grandchild, inner_child, inner]);
 	}
 
-	/// The run declaration rides the whole sweep, and is consumed by it: a
-	/// dormant build carries `run: false`, and a later load into the same tree
-	/// does not inherit an earlier declaration.
+	/// A sweep held back by a dependency still covers the whole subtree when it
+	/// finally drains: a scene gated on an asset load (the `<Scene3d>` shape)
+	/// fires deepest-first, frames after the build returned.
 	#[beet_core::test]
-	fn ready_carries_the_run_declaration() {
-		let runs = Store::new(Vec::<bool>::new());
-		let recorder = runs.clone();
+	fn a_deferred_sweep_covers_the_subtree() {
 		let mut world = TemplatePlugin::world();
-		world.add_observer(move |ev: On<Ready>| {
-			let mut all = recorder.get();
-			all.push(ev.run);
-			recorder.set(all);
-		});
-
-		world.spawn_template(Chain).unwrap();
-		runs.get().xpect_eq(vec![false, false, false]);
-
-		runs.set(Vec::new());
-		let root = world.spawn_template_run(Chain).unwrap().id();
-		runs.get().xpect_eq(vec![true, true, true]);
-
-		// a later load under the running root declares its own, so it is dormant.
-		runs.set(Vec::new());
-		world.spawn(ChildOf(root)).insert_template(Chain).unwrap();
-		runs.get().xpect_eq(vec![false, false, false]);
-	}
-
-	/// A declaration survives however long dependencies defer the sweep: a scene
-	/// gated on an asset load (the `<Scene3d>` shape) still runs its behaviors
-	/// when the last dependency resolves, frames after the build returned.
-	#[beet_core::test]
-	fn a_deferred_sweep_still_carries_the_run_declaration() {
-		let mut world = TemplatePlugin::world();
-		let runs = Store::new(Vec::<bool>::new());
-		let recorder = runs.clone();
-		world.add_observer(move |ev: On<Ready>| {
-			let mut all = recorder.get();
-			all.push(ev.run);
-			recorder.set(all);
-		});
+		let fired = record_ready(&mut world);
 
 		let root = world.spawn_empty().id();
 		let guard = TemplatePending::park(
@@ -582,12 +524,12 @@ mod test {
 			PendingKind::Passive,
 			"test asset",
 		);
-		world.entity_mut(root).insert_template_run(Chain).unwrap();
-		// the dependency holds the sweep back, declaration and all.
-		runs.get().xpect_empty();
+		world.entity_mut(root).insert_template(Chain).unwrap();
+		// the dependency holds the sweep back.
+		fired.get().xpect_empty();
 
 		guard.resolve(&mut world);
-		runs.get().xpect_eq(vec![true, true, true]);
+		fired.get().len().xpect_eq(3);
 	}
 
 	#[beet_core::test]
@@ -605,9 +547,11 @@ mod test {
 		let mut world = TemplatePlugin::world();
 		let load_error = Store::new(None);
 		let le = load_error.clone();
-		world.add_observer(move |ev: On<Ready>| {
-			le.set(Some(ev.is_error));
-		});
+		world.add_observer(
+			move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+				le.set(Some(errors.contains(ev.entity)));
+			},
+		);
 
 		let result = world.spawn_template(Boom);
 
@@ -670,7 +614,11 @@ mod test {
 		let mut world = TemplatePlugin::world();
 		let load_state = Store::new(None);
 		let ls = load_state;
-		world.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
+		world.add_observer(
+			move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+				ls.set(Some(errors.contains(ev.entity)))
+			},
+		);
 
 		// a template that builds a slot target, registers a structural
 		// dependency, and leaves its slot content for the "include" to add.

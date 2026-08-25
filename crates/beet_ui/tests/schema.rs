@@ -248,8 +248,11 @@ async fn async_remote_schema_defers_load() {
 
 	let load_state = Store::new(None);
 	let ls = load_state.clone();
-	app.world_mut()
-		.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
+	app.world_mut().add_observer(
+		move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+			ls.set(Some(errors.contains(ev.entity)))
+		},
+	);
 
 	// spawn the template; the remote schema parks a pending dependency.
 	let bytes = MediaBytes::new_bsx("<Remote/>");
@@ -293,8 +296,11 @@ async fn remote_template_stub_defers_load() {
 
 	let load_state = Store::new(None);
 	let ls = load_state.clone();
-	app.world_mut()
-		.add_observer(move |ev: On<Ready>| ls.set(Some(ev.is_error)));
+	app.world_mut().add_observer(
+		move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
+			ls.set(Some(errors.contains(ev.entity)))
+		},
+	);
 
 	// `<Template src="..">` registers a pending fetch into the root's pending set.
 	let bytes =

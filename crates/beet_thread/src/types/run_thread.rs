@@ -249,9 +249,9 @@ mod test {
 		};
 		let booted = app.world_mut().spawn(children![ephemeral()]).flush();
 		let idle = app.world_mut().spawn(children![ephemeral()]).flush();
-		app.world_mut().entity_mut(booted).trigger(|entity| {
-			StartRunning::new(entity, Request::default())
-		});
+		app.world_mut()
+			.entity_mut(booted)
+			.trigger(|entity| StartRunning::new(entity, Request::default()));
 		for _ in 0..60 {
 			app.update();
 		}

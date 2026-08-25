@@ -239,17 +239,16 @@ pub async fn read_sources(
 
 /// Build read [`EntrySources`] into a root carrying `store` (resolved by ancestry for
 /// `<TemplateDir>`, `<RoutesDir>` and `<Template src>`), with `extra` riding onto the
-/// root. `run` is this loader's declaration that the entry should run itself (see
-/// [`Ready::run`]); a render-only command leaves it `false` and the entry's
-/// `CallOnReady` verbs stay dormant. Registers the entry's declared template sources
-/// *before* parsing the entry (so its own tags resolve), then marks the root
-/// [`TemplatesLoaded`]. The synchronous world-mutating tail of an entry load;
-/// returns the root entity.
+/// root. The entry runs itself: its own `CallOnReady` verbs act on their `Ready`, so
+/// a render-only command (`check`, `export-static`, the Worker) passes
+/// [`DisableCallOnReady`] in `extra` to build the tree disarmed. Registers the
+/// entry's declared template sources *before* parsing the entry (so its own tags
+/// resolve), then marks the root [`TemplatesLoaded`]. The synchronous
+/// world-mutating tail of an entry load; returns the root entity.
 pub fn build_root(
 	world: &mut World,
 	store: BlobStore,
 	sources: EntrySources,
-	run: bool,
 	extra: impl Bundle,
 ) -> Result<Entity> {
 	let EntrySources {
@@ -284,11 +283,9 @@ pub fn build_root(
 	// waits on before serving).
 	let mut root_entity = world.entity_mut(root);
 	root_entity.insert((extra, store, TemplatesLoaded));
-	match run {
-		true => root_entity.insert_template_run(template),
-		false => root_entity.insert_template(template),
-	}
-	.map_err(|err| bevyhow!("failed to load entry `{entry_name}`: {err}"))?;
+	root_entity.insert_template(template).map_err(|err| {
+		bevyhow!("failed to load entry `{entry_name}`: {err}")
+	})?;
 	world.flush();
 	Ok(root)
 }
@@ -300,8 +297,8 @@ pub fn build_root(
 /// world-owning driver path (the wasm Worker, a one-shot build); an in-app caller
 /// settles via [`TemplatePending::settle`] instead. Returns the entry root.
 ///
-/// The build is dormant: this driver serves each request itself, so the entry's
-/// declared servers must not start.
+/// The build is disarmed ([`DisableCallOnReady`]): this driver serves each
+/// request itself, so the entry's declared servers must not start.
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub(crate) async fn build_entry_owned(
 	world: &mut World,
@@ -311,7 +308,7 @@ pub(crate) async fn build_entry_owned(
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	let prescan = read_prescan(&store, &entry_name).await?;
 	let sources = read_sources(&store, formats, entry_name, prescan).await?;
-	let root = build_root(world, store, sources, false, ())?;
+	let root = build_root(world, store, sources, DisableCallOnReady)?;
 	TemplatePending::settle_owned(world).await;
 	Ok(root)
 }
@@ -353,13 +350,12 @@ pub async fn rebuild_watched(
 			// tear down the previous entry scene so servers close and sockets drop
 			// before the fresh tree binds (a no-op on the first build).
 			BeetSceneRoot::despawn_all(world);
-			// a rebuild retains nothing from the last one: it simply declares `run`
-			// again, so the fresh tree's servers rebind.
+			// a rebuild retains nothing from the last one: the fresh tree runs
+			// itself on its own `Ready`, so its servers rebind.
 			let root = build_root(
 				world,
 				store,
 				sources,
-				true,
 				(BeetSceneRoot, LiveReload::new()),
 			)?;
 			if let Some(entry_watch) = entry_watch {
@@ -406,14 +402,12 @@ async fn entry_source_paths(
 /// path, where the program is inlined in a `<script type="application/x-bsx">`, not
 /// resolved from `--main`/a filesystem. Constructs [`EntrySources`] directly and
 /// builds onto a storeless ([`BlobStore::temp`]) root, so the same
-/// [`build_root`] core runs as the store-backed native path. `run` declares the
-/// build as for [`build_root`].
+/// [`build_root`] core runs as the store-backed native path.
 pub fn build_from_bsx(
 	world: &mut World,
 	formats: TemplateFormats,
 	entry_name: impl Into<String>,
 	bsx: impl Into<String>,
-	run: bool,
 ) -> Result<Entity> {
 	let entry = MediaBytes::new_bsx(bsx.into());
 	let sources = EntrySources {
@@ -423,7 +417,7 @@ pub fn build_from_bsx(
 		template_sources: Vec::new(),
 		formats,
 	};
-	build_root(world, BlobStore::temp(), sources, run, ())
+	build_root(world, BlobStore::temp(), sources, ())
 }
 
 #[cfg(test)]
@@ -449,7 +443,7 @@ mod test {
 		let sources = read_sources(&store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root = build_root(&mut world, store, sources, false, ()).unwrap();
+		let root = build_root(&mut world, store, sources, ()).unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world
@@ -476,7 +470,7 @@ mod test {
 		let sources = read_sources(&store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root = build_root(&mut world, store, sources, false, ()).unwrap();
+		let root = build_root(&mut world, store, sources, ()).unwrap();
 		world
 			.entity(root)
 			.contains::<TemplatesLoaded>()
@@ -485,27 +479,25 @@ mod test {
 		TemplatePending::settle_owned(&mut world).await;
 	}
 
-	/// The `--watch` rebuild declares `run` on every build, so a rebuilt tree
-	/// boots exactly as the first one did. Nothing is retained between builds:
-	/// the declaration is per-build and consumed by its own sweep.
+	/// Every `--watch` rebuild fires a fresh [`Ready`] on its fresh entry root,
+	/// so a rebuilt tree boots exactly as the first one did: nothing is retained
+	/// between builds.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet::test]
-	async fn rebuild_declares_run_every_time() {
+	async fn rebuild_fires_ready_every_time() {
 		let store = BlobStore::temp();
 		store
 			.insert(&SmolPath::from("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		let runs = Store::new(Vec::<bool>::new());
-		let recorder = runs.clone();
+		let readies = Store::new(0);
+		let recorder = readies.clone();
 		// the entry root is the one marked `TemplatesLoaded`.
 		world.add_observer(
 			move |ev: On<Ready>, entries: Query<(), With<TemplatesLoaded>>| {
 				if entries.contains(ev.entity) {
-					let mut all = recorder.get();
-					all.push(ev.run);
-					recorder.set(all);
+					recorder.set(recorder.get() + 1);
 				}
 			},
 		);
@@ -524,6 +516,6 @@ mod test {
 				}
 			})
 			.await;
-		runs.get().xpect_eq(vec![true, true]);
+		readies.get().xpect_eq(2);
 	}
 }

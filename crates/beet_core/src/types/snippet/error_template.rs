@@ -3,8 +3,8 @@
 //!
 //! Its first use is `#[template(required)]`: required props are runtime-verified
 //! input values, so a `#[template]` with an unset required prop builds an
-//! [`ErrorTemplate`] carrying [`MissingProps`], which rides `TemplateError` and
-//! surfaces through `Ready { is_error: true }`. The type stays generic
+//! [`ErrorTemplate`] carrying [`MissingProps`], which rides `TemplateError` on
+//! the root while the `Ready` sweep still fires. The type stays generic
 //! over the error so other build-time failures use the same path.
 use crate::prelude::*;
 use alloc::sync::Arc;

@@ -7,7 +7,8 @@
 //!   "built" signal and the attach point for future subtree passes.
 //! - [`Ready`] sweeps the loaded subtree when the root's [`TemplatePending`] set
 //!   drains, immediately after [`SpawnTemplate`] when nothing is pending. It
-//!   carries [`Ready::is_error`] and fires whether the load succeeded or failed.
+//!   fires whether the load succeeded or failed; a failure rides
+//!   [`TemplateError`] on the root.
 //!
 //! Slot resolution rides the same boundary: a build with no outstanding
 //! [`PendingKind::Structural`] dependency resolves slots synchronously (before
@@ -17,9 +18,9 @@
 //! therefore guaranteed resolved by [`Ready`], but not by [`SpawnTemplate`] on a
 //! deferred build.
 //!
-//! Build, validation, and load failures never panic and are never returned as
-//! an `Err` from `spawn_template`. They insert [`TemplateError`] on the root
-//! and drive [`Ready`] with `is_error: true`.
+//! Build, validation, and load failures never panic: they insert
+//! [`TemplateError`] on the root and the [`Ready`] sweep still fires (the
+//! synchronous entrypoints also return the shared error).
 
 use super::spawn_template::anchor_pre_slot_children;
 use crate::prelude::*;
@@ -50,22 +51,19 @@ pub struct SpawnTemplate {
 /// runs synchronously, immediately after [`SpawnTemplate`]; slots are resolved
 /// by the time it fires.
 ///
-/// It fires for every load, succeeded or failed, dormant or live: [`Self::run`]
-/// is the loader's declaration that this build should run itself, so a load verb
-/// (`beet_net`'s `CallOnReady`) never runs without it, while a completion
-/// listener (an awaited build) still sees every load.
+/// It fires for every load, succeeded or failed: a failure rides
+/// [`TemplateError`] on the root, so a listener that cares (a load verb, an
+/// awaited build) reads that off the tree rather than the event. Whether the
+/// built tree *runs* is not the event's concern either: an on-ready behavior
+/// (`beet_net`'s `CallOnReady`) fires by default and is opted out per subtree
+/// by its own disarm marker (`DisableCallOnReady`), never by the loader
+/// threading a flag through the build.
 // BSN alignment: bevy's BSN ships its own `On<Ready>`, so migrating is adopting
 // their trigger rather than renaming anything here.
 #[derive(Debug, Clone)]
 pub struct Ready {
 	/// The entity this instance is firing on.
 	pub entity: Entity,
-	/// `true` when the loaded root failed; read [`TemplateError`] off it.
-	pub is_error: bool,
-	/// The loader's run declaration: `true` when whoever built this tree
-	/// declared it should run itself. A dormant build (`false`) is the default,
-	/// so rendering or inspecting a document never starts it.
-	pub run: bool,
 }
 
 impl Event for Ready {
@@ -82,9 +80,8 @@ impl SetEntityEventTarget for Ready {
 
 /// Inserted on a template root whose build, validation, or load failed.
 ///
-/// Build failures ride this path rather than panicking or returning an `Err`:
-/// the walker inserts this component and fires [`Ready`] with
-/// `is_error: true`.
+/// Build failures ride this path rather than panicking: the walker inserts
+/// this component and the [`Ready`] sweep still fires.
 #[derive(Debug, Clone, Component)]
 pub struct TemplateError {
 	/// The underlying error, shared (via [`CloneError`]) with the
@@ -156,9 +153,6 @@ pub struct TemplatePending {
 	/// The pre-build [`SlotChild`] snapshot the walker parked when it deferred
 	/// slot resolution to the drain (see [`TemplatePending::drain_dependencies`]).
 	deferred_slots: Option<Vec<Entity>>,
-	/// The loader's run declaration for this build, carried here as transient
-	/// load bookkeeping and consumed by the drain (see [`Ready::run`]).
-	run: bool,
 }
 
 /// An opaque identifier for one pending dependency on a [`TemplatePending`] set.
@@ -286,23 +280,6 @@ impl TemplatePending {
 	fn take_deferred_slots(&mut self) -> Option<Vec<Entity>> {
 		self.deferred_slots.take()
 	}
-
-	/// Declares that this build should run itself, ie its [`Ready`] sweep carries
-	/// [`Ready::run`]. Set by the run-declaring build entrypoints
-	/// ([`WorldTemplateExt::spawn_template_run`] and friends) on the root before
-	/// the walker runs.
-	pub(crate) fn declare_run(world: &mut World, root: Entity) {
-		world
-			.entity_mut(root)
-			.entry::<TemplatePending>()
-			.or_default()
-			.get_mut()
-			.run = true;
-	}
-
-	/// Takes the run declaration, so one declaration drives exactly one sweep and
-	/// a later load into the same tree is dormant unless it declares its own.
-	fn take_run(&mut self) -> bool { core::mem::take(&mut self.run) }
 
 	/// Parks a dependency for `entity`'s build on the current build root (or on
 	/// `entity` itself outside a build), returning the [`PendingGuard`] that
@@ -532,7 +509,7 @@ impl TemplatePending {
 	///    resolution (parked by the walker when content was still arriving) runs
 	///    exactly once over the settled tree; a failure rides [`TemplateError`].
 	/// 2. Once nothing at all remains, the [`Ready`] sweep runs over the loaded
-	///    subtree, carrying the run declaration this build was given.
+	///    subtree.
 	pub fn drain_dependencies(root: &mut EntityWorldMut) {
 		// deferred slot resolution: the content has settled once every structural
 		// dependency resolved. `take_deferred_slots` yields at most once.
@@ -563,20 +540,10 @@ impl TemplatePending {
 		if !pending_empty {
 			return;
 		}
-		let is_error = root.contains::<TemplateError>();
-		// the declaration is consumed here, so it drives exactly this sweep.
-		let run = root
-			.get_mut::<TemplatePending>()
-			.map(|mut pending| pending.take_run())
-			.unwrap_or(false);
 		// the sweep reaches the root *and* every descendant in the built subtree, so
-		// a load verb (eg `CallOnReady`) sitting on any node observes its own
-		// `Ready` locally, deepest first.
-		root.trigger_subtree(move |entity| Ready {
-			entity,
-			is_error,
-			run,
-		});
+		// an on-ready listener (eg `CallOnReady`) sitting on any node observes its
+		// own `Ready` locally, deepest first.
+		root.trigger_subtree(|entity| Ready { entity });
 	}
 }
 

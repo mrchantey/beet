@@ -245,7 +245,9 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 	})
 	.ok();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let holder = world.spawn_empty().id();
+	// disarm the load through ancestry, as `serve` does: only the explicit
+	// `call_recursive` below may start servers, never the build's own `Ready`.
+	let holder = world.spawn(DisableCallOnReady).id();
 	let root = spawn_bsx_under(
 		&mut world,
 		holder,
@@ -436,7 +438,7 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 /// verb of its own. The regression guard for an include carrying its boot
 /// machinery onto the root.
 ///
-/// The root is built dormant (the load declares no run): the assertion is that the
+/// The root is built disarmed ([`DisableCallOnReady`]): the assertion is that the
 /// machinery *arrived*, and a real boot here would dispatch the test runner's own
 /// argv as its request.
 #[beet_core::test]
@@ -457,9 +459,10 @@ async fn include_carries_boot() {
 	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
 	let template =
 		BsxTemplate::parse_entry(&world, entry.as_utf8().unwrap()).unwrap();
-	// the binary spawns the root with no load verb of its own (`build_entry_root`'s
+	// the binary spawns the root with no load verb of its own (`build_root`'s
 	// empty `extra`), then builds the entry onto it; the server rides the markup.
-	let root = world.spawn(store).id();
+	// Disarmed so the assertion is arrival, not a boot with the test argv.
+	let root = world.spawn((store, DisableCallOnReady)).id();
 	world.entity_mut(root).insert_template(template).unwrap();
 	// the include resolves as an async pending dependency, so settle first
 	AsyncRunner::settle_async_tasks(&mut world).await;

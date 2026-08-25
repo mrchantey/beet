@@ -7,9 +7,10 @@
 //! response. Two fallbacks let a behavior scene load with no adapter, see
 //! [`CallOnReady::call`].
 //!
-//! Loading a template never implies running it: the verb fires only under the
-//! loader's run declaration ([`Ready::run`]), so a command building a document to
-//! render or inspect builds it dormant by simply not declaring one. A
+//! The verb fires on every load, so a document says exactly what happens when
+//! it is loaded, wherever it is loaded. A loader building a document to render
+//! or inspect rather than run (`check`, `export-static`, the wasm Worker)
+//! disarms the subtree by inserting [`DisableCallOnReady`] on its root. A
 //! synthesized request (serve forwarding a route, `export-pdf`) never rides the
 //! sweep; it goes through the explicit [`CallOnReady::call`].
 use crate::prelude::*;
@@ -32,18 +33,30 @@ use beet_core::prelude::*;
 /// </CallOnReady>
 /// ```
 ///
-/// It fires only under the load's run declaration ([`Ready::run`]), which is what
-/// makes a render-only build (`check`, `export-static`) dormant without an
-/// opt-out component. A failed run-declared build exits with an error and never
-/// runs.
+/// It fires on every load: a scene carrying the verb runs wherever it is
+/// loaded, so the file alone says what loading it does. A render-only build
+/// (`check`, `export-static`) opts its subtree out with [`DisableCallOnReady`];
+/// a failed build exits with an error and never runs.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::observe(on_ready_call))]
 pub struct CallOnReady;
 
+/// Opts an entity and its subtree out of [`CallOnReady`]: the tree is built to
+/// render or inspect (`check`, `export-static`, the wasm Worker), not to run.
+///
+/// A component, not a resource, so a single world can build some documents
+/// dormant while running others, and anything loaded *under* a disarmed root
+/// later (a rendered route page) inherits the disarm through ancestry. An
+/// explicit boot ([`CallOnReady::call_recursive`]) ignores it: an explicit
+/// call is deliberate.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct DisableCallOnReady;
+
 impl CallOnReady {
-	/// Call this entity's action with the process request on spawn, as a
-	/// run-declared load would.
+	/// Call this entity's action with the process request on spawn, as the load
+	/// path would on [`Ready`].
 	///
 	/// The code counterpart of the markup load path, for an app that spawns its
 	/// server directly instead of loading a document:
@@ -64,7 +77,7 @@ impl CallOnReady {
 	/// The process request: argv/env as a [`Request`].
 	///
 	/// The one sanctioned ambient read, made at a process boundary (an
-	/// `on_spawn` boot) or under the loader's run declaration.
+	/// `on_spawn` boot, an armed load's [`Ready`]).
 	fn cli_request() -> Request { Request::from_cli_args(CliArgs::parse_env()) }
 
 	/// Call the entity's action with `request` and, once the call resolves,
@@ -127,7 +140,9 @@ impl CallOnReady {
 	}
 
 	/// Explicitly call every [`CallOnReady`] action at or under `host`,
-	/// each with its own request from `make_request`.
+	/// each with its own request from `make_request`, ignoring
+	/// [`DisableCallOnReady`]: an explicit boot is deliberate (eg `serve`
+	/// booting a disarmed-built site).
 	///
 	/// Resolves once every call resolves, so a parked server holds the await.
 	///
@@ -167,19 +182,29 @@ fn collect_call_on_ready(
 }
 
 /// On the entity's [`Ready`], queue [`CallOnReady::call`] with the process
-/// request. A load that declared no run builds the tree and stops there.
+/// request, unless the subtree is disarmed or the build failed.
 fn on_ready_call(
 	ev: On<Ready>,
+	ancestors: Query<&ChildOf>,
+	disabled: Query<(), With<DisableCallOnReady>>,
+	errors: Query<(), With<TemplateError>>,
 	mut exit: MessageWriter<AppExit>,
 	mut commands: Commands,
 ) {
-	// a dormant load runs nothing, and owes nothing on failure either: whoever
-	// built it holds the result.
-	if !ev.run {
+	// a disarmed subtree runs nothing, and owes nothing on failure either:
+	// whoever built it holds the result.
+	if ancestors
+		.iter_ancestors_inclusive(ev.entity)
+		.any(|entity| disabled.contains(entity))
+	{
 		return;
 	}
-	// a failed build never runs: exit with an error code.
-	if ev.is_error {
+	// a failed build never runs: exit with an error code. The error sits on the
+	// loaded root, an ancestor (or self) of every swept entity.
+	if ancestors
+		.iter_ancestors_inclusive(ev.entity)
+		.any(|entity| errors.contains(entity))
+	{
 		exit.write(AppExit::error());
 		return;
 	}
@@ -219,14 +244,11 @@ pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 mod test {
 	use super::*;
 
-	/// Sweep a run-declared load over `entity`'s subtree, as a booting binary's
-	/// build does.
+	/// Sweep a load over `entity`'s subtree, as a booting binary's build does.
 	fn load(world: &mut World, entity: Entity) {
-		world.entity_mut(entity).trigger_subtree(|entity| Ready {
-			entity,
-			is_error: false,
-			run: true,
-		});
+		world
+			.entity_mut(entity)
+			.trigger_subtree(|entity| Ready { entity });
 	}
 
 	/// A one-shot behavior action, recording into `ran` when it runs.
@@ -261,16 +283,17 @@ mod test {
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
 
-	/// A build that declared no run loads the tree and stops: the dormant build
-	/// every render-only command relies on.
+	/// A disarmed build loads the tree and stops: [`DisableCallOnReady`] on the
+	/// root is what every render-only command inserts.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
-	async fn a_dormant_build_never_runs() {
+	async fn a_disarmed_build_never_runs() {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin, TemplatePlugin));
 		let entity = app
 			.world_mut()
 			.spawn_template(Snippet::from_bundle((
+				DisableCallOnReady,
 				CliServer::default(),
 				CallOnReady,
 				children![exchange_ext::handler(|_| {
@@ -290,7 +313,7 @@ mod test {
 	}
 
 	/// The code boot: `CallOnReady::on_spawn` calls a hand-spawned server exactly
-	/// as a run-declared load would, so a `main.rs` app needs no template.
+	/// as a loaded scene's verb would, so a `main.rs` app needs no template.
 	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn on_spawn_resolves_and_exits() {
@@ -353,7 +376,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
 		app.world_mut()
-			.spawn_template_run(Snippet::from_bundle((
+			.spawn_template(Snippet::from_bundle((
 				CallOnReady,
 				recording_action(ran),
 			)))
@@ -374,7 +397,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
 		app.world_mut()
-			.spawn_template_run(Snippet::from_bundle(children![(
+			.spawn_template(Snippet::from_bundle(children![(
 				CallOnReady,
 				recording_action(ran)
 			)]))
@@ -384,18 +407,18 @@ mod test {
 			.xpect_true();
 	}
 
-	/// A later load inside a running tree declares its own run: the entry's
-	/// declaration was consumed by its own sweep, so a nested dormant build stays
-	/// dormant rather than inheriting it.
+	/// A later load under a live root runs itself too: a scene composing a
+	/// runnable sub-scene boots it on the sub-scene's own `Ready`, no
+	/// declaration required.
 	#[beet_core::test]
-	async fn a_later_dormant_load_stays_dormant() {
+	async fn a_nested_load_under_a_live_root_runs() {
 		let ran = Store::new(false);
 		let nested_ran = Store::new(false);
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
 		let root = app
 			.world_mut()
-			.spawn_template_run(Snippet::from_bundle((
+			.spawn_template(Snippet::from_bundle((
 				CallOnReady,
 				recording_action(ran),
 			)))
@@ -405,7 +428,28 @@ mod test {
 			.await
 			.xpect_true();
 
-		// a second, dormant build under the running root.
+		// a second load under the running root.
+		app.world_mut()
+			.spawn(ChildOf(root))
+			.insert_template(Snippet::from_bundle((
+				CallOnReady,
+				recording_action(nested_ran),
+			)))
+			.unwrap();
+		app_ext::update_until(&mut app, |_world| nested_ran.get())
+			.await
+			.xpect_true();
+	}
+
+	/// A load under a disarmed root inherits the disarm through ancestry: a
+	/// render command disarms its entry root once, and everything loaded under
+	/// it later (a route page) stays dormant with no further bookkeeping.
+	#[beet_core::test]
+	async fn a_nested_load_under_a_disarmed_root_stays_dormant() {
+		let nested_ran = Store::new(false);
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
+		let root = app.world_mut().spawn(DisableCallOnReady).id();
 		app.world_mut()
 			.spawn(ChildOf(root))
 			.insert_template(Snippet::from_bundle((
@@ -420,10 +464,10 @@ mod test {
 		nested_ran.get().xpect_false();
 	}
 
-	/// A failed run-declared build never runs and exits nonzero, so a broken
-	/// entry fails the process rather than serving a half-built tree.
+	/// A failed build never runs and exits nonzero, so a broken entry fails the
+	/// process rather than serving a half-built tree.
 	#[beet_core::test]
-	async fn a_failed_run_declared_build_exits_nonzero() {
+	async fn a_failed_build_exits_nonzero() {
 		let ran = Store::new(false);
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
@@ -432,11 +476,7 @@ mod test {
 			.entity_mut(root)
 			.insert(recording_action(ran))
 			.insert(TemplateError::new(bevyhow!("boom")))
-			.trigger_subtree(|entity| Ready {
-				entity,
-				is_error: true,
-				run: true,
-			});
+			.trigger_subtree(|entity| Ready { entity });
 		app.world_mut()
 			.run_system_once(|mut exits: MessageReader<AppExit>| {
 				exits.read().any(AppExit::is_error)

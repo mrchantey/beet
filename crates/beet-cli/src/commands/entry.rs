@@ -16,7 +16,8 @@ use beet::prelude::*;
 /// `beet --main=..` and these commands.
 ///
 /// `check`/`export-static` render the entry rather than serve it, so the build
-/// declares no run and the entry's `CallOnReady` verb stays dormant.
+/// disarms the root ([`DisableCallOnReady`]) and the entry's `CallOnReady` verb
+/// stays dormant.
 /// The reads go through the store ([`entry_build::read_sources`]/[`entry_build::build_root`]),
 /// the same agnostic core the native binary and the wasm Worker use, so the
 /// command is store-driven rather than filesystem-bound.
@@ -47,7 +48,7 @@ pub(crate) async fn build_entry(
 		entry_build::read_sources(&store, formats, entry_name, prescan).await?;
 	let root = caller
 		.with_world(move |world, _| {
-			entry_build::build_root(world, store, sources, false, ())
+			entry_build::build_root(world, store, sources, DisableCallOnReady)
 		})
 		.await??;
 	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
@@ -131,7 +132,7 @@ pub(crate) fn entry_arg(parts: &RequestParts) -> Result<String> {
 /// idempotent `init_plugin`). [`RouterPlugin`] registers the markup-declarable
 /// server *types* (`TuiServer`, `SshTuiServer`) by feature, so an entry's server
 /// spread resolves without the ssh runtime systems (which need an input backend);
-/// declaring no run keeps the declared servers dormant anyway.
+/// the disarmed build keeps the declared servers dormant anyway.
 #[cfg(test)]
 pub(crate) fn render_world() -> World {
 	(
@@ -217,9 +218,13 @@ mod test {
 			entry_build::read_sources(&store, formats, entry_name, prescan)
 				.await
 				.unwrap();
-		let root =
-			entry_build::build_root(&mut world, store, sources, false, ())
-				.unwrap();
+		let root = entry_build::build_root(
+			&mut world,
+			store,
+			sources,
+			DisableCallOnReady,
+		)
+		.unwrap();
 		// the markup `<HttpServer>` owns the boot, with the router as its child
 		world.entity(root).contains::<HttpServer>().xpect_true();
 		// and `<DefaultAppRoutes/>` wired the reactivity-runtime route
