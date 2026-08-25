@@ -543,7 +543,7 @@ impl TemplatePending {
 		// the sweep reaches the root *and* every descendant in the built subtree, so
 		// an on-ready listener (eg `CallOnReady`) sitting on any node observes its
 		// own `Ready` locally, deepest first.
-		root.trigger_subtree(|entity| Ready { entity });
+		root.trigger_target(|entity| Ready { entity });
 	}
 }
 

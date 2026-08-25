@@ -5,10 +5,9 @@
 //! deepest first and the root last, each exactly once, never above the root.
 //! That is the shape a settle signal needs ([`Ready`](crate::prelude::Ready)):
 //! a node observes its own event only after everything it owns has observed
-//! theirs.
+//! theirs. Both are fired the same way, through `trigger_target`.
 
 use crate::prelude::*;
-use bevy::ecs::change_detection::MaybeLocation;
 use bevy::ecs::event::SetEntityEventTarget;
 use bevy::ecs::event::Trigger;
 use bevy::ecs::event::trigger_entity_internal;
@@ -19,41 +18,56 @@ use core::fmt;
 /// An [`EntityEvent`] [`Trigger`] that fires one event instance on every entity
 /// of a subtree, deepest first and the root last.
 ///
-/// The subtree is snapshotted when the trigger is constructed, before any
-/// observer runs, so an observer that restructures or despawns part of the tree
-/// can neither redirect the sweep nor be visited twice; a despawned target is
-/// skipped. The event's target is retargeted per entity through
-/// [`SetEntityEventTarget`], so an observer reads the entity it fired on.
+/// The root is the event's target, so a sweep is fired like any other entity
+/// target event: `entity.trigger_target(|entity| MyEvent { entity })`.
+///
+/// The subtree is snapshotted before the first observer runs, so an observer
+/// that restructures or despawns part of the tree can neither redirect the
+/// sweep nor be visited twice; a despawned target is skipped. The event's
+/// target is retargeted per entity through [`SetEntityEventTarget`], so an
+/// observer reads the entity it fired on.
 pub struct SubtreeTrigger<E> {
 	/// The subtree root: the sweep's origin, and the last entity it fires on.
+	///
+	/// [`Entity::PLACEHOLDER`] until the sweep starts, when it is read off the
+	/// event's target.
 	root: Entity,
-	/// The bottom-up snapshot, taken before the first observer ran.
-	targets: Vec<Entity>,
 	_marker: PhantomData<E>,
 }
 
-impl<E> SubtreeTrigger<E> {
-	/// Snapshot `root`'s subtree, deepest first and `root` last.
-	pub fn new(world: &mut World, root: Entity) -> Self {
-		let targets = world
-			.entity_mut(root)
-			.iter_descendants_inclusive_bottom_up();
+impl<E> Default for SubtreeTrigger<E> {
+	fn default() -> Self {
 		Self {
-			root,
-			targets,
+			root: Entity::PLACEHOLDER,
 			_marker: PhantomData,
 		}
 	}
+}
 
+impl<E> SubtreeTrigger<E> {
 	/// The subtree root the sweep originated at, ie the event's original target.
 	pub fn root(&self) -> Entity { self.root }
+
+	/// `root`'s subtree read through [`Children`], deepest first and `root` last.
+	fn snapshot(world: &World, root: Entity) -> Vec<Entity> {
+		let mut targets = vec![root];
+		let mut index = 0;
+		// breadth-first, so reversing settles every child before its parent.
+		while index < targets.len() {
+			if let Some(children) = world.get::<Children>(targets[index]) {
+				targets.extend(children.iter());
+			}
+			index += 1;
+		}
+		targets.reverse();
+		targets
+	}
 }
 
 impl<E> fmt::Debug for SubtreeTrigger<E> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("SubtreeTrigger")
 			.field("root", &self.root)
-			.field("targets", &self.targets)
 			.finish()
 	}
 }
@@ -71,9 +85,10 @@ where
 		trigger_context: &TriggerContext,
 		event: &mut E,
 	) {
-		// taken, so the snapshot is consumed exactly once however the trigger is
-		// reused.
-		let targets = core::mem::take(&mut self.targets);
+		// the sweep starts where the event was targeted, and snapshots before the
+		// first observer can restructure the tree.
+		self.root = event.event_target();
+		let targets = Self::snapshot(&world, self.root);
 		for target in targets {
 			// an earlier observer may have despawned this entity.
 			if world.get_entity(target).is_err() {
@@ -96,31 +111,6 @@ where
 				);
 			}
 		}
-	}
-}
-
-/// Extension trait for firing a [`SubtreeTrigger`] event from [`EntityWorldMut`].
-#[extend::ext(name=EntityWorldMutSubtreeExt)]
-pub impl EntityWorldMut<'_> {
-	/// Fire `event_fn`'s event across this entity's subtree, deepest first and
-	/// this entity last. See [`SubtreeTrigger`].
-	#[track_caller]
-	fn trigger_subtree<E>(
-		&mut self,
-		event_fn: impl FnOnce(Entity) -> E,
-	) -> &mut Self
-	where
-		E: SetEntityEventTarget
-			+ for<'a> Event<Trigger<'a> = SubtreeTrigger<E>>,
-	{
-		let root = self.id();
-		let mut event = event_fn(root);
-		let caller = MaybeLocation::caller();
-		self.world_scope(move |world| {
-			let mut trigger = SubtreeTrigger::new(world, root);
-			world.trigger_ref_with_caller_pub(&mut event, &mut trigger, caller);
-		});
-		self
 	}
 }
 
@@ -174,10 +164,32 @@ mod test {
 
 		world
 			.entity_mut(root)
-			.trigger_subtree(|entity| Swept { entity });
+			.trigger_target(|entity| Swept { entity });
 
 		fired.get().xpect_eq(vec![d, c, b, a, root]);
 		origins.get().xpect_eq(HashSet::from_iter([root]));
+	}
+
+	/// a sweep is an entity target event like any other, so it also queues.
+	#[beet_core::test]
+	fn fires_from_commands() {
+		let mut world = World::new();
+		let [root, a, b, c, d] = tree(&mut world);
+		let fired = Store::new(Vec::<Entity>::new());
+		let recorder = fired.clone();
+		world.add_observer(move |ev: On<Swept>| {
+			let mut all = recorder.get();
+			all.push(ev.entity);
+			recorder.set(all);
+		});
+
+		world
+			.commands()
+			.entity(root)
+			.trigger_target(|entity| Swept { entity });
+		world.flush();
+
+		fired.get().xpect_eq(vec![d, c, b, a, root]);
 	}
 
 	#[beet_core::test]
@@ -195,7 +207,7 @@ mod test {
 		// sweeping a mid-tree node reaches its own subtree and stops there.
 		world
 			.entity_mut(a)
-			.trigger_subtree(|entity| Swept { entity });
+			.trigger_target(|entity| Swept { entity });
 
 		let fired = fired.get();
 		fired.contains(&root).xpect_false();

@@ -248,7 +248,7 @@ mod test {
 	fn load(world: &mut World, entity: Entity) {
 		world
 			.entity_mut(entity)
-			.trigger_subtree(|entity| Ready { entity });
+			.trigger_target(|entity| Ready { entity });
 	}
 
 	/// A one-shot behavior action, recording into `ran` when it runs.
@@ -476,7 +476,7 @@ mod test {
 			.entity_mut(root)
 			.insert(recording_action(ran))
 			.insert(TemplateError::new(bevyhow!("boom")))
-			.trigger_subtree(|entity| Ready { entity });
+			.trigger_target(|entity| Ready { entity });
 		app.world_mut()
 			.run_system_once(|mut exits: MessageReader<AppExit>| {
 				exits.read().any(AppExit::is_error)

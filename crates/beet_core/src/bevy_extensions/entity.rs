@@ -50,17 +50,6 @@ pub impl<'a> EntityWorldMut<'a> {
 		})
 	}
 
-	/// This entity's subtree deepest-first, ending on this entity: the reverse of
-	/// [`Self::iter_descendants_inclusive`].
-	///
-	/// A child always precedes its parent, so a bottom-up pass (eg the [`Ready`]
-	/// sweep) settles a subtree before the node that owns it.
-	fn iter_descendants_inclusive_bottom_up(&mut self) -> Vec<Entity> {
-		let mut subtree = self.iter_descendants_inclusive();
-		subtree.reverse();
-		subtree
-	}
-
 	/// All descendants reachable through [`Children`], depth-first pre-order,
 	/// excluding this entity.
 	fn iter_descendants_dfs(&mut self) -> Vec<Entity> {
@@ -234,11 +223,6 @@ mod test {
 			.entity_mut(root)
 			.iter_descendants_inclusive()
 			.xpect_eq(vec![root, a, b, c, d]);
-		// deepest first, the root last: every child precedes its parent
-		world
-			.entity_mut(root)
-			.iter_descendants_inclusive_bottom_up()
-			.xpect_eq(vec![d, c, b, a, root]);
 		world
 			.entity_mut(root)
 			.iter_descendants_dfs()

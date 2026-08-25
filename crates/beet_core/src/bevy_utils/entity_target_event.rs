@@ -172,6 +172,10 @@ impl<T> EntityTargetEvent for T where
 /// This encompasses all entity-like events:
 /// - [`EntityEvent`]
 /// - [`EntityTargetEvent`]
+///
+/// The event's own [`Event::Trigger`] decides what targeting means, so the same
+/// call fires a single target, a propagating walk up the hierarchy, or a
+/// [`SubtreeTrigger`] sweep down one.
 pub trait IntoEntityTargetEvent<M>: 'static + Send + Sync {
 	/// The event type.
 	type Event: for<'a> Event<Trigger<'a> = Self::Trigger>;
