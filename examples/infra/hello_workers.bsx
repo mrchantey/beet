@@ -49,7 +49,7 @@ Live deploy needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `.env`, pl
 `wrangler` and `worker-build`. No R2 keys are needed (native binding). `build` needs
 neither (a local compile).
 -->
-<CliServer>
+<CliServer {CallOnReady}>
 <Router {RequestLogger}>
 	<CrateCheck features="infra,extra"/>
 	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->

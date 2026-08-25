@@ -39,14 +39,16 @@ pub fn ExampleBinaryBuild(
 }
 
 /// `<StackHost app_name="lambda">` — the IaC deployer host: a one-shot
-/// [`CliServer`] owning the boot, with the default router as its dispatch child
-/// carrying the [`Stack`] (so the blocks + verbs resolve it by ancestry), the
-/// standard IaC verb routes (validate/plan/apply/...), and a slot for the
-/// example's own deploy/sync/watch routes. The markup form of
-/// `(stack(name), Stack::cli())`.
+/// [`CliServer`] root owning the boot, with the default router as its dispatch
+/// child carrying the [`Stack`] (so the blocks + verbs resolve it by ancestry),
+/// the standard IaC verb routes (validate/plan/apply/...), and a slot for the
+/// example's own deploy/sync/watch routes.
+///
+/// It is an entry root, so it carries [`CallOnReady`]: loading the document
+/// dispatches the process request and the matching verb runs.
 #[template]
 pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
-	(CliServer::default(), children![(
+	(CliServer::default(), CallOnReady, children![(
 		Stack::new(app_name),
 		Router::with_defaults(),
 		children![
@@ -63,9 +65,9 @@ pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
 	)])
 }
 
-/// `<BucketStack app_name="bucket-example"/>` — like [`StackHost`] but selects an S3
-/// state backend when `--s3-backend` is passed (else local). The markup form of
-/// lifecycle.rs's backend toggle.
+/// `<BucketStack app_name="bucket-example"/>` — [`StackHost`]'s shape, but
+/// selecting an S3 state backend when `--s3-backend` is passed (else local).
+/// The markup form of lifecycle.rs's backend toggle.
 #[template]
 pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
 	let backend: StackBackend =
@@ -74,20 +76,19 @@ pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
 		} else {
 			LocalBackend::default().into()
 		};
-	(
+	(CliServer::default(), CallOnReady, children![(
 		Stack::new(app_name).with_backend(backend),
 		Router::with_defaults(),
 		children![
-			CliServer::default(),
 			Validate,
 			Plan,
 			Apply,
 			Show,
 			List,
 			Destroy,
-			SlotTarget::new()
+			SlotTarget::new(),
 		],
-	)
+	)])
 }
 
 /// `<SiteSync app_name="lambda"/>` — publish `examples/bsx_site` to the stack's

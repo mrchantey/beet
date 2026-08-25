@@ -154,9 +154,9 @@ bevy_reflect_documentation = ["bevy/reflect_documentation"]
 bevy_multithreaded = ["bevy/multi_threaded"]
 bevy_color = ["bevy/bevy_color"]
 # Additive asset support for the template substrate: an asset path resolves to a
-# `Handle` at build time and defers `LoadTemplate` until the asset finishes
+# `Handle` at build time and defers `Ready` until the asset finishes
 # loading. The no_std core stays asset-free; removing this leaves a fully
-# functional asset-free substrate where `LoadTemplate` fires immediately.
+# functional asset-free substrate where `Ready` fires immediately.
 bevy_asset = ["bevy/bevy_asset"]
 # no_std base serialization support. Heavier format crates (`ron`,
 # `serde_plain`, json, postcard) are opt-in via their own features.
