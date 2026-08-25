@@ -110,6 +110,8 @@ pub fn SiteSync(
 	infra_ext::sync_site(&Stack::new(app_name).resolve(&package), &deployment)
 }
 
+
+/// An **opinionated** block for websites built with lambda.
 /// `<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>` — the lambda
 /// deploy block plus its build artifact, on one entity. They share an entity
 /// because `TofuApplyAction` pairs the `BuildArtifact` with the block on the same
@@ -118,22 +120,63 @@ pub fn SiteSync(
 /// (`remote_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
 /// boundary). The markup form of the rust example's
 /// `(block, build_beet_lambda_binary(features))` deploy child.
+///
+/// `authorities` publishes the site's public hostnames as api gateway custom
+/// domains behind Cloudflare's edge (proxied, so they are cached and the origin
+/// is never addressed directly). Without them the function answers only on the
+/// gateway's default `execute-api` endpoint.
+///
+/// SAFETY / stage-aware DNS: those are PRODUCTION names, so only a production
+/// stage publishes them; any other stage deploys the same function reachable
+/// only at its own gateway endpoint. This is REQUIRED so a `dev` deploy never
+/// takes the production apex, and it makes `--stage` meaningful.
 #[template(system)]
 pub fn LambdaSiteBlock(
 	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
-	package: Res<PackageConfig>,
+	/// Comma-separated public hostnames, the first being the certificate's
+	/// primary domain, eg `beetmash.com,www.beetmash.com`. Reads the zone from
+	/// `CLOUDFLARE_ZONE_ID`.
+	#[prop(into, default)]
+	authorities: String,
+	/// The route the deployed entry dispatches, for an entry that is its own CLI
+	/// and so names which of its verbs IS the site.
+	#[prop(into)]
+	exec_route: Option<String>,
+	/// The beet checkout to build the binary out of, workspace-relative. A site
+	/// repo carrying no beet crates of its own names one; a site inside the beet
+	/// workspace leaves it unset.
+	#[prop(into)]
+	workspace_dir: Option<String>,
+	stacks: StackQuery,
+	entity: Entity,
 ) -> Result<impl Bundle> {
-	let stack = Stack::new(&app_name).resolve(&package);
-	(
-		LambdaBlock::default(),
-		infra_ext::beet_cargo_build(features)
-			.with_bootstrap(infra_ext::remote_bootstrap(
-				infra_ext::app_bucket_name(&stack),
-			)?)
-			.into_lambda_build_artifact()?,
-	)
-		.xok()
+	// the ancestor `<Stack>`'s stage and region under this block's own app name:
+	// one composition behind both the code bucket and the stage-aware DNS.
+	let stack = stacks.resolve(entity).with_app_name(app_name);
+	let is_production = stack.is_production();
+	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
+	let block = authorities
+		.split(',')
+		.map(str::trim)
+		.filter(|authority| is_production && !authority.is_empty())
+		.fold(LambdaBlock::default(), |block, authority| {
+			block.with_dns(
+				DnsProvider::cloudflare(authority, zone_id.clone())
+					.with_proxied(true),
+			)
+		});
+	let mut build = infra_ext::beet_cargo_build(features).with_bootstrap(
+		infra_ext::remote_bootstrap(infra_ext::app_bucket_name(&stack))?,
+	);
+	if let Some(exec_route) = exec_route {
+		build = build.with_exec_route(exec_route);
+	}
+	if let Some(workspace_dir) = workspace_dir {
+		build =
+			build.with_workspace_dir(WsPathBuf::new(workspace_dir).into_abs());
+	}
+	(block, build.into_lambda_build_artifact()?).xok()
 }
 
 /// `<LambdaWatch timeout="30s"/>` — tail the deployed lambda's logs. The log

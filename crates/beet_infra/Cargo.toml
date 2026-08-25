@@ -23,7 +23,7 @@ deploy = ["beet_router", "dep:base64"]
 # enables `beet_router`, unlocking the route actions (eg `build-wasm`) that need
 # it for dispatch.
 beet_router = ["dep:beet_router"]
-lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns"]
+lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_acm","bindings_aws_dns"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail","bindings_aws_dns"]
 fargate_block = ["bindings_aws_common","bindings_aws_dynamo","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns"]
 # Opt-in Cloudflare DNS + load-balancer failover paths for the AWS blocks. Pulls

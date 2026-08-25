@@ -344,6 +344,14 @@ impl S3Sync {
 		self.filters.push(S3Filter::Include(pattern.into()));
 		self
 	}
+	/// Append a prepared filter list, preserving its order.
+	pub fn filters(
+		mut self,
+		filters: impl IntoIterator<Item = S3Filter>,
+	) -> Self {
+		self.filters.extend(filters);
+		self
+	}
 	/// Append a raw argument verbatim to the end of the argv.
 	pub fn arg(mut self, arg: impl Into<String>) -> Self {
 		self.additional_args.push(arg.into());

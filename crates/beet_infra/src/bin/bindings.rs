@@ -63,6 +63,8 @@ async fn main() -> Result {
 				.with_resources(terra::Provider::AWS, [
 					"aws_api_gateway_rest_api",
 					"aws_apigatewayv2_api",
+					"aws_apigatewayv2_api_mapping",
+					"aws_apigatewayv2_domain_name",
 					"aws_apigatewayv2_integration",
 					"aws_apigatewayv2_route",
 					"aws_apigatewayv2_stage",

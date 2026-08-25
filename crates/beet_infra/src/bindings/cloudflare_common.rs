@@ -178,7 +178,7 @@ pub struct CloudflareDnsRecordData {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tag: Option<SmolStr>,
-	/// Target.
+	/// A valid mail server hostname, or "." for a NULL MX record.
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -229,7 +229,7 @@ pub struct CloudflareDnsRecordDetails {
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub created_on: Option<SmolStr>,
-	/// Components of a CAA record.
+	/// Components of a MX record.
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -894,6 +894,11 @@ pub struct CloudflareLoadBalancerPoolDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub for_each: Option<Vec<SmolStr>>,
+	/// A list of health sources, ordered from highest to lowest priority, used to evaluate individual origin health and overall pool health. The load balancer uses the first source that has data and falls back to the next. Currently accepted values are null or the exact array ["regional", "global"]; any other combination is rejected. Null (the default) behaves like ["local", "global"]. ["regional", "global"] makes each region steer on its own health, falling back to the global decision when a region has no fresh data. Setting regional requires at least one region in check_regions.
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub health_sources: Option<Vec<SmolStr>>,
 	/// Identifier.
 	/// ## Attribute
 	/// `computed`

@@ -125,6 +125,8 @@ pub struct AwsApiGatewayRestApiDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub endpoint_configuration:
 		Option<Vec<AwsApiGatewayRestApiResourceBlockTypeEndpointConfiguration>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeouts: Option<Vec<AwsApiGatewayRestApiResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsApiGatewayRestApiDetails {
 	fn to_json(&self) -> serde_json::Value {
@@ -328,6 +330,185 @@ impl terra::Resource for AwsApigatewayv2ApiDetails {
 			return Err(terra::ResourceValidationError::MissingRequiredField {
 				resource_type: self.resource_type(),
 				field_name: "protocol_type",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct AwsApigatewayv2ApiMappingDetails {
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub api_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub api_mapping_key: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub domain_name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub stage: SmolStr,
+}
+impl terra::ToJson for AwsApigatewayv2ApiMappingDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsApigatewayv2ApiMappingDetails {
+	fn resource_type(&self) -> &'static str { "aws_apigatewayv2_api_mapping" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.api_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "api_id",
+			});
+		}
+		if self.domain_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "domain_name",
+			});
+		}
+		if self.stage.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "stage",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct AwsApigatewayv2DomainNameDetails {
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub api_mapping_selection_expression: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub domain_name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub routing_mode: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags_all: Option<Map<SmolStr, SmolStr>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub domain_name_configuration: Option<
+		Vec<AwsApigatewayv2DomainNameResourceBlockTypeDomainNameConfiguration>,
+	>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub mutual_tls_authentication: Option<
+		Vec<AwsApigatewayv2DomainNameResourceBlockTypeMutualTlsAuthentication>,
+	>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeouts:
+		Option<Vec<AwsApigatewayv2DomainNameResourceBlockTypeTimeouts>>,
+}
+impl terra::ToJson for AwsApigatewayv2DomainNameDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsApigatewayv2DomainNameDetails {
+	fn resource_type(&self) -> &'static str { "aws_apigatewayv2_domain_name" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.api_mapping_selection_expression.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "api_mapping_selection_expression",
+				},
+			);
+		}
+		if self.arn.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "arn",
+				},
+			);
+		}
+		if self.domain_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "domain_name",
 			});
 		}
 		Ok(())
@@ -892,6 +1073,10 @@ pub struct AwsLambdaFunctionDetails {
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
+	pub use_resource_timeout_for_propagation: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub version: Option<SmolStr>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dead_letter_config:
@@ -1221,6 +1406,8 @@ pub struct AwsLambdaPermissionDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub statement_id_prefix: Option<SmolStr>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeouts: Option<Vec<AwsLambdaPermissionResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsLambdaPermissionDetails {
 	fn to_json(&self) -> serde_json::Value {
@@ -1275,6 +1462,24 @@ pub struct AwsApiGatewayRestApiResourceBlockTypeEndpointConfiguration {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+#[serde(rename = "timeouts")]
+pub struct AwsApiGatewayRestApiResourceBlockTypeTimeouts {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub create: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub delete: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub update: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 #[serde(rename = "cors_configuration")]
 pub struct AwsApigatewayv2ApiResourceBlockTypeCorsConfiguration {
 	/// ## Attribute
@@ -1301,6 +1506,68 @@ pub struct AwsApigatewayv2ApiResourceBlockTypeCorsConfiguration {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub max_age: Option<i64>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "domain_name_configuration")]
+pub struct AwsApigatewayv2DomainNameResourceBlockTypeDomainNameConfiguration {
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub certificate_arn: SmolStr,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub endpoint_type: SmolStr,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub hosted_zone_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub ip_address_type: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub ownership_verification_certificate_arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub security_policy: SmolStr,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub target_domain_name: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "mutual_tls_authentication")]
+pub struct AwsApigatewayv2DomainNameResourceBlockTypeMutualTlsAuthentication {
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub truststore_uri: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub truststore_version: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "timeouts")]
+pub struct AwsApigatewayv2DomainNameResourceBlockTypeTimeouts {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub create: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub update: Option<SmolStr>,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
@@ -1618,4 +1885,22 @@ pub struct AwsLambdaFunctionUrlResourceBlockTypeTimeouts {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub create: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "timeouts")]
+pub struct AwsLambdaPermissionResourceBlockTypeTimeouts {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub create: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub delete: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub read: Option<SmolStr>,
 }

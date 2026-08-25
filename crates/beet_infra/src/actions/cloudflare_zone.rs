@@ -45,6 +45,11 @@ async fn send_zone_request(request: Request) -> Result<serde_json::Value> {
 ///   be answered by a cached html body).
 /// - PATCH the `ssl` setting to `strict`: the origin presents a publicly
 ///   trusted ACM cert, so the edge-to-origin leg verifies it.
+/// - PATCH `always_use_https` on: the `ssl` mode governs the HTTPS leg only, so
+///   a plain http request is otherwise forwarded to the origin on port 80. An
+///   https-only origin (an api gateway custom domain) answers nothing there, so
+///   without this http://<site> is a 521. Redirecting at the edge also means the
+///   request never reaches the origin at all.
 #[action(handler_only)]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -72,6 +77,17 @@ pub async fn CloudflareZoneSetup(
 	)
 	.await?;
 	info!("zone ssl mode is strict");
+
+	// http never reaches the origin: the edge redirects it to https first
+	send_zone_request(
+		Request::patch(format!(
+			"{API_BASE}/zones/{zone_id}/settings/always_use_https"
+		))
+		.with_auth_bearer(&token)
+		.with_json_body(&serde_json::json!({ "value": "on" }))?,
+	)
+	.await?;
+	info!("zone redirects http to https");
 
 	Pass(cx.input).xok()
 }

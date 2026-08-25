@@ -67,6 +67,20 @@ pub struct CargoBuild {
 	/// [`into_lambda_build_artifact`](Self::into_lambda_build_artifact)). Unused by
 	/// non-lambda artifacts, whose launch path owns its args.
 	pub bootstrap: BootstrapConfig,
+	/// The route the deployed entry dispatches, appended to the lambda
+	/// `bootstrap` script's exec line as the positional arg. An entry that is its
+	/// own CLI names which of its verbs IS the site (`serve`); an entry whose root
+	/// simply is the site names nothing. The [`LightsailBlock`] `exec_route`
+	/// counterpart, on the channel the lambda has.
+	#[set_with(unwrap_option, into)]
+	pub exec_route: Option<SmolStr>,
+	/// The cargo workspace the build runs in, ie the child's working directory,
+	/// for building a binary that lives in a DIFFERENT checkout to the one being
+	/// deployed (a site repo carrying no beet crates of its own). Its `target/`
+	/// holds the output, so the artifact path resolves there too. `None` builds
+	/// in the current workspace.
+	#[set_with(unwrap_option)]
+	pub workspace_dir: Option<AbsPathBuf>,
 }
 
 impl CargoBuild {
@@ -86,11 +100,21 @@ impl CargoBuild {
 		}
 	}
 
-	/// Resolve the expected executable path after a standard cargo build.
-	pub fn exe_path(&self) -> PathBuf {
+	/// The build's target directory, under [`workspace_dir`](Self::workspace_dir)
+	/// when the build runs in another checkout, so a caller resolving the artifact
+	/// from ITS own cwd still finds it.
+	fn target_dir(&self) -> PathBuf {
 		let target_dir = env_ext::var("CARGO_TARGET_DIR")
 			.unwrap_or_else(|_| "target".into());
-		let mut path = PathBuf::from(target_dir.as_str());
+		match &self.workspace_dir {
+			Some(dir) => dir.join(target_dir.as_str()).into(),
+			None => PathBuf::from(target_dir.as_str()),
+		}
+	}
+
+	/// Resolve the expected executable path after a standard cargo build.
+	pub fn exe_path(&self) -> PathBuf {
+		let mut path = self.target_dir();
 		// cross-compilation targets put output in a subdirectory
 		if let Some(triple) = self.target.target_triple() {
 			path.push(triple);
@@ -112,9 +136,7 @@ impl CargoBuild {
 
 	/// Resolve the lambda build output directory.
 	fn lambda_dir(&self) -> PathBuf {
-		let target_dir = env_ext::var("CARGO_TARGET_DIR")
-			.unwrap_or_else(|_| "target".into());
-		let mut path = PathBuf::from(target_dir.as_str());
+		let mut path = self.target_dir();
 		path.push("lambda");
 		path.push(self.binary_name().as_str());
 		path
@@ -198,9 +220,20 @@ impl CargoBuild {
 			"cargo"
 		};
 		BuildArtifact::new(
-			ChildProcess::new(cmd).with_args(args),
+			self.build_process(ChildProcess::new(cmd).with_args(args)),
 			artifact_path,
 		)
+	}
+
+	/// Run the build in [`workspace_dir`](Self::workspace_dir) when one is
+	/// declared, so cargo resolves the manifest of the checkout holding the
+	/// binary rather than the deploying repo's.
+	#[cfg(feature = "deploy")]
+	fn build_process(&self, process: ChildProcess) -> ChildProcess {
+		match &self.workspace_dir {
+			Some(dir) => process.with_cwd(dir.clone()),
+			None => process,
+		}
 	}
 	/// Convert into a lambda build artifact.
 	/// Builds the lambda binary then zips it for S3 deployment,
@@ -237,8 +270,12 @@ impl CargoBuild {
 			);
 			let full_cmd = format!("{build_cmd} && {pack_cmd}");
 			BuildArtifact::new(
-				ChildProcess::new("sh")
-					.with_args([SmolStr::from("-c"), SmolStr::from(full_cmd)]),
+				self.build_process(
+					ChildProcess::new("sh").with_args([
+						SmolStr::from("-c"),
+						SmolStr::from(full_cmd),
+					]),
+				),
 				zip_path,
 			)
 			.xok()
@@ -254,8 +291,12 @@ impl CargoBuild {
 			let full_cmd =
 				format!("{cargo_cmd} && {}", self.lambda_zip_cmd(&lambda_dir)?);
 			BuildArtifact::new(
-				ChildProcess::new("sh")
-					.with_args([SmolStr::from("-c"), SmolStr::from(full_cmd)]),
+				self.build_process(
+					ChildProcess::new("sh").with_args([
+						SmolStr::from("-c"),
+						SmolStr::from(full_cmd),
+					]),
+				),
 				zip_path,
 			)
 			.xok()
@@ -279,6 +320,7 @@ impl CargoBuild {
 			.0
 			.to_argv()?
 			.iter()
+			.chain(self.exec_route.iter())
 			.map(|arg| format!(" {arg}"))
 			.collect::<String>();
 		if args.is_empty() {
@@ -344,6 +386,34 @@ mod test {
 			.xpect_contains(
 				"exec /var/task/beet --store=s3://beet--dev--app --server=http",
 			);
+	}
+
+	/// An entry that is its own CLI names its site verb, which rides the exec
+	/// line as the positional arg after the config flags.
+	#[cfg(feature = "deploy")]
+	#[beet_core::test]
+	fn lambda_zip_cmd_renders_exec_route() {
+		CargoBuild::default()
+			.with_exec_route("serve")
+			.lambda_zip_cmd(std::path::Path::new("/tmp/lam"))
+			.unwrap()
+			.xpect_contains("exec /var/task/beet serve");
+	}
+
+	/// A build in another checkout runs there and resolves its artifact there, so
+	/// a deploying repo with no beet crates of its own still finds the zip.
+	#[beet_core::test]
+	fn workspace_dir_relocates_the_artifact() {
+		let build = CargoBuild::default()
+			.with_target(BuildTarget::Zigbuild)
+			.with_binary("beet")
+			.with_workspace_dir(AbsPathBuf::new("/tmp/beet").unwrap());
+		build.exe_path().xpect_eq(std::path::PathBuf::from(
+			"/tmp/beet/target/x86_64-unknown-linux-gnu/debug/beet",
+		));
+		build.lambda_exe_path().xpect_eq(std::path::PathBuf::from(
+			"/tmp/beet/target/lambda/beet/bootstrap",
+		));
 	}
 
 	/// A token that cannot be rendered into the exec line is a loud error rather
