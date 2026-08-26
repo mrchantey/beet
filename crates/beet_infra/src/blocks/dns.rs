@@ -9,12 +9,12 @@ use serde_json::json;
 /// [`LightsailBlock`] static IP). It emits a single record pointing its
 /// `authority` at a target: a `CNAME` via [`emit`] for hostname targets, an
 /// `A`/`AAAA` via [`emit_address`] for IP targets, plus any auxiliary records
-/// (eg ACM DNS-validation) via [`emit_validation_record`].
+/// (eg ACM DNS-validation) via [`emit_cname`].
 ///
 /// [`emit`]: Self::emit
 /// [`emit_address`]: Self::emit_address
 ///
-/// [`emit_validation_record`]: Self::emit_validation_record
+/// [`emit_cname`]: Self::emit_cname
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DnsProvider {
 	/// A record in a Cloudflare zone. Authenticates from the
@@ -144,19 +144,23 @@ impl DnsProvider {
 		false
 	}
 
-	/// Emit an ACM DNS-validation `CNAME` (always unproxied) into this
-	/// provider's zone, pointing `name` at `content` (terra field-refs read off
-	/// the certificate's `domain_validation_options`). Returns the terraform
-	/// resource address for use in a validation resource's `depends_on`.
-	pub fn emit_validation_record(
+	/// Emit a `CNAME` at an explicit `name` (always unproxied), pointing it at
+	/// `target`. Both may be terra field-refs, which is how an ACM validation
+	/// record reads its pair off `domain_validation_options` and how a mail
+	/// domain's DKIM records read their selector off the SES identity. Returns
+	/// the terraform resource address, for a `depends_on`.
+	///
+	/// Distinct from [`emit`](Self::emit), which publishes this provider's own
+	/// [`authority`](Self::authority) and honours its proxy setting.
+	pub fn emit_cname(
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		label: &str,
 		name: &str,
-		content: &str,
+		target: &str,
 	) -> Result<String> {
-		self.emit_record(stack, config, label, name, content, false, "CNAME")
+		self.emit_record(stack, config, label, name, target, false, "CNAME")
 	}
 
 	/// Emit a `TXT` record (SPF, DKIM, DMARC, MTA-STS, TLS-RPT, `_atproto`, …).

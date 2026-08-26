@@ -9,6 +9,10 @@ beet_core::test_main!();
 mod actions;
 pub mod bindings;
 mod blocks;
+// the mail stack's blocks and their declarative identity inputs. Definitions
+// only, so a wasm consumer authors a mail stack like any other.
+#[cfg(feature = "mail")]
+mod mail;
 pub mod terra;
 mod types;
 // the `build-wasm` route action, a cargo/wasm-bindgen/wasm-opt child process.
@@ -26,6 +30,8 @@ pub mod prelude {
 	pub use crate::bindings;
 	#[allow(unused)]
 	pub use crate::blocks::*;
+	#[cfg(feature = "mail")]
+	pub use crate::mail::*;
 	pub use crate::terra;
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::terra::tofu;

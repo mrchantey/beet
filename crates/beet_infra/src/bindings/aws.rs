@@ -11,6 +11,7 @@ pub mod region {
 	pub(crate) const DEFAULT: &str = US_WEST_2;
 	pub const US_EAST_1: &str = "us-east-1";
 	pub const US_WEST_2: &str = "us-west-2";
+	pub const AP_SOUTHEAST_2: &str = "ap-southeast-2";
 }
 
 #[cfg(feature = "bindings_aws_common")]

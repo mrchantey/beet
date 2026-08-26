@@ -386,18 +386,16 @@ impl LambdaBlock {
 					"${{[for o in {dvo} : {value} if o.domain_name == \"{authority}\"][0]}}"
 				)
 			};
-			validation_addresses.push(SmolStr::from(
-				dns.emit_validation_record(
-					stack,
-					config,
-					&self.build_label(&format!(
-						"cert-validation-{}",
-						authority.replace('.', "-")
-					)),
-					&select("resource_record_name", true),
-					&select("resource_record_value", true),
-				)?,
-			));
+			validation_addresses.push(SmolStr::from(dns.emit_cname(
+				stack,
+				config,
+				&self.build_label(&format!(
+					"cert-validation-{}",
+					authority.replace('.', "-")
+				)),
+				&select("resource_record_name", true),
+				&select("resource_record_value", true),
+			)?));
 			validation_fqdns
 				.push(SmolStr::from(select("resource_record_name", false)));
 		}

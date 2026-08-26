@@ -26,6 +26,16 @@ pub struct CloudflareWorkerBlock {
 	bucket: SmolStr,
 	/// Plain `vars` injected into the Worker (non-secret), eg a deploy id.
 	env_vars: Vec<Variable>,
+	/// Hostnames this Worker answers on, each deployed as a wrangler *custom
+	/// domain*: wrangler creates the zone record and the edge certificate for
+	/// it, so the name is served over https with nothing else to declare. Empty
+	/// leaves the Worker reachable only at its `workers.dev` host.
+	///
+	/// The record is therefore wrangler's, not terraform's, which is the one
+	/// place in this stack where dns is not owned by the block that needs it.
+	/// A zone audit has to allow for them.
+	#[set_with(skip)]
+	routes: Vec<SmolStr>,
 }
 
 impl Default for CloudflareWorkerBlock {
@@ -34,6 +44,7 @@ impl Default for CloudflareWorkerBlock {
 			name: "beet-worker".into(),
 			bucket: "beet-site".into(),
 			env_vars: Vec::new(),
+			routes: Vec::new(),
 		}
 	}
 }
@@ -45,5 +56,12 @@ impl CloudflareWorkerBlock {
 			name: name.into(),
 			..default()
 		}
+	}
+
+	/// Serve this Worker at `host` as a custom domain, ie
+	/// `mta-sts.stalwart.beetmash.com`. See [`routes`](Self::routes).
+	pub fn with_route(mut self, host: impl Into<SmolStr>) -> Self {
+		self.routes.push(host.into());
+		self
 	}
 }

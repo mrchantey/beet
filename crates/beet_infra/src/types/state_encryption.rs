@@ -107,6 +107,11 @@ mod tests {
 			.xpect_eq("${method.aes_gcm.main}");
 	}
 
+	/// Native-only: wasm has no process environment to write to, so
+	/// `set_var` there is not a failing assertion but an unimplemented
+	/// platform call. The value resolution itself is exercised everywhere by
+	/// [`passphrase_vars_errors_when_env_var_unset`].
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn passphrase_vars_reads_its_env_var() {
 		// SAFETY: test-only, single-threaded per-test env var scope is not

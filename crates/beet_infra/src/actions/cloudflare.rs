@@ -462,9 +462,7 @@ pub async fn CloudflareWorkerDeployAction(
 	Pass(cx.input).xok()
 }
 
-/// `wrangler.jsonc` for the wasm Worker: `main` points at the prebuilt artifacts
-/// (no `build.command`, so the deploy uploads them as-is), plus the R2 bucket
-/// bound by [`WORKER_R2_BINDING`].
+/// Write [`worker_wrangler_json`] into the wrangler project directory.
 fn write_worker_wrangler(
 	dir: &AbsPathBuf,
 	block: &CloudflareWorkerBlock,
@@ -474,14 +472,41 @@ fn write_worker_wrangler(
 	// project dir is fine: wrangler bundles `main` and follows its wasm import.
 	let main_js =
 		AbsPathBuf::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
+	fs_ext::write(
+		dir.join("wrangler.jsonc"),
+		worker_wrangler_json(block, &main_js.to_string())?,
+	)?;
+	Ok(())
+}
+
+/// `wrangler.jsonc` for the wasm Worker: `main` points at the prebuilt artifacts
+/// (no `build.command`, so the deploy uploads them as-is), plus the R2 bucket
+/// bound by [`WORKER_R2_BINDING`] and any custom domains the block declares.
+fn worker_wrangler_json(
+	block: &CloudflareWorkerBlock,
+	main_js: &str,
+) -> Result<String> {
 	let vars = block
 		.env_vars()
 		.iter()
 		.map(|var| (var.key().to_string(), var.key().to_string()))
 		.collect::<std::collections::BTreeMap<_, _>>();
-	let json = serde_json::to_string_pretty(&serde_json::json!({
+	// `custom_domain` rather than a route pattern: wrangler then provisions the
+	// zone record and the certificate, so a declared host is reachable over
+	// https with nothing else to publish.
+	let routes = block
+		.routes()
+		.iter()
+		.map(|host| {
+			serde_json::json!({
+				"pattern": host,
+				"custom_domain": true,
+			})
+		})
+		.collect::<Vec<_>>();
+	let mut config = serde_json::json!({
 		"name": block.name(),
-		"main": main_js.to_string(),
+		"main": main_js,
 		"compatibility_date": COMPATIBILITY_DATE,
 		"compatibility_flags": ["nodejs_compat"],
 		"r2_buckets": [{
@@ -489,9 +514,13 @@ fn write_worker_wrangler(
 			"bucket_name": block.bucket(),
 		}],
 		"vars": vars,
-	}))?;
-	fs_ext::write(dir.join("wrangler.jsonc"), json)?;
-	Ok(())
+	});
+	// omitted rather than empty: wrangler treats an empty `routes` as "serve
+	// nowhere" and unpublishes the `workers.dev` host.
+	if !routes.is_empty() {
+		config["routes"] = routes.into();
+	}
+	serde_json::to_string_pretty(&config)?.xok()
 }
 
 // ───────────────────────────── R2 site sync ────────────────────────────────
@@ -976,6 +1005,28 @@ async fn empty_bucket(bucket: &str) -> Result {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// A declared host lands as a wrangler custom domain, so wrangler creates
+	/// its record and certificate. Without one the key is absent entirely: an
+	/// empty `routes` array means "serve nowhere" and takes the `workers.dev`
+	/// host down with it.
+	#[beet_core::test]
+	fn routes_render_as_custom_domains() {
+		let block = CloudflareWorkerBlock::new("mta-sts");
+		worker_wrangler_json(&block, "index.js")
+			.unwrap()
+			.as_str()
+			.xnot()
+			.xpect_contains("routes");
+		worker_wrangler_json(
+			&block.with_route("mta-sts.stalwart.beetmash.com"),
+			"index.js",
+		)
+		.unwrap()
+		.as_str()
+		.xpect_contains("\"pattern\": \"mta-sts.stalwart.beetmash.com\"")
+		.xpect_contains("\"custom_domain\": true");
+	}
 
 	#[beet_core::test]
 	fn fmt_bytes_scales_units() {

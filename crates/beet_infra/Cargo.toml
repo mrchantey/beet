@@ -35,6 +35,10 @@ cloudflare_dns = ["bindings_cloudflare_common", "bindings_aws_dns"]
 # terraform bindings; needs `deploy` (the actions) and `aws_sdk` (the container's
 # `S3Store::r2` path) at the consumer.
 cloudflare_block = []
+# The self-hosted mail stack: the per-domain DNS + SES declaration
+# (`MailDomainBlock`) and the member/mailbox/alias inputs it is authored from.
+# Cloudflare holds the zone every record lands in, hence `cloudflare_dns`.
+mail = ["bindings_aws_ses", "bindings_aws_dns", "cloudflare_dns"]
 bindings_aws_common = []
 bindings_aws_dynamo = []
 bindings_aws_dns = []
@@ -111,6 +115,7 @@ beet_infra = { path = ".", features = [
 	"lightsail_block",
 	"fargate_block",
 	"cloudflare_dns",
+	"mail",
 ] }
 
 [[example]]

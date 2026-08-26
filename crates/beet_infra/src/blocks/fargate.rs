@@ -865,7 +865,7 @@ impl FargateBlock {
 					"${{[for o in {dvo} : {value} if o.domain_name == \"{authority}\"][0]}}"
 				)
 			};
-			let address = dns.emit_validation_record(
+			let address = dns.emit_cname(
 				stack,
 				config,
 				&self.build_label(&format!("cert-validation-{suffix}")),
