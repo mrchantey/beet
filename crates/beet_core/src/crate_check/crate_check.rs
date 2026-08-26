@@ -163,6 +163,7 @@ impl Plugin for CrateCheckPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<CrateRegistration>()
 			.register_type::<CrateCheck>()
+			.register_type::<RequireFeatures>()
 			.add_observer(CrateCheck::check_on_insert);
 	}
 }
@@ -220,58 +221,6 @@ mod test {
 		parse_version("0.5").xpect_eq((0, 5, 0));
 		parse_version("1.0.0-rc.1").xpect_eq((1, 0, 0));
 		(parse_version("0.10.0") > parse_version("0.9.9")).xpect_true();
-	}
-
-	/// `bx:features` is the same vocabulary with the opposite outcome: a subtree
-	/// FOR builds carrying those features, skipped (not failed) without them,
-	/// and skipped before its tags resolve so unregistered tags inside are inert.
-	///
-	/// This is what lets one entry document carry both meanings: the deploy verbs
-	/// a featured build dispatches, and the served site the lean deployed binary
-	/// loads from the very same file.
-	#[crate::test]
-	fn feature_gate_skips_a_subtree() {
-		/// The entities a document builds in a world registering `beet-cli` with
-		/// only the `sockets` feature.
-		fn build(markup: &str) -> usize {
-			let mut world = (TemplatePlugin, DocumentPlugin).into_world();
-			world.spawn(
-				CrateRegistration::new("beet-cli", "0.0.9")
-					.with_feature("sockets")
-					.with_skip_prefix(),
-			);
-			world
-				.resource_mut::<AppTypeRegistry>()
-				.write()
-				.register::<PackageConfig>();
-			let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())
-				.unwrap();
-			let root = world
-				.spawn_template(BsxTemplate::container(
-					nodes,
-					BsxTemplateRegistry::default(),
-				))
-				.unwrap()
-				.id();
-			world.flush();
-			world.with_state::<Query<&Children>, _>(|children| {
-				children.iter_descendants_inclusive(root).count()
-			})
-		}
-
-		// a met gate builds its children: the root, the gated node, the child.
-		build(r#"<Fragment bx:features="sockets"><PackageConfig/></Fragment>"#)
-			.xpect_eq(3);
-		// an unmet one leaves the gated node an inert empty placeholder and
-		// builds nothing under it, so tags this binary never linked are not an
-		// error.
-		build(
-			r#"<Fragment bx:features="infra"><NotARegisteredTag/></Fragment>"#,
-		)
-		.xpect_eq(2);
-		// an unmet gate works on any element, not just a fragment
-		build(r#"<div bx:features="infra"><AlsoNotRegistered/></div>"#)
-			.xpect_eq(2);
 	}
 
 	#[crate::test]

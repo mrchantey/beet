@@ -146,6 +146,13 @@ pub(crate) fn registration_by_name<'a>(
 	{
 		return Some(registration);
 	}
+	// an ambiguous short path resolves in favour of a sole template candidate,
+	// whose short path is the only name it has.
+	if let Some(registration) =
+		ReflectTemplate::registration_named(registry, name)
+	{
+		return Some(registration);
+	}
 	let mut matches = registry.iter().filter(|registration| {
 		let short = registration.type_info().type_path_table().short_path();
 		short.len() > name.len()

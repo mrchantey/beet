@@ -45,7 +45,10 @@ impl Sequence {
 /// `Action<Input, Outcome<Input, Output>>` signature.
 ///
 /// Honours [`ExcludeErrors`]: when a flagged error is excluded the child is
-/// dropped from the returned list, otherwise the error is propagated.
+/// dropped from the returned list, otherwise the error is propagated. A parent
+/// that skipped every one of its children raises
+/// [`NONE_VALID`](ChildError::NONE_VALID) rather than passing, so a sequence
+/// never succeeds having done nothing.
 async fn valid_children<Input, Output>(
 	cx: &ActionContext<Input>,
 ) -> Result<Vec<Entity>>
@@ -94,7 +97,32 @@ where
 		}
 		valid.push(child);
 	}
+	// a sequence that skipped every child would pass having run nothing, which
+	// on a route reads as a clean exit for work that never happened.
+	if valid.is_empty() && !exclude_errors.contains(ChildError::NONE_VALID) {
+		bevybail!(
+			"sequence {caller} skipped all {} of its children, none serve Action<{}, {}>:{}",
+			children.len(),
+			core::any::type_name::<Input>(),
+			core::any::type_name::<Outcome<Input, Output>>(),
+			describe_children(children.iter(), &metas)
+		);
+	}
 	Ok(valid)
+}
+
+/// Why each of `children` could not serve a call, one indented line each: its
+/// action's signatures, else that it carries no action at all.
+fn describe_children(
+	children: impl Iterator<Item = Entity>,
+	metas: &Query<&ActionMeta>,
+) -> String {
+	children
+		.map(|child| match metas.get(child) {
+			Ok(meta) => format!("\n  {child}: {}", meta.signatures()),
+			Err(_) => format!("\n  {child}: no action"),
+		})
+		.collect::<String>()
 }
 
 /// Selects the first child whose [`ActionMeta`] [`matches`](ActionMeta::matches)
@@ -118,21 +146,19 @@ where
 		.map(Children::iter)
 		.into_iter()
 		.flatten();
-	let mut candidates = Vec::new();
-	for child in children {
-		match metas.get(child) {
-			Ok(meta) if meta.matches::<Input, Out>() => return Ok(child),
-			Ok(meta) => {
-				candidates.push(format!("\n  {child}: {}", meta.signatures()))
-			}
-			Err(_) => candidates.push(format!("\n  {child}: no action")),
+	for child in children.clone() {
+		if metas
+			.get(child)
+			.is_ok_and(|meta| meta.matches::<Input, Out>())
+		{
+			return Ok(child);
 		}
 	}
 	bevybail!(
-		"no child of {parent} matches Action<{}, {}>.{}",
+		"no child of {parent} matches Action<{}, {}>:{}",
 		core::any::type_name::<Input>(),
 		core::any::type_name::<Out>(),
-		candidates.concat()
+		describe_children(children, &metas)
 	)
 }
 
@@ -377,6 +403,38 @@ mod tests {
 					|_: ActionContext| Outcome::Pass(())
 				))
 			)]))
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Pass(()));
+	}
+
+	/// A sequence that skipped every child fails rather than passing, so a run
+	/// that did nothing is never a clean exit.
+	#[beet_core::test]
+	async fn all_children_skipped_errors() {
+		AsyncPlugin::world()
+			.spawn((
+				Sequence::new(),
+				ExcludeErrors(ChildError::NO_ACTION),
+				children![()],
+			))
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("skipped all 1 of its children");
+	}
+
+	/// ..unless the caller declares that running nothing is a valid outcome.
+	#[beet_core::test]
+	async fn none_valid_is_excludable() {
+		AsyncPlugin::world()
+			.spawn((
+				Sequence::new(),
+				ExcludeErrors(ChildError::all()),
+				children![()],
+			))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()

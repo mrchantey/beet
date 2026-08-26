@@ -435,9 +435,9 @@ mod css_dup {
 }
 
 /// A fully-qualified tag (the registered reflect type path) resolves the bevy
-/// `Transform` from markup despite the ambiguous bare short path; the bare path
-/// errors clearly rather than silently picking one (item 6 / item 28's
-/// `<span>`-free scene roots).
+/// `Transform` from markup despite the ambiguous bare short path. Neither
+/// candidate is a template, so the bare path resolves to neither: an inert
+/// entity recording the name, never a silent wrong pick.
 #[beet_core::test]
 fn qualified_transform_tag_disambiguates() {
 	use bevy::reflect::Typed;
@@ -452,9 +452,19 @@ fn qualified_transform_tag_disambiguates() {
 		.entity(root)
 		.contains::<css_dup::Transform>()
 		.xpect_false();
-	// the bare, ambiguous short path resolves to neither: a clear error, never a
-	// silent wrong pick.
-	build_error(&mut world, "<Transform/>").xpect_contains("Transform");
+	// the bare, ambiguous short path picks neither.
+	let root = spawn_bsx(&mut world, "<Transform/>");
+	world.entity(root).contains::<Transform>().xpect_false();
+	world
+		.entity(root)
+		.contains::<css_dup::Transform>()
+		.xpect_false();
+	world
+		.entity(root)
+		.get::<UnregisteredTag>()
+		.unwrap()
+		.as_str()
+		.xpect_eq("Transform");
 }
 
 // ---- template formats: a `.js` file registers as a `<script>` template ------

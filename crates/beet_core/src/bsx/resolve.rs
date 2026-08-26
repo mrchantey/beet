@@ -523,12 +523,6 @@ fn build_element(
 	refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
-	// `bx:features` gates the whole node on this binary's compiled feature set,
-	// skipped BEFORE the tag resolves so a subtree naming types a lean build
-	// never linked is silently absent rather than a hard unregistered-tag error.
-	if !feature_gate_passes(el, cx) {
-		return Ok(());
-	}
 	if el.tag == "Slot" {
 		return build_slot(el, cx.entity);
 	}
@@ -542,34 +536,6 @@ fn build_element(
 		return build_uppercase(el, registry, refs, cx);
 	}
 	build_html_element(el, registry, refs, cx)
-}
-
-/// Whether `el`'s `bx:features` gate is satisfied by the [`CrateRegistration`]s
-/// this binary spawned, ie whether its subtree is built at all.
-///
-/// The terms are the same `feature` / `crate/feature` items
-/// [`CrateCheck`](crate::prelude::CrateCheck) verifies, but the outcome is the
-/// opposite: `<CrateCheck>` says "this entry NEEDS these, fail loudly without
-/// them", `bx:features` says "this part of the entry is FOR builds that have
-/// them, skip it otherwise". A site declares its deploy verbs behind the gate,
-/// and the lean deployed binary loads the same entry without them.
-///
-/// A gated subtree is skipped before its tags resolve, so unregistered tags
-/// inside never error. Note [`EntryPrescan`] walks the document registry-free
-/// and BEFORE this runs, so `<StoreRoot>`, `<TemplateDir>` and `<CrateCheck>`
-/// must not sit inside a gated subtree.
-fn feature_gate_passes(el: &BsxElement, cx: &mut TemplateContext) -> bool {
-	let Some(features) = string_attr(el, "bx:features") else {
-		return true;
-	};
-	cx.entity.world_scope(|world| {
-		let mut registrations = world.query::<&CrateRegistration>();
-		let registrations =
-			registrations.iter(world).cloned().collect::<Vec<_>>();
-		CrateCheck::features(features)
-			.failures(&registrations)
-			.is_empty()
-	})
 }
 
 /// Whether a tag resolves by name (a component or template) rather than as an
@@ -824,14 +790,11 @@ fn build_uppercase(
 
 	let Some((kind, patch)) = registration_kind else {
 		// a known featured-out tag (eg `<LiveReloadScript/>` with `client_io`
-		// compiled out) resolves to nothing instead of erroring.
+		// compiled out) resolves to nothing at all, children included.
 		if is_allowed_unregistered(cx, &el.tag) {
 			return Ok(());
 		}
-		bevybail!(
-			"no component, resource or template registered for tag `{}`",
-			el.tag
-		);
+		return build_unregistered(el, registry, refs, &entity_refs, cx);
 	};
 	let patch = patch?;
 
@@ -875,6 +838,66 @@ fn build_uppercase(
 		}
 	}
 	Ok(())
+}
+
+/// Build a tag nothing is registered under: warn, record the name in an
+/// [`UnregisteredTag`] marker, and build the node's directives, spreads and
+/// children onto the now-inert entity.
+///
+/// Structure is universal, so the entity exists in every binary and only its
+/// behavior is missing: a `bx:ref` into the region still names a real entity,
+/// and a lean build's tree has the same shape as a full one's. Attributes are
+/// dropped, since they are props of a type this binary does not have; a spread
+/// is not, since it names its own types and skips the ones it cannot resolve.
+///
+/// A subtree whose self-or-ancestor [`RequireFeatures`] is unmet has declared
+/// its own inertness, so its tags build quietly at `debug!`; anywhere else the
+/// tag warns. A typo is caught by `beet check`, which registers everything and
+/// elevates every marker it finds to an error.
+fn build_unregistered(
+	el: &BsxElement,
+	registry: &BsxTemplateRegistry,
+	refs: &RefBindings,
+	entity_refs: &HashMap<SmolStr, Entity>,
+	cx: &mut TemplateContext,
+) -> Result<()> {
+	cx.entity.insert(UnregisteredTag::new(el.tag.as_str()));
+	apply_common_directives(el, refs, cx)?;
+	// spreads before the log, so a host declaring its own `RequireFeatures`
+	// quiets its own tag as well as its subtree's.
+	apply_spreads(el, cx.entity, entity_refs)?;
+	if inertness_declared(cx.entity) {
+		debug!(
+			"tag `<{}>` is not registered in this binary, building it inert (declared by `RequireFeatures`)",
+			el.tag
+		);
+	} else {
+		warn!(
+			"no component, resource or template registered for tag `<{}>`, building it inert",
+			el.tag
+		);
+	}
+	build_children(el, registry, refs, cx)
+}
+
+/// Whether a self-or-ancestor [`RequireFeatures`] is unmet in this binary, ie
+/// the subtree has declared that its behavior is feature-dependent and the
+/// features are absent, making an unresolvable tag or spread the expected
+/// state rather than a surprise. Ancestry exists mid-build: a child spawns
+/// with its `ChildOf`, and a parent's spreads apply before its children build.
+fn inertness_declared(entity: &mut EntityWorldMut) -> bool {
+	let id = entity.id();
+	entity.world_scope(|world| {
+		world.with_state::<(
+			AncestorQuery<&RequireFeatures>,
+			Query<&CrateRegistration>,
+		), _>(|(requires, registrations)| {
+			requires
+				.get_ancestors(id)
+				.iter()
+				.any(|require| !require.failures(&registrations).is_empty())
+		})
+	})
 }
 
 /// How an uppercase tag's type registration resolves.
@@ -1408,10 +1431,18 @@ fn apply_spread_named(
 		let Some(registration) = registration_by_name(&registry, &named.name)
 			.or_else(|| enum_variant_registration(&registry, &named.name))
 		else {
-			warn!(
-				"skipping spread `{}`: no component or template of that name is registered in this binary",
-				named.name
-			);
+			drop(registry);
+			if inertness_declared(entity) {
+				debug!(
+					"skipping spread `{}`: not registered in this binary (declared by `RequireFeatures`)",
+					named.name
+				);
+			} else {
+				warn!(
+					"skipping spread `{}`: no component or template of that name is registered in this binary",
+					named.name
+				);
+			}
 			return Ok(());
 		};
 		let info = Some(registration.type_info());
@@ -1896,11 +1927,140 @@ const STRUCTURAL_DIRECTIVES: &[&str] = &[
 	"bx:ref",
 	"bx:schema",
 	"bx:style",
-	"bx:features",
 ];
 
 /// Whether a key is a `bx:<event>` verb-trigger directive (eg `bx:click`), ie a
 /// `bx:` key that is not one of the [`STRUCTURAL_DIRECTIVES`].
 pub(super) fn is_event_directive(key: &str) -> bool {
 	key.starts_with("bx:") && !STRUCTURAL_DIRECTIVES.contains(&key)
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	/// A tuple-struct component with an `Entity` field, the `StoreRef` shape a
+	/// declaration is named by.
+	#[derive(Component, Reflect, MapEntities, Clone, Debug, PartialEq)]
+	#[reflect(Component, MapEntities, Default)]
+	struct Bound(#[entities] Entity);
+
+	impl Default for Bound {
+		fn default() -> Self { Self(Entity::PLACEHOLDER) }
+	}
+
+	/// Build `markup` into a world registering `PackageConfig` and [`Bound`],
+	/// returning the world and the built root.
+	fn build(markup: &str) -> (World, Entity) {
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		{
+			let registry = world.resource_mut::<AppTypeRegistry>();
+			let mut registry = registry.write();
+			registry.register::<PackageConfig>();
+			registry.register::<Bound>();
+		}
+		let nodes =
+			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
+		let root = world
+			.spawn_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap()
+			.id();
+		world.flush();
+		(world, root)
+	}
+
+	/// The entities `markup` builds, root included.
+	fn entity_count(markup: &str) -> usize {
+		let (mut world, root) = build(markup);
+		world.with_state::<Query<&Children>, _>(|children| {
+			children.iter_descendants_inclusive(root).count()
+		})
+	}
+
+	/// Structure is universal: an unresolvable tag is an inert entity recording
+	/// the name it named, and its children build under it exactly as they would
+	/// in a binary that linked the type.
+	#[crate::test]
+	fn unregistered_tag_is_inert_and_builds_children() {
+		let (world, root) =
+			build("<NotRegistered><PackageConfig/></NotRegistered>");
+		let inert = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(inert)
+			.get::<UnregisteredTag>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("NotRegistered");
+		// the child built, and the resource declaration it carries applied.
+		world
+			.entity(inert)
+			.get::<Children>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+		// the same shape a registered tag would build: root, tag, child.
+		entity_count("<NotRegistered><PackageConfig/></NotRegistered>")
+			.xpect_eq(entity_count("<div><PackageConfig/></div>"));
+	}
+
+	/// A `$name` reference into a formerly-gated region resolves to the real
+	/// inert entity, not a never-built placeholder.
+	#[crate::test]
+	fn ref_into_an_unregistered_subtree_resolves() {
+		let (world, root) = build(
+			r#"<div><NotRegistered bx:ref="target"/><span {Bound($target)}/></div>"#,
+		);
+		let host = world.entity(root).get::<Children>().unwrap()[0];
+		let children = world.entity(host).get::<Children>().unwrap();
+		let (target, consumer) = (children[0], children[1]);
+		world
+			.entity(target)
+			.contains::<UnregisteredTag>()
+			.xpect_true();
+		world
+			.entity(consumer)
+			.get::<Bound>()
+			.unwrap()
+			.0
+			.xpect_eq(target);
+	}
+
+	/// The narrow [`AllowedUnregistered`] opt-out still resolves to nothing at
+	/// all, children included: only a tag whose whole content IS the missing
+	/// behavior takes it.
+	#[crate::test]
+	fn allowed_unregistered_tag_builds_nothing() {
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		world.allow_unregistered("NotRegistered");
+		let nodes = BsxNode::parse_document(
+			"<NotRegistered><NorThis/></NotRegistered>",
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
+		let root = world
+			.spawn_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap()
+			.id();
+		world.flush();
+		// the tag's own entity is spawned by the walker, but nothing builds into
+		// it and no child follows.
+		world
+			.entity(root)
+			.get::<Children>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+		let inert = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(inert)
+			.contains::<UnregisteredTag>()
+			.xpect_false();
+		world.entity(inert).get::<Children>().is_none().xpect_true();
+	}
 }

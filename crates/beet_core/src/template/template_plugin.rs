@@ -3,7 +3,8 @@
 use crate::prelude::*;
 
 /// Registers the template lifecycle events, slot and pending markers, the
-/// [`TemplateError`], and the [`ReflectTemplate`] registry bridge.
+/// [`TemplateError`], the [`UnregisteredTag`] marker, and the
+/// [`ReflectTemplate`] registry bridge.
 ///
 /// A minimal world built from this plugin can `spawn_template`. Mirrors
 /// [`DocumentPlugin`] in style; the build walker and slot resolution are
@@ -25,6 +26,8 @@ impl Plugin for TemplatePlugin {
 			.register_type::<SlotChild>()
 			.register_type::<TemplatePending>()
 			.register_type::<TemplatesLoaded>()
+			// the inert marker an unresolvable tag leaves behind.
+			.register_type::<UnregisteredTag>()
 			.add_systems(Update, sweep_dropped_pending);
 	}
 }

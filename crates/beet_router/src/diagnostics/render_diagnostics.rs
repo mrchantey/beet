@@ -120,6 +120,26 @@ impl Diagnostic {
 		}
 	}
 
+	/// The [`UnknownTag`](DiagnosticKind::UnknownTag) diagnostic for an inert
+	/// entity the loader left behind.
+	///
+	/// The loader warns and builds on, so the whole document loads in every
+	/// binary; this is the other half of that bargain, raised by a pass whose
+	/// binary registers everything, where an inert entity means a typo.
+	pub fn unregistered_tag(
+		tag: &UnregisteredTag,
+		severity: DiagnosticSeverity,
+	) -> Self {
+		Self::new(
+			DiagnosticKind::UnknownTag,
+			severity,
+			format!(
+				"unknown tag `<{}>`: no component, resource or template registered",
+				tag.as_str()
+			),
+		)
+	}
+
 	/// Tag this diagnostic with the route it was found on.
 	pub fn with_route(mut self, route: SmolPath) -> Self {
 		self.route = Some(route);
@@ -157,8 +177,8 @@ impl Diagnostic {
 ///
 /// Walks the [`Element`]/[`Attribute`]/[`Classes`] tree with [`DiagnosticsQuery`]
 /// (a [`SystemParam`], not ad-hoc world poking), validating internal hrefs
-/// against `route_tree` and classes against `rule_set`. Any [`TemplateError`] on
-/// the tree (eg the build's unresolved-tag bail) folds in as an
+/// against `route_tree` and classes against `rule_set`. Any [`TemplateError`] or
+/// [`UnregisteredTag`] on the tree folds in as an
 /// [`UnknownTag`](DiagnosticKind::UnknownTag) error, so a no-code author sees the
 /// build failure loudly rather than as a blank page.
 pub(crate) fn render_diagnostics(
@@ -174,12 +194,13 @@ pub(crate) fn render_diagnostics(
 }
 
 /// The render-tree traversal backing [`render_diagnostics`]: every [`Element`]
-/// (with its attributes/classes) plus any [`TemplateError`] reachable from a
-/// render root.
+/// (with its attributes/classes) plus any [`TemplateError`] or
+/// [`UnregisteredTag`] reachable from a render root.
 #[derive(SystemParam)]
 struct DiagnosticsQuery<'w, 's> {
 	elements: ElementQuery<'w, 's>,
-	errors: Query<'w, 's, (Entity, &'static TemplateError)>,
+	errors: Query<'w, 's, &'static TemplateError>,
+	unregistered: Query<'w, 's, &'static UnregisteredTag>,
 	children: Query<'w, 's, &'static Children>,
 }
 
@@ -193,10 +214,10 @@ impl DiagnosticsQuery<'_, '_> {
 		config: &RenderDiagnostics,
 	) -> Vec<Diagnostic> {
 		let mut out = Vec::new();
-		// a build failure (eg the unresolved-uppercase-tag bail) rides
-		// `TemplateError`; fold every one reachable from the root in as an
-		// unknown-tag error so it is never silently dropped.
-		self.collect_template_errors(root, config, &mut out);
+		// a build failure rides `TemplateError` and an unresolvable tag rides
+		// `UnregisteredTag`; fold every one reachable from the root in as an
+		// unknown-tag error so neither is silently dropped.
+		self.collect_build_errors(root, config, &mut out);
 		// then the per-element href/class/literal-uppercase-tag checks.
 		for el in self.elements.iter_descendants_inclusive(root) {
 			self.check_element(&el, route_tree, rule_set, config, &mut out);
@@ -204,10 +225,11 @@ impl DiagnosticsQuery<'_, '_> {
 		out
 	}
 
-	/// Fold every [`TemplateError`] in `root`'s subtree into an
-	/// [`UnknownTag`](DiagnosticKind::UnknownTag) error, the surfacing path for a
-	/// build that bailed (eg on an unresolved tag).
-	fn collect_template_errors(
+	/// Fold every [`TemplateError`] and [`UnregisteredTag`] in `root`'s subtree
+	/// into an [`UnknownTag`](DiagnosticKind::UnknownTag) error: the surfacing
+	/// path for a build that bailed, and for one whose tag resolved to nothing
+	/// and built an inert entity instead.
+	fn collect_build_errors(
 		&self,
 		root: Entity,
 		config: &RenderDiagnostics,
@@ -219,12 +241,15 @@ impl DiagnosticsQuery<'_, '_> {
 		}
 		let mut stack = vec![root];
 		while let Some(entity) = stack.pop() {
-			if let Ok((_, error)) = self.errors.get(entity) {
+			if let Ok(error) = self.errors.get(entity) {
 				out.push(Diagnostic::new(
 					DiagnosticKind::UnknownTag,
 					severity,
 					format!("template build error: {}", error.error),
 				));
+			}
+			if let Ok(tag) = self.unregistered.get(entity) {
+				out.push(Diagnostic::unregistered_tag(tag, severity));
 			}
 			if let Ok(children) = self.children.get(entity) {
 				stack.extend(children.iter());

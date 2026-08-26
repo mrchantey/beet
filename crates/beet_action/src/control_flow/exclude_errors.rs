@@ -7,12 +7,6 @@ use bitflags::bitflags;
 #[reflect(Component)]
 pub struct ExcludeErrors(pub ChildError);
 
-impl ExcludeErrors {
-	pub fn all() -> Self {
-		Self(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH)
-	}
-}
-
 bitflags! {
 	/// Child error types that can occur during control-flow execution.
 	/// Used with [`ExcludeErrors`] to selectively skip certain child issues.
@@ -27,6 +21,10 @@ bitflags! {
 		const NO_ACTION = 0b01;
 		/// Child entity has an action with an incompatible signature.
 		const ACTION_MISMATCH = 0b10;
+		/// Every child was skipped, so a parent that has children would run none
+		/// of them. Excluded only by a parent for which doing nothing is a valid
+		/// outcome.
+		const NONE_VALID = 0b100;
 	}
 }
 

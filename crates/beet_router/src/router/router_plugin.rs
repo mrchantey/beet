@@ -23,7 +23,11 @@ impl Plugin for RouterPlugin {
 			.init_plugin::<AsyncPlugin>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_path_pattern_for_late_path_partial)
-			.add_observer(insert_route_tree);
+			.add_observer(insert_route_tree)
+			// `RequireFeatures` (a beet_core component) is enforced here, where
+			// dispatch lives: an unmet declaration fails any call at or under
+			// it naming the missing features.
+			.add_observer(enforce_require_features);
 
 		// no_std-core reflect registrations: these types are shared across std
 		// and no_std and reflection works on bare metal, so register them

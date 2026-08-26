@@ -83,8 +83,12 @@ pub(crate) async fn log_all_render_diagnostics(world: &AsyncWorld) -> bool {
 }
 
 impl CheckReport {
-	/// Render every static route under `router`, run [`render_diagnostics`] over each
+	/// Render every static route under `root`, run [`render_diagnostics`] over each
 	/// built content tree, and return the aggregated [`CheckReport`].
+	///
+	/// `root` is whatever the caller holds: `beet check` and the exports pass the
+	/// loaded entry root, the dev serve one router at a time. [`RouteTree::of`]
+	/// resolves the tree from either.
 	///
 	/// A route is checked when its path is fully static and its method is `GET`
 	/// (mirroring `export-static`), so the scan covers exactly the pages a no-code
@@ -92,15 +96,20 @@ impl CheckReport {
 	/// when absent); the [`RuleSet`] is re-read per route *after* its build, so a
 	/// `bx:style`/`inline_class!` rule a route registers at build time is matched
 	/// rather than flagged unknown.
+	///
+	/// The pass opens on `root`'s own structure: an unresolvable tag loads as an
+	/// inert [`UnregisteredTag`] entity in every binary, so this — run by a
+	/// binary that registers everything — is where the typo it might be surfaces
+	/// as an error.
 	pub async fn check_routes(
 		world: &AsyncWorld,
-		router: Entity,
+		root: Entity,
 	) -> Result<CheckReport> {
 		// the static GET routes worth checking, plus the route tree + config snapshot
-		// every per-route scan validates against.
-		let (route_entities, route_tree, config) = world
+		// every per-route scan validates against, and the document's own inert tags.
+		let (route_entities, route_tree, config, unregistered) = world
 			.with(move |world: &mut World| -> Result<_> {
-				let route_tree = RouteTree::of(world, router)?.clone();
+				let route_tree = RouteTree::of(world, root)?.clone();
 				let config = world
 					.get_resource::<RenderDiagnostics>()
 					.cloned()
@@ -111,11 +120,13 @@ impl CheckReport {
 					.filter(|node| checkable(node))
 					.map(|node| (node.entity, node.path.annotated_path()))
 					.collect::<Vec<_>>();
-				Ok((route_entities, route_tree, config))
+				let unregistered = unregistered_tags(world, root, &config);
+				Ok((route_entities, route_tree, config, unregistered))
 			})
 			.await?;
 
 		let mut report = CheckReport::default();
+		report.diagnostics.extend(unregistered);
 		for (entity, path) in route_entities {
 			check_route(
 				world,
@@ -128,9 +139,46 @@ impl CheckReport {
 			.await?;
 			report.checked.push(path);
 		}
+		// a persistent route's content is reachable from both the document scan
+		// and its own route scan; drop the routeless duplicate.
+		let routed = report
+			.diagnostics
+			.iter()
+			.filter(|diagnostic| diagnostic.route.is_some())
+			.map(|diagnostic| diagnostic.message.clone())
+			.collect::<HashSet<_>>();
+		report.diagnostics.retain(|diagnostic| {
+			diagnostic.route.is_some() || !routed.contains(&diagnostic.message)
+		});
 		Ok(report)
 	}
 }
+
+/// Every [`UnregisteredTag`] in `root`'s subtree, as an
+/// [`UnknownTag`](DiagnosticKind::UnknownTag) diagnostic.
+///
+/// Route *content* is scanned per route by [`render_diagnostics`] once it is
+/// built; this covers the document's own structure, which is present from load.
+fn unregistered_tags(
+	world: &mut World,
+	root: Entity,
+	config: &RenderDiagnostics,
+) -> Vec<Diagnostic> {
+	let severity = config.severity(DiagnosticKind::UnknownTag);
+	if severity == DiagnosticSeverity::Off {
+		return Vec::new();
+	}
+	world.with_state::<(Query<&UnregisteredTag>, Query<&Children>), _>(
+		|(tags, children)| {
+			children
+				.iter_descendants_inclusive(root)
+				.filter_map(|entity| tags.get(entity).ok())
+				.map(|tag| Diagnostic::unregistered_tag(tag, severity))
+				.collect()
+		},
+	)
+}
+
 /// Whether a route node is a static `GET` page worth scanning: a fully-static
 /// path whose method is `GET` (or unset), and which builds a render tree (a scene
 /// route). Mirrors `export-static`'s selection.
@@ -312,6 +360,31 @@ mod test {
 		// a lone unknown class warns but does not fail.
 		report.has_errors().xpect_false();
 		report.warn_count().xpect_eq(1);
+	}
+
+	/// An unresolvable tag loads as an inert entity in every binary, so this pass
+	/// — run by a binary that registers everything — is where it surfaces as the
+	/// typo it is, even though it sits in the document rather than in any route's
+	/// rendered content.
+	#[beet_core::test]
+	async fn unregistered_tag_errors() {
+		let mut world = check_world();
+		let router = world
+			.spawn((Router, children![
+				render_action::fixed_func_route("", || rsx! { <p>"home"</p> }),
+				UnregisteredTag::new("Butonn"),
+			]))
+			.flush();
+		let report = check(&mut world, router).await;
+		report.has_errors().xpect_true();
+		report
+			.diagnostics
+			.iter()
+			.any(|diagnostic| {
+				diagnostic.kind == DiagnosticKind::UnknownTag
+					&& diagnostic.message.contains("Butonn")
+			})
+			.xpect_true();
 	}
 
 	/// A persistent scene route (a `BlobScene`, as `RoutesDir` spawns) survives a

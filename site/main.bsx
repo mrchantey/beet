@@ -56,11 +56,13 @@ one declaration of what is borrowed, and runs ahead of every publish.
 
 ## The deploy
 
-`bx:features="infra,extra"` gates the deploy verbs on the compiled feature set,
-so this same file loads in the deployed binary (built `--no-default-features
---features aws_sdk,ssh,geoip`) with the whole subtree skipped before its tags
-resolve. That is what lets the application declare its own infrastructure without
-shipping the deployer.
+Structure is universal, so this same file loads whole in the deployed binary
+(built `--no-default-features --features aws_sdk,ssh,geoip`): the deploy tags it
+never linked build as inert entities, quietly, because the host declares
+`RequireFeatures("infra,extra")`. That declaration is also the loudness:
+dispatching any deploy verb in a binary without those features fails naming
+them and the rebuild that fixes it, before any step runs. That is what lets the
+application declare its own infrastructure without shipping the deployer.
 
 The deploy route applies once per layer, and the order is the point: `<TofuApply
 layer="storage"/>` brings up the stores (the app bucket, the analytics table),
@@ -119,45 +121,43 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<AssetsDir src="assets" cache="1h"/>
 		</Router>
 	</Route>
-	<Fragment bx:features="infra,extra">
-		<DeployHost>
-			<Route path="deploy" {ExchangeSequence}>
-				<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-				<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
-				<S3BucketBlock label="app" deploy_versioned=false/>
-				<TofuApply layer="storage"/>
+	<DeployHost {RequireFeatures("infra,extra")}>
+		<Route path="deploy" {ExchangeSequence}>
+			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+			<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
+			<S3BucketBlock label="app" deploy_versioned=false/>
+			<TofuApply layer="storage"/>
+			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+			<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
+			<TofuApply/>
+			<LightsailRelease/>
+			<CloudflareZoneSetup/>
+			<LightsailWatch timeout="300s"/>
+			<CloudflarePurgeCache/>
+		</Route>
+		<Route path="sync" {ExchangeSequence}>
+			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+			<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
+			<CloudflarePurgeCache/>
+		</Route>
+		<Route path="watch" {ExchangeSequence}>
+			<LightsailWatch timeout="300s"/>
+		</Route>
+		<Route path="assets" {ExchangeSequence}>
+			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+		</Route>
+	</DeployHost>
+	<Route path="shared">
+		<DeployHost stage="shared" {RequireFeatures("infra,extra")}>
+			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+			<Route path="push" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
-				<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
-				<TofuApply/>
-				<LightsailRelease/>
-				<CloudflareZoneSetup/>
-				<LightsailWatch timeout="300s"/>
-				<CloudflarePurgeCache/>
+				<DirSync bucket="assets" local_dir="site/assets"/>
 			</Route>
-			<Route path="sync" {ExchangeSequence}>
-				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
-				<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
-				<CloudflarePurgeCache/>
-			</Route>
-			<Route path="watch" {ExchangeSequence}>
-				<LightsailWatch timeout="300s"/>
-			</Route>
-			<Route path="assets" {ExchangeSequence}>
-				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+			<Route path="pull" {ExchangeSequence}>
+				<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
 			</Route>
 		</DeployHost>
-		<Route path="shared">
-			<DeployHost stage="shared">
-				<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-				<Route path="push" {ExchangeSequence}>
-					<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
-					<DirSync bucket="assets" local_dir="site/assets"/>
-				</Route>
-				<Route path="pull" {ExchangeSequence}>
-					<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
-				</Route>
-			</DeployHost>
-		</Route>
-	</Fragment>
+	</Route>
 </Router>
 </CliServer>

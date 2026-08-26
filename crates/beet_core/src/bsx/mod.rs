@@ -27,9 +27,10 @@
 //! grammar: a `{literal}` lowers to a [`Value`], an `{@source:path}` binding to
 //! its reactive sync components. The `bx:` directives (`bx:scope`, `bx:ref`,
 //! `bx:click`, ...) attach their document-system and slot-marker components.
-//! `bx:features="a,b"` is the one directive that resolves *before* its tag: it
-//! skips the whole node when this binary lacks those cargo features, so an entry
-//! can carry a subtree only a richer build knows the types for.
+//! An uppercase tag nothing is registered under is not an error: it warns,
+//! marks its entity [`UnregisteredTag`] and builds its children anyway, so a
+//! lean binary loads the same document shape a full one does and only its
+//! behavior is missing.
 //!
 //! ## Bindings
 //!

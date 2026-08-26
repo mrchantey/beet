@@ -14,6 +14,8 @@ use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
 use bevy::reflect::FromType;
 use bevy::reflect::GetTypeRegistration;
+use bevy::reflect::TypeRegistration;
+use bevy::reflect::TypeRegistry;
 use bevy::reflect::Typed;
 
 /// Reflect type-data that builds a template from a reflected data value.
@@ -33,6 +35,34 @@ pub struct ReflectTemplate {
 }
 
 impl ReflectTemplate {
+	/// The registration under short type path `name`, resolving an ambiguous
+	/// short path in favour of a sole template candidate.
+	///
+	/// A `#[template]` type's short path is its *only* name: it exists to be
+	/// authored as `<Button>` and is reachable no other way, while a component
+	/// or resource is equally reachable from Rust and, from markup, by its full
+	/// type path. So a template wins a collision with foreign types of the same
+	/// name (beet_ui's `<Button>` widget over bevy_ui's `Button` component),
+	/// while a collision no template is party to (the two registered
+	/// `Transform`s) still resolves to nothing rather than guessing.
+	pub fn registration_named<'a>(
+		registry: &'a TypeRegistry,
+		name: &str,
+	) -> Option<&'a TypeRegistration> {
+		if let Some(registration) = registry.get_with_short_type_path(name) {
+			return Some(registration);
+		}
+		if !registry.is_ambiguous(name) {
+			return None;
+		}
+		let mut templates = registry.iter().filter(|registration| {
+			registration.type_info().type_path_table().short_path() == name
+				&& registration.data::<ReflectTemplate>().is_some()
+		});
+		let template = templates.next()?;
+		templates.next().is_none().then_some(template)
+	}
+
 	/// Builds the template from a reflected `value` into `cx`.
 	///
 	/// `value` is the template's data (eg a `DynamicStruct` patch). It is
@@ -159,14 +189,43 @@ pub impl App {
 	}
 }
 
+/// The name of a tag nothing was registered under, recorded on the inert entity
+/// the loader spawned for it anyway.
+///
+/// Structure is universal: a document builds the same entity tree in every
+/// binary, and what a lean build lacks is behavior (unlinked components, absent
+/// actions), never structure. So an unresolvable uppercase tag warns, marks its
+/// entity with the name it named, and still builds its directives, spreads and
+/// children, which keeps `bx:ref` targets and the shape of the tree stable
+/// across builds.
+///
+/// Loudness arrives later, where it can distinguish a lean binary from a typo:
+/// a subtree declaring [`RequireFeatures`] fails dispatch naming the missing
+/// features, a failed sequence route appends its unregistered children's names
+/// at the reporting edge, and `beet check` (which registers everything)
+/// elevates every marker it finds to an error.
+///
+/// The narrower [`AllowedUnregistered`] opts a tag out of even this: it resolves
+/// to nothing at all, children included.
+#[derive(Debug, Clone, Deref, Component, Reflect)]
+#[reflect(Component)]
+pub struct UnregisteredTag(pub SmolStr);
+
+impl UnregisteredTag {
+	/// Record `tag` as unresolvable in this binary.
+	pub fn new(tag: impl Into<SmolStr>) -> Self { Self(tag.into()) }
+}
+
 /// Tag names allowed to resolve to nothing when nothing is registered under them.
 ///
-/// A featured-out widget (eg `<LiveReloadScript/>` when `client_io` is compiled
-/// out) marks its tag here via
-/// [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered), so a site
-/// layout that includes the tag still loads and renders nothing instead of failing
-/// with "no ... registered for tag". Uniform over components, resources and
-/// templates: the check sits on the shared not-found path of both lookups.
+/// The narrow opt-out from [`UnregisteredTag`]: a featured-out widget (eg
+/// `<LiveReloadScript/>` when `client_io` is compiled out) marks its tag here via
+/// [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered) and the
+/// loader resolves it to nothing at all, silently and without its children. Only
+/// a tag whose whole *content* is the missing behavior belongs here; anything
+/// else takes the inert-entity path so its children survive. Uniform over
+/// components, resources and templates: the check sits on the shared not-found
+/// path of both lookups.
 #[derive(Debug, Default, Clone, Resource)]
 pub struct AllowedUnregistered {
 	names: HashSet<SmolStr>,
@@ -227,8 +286,7 @@ impl ValueSchema {
 		tag: &str,
 	) -> Option<ValueSchema> {
 		let registry = registry.read();
-		registry
-			.get_with_short_type_path(tag)
+		ReflectTemplate::registration_named(&registry, tag)
 			.and_then(|registration| {
 				registration.data::<ReflectTemplateSchema>()
 			})
@@ -247,7 +305,8 @@ pub(crate) fn build_template_by_name(
 	cx: &mut TemplateContext,
 ) -> Result {
 	let guard = registry.read();
-	let Some(registration) = guard.get_with_short_type_path(tag) else {
+	let Some(registration) = ReflectTemplate::registration_named(&guard, tag)
+	else {
 		drop(guard);
 		// a known featured-out tag resolves to nothing instead of erroring.
 		return is_allowed_unregistered(cx, tag).then_some(()).ok_or_else(
@@ -332,6 +391,60 @@ mod test {
 				build_template_by_name(&registry, "Nope", &patch, cx)
 			})
 			.unwrap_err();
+	}
+
+	/// Types sharing a short path with the test's own, the bevy-widget collision
+	/// shape: `Label` against the registered template, `Sphere` against a second
+	/// non-template.
+	mod foreign {
+		use crate::prelude::*;
+
+		#[derive(Default, Clone, Reflect)]
+		#[reflect(Default)]
+		pub struct Label;
+
+		#[derive(Default, Clone, Reflect)]
+		#[reflect(Default)]
+		pub struct Sphere;
+	}
+	mod other {
+		use crate::prelude::*;
+
+		#[derive(Default, Clone, Reflect)]
+		#[reflect(Default)]
+		pub struct Sphere;
+	}
+
+	/// A template's short path is its only name, so it wins an ambiguous short
+	/// path; an ambiguity no template is party to still resolves to nothing
+	/// rather than guessing, and is named by its full type path instead.
+	#[beet_core::test]
+	fn a_template_wins_an_ambiguous_short_path() {
+		let mut world = TemplatePlugin::world();
+		world.register_template::<Label>();
+		let app_registry = world.resource::<AppTypeRegistry>().clone();
+		{
+			let mut registry = app_registry.write();
+			registry.register::<foreign::Label>();
+			registry.register::<foreign::Sphere>();
+			registry.register::<other::Sphere>();
+		}
+		let registry = app_registry.read();
+		// bevy's own lookup drops an ambiguous short path entirely..
+		registry
+			.get_with_short_type_path("Label")
+			.is_none()
+			.xpect_true();
+		// ..and the sole template candidate wins it.
+		ReflectTemplate::registration_named(&registry, "Label")
+			.unwrap()
+			.type_info()
+			.type_path()
+			.xpect_eq(<Label as Typed>::type_info().type_path());
+		// two non-templates stay ambiguous.
+		ReflectTemplate::registration_named(&registry, "Sphere")
+			.is_none()
+			.xpect_true();
 	}
 
 	/// A tag marked [`allow_unregistered`](WorldAllowUnregisteredExt::allow_unregistered)

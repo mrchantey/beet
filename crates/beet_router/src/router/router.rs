@@ -430,6 +430,50 @@ mod test {
 			.xpect_eq(StatusCode::NOT_FOUND);
 	}
 
+	/// A route whose action spread this binary never linked keeps its url but
+	/// gets no `ActionMeta`, so it never enters the [`RouteTree`] and dispatch
+	/// 404s rather than half-serving. The lean-binary shape in miniature:
+	/// structure loads, behavior does not.
+	#[beet_core::test]
+	async fn unregistered_action_spread_is_not_a_route() {
+		let mut world = router_world();
+		let root = world
+			.spawn((Router::with_defaults(), children![
+				render_action::fixed_func_route("serve", || rsx! {
+					<p>"site"</p>
+				}),
+			]))
+			.flush();
+		// built from markup so the spread takes the real warn-and-skip path.
+		let nodes = BsxNode::parse_document(
+			r#"<Route path="deploy" {NotRegistered}/>"#,
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
+		world
+			.spawn(ChildOf(root))
+			.insert_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap();
+		world.flush();
+		// the sibling route still serves, so the router has a tree..
+		world
+			.entity_mut(root)
+			.exchange(Request::get("serve"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		// ..which the actionless route never entered.
+		world
+			.entity_mut(root)
+			.exchange(Request::get("deploy"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::NOT_FOUND);
+	}
+
 	#[beet_core::test]
 	async fn renders_root_scene_on_empty_args() {
 		router_world()

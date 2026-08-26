@@ -21,6 +21,14 @@ use beet_net::prelude::*;
 /// action at all (config blocks) or a differently-shaped one are skipped via
 /// [`ExcludeErrors`]; a step that is natively another shape carries its own
 /// [`ActionOverload`].
+///
+/// [`NONE_VALID`](ChildError::NONE_VALID) is deliberately NOT excluded: a route
+/// that skipped every child ran nothing, and a `200` for work that never
+/// happened is the one outcome worse than a failure. A failed run over
+/// children with [`UnregisteredTag`] markers appends their names, so a lean
+/// binary's error explains itself even where no
+/// [`RequireFeatures`] was declared (the declaration is the better error: it
+/// names the missing features before any step runs).
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(
@@ -41,13 +49,44 @@ fn sequence_overload() -> ExchangeOverload {
 					action.clone()
 				})
 				.await?;
-			match cx.caller.call_detached(action, cx.input).await? {
-				Pass(_) => Response::ok(),
-				Fail(response) => response,
+			let caller = cx.caller.clone();
+			match caller.call_detached(action, cx.input).await {
+				Ok(Pass(_)) => Response::ok().xok(),
+				Ok(Fail(response)) => response.xok(),
+				Err(err) => Err(name_unregistered_children(&caller, err).await),
 			}
-			.xok()
 		},
 	))
+}
+
+/// Append the names of any [`UnregisteredTag`] descendants to a failed run:
+/// the backstop explanation for a binary that loaded steps it never linked,
+/// raised at the edge that reports the failure rather than by the sequence
+/// itself (which stays blind to how its children loaded).
+async fn name_unregistered_children(
+	caller: &AsyncEntity,
+	err: BevyError,
+) -> BevyError {
+	caller
+		.with_state::<(Query<&UnregisteredTag>, Query<&Children>), _>(
+			|entity, (tags, children)| {
+				children
+					.iter_descendants(entity)
+					.filter_map(|child| tags.get(child).ok())
+					.map(|tag| format!("`<{}>`", tag.as_str()))
+					.collect::<Vec<_>>()
+			},
+		)
+		.await
+		.ok()
+		.filter(|tags| !tags.is_empty())
+		.map(|tags| {
+			bevyhow!(
+				"{err}\nnote: this binary did not register: {}",
+				tags.join(", ")
+			)
+		})
+		.unwrap_or(err)
 }
 
 #[cfg(test)]
@@ -113,6 +152,28 @@ mod test {
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
+	}
+
+	/// A route whose children are all inert — the shape a lean binary loads an
+	/// undeclared deploy verb as — fails rather than serving a `200` for work
+	/// that never ran, and the edge names the unregistered tags. The sequence
+	/// itself stays blind to how its children loaded; the naming happens here.
+	#[beet_core::test]
+	async fn inert_children_fail_loudly() {
+		router_world()
+			.spawn((Router::with_defaults(), children![(
+				PathPartial::new("deploy"),
+				ExchangeSequence,
+				children![UnregisteredTag::new("TofuApply")],
+			)]))
+			.exchange(Request::get("deploy"))
+			.await
+			.into_result()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("skipped all 1 of its children")
+			.xpect_contains("this binary did not register: `<TofuApply>`");
 	}
 
 	/// A `() -> Outcome` behavior step serves the sequence through its own

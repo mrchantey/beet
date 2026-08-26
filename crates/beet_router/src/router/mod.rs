@@ -27,6 +27,8 @@ mod template_include;
 pub(crate) use template_include::*;
 mod request_logger;
 pub use request_logger::*;
+mod require_features;
+pub(crate) use require_features::*;
 mod interrupt;
 pub use interrupt::*;
 // std-only: `ArticleMeta::sidebar` is a `SidebarInfo`, which lives in the

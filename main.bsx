@@ -47,9 +47,10 @@ not owned by any deploy stage.
     just beet-shared pull                  # hydrate ./assets from it (no credentials)
     just beet-shared push                  # publish ./assets to it
 
-`bx:features="infra,extra"` gates that subtree on the compiled feature set, so a
-lean `beet` (the default build, ie `beet run-wasm`) skips it before its tags
-resolve rather than failing on an unregistered tag.
+Structure is universal, so a lean `beet` (the default build, ie `beet run-wasm`)
+loads that subtree too: the tags it never linked build as inert entities,
+quietly, because the host declares `RequireFeatures("infra,extra")`. Dispatching
+a shared verb in such a build fails naming the missing features.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
 -->
@@ -64,18 +65,16 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 	<ExportPdf/>
 	<CaptureScreenshot/>
 	<SyncS3/>
-	<Fragment bx:features="infra,extra">
-		<Route path="shared">
-			<DeployHost stage="shared">
-				<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-				<Route path="push" {ExchangeSequence}>
-					<DirSync bucket="assets" local_dir="assets"/>
-				</Route>
-				<Route path="pull" {ExchangeSequence}>
-					<DirSync bucket="assets" local_dir="assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
-				</Route>
-			</DeployHost>
-		</Route>
-	</Fragment>
+	<Route path="shared">
+		<DeployHost stage="shared" {RequireFeatures("infra,extra")}>
+			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+			<Route path="push" {ExchangeSequence}>
+				<DirSync bucket="assets" local_dir="assets"/>
+			</Route>
+			<Route path="pull" {ExchangeSequence}>
+				<DirSync bucket="assets" local_dir="assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
+			</Route>
+		</DeployHost>
+	</Route>
 </Router>
 </CliServer>
