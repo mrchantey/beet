@@ -90,9 +90,8 @@ mod tests {
 	// layout), not only from a sibling.
 	#[beet_core::test]
 	fn store_resolves_from_own_entity() {
-		let (stack, _deployment, _dir) = Stack::default_local();
-		let mut world = World::new();
-		let entity = world.spawn((stack, BlobStore::temp())).id();
+		let mut world = BootstrapPlugin.into_world();
+		let entity = world.spawn((Stack::default(), BlobStore::temp())).id();
 		world.with_state::<StackQuery, _>(|query| {
 			query.store(entity).is_ok().xpect_true();
 		});

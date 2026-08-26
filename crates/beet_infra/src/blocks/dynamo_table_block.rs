@@ -58,13 +58,15 @@ impl DynamoTableBlock {
 	}
 
 	/// The composed table name this block declares, ie `beet-site--prod--analytics`.
-	pub fn table_name(&self, stack: &Stack) -> String {
+	pub fn table_name(&self, stack: &ResolvedStack) -> String {
 		stack.resource_name(self.label.clone())
 	}
 
 	/// The region this table lives in: its own override, else `stack`'s.
-	pub fn resolved_region(&self, stack: &Stack) -> SmolStr {
-		self.region.clone().unwrap_or_else(|| stack.region())
+	pub fn resolved_region(&self, stack: &ResolvedStack) -> SmolStr {
+		self.region
+			.clone()
+			.unwrap_or_else(|| stack.region().clone())
 	}
 }
 
@@ -125,7 +127,7 @@ impl Block for DynamoTableBlock {
 	fn apply_to_config(
 		&self,
 		_entity: &EntityRef,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		_deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
@@ -152,7 +154,7 @@ impl Block for DynamoTableBlock {
 
 	/// A table is declared to be recorded to, so the process that declared it
 	/// reads and writes it.
-	fn runtime_access(&self, stack: &Stack) -> Vec<AccessGrant> {
+	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
 		vec![AccessGrant::read_write(AccessResource::DynamoTable {
 			name: self.table_name(stack),
 			region: self.resolved_region(stack),
@@ -168,7 +170,7 @@ mod test {
 	/// string hash key, and pay-per-request billing.
 	#[beet_core::test]
 	fn emits_dynamodb_table() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		DynamoTableBlock::new("analytics")

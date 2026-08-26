@@ -13,7 +13,7 @@ pub trait Block: 'static + Send + Sync {
 	fn apply_to_config(
 		&self,
 		entity: &EntityRef,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 		access: &AccessGrants,
 		config: &mut terra::Config,
@@ -22,7 +22,9 @@ pub trait Block: 'static + Send + Sync {
 	/// What a process running in this stack needs to do with this resource,
 	/// stated without naming any provider's permission model. Empty for a block
 	/// nothing reads at runtime.
-	fn runtime_access(&self, _stack: &Stack) -> Vec<AccessGrant> { Vec::new() }
+	fn runtime_access(&self, _stack: &ResolvedStack) -> Vec<AccessGrant> {
+		Vec::new()
+	}
 
 	/// If this block creates a deployable artifact, return its label.
 	fn artifact_label(&self) -> Option<&str> { None }

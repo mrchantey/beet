@@ -50,8 +50,8 @@ impl DirSync {
 
 	/// The stack this sync addresses its bucket in: the entity's resolved stack,
 	/// with the [`stage`](Self::stage) and [`region`](Self::region) overrides
-	/// applied.
-	fn stack(&self, resolved: Stack) -> Stack {
+	/// applied. Still resolved: an override replaces an answer, never unsets it.
+	fn stack(&self, resolved: ResolvedStack) -> ResolvedStack {
 		let resolved = match &self.stage {
 			Some(stage) => resolved.with_stage(stage.clone()),
 			None => resolved,
@@ -84,7 +84,7 @@ pub(crate) fn attach_dir_sync_store(
 				FsStore::new(WsPathBuf::new(sync.local_dir().to_string())),
 				S3Store::new(
 					stack.resource_name(sync.bucket().clone()),
-					stack.region(),
+					stack.region().clone(),
 				),
 			));
 			Ok(())

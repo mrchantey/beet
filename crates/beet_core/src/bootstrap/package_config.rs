@@ -22,7 +22,13 @@ pub struct PackageConfig {
 	/// [`pkg_config!`]. The ONE location app identity lives: a deploy names its
 	/// cloud resources `<app_name>--<stage>--<label>`, and the running binary
 	/// resolves the same names from the same field, so the two cannot drift.
-	pub app_name: Option<SmolStr>,
+	///
+	/// Always set, defaulting to [`Self::DEFAULT_APP_NAME`], so a resource name
+	/// is total: a nameless app gets a generic name rather than an empty
+	/// segment, and BOTH sides fall back identically so they still cannot
+	/// disagree. (The live incident this guards was two INDEPENDENT
+	/// derivations, not the existence of a fallback.)
+	pub app_name: SmolStr,
 	/// The package version, defaulting to `0.0.1` and usually overridden via
 	/// `CARGO_PKG_VERSION` in [`pkg_config!`].
 	pub version: SmolStr,
@@ -39,7 +45,7 @@ impl Default for PackageConfig {
 		Self {
 			title: "My Beet App".into(),
 			description: "An app built with beet".into(),
-			app_name: None,
+			app_name: Self::DEFAULT_APP_NAME.into(),
 			version: "0.0.1".into(),
 			homepage: None,
 		}
@@ -47,8 +53,13 @@ impl Default for PackageConfig {
 }
 
 impl PackageConfig {
-	/// The app identity, if this package declared one.
-	pub fn app_name(&self) -> Option<&str> { self.app_name.as_deref() }
+	/// The app identity of a package that declared none. Generic on purpose: it
+	/// must not collide with a real app's name, and it must be obvious in a
+	/// provisioned resource name that nobody chose it.
+	pub const DEFAULT_APP_NAME: &'static str = "beet-app";
+
+	/// The app identity, ie the `beet-site` in `beet-site--prod--analytics`.
+	pub fn app_name(&self) -> &str { &self.app_name }
 }
 
 /// Macro to create a `PackageConfig` from compile time environment variables set by Cargo.
@@ -71,7 +82,7 @@ macro_rules! pkg_config {
 		$crate::prelude::PackageConfig {
 			title: env!("CARGO_PKG_NAME").into(),
 			description: env!("CARGO_PKG_DESCRIPTION").into(),
-			app_name: Some(env!("CARGO_PKG_NAME").into()),
+			app_name: env!("CARGO_PKG_NAME").into(),
 			version: env!("CARGO_PKG_VERSION").into(),
 			homepage: Some(env!("CARGO_PKG_HOMEPAGE").into()),
 		}
@@ -86,7 +97,7 @@ mod test {
 	/// the running binary both read it from.
 	#[crate::test]
 	fn app_name_from_the_package() {
-		pkg_config!().app_name().unwrap().xpect_eq("beet_core");
+		pkg_config!().app_name().xpect_eq("beet_core");
 	}
 
 	#[crate::test]
@@ -97,7 +108,7 @@ mod test {
 			.description
 			.as_str()
 			.xpect_eq("An app built with beet");
-		config.app_name.xpect_none();
+		config.app_name.as_str().xpect_eq("beet-app");
 		config.version.as_str().xpect_eq("0.0.1");
 		config.homepage.xpect_none();
 	}
@@ -132,7 +143,7 @@ mod test {
 			.description
 			.as_str()
 			.xpect_eq("An app built with beet");
-		config.app_name.xpect_none();
+		config.app_name.as_str().xpect_eq("beet-app");
 		// version keeps the default since the markup did not set it
 		config.version.as_str().xpect_eq("0.0.1");
 	}

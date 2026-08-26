@@ -37,7 +37,12 @@ impl DynamoStore {
 	/// A provider whose region the SDK's default provider chain resolves, the
 	/// process-boundary convention for a caller holding a table name and
 	/// nothing else.
-	pub fn new_default_region(table_name: impl Into<SmolStr>) -> Self {
+	///
+	/// `pub(crate)` for the same reason as
+	/// [`S3Store::new_default_region`](crate::prelude::S3Store), which carries
+	/// the full note: a region-less store in a tree would ignore its ancestor
+	/// `Stack`, so stack-relative resolution stays with the declaration.
+	pub(crate) fn new_default_region(table_name: impl Into<SmolStr>) -> Self {
 		Self {
 			table_name: table_name.into(),
 			region: None,

@@ -41,7 +41,7 @@ impl Default for WatchTarget {
 
 impl WatchTarget {
 	/// The CloudWatch group this target resolves to in `stack`.
-	pub fn log_group(&self, stack: &Stack) -> String {
+	pub fn log_group(&self, stack: &ResolvedStack) -> String {
 		match self {
 			Self::LogGroup(group) => group.to_string(),
 			Self::Lambda(label) => format!(
@@ -50,16 +50,12 @@ impl WatchTarget {
 					.resource_ident(format!("{label}--function"))
 					.primary_identifier()
 			),
-			Self::Lightsail(label) => format!(
-				"/{}/{label}/{}",
-				stack.app_name().unwrap_or_default(),
-				stack.stage()
-			),
-			Self::Fargate => format!(
-				"/ecs/{}/{}",
-				stack.app_name().unwrap_or_default(),
-				stack.stage()
-			),
+			Self::Lightsail(label) => {
+				format!("/{}/{label}/{}", stack.app_name(), stack.stage())
+			}
+			Self::Fargate => {
+				format!("/ecs/{}/{}", stack.app_name(), stack.stage())
+			}
 		}
 	}
 }
@@ -94,7 +90,7 @@ pub async fn AwsWatchAction(
 		.caller
 		.with_state::<StackQuery, _>(move |entity, query| {
 			let stack = query.resolve(entity);
-			(stack.region(), watch.target().log_group(&stack))
+			(stack.region().clone(), watch.target().log_group(&stack))
 		})
 		.await?;
 

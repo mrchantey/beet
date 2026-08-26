@@ -176,14 +176,14 @@ impl FargateBlock {
 	/// target-group names, which are account-region-global and max 32 chars).
 	/// Includes the stack prefix in the length calculation and falls back to a
 	/// hash when over 32 characters.
-	fn short_name(&self, stack: &Stack, suffix: &str) -> SmolStr {
+	fn short_name(&self, stack: &ResolvedStack, suffix: &str) -> SmolStr {
 		use std::collections::hash_map::DefaultHasher;
 		use std::hash::Hash;
 		use std::hash::Hasher;
 
 		let full = format!(
 			"{}--{}--{}--{}",
-			stack.app_name().unwrap_or_default(),
+			stack.app_name(),
 			stack.stage(),
 			self.label,
 			suffix
@@ -219,13 +219,13 @@ impl Block for FargateBlock {
 	fn apply_to_config(
 		&self,
 		_entity: &EntityRef,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		let region = stack.region();
-		let app_name = stack.app_name().unwrap_or_default();
+		let app_name = stack.app_name();
 		let stage = stack.stage();
 		let deploy_id = deployment.deploy_id();
 		let deploy_timestamp = deployment.deploy_timestamp();
@@ -558,7 +558,7 @@ impl Block for FargateBlock {
 			ssh_port: self.allow_ssh.then_some(self.ssh_container_port),
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
-			stage: stage.into(),
+			stage: stage.clone(),
 			deploy_id: Some(deploy_id.to_string().into()),
 			deploy_timestamp: Some(deploy_timestamp.into()),
 			..self.bootstrap.clone()
@@ -799,16 +799,13 @@ impl FargateBlock {
 	/// `Name`/`Project`/`Stage` tags for a resource, keyed by `suffix`.
 	fn name_tags(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		suffix: &str,
 	) -> std::collections::BTreeMap<SmolStr, SmolStr> {
 		[
 			(SmolStr::from("Name"), self.build_label(suffix).into()),
-			(
-				SmolStr::from("Project"),
-				stack.app_name().unwrap_or_default().into(),
-			),
-			(SmolStr::from("Stage"), stack.stage().into()),
+			(SmolStr::from("Project"), stack.app_name().clone()),
+			(SmolStr::from("Stage"), stack.stage().clone()),
 		]
 		.into_iter()
 		.collect()
@@ -820,7 +817,7 @@ impl FargateBlock {
 	/// listener (forwarding to `http_tg` after terminating TLS).
 	fn emit_https(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		nlb: &terra::ResourceDef<AwsLbDetails>,
 		http_tg: &terra::ResourceDef<AwsLbTargetGroupDetails>,
@@ -959,7 +956,7 @@ mod tests {
 	/// work dir guard that keeps the local stack alive.
 	fn build_config(
 		block: &FargateBlock,
-	) -> (terra::Config, Stack, TestWorkDir) {
+	) -> (terra::Config, ResolvedStack, TestWorkDir) {
 		build_config_at(block, BootstrapConfig::DEFAULT_STAGE)
 	}
 
@@ -967,8 +964,8 @@ mod tests {
 	fn build_config_at(
 		block: &FargateBlock,
 		stage: &str,
-	) -> (terra::Config, Stack, TestWorkDir) {
-		let (stack, deployment, dir) = Stack::default_local();
+	) -> (terra::Config, ResolvedStack, TestWorkDir) {
+		let (stack, deployment, dir) = ResolvedStack::default_local();
 		let stack = stack.with_stage(stage);
 		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();

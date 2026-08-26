@@ -80,24 +80,21 @@ impl Deployment {
 
 	/// The opentofu working directory for `stack`, ie `target/infra/beet-site`.
 	/// Per app rather than per stage, since one app's stacks share a checkout.
-	pub fn work_directory(&self, stack: &Stack) -> WsPathBuf {
+	pub fn work_directory(&self, stack: &ResolvedStack) -> WsPathBuf {
 		self.work_directory.clone().unwrap_or_else(|| {
-			WsPathBuf::new(format!(
-				"target/infra/{}",
-				stack.app_name().unwrap_or_default()
-			))
+			WsPathBuf::new(format!("target/infra/{}", stack.app_name()))
 		})
 	}
 
 	/// The state backend path for `stack`, ie `my-app--prod--tofu.tfstate`. It
 	/// composes through the stack's identity, so two stacks sharing this launch
 	/// still write distinct state.
-	pub fn backend_path(&self, stack: &Stack) -> SmolPath {
+	pub fn backend_path(&self, stack: &ResolvedStack) -> SmolPath {
 		SmolPath::new(stack.resource_name(self.state_suffix.clone()))
 	}
 
 	/// The S3 bucket name for `stack`'s artifacts storage.
-	pub fn artifact_bucket_name(&self, stack: &Stack) -> String {
+	pub fn artifact_bucket_name(&self, stack: &ResolvedStack) -> String {
 		stack.resource_name(self.artifact_bucket_suffix.clone())
 	}
 
@@ -109,11 +106,10 @@ impl Deployment {
 	/// Create an artifacts client for `stack`'s artifact bucket, in the same
 	/// provider family as the state backend: local state stores artifacts in a
 	/// sibling directory, S3 state in an S3 bucket in the stack's region.
-	pub fn artifacts_client(&self, stack: &Stack) -> ArtifactsClient {
-		let provider = self.backend.bucket_provider(
-			&self.artifact_bucket_name(stack),
-			&stack.region(),
-		);
+	pub fn artifacts_client(&self, stack: &ResolvedStack) -> ArtifactsClient {
+		let provider = self
+			.backend
+			.bucket_provider(&self.artifact_bucket_name(stack), stack.region());
 		ArtifactsClient::new(
 			BlobStore::new(provider),
 			ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone()),
@@ -121,13 +117,13 @@ impl Deployment {
 	}
 
 	/// Initialize `stack`'s config with the corresponding backend.
-	pub fn create_config(&self, stack: &Stack) -> terra::Config {
+	pub fn create_config(&self, stack: &ResolvedStack) -> terra::Config {
 		let key = self.backend_path(stack).to_string();
 		terra::Config::default().with_backend(self.backend.to_json(&key))
 	}
 
 	/// The blob holding `stack`'s tofu state.
-	pub fn state_file(&self, stack: &Stack) -> Blob {
+	pub fn state_file(&self, stack: &ResolvedStack) -> Blob {
 		self.backend
 			.provider()
 			.erased_blob(self.backend_path(stack))

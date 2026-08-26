@@ -8,7 +8,7 @@ use beet_net::prelude::BlobStoreProvider;
 pub struct Project {
 	config: Config,
 	#[deref]
-	stack: Stack,
+	stack: ResolvedStack,
 	/// This launch's mechanics: the state backend the project drives and the
 	/// work directory it drives it in.
 	deployment: Deployment,
@@ -17,7 +17,11 @@ pub struct Project {
 	artifacts: ArtifactsClient,
 }
 impl Project {
-	pub fn new(stack: Stack, deployment: Deployment, config: Config) -> Self {
+	pub fn new(
+		stack: ResolvedStack,
+		deployment: Deployment,
+		config: Config,
+	) -> Self {
 		let artifacts = deployment.artifacts_client(&stack);
 		Self {
 			config,

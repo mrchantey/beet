@@ -49,12 +49,15 @@ impl Block for LambdaBlock {
 	fn apply_to_config(
 		&self,
 		entity: &EntityRef,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		let region = self.region.clone().unwrap_or_else(|| stack.region());
+		let region = self
+			.region
+			.clone()
+			.unwrap_or_else(|| stack.region().clone());
 		// artifact values computed directly from the deploy and entity
 		let artifact_bucket = deployment.artifact_bucket_name(stack);
 		let artifact_key = deployment.artifact_key(&self.label);
@@ -313,7 +316,7 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let block = LambdaBlock::default();
 		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();

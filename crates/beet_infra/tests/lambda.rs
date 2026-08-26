@@ -118,11 +118,11 @@ fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
 	let mut world = World::new();
 	let entity_mut = world.spawn(());
 	let entity = entity_mut.as_readonly();
-	let config = deploy.stack.build_config(&deploy.deployment, [
+	let config = deploy.resolved().build_config(&deploy.deployment, [
 		(entity.clone(), &block as &dyn Block),
 		(entity, &bucket_block),
 	])?;
-	terra::Project::new(deploy.stack.clone(), deploy.deployment.clone(), config)
+	terra::Project::new(deploy.resolved(), deploy.deployment.clone(), config)
 		.xok()
 }
 
@@ -140,7 +140,9 @@ async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPathBuf) -> Result {
 		])
 		.into_lambda_build_artifact()?;
 
-	let _response = AsyncPlugin::world()
+	let _response = (AsyncPlugin, BootstrapPlugin)
+		.into_world()
+		.xtap(|world| world.insert_resource(deploy.deployment.clone()))
 		.spawn((
 			deploy.stack.clone(),
 			assets_s3_fs_store(deploy, assets_dir),

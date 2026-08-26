@@ -66,7 +66,7 @@ impl CloudflareFailoverBlock {
 	/// terraform resource address for the load balancer to reference.
 	fn pool(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		suffix: &str,
 		origin_address: &str,
@@ -96,7 +96,7 @@ impl Block for CloudflareFailoverBlock {
 	fn apply_to_config(
 		&self,
 		_entity: &EntityRef,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		_deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
@@ -160,7 +160,7 @@ mod tests {
 
 	#[beet_core::test]
 	fn emits_load_balancer_with_primary_and_fallback_pools() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		CloudflareFailoverBlock::new(

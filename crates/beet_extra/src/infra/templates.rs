@@ -104,9 +104,10 @@ pub fn BucketStack(
 #[template(system)]
 pub fn SiteSync(
 	#[prop(into)] app_name: String,
+	package: Res<PackageConfig>,
 	deployment: Res<Deployment>,
 ) -> impl Bundle {
-	infra_ext::sync_site(&Stack::new(app_name), &deployment)
+	infra_ext::sync_site(&Stack::new(app_name).resolve(&package), &deployment)
 }
 
 /// `<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>` — the lambda
@@ -117,12 +118,13 @@ pub fn SiteSync(
 /// (`remote_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
 /// boundary). The markup form of the rust example's
 /// `(block, build_beet_lambda_binary(features))` deploy child.
-#[template]
+#[template(system)]
 pub fn LambdaSiteBlock(
 	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
+	package: Res<PackageConfig>,
 ) -> Result<impl Bundle> {
-	let stack = Stack::new(&app_name);
+	let stack = Stack::new(&app_name).resolve(&package);
 	(
 		LambdaBlock::default(),
 		infra_ext::beet_cargo_build(features)
@@ -150,12 +152,13 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 /// site-store config, `remote_bootstrap`) plus its build artifact, on one entity
 /// (paired by `TofuApplyAction`, see [`LambdaSiteBlock`]). The markup form of
 /// `(block, build_beet_binary(features))`.
-#[template]
+#[template(system)]
 pub fn LightsailSiteBlock(
 	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
+	package: Res<PackageConfig>,
 ) -> Result<impl Bundle> {
-	let stack = Stack::new(&app_name);
+	let stack = Stack::new(&app_name).resolve(&package);
 	(
 		LightsailBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::app_bucket_name(&stack),
@@ -180,9 +183,12 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 /// serve the site from the stack's bucket: the site-store config
 /// (`remote_bootstrap`) lands in the container `CMD` via the sibling
 /// `<BuildDockerImage/>`. Named to avoid the [`FargateBlock`] it builds.
-#[template]
-pub fn FargateSiteBlock(#[prop(into)] app_name: String) -> Result<impl Bundle> {
-	let stack = Stack::new(&app_name);
+#[template(system)]
+pub fn FargateSiteBlock(
+	#[prop(into)] app_name: String,
+	package: Res<PackageConfig>,
+) -> Result<impl Bundle> {
+	let stack = Stack::new(&app_name).resolve(&package);
 	FargateBlock::default()
 		.with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::app_bucket_name(&stack),
@@ -374,7 +380,7 @@ mod test {
 	fn a_slotted_block_resolves_a_stack() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
-			app_name: Some("bucket-example".into()),
+			app_name: "bucket-example".into(),
 			..default()
 		});
 		let router = world.spawn(Router::with_defaults()).id();
@@ -411,7 +417,7 @@ mod test {
 	fn one_declaration_names_the_table_for_both_sides() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
-			app_name: Some("beet-site".into()),
+			app_name: "beet-site".into(),
 			..default()
 		});
 		let router = world.spawn(Router::with_defaults()).id();
@@ -427,7 +433,9 @@ mod test {
 				<Route path="shared"><DeployHost stage="shared"/></Route>
 			</Fragment>"#,
 		);
-		let scope = Stack::new("beet-site").with_stage("dev");
+		let scope = Stack::new("beet-site")
+			.with_stage("dev")
+			.resolve(&PackageConfig::default());
 		let expected = scope.resource_name("analytics");
 
 		/// The tofu json a host stack builds.
@@ -443,7 +451,15 @@ mod test {
 		let hosts = world
 			.query::<(Entity, &Stack)>()
 			.iter(&world)
-			.map(|(entity, stack)| (entity, stack.stage().to_string()))
+			.map(|(entity, stack)| {
+				(
+					entity,
+					stack
+						.resolve(&PackageConfig::default())
+						.stage()
+						.to_string(),
+				)
+			})
 			.collect::<Vec<_>>();
 		for (host, stage) in hosts {
 			let json = config_json(&mut world, host);
@@ -471,7 +487,7 @@ mod test {
 	fn shared_host_prefixes_verbs_and_names_bucket() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
-			app_name: Some("beet-site".into()),
+			app_name: "beet-site".into(),
 			..default()
 		});
 		let router = world.spawn(Router::with_defaults()).id();
@@ -542,7 +558,7 @@ mod test {
 		fn sync(markup: &str) -> SyncS3Bucket {
 			let mut world = test_world();
 			world.insert_resource(PackageConfig {
-				app_name: Some("beet-site".into()),
+				app_name: "beet-site".into(),
 				..default()
 			});
 			let router = world.spawn(Router::with_defaults()).id();

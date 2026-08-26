@@ -175,7 +175,7 @@ impl LightsailBlock {
 	/// field-ref resolving to the instance's public IP.
 	fn emit_dns(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		address_ref: &str,
 		ipv6: bool,
@@ -211,7 +211,7 @@ impl LightsailBlock {
 	/// the far side).
 	fn runtime_policy(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 		access: &AccessGrants,
 	) -> Result<String> {
@@ -293,19 +293,12 @@ impl LightsailBlock {
 	/// single source of truth shared by the cloud-init agent config and
 	/// [`AwsWatch::for_lightsail`](crate::prelude::AwsWatch::for_lightsail).
 	/// Includes the label so distinct blocks in one stack do not collide.
-	pub fn log_group(&self, stack: &Stack) -> String {
-		format!(
-			"/{}/{}/{}",
-			stack.app_name().unwrap_or_default(),
-			self.label,
-			stack.stage()
-		)
+	pub fn log_group(&self, stack: &ResolvedStack) -> String {
+		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
 	}
 
 	/// The systemd unit, and the name every path on the box is built from.
-	fn service_name(stack: &Stack) -> &str {
-		stack.app_name().unwrap_or_default()
-	}
+	fn service_name(stack: &ResolvedStack) -> &SmolStr { stack.app_name() }
 
 	/// Build the user data script that provisions the instance: the Caddy
 	/// install, the sshd relocation, the CloudWatch agent and the systemd unit
@@ -338,7 +331,7 @@ impl LightsailBlock {
 	/// get resolved by terraform before the script runs on the instance.
 	fn build_user_data(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 		access_key_id_ref: &str,
 		access_key_secret_ref: &str,
@@ -355,7 +348,7 @@ impl LightsailBlock {
 			ssh_port: self.allow_ssh.then_some(22),
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
-			stage: stack.stage().into(),
+			stage: stack.stage().clone(),
 			..self.bootstrap.clone()
 		};
 		let (argv, env) = runtime.split_channels();
@@ -623,7 +616,11 @@ systemctl enable --now {app_name}.service
 	/// A fetch failure is not fatal while a binary is already installed. A
 	/// restart after a crash must not be blocked by a transient S3 error, and
 	/// the box keeps serving what it has rather than serving nothing.
-	fn fetch_script(&self, stack: &Stack, deployment: &Deployment) -> String {
+	fn fetch_script(
+		&self,
+		stack: &ResolvedStack,
+		deployment: &Deployment,
+	) -> String {
 		Self::render_script(
 			r#"#!/bin/bash
 # Install the release the artifacts bucket currently points at.
@@ -679,7 +676,7 @@ touch /etc/__APP__/deploy.env
 	/// stays constant across every one of them. The `exec` keeps the unit's
 	/// `MainPID` on the app itself, so a caller can read the running process's
 	/// own environment to prove which release is serving.
-	fn run_script(&self, stack: &Stack, exec_args: &str) -> String {
+	fn run_script(&self, stack: &ResolvedStack, exec_args: &str) -> String {
 		Self::render_script(
 			r#"#!/bin/bash
 # Launch the current release.
@@ -712,7 +709,7 @@ exec /opt/__APP__/app__EXEC_ARGS__
 	/// box is still running cloud-init when the deploy arrives.
 	pub fn release_script(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deploy_id: &str,
 		timeout: Duration,
 		poll: Duration,
@@ -775,7 +772,7 @@ exit 1
 	/// here rather than passed by each caller.
 	fn render_script(
 		template: &str,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		tokens: &[(&str, &str)],
 	) -> String {
 		tokens
@@ -817,7 +814,7 @@ impl Block for LightsailBlock {
 	fn apply_to_config(
 		&self,
 		_entity: &EntityRef,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 		access: &AccessGrants,
 		config: &mut terra::Config,
@@ -945,11 +942,8 @@ impl Block for LightsailBlock {
 			user_data: Some(user_data),
 			tags: Some(
 				[
-					(
-						SmolStr::from("Project"),
-						stack.app_name().unwrap_or_default().into(),
-					),
-					(SmolStr::from("Stage"), stack.stage().into()),
+					(SmolStr::from("Project"), stack.app_name().clone()),
+					(SmolStr::from("Stage"), stack.stage().clone()),
 				]
 				.into_iter()
 				.collect(),
@@ -1100,7 +1094,7 @@ mod tests {
 	/// The rendered cloud-init user-data script for a block, ie the systemd unit
 	/// the instance provisions itself with.
 	fn build_user_data(block: &LightsailBlock) -> (String, TestWorkDir) {
-		let (stack, deployment, dir) = Stack::default_local();
+		let (stack, deployment, dir) = ResolvedStack::default_local();
 		let script = block
 			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
 			.unwrap();
@@ -1109,7 +1103,7 @@ mod tests {
 
 	/// The rendered terraform config json for a block.
 	fn build_json(block: &LightsailBlock) -> String {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		build_json_for(block, &stack, &deployment)
 	}
 
@@ -1117,7 +1111,7 @@ mod tests {
 	/// granting nothing (no resource blocks declared beside it).
 	fn build_json_for(
 		block: &LightsailBlock,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 	) -> String {
 		build_json_granting(block, stack, deployment, &[])
@@ -1127,7 +1121,7 @@ mod tests {
 	/// `declared`, whose grants it lowers into its runtime policy.
 	fn build_json_granting(
 		block: &LightsailBlock,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 		declared: &[&dyn Block],
 	) -> String {
@@ -1152,7 +1146,7 @@ mod tests {
 	/// ie the identity of the box's machine config.
 	fn rotation_input(
 		block: &LightsailBlock,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 	) -> String {
 		let label = stack
@@ -1170,8 +1164,8 @@ mod tests {
 
 	/// Two deploys of the same machine config, ie the same box built twice with
 	/// different code.
-	fn two_deploys() -> (Stack, Deployment, Deployment, TestWorkDir) {
-		let (stack, first, dir) = Stack::default_local();
+	fn two_deploys() -> (ResolvedStack, Deployment, Deployment, TestWorkDir) {
+		let (stack, first, dir) = ResolvedStack::default_local();
 		let second = first
 			.clone()
 			.with_deploy_id(uuid_ext::now_v7())
@@ -1271,7 +1265,8 @@ mod tests {
 			.xpect_contains(&format!(
 				"aws s3 cp \"s3://{}/${}\"",
 				{
-					let (stack, deployment, _dir) = Stack::default_local();
+					let (stack, deployment, _dir) =
+						ResolvedStack::default_local();
 					deployment.artifact_bucket_name(&stack)
 				},
 				ArtifactLedger::ARTIFACT_KEY_VAR
@@ -1299,7 +1294,7 @@ mod tests {
 	/// interpolation expression", ie no deploy at all.
 	#[beet_core::test]
 	fn escapes_shell_expansions_from_terraform() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let script = LightsailBlock::default()
 			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
 			.unwrap();
@@ -1329,7 +1324,7 @@ mod tests {
 	/// rather than bounced.
 	#[beet_core::test]
 	fn release_proves_the_running_process() {
-		let (stack, _deployment, _dir) = Stack::default_local();
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		LightsailBlock::default()
 			.release_script(
 				&stack,
@@ -1371,7 +1366,7 @@ mod tests {
 	/// instance metadata service and the unit file.
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let block = LightsailBlock::default();
 		let json = build_json_granting(&block, &stack, &deployment, &[
 			&S3BucketBlock::new("app").with_deploy_versioned(false),
@@ -1488,7 +1483,7 @@ mod tests {
 	/// from the stack, not the authored bootstrap.
 	#[beet_core::test]
 	fn splits_exec_and_env_channels() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_stage("staging");
 		let script = LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
@@ -1517,7 +1512,7 @@ mod tests {
 	/// its servers directly.
 	#[beet_core::test]
 	fn no_exec_route_renders_the_bare_invocation() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
 				server: Some(RunningSetFilter::new("http")),
@@ -1533,7 +1528,7 @@ mod tests {
 	/// rather than a corrupted unit file: the old space-join caveat, enforced.
 	#[beet_core::test]
 	fn rejects_unencodable_exec_args() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
 				path: Some("/my page".into()),
@@ -1550,7 +1545,7 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, deployment, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let block = LightsailBlock::default();
 		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();

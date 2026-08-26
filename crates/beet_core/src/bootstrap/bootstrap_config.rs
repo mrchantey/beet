@@ -620,8 +620,7 @@ static BOOTSTRAP: LazyLock<BootstrapConfig> = LazyLock::new(|| {
 });
 
 /// Validates the process [`BootstrapConfig`] at [`PreStartup`], and under `std`
-/// registers [`PackageConfig`] and ensures one exists for the readers that
-/// expect it.
+/// registers [`PackageConfig`] and inserts one for the readers that expect it.
 ///
 /// It does not *assign* the config: [`BootstrapConfig::get`] owns that, lazily and
 /// immutably. What this adds is the strict [`BootstrapConfig::from_env`] parse, so
@@ -638,11 +637,16 @@ impl Plugin for BootstrapPlugin {
 		// `PackageConfig` is std-only (it kebab-cases cloud resource names).
 		// Registered here rather than by a router, so a routerless app can
 		// author `<PackageConfig app_name=".."/>` and a deploy can resolve it.
+		//
+		// Inserted at BUILD time, not from a schedule: a template build (and the
+		// stack resolution under it) can run before the first `PreStartup`, so a
+		// seed system would leave `Res<PackageConfig>` genuinely absent for the
+		// readers that need it most. `init_resource` yields to a host that
+		// already supplied a `pkg_config!()`, and a markup `<PackageConfig/>`
+		// patches it afterwards, keeping whatever it does not name.
 		#[cfg(feature = "std")]
-		app.register_type::<PackageConfig>().add_systems(
-			PreStartup,
-			seed_package_config.after(validate_process_config),
-		);
+		app.register_type::<PackageConfig>()
+			.init_resource::<PackageConfig>();
 	}
 }
 
@@ -652,16 +656,6 @@ impl Plugin for BootstrapPlugin {
 fn validate_process_config() -> Result {
 	BootstrapConfig::from_env()?;
 	Ok(())
-}
-
-/// The [`PreStartup`] [`PackageConfig`] seed, see [`BootstrapPlugin`]. Inserts
-/// the defaults unless a host already supplied one (a
-/// [`pkg_config!`](crate::pkg_config) with the real crate metadata), so a
-/// `Res<PackageConfig>` reader never faces a missing resource. A markup
-/// `<PackageConfig/>` patches it afterwards, keeping whatever it does not name.
-#[cfg(feature = "std")]
-fn seed_package_config(world: &mut World) {
-	world.init_resource::<PackageConfig>();
 }
 
 /// Resolves one field across both transports: the `--kebab` param when present,

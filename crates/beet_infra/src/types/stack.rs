@@ -1,5 +1,6 @@
-//! The hierarchical source of truth for cloud resource identity, and the
-//! traversal every deploy step resolves it through.
+//! The hierarchical source of truth for cloud resource identity: the authored
+//! [`Stack`], the total [`ResolvedStack`] it resolves to, and the traversal
+//! every deploy step reaches them through.
 
 use crate::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
@@ -7,22 +8,15 @@ use crate::terra::Project;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// The app identity, stage and region every resource declared beneath it
-/// composes its name from, ie the `beet-site` + `prod` that turn `analytics`
-/// into `beet-site--prod--analytics`.
-///
-/// A declaration carries only its label, and BOTH meanings of that declaration
-/// resolve the name here: the deploy that creates the resource and the runtime
-/// that reads or writes it. One composition, so the two cannot drift.
+/// The DECLARATION of a resource scope: which app, which stage, which region
+/// the resources beneath it belong to, each field optional and each falling back
+/// to this process's own answer.
 ///
 /// Markup-authorable and registered in every native build, so `<Stack/>` bare
 /// works everywhere and `<Stack stage="shared"/>` overrides exactly one field.
-/// Each field resolves to its own value else this process's default: the app
-/// name from the [`PackageConfig`] (which stays the ONE home of app identity),
-/// the stage from [`BootstrapConfig::stage`], the region from `AWS_REGION` else
-/// [`aws::region::DEFAULT`](crate::bindings::aws::region::DEFAULT). This is the
-/// only in-world reader of `AWS_REGION`; every store is handed a resolved region
-/// rather than reaching for one itself.
+/// It is deliberately NOT the thing a name composes from: that is
+/// [`ResolvedStack`], which [`resolve`](Self::resolve) produces and which has no
+/// optional fields, so a half-answered identity cannot reach a resource name.
 #[derive(Debug, Default, Clone, PartialEq, Eq, SetWith, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct Stack {
@@ -53,61 +47,68 @@ impl Stack {
 		Self::default().with_app_name(app_name)
 	}
 
-	/// Fill every unset field from this process's defaults, the ONE place a
-	/// stack consults [`PackageConfig`], [`BootstrapConfig`] or `AWS_REGION`.
+	/// Fill every unset field from this process's answer, the ONE place a stack
+	/// consults [`PackageConfig`], [`BootstrapConfig`] or `AWS_REGION`.
 	///
-	/// A resolved stack is self-describing, so everything downstream (a block
-	/// emitting tofu, a store attaching at runtime) reads plain fields.
-	pub fn resolve(&self, package: Option<&PackageConfig>) -> Self {
-		Self {
-			app_name: self.app_name.clone().or_else(|| {
-				package.and_then(|it| it.app_name()).map(Into::into)
+	/// Total by construction: `package` is required and its
+	/// [`app_name`](PackageConfig::app_name) always set, so there is no
+	/// half-resolved outcome and nothing downstream re-asks the question.
+	pub fn resolve(&self, package: &PackageConfig) -> ResolvedStack {
+		ResolvedStack {
+			app_name: self
+				.app_name
+				.clone()
+				.unwrap_or_else(|| package.app_name().into()),
+			stage: self
+				.stage
+				.clone()
+				.unwrap_or_else(|| BootstrapConfig::get().stage.clone()),
+			region: self.region.clone().unwrap_or_else(|| {
+				env_ext::var("AWS_REGION")
+					.ok()
+					.map(SmolStr::from)
+					.unwrap_or_else(|| {
+						crate::bindings::aws::region::DEFAULT.into()
+					})
 			}),
-			stage: Some(self.stage().into()),
-			region: Some(self.region()),
 			params: self.params.clone(),
 		}
 	}
+}
 
-	/// The app identity, if this stack has one. Only a world can supply the
-	/// process default, so an unresolved stack authored without one has none.
-	pub fn app_name(&self) -> Option<&str> { self.app_name.as_deref() }
+/// A [`Stack`] with every field answered: the app identity, stage and region
+/// that turn a resource *label* into a resource *name*, ie the `beet-site` +
+/// `prod` behind `beet-site--prod--analytics`.
+///
+/// A declaration carries only its label, and BOTH meanings of that declaration
+/// compose the name here: the deploy that creates the resource and the runtime
+/// that reads or writes it. One composition, so the two cannot drift, and it
+/// takes a RESOLVED stack so a name can never compose from a scope that was
+/// never resolved.
+///
+/// Only [`Stack::resolve`] builds one, which makes that function the single
+/// in-world reader of `AWS_REGION`: every store is handed a resolved region
+/// rather than reaching for one itself.
+#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith)]
+pub struct ResolvedStack {
+	app_name: SmolStr,
+	stage: SmolStr,
+	region: SmolStr,
+	params: MultiMap<SmolStr, SmolStr>,
+}
 
-	/// The deployment stage: this stack's own, else this launch's.
-	pub fn stage(&self) -> &str {
-		self.stage
-			.as_deref()
-			.unwrap_or(&BootstrapConfig::get().stage)
-	}
-
-	/// The aws region: this stack's own, else `AWS_REGION`, else the crate
-	/// default. The one in-world read of that variable.
-	pub fn region(&self) -> SmolStr {
-		self.region
-			.clone()
-			.or_else(|| env_ext::var("AWS_REGION").ok().map(SmolStr::from))
-			.unwrap_or_else(|| crate::bindings::aws::region::DEFAULT.into())
-	}
-
-	/// Additional parameters, some of which may be required by a config
-	/// generator.
-	pub fn params(&self) -> &MultiMap<SmolStr, SmolStr> { &self.params }
-
+impl ResolvedStack {
 	/// Whether this stack deploys the [production
 	/// stage](BootstrapConfig::PROD_STAGE), which often receives special
 	/// treatment like bucket locking and no subdomain.
 	pub fn is_production(&self) -> bool {
-		self.stage() == BootstrapConfig::PROD_STAGE
+		self.stage == BootstrapConfig::PROD_STAGE
 	}
 
 	/// The identifier a resource label composes to in this stack, the single
 	/// definition of the `app--stage--label` convention.
 	pub fn resource_ident(&self, label: impl Into<SmolStr>) -> terra::Ident {
-		terra::Ident::new(
-			self.app_name().unwrap_or_default(),
-			self.stage(),
-			label,
-		)
+		terra::Ident::new(self.app_name.clone(), self.stage.clone(), label)
 	}
 
 	/// The provider-facing resource name, ie `beet-site--prod--analytics`.
@@ -132,7 +133,7 @@ impl Stack {
 		let mut config = deployment.create_config(self);
 		config.add_provider_config(
 			&terra::Provider::AWS,
-			&serde_json::json!({ "region": self.region() }),
+			&serde_json::json!({ "region": self.region }),
 		)?;
 		// a pre-pass, since a compute block lowers the grants its *siblings*
 		// declared and the emit order is otherwise arbitrary.
@@ -159,7 +160,11 @@ impl Stack {
 	#[cfg(test)]
 	pub fn default_local() -> (Self, Deployment, crate::types::TestWorkDir) {
 		let (deployment, dir) = Deployment::default_local();
-		(Self::new("beet_infra").resolve(None), deployment, dir)
+		(
+			Stack::new("beet_infra").resolve(&PackageConfig::default()),
+			deployment,
+			dir,
+		)
 	}
 }
 
@@ -172,20 +177,22 @@ pub struct StackQuery<'w, 's> {
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
 	stores: Query<'w, 's, &'static BlobStore>,
-	package: Option<Res<'w, PackageConfig>>,
+	/// The process app identity, which [`BootstrapPlugin`] inserts at build time
+	/// and [`InfraPlugin`] therefore guarantees, so resolution is total.
+	package: Res<'w, PackageConfig>,
 	deployment: Option<Res<'w, Deployment>>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
-	/// The resolved [`Stack`] `entity` composes its resource names against: the
+	/// The [`ResolvedStack`] `entity` composes its resource names against: the
 	/// nearest ancestor's, else the process default. A declaration outside every
 	/// stack is not an error, it simply belongs to no deploy's config and
 	/// resolves the names the process itself would.
-	pub fn resolve(&self, entity: Entity) -> Stack {
+	pub fn resolve(&self, entity: Entity) -> ResolvedStack {
 		self.stack(entity)
 			.cloned()
 			.unwrap_or_default()
-			.resolve(self.package.as_deref())
+			.resolve(&self.package)
 	}
 
 	/// The nearest ancestor [`Stack`] as authored, if any. A declaration made
@@ -206,9 +213,9 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// The entity carrying the nearest ancestor [`Stack`], and that stack
 	/// resolved: the root every block, artifact and verb under one deploy
 	/// resolves against.
-	pub fn root(&self, entity: Entity) -> Result<(Entity, Stack)> {
+	pub fn root(&self, entity: Entity) -> Result<(Entity, ResolvedStack)> {
 		let (root, stack) = self.stacks.get(entity)?;
-		Ok((root, stack.resolve(self.package.as_deref())))
+		Ok((root, stack.resolve(&self.package)))
 	}
 
 	/// Every entity declared under `entity`'s stack: its root's descendants
@@ -250,7 +257,9 @@ impl<'w, 's> StackQuery<'w, 's> {
 		let hosts = self
 			.all_stacks
 			.iter()
-			.filter(|(_, stack)| stack.stage() == process_stage)
+			.filter(|(_, stack)| {
+				stack.resolve(&self.package).stage() == process_stage
+			})
 			.map(|(entity, _)| entity)
 			.collect::<Vec<_>>();
 		// naming the blocks, since the fix is either to scope them under a host
@@ -280,7 +289,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 	pub fn build_config(
 		&self,
 		entity: Entity,
-	) -> Result<(Stack, Deployment, terra::Config)> {
+	) -> Result<(ResolvedStack, Deployment, terra::Config)> {
 		let (_, stack) = self.root(entity)?;
 		let deployment = self.deployment();
 		let blocks = self
@@ -351,68 +360,76 @@ mod tests {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// A stack resolved against an app that names itself.
+	fn resolved(stack: Stack) -> ResolvedStack {
+		stack.resolve(&PackageConfig {
+			app_name: "beet-site".into(),
+			..default()
+		})
+	}
+
 	/// The composition is the one the live stacks already resolve; renaming a
 	/// deployed resource is a production incident, so these strings are pinned.
 	#[beet_core::test]
 	fn composes_the_live_names() {
-		let prod = Stack::new("beet-site").with_stage("prod");
+		let prod = resolved(Stack::default().with_stage("prod"));
 		prod.resource_name("analytics")
 			.xpect_eq("beet-site--prod--analytics");
 		prod.resource_name("app").xpect_eq("beet-site--prod--app");
-		Stack::new("beet-site")
-			.with_stage("dev")
+		resolved(Stack::default().with_stage("dev"))
 			.resource_name("artifacts")
 			.xpect_eq("beet-site--dev--artifacts");
-		Stack::new("beet-site")
-			.with_stage("shared")
+		resolved(Stack::default().with_stage("shared"))
 			.resource_name("assets")
 			.xpect_eq("beet-site--shared--assets");
-		Stack::new("beet")
-			.with_stage("shared")
+		resolved(Stack::new("beet").with_stage("shared"))
 			.resource_name("assets")
 			.xpect_eq("beet--shared--assets");
 	}
 
-	/// Every field falls back to the process default, and the beet test runner
-	/// passes no `--stage`/`BEET_STAGE`, so a bare stack is `dev` and not
-	/// production. The app name is the one default only a world can supply.
+	/// Every unset field falls back to this process's answer: the app name to
+	/// the [`PackageConfig`], and the stage to the launch (the beet test runner
+	/// passes no `--stage`/`BEET_STAGE`, so it is `dev` and not production).
 	#[beet_core::test]
 	fn resolves_the_process_defaults() {
-		let stack = Stack::default();
-		stack.stage().xpect_eq("dev");
+		let stack = resolved(Stack::default());
+		stack.app_name().as_str().xpect_eq("beet-site");
+		stack.stage().as_str().xpect_eq("dev");
 		stack.is_production().xpect_false();
-		stack.app_name().xpect_none();
-		stack
-			.resolve(Some(&PackageConfig {
-				app_name: Some("beet-site".into()),
-				..default()
-			}))
-			.app_name()
-			.xpect_eq(Some("beet-site"));
+	}
+
+	/// An app that declared no name still composes a name rather than an empty
+	/// segment, and both meanings of a declaration compose the SAME one, which
+	/// is what makes a generic fallback safe (the live incident it guards was
+	/// two INDEPENDENT derivations, not the fallback itself).
+	#[beet_core::test]
+	fn an_unnamed_app_resolves_the_generic_name() {
+		Stack::default()
+			.resolve(&PackageConfig::default())
+			.resource_name("analytics")
+			.xpect_eq("beet-app--dev--analytics");
 	}
 
 	/// The `prod` stage (what `--stage=prod` resolves to) marks production,
 	/// flipping the stage-aware paths (eg the beet-site apex dns).
 	#[beet_core::test]
 	fn prod_stage_is_production() {
-		Stack::new("x")
-			.with_stage("prod")
+		resolved(Stack::default().with_stage("prod"))
 			.is_production()
 			.xpect_true();
 	}
 
-	/// An authored field wins over the process default, and resolution never
+	/// An authored field wins over the process answer, and resolution never
 	/// clobbers it.
 	#[beet_core::test]
 	fn authored_fields_win() {
-		let stack = Stack::default()
-			.with_stage("shared")
-			.with_region("eu-west-1")
-			.resolve(Some(&PackageConfig {
-				app_name: Some("beet-site".into()),
-				..default()
-			}));
-		stack.stage().xpect_eq("shared");
+		let stack = resolved(
+			Stack::new("other-app")
+				.with_stage("shared")
+				.with_region("eu-west-1"),
+		);
+		stack.app_name().as_str().xpect_eq("other-app");
+		stack.stage().as_str().xpect_eq("shared");
 		stack.region().as_str().xpect_eq("eu-west-1");
 	}
 
@@ -426,7 +443,10 @@ mod tests {
 		// `AWS_REGION` is the documented first fallback, so the constant only
 		// governs a process carrying none.
 		if env_ext::var("AWS_REGION").is_err() {
-			Stack::default().region().as_str().xpect_eq("us-west-2");
+			resolved(Stack::default())
+				.region()
+				.as_str()
+				.xpect_eq("us-west-2");
 		}
 	}
 
@@ -437,8 +457,8 @@ mod tests {
 	#[beet_core::test]
 	fn stacks_share_a_launch_and_split_their_state() {
 		let (deployment, _dir) = Deployment::default_local();
-		let stage = Stack::new("beet-site").with_stage("dev");
-		let shared = Stack::new("beet-site").with_stage("shared");
+		let stage = resolved(Stack::default().with_stage("dev"));
+		let shared = resolved(Stack::default().with_stage("shared"));
 		deployment
 			.backend_path(&stage)
 			.to_string()

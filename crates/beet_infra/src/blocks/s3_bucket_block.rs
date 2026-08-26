@@ -66,8 +66,10 @@ impl S3BucketBlock {
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
 	/// The region this bucket lives in: its own override, else `stack`'s.
-	pub fn resolved_region(&self, stack: &Stack) -> SmolStr {
-		self.region.clone().unwrap_or_else(|| stack.region())
+	pub fn resolved_region(&self, stack: &ResolvedStack) -> SmolStr {
+		self.region
+			.clone()
+			.unwrap_or_else(|| stack.region().clone())
 	}
 
 	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket, resolved
@@ -77,7 +79,7 @@ impl S3BucketBlock {
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	pub fn store(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deploy_id: Option<&Uuid>,
 	) -> beet_net::prelude::S3Store {
 		let store = beet_net::prelude::S3Store::new(
@@ -97,7 +99,7 @@ impl S3BucketBlock {
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	pub fn stack_store(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		deployment: &Deployment,
 	) -> beet_net::prelude::S3Store {
 		self.store(stack, Some(deployment.deploy_id()))
@@ -134,7 +136,7 @@ impl Block for S3BucketBlock {
 	fn apply_to_config(
 		&self,
 		_entity: &EntityRef,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		_deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
@@ -167,7 +169,7 @@ impl Block for S3BucketBlock {
 
 	/// A deployed process reads the buckets declared alongside it (its site
 	/// store, its assets); the deploy itself is what writes them.
-	fn runtime_access(&self, stack: &Stack) -> Vec<AccessGrant> {
+	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
 		vec![AccessGrant::read(AccessResource::S3Bucket {
 			name: stack.resource_name(self.label.clone()),
 		})]
@@ -179,7 +181,7 @@ impl S3BucketBlock {
 	/// and the anonymous read bucket policy that depends on it.
 	fn emit_public_read(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		bucket: &ResourceDef<AwsS3BucketDetails>,
 	) -> Result {
@@ -242,8 +244,8 @@ mod tests {
 	use super::*;
 
 	/// The config `block` emits, and the throwaway stack it was resolved against.
-	fn build_config(block: S3BucketBlock) -> (Stack, terra::Config) {
-		let (stack, deployment, _dir) = Stack::default_local();
+	fn build_config(block: S3BucketBlock) -> (ResolvedStack, terra::Config) {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		block

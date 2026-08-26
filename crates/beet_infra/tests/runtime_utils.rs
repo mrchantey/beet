@@ -96,6 +96,8 @@ pub fn setup_isolated_test_guards(
 /// publishes every artifact under one deploy id and a re-deploy is an explicit
 /// new [`Deployment`] rather than a rebuilt stack.
 pub struct TestDeploy {
+	/// The declaration, which is what a world spawns so descendants resolve it
+	/// by ancestry.
 	pub stack: Stack,
 	pub deployment: Deployment,
 }
@@ -117,8 +119,13 @@ impl TestDeploy {
 		}
 	}
 
+	/// The composed identity, ie what a name resolves against outside a world.
+	pub fn resolved(&self) -> ResolvedStack {
+		self.stack.resolve(&PackageConfig::default())
+	}
+
 	pub fn artifacts_client(&self) -> ArtifactsClient {
-		self.deployment.artifacts_client(&self.stack)
+		self.deployment.artifacts_client(&self.resolved())
 	}
 }
 
@@ -135,14 +142,16 @@ pub fn assets_s3_fs_store(
 ) -> S3FsStore {
 	S3FsStore::new(
 		FsStore::new(assets_dir.clone()),
-		assets_bucket_block().stack_store(&deploy.stack, &deploy.deployment),
+		assets_bucket_block()
+			.stack_store(&deploy.resolved(), &deploy.deployment),
 	)
 }
 
 /// Get the deploy-versioned assets store for verification.
 pub fn assets_store(deploy: &TestDeploy) -> BlobStore {
 	BlobStore::new(
-		assets_bucket_block().stack_store(&deploy.stack, &deploy.deployment),
+		assets_bucket_block()
+			.stack_store(&deploy.resolved(), &deploy.deployment),
 	)
 }
 

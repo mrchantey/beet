@@ -20,7 +20,7 @@ fn layout_world() -> World {
 	world.insert_resource(PackageConfig {
 		title: "Beet UI".into(),
 		description: "test".into(),
-		app_name: Some("beet_ui".into()),
+		app_name: "beet_ui".into(),
 		version: "0.0.0".into(),
 		homepage: Some("https://example.test".into()),
 	});

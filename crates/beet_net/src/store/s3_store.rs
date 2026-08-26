@@ -47,7 +47,19 @@ impl S3Store {
 	/// Create a store whose region the SDK's default provider chain resolves,
 	/// the process-boundary convention: a `--store=s3://<bucket>` names a
 	/// bucket, not a region.
-	pub fn new_default_region(bucket_name: impl Into<SmolStr>) -> Self {
+	///
+	/// `pub(crate)` deliberately. A store is below [`Stack`] in the crate graph
+	/// (`beet_infra` depends on `beet_net`, never the reverse), so it cannot
+	/// resolve an ancestor stack's region and a region-less one spawned in a
+	/// tree would silently ignore it. Stack-relative resolution belongs to the
+	/// DECLARATION (`<S3BucketBlock/>`, `<DirSync/>`), whose attach observer
+	/// hands the resolved region in. If a raw store ever does need it, the way
+	/// to add it is an `InfraPlugin` observer: on add of an `S3Store` with no
+	/// region, watch that entity for `Ready`, then walk up for a `Stack`
+	/// ancestor and apply its region. That is deliberately not done today,
+	/// because it would make an unset region mean two different things
+	/// depending on whether `InfraPlugin` is linked.
+	pub(crate) fn new_default_region(bucket_name: impl Into<SmolStr>) -> Self {
 		Self {
 			bucket_name: bucket_name.into(),
 			region: None,

@@ -96,7 +96,7 @@ impl DnsProvider {
 	/// `api_endpoint`). `label` is the resource label suffix.
 	pub fn emit(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		label: &str,
 		alias_target: &str,
@@ -118,7 +118,7 @@ impl DnsProvider {
 	/// IP's `ip_address`): an `AAAA` when `ipv6`, else an `A`.
 	pub fn emit_address(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		label: &str,
 		address: &str,
@@ -150,7 +150,7 @@ impl DnsProvider {
 	/// resource address for use in a validation resource's `depends_on`.
 	pub fn emit_validation_record(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		label: &str,
 		name: &str,
@@ -163,7 +163,7 @@ impl DnsProvider {
 	/// terraform resource address (eg `cloudflare_dns_record.<label>`).
 	fn emit_record(
 		&self,
-		stack: &Stack,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		label: &str,
 		name: &str,

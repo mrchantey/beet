@@ -28,7 +28,7 @@ async fn fargate_lifecycle() {
 	let assets_dir = &guards.assets_dir;
 
 	let mut deploy_ctx = TestDeploy::new("fargate-test");
-	info!("Stack created: {:?}", deploy_ctx.stack.app_name());
+	info!("Stack created: {}", deploy_ctx.resolved().app_name());
 
 	// clean up any prior state
 	let project = build_project(&deploy_ctx).unwrap();
@@ -136,11 +136,11 @@ fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
 	let mut world = World::new();
 	let entity_mut = world.spawn(());
 	let entity = entity_mut.as_readonly();
-	let config = deploy.stack.build_config(&deploy.deployment, [
+	let config = deploy.resolved().build_config(&deploy.deployment, [
 		(entity.clone(), &block as &dyn Block),
 		(entity, &bucket_block),
 	])?;
-	terra::Project::new(deploy.stack.clone(), deploy.deployment.clone(), config)
+	terra::Project::new(deploy.resolved(), deploy.deployment.clone(), config)
 		.xok()
 }
 
@@ -150,7 +150,9 @@ async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPathBuf) -> Result {
 	let block = FargateBlock::default();
 
 	// spawn entity with action sequence, similar to fargate example
-	let response = AsyncPlugin::world()
+	let response = (AsyncPlugin, BootstrapPlugin)
+		.into_world()
+		.xtap(|world| world.insert_resource(deploy.deployment.clone()))
 		.spawn((
 			deploy.stack.clone(),
 			assets_s3_fs_store(deploy, assets_dir),
