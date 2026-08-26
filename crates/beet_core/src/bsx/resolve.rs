@@ -1959,6 +1959,7 @@ mod test {
 			registry.register::<PackageConfig>();
 			registry.register::<Bound>();
 			registry.register::<RequireFeatures>();
+			registry.register::<CrateCheck>();
 		}
 		let nodes =
 			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
@@ -2019,6 +2020,20 @@ mod test {
 			.get::<RequireFeatures>()
 			.unwrap()
 			.xpect_eq(RequireFeatures::new(["infra", "extra"]));
+	}
+
+	/// A `{[..]}` attribute fills a `Vec`-typed field, the shape an entry
+	/// declares its crate requirements in.
+	#[crate::test]
+	fn attribute_list_fills_a_vec_field() {
+		let (world, root) =
+			build(r#"<CrateCheck features={["ml","beet_esp/alvik"]}/>"#);
+		let host = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(host)
+			.get::<CrateCheck>()
+			.unwrap()
+			.xpect_eq(CrateCheck::features(["ml", "beet_esp/alvik"]));
 	}
 
 	/// A `$name` reference into a formerly-gated region resolves to the real

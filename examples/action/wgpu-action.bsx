@@ -11,7 +11,7 @@ agent-chosen `DifferentialDrive` into the fox exactly as these `SetDrive` +
 to `SetDrive` to match the current API.
 -->
 <Scene3d>
-	<CrateCheck features="winit"/>
+	<CrateCheck features={["winit"]}/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:95., offset:{x:0., y:42., z:60.}}}/>
 	<Lighting3d/>

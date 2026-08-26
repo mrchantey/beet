@@ -13,6 +13,6 @@ is; `beet-min.wasm` is the bare runtime and is not), failing fast with the missi
 feature instead of an unresolved `<WebHead>` tag.
 -->
 <Fragment>
-	<CrateCheck features="web_head"/>
+	<CrateCheck features={["web_head"]}/>
 	<WebHead/>
 </Fragment>

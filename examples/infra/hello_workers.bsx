@@ -51,7 +51,7 @@ neither (a local compile).
 -->
 <CliServer {CallOnReady}>
 <Router {RequestLogger}>
-	<CrateCheck features="infra,extra"/>
+	<CrateCheck features={["infra", "extra"]}/>
 	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->
 	<Route path="build" {ExchangeSequence}>
 		<CloudflareWorkerBuildAction/>

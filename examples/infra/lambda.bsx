@@ -27,7 +27,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 `cargo-zigbuild` and `zip`.
 -->
 <StackHost app_name="lambda">
-	<CrateCheck features="infra,extra"/>
+	<CrateCheck features={["infra", "extra"]}/>
 	<Route path="deploy" {ExchangeSequence}>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>

@@ -6,7 +6,7 @@ A terminal chat where each typed sentence is bert-matched against the child `<Se
     beet --main=examples/ml/hello_ml_chat.bsx
 -->
 <Scene2d>
-	<CrateCheck features="ml"/>
+	<CrateCheck features={["ml"]}/>
 	<AppWindow/>
 	<Camera2d/>
 	<UiTerminal input=true/>

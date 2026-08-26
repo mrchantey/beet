@@ -6,7 +6,7 @@ A `<NearestSentenceAgent>` embeds its prompt with a bert model and logs the clos
     beet --main=examples/ml/hello_ml.bsx
 -->
 <NearestSentenceAgent prompt="please kill the baddies" src="ml/default-bert.ron">
-	<CrateCheck features="ml"/>
+	<CrateCheck features={["ml"]}/>
 	<SentenceOption text="heal"/>
 	<SentenceOption text="attack"/>
 </NearestSentenceAgent>

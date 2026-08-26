@@ -345,7 +345,7 @@ fn features_self_check(
 	if RunWasm::is_runner(args) || !runs_entry || config.features.is_empty() {
 		return None;
 	}
-	Some(CrateCheck::features(config.features.join(",")))
+	Some(CrateCheck::features(config.features.clone()))
 }
 
 /// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving

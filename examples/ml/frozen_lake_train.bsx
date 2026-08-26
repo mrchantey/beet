@@ -6,7 +6,7 @@ An `RlSession` trains a Q-table over the 4x4 frozen-lake grid, writing `assets/m
     beet --main=examples/ml/frozen_lake_train.bsx
 -->
 <Scene3d>
-	<CrateCheck features="ml"/>
+	<CrateCheck features={["ml"]}/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:0.77, offset:{x:0., y:0.7, z:0.7}}}/>
 	<Lighting3d/>

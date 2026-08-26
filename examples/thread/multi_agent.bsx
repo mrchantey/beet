@@ -10,7 +10,7 @@ transcript renders full-screen with no composer (there is no user turn), and the
 process runs until Ctrl+C.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
-	<CrateCheck features="thread,tui,ssh"/>
+	<CrateCheck features={["thread", "tui", "ssh"]}/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>

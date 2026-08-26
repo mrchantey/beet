@@ -8,7 +8,7 @@ use crate::prelude::*;
 /// `crate/feature` and `crate@version` items check that crate:
 ///
 /// ```html
-/// <CrateCheck features="sockets,thread,beet_esp/alvik" versions="0.0.9,beet_esp@0.5.9"/>
+/// <CrateCheck features={["sockets","thread","beet_esp/alvik"]} versions={["0.0.9","beet_esp@0.5.9"]}/>
 /// ```
 ///
 /// An entry document declaring its requirements this way fails fast with the
@@ -16,17 +16,19 @@ use crate::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct CrateCheck {
-	/// Comma-separated required features, each `feature` or `crate/feature`.
-	pub features: SmolStr,
-	/// Comma-separated minimum versions, each `x.y.z` or `crate@x.y.z`.
-	pub versions: SmolStr,
+	/// Required features, each `feature` or `crate/feature`.
+	pub features: Vec<SmolStr>,
+	/// Minimum versions, each `x.y.z` or `crate@x.y.z`.
+	pub versions: Vec<SmolStr>,
 }
 
 impl CrateCheck {
-	/// Require `features`, each `feature` or `crate/feature`, comma-separated.
-	pub fn features(features: impl Into<SmolStr>) -> Self {
+	/// Require every feature, each `feature` or `crate/feature`.
+	pub fn features(
+		features: impl IntoIterator<Item = impl Into<SmolStr>>,
+	) -> Self {
 		Self {
-			features: features.into(),
+			features: features.into_iter().map(Into::into).collect(),
 			versions: default(),
 		}
 	}
@@ -66,12 +68,10 @@ impl CrateCheck {
 		&self,
 		registrations: impl IntoIterator<Item = &'a CrateRegistration> + Clone,
 	) -> Vec<String> {
-		let mut failures = Self::feature_failures(
-			Self::split_items(&self.features),
-			registrations.clone(),
-		);
+		let mut failures =
+			Self::feature_failures(&self.features, registrations.clone());
 		// version items: `x.y.z` or `crate@x.y.z`
-		for item in Self::split_items(&self.versions) {
+		for item in self.versions.iter().map(SmolStr::as_str) {
 			let (crate_name, version) = match item.split_once('@') {
 				Some((crate_name, version)) => (Some(crate_name), version),
 				None => (None, item),
@@ -94,13 +94,6 @@ impl CrateCheck {
 		failures.sort();
 		failures.dedup();
 		failures
-	}
-
-	/// Split a comma-separated requirement list, skipping empty segments.
-	fn split_items(list: &str) -> impl Iterator<Item = &str> {
-		list.split(',')
-			.map(str::trim)
-			.filter(|item| !item.is_empty())
 	}
 
 	/// The registration for `crate_name`, or the primary one when unprefixed.
@@ -200,8 +193,8 @@ mod test {
 	#[crate::test]
 	fn passes_when_satisfied() {
 		CrateCheck {
-			features: "sockets,beet_esp/alvik".into(),
-			versions: "0.0.9,beet_esp@0.5.3".into(),
+			features: vec!["sockets".into(), "beet_esp/alvik".into()],
+			versions: vec!["0.0.9".into(), "beet_esp@0.5.3".into()],
 		}
 		.failures(&registrations())
 		.xpect_empty();
@@ -210,8 +203,12 @@ mod test {
 	#[crate::test]
 	fn collects_all_failures_alphabetically() {
 		CrateCheck {
-			features: "thread,sockets,beet_esp/motors".into(),
-			versions: "beet_esp@0.6.0".into(),
+			features: vec![
+				"thread".into(),
+				"sockets".into(),
+				"beet_esp/motors".into(),
+			],
+			versions: vec!["beet_esp@0.6.0".into()],
 		}
 		.failures(&registrations())
 		.xpect_eq(vec![
@@ -223,7 +220,7 @@ mod test {
 
 	#[crate::test]
 	fn reports_unregistered_crates() {
-		CrateCheck::features("other-crate/foo")
+		CrateCheck::features(["other-crate/foo"])
 			.failures(&registrations())
 			.xpect_eq(vec![
 				"other-crate (crate not registered in this binary)".to_string(),
@@ -246,7 +243,7 @@ mod test {
 		app.world_mut().spawn(
 			CrateRegistration::new("beet-cli", "0.0.9").with_skip_prefix(),
 		);
-		app.world_mut().spawn(CrateCheck::features("sockets"));
+		app.world_mut().spawn(CrateCheck::features(["sockets"]));
 		app.update();
 		app.world_mut()
 			.resource_mut::<Messages<AppExit>>()

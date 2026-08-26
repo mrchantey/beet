@@ -21,7 +21,7 @@ watch shape and the served content are identical (see `crates/beet_extra/src/inf
 Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
 -->
 <StackHost app_name="lightsail">
-	<CrateCheck features="infra,extra"/>
+	<CrateCheck features={["infra", "extra"]}/>
 	<Route path="deploy" {ExchangeSequence}>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailSiteBlock app_name="lightsail" features="aws_sdk"/>

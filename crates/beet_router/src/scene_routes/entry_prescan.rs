@@ -66,10 +66,8 @@ impl EntryPrescan {
 					self.template_dirs.extend(Self::str_attr(element, "src"));
 				}
 				"CrateCheck" => self.checks.push(CrateCheck {
-					features: Self::str_attr(element, "features")
-						.unwrap_or_default(),
-					versions: Self::str_attr(element, "versions")
-						.unwrap_or_default(),
+					features: Self::list_attr(element, "features"),
+					versions: Self::list_attr(element, "versions"),
 				}),
 				"Template" => {
 					self.includes.extend(
@@ -96,6 +94,35 @@ impl EntryPrescan {
 		})
 	}
 
+	/// The string items of a list attribute, empty if absent. Reads the literal
+	/// directly, since the reflect path that would coerce it runs after this
+	/// scan; a non-string item is skipped rather than stringified, keeping the
+	/// two readings of the same markup in step.
+	fn list_attr(element: &BsxElement, key: &str) -> Vec<SmolStr> {
+		element
+			.attributes
+			.iter()
+			.find(|attr| attr.key == key)
+			.and_then(|attr| match &attr.value {
+				AttrValue::Expr(ValueExpr::Literal(DataLiteral::List(
+					items,
+				))) => Some(items),
+				_ => None,
+			})
+			.map(|items| {
+				items
+					.iter()
+					.filter_map(|item| match item {
+						DataLiteral::Scalar(Value::Str(value)) => {
+							Some(value.clone())
+						}
+						_ => None,
+					})
+					.collect()
+			})
+			.unwrap_or_default()
+	}
+
 	/// Whether `src` names a remote endpoint rather than a local path.
 	fn is_remote(src: &str) -> bool {
 		src.starts_with("http://")
@@ -115,12 +142,12 @@ mod test {
 			r#"<Router>
 				<StoreRoot src="../.."/>
 				<TemplateDir src="templates"/>
-				<CrateCheck features="sockets" versions="0.1.0"/>
+				<CrateCheck features={["sockets"]} versions={["0.1.0"]}/>
 				<Template src="header.bsx"/>
 				<Template src="https://example.org/remote.bsx"/>
 				<div>
 					<TemplateDir src="more"/>
-					<CrateCheck features="ssh"/>
+					<CrateCheck features={["ssh"]}/>
 					<Template src="footer.bsx"/>
 				</div>
 			</Router>"#,
@@ -131,9 +158,15 @@ mod test {
 			.template_dirs
 			.xpect_eq(vec![SmolStr::from("templates"), SmolStr::from("more")]);
 		prescan.checks.len().xpect_eq(2);
-		prescan.checks[0].features.xpect_eq("sockets");
-		prescan.checks[0].versions.xpect_eq("0.1.0");
-		prescan.checks[1].features.xpect_eq("ssh");
+		prescan.checks[0]
+			.features
+			.xpect_eq(vec![SmolStr::from("sockets")]);
+		prescan.checks[0]
+			.versions
+			.xpect_eq(vec![SmolStr::from("0.1.0")]);
+		prescan.checks[1]
+			.features
+			.xpect_eq(vec![SmolStr::from("ssh")]);
 		// the remote include is skipped: it is not a local file a watcher sees
 		prescan.includes.xpect_eq(vec![
 			SmolStr::from("header.bsx"),

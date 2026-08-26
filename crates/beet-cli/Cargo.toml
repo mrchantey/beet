@@ -32,7 +32,7 @@ pdf = ["dep:lopdf"]
 # actions/tools/templates the demo `.bsx` entries name (eg `<CalculatorToolset/>`,
 # `<StackHost>`, the perceive-act agent). Explicit opt-in: `thread`/`infra` link
 # their runtimes without it, and a demo entry declares
-# `<CrateCheck features="..,extra"/>`. The facade's `thread`/`infra` weakly
+# `<CrateCheck features={["..","extra"]}/>`. The facade's `thread`/`infra` weakly
 # forward the matching `beet_extra` sub-feature, so co-enabling this lights the
 # relevant example set up.
 extra = ["beet/extra"]

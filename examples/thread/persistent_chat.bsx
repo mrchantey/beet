@@ -12,7 +12,7 @@ boot request). The actor ids are pinned so the seed hash, and thus the adopted
 thread, stay stable across runs.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
-	<CrateCheck features="thread,tui,ssh"/>
+	<CrateCheck features={["thread", "tui", "ssh"]}/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>

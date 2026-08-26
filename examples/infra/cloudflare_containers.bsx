@@ -25,7 +25,7 @@ data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
 -->
 <CliServer {CallOnReady}>
 <Router {RequestLogger}>
-	<CrateCheck features="infra,extra"/>
+	<CrateCheck features={["infra", "extra"]}/>
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site"/>
 		<!-- build the native binary, then the deploy bakes it into the image -->

@@ -6,7 +6,7 @@
     beet --main=examples/spatial/flock.bsx
 -->
 <Scene2d>
-	<CrateCheck features="winit"/>
+	<CrateCheck features={["winit"]}/>
 	<AppWindow/>
 	<Camera2d/>
 	<SpaceScene/>

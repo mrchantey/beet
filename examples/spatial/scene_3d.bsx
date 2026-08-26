@@ -6,7 +6,7 @@ The smallest wgpu scene: a window, a distance-framed camera, lighting and a grou
     beet --main=examples/spatial/scene_3d.bsx
 -->
 <Scene3d>
-	<CrateCheck features="winit"/>
+	<CrateCheck features={["winit"]}/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:80., offset:{x:0., y:20., z:40.}}}/>
 	<Lighting3d/>

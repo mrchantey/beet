@@ -24,7 +24,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu`, `cargo-zigbui
 and a container engine.
 -->
 <StackHost app_name="fargate">
-	<CrateCheck features="infra,extra"/>
+	<CrateCheck features={["infra", "extra"]}/>
 	<Route path="deploy" {ExchangeSequence}>
 		<FargateSiteBlock app_name="fargate"/>
 		<S3BucketBlock label="app" deploy_versioned=false/>

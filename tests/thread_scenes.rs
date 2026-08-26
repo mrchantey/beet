@@ -46,7 +46,7 @@ async fn reduce(source: &str) -> App {
 		// registers `{UserInput}` + the store-backed `CreatePostForm` template so
 		// the interactive chat scenes resolve
 		.init_plugin::<ThreadUiPlugin>()
-		// resolves each scene's `<CrateCheck features=".."/>` tag
+		// resolves each scene's `<CrateCheck features={[".."]}/>` tag
 		.init_plugin::<CrateCheckPlugin>()
 		.register_type::<AgentChoiceAction>();
 	app.world_mut().spawn(cli_registration());
