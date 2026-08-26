@@ -23,7 +23,6 @@ fn layout_world() -> World {
 		app_name: Some("beet_ui".into()),
 		version: "0.0.0".into(),
 		homepage: Some("https://example.test".into()),
-		repository: None,
 	});
 	world
 }

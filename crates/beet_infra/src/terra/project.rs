@@ -1,6 +1,7 @@
 use crate::prelude::terra::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::Blob;
 use beet_net::prelude::BlobStoreProvider;
 
 #[derive(Debug, Clone, Deref, Get)]
@@ -8,21 +9,43 @@ pub struct Project {
 	config: Config,
 	#[deref]
 	stack: Stack,
+	/// This launch's mechanics: the state backend the project drives and the
+	/// work directory it drives it in.
+	deployment: Deployment,
 	/// The stack's artifacts client, built once at construction so teardown
-	/// does not rebuild it from the stack.
+	/// does not rebuild it.
 	artifacts: ArtifactsClient,
 }
 impl Project {
-	pub fn new(stack: &Stack, config: Config) -> Self {
+	pub fn new(stack: Stack, deployment: Deployment, config: Config) -> Self {
+		let artifacts = deployment.artifacts_client(&stack);
 		Self {
 			config,
-			stack: stack.clone(),
-			artifacts: stack.artifacts_client(),
+			stack,
+			deployment,
+			artifacts,
 		}
 	}
 
-	/// The absolute working directory for the tofu project.
-	fn dir(&self) -> AbsPathBuf { self.work_directory().into_abs() }
+	/// The absolute working directory for the tofu project, where its rendered
+	/// config, its lockfile and the deploy's scratch files live.
+	pub fn work_dir(&self) -> AbsPathBuf {
+		self.deployment.work_directory(&self.stack).into_abs()
+	}
+
+	/// Short alias for [`Self::work_dir`], the tofu driver's `-chdir`.
+	fn dir(&self) -> AbsPathBuf { self.work_dir() }
+
+	/// The blob holding this project's tofu state.
+	pub fn state_file(&self) -> Blob { self.deployment.state_file(&self.stack) }
+
+	/// The state backend this project's state lives in.
+	fn backend(&self) -> &StackBackend { self.deployment.backend() }
+
+	/// The key this project's state is written under.
+	fn backend_path(&self) -> SmolPath {
+		self.deployment.backend_path(&self.stack)
+	}
 
 	/// Initialize the tofu project if required,
 	/// checking if the config has changes, a lockfile exists,

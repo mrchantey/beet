@@ -26,82 +26,82 @@ async fn lambda_lifecycle() {
 	let assets_file = &guards.assets_file;
 	let assets_dir = &guards.assets_dir;
 
-	let mut stack = Stack::new("lambda-test").with_aws_region("us-west-2");
+	let mut deploy_ctx = TestDeploy::new("lambda-test");
 
 	// clean up any prior state
-	let project = build_project(&stack).unwrap();
-	cleanup_prior_state(&stack, project).await;
+	let project = build_project(&deploy_ctx).unwrap();
+	cleanup_prior_state(&deploy_ctx, project).await;
 
 	// 1. deploy v1
 	info!("step 1: deploying v1");
-	deploy(&stack, assets_dir).await.unwrap();
+	deploy(&deploy_ctx, assets_dir).await.unwrap();
 
 	// 2. verify v1 is live
-	let project = build_project(&stack).unwrap();
+	let project = build_project(&deploy_ctx).unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 2: verifying v1 at {url}");
 	verify_live(&url, MARKER_V1).await.unwrap();
 
 	// 3. verify v1 assets
 	info!("step 3: verifying v1 assets");
-	verify_assets(&stack, MARKER_V1).await.unwrap();
+	verify_assets(&deploy_ctx, MARKER_V1).await.unwrap();
 
 	// 4-5. modify source and assets to v2, deploy again
 	info!("step 4-5: deploying v2");
 	swap_version(source, MARKER_V1, MARKER_V2).unwrap();
 	swap_version(assets_file, MARKER_V1, MARKER_V2).unwrap();
-	stack = Stack::new("lambda-test").with_aws_region("us-west-2");
-	deploy(&stack, assets_dir).await.unwrap();
+	deploy_ctx = deploy_ctx.redeploy();
+	deploy(&deploy_ctx, assets_dir).await.unwrap();
 
 	// 6. verify v2
-	let project = build_project(&stack).unwrap();
+	let project = build_project(&deploy_ctx).unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 6: verifying v2 at {url}");
 	verify_live(&url, MARKER_V2).await.unwrap();
 
 	// 7. verify v2 assets
 	info!("step 7: verifying v2 assets");
-	verify_assets(&stack, MARKER_V2).await.unwrap();
+	verify_assets(&deploy_ctx, MARKER_V2).await.unwrap();
 
 	// 8. rollback to v1
 	info!("step 8: rolling back");
-	let client = stack.artifacts_client();
+	let client = deploy_ctx.artifacts_client();
 	client.rollback(1).await.unwrap();
-	apply_with_current_ledger(&mut stack, build_project)
+	apply_with_current_ledger(&mut deploy_ctx, build_project)
 		.await
 		.unwrap();
 
 	// 9. verify v1 after rollback
-	let project = build_project(&stack).unwrap();
+	let project = build_project(&deploy_ctx).unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 9: verifying v1 after rollback at {url}");
 	verify_live(&url, MARKER_V1).await.unwrap();
 
 	// 10. verify v1 assets after rollback
 	info!("step 10: verifying v1 assets after rollback");
-	verify_assets(&stack, MARKER_V1).await.unwrap();
+	verify_assets(&deploy_ctx, MARKER_V1).await.unwrap();
 
 	// 11. rollforward to v2
 	info!("step 11: rolling forward");
-	let client = stack.artifacts_client();
+	let client = deploy_ctx.artifacts_client();
 	client.rollforward().await.unwrap();
-	apply_with_current_ledger(&mut stack, build_project)
+	apply_with_current_ledger(&mut deploy_ctx, build_project)
 		.await
 		.unwrap();
 
 	// 12. verify v2 after rollforward
-	let project = build_project(&stack).unwrap();
+	let project = build_project(&deploy_ctx).unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 12: verifying v2 after rollforward at {url}");
 	verify_live(&url, MARKER_V2).await.unwrap();
 
 	// 13. verify v2 assets after rollforward
 	info!("step 13: verifying v2 assets after rollforward");
-	verify_assets(&stack, MARKER_V2).await.unwrap();
+	verify_assets(&deploy_ctx, MARKER_V2).await.unwrap();
 
 	// 14. destroy
 	info!("step 14: destroying");
-	build_project(&stack).unwrap().destroy().await.unwrap();
+	build_project(&deploy_ctx).unwrap().destroy().await.unwrap();
 
 	// 15. verify dead
 	info!("step 15: verifying dead");
@@ -112,22 +112,23 @@ async fn lambda_lifecycle() {
 }
 
 /// Build the terraform project for the Lambda test stack.
-fn build_project(stack: &Stack) -> Result<terra::Project> {
+fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
 	let block = LambdaBlock::default();
 	let bucket_block = assets_bucket_block();
 	let mut world = World::new();
 	let entity_mut = world.spawn(());
 	let entity = entity_mut.as_readonly();
-	let config = stack.build_config([
+	let config = deploy.stack.build_config(&deploy.deployment, [
 		(entity.clone(), &block as &dyn Block),
 		(entity, &bucket_block),
 	])?;
-	terra::Project::new(stack, config).xok()
+	terra::Project::new(deploy.stack.clone(), deploy.deployment.clone(), config)
+		.xok()
 }
 
 /// Build, upload artifacts, sync assets, and apply terraform
 /// using the deploy action sequence.
-async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
+async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPathBuf) -> Result {
 	let block = LambdaBlock::default();
 	let cargo = CargoBuild::default()
 		.with_target(BuildTarget::Zigbuild)
@@ -141,8 +142,8 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 
 	let _response = AsyncPlugin::world()
 		.spawn((
-			stack.clone(),
-			assets_s3_fs_store(stack, assets_dir),
+			deploy.stack.clone(),
+			assets_s3_fs_store(deploy, assets_dir),
 			assets_bucket_block(),
 			ExchangeSequence,
 			// the bucket first, so the assets are in place before the function

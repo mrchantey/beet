@@ -50,13 +50,14 @@ impl Block for LambdaBlock {
 		&self,
 		entity: &EntityRef,
 		stack: &Stack,
+		deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		let region = self.region.as_ref().unwrap_or_else(|| stack.aws_region());
-		// artifact values computed directly from stack and entity
-		let artifact_bucket = stack.artifact_bucket_name();
-		let artifact_key = stack.artifact_key(&self.label);
+		let region = self.region.clone().unwrap_or_else(|| stack.region());
+		// artifact values computed directly from the deploy and entity
+		let artifact_bucket = deployment.artifact_bucket_name(stack);
+		let artifact_key = deployment.artifact_key(&self.label);
 		cfg_if! {
 			// `BuildArtifact` holds a `ChildProcess`, so the hash of a
 			// locally-built artifact only exists where the build can run.
@@ -157,10 +158,13 @@ impl Block for LambdaBlock {
 							// runtime parses.
 							let runtime = BootstrapConfig {
 								deploy_id: Some(
-									stack.deploy_id().to_string().into(),
+									deployment.deploy_id().to_string().into(),
 								),
 								deploy_timestamp: Some(
-									stack.deploy_timestamp().to_string().into(),
+									deployment
+										.deploy_timestamp()
+										.to_string()
+										.into(),
 								),
 								..default()
 							};
@@ -309,19 +313,20 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = Stack::default_local();
 		let block = LambdaBlock::default();
-		let mut config = stack.create_config();
+		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		block
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&deployment,
 				&default(),
 				&mut config,
 			)
 			.unwrap();
-		let project = terra::Project::new(&stack, config);
+		let project = terra::Project::new(stack, deployment, config);
 		project.validate().await.unwrap();
 	}
 }

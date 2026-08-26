@@ -4,7 +4,7 @@ use beet::prelude::*;
 #[derive(Reflect, Default)]
 #[reflect(Default)]
 struct AnalyticsParams {
-	/// Directory of a local analytics store (default: `target/analytics`).
+	/// Directory of a local analytics store (default: `target/stores/analytics`).
 	dir: Option<String>,
 	/// Query the remote (cloud) analytics store instead of a local directory.
 	remote: Option<bool>,
@@ -20,7 +20,7 @@ struct AnalyticsParams {
 /// surface over both stores.
 ///
 /// ```sh
-/// beet analytics summary                          # local target/analytics
+/// beet analytics summary                          # local target/stores/analytics
 /// beet analytics summary --dir /data/analytics    # a specific directory
 /// beet analytics summary --remote --bucket my-site--prod--analytics
 /// ```
@@ -43,9 +43,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	} else {
 		let dir = match parts.get_param("dir") {
 			Some(dir) => AbsPathBuf::new(dir)?,
-			None => {
-				WorkspaceConfig::default().store_dir("analytics").into_abs()
-			}
+			None => ServiceAccess::local_store_dir("analytics").into_abs(),
 		};
 		AnalyticsStore::local(dir)
 	};

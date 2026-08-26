@@ -18,6 +18,14 @@ impl Plugin for InfraPlugin {
 		#[cfg(feature = "deploy")]
 		app.init_plugin::<beet_router::prelude::RouterPlugin>();
 
+		// the identity every declaration composes its name from, registered in
+		// every native build so `<Stack stage="shared"/>` authors anywhere, and
+		// this launch's deploy mechanics beside it. `Deployment` is a resource
+		// rather than derived per read, so one launch publishes every artifact
+		// under one id.
+		app.register_type::<crate::prelude::Stack>()
+			.init_resource::<crate::prelude::Deployment>();
+
 		// the deploy `Variable` + its value resolution, a field of the blocks'
 		// `env_vars` (always compiled, in `types/`).
 		app.register_type::<crate::types::Variable>()

@@ -50,12 +50,16 @@ impl WatchTarget {
 					.resource_ident(format!("{label}--function"))
 					.primary_identifier()
 			),
-			Self::Lightsail(label) => {
-				format!("/{}/{label}/{}", stack.app_name(), stack.stage())
-			}
-			Self::Fargate => {
-				format!("/ecs/{}/{}", stack.app_name(), stack.stage())
-			}
+			Self::Lightsail(label) => format!(
+				"/{}/{label}/{}",
+				stack.app_name().unwrap_or_default(),
+				stack.stage()
+			),
+			Self::Fargate => format!(
+				"/ecs/{}/{}",
+				stack.app_name().unwrap_or_default(),
+				stack.stage()
+			),
 		}
 	}
 }
@@ -88,12 +92,11 @@ pub async fn AwsWatchAction(
 	let timeout = *watch.timeout();
 	let (region, log_group) = cx
 		.caller
-		.with_state::<AncestorQuery<&Stack>, _>(move |entity, query| {
-			query.get(entity).map(|stack| {
-				(stack.aws_region().clone(), watch.target().log_group(stack))
-			})
+		.with_state::<StackQuery, _>(move |entity, query| {
+			let stack = query.resolve(entity);
+			(stack.region(), watch.target().log_group(&stack))
 		})
-		.await??;
+		.await?;
 
 	info!("tailing CloudWatch log group: {log_group} (region: {region})");
 

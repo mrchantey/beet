@@ -212,15 +212,16 @@ impl LightsailBlock {
 	fn runtime_policy(
 		&self,
 		stack: &Stack,
+		deployment: &Deployment,
 		access: &AccessGrants,
 	) -> Result<String> {
-		let region = stack.aws_region();
+		let region = stack.region();
 		let mut statements = Vec::new();
 
 		// every declared bucket, read-only: the deploy publishes them, the box
 		// serves them. Its own artifacts bucket is declared by nothing, so it is
 		// added here.
-		let mut read_buckets = vec![stack.artifact_bucket_name()];
+		let mut read_buckets = vec![deployment.artifact_bucket_name(stack)];
 		read_buckets
 			.extend(access.s3_buckets().iter().map(ToString::to_string));
 		statements.push(json!({
@@ -293,11 +294,18 @@ impl LightsailBlock {
 	/// [`AwsWatch::for_lightsail`](crate::prelude::AwsWatch::for_lightsail).
 	/// Includes the label so distinct blocks in one stack do not collide.
 	pub fn log_group(&self, stack: &Stack) -> String {
-		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
+		format!(
+			"/{}/{}/{}",
+			stack.app_name().unwrap_or_default(),
+			self.label,
+			stack.stage()
+		)
 	}
 
 	/// The systemd unit, and the name every path on the box is built from.
-	fn service_name(stack: &Stack) -> &SmolStr { stack.app_name() }
+	fn service_name(stack: &Stack) -> &str {
+		stack.app_name().unwrap_or_default()
+	}
 
 	/// Build the user data script that provisions the instance: the Caddy
 	/// install, the sshd relocation, the CloudWatch agent and the systemd unit
@@ -331,11 +339,12 @@ impl LightsailBlock {
 	fn build_user_data(
 		&self,
 		stack: &Stack,
+		deployment: &Deployment,
 		access_key_id_ref: &str,
 		access_key_secret_ref: &str,
 	) -> Result<SmolStr> {
 		let app_name = Self::service_name(stack);
-		let region = stack.aws_region();
+		let region = stack.region();
 		let app_port = self.app_port();
 		// the deployed binary's config, with the platform bindings this block owns
 		// merged in, then split onto its two channels. The deploy identity is
@@ -346,7 +355,7 @@ impl LightsailBlock {
 			ssh_port: self.allow_ssh.then_some(22),
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
-			stage: stack.stage().clone(),
+			stage: stack.stage().into(),
 			..self.bootstrap.clone()
 		};
 		let (argv, env) = runtime.split_channels();
@@ -509,7 +518,7 @@ CWEOF
 
 		// the two release scripts, the whole of the machine's knowledge about
 		// finding its binary. Neither names a version.
-		let fetch_script = self.fetch_script(stack);
+		let fetch_script = self.fetch_script(stack, deployment);
 		let run_script = self.run_script(stack, &exec_args);
 
 		// uses __PLACEHOLDER__ tokens for terraform refs that contain ${}
@@ -614,7 +623,7 @@ systemctl enable --now {app_name}.service
 	/// A fetch failure is not fatal while a binary is already installed. A
 	/// restart after a crash must not be blocked by a transient S3 error, and
 	/// the box keeps serving what it has rather than serving nothing.
-	fn fetch_script(&self, stack: &Stack) -> String {
+	fn fetch_script(&self, stack: &Stack, deployment: &Deployment) -> String {
 		Self::render_script(
 			r#"#!/bin/bash
 # Install the release the artifacts bucket currently points at.
@@ -651,7 +660,7 @@ touch /etc/__APP__/deploy.env
 "#,
 			stack,
 			&[
-				("__BUCKET__", &stack.artifact_bucket_name()),
+				("__BUCKET__", &deployment.artifact_bucket_name(stack)),
 				(
 					"__POINTER__",
 					&ArtifactLedger::release_pointer_key(&self.label)
@@ -809,6 +818,7 @@ impl Block for LightsailBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		deployment: &Deployment,
 		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
@@ -842,7 +852,7 @@ impl Block for LightsailBlock {
 			AwsIamUserPolicyDetails {
 				name: Some(policy_ident.primary_identifier().clone()),
 				user: user_name_ref.clone().into(),
-				policy: self.runtime_policy(stack, access)?.into(),
+				policy: self.runtime_policy(stack, deployment, access)?.into(),
 				..default()
 			},
 		);
@@ -863,6 +873,7 @@ impl Block for LightsailBlock {
 		// user data, and as the identity the key rotation keys on.
 		let user_data = self.build_user_data(
 			stack,
+			deployment,
 			&access_key_id_ref,
 			&access_key_secret_ref,
 		)?;
@@ -926,7 +937,7 @@ impl Block for LightsailBlock {
 			availability_zone: self
 				.availability_zone
 				.clone()
-				.unwrap_or_else(|| format!("{}a", stack.aws_region()).into()),
+				.unwrap_or_else(|| format!("{}a", stack.region()).into()),
 			blueprint_id: self.blueprint_id.clone(),
 			bundle_id: self.bundle_id.clone(),
 			name: instance_ident.primary_identifier().clone(),
@@ -934,8 +945,11 @@ impl Block for LightsailBlock {
 			user_data: Some(user_data),
 			tags: Some(
 				[
-					(SmolStr::from("Project"), stack.app_name().clone()),
-					(SmolStr::from("Stage"), stack.stage().clone()),
+					(
+						SmolStr::from("Project"),
+						stack.app_name().unwrap_or_default().into(),
+					),
+					(SmolStr::from("Stage"), stack.stage().into()),
 				]
 				.into_iter()
 				.collect(),
@@ -1086,22 +1100,27 @@ mod tests {
 	/// The rendered cloud-init user-data script for a block, ie the systemd unit
 	/// the instance provisions itself with.
 	fn build_user_data(block: &LightsailBlock) -> (String, TestWorkDir) {
-		let (stack, dir) = Stack::default_local();
+		let (stack, deployment, dir) = Stack::default_local();
 		let script = block
-			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
 			.unwrap();
 		(script.to_string(), dir)
 	}
 
 	/// The rendered terraform config json for a block.
 	fn build_json(block: &LightsailBlock) -> String {
-		build_json_for(block, &Stack::default_local().0)
+		let (stack, deployment, _dir) = Stack::default_local();
+		build_json_for(block, &stack, &deployment)
 	}
 
-	/// The rendered terraform config json for a block on a specific stack, ie
-	/// a specific deploy, granting nothing (no resource blocks declared beside it).
-	fn build_json_for(block: &LightsailBlock, stack: &Stack) -> String {
-		build_json_granting(block, stack, &[])
+	/// The rendered terraform config json for a block on a specific deploy,
+	/// granting nothing (no resource blocks declared beside it).
+	fn build_json_for(
+		block: &LightsailBlock,
+		stack: &Stack,
+		deployment: &Deployment,
+	) -> String {
+		build_json_granting(block, stack, deployment, &[])
 	}
 
 	/// The rendered terraform config json for a block deployed alongside
@@ -1109,6 +1128,7 @@ mod tests {
 	fn build_json_granting(
 		block: &LightsailBlock,
 		stack: &Stack,
+		deployment: &Deployment,
 		declared: &[&dyn Block],
 	) -> String {
 		let mut world = World::new();
@@ -1116,6 +1136,7 @@ mod tests {
 		let entity = entity_mut.as_readonly();
 		stack
 			.build_config(
+				deployment,
 				core::iter::once((entity.clone(), block as &dyn Block))
 					.chain(
 						declared.iter().map(|block| (entity.clone(), *block)),
@@ -1129,13 +1150,19 @@ mod tests {
 
 	/// The `terraform_data` input the access key's replacement is triggered by,
 	/// ie the identity of the box's machine config.
-	fn rotation_input(block: &LightsailBlock, stack: &Stack) -> String {
+	fn rotation_input(
+		block: &LightsailBlock,
+		stack: &Stack,
+		deployment: &Deployment,
+	) -> String {
 		let label = stack
 			.resource_ident(block.build_label("key-rotation"))
 			.label()
 			.to_string();
-		serde_json::from_str::<serde_json::Value>(&build_json_for(block, stack))
-			.unwrap()["resource"]["terraform_data"][label]["input"]
+		serde_json::from_str::<serde_json::Value>(&build_json_for(
+			block, stack, deployment,
+		))
+		.unwrap()["resource"]["terraform_data"][label]["input"]
 			.as_str()
 			.unwrap()
 			.to_string()
@@ -1143,13 +1170,13 @@ mod tests {
 
 	/// Two deploys of the same machine config, ie the same box built twice with
 	/// different code.
-	fn two_deploys() -> (Stack, Stack, TestWorkDir) {
-		let (first, dir) = Stack::default_local();
+	fn two_deploys() -> (Stack, Deployment, Deployment, TestWorkDir) {
+		let (stack, first, dir) = Stack::default_local();
 		let second = first
 			.clone()
 			.with_deploy_id(uuid_ext::now_v7())
 			.with_deploy_timestamp("2026-08-19T00:00:00Z".to_string());
-		(first, second, dir)
+		(stack, first, second, dir)
 	}
 
 	/// `allow_ssh`: the TUI takes 22 (`BEET_SSH_PORT=22`), cloud-init relocates
@@ -1185,15 +1212,15 @@ mod tests {
 	/// a Let's Encrypt issuance) clamped to the 20% baseline.
 	#[beet_core::test]
 	fn code_only_deploy_renders_one_box() {
-		let (first, second, _dir) = two_deploys();
+		let (stack, first, second, _dir) = two_deploys();
 		let block = LightsailBlock::default().with_allow_ssh(true);
 		first.deploy_id().xpect_not_eq(*second.deploy_id());
-		build_json_for(&block, &first)
-			.xpect_eq(build_json_for(&block, &second));
+		build_json_for(&block, &stack, &first)
+			.xpect_eq(build_json_for(&block, &stack, &second));
 		// the version it serves is resolved per start from the artifacts
 		// bucket's stable pointer, and named nowhere in the machine config
 		block
-			.build_user_data(&first, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &first, "${key_id}", "${key_secret}")
 			.unwrap()
 			.as_str()
 			.xpect_contains("current/main-lightsail.env")
@@ -1213,17 +1240,17 @@ mod tests {
 	/// was constant.
 	#[beet_core::test]
 	fn machine_config_change_rebuilds_and_rotates() {
-		let (first, second, _dir) = two_deploys();
+		let (stack, first, second, _dir) = two_deploys();
 		let block = LightsailBlock::default();
 		// same machine, two deploys: no rotation, so no new user data, so no
 		// replacement
-		rotation_input(&block, &first)
-			.xpect_eq(rotation_input(&block, &second));
+		rotation_input(&block, &stack, &first)
+			.xpect_eq(rotation_input(&block, &stack, &second));
 		// a different machine: a new key, and the user data that carries it
-		rotation_input(&block.clone().with_allow_ssh(true), &first)
-			.xpect_not_eq(rotation_input(&block, &first));
-		rotation_input(&block.clone().with_app_port(9001), &first)
-			.xpect_not_eq(rotation_input(&block, &first));
+		rotation_input(&block.clone().with_allow_ssh(true), &stack, &first)
+			.xpect_not_eq(rotation_input(&block, &stack, &first));
+		rotation_input(&block.clone().with_app_port(9001), &stack, &first)
+			.xpect_not_eq(rotation_input(&block, &stack, &first));
 	}
 
 	/// The box's fetch script and the artifacts client name the SAME pointer,
@@ -1243,7 +1270,10 @@ mod tests {
 			)
 			.xpect_contains(&format!(
 				"aws s3 cp \"s3://{}/${}\"",
-				Stack::default_local().0.artifact_bucket_name(),
+				{
+					let (stack, deployment, _dir) = Stack::default_local();
+					deployment.artifact_bucket_name(&stack)
+				},
 				ArtifactLedger::ARTIFACT_KEY_VAR
 			))
 			// a pointer missing the key lands in the narrated keep-serving
@@ -1269,9 +1299,9 @@ mod tests {
 	/// interpolation expression", ie no deploy at all.
 	#[beet_core::test]
 	fn escapes_shell_expansions_from_terraform() {
-		let (stack, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = Stack::default_local();
 		let script = LightsailBlock::default()
-			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
 			.unwrap();
 		// every unescaped `${` is one of the injected terraform refs
 		script
@@ -1299,7 +1329,7 @@ mod tests {
 	/// rather than bounced.
 	#[beet_core::test]
 	fn release_proves_the_running_process() {
-		let (stack, _dir) = Stack::default_local();
+		let (stack, _deployment, _dir) = Stack::default_local();
 		LightsailBlock::default()
 			.release_script(
 				&stack,
@@ -1341,9 +1371,9 @@ mod tests {
 	/// instance metadata service and the unit file.
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
-		let stack = Stack::default_local().0;
+		let (stack, deployment, _dir) = Stack::default_local();
 		let block = LightsailBlock::default();
-		let json = build_json_granting(&block, &stack, &[
+		let json = build_json_granting(&block, &stack, &deployment, &[
 			&S3BucketBlock::new("app").with_deploy_versioned(false),
 			&DynamoTableBlock::new("analytics"),
 		]);
@@ -1352,15 +1382,15 @@ mod tests {
 			// one naming composition rather than restated on the block.
 			.xpect_contains(&format!(
 				"arn:aws:s3:::{}/*",
-				stack.scope().resource_name("app")
+				stack.resource_name("app")
 			))
 			.xpect_contains(&format!(
 				"arn:aws:s3:::{}/*",
-				stack.artifact_bucket_name()
+				deployment.artifact_bucket_name(&stack)
 			))
 			.xpect_contains(&format!(
 				"table/{}",
-				stack.scope().resource_name("analytics")
+				stack.resource_name("analytics")
 			))
 			.xpect_contains(&block.log_group(&stack))
 			// and never account-wide
@@ -1458,7 +1488,7 @@ mod tests {
 	/// from the stack, not the authored bootstrap.
 	#[beet_core::test]
 	fn splits_exec_and_env_channels() {
-		let (stack, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = Stack::default_local();
 		let stack = stack.with_stage("staging");
 		let script = LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
@@ -1467,7 +1497,7 @@ mod tests {
 				..default()
 			})
 			.with_exec_route("serve")
-			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
 			.unwrap();
 		script
 			.as_str()
@@ -1487,13 +1517,13 @@ mod tests {
 	/// its servers directly.
 	#[beet_core::test]
 	fn no_exec_route_renders_the_bare_invocation() {
-		let (stack, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = Stack::default_local();
 		LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
 				server: Some(RunningSetFilter::new("http")),
 				..default()
 			})
-			.build_user_data(&stack, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
 			.unwrap()
 			.as_str()
 			.xpect_contains("exec /opt/beet_infra/app --server=http\n");
@@ -1503,13 +1533,13 @@ mod tests {
 	/// rather than a corrupted unit file: the old space-join caveat, enforced.
 	#[beet_core::test]
 	fn rejects_unencodable_exec_args() {
-		let (stack, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = Stack::default_local();
 		LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
 				path: Some("/my page".into()),
 				..default()
 			})
-			.build_user_data(&stack, "id", "secret")
+			.build_user_data(&stack, &deployment, "id", "secret")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("cannot be rendered");
@@ -1520,19 +1550,20 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, _dir) = Stack::default_local();
+		let (stack, deployment, _dir) = Stack::default_local();
 		let block = LightsailBlock::default();
-		let mut config = stack.create_config();
+		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		block
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&deployment,
 				&default(),
 				&mut config,
 			)
 			.unwrap();
-		let project = terra::Project::new(&stack, config);
+		let project = terra::Project::new(stack, deployment, config);
 		project.validate().await.unwrap();
 	}
 }

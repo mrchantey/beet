@@ -92,6 +92,36 @@ pub fn setup_isolated_test_guards(
 	})
 }
 
+/// The identity + launch pair every lifecycle step threads through, so one run
+/// publishes every artifact under one deploy id and a re-deploy is an explicit
+/// new [`Deployment`] rather than a rebuilt stack.
+pub struct TestDeploy {
+	pub stack: Stack,
+	pub deployment: Deployment,
+}
+
+impl TestDeploy {
+	/// A first deploy of `app_name`, pinned to the region the live tests use.
+	pub fn new(app_name: &str) -> Self {
+		Self {
+			stack: Stack::new(app_name).with_region("us-west-2"),
+			deployment: Deployment::default(),
+		}
+	}
+
+	/// The next deploy of the same app: same identity, new launch.
+	pub fn redeploy(&self) -> Self {
+		Self {
+			stack: self.stack.clone(),
+			deployment: Deployment::default(),
+		}
+	}
+
+	pub fn artifacts_client(&self) -> ArtifactsClient {
+		self.deployment.artifacts_client(&self.stack)
+	}
+}
+
 /// Create the assets store block used across all tests.
 pub fn assets_bucket_block() -> S3BucketBlock {
 	S3BucketBlock::new("assets").with_deploy_versioned(true)
@@ -99,42 +129,47 @@ pub fn assets_bucket_block() -> S3BucketBlock {
 
 /// Create the S3FsStore for syncing local assets to S3.
 /// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
-pub fn assets_s3_fs_store(stack: &Stack, assets_dir: &AbsPathBuf) -> S3FsStore {
+pub fn assets_s3_fs_store(
+	deploy: &TestDeploy,
+	assets_dir: &AbsPathBuf,
+) -> S3FsStore {
 	S3FsStore::new(
 		FsStore::new(assets_dir.clone()),
-		assets_bucket_block().stack_store(stack),
+		assets_bucket_block().stack_store(&deploy.stack, &deploy.deployment),
 	)
 }
 
 /// Get the deploy-versioned assets store for verification.
-pub fn assets_store(stack: &Stack) -> BlobStore {
-	BlobStore::new(assets_bucket_block().stack_store(stack))
+pub fn assets_store(deploy: &TestDeploy) -> BlobStore {
+	BlobStore::new(
+		assets_bucket_block().stack_store(&deploy.stack, &deploy.deployment),
+	)
 }
 
 /// Re-apply terraform with the current ledger deploy_id.
 /// Used after rollback/rollforward to update the deployed resource.
 pub async fn apply_with_current_ledger<F>(
-	stack: &mut Stack,
+	deploy: &mut TestDeploy,
 	build_project: F,
 ) -> Result<String>
 where
-	F: FnOnce(&Stack) -> Result<terra::Project>,
+	F: FnOnce(&TestDeploy) -> Result<terra::Project>,
 {
-	let client = stack.artifacts_client();
-	let ledger = client
+	let ledger = deploy
+		.artifacts_client()
 		.current_ledger()
 		.await?
 		.ok_or_else(|| bevyhow!("no current ledger"))?;
-	stack.update_from_ledger(&ledger);
-	let project = build_project(stack)?;
-	project.apply().await
+	deploy.deployment.update_from_ledger(&ledger);
+	build_project(deploy)?.apply().await
 }
 
 /// Verify the assets store contains the expected version marker.
-pub async fn verify_assets(stack: &Stack, expected: &str) -> Result {
-	let store = assets_store(stack);
+pub async fn verify_assets(deploy: &TestDeploy, expected: &str) -> Result {
+	let store = assets_store(deploy);
 	let files = store.list().await?;
-	info!("assets at deploy {}: {:?}", stack.deploy_id(), files);
+	let deploy_id = deploy.deployment.deploy_id();
+	info!("assets at deploy {deploy_id}: {files:?}");
 	files
 		.iter()
 		.any(|path| path.contains("index.html"))
@@ -142,10 +177,7 @@ pub async fn verify_assets(stack: &Stack, expected: &str) -> Result {
 	let bytes = store.get(&SmolPath::new("index.html")).await?;
 	let content = String::from_utf8(bytes.to_vec())?;
 	content.contains(expected).xpect_true();
-	info!(
-		"verified assets contain '{expected}' at deploy {}",
-		stack.deploy_id()
-	);
+	info!("verified assets contain '{expected}' at deploy {deploy_id}");
 	Ok(())
 }
 
@@ -213,10 +245,10 @@ pub async fn verify_dead(
 /// Clean up any prior state before test starts.
 /// Terraform should handle all infrastructure cleanup, we only need to clean
 /// the artifacts store which is not managed by terraform.
-pub async fn cleanup_prior_state(stack: &Stack, project: terra::Project) {
+pub async fn cleanup_prior_state(deploy: &TestDeploy, project: terra::Project) {
 	info!("cleanup_prior_state: calling force_destroy");
 	project.force_destroy().await;
 	info!("cleanup_prior_state: removing artifacts store");
-	stack.artifacts_client().store().store_remove().await.ok();
+	deploy.artifacts_client().store().store_remove().await.ok();
 	info!("cleanup_prior_state: complete");
 }

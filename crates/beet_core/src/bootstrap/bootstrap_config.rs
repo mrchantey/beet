@@ -40,7 +40,8 @@ use core::str::FromStr;
 /// **The process config is a process-global singleton, not a resource.** Launch
 /// arguments are a fact about the process, not state an app owns: there is one
 /// argv, it never changes, and it must be readable from places that have no
-/// world at all (a [`Default`] impl, `Stack::new`, a plugin's `build`, the
+/// world at all (a [`Default`] impl, a deploy [`Stack`]'s stage resolution, a
+/// plugin's `build`, the
 /// binary's pre-world entry resolution). Modelling it as a resource forced world
 /// access into all of those *and* left two sources of truth, since a `Default`
 /// impl could only reach the environment. So it follows `CanonicalPort`: one
@@ -619,7 +620,8 @@ static BOOTSTRAP: LazyLock<BootstrapConfig> = LazyLock::new(|| {
 });
 
 /// Validates the process [`BootstrapConfig`] at [`PreStartup`], and under `std`
-/// ensures a [`PackageConfig`] exists for the readers that expect one.
+/// registers [`PackageConfig`] and ensures one exists for the readers that
+/// expect it.
 ///
 /// It does not *assign* the config: [`BootstrapConfig::get`] owns that, lazily and
 /// immutably. What this adds is the strict [`BootstrapConfig::from_env`] parse, so
@@ -633,9 +635,11 @@ pub struct BootstrapPlugin;
 impl Plugin for BootstrapPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(PreStartup, validate_process_config);
-		// `PackageConfig` is std-only (it kebab-cases cloud resource names)
+		// `PackageConfig` is std-only (it kebab-cases cloud resource names).
+		// Registered here rather than by a router, so a routerless app can
+		// author `<PackageConfig app_name=".."/>` and a deploy can resolve it.
 		#[cfg(feature = "std")]
-		app.add_systems(
+		app.register_type::<PackageConfig>().add_systems(
 			PreStartup,
 			seed_package_config.after(validate_process_config),
 		);

@@ -28,8 +28,8 @@ command route.
 The DEPLOY provisions it into the stage stack (a block outside any deploy host
 is adopted by the host carrying this process's stage), and the RUNTIME attaches
 a store for it, which the content router names with `StoreRef($analytics)`.
-Both sides compose `<app>--<stage>--analytics` through the one `ResourceScope`,
-from the `app_name` on this entry's `<PackageConfig/>`, so they cannot disagree.
+Both sides compose `<app>--<stage>--analytics` through the one resolved `Stack`,
+whose app name comes from this entry's `<PackageConfig/>`, so they cannot disagree.
 The live site once spent a whole deploy writing to a table that did not exist
 because the two sides derived that name independently.
 

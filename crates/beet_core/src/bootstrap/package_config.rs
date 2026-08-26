@@ -28,8 +28,6 @@ pub struct PackageConfig {
 	pub version: SmolStr,
 	/// The homepage URL, usually set via `CARGO_PKG_HOMEPAGE` in [`pkg_config!`].
 	pub homepage: Option<SmolStr>,
-	/// The repository URL, usually set via `CARGO_PKG_REPOSITORY` in [`pkg_config!`].
-	pub repository: Option<SmolStr>,
 }
 
 /// The defaults govern unset fields for markup-only sites: a markup-declared
@@ -44,45 +42,13 @@ impl Default for PackageConfig {
 			app_name: None,
 			version: "0.0.1".into(),
 			homepage: None,
-			repository: None,
 		}
 	}
 }
 
 impl PackageConfig {
-	/// Returns the app name if set.
+	/// The app identity, if this package declared one.
 	pub fn app_name(&self) -> Option<&str> { self.app_name.as_deref() }
-
-	/// Returns the version string.
-	pub fn version(&self) -> &str { &self.version }
-
-	/// Returns the description.
-	pub fn description(&self) -> &str { &self.description }
-
-	/// Returns the homepage URL if set.
-	pub fn homepage(&self) -> Option<&str> { self.homepage.as_deref() }
-
-	/// Returns the repository URL if set.
-	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
-}
-
-impl core::fmt::Display for PackageConfig {
-	/// Writes each set field as a `key: value` line, omitting unset optionals.
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		writeln!(f, "title: {}", self.title)?;
-		writeln!(f, "description: {}", self.description)?;
-		writeln!(f, "version: {}", self.version)?;
-		for (key, value) in [
-			("app_name", &self.app_name),
-			("homepage", &self.homepage),
-			("repository", &self.repository),
-		] {
-			if let Some(value) = value {
-				writeln!(f, "{key}: {value}")?;
-			}
-		}
-		Ok(())
-	}
 }
 
 /// Macro to create a `PackageConfig` from compile time environment variables set by Cargo.
@@ -108,7 +74,6 @@ macro_rules! pkg_config {
 			app_name: Some(env!("CARGO_PKG_NAME").into()),
 			version: env!("CARGO_PKG_VERSION").into(),
 			homepage: Some(env!("CARGO_PKG_HOMEPAGE").into()),
-			repository: option_env!("CARGO_PKG_REPOSITORY").map(|s| s.into()),
 		}
 	};
 }
@@ -135,7 +100,6 @@ mod test {
 		config.app_name.xpect_none();
 		config.version.as_str().xpect_eq("0.0.1");
 		config.homepage.xpect_none();
-		config.repository.xpect_none();
 	}
 
 	/// A markup-declared `<PackageConfig/>` patches only its named fields over

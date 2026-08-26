@@ -1,8 +1,8 @@
 //! ECS types for interacting with terraform configurations.
 mod access_grant;
 mod artifacts;
+mod deployment;
 mod infra_plugin;
-mod resource_scope;
 mod stack;
 mod stack_backend;
 // the cli-facing stack verbs, which drive the native tofu `Project`.
@@ -10,8 +10,8 @@ mod stack_backend;
 mod stack_cli;
 pub use access_grant::*;
 pub use artifacts::*;
+pub use deployment::*;
 pub use infra_plugin::*;
-pub use resource_scope::*;
 pub use stack::*;
 pub use stack_backend::*;
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

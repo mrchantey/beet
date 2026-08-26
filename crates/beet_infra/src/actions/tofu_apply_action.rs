@@ -62,17 +62,16 @@ pub async fn TofuApplyAction(
 	trace!(
 		"TofuApplyAction: step 1 - building project and collecting artifacts"
 	);
-	let (project, stack, artifacts, variables) = cx
+	let (project, stack, deployment, artifacts, variables) = cx
 		.caller
-		.with_state::<(StackQuery, AncestorQuery<&Stack>), _>(
-			|entity, (stack_query, anc_stack)| -> Result<_> {
-				let project = stack_query.build_project(entity)?;
-				let stack = anc_stack.get(entity)?.clone();
-				let artifacts = stack_query.collect_artifacts(entity)?;
-				let variables = stack_query.collect_variables(entity)?;
-				(project, stack, artifacts, variables).xok()
-			},
-		)
+		.with_state::<StackQuery, _>(|entity, stacks| -> Result<_> {
+			let project = stacks.build_project(entity)?;
+			let (_, stack) = stacks.root(entity)?;
+			let deployment = stacks.deployment();
+			let artifacts = stacks.collect_artifacts(entity)?;
+			let variables = stacks.collect_variables(entity)?;
+			(project, stack, deployment, artifacts, variables).xok()
+		})
 		.await??;
 	trace!(
 		"TofuApplyAction: collected {} artifacts, {} variables",
@@ -86,7 +85,7 @@ pub async fn TofuApplyAction(
 	if apply.layer().is_none() {
 		// step 2: build ledger, upload artifacts to S3
 		trace!("TofuApplyAction: step 2 - ensuring artifacts bucket exists");
-		let mut client = stack.artifacts_client();
+		let mut client = deployment.artifacts_client(&stack);
 		client.ensure_store().await?;
 		trace!("TofuApplyAction: artifacts bucket ready");
 
@@ -96,7 +95,7 @@ pub async fn TofuApplyAction(
 			let artifact_path = AbsPathBuf::new(artifact.artifact_path())?;
 			let bytes = fs_ext::read_async(artifact_path.as_path()).await?;
 			let source_hash = artifact.compute_source_hash()?;
-			let artifact_key = stack.artifact_key(label);
+			let artifact_key = deployment.artifact_key(label);
 
 			client
 				.upload_artifact(label, bytes, ArtifactEntry {
@@ -106,7 +105,7 @@ pub async fn TofuApplyAction(
 				.await?;
 			info!(
 				"uploaded artifact to s3://{}/{}",
-				stack.artifact_bucket_name(),
+				deployment.artifact_bucket_name(&stack),
 				artifact_key,
 			);
 		}

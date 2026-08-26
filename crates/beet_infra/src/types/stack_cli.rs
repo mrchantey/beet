@@ -42,30 +42,23 @@ async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
 		.await?
 }
 
-/// Read the current ledger, update the stack's deploy_id to match,
+/// Read the current ledger, point this launch's [`Deployment`] at it,
 /// rebuild the config, and re-apply terraform.
 async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
-	let stack = caller
-		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
-			query.get(entity).cloned()
-		})
-		.await??;
-	let client = stack.artifacts_client();
+	let client = artifacts_client(caller).await?;
 	let ledger = client
 		.current_ledger()
 		.await?
 		.ok_or_else(|| bevyhow!("no current artifact ledger found"))?;
 
-	// update the stack's deploy_id to point at the target version
+	// point this deploy at the target version
 	let target_id = ledger.deploy_id;
 	caller
-		.with_state::<AncestorQuery<&mut Stack>, Result>(
-			move |entity, mut query| {
-				query.get_mut(entity)?.update_from_ledger(&ledger);
-				Ok(())
-			},
-		)
-		.await??;
+		.world()
+		.with_resource::<Deployment, _>(move |mut deployment| {
+			deployment.update_from_ledger(&ledger);
+		})
+		.await;
 
 	// rebuild and re-apply with the updated deploy_id
 	let proj = caller
@@ -190,12 +183,7 @@ mod tests {
 	#[beet_core::test]
 	fn routes_discoverable() {
 		let mut world = cli_world();
-		let root = world
-			.spawn((
-				Stack::new("test-app").with_backend(LocalBackend::default()),
-				Stack::cli(),
-			))
-			.flush();
+		let root = world.spawn((Stack::new("test-app"), Stack::cli())).flush();
 		let tree = RouteTree::of(&world, root).unwrap();
 		// standard IaC routes
 		tree.find(&["validate"]).xpect_some();
@@ -212,12 +200,7 @@ mod tests {
 	#[beet_core::test]
 	fn destroy_has_force_param() {
 		let mut world = cli_world();
-		let root = world
-			.spawn((
-				Stack::new("test-app").with_backend(LocalBackend::default()),
-				Stack::cli(),
-			))
-			.flush();
+		let root = world.spawn((Stack::new("test-app"), Stack::cli())).flush();
 		let tree = RouteTree::of(&world, root).unwrap();
 		let destroy_node = tree.find(&["destroy"]).unwrap();
 		world

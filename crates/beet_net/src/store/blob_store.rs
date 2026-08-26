@@ -109,8 +109,11 @@ impl BlobStore {
 	/// The [`S3Store`]-backed store for an `s3://` uri. An `endpoint` (eg
 	/// `https://<account>.r2.cloudflarestorage.com`) switches onto an
 	/// S3-compatible service such as Cloudflare R2 with region `auto`, so one
-	/// binary serves identically on AWS S3 and R2; otherwise the region falls back
-	/// to the SDK's `AWS_REGION` convention, then `us-west-2`.
+	/// binary serves identically on AWS S3 and R2; otherwise an unnamed region
+	/// is left to the SDK's own default provider chain. That chain IS the
+	/// process boundary's region convention (the deploy writes
+	/// `Environment=AWS_REGION=..` into the unit); nothing in-world reads the
+	/// environment for it.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	fn s3_from_uri(
 		bucket: &str,
@@ -123,14 +126,16 @@ impl BlobStore {
 				S3Store::new(bucket, region.unwrap_or("auto"))
 					.with_endpoint(endpoint)
 			}
-			None => {
-				let region = region
-					.map(SmolStr::from)
-					.or_else(|| env_ext::var("AWS_REGION").ok())
-					.unwrap_or_else(|| "us-west-2".into());
-				info!("entry store: s3 bucket `{bucket}` ({region})");
-				S3Store::new(bucket, region)
-			}
+			None => match region {
+				Some(region) => {
+					info!("entry store: s3 bucket `{bucket}` ({region})");
+					S3Store::new(bucket, region)
+				}
+				None => {
+					info!("entry store: s3 bucket `{bucket}`");
+					S3Store::new_default_region(bucket)
+				}
+			},
 		};
 		BlobStore::new(store).xok()
 	}

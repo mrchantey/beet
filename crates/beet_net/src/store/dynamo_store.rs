@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use aws_config::Region;
-use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::operation;
@@ -17,8 +16,11 @@ use bytes::Bytes;
 pub struct DynamoStore {
 	/// The DynamoDB table name (maps to "store name" in the storage abstraction).
 	table_name: SmolStr,
-	/// The AWS region for this table.
-	region: SmolStr,
+	/// The region this table's client is pinned to, else the SDK's own default
+	/// provider chain. A configured region always wins: a declaration that
+	/// named its region must not be silently beaten by the environment the
+	/// process happens to carry.
+	region: Option<SmolStr>,
 	/// Optional subdirectory prefix for all keys.
 	subdir: Option<SmolPath>,
 }
@@ -29,11 +31,24 @@ impl DynamoStore {
 		table_name: impl Into<SmolStr>,
 		region: impl Into<SmolStr>,
 	) -> Self {
+		Self::new_default_region(table_name).with_region(region)
+	}
+
+	/// A provider whose region the SDK's default provider chain resolves, the
+	/// process-boundary convention for a caller holding a table name and
+	/// nothing else.
+	pub fn new_default_region(table_name: impl Into<SmolStr>) -> Self {
 		Self {
 			table_name: table_name.into(),
-			region: region.into(),
+			region: None,
 			subdir: None,
 		}
+	}
+
+	/// Pin this provider's client to `region`.
+	pub fn with_region(mut self, region: impl Into<SmolStr>) -> Self {
+		self.region = Some(region.into());
+		self
 	}
 
 	/// Set the subdirectory prefix for all keys.
@@ -42,27 +57,19 @@ impl DynamoStore {
 		self
 	}
 
-	/// The region the convention resolves when none is configured: the sdk's
-	/// `AWS_REGION` env, else `us-west-2` (mirroring the `s3://` store uri).
-	pub fn env_region() -> SmolStr {
-		env_ext::var("AWS_REGION").unwrap_or_else(|_| "us-west-2".into())
-	}
-
 	/// Get or create a DynamoDB client for this provider's region.
 	async fn client(&self) -> Client {
-		static POOL: LazyPool<SmolStr, Client, Client> =
+		static POOL: LazyPool<Option<SmolStr>, Client, Client> =
 			LazyPool::new(|region| {
-				let region_str = region.to_string();
+				let region = region.clone();
 				Box::pin(async move {
-					let region_obj = Region::new(region_str);
-					let config = aws_config::from_env()
-						.region(
-							RegionProviderChain::default_provider()
-								.or_else(region_obj),
-						)
-						.load()
-						.await;
-					Client::new(&config)
+					// configured-wins: an authored region is the declaration's
+					// answer, and env only fills the gap when there is none.
+					let mut loader = aws_config::from_env();
+					if let Some(region) = region {
+						loader = loader.region(Region::new(region.to_string()));
+					}
+					Client::new(&loader.load().await)
 				})
 			});
 		POOL.get(&self.region).await
@@ -181,7 +188,9 @@ impl BlobStoreProvider for DynamoStore {
 		format!("dynamo:{}", self.table_name).into()
 	}
 
-	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
+	fn region(&self) -> Option<String> {
+		self.region.as_ref().map(ToString::to_string)
+	}
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
@@ -511,5 +520,34 @@ mod test {
 	async fn table() {
 		let provider = DynamoStore::new("beet-test-table", "us-west-2");
 		table_test::run(provider).await;
+	}
+
+	/// A configured region wins over the environment, and an unconfigured one
+	/// leaves the SDK's own default chain (which reads `AWS_REGION`) in place.
+	///
+	/// REGRESSION: the client used to build
+	/// `RegionProviderChain::default_provider().or_else(configured)`, ie env
+	/// FIRST, so a box whose unit exported a different `AWS_REGION` silently
+	/// talked to a table in another region than the deploy created, while S3
+	/// (configured-wins) talked to the right one.
+	#[beet_core::test]
+	async fn configured_region_beats_env() {
+		unsafe { env_ext::set_var("AWS_REGION", "us-east-1") }.unwrap();
+		DynamoStore::new("beet-site--dev--analytics", "eu-west-1")
+			.client()
+			.await
+			.config()
+			.region()
+			.unwrap()
+			.as_ref()
+			.xpect_eq("eu-west-1");
+		DynamoStore::new_default_region("beet-site--dev--analytics")
+			.client()
+			.await
+			.config()
+			.region()
+			.unwrap()
+			.as_ref()
+			.xpect_eq("us-east-1");
 	}
 }

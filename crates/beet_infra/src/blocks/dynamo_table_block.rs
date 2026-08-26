@@ -11,9 +11,9 @@ use beet_net::prelude::*;
 ///
 /// Mirrors [`S3BucketBlock`](crate::prelude::S3BucketBlock): the declaration
 /// carries only its `label`, and the `<app>--<stage>--<label>` name composes at
-/// resolution through [`ResourceScope`]. The deploy creates the table from that
-/// name and the runtime attaches a store for the same name off the same entity,
-/// so there is one declaration and nothing to keep in agreement.
+/// resolution through the ancestor [`Stack`]. The deploy creates the table from
+/// that name and the runtime attaches a store for the same name off the same
+/// entity, so there is one declaration and nothing to keep in agreement.
 ///
 /// Authored directly from markup, ie
 /// `<DynamoTableBlock bx:ref="analytics" label="analytics"/>`.
@@ -27,10 +27,12 @@ pub struct DynamoTableBlock {
 	label: SmolStr,
 	/// The hash (partition) key attribute name.
 	hash_key: SmolStr,
-	/// The aws region the table lives in. The block's own field, so the runtime
-	/// store and the tofu resource read one value rather than the runtime
-	/// falling back to an environment the deploy never saw.
-	region: SmolStr,
+	/// Override the region this table lives in, which otherwise resolves from
+	/// the ancestor [`Stack`]. The runtime store and the tofu resource read the
+	/// one resolved value rather than the runtime falling back to an environment
+	/// the deploy never saw.
+	#[set_with(unwrap_option, into)]
+	region: Option<SmolStr>,
 	/// The deploy layer ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER)
 	/// by default): the runtime writes to this table from its first request, and
 	/// nothing in the tofu graph orders the table before the service (the name
@@ -50,14 +52,19 @@ impl DynamoTableBlock {
 		Self {
 			label: label.into(),
 			hash_key: "id".into(),
-			region: crate::bindings::aws::region::DEFAULT.into(),
+			region: None,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
 
 	/// The composed table name this block declares, ie `beet-site--prod--analytics`.
-	pub fn table_name(&self, scope: &ResourceScope) -> String {
-		scope.resource_name(self.label.clone())
+	pub fn table_name(&self, stack: &Stack) -> String {
+		stack.resource_name(self.label.clone())
+	}
+
+	/// The region this table lives in: its own override, else `stack`'s.
+	pub fn resolved_region(&self, stack: &Stack) -> SmolStr {
+		self.region.clone().unwrap_or_else(|| stack.region())
 	}
 }
 
@@ -81,36 +88,32 @@ pub(crate) fn attach_table_store(
 	commands.entity(ev.entity).queue(
 		|mut entity: EntityWorldMut| -> Result {
 			let block = entity.get_or_else::<DynamoTableBlock>()?.clone();
-			let (scope, workspace) = entity
-				.with_state::<(ResourceScopeQuery, Option<Res<WorkspaceConfig>>), _>(
-					|entity, (scopes, workspace)| -> Result<_> {
-						(scopes.get(entity)?, workspace.map(|it| it.clone()))
-							.xok()
-					},
-				)?;
+			let stack = entity
+				.with_state::<StackQuery, _>(|entity, stacks| {
+					stacks.resolve(entity)
+				});
 			match BootstrapConfig::get().service_access {
 				ServiceAccess::Remote => {
 					cfg_if! {
 						if #[cfg(feature = "aws_sdk")] {
 							entity.insert(beet_net::prelude::DynamoStore::new(
-								block.table_name(&scope),
-								block.region().clone(),
+								block.table_name(&stack),
+								block.resolved_region(&stack),
 							));
 						} else {
 							bevybail!(
 								"the table declared as `{}` resolves to the remote `{}`, but this binary has no `aws_sdk` backend to reach it",
 								block.label(),
-								block.table_name(&scope)
+								block.table_name(&stack)
 							);
 						}
 					}
 				}
 				ServiceAccess::Local => {
-					let dir = workspace
-						.unwrap_or_default()
-						.store_dir(block.label().as_str())
-						.into_abs();
-					entity.insert(FsStore::new(dir));
+					entity.insert(FsStore::new(
+						ServiceAccess::local_store_dir(block.label().as_str())
+							.into_abs(),
+					));
 				}
 			}
 			Ok(())
@@ -123,6 +126,7 @@ impl Block for DynamoTableBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		_deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
@@ -137,7 +141,7 @@ impl Block for DynamoTableBlock {
 						r#type: "S".into(),
 					},
 				]),
-				region: Some(self.region.clone()),
+				region: Some(self.resolved_region(stack)),
 				..default()
 			},
 		);
@@ -148,10 +152,10 @@ impl Block for DynamoTableBlock {
 
 	/// A table is declared to be recorded to, so the process that declared it
 	/// reads and writes it.
-	fn runtime_access(&self, scope: &ResourceScope) -> Vec<AccessGrant> {
+	fn runtime_access(&self, stack: &Stack) -> Vec<AccessGrant> {
 		vec![AccessGrant::read_write(AccessResource::DynamoTable {
-			name: self.table_name(scope),
-			region: self.region.clone(),
+			name: self.table_name(stack),
+			region: self.resolved_region(stack),
 		})]
 	}
 }
@@ -164,13 +168,14 @@ mod test {
 	/// string hash key, and pay-per-request billing.
 	#[beet_core::test]
 	fn emits_dynamodb_table() {
-		let (stack, _dir) = Stack::default_local();
-		let mut config = stack.create_config();
+		let (stack, deployment, _dir) = Stack::default_local();
+		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		DynamoTableBlock::new("analytics")
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&deployment,
 				&default(),
 				&mut config,
 			)

@@ -183,7 +183,7 @@ impl FargateBlock {
 
 		let full = format!(
 			"{}--{}--{}--{}",
-			stack.app_name(),
+			stack.app_name().unwrap_or_default(),
 			stack.stage(),
 			self.label,
 			suffix
@@ -205,10 +205,10 @@ impl FargateBlock {
 	/// Get the container image URI for the task definition.
 	fn container_image_uri(
 		&self,
-		stack: &Stack,
+		deployment: &Deployment,
 		ecr_repo_url_ref: &str,
 	) -> SmolStr {
-		format!("{}:{}", ecr_repo_url_ref, stack.deploy_id()).into()
+		format!("{}:{}", ecr_repo_url_ref, deployment.deploy_id()).into()
 	}
 }
 
@@ -220,14 +220,15 @@ impl Block for FargateBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		let region = stack.aws_region();
-		let app_name = stack.app_name();
+		let region = stack.region();
+		let app_name = stack.app_name().unwrap_or_default();
 		let stage = stack.stage();
-		let deploy_id = stack.deploy_id();
-		let deploy_timestamp = stack.deploy_timestamp();
+		let deploy_id = deployment.deploy_id();
+		let deploy_timestamp = deployment.deploy_timestamp();
 
 		// declare terraform variables for env_vars
 		for variable in &self.env_vars {
@@ -557,7 +558,7 @@ impl Block for FargateBlock {
 			ssh_port: self.allow_ssh.then_some(self.ssh_container_port),
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
-			stage: stage.clone(),
+			stage: stage.into(),
 			deploy_id: Some(deploy_id.to_string().into()),
 			deploy_timestamp: Some(deploy_timestamp.into()),
 			..self.bootstrap.clone()
@@ -593,7 +594,7 @@ impl Block for FargateBlock {
 		}
 		let container_defs = json!([{
 			"name": self.label.to_string(),
-			"image": self.container_image_uri(stack, &ecr_url_ref),
+			"image": self.container_image_uri(deployment, &ecr_url_ref),
 			"essential": true,
 			"portMappings": port_mappings,
 			"environment": env_vars.iter().map(|(k, v)| {
@@ -803,8 +804,11 @@ impl FargateBlock {
 	) -> std::collections::BTreeMap<SmolStr, SmolStr> {
 		[
 			(SmolStr::from("Name"), self.build_label(suffix).into()),
-			(SmolStr::from("Project"), stack.app_name().clone()),
-			(SmolStr::from("Stage"), stack.stage().clone()),
+			(
+				SmolStr::from("Project"),
+				stack.app_name().unwrap_or_default().into(),
+			),
+			(SmolStr::from("Stage"), stack.stage().into()),
 		]
 		.into_iter()
 		.collect()
@@ -964,14 +968,15 @@ mod tests {
 		block: &FargateBlock,
 		stage: &str,
 	) -> (terra::Config, Stack, TestWorkDir) {
-		let (stack, dir) = Stack::default_local();
+		let (stack, deployment, dir) = Stack::default_local();
 		let stack = stack.with_stage(stage);
-		let mut config = stack.create_config();
+		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		block
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&deployment,
 				&default(),
 				&mut config,
 			)

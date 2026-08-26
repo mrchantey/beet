@@ -1,180 +1,118 @@
+//! The hierarchical source of truth for cloud resource identity, and the
+//! traversal every deploy step resolves it through.
+
 use crate::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::terra::Project;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// The work-dir guard [`Stack::default_local`] returns: a real [`TempDir`] on
-/// native, nothing on wasm where the config-only tests never write to it.
-#[cfg(all(test, not(target_arch = "wasm32")))]
-pub(crate) type TestWorkDir = TempDir;
-#[cfg(all(test, target_arch = "wasm32"))]
-pub(crate) struct TestWorkDir;
-
-#[derive(Debug, Clone, Get, SetWith, Component)]
+/// The app identity, stage and region every resource declared beneath it
+/// composes its name from, ie the `beet-site` + `prod` that turn `analytics`
+/// into `beet-site--prod--analytics`.
+///
+/// A declaration carries only its label, and BOTH meanings of that declaration
+/// resolve the name here: the deploy that creates the resource and the runtime
+/// that reads or writes it. One composition, so the two cannot drift.
+///
+/// Markup-authorable and registered in every native build, so `<Stack/>` bare
+/// works everywhere and `<Stack stage="shared"/>` overrides exactly one field.
+/// Each field resolves to its own value else this process's default: the app
+/// name from the [`PackageConfig`] (which stays the ONE home of app identity),
+/// the stage from [`BootstrapConfig::stage`], the region from `AWS_REGION` else
+/// [`aws::region::DEFAULT`](crate::bindings::aws::region::DEFAULT). This is the
+/// only in-world reader of `AWS_REGION`; every store is handed a resolved region
+/// rather than reaching for one itself.
+#[derive(Debug, Default, Clone, PartialEq, Eq, SetWith, Component, Reflect)]
+#[reflect(Component, Default)]
 pub struct Stack {
-	/// The app name, the deploy half of the one app identity. A host derives it
-	/// from the application's [`PackageConfig`] rather than defaulting it, since
-	/// an app identity derivable from two sources is exactly the drift the
-	/// [`ResourceScope`] composition exists to prevent.
-	app_name: SmolStr,
-	/// The deployment stage, namespacing every resource. Resolved by [`Stack::new`]
-	/// from the `--stage=<x>` cli arg, else the `BEET_STAGE` env var, else `dev`.
-	stage: SmolStr,
-	/// Name of the production stage, which often receives
-	/// special treatment like bucket locking and no subdomain.
-	prod_stage: SmolStr,
-	/// A suffix to append to the state backend, defaults to `tofu.tfstate`,
-	/// making the final state key `app-name--stage--state-suffix`
-	state_suffix: SmolStr,
-	/// A suffix to append to the artifact bucket name, defaults to `artifacts`,
-	/// making the final bucket name `app-name--stage--artifacts`
-	artifact_bucket_suffix: SmolStr,
-	/// The opentofu directory for creating
-	/// and deploying infrastructure config.
-	work_directory: WsPathBuf,
-	#[set_with(into)]
-	backend: StackBackend,
-	/// The default aws region to use
-	aws_region: SmolStr,
-	/// Additional parameters, some of which
-	/// may be required by a config generator
+	/// The app identity, else the process [`PackageConfig`]'s. Overriding it is
+	/// for a multi-app entry; an app naming itself twice is exactly the drift
+	/// this composition exists to prevent.
+	#[set_with(unwrap_option, into)]
+	app_name: Option<SmolStr>,
+	/// The deployment stage namespacing every resource, else this launch's
+	/// (`--stage=<x>`, else `BEET_STAGE`, else `dev`). A resource not owned by
+	/// any deploy stage declares its own, ie `<Stack stage="shared"/>`.
+	#[set_with(unwrap_option, into)]
+	stage: Option<SmolStr>,
+	/// The aws region every resource beneath this stack lives in, else
+	/// `AWS_REGION`, else the crate default.
+	#[set_with(unwrap_option, into)]
+	region: Option<SmolStr>,
+	/// Additional parameters, some of which may be required by a config
+	/// generator.
+	#[reflect(ignore)]
 	params: MultiMap<SmolStr, SmolStr>,
-	/// Unique deploy identifier, regenerated for each deployment.
-	deploy_id: Uuid,
-	/// Timestamp for this deployment.
-	deploy_timestamp: String,
 }
 
 impl Stack {
+	/// A stack naming `app_name` explicitly, the code counterpart of
+	/// `<Stack app_name=".."/>`.
 	pub fn new(app_name: impl Into<SmolStr>) -> Self {
-		let app_name = app_name.into();
-		let work_directory = WsPathBuf::new(format!("target/infra/{app_name}"));
+		Self::default().with_app_name(app_name)
+	}
 
-		// the deploy identity and stage flow from the process `BootstrapConfig`
-		// (`--stage` / `BEET_STAGE` and friends), so they reach every stack in
-		// every scene without per-template threading.
-		let config = BootstrapConfig::get();
-
-		let deploy_id = config
-			.deploy_id
-			.as_deref()
-			.and_then(|id| Uuid::parse_str(id).ok())
-			.unwrap_or_else(Uuid::now_v7);
-
-		let deploy_timestamp = config
-			.deploy_timestamp
-			.as_ref()
-			.map(|stamp| stamp.to_string())
-			.unwrap_or_else(crate::types::artifacts::now_timestamp);
-
-		let stage = config.stage.clone();
-
+	/// Fill every unset field from this process's defaults, the ONE place a
+	/// stack consults [`PackageConfig`], [`BootstrapConfig`] or `AWS_REGION`.
+	///
+	/// A resolved stack is self-describing, so everything downstream (a block
+	/// emitting tofu, a store attaching at runtime) reads plain fields.
+	pub fn resolve(&self, package: Option<&PackageConfig>) -> Self {
 		Self {
-			app_name,
-			work_directory,
-			state_suffix: "tofu.tfstate".into(),
-			stage,
-			prod_stage: "prod".into(),
-			params: default(),
-			artifact_bucket_suffix: "artifacts".into(),
-			backend: default(),
-			aws_region: crate::bindings::aws::region::DEFAULT.into(),
-			deploy_id,
-			deploy_timestamp,
+			app_name: self.app_name.clone().or_else(|| {
+				package.and_then(|it| it.app_name()).map(Into::into)
+			}),
+			stage: Some(self.stage().into()),
+			region: Some(self.region()),
+			params: self.params.clone(),
 		}
 	}
-	pub fn update_from_ledger(&mut self, ledger: &ArtifactLedger) {
-		self.deploy_id = ledger.deploy_id;
-		self.deploy_timestamp = ledger.timestamp.clone();
+
+	/// The app identity, if this stack has one. Only a world can supply the
+	/// process default, so an unresolved stack authored without one has none.
+	pub fn app_name(&self) -> Option<&str> { self.app_name.as_deref() }
+
+	/// The deployment stage: this stack's own, else this launch's.
+	pub fn stage(&self) -> &str {
+		self.stage
+			.as_deref()
+			.unwrap_or(&BootstrapConfig::get().stage)
 	}
 
-	/// Create a stack with a local backend and a temporary directory for testing.
-	/// The directory will be removed on drop. On wasm the directory is a fixed
-	/// pseudo path: the config-only tests never touch the fs, and the two
-	/// `Project::validate` tests that do are native-gated.
-	#[cfg(test)]
-	pub fn default_local() -> (Self, TestWorkDir) {
-		#[cfg(not(target_arch = "wasm32"))]
-		let (dir, path) = {
-			let dir = TempDir::new_ws().unwrap();
-			let path = dir.path().into_ws_path().unwrap();
-			(dir, path)
-		};
-		#[cfg(target_arch = "wasm32")]
-		let (dir, path) = (TestWorkDir, WsPathBuf::new("target/infra/test"));
-
-		(
-			Self {
-				backend: LocalBackend::default().into(),
-				work_directory: path,
-				..Self::new("beet_infra")
-			},
-			dir,
-		)
+	/// The aws region: this stack's own, else `AWS_REGION`, else the crate
+	/// default. The one in-world read of that variable.
+	pub fn region(&self) -> SmolStr {
+		self.region
+			.clone()
+			.or_else(|| env_ext::var("AWS_REGION").ok().map(SmolStr::from))
+			.unwrap_or_else(|| crate::bindings::aws::region::DEFAULT.into())
 	}
 
-	pub fn is_production(&self) -> bool { self.stage == self.prod_stage }
+	/// Additional parameters, some of which may be required by a config
+	/// generator.
+	pub fn params(&self) -> &MultiMap<SmolStr, SmolStr> { &self.params }
 
-	// pub fn bucket_ident(&self, label: impl Into<SmolStr>) -> terra::Ident {
-	// 	self.resource_ident("buckets", label)
-	// }
-	// pub fn iam_role_slug(&self, label: impl Into<SmolStr>) -> terra::Ident {
-	// 	self.resource_ident("iam-roles", label)
-	// }
-
-	/// The app identity + stage this stack names resources in, the half of a
-	/// stack a runtime declaration also resolves against.
-	pub fn scope(&self) -> ResourceScope {
-		ResourceScope::new(self.app_name.clone(), self.stage.clone())
+	/// Whether this stack deploys the [production
+	/// stage](BootstrapConfig::PROD_STAGE), which often receives special
+	/// treatment like bucket locking and no subdomain.
+	pub fn is_production(&self) -> bool {
+		self.stage() == BootstrapConfig::PROD_STAGE
 	}
 
+	/// The identifier a resource label composes to in this stack, the single
+	/// definition of the `app--stage--label` convention.
 	pub fn resource_ident(&self, label: impl Into<SmolStr>) -> terra::Ident {
-		self.scope().resource_ident(label)
-	}
-
-	/// The state backend path, ie `my-app--prod--tofu.tfstate`.
-	pub fn backend_path(&self) -> SmolPath {
-		SmolPath::new(
-			self.resource_ident(self.state_suffix.clone())
-				.primary_identifier()
-				.to_string(),
+		terra::Ident::new(
+			self.app_name().unwrap_or_default(),
+			self.stage(),
+			label,
 		)
 	}
 
-	/// The S3 bucket name for artifacts storage.
-	pub fn artifact_bucket_name(&self) -> String {
-		self.resource_ident(self.artifact_bucket_suffix.clone())
-			.primary_identifier()
-			.to_string()
-	}
-
-	/// The S3 key for an artifact in this deployment.
-	pub fn artifact_key(&self, label: &str) -> String {
-		format!("versions/{}/{label}", self.deploy_id)
-	}
-
-	/// Create an artifacts client for this stack's artifact bucket, in the same
-	/// provider family as the state backend: local state stores artifacts in a
-	/// sibling directory, S3 state in an S3 bucket in [`Self::aws_region`].
-	pub fn artifacts_client(&self) -> ArtifactsClient {
-		let provider = self
-			.backend
-			.bucket_provider(&self.artifact_bucket_name(), &self.aws_region);
-		ArtifactsClient::new(
-			BlobStore::new(provider),
-			ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone()),
-		)
-	}
-
-	/// Initialize a config with the corresponding backend.
-	pub fn create_config(&self) -> terra::Config {
-		let key = self.backend_path().to_string();
-		terra::Config::default().with_backend(self.backend().to_json(&key))
-	}
-
-	pub fn state_file(&self) -> Blob {
-		self.backend.provider().erased_blob(self.backend_path())
+	/// The provider-facing resource name, ie `beet-site--prod--analytics`.
+	pub fn resource_name(&self, label: impl Into<SmolStr>) -> String {
+		self.resource_ident(label).primary_identifier().to_string()
 	}
 
 	/// The tofu config `blocks` build in this stack: the provider region, then
@@ -188,28 +126,45 @@ impl Stack {
 	/// deployed identity.
 	pub fn build_config<'a>(
 		&self,
+		deployment: &Deployment,
 		blocks: impl IntoIterator<Item = (EntityRef<'a>, &'a dyn Block)> + Clone,
 	) -> Result<terra::Config> {
-		let mut config = self.create_config();
+		let mut config = deployment.create_config(self);
 		config.add_provider_config(
 			&terra::Provider::AWS,
-			&serde_json::json!({ "region": self.aws_region() }),
+			&serde_json::json!({ "region": self.region() }),
 		)?;
 		// a pre-pass, since a compute block lowers the grants its *siblings*
 		// declared and the emit order is otherwise arbitrary.
 		let access = blocks
 			.clone()
 			.into_iter()
-			.flat_map(|(_, block)| block.runtime_access(&self.scope()))
+			.flat_map(|(_, block)| block.runtime_access(self))
 			.collect::<Vec<_>>()
 			.xmap(AccessGrants::new);
 		for (entity, block) in blocks {
-			block.apply_to_config(&entity, self, &access, &mut config)?;
+			block.apply_to_config(
+				&entity,
+				self,
+				deployment,
+				&access,
+				&mut config,
+			)?;
 		}
 		config.xok()
 	}
+
+	/// A resolved stack plus the launch that deploys it locally: a local state
+	/// backend and a temporary work directory removed on drop.
+	#[cfg(test)]
+	pub fn default_local() -> (Self, Deployment, crate::types::TestWorkDir) {
+		let (deployment, dir) = Deployment::default_local();
+		(Self::new("beet_infra").resolve(None), deployment, dir)
+	}
 }
 
+/// Resolves the [`Stack`] an entity belongs to, and the deploy traversal that
+/// starts from it.
 #[derive(SystemParam)]
 pub struct StackQuery<'w, 's> {
 	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
@@ -217,13 +172,43 @@ pub struct StackQuery<'w, 's> {
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
 	stores: Query<'w, 's, &'static BlobStore>,
+	package: Option<Res<'w, PackageConfig>>,
+	deployment: Option<Res<'w, Deployment>>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
-	/// The nearest ancestor carrying a [`Stack`], and the stack itself: the
-	/// root every block, artifact and verb under one deploy resolves against.
-	pub fn root(&self, entity: Entity) -> Result<(Entity, &Stack)> {
-		self.stacks.get(entity)
+	/// The resolved [`Stack`] `entity` composes its resource names against: the
+	/// nearest ancestor's, else the process default. A declaration outside every
+	/// stack is not an error, it simply belongs to no deploy's config and
+	/// resolves the names the process itself would.
+	pub fn resolve(&self, entity: Entity) -> Stack {
+		self.stack(entity)
+			.cloned()
+			.unwrap_or_default()
+			.resolve(self.package.as_deref())
+	}
+
+	/// The nearest ancestor [`Stack`] as authored, if any. A declaration made
+	/// purely for its runtime meaning has none.
+	pub fn stack(&self, entity: Entity) -> Option<&Stack> {
+		self.stacks.get(entity).ok().map(|(_, stack)| stack)
+	}
+
+	/// This launch's [`Deployment`], which [`InfraPlugin`] inits, else the
+	/// derived default for a world that has no infra plugin.
+	pub fn deployment(&self) -> Deployment {
+		self.deployment
+			.as_deref()
+			.cloned()
+			.unwrap_or_else(Deployment::default)
+	}
+
+	/// The entity carrying the nearest ancestor [`Stack`], and that stack
+	/// resolved: the root every block, artifact and verb under one deploy
+	/// resolves against.
+	pub fn root(&self, entity: Entity) -> Result<(Entity, Stack)> {
+		let (root, stack) = self.stacks.get(entity)?;
+		Ok((root, stack.resolve(self.package.as_deref())))
 	}
 
 	/// Every entity declared under `entity`'s stack: its root's descendants
@@ -284,10 +269,9 @@ impl<'w, 's> StackQuery<'w, 's> {
 		.xok()
 	}
 
-	/// Finds the stack in ancestors and
-	/// builds a config of all block descendents.
-	/// Sets the AWS provider region from the nearest [`AwsStack`] ancestor,
-	/// ensuring the tofu config and Rust SDK use the same region.
+	/// Finds the stack in ancestors and builds a config of all block
+	/// descendants, with the AWS provider region resolved from that stack so the
+	/// tofu config and the Rust SDK cannot disagree.
 	///
 	/// This is the whole definition step, and it is target-agnostic: a wasm
 	/// consumer authors blocks and builds the config here, then serializes it for
@@ -296,30 +280,31 @@ impl<'w, 's> StackQuery<'w, 's> {
 	pub fn build_config(
 		&self,
 		entity: Entity,
-	) -> Result<(&Stack, terra::Config)> {
+	) -> Result<(Stack, Deployment, terra::Config)> {
 		let (_, stack) = self.root(entity)?;
+		let deployment = self.deployment();
 		let blocks = self
 			.declared(entity)?
 			.into_iter()
 			.filter_map(|child| self.blocks.get(child).ok())
 			.map(|(entity, block)| (entity, &**block))
 			.collect::<Vec<_>>();
-		let config = stack.build_config(blocks)?;
-		Ok((stack, config))
+		let config = stack.build_config(&deployment, blocks)?;
+		Ok((stack, deployment, config))
 	}
 
 	/// [`build_config`](Self::build_config) wrapped in the tofu driver that
 	/// applies it, hence native-only.
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
-		let (stack, config) = self.build_config(entity)?;
-		Ok(Project::new(stack, config))
+		let (stack, deployment, config) = self.build_config(entity)?;
+		Ok(Project::new(stack, deployment, config))
 	}
 
 	/// Create an artifacts client for the stack at the given entity.
 	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
 		let (_, stack) = self.root(entity)?;
-		stack.artifacts_client().xok()
+		self.deployment().artifacts_client(&stack).xok()
 	}
 
 	/// Collect artifact entries from block descendants.
@@ -366,22 +351,104 @@ mod tests {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// The composition is the one the live stacks already resolve; renaming a
+	/// deployed resource is a production incident, so these strings are pinned.
 	#[beet_core::test]
-	fn stage_defaults_to_dev() {
-		// the beet test runner passes no `--stage`/`BEET_STAGE`, so a fresh stack
-		// resolves the `dev` default and is not production.
-		let stack = Stack::new("x");
-		stack.stage().xpect_eq("dev");
-		stack.is_production().xpect_false();
+	fn composes_the_live_names() {
+		let prod = Stack::new("beet-site").with_stage("prod");
+		prod.resource_name("analytics")
+			.xpect_eq("beet-site--prod--analytics");
+		prod.resource_name("app").xpect_eq("beet-site--prod--app");
+		Stack::new("beet-site")
+			.with_stage("dev")
+			.resource_name("artifacts")
+			.xpect_eq("beet-site--dev--artifacts");
+		Stack::new("beet-site")
+			.with_stage("shared")
+			.resource_name("assets")
+			.xpect_eq("beet-site--shared--assets");
+		Stack::new("beet")
+			.with_stage("shared")
+			.resource_name("assets")
+			.xpect_eq("beet--shared--assets");
 	}
 
+	/// Every field falls back to the process default, and the beet test runner
+	/// passes no `--stage`/`BEET_STAGE`, so a bare stack is `dev` and not
+	/// production. The app name is the one default only a world can supply.
+	#[beet_core::test]
+	fn resolves_the_process_defaults() {
+		let stack = Stack::default();
+		stack.stage().xpect_eq("dev");
+		stack.is_production().xpect_false();
+		stack.app_name().xpect_none();
+		stack
+			.resolve(Some(&PackageConfig {
+				app_name: Some("beet-site".into()),
+				..default()
+			}))
+			.app_name()
+			.xpect_eq(Some("beet-site"));
+	}
+
+	/// The `prod` stage (what `--stage=prod` resolves to) marks production,
+	/// flipping the stage-aware paths (eg the beet-site apex dns).
 	#[beet_core::test]
 	fn prod_stage_is_production() {
-		// the `prod` stage (what `--stage=prod` resolves to) marks production,
-		// flipping the stage-aware paths (eg the beet-site apex dns).
 		Stack::new("x")
 			.with_stage("prod")
 			.is_production()
 			.xpect_true();
+	}
+
+	/// An authored field wins over the process default, and resolution never
+	/// clobbers it.
+	#[beet_core::test]
+	fn authored_fields_win() {
+		let stack = Stack::default()
+			.with_stage("shared")
+			.with_region("eu-west-1")
+			.resolve(Some(&PackageConfig {
+				app_name: Some("beet-site".into()),
+				..default()
+			}));
+		stack.stage().xpect_eq("shared");
+		stack.region().as_str().xpect_eq("eu-west-1");
+	}
+
+	/// The region an all-default stack resolves, unchanged from the per-block
+	/// `region` fields this phase turned into overrides: those defaulted to this
+	/// same constant, so the rendered tofu value must not move. A changed region
+	/// REPLACES every physical resource.
+	#[beet_core::test]
+	fn default_region_is_the_pinned_constant() {
+		crate::bindings::aws::region::DEFAULT.xpect_eq("us-west-2");
+		// `AWS_REGION` is the documented first fallback, so the constant only
+		// governs a process carrying none.
+		if env_ext::var("AWS_REGION").is_err() {
+			Stack::default().region().as_str().xpect_eq("us-west-2");
+		}
+	}
+
+	/// Two stacks sharing one launch compose distinct state paths, so a `shared`
+	/// deploy can never overwrite the stage deploy's state. The keys are the ones
+	/// the live backends already hold (the suffix kebab-cases with every other
+	/// segment), so they are pinned too.
+	#[beet_core::test]
+	fn stacks_share_a_launch_and_split_their_state() {
+		let (deployment, _dir) = Deployment::default_local();
+		let stage = Stack::new("beet-site").with_stage("dev");
+		let shared = Stack::new("beet-site").with_stage("shared");
+		deployment
+			.backend_path(&stage)
+			.to_string()
+			.xpect_eq("beet-site--dev--tofu-tfstate");
+		deployment
+			.backend_path(&shared)
+			.to_string()
+			.xpect_eq("beet-site--shared--tofu-tfstate");
+		deployment
+			.artifact_bucket_name(&stage)
+			.xpect_eq("beet-site--dev--artifacts");
 	}
 }

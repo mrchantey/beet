@@ -49,7 +49,7 @@ pub enum DiagnosticKind {
 }
 
 /// Configures the [`DiagnosticSeverity`] of each render check, overridable by a site like
-/// [`PackageConfig`](beet_net::prelude::PackageConfig) (it is a reflected
+/// [`PackageConfig`](beet_core::prelude::PackageConfig) (it is a reflected
 /// resource, patchable from markup).
 ///
 /// Defaults recover the typed-build guarantees: an unknown tag and a broken

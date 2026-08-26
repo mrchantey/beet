@@ -16,8 +16,11 @@ use bytes::Bytes;
 pub struct S3Store {
 	/// The S3 bucket name.
 	bucket_name: SmolStr,
-	/// The AWS region for this store.
-	region: SmolStr,
+	/// The region this store's client is pinned to, else the SDK's own default
+	/// provider chain (`AWS_REGION`, the profile, the instance metadata). A
+	/// store built at the process boundary leaves it unset; one built from a
+	/// declaration carries the region that declaration resolved.
+	region: Option<SmolStr>,
 	/// Optional subdirectory prefix for all keys.
 	subdir: Option<SmolPath>,
 	/// Optional S3 endpoint override. Unset uses the default AWS endpoint;
@@ -38,13 +41,26 @@ impl S3Store {
 		bucket_name: impl Into<SmolStr>,
 		region: impl Into<SmolStr>,
 	) -> Self {
+		Self::new_default_region(bucket_name).with_region(region)
+	}
+
+	/// Create a store whose region the SDK's default provider chain resolves,
+	/// the process-boundary convention: a `--store=s3://<bucket>` names a
+	/// bucket, not a region.
+	pub fn new_default_region(bucket_name: impl Into<SmolStr>) -> Self {
 		Self {
 			bucket_name: bucket_name.into(),
-			region: region.into(),
+			region: None,
 			subdir: None,
 			endpoint: None,
 			public: false,
 		}
+	}
+
+	/// Pin this store's client to `region`.
+	pub fn with_region(mut self, region: impl Into<SmolStr>) -> Self {
+		self.region = Some(region.into());
+		self
 	}
 
 	/// Create a store backed by Cloudflare R2 through its S3-compatible API. The
@@ -95,27 +111,34 @@ impl S3Store {
 	/// Cached by `(region, endpoint)` so an R2 store and an AWS store in the same
 	/// region get distinct clients.
 	async fn client(&self) -> Client {
-		static POOL: LazyPool<(SmolStr, Option<SmolStr>), Client, Client> =
-			LazyPool::new(|key| {
-				let (region, endpoint) = (key.0.clone(), key.1.clone());
-				Box::pin(async move {
-					let region_obj = Region::new(region.to_string());
-					let config =
-						aws_config::from_env().region(region_obj).load().await;
-					match endpoint {
-						// R2 / S3-compatible: override the endpoint and use
-						// path-style addressing, which those services require.
-						Some(endpoint) => Client::from_conf(
-							aws_sdk_s3::config::Builder::from(&config)
-								.endpoint_url(endpoint.to_string())
-								.force_path_style(true)
-								.build(),
-						),
-						// the unchanged default AWS path.
-						None => Client::new(&config),
-					}
-				})
-			});
+		static POOL: LazyPool<
+			(Option<SmolStr>, Option<SmolStr>),
+			Client,
+			Client,
+		> = LazyPool::new(|key| {
+			let (region, endpoint) = (key.0.clone(), key.1.clone());
+			Box::pin(async move {
+				// a configured region wins; an unset one leaves the SDK's own
+				// default chain in place.
+				let mut loader = aws_config::from_env();
+				if let Some(region) = region {
+					loader = loader.region(Region::new(region.to_string()));
+				}
+				let config = loader.load().await;
+				match endpoint {
+					// R2 / S3-compatible: override the endpoint and use
+					// path-style addressing, which those services require.
+					Some(endpoint) => Client::from_conf(
+						aws_sdk_s3::config::Builder::from(&config)
+							.endpoint_url(endpoint.to_string())
+							.force_path_style(true)
+							.build(),
+					),
+					// the unchanged default AWS path.
+					None => Client::new(&config),
+				}
+			})
+		});
 		POOL.get(&(self.region.clone(), self.endpoint.clone()))
 			.await
 	}
@@ -154,7 +177,9 @@ impl BlobStoreProvider for S3Store {
 
 	fn root_key(&self) -> SmolStr { format!("s3:{}", self.bucket_name).into() }
 
-	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
+	fn region(&self) -> Option<String> {
+		self.region.as_ref().map(ToString::to_string)
+	}
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
@@ -186,12 +211,16 @@ impl BlobStoreProvider for S3Store {
 			let mut req =
 				client.create_bucket().bucket(this.bucket_name.as_str());
 
-			// us-east-1 is S3's default region and rejects an explicit
-			// LocationConstraint; all other regions require it.
-			if this.region.as_str() != "us-east-1" {
+			// the client's RESOLVED region, so an unpinned store creates the
+			// bucket where its own requests will land. us-east-1 is S3's default
+			// region and rejects an explicit LocationConstraint; all other
+			// regions require it.
+			let region = client.config().region().map(ToString::to_string);
+			if let Some(region) = region.filter(|region| region != "us-east-1")
+			{
 				use aws_sdk_s3::types::CreateBucketConfiguration;
 				let bucket_config = CreateBucketConfiguration::builder()
-					.location_constraint(this.region.as_str().into())
+					.location_constraint(region.as_str().into())
 					.build();
 				req = req.create_bucket_configuration(bucket_config);
 			}
@@ -407,11 +436,18 @@ impl BlobStoreProvider for S3Store {
 				endpoint.trim_end_matches('/'),
 				self.bucket_name
 			),
-			// virtual-hosted AWS S3 URL.
-			None => format!(
-				"https://{}.s3.{}.amazonaws.com/{key}",
-				self.bucket_name, self.region
-			),
+			// virtual-hosted AWS S3 URL, regional when this store names its
+			// region, else the global endpoint (which redirects to it).
+			None => match &self.region {
+				Some(region) => format!(
+					"https://{}.s3.{region}.amazonaws.com/{key}",
+					self.bucket_name
+				),
+				None => format!(
+					"https://{}.s3.amazonaws.com/{key}",
+					self.bucket_name
+				),
+			},
 		};
 		Box::pin(async move { Some(public_url).xok() })
 	}
@@ -448,7 +484,7 @@ mod test {
 	async fn r2_store_config() {
 		// no network: verifies the R2 constructor wiring + path-style public url.
 		let store = S3Store::r2("abc123", "my-bucket");
-		store.region().as_str().xpect_eq("auto");
+		store.region().as_deref().xpect_eq(Some("auto"));
 		store
 			.endpoint()
 			.as_ref()

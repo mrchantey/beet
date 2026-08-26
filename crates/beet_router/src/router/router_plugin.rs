@@ -21,6 +21,10 @@ impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<ActionPlugin>()
 			.init_plugin::<AsyncPlugin>()
+			// the `PackageConfig` a layout binds through
+			// `@res:PackageConfig.title`: registered and seeded there, so a
+			// routerless app can author one too.
+			.init_plugin::<BootstrapPlugin>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_path_pattern_for_late_path_partial)
 			.add_observer(insert_route_tree)
@@ -93,8 +97,6 @@ impl Plugin for RouterPlugin {
 				// per-route metadata, bindable via the reserved ref, eg
 				// `@entity:PageRoot::ArticleMeta.title`
 				.register_type::<ArticleMeta>()
-				// the package resource, bindable as eg `@res:PackageConfig.title`
-				.register_type::<PackageConfig>()
 				// the no-code render-diagnostics config, patchable from markup
 				// like `PackageConfig`, eg `<RenderDiagnostics unknown_class="Off"/>`
 				.register_type::<RenderDiagnostics>()

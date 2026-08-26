@@ -123,8 +123,7 @@ impl SshConnection {
 
 		// the key file is what `ssh -i` reads, and ssh refuses a group- or
 		// world-readable one outright
-		let key_path = project.stack().work_directory().into_abs();
-		let key_path = key_path.join("deploy_key.pem");
+		let key_path = project.work_dir().join("deploy_key.pem");
 		fs_ext::write_async(&key_path, key_pem.as_bytes()).await?;
 		#[cfg(unix)]
 		{

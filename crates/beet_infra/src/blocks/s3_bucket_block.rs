@@ -11,8 +11,8 @@ use serde_json::json;
 ///
 /// Authored directly from markup, ie `<S3BucketBlock label="app"
 /// deploy_versioned=false/>`. The label alone is declared; the
-/// `<app>--<stage>--<label>` name composes at resolution through
-/// [`ResourceScope`], so both sides read the same string.
+/// `<app>--<stage>--<label>` name composes at resolution through the ancestor
+/// [`Stack`], so both sides read the same string.
 #[derive(
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
@@ -20,8 +20,10 @@ use serde_json::json;
 #[component(immutable, on_add = ErasedBlock::on_add::<S3BucketBlock>)]
 pub struct S3BucketBlock {
 	label: SmolStr,
-	/// The aws region the bucket lives in.
-	region: SmolStr,
+	/// Override the region this bucket lives in, which otherwise resolves from
+	/// the ancestor [`Stack`].
+	#[set_with(unwrap_option, into)]
+	region: Option<SmolStr>,
 	/// add a tofu output for the bucket name
 	output: bool,
 	/// Allow the deploy to delete a non-empty bucket. `false` for a source of
@@ -52,7 +54,7 @@ impl S3BucketBlock {
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
-			region: crate::bindings::aws::region::DEFAULT.into(),
+			region: None,
 			output: true,
 			force_destroy: true,
 			deploy_versioned: true,
@@ -63,19 +65,24 @@ impl S3BucketBlock {
 
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
+	/// The region this bucket lives in: its own override, else `stack`'s.
+	pub fn resolved_region(&self, stack: &Stack) -> SmolStr {
+		self.region.clone().unwrap_or_else(|| stack.region())
+	}
+
 	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket, resolved
-	/// against `scope` (the composed bucket name) and this block's own region.
-	/// A deploy-versioned bucket needs the deploy id, which only a [`Stack`]
-	/// carries, so pass it through when there is one.
+	/// against `stack` (the composed bucket name and the region). A
+	/// deploy-versioned bucket also nests under the deploy id, which only a
+	/// [`Deployment`] carries, so pass one through when there is one.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	pub fn store(
 		&self,
-		scope: &ResourceScope,
+		stack: &Stack,
 		deploy_id: Option<&Uuid>,
 	) -> beet_net::prelude::S3Store {
 		let store = beet_net::prelude::S3Store::new(
-			scope.resource_name(self.label.clone()),
-			self.region.clone(),
+			stack.resource_name(self.label.clone()),
+			self.resolved_region(stack),
 		);
 		match (self.deploy_versioned, deploy_id) {
 			(true, Some(deploy_id)) => {
@@ -88,8 +95,12 @@ impl S3BucketBlock {
 	/// The store for this bucket as a deploy declares it, ie including the
 	/// per-deploy subdir a versioned bucket nests under.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	pub fn stack_store(&self, stack: &Stack) -> beet_net::prelude::S3Store {
-		self.store(&stack.scope(), Some(stack.deploy_id()))
+	pub fn stack_store(
+		&self,
+		stack: &Stack,
+		deployment: &Deployment,
+	) -> beet_net::prelude::S3Store {
+		self.store(stack, Some(deployment.deploy_id()))
 	}
 }
 
@@ -110,13 +121,10 @@ pub(crate) fn attach_s3_store(
 		.entity(ev.entity)
 		.queue(|mut entity: EntityWorldMut| -> Result {
 			let block = entity.get_or_else::<S3BucketBlock>()?.clone();
-			let store = entity.with_state::<ResourceScopeQuery, _>(
-				|entity, scopes| -> Result<_> {
-					let deploy_id =
-						scopes.stack(entity).map(|stack| *stack.deploy_id());
-					block.store(&scopes.get(entity)?, deploy_id.as_ref()).xok()
-				},
-			)?;
+			let store = entity.with_state::<StackQuery, _>(|entity, stacks| {
+				let deploy_id = stacks.deployment().deploy_id().clone();
+				block.store(&stacks.resolve(entity), Some(&deploy_id))
+			});
 			entity.insert(store);
 			Ok(())
 		});
@@ -127,6 +135,7 @@ impl Block for S3BucketBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		_deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
@@ -134,7 +143,7 @@ impl Block for S3BucketBlock {
 			stack.resource_ident(self.label.clone()),
 			AwsS3BucketDetails {
 				force_destroy: Some(self.force_destroy),
-				region: Some(self.region.clone()),
+				region: Some(self.resolved_region(stack)),
 				..default()
 			},
 		);
@@ -158,9 +167,9 @@ impl Block for S3BucketBlock {
 
 	/// A deployed process reads the buckets declared alongside it (its site
 	/// store, its assets); the deploy itself is what writes them.
-	fn runtime_access(&self, scope: &ResourceScope) -> Vec<AccessGrant> {
+	fn runtime_access(&self, stack: &Stack) -> Vec<AccessGrant> {
 		vec![AccessGrant::read(AccessResource::S3Bucket {
-			name: scope.resource_name(self.label.clone()),
+			name: stack.resource_name(self.label.clone()),
 		})]
 	}
 }
@@ -234,13 +243,14 @@ mod tests {
 
 	/// The config `block` emits, and the throwaway stack it was resolved against.
 	fn build_config(block: S3BucketBlock) -> (Stack, terra::Config) {
-		let (stack, _dir) = Stack::default_local();
-		let mut config = stack.create_config();
+		let (stack, deployment, _dir) = Stack::default_local();
+		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		block
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
+				&deployment,
 				&default(),
 				&mut config,
 			)
@@ -266,6 +276,20 @@ mod tests {
 			.xpect_contains("PublicReadGetObject")
 			.xpect_contains("s3:ListBucket")
 			.xpect_contains("PublicListBucket");
+	}
+
+	/// The region is the STACK's now that the block's own field is an override,
+	/// and the emitted value is the one the live buckets already carry: a moved
+	/// region replaces every physical resource.
+	#[beet_core::test]
+	fn region_resolves_from_the_stack() {
+		build_json(S3BucketBlock::new("app"))
+			.as_str()
+			.xpect_contains("\"region\":\"us-west-2\"");
+		// ..and an override on the block wins over its stack
+		build_json(S3BucketBlock::new("app").with_region("eu-west-1"))
+			.as_str()
+			.xpect_contains("\"region\":\"eu-west-1\"");
 	}
 
 	#[beet_core::test]

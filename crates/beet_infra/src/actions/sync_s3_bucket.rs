@@ -110,7 +110,7 @@ pub async fn SyncS3BucketAction(
 		.send()
 		.await?;
 	trace!(
-		"synced {s3_uri} (region: {})",
+		"synced {s3_uri} (region: {:?})",
 		s3_fs_store.s3_store().region()
 	);
 	trace!("SyncS3BucketAction: complete");

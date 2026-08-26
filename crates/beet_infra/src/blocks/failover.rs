@@ -97,6 +97,7 @@ impl Block for CloudflareFailoverBlock {
 		&self,
 		_entity: &EntityRef,
 		stack: &Stack,
+		_deployment: &Deployment,
 		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
@@ -159,8 +160,8 @@ mod tests {
 
 	#[beet_core::test]
 	fn emits_load_balancer_with_primary_and_fallback_pools() {
-		let (stack, _dir) = Stack::default_local();
-		let mut config = stack.create_config();
+		let (stack, deployment, _dir) = Stack::default_local();
+		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
 		CloudflareFailoverBlock::new(
 			"site.example",
@@ -173,6 +174,7 @@ mod tests {
 		.apply_to_config(
 			&world.spawn(()).as_readonly(),
 			&stack,
+			&deployment,
 			&default(),
 			&mut config,
 		)

@@ -40,16 +40,14 @@ impl AnalyticsStore {
 		Self::new(Table::new(BlobStore::new(FsStore::new(dir))))
 	}
 
-	/// The remote (DynamoDB) analytics store at `table_name`, in `AWS_REGION`
-	/// else the default region. Used by `beet analytics --remote` to query
-	/// without a scene; errors without the `aws_sdk` backend.
+	/// The remote (DynamoDB) analytics store at `table_name`, in whichever region
+	/// the SDK's default provider chain resolves. Used by `beet analytics
+	/// --remote` to query without a scene (there is no declaration to read a
+	/// region off); errors without the `aws_sdk` backend.
 	pub fn remote(table_name: &str) -> Result<Self> {
 		cfg_if! {
 			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				Self::new(Table::new(DynamoStore::new(
-					table_name,
-					DynamoStore::env_region(),
-				)))
+				Self::new(Table::new(DynamoStore::new_default_region(table_name)))
 				.xok()
 			} else {
 				let _ = table_name;

@@ -68,16 +68,23 @@ pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
 /// `<BucketStack app_name="bucket-example"/>` — [`StackHost`]'s shape, but
 /// selecting an S3 state backend when `--s3-backend` is passed (else local).
 /// The markup form of lifecycle.rs's backend toggle.
-#[template]
-pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
+///
+/// The backend is a property of the LAUNCH, not of the stack's identity, so the
+/// toggle lands on the process [`Deployment`].
+#[template(system)]
+pub fn BucketStack(
+	#[prop(into)] app_name: String,
+	mut deployment: ResMut<Deployment>,
+) -> impl Bundle {
 	let backend: StackBackend =
 		if CliArgs::parse_env().params.contains_key("s3-backend") {
 			S3Backend::default().into()
 		} else {
 			LocalBackend::default().into()
 		};
+	deployment.set_backend(backend);
 	(CliServer::default(), CallOnReady, children![(
-		Stack::new(app_name).with_backend(backend),
+		Stack::new(app_name),
 		Router::with_defaults(),
 		children![
 			Validate,
@@ -92,10 +99,14 @@ pub fn BucketStack(#[prop(into)] app_name: String) -> impl Bundle {
 }
 
 /// `<SiteSync app_name="lambda"/>` — publish `examples/bsx_site` to the stack's
-/// app bucket. The markup form of `sync_site(stack)`.
-#[template]
-pub fn SiteSync(#[prop(into)] app_name: String) -> impl Bundle {
-	infra_ext::sync_site(&Stack::new(app_name))
+/// app bucket. The markup form of `sync_site(stack, deployment)`: the bucket is
+/// deploy-versioned, so the sync also needs this launch's id.
+#[template(system)]
+pub fn SiteSync(
+	#[prop(into)] app_name: String,
+	deployment: Res<Deployment>,
+) -> impl Bundle {
+	infra_ext::sync_site(&Stack::new(app_name), &deployment)
 }
 
 /// `<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>` — the lambda
@@ -222,18 +233,16 @@ pub fn LightsailBeetSiteBlock(
 	/// dispatcher, so the deployed process names which of its routes IS the site.
 	#[prop(default = String::from("serve"))]
 	exec_route: String,
-	scopes: ResourceScopeQuery,
+	stacks: StackQuery,
 	entity: Entity,
 ) -> Result<impl Bundle> {
-	// the app identity comes from the app's own `<PackageConfig/>`, resolved
-	// through the one composition both the deploy and the runtime read.
-	let scope = scopes.get(entity)?;
-	let is_production = scopes
-		.stack(entity)
-		.is_some_and(|stack| stack.is_production());
+	// the app identity comes from the ancestor `<Stack>`, else the app's own
+	// `<PackageConfig/>`: one composition both the deploy and the runtime read.
+	let stack = stacks.resolve(entity);
+	let is_production = stack.is_production();
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
-	let app_bucket = scope.resource_name("app");
+	let app_bucket = stack.resource_name("app");
 	let block = LightsailBlock::default()
 		.with_bundle_id("small_3_0")
 		.with_allow_ssh(true)
@@ -298,22 +307,18 @@ pub fn LightsailBeetSiteBlock(
 /// resources (the assets bucket) with the same verbs under the `shared/` route
 /// prefix, so provisioning them is its own step (`beet shared apply`), separate
 /// from any stage deploy.
-#[template(system)]
+#[template]
 pub fn DeployHost(
 	#[prop(default)] stage: Option<String>,
 	#[prop(default)] app_name: Option<String>,
-	package: Option<Res<PackageConfig>>,
-) -> Result<impl Bundle> {
-	let app_name = match app_name {
-		Some(app_name) => SmolStr::from(app_name),
-		None => ResourceScope::from_package(package.as_deref())?
-			.app_name()
-			.clone(),
-	};
-	let stack = match stage {
-		Some(stage) => Stack::new(app_name).with_stage(stage),
-		None => Stack::new(app_name),
-	};
+) -> impl Bundle {
+	let mut stack = Stack::default();
+	if let Some(app_name) = app_name {
+		stack = stack.with_app_name(app_name);
+	}
+	if let Some(stage) = stage {
+		stack = stack.with_stage(stage);
+	}
 	(stack, children![
 		Validate,
 		Plan,
@@ -325,7 +330,6 @@ pub fn DeployHost(
 		Rollforward,
 		SlotTarget::new(),
 	])
-		.xok()
 }
 
 #[cfg(test)]
@@ -355,6 +359,40 @@ mod test {
 			))
 			.unwrap();
 		world.flush();
+	}
+
+	/// A block declared in a host's SLOT resolves a stack rather than raising.
+	///
+	/// REGRESSION: `examples/infra/bucket.bsx` and `lambda.bsx` both HUNG. Their
+	/// `<S3BucketBlock/>` sits in the host template's slot, so at attach time it
+	/// is still parented to the unresolved `<BucketStack>` element and has no
+	/// ancestor `<Stack>` yet; resolution used to `bevybail!` there, and a raise
+	/// in a queued command left the process with nothing to run and no output.
+	/// Resolution now falls back to the process default stack, so the store
+	/// attaches and the entry reaches its router.
+	#[beet_core::test]
+	fn a_slotted_block_resolves_a_stack() {
+		let mut world = test_world();
+		world.insert_resource(PackageConfig {
+			app_name: Some("bucket-example".into()),
+			..default()
+		});
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<BucketStack app_name="bucket-example">
+				<Route path="run" {ExchangeSequence}>
+					<S3BucketBlock label="my-bucket" deploy_versioned=false/>
+				</Route>
+			</BucketStack>"#,
+		);
+		world
+			.query::<&S3Store>()
+			.single(&world)
+			.unwrap()
+			.bucket_name()
+			.xpect_eq("bucket-example--dev--my-bucket");
 	}
 
 	/// One declaration, two meanings. The site declares its analytics table
@@ -389,14 +427,14 @@ mod test {
 				<Route path="shared"><DeployHost stage="shared"/></Route>
 			</Fragment>"#,
 		);
-		let scope = ResourceScope::new("beet-site", "dev");
+		let scope = Stack::new("beet-site").with_stage("dev");
 		let expected = scope.resource_name("analytics");
 
 		/// The tofu json a host stack builds.
 		fn config_json(world: &mut World, host: Entity) -> String {
 			world
 				.with_state::<StackQuery, _>(|stacks| {
-					stacks.build_config(host).map(|(_, config)| config)
+					stacks.build_config(host).map(|(.., config)| config)
 				})
 				.unwrap()
 				.to_json()
@@ -405,12 +443,12 @@ mod test {
 		let hosts = world
 			.query::<(Entity, &Stack)>()
 			.iter(&world)
-			.map(|(entity, stack)| (entity, stack.stage().clone()))
+			.map(|(entity, stack)| (entity, stack.stage().to_string()))
 			.collect::<Vec<_>>();
 		for (host, stage) in hosts {
 			let json = config_json(&mut world, host);
 			// the deploy side: the table lands in the app stack's config only
-			match stage.as_str() {
+			match stage.as_str() as &str {
 				"shared" => json.as_str().xnot().xpect_contains("analytics"),
 				_ => json.as_str().xpect_contains(&expected),
 			};

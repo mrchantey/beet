@@ -61,7 +61,7 @@ pub async fn LightsailReleaseAction(
 		.with_state::<ReleaseQuery, _>(|entity, query| query.resolve(entity))
 		.await??;
 
-	let deploy_id = project.stack().deploy_id().to_string();
+	let deploy_id = project.deployment().deploy_id().to_string();
 	let connection =
 		SshConnection::from_project(&project, block.management_ssh_port())
 			.await?;
@@ -77,11 +77,7 @@ pub async fn LightsailReleaseAction(
 		*release.timeout(),
 		*release.poll(),
 	);
-	let local_path = project
-		.stack()
-		.work_directory()
-		.into_abs()
-		.join("release.sh");
+	let local_path = project.work_dir().join("release.sh");
 	fs_ext::write_async(&local_path, script.as_bytes()).await?;
 	// the ssh user's home dir, not /tmp: a predictable world-writable path is
 	// a symlink-planting target, and root runs this script

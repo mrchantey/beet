@@ -18,8 +18,8 @@ use core::str::FromStr;
 /// 2. `memory`: a temporary in-memory store.
 /// 3. `s3://<bucket>[?endpoint=<url>][&region=<region>]`: an S3-compatible
 ///    bucket. With an `endpoint` (eg a Cloudflare R2 account endpoint) the region
-///    defaults to `auto`; without one it falls back to `AWS_REGION`, then
-///    `us-west-2`.
+///    defaults to `auto`; without one an unnamed region is left to the AWS SDK's
+///    own default provider chain.
 /// 4. `local-storage` / `indexed-db`: browser storage (wasm).
 ///
 /// ## Example

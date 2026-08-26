@@ -19,11 +19,9 @@ pub fn app_bucket() -> S3BucketBlock {
 
 /// The resolved name of the app bucket for this stack, ready to inject so the
 /// deployed binary reconstructs the same store. Deterministic for a given stack
-/// (the `resource_ident`, independent of the per-deploy id), so a throwaway stack
+/// (identity only, independent of the per-deploy id), so a throwaway stack
 /// rebuilt from the same `app_name` resolves the same bucket.
-pub fn app_bucket_name(stack: &Stack) -> String {
-	stack.scope().resource_name("app")
-}
+pub fn app_bucket_name(stack: &Stack) -> String { stack.resource_name("app") }
 
 /// A CloudWatch tail of `target`, with an optional timeout after which the
 /// follow is killed. The log group composes from the ancestor [`Stack`] when the
@@ -78,11 +76,14 @@ pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 /// Sync `examples/bsx_site` (the no-code site) to the bucket root, the content every
 /// infra example serves. A mirror, so a renamed or removed source file does not
 /// linger in the bucket across deploys.
-pub fn sync_site(stack: &Stack) -> impl Bundle + use<> {
+pub fn sync_site(
+	stack: &Stack,
+	deployment: &Deployment,
+) -> impl Bundle + use<> {
 	(
 		S3FsStore::new(
 			FsStore::new(WsPathBuf::new("examples/bsx_site")),
-			app_bucket().stack_store(stack),
+			app_bucket().stack_store(stack, deployment),
 		),
 		SyncS3Bucket::default().with_delete(true),
 	)

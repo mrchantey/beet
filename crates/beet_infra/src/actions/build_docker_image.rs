@@ -71,13 +71,13 @@ pub async fn BuildDockerImageAction(
 	let docker_config = cx.caller.get_cloned::<BuildDockerImage>().await?;
 	let engine = docker_config.engine;
 
-	// get the stack for region and deploy_id
-	let stack = cx
+	// the resolved stack (region, resource names) and this launch's deploy id
+	let (stack, deployment) = cx
 		.caller
-		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
-			query.get(entity).map(|s| s.clone())
+		.with_state::<StackQuery, _>(|entity, query| {
+			(query.resolve(entity), query.deployment())
 		})
-		.await??;
+		.await?;
 
 	// get siblings by querying the parent's children
 	let (block, artifact) = cx
@@ -188,13 +188,13 @@ pub async fn BuildDockerImageAction(
 	// terraform uses stack.resource_ident(block.build_label("ecr")).primary_identifier()
 	let ecr_ident = stack.resource_ident(block.build_label("ecr"));
 	let ecr_repo_name = ecr_ident.primary_identifier();
-	let region = stack.aws_region();
+	let region = stack.region();
 	let account_id = get_aws_account_id().await?;
 	let ecr_url =
 		format!("{account_id}.dkr.ecr.{region}.amazonaws.com/{ecr_repo_name}");
 
 	// ensure ECR repository exists
-	ensure_ecr_repository(region, ecr_repo_name).await?;
+	ensure_ecr_repository(&region, ecr_repo_name).await?;
 
 	// authenticate to ECR
 	let engine_cmd = engine.command();
@@ -215,7 +215,7 @@ pub async fn BuildDockerImageAction(
 		.map_err(|err| bevyhow!("ECR authentication failed: {err}"))?;
 
 	// build container image
-	let image_tag = format!("{}:{}", ecr_url, stack.deploy_id());
+	let image_tag = format!("{}:{}", ecr_url, deployment.deploy_id());
 	info!("building {} image: {image_tag}", engine_cmd);
 	let build_cmd = ChildProcess::new(engine_cmd).with_args([
 		"build",

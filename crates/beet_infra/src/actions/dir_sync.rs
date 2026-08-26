@@ -6,8 +6,8 @@ use beet_net::prelude::*;
 
 /// `<DirSync bucket="app" local_dir="site"/>` — the local end and the bucket
 /// end of one sync, addressed by bucket *label* so the
-/// `<app>--<stage>--<label>` name composes through the same [`ResourceScope`]
-/// the deploy created the bucket with.
+/// `<app>--<stage>--<label>` name composes through the same [`Stack`] the
+/// deploy created the bucket with.
 ///
 /// The sync itself is [`SyncS3Bucket`], required here and overridable as a
 /// colocated spread, ie `<DirSync bucket="app" local_dir="site"
@@ -25,13 +25,12 @@ pub struct DirSync {
 	/// Override the resolved stage, for a bucket outside the deploy's own stage.
 	#[set_with(unwrap_option, into)]
 	stage: Option<SmolStr>,
-	/// The aws region the bucket lives in.
-	region: SmolStr,
+	/// Override the region the bucket lives in, which otherwise resolves from
+	/// the ancestor [`Stack`].
+	#[set_with(unwrap_option, into)]
+	region: Option<SmolStr>,
 }
 
-/// The markup patch builds over this, so the region default must be the real
-/// one: an empty region would silently fall back to whatever `AWS_REGION` the
-/// machine happens to carry.
 impl Default for DirSync {
 	fn default() -> Self { Self::new("", "") }
 }
@@ -45,17 +44,20 @@ impl DirSync {
 			bucket: bucket.into(),
 			local_dir: local_dir.into(),
 			stage: None,
-			region: crate::bindings::aws::region::DEFAULT.into(),
+			region: None,
 		}
 	}
 
-	/// The scope this sync addresses its bucket in: the entity's resolved scope,
-	/// with the [`stage`](Self::stage) override applied.
-	fn scope(&self, resolved: ResourceScope) -> ResourceScope {
-		match &self.stage {
-			Some(stage) => {
-				ResourceScope::new(resolved.app_name().clone(), stage.clone())
-			}
+	/// The stack this sync addresses its bucket in: the entity's resolved stack,
+	/// with the [`stage`](Self::stage) and [`region`](Self::region) overrides
+	/// applied.
+	fn stack(&self, resolved: Stack) -> Stack {
+		let resolved = match &self.stage {
+			Some(stage) => resolved.with_stage(stage.clone()),
+			None => resolved,
+		};
+		match &self.region {
+			Some(region) => resolved.with_region(region.clone()),
 			None => resolved,
 		}
 	}
@@ -73,16 +75,16 @@ pub(crate) fn attach_dir_sync_store(
 		.entity(ev.entity)
 		.queue(|mut entity: EntityWorldMut| -> Result {
 			let sync = entity.get_or_else::<DirSync>()?.clone();
-			let scope = entity
-				.with_state::<ResourceScopeQuery, _>(|entity, scopes| {
-					scopes.get(entity)
-				})?
-				.xmap(|scope| sync.scope(scope));
+			let stack = entity
+				.with_state::<StackQuery, _>(|entity, stacks| {
+					stacks.resolve(entity)
+				})
+				.xmap(|stack| sync.stack(stack));
 			entity.insert(S3FsStore::new(
 				FsStore::new(WsPathBuf::new(sync.local_dir().to_string())),
 				S3Store::new(
-					scope.resource_name(sync.bucket().clone()),
-					sync.region().clone(),
+					stack.resource_name(sync.bucket().clone()),
+					stack.region(),
 				),
 			));
 			Ok(())

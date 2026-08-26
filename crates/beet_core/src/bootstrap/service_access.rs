@@ -49,3 +49,14 @@ impl fmt::Display for ServiceAccess {
 		}
 	}
 }
+
+#[cfg(feature = "std")]
+impl ServiceAccess {
+	/// The workspace directory backing a [`Local`](Self::Local) store declared
+	/// under `label`, ie `target/stores/analytics`. The local stand-in for the
+	/// cloud resource the same declaration names when [`Remote`](Self::Remote),
+	/// so one markup declaration runs both ways.
+	pub fn local_store_dir(label: impl AsRef<std::path::Path>) -> WsPathBuf {
+		WsPathBuf::new("target/stores").join(label)
+	}
+}

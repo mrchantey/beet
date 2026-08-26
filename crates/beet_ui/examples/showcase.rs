@@ -45,7 +45,6 @@ fn main() {
 			app_name: Some("showcase".into()),
 			version: "0.0.0".into(),
 			homepage: Some("https://beet.org".into()),
-			repository: None,
 		})
 		.add_systems(Startup, serve_showcase)
 		.run();
