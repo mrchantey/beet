@@ -73,7 +73,7 @@ mod test {
 		world
 			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("deploy"),
-				RequireFeatures::new("infra,extra"),
+				RequireFeatures::new(["infra", "extra"]),
 				ExchangeSequence,
 				children![UnregisteredTag::new("TofuApply")],
 			)]))
@@ -100,7 +100,7 @@ mod test {
 		world
 			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("run"),
-				RequireFeatures::new("infra,extra"),
+				RequireFeatures::new(["infra", "extra"]),
 				ExchangeSequence,
 				children![
 					Action::<Request, Outcome<Request, Response>>::new_pure(
@@ -126,7 +126,7 @@ mod test {
 		world
 			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("shared"),
-				RequireFeatures::new("infra,extra"),
+				RequireFeatures::new(["infra", "extra"]),
 				children![(
 					PathPartial::new("push"),
 					ExchangeSequence,

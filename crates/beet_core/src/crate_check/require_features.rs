@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// [`CrateRegistration`] set:
 ///
 /// ```html
-/// <Route path="deploy" {(ExchangeSequence, RequireFeatures("infra,extra"))}>
+/// <Route path="deploy" {(ExchangeSequence, RequireFeatures(["infra","extra"]))}>
 /// ```
 ///
 /// Also read by the bsx resolver: an unregistered tag under an *unmet*
@@ -21,18 +21,21 @@ use crate::prelude::*;
 /// beet_router's `RouterPlugin`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct RequireFeatures(pub SmolStr);
+pub struct RequireFeatures(pub Vec<SmolStr>);
 
 impl RequireFeatures {
-	/// Require `features`, each `feature` or `crate/feature`, comma-separated.
-	pub fn new(features: impl Into<SmolStr>) -> Self { Self(features.into()) }
+	/// Require every item, each `feature` or `crate/feature`.
+	pub fn new(features: impl IntoIterator<Item = impl Into<SmolStr>>) -> Self {
+		Self(features.into_iter().map(Into::into).collect())
+	}
 
 	/// Every missing requirement as a sorted list, empty when all are compiled
-	/// in. Delegates to [`CrateCheck::failures`], the one requirement grammar.
+	/// in. Delegates to [`CrateCheck::feature_failures`], the one requirement
+	/// grammar.
 	pub fn failures<'a>(
 		&self,
 		registrations: impl IntoIterator<Item = &'a CrateRegistration> + Clone,
 	) -> Vec<String> {
-		CrateCheck::features(self.0.clone()).failures(registrations)
+		CrateCheck::feature_failures(&self.0, registrations)
 	}
 }

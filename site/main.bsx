@@ -59,7 +59,7 @@ one declaration of what is borrowed, and runs ahead of every publish.
 Structure is universal, so this same file loads whole in the deployed binary
 (built `--no-default-features --features aws_sdk,ssh,geoip`): the deploy tags it
 never linked build as inert entities, quietly, because the host declares
-`RequireFeatures("infra,extra")`. That declaration is also the loudness:
+`RequireFeatures(["infra","extra"])`. That declaration is also the loudness:
 dispatching any deploy verb in a binary without those features fails naming
 them and the rebuild that fixes it, before any step runs. That is what lets the
 application declare its own infrastructure without shipping the deployer.
@@ -121,7 +121,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<AssetsDir src="assets" cache="1h"/>
 		</Router>
 	</Route>
-	<DeployHost {RequireFeatures("infra,extra")}>
+	<DeployHost {RequireFeatures(["infra","extra"])}>
 		<Route path="deploy" {ExchangeSequence}>
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
@@ -148,7 +148,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		</Route>
 	</DeployHost>
 	<Route path="shared">
-		<DeployHost stage="shared" {RequireFeatures("infra,extra")}>
+		<DeployHost stage="shared" {RequireFeatures(["infra","extra"])}>
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
 			<Route path="push" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>

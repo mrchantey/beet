@@ -49,7 +49,7 @@ not owned by any deploy stage.
 
 Structure is universal, so a lean `beet` (the default build, ie `beet run-wasm`)
 loads that subtree too: the tags it never linked build as inert entities,
-quietly, because the host declares `RequireFeatures("infra,extra")`. Dispatching
+quietly, because the host declares `RequireFeatures(["infra","extra"])`. Dispatching
 a shared verb in such a build fails naming the missing features.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
@@ -66,7 +66,7 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 	<CaptureScreenshot/>
 	<SyncS3/>
 	<Route path="shared">
-		<DeployHost stage="shared" {RequireFeatures("infra,extra")}>
+		<DeployHost stage="shared" {RequireFeatures(["infra","extra"])}>
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
 			<Route path="push" {ExchangeSequence}>
 				<DirSync bucket="assets" local_dir="assets"/>

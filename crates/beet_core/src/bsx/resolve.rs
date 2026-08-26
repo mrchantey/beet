@@ -1958,6 +1958,7 @@ mod test {
 			let mut registry = registry.write();
 			registry.register::<PackageConfig>();
 			registry.register::<Bound>();
+			registry.register::<RequireFeatures>();
 		}
 		let nodes =
 			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
@@ -2004,6 +2005,20 @@ mod test {
 		// the same shape a registered tag would build: root, tag, child.
 		entity_count("<NotRegistered><PackageConfig/></NotRegistered>")
 			.xpect_eq(entity_count("<div><PackageConfig/></div>"));
+	}
+
+	/// A list literal fills a `Vec`-typed tuple-struct spread, the shape a
+	/// feature-dependent subtree declares its requirements in.
+	#[crate::test]
+	fn spread_list_fills_a_vec_newtype() {
+		let (world, root) =
+			build(r#"<div {RequireFeatures(["infra","extra"])}/>"#);
+		let host = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(host)
+			.get::<RequireFeatures>()
+			.unwrap()
+			.xpect_eq(RequireFeatures::new(["infra", "extra"]));
 	}
 
 	/// A `$name` reference into a formerly-gated region resolves to the real

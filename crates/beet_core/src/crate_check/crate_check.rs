@@ -31,14 +31,16 @@ impl CrateCheck {
 		}
 	}
 
-	/// Every failed requirement as a sorted list, empty when all pass.
-	pub fn failures<'a>(
-		&self,
+	/// Every missing feature requirement as a sorted list, each item a
+	/// `feature` or `crate/feature`. The one feature-requirement grammar,
+	/// shared with [`RequireFeatures`].
+	pub fn feature_failures<'a>(
+		features: impl IntoIterator<Item: AsRef<str>>,
 		registrations: impl IntoIterator<Item = &'a CrateRegistration> + Clone,
 	) -> Vec<String> {
 		let mut failures = Vec::new();
-		// feature items: `feature` or `crate/feature`
-		for item in Self::split_items(&self.features) {
+		for item in features {
+			let item = item.as_ref();
 			let (crate_name, feature) = match item.split_once('/') {
 				Some((crate_name, feature)) => (Some(crate_name), feature),
 				None => (None, item),
@@ -54,6 +56,20 @@ impl CrateCheck {
 				Some(_) => {}
 			}
 		}
+		failures.sort();
+		failures.dedup();
+		failures
+	}
+
+	/// Every failed requirement as a sorted list, empty when all pass.
+	pub fn failures<'a>(
+		&self,
+		registrations: impl IntoIterator<Item = &'a CrateRegistration> + Clone,
+	) -> Vec<String> {
+		let mut failures = Self::feature_failures(
+			Self::split_items(&self.features),
+			registrations.clone(),
+		);
 		// version items: `x.y.z` or `crate@x.y.z`
 		for item in Self::split_items(&self.versions) {
 			let (crate_name, version) = match item.split_once('@') {
