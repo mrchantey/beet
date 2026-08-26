@@ -39,6 +39,10 @@ pub use aws_ec2::*;
 mod aws_rds;
 #[cfg(feature = "bindings_aws_rds")]
 pub use aws_rds::*;
+#[cfg(feature = "bindings_aws_vpc")]
+mod aws_vpc;
+#[cfg(feature = "bindings_aws_vpc")]
+pub use aws_vpc::*;
 #[cfg(feature = "bindings_aws_ses")]
 mod aws_ses;
 #[cfg(feature = "bindings_aws_ses")]

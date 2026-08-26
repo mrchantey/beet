@@ -56,6 +56,17 @@ impl Plugin for InfraPlugin {
 		))]
 		app.add_observer(crate::blocks::attach_table_store);
 
+		// the network and the database, spawned by tag (`<VpcBlock label="net"/>`,
+		// `<RdsPostgresBlock label="db" vpc="net"/>`) in any build carrying them.
+		#[cfg(feature = "vpc_block")]
+		app.register_type::<crate::prelude::VpcBlock>()
+			.register_type::<crate::prelude::VpcRef>()
+			.register_type::<crate::prelude::SubnetTier>()
+			.register_type::<crate::prelude::SecurityGroupRef>();
+		#[cfg(feature = "rds_postgres_block")]
+		app.register_type::<crate::prelude::RdsPostgresBlock>()
+			.register_type::<crate::prelude::DatabaseRef>();
+
 		// the cloudflare deploy blocks, spawned by tag. Definitions, so every target.
 		#[cfg(feature = "cloudflare_block")]
 		app.register_type::<crate::prelude::CloudflareWorkerBlock>()
@@ -125,9 +136,14 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::LightsailRelease>()
 			.register_type::<crate::prelude::LightsailReleaseAction>();
 
-		// the docker/podman image build action + its engine selector (the
-		// `build_docker_image` module is gated on `fargate_block`).
-		#[cfg(all(feature = "fargate_block", not(target_arch = "wasm32")))]
+		// the docker/podman image build action + its engine selector. It lives in
+		// the `actions` module, so it is `deploy`-gated and native-only like the
+		// rest of them, on top of the `fargate_block` its own module is cut by.
+		#[cfg(all(
+			feature = "deploy",
+			feature = "fargate_block",
+			not(target_arch = "wasm32")
+		))]
 		app.register_type::<crate::prelude::BuildDockerImage>()
 			.register_type::<crate::prelude::ContainerEngine>();
 	}

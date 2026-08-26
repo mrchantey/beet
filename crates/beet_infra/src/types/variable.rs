@@ -5,10 +5,14 @@ use beet_net::prelude::*;
 /// A variable to be passed to tofu commands, commonly used
 /// for inserting application-specific environment variables in runtimes,
 /// catching missing variables before deploy.
-#[derive(Debug, Clone, Get, Serialize, Deserialize, Reflect)]
+#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Reflect)]
 pub struct Variable {
 	key: SmolStr,
 	value: VariableValue,
+	/// Redact this value everywhere tofu would otherwise print it: the plan, the
+	/// apply output, an `output` that reads it. State is NOT covered, which is
+	/// why a stack declaring one turns on state encryption.
+	sensitive: bool,
 }
 
 /// How a [`Variable`] value is resolved at deploy time.
@@ -30,6 +34,7 @@ impl Variable {
 		Self {
 			key: key.into(),
 			value: VariableValue::Fixed(value.into()),
+			sensitive: false,
 		}
 	}
 
@@ -38,6 +43,7 @@ impl Variable {
 		Self {
 			key: key.into(),
 			value: VariableValue::ProcessEnv,
+			sensitive: false,
 		}
 	}
 
@@ -46,6 +52,7 @@ impl Variable {
 		Self {
 			key: key.into(),
 			value: VariableValue::Header,
+			sensitive: false,
 		}
 	}
 
@@ -54,6 +61,7 @@ impl Variable {
 		Self {
 			key: key.into(),
 			value: VariableValue::Param,
+			sensitive: false,
 		}
 	}
 
@@ -97,7 +105,7 @@ impl Variable {
 			// `apply` always overrides it with the resolved value via `-var`.
 			default: Some("".into()),
 			description: Some(format!("Variable: {}", self.key)),
-			sensitive: None,
+			sensitive: self.sensitive.then_some(true),
 		}
 	}
 }
@@ -165,5 +173,20 @@ mod test {
 			.tf_declaration()
 			.default
 			.xpect_eq(Some("".into()));
+	}
+
+	// `sensitive` is omitted rather than declared false, so the emitted json is
+	// the same as it was before secrets rode this type at all.
+	#[beet_core::test]
+	fn sensitive_is_opt_in() {
+		Variable::param("db_password")
+			.tf_declaration()
+			.sensitive
+			.xpect_eq(None);
+		Variable::param("db_password")
+			.with_sensitive(true)
+			.tf_declaration()
+			.sensitive
+			.xpect_eq(Some(true));
 	}
 }

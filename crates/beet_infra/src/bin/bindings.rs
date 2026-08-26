@@ -99,10 +99,18 @@ async fn main() -> Result {
 					"aws_ecs_cluster",
 					"aws_ecs_service",
 					"aws_ecs_task_definition",
-					"aws_internet_gateway",
 					"aws_lb",
 					"aws_lb_listener",
 					"aws_lb_target_group",
+				]),
+		)
+		// the network every AWS compute block sits in, its own file because a
+		// vpc is not a fargate thing: the mail stack's box and database need the
+		// same resources with no ECS in sight.
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_vpc.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_internet_gateway",
 					"aws_route",
 					"aws_route_table",
 					"aws_route_table_association",

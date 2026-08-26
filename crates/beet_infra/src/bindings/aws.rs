@@ -65,3 +65,10 @@ impl terra::PrimaryResource for AwsLbDetails {
 		self.name = Some(name.into())
 	}
 }
+
+#[cfg(feature = "bindings_aws_vpc")]
+impl terra::PrimaryResource for AwsSecurityGroupDetails {
+	fn set_primary_identifier(&mut self, name: &str) {
+		self.name = Some(name.into())
+	}
+}

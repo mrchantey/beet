@@ -25,7 +25,12 @@ deploy = ["beet_router", "dep:base64"]
 beet_router = ["dep:beet_router"]
 lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_acm","bindings_aws_dns"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail","bindings_aws_dns"]
-fargate_block = ["bindings_aws_common","bindings_aws_dynamo","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns"]
+fargate_block = ["bindings_aws_common","bindings_aws_dynamo","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns","vpc_block"]
+# The network every AWS compute block sits in: vpc, public + private subnets,
+# internet gateway and the security-group handles a consumer names.
+vpc_block = ["bindings_aws_vpc"]
+# The company Postgres instance, in the private subnets of a `vpc_block` vpc.
+rds_postgres_block = ["vpc_block", "bindings_aws_rds"]
 # Opt-in Cloudflare DNS + load-balancer failover paths for the AWS blocks. Pulls
 # the cloudflare terraform bindings; without it the AWS blocks are Route53-only.
 # Also pulls `bindings_aws_dns`: enabling this compiles the shared `dns` module
@@ -38,7 +43,13 @@ cloudflare_block = []
 # The self-hosted mail stack: the per-domain DNS + SES declaration
 # (`MailDomainBlock`) and the member/mailbox/alias inputs it is authored from.
 # Cloudflare holds the zone every record lands in, hence `cloudflare_dns`.
-mail = ["bindings_aws_ses", "bindings_aws_dns", "cloudflare_dns"]
+mail = [
+	"bindings_aws_ses",
+	"bindings_aws_dns",
+	"cloudflare_dns",
+	"vpc_block",
+	"rds_postgres_block",
+]
 bindings_aws_common = []
 bindings_aws_dynamo = []
 bindings_aws_dns = []
@@ -51,6 +62,10 @@ bindings_aws_fargate = []
 bindings_aws_ec2 = []
 # The mail stack's RDS Postgres instance and its subnet group.
 bindings_aws_rds = []
+# The network resources every AWS compute block sits in: vpc, subnets, internet
+# gateway, route tables and security groups. Their own file rather than the
+# fargate one they started in, since a vpc is not an ECS thing.
+bindings_aws_vpc = []
 # SES v2 sending identities, their custom MAIL FROM attributes, and
 # configuration sets.
 bindings_aws_ses = []
@@ -69,6 +84,7 @@ bindings_aws_all = [
 	"bindings_aws_rds",
 	"bindings_aws_ses",
 	"bindings_aws_ssm",
+	"bindings_aws_vpc",
 ]
 bindings_cloudflare_common = []
 

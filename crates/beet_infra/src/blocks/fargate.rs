@@ -342,11 +342,9 @@ impl Block for FargateBlock {
 		// Task security group. The NLB is layer 4 with no security group and
 		// preserves client IPs, so the container ports accept traffic directly
 		// from anywhere rather than from a load-balancer security group.
-		let task_sg_ident = stack.resource_ident(self.build_label("task-sg"));
-		let task_sg = terra::ResourceDef::new_secondary(
-			task_sg_ident.clone(),
+		let task_sg = terra::ResourceDef::new_primary(
+			stack.resource_ident(self.build_label("task-sg")),
 			AwsSecurityGroupDetails {
-				name: Some(task_sg_ident.primary_identifier().clone()),
 				description: Some("Security group for ECS tasks".into()),
 				vpc_id: Some(vpc.field_ref("id").into()),
 				tags: Some(self.name_tags(stack, "task-sg")),

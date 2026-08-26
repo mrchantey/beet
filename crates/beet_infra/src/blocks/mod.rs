@@ -39,6 +39,16 @@ pub use failover::*;
 mod s3_bucket_block;
 #[cfg(feature = "bindings_aws_common")]
 pub use s3_bucket_block::*;
+// The network the AWS compute blocks sit in, and the company database inside
+// it. Neither is mail-specific: the mail stack is simply their first consumer.
+#[cfg(feature = "vpc_block")]
+mod vpc_block;
+#[cfg(feature = "vpc_block")]
+pub use vpc_block::*;
+#[cfg(feature = "rds_postgres_block")]
+mod rds_postgres_block;
+#[cfg(feature = "rds_postgres_block")]
+pub use rds_postgres_block::*;
 #[cfg(feature = "bindings_aws_dynamo")]
 mod dynamo_table_block;
 #[cfg(feature = "bindings_aws_dynamo")]
