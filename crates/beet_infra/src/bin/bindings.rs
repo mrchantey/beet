@@ -113,6 +113,36 @@ async fn main() -> Result {
 				]),
 		)
 		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_ec2.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_instance",
+					"aws_eip",
+					"aws_eip_association",
+					"aws_key_pair",
+					"aws_iam_instance_profile",
+					"aws_iam_role_policy",
+				]),
+		)
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_rds.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_db_instance",
+					"aws_db_subnet_group",
+				]),
+		)
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_ses.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_sesv2_email_identity",
+					"aws_sesv2_email_identity_mail_from_attributes",
+					"aws_sesv2_configuration_set",
+				]),
+		)
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_ssm.rs")
+				.with_resources(terra::Provider::AWS, ["aws_ssm_parameter"]),
+		)
+		.with_file(
 			BindingFile::new(
 				"crates/beet_infra/src/bindings/cloudflare_common.rs",
 			)

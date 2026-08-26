@@ -32,6 +32,10 @@ pub struct Deployment {
 	/// Where the tofu state for every stack in this deploy is kept.
 	#[set_with(into)]
 	backend: StackBackend,
+	/// State/plan encryption for this deploy's tofu config, off by default. See
+	/// [`StateEncryption`].
+	#[set_with(into)]
+	state_encryption: StateEncryption,
 	/// The opentofu working directory, `target/infra/<app>` when unset (see
 	/// [`Self::work_directory`]). A test points it at a temp dir.
 	#[get(skip)]
@@ -63,6 +67,7 @@ impl Default for Deployment {
 				.map(|stamp| stamp.to_string())
 				.unwrap_or_else(crate::types::artifacts::now_timestamp),
 			backend: default(),
+			state_encryption: default(),
 			work_directory: None,
 			state_suffix: "tofu.tfstate".into(),
 			artifact_bucket_suffix: "artifacts".into(),
@@ -116,10 +121,13 @@ impl Deployment {
 		)
 	}
 
-	/// Initialize `stack`'s config with the corresponding backend.
+	/// Initialize `stack`'s config with the corresponding backend and state
+	/// encryption.
 	pub fn create_config(&self, stack: &ResolvedStack) -> terra::Config {
 		let key = self.backend_path(stack).to_string();
-		terra::Config::default().with_backend(self.backend.to_json(&key))
+		terra::Config::default()
+			.with_backend(self.backend.to_json(&key))
+			.with_state_encryption(self.state_encryption())
 	}
 
 	/// The blob holding `stack`'s tofu state.

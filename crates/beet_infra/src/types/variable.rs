@@ -97,6 +97,7 @@ impl Variable {
 			// `apply` always overrides it with the resolved value via `-var`.
 			default: Some("".into()),
 			description: Some(format!("Variable: {}", self.key)),
+			sensitive: None,
 		}
 	}
 }

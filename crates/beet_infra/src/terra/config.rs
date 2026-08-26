@@ -51,6 +51,10 @@ pub struct Variable {
 	pub r#type: Option<String>,
 	pub default: Option<Value>,
 	pub description: Option<String>,
+	/// Redacts the value from plan/apply/state-list output. Set for anything
+	/// an `EnsureSecret`-style action feeds through, and for the state
+	/// encryption passphrase.
+	pub sensitive: Option<bool>,
 }
 
 /// A Terraform output definition.
@@ -82,6 +86,9 @@ pub struct Output {
 pub struct Config {
 	/// Backend for remote state, serialised into `terraform.backend`.
 	backend: Option<Value>,
+	/// State/plan encryption, serialised into `terraform.encryption`. See
+	/// [`StateEncryption`].
+	encryption: Option<Value>,
 	/// Optional `required_version` constraint in the `terraform` block.
 	required_version: Option<String>,
 	required_providers: Map<String, Value>,
@@ -128,6 +135,40 @@ impl Config {
 	/// Set the backend for remote state storage.
 	pub fn set_backend(&mut self, backend: Value) -> &mut Self {
 		self.backend = Some(backend);
+		self
+	}
+
+	/// Enable state/plan encryption (chaining). A no-op for
+	/// [`StateEncryption::None`]; otherwise sets the `terraform.encryption`
+	/// block and declares the sensitive `tf_state_passphrase` variable its
+	/// key provider reads, with no default so the value must come from a
+	/// `-var` at every state-touching invocation (see
+	/// [`StateEncryption::vars`]).
+	pub fn with_state_encryption(
+		mut self,
+		encryption: &StateEncryption,
+	) -> Self {
+		self.set_state_encryption(encryption);
+		self
+	}
+
+	/// Enable state/plan encryption. See [`Self::with_state_encryption`].
+	pub fn set_state_encryption(
+		&mut self,
+		encryption: &StateEncryption,
+	) -> &mut Self {
+		if let Some(json) = encryption.to_json() {
+			self.encryption = Some(json);
+			self.ensure_variable(STATE_ENCRYPTION_VAR, Variable {
+				r#type: Some("string".into()),
+				default: None,
+				description: Some(
+					"OpenTofu state/plan encryption passphrase, supplied via -var at apply time, never defaulted."
+						.into(),
+				),
+				sensitive: Some(true),
+			});
+		}
 		self
 	}
 
@@ -580,6 +621,9 @@ impl Config {
 		if let Some(backend) = &self.backend {
 			tf_block.insert("backend".to_string(), backend.clone());
 		}
+		if let Some(encryption) = &self.encryption {
+			tf_block.insert("encryption".to_string(), encryption.clone());
+		}
 		if !self.required_providers.is_empty() {
 			tf_block.insert(
 				"required_providers".to_string(),
@@ -692,6 +736,9 @@ impl Config {
 		}
 		if let Some(desc) = variable.description {
 			obj.insert("description".to_string(), Value::String(desc));
+		}
+		if let Some(sensitive) = variable.sensitive {
+			obj.insert("sensitive".to_string(), Value::Bool(sensitive));
 		}
 		self.variables.insert(name, Value::Object(obj));
 		Ok(())

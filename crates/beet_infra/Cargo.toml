@@ -42,6 +42,17 @@ bindings_aws_acm = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
 bindings_aws_fargate = []
+# The mail stack's EC2 box: instance, EIP (+ association), keypair, instance
+# profile and the role policy attached to it.
+bindings_aws_ec2 = []
+# The mail stack's RDS Postgres instance and its subnet group.
+bindings_aws_rds = []
+# SES v2 sending identities, their custom MAIL FROM attributes, and
+# configuration sets.
+bindings_aws_ses = []
+# SSM Parameter Store, for secrets (`EnsureSecret`) and non-secret config the
+# mail box fetches at boot.
+bindings_aws_ssm = []
 bindings_aws_all = [
 	"bindings_aws_common",
 	"bindings_aws_dynamo",
@@ -50,6 +61,10 @@ bindings_aws_all = [
 	"bindings_aws_lightsail",
 	"bindings_aws_lambda",
 	"bindings_aws_fargate",
+	"bindings_aws_ec2",
+	"bindings_aws_rds",
+	"bindings_aws_ses",
+	"bindings_aws_ssm",
 ]
 bindings_cloudflare_common = []
 

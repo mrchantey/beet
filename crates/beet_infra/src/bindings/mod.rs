@@ -31,6 +31,22 @@ pub use aws_dns::*;
 mod aws_acm;
 #[cfg(feature = "bindings_aws_acm")]
 pub use aws_acm::*;
+#[cfg(feature = "bindings_aws_ec2")]
+mod aws_ec2;
+#[cfg(feature = "bindings_aws_ec2")]
+pub use aws_ec2::*;
+#[cfg(feature = "bindings_aws_rds")]
+mod aws_rds;
+#[cfg(feature = "bindings_aws_rds")]
+pub use aws_rds::*;
+#[cfg(feature = "bindings_aws_ses")]
+mod aws_ses;
+#[cfg(feature = "bindings_aws_ses")]
+pub use aws_ses::*;
+#[cfg(feature = "bindings_aws_ssm")]
+mod aws_ssm;
+#[cfg(feature = "bindings_aws_ssm")]
+pub use aws_ssm::*;
 #[cfg(feature = "bindings_cloudflare_common")]
 mod cloudflare_common;
 #[cfg(feature = "bindings_cloudflare_common")]

@@ -79,6 +79,13 @@ impl Project {
 		Ok(())
 	}
 
+	/// `-var` pairs every state-touching invocation needs, currently just the
+	/// [`StateEncryption`] passphrase (empty when the deploy has it off),
+	/// resolved fresh from its environment variable each call.
+	fn required_vars(&self) -> Result<Vec<(SmolStr, SmolStr)>> {
+		self.deployment.state_encryption().vars()
+	}
+
 	/// Validates the OpenTofu config, ie the `main.tf.json`.
 	/// Only downloads providers, no backend needed.
 	pub async fn validate(&self) -> Result<String> {
@@ -89,49 +96,52 @@ impl Project {
 	/// Show execution plan
 	pub async fn plan(&self) -> Result<String> {
 		self.init().await?;
-		tofu::plan(&self.dir()).await
+		tofu::plan(&self.dir(), &self.required_vars()?).await
 	}
 
 	/// Apply the execution plan.
 	pub async fn apply(&self) -> Result<String> {
 		self.init().await?;
-		tofu::apply(&self.dir()).await
+		tofu::apply(&self.dir(), &self.required_vars()?).await
 	}
 
 	/// Apply the execution plan with Terraform variables, narrowed to `targets`
 	/// (resource addresses, ie a layer's [`Config::layer_targets`]) when
-	/// non-empty.
+	/// non-empty. `vars` is merged with [`Self::required_vars`], so a caller
+	/// never needs to thread the state encryption passphrase through itself.
 	pub async fn apply_with_vars(
 		&self,
 		vars: &[(SmolStr, SmolStr)],
 		targets: &[String],
 	) -> Result<String> {
 		self.init().await?;
-		tofu::apply_with_vars(&self.dir(), vars, targets).await
+		let mut all_vars = self.required_vars()?;
+		all_vars.extend_from_slice(vars);
+		tofu::apply_with_vars(&self.dir(), &all_vars, targets).await
 	}
 
 	/// Show the current state.
 	pub async fn show(&self) -> Result<String> {
 		self.init().await?;
-		tofu::show(&self.dir()).await
+		tofu::show(&self.dir(), &self.required_vars()?).await
 	}
 
 	/// Read a specific output value from the tofu state.
 	pub async fn output(&self, name: &str) -> Result<String> {
 		self.init().await?;
-		tofu::output(&self.dir(), name).await
+		tofu::output(&self.dir(), &self.required_vars()?, name).await
 	}
 
 	/// List all resources in the state.
 	pub async fn list(&self) -> Result<String> {
 		self.init().await?;
-		tofu::list(&self.dir()).await
+		tofu::list(&self.dir(), &self.required_vars()?).await
 	}
 
 	/// Remove a resource from the state.
 	pub async fn remove(&self, resource: &str) -> Result<String> {
 		self.init().await?;
-		tofu::remove(&self.dir(), resource).await
+		tofu::remove(&self.dir(), &self.required_vars()?, resource).await
 	}
 
 	/// Destroy infrastructure.
@@ -140,7 +150,7 @@ impl Project {
 	/// - removes the working directory
 	pub async fn destroy(&self) -> Result {
 		self.init().await?;
-		tofu::destroy(&self.dir()).await?;
+		tofu::destroy(&self.dir(), &self.required_vars()?).await?;
 		self.destroy_common().await;
 		Ok(())
 	}
@@ -154,7 +164,8 @@ impl Project {
 		// init so destroy can access providers and state even after partial cleanup
 		self.init().await.ok();
 		self.backend().clear_stale_locks();
-		tofu::destroy_force(&self.dir()).await.ok();
+		let vars = self.required_vars().unwrap_or_default();
+		tofu::destroy_force(&self.dir(), &vars).await.ok();
 		self.destroy_common().await;
 	}
 

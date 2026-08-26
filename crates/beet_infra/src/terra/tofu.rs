@@ -43,6 +43,19 @@ fn tofu_process() -> ChildProcess {
 	ChildProcess::new("tofu").with_not_found(NOT_FOUND)
 }
 
+/// Render `vars` as `-var key=value` pairs, the form every state-touching
+/// tofu subcommand accepts. Used to thread a stack's [`StateEncryption`]
+/// passphrase (and any other required vars) through without ever writing
+/// them into `main.tf.json`.
+fn var_args(vars: &[(SmolStr, SmolStr)]) -> Vec<SmolStr> {
+	let mut args = Vec::with_capacity(vars.len() * 2);
+	for (key, value) in vars {
+		args.push("-var".into());
+		args.push(format!("{key}={value}").into());
+	}
+	args
+}
+
 /// Export the provider schema based on `./providers.tf.json`
 pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
@@ -65,7 +78,8 @@ pub async fn init(dir: &AbsPathBuf) -> Result {
 	Ok(())
 }
 
-/// Validates the opentofu file, ie the `main.tf.json`
+/// Validates the opentofu file, ie the `main.tf.json`. Never needs `-var`:
+/// validation is static and does not evaluate resource or encryption values.
 pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
 		.with_cwd(dir.clone())
@@ -74,22 +88,28 @@ pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
 		.await
 }
 
-/// Show execution plan
-pub async fn plan(dir: &AbsPathBuf) -> Result<String> {
+/// Show execution plan. `vars` carries anything required to read existing
+/// state, eg a [`StateEncryption`] passphrase.
+pub async fn plan(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec!["plan".into()];
+	args.extend(var_args(vars));
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["plan"])
+		.with_args(args)
 		.run_async_stdout()
 		.await
 }
 
-/// Apply the execution plan
-pub async fn apply(dir: &AbsPathBuf) -> Result<String> {
-	tofu_process()
-		.with_cwd(dir.clone())
-		.with_args(["apply", "-auto-approve"])
-		.run_async_stdout()
-		.await
+/// Apply the execution plan. `vars` carries anything required to read/write
+/// state, eg a [`StateEncryption`] passphrase.
+pub async fn apply(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	apply_with_vars(dir, vars, &[]).await
 }
 
 /// Apply the execution plan with Terraform variables, narrowed to `targets`
@@ -100,10 +120,7 @@ pub async fn apply_with_vars(
 	targets: &[String],
 ) -> Result<String> {
 	let mut args: Vec<SmolStr> = vec!["apply".into(), "-auto-approve".into()];
-	for (key, value) in vars {
-		args.push("-var".into());
-		args.push(format!("{key}={value}").into());
-	}
+	args.extend(var_args(vars));
 	// tofu pulls in each target's dependencies but never its dependents, so a
 	// targeted apply converges exactly these resources and leaves the rest of the
 	// stack (notably the service roll) for the apply that follows.
@@ -117,48 +134,82 @@ pub async fn apply_with_vars(
 		.await
 }
 
-/// Show the current state
-pub async fn show(dir: &AbsPathBuf) -> Result<String> {
+/// Show the current state. `vars` carries anything required to read it, eg a
+/// [`StateEncryption`] passphrase.
+pub async fn show(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec!["show".into()];
+	args.extend(var_args(vars));
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["show"])
+		.with_args(args)
 		.run_async_stdout()
 		.await
 }
 
-/// Read a specific output value from the tofu state.
-pub async fn output(dir: &AbsPathBuf, name: &str) -> Result<String> {
+/// Read a specific output value from the tofu state. `vars` carries anything
+/// required to read it, eg a [`StateEncryption`] passphrase.
+pub async fn output(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+	name: &str,
+) -> Result<String> {
+	let mut args: Vec<SmolStr> =
+		vec!["output".into(), "-raw".into(), name.into()];
+	args.extend(var_args(vars));
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["output", "-raw", name])
+		.with_args(args)
 		.run_async_stdout()
 		.await
 		.map(|val| val.trim().to_string())
 }
 
-/// List all resources in the state
-pub async fn list(dir: &AbsPathBuf) -> Result<String> {
+/// List all resources in the state. `vars` carries anything required to read
+/// it, eg a [`StateEncryption`] passphrase.
+pub async fn list(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec!["state".into(), "list".into()];
+	args.extend(var_args(vars));
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["state", "list"])
+		.with_args(args)
 		.run_async_stdout()
 		.await
 }
 
-/// Remove a resource from the state
-pub async fn remove(dir: &AbsPathBuf, resource: &str) -> Result<String> {
+/// Remove a resource from the state. `vars` carries anything required to
+/// read/write it, eg a [`StateEncryption`] passphrase.
+pub async fn remove(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+	resource: &str,
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec!["state".into(), "rm".into()];
+	args.extend(var_args(vars));
+	args.push(resource.into());
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["state", "rm", resource])
+		.with_args(args)
 		.run_async_stdout()
 		.await
 }
 
-/// Destroy infrastructure
-pub async fn destroy(dir: &AbsPathBuf) -> Result<String> {
+/// Destroy infrastructure. `vars` carries anything required to read/write
+/// state, eg a [`StateEncryption`] passphrase.
+pub async fn destroy(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec!["destroy".into(), "-auto-approve".into()];
+	args.extend(var_args(vars));
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["destroy", "-auto-approve"])
+		.with_args(args)
 		.run_async_stdout()
 		.await
 }
@@ -166,10 +217,19 @@ pub async fn destroy(dir: &AbsPathBuf) -> Result<String> {
 /// Destroy infrastructure, bypassing any stale state locks.
 /// Used only by `force_destroy` recovery paths where we know
 /// no concurrent operation is active.
-pub async fn destroy_force(dir: &AbsPathBuf) -> Result<String> {
+pub async fn destroy_force(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec![
+		"destroy".into(),
+		"-auto-approve".into(),
+		"-lock=false".into(),
+	];
+	args.extend(var_args(vars));
 	tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["destroy", "-auto-approve", "-lock=false"])
+		.with_args(args)
 		.run_async_stdout()
 		.await
 }

@@ -159,6 +159,128 @@ impl DnsProvider {
 		self.emit_record(stack, config, label, name, content, false, "CNAME")
 	}
 
+	/// Emit a `TXT` record (SPF, DKIM, DMARC, MTA-STS, TLS-RPT, `_atproto`, …).
+	/// Cloudflare takes the raw text; Route53 additionally requires the value
+	/// double-quoted, the usual Route53 TXT convention (an already-quoted
+	/// `value` is passed through unchanged).
+	pub fn emit_txt(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		label: &str,
+		name: &str,
+		value: &str,
+	) -> Result<String> {
+		let content = match self {
+			#[cfg(feature = "cloudflare_dns")]
+			Self::Cloudflare { .. } => value.to_string(),
+			Self::Route53 { .. } => quote_txt_value(value),
+		};
+		self.emit_record(stack, config, label, name, &content, false, "TXT")
+	}
+
+	/// Emit an `MX` record. Cloudflare carries `priority` as its own field
+	/// alongside `content`; Route53 has no such field, so `priority target` is
+	/// folded into the one content string it does have.
+	pub fn emit_mx(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		label: &str,
+		name: &str,
+		priority: u16,
+		target: &str,
+	) -> Result<String> {
+		match self {
+			#[cfg(feature = "cloudflare_dns")]
+			Self::Cloudflare { .. } => self.emit_record_with_priority(
+				stack,
+				config,
+				label,
+				name,
+				target,
+				false,
+				"MX",
+				Some(priority as i64),
+			),
+			Self::Route53 { .. } => self.emit_record(
+				stack,
+				config,
+				label,
+				name,
+				&format!("{priority} {target}"),
+				false,
+				"MX",
+			),
+		}
+	}
+
+	/// Emit an `SRV` record. `name` is the full service name, eg
+	/// `_jmap._tcp.stalwart.beetmash.com` (matching the "Name" column the DNS
+	/// spec already writes it as); `target` is the resolving hostname.
+	pub fn emit_srv(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		label: &str,
+		name: &str,
+		priority: u16,
+		weight: u16,
+		port: u16,
+		target: &str,
+	) -> Result<String> {
+		let ident = stack.resource_ident(label);
+		let address = match self {
+			#[cfg(feature = "cloudflare_dns")]
+			Self::Cloudflare { zone_id, .. } => {
+				ensure_cloudflare_provider(config)?;
+				let record = ResourceDef::new_secondary(
+					ident,
+					CloudflareDnsRecordDetails {
+						name: name.into(),
+						ttl: 1,
+						r#type: "SRV".into(),
+						zone_id: zone_id.clone(),
+						data: Some(CloudflareDnsRecordData {
+							priority: Some(priority as i64),
+							weight: Some(weight as i64),
+							port: Some(port as i64),
+							target: Some(target.into()),
+							..default()
+						}),
+						proxied: Some(false),
+						..default()
+					},
+				);
+				let address =
+					format!("cloudflare_dns_record.{}", record.ident().label());
+				config.add_resource(&record)?;
+				address
+			}
+			Self::Route53 { zone_id, .. } => {
+				let record = ResourceDef::new_secondary(
+					ident,
+					AwsRoute53RecordDetails {
+						name: name.into(),
+						r#type: "SRV".into(),
+						zone_id: zone_id.clone(),
+						ttl: Some(60),
+						records: Some(vec![
+							format!("{priority} {weight} {port} {target}")
+								.into(),
+						]),
+						..default()
+					},
+				);
+				let address =
+					format!("aws_route53_record.{}", record.ident().label());
+				config.add_resource(&record)?;
+				address
+			}
+		};
+		Ok(address)
+	}
+
 	/// Emit one record of `record_type` into this provider's zone, returning its
 	/// terraform resource address (eg `cloudflare_dns_record.<label>`).
 	fn emit_record(
@@ -170,6 +292,33 @@ impl DnsProvider {
 		content: &str,
 		proxied: bool,
 		record_type: &str,
+	) -> Result<String> {
+		self.emit_record_with_priority(
+			stack,
+			config,
+			label,
+			name,
+			content,
+			proxied,
+			record_type,
+			None,
+		)
+	}
+
+	/// [`Self::emit_record`], with an optional MX-style `priority` set on the
+	/// Cloudflare record (Route53 has no such field: a caller that needs
+	/// priority there folds it into `content` instead).
+	fn emit_record_with_priority(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		label: &str,
+		name: &str,
+		content: &str,
+		proxied: bool,
+		record_type: &str,
+		#[cfg_attr(not(feature = "cloudflare_dns"), allow(unused))]
+		priority: Option<i64>,
 	) -> Result<String> {
 		let ident = stack.resource_ident(label);
 		let address = match self {
@@ -185,6 +334,7 @@ impl DnsProvider {
 						zone_id: zone_id.clone(),
 						content: Some(content.into()),
 						proxied: Some(proxied),
+						priority,
 						..default()
 					},
 				);
@@ -215,6 +365,16 @@ impl DnsProvider {
 	}
 }
 
+/// Route53 TXT record values must be double-quoted; an already-quoted value
+/// is passed through unchanged.
+fn quote_txt_value(value: &str) -> String {
+	if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+		value.to_string()
+	} else {
+		format!("\"{}\"", value.replace('"', "\\\""))
+	}
+}
+
 /// Ensure the Cloudflare terraform provider is configured. The block stays
 /// empty: the provider authenticates from `CLOUDFLARE_API_TOKEN` in the
 /// environment (inherited by the tofu subprocess), keeping the secret out of
@@ -223,4 +383,149 @@ impl DnsProvider {
 pub(crate) fn ensure_cloudflare_provider(config: &mut terra::Config) -> Result {
 	config.ensure_provider_config(&terra::Provider::CLOUDFLARE, &json!({}))?;
 	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// TXT content rides straight through for Cloudflare, whose `content` field
+	/// takes arbitrary text.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn cloudflare_txt_is_unquoted() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::cloudflare("stalwart.beetmash.com", "zone123")
+			.emit_txt(
+				&stack,
+				&mut config,
+				"spf",
+				"stalwart.beetmash.com",
+				"v=spf1 include:amazonses.com -all",
+			)
+			.unwrap();
+		config
+			.to_json()
+			.to_string()
+			.xpect_contains("\"type\":\"TXT\"")
+			.xpect_contains("v=spf1 include:amazonses.com -all")
+			.xnot()
+			.xpect_contains("\\\"v=spf1");
+	}
+
+	/// Route53 TXT values must be double-quoted, the usual Route53 convention;
+	/// an unquoted `-all` SPF-style value is quoted going in.
+	#[beet_core::test]
+	fn route53_txt_is_quoted() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::route53("stalwart.beetmash.com", "zone123")
+			.emit_txt(
+				&stack,
+				&mut config,
+				"spf",
+				"stalwart.beetmash.com",
+				"v=spf1 include:amazonses.com -all",
+			)
+			.unwrap();
+		config
+			.to_json()
+			.to_string()
+			.xpect_contains("\\\"v=spf1 include:amazonses.com -all\\\"");
+	}
+
+	/// Cloudflare carries MX priority as its own field, separate from `content`.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn cloudflare_mx_sets_priority_field() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::cloudflare("stalwart.beetmash.com", "zone123")
+			.emit_mx(
+				&stack,
+				&mut config,
+				"mx",
+				"stalwart.beetmash.com",
+				10,
+				"mail.beetmash.com",
+			)
+			.unwrap();
+		let json = config.to_json().to_string();
+		json.xpect_contains("\"type\":\"MX\"")
+			.xpect_contains("\"priority\":10")
+			.xpect_contains("\"content\":\"mail.beetmash.com\"");
+	}
+
+	/// Route53 has no priority field, so `priority target` is folded into the
+	/// one content string it does have.
+	#[beet_core::test]
+	fn route53_mx_folds_priority_into_content() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::route53("stalwart.beetmash.com", "zone123")
+			.emit_mx(
+				&stack,
+				&mut config,
+				"mx",
+				"stalwart.beetmash.com",
+				10,
+				"mail.beetmash.com",
+			)
+			.unwrap();
+		config
+			.to_json()
+			.to_string()
+			.xpect_contains("\"10 mail.beetmash.com\"");
+	}
+
+	/// Cloudflare structures SRV fields under `data`, never touching `content`.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn cloudflare_srv_uses_data_block() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::cloudflare("zone.example", "zone123")
+			.emit_srv(
+				&stack,
+				&mut config,
+				"jmap",
+				"_jmap._tcp.stalwart.beetmash.com",
+				0,
+				1,
+				443,
+				"mail.beetmash.com",
+			)
+			.unwrap();
+		let json = config.to_json().to_string();
+		json.xpect_contains("\"type\":\"SRV\"")
+			.xpect_contains("\"priority\":0")
+			.xpect_contains("\"weight\":1")
+			.xpect_contains("\"port\":443")
+			.xpect_contains("\"target\":\"mail.beetmash.com\"");
+	}
+
+	/// Route53 has no `data` block, so `priority weight port target` is folded
+	/// into the one content string it does have.
+	#[beet_core::test]
+	fn route53_srv_folds_fields_into_content() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::route53("zone.example", "zone123")
+			.emit_srv(
+				&stack,
+				&mut config,
+				"jmap",
+				"_jmap._tcp.stalwart.beetmash.com",
+				0,
+				1,
+				443,
+				"mail.beetmash.com",
+			)
+			.unwrap();
+		config
+			.to_json()
+			.to_string()
+			.xpect_contains("\"0 1 443 mail.beetmash.com\"");
+	}
 }
