@@ -79,6 +79,40 @@ impl SshConnection {
 		Ok(())
 	}
 
+	/// Forward `local_port` on this machine to `remote_port` on the box's
+	/// loopback, for a service the security group deliberately does not admit
+	/// from the internet (the mail box's management endpoint on 8080).
+	///
+	/// The returned handle kills the forward on drop, so a caller cannot leave
+	/// a port open past the step that needed it. `-N` runs no remote command,
+	/// and `ExitOnForwardFailure` turns a port already in use into an immediate
+	/// error rather than a live ssh session forwarding nothing.
+	pub async fn tunnel(
+		&self,
+		local_port: u16,
+		remote_port: u16,
+	) -> Result<ChildHandle> {
+		let mut args = self.ssh_args();
+		args.push("-o".into());
+		args.push("ExitOnForwardFailure=yes".into());
+		args.push("-N".into());
+		args.push("-p".into());
+		args.push(self.port.to_string().into());
+		args.push("-L".into());
+		args.push(
+			format!("{local_port}:127.0.0.1:{remote_port}")
+				.as_str()
+				.into(),
+		);
+		args.push(self.remote_user().into());
+		let handle = ChildProcess::new("ssh").with_args(args).spawn()?;
+		info!(
+			"tunnelling localhost:{local_port} to {}:{remote_port}",
+			self.host
+		);
+		Ok(handle)
+	}
+
 	/// Wait for SSH to become available, retrying every `poll` until `timeout`
 	/// elapses. At least one attempt is always made.
 	pub async fn wait_for_ready(

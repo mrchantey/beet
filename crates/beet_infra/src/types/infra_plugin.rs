@@ -67,6 +67,10 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::RdsPostgresBlock>()
 			.register_type::<crate::prelude::DatabaseRef>();
 
+		// the parameter-store composition every generated credential is named
+		// by, ie the `<EnsureSecret secret="db-password"/>` attribute.
+		app.register_type::<crate::prelude::SecretRef>();
+
 		// the cloudflare deploy blocks, spawned by tag. Definitions, so every target.
 		#[cfg(feature = "cloudflare_block")]
 		app.register_type::<crate::prelude::CloudflareWorkerBlock>()
@@ -92,6 +96,30 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::TofuApply>()
 			.register_type::<crate::prelude::CloudflareZoneSetup>()
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
+
+		// the create-if-missing secret step, which every stack holding a
+		// generated credential runs before its apply.
+		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+		app.register_type::<crate::prelude::EnsureSecret>()
+			.register_type::<crate::prelude::EnsureSecretAction>();
+
+		// the mail stack's post-apply verbs: the reverse record, the
+		// declarative apply into the mail server's own data store, the
+		// end-to-end probe and the zone audit.
+		#[cfg(all(
+			feature = "deploy",
+			feature = "mail",
+			not(target_arch = "wasm32")
+		))]
+		app.register_type::<crate::prelude::EipReverseDns>()
+			.register_type::<crate::prelude::EipReverseDnsAction>()
+			.register_type::<crate::prelude::StalwartProvision>()
+			.register_type::<crate::prelude::StalwartProvisionAction>()
+			.register_type::<crate::prelude::MailProbe>()
+			.register_type::<crate::prelude::MailProbeAction>()
+			.register_type::<crate::prelude::ZoneAudit>()
+			.register_type::<crate::prelude::ZoneAuditAction>()
+			.register_type::<crate::prelude::AllowedRecord>();
 
 		// the bucket sync settings (`{SyncS3Bucket{delete:true}}`), the direction
 		// enum a markup attribute names by variant, and the `<DirSync>` front-end

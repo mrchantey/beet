@@ -8,11 +8,13 @@ mod cloudflare_zone;
 mod dir_copy;
 #[cfg(feature = "aws_sdk")]
 mod dir_sync;
+mod ensure_secret;
 #[cfg(feature = "aws_sdk")]
 mod lifecycle_probe;
 #[cfg(feature = "lightsail_block")]
 mod lightsail_release;
 mod ssh_connection;
+pub mod ssm_ext;
 #[cfg(feature = "aws_sdk")]
 mod sync_s3_bucket;
 mod tofu_apply_action;
@@ -26,6 +28,7 @@ pub use cloudflare_zone::*;
 pub use dir_copy::*;
 #[cfg(feature = "aws_sdk")]
 pub use dir_sync::*;
+pub use ensure_secret::*;
 #[cfg(feature = "aws_sdk")]
 pub use lifecycle_probe::*;
 #[cfg(feature = "lightsail_block")]

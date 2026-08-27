@@ -32,13 +32,16 @@ pub struct ChildProcess {
 	/// right for a child the caller kills itself (eg a bounded log tail), wrong
 	/// for an interactive child the user stops (eg a monitor).
 	group: bool,
+	/// Values that must never be printed, see [`with_secret`](Self::with_secret).
+	#[set_with(skip)]
+	secrets: Vec<SmolStr>,
 }
 
 impl std::fmt::Display for ChildProcess {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.command)?;
+		write!(f, "{}", self.redact(&self.command))?;
 		for arg in &self.args {
-			write!(f, " {arg}")?;
+			write!(f, " {}", self.redact(arg))?;
 		}
 		Ok(())
 	}
@@ -117,8 +120,38 @@ impl ChildProcess {
 			cwd: None,
 			not_found: None,
 			group: false,
+			secrets: Vec::new(),
 		}
 	}
+
+	/// Declare a value this invocation carries that must never be printed.
+	///
+	/// A failed command reports its own argv (which is how a reader knows what
+	/// failed), so a password passed as an argument would otherwise land in the
+	/// deploy log, the terminal scrollback and whatever ingests either. Every
+	/// occurrence is replaced in the command's [`Display`] and in the error a
+	/// non-zero exit raises, including inside the child's own stderr, which is
+	/// where a cli is most likely to echo an argument back.
+	///
+	/// This is about what gets WRITTEN DOWN. The argument is still in the
+	/// process's argv, exactly as `tofu apply -var` has always been.
+	pub fn with_secret(mut self, secret: impl Into<SmolStr>) -> Self {
+		let secret = secret.into();
+		if !secret.is_empty() {
+			self.secrets.push(secret);
+		}
+		self
+	}
+
+	/// `text` with every declared secret replaced.
+	fn redact(&self, text: &str) -> String {
+		self.secrets.iter().fold(text.to_string(), |text, secret| {
+			text.replace(secret.as_str(), Self::REDACTED)
+		})
+	}
+
+	/// What a declared secret prints as.
+	pub const REDACTED: &'static str = "<redacted>";
 
 	/// Sets the arguments to pass to the command.
 	pub fn with_args(
@@ -315,8 +348,50 @@ exited with non-zero status: {}
 {}",
 				self,
 				output.status,
-				String::from_utf8_lossy(&output.stderr)
+				self.redact(&String::from_utf8_lossy(&output.stderr))
 			)
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	/// A failed process reports its own argv, which is how a reader knows what
+	/// failed and also how a password reaches a deploy log. A declared secret
+	/// is gone from every rendering of the command.
+	#[crate::test]
+	fn a_declared_secret_never_prints() {
+		ChildProcess::new("aws")
+			.with_args(["ssm", "put-parameter", "--value", "hunter2"])
+			.with_secret("hunter2")
+			.to_string()
+			.xpect_eq("aws ssm put-parameter --value <redacted>");
+	}
+
+	/// An undeclared value prints, which is the whole reason declaring is
+	/// explicit: this type cannot guess which argument is the password.
+	#[crate::test]
+	fn an_undeclared_value_prints() {
+		ChildProcess::new("echo")
+			.with_args(["hunter2"])
+			.to_string()
+			.xpect_eq("echo hunter2");
+	}
+
+	/// The child's own stderr is where a cli is most likely to echo an argument
+	/// back, so the redaction has to reach the error text too.
+	#[crate::test]
+	async fn a_secret_echoed_back_is_redacted() {
+		let err = ChildProcess::new("sh")
+			.with_args(["-c", "echo hunter2 >&2; exit 1"])
+			.with_secret("hunter2")
+			.run_async()
+			.await
+			.unwrap_err()
+			.to_string();
+		err.contains("hunter2").xpect_false();
+		err.xpect_contains("<redacted>");
 	}
 }

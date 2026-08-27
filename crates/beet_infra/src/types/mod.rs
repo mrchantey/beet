@@ -3,6 +3,7 @@ mod access_grant;
 mod artifacts;
 mod deployment;
 mod infra_plugin;
+mod secret_ref;
 mod stack;
 mod stack_backend;
 mod state_encryption;
@@ -13,6 +14,7 @@ pub use access_grant::*;
 pub use artifacts::*;
 pub use deployment::*;
 pub use infra_plugin::*;
+pub use secret_ref::*;
 pub use stack::*;
 pub use stack_backend::*;
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

@@ -166,34 +166,23 @@ impl StalwartBlock {
 		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
 	}
 
-	/// An SSM parameter under the stack's secret prefix, ie
-	/// `/beetmash/prod/mail-admin-password`: the `app--stage--label`
-	/// composition with its separators as slashes, matching
-	/// [`DatabaseRef::secret_name`].
-	fn secret_name(&self, stack: &ResolvedStack, suffix: &str) -> String {
-		format!(
-			"/{}",
-			stack
-				.resource_name(format!("{}-{suffix}", self.label))
-				.replace("--", "/")
-		)
+	/// One of this box's secrets, under the stack's secret prefix, ie
+	/// `/beetmash/prod/mail-admin-password`.
+	fn secret(&self, suffix: &str) -> SecretRef {
+		SecretRef::new(format!("{}-{suffix}", self.label))
 	}
 
-	/// The parameter directory every secret of this stack sits under, ie
-	/// `/beetmash/prod`, which is what lets the instance role grant them in one
-	/// statement.
-	fn secret_prefix(&self, stack: &ResolvedStack) -> String {
-		let name = self.secret_name(stack, "x");
-		name.rsplit_once('/')
-			.map(|(prefix, _)| prefix)
-			.unwrap_or("")
-			.to_string()
+	fn secret_name(&self, stack: &ResolvedStack, suffix: &str) -> String {
+		self.secret(suffix).name(stack)
 	}
 
 	/// Where `EnsureSecret` puts the bootstrap admin password and the boot
 	/// script reads it back.
+	pub fn admin_secret(&self) -> SecretRef { self.secret("admin-password") }
+
+	/// The full parameter name of [`admin_secret`](Self::admin_secret).
 	pub fn admin_secret_name(&self, stack: &ResolvedStack) -> String {
-		self.secret_name(stack, "admin-password")
+		self.admin_secret().name(stack)
 	}
 
 	/// Where terraform puts the SES SMTP username (the sending user's access
@@ -427,7 +416,7 @@ impl StalwartBlock {
 			"Action": ["ssm:GetParameter"],
 			"Resource": format!(
 				"arn:aws:ssm:{region}:*:parameter{}/*",
-				self.secret_prefix(stack)
+				SecretRef::prefix(stack)
 			)
 		}));
 

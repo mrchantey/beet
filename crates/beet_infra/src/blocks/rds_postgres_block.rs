@@ -108,8 +108,10 @@ impl RdsPostgresBlock {
 			max_storage: 100,
 			database: label.clone(),
 			username: "postgres".into(),
-			password: Variable::param(format!("{label}_password"))
-				.with_sensitive(true),
+			password: Variable::param(
+				DatabaseRef::new(label.clone()).password_variable(),
+			)
+			.with_sensitive(true),
 			secret: None,
 			backup_days: 14,
 			deletion_protection: true,
@@ -429,22 +431,27 @@ impl DatabaseRef {
 		SecurityGroupRef::new(self.label.clone())
 	}
 
-	/// The SSM parameter the master password lives in, ie
-	/// `/beetmash/prod/db-password`: the stack's own `app--stage--label`
-	/// composition with its separators as slashes, so parameter store nests the
-	/// stack's secrets under a prefix an IAM policy can grant in one statement.
+	/// The [`SecretRef`] the master password lives at, ie
+	/// `/beetmash/prod/db-password`.
 	///
 	/// On the ref rather than the block for the same reason the terraform
-	/// addresses are: the consumer's boot script reads this name and the
-	/// declaring block grants it, and one composition keeps the two from
-	/// drifting.
+	/// addresses are: the consumer's boot script reads this name, the declaring
+	/// block grants it and `EnsureSecret` creates it, and one composition keeps
+	/// the three from drifting.
+	pub fn secret(&self) -> SecretRef {
+		SecretRef::new(format!("{}-password", self.label))
+	}
+
+	/// The full parameter name, ie `/beetmash/prod/db-password`.
 	pub fn secret_name(&self, stack: &ResolvedStack) -> String {
-		format!(
-			"/{}",
-			stack
-				.resource_name(format!("{}-password", self.label))
-				.replace("--", "/")
-		)
+		self.secret().name(stack)
+	}
+
+	/// The tofu variable the master password arrives as, ie `db_password`. The
+	/// instance is created with it and `EnsureSecret` supplies it, so both ends
+	/// read the key from here.
+	pub fn password_variable(&self) -> SmolStr {
+		format!("{}_password", self.label).into()
 	}
 }
 

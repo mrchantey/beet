@@ -299,6 +299,17 @@ impl Request {
 		this
 	}
 
+	/// Sets the `Authorization` header to an already-composed value, for a
+	/// scheme with no dedicated constructor here. Nothing is encoded: a `Basic`
+	/// caller passes `Basic <base64 of user:password>`.
+	pub fn with_auth_raw(self, value: &str) -> Self {
+		let mut this = self;
+		this.headers.set::<header::Authorization>(
+			header::Authorization::Other(value.to_string()),
+		);
+		this
+	}
+
 	/// Sets the content type header.
 	pub fn with_content_type(self, content_type: MediaType) -> Self {
 		let mut this = self;

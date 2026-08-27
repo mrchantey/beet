@@ -169,8 +169,21 @@ impl MailDomainBlock {
 	}
 
 	/// Add a member, and the mailbox they own on this domain.
-	pub fn with_member(mut self, member: Member) -> Self {
-		self.mailboxes.push(Mailbox::for_member(&member));
+	pub fn with_member(self, member: Member) -> Self {
+		self.push_member(member, false)
+	}
+
+	/// Add a member whose mailbox also administers the server, ie whoever runs
+	/// it. Distinct from an ordinary member because full management access is
+	/// the one grant that should be tedious to hand out: it is rarely more than
+	/// one account, and it must be a decision rather than a default.
+	pub fn with_admin_member(self, member: Member) -> Self {
+		self.push_member(member, true)
+	}
+
+	fn push_member(mut self, member: Member, admin: bool) -> Self {
+		self.mailboxes
+			.push(Mailbox::for_member(&member).with_admin(admin));
 		self.members.push(member);
 		self
 	}
