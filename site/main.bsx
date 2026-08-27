@@ -24,14 +24,20 @@ command route.
 
 ## One declaration, two meanings
 
-`<DynamoTableBlock label="analytics"/>` is declared once, here, at router level.
-The DEPLOY provisions it into the stage stack (a block outside any deploy host
-is adopted by the host carrying this process's stage), and the RUNTIME attaches
-a store for it, which the content router names with `StoreRef($analytics)`.
-Both sides compose `<app>--<stage>--analytics` through the one resolved `Stack`,
-whose app name comes from this entry's `<PackageConfig/>`, so they cannot disagree.
-The live site once spent a whole deploy writing to a table that did not exist
-because the two sides derived that name independently.
+`<DynamoTableBlock bx:ref="analytics" label="analytics"/>` is declared once, under
+the stage `<Stack>`. The DEPLOY provisions it into that stack, and the RUNTIME
+attaches a store for it, which the content router names with `StoreRef($analytics)`
+(a `bx:ref` is document-global, and the declaration builds in every binary, so the
+serving side reaches it from a different branch of the tree). Both sides compose
+`<app>--<stage>--analytics` through the one resolved `Stack`, whose app name comes
+from this entry's `<PackageConfig/>`, so they cannot disagree. The live site once
+spent a whole deploy writing to a table that did not exist because the two sides
+derived that name independently.
+
+A resource belongs to the stack it is authored under and to no other. There is no
+adoption: a declaration outside every `<Stack>` still resolves its runtime name,
+but no deploy provisions it, which is a structural answer to "which stack owns
+this?" rather than one inferred from the process stage.
 
 ## The served site
 
@@ -58,11 +64,18 @@ one declaration of what is borrowed, and runs ahead of every publish.
 
 Structure is universal, so this same file loads whole in the deployed binary
 (built `--no-default-features --features aws_sdk,ssh,geoip`): the deploy tags it
-never linked build as inert entities, quietly, because the host declares
+never linked build as inert entities, quietly, because the stack declares
 `RequireFeatures(["infra","extra"])`. That declaration is also the loudness:
 dispatching any deploy verb in a binary without those features fails naming
 them and the rebuild that fixes it, before any step runs. That is what lets the
 application declare its own infrastructure without shipping the deployer.
+
+`<Stack>` is the identity every resource beneath it composes its name from, and it
+is a registered component in every native build rather than a template prop, so the
+lean binary reads the same stage and the same `shared` override off the same tree.
+`<DeployVerbs/>` (a beet_extra template, absent from the lean binary along with the
+verbs it hosts) adds the tofu lifecycle routes `validate`/`plan`/`apply`/`show`/
+`list`/`destroy`/`rollback`/`rollforward` to whichever stack hosts it.
 
 The deploy route applies once per layer, and the order is the point: `<TofuApply
 layer="storage"/>` brings up the stores (the app bucket, the analytics table),
@@ -109,8 +122,6 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 	<!-- the ONE location app identity lives: the deploy names its resources from
 	     this, and so does the running binary. -->
 	<PackageConfig title="Beet" app_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
-	<!-- declared once: the deploy creates it, the runtime records to it -->
-	<DynamoTableBlock bx:ref="analytics" label="analytics"/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>
 		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
 			<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
@@ -121,11 +132,16 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<AssetsDir src="assets" cache="1h"/>
 		</Router>
 	</Route>
-	<DeployHost {RequireFeatures(["infra","extra"])}>
+	<!-- the stage stack: every resource the running site needs, the verbs that
+	     provision them, and the one `RequireFeatures` guarding the whole subtree -->
+	<Stack {RequireFeatures(["infra","extra"])}>
+		<!-- declared once: the deploy creates it, the runtime records to it -->
+		<DynamoTableBlock bx:ref="analytics" label="analytics"/>
+		<S3BucketBlock label="app" deploy_versioned=false/>
+		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+		<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
+		<DeployVerbs/>
 		<Route path="deploy" {ExchangeSequence}>
-			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-			<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
-			<S3BucketBlock label="app" deploy_versioned=false/>
 			<TofuApply layer="storage"/>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 			<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
@@ -146,10 +162,13 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		<Route path="assets" {ExchangeSequence}>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 		</Route>
-	</DeployHost>
-	<Route path="shared">
-		<DeployHost stage="shared" {RequireFeatures(["infra","extra"])}>
+	</Stack>
+	<Route path="shared" {RequireFeatures(["infra","extra"])}>
+		<!-- the stage rides the `Stack` COMPONENT, so it is correct in every
+		     binary, including the lean one where the verbs around it are inert -->
+		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+			<DeployVerbs/>
 			<Route path="push" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 				<DirSync bucket="assets" local_dir="site/assets"/>
@@ -157,7 +176,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<Route path="pull" {ExchangeSequence}>
 				<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
 			</Route>
-		</DeployHost>
+		</Stack>
 	</Route>
 </Router>
 </CliServer>

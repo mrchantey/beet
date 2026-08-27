@@ -4,6 +4,26 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 impl Stack {
+	/// The standard IaC verb routes as children: the tofu lifecycle
+	/// (validate/plan/apply/show/list/destroy) plus the artifact ledger's
+	/// rollback/rollforward.
+	///
+	/// Each resolves its stack by ancestry, so the bundle carries no identity of
+	/// its own and hosting it is the whole declaration: spawn it under a
+	/// `<Stack>` and that stack has a lifecycle.
+	pub fn verbs() -> impl Bundle {
+		children![
+			Validate,
+			Plan,
+			Apply,
+			Show,
+			List,
+			Destroy,
+			Rollback,
+			Rollforward
+		]
+	}
+
 	pub fn cli() -> impl Bundle {
 		// the infra CLI host bundle: a `CliServer` entrypoint owning the boot, with the
 		// router and IaC routes as its dispatch child (a server and a router never share
@@ -11,16 +31,7 @@ impl Stack {
 		// spawning, so the `on_add` observers are registered before the `cli` boot lands.
 		(CliServer::default(), children![(
 			Router::with_defaults(),
-			children![
-				Validate,
-				Plan,
-				Apply,
-				Show,
-				List,
-				Destroy,
-				Rollback,
-				Rollforward
-			]
+			Stack::verbs()
 		)])
 	}
 }

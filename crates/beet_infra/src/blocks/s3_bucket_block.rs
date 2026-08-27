@@ -65,6 +65,10 @@ impl S3BucketBlock {
 
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
+	/// The [`AccessGrant::kind`] a bucket declares, this block's own constant so
+	/// a compute lowering it never shares a vocabulary with another provider's.
+	pub const ACCESS_KIND: &'static str = "s3_bucket";
+
 	/// The region this bucket lives in: its own override, else `stack`'s.
 	pub fn resolved_region(&self, stack: &ResolvedStack) -> SmolStr {
 		self.region
@@ -170,9 +174,10 @@ impl Block for S3BucketBlock {
 	/// A deployed process reads the buckets declared alongside it (its site
 	/// store, its assets); the deploy itself is what writes them.
 	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
-		vec![AccessGrant::read(AccessResource::S3Bucket {
-			name: stack.resource_name(self.label.clone()),
-		})]
+		vec![AccessGrant::read(
+			Self::ACCESS_KIND,
+			stack.resource_name(self.label.clone()),
+		)]
 	}
 }
 

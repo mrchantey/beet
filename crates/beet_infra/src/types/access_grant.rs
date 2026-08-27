@@ -9,85 +9,70 @@ use beet_core::prelude::*;
 /// does with it) and **lowered** by the compute block (which knows the
 /// provider's mechanism): AWS compute renders IAM statements, Cloudflare compute
 /// would render wrangler bindings. Neither side hand-writes the other's ARNs.
+///
+/// Nothing here is provider-shaped: the [`kind`](Self::kind) is a plain string
+/// the declaring block owns, so a Cloudflare block mints `"r2_bucket"` without
+/// touching this module. The compute that cannot lower a kind fails loudly
+/// naming it, which is what replaces the compile-time exhaustiveness a closed
+/// enum used to promise and never delivered (its readers all had catch-alls).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccessGrant {
-	pub level: AccessLevel,
-	pub resource: AccessResource,
+	/// The resource kind, a constant owned by the declaring block, ie
+	/// [`S3BucketBlock::ACCESS_KIND`](crate::prelude::S3BucketBlock::ACCESS_KIND).
+	pub kind: SmolStr,
+	/// The resolved resource name, ie `beet-site--prod--analytics`.
+	pub name: String,
+	/// What the process may do with it.
+	pub permissions: AccessPermissions,
 }
 
 impl AccessGrant {
-	pub fn read(resource: AccessResource) -> Self {
+	/// A read-only grant on `name`, ie a bucket the deploy publishes and the
+	/// process only serves.
+	pub fn read(kind: impl Into<SmolStr>, name: impl Into<String>) -> Self {
 		Self {
-			level: AccessLevel::Read,
-			resource,
+			kind: kind.into(),
+			name: name.into(),
+			permissions: AccessPermissions::Read,
 		}
 	}
-	pub fn read_write(resource: AccessResource) -> Self {
+	/// A read/write grant on `name`, ie a table the process records to.
+	pub fn read_write(
+		kind: impl Into<SmolStr>,
+		name: impl Into<String>,
+	) -> Self {
 		Self {
-			level: AccessLevel::ReadWrite,
-			resource,
+			kind: kind.into(),
+			name: name.into(),
+			permissions: AccessPermissions::ReadWrite,
 		}
 	}
 }
 
+/// What a grant permits, lowered by the compute to its provider's action sets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AccessLevel {
+pub enum AccessPermissions {
 	Read,
 	ReadWrite,
 }
 
-/// A resource kind plus the resolved name a grant applies to. Extend with a
-/// variant per resource kind a block can declare; the compute blocks match on it
-/// exhaustively, so a new kind cannot be silently ungranted.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AccessResource {
-	S3Bucket { name: String },
-	DynamoTable { name: String, region: SmolStr },
-}
-
 /// Every grant the blocks of one stack declared, collected once per deploy and
 /// handed to the compute blocks that lower them.
+///
+/// Deduplicated in declaration order at construction, since declaration order is
+/// the deploy's order: a policy renders identically across runs and a plan shows
+/// no spurious diff.
 #[derive(Debug, Default, Clone, Deref)]
 pub struct AccessGrants(Vec<AccessGrant>);
 
 impl AccessGrants {
-	pub fn new(grants: Vec<AccessGrant>) -> Self { Self(grants) }
-
-	/// Every bucket name any grant names, deduplicated in declaration order.
-	pub fn s3_buckets(&self) -> Vec<&str> {
-		self.0
-			.iter()
-			.filter_map(|grant| match &grant.resource {
-				AccessResource::S3Bucket { name } => Some(name.as_str()),
-				_ => None,
-			})
-			.collect::<Vec<_>>()
-			.xmap(dedup_preserving_order)
-	}
-
-	/// Every read/write table, as `(name, region)` pairs.
-	pub fn dynamo_tables(&self) -> Vec<(&str, &str)> {
-		self.0
-			.iter()
-			.filter_map(|grant| match &grant.resource {
-				AccessResource::DynamoTable { name, region } => {
-					Some((name.as_str(), region.as_str()))
-				}
-				_ => None,
-			})
-			.collect::<Vec<_>>()
-			.xmap(dedup_preserving_order)
-	}
-}
-
-/// Declaration order is the deploy's order, so a policy renders identically
-/// across runs and a plan shows no spurious diff.
-fn dedup_preserving_order<T: PartialEq>(items: Vec<T>) -> Vec<T> {
-	let mut out = Vec::<T>::new();
-	for item in items {
-		if !out.contains(&item) {
-			out.push(item);
+	pub fn new(grants: Vec<AccessGrant>) -> Self {
+		let mut out = Vec::<AccessGrant>::new();
+		for grant in grants {
+			if !out.contains(&grant) {
+				out.push(grant);
+			}
 		}
+		Self(out)
 	}
-	out
 }

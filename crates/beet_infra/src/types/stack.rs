@@ -173,7 +173,6 @@ impl ResolvedStack {
 #[derive(SystemParam)]
 pub struct StackQuery<'w, 's> {
 	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
-	all_stacks: Query<'w, 's, (Entity, &'static Stack)>,
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
 	stores: Query<'w, 's, &'static BlobStore>,
@@ -218,64 +217,22 @@ impl<'w, 's> StackQuery<'w, 's> {
 		Ok((root, stack.resolve(&self.package)))
 	}
 
-	/// Every entity declared under `entity`'s stack: its root's descendants
-	/// (inclusive), plus any UNSCOPED block (see [`Self::unscoped_blocks`]) when
-	/// this stack is the one that adopts them. The one traversal a deploy step
-	/// uses to find what was declared alongside it.
+	/// Every entity declared under `entity`'s stack: its root's inclusive
+	/// descendants, full stop. The one traversal a deploy step uses to find what
+	/// was declared alongside it.
+	///
+	/// A resource belongs to the stack it is authored under and to no other, so
+	/// a declaration outside every `<Stack>` belongs to no deploy's config: it
+	/// still resolves the process default for its runtime meaning, but nothing
+	/// provisions it. That is the unrepresentable-by-construction answer to
+	/// "which stack owns this?", replacing a sweep that inferred it from the
+	/// process stage and could quietly provision a resource into the wrong one.
 	pub fn declared(&self, entity: Entity) -> Result<Vec<Entity>> {
 		let (root, _) = self.root(entity)?;
-		let mut declared = self
-			.children
+		self.children
 			.iter_descendants_inclusive(root)
-			.collect::<Vec<_>>();
-		declared.extend(self.adopted_blocks(root)?);
-		declared.xok()
-	}
-
-	/// Blocks declared outside any [`Stack`], ie an application-level resource
-	/// declaration whose reason to exist is its runtime meaning (the analytics
-	/// table a router records to). They are real resources and something must
-	/// provision them, so a deploy adopts them.
-	fn unscoped_blocks(&self) -> Vec<Entity> {
-		self.blocks
-			.iter()
-			.map(|(entity_ref, _)| entity_ref.id())
-			.filter(|entity| self.stacks.get(*entity).is_err())
-			.collect()
-	}
-
-	/// The unscoped blocks this stack adopts: none unless it is THE host for
-	/// this process's stage, so a stage override (the shared assets host, which
-	/// deploys nothing the app runs on) never quietly provisions the app's
-	/// resources into the wrong stack.
-	fn adopted_blocks(&self, root: Entity) -> Result<Vec<Entity>> {
-		let unscoped = self.unscoped_blocks();
-		if unscoped.is_empty() {
-			return Ok(Vec::new());
-		}
-		let process_stage = &BootstrapConfig::get().stage;
-		let hosts = self
-			.all_stacks
-			.iter()
-			.filter(|(_, stack)| {
-				stack.resolve(&self.package).stage() == process_stage
-			})
-			.map(|(entity, _)| entity)
-			.collect::<Vec<_>>();
-		// naming the blocks, since the fix is either to scope them under a host
-		// or to declare the host they belong to.
-		if hosts.len() != 1 {
-			bevybail!(
-				"{} block(s) are declared outside any deploy host, and {} hosts carry the process stage '{process_stage}' (exactly one must): {unscoped:?}",
-				unscoped.len(),
-				hosts.len()
-			);
-		}
-		match hosts[0] == root {
-			true => unscoped,
-			false => Vec::new(),
-		}
-		.xok()
+			.collect::<Vec<_>>()
+			.xok()
 	}
 
 	/// Finds the stack in ancestors and builds a config of all block
@@ -448,6 +405,42 @@ mod tests {
 				.as_str()
 				.xpect_eq("us-west-2");
 		}
+	}
+
+	/// The storage layer the beet site's stage stack renders: the app bucket and
+	/// the analytics table, both named through the one composition and both in
+	/// the stack's region.
+	///
+	/// These are the LIVE resources. A moved name or region replaces them, and
+	/// for the analytics table that is a silent data loss (a new empty table the
+	/// site happily writes to), so the values are pinned rather than the shape.
+	#[beet_core::test]
+	fn the_storage_layer_renders_the_live_names() {
+		let (deployment, _dir) = Deployment::default_local();
+		let stack = resolved(Stack::default().with_stage("prod"));
+		let mut world = World::new();
+		let spawned = world.spawn(());
+		let entity = spawned.as_readonly();
+		let blocks = [
+			&S3BucketBlock::new("app").with_deploy_versioned(false)
+				as &dyn Block,
+			&DynamoTableBlock::new("analytics") as &dyn Block,
+		];
+		let config = stack
+			.build_config(
+				&deployment,
+				blocks.map(|block| (entity.clone(), block)).to_vec(),
+			)
+			.unwrap();
+		config
+			.to_json()
+			.to_string()
+			.as_str()
+			.xpect_contains("\"bucket\":\"beet-site--prod--app\"")
+			.xpect_contains("\"name\":\"beet-site--prod--analytics\"")
+			.xpect_contains("\"region\":\"us-west-2\"");
+		// both converge in the layer applied before anything that reads them
+		config.layer_targets("storage").unwrap().len().xpect_eq(2);
 	}
 
 	/// Two stacks sharing one launch compose distinct state paths, so a `shared`

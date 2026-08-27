@@ -57,6 +57,10 @@ impl DynamoTableBlock {
 		}
 	}
 
+	/// The [`AccessGrant::kind`] a table declares, this block's own constant so
+	/// a compute lowering it never shares a vocabulary with another provider's.
+	pub const ACCESS_KIND: &'static str = "dynamo_table";
+
 	/// The composed table name this block declares, ie `beet-site--prod--analytics`.
 	pub fn table_name(&self, stack: &ResolvedStack) -> String {
 		stack.resource_name(self.label.clone())
@@ -155,10 +159,10 @@ impl Block for DynamoTableBlock {
 	/// A table is declared to be recorded to, so the process that declared it
 	/// reads and writes it.
 	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
-		vec![AccessGrant::read_write(AccessResource::DynamoTable {
-			name: self.table_name(stack),
-			region: self.resolved_region(stack),
-		})]
+		vec![AccessGrant::read_write(
+			Self::ACCESS_KIND,
+			self.table_name(stack),
+		)]
 	}
 }
 

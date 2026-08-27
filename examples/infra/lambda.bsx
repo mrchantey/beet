@@ -16,34 +16,39 @@ the lambda runtime offers no argv), so a site change re-publishes by re-running
     beet --main=examples/infra/lambda.bsx watch
     beet --main=examples/infra/lambda.bsx destroy --force
 
-`<StackHost>` is the IaC deployer host: a one-shot `CliServer` root whose `CallOnReady`
-fires the CLI request on load, with the `Router` as its child carrying the `Stack`
-(resolved by the blocks + verbs by ancestry) and the standard IaC verb routes
-(validate/plan/apply/...). Each verb below is a child-sequenced
-`<Route path=".." {ExchangeSequence}>`: its block and actions are direct children of
-the route and the sequence runs them in order.
+A one-shot `CliServer` root whose `CallOnReady` fires the CLI request on load, with
+the `Router` as its dispatch child. `<Stack app_name="lambda">` is the resource
+identity every block and verb beneath it resolves by ancestry, and `<DeployVerbs/>`
+adds the standard IaC verb routes (validate/plan/apply/...) to it. Each verb below is
+a child-sequenced `<Route path=".." {ExchangeSequence}>`: its block and actions are
+direct children of the route and the sequence runs them in order.
 
 Live deploy needs AWS credentials in the environment, plus `tofu`,
 `cargo-zigbuild` and `zip`.
 -->
-<StackHost app_name="lambda">
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
-	<Route path="deploy" {ExchangeSequence}>
-		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-		<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>
-		<S3BucketBlock label="app" deploy_versioned=false/>
-		<!-- the bucket first, so the site is in place before the function that
-		     serves it exists -->
-		<TofuApply layer="storage"/>
-		<SiteSync app_name="lambda"/>
-		<TofuApply/>
-		<!-- the rollout is quick, so tail briefly then exit -->
-		<LambdaWatch app_name="lambda" timeout="30s"/>
-	</Route>
-	<Route path="sync" {ExchangeSequence}>
-		<SiteSync app_name="lambda"/>
-	</Route>
-	<Route path="watch" {ExchangeSequence}>
-		<LambdaWatch app_name="lambda"/>
-	</Route>
-</StackHost>
+	<Stack app_name="lambda">
+		<DeployVerbs/>
+		<Route path="deploy" {ExchangeSequence}>
+			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+			<LambdaSiteBlock features="lambda,aws_sdk"/>
+			<S3BucketBlock label="app" deploy_versioned=false/>
+			<!-- the bucket first, so the site is in place before the function that
+			     serves it exists -->
+			<TofuApply layer="storage"/>
+			<SiteSync/>
+			<TofuApply/>
+			<!-- the rollout is quick, so tail briefly then exit -->
+			<LambdaWatch timeout="30s"/>
+		</Route>
+		<Route path="sync" {ExchangeSequence}>
+			<SiteSync/>
+		</Route>
+		<Route path="watch" {ExchangeSequence}>
+			<LambdaWatch/>
+		</Route>
+	</Stack>
+</Router>
+</CliServer>

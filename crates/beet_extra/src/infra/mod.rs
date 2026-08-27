@@ -5,7 +5,7 @@
 //! block/config types and directly-spawnable deploy actions register upstream in
 //! beet_infra's [`InfraPlugin`]; this module adds that plugin plus the few templates
 //! that wrap non-`Reflect` infra values (see `templates.rs`), so a scene's
-//! `<StackHost>`/`<LambdaSiteBlock/>` tag resolves from markup.
+//! `<DeployVerbs/>`/`<LambdaSiteBlock/>` tag resolves from markup.
 pub mod infra_ext;
 mod templates;
 pub use templates::*;
@@ -15,7 +15,7 @@ use beet_infra::prelude::*;
 
 /// Adds the [`InfraPlugin`] runtime (which registers the deploy block/action types)
 /// and registers the beet_extra deploy templates, so a loaded `examples/infra/*.bsx`
-/// scene resolves its `<StackHost>` etc tags and its `deploy`/`sync`/`destroy`
+/// scene resolves its `<DeployVerbs/>` etc tags and its `deploy`/`sync`/`destroy`
 /// routes run.
 pub struct InfraExamplesPlugin;
 
@@ -26,18 +26,18 @@ impl Plugin for InfraExamplesPlugin {
 			.register_template::<BeetBinaryBuild>()
 			// an example-target binary build artifact (eg the `ssh_tui_site` server).
 			.register_template::<ExampleBinaryBuild>()
+			// the IaC verb routes a `<Stack>` hosts, and the bucket-lifecycle
+			// example's state-backend toggle.
+			.register_template::<DeployVerbs>()
+			.register_template::<StateBackendToggle>()
 			// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
 			// `.bsx` lambda deployer composes them (see `templates.rs`).
-			.register_template::<StackHost>()
-			// the bucket-lifecycle example's stack host.
-			.register_template::<BucketStack>()
 			.register_template::<SiteSync>()
-			// the beet-site deployer: the stage-aware lightsail block and the
-			// stack-bearing host every deploy verb resolves by ancestry. The
-			// resource declarations themselves are authored as their blocks
-			// (`<S3BucketBlock/>`, `<DynamoTableBlock/>`), registered upstream.
+			// the beet-site deployer's lightsail block, stage-aware through the
+			// `<Stack>` it resolves by ancestry. The resource declarations
+			// themselves are authored as their blocks (`<S3BucketBlock/>`,
+			// `<DynamoTableBlock/>`), registered upstream.
 			.register_template::<LightsailBeetSiteBlock>()
-			.register_template::<DeployHost>()
 			.register_template::<LambdaSiteBlock>()
 			.register_template::<LambdaWatch>()
 			.register_template::<LightsailSiteBlock>()

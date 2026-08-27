@@ -23,28 +23,33 @@ reading the freshly built binary.
 Live deploy needs AWS credentials in the environment, plus `tofu`, `cargo-zigbuild`
 and a container engine.
 -->
-<StackHost app_name="fargate">
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
-	<Route path="deploy" {ExchangeSequence}>
-		<FargateSiteBlock app_name="fargate"/>
-		<S3BucketBlock label="app" deploy_versioned=false/>
-		<BeetBinaryBuild features="aws_sdk"/>
-		<!-- the stores the deploy publishes into: the image registry and the
-		     bucket the site is served from -->
-		<TofuApply layer="storage"/>
-		<!-- bake the freshly built binary into the container image; the block's
-		     bootstrap config (`--store=s3://<bucket> --server=http`) rides the CMD -->
-		<BuildDockerImage/>
-		<SiteSync app_name="fargate"/>
-		<!-- the full apply rolls the service, onto an image that is pushed and a
-		     bucket that is filled -->
-		<TofuApply/>
-		<FargateWatch app_name="fargate" timeout="300s"/>
-	</Route>
-	<Route path="sync" {ExchangeSequence}>
-		<SiteSync app_name="fargate"/>
-	</Route>
-	<Route path="watch" {ExchangeSequence}>
-		<FargateWatch app_name="fargate"/>
-	</Route>
-</StackHost>
+	<Stack app_name="fargate">
+		<DeployVerbs/>
+		<Route path="deploy" {ExchangeSequence}>
+			<FargateSiteBlock/>
+			<S3BucketBlock label="app" deploy_versioned=false/>
+			<BeetBinaryBuild features="aws_sdk"/>
+			<!-- the stores the deploy publishes into: the image registry and the
+			     bucket the site is served from -->
+			<TofuApply layer="storage"/>
+			<!-- bake the freshly built binary into the container image; the block's
+			     bootstrap config (`--store=s3://<bucket> --server=http`) rides the CMD -->
+			<BuildDockerImage/>
+			<SiteSync/>
+			<!-- the full apply rolls the service, onto an image that is pushed and a
+			     bucket that is filled -->
+			<TofuApply/>
+			<FargateWatch timeout="300s"/>
+		</Route>
+		<Route path="sync" {ExchangeSequence}>
+			<SiteSync/>
+		</Route>
+		<Route path="watch" {ExchangeSequence}>
+			<FargateWatch/>
+		</Route>
+	</Stack>
+</Router>
+</CliServer>

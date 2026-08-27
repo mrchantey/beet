@@ -40,8 +40,9 @@ What lives here is this WORKSPACE's own shared asset bucket
 (`beet--shared--assets`), the source of record for the files too large for git
 that the examples, tests and wasm builds read out of `./assets`. It is
 public-read so a fresh checkout hydrates without credentials, and it is declared
-under a `shared`-stage `<DeployHost>` because a source shared by developers is
-not owned by any deploy stage.
+under a `shared`-stage `<Stack>` because a source shared by developers is not
+owned by any deploy stage. A resource belongs to the stack it is authored under
+and to no other, so no stage deploy touches it.
 
     just beet-shared apply                 # provision the workspace assets bucket
     just beet-shared pull                  # hydrate ./assets from it (no credentials)
@@ -49,8 +50,11 @@ not owned by any deploy stage.
 
 Structure is universal, so a lean `beet` (the default build, ie `beet run-wasm`)
 loads that subtree too: the tags it never linked build as inert entities,
-quietly, because the host declares `RequireFeatures(["infra","extra"])`. Dispatching
-a shared verb in such a build fails naming the missing features.
+quietly, because the route declares `RequireFeatures(["infra","extra"])`. Dispatching
+a shared verb in such a build fails naming the missing features. The stage rides
+the `<Stack>` COMPONENT, registered in every native build, so `shared` is correct
+even there; `<DeployVerbs/>` (a beet_extra template) adds the tofu lifecycle
+routes, and is one of the tags a lean build has no behavior for.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
 -->
@@ -65,16 +69,17 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 	<ExportPdf/>
 	<CaptureScreenshot/>
 	<SyncS3/>
-	<Route path="shared">
-		<DeployHost stage="shared" {RequireFeatures(["infra","extra"])}>
+	<Route path="shared" {RequireFeatures(["infra","extra"])}>
+		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+			<DeployVerbs/>
 			<Route path="push" {ExchangeSequence}>
 				<DirSync bucket="assets" local_dir="assets"/>
 			</Route>
 			<Route path="pull" {ExchangeSequence}>
 				<DirSync bucket="assets" local_dir="assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
 			</Route>
-		</DeployHost>
+		</Stack>
 	</Route>
 </Router>
 </CliServer>

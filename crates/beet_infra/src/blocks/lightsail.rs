@@ -193,17 +193,59 @@ impl LightsailBlock {
 		Ok(())
 	}
 
+	/// The dynamodb actions a read-only table grant lowers to.
+	const READ_TABLE_ACTIONS: &'static [&'static str] = &[
+		"dynamodb:DescribeTable",
+		"dynamodb:GetItem",
+		"dynamodb:Query",
+		"dynamodb:Scan",
+		"dynamodb:BatchGetItem",
+	];
+
+	/// The dynamodb actions a read/write table grant lowers to.
+	const READ_WRITE_TABLE_ACTIONS: &'static [&'static str] = &[
+		"dynamodb:DescribeTable",
+		"dynamodb:GetItem",
+		"dynamodb:PutItem",
+		"dynamodb:UpdateItem",
+		"dynamodb:DeleteItem",
+		"dynamodb:Query",
+		"dynamodb:Scan",
+		"dynamodb:BatchGetItem",
+		"dynamodb:BatchWriteItem",
+	];
+
+	/// The bucket-level and object-level arn for each of `buckets`: an s3 action
+	/// set spans both, and a statement naming only one of them silently fails
+	/// half the calls.
+	fn bucket_arns(buckets: &[String]) -> Vec<String> {
+		buckets
+			.iter()
+			.flat_map(|bucket| {
+				[
+					format!("arn:aws:s3:::{bucket}"),
+					format!("arn:aws:s3:::{bucket}/*"),
+				]
+			})
+			.collect()
+	}
+
 	/// The inline IAM policy document for the box's runtime identity, LOWERED
 	/// from the [`AccessGrants`] the stack's blocks declared: a declared bucket
-	/// becomes an s3 read, a declared table a dynamodb read/write. The two grants
-	/// this block owns internally are added here because nothing declares them:
-	/// the artifacts bucket it pulls its binary from at boot, and its own log
-	/// group.
+	/// becomes an s3 statement, a declared table a dynamodb one, each scoped to
+	/// the grant's own [`AccessPermissions`]. The two grants this block owns
+	/// internally are added here because nothing declares them: the artifacts
+	/// bucket it pulls its binary from at boot, and its own log group.
 	///
 	/// Provider-agnostic on the declaring side, provider-specific here: a block
 	/// says "this process reads that bucket" and the compute renders whatever its
 	/// platform's permission mechanism is (IAM statements here, wrangler bindings
-	/// for a Cloudflare compute).
+	/// for a Cloudflare compute). A kind this compute cannot lower FAILS the
+	/// deploy naming it: a grant silently dropped is a box that serves until the
+	/// first request touching that resource.
+	///
+	/// Every ARN takes its region from the stack, the one place a region is
+	/// answered, so a grant never carries one of its own.
 	///
 	/// The account segment is a wildcard because the account id is not known at
 	/// render time; the resource names are already stage-scoped, and a policy
@@ -218,42 +260,70 @@ impl LightsailBlock {
 		let region = stack.region();
 		let mut statements = Vec::new();
 
-		// every declared bucket, read-only: the deploy publishes them, the box
-		// serves them. Its own artifacts bucket is declared by nothing, so it is
-		// added here.
+		// group the declared grants by kind and permission level. Its own
+		// artifacts bucket is declared by nothing, so it seeds the read set.
 		let mut read_buckets = vec![deployment.artifact_bucket_name(stack)];
-		read_buckets
-			.extend(access.s3_buckets().iter().map(ToString::to_string));
+		let mut write_buckets = Vec::new();
+		let mut tables = Vec::<&AccessGrant>::new();
+		for grant in access.iter() {
+			match grant.kind.as_str() {
+				S3BucketBlock::ACCESS_KIND => match grant.permissions {
+					AccessPermissions::Read => {
+						read_buckets.push(grant.name.clone())
+					}
+					AccessPermissions::ReadWrite => {
+						write_buckets.push(grant.name.clone())
+					}
+				},
+				#[cfg(feature = "bindings_aws_dynamo")]
+				DynamoTableBlock::ACCESS_KIND => tables.push(grant),
+				kind => bevybail!(
+					"a `{kind}` resource was declared alongside this lightsail \
+					instance, which has no IAM lowering for that kind. Add one \
+					to `LightsailBlock::runtime_policy`, or declare the resource \
+					in a stack this compute does not deploy into."
+				),
+			}
+		}
+
+		// every read-only bucket: the deploy publishes them, the box serves them
 		statements.push(json!({
 			"Sid": "ReadStores",
 			"Effect": "Allow",
 			"Action": ["s3:GetObject", "s3:ListBucket"],
-			"Resource": read_buckets
-				.iter()
-				.flat_map(|bucket| [
-					format!("arn:aws:s3:::{bucket}"),
-					format!("arn:aws:s3:::{bucket}/*"),
-				])
-				.collect::<Vec<_>>()
+			"Resource": Self::bucket_arns(&read_buckets)
 		}));
-
-		// every declared table, read/write
-		for (table, table_region) in access.dynamo_tables() {
+		if !write_buckets.is_empty() {
 			statements.push(json!({
-				"Sid": "DeclaredTables",
+				"Sid": "WriteStores",
 				"Effect": "Allow",
 				"Action": [
-					"dynamodb:DescribeTable",
-					"dynamodb:GetItem",
-					"dynamodb:PutItem",
-					"dynamodb:UpdateItem",
-					"dynamodb:DeleteItem",
-					"dynamodb:Query",
-					"dynamodb:Scan",
-					"dynamodb:BatchGetItem",
-					"dynamodb:BatchWriteItem"
+					"s3:GetObject",
+					"s3:ListBucket",
+					"s3:PutObject",
+					"s3:DeleteObject"
 				],
-				"Resource": format!("arn:aws:dynamodb:{table_region}:*:table/{table}")
+				"Resource": Self::bucket_arns(&write_buckets)
+			}));
+		}
+
+		for grant in tables {
+			let (sid, actions) = match grant.permissions {
+				AccessPermissions::Read => {
+					("ReadTables", Self::READ_TABLE_ACTIONS)
+				}
+				AccessPermissions::ReadWrite => {
+					("DeclaredTables", Self::READ_WRITE_TABLE_ACTIONS)
+				}
+			};
+			statements.push(json!({
+				"Sid": sid,
+				"Effect": "Allow",
+				"Action": actions,
+				"Resource": format!(
+					"arn:aws:dynamodb:{region}:*:table/{}",
+					grant.name
+				)
 			}));
 		}
 
@@ -1395,6 +1465,96 @@ mod tests {
 			.xpect_contains("AmazonDynamoDBFullAccess")
 			.xnot()
 			.xpect_contains("CloudWatchAgentServerPolicy");
+	}
+
+	/// A grant's [`AccessPermissions`] is REAL: the same kind lowers to a
+	/// different action set per level, so a resource declaring read-only access
+	/// cannot be written through the box's identity.
+	///
+	/// The live pair is the other way around (a read bucket, a read/write
+	/// table), and both are covered by
+	/// [`grants_only_least_privilege_policies`]; this pins the arms that pair
+	/// does not reach.
+	#[beet_core::test]
+	fn lowers_permissions_per_grant() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let policy = LightsailBlock::default()
+			.runtime_policy(
+				&stack,
+				&deployment,
+				&AccessGrants::new(vec![
+					AccessGrant::read_write(
+						S3BucketBlock::ACCESS_KIND,
+						"writable-bucket",
+					),
+					AccessGrant::read(
+						DynamoTableBlock::ACCESS_KIND,
+						"readable-table",
+					),
+				]),
+			)
+			.unwrap();
+		policy
+			.as_str()
+			.xpect_contains("WriteStores")
+			.xpect_contains("s3:PutObject")
+			.xpect_contains("arn:aws:s3:::writable-bucket/*")
+			.xpect_contains("ReadTables")
+			.xpect_contains("table/readable-table")
+			// a read-only table never reaches the mutating actions
+			.xnot()
+			.xpect_contains("dynamodb:PutItem");
+		// ..and the read-only statement stays the artifacts bucket alone, never
+		// widened by the writable one
+		serde_json::from_str::<serde_json::Value>(&policy).unwrap()["Statement"]
+			[0]["Resource"]
+			.to_string()
+			.as_str()
+			.xnot()
+			.xpect_contains("writable-bucket");
+	}
+
+	/// A resource kind this compute cannot lower FAILS the deploy naming it,
+	/// which is what replaces the compile-time exhaustiveness the closed
+	/// `AccessResource` enum promised and never delivered: every one of its
+	/// readers had a `_ => None` arm, so a new kind was silently ungranted and
+	/// the box served until the first request that touched it.
+	#[beet_core::test]
+	fn unknown_grant_kind_fails_the_deploy() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		LightsailBlock::default()
+			.runtime_policy(
+				&stack,
+				&deployment,
+				&AccessGrants::new(vec![AccessGrant::read(
+					"r2_bucket",
+					"some-bucket",
+				)]),
+			)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`r2_bucket`")
+			.xpect_contains("no IAM lowering");
+	}
+
+	/// Every dynamodb arn takes its region from the STACK, the one place a
+	/// region is answered, so a grant carries none of its own and the policy
+	/// cannot disagree with the table the deploy created.
+	#[beet_core::test]
+	fn table_arns_take_the_stack_region() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region("eu-west-1");
+		LightsailBlock::default()
+			.runtime_policy(
+				&stack,
+				&deployment,
+				&AccessGrants::new(
+					DynamoTableBlock::new("analytics").runtime_access(&stack),
+				),
+			)
+			.unwrap()
+			.as_str()
+			.xpect_contains("arn:aws:dynamodb:eu-west-1:*:table/");
 	}
 
 	/// A stack declaring no table grants no DynamoDB access at all, rather than

@@ -1,16 +1,18 @@
 //! Markup wrappers for the infra example types that are not directly spawnable.
 //!
 //! Most deploy types are reflect components spawned directly by tag (eg
-//! `<CloudflareWorkerBlock/>`, `<CloudflareWorkerDeployAction/>`). The wrappers here
-//! cover the rest: types that build a non-`Reflect` value (a [`Stack`]'s `MultiMap`, a
-//! [`BuildArtifact`]'s `ChildProcess`, an `S3BucketBlock`'s bindings) or compute
-//! stack-derived config. A thin `#[template]` wraps each: its props struct is
-//! reflect-registered, its body builds the bundle.
+//! `<Stack/>`, `<S3BucketBlock/>`, `<CloudflareWorkerBlock/>`). The wrappers here
+//! cover the rest: types that build a non-`Reflect` value (a [`BuildArtifact`]'s
+//! `ChildProcess`, an action route bundle) or compute stack-derived config. A thin
+//! `#[template]` wraps each: its props struct is reflect-registered, its body
+//! builds the bundle.
+//!
+//! None of them carries resource identity. That belongs to `<Stack>`, a component
+//! registered in every native build: a stage or app name on a template prop is
+//! absent exactly in the binary that did not link the template.
 use crate::infra::infra_ext;
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
-use beet_net::prelude::*;
-use beet_router::prelude::*;
 
 /// `<BeetBinaryBuild features="aws_sdk"/>` — builds the generic `beet` binary
 /// (release, zigbuild) with the given feature set as a [`BuildArtifact`], the markup
@@ -38,44 +40,27 @@ pub fn ExampleBinaryBuild(
 		.into_build_artifact()
 }
 
-/// `<StackHost app_name="lambda">` — the IaC deployer host: a one-shot
-/// [`CliServer`] root owning the boot, with the default router as its dispatch
-/// child carrying the [`Stack`] (so the blocks + verbs resolve it by ancestry),
-/// the standard IaC verb routes (validate/plan/apply/...), and a slot for the
-/// example's own deploy/sync/watch routes.
+/// `<DeployVerbs/>` — the standard IaC verb routes (validate / plan / apply /
+/// show / list / destroy / rollback / rollforward), the markup form of
+/// [`Stack::verbs`].
 ///
-/// It is an entry root, so it carries [`CallOnReady`]: loading the document
-/// dispatches the process request and the matching verb runs.
+/// It carries no identity of its own: each verb resolves its [`Stack`] by
+/// ancestry, so authoring it under a `<Stack>` is the whole declaration. That
+/// separation is the point — a stage or app name riding a TEMPLATE prop is
+/// absent from any binary that did not link the template, which is exactly how a
+/// `shared` scope can go missing in a lean build.
 #[template]
-pub fn StackHost(#[prop(into)] app_name: String) -> impl Bundle {
-	(CliServer::default(), CallOnReady, children![(
-		Stack::new(app_name),
-		Router::with_defaults(),
-		children![
-			Validate,
-			Plan,
-			Apply,
-			Show,
-			List,
-			Destroy,
-			Rollback,
-			Rollforward,
-			SlotTarget::new(),
-		],
-	)])
-}
+pub fn DeployVerbs() -> impl Bundle { Stack::verbs() }
 
-/// `<BucketStack app_name="bucket-example"/>` — [`StackHost`]'s shape, but
-/// selecting an S3 state backend when `--s3-backend` is passed (else local).
-/// The markup form of lifecycle.rs's backend toggle.
+/// `<StateBackendToggle/>` — select this launch's tofu state backend from argv:
+/// S3 when `--s3-backend` is passed, local otherwise. The markup form of
+/// lifecycle.rs's backend toggle.
 ///
-/// The backend is a property of the LAUNCH, not of the stack's identity, so the
-/// toggle lands on the process [`Deployment`].
+/// The backend is a property of the LAUNCH, not of a stack's identity, so the
+/// toggle lands on the process [`Deployment`] and nothing about it is authored
+/// per stack.
 #[template(system)]
-pub fn BucketStack(
-	#[prop(into)] app_name: String,
-	mut deployment: ResMut<Deployment>,
-) -> impl Bundle {
+pub fn StateBackendToggle(mut deployment: ResMut<Deployment>) {
 	let backend: StackBackend =
 		if CliArgs::parse_env().params.contains_key("s3-backend") {
 			S3Backend::default().into()
@@ -83,40 +68,29 @@ pub fn BucketStack(
 			LocalBackend::default().into()
 		};
 	deployment.set_backend(backend);
-	(CliServer::default(), CallOnReady, children![(
-		Stack::new(app_name),
-		Router::with_defaults(),
-		children![
-			Validate,
-			Plan,
-			Apply,
-			Show,
-			List,
-			Destroy,
-			SlotTarget::new(),
-		],
-	)])
 }
 
-/// `<SiteSync app_name="lambda"/>` — publish `examples/bsx_site` to the stack's
-/// app bucket. The markup form of `sync_site(stack, deployment)`: the bucket is
-/// deploy-versioned, so the sync also needs this launch's id.
+/// `<SiteSync/>` — publish `examples/bsx_site` to the stack's app bucket. The
+/// markup form of `sync_site(stack, deployment)`: the bucket is deploy-versioned,
+/// so the sync also needs this launch's id.
+///
+/// The bucket name composes from the ancestor `<Stack>`, so nothing here
+/// restates the app identity the stack already answers.
 #[template(system)]
 pub fn SiteSync(
-	#[prop(into)] app_name: String,
-	package: Res<PackageConfig>,
+	stacks: StackQuery,
 	deployment: Res<Deployment>,
+	entity: Entity,
 ) -> impl Bundle {
-	infra_ext::sync_site(&Stack::new(app_name).resolve(&package), &deployment)
+	infra_ext::sync_site(&stacks.resolve(entity), &deployment)
 }
 
-
 /// An **opinionated** block for websites built with lambda.
-/// `<LambdaSiteBlock app_name="lambda" features="lambda,aws_sdk"/>` — the lambda
-/// deploy block plus its build artifact, on one entity. They share an entity
-/// because `TofuApplyAction` pairs the `BuildArtifact` with the block on the same
-/// entity to upload it under the block's label, the S3 key the lambda reads its
-/// code from. The lambda runtime offers no argv, so the site-store args
+/// `<LambdaSiteBlock features="lambda,aws_sdk"/>` — the lambda deploy block plus
+/// its build artifact, on one entity. They share an entity because
+/// `TofuApplyAction` pairs the `BuildArtifact` with the block on the same entity
+/// to upload it under the block's label, the S3 key the lambda reads its code
+/// from. The lambda runtime offers no argv, so the site-store args
 /// (`remote_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
 /// boundary). The markup form of the rust example's
 /// `(block, build_beet_lambda_binary(features))` deploy child.
@@ -132,7 +106,6 @@ pub fn SiteSync(
 /// takes the production apex, and it makes `--stage` meaningful.
 #[template(system)]
 pub fn LambdaSiteBlock(
-	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
 	/// Comma-separated public hostnames, the first being the certificate's
 	/// primary domain, eg `beetmash.com,www.beetmash.com`. Reads the zone from
@@ -151,9 +124,9 @@ pub fn LambdaSiteBlock(
 	stacks: StackQuery,
 	entity: Entity,
 ) -> Result<impl Bundle> {
-	// the ancestor `<Stack>`'s stage and region under this block's own app name:
-	// one composition behind both the code bucket and the stage-aware DNS.
-	let stack = stacks.resolve(entity).with_app_name(app_name);
+	// the ancestor `<Stack>`'s identity: one composition behind both the code
+	// bucket and the stage-aware DNS.
+	let stack = stacks.resolve(entity);
 	let is_production = stack.is_production();
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let block = authorities
@@ -190,18 +163,19 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 	)
 }
 
-/// `<LightsailSiteBlock app_name="lightsail" features="aws_sdk"/>` — the
-/// lightsail deploy block (its systemd `ExecStart` launches the binary with the
-/// site-store config, `remote_bootstrap`) plus its build artifact, on one entity
-/// (paired by `TofuApplyAction`, see [`LambdaSiteBlock`]). The markup form of
-/// `(block, build_beet_binary(features))`.
+/// `<LightsailSiteBlock features="aws_sdk"/>` — the lightsail deploy block (its
+/// systemd `ExecStart` launches the binary with the site-store config,
+/// `remote_bootstrap`) plus its build artifact, on one entity (paired by
+/// `TofuApplyAction`, see [`LambdaSiteBlock`]). The markup form of
+/// `(block, build_beet_binary(features))`. The bucket it serves from composes
+/// from the ancestor `<Stack>`.
 #[template(system)]
 pub fn LightsailSiteBlock(
-	#[prop(into)] app_name: String,
 	#[prop(into)] features: String,
-	package: Res<PackageConfig>,
+	stacks: StackQuery,
+	entity: Entity,
 ) -> Result<impl Bundle> {
-	let stack = Stack::new(&app_name).resolve(&package);
+	let stack = stacks.resolve(entity);
 	(
 		LightsailBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::app_bucket_name(&stack),
@@ -222,16 +196,16 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 	)
 }
 
-/// `<FargateSiteBlock app_name="fargate"/>` — the fargate deploy block wired to
-/// serve the site from the stack's bucket: the site-store config
-/// (`remote_bootstrap`) lands in the container `CMD` via the sibling
-/// `<BuildDockerImage/>`. Named to avoid the [`FargateBlock`] it builds.
+/// `<FargateSiteBlock/>` — the fargate deploy block wired to serve the site from
+/// the stack's bucket: the site-store config (`remote_bootstrap`) lands in the
+/// container `CMD` via the sibling `<BuildDockerImage/>`. Named to avoid the
+/// [`FargateBlock`] it builds. The bucket composes from the ancestor `<Stack>`.
 #[template(system)]
 pub fn FargateSiteBlock(
-	#[prop(into)] app_name: String,
-	package: Res<PackageConfig>,
+	stacks: StackQuery,
+	entity: Entity,
 ) -> Result<impl Bundle> {
-	let stack = Stack::new(&app_name).resolve(&package);
+	let stack = stacks.resolve(entity);
 	FargateBlock::default()
 		.with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::app_bucket_name(&stack),
@@ -339,52 +313,12 @@ pub fn LightsailBeetSiteBlock(
 		.xok()
 }
 
-/// `<DeployHost>` — the [`Stack`]-bearing parent for an app's deploy routes,
-/// mounted inside a dispatch router so the routes resolve a [`Stack`] by
-/// ancestry WITHOUT a second `CliServer`/`Router` (the entry already provides
-/// those). Carries the standard IaC verb routes
-/// (validate/plan/apply/show/list/destroy/...) and a slot the declared `<Route>`
-/// deploy/sync/watch children land in.
-///
-/// The app identity comes from the application's own `<PackageConfig
-/// app_name=".."/>`, the ONE place it lives, so a deploy can never name a
-/// different app than the process it deploys. `app_name` overrides it for a
-/// multi-app entry.
-///
-/// `stage` overrides the stack's stage (which otherwise flows from `--stage`):
-/// `<Route path="shared"><DeployHost stage="shared">..` hosts the shared-stage
-/// resources (the assets bucket) with the same verbs under the `shared/` route
-/// prefix, so provisioning them is its own step (`beet shared apply`), separate
-/// from any stage deploy.
-#[template]
-pub fn DeployHost(
-	#[prop(default)] stage: Option<String>,
-	#[prop(default)] app_name: Option<String>,
-) -> impl Bundle {
-	let mut stack = Stack::default();
-	if let Some(app_name) = app_name {
-		stack = stack.with_app_name(app_name);
-	}
-	if let Some(stage) = stage {
-		stack = stack.with_stage(stage);
-	}
-	(stack, children![
-		Validate,
-		Plan,
-		Apply,
-		Show,
-		List,
-		Destroy,
-		Rollback,
-		Rollforward,
-		SlotTarget::new(),
-	])
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
 	use crate::infra::InfraExamplesPlugin;
+	use beet_net::prelude::*;
+	use beet_router::prelude::*;
 
 	fn test_world() -> World {
 		(
@@ -410,17 +344,17 @@ mod test {
 		world.flush();
 	}
 
-	/// A block declared in a host's SLOT resolves a stack rather than raising.
+	/// A block declared outside every `<Stack>` resolves the process default
+	/// rather than raising: it belongs to no deploy's config, but its RUNTIME
+	/// meaning still names the resource this process would.
 	///
 	/// REGRESSION: `examples/infra/bucket.bsx` and `lambda.bsx` both HUNG. Their
-	/// `<S3BucketBlock/>` sits in the host template's slot, so at attach time it
-	/// is still parented to the unresolved `<BucketStack>` element and has no
-	/// ancestor `<Stack>` yet; resolution used to `bevybail!` there, and a raise
-	/// in a queued command left the process with nothing to run and no output.
-	/// Resolution now falls back to the process default stack, so the store
-	/// attaches and the entry reaches its router.
+	/// `<S3BucketBlock/>` sat in a host template's slot, so at attach time it was
+	/// still parented to the unresolved element and had no ancestor `<Stack>`;
+	/// resolution used to `bevybail!` there, and a raise in a queued command left
+	/// the process with nothing to run and no output.
 	#[beet_core::test]
-	fn a_slotted_block_resolves_a_stack() {
+	fn a_stackless_block_resolves_the_default_stack() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
 			app_name: "bucket-example".into(),
@@ -430,11 +364,9 @@ mod test {
 		spawn_markup(
 			&mut world,
 			router,
-			r#"<BucketStack app_name="bucket-example">
-				<Route path="run" {ExchangeSequence}>
-					<S3BucketBlock label="my-bucket" deploy_versioned=false/>
-				</Route>
-			</BucketStack>"#,
+			r#"<Route path="run" {ExchangeSequence}>
+				<S3BucketBlock label="my-bucket" deploy_versioned=false/>
+			</Route>"#,
 		);
 		world
 			.query::<&S3Store>()
@@ -444,11 +376,42 @@ mod test {
 			.xpect_eq("bucket-example--dev--my-bucket");
 	}
 
+	/// A block declared under an explicit `<Stack>` resolves THAT stack, through
+	/// the `<Route>` it is nested in: the shape every entry now authors, where
+	/// identity is a registered component on the tree rather than a prop on a
+	/// template the binary may not have linked.
+	#[beet_core::test]
+	fn a_stack_ancestor_names_the_block() {
+		let mut world = test_world();
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Stack app_name="bucket-example" stage="staging">
+				<Route path="run" {ExchangeSequence}>
+					<S3BucketBlock label="my-bucket" deploy_versioned=false/>
+				</Route>
+			</Stack>"#,
+		);
+		world
+			.query::<&S3Store>()
+			.single(&world)
+			.unwrap()
+			.bucket_name()
+			.xpect_eq("bucket-example--staging--my-bucket");
+	}
+
 	/// One declaration, two meanings. The site declares its analytics table
-	/// once, at router level; the DEPLOY provisions that table into the app
-	/// stack's tofu config, and the RUNTIME attaches a store for the same
+	/// once, under its stage `<Stack>`; the DEPLOY provisions that table into
+	/// that stack's tofu config, and the RUNTIME attaches a store for the same
 	/// resolved name off the same entity. The invariant is that the two strings
 	/// agree, for any stage.
+	///
+	/// A resource belongs to the stack it is authored under and to no other, so
+	/// the `shared` stack (whose reason to exist is resources no stage deploy
+	/// owns) never provisions it. That used to be inferred: an unscoped block was
+	/// ADOPTED by whichever host matched the process stage, which is one
+	/// misplaced declaration away from provisioning into the wrong stack.
 	///
 	/// REGRESSION: the two sides used to derive the name independently, and
 	/// `site/main.bsx` declared no app name, so the runtime fell back to the
@@ -464,16 +427,14 @@ mod test {
 			..default()
 		});
 		let router = world.spawn(Router::with_defaults()).id();
-		// the declaration sits OUTSIDE the deploy host, since its reason to
-		// exist is the runtime meaning; the stage host adopts it while the
-		// shared host (a stage override) never does.
 		spawn_markup(
 			&mut world,
 			router,
 			r#"<Fragment>
-				<DynamoTableBlock label="analytics"/>
-				<DeployHost/>
-				<Route path="shared"><DeployHost stage="shared"/></Route>
+				<Stack>
+					<DynamoTableBlock label="analytics"/>
+				</Stack>
+				<Route path="shared"><Stack stage="shared"/></Route>
 			</Fragment>"#,
 		);
 		let scope = Stack::new("beet-site")
@@ -481,17 +442,17 @@ mod test {
 			.resolve(&PackageConfig::default());
 		let expected = scope.resource_name("analytics");
 
-		/// The tofu json a host stack builds.
-		fn config_json(world: &mut World, host: Entity) -> String {
+		/// The tofu json a stack builds.
+		fn config_json(world: &mut World, root: Entity) -> String {
 			world
 				.with_state::<StackQuery, _>(|stacks| {
-					stacks.build_config(host).map(|(.., config)| config)
+					stacks.build_config(root).map(|(.., config)| config)
 				})
 				.unwrap()
 				.to_json()
 				.to_string()
 		}
-		let hosts = world
+		let stacks = world
 			.query::<(Entity, &Stack)>()
 			.iter(&world)
 			.map(|(entity, stack)| {
@@ -504,9 +465,10 @@ mod test {
 				)
 			})
 			.collect::<Vec<_>>();
-		for (host, stage) in hosts {
-			let json = config_json(&mut world, host);
-			// the deploy side: the table lands in the app stack's config only
+		stacks.len().xpect_eq(2);
+		for (root, stage) in stacks {
+			let json = config_json(&mut world, root);
+			// the deploy side: the table lands in the stage stack's config only
 			match stage.as_str() as &str {
 				"shared" => json.as_str().xnot().xpect_contains("analytics"),
 				_ => json.as_str().xpect_contains(&expected),
@@ -520,14 +482,22 @@ mod test {
 			.unwrap()
 			.table_name(&scope)
 			.xpect_eq(expected);
+		// ..which locally is backed by a workspace directory rather than the
+		// remote table, so one declaration runs both ways
+		world.query::<&FsStore>().single(&world).xpect_ok();
 	}
 
-	/// The `shared`-stage host, the shape the site entry declares: its verb
+	/// The `shared`-stage stack, the shape the site entry declares: its verb
 	/// routes nest under the `shared/` prefix, the assets bucket resolves the
 	/// shared stack by ancestry (`beet-site--shared--assets`), and the app name
 	/// comes from the app's own `<PackageConfig/>` rather than a prop.
+	///
+	/// The stage rides the `<Stack>` COMPONENT, registered in every native
+	/// build, so a binary that linked no deploy templates still reads `shared`
+	/// off the tree. A stage on a template prop is absent exactly when the
+	/// template is, which is a lean binary quietly resolving the stage stack.
 	#[beet_core::test]
-	fn shared_host_prefixes_verbs_and_names_bucket() {
+	fn shared_stack_prefixes_verbs_and_names_bucket() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
 			app_name: "beet-site".into(),
@@ -538,15 +508,16 @@ mod test {
 			&mut world,
 			router,
 			r#"<Route path="shared">
-				<DeployHost stage="shared">
+				<Stack stage="shared">
 					<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+					<DeployVerbs/>
 					<Route path="push" {ExchangeSequence}>
 						<DirSync bucket="assets" local_dir="site/assets"/>
 					</Route>
 					<Route path="pull" {ExchangeSequence}>
 						<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
 					</Route>
-				</DeployHost>
+				</Stack>
 			</Route>"#,
 		);
 		let tree = world.entity(router).get::<RouteTree>().unwrap();

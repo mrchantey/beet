@@ -20,23 +20,28 @@ watch shape and the served content are identical (see `crates/beet_extra/src/inf
 
 Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
 -->
-<StackHost app_name="lightsail">
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
-	<Route path="deploy" {ExchangeSequence}>
-		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-		<LightsailSiteBlock app_name="lightsail" features="aws_sdk"/>
-		<S3BucketBlock label="app" deploy_versioned=false/>
-		<!-- the bucket first, so the site is in place before the instance that
-		     serves it boots -->
-		<TofuApply layer="storage"/>
-		<SiteSync app_name="lightsail"/>
-		<TofuApply/>
-		<LightsailWatch app_name="lightsail" timeout="30s"/>
-	</Route>
-	<Route path="sync" {ExchangeSequence}>
-		<SiteSync app_name="lightsail"/>
-	</Route>
-	<Route path="watch" {ExchangeSequence}>
-		<LightsailWatch app_name="lightsail"/>
-	</Route>
-</StackHost>
+	<Stack app_name="lightsail">
+		<DeployVerbs/>
+		<Route path="deploy" {ExchangeSequence}>
+			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
+			<LightsailSiteBlock features="aws_sdk"/>
+			<S3BucketBlock label="app" deploy_versioned=false/>
+			<!-- the bucket first, so the site is in place before the instance that
+			     serves it boots -->
+			<TofuApply layer="storage"/>
+			<SiteSync/>
+			<TofuApply/>
+			<LightsailWatch timeout="30s"/>
+		</Route>
+		<Route path="sync" {ExchangeSequence}>
+			<SiteSync/>
+		</Route>
+		<Route path="watch" {ExchangeSequence}>
+			<LightsailWatch/>
+		</Route>
+	</Stack>
+</Router>
+</CliServer>

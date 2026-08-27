@@ -63,8 +63,9 @@ beet *args:
 # tofu/aws/s3 use the explicit `.env` keys rather than a global profile.
 # `--main=site`: the SITE entry declares its own resources and deploy verbs, so
 # the application that runs on them is the thing that provisions them.
-# `infra,extra` links the deploy host and the IaC verb routes; without them the
-# site entry's `bx:features` gate skips the whole subtree and the verb is absent.
+# `infra,extra` links the deploy blocks and the IaC verb routes. Without them the
+# entry still loads whole, with the deploy tags inert: the stack's
+# `RequireFeatures(["infra","extra"])` then fails the dispatch naming them.
 beet-deploy *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site deploy {{ args }}
 # Re-publish the site to S3 without a redeploy (site assets: `site-shared push`).
