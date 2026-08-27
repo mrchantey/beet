@@ -22,11 +22,10 @@ const SKIP_SEGMENTS: [&str; 2] = ["analytics", "health"];
 
 /// Middleware that records a [`AnalyticsKind::Request`] event per routed request.
 ///
-/// Spread on a router alongside an [`AnalyticsConfig`] to enable it (the
-/// `<SiteAnalytics/>` template does both). Reads the client address, session
-/// cookie, and user agent from the request, the status from the response, and a
-/// geoip country from the address, then triggers an [`AnalyticsEvent`] the
-/// analytics observer persists.
+/// Spread on a router alongside an [`AnalyticsConfig`] to enable it. Reads the
+/// client address, session cookie, and user agent from the request, the status
+/// from the response, and a geoip country from the address, then triggers an
+/// [`AnalyticsEvent`] the analytics observer persists.
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
@@ -90,8 +89,8 @@ pub async fn AnalyticsMiddleware(
 
 	// a geoip country from the address, always derived; the raw ip is stored only
 	// when explicitly opted in, keeping the default posture free of personal data.
-	// The database rides the `AnalyticsConfig` entity, resolved by the same
-	// ancestry walk as the config itself.
+	// A country needs a `<GeoIpDb/>` on this route's ancestry; without one every
+	// country is `None`.
 	let country = ip
 		.zip(
 			world

@@ -35,15 +35,20 @@ pub use store::*;
 /// and the geoip country database.
 ///
 /// Inert until an [`AnalyticsConfig`] is spawned (the on-switch): its insertion
-/// creates the store and the country database on that same entity, so a plain
-/// beet app with this plugin still does nothing.
-/// Once a config is present, terminal page views and web beacons persist
-/// automatically; the per-request [`AnalyticsEventKind::Request`] log
-/// additionally honors the config (recording on by default, raw ip off by
-/// default).
+/// creates the store on that same entity, so a plain beet app with this plugin
+/// still does nothing. Once a config is present, terminal page views and web
+/// beacons persist automatically; the per-request
+/// [`AnalyticsEventKind::Request`] log additionally honors the config (recording
+/// on by default, raw ip off by default).
+///
+/// [`GeoIpDb`] is the separate, optional country-database declaration, registered
+/// unconditionally: a binary built without the `geoip` feature still authors it
+/// and simply loads an empty [`GeoIp`].
 #[cfg(feature = "json")]
 pub fn analytics_plugin(app: &mut App) {
 	app.register_type::<AnalyticsConfig>()
+		.register_type::<GeoIpDb>()
+		.add_observer(GeoIpDb::load_on_add)
 		.add_observer(store::spawn_store_on_config)
 		.add_observer(store::handle_analytics_event);
 }

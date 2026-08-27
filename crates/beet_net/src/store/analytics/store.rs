@@ -86,8 +86,7 @@ impl AnalyticsStore {
 }
 
 /// Observer: on an [`AnalyticsConfig`] insertion, resolve the declared store and
-/// insert the [`AnalyticsStore`] and (under `geoip`) the country database on the
-/// config's own entity.
+/// insert the [`AnalyticsStore`] on the config's own entity.
 ///
 /// Declaration-first: a [`StoreRef`] on the config entity names the entity
 /// that *declares* the store (a `<DynamoTableBlock/>`, an `<FsStore/>`, any
@@ -139,20 +138,8 @@ pub(super) fn spawn_store_on_config(
 				);
 			}
 		};
-		// the offline country database rides the app's own store (the checkout in
-		// dev, the app bucket when deployed), resolved like any other tree
-		// consumer. Best-effort: no store, or no blob, just disables lookups.
-		let blobs = config_entity
-			.with_state::<AncestorQuery<&BlobStore>, _>(|entity, stores| {
-				stores.get(entity).cloned().ok()
-			})
-			.await?;
-		let geoip = match blobs {
-			Some(blobs) => GeoIp::load(&blobs).await,
-			None => GeoIp::default(),
-		};
 		config_entity
-			.insert((AnalyticsStore::new(table_store.table()), geoip))
+			.insert(AnalyticsStore::new(table_store.table()))
 			.await?;
 		Ok(())
 	});
@@ -228,9 +215,13 @@ mod test {
 		loaded.event_kind.xpect_eq(AnalyticsEventKind::Request);
 	}
 
-	/// The config's own entity carries the store and the geoip component, so
-	/// consumers resolve them by ancestry rather than as globals, and the table
-	/// itself lives on the declaration the config names.
+	/// The config's own entity carries the store, so consumers resolve it by
+	/// ancestry rather than as a global, and the table itself lives on the
+	/// declaration the config names.
+	///
+	/// The country database is a separate declaration, so a config alone carries
+	/// no [`GeoIp`]: the store must not wait on an ~8 MB mmdb read to start
+	/// recording.
 	#[beet_core::test]
 	async fn config_entity_carries_the_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
@@ -240,7 +231,43 @@ mod test {
 			.entity(config)
 			.contains::<AnalyticsStore>()
 			.xpect_true();
-		world.entity(config).contains::<GeoIp>().xpect_true();
+		world.entity(config).contains::<GeoIp>().xpect_false();
+	}
+
+	/// The site's real shape: a router carrying the config, the store it records
+	/// to and its country database, under an entry that owns the blob store.
+	///
+	/// The database is *content*, so it resolves out of that ancestor
+	/// [`BlobStore`] rather than through a relation, and lands on its own
+	/// declaration entity where consumers still find it by ancestry. It is also
+	/// wholly independent of the store: the [`AnalyticsStore`] lands whatever the
+	/// database does, so an ~8 MB mmdb read never gates the first recorded event,
+	/// and a database that is not in the store degrades to empty lookups rather
+	/// than failing the load.
+	#[beet_core::test]
+	async fn geoip_db_is_content() {
+		let mut world = (AsyncPlugin, analytics_plugin).into_world();
+		let table = world.spawn(InMemoryStore::new()).flush();
+		let entry = world.spawn(InMemoryStore::new()).flush();
+		let router = world
+			.spawn((
+				ChildOf(entry),
+				AnalyticsConfig::default(),
+				StoreRef(table),
+				GeoIpDb::default(),
+			))
+			.flush();
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		world
+			.entity(router)
+			.contains::<AnalyticsStore>()
+			.xpect_true();
+		world
+			.entity(router)
+			.get::<GeoIp>()
+			.unwrap()
+			.country_str("8.8.8.8")
+			.xpect_none();
 	}
 
 	/// The declared store is where the events land, resolved through the

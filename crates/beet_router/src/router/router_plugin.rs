@@ -219,7 +219,7 @@ impl Plugin for RouterPlugin {
 			app.register_type::<ExchangeScriptElement>();
 
 			// cross-transport analytics: the request-middleware type is serde/std,
-			// registered so `<SiteAnalytics/>` can author it. The storage +
+			// registered so `<AnalyticsMiddleware/>` can author it. The storage +
 			// persistence observer need the json store surface, and are inert until
 			// an `<AnalyticsConfig/>` is spawned, so nothing records until a site
 			// opts in with that on-switch.
@@ -387,8 +387,11 @@ fn rebuild_route_trees_on_load(
 	// collect unique namespace roots so we rebuild each tree at most once. A
 	// nested `Router` is its own url space, so the rebuild must land per
 	// namespace, not once on the document root.
-	let mut roots: Vec<Entity> =
-		ev.entities.iter().map(|entity| builder.namespace_of(*entity)).collect();
+	let mut roots: Vec<Entity> = ev
+		.entities
+		.iter()
+		.map(|entity| builder.namespace_of(*entity))
+		.collect();
 	roots.sort();
 	roots.dedup();
 

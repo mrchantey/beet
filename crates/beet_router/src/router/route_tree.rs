@@ -187,7 +187,10 @@ impl RouteTree {
 	/// live [`RouteTreeBuilder`](crate::prelude::RouteTreeBuilder): the scene
 	/// reparent and scene-despawn call sites, via
 	/// [`run_system_cached_with`](bevy::ecs::world::World::run_system_cached_with).
-	pub fn rebuild(server: In<Entity>, mut builder: RouteTreeBuilder) -> Result {
+	pub fn rebuild(
+		server: In<Entity>,
+		mut builder: RouteTreeBuilder,
+	) -> Result {
 		builder.rebuild_subtree(*server)
 	}
 

@@ -123,7 +123,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 	     this, and so does the running binary. -->
 	<PackageConfig title="Beet" app_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>
-		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
 			<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
 			<TemplateDir src="templates"/>
 			<Styles/>
