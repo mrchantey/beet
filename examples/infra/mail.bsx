@@ -1,0 +1,126 @@
+<!--
+# Hello Mail
+
+A self-hosted mail server for two domains: one EC2 box running Stalwart, its
+metadata in RDS Postgres and its message bodies in S3, with every outbound
+message relayed through Amazon SES so delivery never rides one IP's reputation.
+
+The point of the example is the pair of `<MailDomainBlock/>`s. A mail domain is
+declared once, as the domain it serves, and everything composes from it: the SES
+sending identity, its three DKIM selectors, the `MX`/`SPF`/`DMARC`/`MTA-STS`
+records that make it deliverable, the `SRV` and autoconfig records that make it
+discoverable, and the mailboxes it holds. Serving a second domain is a second
+tag, which is exactly what the second one here is.
+
+The two are deliberately unalike, because that is what a second domain is for:
+`example.com` holds people's mailboxes, and `news.example.com` sends
+publications and welcomes replies into a catch-all. They share the box and the
+zone and nothing else, so a newsletter that burns its reputation cannot take
+anyone's mail down with it.
+
+## Usage
+
+    beet --main=examples/infra/mail.bsx validate
+    beet --main=examples/infra/mail.bsx plan
+    beet --main=examples/infra/mail.bsx deploy
+    beet --main=examples/infra/mail.bsx destroy --force
+
+`validate` needs only `tofu`. Live deploy needs AWS credentials, a Cloudflare
+api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
+machine. It also needs domains you actually own: every name below is an RFC 2606
+example domain and the zone id is a placeholder, so a real deploy replaces both.
+
+Note the zone is written out on all three blocks (`dns={Cloudflare{..}}`) only
+so the example validates with nothing configured, which is also why it repeats.
+A real stack omits `dns` entirely and sets `CLOUDFLARE_ZONE_ID`: which zone a
+launch writes into is a property of the launch rather than of any declaration,
+so each block reads it from the environment and none of them restate it.
+
+The box needs a zone of its own because the record it publishes is its own: an
+`A` at `mail.example.com`, which every `MX` here targets and which its
+certificate and reverse record are issued against. The box is infrastructure,
+not a mail domain, so it owns that name rather than borrowing one.
+
+## The deploy order, and why it is that
+
+`<EnsureSecret/>` hands its generated value to the apply as a request param, so
+it sits in this route and ahead of `<TofuApply/>`: the database is created WITH
+its master password, and the box boots reading its admin credential out of the
+parameter the same step minted. Neither value appears here or in any log.
+
+Then the reverse record (AWS validates the forward one first, so it waits for
+dns), then `<StalwartProvision/>`. That last one is not a nicety: Stalwart 0.16
+keeps its listeners, its routing, its domains and its accounts as objects INSIDE
+its own data store, so a freshly built box serves nothing until they are applied
+over its management api. Terraform owns the machine; provision owns the mail
+server. Finally `<MailProbe/>` sends a message out through the whole stack and
+reads one back in, asserting the receiving end believes both.
+-->
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
+	<CrateCheck features={["infra", "extra"]}/>
+	<!-- the region is a DECISION here (an mta near its users, a database near
+	     its mta), so the stack pins it rather than inheriting `AWS_REGION`: a
+	     deploy from a differently-configured machine builds the same stack. -->
+	<Stack app_name="mail-example" region="us-west-2">
+		<DeployVerbs/>
+
+		<!-- the network the box sits in. No NAT gateway: the box has a public
+		     address of its own and the database has nothing to call out to. -->
+		<VpcBlock label="net"/>
+		<!-- mail metadata, in the private subnets, reachable only from the box's
+		     security group (named by the label that block declares). -->
+		<RdsPostgresBlock label="db" vpc="net" database="mail" consumers={["mail"]}/>
+		<!-- message bodies: the source of record, so versioned and not
+		     force-destroyable. -->
+		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
+			runtime_write=true object_versioning=true/>
+
+		<!-- the box, which is infrastructure rather than a mail domain: its name,
+		     its reverse record, its certificate and its SMTP banner stay put while
+		     the domains it serves come and go. It holds no state worth keeping, so
+		     any machine-config change simply replaces it. -->
+		<StalwartBlock label="mail" hostname="mail.example.com"
+			vpc="net" database="db" blob_bucket="mail-blobs"
+			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
+
+		<!-- the domain people have mailboxes on. `postmaster@` and `abuse@` are the
+		     two addresses an outside party actually tries when something is wrong,
+		     so a served domain answers them from day one. -->
+		<MailDomainBlock
+			domain="example.com"
+			mail_host="mail.example.com"
+			dns={Cloudflare{authority:"example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			mailboxes={[
+				{localpart:"hello", admin:true},
+				{localpart:"probe"},
+			]}
+			aliases={[
+				{localpart:"postmaster", target:"hello"},
+				{localpart:"abuse", target:"hello"},
+			]}/>
+
+		<!-- the publication domain: its own identity and its own reputation, with
+		     replies welcomed into a catch-all (a newsletter that bounces its
+		     replies reads as unattended). Its reports go to the domain whose
+		     mailboxes are read by a human. -->
+		<MailDomainBlock
+			domain="news.example.com"
+			mail_host="mail.example.com"
+			report_domain="example.com"
+			dns={Cloudflare{authority:"news.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			catch_all="replies"
+			mailboxes={[{localpart:"replies"}]}/>
+
+		<Route path="deploy" {ExchangeSequence}>
+			<EnsureSecret secret="db-password" variable="db_password"/>
+			<EnsureSecret secret="mail-admin-password"/>
+			<TofuApply/>
+			<EipReverseDns/>
+			<StalwartProvision/>
+			<MailProbe mailbox="probe" sender_domain="news.example.com"/>
+		</Route>
+	</Stack>
+</Router>
+</CliServer>

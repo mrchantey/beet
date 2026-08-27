@@ -590,6 +590,7 @@ fn enum_to_reflect(
 			DynamicVariant::Tuple(tuple)
 		}
 		(NamedFields::Struct(struct_fields), variant) => {
+			assert_variant_complete(variant_name, variant, struct_fields)?;
 			let mut dynamic = DynamicStruct::default();
 			for (name, literal) in struct_fields {
 				let nested = match variant {
@@ -613,6 +614,35 @@ fn enum_to_reflect(
 		DynamicEnum::new(variant_name.to_string(), dynamic_variant);
 	dynamic_enum.set_represented_type(field_info);
 	Ok(Box::new(dynamic_enum))
+}
+
+/// Reject a struct-variant literal that omits any of its variant's fields.
+///
+/// Unlike a struct target, an enum variant cannot be COMPLETED over a default:
+/// a default names one variant and says nothing about the others, so
+/// `FromReflect` needs every field of the variant actually written. Without
+/// this check a partial literal reaches `from_reflect`, misses, and leaves the
+/// target's default in place, so `dns={Cloudflare{authority:"x"}}` resolves to
+/// no provider at all rather than to a bad one.
+fn assert_variant_complete(
+	variant_name: &str,
+	variant: Option<&'static VariantInfo>,
+	fields: &[(SmolStr, DataLiteral)],
+) -> Result {
+	let Some(VariantInfo::Struct(info)) = variant else {
+		return Ok(());
+	};
+	let missing = info
+		.iter()
+		.map(|field| field.name())
+		.filter(|name| !fields.iter().any(|(given, _)| given == name))
+		.collect::<Vec<_>>();
+	if !missing.is_empty() {
+		bevybail!(
+			"`{variant_name}` is missing {missing:?}: an enum variant has no default to fill from, so every field of the variant must be written"
+		);
+	}
+	Ok(())
 }
 
 /// Build a [`DynamicStruct`] from a named literal targeting a struct component,
@@ -827,6 +857,55 @@ mod test {
 					admin: true,
 				}],
 			});
+	}
+
+	/// An enum's struct variant has no default to complete from, so a literal
+	/// that omits a field is an error naming it rather than a value that
+	/// quietly resolves to the target's default.
+	#[beet_core::test]
+	fn a_partial_enum_variant_is_an_error() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		enum Provider {
+			#[default]
+			None,
+			Zone {
+				authority: SmolStr,
+				id: SmolStr,
+			},
+		}
+		let complete = DataLiteral::Enum(NamedLiteral {
+			name: "Zone".into(),
+			fields: NamedFields::Struct(vec![
+				(
+					"authority".into(),
+					DataLiteral::Scalar(Value::Str("beet.org".into())),
+				),
+				("id".into(), DataLiteral::Scalar(Value::Str("z1".into()))),
+			]),
+		});
+		resolve::<Provider>(complete).xpect_eq(Provider::Zone {
+			authority: "beet.org".into(),
+			id: "z1".into(),
+		});
+
+		let partial = DataLiteral::Enum(NamedLiteral {
+			name: "Zone".into(),
+			fields: NamedFields::Struct(vec![(
+				"authority".into(),
+				DataLiteral::Scalar(Value::Str("beet.org".into())),
+			)]),
+		});
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		DataLiteral::to_reflect(
+			&partial,
+			Some(Provider::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("\"id\"");
 	}
 
 	/// A `[a, b, ..]` literal fills an array-typed field (eg an `HttpServer`'s
