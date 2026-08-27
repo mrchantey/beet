@@ -125,28 +125,26 @@ async fn bind_connection(connection: AsyncEntity, server: Entity) -> Result {
 }
 
 /// The agent route entities matching `role`'s capabilities, found in the server
-/// root's [`RouteTree`]. Scoped to the server's own root, so a separate root's
-/// identically-named routes are never touched.
+/// root's [`RouteTree`]. Scoped to the server's own namespace via
+/// [`RouteQuery::resolve_tree`], so a separate root's identically-named routes
+/// are never touched.
 fn capability_route_entities(
 	world: &mut World,
 	server: Entity,
 	role: &str,
 ) -> Vec<Entity> {
-	world.with_state::<(Query<&ChildOf>, Query<&RouteTree>), _>(
-		|(ancestors, trees)| {
-			let root = ancestors.root_ancestor(server);
-			let Ok(tree) = trees.get(root) else {
-				return Vec::new();
-			};
-			capability_routes(role)
-				.iter()
-				.filter_map(|path| {
-					tree.find(&Request::get(*path).path().clone())
-						.map(|node| node.entity)
-				})
-				.collect()
-		},
-	)
+	world.with_state::<RouteQuery, _>(|route_query| {
+		let Ok((_, tree)) = route_query.resolve_tree(server) else {
+			return Vec::new();
+		};
+		capability_routes(role)
+			.iter()
+			.filter_map(|path| {
+				tree.find(&Request::get(*path).path().clone())
+					.map(|node| node.entity)
+			})
+			.collect()
+	})
 }
 
 /// Registers the capability-binding types and the connection-ready observer.

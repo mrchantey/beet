@@ -188,6 +188,17 @@ mod test {
 			.unwrap()
 			.find(&["ping"])
 			.xpect_some();
+		// and it lands there ALONE: the phantom-tree class this guards against
+		// left "ping" split across two `RouteTree`s (one on the pre-reparent
+		// element, one on the real url space), dispatching from neither. Only
+		// `set_scene`'s own explicit rebuild ran here, no manual poke beyond it.
+		world
+			.query::<(Entity, &RouteTree)>()
+			.iter(&world)
+			.filter(|(_, tree)| tree.find(&["ping"]).is_some())
+			.map(|(entity, _)| entity)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![roots[0]]);
 	}
 
 	/// A markup-declared resource is scene-owned: `despawn_scene` removes it

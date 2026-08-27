@@ -20,6 +20,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use std::collections::VecDeque;
 
 /// System parameter for traversing entities within render-root boundaries.
@@ -30,17 +31,54 @@ use std::collections::VecDeque;
 pub struct RouteQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
+	paths: Query<'w, 's, &'static PathPartial>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
 	page_roots: Query<'w, 's, (), With<PageRootOf>>,
 }
 
 impl<'w, 's> RouteQuery<'w, 's> {
-	/// Finds the route tree for the given entity, if it exists.
-	/// This is done by first traversing to the root ancestor,
-	/// which is where route trees should exist.
-	pub fn route_tree(&self, entity: Entity) -> Result<&RouteTree> {
-		let root = self.ancestors.root_ancestor(entity);
-		Ok(self.route_trees.get(root)?)
+	/// Resolves the [`RouteTree`] governing `entity`, returning the entity the
+	/// winning tree lives on alongside the tree.
+	///
+	/// `entity`'s own enclosing namespace ([`PathPattern::namespace_root`])
+	/// carries a tree directly when `entity` sits inside one — the common
+	/// case, unambiguous. When `entity` sits *above* one or more namespaces
+	/// instead (an entry root, a command dispatcher), its own namespace
+	/// carries no tree, so this descends and prefers whichever descendant
+	/// namespace [serves pages](RouteTree::serves_pages) — that is the *site*
+	/// such a caller means (rendering, forwarding a capability call) — else
+	/// the first tree found.
+	///
+	/// The shared resolver behind every "which url space is THE site"
+	/// lookup that starts from a live [`Query`] rather than a [`World`]
+	/// ([`RouteTree::of`] is the equivalent for a `World` in hand); folds in
+	/// two resolvers that used to assume a tree always sits on the document
+	/// root, wrong since namespacing landed.
+	///
+	/// # Errors
+	/// Errors when nothing at or under `entity`'s namespace carries a tree.
+	pub fn resolve_tree(&self, entity: Entity) -> Result<(Entity, &RouteTree)> {
+		let near =
+			PathPattern::namespace_root(entity, &self.ancestors, &self.paths);
+		if let Ok(tree) = self.route_trees.get(near) {
+			return Ok((near, tree));
+		}
+		let mut candidates: Vec<(Entity, &RouteTree)> = Vec::new();
+		let mut queue = vec![near];
+		while let Some(entity) = queue.pop() {
+			if let Ok(tree) = self.route_trees.get(entity) {
+				candidates.push((entity, tree));
+			}
+			if let Ok(children) = self.children.get(entity) {
+				queue.extend(children.iter());
+			}
+		}
+		candidates
+			.iter()
+			.find(|(_, tree)| tree.serves_pages())
+			.or(candidates.first())
+			.copied()
+			.ok_or_else(|| bevyhow!("no RouteTree at or under {entity}"))
 	}
 
 	/// Finds the render root for the given entity.

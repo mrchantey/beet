@@ -27,7 +27,14 @@ impl Plugin for RouterPlugin {
 			.init_plugin::<BootstrapPlugin>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_path_pattern_for_late_path_partial)
-			.add_observer(insert_route_tree)
+			// the four triggers that dirty a `RouteTree`: a route joining or
+			// leaving the tree (`PathPattern` insert/remove) and a route being
+			// hidden or unhidden (`RouteHidden` insert/remove). Each just wakes
+			// `rebuild_dirty_route_trees`, which resolves what actually changed.
+			.add_observer(queue_route_tree_rebuild_on_insert::<PathPattern>)
+			.add_observer(queue_route_tree_rebuild_on_remove::<PathPattern>)
+			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
+			.add_observer(queue_route_tree_rebuild_on_remove::<RouteHidden>)
 			// `RequireFeatures` (a beet_core component) is enforced here, where
 			// dispatch lives: an unmet declaration fails any call at or under
 			// it naming the missing features.
@@ -274,80 +281,130 @@ fn insert_path_pattern_for_late_path_partial(
 	Ok(())
 }
 
-/// Observer that rebuilds the [`RouteTree`] of a route's url space whenever a
-/// [`PathPattern`] is inserted on any entity in the hierarchy.
+/// Observer that wakes [`rebuild_dirty_route_trees`] whenever `T` is inserted
+/// on any entity: a route joining the tree ([`PathPattern`]) or a route being
+/// hidden ([`RouteHidden`]).
 ///
-/// The tree lands on the [namespace root](PathPattern::namespace_root), ie the
-/// nearest `Router` above the route, else the document root. A nested namespace
-/// is a url space of its own, so its routes are excluded here and get their own
-/// tree: that is what lets one entry carry a dispatching command router AND the
-/// site it serves without either reaching the other's routes.
+/// The wake is deferred (queued rather than run inline), so by the time it
+/// runs the insert has settled — in particular so a route added via a bundle's
+/// `ChildOf` has already landed in its parent's [`Children`], which is not
+/// guaranteed yet at the point this observer itself fires.
+fn queue_route_tree_rebuild_on_insert<T: Component>(
+	_ev: On<Insert, T>,
+	mut commands: Commands,
+) {
+	queue_route_tree_rebuild(&mut commands);
+}
+
+/// Observer that wakes [`rebuild_dirty_route_trees`] whenever `T` is removed
+/// from any entity, including via despawn: a route leaving the tree
+/// ([`PathPattern`]) or a hidden route being unhidden ([`RouteHidden`]).
 ///
-/// Collects all entities with action components ([`ActionMeta`], [`PathPattern`],
-/// [`ParamsPattern`]) from that root's descendants and constructs a validated
-/// tree. Scene routes are distinguished from regular actions by their output
-/// type being [`PageRequest`], detected via [`ActionMeta::output_is`].
+/// `On<Remove, T>` fires *before* the component actually leaves the entity, so
+/// resolving the dirty namespace here (rather than in the woken system, which
+/// runs later) would still see `T` present; the wake is deferred for the same
+/// reason as the insert half, and the reconciler itself works out what
+/// changed via [`RemovedComponents`].
+fn queue_route_tree_rebuild_on_remove<T: Component>(
+	_ev: On<Remove, T>,
+	mut commands: Commands,
+) {
+	queue_route_tree_rebuild(&mut commands);
+}
+
+/// Queue one run of [`rebuild_dirty_route_trees`], deferred past whatever
+/// structural change triggered it.
+fn queue_route_tree_rebuild(commands: &mut Commands) {
+	commands.queue(|world: &mut World| {
+		if let Ok(Err(err)) = world.run_system_cached(rebuild_dirty_route_trees)
+		{
+			world.handle_command_error::<RouteTree>(err);
+		}
+	});
+}
+
+/// Recomputes every dirty [`RouteTree`] namespace: the one grouping walk
+/// ([`RouteTree::rebuild_subtree`]) that every trigger in this module funnels
+/// into, run once per dirty namespace root rather than once per changed
+/// entity.
 ///
-/// Rebuilds the whole tree on every insert rather than batching with change
-/// detection, keeping the guarantee that the tree exists as soon as the insert
-/// settles.
-fn insert_route_tree(
-	ev: On<Insert, PathPattern>,
+/// A live [`PathPattern`]/[`RouteHidden`] insert or mutation dirties its own
+/// enclosing namespace. A removal dirties that namespace too, *if* the entity
+/// is still resolvable — a live component removal leaves the entity and its
+/// ancestry intact, so [`PathPattern::namespace_root`] still answers. A full
+/// despawn does not: by the time this runs the entity is gone, so which
+/// namespace lost the route can no longer be found, and every existing
+/// namespace is rebuilt this pass instead ([`RemovedComponents`] is what
+/// makes despawn visible at all here; a plain [`Changed`] query cannot).
+fn rebuild_dirty_route_trees(
+	changed: Query<Entity, Or<(Changed<PathPattern>, Changed<RouteHidden>)>>,
+	mut removed_paths: RemovedComponents<PathPattern>,
+	mut removed_hidden: RemovedComponents<RouteHidden>,
+	all_entities: Query<Entity>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	children_query: Query<&Children>,
 	actions: Query<ActionQueryItem, Without<RouteHidden>>,
+	existing_trees: Query<Entity, With<RouteTree>>,
 	mut commands: Commands,
 ) -> Result {
-	let root = PathPattern::namespace_root(ev.entity, &ancestors, &paths);
-	let mut nodes: Vec<ActionNode> = Vec::new();
-	// when added via ChildOf, it will not have been added to the Children,
-	// so we check this one manually
-	if let Ok(item) = actions.get(ev.entity) {
-		nodes.push(ActionNode::from_query(item));
-	}
+	let mut dirty: HashSet<Entity> = HashSet::new();
+	let mut sweep_all = false;
 
-	for entity in children_query
-		.iter_descendants_inclusive(root)
-		// we've already checked this one
-		.filter(|entity| *entity != ev.entity)
-		// ..and a nested namespace owns its own tree
-		.filter(|entity| {
-			PathPattern::namespace_root(*entity, &ancestors, &paths) == root
-		}) {
-		if let Ok(item) = actions.get(entity) {
-			nodes.push(ActionNode::from_query(item));
+	for entity in changed.iter() {
+		dirty.insert(PathPattern::namespace_root(entity, &ancestors, &paths));
+	}
+	// a removed component leaves the entity itself in place unless it was the
+	// despawn that took it with it; `all_entities` (an unfiltered `Query<Entity>`)
+	// is the only reliable liveness check, since `ancestors`/`paths` fail alike
+	// for "gone" and for "alive but parentless"/"alive but no PathPartial".
+	for entity in removed_paths.read().chain(removed_hidden.read()) {
+		if all_entities.contains(entity) {
+			dirty.insert(PathPattern::namespace_root(entity, &ancestors, &paths));
+		} else {
+			sweep_all = true;
 		}
 	}
-
-	if nodes.is_empty() {
-		return Ok(());
+	if sweep_all {
+		dirty.extend(existing_trees.iter());
 	}
 
-	let tree = RouteTree::from_nodes(nodes)?;
-	commands.entity(root).insert(tree);
-
+	for root in dirty {
+		RouteTree::rebuild_subtree(
+			root,
+			&ancestors,
+			&paths,
+			&children_query,
+			&actions,
+			&existing_trees,
+			&mut commands,
+		)?;
+	}
 	Ok(())
 }
 
 /// Observer that rebuilds [`RouteTree`] roots after a [`LoadTemplateSerde`],
 /// where reflect-driven [`ChildOf`] inserts settle later than [`PathPattern`]
-/// and leave per-leaf trees on the wrong ancestors.
+/// and leave per-leaf trees on the wrong ancestors — invisible to
+/// [`rebuild_dirty_route_trees`], which watches component changes, not
+/// reparenting.
 ///
 /// The load trigger fires synchronously once the hierarchy is whole, so each
-/// affected root is recomputed exactly once before any async serving begins.
+/// affected namespace is recomputed exactly once, through the same
+/// [`RouteTree::rebuild_subtree`] walk, before any async serving begins.
 #[cfg(feature = "template_serde")]
 fn rebuild_route_trees_on_load(
 	ev: On<LoadTemplateSerde>,
-	mut commands: Commands,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	children_query: Query<&Children>,
 	actions: Query<ActionQueryItem, Without<RouteHidden>>,
+	existing_trees: Query<Entity, With<RouteTree>>,
+	mut commands: Commands,
 ) -> Result {
 	// collect unique namespace roots so we rebuild each tree at most once. A
-	// nested `Router` is its own url space (see `insert_route_tree`), so the
-	// rebuild must land per namespace, not once on the document root.
+	// nested `Router` is its own url space, so the rebuild must land per
+	// namespace, not once on the document root.
 	let mut roots: Vec<Entity> = ev
 		.entities
 		.iter()
@@ -357,19 +414,15 @@ fn rebuild_route_trees_on_load(
 	roots.dedup();
 
 	for root in roots {
-		let nodes: Vec<ActionNode> = children_query
-			.iter_descendants_inclusive(root)
-			.filter(|entity| {
-				PathPattern::namespace_root(*entity, &ancestors, &paths) == root
-			})
-			.filter_map(|entity| actions.get(entity).ok())
-			.map(ActionNode::from_query)
-			.collect();
-		if nodes.is_empty() {
-			continue;
-		}
-		let tree = RouteTree::from_nodes(nodes)?;
-		commands.entity(root).insert(tree);
+		RouteTree::rebuild_subtree(
+			root,
+			&ancestors,
+			&paths,
+			&children_query,
+			&actions,
+			&existing_trees,
+			&mut commands,
+		)?;
 	}
 	Ok(())
 }

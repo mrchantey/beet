@@ -37,28 +37,13 @@ pub struct Router;
 /// Each `Router` is a url space of its own, and an entry can hold several (a
 /// command dispatcher whose site is one of its routes), so the one that serves
 /// PAGES wins: that is the site a caller holding the entry root means. Absent
-/// any, the first router found.
+/// any, the first router found. A thin wrapper over
+/// [`RouteQuery::resolve_tree`], the shared "which url space is THE site" pick.
 ///
 /// # Errors
 /// Errors when no [`Router`] is at or under `root`.
-pub fn find_router(
-	In(root): In<Entity>,
-	children: Query<&Children>,
-	routers: Query<(), With<Router>>,
-	trees: Query<&RouteTree>,
-) -> Result<Entity> {
-	let candidates = children
-		.iter_descendants_inclusive(root)
-		.filter(|entity| routers.contains(*entity))
-		.collect::<Vec<_>>();
-	candidates
-		.iter()
-		.find(|entity| {
-			trees.get(**entity).is_ok_and(|tree| tree.serves_pages())
-		})
-		.or(candidates.first())
-		.copied()
-		.ok_or_else(|| bevyhow!("no Router at or under {root}"))
+pub fn find_router(In(root): In<Entity>, route_query: RouteQuery) -> Result<Entity> {
+	route_query.resolve_tree(root).map(|(entity, _)| entity)
 }
 
 /// A markup-spawnable route: its `path` prop becomes a [`PathPartial`], and its
@@ -469,6 +454,76 @@ mod test {
 		world
 			.entity_mut(root)
 			.exchange(Request::get("deploy"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::NOT_FOUND);
+	}
+
+	/// A route despawned after its tree was built drops out of dispatch. The
+	/// despawn is invisible to a plain `Changed` query; it is
+	/// `RemovedComponents<PathPattern>` in `rebuild_dirty_route_trees` that
+	/// makes it visible at all, waking a rebuild that prunes the dead route
+	/// rather than leaving it dispatchable from a stale tree.
+	#[beet_core::test]
+	async fn despawned_route_not_found() {
+		let mut world = router_world();
+		let root = world
+			.spawn((Router::with_defaults(), children![route::exchange(
+				"keep", EchoParams
+			)]))
+			.flush();
+		let gone = world
+			.spawn((ChildOf(root), route::exchange("gone", EchoParams)))
+			.flush();
+		world
+			.entity_mut(root)
+			.exchange(Request::get("gone"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+
+		world.entity_mut(gone).despawn();
+		world.flush();
+
+		world
+			.entity_mut(root)
+			.exchange(Request::get("gone"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::NOT_FOUND);
+		// the sibling route survives the rebuild
+		world
+			.entity_mut(root)
+			.exchange(Request::get("keep"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
+	/// A [`RouteHidden`] inserted after the tree was built hides the route from
+	/// dispatch immediately, without a manual rebuild: the insert observer
+	/// wakes the reconciler ([`RouteTree::rebuild_subtree`]), which excludes a
+	/// hidden route the same way a fresh build always has.
+	#[beet_core::test]
+	async fn late_route_hidden_hides() {
+		let mut world = router_world();
+		let root = world.spawn(Router::with_defaults()).flush();
+		let secret = world
+			.spawn((ChildOf(root), route::exchange("secret", EchoParams)))
+			.flush();
+		world
+			.entity_mut(root)
+			.exchange(Request::get("secret"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+
+		world.entity_mut(secret).insert(RouteHidden);
+		world.flush();
+
+		world
+			.entity_mut(root)
+			.exchange(Request::get("secret"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
