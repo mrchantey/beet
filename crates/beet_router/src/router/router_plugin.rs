@@ -27,14 +27,17 @@ impl Plugin for RouterPlugin {
 			.init_plugin::<BootstrapPlugin>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_path_pattern_for_late_path_partial)
-			// the four triggers that dirty a `RouteTree`: a route joining or
-			// leaving the tree (`PathPattern` insert/remove) and a route being
-			// hidden or unhidden (`RouteHidden` insert/remove). Each just wakes
+			// the five triggers that dirty a `RouteTree`: a route joining or
+			// leaving the tree (`PathPattern` insert/remove), a route being
+			// hidden or unhidden (`RouteHidden` insert/remove), and a template
+			// build settling its slots (`SpawnTemplate`, which reparents routes
+			// without touching either component). Each just wakes
 			// `rebuild_dirty_route_trees`, which resolves what actually changed.
 			.add_observer(queue_route_tree_rebuild_on_insert::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<RouteHidden>)
+			.add_observer(rebuild_route_tree_on_build)
 			// `RequireFeatures` (a beet_core component) is enforced here, where
 			// dispatch lives: an unmet declaration fails any call at or under
 			// it naming the missing features.
@@ -371,6 +374,31 @@ fn rebuild_dirty_route_trees(
 		builder.rebuild_subtree(root)?;
 	}
 	Ok(())
+}
+
+/// Observer that rebuilds the [`RouteTree`] of a built template's url space,
+/// because SLOT RESOLUTION reparents content after its routes were registered.
+///
+/// The `PathPattern` insert wake resolves a route's namespace from its
+/// ancestry at the moment the pattern lands, and slot content is built under
+/// the template ELEMENT and spliced into its [`SlotTarget`] afterwards. A host
+/// template that owns its own `Router` (a `Router` child of the bundle rather
+/// than an ancestor in the entry) therefore sees its slotted routes register
+/// against whatever namespace held them before the splice, so
+/// `<Host><Route path="deploy"/></Host>` built a `deploy` route that dispatch
+/// could not reach, while the host's own `validate`/`plan` (declared in the
+/// same bundle, so never reparented) resolved fine.
+///
+/// [`SpawnTemplate`] is the post-build boundary and fires exactly once per
+/// root, with slots resolved; [`rebuild_dirty_route_trees`] re-buckets every
+/// route under the settled ancestry. The one build it cannot speak for is a
+/// deferred one (an async `<Template src>` include), whose slots settle at the
+/// drain; that path already has its own rebuild through
+/// [`rebuild_route_trees_on_load`].
+///
+/// [`SlotTarget`]: beet_core::prelude::SlotTarget
+fn rebuild_route_tree_on_build(ev: On<SpawnTemplate>, mut commands: Commands) {
+	queue_route_tree_rebuild(&mut commands, ev.entity);
 }
 
 /// Observer that rebuilds [`RouteTree`] roots after a [`LoadTemplateSerde`],

@@ -31,7 +31,13 @@ pub trait Block: 'static + Send + Sync {
 
 	/// Tofu variables declared by this block, resolved
 	/// at deploy time and passed via `tofu apply -var`.
-	fn variables(&self) -> &[Variable] { &[] }
+	///
+	/// Owned rather than borrowed, so a variable a block DERIVES from its label
+	/// (a database's master password) need not be stored as a field. A stored
+	/// derivation is a field a markup declaration cannot correct: reflect
+	/// patches the label over the default and the derived field keeps the
+	/// default's.
+	fn variables(&self) -> Vec<Variable> { Vec::new() }
 }
 
 /// Type-erased block for collecting heterogeneous blocks.

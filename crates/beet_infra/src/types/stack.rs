@@ -300,7 +300,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 		let mut variables = Vec::new();
 		for child in self.declared(entity)? {
 			if let Ok((_, block)) = self.blocks.get(child) {
-				variables.extend_from_slice(block.variables());
+				variables.extend(block.variables());
 			}
 		}
 		Ok(variables)

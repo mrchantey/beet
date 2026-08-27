@@ -228,6 +228,29 @@ fn scalar_to_reflect(
 		return Ok(Box::new(dynamic));
 	}
 
+	// a string targeting a one-string-field struct builds that struct from the
+	// string, so a LABEL REFERENCE authors as the label it is: `<EnsureSecret
+	// secret="db-password"/>`, `<RdsPostgresBlock vpc="net"/>`. Those types
+	// (`SecretRef`, `VpcRef`, `DatabaseRef`, `SecurityGroupRef`) exist so one
+	// composition owns a name both ends of a cross-block reference compose, and
+	// wrapping a label is all they do; without this the string patch misses,
+	// `from_reflect` keeps the default, and a block silently points at the empty
+	// label. The named twin of the bare-number newtype cast above.
+	if let (Value::Str(string), Some(TypeInfo::Struct(info))) =
+		(value, field_info)
+		&& info.field_len() == 1
+		&& let Some(field) = info.field_at(0)
+		&& is_string_target(field.type_id())
+	{
+		let mut dynamic = DynamicStruct::default();
+		dynamic.insert_boxed(
+			field.name(),
+			string_to_reflect(string, field.type_id()),
+		);
+		dynamic.set_represented_type(field_info);
+		return Ok(Box::new(dynamic));
+	}
+
 	// a non-numeric string targeting a numeric field errors rather than silently
 	// falling through to `String` (whose `from_reflect` miss would keep the
 	// target's default, eg a `port="nope"` leaving the default port)
@@ -353,6 +376,21 @@ fn scalar_to_reflect(
 	Ok(reflected)
 }
 
+/// Whether `type_id` is one of the string types a markup attribute's text
+/// lands in directly.
+fn is_string_target(type_id: TypeId) -> bool {
+	type_id == TypeId::of::<SmolStr>() || type_id == TypeId::of::<String>()
+}
+
+/// Reflect `string` as whichever of the [`is_string_target`] types `type_id`
+/// names.
+fn string_to_reflect(string: &str, type_id: TypeId) -> Box<dyn PartialReflect> {
+	match type_id == TypeId::of::<SmolStr>() {
+		true => Box::new(SmolStr::new(string)),
+		false => Box::new(string.to_string()),
+	}
+}
+
 /// Cast a number to a registered scalar type by its [`TypeId`].
 fn cast_number(
 	number: f64,
@@ -442,6 +480,13 @@ fn list_to_reflect(
 }
 
 /// Build a [`DynamicStruct`] from named fields, recursing per field info.
+///
+/// The result is COMPLETED over the target's default when it can be, since a
+/// nested value is consumed by `FromReflect` (a list item, a struct-typed
+/// field), which needs every field and silently drops the whole value without
+/// them. That is the same fill a top-level component patch gets, one level
+/// down: `mailboxes={[{localpart:"probe"}]}` means a default mailbox at that
+/// localpart, not a mailbox list that quietly stays empty.
 fn struct_to_reflect(
 	fields: &[(SmolStr, DataLiteral)],
 	field_info: Option<&'static TypeInfo>,
@@ -463,7 +508,34 @@ fn struct_to_reflect(
 		);
 	}
 	dynamic.set_represented_type(field_info);
-	Ok(Box::new(dynamic))
+	Ok(complete_over_default(
+		Box::new(dynamic),
+		field_info,
+		registry,
+	))
+}
+
+/// Apply `partial` over its target type's `Default`, yielding a CONCRETE value
+/// every field of which is set. Falls through unchanged when the target is
+/// unknown, carries no `#[reflect(Default)]`, or refuses the patch (a field the
+/// type does not have), so a miss stays as loud as it was.
+fn complete_over_default(
+	partial: Box<dyn PartialReflect>,
+	field_info: Option<&'static TypeInfo>,
+	registry: &TypeRegistry,
+) -> Box<dyn PartialReflect> {
+	use bevy::reflect::std_traits::ReflectDefault;
+	let Some(mut value) = field_info
+		.and_then(|info| registry.get(info.type_id()))
+		.and_then(|registration| registration.data::<ReflectDefault>())
+		.map(ReflectDefault::default)
+	else {
+		return partial;
+	};
+	match value.try_apply(partial.as_ref()) {
+		Ok(()) => value.into_partial_reflect(),
+		Err(_) => partial,
+	}
 }
 
 /// Build a named literal (`Name`, `Name(..)`, `Name { .. }`) to a reflected
@@ -630,6 +702,131 @@ mod test {
 			.xpect_eq(Speed(60.0));
 		resolve::<Speed>(DataLiteral::Scalar(Value::Int(90)))
 			.xpect_eq(Speed(90.0));
+	}
+
+	/// A plain string coerces into a one-string-field struct, ie a label
+	/// reference (`SecretRef`, `VpcRef`), so `<EnsureSecret secret="db-password"/>`
+	/// authors the reference as the label it wraps.
+	///
+	/// REGRESSION: without the coercion the `String` patch missed the struct
+	/// field, `from_reflect` fell back to the type's default, and the block
+	/// pointed at the EMPTY label — a deploy that composes `/app/stage/` and
+	/// reads someone else's parameter, silently.
+	#[beet_core::test]
+	fn coerces_string_to_label_ref() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct SecretRef {
+			label: SmolStr,
+		}
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Owned {
+			label: String,
+		}
+		resolve::<SecretRef>(DataLiteral::Scalar(Value::Str(
+			"db-password".into(),
+		)))
+		.xpect_eq(SecretRef {
+			label: "db-password".into(),
+		});
+		resolve::<Owned>(DataLiteral::Scalar(Value::Str("net".into())))
+			.xpect_eq(Owned {
+				label: "net".into(),
+			});
+	}
+
+	/// ..but only a struct that wraps ONE string: a second field means the
+	/// string cannot say which one it is, so the coercion must not guess.
+	#[beet_core::test]
+	fn does_not_coerce_string_to_a_wider_struct() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Pair {
+			label: SmolStr,
+			other: SmolStr,
+		}
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		let reflected = DataLiteral::to_reflect(
+			&DataLiteral::Scalar(Value::Str("net".into())),
+			Some(Pair::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.unwrap();
+		Pair::from_reflect(reflected.as_ref()).xpect_none();
+	}
+
+	/// A nested struct literal names only the fields it cares about, the rest
+	/// coming from the target's `Default` — in a struct-typed field and in a
+	/// list item alike.
+	///
+	/// REGRESSION: the partial `DynamicStruct` reached `FromReflect`, which
+	/// needs every field, so `mailboxes={[{localpart:"probe"}]}` produced an
+	/// EMPTY list and the declaration silently lost its mailboxes.
+	#[beet_core::test]
+	fn completes_a_nested_struct_over_its_default() {
+		#[derive(Reflect, PartialEq, Debug)]
+		struct Item {
+			label: SmolStr,
+			admin: bool,
+		}
+		impl Default for Item {
+			fn default() -> Self {
+				Self {
+					label: "none".into(),
+					admin: true,
+				}
+			}
+		}
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Host {
+			one: Item,
+			many: Vec<Item>,
+		}
+		// the `Default` data is what the fill reads, so it must be registered
+		let mut registry = TypeRegistry::default();
+		registry.register::<Item>();
+		registry
+			.register_type_data::<Item, bevy::reflect::std_traits::ReflectDefault>(
+			);
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		let literal = DataLiteral::Enum(NamedLiteral {
+			name: "Host".into(),
+			fields: NamedFields::Struct(vec![
+				(
+					"one".into(),
+					DataLiteral::Struct(vec![(
+						"label".into(),
+						DataLiteral::Scalar(Value::Str("solo".into())),
+					)]),
+				),
+				(
+					"many".into(),
+					DataLiteral::List(vec![DataLiteral::Struct(vec![(
+						"label".into(),
+						DataLiteral::Scalar(Value::Str("probe".into())),
+					)])]),
+				),
+			]),
+		});
+		let reflected = DataLiteral::to_reflect(
+			&literal,
+			Some(Host::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.unwrap();
+		Host::from_reflect(reflected.as_ref())
+			.unwrap()
+			.xpect_eq(Host {
+				one: Item {
+					label: "solo".into(),
+					admin: true,
+				},
+				many: vec![Item {
+					label: "probe".into(),
+					admin: true,
+				}],
+			});
 	}
 
 	/// A `[a, b, ..]` literal fills an array-typed field (eg an `HttpServer`'s

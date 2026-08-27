@@ -11,8 +11,9 @@ use beet_core::prelude::*;
 /// How strictly a sender should treat a failure to reach this domain over
 /// authenticated TLS.
 #[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize,
+	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
 )]
+#[reflect(Default)]
 pub enum MtaStsMode {
 	/// Publish the policy and expect senders to report failures, but never to
 	/// withhold mail over one. The only safe launch mode: a policy is
@@ -41,7 +42,10 @@ impl MtaStsMode {
 
 /// The MTA-STS policy a mail domain publishes, and the id its TXT record
 /// carries.
-#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith, Serialize, Deserialize)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, Get, SetWith, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Default)]
 pub struct MtaStsPolicy {
 	/// See [`MtaStsMode`].
 	mode: MtaStsMode,

@@ -43,6 +43,25 @@ fn tofu_process() -> ChildProcess {
 	ChildProcess::new("tofu").with_not_found(NOT_FOUND)
 }
 
+/// Where downloaded provider plugins are shared between work directories.
+///
+/// Every `init` runs in a work directory of its own (a deploy's, a test's), so
+/// without a shared cache each one re-downloads the full provider set: the AWS
+/// provider alone is most of a gigabyte, and the concurrent `validate` tests
+/// each pay it. Honours an explicitly-set `TF_PLUGIN_CACHE_DIR`, else picks the
+/// conventional one and creates it, since tofu will not create it itself and
+/// silently skips caching when it is missing.
+fn plugin_cache_dir() -> Option<AbsPathBuf> {
+	let dir = match env_ext::var("TF_PLUGIN_CACHE_DIR") {
+		Ok(dir) if !dir.is_empty() => AbsPathBuf::new(dir.as_str()).ok()?,
+		_ => AbsPathBuf::new(env_ext::var("HOME").ok()?.as_str())
+			.ok()?
+			.join(".cache/tofu-plugins"),
+	};
+	fs_ext::create_dir_all(&dir).ok()?;
+	Some(dir)
+}
+
 /// Render `vars` as `-var key=value` pairs, the form every state-touching
 /// tofu subcommand accepts. Used to thread a stack's [`StateEncryption`]
 /// passphrase (and any other required vars) through without ever writing
@@ -70,11 +89,14 @@ pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
 /// re-point at a different backend key when switching stages (eg `dev` ->
 /// `prod`), which each own an independent remote state and so need no migration.
 pub async fn init(dir: &AbsPathBuf) -> Result {
-	tofu_process()
+	let mut process = tofu_process()
 		.with_cwd(dir.clone())
-		.with_args(["init", "-reconfigure"])
-		.run_async()
-		.await?;
+		.with_args(["init", "-reconfigure"]);
+	if let Some(cache) = plugin_cache_dir() {
+		process = process
+			.with_envs([("TF_PLUGIN_CACHE_DIR", cache.to_string_lossy())]);
+	}
+	process.run_async().await?;
 	Ok(())
 }
 

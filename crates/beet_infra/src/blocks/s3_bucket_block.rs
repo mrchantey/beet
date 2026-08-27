@@ -43,6 +43,21 @@ pub struct S3BucketBlock {
 	/// bucket: `aws s3 sync --no-sign-request` lists before it gets, so
 	/// `GetObject` alone fails at the first `ListObjectsV2`.
 	public_read: bool,
+	/// Keep every version of every object, so an overwrite or a delete is
+	/// recoverable rather than final. For a SOURCE OF RECORD (a mail blob
+	/// store) this is the difference between a bug and a loss; a bucket the
+	/// deploy re-publishes into on every run wants it off, since every version
+	/// is a copy of something git already has.
+	///
+	/// Distinct from [`deploy_versioned`](Self::deploy_versioned), which nests
+	/// objects under the deploy id and is about publication, not durability.
+	object_versioning: bool,
+	/// Days a noncurrent version is kept before it expires, `0` keeping them
+	/// forever. Only meaningful with
+	/// [`object_versioning`](Self::object_versioning): versions accumulate
+	/// silently and are billed like any other object, so a versioned bucket
+	/// with no expiry is a bill that only grows.
+	expire_noncurrent_days: i64,
 	/// The deploy layer for the bucket and its public-read pair
 	/// ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER) by default):
 	/// the deploy syncs content into the bucket, so it converges before anything
@@ -64,6 +79,8 @@ impl S3BucketBlock {
 			deploy_versioned: true,
 			runtime_write: false,
 			public_read: false,
+			object_versioning: false,
+			expire_noncurrent_days: 90,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
@@ -173,6 +190,9 @@ impl Block for S3BucketBlock {
 		if self.public_read {
 			self.emit_public_read(stack, config, &bucket)?;
 		}
+		if self.object_versioning {
+			self.emit_versioning(stack, config, &bucket)?;
+		}
 		Ok(())
 	}
 
@@ -189,6 +209,61 @@ impl Block for S3BucketBlock {
 }
 
 impl S3BucketBlock {
+	/// Emit object versioning and, when
+	/// [`expire_noncurrent_days`](Self::expire_noncurrent_days) is set, the
+	/// lifecycle rule that stops the versions accumulating forever.
+	///
+	/// Both are UNTYPED resources: `aws_s3_bucket_versioning` and
+	/// `aws_s3_bucket_lifecycle_configuration` have no generated binding, and
+	/// the inline `versioning`/`lifecycle_rule` arguments the `aws_s3_bucket`
+	/// schema still carries are unconfigurable from provider 4 on.
+	fn emit_versioning(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		bucket: &ResourceDef<AwsS3BucketDetails>,
+	) -> Result {
+		let versioning_ident =
+			stack.resource_ident(format!("{}-versioning", self.label));
+		let versioning_label = versioning_ident.label();
+		config.add_untyped_resource(
+			"aws_s3_bucket_versioning",
+			&versioning_label,
+			&json!({
+				"bucket": bucket.field_ref("id"),
+				"versioning_configuration": { "status": "Enabled" },
+			}),
+		)?;
+		if self.expire_noncurrent_days > 0 {
+			config.add_untyped_resource(
+				"aws_s3_bucket_lifecycle_configuration",
+				stack
+					.resource_ident(format!("{}-lifecycle", self.label))
+					.label(),
+				&json!({
+					"bucket": bucket.field_ref("id"),
+					"rule": [{
+						"id": "expire-noncurrent-versions",
+						"status": "Enabled",
+						// every object: provider 6 requires a filter or a
+						// prefix, and an empty filter is how "all of them" is
+						// spelled.
+						"filter": {},
+						"noncurrent_version_expiration": {
+							"noncurrent_days": self.expire_noncurrent_days
+						},
+					}],
+					// versioning must be on before a rule can talk about
+					// noncurrent versions
+					"depends_on": [
+						format!("aws_s3_bucket_versioning.{versioning_label}")
+					],
+				}),
+			)?;
+		}
+		Ok(())
+	}
+
 	/// Emit the public-access-block (lifting the default block on public policies)
 	/// and the anonymous read bucket policy that depends on it.
 	fn emit_public_read(
@@ -325,6 +400,42 @@ mod tests {
 				S3BucketBlock::ACCESS_KIND,
 				stack.resource_name("mail-blobs"),
 			)]);
+	}
+
+	/// A source of record keeps its versions, and expires the noncurrent ones so
+	/// the bill does not grow forever. Both resources are separate from the
+	/// bucket, since the inline arguments the `aws_s3_bucket` schema still
+	/// carries have been unconfigurable since provider 4.
+	#[beet_core::test]
+	fn object_versioning_emits_versioning_and_lifecycle() {
+		let json = build_json(
+			S3BucketBlock::new("mail-blobs").with_object_versioning(true),
+		);
+		json.as_str()
+			.xpect_contains("aws_s3_bucket_versioning")
+			.xpect_contains("\"status\":\"Enabled\"")
+			.xpect_contains("aws_s3_bucket_lifecycle_configuration")
+			.xpect_contains("\"noncurrent_days\":90");
+		// ..and neither is emitted for a bucket the deploy simply re-publishes
+		build_json(S3BucketBlock::new("app"))
+			.as_str()
+			.xnot()
+			.xpect_contains("aws_s3_bucket_versioning");
+	}
+
+	/// Keeping versions forever is expressible, since a compliance copy is a
+	/// real requirement; it just is not the default.
+	#[beet_core::test]
+	fn zero_days_keeps_every_version() {
+		build_json(
+			S3BucketBlock::new("mail-backups")
+				.with_object_versioning(true)
+				.with_expire_noncurrent_days(0),
+		)
+		.as_str()
+		.xpect_contains("aws_s3_bucket_versioning")
+		.xnot()
+		.xpect_contains("aws_s3_bucket_lifecycle_configuration");
 	}
 
 	#[beet_core::test]

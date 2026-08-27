@@ -46,7 +46,19 @@ pub const RESERVED_HOSTNAMES: &[&str] = &[
 ///
 /// Members are not assumed human. An agent identity is a member with a mailbox
 /// and a handle, which is why nothing here names a person.
-#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith, Serialize, Deserialize)]
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	Get,
+	SetWith,
+	Serialize,
+	Deserialize,
+	Reflect,
+)]
+#[reflect(Default)]
 pub struct Member {
 	/// The handle label and default mailbox localpart, eg `pete`. Validated
 	/// against [`RESERVED_HOSTNAMES`] and the DNS label rules, since it becomes
@@ -89,7 +101,19 @@ impl Member {
 }
 
 /// An address on a mail domain that stores mail, ie `pete@stalwart.beetmash.com`.
-#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith, Serialize, Deserialize)]
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	Get,
+	SetWith,
+	Serialize,
+	Deserialize,
+	Reflect,
+)]
+#[reflect(Default)]
 pub struct Mailbox {
 	/// The address localpart, eg `pete`.
 	localpart: SmolStr,
@@ -122,7 +146,19 @@ impl Mailbox {
 
 /// A localpart that delivers into a [`Mailbox`] on the same domain, ie
 /// `postmaster@ -> pete@`. An alias stores nothing of its own.
-#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith, Serialize, Deserialize)]
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	Get,
+	SetWith,
+	Serialize,
+	Deserialize,
+	Reflect,
+)]
+#[reflect(Default)]
 pub struct Alias {
 	/// The address localpart being aliased, eg `postmaster`.
 	localpart: SmolStr,

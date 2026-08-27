@@ -49,11 +49,6 @@ pub struct RdsPostgresBlock {
 	database: SmolStr,
 	/// The master role. Not an application's role: tenants get their own.
 	username: SmolStr,
-	/// The master password, arriving as a tofu variable rather than a literal.
-	/// Sensitive, so tofu redacts it everywhere except state, which is why a
-	/// stack declaring one runs with state encryption on.
-	#[set_with(skip)]
-	password: Variable,
 	/// Override where the master password is stored, which otherwise composes
 	/// from the stack. `EnsureSecret` creates it and the deploy reads
 	/// [`password`](Self::password) back out of it; the running consumer reads
@@ -108,10 +103,6 @@ impl RdsPostgresBlock {
 			max_storage: 100,
 			database: label.clone(),
 			username: "postgres".into(),
-			password: Variable::param(
-				DatabaseRef::new(label.clone()).password_variable(),
-			)
-			.with_sensitive(true),
 			secret: None,
 			backup_days: 14,
 			deletion_protection: true,
@@ -129,6 +120,18 @@ impl RdsPostgresBlock {
 	/// The handle a consumer composes its connection from.
 	pub fn database_ref(&self) -> DatabaseRef {
 		DatabaseRef::new(self.label.clone())
+	}
+
+	/// The master password, arriving as a tofu variable rather than a literal.
+	/// Sensitive, so tofu redacts it everywhere except state, which is why a
+	/// stack declaring one runs with state encryption on.
+	///
+	/// Derived from the label rather than stored, so it cannot disagree with
+	/// the [`DatabaseRef`] `EnsureSecret` and the consumer's boot script both
+	/// compose the same variable from.
+	pub fn password(&self) -> Variable {
+		Variable::param(self.database_ref().password_variable())
+			.with_sensitive(true)
 	}
 
 	/// This instance's own security group, the one the consumers' rules point
@@ -231,9 +234,10 @@ impl Block for RdsPostgresBlock {
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
+		let password = self.password();
 		config.ensure_variable(
-			self.password.key().as_str(),
-			self.password.tf_declaration(),
+			password.key().as_str(),
+			password.tf_declaration(),
 		);
 		let group = self.emit_security_group(stack, config)?;
 		self.emit_instance(stack, config, &group)?;
@@ -248,7 +252,7 @@ impl Block for RdsPostgresBlock {
 		vec![AccessGrant::read(Self::ACCESS_KIND, self.secret_name(stack))]
 	}
 
-	fn variables(&self) -> &[Variable] { std::slice::from_ref(&self.password) }
+	fn variables(&self) -> Vec<Variable> { vec![self.password()] }
 }
 
 impl RdsPostgresBlock {
@@ -336,7 +340,7 @@ impl RdsPostgresBlock {
 				storage_encrypted: Some(true),
 				db_name: Some(self.database.clone()),
 				username: Some(self.username.clone()),
-				password: Some(self.password.tf_var_ref().into()),
+				password: Some(self.password().tf_var_ref().into()),
 				port: Some(Self::PORT),
 				db_subnet_group_name: Some(subnets.field_ref("name").into()),
 				vpc_security_group_ids: Some(vec![

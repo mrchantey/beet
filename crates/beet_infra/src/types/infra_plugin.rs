@@ -71,6 +71,31 @@ impl Plugin for InfraPlugin {
 		// by, ie the `<EnsureSecret secret="db-password"/>` attribute.
 		app.register_type::<crate::prelude::SecretRef>();
 
+		// the zone a block publishes into, a field of every block that names a
+		// hostname. Registered wherever the module compiles, since a block
+		// authored by tag can only carry one if the type it holds resolves.
+		#[cfg(any(
+			feature = "lambda_block",
+			feature = "fargate_block",
+			feature = "lightsail_block",
+			feature = "cloudflare_dns"
+		))]
+		app.register_type::<crate::prelude::DnsProvider>();
+
+		// the mail stack, spawned by tag: the domain declaration
+		// (`<MailDomainBlock domain="stalwart.beetmash.com"/>`), the box that
+		// serves it, and the identity inputs both are authored from. Definitions,
+		// so every target: a wasm consumer can author the stack it cannot deploy.
+		#[cfg(feature = "mail")]
+		app.register_type::<crate::prelude::MailDomainBlock>()
+			.register_type::<crate::prelude::MailRecords>()
+			.register_type::<crate::prelude::StalwartBlock>()
+			.register_type::<crate::prelude::Member>()
+			.register_type::<crate::prelude::Mailbox>()
+			.register_type::<crate::prelude::Alias>()
+			.register_type::<crate::prelude::MtaStsPolicy>()
+			.register_type::<crate::prelude::MtaStsMode>();
+
 		// the cloudflare deploy blocks, spawned by tag. Definitions, so every target.
 		#[cfg(feature = "cloudflare_block")]
 		app.register_type::<crate::prelude::CloudflareWorkerBlock>()
@@ -174,5 +199,145 @@ impl Plugin for InfraPlugin {
 		))]
 		app.register_type::<crate::prelude::BuildDockerImage>()
 			.register_type::<crate::prelude::ContainerEngine>();
+	}
+}
+
+#[cfg(all(test, feature = "mail", feature = "deploy"))]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// The world an entry's markup builds into: the plugin under test plus the
+	/// document machinery a `.bsx` load runs through.
+	fn spawn(markup: &str) -> World {
+		let mut world =
+			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
+				.into_world();
+		let nodes =
+			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
+		world
+			.spawn(())
+			.insert_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap();
+		world.flush();
+		world
+	}
+
+	/// The mail stack authors from markup, which is the whole reason its types
+	/// reflect: an entry declares the domain and the box as tags, and the
+	/// cross-block references are the labels they are.
+	///
+	/// REGRESSION: `MailDomainBlock` and `StalwartBlock` were not registered
+	/// (they hold a `DnsProvider`, which was not `Reflect`), so both tags
+	/// resolved to nothing and an entry declaring them built an empty stack
+	/// that deployed successfully.
+	#[beet_core::test]
+	fn the_mail_blocks_spawn_by_tag() {
+		let mut world = spawn(
+			r#"<Fragment>
+				<MailDomainBlock
+					domain="news.beetmash.com"
+					mail_host="mail.beetmash.com"
+					report_domain="stalwart.beetmash.com"
+					catch_all="publications"
+					mailboxes={[{localpart:"publications"}]}
+					aliases={[{localpart:"blog", target:"publications"}]}
+					mta_sts={{mode:Enforce}}/>
+				<StalwartBlock label="mail" hostname="mail.beetmash.com"
+					vpc="net" database="db" blob_bucket="mail-blobs"
+					ssh_public_key="ssh-ed25519 AAAA pete"/>
+			</Fragment>"#,
+		);
+		let domain = world.query::<&MailDomainBlock>().single(&world).unwrap();
+		domain.domain().as_str().xpect_eq("news.beetmash.com");
+		domain
+			.report_domain()
+			.as_str()
+			.xpect_eq("stalwart.beetmash.com");
+		domain.mailboxes().len().xpect_eq(1);
+		domain.aliases()[0]
+			.target()
+			.as_str()
+			.xpect_eq("publications");
+		domain.mta_sts().mode().xpect_eq(MtaStsMode::Enforce);
+		domain.validate().unwrap();
+
+		let mail_box = world.query::<&StalwartBlock>().single(&world).unwrap();
+		mail_box.vpc().label().as_str().xpect_eq("net");
+		mail_box.database().label().as_str().xpect_eq("db");
+		mail_box.security_group().label().as_str().xpect_eq("mail");
+		mail_box.validate().unwrap();
+	}
+
+	/// A field DERIVED from another at construction cannot survive being
+	/// reflect-patched over the type's default, since the default derived from
+	/// the empty value. Both of these read back as the declaration means them.
+	///
+	/// REGRESSION: `report_domain` was copied from `domain` in the constructor,
+	/// so a markup-declared domain addressed its DMARC reports to `dmarc@` with
+	/// no domain at all; and the database's master-password variable was stored
+	/// as a field composed from the label, so a markup-declared database asked
+	/// the apply for `var._password` while `EnsureSecret` supplied `db_password`.
+	#[beet_core::test]
+	fn derived_fields_survive_a_markup_declaration() {
+		let mut world = spawn(
+			r#"<Fragment>
+				<MailDomainBlock domain="stalwart.beetmash.com" mail_host="mail.beetmash.com"/>
+				<RdsPostgresBlock label="db" vpc="net" database="mail"/>
+			</Fragment>"#,
+		);
+		world
+			.query::<&MailDomainBlock>()
+			.single(&world)
+			.unwrap()
+			.dmarc_value()
+			.xpect_contains("rua=mailto:dmarc@stalwart.beetmash.com");
+		world
+			.query::<&RdsPostgresBlock>()
+			.single(&world)
+			.unwrap()
+			.password()
+			.key()
+			.as_str()
+			.xpect_eq("db_password");
+	}
+
+	/// The post-apply verbs author as tags too, each naming what it works on
+	/// rather than restating a composed name.
+	#[beet_core::test]
+	fn the_mail_verbs_spawn_by_tag() {
+		let mut world = spawn(
+			r#"<Fragment>
+				<EnsureSecret secret="db-password" variable="db_password"/>
+				<MailProbe mailbox="probe" sender_domain="news.beetmash.com"/>
+				<ZoneAudit allowed={[{name:"beetmash.com", record_type:"MX", reason:"fastmail"}]}/>
+			</Fragment>"#,
+		);
+		let secret = world.query::<&EnsureSecret>().single(&world).unwrap();
+		secret.secret().label().as_str().xpect_eq("db-password");
+		secret
+			.variable()
+			.clone()
+			.unwrap()
+			.as_str()
+			.xpect_eq("db_password");
+		world
+			.query::<&MailProbe>()
+			.single(&world)
+			.unwrap()
+			.sender_domain()
+			.as_str()
+			.xpect_eq("news.beetmash.com");
+		world
+			.query::<&ZoneAudit>()
+			.single(&world)
+			.unwrap()
+			.allowed()[0]
+			.reason()
+			.as_str()
+			.xpect_eq("fastmail");
 	}
 }

@@ -10,8 +10,9 @@ use beet_core::prelude::*;
 /// and the distinction is what makes a cutover a short window rather than a
 /// second build.
 #[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize,
+	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
 )]
+#[reflect(Default)]
 pub enum MailRecords {
 	/// Everything: this stack serves the domain's mail.
 	#[default]
@@ -58,7 +59,10 @@ impl MailRecords {
 /// singleton owned by the site stack, and the `letsencrypt.org` pair the mail
 /// box's ACME needs is already among them: a second block emitting its own
 /// would fight the first for the same record rather than add to it.
-#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
+#[derive(
+	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
+)]
+#[reflect(Component, Default)]
 #[component(immutable, on_add = ErasedBlock::on_add::<MailDomainBlock>)]
 pub struct MailDomainBlock {
 	/// The mail domain served, eg `stalwart.beetmash.com`.
@@ -75,10 +79,13 @@ pub struct MailDomainBlock {
 	#[get(skip)]
 	#[set_with(unwrap_option)]
 	dns: Option<DnsProvider>,
-	/// The domain the DMARC aggregate and TLS-RPT report addresses live on.
-	/// Reports have to reach a mailbox that exists, which while a domain is
-	/// being commissioned is not that domain's own.
-	report_domain: SmolStr,
+	/// The domain the DMARC aggregate and TLS-RPT report addresses live on,
+	/// defaulting to this domain's own. Reports have to reach a mailbox that
+	/// exists, which while a domain is being commissioned is not that domain's
+	/// own.
+	#[get(skip)]
+	#[set_with(unwrap_option, into)]
+	report_domain: Option<SmolStr>,
 	/// See [`MtaStsPolicy`].
 	mta_sts: MtaStsPolicy,
 	/// The mailboxes this domain stores mail for, read by `StalwartProvision`.
@@ -105,6 +112,10 @@ pub struct MailDomainBlock {
 	/// records.
 	#[set_with(unwrap_option, into)]
 	handle_domain: Option<SmolStr>,
+}
+
+impl Default for MailDomainBlock {
+	fn default() -> Self { Self::new("", "") }
 }
 
 impl MailDomainBlock {
@@ -157,7 +168,7 @@ impl MailDomainBlock {
 			mail_host: mail_host.into(),
 			records: MailRecords::All,
 			dns: None,
-			report_domain: domain.clone(),
+			report_domain: None,
 			mta_sts: default(),
 			mailboxes: Vec::new(),
 			aliases: Vec::new(),
@@ -166,6 +177,35 @@ impl MailDomainBlock {
 			handle_domain: None,
 			domain,
 		}
+	}
+
+	/// Where DMARC aggregate and TLS-RPT reports are addressed: the declared
+	/// [`report_domain`](Self::with_report_domain), else this domain.
+	///
+	/// Resolved on read rather than copied at construction, since a markup
+	/// declaration patches the domain over a default that has none, and a
+	/// report address at the empty domain is a report nobody receives.
+	pub fn report_domain(&self) -> &SmolStr {
+		self.report_domain.as_ref().unwrap_or(&self.domain)
+	}
+
+	/// The zone this domain's records are published into: the declared
+	/// [`dns`](Self::with_dns) provider, else a Cloudflare zone read from
+	/// `CLOUDFLARE_ZONE_ID`.
+	///
+	/// A declaration says which domain it serves and nothing about where the
+	/// zone lives, exactly as it says nothing about which AWS account it
+	/// deploys into: both are properties of the launch. `None` is the honest
+	/// answer for a domain whose records somebody else publishes, which is
+	/// [`MailRecords::None`]'s whole meaning.
+	pub fn resolved_dns(&self) -> Option<DnsProvider> {
+		if let Some(dns) = &self.dns {
+			return Some(dns.clone());
+		}
+		#[cfg(feature = "cloudflare_dns")]
+		return DnsProvider::cloudflare_env(self.domain.clone());
+		#[cfg(not(feature = "cloudflare_dns"))]
+		None
 	}
 
 	/// Add a member, and the mailbox they own on this domain.
@@ -234,14 +274,14 @@ impl MailDomainBlock {
 	pub fn dmarc_value(&self) -> String {
 		format!(
 			"v=DMARC1; p=reject; rua=mailto:dmarc@{}",
-			self.report_domain
+			self.report_domain()
 		)
 	}
 
 	/// The TLS-RPT policy: report failures to negotiate authenticated TLS,
 	/// which is the evidence MTA-STS `enforce` waits on.
 	pub fn tls_rpt_value(&self) -> String {
-		format!("v=TLSRPTv1; rua=mailto:tlsrpt@{}", self.report_domain)
+		format!("v=TLSRPTv1; rua=mailto:tlsrpt@{}", self.report_domain())
 	}
 
 	/// The MTA-STS policy body this domain serves, ie the bytes published at
@@ -327,10 +367,23 @@ impl Block for MailDomainBlock {
 	) -> Result {
 		self.validate()?;
 		let identity = self.emit_ses(stack, config)?;
-		if let Some(dns) = &self.dns {
-			self.emit_identity_records(stack, config, dns, &identity)?;
-			self.emit_delivery_records(stack, deployment, config, dns)?;
-			self.emit_handle_records(stack, config, dns)?;
+		match self.resolved_dns() {
+			Some(dns) => {
+				self.emit_identity_records(stack, config, &dns, &identity)?;
+				self.emit_delivery_records(stack, deployment, config, &dns)?;
+				self.emit_handle_records(stack, config, &dns)?;
+			}
+			// a domain that declares records but resolves no zone would apply
+			// clean and publish nothing, which is the one failure a mail stack
+			// cannot see: the identity exists, the deploy is green, and the
+			// domain is undeliverable. Checked here rather than in `validate`
+			// because which zone a launch has is not a property of the
+			// declaration, and every non-deploy reader validates too.
+			None if self.records.proves_identity() => bevybail!(
+				"mail domain '{}' publishes records but no zone resolves: set CLOUDFLARE_ZONE_ID, `with_dns` a provider, or declare `records=\"None\"` for a domain whose records somebody else holds",
+				self.domain
+			),
+			None => {}
 		}
 		Ok(())
 	}
@@ -777,12 +830,13 @@ mod tests {
 			]);
 	}
 
-	/// A block with no zone declares the identity and stays out of dns
-	/// entirely, which is how a domain whose records somebody else holds still
-	/// gets a verified sending identity.
+	/// A block declaring [`MailRecords::None`] declares the identity and stays
+	/// out of dns entirely, which is how a domain whose records somebody else
+	/// holds still gets a verified sending identity.
 	#[beet_core::test]
-	fn no_zone_emits_no_records() {
-		let block = MailDomainBlock::new("beetmash.com", "mail.beetmash.com");
+	fn records_none_emits_no_records() {
+		let block = MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
+			.with_records(MailRecords::None);
 		records(&[block.clone()]).xpect_eq(Vec::new());
 		build_config(&[block])
 			.to_json()

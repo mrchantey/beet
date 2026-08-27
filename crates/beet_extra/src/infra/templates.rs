@@ -544,6 +544,59 @@ mod test {
 			]);
 	}
 
+	/// A host template that OWNS its `Router` (the router is inside the bundle
+	/// rather than an ancestor in the entry), the shape whose slot content
+	/// reparents under that router only after slot resolution.
+	#[template]
+	pub fn SlottedHost() -> impl Bundle {
+		(CliServer::default(), children![(
+			Stack::default(),
+			Router::with_defaults(),
+			children![Validate, Plan, SlotTarget::new()],
+		)])
+	}
+
+	/// A router-owning host's routes AND the ones an entry declares in its slot
+	/// both land in the tree, which is the whole point of the slot: an entry
+	/// gets the host's verbs for free and adds its own beside them.
+	///
+	/// REGRESSION: slot content registered its routes BEFORE the splice
+	/// reparented it under the host's router, and they landed in the enclosing
+	/// url space instead. Every slotted route in such an entry 404'd while
+	/// `validate`/`plan` — declared in the same bundle, so never reparented —
+	/// worked, which is what made it look like a problem with the entry rather
+	/// than with the host. `SpawnTemplate` now wakes the route-tree rebuild.
+	#[beet_core::test]
+	fn host_mounts_slotted_routes() {
+		let mut world = test_world();
+		world.register_template::<SlottedHost>();
+		world.insert_resource(PackageConfig {
+			app_name: "beetmash".into(),
+			..default()
+		});
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<SlottedHost>
+				<Route path="deploy" {ExchangeSequence}>
+					<TofuApply/>
+				</Route>
+				<Route path="audit" {ExchangeSequence}>
+					<TofuApply/>
+				</Route>
+			</SlottedHost>"#,
+		);
+		let host = world
+			.query_filtered::<Entity, With<Stack>>()
+			.single(&world)
+			.unwrap();
+		let tree = RouteTree::of(&world, host).unwrap();
+		tree.find(&["validate"]).xpect_some();
+		tree.find(&["deploy"]).xpect_some();
+		tree.find(&["audit"]).xpect_some();
+	}
+
 	/// The apply layer coerces from markup, so a deploy route can author its
 	/// layered applies (`layer="storage"` before the content sync, a bare full
 	/// apply after it) as the same tag.

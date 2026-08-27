@@ -879,7 +879,7 @@ exit 1
 
 impl Block for LightsailBlock {
 	fn artifact_label(&self) -> Option<&str> { Some(&self.label) }
-	fn variables(&self) -> &[Variable] { &self.env_vars }
+	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
 
 	fn apply_to_config(
 		&self,

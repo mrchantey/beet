@@ -39,7 +39,10 @@ use serde_json::json;
 /// rendered script holds parameter *names* only.
 ///
 /// [Stalwart]: https://stalw.art
-#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
+#[derive(
+	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
+)]
+#[reflect(Component, Default)]
 #[component(immutable, on_add = ErasedBlock::on_add::<StalwartBlock>)]
 pub struct StalwartBlock {
 	/// Label prefixing every terraform resource, and the label of the
@@ -152,6 +155,22 @@ impl StalwartBlock {
 	pub fn with_database(mut self, label: impl Into<SmolStr>) -> Self {
 		self.database = DatabaseRef::new(label);
 		self
+	}
+
+	/// The zone the box's `A` record is published into: the declared
+	/// [`dns`](Self::with_dns) provider, else a Cloudflare zone read from
+	/// `CLOUDFLARE_ZONE_ID`, at this box's own hostname.
+	///
+	/// The hostname is the block's, never the provider's: a declaration names
+	/// the box, and where the zone lives is a property of the launch.
+	pub fn resolved_dns(&self) -> Option<DnsProvider> {
+		if let Some(dns) = &self.dns {
+			return Some(dns.clone());
+		}
+		#[cfg(feature = "cloudflare_dns")]
+		return DnsProvider::cloudflare_env(self.hostname.clone());
+		#[cfg(not(feature = "cloudflare_dns"))]
+		None
 	}
 
 	/// The security group this block declares, ie the label a database's
@@ -708,15 +727,26 @@ impl StalwartBlock {
 			.add_resource(&eip)?
 			.add_resource(&association)?;
 
-		if let Some(dns) = &self.dns {
-			dns.emit_address(
-				stack,
-				config,
-				&self.build_label("dns"),
-				&eip.field_ref("public_ip"),
-				false,
-			)?;
-		}
+		// without an address record the hostname resolves nowhere, so the
+		// certificate never issues, the `MX` targets nothing and the reverse
+		// record is refused. Every one of those surfaces long after a green
+		// apply, so the emit fails instead of quietly skipping. Not in
+		// `validate`, since which zone a launch has is not a property of the
+		// declaration.
+		let Some(dns) = self.resolved_dns() else {
+			bevybail!(
+				"mail box '{}' resolves no zone to publish '{}' into: set CLOUDFLARE_ZONE_ID or `with_dns` a provider",
+				self.label,
+				self.hostname
+			);
+		};
+		dns.emit_address(
+			stack,
+			config,
+			&self.build_label("dns"),
+			&eip.field_ref("public_ip"),
+			false,
+		)?;
 
 		config
 			.add_output(format!("{}_public_ip", self.label), terra::Output {

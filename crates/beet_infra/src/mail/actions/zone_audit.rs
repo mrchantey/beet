@@ -39,7 +39,10 @@ pub struct ZoneAudit {
 }
 
 /// One record the audit expects to find without this stack declaring it.
-#[derive(Debug, Clone, PartialEq, Eq, Get, Serialize, Deserialize, Reflect)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Get, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Default)]
 pub struct AllowedRecord {
 	/// The record name, ie `beetmash.com`. A leading `*.` matches any label in
 	/// that position, which is how a computed selector is allowed without

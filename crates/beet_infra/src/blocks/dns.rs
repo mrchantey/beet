@@ -15,7 +15,7 @@ use serde_json::json;
 /// [`emit_address`]: Self::emit_address
 ///
 /// [`emit_cname`]: Self::emit_cname
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
 pub enum DnsProvider {
 	/// A record in a Cloudflare zone. Authenticates from the
 	/// `CLOUDFLARE_API_TOKEN` environment variable at apply time.
@@ -51,6 +51,21 @@ impl DnsProvider {
 			zone_id: zone_id.into(),
 			proxied: false,
 		}
+	}
+
+	/// A Cloudflare record whose zone comes from `CLOUDFLARE_ZONE_ID`, the one
+	/// place this repo has ever kept it (`ZoneAudit` and `CloudflareZoneSetup`
+	/// both read it there, and the terraform provider block stays empty for the
+	/// same reason the api token does).
+	///
+	/// `None` when the variable is unset, so a caller can say which zone it
+	/// wanted in the error rather than emitting records into zone `""`.
+	#[cfg(feature = "cloudflare_dns")]
+	pub fn cloudflare_env(authority: impl Into<SmolStr>) -> Option<Self> {
+		env_ext::var("CLOUDFLARE_ZONE_ID")
+			.ok()
+			.filter(|zone_id| !zone_id.is_empty())
+			.map(|zone_id| Self::cloudflare(authority, zone_id))
 	}
 
 	/// A Route53 record.
