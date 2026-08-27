@@ -49,6 +49,10 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// such a caller means (rendering, forwarding a capability call) — else
 	/// the first tree found.
 	///
+	/// A thin wrapper over [`RouteTree::resolve`] (the no_std-core walk, shared
+	/// with [`find_router`](crate::prelude::find_router) which cannot depend on
+	/// this std-only system param) binding this query's own fields.
+	///
 	/// The shared resolver behind every "which url space is THE site"
 	/// lookup that starts from a live [`Query`] rather than a [`World`]
 	/// ([`RouteTree::of`] is the equivalent for a `World` in hand); folds in
@@ -58,27 +62,13 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// # Errors
 	/// Errors when nothing at or under `entity`'s namespace carries a tree.
 	pub fn resolve_tree(&self, entity: Entity) -> Result<(Entity, &RouteTree)> {
-		let near =
-			PathPattern::namespace_root(entity, &self.ancestors, &self.paths);
-		if let Ok(tree) = self.route_trees.get(near) {
-			return Ok((near, tree));
-		}
-		let mut candidates: Vec<(Entity, &RouteTree)> = Vec::new();
-		let mut queue = vec![near];
-		while let Some(entity) = queue.pop() {
-			if let Ok(tree) = self.route_trees.get(entity) {
-				candidates.push((entity, tree));
-			}
-			if let Ok(children) = self.children.get(entity) {
-				queue.extend(children.iter());
-			}
-		}
-		candidates
-			.iter()
-			.find(|(_, tree)| tree.serves_pages())
-			.or(candidates.first())
-			.copied()
-			.ok_or_else(|| bevyhow!("no RouteTree at or under {entity}"))
+		RouteTree::resolve(
+			entity,
+			&self.ancestors,
+			&self.paths,
+			&self.children,
+			&self.route_trees,
+		)
 	}
 
 	/// Finds the render root for the given entity.

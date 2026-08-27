@@ -181,79 +181,63 @@ impl RouteTree {
 		.xok()
 	}
 
-	/// The one grouping walk every [`RouteTree`] rebuild trigger runs: descend
-	/// `root`'s subtree, bucket every live route by its own
-	/// [`PathPattern::namespace_root`] (a nested `Router` owns its own
-	/// namespace and tree, so its routes never bucket to an ancestor), and
-	/// insert a fresh tree per bucket.
+	/// System wrapper around
+	/// [`RouteTreeBuilder::rebuild_subtree`](crate::prelude::RouteTreeBuilder::rebuild_subtree),
+	/// for callers that only hold a bevy system-running handle rather than a
+	/// live [`RouteTreeBuilder`](crate::prelude::RouteTreeBuilder): the scene
+	/// reparent and scene-despawn call sites, via
+	/// [`run_system_cached_with`](bevy::ecs::world::World::run_system_cached_with).
+	pub fn rebuild(server: In<Entity>, mut builder: RouteTreeBuilder) -> Result {
+		builder.rebuild_subtree(*server)
+	}
+
+	/// Resolves the [`RouteTree`] governing `entity` from live queries,
+	/// returning the entity the winning tree lives on alongside the tree.
 	///
-	/// Every namespace, not just `root`'s: a mounted scene rooted in its own
-	/// `Router` is a url space of its own, and reparenting is exactly when its
-	/// ancestry (and so its namespace) settles.
+	/// `entity`'s own enclosing namespace ([`PathPattern::namespace_root`])
+	/// carries a tree directly when `entity` sits inside one — the common
+	/// case, unambiguous. When `entity` sits *above* one or more namespaces
+	/// instead (an entry root, a command dispatcher), its own namespace
+	/// carries no tree, so this descends and prefers whichever descendant
+	/// namespace [serves pages](Self::serves_pages) — that is the *site* such
+	/// a caller means (rendering, forwarding a capability call) — else the
+	/// first tree found.
 	///
-	/// Any subtree entity that currently carries a [`RouteTree`] but is not a
-	/// bucket this pass — no longer a namespace root (reparented away), or a
-	/// namespace root left with no live routes — has it removed. This closes
-	/// the phantom-tree class: a stale tree that would otherwise keep
-	/// dispatching routes that no longer live there.
-	pub fn rebuild_subtree(
-		root: Entity,
+	/// Lives in the no_std core (rather than as a method on the std-only
+	/// `RouteQuery`) so [`find_router`](crate::prelude::find_router), also
+	/// no_std, can share it; `RouteQuery::resolve_tree` is a thin wrapper
+	/// binding a query's own fields, and [`Self::of`] is the `&World`
+	/// counterpart for a caller holding a `World` rather than live queries.
+	///
+	/// # Errors
+	/// Errors when nothing at or under `entity`'s namespace carries a tree.
+	pub fn resolve<'a>(
+		entity: Entity,
 		ancestors: &Query<&ChildOf>,
 		paths: &Query<&PathPartial>,
 		children_query: &Query<&Children>,
-		actions: &Query<ActionQueryItem, Without<RouteHidden>>,
-		existing_trees: &Query<Entity, With<RouteTree>>,
-		commands: &mut Commands,
-	) -> Result {
-		let mut spaces: Vec<(Entity, Vec<ActionNode>)> = Vec::new();
-		let mut visited: Vec<Entity> = Vec::new();
-		for entity in children_query.iter_descendants_inclusive(root) {
-			visited.push(entity);
-			let Ok(item) = actions.get(entity) else {
-				continue;
-			};
-			let space_root = PathPattern::namespace_root(entity, ancestors, paths);
-			let node = ActionNode::from_query(item);
-			match spaces.iter_mut().find(|(space, _)| *space == space_root) {
-				Some((_, nodes)) => nodes.push(node),
-				None => spaces.push((space_root, vec![node])),
+		trees: &'a Query<&RouteTree>,
+	) -> Result<(Entity, &'a RouteTree)> {
+		let near = PathPattern::namespace_root(entity, ancestors, paths);
+		if let Ok(tree) = trees.get(near) {
+			return Ok((near, tree));
+		}
+		let mut candidates: Vec<(Entity, &RouteTree)> = Vec::new();
+		let mut queue = vec![near];
+		while let Some(entity) = queue.pop() {
+			if let Ok(tree) = trees.get(entity) {
+				candidates.push((entity, tree));
+			}
+			if let Ok(children) = children_query.get(entity) {
+				queue.extend(children.iter());
 			}
 		}
-		for entity in visited {
-			if existing_trees.contains(entity)
-				&& !spaces.iter().any(|(space, _)| *space == entity)
-			{
-				commands.entity(entity).remove::<RouteTree>();
-			}
-		}
-		for (space_root, nodes) in spaces {
-			commands.entity(space_root).insert(Self::from_nodes(nodes)?);
-		}
-		Ok(())
-	}
-
-	/// System wrapper around [`Self::rebuild_subtree`], for callers that only
-	/// hold a bevy system-running handle rather than live queries: the scene
-	/// reparent and scene-despawn call sites, via
-	/// [`run_system_cached_with`](bevy::ecs::world::World::run_system_cached_with).
-	pub fn rebuild(
-		server: In<Entity>,
-		ancestors: Query<&ChildOf>,
-		paths: Query<&PathPartial>,
-		children_query: Query<&Children>,
-		actions: Query<ActionQueryItem, Without<RouteHidden>>,
-		existing_trees: Query<Entity, With<RouteTree>>,
-		mut commands: Commands,
-	) -> Result {
-		Self::rebuild_subtree(
-			*server,
-			&ancestors,
-			&paths,
-			&children_query,
-			&actions,
-			&existing_trees,
-			&mut commands,
-		)
+		candidates
+			.iter()
+			.find(|(_, tree)| tree.serves_pages())
+			.or(candidates.first())
+			.copied()
+			.ok_or_else(|| bevyhow!("no RouteTree at or under {entity}"))
 	}
 
 	/// The [`RouteTree`] at or under `entity`.
@@ -268,11 +252,9 @@ impl RouteTree {
 	/// caller holding the entry root means (rendering, checking, exporting).
 	/// Absent any, the first tree found.
 	///
-	/// The `&World` counterpart of
-	/// [`RouteQuery::resolve_tree`](crate::prelude::RouteQuery::resolve_tree)
-	/// (used from a live system's `Query`s rather than a held `World`): both
-	/// implement the same "prefer serving pages" pick, just over different
-	/// traversal primitives.
+	/// The `&World` counterpart of [`Self::resolve`] (used from a caller
+	/// holding a `World` rather than live `Query`s): both implement the same
+	/// "prefer serving pages" pick, just over different traversal primitives.
 	///
 	/// # Errors
 	/// Errors when nothing at or under `entity` carries a tree.
@@ -446,6 +428,77 @@ impl RouteTree {
 			current = matched?;
 		}
 		Some(current)
+	}
+}
+
+/// Everything a [`RouteTree`] rebuild needs, bundled into one system param so
+/// a caller threads one value instead of five queries and [`Commands`]
+/// separately.
+#[derive(SystemParam)]
+pub struct RouteTreeBuilder<'w, 's> {
+	ancestors: Query<'w, 's, &'static ChildOf>,
+	paths: Query<'w, 's, &'static PathPartial>,
+	children: Query<'w, 's, &'static Children>,
+	actions: Query<'w, 's, ActionQueryItem<'static>, Without<RouteHidden>>,
+	existing_trees: Query<'w, 's, Entity, With<RouteTree>>,
+	commands: Commands<'w, 's>,
+}
+
+impl RouteTreeBuilder<'_, '_> {
+	/// The namespace `entity` belongs to: the nearest ancestor `Router`
+	/// ([`PathPattern::namespace_root`]), else the document root.
+	pub fn namespace_of(&self, entity: Entity) -> Entity {
+		PathPattern::namespace_root(entity, &self.ancestors, &self.paths)
+	}
+
+	/// Every entity that currently carries a [`RouteTree`].
+	pub fn existing_roots(&self) -> impl Iterator<Item = Entity> + '_ {
+		self.existing_trees.iter()
+	}
+
+	/// The one grouping walk every [`RouteTree`] rebuild trigger runs: descend
+	/// `root`'s subtree, bucket every live route by its own
+	/// [`PathPattern::namespace_root`] (a nested `Router` owns its own
+	/// namespace and tree, so its routes never bucket to an ancestor), and
+	/// insert a fresh tree per bucket.
+	///
+	/// Every namespace, not just `root`'s: a mounted scene rooted in its own
+	/// `Router` is a url space of its own, and reparenting is exactly when its
+	/// ancestry (and so its namespace) settles.
+	///
+	/// Any subtree entity that currently carries a [`RouteTree`] but is not a
+	/// bucket this pass — no longer a namespace root (reparented away), or a
+	/// namespace root left with no live routes — has it removed. This closes
+	/// the phantom-tree class: a stale tree that would otherwise keep
+	/// dispatching routes that no longer live there.
+	pub fn rebuild_subtree(&mut self, root: Entity) -> Result {
+		let mut spaces: Vec<(Entity, Vec<ActionNode>)> = Vec::new();
+		let mut visited: Vec<Entity> = Vec::new();
+		for entity in self.children.iter_descendants_inclusive(root) {
+			visited.push(entity);
+			let Ok(item) = self.actions.get(entity) else {
+				continue;
+			};
+			let space_root = self.namespace_of(entity);
+			let node = ActionNode::from_query(item);
+			match spaces.iter_mut().find(|(space, _)| *space == space_root) {
+				Some((_, nodes)) => nodes.push(node),
+				None => spaces.push((space_root, vec![node])),
+			}
+		}
+		for entity in visited {
+			if self.existing_trees.contains(entity)
+				&& !spaces.iter().any(|(space, _)| *space == entity)
+			{
+				self.commands.entity(entity).remove::<RouteTree>();
+			}
+		}
+		for (space_root, nodes) in spaces {
+			self.commands
+				.entity(space_root)
+				.insert(RouteTree::from_nodes(nodes)?);
+		}
+		Ok(())
 	}
 }
 

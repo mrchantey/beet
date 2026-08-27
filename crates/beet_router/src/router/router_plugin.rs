@@ -324,9 +324,9 @@ fn queue_route_tree_rebuild(commands: &mut Commands) {
 }
 
 /// Recomputes every dirty [`RouteTree`] namespace: the one grouping walk
-/// ([`RouteTree::rebuild_subtree`]) that every trigger in this module funnels
-/// into, run once per dirty namespace root rather than once per changed
-/// entity.
+/// ([`RouteTreeBuilder::rebuild_subtree`]) that every trigger in this module
+/// funnels into, run once per dirty namespace root rather than once per
+/// changed entity.
 ///
 /// A live [`PathPattern`]/[`RouteHidden`] insert or mutation dirties its own
 /// enclosing namespace. A removal dirties that namespace too, *if* the entity
@@ -341,44 +341,31 @@ fn rebuild_dirty_route_trees(
 	mut removed_paths: RemovedComponents<PathPattern>,
 	mut removed_hidden: RemovedComponents<RouteHidden>,
 	all_entities: Query<Entity>,
-	ancestors: Query<&ChildOf>,
-	paths: Query<&PathPartial>,
-	children_query: Query<&Children>,
-	actions: Query<ActionQueryItem, Without<RouteHidden>>,
-	existing_trees: Query<Entity, With<RouteTree>>,
-	mut commands: Commands,
+	mut builder: RouteTreeBuilder,
 ) -> Result {
 	let mut dirty: HashSet<Entity> = HashSet::new();
 	let mut sweep_all = false;
 
 	for entity in changed.iter() {
-		dirty.insert(PathPattern::namespace_root(entity, &ancestors, &paths));
+		dirty.insert(builder.namespace_of(entity));
 	}
 	// a removed component leaves the entity itself in place unless it was the
 	// despawn that took it with it; `all_entities` (an unfiltered `Query<Entity>`)
-	// is the only reliable liveness check, since `ancestors`/`paths` fail alike
-	// for "gone" and for "alive but parentless"/"alive but no PathPartial".
+	// is the only reliable liveness check, since ancestry-based lookups fail
+	// alike for "gone" and for "alive but parentless"/"alive but no PathPartial".
 	for entity in removed_paths.read().chain(removed_hidden.read()) {
 		if all_entities.contains(entity) {
-			dirty.insert(PathPattern::namespace_root(entity, &ancestors, &paths));
+			dirty.insert(builder.namespace_of(entity));
 		} else {
 			sweep_all = true;
 		}
 	}
 	if sweep_all {
-		dirty.extend(existing_trees.iter());
+		dirty.extend(builder.existing_roots());
 	}
 
 	for root in dirty {
-		RouteTree::rebuild_subtree(
-			root,
-			&ancestors,
-			&paths,
-			&children_query,
-			&actions,
-			&existing_trees,
-			&mut commands,
-		)?;
+		builder.rebuild_subtree(root)?;
 	}
 	Ok(())
 }
@@ -391,38 +378,22 @@ fn rebuild_dirty_route_trees(
 ///
 /// The load trigger fires synchronously once the hierarchy is whole, so each
 /// affected namespace is recomputed exactly once, through the same
-/// [`RouteTree::rebuild_subtree`] walk, before any async serving begins.
+/// [`RouteTreeBuilder::rebuild_subtree`] walk, before any async serving begins.
 #[cfg(feature = "template_serde")]
 fn rebuild_route_trees_on_load(
 	ev: On<LoadTemplateSerde>,
-	ancestors: Query<&ChildOf>,
-	paths: Query<&PathPartial>,
-	children_query: Query<&Children>,
-	actions: Query<ActionQueryItem, Without<RouteHidden>>,
-	existing_trees: Query<Entity, With<RouteTree>>,
-	mut commands: Commands,
+	mut builder: RouteTreeBuilder,
 ) -> Result {
 	// collect unique namespace roots so we rebuild each tree at most once. A
 	// nested `Router` is its own url space, so the rebuild must land per
 	// namespace, not once on the document root.
-	let mut roots: Vec<Entity> = ev
-		.entities
-		.iter()
-		.map(|entity| PathPattern::namespace_root(*entity, &ancestors, &paths))
-		.collect();
+	let mut roots: Vec<Entity> =
+		ev.entities.iter().map(|entity| builder.namespace_of(*entity)).collect();
 	roots.sort();
 	roots.dedup();
 
 	for root in roots {
-		RouteTree::rebuild_subtree(
-			root,
-			&ancestors,
-			&paths,
-			&children_query,
-			&actions,
-			&existing_trees,
-			&mut commands,
-		)?;
+		builder.rebuild_subtree(root)?;
 	}
 	Ok(())
 }

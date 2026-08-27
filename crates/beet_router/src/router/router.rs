@@ -37,13 +37,21 @@ pub struct Router;
 /// Each `Router` is a url space of its own, and an entry can hold several (a
 /// command dispatcher whose site is one of its routes), so the one that serves
 /// PAGES wins: that is the site a caller holding the entry root means. Absent
-/// any, the first router found. A thin wrapper over
-/// [`RouteQuery::resolve_tree`], the shared "which url space is THE site" pick.
+/// any, the first router found. A thin wrapper over [`RouteTree::resolve`],
+/// the shared "which url space is THE site" pick — this lives in the no_std
+/// core, so it takes plain queries rather than the std-only `RouteQuery`.
 ///
 /// # Errors
 /// Errors when no [`Router`] is at or under `root`.
-pub fn find_router(In(root): In<Entity>, route_query: RouteQuery) -> Result<Entity> {
-	route_query.resolve_tree(root).map(|(entity, _)| entity)
+pub fn find_router(
+	In(root): In<Entity>,
+	ancestors: Query<&ChildOf>,
+	paths: Query<&PathPartial>,
+	children: Query<&Children>,
+	trees: Query<&RouteTree>,
+) -> Result<Entity> {
+	RouteTree::resolve(root, &ancestors, &paths, &children, &trees)
+		.map(|(entity, _)| entity)
 }
 
 /// A markup-spawnable route: its `path` prop becomes a [`PathPartial`], and its
