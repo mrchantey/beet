@@ -136,18 +136,15 @@ impl RdsPostgresBlock {
 	}
 
 	/// The SSM parameter the master password lives in, ie
-	/// `/beetmash/prod/db-password`. The stack's own `app--stage--label`
-	/// composition with its separators as slashes, so parameter store nests the
-	/// stack's secrets under a prefix an IAM policy can grant in one statement.
+	/// `/beetmash/prod/db-password`: the [`DatabaseRef`] composition unless
+	/// [`secret`](Self::with_secret) overrides it. An override changes only what
+	/// this block grants; a consumer composing through the ref will not follow
+	/// it, so overriding is for a password managed outside this stack entirely.
 	pub fn secret_name(&self, stack: &ResolvedStack) -> String {
-		self.secret.clone().map(Into::into).unwrap_or_else(|| {
-			format!(
-				"/{}",
-				stack
-					.resource_name(format!("{}-password", self.label))
-					.replace("--", "/")
-			)
-		})
+		self.secret
+			.clone()
+			.map(Into::into)
+			.unwrap_or_else(|| self.database_ref().secret_name(stack))
 	}
 
 	/// Names for RDS, which does not take the usual `app--stage--label`: an
@@ -430,6 +427,24 @@ impl DatabaseRef {
 	/// [`RdsPostgresBlock`] declares for itself.
 	pub fn security_group(&self) -> SecurityGroupRef {
 		SecurityGroupRef::new(self.label.clone())
+	}
+
+	/// The SSM parameter the master password lives in, ie
+	/// `/beetmash/prod/db-password`: the stack's own `app--stage--label`
+	/// composition with its separators as slashes, so parameter store nests the
+	/// stack's secrets under a prefix an IAM policy can grant in one statement.
+	///
+	/// On the ref rather than the block for the same reason the terraform
+	/// addresses are: the consumer's boot script reads this name and the
+	/// declaring block grants it, and one composition keeps the two from
+	/// drifting.
+	pub fn secret_name(&self, stack: &ResolvedStack) -> String {
+		format!(
+			"/{}",
+			stack
+				.resource_name(format!("{}-password", self.label))
+				.replace("--", "/")
+		)
 	}
 }
 

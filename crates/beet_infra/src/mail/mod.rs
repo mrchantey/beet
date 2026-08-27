@@ -11,3 +11,5 @@ mod member;
 pub use member::*;
 mod mta_sts;
 pub use mta_sts::*;
+mod stalwart_block;
+pub use stalwart_block::*;

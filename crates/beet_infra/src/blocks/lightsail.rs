@@ -361,8 +361,8 @@ impl LightsailBlock {
 
 	/// The CloudWatch log group the instance forwards its app logs to, the
 	/// single source of truth shared by the cloud-init agent config and
-	/// [`AwsWatch::for_lightsail`](crate::prelude::AwsWatch::for_lightsail).
-	/// Includes the label so distinct blocks in one stack do not collide.
+	/// `WatchTarget::Instance`. Includes the label so distinct blocks in one
+	/// stack do not collide.
 	pub fn log_group(&self, stack: &ResolvedStack) -> String {
 		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
 	}

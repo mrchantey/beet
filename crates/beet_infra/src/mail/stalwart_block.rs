@@ -1,0 +1,1518 @@
+use crate::bindings::*;
+use crate::mail::*;
+use crate::prelude::*;
+use crate::terra::ResourceDef;
+use beet_core::prelude::*;
+use heck::ToUpperCamelCase;
+use serde_json::Value;
+use serde_json::json;
+
+/// The mail box: one EC2 instance running a pinned [Stalwart] release, holding
+/// no state worth keeping. Mail metadata lives in the stack's
+/// [`RdsPostgresBlock`] and message bodies in its blob [`S3BucketBlock`], so the
+/// instance is cattle: any machine-config change replaces it, and inbound SMTP
+/// during the rebuild is covered by sender retries.
+///
+/// The box is infrastructure, not a mail domain. Its `hostname` (the `A` record
+/// this block emits, its rDNS, its certificate, its SMTP banner) stays put
+/// while the [`MailDomainBlock`]s it serves come and go, which is what makes a
+/// domain cutover a records change rather than a server move.
+///
+/// ## What is machine config and what is not
+///
+/// Stalwart `0.16` split its configuration in two, and this block follows the
+/// split exactly. The on-disk `config.json` holds ONLY the stores (data, fts
+/// and in-memory on Postgres, blobs on S3); everything else — listeners, ACME,
+/// the SES relay route, the spam filter, domains and accounts — lives *inside*
+/// the data store as JMAP objects and is reconciled over the management API
+/// (`StalwartProvision`). So a freshly built box boots in Stalwart's bootstrap
+/// mode, serving only the management endpoint until provision configures it,
+/// and reconfiguring a running server never touches this block at all.
+///
+/// ## The rebuild rule
+///
+/// Everything rendered into user_data is machine identity, and any change to it
+/// replaces the instance (`user_data_replace_on_change`). Secrets are therefore
+/// deliberately absent: the boot script fetches them from SSM parameter store
+/// through the instance profile at every service start, so a credential
+/// rotation is `systemctl restart stalwart` rather than a rebuild, and the
+/// rendered script holds parameter *names* only.
+///
+/// [Stalwart]: https://stalw.art
+#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
+#[component(immutable, on_add = ErasedBlock::on_add::<StalwartBlock>)]
+pub struct StalwartBlock {
+	/// Label prefixing every terraform resource, and the label of the
+	/// [`SecurityGroupRef`] this block declares, ie the one the database's
+	/// `with_consumer` admits.
+	label: SmolStr,
+	/// The box's fqdn, ie `mail.beetmash.com`: the `A` record, the rDNS target,
+	/// the ACME certificate subject and the SMTP banner.
+	hostname: SmolStr,
+	/// The [`VpcBlock`] network the box lives in, by label. Its first PUBLIC
+	/// subnet: an MTA is reachable from the internet by definition.
+	#[set_with(skip)]
+	vpc: VpcRef,
+	/// The [`RdsPostgresBlock`] holding mail metadata, by label. The connection
+	/// host rides terraform into machine config (a non-secret ref); the
+	/// password rides SSM at boot.
+	#[set_with(skip)]
+	database: DatabaseRef,
+	/// The logical database and role inside that instance, which must match the
+	/// `RdsPostgresBlock` declaration; the entry authoring both blocks passes
+	/// one value to each.
+	db_name: SmolStr,
+	db_user: SmolStr,
+	/// The [`S3BucketBlock`] holding message bodies, by label. Declare it
+	/// `with_runtime_write(true)` so the grant this block lowers can store.
+	blob_bucket: SmolStr,
+	/// The zone the box's `A` record is published into. Must be DNS-only: SMTP,
+	/// IMAP and ACME TLS-ALPN-01 all need the origin reached directly, so a
+	/// proxied record is a config-time error rather than a mystery outage.
+	#[get(skip)]
+	#[set_with(unwrap_option)]
+	dns: Option<DnsProvider>,
+	/// The SSH public key installed as the box's key pair. A public half only;
+	/// the private key never touches this stack.
+	ssh_public_key: SmolStr,
+	instance_type: SmolStr,
+	/// Root EBS volume size in GB, encrypted gp3.
+	volume_gb: i64,
+}
+
+impl Default for StalwartBlock {
+	fn default() -> Self { Self::new("", "") }
+}
+
+impl StalwartBlock {
+	/// The pinned Stalwart release. Bump deliberately with a changelog read:
+	/// minors have carried config migrations, and `0.16` replaced the entire
+	/// configuration model.
+	pub const STALWART_VERSION: &'static str = "0.16.19";
+	/// sha256 of [`STALWART_TARBALL`](Self::STALWART_TARBALL), so the boot
+	/// script refuses a tarball GitHub did not serve at pin time.
+	pub const STALWART_SHA256: &'static str =
+		"a783283996616ed28e23b9ca98b8934fbaf1e0e371fcdd47e238a3065a95c853";
+	/// The release asset for the Graviton box: a single static `stalwart`
+	/// binary.
+	pub const STALWART_TARBALL: &'static str =
+		"stalwart-aarch64-unknown-linux-musl.tar.gz";
+
+	/// The open ports, and nothing else: management (8080 in bootstrap mode)
+	/// stays closed and is reached over the SSH port when provision needs it.
+	pub const OPEN_PORTS: &'static [(i64, &'static str)] = &[
+		(22, "ssh"),
+		(25, "smtp"),
+		(443, "https"),
+		(465, "submissions"),
+		(587, "submission"),
+		(993, "imaps"),
+	];
+
+	/// The smallest Graviton instance with enough memory for an MTA plus its
+	/// spam classifier.
+	pub const INSTANCE_TYPE: &'static str = "t4g.small";
+
+	/// The SSM public parameter naming the current AL2023 arm64 AMI. Resolved
+	/// per apply, so an AMI release replaces the box on the next deploy: the
+	/// cattle answer, and the patched-kernel answer.
+	pub const AMI_PARAMETER: &'static str =
+		"/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64";
+
+	/// The bootstrap admin username the box's `stalwart.env` declares, valid
+	/// until provision creates a real admin account.
+	pub const ADMIN_USER: &'static str = "admin";
+
+	pub fn new(
+		label: impl Into<SmolStr>,
+		hostname: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			label: label.into(),
+			hostname: hostname.into(),
+			vpc: VpcRef::default(),
+			database: DatabaseRef::default(),
+			db_name: "mail".into(),
+			db_user: "postgres".into(),
+			blob_bucket: SmolStr::default(),
+			dns: None,
+			ssh_public_key: SmolStr::default(),
+			instance_type: Self::INSTANCE_TYPE.into(),
+			volume_gb: 30,
+		}
+	}
+
+	/// Name the [`VpcBlock`] by label.
+	pub fn with_vpc(mut self, label: impl Into<SmolStr>) -> Self {
+		self.vpc = VpcRef::new(label);
+		self
+	}
+
+	/// Name the [`RdsPostgresBlock`] by label.
+	pub fn with_database(mut self, label: impl Into<SmolStr>) -> Self {
+		self.database = DatabaseRef::new(label);
+		self
+	}
+
+	/// The security group this block declares, ie the label a database's
+	/// `with_consumer` names to admit the box.
+	pub fn security_group(&self) -> SecurityGroupRef {
+		SecurityGroupRef::new(self.label.clone())
+	}
+
+	/// The CloudWatch log group the box's agent forwards `stalwart.log` to,
+	/// shared with `WatchTarget::Instance` so `watch` tails the same group.
+	pub fn log_group(&self, stack: &ResolvedStack) -> String {
+		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
+	}
+
+	/// An SSM parameter under the stack's secret prefix, ie
+	/// `/beetmash/prod/mail-admin-password`: the `app--stage--label`
+	/// composition with its separators as slashes, matching
+	/// [`DatabaseRef::secret_name`].
+	fn secret_name(&self, stack: &ResolvedStack, suffix: &str) -> String {
+		format!(
+			"/{}",
+			stack
+				.resource_name(format!("{}-{suffix}", self.label))
+				.replace("--", "/")
+		)
+	}
+
+	/// The parameter directory every secret of this stack sits under, ie
+	/// `/beetmash/prod`, which is what lets the instance role grant them in one
+	/// statement.
+	fn secret_prefix(&self, stack: &ResolvedStack) -> String {
+		let name = self.secret_name(stack, "x");
+		name.rsplit_once('/')
+			.map(|(prefix, _)| prefix)
+			.unwrap_or("")
+			.to_string()
+	}
+
+	/// Where `EnsureSecret` puts the bootstrap admin password and the boot
+	/// script reads it back.
+	pub fn admin_secret_name(&self, stack: &ResolvedStack) -> String {
+		self.secret_name(stack, "admin-password")
+	}
+
+	/// Where terraform puts the SES SMTP username (the sending user's access
+	/// key id). Read by `StalwartProvision` when it writes the relay route, not
+	/// by the box.
+	pub fn ses_smtp_user_secret_name(&self, stack: &ResolvedStack) -> String {
+		self.secret_name(stack, "ses-smtp-user")
+	}
+
+	/// Where terraform puts the SES SMTP password, derived from the access key
+	/// (`ses_smtp_password_v4`) so it exists nowhere else.
+	pub fn ses_smtp_password_secret_name(
+		&self,
+		stack: &ResolvedStack,
+	) -> String {
+		self.secret_name(stack, "ses-smtp-password")
+	}
+
+	/// The regional SES SMTP endpoint the relay route submits to, port 587
+	/// STARTTLS.
+	pub fn ses_smtp_endpoint(stack: &ResolvedStack) -> String {
+		format!("email-smtp.{}.amazonaws.com", stack.region())
+	}
+
+	fn build_label(&self, suffix: &str) -> String {
+		format!("{}--{suffix}", self.label)
+	}
+
+	fn tags(
+		&self,
+		stack: &ResolvedStack,
+		kind: &str,
+	) -> std::collections::BTreeMap<SmolStr, SmolStr> {
+		[
+			(
+				SmolStr::from("Name"),
+				self.build_label(kind).as_str().into(),
+			),
+			(SmolStr::from("Project"), stack.app_name().clone()),
+			(SmolStr::from("Stage"), stack.stage().clone()),
+		]
+		.into_iter()
+		.collect()
+	}
+
+	/// Reject a declaration that cannot serve mail, at config time.
+	pub fn validate(&self) -> Result {
+		if self.vpc.label().is_empty() {
+			bevybail!(
+				"mail box '{}' names no vpc: `with_vpc` the network it lives in",
+				self.label
+			);
+		}
+		if self.database.label().is_empty() {
+			bevybail!(
+				"mail box '{}' names no database: `with_database` the RdsPostgresBlock holding mail metadata",
+				self.label
+			);
+		}
+		if self.blob_bucket.is_empty() {
+			bevybail!(
+				"mail box '{}' names no blob bucket: `with_blob_bucket` the S3BucketBlock holding message bodies",
+				self.label
+			);
+		}
+		if self.ssh_public_key.is_empty() {
+			bevybail!(
+				"mail box '{}' has no ssh public key: port 22 is keypair-only, so a box without one is unreachable",
+				self.label
+			);
+		}
+		for label in self.hostname.split('.') {
+			validate_dns_label(label, "mail box hostname")?;
+		}
+		#[cfg(feature = "cloudflare_dns")]
+		if let Some(DnsProvider::Cloudflare { proxied: true, .. }) = &self.dns {
+			bevybail!(
+				"mail box '{}' must not be Cloudflare-proxied: SMTP, IMAP and ACME TLS-ALPN-01 all dial the origin directly",
+				self.label
+			);
+		}
+		Ok(())
+	}
+}
+
+impl Block for StalwartBlock {
+	fn apply_to_config(
+		&self,
+		_entity: &EntityRef,
+		stack: &ResolvedStack,
+		_deployment: &Deployment,
+		access: &AccessGrants,
+		config: &mut terra::Config,
+	) -> Result {
+		self.validate()?;
+		let group = self.emit_security_group(stack, config)?;
+		let role = self.emit_instance_role(stack, config, access)?;
+		self.emit_ses_sender(stack, config)?;
+		self.emit_instance(stack, config, &group, &role)?;
+		Ok(())
+	}
+}
+
+impl StalwartBlock {
+	/// The box's security group: the mail port list in, everything out (an MTA
+	/// dials the world: peer MTAs on 25, SES on 587, S3, SSM, ACME, GitHub).
+	fn emit_security_group(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+	) -> Result<ResourceDef<AwsSecurityGroupDetails>> {
+		let group = ResourceDef::new_primary(
+			self.security_group().ident(stack),
+			AwsSecurityGroupDetails {
+				description: Some(
+					format!("Mail box ports for {}", self.label).into(),
+				),
+				vpc_id: Some(self.vpc.id(stack).into()),
+				tags: Some(self.tags(stack, SecurityGroupRef::KIND)),
+				..default()
+			},
+		);
+		config.add_resource(&group)?;
+		for (port, service) in Self::OPEN_PORTS {
+			config.add_resource(&ResourceDef::new_secondary(
+				stack
+					.resource_ident(self.build_label(&format!("in-{service}"))),
+				AwsSecurityGroupRuleDetails {
+					security_group_id: group.field_ref("id").into(),
+					r#type: "ingress".into(),
+					from_port: *port,
+					to_port: *port,
+					protocol: "tcp".into(),
+					cidr_blocks: Some(vec!["0.0.0.0/0".into()]),
+					ipv6_cidr_blocks: Some(vec!["::/0".into()]),
+					description: Some(SmolStr::from(*service)),
+					..default()
+				},
+			))?;
+		}
+		config.add_resource(&ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("out-all")),
+			AwsSecurityGroupRuleDetails {
+				security_group_id: group.field_ref("id").into(),
+				r#type: "egress".into(),
+				from_port: 0,
+				to_port: 0,
+				protocol: "-1".into(),
+				cidr_blocks: Some(vec!["0.0.0.0/0".into()]),
+				ipv6_cidr_blocks: Some(vec!["::/0".into()]),
+				description: Some("an MTA dials the world".into()),
+				..default()
+			},
+		))?;
+		group.xok()
+	}
+
+	/// The instance role: what a compromised box can do, in full. LOWERED from
+	/// the [`AccessGrants`] the stack's blocks declared, plus the two grants
+	/// nothing declares because this block owns them (the stack's secret prefix
+	/// and its own log group).
+	///
+	/// This is the improvement over [`LightsailBlock`]'s static key: EC2
+	/// carries a role through the instance profile, so no long-lived credential
+	/// exists at all and IMDSv2 is the only place short-lived ones come from.
+	fn emit_instance_role(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		access: &AccessGrants,
+	) -> Result<ResourceDef<AwsIamInstanceProfileDetails>> {
+		let role = ResourceDef::new_primary(
+			stack.resource_ident(self.build_label("role")),
+			AwsIamRoleDetails {
+				assume_role_policy: json!({
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": { "Service": "ec2.amazonaws.com" },
+						"Action": "sts:AssumeRole"
+					}]
+				})
+				.to_string()
+				.into(),
+				..default()
+			},
+		);
+		let policy_ident = stack.resource_ident(self.build_label("policy"));
+		let policy = ResourceDef::new_secondary(
+			policy_ident.clone(),
+			AwsIamRolePolicyDetails {
+				name: Some(policy_ident.primary_identifier().clone()),
+				role: role.field_ref("name").into(),
+				policy: self.runtime_policy(stack, access)?.into(),
+				..default()
+			},
+		);
+		let profile_ident = stack.resource_ident(self.build_label("profile"));
+		let profile = ResourceDef::new_secondary(
+			profile_ident.clone(),
+			AwsIamInstanceProfileDetails {
+				name: Some(profile_ident.primary_identifier().clone()),
+				role: Some(role.field_ref("name").into()),
+				..default()
+			},
+		);
+		config
+			.add_resource(&role)?
+			.add_resource(&policy)?
+			.add_resource(&profile)?;
+		profile.xok()
+	}
+
+	/// The inline policy document. SecureString decryption needs no `kms:`
+	/// statement here: the AWS-managed `aws/ssm` key authorises account
+	/// principals through its own key policy for requests made via SSM.
+	fn runtime_policy(
+		&self,
+		stack: &ResolvedStack,
+		access: &AccessGrants,
+	) -> Result<String> {
+		let region = stack.region();
+		let mut statements = Vec::new();
+
+		// the stack's own secret prefix in one statement (the reason the names
+		// compose with slashes at all): the db password, the admin password,
+		// the SES SMTP pair, and whatever EnsureSecret adds later.
+		statements.push(json!({
+			"Sid": "StackSecrets",
+			"Effect": "Allow",
+			"Action": ["ssm:GetParameter"],
+			"Resource": format!(
+				"arn:aws:ssm:{region}:*:parameter{}/*",
+				self.secret_prefix(stack)
+			)
+		}));
+
+		// group the declared grants by kind. A kind this compute cannot lower
+		// FAILS the deploy naming it: a grant silently dropped is a box that
+		// serves until the first request touching that resource.
+		let mut parameters = Vec::new();
+		let mut read_buckets = Vec::new();
+		let mut write_buckets = Vec::new();
+		for grant in access.iter() {
+			match grant.kind.as_str() {
+				RdsPostgresBlock::ACCESS_KIND => {
+					parameters.push(grant.name.as_str())
+				}
+				S3BucketBlock::ACCESS_KIND => {
+					read_buckets.push(grant.name.as_str());
+					if grant.permissions == AccessPermissions::ReadWrite {
+						write_buckets.push(grant.name.as_str());
+					}
+				}
+				kind => bevybail!(
+					"a `{kind}` resource was declared alongside this stalwart \
+					box, which has no IAM lowering for that kind. Add one to \
+					`StalwartBlock::runtime_policy`, or declare the resource \
+					in a stack this compute does not deploy into."
+				),
+			}
+		}
+
+		// any declared parameter living OUTSIDE the prefix (an overridden
+		// secret name); usually redundant with the prefix and harmlessly so.
+		// Every ARN takes its region from the stack, the one place a region
+		// is answered.
+		for name in &parameters {
+			statements.push(json!({
+				"Sid": "DeclaredParameters",
+				"Effect": "Allow",
+				"Action": ["ssm:GetParameter"],
+				"Resource": format!("arn:aws:ssm:{region}:*:parameter{name}")
+			}));
+		}
+
+		// every declared bucket readable, and write actions only where the
+		// declaration said the process stores (the blob bucket).
+		if !read_buckets.is_empty() {
+			statements.push(json!({
+				"Sid": "ReadStores",
+				"Effect": "Allow",
+				"Action": ["s3:GetObject", "s3:ListBucket"],
+				"Resource": read_buckets
+					.iter()
+					.flat_map(|bucket| [
+						format!("arn:aws:s3:::{bucket}"),
+						format!("arn:aws:s3:::{bucket}/*"),
+					])
+					.collect::<Vec<_>>()
+			}));
+		}
+		if !write_buckets.is_empty() {
+			statements.push(json!({
+				"Sid": "WriteStores",
+				"Effect": "Allow",
+				"Action": [
+					"s3:PutObject",
+					"s3:DeleteObject",
+					"s3:AbortMultipartUpload"
+				],
+				"Resource": write_buckets
+					.iter()
+					.map(|bucket| format!("arn:aws:s3:::{bucket}/*"))
+					.collect::<Vec<_>>()
+			}));
+		}
+
+		// the box's own log group, for the CloudWatch agent
+		let log_group = self.log_group(stack);
+		statements.push(json!({
+			"Sid": "OwnLogGroup",
+			"Effect": "Allow",
+			"Action": [
+				"logs:CreateLogStream",
+				"logs:PutLogEvents",
+				"logs:DescribeLogStreams"
+			],
+			"Resource": [
+				format!("arn:aws:logs:{region}:*:log-group:{log_group}"),
+				format!("arn:aws:logs:{region}:*:log-group:{log_group}:*")
+			]
+		}));
+
+		json!({ "Version": "2012-10-17", "Statement": statements })
+			.to_string()
+			.xok()
+	}
+
+	/// The SES sending identity: an IAM user whose only permission is
+	/// `ses:SendRawEmail`, whose access key IS the SMTP credential
+	/// (`ses_smtp_password_v4` derives the password from the secret), parked in
+	/// SSM for `StalwartProvision` to write into the relay route.
+	///
+	/// A user rather than the instance role because SES SMTP authentication is
+	/// a static credential by protocol; scoping it to one action on one service
+	/// is what bounds the loss if it leaks. The parameter values are terraform
+	/// interpolations, so the secret transits state and nothing else, which is
+	/// what the stack's state encryption is for.
+	fn emit_ses_sender(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+	) -> Result {
+		let user = ResourceDef::new_primary(
+			stack.resource_ident(self.build_label("ses-user")),
+			AwsIamUserDetails::default(),
+		);
+		let policy_ident = stack.resource_ident(self.build_label("ses-policy"));
+		let policy = ResourceDef::new_secondary(
+			policy_ident.clone(),
+			AwsIamUserPolicyDetails {
+				name: Some(policy_ident.primary_identifier().clone()),
+				user: user.field_ref("name").into(),
+				// every identity in the account: identities are per-domain
+				// blocks and this user sends for all of them.
+				policy: json!({
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Sid": "SesSmtpRelay",
+						"Effect": "Allow",
+						"Action": "ses:SendRawEmail",
+						"Resource": "*"
+					}]
+				})
+				.to_string()
+				.into(),
+				..default()
+			},
+		);
+		let key = ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("ses-key")),
+			AwsIamAccessKeyDetails {
+				user: user.field_ref("name").into(),
+				..default()
+			},
+		);
+		let user_param = ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("ses-smtp-user")),
+			AwsSsmParameterDetails {
+				name: self.ses_smtp_user_secret_name(stack).into(),
+				r#type: "SecureString".into(),
+				value: Some(key.field_ref("id").into()),
+				..default()
+			},
+		);
+		let password_param = ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("ses-smtp-password")),
+			AwsSsmParameterDetails {
+				name: self.ses_smtp_password_secret_name(stack).into(),
+				r#type: "SecureString".into(),
+				value: Some(key.field_ref("ses_smtp_password_v4").into()),
+				..default()
+			},
+		);
+		config
+			.add_resource(&user)?
+			.add_resource(&policy)?
+			.add_resource(&key)?
+			.add_resource(&user_param)?
+			.add_resource(&password_param)?;
+		Ok(())
+	}
+
+	/// The box itself: AMI resolved from the public AL2023 arm64 pointer, key
+	/// pair, encrypted root, IMDSv2 required, user_data as machine identity,
+	/// an EIP so the address (and its rDNS) survives every rebuild, the log
+	/// group its agent forwards to, and the `A` record naming it.
+	fn emit_instance(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		group: &ResourceDef<AwsSecurityGroupDetails>,
+		profile: &ResourceDef<AwsIamInstanceProfileDetails>,
+	) -> Result {
+		let ami_label = stack
+			.resource_ident(self.build_label("ami"))
+			.label()
+			.to_string();
+		config.add_untyped_data_source(
+			"aws_ssm_parameter",
+			&ami_label,
+			&json!({ "name": Self::AMI_PARAMETER }),
+		)?;
+
+		// `key_name_prefix` so a rotated public key is a NEW key pair name,
+		// which forces instance replacement: EC2 only installs the key at
+		// launch, so an in-place key update would be silently ignored.
+		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
+		let keypair = ResourceDef::new_secondary(
+			keypair_ident.clone(),
+			AwsKeyPairDetails {
+				key_name_prefix: Some(
+					keypair_ident.primary_identifier().clone(),
+				),
+				public_key: self.ssh_public_key.clone(),
+				..default()
+			},
+		);
+
+		// declared so `tofu destroy` removes it; the agent writes into the
+		// existing group rather than auto-creating an unmanaged one.
+		let log_group = ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("logs")),
+			AwsCloudwatchLogGroupDetails {
+				name: Some(self.log_group(stack).into()),
+				retention_in_days: Some(30),
+				..default()
+			},
+		);
+
+		let user_data = self.build_user_data(stack)?;
+		let instance_ident = stack.resource_ident(self.build_label("instance"));
+		let instance = ResourceDef::new_secondary(
+			instance_ident.clone(),
+			AwsInstanceDetails {
+				ami: Some(
+					format!("${{data.aws_ssm_parameter.{ami_label}.value}}")
+						.into(),
+				),
+				instance_type: Some(self.instance_type.clone()),
+				subnet_id: Some(
+					self.vpc.subnet_id(stack, SubnetTier::Public, "a").into(),
+				),
+				vpc_security_group_ids: Some(vec![
+					group.field_ref("id").into(),
+				]),
+				key_name: Some(keypair.field_ref("key_name").into()),
+				iam_instance_profile: Some(profile.field_ref("name").into()),
+				user_data: Some(user_data),
+				// the rebuild rule: an edited machine is a new machine.
+				user_data_replace_on_change: Some(true),
+				metadata_options: Some(vec![
+					AwsInstanceResourceBlockTypeMetadataOptions {
+						http_endpoint: Some("enabled".into()),
+						// IMDSv2 only: an SSRF against a mail-adjacent web
+						// surface must not read the role's credentials.
+						http_tokens: Some("required".into()),
+						..default()
+					},
+				]),
+				root_block_device: Some(vec![
+					AwsInstanceResourceBlockTypeRootBlockDevice {
+						volume_size: Some(self.volume_gb),
+						volume_type: Some("gp3".into()),
+						encrypted: Some(true),
+						..default()
+					},
+				]),
+				tags: Some(self.tags(stack, "instance")),
+				..default()
+			},
+		);
+
+		// an EIP association fails while the vpc has no attached gateway, and
+		// terraform cannot see that dependency through the label reference.
+		let eip_ident = stack.resource_ident(self.build_label("eip"));
+		let eip = ResourceDef::new_secondary(eip_ident, AwsEipDetails {
+			domain: Some("vpc".into()),
+			tags: Some(self.tags(stack, "eip")),
+			depends_on: Some(vec![
+				format!(
+					"aws_internet_gateway.{}",
+					self.vpc.ident(stack, VpcRef::GATEWAY).label()
+				)
+				.into(),
+			]),
+			..default()
+		});
+		let association = ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("eip-assoc")),
+			AwsEipAssociationDetails {
+				allocation_id: Some(eip.field_ref("id").into()),
+				instance_id: Some(instance.field_ref("id").into()),
+				..default()
+			},
+		);
+
+		config
+			.add_resource(&keypair)?
+			.add_resource(&log_group)?
+			.add_resource(&instance)?
+			.add_resource(&eip)?
+			.add_resource(&association)?;
+
+		if let Some(dns) = &self.dns {
+			dns.emit_address(
+				stack,
+				config,
+				&self.build_label("dns"),
+				&eip.field_ref("public_ip"),
+				false,
+			)?;
+		}
+
+		config
+			.add_output(format!("{}_public_ip", self.label), terra::Output {
+				value: json!(eip.field_ref("public_ip")),
+				description: Some("The mail box public address".into()),
+				sensitive: None,
+			})?
+			.add_output(
+				format!("{}_eip_allocation", self.label),
+				terra::Output {
+					value: json!(eip.field_ref("id")),
+					description: Some(
+						"The EIP allocation id, ie what EipReverseDns sets the PTR on"
+							.into(),
+					),
+					sensitive: None,
+				},
+			)?
+			.add_output(format!("{}_instance_id", self.label), terra::Output {
+				value: json!(instance.field_ref("id")),
+				description: Some("The mail box instance id".into()),
+				sensitive: None,
+			})?;
+		Ok(())
+	}
+}
+
+/// The machine config renderers. Everything here lands in user_data, so
+/// everything here obeys the rebuild rule; see the type docs.
+impl StalwartBlock {
+	/// The on-disk `config.json`, as a template: exactly Stalwart `0.16`'s
+	/// store description and nothing else, with the auth secret left as
+	/// `None` for [`secrets_script`](Self::secrets_script) to fill from SSM at
+	/// every start. The Postgres host is a terraform ref (non-secret), so a
+	/// replaced database instance rebuilds the box that points at it.
+	///
+	/// `allowInvalidCerts` is deliberate, not lazy: RDS presents a certificate
+	/// from Amazon's private RDS CA, which no default trust store carries. The
+	/// session is TLS inside a private subnet either way; pinning the RDS CA
+	/// bundle is a hardening follow-up.
+	fn store_config_template(&self, stack: &ResolvedStack) -> Value {
+		let none = json!({ "@type": "None" });
+		let postgres = json!({
+			"@type": "PostgreSql",
+			"host": "__DB_HOST__",
+			"port": RdsPostgresBlock::PORT,
+			"database": self.db_name,
+			"authUsername": self.db_user,
+			"authSecret": none,
+			"useTls": true,
+			"allowInvalidCerts": true
+		});
+		json!({
+			"DataStore": postgres,
+			"SearchStore": postgres,
+			"InMemoryStore": postgres,
+			"BlobStore": {
+				"@type": "S3",
+				"bucket": stack.resource_name(self.blob_bucket.clone()),
+				// no static credential anywhere on this box: the S3 client
+				// falls through its chain to the instance profile.
+				"accessKey": none,
+				"secretKey": none,
+				"securityToken": none,
+				"region": {
+					"@type": stack.region().to_upper_camel_case()
+				}
+			}
+		})
+	}
+
+	/// The boot script at `/usr/local/bin/stalwart-secrets`, run before every
+	/// service start: read the secrets from SSM through the instance profile,
+	/// render `config.json` from the template and the bootstrap admin
+	/// credential into `stalwart.env`. Rotation is therefore a restart.
+	///
+	/// The JSON splice goes through python (present in the AL2023 base AMI)
+	/// rather than sed, so a password is escaped as data and can never be
+	/// interpreted as pattern syntax.
+	fn secrets_script(&self, stack: &ResolvedStack) -> String {
+		let template = r#"#!/bin/bash
+# Render the secret-bearing config from SSM parameter store, at every start.
+set -euo pipefail
+umask 077
+get() { aws ssm get-parameter --region '__REGION__' --name "$1" --with-decryption --query Parameter.Value --output text; }
+db_password="$(get '__DB_SECRET__')"
+admin_password="$(get '__ADMIN_SECRET__')"
+python3 - "$db_password" <<'PY' > /etc/stalwart/config.json.next
+import json, sys
+with open("/etc/stalwart/config.json.template") as file:
+    config = json.load(file)
+secret = {"@type": "Value", "secret": sys.argv[1]}
+for store in ("DataStore", "SearchStore", "InMemoryStore"):
+    if store in config:
+        config[store]["authSecret"] = secret
+json.dump(config, sys.stdout)
+PY
+mv -f /etc/stalwart/config.json.next /etc/stalwart/config.json
+printf 'STALWART_RECOVERY_ADMIN=__ADMIN_USER__:%s\n' "$admin_password" > /etc/stalwart/stalwart.env.next
+mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
+"#;
+		let db_secret = self.database.secret_name(stack);
+		let admin_secret = self.admin_secret_name(stack);
+		[
+			("__REGION__", stack.region().as_str()),
+			("__DB_SECRET__", db_secret.as_str()),
+			("__ADMIN_SECRET__", admin_secret.as_str()),
+			("__ADMIN_USER__", Self::ADMIN_USER),
+		]
+		.iter()
+		.fold(template.to_string(), |script, (token, value)| {
+			script.replace(token, value)
+		})
+		.trim_end()
+		.to_string()
+	}
+
+	/// The systemd unit, modeled on the one Stalwart ships: unprivileged user
+	/// with `CAP_NET_BIND_SERVICE` for the sub-1024 mail ports, SIGINT for a
+	/// clean queue shutdown, secrets re-rendered on every start, and the log
+	/// appended where the CloudWatch agent tails it.
+	fn systemd_unit(&self) -> String {
+		r#"[Unit]
+Description=Stalwart Server
+Conflicts=postfix.service sendmail.service exim4.service
+After=network-online.target
+
+[Service]
+Type=simple
+LimitNOFILE=65536
+KillMode=process
+KillSignal=SIGINT
+Restart=on-failure
+RestartSec=5
+User=stalwart
+Group=stalwart
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ExecStartPre=/usr/local/bin/stalwart-secrets
+EnvironmentFile=/etc/stalwart/stalwart.env
+ExecStart=/usr/local/bin/stalwart --config=/etc/stalwart/config.json
+StandardOutput=append:/var/log/stalwart/stalwart.log
+StandardError=append:/var/log/stalwart/stalwart.log
+
+[Install]
+WantedBy=multi-user.target"#
+			.to_string()
+	}
+
+	/// The CloudWatch agent config: tail the unit's log file into the block's
+	/// group. `-m ec2` credentials come from the instance role; no config file
+	/// of secrets exists. `timestamp_format` matches Stalwart's RFC3339 line
+	/// prefix so events carry write time, and the same prefix keeps a
+	/// multi-line backtrace one event.
+	fn cloudwatch_config(&self, stack: &ResolvedStack) -> Value {
+		json!({
+			"agent": { "run_as_user": "root", "region": stack.region() },
+			"logs": {
+				"logs_collected": {
+					"files": {
+						"collect_list": [{
+							"file_path": "/var/log/stalwart/stalwart.log",
+							"log_group_name": self.log_group(stack),
+							"log_stream_name": "stalwart",
+							"retention_in_days": 30,
+							"timestamp_format": "%Y-%m-%dT%H:%M:%S",
+							"timezone": "UTC",
+							"multi_line_start_pattern": "{timestamp_format}"
+						}]
+					}
+				}
+			}
+		})
+	}
+
+	/// The cloud-init script, ie the machine's identity. Installs the pinned
+	/// release (refusing a tarball that fails the pinned checksum), the store
+	/// config template, the secrets renderer, the unit and the log agent; then
+	/// renders secrets once and starts the service. The first boot comes up in
+	/// Stalwart's bootstrap mode, serving management only, until
+	/// `StalwartProvision` applies the declarative config.
+	fn build_user_data(&self, stack: &ResolvedStack) -> Result<SmolStr> {
+		let hostname = &self.hostname;
+		let version = Self::STALWART_VERSION;
+		let tarball = Self::STALWART_TARBALL;
+		let sha256 = Self::STALWART_SHA256;
+		let store_template =
+			serde_json::to_string_pretty(&self.store_config_template(stack))?;
+		let secrets_script = self.secrets_script(stack);
+		let unit = self.systemd_unit();
+		let cloudwatch =
+			serde_json::to_string_pretty(&self.cloudwatch_config(stack))?;
+
+		let script = format!(
+			r#"#!/bin/bash
+set -euo pipefail
+
+# the box's own name, ie what its SMTP banner and HELO identify as
+hostnamectl set-hostname '{hostname}'
+
+# the service account and Stalwart's FHS layout
+id stalwart >/dev/null 2>&1 || useradd --system --home /var/lib/stalwart --create-home --shell /usr/sbin/nologin stalwart
+mkdir -p /etc/stalwart /var/lib/stalwart /var/log/stalwart
+chown -R stalwart:stalwart /etc/stalwart /var/lib/stalwart /var/log/stalwart
+
+# the pinned release: a tarball that does not hash to the pinned digest never
+# reaches the disk, and the boot fails loudly instead
+curl -sSLf 'https://github.com/stalwartlabs/stalwart/releases/download/v{version}/{tarball}' -o /tmp/stalwart.tar.gz
+echo '{sha256}  /tmp/stalwart.tar.gz' | sha256sum -c -
+tar -xzf /tmp/stalwart.tar.gz -C /usr/local/bin stalwart
+chmod 0755 /usr/local/bin/stalwart
+rm /tmp/stalwart.tar.gz
+
+# the store config, as a template: secrets are absent by design and rendered
+# from SSM at every service start
+cat > /etc/stalwart/config.json.template <<'CONFIG_EOF'
+{store_template}
+CONFIG_EOF
+chown stalwart:stalwart /etc/stalwart/config.json.template
+
+cat > /usr/local/bin/stalwart-secrets <<'SECRETS_EOF'
+{secrets_script}
+SECRETS_EOF
+chmod 0755 /usr/local/bin/stalwart-secrets
+
+cat > /etc/systemd/system/stalwart.service <<'UNIT_EOF'
+{unit}
+UNIT_EOF
+
+# log forwarding into the block's own group, credentials from the instance role
+dnf install -y amazon-cloudwatch-agent
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CW_EOF'
+{cloudwatch}
+CW_EOF
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+# secrets rendered before the first start, and by ExecStartPre on every later
+# one, so rotation is a restart rather than a rebuild
+sudo -u stalwart /usr/local/bin/stalwart-secrets
+systemctl daemon-reload
+systemctl enable --now stalwart
+"#
+		);
+
+		// terraform reads user_data as a string, so every literal `${..}` must
+		// escape to `$${..}` BEFORE the one deliberate terraform ref lands.
+		let script = script.replace("${", "$${");
+		let script = script.replace("__DB_HOST__", &self.database.host(stack));
+		SmolStr::from(script).xok()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// The mail box as the plan declares it: label `mail` (the consumer label
+	/// phase 3's database tests already admit), in the `net` vpc, metadata in
+	/// `db`, blobs in `mail-blobs`.
+	fn mail_box() -> StalwartBlock {
+		StalwartBlock::new("mail", "mail.beetmash.com")
+			.with_vpc("net")
+			.with_database("db")
+			.with_blob_bucket("mail-blobs")
+			.with_ssh_public_key(
+				"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITESTKEY pete",
+			)
+			.with_dns(DnsProvider::cloudflare("mail.beetmash.com", "zone123"))
+	}
+
+	/// The blocks the box is deployed beside, whose grants it lowers.
+	fn siblings() -> (VpcBlock, RdsPostgresBlock, S3BucketBlock) {
+		(
+			VpcBlock::new("net"),
+			RdsPostgresBlock::new("db", "net")
+				.with_database("mail")
+				.with_consumer(SecurityGroupRef::new("mail")),
+			S3BucketBlock::new("mail-blobs")
+				.with_deploy_versioned(false)
+				.with_runtime_write(true),
+		)
+	}
+
+	/// The config the whole set emits against a Sydney stack.
+	fn build_config(
+		block: &StalwartBlock,
+	) -> (ResolvedStack, Deployment, terra::Config) {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (network, db, blobs) = siblings();
+		let mut world = World::new();
+		let spawned = world.spawn(());
+		let entity = spawned.as_readonly();
+		let config = stack
+			.build_config(&deployment, [
+				(entity.clone(), &network as &dyn Block),
+				(entity.clone(), &db as &dyn Block),
+				(entity.clone(), &blobs as &dyn Block),
+				(entity, block as &dyn Block),
+			])
+			.unwrap();
+		(stack, deployment, config)
+	}
+
+	/// The rendered user_data, ie the machine identity.
+	fn user_data(block: &StalwartBlock) -> String {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		block.build_user_data(&stack).unwrap().to_string()
+	}
+
+	/// The sole `aws_instance` in the rendered config.
+	fn instance(config: &terra::Config) -> serde_json::Value {
+		config.to_json()["resource"]["aws_instance"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()
+			.clone()
+	}
+
+	/// A code-only deploy renders the identical config, so terraform plans no
+	/// change and nothing rebuilds: the box's identity carries no deploy id,
+	/// and every per-deploy value lives in SSM or in the database.
+	#[beet_core::test]
+	fn code_only_deploy_renders_one_box() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let second = deployment
+			.clone()
+			.with_deploy_id(uuid_ext::now_v7())
+			.with_deploy_timestamp("2026-08-27T00:00:00Z".to_string());
+		let block = mail_box();
+		let mut world = World::new();
+		let spawned = world.spawn(());
+		let entity = spawned.as_readonly();
+		let render = |deployment: &Deployment| {
+			let mut config = deployment.create_config(&stack);
+			block
+				.apply_to_config(
+					&entity,
+					&stack,
+					deployment,
+					&default(),
+					&mut config,
+				)
+				.unwrap();
+			config.to_json().to_string()
+		};
+		render(&deployment).xpect_eq(render(&second));
+		user_data(&mail_box())
+			.as_str()
+			.xnot()
+			.xpect_contains(&deployment.deploy_id().to_string());
+	}
+
+	/// The rebuild rule is a terraform setting, not a convention: an edited
+	/// user_data REPLACES the instance rather than mutating a live MTA.
+	#[beet_core::test]
+	fn machine_config_change_replaces_the_instance() {
+		let (_stack, _deployment, config) = build_config(&mail_box());
+		instance(&config)["user_data_replace_on_change"]
+			.as_bool()
+			.unwrap()
+			.xpect_true();
+		// ..and a changed hostname IS a changed machine
+		user_data(&mail_box()).xpect_not_eq(user_data(
+			&StalwartBlock::new("mail", "mx.beetmash.com")
+				.with_vpc("net")
+				.with_database("db")
+				.with_blob_bucket("mail-blobs")
+				.with_ssh_public_key("ssh-ed25519 KEY pete"),
+		));
+	}
+
+	/// The install is pinned twice: the exact release in the url, and the
+	/// digest the downloaded bytes must hash to. `sha256sum -c` failing aborts
+	/// the boot under `set -e`, so a tampered or moved tarball is a dead box
+	/// rather than a mystery MTA.
+	#[beet_core::test]
+	fn checksum_gates_the_install() {
+		user_data(&mail_box())
+			.as_str()
+			.xpect_contains(&format!(
+				"releases/download/v{}/{}",
+				StalwartBlock::STALWART_VERSION,
+				StalwartBlock::STALWART_TARBALL
+			))
+			.xpect_contains(&format!(
+				"echo '{}  /tmp/stalwart.tar.gz' | sha256sum -c -",
+				StalwartBlock::STALWART_SHA256
+			));
+	}
+
+	/// No secret exists in machine config or transits it: the only terraform
+	/// interpolation in the rendered user_data is the database HOST, and the
+	/// scripts hold SSM parameter names, never values. The SES SMTP secret
+	/// appears only as the `aws_ssm_parameter` resource's interpolation, which
+	/// is state-bound (hence state encryption), never user_data-bound.
+	#[beet_core::test]
+	fn no_secret_material_in_machine_config() {
+		let script = user_data(&mail_box());
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		// once per store the host feeds: data, search, in-memory
+		let host = DatabaseRef::new("db")
+			.host(&stack)
+			.trim_end_matches('}')
+			.to_string();
+		script
+			.match_indices("${")
+			.filter(|(index, _)| !script[..*index].ends_with('$'))
+			.map(|(index, _)| {
+				script[index..].split('}').next().unwrap().to_string()
+			})
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![host.clone(), host.clone(), host]);
+		script
+			.as_str()
+			.xnot()
+			.xpect_contains("ses_smtp_password_v4")
+			.xnot()
+			.xpect_contains("aws_iam_access_key")
+			.xnot()
+			.xpect_contains("AWS_ACCESS_KEY")
+			.xnot()
+			.xpect_contains("AWS_SECRET");
+	}
+
+	/// The boot script reads exactly the parameters the stack composes: the
+	/// database password through [`DatabaseRef::secret_name`] (the declaring
+	/// block grants the same string) and the admin password `EnsureSecret`
+	/// creates. This is the join between the deploy and the machine; a drift
+	/// here is a box that boots with no credentials.
+	#[beet_core::test]
+	fn boot_reads_the_parameters_the_stack_writes() {
+		let block = mail_box();
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (_, db, _) = siblings();
+		user_data(&block)
+			.as_str()
+			.xpect_contains(&format!(
+				"get '{}'",
+				DatabaseRef::new("db").secret_name(&stack)
+			))
+			.xpect_contains(&format!(
+				"get '{}'",
+				block.admin_secret_name(&stack)
+			))
+			// the ref composes the SAME name the database block grants
+			.xpect_contains(&format!("get '{}'", db.secret_name(&stack)))
+			.xpect_contains("--with-decryption")
+			.xpect_contains("STALWART_RECOVERY_ADMIN=admin:");
+		block
+			.admin_secret_name(&stack)
+			.as_str()
+			.xpect_eq("/beet-infra/dev/mail-admin-password");
+	}
+
+	/// The SES SMTP credential is derived by terraform and parked in
+	/// SecureString parameters under the same stack prefix, named by the same
+	/// methods provision will read them through; the password value is the
+	/// access key's `ses_smtp_password_v4` and exists nowhere else.
+	#[beet_core::test]
+	fn ses_smtp_credential_is_terraform_derived() {
+		let block = mail_box();
+		let (stack, _deployment, config) = build_config(&block);
+		let params = config.to_json()["resource"]["aws_ssm_parameter"]
+			.as_object()
+			.unwrap()
+			.values()
+			.cloned()
+			.collect::<Vec<_>>();
+		params.len().xpect_eq(2);
+		let value_of = |name: &str| {
+			params
+				.iter()
+				.find(|param| param["name"] == name)
+				.unwrap()
+				.clone()
+		};
+		let user = value_of(&block.ses_smtp_user_secret_name(&stack));
+		let password = value_of(&block.ses_smtp_password_secret_name(&stack));
+		user["type"].as_str().unwrap().xpect_eq("SecureString");
+		password["type"].as_str().unwrap().xpect_eq("SecureString");
+		password["value"]
+			.as_str()
+			.unwrap()
+			.xpect_contains(".ses_smtp_password_v4}");
+		// the sending user may send raw mail, and do nothing else
+		let policy = config.to_json()["resource"]["aws_iam_user_policy"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["policy"]
+			.as_str()
+			.unwrap()
+			.to_string();
+		policy
+			.as_str()
+			.xpect_contains("ses:SendRawEmail")
+			.xnot()
+			.xpect_contains("ses:*");
+	}
+
+	/// The firewall is the port list and nothing else: one tcp ingress per
+	/// mail service, one allow-all egress, and no management port. Bootstrap
+	/// mode's 8080 is reached through the SSH port, never the internet.
+	#[beet_core::test]
+	fn firewall_is_exactly_the_port_list() {
+		let (_stack, _deployment, config) = build_config(&mail_box());
+		let rules = config.to_json()["resource"]["aws_security_group_rule"]
+			.as_object()
+			.unwrap()
+			.values()
+			.cloned()
+			.collect::<Vec<_>>();
+		let mut ingress = rules
+			.iter()
+			.filter(|rule| rule["type"] == "ingress")
+			// the box's public rules, not the database's group-sourced one
+			.filter(|rule| rule["cidr_blocks"][0] == "0.0.0.0/0")
+			.map(|rule| rule["from_port"].as_i64().unwrap())
+			.collect::<Vec<_>>();
+		ingress.sort();
+		ingress.xpect_eq(vec![22, 25, 443, 465, 587, 993]);
+		let egress = rules
+			.iter()
+			.filter(|rule| rule["type"] == "egress")
+			.collect::<Vec<_>>();
+		egress.len().xpect_eq(1);
+		egress[0]["protocol"].as_str().unwrap().xpect_eq("-1");
+		config
+			.to_json()
+			.to_string()
+			.as_str()
+			.xnot()
+			.xpect_contains("8080");
+	}
+
+	/// IMDSv2 required, encrypted gp3 root at the declared size, Graviton
+	/// sizing, and the arm64 AMI pointer: the hardware half of the security
+	/// practices list, pinned.
+	#[beet_core::test]
+	fn instance_hardening_is_not_default() {
+		let (_stack, _deployment, config) = build_config(&mail_box());
+		let instance = instance(&config);
+		instance["metadata_options"][0]["http_tokens"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("required");
+		let root = &instance["root_block_device"][0];
+		root["encrypted"].as_bool().unwrap().xpect_true();
+		root["volume_type"].as_str().unwrap().xpect_eq("gp3");
+		root["volume_size"].as_i64().unwrap().xpect_eq(30);
+		instance["instance_type"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("t4g.small");
+		// the AMI rides the public AL2023 arm64 pointer, resolved per apply
+		instance["ami"]
+			.as_str()
+			.unwrap()
+			.xpect_contains("${data.aws_ssm_parameter.");
+		config.to_json()["data"]["aws_ssm_parameter"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["name"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(StalwartBlock::AMI_PARAMETER)
+			.xpect_contains("al2023")
+			.xpect_contains("arm64");
+	}
+
+	/// The box sits in the vpc's PUBLIC subnet (an MTA is reachable by
+	/// definition) with an EIP whose association survives a rebuild, and its
+	/// security group is emitted under exactly the ident the
+	/// [`SecurityGroupRef`] hands a consumer: the other half of the reference
+	/// the database's ingress rule composed in phase 3.
+	#[beet_core::test]
+	fn public_subnet_eip_and_the_shared_group_label() {
+		let (stack, _deployment, config) = build_config(&mail_box());
+		instance(&config)["subnet_id"].as_str().unwrap().xpect_eq(
+			VpcRef::new("net").subnet_id(&stack, SubnetTier::Public, "a"),
+		);
+		config.to_json()["resource"]["aws_security_group"]
+			.as_object()
+			.unwrap()
+			.contains_key(SecurityGroupRef::new("mail").ident(&stack).label())
+			.xpect_true();
+		// the eip waits on the gateway the vpc declares
+		config.to_json()["resource"]["aws_eip"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["depends_on"][0]
+			.as_str()
+			.unwrap()
+			.xpect_contains("aws_internet_gateway");
+		config.to_json()["resource"]["aws_eip_association"]
+			.as_object()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+	}
+
+	/// The role is lowered from what the siblings DECLARED: the stack's secret
+	/// prefix in one statement, read on every declared bucket, write only on
+	/// the blob bucket that declared it, the box's own log group, and no
+	/// static credential anywhere.
+	#[beet_core::test]
+	fn role_lowers_the_declared_grants() {
+		let (stack, _deployment, config) = build_config(&mail_box());
+		let policy = config.to_json()["resource"]["aws_iam_role_policy"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["policy"]
+			.as_str()
+			.unwrap()
+			.to_string();
+		policy
+			.as_str()
+			// one statement for the stack's whole secret prefix
+			.xpect_contains(
+				"arn:aws:ssm:ap-southeast-2:*:parameter/beet-infra/dev/*",
+			)
+			// the database's declared parameter, composed by the same ref
+			.xpect_contains("parameter/beet-infra/dev/db-password")
+			// blob bucket readable and writable, by declaration
+			.xpect_contains(&format!(
+				"arn:aws:s3:::{}/*",
+				stack.resource_name("mail-blobs")
+			))
+			.xpect_contains("s3:PutObject")
+			.xpect_contains(&mail_box().log_group(&stack))
+			// and never the account
+			.xnot()
+			.xpect_contains("\"Resource\":\"arn:aws:s3:::*\"");
+		// grants scale with declarations: an undeclared write is not granted
+		serde_json::from_str::<serde_json::Value>(&policy).unwrap()["Statement"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.filter(|statement| statement["Sid"] == "WriteStores")
+			.count()
+			.xpect_eq(1);
+	}
+
+	/// The store config is Stalwart `0.16`'s split, exactly: data, fts and
+	/// in-memory on the stack's Postgres, blobs on the stack's bucket with no
+	/// static key (the client falls through to the instance profile), and the
+	/// secret slot left empty for the boot renderer.
+	#[beet_core::test]
+	fn store_config_holds_postgres_and_s3_and_no_secrets() {
+		let block = mail_box();
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let template = block.store_config_template(&stack);
+		for store in ["DataStore", "SearchStore", "InMemoryStore"] {
+			template[store]["@type"]
+				.as_str()
+				.unwrap()
+				.xpect_eq("PostgreSql");
+			template[store]["authSecret"]["@type"]
+				.as_str()
+				.unwrap()
+				.xpect_eq("None");
+		}
+		template["DataStore"]["database"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("mail");
+		let blob = &template["BlobStore"];
+		blob["@type"].as_str().unwrap().xpect_eq("S3");
+		blob["bucket"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(stack.resource_name("mail-blobs").as_str());
+		blob["region"]["@type"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("ApSoutheast2");
+		blob["accessKey"]["@type"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("None");
+	}
+
+	/// The `A` record is the box's hostname at the EIP, DNS-only: an MTA
+	/// behind a proxy is unreachable on 25 and cannot pass TLS-ALPN-01, so a
+	/// proxied declaration fails at config time instead.
+	#[beet_core::test]
+	fn dns_is_an_unproxied_a_record() {
+		let (_stack, _deployment, config) = build_config(&mail_box());
+		let record = config.to_json()["resource"]["cloudflare_dns_record"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()
+			.clone();
+		record["type"].as_str().unwrap().xpect_eq("A");
+		record["name"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("mail.beetmash.com");
+		record["proxied"].as_bool().unwrap().xpect_false();
+		record["content"]
+			.as_str()
+			.unwrap()
+			.xpect_contains("aws_eip.")
+			.xpect_contains(".public_ip}");
+		mail_box()
+			.with_dns(
+				DnsProvider::cloudflare("mail.beetmash.com", "zone123")
+					.with_proxied(true),
+			)
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("must not be Cloudflare-proxied");
+	}
+
+	/// A declaration that cannot serve mail fails before any resource exists.
+	#[beet_core::test]
+	fn invalid_declarations_fail_at_config_time() {
+		StalwartBlock::new("mail", "mail.beetmash.com")
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("names no vpc");
+		mail_box()
+			.with_ssh_public_key("")
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no ssh public key");
+		StalwartBlock::new("mail", "Mail.Beetmash.Com")
+			.with_vpc("net")
+			.with_database("db")
+			.with_blob_bucket("mail-blobs")
+			.with_ssh_public_key("ssh-ed25519 KEY")
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("hostname");
+	}
+
+	/// The full stack through the real provider schemas: vpc, database, blob
+	/// bucket and box in one config, with the consumer security group REAL
+	/// rather than stubbed (the stub `rds_postgres_block::tests::validate`
+	/// still carries for its own feature set). Rendered-JSON assertions prove
+	/// what the blocks meant; only tofu proves the schema accepts it, and only
+	/// the combined run proves every cross-block interpolation resolves.
+	///
+	/// Drives the native tofu cli, so it cannot compile for wasm.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test(timeout_ms = 240000)]
+	#[ignore = "very slow"]
+	async fn validate() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let block = mail_box();
+		let (network, db, blobs) = siblings();
+		let mut world = World::new();
+		let spawned = world.spawn(());
+		let entity = spawned.as_readonly();
+		let config = stack
+			.build_config(&deployment, [
+				(entity.clone(), &network as &dyn Block),
+				(entity.clone(), &db as &dyn Block),
+				(entity.clone(), &blobs as &dyn Block),
+				(entity, &block as &dyn Block),
+			])
+			.unwrap();
+		terra::Project::new(stack, deployment, config)
+			.validate()
+			.await
+			.unwrap();
+	}
+}

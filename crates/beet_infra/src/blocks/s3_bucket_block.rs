@@ -32,6 +32,10 @@ pub struct S3BucketBlock {
 	/// All objects will be nested under the deploy uuid,
 	/// ensuring unique files per deploy
 	deploy_versioned: bool,
+	/// Declare the runtime grant as read/write rather than read-only, for a
+	/// bucket the deployed process stores into (a mail blob store) rather than
+	/// one the deploy publishes and the process merely serves.
+	runtime_write: bool,
 	/// Grant anonymous `s3:GetObject` on every object and `s3:ListBucket` on the
 	/// bucket (via a public-access-block that lifts the default block, plus a
 	/// bucket policy). Needed when objects are served by a 301 to the public S3
@@ -58,6 +62,7 @@ impl S3BucketBlock {
 			output: true,
 			force_destroy: true,
 			deploy_versioned: true,
+			runtime_write: false,
 			public_read: false,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
@@ -172,12 +177,14 @@ impl Block for S3BucketBlock {
 	}
 
 	/// A deployed process reads the buckets declared alongside it (its site
-	/// store, its assets); the deploy itself is what writes them.
+	/// store, its assets); the deploy itself is what writes them. A bucket the
+	/// process stores into declares [`runtime_write`](Self::with_runtime_write).
 	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
-		vec![AccessGrant::read(
-			Self::ACCESS_KIND,
-			stack.resource_name(self.label.clone()),
-		)]
+		let name = stack.resource_name(self.label.clone());
+		vec![match self.runtime_write {
+			true => AccessGrant::read_write(Self::ACCESS_KIND, name),
+			false => AccessGrant::read(Self::ACCESS_KIND, name),
+		}]
 	}
 }
 
@@ -297,6 +304,27 @@ mod tests {
 		build_json(S3BucketBlock::new("app").with_region("eu-west-1"))
 			.as_str()
 			.xpect_contains("\"region\":\"eu-west-1\"");
+	}
+
+	/// The runtime grant defaults to read (deploy publishes, process serves) and
+	/// escalates to read/write only when the block says the process stores into
+	/// the bucket, so a lowering compute block can tell the two apart.
+	#[beet_core::test]
+	fn runtime_write_escalates_the_grant() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		S3BucketBlock::new("app")
+			.runtime_access(&stack)
+			.xpect_eq(vec![AccessGrant::read(
+				S3BucketBlock::ACCESS_KIND,
+				stack.resource_name("app"),
+			)]);
+		S3BucketBlock::new("mail-blobs")
+			.with_runtime_write(true)
+			.runtime_access(&stack)
+			.xpect_eq(vec![AccessGrant::read_write(
+				S3BucketBlock::ACCESS_KIND,
+				stack.resource_name("mail-blobs"),
+			)]);
 	}
 
 	#[beet_core::test]

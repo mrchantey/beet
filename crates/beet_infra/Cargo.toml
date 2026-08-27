@@ -41,11 +41,16 @@ cloudflare_dns = ["bindings_cloudflare_common", "bindings_aws_dns"]
 # `S3Store::r2` path) at the consumer.
 cloudflare_block = []
 # The self-hosted mail stack: the per-domain DNS + SES declaration
-# (`MailDomainBlock`) and the member/mailbox/alias inputs it is authored from.
-# Cloudflare holds the zone every record lands in, hence `cloudflare_dns`.
+# (`MailDomainBlock`), the box that serves it (`StalwartBlock`, hence the ec2,
+# ssm and iam/common bindings) and the member/mailbox/alias inputs both are
+# authored from. Cloudflare holds the zone every record lands in, hence
+# `cloudflare_dns`.
 mail = [
 	"bindings_aws_ses",
 	"bindings_aws_dns",
+	"bindings_aws_ec2",
+	"bindings_aws_ssm",
+	"bindings_aws_common",
 	"cloudflare_dns",
 	"vpc_block",
 	"rds_postgres_block",

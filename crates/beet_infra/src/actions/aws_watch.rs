@@ -27,10 +27,11 @@ pub enum WatchTarget {
 	LogGroup(SmolStr),
 	/// A lambda function's `/aws/lambda/<function>` group, by block label.
 	Lambda(SmolStr),
-	/// A lightsail instance's `/<app>/<label>/<stage>` group, by block label,
-	/// the same group its cloud-init agent forwards to
-	/// ([`LightsailBlock::log_group`]).
-	Lightsail(SmolStr),
+	/// A provisioned box's `/<app>/<label>/<stage>` group, by block label: the
+	/// group its cloud-init CloudWatch agent forwards to. Both box blocks
+	/// compose it identically ([`LightsailBlock::log_group`],
+	/// `StalwartBlock::log_group`).
+	Instance(SmolStr),
 	/// A fargate service's `/ecs/<app>/<stage>` group.
 	Fargate,
 }
@@ -50,7 +51,7 @@ impl WatchTarget {
 					.resource_ident(format!("{label}--function"))
 					.primary_identifier()
 			),
-			Self::Lightsail(label) => {
+			Self::Instance(label) => {
 				format!("/{}/{label}/{}", stack.app_name(), stack.stage())
 			}
 			Self::Fargate => {

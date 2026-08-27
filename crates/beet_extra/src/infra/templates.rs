@@ -191,7 +191,7 @@ pub fn LightsailSiteBlock(
 #[template]
 pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 	infra_ext::watch(
-		WatchTarget::Lightsail(LightsailBlock::default().label().clone()),
+		WatchTarget::Instance(LightsailBlock::default().label().clone()),
 		timeout,
 	)
 }
