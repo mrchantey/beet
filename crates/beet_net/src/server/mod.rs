@@ -74,8 +74,8 @@ mod call_on_ready;
 pub use call_on_ready::*;
 
 // The start path: the `CallOnStart` verb calls an entity's action when the run
-// above it starts. Gated on `action` like the load verb it mirrors; its observer
-// is registered by `ServerPlugin`, since a start is a server-shaped event.
+// above it starts, observing its own entity's swept `StartRunning<Request>`.
+// Gated on `action` like the load verb it mirrors.
 #[cfg(feature = "action")]
 mod call_on_start;
 #[cfg(feature = "action")]

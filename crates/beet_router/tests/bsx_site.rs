@@ -264,11 +264,14 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 		.query_filtered_once::<Entity, With<CallOnReady>>()
 		.len()
 		.xpect_eq(1);
-	// count every start, so a second boot of the serve route is visible
+	// count every start, so a second boot of the serve route is visible. The
+	// event sweeps a starting set's subtree, so count only sweep origins.
 	let starts = Store::new(0usize);
 	let counter = starts;
-	world.add_observer(move |_: On<StartRunning<Request>>| {
-		counter.set(counter.get() + 1)
+	world.add_observer(move |ev: On<StartRunning<Request>>| {
+		if ev.trigger().root() == ev.entity {
+			counter.set(counter.get() + 1)
+		}
 	});
 	// boot it the way a launched entry does: argv names the `serve` route
 	world.run_async_local(move |async_world| async move {

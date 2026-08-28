@@ -181,11 +181,12 @@ mod test {
 	}
 
 	/// Run a persistent thread to completion through the start notification: a
-	/// root whose child is the thread, notified as a real start does.
+	/// root whose child is the thread, swept as a real start does
+	/// ([`StartDescendants`] standing in for the `RunningSet` that requires it).
 	fn run_once(path: &str, system: ActorId, agent: ActorId) {
 		let mut app = app();
 		app.world_mut()
-			.spawn(children![scene(path, system, agent)])
+			.spawn((StartDescendants, children![scene(path, system, agent)]))
 			.trigger(|entity| StartRunning::new(entity, Request::default()));
 		pump(&mut app, 120);
 	}
@@ -269,8 +270,8 @@ mod test {
 		stored_threads(path).await.xpect_eq(1);
 	}
 
-	/// The start is scoped by ancestry: starting one entry runs its own thread and
-	/// leaves a co-resident entry's thread alone.
+	/// The start sweep never leaves its root's subtree: starting one entry runs
+	/// its own thread and leaves a co-resident entry's thread alone.
 	#[beet_core::test]
 	async fn kicks_only_its_own_entry() {
 		let mut app = app();
@@ -280,8 +281,14 @@ mod test {
 				(Actor::agent(), MockPostStreamer::default()),
 			])
 		};
-		let booted = app.world_mut().spawn(children![ephemeral()]).flush();
-		let idle = app.world_mut().spawn(children![ephemeral()]).flush();
+		let booted = app
+			.world_mut()
+			.spawn((StartDescendants, children![ephemeral()]))
+			.flush();
+		let idle = app
+			.world_mut()
+			.spawn((StartDescendants, children![ephemeral()]))
+			.flush();
 		app.world_mut()
 			.entity_mut(booted)
 			.trigger(|entity| StartRunning::new(entity, Request::default()));

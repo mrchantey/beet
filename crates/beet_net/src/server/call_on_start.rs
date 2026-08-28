@@ -7,13 +7,13 @@ use beet_core::prelude::*;
 /// Start verb: when the run at or above this entity starts, call this entity's
 /// action with the start request, detached.
 ///
-/// The [`CallOnReady`] counterpart for the other lifecycle edge. `Ready` is a
-/// load, swept over the whole subtree, so [`CallOnReady`] sits on the action it
-/// drives and each declares its own. A start is one event on one entity (the
-/// server root a [`RunningSet`] parked), so this verb instead rides that
-/// [`StartRunning<Request>`] fan-out: a global observer calls every `CallOnStart`
-/// at or under the starting entity, and the ancestry filter is what keeps
-/// co-resident entries from starting each other's work.
+/// The [`CallOnReady`] counterpart for the other lifecycle edge, and the same
+/// shape: `Ready` sweeps a loaded subtree, and a [`RunningSet`]'s
+/// [`StartRunning<Request>`] sweeps the started one (its required
+/// [`StartDescendants`] scopes the [`ScopedTrigger`]), so each verb sits on the
+/// action it drives and observes its own entity. The sweep never leaves its
+/// root's subtree, which is what keeps co-resident entries from starting each
+/// other's work.
 ///
 /// ```bsx
 /// <CallOnReady {(TuiServer, HttpServer)}>       // the run
@@ -30,6 +30,7 @@ use beet_core::prelude::*;
 /// started.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
+#[component(on_add = hook_ext::observe(on_start_call))]
 pub struct CallOnStart;
 
 impl CallOnStart {
@@ -52,29 +53,18 @@ impl CallOnStart {
 		};
 		Ok(())
 	}
+}
 
-	/// Observer: call every [`CallOnStart`] at or under a starting run, once per
-	/// start.
-	///
-	/// Global rather than per-entity so the verb needs no boot machinery of its
-	/// own. Each call is detached, so a parked behavior never holds the fan-out
-	/// up.
-	pub(crate) fn call_on_start(
-		ev: On<StartRunning<Request>>,
-		children: Query<&Children>,
-		verbs: Query<(), With<CallOnStart>>,
-		mut commands: Commands,
-	) -> Result {
-		let parts = ev.with(|request| request.parts().clone())?;
-		for entity in children
-			.iter_descendants_inclusive(ev.entity)
-			.filter(|entity| verbs.contains(*entity))
-		{
-			let request = Request::from_parts(parts.clone(), default());
-			commands
-				.entity(entity)
-				.queue_async_local(move |entity| Self::call(entity, request));
-		}
-		Ok(())
-	}
+/// On the start sweep reaching this entity, queue [`CallOnStart::call`] with the
+/// start request, detached, so a parked behavior never holds the sweep up.
+fn on_start_call(
+	ev: On<StartRunning<Request>>,
+	mut commands: Commands,
+) -> Result {
+	let parts = ev.with(|request| request.parts().clone())?;
+	let request = Request::from_parts(parts, default());
+	commands
+		.entity(ev.entity)
+		.queue_async_local(move |entity| CallOnStart::call(entity, request));
+	Ok(())
 }

@@ -24,8 +24,8 @@ impl Plugin for ThreadPlugin {
 			// upstream by `RouterPlugin` (init above); the store is a plain `FsStore`.
 			.register_type::<RepeatWhileFunctionCallOutput>()
 			// markup verb: the thread's `Request -> Outcome` entry point, plus the
-			// `CallOnStart` that calls it on the entry's start. Owns no action slot;
-			// `ServerPlugin` (via `RouterPlugin`) owns the start fan-out.
+			// `CallOnStart` that calls it on the entry's start sweep. Owns no
+			// action slot.
 			.register_type::<RunThread>()
 			// markup persistence: declare a thread-record store from `.bsx`
 			.register_type::<MountThreadStore>()

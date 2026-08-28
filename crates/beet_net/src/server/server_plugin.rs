@@ -20,11 +20,9 @@ impl Plugin for ServerPlugin {
 			// script or behaviour scene resolves it, and its disarm marker.
 			.register_type::<CallOnReady>()
 			.register_type::<DisableCallOnReady>()
-			// the markup start verb, riding the `StartRunning<Request>` a
-			// `RunningSet` fans out, so it needs one global observer rather than
-			// per-entity boot machinery.
-			.register_type::<CallOnStart>()
-			.add_observer(CallOnStart::call_on_start);
+			// the markup start verb: it observes its own entity's
+			// `StartRunning<Request>`, delivered by the `RunningSet` start sweep.
+			.register_type::<CallOnStart>();
 
 		// the repl reads a real stdin on a background thread, so it exists only
 		// where there is one.

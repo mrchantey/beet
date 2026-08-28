@@ -14,6 +14,7 @@
 //! wants the request but holds nothing open, ie a thread kicking itself off.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::event::SetEntityEventTarget;
 use bevy::platform::sync::Arc;
 use bevy::platform::sync::Mutex;
 use bevy::reflect::GetTypeRegistration;
@@ -85,11 +86,29 @@ pub enum ControlFlowError {
 /// this event, so the non-[`Clone`] `Request`/`Response` bodies are a non-issue.
 /// Cheaply cloned via the inner [`Arc`] (no `In: Clone` bound); all clones share
 /// one slot, so a [`take`](Self::take) by any is seen by all.
-#[derive(EntityEvent)]
+///
+/// Delivery is a [`ScopedTrigger`]: a caller declaring [`StartDescendants`]
+/// (every [`RunningSet`], by `#[require]`) sweeps the event over its subtree,
+/// deepest first and itself last, so a start verb (`CallOnStart`) observes its
+/// own entity exactly as `CallOnReady` observes its own `Ready`. A bare caller
+/// (a `ContinueRun` behavior) fires on itself alone.
 pub struct StartRunning<In: 'static + Send + Sync> {
-	/// The entity the action was called on.
+	/// The entity this instance is firing on: the caller, or under a sweep the
+	/// swept entity.
 	pub entity: Entity,
 	value: Arc<Mutex<Option<In>>>,
+}
+
+impl<In: 'static + Send + Sync> Event for StartRunning<In> {
+	type Trigger<'a> = ScopedTrigger<Self>;
+}
+
+impl<In: 'static + Send + Sync> EntityEvent for StartRunning<In> {
+	fn event_target(&self) -> Entity { self.entity }
+}
+
+impl<In: 'static + Send + Sync> SetEntityEventTarget for StartRunning<In> {
+	fn set_event_target(&mut self, entity: Entity) { self.entity = entity; }
 }
 
 impl<In: 'static + Send + Sync> Clone for StartRunning<In> {
