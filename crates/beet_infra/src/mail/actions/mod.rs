@@ -13,6 +13,8 @@ mod eip_reverse_dns;
 pub use eip_reverse_dns::*;
 mod jmap_client;
 pub use jmap_client::*;
+mod mail_credentials;
+pub use mail_credentials::*;
 mod mail_health;
 pub use mail_health::*;
 mod mail_probe;

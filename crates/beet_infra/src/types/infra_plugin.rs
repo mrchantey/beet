@@ -148,6 +148,8 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::MtaStsPublishAction>()
 			.register_type::<crate::prelude::MailProbe>()
 			.register_type::<crate::prelude::MailProbeAction>()
+			.register_type::<crate::prelude::MailCredentials>()
+			.register_type::<crate::prelude::MailCredentialsAction>()
 			.register_type::<crate::prelude::MailHealth>()
 			.register_type::<crate::prelude::MailHealthAction>()
 			.register_type::<crate::prelude::MailRestoreDrill>()

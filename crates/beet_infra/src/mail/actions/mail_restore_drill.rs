@@ -187,11 +187,11 @@ async fn assert_restored(
 ) -> Result {
 	let domain = mail.domain_holding(localpart)?;
 	let address = format!("{localpart}@{}", domain.domain());
-	let secret = SecretRef::new(format!(
-		"{}-account-{localpart}-at-{}",
+	let secret = AccountPlan::secret_ref(
 		mail.mail_box.label(),
-		domain.slug()
-	))
+		localpart,
+		&domain.slug(),
+	)
 	.name(source);
 	let password = ssm_ext::get(&mail.stack.region(), &secret)
 		.await?

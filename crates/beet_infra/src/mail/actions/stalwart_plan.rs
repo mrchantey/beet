@@ -364,6 +364,26 @@ impl DomainPlan {
 }
 
 impl AccountPlan {
+	/// The parameter one mailbox's generated password is parked at, ie
+	/// `/beetmash/prod/mail-account-pete-at-stalwart-beetmash-com`.
+	///
+	/// Composed HERE and nowhere else because five things read it and none of
+	/// them can see each other: the provision that mints it, the probe that
+	/// signs in with it, the restore drill that proves a restored store still
+	/// answers to it, the credential listing a human reads, and the account
+	/// object it belongs to. A sixth hand-written copy is the bug this exists
+	/// to prevent, and its failure mode is an authentication error three steps
+	/// away from the typo.
+	pub fn secret_ref(
+		box_label: &str,
+		localpart: &str,
+		domain_slug: &str,
+	) -> SecretRef {
+		SecretRef::new(format!(
+			"{box_label}-account-{localpart}-at-{domain_slug}"
+		))
+	}
+
 	fn new(
 		mailbox: &Mailbox,
 		domain: &MailDomainBlock,
@@ -381,10 +401,7 @@ impl AccountPlan {
 			.map(|alias| alias.localpart().clone())
 			.collect();
 		Self {
-			secret: SecretRef::new(format!(
-				"{box_label}-account-{name}-at-{}",
-				domain.slug()
-			)),
+			secret: Self::secret_ref(box_label, &name, &domain.slug()),
 			admin: mailbox.admin(),
 			aliases,
 			name,

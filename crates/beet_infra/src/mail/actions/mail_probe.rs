@@ -115,12 +115,11 @@ pub async fn MailProbeAction(
 
 	// the same parameter `StalwartProvision` minted the account with, so the
 	// probe never holds a credential of its own.
-	let secret = SecretRef::new(format!(
-		"{}-account-{}-at-{}",
+	let secret = AccountPlan::secret_ref(
 		mail.mail_box.label(),
 		probe.mailbox(),
-		domain.slug()
-	));
+		&domain.slug(),
+	);
 	let region = mail.stack.region().clone();
 	let password = ssm_ext::get(&region, &secret.name(&mail.stack))
 		.await?

@@ -394,12 +394,11 @@ fn admin_secret_name(mail: &MailStack) -> Result<String> {
 	mail.domains
 		.first()
 		.map(|domain| {
-			SecretRef::new(format!(
-				"{}-account-{}-at-{}",
+			AccountPlan::secret_ref(
 				mail.mail_box.label(),
 				StalwartBlock::ADMIN_USER,
-				domain.slug()
-			))
+				&domain.slug(),
+			)
 			.name(&mail.stack)
 		})
 		.ok_or_else(|| bevyhow!("no mail domain to name an administrator on"))
@@ -578,11 +577,11 @@ async fn bootstrap(
 		.await;
 	let updated = claim?;
 
-	let secret_name = SecretRef::new(format!(
-		"{}-account-admin-at-{}",
+	let secret_name = AccountPlan::secret_ref(
 		mail.mail_box.label(),
-		domain.slug()
-	))
+		StalwartBlock::ADMIN_USER,
+		&domain.slug(),
+	)
 	.name(stack);
 	match updated["secret"].as_str() {
 		Some(secret) => {
