@@ -28,6 +28,32 @@ impl MailStack {
 			.await
 	}
 
+	/// The address of the database this box's mail lives in, from the apply's
+	/// output.
+	///
+	/// Read from the output rather than from [`DatabaseRef::host`], which
+	/// composes a terraform REFERENCE: the right value in a config file
+	/// terraform interpolates, and a literal `${aws_db_instance..}` anywhere
+	/// else. Anything that reaches the database over ssh — the restore, a
+	/// manual dump — needs the resolved name, and asking the project for it is
+	/// the only way to be sure the two agree.
+	pub async fn database_host(&self) -> Result<String> {
+		let endpoint = self
+			.project
+			.output(&format!(
+				"{}_endpoint",
+				self.mail_box.database().label()
+			))
+			.await?;
+		// `endpoint` is `host:port` and every caller names the port itself
+		endpoint
+			.split(':')
+			.next()
+			.unwrap_or(endpoint.as_str())
+			.to_string()
+			.xok()
+	}
+
 	/// The EIP allocation id, ie what a reverse-dns request names.
 	pub async fn eip_allocation(&self) -> Result<String> {
 		self.project

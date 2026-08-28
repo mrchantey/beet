@@ -314,8 +314,16 @@ impl MailDomainBlock {
 
 	/// The domain with its dots as hyphens, ie `stalwart-beetmash-com`. Used
 	/// wherever a name must be unique per domain but cannot contain a dot: the
-	/// terraform labels, and the SES configuration set name.
-	pub fn slug(&self) -> String { self.domain.replace('.', "-") }
+	/// terraform labels, the SES configuration set name, and every parameter
+	/// holding a mailbox credential.
+	pub fn slug(&self) -> String { Self::slug_of(&self.domain) }
+
+	/// [`slug`](Self::slug) for a domain no block declares, ie one named by a
+	/// step rather than read off the stack. The restore drill is the only
+	/// caller: the account it signs in as belongs to a domain the SOURCE stage
+	/// serves, and composing that parameter name a second way is how the
+	/// composition drifts.
+	pub fn slug_of(domain: &str) -> String { domain.replace('.', "-") }
 
 	/// The SES configuration set this domain sends through. Named from the
 	/// domain and NOT stack-composed, so an account's sets read as the domains

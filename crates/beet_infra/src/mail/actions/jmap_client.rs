@@ -355,9 +355,10 @@ impl JmapClient {
 	}
 
 	/// The path half of the session's `apiUrl`, which may be absolute. The
-	/// origin is the one we dialled: through a tunnel the server's own idea of
-	/// its public origin is not reachable from here.
-	fn url_to_path(url: &str) -> String {
+	/// origin is the one we dialled: through a tunnel, or through a forced
+	/// address, the server's own idea of its public origin is not reachable
+	/// from here.
+	pub fn url_to_path(url: &str) -> String {
 		let after = match url.split_once("://") {
 			Some((scheme, rest))
 				if scheme.eq_ignore_ascii_case("http")

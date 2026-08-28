@@ -989,8 +989,12 @@ set -euo pipefail
 umask 077
 export PGPASSWORD="$(aws ssm get-parameter --region '__REGION__' --name '__DB_SECRET__' --with-decryption --query Parameter.Value --output text)"
 # the same verified-TLS posture the mail server's own connection takes, which
-# the boot script's trust anchor is what makes possible
+# the boot script's trust anchor is what makes possible. `PGSSLROOTCERT` is not
+# optional beside it: libpq verifies against `~/.postgresql/root.crt` and NOT
+# the OS trust store, so `verify-full` alone fails with "root certificate file
+# does not exist" against a database whose CA the box already trusts.
 export PGSSLMODE=verify-full
+export PGSSLROOTCERT=system
 dump="$(mktemp /var/lib/stalwart/backup.XXXXXX.dump)"
 trap 'rm -f "$dump"' EXIT
 pg_dump --host '__DB_HOST__' --port __DB_PORT__ --username '__DB_USER__' --dbname '__DB_NAME__' --format=custom --no-owner --no-acl --file "$dump"
@@ -998,13 +1002,18 @@ aws s3 cp "$dump" "s3://__BUCKET__/__PREFIX__/__DB_NAME__/$(date -u +%Y/%m/%d/%H
 echo "mail database backed up ($(stat -c %s "$dump") bytes)"
 "#;
 		let db_secret = self.database.secret_name(stack);
-		let db_host = self.database.host(stack);
 		let bucket = stack.resource_name(self.backup_bucket.clone());
 		let port = RdsPostgresBlock::PORT.to_string();
+		// `__DB_HOST__` is deliberately NOT substituted here: it is the one
+		// terraform reference in the machine config, and [`Self::user_data`]
+		// fills it AFTER escaping every other `${..}` in the script. Resolving
+		// it early would put a live `${aws_db_instance..}` in front of that
+		// escape pass, which would ship the reference to the box as literal
+		// text and fail every nightly dump with "could not translate host
+		// name". That is exactly what it did until the first restore drill.
 		[
 			("__REGION__", stack.region().as_str()),
 			("__DB_SECRET__", db_secret.as_str()),
-			("__DB_HOST__", db_host.as_str()),
 			("__DB_PORT__", port.as_str()),
 			("__DB_USER__", self.db_user.as_str()),
 			("__DB_NAME__", self.db_name.as_str()),
@@ -1760,7 +1769,38 @@ mod tests {
 			.as_str()
 			.xpect_contains("aws ssm get-parameter")
 			.xpect_contains("PGSSLMODE=verify-full")
+			.xpect_contains("PGSSLROOTCERT=system")
 			.xpect_contains(stack.resource_name("mail-backups").as_str());
+	}
+
+	/// The dump reaches the database it is a dump OF.
+	///
+	/// The whole machine config is written by terraform, so `user_data` escapes
+	/// every literal `${..}` in it and then fills the ONE reference it means to
+	/// keep. A step that resolves its own reference lands in front of that
+	/// escape pass and is shipped to the box verbatim: `pg_dump --host
+	/// '${aws_db_instance...}'`, which fails on every line of a name resolver
+	/// and is discovered a fortnight later by a restore that has nothing to
+	/// restore. So both ends are pinned — the token survives the script, and
+	/// the reference survives the escape.
+	#[beet_core::test]
+	fn the_backup_names_the_database_rather_than_a_terraform_reference() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let block = mail_box().with_backup_bucket("mail-backups");
+		// the script leaves the token for the one late substitution
+		block
+			.backup_script(&stack)
+			.as_str()
+			.xpect_contains("pg_dump --host '__DB_HOST__'");
+		// ..and by the time it is machine config it carries a LIVE reference,
+		// ie one terraform will interpolate rather than one it will escape
+		let data = user_data(&block);
+		data.as_str()
+			.xpect_contains("pg_dump --host '${aws_db_instance");
+		data.as_str()
+			.xnot()
+			.xpect_contains("pg_dump --host '$${aws_db_instance");
 	}
 
 	/// The blob store the `Bootstrap` claim declares: the stack's bucket with
