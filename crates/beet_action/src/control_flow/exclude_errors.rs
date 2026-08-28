@@ -49,5 +49,9 @@ bitflags! {
 	pub struct RunningError: u8 {
 		/// Every declared facet declined the start, so nothing holds the run open.
 		const NONE_STARTED = 0b01;
+		/// A driven facet errored. Excluded, the error is logged loudly, that facet
+		/// is dropped and the survivors keep being driven; the call still fails once
+		/// no facet is left alive, so a fully dead run is never silent.
+		const FACET_FAILED = 0b10;
 	}
 }

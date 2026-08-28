@@ -6,20 +6,25 @@ title = "beet_router"
 
 `beet_router` is the semantic layer between an application and the interfaces it speaks through. A router is an entity hierarchy: each route is a child carrying a path pattern and an [`Action`]. A request arrives, whatever its transport, and is matched against the tree and dispatched to the action that fits.
 
-Because the routes know nothing about where a request came from, one set of routes serves a command line, an HTTP server and an interactive prompt at the same time. You choose the interface by picking the IO layer (`CliServer`, `HttpServer` or `ReplServer`); the routes do not change.
+Because the routes know nothing about where a request came from, one set of routes serves a command line, an HTTP server and an interactive prompt at the same time. An entry declares every IO layer it can speak through (`CliServer`, `HttpServer`, `ReplServer`, ...) and `--server` picks which of them act; the routes do not change.
 
 ```rust,ignore
 use beet::prelude::*;
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
-		// pick the IO layer: CliServer, HttpServer or ReplServer
-		CliServer::default(),
-		// default_router adds route lookup and the built-in app routes
-		(default_router(), children![
-			exchange_route("", Action::<(), &str>::new_pure(|_| "hello world")),
-			exchange_route("about", Action::<(), &str>::new_pure(|_| "about")),
-		]),
+		// declare the IO layers; `--server` picks which of them act
+		(CliServer::default(), ReplServer {
+			default_boot: false,
+			..default()
+		}),
+		CallOnReady::on_spawn(),
+		// the dispatch host is a child: route lookup plus the built-in app
+		// routes, wrapping the user routes declared as its own children
+		children![(Router::with_defaults(), children![
+			route::exchange("", Action::<(), &str>::new_pure(|_| "hello world")),
+			route::exchange("about", Action::<(), &str>::new_pure(|_| "about")),
+		])],
 	));
 }
 ```

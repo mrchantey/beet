@@ -88,7 +88,7 @@ async fn bind_connection(connection: AsyncEntity, server: Entity) -> Result {
 	// the client serves `whoami` as a string; strip any json quoting.
 	let role = body.trim().trim_matches('"').to_string();
 	// resolve the agent's route entities for this role and forward them over the socket.
-	// the thread (a `RunThread` kick) starts in parallel; the first capability call
+	// the thread (a `RunThread` start) starts in parallel; the first capability call
 	// is preceded by a model round-trip, so this fast local handshake wins the race, and
 	// `take-photo` falls back to its local handler if a photo is somehow needed first.
 	let targets = connection

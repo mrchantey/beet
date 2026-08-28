@@ -53,8 +53,8 @@ impl Thread {
 	/// immutable); no match **bootstraps** the seeds under a fresh id. Driving the
 	/// conversation is the caller's job (eg an event-driven composer), so this
 	/// suits a `.bsx`-spawned scene where the trigger would otherwise re-reply on
-	/// reload. [`RunThread`] is the one caller in production, adopting before it
-	/// mounts the store and runs the behavior.
+	/// reload. [`RunThread`]'s entry point is the one caller in production, adopting
+	/// before it mounts the store and runs the behavior.
 	#[cfg(feature = "action")]
 	pub async fn adopt(
 		world: AsyncWorld,
@@ -165,7 +165,8 @@ mod test {
 	}
 
 	/// Spawn the scene, adopt it against `backing`, mount the store and run one
-	/// turn: the sequence [`RunThread::kick`] performs, against an in-memory store.
+	/// turn: the sequence [`RunThread`]'s entry point performs, against an
+	/// in-memory store.
 	fn drive_load(backing: &BlobThreadStore, user: ActorId, agent: ActorId) {
 		let store = ThreadStore::new(backing.clone());
 		let mut app = App::new();

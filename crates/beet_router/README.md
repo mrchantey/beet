@@ -9,14 +9,18 @@ use beet::prelude::*;
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
-		// pick the IO layer: CliServer, HttpServer or ReplServer
-		CliServer::default(),
-		// default_router adds route lookup and the built-in app routes,
-		// wrapping the user routes declared as children
-		(default_router(), children![
-			exchange_route("", Action::<(), &str>::new_pure(|_| "hello world")),
-			exchange_route("about", Action::<(), &str>::new_pure(|_| "about")),
-		]),
+		// declare the IO layers; `--server` picks which of them act
+		(CliServer::default(), ReplServer {
+			default_boot: false,
+			..default()
+		}),
+		CallOnReady::on_spawn(),
+		// the dispatch host is a child: route lookup plus the built-in app
+		// routes, wrapping the user routes declared as its own children
+		children![(Router::with_defaults(), children![
+			route::exchange("", Action::<(), &str>::new_pure(|_| "hello world")),
+			route::exchange("about", Action::<(), &str>::new_pure(|_| "about")),
+		])],
 	));
 }
 ```

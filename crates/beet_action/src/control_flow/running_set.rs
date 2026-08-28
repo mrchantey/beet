@@ -11,8 +11,10 @@ use core::marker::PhantomData;
 /// Calling the entity parks a [`Running<Out>`], fires a [`StartRunning<In>`] for
 /// any observers, then drives every facet the start selected concurrently under
 /// one task. A facet that errors stops the rest gracefully and fails the parked
-/// call with the collapsed errors; a start no facet selected fails it loudly (see
-/// [`ExcludeRunningErrors`]). Removing that `Running` (an interrupt, a reload, a
+/// call with the collapsed errors; a start no facet selected fails it loudly. Both
+/// failures are opt-out (see [`ExcludeRunningErrors`]): excluding
+/// [`RunningError::FACET_FAILED`] keeps the survivors serving a broken facet's
+/// run. Removing that `Running` (an interrupt, a reload, a
 /// despawn) signals every live facet, which is the only way a facet is ever
 /// stopped: there is no stop action, stopping is signalling.
 ///
@@ -192,12 +194,19 @@ where
 		.map(|(func, shutdown)| Some(func(entity.clone(), &input, shutdown)))
 		.collect::<Vec<_>>();
 
+	// an entity opting into surviving a facet failure keeps the rest serving; the
+	// run still fails once nothing is left alive, so a fully dead run is loud.
+	let survives = excludes::<Out>(&entity, RunningError::FACET_FAILED).await;
 	let mut errors = Vec::new();
 	while let Some(err) = async_ext::join_all_until_err(&mut futures).await {
-		// the first failure ends the run: signal the survivors so each tears its
-		// own work down, then keep awaiting them rather than dropping them.
-		if errors.is_empty() {
-			signal_stop::<In, Out>(&entity).await;
+		match survives {
+			// the failed facet is already dropped from the join, so the survivors
+			// carry on; naming it here is the only trace it leaves until the end.
+			true => error!("a facet of {} failed: {err}", entity.id()),
+			// the first failure ends the run: signal the survivors so each tears its
+			// own work down, then keep awaiting them rather than dropping them.
+			false if errors.is_empty() => signal_stop::<In, Out>(&entity).await,
+			false => {}
 		}
 		errors.push(err);
 	}
@@ -205,6 +214,17 @@ where
 		true => Ok(()),
 		false => entity.queue(FailRun::<Out>::new(errors.collapse())).await?,
 	}
+}
+
+/// Whether the set's entity opted out of `error`.
+async fn excludes<Out>(entity: &AsyncEntity, error: RunningError) -> bool
+where
+	Out: 'static + Send + Sync,
+{
+	entity
+		.get::<ExcludeRunningErrors, _>(move |exclude| exclude.contains(error))
+		.await
+		.unwrap_or(false)
 }
 
 /// What one start resolved to, decided under a single world access so a
@@ -300,13 +320,7 @@ async fn fail_none_started<Out>(
 where
 	Out: 'static + Send + Sync,
 {
-	if entity
-		.get::<ExcludeRunningErrors, _>(|exclude| {
-			exclude.contains(RunningError::NONE_STARTED)
-		})
-		.await
-		.unwrap_or(false)
-	{
+	if excludes::<Out>(entity, RunningError::NONE_STARTED).await {
 		return Ok(());
 	}
 	let labels = labels.join(", ");
@@ -557,6 +571,55 @@ mod test {
 			.unwrap_err()
 			.xpect_contains("boom failed")
 			.xpect_contains("held teardown failed");
+	}
+
+	/// Excluding [`RunningError::FACET_FAILED`] keeps the survivors serving: the
+	/// broken facet is dropped, nothing is signalled, and the call stays parked.
+	#[beet_core::test]
+	async fn excluded_facet_error_keeps_survivors_serving() {
+		let log = Store::<Vec<String>>::default();
+		let mut app = app();
+		let entity = spawn_set(&mut app, vec![
+			("boom", always(), failing_facet("boom failed")),
+			("held", always(), facet(log, "held", None)),
+		]);
+		app.world_mut()
+			.entity_mut(entity)
+			.insert(ExcludeRunningErrors(RunningError::FACET_FAILED));
+		let result = call(&mut app, entity);
+		until_logged(&mut app, log, 1).await;
+		AsyncRunner::settle_async_tasks(app.world_mut()).await;
+		// the survivor was never signalled, so it is still holding the run open
+		log.get().xpect_eq(vec!["held-start"]);
+		result.get().xpect_none();
+		app.world()
+			.entity(entity)
+			.contains::<Running<u32>>()
+			.xpect_true();
+	}
+
+	/// The exclusion survives a facet, never a whole run: once nothing is left
+	/// alive the call still fails, carrying every error the run collected.
+	#[beet_core::test]
+	async fn all_facets_dead_fails_even_when_excluded() {
+		let mut app = app();
+		let entity = spawn_set(&mut app, vec![
+			("boom", always(), failing_facet("boom failed")),
+			("bang", always(), failing_facet("bang failed")),
+		]);
+		app.world_mut()
+			.entity_mut(entity)
+			.insert(ExcludeRunningErrors(RunningError::FACET_FAILED));
+		let result = call(&mut app, entity);
+		app_ext::update_until(&mut app, |_| result.get().is_some())
+			.await
+			.xpect_true();
+		result
+			.get()
+			.unwrap()
+			.unwrap_err()
+			.xpect_contains("boom failed")
+			.xpect_contains("bang failed");
 	}
 
 	/// Removing the parked `Running` signals every facet, whose own teardown then

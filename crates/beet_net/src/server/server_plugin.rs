@@ -19,7 +19,17 @@ impl Plugin for ServerPlugin {
 			// the markup load verb, so an `<HttpServer>` entry, a `{CallOnReady}`
 			// script or behaviour scene resolves it, and its disarm marker.
 			.register_type::<CallOnReady>()
-			.register_type::<DisableCallOnReady>();
+			.register_type::<DisableCallOnReady>()
+			// the markup start verb, riding the `StartRunning<Request>` a
+			// `RunningSet` fans out, so it needs one global observer rather than
+			// per-entity boot machinery.
+			.register_type::<CallOnStart>()
+			.add_observer(CallOnStart::call_on_start);
+
+		// the repl reads a real stdin on a background thread, so it exists only
+		// where there is one.
+		#[cfg(not(target_arch = "wasm32"))]
+		app.register_type::<ReplServer>();
 
 		// a start whose `--server` selected no facet fails the call in the
 		// `RunningSet` itself, so there is no server-layer check to register here.

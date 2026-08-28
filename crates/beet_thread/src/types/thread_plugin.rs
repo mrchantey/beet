@@ -23,10 +23,10 @@ impl Plugin for ThreadPlugin {
 			// agent-loop control flow, as markup. `StoreToolset` is registered
 			// upstream by `RouterPlugin` (init above); the store is a plain `FsStore`.
 			.register_type::<RepeatWhileFunctionCallOutput>()
-			// markup verb: run the thread when the entry's servers boot. Owns no
-			// action slot, so the kick rides their `StartRunning<Request>` fan-out.
+			// markup verb: the thread's `Request -> Outcome` entry point, plus the
+			// `CallOnStart` that calls it on the entry's start. Owns no action slot;
+			// `ServerPlugin` (via `RouterPlugin`) owns the start fan-out.
 			.register_type::<RunThread>()
-			.add_observer(RunThread::kick_on_boot)
 			// markup persistence: declare a thread-record store from `.bsx`
 			.register_type::<MountThreadStore>()
 			// markup window bounding: stub older images so an endless loop's

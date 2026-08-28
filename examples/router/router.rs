@@ -22,11 +22,14 @@
 //! cargo run --example router -- about --accept=text/html
 //!
 //! # HTTP mode — start an HTTP server on port 8337
-//! cargo run --example router --features http_server
+//! cargo run --example router --features http_server -- --server=http
 //!
 //! # REPL mode — interactive read-eval-print loop
 //! cargo run --example router -- --server=repl
 //! ```
+//!
+//! Every server is declared on the one entry root and `--server` picks which
+//! ones act, so there is no argv matching in the example itself.
 use beet::prelude::*;
 
 fn main() -> AppExit {
@@ -41,73 +44,39 @@ fn main() -> AppExit {
 		.run()
 }
 
-fn setup(mut commands: Commands) -> Result {
-	commands
-		.spawn((
-			FsStore::new(WsPathBuf::new("examples/assets")),
-			router_scene()?,
-		))
-		// boot the spawned host; `.ok()` since the repl selection self-boots on
-		// spawn and claims no action to call.
-		.queue_async_local(|host| async move {
-			CallOnReady::call(
-				host,
-				Request::from_cli_args(CliArgs::parse_env()),
-			)
-			.await
-			.ok();
-			Ok(())
-		});
-	Ok(())
-}
+fn setup(mut commands: Commands) { commands.spawn(router_scene()); }
 
-pub fn router_scene() -> Result<impl Bundle> {
+/// The whole entry: an entry root declaring every IO layer, with the router as
+/// its dispatch child. `--server` decides which servers act, so the same scene
+/// serves one command, an http listener or an interactive prompt.
+pub fn router_scene() -> impl Bundle {
 	(
-		// declare the store used by the blob scenes
-		// the server is the IO layer, handling incoming requests
-		// from http, stdin etc
-		// the spawn site boots (empty filter matches it).
-		// `ReplServer` self-boots its own loop, so it ignores the boot.
-		server_from_cli()?,
+		// the store the blob scenes read their content from
+		FsStore::new(WsPathBuf::new("examples/assets")),
+		servers(),
+		CallOnReady::on_spawn(),
 		// the batteries-included router: route lookup + the default app routes,
 		// wrapping the user routes (children with a PathPartial and action)
-		(Router::with_defaults(), children![routes()]),
+		children![(Router::with_defaults(), children![routes()])],
 	)
-		.xok()
 }
 
-// OnSpawn serves as a type erased bundle; servers spawn as child entities
-// (`with_child` rather than a `children!` set, which would clobber the routes)
-fn server_from_cli() -> Result<OnSpawn> {
-	cfg_if! {
-		if #[cfg(feature="http_server")]{
-			let default_server = "http";
-		}else{
-			let default_server = "cli";
-		}
-	};
-
-	match CliArgs::parse_env()
-		.params
-		.get("server")
-		.map(|val: &SmolStr| val.to_lowercase())
-		.unwrap_or_else(|| default_server.into())
-		.as_str()
-	{
+/// The IO layers, each a facet of the root's one run. Only `CliServer` boots
+/// bare; the others wait to be named, so `cargo run --example router` still
+/// renders once and exits.
+fn servers() -> impl Bundle {
+	(
+		CliServer::default(),
+		ReplServer {
+			default_boot: false,
+			..default()
+		},
 		#[cfg(feature = "http_server")]
-		"http" => HttpServer::default().any_bundle(),
-		#[cfg(not(feature = "http_server"))]
-		"http" => bevybail!("Add the 'http_server' feature for http servers"),
-		// the repl self-boots on spawn, riding the host entity itself
-		"repl" => ReplServer::default().any_bundle(),
-		"cli" => CliServer::default().any_bundle(),
-		_ => {
-			bevybail!(
-				"Invalid server type specified. Accepted options are http,repl,cli"
-			);
-		}
-	}
-	.xok()
+		HttpServer {
+			default_boot: false,
+			..default()
+		},
+	)
 }
 
 fn routes() -> impl Bundle {
