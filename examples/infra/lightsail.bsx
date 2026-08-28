@@ -24,7 +24,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 <Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
 	<Stack app_name="lightsail">
-		<DeployVerbs/>
+		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LightsailSiteBlock features="aws_sdk"/>

@@ -5,7 +5,7 @@
 //! block/config types and directly-spawnable deploy actions register upstream in
 //! beet_infra's [`InfraPlugin`]; this module adds that plugin plus the few templates
 //! that wrap non-`Reflect` infra values (see `templates.rs`), so a scene's
-//! `<DeployVerbs/>`/`<LambdaSiteBlock/>` tag resolves from markup.
+//! `<DeployRoutes/>`/`<LambdaSiteBlock/>` tag resolves from markup.
 pub mod infra_ext;
 mod templates;
 pub use templates::*;
@@ -15,7 +15,7 @@ use beet_infra::prelude::*;
 
 /// Adds the [`InfraPlugin`] runtime (which registers the deploy block/action types)
 /// and registers the beet_extra deploy templates, so a loaded `examples/infra/*.bsx`
-/// scene resolves its `<DeployVerbs/>` etc tags and its `deploy`/`sync`/`destroy`
+/// scene resolves its `<DeployRoutes/>` etc tags and its `deploy`/`sync`/`destroy`
 /// routes run.
 pub struct InfraExamplesPlugin;
 
@@ -28,7 +28,7 @@ impl Plugin for InfraExamplesPlugin {
 			.register_template::<ExampleBinaryBuild>()
 			// the IaC verb routes a `<Stack>` hosts, and the bucket-lifecycle
 			// example's state-backend toggle.
-			.register_template::<DeployVerbs>()
+			.register_template::<DeployRoutes>()
 			.register_template::<StateBackendToggle>()
 			// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
 			// `.bsx` lambda deployer composes them (see `templates.rs`).

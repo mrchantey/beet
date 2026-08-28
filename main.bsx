@@ -53,7 +53,7 @@ loads that subtree too: the tags it never linked build as inert entities,
 quietly, because the route declares `RequireFeatures(["infra","extra"])`. Dispatching
 a shared verb in such a build fails naming the missing features. The stage rides
 the `<Stack>` COMPONENT, registered in every native build, so `shared` is correct
-even there; `<DeployVerbs/>` (a beet_extra template) adds the tofu lifecycle
+even there; `<DeployRoutes/>` (a beet_extra template) adds the tofu lifecycle
 routes, and is one of the tags a lean build has no behavior for.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
@@ -72,7 +72,7 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 	<Route path="shared" {RequireFeatures(["infra","extra"])}>
 		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-			<DeployVerbs/>
+			<DeployRoutes/>
 			<Route path="push" {ExchangeSequence}>
 				<DirSync bucket="assets" local_dir="assets"/>
 			</Route>

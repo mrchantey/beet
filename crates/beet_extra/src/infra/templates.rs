@@ -40,7 +40,7 @@ pub fn ExampleBinaryBuild(
 		.into_build_artifact()
 }
 
-/// `<DeployVerbs/>` — the standard IaC verb routes (validate / plan / apply /
+/// `<DeployRoutes/>` — the standard IaC verb routes (validate / plan / apply /
 /// show / list / destroy / rollback / rollforward), the markup form of
 /// [`Stack::verbs`].
 ///
@@ -50,7 +50,7 @@ pub fn ExampleBinaryBuild(
 /// absent from any binary that did not link the template, which is exactly how a
 /// `shared` scope can go missing in a lean build.
 #[template]
-pub fn DeployVerbs() -> impl Bundle { Stack::verbs() }
+pub fn DeployRoutes() -> impl Bundle { Stack::verbs() }
 
 /// `<StateBackendToggle/>` — select this launch's tofu state backend from argv:
 /// S3 when `--s3-backend` is passed, local otherwise. The markup form of
@@ -510,7 +510,7 @@ mod test {
 			r#"<Route path="shared">
 				<Stack stage="shared">
 					<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-					<DeployVerbs/>
+					<DeployRoutes/>
 					<Route path="push" {ExchangeSequence}>
 						<DirSync bucket="assets" local_dir="site/assets"/>
 					</Route>

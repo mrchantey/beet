@@ -18,7 +18,7 @@ the lambda runtime offers no argv), so a site change re-publishes by re-running
 
 A one-shot `CliServer` root whose `CallOnReady` fires the CLI request on load, with
 the `Router` as its dispatch child. `<Stack app_name="lambda">` is the resource
-identity every block and verb beneath it resolves by ancestry, and `<DeployVerbs/>`
+identity every block and verb beneath it resolves by ancestry, and `<DeployRoutes/>`
 adds the standard IaC verb routes (validate/plan/apply/...) to it. Each verb below is
 a child-sequenced `<Route path=".." {ExchangeSequence}>`: its block and actions are
 direct children of the route and the sequence runs them in order.
@@ -30,7 +30,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 <Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
 	<Stack app_name="lambda">
-		<DeployVerbs/>
+		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LambdaSiteBlock features="lambda,aws_sdk"/>

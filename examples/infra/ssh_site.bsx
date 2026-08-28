@@ -25,7 +25,7 @@ engine.
 <Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
 	<Stack app_name="ssh-site">
-		<DeployVerbs/>
+		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<FargateSshBlock/>
 			<ExampleBinaryBuild example="ssh_tui_site" features="ssh_tui,http_server,markdown"/>

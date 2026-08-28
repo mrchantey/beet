@@ -20,7 +20,7 @@ Live run needs AWS credentials and `tofu`.
 	     so the toggle sits outside the stack and lands on the process `Deployment` -->
 	<StateBackendToggle/>
 	<Stack app_name="bucket-example">
-		<DeployVerbs/>
+		<DeployRoutes/>
 		<Route path="run" {ExchangeSequence}>
 			<S3BucketBlock label="my-bucket" deploy_versioned=false {LifecycleProbe}/>
 		</Route>

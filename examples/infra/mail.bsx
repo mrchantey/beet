@@ -63,7 +63,7 @@ reads one back in, asserting the receiving end believes both.
 	     its mta), so the stack pins it rather than inheriting `AWS_REGION`: a
 	     deploy from a differently-configured machine builds the same stack. -->
 	<Stack app_name="mail-example" region="us-west-2">
-		<DeployVerbs/>
+		<DeployRoutes/>
 
 		<!-- the network the box sits in. No NAT gateway: the box has a public
 		     address of its own and the database has nothing to call out to. -->

@@ -27,7 +27,7 @@ and a container engine.
 <Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
 	<Stack app_name="fargate">
-		<DeployVerbs/>
+		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<FargateSiteBlock/>
 			<S3BucketBlock label="app" deploy_versioned=false/>

@@ -73,7 +73,7 @@ application declare its own infrastructure without shipping the deployer.
 `<Stack>` is the identity every resource beneath it composes its name from, and it
 is a registered component in every native build rather than a template prop, so the
 lean binary reads the same stage and the same `shared` override off the same tree.
-`<DeployVerbs/>` (a beet_extra template, absent from the lean binary along with the
+`<DeployRoutes/>` (a beet_extra template, absent from the lean binary along with the
 verbs it hosts) adds the tofu lifecycle routes `validate`/`plan`/`apply`/`show`/
 `list`/`destroy`/`rollback`/`rollforward` to whichever stack hosts it.
 
@@ -140,7 +140,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		<S3BucketBlock label="app" deploy_versioned=false/>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
-		<DeployVerbs/>
+		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<TofuApply layer="storage"/>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
@@ -168,7 +168,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		     binary, including the lean one where the verbs around it are inert -->
 		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-			<DeployVerbs/>
+			<DeployRoutes/>
 			<Route path="push" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 				<DirSync bucket="assets" local_dir="site/assets"/>
