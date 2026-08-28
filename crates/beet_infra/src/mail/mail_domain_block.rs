@@ -477,6 +477,17 @@ impl MailDomainBlock {
 }
 
 impl Block for MailDomainBlock {
+	/// The sovereign selector's public key, resolved from the param
+	/// [`EnsureDkimKey`](crate::mail::EnsureDkimKey) set. The filter mirrors
+	/// that action's exactly: a domain whose records somebody else holds gets
+	/// no key minted, so a variable here would fail resolution.
+	fn variables(&self) -> Vec<Variable> {
+		match self.records.proves_identity() {
+			true => vec![self.dkim_public_key_variable()],
+			false => Vec::new(),
+		}
+	}
+
 	fn apply_to_config(
 		&self,
 		_entity: &EntityRef,
@@ -488,6 +499,17 @@ impl Block for MailDomainBlock {
 		self.validate()?;
 		let identity = self.emit_ses(stack, config)?;
 		self.emit_events(stack, config)?;
+		// declared whenever `variables` resolves it, not only when the record
+		// that reads it is published: a `-var` for a variable the config never
+		// declared fails the apply, and a stage outside `dns_stage` still
+		// resolves this one.
+		if self.records.proves_identity() {
+			let variable = self.dkim_public_key_variable();
+			config.ensure_variable(
+				variable.key().to_string(),
+				variable.tf_declaration(),
+			);
+		}
 		// the identity is stack-scoped and the records are not, so a stage that
 		// does not own these names still gets a verified sender and publishes
 		// nothing
@@ -731,11 +753,6 @@ impl MailDomainBlock {
 		// the sovereign selector, whose public half arrives as a variable: the
 		// key is minted before the apply rather than by it, so the record and
 		// the signing server read one value from one parameter.
-		let variable = self.dkim_public_key_variable();
-		config.ensure_variable(
-			variable.key().to_string(),
-			variable.tf_declaration(),
-		);
 		dns.emit_txt(
 			stack,
 			config,
@@ -1185,6 +1202,47 @@ mod tests {
 			.xpect_true();
 		// ..while the sending identity, which IS stack-scoped, still exists
 		drill["resource"]["aws_sesv2_email_identity"]
+			.is_object()
+			.xpect_true();
+	}
+
+	/// The block must HAND its dkim variable to the apply, not merely declare
+	/// it in the config: a declared-only variable resolves to its empty
+	/// default, and `p=` empty is the wire form of a REVOKED selector. This is
+	/// exactly what the first phase-8 deploy published.
+	#[beet_core::test]
+	fn the_apply_resolves_the_dkim_variable() {
+		staging()
+			.variables()
+			.into_iter()
+			.map(|variable| variable.key().to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["dkim_stalwart_beetmash_com".to_string()]);
+		// no key is minted for a domain whose records somebody else holds, so
+		// a variable here would fail resolution rather than default
+		MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
+			.with_records(MailRecords::None)
+			.variables()
+			.len()
+			.xpect_eq(0);
+		// ..and a stage outside `dns_stage` publishes no record but still
+		// declares the variable, since the apply passes the `-var` regardless
+		// and an undeclared one fails the apply
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_stage("drill");
+		let mut config = deployment.create_config(&stack);
+		let mut world = World::new();
+		staging()
+			.with_dns_stage("prod")
+			.apply_to_config(
+				&world.spawn(()).as_readonly(),
+				&stack,
+				&deployment,
+				&default(),
+				&mut config,
+			)
+			.unwrap();
+		config.to_json()["variable"]["dkim_stalwart_beetmash_com"]
 			.is_object()
 			.xpect_true();
 	}
