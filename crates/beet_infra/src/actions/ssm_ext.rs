@@ -70,6 +70,33 @@ pub fn is_already_exists(err: &BevyError) -> bool {
 	err.to_string().contains("ParameterAlreadyExists")
 }
 
+/// Create or replace a `SecureString` parameter.
+///
+/// The opposite posture to [`create`], for the opposite ownership: use this
+/// only for a value some OTHER system mints and this parameter mirrors (the
+/// bootstrap admin credential a fresh Stalwart returns exactly once), where an
+/// existing value is by definition stale. A secret this deploy generates goes
+/// through [`create`], whose refusal to overwrite is what makes racing deploys
+/// safe.
+pub async fn overwrite(region: &str, name: &str, value: &str) -> Result {
+	command(region, [
+		"put-parameter",
+		"--name",
+		name,
+		"--type",
+		"SecureString",
+		"--value",
+		value,
+		"--overwrite",
+	])
+	// a failed command reports its own argv, so without this the one write
+	// that carries a secret is also the one most likely to print it
+	.with_secret(value)
+	.run_async()
+	.await?;
+	Ok(())
+}
+
 /// An `aws ssm` invocation in `region`. Drops a possibly-empty inherited
 /// `AWS_PROFILE`, which the cli reads as a profile literally named `""`.
 fn command<'a>(

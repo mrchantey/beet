@@ -303,7 +303,7 @@ async fn find_probe_message(
 	subject: &str,
 ) -> Result<Option<String>> {
 	let query = client
-		.call(
+		.call_mail(
 			"Email/query",
 			json!({
 				"accountId": account,
@@ -318,7 +318,7 @@ async fn find_probe_message(
 	// the header as text, since the verdicts are what matters and not the
 	// structure a parsed form would give
 	let get = client
-		.call(
+		.call_mail(
 			"Email/get",
 			json!({
 				"accountId": account,

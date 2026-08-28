@@ -59,6 +59,23 @@ pub struct AccountPlan {
 	pub secret: SecretRef,
 }
 
+/// The wire shape of the registry's `Map` type: one key per item, every value
+/// literally `true`. A plain JSON array is rejected (`invalidPatch`), and so is
+/// anything else, so every set-of-strings property in the schema (`contact`,
+/// `subjectAlternativeNames`, `bind`) goes through here.
+fn set_map<I, S>(items: I) -> Value
+where
+	I: IntoIterator<Item = S>,
+	S: ToString,
+{
+	Value::Object(
+		items
+			.into_iter()
+			.map(|item| (item.to_string(), Value::Bool(true)))
+			.collect(),
+	)
+}
+
 impl StalwartPlan {
 	/// The ACME directory the certificates come from. Let's Encrypt, matching
 	/// the `letsencrypt.org` rows the zone's `CAA` records already carry.
@@ -116,7 +133,7 @@ impl StalwartPlan {
 		json!({
 			"directory": Self::ACME_DIRECTORY,
 			"challengeType": "TlsAlpn01",
-			"contact": [self.acme_contact],
+			"contact": set_map([&self.acme_contact]),
 		})
 	}
 
@@ -140,7 +157,7 @@ impl StalwartPlan {
 		json!({
 			"name": service,
 			"protocol": protocol,
-			"bind": [format!("[::]:{port}")],
+			"bind": set_map([format!("[::]:{port}")]),
 			"useTls": true,
 			"tlsImplicit": implicit,
 		})
@@ -178,10 +195,12 @@ impl StalwartPlan {
 		json!({
 			"route": {
 				"else": format!("'{}'", Self::RELAY_ROUTE),
-				"match": [{
+				// a `List` on the wire is an object keyed by index, never an
+				// array, exactly like an account's aliases
+				"match": { "0": {
 					"if": "is_local_domain(rcpt_domain)",
 					"then": format!("'{}'", Self::LOCAL_ROUTE),
-				}],
+				}},
 			}
 		})
 	}
@@ -238,16 +257,17 @@ impl DomainPlan {
 		domain.validate()?;
 		let name = domain.domain().clone();
 		// every name a client opens TLS to, since ACME issues for the SANs and
-		// nothing else: the domain itself and the autoconfig hosts that CNAME
-		// at the box. The FIRST domain additionally carries the box's own
-		// hostname, which is the name an SMTP peer and an IMAP client dial and
-		// which belongs to no mail domain at all.
-		let mut certificate_names = vec![name.to_string()];
-		certificate_names.extend(
-			MailDomainBlock::AUTOCONFIG_LABELS
-				.iter()
-				.map(|label| format!("{label}.{name}")),
-		);
+		// nothing else: the autoconfig hosts that CNAME at the box, plus (on
+		// the FIRST domain) the box's own hostname, which is the name an SMTP
+		// peer and an IMAP client dial and which belongs to no mail domain at
+		// all. The bare domain is deliberately ABSENT: a mail domain is MX and
+		// TXT records with no address of its own, nothing dials TLS at it, and
+		// a TLS-ALPN order naming it dies with "no valid A records", taking
+		// every other name in the order down with it.
+		let mut certificate_names = MailDomainBlock::AUTOCONFIG_LABELS
+			.iter()
+			.map(|label| format!("{label}.{name}"))
+			.collect::<Vec<_>>();
 		if is_first {
 			certificate_names.push(mail_box.hostname().to_string());
 		}
@@ -278,7 +298,7 @@ impl DomainPlan {
 			"certificateManagement": {
 				"@type": "Automatic",
 				"acmeProviderId": acme_provider_id,
-				"subjectAlternativeNames": self.certificate_names,
+				"subjectAlternativeNames": set_map(&self.certificate_names),
 			},
 			"dkimManagement": { "@type": "Manual" },
 		})
@@ -410,13 +430,22 @@ mod tests {
 	/// port 22 does not: the box's sshd is a security-group opening, not
 	/// something Stalwart serves. Mail ports never bind at all until these
 	/// exist, so a missing one is a silently dead protocol.
+	///
+	/// `bind` is the registry's `Map` wire shape (`{addr: true}`), never an
+	/// array: an array is an `invalidPatch` the server rejects at apply.
 	#[beet_core::test]
 	fn a_listener_per_served_port() {
 		let plan = plan();
 		let ports = plan
 			.listeners
 			.iter()
-			.map(|listener| listener["bind"][0].as_str().unwrap().to_string())
+			.map(|listener| {
+				let bind = listener["bind"].as_object().unwrap();
+				bind.values()
+					.all(|value| value.as_bool() == Some(true))
+					.xpect_true();
+				bind.keys().next().unwrap().to_string()
+			})
 			.collect::<Vec<_>>();
 		ports.len().xpect_eq(5);
 		ports.contains(&"[::]:25".to_string()).xpect_true();
@@ -473,7 +502,8 @@ mod tests {
 			.xpect_eq("'ses'");
 		// without the local branch a message between two mailboxes on this
 		// server would go out to SES and come back in through the front door.
-		strategy["route"]["match"][0]["then"]
+		// (a `List` on the wire is keyed by index, never an array)
+		strategy["route"]["match"]["0"]["then"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("'local'");
@@ -482,13 +512,19 @@ mod tests {
 	/// The certificate must cover every name a client opens TLS to, and the
 	/// box's own hostname belongs to no mail domain at all: it rides the first
 	/// domain's SANs, which is the only place it can.
+	///
+	/// REGRESSION: the bare domain was a SAN, and a mail domain is MX and TXT
+	/// records with no A record of its own, so Let's Encrypt answered "no
+	/// valid A records found" and the whole order — every valid name included
+	/// — failed with it. A name belongs here exactly when something resolves
+	/// it to the box.
 	#[beet_core::test]
 	fn the_certificate_covers_the_box_and_the_autoconfig_hosts() {
 		let plan = plan();
 		let first = &plan.domains[0].certificate_names;
 		first
 			.contains(&"stalwart.beetmash.com".to_string())
-			.xpect_true();
+			.xpect_false();
 		first
 			.contains(&"autoconfig.stalwart.beetmash.com".to_string())
 			.xpect_true();
@@ -645,10 +681,11 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_contains("letsencrypt.org");
-		provider["contact"][0]
-			.as_str()
+		// the `Map` wire shape: the address IS the key
+		provider["contact"]["postmaster@stalwart.beetmash.com"]
+			.as_bool()
 			.unwrap()
-			.xpect_eq("postmaster@stalwart.beetmash.com");
+			.xpect_true();
 	}
 
 	/// Outbound mail is signed by SES Easy DKIM, whose selectors the domain

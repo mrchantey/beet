@@ -21,13 +21,20 @@ use serde_json::json;
 /// ## What is machine config and what is not
 ///
 /// Stalwart `0.16` split its configuration in two, and this block follows the
-/// split exactly. The on-disk `config.json` holds ONLY the stores (data, fts
-/// and in-memory on Postgres, blobs on S3); everything else — listeners, ACME,
-/// the SES relay route, the spam filter, domains and accounts — lives *inside*
-/// the data store as JMAP objects and is reconciled over the management API
-/// (`StalwartProvision`). So a freshly built box boots in Stalwart's bootstrap
-/// mode, serving only the management endpoint until provision configures it,
-/// and reconfiguring a running server never touches this block at all.
+/// split exactly. The on-disk `config.json` is the DATA store description alone
+/// (the internally-tagged `DataStore` object); everything else — the blob,
+/// search and in-memory stores, listeners, ACME, the SES relay route, the spam
+/// filter, domains and accounts — lives *inside* the data store as JMAP objects
+/// and is reconciled over the management API (`StalwartProvision`).
+///
+/// The file's absence is itself a state: a box with no `config.json` boots in
+/// Stalwart's bootstrap mode, serving only the management endpoint, and the
+/// SERVER writes the file when provision claims the data store through the
+/// `Bootstrap` singleton. So this block ships a `config.json.template` and
+/// never the file itself: first boot finds no file and waits to be claimed, and
+/// every later start re-renders the file from the template and SSM, so a
+/// credential rotation stays a restart. Reconfiguring a running server never
+/// touches this block at all.
 ///
 /// ## The rebuild rule
 ///
@@ -777,51 +784,67 @@ impl StalwartBlock {
 /// The machine config renderers. Everything here lands in user_data, so
 /// everything here obeys the rebuild rule; see the type docs.
 impl StalwartBlock {
-	/// The on-disk `config.json`, as a template: exactly Stalwart `0.16`'s
-	/// store description and nothing else, with the auth secret left as
-	/// `None` for [`secrets_script`](Self::secrets_script) to fill from SSM at
-	/// every start. The Postgres host is a terraform ref (non-secret), so a
-	/// replaced database instance rebuilds the box that points at it.
+	/// The on-disk `config.json`, as a template: Stalwart `0.16`'s `DataStore`
+	/// object alone — the file describes the data store and NOTHING else, with
+	/// the auth secret left as `None` for
+	/// [`secrets_script`](Self::secrets_script) to fill from SSM. The Postgres
+	/// host is a terraform ref (non-secret), so a replaced database instance
+	/// rebuilds the box that points at it.
+	///
+	/// The blob store is deliberately absent: it is a registry object the
+	/// server holds INSIDE the data store, written once by the `Bootstrap`
+	/// claim ([`Self::blob_store_config`] is that payload's half). The search
+	/// and in-memory stores are `Default`, ie the data store itself, so they
+	/// appear nowhere at all.
 	///
 	/// `allowInvalidCerts` is deliberate, not lazy: RDS presents a certificate
 	/// from Amazon's private RDS CA, which no default trust store carries. The
 	/// session is TLS inside a private subnet either way; pinning the RDS CA
 	/// bundle is a hardening follow-up.
-	fn store_config_template(&self, stack: &ResolvedStack) -> Value {
-		let none = json!({ "@type": "None" });
-		let postgres = json!({
+	fn store_config_template(&self) -> Value {
+		json!({
 			"@type": "PostgreSql",
 			"host": "__DB_HOST__",
 			"port": RdsPostgresBlock::PORT,
 			"database": self.db_name,
 			"authUsername": self.db_user,
-			"authSecret": none,
+			"authSecret": { "@type": "None" },
 			"useTls": true,
 			"allowInvalidCerts": true
-		});
+		})
+	}
+
+	/// The blob store as the `Bootstrap` claim declares it, composed here
+	/// beside the data store template so the box's file and the provision
+	/// payload cannot drift.
+	pub fn blob_store_config(&self, stack: &ResolvedStack) -> Value {
+		let none = json!({ "@type": "None" });
 		json!({
-			"DataStore": postgres,
-			"SearchStore": postgres,
-			"InMemoryStore": postgres,
-			"BlobStore": {
-				"@type": "S3",
-				"bucket": stack.resource_name(self.blob_bucket.clone()),
-				// no static credential anywhere on this box: the S3 client
-				// falls through its chain to the instance profile.
-				"accessKey": none,
-				"secretKey": none,
-				"securityToken": none,
-				"region": {
-					"@type": stack.region().to_upper_camel_case()
-				}
+			"@type": "S3",
+			"bucket": stack.resource_name(self.blob_bucket.clone()),
+			// no static credential anywhere on this box: the S3 client
+			// falls through its chain to the instance profile.
+			"accessKey": none,
+			"secretKey": none,
+			"securityToken": none,
+			"sessionToken": none,
+			"region": {
+				"@type": stack.region().to_upper_camel_case()
 			}
 		})
 	}
 
 	/// The boot script at `/usr/local/bin/stalwart-secrets`, run before every
 	/// service start: read the secrets from SSM through the instance profile,
-	/// render `config.json` from the template and the bootstrap admin
-	/// credential into `stalwart.env`. Rotation is therefore a restart.
+	/// render the bootstrap admin credential into `stalwart.env`, and — only
+	/// once the server has been claimed — `config.json` from the template.
+	/// Rotation is therefore a restart.
+	///
+	/// The existence guard is the commissioning protocol, not caution: a box
+	/// with NO `config.json` boots in bootstrap mode waiting for provision's
+	/// `Bootstrap` claim, and the server writes the first `config.json` itself.
+	/// Rendering one here on first boot would skip bootstrap mode entirely and
+	/// boot a server with an unclaimed, tableless data store.
 	///
 	/// The JSON splice goes through python (present in the AL2023 base AMI)
 	/// rather than sed, so a password is escaped as data and can never be
@@ -832,19 +855,18 @@ impl StalwartBlock {
 set -euo pipefail
 umask 077
 get() { aws ssm get-parameter --region '__REGION__' --name "$1" --with-decryption --query Parameter.Value --output text; }
-db_password="$(get '__DB_SECRET__')"
 admin_password="$(get '__ADMIN_SECRET__')"
-python3 - "$db_password" <<'PY' > /etc/stalwart/config.json.next
+if [ -f /etc/stalwart/config.json ]; then
+	db_password="$(get '__DB_SECRET__')"
+	python3 - "$db_password" <<'PY' > /etc/stalwart/config.json.next
 import json, sys
 with open("/etc/stalwart/config.json.template") as file:
     config = json.load(file)
-secret = {"@type": "Value", "secret": sys.argv[1]}
-for store in ("DataStore", "SearchStore", "InMemoryStore"):
-    if store in config:
-        config[store]["authSecret"] = secret
+config["authSecret"] = {"@type": "Value", "secret": sys.argv[1]}
 json.dump(config, sys.stdout)
 PY
-mv -f /etc/stalwart/config.json.next /etc/stalwart/config.json
+	mv -f /etc/stalwart/config.json.next /etc/stalwart/config.json
+fi
 printf 'STALWART_RECOVERY_ADMIN=__ADMIN_USER__:%s\n' "$admin_password" > /etc/stalwart/stalwart.env.next
 mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 "#;
@@ -933,7 +955,7 @@ WantedBy=multi-user.target"#
 		let tarball = Self::STALWART_TARBALL;
 		let sha256 = Self::STALWART_SHA256;
 		let store_template =
-			serde_json::to_string_pretty(&self.store_config_template(stack))?;
+			serde_json::to_string_pretty(&self.store_config_template())?;
 		let secrets_script = self.secrets_script(stack);
 		let unit = self.systemd_unit();
 		let cloudwatch =
@@ -952,15 +974,19 @@ mkdir -p /etc/stalwart /var/lib/stalwart /var/log/stalwart
 chown -R stalwart:stalwart /etc/stalwart /var/lib/stalwart /var/log/stalwart
 
 # the pinned release: a tarball that does not hash to the pinned digest never
-# reaches the disk, and the boot fails loudly instead
-curl -sSLf 'https://github.com/stalwartlabs/stalwart/releases/download/v{version}/{tarball}' -o /tmp/stalwart.tar.gz
+# reaches the disk, and the boot fails loudly instead. Retries cover a transient
+# mid-transfer reset, which would otherwise dead-end the whole first boot: this
+# script runs once per instance, so a flaky download costs a machine rebuild.
+curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 'https://github.com/stalwartlabs/stalwart/releases/download/v{version}/{tarball}' -o /tmp/stalwart.tar.gz
 echo '{sha256}  /tmp/stalwart.tar.gz' | sha256sum -c -
 tar -xzf /tmp/stalwart.tar.gz -C /usr/local/bin stalwart
 chmod 0755 /usr/local/bin/stalwart
 rm /tmp/stalwart.tar.gz
 
-# the store config, as a template: secrets are absent by design and rendered
-# from SSM at every service start
+# the data store config as a TEMPLATE, never the file itself: config.json's
+# absence is what puts the first boot in bootstrap mode, the server writes the
+# real file when provision claims it, and every later start re-renders it from
+# this template and SSM
 cat > /etc/stalwart/config.json.template <<'CONFIG_EOF'
 {store_template}
 CONFIG_EOF
@@ -1150,7 +1176,8 @@ mod tests {
 	fn no_secret_material_in_machine_config() {
 		let script = user_data(&mail_box());
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		// once per store the host feeds: data, search, in-memory
+		// exactly once: the template is the data store alone, and the stores
+		// that used to restate the host (search, in-memory) default to it
 		let host = DatabaseRef::new("db")
 			.host(&stack)
 			.trim_end_matches('}')
@@ -1162,7 +1189,7 @@ mod tests {
 				script[index..].split('}').next().unwrap().to_string()
 			})
 			.collect::<Vec<_>>()
-			.xpect_eq(vec![host.clone(), host.clone(), host]);
+			.xpect_eq(vec![host]);
 		script
 			.as_str()
 			.xnot()
@@ -1402,31 +1429,40 @@ mod tests {
 			.xpect_eq(1);
 	}
 
-	/// The store config is Stalwart `0.16`'s split, exactly: data, fts and
-	/// in-memory on the stack's Postgres, blobs on the stack's bucket with no
-	/// static key (the client falls through to the instance profile), and the
-	/// secret slot left empty for the boot renderer.
+	/// The on-disk config template is Stalwart `0.16`'s `DataStore` object
+	/// ALONE: an internally-tagged Postgres store with the secret slot left
+	/// empty for the boot renderer, and no other store in the file.
+	///
+	/// REGRESSION: the first render was a map of all four stores, which the
+	/// server rejects at the top level (`missing field @type`) and the service
+	/// crash-loops. The file's whole schema is the one tagged enum; the blob
+	/// store rides the `Bootstrap` claim and the rest default to the data
+	/// store.
 	#[beet_core::test]
-	fn store_config_holds_postgres_and_s3_and_no_secrets() {
+	fn store_config_template_is_the_data_store_alone() {
+		let template = mail_box().store_config_template();
+		template["@type"].as_str().unwrap().xpect_eq("PostgreSql");
+		template["authSecret"]["@type"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("None");
+		template["database"].as_str().unwrap().xpect_eq("mail");
+		template["host"].as_str().unwrap().xpect_eq("__DB_HOST__");
+		for absent in ["DataStore", "SearchStore", "InMemoryStore", "BlobStore"]
+		{
+			template[absent].is_null().xpect_true();
+		}
+	}
+
+	/// The blob store the `Bootstrap` claim declares: the stack's bucket with
+	/// no static key anywhere (every credential slot is `None`, so the S3
+	/// client falls through its chain to the instance profile).
+	#[beet_core::test]
+	fn blob_store_config_holds_s3_and_no_secrets() {
 		let block = mail_box();
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let template = block.store_config_template(&stack);
-		for store in ["DataStore", "SearchStore", "InMemoryStore"] {
-			template[store]["@type"]
-				.as_str()
-				.unwrap()
-				.xpect_eq("PostgreSql");
-			template[store]["authSecret"]["@type"]
-				.as_str()
-				.unwrap()
-				.xpect_eq("None");
-		}
-		template["DataStore"]["database"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("mail");
-		let blob = &template["BlobStore"];
+		let blob = block.blob_store_config(&stack);
 		blob["@type"].as_str().unwrap().xpect_eq("S3");
 		blob["bucket"]
 			.as_str()
@@ -1436,10 +1472,10 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("ApSoutheast2");
-		blob["accessKey"]["@type"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("None");
+		for slot in ["accessKey", "secretKey", "securityToken", "sessionToken"]
+		{
+			blob[slot]["@type"].as_str().unwrap().xpect_eq("None");
+		}
 	}
 
 	/// The `A` record is the box's hostname at the EIP, DNS-only: an MTA

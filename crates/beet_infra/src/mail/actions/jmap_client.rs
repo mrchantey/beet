@@ -91,8 +91,35 @@ impl JmapClient {
 	/// Invoke one method, returning its result. A JMAP-level `error` response
 	/// is an error here rather than a value the caller has to inspect.
 	pub async fn call(&self, method: &str, args: Value) -> Result<Value> {
+		self.call_using(Self::USING, method, args).await
+	}
+
+	/// [`call`](Self::call) for a MAILBOX method (`Email/query`, `Email/get`):
+	/// the same session, declaring the mail capability instead of the
+	/// management one. Separate rather than merged into one `using` set
+	/// because a bootstrap-mode session has no mail capability to declare, and
+	/// a server may reject a capability it did not advertise.
+	pub async fn call_mail(&self, method: &str, args: Value) -> Result<Value> {
+		self.call_using(
+			&["urn:ietf:params:jmap:core", Self::MAIL_CAPABILITY],
+			method,
+			args,
+		)
+		.await
+	}
+
+	async fn call_using(
+		&self,
+		using: &[&str],
+		method: &str,
+		args: Value,
+	) -> Result<Value> {
 		let mut responses = self
-			.call_many(vec![(method.to_string(), args, "c0".to_string())])
+			.call_many_using(using, vec![(
+				method.to_string(),
+				args,
+				"c0".to_string(),
+			)])
 			.await?;
 		if responses.len() != 1 {
 			bevybail!(
@@ -118,11 +145,19 @@ impl JmapClient {
 		&self,
 		calls: Vec<(String, Value, String)>,
 	) -> Result<Vec<(String, Value, String)>> {
+		self.call_many_using(Self::USING, calls).await
+	}
+
+	async fn call_many_using(
+		&self,
+		using: &[&str],
+		calls: Vec<(String, Value, String)>,
+	) -> Result<Vec<(String, Value, String)>> {
 		let response =
 			Request::post(format!("{}{}", self.origin, self.api_path))
 				.with_auth_raw(&self.auth)
 				.with_json_body(&json!({
-					"using": Self::USING,
+					"using": using,
 					"methodCalls": calls,
 				}))?
 				.send()
@@ -215,13 +250,49 @@ impl JmapClient {
 		id: &str,
 		patch: &Value,
 	) -> Result {
+		self.update_returning(object_type, id, patch).await?;
+		Ok(())
+	}
+
+	/// [`update`](Self::update), returning whatever the server attached to the
+	/// updated id. Almost always `null`; the exception is the `Bootstrap`
+	/// claim, whose response carries the admin credential the server minted.
+	pub async fn update_returning(
+		&self,
+		object_type: &str,
+		id: &str,
+		patch: &Value,
+	) -> Result<Value> {
 		let result = self
 			.call(
 				&format!("{object_type}/set"),
 				json!({ "update": { id: patch } }),
 			)
 			.await?;
-		Self::reject_set_errors(object_type, &result, "notUpdated")
+		Self::reject_set_errors(object_type, &result, "notUpdated")?;
+		result["updated"][id].clone().xok()
+	}
+
+	/// The singleton of `object_type` if the server holds one, else `None`.
+	///
+	/// The one caller that matters is the bootstrap probe: `x:Bootstrap/get`
+	/// answers with its singleton exactly while the server is in bootstrap
+	/// mode, and `notFound` from the moment the data store is claimed.
+	pub async fn try_get_singleton(
+		&self,
+		object_type: &str,
+	) -> Result<Option<Value>> {
+		let result = self
+			.call(
+				&format!("{object_type}/get"),
+				json!({ "ids": [Self::SINGLETON_ID] }),
+			)
+			.await?;
+		result["list"]
+			.as_array()
+			.and_then(|list| list.first())
+			.cloned()
+			.xok()
 	}
 
 	/// Patch the one instance of a singleton object type (system settings, the

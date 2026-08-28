@@ -4,6 +4,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
+use serde_json::json;
 
 /// `<StalwartProvision/>` — after the apply, make the box that terraform built
 /// serve the mail the blocks declared.
@@ -144,7 +145,7 @@ pub async fn StalwartProvisionAction(
 		.tunnel(provision.local_port(), StalwartProvision::MANAGEMENT_PORT)
 		.await?;
 	let origin = format!("http://127.0.0.1:{}", provision.local_port());
-	let client = wait_for_management(
+	let mut client = wait_for_management(
 		&origin,
 		&admin_password,
 		*provision.timeout(),
@@ -152,7 +153,31 @@ pub async fn StalwartProvisionAction(
 	)
 	.await?;
 
-	apply_plan(&client, &plan, &region, &mail.stack).await?;
+	// a claim initializes the data store but the CLAIMED server only exists
+	// after a restart: the running process stays in bootstrap mode, refusing
+	// every other object type, until it boots against the config.json it just
+	// wrote. The restarted server seeds a default listener set that includes
+	// management http on 8080, so the same tunnel reaches it again.
+	if bootstrap(&client, &connection, &plan, &mail, &region).await? {
+		info!(
+			"restarting {} to leave bootstrap mode",
+			StalwartProvision::UNIT
+		);
+		connection
+			.run_command(&format!(
+				"sudo -n systemctl restart {}",
+				StalwartProvision::UNIT
+			))
+			.await?;
+		client = wait_for_management(
+			&origin,
+			&admin_password,
+			*provision.timeout(),
+			*provision.poll(),
+		)
+		.await?;
+	}
+	let domain_ids = apply_plan(&client, &plan, &region, &mail.stack).await?;
 
 	info!(
 		"restarting {} so the mail listeners bind",
@@ -164,6 +189,27 @@ pub async fn StalwartProvisionAction(
 			StalwartProvision::UNIT
 		))
 		.await?;
+
+	// certificates come from AcmeRenewal tasks, and a task executes only while
+	// the process that accepted it keeps running: one scheduled moments before
+	// the restart above dies pending with the process. So issuance is asked
+	// for AFTER the last restart, through the same tunnel, and waited on: 443
+	// serving the real certificate is the deploy's proof, not its hope.
+	let client = wait_for_management(
+		&origin,
+		&admin_password,
+		*provision.timeout(),
+		*provision.poll(),
+	)
+	.await?;
+	converge_certificates(
+		&client,
+		&plan,
+		&domain_ids,
+		*provision.timeout(),
+		*provision.poll(),
+	)
+	.await?;
 	drop(_tunnel);
 
 	wait_for_health(&mail.mail_box, *provision.timeout(), *provision.poll())
@@ -171,7 +217,184 @@ pub async fn StalwartProvisionAction(
 	Pass(cx.input).xok()
 }
 
-/// Converge the server onto `plan`, in dependency order.
+/// Ask for a certificate for every domain whose declared names no stored
+/// certificate covers, then wait until every domain is covered.
+///
+/// The server only schedules issuance itself on a domain's Manual ->
+/// Automatic transition and at renewal, so a failed first order or a changed
+/// SAN list would otherwise wait for an expiry that never comes. Covered means
+/// no task, which is what makes a reprovision idempotent.
+async fn converge_certificates(
+	client: &JmapClient,
+	plan: &StalwartPlan,
+	domain_ids: &[String],
+	timeout: Duration,
+	poll: Duration,
+) -> Result {
+	let certificates = client.list("x:Certificate").await?;
+	let mut waiting = Vec::new();
+	for (domain, domain_id) in plan.domains.iter().zip(domain_ids) {
+		if certificate_covers(&certificates, &domain.certificate_names) {
+			continue;
+		}
+		client
+			.create(
+				"x:Task",
+				&json!({ "@type": "AcmeRenewal", "domainId": domain_id }),
+			)
+			.await?;
+		info!("{}: certificate issuance scheduled", domain.name);
+		waiting.push(domain);
+	}
+	if waiting.is_empty() {
+		return Ok(());
+	}
+	let attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
+	for _ in 0..attempts {
+		time_ext::sleep(poll).await;
+		let certificates = client.list("x:Certificate").await?;
+		waiting.retain(|domain| {
+			!certificate_covers(&certificates, &domain.certificate_names)
+		});
+		if waiting.is_empty() {
+			info!("every domain's certificate is issued and stored");
+			return Ok(());
+		}
+	}
+	bevybail!(
+		"certificates never arrived for: {} (the ACME order may be failing; \
+		the server log names the rejected hostname)",
+		waiting
+			.iter()
+			.map(|domain| domain.name.as_str())
+			.collect::<Vec<_>>()
+			.join(", ")
+	)
+}
+
+/// Claim a fresh data store through the `Bootstrap` singleton, or do nothing.
+///
+/// A `0.16` server whose `config.json` is absent boots in bootstrap mode, where
+/// the ONE settable object is `Bootstrap`: patching its singleton hands the
+/// server every store at once, and the server then creates the SQL tables,
+/// writes `config.json` itself, creates the default domain and an
+/// `admin@<domain>` account, and leaves bootstrap mode — all before this
+/// returns. The probe is `x:Bootstrap/get`, which answers with its
+/// singleton exactly while bootstrap mode lasts, so a rerun against a claimed
+/// server skips the whole step.
+///
+/// The data store settings are read off the BOX's own template
+/// (`config.json.template`, terraform-rendered) rather than re-composed here,
+/// so the host the claim names and the host the box re-renders at every later
+/// start are one string. Only the secret is filled in, from the same parameter
+/// the box reads.
+///
+/// The server MINTS the admin account's password and returns it in the set
+/// response, this one time; it is parked at the same parameter composition
+/// every other account's credential uses, overwriting any stale value from a
+/// previous deployment's store (a claim only ever succeeds on a blank one).
+///
+/// Returns whether a claim happened, because a claim obliges the CALLER to
+/// restart the unit: the running process stays in bootstrap mode until it
+/// boots against the `config.json` it wrote.
+async fn bootstrap(
+	client: &JmapClient,
+	connection: &SshConnection,
+	plan: &StalwartPlan,
+	mail: &MailStack,
+	region: &str,
+) -> Result<bool> {
+	if client.try_get_singleton("x:Bootstrap").await?.is_none() {
+		info!("data store already claimed, nothing to bootstrap");
+		return Ok(false);
+	}
+	let stack = &mail.stack;
+	let template = connection
+		.run_command("cat /etc/stalwart/config.json.template")
+		.await?;
+	let template = String::from_utf8(template.stdout)?;
+	let mut data_store: Value = serde_json::from_str(template.trim())
+		.map_err(|err| {
+			bevyhow!("the box's config.json.template is not json: {err}")
+		})?;
+	data_store["authSecret"] = json!({
+		"@type": "Value",
+		"secret": read_secret(region, &mail.mail_box.database().secret_name(stack)).await?,
+	});
+	let domain = mail
+		.domains
+		.first()
+		.ok_or_else(|| bevyhow!("no mail domain to bootstrap with"))?;
+
+	info!("claiming the data store (creates tables, may take a minute)...");
+	let claim = client
+		.update_returning("x:Bootstrap", JmapClient::SINGLETON_ID, &json!({
+			"serverHostname": plan.hostname,
+			"defaultDomain": domain.domain(),
+			// provision owns certificates and DKIM: ACME converges as its own
+			// object below, and outbound is SES-signed until the sovereign
+			// selector lands
+			"requestTlsCertificate": false,
+			"generateDkimKeys": false,
+			"dataStore": data_store,
+			"blobStore": mail.mail_box.blob_store_config(stack),
+			// `Default` IS the data store, which is the declared shape: postgres
+			// carries search and ephemera, S3 carries blobs
+			"searchStore": { "@type": "Default" },
+			"inMemoryStore": { "@type": "Default" },
+			"directory": { "@type": "Internal" },
+		}))
+		.await;
+	let updated = match claim {
+		Ok(updated) => updated,
+		// the state a crash between claim and restart leaves behind: the store
+		// is claimed (the server wrote its own config.json) but the process
+		// never rebooted out of bootstrap mode, so it still serves the
+		// singleton and a second claim trips over the first's objects (the
+		// exact rejection varies: "already been initialized", a
+		// primaryKeyViolation on the domain). The file on disk is the truth of
+		// whether a claim happened, so ask the box rather than matching error
+		// strings; the obligation is the same either way: restart.
+		Err(err) => {
+			let claimed = connection
+				.run_command("test -f /etc/stalwart/config.json && echo claimed || echo unclaimed")
+				.await?;
+			if String::from_utf8_lossy(&claimed.stdout).contains("claimed")
+				&& !String::from_utf8_lossy(&claimed.stdout)
+					.contains("unclaimed")
+			{
+				info!(
+					"the data store is already claimed; a restart finishes it"
+				);
+				return Ok(true);
+			}
+			return Err(err);
+		}
+	};
+
+	let secret_name = SecretRef::new(format!(
+		"{}-account-admin-at-{}",
+		mail.mail_box.label(),
+		domain.slug()
+	))
+	.name(stack);
+	match updated["secret"].as_str() {
+		Some(secret) => {
+			ssm_ext::overwrite(region, &secret_name, secret).await?;
+			info!("parked the bootstrap admin credential at {secret_name}");
+		}
+		None => warn!(
+			"the bootstrap claim returned no admin credential; expected one at \
+			`secret` in the set response"
+		),
+	}
+	info!("data store claimed, {} created", domain.domain());
+	Ok(true)
+}
+
+/// Converge the server onto `plan`, in dependency order. Returns each domain's
+/// id, in the plan's own order, for the certificate step that runs after the
+/// restart.
 ///
 /// The order is the plan's own shape: the ACME provider before the domains that
 /// reference it, the domains before the accounts that live on them, the
@@ -182,7 +405,7 @@ async fn apply_plan(
 	plan: &StalwartPlan,
 	region: &str,
 	stack: &ResolvedStack,
-) -> Result {
+) -> Result<Vec<String>> {
 	client
 		.update_singleton("x:SpamSettings", &plan.spam_settings())
 		.await?;
@@ -211,12 +434,11 @@ async fn apply_plan(
 		.await?;
 	info!("outbound relays through {}", plan.relay["address"]);
 
-	let mut default_domain = None;
+	let mut domain_ids = Vec::new();
 	for domain in &plan.domains {
 		let domain_id =
 			converge(client, "x:Domain", &["name"], &domain.object(&acme))
 				.await?;
-		default_domain.get_or_insert_with(|| domain_id.clone());
 		for account in &domain.accounts {
 			converge_account(client, account, &domain_id, region, stack)
 				.await?;
@@ -230,18 +452,34 @@ async fn apply_plan(
 			domain.name,
 			domain.accounts.len()
 		);
+		domain_ids.push(domain_id);
 	}
 
-	let default_domain = default_domain
+	let default_domain = domain_ids
+		.first()
 		.ok_or_else(|| bevyhow!("the plan declared no domain to default to"))?;
 	client
 		.update_singleton(
 			"x:SystemSettings",
-			&plan.system_settings(&default_domain),
+			&plan.system_settings(default_domain),
 		)
 		.await?;
 	info!("hostname is {}", plan.hostname);
-	Ok(())
+	Ok(domain_ids)
+}
+
+/// Whether any stored certificate covers every one of `names`.
+///
+/// A certificate's `subjectAlternativeNames` arrives in the registry's `Map`
+/// wire shape, ie the names are the KEYS.
+fn certificate_covers(certificates: &[Value], names: &[String]) -> bool {
+	certificates.iter().any(|certificate| {
+		let Some(sans) = certificate["subjectAlternativeNames"].as_object()
+		else {
+			return false;
+		};
+		names.iter().all(|name| sans.contains_key(name))
+	})
 }
 
 /// Create `object` if no existing one matches on `match_on`, else patch the one
