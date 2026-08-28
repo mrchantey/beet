@@ -249,7 +249,10 @@ impl Block for RdsPostgresBlock {
 	/// itself needs no cloud permission at all, being a tcp session inside the
 	/// vpc that the security group either admits or does not.
 	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
-		vec![AccessGrant::read(Self::ACCESS_KIND, self.secret_name(stack))]
+		vec![AccessGrant::read(
+			Self::ACCESS_KIND,
+			self.secret_name(stack),
+		)]
 	}
 
 	fn variables(&self) -> Vec<Variable> { vec![self.password()] }

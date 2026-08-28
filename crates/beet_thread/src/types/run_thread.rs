@@ -188,9 +188,7 @@ mod test {
 			.init_plugin::<ThreadPlugin>();
 		app.world_mut()
 			.spawn(children![scene(path, system, agent)])
-			.trigger(|entity| {
-				StartRunning::new(entity, Request::default())
-			});
+			.trigger(|entity| StartRunning::new(entity, Request::default()));
 		// pump long enough for the async kick -> adopt -> mount -> run -> sync
 		for _ in 0..120 {
 			app.update();
