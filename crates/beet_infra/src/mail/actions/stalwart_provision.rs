@@ -245,19 +245,21 @@ impl Management {
 	) -> Result<Self> {
 		let user = StalwartBlock::ADMIN_USER.to_string();
 		let admin_secret = admin_secret_name(mail)?;
-		let origin = format!("https://{}", mail.mail_box.hostname());
+		let public_origin = format!("https://{}", mail.mail_box.hostname());
 
 		// the commissioned path: the real administrator account over the port
 		// the world already reaches. No tunnel, no recovery credential, and
 		// nothing on the box listening in the clear.
 		if let Some(password) = ssm_ext::get(region, &admin_secret).await?
 			&& let Ok(client) =
-				JmapClient::connect(&origin, &user, &password).await
+				JmapClient::connect(&public_origin, &user, &password).await
 		{
-			info!("management over {origin} as the administrator account");
+			info!(
+				"management over {public_origin} as the administrator account"
+			);
 			return Self {
 				client,
-				origin,
+				origin: public_origin,
 				user,
 				password,
 				tunnel: None,
@@ -271,19 +273,24 @@ impl Management {
 		let tunnel = connection
 			.tunnel(provision.local_port(), StalwartProvision::MANAGEMENT_PORT)
 			.await?;
-		let origin = format!("http://127.0.0.1:{}", provision.local_port());
+		let tunnel_origin =
+			format!("http://127.0.0.1:{}", provision.local_port());
 
 		// bootstrap mode is a property of the RUNNING process rather than of
 		// the disk, so it is decided by which credential answers. The endpoint
 		// is waited for once, unauthenticated, so that a rejected credential
 		// means "not this one" instead of "not up yet" — the difference between
 		// one failed request and a ten-minute poll against the wrong password.
-		wait_for_endpoint(&origin, *provision.timeout(), *provision.poll())
-			.await?;
+		wait_for_endpoint(
+			&tunnel_origin,
+			*provision.timeout(),
+			*provision.poll(),
+		)
+		.await?;
 		let recovery =
 			read_secret(region, &mail.mail_box.admin_secret_name(&mail.stack))
 				.await?;
-		match JmapClient::connect(&origin, &user, &recovery).await {
+		match JmapClient::connect(&tunnel_origin, &user, &recovery).await {
 			Ok(client) => {
 				Self::commission(&client, connection, plan, mail, region)
 					.await?
@@ -303,20 +310,32 @@ impl Management {
 		);
 		connection.run_command(&restart_command()).await?;
 		let password = read_secret(region, &admin_secret).await?;
-		let client = wait_for_management(
-			&origin,
+		// which port the server comes back on depends on how far the store it
+		// is about to load had already been commissioned, and the two cases
+		// cannot be told apart before the restart. A FRESH claim boots into a
+		// store that still holds the server-seeded management listener and no
+		// certificate, so the tunnel is the only way in. A REBUILD recovery
+		// boots into production's own store, where [`retire_listeners`] deleted
+		// that listener the first time it ran and 443 holds a certificate: the
+		// plaintext port never comes back, and waiting for it is a wait with no
+		// end. So both are offered and whichever answers IS the channel.
+		let (client, origin) = wait_for_management(
+			&[&public_origin, &tunnel_origin],
 			&user,
 			&password,
 			*provision.timeout(),
 			*provision.poll(),
 		)
 		.await?;
+		// the forward is held only while it is the channel: kept here, dropped
+		// with `tunnel` going out of scope when the public endpoint won.
+		let tunnel = (origin == tunnel_origin).then_some(tunnel);
 		Self {
 			client,
 			origin,
 			user,
 			password,
-			tunnel: Some(tunnel),
+			tunnel,
 		}
 		.xok()
 	}
@@ -376,8 +395,9 @@ impl Management {
 		provision: &StalwartProvision,
 	) -> Result {
 		connection.run_command(&restart_command()).await?;
-		self.client = wait_for_management(
-			&self.origin,
+		let origin = self.origin.clone();
+		(self.client, _) = wait_for_management(
+			&[&origin],
 			&self.user,
 			&self.password,
 			*provision.timeout(),
@@ -908,31 +928,44 @@ async fn read_secret(region: &str, name: &str) -> Result<String> {
 
 
 
-/// Poll the forwarded management endpoint until it authenticates, which is also
-/// the check that the box finished booting and opened its data store.
+/// Poll the management endpoint until it authenticates, which is also the check
+/// that the box finished booting and opened its data store. Returns the client
+/// and the origin that answered.
+///
+/// Takes every origin the server might come back on rather than the one it is
+/// expected to, because after a restart that is genuinely not known: a box
+/// whose store has been through [`retire_listeners`] has no plaintext
+/// management port to come back on, and a box whose store has not been claimed
+/// has no certificate to serve 443 with. Each round tries them in order, so a
+/// caller passing one origin gets exactly the old behaviour and a caller
+/// passing two gets whichever is real, at the cost of one failed request.
 async fn wait_for_management(
-	origin: &str,
+	origins: &[&str],
 	user: &str,
 	password: &str,
 	timeout: Duration,
 	poll: Duration,
-) -> Result<JmapClient> {
+) -> Result<(JmapClient, String)> {
 	let attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
 	let mut last = None;
 	for attempt in 1..=attempts {
-		match JmapClient::connect(origin, user, password).await {
-			Ok(client) => {
-				info!("management endpoint ready after {attempt} attempt(s)");
-				return Ok(client);
-			}
-			Err(err) => {
-				last = Some(err);
-				time_ext::sleep(poll).await;
+		for origin in origins {
+			match JmapClient::connect(*origin, user, password).await {
+				Ok(client) => {
+					info!(
+						"management endpoint {origin} ready after {attempt} \
+						attempt(s)"
+					);
+					return Ok((client, origin.to_string()));
+				}
+				Err(err) => last = Some(err),
 			}
 		}
+		time_ext::sleep(poll).await;
 	}
 	bevybail!(
-		"the management endpoint never answered: {}",
+		"the management endpoint never answered on any of {}: {}",
+		origins.join(", "),
 		last.map(|err| err.to_string()).unwrap_or_default()
 	)
 }
@@ -1065,6 +1098,32 @@ mod tests {
 		};
 		patch.get("@type").is_none().xpect_true();
 		patch["description"].as_str().unwrap().xpect_eq("mailbox");
+	}
+
+	/// Every origin offered is tried in every round, which is the property the
+	/// rebuild-recovery path rests on: the restarted box comes back on ONE of
+	/// the two channels and which one is not knowable beforehand. Before this,
+	/// the recovery waited on the tunnel alone and a box whose store had
+	/// already retired the plaintext management listener never answered it —
+	/// a wait with no end against a server that was serving mail perfectly.
+	#[beet_core::test]
+	async fn every_offered_origin_is_tried() {
+		// two ports nothing is listening on, so each attempt is a refused
+		// connection rather than a wait, and the whole test is milliseconds
+		let Err(err) = wait_for_management(
+			&["http://127.0.0.1:1", "http://127.0.0.1:2"],
+			"admin",
+			"hunter2",
+			Duration::from_secs(1),
+			Duration::from_secs(1),
+		)
+		.await
+		else {
+			panic!("nothing is listening, so nothing can have connected");
+		};
+		err.to_string()
+			.xpect_contains("http://127.0.0.1:1")
+			.xpect_contains("http://127.0.0.1:2");
 	}
 
 	/// Matching on several properties is what keeps two domains' `pete@`
