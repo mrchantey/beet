@@ -193,64 +193,11 @@ impl LightsailBlock {
 		Ok(())
 	}
 
-	/// The dynamodb actions a read-only table grant lowers to.
-	const READ_TABLE_ACTIONS: &'static [&'static str] = &[
-		"dynamodb:DescribeTable",
-		"dynamodb:GetItem",
-		"dynamodb:Query",
-		"dynamodb:Scan",
-		"dynamodb:BatchGetItem",
-	];
-
-	/// The dynamodb actions a read/write table grant lowers to.
-	const READ_WRITE_TABLE_ACTIONS: &'static [&'static str] = &[
-		"dynamodb:DescribeTable",
-		"dynamodb:GetItem",
-		"dynamodb:PutItem",
-		"dynamodb:UpdateItem",
-		"dynamodb:DeleteItem",
-		"dynamodb:Query",
-		"dynamodb:Scan",
-		"dynamodb:BatchGetItem",
-		"dynamodb:BatchWriteItem",
-	];
-
-	/// The bucket-level and object-level arn for each of `buckets`: an s3 action
-	/// set spans both, and a statement naming only one of them silently fails
-	/// half the calls.
-	fn bucket_arns(buckets: &[String]) -> Vec<String> {
-		buckets
-			.iter()
-			.flat_map(|bucket| {
-				[
-					format!("arn:aws:s3:::{bucket}"),
-					format!("arn:aws:s3:::{bucket}/*"),
-				]
-			})
-			.collect()
-	}
-
 	/// The inline IAM policy document for the box's runtime identity, LOWERED
-	/// from the [`AccessGrants`] the stack's blocks declared: a declared bucket
-	/// becomes an s3 statement, a declared table a dynamodb one, each scoped to
-	/// the grant's own [`AccessPermissions`]. The two grants this block owns
-	/// internally are added here because nothing declares them: the artifacts
-	/// bucket it pulls its binary from at boot, and its own log group.
-	///
-	/// Provider-agnostic on the declaring side, provider-specific here: a block
-	/// says "this process reads that bucket" and the compute renders whatever its
-	/// platform's permission mechanism is (IAM statements here, wrangler bindings
-	/// for a Cloudflare compute). A kind this compute cannot lower FAILS the
-	/// deploy naming it: a grant silently dropped is a box that serves until the
-	/// first request touching that resource.
-	///
-	/// Every ARN takes its region from the stack, the one place a region is
-	/// answered, so a grant never carries one of its own.
-	///
-	/// The account segment is a wildcard because the account id is not known at
-	/// render time; the resource names are already stage-scoped, and a policy
-	/// cannot grant cross-account access anyway (that needs a resource policy on
-	/// the far side).
+	/// from the [`AccessGrants`] the stack's blocks declared by the shared
+	/// [`IamPolicy`]. The two grants this block owns internally are added here
+	/// because nothing declares them: the artifacts bucket it pulls its binary
+	/// from at boot, and its own log group.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
@@ -258,94 +205,27 @@ impl LightsailBlock {
 		access: &AccessGrants,
 	) -> Result<String> {
 		let region = stack.region();
-		let mut statements = Vec::new();
-
-		// group the declared grants by kind and permission level. Its own
-		// artifacts bucket is declared by nothing, so it seeds the read set.
-		let mut read_buckets = vec![deployment.artifact_bucket_name(stack)];
-		let mut write_buckets = Vec::new();
-		let mut tables = Vec::<&AccessGrant>::new();
-		for grant in access.iter() {
-			match grant.kind.as_str() {
-				S3BucketBlock::ACCESS_KIND => match grant.permissions {
-					AccessPermissions::Read => {
-						read_buckets.push(grant.name.clone())
-					}
-					AccessPermissions::ReadWrite => {
-						write_buckets.push(grant.name.clone())
-					}
-				},
-				#[cfg(feature = "bindings_aws_dynamo")]
-				DynamoTableBlock::ACCESS_KIND => tables.push(grant),
-				kind => bevybail!(
-					"a `{kind}` resource was declared alongside this lightsail \
-					instance, which has no IAM lowering for that kind. Add one \
-					to `LightsailBlock::runtime_policy`, or declare the resource \
-					in a stack this compute does not deploy into."
-				),
-			}
-		}
-
-		// every read-only bucket: the deploy publishes them, the box serves them
-		statements.push(json!({
-			"Sid": "ReadStores",
-			"Effect": "Allow",
-			"Action": ["s3:GetObject", "s3:ListBucket"],
-			"Resource": Self::bucket_arns(&read_buckets)
-		}));
-		if !write_buckets.is_empty() {
-			statements.push(json!({
-				"Sid": "WriteStores",
+		let log_group = self.log_group(stack);
+		IamPolicy::new(region.clone(), "lightsail instance")
+			// declared by nothing, so it seeds the read set
+			.read_bucket(deployment.artifact_bucket_name(stack))
+			.lower(access)?
+			// the block's own log group, for the CloudWatch agent
+			.statement(json!({
+				"Sid": "OwnLogGroup",
 				"Effect": "Allow",
 				"Action": [
-					"s3:GetObject",
-					"s3:ListBucket",
-					"s3:PutObject",
-					"s3:DeleteObject"
+					"logs:CreateLogGroup",
+					"logs:CreateLogStream",
+					"logs:PutLogEvents",
+					"logs:DescribeLogStreams"
 				],
-				"Resource": Self::bucket_arns(&write_buckets)
-			}));
-		}
-
-		for grant in tables {
-			let (sid, actions) = match grant.permissions {
-				AccessPermissions::Read => {
-					("ReadTables", Self::READ_TABLE_ACTIONS)
-				}
-				AccessPermissions::ReadWrite => {
-					("DeclaredTables", Self::READ_WRITE_TABLE_ACTIONS)
-				}
-			};
-			statements.push(json!({
-				"Sid": sid,
-				"Effect": "Allow",
-				"Action": actions,
-				"Resource": format!(
-					"arn:aws:dynamodb:{region}:*:table/{}",
-					grant.name
-				)
-			}));
-		}
-
-		// the block's own log group, for the CloudWatch agent
-		let log_group = self.log_group(stack);
-		statements.push(json!({
-			"Sid": "OwnLogGroup",
-			"Effect": "Allow",
-			"Action": [
-				"logs:CreateLogGroup",
-				"logs:CreateLogStream",
-				"logs:PutLogEvents",
-				"logs:DescribeLogStreams"
-			],
-			"Resource": [
-				format!("arn:aws:logs:{region}:*:log-group:{log_group}"),
-				format!("arn:aws:logs:{region}:*:log-group:{log_group}:*")
-			]
-		}));
-
-		json!({ "Version": "2012-10-17", "Statement": statements })
-			.to_string()
+				"Resource": [
+					format!("arn:aws:logs:{region}:*:log-group:{log_group}"),
+					format!("arn:aws:logs:{region}:*:log-group:{log_group}:*")
+				]
+			}))
+			.render()
 			.xok()
 	}
 
@@ -1230,21 +1110,7 @@ mod tests {
 		deployment: &Deployment,
 		declared: &[&dyn Block],
 	) -> String {
-		let mut world = World::new();
-		let entity_mut = world.spawn(());
-		let entity = entity_mut.as_readonly();
-		stack
-			.build_config(
-				deployment,
-				core::iter::once((entity.clone(), block as &dyn Block))
-					.chain(
-						declared.iter().map(|block| (entity.clone(), *block)),
-					)
-					.collect::<Vec<_>>(),
-			)
-			.unwrap()
-			.to_json()
-			.to_string()
+		stack.json_granting(deployment, block, declared).unwrap()
 	}
 
 	/// The `terraform_data` input the access key's replacement is triggered by,

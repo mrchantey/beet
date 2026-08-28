@@ -221,7 +221,7 @@ impl Block for FargateBlock {
 		_entity: &EntityRef,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
-		_access: &AccessGrants,
+		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		let region = stack.region();
@@ -511,8 +511,16 @@ impl Block for FargateBlock {
 			},
 		);
 
-		// IAM task role (runtime S3 + DynamoDB access, ie the app bucket and the
-		// analytics table), stack-prefixed for the same reason.
+		// IAM task role: the identity the CONTAINER runs as, carrying one inline
+		// policy lowered from the grants the stack's blocks declared. It used to
+		// carry `AmazonS3FullAccess` + `AmazonDynamoDBFullAccess`, ie every
+		// bucket and every table in the account. Stack-prefixed for the same
+		// reason as the exec role.
+		//
+		// Nothing is seeded: pulling the image and shipping the container's logs
+		// are the EXEC role's job, and the task reads its artifact from the image
+		// rather than the artifacts bucket. A stack declaring nothing therefore
+		// grants the task nothing, and no policy resource is emitted at all.
 		let task_role = terra::ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("task-role")),
 			AwsIamRoleDetails {
@@ -520,23 +528,21 @@ impl Block for FargateBlock {
 				..default()
 			},
 		);
-		let task_s3_policy = terra::ResourceDef::new_secondary(
-			stack.resource_ident(self.build_label("task-s3-policy")),
-			AwsIamRolePolicyAttachmentDetails {
-				policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess".into(),
-				role: task_role.field_ref("name").into(),
-				..default()
-			},
-		);
-		let task_dynamo_policy = terra::ResourceDef::new_secondary(
-			stack.resource_ident(self.build_label("task-dynamo-policy")),
-			AwsIamRolePolicyAttachmentDetails {
-				policy_arn: "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
-					.into(),
-				role: task_role.field_ref("name").into(),
-				..default()
-			},
-		);
+		let policy =
+			IamPolicy::new(region.clone(), "fargate task").lower(access)?;
+		let policy_ident =
+			stack.resource_ident(self.build_label("task-policy"));
+		let task_policy = (!policy.is_empty()).then(|| {
+			terra::ResourceDef::new_secondary(
+				policy_ident.clone(),
+				AwsIamRolePolicyDetails {
+					name: Some(policy_ident.primary_identifier().clone()),
+					role: task_role.field_ref("name").into(),
+					policy: policy.render().into(),
+					..default()
+				},
+			)
+		});
 
 		// ECS cluster
 		let cluster = terra::ResourceDef::new_primary(
@@ -748,14 +754,16 @@ impl Block for FargateBlock {
 			.add_resource(&exec_role)?
 			.add_resource(&exec_policy)?
 			.add_resource(&task_role)?
-			.add_resource(&task_s3_policy)?
-			.add_resource(&task_dynamo_policy)?
 			.add_resource(&cluster)?
 			.add_resource(&task_def)?
 			.add_resource(&service)?
 			.add_resource(&scaling_target)?
 			.add_resource(&scaling_policy)?;
 
+		// absent when the stack declared no resources for the task to reach
+		if let Some(task_policy) = &task_policy {
+			config.add_resource(task_policy)?;
+		}
 		if let Some(ssh_ingress) = &task_sg_ssh_ingress {
 			config.add_resource(ssh_ingress)?;
 		}
@@ -984,6 +992,16 @@ mod tests {
 		build_config(block).0.to_json().to_string()
 	}
 
+	/// The terraform json for `block` deployed alongside `declared`, whose
+	/// grants its task role lowers.
+	fn build_json_granting(
+		block: &FargateBlock,
+		declared: &[&dyn Block],
+	) -> String {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		stack.json_granting(&deployment, block, declared).unwrap()
+	}
+
 	/// Assert the autoscaling target + policy are emitted regardless of ssh.
 	fn xpect_autoscaling(json: &str) {
 		json.xpect_contains("aws_appautoscaling_target")
@@ -1002,6 +1020,95 @@ mod tests {
 			.with_min_count(2)
 			.with_max_count(7)
 			.with_cpu_target_percent(65.0)
+	}
+
+	/// The task role carries ONE inline policy naming exactly the resources the
+	/// stack DECLARED, and none of the account-wide managed policies. It used to
+	/// attach `AmazonS3FullAccess` + `AmazonDynamoDBFullAccess`, ie every bucket
+	/// and every table in the account, to a task reachable from the internet.
+	///
+	/// The execution role's `AmazonECSTaskExecutionRolePolicy` is a different
+	/// identity (the one ECS itself uses to pull the image and ship logs) and
+	/// stays.
+	#[beet_core::test]
+	fn grants_only_least_privilege_policies() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		build_json_granting(&FargateBlock::default(), &[
+			&S3BucketBlock::new("app").with_deploy_versioned(false),
+			&DynamoTableBlock::new("analytics"),
+		])
+		.as_str()
+		.xpect_contains("\"aws_iam_role_policy\":")
+		.xpect_contains(&format!(
+			"arn:aws:s3:::{}/*",
+			stack.resource_name("app")
+		))
+		.xpect_contains(&format!("table/{}", stack.resource_name("analytics")))
+		.xpect_contains("AmazonECSTaskExecutionRolePolicy")
+		.xnot()
+		.xpect_contains("AmazonS3FullAccess")
+		.xnot()
+		.xpect_contains("AmazonDynamoDBFullAccess");
+	}
+
+	/// A grant's [`AccessPermissions`] is REAL: a read-only declaration cannot be
+	/// written through the task's identity.
+	#[beet_core::test]
+	fn lowers_permissions_per_grant() {
+		build_json_granting(&FargateBlock::default(), &[
+			&S3BucketBlock::new("assets").with_runtime_write(true),
+			&DynamoTableBlock::new("analytics"),
+		])
+		.as_str()
+		.xpect_contains("s3:PutObject")
+		.xpect_contains("dynamodb:PutItem");
+		build_json_granting(&FargateBlock::default(), &[&S3BucketBlock::new(
+			"assets",
+		)])
+		.as_str()
+		.xpect_contains("s3:GetObject")
+		.xnot()
+		.xpect_contains("s3:PutObject");
+	}
+
+	/// A stack declaring nothing the task reaches emits no task policy at all,
+	/// rather than an empty (invalid) document or a wildcard one.
+	#[beet_core::test]
+	fn nothing_declared_grants_nothing() {
+		build_json(&FargateBlock::default())
+			.as_str()
+			.xnot()
+			.xpect_contains("\"aws_iam_role_policy\":")
+			.xnot()
+			.xpect_contains("dynamodb:");
+	}
+
+	/// A resource kind this compute cannot lower FAILS the deploy naming it and
+	/// the compute, rather than silently shipping a task that cannot reach it.
+	#[beet_core::test]
+	fn unknown_grant_kind_fails_the_deploy() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let block = FargateBlock::default();
+		let mut world = World::new();
+		let entity_mut = world.spawn(());
+		let entity = entity_mut.as_readonly();
+		let mut config = deployment.create_config(&stack);
+		block
+			.apply_to_config(
+				&entity,
+				&stack,
+				&deployment,
+				&AccessGrants::new(vec![AccessGrant::read(
+					"r2_bucket",
+					"some-bucket",
+				)]),
+				&mut config,
+			)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`r2_bucket`")
+			.xpect_contains("no IAM lowering")
+			.xpect_contains("fargate task");
 	}
 
 	/// The registry the deploy pushes its image into is the block's one storage

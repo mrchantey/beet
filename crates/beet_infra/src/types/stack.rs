@@ -155,6 +155,34 @@ impl ResolvedStack {
 		config.xok()
 	}
 
+	/// The terraform json for `block` deployed alongside `declared`, ie the
+	/// resource blocks whose [`AccessGrant`]s a compute block lowers. The one
+	/// way a test builds a block's config, so every block is tested through the
+	/// same grant pre-pass the deploy runs.
+	///
+	/// Every block shares one bare entity, which no block reads beyond the
+	/// components it was handed directly.
+	#[cfg(test)]
+	pub fn json_granting(
+		&self,
+		deployment: &Deployment,
+		block: &dyn Block,
+		declared: &[&dyn Block],
+	) -> Result<String> {
+		let mut world = World::new();
+		let entity_mut = world.spawn(());
+		let entity = entity_mut.as_readonly();
+		self.build_config(
+			deployment,
+			core::iter::once((entity.clone(), block))
+				.chain(declared.iter().map(|block| (entity.clone(), *block)))
+				.collect::<Vec<_>>(),
+		)?
+		.to_json()
+		.to_string()
+		.xok()
+	}
+
 	/// A resolved stack plus the launch that deploys it locally: a local state
 	/// backend and a temporary work directory removed on drop.
 	#[cfg(test)]

@@ -13,6 +13,12 @@ mod fargate;
 pub use fargate::*;
 mod block;
 pub use block::*;
+// The AWS IAM lowering every AWS compute block shares. Gated on the bindings
+// feature the s3 block (and so every declared grant kind) needs.
+#[cfg(feature = "bindings_aws_common")]
+mod iam_policy;
+#[cfg(feature = "bindings_aws_common")]
+pub use iam_policy::*;
 // The DNS module is reused by the lambda, fargate and lightsail blocks, and by
 // the cloudflare failover (which calls its `ensure_cloudflare_provider`); gate
 // it on any of them.

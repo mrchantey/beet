@@ -67,7 +67,7 @@ impl Block for LambdaBlock {
 		entity: &EntityRef,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
-		_access: &AccessGrants,
+		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		let region = self
@@ -136,16 +136,32 @@ impl Block for LambdaBlock {
 			},
 		);
 
-		// S3 Read Access for Lambda to read assets and artifacts
-		let s3_read_policy = ResourceDef::new_secondary(
-			stack.resource_ident(self.build_label("s3_read_policy")),
-			AwsIamRolePolicyAttachmentDetails {
-				policy_arn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
-					.into(),
-				role: lambda_role.field_ref("name").into(),
-				..default()
-			},
-		);
+		// The runtime identity: ONE inline policy lowered from the grants the
+		// stack's blocks declared, ie the buckets this function serves from and
+		// the tables it records to. It used to carry `AmazonS3ReadOnlyAccess`,
+		// ie every bucket in the account.
+		//
+		// Nothing is seeded: the Lambda service loads the function's code from
+		// the artifacts bucket under its own identity, and the basic execution
+		// role above carries the log writes. A stack declaring nothing therefore
+		// grants the function nothing, and no policy resource is emitted at all.
+		// Grant ARNs take the STACK's region, not this block's override, since
+		// that is the region the declaring blocks provisioned into.
+		let policy = IamPolicy::new(stack.region().clone(), "lambda function")
+			.lower(access)?;
+		let policy_ident =
+			stack.resource_ident(self.build_label("runtime_policy"));
+		let runtime_policy = (!policy.is_empty()).then(|| {
+			ResourceDef::new_secondary(
+				policy_ident.clone(),
+				AwsIamRolePolicyDetails {
+					name: Some(policy_ident.primary_identifier().clone()),
+					role: lambda_role.field_ref("name").into(),
+					policy: policy.render().into(),
+					..default()
+				},
+			)
+		});
 
 		// declare terraform variables for env_vars
 		for variable in &self.env_vars {
@@ -290,7 +306,6 @@ impl Block for LambdaBlock {
 			.add_resource(&log_group)?
 			.add_resource(&lambda_role)?
 			.add_resource(&lambda_policy)?
-			.add_resource(&s3_read_policy)?
 			.add_resource(&lambda_function)?
 			.add_resource(&lambda_url)?
 			.add_resource(&gateway)?
@@ -298,6 +313,11 @@ impl Block for LambdaBlock {
 			.add_resource(&default_route)?
 			.add_resource(&default_stage)?
 			.add_resource(&apigw_permission)?;
+
+		// absent when the stack declared no resources for the function to reach
+		if let Some(runtime_policy) = &runtime_policy {
+			config.add_resource(runtime_policy)?;
+		}
 
 		// DNS (conditional): a custom domain per authority, and the public record
 		// pointing at it.
@@ -478,6 +498,98 @@ impl LambdaBlock {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	/// The terraform json for `block` deployed alongside `declared`, whose
+	/// grants its runtime policy lowers.
+	fn build_json_granting(
+		block: &LambdaBlock,
+		declared: &[&dyn Block],
+	) -> String {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		stack.json_granting(&deployment, block, declared).unwrap()
+	}
+
+	/// The runtime identity carries ONE inline policy naming exactly the
+	/// resources the stack DECLARED, and none of the account-wide managed
+	/// policies. It used to attach `AmazonS3ReadOnlyAccess`, ie every bucket in
+	/// the account. `AWSLambdaBasicExecutionRole` is the log writes and stays.
+	#[beet_core::test]
+	fn grants_only_least_privilege_policies() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let declared = S3BucketBlock::new("app").with_deploy_versioned(false);
+		build_json_granting(&LambdaBlock::default(), &[&declared])
+			.as_str()
+			.xpect_contains("\"aws_iam_role_policy\":")
+			.xpect_contains(&format!(
+				"arn:aws:s3:::{}/*",
+				stack.resource_name("app")
+			))
+			.xpect_contains("AWSLambdaBasicExecutionRole")
+			.xnot()
+			.xpect_contains("AmazonS3ReadOnlyAccess");
+	}
+
+	/// A grant's [`AccessPermissions`] is REAL: a read-only declaration cannot
+	/// be written through the function's identity, and a declared table is
+	/// reachable at all (the block had no dynamo path whatsoever).
+	#[cfg(feature = "bindings_aws_dynamo")]
+	#[beet_core::test]
+	fn lowers_permissions_per_grant() {
+		build_json_granting(&LambdaBlock::default(), &[
+			&S3BucketBlock::new("assets").with_runtime_write(true),
+			&DynamoTableBlock::new("analytics"),
+		])
+		.as_str()
+		.xpect_contains("s3:PutObject")
+		.xpect_contains("dynamodb:PutItem");
+		build_json_granting(&LambdaBlock::default(), &[&S3BucketBlock::new(
+			"assets",
+		)])
+		.as_str()
+		.xpect_contains("s3:GetObject")
+		.xnot()
+		.xpect_contains("s3:PutObject");
+	}
+
+	/// A stack declaring nothing the function reaches emits no runtime policy at
+	/// all, rather than an empty (invalid) document or a wildcard one.
+	#[beet_core::test]
+	fn nothing_declared_grants_nothing() {
+		build_json(&LambdaBlock::default())
+			.as_str()
+			.xnot()
+			.xpect_contains("\"aws_iam_role_policy\":")
+			.xnot()
+			.xpect_contains("s3:GetObject");
+	}
+
+	/// A resource kind this compute cannot lower FAILS the deploy naming it and
+	/// the compute, rather than silently shipping a function that cannot reach
+	/// it.
+	#[beet_core::test]
+	fn unknown_grant_kind_fails_the_deploy() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut world = World::new();
+		let entity_mut = world.spawn(());
+		let entity = entity_mut.as_readonly();
+		let mut config = deployment.create_config(&stack);
+		LambdaBlock::default()
+			.apply_to_config(
+				&entity,
+				&stack,
+				&deployment,
+				&AccessGrants::new(vec![AccessGrant::read(
+					"r2_bucket",
+					"some-bucket",
+				)]),
+				&mut config,
+			)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`r2_bucket`")
+			.xpect_contains("no IAM lowering")
+			.xpect_contains("lambda function");
+	}
 
 	/// The terraform json for the given block.
 	fn build_json(block: &LambdaBlock) -> String {
