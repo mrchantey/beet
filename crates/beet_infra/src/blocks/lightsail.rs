@@ -355,7 +355,7 @@ impl LightsailBlock {
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337). Must
 	/// match the served site's markup port. With a domain Caddy reverse-proxies
 	/// 443 -> this port; without one the instance opens this port publicly.
-	fn app_port(&self) -> u16 {
+	pub fn app_port(&self) -> u16 {
 		beet_net::prelude::resolve_server_port(self.app_port)
 	}
 
@@ -763,20 +763,39 @@ exec /opt/__APP__/app__EXEC_ARGS__
 	}
 
 	/// The script [`LightsailRelease`] runs on the box: roll the unit onto the
-	/// release the artifacts bucket currently points at, and prove it took.
+	/// release the artifacts bucket currently points at, and prove it serves.
 	///
-	/// The proof is deliberately the RUNNING process's own environment, read
-	/// out of `/proc/<MainPID>/environ`, not the presence of a file or a
-	/// successful `systemctl restart`. A binary that downloaded but never
-	/// launched, or a unit that restarted into a crash loop, both look like
-	/// success from anywhere else.
+	/// The proof is three things at once, because each alone has read as
+	/// success on a box that was not serving:
+	///
+	/// 1. The RUNNING process's own environment carries the expected deploy id,
+	///    read out of `/proc/<MainPID>/environ`. A binary that downloaded but
+	///    never launched, and a zero-exit `systemctl restart`, both look like
+	///    success without this.
+	/// 2. One request through the app's own port is answered. An `active` unit
+	///    carrying the right id can still 502 every request.
+	/// 3. `NRestarts` is unchanged across the whole attempt. Under
+	///    `Restart=always` a crash-looping unit always has a live `MainPID`
+	///    carrying the right id, and may answer one lucky request between
+	///    restarts; only the restart counter tells that box apart from a
+	///    healthy one.
+	///
+	/// The request targets loopback deliberately. With a domain declared the
+	/// firewall opens 80/443 only and Caddy fronts the app port, so the app's
+	/// own port is reachable from the box alone — which is exactly "the app
+	/// itself serves", independent of Caddy, DNS and certificate state.
 	///
 	/// Idempotent: a box that already serves this release (a freshly rebuilt
-	/// one, which pulled it at boot) is left alone rather than bounced.
+	/// one, which pulled it at boot) is left alone rather than bounced, but it
+	/// still has to pass the gate.
 	///
 	/// `poll` is the gap between attempts, and the script gives the unit
 	/// `timeout` to appear and `timeout` again to converge, since a replaced
-	/// box is still running cloud-init when the deploy arrives.
+	/// box is still running cloud-init when the deploy arrives. The gate shares
+	/// that budget: the converge loop IS the gate, there is no third loop.
+	///
+	/// Only ever scp'd and run as a file, never embedded in `user_data`, so it
+	/// is outside `machine_config_hash` and editing it cannot rotate the box.
 	pub fn release_script(
 		&self,
 		stack: &ResolvedStack,
@@ -788,7 +807,8 @@ exec /opt/__APP__/app__EXEC_ARGS__
 		let attempts = (timeout.as_secs() / poll_secs).max(1);
 		Self::render_script(
 			r#"#!/bin/bash
-# Roll the unit onto a release, and prove the process now running IS it.
+# Roll the unit onto a release, and prove the process now running IS it and
+# answers a request without crash looping underneath.
 set -uo pipefail
 unit=__APP__.service
 expect=__DEPLOY_ID__
@@ -798,6 +818,14 @@ running_release() {
 	pid=$(systemctl show -p MainPID --value "$unit" 2>/dev/null)
 	if [ -z "$pid" ] || [ "$pid" = 0 ]; then return 1; fi
 	tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^BEET_DEPLOY_ID=//p'
+}
+
+restarts() {
+	systemctl show -p NRestarts --value "$unit" 2>/dev/null
+}
+
+serves() {
+	curl -fsS -o /dev/null --max-time 5 "http://127.0.0.1:__APP_PORT__/"
 }
 
 # a replaced box is still running cloud-init, so wait for the unit to exist
@@ -814,14 +842,20 @@ else
 fi
 
 for _ in $(seq 1 __ATTEMPTS__); do
-	if [ "$(systemctl is-active "$unit")" = active ] && [ "$(running_release)" = "$expect" ]; then
+	# read the restart counter first, so the comparison spans every check below
+	# and any restart during the attempt invalidates it
+	before=$(restarts)
+	if [ "$(systemctl is-active "$unit")" = active ] &&
+		[ "$(running_release)" = "$expect" ] &&
+		serves &&
+		[ "$(restarts)" = "$before" ]; then
 		echo "$expect"
 		exit 0
 	fi
 	sleep __POLL__
 done
 
-echo "beet: $unit never came up serving release $expect" >&2
+echo "beet: $unit never served a request on port __APP_PORT__ carrying release $expect" >&2
 systemctl status "$unit" --no-pager --lines=40 >&2 || true
 exit 1
 "#,
@@ -830,6 +864,7 @@ exit 1
 				("__DEPLOY_ID__", deploy_id),
 				("__ATTEMPTS__", &attempts.to_string()),
 				("__POLL__", &poll_secs.to_string()),
+				("__APP_PORT__", &self.app_port().to_string()),
 			],
 		)
 	}
@@ -1385,13 +1420,17 @@ mod tests {
 	}
 
 	/// The release step proves the RUNNING process carries the deploy's id,
-	/// read out of its own environment.
+	/// read out of its own environment, AND that it answers a request without a
+	/// restart underneath.
 	///
 	/// A downloaded file, a zero-exit `systemctl restart` and an `active` unit
 	/// all look like success while the box serves the previous binary or crash
-	/// loops; only the live process settles it. It is also idempotent, so a
-	/// freshly rebuilt box (which pulled this release at boot) is confirmed
-	/// rather than bounced.
+	/// loops. Even the live process's id is not enough on its own: under
+	/// `Restart=always` a crash-looping unit always has a `MainPID` carrying
+	/// the right id, which is how a deploy once exited 0 onto a box that 502'd
+	/// and restarted ~340 times. It is also idempotent, so a freshly rebuilt
+	/// box (which pulled this release at boot) is confirmed rather than
+	/// bounced.
 	#[beet_core::test]
 	fn release_proves_the_running_process() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
@@ -1407,10 +1446,47 @@ mod tests {
 			.xpect_contains("/proc/$pid/environ")
 			.xpect_contains("s/^BEET_DEPLOY_ID=//p")
 			.xpect_contains("unit=beet_infra.service")
+			// the app's own port, on loopback: past Caddy, DNS and certs
+			.xpect_contains(&format!(
+				"curl -fsS -o /dev/null --max-time 5 \"http://127.0.0.1:{}/\"",
+				LightsailBlock::default().app_port()
+			))
+			// a crash loop that answers one lucky request still fails
+			.xpect_contains("systemctl show -p NRestarts --value \"$unit\"")
+			.xpect_contains("before=$(restarts)")
+			.xpect_contains("[ \"$(restarts)\" = \"$before\" ]")
 			// idempotent: an already-current box is left alone
 			.xpect_contains("beet: already serving $expect")
 			// 60s of 5s attempts
 			.xpect_contains("seq 1 12");
+	}
+
+	/// The gate probes the port the unit was told to listen on.
+	///
+	/// The release script is scp'd and run as a file, never embedded in
+	/// `user_data`, so it is outside `machine_config_hash` and this phase's
+	/// edit cannot rotate the box.
+	#[beet_core::test]
+	fn release_probes_the_declared_port() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let block = LightsailBlock::default().with_app_port(9001);
+		block
+			.release_script(
+				&stack,
+				"my-deploy-id",
+				Duration::from_secs(60),
+				Duration::from_secs(5),
+			)
+			.as_str()
+			.xpect_contains("http://127.0.0.1:9001/")
+			.xnot()
+			.xpect_contains(&LightsailBlock::default().app_port().to_string());
+		// the machine config never sees the release script
+		build_user_data(&block)
+			.0
+			.as_str()
+			.xnot()
+			.xpect_contains("127.0.0.1:9001");
 	}
 
 	/// Secret env rides the unit's `Environment=` lines, never `ExecStart`.
