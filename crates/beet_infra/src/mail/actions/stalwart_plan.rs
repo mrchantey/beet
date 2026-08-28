@@ -43,6 +43,10 @@ pub struct DomainPlan {
 	/// localpart. Applied after the accounts exist, since it names one.
 	pub catch_all: Option<SmolStr>,
 	pub accounts: Vec<AccountPlan>,
+	/// Where this domain's sovereign DKIM private key is parked, ie what
+	/// `<EnsureDkimKey/>` minted and the selector record published the public
+	/// half of.
+	pub dkim_secret: SecretRef,
 }
 
 /// One mailbox, and every localpart that reaches it.
@@ -90,6 +94,21 @@ impl StalwartPlan {
 	/// The route name Stalwart delivers local mail on, which is the one branch
 	/// of the outbound strategy that must survive the relay override.
 	pub const LOCAL_ROUTE: &'static str = "local";
+
+	/// The listeners a freshly claimed server seeds that this stack does not
+	/// declare, and which provision therefore removes.
+	///
+	/// Two are protocols nobody here speaks (`pop3s`, `sieve`), and the third
+	/// is the plaintext management port the commissioning phase used. All three
+	/// are already unreachable through the security group, so this is defence
+	/// in depth rather than a fix: a listener bound on the box is a listener
+	/// one wrong group rule away from the internet, and a management endpoint
+	/// bound on loopback answers to anyone who reaches the box at all.
+	///
+	/// `http` retires LAST, after the certificate exists, because until then it
+	/// is the only channel provision itself has.
+	pub const RETIRED_LISTENERS: &'static [&'static str] =
+		&["pop3s", "sieve", "http"];
 
 	/// Read the plan off the blocks that declared it.
 	///
@@ -279,6 +298,7 @@ impl DomainPlan {
 		Ok(Self {
 			certificate_names,
 			catch_all: domain.catch_all().clone(),
+			dkim_secret: domain.dkim_secret(),
 			accounts,
 			name,
 		})
@@ -302,6 +322,37 @@ impl DomainPlan {
 			},
 			"dkimManagement": { "@type": "Manual" },
 		})
+	}
+
+	/// The sovereign DKIM signature object: this domain's own key, signing
+	/// under [`MailDomainBlock::DKIM_SELECTOR`].
+	///
+	/// `active` from the moment it is created, because the record carrying its
+	/// public half was published by the apply that ran before this: a signature
+	/// staged as pending would sign nothing while a perfectly good record
+	/// advertised it. The SES Easy DKIM signature keeps signing beside it —
+	/// a verifier needs one of the two to pass, which is what makes the relay
+	/// replaceable without a deliverability cliff.
+	///
+	/// `private_key` is present only on creation, exactly as an account's
+	/// credential is: a key rotated under a published selector is a fortnight
+	/// of mail signed by something no resolver can check.
+	pub fn dkim_object(
+		&self,
+		domain_id: &str,
+		private_key: Option<&str>,
+	) -> Value {
+		let mut object = json!({
+			"@type": "Dkim1RsaSha256",
+			"selector": MailDomainBlock::DKIM_SELECTOR,
+			"domainId": domain_id,
+			"stage": "active",
+		});
+		if let Some(private_key) = private_key {
+			object["privateKey"] =
+				json!({ "@type": "Text", "secret": private_key });
+		}
+		object
 	}
 
 	/// The catch-all patch, as the full address the mailbox answers at.
@@ -711,5 +762,37 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("smtp-derived-password");
+	}
+
+	/// The signature the domain publishes a selector for: this stack's own key,
+	/// active immediately because the record carrying its public half was
+	/// published by the apply that ran before the provision.
+	#[beet_core::test]
+	fn the_sovereign_signature_is_active_on_creation() {
+		let plan = DomainPlan::new(&staging(), &mail_box(), true).unwrap();
+		let object =
+			plan.dkim_object("d1", Some("-----BEGIN PRIVATE KEY-----"));
+		object["@type"].as_str().unwrap().xpect_eq("Dkim1RsaSha256");
+		object["selector"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(MailDomainBlock::DKIM_SELECTOR);
+		object["stage"].as_str().unwrap().xpect_eq("active");
+		object["privateKey"]["@type"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("Text");
+	}
+
+	/// The key is absent from the form convergence MATCHES on, exactly as an
+	/// account's password is: a key rotated under a published selector signs
+	/// mail no verifier can check until dns catches up.
+	#[beet_core::test]
+	fn the_signing_key_is_written_once() {
+		DomainPlan::new(&staging(), &mail_box(), true)
+			.unwrap()
+			.dkim_object("d1", None)["privateKey"]
+			.is_null()
+			.xpect_true();
 	}
 }

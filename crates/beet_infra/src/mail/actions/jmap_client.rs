@@ -273,6 +273,19 @@ impl JmapClient {
 		result["updated"][id].clone().xok()
 	}
 
+	/// Delete one object by id.
+	///
+	/// The one write that is not additive, so it is called only where a
+	/// declaration says an object should not exist at all — a listener the
+	/// server seeded and this stack never asked for. `x:` objects carry no
+	/// disable flag, so removal is the only way to close a port.
+	pub async fn destroy(&self, object_type: &str, id: &str) -> Result {
+		let result = self
+			.call(&format!("{object_type}/set"), json!({ "destroy": [id] }))
+			.await?;
+		Self::reject_set_errors(object_type, &result, "notDestroyed")
+	}
+
 	/// The singleton of `object_type` if the server holds one, else `None`.
 	///
 	/// The one caller that matters is the bootstrap probe: `x:Bootstrap/get`

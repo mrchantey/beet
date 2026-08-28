@@ -73,6 +73,28 @@ impl StalwartProvision {
 	/// listeners only bind at start, so a server configured while running is
 	/// still a server serving nothing.
 	pub const UNIT: &'static str = "stalwart";
+
+	/// A declared private key path, with a leading `~` expanded.
+	///
+	/// The mail box imports a public key rather than generating a pair, so the
+	/// private half is the deployer's own: there is no `ssh_private_key` output
+	/// to read it from the way a Lightsail release does. Every mail step that
+	/// reaches the box reads it through here.
+	pub fn key_path(key: &str) -> Result<AbsPathBuf> {
+		let expanded = match key.strip_prefix("~/") {
+			Some(rest) => {
+				let home = env_ext::var("HOME").map_err(|_| {
+					bevyhow!(
+						"ssh key '{key}' starts with ~ but HOME is unset: name \
+						the path in full"
+					)
+				})?;
+				format!("{home}/{rest}")
+			}
+			None => key.to_string(),
+		};
+		AbsPathBuf::new(expanded).map_err(Into::into)
+	}
 }
 
 /// Applies the plan, restarts the unit and waits for the server to answer on
@@ -93,13 +115,10 @@ pub async fn StalwartProvisionAction(
 		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
 		.await??;
 
-	// the credentials this step authenticates with and writes into the relay
-	// route, all read from parameter store rather than passed in: the box reads
-	// the same admin password at every start, so the two cannot drift.
+	// the credentials this step writes into the relay route, read from
+	// parameter store rather than passed in: the box reads the same values, so
+	// the two cannot drift.
 	let region = mail.stack.region().clone();
-	let admin_password =
-		read_secret(&region, &mail.mail_box.admin_secret_name(&mail.stack))
-			.await?;
 	let ses = SesCredential {
 		username: read_secret(
 			&region,
@@ -130,91 +149,303 @@ pub async fn StalwartProvisionAction(
 		&ses,
 	)?;
 
-	// the management endpoint is closed to the internet, so everything below
-	// happens through a port forward that dies with this step.
+	// ssh is needed either way: the unit is restarted over it, and the tunnel
+	// (if one is opened at all) rides the same connection.
 	let connection = SshConnection {
 		host: mail.public_ip().await?,
 		user: StalwartProvision::SSH_USER.to_string(),
 		port: 22,
-		key_path: ssh_key_path(provision.ssh_key())?,
+		key_path: StalwartProvision::key_path(provision.ssh_key())?,
 	};
 	connection
 		.wait_for_ready(*provision.timeout(), *provision.poll())
 		.await?;
-	let _tunnel = connection
-		.tunnel(provision.local_port(), StalwartProvision::MANAGEMENT_PORT)
-		.await?;
-	let origin = format!("http://127.0.0.1:{}", provision.local_port());
-	let mut client = wait_for_management(
-		&origin,
-		&admin_password,
-		*provision.timeout(),
-		*provision.poll(),
-	)
-	.await?;
 
-	// a claim initializes the data store but the CLAIMED server only exists
-	// after a restart: the running process stays in bootstrap mode, refusing
-	// every other object type, until it boots against the config.json it just
-	// wrote. The restarted server seeds a default listener set that includes
-	// management http on 8080, so the same tunnel reaches it again.
-	if bootstrap(&client, &connection, &plan, &mail, &region).await? {
-		info!(
-			"restarting {} to leave bootstrap mode",
-			StalwartProvision::UNIT
-		);
-		connection
-			.run_command(&format!(
-				"sudo -n systemctl restart {}",
-				StalwartProvision::UNIT
-			))
+	let mut management =
+		Management::open(&connection, &provision, &plan, &mail, &region)
 			.await?;
-		client = wait_for_management(
-			&origin,
-			&admin_password,
-			*provision.timeout(),
-			*provision.poll(),
-		)
-		.await?;
-	}
-	let domain_ids = apply_plan(&client, &plan, &region, &mail.stack).await?;
+	let domain_ids =
+		apply_plan(management.client(), &plan, &region, &mail.stack).await?;
 
 	info!(
 		"restarting {} so the mail listeners bind",
 		StalwartProvision::UNIT
 	);
-	connection
-		.run_command(&format!(
-			"sudo -n systemctl restart {}",
-			StalwartProvision::UNIT
-		))
-		.await?;
+	management.restart(&connection, &provision).await?;
 
 	// certificates come from AcmeRenewal tasks, and a task executes only while
 	// the process that accepted it keeps running: one scheduled moments before
 	// the restart above dies pending with the process. So issuance is asked
-	// for AFTER the last restart, through the same tunnel, and waited on: 443
-	// serving the real certificate is the deploy's proof, not its hope.
-	let client = wait_for_management(
-		&origin,
-		&admin_password,
-		*provision.timeout(),
-		*provision.poll(),
-	)
-	.await?;
+	// for AFTER the last restart and waited on: 443 serving the real
+	// certificate is the deploy's proof, not its hope.
 	converge_certificates(
-		&client,
+		management.client(),
 		&plan,
 		&domain_ids,
 		*provision.timeout(),
 		*provision.poll(),
 	)
 	.await?;
-	drop(_tunnel);
+
+	// only now, with a certificate on 443, may the plaintext management port go
+	// away: it is the channel everything above ran on when the box was fresh.
+	// The restart that unbinds it is therefore the LAST use of this channel —
+	// reconnecting on it would poll a port this step just deleted — so the
+	// management value is dropped first and 443 is the only thing asked after.
+	let retired = retire_listeners(management.client(), &plan).await?;
+	drop(management);
+	if retired {
+		info!(
+			"restarting {} so the retired listeners unbind",
+			StalwartProvision::UNIT
+		);
+		connection.run_command(&restart_command()).await?;
+	}
 
 	wait_for_health(&mail.mail_box, *provision.timeout(), *provision.poll())
 		.await?;
 	Pass(cx.input).xok()
+}
+
+/// The channel this run reached the management API on, and how to get it back
+/// after a restart.
+///
+/// There are two, and which one is available says exactly how far the box has
+/// been commissioned. The PUBLIC endpoint is the steady state: 443, a real
+/// certificate, and the administrator account the server created for itself.
+/// The BOOTSTRAP channel is a forwarded plaintext port authenticated by the
+/// recovery credential, which exists only while the data store is unclaimed and
+/// which the box stops writing into `stalwart.env` the moment it is claimed.
+///
+/// Holding the tunnel here is what keeps its lifetime honest: it is dropped
+/// with this value, after the last call that needs it.
+struct Management {
+	client: JmapClient,
+	origin: String,
+	user: String,
+	password: String,
+	/// The ssh port forward, held open for as long as `origin` names its near
+	/// end, and closed when this value is dropped. `None` for the public
+	/// endpoint. Never read: HOLDING it is the whole job, which is what keeps
+	/// the forward's lifetime tied to the channel that uses it rather than to
+	/// whoever remembered to close it.
+	#[expect(dead_code, reason = "held open for its Drop")]
+	tunnel: Option<ChildHandle>,
+}
+
+impl Management {
+	/// Reach the server the furthest-along way it can be reached, claiming the
+	/// data store first if it has never been claimed.
+	async fn open(
+		connection: &SshConnection,
+		provision: &StalwartProvision,
+		plan: &StalwartPlan,
+		mail: &MailStack,
+		region: &str,
+	) -> Result<Self> {
+		let user = StalwartBlock::ADMIN_USER.to_string();
+		let admin_secret = admin_secret_name(mail)?;
+		let origin = format!("https://{}", mail.mail_box.hostname());
+
+		// the commissioned path: the real administrator account over the port
+		// the world already reaches. No tunnel, no recovery credential, and
+		// nothing on the box listening in the clear.
+		if let Some(password) = ssm_ext::get(region, &admin_secret).await?
+			&& let Ok(client) =
+				JmapClient::connect(&origin, &user, &password).await
+		{
+			info!("management over {origin} as the administrator account");
+			return Self {
+				client,
+				origin,
+				user,
+				password,
+				tunnel: None,
+			}
+			.xok();
+		}
+
+		// else the box is not serving its public endpoint yet, so management is
+		// the plaintext port the security group deliberately does not admit,
+		// reached through a forward over the box's key pair.
+		let tunnel = connection
+			.tunnel(provision.local_port(), StalwartProvision::MANAGEMENT_PORT)
+			.await?;
+		let origin = format!("http://127.0.0.1:{}", provision.local_port());
+
+		// bootstrap mode is a property of the RUNNING process rather than of
+		// the disk, so it is decided by which credential answers. The endpoint
+		// is waited for once, unauthenticated, so that a rejected credential
+		// means "not this one" instead of "not up yet" — the difference between
+		// one failed request and a ten-minute poll against the wrong password.
+		wait_for_endpoint(&origin, *provision.timeout(), *provision.poll())
+			.await?;
+		let recovery =
+			read_secret(region, &mail.mail_box.admin_secret_name(&mail.stack))
+				.await?;
+		match JmapClient::connect(&origin, &user, &recovery).await {
+			Ok(client) => {
+				Self::commission(&client, connection, plan, mail, region)
+					.await?
+			}
+			// the recovery credential is gone, which the box only does once the
+			// store is claimed: this is a claimed server that simply is not
+			// serving its public endpoint yet (no certificate, or the mail
+			// listeners have not bound).
+			Err(_) => info!(
+				"the recovery credential is retired; management over the tunnel"
+			),
+		}
+
+		info!(
+			"restarting {} to leave bootstrap mode",
+			StalwartProvision::UNIT
+		);
+		connection.run_command(&restart_command()).await?;
+		let password = read_secret(region, &admin_secret).await?;
+		let client = wait_for_management(
+			&origin,
+			&user,
+			&password,
+			*provision.timeout(),
+			*provision.poll(),
+		)
+		.await?;
+		Self {
+			client,
+			origin,
+			user,
+			password,
+			tunnel: Some(tunnel),
+		}
+		.xok()
+	}
+
+	/// Claim the data store, or recover the one state a claim cannot: a REBUILT
+	/// box, whose disk is new and whose database is not, and which therefore
+	/// boots into a bootstrap mode that is a lie the missing file told.
+	///
+	/// Called only while the server still answers to the recovery credential,
+	/// ie while it is genuinely running in bootstrap mode. The caller restarts
+	/// afterwards either way: the running process stays in bootstrap mode until
+	/// it boots against a `config.json`.
+	async fn commission(
+		client: &JmapClient,
+		connection: &SshConnection,
+		plan: &StalwartPlan,
+		mail: &MailStack,
+		region: &str,
+	) -> Result {
+		// the file is the truth of whether a claim already happened, which is
+		// the state a crash between the claim and its restart leaves behind.
+		if connection
+			.run_command(
+				"test -f /etc/stalwart/config.json && echo yes || echo no",
+			)
+			.await?
+			.stdout
+			.xmap(|stdout| String::from_utf8_lossy(&stdout).contains("yes"))
+		{
+			info!("the data store is already claimed; a restart finishes it");
+			return Ok(());
+		}
+		if let Err(err) =
+			bootstrap(client, connection, plan, mail, region).await
+		{
+			warn!(
+				"the claim was refused, so this box is being treated as a \
+				rebuild onto an existing data store: {err}"
+			);
+			connection
+				.run_command(
+					"sudo -n /usr/local/bin/stalwart-secrets render-store",
+				)
+				.await?;
+		}
+		Ok(())
+	}
+
+	fn client(&self) -> &JmapClient { &self.client }
+
+	/// Restart the unit and reconnect on the same channel: mail listeners only
+	/// bind at start, so a server configured while running is still a server
+	/// serving nothing.
+	async fn restart(
+		&mut self,
+		connection: &SshConnection,
+		provision: &StalwartProvision,
+	) -> Result {
+		connection.run_command(&restart_command()).await?;
+		self.client = wait_for_management(
+			&self.origin,
+			&self.user,
+			&self.password,
+			*provision.timeout(),
+			*provision.poll(),
+		)
+		.await?;
+		Ok(())
+	}
+}
+
+/// The parameter the server's own administrator credential is parked at, ie
+/// the one the `Bootstrap` claim minted and every later run authenticates with.
+fn admin_secret_name(mail: &MailStack) -> Result<String> {
+	mail.domains
+		.first()
+		.map(|domain| {
+			SecretRef::new(format!(
+				"{}-account-{}-at-{}",
+				mail.mail_box.label(),
+				StalwartBlock::ADMIN_USER,
+				domain.slug()
+			))
+			.name(&mail.stack)
+		})
+		.ok_or_else(|| bevyhow!("no mail domain to name an administrator on"))
+}
+
+/// The restart, which also re-renders the box's secrets: `ExecStartPre` runs
+/// the boot script, so the credential set the server comes back with is the one
+/// the current on-disk state calls for.
+fn restart_command() -> String {
+	format!("sudo -n systemctl restart {}", StalwartProvision::UNIT)
+}
+
+/// Remove every listener the server seeded that the plan does not declare,
+/// reporting whether anything went.
+///
+/// Additive-only is the rule everywhere else in this step, and this is the one
+/// deliberate exception: an undeclared listener is a bound port, and a bound
+/// port is not something a declaration can leave alone. The names are named
+/// (rather than "anything not in the plan") so a listener somebody added on
+/// purpose survives a deploy.
+async fn retire_listeners(
+	client: &JmapClient,
+	plan: &StalwartPlan,
+) -> Result<bool> {
+	let declared = plan
+		.listeners
+		.iter()
+		.filter_map(|listener| listener["name"].as_str())
+		.collect::<Vec<_>>();
+	let mut retired = false;
+	for listener in client.list("x:NetworkListener").await? {
+		let (Some(id), Some(name)) =
+			(listener["id"].as_str(), listener["name"].as_str())
+		else {
+			continue;
+		};
+		if declared.contains(&name)
+			|| !StalwartPlan::RETIRED_LISTENERS.contains(&name)
+		{
+			continue;
+		}
+		client.destroy("x:NetworkListener", id).await?;
+		info!("retired the seeded `{name}` listener");
+		retired = true;
+	}
+	Ok(retired)
 }
 
 /// Ask for a certificate for every domain whose declared names no stored
@@ -294,27 +525,23 @@ async fn converge_certificates(
 /// every other account's credential uses, overwriting any stale value from a
 /// previous deployment's store (a claim only ever succeeds on a blank one).
 ///
-/// Returns whether a claim happened, because a claim obliges the CALLER to
-/// restart the unit: the running process stays in bootstrap mode until it
-/// boots against the `config.json` it wrote.
+/// Errors rather than recovering, since the caller is the one place that can
+/// tell a refused claim on a BLANK store (a real failure) from one on a store
+/// this box was rebuilt onto.
 async fn bootstrap(
 	client: &JmapClient,
 	connection: &SshConnection,
 	plan: &StalwartPlan,
 	mail: &MailStack,
 	region: &str,
-) -> Result<bool> {
-	if client.try_get_singleton("x:Bootstrap").await?.is_none() {
-		info!("data store already claimed, nothing to bootstrap");
-		return Ok(false);
-	}
+) -> Result {
 	let stack = &mail.stack;
 	let template = connection
 		.run_command("cat /etc/stalwart/config.json.template")
 		.await?;
 	let template = String::from_utf8(template.stdout)?;
-	let mut data_store: Value = serde_json::from_str(template.trim())
-		.map_err(|err| {
+	let mut data_store: Value =
+		serde_json::from_str(template.trim()).map_err(|err| {
 			bevyhow!("the box's config.json.template is not json: {err}")
 		})?;
 	data_store["authSecret"] = json!({
@@ -328,49 +555,28 @@ async fn bootstrap(
 
 	info!("claiming the data store (creates tables, may take a minute)...");
 	let claim = client
-		.update_returning("x:Bootstrap", JmapClient::SINGLETON_ID, &json!({
-			"serverHostname": plan.hostname,
-			"defaultDomain": domain.domain(),
-			// provision owns certificates and DKIM: ACME converges as its own
-			// object below, and outbound is SES-signed until the sovereign
-			// selector lands
-			"requestTlsCertificate": false,
-			"generateDkimKeys": false,
-			"dataStore": data_store,
-			"blobStore": mail.mail_box.blob_store_config(stack),
-			// `Default` IS the data store, which is the declared shape: postgres
-			// carries search and ephemera, S3 carries blobs
-			"searchStore": { "@type": "Default" },
-			"inMemoryStore": { "@type": "Default" },
-			"directory": { "@type": "Internal" },
-		}))
+		.update_returning(
+			"x:Bootstrap",
+			JmapClient::SINGLETON_ID,
+			&json!({
+				"serverHostname": plan.hostname,
+				"defaultDomain": domain.domain(),
+				// provision owns certificates and DKIM: ACME converges as its own
+				// object below, and outbound is SES-signed until the sovereign
+				// selector lands
+				"requestTlsCertificate": false,
+				"generateDkimKeys": false,
+				"dataStore": data_store,
+				"blobStore": mail.mail_box.blob_store_config(stack),
+				// `Default` IS the data store, which is the declared shape: postgres
+				// carries search and ephemera, S3 carries blobs
+				"searchStore": { "@type": "Default" },
+				"inMemoryStore": { "@type": "Default" },
+				"directory": { "@type": "Internal" },
+			}),
+		)
 		.await;
-	let updated = match claim {
-		Ok(updated) => updated,
-		// the state a crash between claim and restart leaves behind: the store
-		// is claimed (the server wrote its own config.json) but the process
-		// never rebooted out of bootstrap mode, so it still serves the
-		// singleton and a second claim trips over the first's objects (the
-		// exact rejection varies: "already been initialized", a
-		// primaryKeyViolation on the domain). The file on disk is the truth of
-		// whether a claim happened, so ask the box rather than matching error
-		// strings; the obligation is the same either way: restart.
-		Err(err) => {
-			let claimed = connection
-				.run_command("test -f /etc/stalwart/config.json && echo claimed || echo unclaimed")
-				.await?;
-			if String::from_utf8_lossy(&claimed.stdout).contains("claimed")
-				&& !String::from_utf8_lossy(&claimed.stdout)
-					.contains("unclaimed")
-			{
-				info!(
-					"the data store is already claimed; a restart finishes it"
-				);
-				return Ok(true);
-			}
-			return Err(err);
-		}
-	};
+	let updated = claim?;
 
 	let secret_name = SecretRef::new(format!(
 		"{}-account-admin-at-{}",
@@ -389,7 +595,30 @@ async fn bootstrap(
 		),
 	}
 	info!("data store claimed, {} created", domain.domain());
-	Ok(true)
+	Ok(())
+}
+
+/// Poll `origin` until the management endpoint answers at all, whatever it
+/// answers with.
+///
+/// Unauthenticated on purpose: it separates "the server is not up" from "that
+/// credential is wrong", which are the two things a bootstrap-mode box looks
+/// identical from the outside for.
+async fn wait_for_endpoint(
+	origin: &str,
+	timeout: Duration,
+	poll: Duration,
+) -> Result {
+	let url = format!("{origin}{}", JmapClient::SESSION_PATH);
+	let attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
+	for attempt in 1..=attempts {
+		if Request::get(&url).send().await.is_ok() {
+			info!("management endpoint answering after {attempt} attempt(s)");
+			return Ok(());
+		}
+		time_ext::sleep(poll).await;
+	}
+	bevybail!("the management endpoint at {origin} never answered")
 }
 
 /// Converge the server onto `plan`, in dependency order. Returns each domain's
@@ -439,6 +668,7 @@ async fn apply_plan(
 		let domain_id =
 			converge(client, "x:Domain", &["name"], &domain.object(&acme))
 				.await?;
+		converge_dkim(client, domain, &domain_id, region, stack).await?;
 		for account in &domain.accounts {
 			converge_account(client, account, &domain_id, region, stack)
 				.await?;
@@ -559,6 +789,62 @@ fn plan_converge(
 	}
 }
 
+/// Hand the domain the sovereign signing key whose public half its selector
+/// record already carries.
+///
+/// The key comes from parameter store rather than from the server, which is the
+/// whole point of the arrangement: the record was published by the apply that
+/// read the same parameter, so the selector the world resolves and the key the
+/// server signs with cannot disagree. A server-generated key would have to be
+/// read back and published in a second apply, with a window in between where
+/// mail is signed by a selector nothing answers for.
+///
+/// The credential is written on creation only, for the same reason an account's
+/// is: a key rotated under a published selector signs mail no verifier can
+/// check until DNS catches up. Rotation is a second selector beside this one.
+async fn converge_dkim(
+	client: &JmapClient,
+	domain: &DomainPlan,
+	domain_id: &str,
+	region: &str,
+	stack: &ResolvedStack,
+) -> Result {
+	let name = domain.dkim_secret.name(stack);
+	let private_key = ssm_ext::get(region, &name).await?.ok_or_else(|| {
+		bevyhow!(
+			"no dkim key at {name}: <EnsureDkimKey/> mints it and the apply \
+			publishes its public half, so both run before this step"
+		)
+	})?;
+	// matched WITHOUT the key, so an existing signature never shows a diff on
+	// the one property that must not be patched
+	let existing = client.list("x:DkimSignature").await?;
+	match plan_converge(
+		&existing,
+		&["selector", "domainId"],
+		&domain.dkim_object(domain_id, None),
+	)? {
+		Converge::Create => {
+			client
+				.create(
+					"x:DkimSignature",
+					&domain.dkim_object(domain_id, Some(&private_key)),
+				)
+				.await?;
+			info!(
+				"{} signs with its own `{}` selector",
+				domain.name,
+				MailDomainBlock::DKIM_SELECTOR
+			);
+		}
+		Converge::Unchanged(_) => {}
+		Converge::Patch(id, patch) => {
+			client.update("x:DkimSignature", &id, &patch).await?
+		}
+	}
+	Ok(())
+}
+
 /// Create the account if it is not there, minting and parking its password on
 /// the way; else patch it, leaving the credential it already has alone.
 ///
@@ -621,45 +907,21 @@ async fn read_secret(region: &str, name: &str) -> Result<String> {
 	})
 }
 
-/// The declared private key, with a leading `~` expanded.
-///
-/// The mail box imports a public key rather than generating a pair, so the
-/// private half is the deployer's own: there is no `ssh_private_key` output to
-/// read it from the way a Lightsail release does.
-fn ssh_key_path(key: &str) -> Result<AbsPathBuf> {
-	let expanded = match key.strip_prefix("~/") {
-		Some(rest) => {
-			let home = env_ext::var("HOME").map_err(|_| {
-				bevyhow!(
-					"ssh key '{key}' starts with ~ but HOME is unset: name the \
-					path in full"
-				)
-			})?;
-			format!("{home}/{rest}")
-		}
-		None => key.to_string(),
-	};
-	AbsPathBuf::new(expanded).map_err(Into::into)
-}
+
 
 /// Poll the forwarded management endpoint until it authenticates, which is also
 /// the check that the box finished booting and opened its data store.
 async fn wait_for_management(
 	origin: &str,
-	admin_password: &str,
+	user: &str,
+	password: &str,
 	timeout: Duration,
 	poll: Duration,
 ) -> Result<JmapClient> {
 	let attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
 	let mut last = None;
 	for attempt in 1..=attempts {
-		match JmapClient::connect(
-			origin,
-			StalwartBlock::ADMIN_USER,
-			admin_password,
-		)
-		.await
-		{
+		match JmapClient::connect(origin, user, password).await {
 			Ok(client) => {
 				info!("management endpoint ready after {attempt} attempt(s)");
 				return Ok(client);

@@ -76,12 +76,34 @@ pub struct StalwartBlock {
 	/// The [`S3BucketBlock`] holding message bodies, by label. Declare it
 	/// `with_runtime_write(true)` so the grant this block lowers can store.
 	blob_bucket: SmolStr,
+	/// The [`S3BucketBlock`] the nightly database dump is written to, by label,
+	/// also `with_runtime_write(true)`. Empty installs no backup timer at all,
+	/// which is a deliberate declaration rather than a default: mail metadata
+	/// lives in one database, and a stack that keeps no copy of it should have
+	/// said so.
+	backup_bucket: SmolStr,
 	/// The zone the box's `A` record is published into. Must be DNS-only: SMTP,
 	/// IMAP and ACME TLS-ALPN-01 all need the origin reached directly, so a
 	/// proxied record is a config-time error rather than a mystery outage.
 	#[get(skip)]
 	#[set_with(unwrap_option)]
 	dns: Option<DnsProvider>,
+	/// The stage that OWNS the shared names below, ie the one whose deploy may
+	/// publish them.
+	///
+	/// A stack's resources are named `<app>--<stage>--<label>`, but a mail
+	/// name is not: `mail.beetmash.com` and `stalwart.beetmash.com` are the
+	/// real names of real mail, and a second stage deploying the same
+	/// declaration would publish a SECOND record at each of them. Cloudflare
+	/// accepts that, and receivers round-robin between the live box and
+	/// whatever the other stage stood up, so an experiment takes production
+	/// mail down without erroring anywhere.
+	///
+	/// So a stage that is not this one emits its SES identity and its
+	/// infrastructure and touches no record at all. Empty means no guard,
+	/// which is right for a stack whose domain nothing else serves.
+	#[set_with(unwrap_option, into)]
+	dns_stage: Option<SmolStr>,
 	/// The SSH public key installed as the box's key pair. A public half only;
 	/// the private key never touches this stack.
 	ssh_public_key: SmolStr,
@@ -129,9 +151,28 @@ impl StalwartBlock {
 	pub const AMI_PARAMETER: &'static str =
 		"/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64";
 
-	/// The bootstrap admin username the box's `stalwart.env` declares, valid
-	/// until provision creates a real admin account.
+	/// The administrator username, which names two different credentials in
+	/// sequence: the recovery admin the box's `stalwart.env` declares while the
+	/// data store is unclaimed, and the real `admin@<domain>` account the
+	/// server creates when it is claimed. The recovery credential exists only
+	/// for the window between them, and the boot renderer stops writing it the
+	/// moment a `config.json` exists.
 	pub const ADMIN_USER: &'static str = "admin";
+
+	/// The AWS-published bundle of every RDS certificate authority, installed
+	/// into the box's trust store so the database session is verified rather
+	/// than merely encrypted. RDS presents a certificate from Amazon's private
+	/// CA, which no distribution ships.
+	pub const RDS_CA_BUNDLE: &'static str =
+		"https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
+
+	/// When the nightly dump runs, in UTC (`systemd` calendar syntax). Late
+	/// evening in Sydney, ie the quietest hour for the mailboxes this serves.
+	pub const BACKUP_SCHEDULE: &'static str = "*-*-* 14:30:00";
+
+	/// The prefix every dump is written under, so the bucket's lifecycle rule
+	/// and an off-site `rclone` pull both have one path to name.
+	pub const BACKUP_PREFIX: &'static str = "postgres";
 
 	pub fn new(
 		label: impl Into<SmolStr>,
@@ -145,7 +186,9 @@ impl StalwartBlock {
 			db_name: "mail".into(),
 			db_user: "postgres".into(),
 			blob_bucket: SmolStr::default(),
+			backup_bucket: SmolStr::default(),
 			dns: None,
+			dns_stage: None,
 			ssh_public_key: SmolStr::default(),
 			instance_type: Self::INSTANCE_TYPE.into(),
 			volume_gb: 30,
@@ -178,6 +221,19 @@ impl StalwartBlock {
 		return DnsProvider::cloudflare_env(self.hostname.clone());
 		#[cfg(not(feature = "cloudflare_dns"))]
 		None
+	}
+
+	/// Whether this stage may publish the box's name, ie whether it is the
+	/// [`dns_stage`](Self::dns_stage) (or none was declared).
+	///
+	/// A stage that is not gets no address record, and therefore no
+	/// certificate, so its deploy fails at provision — which is the right place
+	/// for it to fail, rather than at the point where a second `A` record has
+	/// already sent half the world's mail to the wrong box.
+	pub fn owns_names(&self, stack: &ResolvedStack) -> bool {
+		self.dns_stage
+			.as_ref()
+			.is_none_or(|owner| owner == stack.stage())
 	}
 
 	/// The security group this block declares, ie the label a database's
@@ -740,6 +796,15 @@ impl StalwartBlock {
 		// apply, so the emit fails instead of quietly skipping. Not in
 		// `validate`, since which zone a launch has is not a property of the
 		// declaration.
+		if !self.owns_names(stack) {
+			warn!(
+				"stage '{}' does not own '{}', so no address record is \
+				published for it",
+				stack.stage(),
+				self.hostname
+			);
+			return Ok(());
+		}
 		let Some(dns) = self.resolved_dns() else {
 			bevybail!(
 				"mail box '{}' resolves no zone to publish '{}' into: set CLOUDFLARE_ZONE_ID or `with_dns` a provider",
@@ -797,10 +862,12 @@ impl StalwartBlock {
 	/// and in-memory stores are `Default`, ie the data store itself, so they
 	/// appear nowhere at all.
 	///
-	/// `allowInvalidCerts` is deliberate, not lazy: RDS presents a certificate
-	/// from Amazon's private RDS CA, which no default trust store carries. The
-	/// session is TLS inside a private subnet either way; pinning the RDS CA
-	/// bundle is a hardening follow-up.
+	/// The certificate is VERIFIED, not merely negotiated: the boot script
+	/// installs [`RDS_CA_BUNDLE`](Self::RDS_CA_BUNDLE) into the box's trust
+	/// anchors, and Stalwart's Postgres client verifies against the platform
+	/// store, so `allowInvalidCerts` is absent rather than true. Without the
+	/// bundle the session would be encrypted against whoever answered, which
+	/// inside a private subnet is a small window and still a real one.
 	fn store_config_template(&self) -> Value {
 		json!({
 			"@type": "PostgreSql",
@@ -810,7 +877,7 @@ impl StalwartBlock {
 			"authUsername": self.db_user,
 			"authSecret": { "@type": "None" },
 			"useTls": true,
-			"allowInvalidCerts": true
+			"allowInvalidCerts": false
 		})
 	}
 
@@ -835,16 +902,28 @@ impl StalwartBlock {
 	}
 
 	/// The boot script at `/usr/local/bin/stalwart-secrets`, run before every
-	/// service start: read the secrets from SSM through the instance profile,
-	/// render the bootstrap admin credential into `stalwart.env`, and — only
-	/// once the server has been claimed — `config.json` from the template.
-	/// Rotation is therefore a restart.
+	/// service start: render the bootstrap admin credential into
+	/// `stalwart.env` while the server still needs one, and — once the server
+	/// has been claimed — `config.json` from the template and SSM. Rotation is
+	/// therefore a restart.
 	///
-	/// The existence guard is the commissioning protocol, not caution: a box
-	/// with NO `config.json` boots in bootstrap mode waiting for provision's
-	/// `Bootstrap` claim, and the server writes the first `config.json` itself.
-	/// Rendering one here on first boot would skip bootstrap mode entirely and
-	/// boot a server with an unclaimed, tableless data store.
+	/// The `config.json` existence guard is the commissioning protocol, not
+	/// caution: a box with NO file boots in Stalwart's bootstrap mode waiting
+	/// for provision's `Bootstrap` claim, and the server writes the first file
+	/// itself. Rendering one here on first boot would skip bootstrap mode
+	/// entirely and boot a server with an unclaimed, tableless data store.
+	///
+	/// The SAME guard retires the recovery credential. `STALWART_RECOVERY_ADMIN`
+	/// is a password that provisions the whole server and answers on a
+	/// plaintext port, and it exists for one reason: to authenticate the claim
+	/// on a server that has no accounts yet. The moment a `config.json` exists
+	/// there IS an administrator account, so the env file is rewritten without
+	/// it and the backdoor dies with the commissioning phase.
+	///
+	/// `render-store` forces the store render on a box whose disk is fresh but
+	/// whose data store is already claimed — a rebuilt instance, where the file
+	/// is missing and bootstrap mode is a lie. [`StalwartProvision`] is the one
+	/// caller, since only it can tell that state from a genuinely new store.
 	///
 	/// The JSON splice goes through python (present in the AL2023 base AMI)
 	/// rather than sed, so a password is escaped as data and can never be
@@ -855,19 +934,23 @@ impl StalwartBlock {
 set -euo pipefail
 umask 077
 get() { aws ssm get-parameter --region '__REGION__' --name "$1" --with-decryption --query Parameter.Value --output text; }
-admin_password="$(get '__ADMIN_SECRET__')"
-if [ -f /etc/stalwart/config.json ]; then
+if [ -f /etc/stalwart/config.json ] || [ "${1:-}" = "render-store" ]; then
 	db_password="$(get '__DB_SECRET__')"
-	python3 - "$db_password" <<'PY' > /etc/stalwart/config.json.next
+	python3 - "$db_password" <<'RENDER' > /etc/stalwart/config.json.next
 import json, sys
 with open("/etc/stalwart/config.json.template") as file:
     config = json.load(file)
 config["authSecret"] = {"@type": "Value", "secret": sys.argv[1]}
 json.dump(config, sys.stdout)
-PY
+RENDER
 	mv -f /etc/stalwart/config.json.next /etc/stalwart/config.json
+	# the store is claimed, so a real administrator account exists and the
+	# recovery credential is a second way in that nothing needs
+	: > /etc/stalwart/stalwart.env.next
+else
+	admin_password="$(get '__ADMIN_SECRET__')"
+	printf 'STALWART_RECOVERY_ADMIN=__ADMIN_USER__:%s\n' "$admin_password" > /etc/stalwart/stalwart.env.next
 fi
-printf 'STALWART_RECOVERY_ADMIN=__ADMIN_USER__:%s\n' "$admin_password" > /etc/stalwart/stalwart.env.next
 mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 "#;
 		let db_secret = self.database.secret_name(stack);
@@ -884,6 +967,92 @@ mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 		})
 		.trim_end()
 		.to_string()
+	}
+
+	/// The nightly dump at `/usr/local/bin/stalwart-backup`: a custom-format
+	/// `pg_dump` of the mail database straight into the backups bucket, keyed
+	/// by date so a restore names a day rather than a file.
+	///
+	/// The box already holds the credential and the network path, so the dump
+	/// runs HERE rather than from a deploy machine: a backup that only happens
+	/// while somebody is deploying is not a backup. The dump is deleted
+	/// immediately after upload, since a copy on the instance's own disk
+	/// protects against nothing the instance can suffer.
+	///
+	/// `--format=custom` because it is what `pg_restore` reads selectively, and
+	/// `--no-owner --no-acl` so a restore into a differently-named role (the
+	/// drill stage's) does not fail on every ownership statement.
+	fn backup_script(&self, stack: &ResolvedStack) -> String {
+		let template = r#"#!/bin/bash
+# Nightly dump of the mail database into the backups bucket.
+set -euo pipefail
+umask 077
+export PGPASSWORD="$(aws ssm get-parameter --region '__REGION__' --name '__DB_SECRET__' --with-decryption --query Parameter.Value --output text)"
+# the same verified-TLS posture the mail server's own connection takes, which
+# the boot script's trust anchor is what makes possible
+export PGSSLMODE=verify-full
+dump="$(mktemp /var/lib/stalwart/backup.XXXXXX.dump)"
+trap 'rm -f "$dump"' EXIT
+pg_dump --host '__DB_HOST__' --port __DB_PORT__ --username '__DB_USER__' --dbname '__DB_NAME__' --format=custom --no-owner --no-acl --file "$dump"
+aws s3 cp "$dump" "s3://__BUCKET__/__PREFIX__/__DB_NAME__/$(date -u +%Y/%m/%d/%H%M%SZ).dump" --region '__REGION__'
+echo "mail database backed up ($(stat -c %s "$dump") bytes)"
+"#;
+		let db_secret = self.database.secret_name(stack);
+		let db_host = self.database.host(stack);
+		let bucket = stack.resource_name(self.backup_bucket.clone());
+		let port = RdsPostgresBlock::PORT.to_string();
+		[
+			("__REGION__", stack.region().as_str()),
+			("__DB_SECRET__", db_secret.as_str()),
+			("__DB_HOST__", db_host.as_str()),
+			("__DB_PORT__", port.as_str()),
+			("__DB_USER__", self.db_user.as_str()),
+			("__DB_NAME__", self.db_name.as_str()),
+			("__BUCKET__", bucket.as_str()),
+			("__PREFIX__", Self::BACKUP_PREFIX),
+		]
+		.iter()
+		.fold(template.to_string(), |script, (token, value)| {
+			script.replace(token, value)
+		})
+		.trim_end()
+		.to_string()
+	}
+
+	/// The backup unit and its timer.
+	///
+	/// `Persistent=true` so a box that was down at the scheduled hour dumps as
+	/// soon as it is up rather than skipping the night, and a randomised delay
+	/// so several of these never hit the database together. The unit logs where
+	/// the mail server does, so a failed dump reaches the same CloudWatch group
+	/// `watch` tails rather than only the box's journal.
+	fn backup_units(&self) -> (String, String) {
+		let service = r#"[Unit]
+Description=Nightly pg_dump of the mail database into S3
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=stalwart
+Group=stalwart
+ExecStart=/usr/local/bin/stalwart-backup
+StandardOutput=append:/var/log/stalwart/stalwart.log
+StandardError=append:/var/log/stalwart/stalwart.log"#
+			.to_string();
+		let timer = format!(
+			r#"[Unit]
+Description=Nightly mail database backup
+
+[Timer]
+OnCalendar={}
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target"#,
+			Self::BACKUP_SCHEDULE
+		);
+		(service, timer)
 	}
 
 	/// The systemd unit, modeled on the one Stalwart ships: unprivileged user
@@ -943,6 +1112,43 @@ WantedBy=multi-user.target"#
 		})
 	}
 
+	/// The cloud-init stanza that installs the backup script and its units, or
+	/// nothing at all when no [`backup_bucket`](Self::backup_bucket) is
+	/// declared.
+	///
+	fn backup_stanza(&self, stack: &ResolvedStack) -> String {
+		if self.backup_bucket.is_empty() {
+			return String::new();
+		}
+		let script = self.backup_script(stack);
+		let (service, timer) = self.backup_units();
+		format!(
+			r#"# the nightly dump: the box holds the credential and the network path, so
+# the backup runs here rather than from whatever machine last deployed
+cat > /usr/local/bin/stalwart-backup <<'BACKUP_EOF'
+{script}
+BACKUP_EOF
+chmod 0755 /usr/local/bin/stalwart-backup
+
+cat > /etc/systemd/system/stalwart-backup.service <<'BACKUP_UNIT_EOF'
+{service}
+BACKUP_UNIT_EOF
+
+cat > /etc/systemd/system/stalwart-backup.timer <<'BACKUP_TIMER_EOF'
+{timer}
+BACKUP_TIMER_EOF
+"#
+		)
+	}
+
+	/// The line that starts the backup timer, or nothing when there is none.
+	fn backup_enable(&self) -> &'static str {
+		match self.backup_bucket.is_empty() {
+			true => "",
+			false => "systemctl enable --now stalwart-backup.timer",
+		}
+	}
+
 	/// The cloud-init script, ie the machine's identity. Installs the pinned
 	/// release (refusing a tarball that fails the pinned checksum), the store
 	/// config template, the secrets renderer, the unit and the log agent; then
@@ -960,6 +1166,10 @@ WantedBy=multi-user.target"#
 		let unit = self.systemd_unit();
 		let cloudwatch =
 			serde_json::to_string_pretty(&self.cloudwatch_config(stack))?;
+		let ca_bundle = Self::RDS_CA_BUNDLE;
+		let backup = self.backup_stanza(stack);
+		let backup_enable = self.backup_enable();
+		let pg_major = RdsPostgresBlock::ENGINE_VERSION;
 
 		let script = format!(
 			r#"#!/bin/bash
@@ -972,6 +1182,12 @@ hostnamectl set-hostname '{hostname}'
 id stalwart >/dev/null 2>&1 || useradd --system --home /var/lib/stalwart --create-home --shell /usr/sbin/nologin stalwart
 mkdir -p /etc/stalwart /var/lib/stalwart /var/log/stalwart
 chown -R stalwart:stalwart /etc/stalwart /var/lib/stalwart /var/log/stalwart
+
+# the RDS certificate authorities, so the database session is VERIFIED and not
+# merely encrypted: Stalwart's postgres client checks against the platform trust
+# store, which carries no Amazon private CA until this lands in it
+curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 '{ca_bundle}' -o /etc/pki/ca-trust/source/anchors/rds-global-bundle.pem
+update-ca-trust extract
 
 # the pinned release: a tarball that does not hash to the pinned digest never
 # reaches the disk, and the boot fails loudly instead. Retries cover a transient
@@ -1001,6 +1217,13 @@ cat > /etc/systemd/system/stalwart.service <<'UNIT_EOF'
 {unit}
 UNIT_EOF
 
+# the postgres client, for both directions of a backup: the nightly dump and
+# the restore a drill runs. Named from the DATABASE's own engine version, since
+# `pg_dump` refuses a server newer than itself and the two would otherwise
+# drift silently until the first dump failed; the unversioned package is the
+# fallback for a distribution that has not packaged that major yet.
+dnf install -y postgresql{pg_major} || dnf install -y postgresql
+
 # log forwarding into the block's own group, credentials from the instance role
 dnf install -y amazon-cloudwatch-agent
 cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CW_EOF'
@@ -1008,11 +1231,13 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CW_EO
 CW_EOF
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
 
+{backup}
 # secrets rendered before the first start, and by ExecStartPre on every later
 # one, so rotation is a restart rather than a rebuild
 sudo -u stalwart /usr/local/bin/stalwart-secrets
 systemctl daemon-reload
 systemctl enable --now stalwart
+{backup_enable}
 "#
 		);
 
@@ -1452,6 +1677,90 @@ mod tests {
 		{
 			template[absent].is_null().xpect_true();
 		}
+	}
+
+	/// The database session is VERIFIED, which is only possible because the
+	/// boot script installs the RDS certificate authorities: no distribution
+	/// ships Amazon's private CA, so the trust anchor and this flag are one
+	/// decision in two places.
+	#[beet_core::test]
+	fn the_database_certificate_is_verified() {
+		mail_box().store_config_template()["allowInvalidCerts"]
+			.as_bool()
+			.unwrap()
+			.xpect_false();
+		user_data(&mail_box())
+			.as_str()
+			.xpect_contains(StalwartBlock::RDS_CA_BUNDLE)
+			.xpect_contains("update-ca-trust extract");
+	}
+
+	/// The recovery credential exists ONLY while the data store is unclaimed:
+	/// once a `config.json` is on disk there is a real administrator account,
+	/// and a second password that provisions the whole server over a plaintext
+	/// port is a backdoor with no remaining purpose.
+	#[beet_core::test]
+	fn the_recovery_credential_retires_with_the_claim() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let script = mail_box().secrets_script(&stack);
+		// the claimed branch renders the store and an EMPTY env file
+		let (claimed, unclaimed) = script
+			.split_once("else")
+			.map(|(claimed, unclaimed)| {
+				(claimed.to_string(), unclaimed.to_string())
+			})
+			.unwrap();
+		claimed.as_str().xpect_contains("config.json.next");
+		claimed
+			.as_str()
+			.xnot()
+			.xpect_contains("STALWART_RECOVERY_ADMIN");
+		unclaimed.as_str().xpect_contains("STALWART_RECOVERY_ADMIN");
+	}
+
+	/// A rebuilt box has a fresh disk and an existing data store, so bootstrap
+	/// mode is a lie the missing file told. `render-store` is how provision
+	/// tells the box otherwise, and without it a machine-config change would
+	/// mean a box that can never boot against its own database.
+	#[beet_core::test]
+	fn the_store_render_can_be_forced() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		mail_box()
+			.secrets_script(&stack)
+			.as_str()
+			.xpect_contains("render-store");
+	}
+
+	/// The nightly dump is opt-in and complete: no bucket, no timer, and no
+	/// half-installed script that fails every night at half past two.
+	#[beet_core::test]
+	fn the_backup_timer_is_declared_or_absent() {
+		user_data(&mail_box())
+			.as_str()
+			.xnot()
+			.xpect_contains("stalwart-backup");
+		user_data(&mail_box().with_backup_bucket("mail-backups"))
+			.as_str()
+			.xpect_contains("/usr/local/bin/stalwart-backup")
+			.xpect_contains("stalwart-backup.timer")
+			.xpect_contains("pg_dump")
+			.xpect_contains(StalwartBlock::BACKUP_SCHEDULE);
+	}
+
+	/// The dump carries no secret on its command line: the box reads the
+	/// database credential from the parameter every other consumer reads, so a
+	/// process list on the box is not a credential dump.
+	#[beet_core::test]
+	fn the_backup_reads_its_credential_rather_than_carrying_one() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		mail_box()
+			.with_backup_bucket("mail-backups")
+			.backup_script(&stack)
+			.as_str()
+			.xpect_contains("aws ssm get-parameter")
+			.xpect_contains("PGSSLMODE=verify-full")
+			.xpect_contains(stack.resource_name("mail-backups").as_str());
 	}
 
 	/// The blob store the `Bootstrap` claim declares: the stack's bucket with

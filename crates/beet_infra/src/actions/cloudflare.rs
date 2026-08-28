@@ -21,7 +21,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Default Workers compatibility date stamped into generated `wrangler.jsonc`.
-const COMPATIBILITY_DATE: &str = "2025-06-01";
 
 /// Where the `build` verb publishes the deployable wasm Worker artifacts
 /// (`index.js`, `index_bg.wasm`, `package.json`), workspace-relative. `deploy`
@@ -67,39 +66,6 @@ async fn wrangler_r2_create(bucket: &str) -> Result {
 			}
 		}
 	}
-}
-
-/// `wrangler deploy` from the given project directory. When `secrets_file` is
-/// set, its keys are uploaded as real Worker secrets *with* this version
-/// (`--secrets-file`), the only way a deploy publishes secrets: a `.dev.vars`
-/// file is a local-dev artifact `wrangler deploy` otherwise ignores. The
-/// container path needs this so its `this.env.R2_*` reads resolve in production.
-async fn wrangler_deploy(
-	project_dir: &AbsPathBuf,
-	secrets_file: Option<&str>,
-) -> Result {
-	info!("wrangler deploy ({})", project_dir.display());
-	let mut args = vec!["deploy".to_string()];
-	if let Some(secrets_file) = secrets_file {
-		args.push("--secrets-file".to_string());
-		args.push(secrets_file.to_string());
-	}
-	ChildProcess::new("wrangler")
-		.with_args(args)
-		.with_cwd(project_dir.clone())
-		.run_async()
-		.await?;
-	Ok(())
-}
-
-/// The build directory for a Cloudflare project (`target/<name>-cf/`), created
-/// fresh.
-fn cf_project_dir(name: &str) -> Result<AbsPathBuf> {
-	let dir = AbsPathBuf::new_workspace_rel(".")?
-		.join("target")
-		.join(format!("{name}-cf"));
-	fs_ext::create_dir_all(&dir)?;
-	Ok(dir)
 }
 
 /// Find a sibling component of type `T` by walking the action's parent's children
@@ -158,7 +124,7 @@ pub async fn CloudflareContainerDeployAction(
 		.map_err(|_| bevyhow!("CLOUDFLARE_ACCOUNT_ID is unset"))?;
 	let endpoint = format!("https://{account_id}.r2.cloudflarestorage.com");
 
-	let dir = cf_project_dir(block.name())?;
+	let dir = wrangler_ext::project_dir(block.name())?;
 	let binary_name = "beet";
 	std::fs::copy(&binary, dir.join(binary_name))?;
 	write_container_dockerfile(&dir, binary_name, &block, &endpoint)?;
@@ -173,7 +139,7 @@ pub async fn CloudflareContainerDeployAction(
 	wrangler_r2_create(block.bucket()).await?;
 	// upload the R2 keys as real Worker secrets with this version (`.dev.vars` is
 	// otherwise local-only), so the container's `this.env.R2_*` reads resolve.
-	wrangler_deploy(&dir, secrets_file.as_deref()).await?;
+	wrangler_ext::deploy(&dir, secrets_file.as_deref()).await?;
 	info!("deployed container worker `{}`", block.name());
 	Pass(cx.input).xok()
 }
@@ -302,7 +268,7 @@ fn write_container_wrangler(
 	let json = serde_json::to_string_pretty(&serde_json::json!({
 		"name": block.name(),
 		"main": "worker.js",
-		"compatibility_date": COMPATIBILITY_DATE,
+		"compatibility_date": wrangler_ext::COMPATIBILITY_DATE,
 		"containers": [{
 			"class_name": CONTAINER_CLASS,
 			"image": "./Dockerfile",
@@ -449,11 +415,11 @@ pub async fn CloudflareWorkerDeployAction(
 	let start = Instant::now();
 	let block = sibling::<CloudflareWorkerBlock>(&cx).await?;
 	ensure_worker_artifacts().await?;
-	let dir = cf_project_dir(block.name())?;
+	let dir = wrangler_ext::project_dir(block.name())?;
 	write_worker_wrangler(&dir, &block)?;
 
 	wrangler_r2_create(block.bucket()).await?;
-	wrangler_deploy(&dir, None).await?;
+	wrangler_ext::deploy(&dir, None).await?;
 	info!(
 		"deployed wasm worker `{}` in {}",
 		block.name(),
@@ -507,7 +473,7 @@ fn worker_wrangler_json(
 	let mut config = serde_json::json!({
 		"name": block.name(),
 		"main": main_js,
-		"compatibility_date": COMPATIBILITY_DATE,
+		"compatibility_date": wrangler_ext::COMPATIBILITY_DATE,
 		"compatibility_flags": ["nodejs_compat"],
 		"r2_buckets": [{
 			"binding": WORKER_R2_BINDING,
@@ -716,9 +682,9 @@ pub async fn CloudflareBenchAction(
 	build_worker_artifacts().await?;
 	let block = CloudflareWorkerBlock::new(bench.name().clone())
 		.with_bucket(bench.bucket().clone());
-	let dir = cf_project_dir(bench.name())?;
+	let dir = wrangler_ext::project_dir(bench.name())?;
 	write_worker_wrangler(&dir, &block)?;
-	wrangler_deploy(&dir, None).await?;
+	wrangler_ext::deploy(&dir, None).await?;
 	let redeploy_elapsed = redeploy_start.elapsed();
 
 	let speedup = redeploy_elapsed.as_secs_f64() / sync_elapsed.as_secs_f64();

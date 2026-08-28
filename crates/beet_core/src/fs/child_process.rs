@@ -274,6 +274,37 @@ impl ChildProcess {
 			.xmap(|output| self.map_output(output))
 	}
 
+	/// Run the command asynchronously with `input` written to its stdin, which
+	/// is then closed, collecting stdout.
+	///
+	/// The shape a filter takes: a value handed to a tool and its answer read
+	/// back, with nothing landing on disk in between. That matters when the
+	/// value is a private key, which is why this exists rather than a temporary
+	/// file and two invocations.
+	pub async fn run_async_stdin(
+		self,
+		input: impl AsRef<[u8]>,
+	) -> Result<Output> {
+		use futures_lite::AsyncWriteExt;
+		let mut cmd = async_process::Command::from(self.into_command_std());
+		cmd.stdin(std::process::Stdio::piped())
+			.stdout(std::process::Stdio::piped())
+			.stderr(std::process::Stdio::piped());
+		let mut child = cmd.spawn().map_err(|err| self.map_spawn_error(err))?;
+		let mut stdin = child
+			.stdin
+			.take()
+			.ok_or_else(|| bevyhow!("{self}: stdin was not piped"))?;
+		stdin.write_all(input.as_ref()).await?;
+		// the child reads to EOF, so the pipe must close before the wait below
+		drop(stdin);
+		child
+			.output()
+			.await
+			.xmap(|result| self.map_result(result))?
+			.xmap(|output| self.map_output(output))
+	}
+
 	/// Run the command, collecting stdout
 	pub async fn run_async_stdout(self) -> Result<String> {
 		self.run_async()
@@ -302,21 +333,25 @@ impl ChildProcess {
 		self.spawn_with(cmd)
 	}
 
+	/// A spawn failure, with a missing executable mapped onto the configured
+	/// [`not_found`](Self::with_not_found) message.
+	fn map_spawn_error(&self, err: std::io::Error) -> BevyError {
+		match err.kind() == ErrorKind::NotFound {
+			true => match &self.not_found {
+				Some(msg) => bevyhow!("{msg}"),
+				None => err.into(),
+			},
+			false => err.into(),
+		}
+	}
+
 	/// Spawn a prepared command, mapping a missing executable onto the
 	/// configured [`not_found`](Self::with_not_found) message.
 	fn spawn_with(
 		&self,
 		mut cmd: async_process::Command,
 	) -> Result<ChildHandle> {
-		let child = cmd.spawn().map_err(|err| {
-			if err.kind() == ErrorKind::NotFound
-				&& let Some(msg) = &self.not_found
-			{
-				bevyhow!("{msg}")
-			} else {
-				err.into()
-			}
-		})?;
+		let child = cmd.spawn().map_err(|err| self.map_spawn_error(err))?;
 		Ok(ChildHandle {
 			inner: child,
 			group: self.group,

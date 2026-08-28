@@ -7,14 +7,22 @@
 //! nobody declared. These are the steps that close those gaps, and each one is
 //! a verb rather than a resource: idempotent, safe to re-run, and reporting
 //! what it converged.
+mod dkim_key;
+pub use dkim_key::*;
 mod eip_reverse_dns;
 pub use eip_reverse_dns::*;
 mod jmap_client;
 pub use jmap_client::*;
+mod mail_health;
+pub use mail_health::*;
 mod mail_probe;
 pub use mail_probe::*;
+mod mail_restore_drill;
+pub use mail_restore_drill::*;
 mod mail_stack;
 pub use mail_stack::*;
+mod mta_sts_publish;
+pub use mta_sts_publish::*;
 mod stalwart_plan;
 pub use stalwart_plan::*;
 mod stalwart_provision;

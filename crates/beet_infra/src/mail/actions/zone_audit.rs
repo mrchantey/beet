@@ -34,6 +34,13 @@ pub struct ZoneAudit {
 	/// rather than inferred. The apex mail records of a provider still serving
 	/// the domain belong here until its cutover; so does the record wrangler
 	/// creates for a worker custom domain, which terraform never sees.
+	///
+	/// The list belongs to the STACK rather than to the verb that reads it: an
+	/// audit run at the tail of a deploy and one run on its own are asking the
+	/// same question of the same zone, and a second copy of these rows is a
+	/// second thing to update when the cutover retires them. So the action
+	/// gathers every `ZoneAudit` declared under the stack, and one of them
+	/// carrying the list is enough for all of them.
 	#[set_with(skip)]
 	allowed: Vec<AllowedRecord>,
 }
@@ -124,18 +131,23 @@ impl ZoneAudit {
 pub async fn ZoneAuditAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let audit = cx
-		.caller
-		.get_cloned::<ZoneAudit>()
-		.await
-		.unwrap_or_default();
 	let fix = cx.has_param("fix");
-	let declared = cx
+	let (declared, allowed) = cx
 		.caller
-		.with_state::<StackQuery, _>(|entity, query| -> Result<_> {
-			let (_, _, config) = query.build_config(entity)?;
-			declared_records(&config).xok()
-		})
+		.with_state::<(StackQuery, Query<&ZoneAudit>), _>(
+			|entity, (stacks, audits)| -> Result<_> {
+				let (_, _, config) = stacks.build_config(entity)?;
+				// every audit declared under this stack, so the list is stated
+				// once wherever it reads best
+				let allowed = stacks
+					.declared(entity)?
+					.into_iter()
+					.filter_map(|child| audits.get(child).ok())
+					.flat_map(|audit| audit.allowed().iter().cloned())
+					.collect::<Vec<_>>();
+				(declared_records(&config), allowed).xok()
+			},
+		)
 		.await??;
 
 	let (zone_id, token) = zone_env()?;
@@ -146,19 +158,19 @@ pub async fn ZoneAuditAction(
 		declared.len()
 	);
 
-	let strays =
-		live.iter()
-			.filter(|record| {
-				!declared
+	let strays = live
+		.iter()
+		.filter(|record| {
+			!declared
+				.iter()
+				.any(|pattern| pattern.matches(&record.name, &record.kind))
+				&& !allowed
 					.iter()
-					.any(|pattern| pattern.matches(&record.name, &record.kind))
-					&& !audit.allowed().iter().any(|allowed| {
-						allowed.matches(&record.name, &record.kind)
-					})
-			})
-			.collect::<Vec<_>>();
+					.any(|allowed| allowed.matches(&record.name, &record.kind))
+		})
+		.collect::<Vec<_>>();
 
-	for allowed in audit.allowed() {
+	for allowed in &allowed {
 		let count = live
 			.iter()
 			.filter(|record| allowed.matches(&record.name, &record.kind))

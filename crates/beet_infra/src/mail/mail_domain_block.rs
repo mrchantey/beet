@@ -3,6 +3,7 @@ use crate::mail::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
+use serde_json::json;
 
 /// Which of a mail domain's records a [`MailDomainBlock`] publishes.
 ///
@@ -112,6 +113,33 @@ pub struct MailDomainBlock {
 	/// records.
 	#[set_with(unwrap_option, into)]
 	handle_domain: Option<SmolStr>,
+	/// The SNS topic, by bare name in this account and region, that this
+	/// domain's bounces, complaints, rejections and delivery delays publish to,
+	/// and that its reputation alarms notify. Without one the configuration set
+	/// still collects reputation metrics but nothing consumes them, which is a
+	/// sending domain whose first complaint is discovered by a suspension.
+	///
+	/// A name rather than a block reference because one topic serves every
+	/// domain in the account: events carry the configuration set that emitted
+	/// them, so a topic per domain would only move routing into IAM.
+	#[set_with(unwrap_option, into)]
+	events_topic: Option<SmolStr>,
+	/// The stage that OWNS the shared names below, ie the one whose deploy may
+	/// publish them.
+	///
+	/// A stack's resources are named `<app>--<stage>--<label>`, but a mail
+	/// name is not: `mail.beetmash.com` and `stalwart.beetmash.com` are the
+	/// real names of real mail, and a second stage deploying the same
+	/// declaration would publish a SECOND record at each of them. Cloudflare
+	/// accepts that, and receivers round-robin between the live box and
+	/// whatever the other stage stood up, so an experiment takes production
+	/// mail down without erroring anywhere.
+	///
+	/// So a stage that is not this one emits its SES identity and its
+	/// infrastructure and touches no record at all. Empty means no guard,
+	/// which is right for a stack whose domain nothing else serves.
+	#[set_with(unwrap_option, into)]
+	dns_stage: Option<SmolStr>,
 }
 
 impl Default for MailDomainBlock {
@@ -141,6 +169,33 @@ impl MailDomainBlock {
 	/// The sesv2 key-length enum. Note the `_BIT` suffix: the v1 API and most
 	/// documentation say `RSA_2048`, which sesv2 rejects.
 	pub const DKIM_KEY_LENGTH: &'static str = "RSA_2048_BIT";
+
+	/// The selector the SOVEREIGN key signs under, ie the one this stack holds
+	/// rather than the three Amazon rotates. Named for the server that signs
+	/// with it, so a reader of the zone can tell the two sources apart at a
+	/// glance.
+	pub const DKIM_SELECTOR: &'static str = "stalwart";
+
+	/// The event destination's name, which is the one phase 0B made by hand and
+	/// this block now declares: terraform adopts it rather than adding a second
+	/// stream beside it.
+	pub const EVENT_DESTINATION: &'static str = "sns-events";
+
+	/// The SES events a destination forwards. Deliveries themselves are
+	/// deliberately absent: they are the overwhelming majority of the stream
+	/// and carry no decision, while these four are each a reason to stop
+	/// sending to an address.
+	pub const EVENT_TYPES: &'static [&'static str] =
+		&["BOUNCE", "COMPLAINT", "REJECT", "DELIVERY_DELAY"];
+
+	/// The bounce rate SES itself treats as review-worthy, and the level this
+	/// stack alarms at so the warning arrives before the review does.
+	pub const BOUNCE_ALARM_RATE: f64 = 0.05;
+
+	/// The complaint rate with the same relationship to a suspension. An order
+	/// of magnitude below the bounce threshold, because a complaint is a
+	/// recipient saying so rather than a server.
+	pub const COMPLAINT_ALARM_RATE: f64 = 0.001;
 
 	/// The client-facing services advertised by `SRV`, as
 	/// `(service name, port)`. JMAP is first because it is the one an agent
@@ -175,6 +230,8 @@ impl MailDomainBlock {
 			members: Vec::new(),
 			catch_all: None,
 			handle_domain: None,
+			events_topic: None,
+			dns_stage: None,
 			domain,
 		}
 	}
@@ -206,6 +263,14 @@ impl MailDomainBlock {
 		return DnsProvider::cloudflare_env(self.domain.clone());
 		#[cfg(not(feature = "cloudflare_dns"))]
 		None
+	}
+
+	/// Whether this stage may publish these names, ie whether it is the
+	/// [`dns_stage`](Self::dns_stage) (or none was declared).
+	pub fn owns_names(&self, stack: &ResolvedStack) -> bool {
+		self.dns_stage
+			.as_ref()
+			.is_none_or(|owner| owner == stack.stage())
 	}
 
 	/// Add a member, and the mailbox they own on this domain.
@@ -296,6 +361,61 @@ impl MailDomainBlock {
 		self.mta_sts.policy_text(&[&self.mail_host])
 	}
 
+	/// The parameter this domain's sovereign DKIM private key lives at, ie
+	/// `/beetmash/prod/dkim-stalwart-beetmash-com`. Composed here because three
+	/// ends read it: the action that mints it, the record that publishes its
+	/// public half, and the provision that hands it to the signing server.
+	pub fn dkim_secret(&self) -> SecretRef {
+		SecretRef::new(format!("dkim-{}", self.slug()))
+	}
+
+	/// The tofu variable the public half arrives as, ie
+	/// `dkim_stalwart_beetmash_com`. Underscores rather than the slug's
+	/// hyphens: `${var.a-b}` is a subtraction in HCL, not a name.
+	pub fn dkim_public_key_variable(&self) -> Variable {
+		Variable::param(
+			self.slug()
+				.replace('-', "_")
+				.xmap(|slug| format!("dkim_{slug}")),
+		)
+	}
+
+	/// The record `DKIM_SELECTOR` publishes at, ie
+	/// `stalwart._domainkey.stalwart.beetmash.com`.
+	pub fn dkim_record_name(&self) -> String {
+		format!("{}._domainkey.{}", Self::DKIM_SELECTOR, self.domain)
+	}
+
+	/// The selector record's value, reading the public half out of the variable
+	/// the [`EnsureDkimKey`] step resolved.
+	///
+	/// `h=sha256` is stated rather than defaulted, matching what Stalwart's own
+	/// record generator emits for the same key, so the published record and the
+	/// signature it validates are described identically.
+	pub fn dkim_record_value(&self) -> String {
+		format!(
+			"v=DKIM1; k=rsa; h=sha256; p={}",
+			self.dkim_public_key_variable().tf_var_ref()
+		)
+	}
+
+	/// The terraform label suffix an alarm on `metric` takes, ie
+	/// `reputation-bouncerate`.
+	fn alarm_label(metric: &str) -> String {
+		metric.replace('.', "-").to_lowercase()
+	}
+
+	/// The ARN of [`events_topic`](Self::events_topic) in `stack`'s region,
+	/// composed against the account the apply is running in.
+	fn events_topic_arn(&self, stack: &ResolvedStack) -> Option<String> {
+		self.events_topic.as_ref().map(|topic| {
+			format!(
+				"arn:aws:sns:{}:${{data.aws_caller_identity.current.account_id}}:{topic}",
+				stack.region()
+			)
+		})
+	}
+
 	/// A terraform label for this domain's `suffix` resource, distinct from
 	/// every other domain's in the same stack.
 	fn label(&self, suffix: &str) -> String {
@@ -367,6 +487,18 @@ impl Block for MailDomainBlock {
 	) -> Result {
 		self.validate()?;
 		let identity = self.emit_ses(stack, config)?;
+		self.emit_events(stack, config)?;
+		// the identity is stack-scoped and the records are not, so a stage that
+		// does not own these names still gets a verified sender and publishes
+		// nothing
+		if !self.owns_names(stack) {
+			warn!(
+				"stage '{}' does not own '{}', so its records are not published",
+				stack.stage(),
+				self.domain
+			);
+			return Ok(());
+		}
 		match self.resolved_dns() {
 			Some(dns) => {
 				self.emit_identity_records(stack, config, &dns, &identity)?;
@@ -467,6 +599,107 @@ impl MailDomainBlock {
 		identity.xok()
 	}
 
+	/// What watches this domain's sending: the event destination that streams
+	/// every bounce, complaint, rejection and delay onto the account's topic,
+	/// and the two reputation alarms that fire on the same topic before SES
+	/// acts on the same numbers itself.
+	///
+	/// The alarms read the `AWS/SES` reputation metrics the configuration set
+	/// publishes, which is why `reputation_metrics_enabled` is not optional
+	/// here: without it the metric never appears and an alarm on it sits in
+	/// `INSUFFICIENT_DATA` forever, reading exactly like a healthy one.
+	fn emit_events(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+	) -> Result {
+		let Some(topic) = self.events_topic_arn(stack) else {
+			return Ok(());
+		};
+		// the account the apply runs in, since a topic name is not an address
+		config.add_untyped_data_source(
+			"aws_caller_identity",
+			"current",
+			&json!({}),
+		)?;
+		config.add_resource(&ResourceDef::new_secondary(
+			stack.resource_ident(self.label("ses-events")),
+			AwsSesv2ConfigurationSetEventDestinationDetails {
+				configuration_set_name: self.configuration_set_name().into(),
+				event_destination_name: Self::EVENT_DESTINATION.into(),
+				// the set is named by string rather than by field reference,
+				// because the destination is a property OF the set rather than
+				// a resource pointing at one; terraform sees no edge in a
+				// string, so the order is stated
+				depends_on: Some(vec![
+					format!(
+						"aws_sesv2_configuration_set.{}",
+						stack.resource_ident(self.label("ses-set")).label()
+					)
+					.into(),
+				]),
+				event_destination: Some(vec![
+					AwsSesv2ConfigurationSetEventDestinationResourceBlockTypeEventDestination {
+						enabled: Some(true),
+						matching_event_types: Self::EVENT_TYPES
+							.iter()
+							.map(|event| SmolStr::from(*event))
+							.collect(),
+						sns_destination: Some(vec![
+							EventDestinationResourceBlockTypeSnsDestination {
+								topic_arn: topic.as_str().into(),
+							},
+						]),
+						..default()
+					},
+				]),
+				..default()
+			},
+		))?;
+		for (metric, threshold, description) in [
+			(
+				"Reputation.BounceRate",
+				Self::BOUNCE_ALARM_RATE,
+				"bounce rate: SES suspends a sender that stays here",
+			),
+			(
+				"Reputation.ComplaintRate",
+				Self::COMPLAINT_ALARM_RATE,
+				"complaint rate: recipients marking this domain as spam",
+			),
+		] {
+			// UNTYPED, for the same reason the bucket's versioning is: a
+			// reputation threshold is a fraction of a percent and the generated
+			// binding types `threshold` as an integer, so 0.001 would round to
+			// an alarm that never fires.
+			config.add_untyped_resource(
+				"aws_cloudwatch_metric_alarm",
+				stack
+					.resource_ident(self.label(&Self::alarm_label(metric)))
+					.label(),
+				&json!({
+					"alarm_name": format!("{}-{metric}", self.slug()),
+					"alarm_description": format!("{} {description}", self.domain),
+					"namespace": "AWS/SES",
+					"metric_name": metric,
+					"dimensions": {
+						"ses:configuration-set": self.configuration_set_name(),
+					},
+					"statistic": "Average",
+					"comparison_operator": "GreaterThanThreshold",
+					"threshold": threshold,
+					"period": 3600,
+					"evaluation_periods": 1,
+					// no data means nothing was sent, which is not a fault
+					"treat_missing_data": "notBreaching",
+					"alarm_actions": [&topic],
+					"ok_actions": [&topic],
+				}),
+			)?;
+		}
+		Ok(())
+	}
+
 	/// The records that prove the identity: the three Easy DKIM selectors read
 	/// straight off the identity's computed tokens, and the custom MAIL FROM
 	/// pair. Selector- and subdomain-scoped, so they never collide with another
@@ -495,6 +728,21 @@ impl MailDomainBlock {
 				&format!("{token}.dkim.amazonses.com"),
 			)?;
 		}
+		// the sovereign selector, whose public half arrives as a variable: the
+		// key is minted before the apply rather than by it, so the record and
+		// the signing server read one value from one parameter.
+		let variable = self.dkim_public_key_variable();
+		config.ensure_variable(
+			variable.key().to_string(),
+			variable.tf_declaration(),
+		);
+		dns.emit_txt(
+			stack,
+			config,
+			&self.label("dkim-sovereign"),
+			&self.dkim_record_name(),
+			&self.dkim_record_value(),
+		)?;
 		let mail_from = self.mail_from_domain();
 		dns.emit_mx(
 			stack,
@@ -762,8 +1010,79 @@ mod tests {
 				"TXT _mta-sts.stalwart.beetmash.com",
 				"TXT _smtp._tls.stalwart.beetmash.com",
 				"TXT bounce.stalwart.beetmash.com",
+				"TXT stalwart._domainkey.stalwart.beetmash.com",
 				"TXT stalwart.beetmash.com",
 			]);
+	}
+
+	/// The sovereign selector reads its key out of the variable rather than
+	/// carrying a literal, which is what keeps the published record and the
+	/// key the server signs with one value from one parameter.
+	#[beet_core::test]
+	fn the_sovereign_selector_reads_the_minted_key() {
+		let config = build_config(&[staging()]);
+		record_values(&[staging()])
+			.into_iter()
+			.find(|(_, name, _)| name.starts_with("stalwart._domainkey."))
+			.unwrap()
+			.2
+			.as_str()
+			.xpect_eq(
+				"v=DKIM1; k=rsa; h=sha256; p=${var.dkim_stalwart_beetmash_com}",
+			);
+		// declared, so `plan` and `destroy` (which pass no `-var`) still parse
+		config.to_json()["variable"]["dkim_stalwart_beetmash_com"]
+			.is_object()
+			.xpect_true();
+	}
+
+	/// Nothing consumes a sending domain's events until a topic is named, and a
+	/// reputation alarm with nowhere to fire is worse than none: it reads as
+	/// monitoring. So both are emitted together or not at all.
+	#[beet_core::test]
+	fn events_and_alarms_arrive_with_the_topic() {
+		build_config(&[staging()])
+			.to_json()
+			.to_string()
+			.as_str()
+			.xnot()
+			.xpect_contains("aws_cloudwatch_metric_alarm")
+			.xnot()
+			.xpect_contains("aws_sesv2_configuration_set_event_destination");
+
+		let json =
+			build_config(&[staging().with_events_topic("beetmash-ses-events")])
+				.to_json();
+		let alarms = json["resource"]["aws_cloudwatch_metric_alarm"]
+			.as_object()
+			.unwrap()
+			.values()
+			.collect::<Vec<_>>();
+		alarms.len().xpect_eq(2);
+		for alarm in alarms {
+			alarm["namespace"].as_str().unwrap().xpect_eq("AWS/SES");
+			alarm["dimensions"]["ses:configuration-set"]
+				.as_str()
+				.unwrap()
+				.xpect_eq("stalwart-beetmash-com");
+			// a fraction of a percent, which an integer threshold would round
+			// away into an alarm that never fires
+			alarm["threshold"].as_f64().unwrap().xpect_greater_than(0.);
+			alarm["alarm_actions"][0]
+				.as_str()
+				.unwrap()
+				.xpect_contains("beetmash-ses-events");
+		}
+		json["resource"]["aws_sesv2_configuration_set_event_destination"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["event_destination"][0]["matching_event_types"]
+			.as_array()
+			.unwrap()
+			.len()
+			.xpect_eq(MailDomainBlock::EVENT_TYPES.len());
 	}
 
 	/// Exactly one SPF record per NAME, which is the invariant that makes the
@@ -827,7 +1146,47 @@ mod tests {
 				// apex itself, so the incumbent's own SPF is untouched
 				"MX bounce.beetmash.com",
 				"TXT bounce.beetmash.com",
+				// the sovereign selector, which is a selector like any other:
+				// it authorises one more signature and displaces nobody
+				"TXT stalwart._domainkey.beetmash.com",
 			]);
+	}
+
+	/// A mail name is not stack-composed: `stalwart.beetmash.com` is the real
+	/// name of real mail, so a second stage deploying the same declaration
+	/// would publish a SECOND record at each name and receivers would
+	/// round-robin between the live box and whatever the experiment stood up.
+	/// The stage that owns the names is the only one that may publish them.
+	#[beet_core::test]
+	fn only_the_owning_stage_publishes_the_records() {
+		let records_in = |stage: &str| {
+			let (stack, deployment, _dir) = ResolvedStack::default_local();
+			let stack = stack.with_stage(stage);
+			let mut config = deployment.create_config(&stack);
+			let mut world = World::new();
+			staging()
+				.with_dns_stage("prod")
+				.apply_to_config(
+					&world.spawn(()).as_readonly(),
+					&stack,
+					&deployment,
+					&default(),
+					&mut config,
+				)
+				.unwrap();
+			config.to_json()
+		};
+		records_in("prod")["resource"]["cloudflare_dns_record"]
+			.is_object()
+			.xpect_true();
+		let drill = records_in("drill");
+		drill["resource"]["cloudflare_dns_record"]
+			.is_null()
+			.xpect_true();
+		// ..while the sending identity, which IS stack-scoped, still exists
+		drill["resource"]["aws_sesv2_email_identity"]
+			.is_object()
+			.xpect_true();
 	}
 
 	/// A block declaring [`MailRecords::None`] declares the identity and stays

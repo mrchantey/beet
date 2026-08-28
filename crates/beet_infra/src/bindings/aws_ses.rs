@@ -110,6 +110,76 @@ impl terra::Resource for AwsSesv2ConfigurationSetDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsSesv2ConfigurationSetEventDestinationDetails {
+    /// ## Attribute
+    /// `required`
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub configuration_set_name: SmolStr,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<i64>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depends_on: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `required`
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub event_destination_name: SmolStr,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub for_each: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`, `computed`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<SmolStr>,
+    /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+    /// ## Attribute
+    /// `optional`, `computed`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<SmolStr>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event_destination: Option<
+        Vec<AwsSesv2ConfigurationSetEventDestinationResourceBlockTypeEventDestination>,
+    >,
+}
+impl terra::ToJson for AwsSesv2ConfigurationSetEventDestinationDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsSesv2ConfigurationSetEventDestinationDetails {
+	fn resource_type(&self) -> &'static str {
+		"aws_sesv2_configuration_set_event_destination"
+	}
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.configuration_set_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "configuration_set_name",
+			});
+		}
+		if self.event_destination_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "event_destination_name",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsSesv2EmailIdentityDetails {
 	/// ## Attribute
 	/// `computed`
@@ -292,6 +362,34 @@ impl terra::Resource for AwsSesv2EmailIdentityMailFromAttributesDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+#[serde(rename = "event_destination")]
+pub struct AwsSesv2ConfigurationSetEventDestinationResourceBlockTypeEventDestination
+{
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub enabled: Option<bool>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub matching_event_types: Vec<SmolStr>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub event_bridge_destination:
+		Option<Vec<EventDestinationResourceBlockTypeEventBridgeDestination>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub kinesis_firehose_destination: Option<
+		Vec<EventDestinationResourceBlockTypeKinesisFirehoseDestination>,
+	>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub pinpoint_destination:
+		Option<Vec<EventDestinationResourceBlockTypePinpointDestination>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub sns_destination:
+		Option<Vec<EventDestinationResourceBlockTypeSnsDestination>>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 #[serde(rename = "delivery_options")]
 pub struct AwsSesv2ConfigurationSetResourceBlockTypeDeliveryOptions {
 	/// ## Attribute
@@ -392,4 +490,48 @@ pub struct AwsSesv2EmailIdentityResourceBlockTypeDkimSigningAttributes {
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tokens: Option<Vec<SmolStr>>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "event_bridge_destination")]
+pub struct EventDestinationResourceBlockTypeEventBridgeDestination {
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub event_bus_arn: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "kinesis_firehose_destination")]
+pub struct EventDestinationResourceBlockTypeKinesisFirehoseDestination {
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub delivery_stream_arn: SmolStr,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub iam_role_arn: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "pinpoint_destination")]
+pub struct EventDestinationResourceBlockTypePinpointDestination {
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub application_arn: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "sns_destination")]
+pub struct EventDestinationResourceBlockTypeSnsDestination {
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub topic_arn: SmolStr,
 }

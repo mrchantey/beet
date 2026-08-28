@@ -112,6 +112,163 @@ impl terra::Resource for AwsCloudwatchLogGroupDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsCloudwatchMetricAlarmDetails {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub actions_enabled: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub alarm_actions: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub alarm_description: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub alarm_name: SmolStr,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub comparison_operator: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub datapoints_to_alarm: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub dimensions: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub evaluate_low_sample_count_percentiles: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub evaluation_interval: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub evaluation_periods: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub extended_statistic: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub insufficient_data_actions: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub metric_name: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub namespace: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub ok_actions: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub period: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub statistic: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags_all: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub threshold: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub threshold_metric_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub treat_missing_data: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub unit: Option<SmolStr>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub metric_query:
+		Option<Vec<AwsCloudwatchMetricAlarmResourceBlockTypeMetricQuery>>,
+}
+impl terra::ToJson for AwsCloudwatchMetricAlarmDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsCloudwatchMetricAlarmDetails {
+	fn resource_type(&self) -> &'static str { "aws_cloudwatch_metric_alarm" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.alarm_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "alarm_name",
+			});
+		}
+		if self.arn.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "arn",
+				},
+			);
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsIamAccessKeyDetails {
 	/// ## Attribute
 	/// `optional`
@@ -1047,6 +1204,38 @@ impl terra::Resource for AwsS3BucketPublicAccessBlockDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+#[serde(rename = "metric_query")]
+pub struct AwsCloudwatchMetricAlarmResourceBlockTypeMetricQuery {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub account_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub expression: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub label: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub period: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub return_data: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub metric: Option<Vec<MetricQueryResourceBlockTypeMetric>>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 #[serde(rename = "inline_policy")]
 pub struct AwsIamRoleResourceBlockTypeInlinePolicy {
 	/// ## Attribute
@@ -1330,6 +1519,35 @@ pub struct LifecycleRuleResourceBlockTypeTransition {
 	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub storage_class: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "metric")]
+pub struct MetricQueryResourceBlockTypeMetric {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub dimensions: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub metric_name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub namespace: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	pub period: i64,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub stat: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub unit: Option<SmolStr>,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,

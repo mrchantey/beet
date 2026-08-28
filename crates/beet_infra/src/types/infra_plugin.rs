@@ -128,20 +128,30 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::EnsureSecret>()
 			.register_type::<crate::prelude::EnsureSecretAction>();
 
-		// the mail stack's post-apply verbs: the reverse record, the
+		// the mail stack's deploy verbs: the sovereign signing key minted
+		// before the apply that publishes it, the reverse record, the
 		// declarative apply into the mail server's own data store, the
-		// end-to-end probe and the zone audit.
+		// mta-sts policy host, the end-to-end probe, the two liveness checks,
+		// the restore drill and the zone audit.
 		#[cfg(all(
 			feature = "deploy",
 			feature = "mail",
 			not(target_arch = "wasm32")
 		))]
-		app.register_type::<crate::prelude::EipReverseDns>()
+		app.register_type::<crate::prelude::EnsureDkimKey>()
+			.register_type::<crate::prelude::EnsureDkimKeyAction>()
+			.register_type::<crate::prelude::EipReverseDns>()
 			.register_type::<crate::prelude::EipReverseDnsAction>()
 			.register_type::<crate::prelude::StalwartProvision>()
 			.register_type::<crate::prelude::StalwartProvisionAction>()
+			.register_type::<crate::prelude::MtaStsPublish>()
+			.register_type::<crate::prelude::MtaStsPublishAction>()
 			.register_type::<crate::prelude::MailProbe>()
 			.register_type::<crate::prelude::MailProbeAction>()
+			.register_type::<crate::prelude::MailHealth>()
+			.register_type::<crate::prelude::MailHealthAction>()
+			.register_type::<crate::prelude::MailRestoreDrill>()
+			.register_type::<crate::prelude::MailRestoreDrillAction>()
 			.register_type::<crate::prelude::ZoneAudit>()
 			.register_type::<crate::prelude::ZoneAuditAction>()
 			.register_type::<crate::prelude::AllowedRecord>();

@@ -58,6 +58,16 @@ pub struct S3BucketBlock {
 	/// silently and are billed like any other object, so a versioned bucket
 	/// with no expiry is a bill that only grows.
 	expire_noncurrent_days: i64,
+	/// Days a CURRENT object is kept before it expires, `0` keeping it forever.
+	///
+	/// For a bucket whose contents are a rolling window rather than a record: a
+	/// nightly database dump is worth keeping for a season and worth paying for
+	/// forever by nobody. Distinct from
+	/// [`expire_noncurrent_days`](Self::expire_noncurrent_days), which is about
+	/// the versions an overwrite leaves behind; this is about the objects
+	/// themselves, so it is `0` by default and a bucket that sets it is saying
+	/// its contents are disposable.
+	expire_days: i64,
 	/// The deploy layer for the bucket and its public-read pair
 	/// ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER) by default):
 	/// the deploy syncs content into the bucket, so it converges before anything
@@ -81,6 +91,7 @@ impl S3BucketBlock {
 			public_read: false,
 			object_versioning: false,
 			expire_noncurrent_days: 90,
+			expire_days: 0,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
@@ -209,9 +220,8 @@ impl Block for S3BucketBlock {
 }
 
 impl S3BucketBlock {
-	/// Emit object versioning and, when
-	/// [`expire_noncurrent_days`](Self::expire_noncurrent_days) is set, the
-	/// lifecycle rule that stops the versions accumulating forever.
+	/// Emit object versioning and, when either expiry is set, the lifecycle
+	/// rule that stops the bucket growing forever.
 	///
 	/// Both are UNTYPED resources: `aws_s3_bucket_versioning` and
 	/// `aws_s3_bucket_lifecycle_configuration` have no generated binding, and
@@ -234,7 +244,30 @@ impl S3BucketBlock {
 				"versioning_configuration": { "status": "Enabled" },
 			}),
 		)?;
+		// one rule per expiry, since they answer different questions and a
+		// bucket may want either alone
+		let mut rules = Vec::new();
+		if self.expire_days > 0 {
+			rules.push(json!({
+				"id": "expire-objects",
+				"status": "Enabled",
+				"filter": {},
+				"expiration": { "days": self.expire_days },
+			}));
+		}
 		if self.expire_noncurrent_days > 0 {
+			rules.push(json!({
+				"id": "expire-noncurrent-versions",
+				"status": "Enabled",
+				// every object: provider 6 requires a filter or a prefix, and
+				// an empty filter is how "all of them" is spelled.
+				"filter": {},
+				"noncurrent_version_expiration": {
+					"noncurrent_days": self.expire_noncurrent_days
+				},
+			}));
+		}
+		if !rules.is_empty() {
 			config.add_untyped_resource(
 				"aws_s3_bucket_lifecycle_configuration",
 				stack
@@ -242,17 +275,7 @@ impl S3BucketBlock {
 					.label(),
 				&json!({
 					"bucket": bucket.field_ref("id"),
-					"rule": [{
-						"id": "expire-noncurrent-versions",
-						"status": "Enabled",
-						// every object: provider 6 requires a filter or a
-						// prefix, and an empty filter is how "all of them" is
-						// spelled.
-						"filter": {},
-						"noncurrent_version_expiration": {
-							"noncurrent_days": self.expire_noncurrent_days
-						},
-					}],
+					"rule": rules,
 					// versioning must be on before a rule can talk about
 					// noncurrent versions
 					"depends_on": [
@@ -406,6 +429,28 @@ mod tests {
 	/// the bill does not grow forever. Both resources are separate from the
 	/// bucket, since the inline arguments the `aws_s3_bucket` schema still
 	/// carries have been unconfigurable since provider 4.
+	/// A rolling window rather than a record: a bucket of nightly dumps expires
+	/// the dumps themselves, not merely the versions an overwrite leaves. Both
+	/// rules ride one configuration, since a bucket wanting both would
+	/// otherwise have two resources fighting for the same address.
+	#[beet_core::test]
+	fn expiring_objects_is_its_own_rule() {
+		let json = build_json(
+			S3BucketBlock::new("mail-backups")
+				.with_object_versioning(true)
+				.with_expire_days(180),
+		);
+		json.as_str()
+			.xpect_contains("\"id\":\"expire-objects\"")
+			.xpect_contains("\"days\":180")
+			.xpect_contains("\"id\":\"expire-noncurrent-versions\"");
+		// ..and an unversioned bucket that expires nothing declares no rule
+		build_json(S3BucketBlock::new("app"))
+			.as_str()
+			.xnot()
+			.xpect_contains("aws_s3_bucket_lifecycle_configuration");
+	}
+
 	#[beet_core::test]
 	fn object_versioning_emits_versioning_and_lifecycle() {
 		let json = build_json(

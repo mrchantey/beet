@@ -32,6 +32,7 @@ async fn main() -> Result {
 			BindingFile::new("crates/beet_infra/src/bindings/aws_common.rs")
 				.with_resources(terra::Provider::AWS, [
 					"aws_cloudwatch_log_group",
+					"aws_cloudwatch_metric_alarm",
 					"aws_iam_access_key",
 					"aws_iam_role",
 					"aws_iam_role_policy",
@@ -144,6 +145,7 @@ async fn main() -> Result {
 					"aws_sesv2_email_identity",
 					"aws_sesv2_email_identity_mail_from_attributes",
 					"aws_sesv2_configuration_set",
+					"aws_sesv2_configuration_set_event_destination",
 				]),
 		)
 		.with_file(

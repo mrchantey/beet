@@ -18,6 +18,7 @@ pub mod ssm_ext;
 #[cfg(feature = "aws_sdk")]
 mod sync_s3_bucket;
 mod tofu_apply_action;
+pub mod wrangler_ext;
 pub use aws_watch::*;
 pub use build_artifact::*;
 #[cfg(feature = "fargate_block")]
