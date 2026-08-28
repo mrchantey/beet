@@ -435,13 +435,12 @@ impl RouteTree {
 }
 
 /// Everything a [`RouteTree`] rebuild needs, bundled into one system param so
-/// a caller threads one value instead of five queries and [`Commands`]
+/// a caller threads one value instead of four queries and [`Commands`]
 /// separately.
 #[derive(SystemParam)]
 pub struct RouteTreeBuilder<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	paths: Query<'w, 's, &'static PathPartial>,
-	children: Query<'w, 's, &'static Children>,
 	actions: Query<'w, 's, ActionQueryItem<'static>, Without<RouteHidden>>,
 	existing_trees: Query<'w, 's, Entity, With<RouteTree>>,
 	commands: Commands<'w, 's>,
@@ -476,25 +475,25 @@ impl RouteTreeBuilder<'_, '_> {
 	/// dispatching routes that no longer live there.
 	pub fn rebuild_subtree(&mut self, root: Entity) -> Result {
 		let mut spaces: Vec<(Entity, Vec<ActionNode>)> = Vec::new();
-		let mut visited: Vec<Entity> = Vec::new();
-		for entity in self.children.iter_descendants_inclusive(root) {
-			visited.push(entity);
-			let Ok(item) = self.actions.get(entity) else {
+		for item in self.actions.iter() {
+			if !self.is_at_or_under(item.0, root) {
 				continue;
-			};
-			let space_root = self.namespace_of(entity);
+			}
+			let space_root = self.namespace_of(item.0);
 			let node = ActionNode::from_query(item);
 			match spaces.iter_mut().find(|(space, _)| *space == space_root) {
 				Some((_, nodes)) => nodes.push(node),
 				None => spaces.push((space_root, vec![node])),
 			}
 		}
-		for entity in visited {
-			if self.existing_trees.contains(entity)
-				&& !spaces.iter().any(|(space, _)| *space == entity)
-			{
-				self.commands.entity(entity).remove::<RouteTree>();
-			}
+		let stale: Vec<Entity> = self
+			.existing_trees
+			.iter()
+			.filter(|entity| self.is_at_or_under(*entity, root))
+			.filter(|entity| !spaces.iter().any(|(space, _)| space == entity))
+			.collect();
+		for entity in stale {
+			self.commands.entity(entity).remove::<RouteTree>();
 		}
 		for (space_root, nodes) in spaces {
 			self.commands
@@ -502,6 +501,19 @@ impl RouteTreeBuilder<'_, '_> {
 				.insert(RouteTree::from_nodes(nodes)?);
 		}
 		Ok(())
+	}
+
+	/// Whether `entity` is `root` or sits anywhere beneath it.
+	///
+	/// Walks up from `entity` through [`ChildOf`] rather than down from `root`
+	/// through [`Children`]: a child's own `ChildOf` is set the moment it is
+	/// spawned, while the parent's `Children` is maintained by a deferred
+	/// relationship hook, so descending sees a hierarchy one command flush
+	/// stale — which silently drops the routes most recently added to a router.
+	fn is_at_or_under(&self, entity: Entity, root: Entity) -> bool {
+		self.ancestors
+			.iter_ancestors_inclusive_once::<ChildOf>(entity)
+			.any(|ancestor| ancestor == root)
 	}
 }
 

@@ -150,7 +150,7 @@ pub impl<
 ///
 /// Unlike [`DescendantIter`], this only yields immediate children,
 /// not the entire subtree.
-pub(crate) struct DirectDescendantIter {
+pub struct DirectDescendantIter {
 	vec: Vec<Entity>,
 }
 
@@ -185,7 +185,7 @@ impl Iterator for DirectDescendantIter {
 /// even on self-referential relationships. Created via
 /// [`iter_ancestors_once`](HierarchyQueryExtExt::iter_ancestors_once) and
 /// [`iter_ancestors_inclusive_once`](HierarchyQueryExtExt::iter_ancestors_inclusive_once).
-pub(crate) struct AncestorOnceIter<
+pub struct AncestorOnceIter<
 	'w,
 	's,
 	D: QueryData,

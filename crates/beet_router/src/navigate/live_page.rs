@@ -378,14 +378,35 @@ mod test {
 	}
 
 	/// Drive the app until the host frame contains `needle`, returning the frame.
-	fn drive_until(app: &mut App, host: Entity, needle: &str) -> String {
-		for _ in 0..200 {
-			let frame = frame(app, host);
-			if frame.contains(needle) {
-				return frame;
-			}
+	///
+	/// Yields to the host between frames rather than spinning: a bridged
+	/// request skipped by `tick_bridge_executor`'s depth cap (which a loaded
+	/// suite reaches routinely) is requeued for a *later* frame, so a tight
+	/// synchronous loop would re-poll at the same depth forever and never see
+	/// the page land.
+	async fn drive_until(app: &mut App, host: Entity, needle: &str) -> String {
+		drive_while(app, 200, |app| !frame(app, host).contains(needle)).await;
+		let frame = frame(app, host);
+		if frame.contains(needle) {
+			return frame;
 		}
 		panic!("host frame never contained '{needle}'");
+	}
+
+	/// Drive `app` for at most `frames`, yielding to the host between each and
+	/// stopping as soon as `keep_going` answers false. The one place the test
+	/// drive loop lives, for the same yielding reason as [`drive_until`].
+	async fn drive_while(
+		app: &mut App,
+		frames: usize,
+		mut keep_going: impl FnMut(&mut App) -> bool,
+	) {
+		for _ in 0..frames {
+			if !keep_going(app) {
+				return;
+			}
+			time_ext::sleep_millis(0).await;
+		}
 	}
 
 	/// An in-world navigation lands the resolved route as the current page and
@@ -415,11 +436,12 @@ mod test {
 			))
 			.id();
 		// home is `alpha`, so the on_add navigation paints the alpha route
-		drive_until(&mut app, host, "Alpha page");
+		drive_until(&mut app, host, "Alpha page").await;
 
 		// navigate to beta: the page swaps and repaints, alpha is gone
 		navigate(&mut app, host, "beta");
 		drive_until(&mut app, host, "Beta page")
+			.await
 			.xnot()
 			.xpect_contains("Alpha page");
 	}
@@ -488,15 +510,15 @@ mod test {
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();
-		drive_until(&mut app, first, "to beta");
-		drive_until(&mut app, second, "to beta");
+		drive_until(&mut app, first, "to beta").await;
+		drive_until(&mut app, second, "to beta").await;
 
 		// click the first host's link (as the hit-test would on a real click).
 		let link = link_in(&mut app, first);
 		app.world_mut()
 			.entity_mut(link)
 			.trigger(PointerUp::new(link));
-		drive_until(&mut app, first, "Beta page");
+		drive_until(&mut app, first, "Beta page").await;
 
 		// the second host never navigated: still on alpha, never beta.
 		frame(&mut app, second)
@@ -553,14 +575,14 @@ mod test {
 				Navigator::in_world(router, "alpha"),
 			))
 			.id();
-		drive_until(&mut app, host, "to beta");
+		drive_until(&mut app, host, "to beta").await;
 
 		// click the transcluded link (as the hit-test would, via PointerUp on it).
 		let link = any_link(&mut app);
 		app.world_mut()
 			.entity_mut(link)
 			.trigger(PointerUp::new(link));
-		drive_until(&mut app, host, "Beta page");
+		drive_until(&mut app, host, "Beta page").await;
 	}
 
 	/// Whether `host`'s page slot has been bound to a page.
@@ -582,12 +604,11 @@ mod test {
 			.spawn((PageHost::bundle(UVec2::new(40, 8)), Navigator::default()))
 			.id();
 		// drive the async on_add navigation until the surface slot is bound
-		for _ in 0..200 {
-			frame(&mut app, host);
-			if slot_bound(&app, host) {
-				break;
-			}
-		}
+		drive_while(&mut app, 200, |app| {
+			frame(app, host);
+			!slot_bound(app, host)
+		})
+		.await;
 		slot_bound(&app, host).xpect_true();
 	}
 
@@ -625,13 +646,11 @@ mod test {
 			.id();
 
 		// drive until both surfaces have painted their own route
-		for _ in 0..400 {
-			let frame_a = frame(&mut app, host_a);
-			let frame_b = frame(&mut app, host_b);
-			if frame_a.contains("Alpha page") && frame_b.contains("Beta page") {
-				break;
-			}
-		}
+		drive_while(&mut app, 400, |app| {
+			!(frame(app, host_a).contains("Alpha page")
+				&& frame(app, host_b).contains("Beta page"))
+		})
+		.await;
 		frame(&mut app, host_a)
 			.xpect_contains("Alpha page")
 			.xnot()

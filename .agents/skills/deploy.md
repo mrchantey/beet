@@ -28,11 +28,13 @@ Editing `LightsailBlock::build_user_data` (bumping `CADDY_VERSION`, changing the
 
 This matters beyond the outage window. `small_3_0` is burstable at a **20% baseline per vCPU**, and a fresh instance starts at ZERO burst capacity, so a rebuild does the heaviest work of the instance's life while clamped to baseline. That is what produced the cluster of AWS SDK `dispatch failure` errors within ~75 seconds of unit start on a freshly deployed box. Covered by `code_only_deploy_renders_one_box` and `machine_config_change_rebuilds_and_rotates` in `crates/beet_infra/src/blocks/lightsail.rs`.
 
-**`beet-deploy` exiting 0 does NOT mean the site serves.** The deploy's last steps are a timed log tail and a cache purge, neither of which gates on readiness, and cloud-init failures do not propagate back to it. ALWAYS curl the site after the deploy returns. Diagnosis path for a bad origin:
+**`beet-deploy` exiting 0 does NOT mean the site serves.** The deploy's last steps are a timed log tail and a cache purge, neither of which gates on readiness, and cloud-init failures do not propagate back to it. `<LightsailRelease/>`'s own check does not close this either: it confirms the RUNNING process reports this deploy's id by reading `/proc/<MainPID>/environ`, and a unit restarting every few seconds always has a live MainPID carrying the right id, so it reports `is serving release ..` for a box that never answered a request. A deploy has been observed exiting 0 while `LightsailWatch` printed the fatal boot error in that same deploy's log. ALWAYS curl the site after the deploy returns. Diagnosis path for a bad origin:
 
 - **Cloudflare `521`** = the edge reached DNS but nothing accepted on the origin's 443. **`526`** = Caddy answered but its cert is not valid for the Full-strict edge.
 - Get a real shell on the management sshd (port **2222**, the stack's Lightsail key pair, user `ec2-user`; the private key lives in the tofu state under `aws_lightsail_key_pair`). Then: `systemctl is-active caddy beet-site`, `ss -lntp`, and `sudo grep -iE "error|fail" /var/log/cloud-init-output.log`.
 - `beet-site` active on its app port while `caddy` is missing means the TLS terminator failed to install and everything else is fine.
+
+REGRESSION GUARD (fixed): the deploy shipped a binary it never built. A block is declared under its `<Stack>` rather than as a step in the deploy sequence, so nothing dispatches it and its `BuildArtifact`'s action never ran; `<TofuApply/>` went on reading that artifact's file off disk, hashing it and uploading it, so every deploy silently shipped whatever an earlier deploy had left in `target/` (and on a machine with no prior artifact would fail on a missing file instead). The box then crash-looped on `failed to load entry main.bsx: no component, resource or template registered for tag Stack`, warning that types newer than the stale binary were unregistered, while `beet-deploy` reported success. Building now belongs to the step that CONSUMES the artifact: `TofuApplyAction` calls `BuildArtifact::build()` immediately before reading each artifact's bytes, so an artifact that is uploaded but never built is unrepresentable. Covered by `build_runs_the_declared_process` in `crates/beet_infra/src/actions/build_artifact.rs`. A deploy log with no `building: cargo-zigbuild ..` line is this bug back.
 
 REGRESSION GUARD (fixed): Caddy was installed via its cloudsmith rpm repo, whose setup script writes an `amzn/2023` baseurl that Caddy does not publish, with `skip_if_unavailable=1`. `dnf install -y caddy` therefore exited `No match for argument: caddy`, cloud-init logged a failed `scripts-user` module and carried on, and the box booted serving the app on its own port with NOTHING on 80/443 — while `beet-deploy` reported success and every hostname returned `521`. Caddy is now installed from the pinned upstream static release (`LightsailBlock::CADDY_VERSION`) with its own systemd unit, and the script verifies the binary (`caddy version || exit 1`) so a failed install stops the boot instead of silently producing a TLS-less box. Covered by `installs_caddy_from_static_release_not_rpm` in `crates/beet_infra/src/blocks/lightsail.rs`.
 
@@ -42,7 +44,7 @@ Creds load from `.env` (AWS, `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ZONE_ID`, `BEET_
 
 | intent | command |
 | --- | --- |
-| local serve (http+ssh) | `cargo run -p beet-cli -- serve site --server=http,ssh` |
+| local serve (http+ssh) | `cargo run -p beet-cli -- --main=site serve --server=http,ssh` |
 | pre-apply safety check | `just beet-validate` then `just beet-plan` (eyeball the plan) |
 | dev deploy | `just beet-deploy` |
 | re-publish site only (no redeploy) | `just beet-sync` |
@@ -172,7 +174,7 @@ The local query takes ~50s and prints server log lines to stdout ahead of the su
 ## Step 1: Local
 
 ```sh
-cargo run -p beet-cli -- serve site --server=http,ssh    # run in background
+cargo run -p beet-cli -- --main=site serve --server=http,ssh    # run in background
 ```
 
 Read the bound http + ssh ports from the serve output (defaults 8337 / 8339). Run the full verification (a-e) against `http://localhost:<http_port>` and `127.0.0.1:<ssh_port>`. This step is also the shakedown: run the browser test and settle the ssh driver here, recording any changes above. Kill the server when done. No cloud or DNS impact.

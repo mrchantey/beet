@@ -91,6 +91,11 @@ pub async fn TofuApplyAction(
 
 		trace!("TofuApplyAction: uploading {} artifacts", artifacts.len());
 		for (artifact, label) in &artifacts {
+			// build before reading: a block is declared under its `<Stack>`
+			// rather than as a sequence step, so this is the only thing that
+			// runs its build, and uploading a file some earlier deploy left on
+			// disk is how a stale binary ships while the deploy reports success.
+			artifact.build().await?;
 			trace!("TofuApplyAction: uploading artifact '{}'", label);
 			let artifact_path = AbsPathBuf::new(artifact.artifact_path())?;
 			let bytes = fs_ext::read_async(artifact_path.as_path()).await?;

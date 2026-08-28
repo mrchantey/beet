@@ -40,6 +40,25 @@ impl BuildArtifact {
 		}
 	}
 
+	/// Run this artifact's build process, so the file at
+	/// [`artifact_path`](Self::artifact_path) is the one this deploy just built.
+	///
+	/// A block declares its artifact where it is declared (under its `<Stack>`),
+	/// not as a step in a verb sequence, so nothing dispatches the block during
+	/// a deploy. Building therefore belongs to whoever consumes the file: the
+	/// upload runs this first, and an artifact that is uploaded but never built
+	/// is unrepresentable.
+	pub async fn build(&self) -> Result {
+		info!("building: {}", self.process);
+		self.process
+			.clone()
+			.run_async()
+			.await
+			.map_err(|err| bevyhow!("build failed: {err}"))?;
+		info!("artifact built: {}", self.artifact_path.display());
+		Ok(())
+	}
+
 	/// Compute a base64-encoded SHA256 hash of the artifact file,
 	/// matching Terraform's `filebase64sha256` function.
 	///
@@ -73,20 +92,38 @@ impl BuildArtifact {
 pub async fn BuildArtifactAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	// read build artifact config
-	let build = cx.caller.get_cloned::<BuildArtifact>().await?;
-
-	// run the build process
-	info!("building: {}", build.process());
-	build
-		.process()
-		.clone()
-		.run_async()
-		.await
-		.map_err(|err| bevyhow!("build failed: {err}"))?;
-
-	let artifact_path = AbsPathBuf::new(build.artifact_path())?;
-	info!("artifact built: {}", artifact_path.display());
-
+	cx.caller
+		.get_cloned::<BuildArtifact>()
+		.await?
+		.build()
+		.await?;
 	Pass(cx.input).xok()
+}
+
+#[cfg(all(test, feature = "deploy", not(target_arch = "wasm32")))]
+mod test {
+	use super::*;
+	use beet_core::prelude::*;
+
+	/// The artifact file is produced by running the declared process, and
+	/// [`BuildArtifact::build`] is what runs it. Nothing dispatches a block
+	/// during a deploy (it is declared under its `<Stack>`, not as a sequence
+	/// step), so the upload calls this directly; a deploy that skipped it would
+	/// ship whatever an earlier deploy left on disk.
+	#[beet_core::test]
+	async fn build_runs_the_declared_process() {
+		let dir = TempDir::new_ws().unwrap();
+		let artifact = dir.join("artifact");
+		BuildArtifact::new(
+			ChildProcess::new("sh").with_args([
+				"-c".to_string(),
+				format!("printf built > {}", artifact.display()),
+			]),
+			artifact.clone(),
+		)
+		.build()
+		.await
+		.unwrap();
+		fs_ext::read_to_string(&artifact).unwrap().xpect_eq("built");
+	}
 }

@@ -169,8 +169,18 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 				.commands()
 				.entity(cx.entity)
 				.queue_async(super::impl_russh_server::start_russh_server);
+		} else if #[cfg(target_arch = "wasm32")] {
+			// no ssh transport exists in a wasm sandbox, so the component stays
+			// and the listener does not: a document declaring one loads whole
+			// and only its behavior is missing.
+			let _ = cx;
+			warn!(
+				"SshServer is declared but wasm32 has no ssh transport, so no listener is started"
+			);
 		} else {
-			panic!("SSH server requires the 'russh_server' feature on non-wasm32 targets");
+			world.commands().handle_command_error::<SshServer>(bevyhow!(
+				"SshServer requires the `russh_server` feature"
+			));
 		}
 	}
 }

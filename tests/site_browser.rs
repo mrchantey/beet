@@ -12,7 +12,7 @@
 //! Parameterized by `BEET_BASE_URL` so the same test verifies every stage:
 //!
 //! ```sh
-//! cargo run -p beet-cli -- serve site --server=http   # note the bound port
+//! cargo run -p beet-cli -- --main=site serve --server=http   # note the bound port
 //! BEET_BASE_URL=http://localhost:8337 cargo test --test site_browser \
 //!   --features router,json,testing,webdriver -- --include-ignored
 //! ```

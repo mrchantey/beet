@@ -451,13 +451,37 @@ mod test {
 			.unwrap_or_default()
 	}
 
+	/// Drive `app` for `frames`, yielding to the host between each.
+	///
+	/// The boot call a caller makes never resolves (a long-running server parks
+	/// it), so a boot test drives the app instead of awaiting. It yields for the
+	/// same reason [`drive_until`] does: a bridged request deferred by the tick
+	/// depth cap only runs on a later frame.
+	async fn drive_frames(app: &mut App, frames: usize) {
+		for _ in 0..frames {
+			app.update();
+			time_ext::sleep_millis(0).await;
+		}
+	}
+
 	/// Drive the app until `connection`'s frame contains `needle`.
-	fn drive_until(app: &mut App, connection: Entity, needle: &str) -> String {
+	///
+	/// Yields to the host between frames rather than spinning: a bridged
+	/// request skipped by `tick_bridge_executor`'s depth cap (which a loaded
+	/// suite reaches routinely) is requeued for a *later* frame, so a tight
+	/// synchronous loop would re-poll at the same depth forever and never see
+	/// the page land.
+	async fn drive_until(
+		app: &mut App,
+		connection: Entity,
+		needle: &str,
+	) -> String {
 		for _ in 0..200 {
 			let frame = frame(app, connection);
 			if frame.contains(needle) {
 				return frame;
 			}
+			time_ext::sleep_millis(0).await;
 		}
 		panic!("ssh surface frame never contained '{needle}'");
 	}
@@ -483,20 +507,20 @@ mod test {
 	}
 
 	/// Open a session, wait for `needle` to paint, then close it.
-	fn open_and_close(app: &mut App, server: Entity, needle: &str) {
+	async fn open_and_close(app: &mut App, server: Entity, needle: &str) {
 		let connection = open_connection(app, server, UVec2::new(40, 8));
-		drive_until(app, connection, needle);
+		drive_until(app, connection, needle).await;
 		close_connection(app, connection);
 	}
 
 	/// Cycle sessions against `server`, asserting the world does not grow. The
 	/// first cycle is the warmup that spawns any one-off entities; the rest must
 	/// leave the count exactly where they found it.
-	fn expect_no_growth(app: &mut App, server: Entity, needle: &str) {
-		open_and_close(app, server, needle);
+	async fn expect_no_growth(app: &mut App, server: Entity, needle: &str) {
+		open_and_close(app, server, needle).await;
 		let baseline = app.world().iter_entities().count();
 		for _ in 0..3 {
-			open_and_close(app, server, needle);
+			open_and_close(app, server, needle).await;
 		}
 		app.world().iter_entities().count().xpect_eq(baseline);
 	}
@@ -518,11 +542,7 @@ mod test {
 				Ok(())
 			},
 		);
-		// the boot never resolves (a long-running server parks it), so drive the
-		// app rather than awaiting the call.
-		for _ in 0..20 {
-			app.update();
-		}
+		drive_frames(&mut app, 20).await;
 
 		app.world()
 			.entity(server)
@@ -536,7 +556,7 @@ mod test {
 	/// its own router serves, not at the command path that addressed it.
 	///
 	/// This is the deployed shape (`app --store=.. --server=ssh serve`, and `beet
-	/// serve site --server=ssh` locally): the site hangs off a `serve` route, so
+	/// --main=site serve --server=ssh` locally): the site hangs off a `serve` route, so
 	/// every session used to open on a "no route matched //serve" error page.
 	#[beet_core::test]
 	async fn boot_opens_at_the_mounted_url_space() {
@@ -560,11 +580,7 @@ mod test {
 				Ok(())
 			},
 		);
-		// the boot never resolves (a long-running server parks it), so drive the
-		// app rather than awaiting the call.
-		for _ in 0..20 {
-			app.update();
-		}
+		drive_frames(&mut app, 20).await;
 
 		app.world()
 			.entity(server)
@@ -585,7 +601,7 @@ mod test {
 		let mut app = ssh_tui_app();
 		let server = spawn_server(&mut app);
 		let connection = open_connection(&mut app, server, UVec2::new(40, 8));
-		drive_until(&mut app, connection, "Alpha page");
+		drive_until(&mut app, connection, "Alpha page").await;
 		let page = bound_page(&app, connection);
 
 		close_connection(&mut app, connection);
@@ -600,7 +616,7 @@ mod test {
 	async fn session_cycles_do_not_grow_the_world() {
 		let mut app = ssh_tui_app();
 		let server = spawn_server(&mut app);
-		expect_no_growth(&mut app, server, "Alpha page");
+		expect_no_growth(&mut app, server, "Alpha page").await;
 	}
 
 	/// Regression: a client that disconnects *while its opening page is still
@@ -636,7 +652,7 @@ mod test {
 
 		// a warmup cycle (released immediately), so one-off entities are spawned
 		release.send(()).await.unwrap();
-		open_and_close(&mut app, server, "Alpha page");
+		open_and_close(&mut app, server, "Alpha page").await;
 		let baseline = app.world().iter_entities().count();
 
 		// open a session and let its build park in the gated handler
@@ -671,7 +687,7 @@ mod test {
 			.contains::<DoubleBuffer>()
 			.xpect_true();
 		// and the home route paints into its buffer
-		drive_until(&mut app, connection, "Alpha page");
+		drive_until(&mut app, connection, "Alpha page").await;
 	}
 
 	/// Each session's kitty-graphics support comes from its pty's forwarded
@@ -705,8 +721,8 @@ mod test {
 		let server = spawn_server(&mut app);
 		let first = open_connection(&mut app, server, UVec2::new(40, 8));
 		let second = open_connection(&mut app, server, UVec2::new(40, 8));
-		drive_until(&mut app, first, "Alpha page");
-		drive_until(&mut app, second, "Alpha page");
+		drive_until(&mut app, first, "Alpha page").await;
+		drive_until(&mut app, second, "Alpha page").await;
 
 		// navigate only the second session to beta (its navigator is co-located on
 		// the connection surface)
@@ -714,7 +730,7 @@ mod test {
 		app.world_mut()
 			.entity_mut(second)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
-		drive_until(&mut app, second, "Beta page");
+		drive_until(&mut app, second, "Beta page").await;
 
 		// the first session is unchanged: still on alpha, never beta
 		frame(&mut app, first)
@@ -758,9 +774,9 @@ mod test {
 			))
 			.flush();
 		let first = open_connection(&mut app, server, UVec2::new(40, 8));
-		drive_until(&mut app, first, "Mind your step");
+		drive_until(&mut app, first, "Mind your step").await;
 		let second = open_connection(&mut app, server, UVec2::new(40, 8));
-		drive_until(&mut app, second, "Mind your step");
+		drive_until(&mut app, second, "Mind your step").await;
 
 		frame(&mut app, second)
 			.matches("Mind your step")
@@ -782,7 +798,7 @@ mod test {
 		let mut app = ssh_tui_app();
 		let server = spawn_server(&mut app);
 		let connection = open_connection(&mut app, server, UVec2::new(40, 8));
-		drive_until(&mut app, connection, "Alpha page");
+		drive_until(&mut app, connection, "Alpha page").await;
 
 		// record, in order, every event the session would send to its client.
 		let sent =
@@ -909,7 +925,7 @@ mod test {
 	async fn layout_session_cycles_do_not_grow_the_world() {
 		let mut app = ssh_tui_app();
 		let server = spawn_drawer_router(&mut app);
-		expect_no_growth(&mut app, server, "Home page");
+		expect_no_growth(&mut app, server, "Home page").await;
 	}
 
 	/// The string value of attribute `key` on element `entity`, if present.
@@ -1026,8 +1042,8 @@ mod test {
 		let server = spawn_drawer_router(&mut app);
 		let session_a = open_connection(&mut app, server, UVec2::new(40, 8));
 		let session_b = open_connection(&mut app, server, UVec2::new(40, 8));
-		drive_until(&mut app, session_a, "Home page");
-		drive_until(&mut app, session_b, "Home page");
+		drive_until(&mut app, session_a, "Home page").await;
+		drive_until(&mut app, session_b, "Home page").await;
 
 		// each session's own rail + menu button (per-session layout entities)
 		let nav_a = element_on(&mut app, session_a, "nav");
@@ -1091,8 +1107,8 @@ mod test {
 			.flush();
 		let session_a = open_connection(&mut app, server, UVec2::new(40, 8));
 		let session_b = open_connection(&mut app, server, UVec2::new(40, 8));
-		drive_until(&mut app, session_a, "clicked 0 times");
-		drive_until(&mut app, session_b, "clicked 0 times");
+		drive_until(&mut app, session_a, "clicked 0 times").await;
+		drive_until(&mut app, session_b, "clicked 0 times").await;
 
 		// click A's "More" button via real SGR bytes on A's channel only
 		let button_a = element_on(&mut app, session_a, "button");
@@ -1101,7 +1117,7 @@ mod test {
 		click_at(&mut app, session_a, cell);
 
 		// A's own count advanced to 1 ...
-		drive_until(&mut app, session_a, "clicked 1 times");
+		drive_until(&mut app, session_a, "clicked 1 times").await;
 		// ... and B's count is untouched (its reactive document is its own).
 		frame(&mut app, session_b)
 			.xpect_contains("clicked 0 times")

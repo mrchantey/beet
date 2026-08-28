@@ -290,10 +290,10 @@ fn insert_path_pattern_for_late_path_partial(
 /// `ChildOf` has already landed in its parent's [`Children`], which is not
 /// guaranteed yet at the point this observer itself fires.
 fn queue_route_tree_rebuild_on_insert<T: Component>(
-	_ev: On<Insert, T>,
+	ev: On<Insert, T>,
 	mut commands: Commands,
 ) {
-	queue_route_tree_rebuild(&mut commands);
+	queue_route_tree_rebuild(&mut commands, ev.entity);
 }
 
 /// Observer that wakes [`rebuild_dirty_route_trees`] whenever `T` is removed
@@ -306,17 +306,25 @@ fn queue_route_tree_rebuild_on_insert<T: Component>(
 /// reason as the insert half, and the reconciler itself works out what
 /// changed via [`RemovedComponents`].
 fn queue_route_tree_rebuild_on_remove<T: Component>(
-	_ev: On<Remove, T>,
+	ev: On<Remove, T>,
 	mut commands: Commands,
 ) {
-	queue_route_tree_rebuild(&mut commands);
+	queue_route_tree_rebuild(&mut commands, ev.entity);
 }
 
-/// Queue one run of [`rebuild_dirty_route_trees`], deferred past whatever
-/// structural change triggered it.
-fn queue_route_tree_rebuild(commands: &mut Commands) {
-	commands.queue(|world: &mut World| {
-		if let Ok(Err(err)) = world.run_system_cached(rebuild_dirty_route_trees)
+/// Queue one run of [`rebuild_dirty_route_trees`] for `entity`, deferred past
+/// whatever structural change triggered it.
+///
+/// The triggering entity is passed *in* rather than left to be rediscovered by
+/// change detection: several routes commonly join one router in a single
+/// command flush, and every wake in that flush shares one change tick, so only
+/// the first run would see a [`Changed`] filter answer true. Every later
+/// route — in particular the last one added — would then be dropped from the
+/// tree with nothing left to wake it again.
+fn queue_route_tree_rebuild(commands: &mut Commands, entity: Entity) {
+	commands.queue(move |world: &mut World| {
+		if let Ok(Err(err)) =
+			world.run_system_cached_with(rebuild_dirty_route_trees, entity)
 		{
 			world.handle_command_error::<RouteTree>(err);
 		}
@@ -328,40 +336,35 @@ fn queue_route_tree_rebuild(commands: &mut Commands) {
 /// funnels into, run once per dirty namespace root rather than once per
 /// changed entity.
 ///
-/// A live [`PathPattern`]/[`RouteHidden`] insert or mutation dirties its own
-/// enclosing namespace. A removal dirties that namespace too, *if* the entity
-/// is still resolvable — a live component removal leaves the entity and its
-/// ancestry intact, so [`PathPattern::namespace_root`] still answers. A full
-/// despawn does not: by the time this runs the entity is gone, so which
-/// namespace lost the route can no longer be found, and every existing
-/// namespace is rebuilt this pass instead ([`RemovedComponents`] is what
-/// makes despawn visible at all here; a plain [`Changed`] query cannot).
+/// `trigger` is the entity whose [`PathPattern`]/[`RouteHidden`] just changed,
+/// handed over by the waking observer. An insert or a live removal leaves the
+/// entity and its ancestry intact, so [`PathPattern::namespace_root`] answers
+/// and only that namespace is dirty. A despawn does not: by the time this runs
+/// the entity is gone, which namespace lost the route can no longer be found,
+/// and every existing namespace is rebuilt this pass instead.
+///
+/// The [`Changed`] query is the *mutation* half — a path edited in place fires
+/// no insert observer — and is a superset filter only, never the sole source
+/// of dirt: several wakes in one flush share one change tick, so every run
+/// after the first sees it empty.
 fn rebuild_dirty_route_trees(
+	trigger: In<Entity>,
 	changed: Query<Entity, Or<(Changed<PathPattern>, Changed<RouteHidden>)>>,
-	mut removed_paths: RemovedComponents<PathPattern>,
-	mut removed_hidden: RemovedComponents<RouteHidden>,
 	all_entities: Query<Entity>,
 	mut builder: RouteTreeBuilder,
 ) -> Result {
 	let mut dirty: HashSet<Entity> = HashSet::new();
-	let mut sweep_all = false;
 
-	for entity in changed.iter() {
-		dirty.insert(builder.namespace_of(entity));
-	}
-	// a removed component leaves the entity itself in place unless it was the
-	// despawn that took it with it; `all_entities` (an unfiltered `Query<Entity>`)
-	// is the only reliable liveness check, since ancestry-based lookups fail
-	// alike for "gone" and for "alive but parentless"/"alive but no PathPartial".
-	for entity in removed_paths.read().chain(removed_hidden.read()) {
+	for entity in changed.iter().chain(core::iter::once(*trigger)) {
+		// `all_entities` (an unfiltered `Query<Entity>`) is the only reliable
+		// liveness check, since ancestry-based lookups fail alike for "gone" and
+		// for "alive but parentless"/"alive but no `PathPartial`".
 		if all_entities.contains(entity) {
 			dirty.insert(builder.namespace_of(entity));
 		} else {
-			sweep_all = true;
+			// a despawn took the route with it, so sweep every namespace
+			dirty.extend(builder.existing_roots());
 		}
-	}
-	if sweep_all {
-		dirty.extend(builder.existing_roots());
 	}
 
 	for root in dirty {
