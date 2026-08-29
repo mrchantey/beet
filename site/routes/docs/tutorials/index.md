@@ -13,3 +13,5 @@ Every tutorial assumes a recent nightly Rust toolchain and starts from a fresh b
 - [Your first agent](/docs/tutorials/first-agent) holds a short conversation with an LLM.
 
 Once you have a feel for the moving parts, the [Crates](/docs/crates) section explains how they fit together.
+
+One tutorial does not follow the rules above. [Self-hosted mail](/docs/tutorials/mail) is an infrastructure runbook: it stands up a real mail server on real cloud resources with a real domain, costs about US$43 a month to keep running, and takes a week rather than an afternoon because most of that week is spent waiting on a support case. Read it once you are comfortable with beet, or read it for the parts that are about mail rather than about beet.

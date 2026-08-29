@@ -13,3 +13,5 @@ Building on [OpenTofu](https://opentofu.org) means beet does not reinvent the de
 - the `deploy` feature adds actions for the full lifecycle: validate, plan, deploy, watch, show and destroy.
 
 The deploy examples (`lambda`, `fargate`, `lightsail`) take the router example and stand it up on AWS, so the application and the infrastructure it lands on are described in the same language.
+
+Beyond the generic blocks, the `mail` feature carries a complete self-hosted mail stack: `MailDomainBlock` declares a mail domain end to end (its SES sending identity and every record that makes it deliverable), `StalwartBlock` declares the box, and the deploy actions beside them mint keys, set reverse DNS, configure the running mail server over its own API, publish the MTA-STS policy, probe delivery in both directions and audit the DNS zone. [Self-hosted mail](/docs/tutorials/mail) walks the whole path, including the parts that are a human in a console rather than a beet action.
