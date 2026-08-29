@@ -32,6 +32,14 @@ pub fn table() -> Rule {
 		})
 }
 
+/// The marker rule for [`TABLE_VERTICAL_BORDERS`]: the dividers themselves are
+/// drawn per target (an adjacent-sibling rule in `reset.css` on the web, the
+/// charcell decorate system on the terminal), so this declares nothing — it
+/// registers the class so the render diagnostics know it is real.
+pub fn table_vertical_borders() -> Rule {
+	Rule::new().with_selector(Selector::class(TABLE_VERTICAL_BORDERS))
+}
+
 /// Header cells - medium weight, left aligned, padded, with a solid bottom rule
 /// separating the header from the body.
 pub fn table_th() -> Rule {

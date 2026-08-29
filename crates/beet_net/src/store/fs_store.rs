@@ -72,6 +72,35 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
+	/// The filesystem has a parent universe above the store's root, so a
+	/// `../..` root re-roots the store at the absolute resolved directory
+	/// rather than erroring — walking above the entry's directory is the
+	/// point of an fs `<StoreRoot>`.
+	fn rebase(
+		&self,
+		entry_name: &SmolPath,
+		root: &SmolPath,
+	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+		let abs_root = self.effective_root().join(root.as_str());
+		let entry_name = self
+			.effective_root()
+			.join(entry_name.as_str())
+			.strip_prefix(&abs_root)
+			.ok()
+			.map(SmolPath::from)
+			.ok_or_else(|| {
+				bevyhow!(
+					"entry `{entry_name}` is not under its declared store root \
+					`{abs_root}`"
+				)
+			})?;
+		(
+			(Box::new(FsStore::new(abs_root)) as Box<dyn BlobStoreProvider>),
+			entry_name,
+		)
+			.xok()
+	}
+
 	fn id(&self) -> &'static str { "fs" }
 
 	fn root_key(&self) -> SmolStr { format!("fs:{}", self.path).into() }
@@ -174,5 +203,38 @@ mod test {
 		let provider =
 			FsStore::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
 		store_test::run(provider).await;
+	}
+
+	/// The filesystem's parent universe lets a rebase walk above the store's
+	/// current root: the store re-roots at the absolute resolved directory and
+	/// the entry name grows the path back down to it.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test]
+	async fn rebases_above_the_store_root() {
+		let tmp =
+			AbsPathBuf::new_workspace_rel("target/tests/beet_net/rebase-fs")
+				.unwrap();
+		let entry_dir = tmp.join("a/b");
+		fs_ext::create_dir_all(&entry_dir).unwrap();
+		fs_ext::write(entry_dir.join("main.bsx"), "<Router/>").unwrap();
+		fs_ext::write(tmp.join("shared.txt"), "shared").unwrap();
+		let store = BlobStore::new(FsStore::new(entry_dir));
+		let (rebased, entry_name) =
+			store.rebase_entry("main.bsx", "../..").unwrap();
+		entry_name.xpect_eq("a/b/main.bsx");
+		rebased
+			.get_media(&SmolPath::from("a/b/main.bsx"))
+			.await
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq("<Router/>");
+		rebased
+			.get_media(&SmolPath::from("shared.txt"))
+			.await
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq("shared");
 	}
 }

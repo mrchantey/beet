@@ -1,6 +1,5 @@
-//! Serving a path from a [`BlobStore`] with static-host conventions, the shared
-//! primitive behind [`ServeBlobs`](crate::prelude::ServeBlobs) and the
-//! [`HtmlStore`](crate::prelude::HtmlStore) gate.
+//! Serving a path from a [`BlobStore`] with static-host conventions, the
+//! primitive behind [`ServeBlobs`](crate::prelude::ServeBlobs).
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;

@@ -65,48 +65,11 @@ pub async fn read_prescan(
 		.xmap(|entry| EntryPrescan::parse(&entry))
 }
 
-/// Build the entry's store, honouring its own `<StoreRoot src>` declaration:
-/// the root widens to `dir/src` (cleaned) and the entry name becomes the entry
-/// path relative to it. Without a declaration the store roots at the entry's
-/// own directory. Returns `(store, entry_name, root_dir)`; every local entry
-/// load (the binary, `serve`/`check`/`export-static`) resolves through this so
-/// an entry's declared root applies everywhere.
-async fn widen_store_root(
-	store_uri: Option<&StoreUri>,
-	dir: AbsPathBuf,
-	entry_name: String,
-) -> Result<(BlobStore, String, AbsPathBuf, EntryPrescan)> {
-	let store = resolve_store(store_uri, dir.clone())?;
-	let prescan = read_prescan(&store, &entry_name).await?;
-	let Some(src) = prescan.store_root.clone() else {
-		return Ok((store, entry_name, dir, prescan));
-	};
-	let root = dir.join(src.as_str());
-	let entry_name = dir
-		.join(&entry_name)
-		.strip_prefix(&root)
-		.ok()
-		.and_then(|rel| rel.to_str())
-		.map(str::to_string)
-		.ok_or_else(|| {
-			bevyhow!(
-				"entry `{dir}/{entry_name}` is not under its declared \
-				`<StoreRoot src=\"{src}\"/>` (`{root}`)"
-			)
-		})?;
-	// the widened store holds the same entry document, so its pre-scan is the one
-	// already read: entry resolution parses the entry exactly once.
-	Ok((
-		resolve_store(store_uri, root.clone())?,
-		entry_name,
-		root,
-		prescan,
-	))
-}
-
 /// A resolved entry: its store, the entry document name within it, and the local
-/// dir to watch for dev live reload (`None` for a self-rooted store, and always
-/// `None` on wasm, where there is no fs-watcher backend).
+/// dir to watch for dev live reload (`None` for a store with no local root, ie
+/// a self-rooted store, and always `None` on wasm, where there is no fs-watcher
+/// backend).
+#[derive(Debug)]
 pub struct ResolvedEntry {
 	pub store: BlobStore,
 	pub entry_name: String,
@@ -117,17 +80,49 @@ pub struct ResolvedEntry {
 	pub watch_dir: Option<AbsPathBuf>,
 }
 
+/// Resolve an entry within its store: read the prescan once, and rebase the
+/// store through the entry's own `<StoreRoot src>` declaration
+/// ([`BlobStore::rebase_entry`]) when it carries one. The one widening path
+/// every entry load shares (the binary, discovery, `serve`/`check`/
+/// `export-static`, the Worker); callers differ only in how the initial
+/// `(store, entry_name)` pair is derived (a local path walk vs a key in a
+/// self-rooted store).
+///
+/// Live reload watches the store's local root when it has one
+/// ([`BlobStoreProvider::watch_dir`]) — the rebased root, so the watcher sees
+/// the entry's whole declared universe; a store with no local directory
+/// watches nothing.
+pub async fn resolve_in_store(
+	store: BlobStore,
+	entry_name: String,
+) -> Result<ResolvedEntry> {
+	let prescan = read_prescan(&store, &entry_name).await?;
+	// the rebased store holds the same entry document, so its pre-scan is the
+	// one already read: entry resolution parses the entry exactly once.
+	let (store, entry_name) = match &prescan.store_root {
+		Some(src) => store.rebase_entry(&entry_name, src)?,
+		None => (store, entry_name),
+	};
+	Ok(ResolvedEntry {
+		#[cfg(not(target_arch = "wasm32"))]
+		watch_dir: store.watch_dir(),
+		store,
+		entry_name,
+		prescan,
+	})
+}
+
 /// Resolve an explicit entry path (the binary's `--main`, a command's `<entry>`
 /// positional): a path with an extension names the entry file itself, anything
 /// else is a directory probed for the first [`ENTRY_NAMES`] match. Either way
-/// the entry may widen its own store root with a `<StoreRoot src>` declaration
-/// (see [`widen_store_root`]), and the `--store` param picks the backend.
+/// the entry may rebase its own store root with a `<StoreRoot src>` declaration
+/// (see [`resolve_in_store`]), and the `--store` param picks the backend.
 pub async fn resolve_main(
 	store_uri: Option<&StoreUri>,
 	main: &str,
 ) -> Result<ResolvedEntry> {
 	let path = AbsPathBuf::new(main)?;
-	let (dir, entry_name) = if path.extension().is_some() {
+	let (store, entry_name) = if path.extension().is_some() {
 		// an entry file: its parent is the initial root
 		let dir = path.parent().ok_or_else(|| {
 			bevyhow!("entry `{path}` has no parent directory")
@@ -137,7 +132,7 @@ pub async fn resolve_main(
 			.and_then(|name| name.to_str())
 			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
 			.to_string();
-		(dir, entry_name)
+		(resolve_store(store_uri, dir)?, entry_name)
 	} else {
 		// a directory: probe it for an entry document
 		let store = resolve_store(store_uri, path.clone())?;
@@ -147,27 +142,9 @@ pub async fn resolve_main(
 				Create one, or name the entry file itself."
 			)
 		})?;
-		(path, entry_name)
+		(store, entry_name)
 	};
-	resolve_widened(store_uri, dir, entry_name).await
-}
-
-/// [`widen_store_root`] into a [`ResolvedEntry`], live reload watching the
-/// resolved root.
-pub async fn resolve_widened(
-	store_uri: Option<&StoreUri>,
-	dir: AbsPathBuf,
-	entry_name: String,
-) -> Result<ResolvedEntry> {
-	let (store, entry_name, _root, prescan) =
-		widen_store_root(store_uri, dir, entry_name).await?;
-	Ok(ResolvedEntry {
-		store,
-		entry_name,
-		prescan,
-		#[cfg(not(target_arch = "wasm32"))]
-		watch_dir: Some(_root),
-	})
+	resolve_in_store(store, entry_name).await
 }
 
 /// The first [`ENTRY_NAMES`] match at the store's root, if any.
@@ -306,7 +283,13 @@ pub(crate) async fn build_entry_owned(
 	entry_name: String,
 ) -> Result<Entity> {
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let prescan = read_prescan(&store, &entry_name).await?;
+	// the shared resolution: the entry's `<StoreRoot>` rebases the bucket view
+	// exactly as it does every other store kind.
+	let ResolvedEntry {
+		store,
+		entry_name,
+		prescan,
+	} = resolve_in_store(store, entry_name).await?;
 	let sources = read_sources(&store, formats, entry_name, prescan).await?;
 	let root = build_root(world, store, sources, DisableCallOnReady)?;
 	TemplatePending::settle_owned(world).await;
@@ -477,6 +460,108 @@ mod test {
 			.xpect_true();
 		// returns rather than hanging, nothing being pending on this entry.
 		TemplatePending::settle_owned(&mut world).await;
+	}
+
+	/// An fs entry declaring `<StoreRoot src="..">` re-roots the store at the
+	/// resolved ancestor directory: the watch dir is the widened root and the
+	/// entry name grows the path back down to the document.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet::test]
+	async fn fs_entry_rebases_through_resolve_main() {
+		let tmp = TempDir::new().unwrap();
+		let entry_dir = tmp.path().join("app");
+		fs_ext::create_dir_all(&entry_dir).unwrap();
+		fs_ext::write(
+			entry_dir.join("main.bsx"),
+			"<Router><StoreRoot src=\"..\"/></Router>",
+		)
+		.unwrap();
+		let resolved = resolve_main(None, entry_dir.to_string_lossy().as_ref())
+			.await
+			.unwrap();
+		resolved.entry_name.xpect_eq("app/main.bsx");
+		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
+		resolved
+			.store
+			.exists(&SmolPath::from("app/main.bsx"))
+			.await
+			.unwrap()
+			.xpect_true();
+	}
+
+	/// A store with no parent universe honours the same declaration as a
+	/// key-prefix view of itself; the binary's self-rooted branch resolves
+	/// through this same [`resolve_in_store`], so the declaration is never
+	/// dropped by policy.
+	#[beet::test]
+	async fn self_rooted_entry_rebases_to_a_prefix_view() {
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&SmolPath::from("apps/site/main.bsx"),
+				"<Router><StoreRoot src=\"..\"/></Router>",
+			)
+			.await
+			.unwrap();
+		let resolved =
+			resolve_in_store(store, "apps/site/main.bsx".to_string())
+				.await
+				.unwrap();
+		resolved.entry_name.xpect_eq("site/main.bsx");
+		#[cfg(not(target_arch = "wasm32"))]
+		resolved.watch_dir.xpect_none();
+		resolved
+			.store
+			.exists(&SmolPath::from("site/main.bsx"))
+			.await
+			.unwrap()
+			.xpect_true();
+	}
+
+	/// A root-level entry declaring a root above a store with no parent
+	/// universe fails loudly naming the mis-publish.
+	#[beet::test]
+	async fn self_rooted_escape_fails_loudly() {
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&SmolPath::from("main.bsx"),
+				"<Router><StoreRoot src=\"../..\"/></Router>",
+			)
+			.await
+			.unwrap();
+		resolve_in_store(store, "main.bsx".to_string())
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("mis-published");
+	}
+
+	/// The binary path and the command path share [`resolve_in_store`], so the
+	/// same inputs resolve an identical `(store, entry_name)`: here the
+	/// command-shaped `resolve_main` against the binary-shaped store + name
+	/// pair.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet::test]
+	async fn both_paths_resolve_identically() {
+		let tmp = TempDir::new().unwrap();
+		fs_ext::write(
+			tmp.path().join("main.bsx"),
+			"<Router><StoreRoot src=\".\"/></Router>",
+		)
+		.unwrap();
+		let by_path = resolve_main(None, tmp.path().to_string_lossy().as_ref())
+			.await
+			.unwrap();
+		let by_store = resolve_in_store(
+			resolve_store(None, tmp.path().clone()).unwrap(),
+			"main.bsx".to_string(),
+		)
+		.await
+		.unwrap();
+		by_path.entry_name.xpect_eq(by_store.entry_name);
+		by_path.store.same_scope(&by_store.store).xpect_true();
+		by_path.watch_dir.xpect_eq(by_store.watch_dir);
 	}
 
 	/// Every `--watch` rebuild fires a fresh [`Ready`] on its fresh entry root,

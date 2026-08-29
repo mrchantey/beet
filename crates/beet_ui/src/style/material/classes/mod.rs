@@ -133,6 +133,7 @@ pub fn all_rules() -> Vec<Rule> {
 		// an adjacent-sibling rule in `reset.css` on the web, the
 		// `apply_table_vertical_borders` decorate system on the terminal)
 		table(),
+		table_vertical_borders(),
 		table_th(),
 		table_td(),
 		// sidebar (the generic disclosure rules live in `style::elements`)

@@ -67,6 +67,21 @@ impl SmolPath {
 		}
 	}
 
+	/// The path relative to `prefix`, [`None`] when `prefix` is neither this
+	/// path nor an ancestor of it. Segment-aware: `"foo/bar"` is not under
+	/// `"fo"`. An empty `prefix` yields the path unchanged.
+	pub fn strip_prefix(&self, prefix: &Self) -> Option<Self> {
+		if prefix.0.is_empty() {
+			return Some(self.clone());
+		}
+		let rest = self.0.strip_prefix(prefix.0.as_str())?;
+		if rest.is_empty() {
+			Some(Self::default())
+		} else {
+			rest.strip_prefix('/').map(Self::new)
+		}
+	}
+
 	/// Returns the parent path, or [`None`] if the path is empty.
 	pub fn parent(&self) -> Option<Self> {
 		if self.0.is_empty() {
@@ -367,6 +382,26 @@ mod test {
 			.join(&SmolPath::new("/"))
 			.to_string()
 			.xpect_eq("foo");
+	}
+
+	#[crate::test]
+	fn strip_prefix() {
+		SmolPath::new("a/b/c.txt")
+			.strip_prefix(&SmolPath::new("a"))
+			.xpect_eq(Some(SmolPath::new("b/c.txt")));
+		SmolPath::new("a/b")
+			.strip_prefix(&SmolPath::new("a/b"))
+			.xpect_eq(Some(SmolPath::default()));
+		SmolPath::new("a/b")
+			.strip_prefix(&SmolPath::default())
+			.xpect_eq(Some(SmolPath::new("a/b")));
+		// segment-aware: `ab` is not under `a`
+		SmolPath::new("ab/c")
+			.strip_prefix(&SmolPath::new("a"))
+			.xpect_none();
+		SmolPath::new("a")
+			.strip_prefix(&SmolPath::new("a/b"))
+			.xpect_none();
 	}
 
 	#[crate::test]

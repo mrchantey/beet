@@ -14,6 +14,44 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// Returns a new provider scoped to the given subdirectory.
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider>;
 
+	/// A view of this store rooted at `root` (a normalized store-relative key
+	/// path), plus `entry_name` re-expressed relative to that root. The seam
+	/// behind [`BlobStore::rebase_entry`].
+	///
+	/// The default is the key-prefix view every provider supports
+	/// ([`with_subdir`](Self::with_subdir)), erroring loudly when `root` walks
+	/// above the store (`..`): a store with no parent universe cannot widen, so
+	/// an entry declaring a root above it names a mis-published store — its own
+	/// directory was synced instead of its declared universe. A provider whose
+	/// backing *does* have a parent universe (an [`FsStore`]'s filesystem)
+	/// overrides this to re-root above.
+	fn rebase(
+		&self,
+		entry_name: &SmolPath,
+		root: &SmolPath,
+	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+		if root.first_segment() == Some("..") {
+			bevybail!(
+				"entry `{entry_name}` declares a `<StoreRoot>` above the store \
+				itself (`{root}`), and a `{}` store has no parent universe. \
+				This usually means a mis-published store: the entry's directory \
+				was synced instead of its declared root.",
+				self.id()
+			);
+		}
+		let entry_name = entry_name.strip_prefix(root).ok_or_else(|| {
+			bevyhow!(
+				"entry `{entry_name}` is not under its declared store root \
+				`{root}`"
+			)
+		})?;
+		let provider = match root.as_str().is_empty() {
+			true => self.box_clone(),
+			false => self.with_subdir(root.clone()),
+		};
+		(provider, entry_name).xok()
+	}
+
 	/// Create a type-erased [`Blob`] handle for a single object managed by
 	/// this provider. Prefer the typed [`FsStore::blob`], [`S3Store::blob`]
 	/// etc. when you need world serialization.
@@ -235,6 +273,13 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	}
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().with_subdir(path)
+	}
+	fn rebase(
+		&self,
+		entry_name: &SmolPath,
+		root: &SmolPath,
+	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+		self.as_ref().rebase(entry_name, root)
 	}
 	fn id(&self) -> &'static str { self.as_ref().id() }
 	fn root_key(&self) -> SmolStr { self.as_ref().root_key() }

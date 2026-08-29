@@ -22,7 +22,7 @@ Martin Kleppmann headlined Local-First Conf '26 presenting the importance of ✨
 
 ## Malleable Standards
 
-In my last blog post, [ATProto isn't malleable yet](/blog/posts/post-14), I proposed that sovereign protocols like ATProto are missing a malleable application layer. Over the decades we have seen many genuinely awesome solutions to malleable software, but none have been standardized in the same way other technologies have.
+In my last blog post, [ATProto isn't malleable yet](/blog/post-14), I proposed that sovereign protocols like ATProto are missing a malleable application layer. Over the decades we have seen many genuinely awesome solutions to malleable software, but none have been standardized in the same way other technologies have.
 
 At a high level I believe this is because application developers don't think about interoperability in the same way networking folks do, and this is a natural consequence of the kinds of problems we're solving. A narrow siloed app still works for that use case, whereas an isolated node on a bespoke protocol is useless. Interoperability is not inherent to applications but *it should be!* In my favorite panel discussion of all time [Robin Berjon underscores the importance of commoditization](https://youtu.be/gjG_cUx_ueU?t=1013) at the application layer.
 

@@ -2,13 +2,10 @@
 //!
 //! Unlike the generic middleware and dispatch in [`router`](crate::router),
 //! these are opinionated, ready-made building blocks: package-info and
-//! analytics routes, the [`HtmlStore`] prebuilt-HTML gate, and a
-//! batteries-included [`Router::with_defaults`].
+//! analytics routes, and a batteries-included [`Router::with_defaults`].
 
-mod html_store;
-pub use html_store::*;
 // the shared static-host serve rules (`serve_blob`) for a [`BlobStore`], used by
-// `ServeBlobs` and the HTML-store gate (no_std core).
+// `ServeBlobs` (no_std core).
 mod blob_store;
 pub(crate) use blob_store::*;
 // the standard blob-store agent toolset + a markup store mount, composing

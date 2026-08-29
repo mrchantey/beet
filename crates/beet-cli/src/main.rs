@@ -7,7 +7,7 @@
 //! any recognized extension) or a directory probed for [`entry_build::ENTRY_NAMES`]
 //! (`--main=examples/hello`); with no `--main` discovery walks the cwd and its
 //! ancestors for the first match, so a bare `beet` is `--main=.` plus the walk.
-//! The entry may widen its own store root with a `<StoreRoot src="../.."/>`
+//! The entry may rebase its own store root with a `<StoreRoot src="../.."/>`
 //! declaration (see [`StoreRoot`]), so callers never re-supply it. The entry
 //! builds on the async runtime through its [`BlobStore`] (so every store read is
 //! awaited, never blocked), and runs itself: its own `CallOnReady` verb acts at
@@ -254,8 +254,8 @@ async fn build_watched_entry(
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the
-/// local directory to watch for dev live reload (`None` when there is no local
-/// dir, ie a self-rooted store).
+/// local directory to watch for dev live reload (`None` when the store has no
+/// local root, ie a self-rooted store).
 ///
 /// Resolution order:
 /// 1. a self-rooted `--store` (`s3://<bucket>`, `local-storage`, `indexed-db`):
@@ -267,9 +267,11 @@ async fn build_watched_entry(
 /// 3. otherwise: discovery walks the cwd and its ancestors through an `fs` store
 ///    for the first [`entry_build::ENTRY_NAMES`] match.
 ///
-/// A dir-rooted entry may widen its own store root with a `<StoreRoot src>`
-/// declaration (a self-rooted store is already rooted at the site). The config's
-/// [`StoreUri`] selects the backend (default `fs`).
+/// Every path then resolves through [`entry_build::resolve_in_store`], so an
+/// entry's `<StoreRoot src>` declaration rebases any store kind uniformly (an
+/// fs store re-roots, a self-rooted store takes a key-prefix view or fails
+/// loudly on a mis-publish). The config's [`StoreUri`] selects the backend
+/// (default `fs`).
 ///
 /// Target-agnostic: wasm runs the same walk wherever the runtime has a
 /// filesystem (deno/node through the runner's fs globals); a fs-less runtime
@@ -289,7 +291,8 @@ async fn resolve_entry(
 	let store_uri = (!is_wasm_runner).then(|| config.store.as_ref()).flatten();
 	let main = (!is_wasm_runner).then(|| config.main.as_ref()).flatten();
 
-	// a self-rooted store: no local dir, no ancestor walk, no watch dir.
+	// a self-rooted store: no local dir and no ancestor walk, so `--main` is a
+	// key within the store, defaulting to the entry-name probe.
 	if store_uri.is_some_and(StoreUri::is_self_rooted) {
 		let store =
 			entry_build::resolve_store(store_uri, AbsPathBuf::new(".")?)?;
@@ -305,14 +308,7 @@ async fn resolve_entry(
 				},
 			)?,
 		};
-		let prescan = entry_build::read_prescan(&store, &entry_name).await?;
-		return Ok(ResolvedEntry {
-			store,
-			entry_name,
-			prescan,
-			#[cfg(not(target_arch = "wasm32"))]
-			watch_dir: None,
-		});
+		return entry_build::resolve_in_store(store, entry_name).await;
 	}
 
 	// dir-rooted: an explicit `--main`, else the ancestor walk. On wasm the `fs`
@@ -351,8 +347,8 @@ fn features_self_check(
 /// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving
 /// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
-/// a filesystem walk makes sense; the matched entry may still widen its own
-/// root ([`widen_store_root`]), and no match errors with guidance.
+/// a filesystem walk makes sense; the matched entry may still rebase its own
+/// root ([`entry_build::resolve_in_store`]), and no match errors with guidance.
 async fn discover_entry(store_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
 	let start = AbsPathBuf::new(".")?;
 	let mut dir = Some(start.clone());
@@ -360,10 +356,8 @@ async fn discover_entry(store_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
 		let store = BlobStore::new(FsStore::new(current.clone()));
 		if let Some(entry_name) = entry_build::probe_entry_names(&store).await?
 		{
-			return entry_build::resolve_widened(
-				store_uri, current, entry_name,
-			)
-			.await;
+			let store = entry_build::resolve_store(store_uri, current)?;
+			return entry_build::resolve_in_store(store, entry_name).await;
 		}
 		dir = current.parent();
 	}

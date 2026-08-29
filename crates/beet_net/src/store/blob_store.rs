@@ -162,6 +162,36 @@ impl BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
 	}
 
+	/// Rebase this store and `entry_name` through the entry's declared
+	/// `<StoreRoot src>`: `src` names a position relative to the entry
+	/// document's own location *in this store*, so the new root is
+	/// `normalize(parent(entry_name)/src)` and the entry name becomes the
+	/// entry path relative to it.
+	///
+	/// Kind behavior rides [`BlobStoreProvider::rebase`]: a filesystem store
+	/// re-roots at the absolute resolved directory (fs has a parent universe,
+	/// walking above the store is the point), every other store takes a
+	/// key-prefix view of itself for a root at or under its own and errors
+	/// loudly when the root escapes the store. That error is the feature: the
+	/// declaration is a checkable invariant about store layout, and an entry
+	/// whose declared universe is missing was mis-published (its directory was
+	/// synced instead of its declared root).
+	pub fn rebase_entry(
+		&self,
+		entry_name: &str,
+		src: &str,
+	) -> Result<(BlobStore, String)> {
+		let entry_name = SmolPath::new(entry_name);
+		let root = entry_name.parent().unwrap_or_default().join(src);
+		let (provider, entry_name) =
+			self.provider.rebase(&entry_name, &root)?;
+		(
+			BlobStore::from_arc(Arc::from(provider)),
+			entry_name.to_string(),
+		)
+			.xok()
+	}
+
 	/// Whether `other` resolves the same scope: same backing store and subdir. The
 	/// [`DirPath`] change-detection uses it to skip a no-op re-scope, so a cascade of
 	/// ancestor [`BlobStore`] inserts settles instead of re-firing forever.
@@ -301,6 +331,13 @@ impl BlobStoreProvider for BlobStore {
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.provider.with_subdir(path)
 	}
+	fn rebase(
+		&self,
+		entry_name: &SmolPath,
+		root: &SmolPath,
+	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+		self.provider.rebase(entry_name, root)
+	}
 	fn id(&self) -> &'static str { self.provider.id() }
 	fn root_key(&self) -> SmolStr { self.provider.root_key() }
 	fn subdir(&self) -> SmolPath { self.provider.subdir() }
@@ -341,6 +378,85 @@ impl BlobStoreProvider for BlobStore {
 		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.provider.public_url(path)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A store with no parent universe seeded with a nested entry plus content
+	/// beside and above it.
+	async fn nested_store() -> BlobStore {
+		let store = BlobStore::temp();
+		store
+			.insert(&SmolPath::from("a/b/main.bsx"), "<Router/>")
+			.await
+			.unwrap();
+		store
+			.insert(&SmolPath::from("a/shared.txt"), "shared")
+			.await
+			.unwrap();
+		store
+	}
+
+	/// A nested entry declaring a root at an ancestor key takes a key-prefix
+	/// view of the same store, and the view serves both the entry and content
+	/// beside it.
+	#[beet_core::test]
+	async fn rebases_to_a_prefix_view() {
+		let store = nested_store().await;
+		let (rebased, entry_name) =
+			store.rebase_entry("a/b/main.bsx", "..").unwrap();
+		entry_name.xpect_eq("b/main.bsx");
+		rebased
+			.get_media(&SmolPath::from("b/main.bsx"))
+			.await
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq("<Router/>");
+		rebased
+			.get_media(&SmolPath::from("shared.txt"))
+			.await
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq("shared");
+	}
+
+	/// A root resolving exactly to the store's own root is the store itself,
+	/// the entry name unchanged: a nested entry declaring `../..` in a bucket
+	/// published from its universe just works.
+	#[beet_core::test]
+	async fn root_level_rebase_is_identity() {
+		let store = nested_store().await;
+		let (rebased, entry_name) =
+			store.rebase_entry("a/b/main.bsx", "../..").unwrap();
+		entry_name.xpect_eq("a/b/main.bsx");
+		rebased.same_scope(&store).xpect_true();
+	}
+
+	/// A root escaping a store with no parent universe fails loudly naming the
+	/// mis-publish, rather than asking the store for keys it cannot hold.
+	#[beet_core::test]
+	async fn escaping_root_names_the_mis_publish() {
+		BlobStore::temp()
+			.rebase_entry("main.bsx", "../..")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("mis-published");
+	}
+
+	/// A declared root the entry does not sit under is an authoring error.
+	#[beet_core::test]
+	async fn entry_outside_root_errors() {
+		BlobStore::temp()
+			.rebase_entry("a/main.bsx", "sub")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("not under its declared store root");
 	}
 }
 

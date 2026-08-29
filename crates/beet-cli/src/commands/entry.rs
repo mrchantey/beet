@@ -12,7 +12,7 @@ use beet::prelude::*;
 /// Load the entry onto the caller's world through its [`BlobStore`], returning its
 /// root entity. Resolution is the binary's own [`entry_build::resolve_main`] (the
 /// command's [`EntryParams`] `--store` picks the backend, the entry's
-/// `<StoreRoot src>` widens the root), so the same resolution serves
+/// `<StoreRoot src>` rebases the root), so the same resolution serves
 /// `beet --main=..` and these commands.
 ///
 /// `check`/`export-static` render the entry rather than serve it, so the build
