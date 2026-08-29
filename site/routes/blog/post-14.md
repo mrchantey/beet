@@ -44,4 +44,4 @@ Malleable ATProto components are just the beginning. With this fine grained cont
 
 Its early days but perhaps once these ideas are proven out we could discuss a standardized format for locked open malleable software, I think interoperability would be a great benefit for the ecosystem.
 
-This is the area that I am building in, if it sounds of interest check out [beet](https://beet.org) or come and say hello in the [Beetmash Matrix](https://matrix.to/#/!XCPvZTppLjfSeUGZIC:matrix.org).
+This is the area that I am building in, if it sounds of interest check out [beet](https://beet.org) or come and say hello in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).

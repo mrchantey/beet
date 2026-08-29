@@ -22,7 +22,7 @@ Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component Sy
 
 > 🚧 Mind your step! 🚧
 >
-> Beet is under construction, if this project is of interest please come and say hi in the [Beetmash Discord Server](https://discord.gg/DcURUQCXtx).
+> Beet is under construction, if this project is of interest please come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
 
 ## Example - Embodied Agents
 

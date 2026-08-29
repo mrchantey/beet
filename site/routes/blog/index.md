@@ -7,13 +7,13 @@ expanded = true
 
 # The Full Moon Harvest
 
-#### [#14 — Bevy standardizes malleable software](/blog/post-15)
+#### [#15 — Bevy standardizes malleable software](/blog/post-15)
 *Pete Hayman — 28th August, 2026*
 
 Why I think Bevy will rule the world.
 
 #### [#14 — ATProto isn't malleable yet](/blog/post-14)
-*Pete Hayman — 14th August, 2026*
+*Pete Hayman — 18th August, 2026*
 
 The locked open stack is missing a layer.
 

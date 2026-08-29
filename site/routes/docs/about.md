@@ -9,9 +9,7 @@ Beet is an engine for the act of creation. A student learning to code, a company
 
 ## The name
 
-Beet is short for Beetmash, a mispronunciation of Beat Match: a nod to the DJ heritage of [Scratch](https://scratch.mit.edu), and to the goal of collaborative creation, beat matching projects in the spirit of communal creation. Along the way it also picked up a backronym, Behavior Expressed as Entity Trees, for its habit of describing behavior as plain scene hierarchies.
-
-Beetmash is also the company that will eventually be built to serve this mission.
+Beet is short for Beetmash, a mispronunciation of Beat Match: an homage to [Scratch](https://scratch.mit.edu), continuing the DJ theme.
 
 ## The lineage
 

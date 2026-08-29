@@ -12,7 +12,7 @@ title = "Beet"
 			<h3>🚧 Mind your step! 🚧</h3>
 			<p>
 				Beet is under construction. If this project is of interest please come and say hi in the
-				<a href="https://discord.gg/DcURUQCXtx">Beetmash Discord Server</a>.
+				<a href="https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm">Beet Roomy space</a>.
 			</p>
 			<div bx:style="display=Flex justify-content=Center align-items=Center column-gap=Rem(1.0)">
 				<Link href="https://github.com/mrchantey/beet" variant=ButtonVariant::Outlined>GitHub</Link>

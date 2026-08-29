@@ -8,7 +8,7 @@ expanded = true
 
 Beet is a creative tool engine. It helps you build the perfect stack for your cross-domain project: websites, agents, robots, games and infra are all under one roof with great defaults and deep extensibility.
 
-> 🚧 Beet is pre-release and under active construction. If it sounds interesting, come and say hi in the [Beetmash Discord](https://discord.gg/DcURUQCXtx).
+> 🚧 Beet is pre-release and under active construction. If it sounds interesting, come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
 
 ## How it works
 
