@@ -10,8 +10,8 @@
 //!     <CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, size:Large}}>
 //!       <CalculatorToolset/>
 //!     </CreateActor>
-//!   </div>
-//! </div>
+//!   </Thread>
+//! </RepeatWhileFunctionCallOutput>
 //! ```
 use crate::beet::prelude::*;
 use beet_core::prelude::*;

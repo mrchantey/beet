@@ -19,7 +19,7 @@ request, so the view and composer stay bound to the thread the loop drives (the
 `bx:ref="thread"` / `$thread` reference) and repaint reactively. The behavior tree
 is a sibling of the page, kicked by the same start.
 -->
-<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<CrateCheck features={["thread", "tui", "ssh"]}/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>

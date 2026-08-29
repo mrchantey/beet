@@ -8,7 +8,7 @@ tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
 `{RunThread}`. The run is finite, so the transcript settles once the two turns
 complete and the terminal holds it until Ctrl+C.
 -->
-<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<CrateCheck features={["thread", "tui", "ssh", "extra"]}/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>

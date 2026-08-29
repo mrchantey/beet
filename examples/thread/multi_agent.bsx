@@ -9,7 +9,7 @@ agents take turns forever, kicked by `{RunThread}` on the servers' boot. The
 transcript renders full-screen with no composer (there is no user turn), and the
 process runs until Ctrl+C.
 -->
-<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<CrateCheck features={["thread", "tui", "ssh"]}/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>

@@ -9,7 +9,7 @@ resolves), the agent exercises the five blob tools, and
 `{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools. The run is
 finite, so the transcript settles and the terminal holds it until Ctrl+C.
 -->
-<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false})}>
+<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<CrateCheck features={["thread", "tui", "ssh"]}/>
 	<Router {ThreadLayout}>
 		<Route path="/" {FixedPage}>
