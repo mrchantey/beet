@@ -270,7 +270,7 @@ pub(super) fn sync_local_to_document(
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn link_creates_relationship() {
 		let mut world = DocumentPlugin::world();
 
@@ -294,7 +294,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn unlink_removes_relationship() {
 		let mut world = DocumentPlugin::world();
 
@@ -316,7 +316,7 @@ mod test {
 		world.entity(text).contains::<FieldOf>().xpect_false();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn resolves_root_document_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -343,7 +343,7 @@ mod test {
 		content.xpect_eq(Value::Str("from_root".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn resolves_card_document_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -376,7 +376,7 @@ mod test {
 		content.xpect_eq(Value::Str("from_card".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn ancestor_skips_props_document() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -406,7 +406,7 @@ mod test {
 			.xpect_eq(Value::Str("user_doc".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn resolves_props_document_path() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -439,7 +439,7 @@ mod test {
 			.xpect_eq(Value::Str("props_doc".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn nested_props_documents_do_not_leak() {
 		let mut world = DocumentPlugin::world();
 		// outer store -> inner store: each Props ref resolves its nearest store
@@ -483,7 +483,7 @@ mod test {
 			.xpect_eq(Value::Str("outer".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn resolves_entity_document_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -510,7 +510,7 @@ mod test {
 		content.xpect_eq(Value::Str("target_doc".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn handles_null_field_value() {
 		let mut world = DocumentPlugin::world();
 
@@ -529,7 +529,7 @@ mod test {
 		synced[0].xpect_eq(Value::Null);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn handles_array_field_value() {
 		let mut world = DocumentPlugin::world();
 
@@ -548,7 +548,7 @@ mod test {
 		synced[0].xpect_eq(Value::new_list([1, 2, 3]));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn handles_bool_field_value() {
 		let mut world = DocumentPlugin::world();
 
@@ -593,7 +593,7 @@ mod test {
 		world.entity(entity).get::<Value>().unwrap().clone()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn value_change_writes_document() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "old" }))).id();
@@ -614,7 +614,7 @@ mod test {
 			.xpect_eq(Value::Str("new".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn converges_in_one_pass_no_loop() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "old" }))).id();
@@ -642,7 +642,7 @@ mod test {
 		}
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_wins_same_pass_conflict() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "start" }))).id();
@@ -664,7 +664,7 @@ mod test {
 		read_value(&mut world, child).xpect_eq(Value::Str("from_doc".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn value_seeds_missing_field() {
 		let mut world = DocumentPlugin::world();
 		// document present but missing the "name" field
@@ -684,7 +684,7 @@ mod test {
 			.xpect_eq(Value::Str("seeded".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn emit_error_missing_field_skipped() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "other": 1i64 }))).id();
@@ -706,7 +706,7 @@ mod test {
 		document.xpect_eq(val!({ "other": 1i64 }));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn no_document_init_creates() {
 		let mut world = DocumentPlugin::world();
 		// a lone FieldRef child with Init resolving via This, no ancestor Document
@@ -732,7 +732,7 @@ mod test {
 		.xpect_eq(Value::Str("created".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn no_document_emit_error_skips() {
 		let mut world = DocumentPlugin::world();
 		let child = world
@@ -754,7 +754,7 @@ mod test {
 		world.query_once::<&Document>().is_empty().xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn bidirectional_round_trip() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "start" }))).id();
@@ -781,7 +781,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[beet_core::test]
+	#[crate::test]
 	fn schema_seeds_untyped_field() {
 		#[derive(Reflect)]
 		#[allow(dead_code)]

@@ -375,5 +375,15 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
+# A feature-activation shim, and nothing else: it is the only way to turn on the
+# features the unit tests and doctests need without forcing them on every
+# consumer. Nothing under `src/` may name `beet_core::` (write `crate::`, which
+# is what the `#[beet_core::test]` macro expands to anyway): a single reference
+# makes rustc link this second, non-`cfg(test)` copy of the crate into the lib
+# test binary, and under `bevy/reflect_auto_register` (which any build unifying
+# `bevy/default` into the graph enables, eg `-p beet_core -p beet-cli
+# --all-features`) both copies auto-register every reflected type, so every
+# short type path resolves ambiguously to nothing. Doctests are exempt: they
+# compile as separate crates and legitimately name `beet_core::`.
 beet_core = {path = ".", features=["testing", "rsx", "bsx", "json"] }
 # beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}

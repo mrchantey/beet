@@ -177,7 +177,7 @@ fn module_path_from_rel(path: &SmolPath) -> Option<String> {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn module_path_from_rel_derives_module() {
 		module_path_from_rel(&SmolPath::from("path/to/X.bsx"))
 			.unwrap()

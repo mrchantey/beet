@@ -204,7 +204,7 @@ pub impl<'a> EntityWorldMut<'a> {
 mod test {
 	use crate::prelude::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn iter_descendants() {
 		// tree: root -> [a -> [c, d], b]
 		let mut world = World::new();

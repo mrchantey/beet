@@ -226,7 +226,7 @@ mod test {
 	#[relationship_target(relationship = SelfRel)]
 	struct SelfTargets(Vec<Entity>);
 
-	#[beet_core::test]
+	#[crate::test]
 	fn iter_ancestors_once_terminates_on_self_reference() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -251,7 +251,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn iter_ancestors_once_walks_normal_chain() {
 		let mut world = World::new();
 		let a = world.spawn_empty().id();

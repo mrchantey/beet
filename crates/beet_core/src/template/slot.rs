@@ -390,7 +390,7 @@ mod test {
 			.collect()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn named_and_default() {
 		let mut world = World::new();
 		// scope with a default target and a named "header" target.
@@ -425,7 +425,7 @@ mod test {
 		world.entity(title).contains::<SlotChild>().xpect_false();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fallback_when_unfilled() {
 		let mut world = World::new();
 		let scope = node(&mut world, "scope");
@@ -448,7 +448,7 @@ mod test {
 		child_names(&world, scope).xpect_eq(vec!["body".to_string()]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn multi_child_order_preserved() {
 		let mut world = World::new();
 		let scope = node(&mut world, "scope");
@@ -468,7 +468,7 @@ mod test {
 		]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn unconsumed_child_errors() {
 		let mut world = World::new();
 		let scope = node(&mut world, "scope");
@@ -485,7 +485,7 @@ mod test {
 		err.to_string().xpect_contains("default");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn no_slot_stealing_between_siblings() {
 		let mut world = World::new();
 		let root = node(&mut world, "root");
@@ -514,7 +514,7 @@ mod test {
 		child_names(&world, scope_b).xpect_eq(vec!["contentB".to_string()]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn slot_child_of_root_lands_as_direct_children() {
 		// the `<Route path="x"><Foo/></Route>` shape: a `<Slot>` as a direct child
 		// of a root must place the caller content as direct children of that root,
@@ -551,7 +551,7 @@ mod test {
 		}
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn transfer_forwards_through_level() {
 		let mut world = World::new();
 		// Astro-style re-projection: a relay routed into a structural "outer" slot
@@ -598,7 +598,7 @@ mod test {
 		child_names(&world, relay).xpect_eq(vec!["title".to_string()]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn relay_does_not_consume_itself() {
 		// a relay whose `SlotChild` and `SlotTarget` sides share a slot name must
 		// forward sibling content rather than swallowing it into its own target.

@@ -46,7 +46,7 @@ mod test {
 
 	/// Text content is the element's `Value::Str` descendants concatenated in
 	/// pre-order, so a multi-node raw-text body reads back verbatim.
-	#[beet_core::test]
+	#[crate::test]
 	fn concatenates_descendant_text() {
 		let mut world = World::new();
 		let root = world

@@ -129,7 +129,7 @@ impl FieldQuery<'_, '_> {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn typed_seeds_default() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::default()).id();
@@ -150,7 +150,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn local_write_rejects_wrong_type() {
 		let mut world = DocumentPlugin::world();
 		let count = TypedFieldRef::<i64>::new("count");

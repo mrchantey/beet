@@ -619,6 +619,8 @@ fn containing_size(rect: IRect) -> UVec2 {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::input::ScrollPosition;
+	use crate::style::Overflow;
 	use crate::style::*;
 	use bevy::math::IRect;
 	use bevy::math::IVec2;

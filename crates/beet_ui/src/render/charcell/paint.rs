@@ -226,6 +226,7 @@ fn paint_node(
 #[cfg(test)]
 mod tests {
 	use crate::prelude::*;
+	use crate::style::Overflow;
 	use crate::style::*;
 	use beet_core::prelude::*;
 	use bevy::math::UVec2;

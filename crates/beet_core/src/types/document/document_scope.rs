@@ -219,7 +219,7 @@ mod test {
 			.clone()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn scope_prepends_prefix() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -242,7 +242,7 @@ mod test {
 		read_value(&mut world, field).xpect_eq(Value::Str("Alice".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn scopes_compose() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -272,7 +272,7 @@ mod test {
 		read_value(&mut world, field).xpect_eq(Value::Str("NYC".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn terminate_seals_outer_scope() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "top" }))).id();
@@ -300,7 +300,7 @@ mod test {
 		read_value(&mut world, field).xpect_eq(Value::Str("top".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn scope_change_recomputes() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -335,7 +335,7 @@ mod test {
 		read_value(&mut world, field).xpect_eq(Value::Str("from_b".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn scope_removed_recomputes() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -368,7 +368,7 @@ mod test {
 	/// element via [`AttributeOf`]). Its scope prefix and document must still
 	/// resolve through the owning element, agreeing with a text binding to the
 	/// same field under the same scope.
-	#[beet_core::test]
+	#[crate::test]
 	fn attribute_binding_scopes_through_its_element() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -404,7 +404,7 @@ mod test {
 		read_value(&mut world, attribute).xpect_eq(Value::Int(5));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn reparent_recomputes() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -440,7 +440,7 @@ mod test {
 		read_value(&mut world, field).xpect_eq(Value::Str("from_b".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn write_path_is_scoped() {
 		let mut world = DocumentPlugin::world();
 		let doc = world

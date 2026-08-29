@@ -361,6 +361,7 @@ mod test {
 	use super::*;
 	use crate::prelude::*;
 	use crate::render::charcell::test_host::TestHost;
+	use crate::style::Overflow;
 	use crate::style::*;
 
 	/// An SGR mouse sequence: button `b` at 1-indexed cell `(col+1, row+1)`,

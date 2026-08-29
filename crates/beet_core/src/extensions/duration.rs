@@ -114,7 +114,7 @@ mod test {
 	/// [`duration_str`] serializes a unit-suffixed string and round-trips one back;
 	/// a bare number — a JSON number or a unit-less string — is rejected, so a unit
 	/// is always required.
-	#[beet_core::test]
+	#[crate::test]
 	fn duration_str_requires_a_unit() {
 		// a unit string round-trips as `"1.5s"`
 		let json =

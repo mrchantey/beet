@@ -196,49 +196,49 @@ mod test {
 
 	#[derive(Component, Reflect, Default, Clone, PartialEq, Debug)]
 	#[reflect(Component, Default)]
-	struct Slider {
+	struct Dial {
 		value: i64,
 	}
 
-	/// A world with the document plugin plus a registered `Slider`.
+	/// A world with the document plugin plus a registered `Dial`.
 	fn world() -> World {
 		let mut world = DocumentPlugin::world();
 		world
 			.resource_mut::<AppTypeRegistry>()
 			.write()
-			.register::<Slider>();
+			.register::<Dial>();
 		world
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_writes_component_field() {
 		let mut world = world();
 		let doc = world.spawn(Document::new(val!({ "level": 7i64 }))).id();
-		// bind document `level` -> Slider.value via the co-located FieldRef Value.
+		// bind document `level` -> Dial.value via the co-located FieldRef Value.
 		world.spawn((
 			ChildOf(doc),
-			Slider::default(),
+			Dial::default(),
 			Value::default(),
 			FieldRef::new("level"),
-			ReflectFieldRef::new("Slider", "value"),
+			ReflectFieldRef::new("Dial", "value"),
 		));
 		world.update_local();
 
-		let slider = world.query_once::<&Slider>()[0].clone();
-		slider.value.xpect_eq(7);
+		let dial = world.query_once::<&Dial>()[0].clone();
+		dial.value.xpect_eq(7);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn component_field_writes_back_to_document() {
 		let mut world = world();
 		let doc = world.spawn(Document::new(val!({ "level": 0i64 }))).id();
 		let entity = world
 			.spawn((
 				ChildOf(doc),
-				Slider::default(),
+				Dial::default(),
 				Value::default(),
 				FieldRef::new("level"),
-				ReflectFieldRef::new("Slider", "value"),
+				ReflectFieldRef::new("Dial", "value"),
 			))
 			.id();
 		// settle the initial document -> component sync.
@@ -246,7 +246,7 @@ mod test {
 		world.update_local();
 
 		// edit the component directly; the write-back reaches the document.
-		world.entity_mut(entity).get_mut::<Slider>().unwrap().value = 42;
+		world.entity_mut(entity).get_mut::<Dial>().unwrap().value = 42;
 		world.update_local();
 		world.update_local();
 
@@ -259,28 +259,28 @@ mod test {
 			.xpect_eq(42);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn cross_entity_syncs_both_directions() {
 		let mut world = world();
-		let target = world.spawn(Slider::default()).id();
+		let target = world.spawn(Dial::default()).id();
 		// Value on the binding entity, component on the target entity.
 		let entity = world
 			.spawn((
 				Value::Int(7),
-				ReflectFieldRef::new("Slider", "value").with_target(target),
+				ReflectFieldRef::new("Dial", "value").with_target(target),
 			))
 			.id();
 		world.update_local();
 
 		world
 			.entity(target)
-			.get::<Slider>()
+			.get::<Dial>()
 			.unwrap()
 			.value
 			.xpect_eq(7);
 
 		// edit the target's component; the write-back reaches the binding Value.
-		world.entity_mut(target).get_mut::<Slider>().unwrap().value = 42;
+		world.entity_mut(target).get_mut::<Dial>().unwrap().value = 42;
 		world.update_local();
 
 		world
@@ -291,14 +291,14 @@ mod test {
 			.xpect_eq(Value::Int(42));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn unchanged_component_skips_read_back() {
 		let mut world = world();
-		let target = world.spawn(Slider { value: 5 }).id();
+		let target = world.spawn(Dial { value: 5 }).id();
 		let entity = world
 			.spawn((
 				Value::default(),
-				ReflectFieldRef::new("Slider", "value").with_target(target),
+				ReflectFieldRef::new("Dial", "value").with_target(target),
 			))
 			.id();
 		// settle the initial component -> Value sync.
@@ -329,7 +329,7 @@ mod test {
 			.xpect_eq(Value::Int(99));
 
 		// a real component change resumes the read-back.
-		world.entity_mut(target).get_mut::<Slider>().unwrap().value = 6;
+		world.entity_mut(target).get_mut::<Dial>().unwrap().value = 6;
 		world.update_local();
 
 		world
@@ -340,16 +340,16 @@ mod test {
 			.xpect_eq(Value::Int(6));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn missing_component_is_silent() {
 		let mut world = world();
-		// `Slider` exists in the world but not on the target.
-		world.spawn(Slider::default());
+		// `Dial` exists in the world but not on the target.
+		world.spawn(Dial::default());
 		let target = world.spawn_empty().id();
 		let entity = world
 			.spawn((
 				Value::default(),
-				ReflectFieldRef::new("Slider", "value").with_target(target),
+				ReflectFieldRef::new("Dial", "value").with_target(target),
 			))
 			.id();
 		// an entirely unknown component type is also silent.
@@ -369,16 +369,16 @@ mod test {
 	#[derive(Component)]
 	struct Marker;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn reserved_target_resolves_nearest_marker_ancestor() {
 		let mut world = world();
-		let marked = world.spawn((Marker, Slider { value: 3 })).id();
+		let marked = world.spawn((Marker, Dial { value: 3 })).id();
 		let mid = world.spawn(ChildOf(marked)).id();
 		let entity = world
 			.spawn((
 				ChildOf(mid),
 				Value::default(),
-				ReflectFieldRef::new("Slider", "value")
+				ReflectFieldRef::new("Dial", "value")
 					.with_target(BindingTarget::Reserved("Marker".into())),
 			))
 			.id();
@@ -392,7 +392,7 @@ mod test {
 			.xpect_eq(Value::Int(3));
 
 		// reactive both ways: a component edit reaches the Value...
-		world.entity_mut(marked).get_mut::<Slider>().unwrap().value = 6;
+		world.entity_mut(marked).get_mut::<Dial>().unwrap().value = 6;
 		world.update_local();
 		world
 			.entity(entity)
@@ -406,7 +406,7 @@ mod test {
 		world.update_local();
 		world
 			.entity(marked)
-			.get::<Slider>()
+			.get::<Dial>()
 			.unwrap()
 			.value
 			.xpect_eq(11);
@@ -415,15 +415,15 @@ mod test {
 	/// Regression: a despawned binding's cached target goes with it. Bindings live
 	/// in page trees that come and go (one per terminal session), so a cache keyed
 	/// by binding entity grows an entry for every page ever built.
-	#[beet_core::test]
+	#[crate::test]
 	fn despawned_binding_drops_its_cached_target() {
 		let mut world = world();
-		let marked = world.spawn((Marker, Slider { value: 3 })).id();
+		let marked = world.spawn((Marker, Dial { value: 3 })).id();
 		let binding = |marked| {
 			(
 				ChildOf(marked),
 				Value::default(),
-				ReflectFieldRef::new("Slider", "value")
+				ReflectFieldRef::new("Dial", "value")
 					.with_target(BindingTarget::Reserved("Marker".into())),
 			)
 		};
@@ -446,14 +446,14 @@ mod test {
 		cached(&world).xpect_eq(1);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn reserved_target_silent_until_marker_attaches() {
 		let mut world = world();
 		// the binding spawns detached: no marker in its ancestry yet.
 		let entity = world
 			.spawn((
 				Value::default(),
-				ReflectFieldRef::new("Slider", "value")
+				ReflectFieldRef::new("Dial", "value")
 					.with_target(BindingTarget::Reserved("Marker".into())),
 			))
 			.id();
@@ -470,7 +470,7 @@ mod test {
 
 		// attaching beneath a marker picks the binding up, even though the
 		// component's change tick fired before the marker was reachable.
-		let marked = world.spawn((Marker, Slider { value: 9 })).id();
+		let marked = world.spawn((Marker, Dial { value: 9 })).id();
 		world.update_local();
 		world.entity_mut(entity).insert(ChildOf(marked));
 		world.update_local();
@@ -482,7 +482,7 @@ mod test {
 			.xpect_eq(Value::Int(9));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn target_entity_is_scene_mappable() {
 		let mut world = world();
 		// the registration carries the entity-mapping type data for scene loads.
@@ -499,7 +499,7 @@ mod test {
 		let old_target = world.spawn_empty().id();
 		let new_target = world.spawn_empty().id();
 		let mut binding =
-			ReflectFieldRef::new("Slider", "value").with_target(old_target);
+			ReflectFieldRef::new("Dial", "value").with_target(old_target);
 		let mut mapping = <bevy::ecs::entity::EntityHashMap<Entity>>::default();
 		mapping.insert(old_target, new_target);
 		binding.map_entities(&mut mapping);

@@ -674,7 +674,7 @@ mod test {
 		);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn field_helper_writes_document_no_mirror() {
 		let mut world = (BsxPlugin, DocumentPlugin).into_world();
 		register_inline_click(&mut world);
@@ -722,7 +722,7 @@ mod test {
 			.xpect_eq(5);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn literal_arg_with_default() {
 		let mut world = (BsxPlugin, DocumentPlugin).into_world();
 		// `amount` is an optional i64 defaulting to 1.
@@ -754,7 +754,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn side_effect_verb_no_binding() {
 		let mut world = (BsxPlugin, DocumentPlugin).into_world();
 		register_inline_click(&mut world);
@@ -788,7 +788,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn verify_rejects_unknown_missing_and_mistyped() {
 		// verification is pure: no world needed.
 		let schema = VerbSchema::new().binding("field").optional_value(
@@ -846,7 +846,7 @@ mod test {
 	/// The `@comp`/`@res` field helpers (json-gated) read-modify-write a
 	/// reflected component/resource field with no mirror on the host.
 	#[cfg(feature = "json")]
-	#[beet_core::test]
+	#[crate::test]
 	fn field_helper_writes_component_and_resource() {
 		use bevy::ecs::reflect::ReflectResource;
 
@@ -857,7 +857,7 @@ mod test {
 		}
 		#[derive(Resource, Reflect, Default, Clone, PartialEq, Debug)]
 		#[reflect(Resource, Default)]
-		struct Score {
+		struct Tally {
 			points: i64,
 		}
 
@@ -866,9 +866,9 @@ mod test {
 			let registry = world.resource_mut::<AppTypeRegistry>();
 			let mut registry = registry.write();
 			registry.register::<Counter>();
-			registry.register::<Score>();
+			registry.register::<Tally>();
 		}
-		world.insert_resource(Score { points: 10 });
+		world.insert_resource(Tally { points: 10 });
 
 		// `@comp:Counter.value` on the host: bump the host's own component field.
 		let host = world.spawn(Counter { value: 3 }).id();
@@ -884,12 +884,12 @@ mod test {
 			.value
 			.xpect_eq(4);
 
-		// `@res:Score.points`: bump the resource field, no mirror entity.
-		BindingArg::Resource(ResourceFieldRef::new("Score", "points"))
+		// `@res:Tally.points`: bump the resource field, no mirror entity.
+		BindingArg::Resource(ResourceFieldRef::new("Tally", "points"))
 			.update(&mut world.entity_mut(host), |value| {
 				*value = Value::Int(value.as_i64().unwrap_or(0) + 5)
 			})
 			.unwrap();
-		world.resource::<Score>().points.xpect_eq(15);
+		world.resource::<Tally>().points.xpect_eq(15);
 	}
 }

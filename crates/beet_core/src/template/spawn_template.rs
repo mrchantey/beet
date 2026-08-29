@@ -324,7 +324,7 @@ mod test {
 		fn clone_template(&self) -> Self { self.clone() }
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn builds_into_root() {
 		let mut world = TemplatePlugin::world();
 		let root = world.spawn_template(Child("kid")).unwrap().id();
@@ -374,7 +374,7 @@ mod test {
 		fn clone_template(&self) -> Self { self.clone() }
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn nested_slotted_template_end_to_end() {
 		let mut world = TemplatePlugin::world();
 		let spawn_count = Store::new(0);
@@ -420,7 +420,7 @@ mod test {
 		load_state.get().xpect_eq(Some(false));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fires_spawn_then_load() {
 		use crate::prelude::*;
 		let mut world = TemplatePlugin::world();
@@ -477,7 +477,7 @@ mod test {
 	/// The sweep reaches every entity of the loaded tree, deepest first and the
 	/// root last, each exactly once: a child's load verb settles before the node
 	/// that owns it.
-	#[beet_core::test]
+	#[crate::test]
 	fn ready_sweeps_the_subtree_bottom_up() {
 		let mut world = TemplatePlugin::world();
 		let fired = record_ready(&mut world);
@@ -491,7 +491,7 @@ mod test {
 
 	/// A sweep is bounded by the tree that loaded: building into a child of a
 	/// live tree never re-fires the entities above it.
-	#[beet_core::test]
+	#[crate::test]
 	fn ready_never_fires_above_the_loaded_root() {
 		let mut world = TemplatePlugin::world();
 		let outer = world.spawn_template(Chain).unwrap().id();
@@ -512,7 +512,7 @@ mod test {
 	/// A sweep held back by a dependency still covers the whole subtree when it
 	/// finally drains: a scene gated on an asset load (the `<Scene3d>` shape)
 	/// fires deepest-first, frames after the build returned.
-	#[beet_core::test]
+	#[crate::test]
 	fn a_deferred_sweep_covers_the_subtree() {
 		let mut world = TemplatePlugin::world();
 		let fired = record_ready(&mut world);
@@ -532,7 +532,7 @@ mod test {
 		fired.get().len().xpect_eq(3);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn build_failure_rides_template_error() {
 		#[derive(Clone)]
 		struct Boom;
@@ -567,7 +567,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn pending_defers_load() {
 		// a registered dependency defers Ready until it resolves.
 		let mut world = TemplatePlugin::world();
@@ -609,7 +609,7 @@ mod test {
 	/// A structural dependency defers slot resolution to the drain: content
 	/// arriving asynchronously (the include shape) is slotted once the last
 	/// structural dependency resolves, and [`Ready`] fires after it.
-	#[beet_core::test]
+	#[crate::test]
 	fn structural_pending_defers_slots() {
 		let mut world = TemplatePlugin::world();
 		let load_state = Store::new(None);
@@ -673,7 +673,7 @@ mod test {
 
 	/// A guard dropped unresolved (a dead task) resolves through the sweep, so
 	/// the root's [`Ready`] can never hang on a lost dependency.
-	#[beet_core::test]
+	#[crate::test]
 	fn dropped_guard_resolves_via_sweep() {
 		let mut world = TemplatePlugin::world();
 		let load_fired = Store::new(false);
@@ -697,7 +697,7 @@ mod test {
 		world.entity_mut(root).remove::<TemplatePending>();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn content_root_descends_nested_wrappers() {
 		let mut world = World::new();
 		// an element root is its own content root.

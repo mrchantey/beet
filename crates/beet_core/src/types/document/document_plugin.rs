@@ -162,7 +162,7 @@ impl DocumentSync {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn text_field_syncs_on_insert() {
 		let mut world = DocumentPlugin::world();
 
@@ -179,7 +179,7 @@ mod test {
 		(*value).clone().xpect_eq(Value::Str("Hello".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn text_field_syncs_on_document_change() {
 		let mut world = DocumentPlugin::world();
 
@@ -208,7 +208,7 @@ mod test {
 		(*value).clone().xpect_eq(Value::Int(42));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn text_field_with_nested_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -223,7 +223,7 @@ mod test {
 		(*value).clone().xpect_eq(Value::Str("Bob".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn multiple_text_fields_same_document() {
 		let mut world = DocumentPlugin::world();
 
@@ -250,7 +250,7 @@ mod test {
 		results.contains(&Value::Str("Bob".into())).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn text_block_with_field_ref() {
 		let mut world = DocumentPlugin::world();
 

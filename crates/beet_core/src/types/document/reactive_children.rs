@@ -195,7 +195,7 @@ mod test {
 	/// Keyed reconciliation reuses children by key: an append keeps the existing
 	/// row entities (so their state and bindings survive), and a removal despawns
 	/// only the vanished key.
-	#[beet_core::test]
+	#[crate::test]
 	fn keyed_reuses_children_across_append_and_remove() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -237,7 +237,7 @@ mod test {
 		world.entities().contains(generation_1[1]).xpect_false();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn grows_and_shrinks() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -270,7 +270,7 @@ mod test {
 		child_count(&mut world, list).xpect_eq(1);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn leaves_static_siblings_untouched() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -303,7 +303,7 @@ mod test {
 		world.entities().contains(static_child).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn rebuilds_only_on_own_value_change() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "items": ["a"] }))).id();
@@ -339,7 +339,7 @@ mod test {
 	#[derive(EntityTargetEvent)]
 	struct PopItem;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn native_event_drives_list() {
 		let mut world = DocumentPlugin::world();
 		let items = TypedFieldRef::<Vec<String>>::new("items");
@@ -397,7 +397,7 @@ mod test {
 			.collect()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn child_field_resolves_to_item() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
@@ -425,7 +425,7 @@ mod test {
 		values.contains(&Value::Str("Bob".into())).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn nested_list_no_double_count() {
 		let mut world = DocumentPlugin::world();
 		// outer list of groups, each with an inner list of items

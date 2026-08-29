@@ -82,7 +82,7 @@ mod test {
 		todos: Vec<String>,
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn assert_field_type_matches() {
 		let schema = DocumentSchema::of::<CountDoc>();
 		schema
@@ -94,7 +94,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn assert_list_item_type_matches() {
 		let schema = DocumentSchema::of::<CountDoc>();
 		schema
@@ -111,7 +111,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn any_schema_passes() {
 		let schema = DocumentSchema::inline(ValueSchema::Any);
 		schema

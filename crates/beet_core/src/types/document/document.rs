@@ -324,7 +324,7 @@ impl core::fmt::Display for DocumentPath {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_get_field_ref() {
 		let doc = Document::new(val!({
 			"name": "Test",
@@ -354,7 +354,7 @@ mod test {
 		.xpect_eq("deep");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_get_field() {
 		let doc = Document::new(val!({
 			"name": "Test",
@@ -370,7 +370,7 @@ mod test {
 			.xpect_eq(42);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_get_field_array() {
 		let doc = Document::new(val!({
 			"items": [1i64, 2i64, 3i64, 4i64, 5i64]
@@ -386,7 +386,7 @@ mod test {
 		.xpect_eq(3);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_get_field_mut() {
 		let mut doc = Document::new(val!({ "count": 10i64 }));
 
@@ -398,7 +398,7 @@ mod test {
 			.xpect_eq(20);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_try_init_field_object() {
 		let mut doc = Document::default();
 
@@ -422,7 +422,7 @@ mod test {
 	/// A nested init must seed intermediate segments as containers, never with
 	/// the leaf init value (regression: `insert(["scope","count"], 0)` used to
 	/// write `{scope: 0}` and then fail navigating `scope.count`).
-	#[beet_core::test]
+	#[crate::test]
 	fn document_init_nested_leaf() {
 		let mut doc = Document::default();
 		doc.insert(
@@ -439,7 +439,7 @@ mod test {
 		.xpect_eq(0);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_try_init_field_array() {
 		let mut doc = Document::default();
 

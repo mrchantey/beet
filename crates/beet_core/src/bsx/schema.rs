@@ -279,7 +279,7 @@ mod test {
 		}
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn props_value_collects_literals() {
 		let el = element(&[
 			("label", AttrValue::Str("hi".into())),
@@ -304,7 +304,7 @@ mod test {
 		map.0.get("count").unwrap().clone().xpect_eq(Value::Int(3));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn qualified_unit_enum_prop_reduces_to_variant() {
 		// `variant=ButtonVariant::Outlined` reflects by the bare variant name, so the
 		// qualifying path is dropped (else the enum silently falls back to default).

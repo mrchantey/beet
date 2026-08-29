@@ -97,7 +97,7 @@ fn parse_js_format(source: &str) -> Result<Vec<BsxNode>> {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn default_registers_bsx_and_js() {
 		let formats = TemplateFormats::default();
 		formats.get(&MediaType::Bsx).is_some().xpect_true();
@@ -106,7 +106,7 @@ mod test {
 		formats.get(&MediaType::Css).is_none().xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn js_wraps_in_script() {
 		let nodes = parse_js_format("let x = 1 < 2;").unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {
@@ -119,7 +119,7 @@ mod test {
 			.xpect_eq(BsxNode::Text("let x = 1 < 2;".to_string()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn empty_js_is_an_empty_script() {
 		let nodes = parse_js_format("").unwrap();
 		let BsxNode::Element(el) = &nodes[0] else {

@@ -505,6 +505,7 @@ impl Cell {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::style::FontStyle;
 	use crate::style::FontWeight;
 	use crate::style::*;
 

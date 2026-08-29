@@ -272,7 +272,7 @@ mod tests {
 	use super::*;
 	use core::ops::Deref;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn field_ref_new() {
 		let field = FieldRef::new("field");
 
@@ -286,7 +286,7 @@ mod tests {
 			.xpect_eq(OnMissingField::Init { value: Value::Null });
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn inline_keys_are_unique() {
 		let first = TypedFieldRef::<u32>::inline();
 		let second = TypedFieldRef::<u32>::inline();
@@ -294,7 +294,7 @@ mod tests {
 	}
 
 	#[cfg(feature = "json")]
-	#[beet_core::test]
+	#[crate::test]
 	fn seeds_default_and_round_trips() {
 		let mut world = DocumentPlugin::world();
 		let count = TypedFieldRef::<i64>::new("count").with_init(7);
@@ -345,7 +345,7 @@ mod tests {
 	}
 
 	#[cfg(feature = "json")]
-	#[beet_core::test]
+	#[crate::test]
 	fn root_document_path() {
 		let mut world = DocumentPlugin::world();
 		let count = TypedFieldRef::<i64>::new("count")

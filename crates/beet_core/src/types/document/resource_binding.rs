@@ -171,7 +171,7 @@ mod test {
 		world
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn seeds_value_from_resource() {
 		let mut world = world();
 		world.insert_resource(Theme { contrast: 5 });
@@ -191,7 +191,7 @@ mod test {
 			.xpect_eq(Value::Int(5));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn document_writes_resource_field() {
 		let mut world = world();
 		world.insert_resource(Theme::default());
@@ -208,7 +208,7 @@ mod test {
 		world.resource::<Theme>().contrast.xpect_eq(7);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn resource_field_writes_back_to_document() {
 		let mut world = world();
 		world.insert_resource(Theme::default());
@@ -237,7 +237,7 @@ mod test {
 			.xpect_eq(42);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn unchanged_resource_skips_read_back() {
 		let mut world = world();
 		world.insert_resource(Theme { contrast: 5 });
@@ -279,7 +279,7 @@ mod test {
 			.xpect_eq(Value::Int(6));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn missing_resource_is_silent() {
 		let mut world = world();
 		// `Theme` registered but never inserted, plus an entirely unknown type.

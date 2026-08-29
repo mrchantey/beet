@@ -298,7 +298,7 @@ mod test {
 	/// dependency on the build root, so `Ready` defers. The full
 	/// load-then-fire cycle is covered by [`defers_load_until_asset_loaded`];
 	/// both drain through the same [`drain_loaded_assets`].
-	#[beet_core::test]
+	#[crate::test]
 	fn build_assets_defers_load() {
 		let mut app = asset_app();
 		let world = app.world_mut();

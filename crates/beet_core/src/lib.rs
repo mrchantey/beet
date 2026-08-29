@@ -89,7 +89,7 @@ pub mod utils;
 // channels + `send_wrapper` they build on are `std`-gated deps.
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 pub mod web_utils;
-// Re-export for ergonomic `#[beet_core::test]` and `#[beet_core::main]` usage
+// Re-export for ergonomic `#[crate::test]` and `#[beet_core::main]` usage
 pub use beet_core_macros::beet_main as main;
 pub use beet_core_macros::beet_test as test;
 pub use beet_core_macros::*;

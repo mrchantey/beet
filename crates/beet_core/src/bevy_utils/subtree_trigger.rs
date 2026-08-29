@@ -260,7 +260,7 @@ mod test {
 		[root, a, b, c, d]
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fires_bottom_up_exactly_once() {
 		let mut world = World::new();
 		let [root, a, b, c, d] = tree(&mut world);
@@ -287,7 +287,7 @@ mod test {
 	}
 
 	/// a sweep is an entity target event like any other, so it also queues.
-	#[beet_core::test]
+	#[crate::test]
 	fn fires_from_commands() {
 		let mut world = World::new();
 		let [root, a, b, c, d] = tree(&mut world);
@@ -308,7 +308,7 @@ mod test {
 		fired.get().xpect_eq(vec![d, c, b, a, root]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn never_fires_above_the_root() {
 		let mut world = World::new();
 		let [root, a, _b, c, d] = tree(&mut world);
@@ -356,7 +356,7 @@ mod test {
 		fired
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn a_declaring_target_sweeps() {
 		let mut world = World::new();
 		let [root, a, b, c, d] = tree(&mut world);
@@ -372,7 +372,7 @@ mod test {
 		fired.get().xpect_eq(vec![d, c, b, a, root]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn a_bare_target_fires_alone() {
 		let mut world = World::new();
 		let [root, ..] = tree(&mut world);
@@ -387,7 +387,7 @@ mod test {
 
 	/// The marker is typed per event: declaring a sweep for one event never
 	/// opts the entity into another's.
-	#[beet_core::test]
+	#[crate::test]
 	fn a_declaration_for_another_event_fires_alone() {
 		let mut world = World::new();
 		let [root, ..] = tree(&mut world);
@@ -405,7 +405,7 @@ mod test {
 
 	/// A nested declaring entity sweeps only on its own starts: an outer sweep
 	/// delivers to it once, never re-fanning through it.
-	#[beet_core::test]
+	#[crate::test]
 	fn a_nested_declaration_never_double_delivers() {
 		let mut world = World::new();
 		let [root, a, b, c, d] = tree(&mut world);

@@ -128,7 +128,7 @@ async_ext::do_async_thing().await;
 
 
 - We use the custom `beet_core::testing` test runner and matchers in all crates.
-- All tests must use the beet core test attribute ie `#[beet_core::test]`
+- All tests must use the beet core test attribute ie `#[beet_core::test]`. Inside `beet_core` itself write `#[crate::test]`: a crate that names itself turns its self dev-dependency into a real reference, linking a second copy of the crate into the lib test binary (see `crates/beet_core/Cargo.toml`).
 - wasm tests: beet cannot run doctests, so always specify either `--lib` or `--test` for wasm
 - for complex output we use snapshot testing, ie `.xpect_snapshot()`, when updating snapshots we pass the `--snap` flag
 - unit tests belong at the bottom of the file, the need for integration tests is rare

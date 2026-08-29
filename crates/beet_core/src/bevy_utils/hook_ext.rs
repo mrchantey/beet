@@ -143,7 +143,7 @@ mod test {
 	}))]
 	struct Configured(&'static str);
 
-	#[beet_core::test]
+	#[crate::test]
 	fn observe_single() {
 		let mut world = World::new();
 		world.init_resource::<Count>();
@@ -153,7 +153,7 @@ mod test {
 		world.resource::<Count>().0.xpect_eq(1);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn observe_tuple() {
 		let mut world = World::new();
 		world.init_resource::<Count>();
@@ -163,7 +163,7 @@ mod test {
 		world.resource::<Count>().0.xpect_eq(2);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn entity_hook_inserts() {
 		let mut world = World::new();
 		let entity = world.spawn(Named).id();
@@ -178,7 +178,7 @@ mod test {
 
 	/// The queued work reads the declared field, so a hook captures its own
 	/// config rather than re-resolving it later.
-	#[beet_core::test]
+	#[crate::test]
 	fn component_hook_reads_its_config() {
 		let mut world = World::new();
 		let entity = world.spawn(Configured("declared")).id();

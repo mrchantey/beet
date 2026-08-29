@@ -82,7 +82,7 @@ mod utils;
 pub use runner::*;
 pub use utils::*;
 
-// Re-export of [`alloc`] under `testing`, so the `#[beet_core::test]` macro can
+// Re-export of [`alloc`] under `testing`, so the `#[crate::test]` macro can
 // name the runner fn's `String` error type as `..testing::_alloc::string::String`.
 // The macro already reaches everything else through `..testing::*`, and that is
 // the only path that resolves uniformly: integration tests `use
@@ -94,7 +94,7 @@ pub use crate::_alloc;
 // Test registration is per-platform: native/wasm collect via `inventory`'s
 // life-before-main constructors, but those never run on bare metal, so the
 // embedded build registers into a `linkme` distributed slice instead. Both are
-// driven by the same `submit!` the `#[beet_core::test]` macro emits; the macro
+// driven by the same `submit!` the `#[crate::test]` macro emits; the macro
 // is selected here by feature so the test author's usage is identical.
 #[cfg(feature = "testing")]
 #[doc(hidden)]

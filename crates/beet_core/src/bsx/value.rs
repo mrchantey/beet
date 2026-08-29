@@ -416,7 +416,7 @@ mod test {
 		parse_value_expr(&mut Cursor::new(input)).unwrap()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn scalars() {
 		value("42")
 			.xpect_eq(ValueExpr::Literal(DataLiteral::Scalar(Value::Uint(42))));
@@ -433,7 +433,7 @@ mod test {
 		)));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn struct_literal() {
 		let ValueExpr::Literal(DataLiteral::Struct(fields)) =
 			value("{x:0,y:2}")
@@ -444,7 +444,7 @@ mod test {
 		fields[0].0.as_str().xpect_eq("x");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn list_literal() {
 		let ValueExpr::Literal(DataLiteral::List(items)) = value("[1,2,3]")
 		else {
@@ -453,7 +453,7 @@ mod test {
 		items.len().xpect_eq(3);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn enum_variant() {
 		let ValueExpr::Literal(DataLiteral::Enum(named)) = value("Center")
 		else {
@@ -463,18 +463,18 @@ mod test {
 		named.fields.xpect_eq(NamedFields::Unit);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn removed_field_ref_syntax_errors() {
 		parse_err("#count").xpect_contains("use `@doc:field`");
 		parse_err("#user.name=\"x\"").xpect_contains("removed");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn entity_ref() {
 		value("$header").xpect_eq(ValueExpr::EntityRef("header".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn spread_named_and_tuple() {
 		let SpreadExpr::Named(named) =
 			parse_spread(&mut Cursor::new("MyComponent{foo:\"bar\"}")).unwrap()
@@ -499,7 +499,7 @@ mod test {
 		binding
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn doc_binding() {
 		let parsed = binding("@doc:count");
 		parsed.source.xpect_eq(BindingSource::Doc);
@@ -509,7 +509,7 @@ mod test {
 		parsed.init.xpect_eq(None);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn doc_binding_with_init() {
 		let parsed = binding("@doc:user.name=\"x\"");
 		parsed
@@ -521,7 +521,7 @@ mod test {
 			.xpect_eq(Some(DataLiteral::Scalar(Value::Str("x".into()))));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn res_binding() {
 		let parsed = binding("@res:PackageConfig.title");
 		parsed.source.xpect_eq(BindingSource::Res);
@@ -529,7 +529,7 @@ mod test {
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn entity_binding_with_selector() {
 		let parsed = binding("@entity:myref::Bar.boo");
 		parsed.source.xpect_eq(BindingSource::Comp);
@@ -538,7 +538,7 @@ mod test {
 		parsed.field_path.to_string().xpect_eq("boo".to_string());
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn entity_binding_reserved_name() {
 		let parsed = binding("@entity:PageRoot::ArticleMeta.title");
 		parsed.source.xpect_eq(BindingSource::Comp);
@@ -547,7 +547,7 @@ mod test {
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn comp_binding_nested_field() {
 		let parsed = binding("@comp:Bar.style.width");
 		parsed.type_path.xpect_eq(Some("Bar".into()));
@@ -557,7 +557,7 @@ mod test {
 			.xpect_eq("style.width".to_string());
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn prop_binding() {
 		let parsed = binding("@prop:title");
 		parsed.source.xpect_eq(BindingSource::Prop);
@@ -572,7 +572,7 @@ mod test {
 			.to_string()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn binding_errors() {
 		parse_err("@bogus:x").xpect_contains("unknown binding source");
 		parse_err("@doc count").xpect_contains("expected `:`");
@@ -584,7 +584,7 @@ mod test {
 			.xpect_contains("missing its `::Type.field` path");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn spread_tuple_with_binding() {
 		let SpreadExpr::Tuple(items) = parse_spread(&mut Cursor::new(
 			"(Bar{boo:\"bazz\"}, @comp:Bar.boo)",
@@ -609,7 +609,7 @@ mod test {
 		parse_verb_call(&mut Cursor::new(input)).unwrap()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn verb_call_literal_and_binding_args() {
 		let call = verb("increment{ field: @doc:count, amount: 3 }");
 		call.verb.as_str().xpect_eq("increment");
@@ -629,7 +629,7 @@ mod test {
 			.xpect_eq(VerbArg::Literal(DataLiteral::Scalar(Value::Uint(3))));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn verb_call_no_args() {
 		// a bare verb name with no brace map is a zero-argument verb.
 		let call = verb("submit");
@@ -637,7 +637,7 @@ mod test {
 		call.args.is_empty().xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn verb_call_doc_init_arg() {
 		// a binding arg keeps its `=init`, eg `@doc:count=0`.
 		let call = verb("increment{ field: @doc:count=0 }");
@@ -657,7 +657,7 @@ mod test {
 			.to_string()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn verb_call_errors() {
 		verb_err("{ field: @doc:count }")
 			.xpect_contains("expected a verb name");

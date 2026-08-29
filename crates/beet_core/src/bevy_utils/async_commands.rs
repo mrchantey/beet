@@ -1436,7 +1436,7 @@ mod test {
 	#[derive(Resource, Clone, PartialEq, Debug)]
 	struct Count(usize);
 
-	#[beet_core::test]
+	#[crate::test]
 	async fn async_task() {
 		let mut app = test_app();
 		let world = app.world_mut();
@@ -1458,7 +1458,7 @@ mod test {
 			.xpect_eq(Count(1));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	async fn async_queue() {
 		let mut app = test_app();
 		let world = app.world_mut();
@@ -1490,7 +1490,7 @@ mod test {
 			.xpect_eq(Count(2));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	async fn results() {
 		let mut app = test_app();
 		let world = app.world_mut();
@@ -1504,7 +1504,7 @@ mod test {
 			.xpect_eq(Count(0));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	async fn run_async_then() {
 		let mut app = test_app();
 		let result = app.world_mut().run_async_then(|_| async { 42 }).await;
@@ -1517,7 +1517,7 @@ mod test {
 		value: u32,
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	async fn await_event_resolves_with_observer_value() {
 		let mut app = test_app();
 		let entity = app.world_mut().spawn_empty().id();
@@ -1546,7 +1546,7 @@ mod test {
 	/// panicking) error handler — the guarantee a `PersistentSocket`'s connection
 	/// loop relies on when its scene is swapped out. Without the guard the failed
 	/// `insert` panics out of `update()` and fails the test.
-	#[beet_core::test]
+	#[crate::test]
 	async fn entity_task_survives_despawn() {
 		let mut app = test_app();
 		let reached = Store::<bool>::default();
@@ -1582,7 +1582,7 @@ mod test {
 	/// A `queue_async_local` task whose entity is despawned *before* the queued
 	/// command applies is never spawned (it logs the drop at `debug` instead), so
 	/// its body never runs.
-	#[beet_core::test]
+	#[crate::test]
 	async fn queued_entity_task_skipped_when_despawned_before_run() {
 		let mut app = test_app();
 		let ran = Store::<bool>::default();

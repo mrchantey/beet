@@ -342,7 +342,7 @@ mod test {
 	use crate::prelude::*;
 	fn is_snippet<M>(_: impl IntoSnippet<M>) {}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn lifts_markup_values() {
 		// pass-through bundle
 		is_snippet(Name::new("hi"));

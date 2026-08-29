@@ -351,7 +351,7 @@ mod test {
 		fn clone_template(&self) -> Self { self.clone() }
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn builds_by_name() {
 		let mut world = TemplatePlugin::world();
 		world.register_template::<Label>();
@@ -378,7 +378,7 @@ mod test {
 			.xpect_eq("hello");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn unregistered_tag_errors() {
 		let world = TemplatePlugin::world();
 		let registry = world.resource::<AppTypeRegistry>().clone();
@@ -418,7 +418,7 @@ mod test {
 	/// A template's short path is its only name, so it wins an ambiguous short
 	/// path; an ambiguity no template is party to still resolves to nothing
 	/// rather than guessing, and is named by its full type path instead.
-	#[beet_core::test]
+	#[crate::test]
 	fn a_template_wins_an_ambiguous_short_path() {
 		let mut world = TemplatePlugin::world();
 		world.register_template::<Label>();
@@ -449,7 +449,7 @@ mod test {
 
 	/// A tag marked [`allow_unregistered`](WorldAllowUnregisteredExt::allow_unregistered)
 	/// builds to nothing instead of erroring (the featured-out widget contract).
-	#[beet_core::test]
+	#[crate::test]
 	fn allowed_unregistered_tag_is_noop() {
 		let world = TemplatePlugin::world();
 		let registry = world.resource::<AppTypeRegistry>().clone();

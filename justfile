@@ -148,6 +148,14 @@ test-all *args:
 	just test-scripting-fallback {{ args }}
 	# `bevy_default`-enabling crates each run in their own cargo invocation —
 	# unifying `bevy/default` across the whole graph has tripped a mold linker bug.
+	# A second reason since: `bevy/default` turns on `bevy/reflect_auto_register`,
+	# whose inventory pass registers *every* reflected type in the binary, so
+	# bevy's own `Button`/`Slider`/`Display`/`Overflow` join the registry and
+	# collide by short type path with beet's. `<Button>` from a Rust `rsx!` then
+	# resolves to bevy's component instead of beet_ui's template (the `rsx!`
+	# expansion opens with `use beet_core::prelude::*`, which shadows the call
+	# site), so `-p beet_ui` co-built with any `bevy/default` crate fails three
+	# widget tests. Per-crate, through `_core-features`, is the reliable form.
 	# `|| exit 1` on every loop: a `for` loop exits with the status of its *last*
 	# iteration, so without it a failing package in the middle is silently passed over.
 	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" {{ args }} || exit 1; done

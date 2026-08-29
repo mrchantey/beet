@@ -107,7 +107,7 @@ mod test {
 
 	/// An attribute entity sits outside the `ChildOf` tree: the walk must hop
 	/// `AttributeOf` to reach the owning element and continue to the root.
-	#[beet_core::test]
+	#[crate::test]
 	fn walks_child_of_then_attribute_of() {
 		let mut world = World::new();
 		let root = world.spawn_empty().id();

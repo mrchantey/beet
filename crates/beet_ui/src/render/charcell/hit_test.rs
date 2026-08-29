@@ -402,6 +402,8 @@ pub(super) fn vec2_to_cell(position: Vec2) -> IVec2 {
 mod test {
 	use super::*;
 	use crate::render::charcell::test_host::TestHost;
+	use crate::style::Display;
+	use crate::style::Overflow;
 	use crate::style::*;
 
 	/// Records the entities that received each pointer event, by an observer the

@@ -113,6 +113,7 @@ pub(super) fn grid_layout_rects(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use crate::style::Display;
 	use crate::style::*;
 	use beet_core::prelude::*;
 	use bevy::math::IRect;

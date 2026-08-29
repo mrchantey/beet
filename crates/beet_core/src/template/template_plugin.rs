@@ -36,7 +36,7 @@ impl Plugin for TemplatePlugin {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn world_can_spawn_template() {
 		use bevy::ecs::template::Template;
 		use bevy::ecs::template::TemplateContext;

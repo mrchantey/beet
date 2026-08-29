@@ -86,7 +86,7 @@ mod test {
 
 	/// A location's path becomes positionals and its query becomes `--key=value`
 	/// flags, the browser equivalent of process argv.
-	#[beet_core::test]
+	#[crate::test]
 	fn converts_location_to_args() {
 		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(
 			vec![

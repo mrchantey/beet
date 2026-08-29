@@ -199,7 +199,7 @@ fn usize_field(map: &Map<String, Json>, key: &str) -> Option<usize> {
 mod test {
 	use crate::prelude::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn shorthand_struct() {
 		let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
 			r#"{ "label": "string", "count": { "type": "i64", "required": true } }"#,
@@ -217,7 +217,7 @@ mod test {
 		matches!(count.schema, ValueSchema::I64(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn standard_object() {
 		let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
 			r#"{
@@ -247,7 +247,7 @@ mod test {
 		matches!(tags.schema, ValueSchema::List(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn reference_via_ref() {
 		ValueSchema::from_json_schema(r##"{ "$ref": "#/$defs/TodoItem" }"##)
 			.unwrap()
@@ -256,7 +256,7 @@ mod test {
 
 	// a top-level shorthand prop literally named `items` is a struct field, not a
 	// JSON-Schema array node (the `items` keyword only applies to descriptors).
-	#[beet_core::test]
+	#[crate::test]
 	fn shorthand_prop_named_items() {
 		let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
 			r#"{ "items": { "items": "TodoItem", "required": true } }"#,

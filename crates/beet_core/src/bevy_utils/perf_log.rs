@@ -142,7 +142,7 @@ mod test {
 
 	/// The diagnostics a report reads are collected every tick, whether or not
 	/// anything is reporting: a `PerfLog` added later still has history.
-	#[beet_core::test]
+	#[crate::test]
 	fn collects_diagnostics_without_a_perf_log() {
 		let mut app = perf_app();
 		app.world_mut().spawn_empty();
@@ -159,7 +159,7 @@ mod test {
 
 	/// The world's growth between two reports is what the delta carries: the leak
 	/// signal, and the one number a host's metrics cannot supply.
-	#[beet_core::test]
+	#[crate::test]
 	fn reports_entity_growth_between_windows() {
 		let mut app = perf_app();
 		app.update();

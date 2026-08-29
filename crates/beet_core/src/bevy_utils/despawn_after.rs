@@ -38,7 +38,7 @@ mod test {
 
 	/// [`DespawnAfter`] keeps its entity until the duration elapses, then despawns
 	/// it.
-	#[beet_core::test]
+	#[crate::test]
 	fn despawns_after_duration() {
 		let mut world = World::new();
 		world.init_resource::<Time>();

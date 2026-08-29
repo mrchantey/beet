@@ -272,7 +272,7 @@ pub(super) fn sync_source_field_refs(
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn mirrors_source_field() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
@@ -304,7 +304,7 @@ mod test {
 			.xpect_eq(Value::Str("Bob".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn never_writes_back() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
@@ -331,7 +331,7 @@ mod test {
 			.xpect_eq(Value::Str("Alice".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn subject_resolves_from_props_store() {
 		let mut world = DocumentPlugin::world();
 		// user doc -> props store; the binding entity is outside the hierarchy
@@ -360,7 +360,7 @@ mod test {
 	/// write-back iteration order must not matter, ie the body's freshly added
 	/// Null `Value` (no signal) never clobbers the binding's same-pass write
 	/// (the `sync_local_to_document` added-null guard).
-	#[beet_core::test]
+	#[crate::test]
 	fn source_chain_is_iteration_order_independent() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
@@ -398,7 +398,7 @@ mod test {
 
 	/// The full props chain at the document level:
 	/// `user doc -> binding Value <-> props store -> body field`.
-	#[beet_core::test]
+	#[crate::test]
 	fn source_chains_into_props_store() {
 		let mut world = DocumentPlugin::world();
 		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();

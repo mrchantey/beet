@@ -724,7 +724,7 @@ mod test {
 	/// `LinearVelocity(f32)`), so `<SetDrive linear=60>` builds the typed wrapper from a
 	/// plain attribute. The stored field takes the number directly, in whatever unit
 	/// the newtype stores.
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_number_to_newtype() {
 		#[derive(Reflect, PartialEq, Debug)]
 		struct Speed(f32);
@@ -742,7 +742,7 @@ mod test {
 	/// field, `from_reflect` fell back to the type's default, and the block
 	/// pointed at the EMPTY label — a deploy that composes `/app/stage/` and
 	/// reads someone else's parameter, silently.
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_string_to_label_ref() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
 		struct SecretRef {
@@ -766,7 +766,7 @@ mod test {
 
 	/// ..but only a struct that wraps ONE string: a second field means the
 	/// string cannot say which one it is, so the coercion must not guess.
-	#[beet_core::test]
+	#[crate::test]
 	fn does_not_coerce_string_to_a_wider_struct() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
 		struct Pair {
@@ -792,7 +792,7 @@ mod test {
 	/// REGRESSION: the partial `DynamicStruct` reached `FromReflect`, which
 	/// needs every field, so `mailboxes={[{localpart:"probe"}]}` produced an
 	/// EMPTY list and the declaration silently lost its mailboxes.
-	#[beet_core::test]
+	#[crate::test]
 	fn completes_a_nested_struct_over_its_default() {
 		#[derive(Reflect, PartialEq, Debug)]
 		struct Item {
@@ -862,7 +862,7 @@ mod test {
 	/// An enum's struct variant has no default to complete from, so a literal
 	/// that omits a field is an error naming it rather than a value that
 	/// quietly resolves to the target's default.
-	#[beet_core::test]
+	#[crate::test]
 	fn a_partial_enum_variant_is_an_error() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
 		enum Provider {
@@ -910,7 +910,7 @@ mod test {
 
 	/// A `[a, b, ..]` literal fills an array-typed field (eg an `HttpServer`'s
 	/// `host: [u8; 4]` from `{HttpServer{host:[0,0,0,0]}}`), not just a `Vec`.
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_list_to_array_field() {
 		#[derive(Reflect, PartialEq, Debug)]
 		struct Server {
@@ -954,7 +954,7 @@ mod test {
 	/// `{Repeat}` spread / `<Repeat>` tag finds `Repeat<()>` despite the argument
 	/// kept in its short path. Ambiguity (more than one) resolves to nothing
 	/// rather than guessing.
-	#[beet_core::test]
+	#[crate::test]
 	fn generic_resolves_by_base_name() {
 		let mut registry = TypeRegistry::default();
 		registry.register::<GenericMarker<u32>>();
@@ -972,7 +972,7 @@ mod test {
 
 	/// A fully-qualified type path resolves a type whose short path is ambiguous
 	/// (two registered `Dup`s), where the bare short name resolves to nothing.
-	#[beet_core::test]
+	#[crate::test]
 	fn qualified_type_path_disambiguates() {
 		mod outer {
 			#[derive(bevy::prelude::Reflect)]
@@ -1001,7 +1001,7 @@ mod test {
 	/// so `<FsStore path="assets"/>` resolves under the workspace root (the seam that
 	/// replaced the `MountFsStore` string-prop adapter).
 	#[cfg(feature = "std")]
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_string_to_abs_path() {
 		resolve::<AbsPathBuf>(DataLiteral::Scalar(Value::str("assets")))
 			.xpect_eq(WsPathBuf::new("assets").into_abs());
@@ -1011,7 +1011,7 @@ mod test {
 	/// authors an `EndInDuration` delay. The unit is required: a bare number or an
 	/// unknown unit does not parse, and a malformed value targeting a `Duration`
 	/// field is a hard error rather than a silent miss.
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_to_duration() {
 		resolve::<Duration>(DataLiteral::Scalar(Value::str("250ms")))
 			.xpect_eq(Duration::from_millis(250));
@@ -1041,7 +1041,7 @@ mod test {
 
 	/// A `"true"`/`"false"` string attribute coerces to a `bool` field, so a markup
 	/// `home="false"` authors a flag; a non-bool string is a hard error.
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_to_bool() {
 		resolve::<bool>(DataLiteral::Scalar(Value::str("true"))).xpect_eq(true);
 		resolve::<bool>(DataLiteral::Scalar(Value::str("false")))
@@ -1062,7 +1062,7 @@ mod test {
 	/// number, so a markup `<HttpServer port="0"/>` authors an `Option<u16>`
 	/// port; a non-numeric string targeting a numeric field is a hard error
 	/// rather than a silent miss (`from_reflect` would keep the default).
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_string_to_number() {
 		resolve::<u16>(DataLiteral::Scalar(Value::str("0"))).xpect_eq(0);
 		resolve::<f32>(DataLiteral::Scalar(Value::str("1.5"))).xpect_eq(1.5);
@@ -1087,7 +1087,7 @@ mod test {
 	/// A string coerces to a `Cow<'static, str>` field, so a tuple literal carrying
 	/// a string (eg `<Log::Message("hi")/>`, whose variant field is a `Cow`)
 	/// reflect-applies instead of panicking on the `String`->`Cow` mismatch.
-	#[beet_core::test]
+	#[crate::test]
 	fn coerces_to_cow_str() {
 		resolve::<alloc::borrow::Cow<'static, str>>(DataLiteral::Scalar(
 			Value::str("hi"),
@@ -1095,7 +1095,7 @@ mod test {
 		.xpect_eq(alloc::borrow::Cow::Borrowed("hi"));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn wraps_scalar_into_option() {
 		resolve::<Option<String>>(DataLiteral::Scalar(Value::str("beet")))
 			.xpect_eq(Some("beet".to_string()));
@@ -1103,7 +1103,7 @@ mod test {
 			.xpect_eq(Some(7));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn explicit_none_passes_through() {
 		resolve::<Option<String>>(DataLiteral::Enum(NamedLiteral {
 			name: "None".into(),
@@ -1122,7 +1122,7 @@ mod test {
 	/// A qualified unit-variant path (`Emphasis::High`) resolves to its variant,
 	/// not the enum default, the bug that left a `<Link variant=ButtonVariant::Outlined>`
 	/// rendering filled.
-	#[beet_core::test]
+	#[crate::test]
 	fn qualified_unit_variant_resolves() {
 		resolve::<Emphasis>(DataLiteral::Enum(NamedLiteral {
 			name: "Emphasis::High".into(),
