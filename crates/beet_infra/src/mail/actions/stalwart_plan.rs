@@ -345,6 +345,26 @@ impl DomainPlan {
 	/// `private_key` is present only on creation, exactly as an account's
 	/// credential is: a key rotated under a published selector is a fortnight
 	/// of mail signed by something no resolver can check.
+	/// The headers the sovereign signature covers: exactly the ones that
+	/// survive the relay. SES rewrites `Message-ID` and `Date` on every
+	/// message it sends, and both sit in Stalwart's DEFAULT signed set, so a
+	/// default-configured signature is broken by its own relay the moment the
+	/// message leaves — while SES's own two signatures pass, because they are
+	/// applied after the rewrite. Found by a Gmail round trip reading
+	/// `dkim=fail header.s=stalwart` beside two passes. Headers absent from a
+	/// message are signed as absent (RFC 6376 explicitly allows this), which
+	/// also blocks their later addition.
+	pub const SIGNED_HEADERS: &'static [&'static str] = &[
+		"From",
+		"To",
+		"Cc",
+		"Reply-To",
+		"Subject",
+		"MIME-Version",
+		"Content-Type",
+		"Content-Transfer-Encoding",
+	];
+
 	pub fn dkim_object(
 		&self,
 		domain_id: &str,
@@ -355,6 +375,7 @@ impl DomainPlan {
 			"selector": MailDomainBlock::DKIM_SELECTOR,
 			"domainId": domain_id,
 			"stage": "active",
+			"headers": set_map(Self::SIGNED_HEADERS),
 		});
 		if let Some(private_key) = private_key {
 			object["privateKey"] =
@@ -845,6 +866,27 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("Text");
+	}
+
+	/// The signed header set names no header the SES relay rewrites.
+	///
+	/// REGRESSION: the object declared no `headers`, so the server signed its
+	/// default set, which includes `Message-ID` and `Date` — the two headers
+	/// SES replaces on every message it sends. Every real message therefore
+	/// left the box with a sovereign signature its own relay had already
+	/// broken (`dkim=fail header.s=stalwart` at Gmail, beside two SES
+	/// passes), while the probe's inbound leg — signed by SES, not by us —
+	/// stayed green through it.
+	#[beet_core::test]
+	fn the_signature_survives_the_relay() {
+		let object = DomainPlan::new(&staging(), &mail_box(), true)
+			.unwrap()
+			.dkim_object("d1", None);
+		let headers = object["headers"].as_object().unwrap();
+		headers.contains_key("Message-ID").xpect_false();
+		headers.contains_key("Date").xpect_false();
+		headers["From"].as_bool().unwrap().xpect_true();
+		headers["Subject"].as_bool().unwrap().xpect_true();
 	}
 
 	/// The key is absent from the form convergence MATCHES on, exactly as an
