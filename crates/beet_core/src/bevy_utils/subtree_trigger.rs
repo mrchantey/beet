@@ -6,8 +6,8 @@
 //! That is the shape a settle signal needs ([`Ready`](crate::prelude::Ready)):
 //! a node observes its own event only after everything it owns has observed
 //! theirs. [`ScopedTrigger`] is its opt-in sibling: it sweeps only where the
-//! target declares [`StartDescendants`], firing on the target alone otherwise.
-//! All are fired the same way, through `trigger_target`.
+//! target declares [`SweepDescendants`] for that event, firing on the target
+//! alone otherwise. All are fired the same way, through `trigger_target`.
 
 use crate::prelude::*;
 use bevy::ecs::event::SetEntityEventTarget;
@@ -116,21 +116,36 @@ where
 	}
 }
 
-/// Opts an entity into sweeping its subtree when a [`ScopedTrigger`] event
-/// targets it: with it the event fires on every descendant too (deepest first,
-/// the entity last), without it the event fires on the entity alone.
+/// Opts an entity into sweeping its subtree when a [`ScopedTrigger`] fires `E`
+/// at it: with it the event fires on every descendant too (deepest first, the
+/// entity last), without it the event fires on the entity alone.
 ///
-/// Read by the *trigger* rather than an observer, so delivery scope is plain
-/// entity data: no re-fire, and a nested declaring entity sweeps only on its
-/// own starts. Wired by `#[require]` where a type's starts should always fan
-/// out (a `RunningSet`), so hot single-target starts (`ContinueRun`) never pay
-/// for a sweep they don't want.
-#[derive(Debug, Default, Clone, Component, Reflect)]
+/// A marker, typed per event, so declaring a sweep for one event never opts the
+/// entity into another's. Read by the *trigger* rather than an observer, so
+/// delivery scope is plain entity data: no re-fire, and a nested declaring
+/// entity sweeps only on its own fires.
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct StartDescendants;
+pub struct SweepDescendants<E: 'static + Send + Sync>(
+	#[reflect(ignore)] PhantomData<E>,
+);
+
+impl<E: 'static + Send + Sync> Default for SweepDescendants<E> {
+	fn default() -> Self { Self(PhantomData) }
+}
+
+impl<E: 'static + Send + Sync> Clone for SweepDescendants<E> {
+	fn clone(&self) -> Self { Self(PhantomData) }
+}
+
+impl<E: 'static + Send + Sync> fmt::Debug for SweepDescendants<E> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("SweepDescendants").finish()
+	}
+}
 
 /// An [`EntityEvent`] [`Trigger`] whose delivery scope is declared on the
-/// target: a target with [`StartDescendants`] receives a [`SubtreeTrigger`]
+/// target: a target with [`SweepDescendants<E>`] receives a [`SubtreeTrigger`]
 /// style sweep, any other target receives the event alone.
 ///
 /// Fired like any other entity target event:
@@ -185,10 +200,11 @@ where
 		self.root = event.event_target();
 		// the target's own declaration decides the scope, snapshotted before the
 		// first observer can restructure the tree.
-		let targets = match world.get::<StartDescendants>(self.root).is_some() {
-			true => snapshot(&world, self.root),
-			false => vec![self.root],
-		};
+		let targets =
+			match world.get::<SweepDescendants<E>>(self.root).is_some() {
+				true => snapshot(&world, self.root),
+				false => vec![self.root],
+			};
 		for target in targets {
 			// an earlier observer may have despawned this entity.
 			if world.get_entity(target).is_err() {
@@ -344,7 +360,9 @@ mod test {
 	fn a_declaring_target_sweeps() {
 		let mut world = World::new();
 		let [root, a, b, c, d] = tree(&mut world);
-		world.entity_mut(root).insert(StartDescendants);
+		world
+			.entity_mut(root)
+			.insert(SweepDescendants::<Scoped>::default());
 		let fired = record(&mut world);
 
 		world
@@ -367,14 +385,36 @@ mod test {
 		fired.get().xpect_eq(vec![root]);
 	}
 
+	/// The marker is typed per event: declaring a sweep for one event never
+	/// opts the entity into another's.
+	#[beet_core::test]
+	fn a_declaration_for_another_event_fires_alone() {
+		let mut world = World::new();
+		let [root, ..] = tree(&mut world);
+		world
+			.entity_mut(root)
+			.insert(SweepDescendants::<Swept>::default());
+		let fired = record(&mut world);
+
+		world
+			.entity_mut(root)
+			.trigger_target(|entity| Scoped { entity });
+
+		fired.get().xpect_eq(vec![root]);
+	}
+
 	/// A nested declaring entity sweeps only on its own starts: an outer sweep
 	/// delivers to it once, never re-fanning through it.
 	#[beet_core::test]
 	fn a_nested_declaration_never_double_delivers() {
 		let mut world = World::new();
 		let [root, a, b, c, d] = tree(&mut world);
-		world.entity_mut(root).insert(StartDescendants);
-		world.entity_mut(a).insert(StartDescendants);
+		world
+			.entity_mut(root)
+			.insert(SweepDescendants::<Scoped>::default());
+		world
+			.entity_mut(a)
+			.insert(SweepDescendants::<Scoped>::default());
 		let fired = record(&mut world);
 
 		world

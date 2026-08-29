@@ -21,13 +21,8 @@ use core::marker::PhantomData;
 /// A server is the reference facet, so `<Route path="serve" {(HttpServer,
 /// TuiServer)}>` is one entity holding one action and two facets. A facet joins
 /// through [`RunningSet::add`]; this is never inserted directly.
-///
-/// Requires [`StartDescendants`], so the [`StartRunning`] a start fires sweeps
-/// the set's subtree: a start verb below it (`CallOnStart`) observes its own
-/// entity, and co-resident entries never hear each other's starts.
 #[derive(Component)]
 #[require(RunTimer)]
-#[require(StartDescendants)]
 #[require(Action<In, Out> = RunningSet::<In, Out>::action())]
 #[component(
 	on_add = Action::<In, Out>::assert_provider::<Self>,

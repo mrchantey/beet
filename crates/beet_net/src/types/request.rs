@@ -42,7 +42,9 @@ use bytes::Bytes;
 /// assert_eq!(request.method(), &HttpMethod::Get);
 /// assert_eq!(request.path(), &["api", "users"]);
 /// ```
-#[derive(Debug, Default, Component, Get)]
+// `TypePath` (path strings only, no field reflection) lets reflected types
+// name `Request` in a generic param, ie `SweepDescendants<StartRunning<Request>>`.
+#[derive(Debug, Default, Component, Get, TypePath)]
 #[component(on_add = on_add)]
 pub struct Request {
 	/// The request metadata, including method, path, headers, etc.

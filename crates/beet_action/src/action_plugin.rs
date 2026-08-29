@@ -54,8 +54,6 @@ impl Plugin for ActionPlugin {
 			.register_type::<RunTimer>()
 			.register_type::<RunNext>()
 			.register_type::<NoInterrupt>()
-			// the `StartRunning` sweep scope, required by every `RunningSet`
-			.register_type::<StartDescendants>()
 			// long-running action lifecycle
 			.add_systems(Update, tick_run_timers)
 			.add_plugins(running_plugin::<(), Outcome>);

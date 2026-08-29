@@ -4,19 +4,20 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Start verb: when the run at or above this entity starts, call this entity's
+/// Start verb: when a swept run start reaches this entity, call this entity's
 /// action with the start request, detached.
 ///
 /// The [`CallOnReady`] counterpart for the other lifecycle edge, and the same
-/// shape: `Ready` sweeps a loaded subtree, and a [`RunningSet`]'s
-/// [`StartRunning<Request>`] sweeps the started one (its required
-/// [`StartDescendants`] scopes the [`ScopedTrigger`]), so each verb sits on the
-/// action it drives and observes its own entity. The sweep never leaves its
-/// root's subtree, which is what keeps co-resident entries from starting each
-/// other's work.
+/// shape: `Ready` sweeps a loaded subtree, and a run root declaring
+/// [`SweepDescendants`] sweeps its [`StartRunning<Request>`] over the started
+/// one, so each verb sits on the action it drives and observes its own entity.
+/// The sweep never leaves its root's subtree, which is what keeps co-resident
+/// entries from starting each other's work. The declaration is deliberate: a
+/// root without it fires its start on itself alone, and this verb never hears
+/// it.
 ///
 /// ```bsx
-/// <CallOnReady {(TuiServer, HttpServer)}>       // the run
+/// <CallOnReady {(TuiServer, HttpServer, SweepDescendants)}>  // the run
 ///     <Router>
 ///         <Route path="/">..</Route>            // what it serves
 ///         <Repeat {CallOnStart}>..</Repeat>     // what it drives alongside

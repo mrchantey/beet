@@ -1,5 +1,6 @@
 //! Plugin and utilities for running Bevy-based HTTP servers.
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 /// Plugin for running Bevy HTTP servers.
@@ -21,8 +22,11 @@ impl Plugin for ServerPlugin {
 			.register_type::<CallOnReady>()
 			.register_type::<DisableCallOnReady>()
 			// the markup start verb: it observes its own entity's
-			// `StartRunning<Request>`, delivered by the `RunningSet` start sweep.
-			.register_type::<CallOnStart>();
+			// `StartRunning<Request>`, delivered when a run root declares the
+			// start sweep. That declaration is registered here, instantiated for
+			// the start verb's event, so a root authors `{SweepDescendants}`.
+			.register_type::<CallOnStart>()
+			.register_type::<SweepDescendants<StartRunning<Request>>>();
 
 		// the repl reads a real stdin on a background thread, so it exists only
 		// where there is one.

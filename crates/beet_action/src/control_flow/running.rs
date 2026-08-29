@@ -87,11 +87,14 @@ pub enum ControlFlowError {
 /// Cheaply cloned via the inner [`Arc`] (no `In: Clone` bound); all clones share
 /// one slot, so a [`take`](Self::take) by any is seen by all.
 ///
-/// Delivery is a [`ScopedTrigger`]: a caller declaring [`StartDescendants`]
-/// (every [`RunningSet`], by `#[require]`) sweeps the event over its subtree,
-/// deepest first and itself last, so a start verb (`CallOnStart`) observes its
-/// own entity exactly as `CallOnReady` observes its own `Ready`. A bare caller
-/// (a `ContinueRun` behavior) fires on itself alone.
+/// Delivery is a [`ScopedTrigger`]: a caller declaring
+/// [`SweepDescendants<StartRunning<In>>`](SweepDescendants) sweeps the event
+/// over its subtree, deepest first and itself last, so a descendant start verb
+/// (`CallOnStart`) observes its own entity exactly as `CallOnReady` observes
+/// its own `Ready`. A bare caller fires on itself alone.
+// `TypePath` so that declaration is itself reflectable, ie registering
+// `SweepDescendants<StartRunning<Request>>` for markup.
+#[derive(TypePath)]
 pub struct StartRunning<In: 'static + Send + Sync> {
 	/// The entity this instance is firing on: the caller, or under a sweep the
 	/// swept entity.

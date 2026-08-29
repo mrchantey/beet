@@ -6,10 +6,11 @@ use beet_net::prelude::*;
 /// Markup verb that makes an entity run a thread, and runs it when the entry
 /// starts.
 ///
-/// Spread it onto a thread's outer root, anywhere under the servers:
+/// Spread it onto a thread's outer root, anywhere under the servers. The entry
+/// root declares [`SweepDescendants`], so its start sweeps down to the verb:
 ///
 /// ```rsx
-/// <TuiServer {CallOnReady}>
+/// <TuiServer {(CallOnReady, SweepDescendants)}>
 ///     <Router>
 ///         <Repeat {RunThread}>
 ///             <Thread {Sequence}> ..actors.. </Thread>
@@ -180,13 +181,17 @@ mod test {
 		app
 	}
 
+	/// The start sweep declaration a real entry root authors, typed for the
+	/// start verb's event.
+	fn sweep() -> SweepDescendants<StartRunning<Request>> { default() }
+
 	/// Run a persistent thread to completion through the start notification: a
-	/// root whose child is the thread, swept as a real start does
-	/// ([`StartDescendants`] standing in for the `RunningSet` that requires it).
+	/// root whose child is the thread, declaring the sweep as a real entry root
+	/// does.
 	fn run_once(path: &str, system: ActorId, agent: ActorId) {
 		let mut app = app();
 		app.world_mut()
-			.spawn((StartDescendants, children![scene(path, system, agent)]))
+			.spawn((sweep(), children![scene(path, system, agent)]))
 			.trigger(|entity| StartRunning::new(entity, Request::default()));
 		pump(&mut app, 120);
 	}
@@ -283,11 +288,11 @@ mod test {
 		};
 		let booted = app
 			.world_mut()
-			.spawn((StartDescendants, children![ephemeral()]))
+			.spawn((sweep(), children![ephemeral()]))
 			.flush();
 		let idle = app
 			.world_mut()
-			.spawn((StartDescendants, children![ephemeral()]))
+			.spawn((sweep(), children![ephemeral()]))
 			.flush();
 		app.world_mut()
 			.entity_mut(booted)

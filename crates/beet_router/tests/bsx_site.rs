@@ -265,7 +265,7 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 		.len()
 		.xpect_eq(1);
 	// count every start, so a second boot of the serve route is visible. The
-	// event sweeps a starting set's subtree, so count only sweep origins.
+	// event sweeps a `SweepDescendants` root's subtree, so count only origins.
 	let starts = Store::new(0usize);
 	let counter = starts;
 	world.add_observer(move |ev: On<StartRunning<Request>>| {
