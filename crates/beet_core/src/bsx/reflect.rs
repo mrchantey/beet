@@ -364,6 +364,28 @@ fn scalar_to_reflect(
 		)));
 	}
 
+	// a string targeting an enum field that names no unit variant errors rather
+	// than falling through to `String` (whose `from_reflect` miss would keep
+	// the field's DEFAULT, so a mistyped variant name would read as a working
+	// declaration — eg a `records="identity-only"` leaving `MailRecords::All`
+	// in place, which on a cutover-staged mail domain is the difference
+	// between proving an identity and taking the domain's mail). `Option` and
+	// `Cow` targets never reach here: both are unwrapped by earlier branches.
+	if let (Value::Str(string), Some(TypeInfo::Enum(enum_info))) =
+		(value, field_info)
+	{
+		bevybail!(
+			"`{string}` names no unit variant of `{}`; expected one of: {}",
+			enum_info.type_path(),
+			enum_info
+				.iter()
+				.filter(|variant| matches!(variant, VariantInfo::Unit(_)))
+				.map(|variant| variant.name())
+				.collect::<Vec<_>>()
+				.join(", ")
+		);
+	}
+
 	// otherwise the value's natural reflect type.
 	let reflected: Box<dyn PartialReflect> = match value {
 		Value::Bool(b) => Box::new(*b),
@@ -1082,6 +1104,35 @@ mod test {
 		)
 		.is_err()
 		.xpect_true();
+	}
+
+	/// A string names a unit variant of an enum field (`records="IdentityOnly"`),
+	/// and a string naming NO variant is an error rather than a fallthrough.
+	///
+	/// REGRESSION for the second half: the miss fell through to a `String`
+	/// patch, `from_reflect` kept the field's default, and a mistyped variant
+	/// read as a working declaration — for a `MailRecords` field that is
+	/// `All`, ie a cutover-staged mail domain publishing the very records the
+	/// stage exists to withhold.
+	#[beet_core::test]
+	fn a_mistyped_variant_name_errors() {
+		#[derive(Debug, Default, PartialEq, Reflect)]
+		enum Records {
+			#[default]
+			All,
+			IdentityOnly,
+		}
+		resolve::<Records>(DataLiteral::Scalar(Value::str("IdentityOnly")))
+			.xpect_eq(Records::IdentityOnly);
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		DataLiteral::to_reflect(
+			&DataLiteral::Scalar(Value::str("identity-only")),
+			Some(Records::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.xpect_err();
 	}
 
 	/// A string coerces to a `Cow<'static, str>` field, so a tuple literal carrying

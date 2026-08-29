@@ -116,6 +116,13 @@ impl StalwartPlan {
 	/// to; `ses` is the SMTP credential the relay route authenticates with,
 	/// read from parameter store by the caller rather than by the plan, so a
 	/// rendered plan can be asserted without a secret in it.
+	///
+	/// Only the domains whose records this stack serves are planned. An
+	/// [`IdentityOnly`](MailRecords::IdentityOnly) domain is a cutover
+	/// prepared ahead of its window: its identity must verify while the
+	/// incumbent provider keeps the mail, and a local domain on the server
+	/// would hijack every submission addressed to it away from the MX the
+	/// world still resolves.
 	pub fn new(
 		mail_box: &StalwartBlock,
 		domains: &[MailDomainBlock],
@@ -126,6 +133,7 @@ impl StalwartPlan {
 		let hostname = mail_box.hostname().clone();
 		let domains = domains
 			.iter()
+			.filter(|domain| domain.records().serves_mail())
 			.enumerate()
 			.map(|(index, domain)| {
 				DomainPlan::new(domain, mail_box, index == 0)
@@ -608,6 +616,44 @@ mod tests {
 			.certificate_names
 			.contains(&"mail.beetmash.com".to_string())
 			.xpect_false();
+	}
+
+	/// An `IdentityOnly` domain is a cutover prepared ahead of its window: the
+	/// SES identity verifies and its selectors publish while the incumbent
+	/// provider keeps serving the mail, so the server must not hold it.
+	///
+	/// REGRESSION for the two ways holding it goes wrong. A local domain
+	/// hijacks every submission addressed to it, so a soak-period user writing
+	/// to the apex would land in an empty local mailbox instead of at the
+	/// incumbent the MX still names. And its autoconfig host resolves nowhere
+	/// until the delivery records publish, which is the same "no valid A
+	/// records" failure the bare-domain SAN produced, killing the ACME order
+	/// for every domain beside it.
+	#[beet_core::test]
+	fn a_cutover_staged_domain_is_not_provisioned() {
+		let apex = MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
+			.with_records(MailRecords::IdentityOnly);
+		let plan = StalwartPlan::new(
+			&mail_box(),
+			&[staging(), news(), apex],
+			&stack(),
+			"postmaster@stalwart.beetmash.com",
+			&SesCredential {
+				username: "AKIATEST".into(),
+				password: "smtp-derived-password".into(),
+			},
+		)
+		.unwrap();
+		plan.domains
+			.iter()
+			.any(|domain| domain.name == "beetmash.com")
+			.xpect_false();
+		// and the box hostname still rides the first SERVED domain's
+		// certificate, so the filter cannot orphan it.
+		plan.domains[0]
+			.certificate_names
+			.contains(&"mail.beetmash.com".to_string())
+			.xpect_true();
 	}
 
 	/// An alias is a property of the domain, and lands on the account it

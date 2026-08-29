@@ -135,8 +135,8 @@ pub async fn StalwartProvisionAction(
 	// the ACME contact and the reports address are the same human, ie whoever
 	// answers `postmaster@` on the first domain served.
 	let admin_contact = mail
-		.domains
-		.first()
+		.serving()
+		.next()
 		.map(|domain| format!("postmaster@{}", domain.domain()))
 		.ok_or_else(|| {
 			bevyhow!("no mail domain to register an acme account with")
@@ -411,8 +411,8 @@ impl Management {
 /// The parameter the server's own administrator credential is parked at, ie
 /// the one the `Bootstrap` claim minted and every later run authenticates with.
 fn admin_secret_name(mail: &MailStack) -> Result<String> {
-	mail.domains
-		.first()
+	mail.serving()
+		.next()
 		.map(|domain| {
 			AccountPlan::secret_ref(
 				mail.mail_box.label(),
@@ -568,8 +568,8 @@ async fn bootstrap(
 		"secret": read_secret(region, &mail.mail_box.database().secret_name(stack)).await?,
 	});
 	let domain = mail
-		.domains
-		.first()
+		.serving()
+		.next()
 		.ok_or_else(|| bevyhow!("no mail domain to bootstrap with"))?;
 
 	info!("claiming the data store (creates tables, may take a minute)...");

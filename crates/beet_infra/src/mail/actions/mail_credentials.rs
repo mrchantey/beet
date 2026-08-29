@@ -51,7 +51,7 @@ pub async fn MailCredentialsAction(
 	// declaration names: the `Bootstrap` claim created it on the FIRST domain
 	// served and parked its credential beside the mailbox ones.
 	let mut entries = Vec::new();
-	if let Some(domain) = mail.domains.first() {
+	if let Some(domain) = mail.serving().next() {
 		entries.push((
 			format!("{}@{}", StalwartBlock::ADMIN_USER, domain.domain()),
 			AccountPlan::secret_ref(
@@ -62,7 +62,9 @@ pub async fn MailCredentialsAction(
 			format!("administers {}", mail.mail_box.hostname()),
 		));
 	}
-	for domain in &mail.domains {
+	// only the served domains: provision mints a credential per mailbox it
+	// creates, and it creates none on a domain the server does not hold.
+	for domain in mail.serving() {
 		for mailbox in domain.mailboxes() {
 			entries.push((
 				format!("{}@{}", mailbox.localpart(), domain.domain()),
@@ -84,7 +86,13 @@ pub async fn MailCredentialsAction(
 			mail.mail_box.database().secret(),
 			"postgres master password".to_string(),
 		));
-		for domain in &mail.domains {
+		// keys exist exactly where `EnsureDkimKey` mints them, ie wherever the
+		// records prove the identity, which includes a cutover-staged domain.
+		for domain in mail
+			.domains
+			.iter()
+			.filter(|domain| domain.records().proves_identity())
+		{
 			entries.push((
 				format!("{} dkim key", domain.domain()),
 				domain.dkim_secret(),

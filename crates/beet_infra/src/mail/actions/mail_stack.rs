@@ -61,6 +61,22 @@ impl MailStack {
 			.await
 	}
 
+	/// The domains this box actually serves, ie the ones whose records hand
+	/// their mail here, in declaration order.
+	///
+	/// An [`IdentityOnly`](MailRecords::IdentityOnly) domain is deliberately
+	/// absent: it is a cutover prepared ahead of its window, so its identity
+	/// signs and its selectors verify while the server must not hold it as a
+	/// local domain. A local domain hijacks every submission addressed to it
+	/// away from the MX the world still resolves, and its autoconfig host
+	/// resolves nowhere, which is enough to kill an ACME order for every name
+	/// beside it.
+	pub fn serving(&self) -> impl Iterator<Item = &MailDomainBlock> {
+		self.domains
+			.iter()
+			.filter(|domain| domain.records().serves_mail())
+	}
+
 	/// The domain declaring a mailbox at `localpart`, which is how a step names
 	/// a mailbox without restating which domain holds it. Exactly one, since
 	/// two would make `probe@` ambiguous.
