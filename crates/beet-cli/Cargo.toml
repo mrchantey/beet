@@ -51,7 +51,7 @@ thread = ["beet/thread", "beet/ui"]
 # `beet/mail` carries the network, the database and the mail stack with it, so a
 # deployer entry declaring `<VpcBlock/>`/`<RdsPostgresBlock/>`/`<MailDomainBlock/>`
 # resolves those tags from the same build rather than needing a feature of its own.
-infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/mail"]
+infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/mail"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
 # `beet/examples` (winit + bevy_default + spatial + `extra`), so `BeetPlugins` adds

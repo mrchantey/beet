@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
+use lambda_http::request::RequestContext;
 use lambda_http::tower::service_fn;
 
 impl HttpServer {
@@ -43,12 +44,26 @@ impl HttpServer {
 		})
 	}
 }
-/// Handler function that processes each lambda request
+
+/// Handler function that processes each invocation.
+///
+/// Two event shapes arrive here and they fail differently. An http event (api
+/// gateway, function url, load balancer) has a client waiting, so a failed
+/// dispatch is answered with a 500 and the invocation still succeeded. A
+/// [`ScheduledInvoke`] has no client at all: its dispatch IS the invocation, so
+/// a failure must fail the invocation, or a job that has been broken for weeks
+/// reports green in every metric the schedule publishes.
 async fn handle_request(
 	entity: AsyncEntity,
 	lambda_req: lambda_http::Request,
-) -> Result<lambda_http::Response<lambda_http::Body>, std::convert::Infallible>
-{
+) -> Result<lambda_http::Response<lambda_http::Body>, lambda_http::Error> {
+	if is_scheduled(&lambda_req) {
+		return handle_scheduled(entity, lambda_req).await.map_err(|err| {
+			error!("Scheduled invoke failed: {err}");
+			lambda_http::Error::from(err.to_string())
+		});
+	}
+
 	let result: Result<lambda_http::Response<lambda_http::Body>> = async {
 		let req = lambda_to_request(lambda_req)?;
 		let res = entity.exchange_child(req).await;
@@ -71,21 +86,74 @@ async fn handle_request(
 	}
 }
 
+/// Whether this event is not http-shaped, ie a scheduled invoke.
+///
+/// A schedule delivers its own json payload verbatim, which no http event shape
+/// parses, so `lambda_http` hands it over as a synthetic `POST` marked
+/// [`RequestContext::PassThrough`]. That marker is the seam: everything the
+/// runtime recognized as http keeps its own context.
+fn is_scheduled(lambda_req: &lambda_http::Request) -> bool {
+	matches!(
+		lambda_req.extensions().get::<RequestContext>(),
+		Some(RequestContext::PassThrough)
+	)
+}
+
+/// Dispatch a [`ScheduledInvoke`]'s request and resolve the invocation with it,
+/// through the same status ladder a one-shot command exits by.
+///
+/// The response body is echoed back as the invocation's result so a run's own
+/// report lands in the logs, but nothing consumes it: the outcome is the status.
+async fn handle_scheduled(
+	entity: AsyncEntity,
+	lambda_req: lambda_http::Request,
+) -> Result<lambda_http::Response<lambda_http::Body>> {
+	let payload = lambda_body_bytes(lambda_req.into_body());
+	let invoke = ScheduledInvoke::from_payload(&payload)?;
+	let path = invoke.path().clone();
+	info!("⏱ scheduled invoke: {} {path}", invoke.method());
+
+	let (parts, body) = entity
+		.exchange_child(invoke.into_request())
+		.await
+		.into_parts();
+	let body = body.into_bytes().await?;
+	let text = String::from_utf8_lossy(&body);
+	if parts.status_to_exit_code().is_err() {
+		bevybail!(
+			"the scheduled invoke of `{path}` failed with {}: {text}",
+			parts.status()
+		);
+	}
+	lambda_http::Response::builder()
+		.status(parts.status().as_u16())
+		// a pass-through response is parsed as json, so a non-json body would
+		// serialize as `null` rather than the run's report
+		.body(lambda_http::Body::Text(
+			serde_json::json!({ "path": path, "result": text }).to_string(),
+		))?
+		.xok()
+}
+
 /// Convert lambda HTTP request to beet Request
 fn lambda_to_request(lambda_req: lambda_http::Request) -> Result<Request> {
 	let (parts, lambda_body) = lambda_req.into_parts();
+	Request::from_parts(
+		parts.into(),
+		Body::Bytes(lambda_body_bytes(lambda_body)),
+	)
+	.xok()
+}
 
-	// Convert lambda body to beet Body
-	let body = match lambda_body {
-		lambda_http::Body::Empty => Body::default(),
-		lambda_http::Body::Text(text) => Body::Bytes(Bytes::from(text)),
-		lambda_http::Body::Binary(binary) => Body::Bytes(Bytes::from(binary)),
-		// Request streaming not supported in lambda; `Body` is non_exhaustive,
-		// so an unknown future variant reads as an empty body rather than a panic.
-		_ => Body::default(),
-	};
-
-	Ok(Request::from_parts(parts.into(), body))
+/// The bytes a lambda body carries. Request streaming is not supported in
+/// lambda; `Body` is non_exhaustive, so an unknown future variant reads as an
+/// empty body rather than a panic.
+fn lambda_body_bytes(body: lambda_http::Body) -> Bytes {
+	match body {
+		lambda_http::Body::Text(text) => Bytes::from(text),
+		lambda_http::Body::Binary(binary) => Bytes::from(binary),
+		_ => Bytes::new(),
+	}
 }
 
 /// Convert beet Response to lambda HTTP response
@@ -107,4 +175,39 @@ async fn response_to_lambda(
 	};
 	let http_parts = parts.try_into()?;
 	lambda_http::Response::from_parts(http_parts, lambda_body).xok()
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// The event a schedule delivers, as the runtime hands it over: not http
+	/// shaped, so the payload is the whole body.
+	fn scheduled_event(payload: &str) -> lambda_http::Request {
+		serde_json::from_str::<lambda_http::request::LambdaRequest>(payload)
+			.unwrap()
+			.into()
+	}
+
+	/// The seam the adapter branches on: a schedule's own payload matches no
+	/// http shape and arrives marked pass-through, while a gateway event does
+	/// not.
+	#[beet_core::test]
+	fn tells_a_scheduled_invoke_from_an_http_event() {
+		let payload =
+			serde_json::to_string(&ScheduledInvoke::new("analytics/rollup"))
+				.unwrap();
+		let event = scheduled_event(&payload);
+		is_scheduled(&event).xpect_true();
+		ScheduledInvoke::from_payload(&lambda_body_bytes(event.into_body()))
+			.unwrap()
+			.into_request()
+			.path()
+			.xpect_eq(&["analytics", "rollup"]);
+
+		is_scheduled(&scheduled_event(
+			r#"{"httpMethod":"GET","path":"/","requestContext":{"elb":{"targetGroupArn":"arn"}}}"#,
+		))
+		.xpect_false();
+	}
 }

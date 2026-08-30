@@ -51,6 +51,10 @@ pub use aws_ses::*;
 mod aws_ssm;
 #[cfg(feature = "bindings_aws_ssm")]
 pub use aws_ssm::*;
+#[cfg(feature = "bindings_aws_scheduler")]
+mod aws_scheduler;
+#[cfg(feature = "bindings_aws_scheduler")]
+pub use aws_scheduler::*;
 #[cfg(feature = "bindings_cloudflare_common")]
 mod cloudflare_common;
 #[cfg(feature = "bindings_cloudflare_common")]

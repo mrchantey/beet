@@ -55,6 +55,15 @@ pub use http_server::*;
 mod server_params;
 pub use server_params::*;
 
+// The request a schedule delivers to a serverless invoke: the one shape a
+// deploy declaration renders and an adapter dispatches. Action-free and
+// transport-free (a plain `Request` factory), so the block that renders it
+// needs no server backend compiled.
+#[cfg(feature = "serde")]
+mod scheduled_invoke;
+#[cfg(feature = "serde")]
+pub use scheduled_invoke::*;
+
 // In-memory channel-backed HTTP server: shares `HttpServer`'s boot/park/dispatch
 // machinery over an `async_channel` instead of a socket. `std` for `async-channel`,
 // but deliberately not wasm-gated (the wasm-runnable server path).

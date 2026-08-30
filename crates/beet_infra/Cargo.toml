@@ -24,6 +24,10 @@ deploy = ["beet_router", "dep:base64"]
 # it for dispatch.
 beet_router = ["dep:beet_router"]
 lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_acm","bindings_aws_dns"]
+# The recurring timer (`ScheduledJobBlock`) and the lambda it invokes: the
+# schedule names its target through a relation to a `LambdaBlock` entity, so the
+# block that renders the target arn must be compiled beside it.
+scheduled_job_block = ["bindings_aws_scheduler","bindings_aws_common","lambda_block"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail","bindings_aws_dns"]
 fargate_block = ["bindings_aws_common","bindings_aws_dynamo","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns","vpc_block"]
 # The network every AWS compute block sits in: vpc, public + private subnets,
@@ -77,6 +81,8 @@ bindings_aws_ses = []
 # SSM Parameter Store, for secrets (`EnsureSecret`) and non-secret config the
 # mail box fetches at boot.
 bindings_aws_ssm = []
+# EventBridge Scheduler: the recurring timer a `ScheduledJobBlock` declares.
+bindings_aws_scheduler = []
 bindings_aws_all = [
 	"bindings_aws_common",
 	"bindings_aws_dynamo",
@@ -89,6 +95,7 @@ bindings_aws_all = [
 	"bindings_aws_rds",
 	"bindings_aws_ses",
 	"bindings_aws_ssm",
+	"bindings_aws_scheduler",
 	"bindings_aws_vpc",
 ]
 bindings_cloudflare_common = []
@@ -133,6 +140,7 @@ beet_infra = { path = ".", features = [
 	"bindings_generator",
 	"bindings_aws_dns",
 	"lambda_block",
+	"scheduled_job_block",
 	"lightsail_block",
 	"fargate_block",
 	"cloudflare_dns",

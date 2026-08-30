@@ -94,7 +94,9 @@ hyper = [
 "dep:async-executor",
 "dep:pin-project"
 ]
-lambda = ["std", "rustls-tls", "dep:lambda_http", "beet_core/tokio"]
+# `json` deserializes the `ScheduledInvoke` payload a schedule delivers, which
+# arrives as an opaque event `lambda_http` hands over through `pass_through`.
+lambda = ["std", "json", "rustls-tls", "dep:lambda_http", "beet_core/tokio"]
 fs = ["std", "beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
 aws_sdk = [
@@ -262,7 +264,9 @@ pin-project = { workspace = true, optional = true }
 
 
 #💡 lambda
-lambda_http = { version = "1.3", optional = true }
+# `pass_through`: a scheduled invoke is not an http event, so without it the
+# runtime rejects the payload before the adapter ever sees it.
+lambda_http = { version = "1.3", optional = true, features = ["pass_through"] }
 
 #💡 aws
 serde_dynamo = { version = "4",optional = true, features = ["aws-sdk-dynamodb+1"]}

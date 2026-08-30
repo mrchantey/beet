@@ -59,6 +59,12 @@ pub use rds_postgres_block::*;
 mod dynamo_table_block;
 #[cfg(feature = "bindings_aws_dynamo")]
 pub use dynamo_table_block::*;
+// The recurring timer: an EventBridge schedule invoking a `LambdaBlock`, so its
+// feature pulls the block whose function ident it composes.
+#[cfg(feature = "scheduled_job_block")]
+mod scheduled_job_block;
+#[cfg(feature = "scheduled_job_block")]
+pub use scheduled_job_block::*;
 // Cloudflare blocks are plain config components (wrangler-provisioned, not
 // terraform), so they need no bindings feature.
 #[cfg(feature = "cloudflare_block")]

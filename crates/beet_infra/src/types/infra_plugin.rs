@@ -56,6 +56,18 @@ impl Plugin for InfraPlugin {
 		))]
 		app.add_observer(crate::blocks::attach_table_store);
 
+		// the serverless function and the handle another block names it by, so a
+		// stack authors `<LambdaBlock label="rollup"/>` from markup rather than
+		// only from Rust.
+		#[cfg(feature = "lambda_block")]
+		app.register_type::<crate::prelude::LambdaBlock>()
+			.register_type::<crate::prelude::LambdaRef>();
+
+		// the recurring timer, ie `<ScheduledJobBlock target="rollup"
+		// schedule="cron(0 3 * * ? *)" path="analytics/rollup"/>`.
+		#[cfg(feature = "scheduled_job_block")]
+		app.register_type::<crate::prelude::ScheduledJobBlock>();
+
 		// the network and the database, spawned by tag (`<VpcBlock label="net"/>`,
 		// `<RdsPostgresBlock label="db" vpc="net"/>`) in any build carrying them.
 		#[cfg(feature = "vpc_block")]
@@ -218,6 +230,8 @@ impl Plugin for InfraPlugin {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	#[cfg(feature = "scheduled_job_block")]
+	use beet_net::prelude::*;
 
 	/// The world an entry's markup builds into: the plugin under test plus the
 	/// document machinery a `.bsx` load runs through.
@@ -315,6 +329,40 @@ mod test {
 			.key()
 			.as_str()
 			.xpect_eq("db_password");
+	}
+
+	/// The recurring timer and the lambda it drives author as tags, with the
+	/// cross-block reference coercing from the label string it is.
+	///
+	/// A block whose type does not register resolves to nothing at all, so an
+	/// entry declaring a schedule would build a stack with no timer in it and
+	/// deploy successfully. `LambdaBlock` was Rust-only until the schedule
+	/// needed something to point at.
+	#[cfg(feature = "scheduled_job_block")]
+	#[beet_core::test]
+	fn the_schedule_and_its_lambda_spawn_by_tag() {
+		let mut world = spawn(
+			r#"<Fragment>
+				<LambdaBlock label="rollup"/>
+				<ScheduledJobBlock label="rollup-daily" target="rollup"
+					schedule="cron(0 3 * * ? *)" path="analytics/rollup"/>
+			</Fragment>"#,
+		);
+		world
+			.query::<&LambdaBlock>()
+			.single(&world)
+			.unwrap()
+			.label()
+			.as_str()
+			.xpect_eq("rollup");
+		let schedule =
+			world.query::<&ScheduledJobBlock>().single(&world).unwrap();
+		schedule.target().label().as_str().xpect_eq("rollup");
+		schedule.path().as_str().xpect_eq("analytics/rollup");
+		// the defaults a declaration does not name still hold
+		schedule.method().xpect_eq(HttpMethod::Post);
+		schedule.timezone().as_str().xpect_eq("UTC");
+		schedule.validate().unwrap();
 	}
 
 	/// The post-apply verbs author as tags too, each naming what it works on

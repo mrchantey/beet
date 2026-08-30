@@ -489,6 +489,10 @@ syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
 # `BeetExtraPlugin` adds it; the `?` keeps it inert when `beet_extra` is not a dep.
 infra = ["dep:beet_infra", "beet_extra?/infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
+# The recurring timer (`<ScheduledJobBlock/>`) and the lambda it invokes: the
+# schedule composes its target's function ident through a `LambdaRef`, so it
+# forwards `lambda_block` rather than standing alone.
+scheduled_job_block = ["lambda_block", "beet_infra?/scheduled_job_block"]
 lightsail_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
 fargate_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/fargate_block", "fs", "rand"]
 # The Cloudflare Containers + Workers deploy blocks/actions (wrangler-provisioned,

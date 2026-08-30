@@ -10,7 +10,10 @@ use serde_json::json;
 /// - Custom domains with a DNS-validated ACM certificate, when [`dns`] is set
 ///
 /// [`dns`]: Self::dns
-#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
+#[derive(
+	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
+)]
+#[reflect(Component, Default)]
 #[component(immutable, on_add = ErasedBlock::on_add::<LambdaBlock>)]
 pub struct LambdaBlock {
 	/// Label used as a prefix for all terraform resources,
@@ -50,6 +53,9 @@ impl LambdaBlock {
 		format!("{}--{}", self.label, suffix)
 	}
 
+	/// The handle another block in this stack names this function by.
+	pub fn lambda_ref(&self) -> LambdaRef { LambdaRef::new(self.label.clone()) }
+
 	/// Add a hostname the function answers (the first added is the ACM cert's
 	/// primary domain, the rest are subject alternative names). See
 	/// [`dns`](Self::dns).
@@ -57,6 +63,45 @@ impl LambdaBlock {
 		self.dns.push(dns);
 		self
 	}
+}
+
+/// Names a [`LambdaBlock`] declared elsewhere in the same stack, and composes
+/// the terraform references to its function.
+///
+/// Both sides of the reference go through this type, so the ident the block
+/// emits its function under and the ident a [`ScheduledJobBlock`] invokes are
+/// one composition rather than two that agree until one is renamed.
+#[derive(
+	Debug, Default, Clone, Get, Serialize, Deserialize, PartialEq, Eq, Reflect,
+)]
+pub struct LambdaRef {
+	label: SmolStr,
+}
+
+impl LambdaRef {
+	/// The label suffix a lambda's function resource takes.
+	pub const FUNCTION: &'static str = "function";
+
+	pub fn new(label: impl Into<SmolStr>) -> Self {
+		Self {
+			label: label.into(),
+		}
+	}
+
+	/// The terraform ident of this lambda's function.
+	pub fn ident(&self, stack: &ResolvedStack) -> terra::Ident {
+		stack.resource_ident(format!("{}--{}", self.label, Self::FUNCTION))
+	}
+
+	/// An interpolated reference to the function's arn, ie what an invoker
+	/// targets and scopes its permission to.
+	pub fn arn(&self, stack: &ResolvedStack) -> String {
+		format!("${{aws_lambda_function.{}.arn}}", self.ident(stack).label())
+	}
+}
+
+impl From<&str> for LambdaRef {
+	fn from(label: &str) -> Self { Self::new(label) }
 }
 
 impl Block for LambdaBlock {
@@ -91,7 +136,7 @@ impl Block for LambdaBlock {
 
 		// CloudWatch log group for Lambda logs
 		// Must be created before the Lambda function to ensure proper cleanup
-		let function_ident = stack.resource_ident(self.build_label("function"));
+		let function_ident = self.lambda_ref().ident(stack);
 		let log_group = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("logs")),
 			AwsCloudwatchLogGroupDetails {

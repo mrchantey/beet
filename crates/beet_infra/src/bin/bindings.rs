@@ -152,6 +152,15 @@ async fn main() -> Result {
 			BindingFile::new("crates/beet_infra/src/bindings/aws_ssm.rs")
 				.with_resources(terra::Provider::AWS, ["aws_ssm_parameter"]),
 		)
+		// EventBridge Scheduler, the timer a `ScheduledJobBlock` declares. The
+		// invoke role it needs is an `aws_iam_role` + `aws_iam_role_policy`
+		// from `aws_common`, so nothing else belongs here.
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_scheduler.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_scheduler_schedule",
+				]),
+		)
 		.with_file(
 			BindingFile::new(
 				"crates/beet_infra/src/bindings/cloudflare_common.rs",
