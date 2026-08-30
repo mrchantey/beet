@@ -52,10 +52,13 @@ impl RequirePty {
 		for (entity, mut require) in connections.iter_mut() {
 			if require.0.tick(time.delta()).is_finished() {
 				debug!("closing ssh connection {entity}: no pty requested");
+				// the connection may already be gone: its recv loop despawns it the
+				// moment the client drops, which is the common end for the very
+				// scanners this reaps.
 				commands
 					.entity(entity)
-					.remove::<Self>()
-					.trigger_target(SshSend(SshEvent::Close(None)));
+					.try_remove::<Self>()
+					.try_trigger_target(SshSend(SshEvent::Close(None)));
 			}
 		}
 	}

@@ -67,6 +67,10 @@ tui = ["std", "beet_ui/tui"]
 # The multi-tenant SSH-TUI server (`SshTuiServer`): serves each SSH connection its
 # own navigable terminal, all browsing the same router, alongside the http server.
 ssh = ["tui", "beet_net/russh_server"]
+# The `#[ignore]`d SSH multi-tenancy stress harness, which drives real client
+# sessions against a real listener: nothing in the library is gated on it, it
+# only adds the client half of the transport the `ssh` feature serves.
+ssh_stress = ["ssh", "beet_net/russh_client"]
 http = ["std", "beet_net/server"]
 # The server-to-client websocket channel (`ClientIo`) and the dev-mode
 # `LiveReload` watcher built on it. Native-only: no HTTP backend supports

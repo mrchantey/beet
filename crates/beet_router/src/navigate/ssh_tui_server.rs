@@ -222,7 +222,11 @@ fn on_ssh_recv(
 			// browsing this router from the recorded opening route.
 			let (channel, terminal) =
 				ChannelTerminal::new(TerminalConfig::default());
-			commands.entity(connection).insert((
+			// try_insert, not insert: the accept loop owns this entity's lifetime
+			// and a client that vanishes between its pty request and this flush
+			// (a port scanner, a ctrl-c) would otherwise raise on a surface
+			// nobody is left to see.
+			commands.entity(connection).try_insert((
 				channel,
 				terminal,
 				PageHost::bundle(size),
@@ -264,9 +268,12 @@ fn ssh_write(
 	for (entity, mut terminal) in query.iter_mut() {
 		let output = terminal.drain_write();
 		if !output.is_empty() {
+			// this pass fans out over every live surface, and a session's recv
+			// loop can despawn its connection between the query and the flush, so
+			// the send is silenced: one client going is not the others' error.
 			commands
 				.entity(entity)
-				.trigger_target(SshSend(SshEvent::bytes(output)));
+				.try_trigger_target(SshSend(SshEvent::bytes(output)));
 		}
 	}
 }
@@ -305,7 +312,7 @@ fn close_session_on_ctrl_c(
 			)?;
 			commands
 				.entity(window)
-				.trigger_target(SshSend(SshEvent::Close(None)));
+				.try_trigger_target(SshSend(SshEvent::Close(None)));
 		}
 	}
 	Ok(())
@@ -331,7 +338,7 @@ fn restore_sessions_on_exit(
 		)?;
 		commands
 			.entity(connection)
-			.trigger_target(SshSend(SshEvent::Close(None)));
+			.try_trigger_target(SshSend(SshEvent::Close(None)));
 	}
 	Ok(())
 }
@@ -360,7 +367,7 @@ fn restore_session(
 		if !output.is_empty() {
 			commands
 				.entity(connection)
-				.trigger_target(SshSend(SshEvent::bytes(output)));
+				.try_trigger_target(SshSend(SshEvent::bytes(output)));
 		}
 	}
 	Ok(())
@@ -688,6 +695,43 @@ mod test {
 			.xpect_true();
 		// and the home route paints into its buffer
 		drive_until(&mut app, connection, "Alpha page").await;
+	}
+
+	/// Regression: a client that vanishes between its pty request and the surface
+	/// landing is not an error. The accept loop owns the connection entity and
+	/// despawns it the moment the client's channel closes, which a port scanner
+	/// (or anyone who ctrl-c's a slow first paint) does inside one frame; the
+	/// deferred surface insert then applied to a despawned entity and raised
+	/// through the app's error handler, ie a panic on the server's world thread,
+	/// once per vanished client. Found by the stress harness at the bottom of this
+	/// file, ~500 times per 2000-session run.
+	#[beet_core::test]
+	async fn a_session_that_vanishes_before_its_surface_is_not_an_error() {
+		let mut app = ssh_tui_app();
+		let server = spawn_server(&mut app);
+		let connection = app
+			.world_mut()
+			.spawn((SshPeerInfo::default(), ChildOf(server)))
+			.id();
+
+		// the accept loop's interleaving, as the real fault's backtrace shows it:
+		// an entity world scope does not flush, so the observer's surface insert
+		// is still queued when the loop reclaims the connection — and a despawn
+		// flushes the queue itself, *after* removing the entity.
+		app.world_mut()
+			.entity_mut(connection)
+			.trigger_target(SshRecv(SshEvent::RequestPty(RequestPty {
+				terminal: "xterm".into(),
+				window: SshWindowSize {
+					cells: UVec2::new(40, 8),
+					pixels: UVec2::ZERO,
+				},
+				terminal_modes: Vec::new(),
+			})));
+		app.world_mut().despawn(connection);
+		app.update();
+
+		app.world().get_entity(connection).is_err().xpect_true();
 	}
 
 	/// Each session's kitty-graphics support comes from its pty's forwarded
@@ -1123,5 +1167,404 @@ mod test {
 			.xpect_contains("clicked 0 times")
 			.xnot()
 			.xpect_contains("clicked 1 times");
+	}
+
+	// ================================================================
+	// The SSH multi-tenancy stress harness (`ssh_stress` feature, `#[ignore]`d).
+	//
+	// Every case above simulates a connection by triggering `SshRecv` on a child
+	// of the server. This one is the real transport end to end: a bound listener,
+	// real russh clients, and every frame making the world/tokio hop, so a session
+	// despawn (the recv loop's end in `impl_russh_server`) genuinely crosses the
+	// `ssh_write` pass that fans every live surface's output out at once. That is
+	// where it found the fault `a_session_that_vanishes_before_its_surface_is_not_an_error`
+	// now pins, and it stands as the regression instrument for the class. Run it:
+	//
+	//   cargo test -p beet_router --features=ssh_stress --lib -- --ignored ssh_stress
+	//
+	// ================================================================
+
+	#[cfg(feature = "ssh_stress")]
+	mod stress {
+		use super::*;
+
+		/// Session cycles one harness run completes.
+		const STRESS_SESSIONS: usize = 2000;
+		/// Sessions live at once.
+		const STRESS_CONCURRENCY: usize = 24;
+		/// One session in this many is a [`StressKind::Flash`].
+		const STRESS_FLASH_EVERY: usize = 4;
+		/// The stress page's body, repeated until it wraps the whole window so a
+		/// frame is the kilobytes a deployed page's is rather than a few glyphs:
+		/// the wider the write, the wider the window a teardown has to race.
+		const STRESS_BODY: &str = "the quick brown fox jumps over the lazy dog and keeps right on running ";
+		/// The text a session must receive before it counts as served. It heads
+		/// [`STRESS_BODY`], so it always opens the paragraph's first row and
+		/// survives the renderer emitting one contiguous run per row.
+		const STRESS_PAINT_NEEDLE: &str = "the quick brown fox";
+		/// The pty every stress session asks for: wider and taller than the
+		/// deployed default 80x24, so a frame is a bigger write for a teardown to
+		/// race across.
+		const STRESS_WINDOW: UVec2 = UVec2::new(120, 40);
+		/// A session that never paints within this is a server that stopped
+		/// serving, not a slow one.
+		const STRESS_PAINT_TIMEOUT: Duration = Duration::from_secs(30);
+
+		/// How long a [`StressKind::Page`] session holds its socket once served,
+		/// staggered by index so teardowns land mid-frame on their neighbours
+		/// rather than in lockstep.
+		fn stress_hold(index: usize) -> Duration {
+			Duration::from_millis(20 + (index as u64 % 11) * 13)
+		}
+
+		/// How long a [`StressKind::Flash`] session lasts once connected: short
+		/// enough that it is usually gone before its own page finishes building,
+		/// staggered so the teardown lands at a different point of the build every
+		/// time. Measured from the connect, not the spawn: a session dropped before
+		/// its handshake completes never reaches the server at all, and only raises
+		/// the client's own "entity despawned" on the setup still in flight.
+		fn stress_flash(index: usize) -> Duration {
+			Duration::from_millis(3 + (index as u64 % 7) * 4)
+		}
+
+		/// A repaint of a whole surface, the cheapest way to put every neighbour
+		/// mid-frame at the instant one session dies.
+		fn stress_repaint(rows: u32) -> SshSend {
+			SshSend(SshEvent::Resize(SshWindowSize {
+				cells: UVec2::new(STRESS_WINDOW.x, rows),
+				pixels: UVec2::ZERO,
+			}))
+		}
+
+		/// Aggregate progress, published by the client thread for the test to
+		/// poll. Every cycle lands in `finished` exactly once.
+		#[derive(Debug, Default, Clone, Copy)]
+		struct StressStats {
+			/// [`StressKind::Page`] sessions that received the page.
+			painted: usize,
+			/// [`StressKind::Flash`] sessions, gone before it could land.
+			flashed: usize,
+			/// Page sessions dropped without the page, ie a server that stopped
+			/// serving.
+			stalled: usize,
+			/// Cycles completed, whatever their shape.
+			finished: usize,
+		}
+
+		/// What a stress session does with its connection: the two shapes that put
+		/// a despawn somewhere different in the server's frame.
+		#[derive(Clone, Copy, PartialEq)]
+		enum StressKind {
+			/// Wait for the page, hold it for [`stress_hold`], then vanish: a
+			/// teardown against neighbours mid-frame.
+			Page,
+			/// Vanish after [`stress_flash`], usually before its own page has
+			/// finished building: a teardown against its own in-flight build.
+			Flash,
+		}
+
+		/// One client session, tracked from connect to the abrupt disconnect that
+		/// ends it.
+		#[derive(Component)]
+		struct StressSession {
+			/// Spawn order, which picks this session's teardown stagger.
+			index: usize,
+			/// What this session does with its connection.
+			kind: StressKind,
+			/// What the server has sent so far, until the page lands. Cleared on
+			/// paint: a session goes on receiving frames for its whole hold.
+			received: String,
+			/// When it was spawned, for the never-painted timeout.
+			spawned: Duration,
+			/// When to drop the socket: a flash session's is set on its connect, a
+			/// page session's once its page has landed.
+			teardown: Option<Duration>,
+		}
+
+		/// The client half: keeps [`STRESS_CONCURRENCY`] real sessions live until
+		/// [`STRESS_SESSIONS`] cycles have completed.
+		#[derive(Resource)]
+		struct StressDriver {
+			/// `127.0.0.1:<port>` of the server under test.
+			addr: String,
+			/// Sessions spawned so far, the source of each session's index.
+			started: usize,
+			/// Sessions currently live. Despawns are deferred, so the query cannot
+			/// answer this in the frame a teardown is queued.
+			live: usize,
+			/// Progress, published for the test thread.
+			stats: Store<StressStats>,
+		}
+
+		/// One client session: the real anonymous connect plus the state the driver
+		/// reads. Its terminal request and frame collection ride the global
+		/// [`on_stress_recv`] observer.
+		fn stress_session(
+			addr: &str,
+			index: usize,
+			now: Duration,
+		) -> impl Bundle {
+			let kind = if index % STRESS_FLASH_EVERY == STRESS_FLASH_EVERY - 1 {
+				StressKind::Flash
+			} else {
+				StressKind::Page
+			};
+			(
+				StressSession {
+					index,
+					kind,
+					received: String::new(),
+					spawned: now,
+					teardown: None,
+				},
+				SshSession::insert_anon(addr),
+			)
+		}
+
+		/// Observer: ask for a terminal the moment a session connects, and collect
+		/// the frames that come back until the page has landed.
+		fn on_stress_recv(
+			ev: On<SshRecv>,
+			time: Res<Time>,
+			mut sessions: Query<&mut StressSession>,
+			mut commands: Commands,
+		) {
+			match ev.event().inner() {
+				SshEvent::Connect => {
+					// the handshake is done, so a flash session's clock starts here
+					if let Ok(mut session) = sessions.get_mut(ev.target())
+						&& session.kind == StressKind::Flash
+					{
+						session.teardown =
+							Some(time.elapsed() + stress_flash(session.index));
+					}
+					commands
+						.entity(ev.target())
+						.trigger_target(SshSend(SshEvent::RequestPty(
+							RequestPty {
+								terminal: "xterm-256color".into(),
+								window: SshWindowSize {
+									cells: STRESS_WINDOW,
+									pixels: UVec2::ZERO,
+								},
+								terminal_modes: Vec::new(),
+							},
+						)))
+						.trigger_target(SshSend(SshEvent::RequestShell));
+				}
+				SshEvent::Data(bytes) => {
+					if let Ok(mut session) = sessions.get_mut(ev.target())
+						&& session.teardown.is_none()
+					{
+						session
+							.received
+							.push_str(&String::from_utf8_lossy(bytes));
+					}
+				}
+				_ => {}
+			}
+		}
+
+		/// System: hold the concurrency full, tear each painted session down on its
+		/// own stagger, and put every survivor mid-frame as it goes.
+		fn drive_stress(
+			time: Res<Time>,
+			mut driver: ResMut<StressDriver>,
+			mut sessions: Query<(Entity, &mut StressSession)>,
+			mut commands: Commands,
+		) {
+			let now = time.elapsed();
+			let mut stats = driver.stats.get();
+			let mut survivors = Vec::new();
+			let mut torn_down = false;
+
+			for (entity, mut session) in sessions.iter_mut() {
+				match session.teardown {
+					// its page landed: start this session's hold
+					None if session.kind == StressKind::Page
+						&& session.received.contains(STRESS_PAINT_NEEDLE) =>
+					{
+						stats.painted += 1;
+						session.teardown =
+							Some(now + stress_hold(session.index));
+						session.received = String::new();
+						survivors.push(entity);
+					}
+					// it connected and was never served, which is the failure this
+					// harness exists to catch; reclaim the slot and keep hammering.
+					None if now.saturating_sub(session.spawned)
+						> STRESS_PAINT_TIMEOUT =>
+					{
+						stats.stalled += 1;
+						stats.finished += 1;
+						driver.live -= 1;
+						commands.entity(entity).despawn();
+					}
+					// held long enough: drop the socket abruptly. The despawn drops
+					// the send observer, which drops the client's last sender, which
+					// ends its data loop — a client that simply vanishes.
+					Some(deadline) if now >= deadline => {
+						if session.kind == StressKind::Flash {
+							stats.flashed += 1;
+						}
+						stats.finished += 1;
+						driver.live -= 1;
+						torn_down = true;
+						commands.entity(entity).despawn();
+					}
+					_ => survivors.push(entity),
+				}
+			}
+
+			// a teardown only races if its neighbours are mid-frame, so make them
+			// so: a resize repaints a whole surface, and the server fans every
+			// surface's output out in the one `ssh_write` pass the despawn crosses.
+			if torn_down {
+				let rows = STRESS_WINDOW.y + (now.as_millis() % 2) as u32;
+				for entity in survivors {
+					commands
+						.entity(entity)
+						.trigger_target(stress_repaint(rows))
+						.trigger_target(SshSend(SshEvent::bytes(
+							&b"\x1b[B"[..],
+						)));
+				}
+			}
+
+			let addr = driver.addr.clone();
+			while driver.live < STRESS_CONCURRENCY
+				&& driver.started < STRESS_SESSIONS
+			{
+				let index = driver.started;
+				driver.started += 1;
+				driver.live += 1;
+				commands.spawn(stress_session(&addr, index, now));
+			}
+
+			driver.stats.set(stats);
+			// the run is done, so let the client thread's app exit.
+			if stats.finished >= STRESS_SESSIONS {
+				commands.write_message(AppExit::Success);
+			}
+		}
+
+		/// The page the stress sessions browse: the shared drawer chrome every
+		/// deployed page has, wrapped around a body that fills the window.
+		fn spawn_stress_router(app: &mut App) -> Entity {
+			app.world_mut()
+				.spawn((
+					SshTuiServer::default(),
+					OpeningRoute(Url::parse("home")),
+					children![(
+						Router,
+						BaseLayout::<DrawerLayout>::default(),
+						children![render_action::fixed_func_route(
+							"home",
+							|| {
+								rsx! { <p>{STRESS_BODY.repeat(24)}</p> }
+							}
+						)]
+					)],
+				))
+				.flush()
+		}
+
+		/// The real SSH-TUI server on its own thread: the live input stack and the
+		/// same boot the deployed exec line takes.
+		fn spawn_stress_server(port: u16) {
+			std::thread::spawn(move || {
+				let mut app = ssh_tui_live_app();
+				let server = spawn_stress_router(&mut app);
+				app.world_mut().entity_mut(server).run_async_local(
+					move |entity| async move {
+						entity
+							.call::<Request, Response>(Request::from_cli_str(
+								&format!(
+									"--server=ssh --ssh-port={port} --path=home"
+								),
+							))
+							.await?;
+						Ok(())
+					},
+				);
+				app.run();
+			});
+		}
+
+		/// The client half on its own thread, driven by [`drive_stress`].
+		fn spawn_stress_clients(addr: String, stats: Store<StressStats>) {
+			std::thread::spawn(move || {
+				let mut app = App::new();
+				app.add_plugins((MinimalPlugins, AsyncPlugin::default()))
+					.add_observer(on_stress_recv)
+					.insert_resource(StressDriver {
+						addr,
+						started: 0,
+						live: 0,
+						stats,
+					})
+					.add_systems(Update, drive_stress);
+				app.run();
+			});
+		}
+
+		/// Wait for the stress server to answer on `addr`, which a fixed sleep
+		/// cannot promise on a loaded machine.
+		async fn await_stress_server(addr: &str) {
+			for _ in 0..200 {
+				if SshSession::connect_raw(addr, None, None).await.is_ok() {
+					return;
+				}
+				time_ext::sleep_millis(50).await;
+			}
+			panic!("stress server never answered on {addr}");
+		}
+
+		/// The multi-tenancy stress harness: [`STRESS_SESSIONS`] real ssh sessions
+		/// through a real listener, [`STRESS_CONCURRENCY`] at a time, each dropping
+		/// its socket while its neighbours are mid-frame.
+		///
+		/// The assertion is twofold. The process surviving is the first half: the
+		/// crash this hunts is a native `SIGSEGV`/`SIGABRT` with no rust panic, so a
+		/// run that reproduces it kills the test binary outright rather than failing
+		/// a matcher. The second half is that every cycle was actually *served*: a
+		/// listener that dies quietly still accepts, and a session that connects and
+		/// never receives its page is the visible shape of that.
+		#[ignore = "stress harness: run explicitly with --ignored"]
+		#[beet_core::test(timeout_ms = 900000)]
+		async fn ssh_stress_multi_tenancy() {
+			// an OS-assigned port, released before the server claims it, so
+			// parallel cases never collide
+			let port = std::net::TcpListener::bind("127.0.0.1:0")
+				.unwrap()
+				.local_addr()
+				.unwrap()
+				.port();
+			let addr = format!("127.0.0.1:{port}");
+			spawn_stress_server(port);
+			await_stress_server(&addr).await;
+
+			let stats = Store::<StressStats>::default();
+			spawn_stress_clients(addr, stats);
+			for tick in 0..9000 {
+				if stats.get().finished >= STRESS_SESSIONS {
+					break;
+				}
+				// a progress line every 5s: a run is minutes long and a test binary
+				// installs no logger, so this is the only live view of one.
+				if tick % 50 == 49 {
+					cross_log!("ssh stress: {:?}", stats.get());
+				}
+				time_ext::sleep_millis(100).await;
+			}
+
+			let stats = stats.get();
+			cross_log!("ssh stress complete: {stats:?}");
+			stats.finished.xpect_eq(STRESS_SESSIONS);
+			// a page session that never received its page is a server that stopped
+			// serving, the quiet half of the failure this harness hunts.
+			stats.stalled.xpect_eq(0);
+			(stats.painted + stats.flashed).xpect_eq(STRESS_SESSIONS);
+		}
 	}
 }

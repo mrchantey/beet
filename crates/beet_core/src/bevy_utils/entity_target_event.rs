@@ -312,6 +312,33 @@ pub impl EntityCommands<'_> {
 		self
 	}
 
+	/// Triggers an entity target event for this entity, discarding the error if
+	/// the entity is gone by the time the command applies.
+	///
+	/// The form for an entity whose lifetime another task owns: a server fanning
+	/// output out over its connections cannot know that one of them was despawned
+	/// between the query and the flush, and a client that vanished is not an
+	/// error. The [`try_insert`](EntityCommands::try_insert) of triggers.
+	#[track_caller]
+	fn try_trigger_target<M>(
+		&mut self,
+		ev: impl IntoEntityTargetEvent<M>,
+	) -> &mut Self {
+		let caller = MaybeLocation::caller();
+		self.queue_silenced(move |mut entity: EntityWorldMut| {
+			let (mut ev, mut trigger) =
+				ev.into_entity_target_event(entity.id());
+			entity.world_scope(move |world| {
+				world.trigger_ref_with_caller_pub(
+					&mut ev,
+					&mut trigger,
+					caller,
+				);
+			});
+		});
+		self
+	}
+
 	/// Creates an [`Observer`] watching for an [`Event`] of type `E` targeting this entity.
 	///
 	/// Unlike the built-in `observe` method which is restricted to [`EntityEvent`],
@@ -359,5 +386,27 @@ mod test {
 		});
 		world.entity_mut(entity).trigger_target(MyEvent).flush();
 		store.get().xpect_eq(entity);
+	}
+
+	/// A target despawned before the trigger applies is dropped, not raised: the
+	/// shape of a server fanning output out over connections another task owns
+	/// the lifetime of. The plain `trigger_target` raises through the app's error
+	/// handler here, which on the default handler is a panic on the world thread.
+	#[crate::test]
+	fn try_trigger_target_tolerates_a_despawned_target() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		let store = Store::new(false);
+		world.add_observer(move |_: On<MyEvent>| store.set(true));
+
+		world
+			.run_system_once(move |mut commands: Commands| {
+				commands.entity(entity).despawn();
+				commands.entity(entity).try_trigger_target(MyEvent);
+			})
+			.unwrap();
+
+		world.get_entity(entity).is_err().xpect_true();
+		store.get().xpect_false();
 	}
 }

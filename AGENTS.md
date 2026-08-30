@@ -180,6 +180,7 @@ async_ext::do_async_thing().await;
 - A `#[template]` is a constructor returning `impl Bundle`, not a UI/content-only thing. `#[template(system)]` takes `SystemParam`s (`Commands`, queries, resources) and can do arbitrary ECS work at build time, eg spawn child entities or inject routes. Prefer a `<MyThing/>` template over a bespoke reflect-marker + `On<Insert>` observer for markup-spawnable setup: it expands away at build, leaving no component to re-fire on scene reload.
 - Templates may also return `()` for effects, or Result<impl Bundle> if fallible
 - Component hooks: `#[component(on_add = ...)]` accepts a call yielding a closure, so use the constructors instead of a bespoke `fn on_add(world: DeferredWorld, cx: HookContext)`: `observe(my_observer)` / `observe((obs_a, obs_b))` registers observers watching the entity, `entity_hook(|entity| { ... })` runs any `EntityCommands` work. Both live in `beet_core::bevy_utils::hook_ext`.
+- A command aimed at an entity whose lifetime **another task owns** (a server's connections, anything an async accept loop despawns) must tolerate its absence: `try_insert`, `try_remove`, `try_trigger_target`. An entity world scope does not flush, and `EntityWorldMut::despawn` flushes the queue itself *after* removing the entity, so an observer's deferred command routinely applies to a target that has since gone; under the default error handler that raise is a panic on the world thread.
 
 ## Action Cheatsheet
 
