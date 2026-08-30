@@ -281,10 +281,8 @@ async fn assert_restored(
 			)
 		})?;
 
-	let host = format!(
-		"{}.{source_domain}",
-		MailDomainBlock::AUTOCONFIG_LABELS[0]
-	);
+	let host =
+		format!("{}.{source_domain}", MailDomainBlock::AUTOCONFIG_LABELS[0]);
 	let ip = mail.public_ip().await?;
 	let poll = Duration::from_secs(5);
 	let attempts = (timeout.as_secs() / poll.as_secs()).max(1);

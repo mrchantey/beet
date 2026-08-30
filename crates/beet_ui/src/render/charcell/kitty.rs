@@ -9,10 +9,12 @@
 //! bytes transmit directly, an `<img src=*.svg>` is rasterised to PNG (resvg),
 //! any other raster format decodes and re-encodes to PNG, then a [`KittyImage`]
 //! and the `graphics` element state attach so the terminal-gated user-agent rule
-//! gives it a block box. The measure phase sizes that box from the pixel
-//! dimensions, paint reserves its cells, and `place_kitty_images` transmits the
-//! bytes once and (re)places the picture whenever its on-screen rect changes —
-//! scroll, reflow, or resize.
+//! gives it a block box. The measure and layout phases size that box from the
+//! pixel dimensions, contained within its [`CellBounds`] so no raster wants a
+//! box its scroll port could never show; paint reserves its cells; and
+//! `place_kitty_images` transmits the bytes once and (re)places the picture
+//! whenever its on-screen rect changes — scroll, reflow, or resize — cropping
+//! to the visible part of a box the port only partly shows.
 //!
 //! On any failure (no canonical server, a refused/non-2xx fetch, a decode error)
 //! the element shows both its `[image]: alt` marker and the styled error message
@@ -26,6 +28,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 #[cfg(feature = "tui")]
 use bevy::math::IRect;
+#[cfg(feature = "tui")]
+use bevy::math::URect;
 use bevy::math::UVec2;
 #[cfg(feature = "tui")]
 use std::io::Write;
@@ -45,14 +49,38 @@ pub struct KittyImage {
 	pub px: UVec2,
 }
 
+/// The cell box a raster may occupy: the columns available on its line, and the
+/// rows of the nearest scroll port it renders into (the viewport when nothing
+/// clips).
+///
+/// The row bound is what keeps a raster placeable. Sized on aspect alone a
+/// 1280x960 photo across 80 columns wants 30 rows, taller than any 24-row
+/// window, so its box could never be shown whole — and a box that can never be
+/// shown is a blank hole in the page, not a picture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellBounds {
+	pub cols: u32,
+	pub rows: u32,
+}
+
+impl CellBounds {
+	/// Bounds of `cols` x `rows`, each at least one cell so a degenerate
+	/// (collapsed or zero-height) container still yields a placeable box.
+	pub fn new(cols: u32, rows: u32) -> Self {
+		Self {
+			cols: cols.max(1),
+			rows: rows.max(1),
+		}
+	}
+}
+
 impl KittyImage {
-	/// The cell footprint within `max_cols` columns: a nominal 10px column and
-	/// the ~2:1 cell aspect, preserving the raster's aspect ratio. The terminal
-	/// scales the image to exactly this rect (`c=`/`r=`).
-	pub fn cell_size(&self, max_cols: u32) -> UVec2 {
+	/// The cell footprint within `bounds`: a nominal 10px column and the ~2:1
+	/// cell aspect, preserving the raster's aspect ratio. The terminal scales the
+	/// image to exactly this rect (`c=`/`r=`).
+	pub fn cell_size(&self, bounds: CellBounds) -> UVec2 {
 		const CELL_PX_WIDTH: u32 = 10;
-		let cols = self.px.x.div_ceil(CELL_PX_WIDTH).clamp(1, max_cols.max(1));
-		UVec2::new(cols, self.rows_for(cols))
+		self.contain(self.px.x.div_ceil(CELL_PX_WIDTH).min(bounds.cols), bounds)
 	}
 
 	/// The cell footprint honoring explicit box dimensions: a missing axis
@@ -62,40 +90,65 @@ impl KittyImage {
 		&self,
 		width: Option<u32>,
 		height: Option<u32>,
-		max_cols: u32,
+		bounds: CellBounds,
 	) -> UVec2 {
 		match (width, height) {
+			// both axes authored: no aspect left to preserve, so the box is taken
+			// as given. An oversized one is no longer a blank hole — the placement
+			// pass draws whatever part of it the scroll port shows.
 			(Some(cols), Some(rows)) => UVec2::new(cols.max(1), rows.max(1)),
-			(Some(cols), None) => {
-				let cols = cols.max(1);
-				UVec2::new(cols, self.rows_for(cols))
-			}
+			(Some(cols), None) => self.contain(cols, bounds),
 			(None, Some(rows)) => {
-				// invert the 2:1 cell aspect: cols = rows * 2 * (px_w / px_h)
 				let rows = rows.max(1);
-				let cols =
-					(rows * 2 * self.px.x).div_ceil(self.px.y.max(1)).max(1);
+				// invert the 2:1 cell aspect: cols = rows * 2 * (px_w / px_h)
+				let cols = self.cols_for(rows);
 				// a tall raster (eg a `height: 70vh` hero on a narrow terminal)
-				// derives a width wider than the available columns. Clamping only
-				// the width there would squash the aspect and, once the laid-out
-				// rect spills past the screen edge, the placement pass drops the
-				// image entirely. So when the height-driven width would overflow,
+				// derives a width wider than the available columns, and a height
+				// past the scroll port is a box the port can never show whole.
+				// Clamping one axis alone would squash the aspect, so either way
 				// fall back to a width-driven fit: the raster stays aspect-correct
-				// and on-screen, just shorter than the requested height.
-				let max_cols = max_cols.max(1);
-				if cols > max_cols {
-					UVec2::new(max_cols, self.rows_for(max_cols))
+				// and inside the port, just shorter than the requested height.
+				if cols > bounds.cols || rows > bounds.rows {
+					self.contain(bounds.cols, bounds)
 				} else {
 					UVec2::new(cols, rows)
 				}
 			}
-			(None, None) => self.cell_size(max_cols),
+			(None, None) => self.cell_size(bounds),
 		}
+	}
+
+	/// Contain a `cols`-wide box in `bounds`: rows follow the raster's aspect,
+	/// and when they overflow the row bound the columns re-derive from it
+	/// instead, so a tall raster shrinks to its scroll port rather than growing a
+	/// box no window can place.
+	fn contain(&self, cols: u32, bounds: CellBounds) -> UVec2 {
+		let cols = cols.max(1);
+		let rows = self.rows_for(cols);
+		if rows <= bounds.rows {
+			return UVec2::new(cols, rows);
+		}
+		let cols = self.cols_within(bounds.rows).min(cols);
+		UVec2::new(cols, self.rows_for(cols))
 	}
 
 	/// Aspect-preserving rows for a `cols`-wide box, cells being ~2:1.
 	fn rows_for(&self, cols: u32) -> u32 {
 		(cols * self.px.y).div_ceil(self.px.x.max(1) * 2).max(1)
+	}
+
+	/// Aspect-preserving columns for a `rows`-tall box, rounded up so the box
+	/// fills a requested height.
+	fn cols_for(&self, rows: u32) -> u32 {
+		(rows * 2 * self.px.x).div_ceil(self.px.y.max(1)).max(1)
+	}
+
+	/// Aspect-preserving columns for a `rows`-tall box, rounded down so
+	/// [`rows_for`](Self::rows_for) of the result never exceeds `rows` — the
+	/// containing direction, where overshooting by a single row is the whole
+	/// failure the bound exists to prevent.
+	fn cols_within(&self, rows: u32) -> u32 {
+		(rows * 2 * self.px.x / self.px.y.max(1)).max(1)
 	}
 }
 
@@ -485,12 +538,59 @@ struct TerminalPlacements {
 	placed: HashMap<Entity, PlacedImage>,
 }
 
+/// One image's on-screen placement: where it is drawn and which part of the
+/// raster is drawn there.
+///
+/// A fully visible box draws the whole raster (`crop: None`); a box the scroll
+/// port only partly shows draws the matching source rect into the visible cells,
+/// so the picture slides under its port instead of disappearing the moment an
+/// edge crosses it. The crop is part of the placement's identity, so scrolling
+/// re-places through the same diff a move does.
 #[cfg(feature = "tui")]
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct PlacedImage {
 	id: u32,
 	pos: UVec2,
 	cells: UVec2,
+	/// The source rect in raster pixels, `None` when the whole raster is drawn.
+	crop: Option<URect>,
+}
+
+#[cfg(feature = "tui")]
+impl PlacedImage {
+	/// The placement drawing `rect`'s `visible` portion of a `px`-pixel raster.
+	///
+	/// `visible` is a sub-rect of `rect`, so the source rect is that same
+	/// fraction of the pixels: the visible cells keep exactly the scale a whole
+	/// placement would have drawn at, and nothing shifts as the crop grows.
+	fn new(id: u32, px: UVec2, rect: IRect, visible: IRect) -> Self {
+		let span = UVec2::new(rect.width() as u32, rect.height() as u32);
+		let crop = (visible != rect).then(|| {
+			let fraction = |axis: u32, offset: i32, span: u32| {
+				(axis as u64 * offset as u64 / span.max(1) as u64) as u32
+			};
+			let min = UVec2::new(
+				fraction(px.x, visible.min.x - rect.min.x, span.x),
+				fraction(px.y, visible.min.y - rect.min.y, span.y),
+			);
+			let max = UVec2::new(
+				fraction(px.x, visible.max.x - rect.min.x, span.x),
+				fraction(px.y, visible.max.y - rect.min.y, span.y),
+			);
+			// a sliver of a cell can round the source rect flat; the protocol
+			// needs at least one pixel on each axis to have something to scale.
+			URect {
+				min,
+				max: max.max(min + UVec2::ONE),
+			}
+		});
+		Self {
+			id,
+			pos: UVec2::new(visible.min.x as u32, visible.min.y as u32),
+			cells: UVec2::new(visible.width() as u32, visible.height() as u32),
+			crop,
+		}
+	}
 }
 
 #[cfg(feature = "tui")]
@@ -595,10 +695,15 @@ pub(crate) fn place_kitty_images(
 	Ok(())
 }
 
-/// The fully visible images under `root` and the screen rect each should
-/// occupy, through the same scroll translation and clip the paint applied.
-/// A partially clipped image is omitted (hidden) — the protocol places whole
-/// rects, and a torn image is worse than none.
+/// The visible images under `root` and the placement each should occupy,
+/// through the same scroll translation and clip the paint applied.
+///
+/// An image the clip only partly shows is placed cropped to that intersection,
+/// not dropped: a scrolled picture slides under its port a row at a time instead
+/// of popping in and out at the edges. An image the clip excludes entirely is
+/// legitimately absent (scrolled away), and the sizing pass has already
+/// contained every auto-sized box within its port, so "never placeable" is not a
+/// state a raster can reach.
 #[cfg(feature = "tui")]
 fn desired_placements(
 	root: Entity,
@@ -624,17 +729,15 @@ fn desired_placements(
 		if rect.width() <= 0 || rect.height() <= 0 {
 			continue;
 		}
-		// fully visible only: inside both the overflow clip and the screen
-		let visible =
-			cx.clip.intersect(rect) == rect && screen.intersect(rect) == rect;
-		if !visible {
+		// the part of the box the overflow clip and the screen both show
+		let visible = screen.intersect(cx.clip.intersect(rect));
+		if visible.width() <= 0 || visible.height() <= 0 {
 			continue;
 		}
-		desired.insert(entity, PlacedImage {
-			id: image.id,
-			pos: UVec2::new(rect.min.x as u32, rect.min.y as u32),
-			cells: UVec2::new(rect.width() as u32, rect.height() as u32),
-		});
+		desired.insert(
+			entity,
+			PlacedImage::new(image.id, image.px, rect, visible),
+		);
 	}
 	desired
 }
@@ -671,13 +774,28 @@ fn write_transmit(
 
 /// Place image `id` over the given cell rect (`a=p`), scaling to fit and
 /// leaving the cursor where it was.
+///
+/// A cropped placement names its source rect in raster pixels (`x=`/`y=`/`w=`/
+/// `h=`); a whole one omits the keys, so a fully visible image emits exactly the
+/// escape it always did.
 #[cfg(feature = "tui")]
 fn write_place(w: &mut (impl Write + ?Sized), placed: &PlacedImage) -> Result {
 	escape::cursor_goto(&mut &mut *w, placed.pos)?;
+	write!(w, "\x1b_Ga=p,i={}", placed.id)?;
+	if let Some(crop) = placed.crop {
+		write!(
+			w,
+			",x={},y={},w={},h={}",
+			crop.min.x,
+			crop.min.y,
+			crop.width(),
+			crop.height()
+		)?;
+	}
 	write!(
 		w,
-		"\x1b_Ga=p,i={},c={},r={},q=2,C=1\x1b\\",
-		placed.id, placed.cells.x, placed.cells.y
+		",c={},r={},q=2,C=1\x1b\\",
+		placed.cells.x, placed.cells.y
 	)?;
 	Ok(())
 }
@@ -700,6 +818,18 @@ fn write_delete_all(w: &mut (impl Write + ?Sized)) -> Result {
 #[cfg(test)]
 mod test {
 	use super::*;
+	// the style types shadow same-named `bevy_ui` ones leaking through the
+	// preludes when `bevy_default` is co-enabled.
+	#[cfg(feature = "tui")]
+	use crate::input::ScrollPosition;
+	#[cfg(feature = "tui")]
+	use crate::style::Length;
+	#[cfg(feature = "tui")]
+	use crate::style::Overflow;
+	#[cfg(feature = "tui")]
+	use crate::style::common_props;
+	#[cfg(feature = "tui")]
+	use bevy::math::IVec2;
 
 	/// Minimal PNG header bytes for a `width`x`height` image: enough for the
 	/// loader (magic + IHDR dimensions); the terminal never sees it in tests.
@@ -720,42 +850,78 @@ mod test {
 		png_dimensions(b"not a png").xpect_eq(None);
 	}
 
+	/// A raster of the given pixel size, the only field the sizing math reads.
+	fn sized_image(px: UVec2) -> KittyImage {
+		KittyImage {
+			id: 1,
+			data: String::new(),
+			px,
+		}
+	}
+
 	/// The cell box preserves aspect through the ~2:1 cell shape and clamps to
 	/// the available columns.
 	#[beet_core::test]
 	fn cell_size_preserves_aspect() {
-		let image = KittyImage {
-			id: 1,
-			data: String::new(),
-			px: UVec2::new(200, 100),
-		};
+		let image = sized_image(UVec2::new(200, 100));
 		// 200px / 10 = 20 cols; rows = 20 * (100/200) / 2 = 5
-		image.cell_size(80).xpect_eq(UVec2::new(20, 5));
+		image
+			.cell_size(CellBounds::new(80, 24))
+			.xpect_eq(UVec2::new(20, 5));
 		// clamped to 10 cols, rows follow the aspect
-		image.cell_size(10).xpect_eq(UVec2::new(10, 3));
+		image
+			.cell_size(CellBounds::new(10, 24))
+			.xpect_eq(UVec2::new(10, 3));
+	}
+
+	/// THE sizing regression: the blog post's 1280x960 photo. Sized on the column
+	/// bound alone it wants 30 rows — taller than any 24-row window, a box that
+	/// can never be placed — so the row bound re-derives the columns and the
+	/// picture fits its port with the aspect intact.
+	#[beet_core::test]
+	fn cell_size_contains_within_the_row_bound() {
+		let image = sized_image(UVec2::new(1280, 960));
+		// 128 cols of raster clamp to 80, whose aspect rows (30) overflow the
+		// window: the columns re-derive from the 24 rows instead.
+		image
+			.cell_size(CellBounds::new(80, 24))
+			.xpect_eq(UVec2::new(64, 24));
+		// an 8-row scroll port inside that window bounds it further, still on
+		// aspect (a 21-col box is exactly 8 rows tall).
+		image
+			.cell_size(CellBounds::new(80, 8))
+			.xpect_eq(UVec2::new(21, 8));
+		// the derived box never overshoots the bound it was contained to
+		image.rows_for(21).xpect_eq(8);
 	}
 
 	/// An explicit height derives the width from the aspect; when that width fits
-	/// it is honored, and when it would overflow the columns the box falls back to
-	/// a width-driven fit (aspect-correct, shorter) rather than squashing.
+	/// the columns and the height fits the port it is honored, and when either
+	/// overflows the box falls back to a width-driven fit (aspect-correct,
+	/// shorter) rather than squashing.
 	#[beet_core::test]
 	fn cell_size_constrained_contains_tall_height() {
 		// 16:9 raster, the deck's UHD hero shape.
-		let image = KittyImage {
-			id: 1,
-			data: String::new(),
-			px: UVec2::new(3840, 2160),
-		};
+		let image = sized_image(UVec2::new(3840, 2160));
 		// height 10 rows -> width = 10 * 2 * 3840/2160 = 35.6 -> 36 cols; fits in
 		// 80, so the requested height stands.
 		image
-			.cell_size_constrained(None, Some(10), 80)
+			.cell_size_constrained(None, Some(10), CellBounds::new(80, 24))
 			.xpect_eq(UVec2::new(36, 10));
 		// same height on a 30-col terminal: 36 cols would overflow, so fit to
 		// width instead (rows follow the aspect, shorter than the requested 10).
 		image
-			.cell_size_constrained(None, Some(10), 30)
+			.cell_size_constrained(None, Some(10), CellBounds::new(30, 24))
 			.xpect_eq(UVec2::new(30, image.rows_for(30)));
+		// a `70vh` hero in a 10-row scroll port: the height itself overflows, so
+		// the same width-driven fit contains it.
+		image
+			.cell_size_constrained(None, Some(20), CellBounds::new(80, 10))
+			.xpect_eq(UVec2::new(35, 10));
+		// an explicit width whose aspect rows overflow the port narrows too
+		image
+			.cell_size_constrained(Some(80), None, CellBounds::new(80, 10))
+			.xpect_eq(UVec2::new(35, 10));
 	}
 
 	// the live-terminal cases drive the `TestHost`/`KittyGraphicsSupport`
@@ -763,24 +929,31 @@ mod test {
 	#[cfg(feature = "tui")]
 	use crate::render::charcell::test_host::TestHost;
 
-	/// A host with graphics forced on and an `<img>` backed by a [`KittyImage`]
-	/// of the given pixel dimensions, attached directly (no fetch) so the
-	/// placement/transmission paths can be exercised without a server.
+	/// A `size`-cell host with graphics forced on, showing `content` under
+	/// `rules`, its `<img>` backed by a `px`-pixel [`KittyImage`].
+	///
+	/// The raster is attached directly rather than fetched: the fetch path is
+	/// `net`-gated and needs a server, and sizing/placement are independent of how
+	/// the bytes arrived.
 	#[cfg(feature = "tui")]
-	fn image_host(width: u32, height: u32) -> TestHost {
-		let mut host = TestHost::sized(UVec2::new(40, 14));
+	fn image_host_with(
+		size: UVec2,
+		px: UVec2,
+		rules: Vec<Rule>,
+		content: impl Bundle,
+	) -> TestHost {
+		let mut host = TestHost::sized(size);
 		host.app
 			.world_mut()
 			.entity_mut(host.host)
 			.insert(KittyGraphicsSupport { enabled: true });
-		host.spawn_content(rsx! {
-			<div><img src="x.png" alt="a test image"/></div>
-		});
-		// attach the raster directly before the first step: the fetch path is
-		// `net`-gated and needs a server, so seed the `KittyImage` so the attach
-		// system skips the img (placement is independent of how the bytes arrived).
-		let (data, px) =
-			encode_png(png_bytes(width, height)).expect("valid png");
+		// rules must be registered before the content resolves its styles
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(rules);
+		host.spawn_content(content);
+		let (data, px) = encode_png(png_bytes(px.x, px.y)).expect("valid png");
 		let world = host.app.world_mut();
 		let img = world
 			.query_filtered::<(Entity, &Element), With<Element>>()
@@ -791,6 +964,72 @@ mod test {
 		attach_image(world.entity_mut(img), KittyImage { id: 1, data, px });
 		host.step();
 		host
+	}
+
+	/// [`image_host_with`] showing a lone `<img>` in a `size`-cell window.
+	#[cfg(feature = "tui")]
+	fn image_host_sized(size: UVec2, width: u32, height: u32) -> TestHost {
+		image_host_with(size, UVec2::new(width, height), vec![], rsx! {
+			<div><img src="x.png" alt="a test image"/></div>
+		})
+	}
+
+	/// [`image_host_sized`] at the small default snapshot viewport.
+	#[cfg(feature = "tui")]
+	fn image_host(width: u32, height: u32) -> TestHost {
+		image_host_sized(UVec2::new(40, 14), width, height)
+	}
+
+	/// A `height`-row scroll port under `class`, the shape every port test drives.
+	#[cfg(feature = "tui")]
+	fn scroll_port(class: &str, height: f32) -> Rule {
+		Rule::class(class)
+			.with_value(common_props::Height, Length::Rem(height))
+			.with_value(common_props::OverflowYProp, Overflow::Scroll)
+	}
+
+	/// The `<img>`'s laid-out rect, for driving a scroll to a known edge of it.
+	#[cfg(feature = "tui")]
+	fn image_rect(host: &mut TestHost) -> IRect {
+		host.app
+			.world_mut()
+			.query_filtered::<&LayoutRect, With<KittyImage>>()
+			.single(host.app.world())
+			.unwrap()
+			.0
+	}
+
+	/// Scroll the tree's scroll container to `rows` and repaint.
+	#[cfg(feature = "tui")]
+	fn scroll_to(host: &mut TestHost, rows: i32) {
+		let world = host.app.world_mut();
+		let port = world
+			.query_filtered::<Entity, With<ScrollPosition>>()
+			.single(world)
+			.unwrap();
+		world
+			.entity_mut(port)
+			.insert(ScrollPosition::new(IVec2::new(0, rows)));
+		host.step();
+	}
+
+	/// The keys of the first `a=p` placement escape in an emitted frame: the
+	/// `c`/`r` cell box, and `x`/`y`/`w`/`h` when the placement is cropped.
+	#[cfg(feature = "tui")]
+	fn placement_keys(host: &mut TestHost) -> HashMap<String, u32> {
+		String::from_utf8_lossy(&host.frame_ansi())
+			.split("\u{1b}_G")
+			.find(|escape| escape.starts_with("a=p"))
+			.expect("a placement escape")
+			.split('\u{1b}')
+			.next()
+			.unwrap()
+			.split(',')
+			.filter_map(|pair| pair.split_once('='))
+			.filter_map(|(key, value)| {
+				value.parse().ok().map(|value| (key.to_string(), value))
+			})
+			.collect()
 	}
 
 	/// A supported terminal transmits the PNG once and places it at its
@@ -812,6 +1051,108 @@ mod test {
 			.into_owned()
 			.xnot()
 			.xpect_contains("\u{1b}_G");
+	}
+
+	/// THE default-window sizing regression: the blog post's 1280x960 photo in a
+	/// standard 80x24 terminal. Sized on the column bound alone its box is 30
+	/// rows, so the placement pass could never show it whole and the page held a
+	/// blank hole; contained to the window it places, whole and on aspect.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn tall_raster_fits_the_default_window() {
+		let mut host = image_host_sized(UVec2::new(80, 24), 1280, 960);
+		let keys = placement_keys(&mut host);
+		keys["r"].xpect_less_or_equal_to(24);
+		// the whole raster, uncropped, still on the raster's own aspect
+		keys.contains_key("w").xpect_false();
+		sized_image(UVec2::new(1280, 960))
+			.rows_for(keys["c"])
+			.xpect_eq(keys["r"]);
+	}
+
+	/// The bound is the nearest scroll port, not the window: nested ports, panes
+	/// and sidebars are the general case, so a raster is contained by whichever
+	/// clip it actually renders into.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn raster_bounds_to_its_nested_scroll_port() {
+		let mut host = image_host_with(
+			UVec2::new(80, 24),
+			UVec2::new(1280, 960),
+			vec![scroll_port("outer", 12.), scroll_port("inner", 6.)],
+			rsx! {
+				<div class="outer">
+					<div class="inner">
+						<img src="x.png" alt="a test image"/>
+					</div>
+				</div>
+			},
+		);
+		// bounded by the inner 6-row port, not the 12-row one or the 24-row window
+		placement_keys(&mut host)["r"].xpect_less_or_equal_to(6);
+	}
+
+	/// A raster the scroll port only partly shows places its visible portion with
+	/// a source crop, and scrolling moves that crop rather than dropping the
+	/// picture — which is what made an image pop in and out at the port edges.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn scrolled_raster_places_a_moving_crop() {
+		let mut host = image_host_with(
+			UVec2::new(40, 10),
+			UVec2::new(200, 100),
+			vec![scroll_port("port", 10.)],
+			rsx! {
+				<div class="port">
+					<pre>"a\nb\nc\nd\ne\nf\ng\nh"</pre>
+					<img src="x.png" alt="a test image"/>
+					<pre>"i\nj\nk\nl\nm\nn\no\np"</pre>
+				</div>
+			},
+		);
+		// unscrolled the image straddles the port's *bottom* edge: its top rows
+		// draw, from the matching top source pixels.
+		let bottom = placement_keys(&mut host);
+		bottom["y"].xpect_eq(0);
+		bottom["h"].xpect_less_than(100);
+
+		// scrolled flush to the port top the whole picture draws, uncropped.
+		let rect = image_rect(&mut host);
+		scroll_to(&mut host, rect.min.y);
+		let whole = placement_keys(&mut host);
+		whole.contains_key("y").xpect_false();
+		let rows = whole["r"];
+		bottom["r"].xpect_less_than(rows);
+
+		// two rows further it straddles the *top* edge instead: the crop has moved
+		// down the raster and the picture is still placed, not dropped.
+		scroll_to(&mut host, rect.min.y + 2);
+		let top = placement_keys(&mut host);
+		top["r"].xpect_eq(rows - 2);
+		top["y"].xpect_greater_than(bottom["y"]);
+		top["h"].xpect_eq(100 - top["y"]);
+	}
+
+	/// No window size leaves a raster as a reserved blank with neither a picture
+	/// nor an `[image]: alt` marker: the sizing contains the box to its port and
+	/// the placement crops whatever the port shows.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn every_viewport_places_the_raster() {
+		for size in [
+			UVec2::new(80, 24),
+			UVec2::new(60, 40),
+			UVec2::new(40, 14),
+			UVec2::new(30, 10),
+			UVec2::new(120, 30),
+			UVec2::new(20, 6),
+		] {
+			let mut host = image_host_sized(size, 1280, 960);
+			let keys = placement_keys(&mut host);
+			keys["r"].xpect_greater_or_equal_to(1);
+			keys["c"].xpect_greater_or_equal_to(1);
+			host.frame_plain().xnot().xpect_contains("[image]");
+		}
 	}
 
 	/// A non-PNG image (a JPEG) is decoded and re-encoded to PNG so the kitty

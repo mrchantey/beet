@@ -40,10 +40,7 @@ impl MailStack {
 	pub async fn database_host(&self) -> Result<String> {
 		let endpoint = self
 			.project
-			.output(&format!(
-				"{}_endpoint",
-				self.mail_box.database().label()
-			))
+			.output(&format!("{}_endpoint", self.mail_box.database().label()))
 			.await?;
 		// `endpoint` is `host:port` and every caller names the port itself
 		endpoint

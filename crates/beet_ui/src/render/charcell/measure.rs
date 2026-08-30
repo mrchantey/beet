@@ -74,12 +74,15 @@ pub(super) fn measure_node(
 		}
 		// a kitty-graphics raster occupies its scaled cell rect, an explicit
 		// `width`/`height` constraining it (a missing axis follows the
-		// aspect); the marker alt text presents only when no raster attached
+		// aspect); the marker alt text presents only when no raster attached.
+		// The measure pass is bottom-up, so it cannot know which scroll port the
+		// raster will land in and bounds it by the viewport; the layout pass
+		// re-sizes it against the real port (see `child_port_rows`).
 		_ if let Some(image) = node.kitty_image() => image
 			.cell_size_constrained(
 				box_model.width,
 				box_model.height,
-				content_available.x,
+				CellBounds::new(content_available.x, content_available.y),
 			),
 		// leaf whose content is generated (the `<hr>` rule, `<img>` alt, a
 		// `<select>`'s label). Checked before the value branch: a `<select>`

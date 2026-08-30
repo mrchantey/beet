@@ -1,4 +1,5 @@
 use super::BoxModel;
+use super::CellBounds;
 use crate::style::AlignContent;
 use crate::style::AlignItems;
 use crate::style::AlignSelf;
@@ -172,41 +173,63 @@ pub(crate) fn measure_flex(
 /// a sidebar) wraps into more rows than were reserved, and paint clips the tail.
 /// The layout pass calls this with each node's *assigned* width so the reserved
 /// height matches what paint will flow.
+///
+/// `port_rows` is the height of the nearest scroll port this node renders into
+/// (the viewport when nothing clips), bounding a raster to a box its port can
+/// actually show.
 pub(super) fn resolve_height(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	width: u32,
 	viewport: UVec2,
+	port_rows: u32,
 ) -> u32 {
 	let box_model = BoxModel::from_node(node, viewport);
 	let overhead = box_model.overhead();
 	let content_width = width.saturating_sub(overhead.x);
+	// a clipping node is its descendants' scroll port, but only once it has a
+	// height of its own: an auto-height clip sizes to its content and so bounds
+	// nothing, leaving its own port in force.
+	let child_port_rows =
+		match node.is_scroll_container() || node.layout_style().clips() {
+			true => box_model.height.unwrap_or(port_rows),
+			false => port_rows,
+		};
 	let content_height = match node.layout_style().display {
 		Display::None => 0,
 		// a bare text leaf inherits its ancestor's display (eg `flex` inside a
 		// flex footer): resolve it as the text run it is, never as a container
 		_ if node.is_text_leaf() => measure_text(node, content_width).y,
-		Display::Flex => {
-			resolve_flex_height(node, query, content_width, viewport)
-		}
+		Display::Flex => resolve_flex_height(
+			node,
+			query,
+			content_width,
+			viewport,
+			child_port_rows,
+		),
 		Display::Grid => {
 			measure_grid(node, query, UVec2::new(content_width, 0), viewport).y
 		}
-		Display::Table => {
-			resolve_table_height(node, query, content_width, viewport)
-		}
-		// a kitty raster contains within the assigned width: it honors an explicit
-		// `height` only while that height's aspect-width still fits `content_width`,
-		// and past that (eg a `70vh` hero on a narrow terminal) falls to a
-		// width-driven fit so the picture stays on-screen and aspect-correct rather
-		// than overflowing. The generic explicit-`height` override below is skipped
-		// for rasters so it cannot re-impose the overflowing height.
+		Display::Table => resolve_table_height(
+			node,
+			query,
+			content_width,
+			viewport,
+			child_port_rows,
+		),
+		// a kitty raster contains within the assigned width *and* its scroll port's
+		// rows: it honors an explicit `height` only while that height's aspect-width
+		// still fits `content_width` and the height itself fits the port, and past
+		// that (eg a `70vh` hero on a narrow terminal) falls to a width-driven fit
+		// so the picture stays inside the port and aspect-correct rather than
+		// overflowing. The generic explicit-`height` override below is skipped for
+		// rasters so it cannot re-impose the overflowing height.
 		_ if let Some(image) = node.kitty_image() => {
 			image
 				.cell_size_constrained(
 					box_model.width,
 					box_model.height,
-					content_width,
+					CellBounds::new(content_width, port_rows),
 				)
 				.y
 		}
@@ -223,7 +246,13 @@ pub(super) fn resolve_height(
 			measure_scaled(node.visual_style(), marker, content_width).y
 		}
 		// block container: stack children, each flowed at the constrained width
-		_ => resolve_block_height(node, query, content_width, viewport),
+		_ => resolve_block_height(
+			node,
+			query,
+			content_width,
+			viewport,
+			child_port_rows,
+		),
 	};
 	// an explicit `height` overrides the resolved content height; `min-height`
 	// floors it (eg `100vh` to fill the terminal window) and `max-height` caps it.
@@ -246,6 +275,7 @@ fn resolve_block_height(
 	query: &CharcellQuery,
 	content_width: u32,
 	viewport: UVec2,
+	port_rows: u32,
 ) -> u32 {
 	let child_width = content_width.saturating_sub(marker_gutter(node, query));
 	let children: Vec<_> = node.flow_child_nodes(query).collect();
@@ -255,7 +285,8 @@ fn resolve_block_height(
 		.enumerate()
 		.map(|(i, child)| {
 			let height =
-				resolve_height(child, query, child_width, viewport).max(1);
+				resolve_height(child, query, child_width, viewport, port_rows)
+					.max(1);
 			// the last child's trailing margin doesn't reserve a row (matches
 			// `measure_block` and `block_layout_rects`).
 			match i == last {
@@ -275,6 +306,7 @@ fn resolve_flex_height(
 	query: &CharcellQuery,
 	content_width: u32,
 	viewport: UVec2,
+	port_rows: u32,
 ) -> u32 {
 	let flexbox = node.flexbox();
 	let mut child_sizes = node
@@ -304,6 +336,7 @@ fn resolve_flex_height(
 					// a row's cross axis is height, which is unbounded
 					u32::MAX,
 					viewport,
+					port_rows,
 				);
 				gap + sizes.iter().map(|size| size.y).max().unwrap_or(0)
 			})
@@ -319,7 +352,9 @@ fn resolve_flex_height(
 					.filter_map(|(entity, size)| {
 						query.unresolved_node(*entity).ok().map(|child| {
 							let width = size.x.min(content_width);
-							resolve_height(&child, query, width, viewport)
+							resolve_height(
+								&child, query, width, viewport, port_rows,
+							)
 						})
 					})
 					.sum();
@@ -349,6 +384,7 @@ fn resolve_line_sizes(
 	container_main: u32,
 	container_cross: u32,
 	viewport: UVec2,
+	port_rows: u32,
 ) -> Vec<UVec2> {
 	let vertical =
 		resolve_direction(flexbox.direction, viewport) == Direction::Vertical;
@@ -366,7 +402,9 @@ fn resolve_line_sizes(
 			let node = query.unresolved_node(*entity).ok();
 			let content_height = node
 				.as_ref()
-				.map(|child| resolve_height(child, query, width, viewport))
+				.map(|child| {
+					resolve_height(child, query, width, viewport, port_rows)
+				})
 				.unwrap_or(size.y);
 			// A scroll container (overflow clipped on the main axis) keeps its
 			// flex-grown size, so it clips and scrolls its own content instead of
@@ -409,12 +447,15 @@ fn flex_order(entity: Entity, query: &CharcellQuery) -> i32 {
 ///
 /// Reads pre-computed [`IntrinsicSize`] from the query and writes
 /// each child's rect into `layout_rects`.
+/// `port_rows` is the scroll port height bounding the children laid out here
+/// (see [`resolve_height`]).
 pub(crate) fn flex_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	container_rect: IRect,
 	viewport: UVec2,
 	layout_rects: &mut HashMap<Entity, IRect>,
+	port_rows: u32,
 ) -> Result {
 	let flexbox = node.flexbox();
 
@@ -441,7 +482,11 @@ pub(crate) fn flex_layout_rects(
 			// which overflows a container narrower than the screen), aspect-
 			// containing so a tall `height` never pushes it past the line.
 			let size = if let Some(image) = child.kitty_image() {
-				image.cell_size_constrained(explicit_w, explicit_h, available.x)
+				image.cell_size_constrained(
+					explicit_w,
+					explicit_h,
+					CellBounds::new(available.x, port_rows),
+				)
 			} else {
 				let intrinsic = child.intrinsic_size();
 				UVec2::new(
@@ -485,6 +530,7 @@ pub(crate) fn flex_layout_rects(
 				container_main,
 				container_cross,
 				viewport,
+				port_rows,
 			)
 		})
 		.collect();

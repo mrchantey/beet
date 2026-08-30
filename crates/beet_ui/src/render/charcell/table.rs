@@ -99,6 +99,7 @@ fn row_height(
 	query: &CharcellQuery,
 	widths: &[u32],
 	viewport: UVec2,
+	port_rows: u32,
 ) -> u32 {
 	row.cells
 		.iter()
@@ -107,7 +108,8 @@ fn row_height(
 			let width = widths.get(col).copied().unwrap_or(0);
 			match query.unresolved_node(cell) {
 				Ok(node) => {
-					resolve_height(&node, query, width, viewport).max(1)
+					resolve_height(&node, query, width, viewport, port_rows)
+						.max(1)
 				}
 				Err(_) => 1,
 			}
@@ -127,9 +129,11 @@ pub(super) fn measure_table(
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, &mut HashSet::default());
 	let widths = column_widths(&rows, query, available.x);
+	// the measure pass bounds a raster by the viewport, not a scroll port it
+	// cannot know yet (see `measure_node`).
 	let height = rows
 		.iter()
-		.map(|row| row_height(row, query, &widths, viewport))
+		.map(|row| row_height(row, query, &widths, viewport, available.y))
 		.sum();
 	UVec2::new(widths.iter().sum::<u32>().min(available.x), height)
 }
@@ -140,18 +144,21 @@ pub(super) fn resolve_table_height(
 	query: &CharcellQuery,
 	content_width: u32,
 	viewport: UVec2,
+	port_rows: u32,
 ) -> u32 {
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, &mut HashSet::default());
 	let widths = column_widths(&rows, query, content_width);
 	rows.iter()
-		.map(|row| row_height(row, query, &widths, viewport))
+		.map(|row| row_height(row, query, &widths, viewport, port_rows))
 		.sum()
 }
 
 /// Assign rects across a table's grid: stack rows top-to-bottom and place each
 /// row's cells at their column offsets, every cell as tall as its row. Records
 /// the managed wrapper/row entities so the caller skips re-laying them out.
+/// `port_rows` is the scroll port height bounding the cells laid out here (see
+/// [`resolve_height`]).
 pub(super) fn table_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
@@ -159,6 +166,7 @@ pub(super) fn table_layout_rects(
 	viewport: UVec2,
 	layout_rects: &mut HashMap<Entity, IRect>,
 	managed: &mut HashSet<Entity>,
+	port_rows: u32,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
 	let content =
@@ -172,7 +180,7 @@ pub(super) fn table_layout_rects(
 		if row_y >= content.max.y {
 			break;
 		}
-		let height = row_height(row, query, &widths, viewport);
+		let height = row_height(row, query, &widths, viewport, port_rows);
 		let row_bottom = (row_y + height as i32).min(content.max.y);
 		let mut col_x = content.min.x;
 		for (col, &cell) in row.cells.iter().enumerate() {

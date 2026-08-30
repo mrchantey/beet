@@ -41,6 +41,11 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 			root,
 			IRect::new(0, 0, viewport_size.x as i32, viewport_size.y as i32),
 		);
+		// The scroll port bounding each node's own box, narrowed as the walk
+		// descends into clipping containers (see `child_port_rows`). Nothing clips
+		// above the root, so its port is the whole screen.
+		let mut port_rows = HashMap::<Entity, u32>::new();
+		port_rows.insert(root, viewport_size.y);
 
 		// Read phase: use CharcellQuery to distribute rects to children.
 		// `managed` holds the structural rows/wrappers a table laid out itself, so
@@ -93,6 +98,19 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 					continue;
 				};
 
+				// this node's children are bounded by its own scrollport when it
+				// clips, else by whatever port bounds the node itself.
+				let child_port_rows = child_port_rows(
+					&node,
+					&charcell,
+					node_rect,
+					viewport_size,
+					port_rows.get(&entity).copied().unwrap_or(viewport_size.y),
+				);
+				for child in tree.children_of(entity) {
+					port_rows.insert(child, child_port_rows);
+				}
+
 				match node.layout_style().display {
 					Display::Flex => flex_layout_rects(
 						&node,
@@ -100,6 +118,7 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 						node_rect,
 						viewport_size,
 						&mut layout_rects,
+						child_port_rows,
 					)?,
 					Display::Grid => grid_layout_rects(
 						&node,
@@ -115,6 +134,7 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 						viewport_size,
 						&mut layout_rects,
 						&mut managed,
+						child_port_rows,
 					)?,
 					// a list item lays out as a block; its marker is drawn by the
 					// decorator, so charcell treats `list-item` identically to `block`.
@@ -126,6 +146,7 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 							node_rect,
 							viewport_size,
 							&mut layout_rects,
+							child_port_rows,
 						)?
 					}
 					Display::Inline => inline_layout_rects(
@@ -155,13 +176,40 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 	Ok(())
 }
 
+/// The scroll port height bounding a node's children: its own scrollport when it
+/// clips its overflow (nothing inside a scroll port can ever be shown taller
+/// than the port), else the port it inherited.
+///
+/// Read by the sizing of any raster laid out below, so a picture is contained by
+/// the port it scrolls in — a nested pane or sidebar just as much as the window
+/// — rather than by a bound derived from the screen minus known chrome.
+fn child_port_rows(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	node_rect: IRect,
+	viewport: UVec2,
+	inherited: u32,
+) -> u32 {
+	if !(node.is_scroll_container() || node.layout_style().clips()) {
+		return inherited;
+	}
+	let box_model = BoxModel::from_node(node, viewport);
+	scrollport_of(node, query, box_model.content_rect(node_rect))
+		.height()
+		.max(0) as u32
+}
+
 /// Block flow: stack children top-to-bottom, each taking full parent width.
+///
+/// `port_rows` is the scroll port height bounding the children laid out here
+/// (see [`resolve_height`]).
 pub(crate) fn block_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	container_rect: IRect,
 	viewport: UVec2,
 	layout_rects: &mut HashMap<Entity, IRect>,
+	port_rows: u32,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
 	// a scroll container reserves its scrollbar gutter, so children flow within
@@ -195,12 +243,17 @@ pub(crate) fn block_layout_rects(
 		// flow, clamped to the available width; otherwise it fills the content box.
 		// A kitty raster is a replaced element: like CSS `width: auto` on an
 		// `<img>`, its box hugs the raster's cell width (aspect-derived from an
-		// explicit height when one is given).
+		// explicit height when one is given), narrowed to hold the aspect when its
+		// rows would outgrow the scroll port.
 		let (explicit_w, explicit_h) =
 			explicit_box_size(child, viewport, containing);
 		let raster_w = child.kitty_image().map(|image| {
 			image
-				.cell_size_constrained(explicit_w, explicit_h, full_width)
+				.cell_size_constrained(
+					explicit_w,
+					explicit_h,
+					CellBounds::new(full_width, port_rows),
+				)
 				.x
 		});
 		let child_width = explicit_w
@@ -210,7 +263,7 @@ pub(crate) fn block_layout_rects(
 		// height resolved at the assigned width, not the wider measured width, so
 		// a narrowed column reserves every wrapped row instead of clipping the tail.
 		let child_height = explicit_h.unwrap_or_else(|| {
-			resolve_height(child, query, child_width, viewport)
+			resolve_height(child, query, child_width, viewport, port_rows)
 		});
 		// the last child keeps its full box so its own bottom-margin inset never
 		// clips content; the container was already measured one margin shorter
