@@ -5,7 +5,7 @@ title = "Beet"
 <div bx:style="display=Flex flex-direction=Vertical align-items=Center text-align=Center row-gap=Rem(1.5)">
 	<h1 class="text-display-medium">Beet</h1>
 	<p class="text-title-large">
-		<b>A creative tool engine</b>
+		<b>A malleable engine for sovereign software</b>
 	</p>
 	<div bx:style="max-width=Rem(34.0)">
 		<div class="card-filled">
@@ -23,4 +23,4 @@ title = "Beet"
 </div>
 <br/>
 
-Beet helps you build the perfect stack for cross-domain projects. Websites, agents, robots, games and infra are all under one roof with great defaults and deep extensibility.
+Beet is a malleable engine built on interoperable standards, with apps driven by json scene files that users own and edit. Beet operates at the application layer of the sovereign stack, complementing DWeb and local-first technologies with standardized malleable software.

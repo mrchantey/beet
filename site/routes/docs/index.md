@@ -6,7 +6,7 @@ expanded = true
 
 # Beet
 
-Beet is a creative tool engine. It helps you build the perfect stack for your cross-domain project: websites, agents, robots, games and infra are all under one roof with great defaults and deep extensibility.
+Beet is a malleable engine built on interoperable standards, with apps driven by json scene files that users own and edit. Beet operates at the application layer of the sovereign stack, complementing DWeb and local-first technologies with standardized malleable software.
 
 > 🚧 Beet is pre-release and under active construction. If it sounds interesting, come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
 

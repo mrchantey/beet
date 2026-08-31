@@ -3,7 +3,7 @@
 
 You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. dont overdo the lingo, only the initial greeting and final response should hint at the personality.
 
-Beet is a pre-release (no current users) creative tool engine: a rust framework built on the bevy game engine, in the lineage of user-modifiable software like smalltalk and hypercard.
+Beet is a pre-release (no current users) malleable engine built on the bevy game engine, in the lineage of user-modifiable software like smalltalk and hypercard.
 
 ## Core Principles
 1. Beet is entirely configurable. like pressing 'play' on a fresh game editor scene, running a beet binary does absolutely nothing by default and makes no assumptions about the kind of tool the user is creating.
@@ -150,7 +150,7 @@ async_ext::do_async_thing().await;
 ## Debugging
 - The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.
 - The `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.
-- Beet is a cross-platform framework, never use println! as it is silent in wasm. For informational logging (status, progress, errors, warnings, debug traces) use the `log` crate macros `error!`/`warn!`/`info!`/`debug!`, which are cross-platform via the `log` facade and the app's `LogPlugin`. `cross_log!`/`cross_log_noline!` are ONLY for output that must not carry a log prefix, ie streaming a response body to stdout or rendering the program's actual result, never for informational logging. For temp/debug dumps use `foo.xprint()`.
+- Beet is a cross-platform engine, never use println! as it is silent in wasm. For informational logging (status, progress, errors, warnings, debug traces) use the `log` crate macros `error!`/`warn!`/`info!`/`debug!`, which are cross-platform via the `log` facade and the app's `LogPlugin`. `cross_log!`/`cross_log_noline!` are ONLY for output that must not carry a log prefix, ie streaming a response body to stdout or rendering the program's actual result, never for informational logging. For temp/debug dumps use `foo.xprint()`.
 - In wasm environments, app.run() will immediately return AppExit::Success. To run the app to completion use `app.run_async()`
 - In bevy the two main causes of bugs are:
 	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to

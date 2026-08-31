@@ -60,7 +60,7 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
-	<PackageConfig title="Beet" app_name="beet" description="A creative tool engine built on bevy" version="0.0.9-dev.16"/>
+	<PackageConfig title="Beet" app_name="beet" description="A malleable engine for sovereign software" version="0.0.9-dev.16"/>
 	<RunWasm/>
 	<BuildWasm/>
 	<Check/>

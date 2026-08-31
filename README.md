@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A creative tool engine</strong>
+    <strong>A malleable engine for sovereign software</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -16,7 +16,7 @@
   </h3>
 </div>
 
-Beet helps you build the perfect stack for cross-domain projects. Websites, agents, robots, games and infra are all under one roof with great defaults and deep extensibility.
+Beet is a malleable engine built on interoperable standards, with apps driven by json scene files that users own and edit. Beet operates at the application layer of the sovereign stack, complementing DWeb and local-first technologies with standardized malleable software.
 
 Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component System architecture. See [the beet website](https://beet.org/docs) for more info.
 
