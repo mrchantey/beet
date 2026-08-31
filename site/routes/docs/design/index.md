@@ -8,6 +8,10 @@ The beet design system renders the same target-agnostic scenes to both the web
 and the terminal. Pages are authored once with semantic classes and design
 tokens, never raw CSS.
 
+## Brand
+
+- [Beet Branding](/docs/design/beet-branding)
+
 ## Color
 
 - [Color Schemes](/docs/design/color_schemes)
