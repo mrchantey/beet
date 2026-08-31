@@ -81,7 +81,9 @@ impl IamPolicy {
 		let compute = self.compute.clone();
 		let mut write_buckets = Vec::<String>::new();
 		#[cfg(feature = "bindings_aws_dynamo")]
-		let mut tables = Vec::<&AccessGrant>::new();
+		let mut read_tables = Vec::<String>::new();
+		#[cfg(feature = "bindings_aws_dynamo")]
+		let mut write_tables = Vec::<String>::new();
 		for grant in access.iter() {
 			match grant.kind.as_str() {
 				S3BucketBlock::ACCESS_KIND => match grant.permissions {
@@ -93,7 +95,14 @@ impl IamPolicy {
 					}
 				},
 				#[cfg(feature = "bindings_aws_dynamo")]
-				DynamoTableBlock::ACCESS_KIND => tables.push(grant),
+				DynamoTableBlock::ACCESS_KIND => match grant.permissions {
+					AccessPermissions::Read => {
+						read_tables.push(grant.name.clone())
+					}
+					AccessPermissions::ReadWrite => {
+						write_tables.push(grant.name.clone())
+					}
+				},
 				kind => bevybail!(
 					"a `{kind}` resource was declared alongside this {compute}, \
 					which has no IAM lowering for that kind. Add one to \
@@ -129,23 +138,27 @@ impl IamPolicy {
 			}));
 		}
 
+		// one statement per permission, never one per table: a `Sid` must be
+		// unique within an identity policy, so a stack declaring two read/write
+		// tables would otherwise render two `DeclaredTables` statements and AWS
+		// would reject the whole document as malformed.
 		#[cfg(feature = "bindings_aws_dynamo")]
-		for grant in tables {
-			let (sid, actions) = match grant.permissions {
-				AccessPermissions::Read => {
-					("ReadTables", Self::READ_TABLE_ACTIONS)
-				}
-				AccessPermissions::ReadWrite => {
-					("DeclaredTables", Self::READ_WRITE_TABLE_ACTIONS)
-				}
-			};
-			let region = &self.region;
-			let resource =
-				format!("arn:aws:dynamodb:{region}:*:table/{}", grant.name);
+		if !read_tables.is_empty() {
+			let resource = self.table_arns(&read_tables);
 			self.statements.push(json!({
-				"Sid": sid,
+				"Sid": "ReadTables",
 				"Effect": "Allow",
-				"Action": actions,
+				"Action": Self::READ_TABLE_ACTIONS,
+				"Resource": resource
+			}));
+		}
+		#[cfg(feature = "bindings_aws_dynamo")]
+		if !write_tables.is_empty() {
+			let resource = self.table_arns(&write_tables);
+			self.statements.push(json!({
+				"Sid": "DeclaredTables",
+				"Effect": "Allow",
+				"Action": Self::READ_WRITE_TABLE_ACTIONS,
 				"Resource": resource
 			}));
 		}
@@ -201,6 +214,17 @@ impl IamPolicy {
 			})
 			.collect()
 	}
+
+	/// The arn of each of `tables`, in this policy's region. A table is one arn,
+	/// unlike a bucket, since the dynamodb actions all address the table itself.
+	#[cfg(feature = "bindings_aws_dynamo")]
+	fn table_arns(&self, tables: &[String]) -> Vec<String> {
+		let region = &self.region;
+		tables
+			.iter()
+			.map(|table| format!("arn:aws:dynamodb:{region}:*:table/{table}"))
+			.collect()
+	}
 }
 
 #[cfg(test)]
@@ -245,6 +269,50 @@ mod tests {
 			.unwrap()
 			.is_empty()
 			.xpect_true();
+	}
+
+	/// A `Sid` must be unique within an identity policy, so every grant of one
+	/// permission collapses into ONE statement. Rendering a statement per table
+	/// produced two `DeclaredTables` and AWS rejected the whole document
+	/// (`UNIQUE_SIDS_REQUIRED`), which the site hit the moment it declared a
+	/// second read/write table.
+	#[cfg(feature = "bindings_aws_dynamo")]
+	#[beet_core::test]
+	fn one_statement_per_permission_keeps_sids_unique() {
+		let policy = IamPolicy::new("us-west-2", "test compute")
+			.lower(&AccessGrants::new(vec![
+				AccessGrant::read_write(
+					DynamoTableBlock::ACCESS_KIND,
+					"events",
+				),
+				AccessGrant::read_write(
+					DynamoTableBlock::ACCESS_KIND,
+					"aggregates",
+				),
+				AccessGrant::read(DynamoTableBlock::ACCESS_KIND, "reference"),
+				AccessGrant::read(S3BucketBlock::ACCESS_KIND, "content"),
+				AccessGrant::read_write(S3BucketBlock::ACCESS_KIND, "ops"),
+			]))
+			.unwrap()
+			.render();
+		let statements =
+			serde_json::from_str::<Value>(&policy).unwrap()["Statement"]
+				.as_array()
+				.unwrap()
+				.clone();
+		let sids = statements
+			.iter()
+			.map(|statement| statement["Sid"].as_str().unwrap().to_string())
+			.collect::<Vec<_>>();
+		// four permissions declared, four statements, four distinct sids
+		sids.len().xpect_eq(4);
+		sids.iter().collect::<HashSet<_>>().len().xpect_eq(4);
+		// ..and both read/write tables ride the one statement
+		policy
+			.as_str()
+			.xpect_contains("table/events")
+			.xpect_contains("table/aggregates")
+			.xpect_contains("table/reference");
 	}
 
 	/// A kind with no lowering fails the deploy naming both it and the compute

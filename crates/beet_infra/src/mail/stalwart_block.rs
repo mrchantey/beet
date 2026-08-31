@@ -531,13 +531,20 @@ impl StalwartBlock {
 		// any declared parameter living OUTSIDE the prefix (an overridden
 		// secret name); usually redundant with the prefix and harmlessly so.
 		// Every ARN takes its region from the stack, the one place a region
-		// is answered.
-		for name in &parameters {
+		// is answered. ONE statement for all of them, never one each: a `Sid`
+		// must be unique within an identity policy, so a second declaration
+		// would otherwise render a document AWS rejects as malformed.
+		if !parameters.is_empty() {
 			statements.push(json!({
 				"Sid": "DeclaredParameters",
 				"Effect": "Allow",
 				"Action": ["ssm:GetParameter"],
-				"Resource": format!("arn:aws:ssm:{region}:*:parameter{name}")
+				"Resource": parameters
+					.iter()
+					.map(|name| format!(
+						"arn:aws:ssm:{region}:*:parameter{name}"
+					))
+					.collect::<Vec<_>>()
 			}));
 		}
 
