@@ -22,7 +22,7 @@ pub enum LightsailNetworking {
 /// - Optional DNS records pointing each authority at the public address
 /// - Optional beet ssh on 22, relocating the management sshd
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_add = ErasedBlock::on_add::<LightsailBlock>)]
+#[component(immutable, on_add = ArtifactLabel::on_add::<LightsailBlock>)]
 pub struct LightsailBlock {
 	/// Label used as a prefix for all terraform resources.
 	/// Also used as the artifact name.
@@ -792,13 +792,47 @@ exit 1
 	}
 }
 
-impl Block for LightsailBlock {
-	fn artifact_label(&self) -> Option<&str> { Some(&self.label) }
-	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+impl From<&LightsailBlock> for ArtifactLabel {
+	fn from(block: &LightsailBlock) -> Self { Self(block.label.clone()) }
+}
 
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl LightsailBlock {
+	/// Tofu variables the box's environment reads, ie the
+	/// [`env_vars`](Self::env_vars).
+	pub(crate) fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+
+	/// Contribute the tofu [`Variable`]s the block's env vars declare.
+	pub(crate) fn declare(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&LightsailBlock>,
+	) {
+		scope.render_each(&query, |scope, entity, block| {
+			for variable in block.variables() {
+				scope.variable(entity, variable);
+			}
+			Ok(())
+		});
+	}
+
+	/// Render the box, lowering the stack's declared grants into its runtime
+	/// policy.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&LightsailBlock>,
+	) {
+		scope.render_each(&query, |scope, _entity, block| {
+			let access = scope.access();
+			let (stack, deployment, config) = scope.ctx();
+			block.emit(stack, deployment, &access, config)
+		});
+	}
+
+	/// Emit the box's resources: the IAM identity and its key rotation, the key
+	/// pair, log group, instance, firewall, networking and outputs.
+	fn emit(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
 		access: &AccessGrants,
@@ -944,9 +978,14 @@ impl Block for LightsailBlock {
 		let instance =
 			terra::ResourceDef::new_secondary(instance_ident, instance_details);
 
-		// tcp port helper for the firewall entries below
+		// tcp port helper for the firewall entries below. The cidrs are declared
+		// explicitly rather than left for AWS to fill: `port_info` is set-typed,
+		// so a server-side default the config does not state plans as `must be
+		// replaced` on every apply.
 		let tcp_port = |port: u16| {
 			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+				cidrs: Some(vec!["0.0.0.0/0".into()]),
+				ipv6_cidrs: Some(vec!["::/0".into()]),
 				from_port: port.into(),
 				protocol: "tcp".into(),
 				to_port: port.into(),
@@ -1015,7 +1054,7 @@ impl Block for LightsailBlock {
 						..default()
 					},
 				);
-				let addr = json!(static_ip.field_ref("ip_address"));
+				let addr: Value = static_ip.field_ref("ip_address").into();
 				config.add_resource(&static_ip)?.add_resource(&ip_attach)?;
 				// re-attach static IP when instance is replaced
 				config.set_lifecycle(
@@ -1036,14 +1075,14 @@ impl Block for LightsailBlock {
 			LightsailNetworking::Ipv6 => {
 				let addr_ref = instance.field_ref("ipv6_addresses[0]");
 				self.emit_dns(stack, config, &addr_ref, true)?;
-				(json!(addr_ref), "ipv6")
+				(addr_ref.into(), "ipv6")
 			}
 		};
 
 		// outputs
 		config
 			.add_output("instance_name", terra::Output {
-				value: json!(instance.field_ref("name")),
+				value: instance.field_ref("name").into(),
 				description: Some("The Lightsail instance name".into()),
 				sensitive: None,
 			})?
@@ -1053,17 +1092,17 @@ impl Block for LightsailBlock {
 				sensitive: None,
 			})?
 			.add_output("ssh_private_key", terra::Output {
-				value: json!(keypair.field_ref("private_key")),
+				value: keypair.field_ref("private_key").into(),
 				description: Some("SSH private key for the instance".into()),
 				sensitive: Some(true),
 			})?
 			.add_output("ssh_user", terra::Output {
-				value: json!(self.ssh_user()),
+				value: self.ssh_user().into(),
 				description: Some("SSH user for the instance".into()),
 				sensitive: None,
 			})?
 			.add_output("ip_mode", terra::Output {
-				value: json!(ip_mode),
+				value: ip_mode.into(),
 				description: Some("Networking mode of the instance".into()),
 				sensitive: None,
 			})?;
@@ -1086,62 +1125,37 @@ mod tests {
 		(script.to_string(), dir)
 	}
 
+	/// The scope a lone `block` renders under a fresh local deploy, granting
+	/// nothing (no resource blocks declared beside it).
+	fn render_block(block: &LightsailBlock) -> (RenderScope, TestWorkDir) {
+		let block = block.clone();
+		RenderScope::test_render(move |parent| {
+			parent.spawn(block);
+		})
+	}
+
 	/// The rendered terraform config json for a block.
 	fn build_json(block: &LightsailBlock) -> String {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		build_json_for(block, &stack, &deployment)
-	}
-
-	/// The rendered terraform config json for a block on a specific deploy,
-	/// granting nothing (no resource blocks declared beside it).
-	fn build_json_for(
-		block: &LightsailBlock,
-		stack: &ResolvedStack,
-		deployment: &Deployment,
-	) -> String {
-		build_json_granting(block, stack, deployment, &[])
-	}
-
-	/// The rendered terraform config json for a block deployed alongside
-	/// `declared`, whose grants it lowers into its runtime policy.
-	fn build_json_granting(
-		block: &LightsailBlock,
-		stack: &ResolvedStack,
-		deployment: &Deployment,
-		declared: &[&dyn Block],
-	) -> String {
-		stack.json_granting(deployment, block, declared).unwrap()
+		let (scope, _dir) = render_block(block);
+		scope.finish().unwrap().2.to_json_string().unwrap()
 	}
 
 	/// The `terraform_data` input the access key's replacement is triggered by,
-	/// ie the identity of the box's machine config.
-	fn rotation_input(
-		block: &LightsailBlock,
-		stack: &ResolvedStack,
-		deployment: &Deployment,
-	) -> String {
-		let label = stack
+	/// ie the identity of the box's machine config. Each call is its own
+	/// deploy, so two calls on one block ARE two deploys of the same machine.
+	fn rotation_input(block: &LightsailBlock) -> String {
+		let (scope, _dir) = render_block(block);
+		let label = scope
+			.stack()
 			.resource_ident(block.build_label("key-rotation"))
 			.label()
 			.to_string();
-		serde_json::from_str::<serde_json::Value>(&build_json_for(
-			block, stack, deployment,
-		))
-		.unwrap()["resource"]["terraform_data"][label]["input"]
+		let json = scope.finish().unwrap().2.to_json_string().unwrap();
+		serde_json::from_str::<serde_json::Value>(&json).unwrap()["resource"]
+			["terraform_data"][label]["input"]
 			.as_str()
 			.unwrap()
 			.to_string()
-	}
-
-	/// Two deploys of the same machine config, ie the same box built twice with
-	/// different code.
-	fn two_deploys() -> (ResolvedStack, Deployment, Deployment, TestWorkDir) {
-		let (stack, first, dir) = ResolvedStack::default_local();
-		let second = first
-			.clone()
-			.with_deploy_id(uuid_ext::now_v7())
-			.with_deploy_timestamp("2026-08-19T00:00:00Z".to_string());
-		(stack, first, second, dir)
 	}
 
 	/// `allow_ssh`: the TUI takes 22 (`BEET_SSH_PORT=22`), cloud-init relocates
@@ -1177,11 +1191,17 @@ mod tests {
 	/// a Let's Encrypt issuance) clamped to the 20% baseline.
 	#[beet_core::test]
 	fn code_only_deploy_renders_one_box() {
-		let (stack, first, second, _dir) = two_deploys();
 		let block = LightsailBlock::default().with_allow_ssh(true);
+		// two renders, each its own deploy id and timestamp
+		let (first_scope, _dir) = render_block(&block);
+		let (second_scope, _second_dir) = render_block(&block);
+		let (stack, first, first_config) = first_scope.finish().unwrap();
+		let (_stack, second, second_config) = second_scope.finish().unwrap();
 		first.deploy_id().xpect_not_eq(*second.deploy_id());
-		build_json_for(&block, &stack, &first)
-			.xpect_eq(build_json_for(&block, &stack, &second));
+		first_config
+			.to_json_string()
+			.unwrap()
+			.xpect_eq(second_config.to_json_string().unwrap());
 		// the version it serves is resolved per start from the artifacts
 		// bucket's stable pointer, and named nowhere in the machine config
 		block
@@ -1205,17 +1225,15 @@ mod tests {
 	/// was constant.
 	#[beet_core::test]
 	fn machine_config_change_rebuilds_and_rotates() {
-		let (stack, first, second, _dir) = two_deploys();
 		let block = LightsailBlock::default();
 		// same machine, two deploys: no rotation, so no new user data, so no
 		// replacement
-		rotation_input(&block, &stack, &first)
-			.xpect_eq(rotation_input(&block, &stack, &second));
+		rotation_input(&block).xpect_eq(rotation_input(&block));
 		// a different machine: a new key, and the user data that carries it
-		rotation_input(&block.clone().with_allow_ssh(true), &stack, &first)
-			.xpect_not_eq(rotation_input(&block, &stack, &first));
-		rotation_input(&block.clone().with_app_port(9001), &stack, &first)
-			.xpect_not_eq(rotation_input(&block, &stack, &first));
+		rotation_input(&block.clone().with_allow_ssh(true))
+			.xpect_not_eq(rotation_input(&block));
+		rotation_input(&block.clone().with_app_port(9001))
+			.xpect_not_eq(rotation_input(&block));
 	}
 
 	/// The box's fetch script and the artifacts client name the SAME pointer,
@@ -1378,12 +1396,20 @@ mod tests {
 	/// instance metadata service and the unit file.
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let block = LightsailBlock::default();
-		let json = build_json_granting(&block, &stack, &deployment, &[
-			&S3BucketBlock::new("app").with_deploy_versioned(false),
-			&DynamoTableBlock::new("analytics"),
-		]);
+		let (scope, _dir) = RenderScope::test_render({
+			let block = block.clone();
+			move |parent| {
+				parent.spawn(block);
+				parent.spawn(
+					S3BucketBlock::new("app").with_deploy_versioned(false),
+				);
+				parent.spawn(DynamoTableBlock::new("analytics"));
+			}
+		});
+		let stack = scope.stack().clone();
+		let deployment = scope.deployment().clone();
+		let json = scope.finish().unwrap().2.to_json_string().unwrap();
 		json.as_str()
 			// scoped to the resources the stack DECLARED, resolved through the
 			// one naming composition rather than restated on the block.
@@ -1647,20 +1673,7 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let block = LightsailBlock::default();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
-		let project = terra::Project::new(stack, deployment, config);
-		project.validate().await.unwrap();
+		let (scope, _dir) = render_block(&LightsailBlock::default());
+		scope.project().unwrap().validate().await.unwrap();
 	}
 }

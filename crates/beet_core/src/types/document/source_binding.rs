@@ -275,7 +275,7 @@ mod test {
 	#[crate::test]
 	fn mirrors_source_field() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 		let binding = world
 			.spawn((
 				ChildOf(doc),
@@ -294,7 +294,7 @@ mod test {
 
 		// a source change re-mirrors
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "name": "Bob" });
+			value!({ "name": "Bob" });
 		world.update_local();
 		world
 			.entity(binding)
@@ -307,7 +307,7 @@ mod test {
 	#[crate::test]
 	fn never_writes_back() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 		let binding = world
 			.spawn((
 				ChildOf(doc),
@@ -335,7 +335,7 @@ mod test {
 	fn subject_resolves_from_props_store() {
 		let mut world = DocumentPlugin::world();
 		// user doc -> props store; the binding entity is outside the hierarchy
-		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 		let store = world
 			.spawn((ChildOf(doc), Document::default(), PropsDocument))
 			.id();
@@ -363,11 +363,11 @@ mod test {
 	#[crate::test]
 	fn source_chain_is_iteration_order_independent() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 		let store = world
 			.spawn((
 				ChildOf(doc),
-				Document::new(val!({ "title": null })),
+				Document::new(value!({ "title": null })),
 				PropsDocument,
 			))
 			.id();
@@ -401,13 +401,13 @@ mod test {
 	#[crate::test]
 	fn source_chains_into_props_store() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 		// the bound key is pre-seeded (as `resolve.rs` does), so a freshly added
 		// body Value (Null) never racily seeds it via write-back
 		let store = world
 			.spawn((
 				ChildOf(doc),
-				Document::new(val!({ "title": null })),
+				Document::new(value!({ "title": null })),
 				PropsDocument,
 			))
 			.id();
@@ -437,7 +437,7 @@ mod test {
 
 		// reactive: a source document change reaches the body
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "name": "Bob" });
+			value!({ "name": "Bob" });
 		world.update_local();
 		world.update_local();
 		world

@@ -59,10 +59,7 @@ pub async fn MailHealthAction(
 		.get_cloned::<MailHealth>()
 		.await
 		.unwrap_or_default();
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let hostname = mail.mail_box.hostname().to_string();
 
 	check_banner(&hostname, *health.timeout()).await?;

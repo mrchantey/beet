@@ -354,7 +354,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	fn page_view_body() -> Value {
-		val!({
+		value!({
 			"kind": "page_view",
 			"page_view_id": "0192f8a0-0000-7000-8000-000000000000",
 			"session": "0192f8a0-0000-7000-8000-0000000000ff",
@@ -394,7 +394,7 @@ mod test {
 	#[beet_core::test]
 	fn parses_interaction_kinds_with_fresh_ids() {
 		let click = AnalyticsEvent::from_beacon(
-			val!({
+			value!({
 				"kind": "click",
 				"path": "/",
 				"reason": "button-click",
@@ -409,7 +409,7 @@ mod test {
 		matches!(click.data, AnalyticsEventData::Click { .. }).xpect_true();
 
 		AnalyticsEvent::from_beacon(
-			val!({ "kind": "scroll", "path": "/", "max_percent": 80u64 }),
+			value!({ "kind": "scroll", "path": "/", "max_percent": 80u64 }),
 			None,
 			None,
 			None,
@@ -419,7 +419,7 @@ mod test {
 		.xpect_eq(AnalyticsEventKind::Scroll);
 
 		AnalyticsEvent::from_beacon(
-			val!({ "kind": "error", "path": "/", "message": "boom" }),
+			value!({ "kind": "error", "path": "/", "message": "boom" }),
 			None,
 			None,
 			None,
@@ -462,7 +462,7 @@ mod test {
 	#[beet_core::test]
 	fn cookie_session_fills_when_body_absent() {
 		let cookie = uuid_ext::now_v7();
-		let body = val!({ "path": "/", "page_view_id": "not-a-uuid" });
+		let body = value!({ "path": "/", "page_view_id": "not-a-uuid" });
 		let event = AnalyticsEvent::from_beacon(body, Some(cookie), None, None)
 			.unwrap();
 		event.session.xpect_eq(Some(cookie));

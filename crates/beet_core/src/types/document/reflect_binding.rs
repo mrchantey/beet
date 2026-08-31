@@ -213,7 +213,7 @@ mod test {
 	#[crate::test]
 	fn document_writes_component_field() {
 		let mut world = world();
-		let doc = world.spawn(Document::new(val!({ "level": 7i64 }))).id();
+		let doc = world.spawn(Document::new(value!({ "level": 7i64 }))).id();
 		// bind document `level` -> Dial.value via the co-located FieldRef Value.
 		world.spawn((
 			ChildOf(doc),
@@ -231,7 +231,7 @@ mod test {
 	#[crate::test]
 	fn component_field_writes_back_to_document() {
 		let mut world = world();
-		let doc = world.spawn(Document::new(val!({ "level": 0i64 }))).id();
+		let doc = world.spawn(Document::new(value!({ "level": 0i64 }))).id();
 		let entity = world
 			.spawn((
 				ChildOf(doc),

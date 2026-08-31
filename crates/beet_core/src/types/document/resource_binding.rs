@@ -195,7 +195,7 @@ mod test {
 	fn document_writes_resource_field() {
 		let mut world = world();
 		world.insert_resource(Theme::default());
-		let doc = world.spawn(Document::new(val!({ "level": 7i64 }))).id();
+		let doc = world.spawn(Document::new(value!({ "level": 7i64 }))).id();
 		// bind document `level` -> Theme.contrast via the co-located FieldRef Value.
 		world.spawn((
 			ChildOf(doc),
@@ -212,7 +212,7 @@ mod test {
 	fn resource_field_writes_back_to_document() {
 		let mut world = world();
 		world.insert_resource(Theme::default());
-		let doc = world.spawn(Document::new(val!({ "level": 0i64 }))).id();
+		let doc = world.spawn(Document::new(value!({ "level": 0i64 }))).id();
 		world.spawn((
 			ChildOf(doc),
 			Value::default(),

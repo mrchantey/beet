@@ -17,7 +17,7 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ErasedBlock::on_add::<S3BucketBlock>)]
+#[component(immutable)]
 pub struct S3BucketBlock {
 	label: SmolStr,
 	/// Override the region this bucket lives in, which otherwise resolves from
@@ -169,13 +169,54 @@ pub(crate) fn attach_s3_store(
 		});
 }
 
-impl Block for S3BucketBlock {
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl S3BucketBlock {
+	/// A deployed process reads the buckets declared alongside it (its site
+	/// store, its assets); the deploy itself is what writes them. A bucket the
+	/// process stores into declares [`runtime_write`](Self::with_runtime_write).
+	pub(crate) fn runtime_access(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
-		_deployment: &Deployment,
-		_access: &AccessGrants,
+	) -> Vec<AccessGrant> {
+		let name = stack.resource_name(self.label.clone());
+		vec![match self.runtime_write {
+			true => AccessGrant::read_write(Self::ACCESS_KIND, name),
+			false => AccessGrant::read(Self::ACCESS_KIND, name),
+		}]
+	}
+
+	/// Declare the runtime grant a compute block lowers: read for a bucket the
+	/// deploy publishes and the process serves, read/write for one the process
+	/// stores into.
+	pub(crate) fn declare(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&S3BucketBlock>,
+	) {
+		scope.render_each(&query, |scope, entity, block| {
+			for grant in block.runtime_access(scope.stack()) {
+				scope.grant(entity, grant);
+			}
+			Ok(())
+		});
+	}
+
+	/// Render the bucket and its secondaries into the config.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&S3BucketBlock>,
+	) {
+		scope.render_each(&query, |scope, _entity, block| {
+			let (stack, _deployment, config) = scope.ctx();
+			block.emit(stack, config)
+		});
+	}
+
+	/// Emit this bucket's resources: the bucket, its optional output, and the
+	/// public-read / versioning secondaries.
+	fn emit(
+		&self,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 	) -> Result {
 		let bucket = ResourceDef::new_primary(
@@ -191,7 +232,7 @@ impl Block for S3BucketBlock {
 		config.add_layer_resource(self.layer.clone(), &bucket)?;
 		if self.output {
 			config.add_output(self.output_label(), terra::Output {
-				value: json!(bucket.field_ref("bucket")),
+				value: bucket.field_ref("bucket").into(),
 				description: Some(
 					format!("The bucket name for {}", self.label).into(),
 				),
@@ -205,17 +246,6 @@ impl Block for S3BucketBlock {
 			self.emit_versioning(stack, config, &bucket)?;
 		}
 		Ok(())
-	}
-
-	/// A deployed process reads the buckets declared alongside it (its site
-	/// store, its assets); the deploy itself is what writes them. A bucket the
-	/// process stores into declares [`runtime_write`](Self::with_runtime_write).
-	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
-		let name = stack.resource_name(self.label.clone());
-		vec![match self.runtime_write {
-			true => AccessGrant::read_write(Self::ACCESS_KIND, name),
-			false => AccessGrant::read(Self::ACCESS_KIND, name),
-		}]
 	}
 }
 
@@ -353,26 +383,18 @@ impl S3BucketBlock {
 mod tests {
 	use super::*;
 
-	/// The config `block` emits, and the throwaway stack it was resolved against.
+	/// The config `block` renders, and the stack it was resolved against.
 	fn build_config(block: S3BucketBlock) -> (ResolvedStack, terra::Config) {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(block);
+		});
+		let (stack, _deployment, config) = scope.finish().unwrap();
 		(stack, config)
 	}
 
-	/// The terraform json emitted by `block`.
+	/// The terraform json rendered by `block`.
 	fn build_json(block: S3BucketBlock) -> String {
-		build_config(block).1.to_json().to_string()
+		build_config(block).1.to_json_string().unwrap()
 	}
 
 	/// Both grants matter: `GetObject` serves the objects, `ListBucket` lets a
@@ -409,20 +431,23 @@ mod tests {
 	/// the bucket, so a lowering compute block can tell the two apart.
 	#[beet_core::test]
 	fn runtime_write_escalates_the_grant() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		S3BucketBlock::new("app")
-			.runtime_access(&stack)
-			.xpect_eq(vec![AccessGrant::read(
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(S3BucketBlock::new("app"));
+			parent.spawn(
+				S3BucketBlock::new("mail-blobs").with_runtime_write(true),
+			);
+		});
+		let stack = scope.stack().clone();
+		scope.access().to_vec().xpect_eq(vec![
+			AccessGrant::read(
 				S3BucketBlock::ACCESS_KIND,
 				stack.resource_name("app"),
-			)]);
-		S3BucketBlock::new("mail-blobs")
-			.with_runtime_write(true)
-			.runtime_access(&stack)
-			.xpect_eq(vec![AccessGrant::read_write(
+			),
+			AccessGrant::read_write(
 				S3BucketBlock::ACCESS_KIND,
 				stack.resource_name("mail-blobs"),
-			)]);
+			),
+		]);
 	}
 
 	/// A source of record keeps its versions, and expires the noncurrent ones so

@@ -259,7 +259,8 @@ mod test {
 	#[crate::test]
 	fn document_query_get_and_get_mut() {
 		let mut world = World::new();
-		let entity = world.spawn(Document::new(val!({ "value": 42i64 }))).id();
+		let entity =
+			world.spawn(Document::new(value!({ "value": 42i64 }))).id();
 
 		// Test get
 		world
@@ -310,7 +311,7 @@ mod test {
 	#[crate::test]
 	fn document_query_with_field() {
 		let mut world = World::new();
-		let entity = world.spawn(Document::new(val!({ "count": 5i64 }))).id();
+		let entity = world.spawn(Document::new(value!({ "count": 5i64 }))).id();
 
 		let field = FieldRef::new("count");
 
@@ -382,7 +383,7 @@ mod test {
 	fn document_query_resolve_card() {
 		let mut world = World::new();
 		let card = world
-			.spawn(Document::new(val!({ "card_data": "test" })))
+			.spawn(Document::new(value!({ "card_data": "test" })))
 			.id();
 		let child = world.spawn(ChildOf(card)).id();
 
@@ -404,7 +405,7 @@ mod test {
 	fn document_query_resolve_root() {
 		let mut world = World::new();
 		let root = world
-			.spawn(Document::new(val!({ "root_data": "root_test" })))
+			.spawn(Document::new(value!({ "root_data": "root_test" })))
 			.id();
 		let child = world.spawn(ChildOf(root)).id();
 

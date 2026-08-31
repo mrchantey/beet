@@ -152,7 +152,7 @@ pub async fn test_start() -> i32 { crate::testing::test_start().await }
 /// use beet_core::prelude::*;
 /// ```
 pub mod prelude {
-	pub use crate::val;
+	pub use crate::value;
 
 	// Re-export alloc types so modules using `crate::prelude::*` get them
 	// regardless of std/no_std. This avoids scattering `use alloc::*`

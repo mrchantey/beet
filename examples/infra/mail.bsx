@@ -67,10 +67,11 @@ reads one back in, asserting the receiving end believes both.
 
 		<!-- the network the box sits in. No NAT gateway: the box has a public
 		     address of its own and the database has nothing to call out to. -->
-		<VpcBlock label="net"/>
-		<!-- mail metadata, in the private subnets, reachable only from the box's
-		     security group (named by the label that block declares). -->
-		<RdsPostgresBlock label="db" vpc="net" database="mail" consumers={["mail"]}/>
+		<VpcBlock bx:ref="net" label="net"/>
+		<!-- mail metadata, in the private subnets, reachable only from the
+		     security groups of the consumers whose `DatabaseRef` targets it
+		     (the box below; each consumer emits its own admission). -->
+		<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
 		<!-- message bodies: the source of record, so versioned and not
 		     force-destroyable. -->
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
@@ -81,7 +82,7 @@ reads one back in, asserting the receiving end believes both.
 		     the domains it serves come and go. It holds no state worth keeping, so
 		     any machine-config change simply replaces it. -->
 		<StalwartBlock label="mail" hostname="mail.example.com"
-			vpc="net" database="db" blob_bucket="mail-blobs"
+			blob_bucket="mail-blobs" {(VpcRef($net), DatabaseRef($db))}
 			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
 

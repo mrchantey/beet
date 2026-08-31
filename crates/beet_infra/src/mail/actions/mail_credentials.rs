@@ -40,10 +40,7 @@ pub async fn MailCredentialsAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let infra = cx.has_param("infra");
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let region = mail.stack.region().clone();
 	let label = mail.mail_box.label();
 
@@ -83,7 +80,7 @@ pub async fn MailCredentialsAction(
 	if infra {
 		entries.push((
 			format!("{} database", mail.mail_box.db_name()),
-			mail.mail_box.database().secret(),
+			mail.database.secret(),
 			"postgres master password".to_string(),
 		));
 		// keys exist exactly where `EnsureDkimKey` mints them, ie wherever the

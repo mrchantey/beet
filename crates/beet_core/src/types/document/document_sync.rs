@@ -36,7 +36,7 @@
 //!
 //! // Create a document with a value child
 //! world.spawn((
-//!     Document::new(val!({ "score": 100i64 })),
+//!     Document::new(value!({ "score": 100i64 })),
 //!     children![(Value::default(), FieldRef::new("score"))],
 //! ));
 //!
@@ -274,7 +274,7 @@ mod test {
 	fn link_creates_relationship() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world.spawn(Document::new(val!({ "x": "value" }))).id();
+		let card = world.spawn(Document::new(value!({ "x": "value" }))).id();
 		let text = world
 			.spawn((ChildOf(card), Value::default(), FieldRef::new("x")))
 			.id();
@@ -298,7 +298,7 @@ mod test {
 	fn unlink_removes_relationship() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world.spawn(Document::new(val!({ "x": "value" }))).id();
+		let card = world.spawn(Document::new(value!({ "x": "value" }))).id();
 		let text = world
 			.spawn((ChildOf(card), Value::default(), FieldRef::new("x")))
 			.id();
@@ -321,7 +321,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		let root = world
-			.spawn(Document::new(val!({ "root_val": "from_root" })))
+			.spawn(Document::new(value!({ "root_val": "from_root" })))
 			.id();
 		let child = world.spawn(ChildOf(root)).id();
 		let text = world
@@ -353,7 +353,7 @@ mod test {
 		let card = world
 			.spawn((
 				ChildOf(root),
-				Document::new(val!({ "card_val": "from_card" })),
+				Document::new(value!({ "card_val": "from_card" })),
 			))
 			.id();
 		// Nested child
@@ -380,13 +380,13 @@ mod test {
 	fn ancestor_skips_props_document() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "name": "user_doc" })))
+			.spawn(Document::new(value!({ "name": "user_doc" })))
 			.id();
 		// a props store between the user doc and the field
 		let store = world
 			.spawn((
 				ChildOf(doc),
-				Document::new(val!({ "name": "props_doc" })),
+				Document::new(value!({ "name": "props_doc" })),
 				PropsDocument,
 			))
 			.id();
@@ -410,12 +410,12 @@ mod test {
 	fn resolves_props_document_path() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "name": "user_doc" })))
+			.spawn(Document::new(value!({ "name": "user_doc" })))
 			.id();
 		let store = world
 			.spawn((
 				ChildOf(doc),
-				Document::new(val!({ "name": "props_doc" })),
+				Document::new(value!({ "name": "props_doc" })),
 				PropsDocument,
 			))
 			.id();
@@ -444,12 +444,12 @@ mod test {
 		let mut world = DocumentPlugin::world();
 		// outer store -> inner store: each Props ref resolves its nearest store
 		let outer = world
-			.spawn((Document::new(val!({ "name": "outer" })), PropsDocument))
+			.spawn((Document::new(value!({ "name": "outer" })), PropsDocument))
 			.id();
 		let inner = world
 			.spawn((
 				ChildOf(outer),
-				Document::new(val!({ "name": "inner" })),
+				Document::new(value!({ "name": "inner" })),
 				PropsDocument,
 			))
 			.id();
@@ -489,7 +489,7 @@ mod test {
 
 		// Explicit entity reference
 		let target = world
-			.spawn(Document::new(val!({ "explicit": "target_doc" })))
+			.spawn(Document::new(value!({ "explicit": "target_doc" })))
 			.id();
 
 		// Unrelated entity with value
@@ -514,10 +514,9 @@ mod test {
 	fn handles_null_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((Document::new(val!({ "nullable": null })), children![(
-			Value::Str("initial".into()),
-			FieldRef::new("nullable")
-		)]));
+		world.spawn((Document::new(value!({ "nullable": null })), children![
+			(Value::Str("initial".into()), FieldRef::new("nullable"))
+		]));
 
 		world.update_local();
 
@@ -534,7 +533,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Document::new(val!({ "items": [1i64, 2i64, 3i64] })),
+			Document::new(value!({ "items": [1i64, 2i64, 3i64] })),
 			children![(Value::default(), FieldRef::new("items"))],
 		));
 
@@ -552,7 +551,7 @@ mod test {
 	fn handles_bool_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((Document::new(val!({ "flag": true })), children![(
+		world.spawn((Document::new(value!({ "flag": true })), children![(
 			Value::default(),
 			FieldRef::new("flag")
 		)]));
@@ -596,7 +595,7 @@ mod test {
 	#[crate::test]
 	fn value_change_writes_document() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "old" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "old" }))).id();
 		let child = world
 			.spawn((ChildOf(doc), Value::default(), FieldRef::new("name")))
 			.id();
@@ -617,7 +616,7 @@ mod test {
 	#[crate::test]
 	fn converges_in_one_pass_no_loop() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "old" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "old" }))).id();
 		let child = world
 			.spawn((ChildOf(doc), Value::default(), FieldRef::new("name")))
 			.id();
@@ -645,7 +644,7 @@ mod test {
 	#[crate::test]
 	fn document_wins_same_pass_conflict() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "start" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "start" }))).id();
 		let child = world
 			.spawn((ChildOf(doc), Value::default(), FieldRef::new("name")))
 			.id();
@@ -653,7 +652,7 @@ mod test {
 
 		// mutate both sides to different values in the same pass
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "name": "from_doc" });
+			value!({ "name": "from_doc" });
 		*world.entity_mut(child).get_mut::<Value>().unwrap() =
 			Value::Str("from_value".into());
 		world.update_local();
@@ -668,7 +667,7 @@ mod test {
 	fn value_seeds_missing_field() {
 		let mut world = DocumentPlugin::world();
 		// document present but missing the "name" field
-		let doc = world.spawn(Document::new(val!({ "other": 1i64 }))).id();
+		let doc = world.spawn(Document::new(value!({ "other": 1i64 }))).id();
 		let child = world
 			.spawn((ChildOf(doc), Value::default(), FieldRef::new("name")))
 			.id();
@@ -687,7 +686,7 @@ mod test {
 	#[crate::test]
 	fn emit_error_missing_field_skipped() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "other": 1i64 }))).id();
+		let doc = world.spawn(Document::new(value!({ "other": 1i64 }))).id();
 		let child = world
 			.spawn((
 				ChildOf(doc),
@@ -703,7 +702,7 @@ mod test {
 		world.update_local();
 
 		let document = world.entity(doc).get::<Document>().unwrap().0.clone();
-		document.xpect_eq(val!({ "other": 1i64 }));
+		document.xpect_eq(value!({ "other": 1i64 }));
 	}
 
 	#[crate::test]
@@ -757,7 +756,7 @@ mod test {
 	#[crate::test]
 	fn bidirectional_round_trip() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "start" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "start" }))).id();
 		let child = world
 			.spawn((ChildOf(doc), Value::default(), FieldRef::new("name")))
 			.id();
@@ -775,7 +774,7 @@ mod test {
 
 		// document → Value again, proving the loop is alive in both directions
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "name": "reloaded" });
+			value!({ "name": "reloaded" });
 		world.update_local();
 		read_value(&mut world, child).xpect_eq(Value::Str("reloaded".into()));
 	}

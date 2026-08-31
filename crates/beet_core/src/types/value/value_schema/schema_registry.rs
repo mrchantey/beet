@@ -216,13 +216,13 @@ mod test {
 		let resolved = registry.resolve(&list_schema);
 		// a valid list of todo items passes
 		resolved
-			.validate(&mut val!([{ "label": "buy milk" }]))
+			.validate(&mut value!([{ "label": "buy milk" }]))
 			.await
 			.is_empty()
 			.xpect_true();
 		// a todo item missing its required `label` fails recursively
 		resolved
-			.validate(&mut val!([{}]))
+			.validate(&mut value!([{}]))
 			.await
 			.is_empty()
 			.xpect_false();

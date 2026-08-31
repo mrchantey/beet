@@ -626,7 +626,7 @@ impl<V: Into<Value>> From<HashMap<SmolStr, V>> for Value {
 	}
 }
 
-// ── val! macro ──────────────────────────────────────────────────────
+// ── value! macro ──────────────────────────────────────────────────────
 
 /// Creates a [`Value`] from a literal expression.
 ///
@@ -634,7 +634,7 @@ impl<V: Into<Value>> From<HashMap<SmolStr, V>> for Value {
 ///
 /// ```rust,no_run
 /// # use beet_core::prelude::*;
-/// let value = val!({
+/// let value = value!({
 ///     "name": "Alice",
 ///     "score": 100,
 ///     "items": [1, 2, 3],
@@ -642,7 +642,7 @@ impl<V: Into<Value>> From<HashMap<SmolStr, V>> for Value {
 /// });
 /// ```
 #[macro_export]
-macro_rules! val {
+macro_rules! value {
 	// Null
 	(null) => {
 		$crate::prelude::Value::Null
@@ -658,7 +658,7 @@ macro_rules! val {
 
 	// Array
 	([ $($elem:tt),* $(,)? ]) => {
-		$crate::prelude::Value::List(vec![ $( $crate::val!($elem) ),* ])
+		$crate::prelude::Value::List(vec![ $( $crate::value!($elem) ),* ])
 	};
 
 	// Empty object
@@ -671,7 +671,7 @@ macro_rules! val {
 		{
 			let mut map = $crate::prelude::Map::default();
 			$(
-				map.insert($key, $crate::val!($value));
+				map.insert($key, $crate::value!($value));
 			)+
 			$crate::prelude::Value::Map(map)
 		}
@@ -837,32 +837,32 @@ mod test {
 	}
 
 	#[crate::test]
-	fn val_macro_null() { val!(null).xpect_eq(Value::Null); }
+	fn value_macro_null() { value!(null).xpect_eq(Value::Null); }
 
 	#[crate::test]
-	fn val_macro_bool() {
-		val!(true).xpect_eq(Value::Bool(true));
-		val!(false).xpect_eq(Value::Bool(false));
+	fn value_macro_bool() {
+		value!(true).xpect_eq(Value::Bool(true));
+		value!(false).xpect_eq(Value::Bool(false));
 	}
 
 	#[crate::test]
-	fn val_macro_string() {
-		val!("hello").xpect_eq(Value::Str("hello".into()));
+	fn value_macro_string() {
+		value!("hello").xpect_eq(Value::Str("hello".into()));
 	}
 
 	#[crate::test]
-	fn val_macro_number() { val!(42).xpect_eq(Value::Int(42)); }
+	fn value_macro_number() { value!(42).xpect_eq(Value::Int(42)); }
 
 	#[crate::test]
-	fn val_macro_array() {
-		let value = val!([1, 2, 3]);
+	fn value_macro_array() {
+		let value = value!([1, 2, 3]);
 		let list = value.as_list().unwrap();
 		list.len().xpect_eq(3);
 	}
 
 	#[crate::test]
-	fn val_macro_object() {
-		let value = val!({
+	fn value_macro_object() {
+		let value = value!({
 			"name": "Alice",
 			"score": 100
 		});
@@ -872,8 +872,8 @@ mod test {
 	}
 
 	#[crate::test]
-	fn val_macro_nested() {
-		let value = val!({
+	fn value_macro_nested() {
+		let value = value!({
 			"user": {
 				"name": "Bob"
 			},
@@ -891,8 +891,8 @@ mod test {
 		use std::hash::Hash;
 		use std::hash::Hasher;
 
-		let val1 = val!({"a": 1, "b": 2});
-		let val2 = val!({"a": 1, "b": 2});
+		let val1 = value!({"a": 1, "b": 2});
+		let val2 = value!({"a": 1, "b": 2});
 
 		let mut hasher1 = DefaultHasher::new();
 		let mut hasher2 = DefaultHasher::new();

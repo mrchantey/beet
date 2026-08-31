@@ -26,6 +26,17 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::Stack>()
 			.init_resource::<crate::prelude::Deployment>();
 
+		// the deploy render schedule: every declaration lands before any render
+		// reads the grant pool. Target-agnostic like the definitions, so a wasm
+		// consumer renders the stack it cannot apply.
+		use crate::prelude::DeployRender;
+		use crate::prelude::DeployRenderSet;
+		app.init_schedule(DeployRender);
+		app.configure_sets(
+			DeployRender,
+			(DeployRenderSet::Declare, DeployRenderSet::Render).chain(),
+		);
+
 		// the deploy `Variable` + its value resolution, a field of the blocks'
 		// `env_vars` (always compiled, in `types/`).
 		app.register_type::<crate::types::Variable>()
@@ -36,14 +47,32 @@ impl Plugin for InfraPlugin {
 		// `<DynamoTableBlock label="analytics"/>` spawn by tag in any build
 		// carrying their default-on binding features.
 		#[cfg(feature = "bindings_aws_common")]
-		app.register_type::<crate::prelude::S3BucketBlock>();
+		app.register_type::<crate::prelude::S3BucketBlock>()
+			.add_systems(
+				DeployRender,
+				(
+					crate::prelude::S3BucketBlock::declare
+						.in_set(DeployRenderSet::Declare),
+					crate::prelude::S3BucketBlock::render
+						.in_set(DeployRenderSet::Render),
+				),
+			);
 		#[cfg(feature = "bindings_aws_dynamo")]
-		app.register_type::<crate::prelude::DynamoTableBlock>();
+		app.register_type::<crate::prelude::DynamoTableBlock>()
+			.add_systems(
+				DeployRender,
+				(
+					crate::prelude::DynamoTableBlock::declare
+						.in_set(DeployRenderSet::Declare),
+					crate::prelude::DynamoTableBlock::render
+						.in_set(DeployRenderSet::Render),
+				),
+			);
 
 		// ..and the runtime half of those declarations: one observer per block
-		// type attaching the live store, so the deploy meaning (the always
-		// compiled `ErasedBlock` hook) and the runtime meaning hang off the one
-		// entity the markup declared.
+		// type attaching the live store, so the deploy meaning (the render
+		// systems above) and the runtime meaning hang off the one entity the
+		// markup declared.
 		#[cfg(all(
 			feature = "bindings_aws_common",
 			feature = "aws_sdk",
@@ -56,28 +85,89 @@ impl Plugin for InfraPlugin {
 		))]
 		app.add_observer(crate::blocks::attach_table_store);
 
-		// the serverless function and the handle another block names it by, so a
-		// stack authors `<LambdaBlock label="rollup"/>` from markup rather than
-		// only from Rust.
+		// the serverless function, so a stack authors `<LambdaBlock
+		// label="rollup"/>` from markup rather than only from Rust.
 		#[cfg(feature = "lambda_block")]
 		app.register_type::<crate::prelude::LambdaBlock>()
-			.register_type::<crate::prelude::LambdaRef>();
+			.add_systems(
+				DeployRender,
+				(
+					crate::prelude::LambdaBlock::declare
+						.in_set(DeployRenderSet::Declare),
+					crate::prelude::LambdaBlock::render
+						.in_set(DeployRenderSet::Render),
+				),
+			);
 
-		// the recurring timer, ie `<ScheduledJobBlock target="rollup"
+		// the compute and failover blocks are Rust-authored (no register_type
+		// yet), but their render systems run wherever they compile.
+		#[cfg(feature = "fargate_block")]
+		app.add_systems(
+			DeployRender,
+			(
+				crate::prelude::FargateBlock::declare
+					.in_set(DeployRenderSet::Declare),
+				crate::prelude::FargateBlock::render
+					.in_set(DeployRenderSet::Render),
+			),
+		);
+		#[cfg(feature = "lightsail_block")]
+		app.add_systems(
+			DeployRender,
+			(
+				crate::prelude::LightsailBlock::declare
+					.in_set(DeployRenderSet::Declare),
+				crate::prelude::LightsailBlock::render
+					.in_set(DeployRenderSet::Render),
+			),
+		);
+		#[cfg(feature = "cloudflare_dns")]
+		app.add_systems(
+			DeployRender,
+			crate::prelude::CloudflareFailoverBlock::render
+				.in_set(DeployRenderSet::Render),
+		);
+
+		// the recurring timer and the relation naming the lambda it invokes, ie
+		// `<ScheduledJobBlock {InvokeTarget($rollup)}
 		// schedule="cron(0 3 * * ? *)" path="analytics/rollup"/>`.
 		#[cfg(feature = "scheduled_job_block")]
-		app.register_type::<crate::prelude::ScheduledJobBlock>();
+		app.register_type::<crate::prelude::ScheduledJobBlock>()
+			.register_type::<crate::prelude::InvokeTarget>()
+			.register_type::<crate::prelude::Invokers>()
+			.add_systems(
+				DeployRender,
+				crate::prelude::ScheduledJobBlock::render
+					.in_set(DeployRenderSet::Render),
+			);
 
-		// the network and the database, spawned by tag (`<VpcBlock label="net"/>`,
-		// `<RdsPostgresBlock label="db" vpc="net"/>`) in any build carrying them.
+		// the network and the database, spawned by tag (`<VpcBlock bx:ref="net"
+		// label="net"/>`, `<RdsPostgresBlock label="db" {VpcRef($net)}/>`) in
+		// any build carrying them, and the relations their consumers name them
+		// through.
 		#[cfg(feature = "vpc_block")]
 		app.register_type::<crate::prelude::VpcBlock>()
 			.register_type::<crate::prelude::VpcRef>()
+			.register_type::<crate::prelude::VpcConsumers>()
 			.register_type::<crate::prelude::SubnetTier>()
-			.register_type::<crate::prelude::SecurityGroupRef>();
+			.add_systems(
+				DeployRender,
+				crate::prelude::VpcBlock::render
+					.in_set(DeployRenderSet::Render),
+			);
 		#[cfg(feature = "rds_postgres_block")]
 		app.register_type::<crate::prelude::RdsPostgresBlock>()
-			.register_type::<crate::prelude::DatabaseRef>();
+			.register_type::<crate::prelude::DatabaseRef>()
+			.register_type::<crate::prelude::DatabaseConsumers>()
+			.add_systems(
+				DeployRender,
+				(
+					crate::prelude::RdsPostgresBlock::declare
+						.in_set(DeployRenderSet::Declare),
+					crate::prelude::RdsPostgresBlock::render
+						.in_set(DeployRenderSet::Render),
+				),
+			);
 
 		// the parameter-store composition every generated credential is named
 		// by, ie the `<EnsureSecret secret="db-password"/>` attribute.
@@ -98,6 +188,19 @@ impl Plugin for InfraPlugin {
 		// (`<MailDomainBlock domain="stalwart.beetmash.com"/>`), the box that
 		// serves it, and the identity inputs both are authored from. Definitions,
 		// so every target: a wasm consumer can author the stack it cannot deploy.
+		#[cfg(feature = "mail")]
+		app.add_systems(
+			DeployRender,
+			(
+				crate::prelude::MailDomainBlock::declare
+					.in_set(DeployRenderSet::Declare),
+				(
+					crate::prelude::MailDomainBlock::render,
+					crate::prelude::StalwartBlock::render,
+				)
+					.in_set(DeployRenderSet::Render),
+			),
+		);
 		#[cfg(feature = "mail")]
 		app.register_type::<crate::prelude::MailDomainBlock>()
 			.register_type::<crate::prelude::MailRecords>()
@@ -254,7 +357,8 @@ mod test {
 
 	/// The mail stack authors from markup, which is the whole reason its types
 	/// reflect: an entry declares the domain and the box as tags, and the
-	/// cross-block references are the labels they are.
+	/// cross-block references are `bx:ref` relations resolving to the
+	/// declaration entities (forwards or backwards, the resolver handles both).
 	///
 	/// REGRESSION: `MailDomainBlock` and `StalwartBlock` were not registered
 	/// (they hold a `DnsProvider`, which was not `Reflect`), so both tags
@@ -273,8 +377,11 @@ mod test {
 					aliases={[{localpart:"blog", target:"publications"}]}
 					mta_sts={{mode:Enforce}}/>
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"
-					vpc="net" database="db" blob_bucket="mail-blobs"
-					ssh_public_key="ssh-ed25519 AAAA pete"/>
+					blob_bucket="mail-blobs"
+					ssh_public_key="ssh-ed25519 AAAA pete"
+					{(VpcRef($net), DatabaseRef($db))}/>
+				<VpcBlock bx:ref="net" label="net"/>
+				<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
 			</Fragment>"#,
 		);
 		let domain = world.query::<&MailDomainBlock>().single(&world).unwrap();
@@ -291,11 +398,26 @@ mod test {
 		domain.mta_sts().mode().xpect_eq(MtaStsMode::Enforce);
 		domain.validate().unwrap();
 
-		let mail_box = world.query::<&StalwartBlock>().single(&world).unwrap();
-		mail_box.vpc().label().as_str().xpect_eq("net");
-		mail_box.database().label().as_str().xpect_eq("db");
-		mail_box.security_group().label().as_str().xpect_eq("mail");
+		let (mail_box, vpc_ref, database_ref) = world
+			.query::<(&StalwartBlock, &VpcRef, &DatabaseRef)>()
+			.single(&world)
+			.unwrap();
 		mail_box.validate().unwrap();
+		// each relation resolves to the entity carrying the declared block
+		world
+			.entity(vpc_ref.0)
+			.get::<VpcBlock>()
+			.unwrap()
+			.label()
+			.as_str()
+			.xpect_eq("net");
+		world
+			.entity(database_ref.0)
+			.get::<RdsPostgresBlock>()
+			.unwrap()
+			.label()
+			.as_str()
+			.xpect_eq("db");
 	}
 
 	/// A field DERIVED from another at construction cannot survive being
@@ -312,7 +434,7 @@ mod test {
 		let mut world = spawn(
 			r#"<Fragment>
 				<MailDomainBlock domain="stalwart.beetmash.com" mail_host="mail.beetmash.com"/>
-				<RdsPostgresBlock label="db" vpc="net" database="mail"/>
+				<RdsPostgresBlock label="db" database="mail"/>
 			</Fragment>"#,
 		);
 		world
@@ -332,7 +454,9 @@ mod test {
 	}
 
 	/// The recurring timer and the lambda it drives author as tags, with the
-	/// cross-block reference coercing from the label string it is.
+	/// cross-block reference an `InvokeTarget` relation resolving to the
+	/// lambda's declaration entity (a `bx:ref` may point forwards, the
+	/// resolver handles it).
 	///
 	/// A block whose type does not register resolves to nothing at all, so an
 	/// entry declaring a schedule would build a stack with no timer in it and
@@ -343,9 +467,9 @@ mod test {
 	fn the_schedule_and_its_lambda_spawn_by_tag() {
 		let mut world = spawn(
 			r#"<Fragment>
-				<LambdaBlock label="rollup"/>
-				<ScheduledJobBlock label="rollup-daily" target="rollup"
+				<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup)}
 					schedule="cron(0 3 * * ? *)" path="analytics/rollup"/>
+				<LambdaBlock bx:ref="rollup" label="rollup"/>
 			</Fragment>"#,
 		);
 		world
@@ -355,14 +479,23 @@ mod test {
 			.label()
 			.as_str()
 			.xpect_eq("rollup");
-		let schedule =
-			world.query::<&ScheduledJobBlock>().single(&world).unwrap();
-		schedule.target().label().as_str().xpect_eq("rollup");
+		let (schedule, target) = world
+			.query::<(&ScheduledJobBlock, &InvokeTarget)>()
+			.single(&world)
+			.unwrap();
 		schedule.path().as_str().xpect_eq("analytics/rollup");
 		// the defaults a declaration does not name still hold
 		schedule.method().xpect_eq(HttpMethod::Post);
 		schedule.timezone().as_str().xpect_eq("UTC");
 		schedule.validate().unwrap();
+		// the relation resolves forwards to the entity carrying the lambda
+		world
+			.entity(target.0)
+			.get::<LambdaBlock>()
+			.unwrap()
+			.label()
+			.as_str()
+			.xpect_eq("rollup");
 	}
 
 	/// The post-apply verbs author as tags too, each naming what it works on

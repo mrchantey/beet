@@ -64,7 +64,7 @@ impl MailRecords {
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ErasedBlock::on_add::<MailDomainBlock>)]
+#[component(immutable)]
 pub struct MailDomainBlock {
 	/// The mail domain served, eg `stalwart.beetmash.com`.
 	domain: SmolStr,
@@ -484,24 +484,53 @@ impl MailDomainBlock {
 	}
 }
 
-impl Block for MailDomainBlock {
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl MailDomainBlock {
 	/// The sovereign selector's public key, resolved from the param
 	/// [`EnsureDkimKey`](crate::mail::EnsureDkimKey) set. The filter mirrors
 	/// that action's exactly: a domain whose records somebody else holds gets
 	/// no key minted, so a variable here would fail resolution.
-	fn variables(&self) -> Vec<Variable> {
+	pub(crate) fn variables(&self) -> Vec<Variable> {
 		match self.records.proves_identity() {
 			true => vec![self.dkim_public_key_variable()],
 			false => Vec::new(),
 		}
 	}
 
-	fn apply_to_config(
+	/// Declare the sovereign selector's public key variable the apply
+	/// resolves, via [`variables`](Self::variables).
+	pub(crate) fn declare(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&MailDomainBlock>,
+	) {
+		scope.render_each(&query, |scope, entity, block| {
+			for variable in block.variables() {
+				scope.variable(entity, variable);
+			}
+			Ok(())
+		});
+	}
+
+	/// Render the identity, its monitoring and the domain's records into the
+	/// config.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&MailDomainBlock>,
+	) {
+		scope.render_each(&query, |scope, _entity, block| {
+			let (stack, deployment, config) = scope.ctx();
+			block.emit(stack, deployment, config)
+		});
+	}
+
+	/// Emit this domain's resources: the SES identity and its configuration
+	/// set, the event stream and alarms, the dkim variable declaration, and —
+	/// for the stage that owns the names — every dns record.
+	fn emit(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
-		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
@@ -924,25 +953,22 @@ mod tests {
 			.with_catch_all("publications")
 	}
 
-	/// The config `blocks` emit against a Sydney stack, ie the one the mail
-	/// stack deploys into.
+	/// The Sydney stack every test renders against, ie the one the mail stack
+	/// deploys into.
+	fn sydney_stack() -> Stack {
+		Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2)
+	}
+
+	/// The config `blocks` emit against a Sydney stack.
 	fn build_config(blocks: &[MailDomainBlock]) -> terra::Config {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		for block in blocks {
-			block
-				.apply_to_config(
-					&world.spawn(()).as_readonly(),
-					&stack,
-					&deployment,
-					&default(),
-					&mut config,
-				)
-				.unwrap();
-		}
-		config
+		let blocks = blocks.to_vec();
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				for block in blocks {
+					parent.spawn(block);
+				}
+			});
+		scope.finish().unwrap().2
 	}
 
 	/// Every dns record `blocks` render, as `(type, name)`, with any terraform
@@ -976,7 +1002,7 @@ mod tests {
 	fn record_values(
 		blocks: &[MailDomainBlock],
 	) -> Vec<(String, String, String)> {
-		let json = build_config(blocks).to_json();
+		let json = build_config(blocks).to_json().into_json();
 		let Some(Value::Object(records)) = json
 			.get("resource")
 			.and_then(|it| it.get("cloudflare_dns_record"))
@@ -1056,7 +1082,7 @@ mod tests {
 				"v=DKIM1; k=rsa; h=sha256; p=${var.dkim_stalwart_beetmash_com}",
 			);
 		// declared, so `plan` and `destroy` (which pass no `-var`) still parse
-		config.to_json()["variable"]["dkim_stalwart_beetmash_com"]
+		config.to_json().into_json()["variable"]["dkim_stalwart_beetmash_com"]
 			.is_object()
 			.xpect_true();
 	}
@@ -1067,8 +1093,8 @@ mod tests {
 	#[beet_core::test]
 	fn events_and_alarms_arrive_with_the_topic() {
 		build_config(&[staging()])
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("aws_cloudwatch_metric_alarm")
@@ -1077,7 +1103,8 @@ mod tests {
 
 		let json =
 			build_config(&[staging().with_events_topic("beetmash-ses-events")])
-				.to_json();
+				.to_json()
+				.into_json();
 		let alarms = json["resource"]["aws_cloudwatch_metric_alarm"]
 			.as_object()
 			.unwrap()
@@ -1185,21 +1212,13 @@ mod tests {
 	#[beet_core::test]
 	fn only_the_owning_stage_publishes_the_records() {
 		let records_in = |stage: &str| {
-			let (stack, deployment, _dir) = ResolvedStack::default_local();
-			let stack = stack.with_stage(stage);
-			let mut config = deployment.create_config(&stack);
-			let mut world = World::new();
-			staging()
-				.with_dns_stage("prod")
-				.apply_to_config(
-					&world.spawn(()).as_readonly(),
-					&stack,
-					&deployment,
-					&default(),
-					&mut config,
-				)
-				.unwrap();
-			config.to_json()
+			let (scope, _dir) = RenderScope::test_render_stack(
+				Stack::new("beet_infra").with_stage(stage),
+				|parent| {
+					parent.spawn(staging().with_dns_stage("prod"));
+				},
+			);
+			scope.finish().unwrap().2.to_json().into_json()
 		};
 		records_in("prod")["resource"]["cloudflare_dns_record"]
 			.is_object()
@@ -1236,21 +1255,14 @@ mod tests {
 		// ..and a stage outside `dns_stage` publishes no record but still
 		// declares the variable, since the apply passes the `-var` regardless
 		// and an undeclared one fails the apply
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_stage("drill");
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		staging()
-			.with_dns_stage("prod")
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
-		config.to_json()["variable"]["dkim_stalwart_beetmash_com"]
+		let (scope, _dir) = RenderScope::test_render_stack(
+			Stack::new("beet_infra").with_stage("drill"),
+			|parent| {
+				parent.spawn(staging().with_dns_stage("prod"));
+			},
+		);
+		scope.finish().unwrap().2.to_json().into_json()["variable"]
+			["dkim_stalwart_beetmash_com"]
 			.is_object()
 			.xpect_true();
 	}
@@ -1264,8 +1276,8 @@ mod tests {
 			.with_records(MailRecords::None);
 		records(&[block.clone()]).xpect_eq(Vec::new());
 		build_config(&[block])
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.xpect_contains("aws_sesv2_email_identity");
 	}
 
@@ -1290,8 +1302,8 @@ mod tests {
 	#[beet_core::test]
 	fn configuration_set_is_named_from_the_domain() {
 		build_config(&[staging(), news()])
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.xpect_contains(
 				"\"configuration_set_name\":\"stalwart-beetmash-com\"",
 			)
@@ -1375,19 +1387,10 @@ mod tests {
 	#[beet_core::test]
 	fn invalid_declarations_fail_at_config_time() {
 		let block = |block: MailDomainBlock| {
-			let (stack, deployment, _dir) = ResolvedStack::default_local();
-			let mut config = deployment.create_config(&stack);
-			let mut world = World::new();
-			block
-				.apply_to_config(
-					&world.spawn(()).as_readonly(),
-					&stack,
-					&deployment,
-					&default(),
-					&mut config,
-				)
-				.unwrap_err()
-				.to_string()
+			let (scope, _dir) = RenderScope::test_render(|parent| {
+				parent.spawn(block);
+			});
+			scope.finish().unwrap_err().to_string()
 		};
 		let base = || {
 			MailDomainBlock::new("stalwart.beetmash.com", "mail.beetmash.com")

@@ -11,8 +11,6 @@ pub use lightsail::*;
 mod fargate;
 #[cfg(feature = "fargate_block")]
 pub use fargate::*;
-mod block;
-pub use block::*;
 // The AWS IAM lowering every AWS compute block shares. Gated on the bindings
 // feature the s3 block (and so every declared grant kind) needs.
 #[cfg(feature = "bindings_aws_common")]

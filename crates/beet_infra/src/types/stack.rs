@@ -3,8 +3,6 @@
 //! every deploy step reaches them through.
 
 use crate::prelude::*;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::terra::Project;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -116,73 +114,6 @@ impl ResolvedStack {
 		self.resource_ident(label).primary_identifier().to_string()
 	}
 
-	/// The tofu config `blocks` build in this stack: the provider region, then
-	/// every block's resources emitted with the [`AccessGrants`] the whole set
-	/// declared.
-	///
-	/// The one definition of what a stack's config *is*, so the ECS traversal
-	/// ([`StackQuery::build_config`]) and a caller holding blocks directly (a
-	/// test, a wasm consumer authoring a stack in Rust) cannot drift on the
-	/// grant pre-pass, which is easy to omit and silently under-grants the
-	/// deployed identity.
-	pub fn build_config<'a>(
-		&self,
-		deployment: &Deployment,
-		blocks: impl IntoIterator<Item = (EntityRef<'a>, &'a dyn Block)> + Clone,
-	) -> Result<terra::Config> {
-		let mut config = deployment.create_config(self);
-		config.add_provider_config(
-			&terra::Provider::AWS,
-			&serde_json::json!({ "region": self.region }),
-		)?;
-		// a pre-pass, since a compute block lowers the grants its *siblings*
-		// declared and the emit order is otherwise arbitrary.
-		let access = blocks
-			.clone()
-			.into_iter()
-			.flat_map(|(_, block)| block.runtime_access(self))
-			.collect::<Vec<_>>()
-			.xmap(AccessGrants::new);
-		for (entity, block) in blocks {
-			block.apply_to_config(
-				&entity,
-				self,
-				deployment,
-				&access,
-				&mut config,
-			)?;
-		}
-		config.xok()
-	}
-
-	/// The terraform json for `block` deployed alongside `declared`, ie the
-	/// resource blocks whose [`AccessGrant`]s a compute block lowers. The one
-	/// way a test builds a block's config, so every block is tested through the
-	/// same grant pre-pass the deploy runs.
-	///
-	/// Every block shares one bare entity, which no block reads beyond the
-	/// components it was handed directly.
-	#[cfg(test)]
-	pub fn json_granting(
-		&self,
-		deployment: &Deployment,
-		block: &dyn Block,
-		declared: &[&dyn Block],
-	) -> Result<String> {
-		let mut world = World::new();
-		let entity_mut = world.spawn(());
-		let entity = entity_mut.as_readonly();
-		self.build_config(
-			deployment,
-			core::iter::once((entity.clone(), block))
-				.chain(declared.iter().map(|block| (entity.clone(), *block)))
-				.collect::<Vec<_>>(),
-		)?
-		.to_json()
-		.to_string()
-		.xok()
-	}
-
 	/// A resolved stack plus the launch that deploys it locally: a local state
 	/// backend and a temporary work directory removed on drop.
 	#[cfg(test)]
@@ -197,11 +128,12 @@ impl ResolvedStack {
 }
 
 /// Resolves the [`Stack`] an entity belongs to, and the deploy traversal that
-/// starts from it.
+/// starts from it. Rendering the stack's config is not here: every caller,
+/// including tests and wasm consumers, holds a `World` and renders through
+/// [`RenderScope::render`] (the schedule is target-agnostic).
 #[derive(SystemParam)]
 pub struct StackQuery<'w, 's> {
 	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
-	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
 	stores: Query<'w, 's, &'static BlobStore>,
 	/// The process app identity, which [`BootstrapPlugin`] inserts at build time
@@ -263,75 +195,10 @@ impl<'w, 's> StackQuery<'w, 's> {
 			.xok()
 	}
 
-	/// Finds the stack in ancestors and builds a config of all block
-	/// descendants, with the AWS provider region resolved from that stack so the
-	/// tofu config and the Rust SDK cannot disagree.
-	///
-	/// This is the whole definition step, and it is target-agnostic: a wasm
-	/// consumer authors blocks and builds the config here, then serializes it for
-	/// a host that can apply it (see [`build_project`](Self::build_project),
-	/// which is the same config wrapped in the native tofu driver).
-	pub fn build_config(
-		&self,
-		entity: Entity,
-	) -> Result<(ResolvedStack, Deployment, terra::Config)> {
-		let (_, stack) = self.root(entity)?;
-		let deployment = self.deployment();
-		let blocks = self
-			.declared(entity)?
-			.into_iter()
-			.filter_map(|child| self.blocks.get(child).ok())
-			.map(|(entity, block)| (entity, &**block))
-			.collect::<Vec<_>>();
-		let config = stack.build_config(&deployment, blocks)?;
-		Ok((stack, deployment, config))
-	}
-
-	/// [`build_config`](Self::build_config) wrapped in the tofu driver that
-	/// applies it, hence native-only.
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
-		let (stack, deployment, config) = self.build_config(entity)?;
-		Ok(Project::new(stack, deployment, config))
-	}
-
 	/// Create an artifacts client for the stack at the given entity.
 	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
 		let (_, stack) = self.root(entity)?;
 		self.deployment().artifacts_client(&stack).xok()
-	}
-
-	/// Collect artifact entries from block descendants.
-	/// Returns `(BuildArtifact, artifact_label)` for each block
-	/// that has both a [`BuildArtifact`] and an artifact label.
-	#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-	pub fn collect_artifacts(
-		&self,
-		entity: Entity,
-	) -> Result<Vec<(BuildArtifact, SmolStr)>> {
-		let mut pairs = Vec::new();
-		for child in self.declared(entity)? {
-			if let Ok((entity_ref, block)) = self.blocks.get(child) {
-				if let Some(label) = block.artifact_label() {
-					if let Some(artifact) = entity_ref.get::<BuildArtifact>() {
-						pairs.push((artifact.clone(), SmolStr::from(label)));
-					}
-				}
-			}
-		}
-		Ok(pairs)
-	}
-
-	/// Collect all [`Variable`] declarations from block descendants.
-	#[cfg(feature = "deploy")]
-	pub fn collect_variables(&self, entity: Entity) -> Result<Vec<Variable>> {
-		let mut variables = Vec::new();
-		for child in self.declared(entity)? {
-			if let Ok((_, block)) = self.blocks.get(child) {
-				variables.extend(block.variables());
-			}
-		}
-		Ok(variables)
 	}
 
 	/// Get the [`BlobStore`] component from this entity.
@@ -444,25 +311,19 @@ mod tests {
 	/// site happily writes to), so the values are pinned rather than the shape.
 	#[beet_core::test]
 	fn the_storage_layer_renders_the_live_names() {
-		let (deployment, _dir) = Deployment::default_local();
-		let stack = resolved(Stack::default().with_stage("prod"));
-		let mut world = World::new();
-		let spawned = world.spawn(());
-		let entity = spawned.as_readonly();
-		let blocks = [
-			&S3BucketBlock::new("app").with_deploy_versioned(false)
-				as &dyn Block,
-			&DynamoTableBlock::new("analytics") as &dyn Block,
-		];
-		let config = stack
-			.build_config(
-				&deployment,
-				blocks.map(|block| (entity.clone(), block)).to_vec(),
-			)
-			.unwrap();
+		let (scope, _dir) = RenderScope::test_render_stack(
+			Stack::new("beet-site").with_stage("prod"),
+			|parent| {
+				parent.spawn(
+					S3BucketBlock::new("app").with_deploy_versioned(false),
+				);
+				parent.spawn(DynamoTableBlock::new("analytics"));
+			},
+		);
+		let (_stack, _deployment, config) = scope.finish().unwrap();
 		config
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.as_str()
 			.xpect_contains("\"bucket\":\"beet-site--prod--app\"")
 			.xpect_contains("\"name\":\"beet-site--prod--analytics\"")

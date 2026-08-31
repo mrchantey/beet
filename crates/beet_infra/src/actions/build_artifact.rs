@@ -103,7 +103,6 @@ pub async fn BuildArtifactAction(
 #[cfg(all(test, feature = "deploy", not(target_arch = "wasm32")))]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	/// The artifact file is produced by running the declared process, and
 	/// [`BuildArtifact::build`] is what runs it. Nothing dispatches a block

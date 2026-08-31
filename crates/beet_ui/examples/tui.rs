@@ -19,7 +19,7 @@ fn setup(mut commands: Commands) {
 	commands.spawn((
 		StdioTerminal::default(),
 		DoubleBuffer::default(),
-		Document::new(val!({ "count": 0i64 })),
+		Document::new(value!({ "count": 0i64 })),
 		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
 		children![((
 			LayoutStyle::flex_row(),

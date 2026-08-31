@@ -50,27 +50,17 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ErasedBlock::on_add::<StalwartBlock>)]
+#[component(immutable)]
 pub struct StalwartBlock {
-	/// Label prefixing every terraform resource, and the label of the
-	/// [`SecurityGroupRef`] this block declares, ie the one the database's
-	/// `with_consumer` admits.
+	/// Label prefixing every terraform resource, including the box's own
+	/// security group, ie the one its ingress admission names as its source.
 	label: SmolStr,
 	/// The box's fqdn, ie `mail.beetmash.com`: the `A` record, the rDNS target,
 	/// the ACME certificate subject and the SMTP banner.
 	hostname: SmolStr,
-	/// The [`VpcBlock`] network the box lives in, by label. Its first PUBLIC
-	/// subnet: an MTA is reachable from the internet by definition.
-	#[set_with(skip)]
-	vpc: VpcRef,
-	/// The [`RdsPostgresBlock`] holding mail metadata, by label. The connection
-	/// host rides terraform into machine config (a non-secret ref); the
-	/// password rides SSM at boot.
-	#[set_with(skip)]
-	database: DatabaseRef,
-	/// The logical database and role inside that instance, which must match the
-	/// `RdsPostgresBlock` declaration; the entry authoring both blocks passes
-	/// one value to each.
+	/// The logical database and role inside the [`RdsPostgresBlock`] this box's
+	/// [`DatabaseRef`] targets, which must match that declaration; the entry
+	/// authoring both blocks passes one value to each.
 	db_name: SmolStr,
 	db_user: SmolStr,
 	/// The [`S3BucketBlock`] holding message bodies, by label. Declare it
@@ -181,8 +171,6 @@ impl StalwartBlock {
 		Self {
 			label: label.into(),
 			hostname: hostname.into(),
-			vpc: VpcRef::default(),
-			database: DatabaseRef::default(),
 			db_name: "mail".into(),
 			db_user: "postgres".into(),
 			blob_bucket: SmolStr::default(),
@@ -193,18 +181,6 @@ impl StalwartBlock {
 			instance_type: Self::INSTANCE_TYPE.into(),
 			volume_gb: 30,
 		}
-	}
-
-	/// Name the [`VpcBlock`] by label.
-	pub fn with_vpc(mut self, label: impl Into<SmolStr>) -> Self {
-		self.vpc = VpcRef::new(label);
-		self
-	}
-
-	/// Name the [`RdsPostgresBlock`] by label.
-	pub fn with_database(mut self, label: impl Into<SmolStr>) -> Self {
-		self.database = DatabaseRef::new(label);
-		self
 	}
 
 	/// The zone the box's `A` record is published into: the declared
@@ -236,10 +212,27 @@ impl StalwartBlock {
 			.is_none_or(|owner| owner == stack.stage())
 	}
 
-	/// The security group this block declares, ie the label a database's
-	/// `with_consumer` names to admit the box.
-	pub fn security_group(&self) -> SecurityGroupRef {
-		SecurityGroupRef::new(self.label.clone())
+	/// The label suffix every security group takes, so this box's `mail--sg`
+	/// and the database's `db--sg` compose identically on both sides of an
+	/// admission.
+	pub const SECURITY_GROUP: &'static str = "sg";
+
+	/// The terraform ident of the security group this block declares, ie the
+	/// source of its own admission to the database.
+	pub fn security_group_ident(&self, stack: &ResolvedStack) -> terra::Ident {
+		stack.resource_ident(format!(
+			"{}--{}",
+			self.label,
+			Self::SECURITY_GROUP
+		))
+	}
+
+	/// An interpolated reference to the box's security group id.
+	pub fn security_group_id(&self, stack: &ResolvedStack) -> String {
+		format!(
+			"${{aws_security_group.{}.id}}",
+			self.security_group_ident(stack).label()
+		)
 	}
 
 	/// The CloudWatch log group the box's agent forwards `stalwart.log` to,
@@ -310,20 +303,10 @@ impl StalwartBlock {
 		.collect()
 	}
 
-	/// Reject a declaration that cannot serve mail, at config time.
+	/// Reject a declaration that cannot serve mail, at config time. (A box with
+	/// no network or no database fails at render, where its [`VpcRef`] and
+	/// [`DatabaseRef`] relations resolve.)
 	pub fn validate(&self) -> Result {
-		if self.vpc.label().is_empty() {
-			bevybail!(
-				"mail box '{}' names no vpc: `with_vpc` the network it lives in",
-				self.label
-			);
-		}
-		if self.database.label().is_empty() {
-			bevybail!(
-				"mail box '{}' names no database: `with_database` the RdsPostgresBlock holding mail metadata",
-				self.label
-			);
-		}
 		if self.blob_bucket.is_empty() {
 			bevybail!(
 				"mail box '{}' names no blob bucket: `with_blob_bucket` the S3BucketBlock holding message bodies",
@@ -350,40 +333,93 @@ impl StalwartBlock {
 	}
 }
 
-impl Block for StalwartBlock {
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl StalwartBlock {
+	/// Render the box and its secondaries into the config, resolving the
+	/// [`VpcRef`] and [`DatabaseRef`] relations and lowering the grants the
+	/// stack's declarations contributed.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<(&StalwartBlock, Option<&VpcRef>, Option<&DatabaseRef>)>,
+		vpcs: Query<&VpcBlock>,
+		databases: Query<&RdsPostgresBlock>,
+	) {
+		for entity in scope.declared().to_vec() {
+			let Ok((block, vpc_ref, database_ref)) = query.get(entity) else {
+				continue;
+			};
+			let vpc = scope.related(
+				&vpcs,
+				vpc_ref.map(|vpc_ref| vpc_ref.0),
+				"VpcRef",
+				block.label(),
+			);
+			let database = scope.related(
+				&databases,
+				database_ref.map(|database_ref| database_ref.0),
+				"DatabaseRef",
+				block.label(),
+			);
+			match (vpc, database) {
+				(Ok(vpc), Ok(database)) => {
+					let access = scope.access();
+					let (stack, _deployment, config) = scope.ctx();
+					if let Err(err) =
+						block.emit(stack, vpc, database, &access, config)
+					{
+						scope.error(err);
+					}
+				}
+				(vpc, database) => {
+					for err in [vpc.err(), database.err()].into_iter().flatten()
+					{
+						scope.error(err);
+					}
+				}
+			}
+		}
+	}
+
+	/// Emit this box's resources: the security group, the instance role
+	/// lowered from the declared grants, the SES sending identity and the
+	/// instance itself.
+	fn emit(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
-		_deployment: &Deployment,
+		vpc: &VpcBlock,
+		database: &RdsPostgresBlock,
 		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
-		let group = self.emit_security_group(stack, config)?;
+		let group = self.emit_security_group(stack, config, vpc, database)?;
 		let role = self.emit_instance_role(stack, config, access)?;
 		self.emit_ses_sender(stack, config)?;
-		self.emit_instance(stack, config, &group, &role)?;
+		self.emit_instance(stack, config, vpc, database, &group, &role)?;
 		Ok(())
 	}
 }
 
 impl StalwartBlock {
-	/// The box's security group: the mail port list in, everything out (an MTA
-	/// dials the world: peer MTAs on 25, SES on 587, S3, SSM, ACME, GitHub).
+	/// The box's security group (the mail port list in, everything out: an MTA
+	/// dials the world — peer MTAs on 25, SES on 587, S3, SSM, ACME, GitHub),
+	/// and its own admission to the database it consumes.
 	fn emit_security_group(
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
+		vpc: &VpcBlock,
+		database: &RdsPostgresBlock,
 	) -> Result<ResourceDef<AwsSecurityGroupDetails>> {
 		let group = ResourceDef::new_primary(
-			self.security_group().ident(stack),
+			self.security_group_ident(stack),
 			AwsSecurityGroupDetails {
 				description: Some(
 					format!("Mail box ports for {}", self.label).into(),
 				),
-				vpc_id: Some(self.vpc.id(stack).into()),
-				tags: Some(self.tags(stack, SecurityGroupRef::KIND)),
+				vpc_id: Some(vpc.id(stack).into()),
+				tags: Some(self.tags(stack, Self::SECURITY_GROUP)),
 				..default()
 			},
 		);
@@ -416,6 +452,33 @@ impl StalwartBlock {
 				cidr_blocks: Some(vec!["0.0.0.0/0".into()]),
 				ipv6_cidr_blocks: Some(vec!["::/0".into()]),
 				description: Some("an MTA dials the world".into()),
+				..default()
+			},
+		))?;
+		// the box's admission to the database it consumes, which belongs to the
+		// CONSUMER: the box knows its own group and reads the database's through
+		// its `DatabaseRef` target, while the database's group admits nothing by
+		// itself.
+		config.add_resource(&ResourceDef::new_secondary(
+			stack.resource_ident(format!(
+				"{}--sg-from-{}",
+				database.label(),
+				self.label
+			)),
+			AwsSecurityGroupRuleDetails {
+				security_group_id: database.security_group_id(stack).into(),
+				r#type: "ingress".into(),
+				from_port: RdsPostgresBlock::PORT,
+				to_port: RdsPostgresBlock::PORT,
+				protocol: "tcp".into(),
+				// the consumer's group, never a cidr: an address range admits
+				// whatever happens to be in it later.
+				source_security_group_id: Some(
+					self.security_group_id(stack).into(),
+				),
+				description: Some(
+					format!("Postgres from {}", self.label).into(),
+				),
 				..default()
 			},
 		))?;
@@ -458,7 +521,7 @@ impl StalwartBlock {
 			AwsIamRolePolicyDetails {
 				name: Some(policy_ident.primary_identifier().clone()),
 				role: role.field_ref("name").into(),
-				policy: self.runtime_policy(stack, access)?.into(),
+				policy: self.runtime_policy(stack, access)?.render().into(),
 				..default()
 			},
 		);
@@ -478,126 +541,49 @@ impl StalwartBlock {
 		profile.xok()
 	}
 
-	/// The inline policy document. SecureString decryption needs no `kms:`
-	/// statement here: the AWS-managed `aws/ssm` key authorises account
-	/// principals through its own key policy for requests made via SSM.
+	/// The inline policy document, LOWERED through the shared [`IamPolicy`]
+	/// core, seeded with the two statements this block owns: the stack's
+	/// secret prefix first (the reason the names compose with slashes at all:
+	/// the db password, the admin password, the SES SMTP pair, and whatever
+	/// `EnsureSecret` adds later) and the box's own log group last, for the
+	/// CloudWatch agent. The blob store multiparts, so the write statement
+	/// carries `s3:AbortMultipartUpload` through the per-compute knob.
+	///
+	/// SecureString decryption needs no `kms:` statement here: the AWS-managed
+	/// `aws/ssm` key authorises account principals through its own key policy
+	/// for requests made via SSM.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
 		access: &AccessGrants,
-	) -> Result<String> {
+	) -> Result<IamPolicy> {
 		let region = stack.region();
-		let mut statements = Vec::new();
-
-		// the stack's own secret prefix in one statement (the reason the names
-		// compose with slashes at all): the db password, the admin password,
-		// the SES SMTP pair, and whatever EnsureSecret adds later.
-		statements.push(json!({
-			"Sid": "StackSecrets",
-			"Effect": "Allow",
-			"Action": ["ssm:GetParameter"],
-			"Resource": format!(
-				"arn:aws:ssm:{region}:*:parameter{}/*",
-				SecretRef::prefix(stack)
-			)
-		}));
-
-		// group the declared grants by kind. A kind this compute cannot lower
-		// FAILS the deploy naming it: a grant silently dropped is a box that
-		// serves until the first request touching that resource.
-		let mut parameters = Vec::new();
-		let mut read_buckets = Vec::new();
-		let mut write_buckets = Vec::new();
-		for grant in access.iter() {
-			match grant.kind.as_str() {
-				RdsPostgresBlock::ACCESS_KIND => {
-					parameters.push(grant.name.as_str())
-				}
-				S3BucketBlock::ACCESS_KIND => {
-					read_buckets.push(grant.name.as_str());
-					if grant.permissions == AccessPermissions::ReadWrite {
-						write_buckets.push(grant.name.as_str());
-					}
-				}
-				kind => bevybail!(
-					"a `{kind}` resource was declared alongside this stalwart \
-					box, which has no IAM lowering for that kind. Add one to \
-					`StalwartBlock::runtime_policy`, or declare the resource \
-					in a stack this compute does not deploy into."
-				),
-			}
-		}
-
-		// any declared parameter living OUTSIDE the prefix (an overridden
-		// secret name); usually redundant with the prefix and harmlessly so.
-		// Every ARN takes its region from the stack, the one place a region
-		// is answered. ONE statement for all of them, never one each: a `Sid`
-		// must be unique within an identity policy, so a second declaration
-		// would otherwise render a document AWS rejects as malformed.
-		if !parameters.is_empty() {
-			statements.push(json!({
-				"Sid": "DeclaredParameters",
+		let log_group = self.log_group(stack);
+		IamPolicy::new(region.clone(), "stalwart box")
+			.statement(json!({
+				"Sid": "StackSecrets",
 				"Effect": "Allow",
 				"Action": ["ssm:GetParameter"],
-				"Resource": parameters
-					.iter()
-					.map(|name| format!(
-						"arn:aws:ssm:{region}:*:parameter{name}"
-					))
-					.collect::<Vec<_>>()
-			}));
-		}
-
-		// every declared bucket readable, and write actions only where the
-		// declaration said the process stores (the blob bucket).
-		if !read_buckets.is_empty() {
-			statements.push(json!({
-				"Sid": "ReadStores",
-				"Effect": "Allow",
-				"Action": ["s3:GetObject", "s3:ListBucket"],
-				"Resource": read_buckets
-					.iter()
-					.flat_map(|bucket| [
-						format!("arn:aws:s3:::{bucket}"),
-						format!("arn:aws:s3:::{bucket}/*"),
-					])
-					.collect::<Vec<_>>()
-			}));
-		}
-		if !write_buckets.is_empty() {
-			statements.push(json!({
-				"Sid": "WriteStores",
+				"Resource": format!(
+					"arn:aws:ssm:{region}:*:parameter{}/*",
+					SecretRef::prefix(stack)
+				)
+			}))
+			.write_action("s3:AbortMultipartUpload")
+			.lower(access)?
+			.statement(json!({
+				"Sid": "OwnLogGroup",
 				"Effect": "Allow",
 				"Action": [
-					"s3:PutObject",
-					"s3:DeleteObject",
-					"s3:AbortMultipartUpload"
+					"logs:CreateLogStream",
+					"logs:PutLogEvents",
+					"logs:DescribeLogStreams"
 				],
-				"Resource": write_buckets
-					.iter()
-					.map(|bucket| format!("arn:aws:s3:::{bucket}/*"))
-					.collect::<Vec<_>>()
-			}));
-		}
-
-		// the box's own log group, for the CloudWatch agent
-		let log_group = self.log_group(stack);
-		statements.push(json!({
-			"Sid": "OwnLogGroup",
-			"Effect": "Allow",
-			"Action": [
-				"logs:CreateLogStream",
-				"logs:PutLogEvents",
-				"logs:DescribeLogStreams"
-			],
-			"Resource": [
-				format!("arn:aws:logs:{region}:*:log-group:{log_group}"),
-				format!("arn:aws:logs:{region}:*:log-group:{log_group}:*")
-			]
-		}));
-
-		json!({ "Version": "2012-10-17", "Statement": statements })
-			.to_string()
+				"Resource": [
+					format!("arn:aws:logs:{region}:*:log-group:{log_group}"),
+					format!("arn:aws:logs:{region}:*:log-group:{log_group}:*")
+				]
+			}))
 			.xok()
 	}
 
@@ -684,6 +670,8 @@ impl StalwartBlock {
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
+		vpc: &VpcBlock,
+		database: &RdsPostgresBlock,
 		group: &ResourceDef<AwsSecurityGroupDetails>,
 		profile: &ResourceDef<AwsIamInstanceProfileDetails>,
 	) -> Result {
@@ -723,7 +711,7 @@ impl StalwartBlock {
 			},
 		);
 
-		let user_data = self.build_user_data(stack)?;
+		let user_data = self.build_user_data(stack, database)?;
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
 		let instance = ResourceDef::new_secondary(
 			instance_ident.clone(),
@@ -734,7 +722,7 @@ impl StalwartBlock {
 				),
 				instance_type: Some(self.instance_type.clone()),
 				subnet_id: Some(
-					self.vpc.subnet_id(stack, SubnetTier::Public, "a").into(),
+					vpc.subnet_id(stack, SubnetTier::Public, "a").into(),
 				),
 				vpc_security_group_ids: Some(vec![
 					group.field_ref("id").into(),
@@ -775,7 +763,7 @@ impl StalwartBlock {
 			depends_on: Some(vec![
 				format!(
 					"aws_internet_gateway.{}",
-					self.vpc.ident(stack, VpcRef::GATEWAY).label()
+					vpc.ident(stack, VpcBlock::GATEWAY).label()
 				)
 				.into(),
 			]),
@@ -829,14 +817,14 @@ impl StalwartBlock {
 
 		config
 			.add_output(format!("{}_public_ip", self.label), terra::Output {
-				value: json!(eip.field_ref("public_ip")),
+				value: eip.field_ref("public_ip").into(),
 				description: Some("The mail box public address".into()),
 				sensitive: None,
 			})?
 			.add_output(
 				format!("{}_eip_allocation", self.label),
 				terra::Output {
-					value: json!(eip.field_ref("id")),
+					value: eip.field_ref("id").into(),
 					description: Some(
 						"The EIP allocation id, ie what EipReverseDns sets the PTR on"
 							.into(),
@@ -845,7 +833,7 @@ impl StalwartBlock {
 				},
 			)?
 			.add_output(format!("{}_instance_id", self.label), terra::Output {
-				value: json!(instance.field_ref("id")),
+				value: instance.field_ref("id").into(),
 				description: Some("The mail box instance id".into()),
 				sensitive: None,
 			})?;
@@ -935,7 +923,11 @@ impl StalwartBlock {
 	/// The JSON splice goes through python (present in the AL2023 base AMI)
 	/// rather than sed, so a password is escaped as data and can never be
 	/// interpreted as pattern syntax.
-	fn secrets_script(&self, stack: &ResolvedStack) -> String {
+	fn secrets_script(
+		&self,
+		stack: &ResolvedStack,
+		database: &RdsPostgresBlock,
+	) -> String {
 		let template = r#"#!/bin/bash
 # Render the secret-bearing config from SSM parameter store, at every start.
 set -euo pipefail
@@ -960,7 +952,7 @@ else
 fi
 mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 "#;
-		let db_secret = self.database.secret_name(stack);
+		let db_secret = database.secret_name(stack);
 		let admin_secret = self.admin_secret_name(stack);
 		[
 			("__REGION__", stack.region().as_str()),
@@ -989,7 +981,11 @@ mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 	/// `--format=custom` because it is what `pg_restore` reads selectively, and
 	/// `--no-owner --no-acl` so a restore into a differently-named role (the
 	/// drill stage's) does not fail on every ownership statement.
-	fn backup_script(&self, stack: &ResolvedStack) -> String {
+	fn backup_script(
+		&self,
+		stack: &ResolvedStack,
+		database: &RdsPostgresBlock,
+	) -> String {
 		let template = r#"#!/bin/bash
 # Nightly dump of the mail database into the backups bucket.
 set -euo pipefail
@@ -1008,7 +1004,7 @@ pg_dump --host '__DB_HOST__' --port __DB_PORT__ --username '__DB_USER__' --dbnam
 aws s3 cp "$dump" "s3://__BUCKET__/__PREFIX__/__DB_NAME__/$(date -u +%Y/%m/%d/%H%M%SZ).dump" --region '__REGION__'
 echo "mail database backed up ($(stat -c %s "$dump") bytes)"
 "#;
-		let db_secret = self.database.secret_name(stack);
+		let db_secret = database.secret_name(stack);
 		let bucket = stack.resource_name(self.backup_bucket.clone());
 		let port = RdsPostgresBlock::PORT.to_string();
 		// `__DB_HOST__` is deliberately NOT substituted here: it is the one
@@ -1132,11 +1128,15 @@ WantedBy=multi-user.target"#
 	/// nothing at all when no [`backup_bucket`](Self::backup_bucket) is
 	/// declared.
 	///
-	fn backup_stanza(&self, stack: &ResolvedStack) -> String {
+	fn backup_stanza(
+		&self,
+		stack: &ResolvedStack,
+		database: &RdsPostgresBlock,
+	) -> String {
 		if self.backup_bucket.is_empty() {
 			return String::new();
 		}
-		let script = self.backup_script(stack);
+		let script = self.backup_script(stack, database);
 		let (service, timer) = self.backup_units();
 		format!(
 			r#"# the nightly dump: the box holds the credential and the network path, so
@@ -1171,19 +1171,23 @@ BACKUP_TIMER_EOF
 	/// renders secrets once and starts the service. The first boot comes up in
 	/// Stalwart's bootstrap mode, serving management only, until
 	/// `StalwartProvision` applies the declarative config.
-	fn build_user_data(&self, stack: &ResolvedStack) -> Result<SmolStr> {
+	fn build_user_data(
+		&self,
+		stack: &ResolvedStack,
+		database: &RdsPostgresBlock,
+	) -> Result<SmolStr> {
 		let hostname = &self.hostname;
 		let version = Self::STALWART_VERSION;
 		let tarball = Self::STALWART_TARBALL;
 		let sha256 = Self::STALWART_SHA256;
 		let store_template =
 			serde_json::to_string_pretty(&self.store_config_template())?;
-		let secrets_script = self.secrets_script(stack);
+		let secrets_script = self.secrets_script(stack, database);
 		let unit = self.systemd_unit();
 		let cloudwatch =
 			serde_json::to_string_pretty(&self.cloudwatch_config(stack))?;
 		let ca_bundle = Self::RDS_CA_BUNDLE;
-		let backup = self.backup_stanza(stack);
+		let backup = self.backup_stanza(stack, database);
 		let backup_enable = self.backup_enable();
 		let pg_major = RdsPostgresBlock::ENGINE_VERSION;
 
@@ -1260,7 +1264,7 @@ systemctl enable --now stalwart
 		// terraform reads user_data as a string, so every literal `${..}` must
 		// escape to `$${..}` BEFORE the one deliberate terraform ref lands.
 		let script = script.replace("${", "$${");
-		let script = script.replace("__DB_HOST__", &self.database.host(stack));
+		let script = script.replace("__DB_HOST__", &database.host(stack));
 		SmolStr::from(script).xok()
 	}
 }
@@ -1269,13 +1273,11 @@ systemctl enable --now stalwart
 mod tests {
 	use super::*;
 
-	/// The mail box as the plan declares it: label `mail` (the consumer label
-	/// phase 3's database tests already admit), in the `net` vpc, metadata in
-	/// `db`, blobs in `mail-blobs`.
+	/// The mail box as the plan declares it: label `mail`, metadata in `db`,
+	/// blobs in `mail-blobs` (the network and database ride relations, see
+	/// [`spawn_stack`]).
 	fn mail_box() -> StalwartBlock {
 		StalwartBlock::new("mail", "mail.beetmash.com")
-			.with_vpc("net")
-			.with_database("db")
 			.with_blob_bucket("mail-blobs")
 			.with_ssh_public_key(
 				"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITESTKEY pete",
@@ -1287,46 +1289,51 @@ mod tests {
 	fn siblings() -> (VpcBlock, RdsPostgresBlock, S3BucketBlock) {
 		(
 			VpcBlock::new("net"),
-			RdsPostgresBlock::new("db", "net")
-				.with_database("mail")
-				.with_consumer(SecurityGroupRef::new("mail")),
+			RdsPostgresBlock::new("db").with_database("mail"),
 			S3BucketBlock::new("mail-blobs")
 				.with_deploy_versioned(false)
 				.with_runtime_write(true),
 		)
 	}
 
+	/// Spawn `block` beside its [`siblings`], related to the network and the
+	/// database the way the markup relates them.
+	fn spawn_stack(block: StalwartBlock, parent: &mut ChildSpawner) {
+		let (network, db, blobs) = siblings();
+		let vpc = parent.spawn(network).id();
+		let db = parent.spawn((db, VpcRef(vpc))).id();
+		parent.spawn((block, VpcRef(vpc), DatabaseRef(db)));
+		parent.spawn(blobs);
+	}
+
+	/// The Sydney stack every test renders against.
+	fn sydney_stack() -> Stack {
+		Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2)
+	}
+
 	/// The config the whole set emits against a Sydney stack.
 	fn build_config(
 		block: &StalwartBlock,
 	) -> (ResolvedStack, Deployment, terra::Config) {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let (network, db, blobs) = siblings();
-		let mut world = World::new();
-		let spawned = world.spawn(());
-		let entity = spawned.as_readonly();
-		let config = stack
-			.build_config(&deployment, [
-				(entity.clone(), &network as &dyn Block),
-				(entity.clone(), &db as &dyn Block),
-				(entity.clone(), &blobs as &dyn Block),
-				(entity, block as &dyn Block),
-			])
-			.unwrap();
-		(stack, deployment, config)
+		let block = block.clone();
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				spawn_stack(block, parent);
+			});
+		scope.finish().unwrap()
 	}
 
 	/// The rendered user_data, ie the machine identity.
 	fn user_data(block: &StalwartBlock) -> String {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		block.build_user_data(&stack).unwrap().to_string()
+		let (_, db, _) = siblings();
+		block.build_user_data(&stack, &db).unwrap().to_string()
 	}
 
 	/// The sole `aws_instance` in the rendered config.
 	fn instance(config: &terra::Config) -> serde_json::Value {
-		config.to_json()["resource"]["aws_instance"]
+		config.to_json().into_json()["resource"]["aws_instance"]
 			.as_object()
 			.unwrap()
 			.values()
@@ -1340,28 +1347,30 @@ mod tests {
 	/// and every per-deploy value lives in SSM or in the database.
 	#[beet_core::test]
 	fn code_only_deploy_renders_one_box() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (deployment, _dir) = Deployment::default_local();
 		let second = deployment
 			.clone()
 			.with_deploy_id(uuid_ext::now_v7())
 			.with_deploy_timestamp("2026-08-27T00:00:00Z".to_string());
-		let block = mail_box();
-		let mut world = World::new();
-		let spawned = world.spawn(());
-		let entity = spawned.as_readonly();
+		// [`RenderScope::test_render_stack`] mints its own deployment, so this
+		// render seeds the schedule with the caller's directly
 		let render = |deployment: &Deployment| {
-			let mut config = deployment.create_config(&stack);
-			block
-				.apply_to_config(
-					&entity,
-					&stack,
-					deployment,
-					&default(),
-					&mut config,
-				)
-				.unwrap();
-			config.to_json().to_string()
+			let mut world = InfraPlugin.into_world();
+			world.insert_resource(deployment.clone());
+			world.init_resource::<PackageConfig>();
+			let root = world
+				.spawn(sydney_stack())
+				.with_children(|parent| {
+					spawn_stack(mail_box(), parent);
+				})
+				.id();
+			RenderScope::render(&mut world, root)
+				.unwrap()
+				.finish()
+				.unwrap()
+				.2
+				.to_json_string()
+				.unwrap()
 		};
 		render(&deployment).xpect_eq(render(&second));
 		user_data(&mail_box())
@@ -1382,8 +1391,6 @@ mod tests {
 		// ..and a changed hostname IS a changed machine
 		user_data(&mail_box()).xpect_not_eq(user_data(
 			&StalwartBlock::new("mail", "mx.beetmash.com")
-				.with_vpc("net")
-				.with_database("db")
 				.with_blob_bucket("mail-blobs")
 				.with_ssh_public_key("ssh-ed25519 KEY pete"),
 		));
@@ -1419,7 +1426,7 @@ mod tests {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		// exactly once: the template is the data store alone, and the stores
 		// that used to restate the host (search, in-memory) default to it
-		let host = DatabaseRef::new("db")
+		let host = RdsPostgresBlock::new("db")
 			.host(&stack)
 			.trim_end_matches('}')
 			.to_string();
@@ -1444,10 +1451,10 @@ mod tests {
 	}
 
 	/// The boot script reads exactly the parameters the stack composes: the
-	/// database password through [`DatabaseRef::secret_name`] (the declaring
-	/// block grants the same string) and the admin password `EnsureSecret`
-	/// creates. This is the join between the deploy and the machine; a drift
-	/// here is a box that boots with no credentials.
+	/// database password through [`RdsPostgresBlock::secret_name`] (the same
+	/// composition the declaring block grants) and the admin password
+	/// `EnsureSecret` creates. This is the join between the deploy and the
+	/// machine; a drift here is a box that boots with no credentials.
 	#[beet_core::test]
 	fn boot_reads_the_parameters_the_stack_writes() {
 		let block = mail_box();
@@ -1458,13 +1465,9 @@ mod tests {
 			.as_str()
 			.xpect_contains(&format!(
 				"get '{}'",
-				DatabaseRef::new("db").secret_name(&stack)
-			))
-			.xpect_contains(&format!(
-				"get '{}'",
 				block.admin_secret_name(&stack)
 			))
-			// the ref composes the SAME name the database block grants
+			// the block composes the SAME name its declaration grants
 			.xpect_contains(&format!("get '{}'", db.secret_name(&stack)))
 			.xpect_contains("--with-decryption")
 			.xpect_contains("STALWART_RECOVERY_ADMIN=admin:");
@@ -1482,12 +1485,13 @@ mod tests {
 	fn ses_smtp_credential_is_terraform_derived() {
 		let block = mail_box();
 		let (stack, _deployment, config) = build_config(&block);
-		let params = config.to_json()["resource"]["aws_ssm_parameter"]
-			.as_object()
-			.unwrap()
-			.values()
-			.cloned()
-			.collect::<Vec<_>>();
+		let params =
+			config.to_json().into_json()["resource"]["aws_ssm_parameter"]
+				.as_object()
+				.unwrap()
+				.values()
+				.cloned()
+				.collect::<Vec<_>>();
 		params.len().xpect_eq(2);
 		let value_of = |name: &str| {
 			params
@@ -1505,15 +1509,16 @@ mod tests {
 			.unwrap()
 			.xpect_contains(".ses_smtp_password_v4}");
 		// the sending user may send raw mail, and do nothing else
-		let policy = config.to_json()["resource"]["aws_iam_user_policy"]
-			.as_object()
-			.unwrap()
-			.values()
-			.next()
-			.unwrap()["policy"]
-			.as_str()
-			.unwrap()
-			.to_string();
+		let policy =
+			config.to_json().into_json()["resource"]["aws_iam_user_policy"]
+				.as_object()
+				.unwrap()
+				.values()
+				.next()
+				.unwrap()["policy"]
+				.as_str()
+				.unwrap()
+				.to_string();
 		policy
 			.as_str()
 			.xpect_contains("ses:SendRawEmail")
@@ -1527,12 +1532,13 @@ mod tests {
 	#[beet_core::test]
 	fn firewall_is_exactly_the_port_list() {
 		let (_stack, _deployment, config) = build_config(&mail_box());
-		let rules = config.to_json()["resource"]["aws_security_group_rule"]
-			.as_object()
-			.unwrap()
-			.values()
-			.cloned()
-			.collect::<Vec<_>>();
+		let rules =
+			config.to_json().into_json()["resource"]["aws_security_group_rule"]
+				.as_object()
+				.unwrap()
+				.values()
+				.cloned()
+				.collect::<Vec<_>>();
 		let mut ingress = rules
 			.iter()
 			.filter(|rule| rule["type"] == "ingress")
@@ -1549,8 +1555,8 @@ mod tests {
 		egress.len().xpect_eq(1);
 		egress[0]["protocol"].as_str().unwrap().xpect_eq("-1");
 		config
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("8080");
@@ -1580,7 +1586,7 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_contains("${data.aws_ssm_parameter.");
-		config.to_json()["data"]["aws_ssm_parameter"]
+		config.to_json().into_json()["data"]["aws_ssm_parameter"]
 			.as_object()
 			.unwrap()
 			.values()
@@ -1595,22 +1601,21 @@ mod tests {
 
 	/// The box sits in the vpc's PUBLIC subnet (an MTA is reachable by
 	/// definition) with an EIP whose association survives a rebuild, and its
-	/// security group is emitted under exactly the ident the
-	/// [`SecurityGroupRef`] hands a consumer: the other half of the reference
-	/// the database's ingress rule composed in phase 3.
+	/// security group is emitted under exactly the ident its own ingress
+	/// admission names as its source.
 	#[beet_core::test]
 	fn public_subnet_eip_and_the_shared_group_label() {
 		let (stack, _deployment, config) = build_config(&mail_box());
 		instance(&config)["subnet_id"].as_str().unwrap().xpect_eq(
-			VpcRef::new("net").subnet_id(&stack, SubnetTier::Public, "a"),
+			VpcBlock::new("net").subnet_id(&stack, SubnetTier::Public, "a"),
 		);
-		config.to_json()["resource"]["aws_security_group"]
+		config.to_json().into_json()["resource"]["aws_security_group"]
 			.as_object()
 			.unwrap()
-			.contains_key(SecurityGroupRef::new("mail").ident(&stack).label())
+			.contains_key(mail_box().security_group_ident(&stack).label())
 			.xpect_true();
 		// the eip waits on the gateway the vpc declares
-		config.to_json()["resource"]["aws_eip"]
+		config.to_json().into_json()["resource"]["aws_eip"]
 			.as_object()
 			.unwrap()
 			.values()
@@ -1619,7 +1624,7 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_contains("aws_internet_gateway");
-		config.to_json()["resource"]["aws_eip_association"]
+		config.to_json().into_json()["resource"]["aws_eip_association"]
 			.as_object()
 			.unwrap()
 			.len()
@@ -1633,15 +1638,16 @@ mod tests {
 	#[beet_core::test]
 	fn role_lowers_the_declared_grants() {
 		let (stack, _deployment, config) = build_config(&mail_box());
-		let policy = config.to_json()["resource"]["aws_iam_role_policy"]
-			.as_object()
-			.unwrap()
-			.values()
-			.next()
-			.unwrap()["policy"]
-			.as_str()
-			.unwrap()
-			.to_string();
+		let policy =
+			config.to_json().into_json()["resource"]["aws_iam_role_policy"]
+				.as_object()
+				.unwrap()
+				.values()
+				.next()
+				.unwrap()["policy"]
+				.as_str()
+				.unwrap()
+				.to_string();
 		policy
 			.as_str()
 			// one statement for the stack's whole secret prefix
@@ -1718,7 +1724,8 @@ mod tests {
 	#[beet_core::test]
 	fn the_recovery_credential_retires_with_the_claim() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let script = mail_box().secrets_script(&stack);
+		let (_, db, _) = siblings();
+		let script = mail_box().secrets_script(&stack, &db);
 		// the claimed branch renders the store and an EMPTY env file
 		let (claimed, unclaimed) = script
 			.split_once("else")
@@ -1741,8 +1748,9 @@ mod tests {
 	#[beet_core::test]
 	fn the_store_render_can_be_forced() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let (_, db, _) = siblings();
 		mail_box()
-			.secrets_script(&stack)
+			.secrets_script(&stack, &db)
 			.as_str()
 			.xpect_contains("render-store");
 	}
@@ -1770,9 +1778,10 @@ mod tests {
 	fn the_backup_reads_its_credential_rather_than_carrying_one() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (_, db, _) = siblings();
 		mail_box()
 			.with_backup_bucket("mail-backups")
-			.backup_script(&stack)
+			.backup_script(&stack, &db)
 			.as_str()
 			.xpect_contains("aws ssm get-parameter")
 			.xpect_contains("PGSSLMODE=verify-full")
@@ -1795,9 +1804,10 @@ mod tests {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
 		let block = mail_box().with_backup_bucket("mail-backups");
+		let (_, db, _) = siblings();
 		// the script leaves the token for the one late substitution
 		block
-			.backup_script(&stack)
+			.backup_script(&stack, &db)
 			.as_str()
 			.xpect_contains("pg_dump --host '__DB_HOST__'");
 		// ..and by the time it is machine config it carries a LIVE reference,
@@ -1840,13 +1850,14 @@ mod tests {
 	#[beet_core::test]
 	fn dns_is_an_unproxied_a_record() {
 		let (_stack, _deployment, config) = build_config(&mail_box());
-		let record = config.to_json()["resource"]["cloudflare_dns_record"]
-			.as_object()
-			.unwrap()
-			.values()
-			.next()
-			.unwrap()
-			.clone();
+		let record =
+			config.to_json().into_json()["resource"]["cloudflare_dns_record"]
+				.as_object()
+				.unwrap()
+				.values()
+				.next()
+				.unwrap()
+				.clone();
 		record["type"].as_str().unwrap().xpect_eq("A");
 		record["name"]
 			.as_str()
@@ -1869,14 +1880,16 @@ mod tests {
 			.xpect_contains("must not be Cloudflare-proxied");
 	}
 
-	/// A declaration that cannot serve mail fails before any resource exists.
+	/// A declaration that cannot serve mail fails before any resource exists,
+	/// and a box with no network to sit in fails at render, where its
+	/// relations resolve.
 	#[beet_core::test]
 	fn invalid_declarations_fail_at_config_time() {
 		StalwartBlock::new("mail", "mail.beetmash.com")
 			.validate()
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("names no vpc");
+			.xpect_contains("names no blob bucket");
 		mail_box()
 			.with_ssh_public_key("")
 			.validate()
@@ -1884,46 +1897,64 @@ mod tests {
 			.to_string()
 			.xpect_contains("no ssh public key");
 		StalwartBlock::new("mail", "Mail.Beetmash.Com")
-			.with_vpc("net")
-			.with_database("db")
 			.with_blob_bucket("mail-blobs")
 			.with_ssh_public_key("ssh-ed25519 KEY")
 			.validate()
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("hostname");
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				parent.spawn(mail_box());
+			});
+		scope
+			.finish()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("declares no `VpcRef`")
+			.xpect_contains("declares no `DatabaseRef`");
+	}
+
+	/// The box admits ITSELF to the database, through its `DatabaseRef` target:
+	/// one ingress rule on the postgres port, its target the database's group,
+	/// its source the box's own, and no cidr anywhere.
+	#[beet_core::test]
+	fn the_box_admits_itself_to_the_database() {
+		let (stack, _deployment, config) = build_config(&mail_box());
+		let (_, db, _) = siblings();
+		let rule =
+			config.to_json().into_json()["resource"]["aws_security_group_rule"]
+				[stack.resource_ident("db--sg-from-mail").label()]
+			.clone();
+		rule["type"].as_str().unwrap().xpect_eq("ingress");
+		rule["from_port"].as_i64().unwrap().xpect_eq(5432);
+		rule["to_port"].as_i64().unwrap().xpect_eq(5432);
+		rule["security_group_id"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(db.security_group_id(&stack));
+		rule["source_security_group_id"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(mail_box().security_group_id(&stack));
+		rule["cidr_blocks"].is_null().xpect_true();
 	}
 
 	/// The full stack through the real provider schemas: vpc, database, blob
-	/// bucket and box in one config, with the consumer security group REAL
-	/// rather than stubbed (the stub `rds_postgres_block::tests::validate`
-	/// still carries for its own feature set). Rendered-JSON assertions prove
-	/// what the blocks meant; only tofu proves the schema accepts it, and only
-	/// the combined run proves every cross-block interpolation resolves.
+	/// bucket and box in one config, related exactly as the markup relates
+	/// them. Rendered-JSON assertions prove what the blocks meant; only tofu
+	/// proves the schema accepts it, and only the combined run proves every
+	/// cross-block interpolation resolves.
 	///
 	/// Drives the native tofu cli, so it cannot compile for wasm.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test(timeout_ms = 240000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let block = mail_box();
-		let (network, db, blobs) = siblings();
-		let mut world = World::new();
-		let spawned = world.spawn(());
-		let entity = spawned.as_readonly();
-		let config = stack
-			.build_config(&deployment, [
-				(entity.clone(), &network as &dyn Block),
-				(entity.clone(), &db as &dyn Block),
-				(entity.clone(), &blobs as &dyn Block),
-				(entity, &block as &dyn Block),
-			])
-			.unwrap();
-		terra::Project::new(stack, deployment, config)
-			.validate()
-			.await
-			.unwrap();
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				spawn_stack(mail_box(), parent);
+			});
+		scope.project().unwrap().validate().await.unwrap();
 	}
 }

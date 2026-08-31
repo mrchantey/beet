@@ -326,7 +326,7 @@ mod test {
 
 	#[crate::test]
 	fn document_get_field_ref() {
-		let doc = Document::new(val!({
+		let doc = Document::new(value!({
 			"name": "Test",
 			"count": 42i64,
 			"nested": { "value": "deep" }
@@ -356,7 +356,7 @@ mod test {
 
 	#[crate::test]
 	fn document_get_field() {
-		let doc = Document::new(val!({
+		let doc = Document::new(value!({
 			"name": "Test",
 			"count": 42i64
 		}));
@@ -372,7 +372,7 @@ mod test {
 
 	#[crate::test]
 	fn document_get_field_array() {
-		let doc = Document::new(val!({
+		let doc = Document::new(value!({
 			"items": [1i64, 2i64, 3i64, 4i64, 5i64]
 		}));
 
@@ -388,7 +388,7 @@ mod test {
 
 	#[crate::test]
 	fn document_get_field_mut() {
-		let mut doc = Document::new(val!({ "count": 10i64 }));
+		let mut doc = Document::new(value!({ "count": 10i64 }));
 
 		let value = doc.get_field_mut(&[FieldSegment::key("count")]).unwrap();
 		*value = Value::Int(20);

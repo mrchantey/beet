@@ -184,8 +184,8 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		<!-- the box is destroyed and recreated by every deploy, so it can own no
 		     durable timer: the rollup runs as an invoke-only lambda the schedule
 		     calls at 03:00 UTC, booting the `jobs` verb of this same document. -->
-		<LambdaJobBlock label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
-		<ScheduledJobBlock label="rollup-daily" target="rollup" schedule="cron(0 3 * * ? *)" path="rollup"/>
+		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
+		<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<TofuApply layer="storage"/>

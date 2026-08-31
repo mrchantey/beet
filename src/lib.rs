@@ -89,7 +89,7 @@ pub mod prelude {
 		feature = "router_embedded"
 	))]
 	pub use crate::router::prelude::*;
-	pub use beet_core::val;
+	pub use beet_core::value;
 	// #[cfg(feature = "build")]
 	// pub use crate::build::prelude::*;
 	#[cfg(feature = "thread")]

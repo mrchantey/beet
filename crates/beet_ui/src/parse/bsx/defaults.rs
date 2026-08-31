@@ -181,7 +181,7 @@ mod test {
 	#[beet_core::test]
 	fn click_increments_document_field() {
 		let mut world = world_ext::ui_world();
-		let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
+		let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
 		let button = click_button(
 			&mut world,
 			doc,
@@ -202,7 +202,7 @@ mod test {
 	#[beet_core::test]
 	fn click_increments_by_amount() {
 		let mut world = world_ext::ui_world();
-		let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
+		let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
 		let button = click_button(
 			&mut world,
 			doc,
@@ -225,7 +225,7 @@ mod test {
 	fn set_writes_document_field() {
 		let mut world = world_ext::ui_world();
 		let doc = world
-			.spawn(Document::new(val!({ "status": "pending" })))
+			.spawn(Document::new(value!({ "status": "pending" })))
 			.id();
 		let button = click_button(
 			&mut world,

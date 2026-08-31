@@ -87,6 +87,6 @@ pub mod prelude {
 }
 
 pub mod exports {
-	// used by the val! macro
+	// used by the value! macro
 	pub use beet_core::prelude::HashMap;
 }

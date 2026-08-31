@@ -20,24 +20,22 @@ use serde_json::json;
 /// rather than a handler and the target binary dispatches it exactly as it would
 /// a request that arrived over http.
 ///
-/// Authored directly from markup beside the lambda it drives, ie
+/// Authored directly from markup beside the lambda it drives, related through
+/// [`InvokeTarget`], ie
 /// ```html
-/// <LambdaBlock label="rollup"/>
-/// <ScheduledJobBlock label="rollup-daily" target="rollup"
+/// <LambdaBlock bx:ref="rollup" label="rollup"/>
+/// <ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup)}
 ///   schedule="cron(0 3 * * ? *)" path="analytics/rollup"/>
 /// ```
 #[derive(
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ErasedBlock::on_add::<ScheduledJobBlock>)]
+#[component(immutable)]
 pub struct ScheduledJobBlock {
 	/// The unprefixed schedule label (eg `rollup-daily`), which names the
 	/// schedule and its invoke role.
 	label: SmolStr,
-	/// The lambda this schedule invokes, declared elsewhere in the same stack.
-	#[set_with(into)]
-	target: LambdaRef,
 	/// When to run, in EventBridge Scheduler's expression grammar: a `rate(1
 	/// day)` interval, a six-field `cron(0 3 * * ? *)`, or a one-shot
 	/// `at(2026-01-01T03:00:00)`. Validated at render, so a typo fails the
@@ -63,14 +61,29 @@ impl Default for ScheduledJobBlock {
 	fn default() -> Self { Self::new("") }
 }
 
+/// The lambda a schedule invokes: the source half of the [`Invokers`]
+/// relationship, on the [`ScheduledJobBlock`] entity, targeting a declaration
+/// carrying a [`LambdaBlock`]. Authored in markup as `{InvokeTarget($rollup)}`
+/// beside a `<LambdaJobBlock bx:ref="rollup"/>`.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
+#[reflect(Component)]
+#[relationship(relationship_target = Invokers)]
+pub struct InvokeTarget(#[entities] pub Entity);
+
+/// Every schedule invoking a lambda: the target half of the [`InvokeTarget`]
+/// relationship, on the lambda's declaration entity.
+#[derive(Debug, Default, Reflect, Component)]
+#[reflect(Component)]
+#[relationship_target(relationship = InvokeTarget)]
+pub struct Invokers(Vec<Entity>);
+
 impl ScheduledJobBlock {
-	/// A schedule labelled `label`, which must be given a
-	/// [`target`](Self::target), a [`schedule`](Self::schedule) expression and a
+	/// A schedule labelled `label`, which must be given an [`InvokeTarget`]
+	/// relation, a [`schedule`](Self::schedule) expression and a
 	/// [`path`](Self::path) before it renders.
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
-			target: default(),
 			schedule: default(),
 			path: default(),
 			method: HttpMethod::Post,
@@ -100,16 +113,11 @@ impl ScheduledJobBlock {
 			.unwrap_or_else(|| stack.region().clone())
 	}
 
-	/// Whether this declaration can render at all: a schedule with nothing to
-	/// invoke, no time to run at, or no route to dispatch is a deploy-time
-	/// failure rather than a timer that fires into nothing.
+	/// Whether this declaration can render at all: a schedule with no time to
+	/// run at or no route to dispatch is a deploy-time failure rather than a
+	/// timer that fires into nothing. (A schedule with nothing to invoke fails
+	/// at render, where its [`InvokeTarget`] relation resolves.)
 	pub fn validate(&self) -> Result {
-		if self.target.label().is_empty() {
-			bevybail!(
-				"the schedule '{}' names no lambda to invoke, ie `target=\"rollup\"`",
-				self.label
-			);
-		}
 		if self.path.is_empty() {
 			bevybail!(
 				"the schedule '{}' names no route to dispatch, ie `path=\"analytics/rollup\"`",
@@ -160,18 +168,49 @@ impl ScheduledJobBlock {
 	}
 }
 
-impl Block for ScheduledJobBlock {
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl ScheduledJobBlock {
+	/// Render the schedule and its invoke role into the config, resolving the
+	/// [`InvokeTarget`] relation to the [`LambdaBlock`] it invokes.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<(&ScheduledJobBlock, Option<&InvokeTarget>)>,
+		lambdas: Query<&LambdaBlock>,
+	) {
+		for entity in scope.declared().to_vec() {
+			let Ok((block, target)) = query.get(entity) else {
+				continue;
+			};
+			let result = scope
+				.related(
+					&lambdas,
+					target.map(|target| target.0),
+					"InvokeTarget",
+					block.label(),
+				)
+				.and_then(|lambda| {
+					let (stack, _deployment, config) = scope.ctx();
+					block.emit(stack, config, lambda)
+				});
+			if let Err(err) = result {
+				scope.error(err);
+			}
+		}
+	}
+
+	/// Emit the schedule, the invoke role scoped to the one function it targets,
+	/// and that role's policy. Validates the declaration first, so a misdeclared
+	/// job fails the deploy rather than rendering a timer that fires into nothing.
+	fn emit(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
-		_deployment: &Deployment,
-		_access: &AccessGrants,
 		config: &mut terra::Config,
+		lambda: &LambdaBlock,
 	) -> Result {
 		self.validate()?;
 		let region = self.resolved_region(stack);
-		let function_arn = self.target.arn(stack);
+		let function_arn = lambda.arn(stack);
 
 		// The invoke identity: the scheduler assumes this role to call the one
 		// function it targets, and can do nothing else with it. The function's
@@ -257,24 +296,20 @@ impl Block for ScheduledJobBlock {
 mod test {
 	use super::*;
 
-	/// The rendered json for a valid schedule targeting the default lambda.
+	/// The rendered json for a valid schedule related to the `rollup` lambda.
 	fn build_json(block: &ScheduledJobBlock) -> Result<String> {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block.apply_to_config(
-			&world.spawn(()).as_readonly(),
-			&stack,
-			&deployment,
-			&default(),
-			&mut config,
-		)?;
-		config.to_json().to_string().xok()
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			let lambda = parent
+				.spawn(LambdaBlock::default().with_label("rollup"))
+				.id();
+			parent.spawn((block.clone(), InvokeTarget(lambda)));
+		});
+		let (_stack, _deployment, config) = scope.finish()?;
+		config.to_json_string()
 	}
 
 	fn rollup_daily() -> ScheduledJobBlock {
 		ScheduledJobBlock::new("rollup-daily")
-			.with_target("rollup")
 			.with_schedule("cron(0 3 * * ? *)")
 			.with_path("analytics/rollup")
 	}
@@ -307,50 +342,39 @@ mod test {
 	}
 
 	/// The schedule targets the ident the lambda block emits, composed by the
-	/// one type both sides go through.
+	/// one block both sides go through.
 	#[beet_core::test]
 	fn targets_the_ident_the_lambda_emits() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let lambda = LambdaBlock::default().with_label("rollup");
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		let entity = world.spawn(());
-		lambda
-			.apply_to_config(
-				&entity.as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
-		rollup_daily()
-			.apply_to_config(
-				&entity.as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			let target = parent
+				.spawn(LambdaBlock::default().with_label("rollup"))
+				.id();
+			parent.spawn((rollup_daily(), InvokeTarget(target)));
+		});
+		let (stack, _deployment, config) = scope.finish().unwrap();
 		// the schedule's interpolation names a resource this config declares
-		let json = config.to_json().to_string();
-		let address = format!(
-			"aws_lambda_function.{}",
-			lambda.lambda_ref().ident(&stack).label()
-		);
+		let json = config.to_json_string().unwrap();
+		let address =
+			format!("aws_lambda_function.{}", lambda.ident(&stack).label());
 		json.matches(&address).count().xpect_greater_than(1);
 	}
 
-	/// The rendered config is a pure function of the DECLARATION: two deploys of
-	/// one schedule render byte-identically, so a plan shows no diff when
-	/// nothing changed and a later deploy-scoped value cannot leak into the
-	/// payload unnoticed.
+	/// The rendered schedule is a pure function of the DECLARATION: two deploys
+	/// render it byte-identically, so a plan shows no diff when nothing changed
+	/// and a deploy-scoped value cannot leak into the payload unnoticed. (The
+	/// target lambda legitimately carries the deploy id in its artifact key, so
+	/// the comparison is the schedule's resource alone.)
 	#[beet_core::test]
 	fn renders_deterministically() {
-		build_json(&rollup_daily())
-			.unwrap()
-			.xpect_eq(build_json(&rollup_daily()).unwrap());
+		let schedule = || {
+			serde_json::from_str::<serde_json::Value>(
+				&build_json(&rollup_daily()).unwrap(),
+			)
+			.unwrap()["resource"]["aws_scheduler_schedule"]
+				.clone()
+		};
+		schedule().xpect_eq(schedule());
 	}
 
 	/// An unparseable expression fails the DEPLOY, naming the schedule and the
@@ -391,38 +415,39 @@ mod test {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		let entity = world.spawn(());
-		for block in [
-			&LambdaBlock::default().with_label("rollup") as &dyn Block,
-			&rollup_daily(),
-		] {
-			block
-				.apply_to_config(
-					&entity.as_readonly(),
-					&stack,
-					&deployment,
-					&default(),
-					&mut config,
-				)
-				.unwrap();
-		}
-		terra::Project::new(stack, deployment, config)
-			.validate()
-			.await
-			.unwrap();
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			let target = parent
+				.spawn(LambdaBlock::default().with_label("rollup"))
+				.id();
+			parent.spawn((rollup_daily(), InvokeTarget(target)));
+		});
+		scope.project().unwrap().validate().await.unwrap();
 	}
 
-	/// A schedule with nothing to invoke, or nothing to dispatch, fails naming
-	/// what it is missing rather than rendering a timer that fires into nothing.
+	/// A schedule with nothing to invoke, a target that is not a lambda, or
+	/// nothing to dispatch fails naming what it is missing rather than rendering
+	/// a timer that fires into nothing.
 	#[beet_core::test]
 	fn an_unpointed_schedule_fails_the_deploy() {
-		build_json(&rollup_daily().with_target(""))
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(rollup_daily());
+		});
+		scope
+			.finish()
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("names no lambda to invoke");
+			.xpect_contains("declares no `InvokeTarget`")
+			.xpect_contains("rollup-daily");
+		// a target carrying no LambdaBlock is a dangling reference, not a timer
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			let target = parent.spawn(()).id();
+			parent.spawn((rollup_daily(), InvokeTarget(target)));
+		});
+		scope
+			.finish()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("carries no `LambdaBlock`");
 		build_json(&rollup_daily().with_path(""))
 			.unwrap_err()
 			.to_string()

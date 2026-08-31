@@ -1,8 +1,6 @@
 use crate::bindings::aws;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// Strategy for maintaining the Terraform state for this stack.
 /// By default, the state for each stack is
@@ -130,7 +128,7 @@ impl LocalBackend {
 		// resolves relative paths from the tofu working directory, not the
 		// workspace root.
 		let state_path = self.path.join(key).to_string();
-		json!({"local":{ "path": state_path }})
+		value!({ "local": { "path": state_path } })
 	}
 	pub fn provider(&self) -> FsStore { FsStore::new(self.path.clone()) }
 	/// Remove stale `.*.lock.info` files left by interrupted tofu processes.
@@ -187,12 +185,12 @@ impl Default for S3Backend {
 
 impl S3Backend {
 	fn to_json(&self, key: &str) -> Value {
-		json!({
+		value!({
 			"s3": {
-				"bucket": self.bucket,
+				"bucket": (self.bucket.clone()),
 				"key": key,
-				"region": self.region.to_string(),
-				"use_lockfile": self.use_lockfile,
+				"region": (self.region.clone()),
+				"use_lockfile": (self.use_lockfile),
 			}
 		})
 	}

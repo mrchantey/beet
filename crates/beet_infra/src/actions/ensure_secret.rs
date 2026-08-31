@@ -193,11 +193,11 @@ mod tests {
 	/// The name the action reads is the one the database's boot script reads,
 	/// which is the whole reason `SecretRef` exists.
 	#[beet_core::test]
-	fn the_name_is_the_database_ref_composition() {
+	fn the_name_is_the_database_composition() {
 		let stack = Stack::new("beetmash")
 			.with_stage("prod")
 			.resolve(&PackageConfig::default());
-		let database = DatabaseRef::new("db");
+		let database = RdsPostgresBlock::new("db");
 		EnsureSecret::new(database.secret())
 			.secret()
 			.name(&stack)

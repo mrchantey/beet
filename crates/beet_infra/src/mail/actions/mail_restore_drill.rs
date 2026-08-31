@@ -123,10 +123,7 @@ pub async fn MailRestoreDrillAction(
 		.get_cloned::<MailRestoreDrill>()
 		.await
 		.unwrap_or_default();
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let stage = mail.stack.stage().clone();
 	if &stage == drill.source_stage() {
 		bevybail!(
@@ -454,7 +451,7 @@ async fn newest_dump(
 /// stage has already been provisioned with its own empty mailboxes, and
 /// `--no-owner --no-acl` because the dump's roles are the source stage's.
 fn restore_command(mail: &MailStack, host: &str) -> String {
-	let secret = mail.mail_box.database().secret_name(&mail.stack);
+	let secret = mail.database.secret_name(&mail.stack);
 	format!(
 		"sudo -n -u stalwart env \
 		PGPASSWORD=\"$(aws ssm get-parameter --region '{region}' --name '{secret}' --with-decryption --query Parameter.Value --output text)\" \
@@ -513,15 +510,14 @@ mod tests {
 			.xpect_contains(MailRestoreDrill::REMOTE_PATH);
 	}
 
-	/// The restore reaches the database by name. `DatabaseRef::host` composes a
-	/// terraform reference, which is the right value inside a config file and a
-	/// literal `${aws_db_instance..}` over ssh, so this command is built from
-	/// the apply's OUTPUT instead.
+	/// The restore reaches the database by name. `RdsPostgresBlock::host`
+	/// composes a terraform reference, which is the right value inside a config
+	/// file and a literal `${aws_db_instance..}` over ssh, so this command is
+	/// built from the apply's OUTPUT instead.
 	#[beet_core::test]
 	fn the_restore_names_a_host_rather_than_a_terraform_reference() {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let mail_box = StalwartBlock::new("mail", "mail.beetmash.com")
-			.with_database("db")
 			.with_db_name("mail");
 		let command = restore_command(
 			&MailStack {
@@ -532,6 +528,7 @@ mod tests {
 				),
 				stack,
 				mail_box,
+				database: RdsPostgresBlock::new("db"),
 				domains: Vec::new(),
 			},
 			"db.example.ap-southeast-2.rds.amazonaws.com",

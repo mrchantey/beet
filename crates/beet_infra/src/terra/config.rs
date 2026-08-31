@@ -17,7 +17,7 @@
 //!     .with_required_version("~> 1.8")
 //!     .with_resource("assets", &bucket)?
 //!     .with_output("bucket_name", Output {
-//!         value: json!("${aws_s3_bucket.assets.bucket}"),
+//!         value: "${aws_s3_bucket.assets.bucket}".into(),
 //!         description: Some("The bucket name".into()),
 //!         sensitive: None,
 //!     })?;
@@ -26,8 +26,8 @@
 //!
 //! # Untyped API
 //!
-//! The `add_untyped_*` methods accept raw `serde_json::Value` or any
-//! `Serialize` type for escape-hatch usage:
+//! The `add_untyped_*` methods accept any `Serialize` type for escape-hatch
+//! usage:
 //!
 //! ```rust,ignore
 //! let mut config = Config::new();
@@ -42,9 +42,6 @@ use crate::terra::Resource;
 use crate::terra::*;
 use beet_core::prelude::*;
 use serde::Serialize;
-use serde_json::Map;
-use serde_json::Value;
-use serde_json::json;
 
 /// A Terraform variable definition.
 pub struct Variable {
@@ -76,7 +73,7 @@ pub struct Output {
 ///     .with_required_version("~> 1.8")
 ///     .with_resource("assets", &bucket)?
 ///     .with_output("bucket_name", Output {
-///         value: json!("${aws_s3_bucket.assets.bucket}"),
+///         value: "${aws_s3_bucket.assets.bucket}".into(),
 ///         description: Some("The bucket name".into()),
 ///         sensitive: None,
 ///     })?;
@@ -91,15 +88,15 @@ pub struct Config {
 	encryption: Option<Value>,
 	/// Optional `required_version` constraint in the `terraform` block.
 	required_version: Option<String>,
-	required_providers: Map<String, Value>,
-	/// Provider config blocks. Values are `Object` for a single config or
-	/// `Array` of objects when aliases are used.
-	providers: Map<String, Value>,
-	resources: Map<String, Value>,
-	data_sources: Map<String, Value>,
-	variables: Map<String, Value>,
-	outputs: Map<String, Value>,
-	locals: Map<String, Value>,
+	required_providers: Map,
+	/// Provider config blocks. Values are [`Value::Map`] for a single config
+	/// or [`Value::List`] of maps when aliases are used.
+	providers: Map,
+	resources: Map,
+	data_sources: Map,
+	variables: Map,
+	outputs: Map,
+	locals: Map,
 	/// Resource addresses grouped by deploy layer, collected by
 	/// [`add_layer_resource`](Self::add_layer_resource). Config-only, never
 	/// serialized.
@@ -283,10 +280,13 @@ impl Config {
 		self.ensure_provider(resource.provider());
 		let map = self
 			.resources
-			.entry(resource.resource_type().to_string())
-			.or_insert_with(|| Value::Object(Map::new()))
-			.to_object_mut()?;
-		if map.insert(label.clone(), resource.to_json()).is_some() {
+			.entry(resource.resource_type().into())
+			.or_insert_with(Value::map)
+			.as_map_mut()?;
+		if map
+			.insert(label.clone(), Value::from_json(resource.to_json()))
+			.is_some()
+		{
 			bevybail!(
 				"duplicate resource: type `{}` label `{}` already exists",
 				resource.resource_type(),
@@ -318,10 +318,13 @@ impl Config {
 		self.ensure_provider(source.provider());
 		let map = self
 			.data_sources
-			.entry(source.data_type().to_string())
-			.or_insert_with(|| Value::Object(Map::new()))
-			.to_object_mut()?;
-		if map.insert(label.clone(), source.to_json()).is_some() {
+			.entry(source.data_type().into())
+			.or_insert_with(Value::map)
+			.as_map_mut()?;
+		if map
+			.insert(label.clone(), Value::from_json(source.to_json()))
+			.is_some()
+		{
 			bevybail!(
 				"duplicate data source: type `{}` label `{}` already exists",
 				source.data_type(),
@@ -357,7 +360,7 @@ impl Config {
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
 		self.ensure_provider(provider);
-		let value = serde_json::to_value(config)?;
+		let value = Value::from_serde(config)?;
 		self.insert_provider_entry(provider.local_name(), value)?;
 		Ok(self)
 	}
@@ -372,7 +375,7 @@ impl Config {
 		provider: &Provider,
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
-		if self.providers.contains_key(provider.local_name()) {
+		if self.providers.contains(provider.local_name()) {
 			return Ok(self);
 		}
 		self.add_provider_config(provider, config)
@@ -410,9 +413,10 @@ impl Config {
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
 		self.ensure_provider(provider);
-		let mut value = serde_json::to_value(config)?;
-		if let Value::Object(ref mut map) = value {
-			map.insert("alias".to_string(), Value::String(alias.into()));
+		let mut value = Value::from_serde(config)?;
+		let alias: String = alias.into();
+		if let Value::Map(map) = &mut value {
+			map.insert("alias", alias);
 		}
 		self.insert_provider_entry(provider.local_name(), value)?;
 		Ok(self)
@@ -454,7 +458,7 @@ impl Config {
 		variable: Variable,
 	) -> &mut Self {
 		let name = name.into();
-		if !self.variables.contains_key(&name) {
+		if !self.variables.contains(&name) {
 			self.insert_variable(name, variable).ok();
 		}
 		self
@@ -500,8 +504,8 @@ impl Config {
 		name: impl Into<String>,
 		value: impl Serialize,
 	) -> Result<&mut Self> {
-		self.locals
-			.insert(name.into(), serde_json::to_value(value)?);
+		let name: String = name.into();
+		self.locals.insert(name, Value::from_serde(value)?);
 		Ok(self)
 	}
 
@@ -518,13 +522,11 @@ impl Config {
 		source: &str,
 		version: &str,
 	) -> Result<&mut Self> {
-		if self.required_providers.contains_key(name) {
+		if self.required_providers.contains(name) {
 			bevybail!("duplicate required provider: `{}` already exists", name);
 		}
-		self.required_providers.insert(
-			name.to_string(),
-			json!({ "source": source, "version": version }),
-		);
+		self.required_providers
+			.insert(name, value!({ "source": source, "version": version }));
 		Ok(self)
 	}
 
@@ -534,7 +536,7 @@ impl Config {
 		name: &str,
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
-		let value = serde_json::to_value(config)?;
+		let value = Value::from_serde(config)?;
 		self.insert_provider_entry(name, value)?;
 		Ok(self)
 	}
@@ -546,12 +548,12 @@ impl Config {
 		name: &str,
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
-		let value = serde_json::to_value(config)?;
+		let value = Value::from_serde(config)?;
 		self.resources
-			.entry(resource_type.to_string())
-			.or_insert_with(|| Value::Object(Map::new()))
-			.to_object_mut()?
-			.insert(name.to_string(), value);
+			.entry(resource_type.into())
+			.or_insert_with(Value::map)
+			.as_map_mut()?
+			.insert(name, value);
 		Ok(self)
 	}
 
@@ -562,12 +564,12 @@ impl Config {
 		name: &str,
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
-		let value = serde_json::to_value(config)?;
+		let value = Value::from_serde(config)?;
 		self.data_sources
-			.entry(data_type.to_string())
-			.or_insert_with(|| Value::Object(Map::new()))
-			.to_object_mut()?
-			.insert(name.to_string(), value);
+			.entry(data_type.into())
+			.or_insert_with(Value::map)
+			.as_map_mut()?
+			.insert(name, value);
 		Ok(self)
 	}
 
@@ -583,22 +585,22 @@ impl Config {
 		&mut self,
 		resource_type: &str,
 		label: &str,
-		lifecycle: Value,
+		lifecycle: impl Serialize,
 	) -> Result<&mut Self> {
 		let map = self
 			.resources
 			.get_mut(resource_type)
-			.and_then(|v| v.as_object_mut())
+			.and_then(|v| v.as_map_mut().ok())
 			.ok_or_else(|| {
 				bevyhow!("resource type `{resource_type}` not found")
 			})?;
 		let resource = map
 			.get_mut(label)
-			.and_then(|v| v.as_object_mut())
+			.and_then(|v| v.as_map_mut().ok())
 			.ok_or_else(|| {
 				bevyhow!("resource `{resource_type}.{label}` not found")
 			})?;
-		resource.insert("lifecycle".to_string(), lifecycle);
+		resource.insert("lifecycle", Value::from_serde(lifecycle)?);
 		Ok(self)
 	}
 
@@ -608,70 +610,53 @@ impl Config {
 
 	/// Build the complete Terraform JSON configuration as a [`Value`].
 	pub fn to_json(&self) -> Value {
-		let mut root = Map::new();
+		let mut root = Map::default();
 
 		// terraform block: optional required_version, backend, required_providers
-		let mut tf_block = Map::new();
-		if let Some(ref v) = self.required_version {
-			tf_block.insert(
-				"required_version".to_string(),
-				Value::String(v.clone()),
-			);
+		let mut tf_block = Map::default();
+		if let Some(version) = &self.required_version {
+			tf_block.insert("required_version", version.clone());
 		}
 		if let Some(backend) = &self.backend {
-			tf_block.insert("backend".to_string(), backend.clone());
+			tf_block.insert("backend", backend.clone());
 		}
 		if let Some(encryption) = &self.encryption {
-			tf_block.insert("encryption".to_string(), encryption.clone());
+			tf_block.insert("encryption", encryption.clone());
 		}
 		if !self.required_providers.is_empty() {
-			tf_block.insert(
-				"required_providers".to_string(),
-				Value::Object(self.required_providers.clone()),
-			);
+			tf_block
+				.insert("required_providers", self.required_providers.clone());
 		}
 		if !tf_block.is_empty() {
-			root.insert("terraform".to_string(), Value::Object(tf_block));
+			root.insert("terraform", tf_block);
 		}
 
 		if !self.providers.is_empty() {
-			root.insert(
-				"provider".to_string(),
-				Value::Object(self.providers.clone()),
-			);
+			root.insert("provider", self.providers.clone());
 		}
 		if !self.variables.is_empty() {
-			root.insert(
-				"variable".to_string(),
-				Value::Object(self.variables.clone()),
-			);
+			root.insert("variable", self.variables.clone());
 		}
 		if !self.locals.is_empty() {
-			root.insert(
-				"locals".to_string(),
-				Value::Object(self.locals.clone()),
-			);
+			root.insert("locals", self.locals.clone());
 		}
 		if !self.resources.is_empty() {
-			root.insert(
-				"resource".to_string(),
-				Value::Object(self.resources.clone()),
-			);
+			root.insert("resource", self.resources.clone());
 		}
 		if !self.data_sources.is_empty() {
-			root.insert(
-				"data".to_string(),
-				Value::Object(self.data_sources.clone()),
-			);
+			root.insert("data", self.data_sources.clone());
 		}
 		if !self.outputs.is_empty() {
-			root.insert(
-				"output".to_string(),
-				Value::Object(self.outputs.clone()),
-			);
+			root.insert("output", self.outputs.clone());
 		}
 
-		Value::Object(root)
+		Value::Map(root)
+	}
+
+	/// Serialize [`Self::to_json`] to a compact JSON string, entries sorted
+	/// by key.
+	pub fn to_json_string(&self) -> Result<String> {
+		serde_json::to_string(&self.to_json())?.xok()
 	}
 
 	// =====================================================================
@@ -680,16 +665,15 @@ impl Config {
 
 	/// Register a provider in `required_providers` if not already present.
 	fn ensure_provider(&mut self, provider: &Provider) {
-		let local = provider.local_name().to_string();
-		if self.required_providers.contains_key(&local) {
+		let local = provider.local_name();
+		if self.required_providers.contains(local) {
 			return;
 		}
+		let source = provider.short_source();
+		let version = provider.version.as_ref();
 		self.required_providers.insert(
-			local,
-			json!({
-				"source":  provider.short_source(),
-				"version": provider.version.as_ref(),
-			}),
+			SmolStr::from(local),
+			value!({ "source": source, "version": version }),
 		);
 	}
 
@@ -702,17 +686,17 @@ impl Config {
 	) -> Result<()> {
 		match self.providers.get_mut(local_name) {
 			None => {
-				self.providers.insert(local_name.to_string(), config);
+				self.providers.insert(local_name, config);
 			}
-			Some(existing @ Value::Object(_)) => {
+			Some(existing @ Value::Map(_)) => {
 				let first = existing.clone();
-				*existing = Value::Array(vec![first, config]);
+				*existing = Value::List(vec![first, config]);
 			}
-			Some(Value::Array(arr)) => {
-				arr.push(config);
+			Some(Value::List(list)) => {
+				list.push(config);
 			}
 			Some(other) => {
-				other.to_object_mut()?;
+				other.as_map_mut()?;
 			}
 		}
 		Ok(())
@@ -723,24 +707,24 @@ impl Config {
 		name: impl Into<String>,
 		variable: Variable,
 	) -> Result<()> {
-		let name = name.into();
-		if self.variables.contains_key(&name) {
+		let name: String = name.into();
+		if self.variables.contains(&name) {
 			bevybail!("duplicate variable: `{}` already exists", name);
 		}
-		let mut obj = Map::new();
+		let mut obj = Map::default();
 		if let Some(var_type) = variable.r#type {
-			obj.insert("type".to_string(), Value::String(var_type));
+			obj.insert("type", var_type);
 		}
 		if let Some(default) = variable.default {
-			obj.insert("default".to_string(), default);
+			obj.insert("default", default);
 		}
 		if let Some(desc) = variable.description {
-			obj.insert("description".to_string(), Value::String(desc));
+			obj.insert("description", desc);
 		}
 		if let Some(sensitive) = variable.sensitive {
-			obj.insert("sensitive".to_string(), Value::Bool(sensitive));
+			obj.insert("sensitive", sensitive);
 		}
-		self.variables.insert(name, Value::Object(obj));
+		self.variables.insert(name, obj);
 		Ok(())
 	}
 
@@ -749,19 +733,19 @@ impl Config {
 		name: impl Into<String>,
 		output: Output,
 	) -> Result<()> {
-		let name = name.into();
-		if self.outputs.contains_key(&name) {
+		let name: String = name.into();
+		if self.outputs.contains(&name) {
 			bevybail!("duplicate output: `{}` already exists", name);
 		}
-		let mut obj = Map::new();
-		obj.insert("value".to_string(), output.value);
+		let mut obj = Map::default();
+		obj.insert("value", output.value);
 		if let Some(desc) = output.description {
-			obj.insert("description".to_string(), Value::String(desc));
+			obj.insert("description", desc);
 		}
 		if let Some(sensitive) = output.sensitive {
-			obj.insert("sensitive".to_string(), Value::Bool(sensitive));
+			obj.insert("sensitive", sensitive);
 		}
-		self.outputs.insert(name, Value::Object(obj));
+		self.outputs.insert(name, obj);
 		Ok(())
 	}
 }

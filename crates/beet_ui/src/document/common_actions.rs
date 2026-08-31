@@ -346,11 +346,11 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call::<Value, ()>(val!("Hello"))
+			.call::<Value, ()>(value!("Hello"))
 			.await
 			.unwrap();
 
-		value_of(&world, entity).xpect_eq(val!("Hello"));
+		value_of(&world, entity).xpect_eq(value!("Hello"));
 	}
 
 	#[beet_core::test]
@@ -358,18 +358,18 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
-				FieldRef::new("status").with_init(val!("pending")),
+				FieldRef::new("status").with_init(value!("pending")),
 				SetField,
 			))
 			.id();
 
 		world
 			.entity_mut(entity)
-			.call::<Value, ()>(val!("complete"))
+			.call::<Value, ()>(value!("complete"))
 			.await
 			.unwrap();
 
-		value_of(&world, entity).xpect_eq(val!("complete"));
+		value_of(&world, entity).xpect_eq(value!("complete"));
 	}
 
 	#[beet_core::test]
@@ -401,7 +401,7 @@ mod test {
 		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
-				Document::new(val!({ "status": "pending" })),
+				Document::new(value!({ "status": "pending" })),
 				field,
 				SetFieldTyped::<String>::default(),
 			))
@@ -435,7 +435,7 @@ mod test {
 			.call::<(), Value>(())
 			.await
 			.unwrap()
-			.xpect_eq(val!(42i64));
+			.xpect_eq(value!(42i64));
 	}
 
 	#[beet_core::test]
@@ -444,7 +444,7 @@ mod test {
 		let field = FieldRef::new("data");
 		world
 			.spawn((
-				Document::new(val!({ "data": 42i64 })),
+				Document::new(value!({ "data": 42i64 })),
 				field,
 				ReadFieldTyped::<i64>::default(),
 			))
@@ -460,7 +460,7 @@ mod test {
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
-				Document::new(val!({ "user": { "name": "Alice" } })),
+				Document::new(value!({ "user": { "name": "Alice" } })),
 				field,
 				ReadFieldTyped::<String>::default(),
 			))
@@ -539,7 +539,7 @@ mod test {
 		world.entity_mut(actor).call::<i32, ()>(7).await.unwrap();
 		world.entity_mut(actor).call::<i32, ()>(8).await.unwrap();
 
-		host_list(&world, host).xpect_eq(val!([7i64, 8i64]));
+		host_list(&world, host).xpect_eq(value!([7i64, 8i64]));
 	}
 
 	/// Two actions over one field are two entities: an entity holds at most one
@@ -570,7 +570,7 @@ mod test {
 			.await
 			.unwrap();
 
-		host_list(&world, host).xpect_eq(val!([1i64, 99i64, 2i64, 3i64]));
+		host_list(&world, host).xpect_eq(value!([1i64, 99i64, 2i64, 3i64]));
 	}
 
 	#[beet_core::test]
@@ -592,8 +592,8 @@ mod test {
 			.await
 			.unwrap()
 			.unwrap()
-			.xpect_eq(val!(1i64));
-		value_of(&world, actor).xpect_eq(val!([99i64, 2i64, 3i64]));
+			.xpect_eq(value!(1i64));
+		value_of(&world, actor).xpect_eq(value!([99i64, 2i64, 3i64]));
 
 		// an out-of-range index removes nothing
 		world
@@ -609,7 +609,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let actor = world
 			.spawn((
-				FieldRef::new("todos").with_init(val!("not a list")),
+				FieldRef::new("todos").with_init(value!("not a list")),
 				RemoveAtField,
 			))
 			.id();

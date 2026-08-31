@@ -21,7 +21,7 @@ use beet_net::prelude::*;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ErasedBlock::on_add::<DynamoTableBlock>)]
+#[component(immutable)]
 pub struct DynamoTableBlock {
 	/// The unprefixed table label (eg `analytics`).
 	label: SmolStr,
@@ -142,13 +142,50 @@ pub(crate) fn attach_table_store(
 	);
 }
 
-impl Block for DynamoTableBlock {
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl DynamoTableBlock {
+	/// A table is declared to be recorded to, so the process that declared it
+	/// reads and writes it.
+	pub(crate) fn runtime_access(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
-		_deployment: &Deployment,
-		_access: &AccessGrants,
+	) -> Vec<AccessGrant> {
+		vec![AccessGrant::read_write(
+			Self::ACCESS_KIND,
+			self.table_name(stack),
+		)]
+	}
+
+	/// Declare the read/write grant a compute block lowers: a table is declared
+	/// to be recorded to.
+	pub(crate) fn declare(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&DynamoTableBlock>,
+	) {
+		scope.render_each(&query, |scope, entity, block| {
+			for grant in block.runtime_access(scope.stack()) {
+				scope.grant(entity, grant);
+			}
+			Ok(())
+		});
+	}
+
+	/// Render the table into the config.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&DynamoTableBlock>,
+	) {
+		scope.render_each(&query, |scope, _entity, block| {
+			let (stack, _deployment, config) = scope.ctx();
+			block.emit(stack, config)
+		});
+	}
+
+	/// Emit the pay-per-request table, with its ttl sub-resource when declared.
+	fn emit(
+		&self,
+		stack: &ResolvedStack,
 		config: &mut terra::Config,
 	) -> Result {
 		let table = ResourceDef::new_primary(
@@ -178,15 +215,6 @@ impl Block for DynamoTableBlock {
 		config.add_layer_resource(self.layer.clone(), &table)?;
 		Ok(())
 	}
-
-	/// A table is declared to be recorded to, so the process that declared it
-	/// reads and writes it.
-	fn runtime_access(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
-		vec![AccessGrant::read_write(
-			Self::ACCESS_KIND,
-			self.table_name(stack),
-		)]
-	}
 }
 
 #[cfg(test)]
@@ -195,19 +223,9 @@ mod test {
 
 	/// The terraform json `block` emits.
 	fn build_json(block: DynamoTableBlock) -> String {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
-		config.to_json().to_string()
+		RenderScope::test_json(|parent| {
+			parent.spawn(block);
+		})
 	}
 
 	/// Enabling expiry is an IN-PLACE update to a live table: the ttl block is
@@ -235,6 +253,23 @@ mod test {
 		after
 			.replace(r#","ttl":[{"attribute_name":"ttl","enabled":true}]"#, "")
 			.xpect_eq(before);
+	}
+
+	/// The declaration contributes its read/write grant through the schedule's
+	/// declare pass, so a compute lowering the pool sees the table.
+	#[beet_core::test]
+	fn declares_a_read_write_grant() {
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(DynamoTableBlock::new("analytics"));
+		});
+		let stack = scope.stack().clone();
+		scope
+			.access()
+			.to_vec()
+			.xpect_eq(vec![AccessGrant::read_write(
+				DynamoTableBlock::ACCESS_KIND,
+				stack.resource_name("analytics"),
+			)]);
 	}
 
 	/// The block emits an `aws_dynamodb_table` with a stage-prefixed name, an `id`

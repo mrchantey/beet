@@ -672,7 +672,7 @@ mod test {
 		let content_root = world
 			.spawn((
 				Element::new("article"),
-				Document::new(val!({ "count": 0 })),
+				Document::new(value!({ "count": 0 })),
 			))
 			.id();
 		let inner =
@@ -696,13 +696,13 @@ mod test {
 	fn prop_binding_into_props_store_is_not_reactive() {
 		let mut world = world_ext::ui_world();
 		let doc = world
-			.spawn((Element::new("div"), Document::new(val!({ "count": 0 }))))
+			.spawn((Element::new("div"), Document::new(value!({ "count": 0 }))))
 			.id();
 		// a props store (server-only) holding the materialized prop
 		let store = world
 			.spawn((
 				ChildOf(doc),
-				Document::new(val!({ "title": "Hi" })),
+				Document::new(value!({ "title": "Hi" })),
 				PropsDocument,
 			))
 			.id();
@@ -775,7 +775,7 @@ mod test {
 			.run_system_once(
 				|mut docs: Query<&mut Document, Without<PropsDocument>>| {
 					for mut doc in docs.iter_mut() {
-						doc.0 = val!({ "count": 0, "flag": false, "status": "pending" });
+						doc.0 = value!({ "count": 0, "flag": false, "status": "pending" });
 					}
 				},
 			)

@@ -113,17 +113,7 @@ async fn lightsail_lifecycle() {
 
 /// Build the terraform project for the Lightsail test stack.
 fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
-	let block = LightsailBlock::default();
-	let bucket_block = assets_bucket_block();
-	let mut world = World::new();
-	let entity_mut = world.spawn(());
-	let entity = entity_mut.as_readonly();
-	let config = deploy.resolved().build_config(&deploy.deployment, [
-		(entity.clone(), &block as &dyn Block),
-		(entity, &bucket_block),
-	])?;
-	terra::Project::new(deploy.resolved(), deploy.deployment.clone(), config)
-		.xok()
+	render_test_project(deploy, LightsailBlock::default())
 }
 
 /// Build, upload artifacts, sync assets, and apply terraform

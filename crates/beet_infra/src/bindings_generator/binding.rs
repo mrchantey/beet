@@ -1,6 +1,5 @@
 use super::config::CodeGeneratorConfig;
 use super::config::DocComments;
-use super::emit::CodeGenerator;
 use super::ir::Container;
 use super::ir::Field;
 use super::ir::FieldType;
@@ -13,7 +12,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::path::Path;
 
 const RESERVED_WORDS: [&str; 32] = [
@@ -127,18 +125,6 @@ struct NestedBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct AttributeType(Value);
-
-pub(crate) fn generate_serde(
-	config: &str,
-	out: &mut dyn Write,
-	registry: &Registry,
-) -> Result {
-	let config = CodeGeneratorConfig::new()
-		.with_module_name(config)
-		.with_generate_roots(true);
-
-	CodeGenerator::new(&config).output(out, registry)
-}
 
 pub(crate) fn export_schema_to_registry(
 	schema: &TerraformSchemaExport,
@@ -758,7 +744,21 @@ pub(crate) fn read_tf_schema_from_file<P: AsRef<Path>>(
 
 #[cfg(test)]
 mod test {
+	use super::super::emit::CodeGenerator;
 	use super::*;
+	use std::io::Write;
+
+	fn generate_serde(
+		config: &str,
+		out: &mut dyn Write,
+		registry: &Registry,
+	) -> Result {
+		let config = CodeGeneratorConfig::new()
+			.with_module_name(config)
+			.with_generate_roots(true);
+
+		CodeGenerator::new(&config).output(out, registry)
+	}
 	use crate::bindings_generator::test_utils::config;
 	use crate::bindings_generator::test_utils::datasource_root;
 	use crate::bindings_generator::test_utils::provider_root;

@@ -134,20 +134,24 @@ pub async fn ZoneAuditAction(
 	let fix = cx.has_param("fix");
 	let (declared, allowed) = cx
 		.caller
-		.with_state::<(StackQuery, Query<&ZoneAudit>), _>(
-			|entity, (stacks, audits)| -> Result<_> {
-				let (_, _, config) = stacks.build_config(entity)?;
-				// every audit declared under this stack, so the list is stated
-				// once wherever it reads best
-				let allowed = stacks
-					.declared(entity)?
-					.into_iter()
-					.filter_map(|child| audits.get(child).ok())
-					.flat_map(|audit| audit.allowed().iter().cloned())
-					.collect::<Vec<_>>();
-				(declared_records(&config), allowed).xok()
-			},
-		)
+		.with_world(|world, entity| -> Result<_> {
+			let (.., config) = RenderScope::render(world, entity)?.finish()?;
+			// every audit declared under this stack, so the list is stated
+			// once wherever it reads best
+			let allowed = world
+				.with_state::<(StackQuery, Query<&ZoneAudit>), _>(
+					|(stacks, audits)| -> Result<_> {
+						stacks
+							.declared(entity)?
+							.into_iter()
+							.filter_map(|child| audits.get(child).ok())
+							.flat_map(|audit| audit.allowed().iter().cloned())
+							.collect::<Vec<_>>()
+							.xok()
+					},
+				)?;
+			(declared_records(&config), allowed).xok()
+		})
 		.await??;
 
 	let (zone_id, token) = zone_env()?;
@@ -241,7 +245,7 @@ impl DeclaredRecord {
 /// cannot disagree about what this stack owns: a block that adds a record is
 /// audited the moment it is declared, with nothing else to remember.
 fn declared_records(config: &terra::Config) -> Vec<DeclaredRecord> {
-	config.to_json()["resource"]["cloudflare_dns_record"]
+	config.to_json().into_json()["resource"]["cloudflare_dns_record"]
 		.as_object()
 		.map(|records| {
 			records
@@ -385,15 +389,10 @@ mod tests {
 	}
 
 	fn declared() -> Vec<DeclaredRecord> {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut world = World::new();
-		let spawned = world.spawn(());
-		let entity = spawned.as_readonly();
-		let block = staging();
-		let config = stack
-			.build_config(&deployment, [(entity, &block as &dyn Block)])
-			.unwrap();
-		declared_records(&config)
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(staging());
+		});
+		declared_records(&scope.finish().unwrap().2)
 	}
 
 	/// The declared set comes off the emitted config, so a block that adds a

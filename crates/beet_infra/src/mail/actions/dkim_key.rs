@@ -109,10 +109,7 @@ pub async fn EnsureDkimKeyAction(
 		.get_cloned::<EnsureDkimKey>()
 		.await
 		.unwrap_or_default();
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let region = mail.stack.region().clone();
 
 	let mut input = cx.input;

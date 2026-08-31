@@ -209,7 +209,7 @@ fn enum_literal_infers_variant() {
 #[beet_core::test]
 fn field_ref_binds_document() {
 	let mut world = world();
-	let doc = world.spawn(Document::new(val!({ "count": 7 }))).id();
+	let doc = world.spawn(Document::new(value!({ "count": 7 }))).id();
 	let root =
 		spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count}</span>");
 	world.update_local();
@@ -228,7 +228,7 @@ fn field_ref_binds_document() {
 #[beet_core::test]
 fn field_ref_init_seeds_when_missing() {
 	let mut world = world();
-	let doc = world.spawn(Document::new(val!({}))).id();
+	let doc = world.spawn(Document::new(value!({}))).id();
 	let _root =
 		spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count=5}</span>");
 	world.update_local();
@@ -504,7 +504,7 @@ fn js_file_registers_as_script_template() {
 fn scope_prefixes_descendant_fields() {
 	let mut world = world();
 	let doc = world
-		.spawn(Document::new(val!({ "user": { "name": "Alice" } })))
+		.spawn(Document::new(value!({ "user": { "name": "Alice" } })))
 		.id();
 	let root = spawn_bsx_under(
 		&mut world,
@@ -530,7 +530,7 @@ fn scope_prefixes_descendant_fields() {
 fn reactive_children_per_item() {
 	let mut world = world();
 	let doc = world
-		.spawn(Document::new(val!({ "items": ["a", "b", "c"] })))
+		.spawn(Document::new(value!({ "items": ["a", "b", "c"] })))
 		.id();
 	let list = spawn_bsx_under(
 		&mut world,
@@ -603,7 +603,7 @@ fn template_props_bound_reactively() {
 		.unwrap();
 	world.insert_resource(registry);
 
-	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+	let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 	let card =
 		spawn_bsx_under(&mut world, Some(doc), "<Card title=@doc:name/>");
 	world.update_local();
@@ -627,7 +627,7 @@ fn template_props_bound_reactively() {
 	read_value(&world, probe).xpect_eq(Value::Str("Alice".into()));
 
 	world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-		val!({ "name": "Bob" });
+		value!({ "name": "Bob" });
 	world.update_local();
 	world.update_local();
 	read_value(&world, probe).xpect_eq(Value::Str("Bob".into()));
@@ -670,7 +670,7 @@ fn ancestor_ref_in_template_body_skips_props_store() {
 		.unwrap();
 	world.insert_resource(registry);
 
-	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+	let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 	// the tag's own store also carries a `name` prop, which must not shadow
 	// the user document for the body's `@doc:name` ancestor binding.
 	let card =
@@ -759,7 +759,7 @@ fn fragment_forwards_children_into_slot() {
 #[beet_core::test]
 fn click_increments_field() {
 	let mut world = world();
-	let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
+	let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
 	let button = spawn_bsx_under(
 		&mut world,
 		Some(doc),
@@ -787,7 +787,7 @@ fn click_increments_field() {
 #[beet_core::test]
 fn click_increments_by_amount() {
 	let mut world = world();
-	let doc = world.spawn(Document::new(val!({ "count": 0 }))).id();
+	let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
 	let button = spawn_bsx_under(
 		&mut world,
 		Some(doc),
@@ -1029,7 +1029,7 @@ fn read_i64(world: &World, entity: Entity) -> i64 {
 #[beet_core::test]
 fn binding_doc_text() {
 	let mut world = world();
-	let doc = world.spawn(Document::new(val!({ "count": 7 }))).id();
+	let doc = world.spawn(Document::new(value!({ "count": 7 }))).id();
 	let root =
 		spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count}</span>");
 	world.update_local();
@@ -1039,7 +1039,7 @@ fn binding_doc_text() {
 
 	// reactive: a document change reaches the text
 	world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-		val!({ "count": 8 });
+		value!({ "count": 8 });
 	world.update_local();
 	read_i64(&world, text).xpect_eq(8);
 }
@@ -1047,7 +1047,7 @@ fn binding_doc_text() {
 #[beet_core::test]
 fn binding_doc_init_seeds_when_missing() {
 	let mut world = world();
-	let doc = world.spawn(Document::new(val!({}))).id();
+	let doc = world.spawn(Document::new(value!({}))).id();
 	spawn_bsx_under(&mut world, Some(doc), "<span>{@doc:count=5}</span>");
 	world.update_local();
 	world.update_local();
@@ -1063,7 +1063,7 @@ fn binding_doc_init_seeds_when_missing() {
 #[beet_core::test]
 fn binding_doc_attribute_lowers_field_ref() {
 	let mut world = world();
-	let doc = world.spawn(Document::new(val!({ "name": "Ada" }))).id();
+	let doc = world.spawn(Document::new(value!({ "name": "Ada" }))).id();
 	let root =
 		spawn_bsx_under(&mut world, Some(doc), "<input value=@doc:name/>");
 	// the attribute entity carries the FieldRef, exactly the `#` lowering
@@ -1402,7 +1402,7 @@ fn binding_prop_doc_bound_reactively() {
 		.insert_source("Card", "<section>{@prop:title}</section>")
 		.unwrap();
 	world.insert_resource(registry);
-	let doc = world.spawn(Document::new(val!({ "name": "Alice" }))).id();
+	let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 	let card =
 		spawn_bsx_under(&mut world, Some(doc), "<Card title=@doc:name/>");
 	world.update_local();
@@ -1410,7 +1410,7 @@ fn binding_prop_doc_bound_reactively() {
 	render_html(&mut world, card).xpect_contains("Alice");
 
 	world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-		val!({ "name": "Bob" });
+		value!({ "name": "Bob" });
 	world.update_local();
 	world.update_local();
 	render_html(&mut world, card).xpect_contains("Bob");
@@ -1477,7 +1477,7 @@ fn binding_prop_passes_through_nested_templates() {
 fn component_tag_binding_doc() {
 	let mut world = world();
 	register::<Slider>(&mut world);
-	let doc = world.spawn(Document::new(val!({ "level": 7i64 }))).id();
+	let doc = world.spawn(Document::new(value!({ "level": 7i64 }))).id();
 	let slider =
 		spawn_bsx_under(&mut world, Some(doc), "<Slider value=@doc:level/>");
 	world.update_local();

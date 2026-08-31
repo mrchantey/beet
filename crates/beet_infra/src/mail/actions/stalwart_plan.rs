@@ -486,8 +486,6 @@ mod tests {
 
 	fn mail_box() -> StalwartBlock {
 		StalwartBlock::new("mail", "mail.beetmash.com")
-			.with_vpc("net")
-			.with_database("db")
 			.with_blob_bucket("mail-blobs")
 			.with_ssh_public_key("ssh-ed25519 AAAAC3TESTKEY pete")
 	}

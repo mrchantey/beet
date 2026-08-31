@@ -40,6 +40,10 @@ pub struct IamPolicy {
 	/// Buckets the identity may read, seeded by the compute and appended to by
 	/// [`lower`](Self::lower).
 	read_buckets: Vec<String>,
+	/// Extra actions this compute's write statement carries beyond the shared
+	/// set, ie `s3:AbortMultipartUpload` for a box whose blob store multiparts.
+	/// Per-compute so one tenant's need never widens another's policy.
+	write_actions: Vec<String>,
 	/// The document's statements, in render order.
 	statements: Vec<Value>,
 }
@@ -54,8 +58,17 @@ impl IamPolicy {
 			compute: compute.into(),
 			region: region.into(),
 			read_buckets: Vec::new(),
+			write_actions: Vec::new(),
 			statements: Vec::new(),
 		}
+	}
+
+	/// Append an extra action to the write statement, ie
+	/// `s3:AbortMultipartUpload`. Call before [`lower`](Self::lower), which
+	/// renders it.
+	pub fn write_action(mut self, action: impl Into<String>) -> Self {
+		self.write_actions.push(action.into());
+		self
 	}
 
 	/// Seed a bucket this compute reads on its own account, ie the artifacts
@@ -80,6 +93,8 @@ impl IamPolicy {
 	pub fn lower(mut self, access: &AccessGrants) -> Result<Self> {
 		let compute = self.compute.clone();
 		let mut write_buckets = Vec::<String>::new();
+		#[cfg(feature = "rds_postgres_block")]
+		let mut parameters = Vec::<String>::new();
 		#[cfg(feature = "bindings_aws_dynamo")]
 		let mut read_tables = Vec::<String>::new();
 		#[cfg(feature = "bindings_aws_dynamo")]
@@ -94,6 +109,8 @@ impl IamPolicy {
 						write_buckets.push(grant.name.clone())
 					}
 				},
+				#[cfg(feature = "rds_postgres_block")]
+				RdsPostgresBlock::ACCESS_KIND => parameters.push(grant.name.clone()),
 				#[cfg(feature = "bindings_aws_dynamo")]
 				DynamoTableBlock::ACCESS_KIND => match grant.permissions {
 					AccessPermissions::Read => {
@@ -112,6 +129,26 @@ impl IamPolicy {
 			}
 		}
 
+		// any declared parameter living OUTSIDE the stack's secret prefix (an
+		// overridden secret name); usually redundant with a prefix statement
+		// the compute seeds and harmlessly so. ONE statement for all of them:
+		// a `Sid` must be unique within an identity policy.
+		#[cfg(feature = "rds_postgres_block")]
+		if !parameters.is_empty() {
+			let region = &self.region;
+			self.statements.push(json!({
+				"Sid": "DeclaredParameters",
+				"Effect": "Allow",
+				"Action": ["ssm:GetParameter"],
+				"Resource": parameters
+					.iter()
+					.map(|name| format!(
+						"arn:aws:ssm:{region}:*:parameter{name}"
+					))
+					.collect::<Vec<_>>()
+			}));
+		}
+
 		// every read-only bucket: the deploy publishes them, the process serves
 		// them. Absent entirely when nothing is read, rather than a wildcard.
 		if !self.read_buckets.is_empty() {
@@ -125,15 +162,20 @@ impl IamPolicy {
 		}
 		if !write_buckets.is_empty() {
 			let resource = Self::bucket_arns(&write_buckets);
+			let actions = [
+				"s3:GetObject",
+				"s3:ListBucket",
+				"s3:PutObject",
+				"s3:DeleteObject",
+			]
+			.iter()
+			.map(|action| action.to_string())
+			.chain(self.write_actions.iter().cloned())
+			.collect::<Vec<_>>();
 			self.statements.push(json!({
 				"Sid": "WriteStores",
 				"Effect": "Allow",
-				"Action": [
-					"s3:GetObject",
-					"s3:ListBucket",
-					"s3:PutObject",
-					"s3:DeleteObject"
-				],
+				"Action": actions,
 				"Resource": resource
 			}));
 		}

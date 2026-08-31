@@ -199,7 +199,7 @@ mod test {
 	fn keyed_reuses_children_across_append_and_remove() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "items": ["a", "b"] })))
+			.spawn(Document::new(value!({ "items": ["a", "b"] })))
 			.id();
 		let list = world
 			.spawn((
@@ -219,7 +219,7 @@ mod test {
 
 		// append "c": the two existing rows are reused (same entities), in order
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "items": ["a", "b", "c"] });
+			value!({ "items": ["a", "b", "c"] });
 		world.update_local();
 		let generation_2 = reactive_children_of(&mut world, list);
 		generation_2.len().xpect_eq(3);
@@ -228,7 +228,7 @@ mod test {
 
 		// remove "b": only its entity is despawned, "a" and "c" survive
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "items": ["a", "c"] });
+			value!({ "items": ["a", "c"] });
 		world.update_local();
 		let generation_3 = reactive_children_of(&mut world, list);
 		generation_3.len().xpect_eq(2);
@@ -241,7 +241,7 @@ mod test {
 	fn grows_and_shrinks() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "items": ["a", "b"] })))
+			.spawn(Document::new(value!({ "items": ["a", "b"] })))
 			.id();
 		let list = world
 			.spawn((
@@ -259,13 +259,13 @@ mod test {
 
 		// grow
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "items": ["a", "b", "c"] });
+			value!({ "items": ["a", "b", "c"] });
 		world.update_local();
 		child_count(&mut world, list).xpect_eq(3);
 
 		// shrink
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "items": ["a"] });
+			value!({ "items": ["a"] });
 		world.update_local();
 		child_count(&mut world, list).xpect_eq(1);
 	}
@@ -274,7 +274,7 @@ mod test {
 	fn leaves_static_siblings_untouched() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "items": ["a", "b"] })))
+			.spawn(Document::new(value!({ "items": ["a", "b"] })))
 			.id();
 		let list = world
 			.spawn((
@@ -296,7 +296,7 @@ mod test {
 		child_count(&mut world, list).xpect_eq(2);
 
 		world.entity_mut(doc).get_mut::<Document>().unwrap().0 =
-			val!({ "items": [] });
+			value!({ "items": [] });
 		world.update_local();
 		// reactive children despawned, static sibling survives
 		child_count(&mut world, list).xpect_eq(0);
@@ -306,7 +306,7 @@ mod test {
 	#[crate::test]
 	fn rebuilds_only_on_own_value_change() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "items": ["a"] }))).id();
+		let doc = world.spawn(Document::new(value!({ "items": ["a"] }))).id();
 		let list = world
 			.spawn((
 				ChildOf(doc),
@@ -323,7 +323,7 @@ mod test {
 		let generation = world.entity(list).get::<Children>().unwrap()[0];
 
 		// an unrelated document changing must not rebuild this list
-		world.spawn(Document::new(val!({ "other": 1i64 })));
+		world.spawn(Document::new(value!({ "other": 1i64 })));
 		world.update_local();
 		// the same child entity survives, ie no despawn-respawn churn
 		world.entities().contains(generation).xpect_true();
@@ -401,7 +401,7 @@ mod test {
 	fn child_field_resolves_to_item() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({
+			.spawn(Document::new(value!({
 				"items": [{ "name": "Alice" }, { "name": "Bob" }]
 			})))
 			.id();
@@ -430,7 +430,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 		// outer list of groups, each with an inner list of items
 		let doc = world
-			.spawn(Document::new(val!({
+			.spawn(Document::new(value!({
 				"groups": [
 					{ "items": [{ "name": "a0" }, { "name": "a1" }] },
 					{ "items": [{ "name": "b0" }] }

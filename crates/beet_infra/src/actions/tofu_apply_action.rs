@@ -38,9 +38,8 @@ pub struct TofuApply {
 
 /// Builds terraform config, uploads artifacts, publishes the ledger, and applies.
 ///
-/// Collects each [`BuildArtifact`] + [`ErasedBlock`] pair from
+/// Collects each [`BuildArtifact`] + [`ArtifactLabel`] pair from
 /// stack descendants to build the [`ArtifactLedger`], using
-/// [`Block::artifact_label`] for the label and
 /// [`BuildArtifact::compute_source_hash`] for the hash.
 ///
 /// Reads its own [`TofuApply`] for the layer, so the config component requires
@@ -64,12 +63,28 @@ pub async fn TofuApplyAction(
 	);
 	let (project, stack, deployment, artifacts, variables) = cx
 		.caller
-		.with_state::<StackQuery, _>(|entity, stacks| -> Result<_> {
-			let project = stacks.build_project(entity)?;
-			let (_, stack) = stacks.root(entity)?;
-			let deployment = stacks.deployment();
-			let artifacts = stacks.collect_artifacts(entity)?;
-			let variables = stacks.collect_variables(entity)?;
+		.with_world(|world, entity| -> Result<_> {
+			let scope = RenderScope::render(world, entity)?;
+			let variables = scope.variables();
+			// each declared artifact, paired with the label its block inserted
+			let artifacts =
+				world
+					.with_state::<(StackQuery, Query<(&ArtifactLabel, &BuildArtifact)>), _>(
+						|(stacks, artifacts)| -> Result<_> {
+							stacks
+								.declared(entity)?
+								.into_iter()
+								.filter_map(|child| artifacts.get(child).ok())
+								.map(|(label, artifact)| {
+									(artifact.clone(), label.0.clone())
+								})
+								.collect::<Vec<_>>()
+								.xok()
+						},
+					)?;
+			let (stack, deployment, config) = scope.finish()?;
+			let project =
+				terra::Project::new(stack.clone(), deployment.clone(), config);
 			(project, stack, deployment, artifacts, variables).xok()
 		})
 		.await??;

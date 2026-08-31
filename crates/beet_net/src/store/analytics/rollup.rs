@@ -547,8 +547,9 @@ mod test {
 		// which is the whole reason for reducing them.
 		for row in AnalyticsRollup::from_events(&events) {
 			row.version.xpect_eq(AnalyticsRollup::VERSION);
-			serde_json::to_string(&row)
+			Value::from_serde(&row)
 				.unwrap()
+				.to_string()
 				.as_str()
 				.xnot()
 				.xpect_contains("ttl");

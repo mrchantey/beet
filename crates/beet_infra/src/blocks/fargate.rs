@@ -47,7 +47,7 @@ impl ContainerImage {
 ///
 /// [`dns`]: Self::dns
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_add = ErasedBlock::on_add::<FargateBlock>)]
+#[component(immutable, on_add = ArtifactLabel::on_add::<FargateBlock>)]
 pub struct FargateBlock {
 	/// Label used as a prefix for all terraform resources.
 	/// Also used as the artifact name and ECR repository.
@@ -212,13 +212,48 @@ impl FargateBlock {
 	}
 }
 
-impl Block for FargateBlock {
-	fn artifact_label(&self) -> Option<&str> { Some(&self.label) }
-	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+impl From<&FargateBlock> for ArtifactLabel {
+	fn from(block: &FargateBlock) -> Self { Self(block.label.clone()) }
+}
 
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl FargateBlock {
+	/// Tofu variables the task's env references, ie the
+	/// [`env_vars`](Self::env_vars).
+	pub(crate) fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+
+	/// Declare the tofu variables the task's env references.
+	pub(crate) fn declare(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&FargateBlock>,
+	) {
+		scope.render_each(&query, |scope, entity, block| {
+			for variable in block.variables() {
+				scope.variable(entity, variable);
+			}
+			Ok(())
+		});
+	}
+
+	/// Render the service into the config, lowering the declared grants into
+	/// the task role's inline policy.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&FargateBlock>,
+	) {
+		scope.render_each(&query, |scope, _entity, block| {
+			let access = scope.access();
+			let (stack, deployment, config) = scope.ctx();
+			block.emit(stack, deployment, &access, config)
+		});
+	}
+
+	/// Emit the whole service: networking, the NLB, the roles (with the grants
+	/// lowered into the task role's inline policy), the task definition and its
+	/// autoscaling.
+	fn emit(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
 		access: &AccessGrants,
@@ -777,22 +812,22 @@ impl Block for FargateBlock {
 		// Outputs
 		config
 			.add_output("load_balancer_dns", terra::Output {
-				value: json!(nlb.field_ref("dns_name")),
+				value: nlb.field_ref("dns_name").into(),
 				description: Some("The DNS name of the load balancer".into()),
 				sensitive: None,
 			})?
 			.add_output("cluster_name", terra::Output {
-				value: json!(cluster.field_ref("name")),
+				value: cluster.field_ref("name").into(),
 				description: Some("The name of the ECS cluster".into()),
 				sensitive: None,
 			})?
 			.add_output("service_name", terra::Output {
-				value: json!(service.field_ref("name")),
+				value: service.field_ref("name").into(),
 				description: Some("The name of the ECS service".into()),
 				sensitive: None,
 			})?
 			.add_output("ecr_repository_url", terra::Output {
-				value: json!(ecr_repo.field_ref("repository_url")),
+				value: ecr_repo.field_ref("repository_url").into(),
 				description: Some("The URL of the ECR repository".into()),
 				sensitive: None,
 			})?;
@@ -971,35 +1006,20 @@ mod tests {
 		block: &FargateBlock,
 		stage: &str,
 	) -> (terra::Config, ResolvedStack, TestWorkDir) {
-		let (stack, deployment, dir) = ResolvedStack::default_local();
-		let stack = stack.with_stage(stage);
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
+		let block = block.clone();
+		let (scope, dir) = RenderScope::test_render_stack(
+			Stack::new("beet_infra").with_stage(stage),
+			move |parent| {
+				parent.spawn(block);
+			},
+		);
+		let (stack, _deployment, config) = scope.finish().unwrap();
 		(config, stack, dir)
 	}
 
 	/// Build the terraform json for the given block.
 	fn build_json(block: &FargateBlock) -> String {
-		build_config(block).0.to_json().to_string()
-	}
-
-	/// The terraform json for `block` deployed alongside `declared`, whose
-	/// grants its task role lowers.
-	fn build_json_granting(
-		block: &FargateBlock,
-		declared: &[&dyn Block],
-	) -> String {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		stack.json_granting(&deployment, block, declared).unwrap()
+		build_config(block).0.to_json_string().unwrap()
 	}
 
 	/// Assert the autoscaling target + policy are emitted regardless of ssh.
@@ -1032,39 +1052,47 @@ mod tests {
 	/// stays.
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		build_json_granting(&FargateBlock::default(), &[
-			&S3BucketBlock::new("app").with_deploy_versioned(false),
-			&DynamoTableBlock::new("analytics"),
-		])
-		.as_str()
-		.xpect_contains("\"aws_iam_role_policy\":")
-		.xpect_contains(&format!(
-			"arn:aws:s3:::{}/*",
-			stack.resource_name("app")
-		))
-		.xpect_contains(&format!("table/{}", stack.resource_name("analytics")))
-		.xpect_contains("AmazonECSTaskExecutionRolePolicy")
-		.xnot()
-		.xpect_contains("AmazonS3FullAccess")
-		.xnot()
-		.xpect_contains("AmazonDynamoDBFullAccess");
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(FargateBlock::default());
+			parent
+				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
+			parent.spawn(DynamoTableBlock::new("analytics"));
+		});
+		let stack = scope.stack().clone();
+		let json = scope.finish().unwrap().2.to_json_string().unwrap();
+		json.as_str()
+			.xpect_contains("\"aws_iam_role_policy\":")
+			.xpect_contains(&format!(
+				"arn:aws:s3:::{}/*",
+				stack.resource_name("app")
+			))
+			.xpect_contains(&format!(
+				"table/{}",
+				stack.resource_name("analytics")
+			))
+			.xpect_contains("AmazonECSTaskExecutionRolePolicy")
+			.xnot()
+			.xpect_contains("AmazonS3FullAccess")
+			.xnot()
+			.xpect_contains("AmazonDynamoDBFullAccess");
 	}
 
 	/// A grant's [`AccessPermissions`] is REAL: a read-only declaration cannot be
 	/// written through the task's identity.
 	#[beet_core::test]
 	fn lowers_permissions_per_grant() {
-		build_json_granting(&FargateBlock::default(), &[
-			&S3BucketBlock::new("assets").with_runtime_write(true),
-			&DynamoTableBlock::new("analytics"),
-		])
+		RenderScope::test_json(|parent| {
+			parent.spawn(FargateBlock::default());
+			parent.spawn(S3BucketBlock::new("assets").with_runtime_write(true));
+			parent.spawn(DynamoTableBlock::new("analytics"));
+		})
 		.as_str()
 		.xpect_contains("s3:PutObject")
 		.xpect_contains("dynamodb:PutItem");
-		build_json_granting(&FargateBlock::default(), &[&S3BucketBlock::new(
-			"assets",
-		)])
+		RenderScope::test_json(|parent| {
+			parent.spawn(FargateBlock::default());
+			parent.spawn(S3BucketBlock::new("assets"));
+		})
 		.as_str()
 		.xpect_contains("s3:GetObject")
 		.xnot()
@@ -1088,14 +1116,9 @@ mod tests {
 	#[beet_core::test]
 	fn unknown_grant_kind_fails_the_deploy() {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let block = FargateBlock::default();
-		let mut world = World::new();
-		let entity_mut = world.spawn(());
-		let entity = entity_mut.as_readonly();
 		let mut config = deployment.create_config(&stack);
-		block
-			.apply_to_config(
-				&entity,
+		FargateBlock::default()
+			.emit(
 				&stack,
 				&deployment,
 				&AccessGrants::new(vec![AccessGrant::read(
@@ -1128,7 +1151,7 @@ mod tests {
 				"aws_ecr_repository.{}",
 				stack.resource_ident(block.build_label("ecr")).label()
 			)]);
-		config.to_json().to_string().as_str().xpect_contains(
+		config.to_json_string().unwrap().as_str().xpect_contains(
 			"\"deployment_circuit_breaker\":[{\"enable\":true,\"rollback\":true}]",
 		);
 	}
@@ -1239,7 +1262,7 @@ mod tests {
 			build_config_at(&autoscaling_block(), "prod");
 		// container_definitions is a JSON string nested in the config, so the env
 		// entry renders with escaped quotes (matching the BEET_SSH_PORT tests).
-		config.to_json().to_string().xpect_contains(&format!(
+		config.to_json_string().unwrap().xpect_contains(&format!(
 			r#"{{\"name\":\"BEET_STAGE\",\"value\":\"{}\"}}"#,
 			stack.stage()
 		));

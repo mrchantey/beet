@@ -18,7 +18,7 @@ fn main() {
 	// 1. A document holds the state the markup binds to. `unread` is omitted so
 	// the `@doc:unread=0` binding seeds its default.
 	let doc = world
-		.spawn(Document::new(val!({ "user": { "name": "Ada" } })))
+		.spawn(Document::new(value!({ "user": { "name": "Ada" } })))
 		.id();
 
 	// 2. Load the `.bsx` under the document, so its `@doc:field` bindings link

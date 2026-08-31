@@ -134,6 +134,25 @@ pub fn assets_bucket_block() -> S3BucketBlock {
 	S3BucketBlock::new("assets").with_deploy_versioned(true)
 }
 
+/// Build the terraform project for `block` deployed beside the shared assets
+/// bucket, rendered through the same [`DeployRender`] schedule the deploy runs.
+pub fn render_test_project(
+	deploy: &TestDeploy,
+	block: impl Bundle,
+) -> Result<terra::Project> {
+	let mut world = InfraPlugin.into_world();
+	world.insert_resource(deploy.deployment.clone());
+	world.init_resource::<PackageConfig>();
+	let root = world
+		.spawn(deploy.stack.clone())
+		.with_children(|parent| {
+			parent.spawn(block);
+			parent.spawn(assets_bucket_block());
+		})
+		.id();
+	RenderScope::render(&mut world, root)?.project()
+}
+
 /// Create the S3FsStore for syncing local assets to S3.
 /// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
 pub fn assets_s3_fs_store(

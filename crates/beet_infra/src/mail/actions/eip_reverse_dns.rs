@@ -57,10 +57,7 @@ pub async fn EipReverseDnsAction(
 		.get_cloned::<EipReverseDns>()
 		.await
 		.unwrap_or_default();
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
 	let region = mail.stack.region().clone();
 	let hostname = mail.mail_box.hostname().clone();

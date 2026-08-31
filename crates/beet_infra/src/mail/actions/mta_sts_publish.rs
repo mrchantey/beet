@@ -131,10 +131,7 @@ pub async fn MtaStsPublishAction(
 		.get_cloned::<MtaStsPublish>()
 		.await
 		.unwrap_or_default();
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
 	// only the domains this stack publishes an `_mta-sts` record for: a policy
 	// served for a host with no record is a policy nothing looks for, and a

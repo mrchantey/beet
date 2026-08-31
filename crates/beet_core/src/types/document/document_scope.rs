@@ -223,7 +223,7 @@ mod test {
 	fn scope_prepends_prefix() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "user": { "name": "Alice" } })))
+			.spawn(Document::new(value!({ "user": { "name": "Alice" } })))
 			.id();
 		// a DocumentScope ancestor scoping descendants into "user"
 		let scope = world
@@ -247,7 +247,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 		let doc = world
 			.spawn(Document::new(
-				val!({ "user": { "address": { "city": "NYC" } } }),
+				value!({ "user": { "address": { "city": "NYC" } } }),
 			))
 			.id();
 		let outer = world
@@ -275,7 +275,7 @@ mod test {
 	#[crate::test]
 	fn terminate_seals_outer_scope() {
 		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "name": "top" }))).id();
+		let doc = world.spawn(Document::new(value!({ "name": "top" }))).id();
 		// an outer scope that would otherwise prefix "outer"
 		let outer = world
 			.spawn((ChildOf(doc), DocumentScope {
@@ -304,7 +304,7 @@ mod test {
 	fn scope_change_recomputes() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({
+			.spawn(Document::new(value!({
 				"a": { "name": "from_a" },
 				"b": { "name": "from_b" }
 			})))
@@ -339,7 +339,7 @@ mod test {
 	fn scope_removed_recomputes() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({
+			.spawn(Document::new(value!({
 				"name": "root_name",
 				"a": { "name": "from_a" }
 			})))
@@ -372,7 +372,7 @@ mod test {
 	fn attribute_binding_scopes_through_its_element() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "counter": { "count": 5i64 } })))
+			.spawn(Document::new(value!({ "counter": { "count": 5i64 } })))
 			.id();
 		let scope = world
 			.spawn((ChildOf(doc), DocumentScope {
@@ -408,7 +408,7 @@ mod test {
 	fn reparent_recomputes() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({
+			.spawn(Document::new(value!({
 				"a": { "name": "from_a" },
 				"b": { "name": "from_b" }
 			})))
@@ -444,7 +444,7 @@ mod test {
 	fn write_path_is_scoped() {
 		let mut world = DocumentPlugin::world();
 		let doc = world
-			.spawn(Document::new(val!({ "user": { "name": "old" } })))
+			.spawn(Document::new(value!({ "user": { "name": "old" } })))
 			.id();
 		let scope = world
 			.spawn((ChildOf(doc), DocumentScope {
@@ -473,6 +473,6 @@ mod test {
 			.unwrap();
 
 		let document = world.entity(doc).get::<Document>().unwrap().0.clone();
-		document.xpect_eq(val!({ "user": { "name": "new" } }));
+		document.xpect_eq(value!({ "user": { "name": "new" } }));
 	}
 }

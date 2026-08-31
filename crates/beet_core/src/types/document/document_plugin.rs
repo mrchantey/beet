@@ -17,7 +17,7 @@ use crate::prelude::*;
 ///
 /// // Create a document with a value child
 /// world.spawn((
-///     Document::new(val!({ "name": "Alice" })),
+///     Document::new(value!({ "name": "Alice" })),
 ///     children![(Value::default(), FieldRef::new("name"))],
 /// ));
 ///
@@ -167,9 +167,10 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		// Create document with a value child
-		world.spawn((Document::new(val!({ "greeting": "Hello" })), children![
-			(Value::default(), FieldRef::new("greeting"))
-		]));
+		world.spawn((
+			Document::new(value!({ "greeting": "Hello" })),
+			children![(Value::default(), FieldRef::new("greeting"))],
+		));
 
 		// Run update to trigger sync
 		world.update_local();
@@ -185,7 +186,7 @@ mod test {
 
 		// Create document with a value child
 		let card = world
-			.spawn((Document::new(val!({ "count": 0i64 })), children![(
+			.spawn((Document::new(value!({ "count": 0i64 })), children![(
 				Value::default(),
 				FieldRef::new("count")
 			)]))
@@ -199,7 +200,7 @@ mod test {
 
 		// Update the document
 		world.entity_mut(card).get_mut::<Document>().unwrap().0 =
-			val!({ "count": 42i64 });
+			value!({ "count": 42i64 });
 
 		world.update_local();
 
@@ -213,7 +214,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Document::new(val!({ "user": { "name": "Bob" } })),
+			Document::new(value!({ "user": { "name": "Bob" } })),
 			children![(Value::default(), FieldRef::new(vec!["user", "name"]))],
 		));
 
@@ -228,7 +229,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Document::new(val!({
+			Document::new(value!({
 				"first": "Alice",
 				"second": "Bob"
 			})),
@@ -254,7 +255,7 @@ mod test {
 	fn text_block_with_field_ref() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((Document::new(val!({ "name": "World" })), children![
+		world.spawn((Document::new(value!({ "name": "World" })), children![
 			Value::Str("Hello, ".into()),
 			(FieldRef::new("name"), Value::default()),
 		]));

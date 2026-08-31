@@ -16,11 +16,22 @@ pub struct MailStack {
 	pub stack: ResolvedStack,
 	/// The one box under this stack.
 	pub mail_box: StalwartBlock,
+	/// The database the box's [`DatabaseRef`] targets, ie the one holding its
+	/// mail metadata, whose compositions every step reads.
+	pub database: RdsPostgresBlock,
 	/// Every domain it serves, in declaration order.
 	pub domains: Vec<MailDomainBlock>,
 }
 
 impl MailStack {
+	/// Render the stack `entity` belongs to and resolve the whole mail stack
+	/// from it: the one entry every mail verb reaches the stack through, shaped
+	/// to pass directly to [`AsyncEntity::with_world`].
+	pub fn resolve(world: &mut World, entity: Entity) -> Result<MailStack> {
+		let project = RenderScope::render(world, entity)?.project()?;
+		world.with_state::<MailQuery, _>(|query| query.resolve(entity, project))
+	}
+
 	/// The address of the box, from the apply's output.
 	pub async fn public_ip(&self) -> Result<String> {
 		self.project
@@ -31,7 +42,7 @@ impl MailStack {
 	/// The address of the database this box's mail lives in, from the apply's
 	/// output.
 	///
-	/// Read from the output rather than from [`DatabaseRef::host`], which
+	/// Read from the output rather than from [`RdsPostgresBlock::host`], which
 	/// composes a terraform REFERENCE: the right value in a config file
 	/// terraform interpolates, and a literal `${aws_db_instance..}` anywhere
 	/// else. Anything that reaches the database over ssh — the restore, a
@@ -40,7 +51,7 @@ impl MailStack {
 	pub async fn database_host(&self) -> Result<String> {
 		let endpoint = self
 			.project
-			.output(&format!("{}_endpoint", self.mail_box.database().label()))
+			.output(&format!("{}_endpoint", self.database.label()))
 			.await?;
 		// `endpoint` is `host:port` and every caller names the port itself
 		endpoint
@@ -118,44 +129,67 @@ impl MailStack {
 	}
 }
 
-/// The deploy tree a mail step reads: the stack traversal, plus the two block
-/// types the mail stack is made of.
+/// The deploy tree a mail step reads: the stack traversal, the block types the
+/// mail stack is made of, and the box's [`DatabaseRef`] relation.
 #[derive(SystemParam)]
 pub struct MailQuery<'w, 's> {
 	stacks: StackQuery<'w, 's>,
-	boxes: Query<'w, 's, &'static StalwartBlock>,
+	boxes:
+		Query<'w, 's, (&'static StalwartBlock, Option<&'static DatabaseRef>)>,
+	databases: Query<'w, 's, &'static RdsPostgresBlock>,
 	domains: Query<'w, 's, &'static MailDomainBlock>,
 }
 
 impl MailQuery<'_, '_> {
-	/// Resolve the whole mail stack from any entity declared under it.
+	/// Resolve the whole mail stack from any entity declared under it, with
+	/// the `project` a [`RenderScope`] rendered (see [`MailStack::resolve`],
+	/// which composes both).
 	///
 	/// Several boxes under one stack is an error rather than a guess: they
 	/// would have different hostnames, different certificates and different
 	/// admin credentials, and picking one silently would provision the wrong
 	/// server.
-	pub fn resolve(&self, entity: Entity) -> Result<MailStack> {
-		let project = self.stacks.build_project(entity)?;
+	pub fn resolve(
+		&self,
+		entity: Entity,
+		project: terra::Project,
+	) -> Result<MailStack> {
 		let (_, stack) = self.stacks.root(entity)?;
 		let declared = self.stacks.declared(entity)?;
 		let mut boxes = declared
 			.iter()
 			.filter_map(|child| self.boxes.get(*child).ok());
-		let mail_box = boxes
-			.next()
-			.ok_or_else(|| {
-				bevyhow!(
-					"no StalwartBlock is declared under this stack, so there is \
-					no mail box to provision"
-				)
-			})?
-			.clone();
+		let (mail_box, database_ref) = boxes.next().ok_or_else(|| {
+			bevyhow!(
+				"no StalwartBlock is declared under this stack, so there is \
+				no mail box to provision"
+			)
+		})?;
+		let mail_box = mail_box.clone();
 		if boxes.next().is_some() {
 			bevybail!(
 				"several StalwartBlocks are declared under this stack, so a \
 				mail step cannot tell which box it is talking to"
 			);
 		}
+		// the box's database, through the same relation its render resolves
+		let database_ref = database_ref.ok_or_else(|| {
+			bevyhow!(
+				"the mail box '{}' declares no `DatabaseRef`: relate it to the \
+				RdsPostgresBlock holding mail metadata, ie `{{DatabaseRef($db)}}`",
+				mail_box.label()
+			)
+		})?;
+		let database = self
+			.databases
+			.get(database_ref.0)
+			.map_err(|_| {
+				bevyhow!(
+					"the `DatabaseRef` of '{}' targets no RdsPostgresBlock",
+					mail_box.label()
+				)
+			})?
+			.clone();
 		let domains = declared
 			.iter()
 			.filter_map(|child| self.domains.get(*child).ok())
@@ -171,6 +205,7 @@ impl MailQuery<'_, '_> {
 			project,
 			stack,
 			mail_box,
+			database,
 			domains,
 		})
 	}

@@ -1,6 +1,4 @@
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// The tofu variable name the passphrase is threaded through in generated
 /// config. Internal: never appears outside a `var.` reference and a `-var`
@@ -43,11 +41,11 @@ impl StateEncryption {
 	pub fn to_json(&self) -> Option<Value> {
 		match self {
 			Self::None => None,
-			Self::Passphrase { .. } => Some(json!({
+			Self::Passphrase { .. } => Some(value!({
 				"key_provider": {
 					"pbkdf2": {
 						"main": {
-							"passphrase": format!("${{var.{STATE_ENCRYPTION_VAR}}}"),
+							"passphrase": (format!("${{var.{STATE_ENCRYPTION_VAR}}}")),
 						}
 					}
 				},
@@ -96,7 +94,8 @@ mod tests {
 	fn passphrase_emits_pbkdf2_aes_gcm() {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
 			.to_json()
-			.unwrap();
+			.unwrap()
+			.into_json();
 		json["key_provider"]["pbkdf2"]["main"]["passphrase"]
 			.as_str()
 			.unwrap()

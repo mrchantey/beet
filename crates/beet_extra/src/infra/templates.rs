@@ -494,13 +494,9 @@ mod test {
 
 		/// The tofu json a stack builds.
 		fn config_json(world: &mut World, root: Entity) -> String {
-			world
-				.with_state::<StackQuery, _>(|stacks| {
-					stacks.build_config(root).map(|(.., config)| config)
-				})
-				.unwrap()
-				.to_json()
-				.to_string()
+			let (.., config) =
+				RenderScope::render(world, root).unwrap().finish().unwrap();
+			config.to_json_string().unwrap()
 		}
 		let stacks = world
 			.query::<(Entity, &Stack)>()
@@ -566,8 +562,8 @@ mod test {
 					<DynamoTableBlock bx:ref="analytics" label="analytics" ttl="ttl"/>
 					<DynamoTableBlock bx:ref="rollup" label="analytics-rollup"/>
 					<S3BucketBlock bx:ref="runtime_ops" label="runtime-ops" deploy_versioned=false runtime_write=true object_versioning=true/>
-					<LambdaJobBlock label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
-					<ScheduledJobBlock label="rollup-daily" target="rollup" schedule="cron(0 3 * * ? *)" path="rollup"/>
+					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
+					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
 			</Fragment>"#,
 		);
@@ -649,13 +645,13 @@ mod test {
 			.query_filtered::<Entity, With<Stack>>()
 			.single(&world)
 			.unwrap();
-		world
-			.with_state::<StackQuery, _>(|stacks| {
-				stacks.build_config(root).map(|(.., config)| config)
-			})
+		RenderScope::render(&mut world, root)
 			.unwrap()
-			.to_json()
-			.to_string()
+			.finish()
+			.unwrap()
+			.xmap(|(.., config)| config)
+			.to_json_string()
+			.unwrap()
 			.as_str()
 			.xpect_contains("aws_scheduler_schedule")
 			.xpect_contains("cron(0 3 * * ? *)")

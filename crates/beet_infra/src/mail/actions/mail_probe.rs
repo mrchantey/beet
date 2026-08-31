@@ -103,10 +103,7 @@ pub async fn MailProbeAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let probe = cx.caller.get_cloned::<MailProbe>().await?;
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
 	let domain = mail.domain_holding(probe.mailbox())?;
 	let address = format!("{}@{}", probe.mailbox(), domain.domain());

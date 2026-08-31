@@ -38,8 +38,8 @@ impl Stack {
 /// Build a [`terra::Project`] from the nearest ancestor [`Stack`].
 async fn project(caller: &AsyncEntity) -> Result<terra::Project> {
 	caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.build_project(entity)
+		.with_world(|world, entity| {
+			RenderScope::render(world, entity)?.project()
 		})
 		.await?
 }
@@ -73,8 +73,8 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 
 	// rebuild and re-apply with the updated deploy_id
 	let proj = caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.build_project(entity)
+		.with_world(|world, entity| {
+			RenderScope::render(world, entity)?.project()
 		})
 		.await??;
 	info!("re-applying with deploy_id: {target_id}");

@@ -53,7 +53,7 @@ fn setup(mut commands: Commands) {
 		Navigator::new(Url::parse(&url)),
 	));
 	// an editable URL bar bound to the document field `url`.
-	commands.spawn((Document::new(val!({ "url": url })), children![
+	commands.spawn((Document::new(value!({ "url": url })), children![
 		rsx! { <TextField field={FieldRef::new("url")}/> }
 	]));
 }

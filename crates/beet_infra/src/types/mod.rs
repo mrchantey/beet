@@ -1,6 +1,7 @@
 //! ECS types for interacting with terraform configurations.
 mod access_grant;
 mod artifacts;
+mod deploy_render;
 mod deployment;
 mod infra_plugin;
 mod secret_ref;
@@ -12,6 +13,7 @@ mod state_encryption;
 mod stack_cli;
 pub use access_grant::*;
 pub use artifacts::*;
+pub use deploy_render::*;
 pub use deployment::*;
 pub use infra_plugin::*;
 pub use secret_ref::*;

@@ -19,9 +19,11 @@ pub async fn LifecycleProbe(
 	// from this entity in one pass.
 	let (project, store) = cx
 		.caller
-		.with_state::<StackQuery, _>(|entity, query| -> Result<_> {
-			let project = query.build_project(entity)?;
-			let store = query.store(entity)?.clone();
+		.with_world(|world, entity| -> Result<_> {
+			let project = RenderScope::render(world, entity)?.project()?;
+			let store = world.with_state::<StackQuery, _>(|query| {
+				query.store(entity).cloned()
+			})?;
 			(project, store).xok()
 		})
 		.await??;

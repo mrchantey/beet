@@ -8,9 +8,28 @@ use crate::prelude::*;
 /// use in fallible functions via `?`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]
 #[reflect(opaque)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Map(pub HashMap<SmolStr, Value>);
+
+/// Serializes entries sorted by key, matching the deterministic
+/// [`Hash`], [`Ord`] and [`Display`] impls rather than hash-iteration order.
+#[cfg(feature = "serde")]
+impl serde::Serialize for Map {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error> {
+		use serde::ser::SerializeMap;
+		let mut entries: Vec<_> = self.0.iter().collect();
+		entries.sort_by_key(|(key, _)| key.as_str());
+		let mut map = serializer.serialize_map(Some(entries.len()))?;
+		for (key, value) in entries {
+			map.serialize_entry(key, value)?;
+		}
+		map.end()
+	}
+}
 
 impl core::hash::Hash for Map {
 	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {

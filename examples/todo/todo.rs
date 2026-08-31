@@ -172,7 +172,7 @@ async fn load_document() -> Result<Document> {
 		Ok(json) => MediaType::Json
 			.deserialize::<Value>(json.as_bytes())
 			.map(Document::new),
-		Err(_) => Document::new(val!({ "todos": [] })).xok(),
+		Err(_) => Document::new(value!({ "todos": [] })).xok(),
 	}
 }
 

@@ -17,7 +17,7 @@ use serde_json::json;
 /// cannot fail over (Lambda has no ssh), so the failover is HTTP-only, and it
 /// is kept out of the core deploy behind a flag.
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_add = ErasedBlock::on_add::<CloudflareFailoverBlock>)]
+#[component(immutable)]
 pub struct CloudflareFailoverBlock {
 	/// Resource label prefix.
 	label: SmolStr,
@@ -92,13 +92,25 @@ impl CloudflareFailoverBlock {
 	}
 }
 
-impl Block for CloudflareFailoverBlock {
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl CloudflareFailoverBlock {
+	/// Render the monitor, both pools and the load balancer into the config.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&CloudflareFailoverBlock>,
+	) {
+		scope.render_each(&query, |scope, _entity, block| {
+			let (stack, _deployment, config) = scope.ctx();
+			block.emit(stack, config)
+		});
+	}
+
+	/// Emit the shared health monitor, the primary and fallback pools, and the
+	/// load balancer steering between them.
+	fn emit(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
-		_deployment: &Deployment,
-		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
 		ensure_cloudflare_provider(config)?;
@@ -160,36 +172,26 @@ mod tests {
 
 	#[beet_core::test]
 	fn emits_load_balancer_with_primary_and_fallback_pools() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		CloudflareFailoverBlock::new(
-			"site.example",
-			"nlb.example",
-			"lambda.example",
-		)
-		// explicit ids: the env-derived defaults are absent in a test run
-		.with_zone_id("test-zone")
-		.with_account_id("test-account")
-		.apply_to_config(
-			&world.spawn(()).as_readonly(),
-			&stack,
-			&deployment,
-			&default(),
-			&mut config,
-		)
-		.unwrap();
-		config
-			.to_json()
-			.to_string()
-			.as_str()
-			.xpect_contains("cloudflare_load_balancer")
-			.xpect_contains("cloudflare_load_balancer_pool")
-			.xpect_contains("cloudflare_load_balancer_monitor")
-			// primary + fallback origins, and the lb steers between two pools
-			.xpect_contains("nlb.example")
-			.xpect_contains("lambda.example")
-			.xpect_contains("fallback_pool")
-			.xpect_contains("\"proxied\":true");
+		RenderScope::test_json(|parent| {
+			parent.spawn(
+				CloudflareFailoverBlock::new(
+					"site.example",
+					"nlb.example",
+					"lambda.example",
+				)
+				// explicit ids: the env-derived defaults are absent in a test run
+				.with_zone_id("test-zone")
+				.with_account_id("test-account"),
+			);
+		})
+		.as_str()
+		.xpect_contains("cloudflare_load_balancer")
+		.xpect_contains("cloudflare_load_balancer_pool")
+		.xpect_contains("cloudflare_load_balancer_monitor")
+		// primary + fallback origins, and the lb steers between two pools
+		.xpect_contains("nlb.example")
+		.xpect_contains("lambda.example")
+		.xpect_contains("fallback_pool")
+		.xpect_contains("\"proxied\":true");
 	}
 }

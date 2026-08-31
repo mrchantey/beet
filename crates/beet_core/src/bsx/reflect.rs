@@ -230,12 +230,11 @@ fn scalar_to_reflect(
 
 	// a string targeting a one-string-field struct builds that struct from the
 	// string, so a LABEL REFERENCE authors as the label it is: `<EnsureSecret
-	// secret="db-password"/>`, `<RdsPostgresBlock vpc="net"/>`. Those types
-	// (`SecretRef`, `VpcRef`, `DatabaseRef`, `SecurityGroupRef`) exist so one
-	// composition owns a name both ends of a cross-block reference compose, and
-	// wrapping a label is all they do; without this the string patch misses,
-	// `from_reflect` keeps the default, and a block silently points at the empty
-	// label. The named twin of the bare-number newtype cast above.
+	// secret="db-password"/>`. A type like `SecretRef` exists so one composition
+	// owns a name both ends of a reference compose, and wrapping a label is all
+	// it does; without this the string patch misses, `from_reflect` keeps the
+	// default, and a block silently points at the empty label. The named twin of
+	// the bare-number newtype cast above.
 	if let (Value::Str(string), Some(TypeInfo::Struct(info))) =
 		(value, field_info)
 		&& info.field_len() == 1
@@ -757,7 +756,7 @@ mod test {
 	}
 
 	/// A plain string coerces into a one-string-field struct, ie a label
-	/// reference (`SecretRef`, `VpcRef`), so `<EnsureSecret secret="db-password"/>`
+	/// reference (`SecretRef`), so `<EnsureSecret secret="db-password"/>`
 	/// authors the reference as the label it wraps.
 	///
 	/// REGRESSION: without the coercion the `String` patch missed the struct

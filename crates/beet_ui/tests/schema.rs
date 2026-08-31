@@ -197,7 +197,7 @@ fn component_field_binds_document() {
 		.resource_mut::<AppTypeRegistry>()
 		.write()
 		.register::<Slider>();
-	let doc = world.spawn(Document::new(val!({ "level": 9i64 }))).id();
+	let doc = world.spawn(Document::new(value!({ "level": 9i64 }))).id();
 	// `<Slider value=@doc:level>` binds document `level` to `Slider.value`, both ways.
 	let bytes = MediaBytes::new_bsx("<Slider value=@doc:level/>");
 	let root = {

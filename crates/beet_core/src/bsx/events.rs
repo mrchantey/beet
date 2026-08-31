@@ -693,7 +693,7 @@ mod test {
 				}
 			},
 		);
-		let doc = world.spawn(Document::new(val!({ "count": 4 }))).id();
+		let doc = world.spawn(Document::new(value!({ "count": 4 }))).id();
 		let binding = EventBinding::new("click", VerbCall {
 			verb: "increment".into(),
 			args: vec![(

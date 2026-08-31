@@ -14,16 +14,16 @@ use beet_core::prelude::*;
 /// A private workload that genuinely needs egress wants a vpc endpoint for the
 /// one service it calls, not a gateway to the whole internet.
 ///
-/// Authored directly from markup, ie `<VpcBlock label="net"/>`. A consumer
-/// names it with a [`VpcRef`] carrying the same label, which is the only way
-/// one block reaches another's resources: [`Block::apply_to_config`] sees its
-/// own entity and no world, so a sibling is reached through the label both
-/// sides compose the same terraform address from.
+/// Authored directly from markup, ie `<VpcBlock bx:ref="net" label="net"/>`. A
+/// consumer names the declaration entity through a [`VpcRef`] relation
+/// (`{VpcRef($net)}`), and its render system reads this block off the target to
+/// compose the terraform addresses, so both sides of every cross-block
+/// reference go through the one block that emits the resources.
 #[derive(
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ErasedBlock::on_add::<VpcBlock>)]
+#[component(immutable)]
 pub struct VpcBlock {
 	label: SmolStr,
 	/// The network this vpc owns, which must be a `/16`: every subnet is a
@@ -40,6 +40,13 @@ impl VpcBlock {
 	/// free for subnets to number themselves with.
 	pub const CIDR: &'static str = "10.0.0.0/16";
 
+	/// The label suffixes of the resources this block emits, which are also
+	/// the `Name` tags they carry.
+	pub const VPC: &'static str = "vpc";
+	pub const GATEWAY: &'static str = "gateway";
+	pub const PUBLIC_ROUTES: &'static str = "public-routes";
+	pub const DEFAULT_ROUTE: &'static str = "default-route";
+
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
@@ -47,8 +54,60 @@ impl VpcBlock {
 		}
 	}
 
-	/// The handle a consumer names this vpc by.
-	pub fn vpc_ref(&self) -> VpcRef { VpcRef::new(self.label.clone()) }
+	/// This vpc's label with a resource suffix, ie `net--private-a`.
+	pub fn suffix(&self, kind: &str) -> String {
+		format!("{}--{kind}", self.label)
+	}
+
+	/// The terraform ident of one of this vpc's resources: what the block emits
+	/// under, and what a consumer's interpolation resolves against, so a renamed
+	/// resource is a compile-time move rather than a dangling interpolation
+	/// discovered at apply.
+	pub fn ident(&self, stack: &ResolvedStack, kind: &str) -> terra::Ident {
+		stack.resource_ident(self.suffix(kind))
+	}
+
+	/// An interpolated reference to `field` of one of this vpc's resources.
+	fn field_ref(
+		&self,
+		stack: &ResolvedStack,
+		resource_type: &str,
+		kind: &str,
+		field: &str,
+	) -> String {
+		format!(
+			"${{{resource_type}.{}.{field}}}",
+			self.ident(stack, kind).label()
+		)
+	}
+
+	/// The vpc id, ie what a security group or a subnet is created in.
+	pub fn id(&self, stack: &ResolvedStack) -> String {
+		self.field_ref(stack, "aws_vpc", Self::VPC, "id")
+	}
+
+	/// One subnet's id.
+	pub fn subnet_id(
+		&self,
+		stack: &ResolvedStack,
+		tier: SubnetTier,
+		zone: &str,
+	) -> String {
+		self.field_ref(stack, "aws_subnet", &tier.kind(zone), "id")
+	}
+
+	/// Every subnet id of one tier, in availability-zone order. What a db
+	/// subnet group or a load balancer is spread across.
+	pub fn subnet_ids(
+		&self,
+		stack: &ResolvedStack,
+		tier: SubnetTier,
+	) -> Vec<SmolStr> {
+		SubnetTier::AZ_SUFFIXES
+			.iter()
+			.map(|zone| self.subnet_id(stack, tier, zone).into())
+			.collect()
+	}
 
 	/// The first two octets of [`cidr`](Self::cidr), ie the `10.0` every subnet
 	/// numbers itself under. Errors on anything that is not a `/16`, since a
@@ -99,10 +158,7 @@ impl VpcBlock {
 		kind: &str,
 	) -> std::collections::BTreeMap<SmolStr, SmolStr> {
 		[
-			(
-				SmolStr::from("Name"),
-				self.vpc_ref().suffix(kind).as_str().into(),
-			),
+			(SmolStr::from("Name"), self.suffix(kind).as_str().into()),
 			(SmolStr::from("Project"), stack.app_name().clone()),
 			(SmolStr::from("Stage"), stack.stage().clone()),
 		]
@@ -111,25 +167,35 @@ impl VpcBlock {
 	}
 }
 
-impl Block for VpcBlock {
-	fn apply_to_config(
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl VpcBlock {
+	/// Render the network into the config.
+	pub(crate) fn render(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&VpcBlock>,
+	) {
+		scope.render_each(&query, |scope, _entity, block| {
+			let (stack, _deployment, config) = scope.ctx();
+			block.emit(stack, config)
+		});
+	}
+
+	/// Emit the vpc, its subnets and the public side's routes.
+	fn emit(
 		&self,
-		_entity: &EntityRef,
 		stack: &ResolvedStack,
-		_deployment: &Deployment,
-		_access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		let vpc_ref = self.vpc_ref();
 		let vpc = ResourceDef::new_secondary(
-			vpc_ref.ident(stack, VpcRef::VPC),
+			self.ident(stack, Self::VPC),
 			AwsVpcDetails {
 				cidr_block: Some(self.cidr.clone()),
 				// both on, so an instance resolves the private dns name of
 				// anything else in the vpc (which is how it reaches the db).
 				enable_dns_hostnames: Some(true),
 				enable_dns_support: Some(true),
-				tags: Some(self.tags(stack, VpcRef::VPC)),
+				tags: Some(self.tags(stack, Self::VPC)),
 				..default()
 			},
 		);
@@ -149,12 +215,11 @@ impl VpcBlock {
 		config: &mut terra::Config,
 		vpc: &ResourceDef<AwsVpcDetails>,
 	) -> Result {
-		let vpc_ref = self.vpc_ref();
 		for tier in SubnetTier::ALL {
 			for (index, zone) in SubnetTier::AZ_SUFFIXES.iter().enumerate() {
 				let kind = tier.kind(zone);
 				config.add_resource(&ResourceDef::new_secondary(
-					vpc_ref.ident(stack, &kind),
+					self.ident(stack, &kind),
 					AwsSubnetDetails {
 						vpc_id: vpc.field_ref("id").into(),
 						cidr_block: Some(
@@ -185,25 +250,24 @@ impl VpcBlock {
 		config: &mut terra::Config,
 		vpc: &ResourceDef<AwsVpcDetails>,
 	) -> Result {
-		let vpc_ref = self.vpc_ref();
 		let gateway = ResourceDef::new_secondary(
-			vpc_ref.ident(stack, VpcRef::GATEWAY),
+			self.ident(stack, Self::GATEWAY),
 			AwsInternetGatewayDetails {
 				vpc_id: Some(vpc.field_ref("id").into()),
-				tags: Some(self.tags(stack, VpcRef::GATEWAY)),
+				tags: Some(self.tags(stack, Self::GATEWAY)),
 				..default()
 			},
 		);
 		let table = ResourceDef::new_secondary(
-			vpc_ref.ident(stack, VpcRef::PUBLIC_ROUTES),
+			self.ident(stack, Self::PUBLIC_ROUTES),
 			AwsRouteTableDetails {
 				vpc_id: vpc.field_ref("id").into(),
-				tags: Some(self.tags(stack, VpcRef::PUBLIC_ROUTES)),
+				tags: Some(self.tags(stack, Self::PUBLIC_ROUTES)),
 				..default()
 			},
 		);
 		let default_route = ResourceDef::new_secondary(
-			vpc_ref.ident(stack, VpcRef::DEFAULT_ROUTE),
+			self.ident(stack, Self::DEFAULT_ROUTE),
 			AwsRouteDetails {
 				route_table_id: table.field_ref("id").into(),
 				destination_cidr_block: Some("0.0.0.0/0".into()),
@@ -218,12 +282,10 @@ impl VpcBlock {
 		for zone in SubnetTier::AZ_SUFFIXES {
 			let subnet = SubnetTier::Public.kind(zone);
 			config.add_resource(&ResourceDef::new_secondary(
-				vpc_ref.ident(stack, &format!("{subnet}-routes")),
+				self.ident(stack, &format!("{subnet}-routes")),
 				AwsRouteTableAssociationDetails {
 					subnet_id: Some(
-						vpc_ref
-							.subnet_id(stack, SubnetTier::Public, zone)
-							.into(),
+						self.subnet_id(stack, SubnetTier::Public, zone).into(),
 					),
 					route_table_id: table.field_ref("id").into(),
 					..default()
@@ -279,121 +341,25 @@ impl SubnetTier {
 	}
 }
 
-/// Names a [`VpcBlock`] declared elsewhere in the same stack, and composes the
-/// terraform references to its resources.
+/// The network a block sits in: the source half of the [`VpcConsumers`]
+/// relationship, on the consumer's entity, targeting a declaration carrying a
+/// [`VpcBlock`]. Authored in markup as `{VpcRef($net)}` beside a
+/// `<VpcBlock bx:ref="net"/>`.
 ///
-/// Both sides of the reference go through this type: the block emits the
-/// resources under the idents it hands out, and the consumer reads them back
-/// out of it, so a renamed resource is a compile-time move rather than a
-/// dangling interpolation discovered at apply.
-#[derive(
-	Debug, Default, Clone, Get, Serialize, Deserialize, PartialEq, Eq, Reflect,
-)]
-pub struct VpcRef {
-	label: SmolStr,
-}
+/// The consumer's render system reads the [`VpcBlock`] off the target and asks
+/// it for the terraform addresses, so both sides of every reference are one
+/// composition rather than two that agree until one is renamed.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
+#[reflect(Component)]
+#[relationship(relationship_target = VpcConsumers)]
+pub struct VpcRef(#[entities] pub Entity);
 
-impl VpcRef {
-	/// The label suffixes of the resources a [`VpcBlock`] emits, which are also
-	/// the `Name` tags they carry.
-	pub const VPC: &'static str = "vpc";
-	pub const GATEWAY: &'static str = "gateway";
-	pub const PUBLIC_ROUTES: &'static str = "public-routes";
-	pub const DEFAULT_ROUTE: &'static str = "default-route";
-
-	pub fn new(label: impl Into<SmolStr>) -> Self {
-		Self {
-			label: label.into(),
-		}
-	}
-
-	/// This vpc's label with a resource suffix, ie `net--private-a`.
-	pub fn suffix(&self, kind: &str) -> String {
-		format!("{}--{kind}", self.label)
-	}
-
-	/// The terraform ident of one of this vpc's resources.
-	pub fn ident(&self, stack: &ResolvedStack, kind: &str) -> terra::Ident {
-		stack.resource_ident(self.suffix(kind))
-	}
-
-	/// An interpolated reference to `field` of one of this vpc's resources.
-	fn field_ref(
-		&self,
-		stack: &ResolvedStack,
-		resource_type: &str,
-		kind: &str,
-		field: &str,
-	) -> String {
-		format!(
-			"${{{resource_type}.{}.{field}}}",
-			self.ident(stack, kind).label()
-		)
-	}
-
-	/// The vpc id, ie what a security group or a subnet is created in.
-	pub fn id(&self, stack: &ResolvedStack) -> String {
-		self.field_ref(stack, "aws_vpc", Self::VPC, "id")
-	}
-
-	/// One subnet's id.
-	pub fn subnet_id(
-		&self,
-		stack: &ResolvedStack,
-		tier: SubnetTier,
-		zone: &str,
-	) -> String {
-		self.field_ref(stack, "aws_subnet", &tier.kind(zone), "id")
-	}
-
-	/// Every subnet id of one tier, in availability-zone order. What a db
-	/// subnet group or a load balancer is spread across.
-	pub fn subnet_ids(
-		&self,
-		stack: &ResolvedStack,
-		tier: SubnetTier,
-	) -> Vec<SmolStr> {
-		SubnetTier::AZ_SUFFIXES
-			.iter()
-			.map(|zone| self.subnet_id(stack, tier, zone).into())
-			.collect()
-	}
-}
-
-/// Names a security group declared by a block in this stack, the one handle a
-/// resource has for saying "and this may reach me".
-///
-/// A security group belongs to whichever block owns the thing it protects, so
-/// the database declares its own and the mail box declares its own; this is how
-/// the database is told about the box's without either block naming a resource
-/// the other owns.
-#[derive(
-	Debug, Default, Clone, Get, Serialize, Deserialize, PartialEq, Eq, Reflect,
-)]
-pub struct SecurityGroupRef {
-	label: SmolStr,
-}
-
-impl SecurityGroupRef {
-	/// The label suffix every security group takes, so one block's `db--sg` is
-	/// composed identically by the block that declares it and the block that is
-	/// admitted to it.
-	pub const KIND: &'static str = "sg";
-
-	pub fn new(label: impl Into<SmolStr>) -> Self {
-		Self {
-			label: label.into(),
-		}
-	}
-
-	pub fn ident(&self, stack: &ResolvedStack) -> terra::Ident {
-		stack.resource_ident(format!("{}--{}", self.label, Self::KIND))
-	}
-
-	pub fn id(&self, stack: &ResolvedStack) -> String {
-		format!("${{aws_security_group.{}.id}}", self.ident(stack).label())
-	}
-}
+/// Every block sitting in a vpc: the target half of the [`VpcRef`]
+/// relationship, on the vpc's declaration entity.
+#[derive(Debug, Default, Reflect, Component)]
+#[reflect(Component)]
+#[relationship_target(relationship = VpcRef)]
+pub struct VpcConsumers(Vec<Entity>);
 
 #[cfg(test)]
 mod tests {
@@ -403,19 +369,13 @@ mod tests {
 	/// The config `block` emits against a Sydney stack, ie the one the mail
 	/// stack deploys into and the one whose availability zones the subnets name.
 	fn build_config(block: &VpcBlock) -> (ResolvedStack, terra::Config) {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
+		let (scope, _dir) = RenderScope::test_render_stack(
+			Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2),
+			|parent| {
+				parent.spawn(block.clone());
+			},
+		);
+		let (stack, _deployment, config) = scope.finish().unwrap();
 		(stack, config)
 	}
 
@@ -427,6 +387,7 @@ mod tests {
 	) -> serde_json::Map<String, Value> {
 		let Some(Value::Object(resources)) = config
 			.to_json()
+			.into_json()
 			.get("resource")
 			.and_then(|it| it.get(resource_type))
 			.cloned()
@@ -492,29 +453,29 @@ mod tests {
 	#[beet_core::test]
 	fn private_subnets_have_no_egress() {
 		let (stack, config) = build_config(&VpcBlock::new("net"));
-		let json = config.to_json().to_string();
+		let json = config.to_json_string().unwrap();
 		json.as_str().xnot().xpect_contains("aws_nat_gateway");
 		resources(&config, "aws_route_table").len().xpect_eq(1);
-		let vpc_ref = VpcBlock::new("net").vpc_ref();
+		let block = VpcBlock::new("net");
 		let mut associated = resources(&config, "aws_route_table_association")
 			.values()
 			.map(|assoc| assoc["subnet_id"].as_str().unwrap().to_string())
 			.collect::<Vec<_>>();
 		associated.sort();
 		associated.xpect_eq(vec![
-			vpc_ref.subnet_id(&stack, SubnetTier::Public, "a"),
-			vpc_ref.subnet_id(&stack, SubnetTier::Public, "b"),
+			block.subnet_id(&stack, SubnetTier::Public, "a"),
+			block.subnet_id(&stack, SubnetTier::Public, "b"),
 		]);
 	}
 
-	/// A [`VpcRef`] is the only way a consumer reaches these resources, so the
-	/// addresses it composes must be the ones actually emitted. A drift here is
-	/// an interpolation to a resource that does not exist, which terraform
+	/// The block's address compositions are the only way a consumer reaches
+	/// these resources, so they must be the ones actually emitted. A drift here
+	/// is an interpolation to a resource that does not exist, which terraform
 	/// reports at apply rather than at plan.
 	#[beet_core::test]
-	fn vpc_ref_addresses_match_what_is_emitted() {
+	fn composed_addresses_match_what_is_emitted() {
 		let (stack, config) = build_config(&VpcBlock::new("net"));
-		let vpc_ref = VpcBlock::new("net").vpc_ref();
+		let block = VpcBlock::new("net");
 		let address = |reference: &str| {
 			reference
 				.trim_start_matches("${")
@@ -524,10 +485,10 @@ mod tests {
 				.to_string()
 		};
 		for (resource_type, reference) in [
-			("aws_vpc", vpc_ref.id(&stack)),
+			("aws_vpc", block.id(&stack)),
 			(
 				"aws_subnet",
-				vpc_ref.subnet_id(&stack, SubnetTier::Private, "a"),
+				block.subnet_id(&stack, SubnetTier::Private, "a"),
 			),
 		] {
 			let label = address(&reference)
@@ -538,7 +499,7 @@ mod tests {
 				.xpect_true();
 		}
 		// ..and a subnet group's worth of them, in zone order
-		vpc_ref
+		block
 			.subnet_ids(&stack, SubnetTier::Private)
 			.len()
 			.xpect_eq(2);

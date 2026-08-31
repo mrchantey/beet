@@ -592,7 +592,7 @@ mod test {
 	#[crate::test]
 	async fn validate_struct_missing_field() {
 		let schema = ValueSchema::of::<UserProfile>();
-		let mut value = val!({
+		let mut value = value!({
 			"name": "Alice",
 		});
 		let errors = schema.validate(&mut value).await;
@@ -603,7 +603,7 @@ mod test {
 	#[crate::test]
 	async fn validate_struct_ok() {
 		let schema = ValueSchema::of::<UserProfile>();
-		let mut value = val!({
+		let mut value = value!({
 			"name": "Alice",
 			"age": 30u64,
 		});
@@ -614,7 +614,7 @@ mod test {
 	#[crate::test]
 	async fn validate_struct_wrong_type() {
 		let schema = ValueSchema::of::<UserProfile>();
-		let mut value = val!({
+		let mut value = value!({
 			"name": "Alice",
 			"age": "thirty",
 		});
@@ -631,7 +631,7 @@ mod test {
 				behavior: ConstraintBehavior::Error,
 			})],
 		});
-		let mut value = val!(5);
+		let mut value = value!(5);
 		let errors = schema.validate(&mut value).await;
 		errors.len().xpect_eq(1);
 		// no mutation
@@ -646,7 +646,7 @@ mod test {
 				behavior: ConstraintBehavior::Mutate,
 			})],
 		});
-		let mut value = val!(5);
+		let mut value = value!(5);
 		let errors = schema.validate(&mut value).await;
 		errors.is_empty().xpect_true();
 		value.as_i64().unwrap().xpect_eq(10);
@@ -660,7 +660,7 @@ mod test {
 				behavior: ConstraintBehavior::Error,
 			},
 		));
-		let mut value = val!("hi");
+		let mut value = value!("hi");
 		let errors = schema.validate(&mut value).await;
 		errors.len().xpect_eq(1);
 	}
@@ -673,7 +673,7 @@ mod test {
 			max_items: None,
 			unique: true,
 		});
-		let mut value = val!([1, 2, 2]);
+		let mut value = value!([1, 2, 2]);
 		let errors = schema.validate(&mut value).await;
 		errors
 			.iter()
@@ -684,7 +684,7 @@ mod test {
 	#[crate::test]
 	async fn validate_enum_unit() {
 		let schema = ValueSchema::of::<Status>();
-		let mut value = val!("Active");
+		let mut value = value!("Active");
 		let errors = schema.validate(&mut value).await;
 		errors.is_empty().xpect_true();
 	}
@@ -692,7 +692,7 @@ mod test {
 	#[crate::test]
 	async fn validate_enum_unknown_variant() {
 		let schema = ValueSchema::of::<Status>();
-		let mut value = val!("Nope");
+		let mut value = value!("Nope");
 		let errors = schema.validate(&mut value).await;
 		errors.len().xpect_eq(1);
 	}
@@ -703,9 +703,9 @@ mod test {
 	#[crate::test]
 	async fn validate_enum_qualified_unit() {
 		let schema = ValueSchema::of::<Status>();
-		let mut value = val!("Status::Active");
+		let mut value = value!("Status::Active");
 		schema.validate(&mut value).await.is_empty().xpect_true();
-		value.xpect_eq(val!("Active"));
+		value.xpect_eq(value!("Active"));
 	}
 
 	#[crate::test]
@@ -715,19 +715,21 @@ mod test {
 		let schema = ValueSchema::of::<UserProfile>();
 		// present and well typed
 		schema
-			.validate(&mut val!({ "name": "A", "age": 1u64, "email": "a@b.c" }))
+			.validate(
+				&mut value!({ "name": "A", "age": 1u64, "email": "a@b.c" }),
+			)
 			.await
 			.is_empty()
 			.xpect_true();
 		// explicit null is accepted by the optional
 		schema
-			.validate(&mut val!({ "name": "A", "age": 1u64, "email": null }))
+			.validate(&mut value!({ "name": "A", "age": 1u64, "email": null }))
 			.await
 			.is_empty()
 			.xpect_true();
 		// a present but wrong-typed value still fails
 		schema
-			.validate(&mut val!({ "name": "A", "age": 1u64, "email": 42 }))
+			.validate(&mut value!({ "name": "A", "age": 1u64, "email": 42 }))
 			.await
 			.is_empty()
 			.xpect_false();
@@ -748,11 +750,15 @@ mod test {
 	async fn any_matches_everything() {
 		let schema = ValueSchema::Any;
 		schema
-			.validate(&mut val!("anything"))
+			.validate(&mut value!("anything"))
 			.await
 			.is_empty()
 			.xpect_true();
-		schema.validate(&mut val!(42)).await.is_empty().xpect_true();
+		schema
+			.validate(&mut value!(42))
+			.await
+			.is_empty()
+			.xpect_true();
 	}
 
 	#[crate::test]

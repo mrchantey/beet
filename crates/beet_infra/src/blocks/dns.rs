@@ -425,8 +425,8 @@ mod tests {
 			)
 			.unwrap();
 		config
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.xpect_contains("\"type\":\"TXT\"")
 			.xpect_contains("v=spf1 include:amazonses.com -all")
 			.xnot()
@@ -449,8 +449,8 @@ mod tests {
 			)
 			.unwrap();
 		config
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.xpect_contains("\\\"v=spf1 include:amazonses.com -all\\\"");
 	}
 
@@ -470,7 +470,7 @@ mod tests {
 				"mail.beetmash.com",
 			)
 			.unwrap();
-		let json = config.to_json().to_string();
+		let json = config.to_json_string().unwrap();
 		json.xpect_contains("\"type\":\"MX\"")
 			.xpect_contains("\"priority\":10")
 			.xpect_contains("\"content\":\"mail.beetmash.com\"");
@@ -493,8 +493,8 @@ mod tests {
 			)
 			.unwrap();
 		config
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.xpect_contains("\"10 mail.beetmash.com\"");
 	}
 
@@ -516,7 +516,7 @@ mod tests {
 				"mail.beetmash.com",
 			)
 			.unwrap();
-		let json = config.to_json().to_string();
+		let json = config.to_json_string().unwrap();
 		json.xpect_contains("\"type\":\"SRV\"")
 			.xpect_contains("\"priority\":0")
 			.xpect_contains("\"weight\":1")
@@ -543,8 +543,8 @@ mod tests {
 			)
 			.unwrap();
 		config
-			.to_json()
-			.to_string()
+			.to_json_string()
+			.unwrap()
 			.xpect_contains("\"0 1 443 mail.beetmash.com\"");
 	}
 }

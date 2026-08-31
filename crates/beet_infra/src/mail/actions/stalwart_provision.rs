@@ -110,10 +110,7 @@ pub async fn StalwartProvisionAction(
 		.get_cloned::<StalwartProvision>()
 		.await
 		.unwrap_or_default();
-	let mail = cx
-		.caller
-		.with_state::<MailQuery, _>(|entity, query| query.resolve(entity))
-		.await??;
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
 	// the credentials this step writes into the relay route, read from
 	// parameter store rather than passed in: the box reads the same values, so
@@ -565,7 +562,7 @@ async fn bootstrap(
 		})?;
 	data_store["authSecret"] = json!({
 		"@type": "Value",
-		"secret": read_secret(region, &mail.mail_box.database().secret_name(stack)).await?,
+		"secret": read_secret(region, &mail.database.secret_name(stack)).await?,
 	});
 	let domain = mail
 		.serving()

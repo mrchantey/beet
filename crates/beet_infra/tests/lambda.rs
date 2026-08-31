@@ -113,17 +113,7 @@ async fn lambda_lifecycle() {
 
 /// Build the terraform project for the Lambda test stack.
 fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
-	let block = LambdaBlock::default();
-	let bucket_block = assets_bucket_block();
-	let mut world = World::new();
-	let entity_mut = world.spawn(());
-	let entity = entity_mut.as_readonly();
-	let config = deploy.resolved().build_config(&deploy.deployment, [
-		(entity.clone(), &block as &dyn Block),
-		(entity, &bucket_block),
-	])?;
-	terra::Project::new(deploy.resolved(), deploy.deployment.clone(), config)
-		.xok()
+	render_test_project(deploy, LambdaBlock::default())
 }
 
 /// Build, upload artifacts, sync assets, and apply terraform

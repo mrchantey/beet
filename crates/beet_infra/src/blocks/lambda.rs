@@ -14,7 +14,7 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ErasedBlock::on_add::<LambdaBlock>)]
+#[component(immutable, on_add = ArtifactLabel::on_add::<LambdaBlock>)]
 pub struct LambdaBlock {
 	/// Label used as a prefix for all terraform resources,
 	/// variables, and outputs. Also used as the artifact name.
@@ -67,13 +67,25 @@ impl Default for LambdaBlock {
 }
 
 impl LambdaBlock {
+	/// The label suffix a lambda's function resource takes.
+	pub const FUNCTION: &'static str = "function";
+
 	/// Build a prefixed label for terraform resources, variables, and outputs.
 	pub fn build_label(&self, suffix: &str) -> String {
 		format!("{}--{}", self.label, suffix)
 	}
 
-	/// The handle another block in this stack names this function by.
-	pub fn lambda_ref(&self) -> LambdaRef { LambdaRef::new(self.label.clone()) }
+	/// The terraform ident of this lambda's function, ie what the block emits
+	/// under and what an invoker's interpolation resolves against.
+	pub fn ident(&self, stack: &ResolvedStack) -> terra::Ident {
+		stack.resource_ident(self.build_label(Self::FUNCTION))
+	}
+
+	/// An interpolated reference to the function's arn, ie what an invoker
+	/// targets and scopes its permission to.
+	pub fn arn(&self, stack: &ResolvedStack) -> String {
+		format!("${{aws_lambda_function.{}.arn}}", self.ident(stack).label())
+	}
 
 	/// Add a hostname the function answers (the first added is the ACM cert's
 	/// primary domain, the rest are subject alternative names). See
@@ -99,51 +111,78 @@ impl LambdaBlock {
 	}
 }
 
-/// Names a [`LambdaBlock`] declared elsewhere in the same stack, and composes
-/// the terraform references to its function.
-///
-/// Both sides of the reference go through this type, so the ident the block
-/// emits its function under and the ident a [`ScheduledJobBlock`] invokes are
-/// one composition rather than two that agree until one is renamed.
-#[derive(
-	Debug, Default, Clone, Get, Serialize, Deserialize, PartialEq, Eq, Reflect,
-)]
-pub struct LambdaRef {
-	label: SmolStr,
+impl From<&LambdaBlock> for ArtifactLabel {
+	fn from(block: &LambdaBlock) -> Self { Self(block.label.clone()) }
 }
 
-impl LambdaRef {
-	/// The label suffix a lambda's function resource takes.
-	pub const FUNCTION: &'static str = "function";
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
+/// type registration.
+impl LambdaBlock {
+	/// Tofu variables the function's environment reads, ie the
+	/// [`env_vars`](Self::env_vars).
+	pub(crate) fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
 
-	pub fn new(label: impl Into<SmolStr>) -> Self {
-		Self {
-			label: label.into(),
+	/// Declare the tofu [`Variable`]s the function's environment reads, ie the
+	/// [`env_vars`](Self::env_vars).
+	pub(crate) fn declare(
+		mut scope: ResMut<RenderScope>,
+		query: Query<&LambdaBlock>,
+	) {
+		scope.render_each(&query, |scope, entity, block| {
+			for variable in block.variables() {
+				scope.variable(entity, variable);
+			}
+			Ok(())
+		});
+	}
+
+	cfg_if! {
+		// `BuildArtifact` holds a `ChildProcess`, so the hash of a
+		// locally-built artifact only exists where the build can run.
+		if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
+			/// Render the function and its secondaries into the config, hashing
+			/// the colocated [`BuildArtifact`] when there is one.
+			pub(crate) fn render(
+				mut scope: ResMut<RenderScope>,
+				query: Query<(&LambdaBlock, Option<&BuildArtifact>)>,
+			) {
+				for entity in scope.declared().to_vec() {
+					if let Ok((block, artifact)) = query.get(entity) {
+						let source_hash = artifact.and_then(|artifact| {
+							artifact.compute_source_hash().ok()
+						});
+						let access = scope.access();
+						let (stack, deployment, config) = scope.ctx();
+						if let Err(err) = block
+							.emit(source_hash, stack, deployment, &access, config)
+						{
+							scope.error(err);
+						}
+					}
+				}
+			}
+		} else {
+			/// Render the function and its secondaries into the config.
+			pub(crate) fn render(
+				mut scope: ResMut<RenderScope>,
+				query: Query<&LambdaBlock>,
+			) {
+				scope.render_each(&query, |scope, _entity, block| {
+					let access = scope.access();
+					let (stack, deployment, config) = scope.ctx();
+					block.emit(None, stack, deployment, &access, config)
+				});
+			}
 		}
 	}
-
-	/// The terraform ident of this lambda's function.
-	pub fn ident(&self, stack: &ResolvedStack) -> terra::Ident {
-		stack.resource_ident(format!("{}--{}", self.label, Self::FUNCTION))
-	}
-
-	/// An interpolated reference to the function's arn, ie what an invoker
-	/// targets and scopes its permission to.
-	pub fn arn(&self, stack: &ResolvedStack) -> String {
-		format!("${{aws_lambda_function.{}.arn}}", self.ident(stack).label())
-	}
 }
 
-impl From<&str> for LambdaRef {
-	fn from(label: &str) -> Self { Self::new(label) }
-}
-
-impl Block for LambdaBlock {
-	fn artifact_label(&self) -> Option<&str> { Some(&self.label) }
-	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
-	fn apply_to_config(
+impl LambdaBlock {
+	/// Emit the function and its secondaries: its log group, role and lowered
+	/// runtime policy, and (when [`http`](Self::http)) the public front end.
+	fn emit(
 		&self,
-		entity: &EntityRef,
+		source_hash: Option<String>,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
 		access: &AccessGrants,
@@ -154,24 +193,13 @@ impl Block for LambdaBlock {
 			.region
 			.clone()
 			.unwrap_or_else(|| stack.region().clone());
-		// artifact values computed directly from the deploy and entity
+		// artifact values computed directly from the deploy
 		let artifact_bucket = deployment.artifact_bucket_name(stack);
 		let artifact_key = deployment.artifact_key(&self.label);
-		cfg_if! {
-			// `BuildArtifact` holds a `ChildProcess`, so the hash of a
-			// locally-built artifact only exists where the build can run.
-			if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
-				let source_hash = entity
-					.get::<BuildArtifact>()
-					.and_then(|artifact| artifact.compute_source_hash().ok());
-			} else {
-				let source_hash: Option<String> = None;
-			}
-		}
 
 		// CloudWatch log group for Lambda logs
 		// Must be created before the Lambda function to ensure proper cleanup
-		let function_ident = self.lambda_ref().ident(stack);
+		let function_ident = self.ident(stack);
 		let log_group = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("logs")),
 			AwsCloudwatchLogGroupDetails {
@@ -441,12 +469,12 @@ impl LambdaBlock {
 		// Outputs
 		config
 			.add_output(self.build_label("api_endpoint"), terra::Output {
-				value: json!(gateway.field_ref("api_endpoint")),
+				value: gateway.field_ref("api_endpoint").into(),
 				description: Some("The API Gateway endpoint URL".into()),
 				sensitive: None,
 			})?
 			.add_output(self.build_label("function_url"), terra::Output {
-				value: json!(lambda_url.field_ref("function_url")),
+				value: lambda_url.field_ref("function_url").into(),
 				description: Some("The Lambda function URL".into()),
 				sensitive: None,
 			})?;
@@ -606,14 +634,11 @@ impl LambdaBlock {
 mod tests {
 	use super::*;
 
-	/// The terraform json for `block` deployed alongside `declared`, whose
-	/// grants its runtime policy lowers.
-	fn build_json_granting(
-		block: &LambdaBlock,
-		declared: &[&dyn Block],
-	) -> String {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		stack.json_granting(&deployment, block, declared).unwrap()
+	/// The terraform json for `block` rendered alone.
+	fn build_json(block: LambdaBlock) -> String {
+		RenderScope::test_json(move |parent| {
+			parent.spawn(block);
+		})
 	}
 
 	/// An invoke-only function publishes NO http front end: no function url, no
@@ -625,25 +650,28 @@ mod tests {
 	/// its role, its log group and the runtime policy its grants lower into.
 	#[beet_core::test]
 	fn an_invoke_only_lambda_publishes_no_endpoint() {
-		let declared = S3BucketBlock::new("app").with_deploy_versioned(false);
 		let block = LambdaBlock::default().with_http(false);
-		build_json_granting(&block, &[&declared])
-			.as_str()
-			.xpect_contains("aws_lambda_function")
-			.xpect_contains("aws_cloudwatch_log_group")
-			.xpect_contains("aws_iam_role_policy")
-			// a deployed function resolves its declared stores REMOTELY, which
-			// only this channel can say: the zip's `bootstrap` script carries the
-			// argv half of the config and the runtime reads this half off the
-			// environment. Without it a `<DynamoTableBlock/>` the function
-			// records to resolves to a directory inside the container.
-			.xpect_contains(r#""BEET_SERVICE_ACCESS":"remote""#)
-			.xnot()
-			.xpect_contains("aws_lambda_function_url")
-			.xnot()
-			.xpect_contains("aws_apigatewayv2")
-			.xnot()
-			.xpect_contains("aws_lambda_permission");
+		RenderScope::test_json(|parent| {
+			parent.spawn(block.clone());
+			parent
+				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
+		})
+		.as_str()
+		.xpect_contains("aws_lambda_function")
+		.xpect_contains("aws_cloudwatch_log_group")
+		.xpect_contains("aws_iam_role_policy")
+		// a deployed function resolves its declared stores REMOTELY, which
+		// only this channel can say: the zip's `bootstrap` script carries the
+		// argv half of the config and the runtime reads this half off the
+		// environment. Without it a `<DynamoTableBlock/>` the function
+		// records to resolves to a directory inside the container.
+		.xpect_contains(r#""BEET_SERVICE_ACCESS":"remote""#)
+		.xnot()
+		.xpect_contains("aws_lambda_function_url")
+		.xnot()
+		.xpect_contains("aws_apigatewayv2")
+		.xnot()
+		.xpect_contains("aws_lambda_permission");
 		// ..and a hostname with no gateway to address fails the deploy rather
 		// than publishing a record at nothing
 		block
@@ -660,9 +688,18 @@ mod tests {
 	/// the account. `AWSLambdaBasicExecutionRole` is the log writes and stays.
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let declared = S3BucketBlock::new("app").with_deploy_versioned(false);
-		build_json_granting(&LambdaBlock::default(), &[&declared])
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(LambdaBlock::default());
+			parent
+				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
+		});
+		let stack = scope.stack().clone();
+		scope
+			.finish()
+			.unwrap()
+			.2
+			.to_json_string()
+			.unwrap()
 			.as_str()
 			.xpect_contains("\"aws_iam_role_policy\":")
 			.xpect_contains(&format!(
@@ -680,16 +717,18 @@ mod tests {
 	#[cfg(feature = "bindings_aws_dynamo")]
 	#[beet_core::test]
 	fn lowers_permissions_per_grant() {
-		build_json_granting(&LambdaBlock::default(), &[
-			&S3BucketBlock::new("assets").with_runtime_write(true),
-			&DynamoTableBlock::new("analytics"),
-		])
+		RenderScope::test_json(|parent| {
+			parent.spawn(LambdaBlock::default());
+			parent.spawn(S3BucketBlock::new("assets").with_runtime_write(true));
+			parent.spawn(DynamoTableBlock::new("analytics"));
+		})
 		.as_str()
 		.xpect_contains("s3:PutObject")
 		.xpect_contains("dynamodb:PutItem");
-		build_json_granting(&LambdaBlock::default(), &[&S3BucketBlock::new(
-			"assets",
-		)])
+		RenderScope::test_json(|parent| {
+			parent.spawn(LambdaBlock::default());
+			parent.spawn(S3BucketBlock::new("assets"));
+		})
 		.as_str()
 		.xpect_contains("s3:GetObject")
 		.xnot()
@@ -700,7 +739,7 @@ mod tests {
 	/// all, rather than an empty (invalid) document or a wildcard one.
 	#[beet_core::test]
 	fn nothing_declared_grants_nothing() {
-		build_json(&LambdaBlock::default())
+		build_json(LambdaBlock::default())
 			.as_str()
 			.xnot()
 			.xpect_contains("\"aws_iam_role_policy\":")
@@ -713,14 +752,13 @@ mod tests {
 	/// it.
 	#[beet_core::test]
 	fn unknown_grant_kind_fails_the_deploy() {
+		// a foreign grant kind has no declaring block in this crate, so the
+		// injection goes straight at `emit` rather than through the schedule
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut world = World::new();
-		let entity_mut = world.spawn(());
-		let entity = entity_mut.as_readonly();
 		let mut config = deployment.create_config(&stack);
 		LambdaBlock::default()
-			.apply_to_config(
-				&entity,
+			.emit(
+				None,
 				&stack,
 				&deployment,
 				&AccessGrants::new(vec![AccessGrant::read(
@@ -736,44 +774,23 @@ mod tests {
 			.xpect_contains("lambda function");
 	}
 
-	/// The terraform json for the given block.
-	fn build_json(block: &LambdaBlock) -> String {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
-		config.to_json().to_string()
-	}
-
 	/// The function must carry `BEET_STAGE` so the deployed runtime reports the
 	/// stage it is actually running in. Asserted against a named stage, since the
 	/// `dev` default renders to nothing.
 	#[beet_core::test]
 	fn injects_beet_stage_env() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_stage("prod");
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		LambdaBlock::default()
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
-		config
-			.to_json()
-			.to_string()
+		let (scope, _dir) = RenderScope::test_render_stack(
+			Stack::new("beet_infra").with_stage("prod"),
+			|parent| {
+				parent.spawn(LambdaBlock::default());
+			},
+		);
+		scope
+			.finish()
+			.unwrap()
+			.2
+			.to_json_string()
+			.unwrap()
 			.xpect_contains("\"BEET_STAGE\":\"prod\"");
 	}
 
@@ -781,7 +798,7 @@ mod tests {
 	/// it emits no certificate, no custom domain and no record at all.
 	#[beet_core::test]
 	fn no_dns_emits_no_custom_domain() {
-		build_json(&LambdaBlock::default())
+		build_json(LambdaBlock::default())
 			.as_str()
 			.xpect_contains("aws_apigatewayv2_api")
 			.xnot()
@@ -798,7 +815,7 @@ mod tests {
 	#[beet_core::test]
 	fn dns_emits_custom_domain_mapped_to_the_default_stage() {
 		let json = build_json(
-			&LambdaBlock::default().with_dns(
+			LambdaBlock::default().with_dns(
 				DnsProvider::cloudflare("example.org", "zone123")
 					.with_proxied(true),
 			),
@@ -831,7 +848,7 @@ mod tests {
 	#[beet_core::test]
 	fn multiple_dns_emits_a_domain_each_on_one_cert() {
 		let json = build_json(
-			&LambdaBlock::default()
+			LambdaBlock::default()
 				.with_dns(DnsProvider::cloudflare("example.org", "z"))
 				.with_dns(DnsProvider::cloudflare("www.example.org", "z")),
 		);
@@ -855,20 +872,9 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn validate() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let block = LambdaBlock::default();
-		let mut config = deployment.create_config(&stack);
-		let mut world = World::new();
-		block
-			.apply_to_config(
-				&world.spawn(()).as_readonly(),
-				&stack,
-				&deployment,
-				&default(),
-				&mut config,
-			)
-			.unwrap();
-		let project = terra::Project::new(stack, deployment, config);
-		project.validate().await.unwrap();
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(LambdaBlock::default());
+		});
+		scope.project().unwrap().validate().await.unwrap();
 	}
 }

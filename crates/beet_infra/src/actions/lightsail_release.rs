@@ -58,7 +58,12 @@ pub async fn LightsailReleaseAction(
 		.unwrap_or_default();
 	let (project, block) = cx
 		.caller
-		.with_state::<ReleaseQuery, _>(|entity, query| query.resolve(entity))
+		.with_world(|world, entity| -> Result<_> {
+			let project = RenderScope::render(world, entity)?.project()?;
+			let block = world
+				.with_state::<ReleaseQuery, _>(|query| query.resolve(entity))?;
+			(project, block).xok()
+		})
 		.await??;
 
 	let deploy_id = project.deployment().deploy_id().to_string();
@@ -113,14 +118,11 @@ struct ReleaseQuery<'w, 's> {
 }
 
 impl ReleaseQuery<'_, '_> {
-	/// The project to read outputs from, and the box to release onto. Several
-	/// blocks under one stack is an error rather than a guess: they would have
-	/// different management ports and different units.
-	fn resolve(
-		&self,
-		entity: Entity,
-	) -> Result<(terra::Project, LightsailBlock)> {
-		let project = self.stacks.build_project(entity)?;
+	/// The box to release onto (the project to read outputs from comes from a
+	/// [`RenderScope`] render). Several blocks under one stack is an error
+	/// rather than a guess: they would have different management ports and
+	/// different units.
+	fn resolve(&self, entity: Entity) -> Result<LightsailBlock> {
 		let mut blocks = self
 			.stacks
 			.declared(entity)?
@@ -141,6 +143,6 @@ impl ReleaseQuery<'_, '_> {
 				stack, so it cannot tell which box to release onto"
 			);
 		}
-		(project, block).xok()
+		block.xok()
 	}
 }

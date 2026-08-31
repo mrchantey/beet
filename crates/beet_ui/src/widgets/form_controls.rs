@@ -404,7 +404,7 @@ mod test {
 			.id();
 		app.world_mut()
 			.entity_mut(root)
-			.insert(Document::new(val!({ "name": "" })));
+			.insert(Document::new(value!({ "name": "" })));
 		app.update();
 
 		// focus the input (the <input> element) and type "hi".

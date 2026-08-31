@@ -535,7 +535,7 @@ mod test {
 	fn console_reads_input_and_splits_streams() {
 		let output = capture(
 			r#"console.log(input.name); console.error("oops")"#,
-			val!({ "name": "ada" }),
+			value!({ "name": "ada" }),
 		);
 		output.stdout.xpect_eq(vec!["ada".to_string()]);
 		output.stderr.xpect_eq(vec!["oops".to_string()]);
