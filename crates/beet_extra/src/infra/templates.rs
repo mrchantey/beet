@@ -152,6 +152,56 @@ pub fn LambdaSiteBlock(
 	(block, build.into_lambda_build_artifact()?).xok()
 }
 
+/// `<LambdaJobBlock label="rollup" features="aws_sdk,lambda" exec_route="jobs"/>`
+/// — an INVOKE-ONLY lambda plus its build artifact, on one entity (paired by
+/// `TofuApplyAction`, see [`LambdaSiteBlock`]): the target a
+/// `<ScheduledJobBlock/>` drives.
+///
+/// The counterpart of [`LambdaSiteBlock`] for work rather than serving, and the
+/// difference is the whole point: it publishes no function url, no api gateway
+/// and no hostname, so nothing but its declared invoker can reach it. A batch
+/// job that scans a table and rewrites every row in it has no business behind an
+/// endpoint whose authorization is `NONE`.
+///
+/// Otherwise it boots exactly as a served lambda does: the runtime offers no
+/// argv, so the entry-store config (`remote_bootstrap`) bakes into the zip's
+/// `bootstrap` script and `exec_route` names the verb it launches. That verb
+/// hosts the router the schedule's invoke is dispatched into, so what runs is a
+/// route of the same entry document the site serves from.
+#[template(system)]
+pub fn LambdaJobBlock(
+	/// The function's label, which the schedule's `target` names.
+	#[prop(into)]
+	label: String,
+	#[prop(into)] features: String,
+	/// The entry verb the function boots, whose router hosts the job routes an
+	/// invoke dispatches.
+	#[prop(into)]
+	exec_route: String,
+	/// Seconds one run may take, the service maximum by default: a job sweeps a
+	/// store rather than answering a request, and the first run over a history
+	/// that predates it is the longest one it will ever do.
+	#[prop(default = 900)]
+	timeout_secs: i64,
+	stacks: StackQuery,
+	entity: Entity,
+) -> Result<impl Bundle> {
+	let stack = stacks.resolve(entity);
+	(
+		LambdaBlock::default()
+			.with_label(label)
+			.with_http(false)
+			.with_timeout_secs(timeout_secs),
+		infra_ext::beet_cargo_build(features)
+			.with_bootstrap(infra_ext::remote_bootstrap(
+				infra_ext::app_bucket_name(&stack),
+			)?)
+			.with_exec_route(exec_route)
+			.into_lambda_build_artifact()?,
+	)
+		.xok()
+}
+
 /// `<LambdaWatch timeout="30s"/>` — tail the deployed lambda's logs. The log
 /// group composes from the ancestor [`Stack`] when the tail runs, so nothing
 /// here restates the app identity.
@@ -485,6 +535,141 @@ mod test {
 		// ..which locally is backed by a workspace directory rather than the
 		// remote table, so one declaration runs both ways
 		world.query::<&FsStore>().single(&world).xpect_ok();
+	}
+
+	/// The analytics retention stack the site entry declares, end to end: the
+	/// events table that expires, the aggregate table that does not, the bucket
+	/// the raws are archived into, the invoke-only function and the timer that
+	/// drives it — plus the job itself, bound to all three stores by relation.
+	///
+	/// The deploy has to RENDER, not just spawn: an unpointed schedule and a
+	/// hostname on a gateway-less function are both render-time failures, and a
+	/// stack whose tags resolved to nothing deploys green with no timer in it.
+	#[beet_core::test]
+	fn the_rollup_declares_its_stores_its_timer_and_its_job() {
+		let mut world = test_world();
+		world.insert_resource(PackageConfig {
+			app_name: "beet-site".into(),
+			..default()
+		});
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Fragment>
+				<Route path="jobs" {HttpServer}>
+					<Router>
+						<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($rollup), ArchiveStoreRef($runtime_ops))}/>
+					</Router>
+				</Route>
+				<Stack>
+					<DynamoTableBlock bx:ref="analytics" label="analytics" ttl="ttl"/>
+					<DynamoTableBlock bx:ref="rollup" label="analytics-rollup"/>
+					<S3BucketBlock bx:ref="runtime_ops" label="runtime-ops" deploy_versioned=false runtime_write=true object_versioning=true/>
+					<LambdaJobBlock label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
+					<ScheduledJobBlock label="rollup-daily" target="rollup" schedule="cron(0 3 * * ? *)" path="rollup"/>
+				</Stack>
+			</Fragment>"#,
+		);
+		// the expiring table and the aggregates that outlive it
+		let mut tables = world
+			.query::<&DynamoTableBlock>()
+			.iter(&world)
+			.map(|table| {
+				(
+					table.label().to_string(),
+					table.ttl().clone().map(|attribute| attribute.to_string()),
+				)
+			})
+			.collect::<Vec<_>>();
+		tables.sort();
+		tables.xpect_eq(vec![
+			("analytics".to_string(), Some("ttl".to_string())),
+			("analytics-rollup".to_string(), None),
+		]);
+		// nothing but the timer may reach a sweep that rewrites every row
+		world
+			.query::<&LambdaBlock>()
+			.single(&world)
+			.unwrap()
+			.http()
+			.xpect_false();
+
+		// the job names all three stores by relation, and each one resolves to
+		// the declaration whose name the deploy provisions
+		let (job, events, rollups, archive) = world
+			.query::<(Entity, &StoreRef, &RollupStoreRef, &ArchiveStoreRef)>()
+			.single(&world)
+			.map(|(job, events, rollups, archive)| {
+				(job, events.0, rollups.0, archive.0)
+			})
+			.unwrap();
+		world
+			.entity(job)
+			.contains::<AnalyticsRollupJob>()
+			.xpect_true();
+		// the job's `Router` is its own url space, rooted at `/`: the schedule's
+		// `path="rollup"` resolves inside it, and the enclosing space — the one a
+		// served site dispatches into — cannot reach it at any path.
+		let jobs_router = world.entity(job).get::<ChildOf>().unwrap().parent();
+		RouteTree::of(&world, jobs_router)
+			.unwrap()
+			.find(&["rollup"])
+			.xpect_some();
+		let outer = RouteTree::of(&world, router).unwrap();
+		outer.find(&["rollup"]).xpect_none();
+		outer.find(&["jobs", "rollup"]).xpect_none();
+		let stack = Stack::default().resolve(&PackageConfig {
+			app_name: "beet-site".into(),
+			..default()
+		});
+		world
+			.entity(events)
+			.get::<DynamoTableBlock>()
+			.unwrap()
+			.table_name(&stack)
+			.xpect_eq("beet-site--dev--analytics");
+		world
+			.entity(rollups)
+			.get::<DynamoTableBlock>()
+			.unwrap()
+			.table_name(&stack)
+			.xpect_eq("beet-site--dev--analytics-rollup");
+		world
+			.entity(archive)
+			.get::<S3BucketBlock>()
+			.unwrap()
+			.label()
+			.as_str()
+			.xpect_eq("runtime-ops");
+
+		// ..and the whole stack renders, which is where an unpointed schedule or
+		// an unlowerable grant fails
+		let root = world
+			.query_filtered::<Entity, With<Stack>>()
+			.single(&world)
+			.unwrap();
+		world
+			.with_state::<StackQuery, _>(|stacks| {
+				stacks.build_config(root).map(|(.., config)| config)
+			})
+			.unwrap()
+			.to_json()
+			.to_string()
+			.as_str()
+			.xpect_contains("aws_scheduler_schedule")
+			.xpect_contains("cron(0 3 * * ? *)")
+			// the archive bucket is writable by the runtime, the app bucket is not
+			.xpect_contains("beet-site--dev--runtime-ops")
+			.xpect_contains(
+				r#""ttl":[{"attribute_name":"ttl","enabled":true}]"#,
+			)
+			// a job sweeps a store rather than answering a request, so it takes
+			// the long timeout a served function has no use for
+			.xpect_contains(r#""timeout":900"#)
+			// an invoke-only function publishes nothing
+			.xnot()
+			.xpect_contains("aws_apigatewayv2");
 	}
 
 	/// The `shared`-stage stack, the shape the site entry declares: its verb

@@ -99,6 +99,18 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// Returns the provider's region, if applicable.
 	fn region(&self) -> Option<String>;
 
+	/// Where this store actually lives, ie `s3:beet-site--prod--app
+	/// (us-west-2)`. The one thing an operator needs from a store that will not
+	/// answer, so it belongs in any error naming one.
+	fn describe(&self) -> String {
+		match self.region() {
+			Some(region) => {
+				format!("{}:{} ({region})", self.id(), self.root_key())
+			}
+			None => format!("{}:{}", self.id(), self.root_key()),
+		}
+	}
+
 	/// Check if store exists.
 	///
 	/// # Example

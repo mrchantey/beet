@@ -32,6 +32,23 @@ pub struct LambdaBlock {
 	#[serde(default)]
 	#[set_with(skip)]
 	dns: Vec<DnsProvider>,
+	/// Publish an http front end: a function url plus an api gateway routing
+	/// every request to this function, and the [`dns`](Self::dns) domains in
+	/// front of them. On by default, since a lambda usually IS the web app.
+	///
+	/// `false` for a function only its declared invoker calls, ie the target of a
+	/// [`ScheduledJobBlock`]. The gateway authorizes nothing (`authorization_type`
+	/// is `NONE`), so a nightly job that scans a table and rewrites every row
+	/// would otherwise be a public endpoint anyone could hold open.
+	http: bool,
+	/// Seconds one invocation may run before the runtime kills it, the AWS
+	/// default of 180 unless declared (the service maximum is 900).
+	///
+	/// A served function answers a request and wants the short one; a job sweeps
+	/// a store and wants the long one. A sweep killed mid-run is not a
+	/// correctness problem for a pipeline whose stages are ordered and
+	/// idempotent, but it is a run that never finishes.
+	timeout_secs: i64,
 	/// AWS region for the buckets and lambda function.
 	region: Option<SmolStr>,
 }
@@ -41,6 +58,8 @@ impl Default for LambdaBlock {
 		Self {
 			label: "main-lambda".into(),
 			dns: Vec::new(),
+			http: true,
+			timeout_secs: 180,
 			region: None,
 			env_vars: Vec::new(),
 		}
@@ -62,6 +81,21 @@ impl LambdaBlock {
 	pub fn with_dns(mut self, dns: DnsProvider) -> Self {
 		self.dns.push(dns);
 		self
+	}
+
+	/// Whether this declaration is coherent: a function with no http front end
+	/// has nothing for a hostname to point at, so declaring both is a deploy-time
+	/// failure rather than a record published at a gateway that does not exist.
+	pub fn validate(&self) -> Result {
+		if !self.http && !self.dns.is_empty() {
+			bevybail!(
+				"the lambda '{}' publishes {} hostname(s) but declares `http=false`: \
+				 a function with no gateway has nothing for a record to address",
+				self.label,
+				self.dns.len()
+			);
+		}
+		Ok(())
 	}
 }
 
@@ -115,6 +149,7 @@ impl Block for LambdaBlock {
 		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
+		self.validate()?;
 		let region = self
 			.region
 			.clone()
@@ -227,7 +262,7 @@ impl Block for LambdaBlock {
 				s3_key: Some(artifact_key.into()),
 				region: Some(region.clone()),
 				role: lambda_role.field_ref("arn").into(),
-				timeout: Some(180),
+				timeout: Some(self.timeout_secs),
 				memory_size: Some(1024),
 				source_code_hash: source_hash.map(Into::into),
 				environment: Some(vec![
@@ -249,6 +284,14 @@ impl Block for LambdaBlock {
 								// the stage the function actually runs in, or it
 								// reports the `dev` default from a prod stack
 								stage: stack.stage().clone(),
+								// a deployed function IS remote, and this is the
+								// only channel that can say so: the zip's
+								// `bootstrap` script carries the argv half of the
+								// artifact's config and the runtime reads this
+								// half off the environment. Without it a declared
+								// `<DynamoTableBlock/>` resolves to a workspace
+								// directory inside the container.
+								service_access: ServiceAccess::Remote,
 								..default()
 							};
 							for (key, value) in runtime.to_env() {
@@ -269,6 +312,37 @@ impl Block for LambdaBlock {
 			},
 		);
 
+		// Core resources
+		config
+			.add_resource(&log_group)?
+			.add_resource(&lambda_role)?
+			.add_resource(&lambda_policy)?
+			.add_resource(&lambda_function)?;
+
+		// absent when the stack declared no resources for the function to reach
+		if let Some(runtime_policy) = &runtime_policy {
+			config.add_resource(runtime_policy)?;
+		}
+
+		// the public front end, which an invoke-only function does not have
+		if self.http {
+			self.emit_http(stack, config, &region, &lambda_function)?;
+		}
+
+		Ok(())
+	}
+}
+
+impl LambdaBlock {
+	/// Publish the function over http: a function url, an api gateway proxying
+	/// every route to it, and the custom domains [`dns`](Self::dns) declares.
+	fn emit_http(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		region: &SmolStr,
+		lambda_function: &ResourceDef<AwsLambdaFunctionDetails>,
+	) -> Result {
 		// Lambda Function URL
 		let lambda_url = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("function_url")),
@@ -346,12 +420,7 @@ impl Block for LambdaBlock {
 			},
 		);
 
-		// Core resources
 		config
-			.add_resource(&log_group)?
-			.add_resource(&lambda_role)?
-			.add_resource(&lambda_policy)?
-			.add_resource(&lambda_function)?
 			.add_resource(&lambda_url)?
 			.add_resource(&gateway)?
 			.add_resource(&lambda_integration)?
@@ -359,17 +428,12 @@ impl Block for LambdaBlock {
 			.add_resource(&default_stage)?
 			.add_resource(&apigw_permission)?;
 
-		// absent when the stack declared no resources for the function to reach
-		if let Some(runtime_policy) = &runtime_policy {
-			config.add_resource(runtime_policy)?;
-		}
-
 		// DNS (conditional): a custom domain per authority, and the public record
 		// pointing at it.
 		self.emit_custom_domains(
 			stack,
 			config,
-			&region,
+			region,
 			&gateway,
 			&default_stage,
 		)?;
@@ -389,9 +453,7 @@ impl Block for LambdaBlock {
 
 		Ok(())
 	}
-}
 
-impl LambdaBlock {
 	/// Publish every [`dns`](Self::dns) authority as an api gateway custom
 	/// domain: one DNS-validated ACM certificate covering the whole set, a
 	/// `domain_name` + `api_mapping` per authority, and a public record pointing
@@ -552,6 +614,44 @@ mod tests {
 	) -> String {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		stack.json_granting(&deployment, block, declared).unwrap()
+	}
+
+	/// An invoke-only function publishes NO http front end: no function url, no
+	/// gateway, no route, no anonymous invoke permission.
+	///
+	/// The gateway's `authorization_type` is `NONE`, so a nightly job that scans
+	/// a table and rewrites every row in it would otherwise sit behind a public
+	/// url anyone could hold open. It keeps everything a function needs to run:
+	/// its role, its log group and the runtime policy its grants lower into.
+	#[beet_core::test]
+	fn an_invoke_only_lambda_publishes_no_endpoint() {
+		let declared = S3BucketBlock::new("app").with_deploy_versioned(false);
+		let block = LambdaBlock::default().with_http(false);
+		build_json_granting(&block, &[&declared])
+			.as_str()
+			.xpect_contains("aws_lambda_function")
+			.xpect_contains("aws_cloudwatch_log_group")
+			.xpect_contains("aws_iam_role_policy")
+			// a deployed function resolves its declared stores REMOTELY, which
+			// only this channel can say: the zip's `bootstrap` script carries the
+			// argv half of the config and the runtime reads this half off the
+			// environment. Without it a `<DynamoTableBlock/>` the function
+			// records to resolves to a directory inside the container.
+			.xpect_contains(r#""BEET_SERVICE_ACCESS":"remote""#)
+			.xnot()
+			.xpect_contains("aws_lambda_function_url")
+			.xnot()
+			.xpect_contains("aws_apigatewayv2")
+			.xnot()
+			.xpect_contains("aws_lambda_permission");
+		// ..and a hostname with no gateway to address fails the deploy rather
+		// than publishing a record at nothing
+		block
+			.with_dns(DnsProvider::cloudflare("jobs.beet.org", "zone"))
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("has nothing for a record to address");
 	}
 
 	/// The runtime identity carries ONE inline policy naming exactly the

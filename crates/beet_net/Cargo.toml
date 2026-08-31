@@ -38,6 +38,9 @@ std = [
 	# beet_core's `uuid_ext`, whose clock works on every target.
 	"dep:uuid",
 	"uuid/v7",
+	# name-based ids for rows whose key must be a pure function of what they
+	# summarize, ie an analytics aggregate re-run for the same day
+	"uuid/v5",
 	"uuid/std",
 	"beet_core/uuid",
 	# url-encoded query-param extractors: serde_urlencoded forces serde/std,
@@ -57,7 +60,9 @@ action = ["dep:beet_action"]
 # tungstenite/web-sys transports and the server/channel backends ride their own
 # features on top of it.
 sockets = ["action", "dep:sha1", "dep:base64"]
-json = ["serde",	"dep:serde_json", "beet_core/json", "beet_action?/json"]
+# `flate2` is the analytics archive's gzip: the cold copy a raw event is written
+# to before its expiry is ever stamped, and json is what it holds (ndjson).
+json = ["serde", "dep:serde_json", "dep:flate2", "beet_core/json", "beet_action?/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`
 # reader (cross-platform, in-memory). Off by default; the analytics country field
@@ -211,6 +216,7 @@ futures = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 # the websocket `Sec-WebSocket-Accept` digest, see `http_ext::sec_websocket_accept`
 sha1 = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }

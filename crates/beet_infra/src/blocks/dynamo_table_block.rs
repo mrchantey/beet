@@ -27,6 +27,20 @@ pub struct DynamoTableBlock {
 	label: SmolStr,
 	/// The hash (partition) key attribute name.
 	hash_key: SmolStr,
+	/// The attribute DynamoDB reads a row's expiry from, ie `ttl`. Unset (the
+	/// default) keeps every row forever.
+	///
+	/// A row whose attribute holds a unix SECOND in the past is deleted, free,
+	/// within a couple of days; a row without the attribute is never touched, so
+	/// enabling this expires nothing on its own — the writer decides what
+	/// carries a stamp, and for analytics nothing is stamped until its cold
+	/// archive and its daily aggregate both exist.
+	///
+	/// Turning it on is an in-place update to a live table: it is a sub-resource
+	/// of the table rather than one of the fields (the name, the key schema) a
+	/// change to would replace it.
+	#[set_with(unwrap_option, into)]
+	ttl: Option<SmolStr>,
 	/// Override the region this table lives in, which otherwise resolves from
 	/// the ancestor [`Stack`]. The runtime store and the tofu resource read the
 	/// one resolved value rather than the runtime falling back to an environment
@@ -52,6 +66,7 @@ impl DynamoTableBlock {
 		Self {
 			label: label.into(),
 			hash_key: "id".into(),
+			ttl: None,
 			region: None,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
@@ -148,6 +163,14 @@ impl Block for DynamoTableBlock {
 					},
 				]),
 				region: Some(self.resolved_region(stack)),
+				// absent unless declared, so a table that expires nothing
+				// renders exactly as it did before this field existed
+				ttl: self.ttl.clone().map(|attribute_name| {
+					vec![AwsDynamodbTableResourceBlockTypeTtl {
+						attribute_name: Some(attribute_name),
+						enabled: Some(true),
+					}]
+				}),
 				..default()
 			},
 		);
@@ -170,14 +193,12 @@ impl Block for DynamoTableBlock {
 mod test {
 	use super::*;
 
-	/// The block emits an `aws_dynamodb_table` with a stage-prefixed name, an `id`
-	/// string hash key, and pay-per-request billing.
-	#[beet_core::test]
-	fn emits_dynamodb_table() {
+	/// The terraform json `block` emits.
+	fn build_json(block: DynamoTableBlock) -> String {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let mut config = deployment.create_config(&stack);
 		let mut world = World::new();
-		DynamoTableBlock::new("analytics")
+		block
 			.apply_to_config(
 				&world.spawn(()).as_readonly(),
 				&stack,
@@ -186,9 +207,41 @@ mod test {
 				&mut config,
 			)
 			.unwrap();
-		config
-			.to_json()
-			.to_string()
+		config.to_json().to_string()
+	}
+
+	/// Enabling expiry is an IN-PLACE update to a live table: the ttl block is
+	/// the only difference in the rendered resource, and none of the fields a
+	/// change to would replace the table (its name, its key schema, its
+	/// attributes, its billing mode) moves.
+	///
+	/// The live analytics table holds the only copy of anything not yet
+	/// archived, so a replacement here is data loss on a green deploy.
+	#[beet_core::test]
+	fn enabling_ttl_is_an_in_place_change() {
+		let before = build_json(DynamoTableBlock::new("analytics"));
+		let after =
+			build_json(DynamoTableBlock::new("analytics").with_ttl("ttl"));
+		before
+			.as_str()
+			.xnot()
+			.xpect_contains("ttl")
+			.xpect_contains("PAY_PER_REQUEST");
+		after.as_str().xpect_contains(
+			r#""ttl":[{"attribute_name":"ttl","enabled":true}]"#,
+		);
+		// everything else is byte-identical: removing the ttl block from the
+		// rendered json gives back exactly the config that is already deployed
+		after
+			.replace(r#","ttl":[{"attribute_name":"ttl","enabled":true}]"#, "")
+			.xpect_eq(before);
+	}
+
+	/// The block emits an `aws_dynamodb_table` with a stage-prefixed name, an `id`
+	/// string hash key, and pay-per-request billing.
+	#[beet_core::test]
+	fn emits_dynamodb_table() {
+		build_json(DynamoTableBlock::new("analytics"))
 			.as_str()
 			.xpect_contains("aws_dynamodb_table")
 			.xpect_contains("PAY_PER_REQUEST")

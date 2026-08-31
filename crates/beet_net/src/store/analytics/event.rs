@@ -10,7 +10,18 @@ use serde::Serialize;
 ///
 /// Stored as its own field so it is a cheap filter column (and, in a future SQL
 /// table, a real column) rather than something a query digs out of the JSON data.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+	Debug,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+)]
 pub enum AnalyticsEventKind {
 	/// A routed server request: the raw traffic log, one per request.
 	Request,
@@ -139,7 +150,17 @@ pub struct ClickElement {
 
 /// The coarse kind of client that produced an [`AnalyticsEvent`].
 #[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize,
+	Debug,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
 )]
 pub enum ClientKind {
 	/// A web browser over HTTP.
@@ -181,6 +202,15 @@ pub struct AnalyticsEvent {
 	/// Raw client ip, only populated when [`AnalyticsConfig::store_ip`] is set;
 	/// off by default so the default posture collects no personal data.
 	pub ip: Option<SmolStr>,
+	/// The epoch SECOND this row expires at, stamped at record time from the
+	/// [`AnalyticsRetention`] the recording router resolves.
+	///
+	/// Seconds, not milliseconds, because DynamoDB's TTL reads this attribute as
+	/// a unix second and ignores a row it cannot read as one. Absent when the
+	/// kind is kept forever, and absent from every [`AnalyticsRollup`]: the raws
+	/// expire, the aggregates they were reduced to do not.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub ttl: Option<u64>,
 	/// The variant-specific payload.
 	pub data: AnalyticsEventData,
 }
@@ -198,8 +228,23 @@ impl AnalyticsEvent {
 			path: path.into(),
 			country: None,
 			ip: None,
+			ttl: None,
 			data,
 		}
+	}
+
+	/// The UTC day this event was recorded on, `YYYY-MM-DD`: the key its
+	/// aggregate row and its archive object are both named by.
+	pub fn date(&self) -> SmolStr {
+		time_ext::format_date(Duration::from_millis(self.timestamp)).into()
+	}
+
+	/// Stamp the expiry `retention` gives this event's kind, from the server
+	/// time it was recorded at.
+	pub fn with_retention(mut self, retention: &AnalyticsRetention) -> Self {
+		self.ttl = retention
+			.expires_at(self.event_kind, Duration::from_millis(self.timestamp));
+		self
 	}
 
 	/// Builder-style setter for the client kind.

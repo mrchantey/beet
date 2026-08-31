@@ -39,6 +39,9 @@ impl Plugin for InfraExamplesPlugin {
 			// `<DynamoTableBlock/>`), registered upstream.
 			.register_template::<LightsailBeetSiteBlock>()
 			.register_template::<LambdaSiteBlock>()
+			// the invoke-only counterpart, the target a `<ScheduledJobBlock/>`
+			// drives on a timer.
+			.register_template::<LambdaJobBlock>()
 			.register_template::<LambdaWatch>()
 			.register_template::<LightsailSiteBlock>()
 			.register_template::<LightsailWatch>()

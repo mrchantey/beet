@@ -39,6 +39,29 @@ adoption: a declaration outside every `<Stack>` still resolves its runtime name,
 but no deploy provisions it, which is a structural answer to "which stack owns
 this?" rather than one inferred from the process stage.
 
+## Analytics, and what outlives it
+
+Raw per-event detail stops being useful after weeks; the aggregate trend is what
+the site records analytics FOR and must never be lost. Retention is therefore
+three things and **the order is the point**: a day's raw events are archived cold
+into the runtime-ops bucket (`analytics/raw/<date>.ndjson.gz`), rolled up into
+daily `analytics-rollup` aggregates that persist forever, and only then given the
+`ttl` DynamoDB expires them by. No row is ever stamped before both the archive
+object and the aggregate are confirmed present, so deletion from the table is a
+cost decision rather than information loss — the whole history is a few megabytes
+compressed.
+
+`<Route path="jobs">` hosts that job and the deployed `rollup` lambda is the only
+thing that boots it: the schedule invokes the function, the function's `bootstrap`
+loads THIS document out of the app bucket and dispatches `rollup` into the `jobs`
+router. The function publishes no url, no gateway and no hostname, so a sweep
+that rewrites every row in the table is reachable by nothing but its timer, and
+the site's own router is a different url space entirely.
+
+    beet --main=site jobs                        # the job host, over http
+    beet analytics summary                       # aggregates + the recent raws
+    beet analytics summary --remote --bucket beet-site--prod--analytics
+
 ## The served site
 
 `<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>` is the serve route
@@ -132,14 +155,37 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<AssetsDir src="assets" cache="1h"/>
 		</Router>
 	</Route>
+	<!-- the nightly job host: its own url space and its own process. The rollup
+	     lambda is the only thing that ever boots this verb, so a table sweep is
+	     unreachable from the served site even though both live in this file. -->
+	<Route path="jobs" {HttpServer}>
+		<Router>
+			<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($rollup), ArchiveStoreRef($runtime_ops))}/>
+		</Router>
+	</Route>
 	<!-- the stage stack: every resource the running site needs, the verbs that
 	     provision them, and the one `RequireFeatures` guarding the whole subtree -->
 	<Stack {RequireFeatures(["infra","extra"])}>
-		<!-- declared once: the deploy creates it, the runtime records to it -->
-		<DynamoTableBlock bx:ref="analytics" label="analytics"/>
+		<!-- declared once: the deploy creates it, the runtime records to it. `ttl`
+		     is the attribute the nightly job stamps, and it stamps nothing until
+		     that day's cold archive and daily aggregate both exist. -->
+		<DynamoTableBlock bx:ref="analytics" label="analytics" ttl="ttl"/>
+		<!-- what the raws reduce to. Its own table because mixing row shapes would
+		     make every event scan warn-skip the aggregates, and because expiry is
+		     a property of the events table alone: these rows are forever. -->
+		<DynamoTableBlock bx:ref="rollup" label="analytics-rollup"/>
 		<S3BucketBlock label="app" deploy_versioned=false/>
+		<!-- durable data born at RUNTIME, the inverse of the app bucket by
+		     lifecycle and by grant: never touched by a deploy sync (which would
+		     prune it), and the only bucket the running process may write. -->
+		<S3BucketBlock bx:ref="runtime_ops" label="runtime-ops" deploy_versioned=false runtime_write=true object_versioning=true/>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
+		<!-- the box is destroyed and recreated by every deploy, so it can own no
+		     durable timer: the rollup runs as an invoke-only lambda the schedule
+		     calls at 03:00 UTC, booting the `jobs` verb of this same document. -->
+		<LambdaJobBlock label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
+		<ScheduledJobBlock label="rollup-daily" target="rollup" schedule="cron(0 3 * * ? *)" path="rollup"/>
 		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<TofuApply layer="storage"/>

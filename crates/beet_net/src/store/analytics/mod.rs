@@ -20,10 +20,23 @@ mod event;
 pub use event::*;
 mod geoip;
 pub use geoip::*;
+mod retention;
+pub use retention::*;
+mod rollup;
+pub use rollup::*;
 mod summary;
 pub use summary::*;
 pub mod analytics_ext;
-// the store persistence rides the json `TableStore` surface.
+// the store persistence rides the json `TableStore` surface, and the cold
+// archive rides its ndjson.
+#[cfg(feature = "json")]
+mod archive;
+#[cfg(feature = "json")]
+pub use archive::*;
+#[cfg(feature = "json")]
+mod rollup_job;
+#[cfg(feature = "json")]
+pub use rollup_job::*;
 #[cfg(feature = "json")]
 mod store;
 #[cfg(feature = "json")]
@@ -47,7 +60,16 @@ pub use store::*;
 #[cfg(feature = "json")]
 pub fn analytics_plugin(app: &mut App) {
 	app.register_type::<AnalyticsConfig>()
+		.register_type::<AnalyticsRetention>()
 		.register_type::<GeoIpDb>()
+		// the nightly job and the two store relations it names its aggregate
+		// table and its archive by, so `<Route path="rollup" {(
+		// AnalyticsRollupJob, RollupStoreRef($rollup))}/>` authors from markup.
+		.register_type::<AnalyticsRollupJob>()
+		.register_type::<RollupStoreRef>()
+		.register_type::<RollupStoreConsumers>()
+		.register_type::<ArchiveStoreRef>()
+		.register_type::<ArchiveStoreConsumers>()
 		.add_observer(GeoIpDb::load_on_add)
 		.add_observer(store::spawn_store_on_config)
 		.add_observer(store::handle_analytics_event);

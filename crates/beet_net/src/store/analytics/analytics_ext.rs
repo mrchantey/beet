@@ -10,6 +10,27 @@ pub const SESSION_COOKIE: &str = "beet_session";
 /// Milliseconds since the unix epoch, cross-platform via [`time_ext`].
 pub fn now_ms() -> u64 { time_ext::now_millis() as u64 }
 
+/// The coarse class of a response status, ie `404` -> `4xx`. What an aggregate
+/// keeps instead of every distinct code: the class is what a daily trend is read
+/// in, and a per-code map on every row forever is a lot of `200`.
+pub fn status_class(status: u16) -> SmolStr {
+	format!("{}xx", (status / 100).clamp(1, 5)).into()
+}
+
+/// Collect a count map into a vec ordered by descending count, ties broken by
+/// key.
+///
+/// The tie-break is what makes an aggregate row a pure function of its day: a
+/// map's iteration order is not, so re-running a rollup would otherwise write a
+/// row that differs from the identical one already stored.
+pub fn sort_desc<K: Ord, V: Ord + Copy>(map: HashMap<K, V>) -> Vec<(K, V)> {
+	let mut counts = map.into_iter().collect::<Vec<_>>();
+	counts.sort_by(|left, right| {
+		right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+	});
+	counts
+}
+
 /// The client ip from request headers: `cf-connecting-ip` when present (set by
 /// a fronting Cloudflare proxy and not client-spoofable, unlike the first
 /// `x-forwarded-for` hop), then a proxy's `x-forwarded-for` (its client-most

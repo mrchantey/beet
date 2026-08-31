@@ -36,24 +36,15 @@ impl AnalyticsStore {
 
 	/// The local analytics store at `dir`, the same store a dev server derives.
 	/// Used by `beet analytics` to query without a scene.
-	pub fn local(dir: AbsPathBuf) -> Self {
-		Self::new(Table::new(BlobStore::new(FsStore::new(dir))))
-	}
+	#[cfg(feature = "fs")]
+	pub fn local(dir: AbsPathBuf) -> Self { Self::new(Table::local(dir)) }
 
 	/// The remote (DynamoDB) analytics store at `table_name`, in whichever region
 	/// the SDK's default provider chain resolves. Used by `beet analytics
 	/// --remote` to query without a scene (there is no declaration to read a
 	/// region off); errors without the `aws_sdk` backend.
 	pub fn remote(table_name: &str) -> Result<Self> {
-		cfg_if! {
-			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				Self::new(Table::new(DynamoStore::new_default_region(table_name)))
-				.xok()
-			} else {
-				let _ = table_name;
-				bevybail!("a remote analytics store requires the `aws_sdk` feature")
-			}
-		}
+		Table::remote(table_name).map(Self::new)
 	}
 
 	/// Record `event`, raising exactly once for a store that will not answer.
@@ -122,22 +113,9 @@ pub(super) fn spawn_store_on_config(
 			);
 		};
 		// the provider hooks insert the TableStore through the command queue,
-		// so give it a settle window before erroring.
-		let mut backoff = Backoff::default().with_max_attempts(5).stream();
-		let table_store = loop {
-			if let Ok(store) = world
-				.entity(target)
-				.get::<TableStore, _>(|store| store.clone())
-				.await
-			{
-				break store;
-			}
-			if backoff.next().await.is_none() {
-				bevybail!(
-					"analytics store entity {target} has no TableStore: insert a store provider component, ie `<FsStore/>`"
-				);
-			}
-		};
+		// so the resolve gives it a settle window before erroring.
+		let table_store =
+			StoreRef::resolve::<TableStore>(&world, target).await?;
 		config_entity
 			.insert(AnalyticsStore::new(table_store.table()))
 			.await?;
@@ -158,19 +136,35 @@ pub(super) fn spawn_store_on_config(
 /// one's traffic to the store that router declared (through its
 /// [`StoreRef`], resolved once by [`spawn_store_on_config`]) and to no
 /// other.
+///
+/// Recording is also where an event's expiry is stamped, from the
+/// [`AnalyticsRetention`] that config resolves by ancestry: the window belongs
+/// to the store being written to, so two routers recording to two stores each
+/// stamp their own.
 pub(super) fn handle_analytics_event(
 	ev: On<AnalyticsEvent>,
-	configs: Query<&AnalyticsStore, With<AnalyticsConfig>>,
+	configs: Query<(Entity, &AnalyticsStore), With<AnalyticsConfig>>,
+	retentions: AncestorQuery<&AnalyticsRetention>,
 	commands: AsyncCommands,
 ) {
-	let stores = configs.iter().cloned().collect::<Vec<_>>();
+	let stores = configs
+		.iter()
+		.map(|(entity, store)| {
+			(
+				store.clone(),
+				retentions.get(entity).copied().unwrap_or_default(),
+			)
+		})
+		.collect::<Vec<_>>();
 	if stores.is_empty() {
 		return;
 	}
 	let event = ev.event().clone();
 	commands.run(async move |_| {
-		for store in stores {
-			store.record(event.clone()).await?;
+		for (store, retention) in stores {
+			store
+				.record(event.clone().with_retention(&retention))
+				.await?;
 		}
 		Ok(())
 	});
@@ -301,6 +295,61 @@ mod test {
 			.path
 			.as_str()
 			.xpect_eq("/about");
+	}
+
+	/// A recorded event carries the expiry its router's [`AnalyticsRetention`]
+	/// gives its kind, resolved by ancestry so one declaration covers the whole
+	/// subtree, and requests expire ahead of the streams a client reports.
+	///
+	/// This is the LAST step of the retention order, never the first: the row is
+	/// archived cold and rolled up into a daily aggregate weeks before the stamp
+	/// here comes due.
+	#[beet_core::test]
+	async fn records_stamp_their_retention() {
+		let mut world = (AsyncPlugin, analytics_plugin).into_world();
+		let store = world.spawn(InMemoryStore::new()).flush();
+		let entry = world
+			.spawn(AnalyticsRetention {
+				requests: Duration::from_secs(10 * 86_400),
+				events: Duration::from_secs(20 * 86_400),
+			})
+			.flush();
+		world
+			.spawn((
+				ChildOf(entry),
+				AnalyticsConfig::default(),
+				StoreRef(store),
+			))
+			.flush();
+		AsyncRunner::settle_async_tasks(&mut world).await;
+
+		for (data, days) in [
+			(
+				AnalyticsEventData::Request {
+					status: 200,
+					method: "GET".into(),
+					user_agent: None,
+					referrer: None,
+				},
+				10,
+			),
+			(AnalyticsEventData::Scroll { max_percent: 50 }, 20),
+		] {
+			let event = AnalyticsEvent::new("/about", data);
+			let (id, recorded) = (event.id, event.timestamp);
+			world.trigger(event);
+			AsyncRunner::settle_async_tasks(&mut world).await;
+			world
+				.entity(store)
+				.get::<TableStore>()
+				.unwrap()
+				.table::<AnalyticsEvent>()
+				.get(id)
+				.await
+				.unwrap()
+				.ttl
+				.xpect_eq(Some(recorded / 1000 + days * 86_400));
+		}
 	}
 
 	/// Everything raised through the collecting handler below. A `static`

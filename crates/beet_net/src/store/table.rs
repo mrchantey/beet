@@ -134,6 +134,33 @@ impl<T: TableStoreRow> Table<T> {
 	#[cfg(feature = "json")]
 	pub fn temp() -> Self { TableStore::temp().table() }
 
+	/// The table backed by the local directory `dir`, the same store a dev
+	/// server derives for a declaration resolving
+	/// [`ServiceAccess::Local`](beet_core::prelude::ServiceAccess). For a tool
+	/// querying a store without a scene to resolve the declaration through.
+	#[cfg(all(feature = "json", feature = "fs"))]
+	pub fn local(dir: AbsPathBuf) -> Self {
+		Self::new(BlobStore::new(FsStore::new(dir)))
+	}
+
+	/// The remote (DynamoDB) table named `table_name`, in whichever region the
+	/// SDK's default provider chain resolves.
+	///
+	/// The region is the process environment's because there is no declaration
+	/// here to read one off; a store resolved through its `<DynamoTableBlock/>`
+	/// is handed the region that block resolved. Errors without the `aws_sdk`
+	/// backend.
+	pub fn remote(table_name: &str) -> Result<Self> {
+		cfg_if! {
+			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+				Self::new(DynamoStore::new_default_region(table_name)).xok()
+			} else {
+				let _ = table_name;
+				bevybail!("a remote table requires the `aws_sdk` feature")
+			}
+		}
+	}
+
 	/// Create store (may take 10+ seconds for cloud providers).
 	///
 	/// # Errors
@@ -264,12 +291,7 @@ impl<T: TableStoreRow> Table<T> {
 	/// (us-west-2)`. The one thing an operator needs from a store that will not
 	/// answer, so it belongs in any error naming this table.
 	pub fn describe(&self) -> String {
-		let id = BlobStoreProvider::id(self.provider.as_ref());
-		let root = BlobStoreProvider::root_key(self.provider.as_ref());
-		match self.region() {
-			Some(region) => format!("{id}:{root} ({region})"),
-			None => format!("{id}:{root}"),
-		}
+		BlobStoreProvider::describe(self.provider.as_ref())
 	}
 }
 
