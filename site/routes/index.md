@@ -24,3 +24,7 @@ title = "Beet"
 <br/>
 
 Beet is a malleable engine built on interoperable standards, with apps driven by json scene files that users own and edit. Beet operates at the application layer of the sovereign stack, complementing DWeb and local-first technologies with standardized malleable software.
+
+Beet is also advocating for the standardization of a [scene format](/docs/scene-format) for describing tools as data, and published so any engine can implement it.
+
+Pete's [Local-First Conf '26 talk](https://youtu.be/eRpMQhOR93U) demonstrates a static site, web app, TUI, server, robot, infra deploy and agent harness all running on a single beet binary, driven entirely by scenes.

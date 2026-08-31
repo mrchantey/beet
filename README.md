@@ -24,38 +24,6 @@ Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component Sy
 >
 > Beet is under construction, if this project is of interest please come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
 
-## Example - Embodied Agents
-
-Beet is a natural fit for distributed systems like embodied agents with a perceive-act loop. A perceive-act agent is made of three apps: a server for the resources, a smartphone for the head and an ESP32 for the body. The server is an agent whose routes are the capabilities, forwarding over the socket to whichever socket client serves them.
-
-```jsx
-<SocketServer {CapabilityServer}>
-<Router>
-	<!-- routable by interpret-photo, not offered to the model -->
-	<TakePhoto/>
-	<RepeatWhileFunctionCallOutput {RunThread}>
-		<Thread {Sequence}>
-			<CreateActor name="System" kind="System">
-				<CreatePost text='
-You are a small, curious and very emotional floor robot exploring a room.
-You perceive the world one photo at a time and act on what you see.
-...
-'/>
-			</CreateActor>
-			<CreateActor name="Robot" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-				<InterpretPhoto/>
-				<SpeakText/>
-				<SetEmotion/>
-				<ApplyHeading/>
-			</CreateActor>
-		</Thread>
-	</RepeatWhileFunctionCallOutput>
-</Router>
-</SocketServer>
-```
-
-The head is a web page whose tab serves `take-photo` (webcam), `speak-text` (speech synthesis) and `set-emotion` (the face on screen). The body is an ESP32 serving `apply-heading`, steering in the chosen direction. The full example, including mocked and 3d-rendered stages for running without hardware, lives at [examples/perceive_act](examples/perceive_act).
-
 ## Crates
 
 The beet project closely resembles the bevy project with modules divided into crates which can be selected via feature flags.
@@ -138,7 +106,6 @@ Every example documents itself with a `beet` command, eg:
 
 ```sh
 beet --main=examples/hello
-beet --main=examples/perceive_act/main-v1.bsx
 ```
 
 `--features` verifies the installed binary was compiled with those cargo features, and entries declare their own requirements with `<CrateCheck>`, so a leaner install fails fast with the full missing list instead of unresolved tags.

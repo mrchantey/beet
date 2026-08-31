@@ -9,7 +9,11 @@ Beet is an engine for the act of creation. A student learning to code, a company
 
 ## The name
 
-Beet is short for Beetmash, a mispronunciation of Beat Match: an homage to [Scratch](https://scratch.mit.edu), continuing the DJ theme.
+Beet is short for Beetmash, a mispronunciation of Beat Match which nods to [MIT Scratch](https://scratch.mit.edu) continuing the DJ theme.
+
+## Beet and beetmash
+
+Beet is the open source engine and standards and [Beetmash](https://beetmash.com) is the consulting company built on top helping organizations toward tech sovereignty. Beetmash is to Beet roughly what BlueSky is to ATProto.
 
 ## The lineage
 
@@ -28,6 +32,8 @@ Malleable software, learning through making, and simulation as a medium all have
 
 ### Malleable software
 
+The direct lineage, software as a medium people reshape rather than consume.
+
 - 1967 - Marshall McLuhan - The Medium Is The Massage
 	- [youtube](https://youtu.be/cFwVCHkL-JU)
 	- [pdf](https://designopendata.wordpress.com/wp-content/uploads/2014/05/themediumisthemassage_marshallmcluhan_quentinfiore.pdf)
@@ -39,11 +45,15 @@ Malleable software, learning through making, and simulation as a medium all have
 
 ### Education
 
+Papert pioneered the higher level ideas behind malleability, that we come to understand the world by making things in it, and these pieces carry that thread into modern STEM practice.
+
 - [Summary - Mindstorms](https://medium.com/bits-and-behavior/mindstorms-what-did-papert-argue-and-what-does-it-mean-for-learning-and-education-c8324b58aca4)
 - [Article - STEM beyond robotics](https://www.theeducatoronline.com/k12/news/stem-education-must-go-beyond-focus-on-robotics-and-coding/284841)
 - [Research - Promoting engagement in STEM Australia](https://research.acer.edu.au/cgi/viewcontent.cgi?article=1285&context=research_conference)
 
 ### Simulation
+
+Simulation as a medium for understanding, the kind of tool beet wants to make easy to build and share.
 
 - [The Washington Post - Social Distancing Sim](https://www.washingtonpost.com/graphics/2020/world/corona-simulator/)
 - [Parable of the Polygons](https://ncase.me/polygons/)

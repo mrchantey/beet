@@ -58,7 +58,7 @@ The voice is playful, folk, warm, humble, peer and movement, all six sliders at 
 
 ## Words
 
-- Owned: malleable, engine, scene, tool, scene, standard, interoperable, sovereign, locked open, harvest, ecosystem.
+- Owned: malleable, engine, scene, tool, standard, interoperable, sovereign, locked open, harvest, ecosystem.
 - An app is a single binary, which happens to be composed entirely of malleable scenes. The thing a user creates and edits with beet is a scene. A tool is a scene containing definitions for actions to perform on data
 - Reserved for beetmash: mash, remix, DJ and breaking red-tape language.
 - Banned: platform and framework as self-description, revolutionize, blazingly, superlatives and hype generally.
@@ -70,6 +70,14 @@ Analogies come from lived experience and are lightly indicated, never worked to 
 ## Process
 
 Headline copy, ie the hero text, taglines and page-opening sentences, is written by Pete. Agents supply the points a heading should cover and edit for consistency afterwards, they do not draft headline copy.
+
+## Page roles
+
+Each entrypoint has one job and its own register: 
+- `site/routes/index.md` The home page is the poster, the broadest audience and the fewest words, hero plus invitation plus proof. 
+- `site/routes/docs/index.md` The docs index is the orientation, where a curious builder forms the mental model. 
+- `site/routes/docs/about.md` The about page is the story, lineage, name and the beetmash relationship. 
+- `README.md` The README is the workshop door, developer-facing install and run with a link back to the site for the vision.
 
 ## Palette
 
@@ -90,7 +98,3 @@ The neutral key is split per mode, each scheme builds its surface roles from its
 ## Typography
 
 Inter everywhere, with system fallbacks and mono reserved for code. Structural weights run heavy, 700 to 900. The wordmark is weight 900, tightly tracked and set in brand green, and eyebrow labels are small, bold, uppercase and wide tracked.
-
-## Beet and beetmash
-
-Beet is the open source engine and standards, at home at beet.org. Beetmash is the tech sovereignty consultantion company built on top, beet is to beetmash roughly what Automerge is to Ink & Switch. We state that plainly because this audience has watched open source turn into a funnel before, and naming the relationship once is the inoculation. The name beetmash is a mispronunciation of Beat Match, an homage to MIT Scratch that continues the DJ theme.
