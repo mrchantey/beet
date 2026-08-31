@@ -47,19 +47,37 @@ pub(crate) fn token_map() -> CssTokenMap {
 	  .insert(Tertiary99)
 	  .insert(Tertiary100)
 
-	  .insert(Neutral0)
-	  .insert(Neutral10)
-	  .insert(Neutral20)
-	  .insert(Neutral30)
-	  .insert(Neutral40)
-	  .insert(Neutral50)
-	  .insert(Neutral60)
-	  .insert(Neutral70)
-	  .insert(Neutral80)
-	  .insert(Neutral90)
-	  .insert(Neutral95)
-	  .insert(Neutral99)
-	  .insert(Neutral100)
+		.insert(NeutralLight0)
+		.insert(NeutralLight8)
+		.insert(NeutralLight10)
+		.insert(NeutralLight20)
+		.insert(NeutralLight30)
+		.insert(NeutralLight40)
+		.insert(NeutralLight50)
+		.insert(NeutralLight60)
+		.insert(NeutralLight70)
+		.insert(NeutralLight80)
+		.insert(NeutralLight90)
+		.insert(NeutralLight94)
+		.insert(NeutralLight95)
+		.insert(NeutralLight99)
+		.insert(NeutralLight100)
+
+		.insert(NeutralDark0)
+		.insert(NeutralDark8)
+		.insert(NeutralDark10)
+		.insert(NeutralDark20)
+		.insert(NeutralDark30)
+		.insert(NeutralDark40)
+		.insert(NeutralDark50)
+		.insert(NeutralDark60)
+		.insert(NeutralDark70)
+		.insert(NeutralDark80)
+		.insert(NeutralDark90)
+		.insert(NeutralDark94)
+		.insert(NeutralDark95)
+		.insert(NeutralDark99)
+		.insert(NeutralDark100)
 
 		.insert(NeutralVariant0)
 		.insert(NeutralVariant10)
@@ -142,21 +160,41 @@ css_variable!(Tertiary95,  Color);
 css_variable!(Tertiary99,  Color);
 css_variable!(Tertiary100, Color);
 
-// ── Neutral ───────────────────────────────────────────────────────────────────
+// ── Neutral, light ───────────────────────────────────────────────────────────
 
-css_variable!(Neutral0,   Color);
-css_variable!(Neutral10,  Color);
-css_variable!(Neutral20,  Color);
-css_variable!(Neutral30,  Color);
-css_variable!(Neutral40,  Color);
-css_variable!(Neutral50,  Color);
-css_variable!(Neutral60,  Color);
-css_variable!(Neutral70,  Color);
-css_variable!(Neutral80,  Color);
-css_variable!(Neutral90,  Color);
-css_variable!(Neutral95,  Color);
-css_variable!(Neutral99,  Color);
-css_variable!(Neutral100, Color);
+css_variable!(NeutralLight0,   Color);
+css_variable!(NeutralLight8,   Color);
+css_variable!(NeutralLight10,  Color);
+css_variable!(NeutralLight20,  Color);
+css_variable!(NeutralLight30,  Color);
+css_variable!(NeutralLight40,  Color);
+css_variable!(NeutralLight50,  Color);
+css_variable!(NeutralLight60,  Color);
+css_variable!(NeutralLight70,  Color);
+css_variable!(NeutralLight80,  Color);
+css_variable!(NeutralLight90,  Color);
+css_variable!(NeutralLight94,  Color);
+css_variable!(NeutralLight95,  Color);
+css_variable!(NeutralLight99,  Color);
+css_variable!(NeutralLight100, Color);
+
+// ── Neutral, dark ────────────────────────────────────────────────────────────
+
+css_variable!(NeutralDark0,   Color);
+css_variable!(NeutralDark8,   Color);
+css_variable!(NeutralDark10,  Color);
+css_variable!(NeutralDark20,  Color);
+css_variable!(NeutralDark30,  Color);
+css_variable!(NeutralDark40,  Color);
+css_variable!(NeutralDark50,  Color);
+css_variable!(NeutralDark60,  Color);
+css_variable!(NeutralDark70,  Color);
+css_variable!(NeutralDark80,  Color);
+css_variable!(NeutralDark90,  Color);
+css_variable!(NeutralDark94,  Color);
+css_variable!(NeutralDark95,  Color);
+css_variable!(NeutralDark99,  Color);
+css_variable!(NeutralDark100, Color);
 
 // ── NeutralVariant ────────────────────────────────────────────────────────────
 

@@ -78,10 +78,10 @@ Light mode is print, the cream and ink of a zine handout, and dark mode is termi
 | Key | Hex | Notes |
 | --- | --- | --- |
 | Primary | `#006c4f` | Brand green, primary in both modes |
-| Secondary | `#f028a8` | Hot pink, hue 346°, so light tone 40 lands raspberry `#b4067b` rather than purple |
+| Secondary | `#f028a8` | Hot pink, hue 346°, so light tone 40 lands raspberry `#b5007c` rather than purple |
 | Tertiary | `#ea8a0c` | Harvest amber |
 | Neutral, light | `#f4eede` | Handout cream, seeds light surfaces near tone 94 |
-| Neutral, dark | `#14211d` | Handout ink, hue 173°, seeds green-cast dark surfaces near tone 8 (`#0c1a16`) |
+| Neutral, dark | `#14211d` | Handout ink, hue 173°, seeds green-cast dark surfaces near tone 8 (`#0d1a16`) |
 | Neutral variant | `#6a7772` | Handout muted |
 | Error | `#de3730` | Hue 35°, kept well clear of secondary pink |
 

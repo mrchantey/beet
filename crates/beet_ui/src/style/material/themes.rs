@@ -2,8 +2,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use material_colors::color::Argb;
-use material_colors::theme::Palettes;
-use material_colors::theme::ThemeBuilder;
+use material_colors::palette::CorePalette;
+use material_colors::palette::TonalPalette;
 use crate::style::material::colors;
 use crate::style::material::tones;
 use crate::style::material::classes;
@@ -42,26 +42,26 @@ pub(crate) fn light_scheme() -> Rule {
 		.with_token(colors::OnError, tones::Error100).unwrap()
 		.with_token(colors::ErrorContainer, tones::Error90).unwrap()
 		.with_token(colors::OnErrorContainer, tones::Error10).unwrap()
-		.with_token(colors::Background, tones::Neutral99).unwrap()
-		.with_token(colors::OnBackground, tones::Neutral10).unwrap()
-		.with_token(colors::Surface, tones::Neutral99).unwrap()
-		.with_token(colors::SurfaceDim, tones::Neutral90).unwrap()
-		.with_token(colors::SurfaceBright, tones::Neutral99).unwrap()
+		.with_token(colors::Background, tones::NeutralLight94).unwrap()
+		.with_token(colors::OnBackground, tones::NeutralLight10).unwrap()
+		.with_token(colors::Surface, tones::NeutralLight94).unwrap()
+		.with_token(colors::SurfaceDim, tones::NeutralLight90).unwrap()
+		.with_token(colors::SurfaceBright, tones::NeutralLight99).unwrap()
 		.with_token(colors::SurfaceTint, tones::Primary40).unwrap()
-		.with_token(colors::SurfaceContainerLowest, tones::Neutral100).unwrap()
-		.with_token(colors::SurfaceContainerLow, tones::Neutral95).unwrap()
-		.with_token(colors::SurfaceContainer, tones::Neutral95).unwrap()
-		.with_token(colors::SurfaceContainerHigh, tones::Neutral90).unwrap()
-		.with_token(colors::SurfaceContainerHighest, tones::Neutral90).unwrap()
-		.with_token(colors::OnSurface, tones::Neutral10).unwrap()
+		.with_token(colors::SurfaceContainerLowest, tones::NeutralLight100).unwrap()
+		.with_token(colors::SurfaceContainerLow, tones::NeutralLight95).unwrap()
+		.with_token(colors::SurfaceContainer, tones::NeutralLight95).unwrap()
+		.with_token(colors::SurfaceContainerHigh, tones::NeutralLight90).unwrap()
+		.with_token(colors::SurfaceContainerHighest, tones::NeutralLight90).unwrap()
+		.with_token(colors::OnSurface, tones::NeutralLight10).unwrap()
 		.with_token(colors::SurfaceVariant, tones::NeutralVariant90).unwrap()
 		.with_token(colors::OnSurfaceVariant, tones::NeutralVariant30).unwrap()
 		.with_token(colors::Outline, tones::NeutralVariant50).unwrap()
 		.with_token(colors::OutlineVariant, tones::NeutralVariant80).unwrap()
-		.with_token(colors::Shadow, tones::Neutral0).unwrap()
-		.with_token(colors::Scrim, tones::Neutral0).unwrap()
-		.with_token(colors::InverseSurface, tones::Neutral20).unwrap()
-		.with_token(colors::InverseOnSurface, tones::Neutral95).unwrap()
+		.with_token(colors::Shadow, tones::NeutralLight0).unwrap()
+		.with_token(colors::Scrim, tones::NeutralLight0).unwrap()
+		.with_token(colors::InverseSurface, tones::NeutralDark20).unwrap()
+		.with_token(colors::InverseOnSurface, tones::NeutralDark95).unwrap()
 }
 
 /// Returns a [`Rule`] mapping semantic color tokens to their dark-scheme tones.
@@ -85,35 +85,55 @@ pub(crate) fn dark_scheme() -> Rule {
 		.with_token(colors::OnError, tones::Error20).unwrap()
 		.with_token(colors::ErrorContainer, tones::Error30).unwrap()
 		.with_token(colors::OnErrorContainer, tones::Error80).unwrap()
-		.with_token(colors::Background, tones::Neutral10).unwrap()
-		.with_token(colors::OnBackground, tones::Neutral90).unwrap()
-		.with_token(colors::Surface, tones::Neutral10).unwrap()
-		.with_token(colors::SurfaceDim, tones::Neutral0).unwrap()
-		.with_token(colors::SurfaceBright, tones::Neutral30).unwrap()
+		.with_token(colors::Background, tones::NeutralDark8).unwrap()
+		.with_token(colors::OnBackground, tones::NeutralDark90).unwrap()
+		.with_token(colors::Surface, tones::NeutralDark8).unwrap()
+		.with_token(colors::SurfaceDim, tones::NeutralDark0).unwrap()
+		.with_token(colors::SurfaceBright, tones::NeutralDark30).unwrap()
 		.with_token(colors::SurfaceTint, tones::Primary80).unwrap()
-		.with_token(colors::SurfaceContainerLowest, tones::Neutral0).unwrap()
-		.with_token(colors::SurfaceContainerLow, tones::Neutral10).unwrap()
-		.with_token(colors::SurfaceContainer, tones::Neutral20).unwrap()
-		.with_token(colors::SurfaceContainerHigh, tones::Neutral20).unwrap()
-		.with_token(colors::SurfaceContainerHighest, tones::Neutral30).unwrap()
-		.with_token(colors::OnSurface, tones::Neutral90).unwrap()
+		.with_token(colors::SurfaceContainerLowest, tones::NeutralDark0).unwrap()
+		.with_token(colors::SurfaceContainerLow, tones::NeutralDark10).unwrap()
+		.with_token(colors::SurfaceContainer, tones::NeutralDark20).unwrap()
+		.with_token(colors::SurfaceContainerHigh, tones::NeutralDark20).unwrap()
+		.with_token(colors::SurfaceContainerHighest, tones::NeutralDark30).unwrap()
+		.with_token(colors::OnSurface, tones::NeutralDark90).unwrap()
 		.with_token(colors::SurfaceVariant, tones::NeutralVariant30).unwrap()
 		.with_token(colors::OnSurfaceVariant, tones::NeutralVariant80).unwrap()
 		.with_token(colors::Outline, tones::NeutralVariant60).unwrap()
 		.with_token(colors::OutlineVariant, tones::NeutralVariant30).unwrap()
-		.with_token(colors::Shadow, tones::Neutral0).unwrap()
-		.with_token(colors::Scrim, tones::Neutral0).unwrap()
-		.with_token(colors::InverseSurface, tones::Neutral90).unwrap()
-		.with_token(colors::InverseOnSurface, tones::Neutral20).unwrap()
+		.with_token(colors::Shadow, tones::NeutralDark0).unwrap()
+		.with_token(colors::Scrim, tones::NeutralDark0).unwrap()
+		.with_token(colors::InverseSurface, tones::NeutralLight90).unwrap()
+		.with_token(colors::InverseOnSurface, tones::NeutralLight20).unwrap()
 }
 
-/// Returns color values for every palette tone generated from a seed color.
-pub(crate) fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)> {
-	let theme = ThemeBuilder::with_source(color.into().to_argb()).build();
-	let Palettes { primary, secondary, tertiary, neutral, neutral_variant: nv, error } = theme.palettes;
+/// Returns color values for every palette tone in a [`Theme`].
+///
+/// Each key colour holds its own hue and chroma across its ramp, and an unset key
+/// falls back to the seed-derived [`CorePalette`], so a bare `<Theme color=../>`
+/// still generates exactly the Material palette the seed always produced. The
+/// neutral key is split per mode: [`Theme::neutral_light`] seeds the light
+/// scheme's surfaces and the dark scheme's inverse surfaces, and
+/// [`Theme::neutral_dark`] seeds the reverse.
+pub(crate) fn from_theme(theme: &Theme) -> Vec<(TokenKey, TokenValue)> {
+	let core = CorePalette::of(theme.color.to_argb());
+	// a key colour holds its own hue and chroma, rather than being pushed through
+	// a Material variant, so a low-chroma key (the cream, the green-cast ink)
+	// keeps the cast it was picked for.
+	let key = |color: Option<Color>, seeded: TonalPalette| match color {
+		Some(color) => TonalPalette::from_hct(color.to_argb().into()),
+		None => seeded,
+	};
+	let primary = key(theme.primary, core.primary);
+	let secondary = key(theme.secondary, core.secondary);
+	let tertiary = key(theme.tertiary, core.tertiary);
+	let neutral_light = key(theme.neutral_light, core.neutral);
+	let neutral_dark = key(theme.neutral_dark, core.neutral);
+	let nv = key(theme.neutral_variant, core.neutral_variant);
+	let error = key(theme.error, core.error);
 
 	Rule::new()
-		// ── Primary tones ──────────────────────────────────────────────────────────
+		// ── Primary tones ─────────────────────────────────────────────────────────────
 		.with_value(tones::Primary0,Color::from_argb(primary.tone(0)))
 		.with_value(tones::Primary10,Color::from_argb(primary.tone(10)))
 		.with_value(tones::Primary20,Color::from_argb(primary.tone(20)))
@@ -127,7 +147,7 @@ pub(crate) fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)>
 		.with_value(tones::Primary95,Color::from_argb(primary.tone(95)))
 		.with_value(tones::Primary99,Color::from_argb(primary.tone(99)))
 		.with_value(tones::Primary100,Color::from_argb(primary.tone(100)))
-		// ── Secondary tones ───────────────────────────────────────────
+		// ── Secondary tones ───────────────────────────────────────────────────────────
 		.with_value(tones::Secondary0,Color::from_argb(secondary.tone(0)))
 		.with_value(tones::Secondary10,Color::from_argb(secondary.tone(10)))
 		.with_value(tones::Secondary20,Color::from_argb(secondary.tone(20)))
@@ -141,7 +161,7 @@ pub(crate) fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)>
 		.with_value(tones::Secondary95,Color::from_argb(secondary.tone(95)))
 		.with_value(tones::Secondary99,Color::from_argb(secondary.tone(99)))
 		.with_value(tones::Secondary100,Color::from_argb(secondary.tone(100)))
-		// ── Tertiary tones ────────────────────────────────────────────
+		// ── Tertiary tones ────────────────────────────────────────────────────────────
 		.with_value(tones::Tertiary0,Color::from_argb(tertiary.tone(0)))
 		.with_value(tones::Tertiary10,Color::from_argb(tertiary.tone(10)))
 		.with_value(tones::Tertiary20,Color::from_argb(tertiary.tone(20)))
@@ -155,21 +175,39 @@ pub(crate) fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)>
 		.with_value(tones::Tertiary95,Color::from_argb(tertiary.tone(95)))
 		.with_value(tones::Tertiary99,Color::from_argb(tertiary.tone(99)))
 		.with_value(tones::Tertiary100,Color::from_argb(tertiary.tone(100)))
-		// ── Neutral tones ───────────────────────────────────────────────
-		.with_value(tones::Neutral0,Color::from_argb(neutral.tone(0)))
-		.with_value(tones::Neutral10,Color::from_argb(neutral.tone(10)))
-		.with_value(tones::Neutral20,Color::from_argb(neutral.tone(20)))
-		.with_value(tones::Neutral30,Color::from_argb(neutral.tone(30)))
-		.with_value(tones::Neutral40,Color::from_argb(neutral.tone(40)))
-		.with_value(tones::Neutral50,Color::from_argb(neutral.tone(50)))
-		.with_value(tones::Neutral60,Color::from_argb(neutral.tone(60)))
-		.with_value(tones::Neutral70,Color::from_argb(neutral.tone(70)))
-		.with_value(tones::Neutral80,Color::from_argb(neutral.tone(80)))
-		.with_value(tones::Neutral90,Color::from_argb(neutral.tone(90)))
-		.with_value(tones::Neutral95,Color::from_argb(neutral.tone(95)))
-		.with_value(tones::Neutral99,Color::from_argb(neutral.tone(99)))
-		.with_value(tones::Neutral100,Color::from_argb(neutral.tone(100)))
-		// ── NeutralVariant tones ──────────────────────────────────────────
+		// ── Neutral tones, light mode ─────────────────────────────────────────────────
+		.with_value(tones::NeutralLight0,Color::from_argb(neutral_light.tone(0)))
+		.with_value(tones::NeutralLight8,Color::from_argb(neutral_light.tone(8)))
+		.with_value(tones::NeutralLight10,Color::from_argb(neutral_light.tone(10)))
+		.with_value(tones::NeutralLight20,Color::from_argb(neutral_light.tone(20)))
+		.with_value(tones::NeutralLight30,Color::from_argb(neutral_light.tone(30)))
+		.with_value(tones::NeutralLight40,Color::from_argb(neutral_light.tone(40)))
+		.with_value(tones::NeutralLight50,Color::from_argb(neutral_light.tone(50)))
+		.with_value(tones::NeutralLight60,Color::from_argb(neutral_light.tone(60)))
+		.with_value(tones::NeutralLight70,Color::from_argb(neutral_light.tone(70)))
+		.with_value(tones::NeutralLight80,Color::from_argb(neutral_light.tone(80)))
+		.with_value(tones::NeutralLight90,Color::from_argb(neutral_light.tone(90)))
+		.with_value(tones::NeutralLight94,Color::from_argb(neutral_light.tone(94)))
+		.with_value(tones::NeutralLight95,Color::from_argb(neutral_light.tone(95)))
+		.with_value(tones::NeutralLight99,Color::from_argb(neutral_light.tone(99)))
+		.with_value(tones::NeutralLight100,Color::from_argb(neutral_light.tone(100)))
+		// ── Neutral tones, dark mode ──────────────────────────────────────────────────
+		.with_value(tones::NeutralDark0,Color::from_argb(neutral_dark.tone(0)))
+		.with_value(tones::NeutralDark8,Color::from_argb(neutral_dark.tone(8)))
+		.with_value(tones::NeutralDark10,Color::from_argb(neutral_dark.tone(10)))
+		.with_value(tones::NeutralDark20,Color::from_argb(neutral_dark.tone(20)))
+		.with_value(tones::NeutralDark30,Color::from_argb(neutral_dark.tone(30)))
+		.with_value(tones::NeutralDark40,Color::from_argb(neutral_dark.tone(40)))
+		.with_value(tones::NeutralDark50,Color::from_argb(neutral_dark.tone(50)))
+		.with_value(tones::NeutralDark60,Color::from_argb(neutral_dark.tone(60)))
+		.with_value(tones::NeutralDark70,Color::from_argb(neutral_dark.tone(70)))
+		.with_value(tones::NeutralDark80,Color::from_argb(neutral_dark.tone(80)))
+		.with_value(tones::NeutralDark90,Color::from_argb(neutral_dark.tone(90)))
+		.with_value(tones::NeutralDark94,Color::from_argb(neutral_dark.tone(94)))
+		.with_value(tones::NeutralDark95,Color::from_argb(neutral_dark.tone(95)))
+		.with_value(tones::NeutralDark99,Color::from_argb(neutral_dark.tone(99)))
+		.with_value(tones::NeutralDark100,Color::from_argb(neutral_dark.tone(100)))
+		// ── NeutralVariant tones ──────────────────────────────────────────────────────
 		.with_value(tones::NeutralVariant0,Color::from_argb(nv.tone(0)))
 		.with_value(tones::NeutralVariant10,Color::from_argb(nv.tone(10)))
 		.with_value(tones::NeutralVariant20,Color::from_argb(nv.tone(20)))
@@ -183,7 +221,7 @@ pub(crate) fn from_color(color: impl Into<Color>) -> Vec<(TokenKey, TokenValue)>
 		.with_value(tones::NeutralVariant95,Color::from_argb(nv.tone(95)))
 		.with_value(tones::NeutralVariant99,Color::from_argb(nv.tone(99)))
 		.with_value(tones::NeutralVariant100,Color::from_argb(nv.tone(100)))
-		// ── Error tones ───────────────────────────────────────────────
+		// ── Error tones ───────────────────────────────────────────────────────────────
 		.with_value(tones::Error0,Color::from_argb(error.tone(0)))
 		.with_value(tones::Error10,Color::from_argb(error.tone(10)))
 		.with_value(tones::Error20,Color::from_argb(error.tone(20)))

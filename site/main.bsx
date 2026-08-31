@@ -147,7 +147,18 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 	<PackageConfig title="Beet" app_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>
 		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
-			<Theme color={Srgba(Srgba{red:0.0, green:1.0, blue:0.75, alpha:1.0})}/>
+			<!-- the brand palette, one key colour per Material palette. The neutral
+			     is split per mode: light is the handout cream (print), dark is the
+			     green-cast ink (terminal phosphor). See docs/design/beet-branding. -->
+			<Theme
+				color="#006c4f"
+				primary="#006c4f"
+				secondary="#f028a8"
+				tertiary="#ea8a0c"
+				neutral_light="#f4eede"
+				neutral_dark="#14211d"
+				neutral_variant="#6a7772"
+				error="#de3730"/>
 			<TemplateDir src="templates"/>
 			<Styles/>
 			<DefaultAppRoutes/>

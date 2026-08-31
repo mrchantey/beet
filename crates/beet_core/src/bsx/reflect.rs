@@ -348,6 +348,23 @@ fn scalar_to_reflect(
 		return Ok(Box::new(WsPathBuf::new(string.as_str()).into_abs()));
 	}
 
+	// a hex string targeting a `Color` field coerces through `Srgba::hex`, so a
+	// markup `<Theme primary="#006c4f"/>` spells a colour the way every design
+	// tool does rather than as a four-float struct literal. Checked ahead of the
+	// enum branch below because `Color` IS an enum, and a malformed value errors
+	// rather than silently keeping the default.
+	#[cfg(feature = "bevy_color")]
+	if let (Value::Str(string), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<bevy::color::Color>()
+	{
+		let Ok(srgba) = bevy::color::Srgba::hex(string.as_str()) else {
+			bevybail!(
+				"invalid color {string:?}: expected a hex string like \"#006c4f\""
+			);
+		};
+		return Ok(Box::new(bevy::color::Color::Srgba(srgba)));
+	}
+
 	// a string targeting an enum field coerces to that unit variant by name, so a
 	// markup attribute `kind="User"` resolves to `ActorKind::User` (the quoted
 	// twin of the `{Foo{kind:User}}` spread's bare-variant form).
@@ -1132,6 +1149,28 @@ mod test {
 			&mut resolver,
 		)
 		.xpect_err();
+	}
+
+	/// A hex string coerces to a `Color` field, bare or wrapped in an `Option`, so
+	/// a markup `<Theme primary="#006c4f"/>` authors a colour directly. A value
+	/// that is not a colour errors rather than silently keeping the default.
+	#[cfg(feature = "bevy_color")]
+	#[beet_core::test]
+	fn coerces_hex_to_color() {
+		use bevy::color::Color;
+		use bevy::color::Srgba;
+		resolve::<Color>(DataLiteral::Scalar(Value::str("#006c4f")))
+			.xpect_eq(Color::Srgba(Srgba::hex("#006c4f").unwrap()));
+		resolve::<Option<Color>>(DataLiteral::Scalar(Value::str("#f028a8")))
+			.xpect_eq(Some(Color::Srgba(Srgba::hex("#f028a8").unwrap())));
+		DataLiteral::to_reflect(
+			&DataLiteral::Scalar(Value::str("beetroot")),
+			Some(Color::type_info()),
+			&TypeRegistry::default(),
+			&mut |_: &str| Entity::PLACEHOLDER,
+		)
+		.is_err()
+		.xpect_true();
 	}
 
 	/// A string coerces to a `Cow<'static, str>` field, so a tuple literal carrying

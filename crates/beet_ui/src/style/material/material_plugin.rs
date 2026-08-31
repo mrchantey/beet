@@ -3,26 +3,48 @@ use crate::style::material::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-/// The active theme: the brand colour seeding the Material palette plus the
+/// The active theme: the key colours seeding the Material palettes plus the
 /// app-wide [`ColorScheme`] default for non-web targets.
 ///
-/// The colour is the single source of every accent (every tone derives from it
-/// through [`themes::from_color`]). The scheme is the session default a non-html
-/// target (the terminal) falls back to when a request pins none, eg seeded from a
-/// `--color-scheme` CLI argument by the live TUI.
+/// [`Theme::color`] is the seed every unset key derives from, so a bare
+/// `<Theme color=../>` generates a whole palette from one brand colour. A brand
+/// that has picked its own key colours overrides them individually, and the
+/// neutral key is split per mode so a light scheme can be cream while its dark
+/// twin is a green-cast near-black (see [`themes::from_theme`]). The scheme is
+/// the session default a non-html target (the terminal) falls back to when a
+/// request pins none, eg seeded from a `--color-scheme` CLI argument by the live
+/// TUI.
 ///
-/// Declared in markup as `<Theme color=Srgba{..}/>` — the resolver patches the
-/// live resource exactly like `<PackageConfig/>` — or inserted in Rust. A change
-/// re-runs [`rebuild_theme_tones`], rewriting the `:root` tone declarations so
-/// both the web CSS bake and the charcell cascade recolour from the same seed.
+/// Declared in markup as `<Theme color="#006c4f" secondary="#f028a8"/>` — the
+/// resolver patches the live resource exactly like `<PackageConfig/>` — or
+/// inserted in Rust. A change re-runs [`rebuild_theme_tones`], rewriting the
+/// `:root` tone declarations so both the web CSS bake and the charcell cascade
+/// recolour from the same keys.
 ///
 /// Always present once [`MaterialStylePlugin`] is added (it `init_resource`s the
 /// default), so consumers read `Res<Theme>` directly.
 #[derive(Debug, Clone, PartialEq, Resource, Reflect)]
 #[reflect(Resource, Default)]
 pub struct Theme {
-	/// The seed colour the palette tones derive from.
+	/// The seed colour every unset palette key derives from.
 	pub color: Color,
+	/// The key colour of the primary palette, the brand's dominant accent.
+	pub primary: Option<Color>,
+	/// The key colour of the secondary palette, the supporting accent.
+	pub secondary: Option<Color>,
+	/// The key colour of the tertiary palette, the contrasting accent.
+	pub tertiary: Option<Color>,
+	/// The key colour seeding light-scheme surfaces and dark-scheme inverse
+	/// surfaces.
+	pub neutral_light: Option<Color>,
+	/// The key colour seeding dark-scheme surfaces and light-scheme inverse
+	/// surfaces.
+	pub neutral_dark: Option<Color>,
+	/// The key colour of the neutral variant palette, the outlines and the
+	/// medium-emphasis surfaces.
+	pub neutral_variant: Option<Color>,
+	/// The key colour of the error palette.
+	pub error: Option<Color>,
 	/// The app-wide default colour scheme for non-web targets.
 	pub scheme: ColorScheme,
 }
@@ -36,12 +58,19 @@ impl Default for Theme {
 			// tint), conservative on both the web and the terminal. An app picks its
 			// own brand by inserting a seeded `Theme` (or `<Theme color=…/>`).
 			color: palettes::basic::GREEN.into(),
+			primary: None,
+			secondary: None,
+			tertiary: None,
+			neutral_light: None,
+			neutral_dark: None,
+			neutral_variant: None,
+			error: None,
 			scheme: ColorScheme::Dark,
 		}
 	}
 }
 
-/// Installs the Material rule set. The seed colour and scheme are owned by the
+/// Installs the Material rule set. The palette keys and scheme are owned by the
 /// [`Theme`] resource (insert it before adding this plugin to override the
 /// default), the only way to configure them.
 #[derive(Default)]
@@ -69,7 +98,7 @@ impl Plugin for MaterialStylePlugin {
 
 		// Derive the `:root` tones from `Theme` and rewrite them on every change
 		// (insert or a late `<Theme>` patch). Two trigger schedules, one source
-		// of truth (`from_color(Theme.color)`):
+		// of truth (`from_theme(&Theme)`):
 		// - `PostParseTree` before the cascade reads the rule set — recolours the
 		//   charcell render (every terminal render runs this schedule on demand).
 		// - `PreUpdate` — recolours a pure-web build, whose HTML/CSS bake does not
@@ -93,19 +122,19 @@ impl Plugin for MaterialStylePlugin {
 	}
 }
 
-/// Rewrite the `:root` palette tones from the live [`Theme`] seed.
+/// Rewrite the `:root` palette tones from the live [`Theme`] keys.
 ///
-/// [`themes::from_color`] is the only colour-dependent piece of the `:root`
-/// default; this writes its ~85 tone declarations into the default rule, keyed
+/// [`themes::from_theme`] is the only colour-dependent piece of the `:root`
+/// default; this writes its ~95 tone declarations into the default rule, keyed
 /// by token so it overwrites in place (idempotent — the scheme/opacity/
 /// typography keys are untouched). Runs whenever [`Theme`] changes.
 pub(crate) fn rebuild_theme_tones(
 	theme: Res<Theme>,
 	mut rules: ResMut<RuleSet>,
 ) {
-	rules.default_rule_mut().push_declarations(
-		Rule::new().with_extend(themes::from_color(theme.color)),
-	);
+	rules
+		.default_rule_mut()
+		.push_declarations(Rule::new().with_extend(themes::from_theme(&theme)));
 }
 
 pub(crate) fn default_token_map() -> CssTokenMap {
@@ -169,39 +198,131 @@ mod tests {
 			.xpect_eq(palettes::basic::GREEN.into());
 	}
 
+	/// The colour a [`Theme`] derives for one palette tone, the expected value
+	/// every assertion below compares a resolved role against.
+	fn tone(theme: &Theme, key: impl Into<Token>) -> Color {
+		Rule::new()
+			.with_extend(themes::from_theme(theme))
+			.get_typed::<Color>(&key.into())
+			.unwrap()
+	}
+
+	/// A theme seeded by colour alone, the do-nothing shape every host gets.
+	fn seeded(color: Color) -> Theme { Theme { color, ..default() } }
+
 	/// Setting [`Theme::color`] and running [`rebuild_theme_tones`] rewrites the
-	/// `:root` palette tones to exactly `from_color(that color)`, and a different
+	/// `:root` palette tones to exactly `from_theme(that theme)`, and a different
 	/// seed yields different tones.
 	#[beet_core::test]
 	fn theme_recolors_root_tones() {
-		let violet = Color::srgb(0.5, 0.0, 1.0);
+		let violet = seeded(Color::srgb(0.5, 0.0, 1.0));
 		let mut world = MaterialStylePlugin::world();
-		world.insert_resource(Theme {
-			color: violet,
-			..default()
-		});
+		world.insert_resource(violet.clone());
 		world.run_system_cached(rebuild_theme_tones).unwrap();
 
 		world.with_state::<Res<RuleSet>, _>(|rules| {
 			let root = rules.default_rule();
 			// every tone the seed produces is resident in the `:root` default
-			themes::from_color(violet)
+			themes::from_theme(&violet)
 				.iter()
 				.all(|(key, _)| root.contains_key(key))
 				.xpect_true();
 			// a representative tone matches the seed's derived value ...
-			let from_seed = |color| {
-				Rule::new()
-					.with_extend(themes::from_color(color))
-					.get_typed::<Color>(&tones::Primary40.into())
-					.unwrap()
-			};
 			root.get_typed::<Color>(&tones::Primary40.into())
 				.unwrap()
-				.xpect_eq(from_seed(violet));
+				.xpect_eq(tone(&violet, tones::Primary40));
 			// ... and differs from a different seed
-			(from_seed(violet) != from_seed(Color::srgb(1.0, 0.5, 0.0)))
-				.xpect_true();
+			(tone(&violet, tones::Primary40)
+				!= tone(&seeded(Color::srgb(1.0, 0.5, 0.0)), tones::Primary40))
+			.xpect_true();
+		});
+	}
+
+	/// An unset key derives from the seed, so a bare `<Theme color=../>` is
+	/// unchanged by the split palette, and setting a key moves only that palette.
+	#[beet_core::test]
+	fn palette_keys_override_the_seed() {
+		let seed = seeded(Color::srgb(0.0, 1.0, 0.75));
+		let pink = Color::srgb_u8(0xf0, 0x28, 0xa8);
+		let keyed = Theme {
+			secondary: Some(pink),
+			..seed.clone()
+		};
+		// the keyed palette moves off the seed-derived one ...
+		(tone(&keyed, tones::Secondary40) != tone(&seed, tones::Secondary40))
+			.xpect_true();
+		// ... every other palette is untouched, still deriving from the seed.
+		tone(&keyed, tones::Primary40).xpect_eq(tone(&seed, tones::Primary40));
+		tone(&keyed, tones::Error40).xpect_eq(tone(&seed, tones::Error40));
+		// a key holds its own hue, so tone 40 of the pink stays raspberry rather
+		// than sliding purple: red dominates blue dominates green.
+		let raspberry = tone(&keyed, tones::Secondary40).to_srgba();
+		(raspberry.red > raspberry.blue && raspberry.blue > raspberry.green)
+			.xpect_true();
+	}
+
+	/// The neutral key is split per mode: the light ramp is the cream, the dark
+	/// ramp is the green-cast ink, and the inverse-surface roles cross over so an
+	/// inverse surface renders as the other mode's surface.
+	#[beet_core::test]
+	fn split_neutral_ramps_per_mode() {
+		let theme = Theme {
+			neutral_light: Some(Color::srgb_u8(0xf4, 0xee, 0xde)),
+			neutral_dark: Some(Color::srgb_u8(0x14, 0x21, 0x1d)),
+			..seeded(Color::srgb(0.0, 1.0, 0.75))
+		};
+		// the light surface tone is warm (the cream leans red over blue) ...
+		let cream = tone(&theme, tones::NeutralLight94).to_srgba();
+		(cream.red > cream.blue).xpect_true();
+		// ... and the dark one is green-cast (green over red, and dark).
+		let ink = tone(&theme, tones::NeutralDark8).to_srgba();
+		(ink.green > ink.red && ink.green < 0.2).xpect_true();
+		// the two ramps genuinely differ at every shared tone
+		(tone(&theme, tones::NeutralLight50)
+			!= tone(&theme, tones::NeutralDark50))
+		.xpect_true();
+	}
+
+	/// Each scheme's surface roles resolve through its OWN neutral ramp while the
+	/// inverse-surface roles cross over to the other mode's, so a light page is
+	/// cream with an ink inverse and a dark page is ink with a cream inverse.
+	#[beet_core::test]
+	fn schemes_resolve_their_own_neutral_ramp() {
+		let theme = Theme {
+			neutral_light: Some(Color::srgb_u8(0xf4, 0xee, 0xde)),
+			neutral_dark: Some(Color::srgb_u8(0x14, 0x21, 0x1d)),
+			..default()
+		};
+		let mut world = MaterialStylePlugin::world();
+		world.insert_resource(theme.clone());
+		world.run_system_cached(rebuild_theme_tones).unwrap();
+		let light = world
+			.spawn((rsx! { <div/> }, Classes::new([classes::LIGHT_SCHEME])))
+			.id();
+		let dark = world
+			.spawn((rsx! { <div/> }, Classes::new([classes::DARK_SCHEME])))
+			.id();
+
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let memo = &mut default();
+			// each scheme's surface is its own ramp's surface tone ...
+			query
+				.resolve(light, colors::Background, memo)
+				.unwrap()
+				.xpect_eq(tone(&theme, tones::NeutralLight94));
+			query
+				.resolve(dark, colors::Background, memo)
+				.unwrap()
+				.xpect_eq(tone(&theme, tones::NeutralDark8));
+			// ... and each inverse surface crosses over to the other ramp.
+			query
+				.resolve(light, colors::InverseSurface, memo)
+				.unwrap()
+				.xpect_eq(tone(&theme, tones::NeutralDark20));
+			query
+				.resolve(dark, colors::InverseSurface, memo)
+				.unwrap()
+				.xpect_eq(tone(&theme, tones::NeutralLight90));
 		});
 	}
 	#[beet_core::test]
