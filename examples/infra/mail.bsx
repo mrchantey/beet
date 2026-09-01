@@ -76,13 +76,22 @@ reads one back in, asserting the receiving end believes both.
 		     force-destroyable. -->
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 			runtime_write=true object_versioning=true/>
+		<!-- the `archive` profile: cold, append-only, written by the box rather
+		     than by any deploy. The nightly dump under `postgres/` is a copy of a
+		     live database and expires after a season; a prefix holding the only
+		     copy of something would sit beside it and expire never, which is why
+		     the expiry is scoped to a prefix rather than to the bucket. -->
+		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
+			object_versioning=true
+			expire_prefixes={[{prefix:"postgres/", expire_days:180}]}/>
 
 		<!-- the box, which is infrastructure rather than a mail domain: its name,
 		     its reverse record, its certificate and its SMTP banner stay put while
 		     the domains it serves come and go. It holds no state worth keeping, so
 		     any machine-config change simply replaces it. -->
 		<StalwartBlock label="mail" hostname="mail.example.com"
-			blob_bucket="mail-blobs" {(VpcRef($net), DatabaseRef($db))}
+			blob_bucket="mail-blobs" backup_bucket="archive"
+			{(VpcRef($net), DatabaseRef($db))}
 			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
 

@@ -73,6 +73,11 @@ pub struct StalwartBlock {
 	/// which is a deliberate declaration rather than a default: mail metadata
 	/// lives in one database, and a stack that keeps no copy of it should have
 	/// said so.
+	///
+	/// The `archive` bucket in the taxonomy. A dump is a COPY, so the expiry
+	/// belongs to its [`BACKUP_PREFIX`](Self::BACKUP_PREFIX) rather than to the
+	/// bucket: the same archive holds prefixes whose contents are the only copy
+	/// of what is in them and expire never.
 	backup_bucket: SmolStr,
 	/// The zone the box's `A` record is published into. Must be DNS-only: SMTP,
 	/// IMAP and ACME TLS-ALPN-01 all need the origin reached directly, so a
@@ -1781,7 +1786,7 @@ mod tests {
 			.as_str()
 			.xnot()
 			.xpect_contains("stalwart-backup");
-		user_data(&mail_box().with_backup_bucket("mail-backups"))
+		user_data(&mail_box().with_backup_bucket("archive"))
 			.as_str()
 			.xpect_contains("/usr/local/bin/stalwart-backup")
 			.xpect_contains("stalwart-backup.timer")
@@ -1798,13 +1803,13 @@ mod tests {
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
 		let (_, db, _) = siblings();
 		mail_box()
-			.with_backup_bucket("mail-backups")
+			.with_backup_bucket("archive")
 			.backup_script(&stack, &db)
 			.as_str()
 			.xpect_contains("aws ssm get-parameter")
 			.xpect_contains("PGSSLMODE=verify-full")
 			.xpect_contains("PGSSLROOTCERT=system")
-			.xpect_contains(stack.resource_name("mail-backups").as_str());
+			.xpect_contains(stack.resource_name("archive").as_str());
 	}
 
 	/// The dump reaches the database it is a dump OF.
@@ -1821,7 +1826,7 @@ mod tests {
 	fn the_backup_names_the_database_rather_than_a_terraform_reference() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let block = mail_box().with_backup_bucket("mail-backups");
+		let block = mail_box().with_backup_bucket("archive");
 		let (_, db, _) = siblings();
 		// the script leaves the token for the one late substitution
 		block

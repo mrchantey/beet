@@ -23,7 +23,7 @@ use std::io::Write;
 pub struct AnalyticsArchive;
 
 impl AnalyticsArchive {
-	/// The prefix analytics owns in the runtime-ops store. Other durable
+	/// The prefix analytics owns in the archive store. Other durable
 	/// runtime-born data (table exports, generated reports) joins the store
 	/// under its own prefix rather than this one.
 	pub const PREFIX: &'static str = "analytics/raw";

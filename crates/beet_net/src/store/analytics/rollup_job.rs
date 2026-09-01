@@ -303,7 +303,7 @@ struct AnalyticsRollupParams {
 ///   AnalyticsRollupJob,
 ///   StoreRef($analytics),
 ///   RollupStoreRef($rollup),
-///   ArchiveStoreRef($runtime_ops),
+///   ArchiveStoreRef($archive),
 /// )}/>
 /// ```
 ///

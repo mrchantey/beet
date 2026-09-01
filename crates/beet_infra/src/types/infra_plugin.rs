@@ -48,6 +48,7 @@ impl Plugin for InfraPlugin {
 		// carrying their default-on binding features.
 		#[cfg(feature = "bindings_aws_common")]
 		app.register_type::<crate::prelude::S3BucketBlock>()
+			.register_type::<crate::prelude::PrefixExpiry>()
 			.add_systems(
 				DeployRender,
 				(

@@ -555,13 +555,13 @@ mod test {
 			r#"<Fragment>
 				<Route path="jobs" {HttpServer}>
 					<Router>
-						<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($rollup), ArchiveStoreRef($runtime_ops))}/>
+						<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($rollup), ArchiveStoreRef($archive))}/>
 					</Router>
 				</Route>
 				<Stack>
 					<DynamoTableBlock bx:ref="analytics" label="analytics" ttl="ttl"/>
 					<DynamoTableBlock bx:ref="rollup" label="analytics-rollup"/>
-					<S3BucketBlock bx:ref="runtime_ops" label="runtime-ops" deploy_versioned=false runtime_write=true object_versioning=true/>
+					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
@@ -637,7 +637,7 @@ mod test {
 			.unwrap()
 			.label()
 			.as_str()
-			.xpect_eq("runtime-ops");
+			.xpect_eq("archive");
 
 		// ..and the whole stack renders, which is where an unpointed schedule or
 		// an unlowerable grant fails
@@ -656,7 +656,7 @@ mod test {
 			.xpect_contains("aws_scheduler_schedule")
 			.xpect_contains("cron(0 3 * * ? *)")
 			// the archive bucket is writable by the runtime, the app bucket is not
-			.xpect_contains("beet-site--dev--runtime-ops")
+			.xpect_contains("beet-site--dev--archive")
 			.xpect_contains(
 				r#""ttl":[{"attribute_name":"ttl","enabled":true}]"#,
 			)

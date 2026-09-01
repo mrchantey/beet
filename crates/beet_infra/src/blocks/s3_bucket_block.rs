@@ -70,6 +70,12 @@ pub struct S3BucketBlock {
 	/// themselves, so it is `0` by default and a bucket that sets it is saying
 	/// its contents are disposable.
 	expire_days: i64,
+	/// Expiries scoped to a key PREFIX, for a bucket holding datasets whose
+	/// retention differs: an archive bucket keeps a sole-copy export forever
+	/// while expiring nightly database dumps after a season, which
+	/// [`expire_days`](Self::expire_days) (the whole bucket, no filter) cannot
+	/// say. Each entry renders one filtered rule alongside the unfiltered ones.
+	expire_prefixes: Vec<PrefixExpiry>,
 	/// The deploy layer for the bucket and its public-read pair
 	/// ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER) by default):
 	/// the deploy syncs content into the bucket, so it converges before anything
@@ -94,6 +100,7 @@ impl S3BucketBlock {
 			object_versioning: false,
 			expire_noncurrent_days: 90,
 			expire_days: 0,
+			expire_prefixes: Vec::new(),
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
@@ -142,6 +149,85 @@ impl S3BucketBlock {
 		deployment: &Deployment,
 	) -> beet_net::prelude::S3Store {
 		self.store(stack, Some(deployment.deploy_id()))
+	}
+}
+
+/// An expiry scoped to one key prefix of an [`S3BucketBlock`], ie the nightly
+/// database dumps under `postgres/` in an archive bucket whose other prefixes
+/// hold the only copy of what is in them and expire never.
+///
+/// Authored inline on the bucket, ie
+/// `expire_prefixes={[{prefix:"postgres/", expire_days:180}]}`. The prefix is a
+/// writer convention rather than a boundary (a grant is whole-bucket), so this
+/// is where a bucket says which of its conventions are disposable.
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	Get,
+	SetWith,
+	Serialize,
+	Deserialize,
+	Reflect,
+)]
+#[reflect(Default)]
+pub struct PrefixExpiry {
+	/// The literal S3 key prefix the rule filters on, ie `postgres/`. The
+	/// trailing slash is load-bearing: `postgres` also matches `postgres-old/`,
+	/// so a prefix naming a directory should say so.
+	prefix: SmolStr,
+	/// Days an object under [`prefix`](Self::prefix) is kept. Must be positive,
+	/// since a rule expiring in zero days says nothing and AWS rejects it.
+	expire_days: i64,
+}
+
+impl PrefixExpiry {
+	pub fn new(prefix: impl Into<SmolStr>, expire_days: i64) -> Self {
+		Self {
+			prefix: prefix.into(),
+			expire_days,
+		}
+	}
+
+	/// The rule id, ie `expire-postgres`. A function of the prefix rather than
+	/// of the declaration order, so reordering declarations never diffs a
+	/// rendered configuration.
+	pub fn rule_id(&self) -> String {
+		self.prefix
+			.chars()
+			.map(|char| match char.is_ascii_alphanumeric() {
+				true => char,
+				false => '-',
+			})
+			.collect::<String>()
+			.trim_matches('-')
+			.xmap(|prefix| format!("expire-{prefix}"))
+	}
+
+	/// The lifecycle rule this expiry renders as, failing the render on a
+	/// declaration AWS would reject.
+	fn rule(&self) -> Result<serde_json::Value> {
+		if self.prefix.is_empty() {
+			bevybail!(
+				"a prefix expiry declares no prefix; the whole bucket is `expire_days`"
+			);
+		}
+		if self.expire_days <= 0 {
+			bevybail!(
+				"prefix expiry '{}' declares {} days; a prefix that expires nothing is simply not declared",
+				self.prefix,
+				self.expire_days
+			);
+		}
+		json!({
+			"id": self.rule_id(),
+			"status": "Enabled",
+			"filter": { "prefix": self.prefix },
+			"expiration": { "days": self.expire_days },
+		})
+		.xok()
 	}
 }
 
@@ -231,37 +317,57 @@ impl S3BucketBlock {
 		if self.object_versioning {
 			self.emit_versioning(stack, config, &bucket)?;
 		}
+		self.emit_lifecycle(stack, config, &bucket)?;
 		Ok(())
 	}
 }
 
 impl S3BucketBlock {
-	/// Emit object versioning and, when either expiry is set, the lifecycle
-	/// rule that stops the bucket growing forever.
-	///
-	/// Both are UNTYPED resources: `aws_s3_bucket_versioning` and
-	/// `aws_s3_bucket_lifecycle_configuration` have no generated binding, and
-	/// the inline `versioning`/`lifecycle_rule` arguments the `aws_s3_bucket`
-	/// schema still carries are unconfigurable from provider 4 on.
+	/// The resource label of this bucket's versioning configuration, which its
+	/// lifecycle rules depend on.
+	fn versioning_label(&self, stack: &ResolvedStack) -> String {
+		stack
+			.resource_ident(format!("{}-versioning", self.label))
+			.label()
+			.to_string()
+	}
+
+	/// Emit object versioning, an UNTYPED resource: `aws_s3_bucket_versioning`
+	/// has no generated binding, and the inline `versioning` argument the
+	/// `aws_s3_bucket` schema still carries is unconfigurable from provider 4 on.
 	fn emit_versioning(
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		bucket: &ResourceDef<AwsS3BucketDetails>,
 	) -> Result {
-		let versioning_ident =
-			stack.resource_ident(format!("{}-versioning", self.label));
-		let versioning_label = versioning_ident.label();
 		config.add_untyped_resource(
 			"aws_s3_bucket_versioning",
-			&versioning_label,
+			&self.versioning_label(stack),
 			&json!({
 				"bucket": bucket.field_ref("id"),
 				"versioning_configuration": { "status": "Enabled" },
 			}),
 		)?;
+		Ok(())
+	}
+
+	/// Emit the one lifecycle configuration holding every declared expiry, or
+	/// nothing when the bucket declares none. Also UNTYPED, and one resource for
+	/// all rules, since two configurations on one bucket would fight for the
+	/// same address.
+	///
+	/// Rules are emitted unfiltered-first then by prefix, in declaration order,
+	/// with the noncurrent-version sweep last; each carries an id derived from
+	/// what it expires rather than from its position.
+	fn emit_lifecycle(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		bucket: &ResourceDef<AwsS3BucketDetails>,
+	) -> Result {
 		// one rule per expiry, since they answer different questions and a
-		// bucket may want either alone
+		// bucket may want any of them alone
 		let mut rules = Vec::new();
 		if self.expire_days > 0 {
 			rules.push(json!({
@@ -271,7 +377,12 @@ impl S3BucketBlock {
 				"expiration": { "days": self.expire_days },
 			}));
 		}
-		if self.expire_noncurrent_days > 0 {
+		for prefix in &self.expire_prefixes {
+			rules.push(prefix.rule()?);
+		}
+		// versions only accumulate on a bucket that keeps them, so the sweep is
+		// meaningless (and the `depends_on` below unsatisfiable) without it
+		if self.object_versioning && self.expire_noncurrent_days > 0 {
 			rules.push(json!({
 				"id": "expire-noncurrent-versions",
 				"status": "Enabled",
@@ -283,26 +394,50 @@ impl S3BucketBlock {
 				},
 			}));
 		}
-		if !rules.is_empty() {
-			config.add_untyped_resource(
-				"aws_s3_bucket_lifecycle_configuration",
-				stack
-					.resource_ident(format!("{}-lifecycle", self.label))
-					.label(),
-				&json!({
-					"bucket": bucket.field_ref("id"),
-					"rule": rules,
-					// versioning must be on before a rule can talk about
-					// noncurrent versions
-					"depends_on": [
-						format!("aws_s3_bucket_versioning.{versioning_label}")
-					],
-				}),
-			)?;
+		if rules.is_empty() {
+			return Ok(());
 		}
+		self.assert_unique_rule_ids(&rules)?;
+		let mut resource = json!({
+			"bucket": bucket.field_ref("id"),
+			"rule": rules,
+		});
+		if self.object_versioning {
+			// versioning must be on before a rule can talk about noncurrent
+			// versions
+			resource["depends_on"] = json!([format!(
+				"aws_s3_bucket_versioning.{}",
+				self.versioning_label(stack)
+			)]);
+		}
+		config.add_untyped_resource(
+			"aws_s3_bucket_lifecycle_configuration",
+			stack
+				.resource_ident(format!("{}-lifecycle", self.label))
+				.label(),
+			&resource,
+		)?;
 		Ok(())
 	}
 
+	/// Fail the render when two rules would share an id, which AWS rejects and
+	/// which two prefixes sanitizing to the same id (`logs/` and `logs-`) would
+	/// otherwise produce at apply time.
+	fn assert_unique_rule_ids(&self, rules: &[serde_json::Value]) -> Result {
+		let mut seen = HashSet::<&str>::default();
+		for id in rules.iter().filter_map(|rule| rule["id"].as_str()) {
+			if !seen.insert(id) {
+				bevybail!(
+					"bucket '{}' declares two lifecycle rules with id '{id}'",
+					self.label
+				);
+			}
+		}
+		Ok(())
+	}
+}
+
+impl S3BucketBlock {
 	/// Emit the public-access-block (lifting the default block on public policies)
 	/// and the anonymous read bucket policy that depends on it.
 	fn emit_public_read(
@@ -447,7 +582,7 @@ mod tests {
 	#[beet_core::test]
 	fn expiring_objects_is_its_own_rule() {
 		let json = build_json(
-			S3BucketBlock::new("mail-backups")
+			S3BucketBlock::new("archive")
 				.with_object_versioning(true)
 				.with_expire_days(180),
 		);
@@ -460,6 +595,81 @@ mod tests {
 			.as_str()
 			.xnot()
 			.xpect_contains("aws_s3_bucket_lifecycle_configuration");
+	}
+
+	/// An expiry is not a versioning feature: a bucket whose contents are a
+	/// rolling window expires them whether or not it keeps the versions an
+	/// overwrite leaves, and the noncurrent sweep is what versioning gates.
+	#[beet_core::test]
+	fn expiry_does_not_require_versioning() {
+		build_json(S3BucketBlock::new("scratch").with_expire_days(7))
+			.as_str()
+			.xpect_contains("aws_s3_bucket_lifecycle_configuration")
+			.xpect_contains("\"id\":\"expire-objects\"")
+			.xnot()
+			.xpect_contains("expire-noncurrent-versions")
+			.xnot()
+			.xpect_contains("aws_s3_bucket_versioning");
+	}
+
+	/// The archive profile: one bucket holding datasets whose retention
+	/// differs, so the dumps under one prefix expire while the sole-copy
+	/// exports beside them are kept forever. A whole-bucket `expire_days`
+	/// cannot say that, and a second bucket per retention window would multiply
+	/// buckets for a writer convention.
+	#[beet_core::test]
+	fn prefix_rules_scope_an_expiry() {
+		let json = build_json(
+			S3BucketBlock::new("archive")
+				.with_object_versioning(true)
+				.with_expire_prefixes(vec![PrefixExpiry::new(
+					"postgres/",
+					180,
+				)]),
+		);
+		json.as_str()
+			// the filtered rule, named for what it expires
+			.xpect_contains("\"id\":\"expire-postgres\"")
+			.xpect_contains("\"prefix\":\"postgres/\"")
+			.xpect_contains("\"days\":180")
+			// ..riding the same configuration as the noncurrent sweep
+			.xpect_contains("\"id\":\"expire-noncurrent-versions\"")
+			// ..and nothing expires the prefixes it did not name
+			.xnot()
+			.xpect_contains("\"id\":\"expire-objects\"");
+	}
+
+	/// Both rejections are render-time, ie before any tofu invocation: AWS
+	/// rejects a zero-day expiry and two rules sharing an id, and a deploy is a
+	/// slow place to learn either.
+	#[beet_core::test]
+	fn a_prefix_rule_that_says_nothing_is_loud() {
+		RenderScope::test_render(|parent| {
+			parent.spawn(
+				S3BucketBlock::new("archive").with_expire_prefixes(vec![
+					PrefixExpiry::new("postgres/", 0),
+				]),
+			);
+		})
+		.0
+		.finish()
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("expires nothing");
+		// ..and two prefixes sanitizing to one id would collide at apply time
+		RenderScope::test_render(|parent| {
+			parent.spawn(S3BucketBlock::new("archive").with_expire_prefixes(
+				vec![
+					PrefixExpiry::new("logs/", 30),
+					PrefixExpiry::new("logs-", 30),
+				],
+			));
+		})
+		.0
+		.finish()
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("expire-logs");
 	}
 
 	#[beet_core::test]
@@ -484,7 +694,7 @@ mod tests {
 	#[beet_core::test]
 	fn zero_days_keeps_every_version() {
 		build_json(
-			S3BucketBlock::new("mail-backups")
+			S3BucketBlock::new("archive")
 				.with_object_versioning(true)
 				.with_expire_noncurrent_days(0),
 		)

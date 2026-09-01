@@ -159,12 +159,12 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 	<VpcBlock label="net"/>
 	<RdsPostgresBlock label="db" vpc="net" database="mail" consumers={["mail"]}/>
 	<S3BucketBlock label="mail-blobs" object_versioning=true force_destroy=false runtime_write=true/>
-	<S3BucketBlock label="mail-backups" object_versioning=true force_destroy=false
-		runtime_write=true expire_days=180/>
+	<S3BucketBlock label="archive" object_versioning=true force_destroy=false
+		runtime_write=true expire_prefixes={[{prefix:"postgres/", expire_days:180}]}/>
 
 	<StalwartBlock label="mail" hostname="mail.example.com"
 		vpc="net" database="db" db_name="mail" db_user="postgres"
-		blob_bucket="mail-blobs" backup_bucket="mail-backups" dns_stage="prod"
+		blob_bucket="mail-blobs" backup_bucket="archive" dns_stage="prod"
 		ssh_public_key="ssh-ed25519 AAAA... deploy"/>
 
 	<MailDomainBlock
@@ -370,12 +370,12 @@ The layers, ordered by how much losing them would hurt:
 
 1. **Postgres:** RDS automated backups with 14-day point-in-time recovery, roughly a five minute RPO, plus a final snapshot and deletion protection so that a stray `destroy` cannot eat the mail.
 2. **Blobs:** S3 versioning, a lifecycle expiring noncurrent versions at 90 days, a public access block, and server-side encryption.
-3. **Off-cloud:** a systemd timer on the box runs a nightly custom-format `pg_dump` into the backups bucket, with the bucket expiring objects at 180 days. The dump runs *on the box* rather than from a deploy machine, because a backup that only happens while somebody is deploying is not a backup, and it reads its credential from parameter store so that no secret rides its command line and a process listing on a mail box is not a credential dump.
+3. **Off-cloud:** a systemd timer on the box runs a nightly custom-format `pg_dump` into the `archive` bucket, whose `postgres/` prefix expires at 180 days. The dump runs *on the box* rather than from a deploy machine, because a backup that only happens while somebody is deploying is not a backup, and it reads its credential from parameter store so that no secret rides its command line and a process listing on a mail box is not a credential dump.
 4. **Everything else regenerates:** config from git, the box from user data, secrets re-mintable. The exception is the DKIM private key once its selector is published, so include it in the export.
 
 One consistency rule to encode in your runbook: blobs are hash-keyed and the database references them, so a restored database must never be *newer* than the blob store. Back up the database first; restore the blobs first.
 
-The off-cloud pull is `rclone sync :s3:<backups-bucket>/postgres <local>` against a read-only key. *Gap:* ours is documented and not scheduled, so until something runs it the sovereignty claim honestly stops at "in another AWS service".
+The off-cloud pull is `rclone sync :s3:<archive-bucket>/postgres <local>` against a read-only key. *Gap:* ours is documented and not scheduled, so until something runs it the sovereignty claim honestly stops at "in another AWS service".
 
 ### The two bugs, because both generalise
 
