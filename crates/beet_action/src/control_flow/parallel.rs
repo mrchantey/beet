@@ -40,7 +40,7 @@ impl Parallel {
 
 /// Runs all children concurrently, failing fast if any child fails.
 ///
-/// Child error handling is controlled by [`ExcludeErrors`].
+/// Child error handling is controlled by [`BypassErrors`].
 ///
 /// ## Errors
 ///
@@ -56,9 +56,9 @@ where
 	Input: 'static + Send + Sync + Clone,
 	Output: 'static + Send + Sync,
 {
-	let exclude_errors = cx
+	let bypass_errors = cx
 		.caller
-		.get_cloned::<ExcludeErrors>()
+		.get_cloned::<BypassErrors>()
 		.await
 		.unwrap_or_default();
 
@@ -85,7 +85,7 @@ where
 		let action_meta = match action_meta_result {
 			Ok(action_meta) => action_meta,
 			Err(child_error) => {
-				if exclude_errors.contains(ChildError::NO_ACTION) {
+				if bypass_errors.contains(ChildError::NO_ACTION) {
 					continue;
 				}
 				bevybail!(
@@ -97,7 +97,7 @@ where
 		if let Err(mismatch_error) =
 			action_meta.assert_match::<Input, Outcome<Input, Output>>()
 		{
-			if exclude_errors.contains(ChildError::ACTION_MISMATCH) {
+			if bypass_errors.contains(ChildError::ACTION_MISMATCH) {
 				continue;
 			}
 			bevybail!(
@@ -187,11 +187,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_action_mismatch_ignores_wrong_signature() {
+	async fn bypass_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
 				Parallel::new(),
-				ExcludeErrors(ChildError::ACTION_MISMATCH),
+				BypassErrors(ChildError::ACTION_MISMATCH),
 				children![wrong_signature_action(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())
@@ -201,11 +201,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_no_action_ignores_missing() {
+	async fn bypass_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
 				Parallel::new(),
-				ExcludeErrors(ChildError::NO_ACTION),
+				BypassErrors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())

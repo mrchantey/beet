@@ -102,7 +102,7 @@ pub fn fallback() -> impl Bundle {
 		},
 	);
 	(
-		ExcludeErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
+		BypassErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
 		action,
 	)
 }

@@ -44,7 +44,7 @@ impl Sequence {
 /// [`match`](ActionMeta::matches) the expected
 /// `Action<Input, Outcome<Input, Output>>` signature.
 ///
-/// Honours [`ExcludeErrors`]: when a flagged error is excluded the child is
+/// Honours [`BypassErrors`]: when a flagged error is bypassed the child is
 /// dropped from the returned list, otherwise the error is propagated. A parent
 /// that skipped every one of its children raises
 /// [`NONE_VALID`](ChildError::NONE_VALID) rather than passing, so a sequence
@@ -66,7 +66,7 @@ where
 
 fn collect_valid_children<Input, Output>(
 	In(caller): In<Entity>,
-	excludes: Query<&ExcludeErrors>,
+	bypasses: Query<&BypassErrors>,
 	children: Query<&Children>,
 	metas: Query<&ActionMeta>,
 ) -> Result<Vec<Entity>>
@@ -74,20 +74,20 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	let exclude_errors = excludes.get(caller).cloned().unwrap_or_default();
+	let bypass_errors = bypasses.get(caller).cloned().unwrap_or_default();
 	let Ok(children) = children.get(caller) else {
 		return Ok(Vec::new());
 	};
 	let mut valid = Vec::with_capacity(children.len());
 	for child in children.iter() {
 		let Ok(meta) = metas.get(child) else {
-			if exclude_errors.contains(ChildError::NO_ACTION) {
+			if bypass_errors.contains(ChildError::NO_ACTION) {
 				continue;
 			}
 			bevybail!("sequence child has no action: {child:?}");
 		};
 		if !meta.matches::<Input, Outcome<Input, Output>>() {
-			if exclude_errors.contains(ChildError::ACTION_MISMATCH) {
+			if bypass_errors.contains(ChildError::ACTION_MISMATCH) {
 				continue;
 			}
 			bevybail!(
@@ -99,7 +99,7 @@ where
 	}
 	// a sequence that skipped every child would pass having run nothing, which
 	// on a route reads as a clean exit for work that never happened.
-	if valid.is_empty() && !exclude_errors.contains(ChildError::NONE_VALID) {
+	if valid.is_empty() && !bypass_errors.contains(ChildError::NONE_VALID) {
 		bevybail!(
 			"sequence {caller} skipped all {} of its children, none serve Action<{}, {}>:{}",
 			children.len(),
@@ -165,7 +165,7 @@ where
 /// Runs children in order, returning the first [`Outcome::Fail`] immediately.
 /// Returns [`Outcome::Pass`] only if all compatible children pass.
 ///
-/// Child error handling is controlled by [`ExcludeErrors`].
+/// Child error handling is controlled by [`BypassErrors`].
 ///
 /// ## Errors
 ///
@@ -236,7 +236,7 @@ impl InfallibleSequence {
 
 /// Runs every child once, ignoring failures, then passes with the input.
 ///
-/// Child error handling is controlled by [`ExcludeErrors`].
+/// Child error handling is controlled by [`BypassErrors`].
 ///
 /// ## Errors
 ///
@@ -365,11 +365,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_action_mismatch_ignores_wrong_signature() {
+	async fn bypass_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
 				Sequence::new(),
-				ExcludeErrors(ChildError::ACTION_MISMATCH),
+				BypassErrors(ChildError::ACTION_MISMATCH),
 				children![wrong_signature_action(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())
@@ -379,11 +379,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_no_action_ignores_missing() {
+	async fn bypass_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
 				Sequence::new(),
-				ExcludeErrors(ChildError::NO_ACTION),
+				BypassErrors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())
@@ -416,7 +416,7 @@ mod tests {
 		AsyncPlugin::world()
 			.spawn((
 				Sequence::new(),
-				ExcludeErrors(ChildError::NO_ACTION),
+				BypassErrors(ChildError::NO_ACTION),
 				children![()],
 			))
 			.call::<(), Outcome<(), ()>>(())
@@ -428,11 +428,11 @@ mod tests {
 
 	/// ..unless the caller declares that running nothing is a valid outcome.
 	#[beet_core::test]
-	async fn none_valid_is_excludable() {
+	async fn none_valid_is_bypassable() {
 		AsyncPlugin::world()
 			.spawn((
 				Sequence::new(),
-				ExcludeErrors(ChildError::all()),
+				BypassErrors(ChildError::all()),
 				children![()],
 			))
 			.call::<(), Outcome<(), ()>>(())

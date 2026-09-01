@@ -16,7 +16,7 @@ where
 {
 	/// Which child errors to skip rather than propagate.
 	/// Defaults to [`ChildError::empty`].
-	exclude_errors: ChildError,
+	bypass_errors: ChildError,
 	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
@@ -28,7 +28,7 @@ where
 {
 	fn clone(&self) -> Self {
 		Self {
-			exclude_errors: self.exclude_errors,
+			bypass_errors: self.bypass_errors,
 			_marker: PhantomData,
 		}
 	}
@@ -47,7 +47,7 @@ where
 {
 	fn default() -> Self {
 		Self {
-			exclude_errors: ChildError::empty(),
+			bypass_errors: ChildError::empty(),
 			_marker: PhantomData,
 		}
 	}
@@ -65,11 +65,11 @@ where
 }
 /// Try children in order, returning the first pass or final fail.
 ///
-/// Child error handling is controlled by [`Fallback::exclude_errors`].
+/// Child error handling is controlled by [`Fallback::bypass_errors`].
 ///
 /// ## Errors
 ///
-/// Errors depending on [`ChildError`] exclusions when a child has:
+/// Errors depending on [`ChildError`] bypasses when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
 #[action(default)]
@@ -81,9 +81,9 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	let exclude_errors = cx
+	let bypass_errors = cx
 		.caller
-		.get_cloned::<ExcludeErrors>()
+		.get_cloned::<BypassErrors>()
 		.await
 		.unwrap_or_default();
 	let children =
@@ -107,7 +107,7 @@ where
 		let action_meta = match action_meta_result {
 			Ok(action_meta) => action_meta,
 			Err(child_error) => {
-				if exclude_errors.contains(ChildError::NO_ACTION) {
+				if bypass_errors.contains(ChildError::NO_ACTION) {
 					continue;
 				}
 				bevybail!(
@@ -119,7 +119,7 @@ where
 		if let Err(mismatch_error) =
 			action_meta.assert_match::<Input, Outcome<Output, Input>>()
 		{
-			if exclude_errors.contains(ChildError::ACTION_MISMATCH) {
+			if bypass_errors.contains(ChildError::ACTION_MISMATCH) {
 				continue;
 			}
 			bevybail!(
@@ -202,7 +202,7 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn default_exclude_errors_with_compatible_children() {
+	async fn default_bypass_errors_with_compatible_children() {
 		AsyncPlugin::world()
 			.spawn((
 				Fallback::new(),
@@ -215,11 +215,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_no_action_ignores_missing() {
+	async fn bypass_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
 				Fallback::new(),
-				ExcludeErrors(ChildError::NO_ACTION),
+				BypassErrors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())
@@ -229,11 +229,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_action_mismatch_ignores_wrong_signature() {
+	async fn bypass_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
 				Fallback::new(),
-				ExcludeErrors(ChildError::ACTION_MISMATCH),
+				BypassErrors(ChildError::ACTION_MISMATCH),
 				children![wrong_signature_action(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())

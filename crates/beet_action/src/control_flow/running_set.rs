@@ -12,7 +12,7 @@ use core::marker::PhantomData;
 /// any observers, then drives every facet the start selected concurrently under
 /// one task. A facet that errors stops the rest gracefully and fails the parked
 /// call with the collapsed errors; a start no facet selected fails it loudly. Both
-/// failures are opt-out (see [`ExcludeRunningErrors`]): excluding
+/// failures are opt-out (see [`BypassRunningErrors`]): bypassing
 /// [`RunningError::FACET_FAILED`] keeps the survivors serving a broken facet's
 /// run. Removing that `Running` (an interrupt, a reload, a
 /// despawn) signals every live facet, which is the only way a facet is ever
@@ -196,7 +196,7 @@ where
 
 	// an entity opting into surviving a facet failure keeps the rest serving; the
 	// run still fails once nothing is left alive, so a fully dead run is loud.
-	let survives = excludes::<Out>(&entity, RunningError::FACET_FAILED).await;
+	let survives = bypasses::<Out>(&entity, RunningError::FACET_FAILED).await;
 	let mut errors = Vec::new();
 	while let Some(err) = async_ext::join_all_until_err(&mut futures).await {
 		match survives {
@@ -217,12 +217,12 @@ where
 }
 
 /// Whether the set's entity opted out of `error`.
-async fn excludes<Out>(entity: &AsyncEntity, error: RunningError) -> bool
+async fn bypasses<Out>(entity: &AsyncEntity, error: RunningError) -> bool
 where
 	Out: 'static + Send + Sync,
 {
 	entity
-		.get::<ExcludeRunningErrors, _>(move |exclude| exclude.contains(error))
+		.get::<BypassRunningErrors, _>(move |bypass| bypass.contains(error))
 		.await
 		.unwrap_or(false)
 }
@@ -320,7 +320,7 @@ async fn fail_none_started<Out>(
 where
 	Out: 'static + Send + Sync,
 {
-	if excludes::<Out>(entity, RunningError::NONE_STARTED).await {
+	if bypasses::<Out>(entity, RunningError::NONE_STARTED).await {
 		return Ok(());
 	}
 	let labels = labels.join(", ");
@@ -524,9 +524,9 @@ mod test {
 			.xpect_false();
 	}
 
-	/// An entity excluding that failure parks silently instead.
+	/// An entity bypassing that failure parks silently instead.
 	#[beet_core::test]
-	async fn excluded_none_started_parks() {
+	async fn bypassed_none_started_parks() {
 		let log = Store::<Vec<String>>::default();
 		let mut app = app();
 		let entity = spawn_set(&mut app, vec![(
@@ -536,7 +536,7 @@ mod test {
 		)]);
 		app.world_mut()
 			.entity_mut(entity)
-			.insert(ExcludeRunningErrors(RunningError::NONE_STARTED));
+			.insert(BypassRunningErrors(RunningError::NONE_STARTED));
 		let result = call(&mut app, entity);
 		AsyncRunner::settle_async_tasks(app.world_mut()).await;
 		result.get().xpect_none();
@@ -573,10 +573,10 @@ mod test {
 			.xpect_contains("held teardown failed");
 	}
 
-	/// Excluding [`RunningError::FACET_FAILED`] keeps the survivors serving: the
+	/// Bypassing [`RunningError::FACET_FAILED`] keeps the survivors serving: the
 	/// broken facet is dropped, nothing is signalled, and the call stays parked.
 	#[beet_core::test]
-	async fn excluded_facet_error_keeps_survivors_serving() {
+	async fn bypassed_facet_error_keeps_survivors_serving() {
 		let log = Store::<Vec<String>>::default();
 		let mut app = app();
 		let entity = spawn_set(&mut app, vec![
@@ -585,7 +585,7 @@ mod test {
 		]);
 		app.world_mut()
 			.entity_mut(entity)
-			.insert(ExcludeRunningErrors(RunningError::FACET_FAILED));
+			.insert(BypassRunningErrors(RunningError::FACET_FAILED));
 		let result = call(&mut app, entity);
 		until_logged(&mut app, log, 1).await;
 		AsyncRunner::settle_async_tasks(app.world_mut()).await;
@@ -598,10 +598,10 @@ mod test {
 			.xpect_true();
 	}
 
-	/// The exclusion survives a facet, never a whole run: once nothing is left
+	/// The bypass survives a facet, never a whole run: once nothing is left
 	/// alive the call still fails, carrying every error the run collected.
 	#[beet_core::test]
-	async fn all_facets_dead_fails_even_when_excluded() {
+	async fn all_facets_dead_fails_even_when_bypassed() {
 		let mut app = app();
 		let entity = spawn_set(&mut app, vec![
 			("boom", always(), failing_facet("boom failed")),
@@ -609,7 +609,7 @@ mod test {
 		]);
 		app.world_mut()
 			.entity_mut(entity)
-			.insert(ExcludeRunningErrors(RunningError::FACET_FAILED));
+			.insert(BypassRunningErrors(RunningError::FACET_FAILED));
 		let result = call(&mut app, entity);
 		app_ext::update_until(&mut app, |_| result.get().is_some())
 			.await

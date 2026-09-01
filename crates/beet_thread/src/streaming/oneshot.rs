@@ -26,7 +26,7 @@ impl Post {
 			.spawn((
 				Thread::new("Oneshot Thread"),
 				Sequence::new(),
-				ExcludeErrors(ChildError::NO_ACTION),
+				BypassErrors(ChildError::NO_ACTION),
 				author_scene,
 			))
 			.id();

@@ -25,7 +25,7 @@ fn setup(mut commands: Commands) {
 	commands
 		.spawn((
 			Thread::default(),
-			ExcludeErrors(ChildError::NO_ACTION),
+			BypassErrors(ChildError::NO_ACTION),
 			Sequence::new(),
 			children![
 				(Actor::system(), children![Post::spawn(

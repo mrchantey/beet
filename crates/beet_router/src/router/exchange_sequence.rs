@@ -19,10 +19,10 @@ use beet_net::prelude::*;
 /// required [`ExchangeOverload`], mapping `Pass` to `200` and `Fail` to the failing
 /// step's response. The request threads child to child, and children with no
 /// action at all (config blocks) or a differently-shaped one are skipped via
-/// [`ExcludeErrors`]; a step that is natively another shape carries its own
+/// [`BypassErrors`]; a step that is natively another shape carries its own
 /// [`ActionOverload`].
 ///
-/// [`NONE_VALID`](ChildError::NONE_VALID) is deliberately NOT excluded: a route
+/// [`NONE_VALID`](ChildError::NONE_VALID) is deliberately NOT bypassed: a route
 /// that skipped every child ran nothing, and a `200` for work that never
 /// happened is the one outcome worse than a failure. A failed run over
 /// children with [`UnregisteredTag`] markers appends their names, so a lean
@@ -32,7 +32,7 @@ use beet_net::prelude::*;
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(
-	ExcludeErrors = ExcludeErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
+	BypassErrors = BypassErrors(ChildError::NO_ACTION | ChildError::ACTION_MISMATCH),
 	Sequence<Request, Response>,
 	ExchangeOverload = sequence_overload(),
 )]

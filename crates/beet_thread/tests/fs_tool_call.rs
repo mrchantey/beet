@@ -37,7 +37,7 @@ fn main() {
 				.spawn((store, RepeatWhileFunctionCallOutput, children![(
 					Thread::default(),
 					Sequence::new(),
-					ExcludeErrors(ChildError::NO_ACTION),
+					BypassErrors(ChildError::NO_ACTION),
 					children![
 						(Actor::system(), children![Post::spawn(PROMPT)]),
 						(

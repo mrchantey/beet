@@ -1,8 +1,8 @@
+mod bypass_errors;
 mod call_on_spawn;
-mod exclude_errors;
 mod fallback;
+pub use bypass_errors::*;
 pub use call_on_spawn::*;
-pub use exclude_errors::*;
 pub use fallback::*;
 mod highest_score;
 pub use highest_score::*;
