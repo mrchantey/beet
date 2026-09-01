@@ -24,9 +24,9 @@ css_variable!(WeightRegular, FontWeight);
 css_variable!(WeightMedium,  FontWeight);
 css_variable!(WeightBold,    FontWeight);
 css_variable!(
-	/// The heaviest structural weight, carrying the wordmark and the display
-	/// scale. See [`default_typography`] for the brand's weight range.
-	WeightBlack,
+	/// The heaviest structural weight (900), carrying the wordmark and the
+	/// display scale. See [`default_typography`] for the brand's weight range.
+	WeightHeavy,
 	FontWeight
 );
 
@@ -128,7 +128,7 @@ pub(crate) fn token_map() -> CssTokenMap {
 		.insert(WeightRegular)
 		.insert(WeightMedium)
 		.insert(WeightBold)
-		.insert(WeightBlack)
+		.insert(WeightHeavy)
 		.insert(FontSizeDisplayLarge)
 		.insert(FontSizeDisplayMedium)
 		.insert(FontSizeDisplaySmall)
@@ -221,7 +221,7 @@ pub(crate) fn default_typography() -> Vec<(TokenKey, TokenValue)> {
 		.with_value(WeightRegular, 	FontWeight::Absolute(400))
 		.with_value(WeightMedium, 	FontWeight::Absolute(500))
 		.with_value(WeightBold, 		FontWeight::Absolute(700))
-		.with_value(WeightBlack, 		FontWeight::Absolute(900))
+		.with_value(WeightHeavy, 		FontWeight::Absolute(900))
 		// ── Font size ref tokens (MD3 sp → rem at 16 px base) ─────────────────
 		.with_value(FontSizeDisplayLarge, 	Length::Rem(3.5625))
 		.with_value(FontSizeDisplayMedium, 	Length::Rem(2.8125))
@@ -279,9 +279,9 @@ pub(crate) fn default_typography() -> Vec<(TokenKey, TokenValue)> {
 		.with_value(LetterSpacingWordmark, 				Length::Rem(-0.106875))
 		.with_value(LetterSpacingEyebrow, 				Length::Rem(0.12))
 		// ── Composite typography sys tokens ─────────────────────────────────
-		.with_value(DisplayLarge, 	Typography   { typeface: TypefaceBrand.into(), weight: WeightBlack.into(), size: FontSizeDisplayLarge.into(),   line_height: LineHeightDisplayLarge.into(),   letter_spacing: LetterSpacingDisplayLarge.into() })
-		.with_value(DisplayMedium, 	Typography  { typeface: TypefaceBrand.into(), weight: WeightBlack.into(), size: FontSizeDisplayMedium.into(),  line_height: LineHeightDisplayMedium.into(),  letter_spacing: LetterSpacingDisplayMedium.into() })
-		.with_value(DisplaySmall, 	Typography   { typeface: TypefaceBrand.into(), weight: WeightBlack.into(), size: FontSizeDisplaySmall.into(),   line_height: LineHeightDisplaySmall.into(),   letter_spacing: LetterSpacingDisplaySmall.into() })
+		.with_value(DisplayLarge, 	Typography   { typeface: TypefaceBrand.into(), weight: WeightHeavy.into(), size: FontSizeDisplayLarge.into(),   line_height: LineHeightDisplayLarge.into(),   letter_spacing: LetterSpacingDisplayLarge.into() })
+		.with_value(DisplayMedium, 	Typography  { typeface: TypefaceBrand.into(), weight: WeightHeavy.into(), size: FontSizeDisplayMedium.into(),  line_height: LineHeightDisplayMedium.into(),  letter_spacing: LetterSpacingDisplayMedium.into() })
+		.with_value(DisplaySmall, 	Typography   { typeface: TypefaceBrand.into(), weight: WeightHeavy.into(), size: FontSizeDisplaySmall.into(),   line_height: LineHeightDisplaySmall.into(),   letter_spacing: LetterSpacingDisplaySmall.into() })
 		.with_value(HeadlineLarge, 	Typography  { typeface: TypefacePlain.into(), weight: WeightBold.into(),    size: FontSizeHeadlineLarge.into(),  line_height: LineHeightHeadlineLarge.into(),  letter_spacing: LetterSpacingHeadlineLarge.into() })
 		.with_value(HeadlineMedium, Typography { typeface: TypefacePlain.into(), weight: WeightBold.into(),    size: FontSizeHeadlineMedium.into(), line_height: LineHeightHeadlineMedium.into(), letter_spacing: LetterSpacingHeadlineMedium.into() })
 		.with_value(HeadlineSmall, 	Typography  { typeface: TypefacePlain.into(), weight: WeightBold.into(),    size: FontSizeHeadlineSmall.into(),  line_height: LineHeightHeadlineSmall.into(),  letter_spacing: LetterSpacingHeadlineSmall.into() })
@@ -295,7 +295,7 @@ pub(crate) fn default_typography() -> Vec<(TokenKey, TokenValue)> {
 		.with_value(LabelMedium, 		Typography    { typeface: TypefacePlain.into(), weight: WeightMedium.into(),  size: FontSizeLabelMedium.into(),    line_height: LineHeightLabelMedium.into(),    letter_spacing: LetterSpacingLabelMedium.into() })
 		.with_value(LabelSmall, 		Typography     { typeface: TypefacePlain.into(), weight: WeightMedium.into(),  size: FontSizeLabelSmall.into(),     line_height: LineHeightLabelSmall.into(),     letter_spacing: LetterSpacingLabelSmall.into() })
 		// ── Brand composites ────────────────────────────────────────────────
-		.with_value(Wordmark, 			Typography       { typeface: TypefaceBrand.into(), weight: WeightBlack.into(),  size: FontSizeWordmark.into(),       line_height: LineHeightWordmark.into(),       letter_spacing: LetterSpacingWordmark.into() })
+		.with_value(Wordmark, 			Typography       { typeface: TypefaceBrand.into(), weight: WeightHeavy.into(),  size: FontSizeWordmark.into(),       line_height: LineHeightWordmark.into(),       letter_spacing: LetterSpacingWordmark.into() })
 		.with_value(Eyebrow, 				Typography        { typeface: TypefaceBrand.into(), weight: WeightBold.into(),   size: FontSizeLabelMedium.into(),    line_height: LineHeightLabelMedium.into(),    letter_spacing: LetterSpacingEyebrow.into() })
 		.into_iter().collect()
 }

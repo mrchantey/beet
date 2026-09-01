@@ -144,7 +144,7 @@ pub fn app_bar_title() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class("app-bar-title"))
 		.with_token(common_props::FontFamilyProp,typography::TypefaceBrand).unwrap()
-		.with_token(common_props::FontWeightProp,typography::WeightBlack).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightHeavy).unwrap()
 		// the terminal scales the brand to fullwidth off `font-size` (the charcell
 		// renderer scales by the longhand, not a composite token).
 		.with_token(common_props::FontSize,typography::FontSizeTitleLarge).unwrap()

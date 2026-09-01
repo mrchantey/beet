@@ -182,7 +182,7 @@ pub fn text_wordmark() -> Rule {
 		// too: the charcell renderer reads `font-size` and `font-weight`, never a
 		// composite token.
 		.with_token(common_props::FontSize,typography::FontSizeWordmark).unwrap()
-		.with_token(common_props::FontWeightProp,typography::WeightBlack).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightHeavy).unwrap()
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 		.with_canonical(DecorationLine::DEFAULT)
 }

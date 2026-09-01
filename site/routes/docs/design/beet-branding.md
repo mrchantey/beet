@@ -95,8 +95,6 @@ Light mode is print, the cream and ink of a zine handout, and dark mode is termi
 
 The neutral key is split per mode, each scheme builds its surface roles from its own neutral ramp, and the inverse-surface roles cross over to the other mode's ramp, so an inverse surface in light mode is phosphor and in dark mode is print.
 
-Domain accents are filled icon bodies in diagrams and never interface colour: simulation `#7c3aed`, web `#2563eb`, robotics `#0891b2` and infra `#ea8a0c`. Robotics moved off the handout's red, which sat between the secondary pink and the error red, and infra rides the tertiary harvest amber rather than reaching for a fifth hue.
-
 ## Typography
 
 Inter everywhere, with system fallbacks and mono reserved for code. Structural weights run heavy, 700 through the headlines and titles and 900 across the display scale, and every structural step is tracked at -0.03em so heavy type sets as one mass rather than as spaced letters. The wordmark is weight 900 in brand green, worn at display scale on a poster and at title scale in the app bar, while eyebrow labels are small, bold, wide tracked and authored in upper case. The engine carries all of this as tokens, the `Wordmark` and `Eyebrow` composites behind the `text-wordmark` and `text-eyebrow` classes.
