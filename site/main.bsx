@@ -144,7 +144,14 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 <Router {HelpHandler}>
 	<!-- the ONE location app identity lives: the deploy names its resources from
 	     this, and so does the running binary. -->
-	<PackageConfig title="Beet" app_name="beet-site" description="The beet website, built with beet" version="0.0.9-dev.16"/>
+	<PackageConfig
+		title="Beet"
+		app_name="beet-site"
+		description="A malleable engine for sovereign software"
+		version="0.0.9-dev.16"
+		homepage="https://beet.org"
+		social_image="https://beet.org/assets/branding/social-card.png"
+		theme_color="#006c4f"/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>
 		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
 			<!-- the brand palette, one key colour per Material palette. The neutral

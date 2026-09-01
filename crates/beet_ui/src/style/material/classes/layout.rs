@@ -131,18 +131,26 @@ pub fn app_bar_leading() -> Rule {
 		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))
 }
 
-/// App bar title link - the brand wordmark. Larger than body type, undecorated,
-/// and using the surface foreground rather than the prose-link primary color so
-/// it reads as a title rather than a hyperlink.
+/// App bar title link - the brand wordmark worn at title scale. The bar is not
+/// the poster, so it takes the wordmark treatment
+/// ([`text_wordmark`](super::text_wordmark)) rather than its size: the brand
+/// typeface at the heaviest weight, tracked tight, filled with the primary
+/// colour and undecorated, over a title-large line box that leaves the bar's
+/// height untouched.
+///
+/// Built from the ref tokens rather than a composite, since the composite that
+/// carries the wordmark's weight and tracking also carries its display size.
 pub fn app_bar_title() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class("app-bar-title"))
-		.with_token(TypographyProps,typography::TitleLarge).unwrap()
-		// the longhand `font-size` mirrors the composite so the terminal scales
-		// the brand to fullwidth like other title-large text (the charcell
-		// renderer scales by `font-size`, not the composite token).
+		.with_token(common_props::FontFamilyProp,typography::TypefaceBrand).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightBlack).unwrap()
+		// the terminal scales the brand to fullwidth off `font-size` (the charcell
+		// renderer scales by the longhand, not a composite token).
 		.with_token(common_props::FontSize,typography::FontSizeTitleLarge).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(common_props::LineHeight,typography::LineHeightTitleLarge).unwrap()
+		.with_token(common_props::Tracking,typography::LetterSpacingTitleLarge).unwrap()
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 		.with_canonical(DecorationLine::DEFAULT)
 }
 

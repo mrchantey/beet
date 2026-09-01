@@ -325,6 +325,47 @@ mod tests {
 				.xpect_eq(tone(&theme, tones::NeutralLight90));
 		});
 	}
+	/// The wordmark is one treatment worn at two scales: the poster class and the
+	/// app bar title both resolve to the heaviest weight filled with the same
+	/// primary the prose links use, and only the size tells them apart.
+	#[beet_core::test]
+	fn wordmark_treatment_at_both_scales() {
+		let mut world = MaterialStylePlugin::world();
+		let poster = world
+			.spawn((rsx! { <div/> }, Classes::new([classes::TEXT_WORDMARK])))
+			.id();
+		let bar = world
+			.spawn((rsx! { <a/> }, Classes::new(["app-bar-title"])))
+			.id();
+		let link = world.spawn(rsx! { <a/> }).id();
+
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let memo = &mut default();
+			let primary = query
+				.resolve(link, common_props::ForegroundColor, memo)
+				.unwrap();
+			for entity in [poster, bar] {
+				query
+					.resolve(entity, common_props::FontWeightProp, memo)
+					.unwrap()
+					.xpect_eq(FontWeight::Absolute(900));
+				query
+					.resolve(entity, common_props::ForegroundColor, memo)
+					.unwrap()
+					.xpect_eq(primary);
+			}
+			// the poster sets at display scale, the bar at title scale
+			query
+				.resolve(poster, common_props::FontSize, memo)
+				.unwrap()
+				.xpect_eq(Length::Rem(3.5625));
+			query
+				.resolve(bar, common_props::FontSize, memo)
+				.unwrap()
+				.xpect_eq(Length::Rem(1.375));
+		});
+	}
+
 	#[beet_core::test]
 	fn material_css() {
 		MaterialStylePlugin::world()
@@ -335,7 +376,7 @@ mod tests {
 			.xpect_contains(
 				"--io-crates-beet-ui-style-material-motion-short2: 100ms;",
 			)
-			.xpect_contains("--io-crates-beet-ui-style-material-typography-headline-large-weight: var(--io-crates-beet-ui-style-material-typography-weight-regular);");
+			.xpect_contains("--io-crates-beet-ui-style-material-typography-headline-large-weight: var(--io-crates-beet-ui-style-material-typography-weight-bold);");
 	}
 
 	/// The page/card surface fills are ungated, so the built CSS paints them on

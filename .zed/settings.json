@@ -37,7 +37,7 @@
 		".cargo",
 		".beet",
 		".claude",
-		"site/assets",
+		// "site/assets",
 		// ".gitignore",
 		// ".env.example",
 		".github",

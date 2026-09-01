@@ -26,6 +26,9 @@ pub enum MediaType {
 	Xml,
 	/// `application/json`
 	Json,
+	/// `application/manifest+json` — the web app manifest a `<link
+	/// rel="manifest">` names.
+	WebManifest,
 	/// `application/x-postcard`
 	Postcard,
 	/// `application/x-ron`
@@ -164,6 +167,7 @@ impl MediaType {
 	const GZIP: &'static str = "application/gzip";
 	const TAR: &'static str = "application/x-tar";
 	const WASM: &'static str = "application/wasm";
+	const WEB_MANIFEST: &'static str = "application/manifest+json";
 	const WOFF: &'static str = "font/woff";
 	const WOFF2: &'static str = "font/woff2";
 	const TTF: &'static str = "font/ttf";
@@ -215,6 +219,7 @@ impl MediaType {
 			.unwrap_or(content_type)
 			.trim();
 		match raw {
+			val if val.contains(Self::WEB_MANIFEST) => MediaType::WebManifest,
 			val if val.contains(Self::JSON) => MediaType::Json,
 			val if val.contains(Self::POSTCARD) => MediaType::Postcard,
 			val if val.contains(Self::RON) => MediaType::Ron,
@@ -310,6 +315,7 @@ impl MediaType {
 			"css" => MediaType::Css,
 			"js" | "mjs" | "cjs" => MediaType::Javascript,
 			"json" | "jsonl" | "geojson" => MediaType::Json,
+			"webmanifest" => MediaType::WebManifest,
 			"xml" | "xsl" | "xsd" => MediaType::Xml,
 			"url" => MediaType::Url,
 			"yaml" | "yml" => MediaType::Yaml,
@@ -375,6 +381,7 @@ impl MediaType {
 			MediaType::Css => Some("css"),
 			MediaType::Javascript => Some("js"),
 			MediaType::Json => Some("json"),
+			MediaType::WebManifest => Some("webmanifest"),
 			MediaType::Xml => Some("xml"),
 			MediaType::Markdown => Some("md"),
 			MediaType::Bsx => Some("bsx"),
@@ -453,6 +460,7 @@ impl MediaType {
 			MediaType::Html => Self::HTML,
 			MediaType::Xml => Self::XML,
 			MediaType::Json => Self::JSON,
+			MediaType::WebManifest => Self::WEB_MANIFEST,
 			MediaType::Postcard => Self::POSTCARD,
 			MediaType::Ron => Self::RON,
 			MediaType::Markdown => Self::MARKDOWN,
@@ -535,6 +543,7 @@ impl MediaType {
 				| MediaType::Html
 				| MediaType::Xml
 				| MediaType::Json
+				| MediaType::WebManifest
 				| MediaType::Markdown
 				| MediaType::Bsx
 				| MediaType::EventStream
@@ -728,6 +737,11 @@ mod test {
 		MediaType::from_extension("css").xpect_eq(MediaType::Css);
 		MediaType::from_extension("js").xpect_eq(MediaType::Javascript);
 		MediaType::from_extension("json").xpect_eq(MediaType::Json);
+		// the manifest type must not be swallowed by the `json` substring match
+		MediaType::from_extension("webmanifest")
+			.xpect_eq(MediaType::WebManifest);
+		MediaType::from_content_type("application/manifest+json")
+			.xpect_eq(MediaType::WebManifest);
 		MediaType::from_extension("png").xpect_eq(MediaType::Png);
 		MediaType::from_extension("jpg").xpect_eq(MediaType::Jpeg);
 		MediaType::from_extension("jpeg").xpect_eq(MediaType::Jpeg);
@@ -813,6 +827,7 @@ mod test {
 			MediaType::Html,
 			MediaType::Xml,
 			MediaType::Json,
+			MediaType::WebManifest,
 			MediaType::Postcard,
 			MediaType::Markdown,
 			MediaType::EventStream,

@@ -21,6 +21,10 @@ pub const TEXT_LABEL_LARGE: ClassName = ClassName::new_static("text-label-large"
 pub const TEXT_LABEL_MEDIUM: ClassName = ClassName::new_static("text-label-medium");
 pub const TEXT_LABEL_SMALL: ClassName = ClassName::new_static("text-label-small");
 
+// ── Brand type ──────────────────────────────────────────────────────────────────
+pub const TEXT_WORDMARK: ClassName = ClassName::new_static("text-wordmark");
+pub const TEXT_EYEBROW: ClassName = ClassName::new_static("text-eyebrow");
+
 // ── Generic text utilities ──────────────────────────────────────────────────────
 pub const TEXT_LEFT: ClassName = ClassName::new_static("text-left");
 pub const TEXT_CENTER: ClassName = ClassName::new_static("text-center");
@@ -161,6 +165,41 @@ pub fn text_label_small() -> Rule {
 		.with_token(common_props::FontSize,typography::FontSizeLabelSmall).unwrap()
 }
 
+// ── Brand type rules ────────────────────────────────────────────────────────────
+
+/// The wordmark - the brand name set as a poster mark, so display-scale type at
+/// the heaviest weight, tracked tight enough to read as one shape and filled
+/// with the primary colour on any surface.
+///
+/// The poster scale, for a hero. The app bar wears the same treatment at title
+/// scale ([`app_bar_title`](super::app_bar_title)), built from the ref tokens
+/// this composite is assembled from.
+pub fn text_wordmark() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(TEXT_WORDMARK))
+		.with_token(TypographyProps,typography::Wordmark).unwrap()
+		// the longhands mirror the composite so the terminal wears the treatment
+		// too: the charcell renderer reads `font-size` and `font-weight`, never a
+		// composite token.
+		.with_token(common_props::FontSize,typography::FontSizeWordmark).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightBlack).unwrap()
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+		.with_canonical(DecorationLine::DEFAULT)
+}
+
+/// The eyebrow label sitting above a heading - small, bold, widely tracked and in
+/// the primary colour, so a section announces itself without a second heading
+/// level. There is no `text-transform`, so the text is authored in upper case.
+pub fn text_eyebrow() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(TEXT_EYEBROW))
+		.with_token(TypographyProps,typography::Eyebrow).unwrap()
+		// see `text_wordmark`: the longhands carry the treatment to the terminal
+		.with_token(common_props::FontSize,typography::FontSizeLabelMedium).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightBold).unwrap()
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+}
+
 // ── Prose element overrides ───────────────────────────────────────────────────
 
 // Theme overrides for prose tags also styled by the user-agent
@@ -262,28 +301,35 @@ pub fn terminal_headings() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 }
 
-/// Prose heading sizes - maps `<h1>`..`<h6>` onto the MD3 type scale (headline
-/// then title sizes) so headings step down in size as on the web reference,
-/// rather than all rendering at the body size. Only `font-size`/`line-height`
-/// are set. The terminal honours the `font-size` too, scaling headings to
-/// fullwidth (`> 1em`) or the box-drawing block font (`> 2em`), both rendered
-/// hardcoded-bold; see [`FontScale`](crate::render::FontScale).
+/// Prose heading steps - maps `<h1>`..`<h6>` onto the type scale (headline then
+/// title steps) so headings step down as on the web reference rather than all
+/// rendering at the body size.
+///
+/// Each level carries its step's weight as well as its size, because the
+/// vendored preflight resets `h1`-`h6` to `font-weight: inherit`: without this
+/// every prose heading would arrive at the body weight, which is the one thing
+/// the brand's heavy structural type cannot afford. The terminal honours the
+/// `font-size` too, scaling headings to fullwidth (`> 1em`) or the box-drawing
+/// block font (`> 2em`), both rendered hardcoded-bold; see
+/// [`FontScale`](crate::render::FontScale).
 pub fn heading_sizes() -> Vec<Rule> {
 	vec![
-		heading_size("h1", typography::FontSizeHeadlineLarge,  typography::LineHeightHeadlineLarge),
-		heading_size("h2", typography::FontSizeHeadlineMedium, typography::LineHeightHeadlineMedium),
-		heading_size("h3", typography::FontSizeHeadlineSmall,  typography::LineHeightHeadlineSmall),
-		heading_size("h4", typography::FontSizeTitleLarge,     typography::LineHeightTitleLarge),
-		heading_size("h5", typography::FontSizeTitleMedium,    typography::LineHeightTitleMedium),
-		heading_size("h6", typography::FontSizeTitleSmall,     typography::LineHeightTitleSmall),
+		heading_step("h1", typography::FontSizeHeadlineLarge,  typography::LineHeightHeadlineLarge,  typography::WeightBold),
+		heading_step("h2", typography::FontSizeHeadlineMedium, typography::LineHeightHeadlineMedium, typography::WeightBold),
+		heading_step("h3", typography::FontSizeHeadlineSmall,  typography::LineHeightHeadlineSmall,  typography::WeightBold),
+		heading_step("h4", typography::FontSizeTitleLarge,     typography::LineHeightTitleLarge,     typography::WeightBold),
+		heading_step("h5", typography::FontSizeTitleMedium,    typography::LineHeightTitleMedium,    typography::WeightMedium),
+		heading_step("h6", typography::FontSizeTitleSmall,     typography::LineHeightTitleSmall,     typography::WeightMedium),
 	]
 }
 
-/// One heading-level size rule, setting the font size and matching line height.
-fn heading_size(tag: &str, size: impl Into<Token>, line_height: impl Into<Token>) -> Rule {
+/// One heading-level rule, setting the font size, matching line height and the
+/// weight its scale step runs at.
+fn heading_step(tag: &str, size: impl Into<Token>, line_height: impl Into<Token>, weight: impl Into<Token>) -> Rule {
 	Rule::tags(&[tag])
 		.with_token(common_props::FontSize, size).unwrap()
 		.with_token(common_props::LineHeight, line_height).unwrap()
+		.with_token(common_props::FontWeightProp, weight).unwrap()
 }
 
 // ── Generic text utility rules ──────────────────────────────────────────────────

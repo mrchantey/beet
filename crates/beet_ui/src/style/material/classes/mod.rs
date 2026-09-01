@@ -68,6 +68,8 @@ pub fn all_rules() -> Vec<Rule> {
 		text_label_large(),
 		text_label_medium(),
 		text_label_small(),
+		text_wordmark(),
+		text_eyebrow(),
 		color_primary(),
 		shape_none(),
 		shape_extra_small(),

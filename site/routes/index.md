@@ -3,7 +3,7 @@ title = "Beet"
 +++
 
 <div bx:style="display=Flex flex-direction=Vertical align-items=Center text-align=Center row-gap=Rem(1.5)">
-	<h1 class="text-display-medium">Beet</h1>
+	<h1 class="text-wordmark">Beet</h1>
 	<p class="text-title-large">
 		<b>A malleable engine for sovereign software</b>
 	</p>

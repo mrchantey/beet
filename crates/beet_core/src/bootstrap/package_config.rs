@@ -34,6 +34,15 @@ pub struct PackageConfig {
 	pub version: SmolStr,
 	/// The homepage URL, usually set via `CARGO_PKG_HOMEPAGE` in [`pkg_config!`].
 	pub homepage: Option<SmolStr>,
+	/// The absolute URL of the social card, the image a link preview shows.
+	///
+	/// Absolute because a crawler resolves it against nothing, so a relative
+	/// path yields no preview at all. Unset omits the tag and the preview falls
+	/// back to the small summary card.
+	pub social_image: Option<SmolStr>,
+	/// The brand colour a browser tints its own chrome with, ie the mobile
+	/// address bar and the Microsoft tile. Unset leaves the browser default.
+	pub theme_color: Option<SmolStr>,
 }
 
 /// The defaults govern unset fields for markup-only sites: a markup-declared
@@ -48,6 +57,8 @@ impl Default for PackageConfig {
 			app_name: Self::DEFAULT_APP_NAME.into(),
 			version: "0.0.1".into(),
 			homepage: None,
+			social_image: None,
+			theme_color: None,
 		}
 	}
 }
@@ -85,6 +96,10 @@ macro_rules! pkg_config {
 			app_name: env!("CARGO_PKG_NAME").into(),
 			version: env!("CARGO_PKG_VERSION").into(),
 			homepage: Some(env!("CARGO_PKG_HOMEPAGE").into()),
+			// no cargo manifest key names a social card or a brand colour, so
+			// these stay the caller's to set.
+			social_image: None,
+			theme_color: None,
 		}
 	};
 }

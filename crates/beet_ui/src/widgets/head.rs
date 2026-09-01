@@ -27,9 +27,13 @@ use beet_core::prelude::*;
 /// A `<head>` with sensible defaults sourced from [`PackageConfig`].
 ///
 /// Renders charset, title, canonical, viewport (toggle `fixed_scale` for games),
-/// description, version, theme-color, application-name, the core Open Graph and
-/// Twitter-card tags, and the Apple/Android/Microsoft PWA meta block. Extra
-/// app-specific tags can be added through the default slot.
+/// description, version, application-name, the core Open Graph and Twitter-card
+/// tags, and the Apple/Android/Microsoft PWA meta block. Extra app-specific tags
+/// can be added through the default slot.
+///
+/// The brand-dependent tags (the social card, the theme colour) render only when
+/// [`PackageConfig`] names them, so an app that has no card gets the small
+/// summary preview rather than a broken image.
 #[template(system)]
 pub fn Head(
 	#[prop] fixed_scale: bool,
@@ -46,6 +50,17 @@ pub fn Head(
 	// rendering an empty attribute.
 	let homepage = pkg_config.homepage.clone();
 	let version = pkg_config.version.clone();
+	// the social card and the brand tint, each omitted rather than defaulted:
+	// an invented card url is a broken preview and an invented tint is another
+	// brand's colour.
+	let social_image = pkg_config.social_image.clone();
+	let theme_color = pkg_config.theme_color.clone();
+	// a card only fills the large preview when there is a card to fill it with.
+	let twitter_card = if social_image.is_some() {
+		"summary_large_image"
+	} else {
+		"summary"
+	};
 
 	let scale = if fixed_scale {
 		"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
@@ -64,7 +79,7 @@ pub fn Head(
 			<meta name="description" content={&description}/>
 			<meta name="version" content={&version}/>
 			<meta name="application-name" content={&title}/>
-			<meta name="theme-color" content="#ffffff"/>
+			{theme_color.as_ref().map(|color| rsx!{ <meta name="theme-color" content={color.clone()}/> })}
 			// Open Graph
 			<meta property="og:title" content={&title}/>
 			<meta property="og:type" content="website"/>
@@ -72,10 +87,12 @@ pub fn Head(
 			<meta property="og:site_name" {site_name_attr(&title)}/>
 			<meta property="og:description" content={&description}/>
 			{homepage.as_ref().map(|homepage| rsx!{ <meta property="og:url" content={homepage.clone()}/> })}
+			{social_image.as_ref().map(|image| rsx!{ <meta property="og:image" content={image.clone()}/> })}
 			// Twitter card
-			<meta name="twitter:card" content="summary"/>
+			<meta name="twitter:card" content={twitter_card}/>
 			<meta name="twitter:title" content={&title}/>
 			<meta name="twitter:description" content={&description}/>
+			{social_image.as_ref().map(|image| rsx!{ <meta name="twitter:image" content={image.clone()}/> })}
 			// Apple PWA
 			<meta name="apple-mobile-web-app-capable" content="yes"/>
 			<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -83,7 +100,7 @@ pub fn Head(
 			// Android PWA
 			<meta name="mobile-web-app-capable" content="yes"/>
 			// Microsoft tile
-			<meta name="msapplication-TileColor" content="#000000"/>
+			{theme_color.as_ref().map(|color| rsx!{ <meta name="msapplication-TileColor" content={color.clone()}/> })}
 			<Slot/>
 		</head>
 	}

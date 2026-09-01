@@ -6,10 +6,29 @@ transcludes each route's body in as SiteLayout's default-slot child, so it lands
 in <main> with no relay here. No overrides: the no-code site is the full beet
 chrome with nothing excluded.
 
+The `head` slot carries the site's own identity links: the self hosted Inter the
+brand type names, then the icon set and web app manifest under `assets/branding`.
+They live here rather than in the shell because an app that ships no branding
+directory should not be asked for one; the shell emits only the single favicon
+every beet site has. The social card and the brand tint ride `<PackageConfig/>`
+in `main.bsx` instead, since a crawler reads them as meta rather than links.
+
+The font is served from our own bucket, not a CDN, so a visit costs no third
+party request and the site keeps working with the rest of the web unavailable.
+Without it the heaviest weights the type scale asks for are a browser's synthetic
+bold, so the wordmark and every display heading would arrive at the wrong weight.
+
 <Analytics/> injects the page-view beacon script on every page (web only; the
 runtime ignores the <script> on terminal targets, whose page views come from the
 in-world navigator instead).
 -->
 <SiteLayout>
+	<Fragment slot="head">
+		<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+		<link rel="stylesheet" href="/assets/fonts/inter.css"/>
+		<link rel="icon" type="image/png" sizes="16x16" href="/assets/branding/favicon-16x16.png"/>
+		<link rel="apple-touch-icon" sizes="180x180" href="/assets/branding/apple-touch-icon.png"/>
+		<link rel="manifest" href="/assets/branding/site.webmanifest"/>
+	</Fragment>
 	<Analytics/>
 </SiteLayout>
