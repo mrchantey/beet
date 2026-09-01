@@ -1,4 +1,4 @@
-//! The perceive-act embodied-agent tools (see `.agents/plans/percieve-act.md`).
+//! The perceive-act embodied-agent tools.
 //!
 //! A floor robot that perceives one photo at a time and acts on what it sees.
 //! Each cycle [`PostPhoto`] (the camera actor) captures via [`TakePhoto`] and

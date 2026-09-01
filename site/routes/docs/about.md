@@ -13,7 +13,7 @@ Beet is short for Beetmash, a mispronunciation of Beat Match which nods to [MIT 
 
 ## Beet and beetmash
 
-Beet is the open source engine and standards and [Beetmash](https://beetmash.com) is the consulting company built on top helping organizations toward tech sovereignty. Beetmash is to Beet roughly what BlueSky is to ATProto.
+Beet is the open source engine and standards and [Beetmash](https://beetmash.com) is the consulting company built on top, helping organizations toward tech sovereignty. Beetmash is to Beet roughly what BlueSky is to ATProto.
 
 ## The lineage
 
