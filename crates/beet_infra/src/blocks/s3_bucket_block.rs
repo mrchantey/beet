@@ -17,7 +17,7 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct S3BucketBlock {
 	label: SmolStr,
 	/// Override the region this bucket lives in, which otherwise resolves from
@@ -169,49 +169,33 @@ pub(crate) fn attach_s3_store(
 		});
 }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl S3BucketBlock {
+impl Block for S3BucketBlock {
+	fn label(&self) -> &SmolStr { &self.label }
+
 	/// A deployed process reads the buckets declared alongside it (its site
 	/// store, its assets); the deploy itself is what writes them. A bucket the
 	/// process stores into declares [`runtime_write`](Self::with_runtime_write).
-	pub(crate) fn runtime_access(
-		&self,
-		stack: &ResolvedStack,
-	) -> Vec<AccessGrant> {
+	fn grants(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
 		let name = stack.resource_name(self.label.clone());
 		vec![match self.runtime_write {
 			true => AccessGrant::read_write(Self::ACCESS_KIND, name),
 			false => AccessGrant::read(Self::ACCESS_KIND, name),
 		}]
 	}
+}
 
-	/// Declare the runtime grant a compute block lowers: read for a bucket the
-	/// deploy publishes and the process serves, read/write for one the process
-	/// stores into.
-	pub(crate) fn declare(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&S3BucketBlock>,
-	) {
-		scope.render_each(&query, |scope, entity, block| {
-			for grant in block.runtime_access(scope.stack()) {
-				scope.grant(entity, grant);
-			}
-			Ok(())
-		});
+impl EmitBlock for S3BucketBlock {
+	fn emit(
+		&self,
+		stack: &ResolvedStack,
+		_deployment: &Deployment,
+		config: &mut terra::Config,
+	) -> Result {
+		self.emit(stack, config)
 	}
+}
 
-	/// Render the bucket and its secondaries into the config.
-	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&S3BucketBlock>,
-	) {
-		scope.render_each(&query, |scope, _entity, block| {
-			let (stack, _deployment, config) = scope.ctx();
-			block.emit(stack, config)
-		});
-	}
-
+impl S3BucketBlock {
 	/// Emit this bucket's resources: the bucket, its optional output, and the
 	/// public-read / versioning secondaries.
 	fn emit(

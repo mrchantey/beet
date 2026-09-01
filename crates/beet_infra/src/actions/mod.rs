@@ -1,5 +1,4 @@
 mod aws_watch;
-mod build_artifact;
 #[cfg(feature = "fargate_block")]
 mod build_docker_image;
 #[cfg(feature = "cloudflare_block")]
@@ -20,7 +19,6 @@ mod sync_s3_bucket;
 mod tofu_apply_action;
 pub mod wrangler_ext;
 pub use aws_watch::*;
-pub use build_artifact::*;
 #[cfg(feature = "fargate_block")]
 pub use build_docker_image::*;
 #[cfg(feature = "cloudflare_block")]

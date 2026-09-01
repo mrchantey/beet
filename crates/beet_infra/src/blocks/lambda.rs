@@ -14,7 +14,7 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_add = ArtifactLabel::on_add::<LambdaBlock>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct LambdaBlock {
 	/// Label used as a prefix for all terraform resources,
 	/// variables, and outputs. Also used as the artifact name.
@@ -111,67 +111,37 @@ impl LambdaBlock {
 	}
 }
 
-impl From<&LambdaBlock> for ArtifactLabel {
-	fn from(block: &LambdaBlock) -> Self { Self(block.label.clone()) }
-}
+impl Block for LambdaBlock {
+	fn label(&self) -> &SmolStr { &self.label }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl LambdaBlock {
 	/// Tofu variables the function's environment reads, ie the
 	/// [`env_vars`](Self::env_vars).
-	pub(crate) fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
 
-	/// Declare the tofu [`Variable`]s the function's environment reads, ie the
-	/// [`env_vars`](Self::env_vars).
-	pub(crate) fn declare(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&LambdaBlock>,
+	fn artifact_label(&self) -> Option<&SmolStr> { Some(&self.label) }
+}
+
+/// The [`DeployRender`] render system, registered by [`InfraPlugin`] beside
+/// the type registration.
+impl LambdaBlock {
+	/// Render the function and its secondaries into the config, hashing the
+	/// colocated [`BuildArtifact`] when there is one.
+	pub(crate) fn render(
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(Entity, &LambdaBlock, Option<&BuildArtifact>)>,
 	) {
-		scope.render_each(&query, |scope, entity, block| {
-			for variable in block.variables() {
-				scope.variable(entity, variable);
-			}
-			Ok(())
-		});
-	}
-
-	cfg_if! {
-		// `BuildArtifact` holds a `ChildProcess`, so the hash of a
-		// locally-built artifact only exists where the build can run.
-		if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
-			/// Render the function and its secondaries into the config, hashing
-			/// the colocated [`BuildArtifact`] when there is one.
-			pub(crate) fn render(
-				mut scope: ResMut<RenderScope>,
-				query: Query<(&LambdaBlock, Option<&BuildArtifact>)>,
-			) {
-				for entity in scope.declared().to_vec() {
-					if let Ok((block, artifact)) = query.get(entity) {
-						let source_hash = artifact.and_then(|artifact| {
-							artifact.compute_source_hash().ok()
-						});
-						let access = scope.access();
-						let (stack, deployment, config) = scope.ctx();
-						if let Err(err) = block
-							.emit(source_hash, stack, deployment, &access, config)
-						{
-							scope.error(err);
-						}
-					}
-				}
-			}
-		} else {
-			/// Render the function and its secondaries into the config.
-			pub(crate) fn render(
-				mut scope: ResMut<RenderScope>,
-				query: Query<&LambdaBlock>,
-			) {
-				scope.render_each(&query, |scope, _entity, block| {
-					let access = scope.access();
-					let (stack, deployment, config) = scope.ctx();
-					block.emit(None, stack, deployment, &access, config)
-				});
+		for (entity, block, artifact) in blocks.iter() {
+			let Ok(mut scope) = scopes.get_mut(entity) else {
+				continue;
+			};
+			let source_hash = artifact
+				.and_then(|artifact| artifact.compute_source_hash().ok());
+			let access = scope.access();
+			let (stack, deployment, config) = scope.ctx();
+			if let Err(err) =
+				block.emit(source_hash, stack, deployment, &access, config)
+			{
+				scope.error(bevyhow!("LambdaBlock '{}': {err}", block.label()));
 			}
 		}
 	}

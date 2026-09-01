@@ -47,7 +47,7 @@ impl ContainerImage {
 ///
 /// [`dns`]: Self::dns
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_add = ArtifactLabel::on_add::<FargateBlock>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct FargateBlock {
 	/// Label used as a prefix for all terraform resources.
 	/// Also used as the artifact name and ECR repository.
@@ -212,41 +212,36 @@ impl FargateBlock {
 	}
 }
 
-impl From<&FargateBlock> for ArtifactLabel {
-	fn from(block: &FargateBlock) -> Self { Self(block.label.clone()) }
-}
+impl Block for FargateBlock {
+	fn label(&self) -> &SmolStr { &self.label }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl FargateBlock {
 	/// Tofu variables the task's env references, ie the
 	/// [`env_vars`](Self::env_vars).
-	pub(crate) fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
 
-	/// Declare the tofu variables the task's env references.
-	pub(crate) fn declare(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&FargateBlock>,
-	) {
-		scope.render_each(&query, |scope, entity, block| {
-			for variable in block.variables() {
-				scope.variable(entity, variable);
-			}
-			Ok(())
-		});
-	}
+	fn artifact_label(&self) -> Option<&SmolStr> { Some(&self.label) }
+}
 
+/// The [`DeployRender`] render system, registered by [`InfraPlugin`] beside
+/// the type registration.
+impl FargateBlock {
 	/// Render the service into the config, lowering the declared grants into
 	/// the task role's inline policy.
 	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&FargateBlock>,
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(Entity, &FargateBlock)>,
 	) {
-		scope.render_each(&query, |scope, _entity, block| {
+		for (entity, block) in blocks.iter() {
+			let Ok(mut scope) = scopes.get_mut(entity) else {
+				continue;
+			};
 			let access = scope.access();
 			let (stack, deployment, config) = scope.ctx();
-			block.emit(stack, deployment, &access, config)
-		});
+			if let Err(err) = block.emit(stack, deployment, &access, config) {
+				scope
+					.error(bevyhow!("FargateBlock '{}': {err}", block.label()));
+			}
+		}
 	}
 
 	/// Emit the whole service: networking, the NLB, the roles (with the grants

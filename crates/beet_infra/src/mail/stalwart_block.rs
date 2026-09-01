@@ -50,7 +50,7 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct StalwartBlock {
 	/// Label prefixing every terraform resource, including the box's own
 	/// security group, ie the one its ingress admission names as its source.
@@ -104,6 +104,10 @@ pub struct StalwartBlock {
 
 impl Default for StalwartBlock {
 	fn default() -> Self { Self::new("", "") }
+}
+
+impl Block for StalwartBlock {
+	fn label(&self) -> &SmolStr { &self.label }
 }
 
 impl StalwartBlock {
@@ -340,27 +344,39 @@ impl StalwartBlock {
 	/// [`VpcRef`] and [`DatabaseRef`] relations and lowering the grants the
 	/// stack's declarations contributed.
 	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<(&StalwartBlock, Option<&VpcRef>, Option<&DatabaseRef>)>,
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(
+			Entity,
+			&StalwartBlock,
+			Option<&VpcRef>,
+			Option<&DatabaseRef>,
+		)>,
 		vpcs: Query<&VpcBlock>,
 		databases: Query<&RdsPostgresBlock>,
 	) {
-		for entity in scope.declared().to_vec() {
-			let Ok((block, vpc_ref, database_ref)) = query.get(entity) else {
+		for (entity, block, vpc_ref, database_ref) in blocks.iter() {
+			if scopes.get_entity(entity).is_err() {
 				continue;
-			};
-			let vpc = scope.related(
+			}
+			let vpc = crate::types::related(
+				&scopes,
+				entity,
 				&vpcs,
 				vpc_ref.map(|vpc_ref| vpc_ref.0),
 				"VpcRef",
 				block.label(),
 			);
-			let database = scope.related(
+			let database = crate::types::related(
+				&scopes,
+				entity,
 				&databases,
 				database_ref.map(|database_ref| database_ref.0),
 				"DatabaseRef",
 				block.label(),
 			);
+			let Ok(mut scope) = scopes.get_mut(entity) else {
+				continue;
+			};
 			match (vpc, database) {
 				(Ok(vpc), Ok(database)) => {
 					let access = scope.access();

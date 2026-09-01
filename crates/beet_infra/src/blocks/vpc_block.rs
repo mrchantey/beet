@@ -23,7 +23,7 @@ use beet_core::prelude::*;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct VpcBlock {
 	label: SmolStr,
 	/// The network this vpc owns, which must be a `/16`: every subnet is a
@@ -167,20 +167,22 @@ impl VpcBlock {
 	}
 }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl VpcBlock {
-	/// Render the network into the config.
-	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&VpcBlock>,
-	) {
-		scope.render_each(&query, |scope, _entity, block| {
-			let (stack, _deployment, config) = scope.ctx();
-			block.emit(stack, config)
-		});
-	}
+impl Block for VpcBlock {
+	fn label(&self) -> &SmolStr { &self.label }
+}
 
+impl EmitBlock for VpcBlock {
+	fn emit(
+		&self,
+		stack: &ResolvedStack,
+		_deployment: &Deployment,
+		config: &mut terra::Config,
+	) -> Result {
+		self.emit(stack, config)
+	}
+}
+
+impl VpcBlock {
 	/// Emit the vpc, its subnets and the public side's routes.
 	fn emit(
 		&self,

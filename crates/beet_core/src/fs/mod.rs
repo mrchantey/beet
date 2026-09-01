@@ -6,19 +6,19 @@
 //! # Features
 //!
 //! - [`FsWatcher`] - File system watcher with debouncing
-//! - [`ChildProcess`] - Helper for spawning processes with stdout collection
-//! - [`Tempdir`] - Temporary directory management (requires `rand` feature)
+//! - `Tempdir` - Temporary directory management (requires `rand` feature)
+//!
+//! [`ChildProcess`](crate::prelude::ChildProcess) lives in
+//! [`bootstrap`](crate::bootstrap): its description compiles everywhere
 //!
 //! # Platform Support
 //!
 //! This module is only available on native platforms (not wasm).
 
-mod child_process;
 mod fs_watcher;
 #[cfg(feature = "rand")]
 mod tempdir;
 
-pub use child_process::*;
 pub use fs_watcher::*;
 #[cfg(feature = "rand")]
 pub use tempdir::*;

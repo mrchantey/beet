@@ -59,20 +59,24 @@ pub enum AccessPermissions {
 /// Every grant the blocks of one stack declared, collected once per deploy and
 /// handed to the compute blocks that lower them.
 ///
-/// Deduplicated in declaration order at construction, since declaration order is
-/// the deploy's order: a policy renders identically across runs and a plan shows
-/// no spurious diff.
+/// A sorted set by construction (ordered by kind, name, permissions, exact
+/// duplicates removed): the pool is semantically a set, so making it one is
+/// what guarantees a policy renders identically across runs. Contribution
+/// order can never matter, and a reordering of declarations in markup never
+/// shows a spurious plan diff.
 #[derive(Debug, Default, Clone, Deref)]
 pub struct AccessGrants(Vec<AccessGrant>);
 
 impl AccessGrants {
-	pub fn new(grants: Vec<AccessGrant>) -> Self {
-		let mut out = Vec::<AccessGrant>::new();
-		for grant in grants {
-			if !out.contains(&grant) {
-				out.push(grant);
-			}
-		}
-		Self(out)
+	pub fn new(mut grants: Vec<AccessGrant>) -> Self {
+		grants.sort_by(|left, right| {
+			(&left.kind, &left.name, left.permissions as u8).cmp(&(
+				&right.kind,
+				&right.name,
+				right.permissions as u8,
+			))
+		});
+		grants.dedup();
+		Self(grants)
 	}
 }

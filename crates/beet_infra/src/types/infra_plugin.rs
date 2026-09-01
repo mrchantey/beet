@@ -51,9 +51,9 @@ impl Plugin for InfraPlugin {
 			.add_systems(
 				DeployRender,
 				(
-					crate::prelude::S3BucketBlock::declare
+					crate::types::declare::<crate::prelude::S3BucketBlock>
 						.in_set(DeployRenderSet::Declare),
-					crate::prelude::S3BucketBlock::render
+					crate::types::render::<crate::prelude::S3BucketBlock>
 						.in_set(DeployRenderSet::Render),
 				),
 			);
@@ -62,9 +62,9 @@ impl Plugin for InfraPlugin {
 			.add_systems(
 				DeployRender,
 				(
-					crate::prelude::DynamoTableBlock::declare
+					crate::types::declare::<crate::prelude::DynamoTableBlock>
 						.in_set(DeployRenderSet::Declare),
-					crate::prelude::DynamoTableBlock::render
+					crate::types::render::<crate::prelude::DynamoTableBlock>
 						.in_set(DeployRenderSet::Render),
 				),
 			);
@@ -92,7 +92,7 @@ impl Plugin for InfraPlugin {
 			.add_systems(
 				DeployRender,
 				(
-					crate::prelude::LambdaBlock::declare
+					crate::types::declare::<crate::prelude::LambdaBlock>
 						.in_set(DeployRenderSet::Declare),
 					crate::prelude::LambdaBlock::render
 						.in_set(DeployRenderSet::Render),
@@ -105,7 +105,7 @@ impl Plugin for InfraPlugin {
 		app.add_systems(
 			DeployRender,
 			(
-				crate::prelude::FargateBlock::declare
+				crate::types::declare::<crate::prelude::FargateBlock>
 					.in_set(DeployRenderSet::Declare),
 				crate::prelude::FargateBlock::render
 					.in_set(DeployRenderSet::Render),
@@ -115,7 +115,7 @@ impl Plugin for InfraPlugin {
 		app.add_systems(
 			DeployRender,
 			(
-				crate::prelude::LightsailBlock::declare
+				crate::types::declare::<crate::prelude::LightsailBlock>
 					.in_set(DeployRenderSet::Declare),
 				crate::prelude::LightsailBlock::render
 					.in_set(DeployRenderSet::Render),
@@ -124,7 +124,7 @@ impl Plugin for InfraPlugin {
 		#[cfg(feature = "cloudflare_dns")]
 		app.add_systems(
 			DeployRender,
-			crate::prelude::CloudflareFailoverBlock::render
+			crate::types::render::<crate::prelude::CloudflareFailoverBlock>
 				.in_set(DeployRenderSet::Render),
 		);
 
@@ -152,7 +152,7 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::SubnetTier>()
 			.add_systems(
 				DeployRender,
-				crate::prelude::VpcBlock::render
+				crate::types::render::<crate::prelude::VpcBlock>
 					.in_set(DeployRenderSet::Render),
 			);
 		#[cfg(feature = "rds_postgres_block")]
@@ -162,7 +162,7 @@ impl Plugin for InfraPlugin {
 			.add_systems(
 				DeployRender,
 				(
-					crate::prelude::RdsPostgresBlock::declare
+					crate::types::declare::<crate::prelude::RdsPostgresBlock>
 						.in_set(DeployRenderSet::Declare),
 					crate::prelude::RdsPostgresBlock::render
 						.in_set(DeployRenderSet::Render),
@@ -192,10 +192,10 @@ impl Plugin for InfraPlugin {
 		app.add_systems(
 			DeployRender,
 			(
-				crate::prelude::MailDomainBlock::declare
+				crate::types::declare::<crate::prelude::MailDomainBlock>
 					.in_set(DeployRenderSet::Declare),
 				(
-					crate::prelude::MailDomainBlock::render,
+					crate::types::render::<crate::prelude::MailDomainBlock>,
 					crate::prelude::StalwartBlock::render,
 				)
 					.in_set(DeployRenderSet::Render),

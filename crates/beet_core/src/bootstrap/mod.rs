@@ -10,10 +10,12 @@
 //! [`pkg_config!`](crate::pkg_config)).
 
 mod bootstrap_config;
+mod child_process;
 mod running_set_filter;
 mod service_access;
 mod store_uri;
 pub use bootstrap_config::*;
+pub use child_process::*;
 pub use running_set_filter::*;
 pub use service_access::*;
 pub use store_uri::*;

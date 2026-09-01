@@ -38,8 +38,9 @@ pub struct TofuApply {
 
 /// Builds terraform config, uploads artifacts, publishes the ledger, and applies.
 ///
-/// Collects each [`BuildArtifact`] + [`ArtifactLabel`] pair from
-/// stack descendants to build the [`ArtifactLedger`], using
+/// Collects each [`BuildArtifact`] paired with the
+/// [`artifact_label`](ErasedBlock::artifact_label) its [`ErasedBlock`] carries
+/// from stack descendants to build the [`ArtifactLedger`], using
 /// [`BuildArtifact::compute_source_hash`] for the hash.
 ///
 /// Reads its own [`TofuApply`] for the layer, so the config component requires
@@ -66,17 +67,20 @@ pub async fn TofuApplyAction(
 		.with_world(|world, entity| -> Result<_> {
 			let scope = RenderScope::render(world, entity)?;
 			let variables = scope.variables();
-			// each declared artifact, paired with the label its block inserted
+			// each declared artifact, paired with the label its block declared
 			let artifacts =
 				world
-					.with_state::<(StackQuery, Query<(&ArtifactLabel, &BuildArtifact)>), _>(
+					.with_state::<(StackQuery, Query<(&ErasedBlock, &BuildArtifact)>), _>(
 						|(stacks, artifacts)| -> Result<_> {
 							stacks
 								.declared(entity)?
 								.into_iter()
 								.filter_map(|child| artifacts.get(child).ok())
-								.map(|(label, artifact)| {
-									(artifact.clone(), label.0.clone())
+								.filter_map(|(erased, artifact)| {
+									erased
+										.artifact_label
+										.clone()
+										.map(|label| (artifact.clone(), label))
 								})
 								.collect::<Vec<_>>()
 								.xok()

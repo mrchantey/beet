@@ -29,7 +29,7 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct RdsPostgresBlock {
 	label: SmolStr,
 	instance_class: SmolStr,
@@ -258,58 +258,56 @@ impl RdsPostgresBlock {
 	}
 }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl RdsPostgresBlock {
+impl Block for RdsPostgresBlock {
+	fn label(&self) -> &SmolStr { &self.label }
+
 	/// What a process running beside this instance does with it: read the
 	/// master password out of the parameter it was put in. The connection
 	/// itself needs no cloud permission at all, being a tcp session inside the
 	/// vpc that the security group either admits or does not.
-	pub(crate) fn runtime_access(
-		&self,
-		stack: &ResolvedStack,
-	) -> Vec<AccessGrant> {
+	fn grants(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
 		vec![AccessGrant::read(
 			Self::ACCESS_KIND,
 			self.secret_name(stack),
 		)]
 	}
 
-	pub(crate) fn variables(&self) -> Vec<Variable> { vec![self.password()] }
+	/// The sensitive password variable the apply resolves.
+	fn variables(&self) -> Vec<Variable> { vec![self.password()] }
+}
 
-	/// Declare the runtime grant (read on the master password's parameter) and
-	/// the sensitive password variable the apply resolves.
-	pub(crate) fn declare(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&RdsPostgresBlock>,
-	) {
-		scope.render_each(&query, |scope, entity, block| {
-			for grant in block.runtime_access(scope.stack()) {
-				scope.grant(entity, grant);
-			}
-			for variable in block.variables() {
-				scope.variable(entity, variable);
-			}
-			Ok(())
-		});
-	}
-
+/// The [`DeployRender`] render system, registered by [`InfraPlugin`] beside
+/// the type registration.
+impl RdsPostgresBlock {
 	/// Render the instance and its secondaries into the config, resolving the
 	/// [`VpcRef`] relation to the network it lives in. A database whose
 	/// [`DatabaseConsumers`] are missing or empty is a typo, not a
 	/// configuration, so it fails here rather than provisioning twenty minutes
 	/// of unreachable instance.
 	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<(
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(
+			Entity,
 			&RdsPostgresBlock,
 			Option<&VpcRef>,
 			Option<&DatabaseConsumers>,
 		)>,
 		vpcs: Query<&VpcBlock>,
 	) {
-		for entity in scope.declared().to_vec() {
-			let Ok((block, vpc_ref, consumers)) = query.get(entity) else {
+		for (entity, block, vpc_ref, consumers) in blocks.iter() {
+			// skip blocks outside every rendering scope before anything errors
+			if scopes.get_entity(entity).is_err() {
+				continue;
+			}
+			let vpc = crate::types::related(
+				&scopes,
+				entity,
+				&vpcs,
+				vpc_ref.map(|vpc_ref| vpc_ref.0),
+				"VpcRef",
+				block.label(),
+			);
+			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
 			if consumers.is_none_or(|consumers| consumers.is_empty()) {
@@ -320,19 +318,17 @@ impl RdsPostgresBlock {
 				));
 				continue;
 			}
-			let result = scope
-				.related(
-					&vpcs,
-					vpc_ref.map(|vpc_ref| vpc_ref.0),
-					"VpcRef",
-					block.label(),
-				)
-				.and_then(|vpc| {
+			match vpc {
+				Err(err) => scope.error(err),
+				Ok(vpc) => {
 					let (stack, _deployment, config) = scope.ctx();
-					block.emit(stack, config, vpc)
-				});
-			if let Err(err) = result {
-				scope.error(err);
+					if let Err(err) = block.emit(stack, config, vpc) {
+						scope.error(bevyhow!(
+							"RdsPostgresBlock '{}': {err}",
+							block.label()
+						));
+					}
+				}
 			}
 		}
 	}

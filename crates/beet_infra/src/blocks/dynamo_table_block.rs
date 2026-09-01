@@ -21,7 +21,7 @@ use beet_net::prelude::*;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct DynamoTableBlock {
 	/// The unprefixed table label (eg `analytics`).
 	label: SmolStr,
@@ -142,46 +142,31 @@ pub(crate) fn attach_table_store(
 	);
 }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl DynamoTableBlock {
+impl Block for DynamoTableBlock {
+	fn label(&self) -> &SmolStr { &self.label }
+
 	/// A table is declared to be recorded to, so the process that declared it
 	/// reads and writes it.
-	pub(crate) fn runtime_access(
-		&self,
-		stack: &ResolvedStack,
-	) -> Vec<AccessGrant> {
+	fn grants(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
 		vec![AccessGrant::read_write(
 			Self::ACCESS_KIND,
 			self.table_name(stack),
 		)]
 	}
+}
 
-	/// Declare the read/write grant a compute block lowers: a table is declared
-	/// to be recorded to.
-	pub(crate) fn declare(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&DynamoTableBlock>,
-	) {
-		scope.render_each(&query, |scope, entity, block| {
-			for grant in block.runtime_access(scope.stack()) {
-				scope.grant(entity, grant);
-			}
-			Ok(())
-		});
+impl EmitBlock for DynamoTableBlock {
+	fn emit(
+		&self,
+		stack: &ResolvedStack,
+		_deployment: &Deployment,
+		config: &mut terra::Config,
+	) -> Result {
+		self.emit(stack, config)
 	}
+}
 
-	/// Render the table into the config.
-	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&DynamoTableBlock>,
-	) {
-		scope.render_each(&query, |scope, _entity, block| {
-			let (stack, _deployment, config) = scope.ctx();
-			block.emit(stack, config)
-		});
-	}
-
+impl DynamoTableBlock {
 	/// Emit the pay-per-request table, with its ttl sub-resource when declared.
 	fn emit(
 		&self,

@@ -31,7 +31,7 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct ScheduledJobBlock {
 	/// The unprefixed schedule label (eg `rollup-daily`), which names the
 	/// schedule and its invoke role.
@@ -168,33 +168,47 @@ impl ScheduledJobBlock {
 	}
 }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
+impl Block for ScheduledJobBlock {
+	fn label(&self) -> &SmolStr { &self.label }
+}
+
+/// The [`DeployRender`] render system, registered by [`InfraPlugin`] beside
+/// the type registration.
 impl ScheduledJobBlock {
 	/// Render the schedule and its invoke role into the config, resolving the
 	/// [`InvokeTarget`] relation to the [`LambdaBlock`] it invokes.
 	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<(&ScheduledJobBlock, Option<&InvokeTarget>)>,
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(Entity, &ScheduledJobBlock, Option<&InvokeTarget>)>,
 		lambdas: Query<&LambdaBlock>,
 	) {
-		for entity in scope.declared().to_vec() {
-			let Ok((block, target)) = query.get(entity) else {
+		for (entity, block, target) in blocks.iter() {
+			// skip blocks outside every rendering scope before anything errors
+			if scopes.get_entity(entity).is_err() {
+				continue;
+			}
+			let lambda = crate::types::related(
+				&scopes,
+				entity,
+				&lambdas,
+				target.map(|target| target.0),
+				"InvokeTarget",
+				block.label(),
+			);
+			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
-			let result = scope
-				.related(
-					&lambdas,
-					target.map(|target| target.0),
-					"InvokeTarget",
-					block.label(),
-				)
-				.and_then(|lambda| {
+			match lambda {
+				Err(err) => scope.error(err),
+				Ok(lambda) => {
 					let (stack, _deployment, config) = scope.ctx();
-					block.emit(stack, config, lambda)
-				});
-			if let Err(err) = result {
-				scope.error(err);
+					if let Err(err) = block.emit(stack, config, lambda) {
+						scope.error(bevyhow!(
+							"ScheduledJobBlock '{}': {err}",
+							block.label()
+						));
+					}
+				}
 			}
 		}
 	}

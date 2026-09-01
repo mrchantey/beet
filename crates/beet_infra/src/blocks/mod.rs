@@ -1,4 +1,6 @@
 #![allow(unused)]
+mod block;
+pub use block::*;
 #[cfg(feature = "lambda_block")]
 mod lambda;
 #[cfg(feature = "lambda_block")]

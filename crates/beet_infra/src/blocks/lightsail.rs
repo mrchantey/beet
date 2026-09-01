@@ -22,7 +22,7 @@ pub enum LightsailNetworking {
 /// - Optional DNS records pointing each authority at the public address
 /// - Optional beet ssh on 22, relocating the management sshd
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_add = ArtifactLabel::on_add::<LightsailBlock>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct LightsailBlock {
 	/// Label used as a prefix for all terraform resources.
 	/// Also used as the artifact name.
@@ -792,41 +792,38 @@ exit 1
 	}
 }
 
-impl From<&LightsailBlock> for ArtifactLabel {
-	fn from(block: &LightsailBlock) -> Self { Self(block.label.clone()) }
-}
+impl Block for LightsailBlock {
+	fn label(&self) -> &SmolStr { &self.label }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl LightsailBlock {
 	/// Tofu variables the box's environment reads, ie the
 	/// [`env_vars`](Self::env_vars).
-	pub(crate) fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
 
-	/// Contribute the tofu [`Variable`]s the block's env vars declare.
-	pub(crate) fn declare(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&LightsailBlock>,
-	) {
-		scope.render_each(&query, |scope, entity, block| {
-			for variable in block.variables() {
-				scope.variable(entity, variable);
-			}
-			Ok(())
-		});
-	}
+	fn artifact_label(&self) -> Option<&SmolStr> { Some(&self.label) }
+}
 
+/// The [`DeployRender`] render system, registered by [`InfraPlugin`] beside
+/// the type registration.
+impl LightsailBlock {
 	/// Render the box, lowering the stack's declared grants into its runtime
 	/// policy.
 	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&LightsailBlock>,
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(Entity, &LightsailBlock)>,
 	) {
-		scope.render_each(&query, |scope, _entity, block| {
+		for (entity, block) in blocks.iter() {
+			let Ok(mut scope) = scopes.get_mut(entity) else {
+				continue;
+			};
 			let access = scope.access();
 			let (stack, deployment, config) = scope.ctx();
-			block.emit(stack, deployment, &access, config)
-		});
+			if let Err(err) = block.emit(stack, deployment, &access, config) {
+				scope.error(bevyhow!(
+					"LightsailBlock '{}': {err}",
+					block.label()
+				));
+			}
+		}
 	}
 
 	/// Emit the box's resources: the IAM identity and its key rotation, the key
@@ -1516,9 +1513,10 @@ mod tests {
 			.runtime_policy(
 				&stack,
 				&deployment,
-				&AccessGrants::new(
-					DynamoTableBlock::new("analytics").runtime_access(&stack),
-				),
+				&AccessGrants::new(Block::grants(
+					&DynamoTableBlock::new("analytics"),
+					&stack,
+				)),
 			)
 			.unwrap()
 			.as_str()

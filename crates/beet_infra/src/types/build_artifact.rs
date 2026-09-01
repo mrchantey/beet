@@ -1,6 +1,12 @@
-//! Build artifact step for deploy sequences.
+//! The deployable artifact a block ships: its build process and output path.
+//!
+//! The TYPE compiles everywhere (a wasm consumer authors an artifact it cannot
+//! build, exactly as it authors a stack it cannot apply); building and hashing
+//! are native `deploy` machinery.
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 use beet_net::prelude::*;
 use std::path::PathBuf;
 
@@ -8,7 +14,10 @@ use std::path::PathBuf;
 /// Used as an ECS Component on deploy sequence entities alongside a block.
 /// The [`TofuApplyAction`] collects these to build the artifact ledger.
 #[derive(Debug, Clone, Get, SetWith, Component)]
-#[require(BuildArtifactAction)]
+#[cfg_attr(
+	all(feature = "deploy", not(target_arch = "wasm32")),
+	require(BuildArtifactAction)
+)]
 pub struct BuildArtifact {
 	/// The build command to execute
 	process: ChildProcess,
@@ -48,6 +57,7 @@ impl BuildArtifact {
 	/// a deploy. Building therefore belongs to whoever consumes the file: the
 	/// upload runs this first, and an artifact that is uploaded but never built
 	/// is unrepresentable.
+	#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 	pub async fn build(&self) -> Result {
 		info!("building: {}", self.process);
 		self.process
@@ -87,6 +97,7 @@ impl BuildArtifact {
 /// Runs the build process from [`BuildArtifact`].
 /// After building, the artifact file exists on disk for
 /// [`TofuApplyAction`] to upload and hash.
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 #[action]
 #[derive(Default, Component)]
 pub async fn BuildArtifactAction(

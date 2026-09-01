@@ -1,5 +1,14 @@
+//! The description of a child process launch, and (on native `fs` builds) the
+//! machinery that runs it.
+//!
+//! The DESCRIPTION compiles everywhere: a wasm consumer authors a
+//! [`ChildProcess`] (ie a [`BuildArtifact`]'s build command) it cannot itself
+//! run, exactly as it authors a stack it cannot apply. Everything that touches
+//! `std::process` rides the `fs` feature and native targets.
 use crate::prelude::*;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 use std::io::ErrorKind;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 use std::process::Output;
 
 /// Helper for spawning processes with
@@ -49,6 +58,7 @@ impl std::fmt::Display for ChildProcess {
 
 /// Handle for a long-running child process.
 /// Kills the process on drop, and also supports explicit [`kill`](ChildHandle::kill).
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub struct ChildHandle {
 	inner: async_process::Child,
 	/// The child leads its own process group (see [`ChildProcess::with_group`]),
@@ -56,6 +66,7 @@ pub struct ChildHandle {
 	group: bool,
 }
 
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 impl ChildHandle {
 	/// Kill the child process — the whole process group for a
 	/// [`with_group`](ChildProcess::with_group) child, so a wrapper-script cli's
@@ -105,6 +116,7 @@ impl ChildHandle {
 	}
 }
 
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 impl Drop for ChildHandle {
 	fn drop(&mut self) { self.kill().ok(); }
 }
@@ -213,7 +225,12 @@ impl ChildProcess {
 		self.args.extend(config.to_argv()?);
 		self.xok()
 	}
+}
 
+/// Running the described process: native-only, since the description alone is
+/// what a wasm consumer holds.
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+impl ChildProcess {
 	/// The configured command: program, args, cwd, env additions and removals,
 	/// and the unix process group when requested. The single place that
 	/// translation happens, so every run/spawn variant below is only a choice of
@@ -389,7 +406,7 @@ exited with non-zero status: {}
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 

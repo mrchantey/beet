@@ -64,7 +64,7 @@ impl MailRecords {
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct MailDomainBlock {
 	/// The mail domain served, eg `stalwart.beetmash.com`.
 	domain: SmolStr,
@@ -484,46 +484,34 @@ impl MailDomainBlock {
 	}
 }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl MailDomainBlock {
+impl Block for MailDomainBlock {
+	/// The name this block is known by is its domain.
+	fn label(&self) -> &SmolStr { &self.domain }
+
 	/// The sovereign selector's public key, resolved from the param
 	/// [`EnsureDkimKey`](crate::mail::EnsureDkimKey) set. The filter mirrors
 	/// that action's exactly: a domain whose records somebody else holds gets
 	/// no key minted, so a variable here would fail resolution.
-	pub(crate) fn variables(&self) -> Vec<Variable> {
+	fn variables(&self) -> Vec<Variable> {
 		match self.records.proves_identity() {
 			true => vec![self.dkim_public_key_variable()],
 			false => Vec::new(),
 		}
 	}
+}
 
-	/// Declare the sovereign selector's public key variable the apply
-	/// resolves, via [`variables`](Self::variables).
-	pub(crate) fn declare(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&MailDomainBlock>,
-	) {
-		scope.render_each(&query, |scope, entity, block| {
-			for variable in block.variables() {
-				scope.variable(entity, variable);
-			}
-			Ok(())
-		});
+impl EmitBlock for MailDomainBlock {
+	fn emit(
+		&self,
+		stack: &ResolvedStack,
+		deployment: &Deployment,
+		config: &mut terra::Config,
+	) -> Result {
+		self.emit(stack, deployment, config)
 	}
+}
 
-	/// Render the identity, its monitoring and the domain's records into the
-	/// config.
-	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&MailDomainBlock>,
-	) {
-		scope.render_each(&query, |scope, _entity, block| {
-			let (stack, deployment, config) = scope.ctx();
-			block.emit(stack, deployment, config)
-		});
-	}
-
+impl MailDomainBlock {
 	/// Emit this domain's resources: the SES identity and its configuration
 	/// set, the event stream and alarms, the dkim variable declaration, and —
 	/// for the stage that owns the names — every dns record.

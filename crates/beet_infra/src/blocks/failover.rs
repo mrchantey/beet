@@ -17,7 +17,7 @@ use serde_json::json;
 /// cannot fail over (Lambda has no ssh), so the failover is HTTP-only, and it
 /// is kept out of the core deploy behind a flag.
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 pub struct CloudflareFailoverBlock {
 	/// Resource label prefix.
 	label: SmolStr,
@@ -92,20 +92,22 @@ impl CloudflareFailoverBlock {
 	}
 }
 
-/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
-/// type registration.
-impl CloudflareFailoverBlock {
-	/// Render the monitor, both pools and the load balancer into the config.
-	pub(crate) fn render(
-		mut scope: ResMut<RenderScope>,
-		query: Query<&CloudflareFailoverBlock>,
-	) {
-		scope.render_each(&query, |scope, _entity, block| {
-			let (stack, _deployment, config) = scope.ctx();
-			block.emit(stack, config)
-		});
-	}
+impl Block for CloudflareFailoverBlock {
+	fn label(&self) -> &SmolStr { &self.label }
+}
 
+impl EmitBlock for CloudflareFailoverBlock {
+	fn emit(
+		&self,
+		stack: &ResolvedStack,
+		_deployment: &Deployment,
+		config: &mut terra::Config,
+	) -> Result {
+		self.emit(stack, config)
+	}
+}
+
+impl CloudflareFailoverBlock {
 	/// Emit the shared health monitor, the primary and fallback pools, and the
 	/// load balancer steering between them.
 	fn emit(
