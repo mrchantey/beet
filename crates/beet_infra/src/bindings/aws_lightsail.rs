@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -327,7 +328,7 @@ pub struct AwsLightsailKeyPairDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub id: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name: Option<SmolStr>,
 	/// ## Attribute
@@ -627,6 +628,8 @@ pub struct AwsLightsailInstanceResourceBlockTypeAddOn {
 	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub status: SmolStr,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }

@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -89,7 +90,7 @@ pub struct AwsEipDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub address: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub allocation_id: Option<SmolStr>,
 	/// ## Attribute
@@ -173,7 +174,7 @@ pub struct AwsEipDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub public_dns: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub public_ip: Option<SmolStr>,
 	/// ## Attribute
@@ -526,7 +527,7 @@ pub struct AwsInstanceDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub private_dns: Option<SmolStr>,
 	/// ## Attribute
-	/// `computed`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub private_ip: Option<SmolStr>,
 	/// ## Attribute
@@ -538,7 +539,7 @@ pub struct AwsInstanceDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub public_dns: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub public_ip: Option<SmolStr>,
 	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
@@ -628,8 +629,6 @@ pub struct AwsInstanceDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub metadata_options:
 		Option<Vec<AwsInstanceResourceBlockTypeMetadataOptions>>,
-	/// ## Attribute
-	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub network_interface:
 		Option<Vec<AwsInstanceResourceBlockTypeNetworkInterface>>,
@@ -1090,7 +1089,7 @@ pub struct AwsInstanceResourceBlockTypeNetworkInterface {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub network_card_index: Option<i64>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub network_interface_id: SmolStr,
 }
@@ -1100,11 +1099,11 @@ pub struct AwsInstanceResourceBlockTypeNetworkInterface {
 #[serde(rename = "primary_network_interface")]
 pub struct AwsInstanceResourceBlockTypePrimaryNetworkInterface {
 	/// ## Attribute
-	/// `optional`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub delete_on_termination: Option<bool>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub network_interface_id: SmolStr,
 }
@@ -1136,7 +1135,7 @@ pub struct AwsInstanceResourceBlockTypeRootBlockDevice {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub delete_on_termination: Option<bool>,
 	/// ## Attribute
-	/// `required`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub device_name: Option<SmolStr>,
 	/// ## Attribute
@@ -1186,7 +1185,7 @@ pub struct AwsInstanceResourceBlockTypeSecondaryNetworkInterface {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub delete_on_termination: Option<bool>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub device_index: Option<i64>,
 	/// ## Attribute
@@ -1198,7 +1197,7 @@ pub struct AwsInstanceResourceBlockTypeSecondaryNetworkInterface {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub mac_address: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	pub network_card_index: i64,
 	/// ## Attribute
 	/// `optional`
@@ -1221,7 +1220,7 @@ pub struct AwsInstanceResourceBlockTypeSecondaryNetworkInterface {
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub secondary_subnet_id: SmolStr,
 	/// ## Attribute
-	/// `optional`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub source_dest_check: Option<bool>,
 	/// ## Attribute

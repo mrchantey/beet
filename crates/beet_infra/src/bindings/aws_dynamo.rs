@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -142,8 +143,6 @@ pub struct AwsDynamodbTableDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub on_demand_throughput:
 		Option<Vec<AwsDynamodbTableResourceBlockTypeOnDemandThroughput>>,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub point_in_time_recovery:
 		Option<Vec<AwsDynamodbTableResourceBlockTypePointInTimeRecovery>>,
@@ -213,6 +212,8 @@ pub struct AwsDynamodbTableResourceBlockTypeAttribute {
 	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub name: SmolStr,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
@@ -303,7 +304,7 @@ pub struct AwsDynamodbTableResourceBlockTypeLocalSecondaryIndex {
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub projection_type: SmolStr,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub range_key: SmolStr,
 }
@@ -348,7 +349,7 @@ pub struct AwsDynamodbTableResourceBlockTypeReplica {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub consistency_mode: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub deletion_protection_enabled: Option<bool>,
 	/// ## Attribute
@@ -364,7 +365,7 @@ pub struct AwsDynamodbTableResourceBlockTypeReplica {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub propagate_tags: Option<bool>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub region_name: SmolStr,
 	/// ## Attribute
@@ -413,11 +414,11 @@ pub struct AwsDynamodbTableResourceBlockTypeTimeouts {
 #[serde(rename = "ttl")]
 pub struct AwsDynamodbTableResourceBlockTypeTtl {
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub attribute_name: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
 }

@@ -22,7 +22,9 @@ test-threads := '--test-threads=8'
 
 # `rustfmt.toml` uses nightly-only options, so formatting needs a nightly
 # toolchain. Pinned so `just fmt` produces the same output on every machine;
-# bumping it is a deliberate act that reformats the workspace.
+# bumping it is a deliberate act that reformats the workspace. Mirrored as
+# `FMT_TOOLCHAIN` in `schema_binding_generator.rs`, which formats the
+# generated bindings; bump both together.
 fmt-toolchain := 'nightly-2026-07-02'
 
 default:
@@ -113,6 +115,17 @@ install-cli *args:
   echo "linked $dst -> $bin"
 
 #💡 Aliases
+
+# Regenerate the committed terraform provider bindings. Reproducible: each
+# provider is pinned to its exact `schema_version` in `terra::Provider`,
+# bumped deliberately; the pinned schema export is cached under
+# `target/terra-bindings-generator` so a warm rerun is offline and fast.
+bindings *args:
+  cargo run -p beet_infra --bin bindings --features bindings_generator {{ args }}
+
+# Regenerate and fail if the committed bindings tree changed.
+bindings-verify: bindings
+  git diff --exit-code -- crates/beet_infra/src/bindings/
 
 # Format every workspace member with the pinned nightly. Never `cargo fmt`.
 fmt *args:

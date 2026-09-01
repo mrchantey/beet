@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -378,7 +379,7 @@ pub struct AwsRouteTableDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tags_all: Option<Map<SmolStr, SmolStr>>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub vpc_id: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -424,60 +425,32 @@ impl terra::Resource for AwsRouteTableDetails {
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
 pub struct AwsRouteTableRoute {
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub carrier_gateway_id: SmolStr,
-	/// ## Attribute
-	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub cidr_block: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub core_network_arn: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub destination_prefix_list_id: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub egress_only_gateway_id: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub gateway_id: SmolStr,
-	/// ## Attribute
-	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub ipv6_cidr_block: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub local_gateway_id: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub nat_gateway_id: SmolStr,
-	/// ## Attribute
-	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub network_interface_id: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub odb_network_arn: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub transit_gateway_id: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub vpc_endpoint_id: SmolStr,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub vpc_peering_connection_id: SmolStr,
 }
@@ -591,68 +564,40 @@ impl terra::Resource for AwsSecurityGroupDetails {
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
 pub struct AwsSecurityGroupEgress {
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub cidr_blocks: Vec<SmolStr>,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub description: SmolStr,
-	/// ## Attribute
-	/// `required`
 	pub from_port: i64,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub ipv6_cidr_blocks: Vec<SmolStr>,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub prefix_list_ids: Vec<SmolStr>,
-	/// ## Attribute
-	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub protocol: SmolStr,
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub security_groups: Vec<SmolStr>,
 	pub self_ref: bool,
-	/// ## Attribute
-	/// `required`
 	pub to_port: i64,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
 pub struct AwsSecurityGroupIngress {
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub cidr_blocks: Vec<SmolStr>,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub description: SmolStr,
-	/// ## Attribute
-	/// `required`
 	pub from_port: i64,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub ipv6_cidr_blocks: Vec<SmolStr>,
-	/// ## Attribute
-	/// `optional`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub prefix_list_ids: Vec<SmolStr>,
-	/// ## Attribute
-	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub protocol: SmolStr,
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub security_groups: Vec<SmolStr>,
 	pub self_ref: bool,
-	/// ## Attribute
-	/// `required`
 	pub to_port: i64,
 }
 #[derive(
@@ -724,6 +669,8 @@ pub struct AwsSecurityGroupRuleDetails {
 	/// ## Attribute
 	/// `required`
 	pub to_port: i64,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -895,7 +842,7 @@ pub struct AwsSubnetDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tags_all: Option<Map<SmolStr, SmolStr>>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub vpc_id: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]

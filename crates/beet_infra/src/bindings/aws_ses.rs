@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -186,7 +187,7 @@ pub struct AwsSesv2EmailIdentityDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub arn: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub configuration_set_name: Option<SmolStr>,
 	/// ## Attribute

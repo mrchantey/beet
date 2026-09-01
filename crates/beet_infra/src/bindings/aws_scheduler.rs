@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -148,7 +149,7 @@ pub struct AwsSchedulerScheduleResourceBlockTypeFlexibleTimeWindow {
 #[serde(rename = "target")]
 pub struct AwsSchedulerScheduleResourceBlockTypeTarget {
 	/// ## Attribute
-	/// `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub arn: SmolStr,
 	/// ## Attribute
@@ -220,6 +221,8 @@ pub struct EcsParametersResourceBlockTypePlacementConstraints {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub expression: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
@@ -232,6 +235,8 @@ pub struct EcsParametersResourceBlockTypePlacementStrategy {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub field: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
@@ -241,7 +246,7 @@ pub struct EcsParametersResourceBlockTypePlacementStrategy {
 #[serde(rename = "dead_letter_config")]
 pub struct TargetResourceBlockTypeDeadLetterConfig {
 	/// ## Attribute
-	/// `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub arn: SmolStr,
 }

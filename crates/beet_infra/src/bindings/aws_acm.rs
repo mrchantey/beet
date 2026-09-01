@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -127,6 +128,8 @@ pub struct AwsAcmCertificateDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tags_all: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub r#type: Option<SmolStr>,
 	/// ## Attribute
@@ -241,8 +244,6 @@ impl terra::Resource for AwsAcmCertificateDetails {
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
 pub struct AwsAcmCertificateDomainValidationOptions {
-	/// ## Attribute
-	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub domain_name: SmolStr,
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -344,7 +345,7 @@ pub struct AwsAcmCertificateResourceBlockTypeOptions {
 #[serde(rename = "validation_option")]
 pub struct AwsAcmCertificateResourceBlockTypeValidationOption {
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub domain_name: SmolStr,
 	/// ## Attribute

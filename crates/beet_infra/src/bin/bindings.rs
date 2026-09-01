@@ -3,8 +3,15 @@
 //! Many applications require only a handful of common infra resources,
 //! so we commit these types to the repository.
 //!
-//! Run with:
+//! Reproducible: each provider is pinned to its exact
+//! [`schema_version`](terra::Provider::schema_version), so the same command
+//! yields the same tree on every machine. To move to a newer provider, bump
+//! the pin and rerun.
+//!
+//! Run with `just bindings`, or:
 //!     cargo run -p beet_infra --bin bindings --features bindings_generator
+//!
+//! `just bindings-verify` regenerates and fails on a dirty tree.
 //!
 //! Native-only, like the generator it drives. A wasm build of beet_infra still
 //! compiles this bin target, so there it is a stub.

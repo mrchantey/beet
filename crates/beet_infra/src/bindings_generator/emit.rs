@@ -281,10 +281,21 @@ impl<'a> CodeGenerator<'a> {
 					(ident, quote! {})
 				};
 
+				// comment keys use the full container name, ns included
+				let comment_container = namespace
+					.as_ref()
+					.map(|ns| format!("{}_{}", ns, name))
+					.unwrap_or_else(|| name.to_string());
+
 				let field_tokens: Vec<_> = fields
 					.iter()
 					.map(|field| {
-						self.emit_struct_field(state, name, field, true)
+						self.emit_struct_field(
+							state,
+							&comment_container,
+							field,
+							true,
+						)
 					})
 					.collect();
 
@@ -327,7 +338,7 @@ impl<'a> CodeGenerator<'a> {
 	fn emit_struct_field(
 		&self,
 		state: &EmitterState,
-		_container_name: &str,
+		container_name: &str,
 		field: &Field,
 		top_level: bool,
 	) -> TokenStream {
@@ -337,7 +348,8 @@ impl<'a> CodeGenerator<'a> {
 			quote! {}
 		};
 
-		let field_comment = self.emit_field_comment(&field.name);
+		let field_comment =
+			self.emit_field_comment(container_name, &field.name);
 		let serde_attr = field_serde_annotation(&field.value);
 		let field_ident = make_field_ident(&field.name);
 		let ty = quote_field_type(state, &field.value, true);
@@ -352,10 +364,10 @@ impl<'a> CodeGenerator<'a> {
 	fn emit_variant(
 		&self,
 		state: &EmitterState,
-		_base: &str,
+		base: &str,
 		variant: &Variant,
 	) -> TokenStream {
-		let variant_comment = self.emit_field_comment(&variant.name);
+		let variant_comment = self.emit_field_comment(base, &variant.name);
 		let ident = Ident::new(&variant.name, Span::call_site());
 
 		match &variant.value {
@@ -402,25 +414,27 @@ impl<'a> CodeGenerator<'a> {
 		emit_doc_from_comments(&self.config.comments, &path)
 	}
 
-	fn emit_field_comment(&self, field_name: &str) -> TokenStream {
-		// Field comments use a 3-element key: [module, container, field].
-		// We don't have the container name in scope here, so we search for
-		// any key ending with this field name.  The config's comment map is
-		// keyed as [module, container, field], but the old emitter only used
-		// [current_namespace..., field_name].  We replicate that by checking
-		// all comments whose last element matches.
-		//
-		// In practice, comments are populated by `collect_descriptions` which
-		// uses a full 3-element key.  We emit them from `emit_struct_field`
-		// which doesn't track the container path.  Rather than thread it
-		// through, we just look for any matching last-element — this is safe
-		// because field names within a module are unique in practice.
-		for (key, doc) in &self.config.comments {
-			if key.last().map(|seg| seg.as_str()) == Some(field_name) {
-				return emit_doc_string(doc);
-			}
-		}
-		quote! {}
+	/// Field comments use an exact 3-element key `[module, container, field]`.
+	/// A name-only lookup would resolve a field shared between containers
+	/// (`policy`, `role`, ...) to whichever container sorts first in the file,
+	/// flipping doc flags whenever the file's resource set changes.
+	fn emit_field_comment(
+		&self,
+		container_name: &str,
+		field_name: &str,
+	) -> TokenStream {
+		// comment keys use the schema's raw attribute name
+		let field_name = field_name.strip_prefix("r#").unwrap_or(field_name);
+		let key = vec![
+			self.config.module_name_str().to_string(),
+			container_name.to_string(),
+			field_name.to_string(),
+		];
+		self.config
+			.comments
+			.get(&key)
+			.map(|doc| emit_doc_string(doc))
+			.unwrap_or_default()
 	}
 
 	// ------------------------------------------------------------------

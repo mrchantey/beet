@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -603,7 +604,7 @@ pub struct AwsLbDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub desync_mitigation_mode: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dns_name: Option<SmolStr>,
 	/// ## Attribute
@@ -676,7 +677,7 @@ pub struct AwsLbDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub load_balancer_type: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name: Option<SmolStr>,
 	/// ## Attribute
@@ -701,11 +702,11 @@ pub struct AwsLbDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub secondary_ips_auto_assigned_per_subnet: Option<i64>,
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub security_groups: Option<Vec<SmolStr>>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub subnets: Option<Vec<SmolStr>>,
 	/// ## Attribute
@@ -835,7 +836,7 @@ pub struct AwsLbListenerDetails {
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub load_balancer_arn: SmolStr,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub port: Option<i64>,
 	/// ## Attribute
@@ -1057,7 +1058,7 @@ pub struct AwsLbTargetGroupDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub load_balancing_cross_zone_enabled: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name: Option<SmolStr>,
 	/// ## Attribute
@@ -1065,7 +1066,7 @@ pub struct AwsLbTargetGroupDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name_prefix: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub port: Option<i64>,
 	/// ## Attribute
@@ -1073,7 +1074,7 @@ pub struct AwsLbTargetGroupDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub preserve_client_ip: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub protocol: Option<SmolStr>,
 	/// ## Attribute
@@ -1114,7 +1115,7 @@ pub struct AwsLbTargetGroupDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub target_type: Option<SmolStr>,
 	/// ## Attribute
-	/// `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub vpc_id: Option<SmolStr>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1313,6 +1314,8 @@ pub struct AwsEcsServiceResourceBlockTypeDeploymentConfiguration {
 )]
 #[serde(rename = "deployment_controller")]
 pub struct AwsEcsServiceResourceBlockTypeDeploymentController {
+	/// ## Attribute
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub r#type: Option<SmolStr>,
 }
@@ -1367,6 +1370,8 @@ pub struct AwsEcsServiceResourceBlockTypeOrderedPlacementStrategy {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub field: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
@@ -1379,6 +1384,8 @@ pub struct AwsEcsServiceResourceBlockTypePlacementConstraints {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub expression: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
@@ -1391,7 +1398,7 @@ pub struct AwsEcsServiceResourceBlockTypeServiceConnectConfiguration {
 	/// `required`
 	pub enabled: bool,
 	/// ## Attribute
-	/// `required`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub namespace: Option<SmolStr>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1412,15 +1419,15 @@ pub struct AwsEcsServiceResourceBlockTypeServiceConnectConfiguration {
 #[serde(rename = "service_registries")]
 pub struct AwsEcsServiceResourceBlockTypeServiceRegistries {
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub container_name: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub container_port: Option<i64>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub port: Option<i64>,
 	/// ## Attribute
@@ -1473,7 +1480,7 @@ pub struct AwsEcsServiceResourceBlockTypeVpcLatticeConfigurations {
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub role_arn: SmolStr,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub target_group_arn: SmolStr,
 }
@@ -1495,6 +1502,8 @@ pub struct AwsEcsTaskDefinitionResourceBlockTypePlacementConstraints {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub expression: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
@@ -1511,6 +1520,8 @@ pub struct AwsEcsTaskDefinitionResourceBlockTypeProxyConfiguration {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub properties: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub r#type: Option<SmolStr>,
 }
@@ -1572,6 +1583,8 @@ pub struct AwsLbListenerResourceBlockTypeDefaultAction {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub target_group_arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1635,7 +1648,7 @@ pub struct AwsLbResourceBlockTypeAccessLogs {
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub bucket: SmolStr,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
 	/// ## Attribute
@@ -1653,7 +1666,7 @@ pub struct AwsLbResourceBlockTypeConnectionLogs {
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub bucket: SmolStr,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
 	/// ## Attribute
@@ -1671,7 +1684,7 @@ pub struct AwsLbResourceBlockTypeHealthCheckLogs {
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub bucket: SmolStr,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
 	/// ## Attribute
@@ -1748,7 +1761,7 @@ pub struct AwsLbResourceBlockTypeTimeouts {
 #[serde(rename = "health_check")]
 pub struct AwsLbTargetGroupResourceBlockTypeHealthCheck {
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
 	/// ## Attribute
@@ -1764,15 +1777,15 @@ pub struct AwsLbTargetGroupResourceBlockTypeHealthCheck {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub matcher: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub path: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub port: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub protocol: Option<SmolStr>,
 	/// ## Attribute
@@ -1798,9 +1811,11 @@ pub struct AwsLbTargetGroupResourceBlockTypeStickiness {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub cookie_name: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
@@ -1968,11 +1983,11 @@ pub struct DefaultActionResourceBlockTypeRedirect {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub path: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub port: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub protocol: Option<SmolStr>,
 	/// ## Attribute
@@ -1980,7 +1995,7 @@ pub struct DefaultActionResourceBlockTypeRedirect {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub query: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub status_code: SmolStr,
 }
@@ -2185,8 +2200,6 @@ pub struct ServiceConnectConfigurationResourceBlockTypeService {
 	pub port_name: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub client_alias: Option<Vec<ServiceResourceBlockTypeClientAlias>>,
-	/// ## Attribute
-	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub timeout: Option<Vec<ServiceResourceBlockTypeTimeout>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -2225,11 +2238,11 @@ pub struct ServiceResourceBlockTypeTimeout {
 #[serde(rename = "tls")]
 pub struct ServiceResourceBlockTypeTls {
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub kms_key: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub role_arn: Option<SmolStr>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -2356,7 +2369,7 @@ pub struct VolumeResourceBlockTypeFsxWindowsFileServerVolumeConfiguration {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub file_system_id: SmolStr,
     /// ## Attribute
-    /// `optional`
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub root_directory: SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]

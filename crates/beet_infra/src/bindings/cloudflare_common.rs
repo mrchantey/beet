@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the cloudflare/cloudflare v5.24.0 schema.
 
 #![allow(
 	unused_imports,
@@ -133,7 +134,7 @@ pub struct CloudflareDnsRecordData {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub preference: Option<i64>,
-	/// Required for MX, SRV and URI records; unused by other record types. Records with lower priorities are preferred.
+	/// Required for MX and URI records; ignored for other record types (but may still be returned by the API). Records with lower priorities are preferred. This field is to be deprecated in favor of the priority field within the data map.
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -183,6 +184,9 @@ pub struct CloudflareDnsRecordData {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub target: Option<SmolStr>,
+	/// Type.
+	/// ## Attribute
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub r#type: Option<i64>,
 	/// Usage.
@@ -305,6 +309,10 @@ pub struct CloudflareDnsRecordDetails {
 	/// ## Attribute
 	/// `required`
 	pub ttl: i64,
+	/// Record type.
+	/// Available values: "A", "AAAA", "CNAME", "MX", "NS", "OPENPGPKEY", "PTR", "TXT", "CAA", "CERT", "DNSKEY", "DS", "HTTPS", "LOC", "NAPTR", "SMIMEA", "SRV", "SSHFP", "SVCB", "TLSA", "URI".
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 	/// Identifier.
@@ -451,7 +459,6 @@ pub struct CloudflareLoadBalancerDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub country_pools: Option<Map<SmolStr, Vec<SmolStr>>>,
-	/// When the record was created.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -484,7 +491,6 @@ pub struct CloudflareLoadBalancerDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub for_each: Option<Vec<SmolStr>>,
-	/// Identifier.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -494,12 +500,11 @@ pub struct CloudflareLoadBalancerDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub location_strategy: Option<CloudflareLoadBalancerLocationStrategy>,
-	/// When the record was last modified.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub modified_on: Option<SmolStr>,
-	/// DNS record name (or @ for the zone apex) in Punycode.
+	/// The DNS hostname to associate with your Load Balancer. If this hostname already exists as a DNS record in Cloudflare's DNS, the Load Balancer will take precedence and the DNS record will not be used.
 	/// ## Attribute
 	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -518,7 +523,7 @@ pub struct CloudflareLoadBalancerDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub provider: Option<SmolStr>,
-	/// Whether the record is receiving the performance and security benefits of Cloudflare.
+	/// Whether the hostname should be gray clouded (false) or orange clouded (true).
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -572,12 +577,11 @@ pub struct CloudflareLoadBalancerDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub steering_policy: Option<SmolStr>,
-	/// Time To Live (TTL) of the DNS record in seconds. Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the minimum reduced to 30 for Enterprise zones.
+	/// Time to live (TTL) of the DNS entry for the IP address returned by this load balancer. This only applies to gray-clouded (unproxied) load balancers.
 	/// ## Attribute
-	/// `required`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ttl: Option<i64>,
-	/// Identifier.
 	/// ## Attribute
 	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -710,7 +714,6 @@ pub struct CloudflareLoadBalancerMonitorDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub count: Option<i64>,
-	/// When the record was created.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -748,7 +751,6 @@ pub struct CloudflareLoadBalancerMonitorDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub header: Option<Map<SmolStr, Vec<SmolStr>>>,
-	/// Identifier.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -763,7 +765,6 @@ pub struct CloudflareLoadBalancerMonitorDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub method: Option<SmolStr>,
-	/// When the record was last modified.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -773,7 +774,7 @@ pub struct CloudflareLoadBalancerMonitorDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub path: Option<SmolStr>,
-	/// The port of the service.
+	/// The port number to connect to for the health check. Required for TCP, UDP, and SMTP checks. HTTP and HTTPS checks should only define the port when using a non-standard port (HTTP: default 80, HTTPS: default 443).
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -797,6 +798,10 @@ pub struct CloudflareLoadBalancerMonitorDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub timeout: Option<i64>,
+	/// The protocol to use for the health check. Currently supported protocols are 'HTTP','HTTPS', 'TCP', 'ICMP-PING', 'UDP-ICMP', and 'SMTP'.
+	/// Available values: "http", "https", "tcp", "udp_icmp", "icmp_ping", "smtp".
+	/// ## Attribute
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub r#type: Option<SmolStr>,
 }
@@ -866,7 +871,6 @@ pub struct CloudflareLoadBalancerPoolDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub count: Option<i64>,
-	/// When the record was created.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -875,7 +879,7 @@ pub struct CloudflareLoadBalancerPoolDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub depends_on: Option<Vec<SmolStr>>,
-	/// Object description.
+	/// A human-readable description of the pool.
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -885,7 +889,7 @@ pub struct CloudflareLoadBalancerPoolDetails {
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub disabled_at: Option<SmolStr>,
-	/// Whether to enable (the default) this load balancer.
+	/// Whether to enable (the default) or disable this pool. Disabled pools will not receive traffic and are excluded from health checks. Disabling a pool will cause any load balancers using it to failover to the next pool (if any).
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -899,7 +903,6 @@ pub struct CloudflareLoadBalancerPoolDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub health_sources: Option<Vec<SmolStr>>,
-	/// Identifier.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -924,7 +927,6 @@ pub struct CloudflareLoadBalancerPoolDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub minimum_origins: Option<i64>,
-	/// When the record was last modified.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -939,14 +941,14 @@ pub struct CloudflareLoadBalancerPoolDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub monitor_group: Option<SmolStr>,
-	/// DNS record name (or @ for the zone apex) in Punycode.
+	/// A short name (tag) for the pool. Only alphanumeric characters, hyphens, and underscores are allowed.
 	/// ## Attribute
 	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub name: SmolStr,
 	/// List of networks where Load Balancer or Pool is enabled.
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub networks: Option<Vec<SmolStr>>,
 	/// This field is now deprecated. It has been moved to Cloudflare's Centralized Notification service https://developers.cloudflare.com/fundamentals/notifications/. The email address to send health status notifications to. This can be an individual mailbox or a mailing list. Multiple emails can be supplied as a comma delimited list.
@@ -1145,34 +1147,34 @@ pub struct CloudflareLoadBalancerPoolOrigins {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub address: Option<SmolStr>,
-	/// This field shows up only if the pool is disabled. This field is set with the time the pool was disabled at.
+	/// This field shows up only if the origin is disabled. This field is set with the time the origin was disabled.
 	/// ## Attribute
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub disabled_at: Option<SmolStr>,
-	/// Whether to enable (the default) this load balancer.
+	/// Whether to enable (the default) this origin within the pool. Disabled origins will not receive traffic and are excluded from health checks. The origin will only be disabled for the current pool.
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
-	/// If enabled, causes the CNAME record to be resolved externally and the resulting address records (e.g., A and AAAA) to be returned instead of the CNAME record itself. This setting is unavailable for proxied records, since they are always flattened.
+	/// Whether to flatten CNAME records for this origin, resolving them to A/AAAA records before returning to the client. When true (the default), the director resolves CNAME addresses to their underlying A/AAAA records. When false, the origin address is returned as a raw CNAME record without resolution. This setting mirrors the DNS API record flatten_cname setting.
 	/// ## Attribute
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub flatten_cname: Option<bool>,
-	/// The HTTP request headers to send in the health check. It is recommended you set a Host header by default. The User-Agent header cannot be overridden. This parameter is only valid for HTTP and HTTPS monitors.
+	/// The request header is used to pass additional information with an HTTP request. Currently supported header is 'Host'.
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub header: Option<CloudflareLoadBalancerPoolOriginsHeader>,
-	/// DNS record name (or @ for the zone apex) in Punycode.
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub name: Option<SmolStr>,
-	/// The port of the service.
+	/// A human-identifiable name for the origin.
 	/// ## Attribute
 	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub name: Option<SmolStr>,
+	/// The port for upstream connections. A value of 0 means the default port for the protocol will be used.
+	/// ## Attribute
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub port: Option<i64>,
 	/// The virtual network subnet ID the origin belongs in. Virtual network must also belong to the account.
@@ -1180,9 +1182,11 @@ pub struct CloudflareLoadBalancerPoolOrigins {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub virtual_network_id: Option<SmolStr>,
-	/// The record weight.
+	/// The weight of this origin relative to other origins in the pool. Based on the configured weight the total traffic is distributed among origins within the pool.
+	/// - `origin_steering.policy="least_outstanding_requests"`: Use weight to scale the origin's outstanding requests.
+	/// - `origin_steering.policy="least_connections"`: Use weight to scale the origin's open connections.
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub weight: Option<i64>,
 }
@@ -1230,9 +1234,9 @@ pub struct CloudflareLoadBalancerRules {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub fixed_response: Option<CloudflareLoadBalancerRulesFixedResponse>,
-	/// DNS record name (or @ for the zone apex) in Punycode.
+	/// Name of this rule. Only used for human readability.
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name: Option<SmolStr>,
 	/// A collection of overrides to apply to the load balancer when this rule's condition is true. All fields are optional.
@@ -1240,9 +1244,9 @@ pub struct CloudflareLoadBalancerRules {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub overrides: Option<CloudflareLoadBalancerRulesOverrides>,
-	/// Required for MX, SRV and URI records; unused by other record types. Records with lower priorities are preferred.
+	/// The order in which rules should be executed in relation to each other. Lower values are executed first. Values do not need to be sequential. If no value is provided for any rule the array order of the rules field will be used to assign a priority.
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub priority: Option<i64>,
 	/// If this rule's condition is true, this causes rule evaluation to stop after processing this rule.
@@ -1293,12 +1297,12 @@ pub struct CloudflareLoadBalancerRulesOverrides {
 	pub country_pools: Option<Map<SmolStr, Vec<SmolStr>>>,
 	/// A list of pool IDs ordered by their failover priority. Pools defined here are used by default, or when region_pools are not configured for a given region.
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub default_pools: Option<Vec<SmolStr>>,
 	/// The pool ID to use when all other pools are detected as unhealthy.
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub fallback_pool: Option<SmolStr>,
 	/// Controls location-based steering for non-proxied requests. See `steering_policy` to learn how steering is affected.
@@ -1357,9 +1361,9 @@ pub struct CloudflareLoadBalancerRulesOverrides {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub steering_policy: Option<SmolStr>,
-	/// Time To Live (TTL) of the DNS record in seconds. Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the minimum reduced to 30 for Enterprise zones.
+	/// Time to live (TTL) of the DNS entry for the IP address returned by this load balancer. This only applies to gray-clouded (unproxied) load balancers.
 	/// ## Attribute
-	/// `required`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ttl: Option<i64>,
 }

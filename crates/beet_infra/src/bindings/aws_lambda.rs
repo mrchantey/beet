@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -213,11 +214,11 @@ pub struct AwsApigatewayv2ApiDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub depends_on: Option<Vec<SmolStr>>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub disable_execute_api_endpoint: Option<bool>,
 	/// ## Attribute
@@ -547,7 +548,7 @@ pub struct AwsApigatewayv2IntegrationDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub depends_on: Option<Vec<SmolStr>>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<SmolStr>,
 	/// ## Attribute
@@ -715,7 +716,7 @@ pub struct AwsApigatewayv2RouteDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub request_models: Option<Map<SmolStr, SmolStr>>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub route_key: SmolStr,
 	/// ## Attribute
@@ -789,7 +790,7 @@ pub struct AwsApigatewayv2StageDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub deployment_id: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<SmolStr>,
 	/// ## Attribute
@@ -922,7 +923,7 @@ pub struct AwsLambdaFunctionDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub depends_on: Option<Vec<SmolStr>>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<SmolStr>,
 	/// ## Attribute
@@ -1075,7 +1076,7 @@ pub struct AwsLambdaFunctionDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub use_resource_timeout_for_propagation: Option<bool>,
 	/// ## Attribute
-	/// `optional`
+	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub version: Option<SmolStr>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1222,7 +1223,7 @@ impl terra::Resource for AwsLambdaFunctionDetails {
 )]
 pub struct AwsLambdaFunctionUrlDetails {
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub authorization_type: SmolStr,
 	/// ## Attribute
@@ -1533,7 +1534,7 @@ pub struct AwsApigatewayv2DomainNameResourceBlockTypeDomainNameConfiguration {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ownership_verification_certificate_arn: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub security_policy: SmolStr,
 	/// ## Attribute
@@ -1663,7 +1664,7 @@ pub struct AwsApigatewayv2StageResourceBlockTypeRouteSettings {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub logging_level: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub route_key: SmolStr,
 	/// ## Attribute
@@ -1724,7 +1725,7 @@ pub struct AwsLambdaFunctionResourceBlockTypeEphemeralStorage {
 #[serde(rename = "file_system_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeFileSystemConfig {
 	/// ## Attribute
-	/// `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub arn: SmolStr,
 	/// ## Attribute

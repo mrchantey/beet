@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -618,7 +619,7 @@ pub struct AwsIamRolePolicyDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub provider: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub role: SmolStr,
 }
@@ -678,7 +679,7 @@ pub struct AwsIamUserDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub id: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub name: SmolStr,
 	/// ## Attribute
@@ -830,7 +831,7 @@ pub struct AwsIamUserPolicyDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name_prefix: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub policy: SmolStr,
 	/// ## Attribute
@@ -920,7 +921,6 @@ pub struct AwsS3BucketDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub for_each: Option<Vec<SmolStr>>,
-	/// Delete user even if it has non-Terraform-managed IAM access keys, login profile or MFA devices
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -938,7 +938,7 @@ pub struct AwsS3BucketDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub object_lock_enabled: Option<bool>,
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub policy: Option<SmolStr>,
 	/// ## Attribute
@@ -1066,7 +1066,7 @@ impl terra::Resource for AwsS3BucketDetails {
 )]
 pub struct AwsS3BucketPolicyDetails {
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub bucket: SmolStr,
 	/// ## Attribute
@@ -1086,7 +1086,7 @@ pub struct AwsS3BucketPolicyDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub id: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub policy: SmolStr,
 	/// ## Attribute
@@ -1138,7 +1138,7 @@ pub struct AwsS3BucketPublicAccessBlockDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub block_public_policy: Option<bool>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub bucket: SmolStr,
 	/// ## Attribute
@@ -1215,7 +1215,7 @@ pub struct AwsCloudwatchMetricAlarmResourceBlockTypeMetricQuery {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub expression: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub id: SmolStr,
 	/// ## Attribute
@@ -1239,7 +1239,7 @@ pub struct AwsCloudwatchMetricAlarmResourceBlockTypeMetricQuery {
 #[serde(rename = "inline_policy")]
 pub struct AwsIamRoleResourceBlockTypeInlinePolicy {
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name: Option<SmolStr>,
 	/// ## Attribute
@@ -1279,13 +1279,15 @@ pub struct AwsS3BucketResourceBlockTypeCorsRule {
 #[serde(rename = "grant")]
 pub struct AwsS3BucketResourceBlockTypeGrant {
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub id: Option<SmolStr>,
 	/// ## Attribute
 	/// `required`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub permissions: Vec<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 	/// ## Attribute
@@ -1348,7 +1350,7 @@ pub struct AwsS3BucketResourceBlockTypeLogging {
 #[serde(rename = "object_lock_configuration")]
 pub struct AwsS3BucketResourceBlockTypeObjectLockConfiguration {
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub object_lock_enabled: Option<SmolStr>,
 }
@@ -1392,7 +1394,7 @@ pub struct AwsS3BucketResourceBlockTypeTimeouts {
 #[serde(rename = "versioning")]
 pub struct AwsS3BucketResourceBlockTypeVersioning {
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub enabled: Option<bool>,
 	/// ## Attribute
@@ -1530,7 +1532,7 @@ pub struct MetricQueryResourceBlockTypeMetric {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dimensions: Option<Map<SmolStr, SmolStr>>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub metric_name: SmolStr,
 	/// ## Attribute
@@ -1538,7 +1540,7 @@ pub struct MetricQueryResourceBlockTypeMetric {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub namespace: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	pub period: i64,
 	/// ## Attribute
 	/// `required`
@@ -1559,7 +1561,7 @@ pub struct ReplicationConfigurationResourceBlockTypeRules {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub delete_marker_replication_status: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub id: Option<SmolStr>,
 	/// ## Attribute
@@ -1571,7 +1573,7 @@ pub struct ReplicationConfigurationResourceBlockTypeRules {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub priority: Option<i64>,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub status: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1589,7 +1591,7 @@ pub struct RulesResourceBlockTypeDestination {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub account_id: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub bucket: SmolStr,
 	/// ## Attribute
@@ -1597,7 +1599,7 @@ pub struct RulesResourceBlockTypeDestination {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub replica_kms_key_id: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub storage_class: Option<SmolStr>,
 	#[serde(skip_serializing_if = "Option::is_none")]

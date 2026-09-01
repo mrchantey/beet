@@ -209,10 +209,9 @@ pub(crate) fn export_filtered_resources(
 				let mut block = schema_item.block.clone();
 				inject_meta_arguments(&mut block);
 
-				let container_name = format!("{}_details", resource_name);
 				collect_descriptions(
 					config.module_name_str(),
-					&container_name,
+					resource_name,
 					&block,
 					&mut comments,
 				);
@@ -226,6 +225,7 @@ pub(crate) fn export_filtered_resources(
 
 				use heck::ToUpperCamelCase;
 
+				let container_name = format!("{}_details", resource_name);
 				let struct_name = if config.use_title_case {
 					container_name.to_upper_camel_case()
 				} else {
@@ -294,20 +294,28 @@ fn export_roots(roots: &BTreeMap<&str, Vec<&str>>, reg: &mut Registry) {
 	}
 }
 
-/// Walk a block and collect `description` values into the doc comments map.
+/// Walk a resource block and collect `description` values into the doc
+/// comments map.
 ///
-/// Keys are `[module_name, container_name, field_name]` to match the format
-/// expected by `RustEmitter::output_comment`.
+/// Keys are `[module_name, container_name, field_name]` where the container
+/// name mirrors the registry name the exporters give the same attributes
+/// ([`export_block`] / [`export_block_type`] / [`export_attributes`]), so the
+/// emitter resolves a field's doc with an exact lookup. A name-based lookup
+/// picks whichever container in the file happens to sort first, so a doc flag
+/// (`required`/`optional`) flips whenever the file's resource set changes.
 fn collect_descriptions(
 	module_name: &str,
-	container_name: &str,
+	resource_name: &str,
 	block: &Block,
 	comments: &mut DocComments,
 ) {
 	if let Some(attrs) = &block.attributes {
+		// top-level attrs land on the `{resource}_details` struct; their
+		// nested attribute containers hang off the bare resource name
 		collect_attribute_descriptions(
 			module_name,
-			container_name,
+			&format!("{resource_name}_details"),
+			resource_name,
 			attrs,
 			comments,
 		);
@@ -315,11 +323,10 @@ fn collect_descriptions(
 
 	if let Some(block_types) = &block.block_types {
 		for (bt_name, nested) in block_types {
-			let nested_container =
-				format!("{}_block_type_{}", container_name, bt_name);
-			collect_descriptions(
+			collect_block_type_descriptions(
 				module_name,
-				&nested_container,
+				resource_name,
+				bt_name,
 				&nested.block,
 				comments,
 			);
@@ -327,12 +334,48 @@ fn collect_descriptions(
 	}
 }
 
-/// Collect an attribute map's descriptions, recursing into `nested_type`
-/// attribute maps (their containers are named `{container}_{attr}`, matching
-/// [`export_nested_type`]).
+/// Collect a block type's descriptions: its emitted container is
+/// `{parent}_resource_block_type_{name}` and inner block types nest under the
+/// block type's own name, both mirroring [`export_block_type`] (which skips a
+/// block type with no attributes entirely, inner block types included).
+fn collect_block_type_descriptions(
+	module_name: &str,
+	parent_name: &str,
+	name: &str,
+	block: &Block,
+	comments: &mut DocComments,
+) {
+	let Some(attrs) = &block.attributes else {
+		return;
+	};
+	let container = format!("{parent_name}_resource_block_type_{name}");
+	collect_attribute_descriptions(
+		module_name,
+		&container,
+		&container,
+		attrs,
+		comments,
+	);
+	if let Some(block_types) = &block.block_types {
+		for (bt_name, nested) in block_types {
+			collect_block_type_descriptions(
+				module_name,
+				name,
+				bt_name,
+				&nested.block,
+				comments,
+			);
+		}
+	}
+}
+
+/// Collect an attribute map's descriptions under `container_name`, recursing
+/// into `nested_type` attribute maps along the exporter's fqn scheme
+/// (`{fqn_base}_{attr}`, matching [`export_nested_type`]).
 fn collect_attribute_descriptions(
 	module_name: &str,
 	container_name: &str,
+	fqn_base: &str,
 	attrs: &BTreeMap<String, Attribute>,
 	comments: &mut DocComments,
 ) {
@@ -363,9 +406,11 @@ fn collect_attribute_descriptions(
 			.as_ref()
 			.and_then(|nested| nested.attributes.as_ref())
 		{
+			let nested_fqn = format!("{fqn_base}_{attr_name}");
 			collect_attribute_descriptions(
 				module_name,
-				&format!("{container_name}_{attr_name}"),
+				&nested_fqn,
+				&nested_fqn,
 				nested_attrs,
 				comments,
 			);
@@ -1251,5 +1296,74 @@ mod test {
 				.is_none()
 				.xpect_true();
 		}
+	}
+
+	/// A field name shared between containers resolves its doc from its own
+	/// container. A name-only lookup let whichever container sorted first in
+	/// the file win, flipping doc flags whenever the file's resource set
+	/// changed (this is what made a regeneration machine-dependent).
+	#[beet_core::test]
+	fn field_docs_resolve_own_container() {
+		let schema: TerraformSchemaExport =
+			serde_json::from_value(serde_json::json!({
+				"format_version": "1.0",
+				"provider_schemas": {
+					"registry.opentofu.org/hashicorp/aws": {
+						"provider": { "version": 0, "block": { "attributes": {} } },
+						"resource_schemas": {
+							"test_res_a": {
+								"version": 0,
+								"block": {
+									"attributes": {
+										"shared": { "type": "string", "required": true }
+									},
+									"block_types": {
+										"inline": {
+											"nesting_mode": "list",
+											"block": {
+												"attributes": {
+													"shared": { "type": "string", "optional": true }
+												}
+											}
+										}
+									}
+								}
+							},
+							"test_res_b": {
+								"version": 0,
+								"block": {
+									"attributes": {
+										"shared": { "type": "string", "optional": true, "computed": true }
+									}
+								}
+							}
+						}
+					}
+				}
+			}))
+			.unwrap();
+		let filter = terra::ResourceFilter::default().with_resources(
+			"registry.opentofu.org/hashicorp/aws",
+			&["test_res_a".to_string(), "test_res_b".to_string()],
+		);
+		let output = crate::bindings_generator::BindingGenerator::new()
+			.with_title_case(true)
+			.with_filter(filter)
+			.generate_to_string(&schema)
+			.unwrap();
+
+		let body = |name: &str| {
+			let start = output.find(&format!("pub struct {name}")).unwrap();
+			&output[start..start + output[start..].find("\n}").unwrap()]
+		};
+		body("TestResADetails").xpect_contains("`required`");
+		body("TestResBDetails")
+			.xpect_contains("`optional`, `computed`")
+			.xnot()
+			.xpect_contains("`required`");
+		body("TestResAResourceBlockTypeInline")
+			.xpect_contains("`optional`")
+			.xnot()
+			.xpect_contains("`required`");
 	}
 }

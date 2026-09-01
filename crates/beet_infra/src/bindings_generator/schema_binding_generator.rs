@@ -2,11 +2,18 @@
 //!
 //! [`SchemaBindingGenerator`] orchestrates the full workflow:
 //!
-//! 1. Write a `providers.tf.json` declaring the required providers.
+//! 1. Write a `providers.tf.json` pinning each provider to its exact
+//!    [`schema_version`](terra::Provider::schema_version).
 //! 2. Run `tofu init` to download provider plugins.
 //! 3. Run `tofu providers schema -json` to export the full schema.
 //! 4. Parse the schema with [`BindingGenerator`] (applying filters).
 //! 5. Write the generated Rust files to the specified output paths.
+//!
+//! Generation is reproducible: the exact pin means the same command yields
+//! the same tree on every machine, and each generated file records the schema
+//! versions it came from in its preamble. To move to a newer provider, bump
+//! `schema_version` and rerun (`just bindings`); the bump then shows in every
+//! regenerated file's diff as a version line.
 
 use super::binding_generator::BindingGenerator;
 use crate::prelude::*;
@@ -17,7 +24,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 // ---------------------------------------------------------------------------
-// ProviderBindingTarget — per-provider output configuration
+// ResourceList — per-provider output configuration
 // ---------------------------------------------------------------------------
 
 /// Pairs a [`terra::Provider`] with a list of resource type names to generate.
@@ -158,9 +165,11 @@ impl SchemaBindingGenerator {
 
 	/// Run the full generation pipeline.
 	///
-	/// Caches `providers.tf.json` and reuses `schema.json` when the provider
-	/// configuration has not changed, skipping the slow `tofu init` and
-	/// `tofu providers schema` steps.
+	/// Caches `providers.tf.json` and reuses `schema.json` when it matches,
+	/// skipping the slow `tofu init` and `tofu providers schema` steps. The
+	/// cached content pins each provider's exact
+	/// [`schema_version`](terra::Provider::schema_version), and a released
+	/// provider's schema is immutable, so a byte-equal cache is never stale.
 	pub async fn generate(&self) -> Result {
 		let new_content = self.build_providers_tf_content()?;
 		let providers_path = self.work_dir.join("providers.tf.json");
@@ -219,6 +228,11 @@ impl SchemaBindingGenerator {
 	}
 
 	/// Build the serialized `providers.tf.json` content as bytes.
+	///
+	/// Each provider is pinned to its exact `schema_version`: the floating
+	/// [`version`](terra::Provider::version) constraint would resolve to
+	/// whatever release shipped last, making the cache stale by construction
+	/// and the generated tree machine-dependent.
 	fn build_providers_tf_content(&self) -> Result<Vec<u8>> {
 		let mut required_providers = serde_json::Map::new();
 
@@ -233,7 +247,8 @@ impl SchemaBindingGenerator {
 					local,
 					json!({
 						"source": list.provider.short_source(),
-						"version": list.provider.version.as_ref(),
+						"version":
+							format!("= {}", list.provider.schema_version_required()?),
 					}),
 				);
 			}
@@ -299,9 +314,20 @@ impl SchemaBindingGenerator {
 				);
 			}
 
-			// Clone the base binding generator and apply the per-target filter.
-			let binding_gen =
-				self.binding_generator.clone().with_filter(filter);
+			// Clone the base binding generator, apply the per-target filter
+			// and record the file's schema versions in its preamble.
+			let binding_gen = self
+				.binding_generator
+				.clone()
+				.with_filter(filter)
+				.with_custom_preamble(preamble_with_versions(
+					self.binding_generator
+						.code_generator_config()
+						.custom_preamble
+						.as_deref()
+						.unwrap_or_default(),
+					&file.resources,
+				)?);
 
 			// Ensure the parent directory exists.
 			if let Some(parent) = file.path.parent() {
@@ -317,21 +343,24 @@ impl SchemaBindingGenerator {
 		Ok(())
 	}
 
-	/// Format the generated files with nightly rustfmt, matching `just fmt`,
-	/// so a generate run leaves no git diff.
+	/// Format the generated files with the pinned nightly rustfmt, matching
+	/// `just fmt`, so a generate run leaves no git diff. A floating `+nightly`
+	/// would format differently across machines.
 	fn format_generated_files(&self) -> Result {
 		ChildProcess::new("rustfmt")
 			.with_args(
-				["+nightly", "--edition", "2024"]
+				[format!("+{FMT_TOOLCHAIN}"), "--edition".into(), "2024".into()]
 					.into_iter()
-					.map(SmolStr::new)
+					.map(SmolStr::from)
 					.chain(
 						self.files.iter().map(|file| {
 							SmolStr::new(file.path.to_string_lossy())
 						}),
 					),
 			)
-			.with_not_found(RUSTFMT_NOT_FOUND)
+			.with_not_found(format!(
+				"\nIt looks like rustfmt is not installed, this is required for formatting generated bindings.\nPlease install the pinned toolchain and try again:\n\trustup toolchain install {FMT_TOOLCHAIN} --profile minimal --component rustfmt\n"
+			))
 			.run()?;
 		info!(
 			"[schema_binding_generator] formatted {} files",
@@ -341,11 +370,9 @@ impl SchemaBindingGenerator {
 	}
 }
 
-const RUSTFMT_NOT_FOUND: &str = r#"
-It looks like rustfmt is not installed, this is required for formatting generated bindings.
-Please install the nightly toolchain and try again:
-	rustup toolchain install nightly
-"#;
+/// The pinned formatting toolchain, kept in sync with `fmt-toolchain` in the
+/// workspace justfile.
+const FMT_TOOLCHAIN: &str = "nightly-2026-07-02";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -368,4 +395,94 @@ fn build_preamble() -> String {
 		"use crate::prelude::*;",
 	]
 	.join("\n")
+}
+
+/// Insert one `//! Generated from ...` line per provider into `base`, after
+/// its leading `//!` lines, so a schema bump shows in every regenerated
+/// file's diff as a version line.
+fn preamble_with_versions(
+	base: &str,
+	resources: &[ResourceList],
+) -> Result<String> {
+	let mut lines = Vec::new();
+	for list in resources {
+		let line = format!(
+			"//! Generated from the {} v{} schema.",
+			list.provider.short_source(),
+			list.provider.schema_version_required()?
+		);
+		if !lines.contains(&line) {
+			lines.push(line);
+		}
+	}
+	// inner doc lines must stay contiguous at the top of the file
+	let split_at = base
+		.lines()
+		.take_while(|line| line.starts_with("//!"))
+		.map(|line| line.len() + 1)
+		.sum::<usize>()
+		.min(base.len());
+	let (doc_head, rest) = base.split_at(split_at);
+	format!("{doc_head}{}\n{rest}", lines.join("\n")).xok()
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use beet_core::prelude::*;
+
+	fn test_provider() -> terra::Provider {
+		terra::Provider::new(
+			"Test",
+			"registry.opentofu.org/test/test",
+			"~> 2.0",
+		)
+	}
+
+	fn file_with(provider: terra::Provider) -> BindingFile {
+		BindingFile::new("out.rs").with_resources(provider, ["some_resource"])
+	}
+
+	/// The cache key must ask "which exact release", not "which constraint":
+	/// a floating constraint resolves differently over time and across
+	/// machines, making a stale cache undetectable by construction.
+	#[beet_core::test]
+	fn providers_tf_pins_exact_schema_version() {
+		SchemaBindingGenerator::default()
+			.with_file(file_with(test_provider().with_schema_version("2.3.4")))
+			.build_providers_tf_content()
+			.unwrap()
+			.xmap(String::from_utf8)
+			.unwrap()
+			.xpect_contains("\"version\": \"= 2.3.4\"")
+			.xnot()
+			.xpect_contains("~> 2.0");
+	}
+
+	#[beet_core::test]
+	fn unpinned_provider_fails_loudly() {
+		SchemaBindingGenerator::default()
+			.with_file(file_with(test_provider()))
+			.build_providers_tf_content()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("schema_version");
+	}
+
+	/// Version lines land after the leading `//!` block, deduplicated.
+	#[beet_core::test]
+	fn preamble_records_schema_versions() {
+		let provider = test_provider().with_schema_version("2.3.4");
+		let file = BindingFile::new("out.rs")
+			.with_resources(provider.clone(), ["res_a"])
+			.with_resources(provider, ["res_b"]);
+		preamble_with_versions(
+			"//! Do not edit!\n\n#![allow(dead_code)]",
+			&file.resources,
+		)
+		.unwrap()
+		.xpect_eq(
+			"//! Do not edit!\n//! Generated from the test/test v2.3.4 schema.\n\n#![allow(dead_code)]",
+		);
+	}
 }

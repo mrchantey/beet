@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -94,6 +95,8 @@ pub struct AwsSsmParameterDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tier: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 	/// ## Attribute

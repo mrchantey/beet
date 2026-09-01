@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -378,7 +379,7 @@ pub struct CustomizedMetricSpecificationResourceBlockTypeMetrics {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub expression: Option<SmolStr>,
 	/// ## Attribute
-	/// `optional`, `computed`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub id: SmolStr,
 	/// ## Attribute
@@ -457,11 +458,11 @@ pub struct MetricSpecificationResourceBlockTypePredefinedScalingMetricSpecificat
 #[serde(rename = "metric")]
 pub struct MetricStatResourceBlockTypeMetric {
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub metric_name: SmolStr,
 	/// ## Attribute
-	/// `optional`
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub namespace: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]

@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -501,24 +502,16 @@ impl terra::Resource for AwsDbInstanceDetails {
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
 pub struct AwsDbInstanceListenerEndpoint {
-	/// ## Attribute
-	/// `computed`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub address: SmolStr,
-	/// ## Attribute
-	/// `computed`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub hosted_zone_id: SmolStr,
-	/// ## Attribute
-	/// `optional`, `computed`
 	pub port: i64,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
 pub struct AwsDbInstanceMasterUserSecret {
-	/// ## Attribute
-	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub kms_key_id: SmolStr,
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]

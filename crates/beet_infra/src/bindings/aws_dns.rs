@@ -1,6 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
+//! Generated from the hashicorp/aws v6.62.0 schema.
 
 #![allow(
 	unused_imports,
@@ -73,6 +74,8 @@ pub struct AwsRoute53RecordDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ttl: Option<i64>,
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 	/// ## Attribute
@@ -178,6 +181,8 @@ pub struct AwsRoute53RecordResourceBlockTypeCidrRoutingPolicy {
 )]
 #[serde(rename = "failover_routing_policy")]
 pub struct AwsRoute53RecordResourceBlockTypeFailoverRoutingPolicy {
+	/// ## Attribute
+	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub r#type: SmolStr,
 }
