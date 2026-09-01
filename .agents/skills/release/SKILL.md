@@ -1,4 +1,11 @@
-Prepare the specified crates for release, one by one. For each crate follow the below procedure. 
+---
+name: release
+description: Prepare the specified crates for release, checking documentation, native and wasm tests, and examples per crate, without actually releasing. Use when asked to prep crates for release.
+---
+
+# Release Prep
+
+Prepare the specified crates for release, one by one. For each crate follow the below procedure.
 
 **Do not actually release the crate.**
 
@@ -21,6 +28,6 @@ All examples are located in `examples/CRATE_NAME`, not `crates/CRATE_NAME/exampl
 
 For each example:
 - check the implementation is up to date.
-- ensure the example is well and consistenly documented, include the command to run the example, specifying features.
+- ensure the example is well and consistently documented, include the command to run the example, specifying features.
 - run the example to verify it works, ie:
 	- `timeout 1m cargo run --example server --features=http_server | tail 30` (then simultaneously run a `curl`, waiting for it to be live)

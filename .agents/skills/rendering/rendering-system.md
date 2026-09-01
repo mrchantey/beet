@@ -61,7 +61,7 @@ cargo run -p rsx_site --no-default-features --features codegen
 
 This rewrites `src/codegen/{pages.rs,docs/mod.rs,blog/mod.rs,route_tree.rs}` (gitignored). Typed paths (`routes::docs::index()`) come from there, and the sidebar nav is auto-collected from the route tree.
 
-## Legacy API (in `.agents/reference/beet_old`)
+## Legacy API (in `.agents/references/beet_old`)
 
 | Legacy | Current |
 |---|---|

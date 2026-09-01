@@ -36,3 +36,20 @@ cargo install --path crates/beet-cli
 beet run-wasm <module.wasm>               # eg the wasm test runner
 cd examples/bsx_site && beet --server=http
 ```
+
+## Entries
+
+`--main` accepts an entry file (`--main=examples/hello/main.bsx`) or a directory probed for `main.bsx` (`--main=examples/hello`); with no `--main`, discovery walks the cwd and its ancestors.
+
+An entry that mounts paths outside its own directory declares `<StoreRoot src="../.."/>` (there is no `--root` flag): `src` names a position relative to the entry's location *in its store*, not a filesystem directory, so an fs store re-roots at the resolved ancestor while a self-rooted store (a bucket, browser storage) takes a key-prefix view and fails loudly when the root escapes the store. Live reload watches the store's local root when it has one (a self-rooted store watches nothing), and command outputs (`dist/`, `site.pdf`) land beside the entry deliberately.
+
+An entry declares its required features with `<CrateCheck features={["thread", "sockets"]}/>`, which errors when the running binary lacks them; `beet --features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --main=..`, never carrying `--features`: the entry's own `<CrateCheck>` is the verification mechanism.
+
+## Development
+
+- when editing rust, run the workspace CLI: `cargo run -p beet-cli --features=feat1,feat2 -- arg1 arg2`
+- when editing bsx files, use the installed `beet`: `cargo install --path crates/beet-cli --all-features`
+
+## Browser binaries
+
+Three wasm binaries span the range, built with `just build-wasm-min` (`assets/wasm/beet-min.wasm`, the smallest binary that is still a beet runtime in the browser), `just build-wasm-render` (`assets/wasm/beet-render.wasm`, the windowed wgpu stack in a tab: GPU via WebGPU when the browser grants an adapter, GPU-less otherwise) and `just build-wasm-full` (`assets/wasm/beet-full.wasm`, every feature a browser binary can boot with). Their feature sets are `web_min`/`web_render`/`web_full` in `crates/beet-cli/Cargo.toml`, whose comments carry the remaining exclusions and why; a narrower set in between gets its own artifact rather than widening `min`. `build-wasm` itself is target-agnostic, so package/features/out are always explicit, never defaulted to a beet binary.

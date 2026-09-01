@@ -1,3 +1,16 @@
+//! Target-agnostic styling: classes, declarations, design tokens and the
+//! cascade that resolves them for both the web and charcell targets.
+//!
+//! Conventions:
+//! - Colocate a widget's classes with the widget, never in a central rules
+//!   file. A widget owns its styling.
+//! - A widget with only one class uses `inline_class!` rather than registering
+//!   a named rule. A plain declaration is a `(prop, value)` pair; to point a
+//!   prop at a design token use `Declaration::token(prop, value)`, ie
+//!   `Declaration::token(BackgroundColor, colors::InverseSurface)`.
+//! - Put the `inline_class!` in a helper function (eg `fn toast_style() ->
+//!   impl Bundle`) when it is more than two tokens long; keep it inline at the
+//!   call site otherwise.
 mod animate;
 mod bsx_style;
 mod color_scheme;

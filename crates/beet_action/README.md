@@ -4,7 +4,9 @@ Functions as entities.
 
 An [`Action`] component turns an entity into a function: `call` runs its handler with an input and awaits the output. Control-flow nodes like [`Sequence`] are just actions that call their children, so behavior trees, state machines and utility AI are all built from the same primitive.
 
-An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor, and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::matches::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector.
+An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor (`ActionMeta` is immutable, so every change is an insert consumers can observe), and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::matches::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector. `ActionOf` / `Actions` mean agent targeting and nothing else.
+
+A provider (a component that `#[require]`s an action, ie `ContinueRun`, [`RunningSet`], every `#[action]` component) guards its slot with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
 
 ```rust
 # use beet_core::prelude::*;
@@ -44,3 +46,11 @@ async fn Greet(cx: ActionContext<String>) -> String {
 	format!("Hello, {}!", cx.value())
 }
 ```
+
+## Long-running work: facets
+
+A long-running **facet** is one closure plus its selection, contributed to its entity's [`RunningSet`] from the facet component's `on_add` via `RunningSet::add(entity, label, select, func)`. `func` IS the facet: it starts the work, holds it open across a shutdown receiver, then tears it down. There is no stop action anywhere, stopping is signalling: removing the parked `Running` (interrupt, reload, despawn) signals every live facet.
+
+The set owns the entity's single parked action: calling it parks a `Running<Out>`, fires `StartRunning<In>` for observers, then drives every facet the start's `select` accepted concurrently under one local task. A facet that errors signals the survivors, awaits their teardown and fails the parked call with the collapsed errors; a start no facet selected fails it loudly naming every declared label. Both failures are opt-out through [`BypassRunningErrors`], which logs and degrades instead, still failing the call once nothing is left alive.
+
+Servers (`HttpServer`, `CliServer`, `TuiServer`, ...) are just facets, with no exceptions: see `beet_net` for the server topology and the lifecycle verbs (`CallOnReady`, `CallOnStart`) that call these actions.

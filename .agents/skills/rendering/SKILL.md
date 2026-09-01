@@ -1,6 +1,11 @@
+---
+name: rendering
+description: Iterate on the beet rendering pipeline, which renders target-agnostic scenes to the web (HTML + CSS) and the terminal (charcell ANSI). Covers the change-render-verify loop, instrumentation to root cause, and reading generated CSS. Use when changing pages, widgets or style rules.
+---
+
 # Iterating on Beet Rendering
 
-Pages are authored once as target-agnostic scenes and rendered to two targets: the web (HTML + CSS) and the terminal (charcell ANSI). This skill is how to change them and get it right. System reference: `rendering-system.md`. Charcell internals + true terminal width: `charcell.md`. Screenshots: `webdriver.md`. No-code (markup) sites + matching a compiled reference for parity: `no-code-sites.md`. Live reference (previous, web-only site): `.agents/reference/beet_old`.
+Pages are authored once as target-agnostic scenes and rendered to two targets: the web (HTML + CSS) and the terminal (charcell ANSI). This skill is how to change them and get it right. System reference: `rendering-system.md`. Charcell internals + true terminal width: `charcell.md`. Screenshots: `webdriver.md`. No-code (markup) sites + matching a compiled reference for parity: `no-code-sites.md`. Live reference (previous, web-only site): `.agents/references/beet_old`.
 
 ## Attitude
 
