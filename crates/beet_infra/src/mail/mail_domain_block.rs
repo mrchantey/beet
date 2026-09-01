@@ -64,7 +64,9 @@ impl MailRecords {
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
+	on_remove = ErasedBlock::on_remove
+)]
 pub struct MailDomainBlock {
 	/// The mail domain served, eg `stalwart.beetmash.com`.
 	domain: SmolStr,

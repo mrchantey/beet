@@ -22,7 +22,9 @@ pub enum LightsailNetworking {
 /// - Optional DNS records pointing each authority at the public address
 /// - Optional beet ssh on 22, relocating the management sshd
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
+	on_remove = ErasedBlock::on_remove
+)]
 pub struct LightsailBlock {
 	/// Label used as a prefix for all terraform resources.
 	/// Also used as the artifact name.

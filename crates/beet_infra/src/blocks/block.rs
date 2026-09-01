@@ -49,8 +49,9 @@ pub trait EmitBlock: Block {
 	) -> Result;
 }
 
-/// The erased half of any [`Block`], inserted by the generic hook
-/// (`#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]`).
+/// The erased half of any [`Block`], inserted by the generic
+/// [`on_insert`](Self::on_insert) hook and removed with its block by
+/// [`on_remove`](Self::on_remove).
 ///
 /// No `dyn` and no behavior: just the common data a consumer of "a block,
 /// whichever kind" needs, ie [`TofuApplyAction`] pairing a [`BuildArtifact`]
@@ -70,11 +71,33 @@ pub struct ErasedBlock {
 
 impl ErasedBlock {
 	/// Component hook deriving the erased half from the block on the same
-	/// entity: `#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]`.
+	/// entity: `#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
+	/// on_remove = ErasedBlock::on_remove)]`.
+	///
+	/// A declaration entity holds at most one block (both its meanings hang off
+	/// the one entity), so a second block TYPE raises a clobber error rather
+	/// than silently retagging the erased half; reinserting the same type is a
+	/// refresh.
 	pub fn on_insert<T: Block>(mut world: DeferredWorld, cx: HookContext) {
 		let entity = cx.entity;
 		world.commands().queue(move |world: &mut World| -> Result {
-			let block = world.entity(entity).get_or_else::<T>()?.clone();
+			// tolerate a despawn landing between the insert and this command
+			let Ok(entity_ref) = world.get_entity(entity) else {
+				return Ok(());
+			};
+			let existing = entity_ref
+				.get::<ErasedBlock>()
+				.map(|erased| erased.type_name);
+			let block = entity_ref.get_or_else::<T>()?.clone();
+			if let Some(existing) = existing
+				&& existing != short_type_name::<T>()
+			{
+				bevybail!(
+					"an entity holds at most one block, but {entity} already \
+					 declares a {existing}. Remove it before inserting a {}.",
+					short_type_name::<T>()
+				);
+			}
 			let erased = Self {
 				type_name: short_type_name::<T>(),
 				label: block.label().clone(),
@@ -84,6 +107,15 @@ impl ErasedBlock {
 			Ok(())
 		});
 	}
+
+	/// Component hook removing the erased half with its block. A replace
+	/// (reinsert) fires `on_discard` then `on_insert`, never this, so a
+	/// refresh keeps the projection; only a true removal (or despawn, which
+	/// the `try_` tolerates) clears it.
+	pub fn on_remove(mut world: DeferredWorld, cx: HookContext) {
+		let entity = cx.entity;
+		world.commands().entity(entity).try_remove::<ErasedBlock>();
+	}
 }
 
 /// The short type name of `T`, ie `S3BucketBlock`.
@@ -92,4 +124,64 @@ pub(crate) fn short_type_name<T>() -> &'static str {
 		.rsplit("::")
 		.next()
 		.unwrap_or_default()
+}
+
+#[cfg(all(
+	test,
+	feature = "bindings_aws_common",
+	feature = "bindings_aws_dynamo"
+))]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// Blocks are immutable components, so reinsertion is the only mutation
+	/// path, and the `on_insert` edge refreshes the projection on exactly that
+	/// path: the erased half cannot go stale.
+	#[beet_core::test]
+	fn reinsertion_refreshes_the_erased_half() {
+		let mut world = World::new();
+		let entity = world.spawn(S3BucketBlock::new("app")).id();
+		world.flush();
+		world
+			.get::<ErasedBlock>(entity)
+			.unwrap()
+			.label
+			.as_str()
+			.xpect_eq("app");
+		world.entity_mut(entity).insert(S3BucketBlock::new("ops"));
+		world.flush();
+		world
+			.get::<ErasedBlock>(entity)
+			.unwrap()
+			.label
+			.as_str()
+			.xpect_eq("ops");
+	}
+
+	/// The projection leaves with its block; a lingering `ErasedBlock` would
+	/// keep pairing artifacts for a declaration that no longer exists.
+	#[beet_core::test]
+	fn removal_takes_the_erased_half() {
+		let mut world = World::new();
+		let entity = world.spawn(S3BucketBlock::new("app")).id();
+		world.flush();
+		world.get::<ErasedBlock>(entity).xpect_some();
+		world.entity_mut(entity).remove::<S3BucketBlock>();
+		world.flush();
+		world.get::<ErasedBlock>(entity).xpect_none();
+	}
+
+	/// A declaration entity holds at most one block: a second TYPE raises
+	/// rather than silently retagging the erased half.
+	#[beet_core::test]
+	#[should_panic = "holds at most one block"]
+	fn a_second_block_type_raises() {
+		let mut world = World::new();
+		world.spawn((
+			S3BucketBlock::new("app"),
+			DynamoTableBlock::new("analytics"),
+		));
+		world.flush();
+	}
 }

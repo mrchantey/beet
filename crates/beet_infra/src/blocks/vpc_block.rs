@@ -23,7 +23,9 @@ use beet_core::prelude::*;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
+	on_remove = ErasedBlock::on_remove
+)]
 pub struct VpcBlock {
 	label: SmolStr,
 	/// The network this vpc owns, which must be a `/16`: every subnet is a

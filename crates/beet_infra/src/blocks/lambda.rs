@@ -14,7 +14,9 @@ use serde_json::json;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
+	on_remove = ErasedBlock::on_remove
+)]
 pub struct LambdaBlock {
 	/// Label used as a prefix for all terraform resources,
 	/// variables, and outputs. Also used as the artifact name.

@@ -17,7 +17,9 @@ use serde_json::json;
 /// cannot fail over (Lambda has no ssh), so the failover is HTTP-only, and it
 /// is kept out of the core deploy behind a flag.
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
+#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
+	on_remove = ErasedBlock::on_remove
+)]
 pub struct CloudflareFailoverBlock {
 	/// Resource label prefix.
 	label: SmolStr,
