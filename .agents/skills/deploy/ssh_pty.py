@@ -7,6 +7,11 @@ The script is a `;`-separated list of ops applied in order:
 
   w:<secs>      wait, draining output into the emulator (accepts floats)
   m:<col>,<row> SGR mouse press+release at a 1-indexed cell
+  t:<text>      click the first cell of `text` in the CURRENT frame, exiting with
+                the frame if it is absent. Prefer this over `m:` for anything
+                whose position depends on page content: a sidebar entry moves
+                every time a doc or a blog post is added, and a stale `m:` clicks
+                whatever slid into that cell instead of failing.
   k:<keys>      send raw keys (`tab`, `enter`, `esc`, `down`, `up`, or literal text)
 
 Output from ssh is fed through a small VT emulator so the FINAL 80x24 frame is
@@ -24,9 +29,9 @@ Env:
                 the default a totally broken image path still renders a clean
                 frame and check `d` passes.
   PTY_COLS      pty width  (default 80)
-  PTY_ROWS      pty height (default 24). A raster is only placed when its whole
-                cell box fits the screen, so an image page needs a taller window
-                than the 24-row default.
+  PTY_ROWS      pty height (default 24). A raster bounds itself to its scroll
+                port and a partly clipped one places its visible portion, so the
+                24-row default draws images and is what the image check uses.
   PTY_RAW       write the undecoded pty stream to this path. The VT emulator
                 discards APC (`ESC _ ... ESC \\`) sequences, which is exactly
                 where the kitty image payload lives, so asserting on images
@@ -233,6 +238,20 @@ class Screen:
 	def lines(self):
 		return ["".join(cell for cell in row).rstrip() for row in self.grid]
 
+	def find_cell(self, text: str):
+		"""1-indexed (col, row) of the first cell of `text`, or None.
+
+		Searched row-major against a cell-aligned view: the trailing cell of a
+		wide glyph is stored as `""`, so a joined line's string index is not a
+		column once a fullwidth title precedes the match on that row.
+		"""
+		for row_index, row in enumerate(self.grid):
+			line = "".join(cell if cell else "\0" for cell in row)
+			col_index = line.find(text)
+			if col_index != -1:
+				return col_index + 1, row_index + 1
+		return None
+
 	def render(self, ruler: bool):
 		lines = self.lines()
 		if not ruler:
@@ -324,6 +343,14 @@ class Session:
 			elif verb == "m":
 				col, row = (int(part) for part in arg.split(","))
 				self.click(col, row)
+			elif verb == "t":
+				cell = self.screen.find_cell(arg)
+				if cell is None:
+					raise SystemExit(
+						f"no cell matching {arg!r} in the frame:\n"
+						+ self.screen.render(True)
+					)
+				self.click(*cell)
 			elif verb == "k":
 				self.send(self.KEYS.get(arg, arg.encode()))
 			else:

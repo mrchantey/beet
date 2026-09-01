@@ -43,11 +43,16 @@ esac
 # 80x24 the site is in its narrow layout, so the sidebar hides behind the
 # hamburger. Open the menu, click Design, reopen the menu (Design has since
 # auto-expanded), click counter, then click "More" `$1` times.
+#
+# Everything below the menu button is clicked BY LABEL (`t:`), not by cell: the
+# sidebar lists every doc and every blog post, so a single new page shifts every
+# row under it and a pinned `m:` silently clicks its neighbour. The hamburger
+# keeps its cell, being the one control whose position no content can move.
 recipe() {
 	local clicks="$1" script
-	script="w:$BOOT;m:3,1;w:$TICK;m:6,6;w:$NAV;m:3,1;w:$TICK;m:6,10;w:$NAV"
+	script="w:$BOOT;m:3,1;w:$TICK;t:Design;w:$NAV;m:3,1;w:$TICK;t:counter;w:$NAV"
 	for ((i = 0; i < clicks; i++)); do
-		script+=";m:9,12;w:$TICK"
+		script+=";t:More;w:$TICK"
 	done
 	echo "$script"
 }
@@ -87,15 +92,15 @@ expect "client A" "$OUT/a.txt" "You have clicked 1 times."
 expect "client B" "$OUT/b.txt" "You have clicked 2 times."
 
 echo "-- images (kitty graphics) --"
-# The sidebar overlay lists every post, and "Folk Technology" (post-6, the one
-# carrying a raster) sits at row 15 in the overlay, whose width is fixed so the
-# cell is the same at every window size. The image is well below the fold, so
-# scroll it into view: a raster is transmitted only once its box is on screen,
-# and 32 downs lands it straddling the bottom of the port.
+# The sidebar overlay lists every post; "Folk Technology" is post-6, the one
+# carrying a raster, reached by label since every post added above it moves its
+# row. The image is well below the fold, so scroll it into view: a raster is
+# transmitted only once its box is on screen, and 32 downs lands it straddling
+# the bottom of the port.
 DOWNS="$(printf 'k:down;%.0s' {1..32})"
 PTY_TERM=xterm-kitty PTY_RAW="$OUT/img.raw" \
 	python3 "$PTY" "$HOST" "$PORT" \
-	"w:$BOOT;m:3,1;w:$TICK;m:6,15;w:$((NAV * 2));${DOWNS}w:$((NAV * 2))" \
+	"w:$BOOT;m:3,1;w:$TICK;t:Folk Technology;w:$((NAV * 2));${DOWNS}w:$((NAV * 2))" \
 	>"$OUT/img.txt" 2>&1
 # `a=t` is the transmit; the emulator drops APC, so grep the raw stream
 if grep -qa $'\x1b_Ga=t' "$OUT/img.raw"; then

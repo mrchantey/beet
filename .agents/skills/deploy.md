@@ -137,12 +137,14 @@ Connection (what the driver runs per session): `ssh -tt -o StrictHostKeyChecking
 Navigation recipe. The TUI is a charcell render of the site: a left-click on a sidebar link navigates (focus also moves with Tab/Shift+Tab and Enter activates, but clicks are deterministic). The driver feeds SGR mouse press+release at 1-indexed cells and reconstructs the final frame through a small VT emulator, then greps it. At 80x24 the site is in its narrow layout: the home/content pages hide the sidebar behind a hamburger menu (the `三`/`☰` glyph at the top-left), so the sequence opens the menu, navigates, then reopens it once Design has auto-expanded:
 
 1. click the hamburger menu at cell (col 3, row 1): opens the sidebar overlay (Docs/Design/Blog tree).
-2. click "Design" at cell (col 6, row 6): loads `/docs/design` and closes the overlay.
+2. click "Design": loads `/docs/design` and closes the overlay.
 3. click the hamburger again at (col 3, row 1): reopens the overlay, now with the Design subtree expanded (button/color_schemes/counter/...) because the current page is under it.
-4. click "counter" at cell (col 6, row 10): loads `/docs/design/counter`.
-5. click the "More" button at cell (col 9, row 12): increments. On the counter page the sidebar is closed, so the body is full-width and "More" sits at the left; "Less" is at (col 18, row 12). The page title renders fullwidth (`Ｃｏｕｎｔｅｒ`), so an ASCII `grep Counter` will NOT match -- grep the normal-width body line `You have clicked N times` instead (it uniquely identifies the counter page and carries the count).
+4. click "counter": loads `/docs/design/counter`.
+5. click the "More" button: increments. On the counter page the sidebar is closed, so the body is full-width and "More" sits at the left, with "Less" beside it. The page title renders fullwidth (`Ｃｏｕｎｔｅｒ`), so an ASCII `grep Counter` will NOT match -- grep the normal-width body line `You have clicked N times` instead (it uniquely identifies the counter page and carries the count).
 
-As an `ssh_pty.py` script (`w:` is a seconds wait, `m:col,row` a click, `k:` keys): locally `w:5;m:3,1;w:2;m:6,6;w:3;m:3,1;w:2;m:6,10;w:3;m:9,12;w:2;m:9,12;w:2` reaches the counter and clicks More twice (expect "clicked 2 times"). Remote hosts double every wait. `ssh_pty.py` accepts `PTY_RULER=1` to print 1-indexed col/row guides for re-discovering cells if the layout shifts, and `PTY_USER` to override the `root` user.
+**Everything but the hamburger is clicked BY LABEL, not by cell.** The sidebar lists every doc page and every blog post, so adding one page shifts every row beneath it and a pinned `m:col,row` clicks its neighbour instead -- silently, since the driver has no idea it missed. That is exactly what happened in the Phase 1 shakedown: the `Crates` docs section landed above `Design`, so the pinned `(6,6)` opened `/docs/crates/beet_core` and all three checks failed on a page they never asked for, while `(6,15)` in the image check reached the wrong blog post. `ssh_pty.py` therefore takes `t:<text>`, which locates `text` in the CURRENT frame (row-major, cell-aligned so a preceding fullwidth title cannot skew the column) and clicks its first cell, exiting with the frame if it is absent. The hamburger keeps its cell, being the one control no content can move.
+
+As an `ssh_pty.py` script (`w:` is a seconds wait, `m:col,row` a cell click, `t:` a label click, `k:` keys): locally `w:5;m:3,1;w:2;t:Design;w:3;m:3,1;w:2;t:counter;w:3;t:More;w:2;t:More;w:2` reaches the counter and clicks More twice (expect "clicked 2 times"). Remote hosts double every wait. `ssh_pty.py` accepts `PTY_RULER=1` to print 1-indexed col/row guides, for reading the layout when a label match is ambiguous, and `PTY_USER` to override the `root` user.
 
 Two-client recipe: launch two `ssh_pty.py` runs at once (both backgrounded), drive them to DIFFERENT counts (A clicks More once, B twice), `wait`, then assert A shows "clicked 1 times" and B "clicked 2 times" and both rendered the counter. Independent counts prove per-session state. `ssh.sh` does exactly this, and calls out the known crash explicitly if a frame comes back "connection refused/closed/reset".
 
@@ -150,7 +152,7 @@ Image recipe (the third check). The TUI draws real rasters over the cell grid wi
 
 - `PTY_TERM=xterm-kitty`, else the server never transmits at all.
 - Nothing about the window. The check runs at the DEFAULT 80x24: sizing contains a raster within its scroll port and `desired_placements` places the visible part of a partly clipped one, so the default window draws the post-6 image. It used to ask for `PTY_COLS=60 PTY_ROWS=40`, which is now gone.
-- The image scrolled into view (32 `k:down`), since it sits well below the fold.
+- The image scrolled into view (32 `k:down`), since it sits well below the fold. The post itself is reached by label (`t:Folk Technology`, post-6), for the same reason the navigation recipe is.
 
 Assert on `PTY_RAW`, not the frame: the VT emulator discards APC sequences, which is exactly where the payload lives. `ssh.sh` greps the raw stream for an `ESC _ G a=t` transmit and reports the byte count (a healthy run is ~2.7MB), then for an `a=p` placement carrying the `w=`/`h=` source-rect keys, which ride a placement ONLY when the raster is cropped. The second grep is the standing guard on the blank-hole class below: a placement that never crops means either that regression is back or the raster no longer straddles the port, and both want looking at.
 
