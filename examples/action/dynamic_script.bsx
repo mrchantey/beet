@@ -1,0 +1,76 @@
+<!--
+# Dynamic Scripting - a sandboxed script acting on the live world
+
+`<DynamicComponent>` mints a component type with no rust definition behind it,
+and `<DynamicScript>` runs a sandboxed script with a `world` API installed.
+Every `world` method is served the moment it is awaited, so a script reads what
+it just wrote, a `spawn` hands back a real entity id the next line can use, and
+a refused call is an error the script can catch.
+
+The muster script spawns the squad and reads one of them straight back, so the
+world it describes is the world it just made. The round script uses real ids
+throughout, and the last beat asks for something its exposure forbids, catches
+the refusal and writes it onto the roll call, whose `<Log::Name>` reports it.
+
+    beet --main=examples/action/dynamic_script.bsx
+-->
+<Fragment>
+	<!-- the vocabulary this document mints, kept by the scene rather than
+	expanded away, so it survives a serde round trip -->
+	<DynamicComponent name="game.Health"/>
+	<Sequence {CallOnReady}>
+		<DynamicScript
+			{ScriptExposure{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
+			script="
+			// muster: each fighter is spawned with a registered rust component,
+			// addressed by its full type path, beside the minted one
+			await world.spawn({ 'bevy_ecs::name::Name': 'ada', 'game.Health': 3 });
+			await world.spawn({ 'bevy_ecs::name::Name': 'bob', 'game.Health': 5 });
+			const cleo = await world.spawn({ 'bevy_ecs::name::Name': 'cleo', 'game.Health': 2 });
+
+			// the spawn resolved to a real entity, so it can be read back at once
+			const health = await world.get(cleo, 'game.Health');
+			console.log('cleo mustered with ' + health + ' health');
+			"/>
+		<DynamicScript
+			{ScriptExposure{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
+			script="
+			// the roll call is named but carries no health, so it is no fighter
+			let report = null;
+			for (const id of await world.entities('bevy_ecs::name::Name')) {
+				if ((await world.get(id, 'bevy_ecs::name::Name')) === 'roll call') {
+					report = id;
+				}
+			}
+
+			// the round: everyone takes a hit and the weakest is renamed. Each
+			// read is of the world as it is now, so the roster is what landed.
+			const roster = [];
+			let weakest = null;
+			for (const id of await world.entities('game.Health')) {
+				await world.insert(id, 'game.Health', (await world.get(id, 'game.Health')) - 1);
+				const name = await world.get(id, 'bevy_ecs::name::Name');
+				const health = await world.get(id, 'game.Health');
+				roster.push(name + ' ' + health);
+				if (weakest === null || health <= weakest.health) {
+					weakest = { id, health, name };
+				}
+			}
+			await world.insert(weakest.id, 'bevy_ecs::name::Name', weakest.name + ' (wounded)');
+			await world.insert(report, 'bevy_ecs::name::Name', 'roll call ' + roster.join(', '));
+			"/>
+		<DynamicScript
+			{ScriptExposure{read:["bevy_ecs::name::Name","game.Health"],write:["game.Health"]}}
+			script="
+			// this script may read a name but not write one, and the refusal
+			// arrives as an error where the call was made
+			const [named] = await world.entities('bevy_ecs::name::Name');
+			try {
+				await world.insert(named, 'bevy_ecs::name::Name', 'silenced');
+			} catch (err) {
+				console.log('refused: ' + err.message);
+			}
+			"/>
+		<Log::Name {Name("roll call")}/>
+	</Sequence>
+</Fragment>

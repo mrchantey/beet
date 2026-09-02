@@ -1,17 +1,18 @@
 //! The wire protocol every out-of-process [`Script`] backend speaks.
 //!
-//! One request in, a stream of events out. The embedded engine needs none of
-//! this (it calls the engine directly), but every other backend is reached
-//! across a boundary — a child process's stdio, a Worker's `postMessage`, an
-//! iframe's `postMessage` — and they all carry the same two types. Keeping the
-//! protocol transport-shaped is what makes those backends swappable: a
-//! persistent runner or a pooled isolate is a change of transport, not a change
-//! of contract.
+//! One request in, a stream of events out, and — for a world-bridged run — a
+//! stream of replies back in. The embedded engine needs none of this (it calls
+//! the engine directly), but every other backend is reached across a boundary —
+//! a child process's stdio, a Worker's `postMessage`, an iframe's
+//! `postMessage` — and they all carry the same types. Keeping the protocol
+//! transport-shaped is what makes those backends swappable: a persistent runner
+//! or a pooled isolate is a change of transport, not a change of contract.
 //!
 //! The payload is JSON throughout, since every backend is a JavaScript host and
 //! JSON is the one value language they all share natively.
 
 use crate::prelude::*;
+use crate::scripting::dynamic::WORLD_SHIM;
 use beet_core::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -19,9 +20,10 @@ use serde_json::Value as JsonValue;
 
 /// One evaluation request: the whole of what a backend needs to run a script.
 ///
-/// There is deliberately nothing else here. A script is a pure
-/// `Input -> Output` transform, so its source, its bound input and its resource
-/// ceilings are the complete authority it receives.
+/// There is deliberately little else here. A script is a pure `Input -> Output`
+/// transform, so its source, its bound input and its resource ceilings are the
+/// bulk of the authority it receives; the one addition is the world flag, which
+/// is authority the caller grants explicitly and per evaluation.
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
 pub struct ScriptRequest {
 	/// The JavaScript source to evaluate.
@@ -30,14 +32,22 @@ pub struct ScriptRequest {
 	pub input: JsonValue,
 	/// The ceilings the backend enforces, to whatever extent it can.
 	pub limits: ScriptLimits,
+	/// Whether to install the `world` global at all: false, and the script has
+	/// no `world` to reach for.
+	///
+	/// Defaulted rather than required, so a request written by hand (or by an
+	/// older bootstrap) still decodes as the worldless run it means.
+	#[serde(default)]
+	pub world: bool,
 }
 
-/// One event from a running script: console output as it happens, then exactly
-/// one terminal event ([`Output`](Self::Output) or [`Error`](Self::Error)).
+/// One event from a running script: console output and world calls as they
+/// happen, then exactly one terminal event ([`Output`](Self::Output) or
+/// [`Error`](Self::Error)).
 ///
-/// Console lines stream rather than buffer, so a long-running script's output
-/// reaches the host as it runs — a script that never returns still shows what it
-/// did.
+/// The non-terminal events stream rather than buffer, so a long-running
+/// script's output reaches the host as it runs — a script that never returns
+/// still shows what it did.
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum ScriptEvent {
@@ -47,6 +57,16 @@ pub enum ScriptEvent {
 		stream: ConsoleStream,
 		/// The formatted line, without its trailing newline.
 		line: String,
+	},
+	/// One `world` call, awaiting its [`WorldReply`].
+	///
+	/// Non-terminal, but unlike a console line it is a question: the script is
+	/// blocked on the promise this call minted, and stays blocked until a reply
+	/// carrying the same id travels back. Only a world-bridged request can
+	/// produce these.
+	World {
+		/// What the script asked of the world.
+		call: WorldCall,
 	},
 	/// The script's completion value, the last event of a successful run.
 	///
@@ -93,13 +113,19 @@ impl JsonLine for ScriptEvent {}
 /// The JavaScript half of the protocol: the runner body every out-of-process
 /// backend evaluates, kept here beside the Rust types it must agree with.
 ///
-/// A transport prepends exactly two definitions and nothing else:
+/// Never evaluated as written: the two slots below are filled in by
+/// [`ScriptRequest::to_js_source`], which assembles the runnable form.
+///
+/// A transport contributes exactly three definitions and nothing else:
 ///
 /// - `request` — the [`ScriptRequest`], always as a `JSON.parse` of a string
 ///   literal, never spliced in as source. No fragment of a script or its input
 ///   is ever interpreted as code on its way in.
 /// - `emit(event)` — how one [`ScriptEvent`] leaves this realm: a stdout write
 ///   for the deno child, a `postMessage` for the worker and the iframe.
+/// - the receive half — how a [`WorldReply`] line arrives from the host and
+///   reaches `__world_reply`. Spliced only for a world-bridged run, and never
+///   awaited: it starts a listener or a background loop and returns.
 ///
 /// The source runs through *indirect* `eval`, so the completion value of its
 /// last expression is the output, matching the embedded engine (an
@@ -108,7 +134,7 @@ impl JsonLine for ScriptEvent {}
 /// A returned promise is awaited, so an async script resolves before its output
 /// is emitted; top-level `await` inside the source is not supported, which is
 /// again the embedded engine's behaviour.
-pub(crate) const JS_RUNNER: &str = r#"
+const JS_RUNNER: &str = r#"
 const show = (arg) => {
 	if (typeof arg === "string") return arg;
 	// `JSON.stringify` yields undefined for undefined/functions/symbols and
@@ -120,67 +146,124 @@ const show = (arg) => {
 };
 const write = (stream) => (...args) =>
 	emit({ event: "console", stream, line: args.map(show).join(" ") });
+// a thrown value as one message. V8's `stack` opens with the message and
+// QuickJS's does not, so the message is prepended unless it is already there.
+// Mirrors the same helper in the embedded engine's pump.
+const describe = (err) => {
+	if (!(err instanceof Error)) return String(err);
+	const stack = String(err.stack || "");
+	return stack.startsWith(err.name) ? stack : String(err) + "\n" + stack;
+};
 try {
 	globalThis.console = {
 		log: write("stdout"), info: write("stdout"), debug: write("stdout"),
 		warn: write("stderr"), error: write("stderr"),
 	};
 	globalThis.input = request.input;
+	// the world bridge, installed only for a world-bridged request: the host's
+	// inbound hook, then the shim (which installs the outbound `__world_reply`),
+	// then this transport's way of feeding it. A plain run never enters this
+	// branch, so a pure script has no `world` to reach for.
+	if (request.world) {
+		globalThis.__world_send = (call) => emit({ event: "world", call });
+		__WORLD_SHIM__
+		__WORLD_RECEIVE__
+	}
 	let value = (0, eval)(request.source);
 	if (value instanceof Promise) value = await value;
 	// `JSON.stringify` drops an `undefined` value, so a script that produced
 	// none emits `{"event":"output"}`, which decodes as an absent value.
 	emit({ event: "output", value });
 } catch (err) {
-	emit({ event: "error", message: String((err && err.stack) || err) });
+	emit({ event: "error", message: describe(err) });
 }
 "#;
 
-/// Apply one received protocol line, returning `None` to keep reading and
-/// `Some` once the line was terminal.
+/// The placeholder [`JS_RUNNER`] reserves for the shared [`WORLD_SHIM`].
 ///
-/// The transport-independent half of every backend's read loop: a stdio reader
-/// and a `postMessage` receiver differ in how they obtain a line, not in what a
-/// line means.
+/// Spliced rather than written out inline: the shim is one string the embedded
+/// engine evaluates verbatim too, and a second copy here would be a second
+/// thing to keep in step. An identifier rather than a comment, so an unspliced
+/// runner fails loudly instead of silently omitting the bridge.
+const WORLD_SHIM_SLOT: &str = "__WORLD_SHIM__";
+
+/// The placeholder [`JS_RUNNER`] reserves for the transport's receive half.
+const WORLD_RECEIVE_SLOT: &str = "__WORLD_RECEIVE__";
+
+/// What one received protocol line means to a backend's read loop.
 ///
-/// An unparseable line is skipped rather than failing the run. The transport is
-/// never exclusively ours — a script can write to stdout or `postMessage`
-/// itself — so unrecognized traffic is noise, not a protocol violation.
-pub(crate) fn apply_event<Sink>(
-	line: &str,
-	sink: &mut Sink,
-) -> Option<Result<Option<JsonValue>>>
+/// The transport-independent half of every backend's loop: a stdio reader and a
+/// `postMessage` receiver differ in how they obtain a line, not in what a line
+/// means.
+pub(crate) enum Received {
+	/// Nothing to answer: a console line, already forwarded to the sink, or
+	/// traffic that is not ours at all.
+	Continue,
+	/// A world call, blocking the script until its reply travels back.
+	Call(WorldCall),
+	/// The terminal event: the completion value, or the failure.
+	Done(Result<Option<JsonValue>>),
+}
+
+/// Classify one received protocol line, forwarding a console line to `sink` on
+/// the way.
+///
+/// An unparseable line is [`Continue`](Received::Continue) rather than a
+/// failure. The transport is never exclusively ours — a script can write to
+/// stdout or `postMessage` itself — so unrecognized traffic is noise, not a
+/// protocol violation.
+pub(crate) fn apply_event<Sink>(line: &str, sink: &mut Sink) -> Received
 where
 	Sink: FnMut(ConsoleStream, &str),
 {
-	match ScriptEvent::from_line(line).ok()? {
-		ScriptEvent::Console { stream, line } => {
+	match ScriptEvent::from_line(line) {
+		Ok(ScriptEvent::Console { stream, line }) => {
 			sink(stream, &line);
-			None
+			Received::Continue
 		}
-		ScriptEvent::Output { value } => Some(Ok(value)),
-		ScriptEvent::Error { message } => Some(Err(bevyhow!("{message}"))),
+		Ok(ScriptEvent::World { call }) => Received::Call(call),
+		Ok(ScriptEvent::Output { value }) => Received::Done(Ok(value)),
+		Ok(ScriptEvent::Error { message }) => {
+			Received::Done(Err(bevyhow!("{message}")))
+		}
+		Err(_) => Received::Continue,
 	}
 }
 
 impl ScriptRequest {
-	/// This request as the `const request = ..` prelude [`JS_RUNNER`] expects.
+	/// This request as a runnable module: the request prelude, the two
+	/// definitions this transport contributes, then the shared runner.
+	///
+	/// One assembly for every transport, because they differ only in how an
+	/// event leaves the realm and how a reply enters it. A backend assembling
+	/// its own would be free to drift in the parts that must not.
+	pub(crate) fn to_js_source(
+		&self,
+		emit: &str,
+		receive: &str,
+	) -> Result<String> {
+		let runner = JS_RUNNER
+			.replace(WORLD_SHIM_SLOT, WORLD_SHIM)
+			.replace(WORLD_RECEIVE_SLOT, receive);
+		let prelude = self.to_js_prelude()?;
+		// wrapped in an async IIFE so the whole assembly is an ordinary script
+		// rather than a module: the runner awaits a returned promise, and a
+		// transport that hands its source to `eval` (the iframe's bootstrap) has
+		// no module scope to put a top-level `await` in. Every transport gets the
+		// same wrap, so none of them is the odd one out.
+		format!("(async () => {{\n{prelude}\n{emit}\n{runner}\n}})();").xok()
+	}
+
+	/// This request as the `const request = ..` prelude the runner expects.
 	///
 	/// Double-encoded on purpose: the request line is itself JSON-encoded into a
 	/// string literal, so the emitted source carries the script and its input as
 	/// data the runner parses, never as code.
-	///
-	/// Every `<` is then escaped as `\u003c`. The literal is JavaScript, but the
-	/// iframe transport embeds that JavaScript in HTML, where a `</script>`,
-	/// `<!--` or `-->` inside the payload would end the script element and let
-	/// the rest of a script be parsed as markup. Escaping the one character all
-	/// three start with closes that off at the source, for this and any future
-	/// HTML-bearing transport, and costs the other transports nothing (JS reads
-	/// `<` straight back as `<`).
-	pub(crate) fn to_js_prelude(&self) -> Result<String> {
-		let literal = serde_json::to_string(&self.to_line()?)
-			.map_err(|err| bevyhow!("script protocol: encode request: {err}"))?
-			.replace('<', r"\u003c");
+	fn to_js_prelude(&self) -> Result<String> {
+		let literal =
+			serde_json::to_string(&self.to_line()?).map_err(|err| {
+				bevyhow!("script protocol: encode request: {err}")
+			})?;
 		format!("const request = JSON.parse({literal});").xok()
 	}
 }
@@ -194,6 +277,7 @@ mod test {
 			source: "input.name".to_string(),
 			input: serde_json::json!({ "name": "ada" }),
 			limits: ScriptLimits::default(),
+			world: false,
 		}
 	}
 
@@ -217,6 +301,18 @@ mod test {
 		ScriptRequest::from_line(&line).unwrap().xpect_eq(request);
 	}
 
+	/// The worldless run is the common one, so an encoding that never mentions
+	/// `world` must decode as one rather than as a malformed request.
+	#[beet_core::test]
+	fn a_missing_world_decodes_as_false() {
+		let mut encoded = serde_json::to_value(request()).unwrap();
+		encoded.as_object_mut().unwrap().remove("world");
+		serde_json::from_value::<ScriptRequest>(encoded)
+			.unwrap()
+			.world
+			.xpect_false();
+	}
+
 	#[beet_core::test]
 	fn events_round_trip() {
 		let events = vec![
@@ -227,6 +323,14 @@ mod test {
 			ScriptEvent::Console {
 				stream: ConsoleStream::Stderr,
 				line: "oops".to_string(),
+			},
+			ScriptEvent::World {
+				call: WorldCall {
+					id: 2,
+					op: WorldOp::Despawn {
+						entity: "42v1".to_string(),
+					},
+				},
 			},
 			ScriptEvent::Output {
 				value: Some(serde_json::json!(42)),
@@ -253,28 +357,18 @@ mod test {
 			.xpect_eq(ScriptEvent::Output { value: None });
 	}
 
-	/// A script containing `</script>` must not be able to close the element the
-	/// iframe transport embeds it in, so no raw `<` survives into the prelude.
+	/// A renamed slot would leave the sentinel in the source and the shim out of
+	/// it: a `ReferenceError` inside a sandbox rather than a build failure.
 	#[beet_core::test]
-	fn the_js_prelude_carries_no_raw_angle_bracket() {
-		let prelude = ScriptRequest {
-			source: r#"console.log("</script><img onerror=alert(1)>")"#
-				.to_string(),
-			..request()
-		}
-		.to_js_prelude()
-		.unwrap();
-		prelude.contains('<').xpect_false();
-		prelude.xpect_contains(r"\u003c/script");
-	}
-
-	/// The iframe transport embeds the assembled source in HTML, and only the
-	/// request half is escaped — the runner body is emitted verbatim. So the
-	/// runner must never contain a raw `<`: an innocuous `a < b` added here would
-	/// silently reopen the markup break-out that `to_js_prelude` closes.
-	#[beet_core::test]
-	fn the_shared_runner_carries_no_raw_angle_bracket() {
-		JS_RUNNER.contains('<').xpect_false();
+	fn the_shared_shim_is_spliced_into_the_runner() {
+		let source = request()
+			.to_js_source("const emit = () => {};", "/* receive */")
+			.unwrap();
+		source.contains(WORLD_SHIM_SLOT).xpect_false();
+		source.contains(WORLD_RECEIVE_SLOT).xpect_false();
+		source
+			.xpect_contains("globalThis.world")
+			.xpect_contains("/* receive */");
 	}
 
 	/// The tags are the JS side's contract, so they are asserted literally: the
@@ -288,5 +382,18 @@ mod test {
 		.to_line()
 		.unwrap()
 		.xpect_eq(r#"{"event":"console","stream":"stdout","line":"hi"}"#);
+		ScriptEvent::World {
+			call: WorldCall {
+				id: 0,
+				op: WorldOp::Entities {
+					component: "Name".to_string(),
+				},
+			},
+		}
+		.to_line()
+		.unwrap()
+		.xpect_eq(
+			r#"{"event":"world","call":{"id":0,"op":"entities","component":"Name"}}"#,
+		);
 	}
 }

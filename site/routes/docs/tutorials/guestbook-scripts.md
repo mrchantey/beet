@@ -1,0 +1,155 @@
++++
+title = "Teach it new words"
++++
+
+# Teach it new words
+
+In this tutorial we will add behavior to the guestbook that its markup has no vocabulary for, using scripts that live in the same file. By the end you will have minted a component the engine never shipped and written routes that reshape the world through it, without recompiling anything.
+
+## Start from the guestbook
+
+If you are arriving here fresh, put this in a file called `main.bsx` in an empty directory. If you have the guestbook from the previous lesson, you already have it.
+
+```jsx
+<CallOnReady {(CliServer, HttpServer{port:8080})}>
+<Router>
+	<FieldRoute path="sign" field="entries" verb="Push" list/>
+	<FieldRoute path="list" field="entries" verb="Read" list/>
+	<Route path="/" {FixedPage}>
+		<h1>Guestbook</h1>
+		<ul bx:for="entries" bx:key="name">
+			<li>{@doc:name} says {@doc:message}</li>
+		</ul>
+	</Route>
+</Router>
+</CallOnReady>
+```
+
+## A route that is a script
+
+The guestbook greets nobody. Add a route that does, above the page route:
+
+```jsx
+	<ScriptRoute path="greet" script="'hello ' + (input.url.params.name ? input.url.params.name[0] : 'stranger') + ', thanks for visiting'"/>
+```
+
+Run it:
+
+```sh
+beet greet --name=Ada
+```
+
+```text
+INFO Get /greet -> 200 OK in 607 µs
+hello Ada, thanks for visiting
+```
+
+And without a name:
+
+```sh
+beet greet
+```
+
+```text
+INFO Get /greet -> 200 OK in 611 µs
+hello stranger, thanks for visiting
+```
+
+Notice where that behavior lives. It is an attribute, in the same file as the markup, beside the routes it serves. The script runs in QuickJS with nothing of the host to reach for: no filesystem, no network, no environment, only its input and its output.
+
+## Mint a word the engine never shipped
+
+The guestbook should count visits. Nothing in beet has a component called `guestbook.Visits`, so we will make one. Add this as the first child of the router:
+
+```jsx
+	<DynamicComponent name="guestbook.Visits"/>
+```
+
+That is a component type with no Rust definition behind it, minted when the scene loads. It is a declaration the scene keeps, so a guestbook that mints a word still mints it after being saved and loaded again.
+
+## A script that acts
+
+Now a route that uses it. Add this below the greet route:
+
+```jsx
+	<DynamicScriptRoute path="visit"
+		{ScriptExposure{read:["guestbook.Visits"],write:["guestbook.Visits"]}}
+		script="
+		const found = await world.entities('guestbook.Visits');
+		const counter = found.length ? found[0] : await world.spawn({ 'guestbook.Visits': 0 });
+		await world.insert(counter, 'guestbook.Visits', (await world.get(counter, 'guestbook.Visits')) + 1);
+		return 'visit ' + (await world.get(counter, 'guestbook.Visits'));
+		"/>
+```
+
+The count has to outlive a single request, so start the guestbook as a server:
+
+```sh
+beet --server=http
+```
+
+From a second terminal, visit three times:
+
+```sh
+curl localhost:8080/visit
+curl localhost:8080/visit
+curl localhost:8080/visit
+```
+
+```text
+visit 1
+visit 2
+visit 3
+```
+
+That script reached into the world and changed it, through a `world` API it was handed: `world.entities` to find, `world.get` to read, `world.spawn` and `world.insert` to write.
+
+Notice that every one of those is awaited, and that each `await` is a real call against the world at that moment. The `world.spawn` on the second line resolves to a real entity, which the third line writes to. The last line reads back the number the line before it wrote. A script sees its own changes as it makes them.
+
+Notice too that the script has no `reply`. What it returns is the answer: a string comes back as plain text, anything else as JSON. A bridged script is an async function body, which is what makes those `await`s legal, so it answers with `return` where the greet route above answered with a bare expression.
+
+## A script that is told no
+
+`ScriptExposure` names what a script may reach, and the bridge enforces it, not the script. Add a route that is handed a grant it cannot work with:
+
+```jsx
+	<DynamicScriptRoute path="tamper"
+		{ScriptExposure{read:["guestbook.Visits"],write:["nothing.*"]}}
+		script="
+		const [counter] = await world.entities('guestbook.Visits');
+		try {
+			await world.insert(counter, 'guestbook.Visits', 9999);
+			return 'tampered';
+		} catch (err) { return err.message; }
+		"/>
+```
+
+Stop the server with Ctrl-C and start it again, then visit twice, tamper, and visit once more:
+
+```sh
+curl localhost:8080/visit
+curl localhost:8080/visit
+curl localhost:8080/tamper
+curl localhost:8080/visit
+```
+
+```text
+visit 1
+visit 2
+script may not write `guestbook.Visits`: its write exposure is include: nothing.*
+visit 3
+```
+
+The refusal arrived as an error where the script made the call, so the script caught it and answered with the message. The count carried on from two to three, untouched.
+
+Notice that the script could still *read* `guestbook.Visits`; the two halves of the exposure are separate lists. A script you did not write gets a shorter one.
+
+Remember that neither script ever held the world. Each one asked, one call at a time, and the host decided every time whether to answer. That is what lets a script be untrusted and useful at the same time.
+
+## What you have built
+
+You have added behavior to a running tool in the tool's own file: a scripted route, a component type the engine has never heard of, and routes that reshaped the world through it. The binary did not change once.
+
+You have also met the edge of what a script can do. Those scripts could not open a file, reach the network or read an environment variable, because they hold no authority at all. So the guestbook still forgets everything the moment it stops.
+
+Next, [Extend the engine](/docs/tutorials/guestbook-plugins) gives it a memory, with the one layer that is allowed to have one.

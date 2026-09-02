@@ -30,42 +30,89 @@
 //! A build that needs those guarantees in a browser enables `quickjs`, which is
 //! why the embedded engine is the default rather than this.
 //!
+//! ## The source travels as data
+//!
+//! The frame's `srcdoc` is a fixed [`BOOTSTRAP`] with nothing interpolated into
+//! it: it announces itself and waits to be handed the source over the message
+//! channel a bridged run needs anyway. So no fragment of a script or its input
+//! is ever embedded in markup, and there is no HTML escaping rule for anything
+//! else in the assembly to observe.
+//!
+//! ## Serving the world
+//!
+//! A world-bridged script's calls arrive as ordinary frame messages, which
+//! deliver in post order, and each reply is posted back into the frame. The
+//! non-guarantees above bound them the same way: the frame cannot be stopped,
+//! so a script still running past the deadline goes on calling into a listener
+//! that has been removed, where its calls are dropped and its promises never
+//! settle. The run has already failed by then, with whatever it did to the
+//! world before that left in place.
+//!
 //! [`Browser`]: beet_core::prelude::JsEnvironment::Browser
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use alloc::rc::Rc;
 use core::cell::RefCell;
-use core::sync::atomic::AtomicU64;
-use core::sync::atomic::Ordering;
 use serde_json::Value as JsonValue;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen::closure::Closure;
 use web_sys::MessageEvent;
 
-/// Labels this eval's messages so concurrent evals do not read each other's.
+/// The whole of the frame's document, fixed and interpolation-free.
 ///
-/// This is *not* what keeps a hostile message out — [`ListenerGuard`] checks the
-/// sending window itself for that, which no other frame can spoof. The nonce
-/// only separates our own frames from one another, so a counter is enough.
+/// It does two things and no more: announce that the frame is listening, and
+/// run the source the parent then hands it. Indirect `eval` puts that source in
+/// global scope, which is where every other transport runs it too; the assembly
+/// wraps itself in an async function, so it needs no module scope of its own.
 ///
-/// Seeded from the host clock rather than starting at zero, so two beet modules
-/// sharing one page do not both count up from the same place.
-fn next_nonce() -> u64 {
-	static BASE: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-	let base = *BASE.get_or_init(|| js_sys::Date::now() as u64);
-	static COUNTER: AtomicU64 = AtomicU64::new(0);
-	// stays exactly representable as a JS number: the clock is ~2^41 ms and the
-	// counter would have to reach 2^12 evals in one module to overflow into it.
-	base * 4096 + COUNTER.fetch_add(1, Ordering::Relaxed) % 4096
-}
+/// The reply channel is *not* here: it is the runner's receive half
+/// ([`RECEIVE`]), spliced only for a world-bridged run, so a pure run's frame
+/// keeps exactly one listener.
+const BOOTSTRAP: &str = r#"<!doctype html><meta charset="utf-8"><script type="module">
+let started = false;
+addEventListener("message", (event) => {
+	if (started) return;
+	const data = event.data;
+	if (data && typeof data.source === "string") {
+		started = true;
+		(0, eval)(data.source);
+	}
+});
+parent.postMessage("beet:ready", "*");
+</script>"#;
+
+/// The frame's first message, asking for its source.
+///
+/// Not a protocol line (it decodes as none), so the parent recognizes it by
+/// value rather than by shape.
+const READY: &str = "beet:ready";
+
+/// This transport's `emit`: one protocol line per `postMessage`.
+const EMIT: &str =
+	r#"const emit = (event) => parent.postMessage(JSON.stringify(event), "*");"#;
+
+/// This transport's receive half: a second frame listener, handing each
+/// [`WorldReply`] line to the shim.
+///
+/// A reply is a string and the source was an object, so this listener and the
+/// bootstrap's never see each other's messages.
+const RECEIVE: &str = r#"
+addEventListener("message", (event) => {
+	if (typeof event.data === "string") {
+		globalThis.__world_reply(JSON.parse(event.data));
+	}
+});
+"#;
 
 /// Evaluate `request` in a sandboxed iframe, forwarding each console line to
-/// `sink` and returning the script's completion value.
+/// `sink`, serving each world call through `bridge`, and returning the script's
+/// completion value.
 pub(crate) async fn run_iframe<Sink>(
 	request: ScriptRequest,
 	mut sink: Sink,
+	bridge: Option<&WorldBridge>,
 ) -> Result<Option<JsonValue>>
 where
 	Sink: FnMut(ConsoleStream, &str),
@@ -78,16 +125,10 @@ same-thread frame is not interruptible. Enable the `quickjs` feature for an \
 engine that can."
 		);
 	}
-	let nonce = next_nonce();
-	// the frame posts `[nonce, line]`, so the parent can tell our traffic apart.
-	let emit = format!(
-		r#"const emit = (event) => parent.postMessage([{nonce}, JSON.stringify(event)], "*");"#
-	);
-	let source =
-		format!("{}\n{emit}\n{}", request.to_js_prelude()?, JS_RUNNER);
+	let source = request.to_js_source(EMIT, RECEIVE)?;
 
 	let (sender, receiver) = async_channel::unbounded::<String>();
-	// filled in the moment the frame exists, below. Nothing can post to us in
+	// filled the moment the frame exists, below. Nothing can post to us in
 	// between: JS is single-threaded and this function does not yield until the
 	// drain, so the frame's own script cannot have run yet.
 	let expected = Rc::new(RefCell::new(None::<JsValue>));
@@ -96,30 +137,42 @@ engine that can."
 		Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
 			// the sending window *is* the credential. `event.source` is set by the
 			// browser and cannot be forged, and it is readable across an opaque
-			// origin, so only the frame this eval created can speak for it. The
-			// nonce below merely separates our own concurrent frames.
+			// origin, so only the frame this eval created can speak for it.
 			let Some(source) = event.source() else { return };
 			if sender_expected.borrow().as_ref() != Some(source.as_ref()) {
 				return;
 			}
-			if let Some((from, line)) = decode(event.data())
-				&& from == nonce
-			{
+			if let Some(line) = event.data().as_string() {
 				sender.try_send(line).ok();
 			}
 		});
 	// listen before the frame exists. Unlike a Worker's port, whose queue is
 	// flushed when `onmessage` is assigned, a `message` listener on `window`
 	// receives nothing posted before it was added, so attaching the frame first
-	// would race its first console line.
+	// would race its ready announcement.
 	let _listener = ListenerGuard::attach(on_message)?;
-	let frame = FrameGuard::attach(&source)?;
+	let frame = FrameGuard::attach()?;
 	*expected.borrow_mut() = frame.content_window();
 
 	let drain = async {
 		while let Ok(line) = receiver.recv().await {
-			if let Some(result) = protocol::apply_event(&line, &mut sink) {
-				return result.map_err(|err| bevyhow!("iframe: {err}"));
+			if line == READY {
+				frame.post_source(&source)?;
+				continue;
+			}
+			match protocol::apply_event(&line, &mut sink) {
+				protocol::Received::Continue => {}
+				protocol::Received::Call(call) => {
+					// a call with no bridge can only be the script posting the
+					// protocol itself, which there is nothing to answer.
+					let Some(bridge) = bridge else { continue };
+					frame.post(&JsValue::from_str(
+						&bridge.serve_line(call).await?,
+					))?;
+				}
+				protocol::Received::Done(result) => {
+					return result.map_err(|err| bevyhow!("iframe: {err}"));
+				}
 			}
 		}
 		bevybail!("iframe: frame closed without a result")
@@ -164,14 +217,6 @@ impl Drop for ListenerGuard {
 	}
 }
 
-/// A `[nonce, line]` message from one of our frames, or `None` for anything
-/// else on the page.
-fn decode(data: JsValue) -> Option<(u64, String)> {
-	let pair = data.dyn_into::<js_sys::Array>().ok()?;
-	let nonce = pair.get(0).as_f64()? as u64;
-	Some((nonce, pair.get(1).as_string()?))
-}
-
 /// Owns an attached runner frame, removing it from the document on drop.
 ///
 /// Removal reclaims the element, not the thread: see the module doc's second
@@ -187,8 +232,8 @@ impl FrameGuard {
 		self.frame.content_window().map(Into::into)
 	}
 
-	/// Attach a hidden, opaque-origin frame running `source`.
-	fn attach(source: &str) -> Result<Self> {
+	/// Attach a hidden, opaque-origin frame running the [`BOOTSTRAP`].
+	fn attach() -> Result<Self> {
 		let document = web_sys::window()
 			.and_then(|window| window.document())
 			.ok_or_else(|| bevyhow!("iframe: no document in this realm"))?;
@@ -206,15 +251,34 @@ impl FrameGuard {
 		frame
 			.set_attribute("style", "display:none")
 			.map_err(|err| bevyhow!("iframe: style: {err:?}"))?;
-		frame.set_srcdoc(&format!(
-			"<!doctype html><meta charset=\"utf-8\"><script type=\"module\">\n{source}\n</script>"
-		));
+		frame.set_srcdoc(BOOTSTRAP);
 		document
 			.body()
 			.ok_or_else(|| bevyhow!("iframe: document has no body"))?
 			.append_child(&frame)
 			.map_err(|err| bevyhow!("iframe: attach: {err:?}"))?;
 		Self { frame }.xok()
+	}
+
+	/// Hand the frame the source its bootstrap is waiting for.
+	fn post_source(&self, source: &str) -> Result<()> {
+		let message = js_sys::Object::new();
+		js_sys::Reflect::set(
+			&message,
+			&JsValue::from_str("source"),
+			&JsValue::from_str(source),
+		)
+		.map_err(|err| bevyhow!("iframe: build source message: {err:?}"))?;
+		self.post(&message)
+	}
+
+	/// Post one message into the frame.
+	fn post(&self, message: &JsValue) -> Result<()> {
+		self.frame
+			.content_window()
+			.ok_or_else(|| bevyhow!("iframe: frame has no window"))?
+			.post_message(message, "*")
+			.map_err(|err| bevyhow!("iframe: post: {err:?}"))
 	}
 }
 
@@ -232,6 +296,17 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// An async world whose registry knows [`Name`], the component the bridged
+	/// scripts below read and write.
+	fn bridged_world() -> World {
+		let world = AsyncPlugin::world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Name>();
+		world
+	}
+
 	#[beet_core::test(browser)]
 	async fn transforms_its_input() {
 		Script::<i64, i64>::new("input + 1")
@@ -248,6 +323,96 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq("out\n".to_string());
+	}
+
+	/// The source reaches the frame as data over the message channel, so markup
+	/// inside a script is never markup to the document that runs it.
+	#[beet_core::test(browser)]
+	async fn markup_in_a_script_survives_the_crossing() {
+		Script::<(), String>::new(r#""a </script> b <!-- c " + (1 < 2)"#)
+			.run(())
+			.await
+			.unwrap()
+			.xpect_eq("a </script> b <!-- c true".to_string());
+	}
+
+	/// The headline capability, over the frame's message channel: a read after a
+	/// write sees the write, because each call is served against the live world
+	/// before the next one is made.
+	#[beet_core::test(browser)]
+	async fn a_script_reads_its_own_write() {
+		let mut world = bridged_world();
+		world
+			.spawn(DynamicScript::new(
+				r#"
+				const entry = await world.spawn({ "Name": "ada" });
+				const name = await world.get(entry, "Name");
+				await world.insert(entry, "Name", name + " lovelace");
+				"#,
+			))
+			.call::<(), Outcome>(())
+			.await
+			.unwrap();
+		world
+			.query::<&Name>()
+			.iter(&world)
+			.next()
+			.unwrap()
+			.as_str()
+			.xpect_eq("ada lovelace");
+	}
+
+	/// A refused write rejects the promise at the call site rather than failing
+	/// the run, so the script can catch it.
+	#[beet_core::test(browser)]
+	async fn a_refused_write_is_catchable_in_the_script() {
+		let mut world = bridged_world();
+		DynamicComponents::register(&mut world, "game.Refused");
+		let entity = world.spawn(Name::new("ada")).id();
+		world
+			.spawn((
+				DynamicScript::new(
+					r#"
+					const [entry] = await world.entities("Name");
+					try {
+						await world.insert(entry, "Name", "bob");
+					} catch (err) {
+						await world.insert(entry, "game.Refused", err.message);
+					}
+					"#,
+				),
+				// everything but the name, so the catch block can still record
+				// what it was refused
+				ScriptExposure {
+					write: GlobFilter::default().with_exclude("*Name"),
+					..default()
+				},
+			))
+			.call::<(), Outcome>(())
+			.await
+			.unwrap();
+		world.entity(entity).get::<Name>().unwrap().as_str().xpect_eq("ada");
+		WorldRead::get(
+			&mut world,
+			entity,
+			"game.Refused",
+			&ScriptExposure::default(),
+		)
+		.unwrap()
+		.unwrap()
+		.to_string()
+		.xpect_contains("may not write");
+	}
+
+	/// The bridge is opt-in surface, not ambient authority: only a world-bridged
+	/// evaluation installs the shim, so a plain run has no `world` to reach for.
+	#[beet_core::test(browser)]
+	async fn a_pure_script_has_no_world_global() {
+		Script::<(), String>::new("typeof world")
+			.run(())
+			.await
+			.unwrap()
+			.xpect_eq("undefined".to_string());
 	}
 
 	/// The opaque origin is the guarantee this backend does provide: the parent

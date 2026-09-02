@@ -175,6 +175,19 @@ impl Value {
 		}
 	}
 
+	/// Returns this value as a mutable list, treating null as an empty list.
+	///
+	/// The append path: a field a document has never held is null rather than an
+	/// empty list, and a caller about to push wants the list either way.
+	pub fn as_list_mut_or_init(
+		&mut self,
+	) -> Result<&mut Vec<Value>, ValueError> {
+		if self.is_null() {
+			*self = Self::List(Vec::new());
+		}
+		self.as_list_mut()
+	}
+
 	/// Returns this value as a bool.
 	///
 	/// ## Errors

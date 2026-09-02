@@ -1,10 +1,11 @@
 +++
 title = "Self-hosted mail"
+description = "A runbook for standing up a self-hosted mail server on real cloud infrastructure."
 +++
 
 # Self-hosted mail
 
-This is a runbook wearing a tutorial's clothes. The other tutorials teach beet's concepts from an empty crate and type out every line; this one stands up a real mail server on real infrastructure with a real domain, and it assumes you can fill in blanks, hold context across a week and read an error message without being told what it means.
+This is a runbook, not a tutorial. The [tutorials](/docs/tutorials) teach beet's concepts from an empty file and type out every line; this one stands up a real mail server on real infrastructure with a real domain, and it assumes you can fill in blanks, hold context across a week and read an error message without being told what it means.
 
 It is also the longest-running thing in the docs. You start it on a Monday and finish it the following week, and most of that time is spent waiting on an Amazon support case. Plan for that rather than being surprised by it.
 
@@ -443,4 +444,4 @@ The honest summary, because a tutorial that blurs this line strands its reader a
 
 ## Where to go next
 
-[`beet_infra`](/docs/crates/beet_infra) covers the blocks, the terraform export and the deploy lifecycle these verbs sit on. If you have not written a beet router before, [Speak every interface](/docs/tutorials/every-interface) is fifteen minutes and explains why a deploy verb and an HTTP route are the same thing.
+[`beet_infra`](/docs/crates/beet_infra) covers the blocks, the terraform export and the deploy lifecycle these verbs sit on. If you have not written a beet router before, [A guestbook from a scene](/docs/tutorials/guestbook-scenes) is half an hour and shows why a command and an HTTP route are the same thing.

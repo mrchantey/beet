@@ -67,6 +67,19 @@ pub enum Body {
 }
 
 impl Body {
+	/// Clone an in-memory body, or `None` for a stream, which cannot be replayed.
+	///
+	/// A caller that has to hand a request on while holding a borrow of it (a
+	/// server facet receives `&Request`) needs the body too, and an argv-derived
+	/// or buffered body is always the in-memory arm. `Bytes` is reference
+	/// counted, so the copy is cheap.
+	pub fn try_clone(&self) -> Option<Self> {
+		match self {
+			Body::Bytes(bytes) => Some(Body::Bytes(bytes.clone())),
+			Body::Stream(_) => None,
+		}
+	}
+
 	/// Creates a streaming body from the given stream.
 	pub fn stream(stream: impl 'static + MaybeSendStream) -> Self {
 		cfg_if! {

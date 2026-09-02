@@ -57,5 +57,3 @@ Simulation as a medium for understanding, the kind of tool beet wants to make ea
 
 - [The Washington Post - Social Distancing Sim](https://www.washingtonpost.com/graphics/2020/world/corona-simulator/)
 - [Parable of the Polygons](https://ncase.me/polygons/)
-</content>
-</invoke>

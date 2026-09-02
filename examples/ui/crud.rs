@@ -1,6 +1,6 @@
 //! # CRUD - document list operations
 //!
-//! Demonstrates the [`PushField`], [`InsertAtField`], [`RemoveAtField`] and
+//! Demonstrates the [`PushFieldTyped`], [`InsertAtField`], [`RemoveAtField`] and
 //! [`SetFieldTyped`] actions on a document field holding a `Vec<String>`. The
 //! actor entity references the field on its host document, so the host's list
 //! is rebuilt after every mutation.
@@ -27,7 +27,7 @@ async fn main() -> Result {
 		.spawn((
 			ChildOf(host),
 			todos_field(),
-			PushField::<String>::default(),
+			PushFieldTyped::<String>::default(),
 			InsertAtField::<String>::default(),
 			RemoveAtField,
 			SetFieldTyped::<Vec<String>>::default(),

@@ -69,6 +69,7 @@ fn collect_valid_children<Input, Output>(
 	bypasses: Query<&BypassErrors>,
 	children: Query<&Children>,
 	metas: Query<&ActionMeta>,
+	punctuation: Query<(), Or<(With<Comment>, With<Doctype>)>>,
 ) -> Result<Vec<Entity>>
 where
 	Input: 'static + Send + Sync,
@@ -78,8 +79,19 @@ where
 	let Ok(children) = children.get(caller) else {
 		return Ok(Vec::new());
 	};
-	let mut valid = Vec::with_capacity(children.len());
-	for child in children.iter() {
+	// markup punctuation is not a step: an author who comments a behaviour tree
+	// is annotating it, not adding a child that should have carried an action.
+	// A sequence of nothing but punctuation has no children at all, so it takes
+	// the same path a childless one does rather than reporting on zero of them.
+	let considered = children
+		.iter()
+		.filter(|child| punctuation.get(*child).is_err())
+		.collect::<Vec<_>>();
+	if considered.is_empty() {
+		return Ok(Vec::new());
+	}
+	let mut valid = Vec::with_capacity(considered.len());
+	for child in considered.iter().copied() {
 		let Ok(meta) = metas.get(child) else {
 			if bypass_errors.contains(ChildError::NO_ACTION) {
 				continue;
@@ -102,10 +114,10 @@ where
 	if valid.is_empty() && !bypass_errors.contains(ChildError::NONE_VALID) {
 		bevybail!(
 			"sequence {caller} skipped all {} of its children, none serve Action<{}, {}>:{}",
-			children.len(),
+			considered.len(),
 			core::any::type_name::<Input>(),
 			core::any::type_name::<Outcome<Input, Output>>(),
-			describe_children(children.iter(), &metas)
+			describe_children(considered.iter().copied(), &metas)
 		);
 	}
 	Ok(valid)

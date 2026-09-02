@@ -19,8 +19,17 @@ impl Plugin for DocumentUiPlugin {
 			.register_type::<super::Decrement>()
 			.register_type::<super::AddField>()
 			.register_type::<super::SetField>()
+			.register_type::<super::PushField>()
 			.register_type::<super::RemoveAtField>()
-			.register_type::<super::ReadField>();
+			.register_type::<super::SetAtField>()
+			.register_type::<super::ReadAtField>()
+			.register_type::<super::ReadField>()
+			.register_type::<super::SetDocField>()
+			.register_type::<super::PushDocField>()
+			.register_type::<super::RemoveAtDocField>()
+			.register_type::<super::SetAtDocField>()
+			.register_type::<super::ReadAtDocField>()
+			.register_type::<super::ReadDocField>();
 
 		// re-list a changed BlobStore into its backing field, before the sync
 		// chain renders it, also after the async sync point

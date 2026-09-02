@@ -11,6 +11,20 @@
 //! so on initial insert the document's real value lands in the seeded [`Value`]
 //! before write-back runs, and a same-pass conflict resolves document-wins.
 //!
+//! `Changed<Document>` is whole-document granularity, but the read path needs
+//! per-field granularity: a write to one field dirties the document every other
+//! field is bound to, and clobbering all of them would silently discard an edit
+//! a sibling field was holding. [`SyncedValue`] records what the document last
+//! held for each field, so the read path can tell a change to *this* field from
+//! a change to its neighbour and only wins the former.
+//!
+//! It also breaks the echo. The read path's own write marks the local [`Value`]
+//! changed, which the write-back would otherwise propagate straight back; once
+//! the document has moved on that echo is a *stale* value overwriting a newer
+//! one, and two fields bound to one list will undo each other's appends. A local
+//! equal to its [`SyncedValue`] is exactly what the document already knows, so
+//! the write-back has nothing to say about it.
+//!
 //! # Architecture
 //!
 //! The synchronization works through a relationship system:
@@ -54,6 +68,20 @@ use crate::prelude::*;
 #[derive(Component)]
 #[relationship_target(relationship = FieldOf)]
 pub struct Fields(Vec<Entity>);
+
+/// What the document last held for this field, in either sync direction.
+///
+/// Runtime bookkeeping, deliberately not [`Reflect`](bevy::reflect::Reflect): it
+/// is derived from the document and must not ride a scene round trip. Public
+/// only because it appears in [`sync_document_to_local`]'s signature, which
+/// external systems order against; nothing outside this module inserts it.
+///
+/// Without it the read path cannot distinguish "the document changed *this*
+/// field" from "the document changed *some* field", and a self-bound action's
+/// write is discarded whenever any neighbour dirtied the document in the same
+/// window.
+#[derive(Component)]
+pub struct SyncedValue(Value);
 
 /// Attached to a [`FieldRef`] to track its associated [`Document`] entity.
 ///
@@ -99,14 +127,18 @@ pub(super) fn link_field_to_document(
 }
 
 /// Observer that removes the [`FieldOf`] relationship and the derived
-/// [`ResolvedFieldPath`] when a [`FieldRef`] is removed.
+/// [`ResolvedFieldPath`] and [`SyncedValue`] when a [`FieldRef`] is removed.
+///
+/// All three are derived from the binding, so none outlives it. [`SyncedValue`]
+/// in particular records what the document held for *that* field, and a record
+/// of a field nothing points at any more is stale by construction.
 pub(super) fn unlink_field_from_document(
 	ev: On<Remove, FieldRef>,
 	mut commands: Commands,
 ) -> Result {
 	commands
 		.entity(ev.entity)
-		.try_remove::<(FieldOf, ResolvedFieldPath)>();
+		.try_remove::<(FieldOf, ResolvedFieldPath, SyncedValue)>();
 	Ok(())
 }
 
@@ -119,19 +151,41 @@ pub(super) fn unlink_field_from_document(
 /// Public so external systems (eg beet_ui's `refresh_blob_store_list`) can order
 /// against the document read path.
 pub fn sync_document_to_local(
+	mut commands: Commands,
 	query: Populated<(&Document, &Fields), Changed<Document>>,
-	mut text_fields: Query<(&ResolvedFieldPath, &mut Value)>,
+	mut text_fields: Query<(
+		&ResolvedFieldPath,
+		&mut Value,
+		Option<&mut SyncedValue>,
+	)>,
 ) -> Result {
 	for (doc, doc_fields) in query {
 		for field in doc_fields.iter() {
-			if let Ok((resolved, mut text)) = text_fields.get_mut(field) {
-				// skip if field not yet present (document may be uninitialized)
-				if let Ok(field_val) = doc.get_field_ref(&resolved.field_path) {
-					if *text != *field_val {
-						// only clone if we have to
-						*text = field_val.clone();
-					}
+			let Ok((resolved, mut text, synced)) = text_fields.get_mut(field)
+			else {
+				continue;
+			};
+			// skip if field not yet present (document may be uninitialized)
+			let Ok(field_val) = doc.get_field_ref(&resolved.field_path) else {
+				continue;
+			};
+			match synced {
+				// the document holds what it held at the last sync, so this
+				// `Changed<Document>` belongs to another field. Leave this one
+				// alone: it may be carrying an edit write-back has yet to deliver.
+				Some(synced) if synced.0 == *field_val => continue,
+				Some(mut synced) => synced.0 = field_val.clone(),
+				// no record yet, ie a freshly seeded field: the document wins, which
+				// is what the read-before-write chaining has always given it.
+				None => {
+					commands
+						.entity(field)
+						.insert(SyncedValue(field_val.clone()));
 				}
+			}
+			if *text != *field_val {
+				// only clone if we have to
+				*text = field_val.clone();
 			}
 		}
 	}
@@ -231,17 +285,32 @@ pub(super) fn sync_schema(
 /// [`sync_document_to_local`]; the equality guard on both directions is what
 /// breaks the otherwise-infinite sync loop.
 pub(super) fn sync_local_to_document(
+	mut commands: Commands,
 	changed: Populated<
-		(Entity, &FieldRef, &ResolvedFieldPath, Ref<Value>),
+		(
+			Entity,
+			&FieldRef,
+			&ResolvedFieldPath,
+			Ref<Value>,
+			Option<&SyncedValue>,
+		),
 		Changed<Value>,
 	>,
 	mut docs: DocumentQuery,
 ) -> Result {
-	for (entity, field, resolved, value) in changed.iter() {
+	for (entity, field, resolved, value, synced) in changed.iter() {
 		// a freshly added Null carries no signal: it must neither clobber a
 		// field another binding wrote this pass, nor race a sibling's deferred
 		// document creation (the write-back is iteration-order independent).
 		if value.is_added() && value.is_null() {
+			continue;
+		}
+		// the local holds exactly what the last sync put there, so this `Changed`
+		// is the read path's own write echoing back. Propagating it would push a
+		// stale value over whatever the document has since gained.
+		if let Some(synced) = synced
+			&& synced.0 == *value
+		{
 			continue;
 		}
 		// equality guard + policy, computed while the read borrow is live;
@@ -261,6 +330,11 @@ pub(super) fn sync_local_to_document(
 		if should_write {
 			let new = (*value).clone();
 			docs.with_field(entity, field, move |slot| *slot = new)?;
+			// record what the document now holds, so the next read path can tell
+			// this write apart from a neighbour's.
+			commands
+				.entity(entity)
+				.insert(SyncedValue((*value).clone()));
 		}
 	}
 	Ok(())
@@ -661,6 +735,121 @@ mod test {
 		read_field(&mut world, child, &FieldRef::new("name"))
 			.xpect_eq(Value::Str("from_doc".into()));
 		read_value(&mut world, child).xpect_eq(Value::Str("from_doc".into()));
+	}
+
+	/// A write to one field dirties the document every other field is bound to.
+	/// The neighbour must not lose the edit it is holding, which is what the
+	/// whole-document `Changed` filter used to cost it.
+	#[crate::test]
+	fn a_neighbours_write_does_not_discard_a_local_edit() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(value!({ "a": "a0", "b": "b0" })))
+			.id();
+		let field_a = world
+			.spawn((ChildOf(doc), Value::default(), FieldRef::new("a")))
+			.id();
+		let field_b = world
+			.spawn((ChildOf(doc), Value::default(), FieldRef::new("b")))
+			.id();
+		world.update_local();
+
+		// a lands first, leaving the document dirty
+		*world.entity_mut(field_a).get_mut::<Value>().unwrap() =
+			Value::Str("a1".into());
+		world.update_local();
+		// b is edited while that dirt is still fresh, which is the whole trap
+		*world.entity_mut(field_b).get_mut::<Value>().unwrap() =
+			Value::Str("b1".into());
+		world.update_local();
+		world.update_local();
+
+		read_field(&mut world, field_a, &FieldRef::new("a"))
+			.xpect_eq(Value::Str("a1".into()));
+		read_field(&mut world, field_b, &FieldRef::new("b"))
+			.xpect_eq(Value::Str("b1".into()));
+	}
+
+	/// Two appends to one list, one pass apart, both land. A guestbook signed
+	/// twice in quick succession used to keep only the first entry.
+	#[crate::test]
+	fn successive_writes_all_land() {
+		let mut world = DocumentPlugin::world();
+		let doc = world.spawn(Document::new(value!({ "list": [] }))).id();
+		let field = world
+			.spawn((ChildOf(doc), Value::default(), FieldRef::new("list")))
+			.id();
+		world.update_local();
+
+		for entry in ["one", "two", "three"] {
+			world
+				.entity_mut(field)
+				.get_mut::<Value>()
+				.unwrap()
+				.as_list_mut_or_init()
+				.unwrap()
+				.push(Value::str(entry));
+			world.update_local();
+		}
+
+		read_field(&mut world, field, &FieldRef::new("list"))
+			.xpect_eq(value!(["one", "two", "three"]));
+	}
+
+	/// Two bindings on one field, one writing and one only reading, as a route
+	/// that appends beside a route that lists. The reader is updated by the read
+	/// path, which marks its local changed; if the write-back then echoes that
+	/// value it lands *after* the writer's next append and silently undoes it.
+	#[crate::test]
+	fn a_reader_does_not_echo_a_stale_value_over_a_writer() {
+		let mut world = DocumentPlugin::world();
+		let doc = world.spawn(Document::new(value!({ "list": [] }))).id();
+		let writer = world
+			.spawn((ChildOf(doc), Value::default(), FieldRef::new("list")))
+			.id();
+		let reader = world
+			.spawn((ChildOf(doc), Value::default(), FieldRef::new("list")))
+			.id();
+		world.update_local();
+
+		for entry in ["one", "two", "three"] {
+			world
+				.entity_mut(writer)
+				.get_mut::<Value>()
+				.unwrap()
+				.as_list_mut_or_init()
+				.unwrap()
+				.push(Value::str(entry));
+			world.update_local();
+		}
+		world.update_local();
+
+		let expected = value!(["one", "two", "three"]);
+		read_field(&mut world, writer, &FieldRef::new("list"))
+			.xpect_eq(expected.clone());
+		read_value(&mut world, reader).xpect_eq(expected);
+	}
+
+	/// Re-pointing an entity at a different field loads the new field, rather
+	/// than leaving it showing the old one's value.
+	#[crate::test]
+	fn repointing_a_field_loads_the_new_one() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(value!({ "a": "a0", "b": "b0" })))
+			.id();
+		let field = world
+			.spawn((ChildOf(doc), Value::default(), FieldRef::new("a")))
+			.id();
+		world.update_local();
+		read_value(&mut world, field).xpect_eq(Value::Str("a0".into()));
+
+		world.entity_mut(field).remove::<FieldRef>();
+		world.entity_mut(field).insert(FieldRef::new("b"));
+		world.update_local();
+		world.update_local();
+
+		read_value(&mut world, field).xpect_eq(Value::Str("b0".into()));
 	}
 
 	#[crate::test]

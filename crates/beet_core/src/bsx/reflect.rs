@@ -124,43 +124,13 @@ fn name_literal_str(literal: &DataLiteral) -> Option<&str> {
 	}
 }
 
-/// Look up a registered type's `'static` [`TypeInfo`] by short type path.
-///
-/// A generic type's short path keeps its arguments (eg `Repeat<()>`), so a bare
-/// `{Repeat}` spread or `<Repeat>` tag misses the exact lookup; it then falls
-/// back to the unique generic instantiation whose base name matches (the `<`
-/// boundary guards against prefix collisions like `Repeat` vs `RepeatTimes`).
+/// Look up a registered type by short type path, the [`reflect_ext`] resolver
+/// under the name this module's callers use.
 pub(crate) fn registration_by_name<'a>(
 	registry: &'a TypeRegistry,
 	name: &str,
 ) -> Option<&'a TypeRegistration> {
-	if let Some(registration) = registry.get_with_short_type_path(name) {
-		return Some(registration);
-	}
-	// a `::`-qualified name may be a fully-qualified type path: the way to name a
-	// type whose short path is ambiguous (eg the two registered `Transform`s,
-	// `bevy::transform::components::Transform` vs the CSS one). A bare ambiguous
-	// short path resolves to nothing above rather than guessing.
-	if name.contains("::")
-		&& let Some(registration) = registry.get_with_type_path(name)
-	{
-		return Some(registration);
-	}
-	// an ambiguous short path resolves in favour of a sole template candidate,
-	// whose short path is the only name it has.
-	if let Some(registration) =
-		ReflectTemplate::registration_named(registry, name)
-	{
-		return Some(registration);
-	}
-	let mut matches = registry.iter().filter(|registration| {
-		let short = registration.type_info().type_path_table().short_path();
-		short.len() > name.len()
-			&& short.starts_with(name)
-			&& short.as_bytes()[name.len()] == b'<'
-	});
-	let first = matches.next()?;
-	matches.next().is_none().then_some(first)
+	reflect_ext::registration_by_name(registry, name)
 }
 
 /// The [`registration_by_name`] match's [`TypeInfo`], for callers that only need
@@ -294,6 +264,16 @@ fn scalar_to_reflect(
 			}
 		};
 		return Ok(Box::new(parsed));
+	}
+
+	// a single pattern targeting a `GlobFilter` field is the one-entry form of
+	// the list coercion below, so `read="guestbook.*"` and `read=["guestbook.*"]`
+	// both author an allowlist.
+	if let (Value::Str(pattern), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<GlobFilter>()
+	{
+		return glob_filter([pattern.as_str()])
+			.map(|filter| Box::new(filter) as Box<dyn PartialReflect>);
 	}
 
 	// a string targeting a `SmolStr` field coerces to `SmolStr`, mirroring the
@@ -493,6 +473,28 @@ fn list_to_reflect(
 	registry: &TypeRegistry,
 	resolver: EntityResolver,
 ) -> Result<Box<dyn PartialReflect>> {
+	// a list of patterns targeting a `GlobFilter` field builds the filter from
+	// them as includes, so an allowlist authors as the list it reads like:
+	// `{ScriptExposure{read:["guestbook.*","Text"]}}`. Its patterns are a
+	// private `Vec<GlobPattern>`, so field-by-field reflect construction cannot
+	// reach them.
+	if let Some(info) = field_info
+		&& info.type_id() == TypeId::of::<GlobFilter>()
+	{
+		let patterns = items
+			.iter()
+			.map(|item| match item {
+				DataLiteral::Scalar(Value::Str(pattern)) => {
+					pattern.as_str().xok()
+				}
+				other => bevybail!(
+					"invalid glob pattern {other:?}: expected a string"
+				),
+			})
+			.collect::<Result<Vec<_>>>()?;
+		return glob_filter(patterns)
+			.map(|filter| Box::new(filter) as Box<dyn PartialReflect>);
+	}
 	let item_info = match field_info {
 		Some(TypeInfo::List(info)) => info.item_info(),
 		Some(TypeInfo::Array(info)) => info.item_info(),
@@ -739,11 +741,88 @@ fn named_tuple_struct_to_reflect(
 	Ok(Box::new(dynamic))
 }
 
+/// A [`GlobFilter`] over `patterns`, as includes.
+///
+/// The markup form of a filter is the allowlist a human writes; an exclude
+/// needs the struct literal (`{read:{exclude:[..]}}`), which reflects normally.
+fn glob_filter<'a>(
+	patterns: impl IntoIterator<Item = &'a str>,
+) -> Result<GlobFilter> {
+	let mut filter = GlobFilter::default();
+	for pattern in patterns {
+		// `GlobFilter::include` panics on a malformed pattern, and a markup
+		// attribute is authored input, so it is validated into an error first.
+		GlobFilter::parse_glob_pattern(pattern).map_err(|err| {
+			bevyhow!("invalid glob pattern {pattern:?}: {err}")
+		})?;
+		filter.include(pattern);
+	}
+	filter.xok()
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
 	use bevy::reflect::FromReflect;
 	use bevy::reflect::Typed;
+
+	/// A `GlobFilter` field takes the allowlist a human writes, as a list or as
+	/// a bare string, because its patterns are private and reflect cannot build
+	/// them field by field.
+	#[crate::test]
+	fn coerces_patterns_to_a_glob_filter() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Exposure {
+			read: GlobFilter,
+		}
+		let expected = GlobFilter::default().with_include("guestbook.*");
+		resolve::<Exposure>(DataLiteral::Enum(NamedLiteral {
+			name: "Exposure".into(),
+			fields: NamedFields::Struct(vec![(
+				"read".into(),
+				DataLiteral::List(vec![DataLiteral::Scalar(Value::Str(
+					"guestbook.*".into(),
+				))]),
+			)]),
+		}))
+		.xpect_eq(Exposure {
+			read: expected.clone(),
+		});
+		resolve::<Exposure>(DataLiteral::Enum(NamedLiteral {
+			name: "Exposure".into(),
+			fields: NamedFields::Struct(vec![(
+				"read".into(),
+				DataLiteral::Scalar(Value::Str("guestbook.*".into())),
+			)]),
+		}))
+		.xpect_eq(Exposure { read: expected });
+	}
+
+	/// A malformed pattern errors rather than panicking inside the glob
+	/// validator, since a markup attribute is authored input.
+	#[crate::test]
+	fn a_malformed_glob_pattern_names_itself() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Exposure {
+			read: GlobFilter,
+		}
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		DataLiteral::to_reflect(
+			&DataLiteral::Scalar(Value::Str("[".into())),
+			Exposure::type_info()
+				.as_struct()
+				.unwrap()
+				.field("read")
+				.unwrap()
+				.type_info(),
+			&registry,
+			&mut resolver,
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("invalid glob pattern");
+	}
 
 	fn resolve<T: FromReflect + Typed>(literal: DataLiteral) -> T {
 		let registry = TypeRegistry::default();

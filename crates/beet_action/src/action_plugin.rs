@@ -58,7 +58,14 @@ impl Plugin for ActionPlugin {
 			.add_systems(Update, tick_run_timers)
 			.add_plugins(running_plugin::<(), Outcome>);
 		#[cfg(feature = "scripting")]
-		app.register_type::<Script<(), String>>();
+		app.register_type::<Script<(), String>>()
+			// the world bridge: the vocabulary a scene mints and the reach it
+			// grants a script
+			.register_type::<DynamicComponent>()
+			.register_type::<ScriptExposure>()
+			// the world-bridged leaf action, non-generic so a scene can author it
+			// directly
+			.register_type::<DynamicScript>();
 		// the external-process leaf needs the native `ChildProcess` to spawn, so it
 		// (and its action marker) only exist on a native std build. `Command` is
 		// crate-qualified to disambiguate it from bevy's `Command` trait, both in

@@ -135,6 +135,18 @@ pub enum ConsoleStream {
 	Stderr,
 }
 
+impl ConsoleStream {
+	/// Forward one line to the host log on the stream it targets.
+	///
+	/// The default sink for an evaluation that is not capturing output.
+	pub fn log(self, line: &str) {
+		match self {
+			Self::Stdout => info!("{line}"),
+			Self::Stderr => error!("{line}"),
+		}
+	}
+}
+
 impl<Input, Output> Script<Input, Output>
 where
 	Input: 'static + Send + Sync + Serialize,
@@ -178,7 +190,7 @@ where
 			if #[cfg(feature = "quickjs")] {
 				crate::scripting::run_quickjs(&self.content, input, &self.limits)
 			} else if #[cfg(feature = "std")] {
-				host_backend(self.request(input)?, |_, _| {})
+				host_backend(self.request(input, false)?, ConsoleStream::log, None)
 					.await?
 					.ok_or_else(|| bevyhow!("script returned no value"))?
 					.xmap(serde_json::from_value)
@@ -226,7 +238,9 @@ where
 					&self.limits,
 				)
 			} else if #[cfg(feature = "std")] {
-				host_backend(self.request(input)?, sink).await.map(|_| ())
+				host_backend(self.request(input, false)?, sink, None)
+					.await
+					.map(|_| ())
 			} else {
 				let _ = (input, sink);
 				no_backend()
@@ -234,17 +248,109 @@ where
 		}
 	}
 
+	/// Evaluate the script with the `world` bridge installed, serving every
+	/// `world` call live against `world` as it arrives.
+	///
+	/// The presence of a world is what installs the bridge: [`run`](Self::run)
+	/// and [`run_console`](Self::run_console) leave the script with no `world`
+	/// global to reach for, so world access is opt-in surface rather than
+	/// ambient authority.
+	///
+	/// Returns the script's completion value, absent when it produced none: a
+	/// leaf action ignores it, a route answers with it.
+	///
+	/// The embedded engine is synchronous, so it takes exclusive world access
+	/// once and pumps its own job queue against the `&mut World` inside; an
+	/// out-of-process backend serves each call as a round trip over its
+	/// transport. Either way the script sees one contract: an `await` is a real
+	/// operation against the world at the moment it runs.
+	///
+	/// # Errors
+	/// Propagates parse, evaluation, or input-serialization errors, or names the
+	/// missing backend when the build has none. An individual refused call is
+	/// *not* an error here: it rejects inside the script, which may catch it.
+	pub async fn run_world(
+		&self,
+		input: Input,
+		world: AsyncWorld,
+		exposure: ScriptExposure,
+	) -> Result<Option<serde_json::Value>> {
+		let source = Self::async_body(&self.content);
+		let input = serde_json::to_value(input)
+			.map_err(|err| bevyhow!("failed to encode input: {err}"))?;
+		cfg_if! {
+			if #[cfg(feature = "quickjs")] {
+				let limits = self.limits;
+				world
+					.with(move |world| {
+						crate::scripting::run_quickjs_world(
+							&source,
+							&input,
+							world,
+							&exposure,
+							&limits,
+						)
+					})
+					.await
+			} else if #[cfg(feature = "std")] {
+				let bridge = WorldBridge::new(world, exposure);
+				host_backend(
+					self.request_source(source, input, true)?,
+					ConsoleStream::log,
+					Some(&bridge),
+				)
+				.await
+			} else {
+				let _ = (input, source, world, exposure);
+				no_backend()
+			}
+		}
+	}
+
+	/// Wrap a script body so its top-level `await` is legal.
+	///
+	/// Every backend evaluates a script as an expression, not a module, so a bare
+	/// `await world.spawn(..)` is a syntax error. The world-bridged path is
+	/// promise-shaped throughout, so it wraps the body in an async IIFE once,
+	/// here, before any backend sees it: the embedded engine settles the promise
+	/// it returns and the host runner awaits it, and both receive character-
+	/// identical source. Doing it per backend is exactly the drift the one-eval-
+	/// path design forbids.
+	///
+	/// A bridged script is therefore an async *function body*, not an
+	/// expression: it answers with `return`, where a pure
+	/// [`run`](Self::run) script answers with the value of its last expression.
+	/// JavaScript has no construct that offers both, and `await` is the half a
+	/// world-bridged script cannot do without.
+	fn async_body(content: &str) -> String {
+		format!("(async () => {{\n{content}\n}})()")
+	}
+
 	/// This script and `input` as a backend request.
 	///
 	/// Only the host-realm backends marshal one; the embedded engine takes the
 	/// input directly, so this exists exactly where the protocol does.
 	#[cfg(all(feature = "std", not(feature = "quickjs")))]
-	fn request(&self, input: Input) -> Result<ScriptRequest> {
+	fn request(&self, input: Input, world: bool) -> Result<ScriptRequest> {
+		let input = serde_json::to_value(input)
+			.map_err(|err| bevyhow!("failed to encode input: {err}"))?;
+		self.request_source(self.content.clone(), input, world)
+	}
+
+	/// A backend request over `source` rather than this script's own body (the
+	/// world-bridged path wraps it first) and over an already encoded input.
+	#[cfg(all(feature = "std", not(feature = "quickjs")))]
+	fn request_source(
+		&self,
+		source: String,
+		input: serde_json::Value,
+		world: bool,
+	) -> Result<ScriptRequest> {
 		ScriptRequest {
-			source: self.content.clone(),
-			input: serde_json::to_value(input)
-				.map_err(|err| bevyhow!("failed to encode input: {err}"))?,
+			source,
+			input,
 			limits: self.limits,
+			world,
 		}
 		.xok()
 	}
@@ -305,26 +411,27 @@ where
 async fn host_backend<Sink>(
 	request: ScriptRequest,
 	sink: Sink,
+	bridge: Option<&WorldBridge>,
 ) -> Result<Option<serde_json::Value>>
 where
 	Sink: FnMut(ConsoleStream, &str),
 {
 	cfg_if! {
 		if #[cfg(not(target_arch = "wasm32"))] {
-			crate::scripting::run_deno_cli(request, sink).await
+			crate::scripting::run_deno_cli(request, sink, bridge).await
 		} else {
 			match js_runtime::environment() {
 				js_runtime::JsEnvironment::Deno => {
-					crate::scripting::run_deno_worker(request, sink).await
+					crate::scripting::run_deno_worker(request, sink, bridge).await
 				}
 				js_runtime::JsEnvironment::Browser => {
-					crate::scripting::run_iframe(request, sink).await
+					crate::scripting::run_iframe(request, sink, bridge).await
 				}
 				js_runtime::JsEnvironment::Cloudflare => {
-					crate::scripting::run_cloudflare(request, sink).await
+					crate::scripting::run_cloudflare(request, sink, bridge).await
 				}
 				host @ (js_runtime::JsEnvironment::Node | js_runtime::JsEnvironment::Unknown) => {
-					let _ = (request, sink);
+					let _ = (request, sink, bridge);
 					bevybail!(
 						"`Script` has no backend on this host ({host:?}). It offers no \
 	way to run a script with less authority than the program itself holds — Node in \

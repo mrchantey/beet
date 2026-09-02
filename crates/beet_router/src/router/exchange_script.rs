@@ -72,7 +72,7 @@ pub async fn ExchangeScriptElement(
 /// as a string or bytes per its `content-type` (a text media type is a string,
 /// otherwise bytes; with no `content-type` the bytes are a string if valid UTF-8,
 /// else bytes).
-async fn request_input(request: Request) -> Result<Value> {
+pub(crate) async fn request_input(request: Request) -> Result<Value> {
 	let path = request
 		.path_string()
 		.split('/')

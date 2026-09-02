@@ -17,6 +17,17 @@
 //! the *host* process that a wasm module cannot set for itself. A host without
 //! it gets an error naming the flag.
 //!
+//! ## Serving the world
+//!
+//! A world-bridged script's calls ride the same message port as its console
+//! output, and a port delivers in post order, so the host sees them in the
+//! order the script made them; each reply goes back over the same port, which
+//! the shim routes to the promise its id names.
+//!
+//! The gap below covers them too, and more visibly: an isolate that ends itself
+//! emits no terminal event, so the run fails at the deadline with whatever the
+//! script had already done to the world left in place.
+//!
 //! ## Known gap
 //!
 //! A script that ends its own isolate without going through the runner — the
@@ -44,17 +55,25 @@ const EMIT: &str = r#"
 const emit = (event) => self.postMessage(JSON.stringify(event));
 "#;
 
+/// This transport's receive half: the port's inbound side, handing each
+/// [`WorldReply`] line to the shim.
+const RECEIVE: &str = r#"
+self.onmessage = (event) => globalThis.__world_reply(JSON.parse(event.data));
+"#;
+
 /// Evaluate `request` in a permissionless Worker, forwarding each console line
-/// to `sink` and returning the script's completion value.
+/// to `sink`, serving each world call through `bridge`, and returning the
+/// script's completion value.
 pub(crate) async fn run_deno_worker<Sink>(
 	request: ScriptRequest,
 	mut sink: Sink,
+	bridge: Option<&WorldBridge>,
 ) -> Result<Option<JsonValue>>
 where
 	Sink: FnMut(ConsoleStream, &str),
 {
 	let timeout = request.limits.timeout;
-	let source = format!("{}\n{EMIT}\n{}", request.to_js_prelude()?, JS_RUNNER);
+	let source = request.to_js_source(EMIT, RECEIVE)?;
 	let (sender, receiver) = async_channel::unbounded::<String>();
 
 	// the guard owns the isolate: every exit path below (completion, script
@@ -89,8 +108,24 @@ where
 
 	let drain = async {
 		while let Ok(line) = receiver.recv().await {
-			if let Some(result) = protocol::apply_event(&line, &mut sink) {
-				return result.map_err(|err| bevyhow!("deno worker: {err}"));
+			match protocol::apply_event(&line, &mut sink) {
+				protocol::Received::Continue => {}
+				protocol::Received::Call(call) => {
+					// a call with no bridge can only be the script writing the
+					// protocol to the port itself, which there is nothing to
+					// answer, so it is noise.
+					let Some(bridge) = bridge else { continue };
+					let reply = bridge.serve_line(call).await?;
+					guard
+						.worker
+						.post_message(&JsValue::from_str(&reply))
+						.map_err(|err| {
+							bevyhow!("deno worker: post world reply: {err:?}")
+						})?;
+				}
+				protocol::Received::Done(result) => {
+					return result.map_err(|err| bevyhow!("deno worker: {err}"));
+				}
 			}
 		}
 		bevybail!("deno worker: isolate closed without a result")
@@ -176,6 +211,25 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// An async world whose registry knows [`Name`], the component the bridged
+	/// scripts below read and write.
+	fn bridged_world() -> World {
+		let world = AsyncPlugin::world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Name>();
+		world
+	}
+
+	/// Run `script` as a bridged leaf action, the shape every backend serves.
+	async fn run_bridged(world: &mut World, script: &str) -> Result<Outcome> {
+		world
+			.spawn(DynamicScript::new(script))
+			.call::<(), Outcome>(())
+			.await
+	}
+
 	#[beet_core::test]
 	async fn transforms_its_input() {
 		Script::<i64, i64>::new("input + 1")
@@ -222,6 +276,84 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq("out\n".to_string());
+	}
+
+	/// The headline capability, over a message port: a read after a write sees
+	/// the write, because each call is served against the live world before the
+	/// next one is made.
+	#[beet_core::test]
+	async fn a_script_reads_its_own_write() {
+		let mut world = bridged_world();
+		run_bridged(
+			&mut world,
+			r#"
+			const entry = await world.spawn({ "Name": "ada" });
+			const name = await world.get(entry, "Name");
+			await world.insert(entry, "Name", name + " lovelace");
+			"#,
+		)
+		.await
+		.unwrap();
+		world
+			.query::<&Name>()
+			.iter(&world)
+			.next()
+			.unwrap()
+			.as_str()
+			.xpect_eq("ada lovelace");
+	}
+
+	/// A refused write rejects the promise at the call site rather than failing
+	/// the run, so the script can catch it.
+	#[beet_core::test]
+	async fn a_refused_write_is_catchable_in_the_script() {
+		let mut world = bridged_world();
+		DynamicComponents::register(&mut world, "game.Refused");
+		let entity = world.spawn(Name::new("ada")).id();
+		world
+			.spawn((
+				DynamicScript::new(
+					r#"
+					const [entry] = await world.entities("Name");
+					try {
+						await world.insert(entry, "Name", "bob");
+					} catch (err) {
+						await world.insert(entry, "game.Refused", err.message);
+					}
+					"#,
+				),
+				// everything but the name, so the catch block can still record
+				// what it was refused
+				ScriptExposure {
+					write: GlobFilter::default().with_exclude("*Name"),
+					..default()
+				},
+			))
+			.call::<(), Outcome>(())
+			.await
+			.unwrap();
+		world.entity(entity).get::<Name>().unwrap().as_str().xpect_eq("ada");
+		WorldRead::get(
+			&mut world,
+			entity,
+			"game.Refused",
+			&ScriptExposure::default(),
+		)
+		.unwrap()
+		.unwrap()
+		.to_string()
+		.xpect_contains("may not write");
+	}
+
+	/// The bridge is opt-in surface, not ambient authority: only a world-bridged
+	/// evaluation installs the shim, so a plain run has no `world` to reach for.
+	#[beet_core::test]
+	async fn a_pure_script_has_no_world_global() {
+		Script::<(), String>::new("typeof world")
+			.run(())
+			.await
+			.unwrap()
+			.xpect_eq("undefined".to_string());
 	}
 
 	#[beet_core::test]

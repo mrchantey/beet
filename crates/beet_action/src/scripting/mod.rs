@@ -10,6 +10,13 @@ pub use script::*;
 #[cfg(feature = "scripting")]
 pub use script_action::*;
 
+// The world bridge. Pure data and world work, so it needs no engine: which
+// backend evaluates the script is a separate question, answered below.
+#[cfg(feature = "scripting")]
+mod dynamic;
+#[cfg(feature = "scripting")]
+pub use dynamic::*;
+
 // The wire format, compiled with the host-realm backends that speak it and no
 // wider: the embedded engine calls the engine directly and needs none of it.
 // It is also not part of beet's surface — a consumer names `Script`, never a
@@ -31,6 +38,8 @@ mod quickjs_backend;
 pub(crate) use quickjs_backend::run_quickjs;
 #[cfg(feature = "quickjs")]
 pub(crate) use quickjs_backend::run_quickjs_console;
+#[cfg(feature = "quickjs")]
+pub(crate) use quickjs_backend::run_quickjs_world;
 
 // The host-realm fallbacks, compiled only when the embedded engine is absent.
 // Each borrows its isolation from the surrounding runtime, so which ones exist

@@ -104,7 +104,7 @@ fn todos() -> FieldRef {
 fn create() -> impl Bundle {
 	(
 		todos(),
-		route::exchange("create", PushField::<Todo>::default()),
+		route::exchange("create", PushFieldTyped::<Todo>::default()),
 	)
 }
 

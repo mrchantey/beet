@@ -30,6 +30,7 @@ use serde_json::Value as JsonValue;
 pub(crate) async fn run_cloudflare<Sink>(
 	_request: ScriptRequest,
 	_sink: Sink,
+	_bridge: Option<&WorldBridge>,
 ) -> Result<Option<JsonValue>>
 where
 	Sink: FnMut(ConsoleStream, &str),

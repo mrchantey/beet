@@ -91,6 +91,43 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		self.doc_query.get_mut(doc_entity)?.xok()
 	}
 
+	/// Clone a field's [`Value`] out of its document, the read twin of
+	/// [`Self::with_field`]: same document resolution, same scope prefix, same
+	/// [`FieldRef::on_missing`] policy, but the document is never touched so a
+	/// read cannot dirty it.
+	///
+	/// A document or field that does not exist answers with the
+	/// [`OnMissingField::Init`] seed, ie `[]` for a list field, without writing
+	/// it back.
+	pub fn field_value(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+	) -> Result<Value> {
+		let doc_entity = self.entity(subject, &field.document);
+		let field_path = self.scopes.resolved_path(
+			subject,
+			&field.field_path,
+			Some(doc_entity),
+		);
+		match self
+			.doc_query
+			.get(doc_entity)
+			.ok()
+			.and_then(|doc| doc.get_field_ref(&field_path).ok())
+		{
+			Some(value) => value.clone().xok(),
+			None => match &field.on_missing {
+				OnMissingField::Init { value } => value.clone().xok(),
+				_ => Err(DocumentError::ObjectKeyNotFound {
+					key: format!("{field_path}"),
+					path: field_path,
+				}
+				.into()),
+			},
+		}
+	}
+
 	/// Execute a function with a mutable reference to a field.
 	///
 	/// If the document or field doesn't exist and [`FieldRef::on_missing`] is set to initialize,
@@ -212,7 +249,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		self.assert_list_item_type::<T>(subject, field)?;
 		let value = Value::from_serde(value)?;
 		self.with_field(subject, field, move |slot| -> Result {
-			as_list_mut(slot)?.push(value);
+			slot.as_list_mut_or_init()?.push(value);
 			Ok(())
 		})?
 	}
@@ -233,7 +270,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		self.assert_list_item_type::<T>(subject, field)?;
 		let value = Value::from_serde(value)?;
 		self.with_field(subject, field, move |slot| -> Result {
-			let list = as_list_mut(slot)?;
+			let list = slot.as_list_mut_or_init()?;
 			let index = index.min(list.len());
 			list.insert(index, value);
 			Ok(())
@@ -241,16 +278,6 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	}
 }
 
-/// Coerce a field [`Value`] into a mutable list, treating null as empty.
-fn as_list_mut(value: &mut Value) -> Result<&mut Vec<Value>> {
-	if value.is_null() {
-		*value = Value::List(Vec::new());
-	}
-	match value {
-		Value::List(list) => Ok(list),
-		other => bevybail!("expected list, received {}", other.kind()),
-	}
-}
 
 #[cfg(all(test, feature = "json"))]
 mod test {

@@ -12,12 +12,25 @@ mod exchange_sequence;
 /// The Rust route constructors: `route::new`, `route::exchange`, `route::fallback`.
 pub mod route;
 pub use exchange_sequence::*;
+// the `<FieldRoute>` document-field route front-end. std-only: it names the
+// `beet_ui` document actions, which ride `dep:beet_ui`.
+#[cfg(feature = "std")]
+mod field_route;
+#[cfg(feature = "std")]
+pub use field_route::*;
 // the typed `ExchangeScript` route marker, the `ScriptRoute` front-end,
 // and the `ExchangeScriptElement` console-capturing `<script>` entry action.
 #[cfg(feature = "scripting")]
 mod exchange_script;
 #[cfg(feature = "scripting")]
 pub use exchange_script::*;
+// the world-bridged route front-end `<DynamicScriptRoute>`: a script that serves
+// a route *and* reaches the world. `json` carries the values the bridge speaks,
+// so it gates alongside `scripting`.
+#[cfg(all(feature = "scripting", feature = "json"))]
+mod dynamic_script_route;
+#[cfg(all(feature = "scripting", feature = "json"))]
+pub use dynamic_script_route::*;
 // the `<Template src>` include: needs the BSX tag seam + the unified loader. It
 // reads through the store as an async pending dependency, so it relies on the
 // async runtime that `bsx` (→ `std`) pulls in (the same one `RoutesDir` uses).

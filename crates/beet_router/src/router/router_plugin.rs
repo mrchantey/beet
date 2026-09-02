@@ -147,6 +147,11 @@ impl Plugin for RouterPlugin {
 			// self-or-ancestor store, eg `<AssetsDir src="assets"/>`.
 			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
 			app.register_template::<Route>()
+				// the document-field route (`<FieldRoute path=".." field=".."
+				// verb="push"/>`): a typed document action plus the
+				// `ExchangeOverload` that markup cannot spread for itself.
+				.register_template::<FieldRoute>()
+				.register_type::<FieldVerb>()
 				// the persistent page route (`<Route path="/" {FixedPage}>`): its
 				// declared children are one live tree served by every request.
 				.register_type::<FixedPage>()
@@ -212,6 +217,13 @@ impl Plugin for RouterPlugin {
 				>>()
 				// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
 				.register_template::<ScriptRoute>();
+			// the world-bridged route front-end: a script that serves a route and
+			// reaches the world. The values it speaks are json, so it rides that
+			// gate too.
+			#[cfg(all(feature = "scripting", feature = "json"))]
+			app.register_type::<DynamicScriptExchange>()
+				.register_type::<DynamicScriptExchangeAction>()
+				.register_template::<DynamicScriptRoute>();
 
 			// the `ExchangeScriptElement` console-capturing entry action, so a
 			// `<script {ExchangeScriptElement}>` entry resolves it. The backend it

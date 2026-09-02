@@ -69,11 +69,12 @@ impl CliServer {
 				},
 				|entity, request, _shutdown| {
 					// the future owns its dispatch, so nothing borrows the input
-					// past this call; a start request is argv-shaped and carries no
-					// body, so cloning the parts is the whole copy.
+					// past this call. `--body` puts a real body on an argv-shaped
+					// request, so the copy has to carry it; a stream cannot be
+					// replayed and there is none on this path.
 					let dispatch = Request::from_parts(
 						request.request_parts().clone(),
-						default(),
+						request.body.try_clone().unwrap_or_default(),
 					);
 					Box::pin(route_and_end(entity, dispatch))
 				},
@@ -138,5 +139,23 @@ mod tests {
 	#[beet_core::test]
 	fn into_request_empty() {
 		Request::from_cli_str("").path_string().xpect_eq("/");
+	}
+
+	/// The facet receives `&Request` and has to hand a copy onward, which used to
+	/// drop the body: `--body` reached the request and then vanished one hop
+	/// later, so every argv-driven write route saw `null`.
+	#[beet_core::test]
+	fn a_cli_body_survives_the_dispatch_copy() {
+		let request = Request::from_cli_str("sign --body=hello");
+		let dispatch = Request::from_parts(
+			request.request_parts().clone(),
+			request.body.try_clone().unwrap_or_default(),
+		);
+		match dispatch.body {
+			Body::Bytes(bytes) => {
+				bytes.to_vec().xpect_eq(b"hello".to_vec());
+			}
+			Body::Stream(_) => panic!("an argv body is never a stream"),
+		}
 	}
 }

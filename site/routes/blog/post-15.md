@@ -5,34 +5,35 @@ created="2026-08-28"
 
 # Bevy standardizes malleable software
 
-In the tradition of Bevy Birthdays we get a chance to reflect on our journeys. For me the last twelve months carried two major highlights:
+In the tradition of Bevy Birthdays we get a chance to reflect on our adventures over the past year and hopes for the future. For me the last twelve months carried two major themes:
 1. Presenting at [DevOps Days Wollongong](https://youtu.be/a-Sx0aEhDhc?list=PLKIKuXdn4ZMjKxet6G2oQkdIZqsKXLit7) and [Local-First Conf '26](https://youtu.be/eRpMQhOR93U?si=6SMyrZWDEOyQFphS) was an opportunity to develop the storytelling and positioning of my work.
 2. Meeting and hearing from people in adjacent fields like the Decentralized Web who are also rethinking software from first principles.
 
-Both of these endeavours have been utterly exhausting but exciting. My back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
+Both of these endeavours have been utterly exhausting but exciting, my back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
 
 ## Tech Sovereignty is ready
 
-Martin Kleppmann headlined Local-First Conf '26 presenting the importance of ✨*Tech Sovereignty*✨ now more than ever, and over the next two days community members presented their solutions at each layer of the sovereign stack:
+Martin Kleppmann headlined Local-First Conf '26 presenting the importance of ✨*Tech Sovereignty*✨ now more than ever, and over the next two days community members proposed solutions for each layer of this sovereign stack:
 
-- **Peer-to-peer:** Iroh
-- **Social web:** ATProto
-- **Local-first:** Automerge
-- **Malleable software:** Bevy?
+- **Social protocols:** ATProto/Matrix
+- **Sync engines:** Automerge/PowerSync
+- **Malleable software:** Patchwork/Bevy
 
 ## Malleable Standards
 
-In my last blog post, [ATProto isn't malleable yet](/blog/post-14), I proposed that sovereign protocols like ATProto are missing a malleable application layer. Over the decades we have seen many genuinely awesome solutions to malleable software, but none have been standardized in the same way other technologies have.
+In my last blog post, [ATProto isn't malleable yet](/blog/post-14), I argued that sovereign protocols like ATProto are missing a *truely malleable* application layer. 
 
-At a high level I believe this is because application developers don't think about interoperability in the same way networking folks do, and this is a natural consequence of the kinds of problems we're solving. A narrow siloed app still works for that use case, whereas an isolated node on a bespoke protocol is useless. Interoperability is not inherent to applications but *it should be!* In my favorite panel discussion of all time [Robin Berjon underscores the importance of commoditization](https://youtu.be/gjG_cUx_ueU?t=1013) at the application layer.
+Over the decades we have seen many genuinely awesome solutions to malleable software but none have been standardized in the same way other technologies have. At a high level I believe this is because application developers don't think about interoperability in the same way networking folks do, and this reflects the priorities of our domains. A narrow siloed app still works for that use case, whereas an isolated node on a bespoke protocol is useless. Interoperability is not a high priority for applications but *it should be!* In my favorite panel discussion of all time [Robin Berjon underscores the importance of commoditization](https://youtu.be/gjG_cUx_ueU?t=1013) for sync engines, and the exact same arguments can be made for malleable software.
 
 There is plenty of discussion within the Local-First community about **data standards**, the [malleable software essay itself](https://www.inkandswitch.com/essay/malleable-software/#tools-not-apps) calls for tools that operate on shared data, not apps that silo it. The call for **malleable standards** takes this idea further: the apps themselves are data-driven and the tools are client agnostic.
 
 ## Malleable Layers
 
-The reason I quit a comfortable job at PlaySide Studios to hack on Bevy full time is that I believe Bevy is the most malleable technology and the future of the application layer, and after three years I still feel like I haven't even begun to understand the implications of that.
+Writing a no-code ui builder, a game with scripting mods, or a framework with a crisp plugin system are each tasks that are a challenge to get right, Bevy does all three.
 
-Concretely Bevy is unique in that it has hypercard-like layers of malleability, each targeting a different role:
+For many years I searched for the world's most malleable technology, going deep on Unity scenes, custom React renderers and portable WASM modules written in AssemblyScript. I found that each excels at one layer or another, but was dissatisfied with the lack of vertical and horizontal ambitions held by older projects like Hypercard or Smalltalk.
+
+Finding Bevy was like fishing for sharks and catching a dragon, what makes it interesting is its *layers of malleability*, each targeting a different role:
 
 ### 1. Engineers: Bevy Plugins
 

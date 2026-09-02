@@ -4,14 +4,16 @@ title = "Tutorials"
 
 # Tutorials
 
-These lessons take you from an empty project to a working beet tool, one small step at a time. They are meant to be followed in order and typed out as you go, and each one shows a different way a tool built from scenes stays open to change.
+These three lessons build one guestbook, three times over. Each starts from a complete listing you can paste, so you can begin at any of them, and each ends where the next one begins.
 
-Every tutorial assumes a recent nightly Rust toolchain and starts from a fresh binary crate. Each one tells you which beet features to enable as you go.
+They are also a climb. Beet is malleable at three layers, and the guestbook meets them in order: you shape a scene by hand, you teach it new words with sandboxed scripts, and you extend the engine with compiled Rust.
 
-- [A first behavior](/docs/tutorials/first-behavior) builds behavior as a tree of entities rather than compiled control flow, the openness every later lesson leans on.
-- [Speak every interface](/docs/tutorials/every-interface) serves the same routes over the command line and HTTP, showing that the tool is the data and the interface is swappable.
-- [Your first agent](/docs/tutorials/first-agent) holds a short conversation with an LLM through the same actor-and-route machinery, so the conversation itself is scene data you can inspect and reshape.
+- [A guestbook from a scene](/docs/tutorials/guestbook-scenes) builds a working tool out of one markup file and no code, serves it over the command line, HTTP and a terminal, and reshapes it while it runs.
+- [Teach it new words](/docs/tutorials/guestbook-scripts) adds behavior the scene has no vocabulary for, in JavaScript that runs sandboxed with no authority of its own, without recompiling anything.
+- [Extend the engine](/docs/tutorials/guestbook-plugins) writes a compiled action for the one thing a script cannot have, and gives the book a memory that survives a restart.
 
-A tutorial on editing a running tool's scene without recompiling is on its way, since that hand-edit is the heart of the gentle slope. Once you have a feel for the moving parts, the [Crates](/docs/crates) section explains how they fit together.
+The first lesson needs only the `beet` binary. The third needs a Rust toolchain and a crate of your own.
 
-One tutorial does not follow the rules above. [Self-hosted mail](/docs/tutorials/mail) is an infrastructure runbook: it stands up a real mail server on real cloud resources with a real domain, costs about US$43 a month to keep running, and takes a week rather than an afternoon because most of that week is spent waiting on a support case. Read it once you are comfortable with beet, or read it for the parts that are about mail rather than about beet.
+[Self-hosted mail](/docs/mail) sits outside this section. It is an infrastructure runbook rather than a lesson: it stands up a real mail server on real cloud resources with a real domain, costs about US$43 a month to keep running, and takes a week rather than an afternoon because most of that week is spent waiting on a support case.
+
+For material organised by feature rather than by lesson, the [examples](https://github.com/mrchantey/beet/tree/main/examples) directory covers behavior trees, routers, servers, scripting, agents and infrastructure one topic at a time.

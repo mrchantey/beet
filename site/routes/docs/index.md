@@ -26,7 +26,7 @@ Because behavior lives in scenes rather than compiled control flow, a tool stays
 Malleability in beet is a slope rather than a cliff, with a real mechanism at every level of involvement.
 
 1. **Plugins** extend the engine itself. A beet app is plugins all the way down, with engine internals, libraries and business logic all taking the same shape, so extending beet is the same act as building with it.
-2. **Sandboxed scripts** add behavior a scene has no words for. Scripts run in QuickJS with fine-grained control over the capabilities each one is granted, using the same runtime in native, browser and microcontroller environments.
+2. **Sandboxed scripts** add behavior a scene has no words for. A script runs in QuickJS under declared resource ceilings with no ambient authority, reaching the world only by asking, one call at a time, over a channel the host serves and can refuse. A scene narrows that reach per script, by naming components or by pattern. The same engine serves native, browser and microcontroller environments.
 3. **Scene files** reshape a tool while it runs. Since behavior is data, changing a tool means editing a scene, with no fork, no rebuild and no redeploy.
 
 The slope is gentle the whole way up, so a person tweaking a value in a scene today can reach for a script tomorrow and a plugin after that, without the tool ever being thrown away and rewritten.
@@ -37,7 +37,7 @@ The scene format is designed to outgrow beet. The [Scene Format](/docs/scene-for
 
 ## Where to go next
 
-- [Tutorials](/docs/tutorials) walk you through building something from scratch, start here if you are new.
+- [Tutorials](/docs/tutorials) build one guestbook three times over, once at each layer of malleability. Start here if you are new.
 - The [Scene Format](/docs/scene-format) is the draft standard beet implements, and where it is going.
 - [Crates](/docs/crates) explain what each piece of beet does and how they fit together.
 - [Design](/docs/design) covers the target-agnostic design system.
