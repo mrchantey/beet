@@ -6,8 +6,8 @@ created="2026-08-28"
 # Bevy standardizes malleable software
 
 In the tradition of Bevy Birthdays we get a chance to reflect on our adventures over the past year and hopes for the future. For me the last twelve months carried two major themes:
-1. Presenting at [DevOps Days Wollongong](https://youtu.be/a-Sx0aEhDhc?list=PLKIKuXdn4ZMjKxet6G2oQkdIZqsKXLit7) and [Local-First Conf '26](https://youtu.be/eRpMQhOR93U?si=6SMyrZWDEOyQFphS) was an opportunity to develop the storytelling and positioning of my work.
-2. Meeting and hearing from people in adjacent fields like the Decentralized Web who are also rethinking software from first principles.
+1. Developing the storytelling and positioning of my work by presenting at [DevOps Days Wollongong](https://youtu.be/a-Sx0aEhDhc?list=PLKIKuXdn4ZMjKxet6G2oQkdIZqsKXLit7) and [Local-First Conf '26](https://youtu.be/eRpMQhOR93U?si=6SMyrZWDEOyQFphS).
+2. Meeting and hearing from other people who rethinking software from first principles in adjacent fields like the Decentralized Web.
 
 Both of these endeavours have been utterly exhausting but exciting, my back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
 
@@ -17,37 +17,37 @@ Martin Kleppmann headlined Local-First Conf '26 presenting the importance of ✨
 
 - **Social protocols:** ATProto/Matrix
 - **Sync engines:** Automerge/PowerSync
-- **Malleable software:** Patchwork/Bevy
+- **Malleable software:** Patchwork/Beet
 
 ## Malleable Standards
 
 In my last blog post, [ATProto isn't malleable yet](/blog/post-14), I argued that sovereign protocols like ATProto are missing a *truely malleable* application layer. 
 
-Over the decades we have seen many genuinely awesome solutions to malleable software but none have been standardized in the same way other technologies have. At a high level I believe this is because application developers don't think about interoperability in the same way networking folks do, and this reflects the priorities of our domains. A narrow siloed app still works for that use case, whereas an isolated node on a bespoke protocol is useless. Interoperability is not a high priority for applications but *it should be!* In my favorite panel discussion of all time [Robin Berjon underscores the importance of commoditization](https://youtu.be/gjG_cUx_ueU?t=1013) for sync engines, and the exact same arguments can be made for malleable software.
+Over the decades we have seen many genuinely awesome solutions to malleable software but none have been standardized in the same way other technologies have. It seems interoperability is not a priority at the application layer like it is for protocols, but *it should be!* In my favorite panel discussion of all time [Robin Berjon advocates for sync standards](https://youtu.be/gjG_cUx_ueU?t=1013), another application layer problem, and the same arguments can be made for malleability.
 
-There is plenty of discussion within the Local-First community about **data standards**, the [malleable software essay itself](https://www.inkandswitch.com/essay/malleable-software/#tools-not-apps) calls for tools that operate on shared data, not apps that silo it. The call for **malleable standards** takes this idea further: the apps themselves are data-driven and the tools are client agnostic.
+There is plenty of discussion within the Local-First community about **data standards**, the [malleable software essay itself](https://www.inkandswitch.com/essay/malleable-software/#tools-not-apps) calls for tools that operate on shared data, not apps that silo it. The call for **malleable standards** takes this idea further: the tools themselves are data, agnostic to the client used to run them.
 
 ## Malleable Layers
 
-Writing a no-code ui builder, a game with scripting mods, or a framework with a crisp plugin system are each tasks that are a challenge to get right, Bevy does all three.
+Bevy's killer feature is its *layers of malleability*, each targeting a different role:
 
-For many years I searched for the world's most malleable technology, going deep on Unity scenes, custom React renderers and portable WASM modules written in AssemblyScript. I found that each excels at one layer or another, but was dissatisfied with the lack of vertical and horizontal ambitions held by older projects like Hypercard or Smalltalk.
-
-Finding Bevy was like fishing for sharks and catching a dragon, what makes it interesting is its *layers of malleability*, each targeting a different role:
-
-### 1. Engineers: Bevy Plugins
+### 1. Bevy Plugins for engineers
 
 Bevy apps are plugins all the way down. Engine internals, external libraries and business logic are all plugins, creating an unprecedented level of interoperability in application code.
 
-### 2. Tinkerers: Sandboxed Scripts
+### 2. Dynamic Scripts for modders
 
-Application code has unrestricted access to the filesystem, network and computer hardware. Deno solves this at the executable level but that's a coarse instrument, permissions apply to the whole process rather than the individual scripts we may or may not trust. Lua, Rhai and QuickJS enable sandboxed scripting, but these are only as powerful as the parameters and methods an application is capable of exposing. Bevy's built-in [dynamic capabilities](https://github.com/bevyengine/bevy/blob/main/examples/ecs/dynamic.rs) allow for **fine-grained exposure** of application behavior at engine, library and application levels.
+Application code has unrestricted access to the filesystem, network and computer hardware, making it unsuitable for running untrusted code. Deno solves this at the executable level but that's a coarse instrument, permissions apply to the whole process rather than the individual scripts we may or may not trust. Lua, Rhai and QuickJS enable sandboxed scripting, but these are only as powerful as the parameters and methods an application is capable of exposing. Bevy's [Dynamic API](https://github.com/bevyengine/bevy/blob/main/examples/ecs/dynamic.rs) allow for **fine-grained exposure** of application behavior at engine, library and application levels.
 
-### 3. Users: Scene Files
+### 3. Scene Files for users
 
-Data-driven software has been the industry standard for video games since id Software's WAD files in Doom. Where the above two layers are the result of an elegant implementation of ECS, the scene format is pure ECS. In other words, Bevy's scene format is *already interoperable* with other ECS engines.
+Data-driven software has been the industry standard for video games since id Software's WAD files in Doom. Games are naturally multi-diciplinary and deep access for non-technical team members and modders is very valuable.
 
-The clearest way to understand this is by comparing three data-driven engines:
+Each of these layers is itself a challenge to implement in a way thats ergonomic and performant, Bevy combines all three.
+
+## Interoperable Scenes
+
+Bevy's ECS architecture makes its serialized representation very simple, and basically *already interoperable* with other ECS engines. The clearest way to understand why this is unique is by comparing three data-driven engines:
 
 | Engine | Model | Component Composition | Spatial Info | Relations |
 | :--- | :--- | :--- | :--- | :--- |
@@ -55,40 +55,39 @@ The clearest way to understand this is by comparing three data-driven engines:
 | **Godot** | Nodes | 👎 Convention-based | ✅ Optional | 👎 Required and fixed |
 | **Bevy** | Entities | ✅ Strongly typed | ✅ Optional | ✅ Optional & extensible |
 
-ECS representations need only a lightweight adaptor for interoperability with more opinionated formats. A Bevy scene can be used to describe a Godot or Unity scene, but the reverse requires lossy convention mapping.
-
-## Shared Component Definitions
+ECS representations need only a lightweight adaptor for interoperability with more opinionated formats. A Bevy scene can be used to describe a Godot or Unity scene, but the reverse requires lossy convention mapping, making Bevy the lowest common denominator.
 
 The missing piece from true engine interoperability is standardization around components. This is the application layer equivalent of an [ATProto lexicon](https://atproto.com/specs/lexicon) and means representing components via namespaced identities extensible beyond the cargo/crates ecosystem:
 
 ```jsonc
 {
   "0": {
-    // Interoperability Example:
-    // Reverse domain name notation prefix
-    "org.bevy.bevy_ecs::Name": "Billy"
+	  // Closed: cargo/rust module path convention
+  	"bevy_ecs::Name": "Billy"
+    // Open: reverse domain name notation prefix
+    "org.bevy.bevy_ecs.Name": "Billy"
   }
 }
 ```
 
-This follows a similar pattern to how the HTML spec defines a `<details>` element and browsers implement accordingly. Where this aligns more closely with ATProto lexicons than WHATWG standards is in decentralization. The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec. 
+This follows a similar pattern to how the HTML spec defines a `<details>` element and browsers implement accordingly. Where this aligns more closely with ATProto lexicons than WHATWG standards is in decentralization. The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec.
 
-Application level standardization is something I'm excited to explore on over the next year, perhaps starting by writing a bevy scene adaptor for some other ecosystem.
+In this way the standard is a *method for resolving component schemas*, not the schemas themselves, just as ATProto defines the spec, not the lexicons themselves. The BlueSky lexicons are no more standardized than any others. This is one area I'm excited to explore further on over the next year, perhaps starting by writing a bevy scene adaptor for some other ecosystem like React.
 
 ## Get Bevy Funded
 
-Bevy is an engine capable of running just about all software *without compromise*. If you don't believe me you haven't seen my [LFConf '26 presentation](https://youtu.be/eRpMQhOR93U?si=dK8lPL4dO3cSWUWi) which demonstrated static sites, web apps, TUIs, servers, games, robots, infra deploys and agent harnesses not just running on a single engine, but **on a single data-driven binary**. Usually cross-domain capability is achieved through bridges like react-three-fiber, stitching two ecosystems together at the seam, whereas for Bevy each domain is a natural fit. 
+Bevy is an engine capable of running just about all software *without compromise*. My [Local-First Conf '26 presentation](https://youtu.be/eRpMQhOR93U?si=dK8lPL4dO3cSWUWi) demonstrated static sites, web apps, TUIs, servers, games, robots, infra deploys and agent harnesses not just running on a single engine, but **on a single data-driven binary**. Usually cross-domain capability is achieved through bridges like react-three-fiber, stitching two ecosystems together at the seam, but for Bevy each domain is a natural fit.
 
-None of this exceptional layered malleability or cross-domain capability is evident on the home page. We still present Bevy primarily as a game engine and I think this marketing should be inverted:
+However none of these exceptional capabilities are evident on the home page. We still present Bevy primarily as a game engine and I think this marketing should be inverted:
 
 > before: **A game engine capable of running apps**
 >
 > after: **A malleable engine capable of running games**
 
-Most software isn't as cool as indie games and the reframing is beyond the primary interests of most Bevy community members so I imagine this will be a tough sell but the counter-argument is simple: *we want the Bevy project to thrive*. Practically this means substantial funding and the value prop for a unified malleable core underpinning all of software is much bigger than that of games or even apps, and to get there we need to appeal to those beyond the games industry.
+The value prop for *a unified malleable core underpinning the application layer* is bigger than that of *games* or even *games+apps*. For Bevy to thrive we need substantial funding and practically that means appealing to those beyond the games industry.
 
 ## If it ain't broke
 
-Bevy is succeeding technically and is the healthiest online community I've ever been a part of so it would make total sense for the project to stay the course on games and GUIs. The good news is that these broader developments will continue regardless. I am having so much fun pulling on this thread of breadth and depth in software and have no intention of slowing down.
+Bevy is the healthiest online community I've ever been a part of so it makes sense not to rock the boat. Beet will continue exploring these broader developments regardless, I am having so much fun pulling on this thread of breadth and depth in software and have no intention of slowing down.
 
 Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦
