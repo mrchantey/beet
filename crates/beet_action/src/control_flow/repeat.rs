@@ -52,13 +52,9 @@ pub async fn RepeatAction<Input>(cx: ActionContext<Input>) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
-	let child = match cx
-		.caller
-		.get(|children: &Children| children.first().copied())
-		.await
-	{
-		Ok(Some(child)) => child,
-		_ => return Outcome::PASS.xok(),
+	let Some(child) = BehaviourChildren::only_for(&cx.world(), cx.id()).await
+	else {
+		return Outcome::PASS.xok();
 	};
 
 	let world = cx.world();
@@ -189,13 +185,9 @@ where
 		.await
 		.unwrap_or(0);
 
-	let child = match cx
-		.caller
-		.get(|children: &Children| children.first().copied())
-		.await
-	{
-		Ok(Some(child)) => child,
-		_ => return Outcome::PASS.xok(),
+	let Some(child) = BehaviourChildren::only_for(&cx.world(), cx.id()).await
+	else {
+		return Outcome::PASS.xok();
 	};
 
 	let world = cx.world();

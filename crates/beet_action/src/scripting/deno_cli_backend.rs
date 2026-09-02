@@ -7,15 +7,33 @@
 //!
 //! ## Isolation
 //!
-//! The child is `deno run --no-prompt --no-remote -q`: deno denies every
-//! permission by default, `--no-prompt` turns a denial into an immediate error
-//! rather than an interactive prompt, and `--no-remote` blocks remote module
-//! specifiers so a script cannot `import()` its way out. A script therefore
-//! reaches no filesystem, no environment, no network and no subprocess; the
-//! escape tests below assert each one.
+//! The child is `deno run --no-prompt --no-remote --deny-read -q`: deno denies
+//! every permission by default, `--no-prompt` turns a denial into an immediate
+//! error rather than an interactive prompt, `--no-remote` blocks remote module
+//! specifiers, and `--deny-read` makes the read denial explicit rather than
+//! merely absent, so it cannot be widened by a later `--allow-read`. A script
+//! therefore reaches no filesystem, no environment, no network and no
+//! subprocess; the escape tests below assert each one.
 //!
 //! Note that `deno eval` is **not** usable here: it runs with implicit access to
 //! all permissions, so it would silently produce an unsandboxed backend.
+//!
+//! ## Imports, and the one place they are not permission-checked
+//!
+//! `import()` is syntax, so it cannot be removed from the realm; what bounds it
+//! is deno's permission check. That check applies to a dynamic import made from
+//! `eval`ed code, and the runner hands the script to indirect `eval`, so a
+//! script naming `file:///etc/hostname` is refused with a `NotCapable` naming
+//! the path and nothing of its content.
+//!
+//! What is *not* checked is a module already in deno's graph: an entry module's
+//! own top-level `import` reads the file it names whatever the permissions say,
+//! and a failure to parse it as JavaScript reports the bytes it read. That path
+//! is beet's alone (the entry module is the runner, and the script never
+//! becomes a module), so it is not reachable from a script. `--deny-read` does
+//! not close it (verified: the module loader ignores the flag entirely), which
+//! is why the guarantee rests on the script running through `eval` rather than
+//! on the flag.
 //!
 //! ## Transport
 //!
@@ -154,7 +172,14 @@ where
 	let mut child = ChildProcess::new("deno")
 		// see the module doc: `deno run` with no `--allow-*` denies everything,
 		// where `deno eval` would grant everything.
-		.with_args(["run", "--no-prompt", "--no-remote", "-q", &entry])
+		.with_args([
+			"run",
+			"--no-prompt",
+			"--no-remote",
+			"--deny-read",
+			"-q",
+			&entry,
+		])
 		// sandboxed scripts run in UTC: the child has no env access to read a
 		// timezone from, so it is pinned here rather than inherited.
 		.with_envs([("TZ", "UTC")])
@@ -440,6 +465,32 @@ mod test {
 				.xpect_contains("NotCapable")
 				.xpect_contains(expected);
 		}
+	}
+
+	/// A local import is refused, and the refusal discloses the path the script
+	/// already knew rather than anything the file contains.
+	///
+	/// The script runs through indirect `eval`, and deno permission-checks a
+	/// dynamic import made from there. A module in its own graph is not checked
+	/// at all, which is why the entry module is beet's and a script never
+	/// becomes one.
+	#[beet_core::test]
+	async fn blocks_local_imports() {
+		let path = std::env::temp_dir().join("beet_import_probe.js");
+		fs_ext::write(&path, r#"export const secret = "unreadable";"#).unwrap();
+		let failure = Script::<(), ()>::new(format!(
+			r#"import("file://{}")"#,
+			path.display()
+		))
+		.run(())
+		.await
+		.unwrap_err()
+		.to_string();
+		fs_ext::remove(&path).ok();
+		failure
+			.xpect_contains("read access")
+			.xnot()
+			.xpect_contains("unreadable");
 	}
 
 	/// `--no-remote` blocks the other way out: pulling in code from the network.

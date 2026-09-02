@@ -6,13 +6,16 @@ use beet_core::prelude::*;
 /// The seat a bridged script's calls are served from: an [`AsyncWorld`] handle
 /// and the [`ScriptExposure`] every call is checked against.
 ///
-/// Held by an out-of-process backend for the duration of a run, because there
-/// the script and the world are in different realms and each call is a round
-/// trip. The embedded engine has no use for it: being synchronous, it evaluates
-/// inside one exclusive world access and reaches the `&mut World` directly.
-#[derive(Clone)]
+/// The only path a [`WorldCall`] is executed through, on every backend. An
+/// out-of-process backend holds one for the duration of a run and answers each
+/// round trip with it; the embedded engine, which evaluates in-process, holds
+/// one too and awaits it between pumps. So there is one executor rather than a
+/// synchronous shape and an asynchronous one that have to agree.
+#[derive(Clone, Get)]
 pub struct WorldBridge {
+	/// The world every call is served against.
 	world: AsyncWorld,
+	/// The reach every call is checked against.
 	exposure: ScriptExposure,
 }
 
@@ -27,10 +30,7 @@ impl WorldBridge {
 	/// Infallible: a refusal or a bad identifier is a [`WorldReply::Err`] the
 	/// script can catch, not a failure of the run.
 	pub async fn serve(&self, call: WorldCall) -> WorldReply {
-		let exposure = self.exposure.clone();
-		self.world
-			.with(move |world| call.execute(world, &exposure))
-			.await
+		call.execute(self).await
 	}
 
 	/// Serve one call and encode its reply as a protocol line.
@@ -60,8 +60,8 @@ mod test {
 		world
 	}
 
-	/// The bridge is the async face of the same executor, so a call served
-	/// through it lands on the world it was built from.
+	/// The bridge is the only face of the executor, so a call served through it
+	/// lands on the world it was built from.
 	#[beet_core::test]
 	async fn serves_a_call_against_the_live_world() {
 		let mut world = world();
@@ -73,10 +73,11 @@ mod test {
 					.serve_line(WorldCall {
 						id: 0,
 						op: WorldOp::Spawn {
-							components: serde_json::json!({ "Name": "ada" })
-								.as_object()
-								.unwrap()
-								.clone(),
+							components: {
+								let mut components = Map::default();
+								components.insert("Name", "ada");
+								components
+							},
 						},
 					})
 					.await

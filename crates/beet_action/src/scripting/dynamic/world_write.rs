@@ -9,14 +9,19 @@ use beet_core::prelude::*;
 use bevy::ptr::OwningPtr;
 use bevy::reflect::serde::TypedReflectDeserializer;
 use serde::de::DeserializeSeed;
-use serde_json::Map as JsonMap;
-use serde_json::Value as JsonValue;
 
-/// The four world mutations a script can express.
+/// The four world mutations a script can express, and the schema lookup that
+/// precedes one.
 pub struct WorldWrite;
 
 impl WorldWrite {
 	/// Insert or replace `ident` on `entity`.
+	///
+	/// A runtime component takes the [`Value`] as it stands, so anything the
+	/// wire carries reaches its storage unaltered; a registered one is
+	/// deserialized into its rust type, which is its own contract. Whatever a
+	/// runtime component's [`DynamicComponent`] declared is checked *before*
+	/// this, in [`WorldOp`], where the check can be asynchronous.
 	///
 	/// # Errors
 	/// Errors when the identifier is unknown, the exposure excludes it, the
@@ -25,14 +30,13 @@ impl WorldWrite {
 		world: &mut World,
 		entity: Entity,
 		ident: &str,
-		value: &JsonValue,
+		value: Value,
 		exposure: &ScriptExposure,
 	) -> Result {
 		let ident = ComponentIdent::resolve(world, ident)?;
 		exposure.assert_writable(&ident)?;
 		match ident.type_id {
 			None => {
-				let value = Value::from_json(value.clone());
 				Self::entity_mut(world, entity)?.xmap(|mut entity| {
 					// SAFETY: a dynamic `ComponentId` only ever comes from
 					// `DynamicComponents::register`, which declares a `Value` layout
@@ -48,14 +52,17 @@ impl WorldWrite {
 			}
 			Some(type_id) => {
 				let registry = world.resource::<AppTypeRegistry>().clone();
-				let value = {
+				let reflected = {
 					let registry = registry.read();
 					let registration =
 						registry.get(type_id).ok_or_else(|| {
 							bevyhow!("`{}` left the registry", ident.path)
 						})?;
+					// straight off the `Value`, no JSON hop: `ValueDeserializer`
+					// is a real serde data format, so the reflect boundary reads
+					// the same currency the rest of the bridge speaks.
 					TypedReflectDeserializer::new(registration, &registry)
-						.deserialize(value)
+						.deserialize(ValueDeserializer::new(value.clone()))
 						.map_err(|err| {
 							bevyhow!(
 								"failed to read `{}` from {value}: {err}",
@@ -74,7 +81,7 @@ impl WorldWrite {
 					})?
 					.clone();
 				let mut entity = Self::entity_mut(world, entity)?;
-				reflect_component.insert(&mut entity, &*value, &registry);
+				reflect_component.insert(&mut entity, &*reflected, &registry);
 				Ok(())
 			}
 		}
@@ -104,13 +111,13 @@ impl WorldWrite {
 	/// despawned again rather than left half built.
 	pub fn spawn(
 		world: &mut World,
-		components: &JsonMap<String, JsonValue>,
+		components: Map,
 		exposure: &ScriptExposure,
 	) -> Result<Entity> {
 		let entity = world.spawn_empty().id();
 		for (ident, value) in components {
 			if let Err(err) =
-				Self::insert(world, entity, ident, value, exposure)
+				Self::insert(world, entity, &ident, value, exposure)
 			{
 				world.entity_mut(entity).despawn();
 				return Err(err);
@@ -126,6 +133,72 @@ impl WorldWrite {
 	pub fn despawn(world: &mut World, entity: Entity) -> Result {
 		Self::entity_mut(world, entity)?.despawn();
 		Ok(())
+	}
+
+	/// The schema `ident` declares, having checked this exposure may write it.
+	///
+	/// The read half of a write: the short exclusive section an async operation
+	/// runs before validating, so the validation itself happens with no world
+	/// access held. [`None`] means nothing to check: a registered component,
+	/// whose contract is its rust type, or a runtime one declared
+	/// [`Any`](ValueSchema::Any).
+	///
+	/// # Errors
+	/// Errors when the identifier is unknown or the exposure excludes it, which
+	/// is why this runs before the value is looked at rather than after.
+	pub fn declared_schema(
+		world: &mut World,
+		ident: &str,
+		exposure: &ScriptExposure,
+	) -> Result<Option<ValueSchema>> {
+		let ident = ComponentIdent::resolve(world, ident)?;
+		exposure.assert_writable(&ident)?;
+		let Some(schema) = DynamicComponents::schema_of(world, ident.id) else {
+			return None.xok();
+		};
+		if let ValueSchema::Any = schema {
+			return None.xok();
+		}
+		let schema = schema.clone();
+		// a `Reference` names a schema the registry holds, so it is resolved
+		// here, where the world is available, rather than deferred to a
+		// validation that would treat it as a wildcard.
+		world
+			.get_resource::<SchemaRegistry>()
+			.map(|registry| registry.resolve(&schema))
+			.unwrap_or(schema)
+			.xmap(Some)
+			.xok()
+	}
+
+	/// Check `value` against `schema`, coercing it where the schema says to.
+	///
+	/// Async because a schema is allowed to ask something beyond the world
+	/// before it will accept a value ("is this transaction id valid" can mean
+	/// "is there enough money in the account"), which is why the operation that
+	/// calls this is async too.
+	///
+	/// # Errors
+	/// Errors naming the component and every failing path, as one line, so the
+	/// script catches a schema failure exactly the way it catches an exposure
+	/// refusal.
+	pub async fn validate(
+		schema: &ValueSchema,
+		ident: &str,
+		value: &mut Value,
+	) -> Result {
+		let errors = schema.validate(value).await;
+		if errors.is_empty() {
+			return Ok(());
+		}
+		bevybail!(
+			"`{ident}` does not accept this value: {}",
+			errors
+				.iter()
+				.map(ToString::to_string)
+				.collect::<Vec<_>>()
+				.join("; ")
+		)
 	}
 
 	/// The entity, as an error rather than a panic when the world despawned it
@@ -146,6 +219,13 @@ mod test {
 	use crate::scripting::dynamic::test_support::*;
 	use beet_core::prelude::*;
 
+	/// One component, as the map a spawn takes.
+	fn components(ident: &str, value: impl Into<Value>) -> Map {
+		let mut components = Map::default();
+		components.insert(ident, value);
+		components
+	}
+
 	#[beet_core::test]
 	fn inserts_a_registered_component() {
 		let mut world = test_world();
@@ -154,7 +234,7 @@ mod test {
 			&mut world,
 			entity,
 			"Name",
-			&serde_json::json!("ada"),
+			Value::from("ada"),
 			&ScriptExposure::default(),
 		)
 		.unwrap();
@@ -184,7 +264,7 @@ mod test {
 		let mut world = test_world();
 		let entity = WorldWrite::spawn(
 			&mut world,
-			serde_json::json!({ "Name": "ada" }).as_object().unwrap(),
+			components("Name", "ada"),
 			&ScriptExposure::default(),
 		)
 		.unwrap();
@@ -209,7 +289,7 @@ mod test {
 		let mut world = test_world();
 		WorldWrite::spawn(
 			&mut world,
-			serde_json::json!({ "Nonesuch": 1 }).as_object().unwrap(),
+			components("Nonesuch", 1u64),
 			&ScriptExposure::default(),
 		)
 		.unwrap_err();
@@ -224,7 +304,7 @@ mod test {
 			&mut world,
 			entity,
 			"Name",
-			&serde_json::json!("ada"),
+			Value::from("ada"),
 			&ScriptExposure::new(["game.Health"]),
 		)
 		.unwrap_err()
@@ -244,11 +324,56 @@ mod test {
 			&mut world,
 			entity,
 			"Name",
-			&serde_json::json!("bob"),
+			Value::from("bob"),
 			&ScriptExposure::default(),
 		)
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("was despawned");
+	}
+
+	/// A registered component has no declared schema: its rust type is its
+	/// contract, checked by the reflect deserializer at the insert.
+	#[beet_core::test]
+	fn a_registered_component_declares_no_schema() {
+		let mut world = test_world();
+		WorldWrite::declared_schema(
+			&mut world,
+			"Name",
+			&ScriptExposure::default(),
+		)
+		.unwrap()
+		.is_none()
+		.xpect_true();
+	}
+
+	/// The default is inert: an undeclared runtime component has nothing to
+	/// check, so the write path skips validation entirely.
+	#[beet_core::test]
+	fn an_any_schema_is_nothing_to_check() {
+		let mut world = test_world();
+		DynamicComponents::register(&mut world, "game.Loot", ValueSchema::Any)
+			.unwrap();
+		WorldWrite::declared_schema(
+			&mut world,
+			"game.Loot",
+			&ScriptExposure::default(),
+		)
+		.unwrap()
+		.is_none()
+		.xpect_true();
+	}
+
+	#[beet_core::test]
+	async fn a_rejected_value_names_the_component() {
+		WorldWrite::validate(
+			&ValueSchema::U64(default()),
+			"game.Health",
+			&mut Value::from("not a number"),
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("`game.Health` does not accept this value");
 	}
 }

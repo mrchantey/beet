@@ -143,7 +143,12 @@ mod test {
 	#[beet_core::test]
 	fn resolves_a_dynamic_component() {
 		let mut world = test_world();
-		DynamicComponents::register(&mut world, "guestbook.Flagged");
+		DynamicComponents::register(
+			&mut world,
+			"guestbook.Flagged",
+			ValueSchema::Any,
+		)
+		.unwrap();
 		ComponentIdent::resolve(&mut world, "guestbook.Flagged")
 			.unwrap()
 			.is_dynamic()

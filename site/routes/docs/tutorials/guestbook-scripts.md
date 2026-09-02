@@ -40,7 +40,7 @@ beet greet --name=Ada
 ```
 
 ```text
-INFO Get /greet -> 200 OK in 607 µs
+INFO Get /greet -> 200 OK in 746 µs (#1)
 hello Ada, thanks for visiting
 ```
 
@@ -51,7 +51,7 @@ beet greet
 ```
 
 ```text
-INFO Get /greet -> 200 OK in 611 µs
+INFO Get /greet -> 200 OK in 764 µs (#1)
 hello stranger, thanks for visiting
 ```
 
@@ -62,10 +62,10 @@ Notice where that behavior lives. It is an attribute, in the same file as the ma
 The guestbook should count visits. Nothing in beet has a component called `guestbook.Visits`, so we will make one. Add this as the first child of the router:
 
 ```jsx
-	<DynamicComponent name="guestbook.Visits"/>
+	<DynamicComponent name="guestbook.Visits" schema="u64"/>
 ```
 
-That is a component type with no Rust definition behind it, minted when the scene loads. It is a declaration the scene keeps, so a guestbook that mints a word still mints it after being saved and loaded again.
+That is a component type with no Rust definition behind it, minted when the scene loads. It is a declaration the scene keeps, so a guestbook that mints a word still mints it after being saved and loaded again. The `schema` says what the word means: a visit count is a whole number, and the guestbook will not hold anything else under that name.
 
 ## A script that acts
 
@@ -146,9 +146,43 @@ Notice that the script could still *read* `guestbook.Visits`; the two halves of 
 
 Remember that neither script ever held the world. Each one asked, one call at a time, and the host decided every time whether to answer. That is what lets a script be untrusted and useful at the same time.
 
+## A word that means something
+
+We told the guestbook that `guestbook.Visits` is a whole number. Add a route that ignores that, below the tamper route:
+
+```jsx
+	<DynamicScriptRoute path="miscount"
+		{ScriptExposure{read:["guestbook.Visits"],write:["guestbook.Visits"]}}
+		script="
+		const [counter] = await world.entities('guestbook.Visits');
+		try {
+			await world.insert(counter, 'guestbook.Visits', 'lots');
+			return 'miscounted';
+		} catch (err) { return err.message; }
+		"/>
+```
+
+Restart the server again, then visit twice, miscount, and visit once more:
+
+```sh
+curl localhost:8080/visit
+curl localhost:8080/visit
+curl localhost:8080/miscount
+curl localhost:8080/visit
+```
+
+```text
+visit 1
+visit 2
+`guestbook.Visits` does not accept this value: expected u64, got str
+visit 3
+```
+
+Notice that this route *was* allowed to write `guestbook.Visits`; its exposure says so. What refused it was the word's own meaning. The refusal arrived exactly as the tamper route's did, where the call was made, and the count carried on untouched.
+
 ## What you have built
 
-You have added behavior to a running tool in the tool's own file: a scripted route, a component type the engine has never heard of, and routes that reshaped the world through it. The binary did not change once.
+You have added behavior to a running tool in the tool's own file: a scripted route, a component type the engine has never heard of with a meaning of its own, and routes that reshaped the world through it. The binary did not change once.
 
 You have also met the edge of what a script can do. Those scripts could not open a file, reach the network or read an environment variable, because they hold no authority at all. So the guestbook still forgets everything the moment it stops.
 

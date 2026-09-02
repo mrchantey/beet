@@ -339,10 +339,30 @@ async fn validate_bytes(
 	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
+	// a transport with no byte type (json, and so every script host) carries
+	// bytes as a list of numbers, so the destination restores the type rather
+	// than the wire announcing it.
+	if let Value::List(items) = value
+		&& let Some(bytes) = as_bytes(items)
+	{
+		*value = Value::Bytes(bytes);
+	}
 	let Value::Bytes(b) = value else {
 		return type_mismatch(path, "bytes", value);
 	};
 	schema.apply(path, b).await
+}
+
+/// `items` as bytes, when every one of them is a byte-sized integer.
+fn as_bytes(items: &[Value]) -> Option<Vec<u8>> {
+	items
+		.iter()
+		.map(|item| match item {
+			Value::Uint(byte) => u8::try_from(*byte).ok(),
+			Value::Int(byte) => u8::try_from(*byte).ok(),
+			_ => None,
+		})
+		.collect()
 }
 
 async fn validate_struct(

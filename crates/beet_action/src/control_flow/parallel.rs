@@ -56,55 +56,20 @@ where
 	Input: 'static + Send + Sync + Clone,
 	Output: 'static + Send + Sync,
 {
-	let bypass_errors = cx
-		.caller
-		.get_cloned::<BypassErrors>()
-		.await
-		.unwrap_or_default();
-
 	let children =
-		match cx.caller.get(|children: &Children| children.to_vec()).await {
-			Ok(children) => children,
-			Err(_) => {
-				// entity has no children, pass returning the input
-				return Ok(Outcome::Pass(cx.input));
-			}
-		};
+		BehaviourChildren::valid_for::<Input, Outcome<Input, Output>>(
+			&cx.world(),
+			cx.id(),
+			"parallel",
+		)
+		.await?;
 
 	let world = cx.world().clone();
 	let input = cx.input;
 
-	// resolve valid children up-front, then run them concurrently
+	// resolved up-front by the shared query, so they all run concurrently
 	let mut calls = Vec::new();
 	for child in children {
-		let action_meta_result = world
-			.entity(child)
-			.get(|meta: &ActionMeta| meta.clone())
-			.await;
-
-		let action_meta = match action_meta_result {
-			Ok(action_meta) => action_meta,
-			Err(child_error) => {
-				if bypass_errors.contains(ChildError::NO_ACTION) {
-					continue;
-				}
-				bevybail!(
-					"parallel child has no action: {child:?}, error: {child_error}"
-				);
-			}
-		};
-
-		if let Err(mismatch_error) =
-			action_meta.assert_match::<Input, Outcome<Input, Output>>()
-		{
-			if bypass_errors.contains(ChildError::ACTION_MISMATCH) {
-				continue;
-			}
-			bevybail!(
-				"parallel child wrong action signature: {child:?}, error: {mismatch_error}"
-			);
-		}
-
 		let world = world.clone();
 		let input = input.clone();
 		calls.push(async move {

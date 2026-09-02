@@ -14,9 +14,10 @@
 use rquickjs_wasm as rquickjs;
 
 use crate::prelude::ConsoleStream;
-use crate::prelude::ScriptExposure;
 use crate::prelude::ScriptLimits;
+use crate::prelude::WorldBridge;
 use crate::prelude::WorldCall;
+use crate::prelude::WorldReply;
 use crate::scripting::dynamic::WORLD_SHIM;
 use beet_core::prelude::*;
 use rquickjs::CatchResultExt;
@@ -24,7 +25,7 @@ use rquickjs::Context;
 use rquickjs::Ctx;
 use rquickjs::Function;
 use rquickjs::Runtime;
-use rquickjs::Value;
+use rquickjs::Value as JsValue;
 use rquickjs::function::MutFn;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -109,13 +110,13 @@ impl BoundedRuntime {
 	fn settle<'js>(
 		&self,
 		ctx: &Ctx<'js>,
-		value: Value<'js>,
-	) -> Result<Value<'js>> {
+		value: JsValue<'js>,
+	) -> Result<JsValue<'js>> {
 		let Some(promise) = value.as_promise() else {
 			return Ok(value);
 		};
 		loop {
-			if let Some(result) = promise.result::<Value>() {
+			if let Some(result) = promise.result::<JsValue>() {
 				return result.catch(ctx).map_err(|err| self.error(err));
 			}
 			if self.expired() {
@@ -128,6 +129,58 @@ ran dry while it was still pending"
 				));
 			}
 		}
+	}
+
+	/// One pump step: drain the job queue, then take whatever the script asked
+	/// for while it drained, or the completion it recorded instead.
+	///
+	/// One re-entry into the context and no more, so nothing engine-shaped
+	/// survives the return and the caller is free to await.
+	///
+	/// # Errors
+	/// Errors when the deadline passes, or when the script is waiting on a
+	/// promise nothing will ever settle.
+	fn pump(
+		&self,
+		queue: &alloc::rc::Rc<core::cell::RefCell<Vec<String>>>,
+	) -> Result<Pumped> {
+		self.context.with(|ctx| {
+			self.drain_jobs(&ctx)?;
+			if self.expired() {
+				return Err(self.error("serving the world bridge"));
+			}
+			let calls = core::mem::take(&mut *queue.borrow_mut());
+			if !calls.is_empty() {
+				return Pumped::Calls(calls).xok();
+			}
+			ctx.globals()
+				.get::<_, Option<String>>("__world_done")
+				.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
+				.map(Pumped::Done)
+				// nothing pending and nothing asked for: the script is waiting
+				// on a promise nothing will ever settle.
+				.ok_or_else(|| {
+					bevyhow!(
+						"quickjs: the returned promise can never settle: the job \
+queue ran dry while it was still pending"
+					)
+				})
+		})
+	}
+
+	/// Hand one reply to the shim, settling the promise its id names.
+	fn answer(&self, reply: &WorldReply) -> Result<()> {
+		let reply = serde_json::to_string(reply).map_err(|err| {
+			bevyhow!("quickjs: failed to encode world reply: {err}")
+		})?;
+		self.context.with(|ctx| {
+			ctx.globals()
+				.get::<_, Function>("__world_reply")
+				.map_err(|err| bevyhow!("quickjs: world shim: {err}"))?
+				.call::<_, ()>((ctx.json_parse(reply)?,))
+				.catch(&ctx)
+				.map_err(|err| self.error(err))
+		})
 	}
 
 	/// Drain the scheduled microtask queue so a promise-based script runs to
@@ -193,7 +246,7 @@ where
 	// `console.log` in a pure transform must not throw (it runs fine on every
 	// other backend), and a script whose printing silently vanishes is the one
 	// thing in beet you cannot debug by printing.
-	eval_quickjs(script, input, limits, ConsoleStream::log, None)?
+	eval_quickjs(script, input, limits, ConsoleStream::log)?
 		.ok_or_else(|| bevyhow!("quickjs: script returned no value"))?
 		.xmap(|output| serde_json::from_str(&output))
 		.map_err(|err| bevyhow!("quickjs: failed to decode output: {err}"))
@@ -221,49 +274,40 @@ where
 	Input: Serialize,
 	Sink: 'static + FnMut(ConsoleStream, &str),
 {
-	eval_quickjs(script, input, limits, sink, None).map(|_| ())
+	eval_quickjs(script, input, limits, sink).map(|_| ())
 }
 
 /// Evaluate `script` with the `world` bridge installed, serving every call it
-/// makes against `world` as it makes it.
+/// makes through `bridge` as it makes it.
 ///
-/// The world is reached as a plain `&mut World` rather than through the async
-/// bridge, because the engine is synchronous: the whole evaluation happens
-/// inside one exclusive world access, and the pump loop below alternates
-/// between draining the engine's job queue and answering what the script asked
-/// for. That is what makes a read see the write before it.
+/// The engine is synchronous and its `Context` is `!Send`, so this is a local
+/// future: it never holds a `Ctx` across an await. Each pump step is one
+/// re-entry into the context (drain the job queue, take what the script asked
+/// for), and each call is then served with nothing held, which is what lets an
+/// operation be asynchronous. That is also what makes a read see the write
+/// before it.
 ///
 /// The presence of a world is what installs the bridge at all: a plain
 /// [`run_quickjs`] leaves the script with no `world` global to reach for.
-pub(crate) fn run_quickjs_world<Input>(
+pub(crate) async fn run_quickjs_world<Input>(
 	script: &str,
 	input: Input,
-	world: &mut World,
-	exposure: &ScriptExposure,
+	bridge: &WorldBridge,
 	limits: &ScriptLimits,
-) -> Result<Option<JsonValue>>
+) -> Result<Option<Value>>
 where
 	Input: Serialize,
 {
-	eval_quickjs(
-		script,
-		input,
-		limits,
-		ConsoleStream::log,
-		Some(WorldSeat { world, exposure }),
-	)?
-	.map(|output| {
-		serde_json::from_str(&output)
-			.map_err(|err| bevyhow!("quickjs: failed to decode output: {err}"))
-	})
-	.transpose()
-}
-
-/// The world a bridged evaluation serves its calls against, absent for a pure
-/// run.
-struct WorldSeat<'a> {
-	world: &'a mut World,
-	exposure: &'a ScriptExposure,
+	eval_quickjs_world(script, input, limits, bridge)
+		.await?
+		.map(|output| {
+			serde_json::from_str::<serde_json::Value>(&output)
+				.map(Value::from_json)
+				.map_err(|err| {
+					bevyhow!("quickjs: failed to decode output: {err}")
+				})
+		})
+		.transpose()
 }
 
 /// The rust half of the bridge the embedded engine cannot get from a host
@@ -285,140 +329,110 @@ enum Completion {
 	Err { message: String },
 }
 
-/// The one embedded evaluation path, returning the JSON encoding of the script's
-/// completion value (`None` when it produced none).
+/// What one pump step found: either the script is still asking for things, or
+/// it has settled.
+enum Pumped {
+	/// Calls the script made while the job queue drained, in the order it made
+	/// them.
+	Calls(Vec<String>),
+	/// The script's own promise settled, as [`WORLD_PUMP`] recorded it.
+	Done(String),
+}
+
+/// The one embedded evaluation path, returning the JSON encoding of the
+/// script's completion value (`None` when it produced none).
 ///
-/// Every public entry point is this function with a different sink, a different
-/// use of the result, and with or without a world, so they cannot drift in how
-/// they treat `console`, a returned promise or the job queue — a drift that
+/// Every public entry point is this function or [`eval_quickjs_world`] with a
+/// different sink and a different use of the result, so they cannot drift in
+/// how they treat `console`, a returned promise or the job queue, a drift that
 /// would mean a script running on the deno backends and failing on this one.
 fn eval_quickjs<Input, Sink>(
 	script: &str,
 	input: Input,
 	limits: &ScriptLimits,
 	sink: Sink,
-	seat: Option<WorldSeat<'_>>,
 ) -> Result<Option<String>>
 where
 	Input: Serialize,
 	Sink: 'static + FnMut(ConsoleStream, &str),
 {
-	let input = serde_json::to_string(&input)
-		.map_err(|err| bevyhow!("quickjs: failed to encode input: {err}"))?;
-
+	let input = encode_input(input)?;
 	let bounded = BoundedRuntime::new(limits)?;
+	bounded.context.with(|ctx| {
+		install_prelude(&ctx, &input, sink)?;
+		let output = ctx
+			.eval::<JsValue, _>(script)
+			.catch(&ctx)
+			.map_err(|err| bounded.error(err))?;
+		// settle a returned promise, then drain what is left, so an async
+		// script completes and its trailing microtasks get to run.
+		let output = bounded.settle(&ctx, output)?;
+		bounded.drain_jobs(&ctx)?;
+		ctx.json_stringify(output)
+			.catch(&ctx)
+			.map_err(|err| bounded.error(err))?
+			.map(|output| output.to_string())
+			.transpose()
+			.map_err(|err| bounded.error(err))
+	})
+}
+
+/// The bridged evaluation path: [`eval_quickjs`] plus the pump that serves the
+/// script's world calls.
+async fn eval_quickjs_world<Input>(
+	script: &str,
+	input: Input,
+	limits: &ScriptLimits,
+	bridge: &WorldBridge,
+) -> Result<Option<String>>
+where
+	Input: Serialize,
+{
+	let input = encode_input(input)?;
+	let bounded = BoundedRuntime::new(limits)?;
+	// calls queue here rather than crossing a transport: the engine runs on
+	// this thread, so `__world_send_json` is a host function that hands one
+	// over and returns, leaving the promise it minted pending until the pump
+	// below answers it.
+	let queue =
+		alloc::rc::Rc::new(core::cell::RefCell::new(Vec::<String>::new()));
 
 	bounded.context.with(|ctx| {
-		let globals = ctx.globals();
-		// bind `input` by parsing the JSON encoding into a live value.
-		globals
-			.set("input", ctx.json_parse(input)?)
-			.map_err(|err| bevyhow!("quickjs: failed to bind input: {err}"))?;
-
-		// the single FFI sink the `console` prelude forwards every call to. `MutFn`
-		// wraps the `FnMut` for QuickJS's reentrant calls; the closure writes through
-		// immediately, so output streams as the script runs.
-		let mut sink = sink;
-		let write = Function::new(
-			ctx.clone(),
-			MutFn::new(move |stream: i32, msg: String| {
-				let stream = match stream {
-					1 => ConsoleStream::Stderr,
-					_ => ConsoleStream::Stdout,
-				};
-				sink(stream, &msg);
-			}),
-		)
-		.map_err(|err| bevyhow!("quickjs: bind console sink: {err}"))?;
-		globals
-			.set("__console_write", write)
-			.map_err(|err| bevyhow!("quickjs: bind console: {err}"))?;
-
-		// install the streaming `console`, then run the script. Both eval to a
-		// discarded `Value`, so a no-value statement never errors.
-		ctx.eval::<Value, _>(CONSOLE_PRELUDE)
-			.catch(&ctx)
-			.map_err(|err| bevyhow!("quickjs: console prelude: {err}"))?;
-
-		// the world bridge, installed only for a world-bridged evaluation: the
-		// engine-side hooks, then the shared shim. A plain `run` never gets here,
-		// so a pure script has no `world` to reach for.
-		let Some(seat) = seat else {
-			let output = ctx
-				.eval::<Value, _>(script)
-				.catch(&ctx)
-				.map_err(|err| bounded.error(err))?;
-			// settle a returned promise, then drain what is left, so an async
-			// script completes and its trailing microtasks get to run.
-			let output = bounded.settle(&ctx, output)?;
-			bounded.drain_jobs(&ctx)?;
-			return ctx
-				.json_stringify(output)
-				.catch(&ctx)
-				.map_err(|err| bounded.error(err))?
-				.map(|output| output.to_string())
-				.transpose()
-				.map_err(|err| bounded.error(err));
-		};
-
-		// calls queue here rather than crossing a transport: the engine runs on
-		// this thread, so `__world_send_json` is a host function that hands one
-		// over and returns, leaving the promise it minted pending until the pump
-		// below answers it.
-		let queue =
-			alloc::rc::Rc::new(core::cell::RefCell::new(Vec::<String>::new()));
+		install_prelude(&ctx, &input, ConsoleStream::log)?;
 		let sender = queue.clone();
 		let send = Function::new(
 			ctx.clone(),
 			MutFn::new(move |json: String| sender.borrow_mut().push(json)),
 		)
 		.map_err(|err| bevyhow!("quickjs: bind world sink: {err}"))?;
-		globals
+		ctx.globals()
 			.set("__world_send_json", send)
 			.map_err(|err| bevyhow!("quickjs: bind world send: {err}"))?;
-		ctx.eval::<Value, _>(WORLD_PUMP)
+		ctx.eval::<JsValue, _>(WORLD_PUMP)
 			.catch(&ctx)
 			.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?;
-		ctx.eval::<Value, _>(WORLD_SHIM)
+		ctx.eval::<JsValue, _>(WORLD_SHIM)
 			.catch(&ctx)
 			.map_err(|err| bevyhow!("quickjs: world shim: {err}"))?;
-
 		let output = ctx
-			.eval::<Value, _>(script)
+			.eval::<JsValue, _>(script)
 			.catch(&ctx)
 			.map_err(|err| bounded.error(err))?;
-		let begin = globals
+		ctx.globals()
 			.get::<_, Function>("__world_begin")
-			.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?;
-		begin
+			.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
 			.call::<_, ()>((output,))
 			.catch(&ctx)
-			.map_err(|err| bounded.error(err))?;
+			.map_err(|err| bounded.error(err))
+	})?;
 
-		let reply = globals
-			.get::<_, Function>("__world_reply")
-			.map_err(|err| bevyhow!("quickjs: world shim: {err}"))?;
-		// the pump: drain what the engine has queued, answer everything the
-		// script asked for while it drained, and repeat. A call answered here
-		// resolves a promise, which queues more work, which may ask again.
-		loop {
-			bounded.drain_jobs(&ctx)?;
-			if bounded.expired() {
-				return Err(bounded.error("serving the world bridge"));
-			}
-			let calls = core::mem::take(&mut *queue.borrow_mut());
-			if calls.is_empty() {
-				let Some(done) = globals
-					.get::<_, Option<String>>("__world_done")
-					.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
-				else {
-					// nothing pending and nothing asked for: the script is waiting
-					// on a promise nothing will ever settle.
-					return Err(bevyhow!(
-						"quickjs: the returned promise can never settle: the job queue \
-ran dry while it was still pending"
-					));
-				};
+	// the pump: drain what the engine has queued, answer everything the script
+	// asked for while it drained, and repeat. A call answered here resolves a
+	// promise, which queues more work, which may ask again. The engine is only
+	// entered between awaits, never across one.
+	loop {
+		match bounded.pump(&queue)? {
+			Pumped::Done(done) => {
 				return match serde_json::from_str::<Completion>(&done)
 					.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
 				{
@@ -430,27 +444,67 @@ ran dry while it was still pending"
 					}
 				};
 			}
-			for call in calls {
-				let answer = match serde_json::from_str::<WorldCall>(&call) {
-					Ok(call) => call.execute(seat.world, seat.exposure),
-					// the shim is the only writer, so this can only be a bug in
-					// the wire types, and it has no id to correlate.
-					Err(err) => {
-						bevybail!(
-							"quickjs: malformed world call `{call}`: {err}"
-						)
-					}
-				};
-				let answer = serde_json::to_string(&answer).map_err(|err| {
-					bevyhow!("quickjs: failed to encode world reply: {err}")
-				})?;
-				reply
-					.call::<_, ()>((ctx.json_parse(answer)?,))
-					.catch(&ctx)
-					.map_err(|err| bounded.error(err))?;
+			Pumped::Calls(calls) => {
+				for call in calls {
+					let call = serde_json::from_str::<WorldCall>(&call)
+						// the shim is the only writer, so this can only be a bug
+						// in the wire types, and it has no id to correlate.
+						.map_err(|err| {
+							bevyhow!(
+								"quickjs: malformed world call `{call}`: {err}"
+							)
+						})?;
+					let reply = bridge.serve(call).await;
+					bounded.answer(&reply)?;
+				}
 			}
 		}
-	})
+	}
+}
+
+/// `input` as the JSON encoding the engine parses it from.
+fn encode_input<Input: Serialize>(input: Input) -> Result<String> {
+	serde_json::to_string(&input)
+		.map_err(|err| bevyhow!("quickjs: failed to encode input: {err}"))
+}
+
+/// Bind the `input` global and install the streaming `console`, the two things
+/// every evaluation gets.
+fn install_prelude<Sink>(ctx: &Ctx<'_>, input: &str, sink: Sink) -> Result<()>
+where
+	Sink: 'static + FnMut(ConsoleStream, &str),
+{
+	let globals = ctx.globals();
+	// bind `input` by parsing the JSON encoding into a live value.
+	globals
+		.set("input", ctx.json_parse(input)?)
+		.map_err(|err| bevyhow!("quickjs: failed to bind input: {err}"))?;
+
+	// the single FFI sink the `console` prelude forwards every call to. `MutFn`
+	// wraps the `FnMut` for QuickJS's reentrant calls; the closure writes through
+	// immediately, so output streams as the script runs.
+	let mut sink = sink;
+	let write = Function::new(
+		ctx.clone(),
+		MutFn::new(move |stream: i32, msg: String| {
+			let stream = match stream {
+				1 => ConsoleStream::Stderr,
+				_ => ConsoleStream::Stdout,
+			};
+			sink(stream, &msg);
+		}),
+	)
+	.map_err(|err| bevyhow!("quickjs: bind console sink: {err}"))?;
+	globals
+		.set("__console_write", write)
+		.map_err(|err| bevyhow!("quickjs: bind console: {err}"))?;
+
+	// install the streaming `console`. It evals to a discarded `Value`, so a
+	// no-value statement never errors.
+	ctx.eval::<JsValue, _>(CONSOLE_PRELUDE)
+		.catch(ctx)
+		.map_err(|err| bevyhow!("quickjs: console prelude: {err}"))
+		.map(|_| ())
 }
 
 #[cfg(test)]

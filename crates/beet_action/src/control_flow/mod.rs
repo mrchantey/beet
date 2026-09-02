@@ -1,3 +1,5 @@
+mod behaviour_children;
+pub use behaviour_children::*;
 mod bypass_errors;
 mod call_on_spawn;
 mod fallback;

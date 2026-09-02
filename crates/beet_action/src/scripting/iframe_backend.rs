@@ -367,7 +367,12 @@ mod test {
 	#[beet_core::test(browser)]
 	async fn a_refused_write_is_catchable_in_the_script() {
 		let mut world = bridged_world();
-		DynamicComponents::register(&mut world, "game.Refused");
+		DynamicComponents::register(
+			&mut world,
+			"game.Refused",
+			ValueSchema::Any,
+		)
+		.unwrap();
 		let entity = world.spawn(Name::new("ada")).id();
 		world
 			.spawn((

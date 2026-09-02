@@ -16,8 +16,9 @@ the refusal and writes it onto the roll call, whose `<Log::Name>` reports it.
 -->
 <Fragment>
 	<!-- the vocabulary this document mints, kept by the scene rather than
-	expanded away, so it survives a serde round trip -->
-	<DynamicComponent name="game.Health"/>
+	expanded away, so it survives a serde round trip. The schema is what the
+	word means: every write to it is validated before it lands -->
+	<DynamicComponent name="game.Health" schema="u64"/>
 	<Sequence {CallOnReady}>
 		<DynamicScript
 			{ScriptExposure{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}

@@ -14,6 +14,12 @@
 //! script. What the script never holds is the world itself: it holds a channel,
 //! and the host decides what crosses it.
 //!
+//! Every backend serves through one [`WorldBridge`], and every operation is
+//! async: it takes exclusive world access for as long as it needs and gives it
+//! back, so a check that is legitimately asynchronous runs with nothing held.
+//! [`WorldRead`] and [`WorldWrite`] are the synchronous `&mut World` halves
+//! those sections call.
+//!
 //! ## Exposure
 //!
 //! A world-bridged script may address any component by default. A scene running
@@ -29,7 +35,11 @@
 //! [`DynamicComponent`] mints a component type with no rust definition behind
 //! it, holding a [`Value`](beet_core::prelude::Value), so a scene can add words
 //! the engine never shipped and a script can read and write them exactly as it
-//! does a registered one.
+//! does a registered one. Its
+//! [`ValueSchema`](beet_core::prelude::ValueSchema) is what the word *means*:
+//! open by default, and once declared, every write is validated against it
+//! before the value reaches the component's storage, so a rejection reaches the
+//! script as the same catchable error a refusal is.
 
 // the wire form of an entity, one pair of helpers so the format lives in one
 // place.

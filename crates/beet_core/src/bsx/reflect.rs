@@ -276,6 +276,17 @@ fn scalar_to_reflect(
 			.map(|filter| Box::new(filter) as Box<dyn PartialReflect>);
 	}
 
+	// a bare string targeting a `ValueSchema` field names the shape the field
+	// accepts, so `<DynamicComponent name=".." schema="u64"/>` declares what a
+	// runtime component means. `ValueSchema` is reflect-opaque, so this is the
+	// only way markup can build one short of a rust expression.
+	if let (Value::Str(source), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<ValueSchema>()
+	{
+		return value_schema(source.as_str())
+			.map(|schema| Box::new(schema) as Box<dyn PartialReflect>);
+	}
+
 	// a string targeting a `SmolStr` field coerces to `SmolStr`, mirroring the
 	// numeric cast above (the natural reflect type of a string is `String`).
 	if let (Value::Str(string), Some(TypeInfo::Opaque(opaque))) =
@@ -760,6 +771,50 @@ fn glob_filter<'a>(
 	filter.xok()
 }
 
+/// A [`ValueSchema`] from the one word a human means, or from a JSON Schema.
+///
+/// The markup form of a schema is its kind: `schema="u64"`. A shape with more
+/// to say than a kind is written as a JSON Schema object, which is the schema
+/// language a document author is likeliest to already know, and anything
+/// richer than that is a rust expression.
+fn value_schema(source: &str) -> Result<ValueSchema> {
+	let source = source.trim();
+	if source.starts_with('{') {
+		return json_schema(source);
+	}
+	match source {
+		"any" => ValueSchema::Any,
+		"null" => ValueSchema::Null,
+		"bool" => ValueSchema::Bool(default()),
+		"i64" => ValueSchema::I64(default()),
+		"u64" => ValueSchema::U64(default()),
+		"f64" => ValueSchema::F64(default()),
+		"string" => ValueSchema::String(default()),
+		"bytes" => ValueSchema::Bytes(default()),
+		other => bevybail!(
+			"unknown schema {other:?}: expected one of \"any\", \"null\", \
+\"bool\", \"i64\", \"u64\", \"f64\", \"string\", \"bytes\", or a JSON Schema object"
+		),
+	}
+	.xok()
+}
+
+/// A [`ValueSchema`] from one JSON Schema descriptor.
+///
+/// Not [`ValueSchema::from_json_schema`], which reads its top level as a
+/// template's *prop block*: a component's schema is one descriptor, so
+/// `{"type":"integer"}` must mean an integer rather than a prop named `type`.
+#[cfg(feature = "json")]
+fn json_schema(source: &str) -> Result<ValueSchema> {
+	ValueSchema::from_json_value(&serde_json::from_str(source)?)
+}
+
+/// Parsing a JSON schema requires the `json` feature.
+#[cfg(not(feature = "json"))]
+fn json_schema(_source: &str) -> Result<ValueSchema> {
+	bevybail!("parsing a JSON schema requires the `json` feature")
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -822,6 +877,66 @@ mod test {
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("invalid glob pattern");
+	}
+
+	/// A `ValueSchema` field takes the one word a human means, because the type
+	/// is reflect-opaque and cannot be built field by field.
+	#[crate::test]
+	fn coerces_a_kind_to_a_value_schema() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Declaration {
+			schema: ValueSchema,
+		}
+		for (source, expected) in [
+			("any", ValueSchema::Any),
+			("u64", ValueSchema::U64(default())),
+			("bytes", ValueSchema::Bytes(default())),
+		] {
+			resolve::<Declaration>(schema_literal(source))
+				.xpect_eq(Declaration { schema: expected });
+		}
+	}
+
+	/// A shape with more to say than a kind is written as a JSON Schema, which
+	/// is the schema language a document author is likeliest to already know.
+	#[crate::test]
+	fn coerces_a_json_schema_to_a_value_schema() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Declaration {
+			schema: ValueSchema,
+		}
+		resolve::<Declaration>(schema_literal(
+			r#"{"type":"array","items":{"type":"integer"}}"#,
+		))
+		.schema
+		.xpect_eq(
+			super::json_schema(
+				r#"{"type":"array","items":{"type":"integer"}}"#,
+			)
+			.unwrap(),
+		);
+	}
+
+	/// A misspelled kind names the ones that exist rather than becoming a
+	/// wildcard that quietly validates nothing.
+	#[crate::test]
+	fn an_unknown_schema_names_the_kinds() {
+		super::value_schema("uint64")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("unknown schema")
+			.xpect_contains("\"u64\"");
+	}
+
+	/// One `schema:` field, as a struct literal targeting it.
+	fn schema_literal(source: &str) -> DataLiteral {
+		DataLiteral::Enum(NamedLiteral {
+			name: "Declaration".into(),
+			fields: NamedFields::Struct(vec![(
+				"schema".into(),
+				DataLiteral::Scalar(Value::Str(source.into())),
+			)]),
+		})
 	}
 
 	fn resolve<T: FromReflect + Typed>(literal: DataLiteral) -> T {

@@ -259,11 +259,12 @@ where
 	/// Returns the script's completion value, absent when it produced none: a
 	/// leaf action ignores it, a route answers with it.
 	///
-	/// The embedded engine is synchronous, so it takes exclusive world access
-	/// once and pumps its own job queue against the `&mut World` inside; an
-	/// out-of-process backend serves each call as a round trip over its
-	/// transport. Either way the script sees one contract: an `await` is a real
-	/// operation against the world at the moment it runs.
+	/// Every backend serves its calls through one [`WorldBridge`], so there is
+	/// one contract and one executor: an `await` is a real operation against the
+	/// world at the moment it runs. What differs is only how the call reaches
+	/// the bridge: a round trip over a transport for an out-of-process backend,
+	/// a direct await for the embedded engine, which runs in a local task
+	/// because its runtime is `!Send`.
 	///
 	/// # Errors
 	/// Propagates parse, evaluation, or input-serialization errors, or names the
@@ -274,34 +275,42 @@ where
 		input: Input,
 		world: AsyncWorld,
 		exposure: ScriptExposure,
-	) -> Result<Option<serde_json::Value>> {
+	) -> Result<Option<Value>> {
 		let source = Self::async_body(&self.content);
 		let input = serde_json::to_value(input)
 			.map_err(|err| bevyhow!("failed to encode input: {err}"))?;
+		let bridge = WorldBridge::new(world, exposure);
 		cfg_if! {
 			if #[cfg(feature = "quickjs")] {
+				// the engine's runtime is `!Send`, and an `#[action]` future must
+				// be `Send`, so the whole evaluation lives in a local task and its
+				// result comes back over a oneshot. Nothing engine-shaped ever
+				// crosses one of this future's await points.
 				let limits = self.limits;
-				world
-					.with(move |world| {
-						crate::scripting::run_quickjs_world(
-							&source,
-							&input,
-							world,
-							&exposure,
-							&limits,
-						)
+				let (send, recv) = OnceValue::oneshot();
+				bridge
+					.world()
+					.clone()
+					.run_async_local(move |_| async move {
+						send.signal(
+							crate::scripting::run_quickjs_world(
+								&source, &input, &bridge, &limits,
+							)
+							.await,
+						);
 					})
-					.await
+					.await;
+				recv.wait().await
 			} else if #[cfg(feature = "std")] {
-				let bridge = WorldBridge::new(world, exposure);
 				host_backend(
 					self.request_source(source, input, true)?,
 					ConsoleStream::log,
 					Some(&bridge),
 				)
 				.await
+				.map(|value| value.map(Value::from_json))
 			} else {
-				let _ = (input, source, world, exposure);
+				let _ = (input, source, bridge);
 				no_backend()
 			}
 		}

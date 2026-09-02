@@ -16,7 +16,6 @@ use super::exchange_script::request_input;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value as JsonValue;
 
 /// A markup-friendly world-bridged route: a `path` plus a `script` that acts on
 /// the world through the `world` API.
@@ -136,13 +135,13 @@ pub async fn DynamicScriptExchangeAction(
 ///
 /// # Errors
 /// Propagates the JSON encoding failure of a non-string answer.
-fn script_response(answer: Option<JsonValue>) -> Result<Response> {
+fn script_response(answer: Option<Value>) -> Result<Response> {
 	match answer {
-		Some(JsonValue::String(text)) => {
-			Response::ok().with_media(MediaBytes::new_text(text))
+		Some(Value::Str(text)) => {
+			Response::ok().with_media(MediaBytes::new_text(text.to_string()))
 		}
 		answer => Response::ok().with_media(MediaBytes::new_json(
-			serde_json::to_string(&answer.unwrap_or(JsonValue::Null))?,
+			serde_json::to_string(&answer.unwrap_or(Value::Null))?,
 		)),
 	}
 	.xok()

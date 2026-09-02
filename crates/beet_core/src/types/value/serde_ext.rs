@@ -156,6 +156,7 @@ impl<'de> serde::Deserialize<'de> for Value {
 	}
 }
 
+pub use ser::SerError;
 /// A [`serde::Serializer`] that builds a [`Value`] directly.
 ///
 /// This exists so [`Value::from_serde`] does not have to round-trip through
@@ -171,6 +172,7 @@ mod ser {
 	use serde::Serialize;
 	use serde::ser;
 
+	/// Why a value could not be serialized into a [`Value`].
 	#[derive(Debug)]
 	pub struct SerError(String);
 	impl core::fmt::Display for SerError {
@@ -200,6 +202,7 @@ mod ser {
 		}
 	}
 
+	/// A [`serde::Serializer`] whose output is a [`Value`].
 	pub struct ValueSerializer;
 
 	impl ser::Serializer for ValueSerializer {
@@ -452,6 +455,7 @@ mod ser {
 	}
 }
 
+pub use de::DeError;
 /// A [`serde::Deserializer`] that reads a [`Value`] directly.
 ///
 /// The counterpart to [`ValueSerializer`], so [`Value::into_serde`] does not
@@ -465,6 +469,7 @@ mod de {
 	use serde::de;
 	use serde::de::IntoDeserializer;
 
+	/// Why a [`Value`] could not be deserialized into the target type.
 	#[derive(Debug)]
 	pub struct DeError(String);
 	impl core::fmt::Display for DeError {
@@ -481,10 +486,12 @@ mod de {
 
 	type DeResult<T> = core::result::Result<T, DeError>;
 
+	/// A [`serde::Deserializer`] reading from a [`Value`].
 	pub struct ValueDeserializer {
 		value: Value,
 	}
 	impl ValueDeserializer {
+		/// Read from `value`.
 		pub fn new(value: Value) -> Self { Self { value } }
 	}
 

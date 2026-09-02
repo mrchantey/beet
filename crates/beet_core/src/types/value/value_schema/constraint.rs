@@ -29,7 +29,7 @@ pub(crate) trait ApplyConstraints {
 	Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) enum ConstraintBehavior {
+pub enum ConstraintBehavior {
 	/// Emit a [`ValidationError`].
 	#[default]
 	Error,
@@ -40,7 +40,7 @@ pub(crate) enum ConstraintBehavior {
 /// An error produced by validating a [`Value`] against a [`ValueSchema`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) struct ValidationError {
+pub struct ValidationError {
 	/// The path within the root value where the error occurred.
 	pub path: FieldPath,
 	/// A human readable description of what failed.

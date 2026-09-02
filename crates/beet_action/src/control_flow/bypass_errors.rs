@@ -1,4 +1,5 @@
 //! Opt-outs from the failures control flow raises, one component per mechanism.
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bitflags::bitflags;
 
@@ -7,9 +8,54 @@ use bitflags::bitflags;
 #[reflect(Component)]
 pub struct BypassErrors(pub ChildError);
 
+impl BypassErrors {
+	/// Whether `child` serves `Action<Input, Out>`, under this policy.
+	///
+	/// `Ok(false)` is a child the policy skipped, `Err` one it did not. The
+	/// three call sites used to spell this out with three different error
+	/// constructions around the same two checks, which is how they drifted;
+	/// `node` names the caller, ie `"sequence"`.
+	///
+	/// # Errors
+	/// Errors naming the child, and what it does serve, when the policy does
+	/// not bypass its failure.
+	pub fn serves<Input, Out>(
+		&self,
+		node: &str,
+		child: Entity,
+		meta: Option<&ActionMeta>,
+	) -> Result<bool>
+	where
+		Input: 'static,
+		Out: 'static,
+	{
+		let Some(meta) = meta else {
+			if self.contains(ChildError::NO_ACTION) {
+				return Ok(false);
+			}
+			bevybail!("{node} child has no action: {child}");
+		};
+		if !meta.matches::<Input, Out>() {
+			if self.contains(ChildError::ACTION_MISMATCH) {
+				return Ok(false);
+			}
+			bevybail!(
+				"{node} child has the wrong action signature: {child}, it serves: {}",
+				meta.signatures()
+			);
+		}
+		Ok(true)
+	}
+}
+
 bitflags! {
-	/// Child error types that can occur during control-flow execution.
+	/// Why a child of a control-flow node could not serve its call.
 	/// Used with [`BypassErrors`] to selectively skip certain child issues.
+	///
+	/// Every variant is about a child that *was* a step and could not serve.
+	/// Whether something is a step at all is not this policy's question:
+	/// [`BehaviourChildren`] answers that before the policy is consulted, so
+	/// markup punctuation never appears here and there is no flag to forget.
 	#[repr(transparent)]
 	#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Reflect)]
 	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -33,6 +79,11 @@ bitflags! {
 /// An entity whose facets may all decline yet which should still park (a boot
 /// whose selection named none of them) declares the opt-out here, rather than
 /// the set second-guessing what a caller meant by an empty start.
+///
+/// Deliberately not merged with [`BypassErrors`], which reads like it: that one
+/// classifies a child *before* anything runs, structurally and all at once, and
+/// this one classifies a facet's outcome *while* it runs, one at a time. One
+/// flag set would leave each caller carrying flags that cannot arise for it.
 #[derive(Debug, Default, Clone, Copy, Deref, Reflect, Component)]
 #[reflect(Component)]
 pub struct BypassRunningErrors(pub RunningError);

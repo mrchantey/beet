@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use alloc::format;
 use beet_core::prelude::*;
 
 /// Sequence control-flow component.
@@ -40,15 +39,11 @@ impl Sequence {
 	pub fn new() -> Self { Self::default() }
 }
 
-/// Skips child entities whose [`ActionMeta`] is missing or does not
-/// [`match`](ActionMeta::matches) the expected
-/// `Action<Input, Outcome<Input, Output>>` signature.
+/// The steps of this call's caller that can serve it.
 ///
-/// Honours [`BypassErrors`]: when a flagged error is bypassed the child is
-/// dropped from the returned list, otherwise the error is propagated. A parent
-/// that skipped every one of its children raises
-/// [`NONE_VALID`](ChildError::NONE_VALID) rather than passing, so a sequence
-/// never succeeds having done nothing.
+/// One line each way to [`BehaviourChildren`], which owns both rules: markup
+/// punctuation is not a step at all, and a step the [`BypassErrors`] policy
+/// does not excuse is a failure.
 async fn valid_children<Input, Output>(
 	cx: &ActionContext<Input>,
 ) -> Result<Vec<Entity>>
@@ -56,122 +51,12 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	cx.world()
-		.run_system_cached_with(
-			collect_valid_children::<Input, Output>,
-			cx.id(),
-		)
-		.await?
-}
-
-fn collect_valid_children<Input, Output>(
-	In(caller): In<Entity>,
-	bypasses: Query<&BypassErrors>,
-	children: Query<&Children>,
-	metas: Query<&ActionMeta>,
-	punctuation: Query<(), Or<(With<Comment>, With<Doctype>)>>,
-) -> Result<Vec<Entity>>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	let bypass_errors = bypasses.get(caller).cloned().unwrap_or_default();
-	let Ok(children) = children.get(caller) else {
-		return Ok(Vec::new());
-	};
-	// markup punctuation is not a step: an author who comments a behaviour tree
-	// is annotating it, not adding a child that should have carried an action.
-	// A sequence of nothing but punctuation has no children at all, so it takes
-	// the same path a childless one does rather than reporting on zero of them.
-	let considered = children
-		.iter()
-		.filter(|child| punctuation.get(*child).is_err())
-		.collect::<Vec<_>>();
-	if considered.is_empty() {
-		return Ok(Vec::new());
-	}
-	let mut valid = Vec::with_capacity(considered.len());
-	for child in considered.iter().copied() {
-		let Ok(meta) = metas.get(child) else {
-			if bypass_errors.contains(ChildError::NO_ACTION) {
-				continue;
-			}
-			bevybail!("sequence child has no action: {child:?}");
-		};
-		if !meta.matches::<Input, Outcome<Input, Output>>() {
-			if bypass_errors.contains(ChildError::ACTION_MISMATCH) {
-				continue;
-			}
-			bevybail!(
-				"sequence child wrong action signature: {child:?}, matches: {}",
-				meta.signatures()
-			);
-		}
-		valid.push(child);
-	}
-	// a sequence that skipped every child would pass having run nothing, which
-	// on a route reads as a clean exit for work that never happened.
-	if valid.is_empty() && !bypass_errors.contains(ChildError::NONE_VALID) {
-		bevybail!(
-			"sequence {caller} skipped all {} of its children, none serve Action<{}, {}>:{}",
-			considered.len(),
-			core::any::type_name::<Input>(),
-			core::any::type_name::<Outcome<Input, Output>>(),
-			describe_children(considered.iter().copied(), &metas)
-		);
-	}
-	Ok(valid)
-}
-
-/// Why each of `children` could not serve a call, one indented line each: its
-/// action's signatures, else that it carries no action at all.
-fn describe_children(
-	children: impl Iterator<Item = Entity>,
-	metas: &Query<&ActionMeta>,
-) -> String {
-	children
-		.map(|child| match metas.get(child) {
-			Ok(meta) => format!("\n  {child}: {}", meta.signatures()),
-			Err(_) => format!("\n  {child}: no action"),
-		})
-		.collect::<String>()
-}
-
-/// Selects the first child whose [`ActionMeta`] [`matches`](ActionMeta::matches)
-/// `(Input, Out)`, the downward dispatch hop: a parent hands its call to the
-/// first child that can take it, ignoring config-only and differently-shaped
-/// children.
-///
-/// # Errors
-/// Errors when no child matches the signature, listing each child's signatures.
-pub fn first_matching_child<Input, Out>(
-	In(parent): In<Entity>,
-	children: Query<&Children>,
-	metas: Query<&ActionMeta>,
-) -> Result<Entity>
-where
-	Input: 'static,
-	Out: 'static,
-{
-	let children = children
-		.get(parent)
-		.map(Children::iter)
-		.into_iter()
-		.flatten();
-	for child in children.clone() {
-		if metas
-			.get(child)
-			.is_ok_and(|meta| meta.matches::<Input, Out>())
-		{
-			return Ok(child);
-		}
-	}
-	bevybail!(
-		"no child of {parent} matches Action<{}, {}>:{}",
-		core::any::type_name::<Input>(),
-		core::any::type_name::<Out>(),
-		describe_children(children, &metas)
+	BehaviourChildren::valid_for::<Input, Outcome<Input, Output>>(
+		&cx.world(),
+		cx.id(),
+		"sequence",
 	)
+	.await
 }
 
 /// Runs children in order, returning the first [`Outcome::Fail`] immediately.

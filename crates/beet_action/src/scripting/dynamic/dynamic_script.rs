@@ -222,7 +222,12 @@ mod test {
 	#[beet_core::test]
 	async fn a_refused_write_is_catchable_in_the_script() {
 		let mut world = world();
-		DynamicComponents::register(&mut world, "game.Refused");
+		DynamicComponents::register(
+			&mut world,
+			"game.Refused",
+			ValueSchema::Any,
+		)
+		.unwrap();
 		let entity = world.spawn(Name::new("ada")).id();
 		world
 			.spawn((
@@ -287,6 +292,195 @@ mod test {
 		.xpect_contains("no script may write");
 	}
 
+	/// The value a script left on `entity`.
+	fn read(world: &mut World, entity: Entity, ident: &str) -> Value {
+		WorldRead::get(world, entity, ident, &ScriptExposure::default())
+			.unwrap()
+			.unwrap()
+	}
+
+	/// A world with `game.Note` to record in and one named entity to work on.
+	fn world_with(declarations: [(&str, ValueSchema); 1]) -> (World, Entity) {
+		let mut world = world();
+		for (name, schema) in declarations {
+			DynamicComponents::register(&mut world, name, schema).unwrap();
+		}
+		DynamicComponents::register(&mut world, "game.Note", ValueSchema::Any)
+			.unwrap();
+		let entity = world.spawn(Name::new("ada")).id();
+		(world, entity)
+	}
+
+	/// A declared schema is a contract the bridge enforces, and a rejection is
+	/// the same catchable error an exposure refusal is: the script sees one
+	/// shape for "the host said no".
+	#[beet_core::test]
+	async fn a_declared_schema_rejects_a_non_conforming_value() {
+		let (mut world, entity) =
+			world_with([("game.Health", ValueSchema::U64(default()))]);
+		run(
+			&mut world,
+			r#"
+			const [entry] = await world.entities("Name");
+			await world.insert(entry, "game.Health", 3);
+			try {
+				await world.insert(entry, "game.Health", "three");
+			} catch (err) {
+				await world.insert(entry, "game.Note", err.message);
+			}
+			"#,
+		)
+		.await
+		.unwrap();
+		// the rejected value never reached the component's storage
+		read(&mut world, entity, "game.Health").xpect_eq(Value::Uint(3));
+		read(&mut world, entity, "game.Note")
+			.to_string()
+			.xpect_contains("`game.Health` does not accept this value");
+	}
+
+	/// The default is genuinely inert: an undeclared component takes whatever a
+	/// document field can hold, exactly as it did before schemas existed.
+	#[beet_core::test]
+	async fn an_any_schema_accepts_everything() {
+		let (mut world, entity) = world_with([("game.Loot", ValueSchema::Any)]);
+		run(
+			&mut world,
+			r#"
+			const [entry] = await world.entities("Name");
+			for (const value of [1, "sword", [1, 2], { held: true }, null]) {
+				await world.insert(entry, "game.Loot", value);
+			}
+			"#,
+		)
+		.await
+		.unwrap();
+		read(&mut world, entity, "game.Loot").xpect_eq(Value::Null);
+	}
+
+	/// A schema the world has to resolve before it can decide, which is the
+	/// case the async executor exists for: the operation reads the declaration
+	/// under one exclusive section, lets go, and only then validates.
+	#[beet_core::test]
+	async fn validates_against_a_schema_the_world_resolved() {
+		let (mut world, entity) = world_with([(
+			"game.Health",
+			ValueSchema::Reference("game.HealthValue".into()),
+		)]);
+		let mut registry = SchemaRegistry::default();
+		registry.insert("game.HealthValue", ValueSchema::U64(default()));
+		world.insert_resource(registry);
+		run(
+			&mut world,
+			r#"
+			const [entry] = await world.entities("Name");
+			await world.insert(entry, "game.Health", 3);
+			try {
+				await world.insert(entry, "game.Health", "three");
+			} catch (err) {
+				await world.insert(entry, "game.Note", err.message);
+			}
+			"#,
+		)
+		.await
+		.unwrap();
+		read(&mut world, entity, "game.Health").xpect_eq(Value::Uint(3));
+		read(&mut world, entity, "game.Note")
+			.to_string()
+			.xpect_contains("does not accept this value");
+	}
+
+	/// `world.schema` answers a runtime component with its declaration, which
+	/// is the contract every write to it is checked against.
+	#[beet_core::test]
+	async fn reads_the_declared_schema() {
+		let (mut world, entity) =
+			world_with([("game.Health", ValueSchema::U64(default()))]);
+		run(
+			&mut world,
+			r#"
+			const [entry] = await world.entities("Name");
+			const schema = await world.schema("game.Health");
+			await world.insert(entry, "game.Note", JSON.stringify(schema));
+			"#,
+		)
+		.await
+		.unwrap();
+		read(&mut world, entity, "game.Note")
+			.to_string()
+			.xpect_contains("game.Health")
+			.xpect_contains("U64");
+	}
+
+	/// JavaScript has one number type and [`Value`] has three, so what a script
+	/// reads back must be what it wrote. Pinned before any numeric schema can
+	/// act on the distinction.
+	#[beet_core::test]
+	async fn round_trips_numbers_through_a_script() {
+		let (mut world, entity) =
+			world_with([("game.Number", ValueSchema::Any)]);
+		run(
+			&mut world,
+			r#"
+			const [entry] = await world.entities("Name");
+			const sent = [0, -1, 1.5, 9007199254740992];
+			const seen = [];
+			for (const value of sent) {
+				await world.insert(entry, "game.Number", value);
+				seen.push(await world.get(entry, "game.Number"));
+			}
+			await world.insert(entry, "game.Note", { sent, seen });
+			"#,
+		)
+		.await
+		.unwrap();
+		let note = read(&mut world, entity, "game.Note");
+		let note = note.as_map().unwrap();
+		note.get("seen")
+			.unwrap()
+			.xpect_eq(note.get("sent").unwrap().clone())
+			.as_list()
+			.unwrap()
+			.xpect_eq(vec![
+				Value::Uint(0),
+				Value::Int(-1),
+				Value::Float(1.5),
+				Value::Uint(9007199254740992),
+			]);
+	}
+
+	/// A script can hold bytes. JSON has no byte type, so they cross the wire
+	/// as a list of numbers and the *destination* restores the type: a
+	/// [`Bytes`](ValueSchema::Bytes) schema coerces what arrives, so bytes read
+	/// back and written again land as the identical bytes.
+	#[beet_core::test]
+	async fn round_trips_bytes_through_a_script() {
+		let (mut world, entity) =
+			world_with([("game.Blob", ValueSchema::Bytes(default()))]);
+		run(
+			&mut world,
+			r#"
+			const [entry] = await world.entities("Name");
+			await world.insert(entry, "game.Blob", [1, 2, 3, 255]);
+			const read = await world.get(entry, "game.Blob");
+			await world.insert(entry, "game.Blob", read);
+			await world.insert(entry, "game.Note", read);
+			"#,
+		)
+		.await
+		.unwrap();
+		read(&mut world, entity, "game.Blob")
+			.xpect_eq(Value::Bytes(vec![1, 2, 3, 255]));
+		// what the script saw is the number list json can carry, which is what
+		// makes the destination-directed coercion necessary
+		read(&mut world, entity, "game.Note").xpect_eq(Value::List(vec![
+			Value::Uint(1),
+			Value::Uint(2),
+			Value::Uint(3),
+			Value::Uint(255),
+		]));
+	}
+
 	/// The bridge is opt-in surface, not ambient authority: a plain `Script` has
 	/// no `world` to reach for, on any backend.
 	#[beet_core::test]
@@ -296,6 +490,53 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq("undefined".to_string());
+	}
+
+	/// The bridge is served inside one sync point, not one call per frame.
+	///
+	/// [`AsyncPlugin`]'s `max_async_ticks_per_sync_point` drives up to 100
+	/// request/wake/poll rounds per sync point, and a bridged call is one
+	/// round, so a script making a dozen of them settles inside a single
+	/// update. Without that a `<Repeat>` over a `<DynamicScript>` would
+	/// silently become one world call per frame.
+	///
+	/// Embedded engine only: an out-of-process backend is bounded by its
+	/// transport (a process spawn, a `postMessage` round trip), not by the tick
+	/// budget, so the question this pins does not arise there.
+	#[cfg(feature = "quickjs")]
+	#[beet_core::test]
+	async fn a_dozen_calls_settle_in_one_update() {
+		let mut world = world();
+		let script = (0..12)
+			.map(|index| {
+				format!(r#"await world.spawn({{"Name":"n{index}"}});"#)
+			})
+			.collect::<Vec<_>>()
+			.join("\n");
+		let entity = world.spawn(DynamicScript::new(script)).id();
+		let (send, recv) = OnceValue::oneshot();
+		world
+			.entity_mut(entity)
+			.run_async(move |entity| async move {
+				send.signal(entity.call::<(), Outcome>(()).await);
+			});
+		let mut settled = Box::pin(recv.wait());
+		let mut updates = 0;
+		let outcome = loop {
+			world.update_local();
+			updates += 1;
+			if let Some(outcome) =
+				futures_lite::future::poll_once(&mut settled).await
+			{
+				break Some(outcome);
+			}
+			if updates == 10 {
+				break None;
+			}
+		};
+		outcome.unwrap().unwrap().xpect_eq(Outcome::PASS);
+		updates.xpect_eq(1);
+		world.query::<&Name>().iter(&world).count().xpect_eq(12);
 	}
 
 	/// The console still works alongside the bridge: installing one channel must

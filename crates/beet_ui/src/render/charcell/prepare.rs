@@ -29,7 +29,7 @@ pub(crate) fn prepare_charcell_tree<B: Component>(
 	// axis; it then carries a persistent ScrollPosition.
 	layout: Query<&LayoutStyle>,
 	has_scroll: Query<(), With<ScrollPosition>>,
-	non_visual: Query<(), Or<(With<Comment>, With<Doctype>)>>,
+	non_visual: Query<(), Punctuation>,
 ) {
 	for root in roots.iter() {
 		for entity in tree.pre_order(root) {

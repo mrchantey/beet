@@ -14,7 +14,7 @@ mod from_type_info;
 mod kinds;
 mod schema_registry;
 mod value_schema;
-pub(crate) use constraint::*;
+pub use constraint::*;
 pub use field_schema::*;
 pub use kinds::*;
 pub use schema_registry::*;

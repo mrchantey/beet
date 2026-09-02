@@ -207,7 +207,12 @@ mod test {
 	#[beet_core::test]
 	fn a_glob_reaches_a_family() {
 		let mut world = test_world();
-		DynamicComponents::register(&mut world, "guestbook.Visits");
+		DynamicComponents::register(
+			&mut world,
+			"guestbook.Visits",
+			ValueSchema::Any,
+		)
+		.unwrap();
 		ScriptExposure::new(["guestbook.*"])
 			.assert_writable(
 				&ComponentIdent::resolve(&mut world, "guestbook.Visits")

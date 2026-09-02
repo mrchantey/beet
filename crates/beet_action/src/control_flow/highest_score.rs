@@ -51,7 +51,7 @@ impl HighestScore {
 ///
 /// ## Errors
 ///
-/// Errors if the selector has no children, or a child has neither a
+/// Errors if the selector has no children to score, or a child has neither a
 /// [`ScoreProvider`] nor a [`Score`].
 #[action(default)]
 #[derive(Component)]
@@ -62,11 +62,10 @@ where
 	Input: 'static + Send + Sync + Clone,
 	Output: 'static + Send + Sync,
 {
-	let children = cx
-		.caller
-		.get(|children: &Children| children.to_vec())
-		.await
-		.map_err(|_| bevyhow!("HighestScore has no children"))?;
+	let children = BehaviourChildren::steps_for(&cx.world(), cx.id()).await;
+	if children.is_empty() {
+		bevybail!("HighestScore {} has no children to score", cx.id());
+	}
 
 	let world = cx.world().clone();
 	let input = cx.input;

@@ -7,7 +7,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::serde::TypedReflectSerializer;
-use serde_json::Value as JsonValue;
+use serde::Serialize;
 
 /// The three world reads a script can express.
 pub struct WorldRead;
@@ -23,7 +23,7 @@ impl WorldRead {
 		entity: Entity,
 		ident: &str,
 		exposure: &ScriptExposure,
-	) -> Result<Option<JsonValue>> {
+	) -> Result<Option<Value>> {
 		let ident = ComponentIdent::resolve(world, ident)?;
 		exposure.assert_readable(&ident)?;
 		let entity = world.get_entity(entity).map_err(|_| {
@@ -35,7 +35,7 @@ impl WorldRead {
 			None => entity
 				.get_by_id(ident.id)
 				.ok()
-				.map(|ptr| unsafe { ptr.deref::<Value>() }.clone().into_json())
+				.map(|ptr| unsafe { ptr.deref::<Value>() }.clone())
 				.xok(),
 			Some(type_id) => {
 				let registry = world.resource::<AppTypeRegistry>().read();
@@ -49,10 +49,14 @@ impl WorldRead {
 				let Some(value) = reflect_component.reflect(entity) else {
 					return None.xok();
 				};
-				serde_json::to_value(TypedReflectSerializer::new(
+				// straight into a `Value`, the currency the whole bridge speaks:
+				// `ValueSerializer` is a real serde data format, so a registered
+				// component needs no JSON hop to reach the wire.
+				TypedReflectSerializer::new(
 					value.as_partial_reflect(),
 					&registry,
-				))
+				)
+				.serialize(ValueSerializer)
 				.map_err(|err| {
 					bevyhow!("failed to serialize `{}`: {err}", ident.path)
 				})
@@ -69,26 +73,29 @@ impl WorldRead {
 		world: &mut World,
 		ident: &str,
 		exposure: &ScriptExposure,
-	) -> Result<JsonValue> {
+	) -> Result<Value> {
 		let ident = ComponentIdent::resolve(world, ident)?;
 		exposure.assert_readable(&ident)?;
 		QueryBuilder::<Entity>::new(world)
 			.with_id(ident.id)
 			.build()
 			.iter(world)
-			.map(|entity| JsonValue::String(entity_id::encode(entity)))
+			.map(|entity| Value::str(entity_id::encode(entity)))
 			.collect::<Vec<_>>()
-			.xmap(JsonValue::Array)
+			.xmap(Value::List)
 			.xok()
 	}
 
-	/// A loose structural description of `ident`, derived from its reflected
-	/// [`TypeInfo`].
+	/// A structural description of `ident`.
 	///
-	/// A courtesy for a script author working against vocabulary they did not
-	/// write, deliberately shallow: the kind, and one level of field names and
-	/// type paths. It is not a contract, and nothing downstream validates
-	/// against it.
+	/// The two kinds of component answer differently, and the difference is
+	/// real. A runtime component answers with the [`ValueSchema`] its
+	/// [`DynamicComponent`] declared, which *is* a contract: every write to it
+	/// is validated against exactly this. A registered component answers with a
+	/// shallow sketch of its reflected [`TypeInfo`], the kind and one level of
+	/// field names and type paths, which stays a courtesy for a script author
+	/// working against vocabulary they did not write and which nothing validates
+	/// against.
 	///
 	/// # Errors
 	/// Errors when the identifier is unknown or the exposure excludes it.
@@ -96,16 +103,19 @@ impl WorldRead {
 		world: &mut World,
 		ident: &str,
 		exposure: &ScriptExposure,
-	) -> Result<JsonValue> {
+	) -> Result<Value> {
 		let ident = ComponentIdent::resolve(world, ident)?;
 		exposure.assert_readable(&ident)?;
 		let Some(type_id) = ident.type_id else {
-			// a runtime component has no rust type behind it, and its value is
-			// whatever a document field can hold, so that is the honest answer.
-			return serde_json::json!({
-				"component": ident.path,
-				"kind": "dynamic",
-			})
+			// a runtime component's declaration is its whole definition, so its
+			// declared schema is the honest and complete answer.
+			let schema = DynamicComponents::schema_of(world, ident.id)
+				.cloned()
+				.unwrap_or(ValueSchema::Any);
+			return Self::map([
+				("component", Value::str(ident.path.as_str())),
+				("schema", Value::from_serde(&schema)?),
+			])
 			.xok();
 		};
 		let registry = world.resource::<AppTypeRegistry>().read();
@@ -114,57 +124,91 @@ impl WorldRead {
 			.ok_or_else(|| bevyhow!("`{}` left the registry", ident.path))?
 			.type_info();
 		let mut schema = Self::describe(info);
-		schema["component"] = JsonValue::String(ident.path.to_string());
+		schema
+			.as_map_mut()
+			.map_err(|err| bevyhow!("{err}"))?
+			.insert("component", ident.path.as_str());
 		schema.xok()
 	}
 
+	/// A [`Value::Map`] from its entries, the shape every description takes.
+	fn map<const N: usize>(entries: [(&str, Value); N]) -> Value {
+		let mut map = Map::default();
+		for (key, value) in entries {
+			map.insert(key, value);
+		}
+		Value::Map(map)
+	}
+
 	/// One level of structure for a reflected type.
-	fn describe(info: &TypeInfo) -> JsonValue {
-		let field = |name: String, type_path: &str| serde_json::json!({ "name": name, "type": type_path });
+	fn describe(info: &TypeInfo) -> Value {
+		let field = |name: String, type_path: &str| {
+			Self::map([
+				("name", Value::str(name)),
+				("type", Value::str(type_path)),
+			])
+		};
+		let list = |values: Vec<Value>| Value::List(values);
 		match info {
-			TypeInfo::Struct(info) => serde_json::json!({
-				"kind": "struct",
-				"fields": info
-					.iter()
-					.map(|info| field(info.name().to_string(), info.type_path()))
-					.collect::<Vec<_>>(),
-			}),
-			TypeInfo::TupleStruct(info) => serde_json::json!({
-				"kind": "tuple_struct",
-				"fields": info
-					.iter()
-					.enumerate()
-					.map(|(index, info)| field(index.to_string(), info.type_path()))
-					.collect::<Vec<_>>(),
-			}),
-			TypeInfo::Enum(info) => serde_json::json!({
-				"kind": "enum",
-				"variants": info
-					.iter()
-					.map(|variant| variant.name())
-					.collect::<Vec<_>>(),
-			}),
-			TypeInfo::List(info) => serde_json::json!({
-				"kind": "list",
-				"item": info.item_ty().path(),
-			}),
-			TypeInfo::Array(info) => serde_json::json!({
-				"kind": "array",
-				"item": info.item_ty().path(),
-				"length": info.capacity(),
-			}),
-			TypeInfo::Map(info) => serde_json::json!({
-				"kind": "map",
-				"key": info.key_ty().path(),
-				"value": info.value_ty().path(),
-			}),
-			TypeInfo::Set(info) => serde_json::json!({
-				"kind": "set",
-				"item": info.value_ty().path(),
-			}),
+			TypeInfo::Struct(info) => Self::map([
+				("kind", Value::str("struct")),
+				(
+					"fields",
+					list(
+						info.iter()
+							.map(|info| {
+								field(info.name().to_string(), info.type_path())
+							})
+							.collect(),
+					),
+				),
+			]),
+			TypeInfo::TupleStruct(info) => Self::map([
+				("kind", Value::str("tuple_struct")),
+				(
+					"fields",
+					list(
+						info.iter()
+							.enumerate()
+							.map(|(index, info)| {
+								field(index.to_string(), info.type_path())
+							})
+							.collect(),
+					),
+				),
+			]),
+			TypeInfo::Enum(info) => Self::map([
+				("kind", Value::str("enum")),
+				(
+					"variants",
+					list(
+						info.iter()
+							.map(|variant| Value::str(variant.name()))
+							.collect(),
+					),
+				),
+			]),
+			TypeInfo::List(info) => Self::map([
+				("kind", Value::str("list")),
+				("item", Value::str(info.item_ty().path())),
+			]),
+			TypeInfo::Array(info) => Self::map([
+				("kind", Value::str("array")),
+				("item", Value::str(info.item_ty().path())),
+				("length", Value::Uint(info.capacity() as u64)),
+			]),
+			TypeInfo::Map(info) => Self::map([
+				("kind", Value::str("map")),
+				("key", Value::str(info.key_ty().path())),
+				("value", Value::str(info.value_ty().path())),
+			]),
+			TypeInfo::Set(info) => Self::map([
+				("kind", Value::str("set")),
+				("item", Value::str(info.value_ty().path())),
+			]),
 			// a tuple or an opaque type (a number, a string, a `Name`) has no
 			// structure worth describing; the kind alone is the honest answer.
-			other => serde_json::json!({ "kind": Self::kind(other) }),
+			other => Self::map([("kind", Value::str(Self::kind(other)))]),
 		}
 	}
 
@@ -197,19 +241,24 @@ mod test {
 		WorldRead::get(&mut world, entity, "Name", &ScriptExposure::default())
 			.unwrap()
 			.unwrap()
-			.xpect_eq(serde_json::json!("ada"));
+			.xpect_eq(Value::from("ada"));
 	}
 
 	#[beet_core::test]
 	fn reads_a_dynamic_component() {
 		let mut world = test_world();
-		DynamicComponents::register(&mut world, "game.Health");
+		DynamicComponents::register(
+			&mut world,
+			"game.Health",
+			ValueSchema::Any,
+		)
+		.unwrap();
 		let entity = world.spawn_empty().id();
 		WorldWrite::insert(
 			&mut world,
 			entity,
 			"game.Health",
-			&serde_json::json!(3),
+			Value::Uint(3),
 			&ScriptExposure::default(),
 		)
 		.unwrap();
@@ -221,7 +270,7 @@ mod test {
 		)
 		.unwrap()
 		.unwrap()
-		.xpect_eq(serde_json::json!(3));
+		.xpect_eq(Value::Uint(3));
 	}
 
 	#[beet_core::test]
@@ -232,7 +281,7 @@ mod test {
 		world.spawn(Name::new("bob"));
 		WorldRead::entities(&mut world, "Name", &ScriptExposure::default())
 			.unwrap()
-			.as_array()
+			.as_list()
 			.unwrap()
 			.len()
 			.xpect_eq(2);
@@ -259,25 +308,46 @@ mod test {
 		WorldRead::schema(&mut world, "Name", &ScriptExposure::default())
 			.unwrap()
 			.to_string()
-			.xpect_contains(r#""component":"bevy_ecs::name::Name""#)
-			.xpect_contains(r#""kind":"#);
+			.xpect_contains("bevy_ecs::name::Name")
+			.xpect_contains("kind");
 	}
 
-	/// A runtime component has no rust type behind it, so its schema says so
-	/// rather than inventing a shape.
+	/// A runtime component's schema is its declaration, so `world.schema`
+	/// answers with the contract every write to it is checked against.
 	#[beet_core::test]
 	fn describes_a_dynamic_component() {
 		let mut world = test_world();
-		DynamicComponents::register(&mut world, "game.Health");
+		DynamicComponents::register(
+			&mut world,
+			"game.Health",
+			ValueSchema::U64(default()),
+		)
+		.unwrap();
 		WorldRead::schema(
 			&mut world,
 			"game.Health",
 			&ScriptExposure::default(),
 		)
 		.unwrap()
-		.xpect_eq(serde_json::json!({
-			"component": "game.Health",
-			"kind": "dynamic",
-		}));
+		.xpect_eq(WorldRead::map([
+			("component", Value::str("game.Health")),
+			(
+				"schema",
+				Value::from_serde(&ValueSchema::U64(default())).unwrap(),
+			),
+		]));
+	}
+
+	/// An undeclared runtime component is `Any`, so its schema says so rather
+	/// than pretending to a shape.
+	#[beet_core::test]
+	fn an_undeclared_dynamic_component_is_any() {
+		let mut world = test_world();
+		DynamicComponents::register(&mut world, "game.Loot", ValueSchema::Any)
+			.unwrap();
+		WorldRead::schema(&mut world, "game.Loot", &ScriptExposure::default())
+			.unwrap()
+			.to_string()
+			.xpect_contains("Any");
 	}
 }

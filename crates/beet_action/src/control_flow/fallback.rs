@@ -14,9 +14,6 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// Which child errors to skip rather than propagate.
-	/// Defaults to [`ChildError::empty`].
-	bypass_errors: ChildError,
 	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
@@ -28,7 +25,6 @@ where
 {
 	fn clone(&self) -> Self {
 		Self {
-			bypass_errors: self.bypass_errors,
 			_marker: PhantomData,
 		}
 	}
@@ -47,7 +43,6 @@ where
 {
 	fn default() -> Self {
 		Self {
-			bypass_errors: ChildError::empty(),
 			_marker: PhantomData,
 		}
 	}
@@ -57,15 +52,9 @@ impl Fallback<(), ()> {
 	pub fn new() -> Self { Self::default() }
 }
 
-impl<Input, Output> Fallback<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-}
 /// Try children in order, returning the first pass or final fail.
 ///
-/// Child error handling is controlled by [`Fallback::bypass_errors`].
+/// Child error handling is controlled by [`BypassErrors`].
 ///
 /// ## Errors
 ///
@@ -81,52 +70,18 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	let bypass_errors = cx
-		.caller
-		.get_cloned::<BypassErrors>()
-		.await
-		.unwrap_or_default();
 	let children =
-		match cx.caller.get(|children: &Children| children.to_vec()).await {
-			Ok(children) => children,
-			Err(_) => {
-				// entity has no children, fail returning the input
-				return Ok(Outcome::Fail(cx.input));
-			}
-		};
+		BehaviourChildren::valid_for::<Input, Outcome<Output, Input>>(
+			&cx.world(),
+			cx.id(),
+			"fallback",
+		)
+		.await?;
 
 	let world = cx.world().clone();
 	let mut input = cx.input;
 
 	for child in children {
-		let action_meta_result = world
-			.entity(child)
-			.get(|meta: &ActionMeta| meta.clone())
-			.await;
-
-		let action_meta = match action_meta_result {
-			Ok(action_meta) => action_meta,
-			Err(child_error) => {
-				if bypass_errors.contains(ChildError::NO_ACTION) {
-					continue;
-				}
-				bevybail!(
-					"fallback child has no action: {child:?}, error: {child_error}"
-				);
-			}
-		};
-
-		if let Err(mismatch_error) =
-			action_meta.assert_match::<Input, Outcome<Output, Input>>()
-		{
-			if bypass_errors.contains(ChildError::ACTION_MISMATCH) {
-				continue;
-			}
-			bevybail!(
-				"fallback child has incorrect action signature: {child:?}, error: {mismatch_error}"
-			);
-		}
-
 		match world
 			.entity(child)
 			.call::<Input, Outcome<Output, Input>>(input)

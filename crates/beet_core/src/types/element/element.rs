@@ -51,6 +51,15 @@ impl Element {
 	}
 }
 
+/// A query filter matching markup punctuation: a node the document carries for
+/// the reader, never for the behaviour or the layout.
+///
+/// One name for the rule, so a walker that has to skip a `<!-- -->` and a
+/// `<!DOCTYPE html>` says which nodes it means rather than open-coding the
+/// pair. Used by layout (a comment has no box) and by control flow (a comment
+/// is not a step).
+pub type Punctuation = Or<(With<Comment>, With<Doctype>)>;
+
 /// A comment node. The inner string is the comment content excluding the
 /// `<!--` and `-->` delimiters.
 #[derive(
