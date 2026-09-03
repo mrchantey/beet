@@ -6,8 +6,8 @@
 //! block, a schema document) beside reflect-derived ones: one namespace, because
 //! an authored schema and a reflect-derived one are the same kind of thing.
 //!
-//! Identity is the **full** key: a Rust type path, a template module path, or an
-//! authored name. A short name is display and authoring sugar, indexed as an
+//! Identity is the **full** key: a Rust type path, a template module path, an
+//! authored name, or the store path of a schema document that declares no name. A short name is display and authoring sugar, indexed as an
 //! alias; a short name several full keys share is ambiguous, diagnosed where the
 //! collision is created and resolving to nothing rather than to whichever
 //! registered first.
@@ -34,8 +34,10 @@ pub struct SchemaRegistry {
 	/// Short name to every full key ending in it. One key resolves, several are
 	/// a collision.
 	aliases: HashMap<SmolStr, Vec<SmolStr>>,
-	/// Schemas resolved by location: a schema document's store path.
-	located: HashMap<SmolPath, ValueSchema>,
+	/// A schema document's store path, to the key its schema is stored under.
+	/// A pointer into `schemas` rather than a second copy, so the by-name and
+	/// by-location views of one schema can never disagree.
+	located: HashMap<SmolPath, SmolStr>,
 }
 
 impl Default for SchemaRegistry {
@@ -89,25 +91,29 @@ impl SchemaRegistry {
 	/// Register the schema of the schema document at `path`, the by-location
 	/// index a [`FieldSchema::Document`] resolves through.
 	///
-	/// Also registered by **name** when the schema names itself, which is how an
-	/// authored schema joins the one namespace beside the reflect-derived ones:
-	/// a `Reference("TodoItem")` in a document that only composes it then
-	/// resolves, and a second document declaring the same name collides loudly
-	/// rather than first-wins.
+	/// The schema is stored **once**, in the one by-name namespace, under the
+	/// name it declares for itself or, declaring none, under `path`; the
+	/// by-location index holds that key alone. So an authored schema joins the
+	/// namespace beside the reflect-derived ones (a `Reference("TodoItem")` in a
+	/// document that only composes the row schema resolves to it), and editing
+	/// it by either route is what the other route then reads.
 	pub fn insert_located(
 		&mut self,
 		path: impl Into<SmolPath>,
 		schema: ValueSchema,
 	) {
-		if let Some(name) = schema.name() {
-			self.insert(name.clone(), schema.clone());
-		}
-		self.located.insert(path.into(), schema);
+		let path = path.into();
+		let key = match schema.name() {
+			Some(name) => name.clone(),
+			None => SmolStr::from(path.as_str()),
+		};
+		self.insert(key.clone(), schema);
+		self.located.insert(path, key);
 	}
 
 	/// The schema of the schema document at `path`, if it has arrived.
 	pub fn located(&self, path: &SmolPath) -> Option<&ValueSchema> {
-		self.located.get(path)
+		self.located.get(path).and_then(|key| self.schemas.get(key))
 	}
 
 	/// The raw (still-referencing) schema registered under `name`, matching the
@@ -276,6 +282,18 @@ mod test {
 	#[derive(Reflect)]
 	struct Count(#[allow(dead_code)] u32);
 
+	/// `{ label: String }`, an authored schema that names itself.
+	fn todo_item() -> ValueSchema {
+		ValueSchema::Struct(StructSchema {
+			name: Some("TodoItem".into()),
+			allow_additional: false,
+			fields: vec![NamedFieldSchema::new(
+				"label",
+				ValueSchema::String(default()),
+			)],
+		})
+	}
+
 	#[crate::test]
 	fn resolves_a_reference() {
 		let mut registry = SchemaRegistry::default();
@@ -380,35 +398,34 @@ mod test {
 			.xpect_true();
 	}
 
-	/// By-location resolution sits beside the name namespace, so a store path
-	/// can never shadow a name.
+	/// A schema document that names itself joins the by-name namespace, so a
+	/// document composing it by reference resolves without knowing where it is
+	/// stored. One declaring no name is keyed by its path instead.
 	#[crate::test]
-	fn a_located_schema_is_its_own_namespace() {
+	fn a_schema_document_is_keyed_by_its_name_or_its_path() {
 		let mut registry = SchemaRegistry::default();
-		registry.insert_located("schema/todo.json", ValueSchema::of::<i64>());
-		registry.get("schema/todo.json").is_none().xpect_true();
+		registry.insert_located("schema/todo.json", todo_item());
+		registry.get("TodoItem").unwrap().xpect_eq(todo_item());
+
+		registry.insert_located("schema/count.json", ValueSchema::of::<i64>());
 		registry
-			.located(&SmolPath::from("schema/todo.json"))
+			.get("schema/count.json")
 			.unwrap()
 			.xpect_eq(ValueSchema::of::<i64>());
 	}
 
-	/// A schema document that names itself joins the by-name namespace too, so
-	/// a document composing it by reference resolves without knowing where it
-	/// is stored.
+	/// The by-location index points at the one stored schema rather than
+	/// holding a copy, so editing it by name is what a read by location sees.
 	#[crate::test]
-	fn a_named_schema_document_joins_the_namespace() {
+	fn a_located_schema_is_stored_once() {
 		let mut registry = SchemaRegistry::default();
-		let schema = ValueSchema::Struct(StructSchema {
-			name: Some("TodoItem".into()),
-			allow_additional: false,
-			fields: vec![NamedFieldSchema::new(
-				"label",
-				ValueSchema::String(default()),
-			)],
-		});
-		registry.insert_located("schema/todo.json", schema.clone());
-		registry.get("TodoItem").unwrap().xpect_eq(schema);
+		let path = SmolPath::from("schema/todo.json");
+		registry.insert_located(path.clone(), todo_item());
+		registry.insert("TodoItem", ValueSchema::of::<i64>());
+		registry
+			.located(&path)
+			.unwrap()
+			.xpect_eq(ValueSchema::of::<i64>());
 	}
 
 	/// A self-referential Rust type lowers to a reference by short type path,

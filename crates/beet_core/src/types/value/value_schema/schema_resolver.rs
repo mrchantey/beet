@@ -78,8 +78,8 @@ impl<'a> SchemaResolver<'a> {
 
 	/// The schema of the schema document at `path`, once it has arrived.
 	///
-	/// Resolution by *location*, which sits beside the name namespace rather
-	/// than inside it, so a store path can never shadow a schema name.
+	/// Resolution by *location*: a second way in to the one stored schema, not
+	/// a second copy of it.
 	pub fn located(&self, path: &SmolPath) -> Option<&'a ValueSchema> {
 		self.schemas?.located(path)
 	}
