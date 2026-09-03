@@ -78,15 +78,22 @@ pub fn DynamicForm(
 	}
 }
 
-/// Marks a [`DynamicForm`] leaf whose schema has no editing widget, carrying
-/// the schema that found none.
+/// Marks a [`DynamicForm`] leaf whose schema has no editing widget, naming the
+/// kind that found none (`"List"`, `"Entity"`, an unresolved `"Reference"`).
 ///
 /// The leaf still renders, read-only, so a form keeps its shape with only the
-/// editing missing — the same bargain an unregistered tag strikes. The gap is
-/// announced once, where it is built.
+/// editing missing — the same bargain an unregistered tag strikes. The mark sits
+/// on the bound leaf itself, so one `(&FieldRef, &UneditableField)` query
+/// answers both which leaves lost their control and where each one binds.
+///
+/// It carries the *kind*, not the schema. A `#[template]` expands away at build,
+/// so nothing survives it holding the schema this form walked, and a copy here
+/// would be an unowned second one; the authoritative per-leaf schema arrives
+/// from the document side instead, seeded onto every bound field by
+/// `sync_schema` from the document's own [`DocumentSchema`].
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub struct UneditableField(pub ValueSchema);
+pub struct UneditableField(pub SmolStr);
 
 /// `(min, max, step)` as `f64` from a numeric schema's constraints, the last of
 /// each kind winning. A macro because the three numeric schemas share the shape
@@ -281,25 +288,21 @@ fn struct_field<'a>(
 	.any_snippet()
 }
 
-/// The read-only leaf for a schema with no control: the value is shown but not
-/// editable, and the gap is announced where it is built.
-///
-/// The one place the walk clones: a [`Component`] is owned `'static` data, so
-/// [`UneditableField`] cannot borrow the schema the rest of the dispatch reads
-/// in place.
+/// The read-only leaf for a schema with no control: a bound text node, so the
+/// value still shows but nothing can type into it (a text node carries no
+/// element, so the focus path cannot reach it). The gap is announced where it is
+/// built and marked where it landed.
 fn uneditable(
 	schema: &ValueSchema,
 	field: FieldRef,
 	label: Option<String>,
 ) -> Snippet {
+	let kind = schema.variant_name();
 	warn!(
-		"DynamicForm: no control edits a `{}` field at `{}`, rendering it read-only",
-		schema.variant_name(),
+		"DynamicForm: no control edits a `{kind}` field at `{}`, rendering it read-only",
 		field.field_path
 	);
-	labeled(label, rsx! {
-		<span {UneditableField(schema.clone())}>{field}</span>
-	})
+	labeled(label, (field, UneditableField(SmolStr::new_static(kind))))
 }
 
 /// Wrap a control in a `<label>` row (the key above its value, per the form
@@ -400,6 +403,7 @@ mod test {
 			ValueSchema::Any,
 			ValueSchema::Reference("NotRegistered".into()),
 		] {
+			let kind = schema.variant_name();
 			let mut world = world_ext::ui_world();
 			let root = world
 				.spawn_template(rsx! {
@@ -407,11 +411,16 @@ mod test {
 				})
 				.unwrap()
 				.id();
+			world.update_local();
+			// the mark names the kind and sits on the leaf that binds
 			world
-				.query_once::<&UneditableField>()
+				.query_once::<(&FieldRef, &UneditableField)>()
 				.into_iter()
-				.count()
-				.xpect_eq(1);
+				.map(|(field, mark)| {
+					(field.field_path.to_string(), mark.0.to_string())
+				})
+				.collect::<Vec<_>>()
+				.xpect_eq(vec![("field".to_string(), kind.to_string())]);
 			let html = test_ext::render_world(&mut world, root);
 			html.clone().xnot().xpect_contains("<input");
 			html.xnot().xpect_contains("<textarea");
